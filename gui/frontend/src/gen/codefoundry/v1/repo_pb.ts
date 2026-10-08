@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/repo.proto.
  */
 export const file_codefoundry_v1_repo: GenFile = /*@__PURE__*/
-  fileDesc("Chljb2RlZm91bmRyeS92MS9yZXBvLnByb3RvEg5jb2RlZm91bmRyeS52MSLKAQoEUmVwbxIKCgJpZBgBIAEoCRIMCgRwYXRoGAIgASgJEgwKBG5hbWUYAyABKAkSFgoOZGVmYXVsdF9icmFuY2gYBCABKAkSEwoLZ2l0aHViX3NsdWcYBSABKAkSKwoJd29ya3RyZWVzGAYgAygLMhguY29kZWZvdW5kcnkudjEuV29ya3RyZWUSMQoNcmVnaXN0ZXJlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDQoFZXJyb3IYCCABKAkilQEKCFdvcmt0cmVlEg8KB3JlcG9faWQYASABKAkSDAoEcGF0aBgCIAEoCRIOCgZicmFuY2gYAyABKAkSDAoEaGVhZBgEIAEoCRIPCgdpc19tYWluGAUgASgIEikKBnN0YXR1cxgGIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkdpdFN0YXR1cxIQCghkZXRhY2hlZBgHIAEoCCKQAgoJR2l0U3RhdHVzEhAKCHVwc3RyZWFtGAEgASgJEg0KBWFoZWFkGAIgASgFEg4KBmJlaGluZBgDIAEoBRIOCgZzdGFnZWQYBCABKAUSEAoIbW9kaWZpZWQYBSABKAUSEQoJdW50cmFja2VkGAYgASgFEg0KBWRpcnR5GAcgASgIEjAKDHJlZnJlc2hlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEgoKY29uZmxpY3RlZBgJIAEoBRIQCghiYXNlX3JlZhgKIAEoCRISCgpiYXNlX2FoZWFkGAsgASgFEhMKC2Jhc2VfYmVoaW5kGAwgASgFEg0KBWVycm9yGA0gASgJIiMKE1JlZ2lzdGVyUmVwb1JlcXVlc3QSDAoEcGF0aBgBIAEoCSI6ChRSZWdpc3RlclJlcG9SZXNwb25zZRIiCgRyZXBvGAEgASgLMhQuY29kZWZvdW5kcnkudjEuUmVwbyIjChVVbnJlZ2lzdGVyUmVwb1JlcXVlc3QSCgoCaWQYASABKAkiGAoWVW5yZWdpc3RlclJlcG9SZXNwb25zZSISChBMaXN0UmVwb3NSZXF1ZXN0IjgKEUxpc3RSZXBvc1Jlc3BvbnNlEiMKBXJlcG9zGAEgAygLMhQuY29kZWZvdW5kcnkudjEuUmVwbyIcCg5HZXRSZXBvUmVxdWVzdBIKCgJpZBgBIAEoCSI1Cg9HZXRSZXBvUmVzcG9uc2USIgoEcmVwbxgBIAEoCzIULmNvZGVmb3VuZHJ5LnYxLlJlcG8iWAoVQ3JlYXRlV29ya3RyZWVSZXF1ZXN0Eg8KB3JlcG9faWQYASABKAkSDgoGYnJhbmNoGAIgASgJEhAKCGJhc2VfcmVmGAMgASgJEgwKBHBhdGgYBCABKAkiRAoWQ3JlYXRlV29ya3RyZWVSZXNwb25zZRIqCgh3b3JrdHJlZRgBIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLldvcmt0cmVlIlwKFVJlbW92ZVdvcmt0cmVlUmVxdWVzdBIPCgdyZXBvX2lkGAEgASgJEgwKBHBhdGgYAiABKAkSFQoNZGVsZXRlX2JyYW5jaBgDIAEoCBINCgVmb3JjZRgEIAEoCCIYChZSZW1vdmVXb3JrdHJlZVJlc3BvbnNlIiAKElJlZnJlc2hSZXBvUmVxdWVzdBIKCgJpZBgBIAEoCSIVChNSZWZyZXNoUmVwb1Jlc3BvbnNlIhMKEVdhdGNoUmVwb3NSZXF1ZXN0IswBCglSZXBvRXZlbnQSLAoMcmVwb191cGRhdGVkGAEgASgLMhQuY29kZWZvdW5kcnkudjEuUmVwb0gAEhkKD3JlcG9fcmVtb3ZlZF9pZBgCIAEoCUgAEjQKEHdvcmt0cmVlX3VwZGF0ZWQYAyABKAsyGC5jb2RlZm91bmRyeS52MS5Xb3JrdHJlZUgAEjcKEHdvcmt0cmVlX3JlbW92ZWQYBCABKAsyGy5jb2RlZm91bmRyeS52MS5Xb3JrdHJlZVJlZkgAQgcKBWV2ZW50IiwKC1dvcmt0cmVlUmVmEg8KB3JlcG9faWQYASABKAkSDAoEcGF0aBgCIAEoCTLFBQoLUmVwb1NlcnZpY2USVwoIUmVnaXN0ZXISIy5jb2RlZm91bmRyeS52MS5SZWdpc3RlclJlcG9SZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuUmVnaXN0ZXJSZXBvUmVzcG9uc2UiABJdCgpVbnJlZ2lzdGVyEiUuY29kZWZvdW5kcnkudjEuVW5yZWdpc3RlclJlcG9SZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuVW5yZWdpc3RlclJlcG9SZXNwb25zZSIAEk0KBExpc3QSIC5jb2RlZm91bmRyeS52MS5MaXN0UmVwb3NSZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuTGlzdFJlcG9zUmVzcG9uc2UiABJICgNHZXQSHi5jb2RlZm91bmRyeS52MS5HZXRSZXBvUmVxdWVzdBofLmNvZGVmb3VuZHJ5LnYxLkdldFJlcG9SZXNwb25zZSIAEmEKDkNyZWF0ZVdvcmt0cmVlEiUuY29kZWZvdW5kcnkudjEuQ3JlYXRlV29ya3RyZWVSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuQ3JlYXRlV29ya3RyZWVSZXNwb25zZSIAEmEKDlJlbW92ZVdvcmt0cmVlEiUuY29kZWZvdW5kcnkudjEuUmVtb3ZlV29ya3RyZWVSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuUmVtb3ZlV29ya3RyZWVSZXNwb25zZSIAElQKB1JlZnJlc2gSIi5jb2RlZm91bmRyeS52MS5SZWZyZXNoUmVwb1JlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5SZWZyZXNoUmVwb1Jlc3BvbnNlIgASSQoFV2F0Y2gSIS5jb2RlZm91bmRyeS52MS5XYXRjaFJlcG9zUmVxdWVzdBoZLmNvZGVmb3VuZHJ5LnYxLlJlcG9FdmVudCIAMAFCvgEKEmNvbS5jb2RlZm91bmRyeS52MUIJUmVwb1Byb3RvUAFaRGdpdGh1Yi5jb20vYXdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
+  fileDesc("Chljb2RlZm91bmRyeS92MS9yZXBvLnByb3RvEg5jb2RlZm91bmRyeS52MSLKAQoEUmVwbxIKCgJpZBgBIAEoCRIMCgRwYXRoGAIgASgJEgwKBG5hbWUYAyABKAkSFgoOZGVmYXVsdF9icmFuY2gYBCABKAkSEwoLZ2l0aHViX3NsdWcYBSABKAkSKwoJd29ya3RyZWVzGAYgAygLMhguY29kZWZvdW5kcnkudjEuV29ya3RyZWUSMQoNcmVnaXN0ZXJlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDQoFZXJyb3IYCCABKAkilQEKCFdvcmt0cmVlEg8KB3JlcG9faWQYASABKAkSDAoEcGF0aBgCIAEoCRIOCgZicmFuY2gYAyABKAkSDAoEaGVhZBgEIAEoCRIPCgdpc19tYWluGAUgASgIEikKBnN0YXR1cxgGIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkdpdFN0YXR1cxIQCghkZXRhY2hlZBgHIAEoCCKQAgoJR2l0U3RhdHVzEhAKCHVwc3RyZWFtGAEgASgJEg0KBWFoZWFkGAIgASgFEg4KBmJlaGluZBgDIAEoBRIOCgZzdGFnZWQYBCABKAUSEAoIbW9kaWZpZWQYBSABKAUSEQoJdW50cmFja2VkGAYgASgFEg0KBWRpcnR5GAcgASgIEjAKDHJlZnJlc2hlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEgoKY29uZmxpY3RlZBgJIAEoBRIQCghiYXNlX3JlZhgKIAEoCRISCgpiYXNlX2FoZWFkGAsgASgFEhMKC2Jhc2VfYmVoaW5kGAwgASgFEg0KBWVycm9yGA0gASgJIiMKE1JlZ2lzdGVyUmVwb1JlcXVlc3QSDAoEcGF0aBgBIAEoCSI6ChRSZWdpc3RlclJlcG9SZXNwb25zZRIiCgRyZXBvGAEgASgLMhQuY29kZWZvdW5kcnkudjEuUmVwbyIjChVVbnJlZ2lzdGVyUmVwb1JlcXVlc3QSCgoCaWQYASABKAkiGAoWVW5yZWdpc3RlclJlcG9SZXNwb25zZSISChBMaXN0UmVwb3NSZXF1ZXN0IjgKEUxpc3RSZXBvc1Jlc3BvbnNlEiMKBXJlcG9zGAEgAygLMhQuY29kZWZvdW5kcnkudjEuUmVwbyIcCg5HZXRSZXBvUmVxdWVzdBIKCgJpZBgBIAEoCSI1Cg9HZXRSZXBvUmVzcG9uc2USIgoEcmVwbxgBIAEoCzIULmNvZGVmb3VuZHJ5LnYxLlJlcG8iWAoVQ3JlYXRlV29ya3RyZWVSZXF1ZXN0Eg8KB3JlcG9faWQYASABKAkSDgoGYnJhbmNoGAIgASgJEhAKCGJhc2VfcmVmGAMgASgJEgwKBHBhdGgYBCABKAkiRAoWQ3JlYXRlV29ya3RyZWVSZXNwb25zZRIqCgh3b3JrdHJlZRgBIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLldvcmt0cmVlIlwKFVJlbW92ZVdvcmt0cmVlUmVxdWVzdBIPCgdyZXBvX2lkGAEgASgJEgwKBHBhdGgYAiABKAkSFQoNZGVsZXRlX2JyYW5jaBgDIAEoCBINCgVmb3JjZRgEIAEoCCIYChZSZW1vdmVXb3JrdHJlZVJlc3BvbnNlIiAKElJlZnJlc2hSZXBvUmVxdWVzdBIKCgJpZBgBIAEoCSIVChNSZWZyZXNoUmVwb1Jlc3BvbnNlIhMKEVdhdGNoUmVwb3NSZXF1ZXN0Iv4BCglSZXBvRXZlbnQSLAoMcmVwb191cGRhdGVkGAEgASgLMhQuY29kZWZvdW5kcnkudjEuUmVwb0gAEhkKD3JlcG9fcmVtb3ZlZF9pZBgCIAEoCUgAEjQKEHdvcmt0cmVlX3VwZGF0ZWQYAyABKAsyGC5jb2RlZm91bmRyeS52MS5Xb3JrdHJlZUgAEjcKEHdvcmt0cmVlX3JlbW92ZWQYBCABKAsyGy5jb2RlZm91bmRyeS52MS5Xb3JrdHJlZVJlZkgAEjAKCHNuYXBzaG90GAUgASgLMhwuY29kZWZvdW5kcnkudjEuUmVwb1NuYXBzaG90SABCBwoFZXZlbnQiMwoMUmVwb1NuYXBzaG90EiMKBXJlcG9zGAEgAygLMhQuY29kZWZvdW5kcnkudjEuUmVwbyIsCgtXb3JrdHJlZVJlZhIPCgdyZXBvX2lkGAEgASgJEgwKBHBhdGgYAiABKAkyxQUKC1JlcG9TZXJ2aWNlElcKCFJlZ2lzdGVyEiMuY29kZWZvdW5kcnkudjEuUmVnaXN0ZXJSZXBvUmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLlJlZ2lzdGVyUmVwb1Jlc3BvbnNlIgASXQoKVW5yZWdpc3RlchIlLmNvZGVmb3VuZHJ5LnYxLlVucmVnaXN0ZXJSZXBvUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLlVucmVnaXN0ZXJSZXBvUmVzcG9uc2UiABJNCgRMaXN0EiAuY29kZWZvdW5kcnkudjEuTGlzdFJlcG9zUmVxdWVzdBohLmNvZGVmb3VuZHJ5LnYxLkxpc3RSZXBvc1Jlc3BvbnNlIgASSAoDR2V0Eh4uY29kZWZvdW5kcnkudjEuR2V0UmVwb1JlcXVlc3QaHy5jb2RlZm91bmRyeS52MS5HZXRSZXBvUmVzcG9uc2UiABJhCg5DcmVhdGVXb3JrdHJlZRIlLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZVdvcmt0cmVlUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZVdvcmt0cmVlUmVzcG9uc2UiABJhCg5SZW1vdmVXb3JrdHJlZRIlLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVdvcmt0cmVlUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVdvcmt0cmVlUmVzcG9uc2UiABJUCgdSZWZyZXNoEiIuY29kZWZvdW5kcnkudjEuUmVmcmVzaFJlcG9SZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuUmVmcmVzaFJlcG9SZXNwb25zZSIAEkkKBVdhdGNoEiEuY29kZWZvdW5kcnkudjEuV2F0Y2hSZXBvc1JlcXVlc3QaGS5jb2RlZm91bmRyeS52MS5SZXBvRXZlbnQiADABQr4BChJjb20uY29kZWZvdW5kcnkudjFCCVJlcG9Qcm90b1ABWkRnaXRodWIuY29tL2F3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.Repo
@@ -472,9 +472,10 @@ export const RefreshRepoResponseSchema: GenMessage<RefreshRepoResponse> = /*@__P
   messageDesc(file_codefoundry_v1_repo, 16);
 
 /**
- * Watch first replays the current state as one repo_updated event per repository, then
- * streams live changes. Events are ordered: each reflects the snapshot at the moment it
- * was published. repo_updated replaces the whole repo, including its worktree list.
+ * The first event of every Watch stream is a snapshot of all repositories; live changes
+ * follow in publish order, each carrying the full state of what changed. A client
+ * replaces its whole state on every snapshot event (the daemon sends another one if the
+ * client fell behind and events were dropped) and applies the other events in order.
  *
  * @generated from message codefoundry.v1.WatchReposRequest
  */
@@ -497,6 +498,8 @@ export type RepoEvent = Message<"codefoundry.v1.RepoEvent"> & {
    */
   event: {
     /**
+     * Replaces the repo, including its worktree list.
+     *
      * @generated from field: codefoundry.v1.Repo repo_updated = 1;
      */
     value: Repo;
@@ -509,6 +512,8 @@ export type RepoEvent = Message<"codefoundry.v1.RepoEvent"> & {
     case: "repoRemovedId";
   } | {
     /**
+     * Replaces one worktree of an already known repo.
+     *
      * @generated from field: codefoundry.v1.Worktree worktree_updated = 3;
      */
     value: Worktree;
@@ -519,6 +524,14 @@ export type RepoEvent = Message<"codefoundry.v1.RepoEvent"> & {
      */
     value: WorktreeRef;
     case: "worktreeRemoved";
+  } | {
+    /**
+     * Replaces everything.
+     *
+     * @generated from field: codefoundry.v1.RepoSnapshot snapshot = 5;
+     */
+    value: RepoSnapshot;
+    case: "snapshot";
   } | { case: undefined; value?: undefined };
 };
 
@@ -528,6 +541,23 @@ export type RepoEvent = Message<"codefoundry.v1.RepoEvent"> & {
  */
 export const RepoEventSchema: GenMessage<RepoEvent> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_repo, 18);
+
+/**
+ * @generated from message codefoundry.v1.RepoSnapshot
+ */
+export type RepoSnapshot = Message<"codefoundry.v1.RepoSnapshot"> & {
+  /**
+   * @generated from field: repeated codefoundry.v1.Repo repos = 1;
+   */
+  repos: Repo[];
+};
+
+/**
+ * Describes the message codefoundry.v1.RepoSnapshot.
+ * Use `create(RepoSnapshotSchema)` to create a new message.
+ */
+export const RepoSnapshotSchema: GenMessage<RepoSnapshot> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_repo, 19);
 
 /**
  * @generated from message codefoundry.v1.WorktreeRef
@@ -549,7 +579,7 @@ export type WorktreeRef = Message<"codefoundry.v1.WorktreeRef"> & {
  * Use `create(WorktreeRefSchema)` to create a new message.
  */
 export const WorktreeRefSchema: GenMessage<WorktreeRef> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_repo, 19);
+  messageDesc(file_codefoundry_v1_repo, 20);
 
 /**
  * RepoService tracks registered git repositories, their worktrees, and git status.

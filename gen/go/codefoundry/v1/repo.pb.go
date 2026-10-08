@@ -1002,9 +1002,10 @@ func (*RefreshRepoResponse) Descriptor() ([]byte, []int) {
 	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{16}
 }
 
-// Watch first replays the current state as one repo_updated event per repository, then
-// streams live changes. Events are ordered: each reflects the snapshot at the moment it
-// was published. repo_updated replaces the whole repo, including its worktree list.
+// The first event of every Watch stream is a snapshot of all repositories; live changes
+// follow in publish order, each carrying the full state of what changed. A client
+// replaces its whole state on every snapshot event (the daemon sends another one if the
+// client fell behind and events were dropped) and applies the other events in order.
 type WatchReposRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1049,6 +1050,7 @@ type RepoEvent struct {
 	//	*RepoEvent_RepoRemovedId
 	//	*RepoEvent_WorktreeUpdated
 	//	*RepoEvent_WorktreeRemoved
+	//	*RepoEvent_Snapshot
 	Event         isRepoEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1127,11 +1129,21 @@ func (x *RepoEvent) GetWorktreeRemoved() *WorktreeRef {
 	return nil
 }
 
+func (x *RepoEvent) GetSnapshot() *RepoSnapshot {
+	if x != nil {
+		if x, ok := x.Event.(*RepoEvent_Snapshot); ok {
+			return x.Snapshot
+		}
+	}
+	return nil
+}
+
 type isRepoEvent_Event interface {
 	isRepoEvent_Event()
 }
 
 type RepoEvent_RepoUpdated struct {
+	// Replaces the repo, including its worktree list.
 	RepoUpdated *Repo `protobuf:"bytes,1,opt,name=repo_updated,json=repoUpdated,proto3,oneof"`
 }
 
@@ -1140,11 +1152,17 @@ type RepoEvent_RepoRemovedId struct {
 }
 
 type RepoEvent_WorktreeUpdated struct {
+	// Replaces one worktree of an already known repo.
 	WorktreeUpdated *Worktree `protobuf:"bytes,3,opt,name=worktree_updated,json=worktreeUpdated,proto3,oneof"`
 }
 
 type RepoEvent_WorktreeRemoved struct {
 	WorktreeRemoved *WorktreeRef `protobuf:"bytes,4,opt,name=worktree_removed,json=worktreeRemoved,proto3,oneof"`
+}
+
+type RepoEvent_Snapshot struct {
+	// Replaces everything.
+	Snapshot *RepoSnapshot `protobuf:"bytes,5,opt,name=snapshot,proto3,oneof"`
 }
 
 func (*RepoEvent_RepoUpdated) isRepoEvent_Event() {}
@@ -1154,6 +1172,52 @@ func (*RepoEvent_RepoRemovedId) isRepoEvent_Event() {}
 func (*RepoEvent_WorktreeUpdated) isRepoEvent_Event() {}
 
 func (*RepoEvent_WorktreeRemoved) isRepoEvent_Event() {}
+
+func (*RepoEvent_Snapshot) isRepoEvent_Event() {}
+
+type RepoSnapshot struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Repos         []*Repo                `protobuf:"bytes,1,rep,name=repos,proto3" json:"repos,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RepoSnapshot) Reset() {
+	*x = RepoSnapshot{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RepoSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RepoSnapshot) ProtoMessage() {}
+
+func (x *RepoSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RepoSnapshot.ProtoReflect.Descriptor instead.
+func (*RepoSnapshot) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *RepoSnapshot) GetRepos() []*Repo {
+	if x != nil {
+		return x.Repos
+	}
+	return nil
+}
 
 type WorktreeRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1165,7 +1229,7 @@ type WorktreeRef struct {
 
 func (x *WorktreeRef) Reset() {
 	*x = WorktreeRef{}
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1177,7 +1241,7 @@ func (x *WorktreeRef) String() string {
 func (*WorktreeRef) ProtoMessage() {}
 
 func (x *WorktreeRef) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1190,7 +1254,7 @@ func (x *WorktreeRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorktreeRef.ProtoReflect.Descriptor instead.
 func (*WorktreeRef) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{19}
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *WorktreeRef) GetRepoId() string {
@@ -1279,13 +1343,16 @@ const file_codefoundry_v1_repo_proto_rawDesc = "" +
 	"\x12RefreshRepoRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x15\n" +
 	"\x13RefreshRepoResponse\"\x13\n" +
-	"\x11WatchReposRequest\"\x8a\x02\n" +
+	"\x11WatchReposRequest\"\xc6\x02\n" +
 	"\tRepoEvent\x129\n" +
 	"\frepo_updated\x18\x01 \x01(\v2\x14.codefoundry.v1.RepoH\x00R\vrepoUpdated\x12(\n" +
 	"\x0frepo_removed_id\x18\x02 \x01(\tH\x00R\rrepoRemovedId\x12E\n" +
 	"\x10worktree_updated\x18\x03 \x01(\v2\x18.codefoundry.v1.WorktreeH\x00R\x0fworktreeUpdated\x12H\n" +
-	"\x10worktree_removed\x18\x04 \x01(\v2\x1b.codefoundry.v1.WorktreeRefH\x00R\x0fworktreeRemovedB\a\n" +
+	"\x10worktree_removed\x18\x04 \x01(\v2\x1b.codefoundry.v1.WorktreeRefH\x00R\x0fworktreeRemoved\x12:\n" +
+	"\bsnapshot\x18\x05 \x01(\v2\x1c.codefoundry.v1.RepoSnapshotH\x00R\bsnapshotB\a\n" +
 	"\x05event\":\n" +
+	"\fRepoSnapshot\x12*\n" +
+	"\x05repos\x18\x01 \x03(\v2\x14.codefoundry.v1.RepoR\x05repos\":\n" +
 	"\vWorktreeRef\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path2\xc5\x05\n" +
@@ -1313,7 +1380,7 @@ func file_codefoundry_v1_repo_proto_rawDescGZIP() []byte {
 	return file_codefoundry_v1_repo_proto_rawDescData
 }
 
-var file_codefoundry_v1_repo_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_codefoundry_v1_repo_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_codefoundry_v1_repo_proto_goTypes = []any{
 	(*Repo)(nil),                   // 0: codefoundry.v1.Repo
 	(*Worktree)(nil),               // 1: codefoundry.v1.Worktree
@@ -1334,42 +1401,45 @@ var file_codefoundry_v1_repo_proto_goTypes = []any{
 	(*RefreshRepoResponse)(nil),    // 16: codefoundry.v1.RefreshRepoResponse
 	(*WatchReposRequest)(nil),      // 17: codefoundry.v1.WatchReposRequest
 	(*RepoEvent)(nil),              // 18: codefoundry.v1.RepoEvent
-	(*WorktreeRef)(nil),            // 19: codefoundry.v1.WorktreeRef
-	(*timestamppb.Timestamp)(nil),  // 20: google.protobuf.Timestamp
+	(*RepoSnapshot)(nil),           // 19: codefoundry.v1.RepoSnapshot
+	(*WorktreeRef)(nil),            // 20: codefoundry.v1.WorktreeRef
+	(*timestamppb.Timestamp)(nil),  // 21: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_repo_proto_depIdxs = []int32{
 	1,  // 0: codefoundry.v1.Repo.worktrees:type_name -> codefoundry.v1.Worktree
-	20, // 1: codefoundry.v1.Repo.registered_at:type_name -> google.protobuf.Timestamp
+	21, // 1: codefoundry.v1.Repo.registered_at:type_name -> google.protobuf.Timestamp
 	2,  // 2: codefoundry.v1.Worktree.status:type_name -> codefoundry.v1.GitStatus
-	20, // 3: codefoundry.v1.GitStatus.refreshed_at:type_name -> google.protobuf.Timestamp
+	21, // 3: codefoundry.v1.GitStatus.refreshed_at:type_name -> google.protobuf.Timestamp
 	0,  // 4: codefoundry.v1.RegisterRepoResponse.repo:type_name -> codefoundry.v1.Repo
 	0,  // 5: codefoundry.v1.ListReposResponse.repos:type_name -> codefoundry.v1.Repo
 	0,  // 6: codefoundry.v1.GetRepoResponse.repo:type_name -> codefoundry.v1.Repo
 	1,  // 7: codefoundry.v1.CreateWorktreeResponse.worktree:type_name -> codefoundry.v1.Worktree
 	0,  // 8: codefoundry.v1.RepoEvent.repo_updated:type_name -> codefoundry.v1.Repo
 	1,  // 9: codefoundry.v1.RepoEvent.worktree_updated:type_name -> codefoundry.v1.Worktree
-	19, // 10: codefoundry.v1.RepoEvent.worktree_removed:type_name -> codefoundry.v1.WorktreeRef
-	3,  // 11: codefoundry.v1.RepoService.Register:input_type -> codefoundry.v1.RegisterRepoRequest
-	5,  // 12: codefoundry.v1.RepoService.Unregister:input_type -> codefoundry.v1.UnregisterRepoRequest
-	7,  // 13: codefoundry.v1.RepoService.List:input_type -> codefoundry.v1.ListReposRequest
-	9,  // 14: codefoundry.v1.RepoService.Get:input_type -> codefoundry.v1.GetRepoRequest
-	11, // 15: codefoundry.v1.RepoService.CreateWorktree:input_type -> codefoundry.v1.CreateWorktreeRequest
-	13, // 16: codefoundry.v1.RepoService.RemoveWorktree:input_type -> codefoundry.v1.RemoveWorktreeRequest
-	15, // 17: codefoundry.v1.RepoService.Refresh:input_type -> codefoundry.v1.RefreshRepoRequest
-	17, // 18: codefoundry.v1.RepoService.Watch:input_type -> codefoundry.v1.WatchReposRequest
-	4,  // 19: codefoundry.v1.RepoService.Register:output_type -> codefoundry.v1.RegisterRepoResponse
-	6,  // 20: codefoundry.v1.RepoService.Unregister:output_type -> codefoundry.v1.UnregisterRepoResponse
-	8,  // 21: codefoundry.v1.RepoService.List:output_type -> codefoundry.v1.ListReposResponse
-	10, // 22: codefoundry.v1.RepoService.Get:output_type -> codefoundry.v1.GetRepoResponse
-	12, // 23: codefoundry.v1.RepoService.CreateWorktree:output_type -> codefoundry.v1.CreateWorktreeResponse
-	14, // 24: codefoundry.v1.RepoService.RemoveWorktree:output_type -> codefoundry.v1.RemoveWorktreeResponse
-	16, // 25: codefoundry.v1.RepoService.Refresh:output_type -> codefoundry.v1.RefreshRepoResponse
-	18, // 26: codefoundry.v1.RepoService.Watch:output_type -> codefoundry.v1.RepoEvent
-	19, // [19:27] is the sub-list for method output_type
-	11, // [11:19] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	20, // 10: codefoundry.v1.RepoEvent.worktree_removed:type_name -> codefoundry.v1.WorktreeRef
+	19, // 11: codefoundry.v1.RepoEvent.snapshot:type_name -> codefoundry.v1.RepoSnapshot
+	0,  // 12: codefoundry.v1.RepoSnapshot.repos:type_name -> codefoundry.v1.Repo
+	3,  // 13: codefoundry.v1.RepoService.Register:input_type -> codefoundry.v1.RegisterRepoRequest
+	5,  // 14: codefoundry.v1.RepoService.Unregister:input_type -> codefoundry.v1.UnregisterRepoRequest
+	7,  // 15: codefoundry.v1.RepoService.List:input_type -> codefoundry.v1.ListReposRequest
+	9,  // 16: codefoundry.v1.RepoService.Get:input_type -> codefoundry.v1.GetRepoRequest
+	11, // 17: codefoundry.v1.RepoService.CreateWorktree:input_type -> codefoundry.v1.CreateWorktreeRequest
+	13, // 18: codefoundry.v1.RepoService.RemoveWorktree:input_type -> codefoundry.v1.RemoveWorktreeRequest
+	15, // 19: codefoundry.v1.RepoService.Refresh:input_type -> codefoundry.v1.RefreshRepoRequest
+	17, // 20: codefoundry.v1.RepoService.Watch:input_type -> codefoundry.v1.WatchReposRequest
+	4,  // 21: codefoundry.v1.RepoService.Register:output_type -> codefoundry.v1.RegisterRepoResponse
+	6,  // 22: codefoundry.v1.RepoService.Unregister:output_type -> codefoundry.v1.UnregisterRepoResponse
+	8,  // 23: codefoundry.v1.RepoService.List:output_type -> codefoundry.v1.ListReposResponse
+	10, // 24: codefoundry.v1.RepoService.Get:output_type -> codefoundry.v1.GetRepoResponse
+	12, // 25: codefoundry.v1.RepoService.CreateWorktree:output_type -> codefoundry.v1.CreateWorktreeResponse
+	14, // 26: codefoundry.v1.RepoService.RemoveWorktree:output_type -> codefoundry.v1.RemoveWorktreeResponse
+	16, // 27: codefoundry.v1.RepoService.Refresh:output_type -> codefoundry.v1.RefreshRepoResponse
+	18, // 28: codefoundry.v1.RepoService.Watch:output_type -> codefoundry.v1.RepoEvent
+	21, // [21:29] is the sub-list for method output_type
+	13, // [13:21] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_repo_proto_init() }
@@ -1382,6 +1452,7 @@ func file_codefoundry_v1_repo_proto_init() {
 		(*RepoEvent_RepoRemovedId)(nil),
 		(*RepoEvent_WorktreeUpdated)(nil),
 		(*RepoEvent_WorktreeRemoved)(nil),
+		(*RepoEvent_Snapshot)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1389,7 +1460,7 @@ func file_codefoundry_v1_repo_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_repo_proto_rawDesc), len(file_codefoundry_v1_repo_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

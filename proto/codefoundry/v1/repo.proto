@@ -131,18 +131,27 @@ message RefreshRepoRequest {
 
 message RefreshRepoResponse {}
 
-// Watch first replays the current state as one repo_updated event per repository, then
-// streams live changes. Events are ordered: each reflects the snapshot at the moment it
-// was published. repo_updated replaces the whole repo, including its worktree list.
+// The first event of every Watch stream is a snapshot of all repositories; live changes
+// follow in publish order, each carrying the full state of what changed. A client
+// replaces its whole state on every snapshot event (the daemon sends another one if the
+// client fell behind and events were dropped) and applies the other events in order.
 message WatchReposRequest {}
 
 message RepoEvent {
   oneof event {
+    // Replaces the repo, including its worktree list.
     Repo repo_updated = 1;
     string repo_removed_id = 2;
+    // Replaces one worktree of an already known repo.
     Worktree worktree_updated = 3;
     WorktreeRef worktree_removed = 4;
+    // Replaces everything.
+    RepoSnapshot snapshot = 5;
   }
+}
+
+message RepoSnapshot {
+  repeated Repo repos = 1;
 }
 
 message WorktreeRef {
