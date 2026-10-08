@@ -67,12 +67,41 @@ Steps:
   close with four open streams.
 * 2d CLI: `session new|list|focus|close|reconnect|rename|fork` from the registry.
 
-## Phase 3 — Supervision surface
+## Phase 3 — Supervision surface (parallel after Phase 2)
 
-* PR overview page per worktree (PRs, checks, merge state) from `GhService`.
-* Git actions dialog (fetch, pull, push, create PR via `gh`).
-* Settings, help overlay, confirm prompts.
-* Packaging: signed `.app`, Homebrew tap, `code-foundry update`.
+Decisions (Alex, 2026-10-08), modeled on the work TUI's screens:
+
+* **Pull Requests page** (global, replaces the idea of a "dashboard"): monthly tiles
+  (commits / PRs merged by the viewer for this month and last), **Open PRs authored by you**,
+  **PRs awaiting your review**, **Merged PRs in the last 7 days** (repo, number, author,
+  title, age). All from `gh` across registered repos' GitHub slugs.
+* **Worktree overview page**: upstream sync line; GitHub activity for the repo (viewer's
+  merged PRs and commits this/last month, default-branch CI status with failing check
+  names, merged-in-last-7-days involving the viewer, PRs authored by the viewer for this
+  branch); **Files** changed against the base branch with per-file status and +/- counts;
+  **Log** of commits on the branch not on base. This is the baseline; Alex had further
+  updates planned and will direct them later.
+* **Settings** live in a file under the config home and are editable in the UI.
+* **Packaging and updates**: a GitHub release per version holding the app bundle (with the
+  CLI/daemon inside it) and a curl-able `install.sh` that uses `gh release download` into a
+  user-owned location with PATH setup; an in-app updater that checks every 24h via `gh`,
+  surfaces "update ready" in the footer and palette, installs on request, and reports
+  "ready on next restart". The daemon must not be restarted automatically (it would kill
+  sessions); offer a `daemon.restart` command that says how many sessions it will close.
+  Homebrew tap is deferred (needs a separate repo).
+
+Steps:
+
+* 3a Pull Requests page + worktree overview (full stack): gh store additions (viewer
+  dashboards, monthly stats, default-branch checks), repo store additions (files vs base,
+  log vs base), additive proto changes, GUI pages.
+* 3b Settings + help + confirm: `settings.proto`, file-backed settings store with a typed
+  schema, settings UI, help overlay, confirm flag on destructive commands.
+* 3c Git operations: `gitops.proto`/store for fetch, pull, push, PR create/open via `gh`,
+  open-in-editor/Finder; exposed only as registry commands.
+* 3d Packaging + updater: release script, `install.sh`, bundle layout with the CLI inside
+  the app, `update.proto` + store with a 24h check, `app.update`, `daemon.restart`, GUI
+  indicator and dialog.
 
 ## Gates
 
