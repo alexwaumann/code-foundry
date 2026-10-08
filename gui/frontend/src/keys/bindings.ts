@@ -146,6 +146,14 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
     toggleHelp();
     return true;
   },
+  // Like cmd+k: opens this window's palette without a round trip. Deferred so that
+  // picking it inside the palette (which closes after a presenter runs) reopens it.
+  "ui.palette.open": () => {
+    queueMicrotask(() => {
+      useUiStore.getState().openPalette();
+    });
+    return true;
+  },
   // Update commands show their progress in the update dialog. daemon.restart has no
   // presenter: the registry's confirm flow asks (with the live-session count).
   "app.update.check": () => {
@@ -169,6 +177,13 @@ export function startCommand(c: CommandView): void {
   if (presentCommand(c.name)) return;
   if (promptedArgs(c).length > 0) useUiStore.getState().openPalette("", c.name);
   else void runCommand(c.name);
+}
+
+/** startCommand for a command by name, when it is available in the current context. */
+export function startCommandNamed(name: string): boolean {
+  const c = useCommandsStore.getState().commands.find((x) => x.name === name && x.available);
+  if (c) startCommand(c);
+  return c !== undefined;
 }
 
 function isEditable(el: Element | null): boolean {

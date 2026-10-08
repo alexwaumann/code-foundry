@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { BellRing } from "lucide-react";
+import { BellRing, Sparkles, SquareTerminal } from "lucide-react";
+import { CommandButton } from "@/components/command/CommandButton";
 import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
 import { jumpToAttention } from "@/keys/bindings";
 import { buildRows, isLeaf, type Row } from "@/lib/tree";
@@ -218,6 +219,11 @@ export function Sidebar() {
         <span className="flex items-center gap-2">
           <AttentionBadge />
           <span className="tabular-nums">{repoCount > 0 ? repoCount : ""}</span>
+          {/* New session/terminal in the selected worktree, as session.new / terminal.new from the palette. */}
+          <span className="-mr-1.5 flex items-center normal-case">
+            <CommandButton command="session.new" icon={Sparkles} whenUnavailable="disable" data-testid="sidebar-new-session" />
+            <CommandButton command="terminal.new" icon={SquareTerminal} whenUnavailable="disable" data-testid="sidebar-new-terminal" />
+          </span>
         </span>
       </header>
       <SidebarTree />

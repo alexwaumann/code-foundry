@@ -721,6 +721,17 @@ export class World {
         },
       },
       {
+        cmd: { name: "session.fork", title: "Fork Session", category: "Session", description: "Start a new session that continues this one's conversation", keybindings: [], args: [{ name: "name", type: ArgType.STRING, required: false, description: "Name for the fork" }] },
+        when: (ctx) => activeSession(ctx) !== undefined,
+        run: (ctx) => {
+          const s = activeSession(ctx);
+          if (!s) throw new CommandError("unavailable", "no active session");
+          const f = this.createSession(s.repoId, s.worktreePath, s.model, s.effort);
+          this.focusSession(f.id);
+          return `Forked ${s.name || s.id}`;
+        },
+      },
+      {
         cmd: { name: "session.reconnect", title: "Reconnect Session", category: "Session", description: "Resume the session in a new terminal (claude --resume)", keybindings: ["cmd+shift+r"], args: [] },
         when: (ctx) => activeSession(ctx)?.state === SessionState.DISCONNECTED,
         run: (ctx) => {
@@ -865,6 +876,11 @@ export class World {
           this.repoEvents.publish({ event: { case: "worktreeRemoved", value: { repoId: w.repo.id, path: w.wt.path } } });
           return `Removed worktree ${w.wt.branch}`;
         },
+      },
+      {
+        cmd: { name: "ui.palette.open", title: "Open Command Palette", category: "View", description: "Open the command palette in every connected window", keybindings: [], args: [{ name: "query", type: ArgType.STRING, required: false, description: "Text to pre-fill" }] },
+        when: always,
+        run: (_ctx, args) => `delivered=${String(this.emit({ intent: { case: "openPalette", value: { query: args.query ?? "" } } }))}`,
       },
       {
         cmd: { name: "ui.notify", title: "Send Test Notification", category: "Developer", description: "Emit a Notify intent", keybindings: [], args: [{ name: "level", type: ArgType.ENUM, required: true, description: "Level", enumValues: ["info", "warning", "error"], defaultValue: "info" }] },

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { SquareTerminal } from "lucide-react";
+import { Command, Sparkles, SquareTerminal } from "lucide-react";
+import { CommandButton } from "@/components/command/CommandButton";
 import { WorktreeOverview } from "@/components/overview/WorktreeOverview";
 import { terminalLabel } from "@/lib/path";
 import { SessionStatusIcon } from "@/components/session/SessionStatusIcon";
@@ -13,10 +14,21 @@ import {
   useSessionPlacementKeys,
   useTerminalPlacementKeys,
 } from "@/stores/context";
+import { startCommandNamed } from "@/keys/bindings";
 import { useReposStore } from "@/stores/repos";
 import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
+
+/** An empty list: a line of text and the button that fills it. */
+function EmptyState({ text, children }: { text: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3">
+      <p className="text-sm text-muted-foreground">{text}</p>
+      {children}
+    </div>
+  );
+}
 
 /** Session and (unowned) terminal ids placed under the given worktree (or any worktree of the repo). */
 function useItemsIn(repoId: string, path: string | null): { sessions: string[]; terminals: string[] } {
@@ -90,7 +102,9 @@ export function WorktreeItems({ repoId, path }: { repoId: string; path: string |
         <section>
           <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Sessions</h2>
           {sessions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No sessions here.</p>
+            <EmptyState text="No sessions here.">
+              <CommandButton command="session.new" icon={Sparkles} label="New session" variant="outline" size="xs" keepFocus={false} data-testid="empty-new-session" />
+            </EmptyState>
           ) : (
             <div className="flex flex-col">
               {sessions.map((id) => (
@@ -103,7 +117,9 @@ export function WorktreeItems({ repoId, path }: { repoId: string; path: string |
       <section>
         <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Terminals</h2>
         {terminals.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No terminals here.</p>
+          <EmptyState text="No terminals here.">
+            <CommandButton command="terminal.new" icon={SquareTerminal} label="New terminal" variant="outline" size="xs" keepFocus={false} data-testid="empty-new-terminal" />
+          </EmptyState>
         ) : (
           <div className="flex flex-col">
             {terminals.map((id) => (
@@ -130,7 +146,24 @@ function Welcome() {
           {waiting > 0 && ` · ${String(waiting)} waiting on you`}
         </p>
       </div>
-      <p className="text-sm text-muted-foreground">Every action is in the command palette. Keyboard shortcuts are listed under Help.</p>
+      <div className="flex flex-wrap justify-center gap-2" data-testid="welcome-actions">
+        <CommandButton command="session.new" icon={Sparkles} label="New session" variant="outline" whenUnavailable="disable" keepFocus={false} />
+        <CommandButton command="terminal.new" icon={SquareTerminal} label="New terminal" variant="outline" keepFocus={false} />
+        <CommandButton command="ui.palette.open" icon={Command} label="Command palette" title="Command Palette" variant="outline" keepFocus={false} />
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Sessions start in the worktree selected in the sidebar. Shortcuts are listed under{" "}
+        <button
+          type="button"
+          className="underline underline-offset-2 hover:text-foreground"
+          onClick={() => {
+            startCommandNamed("view.help");
+          }}
+        >
+          Keyboard Shortcuts
+        </button>
+        .
+      </p>
     </div>
   );
 }

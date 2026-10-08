@@ -1,0 +1,78 @@
+import type { ComponentProps } from "react";
+import type { LucideIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { startCommandNamed } from "@/keys/bindings";
+import { useCommandsStore } from "@/stores/commands";
+
+type ButtonProps = ComponentProps<typeof Button>;
+
+interface CommandButtonProps {
+  /** Registry command name, e.g. "session.new". */
+  command: string;
+  icon: LucideIcon;
+  /** Visible text. Omit for an icon-only button; the command's title is then its label. */
+  label?: string;
+  /** Tooltip; defaults to the command's title. Never a chord: those live in the palette and help. */
+  title?: string;
+  /** When the command is not available here: hide the button (default) or show it disabled. */
+  whenUnavailable?: "hide" | "disable";
+  /**
+   * Keep keyboard focus where it is (default): the button is skipped by Tab and a click
+   * does not move focus, so the sidebar tree and the terminal keep theirs.
+   */
+  keepFocus?: boolean;
+  variant?: ButtonProps["variant"];
+  size?: ButtonProps["size"];
+  className?: string;
+  "data-testid"?: string;
+}
+
+/**
+ * A button for a registry command. It does exactly what picking the command in the
+ * palette does (startCommand: GUI presenters, arg prompts, confirmation), so it adds no
+ * user action of its own. Availability comes from CommandService.List for the current
+ * context, which only lists available commands.
+ */
+export function CommandButton({
+  command,
+  icon: Icon,
+  label,
+  title,
+  whenUnavailable = "hide",
+  keepFocus = true,
+  variant = "ghost",
+  size,
+  className,
+  "data-testid": testId,
+}: CommandButtonProps) {
+  const commandTitle = useCommandsStore((s) => s.commands.find((c) => c.name === command && c.available)?.title ?? null);
+  if (commandTitle === null && whenUnavailable === "hide") return null;
+  const name = title ?? commandTitle ?? label ?? command;
+  return (
+    <Button
+      type="button"
+      variant={variant}
+      size={size ?? (label ? "sm" : "icon-xs")}
+      className={className}
+      disabled={commandTitle === null}
+      title={name}
+      aria-label={label ? undefined : name}
+      tabIndex={keepFocus ? -1 : undefined}
+      data-command-button={command}
+      data-testid={testId}
+      onMouseDown={
+        keepFocus
+          ? (e) => {
+              e.preventDefault();
+            }
+          : undefined
+      }
+      onClick={() => {
+        startCommandNamed(command);
+      }}
+    >
+      <Icon aria-hidden />
+      {label}
+    </Button>
+  );
+}

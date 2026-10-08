@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { CircleX, Loader2, RefreshCw } from "lucide-react";
+import { CircleX, GitFork, Loader2, OctagonX, Pencil, Power, RefreshCw } from "lucide-react";
+import { CommandButton } from "@/components/command/CommandButton";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { SessionIndicator, SessionTitle } from "@/components/session/SessionParts";
 import { attachTerminal, resizeTerminal, writeTerminal } from "@/api/terminal";
@@ -51,6 +52,26 @@ function TerminalTitle({ id }: { id: string }) {
   );
 }
 
+/**
+ * The pane's own commands, run against the current selection (this pane) exactly as the
+ * palette runs them. Each hides when the daemon does not list it as available.
+ */
+function HeaderActions({ session }: { session: boolean }) {
+  return (
+    <span className="-mr-1.5 flex items-center" data-testid="pane-actions">
+      {session ? (
+        <>
+          <CommandButton command="session.rename" icon={Pencil} />
+          <CommandButton command="session.fork" icon={GitFork} />
+          <CommandButton command="session.close" icon={Power} />
+        </>
+      ) : (
+        <CommandButton command="terminal.kill" icon={OctagonX} />
+      )}
+    </span>
+  );
+}
+
 function TerminalHeader({
   id,
   sessionId,
@@ -72,6 +93,7 @@ function TerminalHeader({
             {size.cols}×{size.rows}
           </span>
         )}
+        <HeaderActions session={sessionId !== undefined} />
       </span>
     </div>
   );
