@@ -82,6 +82,22 @@ func TestParseTrustDialog(t *testing.T) {
 	}
 }
 
+func TestPromptReady(t *testing.T) {
+	tests := map[string]bool{
+		promptScreen:   true,
+		trustScreenNo:  false,
+		trustScreenYes: false,
+		"":             false,
+		" ▐▛███▛█   Claude Code v2.1.294\n\n": false,
+		"⏺ pong\n────\n❯ \n────":              true,
+	}
+	for screen, want := range tests {
+		if got := promptReady(screen); got != want {
+			t.Errorf("promptReady(%q) = %v, want %v", screen, got, want)
+		}
+	}
+}
+
 func TestSetTrusted(t *testing.T) {
 	tests := []struct {
 		name        string

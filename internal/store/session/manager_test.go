@@ -591,6 +591,12 @@ func TestSessionsSurviveRestartAsDisconnected(t *testing.T) {
 func TestInitialPromptIsTypedAfterConnect(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{InitialPrompt: "do the thing"})
+	// Nothing is typed until the input box is on screen.
+	time.Sleep(700 * time.Millisecond)
+	if w := e.terms.Written(s.TerminalID); len(w) != 0 {
+		t.Fatalf("typed %q before the prompt was drawn", w)
+	}
+	_ = e.terms.SetScreen(s.TerminalID, promptScreen)
 	e.waitWritten(s.TerminalID, "do the thing"+keyEnter)
 }
 

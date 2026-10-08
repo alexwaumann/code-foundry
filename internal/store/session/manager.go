@@ -56,7 +56,8 @@ type Options struct {
 	Tick           time.Duration // detector tick and transcript poll; default 1s
 	StatusDebounce time.Duration // default 100ms
 	// ActivityPublish is the minimum interval between updates published only because
-	// last_activity_at moved. Default 5s. It is persisted at most every 30s.
+	// last_activity_at moved. Default 15s: an idle Claude still redraws every few
+	// seconds, so this is mostly noise. It is persisted at most every 30s.
 	ActivityPublish time.Duration
 	Now             func() time.Time
 }
@@ -100,7 +101,7 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.CloseTimeout, 10*time.Second)
 	def(&o.Tick, time.Second)
 	def(&o.StatusDebounce, 100*time.Millisecond)
-	def(&o.ActivityPublish, 5*time.Second)
+	def(&o.ActivityPublish, 15*time.Second)
 	if o.Now == nil {
 		o.Now = time.Now
 	}

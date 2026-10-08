@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,6 +33,8 @@ const (
 	screenCheckGap     = 100 * time.Millisecond // ScreenText at most this often while STARTING
 	promptDelay        = 500 * time.Millisecond // after CONNECTED, before typing the initial prompt
 	promptEnterDelay   = 300 * time.Millisecond // between the prompt text and Enter
+	promptPoll         = 200 * time.Millisecond // while waiting for the input box
+	maxPromptWaits     = 50                     // then type anyway (after ~10s)
 	activityPersistGap = 30 * time.Second
 	screenTextTimeout  = 2 * time.Second
 )
@@ -83,6 +86,7 @@ type runner struct {
 
 	prompt      string
 	promptStep  int
+	promptWaits int
 	promptTimer *time.Timer
 
 	trustKeys    int
@@ -279,6 +283,20 @@ func (r *runner) checkStartup(force bool) {
 	}
 }
 
+// promptReady reports whether Claude's input box is on screen: a line starting with
+// the "❯" prompt marker and no trust dialog.
+func promptReady(screen string) bool {
+	if parseTrustDialog(screen).Visible {
+		return false
+	}
+	for _, line := range strings.Split(screen, "\n") {
+		if strings.HasPrefix(strings.TrimLeft(line, " "), "❯") {
+			return true
+		}
+	}
+	return false
+}
+
 // connect moves STARTING -> CONNECTED.
 func (r *runner) connect(why string) {
 	r.state = StateConnected
@@ -302,6 +320,13 @@ func (r *runner) promptNext() {
 	}
 	switch r.promptStep {
 	case 0:
+		// CONNECTED fires on the title/alt-screen switch, before the input box is
+		// drawn; keystrokes sent earlier can be lost. Wait for the prompt line.
+		if screen, err := r.screen(); err == nil && !promptReady(screen) && r.promptWaits < maxPromptWaits {
+			r.promptWaits++
+			r.promptTimer = time.NewTimer(promptPoll)
+			return
+		}
 		r.write(r.prompt)
 		r.promptStep = 1
 		r.promptTimer = time.NewTimer(promptEnterDelay)
