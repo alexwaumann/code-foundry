@@ -4,3 +4,7 @@ minimumReleaseAge: 10080
 # The Wails JS runtime must match the Go module version (github.com/wailsapp/wails/v3).
 minimumReleaseAgeExclude:
   - "@wailsio/runtime"
+# esbuild (pulled in by tsx, which runs the mock daemon) ships its binary as an optional
+# platform package, so its postinstall script is not needed.
+allowBuilds:
+  esbuild: false
