@@ -19,8 +19,8 @@ func TestViewPullRequestsEmitsShowView(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Message != "delivered=1" {
-		t.Errorf("message = %q", res.Message)
+	if res.Message != "" || res.JSON != (command.EmitResult{Delivered: 1}) {
+		t.Errorf("result = %+v, want no message and delivered 1", res)
 	}
 	got := emit.Intents()
 	if len(got) != 1 || got[0].GetShowView().GetName() != command.ViewPullRequests {

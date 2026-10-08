@@ -41,7 +41,9 @@ func RegisterView(r *Registry, e Emitter, open URLOpener) error {
 			Keybindings: []string{"cmd+shift+d"},
 			Run: func(context.Context, Context, Args) (Result, error) {
 				n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: ViewPullRequests}}})
-				return Result{Message: fmt.Sprintf("delivered=%d", n), JSON: EmitResult{Delivered: n}}, nil
+				// No Message: the GUI toasts non-empty messages, and the page switch is
+				// feedback enough. The CLI's --json still reports delivery.
+				return Result{JSON: EmitResult{Delivered: n}}, nil
 			},
 		},
 		Command{

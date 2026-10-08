@@ -264,3 +264,39 @@ func TestWorktreeDetailUnborn(t *testing.T) {
 		t.Errorf("unborn detail = %+v", d)
 	}
 }
+
+// A clean worktree takes the tree-to-tree path: committed files keep their counts and
+// untracked files are not listed.
+func TestWorktreeDetailCleanUsesTreeDiff(t *testing.T) {
+	f := newFixture(t)
+	runner := &countingRunner{next: ExecRunner{}, n: map[string]int{}}
+	h := startHarness(t, "", Options{Runner: runner})
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	r, err := h.store.Register(ctx, f.repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{RepoID: r.ID, Branch: "feat/clean"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(wt.Path, "a.txt"), "1\n2\n3\n")
+	git(t, wt.Path, "add", "a.txt")
+	git(t, wt.Path, "commit", "-q", "-m", "add a")
+	if err := h.store.Refresh(ctx, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	before := runner.count("ls-files")
+	d, err := h.store.WorktreeDetail(ctx, r.ID, wt.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []FileChange{{Path: "a.txt", Status: "A", Added: 3}}
+	if !slices.Equal(d.Files, want) || d.LogTotal != 1 {
+		t.Errorf("clean detail = %+v", d)
+	}
+	if n := runner.count("ls-files"); n != before {
+		t.Errorf("clean worktree listed untracked files (%d -> %d)", before, n)
+	}
+}

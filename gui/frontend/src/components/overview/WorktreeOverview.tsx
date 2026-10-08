@@ -35,7 +35,7 @@ function SyncLine({ st }: { st: GitStatusView }) {
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-1 font-mono text-xs" data-testid="sync-line">
       <span>
-        <span className="text-muted-foreground">Upstream {st.upstream || ""}: </span>
+        <span className="text-muted-foreground">{st.upstream ? `Upstream ${st.upstream}: ` : "Upstream: "}</span>
         {st.upstream ? <AheadBehind ahead={st.ahead} behind={st.behind} /> : <span className="text-muted-foreground">none</span>}
       </span>
       {st.baseRef && (

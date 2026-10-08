@@ -164,7 +164,9 @@ func (g *Git) detail(ctx context.Context, repoID, path string) {
 	wt := *slot.cur.Load()
 	d := WorktreeDetail{RepoID: repoID, Path: path, Head: wt.Head}
 	d.BaseRef = g.detailBase(ctx, st.meta.Load(), wt)
-	err := g.fillDetail(ctx, &d)
+	// The status job that triggered this ran just before, so a clean status is current.
+	clean := !wt.Status.Dirty && wt.Status.Error == "" && !wt.Status.RefreshedAt.IsZero()
+	err := g.fillDetail(ctx, &d, clean)
 	if ctx.Err() != nil {
 		return
 	}
@@ -212,8 +214,11 @@ func gitDiff(extra ...string) []string {
 	return append(args, extra...)
 }
 
-// fillDetail runs git and fills d's files and log. d.BaseRef and d.Head are set.
-func (g *Git) fillDetail(ctx context.Context, d *WorktreeDetail) error {
+// fillDetail runs git and fills d's files and log. d.BaseRef and d.Head are set. A clean
+// worktree (per status) skips the working-tree scans: the uncommitted diff and the
+// untracked listing are empty, and counts come from a tree-to-tree diff (measured on a
+// neovim checkout: ~0.5s -> ~0.1s).
+func (g *Git) fillDetail(ctx context.Context, d *WorktreeDetail, clean bool) error {
 	dir := d.Path
 	from := "HEAD"
 	if d.Head == "" {
@@ -245,24 +250,34 @@ func (g *Git) fillDetail(ctx context.Context, d *WorktreeDetail) error {
 		}
 		d.LogTotal, _ = strconv.Atoi(string(trimNL(out)))
 	}
-	ref := "HEAD"
-	if d.Head == "" {
-		ref = emptyTree
+	var (
+		uncommitted []nameStatus
+		untracked   []string
+	)
+	numstat := gitDiff("--numstat", from) // from the merge base to the working tree
+	if clean && d.Head != "" {
+		numstat = gitDiff("--numstat", from, "HEAD")
+	} else {
+		ref := "HEAD"
+		if d.Head == "" {
+			ref = emptyTree
+		}
+		out, err := g.runner.Run(ctx, dir, gitDiff("--name-status", ref)...)
+		if err != nil {
+			return err
+		}
+		uncommitted = parseNameStatusZ(out)
+		if out, err = g.runner.Run(ctx, dir, "ls-files", "--others", "--exclude-standard", "--directory",
+			"--no-empty-directory", "-z"); err != nil {
+			return err
+		}
+		untracked = splitZ(out)
 	}
-	out, err := g.runner.Run(ctx, dir, gitDiff("--name-status", ref)...)
+	out, err := g.runner.Run(ctx, dir, numstat...)
 	if err != nil {
 		return err
 	}
-	uncommitted := parseNameStatusZ(out)
-	if out, err = g.runner.Run(ctx, dir, gitDiff("--numstat", from)...); err != nil {
-		return err
-	}
 	counts := parseNumstatZ(out)
-	if out, err = g.runner.Run(ctx, dir, "ls-files", "--others", "--exclude-standard", "--directory",
-		"--no-empty-directory", "-z"); err != nil {
-		return err
-	}
-	untracked := splitZ(out)
 	d.Files, d.FilesTruncated = mergeFiles(committed, uncommitted, counts, untracked)
 	for i := range d.Files {
 		f := &d.Files[i]

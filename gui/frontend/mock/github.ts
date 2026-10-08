@@ -335,7 +335,10 @@ export function viewCommands(emit: (intent: IntentInit) => number) {
     {
       cmd: { name: "view.pullrequests", title: "Show Pull Requests", category: "View", description: "Show the Pull Requests page", keybindings: ["cmd+shift+d"], args: [] },
       when: () => true,
-      run: () => `delivered=${String(emit({ intent: { case: "showView", value: { name: "pullrequests" } } }))}`,
+      run: () => {
+        emit({ intent: { case: "showView", value: { name: "pullrequests" } } });
+        return ""; // like the daemon: no toast
+      },
     },
     {
       cmd: {
