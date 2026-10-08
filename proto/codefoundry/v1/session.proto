@@ -1,0 +1,162 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// SessionService manages Claude Code sessions. A session is the primary unit of the app.
+// It is layered on TerminalService: a connected session owns exactly one terminal; a
+// disconnected session owns none and can be reconnected (claude --resume).
+service SessionService {
+  // Create spawns claude in a worktree and returns the session in STARTING state.
+  rpc Create(CreateSessionRequest) returns (CreateSessionResponse) {}
+  // Fork starts a new session that continues an existing session's conversation.
+  rpc Fork(ForkSessionRequest) returns (ForkSessionResponse) {}
+  // List returns all sessions, connected and disconnected.
+  rpc List(ListSessionsRequest) returns (ListSessionsResponse) {}
+  // Get returns one session.
+  rpc Get(GetSessionRequest) returns (GetSessionResponse) {}
+  // Rename sets a user-chosen name and disables auto-naming for the session.
+  rpc Rename(RenameSessionRequest) returns (RenameSessionResponse) {}
+  // Close ends the Claude process gracefully (/exit, bounded wait, then kill). The
+  // session remains, DISCONNECTED, until Remove.
+  rpc Close(CloseSessionRequest) returns (CloseSessionResponse) {}
+  // Reconnect resumes a DISCONNECTED session in a new terminal.
+  rpc Reconnect(ReconnectSessionRequest) returns (ReconnectSessionResponse) {}
+  // Remove forgets a session. Closes it first if connected.
+  rpc Remove(RemoveSessionRequest) returns (RemoveSessionResponse) {}
+  // Watch streams session changes. The first event is a snapshot.
+  rpc Watch(WatchSessionsRequest) returns (stream SessionEvent) {}
+}
+
+// SessionState is the lifecycle of the Claude process behind a session.
+enum SessionState {
+  SESSION_STATE_UNSPECIFIED = 0;
+  // Process spawned, Claude's UI not yet confirmed (trust dialog may be in progress).
+  SESSION_STATE_STARTING = 1;
+  // Claude is running and the session owns a terminal.
+  SESSION_STATE_CONNECTED = 2;
+  // Close requested; waiting for the process to exit.
+  SESSION_STATE_CLOSING = 3;
+  // No process. Either closed by us, exited by the user (/exit), or crashed.
+  SESSION_STATE_DISCONNECTED = 4;
+}
+
+// SessionStatus is what Claude is doing, derived by observing output and the transcript.
+enum SessionStatus {
+  SESSION_STATUS_UNSPECIFIED = 0;
+  SESSION_STATUS_BUSY = 1;
+  SESSION_STATUS_IDLE = 2;
+  // Claude is waiting on the user: a permission prompt, a question, or a dialog.
+  SESSION_STATUS_NEEDS_ATTENTION = 3;
+}
+
+message Session {
+  // Our stable id (survives reconnects).
+  string id = 1;
+  // Claude's own session id, once discovered from the transcript directory. Needed for
+  // resume; empty until known.
+  string claude_session_id = 2;
+  string repo_id = 3;
+  string worktree_path = 4;
+  // Display name. Auto-generated unless the user renamed it.
+  string name = 5;
+  bool auto_named = 6;
+  // Model and effort as passed to claude (e.g. "opus", "high"). Empty means claude's default.
+  string model = 7;
+  string effort = 8;
+  // Terminal currently attached to this session; empty when DISCONNECTED.
+  string terminal_id = 9;
+  SessionState state = 10;
+  SessionStatus status = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp last_activity_at = 13;
+  // Exit code of the last process, valid when DISCONNECTED after a process ran.
+  int32 exit_code = 14;
+  // Why the session is DISCONNECTED: "closed", "exited", "crashed", or empty.
+  string disconnect_reason = 15;
+  string last_error = 16;
+  // Forked from this session id, if any.
+  string parent_id = 17;
+}
+
+message CreateSessionRequest {
+  string repo_id = 1;
+  string worktree_path = 2;
+  string model = 3;
+  string effort = 4;
+  // Optional explicit name; disables auto-naming.
+  string name = 5;
+  // Optional first prompt sent once Claude is ready.
+  string initial_prompt = 6;
+}
+
+message CreateSessionResponse {
+  Session session = 1;
+}
+
+message ForkSessionRequest {
+  string id = 1;
+  string name = 2;
+}
+
+message ForkSessionResponse {
+  Session session = 1;
+}
+
+message ListSessionsRequest {}
+
+message ListSessionsResponse {
+  repeated Session sessions = 1;
+}
+
+message GetSessionRequest {
+  string id = 1;
+}
+
+message GetSessionResponse {
+  Session session = 1;
+}
+
+message RenameSessionRequest {
+  string id = 1;
+  string name = 2;
+}
+
+message RenameSessionResponse {
+  Session session = 1;
+}
+
+message CloseSessionRequest {
+  string id = 1;
+}
+
+message CloseSessionResponse {}
+
+message ReconnectSessionRequest {
+  string id = 1;
+}
+
+message ReconnectSessionResponse {
+  Session session = 1;
+}
+
+message RemoveSessionRequest {
+  string id = 1;
+}
+
+message RemoveSessionResponse {}
+
+message WatchSessionsRequest {}
+
+message SessionEvent {
+  oneof event {
+    SessionSnapshot snapshot = 1;
+    Session updated = 2;
+    string removed_id = 3;
+  }
+}
+
+message SessionSnapshot {
+  repeated Session sessions = 1;
+}

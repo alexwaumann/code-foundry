@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "codefoundry/v1/gh.proto";
+import "codefoundry/v1/repo.proto";
+import "codefoundry/v1/session.proto";
+import "codefoundry/v1/terminal.proto";
+import "codefoundry/v1/ui.proto";
+
+// EventService multiplexes every store's Watch stream and UI intents onto one server
+// stream. Browsers reach the daemon over HTTP/1.1 with a 6-connection-per-origin limit,
+// so the GUI holds exactly one of these instead of one Watch per service. The per-service
+// Watch RPCs remain for the CLI and tests.
+service EventService {
+  // Watch streams all events. Each store's snapshot event is sent first, in the order
+  // repo, terminal, session, gh, so a client can replace its state wholesale on connect.
+  rpc Watch(WatchEventsRequest) returns (stream Event) {}
+}
+
+message WatchEventsRequest {
+  // Subset of sources to include. Empty means all.
+  repeated EventSource sources = 1;
+}
+
+enum EventSource {
+  EVENT_SOURCE_UNSPECIFIED = 0;
+  EVENT_SOURCE_REPO = 1;
+  EVENT_SOURCE_TERMINAL = 2;
+  EVENT_SOURCE_SESSION = 3;
+  EVENT_SOURCE_GH = 4;
+  EVENT_SOURCE_UI = 5;
+}
+
+message Event {
+  oneof event {
+    RepoEvent repo = 1;
+    TerminalEvent terminal = 2;
+    SessionEvent session = 3;
+    GhEvent gh = 4;
+    UiIntent ui = 5;
+  }
+}
