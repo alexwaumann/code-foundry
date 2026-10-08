@@ -74,6 +74,24 @@ export function whenListed(ctx: UiContextView, timeoutMs = 3000): Promise<boolea
 }
 
 /**
+ * Invokes a command; if the daemon wants it confirmed (ConfirmationRequired), opens the
+ * confirm dialog and invokes again with confirmed set when the user agrees. Resolves
+ * null when the user declines; other errors reject.
+ */
+export async function invokeConfirmed(name: string, args: Record<string, string> = {}, ctx: UiContextView = getUiContext()): Promise<Awaited<ReturnType<typeof invokeCommand>> | null> {
+  try {
+    return await invokeCommand(name, ctx, args);
+  } catch (err) {
+    const confirm = confirmationOf(err);
+    if (!confirm) throw err;
+    const title = confirm.title || (useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name);
+    const yes = await requestConfirm({ title, message: confirm.message, confirmLabel: title });
+    if (!yes) return null;
+    return await invokeCommand(name, ctx, args, undefined, { confirmed: true });
+  }
+}
+
+/**
  * Invokes a command with the current context; reports the result as a toast. A command
  * the daemon wants confirmed (ConfirmationRequired) opens the confirm dialog and runs
  * again with confirmed set if the user agrees; declining returns false quietly.
@@ -81,16 +99,8 @@ export function whenListed(ctx: UiContextView, timeoutMs = 3000): Promise<boolea
 export async function runCommand(name: string, args: Record<string, string> = {}, ctx: UiContextView = getUiContext()): Promise<boolean> {
   const title = useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name;
   try {
-    let res;
-    try {
-      res = await invokeCommand(name, ctx, args);
-    } catch (err) {
-      const confirm = confirmationOf(err);
-      if (!confirm) throw err;
-      const yes = await requestConfirm({ title: confirm.title || title, message: confirm.message, confirmLabel: confirm.title || title });
-      if (!yes) return false;
-      res = await invokeCommand(name, ctx, args, undefined, { confirmed: true });
-    }
+    const res = await invokeConfirmed(name, args, ctx);
+    if (!res) return false;
     // Git operations report through their own toast (gitops events); skip the duplicate.
     if (res.message && !isGitOpResult(res.resultJson)) toast.success(res.message);
     return true;

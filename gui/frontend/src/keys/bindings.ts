@@ -6,6 +6,7 @@ import { contextKey, getTreeInputs, getUiContext } from "@/stores/context";
 import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { zoomFont } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
+import { openUpdateDialog, runUpdateAction } from "@/stores/update";
 import { showView, toggleHelp } from "@/stores/views";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
@@ -145,11 +146,27 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
     toggleHelp();
     return true;
   },
+  // Update commands show their progress in the update dialog. daemon.restart has no
+  // presenter: the registry's confirm flow asks (with the live-session count).
+  "app.update.check": () => {
+    openUpdateDialog({ check: true });
+    return true;
+  },
+  "app.update": () => {
+    openUpdateDialog();
+    void runUpdateAction("install");
+    return true;
+  },
 };
+
+/** Runs the command's presenter, if it has one; false means "invoke it normally". */
+export function presentCommand(name: string): boolean {
+  return commandPresenters[name]?.() ?? false;
+}
 
 /** Starts a command from the keyboard or palette: prompts for args it needs, else invokes. */
 export function startCommand(c: CommandView): void {
-  if (commandPresenters[c.name]?.()) return;
+  if (presentCommand(c.name)) return;
   if (promptedArgs(c).length > 0) useUiStore.getState().openPalette("", c.name);
   else void runCommand(c.name);
 }

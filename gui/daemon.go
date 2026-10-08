@@ -40,16 +40,8 @@ func NewDaemonService(p paths.Paths, log *slog.Logger) *DaemonService {
 // its loopback base URL and bearer token. The frontend calls it at startup and again
 // whenever a request fails, which picks up a restarted daemon's new port and token.
 func (s *DaemonService) GetDaemonEndpoint(ctx context.Context) (DaemonEndpoint, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	bin, err := daemonBinary()
-	if err != nil {
-		s.log.Debug("no code-foundry binary found; can only use an already running daemon", "err", err)
-	}
-	if _, err := client.Connect(ctx, s.paths, client.ConnectOptions{DaemonBinary: bin, Logger: s.log}); err != nil {
-		return DaemonEndpoint{}, fmt.Errorf("connect to daemon: %w", err)
+	if _, err := s.connect(ctx); err != nil {
+		return DaemonEndpoint{}, err
 	}
 	ep, err := client.ReadEndpoint(s.paths)
 	if err != nil {
@@ -58,9 +50,45 @@ func (s *DaemonService) GetDaemonEndpoint(ctx context.Context) (DaemonEndpoint, 
 	return DaemonEndpoint{BaseURL: ep.BaseURL, Token: ep.Token}, nil
 }
 
+// connect returns a client for the daemon, starting it from daemonBinary() if it is not
+// running. The frontend (through GetDaemonEndpoint) and the host's relaunch watcher both
+// use it, so a daemon that stops (daemon.restart) comes back even while the webview is
+// hidden and its timers are suspended.
+func (s *DaemonService) connect(ctx context.Context) (*client.Client, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	bin, err := daemonBinary()
+	if err != nil {
+		s.log.Debug("no code-foundry binary found; can only use an already running daemon", "err", err)
+	}
+	c, err := client.Connect(ctx, s.paths, client.ConnectOptions{DaemonBinary: bin, Logger: s.log})
+	if err != nil {
+		return nil, fmt.Errorf("connect to daemon: %w", err)
+	}
+	return c, nil
+}
+
+// exportDaemonBinary sets CODE_FOUNDRY_BIN to the CLI this app auto-starts (the one in
+// its own bundle when packaged), so the daemon and the sessions it spawns inherit it and
+// can call the CLI without it being on PATH.
+func exportDaemonBinary(log *slog.Logger) {
+	if os.Getenv(EnvDaemonBinary) != "" {
+		return
+	}
+	bin, err := daemonBinary()
+	if err != nil {
+		return
+	}
+	_ = os.Setenv(EnvDaemonBinary, bin)
+	log.Debug("daemon binary", "path", bin)
+}
+
 // daemonBinary finds the code-foundry CLI to spawn: $CODE_FOUNDRY_BIN, then a sibling
-// of this executable (the eventual .app layout), then ../bin/code-foundry relative to
-// the working directory (`wails3 dev` from gui/ after `make build`), then $PATH.
+// of this executable (CodeFoundry.app/Contents/MacOS/code-foundry), then
+// ../bin/code-foundry relative to the working directory (`wails3 dev` from gui/ after
+// `make build`), then $PATH.
 func daemonBinary() (string, error) {
 	if b := os.Getenv(EnvDaemonBinary); b != "" {
 		return b, nil

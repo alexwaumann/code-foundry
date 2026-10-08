@@ -103,7 +103,13 @@ func (r *Registry) List(uctx Context, includeUnavailable bool) []Listed {
 	for _, c := range r.cmds {
 		avail := c.Available(uctx)
 		if avail || includeUnavailable {
-			out = append(out, Listed{Command: r.effective(c), Available: avail})
+			l := Listed{Command: r.effective(c), Available: avail}
+			if c.DynamicTitle != nil {
+				if t := c.DynamicTitle(uctx); t != "" {
+					l.Title = t
+				}
+			}
+			out = append(out, l)
 		}
 	}
 	r.mu.RUnlock()
@@ -150,7 +156,13 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 		return Result{}, fmt.Errorf("%s: %w", name, err)
 	}
 	if c.Confirm != "" && !o.confirmed {
-		return Result{}, &ConfirmError{Command: name, Title: c.Title, Message: renderConfirm(c.Confirm, c.Args, args)}
+		msg := renderConfirm(c.Confirm, c.Args, args)
+		if c.DynamicConfirm != nil {
+			if m := c.DynamicConfirm(ctx, eff, args); m != "" {
+				msg = m
+			}
+		}
+		return Result{}, &ConfirmError{Command: name, Title: c.Title, Message: msg}
 	}
 	return c.Run(ctx, eff, args)
 }

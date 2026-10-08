@@ -12,6 +12,7 @@ import { applyRepoEvent, replaceRepos, useReposStore } from "./repos";
 import { applySessionEvent, replaceSessions, sessionOfTerminal, useSessionsStore } from "./sessions";
 import { applySettingsSnapshot } from "./settings";
 import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./terminals";
+import { applyUpdateEvent } from "./update";
 import { useUiStore } from "./ui";
 
 interface EventsState {
@@ -43,6 +44,7 @@ const handlers: Handlers = {
   gitops: applyGitOpsEvent,
   ui: applyIntent,
   settings: applySettingsSnapshot,
+  update: applyUpdateEvent,
 };
 
 export function dispatchEvent(ev: EventView): void {

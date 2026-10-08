@@ -13,6 +13,7 @@ import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1
 import { MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
 import { Hub } from "./hub";
 import { MockSettings } from "./settings";
+import { MockUpdater } from "./update";
 import { claudeIntro, claudeTick, ENTER_ALT, logLine, prompt, RESET, testRunOutput, topFrame } from "./screens";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
@@ -199,6 +200,11 @@ export class World {
     () => this.registry().map((e) => e.cmd),
     (snap) => this.events.publish({ source: EventSource.SETTINGS, event: { event: { case: "settings", value: { event: { case: "snapshot", value: snap } } } } }),
   );
+  /** UpdateService (Phase 3d): publishes into the events hub as the update source. */
+  readonly update = new MockUpdater(
+    (v) => this.events.publish({ source: EventSource.UPDATE, event: { event: { case: "update", value: v } } }),
+    () => [...this.sessions.values()].filter((s) => s.state !== SessionState.DISCONNECTED).length,
+  );
   /** EventService watchers that include UI intents (they count toward Emit's `delivered`). */
   uiEventWatchers = 0;
   invocations: Invocation[] = [];
@@ -243,6 +249,7 @@ export class World {
     for (const t of this.terms.values()) this.termEvents.publish({ event: { case: "updated", value: this.terminalMsg(t) } });
     for (const r of this.repos.values()) this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(r) } });
     this.sessionEvents.publish(this.sessionSnapshot());
+    this.update.reset();
   }
 
   // ---- Sessions -----------------------------------------------------------------
@@ -893,6 +900,7 @@ export class World {
         when: always,
         run: () => this.settings.snapshot().path ?? "",
       },
+      ...this.update.commands(),
     ];
   }
 

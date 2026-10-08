@@ -26,6 +26,7 @@ import (
 	"github.com/awaumann/code-foundry/internal/store/settings/settingstest"
 	"github.com/awaumann/code-foundry/internal/store/terminal"
 	"github.com/awaumann/code-foundry/internal/store/terminal/terminaltest"
+	"github.com/awaumann/code-foundry/internal/store/update"
 )
 
 type eventsFixture struct {
@@ -36,6 +37,7 @@ type eventsFixture struct {
 	gh     *ghtest.Store
 	gitops *gitopstest.Fake
 	set    *settingstest.Fake
+	update *update.Store
 	done   chan struct{}
 	client codefoundryv1connect.EventServiceClient
 }
@@ -48,8 +50,11 @@ func newEventsFixture(t *testing.T) *eventsFixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = set.Close() })
-	f := &eventsFixture{bus: b, repo: repotest.New(b), term: terminaltest.New(b), sess: sessiontest.New(b), gh: ghtest.New(b), gitops: gitopstest.New(b), set: set, done: make(chan struct{})}
-	route := NewEvents(EventsDeps{Bus: b, Repo: f.repo, Terminal: f.term, Session: f.sess, Gh: f.gh, GitOps: f.gitops, Settings: f.set, Done: f.done}).Route()
+	// A disabled updater: its snapshot is the status and it never checks.
+	upd := update.Start(context.Background(), update.Options{Current: "dev", DisabledReason: "dev build", Bus: b, InitialDelay: time.Hour})
+	t.Cleanup(upd.Close)
+	f := &eventsFixture{bus: b, repo: repotest.New(b), term: terminaltest.New(b), sess: sessiontest.New(b), gh: ghtest.New(b), gitops: gitopstest.New(b), set: set, update: upd, done: make(chan struct{})}
+	route := NewEvents(EventsDeps{Bus: b, Repo: f.repo, Terminal: f.term, Session: f.sess, Gh: f.gh, GitOps: f.gitops, Settings: f.set, Update: f.update, Done: f.done}).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
 	// HTTP/2 like the repo drop test: flow-control windows bound how much the handler
@@ -138,6 +143,11 @@ func describe(ev *v1.Event) string {
 			return fmt.Sprintf("settings.snapshot(%d)", sn.GetRevision())
 		}
 		return "settings.other"
+	case *v1.Event_Update:
+		if st := e.Update.GetStatus(); st != nil {
+			return "update.status " + st.GetState().String()
+		}
+		return "update.other"
 	case *v1.Event_Ui:
 		if p := e.Ui.GetOpenPalette(); p != nil {
 			return "ui.palette " + p.GetQuery()
@@ -170,6 +180,7 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 		"gh.prs o/b",
 		"gitops.snapshot(1)",
 		"settings.snapshot(1)",
+		"update.status UPDATE_STATE_IDLE",
 	}
 	for i, w := range want {
 		if got := describe(s.next()); got != w {
@@ -230,6 +241,7 @@ func TestEventsSourceFilter(t *testing.T) {
 		{"gh only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_GH}, "gh.viewer"},
 		{"gitops only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_GITOPS}, "gitops.snapshot(0)"},
 		{"settings only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_SETTINGS}, "settings.snapshot(1)"},
+		{"update only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_UPDATE}, "update.status UPDATE_STATE_IDLE"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

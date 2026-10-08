@@ -28,6 +28,10 @@ type Deps struct {
 	Settings command.SettingsBackend
 	// Reveal shows a file in Finder (settings.reveal). Nil: command.RevealInFinder.
 	Reveal command.RevealFunc
+	// Update backs app.*. Nil works like Terminal.
+	Update command.UpdateBackend
+	// Restart backs daemon.restart (see command.UpdateDeps). Nil makes it fail.
+	Restart func()
 }
 
 // Register registers every domain's commands into r.
@@ -47,6 +51,9 @@ func Register(r *command.Registry, d Deps) error {
 	if d.Settings == nil {
 		d.Settings = codefoundryv1connect.UnimplementedSettingsServiceHandler{}
 	}
+	if d.Update == nil {
+		d.Update = codefoundryv1connect.UnimplementedUpdateServiceHandler{}
+	}
 	return errors.Join(
 		command.RegisterDaemon(r, d.Daemon),
 		command.RegisterUI(r, d.Emitter),
@@ -55,5 +62,6 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterSession(r, d.Session, d.Emitter),
 		command.RegisterGitOps(r, d.GitOps),
 		command.RegisterSettings(r, d.Settings, d.Emitter, d.Reveal),
+		command.RegisterUpdate(r, command.UpdateDeps{Update: d.Update, Session: d.Session, Restart: d.Restart, Daemon: d.Daemon}),
 	)
 }

@@ -31,21 +31,25 @@ const (
 	EventSource_EVENT_SOURCE_GH          EventSource = 4
 	EventSource_EVENT_SOURCE_UI          EventSource = 5
 	EventSource_EVENT_SOURCE_GITOPS      EventSource = 6
-	// Settings snapshots; sent after gitops, before UI intents.
+	// Settings snapshots; sent after gitops, before update.
 	EventSource_EVENT_SOURCE_SETTINGS EventSource = 7
+	// Phase 3d. Numbered 10 to stay clear of the parallel Phase 3 steps. Sent after
+	// settings, before UI intents.
+	EventSource_EVENT_SOURCE_UPDATE EventSource = 10
 )
 
 // Enum value maps for EventSource.
 var (
 	EventSource_name = map[int32]string{
-		0: "EVENT_SOURCE_UNSPECIFIED",
-		1: "EVENT_SOURCE_REPO",
-		2: "EVENT_SOURCE_TERMINAL",
-		3: "EVENT_SOURCE_SESSION",
-		4: "EVENT_SOURCE_GH",
-		5: "EVENT_SOURCE_UI",
-		6: "EVENT_SOURCE_GITOPS",
-		7: "EVENT_SOURCE_SETTINGS",
+		0:  "EVENT_SOURCE_UNSPECIFIED",
+		1:  "EVENT_SOURCE_REPO",
+		2:  "EVENT_SOURCE_TERMINAL",
+		3:  "EVENT_SOURCE_SESSION",
+		4:  "EVENT_SOURCE_GH",
+		5:  "EVENT_SOURCE_UI",
+		6:  "EVENT_SOURCE_GITOPS",
+		7:  "EVENT_SOURCE_SETTINGS",
+		10: "EVENT_SOURCE_UPDATE",
 	}
 	EventSource_value = map[string]int32{
 		"EVENT_SOURCE_UNSPECIFIED": 0,
@@ -56,6 +60,7 @@ var (
 		"EVENT_SOURCE_UI":          5,
 		"EVENT_SOURCE_GITOPS":      6,
 		"EVENT_SOURCE_SETTINGS":    7,
+		"EVENT_SOURCE_UPDATE":      10,
 	}
 )
 
@@ -142,6 +147,7 @@ type Event struct {
 	//	*Event_Ui
 	//	*Event_Gitops
 	//	*Event_Settings
+	//	*Event_Update
 	Event         isEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -247,6 +253,15 @@ func (x *Event) GetSettings() *SettingsEvent {
 	return nil
 }
 
+func (x *Event) GetUpdate() *UpdateEvent {
+	if x != nil {
+		if x, ok := x.Event.(*Event_Update); ok {
+			return x.Update
+		}
+	}
+	return nil
+}
+
 type isEvent_Event interface {
 	isEvent_Event()
 }
@@ -279,6 +294,11 @@ type Event_Settings struct {
 	Settings *SettingsEvent `protobuf:"bytes,7,opt,name=settings,proto3,oneof"`
 }
 
+type Event_Update struct {
+	// Update status (snapshot: the current status) and relaunch requests.
+	Update *UpdateEvent `protobuf:"bytes,10,opt,name=update,proto3,oneof"`
+}
+
 func (*Event_Repo) isEvent_Event() {}
 
 func (*Event_Terminal) isEvent_Event() {}
@@ -293,13 +313,15 @@ func (*Event_Gitops) isEvent_Event() {}
 
 func (*Event_Settings) isEvent_Event() {}
 
+func (*Event_Update) isEvent_Event() {}
+
 var File_codefoundry_v1_events_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x19codefoundry/v1/repo.proto\x1a\x1ccodefoundry/v1/session.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x17codefoundry/v1/ui.proto\"K\n" +
+	"\x1bcodefoundry/v1/events.proto\x12\x0ecodefoundry.v1\x1a\x17codefoundry/v1/gh.proto\x1a\x1bcodefoundry/v1/gitops.proto\x1a\x19codefoundry/v1/repo.proto\x1a\x1ccodefoundry/v1/session.proto\x1a\x1dcodefoundry/v1/settings.proto\x1a\x1dcodefoundry/v1/terminal.proto\x1a\x17codefoundry/v1/ui.proto\x1a\x1bcodefoundry/v1/update.proto\"K\n" +
 	"\x12WatchEventsRequest\x125\n" +
-	"\asources\x18\x01 \x03(\x0e2\x1b.codefoundry.v1.EventSourceR\asources\"\x83\x03\n" +
+	"\asources\x18\x01 \x03(\x0e2\x1b.codefoundry.v1.EventSourceR\asources\"\xba\x03\n" +
 	"\x05Event\x12/\n" +
 	"\x04repo\x18\x01 \x01(\v2\x19.codefoundry.v1.RepoEventH\x00R\x04repo\x12;\n" +
 	"\bterminal\x18\x02 \x01(\v2\x1d.codefoundry.v1.TerminalEventH\x00R\bterminal\x128\n" +
@@ -307,8 +329,10 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\x02gh\x18\x04 \x01(\v2\x17.codefoundry.v1.GhEventH\x00R\x02gh\x12*\n" +
 	"\x02ui\x18\x05 \x01(\v2\x18.codefoundry.v1.UiIntentH\x00R\x02ui\x125\n" +
 	"\x06gitops\x18\x06 \x01(\v2\x1b.codefoundry.v1.GitOpsEventH\x00R\x06gitops\x12;\n" +
-	"\bsettings\x18\a \x01(\v2\x1d.codefoundry.v1.SettingsEventH\x00R\bsettingsB\a\n" +
-	"\x05event*\xd5\x01\n" +
+	"\bsettings\x18\a \x01(\v2\x1d.codefoundry.v1.SettingsEventH\x00R\bsettings\x125\n" +
+	"\x06update\x18\n" +
+	" \x01(\v2\x1b.codefoundry.v1.UpdateEventH\x00R\x06updateB\a\n" +
+	"\x05event*\xee\x01\n" +
 	"\vEventSource\x12\x1c\n" +
 	"\x18EVENT_SOURCE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11EVENT_SOURCE_REPO\x10\x01\x12\x19\n" +
@@ -317,7 +341,9 @@ const file_codefoundry_v1_events_proto_rawDesc = "" +
 	"\x0fEVENT_SOURCE_GH\x10\x04\x12\x13\n" +
 	"\x0fEVENT_SOURCE_UI\x10\x05\x12\x17\n" +
 	"\x13EVENT_SOURCE_GITOPS\x10\x06\x12\x19\n" +
-	"\x15EVENT_SOURCE_SETTINGS\x10\a2V\n" +
+	"\x15EVENT_SOURCE_SETTINGS\x10\a\x12\x17\n" +
+	"\x13EVENT_SOURCE_UPDATE\x10\n" +
+	"2V\n" +
 	"\fEventService\x12F\n" +
 	"\x05Watch\x12\".codefoundry.v1.WatchEventsRequest\x1a\x15.codefoundry.v1.Event\"\x000\x01B\xc0\x01\n" +
 	"\x12com.codefoundry.v1B\vEventsProtoP\x01ZDgithub.com/awaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
@@ -347,23 +373,25 @@ var file_codefoundry_v1_events_proto_goTypes = []any{
 	(*UiIntent)(nil),           // 7: codefoundry.v1.UiIntent
 	(*GitOpsEvent)(nil),        // 8: codefoundry.v1.GitOpsEvent
 	(*SettingsEvent)(nil),      // 9: codefoundry.v1.SettingsEvent
+	(*UpdateEvent)(nil),        // 10: codefoundry.v1.UpdateEvent
 }
 var file_codefoundry_v1_events_proto_depIdxs = []int32{
-	0, // 0: codefoundry.v1.WatchEventsRequest.sources:type_name -> codefoundry.v1.EventSource
-	3, // 1: codefoundry.v1.Event.repo:type_name -> codefoundry.v1.RepoEvent
-	4, // 2: codefoundry.v1.Event.terminal:type_name -> codefoundry.v1.TerminalEvent
-	5, // 3: codefoundry.v1.Event.session:type_name -> codefoundry.v1.SessionEvent
-	6, // 4: codefoundry.v1.Event.gh:type_name -> codefoundry.v1.GhEvent
-	7, // 5: codefoundry.v1.Event.ui:type_name -> codefoundry.v1.UiIntent
-	8, // 6: codefoundry.v1.Event.gitops:type_name -> codefoundry.v1.GitOpsEvent
-	9, // 7: codefoundry.v1.Event.settings:type_name -> codefoundry.v1.SettingsEvent
-	1, // 8: codefoundry.v1.EventService.Watch:input_type -> codefoundry.v1.WatchEventsRequest
-	2, // 9: codefoundry.v1.EventService.Watch:output_type -> codefoundry.v1.Event
-	9, // [9:10] is the sub-list for method output_type
-	8, // [8:9] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	0,  // 0: codefoundry.v1.WatchEventsRequest.sources:type_name -> codefoundry.v1.EventSource
+	3,  // 1: codefoundry.v1.Event.repo:type_name -> codefoundry.v1.RepoEvent
+	4,  // 2: codefoundry.v1.Event.terminal:type_name -> codefoundry.v1.TerminalEvent
+	5,  // 3: codefoundry.v1.Event.session:type_name -> codefoundry.v1.SessionEvent
+	6,  // 4: codefoundry.v1.Event.gh:type_name -> codefoundry.v1.GhEvent
+	7,  // 5: codefoundry.v1.Event.ui:type_name -> codefoundry.v1.UiIntent
+	8,  // 6: codefoundry.v1.Event.gitops:type_name -> codefoundry.v1.GitOpsEvent
+	9,  // 7: codefoundry.v1.Event.settings:type_name -> codefoundry.v1.SettingsEvent
+	10, // 8: codefoundry.v1.Event.update:type_name -> codefoundry.v1.UpdateEvent
+	1,  // 9: codefoundry.v1.EventService.Watch:input_type -> codefoundry.v1.WatchEventsRequest
+	2,  // 10: codefoundry.v1.EventService.Watch:output_type -> codefoundry.v1.Event
+	10, // [10:11] is the sub-list for method output_type
+	9,  // [9:10] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_events_proto_init() }
@@ -378,6 +406,7 @@ func file_codefoundry_v1_events_proto_init() {
 	file_codefoundry_v1_settings_proto_init()
 	file_codefoundry_v1_terminal_proto_init()
 	file_codefoundry_v1_ui_proto_init()
+	file_codefoundry_v1_update_proto_init()
 	file_codefoundry_v1_events_proto_msgTypes[1].OneofWrappers = []any{
 		(*Event_Repo)(nil),
 		(*Event_Terminal)(nil),
@@ -386,6 +415,7 @@ func file_codefoundry_v1_events_proto_init() {
 		(*Event_Ui)(nil),
 		(*Event_Gitops)(nil),
 		(*Event_Settings)(nil),
+		(*Event_Update)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

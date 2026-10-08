@@ -18,13 +18,15 @@ import type { TerminalEvent } from "./terminal_pb";
 import { file_codefoundry_v1_terminal } from "./terminal_pb";
 import type { UiIntent } from "./ui_pb";
 import { file_codefoundry_v1_ui } from "./ui_pb";
+import type { UpdateEvent } from "./update_pb";
+import { file_codefoundry_v1_update } from "./update_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file codefoundry/v1/events.proto.
  */
 export const file_codefoundry_v1_events: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIkIKEldhdGNoRXZlbnRzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygOMhsuY29kZWZvdW5kcnkudjEuRXZlbnRTb3VyY2Ui0AIKBUV2ZW50EikKBHJlcG8YASABKAsyGS5jb2RlZm91bmRyeS52MS5SZXBvRXZlbnRIABIxCgh0ZXJtaW5hbBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsRXZlbnRIABIvCgdzZXNzaW9uGAMgASgLMhwuY29kZWZvdW5kcnkudjEuU2Vzc2lvbkV2ZW50SAASJQoCZ2gYBCABKAsyFy5jb2RlZm91bmRyeS52MS5HaEV2ZW50SAASJgoCdWkYBSABKAsyGC5jb2RlZm91bmRyeS52MS5VaUludGVudEgAEi0KBmdpdG9wcxgGIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkdpdE9wc0V2ZW50SAASMQoIc2V0dGluZ3MYByABKAsyHS5jb2RlZm91bmRyeS52MS5TZXR0aW5nc0V2ZW50SABCBwoFZXZlbnQq1QEKC0V2ZW50U291cmNlEhwKGEVWRU5UX1NPVVJDRV9VTlNQRUNJRklFRBAAEhUKEUVWRU5UX1NPVVJDRV9SRVBPEAESGQoVRVZFTlRfU09VUkNFX1RFUk1JTkFMEAISGAoURVZFTlRfU09VUkNFX1NFU1NJT04QAxITCg9FVkVOVF9TT1VSQ0VfR0gQBBITCg9FVkVOVF9TT1VSQ0VfVUkQBRIXChNFVkVOVF9TT1VSQ0VfR0lUT1BTEAYSGQoVRVZFTlRfU09VUkNFX1NFVFRJTkdTEAcyVgoMRXZlbnRTZXJ2aWNlEkYKBVdhdGNoEiIuY29kZWZvdW5kcnkudjEuV2F0Y2hFdmVudHNSZXF1ZXN0GhUuY29kZWZvdW5kcnkudjEuRXZlbnQiADABQsABChJjb20uY29kZWZvdW5kcnkudjFCC0V2ZW50c1Byb3RvUAFaRGdpdGh1Yi5jb20vYXdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_gh, file_codefoundry_v1_gitops, file_codefoundry_v1_repo, file_codefoundry_v1_session, file_codefoundry_v1_settings, file_codefoundry_v1_terminal, file_codefoundry_v1_ui]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIkIKEldhdGNoRXZlbnRzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygOMhsuY29kZWZvdW5kcnkudjEuRXZlbnRTb3VyY2Ui/wIKBUV2ZW50EikKBHJlcG8YASABKAsyGS5jb2RlZm91bmRyeS52MS5SZXBvRXZlbnRIABIxCgh0ZXJtaW5hbBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsRXZlbnRIABIvCgdzZXNzaW9uGAMgASgLMhwuY29kZWZvdW5kcnkudjEuU2Vzc2lvbkV2ZW50SAASJQoCZ2gYBCABKAsyFy5jb2RlZm91bmRyeS52MS5HaEV2ZW50SAASJgoCdWkYBSABKAsyGC5jb2RlZm91bmRyeS52MS5VaUludGVudEgAEi0KBmdpdG9wcxgGIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkdpdE9wc0V2ZW50SAASMQoIc2V0dGluZ3MYByABKAsyHS5jb2RlZm91bmRyeS52MS5TZXR0aW5nc0V2ZW50SAASLQoGdXBkYXRlGAogASgLMhsuY29kZWZvdW5kcnkudjEuVXBkYXRlRXZlbnRIAEIHCgVldmVudCruAQoLRXZlbnRTb3VyY2USHAoYRVZFTlRfU09VUkNFX1VOU1BFQ0lGSUVEEAASFQoRRVZFTlRfU09VUkNFX1JFUE8QARIZChVFVkVOVF9TT1VSQ0VfVEVSTUlOQUwQAhIYChRFVkVOVF9TT1VSQ0VfU0VTU0lPThADEhMKD0VWRU5UX1NPVVJDRV9HSBAEEhMKD0VWRU5UX1NPVVJDRV9VSRAFEhcKE0VWRU5UX1NPVVJDRV9HSVRPUFMQBhIZChVFVkVOVF9TT1VSQ0VfU0VUVElOR1MQBxIXChNFVkVOVF9TT1VSQ0VfVVBEQVRFEAoyVgoMRXZlbnRTZXJ2aWNlEkYKBVdhdGNoEiIuY29kZWZvdW5kcnkudjEuV2F0Y2hFdmVudHNSZXF1ZXN0GhUuY29kZWZvdW5kcnkudjEuRXZlbnQiADABQsABChJjb20uY29kZWZvdW5kcnkudjFCC0V2ZW50c1Byb3RvUAFaRGdpdGh1Yi5jb20vYXdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_gh, file_codefoundry_v1_gitops, file_codefoundry_v1_repo, file_codefoundry_v1_session, file_codefoundry_v1_settings, file_codefoundry_v1_terminal, file_codefoundry_v1_ui, file_codefoundry_v1_update]);
 
 /**
  * @generated from message codefoundry.v1.WatchEventsRequest
@@ -94,6 +96,14 @@ export type Event = Message<"codefoundry.v1.Event"> & {
      */
     value: SettingsEvent;
     case: "settings";
+  } | {
+    /**
+     * Update status (snapshot: the current status) and relaunch requests.
+     *
+     * @generated from field: codefoundry.v1.UpdateEvent update = 10;
+     */
+    value: UpdateEvent;
+    case: "update";
   } | { case: undefined; value?: undefined };
 };
 
@@ -144,11 +154,19 @@ export enum EventSource {
   GITOPS = 6,
 
   /**
-   * Settings snapshots; sent after gitops, before UI intents.
+   * Settings snapshots; sent after gitops, before update.
    *
    * @generated from enum value: EVENT_SOURCE_SETTINGS = 7;
    */
   SETTINGS = 7,
+
+  /**
+   * Phase 3d. Numbered 10 to stay clear of the parallel Phase 3 steps. Sent after
+   * settings, before UI intents.
+   *
+   * @generated from enum value: EVENT_SOURCE_UPDATE = 10;
+   */
+  UPDATE = 10,
 }
 
 /**
@@ -168,8 +186,8 @@ export const EventSourceSchema: GenEnum<EventSource> = /*@__PURE__*/
 export const EventService: GenService<{
   /**
    * Watch streams all events. Each store's snapshot event is sent first, in the order
-   * repo, terminal, session, gh, gitops, settings, so a client can replace its state
-   * wholesale on connect.
+   * repo, terminal, session, gh, gitops, settings, update, so a client can replace its
+   * state wholesale on connect.
    *
    * @generated from rpc codefoundry.v1.EventService.Watch
    */

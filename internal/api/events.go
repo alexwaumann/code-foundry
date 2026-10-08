@@ -17,6 +17,7 @@ import (
 	"github.com/awaumann/code-foundry/internal/store/session"
 	"github.com/awaumann/code-foundry/internal/store/settings"
 	"github.com/awaumann/code-foundry/internal/store/terminal"
+	"github.com/awaumann/code-foundry/internal/store/update"
 )
 
 // terminalWatchBuffer matches terminal.Manager.Watch's per-topic bus buffer.
@@ -32,6 +33,7 @@ type EventsDeps struct {
 	Gh       gh.Service
 	GitOps   gitops.Store
 	Settings settings.Service
+	Update   update.Service
 	// Done ends every stream when closed (daemon shutdown). May be nil.
 	Done <-chan struct{}
 }
@@ -69,7 +71,8 @@ type eventSource interface {
 }
 
 // sources lists the stream's sources in the order their snapshots are sent (see
-// events.proto: repo, terminal, session, gh, gitops), followed by UI intents.
+// events.proto: repo, terminal, session, gh, gitops, settings, update), followed by UI
+// intents.
 func (h *Events) sources() []eventSource {
 	d := h.deps
 	var out []eventSource
@@ -90,6 +93,9 @@ func (h *Events) sources() []eventSource {
 	}
 	if d.Settings != nil {
 		out = append(out, settingsSource{store: d.Settings, bus: d.Bus})
+	}
+	if d.Update != nil {
+		out = append(out, updateSource{svc: d.Update, bus: d.Bus}) // api/update.go
 	}
 	out = append(out, uiSource{bus: d.Bus})
 	return out

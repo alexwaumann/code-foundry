@@ -31,6 +31,8 @@ var subcommands = []subcommand{
 	{"status", "Show daemon status, starting it if needed", runStatus},
 	{"version", "Print version information", runVersion},
 	{"commands", "List daemon commands and their availability (--context-* flags)", runCommands},
+	{"gui", "Open the app (the bundle this CLI belongs to, the dev build, or the installed app)", runGUI},
+	{"update", "Install the latest release (also --update; --version, --force, --yes)", runUpdate},
 }
 
 // errUsage marks errors already explained to the user; main exits 2 without repeating them.
@@ -79,7 +81,7 @@ func connectDaemon(ctx context.Context) (*client.Client, error) {
 // word ("daemon status") is a daemon command name, not the verb with an argument.
 func (cl *cli) dispatch(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		fmt.Fprintln(cl.stdout, "code-foundry: the GUI is launched with `code-foundry gui` (not wired up yet).")
+		fmt.Fprintln(cl.stdout, "code-foundry: open the app with `code-foundry gui`.")
 		fmt.Fprintln(cl.stdout, "Run `code-foundry help` for available commands.")
 		return nil
 	}
@@ -87,6 +89,8 @@ func (cl *cli) dispatch(ctx context.Context, args []string) error {
 	switch name {
 	case "help", "-h", "-help", "--help":
 		return cl.help(ctx, rest)
+	case "--update":
+		return runUpdate(ctx, cl, rest)
 	}
 	if sc, ok := localVerb(name); ok && (len(rest) == 0 || !isWord(rest[0])) {
 		return sc.run(ctx, cl, rest)

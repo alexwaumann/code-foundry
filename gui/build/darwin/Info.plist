@@ -10,11 +10,11 @@
         <key>CFBundleIdentifier</key>
             <string>dev.awaumann.codefoundry</string>
         <key>CFBundleVersion</key>
-            <string>0.1.0</string>
+            <string>0.0.0</string>
         <key>CFBundleGetInfoString</key>
             <string>(c) 2026 Alejandro Waumann</string>
         <key>CFBundleShortVersionString</key>
-            <string>0.1.0</string>
+            <string>0.0.0</string>
         <key>CFBundleIconFile</key>
             <string>icons</string>
         <key>CFBundleIconName</key>

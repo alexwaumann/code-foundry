@@ -6,6 +6,7 @@ import { toSessionEventView, type SessionEventView } from "./session";
 import { toSettingsSnapshotView, type SettingsSnapshotView } from "./settings";
 import { toTerminalEventView, type TerminalEventView } from "./terminal";
 import { toUiIntentView, type UiIntentView } from "./ui";
+import { toUpdateEventView, type UpdateEventView } from "./update";
 
 /** GhService change notification (re-read the cached data). */
 export type GhEventView = { kind: "pullRequests"; repoSlug: string } | { kind: "viewer" };
@@ -21,7 +22,8 @@ export type EventView =
   | { source: "gh"; event: GhEventView }
   | { source: "gitops"; event: GitOpsEventView }
   | { source: "ui"; event: UiIntentView }
-  | { source: "settings"; event: SettingsSnapshotView };
+  | { source: "settings"; event: SettingsSnapshotView }
+  | { source: "update"; event: UpdateEventView };
 
 export function toEventView(ev: Event): EventView | null {
   const e = ev.event;
@@ -55,6 +57,10 @@ export function toEventView(ev: Event): EventView | null {
     case "settings": {
       const s = e.value.event;
       return s.case === "snapshot" ? { source: "settings", event: toSettingsSnapshotView(s.value) } : null;
+    }
+    case "update": {
+      const v = toUpdateEventView(e.value);
+      return v && { source: "update", event: v };
     }
     default:
       return null;

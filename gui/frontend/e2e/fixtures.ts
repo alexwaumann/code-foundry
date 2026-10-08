@@ -16,6 +16,7 @@ export interface Invocation {
   name: string;
   context: { activeTerminalId: string; activeSessionId: string; activeRepoId: string; activeWorktreePath: string; activeView: string } | null;
   args: Record<string, string>;
+  confirmed?: boolean;
 }
 
 export async function invocations(): Promise<Invocation[]> {
