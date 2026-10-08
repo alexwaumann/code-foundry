@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/repo.proto.
  */
 export const file_codefoundry_v1_repo: GenFile = /*@__PURE__*/
-  fileDesc("Chljb2RlZm91bmRyeS92MS9yZXBvLnByb3RvEg5jb2RlZm91bmRyeS52MSKIAQoEUmVwbxIKCgJpZBgBIAEoCRIMCgRwYXRoGAIgASgJEgwKBG5hbWUYAyABKAkSFgoOZGVmYXVsdF9icmFuY2gYBCABKAkSEwoLZ2l0aHViX3NsdWcYBSABKAkSKwoJd29ya3RyZWVzGAYgAygLMhguY29kZWZvdW5kcnkudjEuV29ya3RyZWUigwEKCFdvcmt0cmVlEg8KB3JlcG9faWQYASABKAkSDAoEcGF0aBgCIAEoCRIOCgZicmFuY2gYAyABKAkSDAoEaGVhZBgEIAEoCRIPCgdpc19tYWluGAUgASgIEikKBnN0YXR1cxgGIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkdpdFN0YXR1cyKyAQoJR2l0U3RhdHVzEhAKCHVwc3RyZWFtGAEgASgJEg0KBWFoZWFkGAIgASgFEg4KBmJlaGluZBgDIAEoBRIOCgZzdGFnZWQYBCABKAUSEAoIbW9kaWZpZWQYBSABKAUSEQoJdW50cmFja2VkGAYgASgFEg0KBWRpcnR5GAcgASgIEjAKDHJlZnJlc2hlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiIwoTUmVnaXN0ZXJSZXBvUmVxdWVzdBIMCgRwYXRoGAEgASgJIjoKFFJlZ2lzdGVyUmVwb1Jlc3BvbnNlEiIKBHJlcG8YASABKAsyFC5jb2RlZm91bmRyeS52MS5SZXBvIiMKFVVucmVnaXN0ZXJSZXBvUmVxdWVzdBIKCgJpZBgBIAEoCSIYChZVbnJlZ2lzdGVyUmVwb1Jlc3BvbnNlIhIKEExpc3RSZXBvc1JlcXVlc3QiOAoRTGlzdFJlcG9zUmVzcG9uc2USIwoFcmVwb3MYASADKAsyFC5jb2RlZm91bmRyeS52MS5SZXBvIhwKDkdldFJlcG9SZXF1ZXN0EgoKAmlkGAEgASgJIjUKD0dldFJlcG9SZXNwb25zZRIiCgRyZXBvGAEgASgLMhQuY29kZWZvdW5kcnkudjEuUmVwbyJYChVDcmVhdGVXb3JrdHJlZVJlcXVlc3QSDwoHcmVwb19pZBgBIAEoCRIOCgZicmFuY2gYAiABKAkSEAoIYmFzZV9yZWYYAyABKAkSDAoEcGF0aBgEIAEoCSJEChZDcmVhdGVXb3JrdHJlZVJlc3BvbnNlEioKCHdvcmt0cmVlGAEgASgLMhguY29kZWZvdW5kcnkudjEuV29ya3RyZWUiXAoVUmVtb3ZlV29ya3RyZWVSZXF1ZXN0Eg8KB3JlcG9faWQYASABKAkSDAoEcGF0aBgCIAEoCRIVCg1kZWxldGVfYnJhbmNoGAMgASgIEg0KBWZvcmNlGAQgASgIIhgKFlJlbW92ZVdvcmt0cmVlUmVzcG9uc2UiIAoSUmVmcmVzaFJlcG9SZXF1ZXN0EgoKAmlkGAEgASgJIhUKE1JlZnJlc2hSZXBvUmVzcG9uc2UiEwoRV2F0Y2hSZXBvc1JlcXVlc3QizAEKCVJlcG9FdmVudBIsCgxyZXBvX3VwZGF0ZWQYASABKAsyFC5jb2RlZm91bmRyeS52MS5SZXBvSAASGQoPcmVwb19yZW1vdmVkX2lkGAIgASgJSAASNAoQd29ya3RyZWVfdXBkYXRlZBgDIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLldvcmt0cmVlSAASNwoQd29ya3RyZWVfcmVtb3ZlZBgEIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLldvcmt0cmVlUmVmSABCBwoFZXZlbnQiLAoLV29ya3RyZWVSZWYSDwoHcmVwb19pZBgBIAEoCRIMCgRwYXRoGAIgASgJMsUFCgtSZXBvU2VydmljZRJXCghSZWdpc3RlchIjLmNvZGVmb3VuZHJ5LnYxLlJlZ2lzdGVyUmVwb1JlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5SZWdpc3RlclJlcG9SZXNwb25zZSIAEl0KClVucmVnaXN0ZXISJS5jb2RlZm91bmRyeS52MS5VbnJlZ2lzdGVyUmVwb1JlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5VbnJlZ2lzdGVyUmVwb1Jlc3BvbnNlIgASTQoETGlzdBIgLmNvZGVmb3VuZHJ5LnYxLkxpc3RSZXBvc1JlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5MaXN0UmVwb3NSZXNwb25zZSIAEkgKA0dldBIeLmNvZGVmb3VuZHJ5LnYxLkdldFJlcG9SZXF1ZXN0Gh8uY29kZWZvdW5kcnkudjEuR2V0UmVwb1Jlc3BvbnNlIgASYQoOQ3JlYXRlV29ya3RyZWUSJS5jb2RlZm91bmRyeS52MS5DcmVhdGVXb3JrdHJlZVJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5DcmVhdGVXb3JrdHJlZVJlc3BvbnNlIgASYQoOUmVtb3ZlV29ya3RyZWUSJS5jb2RlZm91bmRyeS52MS5SZW1vdmVXb3JrdHJlZVJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5SZW1vdmVXb3JrdHJlZVJlc3BvbnNlIgASVAoHUmVmcmVzaBIiLmNvZGVmb3VuZHJ5LnYxLlJlZnJlc2hSZXBvUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlJlZnJlc2hSZXBvUmVzcG9uc2UiABJJCgVXYXRjaBIhLmNvZGVmb3VuZHJ5LnYxLldhdGNoUmVwb3NSZXF1ZXN0GhkuY29kZWZvdW5kcnkudjEuUmVwb0V2ZW50IgAwAUK+AQoSY29tLmNvZGVmb3VuZHJ5LnYxQglSZXBvUHJvdG9QAVpEZ2l0aHViLmNvbS9hd2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp]);
+  fileDesc("Chljb2RlZm91bmRyeS92MS9yZXBvLnByb3RvEg5jb2RlZm91bmRyeS52MSLKAQoEUmVwbxIKCgJpZBgBIAEoCRIMCgRwYXRoGAIgASgJEgwKBG5hbWUYAyABKAkSFgoOZGVmYXVsdF9icmFuY2gYBCABKAkSEwoLZ2l0aHViX3NsdWcYBSABKAkSKwoJd29ya3RyZWVzGAYgAygLMhguY29kZWZvdW5kcnkudjEuV29ya3RyZWUSMQoNcmVnaXN0ZXJlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDQoFZXJyb3IYCCABKAkilQEKCFdvcmt0cmVlEg8KB3JlcG9faWQYASABKAkSDAoEcGF0aBgCIAEoCRIOCgZicmFuY2gYAyABKAkSDAoEaGVhZBgEIAEoCRIPCgdpc19tYWluGAUgASgIEikKBnN0YXR1cxgGIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkdpdFN0YXR1cxIQCghkZXRhY2hlZBgHIAEoCCKQAgoJR2l0U3RhdHVzEhAKCHVwc3RyZWFtGAEgASgJEg0KBWFoZWFkGAIgASgFEg4KBmJlaGluZBgDIAEoBRIOCgZzdGFnZWQYBCABKAUSEAoIbW9kaWZpZWQYBSABKAUSEQoJdW50cmFja2VkGAYgASgFEg0KBWRpcnR5GAcgASgIEjAKDHJlZnJlc2hlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEgoKY29uZmxpY3RlZBgJIAEoBRIQCghiYXNlX3JlZhgKIAEoCRISCgpiYXNlX2FoZWFkGAsgASgFEhMKC2Jhc2VfYmVoaW5kGAwgASgFEg0KBWVycm9yGA0gASgJIiMKE1JlZ2lzdGVyUmVwb1JlcXVlc3QSDAoEcGF0aBgBIAEoCSI6ChRSZWdpc3RlclJlcG9SZXNwb25zZRIiCgRyZXBvGAEgASgLMhQuY29kZWZvdW5kcnkudjEuUmVwbyIjChVVbnJlZ2lzdGVyUmVwb1JlcXVlc3QSCgoCaWQYASABKAkiGAoWVW5yZWdpc3RlclJlcG9SZXNwb25zZSISChBMaXN0UmVwb3NSZXF1ZXN0IjgKEUxpc3RSZXBvc1Jlc3BvbnNlEiMKBXJlcG9zGAEgAygLMhQuY29kZWZvdW5kcnkudjEuUmVwbyIcCg5HZXRSZXBvUmVxdWVzdBIKCgJpZBgBIAEoCSI1Cg9HZXRSZXBvUmVzcG9uc2USIgoEcmVwbxgBIAEoCzIULmNvZGVmb3VuZHJ5LnYxLlJlcG8iWAoVQ3JlYXRlV29ya3RyZWVSZXF1ZXN0Eg8KB3JlcG9faWQYASABKAkSDgoGYnJhbmNoGAIgASgJEhAKCGJhc2VfcmVmGAMgASgJEgwKBHBhdGgYBCABKAkiRAoWQ3JlYXRlV29ya3RyZWVSZXNwb25zZRIqCgh3b3JrdHJlZRgBIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLldvcmt0cmVlIlwKFVJlbW92ZVdvcmt0cmVlUmVxdWVzdBIPCgdyZXBvX2lkGAEgASgJEgwKBHBhdGgYAiABKAkSFQoNZGVsZXRlX2JyYW5jaBgDIAEoCBINCgVmb3JjZRgEIAEoCCIYChZSZW1vdmVXb3JrdHJlZVJlc3BvbnNlIiAKElJlZnJlc2hSZXBvUmVxdWVzdBIKCgJpZBgBIAEoCSIVChNSZWZyZXNoUmVwb1Jlc3BvbnNlIhMKEVdhdGNoUmVwb3NSZXF1ZXN0IswBCglSZXBvRXZlbnQSLAoMcmVwb191cGRhdGVkGAEgASgLMhQuY29kZWZvdW5kcnkudjEuUmVwb0gAEhkKD3JlcG9fcmVtb3ZlZF9pZBgCIAEoCUgAEjQKEHdvcmt0cmVlX3VwZGF0ZWQYAyABKAsyGC5jb2RlZm91bmRyeS52MS5Xb3JrdHJlZUgAEjcKEHdvcmt0cmVlX3JlbW92ZWQYBCABKAsyGy5jb2RlZm91bmRyeS52MS5Xb3JrdHJlZVJlZkgAQgcKBWV2ZW50IiwKC1dvcmt0cmVlUmVmEg8KB3JlcG9faWQYASABKAkSDAoEcGF0aBgCIAEoCTLFBQoLUmVwb1NlcnZpY2USVwoIUmVnaXN0ZXISIy5jb2RlZm91bmRyeS52MS5SZWdpc3RlclJlcG9SZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuUmVnaXN0ZXJSZXBvUmVzcG9uc2UiABJdCgpVbnJlZ2lzdGVyEiUuY29kZWZvdW5kcnkudjEuVW5yZWdpc3RlclJlcG9SZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuVW5yZWdpc3RlclJlcG9SZXNwb25zZSIAEk0KBExpc3QSIC5jb2RlZm91bmRyeS52MS5MaXN0UmVwb3NSZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuTGlzdFJlcG9zUmVzcG9uc2UiABJICgNHZXQSHi5jb2RlZm91bmRyeS52MS5HZXRSZXBvUmVxdWVzdBofLmNvZGVmb3VuZHJ5LnYxLkdldFJlcG9SZXNwb25zZSIAEmEKDkNyZWF0ZVdvcmt0cmVlEiUuY29kZWZvdW5kcnkudjEuQ3JlYXRlV29ya3RyZWVSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuQ3JlYXRlV29ya3RyZWVSZXNwb25zZSIAEmEKDlJlbW92ZVdvcmt0cmVlEiUuY29kZWZvdW5kcnkudjEuUmVtb3ZlV29ya3RyZWVSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuUmVtb3ZlV29ya3RyZWVSZXNwb25zZSIAElQKB1JlZnJlc2gSIi5jb2RlZm91bmRyeS52MS5SZWZyZXNoUmVwb1JlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5SZWZyZXNoUmVwb1Jlc3BvbnNlIgASSQoFV2F0Y2gSIS5jb2RlZm91bmRyeS52MS5XYXRjaFJlcG9zUmVxdWVzdBoZLmNvZGVmb3VuZHJ5LnYxLlJlcG9FdmVudCIAMAFCvgEKEmNvbS5jb2RlZm91bmRyeS52MUIJUmVwb1Byb3RvUAFaRGdpdGh1Yi5jb20vYXdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.Repo
@@ -55,6 +55,21 @@ export type Repo = Message<"codefoundry.v1.Repo"> & {
    * @generated from field: repeated codefoundry.v1.Worktree worktrees = 6;
    */
   worktrees: Worktree[];
+
+  /**
+   * When the repository was registered.
+   *
+   * @generated from field: google.protobuf.Timestamp registered_at = 7;
+   */
+  registeredAt?: Timestamp | undefined;
+
+  /**
+   * Non-empty when the last reconcile failed (for example, the directory was moved or
+   * deleted). The repo stays registered; worktrees are empty until it recovers.
+   *
+   * @generated from field: string error = 8;
+   */
+  error: string;
 };
 
 /**
@@ -97,6 +112,13 @@ export type Worktree = Message<"codefoundry.v1.Worktree"> & {
    * @generated from field: codefoundry.v1.GitStatus status = 6;
    */
   status?: GitStatus | undefined;
+
+  /**
+   * HEAD is detached (branch is empty).
+   *
+   * @generated from field: bool detached = 7;
+   */
+  detached: boolean;
 };
 
 /**
@@ -149,6 +171,39 @@ export type GitStatus = Message<"codefoundry.v1.GitStatus"> & {
    * @generated from field: google.protobuf.Timestamp refreshed_at = 8;
    */
   refreshedAt?: Timestamp | undefined;
+
+  /**
+   * Unmerged (conflicted) entries. Counted in dirty, not in staged or modified.
+   *
+   * @generated from field: int32 conflicted = 9;
+   */
+  conflicted: number;
+
+  /**
+   * HEAD compared with the default branch on origin (for example "origin/main"), from
+   * `git rev-list --left-right --count HEAD...<base_ref>`. base_ref is empty when that
+   * remote-tracking ref does not exist. ahead/behind above are against the upstream.
+   *
+   * @generated from field: string base_ref = 10;
+   */
+  baseRef: string;
+
+  /**
+   * @generated from field: int32 base_ahead = 11;
+   */
+  baseAhead: number;
+
+  /**
+   * @generated from field: int32 base_behind = 12;
+   */
+  baseBehind: number;
+
+  /**
+   * Non-empty when the last status refresh failed; the other fields are then stale.
+   *
+   * @generated from field: string error = 13;
+   */
+  error: string;
 };
 
 /**
@@ -417,6 +472,10 @@ export const RefreshRepoResponseSchema: GenMessage<RefreshRepoResponse> = /*@__P
   messageDesc(file_codefoundry_v1_repo, 16);
 
 /**
+ * Watch first replays the current state as one repo_updated event per repository, then
+ * streams live changes. Events are ordered: each reflects the snapshot at the moment it
+ * was published. repo_updated replaces the whole repo, including its worktree list.
+ *
  * @generated from message codefoundry.v1.WatchReposRequest
  */
 export type WatchReposRequest = Message<"codefoundry.v1.WatchReposRequest"> & {
