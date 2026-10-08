@@ -7,14 +7,14 @@ import { GhEventSchema } from "@/gen/codefoundry/v1/gh_pb";
 import { RepoEventSchema, RepoSchema } from "@/gen/codefoundry/v1/repo_pb";
 import { SessionEventSchema, SessionSchema, SessionState, SessionStatus } from "@/gen/codefoundry/v1/session_pb";
 import { AttachEventSchema, TerminalEventSchema, TerminalSchema, TerminalState } from "@/gen/codefoundry/v1/terminal_pb";
-import { UiIntent_Notify_Level, UiIntentSchema, type UiIntent } from "@/gen/codefoundry/v1/ui_pb";
+import { UiIntent_Notify_Level, UiIntentSchema } from "@/gen/codefoundry/v1/ui_pb";
 import { toCommandView } from "./command";
 import { overrideEndpoint } from "./endpoint";
 import { toEventView } from "./events";
 import { toRepoEventView, toRepoView } from "./repo";
 import { toSessionView } from "./session";
 import { toAttachEventView, toTerminalEventView, toTerminalView } from "./terminal";
-import { hasFocusSessionIntent, toUiIntentView } from "./ui";
+import { toUiIntentView } from "./ui";
 
 describe("terminal mapping", () => {
   it("maps a Terminal to its view model", () => {
@@ -114,6 +114,7 @@ describe("command mapping", () => {
 describe("ui intent mapping", () => {
   it.each([
     [{ case: "focusTerminal" as const, value: { terminalId: "t" } }, { kind: "focusTerminal", terminalId: "t" }],
+    [{ case: "focusSession" as const, value: { sessionId: "s1" } }, { kind: "focusSession", sessionId: "s1" }],
     [{ case: "focusRepo" as const, value: { repoId: "r", worktreePath: "/w" } }, { kind: "focusRepo", repoId: "r", worktreePath: "/w" }],
     [{ case: "openPalette" as const, value: { query: "new" } }, { kind: "openPalette", query: "new" }],
     [
@@ -123,19 +124,6 @@ describe("ui intent mapping", () => {
     [{ case: "notify" as const, value: { title: "x" } }, { kind: "notify", level: "info", title: "x", body: "" }],
   ])("maps %#", (intent, want) => {
     expect(toUiIntentView(create(UiIntentSchema, { intent }))).toEqual(want);
-  });
-});
-
-describe("focus_session intent (ui.proto addition from Phase 2a)", () => {
-  // Enabled automatically once `make gen` brings FocusSession into the generated UiIntent.
-  it.runIf(hasFocusSessionIntent)("maps the generated FocusSession", () => {
-    const intent = create(UiIntentSchema, { intent: { case: "focusSession", value: { sessionId: "s1" } } } as never);
-    expect(toUiIntentView(intent)).toEqual({ kind: "focusSession", sessionId: "s1" });
-  });
-
-  it("maps a focusSession case by name before the generated type has it", () => {
-    const loose = { $typeName: "codefoundry.v1.UiIntent", intent: { case: "focusSession", value: { sessionId: "s1" } } } as unknown as UiIntent;
-    expect(toUiIntentView(loose)).toEqual({ kind: "focusSession", sessionId: "s1" });
   });
 });
 

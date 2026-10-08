@@ -42,8 +42,7 @@ export function parseIntent(argv: readonly string[]): Intent | null {
 async function main(): Promise<void> {
   const baseUrl = process.env.MOCK_URL ?? "http://127.0.0.1:7788";
   const [verb, id] = process.argv.slice(2);
-  // FocusSession is not in the generated UiIntent until Phase 2a; the mock emits it (or a
-  // FocusTerminal stand-in) through its control endpoint.
+  // focus-session goes through the mock's control endpoint, which checks the id.
   if (verb === "focus-session" && id) {
     const res = await fetch(`${baseUrl}/__mock/session/focus?id=${encodeURIComponent(id)}`, { method: "POST" });
     console.log(await res.text());

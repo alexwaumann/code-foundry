@@ -13,7 +13,7 @@
  *   POST /__mock/session/attention?id=s-1
  *   POST /__mock/session/status?id=s-1&status=busy|idle|attention
  *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139
- *   POST /__mock/session/focus?id=s-3     (FocusSession intent; FocusTerminal before 2a)
+ *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
  *   POST /__mock/sessions-service?enabled=false   (simulate a daemon without SessionService)
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";

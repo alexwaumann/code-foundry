@@ -1,9 +1,7 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import { CF, emit, invocations, mockPost, openApp, openStreams, resetMock, row } from "./fixtures";
 
 const FIX_RESIZE = `${CF}.worktrees/fix-resize`;
-const hasFocusSession = UiIntentSchema.fields.some((f) => f.localName === "focusSession");
 
 test.beforeEach(async () => {
   await resetMock();
@@ -182,8 +180,6 @@ test("FocusTerminal on a session's terminal selects the session", async ({ page 
 });
 
 test("FocusSession intent selects the session", async ({ page }) => {
-  // TODO(phase2a merge): runs once ui.proto has FocusSession and `make gen` has run.
-  test.skip(!hasFocusSession, "UiIntent.FocusSession is added to ui.proto by Phase 2a");
   await openApp(page);
   await expect.poll(async () => ((await mockPost("session/focus?id=s-3")) as { delivered: number }).delivered).toBeGreaterThan(0);
   await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");

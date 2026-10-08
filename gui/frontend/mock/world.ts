@@ -23,9 +23,6 @@ type SessionInit = MessageInitShape<typeof SessionSchema>;
 type SessionEventInit = MessageInitShape<typeof SessionEventSchema>;
 export type EventInit = MessageInitShape<typeof EventSchema>;
 
-/** True once ui.proto has FocusSession (Phase 2a); until then FocusTerminal stands in. */
-export const hasFocusSession = UiIntentSchema.fields.some((f) => f.localName === "focusSession");
-
 interface MockSession {
   id: string;
   claudeSessionId: string;
@@ -317,11 +314,10 @@ export class World {
     this.publishSession(s);
   }
 
-  /** Emits FocusSession when ui.proto has it (Phase 2a), else FocusTerminal on its terminal. */
+  /** Emits FocusSession for an existing session. */
   focusSession(id: string): number {
-    const s = this.session(id);
-    if (hasFocusSession) return this.emit({ intent: { case: "focusSession", value: { sessionId: id } } } as never);
-    return s.terminalId ? this.emit({ intent: { case: "focusTerminal", value: { terminalId: s.terminalId } } }) : 0;
+    this.session(id);
+    return this.emit({ intent: { case: "focusSession", value: { sessionId: id } } });
   }
 
   /** UiService.Emit: delivered to UiService watchers and EventService watchers with UI. */
