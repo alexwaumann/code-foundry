@@ -145,9 +145,17 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 		fs.Var(flags[i], a.GetName(), a.GetDescription())
 	}
 	asJSON := fs.Bool("json", false, "print the structured result as JSON")
+	yes := new(bool)
+	if cmd.GetRequiresConfirmation() {
+		fs.BoolVar(yes, "yes", false, "do not ask for confirmation")
+	}
 	cf := cl.addContextFlags(fs)
-	if err := cl.parseFlags(fs, rest); err != nil {
+	words, err := cl.parseWithPositionals(fs, rest)
+	if err != nil {
 		return quietHelp(err)
+	}
+	if err := cl.assignPositionals(fs, flags, words); err != nil {
+		return err
 	}
 
 	uctx, err := cl.uiContext(cf)
@@ -168,13 +176,9 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 		vals[f.spec.GetName()] = v
 	}
 
-	c, err := cl.connect(ctx)
+	res, err := cl.invoke(ctx, cmd, uctx, vals, *yes)
 	if err != nil {
 		return err
-	}
-	res, err := c.InvokeCommand(ctx, cmd.GetName(), uctx, vals)
-	if err != nil {
-		return cl.invokeFailed(cmd.GetName(), err)
 	}
 	switch {
 	case *asJSON && res.GetResultJson() != "":
@@ -256,8 +260,9 @@ func printCommandHelp(w io.Writer, cmd *v1.Command) {
 	if d := cmd.GetDescription(); d != "" {
 		fmt.Fprintf(w, "\n%s\n", d)
 	}
-	fmt.Fprintf(w, "\nUsage:\n  code-foundry %s [flags]\n  code-foundry %s [flags]\n",
-		name, strings.ReplaceAll(name, ".", " "))
+	pos := positionalUsage(cmd)
+	fmt.Fprintf(w, "\nUsage:\n  code-foundry %s%s [flags]\n  code-foundry %s%s [flags]\n",
+		name, pos, strings.ReplaceAll(name, ".", " "), pos)
 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	if len(cmd.GetArgs()) > 0 {
@@ -268,6 +273,9 @@ func printCommandHelp(w io.Writer, cmd *v1.Command) {
 	}
 	fmt.Fprintln(tw, "\nCommon flags:")
 	fmt.Fprintln(tw, "  --json\tprint the structured result as JSON")
+	if cmd.GetRequiresConfirmation() {
+		fmt.Fprintln(tw, "  --yes\tdo not ask for confirmation (required without a terminal)")
+	}
 	fmt.Fprintln(tw, "  --context-terminal id\tactive terminal, for availability and defaults")
 	fmt.Fprintln(tw, "  --context-session id\tactive session")
 	fmt.Fprintln(tw, "  --context-repo id\tactive repository")
