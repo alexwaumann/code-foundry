@@ -1,0 +1,16 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4997,
+      "resetAt": "2026-10-08T07:02:16Z"
+    },
+    "viewer": {
+      "login": "octocat",
+      "name": "The Octocat",
+      "avatarUrl": "https://avatars.githubusercontent.com/u/583231?v=4",
+      "url": "https://github.com/octocat"
+    }
+  }
+}

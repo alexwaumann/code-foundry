@@ -97,6 +97,7 @@ func Run(ctx context.Context, opts Options) error {
 		api.NewUI(events).Route(),
 		terminalAPI.Route(),
 		repoAPI.Route(),
+		api.NewGh(st.gh, events, ctx.Done()).Route(),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {

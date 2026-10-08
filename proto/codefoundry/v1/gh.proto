@@ -1,0 +1,263 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// GhService exposes GitHub data (viewer, open pull requests, checks) for tracked
+// repositories. The daemon polls GitHub through the user's authenticated `gh` CLI on a
+// paced loop and caches results in SQLite, so reads are served from the last-known state
+// and never wait on the network. Every response carries fetched_at so the UI can show
+// staleness; an unset fetched_at means "never fetched".
+//
+// Repositories are identified by their "owner/name" slug (RepoService's github_slug).
+// Slugs are case-insensitive and are normalised to lower case.
+service GhService {
+  // GetViewer returns the authenticated GitHub user.
+  rpc GetViewer(GetViewerRequest) returns (GetViewerResponse) {}
+  // ListPullRequests returns the cached open pull requests of a repository, most recently
+  // updated first, each with a rollup of its head commit's checks. It never blocks on
+  // GitHub; use Refresh to force a fetch. An untracked, never-fetched repository returns
+  // an empty list with fetched_at unset.
+  rpc ListPullRequests(ListPullRequestsRequest) returns (ListPullRequestsResponse) {}
+  // GetPullRequest returns one pull request with the full list of its head commit's
+  // checks. Served from cache when fresh (30s), otherwise fetched through the paced
+  // queue; on fetch failure the stale cached copy is returned with last_error set.
+  rpc GetPullRequest(GetPullRequestRequest) returns (GetPullRequestResponse) {}
+  // ListChecks returns the checks for a ref (branch name, tag, or commit SHA). Same
+  // caching rules as GetPullRequest.
+  rpc ListChecks(ListChecksRequest) returns (ListChecksResponse) {}
+  // Refresh fetches a repository's pull requests now (through the paced queue) and
+  // returns when the fetch has completed. An empty repo_slug marks every tracked
+  // repository and the viewer due immediately and returns without waiting.
+  rpc Refresh(RefreshGhRequest) returns (RefreshGhResponse) {}
+  // Track adds a repository to the polling loop. RepoService calls this for every
+  // registered repository with a GitHub remote; it is exposed for the CLI and debugging.
+  rpc Track(TrackGhRepoRequest) returns (TrackGhRepoResponse) {}
+  // Untrack removes a repository from the polling loop. Its cache is kept.
+  rpc Untrack(UntrackGhRepoRequest) returns (UntrackGhRepoResponse) {}
+  // Watch streams change notifications. Clients re-read with the List/Get RPCs.
+  rpc Watch(WatchGhRequest) returns (stream GhEvent) {}
+}
+
+// GitHub's pull request review decision.
+enum ReviewDecision {
+  // No review policy applies, or GitHub did not report one.
+  REVIEW_DECISION_UNSPECIFIED = 0;
+  REVIEW_DECISION_APPROVED = 1;
+  REVIEW_DECISION_CHANGES_REQUESTED = 2;
+  REVIEW_DECISION_REVIEW_REQUIRED = 3;
+}
+
+// Whether the pull request can be merged without conflicts.
+enum Mergeable {
+  MERGEABLE_UNSPECIFIED = 0;
+  MERGEABLE_MERGEABLE = 1;
+  MERGEABLE_CONFLICTING = 2;
+  // GitHub has not computed mergeability yet (it does so lazily after a push).
+  MERGEABLE_UNKNOWN = 3;
+}
+
+// GitHub's merge state, which folds in branch protection and check results.
+enum MergeStateStatus {
+  MERGE_STATE_STATUS_UNSPECIFIED = 0;
+  MERGE_STATE_STATUS_BEHIND = 1;
+  MERGE_STATE_STATUS_BLOCKED = 2;
+  MERGE_STATE_STATUS_CLEAN = 3;
+  MERGE_STATE_STATUS_DIRTY = 4;
+  MERGE_STATE_STATUS_HAS_HOOKS = 5;
+  MERGE_STATE_STATUS_UNKNOWN = 6;
+  MERGE_STATE_STATUS_UNSTABLE = 7;
+  MERGE_STATE_STATUS_DRAFT = 8;
+}
+
+// Combined state of all checks on a commit (GitHub's StatusCheckRollup.state).
+enum CheckRollupState {
+  // The commit has no checks.
+  CHECK_ROLLUP_STATE_UNSPECIFIED = 0;
+  CHECK_ROLLUP_STATE_PENDING = 1;
+  CHECK_ROLLUP_STATE_SUCCESS = 2;
+  CHECK_ROLLUP_STATE_FAILURE = 3;
+  CHECK_ROLLUP_STATE_ERROR = 4;
+  CHECK_ROLLUP_STATE_EXPECTED = 5;
+}
+
+// Lifecycle of one check.
+enum CheckStatus {
+  CHECK_STATUS_UNSPECIFIED = 0;
+  CHECK_STATUS_QUEUED = 1;
+  CHECK_STATUS_IN_PROGRESS = 2;
+  CHECK_STATUS_COMPLETED = 3;
+  CHECK_STATUS_WAITING = 4;
+  CHECK_STATUS_PENDING = 5;
+  CHECK_STATUS_REQUESTED = 6;
+}
+
+// Result of a completed check. Commit statuses (the legacy status API) map ERROR and
+// FAILURE to FAILURE, SUCCESS to SUCCESS, and PENDING/EXPECTED to an unspecified
+// conclusion with status PENDING.
+enum CheckConclusion {
+  CHECK_CONCLUSION_UNSPECIFIED = 0;
+  CHECK_CONCLUSION_SUCCESS = 1;
+  CHECK_CONCLUSION_FAILURE = 2;
+  CHECK_CONCLUSION_NEUTRAL = 3;
+  CHECK_CONCLUSION_CANCELLED = 4;
+  CHECK_CONCLUSION_SKIPPED = 5;
+  CHECK_CONCLUSION_TIMED_OUT = 6;
+  CHECK_CONCLUSION_ACTION_REQUIRED = 7;
+  CHECK_CONCLUSION_STALE = 8;
+  CHECK_CONCLUSION_STARTUP_FAILURE = 9;
+}
+
+message GhViewer {
+  string login = 1;
+  string name = 2;
+  string avatar_url = 3;
+  string url = 4;
+}
+
+// Counts of a commit's checks, bucketed for display.
+message CheckRollup {
+  CheckRollupState state = 1;
+  int32 total = 2;
+  // Completed successfully.
+  int32 passed = 3;
+  // Failure, error, timed out, cancelled, action required, startup failure.
+  int32 failed = 4;
+  // Queued, in progress, waiting, pending, expected.
+  int32 pending = 5;
+  // Skipped, neutral, stale.
+  int32 skipped = 6;
+}
+
+message PullRequest {
+  string repo_slug = 1;
+  int32 number = 2;
+  string title = 3;
+  // Author login; empty for deleted ("ghost") accounts.
+  string author = 4;
+  string head_ref = 5;
+  string head_sha = 6;
+  string base_ref = 7;
+  bool draft = 8;
+  ReviewDecision review_decision = 9;
+  Mergeable mergeable = 10;
+  // Set by GetPullRequest only: GitHub computes it per PR and it is too slow for lists
+  // (measured: 100 PRs per page exceeds GitHub's 10s query timeout).
+  MergeStateStatus merge_state_status = 11;
+  // True when the head branch lives in a fork.
+  bool is_cross_repository = 12;
+  // "owner/name" of the head repository; empty when the fork was deleted. Set by
+  // GetPullRequest only.
+  string head_repo_slug = 13;
+  string url = 14;
+  google.protobuf.Timestamp updated_at = 15;
+  CheckRollup checks = 16;
+}
+
+message CheckRun {
+  string name = 1;
+  // Workflow name for GitHub Actions jobs, empty otherwise.
+  string workflow = 2;
+  CheckStatus status = 3;
+  CheckConclusion conclusion = 4;
+  // Details page (Actions job log, external CI page, or status target URL).
+  string url = 5;
+  // Status description for commit statuses; empty for check runs.
+  string description = 6;
+  google.protobuf.Timestamp started_at = 7;
+  google.protobuf.Timestamp completed_at = 8;
+}
+
+message GetViewerRequest {}
+
+message GetViewerResponse {
+  // Unset until the first successful fetch (or cache load).
+  GhViewer viewer = 1;
+  // False once gh reported that it is not authenticated.
+  bool authenticated = 2;
+  google.protobuf.Timestamp fetched_at = 3;
+  // The last fetch error, cleared on success.
+  string last_error = 4;
+}
+
+message ListPullRequestsRequest {
+  string repo_slug = 1;
+}
+
+message ListPullRequestsResponse {
+  repeated PullRequest pull_requests = 1;
+  // Whether the repository is in the polling loop.
+  bool tracked = 2;
+  google.protobuf.Timestamp fetched_at = 3;
+  string last_error = 4;
+  // Total open pull requests on GitHub. pull_requests holds at most the 100 most
+  // recently updated.
+  int32 total_count = 5;
+}
+
+message GetPullRequestRequest {
+  string repo_slug = 1;
+  int32 number = 2;
+}
+
+message GetPullRequestResponse {
+  PullRequest pull_request = 1;
+  // Checks on the head commit.
+  repeated CheckRun checks = 2;
+  google.protobuf.Timestamp fetched_at = 3;
+  string last_error = 4;
+}
+
+message ListChecksRequest {
+  string repo_slug = 1;
+  // Branch name, tag, or commit SHA.
+  string ref = 2;
+}
+
+message ListChecksResponse {
+  // The commit the ref resolved to.
+  string sha = 1;
+  CheckRollup rollup = 2;
+  repeated CheckRun checks = 3;
+  google.protobuf.Timestamp fetched_at = 4;
+  string last_error = 5;
+}
+
+message RefreshGhRequest {
+  string repo_slug = 1;
+}
+
+message RefreshGhResponse {}
+
+message TrackGhRepoRequest {
+  string repo_slug = 1;
+}
+
+message TrackGhRepoResponse {}
+
+message UntrackGhRepoRequest {
+  string repo_slug = 1;
+}
+
+message UntrackGhRepoResponse {}
+
+message WatchGhRequest {}
+
+message GhEvent {
+  oneof event {
+    PullRequestsUpdated pull_requests_updated = 1;
+    ViewerUpdated viewer_updated = 2;
+  }
+
+  // A repository's pull request list (or its fetch status) changed.
+  message PullRequestsUpdated {
+    string repo_slug = 1;
+    google.protobuf.Timestamp fetched_at = 2;
+  }
+
+  // The viewer or authentication state changed.
+  message ViewerUpdated {
+    google.protobuf.Timestamp fetched_at = 1;
+  }
+}

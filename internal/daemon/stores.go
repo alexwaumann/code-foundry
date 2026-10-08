@@ -9,6 +9,7 @@ import (
 	"github.com/awaumann/code-foundry/internal/bus"
 	"github.com/awaumann/code-foundry/internal/db"
 	"github.com/awaumann/code-foundry/internal/paths"
+	"github.com/awaumann/code-foundry/internal/store/gh"
 	"github.com/awaumann/code-foundry/internal/store/repo"
 	"github.com/awaumann/code-foundry/internal/store/terminal"
 )
@@ -19,6 +20,9 @@ type stores struct {
 	bus  *bus.Bus
 	db   *sql.DB
 	repo *repo.Git
+	gh   *gh.Store
+	// stopGh cancels the gh poller and the repo→gh tracking glue, and waits for both.
+	stopGh func()
 	// terminal owns PTYs; closed first so every child gets hung up before the db goes.
 	terminal *terminal.Manager
 }
@@ -38,6 +42,10 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 	if s.repo, err = repo.Start(ctx, repo.Options{DB: s.db, Bus: s.bus, Log: log}); err != nil {
 		return nil, err
 	}
+	if s.gh, err = gh.New(ctx, gh.Options{DB: s.db, Bus: s.bus, Log: log.With("store", "gh")}); err != nil {
+		return nil, err
+	}
+	s.stopGh = startGh(ctx, log, s.gh, s.repo, s.bus)
 	s.terminal = terminal.New(terminal.Options{Bus: s.bus, Logger: log.With("store", "terminal")})
 	return s, nil
 }
@@ -49,6 +57,9 @@ func (s *stores) close() error {
 		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		errs = append(errs, s.terminal.Close(closeCtx))
 		cancel()
+	}
+	if s.stopGh != nil {
+		s.stopGh()
 	}
 	if s.repo != nil {
 		errs = append(errs, s.repo.Close())
