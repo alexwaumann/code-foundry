@@ -58,11 +58,6 @@ func (s State) String() string {
 	}
 }
 
-// live reports whether a process may be running for the state.
-func (s State) live() bool {
-	return s == StateStarting || s == StateConnected || s == StateClosing
-}
-
 // Disconnect reasons recorded in Session.DisconnectReason.
 const (
 	ReasonClosed         = "closed"           // closed through Close/Remove

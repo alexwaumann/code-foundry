@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -204,10 +203,4 @@ func pidSessionID(paths ClaudePaths, pid int) string {
 		return ""
 	}
 	return rec.SessionID
-}
-
-// fileExists reports whether p exists.
-func fileExists(p string) bool {
-	_, err := os.Stat(p)
-	return !errors.Is(err, fs.ErrNotExist) && err == nil
 }

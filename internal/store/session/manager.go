@@ -42,7 +42,7 @@ type Options struct {
 	// NewStubDetector (always Unknown) until internal/claudestatus is wired.
 	NewDetector DetectorFactory
 	// Namer names sessions from their first user message. Default ClaudeNamer in
-	// os.TempDir().
+	// /tmp.
 	Namer Namer
 	// DisablePreTrust skips writing folder trust into Claude's config before spawning
 	// (the on-screen dialog is still answered). For tests.
@@ -85,7 +85,7 @@ func (o Options) withDefaults() (Options, error) {
 		o.NewDetector = NewStubDetector
 	}
 	if o.Namer == nil {
-		o.Namer = ClaudeNamer(o.Claude, os.TempDir())
+		o.Namer = ClaudeNamer(o.Claude, "/tmp")
 	}
 	if o.Cols == 0 || o.Rows == 0 {
 		o.Cols, o.Rows = 120, 40
