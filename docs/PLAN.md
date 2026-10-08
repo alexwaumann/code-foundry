@@ -33,13 +33,39 @@ Lands the skeleton every other step depends on.
 Each step owns its proto file. Steps do not edit each other's packages. Shared needs go
 through `bus` or a new proto message in the owner's file.
 
-## Phase 2 — Sessions (parallel after 1a, 1d, 1e)
+## Phase 2 — Sessions (parallel after Phase 1)
 
-* 2a `store/session`: spawn `claude`, JSONL discovery, resume, auto-naming, `SessionService`.
-* 2b Status detection: pure event-driven state machine with table tests; wired into 2a.
-* 2c GUI: session tree in sidebar, new-session dialog, model/effort picker, status badges,
-  attach/detach on selection, needs-attention surfacing.
-* 2d CLI: `new-session`, `list`, `focus`, `close`, `rename`, `fork` generated from the registry.
+Decisions (Alex, 2026-10-08):
+
+* **Sessions are the unit.** The content pane for a session shows exactly one of two
+  things: the live Claude Code terminal, or a "not connected" state with a one-action
+  reconnect. Nothing else. Generic terminals stay supported but are secondary.
+* **Close = graceful.** Closing a session clears any pending input (Escape, Ctrl-U), sends
+  `/exit`, waits for the process to exit (bounded), falls back to Kill, then removes the
+  terminal. The session row remains, in the disconnected state, until the user removes it.
+* **User-typed `/exit` is normal.** Process exit with no close request transitions the
+  session to disconnected (not an error). Reconnect spawns `claude --resume <session id>`
+  in the same worktree with the same model/effort and rebinds the row to the new terminal.
+* **Trust dialog is always accepted** for worktrees of registered repositories. Prefer
+  pre-trusting via Claude's own config if its format is stable; otherwise detect the dialog
+  text in the output stream and answer it. Never show it to the user.
+* **Scrub inherited Claude env.** The daemon strips `CLAUDECODE` and `CLAUDE_CODE_*` from
+  its own environment at startup. Observed 2026-10-08: a daemon started from inside a Claude
+  session passed `CLAUDE_CODE_CHILD_SESSION` to children, which disabled transcript saving.
+
+Steps:
+
+* 2a `store/session`: spawn `claude`, JSONL discovery (session id from
+  `~/.claude/projects/<slug>/`), resume, auto-naming via `claude -p`, close/reconnect state
+  machine, `SessionService`. Sets `labels.session` and `labels.worktree` on its terminals.
+* 2b Status detection: pure event-driven state machine (busy / idle / needs-attention)
+  fed by a program-agnostic observer hook on the terminal actor (not an Attach subscriber),
+  plus JSONL; table tests; wired into 2a.
+* 2c GUI: session rows in the sidebar, new-session flow (model/effort), status badges,
+  disconnected state + reconnect, needs-attention surfacing. Collapse Watch streams into
+  one shared events stream first: the browser's 6-connections-per-origin limit is already
+  close with four open streams.
+* 2d CLI: `session new|list|focus|close|reconnect|rename|fork` from the registry.
 
 ## Phase 3 — Supervision surface
 

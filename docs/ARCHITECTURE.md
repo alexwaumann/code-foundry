@@ -170,7 +170,7 @@ switch.
 ## 8. Frontend
 
 * React 19, Vite, TypeScript strict, Tailwind v4, shadcn/ui, Zustand, `cmdk` for the palette.
-* `@xterm/xterm` with `addon-webgl` (fallback `addon-canvas` on context loss), `addon-fit`,
+* `@xterm/xterm` with `addon-webgl` (falls back to xterm's DOM renderer on context loss), `addon-fit`,
   `addon-web-links`. Terminal rendering sits behind a small `TerminalRenderer` interface so
   a libghostty-vt-fed grid renderer can replace it later.
 * State discipline: sliced Zustand stores, one per daemon service. Streams update slices;
