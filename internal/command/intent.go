@@ -7,8 +7,8 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	v1 "github.com/awaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/awaumann/code-foundry/internal/bus"
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/bus"
 )
 
 // IntentEvent is the bus event carrying a UI intent to every UiService.WatchIntents

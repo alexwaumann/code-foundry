@@ -14,9 +14,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/bus"
-	"github.com/awaumann/code-foundry/internal/store/repo"
-	"github.com/awaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 )
 
 // RepoSource is the part of the repo store sessions need: resolving worktrees.

@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/bus"
-	"github.com/awaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 )
 
 // Fake implements terminal.Store. The snapshot of a fake terminal is simply all output

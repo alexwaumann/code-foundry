@@ -6,7 +6,7 @@ import (
 	"runtime/debug"
 )
 
-// Version is set at build time with -ldflags "-X github.com/awaumann/code-foundry/internal/version.Version=...".
+// Version is set at build time with -ldflags "-X github.com/alexwaumann/code-foundry/internal/version.Version=...".
 var Version = "dev"
 
 // Info describes the running build.

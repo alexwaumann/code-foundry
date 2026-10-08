@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/version"
+	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
 // DaemonInfo is what the daemon.* commands report.

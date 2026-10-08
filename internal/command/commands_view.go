@@ -3,7 +3,7 @@ package command
 import (
 	"context"
 
-	v1 "github.com/awaumann/code-foundry/gen/go/codefoundry/v1"
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
 // ViewPullRequests is the ShowView name of the Pull Requests page.

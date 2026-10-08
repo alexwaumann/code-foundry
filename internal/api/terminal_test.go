@@ -10,10 +10,10 @@ import (
 
 	"connectrpc.com/connect"
 
-	v1 "github.com/awaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/awaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/awaumann/code-foundry/internal/store/terminal"
-	"github.com/awaumann/code-foundry/internal/store/terminal/terminaltest"
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/alexwaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
 )
 
 func newTerminalClient(t *testing.T) (codefoundryv1connect.TerminalServiceClient, *terminaltest.Fake) {

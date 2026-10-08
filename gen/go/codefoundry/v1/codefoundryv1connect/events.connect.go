@@ -8,7 +8,7 @@ import (
 	connect "connectrpc.com/connect"
 	context "context"
 	errors "errors"
-	v1 "github.com/awaumann/code-foundry/gen/go/codefoundry/v1"
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	http "net/http"
 	strings "strings"
 )

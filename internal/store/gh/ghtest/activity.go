@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/awaumann/code-foundry/internal/bus"
-	"github.com/awaumann/code-foundry/internal/store/gh"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/store/gh"
 )
 
 // SetDashboard replaces the dashboard (including its Stats) and publishes

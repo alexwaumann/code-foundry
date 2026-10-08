@@ -25,8 +25,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/bus"
-	"github.com/awaumann/code-foundry/internal/version"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
 // State is the updater's state.

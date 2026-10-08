@@ -20,7 +20,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/repo"
 )
 
 // Errors returned by Store methods. They are wrapped with detail; test with errors.Is.

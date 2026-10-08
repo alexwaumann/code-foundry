@@ -25,11 +25,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/api"
-	"github.com/awaumann/code-foundry/internal/command"
-	"github.com/awaumann/code-foundry/internal/command/all"
-	"github.com/awaumann/code-foundry/internal/paths"
-	"github.com/awaumann/code-foundry/internal/version"
+	"github.com/alexwaumann/code-foundry/internal/api"
+	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/command/all"
+	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
 // shutdownTimeout bounds graceful shutdown; open streams are cut after it.

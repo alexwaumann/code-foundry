@@ -48,15 +48,15 @@ interface Spec {
 }
 
 const base = (p: string) => p.replace(/\/+$/, "").split("/").pop() ?? p;
-const PR = "https://github.com/awaumann/code-foundry/pull/128";
+const PR = "https://github.com/alexwaumann/code-foundry/pull/128";
 const worktreeArg = { name: "worktree", type: ArgType.PATH, description: "Worktree path (default: the active worktree)" };
 
 const specs: Spec[] = [
   {
     name: "git.fetch", title: "Git: Fetch", category: "Git", description: "Fetch from the remote and prune deleted branches", keybindings: ["cmd+shift+f"], kind: GitOpKind.FETCH,
     label: (w) => `Fetch ${w?.branch ?? ""}`,
-    ok: () => ({ summary: "fetched 2 updated refs", output: "$ git fetch --prune\nFrom github.com:awaumann/code-foundry\n   3c3c465..8d9e0f1  main       -> origin/main\n * [new branch]      feat/x     -> origin/feat/x\n" }),
-    fail: () => ({ summary: "unable to access 'https://github.com/awaumann/code-foundry.git/': Could not resolve host: github.com", output: "$ git fetch --prune\nfatal: unable to access 'https://github.com/awaumann/code-foundry.git/': Could not resolve host: github.com\n(exit 128)\n" }),
+    ok: () => ({ summary: "fetched 2 updated refs", output: "$ git fetch --prune\nFrom github.com:alexwaumann/code-foundry\n   3c3c465..8d9e0f1  main       -> origin/main\n * [new branch]      feat/x     -> origin/feat/x\n" }),
+    fail: () => ({ summary: "unable to access 'https://github.com/alexwaumann/code-foundry.git/': Could not resolve host: github.com", output: "$ git fetch --prune\nfatal: unable to access 'https://github.com/alexwaumann/code-foundry.git/': Could not resolve host: github.com\n(exit 128)\n" }),
   },
   {
     name: "git.pull", title: "Git: Pull", category: "Git", description: "Pull the upstream branch (fast-forward only unless --rebase)", keybindings: ["cmd+shift+u"], kind: GitOpKind.PULL,
@@ -69,12 +69,12 @@ const specs: Spec[] = [
     name: "git.push", title: "Git: Push", category: "Git", description: "Push the current branch (sets origin/<branch> as upstream if missing)", keybindings: ["cmd+shift+k"], kind: GitOpKind.PUSH,
     args: [{ name: "force-with-lease", type: ArgType.BOOL, description: "Force, if the remote is where we last saw it" }],
     label: (w, a) => `${a["force-with-lease"] === "true" ? "Force-push" : "Push"} ${w?.branch ?? ""}`,
-    ok: (w) => ({ summary: `pushed ${w?.branch ?? ""} to origin`, output: `$ git push\nTo github.com:awaumann/code-foundry.git\n   3c3c465..8d9e0f1  ${w?.branch ?? ""} -> ${w?.branch ?? ""}\n` }),
+    ok: (w) => ({ summary: `pushed ${w?.branch ?? ""} to origin`, output: `$ git push\nTo github.com:alexwaumann/code-foundry.git\n   3c3c465..8d9e0f1  ${w?.branch ?? ""} -> ${w?.branch ?? ""}\n` }),
     fail: (w) => {
       const b = w?.branch ?? "main";
       return {
         summary: `[rejected] ${b} -> ${b} (fetch first)`,
-        output: `$ git push\nTo github.com:awaumann/code-foundry.git\n ! [rejected]        ${b} -> ${b} (fetch first)\nerror: failed to push some refs to 'github.com:awaumann/code-foundry.git'\nhint: Updates were rejected because the remote contains work that you do not\nhint: have locally. Integrate the remote changes (e.g. 'git pull ...') before pushing again.\n(exit 1)\n`,
+        output: `$ git push\nTo github.com:alexwaumann/code-foundry.git\n ! [rejected]        ${b} -> ${b} (fetch first)\nerror: failed to push some refs to 'github.com:alexwaumann/code-foundry.git'\nhint: Updates were rejected because the remote contains work that you do not\nhint: have locally. Integrate the remote changes (e.g. 'git pull ...') before pushing again.\n(exit 1)\n`,
       };
     },
   },

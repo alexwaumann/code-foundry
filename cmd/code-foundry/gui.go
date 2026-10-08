@@ -10,8 +10,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/awaumann/code-foundry/internal/paths"
-	"github.com/awaumann/code-foundry/internal/store/update"
+	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/store/update"
 )
 
 // guiEnv are variables forwarded to the app. `open` launches through LaunchServices,

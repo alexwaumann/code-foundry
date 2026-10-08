@@ -1,8 +1,8 @@
 package daemon
 
 import (
-	"github.com/awaumann/code-foundry/internal/claudestatus"
-	"github.com/awaumann/code-foundry/internal/store/session"
+	"github.com/alexwaumann/code-foundry/internal/claudestatus"
+	"github.com/alexwaumann/code-foundry/internal/store/session"
 )
 
 // newDetector adapts internal/claudestatus to the session store's detector interface.

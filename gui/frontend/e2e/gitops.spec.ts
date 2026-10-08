@@ -97,6 +97,6 @@ test("pr.create needs a GitHub repo; its result offers to open the PR", async ({
   await created.getByRole("button", { name: "Open" }).click();
   await expect
     .poll(async () => (await invocations()).find((i) => i.name === "view.open.url")?.args.url)
-    .toBe("https://github.com/awaumann/code-foundry/pull/128");
-  await expect(toast(page, "Open https://github.com/awaumann/code-foundry/pull/128").getByTestId("gitop-toast")).toHaveAttribute("data-state", "succeeded");
+    .toBe("https://github.com/alexwaumann/code-foundry/pull/128");
+  await expect(toast(page, "Open https://github.com/alexwaumann/code-foundry/pull/128").getByTestId("gitop-toast")).toHaveAttribute("data-state", "succeeded");
 });

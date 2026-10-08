@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/awaumann/code-foundry/internal/daemon"
-	"github.com/awaumann/code-foundry/internal/paths"
-	"github.com/awaumann/code-foundry/internal/version"
+	"github.com/alexwaumann/code-foundry/internal/daemon"
+	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
 func runDaemon(ctx context.Context, cl *cli, args []string) error {

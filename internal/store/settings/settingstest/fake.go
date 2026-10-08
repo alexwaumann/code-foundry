@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/awaumann/code-foundry/internal/bus"
-	"github.com/awaumann/code-foundry/internal/store/settings"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/store/settings"
 )
 
 // Fake is a settings.Service backed by a real Store in a test directory.

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/awaumann/code-foundry/internal/bus"
-	"github.com/awaumann/code-foundry/internal/store/gh"
-	"github.com/awaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/store/gh"
+	"github.com/alexwaumann/code-foundry/internal/store/repo"
 )
 
 // startGh runs the GitHub poller and keeps its tracked set equal to the GitHub slugs of

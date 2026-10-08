@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/awaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
 // Type is a field's value type. Values travel as strings; the type drives parsing, the

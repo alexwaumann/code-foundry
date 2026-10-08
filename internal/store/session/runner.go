@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 )
 
 // Close sequence. Escape interrupts a running turn (and leaves vim INSERT mode).

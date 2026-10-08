@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/bus"
-	"github.com/awaumann/code-foundry/internal/store/session"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/store/session"
 )
 
 // Fake implements session.Store. Every mutation publishes the same events as the real

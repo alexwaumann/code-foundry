@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/awaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/repo"
 )
 
 func (f *Fake) detailMap() map[string]repo.WorktreeDetail {

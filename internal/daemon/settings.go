@@ -10,11 +10,11 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
-	v1 "github.com/awaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/awaumann/code-foundry/internal/command"
-	"github.com/awaumann/code-foundry/internal/store/repo"
-	"github.com/awaumann/code-foundry/internal/store/session"
-	"github.com/awaumann/code-foundry/internal/store/settings"
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/session"
+	"github.com/alexwaumann/code-foundry/internal/store/settings"
 )
 
 // Settings consumers. Values the stores read only at start (intervals, scrollback,

@@ -9,8 +9,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/awaumann/code-foundry/internal/command"
-	"github.com/awaumann/code-foundry/internal/store/settings"
+	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/store/settings"
 )
 
 func TestWorktreePath(t *testing.T) {

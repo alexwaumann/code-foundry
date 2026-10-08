@@ -7,7 +7,7 @@ version: '3'
 info:
   companyName: "Alejandro Waumann" # The name of the company
   productName: "Code Foundry" # The name of the application
-  productIdentifier: "dev.awaumann.codefoundry" # The unique product identifier
+  productIdentifier: "dev.alexwaumann.codefoundry" # The unique product identifier
   description: "Supervise fleets of Claude Code sessions" # The application description
   copyright: "(c) 2026 Alejandro Waumann" # Copyright text
   comments: "" # Comments
@@ -20,7 +20,7 @@ info:
 # Note: Keys under `ios` OVERRIDE values under `info` when set.
 # ios:
 #   # The iOS bundle identifier used in the generated Xcode project (CFBundleIdentifier)
-#   bundleID: "dev.awaumann.codefoundry"
+#   bundleID: "dev.alexwaumann.codefoundry"
 #   # The display name shown under the app icon (CFBundleDisplayName/CFBundleName)
 #   displayName: "Code Foundry"
 #   # The app version to embed in Info.plist (CFBundleShortVersionString/CFBundleVersion)

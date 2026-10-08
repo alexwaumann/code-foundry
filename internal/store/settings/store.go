@@ -16,7 +16,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	"github.com/awaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/bus"
 )
 
 // DefaultDebounce coalesces the burst of fs events one save produces.

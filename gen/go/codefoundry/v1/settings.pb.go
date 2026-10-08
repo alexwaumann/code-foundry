@@ -890,8 +890,8 @@ const file_codefoundry_v1_settings_proto_rawDesc = "" +
 	"\tGetSchema\x12(.codefoundry.v1.GetSettingsSchemaRequest\x1a).codefoundry.v1.GetSettingsSchemaResponse\"\x00\x12P\n" +
 	"\x03Get\x12\".codefoundry.v1.GetSettingsRequest\x1a#.codefoundry.v1.GetSettingsResponse\"\x00\x12Y\n" +
 	"\x06Update\x12%.codefoundry.v1.UpdateSettingsRequest\x1a&.codefoundry.v1.UpdateSettingsResponse\"\x00\x12P\n" +
-	"\x05Watch\x12$.codefoundry.v1.WatchSettingsRequest\x1a\x1d.codefoundry.v1.SettingsEvent\"\x000\x01B\xc2\x01\n" +
-	"\x12com.codefoundry.v1B\rSettingsProtoP\x01ZDgithub.com/awaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
+	"\x05Watch\x12$.codefoundry.v1.WatchSettingsRequest\x1a\x1d.codefoundry.v1.SettingsEvent\"\x000\x01B\xc5\x01\n" +
+	"\x12com.codefoundry.v1B\rSettingsProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
 	file_codefoundry_v1_settings_proto_rawDescOnce sync.Once

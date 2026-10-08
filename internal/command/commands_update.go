@@ -7,8 +7,8 @@ import (
 
 	"connectrpc.com/connect"
 
-	v1 "github.com/awaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/awaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
 // UpdateBackend is the slice of UpdateService the app.* commands need, in generated

@@ -6,8 +6,8 @@ package all
 import (
 	"errors"
 
-	"github.com/awaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/awaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
 // Deps are the dependencies of all command domains.

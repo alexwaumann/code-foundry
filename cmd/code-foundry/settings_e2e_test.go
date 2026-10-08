@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/awaumann/code-foundry/internal/client"
+	"github.com/alexwaumann/code-foundry/internal/client"
 )
 
 func runCLIInteractive(c *client.Client, stdin string, interactive bool, args ...string) run {

@@ -14,8 +14,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/awaumann/code-foundry/internal/client"
-	"github.com/awaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/client"
+	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
 // subcommand is a local infrastructure verb. Every user action is a daemon command

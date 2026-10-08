@@ -8,8 +8,8 @@ import (
 
 	"connectrpc.com/connect"
 
-	v1 "github.com/awaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/awaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
 // SessionBackend is the slice of SessionService the session.* commands need, in

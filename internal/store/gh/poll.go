@@ -6,7 +6,7 @@ import (
 	"errors"
 	"slices"
 
-	"github.com/awaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/bus"
 )
 
 // Jobs run on the worker goroutine (Store.Run). Each request goes through call, which

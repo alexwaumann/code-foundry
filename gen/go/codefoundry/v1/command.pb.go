@@ -703,8 +703,8 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\rARG_TYPE_PATH\x10\x052\xbe\x01\n" +
 	"\x0eCommandService\x12S\n" +
 	"\x04List\x12#.codefoundry.v1.ListCommandsRequest\x1a$.codefoundry.v1.ListCommandsResponse\"\x00\x12W\n" +
-	"\x06Invoke\x12$.codefoundry.v1.InvokeCommandRequest\x1a%.codefoundry.v1.InvokeCommandResponse\"\x00B\xc1\x01\n" +
-	"\x12com.codefoundry.v1B\fCommandProtoP\x01ZDgithub.com/awaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
+	"\x06Invoke\x12$.codefoundry.v1.InvokeCommandRequest\x1a%.codefoundry.v1.InvokeCommandResponse\"\x00B\xc4\x01\n" +
+	"\x12com.codefoundry.v1B\fCommandProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
 	file_codefoundry_v1_command_proto_rawDescOnce sync.Once

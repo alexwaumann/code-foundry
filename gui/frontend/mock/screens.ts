@@ -52,7 +52,7 @@ export function claudeIntro(cwd: string, cols: number, task: string): string {
 }
 
 const claudeSteps = [
-  `${GREEN}⏺${RESET} ${BOLD}Bash${RESET}(go test ./internal/store/...)\r\n  ${GRAY}⎿${RESET}  ${GREEN}ok${RESET}  github.com/awaumann/code-foundry/internal/store/terminal  0.412s\r\n\r\n`,
+  `${GREEN}⏺${RESET} ${BOLD}Bash${RESET}(go test ./internal/store/...)\r\n  ${GRAY}⎿${RESET}  ${GREEN}ok${RESET}  github.com/alexwaumann/code-foundry/internal/store/terminal  0.412s\r\n\r\n`,
   `${GREEN}⏺${RESET} ${BOLD}Search${RESET}(pattern: "useVirtualizer", path: "gui/frontend/src")\r\n  ${GRAY}⎿${RESET}  Found ${BOLD}2${RESET} files\r\n\r\n`,
   `${BOLD}⏺${RESET} The tree now flattens into rows; only ${CYAN}visible${RESET} rows render.\r\n\r\n`,
   `${GREEN}⏺${RESET} ${BOLD}Update${RESET}(gui/frontend/src/components/sidebar/SidebarRow.tsx)\r\n  ${GRAY}⎿${RESET}  Updated with ${GREEN}9 additions${RESET} and ${RED}14 removals${RESET}\r\n\r\n`,
@@ -87,12 +87,12 @@ export function testRunOutput(cwd: string): string {
   return (
     prompt(cwd) +
     "go test ./...\r\n" +
-    `${GREEN}ok${RESET}  \tgithub.com/awaumann/code-foundry/internal/bus\t0.212s\r\n` +
-    `${GREEN}ok${RESET}  \tgithub.com/awaumann/code-foundry/internal/paths\t0.104s\r\n` +
+    `${GREEN}ok${RESET}  \tgithub.com/alexwaumann/code-foundry/internal/bus\t0.212s\r\n` +
+    `${GREEN}ok${RESET}  \tgithub.com/alexwaumann/code-foundry/internal/paths\t0.104s\r\n` +
     `--- ${RED}FAIL${RESET}: TestResizeAppliesToPTY (0.00s)\r\n` +
     `    actor_test.go:88: got ${BOLD}80x24${RESET}, want ${BOLD}120x40${RESET}\r\n` +
     `${RED}FAIL${RESET}\r\n` +
-    `${RED}FAIL${RESET}\tgithub.com/awaumann/code-foundry/internal/store/terminal\t0.341s\r\n` +
+    `${RED}FAIL${RESET}\tgithub.com/alexwaumann/code-foundry/internal/store/terminal\t0.341s\r\n` +
     `${RED}FAIL${RESET}\r\n`
   );
 }

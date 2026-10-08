@@ -13,12 +13,12 @@ import (
 
 	"connectrpc.com/connect"
 
-	v1 "github.com/awaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/awaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/awaumann/code-foundry/internal/client"
-	"github.com/awaumann/code-foundry/internal/daemon"
-	"github.com/awaumann/code-foundry/internal/paths"
-	"github.com/awaumann/code-foundry/internal/version"
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/alexwaumann/code-foundry/internal/client"
+	"github.com/alexwaumann/code-foundry/internal/daemon"
+	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
 func run(t *testing.T, dir string, args ...string) {

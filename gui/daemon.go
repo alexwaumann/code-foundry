@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/client"
-	"github.com/awaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/client"
+	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
 // EnvDaemonBinary points the GUI at a specific code-foundry binary to auto-start.

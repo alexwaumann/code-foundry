@@ -2929,8 +2929,8 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\x05Watch\x12\x1e.codefoundry.v1.WatchGhRequest\x1a\x17.codefoundry.v1.GhEvent\"\x000\x01\x12[\n" +
 	"\fGetDashboard\x12#.codefoundry.v1.GetDashboardRequest\x1a$.codefoundry.v1.GetDashboardResponse\"\x00\x12d\n" +
 	"\x0fGetRepoActivity\x12&.codefoundry.v1.GetRepoActivityRequest\x1a'.codefoundry.v1.GetRepoActivityResponse\"\x00\x12v\n" +
-	"\x15GetBranchPullRequests\x12,.codefoundry.v1.GetBranchPullRequestsRequest\x1a-.codefoundry.v1.GetBranchPullRequestsResponse\"\x00B\xbc\x01\n" +
-	"\x12com.codefoundry.v1B\aGhProtoP\x01ZDgithub.com/awaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
+	"\x15GetBranchPullRequests\x12,.codefoundry.v1.GetBranchPullRequestsRequest\x1a-.codefoundry.v1.GetBranchPullRequestsResponse\"\x00B\xbf\x01\n" +
+	"\x12com.codefoundry.v1B\aGhProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
 	file_codefoundry_v1_gh_proto_rawDescOnce sync.Once

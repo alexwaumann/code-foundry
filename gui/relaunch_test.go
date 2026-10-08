@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/api"
-	"github.com/awaumann/code-foundry/internal/bus"
-	"github.com/awaumann/code-foundry/internal/client"
-	"github.com/awaumann/code-foundry/internal/paths"
-	"github.com/awaumann/code-foundry/internal/store/update"
-	"github.com/awaumann/code-foundry/internal/store/update/updatetest"
+	"github.com/alexwaumann/code-foundry/internal/api"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/client"
+	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/store/update"
+	"github.com/alexwaumann/code-foundry/internal/store/update/updatetest"
 )
 
 // TestWatchRelaunch serves UpdateService on a Unix socket, as the daemon does, and checks

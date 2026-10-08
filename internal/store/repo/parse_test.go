@@ -144,8 +144,8 @@ func TestParseLeftRightCount(t *testing.T) {
 
 func TestParseGitHubSlug(t *testing.T) {
 	tests := []struct{ in, want string }{
-		{"git@github.com:awaumann/code-foundry.git", "awaumann/code-foundry"},
-		{"git@github.com:awaumann/code-foundry", "awaumann/code-foundry"},
+		{"git@github.com:alexwaumann/code-foundry.git", "alexwaumann/code-foundry"},
+		{"git@github.com:alexwaumann/code-foundry", "alexwaumann/code-foundry"},
 		{"github.com:owner/name.git", "owner/name"},
 		{"ssh://git@github.com/owner/name.git", "owner/name"},
 		{"ssh://git@ssh.github.com:443/owner/name.git", "owner/name"},

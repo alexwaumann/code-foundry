@@ -7,9 +7,9 @@ import (
 
 	"connectrpc.com/connect"
 
-	v1 "github.com/awaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/awaumann/code-foundry/internal/store/gh"
-	"github.com/awaumann/code-foundry/internal/store/repo"
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/store/gh"
+	"github.com/alexwaumann/code-foundry/internal/store/repo"
 )
 
 func TestGhDashboardFiltersToTracked(t *testing.T) {

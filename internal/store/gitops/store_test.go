@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/bus"
-	"github.com/awaumann/code-foundry/internal/store/repo"
-	"github.com/awaumann/code-foundry/internal/store/repo/repotest"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
 )
 
 // isolateGit keeps a developer's global git config (signing, hooks) out of the tests.

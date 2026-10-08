@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 )
 
 func TestFakeLifecycle(t *testing.T) {

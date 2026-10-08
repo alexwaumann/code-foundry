@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	v1 "github.com/awaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/awaumann/code-foundry/internal/command"
-	"github.com/awaumann/code-foundry/internal/command/commandtest"
-	"github.com/awaumann/code-foundry/internal/version"
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
+	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
 func newUpdateRegistry(t *testing.T, u *commandtest.Update, s *commandtest.Session, restart func()) *command.Registry {

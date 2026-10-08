@@ -12,7 +12,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"github.com/awaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
 //go:embed all:frontend/dist

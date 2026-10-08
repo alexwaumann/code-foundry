@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/awaumann/code-foundry/internal/store/gh"
+	"github.com/alexwaumann/code-foundry/internal/store/gh"
 )
 
 // label names a worktree in titles: its branch, else its directory name.

@@ -679,8 +679,8 @@ const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\tdelivered\x18\x01 \x01(\rR\tdelivered2\xaf\x01\n" +
 	"\tUiService\x12Q\n" +
 	"\fWatchIntents\x12#.codefoundry.v1.WatchIntentsRequest\x1a\x18.codefoundry.v1.UiIntent\"\x000\x01\x12O\n" +
-	"\x04Emit\x12!.codefoundry.v1.EmitIntentRequest\x1a\".codefoundry.v1.EmitIntentResponse\"\x00B\xbc\x01\n" +
-	"\x12com.codefoundry.v1B\aUiProtoP\x01ZDgithub.com/awaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
+	"\x04Emit\x12!.codefoundry.v1.EmitIntentRequest\x1a\".codefoundry.v1.EmitIntentResponse\"\x00B\xbf\x01\n" +
+	"\x12com.codefoundry.v1B\aUiProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
 	file_codefoundry_v1_ui_proto_rawDescOnce sync.Once

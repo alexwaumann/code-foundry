@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/bus"
 )
 
 // gh_activity keys (schema.sql).

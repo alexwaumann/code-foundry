@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/bus"
-	"github.com/awaumann/code-foundry/internal/db"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/db"
 )
 
 // isolateGit points git at a throwaway global config so the developer's config

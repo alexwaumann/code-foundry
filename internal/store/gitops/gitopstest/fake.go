@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/bus"
-	"github.com/awaumann/code-foundry/internal/store/gitops"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/store/gitops"
 )
 
 // Fake is an in-memory gitops.Store. Every call finishes immediately: it publishes

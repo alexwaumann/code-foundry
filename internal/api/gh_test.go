@@ -11,11 +11,11 @@ import (
 
 	"connectrpc.com/connect"
 
-	v1 "github.com/awaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/awaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/awaumann/code-foundry/internal/bus"
-	"github.com/awaumann/code-foundry/internal/store/gh"
-	"github.com/awaumann/code-foundry/internal/store/gh/ghtest"
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/store/gh"
+	"github.com/alexwaumann/code-foundry/internal/store/gh/ghtest"
 )
 
 func newGhTest(t *testing.T) (*ghtest.Store, codefoundryv1connect.GhServiceClient, chan struct{}) {

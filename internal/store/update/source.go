@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/store/gh"
+	"github.com/alexwaumann/code-foundry/internal/store/gh"
 )
 
 // ErrNoRelease means the repository has no published release. A check that gets it is

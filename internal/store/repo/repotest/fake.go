@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/bus"
-	"github.com/awaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/store/repo"
 )
 
 // Fake is an in-memory repo.Store. It never runs git: Register treats the path as the

@@ -1,7 +1,7 @@
 import { Code, ConnectError, createClient, type Client, type Interceptor } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import type { DescService } from "@bufbuild/protobuf";
-import { GetDaemonEndpoint } from "../../bindings/github.com/awaumann/code-foundry/gui/daemonservice";
+import { GetDaemonEndpoint } from "../../bindings/github.com/alexwaumann/code-foundry/gui/daemonservice";
 
 /** Where the daemon's loopback listener is and how to authenticate to it. */
 export interface DaemonEndpoint {

@@ -4,7 +4,7 @@ import "os"
 
 // ReleaseRepo is the "owner/name" GitHub repository whose releases this build updates
 // from. Set at build time with
-// -ldflags "-X github.com/awaumann/code-foundry/internal/version.ReleaseRepo=owner/name"
+// -ldflags "-X github.com/alexwaumann/code-foundry/internal/version.ReleaseRepo=owner/name"
 // (`make package` passes RELEASE_REPO). Empty in dev builds.
 var ReleaseRepo = ""
 

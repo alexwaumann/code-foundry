@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/awaumann/code-foundry/internal/command"
-	"github.com/awaumann/code-foundry/internal/command/commandtest"
+	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
 )
 
 func TestViewPullRequestsEmitsShowView(t *testing.T) {

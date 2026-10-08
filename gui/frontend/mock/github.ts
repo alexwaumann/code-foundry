@@ -64,7 +64,7 @@ const HOME = "/Users/dev";
 const CF = `${HOME}/src/code-foundry`;
 const CFW = `${HOME}/src/code-foundry.worktrees`;
 const GP = `${HOME}/src/ghostty-playground`;
-export const VIEWER = "awaumann";
+export const VIEWER = "alexwaumann";
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -131,8 +131,8 @@ export class GhWorld {
     this.authenticated = true;
     const now = new Date(this.t0);
     const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const cf = "awaumann/code-foundry";
-    const gp = "awaumann/ghostty-playground";
+    const cf = "alexwaumann/code-foundry";
+    const gp = "alexwaumann/ghostty-playground";
     const sidebarPr = this.pr(cf, 142, "feat(gui): virtualized sidebar tree with session rows", {
       headRef: "feat/sidebar",
       reviewDecision: ReviewDecision.APPROVED,
@@ -183,7 +183,7 @@ export class GhWorld {
           defaultBranch: {
             branch: "main",
             sha: "3c3c4651aa",
-            headline: "Merge pull request #138 from awaumann/gh-pacing",
+            headline: "Merge pull request #138 from alexwaumann/gh-pacing",
             committedAt: this.at(DAY),
             rollup: rollup(CheckRollupState.FAILURE, 14, 2),
             failing: [
@@ -290,7 +290,7 @@ export class GhWorld {
 
   /** A poll found a new PR: add it and announce the dashboard. */
   update(): void {
-    const pr = this.pr("awaumann/code-foundry", 150, "feat(gui): Pull Requests page", { headRef: "phase3a", checks: rollup(CheckRollupState.PENDING, 3, 0, 5), ageMs: 0 });
+    const pr = this.pr("alexwaumann/code-foundry", 150, "feat(gui): Pull Requests page", { headRef: "phase3a", checks: rollup(CheckRollupState.PENDING, 3, 0, 5), ageMs: 0 });
     this.dashboard = { ...this.dashboard, authored: [pr, ...this.dashboard.authored], fetchedAt: timestampFromDate(new Date()) };
     this.publishGh({ event: { case: "dashboardUpdated", value: { fetchedAt: this.dashboard.fetchedAt } } });
   }

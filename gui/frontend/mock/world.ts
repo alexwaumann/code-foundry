@@ -157,7 +157,7 @@ function initialRepos(): MockRepo[] {
       path: CF,
       name: "code-foundry",
       defaultBranch: "main",
-      githubSlug: "awaumann/code-foundry",
+      githubSlug: "alexwaumann/code-foundry",
       worktrees: [
         { path: CF, branch: "main", head: "3c3c4651", isMain: true, status: clean() },
         { path: `${CFW}/feat-sidebar`, branch: "feat/sidebar", head: "9a8b7c6d", isMain: false, status: clean({ upstream: "origin/feat/sidebar", ahead: 2, modified: 3, untracked: 1, dirty: true, baseAhead: 3, baseBehind: 1 }) },
@@ -169,7 +169,7 @@ function initialRepos(): MockRepo[] {
       path: GP,
       name: "ghostty-playground",
       defaultBranch: "main",
-      githubSlug: "awaumann/ghostty-playground",
+      githubSlug: "alexwaumann/ghostty-playground",
       worktrees: [{ path: GP, branch: "main", head: "77aa55cc", isMain: true, status: clean({ staged: 1, dirty: true }) }],
     },
     {

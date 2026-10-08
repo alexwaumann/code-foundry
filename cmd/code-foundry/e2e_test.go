@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/client"
-	"github.com/awaumann/code-foundry/internal/daemon"
-	"github.com/awaumann/code-foundry/internal/paths"
-	"github.com/awaumann/code-foundry/internal/version"
+	"github.com/alexwaumann/code-foundry/internal/client"
+	"github.com/alexwaumann/code-foundry/internal/daemon"
+	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
 // startTestDaemon runs a daemon in-process on a fresh home under /tmp (t.TempDir paths

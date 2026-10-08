@@ -12,7 +12,7 @@ import (
 
 	ghostty "go.mitchellh.com/libghostty"
 
-	"github.com/awaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/bus"
 )
 
 const (

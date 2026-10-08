@@ -1,4 +1,4 @@
-module github.com/awaumann/code-foundry
+module github.com/alexwaumann/code-foundry
 
 go 1.26.0
 

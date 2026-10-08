@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
 // ConnectOptions configures Connect.

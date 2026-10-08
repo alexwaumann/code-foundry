@@ -13,9 +13,9 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/awaumann/code-foundry/internal/daemon"
-	"github.com/awaumann/code-foundry/internal/paths"
-	"github.com/awaumann/code-foundry/internal/version"
+	"github.com/alexwaumann/code-foundry/internal/daemon"
+	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
 // TestMain lets the test binary act as `code-foundry daemon`, so the auto-start test can

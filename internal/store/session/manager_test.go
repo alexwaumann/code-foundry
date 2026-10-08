@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/bus"
-	"github.com/awaumann/code-foundry/internal/db"
-	"github.com/awaumann/code-foundry/internal/store/repo"
-	"github.com/awaumann/code-foundry/internal/store/repo/repotest"
-	"github.com/awaumann/code-foundry/internal/store/terminal"
-	"github.com/awaumann/code-foundry/internal/store/terminal/terminaltest"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/db"
+	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
+	"github.com/alexwaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
 )
 
 // fakeDetector reports whatever status the test sets and records what it was fed.

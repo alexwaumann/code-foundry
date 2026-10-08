@@ -31,7 +31,7 @@ test.describe("Pull Requests page", () => {
     const pageEl = page.getByTestId("prs-page");
     await expect(pageEl).toBeVisible();
     await expect(page.getByTestId("nav-pullrequests")).toHaveAttribute("aria-current", "page");
-    await expect(page.getByTestId("prs-viewer")).toHaveText("@awaumann");
+    await expect(page.getByTestId("prs-viewer")).toHaveText("@alexwaumann");
     await expect(page.getByTestId("prs-updated")).toHaveText(/updated \d+s ago/);
     await expect(page.getByTestId("tile-this-month-commits")).toHaveText("16");
     await expect(page.getByTestId("tile-this-month-merged")).toHaveText("2");
@@ -67,7 +67,7 @@ test.describe("Pull Requests page", () => {
     await list.press("j");
     await list.press("Enter");
     await expect.poll(async () => (await invocations()).filter((i) => i.name === "view.open.url").map((i) => i.args.url)).toEqual([
-      "https://github.com/awaumann/code-foundry/pull/145",
+      "https://github.com/alexwaumann/code-foundry/pull/145",
     ]);
     // End jumps to the last row (merged section); double-click opens any row.
     await list.press("End");
@@ -75,7 +75,7 @@ test.describe("Pull Requests page", () => {
     await prRows(page, "review").first().dblclick();
     await expect.poll(async () => (await invocations()).filter((i) => i.name === "view.open.url").length).toBe(2);
     const last = (await invocations()).filter((i) => i.name === "view.open.url").at(-1);
-    expect(last?.args.url).toBe("https://github.com/awaumann/code-foundry/pull/139");
+    expect(last?.args.url).toBe("https://github.com/alexwaumann/code-foundry/pull/139");
   });
 
   test("cmd+shift+d runs view.pullrequests and the ShowView intent switches the page", async ({ page }) => {
@@ -171,7 +171,7 @@ test.describe("worktree overview", () => {
     await list.press("End");
     await list.press("Enter");
     await expect.poll(async () => (await invocations()).filter((i) => i.name === "view.open.url").at(-1)?.args.url).toMatch(
-      /^https:\/\/github\.com\/awaumann\/code-foundry\/commit\/8e7d6c5b4a/,
+      /^https:\/\/github\.com\/alexwaumann\/code-foundry\/commit\/8e7d6c5b4a/,
     );
   });
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	v1 "github.com/awaumann/code-foundry/gen/go/codefoundry/v1"
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
 // EmitResult is the JSON result of every ui.* command.

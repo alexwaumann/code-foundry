@@ -770,8 +770,8 @@ const file_codefoundry_v1_update_proto_rawDesc = "" +
 	"\x05Check\x12%.codefoundry.v1.CheckForUpdateRequest\x1a&.codefoundry.v1.CheckForUpdateResponse\"\x00\x12X\n" +
 	"\aInstall\x12$.codefoundry.v1.InstallUpdateRequest\x1a%.codefoundry.v1.InstallUpdateResponse\"\x00\x12U\n" +
 	"\bRelaunch\x12\".codefoundry.v1.RelaunchAppRequest\x1a#.codefoundry.v1.RelaunchAppResponse\"\x00\x12L\n" +
-	"\x05Watch\x12\".codefoundry.v1.WatchUpdateRequest\x1a\x1b.codefoundry.v1.UpdateEvent\"\x000\x01B\xc0\x01\n" +
-	"\x12com.codefoundry.v1B\vUpdateProtoP\x01ZDgithub.com/awaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
+	"\x05Watch\x12\".codefoundry.v1.WatchUpdateRequest\x1a\x1b.codefoundry.v1.UpdateEvent\"\x000\x01B\xc3\x01\n" +
+	"\x12com.codefoundry.v1B\vUpdateProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
 	file_codefoundry_v1_update_proto_rawDescOnce sync.Once

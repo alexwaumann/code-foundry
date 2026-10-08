@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/awaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
 func isKeybindingKey(k string) bool { return strings.HasPrefix(k, keybindingKeyPrefix) }

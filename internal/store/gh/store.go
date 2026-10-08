@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/bus"
 )
 
 // Options configures a Store. Zero durations and counts take the Default* values.

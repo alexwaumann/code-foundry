@@ -12,7 +12,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"github.com/awaumann/code-foundry/internal/version"
+	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
 // EventCheckForUpdates is emitted to the frontend by the "Check for Updates…" menu item.

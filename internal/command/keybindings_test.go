@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/awaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
 func TestKeybindingsAreUniqueAndNotReserved(t *testing.T) {

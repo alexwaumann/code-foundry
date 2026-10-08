@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 )
 
 // TestProbe drives a real program through the terminal store for manual experiments.

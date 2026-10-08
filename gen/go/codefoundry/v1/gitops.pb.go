@@ -1442,8 +1442,8 @@ const file_codefoundry_v1_gitops_proto_rawDesc = "" +
 	"\x06Reveal\x12\x1d.codefoundry.v1.RevealRequest\x1a\x1e.codefoundry.v1.RevealResponse\"\x00\x12L\n" +
 	"\aOpenUrl\x12\x1e.codefoundry.v1.OpenUrlRequest\x1a\x1f.codefoundry.v1.OpenUrlResponse\"\x00\x12O\n" +
 	"\x04List\x12!.codefoundry.v1.ListGitOpsRequest\x1a\".codefoundry.v1.ListGitOpsResponse\"\x00\x12L\n" +
-	"\x05Watch\x12\".codefoundry.v1.WatchGitOpsRequest\x1a\x1b.codefoundry.v1.GitOpsEvent\"\x000\x01B\xc0\x01\n" +
-	"\x12com.codefoundry.v1B\vGitopsProtoP\x01ZDgithub.com/awaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
+	"\x05Watch\x12\".codefoundry.v1.WatchGitOpsRequest\x1a\x1b.codefoundry.v1.GitOpsEvent\"\x000\x01B\xc3\x01\n" +
+	"\x12com.codefoundry.v1B\vGitopsProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
 	file_codefoundry_v1_gitops_proto_rawDescOnce sync.Once

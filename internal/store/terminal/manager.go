@@ -17,7 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/bus"
 )
 
 // Options configures a Manager. Zero values take the documented defaults.

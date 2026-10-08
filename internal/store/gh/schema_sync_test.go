@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/awaumann/code-foundry/internal/db"
+	"github.com/alexwaumann/code-foundry/internal/db"
 )
 
 // The daemon creates tables from internal/db/migrations, not schema.sql (which only

@@ -1,5 +1,5 @@
 import { Browser, Events } from "@wailsio/runtime";
-import { Info } from "../../bindings/github.com/awaumann/code-foundry/gui/appservice";
+import { Info } from "../../bindings/github.com/alexwaumann/code-foundry/gui/appservice";
 
 /** The Wails host (window shell). */
 export interface AppInfoView {

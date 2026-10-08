@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/bus"
-	"github.com/awaumann/code-foundry/internal/store/update"
-	"github.com/awaumann/code-foundry/internal/store/update/updatetest"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/store/update"
+	"github.com/alexwaumann/code-foundry/internal/store/update/updatetest"
 )
 
 type rig struct {

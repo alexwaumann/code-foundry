@@ -238,8 +238,8 @@ const file_codefoundry_v1_health_proto_rawDesc = "" +
 	"go_version\x18\x03 \x01(\tR\tgoVersion2\xa2\x01\n" +
 	"\rHealthService\x12C\n" +
 	"\x04Ping\x12\x1b.codefoundry.v1.PingRequest\x1a\x1c.codefoundry.v1.PingResponse\"\x00\x12L\n" +
-	"\aVersion\x12\x1e.codefoundry.v1.VersionRequest\x1a\x1f.codefoundry.v1.VersionResponse\"\x00B\xc0\x01\n" +
-	"\x12com.codefoundry.v1B\vHealthProtoP\x01ZDgithub.com/awaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
+	"\aVersion\x12\x1e.codefoundry.v1.VersionRequest\x1a\x1f.codefoundry.v1.VersionResponse\"\x00B\xc3\x01\n" +
+	"\x12com.codefoundry.v1B\vHealthProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
 	file_codefoundry_v1_health_proto_rawDescOnce sync.Once

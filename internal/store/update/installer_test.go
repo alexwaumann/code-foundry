@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/awaumann/code-foundry/scripts"
+	"github.com/alexwaumann/code-foundry/scripts"
 )
 
 func TestScriptInstaller(t *testing.T) {

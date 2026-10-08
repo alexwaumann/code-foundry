@@ -1912,8 +1912,8 @@ const file_codefoundry_v1_repo_proto_rawDesc = "" +
 	"\x0eRemoveWorktree\x12%.codefoundry.v1.RemoveWorktreeRequest\x1a&.codefoundry.v1.RemoveWorktreeResponse\"\x00\x12T\n" +
 	"\aRefresh\x12\".codefoundry.v1.RefreshRepoRequest\x1a#.codefoundry.v1.RefreshRepoResponse\"\x00\x12I\n" +
 	"\x05Watch\x12!.codefoundry.v1.WatchReposRequest\x1a\x19.codefoundry.v1.RepoEvent\"\x000\x01\x12j\n" +
-	"\x11GetWorktreeDetail\x12(.codefoundry.v1.GetWorktreeDetailRequest\x1a).codefoundry.v1.GetWorktreeDetailResponse\"\x00B\xbe\x01\n" +
-	"\x12com.codefoundry.v1B\tRepoProtoP\x01ZDgithub.com/awaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
+	"\x11GetWorktreeDetail\x12(.codefoundry.v1.GetWorktreeDetailRequest\x1a).codefoundry.v1.GetWorktreeDetailResponse\"\x00B\xc1\x01\n" +
+	"\x12com.codefoundry.v1B\tRepoProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
 	file_codefoundry_v1_repo_proto_rawDescOnce sync.Once

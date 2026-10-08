@@ -30,7 +30,7 @@ fi
 	exit 2
 }
 
-PKG="github.com/awaumann/code-foundry/internal/version"
+PKG="github.com/alexwaumann/code-foundry/internal/version"
 VERSION_LDFLAGS="-X $PKG.Version=$VERSION -X $PKG.ReleaseRepo=$RELEASE_REPO"
 APP="gui/bin/CodeFoundry.app"
 ZIP="CodeFoundry-darwin-arm64.zip"

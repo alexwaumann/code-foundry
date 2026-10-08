@@ -87,7 +87,7 @@ scripts/                   install.sh (embedded in the binary), package.sh, rele
 docs/                      this file, PLAN.md, ADRs under docs/adr/
 ```
 
-Module path: `github.com/awaumann/code-foundry`.
+Module path: `github.com/alexwaumann/code-foundry`.
 
 ## 4. Protocol
 

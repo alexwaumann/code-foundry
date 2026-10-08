@@ -8,11 +8,11 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/awaumann/code-foundry/internal/api"
-	"github.com/awaumann/code-foundry/internal/command"
-	"github.com/awaumann/code-foundry/internal/command/commandtest"
-	"github.com/awaumann/code-foundry/internal/store/settings"
-	"github.com/awaumann/code-foundry/internal/store/settings/settingstest"
+	"github.com/alexwaumann/code-foundry/internal/api"
+	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
+	"github.com/alexwaumann/code-foundry/internal/store/settings"
+	"github.com/alexwaumann/code-foundry/internal/store/settings/settingstest"
 )
 
 func newSettingsRegistry(t *testing.T) (*command.Registry, *commandtest.Emitter, *settingstest.Fake, *[]string) {

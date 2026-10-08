@@ -8,7 +8,7 @@
         <key>CFBundleExecutable</key>
             <string>CodeFoundry</string>
         <key>CFBundleIdentifier</key>
-            <string>dev.awaumann.codefoundry</string>
+            <string>dev.alexwaumann.codefoundry</string>
         <key>CFBundleVersion</key>
             <string>0.0.0</string>
         <key>CFBundleGetInfoString</key>

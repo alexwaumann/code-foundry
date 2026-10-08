@@ -1434,8 +1434,8 @@ const file_codefoundry_v1_terminal_proto_rawDesc = "" +
 	"\x06Resize\x12%.codefoundry.v1.ResizeTerminalRequest\x1a&.codefoundry.v1.ResizeTerminalResponse\"\x00\x12S\n" +
 	"\x04Kill\x12#.codefoundry.v1.KillTerminalRequest\x1a$.codefoundry.v1.KillTerminalResponse\"\x00\x12Y\n" +
 	"\x06Remove\x12%.codefoundry.v1.RemoveTerminalRequest\x1a&.codefoundry.v1.RemoveTerminalResponse\"\x00\x12Q\n" +
-	"\x05Watch\x12%.codefoundry.v1.WatchTerminalsRequest\x1a\x1d.codefoundry.v1.TerminalEvent\"\x000\x01B\xc2\x01\n" +
-	"\x12com.codefoundry.v1B\rTerminalProtoP\x01ZDgithub.com/awaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
+	"\x05Watch\x12%.codefoundry.v1.WatchTerminalsRequest\x1a\x1d.codefoundry.v1.TerminalEvent\"\x000\x01B\xc5\x01\n" +
+	"\x12com.codefoundry.v1B\rTerminalProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
 	file_codefoundry_v1_terminal_proto_rawDescOnce sync.Once

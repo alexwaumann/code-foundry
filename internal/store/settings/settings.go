@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
 // FileName is the settings file's name inside the config home.

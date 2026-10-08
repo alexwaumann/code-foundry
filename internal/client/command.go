@@ -6,7 +6,7 @@ import (
 
 	"connectrpc.com/connect"
 
-	v1 "github.com/awaumann/code-foundry/gen/go/codefoundry/v1"
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
 // ListCommands calls CommandService.List. Errors wrap the *connect.Error.

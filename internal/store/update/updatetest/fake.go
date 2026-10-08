@@ -6,7 +6,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/awaumann/code-foundry/internal/store/update"
+	"github.com/alexwaumann/code-foundry/internal/store/update"
 )
 
 // Source is a fake update.Source. Set Tag/Err with Set.

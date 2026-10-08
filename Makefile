@@ -31,8 +31,8 @@ VERSION  ?= dev
 # GitHub repository the in-app updater and install.sh download releases from.
 RELEASE_REPO ?= alexwaumann/code-foundry
 # One set of version ldflags for both binaries (the CLI here, the GUI via scripts/package.sh).
-LDFLAGS  := -X github.com/awaumann/code-foundry/internal/version.Version=$(VERSION) \
-            -X github.com/awaumann/code-foundry/internal/version.ReleaseRepo=$(RELEASE_REPO)
+LDFLAGS  := -X github.com/alexwaumann/code-foundry/internal/version.Version=$(VERSION) \
+            -X github.com/alexwaumann/code-foundry/internal/version.ReleaseRepo=$(RELEASE_REPO)
 FRONTEND := gui/frontend
 PNPM     := pnpm --dir $(FRONTEND)
 

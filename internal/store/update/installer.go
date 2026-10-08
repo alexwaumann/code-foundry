@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/awaumann/code-foundry/internal/store/gh"
-	"github.com/awaumann/code-foundry/internal/version"
-	"github.com/awaumann/code-foundry/scripts"
+	"github.com/alexwaumann/code-foundry/internal/store/gh"
+	"github.com/alexwaumann/code-foundry/internal/version"
+	"github.com/alexwaumann/code-foundry/scripts"
 )
 
 // Installer installs a release.
