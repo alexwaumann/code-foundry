@@ -100,8 +100,11 @@ Services (v1):
   disconnected) and detector `status` (busy, idle, needs-attention) with `status_reason`.
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
   chunks), Write (input bytes), Resize, Detach.
-* `RepoService` — Register, Unregister, List, ListWorktrees, CreateWorktree, Watch.
-* `GhService` — ListPullRequests, GetChecks, Watch.
+* `RepoService` — Register, Unregister, List, ListWorktrees, CreateWorktree, Watch,
+  GetWorktreeDetail (files and log against the base branch, Phase 3a).
+* `GhService` — ListPullRequests, GetChecks, Watch; GetDashboard, GetRepoActivity,
+  GetBranchPullRequests (the viewer's PR dashboards, monthly stats, default-branch CI,
+  Phase 3a).
 * `CommandService` — List(context) → available commands with their arg schemas; Invoke.
 * `UiService` — WatchIntents (server stream: focus session, open palette, …); Emit (from
   CLI).
