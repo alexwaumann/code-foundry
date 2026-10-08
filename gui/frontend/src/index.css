@@ -50,8 +50,8 @@
 
 :root {
     --radius: 0.625rem;
-    /* Sheet and panes. The sheet is the one window background (title strip, sidebar,
-     * footer sit on it); panes are the lighter rounded areas floating on it. */
+    /* Sheet and panes. The sheet is the one window background (title strip and
+     * sidebar sit on it); panes are the lighter rounded areas floating on it. */
     --sheet: oklch(0.955 0 0); /* #f0f0f0 */
     --pane: #ffffff;
     --pane-border: oklch(0 0 0 / 8%);
@@ -92,11 +92,12 @@
 }
 
 .dark {
-    /* #070707; gui/main.go's BackgroundColour, so launch does not flash. */
-    --sheet: oklch(0.13 0 0);
-    /* oklch(0.17 0 0); equals the dark xterm background (src/terminal/theme.ts). */
-    --pane: #101010;
-    --pane-border: oklch(1 0 0 / 8%);
+    /* Black; gui/main.go's BackgroundColour, so launch does not flash. */
+    --sheet: #000000;
+    /* Equals the dark xterm background (src/terminal/theme.ts). */
+    --pane: #0a0a0a;
+    /* A touch stronger than light's 8%: the pane is only 10/255 above the sheet. */
+    --pane-border: oklch(1 0 0 / 11%);
     --background: var(--sheet);
     --foreground: oklch(0.985 0 0);
     --card: var(--pane);

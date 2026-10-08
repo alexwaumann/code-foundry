@@ -62,9 +62,9 @@ func main() {
 		Title:  "Code Foundry",
 		Width:  1200,
 		Height: 780,
-		// The dark sheet colour (--sheet in index.css, oklch(0.13 0 0)), so launch does
-		// not flash a different colour before the page paints.
-		BackgroundColour: application.NewRGB(7, 7, 7),
+		// The dark sheet colour (--sheet in index.css, #000000), so launch does not
+		// flash a different colour before the page paints.
+		BackgroundColour: application.NewRGB(0, 0, 0),
 		URL:              "/",
 		Mac: application.MacWindow{
 			TitleBar:                application.MacTitleBarHiddenInset,
