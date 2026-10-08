@@ -4,24 +4,39 @@
  *   pnpm run mock            # http://127.0.0.1:7788, token "dev-mock-token"
  *   MOCK_PORT=7799 MOCK_TOKEN=secret pnpm run mock
  *
- * Serves Health, Terminal, Repo, Command and Ui over Connect (HTTP/1.1, like the real
- * daemon's loopback listener for browsers), with bearer auth and permissive CORS.
- * Non-RPC control endpoints for tests live under /__mock/.
+ * Serves Health, Terminal, Repo, Session, Command, Ui and Event over Connect (HTTP/1.1,
+ * like the real daemon's loopback listener for browsers), with bearer auth and
+ * permissive CORS. Non-RPC control endpoints for tests live under /__mock/:
+ *
+ *   GET  /__mock/invocations | writes | resizes | sessions | streams
+ *   POST /__mock/reset
+ *   POST /__mock/session/attention?id=s-1
+ *   POST /__mock/session/status?id=s-1&status=busy|idle|attention
+ *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139
+ *   POST /__mock/session/focus?id=s-3     (FocusSession intent; FocusTerminal before 2a)
+ *   POST /__mock/sessions-service?enabled=false   (simulate a daemon without SessionService)
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
+import type { MessageInitShape } from "@bufbuild/protobuf";
 import { durationFromMs } from "@bufbuild/protobuf/wkt";
 import { CommandService } from "../src/gen/codefoundry/v1/command_pb";
+import { EventService, EventSource } from "../src/gen/codefoundry/v1/events_pb";
 import { HealthService } from "../src/gen/codefoundry/v1/health_pb";
 import { RepoService } from "../src/gen/codefoundry/v1/repo_pb";
-import { TerminalService, TerminalState } from "../src/gen/codefoundry/v1/terminal_pb";
+import { SessionService, SessionState, SessionStatus } from "../src/gen/codefoundry/v1/session_pb";
+import { TerminalService, TerminalState, type AttachEventSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
-import { CommandError, World } from "./world";
+import { CommandError, World, type EventInit } from "./world";
+
+type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
 
 const port = Number(process.env.MOCK_PORT ?? 7788);
 const token = process.env.MOCK_TOKEN ?? "dev-mock-token";
 const world = new World();
+/** False simulates a pre-Phase-2a daemon (see POST /__mock/sessions-service). */
+let sessionsEnabled = true;
 
 function rpcError(err: unknown): ConnectError {
   if (err instanceof ConnectError) return err;
@@ -40,6 +55,27 @@ function guard<T>(fn: () => T): T {
   }
 }
 
+async function* attach(id: string, signal: AbortSignal): AsyncGenerator<AttachEventInit> {
+  const t = guard(() => world.term(id));
+  if (t.state !== TerminalState.RUNNING) {
+    yield world.snapshot(t);
+    yield { event: { case: "exited", value: { exitCode: t.exitCode } } };
+    return;
+  }
+  // Subscribe before taking the snapshot so no output falls between them.
+  const live = t.attach.subscribe(signal);
+  const first = live.next();
+  try {
+    yield world.snapshot(t);
+    for (let r = await first; !r.done; r = await live.next()) {
+      if (r.value === "end") return;
+      yield r.value;
+    }
+  } finally {
+    void live.return(undefined);
+  }
+}
+
 function routes(router: ConnectRouter): void {
   router.service(HealthService, {
     ping: () => ({ pid: process.pid, version: "mock", uptime: durationFromMs(Date.now() - world.startedAt) }),
@@ -54,31 +90,12 @@ function routes(router: ConnectRouter): void {
         const t = world.create(req.argv.length ? req.argv : ["/bin/zsh"], req.cwd || "/tmp", req.labels, "shell");
         return { terminal: world.terminalMsg(t) };
       }),
-    async *attach(req, ctx) {
-      const t = guard(() => world.term(req.id));
-      if (t.state !== TerminalState.RUNNING) {
-        yield world.snapshot(t);
-        yield { event: { case: "exited", value: { exitCode: t.exitCode } } };
-        return;
-      }
-      // Subscribe before taking the snapshot so no output falls between them.
-      const live = t.attach.subscribe(ctx.signal);
-      const first = live.next();
-      try {
-        yield world.snapshot(t);
-        for (let r = await first; !r.done; r = await live.next()) {
-          if (r.value === "end") return;
-          yield r.value;
-        }
-      } finally {
-        void live.return(undefined);
-      }
-    },
+    attach: (req, ctx) => tracked("TerminalService/Attach", attach(req.id, ctx.signal)),
     write: (req) => guard(() => (world.write(req.id, req.data), {})),
     resize: (req) => guard(() => (world.resize(req.id, req.cols, req.rows), {})),
     kill: (req) => guard(() => (world.kill(req.id), {})),
     remove: (req) => guard(() => (world.remove(req.id), {})),
-    watch: (_req, ctx) => world.termEvents.subscribe(ctx.signal),
+    watch: (_req, ctx) => tracked("TerminalService/Watch", world.termEvents.subscribe(ctx.signal)),
   });
 
   router.service(RepoService, {
@@ -101,7 +118,7 @@ function routes(router: ConnectRouter): void {
       throw new ConnectError("use the worktree.remove command in the mock", Code.Unimplemented);
     },
     refresh: () => ({}),
-    watch: (_req, ctx) => world.repoEvents.subscribe(ctx.signal),
+    watch: (_req, ctx) => tracked("RepoService/Watch", world.repoEvents.subscribe(ctx.signal)),
   });
 
   router.service(CommandService, {
@@ -110,9 +127,78 @@ function routes(router: ConnectRouter): void {
   });
 
   router.service(UiService, {
-    watchIntents: (_req, ctx) => world.intents.subscribe(ctx.signal),
-    emit: (req) => ({ delivered: req.intent ? world.intents.publish(req.intent) : 0 }),
+    watchIntents: (_req, ctx) => tracked("UiService/WatchIntents", world.intents.subscribe(ctx.signal)),
+    emit: (req) => ({ delivered: req.intent ? world.emit(req.intent) : 0 }),
   });
+
+  router.service(SessionService, {
+    list: () => ({ sessions: [...world.sessions.values()].map((s) => world.sessionMsg(s)) }),
+    get: (req) => guard(() => ({ session: world.sessionMsg(world.session(req.id)) })),
+    create: () => {
+      throw new ConnectError("use the session.new command in the mock", Code.Unimplemented);
+    },
+    fork: () => {
+      throw new ConnectError("fork is not mocked", Code.Unimplemented);
+    },
+    rename: () => {
+      throw new ConnectError("use the session.rename command in the mock", Code.Unimplemented);
+    },
+    close: () => {
+      throw new ConnectError("use the session.close command in the mock", Code.Unimplemented);
+    },
+    reconnect: () => {
+      throw new ConnectError("use the session.reconnect command in the mock", Code.Unimplemented);
+    },
+    remove: () => {
+      throw new ConnectError("use the session.remove command in the mock", Code.Unimplemented);
+    },
+    watch: (_req, ctx) => tracked("SessionService/Watch", world.sessionEvents.subscribe(ctx.signal, [world.sessionSnapshot()])),
+  });
+
+  router.service(EventService, {
+    // Snapshots first in the order events.proto promises (repo, terminal, session, gh),
+    // then everything published, filtered by `sources`.
+    watch: (req, ctx) => {
+      const want = new Set(req.sources.length > 0 ? req.sources : [EventSource.REPO, EventSource.TERMINAL, EventSource.SESSION, EventSource.GH, EventSource.UI]);
+      if (!sessionsEnabled) want.delete(EventSource.SESSION);
+      const initial: { source: EventSource; event: EventInit }[] = [
+        { source: EventSource.REPO, event: { event: { case: "repo", value: { event: { case: "snapshot", value: { repos: [...world.repos.values()].map((r) => world.repoMsg(r)) } } } } } },
+        ...[...world.terms.values()].map((t) => ({ source: EventSource.TERMINAL, event: { event: { case: "terminal" as const, value: { event: { case: "updated" as const, value: world.terminalMsg(t) } } } } })),
+        { source: EventSource.SESSION, event: { event: { case: "session", value: world.sessionSnapshot() } } },
+      ];
+      const ui = want.has(EventSource.UI);
+      return tracked("EventService/Watch", filterEvents(world.events.subscribe(ctx.signal, initial), want), () => {
+        if (ui) world.uiEventWatchers++;
+        return () => {
+          if (ui) world.uiEventWatchers--;
+        };
+      });
+    },
+  });
+}
+
+async function* filterEvents(src: AsyncGenerator<{ source: EventSource; event: EventInit }>, want: Set<EventSource>): AsyncGenerator<EventInit> {
+  for await (const { source, event } of src) if (want.has(source)) yield event;
+}
+
+/** Long-lived streams currently open, by RPC, for GET /__mock/streams (connection budget tests). */
+const openStreams = new Map<string, number>();
+
+function bump(name: string, by: number): void {
+  const n = (openStreams.get(name) ?? 0) + by;
+  if (n > 0) openStreams.set(name, n);
+  else openStreams.delete(name);
+}
+
+async function* tracked<T>(name: string, src: AsyncIterable<T>, onOpen?: () => () => void): AsyncGenerator<T> {
+  bump(name, 1);
+  const onClose = onOpen?.();
+  try {
+    yield* src;
+  } finally {
+    onClose?.();
+    bump(name, -1);
+  }
 }
 
 const rpc = connectNodeAdapter({ routes });
@@ -125,8 +211,63 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body, null, 2));
 }
 
-function control(req: IncomingMessage, res: ServerResponse, path: string): void {
+/** JSON-safe session summary (proto timestamps carry bigints). */
+function sessionSummary(id: string): Record<string, unknown> {
+  const s = world.session(id);
+  return { id: s.id, name: s.name, state: SessionState[s.state], status: SessionStatus[s.status], terminalId: s.terminalId };
+}
+
+const statusNames: Record<string, SessionStatus> = { busy: SessionStatus.BUSY, idle: SessionStatus.IDLE, attention: SessionStatus.NEEDS_ATTENTION };
+
+/** Session controls: POST /__mock/session/{attention|status|disconnect|focus}?id=…[&status=…][&reason=…&code=…] */
+function sessionControl(res: ServerResponse, action: string, q: URLSearchParams): void {
+  const id = q.get("id") ?? "";
+  try {
+    switch (action) {
+      case "attention":
+        world.setSessionStatus(id, SessionStatus.NEEDS_ATTENTION);
+        break;
+      case "status": {
+        const status = statusNames[q.get("status") ?? ""];
+        if (status === undefined) throw new CommandError("invalid", "status must be busy, idle or attention");
+        world.setSessionStatus(id, status);
+        break;
+      }
+      case "disconnect":
+        world.disconnectSession(id, q.get("reason") ?? "crashed", Number(q.get("code") ?? 1));
+        break;
+      case "focus":
+        json(res, 200, { delivered: world.focusSession(id) });
+        return;
+      default:
+        json(res, 404, { error: "unknown session action" });
+        return;
+    }
+    json(res, 200, sessionSummary(id));
+  } catch (err) {
+    json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+function control(req: IncomingMessage, res: ServerResponse, path: string, q: URLSearchParams): void {
+  const session = /^\/__mock\/session\/([a-z]+)$/.exec(path);
+  if (req.method === "POST" && session?.[1]) {
+    sessionControl(res, session[1], q);
+    return;
+  }
   switch (`${req.method ?? ""} ${path}`) {
+    case "POST /__mock/sessions-service":
+      // enabled=false simulates a daemon without Phase 2a: SessionService 404s and the
+      // events stream carries no session source. Reset turns it back on.
+      sessionsEnabled = q.get("enabled") !== "false";
+      json(res, 200, { enabled: sessionsEnabled });
+      break;
+    case "GET /__mock/streams":
+      json(res, 200, Object.fromEntries(openStreams));
+      break;
+    case "GET /__mock/sessions":
+      json(res, 200, [...world.sessions.keys()].map(sessionSummary));
+      break;
     case "GET /__mock/invocations":
       json(res, 200, world.invocations);
       break;
@@ -137,6 +278,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string): void 
       json(res, 200, world.resizes);
       break;
     case "POST /__mock/reset":
+      sessionsEnabled = true;
       world.reset();
       json(res, 200, { ok: true });
       break;
@@ -161,9 +303,14 @@ const server = createServer((req, res) => {
     res.end();
     return;
   }
-  const path = (req.url ?? "/").split("?")[0] ?? "/";
-  if (path.startsWith("/__mock/")) {
-    control(req, res, path);
+  const url = new URL(req.url ?? "/", "http://mock");
+  if (url.pathname.startsWith("/__mock/")) {
+    control(req, res, url.pathname, url.searchParams);
+    return;
+  }
+  if (!sessionsEnabled && url.pathname.startsWith("/codefoundry.v1.SessionService/")) {
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end("404 page not found\n");
     return;
   }
   if (req.headers.authorization !== `Bearer ${token}`) {

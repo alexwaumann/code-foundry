@@ -23,6 +23,19 @@ export async function invocations(): Promise<Invocation[]> {
   return (await res.json()) as Invocation[];
 }
 
+/** POSTs a /__mock control endpoint and returns its JSON. */
+export async function mockPost(pathAndQuery: string): Promise<unknown> {
+  const res = await fetch(`${mockUrl}/__mock/${pathAndQuery}`, { method: "POST" });
+  expect(res.ok, `${pathAndQuery}: ${String(res.status)}`).toBe(true);
+  return res.json();
+}
+
+/** Long-lived streams the mock has open right now, by RPC (e.g. "EventService/Watch"). */
+export async function openStreams(): Promise<Record<string, number>> {
+  const res = await fetch(`${mockUrl}/__mock/streams`);
+  return (await res.json()) as Record<string, number>;
+}
+
 export async function writes(): Promise<{ id: string; data: string }[]> {
   const res = await fetch(`${mockUrl}/__mock/writes`);
   return (await res.json()) as { id: string; data: string }[];

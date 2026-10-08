@@ -12,10 +12,11 @@ test("sidebar renders repos, worktrees and grouped terminals", async ({ page }) 
     await expect(tree.locator('[data-row-kind="repo"]').filter({ hasText: name })).toBeVisible();
   }
   await expect(tree.locator('[data-row-kind="worktree"]').filter({ hasText: "feat/sidebar" })).toBeVisible();
-  // Grouped by labels.worktree (t-claude) and by cwd prefix (t-logs under main, t-top under feat/sidebar).
+  // Grouped by worktree_path (session s-1) and by cwd prefix (t-logs under main, t-top under feat/sidebar).
   const keys = await tree.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
   const idx = (k: string) => keys.indexOf(k);
-  expect(idx(`w:repo-cf::${CF}`)).toBeLessThan(idx("t:t-claude"));
+  expect(idx(`w:repo-cf::${CF}`)).toBeLessThan(idx("s:s-1"));
+  expect(idx("s:s-1")).toBeLessThan(idx("t:t-logs"));
   expect(idx("t:t-logs")).toBeLessThan(idx(`w:repo-cf::${CF}.worktrees/feat-sidebar`));
   expect(idx("t:t-top")).toBeGreaterThan(idx(`w:repo-cf::${CF}.worktrees/feat-sidebar`));
   // Unplaceable terminals land under "Other terminals".
@@ -23,9 +24,9 @@ test("sidebar renders repos, worktrees and grouped terminals", async ({ page }) 
   await expect(page.getByTestId("daemon-status")).toContainText("mock");
 });
 
-test("selecting a terminal attaches and shows the snapshot", async ({ page }) => {
+test("selecting a session attaches its terminal and shows the snapshot", async ({ page }) => {
   await openApp(page);
-  await row(page, "t:t-claude").click();
+  await row(page, "s:s-1").click();
   const host = page.getByTestId("terminal-host");
   await expect(host).toHaveAttribute("data-terminal-id", "t-claude");
   await expect(host).toHaveAttribute("data-attach-phase", "live");
@@ -61,8 +62,8 @@ test("palette opens with cmd+k and lists only commands available in context", as
   await page.keyboard.press("Escape");
   await expect(palette).toHaveCount(0);
 
-  // With a running terminal focused, cmd+shift+p still reaches the app (global chord).
-  await row(page, "t:t-claude").click();
+  // With a running session's terminal focused, cmd+shift+p still reaches the app (global chord).
+  await row(page, "s:s-1").click();
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
   await page.keyboard.press("Meta+Shift+p");
   await expect(palette.locator('[data-command="terminal.kill"]')).toBeVisible();
@@ -74,7 +75,7 @@ test("palette opens with cmd+k and lists only commands available in context", as
 
 test("invoking a command sends the current context", async ({ page }) => {
   await openApp(page);
-  await row(page, "t:t-claude").click();
+  await row(page, "t:t-logs").click();
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("kill term");
@@ -83,11 +84,26 @@ test("invoking a command sends the current context", async ({ page }) => {
   const last = (await invocations()).at(-1);
   expect(last?.name).toBe("terminal.kill");
   expect(last?.context).toEqual({
+    activeTerminalId: "t-logs",
+    activeSessionId: "",
+    activeRepoId: "repo-cf",
+    activeWorktreePath: CF,
+    activeView: "terminal",
+  });
+
+  // A session contributes its id, terminal and worktree.
+  await row(page, "s:s-1").click();
+  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-claude");
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("daemon status");
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("daemon.status");
+  expect((await invocations()).at(-1)?.context).toEqual({
     activeTerminalId: "t-claude",
     activeSessionId: "s-1",
     activeRepoId: "repo-cf",
     activeWorktreePath: CF,
-    activeView: "terminal",
+    activeView: "session",
   });
 });
 
@@ -109,12 +125,14 @@ test("required args are prompted inline before invoking", async ({ page }) => {
   // The command emits FocusRepo for the new worktree.
   await expect(row(page, `w:repo-cf::${CF}.worktrees/feat-palette`)).toHaveAttribute("aria-selected", "true");
 
-  // Enum args list their values.
+  // Enum args list their values (optional enums too); "Default (not set)" omits the arg.
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("new claude");
   await page.keyboard.press("Enter");
   await expect(palette.getByRole("option", { name: "sonnet" })).toBeVisible();
   await palette.getByRole("option", { name: "sonnet" }).click();
+  await expect(palette.getByRole("option", { name: /Default/ })).toBeVisible();
+  await page.keyboard.press("Enter");
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
   expect((await invocations()).at(-1)?.args).toEqual({ model: "sonnet" });
 });
@@ -141,7 +159,7 @@ test("sidebar is keyboard navigable", async ({ page }) => {
   await page.getByRole("tree").focus();
   await page.keyboard.press("Home");
   await page.keyboard.press("ArrowDown"); // main worktree
-  await page.keyboard.press("ArrowDown"); // t-claude
+  await page.keyboard.press("ArrowDown"); // session s-1 (sessions come first)
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-claude");
   // Collapse the first repo with ArrowLeft from its row.
@@ -149,15 +167,18 @@ test("sidebar is keyboard navigable", async ({ page }) => {
   await page.keyboard.press("Home");
   await page.keyboard.press("ArrowLeft");
   await expect(row(page, "r:repo-cf")).toHaveAttribute("aria-expanded", "false");
-  await expect(row(page, "t:t-claude")).toHaveCount(0);
-  // cmd+1 jumps to the first terminal in sidebar order even when collapsed.
-  await page.keyboard.press("Meta+3");
+  await expect(row(page, "s:s-1")).toHaveCount(0);
+  // cmd+N jumps to the Nth session or terminal in sidebar order even when collapsed:
+  // s-1, t-logs, s-4, s-5, t-top, …
+  await page.keyboard.press("Meta+2");
+  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-logs");
+  await page.keyboard.press("Meta+5");
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-top");
 });
 
 test("WebGL context loss falls back to the DOM renderer", async ({ page, browserName }) => {
   await openApp(page);
-  await row(page, "t:t-claude").click();
+  await row(page, "s:s-1").click();
   const host = page.getByTestId("terminal-host");
   await expect(host).toHaveAttribute("data-attach-phase", "live");
   const kind = await host.getAttribute("data-renderer");

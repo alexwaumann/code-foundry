@@ -2,11 +2,15 @@
 export class Hub<T> {
   private readonly subs = new Set<(v: T) => void>();
 
+  /** `tap` sees every published value first (used to tee into the EventService hub). */
+  constructor(private readonly tap?: (v: T) => void) {}
+
   get size(): number {
     return this.subs.size;
   }
 
   publish(v: T): number {
+    this.tap?.(v);
     for (const s of this.subs) s(v);
     return this.subs.size;
   }
