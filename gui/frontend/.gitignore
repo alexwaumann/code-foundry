@@ -1,0 +1,4 @@
+# Playwright output (pnpm run e2e)
+/test-results/
+/playwright-report/
+/blob-report/

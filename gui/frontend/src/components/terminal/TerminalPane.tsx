@@ -1,0 +1,194 @@
+import { useEffect, useRef, useState } from "react";
+import { CircleX, Loader2, RefreshCw } from "lucide-react";
+import { invalidateOnTransportError } from "@/api/endpoint";
+import { attachTerminal, resizeTerminal, writeTerminal } from "@/api/terminal";
+import { isGlobalChord } from "@/keys/bindings";
+import { useColorScheme } from "@/lib/theme";
+import { tildify, terminalLabel } from "@/lib/path";
+import { useTerminalsStore } from "@/stores/terminals";
+import { useUiStore } from "@/stores/ui";
+import { AttachController, type AttachState } from "@/terminal/attach";
+import { XtermRenderer, type RendererKind } from "@/terminal/xterm";
+
+declare global {
+  interface Window {
+    /** Dev/test hook: the mounted renderer (only in dev builds). */
+    __cfTerminal?: { renderer: XtermRenderer; controller: AttachController };
+  }
+}
+
+/**
+ * Dev-only: VITE_SIMULATE_WEBGL_LOSS_MS=<ms> loses the WebGL context that long after mount,
+ * to exercise the DOM fallback inside the real WKWebView (`wails3 dev`).
+ */
+function simulateWebglLoss(host: HTMLElement): () => void {
+  const ms = Number((import.meta.env as { VITE_SIMULATE_WEBGL_LOSS_MS?: string }).VITE_SIMULATE_WEBGL_LOSS_MS);
+  if (!import.meta.env.DEV || !ms) return () => undefined;
+  const t = setTimeout(() => {
+    const canvas = host.querySelector<HTMLCanvasElement>(".xterm-screen canvas:not(.xterm-link-layer)");
+    canvas?.getContext("webgl2")?.getExtension("WEBGL_lose_context")?.loseContext();
+  }, ms);
+  return () => {
+    clearTimeout(t);
+  };
+}
+
+function TerminalHeader({ id, size, renderer }: { id: string; size: { cols: number; rows: number } | null; renderer: RendererKind | null }) {
+  const label = useTerminalsStore((s) => {
+    const t = s.byId[id];
+    return t ? terminalLabel(t) : id;
+  });
+  const cwd = useTerminalsStore((s) => s.byId[id]?.cwd ?? "");
+  return (
+    <div className="flex h-9 shrink-0 items-center gap-3 border-b px-3 text-xs">
+      <span className="truncate font-medium text-foreground" data-testid="terminal-title">
+        {label}
+      </span>
+      <span className="truncate text-muted-foreground">{tildify(cwd)}</span>
+      <span className="ml-auto flex shrink-0 items-center gap-2 text-muted-foreground tabular-nums">
+        {import.meta.env.DEV && renderer && <span className="rounded border px-1 text-[10px] uppercase">{renderer}</span>}
+        {size && (
+          <span>
+            {size.cols}×{size.rows}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+function Overlay({ state }: { state: AttachState }) {
+  if (state.phase === "exited") {
+    return (
+      <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center" data-testid="exit-overlay">
+        <div className="pointer-events-auto flex items-center gap-2 rounded-md border bg-popover/95 px-3 py-2 text-sm shadow-lg backdrop-blur">
+          <CircleX className={state.exitCode === 0 ? "size-4 text-muted-foreground" : "size-4 text-red-400"} />
+          <span>
+            Process exited with code <span className="font-mono">{state.exitCode ?? "?"}</span>
+          </span>
+        </div>
+      </div>
+    );
+  }
+  if (state.phase === "connecting" || state.phase === "reconnecting") {
+    return (
+      <div className="pointer-events-none absolute top-3 right-4 flex items-center gap-2 rounded-md border bg-popover/90 px-2.5 py-1 text-xs text-muted-foreground">
+        {state.phase === "connecting" ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5 animate-spin" />}
+        {state.phase === "connecting" ? "Attaching…" : "Reconnecting…"}
+      </div>
+    );
+  }
+  if (state.phase === "error") {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-background/80" role="alert">
+        <div className="rounded-md border bg-popover px-4 py-3 text-sm">
+          <p className="font-medium">Cannot attach to terminal</p>
+          <p className="mt-1 text-muted-foreground">{state.error}</p>
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
+
+/**
+ * Hosts the one attached terminal. A single renderer lives as long as the pane; switching
+ * terminals aborts the old Attach stream and resets the renderer before the new snapshot.
+ */
+export function TerminalPane({ terminalId }: { terminalId: string }) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const ctlRef = useRef<{ renderer: XtermRenderer; controller: AttachController } | null>(null);
+  const [state, setState] = useState<AttachState>({ terminalId: null, phase: "idle", exitCode: null, error: null });
+  const [rendererKind, setRendererKind] = useState<RendererKind | null>(null);
+  const [size, setSize] = useState<{ cols: number; rows: number } | null>(null);
+  const scheme = useColorScheme();
+  const fontSize = useUiStore((s) => s.fontSize);
+  const focusSeq = useUiStore((s) => s.terminalFocusSeq);
+
+  // Renderer + controller live for the pane's lifetime.
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const ui = useUiStore.getState();
+    const renderer = new XtermRenderer({
+      fontSize: ui.fontSize,
+      colorScheme: scheme,
+      isGlobalChord,
+      onRendererChange: setRendererKind,
+    });
+    renderer.mount(host);
+    const controller = new AttachController(
+      renderer,
+      {
+        attach: (id, signal) => attachTerminal(id, signal),
+        write: (id, data) => writeTerminal(id, data),
+        resize: (id, cols, rows) => resizeTerminal(id, cols, rows),
+        onStreamError: invalidateOnTransportError,
+      },
+      setState,
+    );
+    const sizeSub = renderer.term.onResize((s) => {
+      setSize({ cols: s.cols, rows: s.rows });
+    });
+    setSize(renderer.size);
+    ctlRef.current = { renderer, controller };
+    if (import.meta.env.DEV) window.__cfTerminal = { renderer, controller };
+
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        renderer.fit();
+      });
+    });
+    ro.observe(host);
+    const stopSimulation = simulateWebglLoss(host);
+    return () => {
+      stopSimulation();
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+      sizeSub.dispose();
+      controller.dispose();
+      renderer.dispose();
+      ctlRef.current = null;
+      if (import.meta.env.DEV && window.__cfTerminal?.renderer === renderer) delete window.__cfTerminal;
+    };
+    // The renderer is created once; scheme/font changes are applied by the effects below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    ctlRef.current?.controller.attach(terminalId);
+  }, [terminalId]);
+
+  useEffect(() => {
+    ctlRef.current?.renderer.setColorScheme(scheme);
+  }, [scheme]);
+
+  useEffect(() => {
+    ctlRef.current?.renderer.setFontSize(fontSize);
+  }, [fontSize]);
+
+  useEffect(() => {
+    ctlRef.current?.renderer.focus();
+  }, [focusSeq, terminalId]);
+
+  return (
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Terminal">
+      <TerminalHeader id={terminalId} size={size} renderer={rendererKind} />
+      <div className="relative min-h-0 flex-1 bg-[var(--terminal-bg)] py-1 pl-2">
+        <div
+          ref={hostRef}
+          className="h-full w-full"
+          data-terminal-host
+          data-region="terminal"
+          data-testid="terminal-host"
+          data-renderer={rendererKind ?? undefined}
+          data-attach-phase={state.phase}
+          data-terminal-id={state.terminalId ?? undefined}
+        />
+        <Overlay state={state} />
+      </div>
+    </section>
+  );
+}
