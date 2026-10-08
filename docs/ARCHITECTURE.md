@@ -95,14 +95,21 @@ start; the Wails host reads them and injects them into the page before load.
 
 Services (v1):
 
-* `SessionService` — Create, Fork, List, Get, Rename, Close, Watch (server stream).
+* `SessionService` — Create, Fork, List, Get, Rename, Close, Reconnect, Remove, Watch
+  (server stream). A session carries lifecycle `state` (starting, connected, closing,
+  disconnected) and detector `status` (busy, idle, needs-attention) with `status_reason`.
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
   chunks), Write (input bytes), Resize, Detach.
 * `RepoService` — Register, Unregister, List, ListWorktrees, CreateWorktree, Watch.
 * `GhService` — ListPullRequests, GetChecks, Watch.
 * `CommandService` — List(context) → available commands with their arg schemas; Invoke.
-* `UiService` — WatchIntents (server stream to the GUI: focus session, open palette, …);
-  Emit (from CLI).
+* `UiService` — WatchIntents (server stream: focus session, open palette, …); Emit (from
+  CLI).
+* `EventService` — Watch: one server stream that multiplexes every store's events and UI
+  intents (sources repo, terminal, session, gh, ui; filterable). On connect it sends each
+  source's snapshot in that order, then live events; a source that drops events for a
+  slow client resends only its own snapshot. This is the GUI's only long-lived sync
+  stream; the per-service Watch RPCs remain for the CLI and tests.
 * `HealthService` — Ping, Version.
 
 Rules:
@@ -176,8 +183,14 @@ switch.
 * State discipline: sliced Zustand stores, one per daemon service. Streams update slices;
   components subscribe to the narrowest selector. Lists are virtualized. No global
   re-render on daemon events.
+* Connection budget: the GUI holds exactly one `EventService.Watch` stream plus one
+  `TerminalService.Attach` (the visible terminal). Everything else is unary. This keeps
+  the browser's six HTTP/1.1 connections per origin mostly free.
 * Only the visible terminal is attached. Switching sessions detaches the old stream and
-  attaches the new one. Background sessions cost nothing in the frontend.
+  attaches the new one. Background sessions cost nothing in the frontend. Attaching is
+  also how the daemon knows a session is being looked at: while a session's terminal has
+  an Attach subscriber, finished turns count as seen (see
+  `docs/notes/phase2-integration.md`).
 * Layout: sidebar (repos → worktrees → sessions), content (terminal or overview page),
   footer with context-aware hints, command palette overlay. Keyboard-first; every palette
   command is reachable without the mouse.
