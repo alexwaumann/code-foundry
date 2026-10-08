@@ -133,6 +133,12 @@ func (h *Gh) Watch(ctx context.Context, _ *connect.Request[v1.WatchGhRequest], s
 	defer prs.Close()
 	viewer := bus.Subscribe[gh.ViewerUpdated](h.bus, ghWatchBuffer)
 	defer viewer.Close()
+	dash := bus.Subscribe[gh.DashboardUpdated](h.bus, ghWatchBuffer)
+	defer dash.Close()
+	act := bus.Subscribe[gh.RepoActivityUpdated](h.bus, ghWatchBuffer)
+	defer act.Close()
+	branch := bus.Subscribe[gh.BranchPullRequestsUpdated](h.bus, ghWatchBuffer)
+	defer branch.Close()
 	// Flush response headers now: clients (connect-go and connect-web) block until they
 	// arrive, and the first event may be a poll interval away. Subscribing first means
 	// nothing published after the client sees the stream open is missed.
@@ -150,6 +156,12 @@ func (h *Gh) Watch(ctx context.Context, _ *connect.Request[v1.WatchGhRequest], s
 			ev = ghPullRequestsEvent(e)
 		case e := <-viewer.C():
 			ev = ghViewerEvent(e)
+		case e := <-dash.C():
+			ev = ghDashboardEvent(e)
+		case e := <-act.C():
+			ev = ghRepoActivityEvent(e)
+		case e := <-branch.C():
+			ev = ghBranchEvent(e)
 		}
 		if err := stream.Send(ev); err != nil {
 			return err
@@ -231,6 +243,9 @@ func pullRequestToProto(slug string, p *gh.PullRequest) *v1.PullRequest {
 		Url:               p.URL,
 		UpdatedAt:         timestamp(p.UpdatedAt),
 		Checks:            rollupToProto(p.Checks),
+		State:             enumOf[v1.PullRequestState](v1.PullRequestState_value, "PULL_REQUEST_STATE_", string(p.State)),
+		CreatedAt:         timestamp(p.CreatedAt),
+		MergedAt:          timestamp(p.MergedAt),
 	}
 }
 

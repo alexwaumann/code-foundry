@@ -169,6 +169,8 @@ func eventToProto(ev repo.Event) *v1.RepoEvent {
 		return &v1.RepoEvent{Event: &v1.RepoEvent_WorktreeRemoved{
 			WorktreeRemoved: &v1.WorktreeRef{RepoId: e.RepoID, Path: e.Path},
 		}}
+	case repo.WorktreeDetailUpdated:
+		return worktreeDetailEvent(e)
 	}
 	return nil
 }

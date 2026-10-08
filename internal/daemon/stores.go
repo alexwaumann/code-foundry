@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"os"
 
 	"github.com/awaumann/code-foundry/internal/bus"
 	"github.com/awaumann/code-foundry/internal/db"
@@ -46,7 +47,8 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 	if s.repo, err = repo.Start(ctx, repo.Options{DB: s.db, Bus: s.bus, Log: log}); err != nil {
 		return nil, err
 	}
-	if s.gh, err = gh.New(ctx, gh.Options{DB: s.db, Bus: s.bus, Log: log.With("store", "gh")}); err != nil {
+	// CODE_FOUNDRY_GH_SEARCH_AS is a development aid (see gh.Options.SearchAs).
+	if s.gh, err = gh.New(ctx, gh.Options{DB: s.db, Bus: s.bus, Log: log.With("store", "gh"), SearchAs: os.Getenv("CODE_FOUNDRY_GH_SEARCH_AS")}); err != nil {
 		return nil, err
 	}
 	s.stopGh = startGh(ctx, log, s.gh, s.repo, s.bus)

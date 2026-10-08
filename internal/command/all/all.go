@@ -21,6 +21,8 @@ type Deps struct {
 	Repo command.RepoBackend
 	// Session backs session.*. Nil works like Terminal.
 	Session command.SessionBackend
+	// OpenURL opens links for view.open.url. Nil uses command.OpenURL (macOS open).
+	OpenURL command.URLOpener
 }
 
 // Register registers every domain's commands into r.
@@ -43,5 +45,6 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterTerminal(r, d.Terminal),
 		command.RegisterRepo(r, d.Repo),
 		command.RegisterSession(r, d.Session, d.Emitter),
+		command.RegisterView(r, d.Emitter, d.OpenURL),
 	)
 }
