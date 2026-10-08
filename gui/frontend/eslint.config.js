@@ -24,6 +24,15 @@ export default defineConfig([
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    rules: {
+      // `const { [id]: _removed, ...rest } = obj` is the idiomatic immutable delete.
+      "@typescript-eslint/no-unused-vars": ["error", { ignoreRestSiblings: true }],
+    },
+  },
+  {
+    // Node-side tooling: mock daemon, Playwright config and specs.
+    files: ["mock/**/*.ts", "e2e/**/*.ts", "playwright.config.ts"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {
     // Generated protobuf types are only allowed in src/api (see CLAUDE.md).
