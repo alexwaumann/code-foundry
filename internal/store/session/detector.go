@@ -39,7 +39,9 @@ type ScreenTextFn func() (string, error)
 // one goroutine (the session's runner), so implementations need no locking. None of
 // them may block for long: the runner also drives the close sequence.
 // A detector may additionally implement Input(data []byte), called with user input
-// written to the session terminal; internal/claudestatus uses it to clear "finished".
+// written to the session terminal, and Acknowledge(), called while someone is viewing
+// the session's terminal (see runner.acknowledge); internal/claudestatus uses both to
+// clear "finished".
 type StatusDetector interface {
 	// Output is called with each raw PTY chunk (from the terminal observer hook). The
 	// slice is shared and read-only.

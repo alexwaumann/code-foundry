@@ -58,8 +58,9 @@ type Spec struct {
 	Cols, Rows uint16
 	// Labels are opaque to this package (e.g. the session store's session id).
 	Labels map[string]string
-	// Observer, if set, sees every output chunk, title change, alt-screen change, and
-	// the exit of this terminal. See Observer for the contract.
+	// Observer, if set, sees every output chunk, title change, alt-screen change,
+	// Attach subscriber change, and the exit of this terminal. See Observer for the
+	// contract.
 	Observer Observer
 }
 
@@ -88,7 +89,12 @@ type ObserveEvent struct {
 	Input     []byte
 	Title     *string
 	AltScreen *bool
-	Exited    *Exit
+	// Attached is the number of Attach subscribers right after one attached or went
+	// away (detached, dropped as too slow). Delivered in stream order with Output, so
+	// "Output while Attached > 0" means a viewer received that output. Not delivered
+	// once the terminal has exited.
+	Attached *int
+	Exited   *Exit
 }
 
 // Terminal is an immutable snapshot of a terminal's metadata. Do not mutate Argv or

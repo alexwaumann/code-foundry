@@ -2,6 +2,8 @@ package terminal
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -15,8 +17,9 @@ type observed struct {
 	output bytes.Buffer
 	titles []string
 	alts   []bool
-	exit   *Exit
-	order  []string // event kinds in delivery order
+	exit     *Exit
+	attached []int
+	order    []string // event kinds in delivery order
 	ids    map[string]bool
 }
 
@@ -37,6 +40,9 @@ func (o *observed) observer(id string, ev ObserveEvent) {
 	case ev.AltScreen != nil:
 		o.alts = append(o.alts, *ev.AltScreen)
 		o.order = append(o.order, "alt")
+	case ev.Attached != nil:
+		o.attached = append(o.attached, *ev.Attached)
+		o.order = append(o.order, "attached")
 	case ev.Exited != nil:
 		o.exit = ev.Exited
 		o.order = append(o.order, "exited")
@@ -113,6 +119,64 @@ func TestObserverSeesAltScreenTransitions(t *testing.T) {
 	defer obs.mu.Unlock()
 	if len(obs.alts) != 2 || !obs.alts[0] || obs.alts[1] {
 		t.Errorf("alt transitions = %v, want [true false]", obs.alts)
+	}
+}
+
+// The observer sees the Attach subscriber count after every attach and detach, and
+// nothing about subscribers once the terminal has exited (Exited stays last).
+func TestObserverSeesAttachCount(t *testing.T) {
+	ctx := testCtx(t)
+	m := newTestManager(t, Options{})
+	var obs observed
+	term, err := m.Create(ctx, Spec{Argv: []string{"/bin/sh", "-c", "read x; exit 0"}, Observer: obs.observer})
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := func() []int {
+		obs.mu.Lock()
+		defer obs.mu.Unlock()
+		return append([]int(nil), obs.attached...)
+	}
+	waitCounts := func(want []int) {
+		t.Helper()
+		deadline := time.Now().Add(5 * time.Second)
+		for fmt.Sprint(counts()) != fmt.Sprint(want) {
+			if time.Now().After(deadline) {
+				t.Fatalf("attached counts = %v, want %v", counts(), want)
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
+	ctx1, cancel1 := context.WithCancel(ctx)
+	defer cancel1()
+	if _, err := m.Attach(ctx1, term.ID); err != nil {
+		t.Fatal(err)
+	}
+	ctx2, cancel2 := context.WithCancel(ctx)
+	defer cancel2()
+	if _, err := m.Attach(ctx2, term.ID); err != nil {
+		t.Fatal(err)
+	}
+	waitCounts([]int{1, 2})
+	cancel1()
+	waitCounts([]int{1, 2, 1})
+	if err := m.Write(ctx, term.ID, []byte("\n")); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for !obs.exited() {
+		if time.Now().After(deadline) {
+			t.Fatal("observer never saw exit")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	cancel2() // detaching after exit is not reported
+	time.Sleep(50 * time.Millisecond)
+	waitCounts([]int{1, 2, 1})
+	obs.mu.Lock()
+	defer obs.mu.Unlock()
+	if last := obs.order[len(obs.order)-1]; last != "exited" {
+		t.Errorf("last event = %s, want exited (order %v)", last, obs.order)
 	}
 }
 

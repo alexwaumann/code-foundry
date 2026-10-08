@@ -107,6 +107,10 @@ type runner struct {
 
 	namingSeen bool
 	finished   bool
+
+	// viewers is the terminal's Attach subscriber count (from the observer). While
+	// someone is attached, whatever Claude produces is seen: see acknowledge.
+	viewers int
 }
 
 func newRunner(m *Manager, id, cwd string, l launch, prompt string) *runner {
@@ -224,6 +228,13 @@ func (r *runner) onEvent(ev terminal.ObserveEvent) {
 	case ev.Output != nil:
 		r.activity = r.m.opts.Now()
 		r.det.Output(ev.Output)
+		r.acknowledgeIfViewed()
+	case ev.Attached != nil:
+		prev := r.viewers
+		r.viewers = *ev.Attached
+		if r.viewers > prev {
+			r.acknowledge()
+		}
 	case ev.Input != nil:
 		if in, ok := r.det.(interface{ Input([]byte) }); ok {
 			in.Input(ev.Input)
@@ -238,6 +249,24 @@ func (r *runner) onEvent(ev terminal.ObserveEvent) {
 		}
 	case ev.Exited != nil:
 		r.onExit(ev.Exited.Code)
+	}
+}
+
+// acknowledge tells the detector that the user has seen everything Claude produced so
+// far, which clears "finished" attention (a detector may implement Acknowledge(), as
+// internal/claudestatus does). The rule: acknowledge when a viewer attaches to the
+// session's terminal, and after every Output chunk and transcript line fed to the
+// detector while at least one viewer is attached. Dialog attention is unaffected: it
+// lasts until the dialog is gone from the screen.
+func (r *runner) acknowledge() {
+	if a, ok := r.det.(interface{ Acknowledge() }); ok {
+		a.Acknowledge()
+	}
+}
+
+func (r *runner) acknowledgeIfViewed() {
+	if r.viewers > 0 {
+		r.acknowledge()
 	}
 }
 
@@ -379,6 +408,9 @@ func (r *runner) pollTranscript() {
 		}
 	}
 	if len(lines) > 0 {
+		// The turn-end record trails the last output chunk by ~120 ms and counts as
+		// new work for the detector; a viewer has seen it too.
+		r.acknowledgeIfViewed()
 		r.checkStatus()
 	}
 }

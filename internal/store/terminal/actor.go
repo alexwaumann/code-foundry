@@ -244,6 +244,15 @@ func (a *actor) observe(ev ObserveEvent) {
 	}
 }
 
+// observeAttached tells the Observer how many Attach subscribers there are now.
+func (a *actor) observeAttached() {
+	if a.exited {
+		return
+	}
+	n := len(a.subs)
+	a.observe(ObserveEvent{Attached: &n})
+}
+
 // checkMetadata detects title and alt-screen changes after a write and schedules a
 // throttled publish.
 func (a *actor) checkMetadata() {
@@ -291,6 +300,7 @@ func (a *actor) publish() {
 // broadcast fans ev out without blocking. A subscriber whose buffer is nearly full is
 // sent Dropped (the last slot is reserved for it) and disconnected.
 func (a *actor) broadcast(ev AttachEvent) {
+	dropped := false
 	for ch := range a.subs {
 		if len(ch) >= cap(ch)-1 {
 			ch <- AttachEvent{Dropped: true}
@@ -298,9 +308,13 @@ func (a *actor) broadcast(ev AttachEvent) {
 			delete(a.subs, ch)
 			a.drops.Add(1)
 			a.log.Warn("dropped slow attach subscriber")
+			dropped = true
 			continue
 		}
 		ch <- ev
+	}
+	if dropped {
+		a.observeAttached()
 	}
 }
 
@@ -361,6 +375,7 @@ func (a *actor) attach() (chan AttachEvent, error) {
 		ch <- AttachEvent{Exited: &Exit{Code: a.cur.ExitCode}}
 	}
 	a.subs[ch] = struct{}{}
+	a.observeAttached()
 	return ch, nil
 }
 
@@ -373,6 +388,7 @@ func (a *actor) detach(ch chan AttachEvent) {
 	if _, ok := a.subs[ch]; ok {
 		delete(a.subs, ch)
 		close(ch)
+		a.observeAttached()
 	}
 }
 

@@ -24,7 +24,11 @@ type Fake struct {
 	// CreateErr, if set, is returned by Create.
 	CreateErr error
 
-	mu    sync.Mutex
+	mu sync.Mutex
+	// obsMu serializes Observer calls. Attach/detach notifications take it before
+	// releasing mu, so they reach the Observer before any event caused afterwards
+	// (the real store orders everything on the actor).
+	obsMu sync.Mutex
 	next  int
 	terms map[string]*fakeTerm
 }
@@ -183,11 +187,13 @@ func (f *Fake) Remove(_ context.Context, id string) error {
 
 // Attach sends a snapshot (all output so far) and then live events. Channels hold 1024
 // events; like the real store, a subscriber that falls that far behind is dropped.
+// The Observer sees the subscriber count after each attach and detach (while the
+// terminal is running), as with the real store.
 func (f *Fake) Attach(ctx context.Context, id string) (<-chan terminal.AttachEvent, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	t, err := f.get(id)
 	if err != nil {
+		f.mu.Unlock()
 		return nil, err
 	}
 	ch := make(chan terminal.AttachEvent, 1024)
@@ -198,16 +204,28 @@ func (f *Fake) Attach(ctx context.Context, id string) (<-chan terminal.AttachEve
 		ch <- terminal.AttachEvent{Exited: &terminal.Exit{Code: t.info.ExitCode}}
 	}
 	t.subs[ch] = struct{}{}
+	f.unlockObservingAttached(t, true)
 	go func() {
 		<-ctx.Done()
 		f.mu.Lock()
-		defer f.mu.Unlock()
-		if _, ok := t.subs[ch]; ok {
+		_, ok := t.subs[ch]
+		if ok {
 			delete(t.subs, ch)
 			close(ch)
 		}
+		f.unlockObservingAttached(t, ok)
 	}()
 	return ch, nil
+}
+
+// Attached returns the number of Attach subscribers of a terminal.
+func (f *Fake) Attached(id string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if t, ok := f.terms[id]; ok {
+		return len(t.subs)
+	}
+	return 0
 }
 
 // ScreenText returns the text set with SetScreen, else all output so far.
@@ -301,8 +319,27 @@ func (f *Fake) observe(id string, ev terminal.ObserveEvent) {
 	}
 	f.mu.Unlock()
 	if obs != nil {
+		f.obsMu.Lock()
+		defer f.obsMu.Unlock()
 		obs(id, ev)
 	}
+}
+
+// unlockObservingAttached releases f.mu (held by the caller) and, if changed and the
+// terminal is still running, tells its Observer the subscriber count. The count is
+// taken and the observer slot reserved before mu is released, so a later event cannot
+// overtake the notification.
+func (f *Fake) unlockObservingAttached(t *fakeTerm, changed bool) {
+	obs := t.spec.Observer
+	if !changed || obs == nil || t.info.State != terminal.StateRunning {
+		f.mu.Unlock()
+		return
+	}
+	n, id := len(t.subs), t.info.ID
+	f.obsMu.Lock()
+	f.mu.Unlock()
+	defer f.obsMu.Unlock()
+	obs(id, terminal.ObserveEvent{Attached: &n})
 }
 
 // Written returns all input written to a terminal.
@@ -339,19 +376,21 @@ func (f *Fake) apply(id string, publish bool, fn func(*fakeTerm) []terminal.Atta
 		f.mu.Unlock()
 		return err
 	}
+	dropped := false
 	for _, ev := range fn(t) {
 		for ch := range t.subs {
 			if len(ch) >= cap(ch)-1 {
 				ch <- terminal.AttachEvent{Dropped: true}
 				close(ch)
 				delete(t.subs, ch)
+				dropped = true
 				continue
 			}
 			ch <- ev
 		}
 	}
 	info := t.info
-	f.mu.Unlock()
+	f.unlockObservingAttached(t, dropped)
 	if publish {
 		bus.Publish(f.bus, terminal.TerminalUpdated{Terminal: info})
 	}
