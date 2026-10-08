@@ -43,8 +43,8 @@ type actor struct {
 
 	info     atomic.Pointer[Terminal] // latest published metadata, read by Get/List
 	observer Observer                 // Spec.Observer; may be nil. Called on the actor only.
-	reqs chan func()
-	done chan struct{} // closed when run returns
+	reqs     chan func()
+	done     chan struct{} // closed when run returns
 
 	// ---- actor goroutine only ----
 	vt         *ghostty.Terminal
