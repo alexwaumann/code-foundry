@@ -72,6 +72,7 @@ func RegisterTerminal(r *Registry, b TerminalBackend) error {
 			Category:    "Terminal",
 			Args:        []ArgSpec{idArg},
 			When:        hasTerminal,
+			Confirm:     "Kill terminal {id}? Its process is terminated.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("id")
 				if _, err := b.Kill(ctx, connect.NewRequest(&v1.KillTerminalRequest{Id: id})); err != nil {

@@ -179,7 +179,7 @@ func TestBuiltinCommands(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := newFixture(t)
 			f.term.Err, f.repo.Err = tt.backendEr, tt.backendEr
-			res, err := f.reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args)
+			res, err := f.reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args, command.Confirmed(true))
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}

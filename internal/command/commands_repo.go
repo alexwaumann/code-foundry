@@ -59,6 +59,7 @@ func RegisterRepo(r *Registry, b RepoBackend) error {
 			Category:    "Repository",
 			Args:        []ArgSpec{repoArg},
 			When:        hasRepo,
+			Confirm:     "Stop tracking repository {repo}? Its sessions lose their worktree; nothing on disk is touched.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("repo")
 				if _, err := b.Unregister(ctx, connect.NewRequest(&v1.UnregisterRepoRequest{Id: id})); err != nil {
@@ -102,7 +103,8 @@ func RegisterRepo(r *Registry, b RepoBackend) error {
 				{Name: "delete-branch", Type: Bool, Description: "Also delete the branch"},
 				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes"},
 			},
-			When: hasWorktree,
+			When:    hasWorktree,
+			Confirm: "Remove worktree {path}? This deletes files on disk.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				path := a.Path("path")
 				if _, err := b.RemoveWorktree(ctx, connect.NewRequest(&v1.RemoveWorktreeRequest{

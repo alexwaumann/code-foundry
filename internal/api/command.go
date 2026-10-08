@@ -39,7 +39,8 @@ func (h *Command) List(_ context.Context, req *connect.Request[v1.ListCommandsRe
 
 // Invoke runs a command.
 func (h *Command) Invoke(ctx context.Context, req *connect.Request[v1.InvokeCommandRequest]) (*connect.Response[v1.InvokeCommandResponse], error) {
-	res, err := h.reg.Invoke(ctx, contextFromProto(req.Msg.GetContext()), req.Msg.GetName(), req.Msg.GetArgs())
+	res, err := h.reg.Invoke(ctx, contextFromProto(req.Msg.GetContext()), req.Msg.GetName(), req.Msg.GetArgs(),
+		command.Confirmed(req.Msg.GetConfirmed()))
 	if err != nil {
 		return nil, commandError(err)
 	}
@@ -51,10 +52,22 @@ func (h *Command) Invoke(ctx context.Context, req *connect.Request[v1.InvokeComm
 }
 
 // commandError maps registry and command errors to Connect errors. Errors that already
-// carry a Connect code (from a store-backed command's backend) keep it.
+// carry a Connect code (from a store-backed command's backend) keep it. A command that
+// needs confirmation fails with FailedPrecondition and a ConfirmationRequired detail.
 func commandError(err error) error {
-	var ce *connect.Error
+	var (
+		ce      *connect.Error
+		confirm *command.ConfirmError
+	)
 	switch {
+	case errors.As(err, &confirm):
+		out := connect.NewError(connect.CodeFailedPrecondition, err)
+		if d, derr := connect.NewErrorDetail(&v1.ConfirmationRequired{
+			Command: confirm.Command, Message: confirm.Message, Title: confirm.Title,
+		}); derr == nil {
+			out.AddDetail(d)
+		}
+		return out
 	case errors.Is(err, command.ErrUnknownCommand):
 		return connect.NewError(connect.CodeNotFound, err)
 	case errors.Is(err, command.ErrInvalidArgs):
@@ -107,15 +120,17 @@ func commandToProto(c command.Listed) *v1.Command {
 			Description:  desc,
 			EnumValues:   a.Enum,
 			DefaultValue: a.Default,
+			Positional:   a.Positional,
 		}
 	}
 	return &v1.Command{
-		Name:        c.Name,
-		Title:       c.Title,
-		Description: c.Description,
-		Category:    c.Category,
-		Args:        args,
-		Keybindings: c.Keybindings,
-		Available:   c.Available,
+		Name:                 c.Name,
+		Title:                c.Title,
+		Description:          c.Description,
+		Category:             c.Category,
+		Args:                 args,
+		Keybindings:          c.Keybindings,
+		Available:            c.Available,
+		RequiresConfirmation: c.Confirm != "",
 	}
 }

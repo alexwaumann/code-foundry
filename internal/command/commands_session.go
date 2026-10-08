@@ -221,6 +221,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 			Category:    "Session",
 			Args:        []ArgSpec{idArg},
 			When:        hasSession,
+			Confirm:     "Remove session {id}? It is closed first if connected, and its row is forgotten.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("id")
 				if _, err := b.Remove(ctx, connect.NewRequest(&v1.RemoveSessionRequest{Id: id})); err != nil {
