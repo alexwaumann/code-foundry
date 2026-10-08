@@ -19,6 +19,8 @@ import (
 	"github.com/awaumann/code-foundry/internal/store/gh/ghtest"
 	"github.com/awaumann/code-foundry/internal/store/repo"
 	"github.com/awaumann/code-foundry/internal/store/repo/repotest"
+	"github.com/awaumann/code-foundry/internal/store/session"
+	"github.com/awaumann/code-foundry/internal/store/session/sessiontest"
 	"github.com/awaumann/code-foundry/internal/store/terminal"
 	"github.com/awaumann/code-foundry/internal/store/terminal/terminaltest"
 )
@@ -27,6 +29,7 @@ type eventsFixture struct {
 	bus    *bus.Bus
 	repo   *repotest.Fake
 	term   *terminaltest.Fake
+	sess   *sessiontest.Fake
 	gh     *ghtest.Store
 	done   chan struct{}
 	client codefoundryv1connect.EventServiceClient
@@ -35,8 +38,8 @@ type eventsFixture struct {
 func newEventsFixture(t *testing.T) *eventsFixture {
 	t.Helper()
 	b := bus.New()
-	f := &eventsFixture{bus: b, repo: repotest.New(b), term: terminaltest.New(b), gh: ghtest.New(b), done: make(chan struct{})}
-	route := NewEvents(EventsDeps{Bus: b, Repo: f.repo, Terminal: f.term, Gh: f.gh, Done: f.done}).Route()
+	f := &eventsFixture{bus: b, repo: repotest.New(b), term: terminaltest.New(b), sess: sessiontest.New(b), gh: ghtest.New(b), done: make(chan struct{})}
+	route := NewEvents(EventsDeps{Bus: b, Repo: f.repo, Terminal: f.term, Session: f.sess, Gh: f.gh, Done: f.done}).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
 	// HTTP/2 like the repo drop test: flow-control windows bound how much the handler
@@ -91,6 +94,17 @@ func describe(ev *v1.Event) string {
 			return "terminal.updated " + u.GetId()
 		}
 		return "terminal.removed " + e.Terminal.GetRemovedId()
+	case *v1.Event_Session:
+		switch x := e.Session.GetEvent().(type) {
+		case *v1.SessionEvent_Snapshot:
+			return fmt.Sprintf("session.snapshot(%d)", len(x.Snapshot.GetSessions()))
+		case *v1.SessionEvent_Updated:
+			return "session.updated " + x.Updated.GetId() + " " + x.Updated.GetStatus().String()
+		case *v1.SessionEvent_RemovedId:
+			return "session.removed " + x.RemovedId
+		default:
+			return "session.other"
+		}
 	case *v1.Event_Gh:
 		if p := e.Gh.GetPullRequestsUpdated(); p != nil {
 			return "gh.prs " + p.GetRepoSlug()
@@ -112,6 +126,7 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	_, _ = f.repo.Register(ctx, "/code/a")
 	t1, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"zsh"}})
 	t2, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"claude"}, Labels: map[string]string{"session": "s1"}})
+	f.sess.Put(session.Session{ID: "s1", TerminalID: t2.ID, State: session.StateConnected, Status: session.StatusIdle})
 	f.gh.SetRepo(gh.RepoState{Slug: "o/b"})
 	f.gh.SetRepo(gh.RepoState{Slug: "o/a"})
 
@@ -120,6 +135,7 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 		"repo.snapshot(1)",
 		"terminal.updated " + t1.ID,
 		"terminal.updated " + t2.ID,
+		"session.snapshot(1)",
 		"gh.viewer",
 		"gh.prs o/a",
 		"gh.prs o/b",
@@ -142,6 +158,10 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	_ = f.term.Remove(ctx, t1.ID)
 	if got := describe(s.next()); got != "terminal.removed "+t1.ID {
 		t.Fatalf("got %q, want terminal removal", got)
+	}
+	f.sess.Put(session.Session{ID: "s1", TerminalID: t2.ID, State: session.StateConnected, Status: session.StatusNeedsAttention})
+	if got := describe(s.next()); got != "session.updated s1 SESSION_STATUS_NEEDS_ATTENTION" {
+		t.Fatalf("got %q, want session update", got)
 	}
 	f.gh.SetViewer(gh.ViewerState{Authenticated: true})
 	if got := describe(s.next()); got != "gh.viewer" {
@@ -169,7 +189,8 @@ func TestEventsSourceFilter(t *testing.T) {
 		{"ui only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_UI}, "ui.palette go"},
 		{"terminal only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_TERMINAL}, "terminal.updated fake-1"},
 		{"repo and ui", []v1.EventSource{v1.EventSource_EVENT_SOURCE_UI, v1.EventSource_EVENT_SOURCE_REPO}, "repo.snapshot(0)"},
-		{"session (not served yet)", []v1.EventSource{v1.EventSource_EVENT_SOURCE_SESSION}, ""},
+		{"session only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_SESSION}, "session.snapshot(0)"},
+		{"gh only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_GH}, "gh.viewer"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -182,13 +203,6 @@ func TestEventsSourceFilter(t *testing.T) {
 			f.gh.SetViewer(gh.ViewerState{})
 			_, _ = f.term.Create(ctx, terminal.Spec{Argv: []string{"zsh"}})
 			command.BusEmitter{Bus: f.bus}.Emit(&v1.UiIntent{Intent: &v1.UiIntent_OpenPalette_{OpenPalette: &v1.UiIntent_OpenPalette{Query: "go"}}})
-			if tt.want == "" {
-				cancel()
-				if s.s.Receive() {
-					t.Fatalf("unexpected event %q", describe(s.s.Msg()))
-				}
-				return
-			}
 			if got := describe(s.next()); got != tt.want {
 				t.Fatalf("first event = %q, want %q", got, tt.want)
 			}

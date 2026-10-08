@@ -13,6 +13,7 @@ import (
 	"github.com/awaumann/code-foundry/internal/command"
 	"github.com/awaumann/code-foundry/internal/store/gh"
 	"github.com/awaumann/code-foundry/internal/store/repo"
+	"github.com/awaumann/code-foundry/internal/store/session"
 	"github.com/awaumann/code-foundry/internal/store/terminal"
 )
 
@@ -25,6 +26,7 @@ type EventsDeps struct {
 	Bus      *bus.Bus
 	Repo     repo.Store
 	Terminal terminal.Store
+	Session  session.Store
 	Gh       gh.Service
 	// Done ends every stream when closed (daemon shutdown). May be nil.
 	Done <-chan struct{}
@@ -73,7 +75,9 @@ func (h *Events) sources() []eventSource {
 	if d.Terminal != nil {
 		out = append(out, &terminalSource{store: d.Terminal, bus: d.Bus, known: map[string]bool{}})
 	}
-	// Session (Phase 2a) goes here, between terminal and gh.
+	if d.Session != nil {
+		out = append(out, sessionSource{store: d.Session, bus: d.Bus})
+	}
 	if d.Gh != nil {
 		out = append(out, ghSource{store: d.Gh, bus: d.Bus})
 	}
@@ -298,6 +302,32 @@ func (s *terminalSource) snapshot(ctx context.Context) []*v1.Event {
 		out = append(out, s.wrap(terminal.Event{RemovedID: id}))
 	}
 	return out
+}
+
+// ---- session -------------------------------------------------------------------
+
+// sessionSource reuses SessionService's mapping (api/session.go). The store publishes
+// one bus type, session.Event; its snapshot is a SessionEvent.snapshot.
+type sessionSource struct {
+	store session.Store
+	bus   *bus.Bus
+}
+
+func (sessionSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_SESSION }
+
+func sessionWrap(ev session.Event) *v1.Event {
+	if m := sessionEventToProto(ev); m != nil {
+		return &v1.Event{Event: &v1.Event_Session{Session: m}}
+	}
+	return nil
+}
+
+func (s sessionSource) subscribe(ctx context.Context) <-chan *v1.Event {
+	return fanIn(ctx, newTap(s.bus, watchBuffer, sessionWrap))
+}
+
+func (s sessionSource) snapshot(context.Context) []*v1.Event {
+	return []*v1.Event{sessionWrap(s.store.Snapshot())}
 }
 
 // ---- gh ------------------------------------------------------------------------
