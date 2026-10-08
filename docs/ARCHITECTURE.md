@@ -157,7 +157,7 @@ type Command struct {
     Title   string            // "Close Session"
     Args    ArgSchema         // for CLI flags and palette prompts
     When    func(Context) bool // context-aware availability
-    Run     func(context.Context, Context, Args) error
+    Run     func(context.Context, Context, Args) (Result, error)
 }
 ```
 
