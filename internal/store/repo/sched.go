@@ -13,6 +13,8 @@ const (
 	jobReconcile jobKind = iota + 1
 	// jobStatus owns one worktree's snapshot slot.
 	jobStatus
+	// jobDetail owns one worktree's cached detail (detail.go).
+	jobDetail
 )
 
 // jobKey identifies a job. A key is never run by two workers at once, which is what
