@@ -111,7 +111,7 @@ export function WorktreeItems({ repoId, path }: { repoId: string; path: string |
         <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Terminals</h2>
         {terminals.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No terminals here. Press <Kbd>{formatChord("cmd+k")}</Kbd> to start one.
+            No terminals here. Press <Kbd>{formatChord("cmd+t")}</Kbd> to start one.
           </p>
         ) : (
           <div className="flex flex-col">
