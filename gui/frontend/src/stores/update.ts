@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { toast } from "sonner";
-import { appInfo, onCheckForUpdatesMenu, relaunchApp } from "@/api/app";
+import { appInfo, onCheckForUpdatesMenu } from "@/api/app";
 import { invokeCommand } from "@/api/command";
 import { errorMessage } from "@/api/stream";
 import type { UpdateEventView, UpdateStatusView } from "@/api/update";
@@ -35,11 +35,10 @@ export const useUpdateStore = create<UpdateSlice>()(() => ({
 /** Events-stream reducer for the update source. */
 export function applyUpdateEvent(ev: UpdateEventView): void {
   if (ev.kind === "relaunch") {
-    void relaunchApp()
-      .then((ok) => {
-        if (!ok) toast.info("Relaunch requested", { description: "Reopen the app to run the installed version." });
-      })
-      .catch((err: unknown) => toast.error("Relaunch failed", { description: errorMessage(err) }));
+    // Inside the app the Wails host follows relaunch requests itself (gui/relaunch.go).
+    void appInfo().then((app) => {
+      if (!app) toast.info("Relaunch requested", { description: "Reopen the app to run the installed version." });
+    });
     return;
   }
   const prev = useUpdateStore.getState().status;

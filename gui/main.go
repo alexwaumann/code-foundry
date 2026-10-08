@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"log/slog"
 	"os"
@@ -29,12 +30,13 @@ func main() {
 	adoptLoginShellPath(log)
 	exportDaemonBinary(log)
 
+	appService := NewAppService(log)
 	app := application.New(application.Options{
 		Name:        "Code Foundry",
 		Description: "Supervise fleets of Claude Code sessions",
 		Services: []application.Service{
 			application.NewService(NewDaemonService(p, log)),
-			application.NewService(NewAppService(log)),
+			application.NewService(appService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -52,6 +54,15 @@ func main() {
 		Height:           780,
 		BackgroundColour: application.NewRGB(10, 10, 10),
 		URL:              "/",
+	})
+
+	// `app.relaunch` (e.g. after an update is installed) reaches the host directly.
+	watchCtx, stopWatch := context.WithCancel(context.Background())
+	defer stopWatch()
+	go watchRelaunch(watchCtx, p, log, func() {
+		if err := appService.Relaunch(); err != nil {
+			log.Error("relaunch", "err", err)
+		}
 	})
 
 	if err := app.Run(); err != nil {

@@ -31,7 +31,7 @@ function ActionButton({ action, children, variant = "default" }: { action: Updat
 function NotesLink({ url, version }: { url: string; version: string }) {
   if (!url) return null;
   return (
-    <button type="button" className="inline-flex items-center gap-1 text-sky-400 hover:underline" onClick={() => { openExternal(url); }} data-testid="update-notes">
+    <button type="button" className="inline-flex items-center gap-1 text-sky-400 hover:underline" onClick={() => void openExternal(url).catch(() => undefined)} data-testid="update-notes">
       Release notes for {version} <ExternalLink className="size-3" aria-hidden />
     </button>
   );

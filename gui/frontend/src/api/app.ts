@@ -1,8 +1,9 @@
 import { Browser, Events } from "@wailsio/runtime";
-import { Info, Relaunch } from "../../bindings/github.com/awaumann/code-foundry/gui/appservice";
+import { Info } from "../../bindings/github.com/awaumann/code-foundry/gui/appservice";
 
-/** The Wails host (window shell): its own version and relaunching itself. */
+/** The Wails host (window shell). */
 export interface AppInfoView {
+  /** The GUI binary's version (same ldflag as the daemon's). */
   version: string;
   /** The .app the GUI runs from; "" for a dev binary. */
   bundle: string;
@@ -11,30 +12,28 @@ export interface AppInfoView {
 /** Emitted by the app menu's "Check for Updates…" (gui/app.go EventCheckForUpdates). */
 export const EVENT_CHECK_FOR_UPDATES = "app:check-for-updates";
 
-/** True inside the Wails webview (WKWebView with the host's message handler). */
-export function inWails(): boolean {
-  const w = window as { _wails?: { environment?: unknown }; webkit?: { messageHandlers?: Record<string, unknown> } };
-  return Boolean(w._wails?.environment) || Boolean(w.webkit?.messageHandlers?.external);
+const INFO_TIMEOUT_MS = 2000;
+
+let info: Promise<AppInfoView | null> | null = null;
+
+/**
+ * The GUI's own build, or null when there is no Wails host (browser dev, e2e). Asking the
+ * host is the detection: a binding that answers means we run inside the app.
+ */
+export function appInfo(): Promise<AppInfoView | null> {
+  info ??= Promise.race([
+    Info().then((i): AppInfoView => ({ version: i.version, bundle: i.bundle })),
+    new Promise<null>((resolve) => setTimeout(() => {
+      resolve(null);
+    }, INFO_TIMEOUT_MS)),
+  ]).catch(() => null);
+  return info;
 }
 
-/** The GUI's own build, or null outside Wails (browser dev, e2e). */
-export async function appInfo(): Promise<AppInfoView | null> {
-  if (!inWails()) return null;
-  const i = await Info();
-  return { version: i.version, bundle: i.bundle };
-}
-
-/** Asks the host to quit and reopen. Returns false outside Wails. */
-export async function relaunchApp(): Promise<boolean> {
-  if (!inWails()) return false;
-  await Relaunch();
-  return true;
-}
-
-/** Opens a URL in the user's browser (the Wails webview would navigate away). */
-export function openExternal(url: string): void {
-  if (inWails()) {
-    Browser.OpenURL(url).catch(() => undefined);
+/** Opens a URL in the user's browser (navigating the Wails webview would replace the app). */
+export async function openExternal(url: string): Promise<void> {
+  if (await appInfo()) {
+    await Browser.OpenURL(url);
     return;
   }
   window.open(url, "_blank", "noopener");
@@ -42,7 +41,6 @@ export function openExternal(url: string): void {
 
 /** Calls fn when the app menu's "Check for Updates…" is chosen. Returns an unsubscribe. */
 export function onCheckForUpdatesMenu(fn: () => void): () => void {
-  if (!inWails()) return () => undefined;
   return Events.On(EVENT_CHECK_FOR_UPDATES, () => {
     fn();
   });

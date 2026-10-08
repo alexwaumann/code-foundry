@@ -44,6 +44,7 @@ func (s *AppService) Info() AppInfo {
 // process runs whatever bundle is on disk now (an installed update). Sessions are
 // unaffected: they live in the daemon.
 func (s *AppService) Relaunch() error {
+	s.log.Info("relaunch requested")
 	argv, err := relaunchCommand(os.Getpid(), runningBundle(), os.Getenv)
 	if err != nil {
 		return err
