@@ -81,7 +81,11 @@ type Observer func(id string, ev ObserveEvent)
 // delivered as soon as a change is detected (not throttled like TerminalUpdated).
 // Exited is the last event.
 type ObserveEvent struct {
-	Output    []byte
+	Output []byte
+	// Input is user input queued for the PTY via Write (not replies the emulator sends
+	// itself). Delivered on the actor after the write was queued; ordering relative to
+	// Output is not guaranteed.
+	Input     []byte
 	Title     *string
 	AltScreen *bool
 	Exited    *Exit

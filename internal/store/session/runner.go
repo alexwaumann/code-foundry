@@ -224,6 +224,10 @@ func (r *runner) onEvent(ev terminal.ObserveEvent) {
 	case ev.Output != nil:
 		r.activity = r.m.opts.Now()
 		r.det.Output(ev.Output)
+	case ev.Input != nil:
+		if in, ok := r.det.(interface{ Input([]byte) }); ok {
+			in.Input(ev.Input)
+		}
 	case ev.AltScreen != nil:
 		if *ev.AltScreen && r.state == StateStarting && !r.trustVisible() {
 			r.connect("alt screen")

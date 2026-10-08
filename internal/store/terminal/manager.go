@@ -239,7 +239,20 @@ func (m *Manager) Write(_ context.Context, id string, data []byte) error {
 	if err != nil {
 		return err
 	}
-	return a.input.push(data, true)
+	if err := a.input.push(data, true); err != nil {
+		return err
+	}
+	if a.observer != nil {
+		// Observers run on the actor only. Hop there without blocking the caller; the
+		// queued write already happened, so a late or dropped notification is harmless.
+		in := append([]byte(nil), data...)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			_ = a.call(ctx, func() { a.observe(ObserveEvent{Input: in}) })
+		}()
+	}
+	return nil
 }
 
 // Resize applies a new size to the PTY (TIOCSWINSZ, which signals SIGWINCH) and the

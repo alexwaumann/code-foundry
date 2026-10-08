@@ -53,7 +53,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 	s.terminal = terminal.New(terminal.Options{Bus: s.bus, Logger: log.With("store", "terminal")})
 	if s.session, err = session.New(ctx, session.Options{
 		DB: s.db, Terminals: s.terminal, Repos: s.repo, Bus: s.bus, Log: log.With("store", "session"),
-		// Merge with 2b: NewDetector: func(f session.ScreenTextFn) session.StatusDetector { return claudestatus.New(f) },
+		NewDetector: newDetector,
 	}); err != nil {
 		return nil, err
 	}
