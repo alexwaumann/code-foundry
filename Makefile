@@ -23,7 +23,7 @@ FRONTEND := gui/frontend
 PNPM     := pnpm --dir $(FRONTEND)
 
 .PHONY: all gen build check go-check frontend-check frontend-deps gui-dist-stub \
-        dev gui-build gui-dev ghostty-vt clean
+        dev gui-build gui-dev gui-e2e gui-mock ghostty-vt clean
 
 all: build
 
@@ -69,6 +69,15 @@ dev: build
 ## gui-build: build the Wails GUI binary to gui/bin/CodeFoundry.
 gui-build: build
 	cd gui && $(WAILS3) build
+
+## gui-e2e: Playwright (WebKit + Chromium) against the mock daemon. Not part of `check`:
+## it needs browser binaries (`pnpm --dir gui/frontend exec playwright install webkit chromium`).
+gui-e2e: frontend-deps
+	$(PNPM) run e2e
+
+## gui-mock: run the mock daemon on :7788 (token dev-mock-token); pair with `pnpm run dev:mock`.
+gui-mock: frontend-deps
+	$(PNPM) run mock
 
 ## gui-dev: run the GUI with hot reload (auto-starts ./bin/code-foundry daemon if needed).
 gui-dev: build
