@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"os"
 
 	"github.com/awaumann/code-foundry/internal/bus"
 	"github.com/awaumann/code-foundry/internal/db"
@@ -53,7 +54,11 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 		return nil, err
 	}
 	s.stopGh = startGh(ctx, log, s.gh, s.repo, s.bus)
-	s.gitops = gitops.New(gitops.Options{Bus: s.bus, Repos: s.repo, Log: log.With("store", "gitops")})
+	s.gitops = gitops.New(gitops.Options{
+		Bus: s.bus, Repos: s.repo, Log: log.With("store", "gitops"),
+		// Until the settings store (3b) feeds the editor setting, the environment can.
+		Editor: func() string { return os.Getenv("CODE_FOUNDRY_EDITOR") },
+	})
 	s.terminal = terminal.New(terminal.Options{Bus: s.bus, Logger: log.With("store", "terminal")})
 	if s.session, err = session.New(ctx, session.Options{
 		DB: s.db, Terminals: s.terminal, Repos: s.repo, Bus: s.bus, Log: log.With("store", "session"),

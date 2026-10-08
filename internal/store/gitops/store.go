@@ -343,8 +343,10 @@ func (x *run) exec(ctx context.Context, c Cmd) (Result, error) {
 	}
 	fmt.Fprintf(&x.out, "$ %s\n", c)
 	res := x.m.opts.Runner.Run(ctx, c)
-	x.out.WriteString(res.Combined)
-	if res.Combined != "" && !strings.HasSuffix(res.Combined, "\n") {
+	// Progress lines ("Rebasing (1/1)\r") would render as one run-on line in the GUI.
+	out := strings.ReplaceAll(strings.ReplaceAll(res.Combined, "\r\n", "\n"), "\r", "\n")
+	x.out.WriteString(out)
+	if out != "" && !strings.HasSuffix(out, "\n") {
 		x.out.WriteByte('\n')
 	}
 	if res.Err != nil {

@@ -244,7 +244,7 @@ func (m *Manager) OpenEditor(ctx context.Context, worktreePath string) (Op, erro
 	if errors.Is(err, ErrInvalidArgument) {
 		return Op{}, err
 	}
-	return m.submit(ctx, KindOpenEditor, "Open "+t.label()+" in editor", t, false, func(ctx context.Context, x *run) (string, string, error) {
+	return m.submit(ctx, KindOpenEditor, "Open "+filepath.Base(t.path)+" in editor", t, false, func(ctx context.Context, x *run) (string, string, error) {
 		if err != nil {
 			x.note("%v", err)
 			return "", "", &opError{summary: err.Error()}
@@ -252,7 +252,7 @@ func (m *Manager) OpenEditor(ctx context.Context, worktreePath string) (Op, erro
 		if _, err := x.exec(ctx, Cmd{Name: argv[0], Args: argv[1:]}); err != nil {
 			return "", "", err
 		}
-		return "opened " + t.label() + " in " + editorName(argv), "", nil
+		return "opened " + filepath.Base(t.path) + " in " + editorName(argv), "", nil
 	})
 }
 
@@ -270,7 +270,7 @@ func (m *Manager) Reveal(ctx context.Context, worktreePath string) (Op, error) {
 	if err != nil {
 		return Op{}, err
 	}
-	return m.submit(ctx, KindReveal, "Reveal "+t.label()+" in Finder", t, false, func(ctx context.Context, x *run) (string, string, error) {
+	return m.submit(ctx, KindReveal, "Reveal "+filepath.Base(t.path)+" in Finder", t, false, func(ctx context.Context, x *run) (string, string, error) {
 		if _, err := x.exec(ctx, Cmd{Name: m.opts.Open, Args: []string{"-R", t.path}}); err != nil {
 			return "", "", err
 		}

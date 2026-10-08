@@ -190,13 +190,13 @@ func TestRevealOpenURLEditor(t *testing.T) {
 	}
 
 	op := mustOp(t)(w.m.OpenEditor(ctx, w.a))
-	wantOK(t, op, "opened main in zed")
+	wantOK(t, op, "opened a in zed")
 	if c := fr.called("zed"); len(c) != 1 || c[0].Name != "/opt/bin/zed" || !slices.Equal(c[0].Args, []string{w.a}) {
 		t.Errorf("editor calls = %+v", c)
 	}
 	// The setting is read on every call.
 	editor = "open -a 'Visual Studio Code'"
-	wantOK(t, mustOp(t)(w.m.OpenEditor(ctx, w.a)), "opened main in Visual Studio Code")
+	wantOK(t, mustOp(t)(w.m.OpenEditor(ctx, w.a)), "opened a in Visual Studio Code")
 	editor = "code 'unterminated"
 	if _, err := w.m.OpenEditor(ctx, w.a); !errors.Is(err, ErrInvalidArgument) {
 		t.Errorf("bad editor setting err = %v", err)
