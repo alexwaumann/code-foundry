@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import { toast } from "sonner";
-import { invokeCommand, listCommands, type CommandView, type UiContextView } from "@/api/command";
+import { confirmationOf, invokeCommand, listCommands, type CommandView, type UiContextView } from "@/api/command";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { errorMessage, isAbort } from "@/api/stream";
+import { requestConfirm } from "./confirm";
 import { contextKey, getUiContext } from "./context";
 import { useReposStore } from "./repos";
 import { useSessionsStore } from "./sessions";
@@ -49,11 +50,24 @@ export async function refreshCommands(ctx: UiContextView = getUiContext()): Prom
   }
 }
 
-/** Invokes a command with the current context; reports the result as a toast. */
+/**
+ * Invokes a command with the current context; reports the result as a toast. A command
+ * the daemon wants confirmed (ConfirmationRequired) opens the confirm dialog and runs
+ * again with confirmed set if the user agrees; declining returns false quietly.
+ */
 export async function runCommand(name: string, args: Record<string, string> = {}, ctx: UiContextView = getUiContext()): Promise<boolean> {
   const title = useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name;
   try {
-    const res = await invokeCommand(name, ctx, args);
+    let res;
+    try {
+      res = await invokeCommand(name, ctx, args);
+    } catch (err) {
+      const confirm = confirmationOf(err);
+      if (!confirm) throw err;
+      const yes = await requestConfirm({ title: confirm.title || title, message: confirm.message, confirmLabel: confirm.title || title });
+      if (!yes) return false;
+      res = await invokeCommand(name, ctx, args, undefined, { confirmed: true });
+    }
     if (res.message) toast.success(res.message);
     return true;
   } catch (err) {

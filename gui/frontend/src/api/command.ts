@@ -1,7 +1,9 @@
 import { create } from "@bufbuild/protobuf";
+import { ConnectError } from "@connectrpc/connect";
 import {
   ArgType,
   CommandService,
+  ConfirmationRequiredSchema,
   UiContextSchema,
   type ArgSpec,
   type Command,
@@ -28,6 +30,15 @@ export interface CommandView {
   args: ArgSpecView[];
   keybindings: string[];
   available: boolean;
+  /** Invoke asks for confirmation first (FailedPrecondition + ConfirmationRequired). */
+  requiresConfirmation?: boolean;
+}
+
+/** A destructive command waiting for the user's yes (ConfirmationRequired detail). */
+export interface ConfirmationView {
+  command: string;
+  title: string;
+  message: string;
 }
 
 /** What the user is looking at. Mirrors codefoundry.v1.UiContext; empty string = none. */
@@ -73,7 +84,15 @@ export function toCommandView(c: Command): CommandView {
     args: c.args.map(toArgSpecView),
     keybindings: [...c.keybindings],
     available: c.available,
+    requiresConfirmation: c.requiresConfirmation,
   };
+}
+
+/** The confirmation an Invoke error asks for, or null for any other error. */
+export function confirmationOf(err: unknown): ConfirmationView | null {
+  if (!(err instanceof ConnectError)) return null;
+  const [d] = err.findDetails(ConfirmationRequiredSchema);
+  return d ? { command: d.command, title: d.title, message: d.message } : null;
 }
 
 export function toUiContext(ctx: UiContextView): UiContext {
@@ -98,8 +117,9 @@ export async function invokeCommand(
   ctx: UiContextView,
   args: Record<string, string>,
   conn: DaemonConnection = daemon,
+  opts: { confirmed?: boolean } = {},
 ): Promise<InvokeResultView> {
   const c = await conn.client(CommandService);
-  const res = await c.invoke({ name, context: toUiContext(ctx), args });
+  const res = await c.invoke({ name, context: toUiContext(ctx), args, confirmed: opts.confirmed ?? false });
   return { message: res.message, resultJson: res.resultJson };
 }

@@ -5,6 +5,7 @@ import { SessionIndicator, SessionTitle } from "@/components/session/SessionPart
 import { attachTerminal, resizeTerminal, writeTerminal } from "@/api/terminal";
 import { isGlobalChord } from "@/keys/bindings";
 import { useColorScheme } from "@/lib/theme";
+import { useScrollbackLines, useTerminalFontFamily } from "@/stores/settings";
 import { tildify, terminalLabel } from "@/lib/path";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
@@ -123,6 +124,8 @@ export function TerminalPane({ terminalId, sessionId }: { terminalId: string; se
   const [size, setSize] = useState<{ cols: number; rows: number } | null>(null);
   const scheme = useColorScheme();
   const fontSize = useUiStore((s) => s.fontSize);
+  const fontFamily = useTerminalFontFamily();
+  const scrollback = useScrollbackLines();
   const focusSeq = useUiStore((s) => s.terminalFocusSeq);
 
   // Renderer + controller live for the pane's lifetime.
@@ -188,6 +191,14 @@ export function TerminalPane({ terminalId, sessionId }: { terminalId: string; se
   useEffect(() => {
     ctlRef.current?.renderer.setFontSize(fontSize);
   }, [fontSize]);
+
+  useEffect(() => {
+    ctlRef.current?.renderer.setFontFamily(fontFamily);
+  }, [fontFamily]);
+
+  useEffect(() => {
+    ctlRef.current?.renderer.setScrollback(scrollback);
+  }, [scrollback]);
 
   useEffect(() => {
     ctlRef.current?.renderer.focus();

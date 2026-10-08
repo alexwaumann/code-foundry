@@ -3,6 +3,7 @@ import type { UiIntentView } from "@/api/ui";
 import { sessionOfTerminal, useSessionsStore } from "./sessions";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
+import { showView } from "./views";
 
 /** Applies one UI intent (delivered on the shared events stream) to the GUI. */
 export function applyIntent(intent: UiIntentView): void {
@@ -34,5 +35,8 @@ export function applyIntent(intent: UiIntentView): void {
       else toast.info(title, opts);
       break;
     }
+    case "showView":
+      showView(intent.name);
+      break;
   }
 }

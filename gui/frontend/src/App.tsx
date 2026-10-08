@@ -1,5 +1,8 @@
 import { useEffect } from "react";
+import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
 import { Dashboard } from "@/components/Dashboard";
+import { HelpOverlay } from "@/components/help/HelpOverlay";
+import { SettingsPage } from "@/components/settings/SettingsPage";
 import { Footer } from "@/components/footer/Footer";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { SessionDisconnected } from "@/components/session/SessionParts";
@@ -14,6 +17,7 @@ import { startEventSync } from "@/stores/events";
 import { startHealthPolling } from "@/stores/health";
 import { useAttentionCount, useSessionsStore } from "@/stores/sessions";
 import { useUiStore, type FocusRegion } from "@/stores/ui";
+import { startViewSync, useViewsStore } from "@/stores/views";
 
 function regionOf(el: EventTarget | null): FocusRegion {
   const region = el instanceof Element ? el.closest("[data-region]")?.getAttribute("data-region") : null;
@@ -29,7 +33,7 @@ function startApp(): () => void {
     useUiStore.getState().setFocus(regionOf(e.target));
   };
   document.addEventListener("focusin", onFocusIn);
-  const stops = [syncDocumentScheme(), startHealthPolling(2000), startEventSync(), startCommandSync(), installKeybindings()];
+  const stops = [syncDocumentScheme(), startHealthPolling(2000), startEventSync(), startCommandSync(), installKeybindings(), startViewSync()];
   return () => {
     document.removeEventListener("focusin", onFocusIn);
     for (const stop of stops) stop();
@@ -54,18 +58,19 @@ function Content() {
 export function App() {
   useEffect(() => startApp(), []);
   const scheme = useColorScheme();
+  const settingsOpen = useViewsStore((s) => s.settingsOpen);
   useWindowTitle(useAttentionCount());
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="flex min-w-0 flex-1 flex-col">
-          <Content />
-        </main>
+        <main className="flex min-w-0 flex-1 flex-col">{settingsOpen ? <SettingsPage /> : <Content />}</main>
       </div>
       <Footer />
       <CommandPalette />
+      <HelpOverlay />
+      <ConfirmDialog />
       <Toaster theme={scheme} position="bottom-right" offset={{ bottom: 40, right: 16 }} />
     </div>
   );

@@ -2,6 +2,7 @@ import { EventService, type Event } from "@/gen/codefoundry/v1/events_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { toRepoEventView, type RepoEventView } from "./repo";
 import { toSessionEventView, type SessionEventView } from "./session";
+import { toSettingsSnapshotView, type SettingsSnapshotView } from "./settings";
 import { toTerminalEventView, type TerminalEventView } from "./terminal";
 import { toUiIntentView, type UiIntentView } from "./ui";
 
@@ -17,7 +18,8 @@ export type EventView =
   | { source: "terminal"; event: TerminalEventView }
   | { source: "session"; event: SessionEventView }
   | { source: "gh"; event: GhEventView }
-  | { source: "ui"; event: UiIntentView };
+  | { source: "ui"; event: UiIntentView }
+  | { source: "settings"; event: SettingsSnapshotView };
 
 export function toEventView(ev: Event): EventView | null {
   const e = ev.event;
@@ -43,6 +45,10 @@ export function toEventView(ev: Event): EventView | null {
     case "ui": {
       const v = toUiIntentView(e.value);
       return v && { source: "ui", event: v };
+    }
+    case "settings": {
+      const s = e.value.event;
+      return s.case === "snapshot" ? { source: "settings", event: toSettingsSnapshotView(s.value) } : null;
     }
     default:
       return null;

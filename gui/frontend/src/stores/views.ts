@@ -1,0 +1,49 @@
+/**
+ * Window-level views that are not selections: the settings page (replaces the content
+ * area) and the help overlay. Opened by view.settings / view.help (their chords are
+ * presented locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon.
+ */
+import { create } from "zustand";
+import { useUiStore } from "./ui";
+
+interface ViewsState {
+  settingsOpen: boolean;
+  helpOpen: boolean;
+}
+
+export const useViewsStore = create<ViewsState>()(() => ({ settingsOpen: false, helpOpen: false }));
+
+/** Shows a named view (UiIntent.ShowView.name). Returns false for an unknown name. */
+export function showView(name: string): boolean {
+  switch (name) {
+    case "settings":
+      useViewsStore.setState({ settingsOpen: true, helpOpen: false });
+      return true;
+    case "help":
+      useViewsStore.setState({ helpOpen: true });
+      return true;
+    default:
+      return false;
+  }
+}
+
+export function closeSettings(): void {
+  useViewsStore.setState({ settingsOpen: false });
+  // Back to what was selected; its terminal takes focus again.
+  useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
+}
+
+export function toggleHelp(): void {
+  useViewsStore.setState((s) => ({ helpOpen: !s.helpOpen }));
+}
+
+export function setHelpOpen(open: boolean): void {
+  useViewsStore.setState({ helpOpen: open });
+}
+
+/** Selecting something in the sidebar leaves the settings page. */
+export function startViewSync(): () => void {
+  return useUiStore.subscribe((s, prev) => {
+    if (s.selection !== prev.selection && useViewsStore.getState().settingsOpen) useViewsStore.setState({ settingsOpen: false });
+  });
+}

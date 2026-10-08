@@ -17,7 +17,8 @@ import { useAttentionCount, useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
 import { rowSelection, selectionKey } from "./selection";
 import { ResizeHandle } from "./ResizeHandle";
-import { ROW_HEIGHT, SidebarRow } from "./SidebarRow";
+import { useRowHeight } from "@/stores/settings";
+import { SidebarRow } from "./SidebarRow";
 
 /** Index of the nearest row above `i` with a smaller depth (the parent). */
 function parentIndex(rows: readonly Row[], i: number): number {
@@ -45,16 +46,22 @@ function SidebarTree() {
   const focusSeq = useUiStore((s) => s.sidebarFocusSeq);
   const loaded = useReposStore((s) => s.loaded);
   const streamError = useEventsStore((s) => s.streamError);
+  const rowHeight = useRowHeight();
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: () => rowHeight,
     overscan: 10,
     paddingStart: 4,
     paddingEnd: 8,
   });
+
+  // appearance.density changes the row height; drop the cached sizes.
+  useEffect(() => {
+    virtualizer.measure();
+  }, [virtualizer, rowHeight]);
 
   const cursorIndex = useMemo(() => {
     const key = cursorKey ?? selectedKey;

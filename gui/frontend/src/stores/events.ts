@@ -9,6 +9,7 @@ import { listTerminals } from "@/api/terminal";
 import { applyIntent } from "./intents";
 import { applyRepoEvent, replaceRepos, useReposStore } from "./repos";
 import { applySessionEvent, replaceSessions, sessionOfTerminal, useSessionsStore } from "./sessions";
+import { applySettingsSnapshot } from "./settings";
 import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 
@@ -39,6 +40,7 @@ const handlers: Handlers = {
   },
   gh: () => undefined,
   ui: applyIntent,
+  settings: applySettingsSnapshot,
 };
 
 export function dispatchEvent(ev: EventView): void {
