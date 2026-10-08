@@ -10,6 +10,8 @@ import type { RepoEvent } from "./repo_pb";
 import { file_codefoundry_v1_repo } from "./repo_pb";
 import type { SessionEvent } from "./session_pb";
 import { file_codefoundry_v1_session } from "./session_pb";
+import type { SettingsEvent } from "./settings_pb";
+import { file_codefoundry_v1_settings } from "./settings_pb";
 import type { TerminalEvent } from "./terminal_pb";
 import { file_codefoundry_v1_terminal } from "./terminal_pb";
 import type { UiIntent } from "./ui_pb";
@@ -20,7 +22,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/events.proto.
  */
 export const file_codefoundry_v1_events: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIkIKEldhdGNoRXZlbnRzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygOMhsuY29kZWZvdW5kcnkudjEuRXZlbnRTb3VyY2Ui7gEKBUV2ZW50EikKBHJlcG8YASABKAsyGS5jb2RlZm91bmRyeS52MS5SZXBvRXZlbnRIABIxCgh0ZXJtaW5hbBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsRXZlbnRIABIvCgdzZXNzaW9uGAMgASgLMhwuY29kZWZvdW5kcnkudjEuU2Vzc2lvbkV2ZW50SAASJQoCZ2gYBCABKAsyFy5jb2RlZm91bmRyeS52MS5HaEV2ZW50SAASJgoCdWkYBSABKAsyGC5jb2RlZm91bmRyeS52MS5VaUludGVudEgAQgcKBWV2ZW50KqEBCgtFdmVudFNvdXJjZRIcChhFVkVOVF9TT1VSQ0VfVU5TUEVDSUZJRUQQABIVChFFVkVOVF9TT1VSQ0VfUkVQTxABEhkKFUVWRU5UX1NPVVJDRV9URVJNSU5BTBACEhgKFEVWRU5UX1NPVVJDRV9TRVNTSU9OEAMSEwoPRVZFTlRfU09VUkNFX0dIEAQSEwoPRVZFTlRfU09VUkNFX1VJEAUyVgoMRXZlbnRTZXJ2aWNlEkYKBVdhdGNoEiIuY29kZWZvdW5kcnkudjEuV2F0Y2hFdmVudHNSZXF1ZXN0GhUuY29kZWZvdW5kcnkudjEuRXZlbnQiADABQsABChJjb20uY29kZWZvdW5kcnkudjFCC0V2ZW50c1Byb3RvUAFaRGdpdGh1Yi5jb20vYXdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_gh, file_codefoundry_v1_repo, file_codefoundry_v1_session, file_codefoundry_v1_terminal, file_codefoundry_v1_ui]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIkIKEldhdGNoRXZlbnRzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygOMhsuY29kZWZvdW5kcnkudjEuRXZlbnRTb3VyY2UioQIKBUV2ZW50EikKBHJlcG8YASABKAsyGS5jb2RlZm91bmRyeS52MS5SZXBvRXZlbnRIABIxCgh0ZXJtaW5hbBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsRXZlbnRIABIvCgdzZXNzaW9uGAMgASgLMhwuY29kZWZvdW5kcnkudjEuU2Vzc2lvbkV2ZW50SAASJQoCZ2gYBCABKAsyFy5jb2RlZm91bmRyeS52MS5HaEV2ZW50SAASJgoCdWkYBSABKAsyGC5jb2RlZm91bmRyeS52MS5VaUludGVudEgAEjEKCHNldHRpbmdzGAYgASgLMh0uY29kZWZvdW5kcnkudjEuU2V0dGluZ3NFdmVudEgAQgcKBWV2ZW50KrwBCgtFdmVudFNvdXJjZRIcChhFVkVOVF9TT1VSQ0VfVU5TUEVDSUZJRUQQABIVChFFVkVOVF9TT1VSQ0VfUkVQTxABEhkKFUVWRU5UX1NPVVJDRV9URVJNSU5BTBACEhgKFEVWRU5UX1NPVVJDRV9TRVNTSU9OEAMSEwoPRVZFTlRfU09VUkNFX0dIEAQSEwoPRVZFTlRfU09VUkNFX1VJEAUSGQoVRVZFTlRfU09VUkNFX1NFVFRJTkdTEAYyVgoMRXZlbnRTZXJ2aWNlEkYKBVdhdGNoEiIuY29kZWZvdW5kcnkudjEuV2F0Y2hFdmVudHNSZXF1ZXN0GhUuY29kZWZvdW5kcnkudjEuRXZlbnQiADABQsABChJjb20uY29kZWZvdW5kcnkudjFCC0V2ZW50c1Byb3RvUAFaRGdpdGh1Yi5jb20vYXdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_gh, file_codefoundry_v1_repo, file_codefoundry_v1_session, file_codefoundry_v1_settings, file_codefoundry_v1_terminal, file_codefoundry_v1_ui]);
 
 /**
  * @generated from message codefoundry.v1.WatchEventsRequest
@@ -78,6 +80,12 @@ export type Event = Message<"codefoundry.v1.Event"> & {
      */
     value: UiIntent;
     case: "ui";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.SettingsEvent settings = 6;
+     */
+    value: SettingsEvent;
+    case: "settings";
   } | { case: undefined; value?: undefined };
 };
 
@@ -121,6 +129,13 @@ export enum EventSource {
    * @generated from enum value: EVENT_SOURCE_UI = 5;
    */
   UI = 5,
+
+  /**
+   * Settings snapshots; sent after gh, before UI intents.
+   *
+   * @generated from enum value: EVENT_SOURCE_SETTINGS = 6;
+   */
+  SETTINGS = 6,
 }
 
 /**

@@ -5,6 +5,7 @@ package codefoundry.v1;
 import "codefoundry/v1/gh.proto";
 import "codefoundry/v1/repo.proto";
 import "codefoundry/v1/session.proto";
+import "codefoundry/v1/settings.proto";
 import "codefoundry/v1/terminal.proto";
 import "codefoundry/v1/ui.proto";
 
@@ -30,6 +31,8 @@ enum EventSource {
   EVENT_SOURCE_SESSION = 3;
   EVENT_SOURCE_GH = 4;
   EVENT_SOURCE_UI = 5;
+  // Settings snapshots; sent after gh, before UI intents.
+  EVENT_SOURCE_SETTINGS = 6;
 }
 
 message Event {
@@ -39,5 +42,6 @@ message Event {
     SessionEvent session = 3;
     GhEvent gh = 4;
     UiIntent ui = 5;
+    SettingsEvent settings = 6;
   }
 }

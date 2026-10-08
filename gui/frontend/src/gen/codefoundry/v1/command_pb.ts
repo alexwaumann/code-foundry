@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/command.proto.
  */
 export const file_codefoundry_v1_command: GenFile = /*@__PURE__*/
-  fileDesc("Chxjb2RlZm91bmRyeS92MS9jb21tYW5kLnByb3RvEg5jb2RlZm91bmRyeS52MSKNAQoJVWlDb250ZXh0EhoKEmFjdGl2ZV90ZXJtaW5hbF9pZBgBIAEoCRIZChFhY3RpdmVfc2Vzc2lvbl9pZBgCIAEoCRIWCg5hY3RpdmVfcmVwb19pZBgDIAEoCRIcChRhY3RpdmVfd29ya3RyZWVfcGF0aBgEIAEoCRITCgthY3RpdmVfdmlldxgFIAEoCSKRAQoHQXJnU3BlYxIMCgRuYW1lGAEgASgJEiUKBHR5cGUYAiABKA4yFy5jb2RlZm91bmRyeS52MS5BcmdUeXBlEhAKCHJlcXVpcmVkGAMgASgIEhMKC2Rlc2NyaXB0aW9uGAQgASgJEhMKC2VudW1fdmFsdWVzGAUgAygJEhUKDWRlZmF1bHRfdmFsdWUYBiABKAkinAEKB0NvbW1hbmQSDAoEbmFtZRgBIAEoCRINCgV0aXRsZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCRIQCghjYXRlZ29yeRgEIAEoCRIlCgRhcmdzGAUgAygLMhcuY29kZWZvdW5kcnkudjEuQXJnU3BlYxITCgtrZXliaW5kaW5ncxgGIAMoCRIRCglhdmFpbGFibGUYByABKAgiXgoTTGlzdENvbW1hbmRzUmVxdWVzdBIqCgdjb250ZXh0GAEgASgLMhkuY29kZWZvdW5kcnkudjEuVWlDb250ZXh0EhsKE2luY2x1ZGVfdW5hdmFpbGFibGUYAiABKAgiQQoUTGlzdENvbW1hbmRzUmVzcG9uc2USKQoIY29tbWFuZHMYASADKAsyFy5jb2RlZm91bmRyeS52MS5Db21tYW5kIrsBChRJbnZva2VDb21tYW5kUmVxdWVzdBIMCgRuYW1lGAEgASgJEioKB2NvbnRleHQYAiABKAsyGS5jb2RlZm91bmRyeS52MS5VaUNvbnRleHQSPAoEYXJncxgDIAMoCzIuLmNvZGVmb3VuZHJ5LnYxLkludm9rZUNvbW1hbmRSZXF1ZXN0LkFyZ3NFbnRyeRorCglBcmdzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASI9ChVJbnZva2VDb21tYW5kUmVzcG9uc2USDwoHbWVzc2FnZRgBIAEoCRITCgtyZXN1bHRfanNvbhgCIAEoCSqDAQoHQXJnVHlwZRIYChRBUkdfVFlQRV9VTlNQRUNJRklFRBAAEhMKD0FSR19UWVBFX1NUUklORxABEhEKDUFSR19UWVBFX0JPT0wQAhIQCgxBUkdfVFlQRV9JTlQQAxIRCg1BUkdfVFlQRV9FTlVNEAQSEQoNQVJHX1RZUEVfUEFUSBAFMr4BCg5Db21tYW5kU2VydmljZRJTCgRMaXN0EiMuY29kZWZvdW5kcnkudjEuTGlzdENvbW1hbmRzUmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLkxpc3RDb21tYW5kc1Jlc3BvbnNlIgASVwoGSW52b2tlEiQuY29kZWZvdW5kcnkudjEuSW52b2tlQ29tbWFuZFJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5JbnZva2VDb21tYW5kUmVzcG9uc2UiAELBAQoSY29tLmNvZGVmb3VuZHJ5LnYxQgxDb21tYW5kUHJvdG9QAVpEZ2l0aHViLmNvbS9hd2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw");
+  fileDesc("Chxjb2RlZm91bmRyeS92MS9jb21tYW5kLnByb3RvEg5jb2RlZm91bmRyeS52MSKNAQoJVWlDb250ZXh0EhoKEmFjdGl2ZV90ZXJtaW5hbF9pZBgBIAEoCRIZChFhY3RpdmVfc2Vzc2lvbl9pZBgCIAEoCRIWCg5hY3RpdmVfcmVwb19pZBgDIAEoCRIcChRhY3RpdmVfd29ya3RyZWVfcGF0aBgEIAEoCRITCgthY3RpdmVfdmlldxgFIAEoCSKlAQoHQXJnU3BlYxIMCgRuYW1lGAEgASgJEiUKBHR5cGUYAiABKA4yFy5jb2RlZm91bmRyeS52MS5BcmdUeXBlEhAKCHJlcXVpcmVkGAMgASgIEhMKC2Rlc2NyaXB0aW9uGAQgASgJEhMKC2VudW1fdmFsdWVzGAUgAygJEhUKDWRlZmF1bHRfdmFsdWUYBiABKAkSEgoKcG9zaXRpb25hbBgHIAEoCCK7AQoHQ29tbWFuZBIMCgRuYW1lGAEgASgJEg0KBXRpdGxlGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEhAKCGNhdGVnb3J5GAQgASgJEiUKBGFyZ3MYBSADKAsyFy5jb2RlZm91bmRyeS52MS5BcmdTcGVjEhMKC2tleWJpbmRpbmdzGAYgAygJEhEKCWF2YWlsYWJsZRgHIAEoCBIdChVyZXF1aXJlc19jb25maXJtYXRpb24YCCABKAgiXgoTTGlzdENvbW1hbmRzUmVxdWVzdBIqCgdjb250ZXh0GAEgASgLMhkuY29kZWZvdW5kcnkudjEuVWlDb250ZXh0EhsKE2luY2x1ZGVfdW5hdmFpbGFibGUYAiABKAgiQQoUTGlzdENvbW1hbmRzUmVzcG9uc2USKQoIY29tbWFuZHMYASADKAsyFy5jb2RlZm91bmRyeS52MS5Db21tYW5kIs4BChRJbnZva2VDb21tYW5kUmVxdWVzdBIMCgRuYW1lGAEgASgJEioKB2NvbnRleHQYAiABKAsyGS5jb2RlZm91bmRyeS52MS5VaUNvbnRleHQSPAoEYXJncxgDIAMoCzIuLmNvZGVmb3VuZHJ5LnYxLkludm9rZUNvbW1hbmRSZXF1ZXN0LkFyZ3NFbnRyeRIRCgljb25maXJtZWQYBCABKAgaKwoJQXJnc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiPQoVSW52b2tlQ29tbWFuZFJlc3BvbnNlEg8KB21lc3NhZ2UYASABKAkSEwoLcmVzdWx0X2pzb24YAiABKAkiRwoUQ29uZmlybWF0aW9uUmVxdWlyZWQSDwoHY29tbWFuZBgBIAEoCRIPCgdtZXNzYWdlGAIgASgJEg0KBXRpdGxlGAMgASgJKoMBCgdBcmdUeXBlEhgKFEFSR19UWVBFX1VOU1BFQ0lGSUVEEAASEwoPQVJHX1RZUEVfU1RSSU5HEAESEQoNQVJHX1RZUEVfQk9PTBACEhAKDEFSR19UWVBFX0lOVBADEhEKDUFSR19UWVBFX0VOVU0QBBIRCg1BUkdfVFlQRV9QQVRIEAUyvgEKDkNvbW1hbmRTZXJ2aWNlElMKBExpc3QSIy5jb2RlZm91bmRyeS52MS5MaXN0Q29tbWFuZHNSZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuTGlzdENvbW1hbmRzUmVzcG9uc2UiABJXCgZJbnZva2USJC5jb2RlZm91bmRyeS52MS5JbnZva2VDb21tYW5kUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLkludm9rZUNvbW1hbmRSZXNwb25zZSIAQsEBChJjb20uY29kZWZvdW5kcnkudjFCDENvbW1hbmRQcm90b1ABWkRnaXRodWIuY29tL2F3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z");
 
 /**
  * UiContext describes what the caller is looking at. The daemon never guesses it.
@@ -86,6 +86,14 @@ export type ArgSpec = Message<"codefoundry.v1.ArgSpec"> & {
    * @generated from field: string default_value = 6;
    */
   defaultValue: string;
+
+  /**
+   * Positional args take bare words on the CLI, in declaration order
+   * (`code-foundry settings set <key> <value>`). The flag form still works.
+   *
+   * @generated from field: bool positional = 7;
+   */
+  positional: boolean;
 };
 
 /**
@@ -143,6 +151,14 @@ export type Command = Message<"codefoundry.v1.Command"> & {
    * @generated from field: bool available = 7;
    */
   available: boolean;
+
+  /**
+   * Invoke fails with FailedPrecondition and a ConfirmationRequired detail unless
+   * InvokeCommandRequest.confirmed is set. Clients ask the user, then re-invoke.
+   *
+   * @generated from field: bool requires_confirmation = 8;
+   */
+  requiresConfirmation: boolean;
 };
 
 /**
@@ -209,6 +225,13 @@ export type InvokeCommandRequest = Message<"codefoundry.v1.InvokeCommandRequest"
    * @generated from field: map<string, string> args = 3;
    */
   args: { [key: string]: string };
+
+  /**
+   * The user confirmed a destructive command (Command.requires_confirmation).
+   *
+   * @generated from field: bool confirmed = 4;
+   */
+  confirmed: boolean;
 };
 
 /**
@@ -243,6 +266,39 @@ export type InvokeCommandResponse = Message<"codefoundry.v1.InvokeCommandRespons
  */
 export const InvokeCommandResponseSchema: GenMessage<InvokeCommandResponse> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_command, 6);
+
+/**
+ * ConfirmationRequired is the error detail of an Invoke that needs confirmation.
+ *
+ * @generated from message codefoundry.v1.ConfirmationRequired
+ */
+export type ConfirmationRequired = Message<"codefoundry.v1.ConfirmationRequired"> & {
+  /**
+   * @generated from field: string command = 1;
+   */
+  command: string;
+
+  /**
+   * Rendered prompt, e.g. "Remove worktree /x? This deletes files on disk."
+   *
+   * @generated from field: string message = 2;
+   */
+  message: string;
+
+  /**
+   * Command title, for the dialog's confirm button.
+   *
+   * @generated from field: string title = 3;
+   */
+  title: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.ConfirmationRequired.
+ * Use `create(ConfirmationRequiredSchema)` to create a new message.
+ */
+export const ConfirmationRequiredSchema: GenMessage<ConfirmationRequired> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_command, 7);
 
 /**
  * @generated from enum codefoundry.v1.ArgType
