@@ -1,0 +1,10 @@
+# The authenticated user. Polled every 10 minutes.
+query Viewer {
+  rateLimit { ...RateLimitFields }
+  viewer {
+    login
+    name
+    avatarUrl
+    url
+  }
+}

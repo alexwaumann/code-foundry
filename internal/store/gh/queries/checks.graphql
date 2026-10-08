@@ -1,0 +1,16 @@
+# The checks on whatever commit a ref (branch, tag, or SHA) resolves to. Fetched on
+# demand by ListChecks.
+query Checks($owner: String!, $name: String!, $ref: String!, $after: String) {
+  rateLimit { ...RateLimitFields }
+  repository(owner: $owner, name: $name) {
+    object(expression: $ref) {
+      ... on Commit {
+        oid
+        statusCheckRollup {
+          state
+          contexts(first: 100, after: $after) { ...CheckContexts }
+        }
+      }
+    }
+  }
+}

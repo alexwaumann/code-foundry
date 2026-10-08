@@ -1,0 +1,26 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4910,
+      "resetAt": "2026-10-08T07:02:16Z"
+    },
+    "repository": null
+  },
+  "errors": [
+    {
+      "type": "NOT_FOUND",
+      "path": [
+        "repository"
+      ],
+      "locations": [
+        {
+          "line": 3,
+          "column": 3
+        }
+      ],
+      "message": "Could not resolve to a Repository with the name 'ghostty-org/no-such-repo-cf1c'."
+    }
+  ]
+}

@@ -1,0 +1,972 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4912,
+      "resetAt": "2026-10-08T07:02:16Z"
+    },
+    "repository": {
+      "object": {
+        "oid": "a60e9e2a57f73e1eef2bd1cf2995a467f69e7fb0",
+        "statusCheckRollup": {
+          "state": "SUCCESS",
+          "contexts": {
+            "checkRunCount": 54,
+            "checkRunCountsByState": [
+              {
+                "state": "ACTION_REQUIRED",
+                "count": 0
+              },
+              {
+                "state": "CANCELLED",
+                "count": 0
+              },
+              {
+                "state": "COMPLETED",
+                "count": 0
+              },
+              {
+                "state": "FAILURE",
+                "count": 0
+              },
+              {
+                "state": "IN_PROGRESS",
+                "count": 0
+              },
+              {
+                "state": "NEUTRAL",
+                "count": 0
+              },
+              {
+                "state": "PENDING",
+                "count": 0
+              },
+              {
+                "state": "QUEUED",
+                "count": 0
+              },
+              {
+                "state": "SKIPPED",
+                "count": 50
+              },
+              {
+                "state": "STALE",
+                "count": 0
+              },
+              {
+                "state": "STARTUP_FAILURE",
+                "count": 0
+              },
+              {
+                "state": "SUCCESS",
+                "count": 4
+              },
+              {
+                "state": "TIMED_OUT",
+                "count": 0
+              },
+              {
+                "state": "WAITING",
+                "count": 0
+              }
+            ],
+            "statusContextCount": 0,
+            "statusContextCountsByState": [
+              {
+                "state": "EXPECTED",
+                "count": 0
+              },
+              {
+                "state": "ERROR",
+                "count": 0
+              },
+              {
+                "state": "FAILURE",
+                "count": 0
+              },
+              {
+                "state": "PENDING",
+                "count": 0
+              },
+              {
+                "state": "SUCCESS",
+                "count": 0
+              }
+            ],
+            "pageInfo": {
+              "hasNextPage": false,
+              "endCursor": "NTQ"
+            },
+            "nodes": [
+              {
+                "__typename": "CheckRun",
+                "name": "check-zig-cache-hash",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666746/job/112823766645",
+                "startedAt": "2026-10-07T13:42:49Z",
+                "completedAt": "2026-10-07T13:43:18Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Nix"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "skip",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823768018",
+                "startedAt": "2026-10-07T13:42:48Z",
+                "completedAt": "2026-10-07T13:42:54Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "list-examples",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823906724",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Required Checks: Nix",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666746/job/112824087344",
+                "startedAt": "2026-10-07T13:43:25Z",
+                "completedAt": "2026-10-07T13:43:28Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Nix"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "test",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823907258",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "test-lib-vt",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823906816",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "test-esctest",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823906217",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "test-kaitai",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823905772",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "zig-fmt",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823907149",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "GitHub Actions Pins",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823906148",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "prettier",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823907306",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "swiftlint",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823907112",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "alejandra",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823906538",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "typos",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823906372",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "shellcheck",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823906183",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "translations",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823905995",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "blueprint-compiler",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823906817",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-bench",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823908619",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Example ${{ matrix.dir }}",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823908493",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Example zig-vt (macOS, no SDK)",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823908625",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Example ${{ matrix.dir }}",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823908791",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Example ${{ matrix.dir }} (Windows)",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823909190",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Example ${{ matrix.dir }}",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823909026",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-cmake",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823909391",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "test-lib-vt-pkgconfig",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823908762",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-flatpak",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823908865",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-snap",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823908588",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-libghostty-vt",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823910764",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-libghostty-vt-freestanding",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823909224",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-libghostty-vt-wasm",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823909827",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-libghostty-vt-features",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823909401",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-libghostty-vt-macos",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823910138",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-libghostty-vt-android",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823910026",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-libghostty-vt-windows",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823910349",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-linux",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823910980",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-linux-libghostty",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823909925",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-nix",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823910125",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-dist",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823909731",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-dist-lib-vt",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823909734",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-macos",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823910229",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-macos-xcode-27",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823909886",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build-macos-freetype",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823910948",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "GTK x11=${{ matrix.x11 }} wayland=${{ matrix.wayland }}",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823908979",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Build -Dsimd=${{ matrix.simd }}",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823909837",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Build -Dsentry=${{ matrix.sentry }}",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823910366",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "test-macos",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823910612",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Build -Di18n=${{ matrix.i18n }}",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823909845",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Build test/fuzz-libghostty",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823909052",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Test pkg/${{ matrix.pkg }}",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823909903",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "valgrind",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823910621",
+                "startedAt": "2026-10-07T13:42:55Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "trigger-snap",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823911815",
+                "startedAt": "2026-10-07T13:42:56Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "trigger-flatpak",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823912851",
+                "startedAt": "2026-10-07T13:42:56Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Test build on Debian 13",
+                "status": "COMPLETED",
+                "conclusion": "SKIPPED",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823912549",
+                "startedAt": "2026-10-07T13:42:56Z",
+                "completedAt": "2026-10-07T13:42:55Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Required Checks: Test",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+                "detailsUrl": "https://github.com/ghostty-org/ghostty/actions/runs/37630666721/job/112823910490",
+                "startedAt": "2026-10-07T13:43:07Z",
+                "completedAt": "2026-10-07T13:43:10Z",
+                "checkSuite": {
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Test"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

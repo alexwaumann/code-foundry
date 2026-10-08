@@ -1,0 +1,23 @@
+# One pull request with its head commit's checks (one page of contexts per request).
+# Fetched on demand by GetPullRequest.
+query PullRequest($owner: String!, $name: String!, $number: Int!, $after: String) {
+  rateLimit { ...RateLimitFields }
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      ...PullRequestFields
+      headRepository { nameWithOwner }
+      mergeStateStatus
+      commits(last: 1) {
+        nodes {
+          commit {
+            oid
+            statusCheckRollup {
+              state
+              contexts(first: 100, after: $after) { ...CheckContexts }
+            }
+          }
+        }
+      }
+    }
+  }
+}
