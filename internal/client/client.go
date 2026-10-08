@@ -30,6 +30,7 @@ type Client struct {
 	Health  codefoundryv1connect.HealthServiceClient
 	Command codefoundryv1connect.CommandServiceClient
 	UI      codefoundryv1connect.UiServiceClient
+	Update  codefoundryv1connect.UpdateServiceClient
 
 	paths paths.Paths
 }
@@ -53,6 +54,7 @@ func newClient(p paths.Paths, hc *http.Client, baseURL string) *Client {
 		Health:  codefoundryv1connect.NewHealthServiceClient(hc, baseURL),
 		Command: codefoundryv1connect.NewCommandServiceClient(hc, baseURL),
 		UI:      codefoundryv1connect.NewUiServiceClient(hc, baseURL),
+		Update:  codefoundryv1connect.NewUpdateServiceClient(hc, baseURL),
 		paths:   p,
 	}
 }

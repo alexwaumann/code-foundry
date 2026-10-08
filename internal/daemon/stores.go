@@ -13,6 +13,8 @@ import (
 	"github.com/awaumann/code-foundry/internal/store/repo"
 	"github.com/awaumann/code-foundry/internal/store/session"
 	"github.com/awaumann/code-foundry/internal/store/terminal"
+	"github.com/awaumann/code-foundry/internal/store/update"
+	"github.com/awaumann/code-foundry/internal/version"
 )
 
 // stores is the daemon's shared infrastructure (bus, database) and its stores. Each
@@ -29,6 +31,8 @@ type stores struct {
 	// session layers Claude sessions on terminal and db; shut down before terminal so
 	// live sessions are recorded as disconnected while their processes still run.
 	session *session.Manager
+	// update checks for and installs new releases (disabled in dev builds).
+	update *update.Store
 }
 
 // openStores opens the database, applies migrations, and starts every store. On
@@ -57,12 +61,18 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 	}); err != nil {
 		return nil, err
 	}
+	uo := update.DefaultOptions(version.Version)
+	uo.Bus, uo.Log = s.bus, log.With("store", "update")
+	s.update = update.Start(ctx, uo)
 	return s, nil
 }
 
 // close stops the stores in reverse order of start, then closes the database.
 func (s *stores) close() error {
 	var errs []error
+	if s.update != nil {
+		s.update.Close()
+	}
 	if s.session != nil {
 		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		errs = append(errs, s.session.Shutdown(closeCtx))

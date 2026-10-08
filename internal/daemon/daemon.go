@@ -35,6 +35,13 @@ import (
 // shutdownTimeout bounds graceful shutdown; open streams are cut after it.
 const shutdownTimeout = 5 * time.Second
 
+// restartDelay is how long daemon.restart waits before shutting down, so its response
+// is delivered.
+const restartDelay = 250 * time.Millisecond
+
+// errRestartRequested is the shutdown cause for daemon.restart.
+var errRestartRequested = errors.New("daemon.restart requested")
+
 // Options configures Run.
 type Options struct {
 	Paths   paths.Paths
@@ -73,6 +80,10 @@ func Run(ctx context.Context, opts Options) error {
 
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// daemon.restart shuts down exactly like SIGTERM; the next client auto-starts the
+	// binary installed by then.
+	ctx, restart := context.WithCancelCause(ctx)
+	defer restart(nil)
 
 	st, err := openStores(ctx, log, p)
 	if err != nil {
@@ -85,6 +96,7 @@ func Run(ctx context.Context, opts Options) error {
 	repoAPI := api.NewRepo(st.repo, events)
 	terminalAPI := api.NewTerminal(st.terminal)
 	sessionAPI := api.NewSession(st.session, events)
+	updateAPI := api.NewUpdate(st.update, events, ctx.Done())
 	commands := command.NewRegistry()
 	if err := all.Register(commands, all.Deps{
 		Daemon: command.DaemonInfo{
@@ -94,6 +106,11 @@ func Run(ctx context.Context, opts Options) error {
 		Terminal: terminalAPI,
 		Repo:     repoAPI,
 		Session:  sessionAPI,
+		Update:   updateAPI,
+		Restart: func() {
+			// Let the command's response reach the caller first.
+			time.AfterFunc(restartDelay, func() { restart(errRestartRequested) })
+		},
 	}); err != nil {
 		return fmt.Errorf("register commands: %w", err)
 	}
@@ -105,7 +122,8 @@ func Run(ctx context.Context, opts Options) error {
 		sessionAPI.Route(),
 		repoAPI.Route(),
 		api.NewGh(st.gh, events, ctx.Done()).Route(),
-		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Session: st.session, Gh: st.gh, Done: ctx.Done()}).Route(),
+		updateAPI.Route(),
+		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Session: st.session, Gh: st.gh, Update: st.update, Done: ctx.Done()}).Route(),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {

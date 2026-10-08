@@ -61,7 +61,13 @@ func (r *Registry) List(uctx Context, includeUnavailable bool) []Listed {
 	for _, c := range r.cmds {
 		avail := c.Available(uctx)
 		if avail || includeUnavailable {
-			out = append(out, Listed{Command: *c, Available: avail})
+			l := Listed{Command: *c, Available: avail}
+			if c.DynamicTitle != nil {
+				if t := c.DynamicTitle(uctx); t != "" {
+					l.Title = t
+				}
+			}
+			out = append(out, l)
 		}
 	}
 	r.mu.RUnlock()

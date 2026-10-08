@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// UpdateService is the in-app updater. The daemon checks the latest GitHub release of
+// the build's release repository through the user's authenticated `gh` (30s after start,
+// then every 24h), and installs it on request by running the installer embedded in the
+// binary. Installing replaces the app bundle on disk; nothing restarts by itself. The
+// GUI relaunches on request (Relaunch), and the daemon keeps running the old version
+// until the user runs `daemon.restart`, because restarting it closes every session.
+//
+// Dev builds (version not strict semver) and builds without a release repository do
+// not check: Get reports enabled=false with the reason.
+service UpdateService {
+  // Get returns the current update status.
+  rpc Get(GetUpdateStatusRequest) returns (GetUpdateStatusResponse) {}
+  // Check asks GitHub for the latest release now and returns the resulting status. A
+  // failed check keeps the previous state and sets last_check_error. FailedPrecondition
+  // when updates are disabled.
+  rpc Check(CheckForUpdateRequest) returns (CheckForUpdateResponse) {}
+  // Install starts installing the available version and returns at once with state
+  // DOWNLOADING; progress and the outcome arrive on Watch. FailedPrecondition unless the
+  // state is AVAILABLE or FAILED.
+  rpc Install(InstallUpdateRequest) returns (InstallUpdateResponse) {}
+  // Relaunch asks every connected GUI to relaunch itself (to pick up an installed
+  // bundle). Moves INSTALLED to RESTART_REQUIRED.
+  rpc Relaunch(RelaunchAppRequest) returns (RelaunchAppResponse) {}
+  // Watch streams the status on connect and on every change, plus relaunch requests.
+  rpc Watch(WatchUpdateRequest) returns (stream UpdateEvent) {}
+}
+
+enum UpdateState {
+  UPDATE_STATE_UNSPECIFIED = 0;
+  // Up to date, never checked, or updates disabled.
+  UPDATE_STATE_IDLE = 1;
+  // target_version is newer than what is running and installed.
+  UPDATE_STATE_AVAILABLE = 2;
+  // The installer is downloading and installing target_version.
+  UPDATE_STATE_DOWNLOADING = 3;
+  // target_version is installed on disk. The GUI needs a relaunch and the daemon a
+  // restart to run it.
+  UPDATE_STATE_INSTALLED = 4;
+  // target_version is installed and the GUI was asked to relaunch; the daemon still
+  // runs current_version until `daemon.restart`.
+  UPDATE_STATE_RESTART_REQUIRED = 5;
+  // Installing target_version failed (failure_reason). Install may be retried.
+  UPDATE_STATE_FAILED = 6;
+}
+
+message UpdateStatus {
+  UpdateState state = 1;
+  // Version of the running daemon, e.g. "v0.1.0" (or "dev").
+  string current_version = 2;
+  // False for dev builds and builds without a release repository.
+  bool enabled = 3;
+  // Why updates are disabled, e.g. "dev build".
+  string disabled_reason = 4;
+  // "owner/name" of the GitHub repository releases come from.
+  string release_repo = 5;
+  // A check is in flight.
+  bool checking = 6;
+  // When the last check completed (successfully or not). Unset: never checked.
+  google.protobuf.Timestamp last_checked_at = 7;
+  // The last check's error, cleared by a successful check.
+  string last_check_error = 8;
+  // Latest release tag seen by the last successful check.
+  string latest_version = 9;
+  // The version AVAILABLE / DOWNLOADING / INSTALLED / RESTART_REQUIRED / FAILED refer to.
+  string target_version = 10;
+  // Release page for target_version.
+  string notes_url = 11;
+  // DOWNLOADING: the installer's latest output line.
+  string progress = 12;
+  // FAILED: why, usually the installer's last output lines.
+  string failure_reason = 13;
+}
+
+// RelaunchRequested asks connected GUIs to relaunch themselves.
+message RelaunchRequested {}
+
+message UpdateEvent {
+  oneof event {
+    UpdateStatus status = 1;
+    RelaunchRequested relaunch_requested = 2;
+  }
+}
+
+message GetUpdateStatusRequest {}
+
+message GetUpdateStatusResponse {
+  UpdateStatus status = 1;
+}
+
+message CheckForUpdateRequest {}
+
+message CheckForUpdateResponse {
+  UpdateStatus status = 1;
+}
+
+message InstallUpdateRequest {}
+
+message InstallUpdateResponse {
+  UpdateStatus status = 1;
+}
+
+message RelaunchAppRequest {}
+
+message RelaunchAppResponse {
+  // GUIs that received the request.
+  int32 delivered = 1;
+}
+
+message WatchUpdateRequest {}

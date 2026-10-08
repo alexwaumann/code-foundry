@@ -23,6 +23,9 @@ type Command struct {
 	Name string
 	// Title is the palette title, e.g. "New Terminal".
 	Title string
+	// DynamicTitle, when set and non-empty, replaces Title in List (e.g. "Update to
+	// v0.2.0"). It must be cheap: List calls it for every listed command.
+	DynamicTitle func(Context) string
 	// Description is one or two sentences for help output and the palette.
 	Description string
 	// Category is the palette group, e.g. "Terminal".
