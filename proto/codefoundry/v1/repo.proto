@@ -35,6 +35,11 @@ message Repo {
   // "owner/name" when the origin remote is GitHub, else empty.
   string github_slug = 5;
   repeated Worktree worktrees = 6;
+  // When the repository was registered.
+  google.protobuf.Timestamp registered_at = 7;
+  // Non-empty when the last reconcile failed (for example, the directory was moved or
+  // deleted). The repo stays registered; worktrees are empty until it recovers.
+  string error = 8;
 }
 
 message Worktree {
@@ -44,6 +49,8 @@ message Worktree {
   string head = 4;
   bool is_main = 5;
   GitStatus status = 6;
+  // HEAD is detached (branch is empty).
+  bool detached = 7;
 }
 
 message GitStatus {
@@ -55,6 +62,16 @@ message GitStatus {
   int32 untracked = 6;
   bool dirty = 7;
   google.protobuf.Timestamp refreshed_at = 8;
+  // Unmerged (conflicted) entries. Counted in dirty, not in staged or modified.
+  int32 conflicted = 9;
+  // HEAD compared with the default branch on origin (for example "origin/main"), from
+  // `git rev-list --left-right --count HEAD...<base_ref>`. base_ref is empty when that
+  // remote-tracking ref does not exist. ahead/behind above are against the upstream.
+  string base_ref = 10;
+  int32 base_ahead = 11;
+  int32 base_behind = 12;
+  // Non-empty when the last status refresh failed; the other fields are then stale.
+  string error = 13;
 }
 
 message RegisterRepoRequest {
@@ -114,15 +131,27 @@ message RefreshRepoRequest {
 
 message RefreshRepoResponse {}
 
+// The first event of every Watch stream is a snapshot of all repositories; live changes
+// follow in publish order, each carrying the full state of what changed. A client
+// replaces its whole state on every snapshot event (the daemon sends another one if the
+// client fell behind and events were dropped) and applies the other events in order.
 message WatchReposRequest {}
 
 message RepoEvent {
   oneof event {
+    // Replaces the repo, including its worktree list.
     Repo repo_updated = 1;
     string repo_removed_id = 2;
+    // Replaces one worktree of an already known repo.
     Worktree worktree_updated = 3;
     WorktreeRef worktree_removed = 4;
+    // Replaces everything.
+    RepoSnapshot snapshot = 5;
   }
+}
+
+message RepoSnapshot {
+  repeated Repo repos = 1;
 }
 
 message WorktreeRef {

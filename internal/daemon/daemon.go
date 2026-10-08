@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/awaumann/code-foundry/internal/api"
-	"github.com/awaumann/code-foundry/internal/bus"
 	"github.com/awaumann/code-foundry/internal/command"
 	"github.com/awaumann/code-foundry/internal/command/all"
 	"github.com/awaumann/code-foundry/internal/paths"
@@ -71,8 +70,15 @@ func Run(ctx context.Context, opts Options) error {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	st, err := openStores(ctx, log, p)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.close() }() // after the servers have shut down
+
 	started := time.Now()
-	events := bus.New()
+	events := st.bus
+	repoAPI := api.NewRepo(st.repo, events)
 	commands := command.NewRegistry()
 	if err := all.Register(commands, all.Deps{
 		Daemon: command.DaemonInfo{
@@ -80,7 +86,7 @@ func Run(ctx context.Context, opts Options) error {
 		},
 		Emitter: command.BusEmitter{Bus: events},
 		// Terminal: <TerminalService handler from 1a>,
-		// Repo:     <RepoService handler from 1b>,
+		Repo: repoAPI,
 	}); err != nil {
 		return fmt.Errorf("register commands: %w", err)
 	}
@@ -88,6 +94,7 @@ func Run(ctx context.Context, opts Options) error {
 		api.NewHealth(started, opts.Version).Route(),
 		api.NewCommand(commands).Route(),
 		api.NewUI(events).Route(),
+		repoAPI.Route(),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {
@@ -131,8 +138,12 @@ func Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	unixSrv := newServer(log, "unix", logRequests(log, "unix", mux))
-	tcpSrv := newServer(log, "loopback", logRequests(log, "loopback", cors(requireBearer(token, mux))))
+	// Request contexts derive from reqCtx, cancelled before Shutdown, so long-lived
+	// server streams (Watch, Attach) return instead of holding shutdown for its timeout.
+	reqCtx, cancelRequests := context.WithCancel(ctx)
+	defer cancelRequests()
+	unixSrv := newServer(reqCtx, log, "unix", logRequests(log, "unix", mux))
+	tcpSrv := newServer(reqCtx, log, "loopback", logRequests(log, "loopback", cors(requireBearer(token, mux))))
 
 	errc := make(chan error, 2)
 	go func() { errc <- serve(unixSrv, unixLn) }()
@@ -150,6 +161,7 @@ func Run(ctx context.Context, opts Options) error {
 		log.Error("listener failed, shutting down", "err", runErr)
 	}
 
+	cancelRequests()
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
 	defer cancel()
 	for _, s := range []*http.Server{unixSrv, tcpSrv} {
@@ -162,11 +174,12 @@ func Run(ctx context.Context, opts Options) error {
 	return runErr
 }
 
-func newServer(log *slog.Logger, name string, h http.Handler) *http.Server {
+func newServer(ctx context.Context, log *slog.Logger, name string, h http.Handler) *http.Server {
 	var protocols http.Protocols
 	protocols.SetHTTP1(true)
 	protocols.SetUnencryptedHTTP2(true)
 	return &http.Server{
+		BaseContext:       func(net.Listener) context.Context { return ctx },
 		Handler:           h,
 		Protocols:         &protocols,
 		ReadHeaderTimeout: 10 * time.Second,
