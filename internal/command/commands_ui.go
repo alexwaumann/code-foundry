@@ -31,7 +31,8 @@ func RegisterUI(r *Registry, e Emitter) error {
 			Title:       "Open Command Palette",
 			Description: "Open the command palette in every connected window.",
 			Category:    "View",
-			Keybindings: []string{"cmd+k"},
+			// No keybinding: in the GUI, cmd+k is a reserved view action that opens the
+			// palette locally (gui/frontend/src/keys/bindings.ts).
 			Args: []ArgSpec{
 				{Name: "query", Type: String, Description: "Text to pre-fill"},
 			},

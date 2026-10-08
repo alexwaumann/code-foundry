@@ -134,6 +134,8 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 			Title:       "Close Session",
 			Description: "End Claude gracefully. The session stays listed, disconnected, until removed.",
 			Category:    "Session",
+			// Not cmd+w: the Wails app menu closes the window with it.
+			Keybindings: []string{"cmd+shift+w"},
 			Args:        []ArgSpec{idArg},
 			When:        hasSession,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -149,6 +151,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 			Title:       "Reconnect Session",
 			Description: "Resume a disconnected session's conversation in a new Claude process.",
 			Category:    "Session",
+			Keybindings: []string{"cmd+shift+r"},
 			Args:        []ArgSpec{idArg},
 			When:        hasSession,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -178,6 +181,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 			Title:       "Rename Session",
 			Description: "Set the session's name. Turns off automatic naming.",
 			Category:    "Session",
+			Keybindings: []string{"cmd+r"},
 			Args:        []ArgSpec{idArg, {Name: "name", Type: String, Required: true, Description: "New name"}},
 			When:        hasSession,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
