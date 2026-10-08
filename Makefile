@@ -3,8 +3,13 @@
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-# buf and wails3 are installed with `go install` into GOPATH/bin.
-export PATH := $(shell go env GOPATH)/bin:$(PATH)
+# buf and wails3 are installed with `go install` into GOPATH/bin. macOS's make 3.81
+# ignores an exported PATH when it looks up recipe commands itself, so reference the
+# tools through variables; the export still covers child processes (wails3 -> task).
+GOBIN_DIR := $(shell go env GOPATH)/bin
+export PATH := $(GOBIN_DIR):$(PATH)
+BUF    ?= $(shell command -v buf 2>/dev/null || echo $(GOBIN_DIR)/buf)
+WAILS3 ?= $(shell command -v wails3 2>/dev/null || echo $(GOBIN_DIR)/wails3)
 
 # Match the Wails Taskfile's macOS target so cgo objects in the gui package link
 # without "built for newer macOS version" warnings.
@@ -24,9 +29,9 @@ all: build
 
 ## gen: regenerate protobuf/Connect code (Go + TS) and Wails bindings. Commit the result.
 gen:
-	buf lint
-	buf generate
-	cd gui && wails3 generate bindings -clean=true -ts -i
+	$(BUF) lint
+	$(BUF) generate
+	cd gui && $(WAILS3) generate bindings -clean=true -ts -i
 
 ## build: build the CLI/daemon binary to ./bin/code-foundry.
 build:
@@ -57,16 +62,17 @@ frontend-check: frontend-deps
 	$(PNPM) run test
 
 ## dev: run the daemon in the foreground with text logs on stderr.
-dev:
-	go run -ldflags "$(LDFLAGS)" ./cmd/code-foundry daemon --dev
+# Builds then execs the binary (not `go run`, which exits 1 on Ctrl-C).
+dev: build
+	exec ./bin/code-foundry daemon --dev
 
 ## gui-build: build the Wails GUI binary to gui/bin/CodeFoundry.
 gui-build: build
-	cd gui && wails3 build
+	cd gui && $(WAILS3) build
 
 ## gui-dev: run the GUI with hot reload (auto-starts ./bin/code-foundry daemon if needed).
 gui-dev: build
-	cd gui && wails3 dev
+	cd gui && $(WAILS3) dev
 
 ## ghostty-vt: RESERVED for Phase 1a. It will build libghostty-vt from a pinned ghostty
 ## commit with zig 0.16.0 (NOT the Homebrew zig 0.17) into third_party/ghostty-vt
