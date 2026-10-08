@@ -83,6 +83,11 @@ export const viewActions: readonly ViewAction[] = [
 
 const viewActionMap = new Map(viewActions.map((a) => [normalizeChord(a.chord) ?? a.chord, a]));
 
+/** True for a chord a GUI view action owns (a command bound to it never fires). */
+export function isViewActionChord(chord: string): boolean {
+  return viewActionMap.has(normalizeChord(chord) ?? chord);
+}
+
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
 /** chord -> command, from Command.keybindings. Only available commands bind. */

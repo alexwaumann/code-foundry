@@ -176,6 +176,11 @@ describe("hintsFor", () => {
     expect(hintsFor(focus, { kind: "none" }, cmds).map((h) => h.keys)).toEqual(keys);
   });
 
+  it("omits commands bound to a chord a view action owns", () => {
+    const withPalette = [cmd({ name: "ui.palette.open", title: "Open Command Palette", keybindings: ["cmd+k"] }), ...cmds];
+    expect(hintsFor("terminal", { kind: "none" }, withPalette).map((h) => h.label)).not.toContain("Open Command Palette");
+  });
+
   it("session context: session commands first, attention and rename hints", () => {
     const withSession = [
       ...cmds,

@@ -1,5 +1,6 @@
 import type { CommandView } from "@/api/command";
 import type { FocusRegion, Selection } from "@/stores/ui";
+import { isViewActionChord } from "./bindings";
 import { formatChord, normalizeChord, terminalYieldable } from "./chord";
 
 export interface Hint {
@@ -18,12 +19,13 @@ const attention: Hint = { keys: "⌘⇧A", label: "Needs attention" };
  */
 function boundHints(commands: readonly CommandView[], selection: Selection, chordOk: (chord: string) => boolean, max: number): Hint[] {
   const prefix = selection.kind === "session" || selection.kind === "terminal" ? `${selection.kind}.` : null;
+  const usable = (k: string) => chordOk(k) && !isViewActionChord(k);
   return commands
-    .filter((c) => c.available && c.keybindings.some(chordOk))
+    .filter((c) => c.available && c.keybindings.some(usable))
     .map((c, i) => ({ c, i, rank: prefix && c.name.startsWith(prefix) ? 0 : 1 }))
     .sort((a, b) => a.rank - b.rank || a.i - b.i)
     .slice(0, max)
-    .map(({ c }) => ({ keys: formatChord(c.keybindings.find(chordOk) ?? ""), label: c.title }));
+    .map(({ c }) => ({ keys: formatChord(c.keybindings.find(usable) ?? ""), label: c.title }));
 }
 
 /**

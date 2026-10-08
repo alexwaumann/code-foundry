@@ -12,9 +12,10 @@ function Hints() {
   const attention = useAttentionCount();
   const hints = useMemo(() => hintsFor(focus, selection, commands, 4, attention), [focus, selection, commands, attention]);
   return (
-    <ul className="flex min-w-0 items-center gap-3 overflow-hidden" data-testid="hints" data-focus={focus}>
+    // Hints that don't fit wrap onto a hidden second line instead of being cut mid-word.
+    <ul className="flex h-7 min-w-0 flex-wrap content-start items-center gap-x-3 overflow-hidden" data-testid="hints" data-focus={focus}>
       {hints.map((h) => (
-        <li key={`${h.keys}:${h.label}`} className="flex shrink-0 items-center gap-1">
+        <li key={`${h.keys}:${h.label}`} className="flex h-7 shrink-0 items-center gap-1">
           <kbd className="rounded border border-border bg-muted/60 px-1 font-sans text-[10px] text-foreground/80">{h.keys}</kbd>
           <span>{h.label}</span>
         </li>
