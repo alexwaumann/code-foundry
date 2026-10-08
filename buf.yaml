@@ -4,6 +4,11 @@ modules:
 lint:
   use:
     - STANDARD
+  except:
+    # Several services share one package; request/response names carry the service noun
+    # (ListTerminalsRequest) instead of the service prefix (TerminalServiceListRequest).
+    - RPC_REQUEST_STANDARD_NAME
+    - RPC_RESPONSE_STANDARD_NAME
 breaking:
   use:
     - FILE

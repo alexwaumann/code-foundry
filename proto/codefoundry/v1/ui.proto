@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+// UiService lets the daemon (and the CLI through it) steer a running GUI.
+service UiService {
+  // WatchIntents is held open by the GUI. Intents are fan-out: every watcher gets each.
+  rpc WatchIntents(WatchIntentsRequest) returns (stream UiIntent) {}
+  // Emit publishes an intent to all watchers. Commands use this to drive the GUI.
+  rpc Emit(EmitIntentRequest) returns (EmitIntentResponse) {}
+}
+
+message WatchIntentsRequest {}
+
+message UiIntent {
+  oneof intent {
+    FocusTerminal focus_terminal = 1;
+    FocusRepo focus_repo = 2;
+    OpenPalette open_palette = 3;
+    Notify notify = 4;
+  }
+
+  message FocusTerminal {
+    string terminal_id = 1;
+  }
+
+  message FocusRepo {
+    string repo_id = 1;
+    string worktree_path = 2;
+  }
+
+  message OpenPalette {
+    // Pre-filled query text.
+    string query = 1;
+  }
+
+  message Notify {
+    enum Level {
+      LEVEL_UNSPECIFIED = 0;
+      LEVEL_INFO = 1;
+      LEVEL_WARNING = 2;
+      LEVEL_ERROR = 3;
+    }
+    Level level = 1;
+    string title = 2;
+    string body = 3;
+  }
+}
+
+message EmitIntentRequest {
+  UiIntent intent = 1;
+}
+
+message EmitIntentResponse {
+  // Number of connected watchers that received the intent.
+  uint32 delivered = 1;
+}

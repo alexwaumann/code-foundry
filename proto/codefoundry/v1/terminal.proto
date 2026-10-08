@@ -1,0 +1,156 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// TerminalService owns PTY-backed terminals. It is program-agnostic: a terminal runs any
+// argv. "This is a Claude session" is SessionService's concern (Phase 2).
+service TerminalService {
+  // Create spawns argv in a new PTY and returns the terminal.
+  rpc Create(CreateTerminalRequest) returns (CreateTerminalResponse) {}
+  // List returns all live and recently exited terminals.
+  rpc List(ListTerminalsRequest) returns (ListTerminalsResponse) {}
+  // Get returns one terminal.
+  rpc Get(GetTerminalRequest) returns (GetTerminalResponse) {}
+  // Attach streams the terminal to one viewer: first a Snapshot of the current screen,
+  // then Output chunks as they arrive, plus Resized and Exited events. Cancelling the
+  // stream detaches. Only the visible terminal should be attached.
+  rpc Attach(AttachRequest) returns (stream AttachEvent) {}
+  // Write sends input bytes to the PTY.
+  rpc Write(WriteTerminalRequest) returns (WriteTerminalResponse) {}
+  // Resize changes the PTY and emulator size.
+  rpc Resize(ResizeTerminalRequest) returns (ResizeTerminalResponse) {}
+  // Kill terminates the process (SIGHUP then SIGKILL after a grace period).
+  rpc Kill(KillTerminalRequest) returns (KillTerminalResponse) {}
+  // Remove forgets an exited terminal.
+  rpc Remove(RemoveTerminalRequest) returns (RemoveTerminalResponse) {}
+  // Watch streams lifecycle and metadata changes for all terminals.
+  rpc Watch(WatchTerminalsRequest) returns (stream TerminalEvent) {}
+}
+
+enum TerminalState {
+  TERMINAL_STATE_UNSPECIFIED = 0;
+  TERMINAL_STATE_RUNNING = 1;
+  TERMINAL_STATE_EXITED = 2;
+}
+
+message Terminal {
+  string id = 1;
+  repeated string argv = 2;
+  string cwd = 3;
+  uint32 cols = 4;
+  uint32 rows = 5;
+  // Window title as set by the program (OSC 0/2), empty if never set.
+  string title = 6;
+  TerminalState state = 7;
+  // Valid when state is EXITED.
+  int32 exit_code = 8;
+  google.protobuf.Timestamp started_at = 9;
+  google.protobuf.Timestamp exited_at = 10;
+  // True while the program is on the alternate screen (DECSET 1049/1047/47).
+  bool alt_screen = 11;
+  // Opaque labels set by the creator (e.g. session store). Not interpreted here.
+  map<string, string> labels = 12;
+}
+
+message CreateTerminalRequest {
+  repeated string argv = 1;
+  string cwd = 2;
+  // Extra environment entries "KEY=VALUE" merged over the daemon's environment.
+  repeated string env = 3;
+  uint32 cols = 4;
+  uint32 rows = 5;
+  map<string, string> labels = 6;
+}
+
+message CreateTerminalResponse {
+  Terminal terminal = 1;
+}
+
+message ListTerminalsRequest {}
+
+message ListTerminalsResponse {
+  repeated Terminal terminals = 1;
+}
+
+message GetTerminalRequest {
+  string id = 1;
+}
+
+message GetTerminalResponse {
+  Terminal terminal = 1;
+}
+
+message AttachRequest {
+  string id = 1;
+}
+
+message AttachEvent {
+  oneof event {
+    Snapshot snapshot = 1;
+    Output output = 2;
+    Resized resized = 3;
+    Exited exited = 4;
+  }
+
+  // Snapshot is a byte sequence that reproduces the current screen (and scrollback when
+  // available) when written to a freshly reset terminal emulator.
+  message Snapshot {
+    bytes data = 1;
+    uint32 cols = 2;
+    uint32 rows = 3;
+    bool alt_screen = 4;
+  }
+
+  message Output {
+    bytes data = 1;
+  }
+
+  message Resized {
+    uint32 cols = 1;
+    uint32 rows = 2;
+  }
+
+  message Exited {
+    int32 exit_code = 1;
+  }
+}
+
+message WriteTerminalRequest {
+  string id = 1;
+  bytes data = 2;
+}
+
+message WriteTerminalResponse {}
+
+message ResizeTerminalRequest {
+  string id = 1;
+  uint32 cols = 2;
+  uint32 rows = 3;
+}
+
+message ResizeTerminalResponse {}
+
+message KillTerminalRequest {
+  string id = 1;
+}
+
+message KillTerminalResponse {}
+
+message RemoveTerminalRequest {
+  string id = 1;
+}
+
+message RemoveTerminalResponse {}
+
+message WatchTerminalsRequest {}
+
+message TerminalEvent {
+  oneof event {
+    // Emitted on create and whenever title/size/alt_screen/state change.
+    Terminal updated = 1;
+    // Emitted on Remove.
+    string removed_id = 2;
+  }
+}

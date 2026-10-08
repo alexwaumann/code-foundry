@@ -1,0 +1,131 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// RepoService tracks registered git repositories, their worktrees, and git status.
+service RepoService {
+  // Register adds a repository by path (any path inside the repo is accepted).
+  rpc Register(RegisterRepoRequest) returns (RegisterRepoResponse) {}
+  // Unregister forgets a repository. Worktrees on disk are not touched.
+  rpc Unregister(UnregisterRepoRequest) returns (UnregisterRepoResponse) {}
+  // List returns registered repositories with their worktrees.
+  rpc List(ListReposRequest) returns (ListReposResponse) {}
+  // Get returns one repository.
+  rpc Get(GetRepoRequest) returns (GetRepoResponse) {}
+  // CreateWorktree creates a worktree with a new or existing branch.
+  rpc CreateWorktree(CreateWorktreeRequest) returns (CreateWorktreeResponse) {}
+  // RemoveWorktree removes a worktree (and optionally its branch).
+  rpc RemoveWorktree(RemoveWorktreeRequest) returns (RemoveWorktreeResponse) {}
+  // Refresh forces a status reconcile for a repo (or all repos when id is empty).
+  rpc Refresh(RefreshRepoRequest) returns (RefreshRepoResponse) {}
+  // Watch streams repository and worktree changes.
+  rpc Watch(WatchReposRequest) returns (stream RepoEvent) {}
+}
+
+message Repo {
+  // Stable id derived from the main worktree path.
+  string id = 1;
+  // Main worktree path.
+  string path = 2;
+  // Display name (directory basename unless renamed).
+  string name = 3;
+  string default_branch = 4;
+  // "owner/name" when the origin remote is GitHub, else empty.
+  string github_slug = 5;
+  repeated Worktree worktrees = 6;
+}
+
+message Worktree {
+  string repo_id = 1;
+  string path = 2;
+  string branch = 3;
+  string head = 4;
+  bool is_main = 5;
+  GitStatus status = 6;
+}
+
+message GitStatus {
+  string upstream = 1;
+  int32 ahead = 2;
+  int32 behind = 3;
+  int32 staged = 4;
+  int32 modified = 5;
+  int32 untracked = 6;
+  bool dirty = 7;
+  google.protobuf.Timestamp refreshed_at = 8;
+}
+
+message RegisterRepoRequest {
+  string path = 1;
+}
+
+message RegisterRepoResponse {
+  Repo repo = 1;
+}
+
+message UnregisterRepoRequest {
+  string id = 1;
+}
+
+message UnregisterRepoResponse {}
+
+message ListReposRequest {}
+
+message ListReposResponse {
+  repeated Repo repos = 1;
+}
+
+message GetRepoRequest {
+  string id = 1;
+}
+
+message GetRepoResponse {
+  Repo repo = 1;
+}
+
+message CreateWorktreeRequest {
+  string repo_id = 1;
+  // Branch to check out. Created from base_ref when it does not exist.
+  string branch = 2;
+  // Ref to branch from when creating. Defaults to the default branch.
+  string base_ref = 3;
+  // Optional explicit path. Defaults to <repo parent>/<repo name>.worktrees/<branch>.
+  string path = 4;
+}
+
+message CreateWorktreeResponse {
+  Worktree worktree = 1;
+}
+
+message RemoveWorktreeRequest {
+  string repo_id = 1;
+  string path = 2;
+  bool delete_branch = 3;
+  bool force = 4;
+}
+
+message RemoveWorktreeResponse {}
+
+message RefreshRepoRequest {
+  string id = 1;
+}
+
+message RefreshRepoResponse {}
+
+message WatchReposRequest {}
+
+message RepoEvent {
+  oneof event {
+    Repo repo_updated = 1;
+    string repo_removed_id = 2;
+    Worktree worktree_updated = 3;
+    WorktreeRef worktree_removed = 4;
+  }
+}
+
+message WorktreeRef {
+  string repo_id = 1;
+  string path = 2;
+}
