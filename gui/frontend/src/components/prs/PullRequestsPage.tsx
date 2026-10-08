@@ -2,17 +2,15 @@ import { useEffect, useMemo, useRef } from "react";
 import { create } from "zustand";
 import { GitPullRequest } from "lucide-react";
 import type { DashboardView, MonthView, PullRequestView } from "@/api/gh";
-import { formatChord } from "@/keys/chord";
 import { useNow } from "@/lib/clock";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
-import { useCommandsStore } from "@/stores/commands";
 import { dashboardResource, openUrl } from "@/stores/gh";
 import { useResource } from "@/stores/resource";
 import { useUiStore } from "@/stores/ui";
 import { monthName, prKey, repoName } from "./format";
-import { Age, ChecksBadge, Freshness, Kbd, PrStateIcon, ReviewBadge, SectionTitle } from "./PrBits";
+import { Age, ChecksBadge, Freshness, PrStateIcon, ReviewBadge, SectionTitle } from "./PrBits";
 import { RowList } from "./RowList";
 
 /** Dashboards are polled every 2 minutes; older than two polls plus slack is stale. */
@@ -152,7 +150,10 @@ function Body({ d, includeAll }: { d: DashboardView; includeAll: boolean }) {
         {!d.authenticated && <Banner tone="warn">gh is not authenticated. Run `gh auth login`; the lists below are from the last successful poll.</Banner>}
         {!includeAll && d.trackedSlugs.length === 0 && (
           <Banner tone="info">
-            No registered repository has a GitHub remote, so the lists are empty. Press <Kbd>A</Kbd> to show pull requests from every repository.
+            No registered repository has a GitHub remote, so the lists are empty.{" "}
+            <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={toggle} data-testid="prs-show-all">
+              Show pull requests from every repository
+            </button>
           </Banner>
         )}
         <div className="flex flex-wrap gap-4">
@@ -182,7 +183,7 @@ export function PullRequestsPage() {
           type="button"
           onClick={toggle}
           className="rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-accent"
-          title="Toggle with A"
+          title="Switch between registered and all repositories"
           data-testid="prs-scope"
         >
           {includeAll ? "all repositories" : "registered repositories"}
@@ -215,7 +216,6 @@ export function PullRequestsPage() {
 /** Sidebar entry above the repository tree. */
 export function PullRequestsNav() {
   const active = useUiStore((s) => s.selection.kind === "view" && s.selection.name === "pullrequests");
-  const chord = useCommandsStore((s) => s.commands.find((c) => c.name === "view.pullrequests")?.keybindings[0] ?? "");
   return (
     <button
       type="button"
@@ -225,14 +225,13 @@ export function PullRequestsNav() {
       )}
       data-testid="nav-pullrequests"
       aria-current={active ? "page" : undefined}
-      title={chord ? `Pull Requests (${formatChord(chord)})` : "Pull Requests"}
+      title="Pull Requests"
       onClick={() => {
         useUiStore.getState().select({ kind: "view", name: "pullrequests" });
       }}
     >
       <GitPullRequest className="size-4 shrink-0 text-muted-foreground" aria-hidden />
       <span className="truncate">Pull Requests</span>
-      {chord && <span className="ml-auto text-[11px] text-muted-foreground">{formatChord(chord)}</span>}
     </button>
   );
 }

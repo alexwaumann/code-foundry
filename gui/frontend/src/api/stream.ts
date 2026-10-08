@@ -1,6 +1,6 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 
-/** Lifecycle of a long-lived server stream, for the footer and tests. */
+/** Lifecycle of a long-lived server stream, for the daemon status row and tests. */
 export type StreamStatus = "connecting" | "open" | "retrying" | "stopped";
 
 export interface Backoff {

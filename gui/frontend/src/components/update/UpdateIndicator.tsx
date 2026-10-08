@@ -11,7 +11,7 @@ const tone: Record<UpdateBadgeKind, string> = {
   restart: "text-amber-400",
 };
 
-/** Footer: "· update ready v0.2.0", "· relaunch to apply", …; opens the update dialog. */
+/** Sidebar status row: "update ready v0.2.0", "relaunch to apply", …; opens the update dialog. */
 export function UpdateIndicator() {
   const status = useUpdateStore((s) => s.status);
   const guiVersion = useUpdateStore((s) => s.guiVersion);
@@ -20,7 +20,7 @@ export function UpdateIndicator() {
   return (
     <button
       type="button"
-      className={cn("truncate hover:underline", tone[badge.kind])}
+      className={cn("min-w-0 truncate text-left hover:underline", tone[badge.kind])}
       onClick={() => {
         openUpdateDialog();
       }}
@@ -28,7 +28,7 @@ export function UpdateIndicator() {
       data-kind={badge.kind}
       title="Software update"
     >
-      · {badge.label}
+      {badge.label}
     </button>
   );
 }

@@ -40,7 +40,20 @@ test("the title strip spans the window, drags it, and keeps the traffic-light gu
     expect(pane.top).toBeGreaterThanOrEqual(52);
     expect(pane.left).toBeGreaterThanOrEqual(8);
     expect(viewport && viewport.width - pane.right).toBe(8);
+    // No footer: the pane stops 8px above the window's bottom edge.
+    expect(viewport && viewport.height - pane.bottom).toBe(8);
   }
+  await expect(page.getByTestId("hints")).toHaveCount(0);
+});
+
+test("the daemon status and update indicator sit at the bottom of the sidebar", async ({ page }) => {
+  await openApp(page);
+  const sidebar = await box(page, "sidebar");
+  const status = await box(page, "daemon-status");
+  expect(status.left).toBeGreaterThanOrEqual(sidebar.left);
+  expect(status.right).toBeLessThanOrEqual(sidebar.right);
+  expect(sidebar.bottom - status.bottom).toBeLessThan(16);
+  await expect(page.locator("footer")).toHaveCount(0);
 });
 
 for (const scheme of ["dark", "light"] as const) {

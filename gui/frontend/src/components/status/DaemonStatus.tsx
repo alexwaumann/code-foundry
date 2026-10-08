@@ -14,7 +14,10 @@ function useDegradedStreams(): string {
   return useEventsStore((s) => (s.stream !== "open" ? "events" : ""));
 }
 
-/** Daemon pid/version/uptime from HealthService.Ping (moved from the Phase 0 panel). */
+/**
+ * Daemon pid/version/uptime from HealthService.Ping, in the sidebar's status row. A
+ * narrow sidebar clips the trailing details; the tooltip carries all of them.
+ */
 export function DaemonStatus() {
   const status = useHealthStore((s) => s.status);
   const pid = useHealthStore((s) => s.health?.pid);
@@ -22,17 +25,21 @@ export function DaemonStatus() {
   const uptime = useHealthStore((s) => s.health?.uptimeSeconds);
   const error = useHealthStore((s) => s.error);
   const degraded = useDegradedStreams();
+  const label = status === "ok" ? "daemon" : status === "error" ? "daemon unreachable" : "connecting";
+  const details = [label, pid !== undefined && `pid ${String(pid)}`, version, uptime !== undefined && `up ${formatUptime(uptime)}`, status === "error" && error]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <div className="flex shrink-0 items-center gap-3 whitespace-nowrap" data-testid="daemon-status">
+    <div className="flex min-w-0 items-center gap-2.5 overflow-hidden whitespace-nowrap" data-testid="daemon-status" title={details}>
       {status === "ok" && degraded && (
-        <span className="truncate text-amber-400" title={`Not streaming: ${degraded}`}>
+        <span className="shrink-0 text-amber-400" title={`Not streaming: ${degraded}`}>
           syncing {degraded}…
         </span>
       )}
-      <span className="flex items-center gap-1.5" title={status === "error" ? (error ?? "") : "daemon"}>
+      <span className="flex shrink-0 items-center gap-1.5">
         <span className={cn("size-2 rounded-full", dot[status])} aria-hidden />
-        <span data-testid="status">{status === "ok" ? "daemon" : status === "error" ? "daemon unreachable" : "connecting"}</span>
+        <span data-testid="status">{label}</span>
       </span>
       {pid !== undefined && (
         <span className="tabular-nums">

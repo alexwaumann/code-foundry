@@ -34,7 +34,7 @@ test("no indicator while up to date", async ({ page }) => {
   expect((await openStreams())["UpdateService/Watch"]).toBeUndefined();
 });
 
-test("Check for Updates finds a release; the footer and palette offer it", async ({ page }) => {
+test("Check for Updates finds a release; the sidebar status row and palette offer it", async ({ page }) => {
   await openApp(page);
   await mockPost("update/latest?version=v0.2.0");
   await paletteRun(page, "app.update.check");
@@ -44,7 +44,7 @@ test("Check for Updates finds a release; the footer and palette offer it", async
   await expect(d.getByTestId("update-state")).toHaveText("Code Foundry v0.2.0 is available. You have v0.1.0.");
   await expect(d.getByTestId("update-notes")).toContainText("Release notes for v0.2.0");
   await expect(d.getByTestId("update-install")).toHaveText("Update to v0.2.0");
-  await expect(indicator(page)).toHaveText("· update ready v0.2.0");
+  await expect(indicator(page)).toHaveText("update ready v0.2.0");
   expect((await invocations()).at(-1)?.name).toBe("app.update.check");
 
   // The palette entry carries the version.
@@ -62,11 +62,11 @@ test("install shows progress, then relaunch and daemon restart", async ({ page }
 
   await expect(d).toHaveAttribute("data-state-name", "downloading");
   await expect(d.getByTestId("update-progress")).toContainText("==>");
-  await expect(indicator(page)).toHaveText("· updating to v0.2.0…");
+  await expect(indicator(page)).toHaveText("updating to v0.2.0…");
 
   // Installed: the GUI needs a relaunch, the daemon a restart (with a session count).
   await expect(d.getByTestId("update-relaunch-section")).toContainText("Ready: relaunch to apply.", { timeout: 8000 });
-  await expect(indicator(page)).toHaveText("· relaunch to apply");
+  await expect(indicator(page)).toHaveText("relaunch to apply");
   const restart = d.getByTestId("update-restart-section");
   await expect(restart).toContainText("Daemon restart pending;");
   await expect(restart.getByTestId("restart-sessions")).toHaveText(new RegExp(`^${String(await liveSessions())} sessions?$`));
@@ -75,7 +75,7 @@ test("install shows progress, then relaunch and daemon restart", async ({ page }
   // Wails that is a toast), and only the daemon restart is left.
   await d.getByTestId("update-relaunch").click();
   await expect(page.getByText("Relaunch requested")).toBeVisible();
-  await expect(indicator(page)).toHaveText("· daemon restart pending");
+  await expect(indicator(page)).toHaveText("daemon restart pending");
   await expect(d.getByTestId("update-relaunch-section")).toHaveCount(0);
 
   // Restart asks for confirmation first, through the registry's confirm flow.
@@ -94,7 +94,7 @@ test("install shows progress, then relaunch and daemon restart", async ({ page }
 test("app.update from the palette opens the dialog and installs", async ({ page }) => {
   await openApp(page);
   await mockPost("update/state?state=available&version=v0.3.0");
-  await expect(indicator(page)).toHaveText("· update ready v0.3.0");
+  await expect(indicator(page)).toHaveText("update ready v0.3.0");
   await paletteRun(page, "app.update");
   await expect(dialog(page)).toHaveAttribute("data-state-name", /downloading|installed/);
   expect((await invocations()).at(-1)?.name).toBe("app.update");
@@ -111,7 +111,7 @@ test("daemon.restart from the palette asks for confirmation instead of running",
   // Only the unconfirmed attempt reached the daemon; nothing restarted.
   const restarts = (await invocations()).filter((i) => i.name === "daemon.restart");
   expect(restarts.map((i) => i.confirmed)).toEqual([false]);
-  await expect(indicator(page)).toHaveText("· daemon restart pending");
+  await expect(indicator(page)).toHaveText("daemon restart pending");
 });
 
 test("a failed install shows the reason and can be retried", async ({ page }) => {
@@ -122,7 +122,7 @@ test("a failed install shows the reason and can be retried", async ({ page }) =>
   const d = dialog(page);
   await d.getByTestId("update-install").click();
   await expect(d.getByTestId("update-failure")).toHaveText("installer: exit status 1: error: checksum mismatch", { timeout: 8000 });
-  await expect(indicator(page)).toHaveText("· update failed");
+  await expect(indicator(page)).toHaveText("update failed");
   await d.getByTestId("update-install").click(); // Retry
   await expect(d.getByTestId("update-relaunch-section")).toBeVisible({ timeout: 8000 });
 });

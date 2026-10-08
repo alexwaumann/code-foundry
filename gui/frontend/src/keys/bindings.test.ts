@@ -5,7 +5,6 @@ import { useCommandsStore } from "@/stores/commands";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
 import { commandBindings, handleKeyDown, isGlobalChord } from "./bindings";
-import { hintsFor } from "./hints";
 
 const runCommand = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommand }));
@@ -157,48 +156,5 @@ describe("handleKeyDown precedence", () => {
     expect(useUiStore.getState().sidebarVisible).toBe(false);
     press(terminal, { key: "b", code: "KeyB", metaKey: true });
     expect(useUiStore.getState().sidebarVisible).toBe(true);
-  });
-});
-
-describe("hintsFor", () => {
-  const cmds = [
-    cmd({ name: "terminal.new", title: "New Terminal", keybindings: ["cmd+t"] }),
-    cmd({ name: "x.hidden", title: "Hidden", keybindings: ["cmd+h"], available: false }),
-    cmd({ name: "x.nokey", title: "No key" }),
-    cmd({ name: "terminal.clear", title: "Clear", keybindings: ["ctrl+l"] }),
-  ];
-  it.each([
-    ["terminal: global chords + cmd command chords", "terminal" as const, ["⌘K", "⌘T", "⌘B", "⌘1–9", "⌘C", "⌘+ ⌘−"]],
-    ["sidebar: navigation + bound commands", "sidebar" as const, ["↑↓", "↵", "←→", "⌘K", "⌘T", "⌃L"]],
-    ["content: palette + bound commands", "content" as const, ["⌘K", "⌘B", "⌘1–9", "⌘T", "⌃L"]],
-    ["palette", "palette" as const, ["↑↓", "↵", "⌫", "Esc"]],
-  ])("%s", (_name, focus, keys) => {
-    expect(hintsFor(focus, { kind: "none" }, cmds).map((h) => h.keys)).toEqual(keys);
-  });
-
-  it("omits commands bound to a chord a view action owns", () => {
-    const withPalette = [cmd({ name: "ui.palette.open", title: "Open Command Palette", keybindings: ["cmd+k"] }), ...cmds];
-    expect(hintsFor("terminal", { kind: "none" }, withPalette).map((h) => h.label)).not.toContain("Open Command Palette");
-  });
-
-  it("session context: session commands first, attention and rename hints", () => {
-    const withSession = [
-      ...cmds,
-      cmd({ name: "session.close", title: "Close Session", keybindings: ["cmd+shift+w"] }),
-      cmd({ name: "session.reconnect", title: "Reconnect", keybindings: ["cmd+shift+r"] }),
-    ];
-    const sel = { kind: "session", id: "s1" } as const;
-    expect(hintsFor("terminal", sel, withSession, 4, 2).map((h) => h.label)).toEqual([
-      "Commands",
-      "Needs attention",
-      "Close Session",
-      "Reconnect",
-      "New Terminal",
-      "Sidebar",
-      "Jump",
-      "Copy selection",
-      "Font size",
-    ]);
-    expect(hintsFor("content", sel, withSession, 2).map((h) => h.keys)).toEqual(["⌘K", "⌘B", "⇧⌘W", "⇧⌘R", "F2"]);
   });
 });

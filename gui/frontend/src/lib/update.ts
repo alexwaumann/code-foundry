@@ -43,7 +43,7 @@ export interface UpdateBadge {
 }
 
 /**
- * The footer's update indicator. `guiVersion` is the window shell's own version (null
+ * The sidebar status row's update indicator. `guiVersion` is the window shell's own version (null
  * outside Wails). After an install the GUI needs a relaunch and the daemon a restart;
  * which one is still pending depends on what each is running:
  *

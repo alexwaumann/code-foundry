@@ -216,10 +216,12 @@ switch.
   an Attach subscriber, finished turns count as seen (see
   `docs/notes/phase2-integration.md`).
 * Layout: a draggable title strip under the hidden-inset traffic lights, sidebar (repos →
-  worktrees → sessions), content (terminal or overview page), footer with context-aware
-  hints, command palette overlay. Strip, sidebar and footer sit on one background (the
-  sheet); the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Keyboard-first; every palette
-  command is reachable without the mouse.
+  worktrees → sessions, with a status row at its foot), content (terminal or overview
+  page), command palette overlay. Strip and sidebar sit on one background (the sheet);
+  the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Every
+  palette command is reachable without the mouse, and common ones also have buttons that
+  invoke the same registry command. Chords are listed only in the palette and the
+  Keyboard Shortcuts overlay (`docs/notes/phase3-ui-buttons.md`).
 
 ## 9. Repo and GitHub stores
 

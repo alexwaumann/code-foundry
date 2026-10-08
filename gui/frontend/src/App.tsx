@@ -3,7 +3,6 @@ import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
 import { Dashboard } from "@/components/Dashboard";
 import { HelpOverlay } from "@/components/help/HelpOverlay";
 import { SettingsPage } from "@/components/settings/SettingsPage";
-import { Footer } from "@/components/footer/Footer";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { PullRequestsPage } from "@/components/prs/PullRequestsPage";
 import { SessionDisconnected } from "@/components/session/SessionParts";
@@ -75,22 +74,22 @@ export function App() {
   useWindowTitle(useAttentionCount());
 
   return (
-    // The sheet: one background under the title strip, sidebar and footer. The content
-    // area is the one pane floating on it (rounded, lighter, 8px in from its neighbours).
+    // The sheet: one background under the title strip and sidebar. The content area is
+    // the one pane floating on it (rounded, lighter, 8px in from its neighbours and the
+    // window's right and bottom edges).
     <div className="flex h-screen flex-col overflow-hidden bg-sheet text-foreground">
       <TitleStrip />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="mx-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs" data-testid="content-pane">
+        <main className="mx-2 mb-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs" data-testid="content-pane">
           {settingsOpen ? <SettingsPage /> : <Content />}
         </main>
       </div>
-      <Footer />
       <CommandPalette />
       <HelpOverlay />
       <ConfirmDialog />
       <UpdateDialog />
-      <Toaster theme={scheme} position="bottom-right" offset={{ bottom: 40, right: 16 }} />
+      <Toaster theme={scheme} position="bottom-right" offset={{ bottom: 20, right: 20 }} />
     </div>
   );
 }

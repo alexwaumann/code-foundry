@@ -14,7 +14,7 @@ export type Selection =
 /** Top-level page names (UiIntent.ShowView); unknown names are ignored. */
 export const viewNames: readonly string[] = ["pullrequests"];
 
-/** Which region has keyboard focus; drives footer hints. */
+/** Which region has keyboard focus; the palette returns focus to it on close. */
 export type FocusRegion = "sidebar" | "terminal" | "content" | "palette";
 
 export const SIDEBAR_MIN = 180;

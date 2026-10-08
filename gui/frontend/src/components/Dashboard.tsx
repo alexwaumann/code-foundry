@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { SquareTerminal } from "lucide-react";
 import { WorktreeOverview } from "@/components/overview/WorktreeOverview";
-import { formatChord } from "@/keys/chord";
 import { terminalLabel } from "@/lib/path";
 import { SessionStatusIcon } from "@/components/session/SessionStatusIcon";
 import { badgeLabels, sessionBadge } from "@/lib/session";
@@ -18,10 +17,6 @@ import { useReposStore } from "@/stores/repos";
 import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
-
-function Kbd({ children }: { children: string }) {
-  return <kbd className="rounded border bg-muted px-1.5 py-0.5 font-sans text-xs">{children}</kbd>;
-}
 
 /** Session and (unowned) terminal ids placed under the given worktree (or any worktree of the repo). */
 function useItemsIn(repoId: string, path: string | null): { sessions: string[]; terminals: string[] } {
@@ -95,9 +90,7 @@ export function WorktreeItems({ repoId, path }: { repoId: string; path: string |
         <section>
           <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Sessions</h2>
           {sessions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No sessions here. Press <Kbd>{formatChord("cmd+n")}</Kbd> to start Claude.
-            </p>
+            <p className="text-sm text-muted-foreground">No sessions here.</p>
           ) : (
             <div className="flex flex-col">
               {sessions.map((id) => (
@@ -110,9 +103,7 @@ export function WorktreeItems({ repoId, path }: { repoId: string; path: string |
       <section>
         <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Terminals</h2>
         {terminals.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No terminals here. Press <Kbd>{formatChord("cmd+t")}</Kbd> to start one.
-          </p>
+          <p className="text-sm text-muted-foreground">No terminals here.</p>
         ) : (
           <div className="flex flex-col">
             {terminals.map((id) => (
@@ -139,20 +130,7 @@ function Welcome() {
           {waiting > 0 && ` · ${String(waiting)} waiting on you`}
         </p>
       </div>
-      <ul className="flex flex-col gap-2 text-sm text-muted-foreground">
-        <li>
-          <Kbd>{formatChord("cmd+k")}</Kbd> run a command
-        </li>
-        <li>
-          <Kbd>{formatChord("cmd+1")}</Kbd>…<Kbd>{formatChord("cmd+9")}</Kbd> jump to a session or terminal
-        </li>
-        <li>
-          <Kbd>{formatChord("cmd+shift+a")}</Kbd> next session that needs you
-        </li>
-        <li>
-          <Kbd>{formatChord("cmd+b")}</Kbd> toggle the sidebar
-        </li>
-      </ul>
+      <p className="text-sm text-muted-foreground">Every action is in the command palette. Keyboard shortcuts are listed under Help.</p>
     </div>
   );
 }

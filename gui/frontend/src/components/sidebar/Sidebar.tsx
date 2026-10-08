@@ -20,6 +20,7 @@ import { rowSelection, selectionKey } from "./selection";
 import { ResizeHandle } from "./ResizeHandle";
 import { useRowHeight } from "@/stores/settings";
 import { SidebarRow } from "./SidebarRow";
+import { SidebarStatus } from "./SidebarStatus";
 
 /** Index of the nearest row above `i` with a smaller depth (the parent). */
 function parentIndex(rows: readonly Row[], i: number): number {
@@ -169,7 +170,7 @@ function SidebarTree() {
   );
 }
 
-/** Count of sessions waiting on the user; click (or cmd+shift+a) jumps to the next one. */
+/** Count of sessions waiting on the user; click jumps to the next one. */
 function AttentionBadge() {
   const count = useAttentionCount();
   if (count === 0) return null;
@@ -178,7 +179,7 @@ function AttentionBadge() {
     <button
       type="button"
       tabIndex={-1}
-      title={`${label} (⌘⇧A)`}
+      title={label}
       aria-label={label}
       data-testid="attention-badge"
       className="flex h-5 items-center gap-1 rounded-full bg-amber-400/15 px-2 font-semibold tracking-normal text-amber-300 tabular-nums normal-case hover:bg-amber-400/25"
@@ -221,6 +222,7 @@ export function Sidebar() {
       </header>
       <SidebarTree />
       <SessionsUnavailable />
+      <SidebarStatus />
       <ResizeHandle />
     </aside>
   );

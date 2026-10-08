@@ -73,7 +73,3 @@ export function SectionTitle({ children, count, extra }: { children: React.React
     </h2>
   );
 }
-
-export function Kbd({ children }: { children: string }) {
-  return <kbd className="rounded border bg-muted px-1.5 py-0.5 font-sans text-[11px]">{children}</kbd>;
-}

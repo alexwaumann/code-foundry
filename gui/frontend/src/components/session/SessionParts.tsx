@@ -2,11 +2,9 @@ import { useEffect, useState } from "react";
 import { Loader2, RotateCcw, Trash2, Unplug } from "lucide-react";
 import { SessionStatusIcon } from "./SessionStatusIcon";
 import { Button } from "@/components/ui/button";
-import { formatChord } from "@/keys/chord";
 import { basename, tildify } from "@/lib/path";
 import { badgeLabels, disconnectReason, formatAgo, sessionBadge } from "@/lib/session";
-import { useCommandsStore } from "@/stores/commands";
-import { reconnectSession, removeSession, SESSION_COMMANDS } from "@/stores/sessionActions";
+import { reconnectSession, removeSession } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
 
@@ -22,14 +20,6 @@ function useNow(ms = 30_000): number {
     };
   }, [ms]);
   return now;
-}
-
-/** First keybinding of a registry command, formatted, or "". */
-function useChord(name: string): string {
-  return useCommandsStore((s) => {
-    const k = s.commands.find((c) => c.name === name)?.keybindings[0];
-    return k ? formatChord(k) : "";
-  });
 }
 
 /** Left side of the terminal header when the terminal belongs to a session. */
@@ -83,7 +73,6 @@ export function SessionDisconnected({ id }: { id: string }) {
   const loaded = useSessionsStore((st) => st.loaded || st.availability !== "unknown");
   const now = useNow();
   const [pending, setPending] = useState<"reconnect" | "remove" | null>(null);
-  const reconnectChord = useChord(SESSION_COMMANDS.reconnect);
 
   if (!s) {
     return (
@@ -140,7 +129,6 @@ export function SessionDisconnected({ id }: { id: string }) {
           <Button autoFocus onClick={() => void reconnect()} disabled={pending !== null} data-testid="reconnect">
             {pending === "reconnect" ? <Loader2 className="animate-spin" /> : <RotateCcw />}
             Reconnect
-            {reconnectChord && <kbd className="ml-1 rounded bg-primary-foreground/15 px-1 font-sans text-[10px]">{reconnectChord}</kbd>}
           </Button>
           <Button variant="ghost" onClick={() => void remove()} disabled={pending !== null} data-testid="remove-session">
             {pending === "remove" ? <Loader2 className="animate-spin" /> : <Trash2 />}

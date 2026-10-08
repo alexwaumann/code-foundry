@@ -7,10 +7,19 @@ import { helpSections, type LocalChord } from "@/keys/help";
 import { getUiContext } from "@/stores/context";
 import { setHelpOpen, useViewsStore } from "@/stores/views";
 
-/** GUI chords that are not view actions but are worth knowing. */
+/**
+ * GUI chords that are not view actions but are worth knowing. This overlay (and the
+ * palette) is the one place chords are listed; the rest of the UI uses buttons.
+ */
 const extraChords: LocalChord[] = [
   { chord: "f2", title: "Rename the selected session" },
   { chord: "escape", title: "Close the palette, dialog, or settings" },
+  { chord: "arrowup", title: "Move in the sidebar and lists" },
+  { chord: "arrowdown", title: "Move in the sidebar and lists" },
+  { chord: "enter", title: "Open the highlighted row" },
+  { chord: "arrowleft", title: "Fold or unfold a sidebar row" },
+  { chord: "arrowright", title: "Fold or unfold a sidebar row" },
+  { chord: "a", title: "Pull Requests: all or registered repositories" },
 ];
 
 function Keys({ keys }: { keys: string[] }) {
