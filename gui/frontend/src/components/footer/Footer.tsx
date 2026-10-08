@@ -27,7 +27,7 @@ function Hints() {
 
 export function Footer() {
   return (
-    <footer className="flex h-7 shrink-0 items-center justify-between gap-4 border-t bg-sidebar px-3 text-[11px] text-muted-foreground">
+    <footer className="flex h-7 shrink-0 items-center justify-between gap-4 px-3 text-[11px] text-muted-foreground">
       <Hints />
       <div className="flex min-w-0 shrink-0 items-center gap-3">
         <UpdateIndicator />

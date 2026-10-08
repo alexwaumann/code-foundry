@@ -210,7 +210,7 @@ export function Sidebar() {
   const repoCount = useReposStore((s) => s.order.length);
   if (!visible) return null;
   return (
-    <aside className="relative flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar" style={{ width }} data-testid="sidebar">
+    <aside className="relative flex shrink-0 flex-col bg-sidebar" style={{ width }} data-testid="sidebar">
       <PullRequestsNav />
       <header className="flex h-9 shrink-0 items-center justify-between gap-2 px-3 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
         <span>Repositories</span>

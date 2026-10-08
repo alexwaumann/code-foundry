@@ -75,11 +75,15 @@ export function App() {
   useWindowTitle(useAttentionCount());
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+    // The sheet: one background under the title strip, sidebar and footer. The content
+    // area is the one pane floating on it (rounded, lighter, 8px in from its neighbours).
+    <div className="flex h-screen flex-col overflow-hidden bg-sheet text-foreground">
       <TitleStrip />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="flex min-w-0 flex-1 flex-col">{settingsOpen ? <SettingsPage /> : <Content />}</main>
+        <main className="mx-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs" data-testid="content-pane">
+          {settingsOpen ? <SettingsPage /> : <Content />}
+        </main>
       </div>
       <Footer />
       <CommandPalette />

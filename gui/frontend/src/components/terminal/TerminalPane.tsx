@@ -63,7 +63,7 @@ function TerminalHeader({
   renderer: RendererKind | null;
 }) {
   return (
-    <div className="flex h-9 shrink-0 items-center gap-3 border-b px-3 text-xs" data-testid="terminal-header">
+    <div className="flex h-9 shrink-0 items-center gap-3 border-b border-pane-border px-3 text-xs" data-testid="terminal-header">
       {sessionId ? <SessionTitle id={sessionId} /> : <TerminalTitle id={id} />}
       <span className="ml-auto flex shrink-0 items-center gap-2 text-muted-foreground tabular-nums">
         {import.meta.env.DEV && renderer && <span className="rounded border px-1 text-[10px] uppercase">{renderer}</span>}

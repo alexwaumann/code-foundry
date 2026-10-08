@@ -175,7 +175,7 @@ export function PullRequestsPage() {
   const d = entry?.data ?? null;
   return (
     <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label="Pull Requests" data-testid="prs-page">
-      <header className="flex h-11 shrink-0 items-center gap-3 border-b px-5">
+      <header className="flex h-11 shrink-0 items-center gap-3 border-b border-pane-border px-5">
         <GitPullRequest className="size-4 text-muted-foreground" aria-hidden />
         <h1 className="text-sm font-semibold">Pull Requests</h1>
         <button

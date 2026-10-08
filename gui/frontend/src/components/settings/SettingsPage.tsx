@@ -91,7 +91,7 @@ export function SettingsPage() {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Settings" data-testid="settings-page">
-      <header className="flex h-11 shrink-0 items-center gap-3 border-b px-4">
+      <header className="flex h-11 shrink-0 items-center gap-3 border-b border-pane-border px-4">
         <h1 className="text-sm font-semibold">Settings</h1>
         <div className="relative max-w-xs flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -124,7 +124,7 @@ export function SettingsPage() {
         </Button>
       </header>
       <div className="flex min-h-0 flex-1">
-        <nav className="w-44 shrink-0 space-y-0.5 border-r p-2 text-[13px]" aria-label="Setting groups">
+        <nav className="w-44 shrink-0 space-y-0.5 border-r border-pane-border p-2 text-[13px]" aria-label="Setting groups">
           {groups.map(({ group, fields }) => (
             <button
               key={group.id}

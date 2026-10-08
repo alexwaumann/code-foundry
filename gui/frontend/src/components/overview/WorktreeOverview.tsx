@@ -377,7 +377,7 @@ export function WorktreeOverview({ repoId, path, items }: { repoId: string; path
   const wt = useReposStore((s) => findWorktree(s, repoId, wtPath));
   return (
     <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label="Worktree overview" data-testid="overview-page">
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b px-5">
+      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-pane-border px-5">
         {path ? <GitBranch className="size-4 text-violet-400" aria-hidden /> : <FolderGit2 className="size-4 text-sky-400" aria-hidden />}
         <h1 className="truncate text-sm font-semibold" data-testid="overview-title">
           {repo?.name ?? "Repository"}

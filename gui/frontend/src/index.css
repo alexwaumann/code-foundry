@@ -43,15 +43,23 @@
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
+    --color-sheet: var(--sheet);
+    --color-pane: var(--pane);
+    --color-pane-border: var(--pane-border);
 }
 
 :root {
     --radius: 0.625rem;
-    --background: oklch(1 0 0);
+    /* Sheet and panes. The sheet is the one window background (title strip, sidebar,
+     * footer sit on it); panes are the lighter rounded areas floating on it. */
+    --sheet: oklch(0.955 0 0); /* #f0f0f0 */
+    --pane: #ffffff;
+    --pane-border: oklch(0 0 0 / 8%);
+    --background: var(--sheet);
     --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
+    --card: var(--pane);
     --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
+    --popover: var(--pane);
     --popover-foreground: oklch(0.145 0 0);
     --primary: oklch(0.205 0 0);
     --primary-foreground: oklch(0.985 0 0);
@@ -70,24 +78,30 @@
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.985 0 0);
+    --sidebar: var(--sheet);
     --sidebar-foreground: oklch(0.145 0 0);
     --sidebar-primary: oklch(0.205 0 0);
     --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent: oklch(0.91 0 0);
     --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-border: var(--sheet);
     --sidebar-ring: oklch(0.708 0 0);
-    /* Matches the xterm theme background (src/terminal/theme.ts). */
-    --terminal-bg: #ffffff;
+    /* The terminal is part of its pane: --pane must equal the xterm theme background
+     * (src/terminal/theme.ts), so --pane is a hex value in both schemes. */
+    --terminal-bg: var(--pane);
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
+    /* #070707; gui/main.go's BackgroundColour, so launch does not flash. */
+    --sheet: oklch(0.13 0 0);
+    /* oklch(0.205 0 0); equals the dark xterm background (src/terminal/theme.ts). */
+    --pane: #171717;
+    --pane-border: oklch(1 0 0 / 8%);
+    --background: var(--sheet);
     --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
+    --card: var(--pane);
     --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
+    --popover: var(--pane);
     --popover-foreground: oklch(0.985 0 0);
     --primary: oklch(0.922 0 0);
     --primary-foreground: oklch(0.205 0 0);
@@ -106,15 +120,15 @@
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
+    --sidebar: var(--sheet);
     --sidebar-foreground: oklch(0.985 0 0);
     --sidebar-primary: oklch(0.488 0.243 264.376);
     --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent: oklch(0.235 0 0);
     --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-border: var(--sheet);
     --sidebar-ring: oklch(0.556 0 0);
-    --terminal-bg: #0b0b0c;
+    --terminal-bg: var(--pane);
 }
 
 @layer base {

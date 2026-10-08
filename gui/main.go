@@ -59,10 +59,12 @@ func main() {
 	// makes that band drag the window natively. The title stays set for Mission Control
 	// and the app switcher even though the bar no longer shows it.
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:            "Code Foundry",
-		Width:            1200,
-		Height:           780,
-		BackgroundColour: application.NewRGB(10, 10, 10),
+		Title:  "Code Foundry",
+		Width:  1200,
+		Height: 780,
+		// The dark sheet colour (--sheet in index.css, oklch(0.13 0 0)), so launch does
+		// not flash a different colour before the page paints.
+		BackgroundColour: application.NewRGB(7, 7, 7),
 		URL:              "/",
 		Mac: application.MacWindow{
 			TitleBar:                application.MacTitleBarHiddenInset,
