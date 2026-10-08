@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { toast } from "sonner";
 import { invokeCommand, listCommands, type CommandView, type UiContextView } from "@/api/command";
 import { invalidateOnTransportError } from "@/api/endpoint";
+import { isGitOpFailure, isGitOpResult } from "@/api/gitops";
 import { errorMessage, isAbort } from "@/api/stream";
 import { contextKey, getUiContext } from "./context";
 import { useReposStore } from "./repos";
@@ -54,10 +55,11 @@ export async function runCommand(name: string, args: Record<string, string> = {}
   const title = useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name;
   try {
     const res = await invokeCommand(name, ctx, args);
-    if (res.message) toast.success(res.message);
+    // Git operations report through their own toast (gitops events); skip the duplicate.
+    if (res.message && !isGitOpResult(res.resultJson)) toast.success(res.message);
     return true;
   } catch (err) {
-    toast.error(`${title} failed`, { description: errorMessage(err) });
+    if (!isGitOpFailure(err)) toast.error(`${title} failed`, { description: errorMessage(err) });
     return false;
   } finally {
     void refreshCommands();

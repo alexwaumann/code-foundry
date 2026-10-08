@@ -10,6 +10,7 @@ import type { RepoEventSchema, RepoSchema, WorktreeSchema } from "../src/gen/cod
 import { SessionState, SessionStatus, type SessionEventSchema, type SessionSchema } from "../src/gen/codefoundry/v1/session_pb";
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
+import { MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
 import { Hub } from "./hub";
 import { claudeIntro, claudeTick, ENTER_ALT, logLine, prompt, RESET, testRunOutput, topFrame } from "./screens";
 
@@ -176,6 +177,9 @@ export class World {
   readonly repoEvents = new Hub<RepoEventInit>((v) => this.events.publish({ source: EventSource.REPO, event: { event: { case: "repo", value: v } } }));
   readonly sessionEvents = new Hub<SessionEventInit>((v) => this.events.publish({ source: EventSource.SESSION, event: { event: { case: "session", value: v } } }));
   readonly intents = new Hub<UiIntentInit>((v) => this.events.publish({ source: EventSource.UI, event: { event: { case: "ui", value: v } } }));
+  readonly gitopsEvents = new Hub<GitOpsEventInit>((v) => this.events.publish({ source: EventSource.GITOPS, event: { event: { case: "gitops", value: v } } }));
+  /** git.*, pr.*, worktree.open.editor, worktree.reveal, view.open.url (mock/gitops.ts). */
+  readonly gitops = new MockGitOps((e) => this.gitopsEvents.publish(e));
   /** EventService watchers that include UI intents (they count toward Emit's `delivered`). */
   uiEventWatchers = 0;
   invocations: Invocation[] = [];
@@ -194,6 +198,7 @@ export class World {
     this.terms.clear();
     this.repos.clear();
     this.invocations = [];
+    this.gitops.reset();
     this.writes = [];
     this.resizes = [];
     this.nextId = 1;
@@ -631,7 +636,7 @@ export class World {
   }
 
   /** The registry: definitions plus a `when` predicate over the caller's context. */
-  private registry(): { cmd: CmdDef; when: (ctx: UiContext | undefined) => boolean; run: (ctx: UiContext | undefined, args: Record<string, string>) => string }[] {
+  private registry(): { cmd: CmdDef; when: (ctx: UiContext | undefined) => boolean; run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut> }[] {
     const activeTerm = (ctx: UiContext | undefined) => (ctx?.activeTerminalId ? this.terms.get(ctx.activeTerminalId) : undefined);
     const activeSession = (ctx: UiContext | undefined) => (ctx?.activeSessionId ? this.sessions.get(ctx.activeSessionId) : undefined);
     const always = () => true;
@@ -828,6 +833,13 @@ export class World {
         when: always,
         run: () => `mock daemon pid ${String(process.pid)}, up ${String(Math.round((Date.now() - this.startedAt) / 1000))}s`,
       },
+      ...this.gitops.entries((path) => {
+        for (const repo of this.repos.values()) {
+          const wt = repo.worktrees.find((w) => w.path === path);
+          if (wt) return { repoId: repo.id, path: wt.path, branch: wt.branch, githubSlug: repo.githubSlug };
+        }
+        return null;
+      }),
     ];
   }
 
@@ -837,7 +849,7 @@ export class World {
       .filter((c) => includeUnavailable || c.available);
   }
 
-  invoke(name: string, ctx: UiContext | undefined, args: Record<string, string>): string {
+  invoke(name: string, ctx: UiContext | undefined, args: Record<string, string>): string | Promise<InvokeOut> {
     const entry = this.registry().find((e) => e.cmd.name === name);
     this.invocations.push({
       name,
@@ -848,7 +860,9 @@ export class World {
       at: new Date().toISOString(),
     });
     if (!entry) throw new CommandError("notfound", `unknown command ${name}`);
-    if (!entry.when(ctx)) throw new CommandError("unavailable", `${name} is not available here`);
+    // Like the daemon's context-bound args: an explicit worktree stands in for the context's.
+    const whenCtx = args.worktree ? ({ ...ctx, activeWorktreePath: args.worktree } as UiContext) : ctx;
+    if (!entry.when(whenCtx)) throw new CommandError("unavailable", `${name} is not available here`);
     for (const a of entry.cmd.args) {
       if (a.required && !args[a.name]) throw new CommandError("invalid", `missing required arg ${a.name}`);
     }

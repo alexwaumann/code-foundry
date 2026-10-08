@@ -6,6 +6,7 @@ import { listRepos } from "@/api/repo";
 import { listSessions } from "@/api/session";
 import { errorMessage, isAbort, runStream, type StreamStatus } from "@/api/stream";
 import { listTerminals } from "@/api/terminal";
+import { applyGitOpsEvent } from "./gitops";
 import { applyIntent } from "./intents";
 import { applyRepoEvent, replaceRepos, useReposStore } from "./repos";
 import { applySessionEvent, replaceSessions, sessionOfTerminal, useSessionsStore } from "./sessions";
@@ -38,6 +39,7 @@ const handlers: Handlers = {
     useSessionsStore.setState((s) => ({ ...applySessionEvent(s, ev), availability: "available", error: null }));
   },
   gh: () => undefined,
+  gitops: applyGitOpsEvent,
   ui: applyIntent,
 };
 
