@@ -7,8 +7,8 @@
 # Dependencies
 node_modules/
 
-# libghostty-vt build output (Phase 1a, see `make ghostty-vt`)
-/third_party/ghostty-vt/
+# zig, ghostty source, and libghostty-vt build output (see `make ghostty-vt`)
+/third_party/
 
 # macOS
 .DS_Store

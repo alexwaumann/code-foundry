@@ -6,8 +6,11 @@ toolchain go1.26.8
 
 require (
 	connectrpc.com/connect v1.21.0
+	github.com/creack/pty v1.1.24
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/wailsapp/wails/v3 v3.0.0-beta.28
+	go.mitchellh.com/libghostty v0.0.0-20261007030428-8812ad0e0f79
+	golang.org/x/sys v0.48.0
 	google.golang.org/protobuf v1.36.12
 	modernc.org/sqlite v1.60.1
 )
@@ -27,7 +30,6 @@ require (
 	golang.org/x/exp/typeparams v0.0.0-20260112195511-716be5621a96 // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/tools v0.50.0 // indirect
 	honnef.co/go/tools v0.8.1 // indirect
 	modernc.org/libc v1.77.1 // indirect

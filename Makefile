@@ -11,11 +11,21 @@ export PATH := $(GOBIN_DIR):$(PATH)
 BUF    ?= $(shell command -v buf 2>/dev/null || echo $(GOBIN_DIR)/buf)
 WAILS3 ?= $(shell command -v wails3 2>/dev/null || echo $(GOBIN_DIR)/wails3)
 
-# Match the Wails Taskfile's macOS target so cgo objects in the gui package link
-# without "built for newer macOS version" warnings.
-export MACOSX_DEPLOYMENT_TARGET := 12.0
-export CGO_CFLAGS  := -mmacosx-version-min=12.0
-export CGO_LDFLAGS := -mmacosx-version-min=12.0
+# One macOS deployment target for every cgo object we link, so the linker does not warn
+# "built for newer macOS version". libghostty-vt is built by zig for ghostty's minimum,
+# macOS 13.0, so Go builds target 13.0. (The Wails Taskfile still builds the GUI binary
+# for 12.0; it does not link libghostty-vt.)
+export MACOSX_DEPLOYMENT_TARGET := 13.0
+export CGO_CFLAGS  := -mmacosx-version-min=13.0
+export CGO_LDFLAGS := -mmacosx-version-min=13.0
+
+# libghostty-vt (static) is built from a pinned ghostty commit into third_party/ghostty-vt
+# by `make ghostty-vt` (scripts/ghostty-vt.sh holds the pins). The Go bindings find it via
+# pkg-config. The generated .pc hardcodes this absolute prefix, so the directory cannot
+# be moved after building.
+GHOSTTY_VT_PREFIX := $(CURDIR)/third_party/ghostty-vt
+GHOSTTY_VT_PC     := $(GHOSTTY_VT_PREFIX)/share/pkgconfig/libghostty-vt-static.pc
+export PKG_CONFIG_PATH := $(GHOSTTY_VT_PREFIX)/share/pkgconfig$(if $(PKG_CONFIG_PATH),:$(PKG_CONFIG_PATH))
 
 VERSION  ?= dev
 LDFLAGS  := -X github.com/awaumann/code-foundry/internal/version.Version=$(VERSION)
@@ -34,7 +44,7 @@ gen:
 	cd gui && $(WAILS3) generate bindings -clean=true -ts -i
 
 ## build: build the CLI/daemon binary to ./bin/code-foundry.
-build:
+build: ghostty-vt
 	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/code-foundry ./cmd/code-foundry
 
 ## check: everything CI runs.
@@ -48,7 +58,7 @@ gui-dist-stub:
 		echo '<!doctype html><p>Frontend not built. Run <code>wails3 build</code> in gui/.</p>' > $(FRONTEND)/dist/index.html; \
 	fi
 
-go-check: gui-dist-stub
+go-check: gui-dist-stub ghostty-vt
 	go vet ./...
 	go tool staticcheck ./...
 	go test -race ./...
@@ -74,12 +84,10 @@ gui-build: build
 gui-dev: build
 	cd gui && $(WAILS3) dev
 
-## ghostty-vt: RESERVED for Phase 1a. It will build libghostty-vt from a pinned ghostty
-## commit with zig 0.16.0 (NOT the Homebrew zig 0.17) into third_party/ghostty-vt
-## (gitignored). Not implemented yet.
+## ghostty-vt: build libghostty-vt from the pinned ghostty commit with zig 0.16.0 (both
+## downloaded into third_party/, gitignored). No-op once the pkg-config file exists.
 ghostty-vt:
-	@echo "ghostty-vt: not implemented yet (Phase 1a)" >&2
-	@exit 1
+	@./scripts/ghostty-vt.sh
 
 clean:
 	rm -rf bin gui/bin $(FRONTEND)/dist

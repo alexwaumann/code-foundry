@@ -79,14 +79,15 @@ func Run(ctx context.Context, opts Options) error {
 	started := time.Now()
 	events := st.bus
 	repoAPI := api.NewRepo(st.repo, events)
+	terminalAPI := api.NewTerminal(st.terminal)
 	commands := command.NewRegistry()
 	if err := all.Register(commands, all.Deps{
 		Daemon: command.DaemonInfo{
 			PID: os.Getpid(), Version: opts.Version, Started: started, Home: p.Home(), Socket: p.Socket(),
 		},
-		Emitter: command.BusEmitter{Bus: events},
-		// Terminal: <TerminalService handler from 1a>,
-		Repo: repoAPI,
+		Emitter:  command.BusEmitter{Bus: events},
+		Terminal: terminalAPI,
+		Repo:     repoAPI,
 	}); err != nil {
 		return fmt.Errorf("register commands: %w", err)
 	}
@@ -94,6 +95,7 @@ func Run(ctx context.Context, opts Options) error {
 		api.NewHealth(started, opts.Version).Route(),
 		api.NewCommand(commands).Route(),
 		api.NewUI(events).Route(),
+		terminalAPI.Route(),
 		repoAPI.Route(),
 	}
 	mux := http.NewServeMux()

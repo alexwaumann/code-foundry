@@ -10,6 +10,7 @@ import (
 	"github.com/awaumann/code-foundry/internal/db"
 	"github.com/awaumann/code-foundry/internal/paths"
 	"github.com/awaumann/code-foundry/internal/store/repo"
+	"github.com/awaumann/code-foundry/internal/store/terminal"
 )
 
 // stores is the daemon's shared infrastructure (bus, database) and its stores. Each
@@ -18,6 +19,8 @@ type stores struct {
 	bus  *bus.Bus
 	db   *sql.DB
 	repo *repo.Git
+	// terminal owns PTYs; closed first so every child gets hung up before the db goes.
+	terminal *terminal.Manager
 }
 
 // openStores opens the database, applies migrations, and starts every store. On
@@ -35,12 +38,18 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 	if s.repo, err = repo.Start(ctx, repo.Options{DB: s.db, Bus: s.bus, Log: log}); err != nil {
 		return nil, err
 	}
+	s.terminal = terminal.New(terminal.Options{Bus: s.bus, Logger: log.With("store", "terminal")})
 	return s, nil
 }
 
 // close stops the stores in reverse order of start, then closes the database.
 func (s *stores) close() error {
 	var errs []error
+	if s.terminal != nil {
+		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		errs = append(errs, s.terminal.Close(closeCtx))
+		cancel()
+	}
 	if s.repo != nil {
 		errs = append(errs, s.repo.Close())
 	}
