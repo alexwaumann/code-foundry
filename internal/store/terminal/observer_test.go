@@ -13,14 +13,14 @@ import (
 // observed records Observer events. The Observer appends under a mutex and never
 // blocks, as the contract requires.
 type observed struct {
-	mu     sync.Mutex
-	output bytes.Buffer
-	titles []string
-	alts   []bool
+	mu       sync.Mutex
+	output   bytes.Buffer
+	titles   []string
+	alts     []bool
 	exit     *Exit
 	attached []int
 	order    []string // event kinds in delivery order
-	ids    map[string]bool
+	ids      map[string]bool
 }
 
 func (o *observed) observer(id string, ev ObserveEvent) {

@@ -82,7 +82,7 @@ func TestSessionCommands(t *testing.T) {
 			wantReqs: []proto.Message{&v1.ListSessionsRequest{}}, wantIn: []string{"s1", "n", "disconnected", "unspecified", "closed"}},
 		{name: "list shows the status reason of a live session", cmd: "session.list",
 			current: &v1.Session{Id: "s2", Name: "m", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION, StatusReason: "finished", DisconnectReason: "exited"},
-			wantIn: []string{"s2", "m", "connected", "needs_attention", "finished"}},
+			wantIn:  []string{"s2", "m", "connected", "needs_attention", "finished"}},
 		{name: "backend error passes through", cmd: "session.close", args: map[string]string{"id": "s5"},
 			backendErr: connect.NewError(connect.CodeNotFound, errors.New("nope")), wantCode: connect.CodeNotFound},
 	}

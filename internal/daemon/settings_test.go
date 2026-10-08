@@ -57,7 +57,9 @@ func openSettings(t *testing.T) *settings.Store {
 func TestApplySettings(t *testing.T) {
 	st := openSettings(t)
 	reg := command.NewRegistry()
-	noop := func(context.Context, command.Context, command.Args) (command.Result, error) { return command.Result{}, nil }
+	noop := func(context.Context, command.Context, command.Args) (command.Result, error) {
+		return command.Result{}, nil
+	}
 	if err := reg.RegisterAll(
 		command.Command{Name: "session.new", Title: "New Session", Category: "Session", Keybindings: []string{"cmd+n"}, Run: noop,
 			Args: []command.ArgSpec{
