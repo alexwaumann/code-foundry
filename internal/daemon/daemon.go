@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/awaumann/code-foundry/internal/api"
+	"github.com/awaumann/code-foundry/internal/bus"
 	"github.com/awaumann/code-foundry/internal/paths"
 	"github.com/awaumann/code-foundry/internal/version"
 )
@@ -69,8 +70,15 @@ func Run(ctx context.Context, opts Options) error {
 	defer stop()
 
 	started := time.Now()
+	events := bus.New()
+	_, ghRoute, stopGh, err := startGh(ctx, log, p, events)
+	if err != nil {
+		return err
+	}
+	defer stopGh()
 	routes := []api.Route{
 		api.NewHealth(started, opts.Version).Route(),
+		ghRoute,
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {
