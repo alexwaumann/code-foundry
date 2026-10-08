@@ -20,10 +20,17 @@ type Info struct {
 func Get() Info {
 	info := Info{Version: Version, GoVersion: runtime.Version()}
 	if bi, ok := debug.ReadBuildInfo(); ok {
+		dirty := false
 		for _, s := range bi.Settings {
-			if s.Key == "vcs.revision" {
+			switch s.Key {
+			case "vcs.revision":
 				info.Commit = s.Value
+			case "vcs.modified":
+				dirty = s.Value == "true"
 			}
+		}
+		if dirty && info.Commit != "" {
+			info.Commit += "-dirty"
 		}
 	}
 	return info
