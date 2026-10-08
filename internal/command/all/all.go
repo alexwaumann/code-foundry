@@ -21,6 +21,9 @@ type Deps struct {
 	Repo command.RepoBackend
 	// Session backs session.*. Nil works like Terminal.
 	Session command.SessionBackend
+	// GitOps backs git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url.
+	// A nil Backend works like Terminal.
+	GitOps command.GitOpsDeps
 }
 
 // Register registers every domain's commands into r.
@@ -43,5 +46,6 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterTerminal(r, d.Terminal),
 		command.RegisterRepo(r, d.Repo),
 		command.RegisterSession(r, d.Session, d.Emitter),
+		command.RegisterGitOps(r, d.GitOps),
 	)
 }

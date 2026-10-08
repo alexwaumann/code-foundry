@@ -85,6 +85,7 @@ func Run(ctx context.Context, opts Options) error {
 	repoAPI := api.NewRepo(st.repo, events)
 	terminalAPI := api.NewTerminal(st.terminal)
 	sessionAPI := api.NewSession(st.session, events)
+	gitopsAPI := api.NewGitOps(st.gitops, events, ctx.Done())
 	commands := command.NewRegistry()
 	if err := all.Register(commands, all.Deps{
 		Daemon: command.DaemonInfo{
@@ -94,6 +95,10 @@ func Run(ctx context.Context, opts Options) error {
 		Terminal: terminalAPI,
 		Repo:     repoAPI,
 		Session:  sessionAPI,
+		GitOps: command.GitOpsDeps{
+			Backend:    gitopsAPI,
+			GitHubSlug: func(c command.Context) string { return st.gitops.GitHubSlug(c.ActiveRepoID, c.ActiveWorktreePath) },
+		},
 	}); err != nil {
 		return fmt.Errorf("register commands: %w", err)
 	}
@@ -105,7 +110,8 @@ func Run(ctx context.Context, opts Options) error {
 		sessionAPI.Route(),
 		repoAPI.Route(),
 		api.NewGh(st.gh, events, ctx.Done()).Route(),
-		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Session: st.session, Gh: st.gh, Done: ctx.Done()}).Route(),
+		gitopsAPI.Route(),
+		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Session: st.session, Gh: st.gh, GitOps: st.gitops, Done: ctx.Done()}).Route(),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {
