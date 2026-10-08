@@ -26,7 +26,9 @@ import (
 	"time"
 
 	"github.com/awaumann/code-foundry/internal/api"
+	"github.com/awaumann/code-foundry/internal/bus"
 	"github.com/awaumann/code-foundry/internal/paths"
+	"github.com/awaumann/code-foundry/internal/store/terminal"
 	"github.com/awaumann/code-foundry/internal/version"
 )
 
@@ -69,8 +71,19 @@ func Run(ctx context.Context, opts Options) error {
 	defer stop()
 
 	started := time.Now()
+	events := bus.New()
+	terminals := terminal.New(terminal.Options{Bus: events, Logger: log.With("store", "terminal")})
+	// Runs after the listeners have shut down (defers are LIFO): hang up every PTY.
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
+		defer cancel()
+		if err := terminals.Close(closeCtx); err != nil {
+			log.Warn("close terminals", "err", err)
+		}
+	}()
 	routes := []api.Route{
 		api.NewHealth(started, opts.Version).Route(),
+		api.NewTerminal(terminals).Route(),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {
