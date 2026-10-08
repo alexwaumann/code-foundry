@@ -1,0 +1,6 @@
+# Refuse package versions published less than 7 days ago (carried over from the Wails
+# template's .npmrc), reducing exposure to freshly compromised releases.
+minimumReleaseAge: 10080
+# The Wails JS runtime must match the Go module version (github.com/wailsapp/wails/v3).
+minimumReleaseAgeExclude:
+  - "@wailsio/runtime"
