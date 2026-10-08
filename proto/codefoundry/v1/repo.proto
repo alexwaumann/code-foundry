@@ -22,6 +22,12 @@ service RepoService {
   rpc Refresh(RefreshRepoRequest) returns (RefreshRepoResponse) {}
   // Watch streams repository and worktree changes.
   rpc Watch(WatchReposRequest) returns (stream RepoEvent) {}
+  // GetWorktreeDetail returns the files changed and commits on a worktree against its
+  // base (status.base_ref, else the local default branch). It computes on first call
+  // (or after 10 idle minutes) and serves the cached result otherwise. While a
+  // worktree has been asked about in the last 10 minutes, every status refresh of it
+  // recomputes the detail and announces changes as worktree_detail_updated.
+  rpc GetWorktreeDetail(GetWorktreeDetailRequest) returns (GetWorktreeDetailResponse) {}
 }
 
 message Repo {
@@ -147,7 +153,78 @@ message RepoEvent {
     WorktreeRef worktree_removed = 4;
     // Replaces everything.
     RepoSnapshot snapshot = 5;
+    // A worktree's detail changed; re-read it with GetWorktreeDetail.
+    WorktreeDetailRef worktree_detail_updated = 6;
   }
+}
+
+message WorktreeDetailRef {
+  string repo_id = 1;
+  string path = 2;
+  google.protobuf.Timestamp computed_at = 3;
+}
+
+message GetWorktreeDetailRequest {
+  string repo_id = 1;
+  string path = 2;
+}
+
+message GetWorktreeDetailResponse {
+  WorktreeDetail detail = 1;
+}
+
+// A worktree compared with its base.
+message WorktreeDetail {
+  string repo_id = 1;
+  string path = 2;
+  // The ref compared against ("origin/main", or "main" without a remote). Empty when
+  // there is none (or HEAD is unborn): files then hold only uncommitted changes and
+  // log is empty.
+  string base_ref = 3;
+  // `git merge-base HEAD <base_ref>`.
+  string merge_base = 4;
+  string head = 5;
+  // Changed files, sorted by path: committed on the branch (merge base..HEAD) and
+  // uncommitted (tracked changes against HEAD, and untracked files).
+  repeated FileChange files = 6;
+  // More than the cap (2000) changed; files holds the first ones by path.
+  bool files_truncated = 7;
+  // Commits on HEAD not on base_ref, newest first, at most 100.
+  repeated LogEntry log = 8;
+  // How many commits are on HEAD and not on base_ref.
+  int32 log_total = 9;
+  google.protobuf.Timestamp computed_at = 10;
+  // Non-empty when computing failed; the other fields are then from the last success
+  // (or empty).
+  string error = 11;
+}
+
+message FileChange {
+  string path = 1;
+  // Previous path for renames and copies.
+  string old_path = 2;
+  // One git status letter: A added, M modified, D deleted, R renamed, C copied,
+  // T type changed, U unmerged, ? untracked. For a file changed both on the branch and
+  // in the working tree, the working tree's letter.
+  string status = 3;
+  // Lines added and deleted from the merge base to the working tree (untracked files:
+  // their line count). Zero for binary files.
+  int32 added = 4;
+  int32 deleted = 5;
+  bool binary = 6;
+  // Changed in the working tree or index (not committed yet).
+  bool uncommitted = 7;
+  // An untracked directory git reports as one entry (path ends in "/").
+  bool is_dir = 8;
+}
+
+message LogEntry {
+  string sha = 1;
+  string short_sha = 2;
+  string subject = 3;
+  string author_name = 4;
+  string author_email = 5;
+  google.protobuf.Timestamp authored_at = 6;
 }
 
 message RepoSnapshot {

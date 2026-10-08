@@ -70,7 +70,7 @@ func (x UiIntent_Notify_Level) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use UiIntent_Notify_Level.Descriptor instead.
 func (UiIntent_Notify_Level) EnumDescriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{1, 4, 0}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{1, 5, 0}
 }
 
 type WatchIntentsRequest struct {
@@ -118,6 +118,7 @@ type UiIntent struct {
 	//	*UiIntent_OpenPalette_
 	//	*UiIntent_Notify_
 	//	*UiIntent_FocusSession_
+	//	*UiIntent_ShowView_
 	Intent        isUiIntent_Intent `protobuf_oneof:"intent"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -205,6 +206,15 @@ func (x *UiIntent) GetFocusSession() *UiIntent_FocusSession {
 	return nil
 }
 
+func (x *UiIntent) GetShowView() *UiIntent_ShowView {
+	if x != nil {
+		if x, ok := x.Intent.(*UiIntent_ShowView_); ok {
+			return x.ShowView
+		}
+	}
+	return nil
+}
+
 type isUiIntent_Intent interface {
 	isUiIntent_Intent()
 }
@@ -229,6 +239,10 @@ type UiIntent_FocusSession_ struct {
 	FocusSession *UiIntent_FocusSession `protobuf:"bytes,5,opt,name=focus_session,json=focusSession,proto3,oneof"`
 }
 
+type UiIntent_ShowView_ struct {
+	ShowView *UiIntent_ShowView `protobuf:"bytes,6,opt,name=show_view,json=showView,proto3,oneof"`
+}
+
 func (*UiIntent_FocusTerminal_) isUiIntent_Intent() {}
 
 func (*UiIntent_FocusRepo_) isUiIntent_Intent() {}
@@ -238,6 +252,8 @@ func (*UiIntent_OpenPalette_) isUiIntent_Intent() {}
 func (*UiIntent_Notify_) isUiIntent_Intent() {}
 
 func (*UiIntent_FocusSession_) isUiIntent_Intent() {}
+
+func (*UiIntent_ShowView_) isUiIntent_Intent() {}
 
 type EmitIntentRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -328,6 +344,52 @@ func (x *EmitIntentResponse) GetDelivered() uint32 {
 	return 0
 }
 
+// Switch the content pane to a named top-level view. Names: "pullrequests".
+// Unknown names are ignored.
+type UiIntent_ShowView struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UiIntent_ShowView) Reset() {
+	*x = UiIntent_ShowView{}
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UiIntent_ShowView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UiIntent_ShowView) ProtoMessage() {}
+
+func (x *UiIntent_ShowView) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UiIntent_ShowView.ProtoReflect.Descriptor instead.
+func (*UiIntent_ShowView) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{1, 0}
+}
+
+func (x *UiIntent_ShowView) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 type UiIntent_FocusSession struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
@@ -337,7 +399,7 @@ type UiIntent_FocusSession struct {
 
 func (x *UiIntent_FocusSession) Reset() {
 	*x = UiIntent_FocusSession{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -349,7 +411,7 @@ func (x *UiIntent_FocusSession) String() string {
 func (*UiIntent_FocusSession) ProtoMessage() {}
 
 func (x *UiIntent_FocusSession) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -362,7 +424,7 @@ func (x *UiIntent_FocusSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent_FocusSession.ProtoReflect.Descriptor instead.
 func (*UiIntent_FocusSession) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{1, 0}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{1, 1}
 }
 
 func (x *UiIntent_FocusSession) GetSessionId() string {
@@ -381,7 +443,7 @@ type UiIntent_FocusTerminal struct {
 
 func (x *UiIntent_FocusTerminal) Reset() {
 	*x = UiIntent_FocusTerminal{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -393,7 +455,7 @@ func (x *UiIntent_FocusTerminal) String() string {
 func (*UiIntent_FocusTerminal) ProtoMessage() {}
 
 func (x *UiIntent_FocusTerminal) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -406,7 +468,7 @@ func (x *UiIntent_FocusTerminal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent_FocusTerminal.ProtoReflect.Descriptor instead.
 func (*UiIntent_FocusTerminal) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{1, 1}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{1, 2}
 }
 
 func (x *UiIntent_FocusTerminal) GetTerminalId() string {
@@ -426,7 +488,7 @@ type UiIntent_FocusRepo struct {
 
 func (x *UiIntent_FocusRepo) Reset() {
 	*x = UiIntent_FocusRepo{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -438,7 +500,7 @@ func (x *UiIntent_FocusRepo) String() string {
 func (*UiIntent_FocusRepo) ProtoMessage() {}
 
 func (x *UiIntent_FocusRepo) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -451,7 +513,7 @@ func (x *UiIntent_FocusRepo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent_FocusRepo.ProtoReflect.Descriptor instead.
 func (*UiIntent_FocusRepo) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{1, 2}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{1, 3}
 }
 
 func (x *UiIntent_FocusRepo) GetRepoId() string {
@@ -478,7 +540,7 @@ type UiIntent_OpenPalette struct {
 
 func (x *UiIntent_OpenPalette) Reset() {
 	*x = UiIntent_OpenPalette{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -490,7 +552,7 @@ func (x *UiIntent_OpenPalette) String() string {
 func (*UiIntent_OpenPalette) ProtoMessage() {}
 
 func (x *UiIntent_OpenPalette) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -503,7 +565,7 @@ func (x *UiIntent_OpenPalette) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent_OpenPalette.ProtoReflect.Descriptor instead.
 func (*UiIntent_OpenPalette) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{1, 3}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{1, 4}
 }
 
 func (x *UiIntent_OpenPalette) GetQuery() string {
@@ -524,7 +586,7 @@ type UiIntent_Notify struct {
 
 func (x *UiIntent_Notify) Reset() {
 	*x = UiIntent_Notify{}
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -536,7 +598,7 @@ func (x *UiIntent_Notify) String() string {
 func (*UiIntent_Notify) ProtoMessage() {}
 
 func (x *UiIntent_Notify) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ui_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_ui_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -549,7 +611,7 @@ func (x *UiIntent_Notify) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiIntent_Notify.ProtoReflect.Descriptor instead.
 func (*UiIntent_Notify) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{1, 4}
+	return file_codefoundry_v1_ui_proto_rawDescGZIP(), []int{1, 5}
 }
 
 func (x *UiIntent_Notify) GetLevel() UiIntent_Notify_Level {
@@ -578,14 +640,17 @@ var File_codefoundry_v1_ui_proto protoreflect.FileDescriptor
 const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\n" +
 	"\x17codefoundry/v1/ui.proto\x12\x0ecodefoundry.v1\"\x15\n" +
-	"\x13WatchIntentsRequest\"\x95\x06\n" +
+	"\x13WatchIntentsRequest\"\xf7\x06\n" +
 	"\bUiIntent\x12O\n" +
 	"\x0efocus_terminal\x18\x01 \x01(\v2&.codefoundry.v1.UiIntent.FocusTerminalH\x00R\rfocusTerminal\x12C\n" +
 	"\n" +
 	"focus_repo\x18\x02 \x01(\v2\".codefoundry.v1.UiIntent.FocusRepoH\x00R\tfocusRepo\x12I\n" +
 	"\fopen_palette\x18\x03 \x01(\v2$.codefoundry.v1.UiIntent.OpenPaletteH\x00R\vopenPalette\x129\n" +
 	"\x06notify\x18\x04 \x01(\v2\x1f.codefoundry.v1.UiIntent.NotifyH\x00R\x06notify\x12L\n" +
-	"\rfocus_session\x18\x05 \x01(\v2%.codefoundry.v1.UiIntent.FocusSessionH\x00R\ffocusSession\x1a-\n" +
+	"\rfocus_session\x18\x05 \x01(\v2%.codefoundry.v1.UiIntent.FocusSessionH\x00R\ffocusSession\x12@\n" +
+	"\tshow_view\x18\x06 \x01(\v2!.codefoundry.v1.UiIntent.ShowViewH\x00R\bshowView\x1a\x1e\n" +
+	"\bShowView\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x1a-\n" +
 	"\fFocusSession\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x1a0\n" +
@@ -630,36 +695,38 @@ func file_codefoundry_v1_ui_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_ui_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_ui_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_codefoundry_v1_ui_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_codefoundry_v1_ui_proto_goTypes = []any{
 	(UiIntent_Notify_Level)(0),     // 0: codefoundry.v1.UiIntent.Notify.Level
 	(*WatchIntentsRequest)(nil),    // 1: codefoundry.v1.WatchIntentsRequest
 	(*UiIntent)(nil),               // 2: codefoundry.v1.UiIntent
 	(*EmitIntentRequest)(nil),      // 3: codefoundry.v1.EmitIntentRequest
 	(*EmitIntentResponse)(nil),     // 4: codefoundry.v1.EmitIntentResponse
-	(*UiIntent_FocusSession)(nil),  // 5: codefoundry.v1.UiIntent.FocusSession
-	(*UiIntent_FocusTerminal)(nil), // 6: codefoundry.v1.UiIntent.FocusTerminal
-	(*UiIntent_FocusRepo)(nil),     // 7: codefoundry.v1.UiIntent.FocusRepo
-	(*UiIntent_OpenPalette)(nil),   // 8: codefoundry.v1.UiIntent.OpenPalette
-	(*UiIntent_Notify)(nil),        // 9: codefoundry.v1.UiIntent.Notify
+	(*UiIntent_ShowView)(nil),      // 5: codefoundry.v1.UiIntent.ShowView
+	(*UiIntent_FocusSession)(nil),  // 6: codefoundry.v1.UiIntent.FocusSession
+	(*UiIntent_FocusTerminal)(nil), // 7: codefoundry.v1.UiIntent.FocusTerminal
+	(*UiIntent_FocusRepo)(nil),     // 8: codefoundry.v1.UiIntent.FocusRepo
+	(*UiIntent_OpenPalette)(nil),   // 9: codefoundry.v1.UiIntent.OpenPalette
+	(*UiIntent_Notify)(nil),        // 10: codefoundry.v1.UiIntent.Notify
 }
 var file_codefoundry_v1_ui_proto_depIdxs = []int32{
-	6, // 0: codefoundry.v1.UiIntent.focus_terminal:type_name -> codefoundry.v1.UiIntent.FocusTerminal
-	7, // 1: codefoundry.v1.UiIntent.focus_repo:type_name -> codefoundry.v1.UiIntent.FocusRepo
-	8, // 2: codefoundry.v1.UiIntent.open_palette:type_name -> codefoundry.v1.UiIntent.OpenPalette
-	9, // 3: codefoundry.v1.UiIntent.notify:type_name -> codefoundry.v1.UiIntent.Notify
-	5, // 4: codefoundry.v1.UiIntent.focus_session:type_name -> codefoundry.v1.UiIntent.FocusSession
-	2, // 5: codefoundry.v1.EmitIntentRequest.intent:type_name -> codefoundry.v1.UiIntent
-	0, // 6: codefoundry.v1.UiIntent.Notify.level:type_name -> codefoundry.v1.UiIntent.Notify.Level
-	1, // 7: codefoundry.v1.UiService.WatchIntents:input_type -> codefoundry.v1.WatchIntentsRequest
-	3, // 8: codefoundry.v1.UiService.Emit:input_type -> codefoundry.v1.EmitIntentRequest
-	2, // 9: codefoundry.v1.UiService.WatchIntents:output_type -> codefoundry.v1.UiIntent
-	4, // 10: codefoundry.v1.UiService.Emit:output_type -> codefoundry.v1.EmitIntentResponse
-	9, // [9:11] is the sub-list for method output_type
-	7, // [7:9] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	7,  // 0: codefoundry.v1.UiIntent.focus_terminal:type_name -> codefoundry.v1.UiIntent.FocusTerminal
+	8,  // 1: codefoundry.v1.UiIntent.focus_repo:type_name -> codefoundry.v1.UiIntent.FocusRepo
+	9,  // 2: codefoundry.v1.UiIntent.open_palette:type_name -> codefoundry.v1.UiIntent.OpenPalette
+	10, // 3: codefoundry.v1.UiIntent.notify:type_name -> codefoundry.v1.UiIntent.Notify
+	6,  // 4: codefoundry.v1.UiIntent.focus_session:type_name -> codefoundry.v1.UiIntent.FocusSession
+	5,  // 5: codefoundry.v1.UiIntent.show_view:type_name -> codefoundry.v1.UiIntent.ShowView
+	2,  // 6: codefoundry.v1.EmitIntentRequest.intent:type_name -> codefoundry.v1.UiIntent
+	0,  // 7: codefoundry.v1.UiIntent.Notify.level:type_name -> codefoundry.v1.UiIntent.Notify.Level
+	1,  // 8: codefoundry.v1.UiService.WatchIntents:input_type -> codefoundry.v1.WatchIntentsRequest
+	3,  // 9: codefoundry.v1.UiService.Emit:input_type -> codefoundry.v1.EmitIntentRequest
+	2,  // 10: codefoundry.v1.UiService.WatchIntents:output_type -> codefoundry.v1.UiIntent
+	4,  // 11: codefoundry.v1.UiService.Emit:output_type -> codefoundry.v1.EmitIntentResponse
+	10, // [10:12] is the sub-list for method output_type
+	8,  // [8:10] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_ui_proto_init() }
@@ -673,6 +740,7 @@ func file_codefoundry_v1_ui_proto_init() {
 		(*UiIntent_OpenPalette_)(nil),
 		(*UiIntent_Notify_)(nil),
 		(*UiIntent_FocusSession_)(nil),
+		(*UiIntent_ShowView_)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -680,7 +748,7 @@ func file_codefoundry_v1_ui_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_ui_proto_rawDesc), len(file_codefoundry_v1_ui_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

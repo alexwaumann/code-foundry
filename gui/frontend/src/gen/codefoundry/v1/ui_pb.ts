@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/ui.proto.
  */
 export const file_codefoundry_v1_ui: GenFile = /*@__PURE__*/
-  fileDesc("Chdjb2RlZm91bmRyeS92MS91aS5wcm90bxIOY29kZWZvdW5kcnkudjEiFQoTV2F0Y2hJbnRlbnRzUmVxdWVzdCKQBQoIVWlJbnRlbnQSQAoOZm9jdXNfdGVybWluYWwYASABKAsyJi5jb2RlZm91bmRyeS52MS5VaUludGVudC5Gb2N1c1Rlcm1pbmFsSAASOAoKZm9jdXNfcmVwbxgCIAEoCzIiLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzUmVwb0gAEjwKDG9wZW5fcGFsZXR0ZRgDIAEoCzIkLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk9wZW5QYWxldHRlSAASMQoGbm90aWZ5GAQgASgLMh8uY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuTm90aWZ5SAASPgoNZm9jdXNfc2Vzc2lvbhgFIAEoCzIlLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzU2Vzc2lvbkgAGiIKDEZvY3VzU2Vzc2lvbhISCgpzZXNzaW9uX2lkGAEgASgJGiQKDUZvY3VzVGVybWluYWwSEwoLdGVybWluYWxfaWQYASABKAkaMwoJRm9jdXNSZXBvEg8KB3JlcG9faWQYASABKAkSFQoNd29ya3RyZWVfcGF0aBgCIAEoCRocCgtPcGVuUGFsZXR0ZRINCgVxdWVyeRgBIAEoCRqvAQoGTm90aWZ5EjQKBWxldmVsGAEgASgOMiUuY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuTm90aWZ5LkxldmVsEg0KBXRpdGxlGAIgASgJEgwKBGJvZHkYAyABKAkiUgoFTGV2ZWwSFQoRTEVWRUxfVU5TUEVDSUZJRUQQABIOCgpMRVZFTF9JTkZPEAESEQoNTEVWRUxfV0FSTklORxACEg8KC0xFVkVMX0VSUk9SEANCCAoGaW50ZW50Ij0KEUVtaXRJbnRlbnRSZXF1ZXN0EigKBmludGVudBgBIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50IicKEkVtaXRJbnRlbnRSZXNwb25zZRIRCglkZWxpdmVyZWQYASABKA0yrwEKCVVpU2VydmljZRJRCgxXYXRjaEludGVudHMSIy5jb2RlZm91bmRyeS52MS5XYXRjaEludGVudHNSZXF1ZXN0GhguY29kZWZvdW5kcnkudjEuVWlJbnRlbnQiADABEk8KBEVtaXQSIS5jb2RlZm91bmRyeS52MS5FbWl0SW50ZW50UmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLkVtaXRJbnRlbnRSZXNwb25zZSIAQrwBChJjb20uY29kZWZvdW5kcnkudjFCB1VpUHJvdG9QAVpEZ2l0aHViLmNvbS9hd2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw");
+  fileDesc("Chdjb2RlZm91bmRyeS92MS91aS5wcm90bxIOY29kZWZvdW5kcnkudjEiFQoTV2F0Y2hJbnRlbnRzUmVxdWVzdCLiBQoIVWlJbnRlbnQSQAoOZm9jdXNfdGVybWluYWwYASABKAsyJi5jb2RlZm91bmRyeS52MS5VaUludGVudC5Gb2N1c1Rlcm1pbmFsSAASOAoKZm9jdXNfcmVwbxgCIAEoCzIiLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzUmVwb0gAEjwKDG9wZW5fcGFsZXR0ZRgDIAEoCzIkLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk9wZW5QYWxldHRlSAASMQoGbm90aWZ5GAQgASgLMh8uY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuTm90aWZ5SAASPgoNZm9jdXNfc2Vzc2lvbhgFIAEoCzIlLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzU2Vzc2lvbkgAEjYKCXNob3dfdmlldxgGIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LlNob3dWaWV3SAAaGAoIU2hvd1ZpZXcSDAoEbmFtZRgBIAEoCRoiCgxGb2N1c1Nlc3Npb24SEgoKc2Vzc2lvbl9pZBgBIAEoCRokCg1Gb2N1c1Rlcm1pbmFsEhMKC3Rlcm1pbmFsX2lkGAEgASgJGjMKCUZvY3VzUmVwbxIPCgdyZXBvX2lkGAEgASgJEhUKDXdvcmt0cmVlX3BhdGgYAiABKAkaHAoLT3BlblBhbGV0dGUSDQoFcXVlcnkYASABKAkarwEKBk5vdGlmeRI0CgVsZXZlbBgBIAEoDjIlLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk5vdGlmeS5MZXZlbBINCgV0aXRsZRgCIAEoCRIMCgRib2R5GAMgASgJIlIKBUxldmVsEhUKEUxFVkVMX1VOU1BFQ0lGSUVEEAASDgoKTEVWRUxfSU5GTxABEhEKDUxFVkVMX1dBUk5JTkcQAhIPCgtMRVZFTF9FUlJPUhADQggKBmludGVudCI9ChFFbWl0SW50ZW50UmVxdWVzdBIoCgZpbnRlbnQYASABKAsyGC5jb2RlZm91bmRyeS52MS5VaUludGVudCInChJFbWl0SW50ZW50UmVzcG9uc2USEQoJZGVsaXZlcmVkGAEgASgNMq8BCglVaVNlcnZpY2USUQoMV2F0Y2hJbnRlbnRzEiMuY29kZWZvdW5kcnkudjEuV2F0Y2hJbnRlbnRzUmVxdWVzdBoYLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50IgAwARJPCgRFbWl0EiEuY29kZWZvdW5kcnkudjEuRW1pdEludGVudFJlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5FbWl0SW50ZW50UmVzcG9uc2UiAEK8AQoSY29tLmNvZGVmb3VuZHJ5LnYxQgdVaVByb3RvUAFaRGdpdGh1Yi5jb20vYXdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
 
 /**
  * @generated from message codefoundry.v1.WatchIntentsRequest
@@ -62,6 +62,12 @@ export type UiIntent = Message<"codefoundry.v1.UiIntent"> & {
      */
     value: UiIntent_FocusSession;
     case: "focusSession";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.UiIntent.ShowView show_view = 6;
+     */
+    value: UiIntent_ShowView;
+    case: "showView";
   } | { case: undefined; value?: undefined };
 };
 
@@ -71,6 +77,26 @@ export type UiIntent = Message<"codefoundry.v1.UiIntent"> & {
  */
 export const UiIntentSchema: GenMessage<UiIntent> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_ui, 1);
+
+/**
+ * Switch the content pane to a named top-level view. Names: "pullrequests".
+ * Unknown names are ignored.
+ *
+ * @generated from message codefoundry.v1.UiIntent.ShowView
+ */
+export type UiIntent_ShowView = Message<"codefoundry.v1.UiIntent.ShowView"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.UiIntent.ShowView.
+ * Use `create(UiIntent_ShowViewSchema)` to create a new message.
+ */
+export const UiIntent_ShowViewSchema: GenMessage<UiIntent_ShowView> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_ui, 1, 0);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.FocusSession
@@ -87,7 +113,7 @@ export type UiIntent_FocusSession = Message<"codefoundry.v1.UiIntent.FocusSessio
  * Use `create(UiIntent_FocusSessionSchema)` to create a new message.
  */
 export const UiIntent_FocusSessionSchema: GenMessage<UiIntent_FocusSession> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 0);
+  messageDesc(file_codefoundry_v1_ui, 1, 1);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.FocusTerminal
@@ -104,7 +130,7 @@ export type UiIntent_FocusTerminal = Message<"codefoundry.v1.UiIntent.FocusTermi
  * Use `create(UiIntent_FocusTerminalSchema)` to create a new message.
  */
 export const UiIntent_FocusTerminalSchema: GenMessage<UiIntent_FocusTerminal> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 1);
+  messageDesc(file_codefoundry_v1_ui, 1, 2);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.FocusRepo
@@ -126,7 +152,7 @@ export type UiIntent_FocusRepo = Message<"codefoundry.v1.UiIntent.FocusRepo"> & 
  * Use `create(UiIntent_FocusRepoSchema)` to create a new message.
  */
 export const UiIntent_FocusRepoSchema: GenMessage<UiIntent_FocusRepo> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 2);
+  messageDesc(file_codefoundry_v1_ui, 1, 3);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.OpenPalette
@@ -145,7 +171,7 @@ export type UiIntent_OpenPalette = Message<"codefoundry.v1.UiIntent.OpenPalette"
  * Use `create(UiIntent_OpenPaletteSchema)` to create a new message.
  */
 export const UiIntent_OpenPaletteSchema: GenMessage<UiIntent_OpenPalette> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 3);
+  messageDesc(file_codefoundry_v1_ui, 1, 4);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.Notify
@@ -172,7 +198,7 @@ export type UiIntent_Notify = Message<"codefoundry.v1.UiIntent.Notify"> & {
  * Use `create(UiIntent_NotifySchema)` to create a new message.
  */
 export const UiIntent_NotifySchema: GenMessage<UiIntent_Notify> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 4);
+  messageDesc(file_codefoundry_v1_ui, 1, 5);
 
 /**
  * @generated from enum codefoundry.v1.UiIntent.Notify.Level
@@ -203,7 +229,7 @@ export enum UiIntent_Notify_Level {
  * Describes the enum codefoundry.v1.UiIntent.Notify.Level.
  */
 export const UiIntent_Notify_LevelSchema: GenEnum<UiIntent_Notify_Level> = /*@__PURE__*/
-  enumDesc(file_codefoundry_v1_ui, 1, 4, 0);
+  enumDesc(file_codefoundry_v1_ui, 1, 5, 0);
 
 /**
  * @generated from message codefoundry.v1.EmitIntentRequest
