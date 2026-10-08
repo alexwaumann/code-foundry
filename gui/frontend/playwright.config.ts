@@ -8,6 +8,8 @@ export const VITE_PORT = 9255;
 
 export default defineConfig({
   testDir: "e2e",
+  // e2e/live.spec.ts drives a real daemon: playwright.live.config.ts (pnpm run e2e:live).
+  testIgnore: "live.spec.ts",
   timeout: 20_000,
   expect: { timeout: 5_000 },
   // Tests share one mock daemon and reset it in beforeEach.

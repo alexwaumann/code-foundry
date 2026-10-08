@@ -14,7 +14,8 @@
     "mock": "tsx mock/server.ts",
     "mock:emit": "tsx mock/emit.ts",
     "dev:mock": "vite --mode mock",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:live": "playwright test -c playwright.live.config.ts"
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.16.0",
