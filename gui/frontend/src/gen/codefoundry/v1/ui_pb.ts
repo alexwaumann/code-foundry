@@ -79,7 +79,8 @@ export const UiIntentSchema: GenMessage<UiIntent> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_ui, 1);
 
 /**
- * ShowView opens a named GUI view: "help", "settings".
+ * ShowView opens a named GUI view: "help", "settings", "pullrequests".
+ * Unknown names are ignored.
  *
  * @generated from message codefoundry.v1.UiIntent.ShowView
  */

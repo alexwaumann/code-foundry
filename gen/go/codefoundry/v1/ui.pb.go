@@ -344,7 +344,8 @@ func (x *EmitIntentResponse) GetDelivered() uint32 {
 	return 0
 }
 
-// ShowView opens a named GUI view: "help", "settings".
+// ShowView opens a named GUI view: "help", "settings", "pullrequests".
+// Unknown names are ignored.
 type UiIntent_ShowView struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`

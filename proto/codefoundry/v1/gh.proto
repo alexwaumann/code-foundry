@@ -38,6 +38,28 @@ service GhService {
   rpc Untrack(UntrackGhRepoRequest) returns (UntrackGhRepoResponse) {}
   // Watch streams change notifications. Clients re-read with the List/Get RPCs.
   rpc Watch(WatchGhRequest) returns (stream GhEvent) {}
+  // GetDashboard returns the viewer's pull request dashboards (open PRs they authored,
+  // PRs awaiting their review, PRs merged in the last 7 days involving them) and their
+  // monthly stats across GitHub. Served from the last poll (every 2 minutes; stats
+  // every 15). The lists hold only tracked repositories unless include_untracked.
+  rpc GetDashboard(GetDashboardRequest) returns (GetDashboardResponse) {}
+  // GetRepoActivity returns the viewer's monthly stats in one repository, its default
+  // branch's CI, and the dashboard's recently merged PRs in it. Served from cache.
+  rpc GetRepoActivity(GetRepoActivityRequest) returns (GetRepoActivityResponse) {}
+  // GetBranchPullRequests returns the viewer's pull requests (any state) whose head is
+  // head_ref in the repository itself, from cache, and keeps that branch polled (with
+  // the PR list cadence) for 10 minutes after the last call. A first call returns an
+  // empty list with fetched_at unset; a branch_pull_requests_updated event follows.
+  rpc GetBranchPullRequests(GetBranchPullRequestsRequest) returns (GetBranchPullRequestsResponse) {}
+}
+
+// GitHub's pull request state. Set on pull requests from GetDashboard and
+// GetBranchPullRequests; the open-PR list leaves it unspecified.
+enum PullRequestState {
+  PULL_REQUEST_STATE_UNSPECIFIED = 0;
+  PULL_REQUEST_STATE_OPEN = 1;
+  PULL_REQUEST_STATE_CLOSED = 2;
+  PULL_REQUEST_STATE_MERGED = 3;
 }
 
 // GitHub's pull request review decision.
@@ -153,6 +175,10 @@ message PullRequest {
   string url = 14;
   google.protobuf.Timestamp updated_at = 15;
   CheckRollup checks = 16;
+  // Set by GetDashboard and GetBranchPullRequests.
+  PullRequestState state = 17;
+  google.protobuf.Timestamp created_at = 18;
+  google.protobuf.Timestamp merged_at = 19;
 }
 
 message CheckRun {
@@ -248,6 +274,29 @@ message GhEvent {
   oneof event {
     PullRequestsUpdated pull_requests_updated = 1;
     ViewerUpdated viewer_updated = 2;
+    DashboardUpdated dashboard_updated = 3;
+    RepoActivityUpdated repo_activity_updated = 4;
+    BranchPullRequestsUpdated branch_pull_requests_updated = 5;
+  }
+
+  // The dashboards or the global monthly stats were fetched (every poll) or their
+  // fetch status changed. Re-read with GetDashboard.
+  message DashboardUpdated {
+    google.protobuf.Timestamp fetched_at = 1;
+  }
+
+  // A repository's monthly stats were fetched, or its default branch CI changed.
+  // Re-read with GetRepoActivity.
+  message RepoActivityUpdated {
+    string repo_slug = 1;
+    google.protobuf.Timestamp fetched_at = 2;
+  }
+
+  // A watched branch was polled. Re-read with GetBranchPullRequests.
+  message BranchPullRequestsUpdated {
+    string repo_slug = 1;
+    string head_ref = 2;
+    google.protobuf.Timestamp fetched_at = 3;
   }
 
   // A repository's pull request list (or its fetch status) changed.
@@ -260,4 +309,90 @@ message GhEvent {
   message ViewerUpdated {
     google.protobuf.Timestamp fetched_at = 1;
   }
+}
+
+// One calendar month (in the daemon's time zone) of the viewer's activity.
+message MonthActivity {
+  // "YYYY-MM".
+  string month = 1;
+  // Commits authored by the viewer (on default branches; see commits_source).
+  int32 commits = 2;
+  // Pull requests authored by the viewer and merged in the month.
+  int32 merged = 3;
+}
+
+message ActivityStats {
+  MonthActivity this_month = 1;
+  MonthActivity last_month = 2;
+  // Where commit counts came from: "search" (REST search/commits, or the default
+  // branch's history for one repository) or "contributions" (contributionsCollection,
+  // the fallback when commit search fails; buckets by UTC day).
+  string commits_source = 3;
+  google.protobuf.Timestamp fetched_at = 4;
+  string last_error = 5;
+}
+
+message GetDashboardRequest {
+  // Keep pull requests from every repository, not only tracked ones.
+  bool include_untracked = 1;
+}
+
+message GetDashboardResponse {
+  // Unset until the viewer is known.
+  GhViewer viewer = 1;
+  bool authenticated = 2;
+  // Open pull requests authored by the viewer, most recently updated first.
+  repeated PullRequest authored = 3;
+  // Open pull requests requesting the viewer's review (directly or via a team).
+  repeated PullRequest review_requested = 4;
+  // Pull requests merged in the last 7 days that the viewer authored, reviewed, or is
+  // assigned to, most recently updated first.
+  repeated PullRequest recently_merged = 5;
+  // Global (all of GitHub) monthly stats.
+  ActivityStats stats = 6;
+  // When the dashboards were last fetched; unset if never.
+  google.protobuf.Timestamp fetched_at = 7;
+  string last_error = 8;
+  // The tracked repositories the lists were filtered to (lower case).
+  repeated string tracked_slugs = 9;
+}
+
+message GetRepoActivityRequest {
+  string repo_slug = 1;
+}
+
+// The default branch's head commit and its checks.
+message DefaultBranchStatus {
+  string branch = 1;
+  string sha = 2;
+  // Commit message headline.
+  string headline = 3;
+  google.protobuf.Timestamp committed_at = 4;
+  CheckRollup rollup = 5;
+  // Failed checks (failure, error, cancelled, timed out, action required, startup
+  // failure), failed first by workflow and name.
+  repeated CheckRun failing = 6;
+  google.protobuf.Timestamp fetched_at = 7;
+}
+
+message GetRepoActivityResponse {
+  string repo_slug = 1;
+  bool tracked = 2;
+  // The viewer's activity in this repository.
+  ActivityStats stats = 3;
+  // Unset until the repository's PR list was polled once.
+  DefaultBranchStatus default_branch = 4;
+  // The dashboard's recently merged pull requests in this repository.
+  repeated PullRequest recently_merged = 5;
+}
+
+message GetBranchPullRequestsRequest {
+  string repo_slug = 1;
+  string head_ref = 2;
+}
+
+message GetBranchPullRequestsResponse {
+  repeated PullRequest pull_requests = 1;
+  google.protobuf.Timestamp fetched_at = 2;
+  string last_error = 3;
 }

@@ -163,4 +163,7 @@ type Store interface {
 	RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) error
 	// Refresh reconciles one repo (or all when id is empty) and waits for its status.
 	Refresh(ctx context.Context, id string) error
+	// WorktreeDetail returns the files changed and commits on a worktree against its
+	// base (detail.go), computing them if needed.
+	WorktreeDetail(ctx context.Context, repoID, path string) (WorktreeDetail, error)
 }

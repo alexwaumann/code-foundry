@@ -38,3 +38,12 @@ CREATE TABLE IF NOT EXISTS gh_ref_checks (
 
 CREATE INDEX IF NOT EXISTS gh_pull_request_details_fetched_at ON gh_pull_request_details (fetched_at);
 CREATE INDEX IF NOT EXISTS gh_ref_checks_fetched_at ON gh_ref_checks (fetched_at);
+
+-- Phase 3a activity (activity_cache.go): the viewer dashboards ("dashboard"), global
+-- monthly stats ("stats"), per-repository stats ("repo_stats:<slug>") and default-branch
+-- CI ("default_branch:<slug>"), and per-branch pull requests ("branch:<slug>:<head>").
+CREATE TABLE IF NOT EXISTS gh_activity (
+  key        TEXT    PRIMARY KEY,
+  fetched_at INTEGER NOT NULL,
+  payload    TEXT    NOT NULL
+);

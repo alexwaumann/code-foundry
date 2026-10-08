@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -101,6 +102,8 @@ func describe(ev *v1.Event) string {
 			return "repo.updated " + r.RepoUpdated.GetName()
 		case *v1.RepoEvent_RepoRemovedId:
 			return "repo.removed"
+		case *v1.RepoEvent_WorktreeDetailUpdated:
+			return "repo.detail " + r.WorktreeDetailUpdated.GetPath()
 		default:
 			return "repo.other"
 		}
@@ -123,6 +126,15 @@ func describe(ev *v1.Event) string {
 	case *v1.Event_Gh:
 		if p := e.Gh.GetPullRequestsUpdated(); p != nil {
 			return "gh.prs " + p.GetRepoSlug()
+		}
+		if e.Gh.GetDashboardUpdated() != nil {
+			return "gh.dashboard"
+		}
+		if p := e.Gh.GetRepoActivityUpdated(); p != nil {
+			return "gh.activity " + p.GetRepoSlug()
+		}
+		if p := e.Gh.GetBranchPullRequestsUpdated(); p != nil {
+			return "gh.branch " + p.GetRepoSlug() + " " + p.GetHeadRef()
 		}
 		return "gh.viewer"
 	case *v1.Event_Gitops:
@@ -176,6 +188,7 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 		"terminal.updated " + t2.ID,
 		"session.snapshot(1)",
 		"gh.viewer",
+		"gh.dashboard",
 		"gh.prs o/a",
 		"gh.prs o/b",
 		"gitops.snapshot(1)",
@@ -214,6 +227,20 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 		if got := describe(s.next()); got != w {
 			t.Fatalf("got %q, want %q", got, w)
 		}
+	}
+	// Phase 3a events.
+	f.gh.SetDashboard(gh.Dashboard{})
+	f.gh.SetActivity("o/a", gh.RepoActivity{})
+	f.gh.SetBranchPullRequests(gh.BranchPullRequests{Slug: "o/a", HeadRef: "feat"})
+	// Separate bus topics: order across them is not kept.
+	got := []string{describe(s.next()), describe(s.next()), describe(s.next())}
+	slices.Sort(got)
+	if want := []string{"gh.activity o/a", "gh.branch o/a feat", "gh.dashboard"}; !slices.Equal(got, want) {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	f.repo.SetDetail(repo.WorktreeDetail{RepoID: "r", Path: "/code/a"})
+	if got := describe(s.next()); got != "repo.detail /code/a" {
+		t.Fatalf("got %q, want repo.detail", got)
 	}
 	n := command.BusEmitter{Bus: f.bus}.Emit(&v1.UiIntent{Intent: &v1.UiIntent_OpenPalette_{OpenPalette: &v1.UiIntent_OpenPalette{Query: "x"}}})
 	if n != 1 {

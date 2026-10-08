@@ -3,10 +3,11 @@
     "rateLimit": {
       "limit": 5000,
       "cost": 1,
-      "remaining": 4997,
-      "resetAt": "2026-10-08T07:02:16Z"
+      "remaining": 4492,
+      "resetAt": "2026-10-08T09:24:26Z"
     },
     "viewer": {
+      "id": "MDQ6VXNlcjU4MzIzMQ==",
       "login": "octocat",
       "name": "The Octocat",
       "avatarUrl": "https://avatars.githubusercontent.com/u/583231?v=4",

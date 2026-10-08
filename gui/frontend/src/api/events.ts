@@ -1,5 +1,6 @@
 import { EventService, type Event } from "@/gen/codefoundry/v1/events_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { toGhEventView, type GhEventView } from "./gh";
 import { toGitOpsEventView, type GitOpsEventView } from "./gitops";
 import { toRepoEventView, type RepoEventView } from "./repo";
 import { toSessionEventView, type SessionEventView } from "./session";
@@ -8,8 +9,7 @@ import { toTerminalEventView, type TerminalEventView } from "./terminal";
 import { toUiIntentView, type UiIntentView } from "./ui";
 import { toUpdateEventView, type UpdateEventView } from "./update";
 
-/** GhService change notification (re-read the cached data). */
-export type GhEventView = { kind: "pullRequests"; repoSlug: string } | { kind: "viewer" };
+export type { GhEventView } from "./gh";
 
 /**
  * One item of the multiplexed EventService stream, tagged by source. The GUI holds
@@ -41,10 +41,8 @@ export function toEventView(ev: Event): EventView | null {
       return v && { source: "session", event: v };
     }
     case "gh": {
-      const g = e.value.event;
-      if (g.case === "pullRequestsUpdated") return { source: "gh", event: { kind: "pullRequests", repoSlug: g.value.repoSlug } };
-      if (g.case === "viewerUpdated") return { source: "gh", event: { kind: "viewer" } };
-      return null;
+      const v = toGhEventView(e.value);
+      return v && { source: "gh", event: v };
     }
     case "gitops": {
       const v = toGitOpsEventView(e.value);

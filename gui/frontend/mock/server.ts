@@ -25,6 +25,8 @@
  *   POST /__mock/update/latest?version=v0.2.0     (what the next check finds)
  *   POST /__mock/update/fail?reason=…             (the next install fails)
  *   POST /__mock/update/disabled?reason=dev%20build
+ *   POST /__mock/gh/update | stale | auth?ok=false | touch?path=…   (Phase 3a GitHub + detail)
+ *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts)
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
@@ -34,6 +36,7 @@ import { durationFromMs } from "@bufbuild/protobuf/wkt";
 import { CommandService, ConfirmationRequiredSchema } from "../src/gen/codefoundry/v1/command_pb";
 import { SettingsService, SettingsValidationErrorsSchema } from "../src/gen/codefoundry/v1/settings_pb";
 import { EventService, EventSource } from "../src/gen/codefoundry/v1/events_pb";
+import { GhService } from "../src/gen/codefoundry/v1/gh_pb";
 import { HealthService } from "../src/gen/codefoundry/v1/health_pb";
 import { RepoService } from "../src/gen/codefoundry/v1/repo_pb";
 import { SessionService, SessionState, SessionStatus } from "../src/gen/codefoundry/v1/session_pb";
@@ -98,6 +101,11 @@ async function* attach(id: string, signal: AbortSignal): AsyncGenerator<AttachEv
   }
 }
 
+/** GitHub slugs of the mock's registered repos (what the real daemon tracks). */
+function trackedSlugs(): string[] {
+  return [...world.repos.values()].map((r) => r.githubSlug.toLowerCase()).filter(Boolean).sort();
+}
+
 function routes(router: ConnectRouter): void {
   router.service(HealthService, {
     ping: () => ({ pid: process.pid, version: "mock", uptime: durationFromMs(Date.now() - world.startedAt) }),
@@ -140,7 +148,24 @@ function routes(router: ConnectRouter): void {
       throw new ConnectError("use the worktree.remove command in the mock", Code.Unimplemented);
     },
     refresh: () => ({}),
+    getWorktreeDetail: (req) => {
+      const detail = world.gh.getWorktreeDetail(req.repoId, req.path);
+      if (!detail) throw new ConnectError(`worktree ${req.path} not found`, Code.NotFound);
+      return { detail };
+    },
     watch: (_req, ctx) => tracked("RepoService/Watch", world.repoEvents.subscribe(ctx.signal)),
+  });
+
+  router.service(GhService, {
+    getViewer: () => ({ viewer: world.gh.dashboard.viewer, authenticated: world.gh.authenticated, fetchedAt: world.gh.dashboard.fetchedAt }),
+    getDashboard: (req) => world.gh.getDashboard(req.includeUntracked, trackedSlugs()),
+    getRepoActivity: (req) => world.gh.getRepoActivity(req.repoSlug.toLowerCase()),
+    getBranchPullRequests: (req) => {
+      if (!req.headRef) throw new ConnectError("head_ref is required", Code.InvalidArgument);
+      return world.gh.getBranchPullRequests(req.repoSlug.toLowerCase(), req.headRef);
+    },
+    listPullRequests: () => ({ pullRequests: [] }),
+    refresh: () => ({}),
   });
 
   router.service(CommandService, {
@@ -387,6 +412,24 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "GET /__mock/update":
       json(res, 200, updateSummary());
+      break;
+    case "POST /__mock/gh/update":
+      world.gh.update();
+      json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/gh/stale":
+      world.gh.stale();
+      json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/gh/auth":
+      world.gh.authenticated = q.get("ok") !== "false";
+      json(res, 200, { authenticated: world.gh.authenticated });
+      break;
+    case "POST /__mock/gh/touch":
+      json(res, world.gh.touch(q.get("path") ?? "") ? 200 : 404, { ok: true });
+      break;
+    case "GET /__mock/gh/calls":
+      json(res, 200, world.gh.calls);
       break;
     case "GET /__mock/streams":
       json(res, 200, Object.fromEntries(openStreams));

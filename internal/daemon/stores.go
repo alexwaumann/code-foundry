@@ -66,7 +66,11 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 	if s.repo, err = repo.Start(ctx, repo.Options{DB: s.db, Bus: s.bus, Log: log, FetchInterval: cfg.FetchInterval()}); err != nil {
 		return nil, err
 	}
-	ghOpts := gh.Options{DB: s.db, Bus: s.bus, Log: log.With("store", "gh"), RepoInterval: cfg.GhPollInterval()}
+	// CODE_FOUNDRY_GH_SEARCH_AS is a development aid (see gh.Options.SearchAs).
+	ghOpts := gh.Options{
+		DB: s.db, Bus: s.bus, Log: log.With("store", "gh"), RepoInterval: cfg.GhPollInterval(),
+		SearchAs: os.Getenv("CODE_FOUNDRY_GH_SEARCH_AS"),
+	}
 	if ghPath := settings.ExpandedPath(cfg.Advanced.GhPath); ghPath != "" {
 		ghOpts.Runner = gh.ExecRunner{Path: ghPath}
 	}

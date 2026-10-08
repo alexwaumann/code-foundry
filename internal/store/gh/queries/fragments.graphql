@@ -56,3 +56,57 @@ fragment CheckContexts on StatusCheckRollupContextConnection {
     }
   }
 }
+
+# Phase 3a. A pull request found by search or by head branch (any repository): cheap
+# identity fields only. reviewDecision and the check counts dominate server time, so
+# they are a separate fragment that only the open-PR lists select.
+fragment PullRequestSummary on PullRequest {
+  number
+  title
+  url
+  state
+  isDraft
+  createdAt
+  updatedAt
+  mergedAt
+  author { login }
+  repository { nameWithOwner }
+  headRefName
+  headRefOid
+  baseRefName
+  isCrossRepository
+}
+
+fragment PullRequestReview on PullRequest {
+  reviewDecision
+  commits(last: 1) {
+    nodes {
+      commit {
+        oid
+        statusCheckRollup {
+          state
+          contexts { ...RollupCounts }
+        }
+      }
+    }
+  }
+}
+
+# The default branch's head commit with its checks: the first page of contexts. Later
+# pages come from checks.graphql with the commit's oid.
+fragment DefaultBranchFields on Repository {
+  defaultBranchRef {
+    name
+    target {
+      ... on Commit {
+        oid
+        committedDate
+        messageHeadline
+        statusCheckRollup {
+          state
+          contexts(first: 100) { ...CheckContexts }
+        }
+      }
+    }
+  }
+}

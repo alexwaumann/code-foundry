@@ -9,7 +9,7 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "e2e",
-  testMatch: "live.spec.ts",
+  testMatch: /live(-[a-z]+)?\.spec\.ts$/,
   timeout: 300_000,
   expect: { timeout: 10_000 },
   workers: 1,

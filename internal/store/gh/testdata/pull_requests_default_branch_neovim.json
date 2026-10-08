@@ -1,0 +1,868 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4824,
+      "resetAt": "2026-10-08T09:24:26Z"
+    },
+    "repository": {
+      "defaultBranchRef": {
+        "name": "master",
+        "target": {
+          "oid": "27ee55c09d088c88b6c5ab5e8e2c4eaf86d6df71",
+          "committedDate": "2026-10-07T08:42:05Z",
+          "messageHeadline": "Merge pull request #42086 from bfredl/multichar",
+          "statusCheckRollup": {
+            "state": "FAILURE",
+            "contexts": {
+              "checkRunCount": 31,
+              "checkRunCountsByState": [
+                {
+                  "state": "ACTION_REQUIRED",
+                  "count": 0
+                },
+                {
+                  "state": "CANCELLED",
+                  "count": 0
+                },
+                {
+                  "state": "COMPLETED",
+                  "count": 0
+                },
+                {
+                  "state": "FAILURE",
+                  "count": 1
+                },
+                {
+                  "state": "IN_PROGRESS",
+                  "count": 0
+                },
+                {
+                  "state": "NEUTRAL",
+                  "count": 0
+                },
+                {
+                  "state": "PENDING",
+                  "count": 0
+                },
+                {
+                  "state": "QUEUED",
+                  "count": 0
+                },
+                {
+                  "state": "SKIPPED",
+                  "count": 0
+                },
+                {
+                  "state": "STALE",
+                  "count": 0
+                },
+                {
+                  "state": "STARTUP_FAILURE",
+                  "count": 0
+                },
+                {
+                  "state": "SUCCESS",
+                  "count": 30
+                },
+                {
+                  "state": "TIMED_OUT",
+                  "count": 0
+                },
+                {
+                  "state": "WAITING",
+                  "count": 0
+                }
+              ],
+              "statusContextCount": 0,
+              "statusContextCountsByState": [
+                {
+                  "state": "EXPECTED",
+                  "count": 0
+                },
+                {
+                  "state": "ERROR",
+                  "count": 0
+                },
+                {
+                  "state": "FAILURE",
+                  "count": 0
+                },
+                {
+                  "state": "PENDING",
+                  "count": 0
+                },
+                {
+                  "state": "SUCCESS",
+                  "count": 0
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "MzE"
+              },
+              "nodes": [
+                {
+                  "__typename": "CheckRun",
+                  "name": "Analyze",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595522816/job/112707088528",
+                  "startedAt": "2026-10-07T08:42:11Z",
+                  "completedAt": "2026-10-07T08:47:16Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "codeql"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "Run zizmor",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595522975/job/112707088968",
+                  "startedAt": "2026-10-07T08:42:11Z",
+                  "completedAt": "2026-10-07T08:42:41Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "security: zizmor GHA analyzer"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "lintc",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707091894",
+                  "startedAt": "2026-10-07T08:42:12Z",
+                  "completedAt": "2026-10-07T08:44:51Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "FreeBSD",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595522835/job/112707093389",
+                  "startedAt": "2026-10-07T08:45:37Z",
+                  "completedAt": "2026-10-07T08:47:25Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test-bsd"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "wasmtime",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595522857/job/112707089066",
+                  "startedAt": "2026-10-07T08:42:12Z",
+                  "completedAt": "2026-10-07T08:43:41Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "wasm"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "lint",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092423",
+                  "startedAt": "2026-10-07T08:42:14Z",
+                  "completedAt": "2026-10-07T08:43:19Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "OpenBSD",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595522835/job/112707093097",
+                  "startedAt": "2026-10-07T08:42:43Z",
+                  "completedAt": "2026-10-07T08:45:53Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test-bsd"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "clang-analyzer",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092401",
+                  "startedAt": "2026-10-07T08:42:14Z",
+                  "completedAt": "2026-10-07T08:48:47Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "ubuntu asan clang unittest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092857",
+                  "startedAt": "2026-10-07T08:45:57Z",
+                  "completedAt": "2026-10-07T08:48:38Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "ubuntu asan clang functionaltest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092322",
+                  "startedAt": "2026-10-07T08:42:12Z",
+                  "completedAt": "2026-10-07T08:56:42Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "ubuntu asan clang oldtest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092427",
+                  "startedAt": "2026-10-07T08:43:22Z",
+                  "completedAt": "2026-10-07T08:51:00Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "ubuntu tsan clang functionaltest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092352",
+                  "startedAt": "2026-10-07T08:42:12Z",
+                  "completedAt": "2026-10-07T08:53:52Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "ubuntu release gcc unittest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092331",
+                  "startedAt": "2026-10-07T08:44:06Z",
+                  "completedAt": "2026-10-07T08:47:03Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "ubuntu release gcc functionaltest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092557",
+                  "startedAt": "2026-10-07T08:45:50Z",
+                  "completedAt": "2026-10-07T08:53:02Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "ubuntu release gcc oldtest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092450",
+                  "startedAt": "2026-10-07T08:42:13Z",
+                  "completedAt": "2026-10-07T08:45:46Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "ubuntu arm clang unittest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092349",
+                  "startedAt": "2026-10-07T08:42:15Z",
+                  "completedAt": "2026-10-07T08:45:41Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "ubuntu arm clang functionaltest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092494",
+                  "startedAt": "2026-10-07T08:42:15Z",
+                  "completedAt": "2026-10-07T08:49:52Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "macos intel clang unittest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092560",
+                  "startedAt": "2026-10-07T08:45:35Z",
+                  "completedAt": "2026-10-07T08:50:44Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "macos intel clang functionaltest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092959",
+                  "startedAt": "2026-10-07T08:48:02Z",
+                  "completedAt": "2026-10-07T09:01:49Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "macos intel clang oldtest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092625",
+                  "startedAt": "2026-10-07T08:43:05Z",
+                  "completedAt": "2026-10-07T08:49:56Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "macos arm clang unittest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092433",
+                  "startedAt": "2026-10-07T08:42:17Z",
+                  "completedAt": "2026-10-07T08:44:03Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "macos arm clang functionaltest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092438",
+                  "startedAt": "2026-10-07T08:42:22Z",
+                  "completedAt": "2026-10-07T08:54:13Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "macos arm clang oldtest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092419",
+                  "startedAt": "2026-10-07T08:42:21Z",
+                  "completedAt": "2026-10-07T08:47:59Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "ubuntu puc-lua gcc functionaltest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092539",
+                  "startedAt": "2026-10-07T08:45:55Z",
+                  "completedAt": "2026-10-07T08:52:38Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "ubuntu puc-lua gcc oldtest",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092519",
+                  "startedAt": "2026-10-07T08:42:12Z",
+                  "completedAt": "2026-10-07T08:45:34Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "build using zig build (linux)",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092499",
+                  "startedAt": "2026-10-07T08:47:06Z",
+                  "completedAt": "2026-10-07T08:59:31Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "build using zig build (macos 15)",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092402",
+                  "startedAt": "2026-10-07T08:42:18Z",
+                  "completedAt": "2026-10-07T09:02:33Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "build using zig build (windows)",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092318",
+                  "startedAt": "2026-10-07T08:42:12Z",
+                  "completedAt": "2026-10-07T08:47:36Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "windows / windows (functional)",
+                  "status": "COMPLETED",
+                  "conclusion": "FAILURE",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092467",
+                  "startedAt": "2026-10-07T08:43:42Z",
+                  "completedAt": "2026-10-07T08:57:50Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "windows / windows (old)",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092940",
+                  "startedAt": "2026-10-07T08:44:53Z",
+                  "completedAt": "2026-10-07T08:51:09Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                },
+                {
+                  "__typename": "CheckRun",
+                  "name": "with-external-deps",
+                  "status": "COMPLETED",
+                  "conclusion": "SUCCESS",
+                  "detailsUrl": "https://github.com/neovim/neovim/actions/runs/37595523604/job/112707092513",
+                  "startedAt": "2026-10-07T08:42:14Z",
+                  "completedAt": "2026-10-07T08:43:02Z",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "workflow": {
+                        "name": "test"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "pullRequests": {
+        "totalCount": 307,
+        "pageInfo": {
+          "hasNextPage": true,
+          "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0xMC0wOFQwNzo1ODo1NFrPAAAAARuXroQ="
+        },
+        "nodes": [
+          {
+            "number": 41987,
+            "title": "fix(options): extend dry-run validation",
+            "url": "https://github.com/neovim/neovim/pull/41987",
+            "updatedAt": "2026-10-08T09:02:25Z",
+            "isDraft": true,
+            "isCrossRepository": true,
+            "author": {
+              "login": "lewis6991"
+            },
+            "headRefName": "option-prepared-values",
+            "headRefOid": "37f8c653b33aae871f324341fc8bc6285be12376",
+            "baseRefName": "master",
+            "reviewDecision": null,
+            "mergeable": "UNKNOWN",
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "37f8c653b33aae871f324341fc8bc6285be12376",
+                    "statusCheckRollup": null
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 42272,
+            "title": "fix(build.zig): make utf8proc and unibilium lazy again",
+            "url": "https://github.com/neovim/neovim/pull/42272",
+            "updatedAt": "2026-10-08T08:20:51Z",
+            "isDraft": false,
+            "isCrossRepository": true,
+            "author": {
+              "login": "dchinmay2"
+            },
+            "headRefName": "push-zznuyqlvwnkt",
+            "headRefOid": "6353291acfccfa265fba6c01ed2f4e7899ffc4fc",
+            "baseRefName": "master",
+            "reviewDecision": null,
+            "mergeable": "MERGEABLE",
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "6353291acfccfa265fba6c01ed2f4e7899ffc4fc",
+                    "statusCheckRollup": {
+                      "state": "SUCCESS",
+                      "contexts": {
+                        "checkRunCount": 44,
+                        "checkRunCountsByState": [
+                          {
+                            "state": "ACTION_REQUIRED",
+                            "count": 0
+                          },
+                          {
+                            "state": "CANCELLED",
+                            "count": 0
+                          },
+                          {
+                            "state": "COMPLETED",
+                            "count": 0
+                          },
+                          {
+                            "state": "FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "IN_PROGRESS",
+                            "count": 0
+                          },
+                          {
+                            "state": "NEUTRAL",
+                            "count": 0
+                          },
+                          {
+                            "state": "PENDING",
+                            "count": 0
+                          },
+                          {
+                            "state": "QUEUED",
+                            "count": 0
+                          },
+                          {
+                            "state": "SKIPPED",
+                            "count": 4
+                          },
+                          {
+                            "state": "STALE",
+                            "count": 0
+                          },
+                          {
+                            "state": "STARTUP_FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "SUCCESS",
+                            "count": 40
+                          },
+                          {
+                            "state": "TIMED_OUT",
+                            "count": 0
+                          },
+                          {
+                            "state": "WAITING",
+                            "count": 0
+                          }
+                        ],
+                        "statusContextCount": 0,
+                        "statusContextCountsByState": [
+                          {
+                            "state": "EXPECTED",
+                            "count": 0
+                          },
+                          {
+                            "state": "ERROR",
+                            "count": 0
+                          },
+                          {
+                            "state": "FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "PENDING",
+                            "count": 0
+                          },
+                          {
+                            "state": "SUCCESS",
+                            "count": 0
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 42256,
+            "title": "refactor(watch): extract watchdirs into a class",
+            "url": "https://github.com/neovim/neovim/pull/42256",
+            "updatedAt": "2026-10-08T07:58:54Z",
+            "isDraft": false,
+            "isCrossRepository": true,
+            "author": {
+              "login": "lewis6991"
+            },
+            "headRefName": "watchdirs",
+            "headRefOid": "3dabc95bbc9e4adbb136ad6bc680954d7d6d6fd2",
+            "baseRefName": "master",
+            "reviewDecision": null,
+            "mergeable": "MERGEABLE",
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "3dabc95bbc9e4adbb136ad6bc680954d7d6d6fd2",
+                    "statusCheckRollup": {
+                      "state": "SUCCESS",
+                      "contexts": {
+                        "checkRunCount": 50,
+                        "checkRunCountsByState": [
+                          {
+                            "state": "ACTION_REQUIRED",
+                            "count": 0
+                          },
+                          {
+                            "state": "CANCELLED",
+                            "count": 0
+                          },
+                          {
+                            "state": "COMPLETED",
+                            "count": 0
+                          },
+                          {
+                            "state": "FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "IN_PROGRESS",
+                            "count": 0
+                          },
+                          {
+                            "state": "NEUTRAL",
+                            "count": 0
+                          },
+                          {
+                            "state": "PENDING",
+                            "count": 0
+                          },
+                          {
+                            "state": "QUEUED",
+                            "count": 0
+                          },
+                          {
+                            "state": "SKIPPED",
+                            "count": 9
+                          },
+                          {
+                            "state": "STALE",
+                            "count": 0
+                          },
+                          {
+                            "state": "STARTUP_FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "SUCCESS",
+                            "count": 41
+                          },
+                          {
+                            "state": "TIMED_OUT",
+                            "count": 0
+                          },
+                          {
+                            "state": "WAITING",
+                            "count": 0
+                          }
+                        ],
+                        "statusContextCount": 0,
+                        "statusContextCountsByState": [
+                          {
+                            "state": "EXPECTED",
+                            "count": 0
+                          },
+                          {
+                            "state": "ERROR",
+                            "count": 0
+                          },
+                          {
+                            "state": "FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "PENDING",
+                            "count": 0
+                          },
+                          {
+                            "state": "SUCCESS",
+                            "count": 0
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

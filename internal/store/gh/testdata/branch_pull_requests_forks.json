@@ -1,0 +1,484 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4866,
+      "resetAt": "2026-10-08T09:24:26Z"
+    },
+    "repository": {
+      "pullRequests": {
+        "nodes": [
+          {
+            "number": 12604,
+            "title": "Implement needed modifications for issue #12600, more flexible copy-on-select and middle-click-action",
+            "url": "https://github.com/ghostty-org/ghostty/pull/12604",
+            "state": "MERGED",
+            "isDraft": false,
+            "createdAt": "2026-05-06T22:27:41Z",
+            "updatedAt": "2026-08-31T17:14:27Z",
+            "mergedAt": "2026-08-31T17:14:03Z",
+            "author": {
+              "login": "mohshami"
+            },
+            "repository": {
+              "nameWithOwner": "ghostty-org/ghostty"
+            },
+            "headRefName": "main",
+            "headRefOid": "e80ce2ed4cc603c0b52f9cb344f39c64048478e0",
+            "baseRefName": "main",
+            "isCrossRepository": true,
+            "reviewDecision": "CHANGES_REQUESTED",
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "e80ce2ed4cc603c0b52f9cb344f39c64048478e0",
+                    "statusCheckRollup": {
+                      "state": "SUCCESS",
+                      "contexts": {
+                        "checkRunCount": 102,
+                        "checkRunCountsByState": [
+                          {
+                            "state": "ACTION_REQUIRED",
+                            "count": 0
+                          },
+                          {
+                            "state": "CANCELLED",
+                            "count": 0
+                          },
+                          {
+                            "state": "COMPLETED",
+                            "count": 0
+                          },
+                          {
+                            "state": "FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "IN_PROGRESS",
+                            "count": 0
+                          },
+                          {
+                            "state": "NEUTRAL",
+                            "count": 0
+                          },
+                          {
+                            "state": "PENDING",
+                            "count": 0
+                          },
+                          {
+                            "state": "QUEUED",
+                            "count": 0
+                          },
+                          {
+                            "state": "SKIPPED",
+                            "count": 7
+                          },
+                          {
+                            "state": "STALE",
+                            "count": 0
+                          },
+                          {
+                            "state": "STARTUP_FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "SUCCESS",
+                            "count": 95
+                          },
+                          {
+                            "state": "TIMED_OUT",
+                            "count": 0
+                          },
+                          {
+                            "state": "WAITING",
+                            "count": 0
+                          }
+                        ],
+                        "statusContextCount": 0,
+                        "statusContextCountsByState": [
+                          {
+                            "state": "EXPECTED",
+                            "count": 0
+                          },
+                          {
+                            "state": "ERROR",
+                            "count": 0
+                          },
+                          {
+                            "state": "FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "PENDING",
+                            "count": 0
+                          },
+                          {
+                            "state": "SUCCESS",
+                            "count": 0
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 13915,
+            "title": "Release packages on new release",
+            "url": "https://github.com/ghostty-org/ghostty/pull/13915",
+            "state": "CLOSED",
+            "isDraft": false,
+            "createdAt": "2026-08-19T18:38:42Z",
+            "updatedAt": "2026-08-19T18:41:43Z",
+            "mergedAt": null,
+            "author": {
+              "login": "zetneteork"
+            },
+            "repository": {
+              "nameWithOwner": "ghostty-org/ghostty"
+            },
+            "headRefName": "main",
+            "headRefOid": "3c566e0476d856203dec817d21a2f6854f37d868",
+            "baseRefName": "main",
+            "isCrossRepository": true,
+            "reviewDecision": "REVIEW_REQUIRED",
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "3c566e0476d856203dec817d21a2f6854f37d868",
+                    "statusCheckRollup": {
+                      "state": "SUCCESS",
+                      "contexts": {
+                        "checkRunCount": 2,
+                        "checkRunCountsByState": [
+                          {
+                            "state": "ACTION_REQUIRED",
+                            "count": 0
+                          },
+                          {
+                            "state": "CANCELLED",
+                            "count": 0
+                          },
+                          {
+                            "state": "COMPLETED",
+                            "count": 0
+                          },
+                          {
+                            "state": "FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "IN_PROGRESS",
+                            "count": 0
+                          },
+                          {
+                            "state": "NEUTRAL",
+                            "count": 0
+                          },
+                          {
+                            "state": "PENDING",
+                            "count": 0
+                          },
+                          {
+                            "state": "QUEUED",
+                            "count": 0
+                          },
+                          {
+                            "state": "SKIPPED",
+                            "count": 0
+                          },
+                          {
+                            "state": "STALE",
+                            "count": 0
+                          },
+                          {
+                            "state": "STARTUP_FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "SUCCESS",
+                            "count": 2
+                          },
+                          {
+                            "state": "TIMED_OUT",
+                            "count": 0
+                          },
+                          {
+                            "state": "WAITING",
+                            "count": 0
+                          }
+                        ],
+                        "statusContextCount": 0,
+                        "statusContextCountsByState": [
+                          {
+                            "state": "EXPECTED",
+                            "count": 0
+                          },
+                          {
+                            "state": "ERROR",
+                            "count": 0
+                          },
+                          {
+                            "state": "FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "PENDING",
+                            "count": 0
+                          },
+                          {
+                            "state": "SUCCESS",
+                            "count": 0
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 13913,
+            "title": "ci: Add automated Linux package builds (DEB, RPM, Arch) on release",
+            "url": "https://github.com/ghostty-org/ghostty/pull/13913",
+            "state": "CLOSED",
+            "isDraft": false,
+            "createdAt": "2026-08-19T16:14:56Z",
+            "updatedAt": "2026-08-19T16:15:18Z",
+            "mergedAt": null,
+            "author": {
+              "login": "zetneteork"
+            },
+            "repository": {
+              "nameWithOwner": "ghostty-org/ghostty"
+            },
+            "headRefName": "main",
+            "headRefOid": "4bf6d4f9d1c71a061e162907c3c63160269d3e9c",
+            "baseRefName": "main",
+            "isCrossRepository": true,
+            "reviewDecision": "REVIEW_REQUIRED",
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "4bf6d4f9d1c71a061e162907c3c63160269d3e9c",
+                    "statusCheckRollup": {
+                      "state": "SUCCESS",
+                      "contexts": {
+                        "checkRunCount": 2,
+                        "checkRunCountsByState": [
+                          {
+                            "state": "ACTION_REQUIRED",
+                            "count": 0
+                          },
+                          {
+                            "state": "CANCELLED",
+                            "count": 0
+                          },
+                          {
+                            "state": "COMPLETED",
+                            "count": 0
+                          },
+                          {
+                            "state": "FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "IN_PROGRESS",
+                            "count": 0
+                          },
+                          {
+                            "state": "NEUTRAL",
+                            "count": 0
+                          },
+                          {
+                            "state": "PENDING",
+                            "count": 0
+                          },
+                          {
+                            "state": "QUEUED",
+                            "count": 0
+                          },
+                          {
+                            "state": "SKIPPED",
+                            "count": 1
+                          },
+                          {
+                            "state": "STALE",
+                            "count": 0
+                          },
+                          {
+                            "state": "STARTUP_FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "SUCCESS",
+                            "count": 1
+                          },
+                          {
+                            "state": "TIMED_OUT",
+                            "count": 0
+                          },
+                          {
+                            "state": "WAITING",
+                            "count": 0
+                          }
+                        ],
+                        "statusContextCount": 0,
+                        "statusContextCountsByState": [
+                          {
+                            "state": "EXPECTED",
+                            "count": 0
+                          },
+                          {
+                            "state": "ERROR",
+                            "count": 0
+                          },
+                          {
+                            "state": "FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "PENDING",
+                            "count": 0
+                          },
+                          {
+                            "state": "SUCCESS",
+                            "count": 0
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 13785,
+            "title": "i18n: update Hebrew translations for v1.4",
+            "url": "https://github.com/ghostty-org/ghostty/pull/13785",
+            "state": "MERGED",
+            "isDraft": false,
+            "createdAt": "2026-08-13T16:28:04Z",
+            "updatedAt": "2026-08-16T09:29:15Z",
+            "mergedAt": "2026-08-16T09:28:59Z",
+            "author": {
+              "login": "slsrepo"
+            },
+            "repository": {
+              "nameWithOwner": "ghostty-org/ghostty"
+            },
+            "headRefName": "main",
+            "headRefOid": "06b63c48594ea04d2a68dd8249250d1477722296",
+            "baseRefName": "main",
+            "isCrossRepository": true,
+            "reviewDecision": "APPROVED",
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "06b63c48594ea04d2a68dd8249250d1477722296",
+                    "statusCheckRollup": {
+                      "state": "SUCCESS",
+                      "contexts": {
+                        "checkRunCount": 102,
+                        "checkRunCountsByState": [
+                          {
+                            "state": "ACTION_REQUIRED",
+                            "count": 0
+                          },
+                          {
+                            "state": "CANCELLED",
+                            "count": 0
+                          },
+                          {
+                            "state": "COMPLETED",
+                            "count": 0
+                          },
+                          {
+                            "state": "FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "IN_PROGRESS",
+                            "count": 0
+                          },
+                          {
+                            "state": "NEUTRAL",
+                            "count": 0
+                          },
+                          {
+                            "state": "PENDING",
+                            "count": 0
+                          },
+                          {
+                            "state": "QUEUED",
+                            "count": 0
+                          },
+                          {
+                            "state": "SKIPPED",
+                            "count": 4
+                          },
+                          {
+                            "state": "STALE",
+                            "count": 0
+                          },
+                          {
+                            "state": "STARTUP_FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "SUCCESS",
+                            "count": 98
+                          },
+                          {
+                            "state": "TIMED_OUT",
+                            "count": 0
+                          },
+                          {
+                            "state": "WAITING",
+                            "count": 0
+                          }
+                        ],
+                        "statusContextCount": 0,
+                        "statusContextCountsByState": [
+                          {
+                            "state": "EXPECTED",
+                            "count": 0
+                          },
+                          {
+                            "state": "ERROR",
+                            "count": 0
+                          },
+                          {
+                            "state": "FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "PENDING",
+                            "count": 0
+                          },
+                          {
+                            "state": "SUCCESS",
+                            "count": 0
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

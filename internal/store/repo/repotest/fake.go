@@ -24,6 +24,8 @@ type Fake struct {
 	mu    sync.Mutex
 	repos map[string]repo.Repo
 	snap  *repo.Snapshot
+	// details backs WorktreeDetail (detail.go); nil until SetDetail.
+	details map[string]repo.WorktreeDetail
 
 	// Err, when set, is returned by every mutating method.
 	Err error

@@ -51,6 +51,9 @@ const (
 	RepoServiceRefreshProcedure = "/codefoundry.v1.RepoService/Refresh"
 	// RepoServiceWatchProcedure is the fully-qualified name of the RepoService's Watch RPC.
 	RepoServiceWatchProcedure = "/codefoundry.v1.RepoService/Watch"
+	// RepoServiceGetWorktreeDetailProcedure is the fully-qualified name of the RepoService's
+	// GetWorktreeDetail RPC.
+	RepoServiceGetWorktreeDetailProcedure = "/codefoundry.v1.RepoService/GetWorktreeDetail"
 )
 
 // RepoServiceClient is a client for the codefoundry.v1.RepoService service.
@@ -71,6 +74,12 @@ type RepoServiceClient interface {
 	Refresh(context.Context, *connect.Request[v1.RefreshRepoRequest]) (*connect.Response[v1.RefreshRepoResponse], error)
 	// Watch streams repository and worktree changes.
 	Watch(context.Context, *connect.Request[v1.WatchReposRequest]) (*connect.ServerStreamForClient[v1.RepoEvent], error)
+	// GetWorktreeDetail returns the files changed and commits on a worktree against its
+	// base (status.base_ref, else the local default branch). It computes on first call
+	// (or after 10 idle minutes) and serves the cached result otherwise. While a
+	// worktree has been asked about in the last 10 minutes, every status refresh of it
+	// recomputes the detail and announces changes as worktree_detail_updated.
+	GetWorktreeDetail(context.Context, *connect.Request[v1.GetWorktreeDetailRequest]) (*connect.Response[v1.GetWorktreeDetailResponse], error)
 }
 
 // NewRepoServiceClient constructs a client for the codefoundry.v1.RepoService service. By default,
@@ -132,19 +141,26 @@ func NewRepoServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(repoServiceMethods.ByName("Watch")),
 			connect.WithClientOptions(opts...),
 		),
+		getWorktreeDetail: connect.NewClient[v1.GetWorktreeDetailRequest, v1.GetWorktreeDetailResponse](
+			httpClient,
+			baseURL+RepoServiceGetWorktreeDetailProcedure,
+			connect.WithSchema(repoServiceMethods.ByName("GetWorktreeDetail")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // repoServiceClient implements RepoServiceClient.
 type repoServiceClient struct {
-	register       *connect.Client[v1.RegisterRepoRequest, v1.RegisterRepoResponse]
-	unregister     *connect.Client[v1.UnregisterRepoRequest, v1.UnregisterRepoResponse]
-	list           *connect.Client[v1.ListReposRequest, v1.ListReposResponse]
-	get            *connect.Client[v1.GetRepoRequest, v1.GetRepoResponse]
-	createWorktree *connect.Client[v1.CreateWorktreeRequest, v1.CreateWorktreeResponse]
-	removeWorktree *connect.Client[v1.RemoveWorktreeRequest, v1.RemoveWorktreeResponse]
-	refresh        *connect.Client[v1.RefreshRepoRequest, v1.RefreshRepoResponse]
-	watch          *connect.Client[v1.WatchReposRequest, v1.RepoEvent]
+	register          *connect.Client[v1.RegisterRepoRequest, v1.RegisterRepoResponse]
+	unregister        *connect.Client[v1.UnregisterRepoRequest, v1.UnregisterRepoResponse]
+	list              *connect.Client[v1.ListReposRequest, v1.ListReposResponse]
+	get               *connect.Client[v1.GetRepoRequest, v1.GetRepoResponse]
+	createWorktree    *connect.Client[v1.CreateWorktreeRequest, v1.CreateWorktreeResponse]
+	removeWorktree    *connect.Client[v1.RemoveWorktreeRequest, v1.RemoveWorktreeResponse]
+	refresh           *connect.Client[v1.RefreshRepoRequest, v1.RefreshRepoResponse]
+	watch             *connect.Client[v1.WatchReposRequest, v1.RepoEvent]
+	getWorktreeDetail *connect.Client[v1.GetWorktreeDetailRequest, v1.GetWorktreeDetailResponse]
 }
 
 // Register calls codefoundry.v1.RepoService.Register.
@@ -187,6 +203,11 @@ func (c *repoServiceClient) Watch(ctx context.Context, req *connect.Request[v1.W
 	return c.watch.CallServerStream(ctx, req)
 }
 
+// GetWorktreeDetail calls codefoundry.v1.RepoService.GetWorktreeDetail.
+func (c *repoServiceClient) GetWorktreeDetail(ctx context.Context, req *connect.Request[v1.GetWorktreeDetailRequest]) (*connect.Response[v1.GetWorktreeDetailResponse], error) {
+	return c.getWorktreeDetail.CallUnary(ctx, req)
+}
+
 // RepoServiceHandler is an implementation of the codefoundry.v1.RepoService service.
 type RepoServiceHandler interface {
 	// Register adds a repository by path (any path inside the repo is accepted).
@@ -205,6 +226,12 @@ type RepoServiceHandler interface {
 	Refresh(context.Context, *connect.Request[v1.RefreshRepoRequest]) (*connect.Response[v1.RefreshRepoResponse], error)
 	// Watch streams repository and worktree changes.
 	Watch(context.Context, *connect.Request[v1.WatchReposRequest], *connect.ServerStream[v1.RepoEvent]) error
+	// GetWorktreeDetail returns the files changed and commits on a worktree against its
+	// base (status.base_ref, else the local default branch). It computes on first call
+	// (or after 10 idle minutes) and serves the cached result otherwise. While a
+	// worktree has been asked about in the last 10 minutes, every status refresh of it
+	// recomputes the detail and announces changes as worktree_detail_updated.
+	GetWorktreeDetail(context.Context, *connect.Request[v1.GetWorktreeDetailRequest]) (*connect.Response[v1.GetWorktreeDetailResponse], error)
 }
 
 // NewRepoServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -262,6 +289,12 @@ func NewRepoServiceHandler(svc RepoServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(repoServiceMethods.ByName("Watch")),
 		connect.WithHandlerOptions(opts...),
 	)
+	repoServiceGetWorktreeDetailHandler := connect.NewUnaryHandler(
+		RepoServiceGetWorktreeDetailProcedure,
+		svc.GetWorktreeDetail,
+		connect.WithSchema(repoServiceMethods.ByName("GetWorktreeDetail")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.RepoService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RepoServiceRegisterProcedure:
@@ -280,6 +313,8 @@ func NewRepoServiceHandler(svc RepoServiceHandler, opts ...connect.HandlerOption
 			repoServiceRefreshHandler.ServeHTTP(w, r)
 		case RepoServiceWatchProcedure:
 			repoServiceWatchHandler.ServeHTTP(w, r)
+		case RepoServiceGetWorktreeDetailProcedure:
+			repoServiceGetWorktreeDetailHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -319,4 +354,8 @@ func (UnimplementedRepoServiceHandler) Refresh(context.Context, *connect.Request
 
 func (UnimplementedRepoServiceHandler) Watch(context.Context, *connect.Request[v1.WatchReposRequest], *connect.ServerStream[v1.RepoEvent]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.Watch is not implemented"))
+}
+
+func (UnimplementedRepoServiceHandler) GetWorktreeDetail(context.Context, *connect.Request[v1.GetWorktreeDetailRequest]) (*connect.Response[v1.GetWorktreeDetailResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.GetWorktreeDetail is not implemented"))
 }

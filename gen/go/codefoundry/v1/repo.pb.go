@@ -1051,6 +1051,7 @@ type RepoEvent struct {
 	//	*RepoEvent_WorktreeUpdated
 	//	*RepoEvent_WorktreeRemoved
 	//	*RepoEvent_Snapshot
+	//	*RepoEvent_WorktreeDetailUpdated
 	Event         isRepoEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1138,6 +1139,15 @@ func (x *RepoEvent) GetSnapshot() *RepoSnapshot {
 	return nil
 }
 
+func (x *RepoEvent) GetWorktreeDetailUpdated() *WorktreeDetailRef {
+	if x != nil {
+		if x, ok := x.Event.(*RepoEvent_WorktreeDetailUpdated); ok {
+			return x.WorktreeDetailUpdated
+		}
+	}
+	return nil
+}
+
 type isRepoEvent_Event interface {
 	isRepoEvent_Event()
 }
@@ -1165,6 +1175,11 @@ type RepoEvent_Snapshot struct {
 	Snapshot *RepoSnapshot `protobuf:"bytes,5,opt,name=snapshot,proto3,oneof"`
 }
 
+type RepoEvent_WorktreeDetailUpdated struct {
+	// A worktree's detail changed; re-read it with GetWorktreeDetail.
+	WorktreeDetailUpdated *WorktreeDetailRef `protobuf:"bytes,6,opt,name=worktree_detail_updated,json=worktreeDetailUpdated,proto3,oneof"`
+}
+
 func (*RepoEvent_RepoUpdated) isRepoEvent_Event() {}
 
 func (*RepoEvent_RepoRemovedId) isRepoEvent_Event() {}
@@ -1175,6 +1190,492 @@ func (*RepoEvent_WorktreeRemoved) isRepoEvent_Event() {}
 
 func (*RepoEvent_Snapshot) isRepoEvent_Event() {}
 
+func (*RepoEvent_WorktreeDetailUpdated) isRepoEvent_Event() {}
+
+type WorktreeDetailRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RepoId        string                 `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	ComputedAt    *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=computed_at,json=computedAt,proto3" json:"computed_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorktreeDetailRef) Reset() {
+	*x = WorktreeDetailRef{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorktreeDetailRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorktreeDetailRef) ProtoMessage() {}
+
+func (x *WorktreeDetailRef) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorktreeDetailRef.ProtoReflect.Descriptor instead.
+func (*WorktreeDetailRef) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *WorktreeDetailRef) GetRepoId() string {
+	if x != nil {
+		return x.RepoId
+	}
+	return ""
+}
+
+func (x *WorktreeDetailRef) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *WorktreeDetailRef) GetComputedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ComputedAt
+	}
+	return nil
+}
+
+type GetWorktreeDetailRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RepoId        string                 `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetWorktreeDetailRequest) Reset() {
+	*x = GetWorktreeDetailRequest{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetWorktreeDetailRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetWorktreeDetailRequest) ProtoMessage() {}
+
+func (x *GetWorktreeDetailRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetWorktreeDetailRequest.ProtoReflect.Descriptor instead.
+func (*GetWorktreeDetailRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *GetWorktreeDetailRequest) GetRepoId() string {
+	if x != nil {
+		return x.RepoId
+	}
+	return ""
+}
+
+func (x *GetWorktreeDetailRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+type GetWorktreeDetailResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Detail        *WorktreeDetail        `protobuf:"bytes,1,opt,name=detail,proto3" json:"detail,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetWorktreeDetailResponse) Reset() {
+	*x = GetWorktreeDetailResponse{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetWorktreeDetailResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetWorktreeDetailResponse) ProtoMessage() {}
+
+func (x *GetWorktreeDetailResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetWorktreeDetailResponse.ProtoReflect.Descriptor instead.
+func (*GetWorktreeDetailResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *GetWorktreeDetailResponse) GetDetail() *WorktreeDetail {
+	if x != nil {
+		return x.Detail
+	}
+	return nil
+}
+
+// A worktree compared with its base.
+type WorktreeDetail struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	RepoId string                 `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	Path   string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	// The ref compared against ("origin/main", or "main" without a remote). Empty when
+	// there is none (or HEAD is unborn): files then hold only uncommitted changes and
+	// log is empty.
+	BaseRef string `protobuf:"bytes,3,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
+	// `git merge-base HEAD <base_ref>`.
+	MergeBase string `protobuf:"bytes,4,opt,name=merge_base,json=mergeBase,proto3" json:"merge_base,omitempty"`
+	Head      string `protobuf:"bytes,5,opt,name=head,proto3" json:"head,omitempty"`
+	// Changed files, sorted by path: committed on the branch (merge base..HEAD) and
+	// uncommitted (tracked changes against HEAD, and untracked files).
+	Files []*FileChange `protobuf:"bytes,6,rep,name=files,proto3" json:"files,omitempty"`
+	// More than the cap (2000) changed; files holds the first ones by path.
+	FilesTruncated bool `protobuf:"varint,7,opt,name=files_truncated,json=filesTruncated,proto3" json:"files_truncated,omitempty"`
+	// Commits on HEAD not on base_ref, newest first, at most 100.
+	Log []*LogEntry `protobuf:"bytes,8,rep,name=log,proto3" json:"log,omitempty"`
+	// How many commits are on HEAD and not on base_ref.
+	LogTotal   int32                  `protobuf:"varint,9,opt,name=log_total,json=logTotal,proto3" json:"log_total,omitempty"`
+	ComputedAt *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=computed_at,json=computedAt,proto3" json:"computed_at,omitempty"`
+	// Non-empty when computing failed; the other fields are then from the last success
+	// (or empty).
+	Error         string `protobuf:"bytes,11,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorktreeDetail) Reset() {
+	*x = WorktreeDetail{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorktreeDetail) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorktreeDetail) ProtoMessage() {}
+
+func (x *WorktreeDetail) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorktreeDetail.ProtoReflect.Descriptor instead.
+func (*WorktreeDetail) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *WorktreeDetail) GetRepoId() string {
+	if x != nil {
+		return x.RepoId
+	}
+	return ""
+}
+
+func (x *WorktreeDetail) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *WorktreeDetail) GetBaseRef() string {
+	if x != nil {
+		return x.BaseRef
+	}
+	return ""
+}
+
+func (x *WorktreeDetail) GetMergeBase() string {
+	if x != nil {
+		return x.MergeBase
+	}
+	return ""
+}
+
+func (x *WorktreeDetail) GetHead() string {
+	if x != nil {
+		return x.Head
+	}
+	return ""
+}
+
+func (x *WorktreeDetail) GetFiles() []*FileChange {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+func (x *WorktreeDetail) GetFilesTruncated() bool {
+	if x != nil {
+		return x.FilesTruncated
+	}
+	return false
+}
+
+func (x *WorktreeDetail) GetLog() []*LogEntry {
+	if x != nil {
+		return x.Log
+	}
+	return nil
+}
+
+func (x *WorktreeDetail) GetLogTotal() int32 {
+	if x != nil {
+		return x.LogTotal
+	}
+	return 0
+}
+
+func (x *WorktreeDetail) GetComputedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ComputedAt
+	}
+	return nil
+}
+
+func (x *WorktreeDetail) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type FileChange struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Path  string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	// Previous path for renames and copies.
+	OldPath string `protobuf:"bytes,2,opt,name=old_path,json=oldPath,proto3" json:"old_path,omitempty"`
+	// One git status letter: A added, M modified, D deleted, R renamed, C copied,
+	// T type changed, U unmerged, ? untracked. For a file changed both on the branch and
+	// in the working tree, the working tree's letter.
+	Status string `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	// Lines added and deleted from the merge base to the working tree (untracked files:
+	// their line count). Zero for binary files.
+	Added   int32 `protobuf:"varint,4,opt,name=added,proto3" json:"added,omitempty"`
+	Deleted int32 `protobuf:"varint,5,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	Binary  bool  `protobuf:"varint,6,opt,name=binary,proto3" json:"binary,omitempty"`
+	// Changed in the working tree or index (not committed yet).
+	Uncommitted bool `protobuf:"varint,7,opt,name=uncommitted,proto3" json:"uncommitted,omitempty"`
+	// An untracked directory git reports as one entry (path ends in "/").
+	IsDir         bool `protobuf:"varint,8,opt,name=is_dir,json=isDir,proto3" json:"is_dir,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FileChange) Reset() {
+	*x = FileChange{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FileChange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileChange) ProtoMessage() {}
+
+func (x *FileChange) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FileChange.ProtoReflect.Descriptor instead.
+func (*FileChange) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *FileChange) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *FileChange) GetOldPath() string {
+	if x != nil {
+		return x.OldPath
+	}
+	return ""
+}
+
+func (x *FileChange) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *FileChange) GetAdded() int32 {
+	if x != nil {
+		return x.Added
+	}
+	return 0
+}
+
+func (x *FileChange) GetDeleted() int32 {
+	if x != nil {
+		return x.Deleted
+	}
+	return 0
+}
+
+func (x *FileChange) GetBinary() bool {
+	if x != nil {
+		return x.Binary
+	}
+	return false
+}
+
+func (x *FileChange) GetUncommitted() bool {
+	if x != nil {
+		return x.Uncommitted
+	}
+	return false
+}
+
+func (x *FileChange) GetIsDir() bool {
+	if x != nil {
+		return x.IsDir
+	}
+	return false
+}
+
+type LogEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Sha           string                 `protobuf:"bytes,1,opt,name=sha,proto3" json:"sha,omitempty"`
+	ShortSha      string                 `protobuf:"bytes,2,opt,name=short_sha,json=shortSha,proto3" json:"short_sha,omitempty"`
+	Subject       string                 `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`
+	AuthorName    string                 `protobuf:"bytes,4,opt,name=author_name,json=authorName,proto3" json:"author_name,omitempty"`
+	AuthorEmail   string                 `protobuf:"bytes,5,opt,name=author_email,json=authorEmail,proto3" json:"author_email,omitempty"`
+	AuthoredAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=authored_at,json=authoredAt,proto3" json:"authored_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogEntry) Reset() {
+	*x = LogEntry{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogEntry) ProtoMessage() {}
+
+func (x *LogEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogEntry.ProtoReflect.Descriptor instead.
+func (*LogEntry) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *LogEntry) GetSha() string {
+	if x != nil {
+		return x.Sha
+	}
+	return ""
+}
+
+func (x *LogEntry) GetShortSha() string {
+	if x != nil {
+		return x.ShortSha
+	}
+	return ""
+}
+
+func (x *LogEntry) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *LogEntry) GetAuthorName() string {
+	if x != nil {
+		return x.AuthorName
+	}
+	return ""
+}
+
+func (x *LogEntry) GetAuthorEmail() string {
+	if x != nil {
+		return x.AuthorEmail
+	}
+	return ""
+}
+
+func (x *LogEntry) GetAuthoredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AuthoredAt
+	}
+	return nil
+}
+
 type RepoSnapshot struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Repos         []*Repo                `protobuf:"bytes,1,rep,name=repos,proto3" json:"repos,omitempty"`
@@ -1184,7 +1685,7 @@ type RepoSnapshot struct {
 
 func (x *RepoSnapshot) Reset() {
 	*x = RepoSnapshot{}
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1196,7 +1697,7 @@ func (x *RepoSnapshot) String() string {
 func (*RepoSnapshot) ProtoMessage() {}
 
 func (x *RepoSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1209,7 +1710,7 @@ func (x *RepoSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RepoSnapshot.ProtoReflect.Descriptor instead.
 func (*RepoSnapshot) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{19}
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *RepoSnapshot) GetRepos() []*Repo {
@@ -1229,7 +1730,7 @@ type WorktreeRef struct {
 
 func (x *WorktreeRef) Reset() {
 	*x = WorktreeRef{}
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1241,7 +1742,7 @@ func (x *WorktreeRef) String() string {
 func (*WorktreeRef) ProtoMessage() {}
 
 func (x *WorktreeRef) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1254,7 +1755,7 @@ func (x *WorktreeRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorktreeRef.ProtoReflect.Descriptor instead.
 func (*WorktreeRef) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{20}
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *WorktreeRef) GetRepoId() string {
@@ -1343,19 +1844,64 @@ const file_codefoundry_v1_repo_proto_rawDesc = "" +
 	"\x12RefreshRepoRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x15\n" +
 	"\x13RefreshRepoResponse\"\x13\n" +
-	"\x11WatchReposRequest\"\xc6\x02\n" +
+	"\x11WatchReposRequest\"\xa3\x03\n" +
 	"\tRepoEvent\x129\n" +
 	"\frepo_updated\x18\x01 \x01(\v2\x14.codefoundry.v1.RepoH\x00R\vrepoUpdated\x12(\n" +
 	"\x0frepo_removed_id\x18\x02 \x01(\tH\x00R\rrepoRemovedId\x12E\n" +
 	"\x10worktree_updated\x18\x03 \x01(\v2\x18.codefoundry.v1.WorktreeH\x00R\x0fworktreeUpdated\x12H\n" +
 	"\x10worktree_removed\x18\x04 \x01(\v2\x1b.codefoundry.v1.WorktreeRefH\x00R\x0fworktreeRemoved\x12:\n" +
-	"\bsnapshot\x18\x05 \x01(\v2\x1c.codefoundry.v1.RepoSnapshotH\x00R\bsnapshotB\a\n" +
-	"\x05event\":\n" +
+	"\bsnapshot\x18\x05 \x01(\v2\x1c.codefoundry.v1.RepoSnapshotH\x00R\bsnapshot\x12[\n" +
+	"\x17worktree_detail_updated\x18\x06 \x01(\v2!.codefoundry.v1.WorktreeDetailRefH\x00R\x15worktreeDetailUpdatedB\a\n" +
+	"\x05event\"}\n" +
+	"\x11WorktreeDetailRef\x12\x17\n" +
+	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12;\n" +
+	"\vcomputed_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"computedAt\"G\n" +
+	"\x18GetWorktreeDetailRequest\x12\x17\n" +
+	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\"S\n" +
+	"\x19GetWorktreeDetailResponse\x126\n" +
+	"\x06detail\x18\x01 \x01(\v2\x1e.codefoundry.v1.WorktreeDetailR\x06detail\"\x82\x03\n" +
+	"\x0eWorktreeDetail\x12\x17\n" +
+	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x19\n" +
+	"\bbase_ref\x18\x03 \x01(\tR\abaseRef\x12\x1d\n" +
+	"\n" +
+	"merge_base\x18\x04 \x01(\tR\tmergeBase\x12\x12\n" +
+	"\x04head\x18\x05 \x01(\tR\x04head\x120\n" +
+	"\x05files\x18\x06 \x03(\v2\x1a.codefoundry.v1.FileChangeR\x05files\x12'\n" +
+	"\x0ffiles_truncated\x18\a \x01(\bR\x0efilesTruncated\x12*\n" +
+	"\x03log\x18\b \x03(\v2\x18.codefoundry.v1.LogEntryR\x03log\x12\x1b\n" +
+	"\tlog_total\x18\t \x01(\x05R\blogTotal\x12;\n" +
+	"\vcomputed_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"computedAt\x12\x14\n" +
+	"\x05error\x18\v \x01(\tR\x05error\"\xd4\x01\n" +
+	"\n" +
+	"FileChange\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x19\n" +
+	"\bold_path\x18\x02 \x01(\tR\aoldPath\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\x12\x14\n" +
+	"\x05added\x18\x04 \x01(\x05R\x05added\x12\x18\n" +
+	"\adeleted\x18\x05 \x01(\x05R\adeleted\x12\x16\n" +
+	"\x06binary\x18\x06 \x01(\bR\x06binary\x12 \n" +
+	"\vuncommitted\x18\a \x01(\bR\vuncommitted\x12\x15\n" +
+	"\x06is_dir\x18\b \x01(\bR\x05isDir\"\xd4\x01\n" +
+	"\bLogEntry\x12\x10\n" +
+	"\x03sha\x18\x01 \x01(\tR\x03sha\x12\x1b\n" +
+	"\tshort_sha\x18\x02 \x01(\tR\bshortSha\x12\x18\n" +
+	"\asubject\x18\x03 \x01(\tR\asubject\x12\x1f\n" +
+	"\vauthor_name\x18\x04 \x01(\tR\n" +
+	"authorName\x12!\n" +
+	"\fauthor_email\x18\x05 \x01(\tR\vauthorEmail\x12;\n" +
+	"\vauthored_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"authoredAt\":\n" +
 	"\fRepoSnapshot\x12*\n" +
 	"\x05repos\x18\x01 \x03(\v2\x14.codefoundry.v1.RepoR\x05repos\":\n" +
 	"\vWorktreeRef\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path2\xc5\x05\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path2\xb1\x06\n" +
 	"\vRepoService\x12W\n" +
 	"\bRegister\x12#.codefoundry.v1.RegisterRepoRequest\x1a$.codefoundry.v1.RegisterRepoResponse\"\x00\x12]\n" +
 	"\n" +
@@ -1365,7 +1911,8 @@ const file_codefoundry_v1_repo_proto_rawDesc = "" +
 	"\x0eCreateWorktree\x12%.codefoundry.v1.CreateWorktreeRequest\x1a&.codefoundry.v1.CreateWorktreeResponse\"\x00\x12a\n" +
 	"\x0eRemoveWorktree\x12%.codefoundry.v1.RemoveWorktreeRequest\x1a&.codefoundry.v1.RemoveWorktreeResponse\"\x00\x12T\n" +
 	"\aRefresh\x12\".codefoundry.v1.RefreshRepoRequest\x1a#.codefoundry.v1.RefreshRepoResponse\"\x00\x12I\n" +
-	"\x05Watch\x12!.codefoundry.v1.WatchReposRequest\x1a\x19.codefoundry.v1.RepoEvent\"\x000\x01B\xbe\x01\n" +
+	"\x05Watch\x12!.codefoundry.v1.WatchReposRequest\x1a\x19.codefoundry.v1.RepoEvent\"\x000\x01\x12j\n" +
+	"\x11GetWorktreeDetail\x12(.codefoundry.v1.GetWorktreeDetailRequest\x1a).codefoundry.v1.GetWorktreeDetailResponse\"\x00B\xbe\x01\n" +
 	"\x12com.codefoundry.v1B\tRepoProtoP\x01ZDgithub.com/awaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
@@ -1380,66 +1927,81 @@ func file_codefoundry_v1_repo_proto_rawDescGZIP() []byte {
 	return file_codefoundry_v1_repo_proto_rawDescData
 }
 
-var file_codefoundry_v1_repo_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_codefoundry_v1_repo_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_codefoundry_v1_repo_proto_goTypes = []any{
-	(*Repo)(nil),                   // 0: codefoundry.v1.Repo
-	(*Worktree)(nil),               // 1: codefoundry.v1.Worktree
-	(*GitStatus)(nil),              // 2: codefoundry.v1.GitStatus
-	(*RegisterRepoRequest)(nil),    // 3: codefoundry.v1.RegisterRepoRequest
-	(*RegisterRepoResponse)(nil),   // 4: codefoundry.v1.RegisterRepoResponse
-	(*UnregisterRepoRequest)(nil),  // 5: codefoundry.v1.UnregisterRepoRequest
-	(*UnregisterRepoResponse)(nil), // 6: codefoundry.v1.UnregisterRepoResponse
-	(*ListReposRequest)(nil),       // 7: codefoundry.v1.ListReposRequest
-	(*ListReposResponse)(nil),      // 8: codefoundry.v1.ListReposResponse
-	(*GetRepoRequest)(nil),         // 9: codefoundry.v1.GetRepoRequest
-	(*GetRepoResponse)(nil),        // 10: codefoundry.v1.GetRepoResponse
-	(*CreateWorktreeRequest)(nil),  // 11: codefoundry.v1.CreateWorktreeRequest
-	(*CreateWorktreeResponse)(nil), // 12: codefoundry.v1.CreateWorktreeResponse
-	(*RemoveWorktreeRequest)(nil),  // 13: codefoundry.v1.RemoveWorktreeRequest
-	(*RemoveWorktreeResponse)(nil), // 14: codefoundry.v1.RemoveWorktreeResponse
-	(*RefreshRepoRequest)(nil),     // 15: codefoundry.v1.RefreshRepoRequest
-	(*RefreshRepoResponse)(nil),    // 16: codefoundry.v1.RefreshRepoResponse
-	(*WatchReposRequest)(nil),      // 17: codefoundry.v1.WatchReposRequest
-	(*RepoEvent)(nil),              // 18: codefoundry.v1.RepoEvent
-	(*RepoSnapshot)(nil),           // 19: codefoundry.v1.RepoSnapshot
-	(*WorktreeRef)(nil),            // 20: codefoundry.v1.WorktreeRef
-	(*timestamppb.Timestamp)(nil),  // 21: google.protobuf.Timestamp
+	(*Repo)(nil),                      // 0: codefoundry.v1.Repo
+	(*Worktree)(nil),                  // 1: codefoundry.v1.Worktree
+	(*GitStatus)(nil),                 // 2: codefoundry.v1.GitStatus
+	(*RegisterRepoRequest)(nil),       // 3: codefoundry.v1.RegisterRepoRequest
+	(*RegisterRepoResponse)(nil),      // 4: codefoundry.v1.RegisterRepoResponse
+	(*UnregisterRepoRequest)(nil),     // 5: codefoundry.v1.UnregisterRepoRequest
+	(*UnregisterRepoResponse)(nil),    // 6: codefoundry.v1.UnregisterRepoResponse
+	(*ListReposRequest)(nil),          // 7: codefoundry.v1.ListReposRequest
+	(*ListReposResponse)(nil),         // 8: codefoundry.v1.ListReposResponse
+	(*GetRepoRequest)(nil),            // 9: codefoundry.v1.GetRepoRequest
+	(*GetRepoResponse)(nil),           // 10: codefoundry.v1.GetRepoResponse
+	(*CreateWorktreeRequest)(nil),     // 11: codefoundry.v1.CreateWorktreeRequest
+	(*CreateWorktreeResponse)(nil),    // 12: codefoundry.v1.CreateWorktreeResponse
+	(*RemoveWorktreeRequest)(nil),     // 13: codefoundry.v1.RemoveWorktreeRequest
+	(*RemoveWorktreeResponse)(nil),    // 14: codefoundry.v1.RemoveWorktreeResponse
+	(*RefreshRepoRequest)(nil),        // 15: codefoundry.v1.RefreshRepoRequest
+	(*RefreshRepoResponse)(nil),       // 16: codefoundry.v1.RefreshRepoResponse
+	(*WatchReposRequest)(nil),         // 17: codefoundry.v1.WatchReposRequest
+	(*RepoEvent)(nil),                 // 18: codefoundry.v1.RepoEvent
+	(*WorktreeDetailRef)(nil),         // 19: codefoundry.v1.WorktreeDetailRef
+	(*GetWorktreeDetailRequest)(nil),  // 20: codefoundry.v1.GetWorktreeDetailRequest
+	(*GetWorktreeDetailResponse)(nil), // 21: codefoundry.v1.GetWorktreeDetailResponse
+	(*WorktreeDetail)(nil),            // 22: codefoundry.v1.WorktreeDetail
+	(*FileChange)(nil),                // 23: codefoundry.v1.FileChange
+	(*LogEntry)(nil),                  // 24: codefoundry.v1.LogEntry
+	(*RepoSnapshot)(nil),              // 25: codefoundry.v1.RepoSnapshot
+	(*WorktreeRef)(nil),               // 26: codefoundry.v1.WorktreeRef
+	(*timestamppb.Timestamp)(nil),     // 27: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_repo_proto_depIdxs = []int32{
 	1,  // 0: codefoundry.v1.Repo.worktrees:type_name -> codefoundry.v1.Worktree
-	21, // 1: codefoundry.v1.Repo.registered_at:type_name -> google.protobuf.Timestamp
+	27, // 1: codefoundry.v1.Repo.registered_at:type_name -> google.protobuf.Timestamp
 	2,  // 2: codefoundry.v1.Worktree.status:type_name -> codefoundry.v1.GitStatus
-	21, // 3: codefoundry.v1.GitStatus.refreshed_at:type_name -> google.protobuf.Timestamp
+	27, // 3: codefoundry.v1.GitStatus.refreshed_at:type_name -> google.protobuf.Timestamp
 	0,  // 4: codefoundry.v1.RegisterRepoResponse.repo:type_name -> codefoundry.v1.Repo
 	0,  // 5: codefoundry.v1.ListReposResponse.repos:type_name -> codefoundry.v1.Repo
 	0,  // 6: codefoundry.v1.GetRepoResponse.repo:type_name -> codefoundry.v1.Repo
 	1,  // 7: codefoundry.v1.CreateWorktreeResponse.worktree:type_name -> codefoundry.v1.Worktree
 	0,  // 8: codefoundry.v1.RepoEvent.repo_updated:type_name -> codefoundry.v1.Repo
 	1,  // 9: codefoundry.v1.RepoEvent.worktree_updated:type_name -> codefoundry.v1.Worktree
-	20, // 10: codefoundry.v1.RepoEvent.worktree_removed:type_name -> codefoundry.v1.WorktreeRef
-	19, // 11: codefoundry.v1.RepoEvent.snapshot:type_name -> codefoundry.v1.RepoSnapshot
-	0,  // 12: codefoundry.v1.RepoSnapshot.repos:type_name -> codefoundry.v1.Repo
-	3,  // 13: codefoundry.v1.RepoService.Register:input_type -> codefoundry.v1.RegisterRepoRequest
-	5,  // 14: codefoundry.v1.RepoService.Unregister:input_type -> codefoundry.v1.UnregisterRepoRequest
-	7,  // 15: codefoundry.v1.RepoService.List:input_type -> codefoundry.v1.ListReposRequest
-	9,  // 16: codefoundry.v1.RepoService.Get:input_type -> codefoundry.v1.GetRepoRequest
-	11, // 17: codefoundry.v1.RepoService.CreateWorktree:input_type -> codefoundry.v1.CreateWorktreeRequest
-	13, // 18: codefoundry.v1.RepoService.RemoveWorktree:input_type -> codefoundry.v1.RemoveWorktreeRequest
-	15, // 19: codefoundry.v1.RepoService.Refresh:input_type -> codefoundry.v1.RefreshRepoRequest
-	17, // 20: codefoundry.v1.RepoService.Watch:input_type -> codefoundry.v1.WatchReposRequest
-	4,  // 21: codefoundry.v1.RepoService.Register:output_type -> codefoundry.v1.RegisterRepoResponse
-	6,  // 22: codefoundry.v1.RepoService.Unregister:output_type -> codefoundry.v1.UnregisterRepoResponse
-	8,  // 23: codefoundry.v1.RepoService.List:output_type -> codefoundry.v1.ListReposResponse
-	10, // 24: codefoundry.v1.RepoService.Get:output_type -> codefoundry.v1.GetRepoResponse
-	12, // 25: codefoundry.v1.RepoService.CreateWorktree:output_type -> codefoundry.v1.CreateWorktreeResponse
-	14, // 26: codefoundry.v1.RepoService.RemoveWorktree:output_type -> codefoundry.v1.RemoveWorktreeResponse
-	16, // 27: codefoundry.v1.RepoService.Refresh:output_type -> codefoundry.v1.RefreshRepoResponse
-	18, // 28: codefoundry.v1.RepoService.Watch:output_type -> codefoundry.v1.RepoEvent
-	21, // [21:29] is the sub-list for method output_type
-	13, // [13:21] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	26, // 10: codefoundry.v1.RepoEvent.worktree_removed:type_name -> codefoundry.v1.WorktreeRef
+	25, // 11: codefoundry.v1.RepoEvent.snapshot:type_name -> codefoundry.v1.RepoSnapshot
+	19, // 12: codefoundry.v1.RepoEvent.worktree_detail_updated:type_name -> codefoundry.v1.WorktreeDetailRef
+	27, // 13: codefoundry.v1.WorktreeDetailRef.computed_at:type_name -> google.protobuf.Timestamp
+	22, // 14: codefoundry.v1.GetWorktreeDetailResponse.detail:type_name -> codefoundry.v1.WorktreeDetail
+	23, // 15: codefoundry.v1.WorktreeDetail.files:type_name -> codefoundry.v1.FileChange
+	24, // 16: codefoundry.v1.WorktreeDetail.log:type_name -> codefoundry.v1.LogEntry
+	27, // 17: codefoundry.v1.WorktreeDetail.computed_at:type_name -> google.protobuf.Timestamp
+	27, // 18: codefoundry.v1.LogEntry.authored_at:type_name -> google.protobuf.Timestamp
+	0,  // 19: codefoundry.v1.RepoSnapshot.repos:type_name -> codefoundry.v1.Repo
+	3,  // 20: codefoundry.v1.RepoService.Register:input_type -> codefoundry.v1.RegisterRepoRequest
+	5,  // 21: codefoundry.v1.RepoService.Unregister:input_type -> codefoundry.v1.UnregisterRepoRequest
+	7,  // 22: codefoundry.v1.RepoService.List:input_type -> codefoundry.v1.ListReposRequest
+	9,  // 23: codefoundry.v1.RepoService.Get:input_type -> codefoundry.v1.GetRepoRequest
+	11, // 24: codefoundry.v1.RepoService.CreateWorktree:input_type -> codefoundry.v1.CreateWorktreeRequest
+	13, // 25: codefoundry.v1.RepoService.RemoveWorktree:input_type -> codefoundry.v1.RemoveWorktreeRequest
+	15, // 26: codefoundry.v1.RepoService.Refresh:input_type -> codefoundry.v1.RefreshRepoRequest
+	17, // 27: codefoundry.v1.RepoService.Watch:input_type -> codefoundry.v1.WatchReposRequest
+	20, // 28: codefoundry.v1.RepoService.GetWorktreeDetail:input_type -> codefoundry.v1.GetWorktreeDetailRequest
+	4,  // 29: codefoundry.v1.RepoService.Register:output_type -> codefoundry.v1.RegisterRepoResponse
+	6,  // 30: codefoundry.v1.RepoService.Unregister:output_type -> codefoundry.v1.UnregisterRepoResponse
+	8,  // 31: codefoundry.v1.RepoService.List:output_type -> codefoundry.v1.ListReposResponse
+	10, // 32: codefoundry.v1.RepoService.Get:output_type -> codefoundry.v1.GetRepoResponse
+	12, // 33: codefoundry.v1.RepoService.CreateWorktree:output_type -> codefoundry.v1.CreateWorktreeResponse
+	14, // 34: codefoundry.v1.RepoService.RemoveWorktree:output_type -> codefoundry.v1.RemoveWorktreeResponse
+	16, // 35: codefoundry.v1.RepoService.Refresh:output_type -> codefoundry.v1.RefreshRepoResponse
+	18, // 36: codefoundry.v1.RepoService.Watch:output_type -> codefoundry.v1.RepoEvent
+	21, // 37: codefoundry.v1.RepoService.GetWorktreeDetail:output_type -> codefoundry.v1.GetWorktreeDetailResponse
+	29, // [29:38] is the sub-list for method output_type
+	20, // [20:29] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_repo_proto_init() }
@@ -1453,6 +2015,7 @@ func file_codefoundry_v1_repo_proto_init() {
 		(*RepoEvent_WorktreeUpdated)(nil),
 		(*RepoEvent_WorktreeRemoved)(nil),
 		(*RepoEvent_Snapshot)(nil),
+		(*RepoEvent_WorktreeDetailUpdated)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1460,7 +2023,7 @@ func file_codefoundry_v1_repo_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_repo_proto_rawDesc), len(file_codefoundry_v1_repo_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   21,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

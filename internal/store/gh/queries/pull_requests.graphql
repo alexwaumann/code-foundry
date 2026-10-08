@@ -3,9 +3,12 @@
 # PR with 100+ checks costs no more than one with none. Polled every 60s per tracked repo.
 # Server time is ~95ms per PR (the check counts and reviewDecision dominate), so pages are
 # small (DefaultPageSize = 25, ~2.6s) to stay well under GitHub's 10s timeout.
-query PullRequests($owner: String!, $name: String!, $first: Int!, $after: String) {
+# Page one also selects the default branch's head commit checks (withDefaultBranch, +~0.6s),
+# so default-branch CI is polled with the PR list at no extra request.
+query PullRequests($owner: String!, $name: String!, $first: Int!, $after: String, $withDefaultBranch: Boolean = false) {
   rateLimit { ...RateLimitFields }
   repository(owner: $owner, name: $name) {
+    ...DefaultBranchFields @include(if: $withDefaultBranch)
     pullRequests(
       states: [OPEN]
       first: $first

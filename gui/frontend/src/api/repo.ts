@@ -17,6 +17,12 @@ export interface GitStatusView {
   untracked: number;
   dirty: boolean;
   refreshedAtMs: number | null;
+  /** Remote-tracking default branch HEAD is compared with ("origin/main"); "" when none. */
+  baseRef?: string;
+  baseAhead?: number;
+  baseBehind?: number;
+  /** Last status refresh error ("" when fine). */
+  error?: string;
 }
 
 export interface WorktreeView {
@@ -42,7 +48,9 @@ export type RepoEventView =
   | { kind: "repoUpdated"; repo: RepoView }
   | { kind: "repoRemoved"; id: string }
   | { kind: "worktreeUpdated"; worktree: WorktreeView }
-  | { kind: "worktreeRemoved"; repoId: string; path: string };
+  | { kind: "worktreeRemoved"; repoId: string; path: string }
+  /** The worktree's detail changed (see api/worktreeDetail.ts); repo state is unchanged. */
+  | { kind: "worktreeDetailUpdated"; repoId: string; path: string };
 
 const cleanStatus: GitStatusView = {
   upstream: "",
@@ -53,6 +61,10 @@ const cleanStatus: GitStatusView = {
   untracked: 0,
   dirty: false,
   refreshedAtMs: null,
+  baseRef: "",
+  baseAhead: 0,
+  baseBehind: 0,
+  error: "",
 };
 
 export function toGitStatusView(s: GitStatus | undefined): GitStatusView {
@@ -66,6 +78,10 @@ export function toGitStatusView(s: GitStatus | undefined): GitStatusView {
     untracked: s.untracked,
     dirty: s.dirty,
     refreshedAtMs: s.refreshedAt ? timestampMs(s.refreshedAt) : null,
+    baseRef: s.baseRef,
+    baseAhead: s.baseAhead,
+    baseBehind: s.baseBehind,
+    error: s.error,
   };
 }
 
@@ -97,6 +113,8 @@ export function toRepoEventView(ev: RepoEvent): RepoEventView | null {
       return { kind: "worktreeUpdated", worktree: toWorktreeView(e.value) };
     case "worktreeRemoved":
       return { kind: "worktreeRemoved", repoId: e.value.repoId, path: e.value.path };
+    case "worktreeDetailUpdated":
+      return { kind: "worktreeDetailUpdated", repoId: e.value.repoId, path: e.value.path };
     default:
       return null;
   }

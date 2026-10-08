@@ -1,10 +1,11 @@
 /**
  * Window-level views that are not selections: the settings page (replaces the content
- * area) and the help overlay. Opened by view.settings / view.help (their chords are
+ * area) and the help overlay. Top-level pages that are selections (ui.ts `viewNames`,
+ * the Pull Requests page) are routed to `select`. Opened by view.settings / view.help (their chords are
  * presented locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon.
  */
 import { create } from "zustand";
-import { useUiStore } from "./ui";
+import { useUiStore, viewNames } from "./ui";
 
 interface ViewsState {
   settingsOpen: boolean;
@@ -23,7 +24,12 @@ export function showView(name: string): boolean {
       useViewsStore.setState({ helpOpen: true });
       return true;
     default:
-      return false;
+      // Top-level pages (the Pull Requests page) are selections. Closing settings here
+      // too covers re-selecting the page that is already selected.
+      if (!viewNames.includes(name)) return false;
+      useViewsStore.setState({ settingsOpen: false, helpOpen: false });
+      useUiStore.getState().select({ kind: "view", name });
+      return true;
   }
 }
 

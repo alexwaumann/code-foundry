@@ -363,12 +363,18 @@ func (s ghSource) subscribe(ctx context.Context) <-chan *v1.Event {
 	return fanIn(ctx,
 		newTap(s.bus, ghWatchBuffer, func(e gh.PullRequestsUpdated) *v1.Event { return ghWrap(ghPullRequestsEvent(e)) }),
 		newTap(s.bus, ghWatchBuffer, func(e gh.ViewerUpdated) *v1.Event { return ghWrap(ghViewerEvent(e)) }),
+		newTap(s.bus, ghWatchBuffer, func(e gh.DashboardUpdated) *v1.Event { return ghWrap(ghDashboardEvent(e)) }),
+		newTap(s.bus, ghWatchBuffer, func(e gh.RepoActivityUpdated) *v1.Event { return ghWrap(ghRepoActivityEvent(e)) }),
+		newTap(s.bus, ghWatchBuffer, func(e gh.BranchPullRequestsUpdated) *v1.Event { return ghWrap(ghBranchEvent(e)) }),
 	)
 }
 
 func (s ghSource) snapshot(context.Context) []*v1.Event {
 	snap := s.store.Snapshot()
-	out := []*v1.Event{ghWrap(ghViewerEvent(gh.ViewerUpdated{FetchedAt: snap.Viewer.FetchedAt}))}
+	out := []*v1.Event{
+		ghWrap(ghViewerEvent(gh.ViewerUpdated{FetchedAt: snap.Viewer.FetchedAt})),
+		ghWrap(ghDashboardEvent(gh.DashboardUpdated{FetchedAt: snap.Dashboard.FetchedAt})),
+	}
 	slugs := make([]string, 0, len(snap.Repos))
 	for slug := range snap.Repos {
 		slugs = append(slugs, slug)

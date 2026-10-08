@@ -111,8 +111,11 @@ Services (v1):
   disconnected) and detector `status` (busy, idle, needs-attention) with `status_reason`.
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
   chunks), Write (input bytes), Resize, Detach.
-* `RepoService` — Register, Unregister, List, ListWorktrees, CreateWorktree, Watch.
-* `GhService` — ListPullRequests, GetChecks, Watch.
+* `RepoService` — Register, Unregister, List, ListWorktrees, CreateWorktree, Watch,
+  GetWorktreeDetail (files and log against the base branch, Phase 3a).
+* `GhService` — ListPullRequests, GetChecks, Watch; GetDashboard, GetRepoActivity,
+  GetBranchPullRequests (the viewer's PR dashboards, monthly stats, default-branch CI,
+  Phase 3a).
 * `GitOpsService` — Fetch, Pull, Push, CreatePullRequest, OpenPullRequest, OpenEditor,
   Reveal, OpenUrl, List, Watch. One operation at a time per worktree; a failed operation
   is a result (state FAILED, output), not an RPC error. The GUI reaches it only through

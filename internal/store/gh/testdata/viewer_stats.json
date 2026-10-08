@@ -1,0 +1,24 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4496,
+      "resetAt": "2026-10-08T09:24:26Z"
+    },
+    "mergedThis": {
+      "issueCount": 4
+    },
+    "mergedLast": {
+      "issueCount": 22
+    },
+    "user": {
+      "thisMonth": {
+        "totalCommitContributions": 35
+      },
+      "lastMonth": {
+        "totalCommitContributions": 143
+      }
+    }
+  }
+}

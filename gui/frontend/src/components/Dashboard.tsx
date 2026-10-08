@@ -1,7 +1,8 @@
 import { useMemo } from "react";
-import { FolderGit2, GitBranch, SquareTerminal } from "lucide-react";
+import { SquareTerminal } from "lucide-react";
+import { WorktreeOverview } from "@/components/overview/WorktreeOverview";
 import { formatChord } from "@/keys/chord";
-import { tildify, terminalLabel } from "@/lib/path";
+import { terminalLabel } from "@/lib/path";
 import { SessionStatusIcon } from "@/components/session/SessionStatusIcon";
 import { badgeLabels, sessionBadge } from "@/lib/session";
 import { ownedTerminalIds, placeSession, placeTerminal } from "@/lib/tree";
@@ -13,21 +14,10 @@ import {
   useSessionPlacementKeys,
   useTerminalPlacementKeys,
 } from "@/stores/context";
-import { findWorktree, useReposStore } from "@/stores/repos";
+import { useReposStore } from "@/stores/repos";
 import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
-
-/** "2 staged · 4 modified · 1 new", omitting zero counts; "clean" when nothing changed. */
-function describeChanges(st: { staged: number; modified: number; untracked: number; dirty: boolean }): string {
-  const parts = [
-    st.staged > 0 && `${String(st.staged)} staged`,
-    st.modified > 0 && `${String(st.modified)} modified`,
-    st.untracked > 0 && `${String(st.untracked)} new`,
-  ].filter(Boolean);
-  if (parts.length > 0) return parts.join(" · ");
-  return st.dirty ? "dirty" : "clean";
-}
 
 function Kbd({ children }: { children: string }) {
   return <kbd className="rounded border bg-muted px-1.5 py-0.5 font-sans text-xs">{children}</kbd>;
@@ -92,38 +82,15 @@ function TerminalLink({ id }: { id: string }) {
   );
 }
 
-function WorktreeOverview({ repoId, path }: { repoId: string; path: string | null }) {
-  const repo = useReposStore((s) => s.byId[repoId]);
-  const mainPath = repo?.worktrees.find((w) => w.isMain)?.path ?? repo?.path ?? "";
-  const wt = useReposStore((s) => findWorktree(s, repoId, path ?? mainPath));
+/**
+ * The sessions and terminals placed on a worktree (or, with path null, anywhere in the
+ * repo). Rendered by the worktree overview (components/overview).
+ */
+export function WorktreeItems({ repoId, path }: { repoId: string; path: string | null }) {
   const { sessions, terminals } = useItemsIn(repoId, path);
   const sessionsAvailable = useSessionsStore((s) => s.availability !== "unavailable");
-  if (!repo) return <p className="text-sm text-muted-foreground">Repository not found.</p>;
-  const st = wt?.status;
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-6">
-      <header className="flex items-start gap-3">
-        {path ? <GitBranch className="mt-1 size-5 text-violet-400" /> : <FolderGit2 className="mt-1 size-5 text-sky-400" />}
-        <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold">{path ? wt?.branch || path : repo.name}</h1>
-          <p className="truncate text-sm text-muted-foreground">{tildify(path ?? repo.path)}</p>
-        </div>
-      </header>
-      {st && (
-        <dl className="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] gap-x-8 gap-y-4 rounded-lg border p-4 text-sm">
-          {[
-            ["upstream", st.upstream || "—"],
-            ["ahead / behind", `${String(st.ahead)} / ${String(st.behind)}`],
-            ["changes", describeChanges(st)],
-            ["default branch", repo.defaultBranch || "—"],
-          ].map(([k, v]) => (
-            <div key={k} className="min-w-0">
-              <dt className="text-xs text-muted-foreground uppercase">{k}</dt>
-              <dd className="truncate font-mono text-xs">{v}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
+    <div className="flex flex-col gap-6">
       {sessionsAvailable && (
         <section>
           <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Sessions</h2>
@@ -192,15 +159,14 @@ function Welcome() {
 
 export function Dashboard() {
   const selection = useUiStore((s) => s.selection);
+  // A repo row is its main worktree (as in deriveContext).
+  if (selection.kind === "repo") return <WorktreeOverview repoId={selection.repoId} path={null} items={<WorktreeItems repoId={selection.repoId} path={null} />} />;
+  if (selection.kind === "worktree") return <WorktreeOverview repoId={selection.repoId} path={selection.path} items={<WorktreeItems repoId={selection.repoId} path={selection.path} />} />;
   return (
     <section className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto p-10" data-region="content" aria-label="Overview">
-      {selection.kind === "repo" && <WorktreeOverview repoId={selection.repoId} path={null} />}
-      {selection.kind === "worktree" && <WorktreeOverview repoId={selection.repoId} path={selection.path} />}
-      {(selection.kind === "none" || selection.kind === "terminal" || selection.kind === "session") && (
-        <div className="mt-[18vh]">
-          <Welcome />
-        </div>
-      )}
+      <div className="mt-[18vh]">
+        <Welcome />
+      </div>
     </section>
   );
 }

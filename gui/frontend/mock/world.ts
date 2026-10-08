@@ -11,6 +11,7 @@ import { SessionState, SessionStatus, type SessionEventSchema, type SessionSchem
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import { MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
+import { GhWorld, ghEvent, viewCommands } from "./github";
 import { Hub } from "./hub";
 import { MockSettings } from "./settings";
 import { MockUpdater } from "./update";
@@ -98,7 +99,7 @@ interface MockWorktree {
   branch: string;
   head: string;
   isMain: boolean;
-  status: { upstream: string; ahead: number; behind: number; staged: number; modified: number; untracked: number; dirty: boolean };
+  status: { upstream: string; ahead: number; behind: number; staged: number; modified: number; untracked: number; dirty: boolean; baseRef?: string; baseAhead?: number; baseBehind?: number };
 }
 
 interface MockRepo {
@@ -146,7 +147,7 @@ const enc = new TextEncoder();
 const HISTORY_CAP = 256 * 1024;
 
 function clean(over: Partial<MockWorktree["status"]> = {}): MockWorktree["status"] {
-  return { upstream: "origin/main", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, ...over };
+  return { upstream: "origin/main", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, baseRef: "origin/main", baseAhead: 0, baseBehind: 0, ...over };
 }
 
 function initialRepos(): MockRepo[] {
@@ -159,8 +160,8 @@ function initialRepos(): MockRepo[] {
       githubSlug: "awaumann/code-foundry",
       worktrees: [
         { path: CF, branch: "main", head: "3c3c4651", isMain: true, status: clean() },
-        { path: `${CFW}/feat-sidebar`, branch: "feat/sidebar", head: "9a8b7c6d", isMain: false, status: clean({ upstream: "origin/feat/sidebar", ahead: 2, modified: 3, untracked: 1, dirty: true }) },
-        { path: `${CFW}/fix-resize`, branch: "fix/resize", head: "1f2e3d4c", isMain: false, status: clean({ upstream: "origin/fix/resize", behind: 1 }) },
+        { path: `${CFW}/feat-sidebar`, branch: "feat/sidebar", head: "9a8b7c6d", isMain: false, status: clean({ upstream: "origin/feat/sidebar", ahead: 2, modified: 3, untracked: 1, dirty: true, baseAhead: 3, baseBehind: 1 }) },
+        { path: `${CFW}/fix-resize`, branch: "fix/resize", head: "1f2e3d4c", isMain: false, status: clean({ upstream: "origin/fix/resize", behind: 1, baseAhead: 12 }) },
       ],
     },
     {
@@ -177,7 +178,7 @@ function initialRepos(): MockRepo[] {
       name: "dotfiles",
       defaultBranch: "main",
       githubSlug: "",
-      worktrees: [{ path: `${HOME}/dotfiles`, branch: "main", head: "0badc0de", isMain: true, status: clean({ upstream: "" }) }],
+      worktrees: [{ path: `${HOME}/dotfiles`, branch: "main", head: "0badc0de", isMain: true, status: clean({ upstream: "", baseRef: "" }) }],
     },
   ];
 }
@@ -205,6 +206,11 @@ export class World {
     (v) => this.events.publish({ source: EventSource.UPDATE, event: { event: { case: "update", value: v } } }),
     () => [...this.sessions.values()].filter((s) => s.state !== SessionState.DISCONNECTED).length,
   );
+  /** Phase 3a GitHub dashboards/activity and worktree details (mock/github.ts). */
+  readonly gh = new GhWorld(
+    (e) => this.events.publish(ghEvent(e)),
+    (e) => this.repoEvents.publish(e),
+  );
   /** EventService watchers that include UI intents (they count toward Emit's `delivered`). */
   uiEventWatchers = 0;
   invocations: Invocation[] = [];
@@ -229,6 +235,7 @@ export class World {
     this.resizes = [];
     this.nextId = 1;
     for (const r of initialRepos()) this.repos.set(r.id, r);
+    this.gh.reset();
     const started = new Date(Date.now() - 42 * 60_000);
     this.addTerm({ id: "t-claude", argv: ["claude"], cwd: CF, title: "✳ Refactor sidebar tree", kind: "claude", labels: { worktree: CF, session: "s-1" }, startedAt: started });
     this.addTerm({ id: "t-logs", argv: ["/bin/zsh"], cwd: `${CF}/internal/daemon`, title: "tail -f daemon.log", kind: "logs", labels: {}, startedAt: started });
@@ -668,6 +675,7 @@ export class World {
     const activeSession = (ctx: UiContext | undefined) => (ctx?.activeSessionId ? this.sessions.get(ctx.activeSessionId) : undefined);
     const always = () => true;
     return [
+      ...viewCommands((i) => this.emit(i)),
       {
         cmd: { name: "terminal.new", title: "New Terminal", category: "Terminal", description: "Start a shell in the active worktree", keybindings: ["cmd+t"], args: [{ name: "cwd", type: ArgType.PATH, required: false, description: "Working directory" }] },
         when: always,
@@ -832,7 +840,7 @@ export class World {
           const repo = this.repos.get(ctx?.activeRepoId ?? "");
           if (!repo) throw new CommandError("unavailable", "no active repository");
           const branch = args.branch ?? "";
-          const w: MockWorktree = { path: `${repo.path}.worktrees/${branch.replace(/\//g, "-")}`, branch, head: "c0ffee00", isMain: false, status: clean({ upstream: "" }) };
+          const w: MockWorktree = { path: `${repo.path}.worktrees/${branch.replace(/\//g, "-")}`, branch, head: "c0ffee00", isMain: false, status: clean({ upstream: "", baseRef: "" }) };
           repo.worktrees.push(w);
           this.repoEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(repo.id, w) } });
           this.intents.publish({ intent: { case: "focusRepo", value: { repoId: repo.id, worktreePath: w.path } } });

@@ -103,6 +103,8 @@ type Git struct {
 	sched   *scheduler
 	deb     *debouncer
 
+	details detailState // worktree detail cache (detail.go)
+
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 }
@@ -557,6 +559,9 @@ func (g *Git) runJob(ctx context.Context, k jobKey) {
 		g.reconcile(ctx, k.repoID)
 	case jobStatus:
 		g.status(ctx, k.repoID, k.path)
+		g.detailAfterStatus(k.repoID, k.path)
+	case jobDetail:
+		g.detail(ctx, k.repoID, k.path)
 	}
 }
 

@@ -22,7 +22,8 @@ message UiIntent {
     ShowView show_view = 6;
   }
 
-  // ShowView opens a named GUI view: "help", "settings".
+  // ShowView opens a named GUI view: "help", "settings", "pullrequests".
+  // Unknown names are ignored.
   message ShowView {
     string name = 1;
   }

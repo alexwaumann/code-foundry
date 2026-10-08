@@ -2,6 +2,7 @@
 query Viewer {
   rateLimit { ...RateLimitFields }
   viewer {
+    id
     login
     name
     avatarUrl

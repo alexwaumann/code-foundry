@@ -14,6 +14,8 @@ export function selectionKey(sel: Selection): string | null {
       return repoKey(sel.repoId);
     case "worktree":
       return worktreeKey(sel.repoId, sel.path);
+    case "view":
+      return null;
   }
 }
 

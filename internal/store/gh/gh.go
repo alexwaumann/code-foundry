@@ -1,6 +1,7 @@
 // Package gh is the GitHub store: the authenticated viewer, open pull requests of
 // tracked repositories with a check rollup each, and on-demand pull request and ref
-// check details.
+// check details. Phase 3a adds the viewer's dashboards, monthly stats, default-branch
+// CI, and per-branch pull requests (activity*.go).
 //
 // All GitHub access goes through the user's authenticated `gh` CLI (`gh api graphql`,
 // `gh auth status`) via a Runner. A single worker goroutine owns the network: one
@@ -38,6 +39,10 @@ type Service interface {
 	PullRequest(ctx context.Context, slug string, number int) (PullRequestDetail, error)
 	// Checks returns the checks on the commit a ref resolves to.
 	Checks(ctx context.Context, slug, ref string) (RefChecks, error)
+	// BranchPullRequests returns the viewer's cached pull requests whose head is
+	// branch head of the repository, and keeps that branch polled for a while
+	// (activity.go). It never waits on GitHub.
+	BranchPullRequests(ctx context.Context, slug, head string) (BranchPullRequests, error)
 }
 
 // Errors returned by the store and the runner. Match with errors.Is.
@@ -140,6 +145,9 @@ const (
 
 // Viewer is the authenticated GitHub user.
 type Viewer struct {
+	// ID is the GraphQL node id (filters commit history by author). Empty in caches
+	// written before Phase 3a; the next viewer poll fills it.
+	ID        string `json:"id,omitempty"`
 	Login     string `json:"login"`
 	Name      string `json:"name,omitempty"`
 	AvatarURL string `json:"avatarUrl,omitempty"`
@@ -173,6 +181,13 @@ type PullRequest struct {
 	URL               string           `json:"url"`
 	UpdatedAt         time.Time        `json:"updatedAt"`
 	Checks            CheckRollup      `json:"checks"`
+	// Repo is the "owner/name" (lower case) of search and branch results.
+	// Set for pull requests found by search or head branch (see activity.go); the
+	// open-PR list leaves them empty.
+	Repo      string           `json:"repo,omitempty"`
+	State     PullRequestState `json:"state,omitempty"`
+	CreatedAt time.Time        `json:"createdAt,omitzero"`
+	MergedAt  time.Time        `json:"mergedAt,omitzero"`
 }
 
 // CheckRun is one check on a commit: a check run (GitHub Actions job, app check) or a
@@ -208,6 +223,9 @@ type RepoState struct {
 	TotalCount int
 	FetchedAt  time.Time
 	LastError  string
+	// Activity is the viewer's monthly stats here and the default branch's CI
+	// (activity.go). Its fetch times and errors are its own.
+	Activity RepoActivity
 }
 
 // PullRequestDetail is one pull request with every check on its head commit.
@@ -234,6 +252,9 @@ type Snapshot struct {
 	// Repos holds tracked repositories and any cached untracked ones, keyed by
 	// normalized slug.
 	Repos map[string]RepoState
+	// Dashboard is the viewer's pull request dashboards and global monthly stats
+	// (activity.go), unfiltered: readers keep the tracked repositories they want.
+	Dashboard Dashboard
 }
 
 // Repo returns the state for slug (any case). ok is false for an unknown or invalid slug.
@@ -247,7 +268,7 @@ func (s *Snapshot) Repo(slug string) (RepoState, bool) {
 }
 
 func (s *Snapshot) clone() *Snapshot {
-	n := &Snapshot{Viewer: s.Viewer, Repos: make(map[string]RepoState, len(s.Repos)+1)}
+	n := &Snapshot{Viewer: s.Viewer, Dashboard: s.Dashboard, Repos: make(map[string]RepoState, len(s.Repos)+1)}
 	for k, v := range s.Repos {
 		n.Repos[k] = v
 	}

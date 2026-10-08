@@ -127,7 +127,10 @@ func testOptions(db DB, r Runner, b *bus.Bus) Options {
 		MaxBackoff:       time.Second,
 		PageSize:         25,
 		MaxPages:         2,
-		Rand:             func() float64 { return 0.5 },
+		// Phase 3a polls are off here; activity_test.go turns them on.
+		DashboardInterval: -1,
+		StatsInterval:     -1,
+		Rand:              func() float64 { return 0.5 },
 	}
 }
 
@@ -552,7 +555,9 @@ func TestStoreRefreshAndUntrack(t *testing.T) {
 		t.Errorf("track bad slug: %v", err)
 	}
 
-	// Refresh("") marks everything due and returns immediately.
+	// Refresh("") marks everything due and returns immediately. Wait out the first
+	// viewer poll: a Refresh("") while it is in flight is satisfied by it.
+	waitFor(t, "first viewer poll", func() bool { return !s.Snapshot().Viewer.FetchedAt.IsZero() })
 	before := f.count("Viewer")
 	if err := s.Refresh(ctx, ""); err != nil {
 		t.Fatal(err)
