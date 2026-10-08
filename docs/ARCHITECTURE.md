@@ -67,6 +67,7 @@ internal/
     session/               Claude sessions layered on terminal: spawn, naming, status, resume
     repo/                  registered repos, worktrees, git status, filesystem watcher
     gh/                    gh GraphQL polling, PR/CI cache
+    gitops/                git/gh operations per worktree (fetch, pull, push, PR); editor, Finder, browser
   db/                      SQLite (modernc.org/sqlite, WAL) + migrations
   client/                  Go client for the daemon API, used by CLI and the Wails host
   paths/                   XDG-ish paths: config dir, socket, token, db, logs
@@ -102,11 +103,15 @@ Services (v1):
   chunks), Write (input bytes), Resize, Detach.
 * `RepoService` — Register, Unregister, List, ListWorktrees, CreateWorktree, Watch.
 * `GhService` — ListPullRequests, GetChecks, Watch.
+* `GitOpsService` — Fetch, Pull, Push, CreatePullRequest, OpenPullRequest, OpenEditor,
+  Reveal, OpenUrl, List, Watch. One operation at a time per worktree; a failed operation
+  is a result (state FAILED, output), not an RPC error. The GUI reaches it only through
+  the git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url commands.
 * `CommandService` — List(context) → available commands with their arg schemas; Invoke.
 * `UiService` — WatchIntents (server stream: focus session, open palette, …); Emit (from
   CLI).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
-  intents (sources repo, terminal, session, gh, ui; filterable). On connect it sends each
+  intents (sources repo, terminal, session, gh, gitops, ui; filterable). On connect it sends each
   source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream; the per-service Watch RPCs remain for the CLI and tests.
