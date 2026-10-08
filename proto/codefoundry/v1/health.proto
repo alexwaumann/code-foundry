@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/duration.proto";
+
+// HealthService reports daemon liveness and build information.
+service HealthService {
+  // Ping reports that the daemon is up, with its pid, version and uptime.
+  rpc Ping(PingRequest) returns (PingResponse) {}
+  // Version reports build information for the daemon.
+  rpc Version(VersionRequest) returns (VersionResponse) {}
+}
+
+message PingRequest {}
+
+message PingResponse {
+  // Process id of the daemon.
+  int32 pid = 1;
+  // Daemon version (same as VersionResponse.version).
+  string version = 2;
+  // Time since the daemon started.
+  google.protobuf.Duration uptime = 3;
+}
+
+message VersionRequest {}
+
+message VersionResponse {
+  // Semantic version, or "dev" for local builds.
+  string version = 1;
+  // VCS commit the daemon was built from, if known.
+  string commit = 2;
+  // Go toolchain version the daemon was built with.
+  string go_version = 3;
+}

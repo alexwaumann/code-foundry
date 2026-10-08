@@ -1,0 +1,19 @@
+version: v2
+clean: true
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/awaumann/code-foundry/gen/go
+plugins:
+  - remote: buf.build/protocolbuffers/go:v1.36.12
+    out: gen/go
+    opt: paths=source_relative
+  - remote: buf.build/connectrpc/go:v1.21.0
+    out: gen/go
+    opt: paths=source_relative
+  # protobuf-es v2 emits service descriptors that @connectrpc/connect v2 consumes
+  # directly; the separate protoc-gen-connect-es plugin is only for connect v1.
+  - remote: buf.build/bufbuild/es:v2.16.0
+    out: gui/frontend/src/gen
+    opt: target=ts
