@@ -94,7 +94,7 @@ Status: done on this branch.
 | `sessions.close_grace_seconds` | int 1–120 | 10 | **restart** (session `CloseTimeout`) |
 | `sessions.scrollback_lines` | int 1000–100000 | 10000 | **restart** (terminal `MaxScrollbackLines`); the GUI's xterm scrollback follows live |
 | `github.poll_interval_seconds` | int 15–3600 | 60 | **restart** (gh `RepoInterval`) |
-| `github.dashboards_enabled` | bool | true | no consumer yet (3a's Pull Requests page) |
+| `github.dashboards_enabled` | bool | true | **restart** (gh `DashboardInterval` < 0 turns the dashboard poll off; wired in the Phase 3 integration) |
 | `repos.fetch_interval_seconds` | int 0–86400 (0 = off) | 120 | **restart** (repo `FetchInterval`) |
 | `repos.worktree_dir` | path, `{repo}` expands | `""` = `<repo parent>/<repo>.worktrees` | live (repo.worktree.new) |
 | `gitops.editor_command` | string, `{path}` expands (else appended) | `""` = `CODE_FOUNDRY_EDITOR`, then auto-detect | live (worktree.open.editor; added when merging with 3c) |

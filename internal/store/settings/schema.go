@@ -159,8 +159,8 @@ var staticFields = []Field{
 	{
 		Key: KeyDashboards, Group: GroupGitHub, Type: Bool, Title: "Pull request dashboards",
 		Description: "Fetch the viewer's dashboards (open, awaiting review, recently merged) for the Pull Requests page.",
-		Default:     "true",
-		bind:        func(s *Settings) any { return &s.GitHub.DashboardsEnabled },
+		Default:     "true", Restart: true,
+		bind: func(s *Settings) any { return &s.GitHub.DashboardsEnabled },
 	},
 	{
 		Key: KeyFetchInterval, Group: GroupRepos, Type: Int, Title: "Fetch interval (seconds)",

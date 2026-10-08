@@ -18,7 +18,7 @@ import (
 )
 
 // Settings consumers. Values the stores read only at start (intervals, scrollback,
-// close grace, executable paths) are passed as store options in openStores; the
+// close grace, executable paths, github.dashboards_enabled) are passed as store options in openStores; the
 // settings page marks them "applies after a daemon restart". Everything below applies
 // live:
 //

@@ -71,6 +71,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 		DB: s.db, Bus: s.bus, Log: log.With("store", "gh"), RepoInterval: cfg.GhPollInterval(),
 		SearchAs: os.Getenv("CODE_FOUNDRY_GH_SEARCH_AS"),
 	}
+	if !cfg.GitHub.DashboardsEnabled {
+		ghOpts.DashboardInterval = -1 // negative disables the dashboard poll
+	}
 	if ghPath := settings.ExpandedPath(cfg.Advanced.GhPath); ghPath != "" {
 		ghOpts.Runner = gh.ExecRunner{Path: ghPath}
 	}
