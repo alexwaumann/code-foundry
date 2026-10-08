@@ -52,12 +52,25 @@ function show({ show, op }: GitOpToastAction): void {
     return;
   }
   if (op.state === "failed") {
-    toast.error(`${op.title} failed`, { id: op.id, description: <GitOpResult op={op} />, duration: Infinity, closeButton: true });
+    showFailure(op, false);
     return;
   }
   // A created PR offers to open it; pr-open and open-url have already opened theirs.
   const openPr = op.kind === "pr-create" && op.url ? { label: "Open", onClick: () => void runCommand("view.open.url", { url: op.url }) } : undefined;
   toast.success(op.title, { id: op.id, description: <GitOpResult op={op} />, duration: SUCCESS_MS, action: openPr });
+}
+
+/** Failure toast; toggling the output re-issues it so sonner re-measures its height. */
+function showFailure(op: GitOpView, expanded: boolean): void {
+  const onToggle = () => {
+    showFailure(op, !expanded);
+  };
+  toast.error(`${op.title} failed`, {
+    id: op.id,
+    description: <GitOpResult op={op} expanded={expanded} onToggle={onToggle} />,
+    duration: Infinity,
+    closeButton: true,
+  });
 }
 
 let shown: ReadonlySet<string> = new Set();
