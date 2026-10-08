@@ -12,6 +12,7 @@ import (
 	"github.com/awaumann/code-foundry/internal/bus"
 	"github.com/awaumann/code-foundry/internal/command"
 	"github.com/awaumann/code-foundry/internal/store/gh"
+	"github.com/awaumann/code-foundry/internal/store/gitops"
 	"github.com/awaumann/code-foundry/internal/store/repo"
 	"github.com/awaumann/code-foundry/internal/store/session"
 	"github.com/awaumann/code-foundry/internal/store/terminal"
@@ -28,6 +29,7 @@ type EventsDeps struct {
 	Terminal terminal.Store
 	Session  session.Store
 	Gh       gh.Service
+	GitOps   gitops.Store
 	// Done ends every stream when closed (daemon shutdown). May be nil.
 	Done <-chan struct{}
 }
@@ -65,7 +67,7 @@ type eventSource interface {
 }
 
 // sources lists the stream's sources in the order their snapshots are sent (see
-// events.proto: repo, terminal, session, gh), followed by UI intents.
+// events.proto: repo, terminal, session, gh, gitops), followed by UI intents.
 func (h *Events) sources() []eventSource {
 	d := h.deps
 	var out []eventSource
@@ -80,6 +82,9 @@ func (h *Events) sources() []eventSource {
 	}
 	if d.Gh != nil {
 		out = append(out, ghSource{store: d.Gh, bus: d.Bus})
+	}
+	if d.GitOps != nil {
+		out = append(out, gitopsSource{store: d.GitOps, bus: d.Bus})
 	}
 	out = append(out, uiSource{bus: d.Bus})
 	return out
@@ -362,6 +367,32 @@ func (s ghSource) snapshot(context.Context) []*v1.Event {
 		out = append(out, ghWrap(ghPullRequestsEvent(gh.PullRequestsUpdated{Slug: slug, FetchedAt: snap.Repos[slug].FetchedAt})))
 	}
 	return out
+}
+
+// ---- gitops --------------------------------------------------------------------
+
+// gitopsSource reuses GitOpsService's mapping (api/gitops.go). Its snapshot is the
+// running and recent operations.
+type gitopsSource struct {
+	store gitops.Store
+	bus   *bus.Bus
+}
+
+func (gitopsSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_GITOPS }
+
+func gitopsWrap(e *v1.GitOpsEvent) *v1.Event { return &v1.Event{Event: &v1.Event_Gitops{Gitops: e}} }
+
+func (s gitopsSource) subscribe(ctx context.Context) <-chan *v1.Event {
+	return fanIn(ctx, newTap(s.bus, gitopsWatchBuffer, func(ev gitops.Event) *v1.Event {
+		if m := gitopsEventToProto(ev); m != nil {
+			return gitopsWrap(m)
+		}
+		return nil
+	}))
+}
+
+func (s gitopsSource) snapshot(context.Context) []*v1.Event {
+	return []*v1.Event{gitopsWrap(gitopsSnapshotEvent(s.store.Snapshot()))}
 }
 
 // ---- ui ------------------------------------------------------------------------

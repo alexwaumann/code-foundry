@@ -15,6 +15,8 @@
  *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
  *   POST /__mock/sessions-service?enabled=false   (simulate a daemon without SessionService)
+ *   POST /__mock/gitops?fail=git.push&delay=800   (next git.push fails; ops take 800ms)
+ *   GET  /__mock/gitops
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
@@ -123,7 +125,15 @@ function routes(router: ConnectRouter): void {
 
   router.service(CommandService, {
     list: (req) => ({ commands: world.listCommands(req.context, req.includeUnavailable) }),
-    invoke: (req) => guard(() => ({ message: world.invoke(req.name, req.context, req.args), resultJson: "" })),
+    // Git operations resolve when the fake op finishes (mock/gitops.ts), like the daemon.
+    invoke: async (req) => {
+      try {
+        const out = await world.invoke(req.name, req.context, req.args);
+        return typeof out === "string" ? { message: out, resultJson: "" } : out;
+      } catch (err) {
+        throw rpcError(err);
+      }
+    },
   });
 
   router.service(UiService, {
@@ -159,12 +169,13 @@ function routes(router: ConnectRouter): void {
     // Snapshots first in the order events.proto promises (repo, terminal, session, gh),
     // then everything published, filtered by `sources`.
     watch: (req, ctx) => {
-      const want = new Set(req.sources.length > 0 ? req.sources : [EventSource.REPO, EventSource.TERMINAL, EventSource.SESSION, EventSource.GH, EventSource.UI]);
+      const want = new Set(req.sources.length > 0 ? req.sources : [EventSource.REPO, EventSource.TERMINAL, EventSource.SESSION, EventSource.GH, EventSource.GITOPS, EventSource.UI]);
       if (!sessionsEnabled) want.delete(EventSource.SESSION);
       const initial: { source: EventSource; event: EventInit }[] = [
         { source: EventSource.REPO, event: { event: { case: "repo", value: { event: { case: "snapshot", value: { repos: [...world.repos.values()].map((r) => world.repoMsg(r)) } } } } } },
         ...[...world.terms.values()].map((t) => ({ source: EventSource.TERMINAL, event: { event: { case: "terminal" as const, value: { event: { case: "updated" as const, value: world.terminalMsg(t) } } } } })),
         { source: EventSource.SESSION, event: { event: { case: "session", value: world.sessionSnapshot() } } },
+        { source: EventSource.GITOPS, event: { event: { case: "gitops", value: world.gitops.snapshot() } } },
       ];
       const ui = want.has(EventSource.UI);
       return tracked("EventService/Watch", filterEvents(world.events.subscribe(ctx.signal, initial), want), () => {
@@ -261,6 +272,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       // events stream carries no session source. Reset turns it back on.
       sessionsEnabled = q.get("enabled") !== "false";
       json(res, 200, { enabled: sessionsEnabled });
+      break;
+    case "POST /__mock/gitops":
+      // fail=git.push makes that command's next op fail; delay=ms sets how long ops run.
+      for (const name of q.getAll("fail")) world.gitops.failNext.add(name);
+      if (q.has("delay")) world.gitops.delayMs = Number(q.get("delay"));
+      json(res, 200, { fail: [...world.gitops.failNext], delayMs: world.gitops.delayMs });
+      break;
+    case "GET /__mock/gitops":
+      json(res, 200, world.gitops.summaries());
       break;
     case "GET /__mock/streams":
       json(res, 200, Object.fromEntries(openStreams));

@@ -17,6 +17,8 @@ import (
 	"github.com/awaumann/code-foundry/internal/command"
 	"github.com/awaumann/code-foundry/internal/store/gh"
 	"github.com/awaumann/code-foundry/internal/store/gh/ghtest"
+	"github.com/awaumann/code-foundry/internal/store/gitops"
+	"github.com/awaumann/code-foundry/internal/store/gitops/gitopstest"
 	"github.com/awaumann/code-foundry/internal/store/repo"
 	"github.com/awaumann/code-foundry/internal/store/repo/repotest"
 	"github.com/awaumann/code-foundry/internal/store/session"
@@ -31,6 +33,7 @@ type eventsFixture struct {
 	term   *terminaltest.Fake
 	sess   *sessiontest.Fake
 	gh     *ghtest.Store
+	gitops *gitopstest.Fake
 	done   chan struct{}
 	client codefoundryv1connect.EventServiceClient
 }
@@ -38,8 +41,8 @@ type eventsFixture struct {
 func newEventsFixture(t *testing.T) *eventsFixture {
 	t.Helper()
 	b := bus.New()
-	f := &eventsFixture{bus: b, repo: repotest.New(b), term: terminaltest.New(b), sess: sessiontest.New(b), gh: ghtest.New(b), done: make(chan struct{})}
-	route := NewEvents(EventsDeps{Bus: b, Repo: f.repo, Terminal: f.term, Session: f.sess, Gh: f.gh, Done: f.done}).Route()
+	f := &eventsFixture{bus: b, repo: repotest.New(b), term: terminaltest.New(b), sess: sessiontest.New(b), gh: ghtest.New(b), gitops: gitopstest.New(b), done: make(chan struct{})}
+	route := NewEvents(EventsDeps{Bus: b, Repo: f.repo, Terminal: f.term, Session: f.sess, Gh: f.gh, GitOps: f.gitops, Done: f.done}).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
 	// HTTP/2 like the repo drop test: flow-control windows bound how much the handler
@@ -110,6 +113,19 @@ func describe(ev *v1.Event) string {
 			return "gh.prs " + p.GetRepoSlug()
 		}
 		return "gh.viewer"
+	case *v1.Event_Gitops:
+		switch g := e.Gitops.GetEvent().(type) {
+		case *v1.GitOpsEvent_Snapshot:
+			return fmt.Sprintf("gitops.snapshot(%d)", len(g.Snapshot.GetOps()))
+		case *v1.GitOpsEvent_Queued:
+			return "gitops.queued " + g.Queued.GetKind().String()
+		case *v1.GitOpsEvent_Started:
+			return "gitops.started " + g.Started.GetKind().String()
+		case *v1.GitOpsEvent_Finished:
+			return "gitops.finished " + g.Finished.GetKind().String() + " " + g.Finished.GetState().String()
+		default:
+			return "gitops.other"
+		}
 	case *v1.Event_Ui:
 		if p := e.Ui.GetOpenPalette(); p != nil {
 			return "ui.palette " + p.GetQuery()
@@ -129,6 +145,7 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	f.sess.Put(session.Session{ID: "s1", TerminalID: t2.ID, State: session.StateConnected, Status: session.StatusIdle})
 	f.gh.SetRepo(gh.RepoState{Slug: "o/b"})
 	f.gh.SetRepo(gh.RepoState{Slug: "o/a"})
+	f.gitops.Put(gitops.Op{ID: "op-0", Kind: gitops.KindFetch, State: gitops.StateRunning})
 
 	s := f.watch(t, ctx)
 	want := []string{
@@ -139,6 +156,7 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 		"gh.viewer",
 		"gh.prs o/a",
 		"gh.prs o/b",
+		"gitops.snapshot(1)",
 	}
 	for i, w := range want {
 		if got := describe(s.next()); got != w {
@@ -167,6 +185,12 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	if got := describe(s.next()); got != "gh.viewer" {
 		t.Fatalf("got %q, want gh.viewer", got)
 	}
+	_, _ = f.gitops.Push(ctx, gitops.PushOptions{WorktreePath: "/code/a"})
+	for _, w := range []string{"gitops.started GIT_OP_KIND_PUSH", "gitops.finished GIT_OP_KIND_PUSH GIT_OP_STATE_SUCCEEDED"} {
+		if got := describe(s.next()); got != w {
+			t.Fatalf("got %q, want %q", got, w)
+		}
+	}
 	n := command.BusEmitter{Bus: f.bus}.Emit(&v1.UiIntent{Intent: &v1.UiIntent_OpenPalette_{OpenPalette: &v1.UiIntent_OpenPalette{Query: "x"}}})
 	if n != 1 {
 		t.Errorf("Emit delivered to %d, want 1 (the events stream)", n)
@@ -191,6 +215,7 @@ func TestEventsSourceFilter(t *testing.T) {
 		{"repo and ui", []v1.EventSource{v1.EventSource_EVENT_SOURCE_UI, v1.EventSource_EVENT_SOURCE_REPO}, "repo.snapshot(0)"},
 		{"session only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_SESSION}, "session.snapshot(0)"},
 		{"gh only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_GH}, "gh.viewer"},
+		{"gitops only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_GITOPS}, "gitops.snapshot(0)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -1,5 +1,6 @@
 import { EventService, type Event } from "@/gen/codefoundry/v1/events_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { toGitOpsEventView, type GitOpsEventView } from "./gitops";
 import { toRepoEventView, type RepoEventView } from "./repo";
 import { toSessionEventView, type SessionEventView } from "./session";
 import { toTerminalEventView, type TerminalEventView } from "./terminal";
@@ -17,6 +18,7 @@ export type EventView =
   | { source: "terminal"; event: TerminalEventView }
   | { source: "session"; event: SessionEventView }
   | { source: "gh"; event: GhEventView }
+  | { source: "gitops"; event: GitOpsEventView }
   | { source: "ui"; event: UiIntentView };
 
 export function toEventView(ev: Event): EventView | null {
@@ -39,6 +41,10 @@ export function toEventView(ev: Event): EventView | null {
       if (g.case === "pullRequestsUpdated") return { source: "gh", event: { kind: "pullRequests", repoSlug: g.value.repoSlug } };
       if (g.case === "viewerUpdated") return { source: "gh", event: { kind: "viewer" } };
       return null;
+    }
+    case "gitops": {
+      const v = toGitOpsEventView(e.value);
+      return v && { source: "gitops", event: v };
     }
     case "ui": {
       const v = toUiIntentView(e.value);

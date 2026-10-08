@@ -1,0 +1,192 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// GitOpsService runs git and gh operations on worktrees: fetch, pull, push, pull
+// request create/open, and handing a worktree or URL to another app (editor, Finder,
+// browser). Operations on one worktree run one at a time in request order; different
+// worktrees run in parallel (bounded). Every RPC waits for its operation to finish and
+// returns it. A failed operation is not an RPC error: the returned GitOp has state
+// FAILED with the tool's output. RPC errors mean the request itself was bad
+// (invalid_argument) or the call was cancelled.
+//
+// The GUI does not call this service: user actions go through the command registry
+// (git.*, pr.*, worktree.open_editor, worktree.reveal, view.open_url), and progress
+// arrives on EventService as GitOpsEvent.
+service GitOpsService {
+  // Fetch runs `git fetch --prune` in the worktree.
+  rpc Fetch(GitFetchRequest) returns (GitFetchResponse) {}
+  // Pull runs `git pull --ff-only` (or `--rebase`). A rebase that stops on conflicts is
+  // aborted, leaving the worktree as it was.
+  rpc Pull(GitPullRequest) returns (GitPullResponse) {}
+  // Push pushes the current branch, setting `origin/<branch>` as upstream when the
+  // branch has none.
+  rpc Push(GitPushRequest) returns (GitPushResponse) {}
+  // CreatePullRequest pushes the branch (as Push) and runs `gh pr create`. GitOp.url is
+  // the pull request.
+  rpc CreatePullRequest(CreatePullRequestRequest) returns (CreatePullRequestResponse) {}
+  // OpenPullRequest opens the current branch's pull request in the default browser.
+  rpc OpenPullRequest(OpenPullRequestRequest) returns (OpenPullRequestResponse) {}
+  // OpenEditor opens the worktree in the configured editor.
+  rpc OpenEditor(OpenEditorRequest) returns (OpenEditorResponse) {}
+  // Reveal shows the worktree in Finder (`open -R`).
+  rpc Reveal(RevealRequest) returns (RevealResponse) {}
+  // OpenUrl opens an http(s) URL in the default browser.
+  rpc OpenUrl(OpenUrlRequest) returns (OpenUrlResponse) {}
+  // List returns queued and running operations and the most recent finished ones.
+  rpc List(ListGitOpsRequest) returns (ListGitOpsResponse) {}
+  // Watch streams operation events: a snapshot first, then queued/started/finished.
+  rpc Watch(WatchGitOpsRequest) returns (stream GitOpsEvent) {}
+}
+
+enum GitOpKind {
+  GIT_OP_KIND_UNSPECIFIED = 0;
+  GIT_OP_KIND_FETCH = 1;
+  GIT_OP_KIND_PULL = 2;
+  GIT_OP_KIND_PUSH = 3;
+  GIT_OP_KIND_PR_CREATE = 4;
+  GIT_OP_KIND_PR_OPEN = 5;
+  GIT_OP_KIND_OPEN_EDITOR = 6;
+  GIT_OP_KIND_REVEAL = 7;
+  GIT_OP_KIND_OPEN_URL = 8;
+}
+
+enum GitOpState {
+  GIT_OP_STATE_UNSPECIFIED = 0;
+  // Waiting for an earlier operation on the same worktree (or for a free worker).
+  GIT_OP_STATE_QUEUED = 1;
+  GIT_OP_STATE_RUNNING = 2;
+  GIT_OP_STATE_SUCCEEDED = 3;
+  GIT_OP_STATE_FAILED = 4;
+}
+
+// GitOp is one operation and, once finished, its result.
+message GitOp {
+  // Unique for the daemon's lifetime ("op-17").
+  string id = 1;
+  GitOpKind kind = 2;
+  GitOpState state = 3;
+  // Short display title, e.g. "Push alex/feature".
+  string title = 4;
+  // The worktree the operation runs in. Empty for open_url.
+  string worktree_path = 5;
+  // The registered repository containing worktree_path, or empty.
+  string repo_id = 6;
+  // Branch when the operation was requested, if known.
+  string branch = 7;
+  google.protobuf.Timestamp queued_at = 8;
+  google.protobuf.Timestamp started_at = 9;
+  google.protobuf.Timestamp finished_at = 10;
+  // Wall time from start to finish.
+  int64 duration_ms = 11;
+  // One line describing the outcome, e.g. "pushed alex/feature to origin (new branch)".
+  string summary = 12;
+  // Every command run ("$ git push ..."), with its stdout and stderr, capped at 64 KiB.
+  string output = 13;
+  // A URL the operation produced or opened (pull request).
+  string url = 14;
+}
+
+message GitFetchRequest {
+  string worktree_path = 1;
+}
+
+message GitFetchResponse {
+  GitOp op = 1;
+}
+
+message GitPullRequest {
+  string worktree_path = 1;
+  // Rebase local commits onto the upstream instead of requiring a fast-forward.
+  bool rebase = 2;
+}
+
+message GitPullResponse {
+  GitOp op = 1;
+}
+
+message GitPushRequest {
+  string worktree_path = 1;
+  // `--force-with-lease`: overwrite the remote branch only if it is where we last saw it.
+  bool force_with_lease = 2;
+}
+
+message GitPushResponse {
+  GitOp op = 1;
+}
+
+message CreatePullRequestRequest {
+  string worktree_path = 1;
+  // Default: the subject of the branch's last commit.
+  string title = 2;
+  string body = 3;
+  bool draft = 4;
+  // Base branch. Default: the repository's default branch on GitHub.
+  string base = 5;
+}
+
+message CreatePullRequestResponse {
+  GitOp op = 1;
+}
+
+message OpenPullRequestRequest {
+  string worktree_path = 1;
+}
+
+message OpenPullRequestResponse {
+  GitOp op = 1;
+}
+
+message OpenEditorRequest {
+  string worktree_path = 1;
+}
+
+message OpenEditorResponse {
+  GitOp op = 1;
+}
+
+message RevealRequest {
+  string worktree_path = 1;
+}
+
+message RevealResponse {
+  GitOp op = 1;
+}
+
+message OpenUrlRequest {
+  // http or https only.
+  string url = 1;
+}
+
+message OpenUrlResponse {
+  GitOp op = 1;
+}
+
+message ListGitOpsRequest {}
+
+message ListGitOpsResponse {
+  // Queued and running operations first (oldest first), then finished ones, newest first.
+  repeated GitOp ops = 1;
+}
+
+message WatchGitOpsRequest {}
+
+message GitOpsEvent {
+  oneof event {
+    // Sent first on every stream (and again after the client fell behind): the same
+    // list as List.
+    GitOpsSnapshot snapshot = 1;
+    // An operation is waiting behind another one on the same worktree.
+    GitOp queued = 2;
+    // An operation started running.
+    GitOp started = 3;
+    // An operation finished; state is SUCCEEDED or FAILED.
+    GitOp finished = 4;
+  }
+}
+
+message GitOpsSnapshot {
+  repeated GitOp ops = 1;
+}

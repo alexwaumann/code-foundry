@@ -5,11 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"os"
 
 	"github.com/awaumann/code-foundry/internal/bus"
 	"github.com/awaumann/code-foundry/internal/db"
 	"github.com/awaumann/code-foundry/internal/paths"
 	"github.com/awaumann/code-foundry/internal/store/gh"
+	"github.com/awaumann/code-foundry/internal/store/gitops"
 	"github.com/awaumann/code-foundry/internal/store/repo"
 	"github.com/awaumann/code-foundry/internal/store/session"
 	"github.com/awaumann/code-foundry/internal/store/terminal"
@@ -24,6 +26,8 @@ type stores struct {
 	gh   *gh.Store
 	// stopGh cancels the gh poller and the repo→gh tracking glue, and waits for both.
 	stopGh func()
+	// gitops runs git/gh operations and refreshes repo afterwards; closed before repo.
+	gitops *gitops.Manager
 	// terminal owns PTYs; closed first so every child gets hung up before the db goes.
 	terminal *terminal.Manager
 	// session layers Claude sessions on terminal and db; shut down before terminal so
@@ -50,6 +54,11 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 		return nil, err
 	}
 	s.stopGh = startGh(ctx, log, s.gh, s.repo, s.bus)
+	s.gitops = gitops.New(gitops.Options{
+		Bus: s.bus, Repos: s.repo, Log: log.With("store", "gitops"),
+		// Until the settings store (3b) feeds the editor setting, the environment can.
+		Editor: func() string { return os.Getenv("CODE_FOUNDRY_EDITOR") },
+	})
 	s.terminal = terminal.New(terminal.Options{Bus: s.bus, Logger: log.With("store", "terminal")})
 	if s.session, err = session.New(ctx, session.Options{
 		DB: s.db, Terminals: s.terminal, Repos: s.repo, Bus: s.bus, Log: log.With("store", "session"),
@@ -72,6 +81,9 @@ func (s *stores) close() error {
 		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		errs = append(errs, s.terminal.Close(closeCtx))
 		cancel()
+	}
+	if s.gitops != nil {
+		errs = append(errs, s.gitops.Close())
 	}
 	if s.stopGh != nil {
 		s.stopGh()
