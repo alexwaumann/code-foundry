@@ -30,12 +30,13 @@ func main() {
 	adoptLoginShellPath(log)
 	exportDaemonBinary(log)
 
+	daemonService := NewDaemonService(p, log)
 	appService := NewAppService(log)
 	app := application.New(application.Options{
 		Name:        "Code Foundry",
 		Description: "Supervise fleets of Claude Code sessions",
 		Services: []application.Service{
-			application.NewService(NewDaemonService(p, log)),
+			application.NewService(daemonService),
 			application.NewService(appService),
 		},
 		Assets: application.AssetOptions{
@@ -59,7 +60,7 @@ func main() {
 	// `app.relaunch` (e.g. after an update is installed) reaches the host directly.
 	watchCtx, stopWatch := context.WithCancel(context.Background())
 	defer stopWatch()
-	go watchRelaunch(watchCtx, p, log, func() {
+	go watchRelaunch(watchCtx, daemonService.connect, log, func() {
 		if err := appService.Relaunch(); err != nil {
 			log.Error("relaunch", "err", err)
 		}

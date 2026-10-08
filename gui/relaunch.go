@@ -9,7 +9,6 @@ import (
 
 	v1 "github.com/awaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/awaumann/code-foundry/internal/client"
-	"github.com/awaumann/code-foundry/internal/paths"
 )
 
 // relaunchRetry is how long the watcher waits before reconnecting to the daemon (it may
@@ -18,11 +17,15 @@ const relaunchRetry = 2 * time.Second
 
 // watchRelaunch follows UpdateService.Watch over the daemon's Unix socket and calls
 // relaunch when the daemon asks GUIs to relaunch (`app.relaunch`). The host does this
-// itself rather than the frontend, so relaunching does not depend on the webview. It
-// never starts the daemon (GetDaemonEndpoint does) and reconnects until ctx ends.
-func watchRelaunch(ctx context.Context, p paths.Paths, log *slog.Logger, relaunch func()) {
+// itself rather than the frontend, so it does not depend on the webview. connect may
+// auto-start the daemon: after `daemon.restart` the host brings up the installed
+// version, like the frontend's next request would. Reconnects until ctx ends.
+func watchRelaunch(ctx context.Context, connect func(context.Context) (*client.Client, error), log *slog.Logger, relaunch func()) {
 	for ctx.Err() == nil {
-		err := watchRelaunchOnce(ctx, client.New(p), relaunch)
+		c, err := connect(ctx)
+		if err == nil {
+			err = watchRelaunchOnce(ctx, c, relaunch)
+		}
 		if ctx.Err() != nil {
 			return
 		}

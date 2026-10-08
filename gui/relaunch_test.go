@@ -12,6 +12,7 @@ import (
 
 	"github.com/awaumann/code-foundry/internal/api"
 	"github.com/awaumann/code-foundry/internal/bus"
+	"github.com/awaumann/code-foundry/internal/client"
 	"github.com/awaumann/code-foundry/internal/paths"
 	"github.com/awaumann/code-foundry/internal/store/update"
 	"github.com/awaumann/code-foundry/internal/store/update/updatetest"
@@ -50,7 +51,8 @@ func TestWatchRelaunch(t *testing.T) {
 	var relaunches atomic.Int32
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go watchRelaunch(ctx, p, slog.New(slog.DiscardHandler), func() { relaunches.Add(1) })
+	connect := func(context.Context) (*client.Client, error) { return client.New(p), nil }
+	go watchRelaunch(ctx, connect, slog.New(slog.DiscardHandler), func() { relaunches.Add(1) })
 
 	// Wait for the watcher's stream to be subscribed: the request is then delivered.
 	deadline := time.Now().Add(5 * time.Second)

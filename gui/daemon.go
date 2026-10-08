@@ -40,6 +40,21 @@ func NewDaemonService(p paths.Paths, log *slog.Logger) *DaemonService {
 // its loopback base URL and bearer token. The frontend calls it at startup and again
 // whenever a request fails, which picks up a restarted daemon's new port and token.
 func (s *DaemonService) GetDaemonEndpoint(ctx context.Context) (DaemonEndpoint, error) {
+	if _, err := s.connect(ctx); err != nil {
+		return DaemonEndpoint{}, err
+	}
+	ep, err := client.ReadEndpoint(s.paths)
+	if err != nil {
+		return DaemonEndpoint{}, err
+	}
+	return DaemonEndpoint{BaseURL: ep.BaseURL, Token: ep.Token}, nil
+}
+
+// connect returns a client for the daemon, starting it from daemonBinary() if it is not
+// running. The frontend (through GetDaemonEndpoint) and the host's relaunch watcher both
+// use it, so a daemon that stops (daemon.restart) comes back even while the webview is
+// hidden and its timers are suspended.
+func (s *DaemonService) connect(ctx context.Context) (*client.Client, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
@@ -48,14 +63,11 @@ func (s *DaemonService) GetDaemonEndpoint(ctx context.Context) (DaemonEndpoint, 
 	if err != nil {
 		s.log.Debug("no code-foundry binary found; can only use an already running daemon", "err", err)
 	}
-	if _, err := client.Connect(ctx, s.paths, client.ConnectOptions{DaemonBinary: bin, Logger: s.log}); err != nil {
-		return DaemonEndpoint{}, fmt.Errorf("connect to daemon: %w", err)
-	}
-	ep, err := client.ReadEndpoint(s.paths)
+	c, err := client.Connect(ctx, s.paths, client.ConnectOptions{DaemonBinary: bin, Logger: s.log})
 	if err != nil {
-		return DaemonEndpoint{}, err
+		return nil, fmt.Errorf("connect to daemon: %w", err)
 	}
-	return DaemonEndpoint{BaseURL: ep.BaseURL, Token: ep.Token}, nil
+	return c, nil
 }
 
 // exportDaemonBinary sets CODE_FOUNDRY_BIN to the CLI this app auto-starts (the one in
