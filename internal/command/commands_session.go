@@ -73,8 +73,8 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 			Args: []ArgSpec{
 				{Name: "repo", Type: String, Context: ContextRepo, Description: "Repository id"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path"},
-				{Name: "model", Type: Enum, Enum: SessionModels, Description: "Model (default: Claude's default)"},
-				{Name: "effort", Type: Enum, Enum: SessionEfforts, Description: "Effort level (default: Claude's default)"},
+				{Name: "model", Type: Enum, Enum: SessionModels, Description: "Model (default: settings sessions.default_model, else Claude's default)"},
+				{Name: "effort", Type: Enum, Enum: SessionEfforts, Description: "Effort level (default: settings sessions.default_effort, else Claude's default)"},
 				{Name: "name", Type: String, Description: "Session name (default: generated from the first message)"},
 				{Name: "prompt", Type: String, Description: "First prompt to send once Claude is ready"},
 			},

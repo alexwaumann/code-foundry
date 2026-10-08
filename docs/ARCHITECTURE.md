@@ -106,10 +106,12 @@ Services (v1):
 * `UiService` — WatchIntents (server stream: focus session, open palette, …); Emit (from
   CLI).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
-  intents (sources repo, terminal, session, gh, ui; filterable). On connect it sends each
+  intents (sources repo, terminal, session, gh, settings, ui; filterable). On connect it sends each
   source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream; the per-service Watch RPCs remain for the CLI and tests.
+* `SettingsService` — GetSchema, Get, Update, Watch over `$CONFIG/settings.toml` (TOML,
+  hand-editable, reloaded on change). See `docs/notes/phase3b-settings.md`.
 * `HealthService` — Ping, Version.
 
 Rules:

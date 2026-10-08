@@ -66,7 +66,7 @@ function EnumEditor({ field, value, pending, commit }: EditorProps) {
       {field.enumValues.map((v) => (
         <option key={v} value={v}>
           {enumLabel(v)}
-          {v === field.defaultValue ? " (default)" : ""}
+          {v === field.defaultValue && v !== "" ? " (default)" : ""}
         </option>
       ))}
     </select>
