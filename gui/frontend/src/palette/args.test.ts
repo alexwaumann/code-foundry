@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ArgSpecView, CommandView } from "@/api/command";
-import { argChoices, groupByCategory, previousArg, promptedArgs, startPrompt, submitArg, validateArg } from "./args";
+import { argChoices, groupByCategory, previousArg, promptedArgs, startPrompt, submitArg, UNSET_CHOICE, validateArg } from "./args";
 
 function arg(over: Partial<ArgSpecView>): ArgSpecView {
   return { name: "x", type: "string", required: true, description: "", enumValues: [], defaultValue: "", ...over };
@@ -36,8 +36,33 @@ describe("argChoices", () => {
     [arg({ type: "bool" }), ["false", "true"]],
     [arg({ type: "bool", defaultValue: "true" }), ["true", "false"]],
     [arg({ type: "path" }), null],
+    [arg({ type: "enum", required: false, enumValues: ["low", "high"] }), [UNSET_CHOICE, "low", "high"]],
+    [arg({ type: "enum", required: false, enumValues: ["low", "high"], defaultValue: "high" }), ["low", "high"]],
   ])("%#", (spec, want) => {
     expect(argChoices(spec)).toEqual(want);
+  });
+});
+
+describe("optional enum prompts (session.new model/effort)", () => {
+  const c = cmd({
+    name: "session.new",
+    args: [
+      arg({ name: "worktree", type: "path", required: false }),
+      arg({ name: "model", type: "enum", required: false, enumValues: ["opus", "sonnet"], defaultValue: "opus" }),
+      arg({ name: "effort", type: "enum", required: false, enumValues: ["low", "high"] }),
+      arg({ name: "prompt", required: false }),
+    ],
+  });
+
+  it("prompts enums even when optional, not other optional args", () => {
+    expect(promptedArgs(c).map((a) => a.name)).toEqual(["model", "effort"]);
+  });
+
+  it("sends the picked value, and omits an optional enum left at Default", () => {
+    const s1 = submitArg(startPrompt(c), "sonnet");
+    if (s1.kind !== "next") throw new Error("expected next");
+    expect(submitArg(s1.prompt, UNSET_CHOICE)).toEqual({ kind: "done", values: { model: "sonnet" } });
+    expect(submitArg(s1.prompt, "high")).toEqual({ kind: "done", values: { model: "sonnet", effort: "high" } });
   });
 });
 

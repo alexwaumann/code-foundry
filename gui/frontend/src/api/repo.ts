@@ -38,6 +38,7 @@ export interface RepoView {
 }
 
 export type RepoEventView =
+  | { kind: "snapshot"; repos: RepoView[] }
   | { kind: "repoUpdated"; repo: RepoView }
   | { kind: "repoRemoved"; id: string }
   | { kind: "worktreeUpdated"; worktree: WorktreeView }
@@ -86,6 +87,8 @@ export function toRepoView(r: Repo): RepoView {
 export function toRepoEventView(ev: RepoEvent): RepoEventView | null {
   const e = ev.event;
   switch (e.case) {
+    case "snapshot":
+      return { kind: "snapshot", repos: e.value.repos.map(toRepoView) };
     case "repoUpdated":
       return { kind: "repoUpdated", repo: toRepoView(e.value) };
     case "repoRemovedId":
@@ -103,12 +106,4 @@ export async function listRepos(conn: DaemonConnection = daemon, signal?: AbortS
   const c = await conn.client(RepoService);
   const res = await c.list({}, { signal });
   return res.repos.map(toRepoView);
-}
-
-export async function* watchRepos(signal: AbortSignal, conn: DaemonConnection = daemon): AsyncGenerator<RepoEventView> {
-  const c = await conn.client(RepoService);
-  for await (const ev of c.watch({}, { signal })) {
-    const v = toRepoEventView(ev);
-    if (v) yield v;
-  }
 }

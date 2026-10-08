@@ -2,14 +2,19 @@ import { create } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { describe, expect, it } from "vitest";
 import { ArgType, CommandSchema } from "@/gen/codefoundry/v1/command_pb";
+import { EventSchema } from "@/gen/codefoundry/v1/events_pb";
+import { GhEventSchema } from "@/gen/codefoundry/v1/gh_pb";
 import { RepoEventSchema, RepoSchema } from "@/gen/codefoundry/v1/repo_pb";
+import { SessionEventSchema, SessionSchema, SessionState, SessionStatus } from "@/gen/codefoundry/v1/session_pb";
 import { AttachEventSchema, TerminalEventSchema, TerminalSchema, TerminalState } from "@/gen/codefoundry/v1/terminal_pb";
-import { UiIntent_Notify_Level, UiIntentSchema } from "@/gen/codefoundry/v1/ui_pb";
+import { UiIntent_Notify_Level, UiIntentSchema, type UiIntent } from "@/gen/codefoundry/v1/ui_pb";
 import { toCommandView } from "./command";
 import { overrideEndpoint } from "./endpoint";
+import { toEventView } from "./events";
 import { toRepoEventView, toRepoView } from "./repo";
+import { toSessionView } from "./session";
 import { toAttachEventView, toTerminalEventView, toTerminalView } from "./terminal";
-import { toUiIntentView } from "./ui";
+import { hasFocusSessionIntent, toUiIntentView } from "./ui";
 
 describe("terminal mapping", () => {
   it("maps a Terminal to its view model", () => {
@@ -118,6 +123,51 @@ describe("ui intent mapping", () => {
     [{ case: "notify" as const, value: { title: "x" } }, { kind: "notify", level: "info", title: "x", body: "" }],
   ])("maps %#", (intent, want) => {
     expect(toUiIntentView(create(UiIntentSchema, { intent }))).toEqual(want);
+  });
+});
+
+describe("focus_session intent (ui.proto addition from Phase 2a)", () => {
+  // Enabled automatically once `make gen` brings FocusSession into the generated UiIntent.
+  it.runIf(hasFocusSessionIntent)("maps the generated FocusSession", () => {
+    const intent = create(UiIntentSchema, { intent: { case: "focusSession", value: { sessionId: "s1" } } } as never);
+    expect(toUiIntentView(intent)).toEqual({ kind: "focusSession", sessionId: "s1" });
+  });
+
+  it("maps a focusSession case by name before the generated type has it", () => {
+    const loose = { $typeName: "codefoundry.v1.UiIntent", intent: { case: "focusSession", value: { sessionId: "s1" } } } as unknown as UiIntent;
+    expect(toUiIntentView(loose)).toEqual({ kind: "focusSession", sessionId: "s1" });
+  });
+});
+
+describe("events mapping", () => {
+  it.each([
+    [{ case: "repo" as const, value: create(RepoEventSchema, { event: { case: "snapshot", value: { repos: [] } } }) }, { source: "repo", event: { kind: "snapshot", repos: [] } }],
+    [{ case: "terminal" as const, value: create(TerminalEventSchema, { event: { case: "removedId", value: "t1" } }) }, { source: "terminal", event: { kind: "removed", id: "t1" } }],
+    [{ case: "session" as const, value: create(SessionEventSchema, { event: { case: "removedId", value: "s1" } }) }, { source: "session", event: { kind: "removed", id: "s1" } }],
+    [{ case: "gh" as const, value: create(GhEventSchema, { event: { case: "pullRequestsUpdated", value: { repoSlug: "o/r" } } }) }, { source: "gh", event: { kind: "pullRequests", repoSlug: "o/r" } }],
+    [{ case: "ui" as const, value: create(UiIntentSchema, { intent: { case: "openPalette", value: { query: "q" } } }) }, { source: "ui", event: { kind: "openPalette", query: "q" } }],
+  ])("maps %#", (event, want) => {
+    expect(toEventView(create(EventSchema, { event }))).toEqual(want);
+  });
+
+  it("maps a session", () => {
+    const s = create(SessionSchema, {
+      id: "s1",
+      worktreePath: "/w",
+      name: "fix tests",
+      model: "opus",
+      terminalId: "t1",
+      state: SessionState.DISCONNECTED,
+      status: SessionStatus.NEEDS_ATTENTION,
+      lastActivityAt: timestampFromMs(5000),
+      exitCode: 1,
+      disconnectReason: "crashed",
+    });
+    expect(toSessionView(s)).toMatchObject({ id: "s1", state: "disconnected", status: "attention", lastActivityAtMs: 5000, createdAtMs: null, exitCode: 1, disconnectReason: "crashed" });
+  });
+
+  it("empty events map to null", () => {
+    expect(toEventView(create(EventSchema, {}))).toBeNull();
   });
 });
 

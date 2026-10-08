@@ -1,7 +1,5 @@
 import { create } from "zustand";
-import { daemon, invalidateOnTransportError } from "@/api/endpoint";
-import { listRepos, watchRepos, type RepoEventView, type RepoView, type WorktreeView } from "@/api/repo";
-import { runStream, type StreamStatus } from "@/api/stream";
+import type { RepoEventView, RepoView, WorktreeView } from "@/api/repo";
 
 export interface ReposData {
   byId: Readonly<Record<string, RepoView>>;
@@ -11,8 +9,6 @@ export interface ReposData {
 
 interface ReposState extends ReposData {
   loaded: boolean;
-  stream: StreamStatus;
-  streamError: string | null;
 }
 
 export const emptyRepos: ReposData = { byId: {}, order: [] };
@@ -43,6 +39,8 @@ export function replaceRepos(list: readonly RepoView[]): ReposData {
 
 export function applyRepoEvent(prev: ReposData, ev: RepoEventView): ReposData {
   switch (ev.kind) {
+    case "snapshot":
+      return replaceRepos(ev.repos);
     case "repoUpdated": {
       const byId = { ...prev.byId, [ev.repo.id]: normalizeRepo(ev.repo) };
       return { byId, order: sortedOrder(byId) };
@@ -69,32 +67,12 @@ export function applyRepoEvent(prev: ReposData, ev: RepoEventView): ReposData {
   }
 }
 
+/** Fed by the shared events stream (stores/events.ts). */
 export const useReposStore = create<ReposState>()(() => ({
   ...emptyRepos,
   loaded: false,
-  stream: "connecting",
-  streamError: null,
 }));
 
 export function findWorktree(data: ReposData, repoId: string, path: string): WorktreeView | undefined {
   return data.byId[repoId]?.worktrees.find((w) => w.path === path);
-}
-
-/** Keeps the repos slice in sync: List on every (re)connect, then Watch events. */
-export function startRepoSync(): () => void {
-  const set = useReposStore.setState;
-  return runStream({
-    open: (signal) => watchRepos(signal),
-    onConnect: async (signal) => {
-      const list = await listRepos(daemon, signal);
-      set({ ...replaceRepos(list), loaded: true });
-    },
-    onEvent: (ev) => {
-      set((s) => applyRepoEvent(s, ev));
-    },
-    onStatus: (stream, err) => {
-      set({ stream, streamError: err ?? null });
-    },
-    onError: invalidateOnTransportError,
-  });
 }

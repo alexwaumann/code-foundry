@@ -141,3 +141,15 @@ export function formatChord(input: string): string {
   const key = keyGlyphs[c.key] ?? (c.key.length === 1 ? c.key.toUpperCase() : c.key.charAt(0).toUpperCase() + c.key.slice(1));
   return `${c.ctrl ? "⌃" : ""}${c.alt ? "⌥" : ""}${c.shift ? "⇧" : ""}${c.cmd ? "⌘" : ""}${key}`;
 }
+
+/** Clipboard and editing chords: always left to the focused terminal or text field. */
+const editingChords = new Set(["cmd+c", "cmd+v", "cmd+x", "cmd+a", "cmd+z", "cmd+shift+z"]);
+
+/**
+ * True for a normalized chord that a focused terminal yields to the app when a command is
+ * bound to it: cmd-modified (macOS terminals never send cmd chords to the PTY) and not a
+ * clipboard/editing chord.
+ */
+export function terminalYieldable(chord: string): boolean {
+  return chord.startsWith("cmd+") && !editingChords.has(chord);
+}

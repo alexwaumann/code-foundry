@@ -1,7 +1,17 @@
 import { useShallow } from "zustand/react/shallow";
 import type { UiContextView } from "@/api/command";
-import { placeTerminal, WORKTREE_LABEL, type PlaceableTerminal, type TreeRepo, type WorktreeRef } from "@/lib/tree";
+import {
+  placeSession,
+  placeTerminal,
+  SESSION_LABEL,
+  WORKTREE_LABEL,
+  type PlaceableTerminal,
+  type TreeRepo,
+  type TreeSession,
+  type WorktreeRef,
+} from "@/lib/tree";
 import { useReposStore, type ReposData } from "./repos";
+import { useSessionsStore, type SessionsData } from "./sessions";
 import { useTerminalsStore, type TerminalsData } from "./terminals";
 import { useUiStore, type Selection } from "./ui";
 
@@ -20,9 +30,10 @@ function allWorktrees(repos: ReposData): WorktreeRef[] {
 /**
  * Derives the UiContext the daemon sees from the current selection. A terminal's
  * repo/worktree come from the same placement the sidebar uses. Selecting a repo row
- * counts as looking at its main worktree.
+ * counts as looking at its main worktree. A session contributes its attached terminal
+ * (if any) so terminal.* commands apply to it.
  */
-export function deriveContext(sel: Selection, terminals: TerminalsData, repos: ReposData): UiContextView {
+export function deriveContext(sel: Selection, terminals: TerminalsData, repos: ReposData, sessions: SessionsData = { byId: {}, order: [] }): UiContextView {
   switch (sel.kind) {
     case "none":
       return emptyContext;
@@ -32,10 +43,22 @@ export function deriveContext(sel: Selection, terminals: TerminalsData, repos: R
       return {
         ...emptyContext,
         activeTerminalId: sel.id,
-        activeSessionId: t?.labels.session ?? "",
+        activeSessionId: t?.labels[SESSION_LABEL] ?? "",
         activeRepoId: place?.repoId ?? "",
         activeWorktreePath: place?.path ?? "",
         activeView: "terminal",
+      };
+    }
+    case "session": {
+      const s = sessions.byId[sel.id];
+      const place = s ? placeSession(s, allWorktrees(repos)) : null;
+      return {
+        ...emptyContext,
+        activeSessionId: sel.id,
+        activeTerminalId: s?.terminalId ?? "",
+        activeRepoId: place?.repoId ?? s?.repoId ?? "",
+        activeWorktreePath: place?.path ?? s?.worktreePath ?? "",
+        activeView: "session",
       };
     }
     case "repo": {
@@ -53,8 +76,8 @@ export function contextKey(c: UiContextView): string {
 }
 
 /** Current context, read imperatively (keybindings, invoke). */
-export function getUiContext(): UiContextView {
-  return deriveContext(useUiStore.getState().selection, useTerminalsStore.getState(), useReposStore.getState());
+export function getUiContext(sel: Selection = useUiStore.getState().selection): UiContextView {
+  return deriveContext(sel, useTerminalsStore.getState(), useReposStore.getState(), useSessionsStore.getState());
 }
 
 const SEP = "\u0001";
@@ -64,13 +87,25 @@ export function useRepoStructureKeys(): string[] {
   return useReposStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.worktrees.map((w) => w.path) ?? [])].join(SEP))));
 }
 
-/** One string per terminal: id + the inputs that decide where it sits in the tree. */
+/** One string per terminal: id + the inputs that decide where (and whether) it sits in the tree. */
 export function useTerminalPlacementKeys(): string[] {
   return useTerminalsStore(
     useShallow((s) =>
       s.order.map((id) => {
         const t = s.byId[id];
-        return [id, t?.cwd ?? "", t?.labels[WORKTREE_LABEL] ?? ""].join(SEP);
+        return [id, t?.cwd ?? "", t?.labels[WORKTREE_LABEL] ?? "", t?.labels[SESSION_LABEL] ?? ""].join(SEP);
+      }),
+    ),
+  );
+}
+
+/** One string per session: id + worktree + attached terminal (status/name changes don't rebuild). */
+export function useSessionPlacementKeys(): string[] {
+  return useSessionsStore(
+    useShallow((s) =>
+      s.order.map((id) => {
+        const x = s.byId[id];
+        return [id, x?.worktreePath ?? "", x?.terminalId ?? ""].join(SEP);
       }),
     ),
   );
@@ -85,20 +120,29 @@ export function decodeRepoKeys(keys: readonly string[]): TreeRepo[] {
 
 export function decodeTerminalKeys(keys: readonly string[]): PlaceableTerminal[] {
   return keys.map((k) => {
-    const [id = "", cwd = "", worktreeLabel = ""] = k.split(SEP);
-    return { id, cwd, worktreeLabel };
+    const [id = "", cwd = "", worktreeLabel = "", sessionLabel = ""] = k.split(SEP);
+    return { id, cwd, worktreeLabel, sessionLabel };
   });
 }
 
-/** Tree inputs read imperatively (cmd+1..9). */
-export function getTreeInputs(): { repos: TreeRepo[]; terminals: PlaceableTerminal[] } {
+export function decodeSessionKeys(keys: readonly string[]): TreeSession[] {
+  return keys.map((k) => {
+    const [id = "", worktreePath = "", terminalId = ""] = k.split(SEP);
+    return { id, worktreePath, terminalId };
+  });
+}
+
+/** Tree inputs read imperatively (cmd+1..9, cmd+shift+a). */
+export function getTreeInputs(): { repos: TreeRepo[]; terminals: PlaceableTerminal[]; sessions: TreeSession[] } {
   const r = useReposStore.getState();
   const t = useTerminalsStore.getState();
+  const s = useSessionsStore.getState();
   return {
     repos: r.order.map((id) => ({ id, worktreePaths: r.byId[id]?.worktrees.map((w) => w.path) ?? [] })),
     terminals: t.order.map((id) => {
       const term = t.byId[id];
-      return { id, cwd: term?.cwd ?? "", worktreeLabel: term?.labels[WORKTREE_LABEL] ?? "" };
+      return { id, cwd: term?.cwd ?? "", worktreeLabel: term?.labels[WORKTREE_LABEL] ?? "", sessionLabel: term?.labels[SESSION_LABEL] ?? "" };
     }),
+    sessions: s.order.map((id) => ({ id, worktreePath: s.byId[id]?.worktreePath ?? "", terminalId: s.byId[id]?.terminalId ?? "" })),
   };
 }

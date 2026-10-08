@@ -2,16 +2,17 @@ import { useEffect } from "react";
 import { Dashboard } from "@/components/Dashboard";
 import { Footer } from "@/components/footer/Footer";
 import { CommandPalette } from "@/components/palette/CommandPalette";
+import { SessionDisconnected } from "@/components/session/SessionParts";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { TerminalPane } from "@/components/terminal/TerminalPane";
 import { Toaster } from "@/components/ui/sonner";
 import { installKeybindings } from "@/keys/bindings";
 import { syncDocumentScheme, useColorScheme } from "@/lib/theme";
+import { useWindowTitle } from "@/lib/title";
 import { startCommandSync } from "@/stores/commands";
+import { startEventSync } from "@/stores/events";
 import { startHealthPolling } from "@/stores/health";
-import { startIntentWatch } from "@/stores/intents";
-import { startRepoSync } from "@/stores/repos";
-import { startTerminalSync } from "@/stores/terminals";
+import { useAttentionCount, useSessionsStore } from "@/stores/sessions";
 import { useUiStore, type FocusRegion } from "@/stores/ui";
 
 function regionOf(el: EventTarget | null): FocusRegion {
@@ -19,35 +20,41 @@ function regionOf(el: EventTarget | null): FocusRegion {
   return region === "sidebar" || region === "terminal" || region === "palette" ? region : "content";
 }
 
-/** Starts every daemon stream and global listener; returns one stop function. */
+/**
+ * Starts the daemon sync and global listeners; returns one stop function. Long-lived
+ * connections: one EventService.Watch (all slices) plus the visible terminal's Attach.
+ */
 function startApp(): () => void {
   const onFocusIn = (e: FocusEvent) => {
     useUiStore.getState().setFocus(regionOf(e.target));
   };
   document.addEventListener("focusin", onFocusIn);
-  const stops = [
-    syncDocumentScheme(),
-    startHealthPolling(2000),
-    startTerminalSync(),
-    startRepoSync(),
-    startIntentWatch(),
-    startCommandSync(),
-    installKeybindings(),
-  ];
+  const stops = [syncDocumentScheme(), startHealthPolling(2000), startEventSync(), startCommandSync(), installKeybindings()];
   return () => {
     document.removeEventListener("focusin", onFocusIn);
     for (const stop of stops) stop();
   };
 }
 
+/**
+ * Exactly one thing fills the content area. A session shows its live terminal when it
+ * has one, otherwise the "Not connected" panel. TerminalPane stays mounted across
+ * terminal/session switches (same element position), so its renderer is reused.
+ */
 function Content() {
-  const terminalId = useUiStore((s) => (s.selection.kind === "terminal" ? s.selection.id : null));
-  return terminalId ? <TerminalPane terminalId={terminalId} /> : <Dashboard />;
+  const sel = useUiStore((s) => s.selection);
+  const sessionTerminal = useSessionsStore((s) => (sel.kind === "session" ? s.byId[sel.id]?.terminalId || null : null));
+  if (sel.kind === "terminal") return <TerminalPane terminalId={sel.id} />;
+  if (sel.kind === "session") {
+    return sessionTerminal ? <TerminalPane terminalId={sessionTerminal} sessionId={sel.id} /> : <SessionDisconnected id={sel.id} />;
+  }
+  return <Dashboard />;
 }
 
 export function App() {
   useEffect(() => startApp(), []);
   const scheme = useColorScheme();
+  useWindowTitle(useAttentionCount());
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">

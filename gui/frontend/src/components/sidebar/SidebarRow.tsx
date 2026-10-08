@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect, useRef } from "react";
 import {
   AppWindow,
   ArrowDown,
@@ -12,13 +12,19 @@ import {
   FolderGit2,
   GitBranch,
   Layers,
+  Plus,
   SquareTerminal,
 } from "lucide-react";
+import { SessionStatusIcon } from "@/components/session/SessionStatusIcon";
 import { cn } from "@/lib/utils";
 import { basename, terminalLabel } from "@/lib/path";
-import type { Row } from "@/lib/tree";
+import { sessionBadge } from "@/lib/session";
+import { isLeaf, type Row } from "@/lib/tree";
 import { findWorktree, useReposStore } from "@/stores/repos";
+import { newSessionIn, renameSession } from "@/stores/sessionActions";
+import { useSessionsStore } from "@/stores/sessions";
 import { useTerminalsStore } from "@/stores/terminals";
+import { useUiStore } from "@/stores/ui";
 
 export const ROW_HEIGHT = 26;
 
@@ -29,7 +35,7 @@ interface RowProps {
   onActivate: (row: Row, how: "click" | "toggle") => void;
 }
 
-function Chevron({ row, onActivate }: { row: Row & { expanded: boolean; hasChildren: boolean }; onActivate: RowProps["onActivate"] }) {
+function Chevron({ row, onActivate }: { row: Exclude<Row, { kind: "session" | "terminal" }>; onActivate: RowProps["onActivate"] }) {
   if (!row.hasChildren) return <span className="size-4 shrink-0" />;
   const Icon = row.expanded ? ChevronDown : ChevronRight;
   return (
@@ -137,20 +143,109 @@ function TerminalLabel({ id }: { id: string }) {
   );
 }
 
+/** Inline name editor; Enter or blur commits via session.rename, Escape cancels. */
+function RenameField({ id, name }: { id: string; name: string }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const done = useRef(false);
+  const returnTo = useRef<Element | null>(null);
+  useEffect(() => {
+    returnTo.current = document.activeElement;
+    ref.current?.select();
+  }, []);
+  const finish = (commit: boolean) => {
+    if (done.current) return;
+    done.current = true;
+    const value = ref.current?.value.trim() ?? "";
+    useUiStore.getState().setRenaming(null);
+    if (commit && value && value !== name) void renameSession(id, value);
+    if (returnTo.current instanceof HTMLElement && returnTo.current.isConnected) returnTo.current.focus();
+    else useUiStore.getState().focusSidebar();
+  };
+  return (
+    <input
+      ref={ref}
+      autoFocus
+      defaultValue={name}
+      aria-label="Session name"
+      data-testid="rename-input"
+      className="h-5 min-w-0 flex-1 rounded-sm border border-sidebar-ring bg-background px-1 text-[13px] outline-none"
+      onClick={(e) => {
+        e.stopPropagation();
+      }}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+      }}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") finish(true);
+        else if (e.key === "Escape") finish(false);
+      }}
+      onBlur={() => {
+        finish(true);
+      }}
+    />
+  );
+}
+
+function SessionLabel({ id }: { id: string }) {
+  const name = useSessionsStore((s) => s.byId[id]?.name || "New session");
+  const model = useSessionsStore((s) => s.byId[id]?.model ?? "");
+  const disconnected = useSessionsStore((s) => s.byId[id]?.state === "disconnected");
+  const attention = useSessionsStore((s) => sessionBadge(s.byId[id]) === "attention");
+  const renaming = useUiStore((s) => s.renamingSessionId === id);
+  return (
+    <>
+      <span className="flex size-4 shrink-0 items-center justify-center">
+        <SessionStatusIcon id={id} />
+      </span>
+      {renaming ? (
+        <RenameField id={id} name={name} />
+      ) : (
+        <>
+          <span className={cn("truncate", disconnected && "text-muted-foreground", attention && "font-medium text-amber-200")} data-testid="session-name">
+            {name}
+          </span>
+          {model && <span className="shrink-0 truncate text-xs text-muted-foreground">{model}</span>}
+        </>
+      )}
+    </>
+  );
+}
+
+function NewSessionButton({ repoId, path }: { repoId: string; path: string }) {
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label="New session"
+      title="New session"
+      data-testid="new-session"
+      className="ml-1 hidden size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground group-hover/row:flex hover:bg-sidebar-accent hover:text-foreground"
+      onClick={(e) => {
+        e.stopPropagation();
+        newSessionIn(repoId, path);
+      }}
+    >
+      <Plus className="size-3.5" />
+    </button>
+  );
+}
+
 export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onActivate }: RowProps) {
   const indent = 8 + row.depth * 14;
+  const leaf = isLeaf(row);
   return (
     <div
       id={`row-${row.key}`}
       role="treeitem"
       aria-level={row.depth + 1}
       aria-selected={selected}
-      aria-expanded={row.kind === "terminal" ? undefined : row.expanded}
+      aria-expanded={leaf ? undefined : row.expanded}
       data-row-kind={row.kind}
       data-row-key={row.key}
       data-cursor={cursor || undefined}
       className={cn(
-        "flex h-full cursor-default items-center gap-1.5 rounded-md pr-2 text-[13px] select-none",
+        "group/row flex h-full cursor-default items-center gap-1.5 rounded-md pr-2 text-[13px] select-none",
         selected ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/90 hover:bg-sidebar-accent/50",
         cursor && "group-focus:ring-1 group-focus:ring-sidebar-ring group-focus:ring-inset",
       )}
@@ -159,16 +254,24 @@ export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onAc
         onActivate(row, "click");
       }}
       onDoubleClick={() => {
-        if (row.kind !== "terminal") onActivate(row, "toggle");
+        if (row.kind === "session") useUiStore.getState().setRenaming(row.sessionId);
+        else if (!leaf) onActivate(row, "toggle");
       }}
     >
       {row.kind === "terminal" ? (
         <TerminalLabel id={row.terminalId} />
+      ) : row.kind === "session" ? (
+        <SessionLabel id={row.sessionId} />
       ) : (
         <>
           <Chevron row={row} onActivate={onActivate} />
           {row.kind === "repo" && <RepoLabel repoId={row.repoId} />}
-          {row.kind === "worktree" && <WorktreeLabel repoId={row.repoId} path={row.path} />}
+          {row.kind === "worktree" && (
+            <>
+              <WorktreeLabel repoId={row.repoId} path={row.path} />
+              <NewSessionButton repoId={row.repoId} path={row.path} />
+            </>
+          )}
           {row.kind === "group" && (
             <>
               <Layers className="size-4 shrink-0 text-muted-foreground" aria-hidden />

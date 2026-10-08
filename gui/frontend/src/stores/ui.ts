@@ -5,6 +5,7 @@ import { persist } from "zustand/middleware";
 export type Selection =
   | { kind: "none" }
   | { kind: "terminal"; id: string }
+  | { kind: "session"; id: string }
   | { kind: "repo"; repoId: string }
   | { kind: "worktree"; repoId: string; path: string };
 
@@ -28,6 +29,8 @@ interface UiState {
   cursorKey: string | null;
   collapsed: Readonly<Record<string, boolean>>;
   palette: { open: boolean; query: string; commandName: string | null; returnTo: FocusRegion };
+  /** Session whose sidebar row is in inline-rename mode. */
+  renamingSessionId: string | null;
 
   // Persisted settings.
   sidebarVisible: boolean;
@@ -41,6 +44,7 @@ interface UiState {
   toggleCollapsed: (key: string, collapsed?: boolean) => void;
   openPalette: (query?: string, commandName?: string | null) => void;
   closePalette: () => void;
+  setRenaming: (sessionId: string | null) => void;
   toggleSidebar: () => void;
   setSidebarWidth: (w: number) => void;
   setFontSize: (n: number) => void;
@@ -56,6 +60,7 @@ export function sameSelection(a: Selection, b: Selection): boolean {
     case "none":
       return true;
     case "terminal":
+    case "session":
       return a.id === (b as typeof a).id;
     case "repo":
       return a.repoId === (b as typeof a).repoId;
@@ -74,6 +79,7 @@ export const useUiStore = create<UiState>()(
       cursorKey: null,
       collapsed: {},
       palette: { open: false, query: "", commandName: null, returnTo: "content" },
+      renamingSessionId: null,
       sidebarVisible: true,
       sidebarWidth: 260,
       fontSize: FONT_DEFAULT,
@@ -81,8 +87,12 @@ export const useUiStore = create<UiState>()(
       select: (sel, opts) => {
         set((s) => ({
           selection: sameSelection(s.selection, sel) ? s.selection : sel,
-          terminalFocusSeq: opts?.focusTerminal && sel.kind === "terminal" ? s.terminalFocusSeq + 1 : s.terminalFocusSeq,
+          terminalFocusSeq:
+            opts?.focusTerminal && (sel.kind === "terminal" || sel.kind === "session") ? s.terminalFocusSeq + 1 : s.terminalFocusSeq,
         }));
+      },
+      setRenaming: (renamingSessionId) => {
+        set({ renamingSessionId });
       },
       setFocus: (focus) => {
         set({ focus });
