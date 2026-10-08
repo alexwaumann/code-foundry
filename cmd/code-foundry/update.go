@@ -42,13 +42,20 @@ func runUpdate(ctx context.Context, cl *cli, args []string) error {
 		return errors.New("this build has no release repository; set " + version.EnvReleaseRepo + "=owner/name")
 	}
 
-	current := version.Version
-	installed := current
+	// Compare against the installed app: the bundle this CLI lives in, else (standalone
+	// CLI) the default install location.
+	installed := version.Version
 	bundle := update.RunningBundle()
-	if bundle != "" {
-		if v, err := update.BundleVersion(bundle); err == nil && update.Newer(v, installed) {
-			installed = v
+	target := bundle
+	if target == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			target = filepath.Join(home, "Applications", update.BundleName)
 		}
+	}
+	if v, err := update.BundleVersion(target); err == nil && update.IsSemver(v) {
+		installed = v
+	} else if bundle == "" {
+		installed = "(not installed)"
 	}
 	if *tag == "" {
 		latest, err := src.Latest(ctx)

@@ -88,11 +88,10 @@ func (i ScriptInstaller) Install(ctx context.Context, tag string, progress func(
 	cmd := exec.CommandContext(ctx, "/bin/bash", args...)
 	cmd.Env = i.env()
 	cmd.WaitDelay = 5 * time.Second
-	// Its own process group, so cancelling kills gh and ditto too, not just bash.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) }
 
 	if interactive {
+		// Stays in the terminal's foreground process group: the installer prompts on
+		// /dev/tty, and a background group reading it is stopped with SIGTTIN.
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = i.Stdin, i.Stdout, i.Stderr
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("installer: %w", err)
@@ -100,6 +99,9 @@ func (i ScriptInstaller) Install(ctx context.Context, tag string, progress func(
 		return nil
 	}
 
+	// Its own process group, so cancelling kills gh and ditto too, not just bash.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) }
 	pr, pw := io.Pipe()
 	cmd.Stdout, cmd.Stderr = pw, pw
 	if err := cmd.Start(); err != nil {
