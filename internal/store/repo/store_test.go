@@ -488,6 +488,31 @@ func TestNoSelfTriggeredRefreshLoop(t *testing.T) {
 	}
 }
 
+func TestFetchErrorIsNotFatal(t *testing.T) {
+	f := newFixture(t)
+	git(t, f.repo, "remote", "set-url", "origin", filepath.Join(f.base, "does-not-exist.git"))
+	cr := &countingRunner{next: ExecRunner{}, n: map[string]int{}}
+	h := startHarness(t, "", Options{Runner: cr, FetchInterval: 50 * time.Millisecond})
+	r, err := h.store.Register(context.Background(), f.repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for cr.count("fetch") < 2 {
+		if time.Now().After(deadline) {
+			t.Fatal("fetch never retried")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err := h.store.Refresh(context.Background(), r.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := h.store.Snapshot().Repo(r.ID)
+	if got.Error != "" || len(got.Worktrees) != 1 || got.Worktrees[0].Status.Error != "" {
+		t.Fatalf("fetch failure leaked into state: %+v", got)
+	}
+}
+
 func TestPeriodicFetch(t *testing.T) {
 	f := newFixture(t)
 	h := startHarness(t, "", Options{FetchInterval: 200 * time.Millisecond})

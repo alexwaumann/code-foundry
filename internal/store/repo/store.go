@@ -360,8 +360,9 @@ func (g *Git) Register(ctx context.Context, path string) (Repo, error) {
 			g.mu.Unlock()
 			return Repo{}, fmt.Errorf("repo: register %s: %w", mainPath, err)
 		}
+		// No publish here: the first reconcile always publishes RepoUpdated (its
+		// worktree set changes from empty), so watchers never see a worktree-less repo.
 		g.log.Info("repo registered", "id", m.ID, "path", m.Path)
-		g.commit(repoUpdated(m.ID))
 	}
 	if err := g.refresh(ctx, m.ID); err != nil {
 		return Repo{}, err
