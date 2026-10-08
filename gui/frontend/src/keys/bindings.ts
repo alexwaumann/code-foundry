@@ -1,7 +1,7 @@
 import type { CommandView } from "@/api/command";
 import { promptedArgs } from "@/palette/args";
 import { leafOrder, nextAfter, sessionOrder } from "@/lib/tree";
-import { refreshCommands, runCommand, useCommandsStore } from "@/stores/commands";
+import { refreshCommands, runCommand, useCommandsStore, whenListed } from "@/stores/commands";
 import { contextKey, getTreeInputs, getUiContext } from "@/stores/context";
 import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { zoomFont } from "@/stores/settings";
@@ -210,10 +210,14 @@ export function handleKeyDown(e: KeyboardEvent): void {
   const ctx = getUiContext();
   if (/^(cmd|ctrl|alt)\+/.test(chord) && useCommandsStore.getState().contextKey !== contextKey(ctx)) {
     e.preventDefault();
-    void refreshCommands(ctx).then(() => {
-      const late = commandBindings(useCommandsStore.getState().commands).get(chord);
-      if (late && contextKey(getUiContext()) === contextKey(ctx)) startCommand(late);
-    });
+    // Another refresh may abort this one (startup, context changes): wait for the list
+    // for ctx from whichever refresh completes, not just this call.
+    void refreshCommands(ctx)
+      .then(() => whenListed(ctx))
+      .then(() => {
+        const late = commandBindings(useCommandsStore.getState().commands).get(chord);
+        if (late && contextKey(getUiContext()) === contextKey(ctx)) startCommand(late);
+      });
   }
 }
 

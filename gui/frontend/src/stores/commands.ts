@@ -51,6 +51,28 @@ export async function refreshCommands(ctx: UiContextView = getUiContext()): Prom
 }
 
 /**
+ * Resolves once the list for ctx has arrived (any refresh, not necessarily this
+ * caller's: a newer refresh aborts older ones), or false after timeoutMs.
+ */
+export function whenListed(ctx: UiContextView, timeoutMs = 3000): Promise<boolean> {
+  const key = contextKey(ctx);
+  const ready = (s: CommandsState) => s.contextKey === key && !s.loading;
+  if (ready(useCommandsStore.getState())) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      unsub();
+      resolve(false);
+    }, timeoutMs);
+    const unsub = useCommandsStore.subscribe((s) => {
+      if (!ready(s)) return;
+      clearTimeout(timer);
+      unsub();
+      resolve(true);
+    });
+  });
+}
+
+/**
  * Invokes a command with the current context; reports the result as a toast. A command
  * the daemon wants confirmed (ConfirmationRequired) opens the confirm dialog and runs
  * again with confirmed set if the user agrees; declining returns false quietly.
