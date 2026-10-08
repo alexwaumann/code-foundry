@@ -45,6 +45,7 @@ func TestSessionCommands(t *testing.T) {
 		wantMsg    string
 		wantReqs   []proto.Message // backend requests in order
 		wantIntent *v1.UiIntent
+		wantIn     []string // fields expected in the message, in order on one line
 	}{
 		{name: "new from worktree context", cmd: "session.new", ctx: command.Context{ActiveWorktreePath: "/wt"},
 			args:     map[string]string{"model": "opus", "effort": "high"},
@@ -78,7 +79,10 @@ func TestSessionCommands(t *testing.T) {
 			wantMsg: "removed session s5", wantReqs: []proto.Message{&v1.RemoveSessionRequest{Id: "s5"}}},
 		{name: "focus", cmd: "session.focus", ctx: command.Context{ActiveSessionID: "s7"}, wantMsg: "delivered=1", wantIntent: focusIntent("s7")},
 		{name: "list", cmd: "session.list", current: &v1.Session{Id: "s1", Name: "n", State: v1.SessionState_SESSION_STATE_DISCONNECTED, DisconnectReason: "closed"},
-			wantReqs: []proto.Message{&v1.ListSessionsRequest{}}},
+			wantReqs: []proto.Message{&v1.ListSessionsRequest{}}, wantIn: []string{"s1", "n", "disconnected", "unspecified", "closed"}},
+		{name: "list shows the status reason of a live session", cmd: "session.list",
+			current: &v1.Session{Id: "s2", Name: "m", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION, StatusReason: "finished", DisconnectReason: "exited"},
+			wantIn: []string{"s2", "m", "connected", "needs_attention", "finished"}},
 		{name: "backend error passes through", cmd: "session.close", args: map[string]string{"id": "s5"},
 			backendErr: connect.NewError(connect.CodeNotFound, errors.New("nope")), wantCode: connect.CodeNotFound},
 	}
@@ -110,8 +114,11 @@ func TestSessionCommands(t *testing.T) {
 					t.Errorf("intents = %v, want %v", in, tt.wantIntent)
 				}
 			}
-			if tt.cmd == "session.list" && err == nil && !strings.Contains(res.Message, "disconnected") {
-				t.Errorf("list output = %q", res.Message)
+			if tt.wantIn != nil {
+				lines := strings.Split(res.Message, "\n")
+				if len(lines) != 2 || !slices.Equal(strings.Fields(lines[1])[:len(tt.wantIn)], tt.wantIn) {
+					t.Errorf("list output = %q, want a row starting %v", res.Message, tt.wantIn)
+				}
 			}
 		})
 	}

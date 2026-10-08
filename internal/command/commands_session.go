@@ -110,8 +110,13 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				_, _ = fmt.Fprintln(tw, "ID\tNAME\tSTATE\tSTATUS\tREASON\tWORKTREE")
 				for _, s := range res.Msg.GetSessions() {
 					status := strings.ToLower(strings.TrimPrefix(s.GetStatus().String(), "SESSION_STATUS_"))
+					// The reason explains the state when disconnected, else the status.
+					reason := s.GetStatusReason()
+					if s.GetState() == v1.SessionState_SESSION_STATE_DISCONNECTED {
+						reason = s.GetDisconnectReason()
+					}
 					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), s.GetName(), sessionStateName(s.GetState()),
-						status, s.GetDisconnectReason(), s.GetWorktreePath())
+						status, reason, s.GetWorktreePath())
 				}
 				_ = tw.Flush()
 				return Result{Message: strings.TrimRight(sb.String(), "\n"), JSON: res.Msg}, nil

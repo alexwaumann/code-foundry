@@ -170,6 +170,7 @@ func sessionToProto(s session.Session) *v1.Session {
 		TerminalId:       s.TerminalID,
 		State:            v1.SessionState(s.State),
 		Status:           v1.SessionStatus(s.Status),
+		StatusReason:     s.StatusReason,
 		ExitCode:         int32(s.ExitCode),
 		DisconnectReason: s.DisconnectReason,
 		LastError:        s.LastError,

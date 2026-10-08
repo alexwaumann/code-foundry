@@ -65,10 +65,11 @@ func TestSessionUnaryAndErrorCodes(t *testing.T) {
 	if err != nil || len(list.Msg.GetSessions()) != 1 {
 		t.Fatalf("List = %v, %v", list, err)
 	}
-	fake.Put(session.Session{ID: "s-9", Status: session.StatusNeedsAttention, State: session.StateConnected, CreatedAt: time.Unix(9, 0)})
+	fake.Put(session.Session{ID: "s-9", Status: session.StatusNeedsAttention, StatusReason: "finished", State: session.StateConnected, CreatedAt: time.Unix(9, 0)})
 	got, _ = c.Get(ctx, connect.NewRequest(&v1.GetSessionRequest{Id: "s-9"}))
 	if got.Msg.GetSession().GetStatus() != v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION ||
-		got.Msg.GetSession().GetState() != v1.SessionState_SESSION_STATE_CONNECTED {
+		got.Msg.GetSession().GetState() != v1.SessionState_SESSION_STATE_CONNECTED ||
+		got.Msg.GetSession().GetStatusReason() != "finished" {
 		t.Errorf("enum mapping = %v", got.Msg.GetSession())
 	}
 }

@@ -78,6 +78,9 @@ message Session {
   string last_error = 16;
   // Forked from this session id, if any.
   string parent_id = 17;
+  // Short explanation of status from the detector, e.g. "finished", "at prompt",
+  // "permission: Do you want to proceed?". Empty when unknown or DISCONNECTED.
+  string status_reason = 18;
 }
 
 message CreateSessionRequest {

@@ -163,7 +163,10 @@ type Session struct {
 	DisconnectReason string `protobuf:"bytes,15,opt,name=disconnect_reason,json=disconnectReason,proto3" json:"disconnect_reason,omitempty"`
 	LastError        string `protobuf:"bytes,16,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
 	// Forked from this session id, if any.
-	ParentId      string `protobuf:"bytes,17,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
+	ParentId string `protobuf:"bytes,17,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
+	// Short explanation of status from the detector, e.g. "finished", "at prompt",
+	// "permission: Do you want to proceed?". Empty when unknown or DISCONNECTED.
+	StatusReason  string `protobuf:"bytes,18,opt,name=status_reason,json=statusReason,proto3" json:"status_reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -313,6 +316,13 @@ func (x *Session) GetLastError() string {
 func (x *Session) GetParentId() string {
 	if x != nil {
 		return x.ParentId
+	}
+	return ""
+}
+
+func (x *Session) GetStatusReason() string {
+	if x != nil {
+		return x.StatusReason
 	}
 	return ""
 }
@@ -1237,7 +1247,7 @@ var File_codefoundry_v1_session_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccodefoundry/v1/session.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf7\x04\n" +
+	"\x1ccodefoundry/v1/session.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9c\x05\n" +
 	"\aSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x17\n" +
@@ -1260,7 +1270,8 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\x11disconnect_reason\x18\x0f \x01(\tR\x10disconnectReason\x12\x1d\n" +
 	"\n" +
 	"last_error\x18\x10 \x01(\tR\tlastError\x12\x1b\n" +
-	"\tparent_id\x18\x11 \x01(\tR\bparentId\"\xbd\x01\n" +
+	"\tparent_id\x18\x11 \x01(\tR\bparentId\x12#\n" +
+	"\rstatus_reason\x18\x12 \x01(\tR\fstatusReason\"\xbd\x01\n" +
 	"\x14CreateSessionRequest\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12#\n" +
 	"\rworktree_path\x18\x02 \x01(\tR\fworktreePath\x12\x14\n" +
