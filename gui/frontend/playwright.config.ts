@@ -1,10 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /** e2e against the mock daemon. Ports differ from `pnpm run mock` / `wails3 dev` defaults
- * so a running dev setup does not interfere. See e2e/fixtures.ts. */
-export const MOCK_PORT = 7799;
+ * so a running dev setup does not interfere; E2E_MOCK_PORT / E2E_VITE_PORT move them
+ * (e.g. two worktrees running e2e at once). See e2e/fixtures.ts. */
+export const MOCK_PORT = Number(process.env.E2E_MOCK_PORT ?? 7799);
 export const MOCK_TOKEN = "e2e-token";
-export const VITE_PORT = 9255;
+export const VITE_PORT = Number(process.env.E2E_VITE_PORT ?? 9255);
 
 export default defineConfig({
   testDir: "e2e",

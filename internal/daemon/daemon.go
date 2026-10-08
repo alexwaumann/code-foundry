@@ -61,7 +61,7 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	defer func() { _ = lock.release() }()
 
-	log, logFile, err := newLogger(p.DaemonLog(), opts.Dev, opts.Stderr)
+	log, logLevel, logFile, err := newLogger(p.DaemonLog(), opts.Dev, opts.Stderr)
 	if err != nil {
 		return err
 	}
@@ -86,6 +86,7 @@ func Run(ctx context.Context, opts Options) error {
 	terminalAPI := api.NewTerminal(st.terminal)
 	sessionAPI := api.NewSession(st.session, events)
 	gitopsAPI := api.NewGitOps(st.gitops, events, ctx.Done())
+	settingsAPI := api.NewSettings(st.settings)
 	commands := command.NewRegistry()
 	if err := all.Register(commands, all.Deps{
 		Daemon: command.DaemonInfo{
@@ -93,15 +94,17 @@ func Run(ctx context.Context, opts Options) error {
 		},
 		Emitter:  command.BusEmitter{Bus: events},
 		Terminal: terminalAPI,
-		Repo:     repoAPI,
+		Repo:     worktreeDirRepo{RepoBackend: repoAPI, repos: st.repo, settings: st.settings},
 		Session:  sessionAPI,
 		GitOps: command.GitOpsDeps{
 			Backend:    gitopsAPI,
 			GitHubSlug: func(c command.Context) string { return st.gitops.GitHubSlug(c.ActiveRepoID, c.ActiveWorktreePath) },
 		},
+		Settings: settingsAPI,
 	}); err != nil {
 		return fmt.Errorf("register commands: %w", err)
 	}
+	applySettings(st.settings, commands, logLevel, opts.Dev)
 	routes := []api.Route{
 		api.NewHealth(started, opts.Version).Route(),
 		api.NewCommand(commands).Route(),
@@ -111,7 +114,8 @@ func Run(ctx context.Context, opts Options) error {
 		repoAPI.Route(),
 		api.NewGh(st.gh, events, ctx.Done()).Route(),
 		gitopsAPI.Route(),
-		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Session: st.session, Gh: st.gh, GitOps: st.gitops, Done: ctx.Done()}).Route(),
+		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Session: st.session, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Done: ctx.Done()}).Route(),
+		settingsAPI.Route(),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {

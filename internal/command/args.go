@@ -63,6 +63,9 @@ type ArgSpec struct {
 	// It also works the other way: an explicit value stands in for that field when
 	// evaluating When, so `terminal.kill --id t1` is available without an active terminal.
 	Context ContextField
+	// Positional args also take bare words on the CLI, in declaration order:
+	// `code-foundry settings set <key> <value>`.
+	Positional bool
 }
 
 // validate checks the spec's static shape at Register time.

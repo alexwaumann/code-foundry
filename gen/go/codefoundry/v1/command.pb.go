@@ -159,13 +159,16 @@ func (x *UiContext) GetActiveView() string {
 }
 
 type ArgSpec struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Type          ArgType                `protobuf:"varint,2,opt,name=type,proto3,enum=codefoundry.v1.ArgType" json:"type,omitempty"`
-	Required      bool                   `protobuf:"varint,3,opt,name=required,proto3" json:"required,omitempty"`
-	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	EnumValues    []string               `protobuf:"bytes,5,rep,name=enum_values,json=enumValues,proto3" json:"enum_values,omitempty"`
-	DefaultValue  string                 `protobuf:"bytes,6,opt,name=default_value,json=defaultValue,proto3" json:"default_value,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Name         string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Type         ArgType                `protobuf:"varint,2,opt,name=type,proto3,enum=codefoundry.v1.ArgType" json:"type,omitempty"`
+	Required     bool                   `protobuf:"varint,3,opt,name=required,proto3" json:"required,omitempty"`
+	Description  string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	EnumValues   []string               `protobuf:"bytes,5,rep,name=enum_values,json=enumValues,proto3" json:"enum_values,omitempty"`
+	DefaultValue string                 `protobuf:"bytes,6,opt,name=default_value,json=defaultValue,proto3" json:"default_value,omitempty"`
+	// Positional args take bare words on the CLI, in declaration order
+	// (`code-foundry settings set <key> <value>`). The flag form still works.
+	Positional    bool `protobuf:"varint,7,opt,name=positional,proto3" json:"positional,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -242,6 +245,13 @@ func (x *ArgSpec) GetDefaultValue() string {
 	return ""
 }
 
+func (x *ArgSpec) GetPositional() bool {
+	if x != nil {
+		return x.Positional
+	}
+	return false
+}
+
 type Command struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Dotted, stable identifier, e.g. "terminal.new", "repo.register".
@@ -255,9 +265,12 @@ type Command struct {
 	// Default keybindings in the GUI's chord syntax, e.g. "cmd+n".
 	Keybindings []string `protobuf:"bytes,6,rep,name=keybindings,proto3" json:"keybindings,omitempty"`
 	// Whether the command is available in the requested context.
-	Available     bool `protobuf:"varint,7,opt,name=available,proto3" json:"available,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Available bool `protobuf:"varint,7,opt,name=available,proto3" json:"available,omitempty"`
+	// Invoke fails with FailedPrecondition and a ConfirmationRequired detail unless
+	// InvokeCommandRequest.confirmed is set. Clients ask the user, then re-invoke.
+	RequiresConfirmation bool `protobuf:"varint,8,opt,name=requires_confirmation,json=requiresConfirmation,proto3" json:"requires_confirmation,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *Command) Reset() {
@@ -335,6 +348,13 @@ func (x *Command) GetKeybindings() []string {
 func (x *Command) GetAvailable() bool {
 	if x != nil {
 		return x.Available
+	}
+	return false
+}
+
+func (x *Command) GetRequiresConfirmation() bool {
+	if x != nil {
+		return x.RequiresConfirmation
 	}
 	return false
 }
@@ -436,10 +456,12 @@ func (x *ListCommandsResponse) GetCommands() []*Command {
 }
 
 type InvokeCommandRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Context       *UiContext             `protobuf:"bytes,2,opt,name=context,proto3" json:"context,omitempty"`
-	Args          map[string]string      `protobuf:"bytes,3,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Name    string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Context *UiContext             `protobuf:"bytes,2,opt,name=context,proto3" json:"context,omitempty"`
+	Args    map[string]string      `protobuf:"bytes,3,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// The user confirmed a destructive command (Command.requires_confirmation).
+	Confirmed     bool `protobuf:"varint,4,opt,name=confirmed,proto3" json:"confirmed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -493,6 +515,13 @@ func (x *InvokeCommandRequest) GetArgs() map[string]string {
 		return x.Args
 	}
 	return nil
+}
+
+func (x *InvokeCommandRequest) GetConfirmed() bool {
+	if x != nil {
+		return x.Confirmed
+	}
+	return false
 }
 
 type InvokeCommandResponse struct {
@@ -549,6 +578,69 @@ func (x *InvokeCommandResponse) GetResultJson() string {
 	return ""
 }
 
+// ConfirmationRequired is the error detail of an Invoke that needs confirmation.
+type ConfirmationRequired struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Command string                 `protobuf:"bytes,1,opt,name=command,proto3" json:"command,omitempty"`
+	// Rendered prompt, e.g. "Remove worktree /x? This deletes files on disk."
+	Message string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	// Command title, for the dialog's confirm button.
+	Title         string `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConfirmationRequired) Reset() {
+	*x = ConfirmationRequired{}
+	mi := &file_codefoundry_v1_command_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmationRequired) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmationRequired) ProtoMessage() {}
+
+func (x *ConfirmationRequired) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_command_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmationRequired.ProtoReflect.Descriptor instead.
+func (*ConfirmationRequired) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_command_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ConfirmationRequired) GetCommand() string {
+	if x != nil {
+		return x.Command
+	}
+	return ""
+}
+
+func (x *ConfirmationRequired) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ConfirmationRequired) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
 var File_codefoundry_v1_command_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_command_proto_rawDesc = "" +
@@ -560,7 +652,7 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\x0eactive_repo_id\x18\x03 \x01(\tR\factiveRepoId\x120\n" +
 	"\x14active_worktree_path\x18\x04 \x01(\tR\x12activeWorktreePath\x12\x1f\n" +
 	"\vactive_view\x18\x05 \x01(\tR\n" +
-	"activeView\"\xce\x01\n" +
+	"activeView\"\xee\x01\n" +
 	"\aArgSpec\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12+\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x17.codefoundry.v1.ArgTypeR\x04type\x12\x1a\n" +
@@ -568,7 +660,10 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x1f\n" +
 	"\venum_values\x18\x05 \x03(\tR\n" +
 	"enumValues\x12#\n" +
-	"\rdefault_value\x18\x06 \x01(\tR\fdefaultValue\"\xde\x01\n" +
+	"\rdefault_value\x18\x06 \x01(\tR\fdefaultValue\x12\x1e\n" +
+	"\n" +
+	"positional\x18\a \x01(\bR\n" +
+	"positional\"\x93\x02\n" +
 	"\aCommand\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -576,23 +671,29 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\bcategory\x18\x04 \x01(\tR\bcategory\x12+\n" +
 	"\x04args\x18\x05 \x03(\v2\x17.codefoundry.v1.ArgSpecR\x04args\x12 \n" +
 	"\vkeybindings\x18\x06 \x03(\tR\vkeybindings\x12\x1c\n" +
-	"\tavailable\x18\a \x01(\bR\tavailable\"{\n" +
+	"\tavailable\x18\a \x01(\bR\tavailable\x123\n" +
+	"\x15requires_confirmation\x18\b \x01(\bR\x14requiresConfirmation\"{\n" +
 	"\x13ListCommandsRequest\x123\n" +
 	"\acontext\x18\x01 \x01(\v2\x19.codefoundry.v1.UiContextR\acontext\x12/\n" +
 	"\x13include_unavailable\x18\x02 \x01(\bR\x12includeUnavailable\"K\n" +
 	"\x14ListCommandsResponse\x123\n" +
-	"\bcommands\x18\x01 \x03(\v2\x17.codefoundry.v1.CommandR\bcommands\"\xdc\x01\n" +
+	"\bcommands\x18\x01 \x03(\v2\x17.codefoundry.v1.CommandR\bcommands\"\xfa\x01\n" +
 	"\x14InvokeCommandRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x123\n" +
 	"\acontext\x18\x02 \x01(\v2\x19.codefoundry.v1.UiContextR\acontext\x12B\n" +
-	"\x04args\x18\x03 \x03(\v2..codefoundry.v1.InvokeCommandRequest.ArgsEntryR\x04args\x1a7\n" +
+	"\x04args\x18\x03 \x03(\v2..codefoundry.v1.InvokeCommandRequest.ArgsEntryR\x04args\x12\x1c\n" +
+	"\tconfirmed\x18\x04 \x01(\bR\tconfirmed\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"R\n" +
 	"\x15InvokeCommandResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x1f\n" +
 	"\vresult_json\x18\x02 \x01(\tR\n" +
-	"resultJson*\x83\x01\n" +
+	"resultJson\"`\n" +
+	"\x14ConfirmationRequired\x12\x18\n" +
+	"\acommand\x18\x01 \x01(\tR\acommand\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title*\x83\x01\n" +
 	"\aArgType\x12\x18\n" +
 	"\x14ARG_TYPE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fARG_TYPE_STRING\x10\x01\x12\x11\n" +
@@ -618,7 +719,7 @@ func file_codefoundry_v1_command_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_command_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_codefoundry_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_codefoundry_v1_command_proto_goTypes = []any{
 	(ArgType)(0),                  // 0: codefoundry.v1.ArgType
 	(*UiContext)(nil),             // 1: codefoundry.v1.UiContext
@@ -628,7 +729,8 @@ var file_codefoundry_v1_command_proto_goTypes = []any{
 	(*ListCommandsResponse)(nil),  // 5: codefoundry.v1.ListCommandsResponse
 	(*InvokeCommandRequest)(nil),  // 6: codefoundry.v1.InvokeCommandRequest
 	(*InvokeCommandResponse)(nil), // 7: codefoundry.v1.InvokeCommandResponse
-	nil,                           // 8: codefoundry.v1.InvokeCommandRequest.ArgsEntry
+	(*ConfirmationRequired)(nil),  // 8: codefoundry.v1.ConfirmationRequired
+	nil,                           // 9: codefoundry.v1.InvokeCommandRequest.ArgsEntry
 }
 var file_codefoundry_v1_command_proto_depIdxs = []int32{
 	0, // 0: codefoundry.v1.ArgSpec.type:type_name -> codefoundry.v1.ArgType
@@ -636,7 +738,7 @@ var file_codefoundry_v1_command_proto_depIdxs = []int32{
 	1, // 2: codefoundry.v1.ListCommandsRequest.context:type_name -> codefoundry.v1.UiContext
 	3, // 3: codefoundry.v1.ListCommandsResponse.commands:type_name -> codefoundry.v1.Command
 	1, // 4: codefoundry.v1.InvokeCommandRequest.context:type_name -> codefoundry.v1.UiContext
-	8, // 5: codefoundry.v1.InvokeCommandRequest.args:type_name -> codefoundry.v1.InvokeCommandRequest.ArgsEntry
+	9, // 5: codefoundry.v1.InvokeCommandRequest.args:type_name -> codefoundry.v1.InvokeCommandRequest.ArgsEntry
 	4, // 6: codefoundry.v1.CommandService.List:input_type -> codefoundry.v1.ListCommandsRequest
 	6, // 7: codefoundry.v1.CommandService.Invoke:input_type -> codefoundry.v1.InvokeCommandRequest
 	5, // 8: codefoundry.v1.CommandService.List:output_type -> codefoundry.v1.ListCommandsResponse
@@ -659,7 +761,7 @@ func file_codefoundry_v1_command_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_command_proto_rawDesc), len(file_codefoundry_v1_command_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

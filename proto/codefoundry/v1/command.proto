@@ -39,6 +39,9 @@ message ArgSpec {
   string description = 4;
   repeated string enum_values = 5;
   string default_value = 6;
+  // Positional args take bare words on the CLI, in declaration order
+  // (`code-foundry settings set <key> <value>`). The flag form still works.
+  bool positional = 7;
 }
 
 message Command {
@@ -54,6 +57,9 @@ message Command {
   repeated string keybindings = 6;
   // Whether the command is available in the requested context.
   bool available = 7;
+  // Invoke fails with FailedPrecondition and a ConfirmationRequired detail unless
+  // InvokeCommandRequest.confirmed is set. Clients ask the user, then re-invoke.
+  bool requires_confirmation = 8;
 }
 
 message ListCommandsRequest {
@@ -69,6 +75,8 @@ message InvokeCommandRequest {
   string name = 1;
   UiContext context = 2;
   map<string, string> args = 3;
+  // The user confirmed a destructive command (Command.requires_confirmation).
+  bool confirmed = 4;
 }
 
 message InvokeCommandResponse {
@@ -76,4 +84,13 @@ message InvokeCommandResponse {
   string message = 1;
   // Optional structured result for CLI --json; JSON-encoded.
   string result_json = 2;
+}
+
+// ConfirmationRequired is the error detail of an Invoke that needs confirmation.
+message ConfirmationRequired {
+  string command = 1;
+  // Rendered prompt, e.g. "Remove worktree /x? This deletes files on disk."
+  string message = 2;
+  // Command title, for the dialog's confirm button.
+  string title = 3;
 }

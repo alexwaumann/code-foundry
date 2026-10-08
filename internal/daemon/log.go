@@ -10,21 +10,22 @@ import (
 )
 
 // newLogger returns a logger that writes JSON to logPath and, in dev mode, text to
-// stderr. The returned closer closes the log file.
-func newLogger(logPath string, dev bool, stderr io.Writer) (*slog.Logger, io.Closer, error) {
+// stderr. The returned closer closes the log file. The file handler's level is the
+// returned LevelVar (settings: advanced.log_level); dev mode logs at debug.
+func newLogger(logPath string, dev bool, stderr io.Writer) (*slog.Logger, *slog.LevelVar, io.Closer, error) {
 	f, err := os.OpenFile(logPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
 	if err != nil {
-		return nil, nil, fmt.Errorf("open log %s: %w", logPath, err)
+		return nil, nil, nil, fmt.Errorf("open log %s: %w", logPath, err)
 	}
-	level := slog.LevelInfo
+	level := new(slog.LevelVar)
 	if dev {
-		level = slog.LevelDebug
+		level.Set(slog.LevelDebug)
 	}
 	var h slog.Handler = slog.NewJSONHandler(f, &slog.HandlerOptions{Level: level})
 	if dev {
 		h = slog.NewMultiHandler(h, slog.NewTextHandler(stderr, &slog.HandlerOptions{Level: level}))
 	}
-	return slog.New(h), f, nil
+	return slog.New(h), level, f, nil
 }
 
 // logRequests logs each request at debug level. The wrapper keeps http.Flusher and

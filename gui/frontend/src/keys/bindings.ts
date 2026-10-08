@@ -1,10 +1,12 @@
 import type { CommandView } from "@/api/command";
 import { promptedArgs } from "@/palette/args";
 import { leafOrder, nextAfter, sessionOrder } from "@/lib/tree";
-import { refreshCommands, runCommand, useCommandsStore } from "@/stores/commands";
+import { refreshCommands, runCommand, useCommandsStore, whenListed } from "@/stores/commands";
 import { contextKey, getTreeInputs, getUiContext } from "@/stores/context";
 import { attentionIds, useSessionsStore } from "@/stores/sessions";
+import { zoomFont } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
+import { showView, toggleHelp } from "@/stores/views";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -59,9 +61,9 @@ function toggleSidebar(): void {
   }
 }
 
+/** Font size; saved to appearance.font_size in the settings file. */
 function zoom(delta: number | null): void {
-  const ui = useUiStore.getState();
-  ui.setFontSize(delta === null ? 13 : ui.fontSize + delta);
+  zoomFont(delta);
 }
 
 export const viewActions: readonly ViewAction[] = [
@@ -136,6 +138,13 @@ export function beginRename(sessionId: string | null = getUiContext().activeSess
  */
 const commandPresenters: Readonly<Record<string, () => boolean>> = {
   "session.rename": () => beginRename(),
+  // Window-local: only this window opens, without a round trip (the CLI and palette
+  // reach every window through UiIntent.ShowView instead).
+  "view.settings": () => showView("settings"),
+  "view.help": () => {
+    toggleHelp();
+    return true;
+  },
 };
 
 /** Starts a command from the keyboard or palette: prompts for args it needs, else invokes. */
@@ -162,6 +171,8 @@ function isEditable(el: Element | null): boolean {
  */
 export function handleKeyDown(e: KeyboardEvent): void {
   if (e.isComposing || e.defaultPrevented) return;
+  // A keybinding recorder (settings page) captures every chord, reserved ones included.
+  if (e.target instanceof Element && e.target.closest("[data-key-recorder]")) return;
   const chord = chordFromEvent(e);
   if (!chord) return;
   const action = viewActionMap.get(chord);
@@ -199,10 +210,14 @@ export function handleKeyDown(e: KeyboardEvent): void {
   const ctx = getUiContext();
   if (/^(cmd|ctrl|alt)\+/.test(chord) && useCommandsStore.getState().contextKey !== contextKey(ctx)) {
     e.preventDefault();
-    void refreshCommands(ctx).then(() => {
-      const late = commandBindings(useCommandsStore.getState().commands).get(chord);
-      if (late && contextKey(getUiContext()) === contextKey(ctx)) startCommand(late);
-    });
+    // Another refresh may abort this one (startup, context changes): wait for the list
+    // for ctx from whichever refresh completes, not just this call.
+    void refreshCommands(ctx)
+      .then(() => whenListed(ctx))
+      .then(() => {
+        const late = commandBindings(useCommandsStore.getState().commands).get(chord);
+        if (late && contextKey(getUiContext()) === contextKey(ctx)) startCommand(late);
+      });
   }
 }
 

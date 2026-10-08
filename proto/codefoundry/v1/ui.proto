@@ -19,6 +19,12 @@ message UiIntent {
     OpenPalette open_palette = 3;
     Notify notify = 4;
     FocusSession focus_session = 5;
+    ShowView show_view = 6;
+  }
+
+  // ShowView opens a named GUI view: "help", "settings".
+  message ShowView {
+    string name = 1;
   }
 
   message FocusSession {

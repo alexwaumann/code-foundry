@@ -43,18 +43,24 @@ type cli struct {
 	connect func(context.Context) (*client.Client, error)
 	// getwd resolves relative path flags.
 	getwd func() (string, error)
+	// stdin and interactive serve confirmation prompts; without them (or when
+	// interactive reports false) destructive commands need --yes.
+	stdin       io.Reader
+	interactive func() bool
 }
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn})))
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	cl := &cli{stdout: os.Stdout, stderr: os.Stderr, connect: connectDaemon, getwd: os.Getwd}
+	cl := &cli{stdout: os.Stdout, stderr: os.Stderr, connect: connectDaemon, getwd: os.Getwd, stdin: os.Stdin, interactive: stdinIsTerminal}
 	err := cl.dispatch(ctx, os.Args[1:])
 	stop()
 	switch {
 	case err == nil:
 	case errors.Is(err, errUsage):
 		os.Exit(2)
+	case errors.Is(err, errCancelled):
+		os.Exit(1)
 	default:
 		fmt.Fprintln(os.Stderr, "code-foundry:", err)
 		os.Exit(1)
@@ -131,6 +137,7 @@ func (cl *cli) usage(w io.Writer) {
 	fmt.Fprintln(w, "to list them. Invoke one by its dotted name or with spaces:")
 	fmt.Fprintln(w, "  code-foundry terminal.new --cwd .")
 	fmt.Fprintln(w, "  code-foundry terminal new --cwd .")
+	fmt.Fprintln(w, "  code-foundry settings set appearance.font_size 14")
 }
 
 // newFlagSet returns a FlagSet that reports parse errors as errUsage.

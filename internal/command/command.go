@@ -37,6 +37,12 @@ type Command struct {
 	When func(Context) bool
 	// Run executes the command with validated args.
 	Run func(ctx context.Context, uctx Context, args Args) (Result, error)
+	// Confirm, when set, makes the command destructive: Invoke refuses to run it unless
+	// the caller passes Confirmed(true), returning a *ConfirmError whose message is this
+	// template with each {arg-name} replaced by the arg's value, e.g.
+	// "Remove worktree {path}? This deletes files on disk." The GUI shows the message in
+	// a dialog and the CLI prompts (or takes --yes), then they invoke again.
+	Confirm string
 }
 
 // Available reports whether c is available in uctx.
@@ -137,7 +143,7 @@ var argNamePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 
 // ReservedArgNames are CLI flags every generated verb has; commands may not use them.
 var ReservedArgNames = []string{
-	"json", "help", "h",
+	"json", "help", "h", "yes",
 	"context-terminal", "context-session", "context-repo", "context-worktree",
 }
 
@@ -184,6 +190,9 @@ func (c *Command) validate() error {
 	}
 	if slices.Contains(c.Keybindings, "") {
 		return invalid("empty keybinding")
+	}
+	if err := validateConfirm(c.Confirm, c.Args); err != nil {
+		return invalid("%v", err)
 	}
 	return nil
 }

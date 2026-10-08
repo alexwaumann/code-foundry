@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+// SettingsService reads and edits the user's settings file ($CONFIG/settings.toml).
+// The file is the source of truth: edits made by hand while the daemon runs are picked
+// up and published like edits made through Update.
+//
+// Every value travels as a string, encoded by its field's type (bool "true"/"false",
+// int in decimal, everything else verbatim), like command args. The schema describes
+// each field, so a client renders a form without hardcoding any setting.
+service SettingsService {
+  // GetSchema returns every field, in display order, and the groups they belong to.
+  rpc GetSchema(GetSettingsSchemaRequest) returns (GetSettingsSchemaResponse) {}
+  // Get returns the current values.
+  rpc Get(GetSettingsRequest) returns (GetSettingsResponse) {}
+  // Update applies a partial change: only the given keys change. An empty value resets
+  // that key to its default. The whole change is validated first and applied atomically;
+  // on failure nothing is written and the error (InvalidArgument) carries a
+  // SettingsValidationErrors detail with one entry per rejected key.
+  rpc Update(UpdateSettingsRequest) returns (UpdateSettingsResponse) {}
+  // Watch streams the current snapshot, then one snapshot per change. The GUI receives
+  // the same events on EventService instead.
+  rpc Watch(WatchSettingsRequest) returns (stream SettingsEvent) {}
+}
+
+enum SettingType {
+  SETTING_TYPE_UNSPECIFIED = 0;
+  SETTING_TYPE_STRING = 1;
+  SETTING_TYPE_INT = 2;
+  SETTING_TYPE_BOOL = 3;
+  // One of enum_values. The empty string, when listed, means "no preference".
+  SETTING_TYPE_ENUM = 4;
+  // A filesystem path; ~ is expanded.
+  SETTING_TYPE_PATH = 5;
+  // A keyboard chord in the GUI's syntax ("cmd+shift+n"), or "none" to unbind.
+  SETTING_TYPE_KEYBINDING = 6;
+}
+
+message SettingField {
+  // Dotted key, "<group>.<name>", e.g. "sessions.default_model". Keybinding fields are
+  // "keybindings.<command name>", e.g. "keybindings.session.new".
+  string key = 1;
+  string title = 2;
+  string description = 3;
+  // Group id (SettingGroup.id).
+  string group = 4;
+  SettingType type = 5;
+  repeated string enum_values = 6;
+  string default_value = 7;
+  // The daemon reads this value only at start; a change applies after a restart.
+  bool restart_required = 8;
+  // Inclusive bounds for SETTING_TYPE_INT.
+  int64 min = 9;
+  int64 max = 10;
+  // Free-form hint for the input (e.g. a template or an example).
+  string placeholder = 11;
+}
+
+message SettingGroup {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+}
+
+message SettingIssue {
+  string key = 1;
+  string message = 2;
+}
+
+message SettingsSnapshot {
+  // Every field's effective value, keyed by SettingField.key. Defaults included.
+  map<string, string> values = 1;
+  // Absolute path of the settings file.
+  string path = 2;
+  // Increments with every published change.
+  uint64 revision = 3;
+  // Set when the file could not be parsed; the previous values stay in effect.
+  string load_error = 4;
+  // Values in the file that were rejected (and replaced by their defaults), and unknown
+  // keys.
+  repeated SettingIssue issues = 5;
+  // restart_required keys whose value differs from the one the daemon started with.
+  repeated string restart_pending = 6;
+}
+
+// SettingsValidationErrors is the error detail of a rejected Update.
+message SettingsValidationErrors {
+  repeated SettingIssue errors = 1;
+}
+
+message SettingsEvent {
+  oneof event {
+    SettingsSnapshot snapshot = 1;
+  }
+}
+
+message GetSettingsSchemaRequest {}
+
+message GetSettingsSchemaResponse {
+  repeated SettingGroup groups = 1;
+  repeated SettingField fields = 2;
+}
+
+message GetSettingsRequest {}
+
+message GetSettingsResponse {
+  SettingsSnapshot settings = 1;
+}
+
+message UpdateSettingsRequest {
+  map<string, string> values = 1;
+}
+
+message UpdateSettingsResponse {
+  SettingsSnapshot settings = 1;
+}
+
+message WatchSettingsRequest {}

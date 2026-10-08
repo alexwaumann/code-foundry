@@ -61,6 +61,8 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"session.rename", "session.fork", "session.remove",
 		"git.fetch", "git.pull", "git.push", "pr.create", "pr.open",
 		"worktree.open.editor", "worktree.reveal", "view.open.url",
+		"settings.get", "settings.set", "settings.reset", "settings.path", "settings.reveal",
+		"view.settings", "view.help",
 	}
 	for _, n := range want {
 		if _, ok := f.reg.Get(n); !ok {
@@ -181,7 +183,7 @@ func TestBuiltinCommands(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := newFixture(t)
 			f.term.Err, f.repo.Err = tt.backendEr, tt.backendEr
-			res, err := f.reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args)
+			res, err := f.reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args, command.Confirmed(true))
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}

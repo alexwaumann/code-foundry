@@ -200,6 +200,18 @@ export class XtermRenderer implements TerminalRenderer {
     this.term.options.theme = terminalTheme(scheme);
   }
 
+  /** appearance.font_family (with fallbacks). Changes cell metrics, so it refits. */
+  setFontFamily(family: string): void {
+    if (this.term.options.fontFamily === family) return;
+    this.term.options.fontFamily = family;
+    this.fit();
+  }
+
+  /** sessions.scrollback_lines. */
+  setScrollback(lines: number): void {
+    this.term.options.scrollback = lines;
+  }
+
   /** Visible buffer as text, for tests and debugging. */
   getText(): string {
     const buf = this.term.buffer.active;

@@ -24,6 +24,10 @@ type Deps struct {
 	// GitOps backs git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url.
 	// A nil Backend works like Terminal.
 	GitOps command.GitOpsDeps
+	// Settings backs settings.*. Nil works like Terminal.
+	Settings command.SettingsBackend
+	// Reveal shows a file in Finder (settings.reveal). Nil: command.RevealInFinder.
+	Reveal command.RevealFunc
 }
 
 // Register registers every domain's commands into r.
@@ -40,6 +44,9 @@ func Register(r *command.Registry, d Deps) error {
 	if d.Session == nil {
 		d.Session = codefoundryv1connect.UnimplementedSessionServiceHandler{}
 	}
+	if d.Settings == nil {
+		d.Settings = codefoundryv1connect.UnimplementedSettingsServiceHandler{}
+	}
 	return errors.Join(
 		command.RegisterDaemon(r, d.Daemon),
 		command.RegisterUI(r, d.Emitter),
@@ -47,5 +54,6 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterRepo(r, d.Repo),
 		command.RegisterSession(r, d.Session, d.Emitter),
 		command.RegisterGitOps(r, d.GitOps),
+		command.RegisterSettings(r, d.Settings, d.Emitter, d.Reveal),
 	)
 }

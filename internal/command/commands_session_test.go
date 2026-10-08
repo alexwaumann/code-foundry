@@ -90,7 +90,7 @@ func TestSessionCommands(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg, b, e := newSessionRegistry(t)
 			b.Current, b.Err = tt.current, tt.backendErr
-			res, err := reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args)
+			res, err := reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args, command.Confirmed(true))
 			switch {
 			case tt.wantCode != 0:
 				if connect.CodeOf(err) != tt.wantCode {

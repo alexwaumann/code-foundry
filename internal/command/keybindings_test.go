@@ -2,63 +2,21 @@ package command_test
 
 import (
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/awaumann/code-foundry/internal/command"
 )
-
-// reservedChords are chords command keybindings must never use. Keep in sync with:
-//   - viewActions in gui/frontend/src/keys/bindings.ts: GUI-local actions that win
-//     over any command, even in a focused terminal (a command bound there never fires);
-//   - editingChords in gui/frontend/src/keys/chord.ts: clipboard/undo, always left to
-//     the focused terminal or text field;
-//   - cmd+w and cmd+q, which the Wails app menu takes (close window, quit).
-//
-// See docs/notes/phase1e-gui.md and docs/notes/phase2-integration.md.
-var reservedChords = []string{
-	// viewActions
-	"cmd+k", "cmd+shift+p", "cmd+b", "cmd+shift+a",
-	"cmd+1", "cmd+2", "cmd+3", "cmd+4", "cmd+5", "cmd+6", "cmd+7", "cmd+8", "cmd+9",
-	"cmd+=", "cmd+-", "cmd+0",
-	// editingChords
-	"cmd+c", "cmd+v", "cmd+x", "cmd+a", "cmd+z", "cmd+shift+z",
-	// app menu
-	"cmd+w", "cmd+q",
-}
-
-// normalizeChord mirrors the frontend's normalizeChord closely enough for comparison:
-// lower case, modifier aliases folded, modifiers in a fixed order, key last.
-func normalizeChord(s string) string {
-	alias := map[string]string{
-		"meta": "cmd", "command": "cmd", "⌘": "cmd",
-		"control": "ctrl", "⌃": "ctrl",
-		"opt": "alt", "option": "alt", "⌥": "alt",
-		"⇧": "shift",
-	}
-	order := []string{"cmd", "ctrl", "alt", "shift"}
-	parts := strings.Split(strings.ToLower(strings.TrimSpace(s)), "+")
-	key := parts[len(parts)-1]
-	var mods []string
-	for _, p := range parts[:len(parts)-1] {
-		if a, ok := alias[p]; ok {
-			p = a
-		}
-		if !slices.Contains(mods, p) {
-			mods = append(mods, p)
-		}
-	}
-	slices.SortFunc(mods, func(a, b string) int { return slices.Index(order, a) - slices.Index(order, b) })
-	return strings.Join(append(mods, key), "+")
-}
 
 func TestKeybindingsAreUniqueAndNotReserved(t *testing.T) {
 	f := newFixture(t)
 	owner := map[string]string{} // normalized chord -> command
 	for _, l := range f.reg.List(command.Context{}, true) {
 		for _, k := range l.Command.Keybindings {
-			chord := normalizeChord(k)
-			if slices.Contains(reservedChords, chord) {
+			chord, err := command.NormalizeChord(k)
+			if err != nil {
+				t.Errorf("%s binds unparsable chord %q: %v", l.Command.Name, k, err)
+			}
+			if slices.Contains(command.ReservedChords, chord) {
 				t.Errorf("%s binds reserved chord %q", l.Command.Name, k)
 			}
 			if prev, ok := owner[chord]; ok {
@@ -90,17 +48,59 @@ func TestSessionKeybindings(t *testing.T) {
 }
 
 func TestNormalizeChord(t *testing.T) {
-	tests := []struct{ in, want string }{
-		{"cmd+k", "cmd+k"},
-		{"Shift+Cmd+W", "cmd+shift+w"},
-		{"meta+alt+r", "cmd+alt+r"},
-		{"option+command+r", "cmd+alt+r"},
-		{"cmd+=", "cmd+="},
-		{"f2", "f2"},
+	tests := []struct{ in, want, err string }{
+		{in: "cmd+k", want: "cmd+k"},
+		{in: "Shift+Cmd+W", want: "cmd+shift+w"},
+		{in: "meta+alt+r", want: "cmd+alt+r"},
+		{in: "option+command+r", want: "cmd+alt+r"},
+		{in: "cmd+=", want: "cmd+="},
+		{in: "cmd++", want: "cmd+="},
+		{in: "cmd+/", want: "cmd+/"},
+		{in: "cmd+comma", want: "cmd+,"},
+		{in: "f2", want: "f2"},
+		{in: "ctrl+esc", want: "ctrl+escape"},
+		{in: "", err: "empty chord"},
+		{in: "hyper+k", err: `unknown modifier "hyper"`},
+		{in: "cmd+", err: `unknown key ""`},
+		{in: "cmd+π", err: `unknown key "π"`},
 	}
 	for _, tt := range tests {
-		if got := normalizeChord(tt.in); got != tt.want {
-			t.Errorf("normalizeChord(%q) = %q, want %q", tt.in, got, tt.want)
+		got, err := command.NormalizeChord(tt.in)
+		if tt.err != "" {
+			if err == nil || err.Error() != tt.err {
+				t.Errorf("NormalizeChord(%q) err = %v, want %q", tt.in, err, tt.err)
+			}
+			continue
+		}
+		if err != nil || got != tt.want {
+			t.Errorf("NormalizeChord(%q) = %q, %v; want %q", tt.in, got, err, tt.want)
+		}
+	}
+}
+
+func TestValidateBinding(t *testing.T) {
+	tests := []struct{ in, want, err string }{
+		{in: "cmd+shift+n", want: "cmd+shift+n"},
+		{in: "ctrl+alt+t", want: "ctrl+alt+t"},
+		{in: "f5", want: "f5"},
+		{in: "shift+f5", want: "shift+f5"},
+		{in: "Cmd+K", err: "cmd+k is reserved by the app"},
+		{in: "cmd+shift+a", err: "cmd+shift+a is reserved by the app"},
+		{in: "cmd+w", err: "cmd+w is reserved by the app"},
+		{in: "f", err: "f needs cmd, ctrl, or alt (a bare key would steal typing)"},
+		{in: "shift+x", err: "shift+x needs cmd, ctrl, or alt (a bare key would steal typing)"},
+		{in: "cmd+nope", err: `unknown key "nope"`},
+	}
+	for _, tt := range tests {
+		got, err := command.ValidateBinding(tt.in)
+		if tt.err != "" {
+			if err == nil || err.Error() != tt.err {
+				t.Errorf("ValidateBinding(%q) err = %v, want %q", tt.in, err, tt.err)
+			}
+			continue
+		}
+		if err != nil || got != tt.want {
+			t.Errorf("ValidateBinding(%q) = %q, %v; want %q", tt.in, got, err, tt.want)
 		}
 	}
 }

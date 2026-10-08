@@ -15,6 +15,7 @@ import (
 	"github.com/awaumann/code-foundry/internal/store/gitops"
 	"github.com/awaumann/code-foundry/internal/store/repo"
 	"github.com/awaumann/code-foundry/internal/store/session"
+	"github.com/awaumann/code-foundry/internal/store/settings"
 	"github.com/awaumann/code-foundry/internal/store/terminal"
 )
 
@@ -30,6 +31,7 @@ type EventsDeps struct {
 	Session  session.Store
 	Gh       gh.Service
 	GitOps   gitops.Store
+	Settings settings.Service
 	// Done ends every stream when closed (daemon shutdown). May be nil.
 	Done <-chan struct{}
 }
@@ -85,6 +87,9 @@ func (h *Events) sources() []eventSource {
 	}
 	if d.GitOps != nil {
 		out = append(out, gitopsSource{store: d.GitOps, bus: d.Bus})
+	}
+	if d.Settings != nil {
+		out = append(out, settingsSource{store: d.Settings, bus: d.Bus})
 	}
 	out = append(out, uiSource{bus: d.Bus})
 	return out
