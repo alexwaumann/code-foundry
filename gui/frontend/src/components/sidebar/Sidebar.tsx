@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { BellRing } from "lucide-react";
+import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
 import { jumpToAttention } from "@/keys/bindings";
 import { buildRows, isLeaf, type Row } from "@/lib/tree";
 import {
@@ -203,6 +204,7 @@ export function Sidebar() {
   if (!visible) return null;
   return (
     <aside className="relative flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar" style={{ width }} data-testid="sidebar">
+      <PullRequestsNav />
       <header className="flex h-9 shrink-0 items-center justify-between gap-2 px-3 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
         <span>Repositories</span>
         <span className="flex items-center gap-2">

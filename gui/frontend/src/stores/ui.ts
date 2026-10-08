@@ -7,7 +7,12 @@ export type Selection =
   | { kind: "terminal"; id: string }
   | { kind: "session"; id: string }
   | { kind: "repo"; repoId: string }
-  | { kind: "worktree"; repoId: string; path: string };
+  | { kind: "worktree"; repoId: string; path: string }
+  /** A top-level page that is not a sidebar row (see components/prs). */
+  | { kind: "view"; name: string };
+
+/** Top-level page names (UiIntent.ShowView); unknown names are ignored. */
+export const viewNames: readonly string[] = ["pullrequests"];
 
 /** Which region has keyboard focus; drives footer hints. */
 export type FocusRegion = "sidebar" | "terminal" | "content" | "palette";
@@ -66,6 +71,8 @@ export function sameSelection(a: Selection, b: Selection): boolean {
       return a.repoId === (b as typeof a).repoId;
     case "worktree":
       return a.repoId === (b as typeof a).repoId && a.path === (b as typeof a).path;
+    case "view":
+      return a.name === (b as typeof a).name;
   }
 }
 

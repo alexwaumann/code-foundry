@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Dashboard } from "@/components/Dashboard";
 import { Footer } from "@/components/footer/Footer";
 import { CommandPalette } from "@/components/palette/CommandPalette";
+import { PullRequestsPage } from "@/components/prs/PullRequestsPage";
 import { SessionDisconnected } from "@/components/session/SessionParts";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { TerminalPane } from "@/components/terminal/TerminalPane";
@@ -45,6 +46,7 @@ function Content() {
   const sel = useUiStore((s) => s.selection);
   const sessionTerminal = useSessionsStore((s) => (sel.kind === "session" ? s.byId[sel.id]?.terminalId || null : null));
   if (sel.kind === "terminal") return <TerminalPane terminalId={sel.id} />;
+  if (sel.kind === "view" && sel.name === "pullrequests") return <PullRequestsPage />;
   if (sel.kind === "session") {
     return sessionTerminal ? <TerminalPane terminalId={sessionTerminal} sessionId={sel.id} /> : <SessionDisconnected id={sel.id} />;
   }

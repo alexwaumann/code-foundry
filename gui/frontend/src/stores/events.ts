@@ -6,11 +6,13 @@ import { listRepos } from "@/api/repo";
 import { listSessions } from "@/api/session";
 import { errorMessage, isAbort, runStream, type StreamStatus } from "@/api/stream";
 import { listTerminals } from "@/api/terminal";
+import { applyGhEvent } from "./gh";
 import { applyIntent } from "./intents";
 import { applyRepoEvent, replaceRepos, useReposStore } from "./repos";
 import { applySessionEvent, replaceSessions, sessionOfTerminal, useSessionsStore } from "./sessions";
 import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
+import { applyRepoEventToDetails } from "./worktreeDetail";
 
 interface EventsState {
   /** Status of the one EventService.Watch stream that feeds every slice. */
@@ -24,11 +26,12 @@ type Handlers = { [S in EventView["source"]]: (event: Extract<EventView, { sourc
 
 /**
  * Where each source's events go. A registry, not a switch: a new source is one entry.
- * gh has no slice yet (Phase 3 adds the PR overview), so its notifications are dropped.
+ * gh events invalidate the GitHub views on screen (stores/gh.ts).
  */
 const handlers: Handlers = {
   repo: (ev) => {
     useReposStore.setState((s) => applyRepoEvent(s, ev));
+    applyRepoEventToDetails(ev);
   },
   terminal: (ev) => {
     useTerminalsStore.setState((s) => applyTerminalEvent(s, ev));
@@ -37,7 +40,7 @@ const handlers: Handlers = {
     // Session events prove the service exists, even if List failed transiently.
     useSessionsStore.setState((s) => ({ ...applySessionEvent(s, ev), availability: "available", error: null }));
   },
-  gh: () => undefined,
+  gh: applyGhEvent,
   ui: applyIntent,
 };
 

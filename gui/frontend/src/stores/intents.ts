@@ -2,7 +2,7 @@ import { toast } from "sonner";
 import type { UiIntentView } from "@/api/ui";
 import { sessionOfTerminal, useSessionsStore } from "./sessions";
 import { useTerminalsStore } from "./terminals";
-import { useUiStore } from "./ui";
+import { useUiStore, viewNames } from "./ui";
 
 /** Applies one UI intent (delivered on the shared events stream) to the GUI. */
 export function applyIntent(intent: UiIntentView): void {
@@ -25,6 +25,9 @@ export function applyIntent(intent: UiIntentView): void {
       break;
     case "openPalette":
       ui.openPalette(intent.query);
+      break;
+    case "showView":
+      if (viewNames.includes(intent.name)) ui.select({ kind: "view", name: intent.name });
       break;
     case "notify": {
       const opts = intent.body ? { description: intent.body } : undefined;

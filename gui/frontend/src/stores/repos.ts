@@ -64,6 +64,8 @@ export function applyRepoEvent(prev: ReposData, ev: RepoEventView): ReposData {
       const next = { ...repo, worktrees: repo.worktrees.filter((x) => x.path !== ev.path) };
       return { byId: { ...prev.byId, [repo.id]: next }, order: prev.order };
     }
+    case "worktreeDetailUpdated":
+      return prev;
   }
 }
 

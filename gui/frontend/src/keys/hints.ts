@@ -50,9 +50,14 @@ export function hintsFor(focus: FocusRegion, selection: Selection, commands: rea
   // F2 always renames inline; list it only when session.rename has no chord of its own.
   const renameBound = commands.some((c) => c.name === "session.rename" && c.available && c.keybindings.length > 0);
   const rename: Hint[] = selection.kind === "session" && !renameBound ? [{ keys: "F2", label: "Rename" }] : [];
+  // The Pull Requests page and the worktree overview are keyboard lists (lib/nav.ts).
+  const page: Hint[] =
+    selection.kind === "view" ? [{ keys: "↑↓", label: "Move" }, { keys: "↵", label: "Open in browser" }, { keys: "A", label: "All repos" }]
+    : selection.kind === "worktree" || selection.kind === "repo" ? [{ keys: "↑↓", label: "Move" }, { keys: "↵", label: "Open" }, { keys: "←→", label: "Fold" }]
+    : [];
   const base: Hint[] =
     focus === "sidebar"
       ? [{ keys: "↑↓", label: "Move" }, { keys: "↵", label: "Open" }, { keys: "←→", label: "Fold" }, palette]
-      : [palette, sidebar, ...(selection.kind === "none" ? [jump] : [])];
+      : [...page, palette, sidebar, ...(selection.kind === "none" ? [jump] : [])];
   return [...base, ...waiting, ...boundHints(commands, selection, () => true, max), ...rename];
 }

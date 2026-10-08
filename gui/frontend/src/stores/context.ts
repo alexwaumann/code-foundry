@@ -68,6 +68,8 @@ export function deriveContext(sel: Selection, terminals: TerminalsData, repos: R
     }
     case "worktree":
       return { ...emptyContext, activeRepoId: sel.repoId, activeWorktreePath: sel.path, activeView: "worktree" };
+    case "view":
+      return { ...emptyContext, activeView: sel.name };
   }
 }
 
