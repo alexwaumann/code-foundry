@@ -37,10 +37,27 @@ const DefaultCallTimeout = 30 * time.Second
 
 // ExecRunner runs the gh CLI.
 type ExecRunner struct {
-	// Path is the gh executable; "gh" (resolved on $PATH) when empty.
+	// Path is the gh executable; LookPath() when empty.
 	Path string
 	// Timeout bounds each invocation; DefaultCallTimeout when zero.
 	Timeout time.Duration
+}
+
+// ghFallbacks are where Homebrew installs gh. A daemon auto-started by a Finder-launched
+// app inherits launchd's minimal PATH, which contains neither.
+var ghFallbacks = []string{"/opt/homebrew/bin/gh", "/usr/local/bin/gh"}
+
+// LookPath finds gh on $PATH, then in the Homebrew locations.
+func LookPath() (string, error) {
+	if p, err := exec.LookPath("gh"); err == nil {
+		return p, nil
+	}
+	for _, p := range ghFallbacks {
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() && fi.Mode()&0o111 != 0 {
+			return p, nil
+		}
+	}
+	return "", fmt.Errorf("gh: executable not found on $PATH or in %v: %w", ghFallbacks, exec.ErrNotFound)
 }
 
 // ghEnv keeps gh non-interactive and its output machine-readable.
@@ -110,7 +127,9 @@ func (r ExecRunner) AuthStatus(ctx context.Context) (AuthStatus, error) {
 func (r ExecRunner) run(ctx context.Context, args ...string) (stdout, stderr []byte, code int, err error) {
 	path := r.Path
 	if path == "" {
-		path = "gh"
+		if path, err = LookPath(); err != nil {
+			return nil, nil, -1, err
+		}
 	}
 	timeout := r.Timeout
 	if timeout <= 0 {
