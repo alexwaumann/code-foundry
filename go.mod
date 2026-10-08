@@ -6,6 +6,7 @@ toolchain go1.26.8
 
 require (
 	connectrpc.com/connect v1.21.0
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/wailsapp/wails/v3 v3.0.0-beta.28
 	google.golang.org/protobuf v1.36.12
 	modernc.org/sqlite v1.60.1
