@@ -21,6 +21,10 @@ type Deps struct {
 	Repo command.RepoBackend
 	// Session backs session.*. Nil works like Terminal.
 	Session command.SessionBackend
+	// Settings backs settings.*. Nil works like Terminal.
+	Settings command.SettingsBackend
+	// Reveal shows a file in Finder (settings.reveal). Nil: command.RevealInFinder.
+	Reveal command.RevealFunc
 }
 
 // Register registers every domain's commands into r.
@@ -37,11 +41,15 @@ func Register(r *command.Registry, d Deps) error {
 	if d.Session == nil {
 		d.Session = codefoundryv1connect.UnimplementedSessionServiceHandler{}
 	}
+	if d.Settings == nil {
+		d.Settings = codefoundryv1connect.UnimplementedSettingsServiceHandler{}
+	}
 	return errors.Join(
 		command.RegisterDaemon(r, d.Daemon),
 		command.RegisterUI(r, d.Emitter),
 		command.RegisterTerminal(r, d.Terminal),
 		command.RegisterRepo(r, d.Repo),
 		command.RegisterSession(r, d.Session, d.Emitter),
+		command.RegisterSettings(r, d.Settings, d.Emitter, d.Reveal),
 	)
 }

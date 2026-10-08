@@ -1,10 +1,12 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"errors"
 	"log/slog"
+	"path/filepath"
 
 	"github.com/awaumann/code-foundry/internal/bus"
 	"github.com/awaumann/code-foundry/internal/db"
@@ -12,14 +14,17 @@ import (
 	"github.com/awaumann/code-foundry/internal/store/gh"
 	"github.com/awaumann/code-foundry/internal/store/repo"
 	"github.com/awaumann/code-foundry/internal/store/session"
+	"github.com/awaumann/code-foundry/internal/store/settings"
 	"github.com/awaumann/code-foundry/internal/store/terminal"
 )
 
 // stores is the daemon's shared infrastructure (bus, database) and its stores. Each
 // store gets one field here and one line in openStores and close.
 type stores struct {
-	bus  *bus.Bus
-	db   *sql.DB
+	bus *bus.Bus
+	// settings is opened first: the other stores take start-time options from it.
+	settings *settings.Store
+	db       *sql.DB
 	repo *repo.Git
 	gh   *gh.Store
 	// stopGh cancels the gh poller and the repo→gh tracking glue, and waits for both.
@@ -40,20 +45,35 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 			s.close()
 		}
 	}()
+	if s.settings, err = settings.Open(ctx, settings.Options{
+		Path: filepath.Join(p.Home(), settings.FileName), Bus: s.bus, Log: log.With("store", "settings"),
+	}); err != nil {
+		return nil, err
+	}
+	// Start-time settings (see internal/daemon/settings.go for the live ones).
+	cfg := s.settings.Settings()
 	if s.db, err = db.Open(ctx, p.DB()); err != nil {
 		return nil, err
 	}
-	if s.repo, err = repo.Start(ctx, repo.Options{DB: s.db, Bus: s.bus, Log: log}); err != nil {
+	if s.repo, err = repo.Start(ctx, repo.Options{DB: s.db, Bus: s.bus, Log: log, FetchInterval: cfg.FetchInterval()}); err != nil {
 		return nil, err
 	}
-	if s.gh, err = gh.New(ctx, gh.Options{DB: s.db, Bus: s.bus, Log: log.With("store", "gh")}); err != nil {
+	ghOpts := gh.Options{DB: s.db, Bus: s.bus, Log: log.With("store", "gh"), RepoInterval: cfg.GhPollInterval()}
+	if ghPath := settings.ExpandedPath(cfg.Advanced.GhPath); ghPath != "" {
+		ghOpts.Runner = gh.ExecRunner{Path: ghPath}
+	}
+	if s.gh, err = gh.New(ctx, ghOpts); err != nil {
 		return nil, err
 	}
 	s.stopGh = startGh(ctx, log, s.gh, s.repo, s.bus)
-	s.terminal = terminal.New(terminal.Options{Bus: s.bus, Logger: log.With("store", "terminal")})
+	s.terminal = terminal.New(terminal.Options{
+		Bus: s.bus, Logger: log.With("store", "terminal"), MaxScrollbackLines: uint(cfg.Sessions.ScrollbackLines),
+	})
+	claude := cmp.Or(settings.ExpandedPath(cfg.Advanced.ClaudePath), "claude")
 	if s.session, err = session.New(ctx, session.Options{
 		DB: s.db, Terminals: s.terminal, Repos: s.repo, Bus: s.bus, Log: log.With("store", "session"),
-		NewDetector: newDetector,
+		NewDetector: newDetector, Claude: claude, CloseTimeout: cfg.CloseGrace(),
+		Namer: settingsNamer(s.settings, session.ClaudeNamer(claude, "/tmp")),
 	}); err != nil {
 		return nil, err
 	}
@@ -81,6 +101,9 @@ func (s *stores) close() error {
 	}
 	if s.db != nil {
 		errs = append(errs, s.db.Close())
+	}
+	if s.settings != nil {
+		errs = append(errs, s.settings.Close())
 	}
 	return errors.Join(errs...)
 }

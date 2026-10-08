@@ -59,6 +59,8 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"repo.register", "repo.unregister", "repo.worktree.new", "repo.worktree.remove", "repo.refresh",
 		"session.new", "session.list", "session.focus", "session.close", "session.reconnect",
 		"session.rename", "session.fork", "session.remove",
+		"settings.get", "settings.set", "settings.reset", "settings.path", "settings.reveal",
+		"view.settings", "view.help",
 	}
 	for _, n := range want {
 		if _, ok := f.reg.Get(n); !ok {
