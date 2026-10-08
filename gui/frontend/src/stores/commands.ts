@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { toast } from "sonner";
 import { invokeCommand, listCommands, type CommandView, type UiContextView } from "@/api/command";
-import { daemon } from "@/api/endpoint";
+import { invalidateOnTransportError } from "@/api/endpoint";
 import { errorMessage, isAbort } from "@/api/stream";
 import { contextKey, getUiContext } from "./context";
 import { useReposStore } from "./repos";
@@ -41,7 +41,7 @@ export async function refreshCommands(ctx: UiContextView = getUiContext()): Prom
     useCommandsStore.setState({ commands, contextKey: contextKey(ctx), loading: false, error: null });
   } catch (err) {
     if (isAbort(err) || inflight !== ctl) return;
-    daemon.invalidate();
+    invalidateOnTransportError(err);
     useCommandsStore.setState({ loading: false, error: errorMessage(err) });
   } finally {
     if (inflight === ctl) inflight = null;

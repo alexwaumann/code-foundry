@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { daemon } from "@/api/endpoint";
+import { daemon, invalidateOnTransportError } from "@/api/endpoint";
 import { listRepos, watchRepos, type RepoEventView, type RepoView, type WorktreeView } from "@/api/repo";
 import { runStream, type StreamStatus } from "@/api/stream";
 
@@ -95,8 +95,6 @@ export function startRepoSync(): () => void {
     onStatus: (stream, err) => {
       set({ stream, streamError: err ?? null });
     },
-    onError: () => {
-      daemon.invalidate();
-    },
+    onError: invalidateOnTransportError,
   });
 }

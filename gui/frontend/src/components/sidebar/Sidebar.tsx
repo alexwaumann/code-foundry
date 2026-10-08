@@ -29,6 +29,7 @@ function SidebarTree() {
   const cursorKey = useUiStore((s) => s.cursorKey);
   const focusSeq = useUiStore((s) => s.sidebarFocusSeq);
   const loaded = useReposStore((s) => s.loaded);
+  const streamError = useReposStore((s) => s.streamError);
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const virtualizer = useVirtualizer({
@@ -120,7 +121,9 @@ function SidebarTree() {
       onKeyDown={onKeyDown}
     >
       {rows.length === 0 ? (
-        <p className="px-3 py-4 text-xs text-muted-foreground">{loaded ? "No repositories registered." : "Loading…"}</p>
+        <p className="px-3 py-4 text-xs break-words text-muted-foreground">
+          {loaded ? "No repositories registered." : streamError ? `Cannot list repositories: ${streamError}. Retrying…` : "Loading…"}
+        </p>
       ) : (
         <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
           {virtualizer.getVirtualItems().map((vi) => {

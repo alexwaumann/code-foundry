@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CircleX, Loader2, RefreshCw } from "lucide-react";
-import { daemon } from "@/api/endpoint";
+import { invalidateOnTransportError } from "@/api/endpoint";
 import { attachTerminal, resizeTerminal, writeTerminal } from "@/api/terminal";
 import { isGlobalChord } from "@/keys/bindings";
 import { useColorScheme } from "@/lib/theme";
@@ -17,7 +17,23 @@ declare global {
   }
 }
 
-function TerminalHeader({ id, size }: { id: string; size: { cols: number; rows: number } | null }) {
+/**
+ * Dev-only: VITE_SIMULATE_WEBGL_LOSS_MS=<ms> loses the WebGL context that long after mount,
+ * to exercise the DOM fallback inside the real WKWebView (`wails3 dev`).
+ */
+function simulateWebglLoss(host: HTMLElement): () => void {
+  const ms = Number((import.meta.env as { VITE_SIMULATE_WEBGL_LOSS_MS?: string }).VITE_SIMULATE_WEBGL_LOSS_MS);
+  if (!import.meta.env.DEV || !ms) return () => undefined;
+  const t = setTimeout(() => {
+    const canvas = host.querySelector<HTMLCanvasElement>(".xterm-screen canvas:not(.xterm-link-layer)");
+    canvas?.getContext("webgl2")?.getExtension("WEBGL_lose_context")?.loseContext();
+  }, ms);
+  return () => {
+    clearTimeout(t);
+  };
+}
+
+function TerminalHeader({ id, size, renderer }: { id: string; size: { cols: number; rows: number } | null; renderer: RendererKind | null }) {
   const label = useTerminalsStore((s) => {
     const t = s.byId[id];
     return t ? terminalLabel(t) : id;
@@ -29,11 +45,14 @@ function TerminalHeader({ id, size }: { id: string; size: { cols: number; rows: 
         {label}
       </span>
       <span className="truncate text-muted-foreground">{tildify(cwd)}</span>
-      {size && (
-        <span className="ml-auto shrink-0 text-muted-foreground tabular-nums">
-          {size.cols}×{size.rows}
-        </span>
-      )}
+      <span className="ml-auto flex shrink-0 items-center gap-2 text-muted-foreground tabular-nums">
+        {import.meta.env.DEV && renderer && <span className="rounded border px-1 text-[10px] uppercase">{renderer}</span>}
+        {size && (
+          <span>
+            {size.cols}×{size.rows}
+          </span>
+        )}
+      </span>
     </div>
   );
 }
@@ -104,9 +123,7 @@ export function TerminalPane({ terminalId }: { terminalId: string }) {
         attach: (id, signal) => attachTerminal(id, signal),
         write: (id, data) => writeTerminal(id, data),
         resize: (id, cols, rows) => resizeTerminal(id, cols, rows),
-        onStreamError: () => {
-          daemon.invalidate();
-        },
+        onStreamError: invalidateOnTransportError,
       },
       setState,
     );
@@ -125,14 +142,16 @@ export function TerminalPane({ terminalId }: { terminalId: string }) {
       });
     });
     ro.observe(host);
+    const stopSimulation = simulateWebglLoss(host);
     return () => {
+      stopSimulation();
       ro.disconnect();
       cancelAnimationFrame(raf);
       sizeSub.dispose();
       controller.dispose();
       renderer.dispose();
       ctlRef.current = null;
-      if (window.__cfTerminal?.renderer === renderer) delete window.__cfTerminal;
+      if (import.meta.env.DEV && window.__cfTerminal?.renderer === renderer) delete window.__cfTerminal;
     };
     // The renderer is created once; scheme/font changes are applied by the effects below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -156,7 +175,7 @@ export function TerminalPane({ terminalId }: { terminalId: string }) {
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Terminal">
-      <TerminalHeader id={terminalId} size={size} />
+      <TerminalHeader id={terminalId} size={size} renderer={rendererKind} />
       <div className="relative min-h-0 flex-1 bg-[var(--terminal-bg)] py-1 pl-2">
         <div
           ref={hostRef}

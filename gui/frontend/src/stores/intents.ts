@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { toast } from "sonner";
-import { daemon } from "@/api/endpoint";
+import { invalidateOnTransportError } from "@/api/endpoint";
 import { runStream, type StreamStatus } from "@/api/stream";
 import { watchIntents, type UiIntentView } from "@/api/ui";
 import { useUiStore } from "./ui";
@@ -44,8 +44,6 @@ export function startIntentWatch(): () => void {
     onStatus: (stream, err) => {
       useIntentsStore.setState({ stream, streamError: err ?? null });
     },
-    onError: () => {
-      daemon.invalidate();
-    },
+    onError: invalidateOnTransportError,
   });
 }

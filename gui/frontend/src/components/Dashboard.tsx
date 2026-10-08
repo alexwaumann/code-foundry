@@ -8,6 +8,17 @@ import { findWorktree, useReposStore } from "@/stores/repos";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 
+/** "2 staged · 4 modified · 1 new", omitting zero counts; "clean" when nothing changed. */
+function describeChanges(st: { staged: number; modified: number; untracked: number; dirty: boolean }): string {
+  const parts = [
+    st.staged > 0 && `${String(st.staged)} staged`,
+    st.modified > 0 && `${String(st.modified)} modified`,
+    st.untracked > 0 && `${String(st.untracked)} new`,
+  ].filter(Boolean);
+  if (parts.length > 0) return parts.join(" · ");
+  return st.dirty ? "dirty" : "clean";
+}
+
 function Kbd({ children }: { children: string }) {
   return <kbd className="rounded border bg-muted px-1.5 py-0.5 font-sans text-xs">{children}</kbd>;
 }
@@ -65,11 +76,11 @@ function WorktreeOverview({ repoId, path }: { repoId: string; path: string | nul
         </div>
       </header>
       {st && (
-        <dl className="grid grid-cols-4 gap-4 rounded-lg border p-4 text-sm">
+        <dl className="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] gap-x-8 gap-y-4 rounded-lg border p-4 text-sm">
           {[
             ["upstream", st.upstream || "—"],
             ["ahead / behind", `${String(st.ahead)} / ${String(st.behind)}`],
-            ["changes", st.dirty ? `${String(st.staged)} staged · ${String(st.modified)} modified · ${String(st.untracked)} new` : "clean"],
+            ["changes", describeChanges(st)],
             ["default branch", repo.defaultBranch || "—"],
           ].map(([k, v]) => (
             <div key={k} className="min-w-0">

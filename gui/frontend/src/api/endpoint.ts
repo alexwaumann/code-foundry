@@ -1,4 +1,4 @@
-import { createClient, type Client, type Interceptor } from "@connectrpc/connect";
+import { Code, ConnectError, createClient, type Client, type Interceptor } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import type { DescService } from "@bufbuild/protobuf";
 import { GetDaemonEndpoint } from "../../bindings/github.com/awaumann/code-foundry/gui/daemonservice";
@@ -86,3 +86,13 @@ export class DaemonConnection {
 }
 
 export const daemon = new DaemonConnection(defaultResolver());
+
+/**
+ * Drops the cached endpoint after errors that suggest the daemon moved (a restart picks a
+ * new port and token): transport failures and auth errors. Application errors such as
+ * NotFound or Unimplemented keep it.
+ */
+export function invalidateOnTransportError(err: unknown, conn: DaemonConnection = daemon): void {
+  if (err instanceof ConnectError && err.code !== Code.Unavailable && err.code !== Code.Unauthenticated && err.code !== Code.Unknown) return;
+  conn.invalidate();
+}
