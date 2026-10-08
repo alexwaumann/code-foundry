@@ -155,6 +155,9 @@ export type PullRequest = Message<"codefoundry.v1.PullRequest"> & {
   mergeable: Mergeable;
 
   /**
+   * Set by GetPullRequest only: GitHub computes it per PR and it is too slow for lists
+   * (measured: 100 PRs per page exceeds GitHub's 10s query timeout).
+   *
    * @generated from field: codefoundry.v1.MergeStateStatus merge_state_status = 11;
    */
   mergeStateStatus: MergeStateStatus;
@@ -167,7 +170,8 @@ export type PullRequest = Message<"codefoundry.v1.PullRequest"> & {
   isCrossRepository: boolean;
 
   /**
-   * "owner/name" of the head repository; empty when the fork was deleted.
+   * "owner/name" of the head repository; empty when the fork was deleted. Set by
+   * GetPullRequest only.
    *
    * @generated from field: string head_repo_slug = 13;
    */
@@ -349,7 +353,8 @@ export type ListPullRequestsResponse = Message<"codefoundry.v1.ListPullRequestsR
   lastError: string;
 
   /**
-   * Total open pull requests on GitHub (pull_requests is capped at 500).
+   * Total open pull requests on GitHub. pull_requests holds at most the 100 most
+   * recently updated.
    *
    * @generated from field: int32 total_count = 5;
    */
@@ -969,7 +974,8 @@ export const GhService: GenService<{
   /**
    * ListPullRequests returns the cached open pull requests of a repository, most recently
    * updated first, each with a rollup of its head commit's checks. It never blocks on
-   * GitHub; use Refresh to force a fetch.
+   * GitHub; use Refresh to force a fetch. An untracked, never-fetched repository returns
+   * an empty list with fetched_at unset.
    *
    * @generated from rpc codefoundry.v1.GhService.ListPullRequests
    */

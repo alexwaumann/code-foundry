@@ -556,17 +556,20 @@ type PullRequest struct {
 	Number   int32                  `protobuf:"varint,2,opt,name=number,proto3" json:"number,omitempty"`
 	Title    string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
 	// Author login; empty for deleted ("ghost") accounts.
-	Author           string           `protobuf:"bytes,4,opt,name=author,proto3" json:"author,omitempty"`
-	HeadRef          string           `protobuf:"bytes,5,opt,name=head_ref,json=headRef,proto3" json:"head_ref,omitempty"`
-	HeadSha          string           `protobuf:"bytes,6,opt,name=head_sha,json=headSha,proto3" json:"head_sha,omitempty"`
-	BaseRef          string           `protobuf:"bytes,7,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
-	Draft            bool             `protobuf:"varint,8,opt,name=draft,proto3" json:"draft,omitempty"`
-	ReviewDecision   ReviewDecision   `protobuf:"varint,9,opt,name=review_decision,json=reviewDecision,proto3,enum=codefoundry.v1.ReviewDecision" json:"review_decision,omitempty"`
-	Mergeable        Mergeable        `protobuf:"varint,10,opt,name=mergeable,proto3,enum=codefoundry.v1.Mergeable" json:"mergeable,omitempty"`
+	Author         string         `protobuf:"bytes,4,opt,name=author,proto3" json:"author,omitempty"`
+	HeadRef        string         `protobuf:"bytes,5,opt,name=head_ref,json=headRef,proto3" json:"head_ref,omitempty"`
+	HeadSha        string         `protobuf:"bytes,6,opt,name=head_sha,json=headSha,proto3" json:"head_sha,omitempty"`
+	BaseRef        string         `protobuf:"bytes,7,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
+	Draft          bool           `protobuf:"varint,8,opt,name=draft,proto3" json:"draft,omitempty"`
+	ReviewDecision ReviewDecision `protobuf:"varint,9,opt,name=review_decision,json=reviewDecision,proto3,enum=codefoundry.v1.ReviewDecision" json:"review_decision,omitempty"`
+	Mergeable      Mergeable      `protobuf:"varint,10,opt,name=mergeable,proto3,enum=codefoundry.v1.Mergeable" json:"mergeable,omitempty"`
+	// Set by GetPullRequest only: GitHub computes it per PR and it is too slow for lists
+	// (measured: 100 PRs per page exceeds GitHub's 10s query timeout).
 	MergeStateStatus MergeStateStatus `protobuf:"varint,11,opt,name=merge_state_status,json=mergeStateStatus,proto3,enum=codefoundry.v1.MergeStateStatus" json:"merge_state_status,omitempty"`
 	// True when the head branch lives in a fork.
 	IsCrossRepository bool `protobuf:"varint,12,opt,name=is_cross_repository,json=isCrossRepository,proto3" json:"is_cross_repository,omitempty"`
-	// "owner/name" of the head repository; empty when the fork was deleted.
+	// "owner/name" of the head repository; empty when the fork was deleted. Set by
+	// GetPullRequest only.
 	HeadRepoSlug  string                 `protobuf:"bytes,13,opt,name=head_repo_slug,json=headRepoSlug,proto3" json:"head_repo_slug,omitempty"`
 	Url           string                 `protobuf:"bytes,14,opt,name=url,proto3" json:"url,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
@@ -978,7 +981,8 @@ type ListPullRequestsResponse struct {
 	Tracked   bool                   `protobuf:"varint,2,opt,name=tracked,proto3" json:"tracked,omitempty"`
 	FetchedAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=fetched_at,json=fetchedAt,proto3" json:"fetched_at,omitempty"`
 	LastError string                 `protobuf:"bytes,4,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
-	// Total open pull requests on GitHub (pull_requests is capped at 500).
+	// Total open pull requests on GitHub. pull_requests holds at most the 100 most
+	// recently updated.
 	TotalCount    int32 `protobuf:"varint,5,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

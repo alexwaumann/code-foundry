@@ -59,7 +59,8 @@ type GhServiceClient interface {
 	GetViewer(context.Context, *connect.Request[v1.GetViewerRequest]) (*connect.Response[v1.GetViewerResponse], error)
 	// ListPullRequests returns the cached open pull requests of a repository, most recently
 	// updated first, each with a rollup of its head commit's checks. It never blocks on
-	// GitHub; use Refresh to force a fetch.
+	// GitHub; use Refresh to force a fetch. An untracked, never-fetched repository returns
+	// an empty list with fetched_at unset.
 	ListPullRequests(context.Context, *connect.Request[v1.ListPullRequestsRequest]) (*connect.Response[v1.ListPullRequestsResponse], error)
 	// GetPullRequest returns one pull request with the full list of its head commit's
 	// checks. Served from cache when fresh (30s), otherwise fetched through the paced
@@ -201,7 +202,8 @@ type GhServiceHandler interface {
 	GetViewer(context.Context, *connect.Request[v1.GetViewerRequest]) (*connect.Response[v1.GetViewerResponse], error)
 	// ListPullRequests returns the cached open pull requests of a repository, most recently
 	// updated first, each with a rollup of its head commit's checks. It never blocks on
-	// GitHub; use Refresh to force a fetch.
+	// GitHub; use Refresh to force a fetch. An untracked, never-fetched repository returns
+	// an empty list with fetched_at unset.
 	ListPullRequests(context.Context, *connect.Request[v1.ListPullRequestsRequest]) (*connect.Response[v1.ListPullRequestsResponse], error)
 	// GetPullRequest returns one pull request with the full list of its head commit's
 	// checks. Served from cache when fresh (30s), otherwise fetched through the paced
