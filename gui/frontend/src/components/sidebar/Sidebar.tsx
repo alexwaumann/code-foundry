@@ -1,8 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { buildRows, type Row } from "@/lib/tree";
-import { decodeRepoKeys, decodeTerminalKeys, useRepoStructureKeys, useTerminalPlacementKeys } from "@/stores/context";
+import { BellRing } from "lucide-react";
+import { jumpToAttention } from "@/keys/bindings";
+import { buildRows, isLeaf, type Row } from "@/lib/tree";
+import {
+  decodeRepoKeys,
+  decodeSessionKeys,
+  decodeTerminalKeys,
+  useRepoStructureKeys,
+  useSessionPlacementKeys,
+  useTerminalPlacementKeys,
+} from "@/stores/context";
+import { useEventsStore } from "@/stores/events";
 import { useReposStore } from "@/stores/repos";
+import { useAttentionCount, useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
 import { rowSelection, selectionKey } from "./selection";
 import { ResizeHandle } from "./ResizeHandle";
@@ -18,8 +29,12 @@ function parentIndex(rows: readonly Row[], i: number): number {
 function useRows(): Row[] {
   const repoKeys = useRepoStructureKeys();
   const termKeys = useTerminalPlacementKeys();
+  const sessionKeys = useSessionPlacementKeys();
   const collapsed = useUiStore((s) => s.collapsed);
-  return useMemo(() => buildRows(decodeRepoKeys(repoKeys), decodeTerminalKeys(termKeys), collapsed), [repoKeys, termKeys, collapsed]);
+  return useMemo(
+    () => buildRows(decodeRepoKeys(repoKeys), decodeTerminalKeys(termKeys), collapsed, decodeSessionKeys(sessionKeys)),
+    [repoKeys, termKeys, sessionKeys, collapsed],
+  );
 }
 
 function SidebarTree() {
@@ -29,7 +44,7 @@ function SidebarTree() {
   const cursorKey = useUiStore((s) => s.cursorKey);
   const focusSeq = useUiStore((s) => s.sidebarFocusSeq);
   const loaded = useReposStore((s) => s.loaded);
-  const streamError = useReposStore((s) => s.streamError);
+  const streamError = useEventsStore((s) => s.streamError);
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const virtualizer = useVirtualizer({
@@ -55,11 +70,11 @@ function SidebarTree() {
     const ui = useUiStore.getState();
     ui.setCursor(row.key);
     if (how === "toggle" || row.kind === "group") {
-      if (row.kind !== "terminal") ui.toggleCollapsed(row.key);
+      if (!isLeaf(row)) ui.toggleCollapsed(row.key);
       return;
     }
     const sel = rowSelection(row);
-    if (sel) ui.select(sel, { focusTerminal: row.kind === "terminal" });
+    if (sel) ui.select(sel, { focusTerminal: isLeaf(row) });
   }, []);
 
   const moveCursor = (i: number) => {
@@ -70,7 +85,7 @@ function SidebarTree() {
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.target !== e.currentTarget) return;
     const row = rows[cursorIndex];
     const ui = useUiStore.getState();
     switch (e.key) {
@@ -91,16 +106,21 @@ function SidebarTree() {
         if (row) activate(row, "enter");
         break;
       case "ArrowRight":
-        if (!row || row.kind === "terminal") break;
+        if (!row || isLeaf(row)) break;
         if (!row.expanded) ui.toggleCollapsed(row.key, false);
         else if (row.hasChildren) moveCursor(cursorIndex + 1);
         break;
       case "ArrowLeft":
-        if (row && row.kind !== "terminal" && row.expanded && row.hasChildren) ui.toggleCollapsed(row.key, true);
+        if (row && !isLeaf(row) && row.expanded && row.hasChildren) ui.toggleCollapsed(row.key, true);
         else moveCursor(parentIndex(rows, cursorIndex));
         break;
+      case "F2":
+        if (row?.kind !== "session") return;
+        activate(row, "click");
+        ui.setRenaming(row.sessionId);
+        break;
       case "Escape":
-        if (ui.selection.kind === "terminal") useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
+        if (ui.selection.kind === "terminal" || ui.selection.kind === "session") useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
         break;
       default:
         return;
@@ -113,7 +133,7 @@ function SidebarTree() {
     <div
       ref={scrollRef}
       role="tree"
-      aria-label="Repositories and terminals"
+      aria-label="Repositories, sessions and terminals"
       tabIndex={0}
       data-region="sidebar"
       aria-activedescendant={activeRow ? `row-${activeRow.key}` : undefined}
@@ -141,6 +161,41 @@ function SidebarTree() {
   );
 }
 
+/** Count of sessions waiting on the user; click (or cmd+shift+a) jumps to the next one. */
+function AttentionBadge() {
+  const count = useAttentionCount();
+  if (count === 0) return null;
+  const label = `${String(count)} ${count === 1 ? "session needs" : "sessions need"} attention`;
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      title={`${label} (⌘⇧A)`}
+      aria-label={label}
+      data-testid="attention-badge"
+      className="flex h-5 items-center gap-1 rounded-full bg-amber-400/15 px-2 font-semibold tracking-normal text-amber-300 tabular-nums normal-case hover:bg-amber-400/25"
+      onClick={() => {
+        jumpToAttention();
+      }}
+    >
+      <BellRing className="size-3" aria-hidden />
+      {count}
+    </button>
+  );
+}
+
+/** Shown when the daemon has no SessionService (older daemon): everything else still works. */
+function SessionsUnavailable() {
+  const unavailable = useSessionsStore((s) => s.availability === "unavailable");
+  const error = useSessionsStore((s) => s.error);
+  if (!unavailable) return null;
+  return (
+    <p className="shrink-0 border-t border-sidebar-border px-3 py-1.5 text-[11px] text-muted-foreground" data-testid="sessions-unavailable" title={error ?? ""}>
+      Sessions: service unavailable
+    </p>
+  );
+}
+
 export function Sidebar() {
   const visible = useUiStore((s) => s.sidebarVisible);
   const width = useUiStore((s) => s.sidebarWidth);
@@ -148,11 +203,15 @@ export function Sidebar() {
   if (!visible) return null;
   return (
     <aside className="relative flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar" style={{ width }} data-testid="sidebar">
-      <header className="flex h-9 shrink-0 items-center justify-between px-3 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+      <header className="flex h-9 shrink-0 items-center justify-between gap-2 px-3 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
         <span>Repositories</span>
-        <span className="tabular-nums">{repoCount > 0 ? repoCount : ""}</span>
+        <span className="flex items-center gap-2">
+          <AttentionBadge />
+          <span className="tabular-nums">{repoCount > 0 ? repoCount : ""}</span>
+        </span>
       </header>
       <SidebarTree />
+      <SessionsUnavailable />
       <ResizeHandle />
     </aside>
   );

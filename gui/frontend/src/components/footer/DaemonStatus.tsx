@@ -1,9 +1,7 @@
 import { formatUptime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useEventsStore } from "@/stores/events";
 import { useHealthStore } from "@/stores/health";
-import { useIntentsStore } from "@/stores/intents";
-import { useReposStore } from "@/stores/repos";
-import { useTerminalsStore } from "@/stores/terminals";
 
 const dot = {
   connecting: "bg-yellow-500",
@@ -11,12 +9,9 @@ const dot = {
   error: "bg-red-500",
 } as const;
 
-/** Streams that are not open, e.g. "terminals" while reconnecting. */
+/** "events" while the shared events stream is not open (connecting or reconnecting). */
 function useDegradedStreams(): string {
-  const t = useTerminalsStore((s) => s.stream !== "open");
-  const r = useReposStore((s) => s.stream !== "open");
-  const i = useIntentsStore((s) => s.stream !== "open");
-  return [t && "terminals", r && "repos", i && "intents"].filter(Boolean).join(", ");
+  return useEventsStore((s) => (s.stream !== "open" ? "events" : ""));
 }
 
 /** Daemon pid/version/uptime from HealthService.Ping (moved from the Phase 0 panel). */
@@ -29,7 +24,7 @@ export function DaemonStatus() {
   const degraded = useDegradedStreams();
 
   return (
-    <div className="flex min-w-0 items-center gap-3" data-testid="daemon-status">
+    <div className="flex shrink-0 items-center gap-3 whitespace-nowrap" data-testid="daemon-status">
       {status === "ok" && degraded && (
         <span className="truncate text-amber-400" title={`Not streaming: ${degraded}`}>
           syncing {degraded}…

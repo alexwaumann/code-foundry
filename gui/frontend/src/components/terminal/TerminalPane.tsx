@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CircleX, Loader2, RefreshCw } from "lucide-react";
 import { invalidateOnTransportError } from "@/api/endpoint";
+import { SessionIndicator, SessionTitle } from "@/components/session/SessionParts";
 import { attachTerminal, resizeTerminal, writeTerminal } from "@/api/terminal";
 import { isGlobalChord } from "@/keys/bindings";
 import { useColorScheme } from "@/lib/theme";
@@ -33,18 +34,36 @@ function simulateWebglLoss(host: HTMLElement): () => void {
   };
 }
 
-function TerminalHeader({ id, size, renderer }: { id: string; size: { cols: number; rows: number } | null; renderer: RendererKind | null }) {
+function TerminalTitle({ id }: { id: string }) {
   const label = useTerminalsStore((s) => {
     const t = s.byId[id];
     return t ? terminalLabel(t) : id;
   });
   const cwd = useTerminalsStore((s) => s.byId[id]?.cwd ?? "");
   return (
-    <div className="flex h-9 shrink-0 items-center gap-3 border-b px-3 text-xs">
+    <>
       <span className="truncate font-medium text-foreground" data-testid="terminal-title">
         {label}
       </span>
       <span className="truncate text-muted-foreground">{tildify(cwd)}</span>
+    </>
+  );
+}
+
+function TerminalHeader({
+  id,
+  sessionId,
+  size,
+  renderer,
+}: {
+  id: string;
+  sessionId: string | undefined;
+  size: { cols: number; rows: number } | null;
+  renderer: RendererKind | null;
+}) {
+  return (
+    <div className="flex h-9 shrink-0 items-center gap-3 border-b px-3 text-xs" data-testid="terminal-header">
+      {sessionId ? <SessionTitle id={sessionId} /> : <TerminalTitle id={id} />}
       <span className="ml-auto flex shrink-0 items-center gap-2 text-muted-foreground tabular-nums">
         {import.meta.env.DEV && renderer && <span className="rounded border px-1 text-[10px] uppercase">{renderer}</span>}
         {size && (
@@ -93,9 +112,10 @@ function Overlay({ state }: { state: AttachState }) {
 
 /**
  * Hosts the one attached terminal. A single renderer lives as long as the pane; switching
- * terminals aborts the old Attach stream and resets the renderer before the new snapshot.
+ * terminals (or sessions, or a session's terminal after Reconnect) aborts the old Attach
+ * stream and resets the renderer before the new snapshot.
  */
-export function TerminalPane({ terminalId }: { terminalId: string }) {
+export function TerminalPane({ terminalId, sessionId }: { terminalId: string; sessionId?: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const ctlRef = useRef<{ renderer: XtermRenderer; controller: AttachController } | null>(null);
   const [state, setState] = useState<AttachState>({ terminalId: null, phase: "idle", exitCode: null, error: null });
@@ -174,8 +194,8 @@ export function TerminalPane({ terminalId }: { terminalId: string }) {
   }, [focusSeq, terminalId]);
 
   return (
-    <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Terminal">
-      <TerminalHeader id={terminalId} size={size} renderer={rendererKind} />
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label={sessionId ? "Session" : "Terminal"} data-session-id={sessionId}>
+      <TerminalHeader id={terminalId} sessionId={sessionId} size={size} renderer={rendererKind} />
       <div className="relative min-h-0 flex-1 bg-[var(--terminal-bg)] py-1 pl-2">
         <div
           ref={hostRef}
@@ -188,6 +208,7 @@ export function TerminalPane({ terminalId }: { terminalId: string }) {
           data-terminal-id={state.terminalId ?? undefined}
         />
         <Overlay state={state} />
+        {sessionId && <SessionIndicator id={sessionId} />}
       </div>
     </section>
   );

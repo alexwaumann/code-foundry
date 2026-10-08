@@ -1,9 +1,16 @@
 import type { ArgSpecView, CommandView } from "@/api/command";
 
-/** Args the palette prompts for: only required ones. Optional args take daemon defaults. */
+/**
+ * Args the palette prompts for: required ones, plus enums (a pick list costs one Enter on
+ * the highlighted default, and is how session.new offers model/effort from its ArgSpec).
+ * Other optional args take daemon defaults.
+ */
 export function promptedArgs(c: CommandView): ArgSpecView[] {
-  return c.args.filter((a) => a.required);
+  return c.args.filter((a) => a.required || a.type === "enum");
 }
+
+/** Pick-list value for "leave this optional arg unset" (an enum without a default). */
+export const UNSET_CHOICE = "__unset";
 
 export type ArgResult = { ok: true; value: string } | { ok: false; error: string };
 
@@ -15,6 +22,7 @@ const falsy = new Set(["false", "no", "n", "0", "off"]);
  * untouched: "~" expansion happens daemon-side.
  */
 export function validateArg(spec: ArgSpecView, raw: string): ArgResult {
+  if (raw === UNSET_CHOICE && !spec.required) return { ok: true, value: "" };
   const v = spec.type === "string" ? raw : raw.trim();
   if (v === "") {
     if (spec.defaultValue !== "") return { ok: true, value: spec.defaultValue };
@@ -41,7 +49,7 @@ export function validateArg(spec: ArgSpecView, raw: string): ArgResult {
 
 /** Fixed choices to list for an arg, or null for free text. */
 export function argChoices(spec: ArgSpecView): string[] | null {
-  if (spec.type === "enum") return spec.enumValues;
+  if (spec.type === "enum") return !spec.required && spec.defaultValue === "" ? [UNSET_CHOICE, ...spec.enumValues] : spec.enumValues;
   if (spec.type === "bool") return spec.defaultValue === "true" ? ["true", "false"] : ["false", "true"];
   return null;
 }
@@ -65,7 +73,8 @@ export function submitArg(p: ArgPrompt, raw: string): ArgStep {
   if (!spec) return { kind: "done", values: p.values };
   const r = validateArg(spec, raw);
   if (!r.ok) return { kind: "error", error: r.error };
-  const values = { ...p.values, [spec.name]: r.value };
+  // An optional arg left empty is not sent, so the daemon applies its own default.
+  const values = r.value === "" && !spec.required ? { ...p.values } : { ...p.values, [spec.name]: r.value };
   if (p.index + 1 >= p.specs.length) return { kind: "done", values };
   return { kind: "next", prompt: { ...p, index: p.index + 1, values } };
 }

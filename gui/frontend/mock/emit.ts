@@ -2,6 +2,7 @@
  * Pushes a UiIntent to the mock daemon (UiService.Emit), like a CLI verb would.
  *
  *   pnpm run mock:emit focus-terminal t-top
+ *   pnpm run mock:emit focus-session s-3
  *   pnpm run mock:emit focus-repo repo-cf [worktreePath]
  *   pnpm run mock:emit palette [query]
  *   pnpm run mock:emit notify [info|warning|error] <title> [body]
@@ -15,7 +16,7 @@ import { UiIntent_Notify_Level, UiService, type UiIntentSchema } from "../src/ge
 
 type Intent = MessageInitShape<typeof UiIntentSchema>;
 
-const usage = "usage: emit focus-terminal <id> | focus-repo <repoId> [path] | palette [query] | notify [info|warning|error] <title> [body]";
+const usage = "usage: emit focus-terminal <id> | focus-session <id> | focus-repo <repoId> [path] | palette [query] | notify [info|warning|error] <title> [body]";
 
 export function parseIntent(argv: readonly string[]): Intent | null {
   const [verb, ...rest] = argv;
@@ -39,12 +40,20 @@ export function parseIntent(argv: readonly string[]): Intent | null {
 }
 
 async function main(): Promise<void> {
+  const baseUrl = process.env.MOCK_URL ?? "http://127.0.0.1:7788";
+  const [verb, id] = process.argv.slice(2);
+  // FocusSession is not in the generated UiIntent until Phase 2a; the mock emits it (or a
+  // FocusTerminal stand-in) through its control endpoint.
+  if (verb === "focus-session" && id) {
+    const res = await fetch(`${baseUrl}/__mock/session/focus?id=${encodeURIComponent(id)}`, { method: "POST" });
+    console.log(await res.text());
+    return;
+  }
   const intent = parseIntent(process.argv.slice(2));
   if (!intent) {
     console.error(usage);
     process.exit(2);
   }
-  const baseUrl = process.env.MOCK_URL ?? "http://127.0.0.1:7788";
   const token = process.env.MOCK_TOKEN ?? "dev-mock-token";
   const transport = createConnectTransport({
     baseUrl,

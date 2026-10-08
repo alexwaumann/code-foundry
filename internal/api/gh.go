@@ -147,18 +147,27 @@ func (h *Gh) Watch(ctx context.Context, _ *connect.Request[v1.WatchGhRequest], s
 		case <-h.done:
 			return nil
 		case e := <-prs.C():
-			ev = &v1.GhEvent{Event: &v1.GhEvent_PullRequestsUpdated_{PullRequestsUpdated: &v1.GhEvent_PullRequestsUpdated{
-				RepoSlug: e.Slug, FetchedAt: timestamp(e.FetchedAt),
-			}}}
+			ev = ghPullRequestsEvent(e)
 		case e := <-viewer.C():
-			ev = &v1.GhEvent{Event: &v1.GhEvent_ViewerUpdated_{ViewerUpdated: &v1.GhEvent_ViewerUpdated{
-				FetchedAt: timestamp(e.FetchedAt),
-			}}}
+			ev = ghViewerEvent(e)
 		}
 		if err := stream.Send(ev); err != nil {
 			return err
 		}
 	}
+}
+
+// ghPullRequestsEvent and ghViewerEvent map gh bus events; shared with EventService.
+func ghPullRequestsEvent(e gh.PullRequestsUpdated) *v1.GhEvent {
+	return &v1.GhEvent{Event: &v1.GhEvent_PullRequestsUpdated_{PullRequestsUpdated: &v1.GhEvent_PullRequestsUpdated{
+		RepoSlug: e.Slug, FetchedAt: timestamp(e.FetchedAt),
+	}}}
+}
+
+func ghViewerEvent(e gh.ViewerUpdated) *v1.GhEvent {
+	return &v1.GhEvent{Event: &v1.GhEvent_ViewerUpdated_{ViewerUpdated: &v1.GhEvent_ViewerUpdated{
+		FetchedAt: timestamp(e.FetchedAt),
+	}}}
 }
 
 // ghErrorCodes maps store errors to Connect codes, first match wins. Not-authenticated

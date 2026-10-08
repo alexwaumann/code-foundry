@@ -141,3 +141,13 @@
     user-select: text;
   }
 }
+
+/* Thin indeterminate bar for a session that is starting or closing. */
+@keyframes cf-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}

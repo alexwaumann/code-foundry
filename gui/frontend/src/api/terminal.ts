@@ -90,14 +90,6 @@ export async function listTerminals(conn: DaemonConnection = daemon, signal?: Ab
   return res.terminals.map(toTerminalView);
 }
 
-export async function* watchTerminals(signal: AbortSignal, conn: DaemonConnection = daemon): AsyncGenerator<TerminalEventView> {
-  const c = await conn.client(TerminalService);
-  for await (const ev of c.watch({}, { signal })) {
-    const v = toTerminalEventView(ev);
-    if (v) yield v;
-  }
-}
-
 export async function* attachTerminal(
   id: string,
   signal: AbortSignal,

@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { buildRows, OTHER_GROUP_KEY, placeTerminal, repoKey, terminalKey, terminalOrder, worktreeKey, type PlaceableTerminal, type TreeRepo } from "./tree";
+import {
+  buildRows,
+  leafOrder,
+  nextAfter,
+  OTHER_GROUP_KEY,
+  ownedTerminalIds,
+  placeTerminal,
+  repoKey,
+  sessionKey,
+  sessionOrder,
+  terminalKey,
+  terminalOrder,
+  worktreeKey,
+  type PlaceableTerminal,
+  type TreeRepo,
+  type TreeSession,
+} from "./tree";
 
 const W = [
   { repoId: "r1", path: "/src/app" },
@@ -66,5 +82,64 @@ describe("buildRows", () => {
 
   it("terminalOrder ignores collapse state", () => {
     expect(terminalOrder(repos, terms)).toEqual(["a", "c", "d", "b"]);
+  });
+});
+
+describe("buildRows with sessions", () => {
+  const sessions: TreeSession[] = [
+    { id: "s1", worktreePath: "/src/app", terminalId: "a" },
+    { id: "s2", worktreePath: "/src/app", terminalId: "" },
+    { id: "s3", worktreePath: "/gone", terminalId: "" },
+  ];
+  const withLabels: PlaceableTerminal[] = [
+    ...terms,
+    { id: "e", cwd: "/src/lib", worktreeLabel: "", sessionLabel: "s9" }, // unknown session: shown
+    { id: "f", cwd: "/src/lib", worktreeLabel: "", sessionLabel: "s2" }, // owned by label: hidden
+  ];
+
+  it("lists sessions first under their worktree and hides their terminals", () => {
+    const keys = buildRows(repos, withLabels, {}, sessions).map((r) => `${String(r.depth)}:${r.key}`);
+    expect(keys).toEqual([
+      `0:${repoKey("r1")}`,
+      `1:${worktreeKey("r1", "/src/app")}`,
+      `2:${sessionKey("s1")}`,
+      `2:${sessionKey("s2")}`,
+      `1:${worktreeKey("r1", "/src/app.worktrees/feat")}`,
+      `2:${terminalKey("c")}`,
+      `0:${repoKey("r2")}`,
+      `1:${worktreeKey("r2", "/src/lib")}`,
+      `2:${terminalKey("d")}`,
+      `2:${terminalKey("e")}`,
+      `0:${OTHER_GROUP_KEY}`,
+      `1:${sessionKey("s3")}`,
+      `1:${terminalKey("b")}`,
+    ]);
+    expect(buildRows(repos, withLabels, {}, sessions).find((r) => r.key === OTHER_GROUP_KEY)).toMatchObject({ label: "Other" });
+  });
+
+  it("ownedTerminalIds uses both terminal_id and labels.session", () => {
+    expect([...ownedTerminalIds(sessions, withLabels)].sort()).toEqual(["a", "f"]);
+  });
+
+  it("orders leaves and sessions regardless of collapse", () => {
+    expect(sessionOrder(repos, withLabels, sessions)).toEqual(["s1", "s2", "s3"]);
+    expect(leafOrder(repos, withLabels, sessions).map((r) => r.key)).toEqual(["s:s1", "s:s2", "t:c", "t:d", "t:e", "s:s3", "t:b"]);
+  });
+});
+
+describe("nextAfter", () => {
+  const order = ["a", "b", "c", "d"];
+  const pick = (id: string) => id === "b" || id === "d";
+  it.each([
+    ["from nothing: first match", null, "b"],
+    ["from a match: the next one", "b", "d"],
+    ["wraps", "d", "b"],
+    ["from a non-match", "c", "d"],
+    ["unknown current", "zz", "b"],
+  ])("%s", (_name, current, want) => {
+    expect(nextAfter(order, current, pick)).toBe(want);
+  });
+  it("null when nothing matches", () => {
+    expect(nextAfter(order, "a", () => false)).toBeNull();
   });
 });

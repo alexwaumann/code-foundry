@@ -1,0 +1,280 @@
+package api
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"connectrpc.com/connect"
+
+	v1 "github.com/awaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/awaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/awaumann/code-foundry/internal/bus"
+	"github.com/awaumann/code-foundry/internal/command"
+	"github.com/awaumann/code-foundry/internal/store/gh"
+	"github.com/awaumann/code-foundry/internal/store/gh/ghtest"
+	"github.com/awaumann/code-foundry/internal/store/repo"
+	"github.com/awaumann/code-foundry/internal/store/repo/repotest"
+	"github.com/awaumann/code-foundry/internal/store/terminal"
+	"github.com/awaumann/code-foundry/internal/store/terminal/terminaltest"
+)
+
+type eventsFixture struct {
+	bus    *bus.Bus
+	repo   *repotest.Fake
+	term   *terminaltest.Fake
+	gh     *ghtest.Store
+	done   chan struct{}
+	client codefoundryv1connect.EventServiceClient
+}
+
+func newEventsFixture(t *testing.T) *eventsFixture {
+	t.Helper()
+	b := bus.New()
+	f := &eventsFixture{bus: b, repo: repotest.New(b), term: terminaltest.New(b), gh: ghtest.New(b), done: make(chan struct{})}
+	route := NewEvents(EventsDeps{Bus: b, Repo: f.repo, Terminal: f.term, Gh: f.gh, Done: f.done}).Route()
+	mux := http.NewServeMux()
+	mux.Handle(route.Path, route.Handler)
+	// HTTP/2 like the repo drop test: flow-control windows bound how much the handler
+	// can write ahead of a client that is not reading.
+	srv := httptest.NewUnstartedServer(mux)
+	srv.EnableHTTP2 = true
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+	f.client = codefoundryv1connect.NewEventServiceClient(srv.Client(), srv.URL)
+	return f
+}
+
+type eventStream struct {
+	t *testing.T
+	s *connect.ServerStreamForClient[v1.Event]
+}
+
+func (f *eventsFixture) watch(t *testing.T, ctx context.Context, sources ...v1.EventSource) *eventStream {
+	t.Helper()
+	s, err := f.client.Watch(ctx, connect.NewRequest(&v1.WatchEventsRequest{Sources: sources}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	return &eventStream{t: t, s: s}
+}
+
+func (e *eventStream) next() *v1.Event {
+	e.t.Helper()
+	if !e.s.Receive() {
+		e.t.Fatalf("stream ended: %v", e.s.Err())
+	}
+	return e.s.Msg()
+}
+
+// describe renders an event compactly for order assertions.
+func describe(ev *v1.Event) string {
+	switch e := ev.GetEvent().(type) {
+	case *v1.Event_Repo:
+		switch r := e.Repo.GetEvent().(type) {
+		case *v1.RepoEvent_Snapshot:
+			return fmt.Sprintf("repo.snapshot(%d)", len(r.Snapshot.GetRepos()))
+		case *v1.RepoEvent_RepoUpdated:
+			return "repo.updated " + r.RepoUpdated.GetName()
+		case *v1.RepoEvent_RepoRemovedId:
+			return "repo.removed"
+		default:
+			return "repo.other"
+		}
+	case *v1.Event_Terminal:
+		if u := e.Terminal.GetUpdated(); u != nil {
+			return "terminal.updated " + u.GetId()
+		}
+		return "terminal.removed " + e.Terminal.GetRemovedId()
+	case *v1.Event_Gh:
+		if p := e.Gh.GetPullRequestsUpdated(); p != nil {
+			return "gh.prs " + p.GetRepoSlug()
+		}
+		return "gh.viewer"
+	case *v1.Event_Ui:
+		if p := e.Ui.GetOpenPalette(); p != nil {
+			return "ui.palette " + p.GetQuery()
+		}
+		return "ui.other"
+	}
+	return "?"
+}
+
+func TestEventsSnapshotOrderThenLive(t *testing.T) {
+	f := newEventsFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_, _ = f.repo.Register(ctx, "/code/a")
+	t1, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"zsh"}})
+	t2, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"claude"}, Labels: map[string]string{"session": "s1"}})
+	f.gh.SetRepo(gh.RepoState{Slug: "o/b"})
+	f.gh.SetRepo(gh.RepoState{Slug: "o/a"})
+
+	s := f.watch(t, ctx)
+	want := []string{
+		"repo.snapshot(1)",
+		"terminal.updated " + t1.ID,
+		"terminal.updated " + t2.ID,
+		"gh.viewer",
+		"gh.prs o/a",
+		"gh.prs o/b",
+	}
+	for i, w := range want {
+		if got := describe(s.next()); got != w {
+			t.Fatalf("snapshot event %d = %q, want %q", i, got, w)
+		}
+	}
+
+	// Live events from every source, each in its own source's order.
+	_, _ = f.repo.Register(ctx, "/code/b")
+	if got := describe(s.next()); got != "repo.updated b" {
+		t.Fatalf("got %q, want repo.updated b", got)
+	}
+	_ = f.term.Exit(t1.ID, 0)
+	if got := describe(s.next()); got != "terminal.updated "+t1.ID {
+		t.Fatalf("got %q, want terminal update", got)
+	}
+	_ = f.term.Remove(ctx, t1.ID)
+	if got := describe(s.next()); got != "terminal.removed "+t1.ID {
+		t.Fatalf("got %q, want terminal removal", got)
+	}
+	f.gh.SetViewer(gh.ViewerState{Authenticated: true})
+	if got := describe(s.next()); got != "gh.viewer" {
+		t.Fatalf("got %q, want gh.viewer", got)
+	}
+	n := command.BusEmitter{Bus: f.bus}.Emit(&v1.UiIntent{Intent: &v1.UiIntent_OpenPalette_{OpenPalette: &v1.UiIntent_OpenPalette{Query: "x"}}})
+	if n != 1 {
+		t.Errorf("Emit delivered to %d, want 1 (the events stream)", n)
+	}
+	if got := describe(s.next()); got != "ui.palette x" {
+		t.Fatalf("got %q, want ui.palette x", got)
+	}
+	// The labels that place session terminals survive the mapping.
+	if l := f.term.List(ctx); len(l) != 1 || l[0].Labels["session"] != "s1" {
+		t.Fatalf("list = %v", l)
+	}
+}
+
+func TestEventsSourceFilter(t *testing.T) {
+	tests := []struct {
+		name    string
+		sources []v1.EventSource
+		want    string // first event after the trigger sequence below
+	}{
+		{"ui only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_UI}, "ui.palette go"},
+		{"terminal only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_TERMINAL}, "terminal.updated fake-1"},
+		{"repo and ui", []v1.EventSource{v1.EventSource_EVENT_SOURCE_UI, v1.EventSource_EVENT_SOURCE_REPO}, "repo.snapshot(0)"},
+		{"session (not served yet)", []v1.EventSource{v1.EventSource_EVENT_SOURCE_SESSION}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newEventsFixture(t)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			// Watch returns once headers arrive, so a source with no snapshot still
+			// has its subscription in place.
+			s := f.watch(t, ctx, tt.sources...)
+			f.gh.SetViewer(gh.ViewerState{})
+			_, _ = f.term.Create(ctx, terminal.Spec{Argv: []string{"zsh"}})
+			command.BusEmitter{Bus: f.bus}.Emit(&v1.UiIntent{Intent: &v1.UiIntent_OpenPalette_{OpenPalette: &v1.UiIntent_OpenPalette{Query: "go"}}})
+			if tt.want == "" {
+				cancel()
+				if s.s.Receive() {
+					t.Fatalf("unexpected event %q", describe(s.s.Msg()))
+				}
+				return
+			}
+			if got := describe(s.next()); got != tt.want {
+				t.Fatalf("first event = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEventsResyncsSourceAfterDrops(t *testing.T) {
+	f := newEventsFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	s := f.watch(t, ctx, v1.EventSource_EVENT_SOURCE_REPO, v1.EventSource_EVENT_SOURCE_UI)
+	if got := describe(s.next()); got != "repo.snapshot(0)" {
+		t.Fatalf("first = %q", got)
+	}
+	// Overflow the repo subscription while the client is not reading (more than the
+	// HTTP/2 flow-control windows the handler can fill first).
+	big := strings.Repeat("x", 4096)
+	for i := range 2000 {
+		f.repo.Put(repo.Repo{ID: fmt.Sprint(i % 3), Name: fmt.Sprint(i), Path: big})
+	}
+	for {
+		ev := s.next()
+		if snap := ev.GetRepo().GetSnapshot(); snap != nil && len(snap.GetRepos()) == 3 {
+			break
+		}
+	}
+	// The stream is still live for the other sources.
+	command.BusEmitter{Bus: f.bus}.Emit(&v1.UiIntent{Intent: &v1.UiIntent_OpenPalette_{OpenPalette: &v1.UiIntent_OpenPalette{Query: "after"}}})
+	for {
+		if describe(s.next()) == "ui.palette after" {
+			return
+		}
+	}
+}
+
+func TestEventsDoneEndsStream(t *testing.T) {
+	f := newEventsFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	s := f.watch(t, ctx, v1.EventSource_EVENT_SOURCE_UI)
+	close(f.done)
+	for s.s.Receive() {
+	}
+	if err := s.s.Err(); err != nil {
+		t.Errorf("stream ended with %v, want clean end", err)
+	}
+}
+
+// A terminal resync must also retract terminals the client knows but that were removed
+// while its events were being dropped; terminal.proto has no snapshot message.
+func TestTerminalSourceSnapshotRetractsRemoved(t *testing.T) {
+	ctx := context.Background()
+	fake := terminaltest.New(nil)
+	a, _ := fake.Create(ctx, terminal.Spec{Argv: []string{"a"}})
+	b, _ := fake.Create(ctx, terminal.Spec{Argv: []string{"b"}})
+	src := &terminalSource{store: fake, bus: fake.Bus(), known: map[string]bool{}}
+
+	tests := []struct {
+		name   string
+		mutate func()
+		want   []string
+	}{
+		{"initial", func() {}, []string{"terminal.updated " + a.ID, "terminal.updated " + b.ID}},
+		{"a removed, c added", func() {
+			_ = fake.Exit(a.ID, 0)
+			_ = fake.Remove(ctx, a.ID)
+			_, _ = fake.Create(ctx, terminal.Spec{Argv: []string{"c"}})
+		}, []string{"terminal.updated " + b.ID, "terminal.updated fake-3", "terminal.removed " + a.ID}},
+		{"nothing changed", func() {}, []string{"terminal.updated " + b.ID, "terminal.updated fake-3"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mutate()
+			var got []string
+			for _, ev := range src.snapshot(ctx) {
+				got = append(got, describe(ev))
+			}
+			if fmt.Sprint(got) != fmt.Sprint(tt.want) {
+				t.Fatalf("snapshot = %v, want %v", got, tt.want)
+			}
+		})
+	}
+	// A live removal also forgets the id, so the next snapshot does not retract it again.
+	src.wrap(terminal.Event{RemovedID: b.ID})
+	if src.known[b.ID] {
+		t.Fatal("removed id still known")
+	}
+}

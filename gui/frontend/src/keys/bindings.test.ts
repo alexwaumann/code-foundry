@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
+import type { SessionView } from "@/api/session";
 import { useCommandsStore } from "@/stores/commands";
+import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
 import { commandBindings, handleKeyDown, isGlobalChord } from "./bindings";
 import { hintsFor } from "./hints";
@@ -10,6 +12,29 @@ vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/
 
 function cmd(over: Partial<CommandView>): CommandView {
   return { name: "c", title: "C", description: "", category: "X", args: [], keybindings: [], available: true, ...over };
+}
+
+function session(id: string, over: Partial<SessionView> = {}): SessionView {
+  return {
+    id,
+    claudeSessionId: "",
+    repoId: "",
+    worktreePath: "/src/app",
+    name: id,
+    autoNamed: false,
+    model: "",
+    effort: "",
+    terminalId: `t-${id}`,
+    state: "connected",
+    status: "idle",
+    createdAtMs: 1,
+    lastActivityAtMs: null,
+    exitCode: 0,
+    disconnectReason: "",
+    lastError: "",
+    parentId: "",
+    ...over,
+  };
 }
 
 function press(target: Element, init: KeyboardEventInit): KeyboardEvent {
@@ -44,8 +69,16 @@ describe("handleKeyDown precedence", () => {
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     useUiStore.setState({ palette: { open: false, query: "", commandName: null, returnTo: "content" }, sidebarVisible: true });
     useCommandsStore.setState({
-      commands: [cmd({ name: "terminal.new", keybindings: ["cmd+t"] }), cmd({ name: "session.new", keybindings: ["cmd+n"], args: [{ name: "model", type: "enum", required: true, description: "", enumValues: ["opus"], defaultValue: "" }] })],
+      commands: [
+        cmd({ name: "terminal.new", keybindings: ["cmd+t"] }),
+        cmd({ name: "terminal.clear", keybindings: ["ctrl+l"] }),
+        cmd({ name: "edit.copy", keybindings: ["cmd+c"] }),
+        cmd({ name: "session.new", keybindings: ["cmd+n"], args: [{ name: "model", type: "enum", required: true, description: "", enumValues: ["opus"], defaultValue: "" }] }),
+        cmd({ name: "session.rename", keybindings: ["cmd+r"], args: [{ name: "name", type: "string", required: true, description: "", enumValues: [], defaultValue: "" }] }),
+      ],
     });
+    useSessionsStore.setState({ byId: {}, order: [] });
+    useUiStore.setState({ selection: { kind: "none" }, renamingSessionId: null });
     runCommand.mockClear();
   });
 
@@ -58,13 +91,48 @@ describe("handleKeyDown precedence", () => {
     expect(e.defaultPrevented).toBe(true);
     expect(useUiStore.getState().palette.open).toBe(true);
     expect(isGlobalChord("cmd+shift+p")).toBe(true);
-    expect(isGlobalChord("cmd+t")).toBe(false);
+    expect(isGlobalChord("cmd+shift+a")).toBe(true);
   });
 
-  it("the terminal consumes non-global command chords", () => {
-    const e = press(terminal, { key: "t", code: "KeyT", metaKey: true });
-    expect(e.defaultPrevented).toBe(false);
-    expect(runCommand).not.toHaveBeenCalled();
+  it.each<[string, KeyboardEventInit & { key: string }, boolean]>([
+    ["cmd chord bound to a command runs from the terminal", { key: "t", code: "KeyT", metaKey: true }, true],
+    ["non-cmd command chord goes to the PTY", { key: "l", code: "KeyL", ctrlKey: true }, false],
+    ["clipboard chord stays with the terminal even if bound", { key: "c", code: "KeyC", metaKey: true }, false],
+    ["unbound cmd chord goes to the terminal", { key: "j", code: "KeyJ", metaKey: true }, false],
+  ])("terminal focus: %s", (_name, init, runs) => {
+    const e = press(terminal, init);
+    expect(e.defaultPrevented).toBe(runs);
+    expect(runCommand).toHaveBeenCalledTimes(runs ? 1 : 0);
+    expect(isGlobalChord(init.metaKey ? `cmd+${init.key}` : `ctrl+${init.key}`)).toBe(runs);
+  });
+
+  it("session.rename's chord starts the inline rename instead of the palette", () => {
+    useSessionsStore.setState({ byId: { s1: session("s1") }, order: ["s1"] });
+    useUiStore.setState({ selection: { kind: "session", id: "s1" } });
+    press(terminal, { key: "r", code: "KeyR", metaKey: true });
+    expect(useUiStore.getState().renamingSessionId).toBe("s1");
+    expect(useUiStore.getState().palette.open).toBe(false);
+  });
+
+  it("F2 renames the selected session outside the tree", () => {
+    useSessionsStore.setState({ byId: { s1: session("s1") }, order: ["s1"] });
+    useUiStore.setState({ selection: { kind: "session", id: "s1" } });
+    press(outside, { key: "F2", code: "F2" });
+    expect(useUiStore.getState().renamingSessionId).toBe("s1");
+  });
+
+  it("cmd+shift+a cycles through sessions needing attention", () => {
+    useSessionsStore.setState({
+      byId: { a: session("a", { status: "attention" }), b: session("b"), c: session("c", { status: "attention" }) },
+      order: ["a", "b", "c"],
+    });
+    const jump = () => press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
+    jump();
+    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "a" });
+    jump();
+    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "c" });
+    jump();
+    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "a" });
   });
 
   it("text fields consume command chords", () => {
@@ -93,13 +161,44 @@ describe("handleKeyDown precedence", () => {
 });
 
 describe("hintsFor", () => {
-  const cmds = [cmd({ title: "New Terminal", keybindings: ["cmd+t"] }), cmd({ title: "Hidden", keybindings: ["cmd+h"], available: false }), cmd({ title: "No key" })];
+  const cmds = [
+    cmd({ name: "terminal.new", title: "New Terminal", keybindings: ["cmd+t"] }),
+    cmd({ name: "x.hidden", title: "Hidden", keybindings: ["cmd+h"], available: false }),
+    cmd({ name: "x.nokey", title: "No key" }),
+    cmd({ name: "terminal.clear", title: "Clear", keybindings: ["ctrl+l"] }),
+  ];
   it.each([
-    ["terminal: only global chords", "terminal" as const, ["⌘K", "⌘B", "⌘1–9", "⌘C", "⌘+ ⌘−"]],
-    ["sidebar: navigation + bound commands", "sidebar" as const, ["↑↓", "↵", "←→", "⌘K", "⌘T"]],
-    ["content: palette + bound commands", "content" as const, ["⌘K", "⌘B", "⌘1–9", "⌘T"]],
+    ["terminal: global chords + cmd command chords", "terminal" as const, ["⌘K", "⌘T", "⌘B", "⌘1–9", "⌘C", "⌘+ ⌘−"]],
+    ["sidebar: navigation + bound commands", "sidebar" as const, ["↑↓", "↵", "←→", "⌘K", "⌘T", "⌃L"]],
+    ["content: palette + bound commands", "content" as const, ["⌘K", "⌘B", "⌘1–9", "⌘T", "⌃L"]],
     ["palette", "palette" as const, ["↑↓", "↵", "⌫", "Esc"]],
   ])("%s", (_name, focus, keys) => {
     expect(hintsFor(focus, { kind: "none" }, cmds).map((h) => h.keys)).toEqual(keys);
+  });
+
+  it("omits commands bound to a chord a view action owns", () => {
+    const withPalette = [cmd({ name: "ui.palette.open", title: "Open Command Palette", keybindings: ["cmd+k"] }), ...cmds];
+    expect(hintsFor("terminal", { kind: "none" }, withPalette).map((h) => h.label)).not.toContain("Open Command Palette");
+  });
+
+  it("session context: session commands first, attention and rename hints", () => {
+    const withSession = [
+      ...cmds,
+      cmd({ name: "session.close", title: "Close Session", keybindings: ["cmd+shift+w"] }),
+      cmd({ name: "session.reconnect", title: "Reconnect", keybindings: ["cmd+shift+r"] }),
+    ];
+    const sel = { kind: "session", id: "s1" } as const;
+    expect(hintsFor("terminal", sel, withSession, 4, 2).map((h) => h.label)).toEqual([
+      "Commands",
+      "Needs attention",
+      "Close Session",
+      "Reconnect",
+      "New Terminal",
+      "Sidebar",
+      "Jump",
+      "Copy selection",
+      "Font size",
+    ]);
+    expect(hintsFor("content", sel, withSession, 2).map((h) => h.keys)).toEqual(["⌘K", "⌘B", "⇧⌘W", "⇧⌘R", "F2"]);
   });
 });

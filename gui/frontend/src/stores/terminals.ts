@@ -1,7 +1,5 @@
 import { create } from "zustand";
-import { daemon, invalidateOnTransportError } from "@/api/endpoint";
-import { runStream, type StreamStatus } from "@/api/stream";
-import { listTerminals, watchTerminals, type TerminalEventView, type TerminalView } from "@/api/terminal";
+import type { TerminalEventView, TerminalView } from "@/api/terminal";
 
 export interface TerminalsData {
   byId: Readonly<Record<string, TerminalView>>;
@@ -11,8 +9,6 @@ export interface TerminalsData {
 
 interface TerminalsState extends TerminalsData {
   loaded: boolean;
-  stream: StreamStatus;
-  streamError: string | null;
 }
 
 export const emptyTerminals: TerminalsData = { byId: {}, order: [] };
@@ -67,28 +63,8 @@ export function applyTerminalEvent(prev: TerminalsData, ev: TerminalEventView): 
   return { byId, order: prev.order.filter((id) => id !== ev.id) };
 }
 
+/** Fed by the shared events stream (stores/events.ts). */
 export const useTerminalsStore = create<TerminalsState>()(() => ({
   ...emptyTerminals,
   loaded: false,
-  stream: "connecting",
-  streamError: null,
 }));
-
-/** Keeps the terminals slice in sync: List on every (re)connect, then Watch events. */
-export function startTerminalSync(): () => void {
-  const set = useTerminalsStore.setState;
-  return runStream({
-    open: (signal) => watchTerminals(signal),
-    onConnect: async (signal) => {
-      const list = await listTerminals(daemon, signal);
-      set((s) => ({ ...replaceTerminals(s, list), loaded: true }));
-    },
-    onEvent: (ev) => {
-      set((s) => applyTerminalEvent(s, ev));
-    },
-    onStatus: (stream, err) => {
-      set({ stream, streamError: err ?? null });
-    },
-    onError: invalidateOnTransportError,
-  });
-}

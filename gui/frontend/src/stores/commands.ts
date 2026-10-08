@@ -5,6 +5,7 @@ import { invalidateOnTransportError } from "@/api/endpoint";
 import { errorMessage, isAbort } from "@/api/stream";
 import { contextKey, getUiContext } from "./context";
 import { useReposStore } from "./repos";
+import { useSessionsStore } from "./sessions";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 
@@ -65,7 +66,7 @@ export async function runCommand(name: string, args: Record<string, string> = {}
 
 /**
  * Re-lists commands whenever the derived UiContext changes (debounced), and when the
- * selected terminal's state changes (availability often depends on it).
+ * selected terminal's or session's state changes (availability often depends on it).
  */
 export function startCommandSync(debounceMs = 60): () => void {
   let lastKey = "";
@@ -74,7 +75,12 @@ export function startCommandSync(debounceMs = 60): () => void {
   const check = () => {
     const ctx = getUiContext();
     const sel = useUiStore.getState().selection;
-    const state = sel.kind === "terminal" ? (useTerminalsStore.getState().byId[sel.id]?.state ?? "") : "";
+    const state =
+      sel.kind === "terminal"
+        ? (useTerminalsStore.getState().byId[sel.id]?.state ?? "")
+        : sel.kind === "session"
+          ? (useSessionsStore.getState().byId[sel.id]?.state ?? "")
+          : "";
     const key = contextKey(ctx);
     if (key === lastKey && state === lastState) return;
     lastKey = key;
@@ -82,7 +88,7 @@ export function startCommandSync(debounceMs = 60): () => void {
     clearTimeout(timer);
     timer = setTimeout(() => void refreshCommands(ctx), debounceMs);
   };
-  const unsubs = [useUiStore.subscribe(check), useTerminalsStore.subscribe(check), useReposStore.subscribe(check)];
+  const unsubs = [useUiStore.subscribe(check), useTerminalsStore.subscribe(check), useReposStore.subscribe(check), useSessionsStore.subscribe(check)];
   check();
   // Retry periodically while the list is failing (e.g. daemon restarting).
   const retry = setInterval(() => {

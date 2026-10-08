@@ -1,14 +1,16 @@
 import type { CommandView } from "@/api/command";
-import { terminalOrder } from "@/lib/tree";
-import { runCommand, useCommandsStore } from "@/stores/commands";
-import { getTreeInputs } from "@/stores/context";
+import { promptedArgs } from "@/palette/args";
+import { leafOrder, nextAfter, sessionOrder } from "@/lib/tree";
+import { refreshCommands, runCommand, useCommandsStore } from "@/stores/commands";
+import { contextKey, getTreeInputs, getUiContext } from "@/stores/context";
+import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
-import { chordFromEvent, normalizeChord } from "./chord";
+import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
  * GUI-local view actions. They change only what the window shows (palette, sidebar,
- * zoom), never daemon state, so they are not registry commands. Every chord here is
- * "global": it wins even when the terminal has focus.
+ * zoom, which row is selected), never daemon state, so they are not registry commands.
+ * Every chord here is "global": it wins even when the terminal has focus.
  */
 export interface ViewAction {
   chord: string;
@@ -16,10 +18,24 @@ export interface ViewAction {
   run: () => void;
 }
 
+/** Selects the Nth session or terminal in sidebar order (ignoring collapse). */
 function jumpTo(n: number): void {
-  const { repos, terminals } = getTreeInputs();
-  const id = terminalOrder(repos, terminals)[n - 1];
-  if (id) useUiStore.getState().select({ kind: "terminal", id }, { focusTerminal: true });
+  const { repos, terminals, sessions } = getTreeInputs();
+  const row = leafOrder(repos, terminals, sessions)[n - 1];
+  if (!row) return;
+  const sel = row.kind === "session" ? ({ kind: "session", id: row.sessionId } as const) : ({ kind: "terminal", id: row.terminalId } as const);
+  useUiStore.getState().select(sel, { focusTerminal: true });
+}
+
+/** Selects the next session that needs attention after the current one, wrapping. */
+export function jumpToAttention(): boolean {
+  const { repos, terminals, sessions } = getTreeInputs();
+  const waiting = new Set(attentionIds(useSessionsStore.getState()));
+  const sel = useUiStore.getState().selection;
+  const next = nextAfter(sessionOrder(repos, terminals, sessions), sel.kind === "session" ? sel.id : null, (id) => waiting.has(id));
+  if (next === null) return false;
+  useUiStore.getState().select({ kind: "session", id: next }, { focusTerminal: true });
+  return true;
 }
 
 function togglePalette(): void {
@@ -28,11 +44,16 @@ function togglePalette(): void {
   else ui.openPalette();
 }
 
+function focusContentTerminal(): void {
+  const kind = useUiStore.getState().selection.kind;
+  if (kind === "terminal" || kind === "session") useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
+}
+
 function toggleSidebar(): void {
   const ui = useUiStore.getState();
   if (ui.sidebarVisible) {
     ui.toggleSidebar();
-    if (ui.selection.kind === "terminal") useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
+    focusContentTerminal();
   } else {
     ui.focusSidebar();
   }
@@ -47,9 +68,10 @@ export const viewActions: readonly ViewAction[] = [
   { chord: "cmd+k", title: "Command palette", run: togglePalette },
   { chord: "cmd+shift+p", title: "Command palette", run: togglePalette },
   { chord: "cmd+b", title: "Toggle sidebar", run: toggleSidebar },
+  { chord: "cmd+shift+a", title: "Next session needing attention", run: () => void jumpToAttention() },
   ...Array.from({ length: 9 }, (_, i) => ({
     chord: `cmd+${String(i + 1)}`,
-    title: `Jump to terminal ${String(i + 1)}`,
+    title: `Jump to item ${String(i + 1)}`,
     run: () => {
       jumpTo(i + 1);
     },
@@ -61,9 +83,9 @@ export const viewActions: readonly ViewAction[] = [
 
 const viewActionMap = new Map(viewActions.map((a) => [normalizeChord(a.chord) ?? a.chord, a]));
 
-/** True when the chord must reach the app even while xterm has focus. */
-export function isGlobalChord(chord: string): boolean {
-  return viewActionMap.has(chord);
+/** True for a chord a GUI view action owns (a command bound to it never fires). */
+export function isViewActionChord(chord: string): boolean {
+  return viewActionMap.has(normalizeChord(chord) ?? chord);
 }
 
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
@@ -83,9 +105,43 @@ export function commandBindings(commands: readonly CommandView[]): Map<string, C
   return map;
 }
 
-/** Starts a command from the keyboard or palette: prompts for required args, else invokes. */
+/**
+ * The command a focused terminal yields this chord to (see terminalYieldable). Sessions
+ * are terminals, so without this session.close/rename/reconnect would never fire from
+ * the main view.
+ */
+function terminalYields(chord: string): CommandView | undefined {
+  if (!terminalYieldable(chord)) return undefined;
+  return commandBindings(useCommandsStore.getState().commands).get(chord);
+}
+
+/** True when the chord must reach the app even while xterm has focus. */
+export function isGlobalChord(chord: string): boolean {
+  return viewActionMap.has(chord) || terminalYields(chord) !== undefined;
+}
+
+/** Starts inline rename of the active session's sidebar row. */
+export function beginRename(sessionId: string | null = getUiContext().activeSessionId || null): boolean {
+  if (!sessionId || !useSessionsStore.getState().byId[sessionId]) return false;
+  const ui = useUiStore.getState();
+  if (!ui.sidebarVisible) ui.toggleSidebar();
+  ui.setRenaming(sessionId);
+  return true;
+}
+
+/**
+ * GUI presentations of specific registry commands. The command still runs through the
+ * registry (session.rename is invoked when the inline edit is committed); this only
+ * replaces the generic palette prompt. Return false to fall back to the default.
+ */
+const commandPresenters: Readonly<Record<string, () => boolean>> = {
+  "session.rename": () => beginRename(),
+};
+
+/** Starts a command from the keyboard or palette: prompts for args it needs, else invokes. */
 export function startCommand(c: CommandView): void {
-  if (c.args.some((a) => a.required)) useUiStore.getState().openPalette("", c.name);
+  if (commandPresenters[c.name]?.()) return;
+  if (promptedArgs(c).length > 0) useUiStore.getState().openPalette("", c.name);
   else void runCommand(c.name);
 }
 
@@ -97,10 +153,12 @@ function isEditable(el: Element | null): boolean {
 
 /**
  * Key precedence:
- *  1. Global view actions (cmd+k, cmd+shift+p, cmd+b, cmd+1..9, zoom) always win.
- *  2. A focused terminal consumes everything else (the PTY gets it).
- *  3. A focused text field (palette input) consumes everything else.
- *  4. Command keybindings from CommandService.List for the current context.
+ *  1. Global view actions (cmd+k, cmd+shift+p, cmd+b, cmd+shift+a, cmd+1..9, zoom) always win.
+ *  2. A focused terminal consumes everything else, except cmd chords bound to commands
+ *     (see terminalYields).
+ *  3. A focused text field (palette input, rename field) consumes everything else.
+ *  4. F2 renames the selected session (the cursor row inside the tree); command
+ *     keybindings from CommandService.List for the current context.
  */
 export function handleKeyDown(e: KeyboardEvent): void {
   if (e.isComposing || e.defaultPrevented) return;
@@ -114,13 +172,38 @@ export function handleKeyDown(e: KeyboardEvent): void {
     return;
   }
   const target = e.target instanceof Element ? e.target : null;
-  if (target?.closest("[data-terminal-host]")) return;
+  if (target?.closest("[data-terminal-host]")) {
+    const yielded = terminalYields(chord);
+    if (!yielded || useUiStore.getState().palette.open) return;
+    e.preventDefault();
+    e.stopPropagation();
+    startCommand(yielded);
+    return;
+  }
   if (isEditable(target) || useUiStore.getState().palette.open) return;
+  // In the tree, F2 renames the row under the cursor (Sidebar handles it).
+  if (chord === "f2" && !target?.closest('[role="tree"]') && beginRename()) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
   const cmd = commandBindings(useCommandsStore.getState().commands).get(chord);
-  if (!cmd) return;
-  e.preventDefault();
-  e.stopPropagation();
-  startCommand(cmd);
+  if (cmd) {
+    e.preventDefault();
+    e.stopPropagation();
+    startCommand(cmd);
+    return;
+  }
+  // Clicking a worktree and pressing cmd+n at once beats the debounced re-list: when the
+  // list is for an older context, re-list now and look the chord up again.
+  const ctx = getUiContext();
+  if (/^(cmd|ctrl|alt)\+/.test(chord) && useCommandsStore.getState().contextKey !== contextKey(ctx)) {
+    e.preventDefault();
+    void refreshCommands(ctx).then(() => {
+      const late = commandBindings(useCommandsStore.getState().commands).get(chord);
+      if (late && contextKey(getUiContext()) === contextKey(ctx)) startCommand(late);
+    });
+  }
 }
 
 /** Installs the global key handler (capture phase, ahead of xterm). */

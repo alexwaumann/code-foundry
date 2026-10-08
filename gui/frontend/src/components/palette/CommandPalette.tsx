@@ -4,7 +4,7 @@ import type { CommandView, UiContextView } from "@/api/command";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { formatChord } from "@/keys/chord";
-import { argChoices, groupByCategory, previousArg, startPrompt, submitArg, type ArgPrompt } from "@/palette/args";
+import { argChoices, groupByCategory, previousArg, promptedArgs, startPrompt, submitArg, UNSET_CHOICE, type ArgPrompt } from "@/palette/args";
 import { refreshCommands, runCommand, useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { useUiStore } from "@/stores/ui";
@@ -20,7 +20,7 @@ function CommandRow({ c, onPick }: { c: CommandView; onPick: (c: CommandView) =>
       data-command={c.name}
     >
       <span className="truncate">{c.title}</span>
-      {c.args.some((a) => a.required) && <ChevronRight className="size-3.5 text-muted-foreground" aria-label="asks for input" />}
+      {promptedArgs(c).length > 0 && <ChevronRight className="size-3.5 text-muted-foreground" aria-label="asks for input" />}
       <span className="truncate text-xs text-muted-foreground">{c.name}</span>
       {c.keybindings[0] && <CommandShortcut>{formatChord(c.keybindings[0])}</CommandShortcut>}
     </CommandItem>
@@ -52,6 +52,7 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
   const [prompt, setPrompt] = useState<ArgPrompt | null>(null);
   const [argError, setArgError] = useState<string | null>(null);
   const [pendingCommand, setPendingCommand] = useState(initialCommand);
+  const [autoRun, setAutoRun] = useState<CommandView | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   // The list is fresh once a List for this palette's context has completed.
   const fresh = useCommandsStore((s) => !s.loading && s.contextKey === contextKey(context));
@@ -85,15 +86,23 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
     enterPrompt(p);
   };
 
-  // A keybinding can open the palette straight into a command's arg prompts (such
-  // commands always have required args). Adjusts state during render once it's listed.
+  // A keybinding (or the sidebar "+") can open the palette straight into a command's arg
+  // prompts. Adjusts state during render once it's listed.
   if (pendingCommand) {
     const c = available.find((x) => x.name === pendingCommand);
     if (c) {
       setPendingCommand(null);
-      enterPrompt(startPrompt(c));
+      const p = startPrompt(c);
+      if (p.specs.length > 0) enterPrompt(p);
+      else setAutoRun(c);
     }
   }
+
+  // A pre-selected command with nothing to ask runs straight away (outside render).
+  useEffect(() => {
+    if (autoRun) invoke(autoRun, {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun]);
 
   useEffect(() => {
     if (!pendingEnter.current || !fresh || prompt) return;
@@ -201,11 +210,12 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
                 <CommandItem
                   key={v}
                   value={v}
+                  keywords={v === UNSET_CHOICE ? ["default"] : undefined}
                   onSelect={() => {
                     submit(v);
                   }}
                 >
-                  {spec.type === "bool" ? (v === "true" ? "Yes" : "No") : v}
+                  {spec.type === "bool" ? (v === "true" ? "Yes" : "No") : v === UNSET_CHOICE ? <span className="text-muted-foreground">Default (not set)</span> : v}
                   {v === spec.defaultValue && <span className="text-xs text-muted-foreground">default</span>}
                 </CommandItem>
               ))}

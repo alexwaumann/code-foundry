@@ -5,9 +5,11 @@
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
+import { EventSource, type EventSchema } from "../src/gen/codefoundry/v1/events_pb";
 import type { RepoEventSchema, RepoSchema, WorktreeSchema } from "../src/gen/codefoundry/v1/repo_pb";
+import { SessionState, SessionStatus, type SessionEventSchema, type SessionSchema } from "../src/gen/codefoundry/v1/session_pb";
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
-import { UiIntent_Notify_Level, type UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
+import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import { Hub } from "./hub";
 import { claudeIntro, claudeTick, ENTER_ALT, logLine, prompt, RESET, testRunOutput, topFrame } from "./screens";
 
@@ -17,6 +19,32 @@ type TerminalEventInit = MessageInitShape<typeof TerminalEventSchema>;
 type RepoInit = MessageInitShape<typeof RepoSchema>;
 type WorktreeInit = MessageInitShape<typeof WorktreeSchema>;
 type RepoEventInit = MessageInitShape<typeof RepoEventSchema>;
+type SessionInit = MessageInitShape<typeof SessionSchema>;
+type SessionEventInit = MessageInitShape<typeof SessionEventSchema>;
+export type EventInit = MessageInitShape<typeof EventSchema>;
+
+/** True once ui.proto has FocusSession (Phase 2a); until then FocusTerminal stands in. */
+export const hasFocusSession = UiIntentSchema.fields.some((f) => f.localName === "focusSession");
+
+interface MockSession {
+  id: string;
+  claudeSessionId: string;
+  repoId: string;
+  worktreePath: string;
+  name: string;
+  autoNamed: boolean;
+  model: string;
+  effort: string;
+  terminalId: string;
+  state: SessionState;
+  status: SessionStatus;
+  createdAt: Date;
+  lastActivityAt: Date;
+  exitCode: number;
+  disconnectReason: string;
+  /** Mock-only: seconds left before a STARTING/CLOSING session settles. */
+  settleIn: number;
+}
 
 interface ArgDef {
   name: string;
@@ -144,9 +172,15 @@ export class World {
   readonly startedAt = Date.now();
   terms = new Map<string, MockTerm>();
   repos = new Map<string, MockRepo>();
-  readonly termEvents = new Hub<TerminalEventInit>();
-  readonly repoEvents = new Hub<RepoEventInit>();
-  readonly intents = new Hub<UiIntentInit>();
+  sessions = new Map<string, MockSession>();
+  /** EventService: every hub below tees into this one, so its order is publish order. */
+  readonly events = new Hub<{ source: EventSource; event: EventInit }>();
+  readonly termEvents = new Hub<TerminalEventInit>((v) => this.events.publish({ source: EventSource.TERMINAL, event: { event: { case: "terminal", value: v } } }));
+  readonly repoEvents = new Hub<RepoEventInit>((v) => this.events.publish({ source: EventSource.REPO, event: { event: { case: "repo", value: v } } }));
+  readonly sessionEvents = new Hub<SessionEventInit>((v) => this.events.publish({ source: EventSource.SESSION, event: { event: { case: "session", value: v } } }));
+  readonly intents = new Hub<UiIntentInit>((v) => this.events.publish({ source: EventSource.UI, event: { event: { case: "ui", value: v } } }));
+  /** EventService watchers that include UI intents (they count toward Emit's `delivered`). */
+  uiEventWatchers = 0;
   invocations: Invocation[] = [];
   writes: { id: string; data: string }[] = [];
   resizes: { id: string; cols: number; rows: number }[] = [];
@@ -174,9 +208,169 @@ export class World {
     this.addTerm({ id: "t-tests", argv: ["go", "test", "./..."], cwd: `${CFW}/fix-resize`, title: "", kind: "exited", labels: { worktree: `${CFW}/fix-resize` }, startedAt: started });
     this.addTerm({ id: "t-ghostty", argv: ["claude", "--resume"], cwd: GP, title: "✳ Port renderer", kind: "claude", labels: { worktree: GP, session: "s-2" }, startedAt: started });
     this.addTerm({ id: "t-tmp", argv: ["/bin/zsh"], cwd: "/tmp", title: "", kind: "shell", labels: {}, startedAt: started });
+    // Sessions in every state. s-1/s-2 own t-claude/t-ghostty (labels.session above).
+    this.sessions.clear();
+    const ago = (min: number) => new Date(Date.now() - min * 60_000);
+    this.addSession({ id: "s-1", repoId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "opus", effort: "high", terminalId: "t-claude", status: SessionStatus.BUSY, createdAt: ago(42) });
+    this.addSession({ id: "s-2", repoId: "repo-gp", worktreePath: GP, name: "Port renderer", model: "sonnet", effort: "", terminalId: "t-ghostty", status: SessionStatus.NEEDS_ATTENTION, createdAt: ago(40) });
+    this.addSession({ id: "s-3", repoId: "repo-cf", worktreePath: `${CFW}/fix-resize`, name: "Fix resize race", model: "opus", effort: "medium", state: SessionState.DISCONNECTED, disconnectReason: "exited", createdAt: ago(300), lastActivityAt: ago(95) });
+    this.addSession({ id: "s-4", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Investigate flaky e2e", model: "haiku", effort: "", state: SessionState.DISCONNECTED, disconnectReason: "crashed", exitCode: 139, createdAt: ago(200), lastActivityAt: ago(17) });
+    this.addSession({ id: "s-5", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Write session docs", model: "opus", effort: "low", state: SessionState.STARTING, settleIn: 8, createdAt: ago(0) });
+    this.addSession({ id: "s-6", repoId: "repo-dot", worktreePath: `${HOME}/dotfiles`, name: "Tidy zshrc", model: "sonnet", effort: "", state: SessionState.CLOSING, settleIn: 8, createdAt: ago(60) });
     // Republish so connected watchers converge on the reset state.
     for (const t of this.terms.values()) this.termEvents.publish({ event: { case: "updated", value: this.terminalMsg(t) } });
     for (const r of this.repos.values()) this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(r) } });
+    this.sessionEvents.publish(this.sessionSnapshot());
+  }
+
+  // ---- Sessions -----------------------------------------------------------------
+
+  private addSession(o: Partial<MockSession> & Pick<MockSession, "id" | "repoId" | "worktreePath" | "name" | "model" | "effort">): MockSession {
+    const state = o.state ?? SessionState.CONNECTED;
+    let terminalId = o.terminalId ?? "";
+    if (!terminalId && (state === SessionState.STARTING || state === SessionState.CONNECTED || state === SessionState.CLOSING)) {
+      terminalId = this.sessionTerminal(o.id, o.worktreePath, o.model, false).id;
+    }
+    const s: MockSession = {
+      claudeSessionId: `cl-${o.id}`,
+      autoNamed: true,
+      status: SessionStatus.IDLE,
+      createdAt: new Date(),
+      lastActivityAt: new Date(),
+      exitCode: 0,
+      disconnectReason: "",
+      settleIn: 0,
+      ...o,
+      state,
+      terminalId,
+    };
+    this.sessions.set(s.id, s);
+    return s;
+  }
+
+  private sessionTerminal(sessionId: string, cwd: string, model: string, publish: boolean): MockTerm {
+    const id = `t-${sessionId}-${String(this.nextId++)}`;
+    const t = this.addTerm({ id, argv: ["claude", "--model", model || "opus"], cwd, title: "✳ Claude Code", kind: "claude", labels: { worktree: cwd, session: sessionId } });
+    t.history = claudeIntro(cwd, t.cols, "continue where we left off");
+    if (publish) this.publishTerm(t);
+    return t;
+  }
+
+  sessionMsg(s: MockSession): SessionInit {
+    return {
+      id: s.id,
+      claudeSessionId: s.claudeSessionId,
+      repoId: s.repoId,
+      worktreePath: s.worktreePath,
+      name: s.name,
+      autoNamed: s.autoNamed,
+      model: s.model,
+      effort: s.effort,
+      terminalId: s.terminalId,
+      state: s.state,
+      status: s.status,
+      createdAt: timestampFromDate(s.createdAt),
+      lastActivityAt: timestampFromDate(s.lastActivityAt),
+      exitCode: s.exitCode,
+      disconnectReason: s.disconnectReason,
+    };
+  }
+
+  sessionSnapshot(): SessionEventInit {
+    return { event: { case: "snapshot", value: { sessions: [...this.sessions.values()].map((s) => this.sessionMsg(s)) } } };
+  }
+
+  session(id: string): MockSession {
+    const s = this.sessions.get(id);
+    if (!s) throw new CommandError("notfound", `session ${id} not found`);
+    return s;
+  }
+
+  private publishSession(s: MockSession): void {
+    this.sessionEvents.publish({ event: { case: "updated", value: this.sessionMsg(s) } });
+  }
+
+  /** Session → disconnected. Its terminal is killed (if running) and removed first. */
+  disconnectSession(id: string, reason: string, code: number): void {
+    const s = this.session(id);
+    const t = s.terminalId ? this.terms.get(s.terminalId) : undefined;
+    // terminal_id clears in the same update that sets DISCONNECTED (the contract 2a keeps).
+    s.terminalId = "";
+    s.state = SessionState.DISCONNECTED;
+    s.status = SessionStatus.IDLE;
+    s.disconnectReason = reason;
+    s.exitCode = code;
+    s.settleIn = 0;
+    s.lastActivityAt = new Date();
+    this.publishSession(s);
+    if (t) {
+      this.kill(t.id, code, false);
+      this.remove(t.id);
+    }
+  }
+
+  setSessionStatus(id: string, status: SessionStatus): void {
+    const s = this.session(id);
+    if (s.state === SessionState.DISCONNECTED) throw new CommandError("unavailable", "session is disconnected");
+    s.status = status;
+    s.lastActivityAt = new Date();
+    this.publishSession(s);
+  }
+
+  /** Emits FocusSession when ui.proto has it (Phase 2a), else FocusTerminal on its terminal. */
+  focusSession(id: string): number {
+    const s = this.session(id);
+    if (hasFocusSession) return this.emit({ intent: { case: "focusSession", value: { sessionId: id } } } as never);
+    return s.terminalId ? this.emit({ intent: { case: "focusTerminal", value: { terminalId: s.terminalId } } }) : 0;
+  }
+
+  /** UiService.Emit: delivered to UiService watchers and EventService watchers with UI. */
+  emit(intent: UiIntentInit): number {
+    return this.intents.publish(intent) + this.uiEventWatchers;
+  }
+
+  private createSession(repoId: string, path: string, model: string, effort: string): MockSession {
+    const id = `s-new-${String(this.nextId++)}`;
+    const s = this.addSession({ id, repoId, worktreePath: path, name: "", model, effort, state: SessionState.STARTING, settleIn: 2, createdAt: new Date() });
+    const t = this.terms.get(s.terminalId);
+    if (t) this.publishTerm(t);
+    this.publishSession(s);
+    return s;
+  }
+
+  private reconnect(s: MockSession): void {
+    const t = this.sessionTerminal(s.id, s.worktreePath, s.model, true);
+    s.terminalId = t.id;
+    s.state = SessionState.STARTING;
+    s.settleIn = 2;
+    s.disconnectReason = "";
+    s.exitCode = 0;
+    s.lastActivityAt = new Date();
+    this.publishSession(s);
+  }
+
+  private tickSessions(): void {
+    for (const s of this.sessions.values()) {
+      if (s.settleIn > 0 && --s.settleIn === 0) {
+        if (s.state === SessionState.STARTING) {
+          s.state = SessionState.CONNECTED;
+          s.status = SessionStatus.IDLE;
+          if (!s.name) {
+            s.name = "New session";
+          }
+          this.publishSession(s);
+        } else if (s.state === SessionState.CLOSING) {
+          this.disconnectSession(s.id, "closed", 0);
+        }
+        continue;
+      }
+      // s-1 alternates busy/idle every 4s; attention sticks until input arrives.
+      if (s.id === "s-1" && s.state === SessionState.CONNECTED && s.status !== SessionStatus.NEEDS_ATTENTION && this.seconds % 4 === 0) {
+        s.status = s.status === SessionStatus.BUSY ? SessionStatus.IDLE : SessionStatus.BUSY;
+        s.lastActivityAt = new Date();
+        this.publishSession(s);
+      }
+    }
   }
 
   private addTerm(o: { id: string; argv: string[]; cwd: string; title: string; kind: Kind; labels: Record<string, string>; startedAt?: Date }): MockTerm {
@@ -238,6 +432,7 @@ export class World {
 
   private tick(): void {
     this.seconds++;
+    this.tickSessions();
     for (const t of this.terms.values()) {
       if (t.state !== TerminalState.RUNNING) continue;
       t.tick++;
@@ -344,6 +539,12 @@ export class World {
       }
       return;
     }
+    const owner = [...this.sessions.values()].find((s) => s.terminalId === id);
+    if (owner?.status === SessionStatus.NEEDS_ATTENTION) this.setSessionStatus(owner.id, SessionStatus.BUSY);
+    if (owner && (t.line + text).replace(/\r$/, "").trim() === "/exit" && text.endsWith("\r")) {
+      this.disconnectSession(owner.id, "exited", 0);
+      return;
+    }
     // Shell-ish line discipline: echo, backspace, enter, ^C. Escape sequences ignored.
     // eslint-disable-next-line no-control-regex
     const plain = text.replace(/\x1b\[20[01]~/g, "").replace(/\x1b(\[[0-9;?]*[ -/]*[@-~]|O.)/g, "");
@@ -383,9 +584,15 @@ export class World {
     this.publishTerm(t);
   }
 
-  kill(id: string, code = 129): void {
+  /** Ends a terminal. A session whose process dies without a close request disconnects. */
+  kill(id: string, code = 129, notifySession = true): void {
     const t = this.term(id);
     if (t.state !== TerminalState.RUNNING) return;
+    const owner = notifySession ? [...this.sessions.values()].find((s) => s.terminalId === id && s.state !== SessionState.CLOSING) : undefined;
+    if (owner) {
+      this.disconnectSession(owner.id, code === 0 ? "exited" : "crashed", code);
+      return;
+    }
     if (t.altScreen) {
       t.altScreen = false;
       t.attach.publish({ event: { case: "output", value: { data: enc.encode("\x1b[?1049l\x1b[?25h") } } });
@@ -430,6 +637,7 @@ export class World {
   /** The registry: definitions plus a `when` predicate over the caller's context. */
   private registry(): { cmd: CmdDef; when: (ctx: UiContext | undefined) => boolean; run: (ctx: UiContext | undefined, args: Record<string, string>) => string }[] {
     const activeTerm = (ctx: UiContext | undefined) => (ctx?.activeTerminalId ? this.terms.get(ctx.activeTerminalId) : undefined);
+    const activeSession = (ctx: UiContext | undefined) => (ctx?.activeSessionId ? this.sessions.get(ctx.activeSessionId) : undefined);
     const always = () => true;
     return [
       {
@@ -450,21 +658,68 @@ export class World {
           description: "Start claude in the active worktree",
           keybindings: ["cmd+n"],
           args: [
-            { name: "model", type: ArgType.ENUM, required: true, description: "Model", enumValues: ["opus", "sonnet", "haiku"], defaultValue: "opus" },
-            { name: "effort", type: ArgType.ENUM, required: false, description: "Effort", enumValues: ["low", "medium", "high"], defaultValue: "high" },
+            { name: "model", type: ArgType.ENUM, required: false, description: "Model", enumValues: ["opus", "sonnet", "haiku"], defaultValue: "opus" },
+            { name: "effort", type: ArgType.ENUM, required: false, description: "Effort", enumValues: ["low", "medium", "high", "xhigh", "max"] },
           ],
         },
         when: (ctx) => this.worktreeOf(ctx) !== null,
         run: (ctx, args) => {
           const w = this.worktreeOf(ctx);
           if (!w) throw new CommandError("unavailable", "no active worktree");
-          const t = this.create(["claude", "--model", args.model ?? "opus"], w.wt.path, { worktree: w.wt.path, session: `s-${String(this.nextId)}` }, "claude");
-          this.intents.publish({ intent: { case: "focusTerminal", value: { terminalId: t.id } } });
-          return `Started Claude (${args.model ?? "opus"}) in ${w.wt.branch}`;
+          const model = args.model ?? "opus";
+          const s = this.createSession(w.repo.id, w.wt.path, model, args.effort ?? "");
+          this.focusSession(s.id);
+          return `Started Claude (${model}${args.effort ? `, ${args.effort}` : ""}) in ${w.wt.branch}`;
         },
       },
       {
-        cmd: { name: "terminal.kill", title: "Kill Terminal", category: "Terminal", description: "Send SIGHUP to the active terminal", keybindings: ["cmd+shift+w"], args: [] },
+        cmd: { name: "session.close", title: "Close Session", category: "Session", description: "Exit Claude gracefully; the session stays, disconnected", keybindings: ["cmd+shift+w"], args: [] },
+        when: (ctx) => activeSession(ctx)?.state === SessionState.CONNECTED,
+        run: (ctx) => {
+          const s = activeSession(ctx);
+          if (!s) throw new CommandError("unavailable", "no active session");
+          s.state = SessionState.CLOSING;
+          s.settleIn = 2;
+          this.publishSession(s);
+          return "";
+        },
+      },
+      {
+        cmd: { name: "session.reconnect", title: "Reconnect Session", category: "Session", description: "Resume the session in a new terminal (claude --resume)", keybindings: ["cmd+shift+r"], args: [] },
+        when: (ctx) => activeSession(ctx)?.state === SessionState.DISCONNECTED,
+        run: (ctx) => {
+          const s = activeSession(ctx);
+          if (!s) throw new CommandError("unavailable", "no active session");
+          this.reconnect(s);
+          return "";
+        },
+      },
+      {
+        cmd: { name: "session.rename", title: "Rename Session", category: "Session", description: "Set the session's name", keybindings: ["cmd+r"], args: [{ name: "name", type: ArgType.STRING, required: true, description: "New name" }] },
+        when: (ctx) => activeSession(ctx) !== undefined,
+        run: (ctx, args) => {
+          const s = activeSession(ctx);
+          if (!s) throw new CommandError("unavailable", "no active session");
+          s.name = args.name ?? s.name;
+          s.autoNamed = false;
+          this.publishSession(s);
+          return "";
+        },
+      },
+      {
+        cmd: { name: "session.remove", title: "Remove Session", category: "Session", description: "Forget the session (closes it first if connected)", keybindings: [], args: [] },
+        when: (ctx) => activeSession(ctx) !== undefined,
+        run: (ctx) => {
+          const s = activeSession(ctx);
+          if (!s) throw new CommandError("unavailable", "no active session");
+          if (s.state !== SessionState.DISCONNECTED) this.disconnectSession(s.id, "closed", 0);
+          this.sessions.delete(s.id);
+          this.sessionEvents.publish({ event: { case: "removedId", value: s.id } });
+          return `Removed ${s.name || s.id}`;
+        },
+      },
+      {
+        cmd: { name: "terminal.kill", title: "Kill Terminal", category: "Terminal", description: "Send SIGHUP to the active terminal", keybindings: ["cmd+alt+w"], args: [] },
         when: (ctx) => activeTerm(ctx)?.state === TerminalState.RUNNING,
         run: (ctx) => {
           const t = activeTerm(ctx);
@@ -516,7 +771,7 @@ export class World {
         },
       },
       {
-        cmd: { name: "repo.refresh", title: "Refresh Git Status", category: "Repository", description: "Reconcile git status now", keybindings: ["cmd+r"], args: [] },
+        cmd: { name: "repo.refresh", title: "Refresh Git Status", category: "Repository", description: "Reconcile git status now", keybindings: ["cmd+alt+r"], args: [] },
         when: always,
         run: () => {
           for (const r of this.repos.values()) this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(r) } });
