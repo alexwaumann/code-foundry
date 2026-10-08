@@ -41,7 +41,8 @@ type actor struct {
 	opts   Options
 	drops  *atomic.Uint64
 
-	info atomic.Pointer[Terminal] // latest published metadata, read by Get/List
+	info     atomic.Pointer[Terminal] // latest published metadata, read by Get/List
+	observer Observer                 // Spec.Observer; may be nil. Called on the actor only.
 	reqs chan func()
 	done chan struct{} // closed when run returns
 
@@ -232,7 +233,15 @@ func (a *actor) feed(data []byte) {
 	a.touch()
 	a.vt.VTWrite(data)
 	a.broadcast(AttachEvent{Output: data})
+	a.observe(ObserveEvent{Output: data})
 	a.checkMetadata()
+}
+
+// observe delivers ev to the terminal's Observer, if any.
+func (a *actor) observe(ev ObserveEvent) {
+	if a.observer != nil {
+		a.observer(a.id, ev)
+	}
 }
 
 // checkMetadata detects title and alt-screen changes after a write and schedules a
@@ -243,6 +252,7 @@ func (a *actor) checkMetadata() {
 		if alt := scr == ghostty.ScreenAlternate; alt != a.cur.AltScreen {
 			a.cur.AltScreen = alt
 			changed = true
+			a.observe(ObserveEvent{AltScreen: &alt})
 		}
 	}
 	if a.titleDirty {
@@ -250,6 +260,7 @@ func (a *actor) checkMetadata() {
 		if title, err := a.vt.Title(); err == nil && title != a.cur.Title {
 			a.cur.Title = title
 			changed = true
+			a.observe(ObserveEvent{Title: &title})
 		}
 	}
 	if !changed {
@@ -331,6 +342,7 @@ func (a *actor) finish() {
 	a.cur.ExitCode = code
 	a.cur.ExitedAt = a.opts.Now()
 	a.broadcast(AttachEvent{Exited: &Exit{Code: code}})
+	a.observe(ObserveEvent{Exited: &Exit{Code: code}})
 	a.publish()
 	a.log.Info("terminal exited", "code", code)
 }
@@ -350,6 +362,11 @@ func (a *actor) attach() (chan AttachEvent, error) {
 	}
 	a.subs[ch] = struct{}{}
 	return ch, nil
+}
+
+// screenText formats the active area (no scrollback) as plain text.
+func (a *actor) screenText() (string, error) {
+	return formatActivePlain(a.vt, a.cur.Cols, a.cur.Rows)
 }
 
 func (a *actor) detach(ch chan AttachEvent) {
