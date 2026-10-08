@@ -11,6 +11,7 @@ import { SessionState, SessionStatus, type SessionEventSchema, type SessionSchem
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import { Hub } from "./hub";
+import { MockSettings } from "./settings";
 import { claudeIntro, claudeTick, ENTER_ALT, logLine, prompt, RESET, testRunOutput, topFrame } from "./screens";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
@@ -59,6 +60,8 @@ interface CmdDef {
   description: string;
   keybindings: string[];
   args: ArgDef[];
+  /** Destructive: Invoke needs confirmed=true; renders the prompt from the context. */
+  confirm?: (ctx: UiContext | undefined) => string;
 }
 export type UiIntentInit = MessageInitShape<typeof UiIntentSchema>;
 
@@ -109,7 +112,19 @@ export interface Invocation {
   name: string;
   context: Omit<UiContext, "$typeName" | "$unknown"> | null;
   args: Record<string, string>;
+  confirmed: boolean;
   at: string;
+}
+
+/** A destructive command invoked without confirmed=true (FailedPrecondition + detail). */
+export class ConfirmNeeded extends Error {
+  constructor(
+    readonly command: string,
+    readonly title: string,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 
 export class CommandError extends Error {
@@ -176,6 +191,10 @@ export class World {
   readonly repoEvents = new Hub<RepoEventInit>((v) => this.events.publish({ source: EventSource.REPO, event: { event: { case: "repo", value: v } } }));
   readonly sessionEvents = new Hub<SessionEventInit>((v) => this.events.publish({ source: EventSource.SESSION, event: { event: { case: "session", value: v } } }));
   readonly intents = new Hub<UiIntentInit>((v) => this.events.publish({ source: EventSource.UI, event: { event: { case: "ui", value: v } } }));
+  readonly settings = new MockSettings(
+    () => this.registry().map((e) => e.cmd),
+    (snap) => this.events.publish({ source: EventSource.SETTINGS, event: { event: { case: "settings", value: { event: { case: "snapshot", value: snap } } } } }),
+  );
   /** EventService watchers that include UI intents (they count toward Emit's `delivered`). */
   uiEventWatchers = 0;
   invocations: Invocation[] = [];
@@ -194,6 +213,7 @@ export class World {
     this.terms.clear();
     this.repos.clear();
     this.invocations = [];
+    this.settings.reset();
     this.writes = [];
     this.resizes = [];
     this.nextId = 1;
@@ -703,7 +723,10 @@ export class World {
         },
       },
       {
-        cmd: { name: "session.remove", title: "Remove Session", category: "Session", description: "Forget the session (closes it first if connected)", keybindings: [], args: [] },
+        cmd: {
+          name: "session.remove", title: "Remove Session", category: "Session", description: "Forget the session (closes it first if connected)", keybindings: [], args: [],
+          confirm: (ctx) => `Remove session ${ctx?.activeSessionId ?? ""}? It is closed first if connected, and its row is forgotten.`,
+        },
         when: (ctx) => activeSession(ctx) !== undefined,
         run: (ctx) => {
           const s = activeSession(ctx);
@@ -715,7 +738,10 @@ export class World {
         },
       },
       {
-        cmd: { name: "terminal.kill", title: "Kill Terminal", category: "Terminal", description: "Send SIGHUP to the active terminal", keybindings: ["cmd+alt+w"], args: [] },
+        cmd: {
+          name: "terminal.kill", title: "Kill Terminal", category: "Terminal", description: "Send SIGHUP to the active terminal", keybindings: ["cmd+alt+w"], args: [],
+          confirm: (ctx) => `Kill terminal ${ctx?.activeTerminalId ?? ""}? Its process is terminated.`,
+        },
         when: (ctx) => activeTerm(ctx)?.state === TerminalState.RUNNING,
         run: (ctx) => {
           const t = activeTerm(ctx);
@@ -757,7 +783,10 @@ export class World {
         },
       },
       {
-        cmd: { name: "repo.unregister", title: "Unregister Repository", category: "Repository", description: "Stop tracking the active repository", keybindings: [], args: [] },
+        cmd: {
+          name: "repo.unregister", title: "Unregister Repository", category: "Repository", description: "Stop tracking the active repository", keybindings: [], args: [],
+          confirm: (ctx) => `Stop tracking repository ${ctx?.activeRepoId ?? ""}? Nothing on disk is touched.`,
+        },
         when: (ctx) => Boolean(ctx?.activeRepoId && this.repos.has(ctx.activeRepoId)),
         run: (ctx) => {
           const id = ctx?.activeRepoId ?? "";
@@ -799,7 +828,11 @@ export class World {
         },
       },
       {
-        cmd: { name: "worktree.remove", title: "Remove Worktree", category: "Worktree", description: "Remove the active worktree", keybindings: [], args: [{ name: "force", type: ArgType.BOOL, required: true, description: "Discard local changes?", defaultValue: "false" }] },
+        cmd: {
+          name: "worktree.remove", title: "Remove Worktree", category: "Worktree", description: "Remove the active worktree", keybindings: [],
+          args: [{ name: "force", type: ArgType.BOOL, required: true, description: "Discard local changes?", defaultValue: "false" }],
+          confirm: (ctx) => `Remove worktree ${ctx?.activeWorktreePath ?? ""}? This deletes files on disk.`,
+        },
         when: (ctx) => {
           const w = this.worktreeOf(ctx);
           return w !== null && !w.wt.isMain;
@@ -828,23 +861,59 @@ export class World {
         when: always,
         run: () => `mock daemon pid ${String(process.pid)}, up ${String(Math.round((Date.now() - this.startedAt) / 1000))}s`,
       },
+      {
+        cmd: { name: "view.settings", title: "Open Settings", category: "View", description: "Open the settings page", keybindings: ["cmd+,"], args: [] },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "settings" } } }))}`,
+      },
+      {
+        cmd: { name: "view.help", title: "Keyboard Shortcuts and Help", category: "View", description: "Show keybindings and how the app works", keybindings: ["cmd+/"], args: [] },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "help" } } }))}`,
+      },
+      {
+        cmd: { name: "settings.reveal", title: "Reveal Settings File", category: "Settings", description: "Show the settings file in Finder", keybindings: [], args: [] },
+        when: always,
+        run: () => "revealed settings.toml",
+      },
+      {
+        cmd: { name: "settings.path", title: "Settings File Path", category: "Settings", description: "Print the settings file's path", keybindings: [], args: [] },
+        when: always,
+        run: () => this.settings.snapshot().path ?? "",
+      },
     ];
   }
 
-  listCommands(ctx: UiContext | undefined, includeUnavailable: boolean): (CmdDef & { available: boolean })[] {
-    return this.registry()
-      .map(({ cmd, when }) => ({ ...cmd, available: when(ctx) }))
+  /** The registry with settings applied: keybinding overrides and session.new defaults. */
+  private effectiveRegistry(): ReturnType<World["registry"]> {
+    const entries = this.registry();
+    const kb = this.settings.keybindings();
+    const model = this.settings.values()["sessions.default_model"] ?? "";
+    return entries.map((e) => ({
+      ...e,
+      cmd: {
+        ...e.cmd,
+        keybindings: kb[e.cmd.name] ?? e.cmd.keybindings,
+        args: e.cmd.args.map((a) => (e.cmd.name === "session.new" && a.name === "model" && model && a.enumValues?.includes(model) ? { ...a, defaultValue: model } : a)),
+      },
+    }));
+  }
+
+  listCommands(ctx: UiContext | undefined, includeUnavailable: boolean): (Omit<CmdDef, "confirm"> & { available: boolean; requiresConfirmation: boolean })[] {
+    return this.effectiveRegistry()
+      .map(({ cmd: { confirm, ...cmd }, when }) => ({ ...cmd, available: when(ctx), requiresConfirmation: confirm !== undefined }))
       .filter((c) => includeUnavailable || c.available);
   }
 
-  invoke(name: string, ctx: UiContext | undefined, args: Record<string, string>): string {
-    const entry = this.registry().find((e) => e.cmd.name === name);
+  invoke(name: string, ctx: UiContext | undefined, args: Record<string, string>, confirmed = false): string {
+    const entry = this.effectiveRegistry().find((e) => e.cmd.name === name);
     this.invocations.push({
       name,
       context: ctx
         ? { activeTerminalId: ctx.activeTerminalId, activeSessionId: ctx.activeSessionId, activeRepoId: ctx.activeRepoId, activeWorktreePath: ctx.activeWorktreePath, activeView: ctx.activeView }
         : null,
       args,
+      confirmed,
       at: new Date().toISOString(),
     });
     if (!entry) throw new CommandError("notfound", `unknown command ${name}`);
@@ -852,6 +921,7 @@ export class World {
     for (const a of entry.cmd.args) {
       if (a.required && !args[a.name]) throw new CommandError("invalid", `missing required arg ${a.name}`);
     }
+    if (entry.cmd.confirm && !confirmed) throw new ConfirmNeeded(name, entry.cmd.title, entry.cmd.confirm(ctx));
     return entry.run(ctx, args);
   }
 }

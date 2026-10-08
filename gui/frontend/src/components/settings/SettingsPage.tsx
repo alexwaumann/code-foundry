@@ -39,7 +39,8 @@ function useEscapeCloses(): void {
 
 function Banners() {
   const loadError = useSettingsStore((s) => s.snapshot?.loadError ?? "");
-  const unknown = useSettingsStore((s) => s.snapshot?.issues.filter((i) => i.message === "unknown setting").map((i) => i.key) ?? []);
+  const issues = useSettingsStore((s) => s.snapshot?.issues);
+  const unknown = useMemo(() => (issues ?? []).filter((i) => i.message === "unknown setting").map((i) => i.key), [issues]);
   const noService = useSettingsStore((s) => s.snapshot === null);
   return (
     <>

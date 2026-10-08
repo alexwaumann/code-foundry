@@ -80,6 +80,9 @@ test("invoking a command sends the current context", async ({ page }) => {
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("kill term");
   await page.keyboard.press("Enter");
+  // terminal.kill requires confirmation; the confirm button has focus.
+  await expect(page.getByTestId("confirm-dialog")).toContainText("Kill terminal t-logs?");
+  await page.keyboard.press("Enter");
   await expect(page.getByTestId("exit-overlay")).toContainText("code 129");
   const last = (await invocations()).at(-1);
   expect(last?.name).toBe("terminal.kill");

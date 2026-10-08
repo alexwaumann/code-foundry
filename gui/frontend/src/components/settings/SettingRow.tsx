@@ -128,7 +128,9 @@ function KeybindingEditor({ field, value, pending, invalid, commit, setError }: 
       aria-invalid={invalid || undefined}
       disabled={pending}
       className={cn(inputClass, "flex items-center justify-between text-left", recording && "ring-2 ring-ring/60")}
-      onClick={() => {
+      onClick={(e) => {
+        // WebKit does not focus a button on click; the recorder needs the keydowns.
+        e.currentTarget.focus();
         setError(null);
         setRecording((r) => !r);
       }}

@@ -15,20 +15,25 @@
  *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
  *   POST /__mock/sessions-service?enabled=false   (simulate a daemon without SessionService)
+ *   GET  /__mock/settings                          ({ raw, values } of the settings "file")
+ *   POST /__mock/settings/external?appearance.font_size=18   (a hand edit; "" deletes a key)
+ *   POST /__mock/settings/external?loadError=…               (the file stops parsing)
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { durationFromMs } from "@bufbuild/protobuf/wkt";
-import { CommandService } from "../src/gen/codefoundry/v1/command_pb";
+import { CommandService, ConfirmationRequiredSchema } from "../src/gen/codefoundry/v1/command_pb";
+import { SettingsService, SettingsValidationErrorsSchema } from "../src/gen/codefoundry/v1/settings_pb";
 import { EventService, EventSource } from "../src/gen/codefoundry/v1/events_pb";
 import { HealthService } from "../src/gen/codefoundry/v1/health_pb";
 import { RepoService } from "../src/gen/codefoundry/v1/repo_pb";
 import { SessionService, SessionState, SessionStatus } from "../src/gen/codefoundry/v1/session_pb";
 import { TerminalService, TerminalState, type AttachEventSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
-import { CommandError, World, type EventInit } from "./world";
+import { groups as settingsGroups, SettingsValidation } from "./settings";
+import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
 
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
 
@@ -40,6 +45,14 @@ let sessionsEnabled = true;
 
 function rpcError(err: unknown): ConnectError {
   if (err instanceof ConnectError) return err;
+  if (err instanceof ConfirmNeeded) {
+    return new ConnectError(err.message, Code.FailedPrecondition, undefined, [
+      { desc: ConfirmationRequiredSchema, value: { command: err.command, title: err.title, message: err.message } },
+    ]);
+  }
+  if (err instanceof SettingsValidation) {
+    return new ConnectError(err.message, Code.InvalidArgument, undefined, [{ desc: SettingsValidationErrorsSchema, value: { errors: err.issues } }]);
+  }
   if (err instanceof CommandError) {
     const code = { unavailable: Code.FailedPrecondition, invalid: Code.InvalidArgument, notfound: Code.NotFound }[err.kind];
     return new ConnectError(err.message, code);
@@ -123,7 +136,26 @@ function routes(router: ConnectRouter): void {
 
   router.service(CommandService, {
     list: (req) => ({ commands: world.listCommands(req.context, req.includeUnavailable) }),
-    invoke: (req) => guard(() => ({ message: world.invoke(req.name, req.context, req.args), resultJson: "" })),
+    invoke: (req) => guard(() => ({ message: world.invoke(req.name, req.context, req.args, req.confirmed), resultJson: "" })),
+  });
+
+  router.service(SettingsService, {
+    getSchema: () => ({ groups: settingsGroups, fields: world.settings.fields() }),
+    get: () => ({ settings: world.settings.snapshot() }),
+    update: (req) => {
+      try {
+        return { settings: world.settings.update(req.values) };
+      } catch (err) {
+        if (err instanceof SettingsValidation) throw rpcError(err);
+        throw new ConnectError((err as Error).message, Code.FailedPrecondition);
+      }
+    },
+    watch: async function* (_req, ctx) {
+      yield { event: { case: "snapshot" as const, value: world.settings.snapshot() } };
+      for await (const { source, event } of world.events.subscribe(ctx.signal)) {
+        if (source === EventSource.SETTINGS && event.event?.case === "settings") yield event.event.value;
+      }
+    },
   });
 
   router.service(UiService, {
@@ -159,12 +191,15 @@ function routes(router: ConnectRouter): void {
     // Snapshots first in the order events.proto promises (repo, terminal, session, gh),
     // then everything published, filtered by `sources`.
     watch: (req, ctx) => {
-      const want = new Set(req.sources.length > 0 ? req.sources : [EventSource.REPO, EventSource.TERMINAL, EventSource.SESSION, EventSource.GH, EventSource.UI]);
+      const want = new Set(
+        req.sources.length > 0 ? req.sources : [EventSource.REPO, EventSource.TERMINAL, EventSource.SESSION, EventSource.GH, EventSource.SETTINGS, EventSource.UI],
+      );
       if (!sessionsEnabled) want.delete(EventSource.SESSION);
       const initial: { source: EventSource; event: EventInit }[] = [
         { source: EventSource.REPO, event: { event: { case: "repo", value: { event: { case: "snapshot", value: { repos: [...world.repos.values()].map((r) => world.repoMsg(r)) } } } } } },
         ...[...world.terms.values()].map((t) => ({ source: EventSource.TERMINAL, event: { event: { case: "terminal" as const, value: { event: { case: "updated" as const, value: world.terminalMsg(t) } } } } })),
         { source: EventSource.SESSION, event: { event: { case: "session", value: world.sessionSnapshot() } } },
+        { source: EventSource.SETTINGS, event: { event: { case: "settings", value: { event: { case: "snapshot", value: world.settings.snapshot() } } } } },
       ];
       const ui = want.has(EventSource.UI);
       return tracked("EventService/Watch", filterEvents(world.events.subscribe(ctx.signal, initial), want), () => {
@@ -271,6 +306,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "GET /__mock/invocations":
       json(res, 200, world.invocations);
       break;
+    case "GET /__mock/settings":
+      json(res, 200, { raw: world.settings.raw, values: world.settings.values(), loadError: world.settings.loadError });
+      break;
+    case "POST /__mock/settings/external": {
+      const values = Object.fromEntries([...q.entries()].filter(([k]) => k !== "loadError"));
+      world.settings.external(values, q.get("loadError"));
+      json(res, 200, { raw: world.settings.raw });
+      break;
+    }
     case "GET /__mock/writes":
       json(res, 200, world.writes);
       break;
