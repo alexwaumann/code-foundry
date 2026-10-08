@@ -130,12 +130,3 @@ func (r ExecRunner) Run(ctx context.Context, dir string, args ...string) ([]byte
 	}
 	return stdout.Bytes(), ge
 }
-
-// exitCode returns the git exit code of err, or -1.
-func exitCode(err error) int {
-	var ge *GitError
-	if errors.As(err, &ge) {
-		return ge.ExitCode
-	}
-	return -1
-}
