@@ -28,12 +28,16 @@ GHOSTTY_VT_PC     := $(GHOSTTY_VT_PREFIX)/share/pkgconfig/libghostty-vt-static.p
 export PKG_CONFIG_PATH := $(GHOSTTY_VT_PREFIX)/share/pkgconfig$(if $(PKG_CONFIG_PATH),:$(PKG_CONFIG_PATH))
 
 VERSION  ?= dev
-LDFLAGS  := -X github.com/awaumann/code-foundry/internal/version.Version=$(VERSION)
+# GitHub repository the in-app updater and install.sh download releases from.
+RELEASE_REPO ?= alexwaumann/code-foundry
+# One set of version ldflags for both binaries (the CLI here, the GUI via scripts/package.sh).
+LDFLAGS  := -X github.com/awaumann/code-foundry/internal/version.Version=$(VERSION) \
+            -X github.com/awaumann/code-foundry/internal/version.ReleaseRepo=$(RELEASE_REPO)
 FRONTEND := gui/frontend
 PNPM     := pnpm --dir $(FRONTEND)
 
 .PHONY: all gen build check go-check frontend-check frontend-deps gui-dist-stub \
-        dev gui-build gui-dev gui-e2e gui-mock ghostty-vt clean
+        dev gui-build gui-dev gui-e2e gui-mock ghostty-vt package release clean
 
 all: build
 
@@ -93,10 +97,20 @@ gui-mock: frontend-deps
 gui-dev: build
 	cd gui && $(WAILS3) dev
 
+## package: release assets in dist/ (VERSION=vX.Y.Z required): the app zip with the CLI
+## inside, the standalone CLI, install.sh, checksums.txt. See scripts/package.sh.
+package: ghostty-vt frontend-deps
+	VERSION=$(VERSION) RELEASE_REPO=$(RELEASE_REPO) WAILS3=$(WAILS3) MAKE=$(MAKE) ./scripts/package.sh
+
+## release: manual fallback for .github/workflows/release.yml. Next version from
+## conventional commits unless VERSION=vX.Y.Z is given; DRY_RUN=1 prints the commands.
+release:
+	./scripts/release.sh $(if $(DRY_RUN),--dry-run) $(filter-out dev,$(VERSION))
+
 ## ghostty-vt: build libghostty-vt from the pinned ghostty commit with zig 0.16.0 (both
 ## downloaded into third_party/, gitignored). No-op once the pkg-config file exists.
 ghostty-vt:
 	@./scripts/ghostty-vt.sh
 
 clean:
-	rm -rf bin gui/bin $(FRONTEND)/dist
+	rm -rf bin gui/bin dist $(FRONTEND)/dist

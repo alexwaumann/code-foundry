@@ -3,6 +3,7 @@
 /gui/bin/
 /gui/.task/
 /gui/frontend/dist/
+/dist/
 
 # Dependencies
 node_modules/

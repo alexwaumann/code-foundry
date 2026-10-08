@@ -24,12 +24,17 @@ func main() {
 		log.Error("resolve config home", "err", err)
 		os.Exit(1)
 	}
+	// Before anything spawns the daemon: give it the user's PATH (Finder launches get
+	// launchd's minimal one) and point it and its sessions at the bundled CLI.
+	adoptLoginShellPath(log)
+	exportDaemonBinary(log)
 
 	app := application.New(application.Options{
 		Name:        "Code Foundry",
 		Description: "Supervise fleets of Claude Code sessions",
 		Services: []application.Service{
 			application.NewService(NewDaemonService(p, log)),
+			application.NewService(NewAppService(log)),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -38,6 +43,8 @@ func main() {
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
+
+	app.Menu.Set(appMenu(app))
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "Code Foundry",

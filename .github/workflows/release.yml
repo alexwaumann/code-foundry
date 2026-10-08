@@ -1,0 +1,87 @@
+name: release
+
+# Builds and publishes a GitHub release: version from conventional commits since the last
+# v* tag (scripts/next-version.sh), assets from `make package`, tag + `gh release create`
+# by scripts/release.sh (idempotent, so a failed run can simply be re-run).
+#
+# Automatic releases are OFF. Two switches turn them on (docs/notes/phase3d-packaging.md,
+# "Enabling automatic releases"): uncomment the push trigger below, and set the
+# repository variable RELEASE_ENABLED to "true". The variable also gates manual runs.
+on:
+  # push:
+  #   branches: [main] # enable when ready for the first automatic release
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (vX.Y.Z). Empty: next version from conventional commits."
+        required: false
+        default: ""
+
+permissions:
+  contents: write # tag push and gh release create with GITHUB_TOKEN
+
+# Two merges in quick succession must not compute the same version; queue, never cancel
+# a release half-way.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: vars.RELEASE_ENABLED == 'true'
+    # Apple silicon: the assets are darwin-arm64.
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history and tags: next-version.sh reads commits since the last tag.
+          fetch-depth: 0
+          fetch-tags: true
+
+      # Same setup as ci.yml.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.8.1
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: gui/frontend/pnpm-lock.yaml
+
+      - name: libghostty-vt cache key
+        id: ghostty-vt
+        run: echo "key=$(./scripts/ghostty-vt.sh --print-key)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v6
+        with:
+          path: third_party/ghostty-vt
+          key: ${{ runner.os }}-${{ steps.ghostty-vt.outputs.key }}
+
+      - run: make ghostty-vt
+
+      # wails3 builds the GUI bundle. Built with the module's toolchain (go1.26), which
+      # setup-go put on PATH via the go.mod toolchain directive.
+      - name: Install wails3
+        run: |
+          GOTOOLCHAIN="$(go mod edit -json | jq -r '.Toolchain // ("go" + .Go)')" \
+            go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.28
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          CODE_FOUNDRY_RELEASE_REPO: ${{ github.repository }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Empty VERSION: next-version.sh decides, and exits without releasing when
+          # nothing changed since the last tag.
+          scripts/release.sh ${VERSION:+"$VERSION"}
