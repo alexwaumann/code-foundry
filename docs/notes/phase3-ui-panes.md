@@ -8,13 +8,15 @@ isolated `CODE_FOUNDRY_HOME`, in dark and light.
 ## What changed
 
 * `gui/main.go`: `Mac: MacWindow{TitleBar: MacTitleBarHiddenInset, InvisibleTitleBarHeight: 52}`
-  and `BackgroundColour` = the dark sheet, `NewRGB(7, 7, 7)`. `Title` stays set, and
+  and `BackgroundColour` = the dark sheet, `NewRGB(0, 0, 0)` (was `NewRGB(7, 7, 7)`, see
+  `phase3-ui-buttons.md`). `Title` stays set, and
   `lib/title.ts` keeps setting it, so Mission Control and the app switcher still show it.
 * `components/window/TitleStrip.tsx`: a full-width, 52px strip on the sheet with an 80px
   traffic-light gutter. It holds nothing interactive.
 * `App.tsx`: the root is the sheet (`bg-sheet`). `<main>` is the one pane
   (`data-testid="content-pane"`): `mx-2 rounded-lg border border-pane-border bg-pane shadow-xs`.
-* The sidebar loses `border-r`, the footer loses `border-t` and `bg-sidebar`. Both sit on the sheet.
+* The sidebar loses `border-r` and sits on the sheet. (The footer was later removed; its
+  daemon status moved to the foot of the sidebar, see `phase3-ui-buttons.md`.)
 * Pane headers (terminal, settings and its nav, Pull Requests, worktree overview) use
   `border-pane-border`.
 
@@ -24,9 +26,9 @@ New tokens, mapped in `@theme inline` as `bg-sheet`, `bg-pane`, `border-pane-bor
 
 | Token | Dark (`.dark`) | Light (`:root`) |
 |---|---|---|
-| `--sheet` | `oklch(0.13 0 0)` (#070707) | `oklch(0.955 0 0)` (#f0f0f0) |
-| `--pane` | `#101010` (darker than the old `--card`; a first pass used `#171717` and read too light) | `#ffffff` |
-| `--pane-border` | `oklch(1 0 0 / 8%)` | `oklch(0 0 0 / 8%)` |
+| `--sheet` | `#000000` (was `oklch(0.13 0 0)`, #070707) | `oklch(0.955 0 0)` (#f0f0f0) |
+| `--pane` | `#0a0a0a` (first `#171717`, then `#101010`; both read too light) | `#ffffff` |
+| `--pane-border` | `oklch(1 0 0 / 11%)` (was 8%; the pane is only 10/255 above the sheet) | `oklch(0 0 0 / 8%)` |
 
 Aliases: `--background`, `--sidebar` and `--sidebar-border` are `var(--sheet)`. `--card`,
 `--popover` and `--terminal-bg` are `var(--pane)`. The sidebar therefore matches the app
@@ -37,7 +39,7 @@ Accent changes so selection stays visible on the sheet: light `--sidebar-accent`
 the same step above the darker sheet.
 
 `--pane` is a hex value, not oklch, because the xterm theme needs a colour xterm can parse.
-`src/terminal/theme.ts` dark `background`/`cursorAccent` went `#0b0b0c` → `#101010`, and
+`src/terminal/theme.ts` dark `background`/`cursorAccent` went `#0b0b0c` → `#101010` → `#0a0a0a`, and
 light stays `#ffffff`. Comments in both files tie them together. `e2e/layout.spec.ts`
 asserts the xterm theme background equals the pane's computed colour in both schemes.
 
