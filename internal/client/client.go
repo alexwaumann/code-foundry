@@ -27,7 +27,9 @@ const unixBaseURL = "http://code-foundry.sock"
 
 // Client is a connection to the daemon. It is cheap to create and safe for concurrent use.
 type Client struct {
-	Health codefoundryv1connect.HealthServiceClient
+	Health  codefoundryv1connect.HealthServiceClient
+	Command codefoundryv1connect.CommandServiceClient
+	UI      codefoundryv1connect.UiServiceClient
 
 	paths paths.Paths
 }
@@ -48,8 +50,10 @@ func NewLoopback(baseURL, token string) *Client {
 
 func newClient(p paths.Paths, hc *http.Client, baseURL string) *Client {
 	return &Client{
-		Health: codefoundryv1connect.NewHealthServiceClient(hc, baseURL),
-		paths:  p,
+		Health:  codefoundryv1connect.NewHealthServiceClient(hc, baseURL),
+		Command: codefoundryv1connect.NewCommandServiceClient(hc, baseURL),
+		UI:      codefoundryv1connect.NewUiServiceClient(hc, baseURL),
+		paths:   p,
 	}
 }
 
