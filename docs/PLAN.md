@@ -4,6 +4,42 @@ Phases are ordered by dependency. Steps inside a phase run in parallel, each on 
 branch off `main`, each landing through a PR. A step is done when it builds, its tests
 pass, `make check` is green, and its doc note is written.
 
+## Status (2026-10-08)
+
+Phases 0–3 are done and merged on `main`. Each step's note is in `docs/notes/`.
+
+* **Phase 0** done: daemon with socket + token listeners, bus, client auto-start, CLI, Wails/React shell, CI (`phase0.md`).
+* **Phase 1** done: terminal (libghostty-vt actors), repo, GitHub, command registry and GUI shell (`phase1a`–`phase1e`).
+* **Phase 2** done: sessions, status detection, session GUI, one EventService stream; memory gate in `docs/perf.md` (`phase2a`–`phase2c`, `phase2-integration.md`).
+* **Phase 3** done: Pull Requests page and worktree overview, settings/help/confirm, git operations, packaging and updater (`phase3a`–`phase3d`, `phase3-integration.md`).
+
+### Open items
+
+Collected from the step notes; none blocks daily use.
+
+* **Sessions**
+  * The GUI does not show `Session.status_reason` (the CLI does). A badge tooltip or the session header could.
+  * "Viewed" means "has an Attach subscriber": a minimized or occluded window keeps acknowledging finished turns. Detaching on `visibilitychange` would fix it.
+  * Status detection is untested against real output for subagent permission prompts, auto-compaction, usage-limit menus, login "Press Enter" screens and MCP auth prompts (`phase2b-status.md`, Known blind spots).
+  * Memory gate measured the daemon only; the GUI (WKWebView) was not measured.
+* **Git operations**
+  * `git.push --force-with-lease` runs without a confirm prompt. `Command.Confirm` applies to every invocation, so confirming only the forced form needs an arg-conditional confirm.
+  * Opening a link from the Pull Requests page or overview runs 3c's `view.open.url`, which shows a short "Open <url>" success toast each time.
+  * `CODE_FOUNDRY_EDITOR` remains as a fallback when `gitops.editor_command` is empty.
+* **GitHub / Pull Requests page**
+  * Populated PR lists have only been seen live through the `CODE_FOUNDRY_GH_SEARCH_AS` dev knob. The owner's account has no PRs, so with the real login the GUI has only ever shown empty lists.
+  * Dashboards are fetched unfiltered (50/30/50) and filtered to tracked repos at read time. A viewer with many PRs outside registered repos can crowd out registered ones.
+  * Branch PRs on the overview show only the viewer's own, non-fork PRs.
+  * `github.dashboards_enabled` applies after a daemon restart, and the page does not say the dashboards are off. It shows the last cached data.
+* **Settings**
+  * Saving from the app rewrites `settings.toml`, which drops user comments and unknown keys.
+* **Packaging and updates**
+  * The release workflow is disabled. No real release has been published, so `gh release download`, the `install.sh` one-liner and the workflow are untested end to end.
+  * Homebrew tap deferred (needs a separate repo).
+  * A real Finder double-click launch is unverified (`env -i … open` stood in for it). macOS arm64 only.
+* **Integration pass**
+  * The custom View menu (no Reload / Zoom items, `gui/app.go`) has not been checked in a running Wails window. Screen capture is unavailable on this machine.
+
 ## Phase 0 — Foundation (serial, one agent)
 
 Lands the skeleton every other step depends on.
