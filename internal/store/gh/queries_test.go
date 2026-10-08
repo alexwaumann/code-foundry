@@ -10,9 +10,15 @@ func TestQueriesAssemble(t *testing.T) {
 	defRE := regexp.MustCompile(`(?m)^fragment (\w+) on`)
 	wantFrags := map[string][]string{
 		queryViewer:       {"RateLimitFields"},
-		queryPullRequests: {"PullRequestFields", "RateLimitFields", "RollupCounts"},
+		queryPullRequests: {"CheckContexts", "DefaultBranchFields", "PullRequestFields", "RateLimitFields", "RollupCounts"},
 		queryPullRequest:  {"CheckContexts", "PullRequestFields", "RateLimitFields", "RollupCounts"},
 		queryChecks:       {"CheckContexts", "RateLimitFields", "RollupCounts"},
+		// Phase 3a.
+		querySearchPullRequests: {"PullRequestReview", "PullRequestSummary", "RateLimitFields", "RollupCounts"},
+		queryViewerStats:        {"RateLimitFields"},
+		queryRepoStats:          {"RateLimitFields"},
+		queryBranchPullRequests: {"PullRequestReview", "PullRequestSummary", "RateLimitFields", "RollupCounts"},
+		queryUserID:             {"RateLimitFields"},
 	}
 	for name, want := range wantFrags {
 		q, err := query(name)

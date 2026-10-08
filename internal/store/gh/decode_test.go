@@ -37,7 +37,7 @@ func TestDecodeViewer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Viewer{Login: "octocat", Name: "The Octocat",
+	want := Viewer{ID: "MDQ6VXNlcjU4MzIzMQ==", Login: "octocat", Name: "The Octocat",
 		AvatarURL: "https://avatars.githubusercontent.com/u/583231?v=4", URL: "https://github.com/octocat"}
 	if v != want {
 		t.Errorf("viewer = %+v, want %+v", v, want)

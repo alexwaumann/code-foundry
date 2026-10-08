@@ -20,6 +20,7 @@ type Store struct {
 	mu      sync.Mutex
 	details map[string]gh.PullRequestDetail
 	checks  map[string]gh.RefChecks
+	branch  map[string]gh.BranchPullRequests
 	err     error
 	calls   []string
 }
@@ -28,7 +29,7 @@ var _ gh.Service = (*Store)(nil)
 
 // New returns an empty fake that publishes to b (which may be nil).
 func New(b *bus.Bus) *Store {
-	s := &Store{bus: b, details: map[string]gh.PullRequestDetail{}, checks: map[string]gh.RefChecks{}}
+	s := &Store{bus: b, details: map[string]gh.PullRequestDetail{}, checks: map[string]gh.RefChecks{}, branch: map[string]gh.BranchPullRequests{}}
 	s.snap.Store(&gh.Snapshot{Viewer: gh.ViewerState{Authenticated: true}, Repos: map[string]gh.RepoState{}})
 	return s
 }
@@ -88,7 +89,7 @@ func (s *Store) update(fn func(*gh.Snapshot)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	old := s.snap.Load()
-	n := &gh.Snapshot{Viewer: old.Viewer, Repos: make(map[string]gh.RepoState, len(old.Repos)+1)}
+	n := &gh.Snapshot{Viewer: old.Viewer, Dashboard: old.Dashboard, Repos: make(map[string]gh.RepoState, len(old.Repos)+1)}
 	for k, v := range old.Repos {
 		n.Repos[k] = v
 	}

@@ -1,0 +1,22 @@
+# The viewer's monthly stats across GitHub: merged pull requests they authored (search
+# counts) and commit contributions. Commit counts prefer REST search/commits (GraphQL
+# search has no commit type); contributionsCollection is the fallback when that REST
+# call fails (it counts the same default-branch commits, but by UTC day, so it can be
+# off by a few at month edges). Polled every 15 minutes.
+query ViewerStats(
+  $login: String!
+  $mergedThis: String!
+  $mergedLast: String!
+  $thisStart: DateTime!
+  $thisEnd: DateTime!
+  $lastStart: DateTime!
+  $lastEnd: DateTime!
+) {
+  rateLimit { ...RateLimitFields }
+  mergedThis: search(query: $mergedThis, type: ISSUE, first: 0) { issueCount }
+  mergedLast: search(query: $mergedLast, type: ISSUE, first: 0) { issueCount }
+  user(login: $login) {
+    thisMonth: contributionsCollection(from: $thisStart, to: $thisEnd) { totalCommitContributions }
+    lastMonth: contributionsCollection(from: $lastStart, to: $lastEnd) { totalCommitContributions }
+  }
+}

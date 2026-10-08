@@ -36,6 +36,18 @@ type Options struct {
 	PageSize         int
 	MaxPages         int
 
+	// Phase 3a activity polling (activity.go). Zero takes the default; negative
+	// disables that poll.
+	DashboardInterval time.Duration
+	StatsInterval     time.Duration
+	// BranchWatch is how long a branch stays polled after BranchPullRequests asked
+	// for it.
+	BranchWatch time.Duration
+	// SearchAs replaces @me in the viewer searches and stats with this login (and the
+	// branch filter with it). A development aid for capturing populated dashboards
+	// from an account that has no pull requests; empty in normal use.
+	SearchAs string
+
 	// Now and Rand are injectable for tests.
 	Now  func() time.Time
 	Rand func() float64
@@ -58,6 +70,13 @@ func (o *Options) setDefaults() {
 	o.MinRemaining = cmp.Or(o.MinRemaining, DefaultMinRemaining)
 	o.PageSize = cmp.Or(o.PageSize, DefaultPageSize)
 	o.MaxPages = cmp.Or(o.MaxPages, DefaultMaxPages)
+	def(&o.BranchWatch, DefaultBranchWatch)
+	if o.DashboardInterval == 0 {
+		o.DashboardInterval = DefaultDashboardInterval
+	}
+	if o.StatsInterval == 0 {
+		o.StatsInterval = DefaultStatsInterval
+	}
 	if o.Runner == nil {
 		o.Runner = ExecRunner{}
 	}
@@ -98,6 +117,8 @@ type Store struct {
 	lastEnd   time.Time      // when the previous request finished
 	pageSizes map[string]int // per-repo PR page size after 502/504 shrinking
 
+	act activity // Phase 3a scheduling and branch state (activity.go)
+
 	wake chan struct{}
 }
 
@@ -116,6 +137,8 @@ const (
 	jobPullRequests
 	jobPullRequest
 	jobChecks
+	// jobActivity runs j.run (activity.go); j.ref names it for coalescing.
+	jobActivity
 )
 
 type job struct {
@@ -123,6 +146,7 @@ type job struct {
 	slug    string
 	number  int
 	ref     string
+	run     func(context.Context) error
 	waiters []chan jobResult
 }
 
@@ -158,9 +182,10 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.loadActivity(ctx, snap)
 	s.snap.Store(snap)
 	s.viewerNext = now
-	if snap.Viewer.Viewer != nil {
+	if snap.Viewer.Viewer != nil && snap.Viewer.Viewer.ID != "" {
 		s.viewerNext = laterOf(now, snap.Viewer.FetchedAt.Add(opts.ViewerInterval))
 	}
 	s.log.Info("gh store loaded cache", "repos", len(snap.Repos), "viewer", snap.Viewer.Viewer != nil)
@@ -388,6 +413,9 @@ func (s *Store) next() (*job, time.Duration) {
 				j, at = &job{kind: jobPullRequests, slug: slug}, sc.next
 			}
 		}
+		if aj, aat := s.nextActivityLocked(now); aj != nil && aat.Before(at) {
+			j, at = aj, aat
+		}
 		at = laterOf(at, s.pauseUntil)
 	}
 	at = laterOf(at, earliest)
@@ -423,6 +451,8 @@ func (s *Store) execute(ctx context.Context, j *job) {
 		res.detail, res.err = s.fetchPullRequest(ctx, j.slug, j.number)
 	case jobChecks:
 		res.checks, res.err = s.fetchChecks(ctx, j.slug, j.ref)
+	case jobActivity:
+		res.err = j.run(ctx)
 	}
 	j.reply(res)
 }

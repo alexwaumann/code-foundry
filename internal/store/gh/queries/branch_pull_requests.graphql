@@ -1,0 +1,19 @@
+# Pull requests (any state) whose head is a branch of this repository, most recently
+# updated first. The store keeps the viewer's, from this repository (not forks). Polled
+# with the PR list for branches a client asked about in the last 10 minutes.
+query BranchPullRequests($owner: String!, $name: String!, $head: String!, $first: Int!) {
+  rateLimit { ...RateLimitFields }
+  repository(owner: $owner, name: $name) {
+    pullRequests(
+      headRefName: $head
+      first: $first
+      states: [OPEN, MERGED, CLOSED]
+      orderBy: { field: UPDATED_AT, direction: DESC }
+    ) {
+      nodes {
+        ...PullRequestSummary
+        ...PullRequestReview
+      }
+    }
+  }
+}

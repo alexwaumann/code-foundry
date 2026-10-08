@@ -38,8 +38,8 @@ func TestMigrateIdempotent(t *testing.T) {
 	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name LIKE 'gh_%'`).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	if n != 4 {
-		t.Errorf("gh tables = %d, want 4", n)
+	if n != 5 {
+		t.Errorf("gh tables = %d, want 5", n)
 	}
 }
 

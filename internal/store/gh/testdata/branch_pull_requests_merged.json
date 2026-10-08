@@ -1,0 +1,133 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4874,
+      "resetAt": "2026-10-08T09:24:26Z"
+    },
+    "repository": {
+      "pullRequests": {
+        "nodes": [
+          {
+            "number": 14560,
+            "title": "libghostty-vt: program status protocol (OSC 7501)",
+            "url": "https://github.com/ghostty-org/ghostty/pull/14560",
+            "state": "MERGED",
+            "isDraft": false,
+            "createdAt": "2026-10-06T15:53:34Z",
+            "updatedAt": "2026-10-06T21:59:46Z",
+            "mergedAt": "2026-10-06T21:59:44Z",
+            "author": {
+              "login": "mitchellh"
+            },
+            "repository": {
+              "nameWithOwner": "ghostty-org/ghostty"
+            },
+            "headRefName": "osc7501",
+            "headRefOid": "bae2c3cdbf73f2ac33a67e4b0b7811165f0f62d4",
+            "baseRefName": "main",
+            "isCrossRepository": false,
+            "reviewDecision": "REVIEW_REQUIRED",
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "bae2c3cdbf73f2ac33a67e4b0b7811165f0f62d4",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "checkRunCount": 207,
+                        "checkRunCountsByState": [
+                          {
+                            "state": "ACTION_REQUIRED",
+                            "count": 0
+                          },
+                          {
+                            "state": "CANCELLED",
+                            "count": 1
+                          },
+                          {
+                            "state": "COMPLETED",
+                            "count": 0
+                          },
+                          {
+                            "state": "FAILURE",
+                            "count": 1
+                          },
+                          {
+                            "state": "IN_PROGRESS",
+                            "count": 0
+                          },
+                          {
+                            "state": "NEUTRAL",
+                            "count": 0
+                          },
+                          {
+                            "state": "PENDING",
+                            "count": 0
+                          },
+                          {
+                            "state": "QUEUED",
+                            "count": 0
+                          },
+                          {
+                            "state": "SKIPPED",
+                            "count": 12
+                          },
+                          {
+                            "state": "STALE",
+                            "count": 0
+                          },
+                          {
+                            "state": "STARTUP_FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "SUCCESS",
+                            "count": 193
+                          },
+                          {
+                            "state": "TIMED_OUT",
+                            "count": 0
+                          },
+                          {
+                            "state": "WAITING",
+                            "count": 0
+                          }
+                        ],
+                        "statusContextCount": 0,
+                        "statusContextCountsByState": [
+                          {
+                            "state": "EXPECTED",
+                            "count": 0
+                          },
+                          {
+                            "state": "ERROR",
+                            "count": 0
+                          },
+                          {
+                            "state": "FAILURE",
+                            "count": 0
+                          },
+                          {
+                            "state": "PENDING",
+                            "count": 0
+                          },
+                          {
+                            "state": "SUCCESS",
+                            "count": 0
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -96,14 +96,20 @@ func (s *Store) pollPullRequests(ctx context.Context, slug string) error {
 		all   []PullRequest
 		total int
 		after string
+		ci    *defaultBranchJSON
 	)
 	size := cmp.Or(s.pageSizes[slug], s.opts.PageSize)
 	for range s.opts.MaxPages {
 		vars := map[string]any{"owner": owner, "name": name, "first": size}
 		if after != "" {
 			vars["after"] = after
+		} else {
+			vars["withDefaultBranch"] = true // default-branch CI rides on page one
 		}
 		data, err := s.call(ctx, queryPullRequests, vars)
+		if err == nil && after == "" {
+			ci = decodeDefaultBranchField(data)
+		}
 		var page prPage
 		if err == nil {
 			page, _, err = decodePullRequestsPage(data)
@@ -134,6 +140,9 @@ func (s *Store) pollPullRequests(ctx context.Context, slug string) error {
 		return dup
 	})
 	s.repoSucceeded(ctx, slug, all, total)
+	if ci != nil {
+		s.defaultBranchFetched(ctx, slug, ci)
+	}
 	return nil
 }
 
