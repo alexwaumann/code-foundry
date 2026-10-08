@@ -11,6 +11,7 @@ import { Sidebar } from "@/components/sidebar/Sidebar";
 import { TerminalPane } from "@/components/terminal/TerminalPane";
 import { Toaster } from "@/components/ui/sonner";
 import { UpdateDialog } from "@/components/update/UpdateDialog";
+import { TitleStrip } from "@/components/window/TitleStrip";
 import { installKeybindings } from "@/keys/bindings";
 import { syncDocumentScheme, useColorScheme } from "@/lib/theme";
 import { useWindowTitle } from "@/lib/title";
@@ -75,6 +76,7 @@ export function App() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+      <TitleStrip />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <main className="flex min-w-0 flex-1 flex-col">{settingsOpen ? <SettingsPage /> : <Content />}</main>

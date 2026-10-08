@@ -18,6 +18,11 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+// titleStripHeight is the height in points of the frontend's top strip; keep in sync with
+// TITLE_STRIP_HEIGHT in frontend/src/components/window/TitleStrip.tsx. Hidden-inset centres
+// the traffic lights on y=26, so 52 leaves them centred in the strip.
+const titleStripHeight = 52
+
 func main() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	p, err := paths.Resolve()
@@ -49,12 +54,20 @@ func main() {
 
 	app.Menu.Set(appMenu(app))
 
+	// Hidden-inset title bar: the traffic lights float over the web content, whose top
+	// strip (TitleStrip.tsx, TITLE_STRIP_HEIGHT) is the title bar. InvisibleTitleBarHeight
+	// makes that band drag the window natively. The title stays set for Mission Control
+	// and the app switcher even though the bar no longer shows it.
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "Code Foundry",
 		Width:            1200,
 		Height:           780,
 		BackgroundColour: application.NewRGB(10, 10, 10),
 		URL:              "/",
+		Mac: application.MacWindow{
+			TitleBar:                application.MacTitleBarHiddenInset,
+			InvisibleTitleBarHeight: titleStripHeight,
+		},
 	})
 
 	// `app.relaunch` (e.g. after an update is installed) reaches the host directly.
