@@ -71,7 +71,7 @@ export function CommandButton({
         startCommandNamed(command);
       }}
     >
-      <Icon aria-hidden />
+      <Icon aria-hidden className={label ? undefined : "size-3.5"} />
       {label}
     </Button>
   );
