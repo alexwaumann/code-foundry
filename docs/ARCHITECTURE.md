@@ -32,13 +32,19 @@ Three processes, one protocol.
 * **GUI** is a Wails v3 shell hosting a React frontend. The frontend talks to the daemon
   *directly* with Connect-Web over a loopback HTTP listener. The Go host process in Wails is
   deliberately thin: window, menu, native dialogs, and injecting the daemon's address and
-  token into the page. No business logic lives in the Wails host.
+  token into the page. As the process LaunchServices starts, it also adopts the user's
+  login-shell PATH on Finder launches, auto-starts the daemon from the CLI bundled next
+  to it, and relaunches itself when the daemon asks (`app.relaunch`). No business logic
+  lives in the Wails host.
 * **CLI** subcommands (`code-foundry new-session --repo foo`, `code-foundry focus <id>`, …)
   are clients of the same daemon API. A Claude Code session running inside the app can call
   the CLI, so sessions can orchestrate other sessions.
 
-One binary. `code-foundry` with no args launches the GUI. `code-foundry daemon` runs the
-daemon in the foreground. Every client auto-starts the daemon if the socket is absent.
+Two binaries from one version stamp, shipped together in `CodeFoundry.app`:
+`Contents/MacOS/CodeFoundry` (the Wails GUI) and `Contents/MacOS/code-foundry` (daemon +
+CLI; `~/.local/bin/code-foundry` links to it). `code-foundry gui` opens the app.
+`code-foundry daemon` runs the daemon in the foreground. Every client auto-starts the
+daemon if the socket is absent. Packaging and updates: `docs/notes/phase3d-packaging.md`.
 
 ## 2. The one rule
 
@@ -67,12 +73,16 @@ internal/
     session/               Claude sessions layered on terminal: spawn, naming, status, resume
     repo/                  registered repos, worktrees, git status, filesystem watcher
     gh/                    gh GraphQL polling, PR/CI cache
+    update/                release checks via gh, installs with the embedded installer
   db/                      SQLite (modernc.org/sqlite, WAL) + migrations
   client/                  Go client for the daemon API, used by CLI and the Wails host
   paths/                   XDG-ish paths: config dir, socket, token, db, logs
 gui/
   main.go                  Wails v3 host (thin)
   frontend/                Vite + React 19 + TypeScript + Tailwind v4 + shadcn + Zustand
+  build/                   Wails build assets; darwin Taskfile assembles CodeFoundry.app
+scripts/                   install.sh (embedded in the binary), package.sh, release.sh,
+                           next-version.sh, ghostty-vt.sh
 docs/                      this file, PLAN.md, ADRs under docs/adr/
 ```
 
@@ -106,10 +116,13 @@ Services (v1):
 * `UiService` — WatchIntents (server stream: focus session, open palette, …); Emit (from
   CLI).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
-  intents (sources repo, terminal, session, gh, ui; filterable). On connect it sends each
+  intents (sources repo, terminal, session, gh, update, ui; filterable). On connect it sends each
   source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream; the per-service Watch RPCs remain for the CLI and tests.
+* `UpdateService` — Get, Check, Install, Relaunch, Watch. The 24h release check, install
+  progress, and relaunch requests. Nothing restarts automatically; `daemon.restart`
+  closes sessions and exits, and the next client starts the installed binary.
 * `HealthService` — Ping, Version.
 
 Rules:
