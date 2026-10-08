@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -16,15 +15,15 @@ import (
 	"github.com/awaumann/code-foundry/internal/version"
 )
 
-func runStatus(ctx context.Context, args []string) error {
-	if err := parseFlags(newFlagSet("status"), args); err != nil {
-		return err
+func runStatus(ctx context.Context, cl *cli, args []string) error {
+	if err := cl.parseFlags(cl.newFlagSet("status"), args); err != nil {
+		return quietHelp(err)
 	}
 	p, err := paths.Resolve()
 	if err != nil {
 		return err
 	}
-	c, err := client.Connect(ctx, p, client.ConnectOptions{})
+	c, err := cl.connect(ctx)
 	if err != nil {
 		return err
 	}
@@ -41,7 +40,7 @@ func runStatus(ctx context.Context, args []string) error {
 		loopback = ep.BaseURL
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	w := tabwriter.NewWriter(cl.stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintf(w, "pid\t%d\n", ping.GetPid())
 	fmt.Fprintf(w, "version\t%s\n", formatVersion(ver.Msg.GetVersion(), ver.Msg.GetCommit()))
 	fmt.Fprintf(w, "uptime\t%s\n", ping.GetUptime().AsDuration().Round(time.Second))
@@ -51,12 +50,12 @@ func runStatus(ctx context.Context, args []string) error {
 	return w.Flush()
 }
 
-func runVersion(_ context.Context, args []string) error {
-	if err := parseFlags(newFlagSet("version"), args); err != nil {
-		return err
+func runVersion(_ context.Context, cl *cli, args []string) error {
+	if err := cl.parseFlags(cl.newFlagSet("version"), args); err != nil {
+		return quietHelp(err)
 	}
 	v := version.Get()
-	fmt.Printf("code-foundry %s %s\n", formatVersion(v.Version, v.Commit), v.GoVersion)
+	fmt.Fprintf(cl.stdout, "code-foundry %s %s\n", formatVersion(v.Version, v.Commit), v.GoVersion)
 	return nil
 }
 
