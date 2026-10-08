@@ -11,11 +11,11 @@ import (
 	"github.com/awaumann/code-foundry/internal/version"
 )
 
-func runDaemon(ctx context.Context, args []string) error {
-	fs := newFlagSet("daemon")
+func runDaemon(ctx context.Context, cl *cli, args []string) error {
+	fs := cl.newFlagSet("daemon")
 	dev := fs.Bool("dev", false, "also log human-readable text at debug level to stderr")
-	if err := parseFlags(fs, args); err != nil {
-		return err
+	if err := cl.parseFlags(fs, args); err != nil {
+		return quietHelp(err)
 	}
 	p, err := paths.Resolve()
 	if err != nil {

@@ -26,6 +26,9 @@ import (
 	"time"
 
 	"github.com/awaumann/code-foundry/internal/api"
+	"github.com/awaumann/code-foundry/internal/bus"
+	"github.com/awaumann/code-foundry/internal/command"
+	"github.com/awaumann/code-foundry/internal/command/all"
 	"github.com/awaumann/code-foundry/internal/paths"
 	"github.com/awaumann/code-foundry/internal/version"
 )
@@ -69,8 +72,22 @@ func Run(ctx context.Context, opts Options) error {
 	defer stop()
 
 	started := time.Now()
+	events := bus.New()
+	commands := command.NewRegistry()
+	if err := all.Register(commands, all.Deps{
+		Daemon: command.DaemonInfo{
+			PID: os.Getpid(), Version: opts.Version, Started: started, Home: p.Home(), Socket: p.Socket(),
+		},
+		Emitter: command.BusEmitter{Bus: events},
+		// Terminal: <TerminalService handler from 1a>,
+		// Repo:     <RepoService handler from 1b>,
+	}); err != nil {
+		return fmt.Errorf("register commands: %w", err)
+	}
 	routes := []api.Route{
 		api.NewHealth(started, opts.Version).Route(),
+		api.NewCommand(commands).Route(),
+		api.NewUI(events).Route(),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {
