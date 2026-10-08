@@ -154,17 +154,19 @@ func (h *Terminal) Watch(ctx context.Context, _ *connect.Request[v1.WatchTermina
 			if !ok {
 				return nil
 			}
-			msg := &v1.TerminalEvent{}
-			if ev.Updated != nil {
-				msg.Event = &v1.TerminalEvent_Updated{Updated: terminalToProto(*ev.Updated)}
-			} else {
-				msg.Event = &v1.TerminalEvent_RemovedId{RemovedId: ev.RemovedID}
-			}
-			if err := stream.Send(msg); err != nil {
+			if err := stream.Send(terminalEventToProto(ev)); err != nil {
 				return err
 			}
 		}
 	}
+}
+
+// terminalEventToProto maps one Watch item; shared with EventService.
+func terminalEventToProto(ev terminal.Event) *v1.TerminalEvent {
+	if ev.Updated != nil {
+		return &v1.TerminalEvent{Event: &v1.TerminalEvent_Updated{Updated: terminalToProto(*ev.Updated)}}
+	}
+	return &v1.TerminalEvent{Event: &v1.TerminalEvent_RemovedId{RemovedId: ev.RemovedID}}
 }
 
 func size(cols, rows uint32) (uint16, uint16, error) {

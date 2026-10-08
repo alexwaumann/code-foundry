@@ -98,6 +98,7 @@ func Run(ctx context.Context, opts Options) error {
 		terminalAPI.Route(),
 		repoAPI.Route(),
 		api.NewGh(st.gh, events, ctx.Done()).Route(),
+		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Gh: st.gh, Done: ctx.Done()}).Route(),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {
