@@ -11,6 +11,7 @@ import { SessionState, SessionStatus, type SessionEventSchema, type SessionSchem
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import { Hub } from "./hub";
+import { MockUpdater } from "./update";
 import { claudeIntro, claudeTick, ENTER_ALT, logLine, prompt, RESET, testRunOutput, topFrame } from "./screens";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
@@ -176,6 +177,11 @@ export class World {
   readonly repoEvents = new Hub<RepoEventInit>((v) => this.events.publish({ source: EventSource.REPO, event: { event: { case: "repo", value: v } } }));
   readonly sessionEvents = new Hub<SessionEventInit>((v) => this.events.publish({ source: EventSource.SESSION, event: { event: { case: "session", value: v } } }));
   readonly intents = new Hub<UiIntentInit>((v) => this.events.publish({ source: EventSource.UI, event: { event: { case: "ui", value: v } } }));
+  /** UpdateService (Phase 3d): publishes into the events hub as the update source. */
+  readonly update = new MockUpdater(
+    (v) => this.events.publish({ source: EventSource.UPDATE, event: { event: { case: "update", value: v } } }),
+    () => [...this.sessions.values()].filter((s) => s.state !== SessionState.DISCONNECTED).length,
+  );
   /** EventService watchers that include UI intents (they count toward Emit's `delivered`). */
   uiEventWatchers = 0;
   invocations: Invocation[] = [];
@@ -218,6 +224,7 @@ export class World {
     for (const t of this.terms.values()) this.termEvents.publish({ event: { case: "updated", value: this.terminalMsg(t) } });
     for (const r of this.repos.values()) this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(r) } });
     this.sessionEvents.publish(this.sessionSnapshot());
+    this.update.reset();
   }
 
   // ---- Sessions -----------------------------------------------------------------
@@ -828,6 +835,7 @@ export class World {
         when: always,
         run: () => `mock daemon pid ${String(process.pid)}, up ${String(Math.round((Date.now() - this.startedAt) / 1000))}s`,
       },
+      ...this.update.commands(),
     ];
   }
 

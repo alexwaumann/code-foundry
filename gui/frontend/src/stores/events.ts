@@ -10,6 +10,7 @@ import { applyIntent } from "./intents";
 import { applyRepoEvent, replaceRepos, useReposStore } from "./repos";
 import { applySessionEvent, replaceSessions, sessionOfTerminal, useSessionsStore } from "./sessions";
 import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./terminals";
+import { applyUpdateEvent } from "./update";
 import { useUiStore } from "./ui";
 
 interface EventsState {
@@ -39,6 +40,7 @@ const handlers: Handlers = {
   },
   gh: () => undefined,
   ui: applyIntent,
+  update: applyUpdateEvent,
 };
 
 export function dispatchEvent(ev: EventView): void {

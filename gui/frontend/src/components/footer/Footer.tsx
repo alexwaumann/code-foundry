@@ -3,6 +3,7 @@ import { hintsFor } from "@/keys/hints";
 import { useCommandsStore } from "@/stores/commands";
 import { useAttentionCount } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
+import { UpdateIndicator } from "@/components/update/UpdateIndicator";
 import { DaemonStatus } from "./DaemonStatus";
 
 function Hints() {
@@ -28,7 +29,10 @@ export function Footer() {
   return (
     <footer className="flex h-7 shrink-0 items-center justify-between gap-4 border-t bg-sidebar px-3 text-[11px] text-muted-foreground">
       <Hints />
-      <DaemonStatus />
+      <div className="flex min-w-0 shrink-0 items-center gap-3">
+        <UpdateIndicator />
+        <DaemonStatus />
+      </div>
     </footer>
   );
 }

@@ -6,6 +6,7 @@ import { SessionDisconnected } from "@/components/session/SessionParts";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { TerminalPane } from "@/components/terminal/TerminalPane";
 import { Toaster } from "@/components/ui/sonner";
+import { UpdateDialog } from "@/components/update/UpdateDialog";
 import { installKeybindings } from "@/keys/bindings";
 import { syncDocumentScheme, useColorScheme } from "@/lib/theme";
 import { useWindowTitle } from "@/lib/title";
@@ -14,6 +15,7 @@ import { startEventSync } from "@/stores/events";
 import { startHealthPolling } from "@/stores/health";
 import { useAttentionCount, useSessionsStore } from "@/stores/sessions";
 import { useUiStore, type FocusRegion } from "@/stores/ui";
+import { startUpdateSync } from "@/stores/update";
 
 function regionOf(el: EventTarget | null): FocusRegion {
   const region = el instanceof Element ? el.closest("[data-region]")?.getAttribute("data-region") : null;
@@ -29,7 +31,7 @@ function startApp(): () => void {
     useUiStore.getState().setFocus(regionOf(e.target));
   };
   document.addEventListener("focusin", onFocusIn);
-  const stops = [syncDocumentScheme(), startHealthPolling(2000), startEventSync(), startCommandSync(), installKeybindings()];
+  const stops = [syncDocumentScheme(), startHealthPolling(2000), startEventSync(), startCommandSync(), installKeybindings(), startUpdateSync()];
   return () => {
     document.removeEventListener("focusin", onFocusIn);
     for (const stop of stops) stop();
@@ -66,6 +68,7 @@ export function App() {
       </div>
       <Footer />
       <CommandPalette />
+      <UpdateDialog />
       <Toaster theme={scheme} position="bottom-right" offset={{ bottom: 40, right: 16 }} />
     </div>
   );

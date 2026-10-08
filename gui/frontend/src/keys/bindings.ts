@@ -5,6 +5,7 @@ import { refreshCommands, runCommand, useCommandsStore } from "@/stores/commands
 import { contextKey, getTreeInputs, getUiContext } from "@/stores/context";
 import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
+import { openUpdateDialog, runUpdateAction } from "@/stores/update";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -136,11 +137,30 @@ export function beginRename(sessionId: string | null = getUiContext().activeSess
  */
 const commandPresenters: Readonly<Record<string, () => boolean>> = {
   "session.rename": () => beginRename(),
+  // Update commands show their progress and confirmation in the update dialog.
+  "app.update.check": () => {
+    openUpdateDialog({ check: true });
+    return true;
+  },
+  "app.update": () => {
+    openUpdateDialog();
+    void runUpdateAction("install");
+    return true;
+  },
+  "daemon.restart": () => {
+    openUpdateDialog({ confirmRestart: true });
+    return true;
+  },
 };
+
+/** Runs the command's presenter, if it has one; false means "invoke it normally". */
+export function presentCommand(name: string): boolean {
+  return commandPresenters[name]?.() ?? false;
+}
 
 /** Starts a command from the keyboard or palette: prompts for args it needs, else invokes. */
 export function startCommand(c: CommandView): void {
-  if (commandPresenters[c.name]?.()) return;
+  if (presentCommand(c.name)) return;
   if (promptedArgs(c).length > 0) useUiStore.getState().openPalette("", c.name);
   else void runCommand(c.name);
 }

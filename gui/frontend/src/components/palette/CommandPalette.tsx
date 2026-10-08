@@ -3,6 +3,7 @@ import { ChevronRight, CornerDownLeft } from "lucide-react";
 import type { CommandView, UiContextView } from "@/api/command";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { presentCommand } from "@/keys/bindings";
 import { formatChord } from "@/keys/chord";
 import { argChoices, groupByCategory, previousArg, promptedArgs, startPrompt, submitArg, UNSET_CHOICE, type ArgPrompt } from "@/palette/args";
 import { refreshCommands, runCommand, useCommandsStore } from "@/stores/commands";
@@ -80,6 +81,11 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
   const pick = (c: CommandView) => {
     const p = startPrompt(c);
     if (p.specs.length === 0) {
+      // Commands with their own UI (e.g. the update dialog) present themselves.
+      if (presentCommand(c.name)) {
+        close();
+        return;
+      }
       invoke(c, {});
       return;
     }

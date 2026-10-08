@@ -15,6 +15,11 @@
  *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
  *   POST /__mock/sessions-service?enabled=false   (simulate a daemon without SessionService)
+ *   GET  /__mock/update
+ *   POST /__mock/update/state?state=idle|available|downloading|installed|restartRequired|failed&version=v0.2.0[&reason=…]
+ *   POST /__mock/update/latest?version=v0.2.0     (what the next check finds)
+ *   POST /__mock/update/fail?reason=…             (the next install fails)
+ *   POST /__mock/update/disabled?reason=dev%20build
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
@@ -28,6 +33,8 @@ import { RepoService } from "../src/gen/codefoundry/v1/repo_pb";
 import { SessionService, SessionState, SessionStatus } from "../src/gen/codefoundry/v1/session_pb";
 import { TerminalService, TerminalState, type AttachEventSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
+import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
+import { updateStateNames, type UpdateEventInit } from "./update";
 import { CommandError, World, type EventInit } from "./world";
 
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -155,16 +162,25 @@ function routes(router: ConnectRouter): void {
     watch: (_req, ctx) => tracked("SessionService/Watch", world.sessionEvents.subscribe(ctx.signal, [world.sessionSnapshot()])),
   });
 
+  router.service(UpdateService, {
+    get: () => ({ status: world.update.msg() }),
+    check: () => guard(() => (world.update.check(), { status: world.update.msg() })),
+    install: () => guard(() => (world.update.install(), { status: world.update.msg() })),
+    relaunch: () => ({ delivered: world.update.relaunch() }),
+    watch: (_req, ctx) => tracked("UpdateService/Watch", updateEvents(world.events.subscribe(ctx.signal, [{ source: EventSource.UPDATE, event: { event: { case: "update", value: world.update.event() } } }]))),
+  });
+
   router.service(EventService, {
     // Snapshots first in the order events.proto promises (repo, terminal, session, gh),
     // then everything published, filtered by `sources`.
     watch: (req, ctx) => {
-      const want = new Set(req.sources.length > 0 ? req.sources : [EventSource.REPO, EventSource.TERMINAL, EventSource.SESSION, EventSource.GH, EventSource.UI]);
+      const want = new Set(req.sources.length > 0 ? req.sources : [EventSource.REPO, EventSource.TERMINAL, EventSource.SESSION, EventSource.GH, EventSource.UPDATE, EventSource.UI]);
       if (!sessionsEnabled) want.delete(EventSource.SESSION);
       const initial: { source: EventSource; event: EventInit }[] = [
         { source: EventSource.REPO, event: { event: { case: "repo", value: { event: { case: "snapshot", value: { repos: [...world.repos.values()].map((r) => world.repoMsg(r)) } } } } } },
         ...[...world.terms.values()].map((t) => ({ source: EventSource.TERMINAL, event: { event: { case: "terminal" as const, value: { event: { case: "updated" as const, value: world.terminalMsg(t) } } } } })),
         { source: EventSource.SESSION, event: { event: { case: "session", value: world.sessionSnapshot() } } },
+        { source: EventSource.UPDATE, event: { event: { case: "update", value: world.update.event() } } },
       ];
       const ui = want.has(EventSource.UI);
       return tracked("EventService/Watch", filterEvents(world.events.subscribe(ctx.signal, initial), want), () => {
@@ -175,6 +191,51 @@ function routes(router: ConnectRouter): void {
       });
     },
   });
+}
+
+async function* updateEvents(src: AsyncGenerator<{ source: EventSource; event: EventInit }>): AsyncGenerator<UpdateEventInit> {
+  for await (const { source, event } of src) {
+    if (source === EventSource.UPDATE && event.event?.case === "update") yield event.event.value;
+  }
+}
+
+/** Update controls: POST /__mock/update/{state|latest|fail|disabled}. */
+function updateControl(res: ServerResponse, action: string, q: URLSearchParams): void {
+  const u = world.update;
+  switch (action) {
+    case "state": {
+      const state = updateStateNames[q.get("state") ?? ""];
+      if (state === undefined) {
+        json(res, 400, { error: "state must be one of " + Object.keys(updateStateNames).join(", ") });
+        return;
+      }
+      u.set(state, state === UpdateState.IDLE ? "" : (q.get("version") ?? "v0.2.0"), {
+        failureReason: q.get("reason") ?? (state === UpdateState.FAILED ? "installer: exit status 1: error: checksum mismatch" : ""),
+        progress: state === UpdateState.DOWNLOADING ? "==> downloading CodeFoundry-darwin-arm64.zip" : "",
+        currentVersion: q.get("current") ?? u.status.currentVersion,
+        lastCheckedAt: new Date(),
+      });
+      break;
+    }
+    case "latest":
+      u.latest = q.get("version") ?? "v0.2.0";
+      break;
+    case "fail":
+      u.failNext = q.get("reason") ?? "installer: exit status 1: error: checksum mismatch";
+      break;
+    case "disabled":
+      u.set(UpdateState.IDLE, "", { enabled: false, disabledReason: q.get("reason") ?? "dev build" });
+      break;
+    default:
+      json(res, 404, { error: "unknown update action" });
+      return;
+  }
+  json(res, 200, updateSummary());
+}
+
+function updateSummary(): Record<string, unknown> {
+  const s = world.update.status;
+  return { state: UpdateState[s.state], current: s.currentVersion, target: s.targetVersion, progress: s.progress, relaunches: world.update.relaunches };
 }
 
 async function* filterEvents(src: AsyncGenerator<{ source: EventSource; event: EventInit }>, want: Set<EventSource>): AsyncGenerator<EventInit> {
@@ -255,12 +316,20 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     sessionControl(res, session[1], q);
     return;
   }
+  const update = /^\/__mock\/update\/([a-z]+)$/.exec(path);
+  if (req.method === "POST" && update?.[1]) {
+    updateControl(res, update[1], q);
+    return;
+  }
   switch (`${req.method ?? ""} ${path}`) {
     case "POST /__mock/sessions-service":
       // enabled=false simulates a daemon without Phase 2a: SessionService 404s and the
       // events stream carries no session source. Reset turns it back on.
       sessionsEnabled = q.get("enabled") !== "false";
       json(res, 200, { enabled: sessionsEnabled });
+      break;
+    case "GET /__mock/update":
+      json(res, 200, updateSummary());
       break;
     case "GET /__mock/streams":
       json(res, 200, Object.fromEntries(openStreams));
