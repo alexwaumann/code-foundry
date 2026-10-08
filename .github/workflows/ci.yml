@@ -1,0 +1,41 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # macOS only: the gui package links Wails (cgo + WebKit), and the product is macOS-only.
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      # Reads the `toolchain` directive (go1.26.x) from go.mod.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.8.1
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: gui/frontend/pnpm-lock.yaml
+
+      # go vet + staticcheck + go test -race, then frontend typecheck + lint + test.
+      # Generated code (buf, Wails bindings) is committed, so neither buf nor wails3 is needed.
+      - run: make check
