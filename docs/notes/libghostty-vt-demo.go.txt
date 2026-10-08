@@ -1,0 +1,187 @@
+// Demo of go.mitchellh.com/libghostty (libghostty-vt Go bindings).
+package main
+
+import (
+	"fmt"
+	"log"
+	"strings"
+
+	"go.mitchellh.com/libghostty"
+)
+
+func must(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+// dumpViewport snapshots the viewport through a RenderState and prints
+// each row's text (trailing blanks dropped by AppendText).
+func dumpViewport(label string, term *libghostty.Terminal, rs *libghostty.RenderState,
+	ri *libghostty.RenderStateRowIterator, rc *libghostty.RenderStateRowCells) {
+	must(rs.Update(term))
+	dirty, _ := rs.Dirty()
+	fmt.Printf("--- %s (global dirty=%d) ---\n", label, dirty)
+	must(rs.RowIterator(ri))
+	var buf []byte
+	y := 0
+	for ri.Next() {
+		var err error
+		buf, err = ri.AppendText(buf[:0], rc)
+		must(err)
+		if len(buf) > 0 {
+			fmt.Printf("%2d|%s\n", y, buf)
+		}
+		y++
+	}
+	must(rs.Clean()) // consume dirty state after a "full frame"
+}
+
+// rowText reads one row via GridRef (works for any coordinate space,
+// including scrollback history).
+func rowText(term *libghostty.Terminal, tag libghostty.PointTag, y uint32) string {
+	cols, _ := term.Cols()
+	var sb strings.Builder
+	for x := uint16(0); x < cols; x++ {
+		ref, err := term.GridRef(libghostty.Point{Tag: tag, X: x, Y: y})
+		if err != nil {
+			return fmt.Sprintf("<err %v>", err)
+		}
+		cps, _ := ref.Graphemes()
+		if len(cps) == 0 {
+			sb.WriteByte(' ')
+			continue
+		}
+		for _, cp := range cps {
+			sb.WriteRune(rune(cp))
+		}
+	}
+	return strings.TrimRight(sb.String(), " ")
+}
+
+func main() {
+	info, err := libghostty.GetBuildInfo()
+	if err == nil {
+		fmt.Printf("build info: %+v\n", info)
+	}
+
+	term, err := libghostty.NewTerminal(
+		libghostty.WithSize(80, 24),
+		libghostty.WithMaxScrollbackLines(1000),
+	)
+	must(err)
+	defer term.Close()
+
+	rs, err := libghostty.NewRenderState()
+	must(err)
+	defer rs.Close()
+	ri, err := libghostty.NewRenderStateRowIterator()
+	must(err)
+	defer ri.Close()
+	rc, err := libghostty.NewRenderStateRowCells()
+	must(err)
+	defer rc.Close()
+
+	// 1. Text, cursor movement (CUP), colors (SGR 16-color + truecolor).
+	term.VTWrite([]byte("plain line 1\r\n"))
+	term.VTWrite([]byte("\x1b[1;31mred bold\x1b[0m and \x1b[38;2;255;128;0morange\x1b[0m\r\n"))
+	term.VTWrite([]byte("\x1b[10;20Hat row10 col20")) // CUP is 1-based
+	fmt.Fprintf(term, "\x1b[5;1H%s", "via io.Writer") // Terminal implements io.Writer
+	cx, _ := term.CursorX()
+	cy, _ := term.CursorY()
+	fmt.Printf("cursor after writes: x=%d y=%d (0-based)\n", cx, cy)
+	dumpViewport("primary", term, rs, ri, rc)
+
+	// Inspect style of the 'r' in "red bold" (row 1, col 0) via GridRef.
+	ref, err := term.GridRef(libghostty.Point{Tag: libghostty.PointTagActive, X: 0, Y: 1})
+	must(err)
+	st, err := ref.Style()
+	must(err)
+	fg := st.FgColor()
+	fmt.Printf("cell(0,1) bold=%v fgTag=%v palette=%d\n", st.Bold(), fg.Tag, fg.Palette)
+	ref, _ = term.GridRef(libghostty.Point{Tag: libghostty.PointTagActive, X: 13, Y: 1})
+	st, _ = ref.Style()
+	fmt.Printf("cell(13,1) fgTag=%v rgb=%+v\n", st.FgColor().Tag, st.FgColor().RGB)
+
+	// Same thing via the render-state cell iterator.
+	must(rs.Update(term))
+	must(rs.RowIterator(ri))
+	ri.Next()
+	ri.Next() // row 1
+	must(ri.Cells(rc))
+	must(rc.Select(13))
+	if fgc, err := rc.FgColor(); err == nil && fgc != nil {
+		fmt.Printf("render cell(13,1) resolved fg=%+v\n", *fgc)
+	}
+	must(rs.Clean())
+
+	// 2. Alternate screen (1049h), write, inspect, leave (1049l).
+	term.VTWrite([]byte("\x1b[?1049h"))
+	scr, _ := term.ActiveScreen()
+	on, _ := term.Mode(libghostty.ModeAltScreenSave)
+	fmt.Printf("after 1049h: ActiveScreen=%v (alt=%v) Mode(1049)=%v\n", scr, scr == libghostty.ScreenAlternate, on)
+	term.VTWrite([]byte("\x1b[H\x1b[7mALT SCREEN\x1b[0m\r\nfullscreen app here"))
+	dumpViewport("alternate", term, rs, ri, rc)
+
+	term.VTWrite([]byte("\x1b[?1049l"))
+	scr, _ = term.ActiveScreen()
+	on, _ = term.Mode(libghostty.ModeAltScreenSave)
+	fmt.Printf("after 1049l: ActiveScreen=%v (primary=%v) Mode(1049)=%v\n", scr, scr == libghostty.ScreenPrimary, on)
+	cx, _ = term.CursorX()
+	cy, _ = term.CursorY()
+	fmt.Printf("cursor restored: x=%d y=%d\n", cx, cy)
+	dumpViewport("primary restored", term, rs, ri, rc)
+
+	// 3. Dirty tracking: after Clean(), change one row, see what's dirty.
+	must(rs.Update(term))
+	d, _ := rs.Dirty()
+	fmt.Printf("dirty with no changes: %d (False=%d)\n", d, libghostty.RenderStateDirtyFalse)
+	term.VTWrite([]byte("\x1b[3;1Hchanged row 3"))
+	must(rs.Update(term))
+	d, _ = rs.Dirty()
+	fmt.Printf("dirty after one-row edit: %d (Partial=%d Full=%d)\n", d, libghostty.RenderStateDirtyPartial, libghostty.RenderStateDirtyFull)
+	must(rs.RowIterator(ri))
+	var dirtyRows []uint16
+	for {
+		idx, ok := ri.NextDirty()
+		if !ok {
+			break
+		}
+		dirtyRows = append(dirtyRows, idx)
+	}
+	fmt.Printf("dirty rows: %v\n", dirtyRows)
+	must(rs.Clean())
+
+	// 4. Scrollback: push lines off the top.
+	term.VTWrite([]byte("\x1b[24;1H"))
+	for i := 0; i < 40; i++ {
+		fmt.Fprintf(term, "\r\nscroll line %02d", i)
+	}
+	sb, _ := term.ScrollbackRows()
+	bar, _ := term.Scrollbar()
+	fmt.Printf("scrollback rows=%d scrollbar=%+v\n", sb, bar)
+	fmt.Printf("history row 0: %q\n", rowText(term, libghostty.PointTagHistory, 0))
+	fmt.Printf("screen  row 1: %q\n", rowText(term, libghostty.PointTagScreen, 1))
+	fmt.Printf("active  row 0: %q\n", rowText(term, libghostty.PointTagActive, 0))
+	term.ScrollViewportTop()
+	fmt.Printf("viewport row 0 after ScrollViewportTop: %q\n", rowText(term, libghostty.PointTagViewport, 0))
+	term.ScrollViewportBottom()
+
+	// Formatter: whole screen (incl. scrollback?) as plain text.
+	f, err := libghostty.NewFormatter(term,
+		libghostty.WithFormatterFormat(libghostty.FormatterFormatPlain),
+		libghostty.WithFormatterTrim(true))
+	must(err)
+	out, err := f.FormatString()
+	must(err)
+	f.Close()
+	lines := strings.Split(out, "\n")
+	fmt.Printf("formatter: %d lines, first=%q last=%q\n", len(lines), lines[0], lines[len(lines)-1])
+
+	// 5. Resize.
+	must(term.Resize(40, 10, 8, 16))
+	c, _ := term.Cols()
+	r, _ := term.Rows()
+	fmt.Printf("after resize: %dx%d\n", c, r)
+	dumpViewport("after resize 40x10", term, rs, ri, rc)
+}

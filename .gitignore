@@ -1,0 +1,15 @@
+# Build output
+/bin/
+/gui/bin/
+/gui/.task/
+/gui/frontend/dist/
+/gui/frontend/bindings/
+
+# Dependencies
+node_modules/
+
+# libghostty-vt build output (Phase 1a, see `make ghostty-vt`)
+/third_party/ghostty-vt/
+
+# macOS
+.DS_Store
