@@ -9,8 +9,8 @@ import { isEditingChord, normalizeChord } from "@/keys/chord";
 
 export type Validated = { ok: true; value: string } | { ok: false; error: string };
 
-/** Chords the Wails app menu takes. */
-const menuChords = new Set(["cmd+w", "cmd+q"]);
+/** Chords the Wails app menu takes (gui/app.go appMenu; ReservedChords in chord.go). */
+const menuChords = new Set(["cmd+w", "cmd+q", "cmd+h", "cmd+alt+h", "cmd+m", "cmd+ctrl+f"]);
 
 const keyPattern =
   /^([a-z0-9]|enter|escape|tab|space|backspace|delete|arrowup|arrowdown|arrowleft|arrowright|home|end|pageup|pagedown|f([1-9]|1[0-2])|[,./=\-[\];'`\\])$/;

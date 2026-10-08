@@ -16,7 +16,8 @@ import (
 //     any command, even in a focused terminal (a command bound there never fires);
 //   - editingChords in gui/frontend/src/keys/chord.ts: clipboard/undo, always left to
 //     the focused terminal or text field;
-//   - cmd+w and cmd+q, which the Wails app menu takes (close window, quit).
+//   - the Wails app menu (gui/app.go appMenu): close window, quit, hide, hide others,
+//     minimize, full screen.
 //
 // See docs/notes/phase1e-gui.md and docs/notes/phase2-integration.md.
 var ReservedChords = []string{
@@ -27,7 +28,7 @@ var ReservedChords = []string{
 	// editingChords
 	"cmd+c", "cmd+v", "cmd+x", "cmd+a", "cmd+z", "cmd+shift+z",
 	// app menu
-	"cmd+w", "cmd+q",
+	"cmd+w", "cmd+q", "cmd+h", "cmd+alt+h", "cmd+m", "cmd+ctrl+f",
 }
 
 var chordModifiers = map[string]string{

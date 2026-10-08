@@ -106,7 +106,12 @@ func runningBundle() string {
 }
 
 // appMenu is the default macOS menu with "Check for Updates…" in the app menu, which
-// asks the frontend to open the update dialog and check.
+// asks the frontend to open the update dialog and check. The View menu is custom: the
+// default one binds Reload (cmd+r) and Force Reload (cmd+shift+r), which are
+// session.rename and session.reconnect, and Zoom (cmd+0/=/-), which the GUI uses for
+// terminal font size. A menu chord fires whenever the page leaves the key unhandled,
+// so cmd+r with no session selected would reload the whole GUI. Keep the chords left
+// here in command.ReservedChords.
 func appMenu(app *application.App) *application.Menu {
 	menu := application.NewMenu()
 	m := menu.AddSubmenu("Code Foundry")
@@ -124,7 +129,9 @@ func appMenu(app *application.App) *application.Menu {
 	m.AddRole(application.Quit)
 	menu.AddRole(application.FileMenu)
 	menu.AddRole(application.EditMenu)
-	menu.AddRole(application.ViewMenu)
+	view := menu.AddSubmenu("View")
+	view.AddRole(application.OpenDevTools) // nil, so skipped, in production builds
+	view.AddRole(application.ToggleFullscreen)
 	menu.AddRole(application.WindowMenu)
 	return menu
 }

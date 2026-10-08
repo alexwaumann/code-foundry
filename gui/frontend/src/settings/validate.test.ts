@@ -33,6 +33,7 @@ describe("validateKeybinding", () => {
     ["jump is reserved", "cmd+3", { ok: false, error: "cmd+3 is reserved by the app" }],
     ["editing chord is reserved", "cmd+c", { ok: false, error: "cmd+c is reserved by the app" }],
     ["menu chord is reserved", "cmd+w", { ok: false, error: "cmd+w is reserved by the app" }],
+    ["minimize is reserved", "cmd+m", { ok: false, error: "cmd+m is reserved by the app" }],
     ["bare letter", "x", { ok: false, error: "x needs cmd, ctrl, or alt (a bare key would steal typing)" }],
     ["shift letter", "shift+x", { ok: false, error: "shift+x needs cmd, ctrl, or alt (a bare key would steal typing)" }],
     ["unknown key", "cmd+π", { ok: false, error: "cmd+π is not a shortcut this app can match" }],

@@ -55,6 +55,7 @@ const staticFields: FieldInit[] = [
 const reserved = new Set([
   "cmd+k", "cmd+shift+p", "cmd+b", "cmd+shift+a", "cmd+1", "cmd+2", "cmd+3", "cmd+4", "cmd+5", "cmd+6", "cmd+7", "cmd+8", "cmd+9",
   "cmd+=", "cmd+-", "cmd+0", "cmd+c", "cmd+v", "cmd+x", "cmd+a", "cmd+z", "cmd+shift+z", "cmd+w", "cmd+q",
+  "cmd+h", "cmd+alt+h", "cmd+m", "cmd+ctrl+f",
 ]);
 
 const order = ["cmd", "ctrl", "alt", "shift"];

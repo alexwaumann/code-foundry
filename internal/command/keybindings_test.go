@@ -87,6 +87,7 @@ func TestValidateBinding(t *testing.T) {
 		{in: "Cmd+K", err: "cmd+k is reserved by the app"},
 		{in: "cmd+shift+a", err: "cmd+shift+a is reserved by the app"},
 		{in: "cmd+w", err: "cmd+w is reserved by the app"},
+		{in: "ctrl+cmd+f", err: "cmd+ctrl+f is reserved by the app"},
 		{in: "f", err: "f needs cmd, ctrl, or alt (a bare key would steal typing)"},
 		{in: "shift+x", err: "shift+x needs cmd, ctrl, or alt (a bare key would steal typing)"},
 		{in: "cmd+nope", err: `unknown key "nope"`},
