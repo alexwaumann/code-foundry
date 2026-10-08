@@ -94,8 +94,8 @@
 .dark {
     /* #070707; gui/main.go's BackgroundColour, so launch does not flash. */
     --sheet: oklch(0.13 0 0);
-    /* oklch(0.205 0 0); equals the dark xterm background (src/terminal/theme.ts). */
-    --pane: #171717;
+    /* oklch(0.17 0 0); equals the dark xterm background (src/terminal/theme.ts). */
+    --pane: #101010;
     --pane-border: oklch(1 0 0 / 8%);
     --background: var(--sheet);
     --foreground: oklch(0.985 0 0);

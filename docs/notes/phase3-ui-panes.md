@@ -25,7 +25,7 @@ New tokens, mapped in `@theme inline` as `bg-sheet`, `bg-pane`, `border-pane-bor
 | Token | Dark (`.dark`) | Light (`:root`) |
 |---|---|---|
 | `--sheet` | `oklch(0.13 0 0)` (#070707) | `oklch(0.955 0 0)` (#f0f0f0) |
-| `--pane` | `#171717` (= oklch(0.205 0 0), the old `--card`) | `#ffffff` |
+| `--pane` | `#101010` (darker than the old `--card`; a first pass used `#171717` and read too light) | `#ffffff` |
 | `--pane-border` | `oklch(1 0 0 / 8%)` | `oklch(0 0 0 / 8%)` |
 
 Aliases: `--background`, `--sidebar` and `--sidebar-border` are `var(--sheet)`. `--card`,
@@ -37,7 +37,7 @@ Accent changes so selection stays visible on the sheet: light `--sidebar-accent`
 the same step above the darker sheet.
 
 `--pane` is a hex value, not oklch, because the xterm theme needs a colour xterm can parse.
-`src/terminal/theme.ts` dark `background`/`cursorAccent` went `#0b0b0c` → `#171717`, and
+`src/terminal/theme.ts` dark `background`/`cursorAccent` went `#0b0b0c` → `#101010`, and
 light stays `#ffffff`. Comments in both files tie them together. `e2e/layout.spec.ts`
 asserts the xterm theme background equals the pane's computed colour in both schemes.
 
@@ -97,7 +97,7 @@ gutter is 80px because the zoom button ends at x=79. `TITLE_STRIP_HEIGHT` (TS) a
 * Live, with `gui/bin/CodeFoundry` and an isolated home, a registered scratch repo, and a
   terminal opened and focused through the CLI (`terminal.new`, `ui.focus.terminal`):
   * the traffic lights sit in the gutter, centred in the strip;
-  * sampled colours: sheet (7,7,7), pane and terminal (23,23,23) in dark; sheet
+  * sampled colours: sheet (7,7,7), pane and terminal (16,16,16) in dark; sheet
     (240,240,240), pane and terminal (255,255,255) in light, after switching with
     `settings set appearance.theme light`.
 * Not verified live: dragging the window by the strip, double-click to zoom, and the
