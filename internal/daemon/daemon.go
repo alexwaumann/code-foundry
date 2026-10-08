@@ -67,6 +67,10 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	defer func() { _ = logFile.Close() }()
 
+	// Before any store starts a process: children must not inherit an enclosing
+	// Claude Code session's variables.
+	scrubClaudeEnv(log)
+
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -80,6 +84,7 @@ func Run(ctx context.Context, opts Options) error {
 	events := st.bus
 	repoAPI := api.NewRepo(st.repo, events)
 	terminalAPI := api.NewTerminal(st.terminal)
+	sessionAPI := api.NewSession(st.session, events)
 	commands := command.NewRegistry()
 	if err := all.Register(commands, all.Deps{
 		Daemon: command.DaemonInfo{
@@ -88,6 +93,7 @@ func Run(ctx context.Context, opts Options) error {
 		Emitter:  command.BusEmitter{Bus: events},
 		Terminal: terminalAPI,
 		Repo:     repoAPI,
+		Session:  sessionAPI,
 	}); err != nil {
 		return fmt.Errorf("register commands: %w", err)
 	}
@@ -96,6 +102,7 @@ func Run(ctx context.Context, opts Options) error {
 		api.NewCommand(commands).Route(),
 		api.NewUI(events).Route(),
 		terminalAPI.Route(),
+		sessionAPI.Route(),
 		repoAPI.Route(),
 		api.NewGh(st.gh, events, ctx.Done()).Route(),
 	}

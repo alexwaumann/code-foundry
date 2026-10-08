@@ -18,6 +18,11 @@ message UiIntent {
     FocusRepo focus_repo = 2;
     OpenPalette open_palette = 3;
     Notify notify = 4;
+    FocusSession focus_session = 5;
+  }
+
+  message FocusSession {
+    string session_id = 1;
   }
 
   message FocusTerminal {

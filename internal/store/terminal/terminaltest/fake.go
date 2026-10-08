@@ -34,6 +34,7 @@ type fakeTerm struct {
 	spec    terminal.Spec
 	output  []byte
 	written []byte
+	screen  *string
 	subs    map[chan terminal.AttachEvent]struct{}
 }
 
@@ -209,6 +210,20 @@ func (f *Fake) Attach(ctx context.Context, id string) (<-chan terminal.AttachEve
 	return ch, nil
 }
 
+// ScreenText returns the text set with SetScreen, else all output so far.
+func (f *Fake) ScreenText(_ context.Context, id string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	t, err := f.get(id)
+	if err != nil {
+		return "", err
+	}
+	if t.screen != nil {
+		return *t.screen, nil
+	}
+	return string(t.output), nil
+}
+
 // Watch merges bus events like the real store.
 func (f *Fake) Watch(ctx context.Context) (<-chan terminal.Event, error) {
 	return terminal.WatchBus(ctx, f.bus), nil
@@ -216,32 +231,78 @@ func (f *Fake) Watch(ctx context.Context) (<-chan terminal.Event, error) {
 
 // ---- test controls ----
 
-// Emit appends program output and forwards it to attached subscribers.
+// Emit appends program output, forwards it to attached subscribers, and then calls
+// the terminal's Observer (if any) with the chunk.
 func (f *Fake) Emit(id string, data []byte) error {
-	return f.apply(id, false, func(t *fakeTerm) []terminal.AttachEvent {
+	data = slices.Clone(data)
+	if err := f.apply(id, false, func(t *fakeTerm) []terminal.AttachEvent {
 		t.output = append(t.output, data...)
-		return []terminal.AttachEvent{{Output: slices.Clone(data)}}
-	})
+		return []terminal.AttachEvent{{Output: data}}
+	}); err != nil {
+		return err
+	}
+	f.observe(id, terminal.ObserveEvent{Output: data})
+	return nil
 }
 
-// SetTitle sets the title and publishes an update.
+// SetScreen sets what ScreenText returns (instead of all output so far).
+func (f *Fake) SetScreen(id, text string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	t, err := f.get(id)
+	if err != nil {
+		return err
+	}
+	t.screen = &text
+	return nil
+}
+
+// SetTitle sets the title, publishes an update, and notifies the Observer.
 func (f *Fake) SetTitle(id, title string) error {
-	return f.update(id, func(t *fakeTerm) []terminal.AttachEvent { t.info.Title = title; return nil })
+	if err := f.update(id, func(t *fakeTerm) []terminal.AttachEvent { t.info.Title = title; return nil }); err != nil {
+		return err
+	}
+	f.observe(id, terminal.ObserveEvent{Title: &title})
+	return nil
 }
 
-// SetAltScreen sets the alt-screen flag and publishes an update.
+// SetAltScreen sets the alt-screen flag, publishes an update, and notifies the
+// Observer.
 func (f *Fake) SetAltScreen(id string, alt bool) error {
-	return f.update(id, func(t *fakeTerm) []terminal.AttachEvent { t.info.AltScreen = alt; return nil })
+	if err := f.update(id, func(t *fakeTerm) []terminal.AttachEvent { t.info.AltScreen = alt; return nil }); err != nil {
+		return err
+	}
+	f.observe(id, terminal.ObserveEvent{AltScreen: &alt})
+	return nil
 }
 
-// Exit marks a terminal exited with code.
+// Exit marks a terminal exited with code and notifies the Observer.
 func (f *Fake) Exit(id string, code int) error {
-	return f.update(id, func(t *fakeTerm) []terminal.AttachEvent {
+	if err := f.update(id, func(t *fakeTerm) []terminal.AttachEvent {
 		t.info.State = terminal.StateExited
 		t.info.ExitCode = code
 		t.info.ExitedAt = f.Now()
 		return []terminal.AttachEvent{{Exited: &terminal.Exit{Code: code}}}
-	})
+	}); err != nil {
+		return err
+	}
+	f.observe(id, terminal.ObserveEvent{Exited: &terminal.Exit{Code: code}})
+	return nil
+}
+
+// observe calls the terminal's Observer outside the lock, like the real store calls
+// it on the actor goroutine.
+func (f *Fake) observe(id string, ev terminal.ObserveEvent) {
+	f.mu.Lock()
+	t, ok := f.terms[id]
+	var obs terminal.Observer
+	if ok {
+		obs = t.spec.Observer
+	}
+	f.mu.Unlock()
+	if obs != nil {
+		obs(id, ev)
+	}
 }
 
 // Written returns all input written to a terminal.

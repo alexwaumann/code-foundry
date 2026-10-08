@@ -19,6 +19,8 @@ type Deps struct {
 	Terminal command.TerminalBackend
 	// Repo backs repo.*. Nil works like Terminal.
 	Repo command.RepoBackend
+	// Session backs session.*. Nil works like Terminal.
+	Session command.SessionBackend
 }
 
 // Register registers every domain's commands into r.
@@ -32,10 +34,14 @@ func Register(r *command.Registry, d Deps) error {
 	if d.Repo == nil {
 		d.Repo = codefoundryv1connect.UnimplementedRepoServiceHandler{}
 	}
+	if d.Session == nil {
+		d.Session = codefoundryv1connect.UnimplementedSessionServiceHandler{}
+	}
 	return errors.Join(
 		command.RegisterDaemon(r, d.Daemon),
 		command.RegisterUI(r, d.Emitter),
 		command.RegisterTerminal(r, d.Terminal),
 		command.RegisterRepo(r, d.Repo),
+		command.RegisterSession(r, d.Session, d.Emitter),
 	)
 }

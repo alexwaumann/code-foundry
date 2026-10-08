@@ -58,6 +58,33 @@ type Spec struct {
 	Cols, Rows uint16
 	// Labels are opaque to this package (e.g. the session store's session id).
 	Labels map[string]string
+	// Observer, if set, sees every output chunk, title change, alt-screen change, and
+	// the exit of this terminal. See Observer for the contract.
+	Observer Observer
+}
+
+// Observer is called synchronously on the terminal's actor goroutine, in stream order,
+// for every event of one terminal. It is the in-process feed for consumers that must
+// not miss output (status detection), unlike Attach subscribers, which are dropped
+// when they fall behind.
+//
+// An Observer must never block and must not call back into the Store for the same
+// terminal (that would deadlock the actor): hand the event to another goroutine
+// through an unbounded queue or a non-blocking send, and do the work there. Output
+// slices are shared and read-only, and stay valid after the call.
+type Observer func(id string, ev ObserveEvent)
+
+// ObserveEvent is one event delivered to an Observer. Exactly one field is set.
+//
+// Output is delivered after the chunk has been fed to the emulator, so ScreenText
+// called afterwards (from another goroutine) reflects it. Title and AltScreen are
+// delivered as soon as a change is detected (not throttled like TerminalUpdated).
+// Exited is the last event.
+type ObserveEvent struct {
+	Output    []byte
+	Title     *string
+	AltScreen *bool
+	Exited    *Exit
 }
 
 // Terminal is an immutable snapshot of a terminal's metadata. Do not mutate Argv or
@@ -144,4 +171,9 @@ type Store interface {
 	// Watch streams TerminalUpdated/TerminalRemoved for all terminals until ctx ends.
 	// It does not replay current state; call List after subscribing.
 	Watch(ctx context.Context) (<-chan Event, error)
+	// ScreenText returns the active screen (no scrollback) as plain text, one line per
+	// row with trailing whitespace trimmed. It is meant for matching prompts and
+	// dialogs: TUIs position text with cursor movement, so the raw output stream does
+	// not contain the words a user sees. Must not be called from an Observer.
+	ScreenText(ctx context.Context, id string) (string, error)
 }

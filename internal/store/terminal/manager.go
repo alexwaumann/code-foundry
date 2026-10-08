@@ -116,6 +116,7 @@ func (m *Manager) Create(ctx context.Context, spec Spec) (Terminal, error) {
 
 	log := m.opts.Logger.With("terminal", info.ID, "pid", info.Pid)
 	a := newActor(info.ID, cmd, master, info, m.opts.Bus, log, m.opts, &m.drops)
+	a.observer = spec.Observer
 	ready := make(chan error, 1)
 	go a.run(ready)
 	if err := <-ready; err != nil {
@@ -313,6 +314,20 @@ func (m *Manager) Attach(ctx context.Context, id string) (<-chan AttachEvent, er
 		}
 	}()
 	return ch, nil
+}
+
+// ScreenText returns the active screen as plain text. See Store.ScreenText.
+func (m *Manager) ScreenText(ctx context.Context, id string) (string, error) {
+	a, err := m.actor(id)
+	if err != nil {
+		return "", err
+	}
+	var text string
+	var terr error
+	if err := a.call(ctx, func() { text, terr = a.screenText() }); err != nil {
+		return "", err
+	}
+	return text, terr
 }
 
 // Watch merges TerminalUpdated and TerminalRemoved bus events into one channel.

@@ -57,6 +57,8 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"ui.palette.open", "ui.notify", "ui.focus.terminal", "ui.focus.repo",
 		"terminal.new", "terminal.kill", "terminal.remove",
 		"repo.register", "repo.unregister", "repo.worktree.new", "repo.worktree.remove", "repo.refresh",
+		"session.new", "session.list", "session.focus", "session.close", "session.reconnect",
+		"session.rename", "session.fork", "session.remove",
 	}
 	for _, n := range want {
 		if _, ok := f.reg.Get(n); !ok {

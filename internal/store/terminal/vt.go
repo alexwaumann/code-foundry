@@ -73,3 +73,29 @@ func deviceAttributes(*ghostty.Terminal) (ghostty.DeviceAttributes, bool) {
 	da.Secondary.FirmwareVersion = 10
 	return da, true
 }
+
+// formatActivePlain returns the active area of t (cols x rows, no scrollback) as plain
+// text, one line per row, trailing whitespace trimmed. Call only on t's owning goroutine.
+func formatActivePlain(t *ghostty.Terminal, cols, rows uint16) (string, error) {
+	if cols == 0 || rows == 0 {
+		return "", nil
+	}
+	start, err := t.GridRef(ghostty.Point{Tag: ghostty.PointTagActive})
+	if err != nil {
+		return "", fmt.Errorf("screen text start: %w", err)
+	}
+	end, err := t.GridRef(ghostty.Point{Tag: ghostty.PointTagActive, X: cols - 1, Y: uint32(rows - 1)})
+	if err != nil {
+		return "", fmt.Errorf("screen text end: %w", err)
+	}
+	sel := ghostty.Selection{Start: *start, End: *end}
+	text, err := t.SelectionFormatString(
+		ghostty.WithSelection(&sel),
+		ghostty.WithSelectionFormat(ghostty.FormatterFormatPlain),
+		ghostty.WithSelectionTrim(true),
+	)
+	if err != nil {
+		return "", fmt.Errorf("screen text: %w", err)
+	}
+	return text, nil
+}

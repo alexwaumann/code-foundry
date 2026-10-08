@@ -11,6 +11,7 @@ import (
 	"github.com/awaumann/code-foundry/internal/paths"
 	"github.com/awaumann/code-foundry/internal/store/gh"
 	"github.com/awaumann/code-foundry/internal/store/repo"
+	"github.com/awaumann/code-foundry/internal/store/session"
 	"github.com/awaumann/code-foundry/internal/store/terminal"
 )
 
@@ -25,6 +26,9 @@ type stores struct {
 	stopGh func()
 	// terminal owns PTYs; closed first so every child gets hung up before the db goes.
 	terminal *terminal.Manager
+	// session layers Claude sessions on terminal and db; shut down before terminal so
+	// live sessions are recorded as disconnected while their processes still run.
+	session *session.Manager
 }
 
 // openStores opens the database, applies migrations, and starts every store. On
@@ -47,12 +51,23 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 	}
 	s.stopGh = startGh(ctx, log, s.gh, s.repo, s.bus)
 	s.terminal = terminal.New(terminal.Options{Bus: s.bus, Logger: log.With("store", "terminal")})
+	if s.session, err = session.New(ctx, session.Options{
+		DB: s.db, Terminals: s.terminal, Repos: s.repo, Bus: s.bus, Log: log.With("store", "session"),
+		// Merge with 2b: NewDetector: func(f session.ScreenTextFn) session.StatusDetector { return claudestatus.New(f) },
+	}); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
 // close stops the stores in reverse order of start, then closes the database.
 func (s *stores) close() error {
 	var errs []error
+	if s.session != nil {
+		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		errs = append(errs, s.session.Shutdown(closeCtx))
+		cancel()
+	}
 	if s.terminal != nil {
 		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		errs = append(errs, s.terminal.Close(closeCtx))
