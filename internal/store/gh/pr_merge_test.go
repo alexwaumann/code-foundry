@@ -140,8 +140,10 @@ func TestMergePullRequest(t *testing.T) {
 			},
 			err: ErrFailedPrecondition, errHas: "its base branch main changed on GitHub during the merge; refresh", mutations: 1},
 		{name: "NOT_FOUND keeps its kind", number: 1, req: MergeRequest{Method: MergeSquash},
-			setup: func(g *fakeGitHub, _ *fakeWriter, _ *Store) { g.refuseMerges("NOT_FOUND", "Could not resolve to a node") },
-			err:   ErrNotFound, errHas: "Could not resolve", mutations: 1},
+			setup: func(g *fakeGitHub, _ *fakeWriter, _ *Store) {
+				g.refuseMerges("NOT_FOUND", "Could not resolve to a node")
+			},
+			err: ErrNotFound, errHas: "Could not resolve", mutations: 1},
 		{name: "the default branch is never deleted", number: 6, req: MergeRequest{Method: MergeSquash, DeleteBranch: true},
 			want: MergeResult{Merged: true, SHA: "5e1f" + strings.Repeat("0", 36),
 				Message: "Merged #6 (5e1f000); kept origin/main: it is the repository's default branch"},
