@@ -25,7 +25,7 @@ Three processes, one protocol.
                                                                       └──────────────────┘
 ```
 
-* **Daemon** (`code-foundry daemon`) owns PTYs, terminal emulation (libghostty-vt),
+* **Daemon** (`code-foundry daemon`) owns PTYs, terminal emulation (libghostty-vt, vendored prebuilt and linked statically),
   Claude session lifecycle and status detection, git and GitHub workers, SQLite, and the
   command registry. It never renders. It outlives the window: closing or crashing the GUI
   does not kill sessions.
@@ -83,7 +83,9 @@ gui/
   frontend/                Vite + React 19 + TypeScript + Tailwind v4 + shadcn + Zustand
   build/                   Wails build assets; darwin Taskfile assembles CodeFoundry.app
 scripts/                   install.sh (embedded in the binary), package.sh, release.sh,
-                           next-version.sh, ghostty-vt.sh
+                           next-version.sh, ghostty-vt.sh (rebuilds third_party/libghostty-vt)
+third_party/libghostty-vt/ vendored prebuilt libghostty-vt (static .a, headers, MANIFEST);
+                           `make ghostty-vt` writes its pkg-config file. No zig needed to build.
 docs/                      this file, PLAN.md, ADRs under docs/adr/
 ```
 
