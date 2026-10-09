@@ -38,7 +38,7 @@
  *   POST /__mock/gh/pr-delay?ms=800          (pr.ask, pr.explain, pr.fix.findings, pr.merge take 800ms)
  *   POST /__mock/gh/pr-comment?repo=o/r&number=145&body=…   (a new comment on a PR detail;
  *        pull_request_detail_updated). PR detail fixtures: mock/prDetail.ts (#145 open,
- *        #138 merged, #131 closed, #140 read-only, #142 mergeable); its commands are
+ *        #138 merged, #131 closed, #140 read-only, #142 mergeable, #146 from a fork); its commands are
  *        pr.merge, pr.revert, pr.review.request and pr.refresh
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -188,7 +188,7 @@ function routes(router: ConnectRouter): void {
     setReviewRequest: (req) =>
       prDetailCall(() => ({ requested: world.gh.prDetails.setReviewRequest(req.repoSlug, req.number, req.login, req.kind, req.requested) })),
     revertPullRequest: (req) => prDetailCall(() => world.gh.prDetails.revert(req.repoSlug, req.number)),
-    mergePullRequest: (req) => prDetailCall(() => world.gh.prDetails.merge(req.repoSlug, req.number, req.method, req.deleteBranch)),
+    mergePullRequest: (req) => prDetailCall(() => world.gh.prDetails.merge(req.repoSlug, req.number, req.method, req.deleteBranch, req.expectedHeadSha)),
   });
 
   router.service(CommandService, {

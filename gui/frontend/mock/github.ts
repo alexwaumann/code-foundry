@@ -32,6 +32,9 @@ export interface PrInit {
   state: PullRequestState;
   draft?: boolean;
   headRef: string;
+  /** The head commit; the merge button sends it as pr.merge's head-sha. */
+  headSha?: string;
+  isCrossRepository?: boolean;
   baseRef: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
@@ -157,6 +160,8 @@ export class GhWorld {
     const gp = "alexwaumann/ghostty-playground";
     const sidebarPr = this.pr(cf, 142, "feat(gui): virtualized sidebar tree with session rows", {
       headRef: "feat/sidebar",
+      // The merge button sends it as pr.merge's head-sha; the mock refuses another.
+      headSha: "5eb1d0a142000000000000000000000000000000",
       reviewDecision: ReviewDecision.APPROVED,
       // Ready to merge (mock/prDetail.ts): approved, checks passing, no conflicts.
       mergeStateStatus: MergeStateStatus.CLEAN,

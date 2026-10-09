@@ -4,7 +4,8 @@ import { CF, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
 /**
  * The Pull request surface in the side panel, against the mock daemon's fixtures
  * (mock/prDetail.ts): #145 open with failing checks, threads, labels and reviewers;
- * #138 merged and revertable; #131 closed; #140 read-only. Set SHOTS=<dir> to save
+ * #138 merged and revertable; #131 closed; #140 read-only; #142 mergeable; #146 from a
+ * fork. Set SHOTS=<dir> to save
  * screenshots.
  */
 
@@ -786,6 +787,8 @@ async function settledAnimations(page: Page, testId: string): Promise<void> {
   await page.getByTestId(testId).evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
 }
 
+const HEAD_142 = "5eb1d0a142000000000000000000000000000000";
+const HEAD_146 = "f04c146000000000000000000000000000000000";
 const merges = async () => (await invocations()).filter((i) => i.name === "pr.merge").map((i) => [i.args, Boolean(i.confirmed)]);
 
 test("#142 merges: Squash and merge confirms, runs pr.merge with squash and the branch deleted, and the state turns Merged", async ({ page }) => {
@@ -809,16 +812,26 @@ test("#142 merges: Squash and merge confirms, runs pr.merge with squash and the 
   await expect(menu.getByRole("menuitem")).toHaveText([/^Create a merge commit/, /^Squash and merge/, /^Rebase and merge/]);
   const del = page.getByTestId("pr-merge-delete-branch");
   await expect(del).toHaveAttribute("aria-checked", "true");
-  await expect(del).toContainText("feat/sidebar");
+  await expect(page.getByTestId("pr-merge-delete-branch-note")).toHaveText("Deletes origin/feat/sidebar; local branches and worktrees are untouched");
   expect(inside(await boxOf(page, "pr-merge-menu"), await boxOf(page, "side-panel"))).toBe(true);
   await settledAnimations(page, "pr-merge-menu");
+  // The label sits as far right of the box as the box sits from the menu's edge.
+  const gaps = await del.evaluate((el) => {
+    const box = el.querySelector("[data-state]")?.getBoundingClientRect();
+    const label = el.querySelector("[data-testid=pr-merge-delete-branch-note]")?.parentElement?.getBoundingClientRect();
+    const menu = el.closest("[data-testid=pr-merge-menu]")?.getBoundingClientRect();
+    return box && label && menu ? { left: box.left - menu.left, right: label.left - box.right } : null;
+  });
+  expect(gaps).not.toBeNull();
+  expect(Math.abs((gaps?.left ?? 0) - (gaps?.right ?? 99))).toBeLessThanOrEqual(1);
   await shot(page, "merge-button");
 
   await page.getByTestId("pr-merge-method-squash").click();
   const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText("Merge #142 into main with squash? Branch feat/sidebar is deleted afterwards.");
+  await expect(dialog).toContainText("Merge #142 into main with squash? Branch origin/feat/sidebar is deleted afterwards.");
   await page.getByTestId("confirm-ok").click();
-  const args = { "repo-slug": SLUG, number: "142", method: "squash", "delete-branch": "true" };
+  // With the head the panel shows: the daemon refuses if GitHub's moved since.
+  const args = { "repo-slug": SLUG, number: "142", method: "squash", "delete-branch": "true", "head-sha": HEAD_142 };
   await expect.poll(merges).toEqual([
     [args, false],
     [args, true],
@@ -826,7 +839,7 @@ test("#142 merges: Squash and merge confirms, runs pr.merge with squash and the 
   await expect(page.getByTestId("pr-state")).toHaveText("Merged");
   await expect(button).toHaveCount(0);
   await expect(page.getByText("Merged #142 (e2e0142)")).toBeVisible();
-  await expect(page.getByText("deleted branch feat/sidebar")).toBeVisible();
+  await expect(page.getByText("deleted origin/feat/sidebar")).toBeVisible();
   // The dashboard moved it to recently merged.
   await expect(prRow(page, "merged", 142)).toBeVisible();
   await expect(prRow(page, "authored", 142)).toHaveCount(0);
@@ -882,7 +895,33 @@ test("the merge button: draft, read-only and merged pull requests; unchecking th
   await expect(button).not.toHaveAttribute("aria-busy");
   await expect(button).not.toHaveAttribute("aria-disabled");
   await expect(page.getByTestId("pr-state")).toHaveText("Open");
-  expect((await merges()).filter(([, confirmed]) => confirmed)).toEqual([[{ "repo-slug": SLUG, number: "142", method: "rebase", "delete-branch": "false" }, true]]);
+  expect((await merges()).filter(([, confirmed]) => confirmed)).toEqual([[{ "repo-slug": SLUG, number: "142", method: "rebase", "delete-branch": "false", "head-sha": HEAD_142 }, true]]);
+});
+
+test("#146 from a fork: the branch cannot be deleted, and a merge asking anyway keeps it", async ({ page }) => {
+  await openPrPage(page);
+  await openPr(page, 146);
+  await expect(page.getByTestId("pr-state")).toHaveText("Open");
+  const button = page.getByTestId("pr-merge-button");
+  await button.click();
+  const del = page.getByTestId("pr-merge-delete-branch");
+  await expect(del).toHaveAttribute("aria-checked", "false");
+  await expect(del).toHaveAttribute("data-disabled", "");
+  await expect(page.getByTestId("pr-merge-delete-branch-note")).toHaveText("The branch is in a fork");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pr-merge-menu")).toHaveCount(0);
+
+  // pr.merge with delete-branch on (as the CLI can): the confirmation promises no
+  // delete, and the merge keeps the fork's branch.
+  const args = { "repo-slug": SLUG, number: "146", method: "squash", "delete-branch": "true", "head-sha": HEAD_146 };
+  await page.evaluate(`import("/src/stores/commands.ts").then((m) => { void m.runCommandForResult("pr.merge", ${JSON.stringify(args)}); })`);
+  const dialog = page.getByTestId("confirm-dialog");
+  await expect(dialog).toContainText("Merge #146 into main with squash?");
+  await expect(dialog).not.toContainText("deleted afterwards");
+  await page.getByTestId("confirm-ok").click();
+  await expect(page.getByTestId("pr-state")).toHaveText("Merged");
+  await expect(page.getByText("kept patch-1: it is in a fork")).toBeVisible();
+  expect((await merges()).filter(([, confirmed]) => confirmed)).toEqual([[args, true]]);
 });
 
 test("at 280px the merge button keeps its icons and its dropdown stays inside the panel", async ({ page }) => {

@@ -14,14 +14,17 @@
  *        one check queued (a first-time contributor's workflow awaiting approval)
  *   #142 open, approved, checks passing, merge state clean: the merge button works, and a
  *        merge flips it to merged (it moves to the dashboard's recently merged)
+ *   #146 open from a fork (outside-contrib:patch-1), approved, mergeable, the viewer an
+ *        admin: merging never deletes its branch
  *
- * #131 and #140 are on no dashboard: open them by number. Every other pull request the
+ * #131, #140 and #146 are on no dashboard: open them by number. Every other pull request the
  * dashboards or branches list gets a minimal detail built from its summary, so any row
  * the GUI shows can open the panel.
  *
  * The panel's actions are commands (pr.revert, pr.merge, pr.review.request, pr.refresh;
  * see commands()), like the daemon's; the RPCs they wrap are served too. Every open pull
- * request allows all three merge methods. pr.refresh answers
+ * request allows all three merge methods; every repository's default branch is main.
+ * pr.merge refuses a head-sha other than the fixture's head. pr.refresh answers
  * with the detail (protojson), as the daemon does. POST /__mock/gh/pr-fail?command=pr.refresh
  * makes that command's next run fail (UNAVAILABLE, like a refresh GitHub refused);
  * ?command=pr.merge fails the next merge like a moved head (FAILED_PRECONDITION).
@@ -112,6 +115,14 @@ interface MergeOut {
   branchDeleted: boolean;
 }
 
+/** Why a merge keeps pr's head branch even when asked (the daemon's keepBranch, plus forks), or "". */
+function keepBranch(pr: { headRef?: string; baseRef?: string; isCrossRepository?: boolean }, defaultBranch: string): string {
+  if (pr.isCrossRepository) return "it is in a fork";
+  if (pr.headRef === defaultBranch) return "it is the repository's default branch";
+  if (pr.headRef === pr.baseRef) return "it is the base branch";
+  return "";
+}
+
 const avatar = (login: string) => `https://avatars.example.com/${login.replace("/", "-")}.png`;
 const key = (slug: string, number: number) => `${slug.toLowerCase()}#${String(number)}`;
 
@@ -134,7 +145,7 @@ export class PrDetailWorld {
   private readonly details = new Map<string, DetailInit>();
   private readonly candidates = new Map<string, CandidateInit[]>();
   private readonly reverts = new Map<string, { number: number; url: string }>();
-  private readonly merges = new Map<string, MergeOut>();
+  private readonly merges = new Map<string, { res: MergeOut; deleteAsked: boolean }>();
   private nextNumber = 151;
   /** Commands whose next run fails (POST /__mock/gh/pr-fail?command=…). */
   readonly failNext = new Set<string>();
@@ -148,6 +159,8 @@ export class PrDetailWorld {
     if (merged) this.details.set(key(CF, 138), this.mergedDetail(merged));
     this.details.set(key(CF, 131), this.closedDetail());
     this.details.set(key(CF, 140), this.readOnlyDetail());
+    this.details.set(key(CF, 146), this.forkDetail());
+    for (const d of this.details.values()) d.defaultBranch = "main";
     this.candidates.set(key(CF, 145), [
       { id: "T_core", kind: ReviewerKind.TEAM, login: "acme/core", name: "Core", avatarUrl: avatar("acme/core"), isRequested: true },
       { id: "U_ana", kind: ReviewerKind.USER, login: "teammate-ana", name: "Ana", avatarUrl: avatar("teammate-ana"), isRequested: true },
@@ -369,6 +382,32 @@ export class PrDetailWorld {
     };
   }
 
+  /** #146: an outside contributor's open pull request from a fork, ready to merge. */
+  private forkDetail(): DetailInit {
+    const pr = this.h.makePr(CF, 146, "fix(cli): typo in --help", {
+      author: "outside-contrib",
+      headRef: "patch-1",
+      headSha: "f04c146000000000000000000000000000000000",
+      isCrossRepository: true,
+      reviewDecision: ReviewDecision.APPROVED,
+      mergeStateStatus: MergeStateStatus.CLEAN,
+      ageMs: 6 * HOUR,
+      checks: { state: CheckRollupState.SUCCESS, total: 1, passed: 1, failed: 0, pending: 0, skipped: 0 },
+    });
+    return {
+      pullRequest: pr,
+      body: "Fixes a typo.",
+      commits: [{ sha: "f04c146000000000000000000000000000000000", headline: "fix(cli): typo in --help", authorLogin: "outside-contrib", authorName: "Contributor", committedAt: this.at(6 * HOUR) }],
+      commitCount: 1,
+      checks: [{ name: "build", workflow: "CI", status: CheckStatus.COMPLETED, conclusion: CheckConclusion.SUCCESS, startedAt: this.at(6 * HOUR), completedAt: this.at(6 * HOUR - 3 * MIN) }],
+      nodeId: "PR_kwMock146",
+      mergeMethodsAllowed: ALL_METHODS,
+      viewerCanUpdate: true,
+      viewerPermission: "admin",
+      fetchedAt: this.at(20_000),
+    };
+  }
+
   /** A minimal detail from a listed pull request's summary. */
   private fromSummary(pr: PrInit): DetailInit {
     return {
@@ -381,6 +420,7 @@ export class PrDetailWorld {
       viewerPermission: pr.author === this.h.viewer ? "admin" : "read",
       mergedBy: pr.state === PullRequestState.MERGED ? pr.author : "",
       closedAt: pr.mergedAt,
+      defaultBranch: "main",
       fetchedAt: this.at(20_000),
     };
   }
@@ -470,21 +510,36 @@ export class PrDetailWorld {
           name: "pr.merge",
           title: "Merge Pull Request",
           category: "Pull Request",
-          description: "Merge an open pull request with a merge commit, squash, or rebase (GitHub's merge button); --delete-branch deletes its branch afterwards.",
+          description:
+            "Merge an open pull request with a merge commit, squash, or rebase (GitHub's merge button); --delete-branch deletes its branch on GitHub afterwards (never local branches or worktrees).",
           keybindings: [],
           args: [
             slugArg,
             numberArg,
             { name: "method", type: ArgType.ENUM, required: true, description: "How to merge: a merge commit, squash, or rebase", enumValues: ["merge", "squash", "rebase"] },
-            { name: "delete-branch", type: ArgType.BOOL, required: false, description: "Delete the head branch after the merge (never a fork's)" },
+            {
+              name: "delete-branch",
+              type: ArgType.BOOL,
+              required: false,
+              description: "Delete the head branch on GitHub (origin) after the merge; never a fork's, the default or the base branch, nor local branches or worktrees",
+            },
+            { name: "head-sha", type: ArgType.STRING, required: false, description: "Merge only if the head is still this commit (full SHA): refused when the pull request changed since you looked" },
           ],
-          // Like the daemon's DynamicConfirm: the base from the detail, and the branch it deletes.
+          // Like the daemon's DynamicConfirm: the base from the detail, what merges without
+          // head-sha, and the branch it deletes (origin's; not a fork's, the default or base).
           confirm: (_ctx: UiContext | undefined, args: Record<string, string>) => {
             const method = args.method ?? "";
-            const pr = this.details.get(key(args["repo-slug"] ?? "", Number(args.number)))?.pullRequest ?? this.h.findPr(args["repo-slug"] ?? "", Number(args.number));
+            const k = key(args["repo-slug"] ?? "", Number(args.number));
+            const d = this.details.get(k);
+            const pr = d?.pullRequest ?? this.h.findPr(args["repo-slug"] ?? "", Number(args.number));
             if (!pr?.baseRef) return `Merge #${args.number ?? ""} with ${method}?`;
-            let msg = `Merge #${args.number ?? ""} into ${pr.baseRef} with ${methodWords[method] ?? method}?`;
-            if (args["delete-branch"] === "true" && pr.headRef) msg += ` Branch ${pr.headRef} is deleted afterwards.`;
+            let what = `#${args.number ?? ""}`;
+            if (!args["head-sha"] && pr.headSha) {
+              const c = d?.commitCount ?? 0;
+              what += ` (${c === 1 ? "1 commit" : `${String(c)} commits`}, head ${pr.headSha.slice(0, 7)})`;
+            }
+            let msg = `Merge ${what} into ${pr.baseRef} with ${methodWords[method] ?? method}?`;
+            if (args["delete-branch"] === "true" && keepBranch(pr, d?.defaultBranch ?? "main") === "") msg += ` Branch origin/${pr.headRef ?? ""} is deleted afterwards.`;
             return msg;
           },
         },
@@ -494,7 +549,7 @@ export class PrDetailWorld {
           const method = methodNames[args.method ?? ""];
           if (method === undefined) throw new ConnectError("method must be merge, squash, or rebase", Code.InvalidArgument);
           if (this.sessionDelayMs > 0) await new Promise((r) => setTimeout(r, this.sessionDelayMs));
-          const r = prDetailCall(() => this.merge(slug, n, method, args["delete-branch"] === "true"));
+          const r = prDetailCall(() => this.merge(slug, n, method, args["delete-branch"] === "true", args["head-sha"] ?? ""));
           return out(r.message, r);
         },
       },
@@ -595,16 +650,21 @@ export class PrDetailWorld {
   }
 
   /**
-   * Merges an open pull request (once; repeats in the session return the same), like the
-   * daemon: refused when it is not open, a draft, conflicting, blocked, the method is not
-   * allowed, or the viewer cannot write. A success marks it merged, moves it to the
-   * dashboard's recently merged and announces it.
+   * Merges an open pull request (once; repeats in the session return the same, saying
+   * when only the repeat asked for the branch), like the daemon: refused when it is not
+   * open, a draft, conflicting, blocked, the method is not allowed, the viewer cannot
+   * write, or expectedHeadSha is not its head. A success marks it merged, moves it to the
+   * dashboard's recently merged and announces it. The branch (origin/<head>) is deleted
+   * when asked, except a fork's, the default branch and the base branch.
    */
-  merge(slug: string, number: number, method: PullRequestMergeMethod, deleteBranch: boolean): MergeOut {
+  merge(slug: string, number: number, method: PullRequestMergeMethod, deleteBranch: boolean, expectedHeadSha = ""): MergeOut {
     this.h.count("MergePullRequest");
     const k = key(slug, number);
     const done = this.merges.get(k);
-    if (done) return done;
+    if (done) {
+      if (deleteBranch && !done.deleteAsked) return { ...done.res, message: `${done.res.message}; branch not deleted: the first merge did not ask` };
+      return done.res;
+    }
     const d = this.detailOf(slug, number);
     const pr = d.pullRequest;
     if (method === PullRequestMergeMethod.UNSPECIFIED) throw new PrDetailError("invalid_argument", "method is required: merge, squash, or rebase");
@@ -613,6 +673,10 @@ export class PrDetailWorld {
     if (pr.state !== PullRequestState.OPEN) throw refuse(`pull request #${String(number)} is ${pr.state === PullRequestState.MERGED ? "merged" : "closed"}, not open`);
     if (pr.draft) throw refuse(`pull request #${String(number)} is a draft`);
     if (!(d.mergeMethodsAllowed ?? []).includes(method)) throw refuse(`pull request #${String(number)} cannot be merged with ${methodWords[PullRequestMergeMethod[method].toLowerCase()] ?? "it"}: the repository does not allow it`);
+    const head = pr.headSha ?? "";
+    if (expectedHeadSha && expectedHeadSha.toLowerCase() !== head.toLowerCase()) {
+      throw refuse(`pull request #${String(number)} changed since it was shown (head ${head.slice(0, 7)}, shown ${expectedHeadSha.slice(0, 7)}); refresh and try again`);
+    }
     if (!d.viewerCanUpdate) throw new PrDetailError("permission_denied", "permission denied on github: Resource not accessible by integration");
     if (this.failNext.delete("pr.merge")) {
       throw refuse(`pull request #${String(number)} changed on GitHub since it was loaded (${pr.headRef ?? ""} has new commits); refresh and review it before merging`);
@@ -632,14 +696,20 @@ export class PrDetailWorld {
     d.fetchedAt = now;
     const found = this.h.findPr(slug, number);
     if (found) this.h.markMerged(found);
-    const branchDeleted = deleteBranch && Boolean(pr.headRef);
-    const res: MergeOut = {
-      merged: true,
-      sha,
-      message: `Merged #${String(number)} (${sha.slice(0, 7)})${branchDeleted ? `; deleted branch ${pr.headRef ?? ""}` : ""}`,
-      branchDeleted,
-    };
-    this.merges.set(k, res);
+    let message = `Merged #${String(number)} (${sha.slice(0, 7)})`;
+    let branchDeleted = false;
+    const branch = pr.headRef ?? "";
+    if (deleteBranch && branch) {
+      const why = keepBranch(pr, d.defaultBranch ?? "main");
+      if (pr.isCrossRepository) message += `; kept ${branch}: ${why}`;
+      else if (why) message += `; kept origin/${branch}: ${why}`;
+      else {
+        branchDeleted = true;
+        message += `; deleted origin/${branch}`;
+      }
+    }
+    const res: MergeOut = { merged: true, sha, message, branchDeleted };
+    this.merges.set(k, { res, deleteAsked: deleteBranch });
     this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
     return res;
   }
