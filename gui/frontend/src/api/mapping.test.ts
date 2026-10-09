@@ -3,7 +3,22 @@ import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { describe, expect, it } from "vitest";
 import { ArgType, CommandSchema } from "@/gen/codefoundry/v1/command_pb";
 import { EventSchema } from "@/gen/codefoundry/v1/events_pb";
-import { GhEventSchema, Mergeable, MergeStateStatus, PullRequestReviewState, PullRequestSchema, PullRequestState } from "@/gen/codefoundry/v1/gh_pb";
+import {
+  CheckConclusion,
+  CheckRollupState,
+  CheckStatus,
+  DiffSide,
+  GhEventSchema,
+  Mergeable,
+  MergeStateStatus,
+  PullRequestCommentKind,
+  PullRequestDetailSchema,
+  PullRequestReviewState,
+  PullRequestSchema,
+  PullRequestState,
+  ReviewerCandidateSchema,
+  ReviewerKind,
+} from "@/gen/codefoundry/v1/gh_pb";
 import { RepoEventSchema, RepoSchema } from "@/gen/codefoundry/v1/repo_pb";
 import { SessionEventSchema, SessionSchema, SessionState, SessionStatus } from "@/gen/codefoundry/v1/session_pb";
 import { AttachEventSchema, TerminalEventSchema, TerminalSchema, TerminalState } from "@/gen/codefoundry/v1/terminal_pb";
@@ -11,7 +26,7 @@ import { UiIntent_Notify_Level, UiIntentSchema } from "@/gen/codefoundry/v1/ui_p
 import { toCommandView } from "./command";
 import { overrideEndpoint } from "./endpoint";
 import { toEventView } from "./events";
-import { toPullRequestView } from "./gh";
+import { toGhEventView, toPullRequestDetailView, toPullRequestView, toReviewerCandidateView } from "./gh";
 import { toRepoEventView, toRepoView } from "./repo";
 import { toSessionView } from "./session";
 import { toAttachEventView, toTerminalEventView, toTerminalView } from "./terminal";
@@ -167,6 +182,97 @@ describe("gh mapping", () => {
       partial: true,
     });
     expect(toPullRequestView(create(PullRequestSchema, {}))).toMatchObject({ mergeable: null, mergeState: "", partial: false });
+  });
+
+  it("maps a pull request detail", () => {
+    const d = create(PullRequestDetailSchema, {
+      pullRequest: { repoSlug: "o/r", number: 7, state: PullRequestState.MERGED, checks: { state: CheckRollupState.FAILURE, total: 2, passed: 1, failed: 1 } },
+      body: "## Summary",
+      labels: [{ name: "bug", color: "d73a4a" }],
+      reviewers: [
+        { login: "acme/core", isTeam: true, requested: true },
+        { login: "kim", state: PullRequestReviewState.CHANGES_REQUESTED, submittedAt: timestampFromMs(5000), stale: true, avatarUrl: "a" },
+        { login: "bot", isBot: true, state: PullRequestReviewState.DISMISSED },
+      ],
+      commits: [{ sha: "0123456789abcdef", headline: "fix", authorLogin: "octocat", authorName: "Octo", committedAt: timestampFromMs(1000) }],
+      commitCount: 120,
+      comments: [
+        { id: "IC_1", kind: PullRequestCommentKind.ISSUE_COMMENT, author: "kim", body: "why?", createdAt: timestampFromMs(2000), url: "u" },
+        { id: "PRR_1", kind: PullRequestCommentKind.REVIEW, author: "kim", reviewState: PullRequestReviewState.APPROVED },
+      ],
+      commentsTruncated: true,
+      reviewThreads: [
+        {
+          id: "T1",
+          path: "main.go",
+          line: 12,
+          side: DiffSide.LEFT,
+          isOutdated: true,
+          comments: [{ id: "C1", kind: PullRequestCommentKind.REVIEW_COMMENT, author: "gha", authorIsBot: true, path: "main.go" }],
+          commentsTruncated: true,
+        },
+        { id: "T2", path: "x.go" },
+      ],
+      checks: [{ name: "test", workflow: "CI", status: CheckStatus.IN_PROGRESS, description: "d", startedAt: timestampFromMs(3000) }, { name: "lint", status: CheckStatus.COMPLETED, conclusion: CheckConclusion.FAILURE }],
+      mergeCommitSha: "abc",
+      mergedBy: "kim",
+      closedAt: timestampFromMs(4000),
+      nodeId: "PR_7",
+      viewerCanUpdate: true,
+      viewerPermission: "write",
+      fetchedAt: timestampFromMs(6000),
+      lastError: "stale",
+    });
+    const v = toPullRequestDetailView(d);
+    expect(v).toMatchObject({
+      pullRequest: { repoSlug: "o/r", number: 7, state: "merged", checks: { state: "failure", failed: 1 } },
+      body: "## Summary",
+      labels: [{ name: "bug", color: "d73a4a" }],
+      reviewers: [
+        { login: "acme/core", isTeam: true, isBot: false, state: "", submittedAtMs: null, requested: true, stale: false },
+        { login: "kim", isTeam: false, state: "changes_requested", submittedAtMs: 5000, requested: false, stale: true, avatarUrl: "a" },
+        { login: "bot", isBot: true, state: "dismissed" },
+      ],
+      commits: [{ sha: "0123456789abcdef", shortSha: "0123456", headline: "fix", authorLogin: "octocat", authorName: "Octo", committedAtMs: 1000 }],
+      commitCount: 120,
+      comments: [
+        { id: "IC_1", kind: "issue_comment", author: "kim", body: "why?", createdAtMs: 2000, url: "u", reviewState: "" },
+        { id: "PRR_1", kind: "review", reviewState: "approved", createdAtMs: null },
+      ],
+      commentsTruncated: true,
+      reviewThreads: [
+        { id: "T1", path: "main.go", line: 12, side: "left", isResolved: false, isOutdated: true, commentsTruncated: true, comments: [{ kind: "review_comment", authorIsBot: true, path: "main.go" }] },
+        { id: "T2", side: null, line: 0, comments: [] },
+      ],
+      reviewThreadsTruncated: false,
+      checks: [
+        { name: "test", workflow: "CI", conclusion: "", status: "in_progress", description: "d", startedAtMs: 3000, completedAtMs: null },
+        { name: "lint", conclusion: "failure", status: "completed" },
+      ],
+      mergeCommitSha: "abc",
+      mergedBy: "kim",
+      closedAtMs: 4000,
+      nodeId: "PR_7",
+      viewerCanUpdate: true,
+      viewerPermission: "write",
+      fetchedAtMs: 6000,
+      lastError: "stale",
+    });
+    expect(toPullRequestDetailView(create(PullRequestDetailSchema, {}))).toMatchObject({ pullRequest: { state: "unknown", number: 0 }, closedAtMs: null, checks: [] });
+  });
+
+  it("maps reviewer candidates and the detail event", () => {
+    expect(toReviewerCandidateView(create(ReviewerCandidateSchema, { id: "T1", kind: ReviewerKind.TEAM, login: "acme/core", name: "Core", isRequested: true }))).toEqual({
+      id: "T1",
+      kind: "team",
+      login: "acme/core",
+      name: "Core",
+      avatarUrl: "",
+      isRequested: true,
+    });
+    expect(toReviewerCandidateView(create(ReviewerCandidateSchema, { login: "kim" })).kind).toBe("user");
+    const ev = create(GhEventSchema, { event: { case: "pullRequestDetailUpdated", value: { repoSlug: "o/r", number: 7 } } });
+    expect(toGhEventView(ev)).toEqual({ kind: "pullRequestDetail", repoSlug: "o/r", number: 7 });
   });
 });
 

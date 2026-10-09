@@ -27,6 +27,8 @@
  *   POST /__mock/update/disabled?reason=dev%20build
  *   POST /__mock/gh/update | poll | stale | auth?ok=false | touch?path=…   (GitHub + detail)
  *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts)
+ *   POST /__mock/gh/pr-comment?repo=o/r&number=145&body=…   (a new comment on a PR detail;
+ *        pull_request_detail_updated). PR detail fixtures: mock/prDetail.ts (#145 open, #138 merged)
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
@@ -46,6 +48,7 @@ import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb"
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { ghEvent } from "./github";
+import { PrDetailError } from "./prDetail";
 import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
 
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -55,6 +58,18 @@ const token = process.env.MOCK_TOKEN ?? "dev-mock-token";
 const world = new World();
 /** False simulates a pre-Phase-2a daemon (see POST /__mock/sessions-service). */
 let sessionsEnabled = true;
+
+const prDetailCodes = { not_found: Code.NotFound, failed_precondition: Code.FailedPrecondition, invalid_argument: Code.InvalidArgument };
+
+/** Runs a pull request detail RPC, mapping PrDetailError to its Connect code. */
+function prDetailCall<T>(fn: () => T): T {
+  try {
+    return fn();
+  } catch (err) {
+    if (err instanceof PrDetailError) throw new ConnectError(err.message, prDetailCodes[err.code]);
+    throw err;
+  }
+}
 
 function rpcError(err: unknown): ConnectError {
   if (err instanceof ConnectError) return err;
@@ -166,6 +181,11 @@ function routes(router: ConnectRouter): void {
       return world.gh.getBranchPullRequests(req.repoSlug.toLowerCase(), req.headRef);
     },
     refresh: () => ({}),
+    getPullRequestDetail: (req) => prDetailCall(() => ({ detail: world.gh.prDetails.get(req.repoSlug, req.number, req.refresh) })),
+    listReviewerCandidates: (req) => prDetailCall(() => world.gh.prDetails.listCandidates(req.repoSlug, req.number)),
+    setReviewRequest: (req) =>
+      prDetailCall(() => ({ requested: world.gh.prDetails.setReviewRequest(req.repoSlug, req.number, req.login, req.kind, req.requested) })),
+    revertPullRequest: (req) => prDetailCall(() => world.gh.prDetails.revert(req.repoSlug, req.number)),
   });
 
   router.service(CommandService, {
@@ -436,6 +456,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "GET /__mock/gh/calls":
       json(res, 200, world.gh.calls);
       break;
+    case "POST /__mock/gh/pr-comment": {
+      // A poll saw a new comment on a pull request with a detail: pull_request_detail_updated.
+      const ok = world.gh.prDetails.addComment(q.get("repo") ?? "alexwaumann/code-foundry", Number(q.get("number") ?? "145"), q.get("body") ?? "New comment");
+      json(res, ok ? 200 : 404, { ok });
+      break;
+    }
     case "GET /__mock/streams":
       json(res, 200, Object.fromEntries(openStreams));
       break;

@@ -20,9 +20,10 @@ import {
 } from "../src/gen/codefoundry/v1/gh_pb";
 import type { RepoEventSchema, WorktreeDetailSchema } from "../src/gen/codefoundry/v1/repo_pb";
 import type { UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
+import { PrDetailWorld } from "./prDetail";
 
 /** Plain init shapes (no $typeName arm), so spreads stay assignable to the RPC responses. */
-interface PrInit {
+export interface PrInit {
   repoSlug: string;
   number: number;
   title: string;
@@ -103,6 +104,8 @@ export class GhWorld {
   branches = new Map<string, PrInit[]>();
   details = new Map<string, DetailInit>();
   calls: Record<string, number> = {};
+  /** The pull request detail panel's fixtures (mock/prDetail.ts). */
+  prDetails!: PrDetailWorld;
   /** Viewer is authenticated (POST /__mock/gh/auth?ok=false flips it). */
   authenticated = true;
 
@@ -253,6 +256,26 @@ export class GhWorld {
       [`${CFW}/fix-resize`, this.detail(`${CFW}/fix-resize`, "origin/main", manyFiles(), Array.from({ length: 12 }, (_, i): [string, string, number] => [`${(0x1f2e3d4c + i * 7919).toString(16)}aa`, `fix(terminal): step ${String(12 - i)} of the resize rework`, (i + 1) * 3 * HOUR]))],
       [GP, this.detail(GP, "origin/main", [{ path: "src/renderer/atlas.zig", status: "M", added: 12, deleted: 3, uncommitted: true }], [])],
     ]);
+    this.prDetails = new PrDetailWorld({
+      t0: this.t0,
+      viewer: VIEWER,
+      publishGh: this.publishGh,
+      findPr: (slug, number) => this.findPr(slug, number),
+      addAuthored: (pr) => {
+        this.dashboard = { ...this.dashboard, authored: [pr, ...this.dashboard.authored], fetchedAt: timestampFromDate(new Date()) };
+        this.publishGh({ event: { case: "dashboardUpdated", value: { fetchedAt: this.dashboard.fetchedAt } } });
+      },
+      count: (rpc) => {
+        this.count(rpc);
+      },
+    });
+  }
+
+  /** A pull request any dashboard list or watched branch holds. */
+  findPr(slug: string, number: number): PrInit | undefined {
+    const d = this.dashboard;
+    const all = [...d.authored, ...d.reviewRequested, ...d.reviewed, ...d.recentlyMerged, ...[...this.branches.values()].flat()];
+    return all.find((p) => p.repoSlug.toLowerCase() === slug.toLowerCase() && p.number === number);
   }
 
   private detail(path: string, baseRef: string, files: FileInit[], log: [string, string, number][]): DetailInit {
