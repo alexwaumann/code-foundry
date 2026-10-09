@@ -8,8 +8,11 @@
 import { create } from "zustand";
 import { useUiStore, type Selection } from "./ui";
 
-/** What a panel tab shows. Each kind has a SurfaceSpec in surfaces/registry.ts. */
-export type SurfaceKind = "files" | "diff" | "pullrequest";
+/**
+ * What a panel tab shows: a SurfaceSpec kind from surfaces/registry.ts. A plain string,
+ * so adding a surface adds files there and edits nothing here.
+ */
+export type SurfaceKind = string;
 
 export interface Tab {
   /** Deterministic from kind + params (tabId), so opening the same thing twice finds it. */
@@ -94,11 +97,10 @@ export function toggle(e: PanelEntry, open?: boolean): PanelEntry {
 
 interface PanelState {
   byKey: Readonly<Record<string, PanelEntry>>;
-  /** Incremented to ask the visible panel to take keyboard focus. */
-  focusSeq: number;
 }
 
-export const usePanelStore = create<PanelState>()(() => ({ byKey: {}, focusSeq: 0 }));
+/** Focus requests for the panel go through the ui store (panelFocusSeq), which the palette also uses. */
+export const usePanelStore = create<PanelState>()(() => ({ byKey: {} }));
 
 /** A panel key (keyOf), or "current" for the window's selection. */
 export type PanelTarget = string;
@@ -107,17 +109,22 @@ function resolve(target: PanelTarget): string | null {
   return target === "current" ? keyOf(useUiStore.getState().selection) : target;
 }
 
-/** Applies a reducer to one key's entry. Returns the key it changed, or null. */
+/**
+ * Applies a reducer to one key's entry. Returns the key it changed, or null. With
+ * `focus`, an open result asks the panel to take focus. That request comes after the
+ * state change, so the panel it shows is mounted when SidePanel acts on it.
+ */
 function update(target: PanelTarget, f: (e: PanelEntry) => PanelEntry, opts?: { focus?: boolean }): string | null {
   const key = resolve(target);
   if (key === null) return null;
   usePanelStore.setState((s) => {
     const prev = s.byKey[key] ?? emptyEntry;
     const next = f(prev);
-    const focusSeq = opts?.focus && next.open ? s.focusSeq + 1 : s.focusSeq;
-    if (next === prev && focusSeq === s.focusSeq) return s;
-    return { byKey: next === prev ? s.byKey : { ...s.byKey, [key]: next }, focusSeq };
+    return next === prev ? s : { byKey: { ...s.byKey, [key]: next } };
   });
+  if (opts?.focus && (usePanelStore.getState().byKey[key]?.open ?? false)) {
+    useUiStore.setState((s) => ({ panelFocusSeq: s.panelFocusSeq + 1 }));
+  }
   return key;
 }
 
@@ -138,22 +145,12 @@ export function openSurface(target: PanelTarget, tab: Tab): boolean {
 
 /**
  * Shows or hides the panel for a key (default: the current selection). Showing it asks
- * the panel to take focus so its hotkeys work at once. Returns the new open state.
+ * the panel to take focus so its hotkeys work at once, unless `focus` is false. Returns
+ * the new open state. The view.panel.toggle command is togglePanelCommand (stores/views.ts).
  */
-export function togglePanel(target: PanelTarget = "current", open?: boolean): boolean {
-  const key = update(target, (e) => toggle(e, open), { focus: true });
+export function togglePanel(target: PanelTarget = "current", open?: boolean, opts: { focus?: boolean } = {}): boolean {
+  const key = update(target, (e) => toggle(e, open), { focus: opts.focus ?? true });
   return key !== null && (usePanelStore.getState().byKey[key]?.open ?? false);
-}
-
-/**
- * view.panel.toggle for the current selection. Hiding the panel while it has focus hands
- * focus back to the content terminal (if one is showing).
- */
-export function togglePanelCommand(): boolean {
-  const hadFocus = useUiStore.getState().focus === "panel";
-  const open = togglePanel("current");
-  if (!open && hadFocus) useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
-  return open;
 }
 
 export function closePanelTab(target: PanelTarget, id: string): void {

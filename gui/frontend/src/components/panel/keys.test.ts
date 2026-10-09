@@ -12,7 +12,7 @@ const withTab: PanelEntry = { open: true, tabs: [files], activeTabId: files.id }
 describe("panelKeyAction", () => {
   const cases: [string, string, PanelEntry, ReturnType<typeof panelKeyAction>][] = [
     ["cmd+w closes the active tab", "cmd+w", withTab, { kind: "close", tabId: files.id }],
-    ["cmd+w with no tabs does nothing", "cmd+w", { ...emptyEntry, open: true }, null],
+    ["cmd+w with no tabs hides the panel", "cmd+w", { ...emptyEntry, open: true }, { kind: "hide" }],
     ["disabled surface hotkey does nothing", "f", withTab, null],
     ["pull request is disabled for now", "p", withTab, null],
     ["unknown letter does nothing", "q", withTab, null],

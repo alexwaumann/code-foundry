@@ -20,7 +20,7 @@ const extraChords: LocalChord[] = [
   { chord: "arrowleft", title: "Fold or unfold a sidebar row" },
   { chord: "arrowright", title: "Fold or unfold a sidebar row" },
   { chord: "a", title: "Pull Requests: all or registered repositories" },
-  { chord: "cmd+w", title: "Side panel: close the active tab" },
+  { chord: "cmd+w", title: "Side panel: close the active tab (hides an empty panel)" },
 ];
 
 function Keys({ keys }: { keys: string[] }) {

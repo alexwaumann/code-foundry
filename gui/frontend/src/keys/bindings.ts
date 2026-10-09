@@ -7,8 +7,7 @@ import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { zoomFont } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
-import { togglePanelCommand } from "@/stores/panel";
-import { showView, toggleHelp } from "@/stores/views";
+import { showView, toggleHelp, togglePanelCommand } from "@/stores/views";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**

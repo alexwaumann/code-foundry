@@ -11,11 +11,10 @@ import {
   tabId,
   toggle,
   togglePanel,
-  togglePanelCommand,
   usePanelStore,
   type PanelEntry,
 } from "./panel";
-import { panelMax, PANEL_MIN, useUiStore, type Selection } from "./ui";
+import { useUiStore, type Selection } from "./ui";
 
 const files = makeTab("files", "Files");
 const diff = makeTab("diff", "Diff");
@@ -117,8 +116,8 @@ describe("toggle", () => {
 
 describe("panel store", () => {
   beforeEach(() => {
-    usePanelStore.setState({ byKey: {}, focusSeq: 0 });
-    useUiStore.setState({ selection: { kind: "session", id: "a" }, focus: "content", terminalFocusSeq: 0 });
+    usePanelStore.setState({ byKey: {} });
+    useUiStore.setState({ selection: { kind: "session", id: "a" }, focus: "content", panelFocusSeq: 0 });
   });
 
   it("keeps state per selection", () => {
@@ -135,35 +134,20 @@ describe("panel store", () => {
     expect(usePanelStore.getState().byKey).toEqual({});
   });
 
-  it("openSurface opens another selection's panel by key", () => {
+  it("openSurface opens another selection's panel by key, without a focus request", () => {
     expect(openSurface("worktree:r:/p", diff)).toBe(true);
     expect(getPanel("worktree:r:/p")).toEqual(entry(true, [diff], diff.id));
     expect(getPanel().open).toBe(false);
+    expect(useUiStore.getState().panelFocusSeq).toBe(0);
   });
 
-  it("toggling on asks for focus; hiding from the panel returns it to the terminal", () => {
-    togglePanelCommand();
-    expect(usePanelStore.getState().focusSeq).toBe(1);
-    useUiStore.setState({ focus: "panel" });
-    expect(togglePanelCommand()).toBe(false);
-    expect(useUiStore.getState().terminalFocusSeq).toBe(1);
-    expect(usePanelStore.getState().focusSeq).toBe(1);
-  });
-});
-
-describe("panel width", () => {
-  const cases: [string, number, number, number][] = [
-    ["below the minimum", 100, 1400, PANEL_MIN],
-    ["inside the bounds", 500.4, 1400, 500],
-    ["above 60% of the window", 1000, 1400, 840],
-    ["narrow window keeps the minimum", 400, 300, PANEL_MIN],
-  ];
-  it.each(cases)("%s", (_name, w, windowWidth, want) => {
-    useUiStore.getState().setPanelWidth(w, windowWidth);
-    expect(useUiStore.getState().panelWidth).toBe(want);
-  });
-
-  it("panelMax is 60% of the window", () => {
-    expect(panelMax(1000)).toBe(600);
+  it("showing asks for focus unless told not to; hiding never does", () => {
+    togglePanel();
+    expect(useUiStore.getState().panelFocusSeq).toBe(1);
+    togglePanel();
+    expect(useUiStore.getState().panelFocusSeq).toBe(1);
+    togglePanel("current", true, { focus: false });
+    expect(getPanel().open).toBe(true);
+    expect(useUiStore.getState().panelFocusSeq).toBe(1);
   });
 });

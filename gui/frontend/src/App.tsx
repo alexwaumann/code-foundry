@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
 import { Dashboard } from "@/components/Dashboard";
 import { HelpOverlay } from "@/components/help/HelpOverlay";
@@ -19,7 +19,7 @@ import { startCommandSync } from "@/stores/commands";
 import { startEventSync } from "@/stores/events";
 import { startHealthPolling } from "@/stores/health";
 import { useAttentionCount, useSessionsStore } from "@/stores/sessions";
-import { useUiStore, type FocusRegion } from "@/stores/ui";
+import { CONTENT_MIN, useUiStore, type FocusRegion } from "@/stores/ui";
 import { startViewSync, useViewsStore } from "@/stores/views";
 import { startUpdateSync } from "@/stores/update";
 
@@ -37,6 +37,12 @@ function startApp(): () => void {
     useUiStore.getState().setFocus(regionOf(e.target));
   };
   document.addEventListener("focusin", onFocusIn);
+  // The side panel's bounds depend on the window width (stores/ui.ts panelMax).
+  const onResize = () => {
+    useUiStore.getState().setWindowWidth(window.innerWidth);
+  };
+  window.addEventListener("resize", onResize);
+  onResize();
   const stops = [
     syncDocumentScheme(),
     startHealthPolling(2000),
@@ -48,6 +54,7 @@ function startApp(): () => void {
   ];
   return () => {
     document.removeEventListener("focusin", onFocusIn);
+    window.removeEventListener("resize", onResize);
     for (const stop of stops) stop();
   };
 }
@@ -68,6 +75,31 @@ function Content() {
   return <Dashboard />;
 }
 
+/**
+ * The content pane. On a focus request (ui contentFocusSeq) it focuses the page's
+ * `[data-focus-root]` element (a page's keyboard list or its root section); a terminal
+ * answers the same request itself (TerminalPane), and has no focus root.
+ */
+function ContentPane({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLElement>(null);
+  const focusSeq = useUiStore((s) => s.contentFocusSeq);
+  useEffect(() => {
+    if (focusSeq === 0) return;
+    ref.current?.querySelector<HTMLElement>("[data-focus-root]")?.focus({ preventScroll: true });
+  }, [focusSeq]);
+  return (
+    <main
+      ref={ref}
+      className="mx-2 mb-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs"
+      // The side panel shrinks, then hides, before the content pane gets narrower than this.
+      style={{ minWidth: CONTENT_MIN }}
+      data-testid="content-pane"
+    >
+      {children}
+    </main>
+  );
+}
+
 export function App() {
   useEffect(() => startApp(), []);
   const scheme = useColorScheme();
@@ -83,9 +115,7 @@ export function App() {
       <TitleStrip />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="mx-2 mb-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs" data-testid="content-pane">
-          {settingsOpen ? <SettingsPage /> : <Content />}
-        </main>
+        <ContentPane>{settingsOpen ? <SettingsPage /> : <Content />}</ContentPane>
         <SidePanel />
       </div>
       <CommandPalette />

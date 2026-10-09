@@ -139,6 +139,7 @@ function Body({ d, includeAll }: { d: DashboardView; includeAll: boolean }) {
         aria-activedescendant={nav.activeDescendant}
         className="flex flex-col gap-6 outline-none"
         data-testid="prs-list"
+        data-focus-root
         onKeyDown={(e) => {
           if (e.key === "a" && !e.metaKey && !e.ctrlKey && !e.altKey) {
             toggle();

@@ -3,13 +3,14 @@
  * exporting a SurfaceSpec (see types.ts); list it here. The panel finds renderers,
  * hotkeys and availability through these lookups, never by switching on the kind.
  */
+import { useCallback, useSyncExternalStore } from "react";
 import type { SurfaceKind } from "@/stores/panel";
 import { diffSurface } from "./diff";
 import { filesSurface } from "./files";
 import { pullRequestSurface } from "./pullrequest";
 import type { SurfaceAvailability, SurfaceContext, SurfaceSpec } from "./types";
 
-export type { SurfaceAvailability, SurfaceContext, SurfaceSpec } from "./types";
+export type { Subscribable, SurfaceAvailability, SurfaceContext, SurfaceSpec } from "./types";
 
 export const surfaces: readonly SurfaceSpec[] = [filesSurface, diffSurface, pullRequestSurface];
 
@@ -25,10 +26,21 @@ export function surfaceByHotkey(key: string): SurfaceSpec | undefined {
   return byHotkey.get(key.toLowerCase());
 }
 
-/** Surfaces to list for a selection, with their availability; hidden ones are left out. */
-export function listedSurfaces(ctx: SurfaceContext): { spec: SurfaceSpec; availability: Exclude<SurfaceAvailability, "hidden"> }[] {
-  return surfaces.flatMap((spec) => {
-    const availability = spec.available(ctx);
-    return availability === "hidden" ? [] : [{ spec, availability }];
-  });
+/**
+ * A surface's availability for ctx, kept current: subscribes to the stores the spec
+ * `watches` and re-evaluates `available` when any of them changes. The snapshot is a
+ * string, so unrelated store updates do not re-render the caller.
+ */
+export function useAvailability(spec: SurfaceSpec, ctx: SurfaceContext): SurfaceAvailability {
+  const { watches } = spec;
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const stops = (watches ?? []).map((s) => s.subscribe(onChange));
+      return () => {
+        for (const stop of stops) stop();
+      };
+    },
+    [watches],
+  );
+  return useSyncExternalStore(subscribe, () => spec.available(ctx));
 }

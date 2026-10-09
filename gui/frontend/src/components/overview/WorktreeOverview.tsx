@@ -297,6 +297,7 @@ function OverviewBody({ repo, wt, items }: { repo: RepoView; wt: WorktreeView; i
         aria-activedescendant={nav.activeDescendant}
         className="flex flex-col gap-6 outline-none"
         data-testid="overview-list"
+        data-focus-root
         onKeyDown={(e) => {
           if ((e.key === "e" || e.key === "E") && !e.metaKey && !e.ctrlKey && !e.altKey) {
             expandAll(e.key === "e");

@@ -174,7 +174,7 @@ export function Dashboard() {
   if (selection.kind === "repo") return <WorktreeOverview repoId={selection.repoId} path={null} items={<WorktreeItems repoId={selection.repoId} path={null} />} />;
   if (selection.kind === "worktree") return <WorktreeOverview repoId={selection.repoId} path={selection.path} items={<WorktreeItems repoId={selection.repoId} path={selection.path} />} />;
   return (
-    <section className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto p-10" data-region="content" aria-label="Overview">
+    <section className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto p-10 outline-none" tabIndex={-1} data-focus-root data-region="content" aria-label="Overview">
       <div className="mt-[18vh]">
         <Welcome />
       </div>
