@@ -39,17 +39,11 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      # Same setup as ci.yml. libghostty-vt is vendored (third_party/libghostty-vt), so
-      # `make package` needs no zig or cache.
+      # Same setup as ci.yml.
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-          # The Go build cache bakes pkg-config output (the libghostty-vt link path) into
-          # compiled cgo packages without keying on it, so a stale cache links a library
-          # that no longer exists. Key the cache on the vendored library's MANIFEST too.
-          cache-dependency-path: |
-            go.sum
-            third_party/libghostty-vt/MANIFEST
+          cache-dependency-path: go.sum
 
       - uses: pnpm/action-setup@v6
         with:
@@ -60,6 +54,17 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: gui/frontend/pnpm-lock.yaml
+
+      - name: libghostty-vt cache key
+        id: ghostty-vt
+        run: echo "key=$(./scripts/ghostty-vt.sh --print-key)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v6
+        with:
+          path: third_party/ghostty-vt
+          key: ${{ runner.os }}-${{ steps.ghostty-vt.outputs.key }}
+
+      - run: make ghostty-vt
 
       # wails3 builds the GUI bundle. Built with the module's toolchain (go1.26), which
       # setup-go put on PATH via the go.mod toolchain directive.

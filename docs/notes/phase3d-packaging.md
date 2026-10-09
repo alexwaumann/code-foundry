@@ -66,12 +66,11 @@ package.sh refuses to finish when:
 ### Automatic (GitHub Actions, on since 2026-10-09)
 
 `.github/workflows/release.yml` uses the same setup as `ci.yml`: checkout with full
-history and tags, setup-go from go.mod, pnpm 12.8.1, node 24 (libghostty-vt is vendored,
-see vendored-libghostty-vt.md, so there is no zig build or cache). It then installs
-`wails3@v3.0.0-beta.28` with the go.mod toolchain and runs `scripts/release.sh` with the
-default `GITHUB_TOKEN` (`permissions: contents: write`). `concurrency: release` with no
-cancellation queues merges instead of racing them. `workflow_dispatch` takes an optional
-explicit version.
+history and tags, setup-go from go.mod, pnpm 12.8.1, node 24, the libghostty-vt cache
+key, and `make ghostty-vt`. It then installs `wails3@v3.0.0-beta.28` with the go.mod
+toolchain and runs `scripts/release.sh` with the default `GITHUB_TOKEN`
+(`permissions: contents: write`). `concurrency: release` with no cancellation queues
+merges instead of racing them. `workflow_dispatch` takes an optional explicit version.
 
 ### Enabling automatic releases
 

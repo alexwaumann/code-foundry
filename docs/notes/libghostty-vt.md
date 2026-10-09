@@ -1,7 +1,5 @@
 # libghostty-vt Go bindings — verified findings (2026-10-08)
 
-> The library is now vendored prebuilt; see [vendored-libghostty-vt.md](vendored-libghostty-vt.md).
-
 Verified by actually building and running on macOS 27 arm64 with Command Line Tools only.
 
 ## Versions
