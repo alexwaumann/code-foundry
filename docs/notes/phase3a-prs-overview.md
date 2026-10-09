@@ -1,5 +1,9 @@
 # Phase 3a: Pull Requests page and worktree overview
 
+> **Polling superseded** by `gh-viewer-polling.md`: the three searches, stats, default-branch
+> CI, and branch PRs below are now parts of one fingerprint poll per interval, with
+> details fetched only for what changed. The page and overview behave as described.
+
 Status: done on branch `phase3a-prs-overview`. `make check` is green and `make gui-e2e`
 passes (WebKit and Chromium). The behaviour was exercised live against a real daemon with
 three repos registered:

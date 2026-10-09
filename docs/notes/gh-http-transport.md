@@ -54,7 +54,7 @@ read it.
   with the reason in `Error`. A transport failure returns an error, as before. The
   store's auth-paused/resume logic is unchanged.
 * **HTTP client.** It is a clone of `http.DefaultTransport` with HTTP/2,
-  `MaxIdleConnsPerHost=2`, `IdleConnTimeout=5m` (longer than the 60s repo interval),
+  `MaxIdleConnsPerHost=2`, `IdleConnTimeout=5m` (now 25s, see below),
   `TLSHandshakeTimeout=10s`, and `ResponseHeaderTimeout=30s`. Each request has a 30s
   context timeout that also covers reading the body, and bodies are capped at 32 MiB.
   Requests send these headers:
@@ -134,10 +134,10 @@ In the daemon (debug log, `msg="github http"`, all over HTTP/2):
 | NOT_FOUND `pull_request` | 221 ms |
 
 * Every request after the first had `reused_conn=true`, including after 30s idle.
-* After 63s idle, in the bogus-token run, the request opened a new connection. That
-  is one observation, but GitHub (or something on the path) may close idle connections
-  at around a minute, close to the 60s repo interval. A reconnect costs ~150–250ms and
-  is transparent.
+* After 63s idle, in the bogus-token run, the request opened a new connection. Measured
+  later (`gh-viewer-polling.md`): GitHub closes idle connections after ~30s (reused
+  after 28s, new after 31s), so the client now drops its own at 25s. A reconnect costs
+  ~150–400ms and is transparent.
 * The ghostty pages are server time and unchanged by the transport.
 
 ## MinGap: 2s → 1s
@@ -156,7 +156,7 @@ remaining constraints are GitHub's:
   the smallest round gap where the pacing alone bounds the hourly cost.
 
 The polling cadence itself (intervals, page counts) is unchanged and left to the
-polling redesign.
+polling redesign (done: `gh-viewer-polling.md`).
 
 ## End-to-end runs
 

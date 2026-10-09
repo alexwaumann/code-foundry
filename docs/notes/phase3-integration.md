@@ -66,7 +66,8 @@ The bundle id change means a fresh WKWebView storage location: persisted GUI sta
 
 ## Settings consumer
 
-`github.dashboards_enabled` = false sets `gh.Options.DashboardInterval = -1`. The gh store
+(Superseded by `gh-viewer-polling.md`: both github.* settings apply live through
+`gh.Options.Config`.) `github.dashboards_enabled` = false sets `gh.Options.DashboardInterval = -1`. The gh store
 already treats a negative interval as "poll off" (tested in `activity_test.go`). The field
 is now `Restart: true`, like the other GitHub interval, in the schema and in the mock's
 copy. Stats and per-repo activity still poll. The page shows the last cached dashboard.
