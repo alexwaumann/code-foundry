@@ -86,7 +86,7 @@ mkdir -p dist
 rm -f "dist/$TARBALL" dist/install.sh dist/checksums.txt dist/CodeFoundry-darwin-arm64.zip dist/code-foundry-darwin-arm64
 # shellcheck disable=SC2086 # FILES is a fixed list of plain names
 COPYFILE_DISABLE=1 tar -czf "dist/$TARBALL" -C "$STAGE" $FILES
-listing="$(tar -tzf "dist/$TARBALL" | sort | tr '\n' ' ')"
+listing="$(tar -tzf "dist/$TARBALL" | LC_ALL=C sort | tr '\n' ' ')"
 [ "$listing" = "CodeFoundry VERSION code-foundry " ] || die "unexpected tarball contents: $listing"
 if [ -n "$RELEASE_REPO" ]; then
 	sed "s|^DEFAULT_REPO=.*|DEFAULT_REPO=\"$RELEASE_REPO\"|" scripts/install.sh >dist/install.sh
