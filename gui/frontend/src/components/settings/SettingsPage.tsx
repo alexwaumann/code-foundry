@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FileText, Search, TriangleAlert, X } from "lucide-react";
 import type { SettingFieldView } from "@/api/settings";
 import { Button } from "@/components/ui/button";
+import { PaneHeader } from "@/components/window/PaneHeader";
 import { tildify } from "@/lib/path";
 import { runCommand } from "@/stores/commands";
 import { useConfirmStore } from "@/stores/confirm";
@@ -91,7 +92,7 @@ export function SettingsPage() {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Settings" data-testid="settings-page">
-      <header className="flex h-11 shrink-0 items-center gap-3 border-b border-pane-border px-4">
+      <PaneHeader className="gap-3 px-4">
         <h1 className="text-sm font-semibold">Settings</h1>
         <div className="relative max-w-xs flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -122,7 +123,7 @@ export function SettingsPage() {
         <Button variant="ghost" size="icon-xs" aria-label="Close settings" title="Close (Esc)" onClick={closeSettings}>
           <X />
         </Button>
-      </header>
+      </PaneHeader>
       <div className="flex min-h-0 flex-1">
         <nav className="w-44 shrink-0 space-y-0.5 border-r border-pane-border p-2 text-[13px]" aria-label="Setting groups">
           {groups.map(({ group, fields }) => (

@@ -12,7 +12,6 @@ import { Sidebar } from "@/components/sidebar/Sidebar";
 import { TerminalPane } from "@/components/terminal/TerminalPane";
 import { Toaster } from "@/components/ui/sonner";
 import { UpdateDialog } from "@/components/update/UpdateDialog";
-import { TitleStrip } from "@/components/window/TitleStrip";
 import { installKeybindings } from "@/keys/bindings";
 import { syncDocumentScheme, useColorScheme } from "@/lib/theme";
 import { useWindowTitle } from "@/lib/title";
@@ -92,7 +91,7 @@ function ContentPane({ children }: { children: ReactNode }) {
   return (
     <main
       ref={ref}
-      className="mx-2 mb-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs"
+      className="m-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs"
       // The side panel shrinks, then hides, before the content pane gets narrower than this.
       style={{ minWidth: CONTENT_MIN }}
       data-testid="content-pane"
@@ -109,12 +108,12 @@ export function App() {
   useWindowTitle(useAttentionCount());
 
   return (
-    // The sheet: one background under the title strip and sidebar. The content area is a
-    // pane floating on it (rounded, lighter, 8px in from its neighbours and the window's
-    // right and bottom edges); the selection's side panel, when open, is a second pane
-    // to its right (components/panel, docs/notes/side-panel.md).
+    // The sheet: one background under the sidebar. The content area is a pane floating
+    // on it (rounded, lighter, 8px in from its neighbours and the window's top, right
+    // and bottom edges); the selection's side panel, when open, is a second pane to its
+    // right (components/panel, docs/notes/side-panel.md). Nothing spans the title band
+    // (components/window/titleBand.ts): the sidebar's top band and the pane headers fill it.
     <div className="flex h-screen flex-col overflow-hidden bg-sheet text-foreground">
-      <TitleStrip />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <ContentPane>{settingsOpen ? <SettingsPage /> : <Content />}</ContentPane>

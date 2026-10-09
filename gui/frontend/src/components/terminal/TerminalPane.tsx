@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { CircleX, GitFork, Loader2, OctagonX, Pencil, Power, RefreshCw } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { PanelToggle } from "@/components/panel/PanelToggle";
+import { PaneHeader } from "@/components/window/PaneHeader";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { SessionIndicator, SessionTitle } from "@/components/session/SessionParts";
 import { attachTerminal, resizeTerminal, writeTerminal } from "@/api/terminal";
@@ -86,7 +87,7 @@ function TerminalHeader({
   renderer: RendererKind | null;
 }) {
   return (
-    <div className="flex h-9 shrink-0 items-center gap-3 border-b border-pane-border px-3 text-xs" data-testid="terminal-header">
+    <PaneHeader className="gap-3 px-3 text-xs" data-testid="terminal-header">
       {sessionId ? <SessionTitle id={sessionId} /> : <TerminalTitle id={id} />}
       <span className="ml-auto flex shrink-0 items-center gap-2 text-muted-foreground tabular-nums">
         {import.meta.env.DEV && renderer && <span className="rounded border px-1 text-[10px] uppercase">{renderer}</span>}
@@ -97,7 +98,7 @@ function TerminalHeader({
         )}
         <HeaderActions session={sessionId !== undefined} />
       </span>
-    </div>
+    </PaneHeader>
   );
 }
 

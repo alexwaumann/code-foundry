@@ -7,6 +7,7 @@ import { checksSummary } from "@/components/prs/format";
 import { Age, ChecksBadge, Freshness, PrStateIcon, ReviewBadge } from "@/components/prs/PrBits";
 import { RowList } from "@/components/prs/RowList";
 import { PanelToggle } from "@/components/panel/PanelToggle";
+import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
 import { tildify } from "@/lib/path";
@@ -392,7 +393,7 @@ export function WorktreeOverview({ repoId, path, items }: { repoId: string; path
   const wt = useReposStore((s) => findWorktree(s, repoId, wtPath));
   return (
     <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label="Worktree overview" data-testid="overview-page">
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-pane-border px-5">
+      <PaneHeader className="gap-2 px-5">
         {path ? <GitBranch className="size-4 text-violet-400" aria-hidden /> : <FolderGit2 className="size-4 text-sky-400" aria-hidden />}
         <h1 className="truncate text-sm font-semibold" data-testid="overview-title">
           {repo?.name ?? "Repository"}
@@ -401,7 +402,7 @@ export function WorktreeOverview({ repoId, path, items }: { repoId: string; path
         </h1>
         <span className="ml-auto truncate font-mono text-xs text-muted-foreground">{tildify(wtPath)}</span>
         <PanelToggle className="-mr-2" />
-      </header>
+      </PaneHeader>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         <div className="mx-auto max-w-6xl">
           {!repo ? (

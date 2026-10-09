@@ -211,14 +211,13 @@ function surfaceKey(panelKey: string, chord: string): boolean {
 }
 
 /**
- * The panel's header: tabs on the left, the toggle at the far right. It is as tall as the
- * header of the pane beside it: the terminal's (h-9) for sessions and terminals, the
- * page headers' (h-11) for everything else.
+ * The panel's header: tabs on the left, the toggle at the far right. 44px (h-11) like
+ * every content pane header (window/PaneHeader), so it ends on the title band's bottom
+ * edge beside them (window/titleBand.ts).
  */
 function PanelHeader({ panelKey, hasTabs }: { panelKey: string; hasTabs: boolean }) {
-  const beside = panelKey.startsWith("session:") || panelKey.startsWith("terminal:") ? "h-9" : "h-11";
   return (
-    <div className={cn("flex shrink-0 items-center gap-2 border-b border-pane-border pr-2 pl-1.5", beside)} data-testid="panel-header">
+    <div className="flex h-11 shrink-0 items-center gap-2 border-b border-pane-border pr-2 pl-1.5" data-testid="panel-header">
       {hasTabs ? <TabStrip panelKey={panelKey} /> : <div className="min-w-0 flex-1" />}
       <PanelToggle inPanel />
     </div>
@@ -262,7 +261,7 @@ function Panel({ panelKey, max, asideRef }: { panelKey: string; max: number; asi
 
   return (
     // The wrapper is not clipped so the resize handle can sit in the gap to its left.
-    <div className="relative mr-2 mb-2 flex shrink-0" style={{ width }} data-testid="side-panel-wrapper">
+    <div className="relative mt-2 mr-2 mb-2 flex shrink-0" style={{ width }} data-testid="side-panel-wrapper">
       <PanelResizeHandle panelKey={panelKey} width={width} max={max} />
       <aside
         ref={asideRef}
