@@ -46,7 +46,15 @@ echo "==> package $VERSION (release repo: ${RELEASE_REPO:-none})"
 "$MAKE" build VERSION="$VERSION" RELEASE_REPO="$RELEASE_REPO"
 
 # 2. GUI executable (gui/build/darwin/Taskfile.yml appends EXTRA_LDFLAGS to -ldflags).
+# The Taskfile runs `wails3 tool ...` by name, so wails3's directory must be on PATH; a
+# failed build must not leave the previous gui/bin/CodeFoundry to be packaged.
+case "$WAILS3" in
+*/*) PATH="$(cd "$(dirname "$WAILS3")" && pwd):$PATH" ;;
+esac
+export PATH
+rm -f gui/bin/CodeFoundry
 (cd gui && "$WAILS3" build EXTRA_LDFLAGS="$VERSION_LDFLAGS")
+[ -x gui/bin/CodeFoundry ] || die "wails3 build did not produce gui/bin/CodeFoundry"
 
 # 3. Stage the app directory, sign, and check what we built.
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/code-foundry-package.XXXXXX")"
