@@ -2,6 +2,7 @@
 package commandtest
 
 import (
+	"cmp"
 	"context"
 	"sync"
 
@@ -37,16 +38,22 @@ func (e *Emitter) Intents() []*v1.UiIntent {
 	return append([]*v1.UiIntent(nil), e.intents...)
 }
 
-// Calls records backend requests in order.
+// Calls records backend requests in order. Shared, when set, records them too: give
+// several fakes the same Shared log to see the order of calls across them.
 type Calls struct {
+	Shared *Calls
+
 	mu   sync.Mutex
 	reqs []proto.Message
 }
 
 func (c *Calls) record(m proto.Message) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.reqs = append(c.reqs, m)
+	c.mu.Unlock()
+	if c.Shared != nil {
+		c.Shared.record(m)
+	}
 }
 
 // Requests returns the recorded request messages.
@@ -93,11 +100,14 @@ func (t *Terminal) Remove(_ context.Context, r *connect.Request[v1.RemoveTermina
 }
 
 // Repo is a fake command.RepoBackend. Err, when set, is returned by every call. List
-// returns Repos.
+// returns Repos. CreateWorktree calls OnCreateWorktree (when set) and then fails with
+// CreateWorktreeErr (when set).
 type Repo struct {
 	Calls
-	Err   error
-	Repos []*v1.Repo
+	Err               error
+	Repos             []*v1.Repo
+	CreateWorktreeErr error
+	OnCreateWorktree  func(*v1.CreateWorktreeRequest)
 }
 
 var _ command.RepoBackend = (*Repo)(nil)
@@ -120,8 +130,11 @@ func (f *Repo) Unregister(_ context.Context, r *connect.Request[v1.UnregisterRep
 // CreateWorktree records the request and echoes it as a worktree.
 func (f *Repo) CreateWorktree(_ context.Context, r *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error) {
 	f.record(r.Msg)
-	if f.Err != nil {
-		return nil, f.Err
+	if f.OnCreateWorktree != nil {
+		f.OnCreateWorktree(r.Msg)
+	}
+	if err := cmp.Or(f.Err, f.CreateWorktreeErr); err != nil {
+		return nil, err
 	}
 	return connect.NewResponse(&v1.CreateWorktreeResponse{Worktree: &v1.Worktree{
 		RepoId: r.Msg.GetRepoId(), Branch: r.Msg.GetBranch(), Path: "/wt/" + r.Msg.GetBranch(),
