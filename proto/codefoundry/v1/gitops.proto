@@ -16,7 +16,8 @@ import "google/protobuf/timestamp.proto";
 // (git.*, pr.*, worktree.open_editor, worktree.reveal, view.open_url), and progress
 // arrives on EventService as GitOpsEvent.
 service GitOpsService {
-  // Fetch runs `git fetch --prune` in the worktree.
+  // Fetch runs `git fetch --prune` in the worktree, optionally for one remote or one
+  // branch of it.
   rpc Fetch(GitFetchRequest) returns (GitFetchResponse) {}
   // Pull runs `git pull --ff-only` (or `--rebase`). A rebase that stops on conflicts is
   // aborted, leaving the worktree as it was.
@@ -91,6 +92,13 @@ message GitOp {
 
 message GitFetchRequest {
   string worktree_path = 1;
+  // The remote to fetch (`git fetch --prune <remote>`). Empty: git's default (the
+  // branch's remote, else origin), with every configured refspec.
+  string remote = 2;
+  // With remote: fetch only this branch, into refs/remotes/<remote>/<branch>, even when
+  // the remote's configured refspec leaves it out (a single-branch clone). Fails when
+  // the remote has no such branch.
+  string branch = 3;
 }
 
 message GitFetchResponse {

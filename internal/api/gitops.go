@@ -39,7 +39,7 @@ func (h *GitOps) Route(opts ...connect.HandlerOption) Route {
 
 // Fetch implements GitOpsServiceHandler.
 func (h *GitOps) Fetch(ctx context.Context, req *connect.Request[v1.GitFetchRequest]) (*connect.Response[v1.GitFetchResponse], error) {
-	op, err := h.store.Fetch(ctx, gitops.FetchOptions{WorktreePath: req.Msg.GetWorktreePath()})
+	op, err := h.store.Fetch(ctx, gitops.FetchOptions{WorktreePath: req.Msg.GetWorktreePath(), Remote: req.Msg.GetRemote(), Branch: req.Msg.GetBranch()})
 	if err != nil {
 		return nil, gitopsError(err)
 	}

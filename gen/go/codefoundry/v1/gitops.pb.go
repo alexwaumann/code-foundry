@@ -304,8 +304,15 @@ func (x *GitOp) GetUrl() string {
 }
 
 type GitFetchRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorktreePath  string                 `protobuf:"bytes,1,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	WorktreePath string                 `protobuf:"bytes,1,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
+	// The remote to fetch (`git fetch --prune <remote>`). Empty: git's default (the
+	// branch's remote, else origin), with every configured refspec.
+	Remote string `protobuf:"bytes,2,opt,name=remote,proto3" json:"remote,omitempty"`
+	// With remote: fetch only this branch, into refs/remotes/<remote>/<branch>, even when
+	// the remote's configured refspec leaves it out (a single-branch clone). Fails when
+	// the remote has no such branch.
+	Branch        string `protobuf:"bytes,3,opt,name=branch,proto3" json:"branch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -343,6 +350,20 @@ func (*GitFetchRequest) Descriptor() ([]byte, []int) {
 func (x *GitFetchRequest) GetWorktreePath() string {
 	if x != nil {
 		return x.WorktreePath
+	}
+	return ""
+}
+
+func (x *GitFetchRequest) GetRemote() string {
+	if x != nil {
+		return x.Remote
+	}
+	return ""
+}
+
+func (x *GitFetchRequest) GetBranch() string {
+	if x != nil {
+		return x.Branch
 	}
 	return ""
 }
@@ -1363,9 +1384,11 @@ const file_codefoundry_v1_gitops_proto_rawDesc = "" +
 	"durationMs\x12\x18\n" +
 	"\asummary\x18\f \x01(\tR\asummary\x12\x16\n" +
 	"\x06output\x18\r \x01(\tR\x06output\x12\x10\n" +
-	"\x03url\x18\x0e \x01(\tR\x03url\"6\n" +
+	"\x03url\x18\x0e \x01(\tR\x03url\"f\n" +
 	"\x0fGitFetchRequest\x12#\n" +
-	"\rworktree_path\x18\x01 \x01(\tR\fworktreePath\"9\n" +
+	"\rworktree_path\x18\x01 \x01(\tR\fworktreePath\x12\x16\n" +
+	"\x06remote\x18\x02 \x01(\tR\x06remote\x12\x16\n" +
+	"\x06branch\x18\x03 \x01(\tR\x06branch\"9\n" +
 	"\x10GitFetchResponse\x12%\n" +
 	"\x02op\x18\x01 \x01(\v2\x15.codefoundry.v1.GitOpR\x02op\"M\n" +
 	"\x0eGitPullRequest\x12#\n" +

@@ -160,6 +160,71 @@ func TestPushFetchPullRoundTrip(t *testing.T) {
 	}
 }
 
+// A remote and branch fetch only that branch, into its remote-tracking ref, even in a
+// clone whose refspec leaves it out; a missing branch fails the op.
+func TestFetchRemoteBranch(t *testing.T) {
+	w := newWorld(t, Options{})
+	ctx := context.Background()
+	git(t, w.a, "switch", "-q", "-c", "feat/x")
+	commit(t, w.a, "f.txt", "1\n", "feat: one")
+	git(t, w.a, "push", "-q", "origin", "feat/x")
+	git(t, w.b, "remote", "set-branches", "origin", "main") // a single-branch clone
+
+	wantOK(t, mustOp(t)(w.m.Fetch(ctx, FetchOptions{WorktreePath: w.b})), "already up to date")
+	git(t, w.b, "rev-parse", "--verify", "-q", "refs/remotes/origin/main")
+	if out, err := exec.Command("git", "-C", w.b, "rev-parse", "--verify", "-q", "refs/remotes/origin/feat/x").Output(); err == nil {
+		t.Fatalf("plain fetch created origin/feat/x (%s)", out)
+	}
+	op := mustOp(t)(w.m.Fetch(ctx, FetchOptions{WorktreePath: w.b, Remote: "origin", Branch: "feat/x"}))
+	wantOK(t, op, "")
+	if op.Title != "Fetch origin/feat/x" || !strings.Contains(op.Output, "$ git fetch --prune -- origin +refs/heads/feat/x:refs/remotes/origin/feat/x") {
+		t.Errorf("title %q, output:\n%s", op.Title, op.Output)
+	}
+	if git(t, w.b, "rev-parse", "origin/feat/x") != git(t, w.a, "rev-parse", "feat/x") {
+		t.Error("origin/feat/x is not at a's feat/x")
+	}
+	git(t, w.b, "rev-parse", "--verify", "-q", "refs/remotes/origin/main") // not pruned
+	wantFailed(t, mustOp(t)(w.m.Fetch(ctx, FetchOptions{WorktreePath: w.b, Remote: "origin", Branch: "gone"})), "")
+}
+
+func TestFetchArgs(t *testing.T) {
+	tests := []struct {
+		name string
+		o    FetchOptions
+		want []string // nil: ErrInvalidArgument
+	}{
+		{name: "default", o: FetchOptions{}, want: []string{"fetch", "--prune"}},
+		{name: "remote", o: FetchOptions{Remote: "upstream"}, want: []string{"fetch", "--prune", "--", "upstream"}},
+		{name: "remote and branch", o: FetchOptions{Remote: "origin", Branch: "feat/a+b"},
+			want: []string{"fetch", "--prune", "--", "origin", "+refs/heads/feat/a+b:refs/remotes/origin/feat/a+b"}},
+		{name: "branch without remote", o: FetchOptions{Branch: "x"}},
+		{name: "remote like an option", o: FetchOptions{Remote: "--upload-pack=x"}},
+		{name: "remote with a slash", o: FetchOptions{Remote: "a/b"}},
+		{name: "branch like an option", o: FetchOptions{Remote: "origin", Branch: "-x"}},
+		{name: "branch with a colon", o: FetchOptions{Remote: "origin", Branch: "a:refs/heads/main"}},
+		{name: "branch with a glob", o: FetchOptions{Remote: "origin", Branch: "a*"}},
+		{name: "branch with a space", o: FetchOptions{Remote: "origin", Branch: "a b"}},
+		{name: "branch with ..", o: FetchOptions{Remote: "origin", Branch: "a..b"}},
+		{name: "branch ending in .lock", o: FetchOptions{Remote: "origin", Branch: "a/b.lock"}},
+		{name: "branch with a hidden component", o: FetchOptions{Remote: "origin", Branch: "a/.b"}},
+		{name: "branch with @{", o: FetchOptions{Remote: "origin", Branch: "a@{1}"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := fetchArgs(tt.o)
+			if tt.want == nil {
+				if !errors.Is(err, ErrInvalidArgument) {
+					t.Fatalf("args %q, err %v, want ErrInvalidArgument", got, err)
+				}
+				return
+			}
+			if err != nil || !slices.Equal(got, tt.want) {
+				t.Errorf("args %q, err %v, want %q", got, err, tt.want)
+			}
+		})
+	}
+}
+
 func TestDivergedBranches(t *testing.T) {
 	w := newWorld(t, Options{})
 	ctx := context.Background()
