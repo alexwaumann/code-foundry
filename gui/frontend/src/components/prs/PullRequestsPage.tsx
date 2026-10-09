@@ -8,6 +8,7 @@ import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
 import { dashboardResource, openUrl, useFreshness } from "@/stores/gh";
+import { openPullRequestInPanel } from "@/stores/prPanel";
 import { useResource } from "@/stores/resource";
 import { useUiStore } from "@/stores/ui";
 import { monthName, prKey, repoName } from "./format";
@@ -28,10 +29,12 @@ const usePrPageStore = create<{ includeAll: boolean; toggle: () => void }>()((se
 
 type Section = "authored" | "review" | "merged";
 
+// Flexible tracks only (fr with a floor): fixed maxima grow before an fr track gets any
+// room, which squeezed the title to nothing beside the side panel.
 const columns: Record<Section, string> = {
-  authored: "grid-cols-[minmax(7rem,12rem)_4rem_minmax(0,1fr)_8.5rem_8.5rem_3rem]",
-  review: "grid-cols-[minmax(7rem,12rem)_4rem_minmax(5rem,9rem)_minmax(0,1fr)_8.5rem_3rem]",
-  merged: "grid-cols-[minmax(7rem,12rem)_4rem_minmax(5rem,9rem)_minmax(0,1fr)_3rem]",
+  authored: "grid-cols-[minmax(5rem,0.8fr)_4rem_minmax(6rem,2.4fr)_minmax(6.5rem,1fr)_minmax(6.5rem,1fr)_3rem]",
+  review: "grid-cols-[minmax(5rem,0.8fr)_4rem_minmax(5rem,0.8fr)_minmax(6rem,2.4fr)_minmax(6.5rem,1fr)_3rem]",
+  merged: "grid-cols-[minmax(5rem,0.8fr)_4rem_minmax(5rem,0.8fr)_minmax(6rem,2.4fr)_3rem]",
 };
 
 const headers: Record<Section, string[]> = {
@@ -43,7 +46,12 @@ const headers: Record<Section, string[]> = {
 function PrRow({ section, pr, viewer }: { section: Section; pr: PullRequestView; viewer: string }) {
   const author = pr.author && pr.author.toLowerCase() === viewer.toLowerCase() ? "you" : pr.author || "ghost";
   return (
-    <NavRow navKey={prKey(section, pr)} title={pr.url} className={cn("grid h-full items-center gap-3 px-2 text-sm", columns[section])}>
+    <NavRow
+      navKey={prKey(section, pr)}
+      title={`${pr.url}\nClick or Enter: open in the side panel · ⌘-click or ⌘↵: open on GitHub`}
+      activateOnClick
+      onCmdClick={() => void openUrl(pr.url)}
+      className={cn("grid h-full items-center gap-3 px-2 text-sm", columns[section])}>
       <span className="truncate text-muted-foreground" title={pr.repoSlug}>
         {repoName(pr.repoSlug)}
       </span>
@@ -120,7 +128,13 @@ function Banner({ tone, children }: { tone: "warn" | "info"; children: React.Rea
 function Body({ d, includeAll }: { d: DashboardView; includeAll: boolean }) {
   const viewer = d.viewer?.login ?? "";
   const items = useMemo<NavItem[]>(() => {
-    const mk = (section: Section, list: PullRequestView[]) => list.map((p) => ({ key: prKey(section, p), activate: () => void openUrl(p.url) }));
+    const mk = (section: Section, list: PullRequestView[]) =>
+      list.map((p) => ({
+        key: prKey(section, p),
+        // Enter and click open the pull request in the side panel; cmd+Enter and cmd+click on GitHub.
+        activate: () => void openPullRequestInPanel({ slug: p.repoSlug, number: p.number }),
+        secondary: () => void openUrl(p.url),
+      }));
     return [...mk("authored", d.authored), ...mk("review", d.reviewRequested), ...mk("merged", d.recentlyMerged)];
   }, [d]);
   const nav = useNav(items);

@@ -57,7 +57,7 @@ test.describe("Pull Requests page", () => {
     await expect(prRows(page, "merged")).toHaveCount(4);
   });
 
-  test("keyboard and double-click open pull requests through view.open.url", async ({ page }) => {
+  test("Enter and click open pull requests in the side panel; cmd+Enter and cmd+click on GitHub", async ({ page }) => {
     await openApp(page);
     await page.getByTestId("nav-pullrequests").click();
     const list = page.getByTestId("prs-list");
@@ -66,16 +66,27 @@ test.describe("Pull Requests page", () => {
     await expect(prRows(page, "authored").first()).toHaveAttribute("aria-selected", "true");
     await list.press("j");
     await list.press("Enter");
+    const tabs = page.getByTestId("panel-tabs").getByRole("tab");
+    await expect(tabs).toHaveText(["#145"]);
+    await expect(page.getByTestId("pr-title")).toHaveText("fix(terminal): resize race between attach and first output");
+    // The list keeps focus, so the keyboard goes on: cmd+Enter opens the row on GitHub.
+    await expect(list).toBeFocused();
+    await list.press("Meta+Enter");
     await expect.poll(async () => (await invocations()).filter((i) => i.name === "view.open.url").map((i) => i.args.url)).toEqual([
       "https://github.com/alexwaumann/code-foundry/pull/145",
     ]);
-    // End jumps to the last row (merged section); double-click opens any row.
+    // End jumps to the last row (merged section); a click opens any row in the panel.
     await list.press("End");
     await expect(prRows(page, "merged").last()).toHaveAttribute("aria-selected", "true");
-    await prRows(page, "review").first().dblclick();
+    await prRows(page, "review").first().click();
+    await expect(tabs).toHaveText(["#145", "#139"]);
+    await expect(prRows(page, "review").first()).toHaveAttribute("aria-selected", "true");
+    // cmd+click opens it on GitHub and adds no tab.
+    await prRows(page, "review").first().click({ modifiers: ["Meta"] });
     await expect.poll(async () => (await invocations()).filter((i) => i.name === "view.open.url").length).toBe(2);
     const last = (await invocations()).filter((i) => i.name === "view.open.url").at(-1);
     expect(last?.args.url).toBe("https://github.com/alexwaumann/code-foundry/pull/139");
+    await expect(tabs).toHaveCount(2);
   });
 
   test("cmd+shift+d runs view.pullrequests and the ShowView intent switches the page", async ({ page }) => {

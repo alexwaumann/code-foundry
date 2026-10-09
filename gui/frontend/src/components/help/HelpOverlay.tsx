@@ -20,7 +20,9 @@ const extraChords: LocalChord[] = [
   { chord: "arrowleft", title: "Fold or unfold a sidebar row" },
   { chord: "arrowright", title: "Fold or unfold a sidebar row" },
   { chord: "a", title: "Pull Requests: all or registered repositories" },
+  { chord: "cmd+enter", title: "Pull request rows: open on GitHub (Enter opens them in the side panel)" },
   { chord: "cmd+w", title: "Side panel: close the active tab (hides an empty panel)" },
+  { chord: "cmd+shift+c", title: "Side panel, pull request: copy its link" },
 ];
 
 function Keys({ keys }: { keys: string[] }) {

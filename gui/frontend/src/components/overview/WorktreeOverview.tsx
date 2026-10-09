@@ -12,6 +12,7 @@ import { NavProvider, NavRow } from "@/lib/NavRow";
 import { tildify } from "@/lib/path";
 import { cn } from "@/lib/utils";
 import { branchKey, branchPullRequestsResource, openUrl, repoActivityResource, useFreshness } from "@/stores/gh";
+import { openPullRequestInPanel } from "@/stores/prPanel";
 import { findWorktree, useReposStore } from "@/stores/repos";
 import { useResource } from "@/stores/resource";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
@@ -132,7 +133,13 @@ function CheckLine({ c }: { c: CheckRunView }) {
 function PrLine({ pr, prefix, viewer }: { pr: PullRequestView; prefix: string; viewer?: string }) {
   const by = viewer && pr.author.toLowerCase() === viewer.toLowerCase() ? "you" : pr.author;
   return (
-    <NavRow navKey={`${prefix}:${String(pr.number)}`} title={pr.url} className="flex h-6 items-center gap-2 px-2 pl-6 text-xs">
+    <NavRow
+      navKey={`${prefix}:${String(pr.number)}`}
+      title={`${pr.url}\nClick or Enter: open in the side panel · ⌘-click or ⌘↵: open on GitHub`}
+      activateOnClick
+      onCmdClick={() => void openUrl(pr.url)}
+      className="flex h-6 items-center gap-2 px-2 pl-6 text-xs"
+    >
       <PrStateIcon state={pr.state} draft={pr.draft} />
       <span className="text-muted-foreground tabular-nums">#{pr.number}</span>
       <span className="text-muted-foreground capitalize">{pr.state}</span>
@@ -251,8 +258,10 @@ function OverviewBody({ repo, wt, items }: { repo: RepoView; wt: WorktreeView; i
   const items_ = useMemo<NavItem[]>(() => {
     const out: NavItem[] = [];
     for (const c of activity?.defaultBranch?.failing ?? []) out.push({ key: `c:${c.url || c.name}`, activate: () => void openUrl(c.url) });
-    for (const p of activity?.recentlyMerged ?? []) out.push({ key: `m:${String(p.number)}`, activate: () => void openUrl(p.url) });
-    for (const p of branchPrs.prs) out.push({ key: `b:${String(p.number)}`, activate: () => void openUrl(p.url) });
+    // Pull request rows open in the side panel; cmd+Enter (and cmd+click) on GitHub.
+    const pr = (key: string, p: PullRequestView): NavItem => ({ key, activate: () => void openPullRequestInPanel({ slug: p.repoSlug || slug, number: p.number }), secondary: () => void openUrl(p.url) });
+    for (const p of activity?.recentlyMerged ?? []) out.push(pr(`m:${String(p.number)}`, p));
+    for (const p of branchPrs.prs) out.push(pr(`b:${String(p.number)}`, p));
     for (const r of fileRows) {
       if (r.kind === "dir") {
         out.push({
