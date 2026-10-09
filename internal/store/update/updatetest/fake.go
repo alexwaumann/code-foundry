@@ -49,7 +49,7 @@ func (s *Source) NotesURL(tag string) string { return "https://example.test/rele
 
 // Installer is a fake update.Installer. Each Install reports the Progress lines, then
 // blocks until Release is called (when Hold is set), then returns Err. On success it
-// sets the shared OnDisk version, so the store's InstalledVersion sees the new bundle.
+// sets the shared OnDisk version, so the store's InstalledVersion sees the new install.
 type Installer struct {
 	Progress []string
 	Err      error
@@ -109,13 +109,13 @@ func (i *Installer) Install(ctx context.Context, tag string, progress func(strin
 	return nil
 }
 
-// OnDisk is a fake installed-bundle version for update.Options.InstalledVersion.
+// OnDisk is a fake installed version for update.Options.InstalledVersion.
 type OnDisk struct {
 	mu sync.Mutex
 	v  string
 }
 
-// NewOnDisk returns a bundle version starting at v.
+// NewOnDisk returns an installed version starting at v.
 func NewOnDisk(v string) *OnDisk { return &OnDisk{v: v} }
 
 // Set changes the version on disk.

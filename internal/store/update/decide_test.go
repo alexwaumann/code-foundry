@@ -19,7 +19,7 @@ func TestDecide(t *testing.T) {
 	}{
 		{"up to date", Idle, "", "v0.1.0", "v0.1.0", "v0.1.0", Idle, ""},
 		{"newer release", Idle, "", "v0.1.0", "v0.1.0", "v0.2.0", Available, "v0.2.0"},
-		{"newer release, bundle unknown", Idle, "", "v0.1.0", "", "v0.2.0", Available, "v0.2.0"},
+		{"newer release, install unknown", Idle, "", "v0.1.0", "", "v0.2.0", Available, "v0.2.0"},
 		{"older release (yanked latest)", Idle, "", "v0.2.0", "", "v0.1.0", Idle, ""},
 		{"no release published", Idle, "", "v0.1.0", "", "", Idle, ""},
 		{"available stays available", Available, "v0.2.0", "v0.1.0", "", "v0.2.0", Available, "v0.2.0"},
@@ -46,49 +46,45 @@ func TestDecide(t *testing.T) {
 	}
 }
 
-func TestBundleOf(t *testing.T) {
-	tests := []struct{ exe, want string }{
-		{"/Users/a/Applications/CodeFoundry.app/Contents/MacOS/code-foundry", "/Users/a/Applications/CodeFoundry.app"},
-		{"/Applications/CodeFoundry.app/Contents/MacOS/CodeFoundry", "/Applications/CodeFoundry.app"},
-		{"/Users/a/src/code-foundry/bin/code-foundry", ""},
-		{"/Users/a/Contents/MacOS/code-foundry", ""},
-		{"/x/Foo.app/Contents/Resources/code-foundry", ""},
-		{"code-foundry", ""},
-	}
-	for _, tt := range tests {
-		if got := BundleOf(tt.exe); got != tt.want {
-			t.Errorf("BundleOf(%q) = %q, want %q", tt.exe, got, tt.want)
-		}
-	}
-}
-
-func TestBundleVersion(t *testing.T) {
-	plist := func(body string) string {
-		return `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>` + body + `</dict></plist>`
-	}
+func TestInstalledVersion(t *testing.T) {
 	tests := []struct {
-		name, plist, want string
-		wantErr           bool
+		name    string
+		file    *string // VERSION contents; nil = no file
+		want    string
+		wantErr bool
+		install bool
 	}{
-		{"full tag", plist("<key>CFBundleShortVersionString</key>\n\t<string>0.2.0</string>\n\t<key>CodeFoundryVersion</key>\n\t<string>v0.2.0-rc.1</string>"), "v0.2.0-rc.1", false},
-		{"short version only", plist("<key>CFBundleShortVersionString</key>\n            <string>0.1.0</string>"), "v0.1.0", false},
-		{"no version", plist("<key>CFBundleName</key><string>x</string>"), "", true},
+		{"tag with newline", ptr("v0.2.0\n"), "v0.2.0", false, true},
+		{"pre-release, no newline", ptr("v0.2.0-rc.1"), "v0.2.0-rc.1", false, true},
+		{"first line only, trimmed", ptr("  v0.3.0 \nextra\n"), "v0.3.0", false, true},
+		{"empty", ptr("\n"), "", true, true},
+		{"no VERSION file", nil, "", true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := filepath.Join(t.TempDir(), BundleName)
-			if err := os.MkdirAll(filepath.Join(b, "Contents"), 0o755); err != nil {
-				t.Fatal(err)
+			dir := t.TempDir()
+			if tt.file != nil {
+				if err := os.WriteFile(filepath.Join(dir, VersionFile), []byte(*tt.file), 0o644); err != nil {
+					t.Fatal(err)
+				}
 			}
-			if err := os.WriteFile(filepath.Join(b, "Contents", "Info.plist"), []byte(tt.plist), 0o644); err != nil {
-				t.Fatal(err)
+			if got := IsInstall(dir); got != tt.install {
+				t.Errorf("IsInstall = %v, want %v", got, tt.install)
 			}
-			got, err := BundleVersion(b)
+			got, err := InstalledVersion(dir)
 			if (err != nil) != tt.wantErr || got != tt.want {
-				t.Errorf("BundleVersion = %q, %v; want %q (err %v)", got, err, tt.want, tt.wantErr)
+				t.Errorf("InstalledVersion = %q, %v; want %q (err %v)", got, err, tt.want, tt.wantErr)
+			}
+			// The store's reader treats a directory that is not an install as unknown.
+			v, err := installedVersionIn(dir)()
+			if !tt.install && (v != "" || err != nil) {
+				t.Errorf("installedVersionIn(non-install) = %q, %v", v, err)
 			}
 		})
 	}
+	if IsInstall("") {
+		t.Error(`IsInstall("") = true`)
+	}
 }
+
+func ptr(s string) *string { return &s }

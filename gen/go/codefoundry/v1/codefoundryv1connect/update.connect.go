@@ -58,7 +58,7 @@ type UpdateServiceClient interface {
 	// state is AVAILABLE or FAILED.
 	Install(context.Context, *connect.Request[v1.InstallUpdateRequest]) (*connect.Response[v1.InstallUpdateResponse], error)
 	// Relaunch asks every connected GUI to relaunch itself (to pick up an installed
-	// bundle). Moves INSTALLED to RESTART_REQUIRED.
+	// update). Moves INSTALLED to RESTART_REQUIRED.
 	Relaunch(context.Context, *connect.Request[v1.RelaunchAppRequest]) (*connect.Response[v1.RelaunchAppResponse], error)
 	// Watch streams the status on connect and on every change, plus relaunch requests.
 	Watch(context.Context, *connect.Request[v1.WatchUpdateRequest]) (*connect.ServerStreamForClient[v1.UpdateEvent], error)
@@ -155,7 +155,7 @@ type UpdateServiceHandler interface {
 	// state is AVAILABLE or FAILED.
 	Install(context.Context, *connect.Request[v1.InstallUpdateRequest]) (*connect.Response[v1.InstallUpdateResponse], error)
 	// Relaunch asks every connected GUI to relaunch itself (to pick up an installed
-	// bundle). Moves INSTALLED to RESTART_REQUIRED.
+	// update). Moves INSTALLED to RESTART_REQUIRED.
 	Relaunch(context.Context, *connect.Request[v1.RelaunchAppRequest]) (*connect.Response[v1.RelaunchAppResponse], error)
 	// Watch streams the status on connect and on every change, plus relaunch requests.
 	Watch(context.Context, *connect.Request[v1.WatchUpdateRequest], *connect.ServerStream[v1.UpdateEvent]) error

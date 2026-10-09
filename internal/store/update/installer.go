@@ -37,7 +37,7 @@ type ScriptInstaller struct {
 	Repo string
 	// ReleaseDir, when set, is passed as CODE_FOUNDRY_RELEASE_DIR (local release source).
 	ReleaseDir string
-	// AppDir is where CodeFoundry.app is installed (--app-dir); the installer's default
+	// AppDir is the app directory to replace (--app-dir); the installer's default
 	// (~/Applications) when empty.
 	AppDir string
 	// Gh is passed as CODE_FOUNDRY_GH; gh.LookPath() when empty. A Finder-launched daemon
@@ -99,7 +99,7 @@ func (i ScriptInstaller) Install(ctx context.Context, tag string, progress func(
 		return nil
 	}
 
-	// Its own process group, so cancelling kills gh and ditto too, not just bash.
+	// Its own process group, so cancelling kills gh and tar too, not just bash.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) }
 	pr, pw := io.Pipe()
@@ -143,7 +143,7 @@ func (i ScriptInstaller) Install(ctx context.Context, tag string, progress func(
 }
 
 // env is the daemon's environment plus the installer's inputs. PATH gains gh's
-// directory and the system directories the script needs (ditto, shasum, plutil).
+// directory and the system directories the script needs (tar, shasum, xattr).
 func (i ScriptInstaller) env() []string {
 	repo := i.Repo
 	if repo == "" {
@@ -181,6 +181,6 @@ func (i ScriptInstaller) env() []string {
 	return env
 }
 
-// errInstalledMismatch is returned when the installer succeeded but the bundle on disk
+// errInstalledMismatch is returned when the installer succeeded but the install on disk
 // does not report the requested version.
-var errInstalledMismatch = errors.New("installed bundle reports a different version")
+var errInstalledMismatch = errors.New("installed app reports a different version")

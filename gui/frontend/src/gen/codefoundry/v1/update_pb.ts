@@ -358,7 +358,7 @@ export const UpdateStateSchema: GenEnum<UpdateState> = /*@__PURE__*/
  * UpdateService is the in-app updater. The daemon checks the latest GitHub release of
  * the build's release repository through the user's authenticated `gh` (30s after start,
  * then every 24h), and installs it on request by running the installer embedded in the
- * binary. Installing replaces the app bundle on disk; nothing restarts by itself. The
+ * binary. Installing replaces the app directory on disk; nothing restarts by itself. The
  * GUI relaunches on request (Relaunch), and the daemon keeps running the old version
  * until the user runs `daemon.restart`, because restarting it closes every session.
  *
@@ -404,7 +404,7 @@ export const UpdateService: GenService<{
   },
   /**
    * Relaunch asks every connected GUI to relaunch itself (to pick up an installed
-   * bundle). Moves INSTALLED to RESTART_REQUIRED.
+   * update). Moves INSTALLED to RESTART_REQUIRED.
    *
    * @generated from rpc codefoundry.v1.UpdateService.Relaunch
    */

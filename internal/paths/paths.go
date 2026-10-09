@@ -56,6 +56,10 @@ func Resolve() (Paths, error) {
 // Home is the config home directory.
 func (p Paths) Home() string { return p.home }
 
+// App is the default install directory (scripts/install.sh): the code-foundry and
+// CodeFoundry executables and a VERSION file.
+func (p Paths) App() string { return filepath.Join(p.home, "app") }
+
 // Socket is the daemon's Unix socket.
 func (p Paths) Socket() string { return filepath.Join(p.home, "daemon.sock") }
 

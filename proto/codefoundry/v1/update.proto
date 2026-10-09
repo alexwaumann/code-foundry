@@ -7,7 +7,7 @@ import "google/protobuf/timestamp.proto";
 // UpdateService is the in-app updater. The daemon checks the latest GitHub release of
 // the build's release repository through the user's authenticated `gh` (30s after start,
 // then every 24h), and installs it on request by running the installer embedded in the
-// binary. Installing replaces the app bundle on disk; nothing restarts by itself. The
+// binary. Installing replaces the app directory on disk; nothing restarts by itself. The
 // GUI relaunches on request (Relaunch), and the daemon keeps running the old version
 // until the user runs `daemon.restart`, because restarting it closes every session.
 //
@@ -25,7 +25,7 @@ service UpdateService {
   // state is AVAILABLE or FAILED.
   rpc Install(InstallUpdateRequest) returns (InstallUpdateResponse) {}
   // Relaunch asks every connected GUI to relaunch itself (to pick up an installed
-  // bundle). Moves INSTALLED to RESTART_REQUIRED.
+  // update). Moves INSTALLED to RESTART_REQUIRED.
   rpc Relaunch(RelaunchAppRequest) returns (RelaunchAppResponse) {}
   // Watch streams the status on connect and on every change, plus relaunch requests.
   rpc Watch(WatchUpdateRequest) returns (stream UpdateEvent) {}
