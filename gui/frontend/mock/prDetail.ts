@@ -2,17 +2,26 @@
  * Mock GhService pull request detail panel: GetPullRequestDetail, ListReviewerCandidates,
  * SetReviewRequest, RevertPullRequest. Two rich fixtures on alexwaumann/code-foundry:
  *
- *   #145 open, draft, failing checks, changes requested (stale), two pending requests
- *        (a team and a user), a bot review, unresolved and outdated review threads,
- *        labels, issue comments
+ *   #145 open, draft, failing, in-progress and queued checks, changes requested by a
+ *        reviewer who is stale and re-requested, a team and a user pending, a bot
+ *        review, reviewers_truncated, unresolved and outdated review threads (with
+ *        review ids), labels, issue comments (one by a deleted account)
  *   #138 merged with a merge commit (the default branch head in mock/github.ts), an
  *        approval, a resolved thread; revertable
+ *   #131 closed without merging (revert: FAILED_PRECONDITION)
+ *   #140 open, someone else's, the viewer has read access only (viewer_can_update false)
  *
- * Every other pull request the dashboards or branches list gets a minimal detail built
- * from its summary, so any row the GUI shows can open the panel.
+ * #131 and #140 are on no dashboard: open them by number. Every other pull request the
+ * dashboards or branches list gets a minimal detail built from its summary, so any row
+ * the GUI shows can open the panel.
+ *
+ * The panel's actions are commands (pr.revert, pr.review.request, pr.refresh; see
+ * commands()), like the daemon's; the RPCs they wrap are served too.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate, type Timestamp } from "@bufbuild/protobuf/wkt";
+import { Code, ConnectError } from "@connectrpc/connect";
+import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import {
   CheckConclusion,
   CheckStatus,
@@ -20,12 +29,14 @@ import {
   PullRequestCommentKind,
   PullRequestReviewState,
   PullRequestState,
+  ReviewDecision,
   ReviewerKind,
   type GhEventSchema,
   type PullRequestDetailSchema,
   type ReviewerCandidateSchema,
 } from "../src/gen/codefoundry/v1/gh_pb";
 import type { PrInit } from "./github";
+import type { InvokeOut } from "./gitops";
 
 type DetailInit = MessageInitShape<typeof PullRequestDetailSchema>;
 type CandidateInit = MessageInitShape<typeof ReviewerCandidateSchema>;
@@ -41,16 +52,29 @@ interface CommentInit {
   url?: string;
   path?: string;
   reviewState?: PullRequestReviewState;
+  reviewId?: string;
 }
 type GhEventInit = MessageInitShape<typeof GhEventSchema>;
 
-/** Thrown for RPC errors; server.ts maps `code` to a ConnectError code. */
+/** Thrown for RPC errors; prDetailCall maps `code` to a ConnectError code. */
 export class PrDetailError extends Error {
   constructor(
     readonly code: "not_found" | "failed_precondition" | "invalid_argument",
     message: string,
   ) {
     super(message);
+  }
+}
+
+const prDetailCodes = { not_found: Code.NotFound, failed_precondition: Code.FailedPrecondition, invalid_argument: Code.InvalidArgument };
+
+/** Runs a pull request detail RPC or command, mapping PrDetailError to its Connect code. */
+export function prDetailCall<T>(fn: () => T): T {
+  try {
+    return fn();
+  } catch (err) {
+    if (err instanceof PrDetailError) throw new ConnectError(err.message, prDetailCodes[err.code]);
+    throw err;
   }
 }
 
@@ -70,6 +94,8 @@ export interface PrDetailHooks {
   findPr: (slug: string, number: number) => PrInit | undefined;
   /** A new pull request authored by the viewer (a revert): add it to the dashboard. */
   addAuthored: (pr: PrInit) => void;
+  /** A pull request summary built like the dashboards' (for fixtures on no dashboard). */
+  makePr: (slug: string, number: number, title: string, o?: Partial<PrInit> & { ageMs?: number }) => PrInit;
   count: (rpc: string) => void;
 }
 
@@ -84,10 +110,12 @@ export class PrDetailWorld {
     const merged = h.findPr(CF, 138);
     if (open) this.details.set(key(CF, 145), this.openDetail(open));
     if (merged) this.details.set(key(CF, 138), this.mergedDetail(merged));
+    this.details.set(key(CF, 131), this.closedDetail());
+    this.details.set(key(CF, 140), this.readOnlyDetail());
     this.candidates.set(key(CF, 145), [
       { id: "T_core", kind: ReviewerKind.TEAM, login: "acme/core", name: "Core", avatarUrl: avatar("acme/core"), isRequested: true },
       { id: "U_ana", kind: ReviewerKind.USER, login: "teammate-ana", name: "Ana", avatarUrl: avatar("teammate-ana"), isRequested: true },
-      { id: "U_kim", kind: ReviewerKind.USER, login: "teammate-kim", name: "Kim", avatarUrl: avatar("teammate-kim") },
+      { id: "U_kim", kind: ReviewerKind.USER, login: "teammate-kim", name: "Kim", avatarUrl: avatar("teammate-kim"), isRequested: true },
       { id: "U_lee", kind: ReviewerKind.USER, login: "teammate-lee", name: "Lee", avatarUrl: avatar("teammate-lee") },
       { id: "U_max", kind: ReviewerKind.USER, login: "teammate-max", name: "", avatarUrl: avatar("teammate-max") },
     ]);
@@ -129,12 +157,15 @@ export class PrDetailWorld {
         { name: "bug", color: "d73a4a" },
         { name: "terminal", color: "0e8a16" },
       ],
+      // Requested first (most recent review first, then by login), then the rest; kim
+      // reviewed an older head and was asked again.
       reviewers: [
+        { login: "teammate-kim", state: PullRequestReviewState.CHANGES_REQUESTED, submittedAt: this.at(3 * HOUR), stale: true, requested: true, avatarUrl: avatar("teammate-kim") },
         { login: "acme/core", isTeam: true, requested: true, avatarUrl: avatar("acme/core") },
         { login: "teammate-ana", requested: true, avatarUrl: avatar("teammate-ana") },
-        { login: "teammate-kim", state: PullRequestReviewState.CHANGES_REQUESTED, submittedAt: this.at(3 * HOUR), stale: true, avatarUrl: avatar("teammate-kim") },
         { login: "coderabbitai", isBot: true, state: PullRequestReviewState.COMMENTED, submittedAt: this.at(6 * HOUR), stale: true, avatarUrl: avatar("coderabbitai") },
       ],
+      reviewersTruncated: true,
       commits: [
         ["5a1e0c3d2b9f8e7d6c5b4a39281706f5e4d3c2b1", "fix(terminal): size from the attach snapshot", 9 * HOUR],
         ["6b2f1d4e3c0a9f8e7d6c5b4a39281706f5e4d3c2", "test(terminal): resize during first output", 7 * HOUR],
@@ -149,6 +180,7 @@ export class PrDetailWorld {
         }),
         c(PullRequestCommentKind.ISSUE_COMMENT, "IC_1", "teammate-kim", "Does this also fix the flicker when the sidebar collapses?", 5 * HOUR),
         c(PullRequestCommentKind.ISSUE_COMMENT, "IC_2", this.h.viewer, "Partly: the flicker had a second cause in the layout pass. Follow-up PR.", 4 * HOUR),
+        c(PullRequestCommentKind.ISSUE_COMMENT, "IC_ghost", "", "Same race shows up on Linux under load.", 3.5 * HOUR, { authorAvatarUrl: "" }),
         c(PullRequestCommentKind.REVIEW, "PRR_kim", "teammate-kim", "The replay can still drop a resize that arrives during the snapshot. See inline.", 3 * HOUR, {
           reviewState: PullRequestReviewState.CHANGES_REQUESTED,
         }),
@@ -163,8 +195,9 @@ export class PrDetailWorld {
           isResolved: false,
           isOutdated: false,
           comments: [
-            c(PullRequestCommentKind.REVIEW_COMMENT, "PRRC_1", "teammate-kim", "A resize queued while `snapshot()` runs is overwritten here.", 3 * HOUR, { path: "internal/store/terminal/actor.go" }),
-            c(PullRequestCommentKind.REVIEW_COMMENT, "PRRC_2", this.h.viewer, "Good catch. Keeping the last pending size instead.", 2 * HOUR, { path: "internal/store/terminal/actor.go" }),
+            c(PullRequestCommentKind.REVIEW_COMMENT, "PRRC_1", "teammate-kim", "A resize queued while `snapshot()` runs is overwritten here.", 3 * HOUR, { path: "internal/store/terminal/actor.go", reviewId: "PRR_kim" }),
+            // A reply: its review (COMMENTED, empty body) is not in comments, like the daemon's.
+            c(PullRequestCommentKind.REVIEW_COMMENT, "PRRC_2", this.h.viewer, "Good catch. Keeping the last pending size instead.", 2 * HOUR, { path: "internal/store/terminal/actor.go", reviewId: "PRR_reply" }),
           ],
         },
         {
@@ -174,7 +207,7 @@ export class PrDetailWorld {
           side: DiffSide.RIGHT,
           isResolved: false,
           isOutdated: false,
-          comments: [c(PullRequestCommentKind.REVIEW_COMMENT, "PRRC_3", "coderabbitai", "Consider returning the error from `Resize` instead of logging it.", 6 * HOUR, { authorIsBot: true, path: "internal/store/terminal/attach.go" })],
+          comments: [c(PullRequestCommentKind.REVIEW_COMMENT, "PRRC_3", "coderabbitai", "Consider returning the error from `Resize` instead of logging it.", 6 * HOUR, { authorIsBot: true, path: "internal/store/terminal/attach.go", reviewId: "PRR_bot" })],
         },
         {
           id: "PRRT_3",
@@ -183,7 +216,7 @@ export class PrDetailWorld {
           side: DiffSide.LEFT,
           isResolved: true,
           isOutdated: true,
-          comments: [c(PullRequestCommentKind.REVIEW_COMMENT, "PRRC_4", "teammate-kim", "Why remove the size check?", 8 * HOUR, { path: "internal/store/terminal/terminal.go" })],
+          comments: [c(PullRequestCommentKind.REVIEW_COMMENT, "PRRC_4", "teammate-kim", "Why remove the size check?", 8 * HOUR, { path: "internal/store/terminal/terminal.go", reviewId: "PRR_kim_old" })],
         },
       ],
       reviewThreadsTruncated: false,
@@ -192,6 +225,8 @@ export class PrDetailWorld {
         { name: "lint", workflow: "CI", status: CheckStatus.COMPLETED, conclusion: CheckConclusion.FAILURE, url: "https://github.com/alexwaumann/code-foundry/actions/runs/1/job/12", startedAt: this.at(100 * MIN), completedAt: this.at(98 * MIN) },
         { name: "build", workflow: "CI", status: CheckStatus.COMPLETED, conclusion: CheckConclusion.SUCCESS, url: "https://github.com/alexwaumann/code-foundry/actions/runs/1/job/13", startedAt: this.at(100 * MIN), completedAt: this.at(95 * MIN) },
         { name: "test (ubuntu-24.04)", workflow: "CI", status: CheckStatus.COMPLETED, conclusion: CheckConclusion.SUCCESS, url: "https://github.com/alexwaumann/code-foundry/actions/runs/1/job/14", startedAt: this.at(100 * MIN), completedAt: this.at(90 * MIN) },
+        { name: "e2e (webkit)", workflow: "CI", status: CheckStatus.IN_PROGRESS, url: "https://github.com/alexwaumann/code-foundry/actions/runs/1/job/15", startedAt: this.at(10 * MIN) },
+        { name: "e2e (chromium)", workflow: "CI", status: CheckStatus.QUEUED, url: "https://github.com/alexwaumann/code-foundry/actions/runs/1/job/16" },
         { name: "release-notes", workflow: "Release", status: CheckStatus.COMPLETED, conclusion: CheckConclusion.SKIPPED, startedAt: this.at(100 * MIN), completedAt: this.at(100 * MIN) },
       ],
       nodeId: "PR_kwMock145",
@@ -241,6 +276,44 @@ export class PrDetailWorld {
       viewerPermission: "admin",
       fetchedAt: this.at(20_000),
       lastError: "",
+    };
+  }
+
+  /** #131: closed without merging; the viewer's, so they could revert, but there is nothing to revert. */
+  private closedDetail(): DetailInit {
+    const pr = this.h.makePr(CF, 131, "feat(gui): tabbed terminals (superseded by split panes)", {
+      headRef: "feat/tabs",
+      state: PullRequestState.CLOSED,
+      ageMs: 4 * DAY,
+      reviewDecision: ReviewDecision.REVIEW_REQUIRED,
+    });
+    return {
+      pullRequest: pr,
+      body: "Superseded by the split pane layout; closing.",
+      commits: [{ sha: "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d", headline: "feat(gui): terminal tabs", authorLogin: this.h.viewer, authorName: "Alex", committedAt: this.at(5 * DAY) }],
+      commitCount: 1,
+      comments: [{ id: "IC_c1", kind: PullRequestCommentKind.ISSUE_COMMENT, author: this.h.viewer, authorAvatarUrl: avatar(this.h.viewer), body: "Closing in favour of split panes.", createdAt: this.at(4 * DAY), url: `https://github.com/${CF}/pull/131#IC_c1` }],
+      closedAt: this.at(4 * DAY),
+      nodeId: "PR_kwMock131",
+      viewerCanUpdate: true,
+      viewerPermission: "admin",
+      fetchedAt: this.at(20_000),
+    };
+  }
+
+  /** #140: someone else's open pull request; the viewer can read only (no reviewer picker, no revert). */
+  private readOnlyDetail(): DetailInit {
+    const pr = this.h.makePr(CF, 140, "docs: contributing guide", { author: "outside-contrib", headRef: "docs/contributing", ageMs: 2 * DAY });
+    return {
+      pullRequest: pr,
+      body: "Adds CONTRIBUTING.md.",
+      reviewers: [{ login: "teammate-kim", requested: true, avatarUrl: avatar("teammate-kim") }],
+      commits: [{ sha: "4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a", headline: "docs: contributing guide", authorLogin: "outside-contrib", authorName: "Contributor", committedAt: this.at(2 * DAY) }],
+      commitCount: 1,
+      nodeId: "PR_kwMock140",
+      viewerCanUpdate: false,
+      viewerPermission: "read",
+      fetchedAt: this.at(20_000),
     };
   }
 
@@ -325,6 +398,79 @@ export class PrDetailWorld {
     d.reviewers = reviewers.filter((r) => r.requested || r.state);
     this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
     return list.filter((c) => c.isRequested).map((c) => c.login ?? "");
+  }
+
+  /** The pull request detail panel's commands, as the daemon registers them (internal/command/commands_pr.go). */
+  commands() {
+    const slugArg = { name: "repo-slug", type: ArgType.STRING, required: true, description: 'GitHub repository, "owner/name"' };
+    const numberArg = { name: "number", type: ArgType.INT, required: true, description: "Pull request number" };
+    const target = (args: Record<string, string>): [string, number] => {
+      const n = Number(args.number);
+      if (!Number.isInteger(n) || n <= 0) throw new ConnectError("number must be a positive pull request number", Code.InvalidArgument);
+      return [args["repo-slug"] ?? "", n];
+    };
+    const always = () => true;
+    const out = (message: string, json: unknown): Promise<InvokeOut> => Promise.resolve({ message, resultJson: JSON.stringify(json) });
+    return [
+      {
+        cmd: {
+          name: "pr.revert",
+          title: "Revert Pull Request",
+          category: "Pull Request",
+          description: "Open a pull request that reverses a merged one (GitHub's Revert button).",
+          keybindings: [],
+          args: [slugArg, numberArg],
+          confirm: (_ctx: UiContext | undefined, args: Record<string, string>) => `This opens a new pull request that reverses the changes merged by #${args.number ?? ""}.`,
+        },
+        when: always,
+        run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
+          const [slug, n] = target(args);
+          const r = prDetailCall(() => this.revert(slug, n));
+          return out(`Opened #${String(r.number)} to revert #${String(n)}: ${r.url}`, r);
+        },
+      },
+      {
+        cmd: {
+          name: "pr.review.request",
+          title: "Request Review",
+          category: "Pull Request",
+          description: "Request a review on a pull request from a user or team, or withdraw the request (--requested=false).",
+          keybindings: [],
+          args: [
+            slugArg,
+            numberArg,
+            { name: "login", type: ArgType.STRING, required: true, description: 'User login, or a team as "org/team" (or its slug)' },
+            { name: "kind", type: ArgType.ENUM, required: false, description: "Whether login is a user or a team", enumValues: ["user", "team"], defaultValue: "user" },
+            { name: "requested", type: ArgType.BOOL, required: false, description: "Request the review (false withdraws the request)", defaultValue: "true" },
+          ],
+        },
+        when: always,
+        run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
+          const [slug, n] = target(args);
+          const login = (args.login ?? "").trim();
+          const requested = args.requested !== "false";
+          const kind = args.kind === "team" ? ReviewerKind.TEAM : ReviewerKind.USER;
+          const pending = prDetailCall(() => this.setReviewRequest(slug, n, login, kind, requested));
+          return out(requested ? `Requested a review from ${login} on #${String(n)}` : `Withdrew the review request for ${login} on #${String(n)}`, { requested: pending });
+        },
+      },
+      {
+        cmd: {
+          name: "pr.refresh",
+          title: "Refresh Pull Request",
+          category: "Pull Request",
+          description: "Fetch a pull request's detail from GitHub now instead of from the daemon's cache.",
+          keybindings: [],
+          args: [slugArg, numberArg],
+        },
+        when: always,
+        run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
+          const [slug, n] = target(args);
+          const d = prDetailCall(() => this.get(slug, n, true));
+          return out(`Refreshed #${String(n)}: ${d.pullRequest?.title ?? ""}`, { number: n });
+        },
+      },
+    ];
   }
 
   /** Opens a revert PR for a merged one (once; repeats return the same) and announces it. */

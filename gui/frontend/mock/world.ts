@@ -63,8 +63,8 @@ interface CmdDef {
   description: string;
   keybindings: string[];
   args: ArgDef[];
-  /** Destructive: Invoke needs confirmed=true; renders the prompt from the context. */
-  confirm?: (ctx: UiContext | undefined) => string;
+  /** Destructive: Invoke needs confirmed=true; renders the prompt from the context and args. */
+  confirm?: (ctx: UiContext | undefined, args: Record<string, string>) => string;
 }
 export type UiIntentInit = MessageInitShape<typeof UiIntentSchema>;
 
@@ -904,6 +904,7 @@ export class World {
         }
         return null;
       }),
+      ...this.gh.prDetails.commands(),
       {
         cmd: { name: "view.settings", title: "Open Settings", category: "View", description: "Open the settings page", keybindings: ["cmd+,"], args: [] },
         when: always,
@@ -967,7 +968,7 @@ export class World {
     for (const a of entry.cmd.args) {
       if (a.required && !args[a.name]) throw new CommandError("invalid", `missing required arg ${a.name}`);
     }
-    if (entry.cmd.confirm && !confirmed) throw new ConfirmNeeded(name, entry.cmd.title, entry.cmd.confirm(ctx));
+    if (entry.cmd.confirm && !confirmed) throw new ConfirmNeeded(name, entry.cmd.title, entry.cmd.confirm(ctx, args));
     return entry.run(ctx, args);
   }
 }

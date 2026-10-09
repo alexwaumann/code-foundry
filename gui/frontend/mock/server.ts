@@ -28,7 +28,9 @@
  *   POST /__mock/gh/update | poll | stale | auth?ok=false | touch?path=…   (GitHub + detail)
  *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts)
  *   POST /__mock/gh/pr-comment?repo=o/r&number=145&body=…   (a new comment on a PR detail;
- *        pull_request_detail_updated). PR detail fixtures: mock/prDetail.ts (#145 open, #138 merged)
+ *        pull_request_detail_updated). PR detail fixtures: mock/prDetail.ts (#145 open,
+ *        #138 merged, #131 closed, #140 read-only); its commands are pr.revert,
+ *        pr.review.request and pr.refresh
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
@@ -48,7 +50,7 @@ import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb"
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { ghEvent } from "./github";
-import { PrDetailError } from "./prDetail";
+import { prDetailCall } from "./prDetail";
 import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
 
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -58,18 +60,6 @@ const token = process.env.MOCK_TOKEN ?? "dev-mock-token";
 const world = new World();
 /** False simulates a pre-Phase-2a daemon (see POST /__mock/sessions-service). */
 let sessionsEnabled = true;
-
-const prDetailCodes = { not_found: Code.NotFound, failed_precondition: Code.FailedPrecondition, invalid_argument: Code.InvalidArgument };
-
-/** Runs a pull request detail RPC, mapping PrDetailError to its Connect code. */
-function prDetailCall<T>(fn: () => T): T {
-  try {
-    return fn();
-  } catch (err) {
-    if (err instanceof PrDetailError) throw new ConnectError(err.message, prDetailCodes[err.code]);
-    throw err;
-  }
-}
 
 function rpcError(err: unknown): ConnectError {
   if (err instanceof ConnectError) return err;

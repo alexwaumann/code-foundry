@@ -261,6 +261,7 @@ export class GhWorld {
       viewer: VIEWER,
       publishGh: this.publishGh,
       findPr: (slug, number) => this.findPr(slug, number),
+      makePr: (slug, number, title, o) => this.pr(slug, number, title, o),
       addAuthored: (pr) => {
         this.dashboard = { ...this.dashboard, authored: [pr, ...this.dashboard.authored], fetchedAt: timestampFromDate(new Date()) };
         this.publishGh({ event: { case: "dashboardUpdated", value: { fetchedAt: this.dashboard.fetchedAt } } });
