@@ -76,4 +76,32 @@ describe("createResource", () => {
     await vi.advanceTimersByTimeAsync(5000);
     expect(n).toBe(3);
   });
+
+  it("set writes data or an error, and supersedes a fetch in flight", async () => {
+    const pending: ReturnType<typeof deferred<string>>[] = [];
+    const r = createResource(() => {
+      const d = deferred<string>();
+      pending.push(d);
+      return d.promise;
+    });
+    r.watch("k");
+    expect(r.store.getState().entries.k?.loading).toBe(true);
+    r.set("k", { data: "refreshed" });
+    expect(r.store.getState().entries.k).toEqual({ data: "refreshed", error: null, loading: false });
+    // The read that started before the set answers late: dropped.
+    pending[0]?.resolve("older");
+    await flush();
+    expect(r.store.getState().entries.k).toEqual({ data: "refreshed", error: null, loading: false });
+    // An error keeps the data.
+    r.set("k", { error: "boom" });
+    expect(r.store.getState().entries.k).toEqual({ data: "refreshed", error: "boom", loading: false });
+    // Reads started after a set apply as usual.
+    r.invalidate("k");
+    pending[1]?.resolve("newer");
+    await flush();
+    expect(r.store.getState().entries.k).toEqual({ data: "newer", error: null, loading: false });
+    // A set for a key nobody watches still records it (a later watch shows it while fetching).
+    r.set("other", { data: "x" });
+    expect(r.store.getState().entries.other?.data).toBe("x");
+  });
 });

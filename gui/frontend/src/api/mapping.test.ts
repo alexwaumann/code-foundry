@@ -208,7 +208,7 @@ describe("gh mapping", () => {
           line: 12,
           side: DiffSide.LEFT,
           isOutdated: true,
-          comments: [{ id: "C1", kind: PullRequestCommentKind.REVIEW_COMMENT, author: "gha", authorIsBot: true, path: "main.go" }],
+          comments: [{ id: "C1", kind: PullRequestCommentKind.REVIEW_COMMENT, author: "gha", authorIsBot: true, path: "main.go", reviewId: "PRR_9" }],
           commentsTruncated: true,
         },
         { id: "T2", path: "x.go" },
@@ -222,6 +222,9 @@ describe("gh mapping", () => {
       viewerPermission: "write",
       fetchedAt: timestampFromMs(6000),
       lastError: "stale",
+      labelsTruncated: true,
+      reviewersTruncated: true,
+      checksTruncated: true,
     });
     const v = toPullRequestDetailView(d);
     expect(v).toMatchObject({
@@ -236,12 +239,12 @@ describe("gh mapping", () => {
       commits: [{ sha: "0123456789abcdef", shortSha: "0123456", headline: "fix", authorLogin: "octocat", authorName: "Octo", committedAtMs: 1000 }],
       commitCount: 120,
       comments: [
-        { id: "IC_1", kind: "issue_comment", author: "kim", body: "why?", createdAtMs: 2000, url: "u", reviewState: "" },
+        { id: "IC_1", kind: "issue_comment", author: "kim", body: "why?", createdAtMs: 2000, url: "u", reviewState: "", reviewId: "" },
         { id: "PRR_1", kind: "review", reviewState: "approved", createdAtMs: null },
       ],
       commentsTruncated: true,
       reviewThreads: [
-        { id: "T1", path: "main.go", line: 12, side: "left", isResolved: false, isOutdated: true, commentsTruncated: true, comments: [{ kind: "review_comment", authorIsBot: true, path: "main.go" }] },
+        { id: "T1", path: "main.go", line: 12, side: "left", isResolved: false, isOutdated: true, commentsTruncated: true, comments: [{ kind: "review_comment", authorIsBot: true, path: "main.go", reviewId: "PRR_9" }] },
         { id: "T2", side: null, line: 0, comments: [] },
       ],
       reviewThreadsTruncated: false,
@@ -257,8 +260,18 @@ describe("gh mapping", () => {
       viewerPermission: "write",
       fetchedAtMs: 6000,
       lastError: "stale",
+      labelsTruncated: true,
+      reviewersTruncated: true,
+      checksTruncated: true,
     });
-    expect(toPullRequestDetailView(create(PullRequestDetailSchema, {}))).toMatchObject({ pullRequest: { state: "unknown", number: 0 }, closedAtMs: null, checks: [] });
+    expect(toPullRequestDetailView(create(PullRequestDetailSchema, {}))).toMatchObject({
+      pullRequest: { state: "unknown", number: 0 },
+      closedAtMs: null,
+      checks: [],
+      labelsTruncated: false,
+      reviewersTruncated: false,
+      checksTruncated: false,
+    });
   });
 
   it("maps reviewer candidates and the detail event", () => {

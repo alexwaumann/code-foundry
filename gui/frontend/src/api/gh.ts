@@ -165,7 +165,9 @@ export type GhEventView =
   | { kind: "branchPullRequests"; repoSlug: string; headRef: string }
   | { kind: "pullRequestDetail"; repoSlug: string; number: number };
 
-// ---- Pull request detail panel (GetPullRequestDetail and its actions) ---------------
+// ---- Pull request detail panel (GetPullRequestDetail, ListReviewerCandidates) ------
+// Reads only. Its actions are daemon commands (pr.revert, pr.review.request, pr.refresh):
+// the GUI invokes them with runCommand, like the palette and the CLI.
 
 /** A submitted review's state; "" when there is none (only requested) or unknown. */
 export type ReviewStateView = "" | "pending" | "commented" | "approved" | "changes_requested" | "dismissed";
@@ -218,6 +220,8 @@ export interface PullRequestCommentView {
   path: string;
   /** Reviews: the review's state. */
   reviewState: ReviewStateView;
+  /** Review comments: the review they belong to (group a review's inline comments by it); "" otherwise. */
+  reviewId: string;
 }
 
 export interface ReviewThreadView {
@@ -246,18 +250,28 @@ export interface PullRequestDetailView {
   pullRequest: PullRequestView;
   body: string;
   labels: PullRequestLabelView[];
+  /** The first 20; labelsTruncated says there are more. */
+  labelsTruncated: boolean;
   /** Requested first, then most recent review first. */
   reviewers: PullRequestReviewerView[];
+  /** More than 50 latest reviews or pending requests exist than reviewers was built from. */
+  reviewersTruncated: boolean;
   /** The last 100, oldest first; commitCount counts all. */
   commits: PullRequestCommitView[];
   commitCount: number;
-  /** Issue comments and reviews, oldest first. Inline comments are in reviewThreads. */
+  /**
+   * Issue comments and reviews, oldest first. Inline comments are in reviewThreads, and so
+   * are reviews that only carried them (COMMENTED, empty body): those are left out here.
+   */
   comments: PullRequestCommentView[];
+  /** Covers both streams: more than 100 issue comments or more than 100 reviews exist. */
   commentsTruncated: boolean;
   reviewThreads: ReviewThreadView[];
   reviewThreadsTruncated: boolean;
   /** Every check on the head commit, failed first. The rollup is pullRequest.checks. */
   checks: CheckView[];
+  /** checks is incomplete: a page beyond the first failed (lastError says why) or there are too many. */
+  checksTruncated: boolean;
   mergeCommitSha: string;
   mergedBy: string;
   closedAtMs: number | null;
@@ -268,6 +282,7 @@ export interface PullRequestDetailView {
   /** "admin" | "maintain" | "write" | "triage" | "read" | "". */
   viewerPermission: string;
   fetchedAtMs: number | null;
+  /** The last fetch's error when this is the cached copy, or why checks is incomplete. */
   lastError: string;
 }
 
@@ -286,11 +301,6 @@ export interface ReviewerCandidatesView {
   candidates: ReviewerCandidateView[];
   /** More assignable users exist than were listed (100). */
   truncated: boolean;
-}
-
-export interface RevertResultView {
-  number: number;
-  url: string;
 }
 
 const ms = (t: Timestamp | undefined): number | null => (t ? timestampMs(t) : null);
@@ -505,6 +515,7 @@ function toCommentView(c: PullRequestComment): PullRequestCommentView {
     url: c.url,
     path: c.path,
     reviewState: reviewStates[c.reviewState],
+    reviewId: c.reviewId,
   };
 }
 
@@ -523,6 +534,7 @@ export function toPullRequestDetailView(d: PullRequestDetail): PullRequestDetail
     pullRequest: toPullRequestView(d.pullRequest ?? create(PullRequestSchema)),
     body: d.body,
     labels: d.labels.map((l) => ({ name: l.name, color: l.color })),
+    labelsTruncated: d.labelsTruncated,
     reviewers: d.reviewers.map((r) => ({
       login: r.login,
       isTeam: r.isTeam,
@@ -533,6 +545,7 @@ export function toPullRequestDetailView(d: PullRequestDetail): PullRequestDetail
       requested: r.requested,
       stale: r.stale,
     })),
+    reviewersTruncated: d.reviewersTruncated,
     commits: d.commits.map((c) => ({
       sha: c.sha,
       shortSha: c.sha.slice(0, 7),
@@ -556,6 +569,7 @@ export function toPullRequestDetailView(d: PullRequestDetail): PullRequestDetail
     })),
     reviewThreadsTruncated: d.reviewThreadsTruncated,
     checks: d.checks.map(toCheckView),
+    checksTruncated: d.checksTruncated,
     mergeCommitSha: d.mergeCommitSha,
     mergedBy: d.mergedBy,
     closedAtMs: ms(d.closedAt),
@@ -588,25 +602,4 @@ export async function listReviewerCandidates(repoSlug: string, number: number, c
   const c = await conn.client(GhService);
   const r = await c.listReviewerCandidates({ repoSlug, number }, { signal });
   return { candidates: r.candidates.map(toReviewerCandidateView), truncated: r.truncated };
-}
-
-/** Requests (or withdraws) a review; returns the pending requests afterwards (logins and "org/team"). */
-export async function setReviewRequest(
-  repoSlug: string,
-  number: number,
-  login: string,
-  kind: ReviewerKindView,
-  requested: boolean,
-  conn: DaemonConnection = daemon,
-): Promise<string[]> {
-  const c = await conn.client(GhService);
-  const r = await c.setReviewRequest({ repoSlug, number, login, kind: kind === "team" ? ReviewerKind.TEAM : ReviewerKind.USER, requested });
-  return r.requested;
-}
-
-/** Opens a pull request reverting a merged one; FAILED_PRECONDITION when it is not merged. */
-export async function revertPullRequest(repoSlug: string, number: number, conn: DaemonConnection = daemon): Promise<RevertResultView> {
-  const c = await conn.client(GhService);
-  const r = await c.revertPullRequest({ repoSlug, number });
-  return { number: r.number, url: r.url };
 }

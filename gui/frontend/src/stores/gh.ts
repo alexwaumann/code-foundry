@@ -77,19 +77,39 @@ function parsePullRequestKey(key: string): [string, number] {
 }
 
 /**
+ * How often an open detail is re-read: the daemon's default poll interval
+ * (github.poll_interval_seconds). Reads are cache hits until the daemon's entry is older
+ * than the poll interval; then the read fetches. That keeps a PR the poll does not cover
+ * (not on a dashboard or watched branch, so no pull_request_detail_updated) from going stale.
+ */
+export const PULL_REQUEST_DETAIL_KEEPALIVE_MS = 60_000;
+
+/**
  * Key: pullRequestKey(slug, number). The daemon caches the detail and announces a change
  * (pull_request_detail_updated) when a poll sees the PR move or a review request is set;
  * the re-read then fetches from GitHub.
  */
-export const pullRequestDetailResource = createResource((key, signal) => {
-  const [slug, number] = parsePullRequestKey(key);
-  return getPullRequestDetail(slug, number, false, undefined, signal);
-});
+export const pullRequestDetailResource = createResource(
+  (key, signal) => {
+    const [slug, number] = parsePullRequestKey(key);
+    return getPullRequestDetail(slug, number, false, undefined, signal);
+  },
+  { keepAliveMs: PULL_REQUEST_DETAIL_KEEPALIVE_MS },
+);
 
-/** Fetches the detail from GitHub now (refresh) and updates the resource. */
+/**
+ * Fetches the detail from GitHub now (refresh) and writes the answer into the resource:
+ * the fresh detail, or the daemon's cached copy with lastError when the fetch failed. An
+ * RPC error (no cached copy) is recorded as the entry's error and rethrown.
+ */
 export async function refreshPullRequestDetail(slug: string, number: number): Promise<void> {
-  await getPullRequestDetail(slug, number, true);
-  pullRequestDetailResource.invalidate(pullRequestKey(slug, number));
+  const key = pullRequestKey(slug, number);
+  try {
+    pullRequestDetailResource.set(key, { data: await getPullRequestDetail(slug, number, true) });
+  } catch (err) {
+    pullRequestDetailResource.set(key, { error: errorMessage(err) });
+    throw err;
+  }
 }
 
 /** Routes one gh notification to the views it affects. */
