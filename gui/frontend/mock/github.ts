@@ -165,7 +165,8 @@ export class GhWorld {
       headRef: "fix/resize",
       draft: true,
       reviewDecision: ReviewDecision.CHANGES_REQUESTED,
-      checks: rollup(CheckRollupState.FAILURE, 28, 2, 0, 3),
+      // The detail's 7 checks (mock/prDetail.ts): 2 passed, 2 failed, 2 pending, 1 skipped.
+      checks: rollup(CheckRollupState.FAILURE, 2, 2, 2, 1),
       ageMs: 5 * HOUR,
     });
     this.dashboard = {

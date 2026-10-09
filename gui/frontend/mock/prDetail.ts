@@ -8,22 +8,26 @@
  *        review ids), labels, issue comments (one by a deleted account)
  *   #138 merged with a merge commit (the default branch head in mock/github.ts), an
  *        approval, a resolved thread; revertable
- *   #131 closed without merging (revert: FAILED_PRECONDITION)
- *   #140 open, someone else's, the viewer has read access only (viewer_can_update false)
+ *   #131 closed without merging (revert: FAILED_PRECONDITION); two passed checks
+ *   #140 open, someone else's, the viewer has read access only (viewer_can_update false);
+ *        one check queued (a first-time contributor's workflow awaiting approval)
  *
  * #131 and #140 are on no dashboard: open them by number. Every other pull request the
  * dashboards or branches list gets a minimal detail built from its summary, so any row
  * the GUI shows can open the panel.
  *
  * The panel's actions are commands (pr.revert, pr.review.request, pr.refresh; see
- * commands()), like the daemon's; the RPCs they wrap are served too.
+ * commands()), like the daemon's; the RPCs they wrap are served too. pr.refresh answers
+ * with the detail (protojson), as the daemon does. POST /__mock/gh/pr-fail?command=pr.refresh
+ * makes that command's next run fail (UNAVAILABLE, like a refresh GitHub refused).
  */
-import type { MessageInitShape } from "@bufbuild/protobuf";
+import { create, toJson, type MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate, type Timestamp } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import {
   CheckConclusion,
+  CheckRollupState,
   CheckStatus,
   DiffSide,
   PullRequestCommentKind,
@@ -32,7 +36,7 @@ import {
   ReviewDecision,
   ReviewerKind,
   type GhEventSchema,
-  type PullRequestDetailSchema,
+  PullRequestDetailSchema,
   type ReviewerCandidateSchema,
 } from "../src/gen/codefoundry/v1/gh_pb";
 import type { PrInit } from "./github";
@@ -104,6 +108,8 @@ export class PrDetailWorld {
   private readonly candidates = new Map<string, CandidateInit[]>();
   private readonly reverts = new Map<string, { number: number; url: string }>();
   private nextNumber = 151;
+  /** Commands whose next run fails (POST /__mock/gh/pr-fail?command=…). */
+  readonly failNext = new Set<string>();
 
   constructor(private readonly h: PrDetailHooks) {
     const open = h.findPr(CF, 145);
@@ -286,6 +292,7 @@ export class PrDetailWorld {
       state: PullRequestState.CLOSED,
       ageMs: 4 * DAY,
       reviewDecision: ReviewDecision.REVIEW_REQUIRED,
+      checks: { state: CheckRollupState.SUCCESS, total: 2, passed: 2, failed: 0, pending: 0, skipped: 0 },
     });
     return {
       pullRequest: pr,
@@ -293,6 +300,10 @@ export class PrDetailWorld {
       commits: [{ sha: "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d", headline: "feat(gui): terminal tabs", authorLogin: this.h.viewer, authorName: "Alex", committedAt: this.at(5 * DAY) }],
       commitCount: 1,
       comments: [{ id: "IC_c1", kind: PullRequestCommentKind.ISSUE_COMMENT, author: this.h.viewer, authorAvatarUrl: avatar(this.h.viewer), body: "Closing in favour of split panes.", createdAt: this.at(4 * DAY), url: `https://github.com/${CF}/pull/131#IC_c1` }],
+      checks: [
+        { name: "build", workflow: "CI", status: CheckStatus.COMPLETED, conclusion: CheckConclusion.SUCCESS, startedAt: this.at(5 * DAY), completedAt: this.at(5 * DAY - 4 * MIN) },
+        { name: "test (macos-15)", workflow: "CI", status: CheckStatus.COMPLETED, conclusion: CheckConclusion.SUCCESS, startedAt: this.at(5 * DAY), completedAt: this.at(5 * DAY - 9 * MIN) },
+      ],
       closedAt: this.at(4 * DAY),
       nodeId: "PR_kwMock131",
       viewerCanUpdate: true,
@@ -301,15 +312,24 @@ export class PrDetailWorld {
     };
   }
 
-  /** #140: someone else's open pull request; the viewer can read only (no reviewer picker, no revert). */
+  /**
+   * #140: someone else's open pull request; the viewer can read only: the reviewer picker
+   * explains that it needs write access instead of listing people, and there is no revert.
+   */
   private readOnlyDetail(): DetailInit {
-    const pr = this.h.makePr(CF, 140, "docs: contributing guide", { author: "outside-contrib", headRef: "docs/contributing", ageMs: 2 * DAY });
+    const pr = this.h.makePr(CF, 140, "docs: contributing guide", {
+      author: "outside-contrib",
+      headRef: "docs/contributing",
+      ageMs: 2 * DAY,
+      checks: { state: CheckRollupState.PENDING, total: 1, passed: 0, failed: 0, pending: 1, skipped: 0 },
+    });
     return {
       pullRequest: pr,
       body: "Adds CONTRIBUTING.md.",
       reviewers: [{ login: "teammate-kim", requested: true, avatarUrl: avatar("teammate-kim") }],
       commits: [{ sha: "4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a", headline: "docs: contributing guide", authorLogin: "outside-contrib", authorName: "Contributor", committedAt: this.at(2 * DAY) }],
       commitCount: 1,
+      checks: [{ name: "build", workflow: "CI", status: CheckStatus.QUEUED, description: "Waiting for a maintainer to approve the workflow run" }],
       nodeId: "PR_kwMock140",
       viewerCanUpdate: false,
       viewerPermission: "read",
@@ -466,8 +486,12 @@ export class PrDetailWorld {
         when: always,
         run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
           const [slug, n] = target(args);
+          if (this.failNext.delete("pr.refresh")) {
+            // Like the daemon: GitHub failed, so it answered with its cached copy and the command fails.
+            throw new ConnectError(`refresh #${String(n)} failed, the cached copy is unchanged: github graphql: 502 Bad Gateway`, Code.Unavailable);
+          }
           const d = prDetailCall(() => this.get(slug, n, true));
-          return out(`Refreshed #${String(n)}: ${d.pullRequest?.title ?? ""}`, { number: n });
+          return out(`Refreshed #${String(n)}: ${d.pullRequest?.title ?? ""}`, toJson(PullRequestDetailSchema, create(PullRequestDetailSchema, d)));
         },
       },
     ];
