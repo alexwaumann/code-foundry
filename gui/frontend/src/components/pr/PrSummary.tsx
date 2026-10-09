@@ -1,6 +1,6 @@
-import { ArrowDownUp, Bot, Check, ChevronDown, ChevronRight, CircleCheck, CircleDashed, CircleDot, CircleMinus, CircleX, Clock, ExternalLink, FileCode2, FileDiff, MessageSquare, Tag, Users } from "lucide-react";
+import { ArrowDownUp, Bot, Check, ChevronDown, ChevronRight, CircleCheck, CircleDashed, CircleDot, CircleMinus, CircleX, Clock, ExternalLink, FileCode2, FileDiff, MessageSquare, Users } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
-import type { CheckView, PullRequestCommentView, PullRequestDetailView, PullRequestLabelView, PullRequestReviewerView, ReviewThreadView } from "@/api/gh";
+import type { CheckView, PullRequestCommentView, PullRequestDetailView, PullRequestReviewerView, ReviewThreadView } from "@/api/gh";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
@@ -69,20 +69,6 @@ function Reviewer({ r }: { r: PullRequestReviewerView }) {
       {r.isBot && <Bot className="size-3 shrink-0 text-muted-foreground" aria-label="bot" />}
       {icon && <icon.icon className={cn("size-3.5 shrink-0", icon.cls)} aria-label={label} />}
       {r.requested && r.state !== "" && <Clock className={cn("size-3 shrink-0", toneText.pending)} aria-hidden />}
-    </span>
-  );
-}
-
-function LabelChip({ l }: { l: PullRequestLabelView }) {
-  const hex = /^[0-9a-f]{6}$/i.test(l.color) ? `#${l.color}` : "#888888";
-  return (
-    <span
-      className="inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-full border px-2 text-xs"
-      style={{ backgroundColor: `${hex}22`, borderColor: `${hex}66` }}
-      data-testid="pr-label"
-    >
-      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: hex }} aria-hidden />
-      <span className="min-w-0 truncate">{l.name}</span>
     </span>
   );
 }
@@ -284,7 +270,7 @@ function OrderToggle({ tabKey, which, compact = false }: { tabKey: string; which
 
 export { OrderToggle };
 
-/** Summary: reviewers, labels, description, checks, and the conversation. */
+/** Summary: reviewers, description, checks, and the conversation. */
 export function PrSummary({ d, prRef, tabKey }: { d: PullRequestDetailView; prRef: PrRef; tabKey: string }) {
   const order = usePrPanelStore((s) => s.byTab[tabKey]?.commentOrder ?? "newest");
   const items = useMemo(() => conversation(d, order), [d, order]);
@@ -298,14 +284,6 @@ export function PrSummary({ d, prRef, tabKey }: { d: PullRequestDetailView; prRe
           ))}
           {d.reviewersTruncated && <span className="text-xs text-muted-foreground" data-testid="pr-truncated">and more on GitHub</span>}
           <ReviewerPicker prRef={prRef} canUpdate={d.viewerCanUpdate} />
-        </Row>
-        <Row icon={Tag} label="Labels" testId="pr-labels">
-          {d.labels.length === 0 ? (
-            <span className="text-[13px] text-muted-foreground">None</span>
-          ) : (
-            d.labels.map((l) => <LabelChip key={l.name} l={l} />)
-          )}
-          {d.labelsTruncated && <span className="text-xs text-muted-foreground" data-testid="pr-truncated">and more on GitHub</span>}
         </Row>
       </div>
       <Section tabKey={tabKey} section="description" title="Description" testId="pr-description">

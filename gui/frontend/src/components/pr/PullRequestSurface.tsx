@@ -53,39 +53,44 @@ export function ChecksHeadline({ d }: { d: PullRequestDetailView }) {
 }
 
 /**
- * The repo link on its own row (as in T3 Code), then state, comment count and the menu;
- * the title; author and age; branches, with the diffstat wrapping below in a narrow panel.
+ * Row one: the repo link, then the actions (merge, the menu) at the far right. Row two:
+ * the title, with the comment count and state at the right. Then author and age, and
+ * branches with the diffstat wrapping below in a narrow panel.
  */
 function Header({ d, prRef, panelKey, onAsk }: { d: PullRequestDetailView; prRef: PrRef; panelKey: string; onAsk: () => void }) {
   const pr = d.pullRequest;
   const now = useNow(30_000);
   const comments = commentCount(d);
   return (
-    <header className="flex min-w-0 flex-col gap-2 border-b border-pane-border px-4 pt-3 pb-3 @max-[340px]:px-3" data-testid="pr-header">
-      <button
-        type="button"
-        className="flex max-w-full min-w-0 items-center gap-1 self-start rounded text-[13px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-        title={`Open ${pr.url} on GitHub`}
-        data-testid="pr-repo-link"
-        onClick={() => void openUrl(pr.url)}
-      >
-        <span className="truncate">{prRef.slug}</span>
-        <span className={cn("shrink-0 font-medium", toneText.merged)}>#{prRef.number}</span>
-        <ExternalLink className="size-3 shrink-0" aria-hidden />
-      </button>
+    <header className="flex min-w-0 flex-col gap-2 border-b border-pane-border px-4 pt-2 pb-3 @max-[340px]:px-3" data-testid="pr-header">
       <div className="flex min-w-0 items-center gap-1.5">
-        <StateBadge d={d} />
-        <span className="flex items-center gap-1 px-1 text-[13px] text-muted-foreground tabular-nums" title={`${String(comments)} comments`} data-testid="pr-comment-count">
-          <MessageSquare className="size-3.5" aria-hidden />
-          {comments}
-        </span>
-        <span className="ml-auto shrink-0">
+        <button
+          type="button"
+          className="flex min-w-0 items-center gap-1 rounded text-[13px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+          title={`Open ${pr.url} on GitHub`}
+          data-testid="pr-repo-link"
+          onClick={() => void openUrl(pr.url)}
+        >
+          <span className="truncate">{prRef.slug}</span>
+          <span className={cn("shrink-0 font-medium", toneText.merged)}>#{prRef.number}</span>
+          <ExternalLink className="size-3 shrink-0" aria-hidden />
+        </button>
+        <span className="ml-auto flex shrink-0 items-center gap-1" data-testid="pr-actions">
           <PrMenu prRef={prRef} detail={d} panelKey={panelKey} onAsk={onAsk} />
         </span>
       </div>
-      <h2 className="text-[15px] leading-snug font-semibold break-words select-text" data-testid="pr-title">
-        {pr.title || `#${String(prRef.number)}`}
-      </h2>
+      <div className="flex min-w-0 items-start gap-2">
+        <h2 className="min-w-0 flex-1 text-[15px] leading-snug font-semibold break-words select-text" data-testid="pr-title">
+          {pr.title || `#${String(prRef.number)}`}
+        </h2>
+        <span className="flex shrink-0 items-center gap-1.5 pt-px">
+          <span className="flex items-center gap-1 px-1 text-[13px] text-muted-foreground tabular-nums" title={`${String(comments)} comments`} data-testid="pr-comment-count">
+            <MessageSquare className="size-3.5" aria-hidden />
+            {comments}
+          </span>
+          <StateBadge d={d} />
+        </span>
+      </div>
       <div className="flex min-w-0 items-center gap-1.5 text-[13px]">
         <Avatar login={pr.author} size={18} />
         <span className="min-w-0 truncate font-medium" data-testid="pr-author">

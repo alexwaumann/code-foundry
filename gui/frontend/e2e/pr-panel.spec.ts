@@ -80,7 +80,7 @@ function copied(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as { __copied: string[] }).__copied);
 }
 
-test("a row on the Pull Requests page opens #145: header, labels, reviewers, failing checks", async ({ page }) => {
+test("a row on the Pull Requests page opens #145: header, reviewers, failing checks", async ({ page }) => {
   await openPrPage(page);
   await expect(panel(page)).toHaveCount(0);
   await prRow(page, "authored", 145).click();
@@ -98,7 +98,6 @@ test("a row on the Pull Requests page opens #145: header, labels, reviewers, fai
   await expect(page.getByTestId("pr-checks-summary")).toHaveText("2 failing");
   await expect(page.getByTestId("pr-checks-summary")).toHaveAttribute("data-tone", "failure");
 
-  await expect(page.getByTestId("pr-label")).toHaveText(["bug", "terminal"]);
   const reviewers = page.getByTestId("pr-reviewer");
   await expect(reviewers).toHaveCount(4);
   await expect(reviewers.first()).toHaveAttribute("data-login", "teammate-kim");
@@ -325,7 +324,6 @@ test("#140 (read access) explains the picker and has no revert; #131 is closed; 
 
   await openPr(page, 131);
   await expect(page.getByTestId("pr-state")).toHaveText("Closed");
-  await expect(page.getByTestId("pr-labels")).toContainText("None");
   await page.getByTestId("pr-menu-button").click();
   await expect(page.getByTestId("pr-menu-open")).toBeVisible();
   await expect(page.getByTestId("pr-menu-revert")).toHaveCount(0);
