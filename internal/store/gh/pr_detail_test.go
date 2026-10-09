@@ -114,7 +114,7 @@ func TestFullPullRequestCache(t *testing.T) {
 		t.Errorf("failed refresh: lastError %q body %q", d.LastError, d.Body)
 	}
 
-	if _, err := s.FullPullRequest(ctx, "o/r", 99, false); !errors.Is(err, ErrNotFound) {
+	if _, err := s.FullPullRequest(ctx, "o/r", 99, false); !errors.Is(err, ErrNotFound) || !strings.Contains(err.Error(), "Could not resolve") {
 		t.Errorf("unknown PR err = %v", err)
 	}
 	if _, err := s.FullPullRequest(ctx, "nope", 1, false); !errors.Is(err, ErrInvalidSlug) {

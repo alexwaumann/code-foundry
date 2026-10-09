@@ -2,6 +2,7 @@ package gh
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -224,15 +225,24 @@ func (s *Store) FullPullRequest(ctx context.Context, slug string, number int, re
 func (s *Store) fetchFull(ctx context.Context, k fullKey) (FullPullRequest, error) {
 	owner, name := splitSlug(k.slug)
 	data, err := s.call(ctx, queryPullRequestFull, map[string]any{"owner": owner, "name": name, "number": k.number})
-	switch {
-	case err != nil && !isPartial(err):
+	if err != nil && !isPartial(err) {
 		return FullPullRequest{}, err
-	case err != nil:
-		s.log.Warn("gh pull request detail has partial errors", "pr", k.String(), "err", err)
 	}
+	partialErr := err
 	d, page, err := decodeFullPullRequest(data)
-	if err != nil {
+	switch {
+	case err != nil && partialErr != nil:
+		// A missing pull request is a NOT_FOUND part next to a null pullRequest: report
+		// GitHub's message, not the decoder's.
+		var pe *PartialError
+		if errors.As(partialErr, &pe) {
+			return FullPullRequest{}, pe.Unwrap()
+		}
+		return FullPullRequest{}, partialErr
+	case err != nil:
 		return FullPullRequest{}, err
+	case partialErr != nil:
+		s.log.Warn("gh pull request detail has partial errors", "pr", k.String(), "err", partialErr)
 	}
 	runs, next := page.Runs, page.Next
 	for p := 1; next.HasNextPage && next.EndCursor != "" && p < s.opts.MaxPages; p++ {
