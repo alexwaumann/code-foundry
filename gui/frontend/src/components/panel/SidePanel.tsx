@@ -192,14 +192,35 @@ function Body({ panelKey }: { panelKey: string }) {
   );
 }
 
+/** The active tab's surface handles a chord (SurfaceSpec.onKey); true if it did. */
+function surfaceKey(panelKey: string, chord: string): boolean {
+  const e = getPanel(panelKey);
+  const tab = e.tabs.find((t) => t.id === e.activeTabId);
+  return tab ? (surfaceOf(tab.kind)?.onKey?.(chord, tab) ?? false) : false;
+}
+
 function Panel({ panelKey, width, max, asideRef }: { panelKey: string; width: number; max: number; asideRef: RefObject<HTMLElement | null> }) {
   const hasTabs = usePanelStore((s) => (s.byKey[panelKey]?.tabs.length ?? 0) > 0);
+
+  // Surfaces keep what their availability reads loaded while this panel shows.
+  useEffect(() => {
+    const ctx = surfaceContext(panelKey);
+    const releases = surfaces.map((s) => s.warm?.(ctx));
+    return () => {
+      for (const release of releases) release?.();
+    };
+  }, [panelKey]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     const chord = chordFromEvent(e.nativeEvent);
     if (!chord) return;
     // cmd+w applies in text fields too (it is no editing chord); letters do not.
     if (chord !== "cmd+w" && isEditable(e.target)) return;
+    if (chord !== "cmd+w" && surfaceKey(panelKey, chord)) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     const action = panelKeyAction(chord, getPanel(panelKey), surfaceContext(panelKey));
     if (!action) return;
     e.preventDefault();

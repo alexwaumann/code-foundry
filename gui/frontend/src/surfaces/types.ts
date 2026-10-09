@@ -41,6 +41,18 @@ export interface SurfaceSpec {
    * `available` on every change; the row re-renders only when the answer changes.
    */
   watches?: readonly Subscribable[];
+  /**
+   * Keeps what `available` reads loaded while this selection's panel shows (e.g. watches
+   * a resource). Called when the panel mounts; returns the release, called on unmount.
+   * It may subscribe to stores itself to follow changes (a worktree's branch).
+   */
+  warm?: (ctx: SurfaceContext) => () => void;
+  /**
+   * A chord (keys/chord.ts syntax) pressed while the panel has focus and this surface's
+   * tab is active, outside text fields. Return true when handled (the panel then
+   * prevents the default). cmd+w and the panel's letters are the panel's, not offered here.
+   */
+  onKey?: (chord: string, tab: Tab) => boolean;
   /** The tab body. Mounted under key={tab.id}, so each tab gets fresh component state. */
   render: (tab: Tab) => ReactNode;
   /** The tab the empty state and the hotkey open; null when there is nothing to open. */

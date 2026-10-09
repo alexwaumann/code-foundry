@@ -25,6 +25,7 @@ import {
   type PullRequestDetail,
   type ReviewerCandidate,
 } from "@/gen/codefoundry/v1/gh_pb";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { daemon, type DaemonConnection } from "./endpoint";
 
 // View models for GhService's reads. Generated types stay in src/api.
@@ -594,8 +595,33 @@ export async function getPullRequestDetail(
   signal?: AbortSignal,
 ): Promise<PullRequestDetailView> {
   const c = await conn.client(GhService);
-  const r = await c.getPullRequestDetail({ repoSlug, number, refresh }, { signal });
-  return toPullRequestDetailView(r.detail ?? create(PullRequestDetailSchema));
+  try {
+    const r = await c.getPullRequestDetail({ repoSlug, number, refresh }, { signal });
+    return toPullRequestDetailView(r.detail ?? create(PullRequestDetailSchema));
+  } catch (err) {
+    // The resource keeps only a message: mark NOT_FOUND so views can tell it apart.
+    if (err instanceof ConnectError && err.code === Code.NotFound) throw new Error(NOT_FOUND_PREFIX + err.rawMessage, { cause: err });
+    throw err;
+  }
+}
+
+const NOT_FOUND_PREFIX = "not found: ";
+
+/** Whether a detail read's error message (errorMessage of what getPullRequestDetail threw) is NOT_FOUND. */
+export function isNotFoundMessage(message: string | null | undefined): boolean {
+  return (message ?? "").startsWith(NOT_FOUND_PREFIX);
+}
+
+/** The new pull request in pr.revert's result JSON (RevertPullRequestResponse); null if it has none. */
+export function parseRevertResult(resultJson: string): { number: number; url: string } | null {
+  try {
+    const v = JSON.parse(resultJson) as { number?: unknown; url?: unknown };
+    const number = Number(v.number);
+    if (!Number.isInteger(number) || number <= 0) return null;
+    return { number, url: typeof v.url === "string" ? v.url : "" };
+  } catch {
+    return null;
+  }
 }
 
 export async function listReviewerCandidates(repoSlug: string, number: number, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<ReviewerCandidatesView> {
