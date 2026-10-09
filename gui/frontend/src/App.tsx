@@ -113,7 +113,11 @@ export function App() {
     // and bottom edges); the selection's side panel, when open, is a second pane to its
     // right (components/panel, docs/notes/side-panel.md). Nothing spans the title band
     // (components/window/titleBand.ts): the sidebar's top band and the pane headers fill it.
-    <div className="flex h-screen flex-col overflow-hidden bg-sheet text-foreground">
+    <div className="relative flex h-screen flex-col overflow-hidden bg-sheet text-foreground">
+      {/* The sheet above the panes drags the window too (as the sidebar band and the pane
+          headers do), so a page without a header (dashboard, composer, a disconnected
+          thread) still has a drag surface when the sidebar is hidden. */}
+      <div className="absolute inset-x-0 top-0 h-2 [--wails-draggable:drag]" data-testid="window-drag-edge" aria-hidden />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <ContentPane>{settingsOpen ? <SettingsPage /> : <Content />}</ContentPane>

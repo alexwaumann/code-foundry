@@ -60,7 +60,7 @@ function TerminalTitle({ id }: { id: string }) {
  */
 function HeaderActions({ session }: { session: boolean }) {
   return (
-    <span className="-mr-1.5 flex items-center" data-testid="pane-actions">
+    <span className="-mr-1.5 flex items-center [--wails-draggable:no-drag]" data-testid="pane-actions">
       {session ? (
         <>
           <CommandButton command="session.rename" icon={Pencil} />

@@ -209,16 +209,17 @@ function SessionsUnavailable() {
 
 /**
  * The sidebar's share of the title band (components/window/titleBand.ts): the
- * traffic-light gutter, kept empty for the lights, then the Repositories header.
+ * traffic-light gutter, kept empty for the lights, then the Repositories header. The
+ * whole band drags the window (Wails runtime, `--wails-draggable`) except its controls.
  */
 function SidebarBand() {
   const repoCount = useReposStore((s) => s.order.length);
   return (
-    <div className="flex shrink-0 items-center" style={{ height: TITLE_BAND_HEIGHT }} data-testid="sidebar-band">
+    <div className="flex shrink-0 items-center [--wails-draggable:drag]" style={{ height: TITLE_BAND_HEIGHT }} data-testid="sidebar-band">
       <div className="h-full shrink-0" style={{ width: TRAFFIC_LIGHT_GUTTER }} data-testid="traffic-light-gutter" aria-hidden />
       <header className="flex h-full min-w-0 flex-1 items-center justify-between gap-2 pr-3 pl-2 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
         <span className="min-w-0 truncate">Repositories</span>
-        <span className="flex shrink-0 items-center gap-2">
+        <span className="flex shrink-0 items-center gap-2 [--wails-draggable:no-drag]" data-testid="sidebar-band-controls">
           <AttentionBadge />
           <span className="tabular-nums">{repoCount > 0 ? repoCount : ""}</span>
           {/* New thread (the project picker) and new terminal in the selected worktree, as session.new / terminal.new from the palette. */}

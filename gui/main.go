@@ -18,11 +18,6 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-// titleStripHeight is the height in points of the frontend's top strip; keep in sync with
-// TITLE_STRIP_HEIGHT in frontend/src/components/window/TitleStrip.tsx. Hidden-inset centres
-// the traffic lights on y=26, so 52 leaves them centred in the strip.
-const titleStripHeight = 52
-
 func main() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	p, err := paths.Resolve()
@@ -54,10 +49,12 @@ func main() {
 
 	app.Menu.Set(appMenu(app))
 
-	// Hidden-inset title bar: the traffic lights float over the web content, whose top
-	// strip (TitleStrip.tsx, TITLE_STRIP_HEIGHT) is the title bar. InvisibleTitleBarHeight
-	// makes that band drag the window natively. The title stays set for Mission Control
-	// and the app switcher even though the bar no longer shows it.
+	// Hidden-inset title bar: the traffic lights float over the web content (centred on
+	// y=26 in the 52pt title band, TITLE_BAND_HEIGHT in
+	// frontend/src/components/window/titleBand.ts). Nothing spans that band: the sidebar's
+	// top band and the pane headers fill it, and they drag the window through the Wails
+	// runtime (`--wails-draggable: drag`), so their buttons still click. The title stays
+	// set for Mission Control and the app switcher even though the bar no longer shows it.
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "Code Foundry",
 		Width:  1200,
@@ -71,8 +68,10 @@ func main() {
 		BackgroundColour: application.NewRGB(0, 0, 0),
 		URL:              "/",
 		Mac: application.MacWindow{
-			TitleBar:                application.MacTitleBarHiddenInset,
-			InvisibleTitleBarHeight: titleStripHeight,
+			TitleBar: application.MacTitleBarHiddenInset,
+			// No native drag band. A native band drags on any mouse-down in it, before the
+			// page sees the click, so it would swallow the header buttons now in the band.
+			InvisibleTitleBarHeight: 0,
 		},
 	})
 

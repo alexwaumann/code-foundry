@@ -155,6 +155,18 @@
     -webkit-user-select: text;
     user-select: text;
   }
+  /* Controls never drag the window, even inside a drag surface (`--wails-draggable`
+     inherits; docs/notes/phase3-ui-panes.md). A utility still overrides this. */
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [contenteditable],
+  [role="tab"],
+  [role="separator"] {
+    --wails-draggable: no-drag;
+  }
 }
 
 /* Thin indeterminate bar for a session that is starting or closing. */

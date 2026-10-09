@@ -48,7 +48,7 @@ function TabButton({ panelKey, tab, active }: { panelKey: string; tab: Tab; acti
       role="presentation"
       data-tab-id={tab.id}
       className={cn(
-        "group flex h-7 max-w-48 shrink-0 items-center rounded-md pr-1 text-xs",
+        "group flex h-7 max-w-48 shrink-0 items-center rounded-md pr-1 text-xs [--wails-draggable:no-drag]",
         active ? "bg-accent text-accent-foreground dark:bg-accent/50" : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
       )}
       onMouseDown={(e) => {
@@ -213,11 +213,12 @@ function surfaceKey(panelKey: string, chord: string): boolean {
 /**
  * The panel's header: tabs on the left, the toggle at the far right. 44px (h-11) like
  * every content pane header (window/PaneHeader), so it ends on the title band's bottom
- * edge beside them (window/titleBand.ts).
+ * edge beside them (window/titleBand.ts). Like them it drags the window: the empty
+ * space around the tabs does, each tab and the toggle are `no-drag`.
  */
 function PanelHeader({ panelKey, hasTabs }: { panelKey: string; hasTabs: boolean }) {
   return (
-    <div className="flex h-11 shrink-0 items-center gap-2 border-b border-pane-border pr-2 pl-1.5" data-testid="panel-header">
+    <div className="flex h-11 shrink-0 items-center gap-2 border-b border-pane-border pr-2 pl-1.5 [--wails-draggable:drag]" data-testid="panel-header">
       {hasTabs ? <TabStrip panelKey={panelKey} /> : <div className="min-w-0 flex-1" />}
       <PanelToggle inPanel />
     </div>

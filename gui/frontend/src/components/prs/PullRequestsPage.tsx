@@ -205,7 +205,7 @@ export function PullRequestsPage() {
         <button
           type="button"
           onClick={toggle}
-          className="rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-accent"
+          className="rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground [--wails-draggable:no-drag] hover:bg-accent"
           title="Switch between registered and all repositories"
           data-testid="prs-scope"
         >
