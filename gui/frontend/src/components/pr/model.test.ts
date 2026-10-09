@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CheckRollupView, PullRequestCommentView, PullRequestDetailView, PullRequestView, ReviewThreadView } from "@/api/gh";
-import { ago, checkDuration, checksHeadline, checkTone, commentCount, conversation, resolveLink, reviewerStatus, stateBadge, threadLocation, timeline } from "./model";
+import { ago, checkDuration, checkMeta, checkRunning, checksHeadline, checkTone, commentCount, conversation, resolveLink, reviewerStatus, stateBadge, threadLocation, timeline } from "./model";
 
 const NOW = new Date(2026, 9, 8, 12, 0, 0).getTime();
 const M = 60_000;
@@ -15,9 +15,10 @@ describe("checksHeadline", () => {
     ["all passed", rollup({ total: 12, passed: 12 }), "success", "All checks passed"],
     ["passed with skipped", rollup({ total: 5, passed: 3, skipped: 2 }), "success", "All checks passed"],
     ["failing wins over pending", rollup({ state: "failure", total: 28, failed: 2, pending: 3 }), "failure", "2 failing"],
-    ["failure state without counts", rollup({ state: "error", total: 1 }), "failure", "1 failing"],
+    ["failure state without counts", rollup({ state: "error", total: 1 }), "failure", "Checks failing"],
+    ["failure state, only pending counted", rollup({ state: "failure", total: 3, pending: 3 }), "failure", "Checks failing"],
     ["pending", rollup({ state: "pending", total: 9, pending: 4 }), "pending", "4 pending"],
-    ["expected", rollup({ state: "expected", total: 1 }), "pending", "1 pending"],
+    ["expected", rollup({ state: "expected", total: 1 }), "pending", "Checks pending"],
   ] as const)("%s", (_name, r, tone, text) => {
     expect(checksHeadline(r)).toEqual({ tone, text });
   });
@@ -58,6 +59,25 @@ describe("checkTone and checkDuration", () => {
   ])("started %s completed %s -> %s", (startedAtMs, completedAtMs, want) => {
     expect(checkDuration({ startedAtMs, completedAtMs }, NOW)).toBe(want);
   });
+
+  it.each([
+    ["skipped, zero length", { conclusion: "skipped", status: "completed", startedAtMs: NOW - M, completedAtMs: NOW - M }, "skipped"],
+    ["neutral", { conclusion: "neutral", status: "completed", startedAtMs: null, completedAtMs: null }, "skipped"],
+    ["passed", { conclusion: "success", status: "completed", startedAtMs: NOW - 92 * 1000, completedAtMs: NOW }, "1m 32s"],
+    ["running", { conclusion: "", status: "in_progress", startedAtMs: NOW - 10 * M, completedAtMs: null }, "10m 0s"],
+    ["queued", { conclusion: "", status: "queued", startedAtMs: null, completedAtMs: null }, "queued"],
+    ["in progress, not started", { conclusion: "", status: "in_progress", startedAtMs: null, completedAtMs: null }, "in progress"],
+  ])("checkMeta %s -> %s", (_name, c, want) => {
+    expect(checkMeta(c, NOW)).toBe(want);
+  });
+
+  it.each([
+    [{ status: "in_progress", startedAtMs: NOW, completedAtMs: null }, true],
+    [{ status: "queued", startedAtMs: null, completedAtMs: null }, false],
+    [{ status: "completed", startedAtMs: NOW - M, completedAtMs: NOW }, false],
+  ])("checkRunning %j -> %s", (c, want) => {
+    expect(checkRunning(c)).toBe(want);
+  });
 });
 
 describe("ago", () => {
@@ -67,6 +87,7 @@ describe("ago", () => {
     [NOW - 36 * M, "36m ago"],
     [NOW - 5 * H, "5h ago"],
     [NOW - 3 * D, "3d ago"],
+    [NOW - 20 * D, "2w ago"],
     [NOW - 90 * D, "3mo ago"],
     [NOW - 800 * D, "2y ago"],
   ])("%s -> %s", (ms, want) => {
@@ -143,7 +164,9 @@ describe("timeline", () => {
     ["open, oldest first", { pullRequest: pr({}), commits, comments, mergedBy: "", closedAtMs: null }, "oldest", ["opened", "k:aaa", "c:c1", "k:bbb", "r:r1"]],
     ["merged first", { pullRequest: pr({ state: "merged", mergedAtMs: NOW - H }), commits, comments: [], mergedBy: "alex", closedAtMs: NOW - H }, "newest", ["merged", "k:bbb", "k:aaa", "opened"]],
     ["closed without merging", { pullRequest: pr({ state: "closed" }), commits: [], comments: [], mergedBy: "", closedAtMs: NOW - H }, "newest", ["closed", "opened"]],
-    ["merged at unknown time falls to the end", { pullRequest: pr({ state: "merged" }), commits: [], comments: [], mergedBy: "", closedAtMs: null }, "newest", ["opened", "merged"]],
+    ["merged at an unknown time is still the latest", { pullRequest: pr({ state: "merged" }), commits, comments: [], mergedBy: "", closedAtMs: null }, "newest", ["merged", "k:bbb", "k:aaa", "opened"]],
+    ["closed at an unknown time is still the latest", { pullRequest: pr({ state: "closed" }), commits: [], comments: [], mergedBy: "", closedAtMs: null }, "newest", ["closed", "opened"]],
+    ["closed at an unknown time, oldest first", { pullRequest: pr({ state: "closed" }), commits, comments: [], mergedBy: "", closedAtMs: null }, "oldest", ["opened", "k:aaa", "k:bbb", "closed"]],
   ];
   it.each(cases)("%s", (_name, d, order, keys) => {
     expect(timeline(d, order).map((e) => e.key)).toEqual(keys);

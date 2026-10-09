@@ -3,6 +3,7 @@
  * tones and durations, reviewer status, the summary's conversation and the timeline.
  */
 import type { CheckRollupView, CheckView, PullRequestCommentView, PullRequestCommitView, PullRequestDetailView, PullRequestReviewerView, PullRequestView, ReviewThreadView } from "@/api/gh";
+import { shortAge } from "@/components/prs/format";
 import { formatUptime } from "@/lib/format";
 import type { SortOrder } from "@/stores/prPanel";
 
@@ -22,11 +23,16 @@ export function stateBadge(pr: Pick<PullRequestView, "state" | "draft">): { labe
   }
 }
 
-/** The header's checks line from the rollup: "All checks passed", "2 failing", "3 pending", "No checks". */
+/**
+ * The header's checks line from the rollup: "All checks passed", "2 failing", "3 pending",
+ * "No checks". A failing or pending state without a count says so without a number.
+ */
 export function checksHeadline(c: CheckRollupView): { tone: Tone; text: string } {
   if (c.total === 0 && c.state === "none") return { tone: "neutral", text: "No checks" };
-  if (c.failed > 0 || c.state === "failure" || c.state === "error") return { tone: "failure", text: `${String(Math.max(c.failed, 1))} failing` };
-  if (c.pending > 0 || c.state === "pending" || c.state === "expected") return { tone: "pending", text: `${String(Math.max(c.pending, 1))} pending` };
+  if (c.failed > 0) return { tone: "failure", text: `${String(c.failed)} failing` };
+  if (c.state === "failure" || c.state === "error") return { tone: "failure", text: "Checks failing" };
+  if (c.pending > 0) return { tone: "pending", text: `${String(c.pending)} pending` };
+  if (c.state === "pending" || c.state === "expected") return { tone: "pending", text: "Checks pending" };
   return { tone: "success", text: "All checks passed" };
 }
 
@@ -48,19 +54,28 @@ export function checkDuration(c: Pick<CheckView, "startedAtMs" | "completedAtMs"
   return formatUptime(Math.max(0, (end - c.startedAtMs) / 1000));
 }
 
-/** Relative age with "ago": "just now", "5m ago", "3h ago", "2d ago"; "" when unknown. */
+/** Whether a check is running now (its duration grows every second). */
+export function checkRunning(c: Pick<CheckView, "startedAtMs" | "completedAtMs" | "status">): boolean {
+  return c.startedAtMs !== null && c.completedAtMs === null && c.status !== "completed";
+}
+
+/** A check row's right-hand text: "skipped", its duration, or its pending status ("queued"). */
+export function checkMeta(c: Pick<CheckView, "conclusion" | "status" | "startedAtMs" | "completedAtMs">, now: number): string {
+  const tone = checkTone(c);
+  if (tone === "skipped") return "skipped";
+  const duration = checkDuration(c, now);
+  if (duration) return duration;
+  return tone === "pending" ? c.status.replace("_", " ") : "";
+}
+
+/**
+ * Relative age with "ago", on the Pull Requests page's scale (shortAge): "just now",
+ * "5m ago", "3h ago", "2d ago", "3w ago", "4mo ago"; "" when unknown.
+ */
 export function ago(ms: number | null, now: number): string {
   if (ms === null) return "";
-  const s = Math.max(0, Math.floor((now - ms) / 1000));
-  if (s < 60) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${String(m)}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${String(h)}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 30) return `${String(d)}d ago`;
-  if (d < 365) return `${String(Math.floor(d / 30))}mo ago`;
-  return `${String(Math.floor(d / 365))}y ago`;
+  const a = shortAge(ms, now);
+  return a === "now" ? "just now" : `${a} ago`;
 }
 
 export type ReviewerStatus = "approved" | "changes_requested" | "commented" | "dismissed" | "requested" | "none";
@@ -96,14 +111,17 @@ export function reviewVerb(state: PullRequestCommentView["reviewState"]): string
   }
 }
 
-/** Newest first or oldest first; unknown times always last; ties keep their input order. */
-function byTime<T extends { atMs: number | null }>(items: T[], order: SortOrder, rank: (t: T) => number = () => 0): T[] {
+/**
+ * Newest first or oldest first by `at` (default atMs); unknown times (null) always last;
+ * ties by rank, then input order.
+ */
+function byTime<T extends { atMs: number | null }>(items: T[], order: SortOrder, rank: (t: T) => number = () => 0, at: (t: T) => number | null = (t) => t.atMs): T[] {
   const dir = order === "newest" ? -1 : 1;
   return items
-    .map((it, i) => ({ it, i }))
+    .map((it, i) => ({ it, i, at: at(it) }))
     .sort((a, b) => {
-      if (a.it.atMs === null || b.it.atMs === null) return a.it.atMs === b.it.atMs ? a.i - b.i : a.it.atMs === null ? 1 : -1;
-      return (a.it.atMs - b.it.atMs) * dir || (rank(b.it) - rank(a.it)) * -dir || a.i - b.i;
+      if (a.at === null || b.at === null) return a.at === b.at ? a.i - b.i : a.at === null ? 1 : -1;
+      return (a.at - b.at) * dir || (rank(b.it) - rank(a.it)) * -dir || a.i - b.i;
     })
     .map((x) => x.it);
 }
@@ -124,7 +142,11 @@ export function conversation(d: Pick<PullRequestDetailView, "comments" | "review
   return byTime(items, order);
 }
 
-/** Comments the summary counts: issue comments, reviews with a body or a verdict, and every thread comment. */
+/**
+ * Comments the header and the summary count: issue comments, reviews with a body or a
+ * verdict, and every thread comment (replies included). The Timeline counts its entries
+ * instead (it leaves thread comments in the summary).
+ */
 export function commentCount(d: Pick<PullRequestDetailView, "comments" | "reviewThreads">): number {
   return d.comments.length + d.reviewThreads.reduce((n, t) => n + t.comments.length, 0);
 }
@@ -155,7 +177,10 @@ export function timeline(d: Pick<PullRequestDetailView, "pullRequest" | "commits
     if (c.kind === "review") out.push({ kind: "review", key: `r:${c.id}`, atMs: c.createdAtMs, comment: c });
     else out.push({ kind: "comment", key: `c:${c.id}`, atMs: c.createdAtMs, comment: c });
   }
-  return byTime(out, order, (e) => timelineRank[e.kind]);
+  // The end state is the latest event even when its time is unknown: it sorts after
+  // everything (first when newest first), not with the unknowns.
+  const end = (e: TimelineEntry) => e.kind === "merged" || e.kind === "closed";
+  return byTime(out, order, (e) => timelineRank[e.kind], (e) => (end(e) && e.atMs === null ? Number.MAX_SAFE_INTEGER : e.atMs));
 }
 
 /** A thread's location: "path:line" (the line is left out when unknown). */
