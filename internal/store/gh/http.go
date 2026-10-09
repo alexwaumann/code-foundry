@@ -96,14 +96,21 @@ func NewHTTPRunner(o HTTPOptions) *HTTPRunner {
 	return &HTTPRunner{opts: o}
 }
 
-// newHTTPClient keeps connections to api.github.com alive between polls. The store
-// sends one request at a time, so a couple of idle connections is plenty; the idle
-// timeout outlasts the 60s repo poll interval so the next poll reuses the connection.
+// idleConnTimeout drops our idle connections before GitHub does. api.github.com closes
+// an HTTP/2 connection after ~30s idle (measured 2026-10: reused after 28s, new after
+// 31s), so reusing one near that edge could race the server's close, and a POST is not
+// retried on a dead connection. Requests of one poll come seconds apart and reuse; the
+// poll itself (60s) reconnects, ~0.2-0.4s once a minute.
+const idleConnTimeout = 25 * time.Second
+
+// newHTTPClient keeps connections to api.github.com alive between the requests of a
+// poll. The store sends one request at a time, so a couple of idle connections is
+// plenty.
 func newHTTPClient() *http.Client {
 	t := http.DefaultTransport.(*http.Transport).Clone()
 	t.MaxIdleConns = 4
 	t.MaxIdleConnsPerHost = 2
-	t.IdleConnTimeout = 5 * time.Minute
+	t.IdleConnTimeout = idleConnTimeout
 	t.TLSHandshakeTimeout = 10 * time.Second
 	t.ResponseHeaderTimeout = DefaultCallTimeout
 	t.ExpectContinueTimeout = 0
