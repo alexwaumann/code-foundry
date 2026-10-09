@@ -80,7 +80,7 @@ until the contributor pushes again; then the command asks for `--worktree`.
    `RepoService.CreateWorktree{branch: head, base_ref: "origin/<head>"}`. If a local
    branch with that name exists, CreateWorktree checks it out as is. Otherwise it runs
    `git worktree add --track -b <head> <path> origin/<head>`, so the new branch tracks
-   `origin/<head>`.
+   `origin/<head>` (`--no-track` in a single-branch clone; see Gotchas).
 4. If CreateWorktree fails with `FailedPrecondition` (two runs at once: the other one
    created the worktree after this one listed), the repos are listed once more and a
    worktree now on the head is used. Otherwise the error is returned as
@@ -211,7 +211,11 @@ checks): about 52 KiB, or about 68 KiB when one oversized thread is all that fit
   fail loudly. CreateWorktree used `--no-track` for every explicit base, which left the
   new branch without an upstream; it now uses `--track` when the base is
   `origin/<the branch itself>` (only that case: branching `feat` from `origin/main`
-  must still not track main).
+  must still not track main) and origin's configured fetch refspec writes
+  `refs/remotes/origin/<branch>`. git refuses `--track` for a ref no refspec maps
+  ("cannot set up tracking information; starting point … is not a branch"), which is
+  what a single-branch clone has after the explicit-refspec fetch below; there the
+  branch is created without an upstream, as before. The review-fix live run hit this.
 * **Single-branch clones.** `git clone --depth N` implies `--single-branch`, so a plain
   `git fetch --prune` never creates `origin/<head>`. The live run hit this (`invalid
   reference: origin/<head>`). The fetch now names the refspec
@@ -275,6 +279,28 @@ checked the PR with `gh pr view`, and was closed with `session close` before it 
 anything (worktree clean, nothing pushed). Both sessions were closed and the daemon was
 stopped.
 
+## Live run after the review fixes (scratch daemon, 2026-10-09)
+
+```
+$ git clone --depth 5 https://github.com/alexwaumann/code-foundry.git /tmp/cf-ae08b-clone
+$ code-foundry repo register --path /tmp/cf-ae08b-clone     # fetch refspec: main only
+$ code-foundry pr fix findings alexwaumann/code-foundry 1 --model haiku --effort medium --json
+{"id":"s-ae000fa8186d",…,"worktreePath":"…/worktrees/alexwaumann/code-foundry/t3code-review-gh-git-diff-services",…}
+$ code-foundry pr ask alexwaumann/code-foundry 1 "/clear In one sentence, what is this PR's title? Do not run any tools." --model haiku --effort medium
+Started session s-13a5e7bfbcc0 for PR #1
+```
+
+The first attempt with `--track` failed in this clone ("starting point … is not a
+branch"; nothing was left behind), which led to the refspec check above. After it, the
+shallow single-branch clone needed no `set-branches`: the fetch created
+`origin/t3code/review-gh-git-diff-services`, and the worktree was created at 81b2ff9.
+The fix session's first message had the new up-to-date line; Claude checked the
+checkout against `origin/<head>`, found PR #1 merged with nothing to fix, and changed
+nothing. The ask session ran in that same worktree (the head's), received
+`Question about PR #1:\n/clear In one sentence…` as text (no slash command ran), and
+answered with the title. Both sessions were closed and the daemon stopped; nothing was
+pushed.
+
 ## Review fixes (2026-10-09)
 
 A review of the first version found these; each has a test.
@@ -287,7 +313,7 @@ A review of the first version found these; each has a test.
 | Invisible format characters survived | `unicode.Cf` dropped; C1, NEL, U+2028, invalid UTF-8, `ESC[201~` pinned | `TestSanitizePRText` |
 | Review summaries crowded out threads | order checks, threads, remarks; no APPROVED/DISMISSED; latest per reviewer | `TestFixFindingsPRPrompt`, `…Cap` |
 | Session could start on stale code | up-to-date line, behind/dirty lines | `TestFixFindingsPRPrompt`, command table |
-| New worktree had no upstream | `--track` for base `origin/<branch>` | `TestCreateWorktreeUpstream` (repo) |
+| New worktree had no upstream | `--track` for base `origin/<branch>` when origin's refspec maps it | `TestCreateWorktreeUpstream`, `TestRefspecWrites` (repo) |
 | STARTUP_FAILURE not listed | added | `TestFixFindingsPRPrompt` |
 | Fetch named no remote | `GitFetchRequest.remote`/`branch` | `TestFetchRemoteBranch`, `TestFetchArgs`, `TestGitOpsRPCs` |
 | Concurrent runs | re-list once on `FailedPrecondition` | "a concurrent run created the worktree" |
