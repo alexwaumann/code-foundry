@@ -592,3 +592,75 @@ and clone directories were removed.
   one. The menu does not say which beforehand.
 * Not run in the real Wails window.
 
+## Chunk 5: the Merge button
+
+A Merge button on the PR header's repo row, left of the ⋯ menu (daemon side:
+`gh-pr-detail.md`, "Merge").
+
+Status: `make check` green (45 vitest files / 628 tests, plus the Go suite). `make
+gui-e2e` passes 232/232 (116 per engine), with `e2e/pr-panel.spec.ts` at 25 tests per
+engine; the declined-confirmation assertion was checked to fail with its fix reverted.
+Screenshots (WebKit, dark, 1400x900, mock daemon): `/tmp/cf-shots/merge-button.png`
+(#142 at 420px, dropdown open) and `/tmp/cf-shots/merge-button-280.png`. Not run in the
+real Wails window, and no merge was sent to GitHub.
+
+### Pieces
+
+| File | Role |
+|---|---|
+| `components/pr/MergeButton.tsx` | The button (`pr-merge-button`) and its dropdown (`pr-merge-menu`): a "Merge into <base>" label, notes, one item per allowed method (`pr-merge-method-<m>`), and the "Delete branch after merge" checkbox item (`pr-merge-delete-branch`) |
+| `components/pr/merge.ts` | Pure: `mergeAvailability` (visible, disabled reason, methods, notes), `canDeleteBranch`, `mergeArgs`, `mergeMethodHint`, labels |
+| `stores/prPanel.ts` | `mergePullRequest` (pr.merge through `runCommandForResult`, quiet; `merging` busy flag per pull request) |
+| `api/gh.ts` | `mergeMethods`, `autoMergeEnabled` on the detail view; `parseMergeResult` |
+| `components/ui/dropdown-menu.tsx` | shadcn `DropdownMenuCheckboxItem` and `DropdownMenuLabel` |
+
+### Decisions
+
+* **When it shows, and why it is disabled.** Hidden unless the pull request is open.
+  Disabled reasons, first match wins: draft (or merge state `draft`) "Draft pull requests
+  cannot be merged"; no write access "Merging needs write access"; `mergeable`
+  conflicting or merge state `dirty` "Resolve conflicts first"; merge state `blocked`
+  "Blocked: required checks or reviews are missing"; no allowed method "This repository
+  allows no merge method". Write access comes before conflicts: someone without it can do
+  nothing about them. Behind, unstable (non-required checks failing), auto-merge on and
+  mergeability not computed yet are allowed; the first three get a note in the dropdown.
+* **Disabled is `aria-disabled`, not `disabled`**, so the button stays focusable and its
+  `title` tooltip shows; the reason is also its accessible description. The dropdown
+  refuses to open while disabled or busy (`onOpenChange` ignores opening).
+* **Branch default.** "Delete branch after merge" starts on unless the head is in a fork
+  (then it is disabled, "The branch is in a fork"). The choice is local to the tab's
+  surface and stays while the dropdown is reopened. Toggling keeps the menu open.
+* **Running.** Choosing a method closes the menu, then runs pr.merge; the daemon's
+  confirmation ("Merge #142 into main with squash? Branch feat/sidebar is deleted
+  afterwards.") goes through the ConfirmDialog. The button shows a spinner and is
+  `aria-busy` from the confirmation until the answer, and a second run meanwhile sends
+  nothing. Success toasts the daemon's message, split at "; " into title and description
+  ("Merged #142 (e2e0142)", "deleted branch feat/sidebar"). Either way the detail is
+  invalidated (the daemon also sends the event), so a refusal like a moved head shows
+  GitHub's state; the refusal itself is the generic "Merge Pull Request failed" toast.
+* **Style.** `bg-primary` (near white in dark, near black in light), 28px high like the
+  ⋯ button. Below 340px (container query) the label is screen-reader only and the
+  icon and chevron stay (under 48px wide). The dropdown is 18rem, inside the panel
+  through `usePanelBoundary`.
+
+### Gotchas
+
+* **The menu came back after a declined confirmation.** Selecting a method set the busy
+  flag in the same event, so the controlled `open` (`open && !blocked`) was already false
+  when Radix closed the menu; Radix's `useControllableState` then skips `onOpenChange`,
+  the local `open` stayed true, and the menu reopened once the merge ended (and the next
+  click toggled it shut). The item now calls `setOpen(false)` itself.
+* Playwright will not click an `aria-disabled` button; the draft check forces the click
+  to prove it opens nothing.
+* The mock's `pr-fail?command=pr.merge` fails the next merge like a moved head, and
+  `pr-delay` now also delays pr.merge (for the spinner).
+
+### Open items
+
+* Not run against a real daemon with GitHub (no merge may be sent). The new detail query
+  fields (`mergeCommitAllowed`, `squashMergeAllowed`, `rebaseMergeAllowed`,
+  `autoMergeRequest`) and the head-moved message were not checked against GitHub.
+* No commit message editing (GitHub's squash title/body), no "merge when ready" (enabling
+  auto-merge), no admin bypass of branch protection.
+* Deleting the branch does not check for other open pull requests based on it.
+

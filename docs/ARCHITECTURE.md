@@ -207,8 +207,8 @@ context from flags or none. The palette, keybindings, and CLI subcommands are th
 doors to this one registry. Adding a feature means registering commands, not editing a
 switch.
 
-Pull request commands: the detail panel's actions (`pr.revert`, `pr.review.request`,
-`pr.refresh`; docs/notes/gh-pr-detail.md) and the session starters `pr.ask`,
+Pull request commands: the detail panel's actions (`pr.merge`, `pr.revert`,
+`pr.review.request`, `pr.refresh`; docs/notes/gh-pr-detail.md) and the session starters `pr.ask`,
 `pr.explain`, `pr.fix.findings`, which pick or create a worktree and type a prompt built
 from the pull request (docs/notes/pr-thread-commands.md).
 
