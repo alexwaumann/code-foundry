@@ -3,12 +3,13 @@ import { Check, Loader2, Search, UserPlus } from "lucide-react";
 import type { ReviewerCandidateView } from "@/api/gh";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { pullRequestKey } from "@/stores/gh";
 import { requestingKey, reviewerCandidatesResource, setReviewRequest, usePrPanelStore } from "@/stores/prPanel";
 import { useResource } from "@/stores/resource";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
-import { stopPlainKeys } from "./keys";
+import { POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
 
 export const WRITE_ACCESS_HINT = "Asking someone to review needs write access on this repository.";
 
@@ -69,10 +70,12 @@ function Candidates({ prRef }: { prRef: PrRef }) {
  */
 export function ReviewerPicker({ prRef, canUpdate }: { prRef: PrRef; canUpdate: boolean }) {
   const [open, setOpen] = useState(false);
+  const { ref, boundary } = usePanelBoundary();
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
+          ref={ref}
           type="button"
           aria-label="Request a review"
           title={canUpdate ? "Request a review" : WRITE_ACCESS_HINT}
@@ -82,7 +85,15 @@ export function ReviewerPicker({ prRef, canUpdate }: { prRef: PrRef; canUpdate: 
           <UserPlus className="size-3.5" aria-hidden />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 overflow-hidden p-0" data-testid="pr-reviewer-picker" data-region="panel" onKeyDown={stopPlainKeys}>
+      <PopoverContent
+        align="start"
+        collisionBoundary={boundary}
+        collisionPadding={POPUP_COLLISION_PADDING}
+        className={cn("w-72 overflow-hidden p-0", POPUP_FIT)}
+        data-testid="pr-reviewer-picker"
+        data-region="panel"
+        onKeyDown={stopPlainKeys}
+      >
         {canUpdate ? (
           <Candidates prRef={prRef} />
         ) : (

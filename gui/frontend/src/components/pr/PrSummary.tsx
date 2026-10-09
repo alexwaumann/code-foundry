@@ -8,9 +8,10 @@ import { sectionOpenByDefault, toggleOrder, toggleSection, usePrPanelStore, type
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
 import { Markdown } from "./Markdown";
-import { ago, checkDuration, checkTone, commentCount, conversation, reviewerStatus, reviewVerb, threadLocation, type ConversationItem, type ReviewerStatus } from "./model";
+import { ago, checkMeta, checkRunning, checkTone, commentCount, conversation, reviewerStatus, reviewVerb, threadLocation, type ConversationItem, type ReviewerStatus } from "./model";
 import { ReviewerPicker } from "./ReviewerPicker";
 import { toneText } from "./tones";
+import { VirtualStack } from "./VirtualStack";
 
 function useSectionOpen(tabKey: string, section: PrSection): boolean {
   return usePrPanelStore((s) => s.byTab[tabKey]?.open[section] ?? sectionOpenByDefault[section]);
@@ -56,7 +57,7 @@ function Reviewer({ r }: { r: PullRequestReviewerView }) {
   const icon = reviewerIcon[status];
   return (
     <span
-      className={cn("inline-flex h-6 items-center gap-1.5 rounded-full border border-border bg-muted/40 pr-2 pl-0.5 text-xs", r.stale && "opacity-55")}
+      className={cn("inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-full border border-border bg-muted/40 pr-2 pl-0.5 text-xs", r.stale && "opacity-70")}
       title={label ? `${r.login}: ${label}` : r.login}
       data-testid="pr-reviewer"
       data-login={r.login}
@@ -64,10 +65,10 @@ function Reviewer({ r }: { r: PullRequestReviewerView }) {
       data-stale={r.stale}
     >
       <Avatar login={r.login} src={r.avatarUrl} size={18} />
-      <span className="max-w-36 truncate">{r.login}</span>
-      {r.isBot && <Bot className="size-3 text-muted-foreground" aria-label="bot" />}
-      {icon && <icon.icon className={cn("size-3.5", icon.cls)} aria-label={label} />}
-      {r.requested && r.state !== "" && <Clock className={cn("size-3", toneText.pending)} aria-hidden />}
+      <span className="max-w-36 min-w-0 truncate">{r.login}</span>
+      {r.isBot && <Bot className="size-3 shrink-0 text-muted-foreground" aria-label="bot" />}
+      {icon && <icon.icon className={cn("size-3.5 shrink-0", icon.cls)} aria-label={label} />}
+      {r.requested && r.state !== "" && <Clock className={cn("size-3 shrink-0", toneText.pending)} aria-hidden />}
     </span>
   );
 }
@@ -76,19 +77,20 @@ function LabelChip({ l }: { l: PullRequestLabelView }) {
   const hex = /^[0-9a-f]{6}$/i.test(l.color) ? `#${l.color}` : "#888888";
   return (
     <span
-      className="inline-flex h-6 items-center gap-1.5 rounded-full border px-2 text-xs"
+      className="inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-full border px-2 text-xs"
       style={{ backgroundColor: `${hex}22`, borderColor: `${hex}66` }}
       data-testid="pr-label"
     >
-      <span className="size-2 rounded-full" style={{ backgroundColor: hex }} aria-hidden />
-      {l.name}
+      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: hex }} aria-hidden />
+      <span className="min-w-0 truncate">{l.name}</span>
     </span>
   );
 }
 
+/** "Reviewers  [chips]": the label beside the values, or above them in a narrow panel. */
 function Row({ icon: Icon, label, children, testId }: { icon: typeof Users; label: string; children: ReactNode; testId: string }) {
   return (
-    <div className="flex min-h-7 items-start gap-3" data-testid={testId}>
+    <div className="flex min-h-7 items-start gap-3 @max-[340px]:flex-col @max-[340px]:gap-0" data-testid={testId}>
       <span className="flex h-7 w-24 shrink-0 items-center gap-2 text-[13px] text-muted-foreground">
         <Icon className="size-4" aria-hidden />
         {label}
@@ -103,7 +105,6 @@ const checkIcon = { success: CircleCheck, failure: CircleX, pending: CircleDot, 
 function CheckRow({ c, now }: { c: CheckView; now: number }) {
   const tone = checkTone(c);
   const Icon = checkIcon[tone];
-  const duration = checkDuration(c, now);
   return (
     <li>
       <button
@@ -118,7 +119,9 @@ function CheckRow({ c, now }: { c: CheckView; now: number }) {
         <Icon className={cn("size-3.5 shrink-0", toneText[tone], tone === "pending" && c.status === "in_progress" && "animate-pulse")} aria-label={tone} />
         <span className="min-w-0 truncate">{c.name}</span>
         {c.workflow && <span className="min-w-0 shrink truncate text-xs text-muted-foreground">{c.workflow}</span>}
-        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">{duration || (tone === "pending" ? c.status.replace("_", " ") : "")}</span>
+        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums" data-testid="pr-check-meta">
+          {checkMeta(c, now)}
+        </span>
         <ExternalLink className={cn("size-3 shrink-0 text-muted-foreground opacity-0", c.url && "group-hover:opacity-100")} aria-hidden />
       </button>
     </li>
@@ -126,7 +129,8 @@ function CheckRow({ c, now }: { c: CheckView; now: number }) {
 }
 
 function Checks({ d }: { d: PullRequestDetailView }) {
-  const now = useNow(1000);
+  // Tick every second only while a running check's duration grows.
+  const now = useNow(d.checks.some(checkRunning) ? 1000 : 30_000);
   if (d.checks.length === 0) return <p className="text-[13px] text-muted-foreground">No checks on the head commit.</p>;
   return (
     <>
@@ -150,13 +154,18 @@ function Notice({ children }: { children: ReactNode }) {
 
 function CommentHeader({ c, now, verb }: { c: PullRequestCommentView; now: number; verb?: ReactNode }) {
   return (
-    <div className="flex min-w-0 items-center gap-1.5 text-xs">
+    <div className="flex min-w-0 items-start gap-1.5 text-xs">
       <Avatar login={c.author} src={c.authorAvatarUrl} size={20} />
-      <span className="truncate font-medium text-foreground">{c.author || "ghost"}</span>
-      {c.authorIsBot && <span className="rounded border px-1 text-[10px] text-muted-foreground">bot</span>}
-      {verb}
-      <span className="shrink-0 text-muted-foreground" title={c.createdAtMs === null ? undefined : new Date(c.createdAtMs).toLocaleString()}>
-        {ago(c.createdAtMs, now)}
+      {/* The verb and age wrap under a long login instead of cutting it short. */}
+      <span className="flex min-h-5 min-w-0 flex-1 flex-wrap items-center gap-x-1.5">
+        <span className="max-w-full min-w-0 truncate font-medium text-foreground" data-testid="pr-comment-author">
+          {c.author || "ghost"}
+        </span>
+        {c.authorIsBot && <span className="rounded border px-1 text-[10px] text-muted-foreground">bot</span>}
+        {verb}
+        <span className="whitespace-nowrap text-muted-foreground" title={c.createdAtMs === null ? undefined : new Date(c.createdAtMs).toLocaleString()}>
+          {ago(c.createdAtMs, now)}
+        </span>
       </span>
       {c.url && (
         <button
@@ -178,7 +187,7 @@ const verdictTone = { approved: toneText.success, changes_requested: toneText.fa
 function Comment({ c, now }: { c: PullRequestCommentView; now: number }) {
   const verb =
     c.kind === "review" ? (
-      <span className={cn("shrink-0", verdictTone[c.reviewState] ?? "text-muted-foreground")} data-testid="pr-review-verdict">
+      <span className={cn("whitespace-nowrap", verdictTone[c.reviewState] ?? "text-muted-foreground")} data-testid="pr-review-verdict">
         {reviewVerb(c.reviewState)}
       </span>
     ) : null;
@@ -241,17 +250,25 @@ function Conversation({ items }: { items: ConversationItem[] }) {
   const now = useNow(30_000);
   if (items.length === 0) return <p className="text-[13px] text-muted-foreground">No comments yet.</p>;
   return (
-    <div className="flex flex-col" data-testid="pr-comments-list">
-      {items.map((it) => (it.kind === "thread" ? <Thread key={it.key} t={it.thread} now={now} /> : <Comment key={it.key} c={it.comment} now={now} />))}
-    </div>
+    <VirtualStack
+      items={items}
+      itemKey={(it) => it.key}
+      estimate={96}
+      className="flex flex-col"
+      testId="pr-comments-list"
+      render={(it) => (it.kind === "thread" ? <Thread t={it.thread} now={now} /> : <Comment c={it.comment} now={now} />)}
+    />
   );
 }
 
-function OrderToggle({ tabKey, which }: { tabKey: string; which: "commentOrder" | "timelineOrder" }) {
+/** "Newest first" / "Oldest first". `compact` keeps only the icon (and the tooltip) below 480px. */
+function OrderToggle({ tabKey, which, compact = false }: { tabKey: string; which: "commentOrder" | "timelineOrder"; compact?: boolean }) {
   const order = usePrPanelStore((s) => s.byTab[tabKey]?.[which] ?? "newest");
+  const label = order === "newest" ? "Newest first" : "Oldest first";
   return (
     <button
       type="button"
+      title={compact ? `${label} (click to reverse)` : undefined}
       className="flex h-6 shrink-0 items-center gap-1 rounded px-1.5 text-xs whitespace-nowrap text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
       data-testid={which === "commentOrder" ? "pr-comment-order" : "pr-timeline-order"}
       data-order={order}
@@ -260,7 +277,7 @@ function OrderToggle({ tabKey, which }: { tabKey: string; which: "commentOrder" 
       }}
     >
       <ArrowDownUp className="size-3" aria-hidden />
-      {order === "newest" ? "Newest first" : "Oldest first"}
+      <span className={compact ? "@max-[480px]:sr-only" : undefined}>{label}</span>
     </button>
   );
 }

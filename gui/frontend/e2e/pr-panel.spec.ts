@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, openApp, resetMock, row } from "./fixtures";
+import { CF, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
 
 /**
  * The Pull request surface in the side panel, against the mock daemon's fixtures
@@ -47,6 +47,28 @@ async function openPrPage(page: Page): Promise<void> {
 /** Opens a pull request in the current selection's panel through the app's own store (for PRs on no dashboard). */
 async function openPr(page: Page, number: number): Promise<void> {
   await page.evaluate(`import("/src/stores/prPanel.ts").then((m) => m.openPullRequestInPanel({ slug: "${SLUG}", number: ${String(number)} }))`);
+}
+
+/** Sets the side panel's width through the app's own ui store, and waits for it. */
+async function setPanelWidth(page: Page, width: number): Promise<void> {
+  await page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setPanelWidth(${String(width)}))`);
+  await expect.poll(async () => (await panel(page).boundingBox())?.width).toBe(width);
+}
+
+/** How far an element's content overflows it horizontally (0 or less: it fits). */
+function overflowX(page: Page, testId: string): Promise<number> {
+  return page.getByTestId(testId).evaluate((el) => el.scrollWidth - el.clientWidth);
+}
+
+async function boxOf(page: Page, testId: string): Promise<{ x: number; y: number; width: number; height: number }> {
+  const b = await page.getByTestId(testId).boundingBox();
+  if (!b) throw new Error(`${testId} has no box`);
+  return b;
+}
+
+/** Whether `inner` lies horizontally inside `outer` (1px slack for rounding). */
+function inside(inner: { x: number; width: number }, outer: { x: number; width: number }): boolean {
+  return inner.x >= outer.x - 1 && inner.x + inner.width <= outer.x + outer.width + 1;
 }
 
 function copied(page: Page): Promise<string[]> {
@@ -131,6 +153,17 @@ test("Timeline lists the end state, commits, comments and reviews; inner tabs st
   await expect(entries.nth(1)).toContainText("teammate-kim");
   await expect(entries.nth(1)).toContainText("requested changes");
   await expect(entries.last()).toHaveAttribute("data-kind", "opened");
+  // The bar counts timeline entries (not the header's comments, which include thread replies) and commits.
+  await expect(page.getByTestId("pr-timeline-counts")).toHaveText(/10 entries\s*·\s*4/);
+  // At the default 420px width the counts and the order toggle (its icon) sit side by
+  // side: the counts' text fits their box, and that box ends before the toggle.
+  expect(await overflowX(page, "pr-timeline-counts")).toBeLessThanOrEqual(0);
+  const counts = await boxOf(page, "pr-timeline-counts");
+  expect(counts.x + counts.width).toBeLessThanOrEqual((await boxOf(page, "pr-timeline-order")).x);
+  // The rail stops at the last entry's icon.
+  const lastBox = await entries.last().boundingBox();
+  const railBox = await entries.last().getByTestId("pr-timeline-rail").boundingBox();
+  expect(railBox && lastBox && railBox.y + railBox.height).toBeLessThanOrEqual((lastBox?.y ?? 0) + 25);
   await shot(page, "chunk3-timeline");
   await page.getByTestId("pr-timeline-order").click();
   await expect(entries.first()).toHaveAttribute("data-kind", "opened");
@@ -221,6 +254,8 @@ test("menu: Refresh, Open on GitHub, Copy link, the coming-next slots; shift+cmd
   await expect.poll(async () => (await invocations()).filter((i) => i.name === "pr.refresh").map((i) => i.args)).toEqual([{ "repo-slug": SLUG, number: "145" }]);
   await expect(menu).toBeVisible();
   await expect(page.getByTestId("pr-menu-refresh-hint")).toHaveText(/^Updated [0-5]s ago$/);
+  // Quiet: the menu reports it, no toast.
+  await expect(page.getByText(/^Refreshed #145/)).toHaveCount(0);
 
   await page.getByTestId("pr-menu-copy").click();
   await expect(menu).toHaveCount(0);
@@ -348,4 +383,117 @@ test("light scheme", async ({ page }) => {
   await prRow(page, "authored", 145).click();
   await expect(page.getByTestId("pr-checks-summary")).toHaveText("2 failing");
   await shot(page, "chunk3-light-summary");
+});
+
+test("a failed Refresh is reported, and the copy stays", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "authored", 145).click();
+  await expect(page.getByTestId("pr-title")).toContainText("resize race");
+  await mockPost("gh/pr-fail?command=pr.refresh");
+  await page.getByTestId("pr-menu-button").click();
+  await page.getByTestId("pr-menu-refresh").click();
+  await expect(page.getByText("Refresh Pull Request failed")).toBeVisible();
+  await expect(page.getByTestId("pr-refresh-error")).toContainText("502 Bad Gateway");
+  await expect(page.getByTestId("pr-menu-refresh-hint")).toHaveText(/^Updated \d+s ago$/);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pr-title")).toContainText("resize race");
+  await expect(page.getByTestId("pr-check")).toHaveCount(7);
+});
+
+test("closing a tab drops its inner state: reopened, it starts on Summary", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "authored", 145).click();
+  await page.getByTestId("pr-tab-timeline").click();
+  await page.getByTestId("pr-timeline-order").click();
+  await expect(page.getByTestId("pr-timeline")).toHaveAttribute("data-order", "oldest");
+  await page.getByRole("button", { name: "Close #145" }).click();
+  await expect(panel(page)).toHaveCount(0);
+  await prRow(page, "authored", 145).click();
+  await expect(page.getByTestId("pr-tab-summary")).toHaveAttribute("aria-selected", "true");
+  await page.getByTestId("pr-tab-timeline").click();
+  await expect(page.getByTestId("pr-timeline")).toHaveAttribute("data-order", "newest");
+});
+
+test("at 280px nothing overflows: header, inner tab bar, logins, popups; the active tab is revealed", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "authored", 145).click();
+  await setPanelWidth(page, 280);
+  await expect(page.getByTestId("pr-surface")).toBeVisible();
+
+  // Summary: the headline keeps its icon and number inside the bar.
+  expect(await overflowX(page, "pr-header")).toBeLessThanOrEqual(0);
+  expect(await overflowX(page, "pr-inner-bar")).toBeLessThanOrEqual(0);
+  await expect(page.getByTestId("pr-checks-summary")).toHaveText("2 failing");
+  expect(inside(await boxOf(page, "pr-checks-summary"), await boxOf(page, "pr-inner-bar"))).toBe(true);
+  // The repo link has its own row; the diffstat wraps under the branches.
+  expect(inside(await boxOf(page, "pr-diffstat"), await boxOf(page, "pr-header"))).toBe(true);
+  expect(inside(await boxOf(page, "pr-reviewers"), await boxOf(page, "side-panel"))).toBe(true);
+  // Comment authors are not cut before their verdict.
+  const cutComments = await page.getByTestId("pr-comment-author").evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth).map((e) => e.textContent));
+  expect(cutComments).toEqual([]);
+
+  // Timeline: the counts give way; the order toggle stays reachable.
+  await page.getByTestId("pr-tab-timeline").click();
+  expect(await overflowX(page, "pr-inner-bar")).toBeLessThanOrEqual(0);
+  await expect(page.getByTestId("pr-timeline-counts")).toBeHidden();
+  expect(inside(await boxOf(page, "pr-timeline-order"), await boxOf(page, "pr-inner-bar"))).toBe(true);
+  const cut = await page.getByTestId("pr-timeline-author").evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth).map((e) => e.textContent));
+  expect(cut).toEqual([]);
+  await page.getByTestId("pr-timeline-order").click();
+  await expect(page.getByTestId("pr-timeline")).toHaveAttribute("data-order", "oldest");
+
+  // Popups stay inside the panel.
+  await page.getByTestId("pr-menu-button").click();
+  await expect(page.getByTestId("pr-menu")).toBeVisible();
+  expect(inside(await boxOf(page, "pr-menu"), await boxOf(page, "side-panel"))).toBe(true);
+  await page.keyboard.press("Escape");
+  await page.getByTestId("pr-tab-summary").click();
+  await page.getByTestId("pr-add-reviewer").click();
+  await expect(page.getByTestId("pr-reviewer-picker")).toBeVisible();
+  expect(inside(await boxOf(page, "pr-reviewer-picker"), await boxOf(page, "side-panel"))).toBe(true);
+  await page.keyboard.press("Escape");
+
+  // Many tabs: each new one scrolls into view in the strip.
+  for (const [section, n] of [["authored", 142], ["authored", 12], ["review", 139], ["merged", 138], ["merged", 136], ["merged", 10]] as const) {
+    await prRow(page, section, n).click();
+    await expect(tabs(page).last()).toHaveAttribute("aria-selected", "true");
+    const strip = await boxOf(page, "panel-tabs");
+    const active = await page.getByTestId("panel-tabs").locator(`[data-tab-id]:has([aria-selected="true"])`).boundingBox();
+    expect(active && inside(active, strip)).toBe(true);
+  }
+  expect(await page.getByTestId("panel-tabs").evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+});
+
+test("long conversations and timelines are virtualized in the panel's scroll", async ({ page }) => {
+  for (let i = 1; i <= 45; i++) await mockPost(`gh/pr-comment?number=145&body=${encodeURIComponent(`Note ${String(i)}`)}`);
+  await openPrPage(page);
+  await prRow(page, "authored", 145).click();
+  const list = page.getByTestId("pr-comments-list");
+  await expect(list).toHaveAttribute("data-virtual", "true");
+  await expect(page.getByTestId("pr-comments")).toContainText("Comments(54)");
+  expect(await page.getByTestId("pr-comment").count()).toBeLessThan(50);
+  // Scrolled to the end, the oldest item (the outdated thread) is mounted and visible.
+  const body = page.getByTestId("panel-body");
+  await expect
+    .poll(async () => {
+      await body.evaluate((el) => {
+        el.scrollTop = el.scrollHeight;
+      });
+      return page.getByText("Why remove the size check?").isVisible();
+    })
+    .toBe(true);
+
+  await body.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await page.getByTestId("pr-tab-timeline").click();
+  await expect(page.getByTestId("pr-timeline-list")).toHaveAttribute("data-virtual", "true");
+  await expect
+    .poll(async () => {
+      await body.evaluate((el) => {
+        el.scrollTop = el.scrollHeight;
+      });
+      return page.locator('[data-testid="pr-timeline-entry"][data-kind="opened"]').isVisible();
+    })
+    .toBe(true);
 });

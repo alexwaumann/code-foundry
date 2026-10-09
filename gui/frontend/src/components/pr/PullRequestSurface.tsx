@@ -1,5 +1,5 @@
 import { useEffect, useMemo, type ReactNode } from "react";
-import { ArrowLeft, CircleCheck, CircleDashed, CircleDot, CircleX, ExternalLink, FileDiff, GitCommitHorizontal, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, MessageSquare, SearchX, TriangleAlert } from "lucide-react";
+import { ArrowLeft, CircleCheck, CircleDashed, CircleDot, CircleX, ExternalLink, FileDiff, GitCommitHorizontal, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, History, MessageSquare, SearchX, TriangleAlert } from "lucide-react";
 import { isNotFoundMessage, type PullRequestDetailView } from "@/api/gh";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
@@ -8,7 +8,7 @@ import { useCurrentPanelKey } from "@/stores/panel";
 import { prTabKey, setInnerTab, usePrPanelStore, type PrInnerTab } from "@/stores/prPanel";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
-import { ago, checksHeadline, commentCount, stateBadge, type Tone } from "./model";
+import { ago, checksHeadline, commentCount, stateBadge, timeline, type Tone } from "./model";
 import { PrMenu } from "./PrMenu";
 import { OrderToggle, PrSummary } from "./PrSummary";
 import { PrTimeline } from "./PrTimeline";
@@ -28,50 +28,66 @@ function StateBadge({ d }: { d: PullRequestDetailView }) {
   );
 }
 
+/**
+ * "2 failing", "All checks passed". In a narrow panel only the icon and the number show
+ * (the words stay for screen readers and the tooltip).
+ */
 export function ChecksHeadline({ d }: { d: PullRequestDetailView }) {
   const h = checksHeadline(d.pullRequest.checks);
   const Icon = checksIcon[h.tone] ?? CircleDashed;
+  const m = /^(\d+) (.*)$/.exec(h.text);
   return (
-    <span className={cn("flex items-center gap-1.5 text-xs", toneText[h.tone])} data-testid="pr-checks-summary" data-tone={h.tone}>
-      <Icon className="size-3.5" aria-hidden />
-      {h.text}
+    <span className={cn("flex min-w-0 items-center gap-1.5 text-xs whitespace-nowrap", toneText[h.tone])} title={h.text} data-testid="pr-checks-summary" data-tone={h.tone}>
+      <Icon className="size-3.5 shrink-0" aria-hidden />
+      {m ? (
+        <span className="min-w-0 truncate">
+          {m[1]}
+          <span className="@max-[340px]:sr-only"> {m[2]}</span>
+        </span>
+      ) : (
+        <span className="min-w-0 truncate @max-[340px]:sr-only">{h.text}</span>
+      )}
     </span>
   );
 }
 
+/**
+ * The repo link on its own row (as in T3 Code), then state, comment count and the menu;
+ * the title; author and age; branches, with the diffstat wrapping below in a narrow panel.
+ */
 function Header({ d, prRef, panelKey }: { d: PullRequestDetailView; prRef: PrRef; panelKey: string }) {
   const pr = d.pullRequest;
   const now = useNow(30_000);
   const comments = commentCount(d);
   return (
-    <header className="flex flex-col gap-2 border-b border-pane-border px-4 pt-3 pb-3" data-testid="pr-header">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          className="flex min-w-0 items-center gap-1 rounded text-[13px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-          title={`Open ${pr.url} on GitHub`}
-          data-testid="pr-repo-link"
-          onClick={() => void openUrl(pr.url)}
-        >
-          <span className="truncate">{prRef.slug}</span>
-          <span className={cn("shrink-0 font-medium", toneText.merged)}>#{prRef.number}</span>
-          <ExternalLink className="size-3 shrink-0" aria-hidden />
-        </button>
-        <span className="ml-auto flex shrink-0 items-center gap-1.5">
-          <span className="flex items-center gap-1 px-1 text-[13px] text-muted-foreground tabular-nums" title={`${String(comments)} comments`} data-testid="pr-comment-count">
-            <MessageSquare className="size-3.5" aria-hidden />
-            {comments}
-          </span>
-          <StateBadge d={d} />
+    <header className="flex min-w-0 flex-col gap-2 border-b border-pane-border px-4 pt-3 pb-3 @max-[340px]:px-3" data-testid="pr-header">
+      <button
+        type="button"
+        className="flex max-w-full min-w-0 items-center gap-1 self-start rounded text-[13px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+        title={`Open ${pr.url} on GitHub`}
+        data-testid="pr-repo-link"
+        onClick={() => void openUrl(pr.url)}
+      >
+        <span className="truncate">{prRef.slug}</span>
+        <span className={cn("shrink-0 font-medium", toneText.merged)}>#{prRef.number}</span>
+        <ExternalLink className="size-3 shrink-0" aria-hidden />
+      </button>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <StateBadge d={d} />
+        <span className="flex items-center gap-1 px-1 text-[13px] text-muted-foreground tabular-nums" title={`${String(comments)} comments`} data-testid="pr-comment-count">
+          <MessageSquare className="size-3.5" aria-hidden />
+          {comments}
+        </span>
+        <span className="ml-auto shrink-0">
           <PrMenu prRef={prRef} detail={d} panelKey={panelKey} />
         </span>
       </div>
-      <h2 className="text-[15px] leading-snug font-semibold select-text" data-testid="pr-title">
+      <h2 className="text-[15px] leading-snug font-semibold break-words select-text" data-testid="pr-title">
         {pr.title || `#${String(prRef.number)}`}
       </h2>
       <div className="flex min-w-0 items-center gap-1.5 text-[13px]">
         <Avatar login={pr.author} size={18} />
-        <span className="truncate font-medium" data-testid="pr-author">
+        <span className="min-w-0 truncate font-medium" data-testid="pr-author">
           {pr.author || "ghost"}
         </span>
         <span className="text-muted-foreground">·</span>
@@ -79,13 +95,13 @@ function Header({ d, prRef, panelKey }: { d: PullRequestDetailView; prRef: PrRef
           updated {ago(pr.updatedAtMs, now) || "—"}
         </span>
       </div>
-      <div className="flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
-        <span className="flex min-w-0 items-center gap-1.5 font-mono" data-testid="pr-branches" title={`${pr.headRef} into ${pr.baseRef}`}>
-          <span className="shrink-0">{pr.baseRef}</span>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <span className="flex max-w-full min-w-0 items-center gap-1.5 font-mono" data-testid="pr-branches" title={`${pr.headRef} into ${pr.baseRef}`}>
+          <span className="min-w-0 shrink truncate">{pr.baseRef}</span>
           <ArrowLeft className="size-3 shrink-0" aria-hidden />
-          <span className="truncate">{pr.headRef}</span>
+          <span className="min-w-0 truncate">{pr.headRef}</span>
         </span>
-        <span className="ml-auto flex shrink-0 items-center gap-1.5 tabular-nums" data-testid="pr-diffstat">
+        <span className="ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap tabular-nums" data-testid="pr-diffstat">
           <FileDiff className="size-3.5" aria-hidden />
           {pr.changedFiles} {pr.changedFiles === 1 ? "file" : "files"}
           <span className={toneText.success}>+{pr.additions.toLocaleString()}</span>
@@ -102,10 +118,18 @@ const innerTabs: { id: PrInnerTab | "code"; label: string }[] = [
   { id: "code", label: "Code" },
 ];
 
+/**
+ * Summary | Timeline | Code, then the checks headline (Summary) or the timeline's counts
+ * and order (Timeline). Container queries on the surface give way in steps, so nothing
+ * is pushed out of the bar or overlaps: below 480px the order toggle keeps only its icon
+ * (the default 420px panel), below 400px the counts go, and below 340px the headline
+ * keeps its icon and number. Measured in WebKit: tabs 208px, counts 119px, toggle 96px.
+ */
 function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView; tabKey: string; inner: PrInnerTab }) {
+  const entries = useMemo(() => (inner === "timeline" ? timeline(d).length : 0), [d, inner]);
   return (
-    <div className="sticky top-0 z-10 flex h-11 items-center gap-2 border-b border-pane-border bg-pane px-4">
-      <div role="tablist" aria-label="Pull request views" className="flex items-center gap-0.5 rounded-lg bg-muted/60 p-0.5 dark:bg-muted/40">
+    <div className="sticky top-0 z-10 flex h-11 min-w-0 items-center gap-2 border-b border-pane-border bg-pane px-4 @max-[340px]:gap-1.5 @max-[340px]:px-3" data-testid="pr-inner-bar">
+      <div role="tablist" aria-label="Pull request views" className="flex shrink-0 items-center gap-0.5 rounded-lg bg-muted/60 p-0.5 dark:bg-muted/40">
         {innerTabs.map((t) => {
           const active = t.id === inner;
           const disabled = t.id === "code";
@@ -119,7 +143,7 @@ function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView; tabKey: s
               title={disabled ? "The diff view comes in a later step" : undefined}
               data-testid={`pr-tab-${t.id}`}
               className={cn(
-                "h-6 rounded-md px-2.5 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default disabled:opacity-40",
+                "h-6 rounded-md px-2.5 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default disabled:opacity-55 @max-[340px]:px-2",
                 active ? "bg-pane text-foreground shadow-xs dark:bg-accent" : "text-muted-foreground enabled:hover:text-foreground",
               )}
               onClick={() => {
@@ -131,25 +155,38 @@ function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView; tabKey: s
           );
         })}
       </div>
-      <div className="ml-auto flex min-w-0 items-center gap-2">
+      <div className="ml-auto flex min-w-0 items-center gap-2 overflow-hidden" data-testid="pr-inner-bar-end">
         {inner === "summary" ? (
           <ChecksHeadline d={d} />
         ) : (
           <>
-            <span className="flex items-center gap-1 text-xs text-muted-foreground tabular-nums" title="Comments and reviews">
-              <MessageSquare className="size-3" aria-hidden />
-              {d.comments.length}
+            <span className="flex shrink-0 items-center gap-2 text-xs whitespace-nowrap text-muted-foreground tabular-nums @max-[400px]:hidden" data-testid="pr-timeline-counts">
+              {/* Timeline entries, not comments: the header's comment count includes thread replies the timeline leaves out. */}
+              <span className="flex items-center gap-1" title={`${String(entries)} timeline entries`}>
+                <History className="size-3" aria-hidden />
+                {entries} {entries === 1 ? "entry" : "entries"}
+              </span>
+              <span>·</span>
+              <span className="flex items-center gap-1" title={`${String(d.commitCount)} commits`}>
+                <GitCommitHorizontal className="size-3.5" aria-hidden />
+                {d.commitCount}
+              </span>
             </span>
-            <span className="text-xs text-muted-foreground">·</span>
-            <span className="flex items-center gap-1 text-xs text-muted-foreground tabular-nums" title="Commits">
-              <GitCommitHorizontal className="size-3.5" aria-hidden />
-              {d.commitCount}
-            </span>
-            <OrderToggle tabKey={tabKey} which="timelineOrder" />
+            <OrderToggle tabKey={tabKey} which="timelineOrder" compact />
           </>
         )}
       </div>
     </div>
+  );
+}
+
+/** "Showing the copy from 5m ago": its own 30 s clock, so the surface root does not re-render with it. */
+function StaleBanner({ fetchedAtMs, lastError }: { fetchedAtMs: number | null; lastError: string }) {
+  const now = useNow(30_000);
+  return (
+    <Banner testId="pr-stale">
+      Showing the copy from {ago(fetchedAtMs, now) || "earlier"}: the last fetch from GitHub failed ({lastError}).
+    </Banner>
   );
 }
 
@@ -202,7 +239,6 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
   const d = pullRequestDetailResource.store((s) => s.entries[key]?.data ?? null);
   const error = pullRequestDetailResource.store((s) => s.entries[key]?.error ?? null);
   const inner = usePrPanelStore((s) => s.byTab[tabKey]?.inner ?? "summary");
-  const now = useNow(30_000);
 
   if (!d) {
     if (isNotFoundMessage(error)) {
@@ -222,13 +258,10 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
     return <Skeleton />;
   }
   return (
-    <div className="flex flex-col" data-testid="pr-surface" data-pr={`${slug}#${String(number)}`}>
+    // @container: the header, tab bar and summary rows adapt to the panel's width.
+    <div className="@container flex min-w-0 flex-col" data-testid="pr-surface" data-pr={`${slug}#${String(number)}`}>
       <Header d={d} prRef={prRef} panelKey={panelKey} />
-      {d.lastError && !d.checksTruncated && (
-        <Banner testId="pr-stale">
-          Showing the copy from {ago(d.fetchedAtMs, now) || "earlier"}: the last fetch from GitHub failed ({d.lastError}).
-        </Banner>
-      )}
+      {d.lastError && !d.checksTruncated && <StaleBanner fetchedAtMs={d.fetchedAtMs} lastError={d.lastError} />}
       {error && <Banner testId="pr-refresh-error">Could not refresh: {error}</Banner>}
       <InnerTabBar d={d} tabKey={tabKey} inner={inner} />
       {inner === "timeline" ? <PrTimeline d={d} tabKey={tabKey} /> : <PrSummary d={d} prRef={prRef} tabKey={tabKey} />}

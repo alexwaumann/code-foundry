@@ -5,10 +5,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { updatedAgo } from "@/components/prs/format";
 import { formatChord } from "@/keys/chord";
 import { useNow } from "@/lib/clock";
+import { cn } from "@/lib/utils";
 import { openUrl, pullRequestKey, useFreshness } from "@/stores/gh";
 import { copyPullRequestLink, refreshPullRequest, revertPullRequest, usePrPanelStore } from "@/stores/prPanel";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
-import { COPY_LINK_CHORD, stopPlainKeys } from "./keys";
+import { COPY_LINK_CHORD, POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
 
 function Item({ icon, title, hint, children }: { icon: ReactNode; title: string; hint?: ReactNode; children?: ReactNode }) {
   return (
@@ -45,10 +46,12 @@ export function PrMenu({ prRef, detail, panelKey }: { prRef: PrRef; detail: Pull
   const pr = detail.pullRequest;
   const url = pr.url || `https://github.com/${prRef.slug}/pull/${String(prRef.number)}`;
   const canRevert = pr.state === "merged" && detail.viewerCanUpdate;
+  const { ref, boundary } = usePanelBoundary();
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <button
+          ref={ref}
           type="button"
           aria-label="Pull request actions"
           title="More actions"
@@ -58,7 +61,15 @@ export function PrMenu({ prRef, detail, panelKey }: { prRef: PrRef; detail: Pull
           <Ellipsis className="size-4" aria-hidden />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80" data-testid="pr-menu" data-region="panel" onKeyDown={stopPlainKeys}>
+      <DropdownMenuContent
+        align="end"
+        collisionBoundary={boundary}
+        collisionPadding={POPUP_COLLISION_PADDING}
+        className={cn("w-80", POPUP_FIT)}
+        data-testid="pr-menu"
+        data-region="panel"
+        onKeyDown={stopPlainKeys}
+      >
         <DropdownMenuItem
           data-testid="pr-menu-refresh"
           onSelect={(e) => {
