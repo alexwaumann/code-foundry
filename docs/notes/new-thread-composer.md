@@ -32,7 +32,9 @@ scratch daemon on haiku.
   (migration 0006) and re-passed on reconnect and fork.
 * **Attachments**: PNG/JPEG/GIF/WebP, 10 MiB each, sniffed content; stored as
   `$CONFIG/attachments/<32 hex><ext>` (0600 in 0700); `Create` accepts only regular files
-  directly in that directory; files older than 24h are reaped at daemon start. The prompt
+  directly in that directory; files older than 7 days are reaped at daemon start and
+  then daily (session Manager ticker, stopped on Shutdown; `Options.AttachmentMaxAge` /
+  `AttachmentReapInterval` override both, no settings key yet). The prompt
   gets `Attached image: <path>` lines and every spawn passes `--add-dir <attachments
   dir>` so Claude reads them without a permission prompt (verified: Claude reads image
   paths named in the prompt with its Read tool; without `--add-dir`, auto mode stopped at

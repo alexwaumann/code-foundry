@@ -18,14 +18,20 @@ import (
 // Attachments are images staged for a new session's first prompt. The GUI uploads
 // them with StageAttachment before Create; Create appends one "Attached image: <path>"
 // line per path and Claude reads them with its Read tool. Staged files are kept so a
-// later turn can read them again, and reaped on daemon start once older than
-// AttachmentMaxAge.
+// later turn can read them again (and so what a thread was sent can be inspected when
+// debugging). The Manager reaps files older than Options.AttachmentMaxAge (default
+// AttachmentMaxAge) when it starts and then every Options.AttachmentReapInterval
+// (default AttachmentReapInterval) until Shutdown, since the daemon runs for days.
+// Reaping only removes regular, non-hidden files directly in the directory.
 
 // MaxAttachmentBytes bounds one staged attachment.
 const MaxAttachmentBytes = 10 << 20
 
-// AttachmentMaxAge is how long a staged attachment is kept.
-const AttachmentMaxAge = 24 * time.Hour
+// AttachmentMaxAge is the default for how long a staged attachment is kept.
+const AttachmentMaxAge = 7 * 24 * time.Hour
+
+// AttachmentReapInterval is the default interval between reaps while the daemon runs.
+const AttachmentReapInterval = 24 * time.Hour
 
 // AttachmentTypes maps the accepted MIME types to the file extension they are stored
 // with.
@@ -116,6 +122,34 @@ func checkAttachments(dir string, paths []string) ([]string, error) {
 		out[i] = c
 	}
 	return out, nil
+}
+
+// reapAttachmentsLoop reaps on every tick until Shutdown cancels m.ctx. New reaps once
+// itself and then runs this under m.wg when attachments are enabled.
+func (m *Manager) reapAttachmentsLoop(tick <-chan time.Time) {
+	for {
+		select {
+		case <-m.ctx.Done():
+			return
+		case <-tick:
+			m.reapAttachmentsNow()
+		}
+	}
+}
+
+// reapAttachmentsNow removes staged attachments older than Options.AttachmentMaxAge
+// and logs the outcome.
+func (m *Manager) reapAttachmentsNow() {
+	dir := m.opts.AttachmentsDir
+	n, err := reapAttachments(dir, m.opts.Now().Add(-m.opts.AttachmentMaxAge))
+	switch {
+	case err != nil:
+		m.log.Warn("reap staged attachments", "dir", dir, "removed", n, "err", err)
+	case n > 0:
+		m.log.Info("reaped staged attachments", "dir", dir, "removed", n)
+	default:
+		m.log.Debug("reaped staged attachments", "dir", dir, "removed", n)
+	}
 }
 
 // reapAttachments deletes staged files in dir last modified before cutoff. Best

@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -189,7 +190,8 @@ func TestReapAttachmentsOnStart(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
-	files := map[string]time.Duration{"old.png": 25 * time.Hour, "fresh.png": 23 * time.Hour, ".hidden": 48 * time.Hour}
+	const day = 24 * time.Hour
+	files := map[string]time.Duration{"old.png": 7*day + time.Hour, "fresh.png": 7*day - time.Hour, ".hidden": 30 * day}
 	for name, age := range files {
 		p := filepath.Join(dir, name)
 		if err := os.WriteFile(p, pngData, 0o600); err != nil {
@@ -202,7 +204,7 @@ func TestReapAttachmentsOnStart(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(dir, "olddir"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	_ = os.Chtimes(filepath.Join(dir, "olddir"), now.Add(-72*time.Hour), now.Add(-72*time.Hour))
+	_ = os.Chtimes(filepath.Join(dir, "olddir"), now.Add(-30*day), now.Add(-30*day))
 	newEnv(t, func(o *Options) {
 		o.AttachmentsDir = dir
 		o.Now = func() time.Time { return now }
@@ -218,5 +220,78 @@ func TestReapAttachmentsOnStart(t *testing.T) {
 	// A missing directory is not an error.
 	if n, err := reapAttachments(filepath.Join(dir, "nope"), now); n != 0 || err != nil {
 		t.Errorf("reap missing = %d, %v", n, err)
+	}
+}
+
+func TestReapAttachmentsOnTick(t *testing.T) {
+	const maxAge = time.Hour
+	start := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	// Ages are relative to start; the clock advances by 45m before the ticks that
+	// should reap, so "aging" files cross maxAge only on a later tick.
+	tests := []struct {
+		name      string
+		age       time.Duration
+		dir       bool
+		keptStart bool
+		keptTick  bool
+	}{
+		{name: "expired.png", age: 2 * time.Hour, keptStart: false, keptTick: false},
+		{name: "aging.png", age: 30 * time.Minute, keptStart: true, keptTick: false},
+		{name: "fresh.png", age: 0, keptStart: true, keptTick: true},
+		{name: ".hidden", age: 48 * time.Hour, keptStart: true, keptTick: true},
+		{name: "olddir", age: 48 * time.Hour, dir: true, keptStart: true, keptTick: true},
+	}
+	dir := filepath.Join(t.TempDir(), "attachments")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range tests {
+		p := filepath.Join(dir, tt.name)
+		var err error
+		if tt.dir {
+			err = os.Mkdir(p, 0o700)
+		} else {
+			err = os.WriteFile(p, pngData, 0o600)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(p, start.Add(-tt.age), start.Add(-tt.age)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var clock atomic.Int64
+	clock.Store(start.UnixNano())
+	newEnv(t, func(o *Options) {
+		o.AttachmentsDir = dir
+		o.AttachmentMaxAge = maxAge
+		o.AttachmentReapInterval = 10 * time.Millisecond
+		o.Now = func() time.Time { return time.Unix(0, clock.Load()).UTC() }
+	})
+	exists := func(name string) bool {
+		_, err := os.Lstat(filepath.Join(dir, name))
+		return err == nil
+	}
+	// The start reap runs inside New; ticks at the unchanged clock change nothing.
+	time.Sleep(50 * time.Millisecond)
+	for _, tt := range tests {
+		if got := exists(tt.name); got != tt.keptStart {
+			t.Errorf("after start: %s kept = %v, want %v", tt.name, got, tt.keptStart)
+		}
+	}
+	clock.Store(start.Add(45 * time.Minute).UnixNano())
+	deadline := time.Now().Add(5 * time.Second)
+	for exists("aging.png") {
+		if time.Now().After(deadline) {
+			t.Fatal("aging.png not reaped by a later tick")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := exists(tt.name); got != tt.keptTick {
+				t.Errorf("after tick: kept = %v, want %v", got, tt.keptTick)
+			}
+		})
 	}
 }

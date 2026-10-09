@@ -47,9 +47,16 @@ type Options struct {
 	// /tmp.
 	Namer Namer
 	// AttachmentsDir is where StageAttachment writes images. Empty disables
-	// attachments. New creates it and removes files older than AttachmentMaxAge;
+	// attachments. New creates it and removes files older than
+	// AttachmentMaxAge, then again every AttachmentReapInterval until Shutdown;
 	// every claude gets --add-dir for it so Read of an attachment does not ask.
 	AttachmentsDir string
+	// AttachmentMaxAge is how long a staged attachment is kept. Default
+	// AttachmentMaxAge (the package constant).
+	AttachmentMaxAge time.Duration
+	// AttachmentReapInterval is how often staged attachments are reaped while the
+	// Manager runs. Default AttachmentReapInterval (the package constant).
+	AttachmentReapInterval time.Duration
 	// WorktreePath, when set, picks the path of a worktree Create makes for branch in
 	// r; "" leaves it to the repo store's default. The daemon applies the
 	// repos.worktree_dir setting with it, as repo.worktree.new does.
@@ -126,6 +133,8 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.Tick, time.Second)
 	def(&o.StatusDebounce, 100*time.Millisecond)
 	def(&o.ActivityPublish, 15*time.Second)
+	def(&o.AttachmentMaxAge, AttachmentMaxAge)
+	def(&o.AttachmentReapInterval, AttachmentReapInterval)
 	if o.Now == nil {
 		o.Now = time.Now
 	}
@@ -184,12 +193,14 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		if err := os.MkdirAll(opts.AttachmentsDir, 0o700); err != nil {
 			m.log.Warn("create attachments dir", "dir", opts.AttachmentsDir, "err", err)
 		}
-		n, err := reapAttachments(opts.AttachmentsDir, opts.Now().Add(-AttachmentMaxAge))
-		if err != nil {
-			m.log.Warn("reap staged attachments", "dir", opts.AttachmentsDir, "removed", n, "err", err)
-		} else if n > 0 {
-			m.log.Info("reaped staged attachments", "dir", opts.AttachmentsDir, "removed", n)
-		}
+		m.reapAttachmentsNow()
+		ticker := time.NewTicker(opts.AttachmentReapInterval)
+		m.wg.Add(1)
+		go func() {
+			defer m.wg.Done()
+			defer ticker.Stop()
+			m.reapAttachmentsLoop(ticker.C)
+		}()
 	}
 	return m, nil
 }
