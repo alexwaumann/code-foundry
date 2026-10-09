@@ -32,19 +32,22 @@ Three processes, one protocol.
 * **GUI** is a Wails v3 shell hosting a React frontend. The frontend talks to the daemon
   *directly* with Connect-Web over a loopback HTTP listener. The Go host process in Wails is
   deliberately thin: window, menu, native dialogs, and injecting the daemon's address and
-  token into the page. As the process LaunchServices starts, it also adopts the user's
-  login-shell PATH on Finder launches, auto-starts the daemon from the CLI bundled next
-  to it, and relaunches itself when the daemon asks (`app.relaunch`). No business logic
-  lives in the Wails host.
+  token into the page. It also adopts the user's login-shell PATH when it was started
+  with launchd's minimal one, auto-starts the daemon from the CLI installed next to it,
+  and relaunches itself when the daemon asks (`app.relaunch`). No business logic lives
+  in the Wails host.
 * **CLI** subcommands (`code-foundry new-session --repo foo`, `code-foundry focus <id>`, …)
   are clients of the same daemon API. A Claude Code session running inside the app can call
   the CLI, so sessions can orchestrate other sessions.
 
-Two binaries from one version stamp, shipped together in `CodeFoundry.app`:
-`Contents/MacOS/CodeFoundry` (the Wails GUI) and `Contents/MacOS/code-foundry` (daemon +
-CLI; `~/.local/bin/code-foundry` links to it). `code-foundry gui` opens the app.
-`code-foundry daemon` runs the daemon in the foreground. Every client auto-starts the
-daemon if the socket is absent. Packaging and updates: `docs/notes/phase3d-packaging.md`.
+Two binaries from one version stamp, installed side by side as plain executables (no
+`.app` bundle; managed Macs often block unsigned bundles) in `~/.code-foundry/app`:
+`CodeFoundry` (the Wails GUI), `code-foundry` (daemon + CLI; `~/.local/bin/code-foundry`
+links to it) and `VERSION` (the release tag the updater reads). `code-foundry gui` starts
+the GUI next to it. `code-foundry daemon` runs the daemon in the foreground. Every client
+auto-starts the daemon if the socket is absent. Packaging and updates:
+`docs/notes/bare-binary-distribution.md` (layout and launch) on top of
+`docs/notes/phase3d-packaging.md` (releases and the update flow).
 
 ## 2. The one rule
 
@@ -81,7 +84,7 @@ internal/
 gui/
   main.go                  Wails v3 host (thin)
   frontend/                Vite + React 19 + TypeScript + Tailwind v4 + shadcn + Zustand
-  build/                   Wails build assets; darwin Taskfile assembles CodeFoundry.app
+  build/                   Wails build assets; darwin Taskfile builds the bare GUI executable
 scripts/                   install.sh (embedded in the binary), package.sh, release.sh,
                            next-version.sh, ghostty-vt.sh
 docs/                      this file, PLAN.md, ADRs under docs/adr/

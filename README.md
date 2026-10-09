@@ -19,11 +19,14 @@ gh release download --repo alexwaumann/code-foundry --pattern install.sh -O - | 
 
 The installer downloads the latest release, verifies its checksum, and:
 
-* installs `CodeFoundry.app` into `~/Applications`
-* links `~/.local/bin/code-foundry` to the CLI inside the bundle
+* installs the app into `~/.code-foundry/app`: `code-foundry` (the daemon and CLI),
+  `CodeFoundry` (the window) and a `VERSION` file
+* links `~/.local/bin/code-foundry` to the CLI
 * adds `~/.local/bin` to your PATH in `~/.zshrc`, once, if it is not already there
 
-Open a new shell afterwards, then launch the app from `~/Applications` or with:
+The app is two executables, not an `.app` bundle, because managed Macs often block
+unsigned bundles. So it is not in `~/Applications` or Launchpad. Open a new shell
+afterwards, then launch it with:
 
 ```sh
 code-foundry gui
@@ -44,14 +47,16 @@ bash install.sh --help
 | `--yes` | never prompt |
 | `--force` | reinstall even if that version is already installed |
 | `--skip-path` | do not touch `~/.zshrc` |
-| `--app-dir DIR` | where `CodeFoundry.app` goes (default `~/Applications`) |
+| `--skip-link` | do not create or replace the `code-foundry` link |
+| `--app-dir DIR` | the app directory (default `~/.code-foundry/app`, or `$CODE_FOUNDRY_HOME/app`); it is replaced as a whole, so it must be a previous install or absent |
 | `--bin-dir DIR` | where the `code-foundry` link goes (default `~/.local/bin`) |
 
 ## Update
 
 The app checks for new releases on its own and shows an update in the footer. Pick
 **Code Foundry → Check for Updates…** to check now. Installing an update replaces the
-bundle on disk; relaunch the app and restart the daemon from the update dialog to run it.
+app directory the running daemon was started from; relaunch the app and restart the
+daemon from the update dialog to run it.
 
 From a terminal:
 
@@ -62,11 +67,14 @@ code-foundry update
 ## Uninstall
 
 ```sh
-rm -rf ~/Applications/CodeFoundry.app ~/.local/bin/code-foundry
+rm -rf ~/.code-foundry/app ~/.local/bin/code-foundry
 ```
 
-State lives in `~/.code-foundry` (settings, database, logs, and the worktrees it created).
-Remove it too if you want a clean slate.
+The rest of `~/.code-foundry` is state (settings, database, logs, and the worktrees it
+created). Remove it too if you want a clean slate.
+
+Installed an earlier version as `CodeFoundry.app`? Quit it and remove
+`~/Applications/CodeFoundry.app`; the installer replaces the old CLI link.
 
 ## Developing
 
@@ -78,14 +86,11 @@ pnpm. The GUI also needs `wails3`
 ```sh
 make build       # ./bin/code-foundry
 make check       # what CI runs
-make gui-build   # gui/bin/CodeFoundry.app
-make gui-bin     # gui/bin/CodeFoundry only, no .app bundle (see below)
+make gui-build   # gui/bin/CodeFoundry, a bare executable (no .app bundle)
 ```
 
-If your machine's management software blocks unsigned app bundles, use `make gui-bin`.
-It builds only the bare executable and removes any `gui/bin/CodeFoundry.app`, and
-`code-foundry gui` then launches the executable instead. That build is not a bundle, so
-the in-app updater does not apply to it; everything else works.
+`./bin/code-foundry gui` starts `gui/bin/CodeFoundry` and points it at that CLI. Dev
+builds never check for updates.
 
 `make build` also builds libghostty-vt from a pinned ghostty commit with a pinned zig,
 both downloaded into the gitignored `third_party/` on first use (about a minute; needs

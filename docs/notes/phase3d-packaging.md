@@ -1,5 +1,12 @@
 # Phase 3d: Packaging, releases, and the in-app updater
 
+> **Superseded in part by [bare-binary-distribution.md](bare-binary-distribution.md).**
+> The app is no longer an `.app` bundle: releases ship a tarball of `code-foundry`,
+> `CodeFoundry` and `VERSION`, installed into `~/.code-foundry/app`. The bundle layout,
+> the zip and standalone CLI assets, Info.plist versioning, `open`-based launch and
+> relaunch below are history. Releases, versioning, the update state machine and the
+> GUI surfaces still work as described here.
+
 Status: done on branch. `make check` and `make gui-e2e` are green (58 e2e tests, 14 of
 them new in `e2e/update.spec.ts`). The full install → check → install → relaunch →
 daemon restart cycle was run on this machine against a local fake release source, using
