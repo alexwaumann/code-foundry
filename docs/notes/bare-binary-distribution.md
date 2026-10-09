@@ -38,7 +38,7 @@ the Info.plist reader.
 
 | Asset | What |
 |---|---|
-| `code-foundry-darwin-arm64.tar.gz` | `code-foundry`, `CodeFoundry` and `VERSION` at the top level, with no directory prefix (about 22 MB) |
+| `code-foundry-darwin-arm64.tar.gz` | `code-foundry`, `Code Foundry` (was `CodeFoundry`) and `VERSION` at the top level, with no directory prefix (about 22 MB) |
 | `install.sh` | the installer, with `DEFAULT_REPO` set to the release repo |
 | `checksums.txt` | sha256 of the two above |
 
@@ -53,7 +53,8 @@ The zip (`CodeFoundry-darwin-arm64.zip`) and the standalone CLI asset are gone.
 3. Runs `codesign --force --sign -` on both binaries, then `codesign --verify --strict`.
 4. Refuses to finish unless all three agree:
    * `code-foundry version` prints `code-foundry vX.Y.Z …`
-   * `CodeFoundry --version` prints `CodeFoundry vX.Y.Z`
+   * `"Code Foundry" --version` prints `Code Foundry vX.Y.Z` (was `CodeFoundry …`), and
+     its embedded Info.plist has `CodeFoundryVersion` vX.Y.Z
    * `VERSION` holds `vX.Y.Z`
 5. Runs `COPYFILE_DISABLE=1 tar -czf`, then checks that the listing is exactly the three
    names.
@@ -128,8 +129,9 @@ No Info.plist, `ditto`, `wails3 package` or `create:app:bundle` is involved any 
 
 ## Launch (`code-foundry gui`)
 
-* **What it starts.** `guiBinary` picks `CodeFoundry` next to the CLI's resolved path.
-  For a repo CLI (`./bin/code-foundry`) it falls back to `gui/bin/CodeFoundry`.
+* **What it starts.** `guiBinary` picks `Code Foundry` (was `CodeFoundry`) next to the
+  CLI's resolved path. For a repo CLI (`./bin/code-foundry`) it falls back to
+  `gui/bin/Code Foundry`.
 * **How.** It starts that executable directly:
   * `Setsid`, with stdio on /dev/null
   * the environment inherited, plus `CODE_FOUNDRY_BIN=<cli>`
