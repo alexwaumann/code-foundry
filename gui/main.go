@@ -21,10 +21,10 @@ import (
 var assets embed.FS
 
 func main() {
-	// `CodeFoundry --version` prints the build's version without opening a window
+	// `"Code Foundry" --version` prints the build's version without opening a window
 	// (scripts/package.sh checks it against the CLI's and VERSION).
 	if len(os.Args) == 2 && os.Args[1] == "--version" {
-		fmt.Println("CodeFoundry " + version.Version)
+		fmt.Println("Code Foundry " + version.Version)
 		return
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))

@@ -6,7 +6,7 @@
 # Downloads code-foundry-darwin-arm64.tar.gz and checksums.txt from the latest GitHub
 # release (or --version) with the authenticated gh CLI, verifies the checksum, and
 # installs the app directory ~/.code-foundry/app: code-foundry (daemon + CLI),
-# CodeFoundry (the GUI) and VERSION. Plain executables, not an .app bundle: managed Macs
+# "Code Foundry" (the GUI) and VERSION. Plain executables, not an .app bundle: managed Macs
 # often block unsigned bundles. An existing install is replaced by unpacking next to it
 # (app.new) and swapping with mv (the old one moves to app.old and is restored if the
 # swap fails). Then it links ~/.local/bin/code-foundry to the CLI and adds ~/.local/bin
@@ -299,7 +299,7 @@ mkdir "$STAGE"
 say "unpacking"
 /usr/bin/tar -xzf "$TMP/$ARCHIVE" -C "$STAGE" || die "could not unpack $ARCHIVE"
 [ -f "$STAGE/code-foundry" ] && [ -x "$STAGE/code-foundry" ] || die "the archive has no code-foundry executable"
-[ -f "$STAGE/CodeFoundry" ] && [ -x "$STAGE/CodeFoundry" ] || die "the archive has no CodeFoundry executable"
+[ -f "$STAGE/Code Foundry" ] && [ -x "$STAGE/Code Foundry" ] || die "the archive has no Code Foundry executable"
 GOT="$(installed_version "$STAGE")"
 [ "$GOT" = "$TAG" ] || die "the archive contains version '$GOT', expected $TAG"
 # Belt and braces: gh does not quarantine downloads, but a copied archive might be, and

@@ -13,8 +13,9 @@ import (
 const (
 	// CLIName is the daemon + CLI executable.
 	CLIName = "code-foundry"
-	// GUIName is the Wails GUI executable.
-	GUIName = "CodeFoundry"
+	// GUIName is the Wails GUI executable. Launch Services names a bare executable after
+	// its file, so this is what the Dock and the app menu show.
+	GUIName = "Code Foundry"
 	// VersionFile holds the installed release tag (e.g. "v0.2.0\n"). Its presence is
 	// what makes a directory an install.
 	VersionFile = "VERSION"

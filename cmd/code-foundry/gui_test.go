@@ -15,25 +15,30 @@ func TestGuiBinary(t *testing.T) {
 		{
 			name:    "installed CLI starts its sibling",
 			exe:     "/Users/a/.code-foundry/app/code-foundry",
-			present: []string{"/Users/a/.code-foundry/app/CodeFoundry"},
-			want:    "/Users/a/.code-foundry/app/CodeFoundry",
+			present: []string{"/Users/a/.code-foundry/app/Code Foundry"},
+			want:    "/Users/a/.code-foundry/app/Code Foundry",
 		},
 		{
 			name:    "sibling wins over a dev build",
 			exe:     "/src/cf/bin/code-foundry",
-			present: []string{"/src/cf/bin/CodeFoundry", "/src/cf/gui/bin/CodeFoundry"},
-			want:    "/src/cf/bin/CodeFoundry",
+			present: []string{"/src/cf/bin/Code Foundry", "/src/cf/gui/bin/Code Foundry"},
+			want:    "/src/cf/bin/Code Foundry",
 		},
 		{
 			name:    "repo CLI starts the dev build",
 			exe:     "/src/cf/bin/code-foundry",
-			present: []string{"/src/cf/gui/bin/CodeFoundry"},
-			want:    "/src/cf/gui/bin/CodeFoundry",
+			present: []string{"/src/cf/gui/bin/Code Foundry"},
+			want:    "/src/cf/gui/bin/Code Foundry",
 		},
 		{
 			name:    "an installed app elsewhere is not searched for",
 			exe:     "/usr/local/bin/code-foundry",
-			present: []string{"/Users/a/.code-foundry/app/CodeFoundry", "/Users/a/Applications/CodeFoundry.app"},
+			present: []string{"/Users/a/.code-foundry/app/Code Foundry", "/Users/a/Applications/CodeFoundry.app"},
+		},
+		{
+			name:    "a GUI from before the rename is not started",
+			exe:     "/Users/a/.code-foundry/app/code-foundry",
+			present: []string{"/Users/a/.code-foundry/app/CodeFoundry"},
 		},
 		{name: "nothing built", exe: "/src/cf/bin/code-foundry"},
 	}

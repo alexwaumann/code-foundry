@@ -5,7 +5,10 @@ version: '3'
 # dispatch here.
 
 vars:
-  APP_NAME: "CodeFoundry"
+  # The GUI executable's name, and so the name macOS shows in the Dock, the app menu and the
+  # app switcher (Launch Services names a bare executable after its file, whatever its
+  # embedded Info.plist says). Quote it wherever it is used.
+  APP_NAME: "Code Foundry"
   BIN_DIR: "bin"
   PACKAGE_MANAGER: "pnpm"
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'

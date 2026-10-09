@@ -10,14 +10,14 @@ func TestRelaunchCommand(t *testing.T) {
 	}{
 		{
 			name: "installed GUI",
-			exe:  "/Users/a/.code-foundry/app/CodeFoundry",
-			want: "while kill -0 42 2>/dev/null; do sleep 0.1; done; exec '/Users/a/.code-foundry/app/CodeFoundry'",
+			exe:  "/Users/a/.code-foundry/app/Code Foundry",
+			want: "while kill -0 42 2>/dev/null; do sleep 0.1; done; exec '/Users/a/.code-foundry/app/Code Foundry'",
 		},
 		{
 			name: "arguments and spaces are kept",
-			exe:  "/tmp/cf home/app/CodeFoundry",
+			exe:  "/tmp/cf home/app/Code Foundry",
 			args: []string{"--flag", "it's"},
-			want: `while kill -0 42 2>/dev/null; do sleep 0.1; done; exec '/tmp/cf home/app/CodeFoundry' '--flag' 'it'\''s'`,
+			want: `while kill -0 42 2>/dev/null; do sleep 0.1; done; exec '/tmp/cf home/app/Code Foundry' '--flag' 'it'\''s'`,
 		},
 	}
 	for _, tt := range tests {
