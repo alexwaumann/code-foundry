@@ -617,3 +617,64 @@ test("Fix findings: a failure toasts the daemon's hint; a retry prepares the wor
   await page.getByTestId("nav-pullrequests").click();
   await expect(tabs(page)).toHaveText(["#145"]);
 });
+
+const askInput = (page: Page) => page.getByTestId("pr-ask-input");
+
+async function openAsk(page: Page): Promise<void> {
+  await page.getByTestId("pr-menu-button").click();
+  await page.getByTestId("pr-menu-ask").click();
+  await expect(askInput(page)).toBeFocused();
+}
+
+test("Ask from the Pull Requests page sends no worktree; while it starts, Cancel is disabled and Escape does nothing", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "authored", 145).click();
+  await mockPost("gh/pr-delay?ms=800");
+  await openAsk(page);
+  await expect(page.getByTestId("pr-ask-hint")).toHaveText("⏎ send · ⇧⏎ newline");
+  await askInput(page).pressSequentially("What changed?");
+  await page.keyboard.press("Enter");
+
+  await expect(page.getByTestId("pr-ask-hint")).toHaveText("Starting a session…");
+  await expect(page.getByTestId("pr-ask-send")).toHaveAttribute("aria-busy", "true");
+  await expect(page.getByTestId("pr-ask-cancel")).toBeDisabled();
+  await expect(askInput(page)).toHaveJSProperty("readOnly", true);
+  // Escape neither closes the composer nor reaches the panel: the session starts anyway.
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pr-ask")).toBeVisible();
+  await expect(tabs(page)).toHaveText(["#145"]);
+
+  await expect(selectedSession(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
+  // From the Pull Requests page there is no active worktree: the daemon picks one.
+  expect(await sessionInvocations("pr.ask")).toEqual([{ args: { "repo-slug": SLUG, number: "145", question: "What changed?" }, worktree: "" }]);
+  await page.getByTestId("nav-pullrequests").click();
+  await expect(tabs(page)).toHaveText(["#145"]);
+  await expect(page.getByTestId("pr-ask")).toHaveCount(0);
+});
+
+test("at 280px the composer's hint fits and its field grows to six rows, then scrolls", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "authored", 145).click();
+  await setPanelWidth(page, 280);
+  await openAsk(page);
+  expect(await overflowX(page, "pr-ask")).toBeLessThanOrEqual(0);
+  expect(await page.getByTestId("pr-ask-hint").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  expect(inside(await boxOf(page, "pr-ask-send"), await boxOf(page, "side-panel"))).toBe(true);
+
+  const size = () =>
+    askInput(page).evaluate((el) => ({ height: el.clientHeight, scroll: el.scrollHeight, line: parseFloat(getComputedStyle(el).lineHeight) }));
+  const three = await size();
+  await askInput(page).fill("one\ntwo");
+  expect((await size()).height).toBe(three.height);
+  await askInput(page).fill("1\n2\n3\n4\n5");
+  const five = await size();
+  expect(five.height).toBeGreaterThan(three.height);
+  expect(five.scroll).toBeLessThanOrEqual(five.height);
+  await askInput(page).fill(Array.from({ length: 12 }, (_, i) => `line ${String(i + 1)}`).join("\n"));
+  const many = await size();
+  // Six rows plus the padding, then it scrolls.
+  expect(Math.abs(many.height - (6 * many.line + 16))).toBeLessThanOrEqual(2);
+  expect(many.scroll).toBeGreaterThan(many.height);
+  await askInput(page).fill("short");
+  expect((await size()).height).toBe(three.height);
+});

@@ -241,6 +241,8 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
   const error = pullRequestDetailResource.store((s) => s.entries[key]?.error ?? null);
   const inner = usePrPanelStore((s) => s.byTab[tabKey]?.inner ?? "summary");
   const [asking, setAsking] = useState(false);
+  // Bumped each time Ask a question is chosen: the composer (re)takes focus.
+  const [askFocus, setAskFocus] = useState(0);
 
   if (!d) {
     if (isNotFoundMessage(error)) {
@@ -262,12 +264,24 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
   return (
     // @container: the header, tab bar and summary rows adapt to the panel's width.
     <div className="@container flex min-w-0 flex-col" data-testid="pr-surface" data-pr={`${slug}#${String(number)}`}>
-      <Header d={d} prRef={prRef} panelKey={panelKey} onAsk={() => {
+      <Header
+        d={d}
+        prRef={prRef}
+        panelKey={panelKey}
+        onAsk={() => {
           setAsking(true);
-        }} />
-      {asking && <PrAskComposer prRef={prRef} onClose={() => {
+          setAskFocus((n) => n + 1);
+        }}
+      />
+      {asking && (
+        <PrAskComposer
+          prRef={prRef}
+          focusRequest={askFocus}
+          onClose={() => {
             setAsking(false);
-          }} />}
+          }}
+        />
+      )}
       {d.lastError && !d.checksTruncated && <StaleBanner fetchedAtMs={d.fetchedAtMs} lastError={d.lastError} />}
       {error && <Banner testId="pr-refresh-error">Could not refresh: {error}</Banner>}
       <InnerTabBar d={d} tabKey={tabKey} inner={inner} />
