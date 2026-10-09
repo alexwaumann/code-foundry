@@ -683,7 +683,9 @@ export class World {
     const effortArg = { name: "effort", type: ArgType.ENUM, required: false, description: "Effort level (default: settings sessions.default_effort, else Claude's default)", enumValues: ["low", "medium", "high", "xhigh", "max"] };
     const start =
       (fix: boolean) =>
-      (ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> => {
+      async (ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> => {
+        // POST /__mock/gh/pr-delay?ms=800: these commands take that long (fetch, worktree, start).
+        if (this.gh.prDetails.sessionDelayMs > 0) await new Promise((r) => setTimeout(r, this.gh.prDetails.sessionDelayMs));
         const slug = args["repo-slug"] ?? "";
         const n = Number(args.number);
         if (!slug.trim()) throw new CommandError("invalid", "repo-slug is required");
@@ -743,10 +745,10 @@ export class World {
         const s = this.createSession(target.repoId, target.path, args.model ?? defaults.model, args.effort ?? defaults.effort);
         this.focusSession(s.id);
         // Like the daemon: the result JSON is the created Session (protojson).
-        return Promise.resolve({
+        return {
           message: `Started session ${s.id} for PR #${String(n)}`,
           resultJson: JSON.stringify({ id: s.id, repoId: s.repoId, worktreePath: s.worktreePath, model: s.model, effort: s.effort }),
-        });
+        };
       };
     const always = () => true;
     return [

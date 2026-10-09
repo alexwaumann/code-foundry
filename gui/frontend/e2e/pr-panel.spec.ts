@@ -16,6 +16,11 @@ async function shot(page: Page, name: string): Promise<void> {
   if (shots) await page.screenshot({ path: `${shots}/${name}.png` });
 }
 
+/** Screenshots are taken at 1400x900. */
+async function shotViewport(page: Page): Promise<void> {
+  if (shots) await page.setViewportSize({ width: 1400, height: 900 });
+}
+
 test.beforeEach(async ({ page }) => {
   await resetMock();
   // Record copies: the async Clipboard API needs a permission (Chromium) or a gesture (WebKit).
@@ -234,7 +239,7 @@ test("the reviewer picker lists people with access and toggles requests through 
   await expect(tabs(page)).toHaveText(["#145"]);
 });
 
-test("menu: Refresh, Open on GitHub, Copy link, the coming-next slots; shift+cmd+c copies too", async ({ page }) => {
+test("menu: Refresh, the session actions, Open on GitHub, Copy link; shift+cmd+c copies too", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
   await page.getByTestId("pr-menu-button").click();
@@ -242,9 +247,11 @@ test("menu: Refresh, Open on GitHub, Copy link, the coming-next slots; shift+cmd
   await expect(menu).toBeVisible();
   await expect(menu.getByRole("menuitem")).toHaveText([/^Refresh/, /^Ask a question/, /^Explain this PR/, /^Fix findings in a thread/, /^Open on GitHub/, /^Copy link⇧⌘C$/]);
   for (const id of ["pr-menu-ask", "pr-menu-explain", "pr-menu-fix"]) {
-    await expect(page.getByTestId(id)).toHaveAttribute("data-disabled", "");
-    await expect(page.getByTestId(id)).toHaveAttribute("title", "Coming next");
+    await expect(page.getByTestId(id)).not.toHaveAttribute("data-disabled");
+    await expect(page.getByTestId(id)).not.toHaveAttribute("title");
   }
+  await expect(page.getByTestId("pr-menu-ask")).toContainText("Starts a thread that knows which pull request you mean.");
+  await expect(page.getByTestId("pr-menu-explain")).toContainText("A walk through the diff and what to read closely.");
   // No revert for an open pull request.
   await expect(page.getByTestId("pr-menu-revert")).toHaveCount(0);
   await expect(page.getByTestId("pr-menu-refresh-hint")).toHaveText(/^Updated \d+s ago$/);
@@ -496,4 +503,117 @@ test("long conversations and timelines are virtualized in the panel's scroll", a
       return page.locator('[data-testid="pr-timeline-entry"][data-kind="opened"]').isVisible();
     })
     .toBe(true);
+});
+
+// ---- Sessions about a pull request (pr.ask, pr.explain, pr.fix.findings) ----
+
+const selectedSession = (page: Page) => page.locator('[data-row-kind="session"][aria-selected="true"]');
+
+async function sessionInvocations(name: string): Promise<{ args: Record<string, string>; worktree: string | undefined }[]> {
+  return (await invocations()).filter((i) => i.name === name).map((i) => ({ args: i.args, worktree: i.context?.activeWorktreePath }));
+}
+
+test("Explain this PR runs pr.explain, selects the new session, and the PR tab stays on the Pull Requests page", async ({ page }) => {
+  await shotViewport(page);
+  await openPrPage(page);
+  await prRow(page, "authored", 145).click();
+  await expect(tabs(page)).toHaveText(["#145"]);
+  await mockPost("gh/pr-delay?ms=600");
+  await page.getByTestId("pr-menu-button").click();
+  await expect(page.getByTestId("pr-menu")).toBeVisible();
+  // Let the menu's fade-in finish before the screenshot.
+  await page.getByTestId("pr-menu").evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+  await shot(page, "chunk4-menu");
+
+  await page.getByTestId("pr-menu-explain").click();
+  // The menu stays open with a spinner until the session has started.
+  await expect(page.getByTestId("pr-menu-explain")).toHaveAttribute("aria-busy", "true");
+  await expect(page.getByTestId("pr-menu")).toBeVisible();
+  // No worktree, model or effort args: the daemon picks them.
+  await expect.poll(() => sessionInvocations("pr.explain")).toEqual([{ args: { "repo-slug": SLUG, number: "145" }, worktree: "" }]);
+  // The daemon's FocusSession selects the new session; its own panel is untouched.
+  await expect(selectedSession(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
+  await expect(page.getByText(/^Started session s-new-\d+ for PR #145$/)).toBeVisible();
+  await expect(panel(page)).toHaveCount(0);
+  await expect(page.getByText("Preparing worktree for #145…")).toHaveCount(0);
+
+  // Back on the Pull Requests page, its panel still shows #145 (menu closed).
+  await page.getByTestId("nav-pullrequests").click();
+  await expect(tabs(page)).toHaveText(["#145"]);
+  await expect(page.getByTestId("pr-title")).toContainText("resize race");
+  await expect(page.getByTestId("pr-menu")).toHaveCount(0);
+});
+
+test("Ask a question: a composer under the header; Escape cancels, Enter sends pr.ask with the question", async ({ page }) => {
+  await shotViewport(page);
+  // From a session on main: ask uses its worktree through the context, not a worktree arg.
+  await openApp(page);
+  await row(page, "s:s-1").click();
+  await openPr(page, 145);
+  await expect(tabs(page)).toHaveText(["#145"]);
+
+  await page.getByTestId("pr-menu-button").click();
+  await page.getByTestId("pr-menu-ask").click();
+  await expect(page.getByTestId("pr-menu")).toHaveCount(0);
+  const input = page.getByTestId("pr-ask-input");
+  await expect(input).toBeFocused();
+  await expect(input).toHaveAttribute("placeholder", "Ask about this pull request…");
+  await input.pressSequentially("never mind");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pr-ask")).toHaveCount(0);
+  // Escape stays in the composer (the panel keeps its tab, the panel has focus).
+  await expect(tabs(page)).toHaveText(["#145"]);
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("panel");
+
+  await page.getByTestId("pr-menu-button").click();
+  await page.getByTestId("pr-menu-ask").click();
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue(""); // a fresh composer
+  await input.pressSequentially("Why does attach race the first output?");
+  await page.keyboard.press("Shift+Enter");
+  await input.pressSequentially("And is the fix covered by a test?");
+  await expect(input).toHaveValue("Why does attach race the first output?\nAnd is the fix covered by a test?");
+  expect(await sessionInvocations("pr.ask")).toEqual([]);
+  await shot(page, "chunk4-ask");
+  await page.keyboard.press("Enter");
+
+  await expect
+    .poll(() => sessionInvocations("pr.ask"))
+    .toEqual([{ args: { "repo-slug": SLUG, number: "145", question: "Why does attach race the first output?\nAnd is the fix covered by a test?" }, worktree: CF }]);
+  await expect(selectedSession(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
+  await expect(panel(page)).toHaveCount(0);
+
+  // The originating session's panel keeps #145; the composer is gone.
+  await row(page, "s:s-1").click();
+  await expect(tabs(page)).toHaveText(["#145"]);
+  await expect(page.getByTestId("pr-ask")).toHaveCount(0);
+});
+
+test("Fix findings: a failure toasts the daemon's hint; a retry prepares the worktree and selects the session", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "authored", 145).click();
+  await mockPost("gh/pr-fail?command=pr.fix.findings");
+  await page.getByTestId("pr-menu-button").click();
+  await page.getByTestId("pr-menu-fix").click();
+  await expect(page.getByText("Fix Pull Request Findings failed")).toBeVisible();
+  await expect(page.getByText(/gh pr checkout 145/)).toBeVisible();
+  // A quick answer leaves no "Preparing" toast behind.
+  await expect(page.getByText("Preparing worktree for #145…")).toHaveCount(0);
+  // Nothing was selected; the menu stays open for a retry.
+  await expect(selectedSession(page)).toHaveCount(0);
+  await expect(page.getByTestId("pr-menu")).toBeVisible();
+  await expect(page.getByTestId("pr-menu-fix")).not.toHaveAttribute("aria-busy");
+
+  await mockPost("gh/pr-delay?ms=800");
+  await page.getByTestId("pr-menu-fix").click();
+  await expect(page.getByTestId("pr-menu-fix")).toHaveAttribute("aria-busy", "true");
+  await expect(page.getByText("Preparing worktree for #145…")).toBeVisible();
+  await expect(selectedSession(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
+  await expect(page.getByText("Preparing worktree for #145…")).toHaveCount(0);
+  expect(await sessionInvocations("pr.fix.findings")).toEqual([
+    { args: { "repo-slug": SLUG, number: "145" }, worktree: "" },
+    { args: { "repo-slug": SLUG, number: "145" }, worktree: "" },
+  ]);
+  await page.getByTestId("nav-pullrequests").click();
+  await expect(tabs(page)).toHaveText(["#145"]);
 });

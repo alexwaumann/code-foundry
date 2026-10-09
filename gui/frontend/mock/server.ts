@@ -29,6 +29,7 @@
  *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts)
  *   POST /__mock/gh/pr-fail?command=pr.refresh             (that command's next run fails;
  *        also pr.ask, pr.explain, pr.fix.findings)
+ *   POST /__mock/gh/pr-delay?ms=800          (pr.ask, pr.explain, pr.fix.findings take 800ms)
  *   POST /__mock/gh/pr-comment?repo=o/r&number=145&body=…   (a new comment on a PR detail;
  *        pull_request_detail_updated). PR detail fixtures: mock/prDetail.ts (#145 open,
  *        #138 merged, #131 closed, #140 read-only); its commands are pr.revert,
@@ -452,6 +453,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       // command=pr.refresh makes that pull request command's next run fail.
       for (const name of q.getAll("command")) world.gh.prDetails.failNext.add(name);
       json(res, 200, { fail: [...world.gh.prDetails.failNext] });
+      break;
+    case "POST /__mock/gh/pr-delay":
+      world.gh.prDetails.sessionDelayMs = Number(q.get("ms") ?? "0");
+      json(res, 200, { delayMs: world.gh.prDetails.sessionDelayMs });
       break;
     case "POST /__mock/gh/pr-comment": {
       // A poll saw a new comment on a pull request with a detail: pull_request_detail_updated.

@@ -110,6 +110,8 @@ export class PrDetailWorld {
   private nextNumber = 151;
   /** Commands whose next run fails (POST /__mock/gh/pr-fail?command=…). */
   readonly failNext = new Set<string>();
+  /** How long pr.ask, pr.explain and pr.fix.findings take (POST /__mock/gh/pr-delay?ms=…). */
+  sessionDelayMs = 0;
 
   constructor(private readonly h: PrDetailHooks) {
     const open = h.findPr(CF, 145);
