@@ -130,6 +130,7 @@ func TestGhErrorCodes(t *testing.T) {
 		{&gh.RateLimitError{Secondary: true, Msg: "slow down"}, connect.CodeResourceExhausted},
 		{fmt.Errorf("%w: x", gh.ErrNetwork), connect.CodeUnavailable},
 		{fmt.Errorf("%w: x", gh.ErrServerTimeout), connect.CodeUnavailable},
+		{fmt.Errorf("%w: x", gh.ErrFailedPrecondition), connect.CodeFailedPrecondition},
 		{errors.New("gh exited 2: odd"), connect.CodeUnknown},
 	}
 	for _, tt := range tests {

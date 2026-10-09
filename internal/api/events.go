@@ -366,6 +366,7 @@ func (s ghSource) subscribe(ctx context.Context) <-chan *v1.Event {
 		newTap(s.bus, ghWatchBuffer, func(e gh.DashboardUpdated) *v1.Event { return ghWrap(ghDashboardEvent(e)) }),
 		newTap(s.bus, ghWatchBuffer, func(e gh.RepoActivityUpdated) *v1.Event { return ghWrap(ghRepoActivityEvent(e)) }),
 		newTap(s.bus, ghWatchBuffer, func(e gh.BranchPullRequestsUpdated) *v1.Event { return ghWrap(ghBranchEvent(e)) }),
+		newTap(s.bus, ghWatchBuffer, func(e gh.PullRequestDetailUpdated) *v1.Event { return ghWrap(ghDetailEvent(e)) }),
 	)
 }
 

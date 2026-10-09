@@ -120,6 +120,8 @@ func (h *Gh) Watch(ctx context.Context, _ *connect.Request[v1.WatchGhRequest], s
 	defer act.Close()
 	branch := bus.Subscribe[gh.BranchPullRequestsUpdated](h.bus, ghWatchBuffer)
 	defer branch.Close()
+	detail := bus.Subscribe[gh.PullRequestDetailUpdated](h.bus, ghWatchBuffer)
+	defer detail.Close()
 	// Flush response headers now: clients (connect-go and connect-web) block until they
 	// arrive, and the first event may be a poll interval away. Subscribing first means
 	// nothing published after the client sees the stream open is missed.
@@ -143,6 +145,8 @@ func (h *Gh) Watch(ctx context.Context, _ *connect.Request[v1.WatchGhRequest], s
 			ev = ghRepoActivityEvent(e)
 		case e := <-branch.C():
 			ev = ghBranchEvent(e)
+		case e := <-detail.C():
+			ev = ghDetailEvent(e)
 		}
 		if err := stream.Send(ev); err != nil {
 			return err
@@ -173,6 +177,7 @@ var ghErrorCodes = []struct {
 	{gh.ErrInvalidSlug, connect.CodeInvalidArgument},
 	{gh.ErrInvalidArgument, connect.CodeInvalidArgument},
 	{gh.ErrNotFound, connect.CodeNotFound},
+	{gh.ErrFailedPrecondition, connect.CodeFailedPrecondition},
 	{gh.ErrNotAuthenticated, connect.CodeFailedPrecondition},
 	{gh.ErrRateLimited, connect.CodeResourceExhausted},
 	{gh.ErrNetwork, connect.CodeUnavailable},
