@@ -17,6 +17,7 @@ func TestQueriesAssemble(t *testing.T) {
 			"RequestedReviewerFields", "RollupCounts", "RollupFingerprint"},
 		queryReviewerCandidates: {"RateLimitFields", "RequestedReviewerFields"},
 		queryRevertPullRequest:  nil,
+		queryMergePullRequest:   nil,
 	}
 	if qs, _ := loadQueries(); len(qs) != len(wantFrags) {
 		t.Errorf("queries = %d files, want %d", len(qs), len(wantFrags))

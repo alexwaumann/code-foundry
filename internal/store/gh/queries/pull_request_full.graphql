@@ -2,7 +2,8 @@
 # (PullRequestDetail), body, labels, each reviewer's latest review with the commit it
 # reviewed, pending review requests, the last 100 commits, the last 100 issue comments
 # and reviews, the last 50 review threads (first 20 comments each, with the review each
-# belongs to), and the first page of head commit checks. Fetched on demand by GetPullRequestDetail and cached per pull
+# belongs to), the first page of head commit checks, and what the merge button needs
+# (the repository's allowed merge methods, auto-merge). Fetched on demand by GetPullRequestDetail and cached per pull
 # request (docs/notes/gh-pr-detail.md); never polled.
 #
 # Fields that PullRequestDetail selects with other arguments are aliased (GraphQL
@@ -12,8 +13,12 @@ query PullRequestFull($owner: String!, $name: String!, $number: Int!) {
   rateLimit { ...RateLimitFields }
   repository(owner: $owner, name: $name) {
     viewerPermission
+    mergeCommitAllowed
+    squashMergeAllowed
+    rebaseMergeAllowed
     pullRequest(number: $number) {
       ...PullRequestDetail
+      autoMergeRequest { enabledAt }
       body
       closedAt
       mergeCommit { oid }

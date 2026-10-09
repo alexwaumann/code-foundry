@@ -65,6 +65,10 @@ type Service interface {
 	// RevertPullRequest opens a pull request reverting a merged one
 	// (ErrFailedPrecondition when it is not merged).
 	RevertPullRequest(ctx context.Context, slug string, number int) (RevertResult, error)
+	// MergePullRequest merges an open pull request, guarded by the cached head commit
+	// (ErrFailedPrecondition when it is not open, a draft, its head moved, or GitHub
+	// refuses), and optionally deletes its head branch.
+	MergePullRequest(ctx context.Context, slug string, number int, r MergeRequest) (MergeResult, error)
 }
 
 // Errors returned by the store and the runner. Match with errors.Is.

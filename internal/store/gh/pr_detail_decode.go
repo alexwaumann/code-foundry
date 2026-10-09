@@ -9,8 +9,8 @@ import (
 	"time"
 )
 
-// JSON shapes of pull_request_full.graphql, reviewer_candidates.graphql, and
-// revert_pull_request.graphql, and their mapping to the domain types.
+// JSON shapes of pull_request_full.graphql, reviewer_candidates.graphql,
+// revert_pull_request.graphql, and merge_pull_request.graphql, and their mapping to the domain types.
 
 type actorJSON struct {
 	Typename  string `json:"__typename"`
@@ -68,7 +68,11 @@ type pullRequestFullJSON struct {
 	ClosedAt    time.Time  `json:"closedAt"`
 	MergeCommit *oidJSON   `json:"mergeCommit"`
 	MergedBy    *loginJSON `json:"mergedBy"`
-	Labels      *struct {
+	// AutoMergeRequest is non-null while auto-merge is enabled.
+	AutoMergeRequest *struct {
+		EnabledAt time.Time `json:"enabledAt"`
+	} `json:"autoMergeRequest"`
+	Labels *struct {
 		TotalCount int     `json:"totalCount"`
 		Nodes      []Label `json:"nodes"`
 	} `json:"labels"`
@@ -107,8 +111,12 @@ type pullRequestFullJSON struct {
 type pullRequestFullData struct {
 	RateLimit  *rateLimitJSON `json:"rateLimit"`
 	Repository *struct {
-		ViewerPermission string               `json:"viewerPermission"`
-		PullRequest      *pullRequestFullJSON `json:"pullRequest"`
+		ViewerPermission string `json:"viewerPermission"`
+		// Pointers: a row decoded from a response without them knows no methods.
+		MergeCommitAllowed *bool                `json:"mergeCommitAllowed"`
+		SquashMergeAllowed *bool                `json:"squashMergeAllowed"`
+		RebaseMergeAllowed *bool                `json:"rebaseMergeAllowed"`
+		PullRequest        *pullRequestFullJSON `json:"pullRequest"`
 	} `json:"repository"`
 }
 
@@ -128,6 +136,19 @@ func decodeFullPullRequest(data []byte) (FullPullRequest, checksPage, error) {
 		Body:             p.Body,
 		ClosedAt:         p.ClosedAt,
 		ViewerPermission: d.Repository.ViewerPermission,
+		AutoMerge:        p.AutoMergeRequest != nil,
+	}
+	for _, m := range []struct {
+		allowed *bool
+		method  MergeMethod
+	}{
+		{d.Repository.MergeCommitAllowed, MergeCommit},
+		{d.Repository.SquashMergeAllowed, MergeSquash},
+		{d.Repository.RebaseMergeAllowed, MergeRebase},
+	} {
+		if m.allowed != nil && *m.allowed {
+			out.MergeMethods = append(out.MergeMethods, m.method)
+		}
 	}
 	if p.MergeCommit != nil {
 		out.MergeCommitSHA = p.MergeCommit.Oid
@@ -368,6 +389,38 @@ func decodeRevert(data []byte) (RevertResult, error) {
 	}
 	r := d.RevertPullRequest.RevertPullRequest
 	return RevertResult{Number: r.Number, URL: r.URL}, nil
+}
+
+// mergeOutcome is a MergePullRequest mutation's pull request afterwards.
+type mergeOutcome struct {
+	Merged bool
+	State  PullRequestState
+	SHA    string
+}
+
+// decodeMerge maps a MergePullRequest mutation response.
+func decodeMerge(data []byte) (mergeOutcome, error) {
+	var d struct {
+		MergePullRequest *struct {
+			PullRequest *struct {
+				Merged      bool             `json:"merged"`
+				State       PullRequestState `json:"state"`
+				MergeCommit *oidJSON         `json:"mergeCommit"`
+			} `json:"pullRequest"`
+		} `json:"mergePullRequest"`
+	}
+	if err := json.Unmarshal(data, &d); err != nil {
+		return mergeOutcome{}, fmt.Errorf("decode merge: %w", err)
+	}
+	if d.MergePullRequest == nil || d.MergePullRequest.PullRequest == nil {
+		return mergeOutcome{}, fmt.Errorf("decode merge: no pull request in the response")
+	}
+	p := d.MergePullRequest.PullRequest
+	out := mergeOutcome{Merged: p.Merged, State: p.State}
+	if p.MergeCommit != nil {
+		out.SHA = p.MergeCommit.Oid
+	}
+	return out, nil
 }
 
 // decodeRequestedReviewers maps the REST pull request a requested_reviewers POST or

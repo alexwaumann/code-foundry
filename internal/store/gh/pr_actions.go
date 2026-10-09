@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// The detail panel's actions: the reviewer picker and revert. Each is one request on
+// The detail panel's actions: the reviewer picker and revert (merge: pr_merge.go). Each is one request on
 // the store's worker, so pacing, the rate-limit pauses, and the auth state apply as to
 // every other request. Mutations are never retried.
 
@@ -103,7 +103,7 @@ func (s *Store) SetReviewRequest(ctx context.Context, slug string, number int, r
 }
 
 // RevertPullRequest implements Service. The pull request must be merged; its node id
-// comes from the detail (cached, or fetched). Within revertMemoTTL of a revert, another
+// comes from the detail (cached, or fetched). Within writeMemoTTL of a revert, another
 // call returns the first's outcome instead of sending the mutation again: the pull
 // request it opened or, when GitHub did not answer, the error saying it may have
 // opened one.
@@ -112,7 +112,7 @@ func (s *Store) RevertPullRequest(ctx context.Context, slug string, number int) 
 	if err != nil {
 		return RevertResult{}, err
 	}
-	if m, ok := s.full.recentRevert(k, s.opts.Now()); ok {
+	if m, ok := s.full.reverts.recent(k, s.opts.Now()); ok {
 		return m.res, m.err
 	}
 	d, err := s.FullPullRequest(ctx, k.slug, k.number, false)
@@ -136,7 +136,7 @@ func (s *Store) RevertPullRequest(ctx context.Context, slug string, number int) 
 	nodeID := d.PullRequest.ID
 	res, err := submitFunc(ctx, s, "revert|"+k.String(), func(ctx context.Context) (RevertResult, error) {
 		// The worker is serial, so a concurrent second revert sees the first's memo.
-		if m, ok := s.full.recentRevert(k, s.opts.Now()); ok {
+		if m, ok := s.full.reverts.recent(k, s.opts.Now()); ok {
 			return m.res, m.err
 		}
 		data, err := s.call(ctx, queryRevertPullRequest, map[string]any{"id": nodeID})
@@ -145,12 +145,12 @@ func (s *Store) RevertPullRequest(ctx context.Context, slug string, number int) 
 		case errors.As(err, &pe):
 			// GitHub refused the mutation (FORBIDDEN, UNPROCESSABLE): nothing was opened.
 			return RevertResult{}, pe.Unwrap()
-		case revertOutcomeUnknown(err):
+		case outcomeUnknown(err):
 			now := s.opts.Now()
 			err = fmt.Errorf("pull request #%d: GitHub did not confirm the revert, and it may have opened one; "+
 				"check GitHub before trying again (until %s a retry returns this error): %w",
-				k.number, now.Add(revertMemoTTL).Local().Format(time.TimeOnly), err)
-			s.full.rememberRevert(k, revertMemo{err: err, at: now})
+				k.number, now.Add(writeMemoTTL).Local().Format(time.TimeOnly), err)
+			s.full.reverts.remember(k, writeMemo[RevertResult]{err: err, at: now})
 			return RevertResult{}, err
 		case err != nil:
 			return RevertResult{}, err
@@ -159,7 +159,7 @@ func (s *Store) RevertPullRequest(ctx context.Context, slug string, number int) 
 		if err != nil {
 			return RevertResult{}, err
 		}
-		s.full.rememberRevert(k, revertMemo{res: r, at: s.opts.Now()})
+		s.full.reverts.remember(k, writeMemo[RevertResult]{res: r, at: s.opts.Now()})
 		return r, nil
 	})
 	if err != nil {
@@ -175,9 +175,9 @@ func (s *Store) RevertPullRequest(ctx context.Context, slug string, number int) 
 	return res, nil
 }
 
-// revertOutcomeUnknown reports whether a failed revert mutation may still have run:
-// GitHub timed out (502/504) or the connection failed after the request may have left.
-func revertOutcomeUnknown(err error) bool {
+// outcomeUnknown reports whether a failed mutation may still have run: GitHub timed out
+// (502/504) or the connection failed after the request may have left.
+func outcomeUnknown(err error) bool {
 	return errors.Is(err, ErrServerTimeout) || errors.Is(err, ErrNetwork) || errors.Is(err, context.DeadlineExceeded)
 }
 

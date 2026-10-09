@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -11,7 +12,7 @@ import (
 )
 
 // GhService's pull request detail panel: GetPullRequestDetail, ListReviewerCandidates,
-// SetReviewRequest, RevertPullRequest. Thin: the gh store fetches, caches, and talks to
+// SetReviewRequest, RevertPullRequest, MergePullRequest. Thin: the gh store fetches, caches, and talks to
 // GitHub (docs/notes/gh-pr-detail.md).
 
 // GetPullRequestDetail returns the detail panel's data for one pull request.
@@ -67,6 +68,28 @@ func (h *Gh) RevertPullRequest(ctx context.Context, req *connect.Request[v1.Reve
 	return connect.NewResponse(&v1.RevertPullRequestResponse{Number: int32(r.Number), Url: r.URL}), nil
 }
 
+// MergePullRequest merges an open pull request.
+func (h *Gh) MergePullRequest(ctx context.Context, req *connect.Request[v1.MergePullRequestRequest]) (*connect.Response[v1.MergePullRequestResponse], error) {
+	method, ok := mergeMethods[req.Msg.GetMethod()]
+	if !ok {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("method is required: merge, squash, or rebase"))
+	}
+	r, err := h.store.MergePullRequest(ctx, req.Msg.GetRepoSlug(), int(req.Msg.GetNumber()),
+		gh.MergeRequest{Method: method, DeleteBranch: req.Msg.GetDeleteBranch()})
+	if err != nil {
+		return nil, ghError(err)
+	}
+	return connect.NewResponse(&v1.MergePullRequestResponse{
+		Merged: r.Merged, Sha: r.SHA, Message: r.Message, BranchDeleted: r.BranchDeleted,
+	}), nil
+}
+
+var mergeMethods = map[v1.PullRequestMergeMethod]gh.MergeMethod{
+	v1.PullRequestMergeMethod_PULL_REQUEST_MERGE_METHOD_MERGE:  gh.MergeCommit,
+	v1.PullRequestMergeMethod_PULL_REQUEST_MERGE_METHOD_SQUASH: gh.MergeSquash,
+	v1.PullRequestMergeMethod_PULL_REQUEST_MERGE_METHOD_REBASE: gh.MergeRebase,
+}
+
 // ghDetailEvent maps the bus event; shared by GhService.Watch and EventService.
 func ghDetailEvent(e gh.PullRequestDetailUpdated) *v1.GhEvent {
 	return &v1.GhEvent{Event: &v1.GhEvent_PullRequestDetailUpdated_{PullRequestDetailUpdated: &v1.GhEvent_PullRequestDetailUpdated{
@@ -97,6 +120,11 @@ func fullPullRequestToProto(slug string, d *gh.FullPullRequest) *v1.PullRequestD
 		LabelsTruncated:        d.LabelsTruncated,
 		ReviewersTruncated:     d.ReviewersTruncated,
 		ChecksTruncated:        d.ChecksTruncated,
+		AutoMergeEnabled:       d.AutoMerge,
+	}
+	for _, m := range d.MergeMethods {
+		out.MergeMethodsAllowed = append(out.MergeMethodsAllowed,
+			enumOf[v1.PullRequestMergeMethod](v1.PullRequestMergeMethod_value, "PULL_REQUEST_MERGE_METHOD_", string(m)))
 	}
 	for _, l := range d.Labels {
 		out.Labels = append(out.Labels, &v1.PullRequestLabel{Name: l.Name, Color: l.Color})
@@ -142,9 +170,4 @@ func commentToProto(c *gh.Comment) *v1.PullRequestComment {
 		ReviewState:     reviewStateOf(c.ReviewState),
 		ReviewId:        c.ReviewID,
 	}
-}
-
-// MergePullRequest is not implemented yet.
-func (h *Gh) MergePullRequest(context.Context, *connect.Request[v1.MergePullRequestRequest]) (*connect.Response[v1.MergePullRequestResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, nil)
 }

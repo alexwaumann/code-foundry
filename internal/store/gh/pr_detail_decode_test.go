@@ -377,6 +377,7 @@ func TestDetailQueryVariables(t *testing.T) {
 		{queryPullRequestFull, map[string]any{"owner": "o", "name": "r", "number": 1}},
 		{queryReviewerCandidates, map[string]any{"owner": "o", "name": "r", "number": 1}},
 		{queryRevertPullRequest, map[string]any{"id": "PR_x"}},
+		{queryMergePullRequest, map[string]any{"id": "PR_x", "method": "SQUASH", "head": "abc"}},
 	} {
 		q, err := query(tt.name)
 		if err != nil {

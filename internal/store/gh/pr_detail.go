@@ -25,9 +25,9 @@ import (
 // fullCacheMax bounds the in-memory entries; the least recently fetched go first.
 const fullCacheMax = 64
 
-// revertMemoTTL is how long a revert's result answers repeated revert calls for the
-// same pull request instead of opening another revert.
-const revertMemoTTL = 2 * time.Minute
+// writeMemoTTL is how long a revert's or a merge's outcome answers repeated calls for
+// the same pull request instead of sending the mutation again.
+const writeMemoTTL = 2 * time.Minute
 
 type fullKey struct {
 	slug   string
@@ -52,19 +52,55 @@ type fullEntry struct {
 	stale bool // the poll saw the pull request change since d was fetched
 }
 
-// revertMemo is a revert's outcome for revertMemoTTL: the pull request it opened or,
-// when GitHub did not answer (err), that it may have opened one.
-type revertMemo struct {
-	res RevertResult
+// writeMemo is a mutation's outcome for writeMemoTTL: its result (the pull request a
+// revert opened, a merge) or, when GitHub did not answer (err), that it may have run.
+type writeMemo[T any] struct {
+	res T
 	err error
 	at  time.Time
 }
 
+// writeMemos holds the recent outcomes of one kind of mutation per pull request. The
+// zero value is ready to use.
+type writeMemos[T any] struct {
+	mu sync.Mutex
+	m  map[fullKey]writeMemo[T]
+}
+
+// recent returns the outcome for k within writeMemoTTL of now.
+func (w *writeMemos[T]) recent(k fullKey, now time.Time) (writeMemo[T], bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	m, ok := w.m[k]
+	if !ok || now.Sub(m.at) > writeMemoTTL {
+		return writeMemo[T]{}, false
+	}
+	return m, true
+}
+
+// remember records k's outcome and drops the expired ones.
+func (w *writeMemos[T]) remember(k fullKey, m writeMemo[T]) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.m == nil {
+		w.m = map[fullKey]writeMemo[T]{}
+	}
+	for key, old := range w.m {
+		if m.at.Sub(old.at) > writeMemoTTL {
+			delete(w.m, key)
+		}
+	}
+	w.m[k] = m
+}
+
 // fullCache is the in-memory detail cache. The zero value is ready to use.
 type fullCache struct {
-	mu      sync.Mutex
-	m       map[fullKey]*fullEntry
-	reverts map[fullKey]revertMemo
+	mu sync.Mutex
+	m  map[fullKey]*fullEntry
+	// reverts and merges answer repeats of a recent revert or merge (pr_actions.go,
+	// pr_merge.go).
+	reverts writeMemos[RevertResult]
+	merges  writeMemos[MergeResult]
 }
 
 func (c *fullCache) get(k fullKey) (d FullPullRequest, stale, ok bool) {
@@ -153,31 +189,6 @@ func (c *fullCache) staleMoved(fps []prFingerprint) []fullKey {
 		out = append(out, k)
 	}
 	return out
-}
-
-// recentRevert returns the outcome of a revert of k within revertMemoTTL of now.
-func (c *fullCache) recentRevert(k fullKey, now time.Time) (revertMemo, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	m, ok := c.reverts[k]
-	if !ok || now.Sub(m.at) > revertMemoTTL {
-		return revertMemo{}, false
-	}
-	return m, true
-}
-
-func (c *fullCache) rememberRevert(k fullKey, m revertMemo) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.reverts == nil {
-		c.reverts = map[fullKey]revertMemo{}
-	}
-	for key, old := range c.reverts {
-		if m.at.Sub(old.at) > revertMemoTTL {
-			delete(c.reverts, key)
-		}
-	}
-	c.reverts[k] = m
 }
 
 // fingerprintMoved reports whether the poll's fingerprint of a pull request differs

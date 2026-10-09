@@ -17,6 +17,8 @@ type fakeDetail struct {
 	// revertRefusal, when set, is the GraphQL error type every RevertPullRequest gets
 	// (FORBIDDEN: the viewer cannot push).
 	revertRefusal string
+	// merge is the merge button's state (fakegithub_merge_test.go).
+	merge fakeMerge
 }
 
 func (g *fakeGitHub) refuseReverts(errType string) {
@@ -73,7 +75,9 @@ func (g *fakeGitHub) detailOp(op string, vars map[string]any, data map[string]an
 			notFound("repository", fmt.Sprintf("Could not resolve to a PullRequest with the number of %d.", number))
 			return
 		}
-		data["repository"] = map[string]any{"viewerPermission": perm, "pullRequest": g.fullJSON(p)}
+		repo := map[string]any{"viewerPermission": perm, "pullRequest": g.fullJSON(p)}
+		g.mergeSettings(repo)
+		data["repository"] = repo
 	case "ReviewerCandidates":
 		owner, name, number := vars["owner"].(string), vars["name"].(string), vars["number"].(int)
 		p := g.findPR(owner, name, number)

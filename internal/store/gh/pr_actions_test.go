@@ -78,7 +78,7 @@ func TestRevertPullRequestOutcomes(t *testing.T) {
 		if !errors.Is(err, ErrServerTimeout) || !strings.Contains(err.Error(), "check GitHub before trying again") {
 			t.Fatalf("err = %v", err)
 		}
-		clk.advance(revertMemoTTL - time.Second)
+		clk.advance(writeMemoTTL - time.Second)
 		_, again := s.RevertPullRequest(ctx, "o/r", 3)
 		if again == nil || again.Error() != err.Error() || mutations() != before+1 {
 			t.Errorf("retry inside the window: %v, mutations %d; want the same error, nothing sent", again, mutations()-before)
@@ -96,7 +96,7 @@ func TestRevertPullRequestOutcomes(t *testing.T) {
 		if err != nil || res.Number != 901 || mutations() != before {
 			t.Errorf("repeat inside the window: %+v, %v, mutations %d", res, err, mutations()-before)
 		}
-		clk.advance(revertMemoTTL + time.Second)
+		clk.advance(writeMemoTTL + time.Second)
 		res, err = s.RevertPullRequest(ctx, "o/r", 3)
 		if err != nil || res.Number != 902 || mutations() != before+1 {
 			t.Errorf("after the window: %+v, %v, mutations %d; want a second revert", res, err, mutations()-before)

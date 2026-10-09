@@ -45,6 +45,12 @@ type FullPullRequest struct {
 	MergeCommitSHA  string     `json:"mergeCommitSha,omitempty"`
 	MergedBy        string     `json:"mergedBy,omitempty"`
 	ClosedAt        time.Time  `json:"closedAt,omitzero"`
+	// MergeMethods are the merge methods the repository allows, in GitHub's order
+	// (merge commit, squash, rebase); empty if unknown (a row cached before they were
+	// fetched).
+	MergeMethods []MergeMethod `json:"mergeMethods,omitempty"`
+	// AutoMerge: auto-merge is enabled on the pull request.
+	AutoMerge bool `json:"autoMerge,omitempty"`
 	// ViewerPermission is GitHub's RepositoryPermission (ADMIN, MAINTAIN, WRITE, TRIAGE,
 	// READ); empty if unknown.
 	ViewerPermission string    `json:"viewerPermission,omitempty"`
@@ -185,9 +191,40 @@ type RevertResult struct {
 	URL    string
 }
 
+// MergeMethod is GitHub's PullRequestMergeMethod.
+type MergeMethod string
+
+// Merge methods.
+const (
+	MergeCommit MergeMethod = "MERGE"
+	MergeSquash MergeMethod = "SQUASH"
+	MergeRebase MergeMethod = "REBASE"
+)
+
+// MergeRequest is how MergePullRequest merges.
+type MergeRequest struct {
+	Method MergeMethod
+	// DeleteBranch deletes the head branch after a successful merge, unless it lives
+	// in a fork.
+	DeleteBranch bool
+}
+
+// MergeResult is what MergePullRequest did.
+type MergeResult struct {
+	// Merged: GitHub reports the pull request merged.
+	Merged bool
+	// SHA is the merge commit (squash and rebase: the last commit on the base branch).
+	SHA string
+	// BranchDeleted: the head branch was deleted, or GitHub had already deleted it.
+	BranchDeleted bool
+	// Message says what happened, for people: the merge, then the branch deletion or
+	// why the branch was kept.
+	Message string
+}
+
 // PullRequestDetailUpdated is published when a cached FullPullRequest changed or went
 // stale (a poll saw the pull request change, a review request was set, it was
-// reverted). Clients re-read with GetPullRequestDetail.
+// reverted or merged). Clients re-read with GetPullRequestDetail.
 type PullRequestDetailUpdated struct {
 	Slug   string
 	Number int

@@ -157,6 +157,8 @@ func (g *fakeGitHub) respond(op, doc string, vars map[string]any) (json.RawMessa
 		}
 	case "PullRequestFull", "ReviewerCandidates", "RevertPullRequest":
 		g.detailOp(op, vars, data, &errs) // fakegithub_detail_test.go
+	case "MergePullRequest":
+		g.mergeOp(vars, data, &errs) // fakegithub_merge_test.go
 	default:
 		return nil, fmt.Errorf("fakeGitHub: unexpected op %s", op)
 	}
