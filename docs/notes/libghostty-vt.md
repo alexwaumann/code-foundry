@@ -42,3 +42,20 @@ PKG_CONFIG_PATH=<abs prefix>/share/pkgconfig go build ./...
 - No API stability promise. Expect renames when bumping the pseudo-version.
 
 Working demo: `libghostty-vt-demo.go.txt` next to this file.
+
+## Vendoring tried and reverted (2026-10-09)
+
+PR #6 committed the prebuilt, stripped `libghostty-vt.a` so a clone could build without
+zig or codeberg (ghostty's zig dependencies live there, blocked on Alex's work network).
+It was reverted the same day once the app shipped as bare binaries, which removed the
+need to build on that machine. Two things learned there still apply:
+
+* **Go's build cache does not key on pkg-config output.** The `.pc` link path is baked
+  into the compiled cgo package. Moving or rebuilding the library under a different path
+  with a warm cache links the old file, silently while it exists and with
+  `no such file or directory` once it is gone. CI keys setup-go's cache on
+  `scripts/ghostty-vt.sh` (the pins) as well as `go.sum`; locally, `go clean -cache` after
+  a pin bump or a path change.
+* `strip -S` takes the archive from 11 MB to 2.6 MB with every exported symbol intact and
+  the tests passing, and `ZERO_AR_DATE=1` makes the result byte-reproducible. Useful if
+  the library is ever shipped separately again.

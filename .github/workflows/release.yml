@@ -43,7 +43,11 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-          cache-dependency-path: go.sum
+          # Go bakes the pkg-config link path of libghostty-vt into compiled cgo packages
+          # without keying on it, so key the build cache on the library pins as well.
+          cache-dependency-path: |
+            go.sum
+            scripts/ghostty-vt.sh
 
       - uses: pnpm/action-setup@v6
         with:
