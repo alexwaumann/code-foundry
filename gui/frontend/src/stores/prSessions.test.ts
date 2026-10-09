@@ -7,7 +7,7 @@ vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), loading: vi.fn(() => "t1"), dismiss: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
-const { prSessionArgs, startingKey, startPrSession, usePrSessionsStore } = await import("./prSessions");
+const { PREPARING_TOAST_DELAY_MS, prSessionArgs, startingKey, startPrSession, usePrSessionsStore } = await import("./prSessions");
 
 const REF = { slug: "acme/repo", number: 12 };
 const started = (id: string) => ({ message: `Started session ${id} for PR #12`, resultJson: JSON.stringify({ id, worktreePath: "/w" }) });
@@ -71,15 +71,37 @@ describe("startPrSession", () => {
     expect(usePrSessionsStore.getState().starting).toEqual({});
   });
 
-  it("fix findings shows a preparing toast while it runs and dismisses it", async () => {
-    const d = deferred<ReturnType<typeof started>>();
-    invokeCommand.mockReturnValueOnce(d.promise);
-    const run = startPrSession("fix", REF);
-    expect(toast.loading).toHaveBeenCalledWith("Preparing worktree for #12…");
-    expect(toast.dismiss).not.toHaveBeenCalled();
-    d.resolve(started("s-2"));
-    await run;
-    expect(toast.dismiss).toHaveBeenCalledWith("t1");
+  it("fix findings shows a preparing toast while it runs and dismisses it after sonner has added it", async () => {
+    vi.useFakeTimers();
+    try {
+      const d = deferred<ReturnType<typeof started>>();
+      invokeCommand.mockReturnValueOnce(d.promise);
+      const run = startPrSession("fix", REF);
+      expect(toast.loading).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(PREPARING_TOAST_DELAY_MS);
+      expect(toast.loading).toHaveBeenCalledWith("Preparing worktree for #12…");
+      d.resolve(started("s-2"));
+      await run;
+      // Deferred to a timeout queued after sonner's own add.
+      expect(toast.dismiss).not.toHaveBeenCalled();
+      vi.runAllTimers();
+      expect(toast.dismiss).toHaveBeenCalledWith("t1");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a quick answer shows no preparing toast", async () => {
+    vi.useFakeTimers();
+    try {
+      invokeCommand.mockResolvedValueOnce(started("s-2"));
+      await startPrSession("fix", REF);
+      vi.runAllTimers();
+      expect(toast.loading).not.toHaveBeenCalled();
+      expect(toast.dismiss).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("explain shows no preparing toast", async () => {
@@ -93,7 +115,6 @@ describe("startPrSession", () => {
     await expect(startPrSession("fix", REF)).resolves.toBeNull();
     expect(toast.error).toHaveBeenCalledTimes(1);
     expect(toast.error.mock.calls[0]).toEqual(["pr.fix.findings failed", { description: "#12 comes from a fork and no worktree of acme/repo has its head checked out" }]);
-    expect(toast.dismiss).toHaveBeenCalledWith("t1");
     expect(usePrSessionsStore.getState().starting).toEqual({});
   });
 

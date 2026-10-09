@@ -39,12 +39,35 @@ export function prSessionArgs(kind: PrSessionKind, ref: PrRef, question = ""): R
   return args;
 }
 
+/** How long pr.fix.findings runs before its "Preparing worktree" toast shows. */
+export const PREPARING_TOAST_DELAY_MS = 200;
+
+/**
+ * Shows "Preparing worktree for #N…" if the command is still running after
+ * PREPARING_TOAST_DELAY_MS (a quick answer, such as the fork error, shows no flash), and
+ * returns its dismissal. Sonner adds a toast on a setTimeout(0) but removes it on an
+ * animation frame, so a dismissal that runs before the add leaves the toast up for good;
+ * the dismissal therefore waits for a timeout queued after the add's.
+ */
+function preparingToast(ref: PrRef): () => void {
+  let id: string | number | undefined;
+  const timer = setTimeout(() => {
+    id = toast.loading(`Preparing worktree for #${String(ref.number)}…`);
+  }, PREPARING_TOAST_DELAY_MS);
+  return () => {
+    clearTimeout(timer);
+    if (id === undefined) return;
+    const shown = id;
+    setTimeout(() => toast.dismiss(shown), 0);
+  };
+}
+
 /**
  * Runs the command for kind. Resolves the new session's id (an empty string when the
  * result names none), or null when it failed (toasted by runCommandForResult), the
  * question is blank, or the same command for this pull request is already running.
- * pr.fix.findings shows a "Preparing worktree" toast while it runs, as it may fetch and
- * create a worktree.
+ * pr.fix.findings shows a "Preparing worktree" toast while it runs (preparingToast), as it
+ * may fetch and create a worktree.
  */
 export async function startPrSession(kind: PrSessionKind, ref: PrRef, question = ""): Promise<string | null> {
   const args = prSessionArgs(kind, ref, question);
@@ -52,13 +75,13 @@ export async function startPrSession(kind: PrSessionKind, ref: PrRef, question =
   const busy = startingKey(ref, kind);
   if (usePrSessionsStore.getState().starting[busy]) return null;
   usePrSessionsStore.setState((s) => ({ starting: { ...s.starting, [busy]: true } }));
-  const preparing = kind === "fix" ? toast.loading(`Preparing worktree for #${String(ref.number)}…`) : undefined;
+  const preparing = kind === "fix" ? preparingToast(ref) : undefined;
   try {
     const res = await runCommandForResult(PR_SESSION_COMMANDS[kind], args);
     if (!res) return null;
     return parseSessionResult(res.resultJson) ?? "";
   } finally {
-    if (preparing !== undefined) toast.dismiss(preparing);
+    preparing?.();
     usePrSessionsStore.setState((s) => {
       const { [busy]: _done, ...rest } = s.starting;
       return { starting: rest };
