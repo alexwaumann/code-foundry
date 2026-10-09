@@ -156,7 +156,8 @@ func TestRepoServiceEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	wt := cw.Msg.GetWorktree().GetPath()
-	if wt != filepath.Join(base, "proj.worktrees", "e2e-one") {
+	realHome, _ := filepath.EvalSymlinks(home) // /tmp is a symlink; worktree paths are resolved
+	if wt != filepath.Join(realHome, "worktrees", "_local", "proj", "e2e-one") {
 		t.Fatalf("worktree path = %s", wt)
 	}
 

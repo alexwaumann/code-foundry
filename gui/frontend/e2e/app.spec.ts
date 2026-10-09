@@ -125,8 +125,8 @@ test("required args are prompted inline before invoking", async ({ page }) => {
   expect(last?.name).toBe("worktree.create");
   expect(last?.args).toEqual({ branch: "feat/palette" });
   expect(last?.context?.activeWorktreePath).toBe(`${CF}.worktrees/feat-sidebar`);
-  // The command emits FocusRepo for the new worktree.
-  await expect(row(page, `w:repo-cf::${CF}.worktrees/feat-palette`)).toHaveAttribute("aria-selected", "true");
+  // The command emits FocusRepo for the new worktree, created under ~/.code-foundry/worktrees/<owner>/<repo>.
+  await expect(row(page, "w:repo-cf::/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/feat-palette")).toHaveAttribute("aria-selected", "true");
 
   // Enum args list their values (optional enums too); "Default (not set)" omits the arg.
   await page.keyboard.press("Meta+k");

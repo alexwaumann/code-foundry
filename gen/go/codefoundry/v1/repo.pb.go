@@ -710,7 +710,8 @@ type CreateWorktreeRequest struct {
 	Branch string `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
 	// Ref to branch from when creating. Defaults to the default branch.
 	BaseRef string `protobuf:"bytes,3,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
-	// Optional explicit path. Defaults to <repo parent>/<repo name>.worktrees/<branch>.
+	// Optional explicit path. Defaults to <config home>/worktrees/<owner>/<repo>/<branch>
+	// (_local/<repo name> in place of owner/repo when origin is not on GitHub).
 	Path          string `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

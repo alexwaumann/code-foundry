@@ -17,7 +17,7 @@ func TestResolve(t *testing.T) {
 		env  string
 		want string
 	}{
-		{"default", "", filepath.Join(userHome, "Library", "Application Support", "code-foundry")},
+		{"default", "", filepath.Join(userHome, ".code-foundry")},
 		{"override", "/tmp/cf-home", "/tmp/cf-home"},
 	}
 	for _, tt := range tests {
@@ -38,11 +38,12 @@ func TestLayout(t *testing.T) {
 	p := New("/h")
 	got := map[string]string{
 		"socket": p.Socket(), "token": p.Token(), "port": p.Port(), "lock": p.Lock(),
-		"db": p.DB(), "logs": p.Logs(), "daemonlog": p.DaemonLog(),
+		"db": p.DB(), "logs": p.Logs(), "daemonlog": p.DaemonLog(), "worktrees": p.Worktrees(),
 	}
 	want := map[string]string{
 		"socket": "/h/daemon.sock", "token": "/h/daemon.token", "port": "/h/daemon.port",
 		"lock": "/h/daemon.lock", "db": "/h/db.sqlite", "logs": "/h/logs", "daemonlog": "/h/logs/daemon.log",
+		"worktrees": "/h/worktrees",
 	}
 	for k, w := range want {
 		if got[k] != w {

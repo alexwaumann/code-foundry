@@ -94,7 +94,8 @@ branches, heads, and staged/modified/untracked counts. `github_slug`, upstream, 
   **`--no-track` matters**: without it, branching from `origin/main` makes `origin/main`
   the upstream, so ahead/behind would be against main and `git push` would target main.
   The default path is `<repo parent>/<repo name>.worktrees/<branch with / → ->`, and git
-  creates the parent dirs. An explicit path must be absolute.
+  creates the parent dirs. *Superseded: worktrees now default to
+  `~/.code-foundry/worktrees/<owner>/<repo>/<branch>` (`config-home.md`).* An explicit path must be absolute.
 * **RemoveWorktree** refuses the main worktree (`invalid_argument`) and runs
   `git worktree remove [--force]`. If `delete_branch` is set it then runs `git branch -D`.
   If the branch delete fails, the worktree is still gone and the error says so.

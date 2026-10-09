@@ -3,6 +3,7 @@
 package repotest
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"path/filepath"
@@ -27,6 +28,9 @@ type Fake struct {
 	// details backs WorktreeDetail (detail.go); nil until SetDetail.
 	details map[string]repo.WorktreeDetail
 
+	// WorktreeRoot is where CreateWorktree puts worktrees without a path, like
+	// repo.Options.WorktreeRoot. New sets it to DefaultWorktreeRoot.
+	WorktreeRoot string
 	// Err, when set, is returned by every mutating method.
 	Err error
 	// Calls records method calls, e.g. "Register /x", "Refresh r1".
@@ -35,9 +39,12 @@ type Fake struct {
 
 var _ repo.Store = (*Fake)(nil)
 
+// DefaultWorktreeRoot is the fake's initial WorktreeRoot.
+const DefaultWorktreeRoot = "/worktrees"
+
 // New returns an empty fake publishing to b (which may be nil).
 func New(b *bus.Bus) *Fake {
-	return &Fake{bus: b, repos: map[string]repo.Repo{}, snap: &repo.Snapshot{}}
+	return &Fake{bus: b, repos: map[string]repo.Repo{}, snap: &repo.Snapshot{}, WorktreeRoot: DefaultWorktreeRoot}
 }
 
 // ID returns the id the fake assigns to path.
@@ -141,7 +148,8 @@ func (f *Fake) CreateWorktree(_ context.Context, o repo.CreateWorktreeOptions) (
 	}
 	path := o.Path
 	if path == "" {
-		path = filepath.Join(filepath.Dir(r.Path), r.Name+".worktrees", strings.ReplaceAll(o.Branch, "/", "-"))
+		slug := cmp.Or(r.GitHubSlug, "_local/"+r.Name)
+		path = filepath.Join(f.WorktreeRoot, filepath.FromSlash(slug), strings.ReplaceAll(o.Branch, "/", "-"))
 	}
 	w := repo.Worktree{RepoID: r.ID, Path: path, Branch: o.Branch}
 	r.Worktrees = append(slices.Clone(r.Worktrees), w)

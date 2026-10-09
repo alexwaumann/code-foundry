@@ -63,7 +63,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 	if s.db, err = db.Open(ctx, p.DB()); err != nil {
 		return nil, err
 	}
-	if s.repo, err = repo.Start(ctx, repo.Options{DB: s.db, Bus: s.bus, Log: log, FetchInterval: cfg.FetchInterval()}); err != nil {
+	if s.repo, err = repo.Start(ctx, repo.Options{DB: s.db, Bus: s.bus, Log: log, WorktreeRoot: p.Worktrees(), FetchInterval: cfg.FetchInterval()}); err != nil {
 		return nil, err
 	}
 	// CODE_FOUNDRY_GH_SEARCH_AS is a development aid (see gh.Options.SearchAs).

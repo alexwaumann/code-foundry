@@ -19,7 +19,7 @@ export interface MockCommandInfo {
   keybindings: string[];
 }
 
-export const PATH = "/Users/dev/Library/Application Support/code-foundry/settings.toml";
+export const PATH = "/Users/dev/.code-foundry/settings.toml";
 
 export const groups: GroupInit[] = [
   { id: "sessions", title: "Sessions", description: "Defaults for new Claude Code sessions." },
@@ -41,7 +41,7 @@ const staticFields: FieldInit[] = [
   { key: "github.poll_interval_seconds", group: "github", type: S.INT, title: "Poll interval (seconds)", description: "How often pull requests and checks are refreshed.", defaultValue: "60", min: 15n, max: 3600n, restartRequired: true },
   { key: "github.dashboards_enabled", group: "github", type: S.BOOL, title: "Pull request dashboards", description: "Fetch the viewer's dashboards for the Pull Requests page.", defaultValue: "true", restartRequired: true },
   { key: "repos.fetch_interval_seconds", group: "repos", type: S.INT, title: "Fetch interval (seconds)", description: "How often each repository runs git fetch --prune. 0 turns it off.", defaultValue: "120", min: 0n, max: 86400n, restartRequired: true },
-  { key: "repos.worktree_dir", group: "repos", type: S.PATH, title: "Worktree directory", description: "Where New Worktree puts worktrees. {repo} is replaced by the repository's name.", defaultValue: "", placeholder: "~/worktrees/{repo}" },
+  { key: "repos.worktree_dir", group: "repos", type: S.PATH, title: "Worktree directory", description: "Where New Worktree puts worktrees. {repo} is replaced by the repository's name. Empty uses ~/.code-foundry/worktrees/<owner>/<repo>.", defaultValue: "", placeholder: "~/worktrees/{repo}" },
   { key: "gitops.editor_command", group: "gitops", type: S.STRING, title: "Editor command", description: "Command that opens a worktree (Open in Editor). {path} is replaced by the worktree path. Empty detects an editor.", defaultValue: "", placeholder: "auto-detect" },
   { key: "appearance.theme", group: "appearance", type: S.ENUM, title: "Theme", description: "System follows the macOS appearance.", enumValues: ["system", "dark", "light"], defaultValue: "system" },
   { key: "appearance.font_family", group: "appearance", type: S.STRING, title: "Terminal font family", description: "Comma-separated font families, first installed wins.", defaultValue: "JetBrains Mono, SF Mono, Menlo", placeholder: "JetBrains Mono, SF Mono, Menlo" },

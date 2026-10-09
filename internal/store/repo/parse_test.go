@@ -209,14 +209,14 @@ func TestMainWorktreeFromCommonDir(t *testing.T) {
 }
 
 func TestDefaultWorktreePathAndID(t *testing.T) {
-	tests := []struct{ main, branch, want string }{
-		{"/Users/a/code/foundry", "feat", "/Users/a/code/foundry.worktrees/feat"},
-		{"/Users/a/code/foundry", "alex/fix-x", "/Users/a/code/foundry.worktrees/alex-fix-x"},
-		{"/r", "a/b/c", "/r.worktrees/a-b-c"},
+	tests := []struct{ slug, name, branch, want string }{
+		{"alex/foundry", "foundry", "feat", "/wt/alex/foundry/feat"},
+		{"alex/foundry", "foundry-fork", "alex/fix-x", "/wt/alex/foundry/alex-fix-x"},
+		{"", "foundry", "a/b/c", "/wt/_local/foundry/a-b-c"},
 	}
 	for _, tt := range tests {
-		if got := defaultWorktreePath(tt.main, tt.branch); got != tt.want {
-			t.Errorf("defaultWorktreePath(%q, %q) = %q, want %q", tt.main, tt.branch, got, tt.want)
+		if got := defaultWorktreePath("/wt", tt.slug, tt.name, tt.branch); got != tt.want {
+			t.Errorf("defaultWorktreePath(/wt, %q, %q, %q) = %q, want %q", tt.slug, tt.name, tt.branch, got, tt.want)
 		}
 	}
 	id := repoID("/Users/a/code/foundry")

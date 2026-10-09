@@ -135,7 +135,8 @@ type CreateWorktreeOptions struct {
 	Branch string
 	// BaseRef to branch from. Defaults to origin/<default branch>, else <default branch>.
 	BaseRef string
-	// Path defaults to <repo parent>/<repo name>.worktrees/<branch, "/" -> "-">.
+	// Path defaults to <Options.WorktreeRoot>/<owner>/<repo>/<branch, "/" -> "-">, with
+	// _local/<repo name> in place of owner/repo when origin is not on GitHub.
 	Path string
 }
 

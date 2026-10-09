@@ -365,7 +365,8 @@ export type CreateWorktreeRequest = Message<"codefoundry.v1.CreateWorktreeReques
   baseRef: string;
 
   /**
-   * Optional explicit path. Defaults to <repo parent>/<repo name>.worktrees/<branch>.
+   * Optional explicit path. Defaults to <config home>/worktrees/<owner>/<repo>/<branch>
+   * (_local/<repo name> in place of owner/repo when origin is not on GitHub).
    *
    * @generated from field: string path = 4;
    */

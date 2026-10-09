@@ -48,11 +48,11 @@ func TestRepoUnaryAndErrorCodes(t *testing.T) {
 	}
 
 	wt, err := c.CreateWorktree(ctx, connect.NewRequest(&v1.CreateWorktreeRequest{RepoId: r.GetId(), Branch: "a/b"}))
-	if err != nil || wt.Msg.GetWorktree().GetPath() != "/code/proj.worktrees/a-b" {
+	if err != nil || wt.Msg.GetWorktree().GetPath() != "/worktrees/_local/proj/a-b" {
 		t.Fatalf("CreateWorktree = %v, %v", wt, err)
 	}
 	fake.UpdateWorktree(repo.Worktree{
-		RepoID: r.GetId(), Path: "/code/proj.worktrees/a-b", Branch: "a/b",
+		RepoID: r.GetId(), Path: "/worktrees/_local/proj/a-b", Branch: "a/b",
 		Status: repo.Status{Ahead: 2, Untracked: 3, Dirty: true, BaseRef: "origin/main", BaseBehind: 4, RefreshedAt: time.Unix(5, 0)},
 	})
 
@@ -69,7 +69,7 @@ func TestRepoUnaryAndErrorCodes(t *testing.T) {
 	if _, err := c.Refresh(ctx, connect.NewRequest(&v1.RefreshRepoRequest{})); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.RemoveWorktree(ctx, connect.NewRequest(&v1.RemoveWorktreeRequest{RepoId: r.GetId(), Path: "/code/proj.worktrees/a-b"})); err != nil {
+	if _, err := c.RemoveWorktree(ctx, connect.NewRequest(&v1.RemoveWorktreeRequest{RepoId: r.GetId(), Path: "/worktrees/_local/proj/a-b"})); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := c.Unregister(ctx, connect.NewRequest(&v1.UnregisterRepoRequest{Id: r.GetId()})); err != nil {

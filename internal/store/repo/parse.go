@@ -246,7 +246,15 @@ func worktreeDirName(branch string) string {
 	return strings.ReplaceAll(branch, "/", "-")
 }
 
-// defaultWorktreePath is <repo parent>/<repo name>.worktrees/<branch, "/" -> "-">.
-func defaultWorktreePath(mainPath, branch string) string {
-	return filepath.Join(filepath.Dir(mainPath), filepath.Base(mainPath)+".worktrees", worktreeDirName(branch))
+// localOwner is the owner directory for repos without a GitHub origin. GitHub owner
+// names cannot start with "_", so it never collides with a real owner.
+const localOwner = "_local"
+
+// defaultWorktreePath is <root>/<owner>/<repo>/<branch, "/" -> "-">, where owner/repo
+// is the GitHub slug, or _local/<repo name> when there is none.
+func defaultWorktreePath(root, slug, name, branch string) string {
+	if slug == "" {
+		slug = localOwner + "/" + name
+	}
+	return filepath.Join(root, filepath.FromSlash(slug), worktreeDirName(branch))
 }

@@ -44,6 +44,7 @@ port, lock, logs) from your real config home. The GUI honours it too
 * **Config home is `~/Library/Application Support/code-foundry`.** It's the macOS-native
   location, and the product is macOS-only. `XDG_CONFIG_HOME` is deliberately ignored.
   `CODE_FOUNDRY_HOME` overrides it for tests and side-by-side installs.
+  *Superseded: the home is now `~/.code-foundry` (`config-home.md`).*
 * **Go 1.26.** `go 1.26.0` + `toolchain go1.26.8` in go.mod, because Phase 1a's libghostty-vt
   bindings require it. With a local go1.25.5 and the default `GOTOOLCHAIN=auto`, the first
   `go` command in the module downloaded go1.26.8 (verified: `go version` inside the repo

@@ -106,6 +106,9 @@ func startHarness(t *testing.T, dbPath string, opts Options) *harness {
 	b := bus.New()
 	sub := bus.Subscribe[Event](b, 1024)
 	opts.DB, opts.Bus = d, b
+	if opts.WorktreeRoot == "" {
+		opts.WorktreeRoot = filepath.Join(t.TempDir(), "worktrees")
+	}
 	opts.Debounce = 50 * time.Millisecond
 	if opts.FetchInterval == 0 {
 		opts.FetchInterval = -1
@@ -213,7 +216,7 @@ func TestRegisterReportsRepoWorktreesAndStatus(t *testing.T) {
 
 func TestWorktreeLifecycleAndWatcher(t *testing.T) {
 	f := newFixture(t)
-	h := startHarness(t, "", Options{})
+	h := startHarness(t, "", Options{WorktreeRoot: filepath.Join(f.base, "wt")})
 	ctx := context.Background()
 	r, err := h.store.Register(ctx, f.repo)
 	if err != nil {
@@ -221,11 +224,12 @@ func TestWorktreeLifecycleAndWatcher(t *testing.T) {
 	}
 
 	// New branch from origin/main at the default path, without tracking origin/main.
+	// origin is a local path, so the repo files under _local.
 	w, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{RepoID: r.ID, Branch: "alex/feat"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantPath := filepath.Join(f.base, "proj.worktrees", "alex-feat")
+	wantPath := filepath.Join(f.base, "wt", "_local", "proj", "alex-feat")
 	if w.Path != wantPath || w.Branch != "alex/feat" || w.IsMain || w.Status.Upstream != "" ||
 		w.Status.BaseRef != "origin/main" || w.Status.BaseAhead != 0 || w.Status.Dirty {
 		t.Fatalf("worktree = %+v", w)

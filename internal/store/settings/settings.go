@@ -54,7 +54,7 @@ type GitHub struct {
 // Repos configures the repo store.
 type Repos struct {
 	FetchIntervalSeconds int    // 0 = off
-	WorktreeDir          string // "" = <repo parent>/<repo>.worktrees; {repo} expands
+	WorktreeDir          string // "" = <config home>/worktrees/<owner>/<repo>; {repo} expands
 }
 
 // GitOps configures the gitops store.

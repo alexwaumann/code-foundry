@@ -35,7 +35,10 @@ const (
 type Options struct {
 	DB  *sql.DB  // required; holds the repos table
 	Bus *bus.Bus // required; receives Event values
-	Log *slog.Logger
+	// WorktreeRoot is where CreateWorktree puts worktrees without an explicit path:
+	// <WorktreeRoot>/<owner>/<repo>/<branch>. Required, absolute.
+	WorktreeRoot string
+	Log          *slog.Logger
 	// Runner runs git. Defaults to ExecRunner{}.
 	Runner Runner
 	// Workers bounds concurrent git refresh jobs. Defaults to DefaultWorkers.
@@ -88,6 +91,7 @@ type Git struct {
 	log    *slog.Logger
 	runner Runner
 	now    func() time.Time
+	wtRoot string
 
 	snap atomic.Pointer[Snapshot]
 
@@ -117,9 +121,13 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 	if opts.DB == nil || opts.Bus == nil {
 		return nil, errors.New("repo: Options.DB and Options.Bus are required")
 	}
+	if !filepath.IsAbs(opts.WorktreeRoot) {
+		return nil, fmt.Errorf("repo: Options.WorktreeRoot must be an absolute path, got %q", opts.WorktreeRoot)
+	}
 	g := &Git{
 		db:      opts.DB,
 		bus:     opts.Bus,
+		wtRoot:  opts.WorktreeRoot,
 		log:     cmp.Or(opts.Log, slog.Default()).With("store", "repo"),
 		runner:  opts.Runner,
 		now:     opts.Now,
@@ -456,7 +464,13 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 	}
 	path := opts.Path
 	if path == "" {
-		path = defaultWorktreePath(m.Path, opts.Branch)
+		// Read origin now rather than m.GitHubSlug, which is empty until the repo's
+		// first reconcile after a daemon start.
+		slug := ""
+		if out, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin"); err == nil {
+			slug = parseGitHubSlug(string(trimNL(out)))
+		}
+		path = defaultWorktreePath(g.wtRoot, slug, m.Name, opts.Branch)
 	} else if !filepath.IsAbs(path) {
 		return Worktree{}, fmt.Errorf("%w: path %q must be absolute", ErrInvalidArgument, path)
 	}

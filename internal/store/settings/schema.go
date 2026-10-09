@@ -170,7 +170,7 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeyWorktreeDir, Group: GroupRepos, Type: Path, Title: "Worktree directory",
-		Description: "Where New Worktree puts worktrees. {repo} is replaced by the repository's name. Empty uses <repo parent>/<repo>.worktrees.",
+		Description: "Where New Worktree puts worktrees. {repo} is replaced by the repository's name. Empty uses ~/.code-foundry/worktrees/<owner>/<repo>.",
 		Placeholder: "~/worktrees/{repo}",
 		bind:        func(s *Settings) any { return &s.Repos.WorktreeDir },
 	},

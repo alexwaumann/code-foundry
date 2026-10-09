@@ -114,7 +114,8 @@ message CreateWorktreeRequest {
   string branch = 2;
   // Ref to branch from when creating. Defaults to the default branch.
   string base_ref = 3;
-  // Optional explicit path. Defaults to <repo parent>/<repo name>.worktrees/<branch>.
+  // Optional explicit path. Defaults to <config home>/worktrees/<owner>/<repo>/<branch>
+  // (_local/<repo name> in place of owner/repo when origin is not on GitHub).
   string path = 4;
 }
 

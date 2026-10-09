@@ -851,7 +851,7 @@ export class World {
           const repo = this.repos.get(ctx?.activeRepoId ?? "");
           if (!repo) throw new CommandError("unavailable", "no active repository");
           const branch = args.branch ?? "";
-          const w: MockWorktree = { path: `${repo.path}.worktrees/${branch.replace(/\//g, "-")}`, branch, head: "c0ffee00", isMain: false, status: clean({ upstream: "", baseRef: "" }) };
+          const w: MockWorktree = { path: `${HOME}/.code-foundry/worktrees/${repo.githubSlug || `_local/${repo.name}`}/${branch.replace(/\//g, "-")}`, branch, head: "c0ffee00", isMain: false, status: clean({ upstream: "", baseRef: "" }) };
           repo.worktrees.push(w);
           this.repoEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(repo.id, w) } });
           this.intents.publish({ intent: { case: "focusRepo", value: { repoId: repo.id, worktreePath: w.path } } });

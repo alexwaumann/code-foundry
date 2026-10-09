@@ -1,13 +1,15 @@
 // Package paths resolves the on-disk locations code-foundry uses: the config home,
-// the daemon's socket, token, port and lock files, the SQLite database, and logs.
+// the daemon's socket, token, port and lock files, the SQLite database, logs, and the
+// worktrees New Worktree creates.
 //
 // The home directory is, in order of precedence:
 //
 //  1. $CODE_FOUNDRY_HOME, if set (used by tests and for side-by-side installs).
-//  2. ~/Library/Application Support/code-foundry (the macOS-native location).
+//  2. ~/.code-foundry.
 //
-// XDG_CONFIG_HOME is deliberately not consulted: code-foundry is macOS-only and the
-// Application Support directory is where macOS apps keep this kind of state.
+// A dot-directory in the user's home, like ~/.claude, keeps every path short, free of
+// spaces and well under the socket path limit. XDG_CONFIG_HOME is deliberately not
+// consulted: code-foundry is macOS-only.
 package paths
 
 import (
@@ -19,6 +21,9 @@ import (
 
 // EnvHome overrides the config home directory.
 const EnvHome = "CODE_FOUNDRY_HOME"
+
+// DirName is the default config home's name inside the user's home directory.
+const DirName = ".code-foundry"
 
 // MaxSocketPath is the longest Unix socket path macOS accepts (sun_path is 104 bytes
 // including the trailing NUL).
@@ -45,7 +50,7 @@ func Resolve() (Paths, error) {
 	if err != nil {
 		return Paths{}, fmt.Errorf("resolve user home: %w", err)
 	}
-	return New(filepath.Join(userHome, "Library", "Application Support", "code-foundry")), nil
+	return New(filepath.Join(userHome, DirName)), nil
 }
 
 // Home is the config home directory.
@@ -71,6 +76,10 @@ func (p Paths) Logs() string { return filepath.Join(p.home, "logs") }
 
 // DaemonLog is the daemon's JSON log file.
 func (p Paths) DaemonLog() string { return filepath.Join(p.Logs(), "daemon.log") }
+
+// Worktrees is where New Worktree puts worktrees: <Worktrees>/<owner>/<repo>/<branch>.
+// git creates the directories on demand.
+func (p Paths) Worktrees() string { return filepath.Join(p.home, "worktrees") }
 
 // Ensure creates the home and logs directories with 0700 permissions and checks that
 // the socket path fits in sun_path.
