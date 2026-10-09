@@ -13,8 +13,8 @@ make dev                     # daemon in the foreground, JSON log + text on stde
 make check                   # go vet, staticcheck, go test -race, frontend typecheck/lint/test
 make gen                     # buf lint + generate (Go + TS) + Wails bindings; commit the result
 
-make gui-build               # = make build && cd gui && wails3 build   -> gui/bin/CodeFoundry
-cd gui && wails3 package     # -> gui/bin/CodeFoundry.app (ad-hoc signed)
+make gui-build               # = make build && cd gui && wails3 package -> gui/bin/CodeFoundry.app (+ bare CodeFoundry)
+cd gui && wails3 build       # bare gui/bin/CodeFoundry only; `code-foundry gui` prefers the .app if one exists
 make gui-dev                 # = make build && cd gui && wails3 dev     (Vite HMR on :9245)
 ```
 
