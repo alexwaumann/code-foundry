@@ -10,6 +10,7 @@ import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
 import { ago, checksHeadline, commentCount, stateBadge, type Tone } from "./model";
 import { OrderToggle, PrSummary } from "./PrSummary";
+import { PrTimeline } from "./PrTimeline";
 import { toneBadge, toneText } from "./tones";
 
 const stateIcon: Record<string, typeof GitPullRequest> = { Open: GitPullRequest, Draft: GitPullRequestDraft, Merged: GitMerge, Closed: GitPullRequestClosed };
@@ -105,7 +106,7 @@ function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView; tabKey: s
       <div role="tablist" aria-label="Pull request views" className="flex items-center gap-0.5 rounded-lg bg-muted/60 p-0.5 dark:bg-muted/40">
         {innerTabs.map((t) => {
           const active = t.id === inner;
-          const disabled = t.id !== "summary";
+          const disabled = t.id === "code";
           return (
             <button
               key={t.id}
@@ -113,7 +114,7 @@ function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView; tabKey: s
               role="tab"
               aria-selected={active}
               disabled={disabled}
-              title={disabled ? "Coming in a later step" : undefined}
+              title={disabled ? "The diff view comes in a later step" : undefined}
               data-testid={`pr-tab-${t.id}`}
               className={cn(
                 "h-6 rounded-md px-2.5 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default disabled:opacity-40",
@@ -228,7 +229,7 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
       )}
       {error && <Banner testId="pr-refresh-error">Could not refresh: {error}</Banner>}
       <InnerTabBar d={d} tabKey={tabKey} inner={inner} />
-      <PrSummary d={d} tabKey={tabKey} />
+      {inner === "timeline" ? <PrTimeline d={d} tabKey={tabKey} /> : <PrSummary d={d} tabKey={tabKey} />}
     </div>
   );
 }
