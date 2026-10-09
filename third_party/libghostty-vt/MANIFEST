@@ -1,0 +1,10 @@
+ghostty_repo: https://github.com/ghostty-org/ghostty.git
+ghostty_commit: 34f39002c6e3974b54e6a6d400bd83777c5ea558
+go_bindings_version: v0.0.0-20261007030428-8812ad0e0f79
+zig_version: 0.16.0
+optimize: ReleaseFast
+arch: arm64
+lib_version: 0.1.0-dev
+built: 2026-10-09T20:23:43Z
+stripped: true
+sha256: 0fd91b31859139dcf376efae92124df22917f9d5c2c9ee892ddd00a72331318d
