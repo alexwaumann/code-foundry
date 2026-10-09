@@ -1,0 +1,7 @@
+# Opens a pull request that reverts a merged one (RevertPullRequest). GitHub creates the
+# revert branch and the pull request with its default title and body.
+mutation RevertPullRequest($id: ID!) {
+  revertPullRequest(input: { pullRequestId: $id }) {
+    revertPullRequest { number url }
+  }
+}

@@ -127,9 +127,15 @@ func TestGhErrorCodes(t *testing.T) {
 	}{
 		{fmt.Errorf("%w: x", gh.ErrNotFound), connect.CodeNotFound},
 		{fmt.Errorf("%w: x", gh.ErrNotAuthenticated), connect.CodeFailedPrecondition},
+		{fmt.Errorf("%w: Resource not accessible by integration", gh.ErrPermissionDenied), connect.CodePermissionDenied},
+		// Wrapped by the store (a revert that could not confirm the merge, or whose outcome
+		// is unknown): the cause's code.
+		{fmt.Errorf("pull request #1: cannot confirm it is merged: %w", &gh.RateLimitError{Msg: "exceeded"}), connect.CodeResourceExhausted},
+		{fmt.Errorf("pull request #1: check GitHub before trying again: %w", fmt.Errorf("%w: 502", gh.ErrServerTimeout)), connect.CodeUnavailable},
 		{&gh.RateLimitError{Secondary: true, Msg: "slow down"}, connect.CodeResourceExhausted},
 		{fmt.Errorf("%w: x", gh.ErrNetwork), connect.CodeUnavailable},
 		{fmt.Errorf("%w: x", gh.ErrServerTimeout), connect.CodeUnavailable},
+		{fmt.Errorf("%w: x", gh.ErrFailedPrecondition), connect.CodeFailedPrecondition},
 		{errors.New("gh exited 2: odd"), connect.CodeUnknown},
 	}
 	for _, tt := range tests {

@@ -134,6 +134,10 @@ type requestedReviewerJSON struct {
 	Login        string     `json:"login"`
 	Slug         string     `json:"slug"`
 	Organization *loginJSON `json:"organization"`
+	// RequestedReviewerFields only (pull_request_full, reviewer_candidates).
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	AvatarURL string `json:"avatarUrl"`
 }
 
 type pullRequestData struct {

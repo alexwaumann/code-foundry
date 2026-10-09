@@ -97,6 +97,7 @@ func Run(ctx context.Context, opts Options) error {
 	terminalAPI := api.NewTerminal(st.terminal)
 	sessionAPI := api.NewSession(st.session, events)
 	gitopsAPI := api.NewGitOps(st.gitops, events, ctx.Done())
+	ghAPI := api.NewGh(st.gh, events, ctx.Done())
 	settingsAPI := api.NewSettings(st.settings)
 	updateAPI := api.NewUpdate(st.update, events, ctx.Done())
 	commands := command.NewRegistry()
@@ -113,6 +114,7 @@ func Run(ctx context.Context, opts Options) error {
 			GitHubSlug: func(c command.Context) string { return st.gitops.GitHubSlug(c.ActiveRepoID, c.ActiveWorktreePath) },
 			LocalOnly:  func(c command.Context) bool { return st.gitops.LocalOnly(c.ActiveRepoID, c.ActiveWorktreePath) },
 		},
+		Gh:       ghAPI,
 		Settings: settingsAPI,
 		Update:   updateAPI,
 		Restart: func() {
@@ -130,7 +132,7 @@ func Run(ctx context.Context, opts Options) error {
 		terminalAPI.Route(),
 		sessionAPI.Route(),
 		repoAPI.Route(),
-		api.NewGh(st.gh, events, ctx.Done()).Route(),
+		ghAPI.Route(),
 		gitopsAPI.Route(),
 		settingsAPI.Route(),
 		updateAPI.Route(),

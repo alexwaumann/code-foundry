@@ -16,8 +16,15 @@ import (
 //     any command, even in a focused terminal (a command bound there never fires);
 //   - editingChords in gui/frontend/src/keys/chord.ts: clipboard/undo, always left to
 //     the focused terminal or text field;
-//   - the Wails app menu (gui/app.go appMenu): close window, quit, hide, hide others,
-//     minimize, full screen.
+//   - the Wails app menu (gui/app.go appMenu): quit, hide, hide others, minimize, full
+//     screen;
+//   - cmd+w: the side panel's "close the active tab" (gui/frontend/src/components/panel).
+//     The app menu's Close Window has no key equivalent, so cmd+w never closes the
+//     window, but no command may bind it either.
+//   - cmd+shift+c: the side panel's Pull request surface copies its link
+//     (COPY_LINK_CHORD in gui/frontend/src/components/pr/keys.ts). The panel handles it
+//     before the registry while it has focus, so a command bound to it would never fire
+//     there.
 //
 // See docs/notes/phase1e-gui.md and docs/notes/phase2-integration.md.
 var ReservedChords = []string{
@@ -27,8 +34,10 @@ var ReservedChords = []string{
 	"cmd+=", "cmd+-", "cmd+0",
 	// editingChords
 	"cmd+c", "cmd+v", "cmd+x", "cmd+a", "cmd+z", "cmd+shift+z",
+	// side panel: close tab; the Pull request surface's copy link
+	"cmd+w", "cmd+shift+c",
 	// app menu
-	"cmd+w", "cmd+q", "cmd+h", "cmd+alt+h", "cmd+m", "cmd+ctrl+f",
+	"cmd+q", "cmd+h", "cmd+alt+h", "cmd+m", "cmd+ctrl+f",
 }
 
 var chordModifiers = map[string]string{

@@ -93,6 +93,7 @@ branches, heads, and staged/modified/untracked counts. `github_slug`, upstream, 
   `origin/<default>` when that ref exists (freshest after fetch), else `<default>`.
   **`--no-track` matters**: without it, branching from `origin/main` makes `origin/main`
   the upstream, so ahead/behind would be against main and `git push` would target main.
+  *Later: a base of `origin/<b>` itself uses `--track` instead (pr-thread-commands.md).*
   The default path is `<repo parent>/<repo name>.worktrees/<branch with / → ->`, and git
   creates the parent dirs. *Superseded: worktrees now default to
   `~/.code-foundry/worktrees/<owner>/<repo>/<branch>` (`config-home.md`).* An explicit path must be absolute.

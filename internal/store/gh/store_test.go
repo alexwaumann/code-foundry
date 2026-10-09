@@ -31,7 +31,7 @@ type fakeCall struct {
 	start, end time.Time
 }
 
-var opRE = regexp.MustCompile(`^query (\w+)`)
+var opRE = regexp.MustCompile(`^(?:query|mutation) (\w+)`)
 
 func (f *fakeRunner) GraphQL(ctx context.Context, q string, vars map[string]any) (json.RawMessage, error) {
 	op := opRE.FindStringSubmatch(q)[1]

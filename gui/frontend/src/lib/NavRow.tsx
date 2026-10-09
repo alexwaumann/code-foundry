@@ -7,10 +7,25 @@ export function NavProvider({ value, children }: { value: NavCtx; children: Reac
 }
 
 /**
- * One navigable row. Click moves the cursor; double-click activates. The cursor row is
+ * One navigable row. Click moves the cursor (or activates, with activateOnClick);
+ * double-click activates; cmd+click runs onCmdClick when given. The cursor row is
  * highlighted and scrolled into view.
  */
-export function NavRow({ navKey, className, children, title }: { navKey: string; className?: string; children: ReactNode; title?: string }) {
+export function NavRow({
+  navKey,
+  className,
+  children,
+  title,
+  activateOnClick = false,
+  onCmdClick,
+}: {
+  navKey: string;
+  className?: string;
+  children: ReactNode;
+  title?: string;
+  activateOnClick?: boolean;
+  onCmdClick?: () => void;
+}) {
   const { cursorKey, setCursor, activate } = useContext(NavContext);
   const selected = cursorKey === navKey;
   const ref = useRef<HTMLDivElement>(null);
@@ -26,8 +41,12 @@ export function NavRow({ navKey, className, children, title }: { navKey: string;
       data-nav-key={navKey}
       title={title}
       className={cn("cursor-default rounded-sm", selected ? "bg-accent text-accent-foreground ring-1 ring-ring/40" : "hover:bg-accent/50", className)}
-      onClick={() => {
-        setCursor(navKey);
+      onClick={(e) => {
+        if (e.metaKey && onCmdClick) {
+          setCursor(navKey);
+          onCmdClick();
+        } else if (activateOnClick) activate(navKey);
+        else setCursor(navKey);
       }}
       onDoubleClick={() => {
         activate(navKey);

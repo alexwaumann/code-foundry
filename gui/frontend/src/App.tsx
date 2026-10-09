@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Composer } from "@/components/compose/Composer";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
 import { Dashboard } from "@/components/Dashboard";
@@ -7,6 +7,7 @@ import { SettingsPage } from "@/components/settings/SettingsPage";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { PullRequestsPage } from "@/components/prs/PullRequestsPage";
 import { SessionDisconnected } from "@/components/session/SessionParts";
+import { SidePanel } from "@/components/panel/SidePanel";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { TerminalPane } from "@/components/terminal/TerminalPane";
 import { Toaster } from "@/components/ui/sonner";
@@ -19,13 +20,13 @@ import { startCommandSync } from "@/stores/commands";
 import { startEventSync } from "@/stores/events";
 import { startHealthPolling } from "@/stores/health";
 import { useAttentionCount, useSessionsStore } from "@/stores/sessions";
-import { useUiStore, type FocusRegion } from "@/stores/ui";
+import { CONTENT_MIN, useUiStore, type FocusRegion } from "@/stores/ui";
 import { startViewSync, useViewsStore } from "@/stores/views";
 import { startUpdateSync } from "@/stores/update";
 
 function regionOf(el: EventTarget | null): FocusRegion {
   const region = el instanceof Element ? el.closest("[data-region]")?.getAttribute("data-region") : null;
-  return region === "sidebar" || region === "terminal" || region === "palette" ? region : "content";
+  return region === "sidebar" || region === "terminal" || region === "palette" || region === "panel" ? region : "content";
 }
 
 /**
@@ -37,6 +38,12 @@ function startApp(): () => void {
     useUiStore.getState().setFocus(regionOf(e.target));
   };
   document.addEventListener("focusin", onFocusIn);
+  // The side panel's bounds depend on the window width (stores/ui.ts panelMax).
+  const onResize = () => {
+    useUiStore.getState().setWindowWidth(window.innerWidth);
+  };
+  window.addEventListener("resize", onResize);
+  onResize();
   const stops = [
     syncDocumentScheme(),
     startHealthPolling(2000),
@@ -48,6 +55,7 @@ function startApp(): () => void {
   ];
   return () => {
     document.removeEventListener("focusin", onFocusIn);
+    window.removeEventListener("resize", onResize);
     for (const stop of stops) stop();
   };
 }
@@ -69,6 +77,31 @@ function Content() {
   return <Dashboard />;
 }
 
+/**
+ * The content pane. On a focus request (ui contentFocusSeq) it focuses the page's
+ * `[data-focus-root]` element (a page's keyboard list or its root section); a terminal
+ * answers the same request itself (TerminalPane), and has no focus root.
+ */
+function ContentPane({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLElement>(null);
+  const focusSeq = useUiStore((s) => s.contentFocusSeq);
+  useEffect(() => {
+    if (focusSeq === 0) return;
+    ref.current?.querySelector<HTMLElement>("[data-focus-root]")?.focus({ preventScroll: true });
+  }, [focusSeq]);
+  return (
+    <main
+      ref={ref}
+      className="mx-2 mb-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs"
+      // The side panel shrinks, then hides, before the content pane gets narrower than this.
+      style={{ minWidth: CONTENT_MIN }}
+      data-testid="content-pane"
+    >
+      {children}
+    </main>
+  );
+}
+
 export function App() {
   useEffect(() => startApp(), []);
   const scheme = useColorScheme();
@@ -76,16 +109,16 @@ export function App() {
   useWindowTitle(useAttentionCount());
 
   return (
-    // The sheet: one background under the title strip and sidebar. The content area is
-    // the one pane floating on it (rounded, lighter, 8px in from its neighbours and the
-    // window's right and bottom edges).
+    // The sheet: one background under the title strip and sidebar. The content area is a
+    // pane floating on it (rounded, lighter, 8px in from its neighbours and the window's
+    // right and bottom edges); the selection's side panel, when open, is a second pane
+    // to its right (components/panel, docs/notes/side-panel.md).
     <div className="flex h-screen flex-col overflow-hidden bg-sheet text-foreground">
       <TitleStrip />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="mx-2 mb-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs" data-testid="content-pane">
-          {settingsOpen ? <SettingsPage /> : <Content />}
-        </main>
+        <ContentPane>{settingsOpen ? <SettingsPage /> : <Content />}</ContentPane>
+        <SidePanel />
       </div>
       <CommandPalette />
       <HelpOverlay />

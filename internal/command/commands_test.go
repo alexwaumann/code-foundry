@@ -60,11 +60,12 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"session.new", "session.list", "session.focus", "session.close", "session.reconnect",
 		"session.rename", "session.fork", "session.remove",
 		"git.fetch", "git.pull", "git.push", "pr.create", "pr.open",
+		"pr.revert", "pr.merge", "pr.review.request", "pr.refresh", "pr.ask", "pr.explain", "pr.fix.findings",
 		"worktree.open.editor", "worktree.reveal", "view.open.url",
 		"settings.get", "settings.set", "settings.reset", "settings.path", "settings.reveal",
 		"view.settings", "view.help",
 		"app.version", "app.update.check", "app.update", "app.relaunch", "daemon.restart",
-		"view.pullrequests",
+		"view.pullrequests", "view.panel.toggle",
 	}
 	for _, n := range want {
 		if _, ok := f.reg.Get(n); !ok {

@@ -61,6 +61,9 @@ func TestGitOpsRPCs(t *testing.T) {
 		{"fetch", func() (gitOpResponse, error) {
 			return unwrap(c.Fetch(ctx, connect.NewRequest(&v1.GitFetchRequest{WorktreePath: "/w"})))
 		}, "Fetch /w", v1.GitOpKind_GIT_OP_KIND_FETCH},
+		{"fetch a remote branch", func() (gitOpResponse, error) {
+			return unwrap(c.Fetch(ctx, connect.NewRequest(&v1.GitFetchRequest{WorktreePath: "/w", Remote: "origin", Branch: "feat/x"})))
+		}, `Fetch /w remote="origin" branch="feat/x"`, v1.GitOpKind_GIT_OP_KIND_FETCH},
 		{"pull rebase", func() (gitOpResponse, error) {
 			return unwrap(c.Pull(ctx, connect.NewRequest(&v1.GitPullRequest{WorktreePath: "/w", Rebase: true})))
 		}, "Pull /w rebase=true", v1.GitOpKind_GIT_OP_KIND_PULL},

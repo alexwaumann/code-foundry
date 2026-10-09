@@ -1,0 +1,193 @@
+import { ArrowUpRight, BookOpen, Ellipsis, Hammer, Link2, Loader2, MessageCircleQuestion, RefreshCw, Undo2 } from "lucide-react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
+import type { PullRequestDetailView } from "@/api/gh";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { updatedAgo } from "@/components/prs/format";
+import { formatChord } from "@/keys/chord";
+import { useNow } from "@/lib/clock";
+import { cn } from "@/lib/utils";
+import { openUrl, pullRequestKey, useFreshness } from "@/stores/gh";
+import { copyPullRequestLink, refreshPullRequest, revertPullRequest, usePrPanelStore } from "@/stores/prPanel";
+import { startingKey, startPrSession, usePrSessionsStore, type PrSessionKind } from "@/stores/prSessions";
+import type { PrRef } from "@/surfaces/pullrequestTarget";
+import { COPY_LINK_CHORD, POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
+
+function Item({ icon, title, hint, children }: { icon: ReactNode; title: string; hint?: ReactNode; children?: ReactNode }) {
+  return (
+    <>
+      {icon}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span>{title}</span>
+        {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+      </span>
+      {children}
+    </>
+  );
+}
+
+function RefreshHint({ fetchedAtMs, lastError, busy }: { fetchedAtMs: number | null; lastError: string; busy: boolean }) {
+  const now = useNow(1000);
+  const f = useFreshness(fetchedAtMs, lastError, false);
+  if (busy) return <span data-testid="pr-menu-refresh-hint">Refreshing…</span>;
+  const when = f.fetchedAtMs === null ? "Not fetched yet" : `U${updatedAgo(f.fetchedAtMs, now).slice(1)}`;
+  return (
+    <span data-testid="pr-menu-refresh-hint" className={f.lastError ? "text-amber-600 dark:text-amber-300" : undefined} title={f.lastError || undefined}>
+      {when}
+      {f.lastError && " · last fetch failed"}
+    </span>
+  );
+}
+
+/** Whether kind's command is running for ref (its menu item shows a spinner). */
+function useStarting(prRef: PrRef, kind: PrSessionKind): boolean {
+  return usePrSessionsStore((s) => s.starting[startingKey(prRef, kind)] ?? false);
+}
+
+/**
+ * The header's ⋯ menu, in T3 Code's order. Every action is a registry command or a store
+ * action. Ask a question opens the surface's composer (onAsk), or focuses it again when it
+ * is open; Explain and Fix findings start their session at once, keeping the menu
+ * open with a spinner until it has started. A running item is aria-disabled (it stays
+ * focusable; a second select sends nothing) wherever the pull request is shown.
+ */
+export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detail: PullRequestDetailView; panelKey: string; onAsk: () => void }) {
+  const busy = usePrPanelStore((s) => s.refreshing[pullRequestKey(prRef.slug, prRef.number)] ?? false);
+  const explaining = useStarting(prRef, "explain");
+  const fixing = useStarting(prRef, "fix");
+  const [open, setOpen] = useState(false);
+  // Ask hands focus to the composer, so the menu must not take it back to its button.
+  const keepFocus = useRef(false);
+  const start = (kind: PrSessionKind) => {
+    void startPrSession(kind, prRef).then((id) => {
+      if (id !== null) setOpen(false);
+    });
+  };
+  const pr = detail.pullRequest;
+  const url = pr.url || `https://github.com/${prRef.slug}/pull/${String(prRef.number)}`;
+  const canRevert = pr.state === "merged" && detail.viewerCanUpdate;
+  const { ref: boundaryRef, boundary } = usePanelBoundary();
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  // The last press outside the menu was on the ⋯ button (see onPointerDownOutside).
+  const pressedTrigger = useRef(false);
+  const ref = useCallback(
+    (el: HTMLButtonElement | null) => {
+      trigger.current = el;
+      boundaryRef(el);
+    },
+    [boundaryRef],
+  );
+  return (
+    <DropdownMenu
+      modal={false}
+      open={open}
+      onOpenChange={(next) => {
+        // Reopened before the last close's focus handling ran: that close is over.
+        if (next) {
+          keepFocus.current = false;
+          pressedTrigger.current = false;
+        }
+        setOpen(next);
+      }}
+    >
+      <DropdownMenuTrigger asChild>
+        <button
+          ref={ref}
+          type="button"
+          aria-label="Pull request actions"
+          title="More actions"
+          data-testid="pr-menu-button"
+          className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring data-[state=open]:bg-accent"
+        >
+          <Ellipsis className="size-4" aria-hidden />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        collisionBoundary={boundary}
+        collisionPadding={POPUP_COLLISION_PADDING}
+        className={cn("w-80", POPUP_FIT)}
+        data-testid="pr-menu"
+        data-region="panel"
+        onKeyDown={stopPlainKeys}
+        onPointerDownOutside={(e) => {
+          // The ⋯ button toggles the menu itself. While the menu fades out its layer is
+          // still mounted, and would take a reopening press as an outside one and shut it.
+          pressedTrigger.current = e.target instanceof Node && (trigger.current?.contains(e.target) ?? false);
+          if (pressedTrigger.current) e.preventDefault();
+        }}
+        onCloseAutoFocus={(e) => {
+          if (keepFocus.current) {
+            keepFocus.current = false;
+            e.preventDefault();
+          } else if (pressedTrigger.current) {
+            // Radix counts that press as an outside interaction and would leave focus
+            // wherever it is; it was on the button, so focus goes back there.
+            e.preventDefault();
+            trigger.current?.focus();
+          }
+          pressedTrigger.current = false;
+        }}
+      >
+        <DropdownMenuItem
+          data-testid="pr-menu-refresh"
+          onSelect={(e) => {
+            // Stay open: the item shows the refresh's progress and then its time.
+            e.preventDefault();
+            void refreshPullRequest(prRef);
+          }}
+        >
+          <Item icon={busy ? <Loader2 className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />} title="Refresh" hint={<RefreshHint fetchedAtMs={detail.fetchedAtMs} lastError={detail.lastError} busy={busy} />} />
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          data-testid="pr-menu-ask"
+          onSelect={() => {
+            keepFocus.current = true;
+            onAsk();
+          }}
+        >
+          <Item icon={<MessageCircleQuestion aria-hidden />} title="Ask a question" hint="Starts a thread that knows which pull request you mean." />
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          data-testid="pr-menu-explain"
+          aria-busy={explaining || undefined}
+          aria-disabled={explaining || undefined}
+          onSelect={(e) => {
+            // Stay open with a spinner until the session has started.
+            e.preventDefault();
+            start("explain");
+          }}
+        >
+          <Item icon={explaining ? <Loader2 className="animate-spin" aria-hidden /> : <BookOpen aria-hidden />} title="Explain this PR" hint="A walk through the diff and what to read closely." />
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          data-testid="pr-menu-fix"
+          aria-busy={fixing || undefined}
+          aria-disabled={fixing || undefined}
+          onSelect={(e) => {
+            e.preventDefault();
+            start("fix");
+          }}
+        >
+          <Item icon={fixing ? <Loader2 className="animate-spin" aria-hidden /> : <Hammer aria-hidden />} title="Fix findings in a thread" />
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem data-testid="pr-menu-open" onSelect={() => void openUrl(url)}>
+          <Item icon={<ArrowUpRight aria-hidden />} title="Open on GitHub" />
+        </DropdownMenuItem>
+        <DropdownMenuItem data-testid="pr-menu-copy" onSelect={() => void copyPullRequestLink(prRef, url)}>
+          <Item icon={<Link2 aria-hidden />} title="Copy link">
+            <DropdownMenuShortcut>{formatChord(COPY_LINK_CHORD)}</DropdownMenuShortcut>
+          </Item>
+        </DropdownMenuItem>
+        {canRevert && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem data-testid="pr-menu-revert" onSelect={() => void revertPullRequest(prRef, panelKey)}>
+              <Item icon={<Undo2 aria-hidden />} title="Revert changes" hint={`Opens a pull request that reverses #${String(prRef.number)}.`} />
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

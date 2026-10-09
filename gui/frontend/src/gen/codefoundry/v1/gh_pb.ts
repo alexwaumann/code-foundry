@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/gh.proto.
  */
 export const file_codefoundry_v1_gh: GenFile = /*@__PURE__*/
-  fileDesc("Chdjb2RlZm91bmRyeS92MS9naC5wcm90bxIOY29kZWZvdW5kcnkudjEiSAoIR2hWaWV3ZXISDQoFbG9naW4YASABKAkSDAoEbmFtZRgCIAEoCRISCgphdmF0YXJfdXJsGAMgASgJEgsKA3VybBgEIAEoCSKPAQoLQ2hlY2tSb2xsdXASLwoFc3RhdGUYASABKA4yIC5jb2RlZm91bmRyeS52MS5DaGVja1JvbGx1cFN0YXRlEg0KBXRvdGFsGAIgASgFEg4KBnBhc3NlZBgDIAEoBRIOCgZmYWlsZWQYBCABKAUSDwoHcGVuZGluZxgFIAEoBRIPCgdza2lwcGVkGAYgASgFIrcGCgtQdWxsUmVxdWVzdBIRCglyZXBvX3NsdWcYASABKAkSDgoGbnVtYmVyGAIgASgFEg0KBXRpdGxlGAMgASgJEg4KBmF1dGhvchgEIAEoCRIQCghoZWFkX3JlZhgFIAEoCRIQCghoZWFkX3NoYRgGIAEoCRIQCghiYXNlX3JlZhgHIAEoCRINCgVkcmFmdBgIIAEoCBI3Cg9yZXZpZXdfZGVjaXNpb24YCSABKA4yHi5jb2RlZm91bmRyeS52MS5SZXZpZXdEZWNpc2lvbhIsCgltZXJnZWFibGUYCiABKA4yGS5jb2RlZm91bmRyeS52MS5NZXJnZWFibGUSPAoSbWVyZ2Vfc3RhdGVfc3RhdHVzGAsgASgOMiAuY29kZWZvdW5kcnkudjEuTWVyZ2VTdGF0ZVN0YXR1cxIbChNpc19jcm9zc19yZXBvc2l0b3J5GAwgASgIEhYKDmhlYWRfcmVwb19zbHVnGA0gASgJEgsKA3VybBgOIAEoCRIuCgp1cGRhdGVkX2F0GA8gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgZjaGVja3MYECABKAsyGy5jb2RlZm91bmRyeS52MS5DaGVja1JvbGx1cBIvCgVzdGF0ZRgRIAEoDjIgLmNvZGVmb3VuZHJ5LnYxLlB1bGxSZXF1ZXN0U3RhdGUSLgoKY3JlYXRlZF9hdBgSIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLQoJbWVyZ2VkX2F0GBMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIRCglhZGRpdGlvbnMYFCABKAUSEQoJZGVsZXRpb25zGBUgASgFEhUKDWNoYW5nZWRfZmlsZXMYFiABKAUSFQoNY29tbWVudF9jb3VudBgXIAEoBRIUCgxyZXZpZXdfY291bnQYGCABKAUSOQoObGF0ZXN0X3Jldmlld3MYGSADKAsyIS5jb2RlZm91bmRyeS52MS5QdWxsUmVxdWVzdFJldmlldxIXCg9yZXZpZXdfcmVxdWVzdHMYGiADKAkSDwoHcGFydGlhbBgbIAEoCCKMAQoRUHVsbFJlcXVlc3RSZXZpZXcSDgoGYXV0aG9yGAEgASgJEjUKBXN0YXRlGAIgASgOMiYuY29kZWZvdW5kcnkudjEuUHVsbFJlcXVlc3RSZXZpZXdTdGF0ZRIwCgxzdWJtaXR0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIpACCghDaGVja1J1bhIMCgRuYW1lGAEgASgJEhAKCHdvcmtmbG93GAIgASgJEisKBnN0YXR1cxgDIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLkNoZWNrU3RhdHVzEjMKCmNvbmNsdXNpb24YBCABKA4yHy5jb2RlZm91bmRyeS52MS5DaGVja0NvbmNsdXNpb24SCwoDdXJsGAUgASgJEhMKC2Rlc2NyaXB0aW9uGAYgASgJEi4KCnN0YXJ0ZWRfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGNvbXBsZXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiEgoQR2V0Vmlld2VyUmVxdWVzdCKYAQoRR2V0Vmlld2VyUmVzcG9uc2USKAoGdmlld2VyGAEgASgLMhguY29kZWZvdW5kcnkudjEuR2hWaWV3ZXISFQoNYXV0aGVudGljYXRlZBgCIAEoCBIuCgpmZXRjaGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpsYXN0X2Vycm9yGAQgASgJIjoKFUdldFB1bGxSZXF1ZXN0UmVxdWVzdBIRCglyZXBvX3NsdWcYASABKAkSDgoGbnVtYmVyGAIgASgFIrkBChZHZXRQdWxsUmVxdWVzdFJlc3BvbnNlEjEKDHB1bGxfcmVxdWVzdBgBIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLlB1bGxSZXF1ZXN0EigKBmNoZWNrcxgCIAMoCzIYLmNvZGVmb3VuZHJ5LnYxLkNoZWNrUnVuEi4KCmZldGNoZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmxhc3RfZXJyb3IYBCABKAkiMwoRTGlzdENoZWNrc1JlcXVlc3QSEQoJcmVwb19zbHVnGAEgASgJEgsKA3JlZhgCIAEoCSK8AQoSTGlzdENoZWNrc1Jlc3BvbnNlEgsKA3NoYRgBIAEoCRIrCgZyb2xsdXAYAiABKAsyGy5jb2RlZm91bmRyeS52MS5DaGVja1JvbGx1cBIoCgZjaGVja3MYAyADKAsyGC5jb2RlZm91bmRyeS52MS5DaGVja1J1bhIuCgpmZXRjaGVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpsYXN0X2Vycm9yGAUgASgJIiUKEFJlZnJlc2hHaFJlcXVlc3QSEQoJcmVwb19zbHVnGAEgASgJIhMKEVJlZnJlc2hHaFJlc3BvbnNlIicKElRyYWNrR2hSZXBvUmVxdWVzdBIRCglyZXBvX3NsdWcYASABKAkiFQoTVHJhY2tHaFJlcG9SZXNwb25zZSIpChRVbnRyYWNrR2hSZXBvUmVxdWVzdBIRCglyZXBvX3NsdWcYASABKAkiFwoVVW50cmFja0doUmVwb1Jlc3BvbnNlIhAKDldhdGNoR2hSZXF1ZXN0IrEGCgdHaEV2ZW50Ej8KDnZpZXdlcl91cGRhdGVkGAIgASgLMiUuY29kZWZvdW5kcnkudjEuR2hFdmVudC5WaWV3ZXJVcGRhdGVkSAASRQoRZGFzaGJvYXJkX3VwZGF0ZWQYAyABKAsyKC5jb2RlZm91bmRyeS52MS5HaEV2ZW50LkRhc2hib2FyZFVwZGF0ZWRIABJMChVyZXBvX2FjdGl2aXR5X3VwZGF0ZWQYBCABKAsyKy5jb2RlZm91bmRyeS52MS5HaEV2ZW50LlJlcG9BY3Rpdml0eVVwZGF0ZWRIABJZChxicmFuY2hfcHVsbF9yZXF1ZXN0c191cGRhdGVkGAUgASgLMjEuY29kZWZvdW5kcnkudjEuR2hFdmVudC5CcmFuY2hQdWxsUmVxdWVzdHNVcGRhdGVkSAASMAoGcG9sbGVkGAYgASgLMh4uY29kZWZvdW5kcnkudjEuR2hFdmVudC5Qb2xsZWRIABpCChBEYXNoYm9hcmRVcGRhdGVkEi4KCmZldGNoZWRfYXQYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wGlgKE1JlcG9BY3Rpdml0eVVwZGF0ZWQSEQoJcmVwb19zbHVnGAEgASgJEi4KCmZldGNoZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wGnAKGUJyYW5jaFB1bGxSZXF1ZXN0c1VwZGF0ZWQSEQoJcmVwb19zbHVnGAEgASgJEhAKCGhlYWRfcmVmGAIgASgJEi4KCmZldGNoZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wGj8KDVZpZXdlclVwZGF0ZWQSLgoKZmV0Y2hlZF9hdBgBIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAaTAoGUG9sbGVkEi4KCmZldGNoZWRfYXQYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmxhc3RfZXJyb3IYAiABKAlCBwoFZXZlbnRKBAgBEAJSFXB1bGxfcmVxdWVzdHNfdXBkYXRlZCI/Cg1Nb250aEFjdGl2aXR5Eg0KBW1vbnRoGAEgASgJEg8KB2NvbW1pdHMYAiABKAUSDgoGbWVyZ2VkGAMgASgFItEBCg1BY3Rpdml0eVN0YXRzEjEKCnRoaXNfbW9udGgYASABKAsyHS5jb2RlZm91bmRyeS52MS5Nb250aEFjdGl2aXR5EjEKCmxhc3RfbW9udGgYAiABKAsyHS5jb2RlZm91bmRyeS52MS5Nb250aEFjdGl2aXR5EhYKDmNvbW1pdHNfc291cmNlGAMgASgJEi4KCmZldGNoZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmxhc3RfZXJyb3IYBSABKAkiMAoTR2V0RGFzaGJvYXJkUmVxdWVzdBIZChFpbmNsdWRlX3VudHJhY2tlZBgBIAEoCCLIAwoUR2V0RGFzaGJvYXJkUmVzcG9uc2USKAoGdmlld2VyGAEgASgLMhguY29kZWZvdW5kcnkudjEuR2hWaWV3ZXISFQoNYXV0aGVudGljYXRlZBgCIAEoCBItCghhdXRob3JlZBgDIAMoCzIbLmNvZGVmb3VuZHJ5LnYxLlB1bGxSZXF1ZXN0EjUKEHJldmlld19yZXF1ZXN0ZWQYBCADKAsyGy5jb2RlZm91bmRyeS52MS5QdWxsUmVxdWVzdBI0Cg9yZWNlbnRseV9tZXJnZWQYBSADKAsyGy5jb2RlZm91bmRyeS52MS5QdWxsUmVxdWVzdBIsCgVzdGF0cxgGIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLkFjdGl2aXR5U3RhdHMSLgoKZmV0Y2hlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEgoKbGFzdF9lcnJvchgIIAEoCRIVCg10cmFja2VkX3NsdWdzGAkgAygJEi0KCHJldmlld2VkGAogAygLMhsuY29kZWZvdW5kcnkudjEuUHVsbFJlcXVlc3QSGwoTZGFzaGJvYXJkc19kaXNhYmxlZBgLIAEoCCIrChZHZXRSZXBvQWN0aXZpdHlSZXF1ZXN0EhEKCXJlcG9fc2x1ZxgBIAEoCSKSAgoTRGVmYXVsdEJyYW5jaFN0YXR1cxIOCgZicmFuY2gYASABKAkSCwoDc2hhGAIgASgJEhAKCGhlYWRsaW5lGAMgASgJEjAKDGNvbW1pdHRlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASKwoGcm9sbHVwGAUgASgLMhsuY29kZWZvdW5kcnkudjEuQ2hlY2tSb2xsdXASKQoHZmFpbGluZxgGIAMoCzIYLmNvZGVmb3VuZHJ5LnYxLkNoZWNrUnVuEi4KCmZldGNoZWRfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmxhc3RfZXJyb3IYCCABKAki3gEKF0dldFJlcG9BY3Rpdml0eVJlc3BvbnNlEhEKCXJlcG9fc2x1ZxgBIAEoCRIPCgd0cmFja2VkGAIgASgIEiwKBXN0YXRzGAMgASgLMh0uY29kZWZvdW5kcnkudjEuQWN0aXZpdHlTdGF0cxI7Cg5kZWZhdWx0X2JyYW5jaBgEIAEoCzIjLmNvZGVmb3VuZHJ5LnYxLkRlZmF1bHRCcmFuY2hTdGF0dXMSNAoPcmVjZW50bHlfbWVyZ2VkGAUgAygLMhsuY29kZWZvdW5kcnkudjEuUHVsbFJlcXVlc3QiQwocR2V0QnJhbmNoUHVsbFJlcXVlc3RzUmVxdWVzdBIRCglyZXBvX3NsdWcYASABKAkSEAoIaGVhZF9yZWYYAiABKAkilwEKHUdldEJyYW5jaFB1bGxSZXF1ZXN0c1Jlc3BvbnNlEjIKDXB1bGxfcmVxdWVzdHMYASADKAsyGy5jb2RlZm91bmRyeS52MS5QdWxsUmVxdWVzdBIuCgpmZXRjaGVkX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpsYXN0X2Vycm9yGAMgASgJKpEBChBQdWxsUmVxdWVzdFN0YXRlEiIKHlBVTExfUkVRVUVTVF9TVEFURV9VTlNQRUNJRklFRBAAEhsKF1BVTExfUkVRVUVTVF9TVEFURV9PUEVOEAESHQoZUFVMTF9SRVFVRVNUX1NUQVRFX0NMT1NFRBACEh0KGVBVTExfUkVRVUVTVF9TVEFURV9NRVJHRUQQAyqbAQoOUmV2aWV3RGVjaXNpb24SHwobUkVWSUVXX0RFQ0lTSU9OX1VOU1BFQ0lGSUVEEAASHAoYUkVWSUVXX0RFQ0lTSU9OX0FQUFJPVkVEEAESJQohUkVWSUVXX0RFQ0lTSU9OX0NIQU5HRVNfUkVRVUVTVEVEEAISIwofUkVWSUVXX0RFQ0lTSU9OX1JFVklFV19SRVFVSVJFRBADKnEKCU1lcmdlYWJsZRIZChVNRVJHRUFCTEVfVU5TUEVDSUZJRUQQABIXChNNRVJHRUFCTEVfTUVSR0VBQkxFEAESGQoVTUVSR0VBQkxFX0NPTkZMSUNUSU5HEAISFQoRTUVSR0VBQkxFX1VOS05PV04QAyqyAgoQTWVyZ2VTdGF0ZVN0YXR1cxIiCh5NRVJHRV9TVEFURV9TVEFUVVNfVU5TUEVDSUZJRUQQABIdChlNRVJHRV9TVEFURV9TVEFUVVNfQkVISU5EEAESHgoaTUVSR0VfU1RBVEVfU1RBVFVTX0JMT0NLRUQQAhIcChhNRVJHRV9TVEFURV9TVEFUVVNfQ0xFQU4QAxIcChhNRVJHRV9TVEFURV9TVEFUVVNfRElSVFkQBBIgChxNRVJHRV9TVEFURV9TVEFUVVNfSEFTX0hPT0tTEAUSHgoaTUVSR0VfU1RBVEVfU1RBVFVTX1VOS05PV04QBhIfChtNRVJHRV9TVEFURV9TVEFUVVNfVU5TVEFCTEUQBxIcChhNRVJHRV9TVEFURV9TVEFUVVNfRFJBRlQQCCqVAgoWUHVsbFJlcXVlc3RSZXZpZXdTdGF0ZRIpCiVQVUxMX1JFUVVFU1RfUkVWSUVXX1NUQVRFX1VOU1BFQ0lGSUVEEAASJQohUFVMTF9SRVFVRVNUX1JFVklFV19TVEFURV9QRU5ESU5HEAESJwojUFVMTF9SRVFVRVNUX1JFVklFV19TVEFURV9DT01NRU5URUQQAhImCiJQVUxMX1JFUVVFU1RfUkVWSUVXX1NUQVRFX0FQUFJPVkVEEAMSLworUFVMTF9SRVFVRVNUX1JFVklFV19TVEFURV9DSEFOR0VTX1JFUVVFU1RFRBAEEicKI1BVTExfUkVRVUVTVF9SRVZJRVdfU1RBVEVfRElTTUlTU0VEEAUq1QEKEENoZWNrUm9sbHVwU3RhdGUSIgoeQ0hFQ0tfUk9MTFVQX1NUQVRFX1VOU1BFQ0lGSUVEEAASHgoaQ0hFQ0tfUk9MTFVQX1NUQVRFX1BFTkRJTkcQARIeChpDSEVDS19ST0xMVVBfU1RBVEVfU1VDQ0VTUxACEh4KGkNIRUNLX1JPTExVUF9TVEFURV9GQUlMVVJFEAMSHAoYQ0hFQ0tfUk9MTFVQX1NUQVRFX0VSUk9SEAQSHwobQ0hFQ0tfUk9MTFVQX1NUQVRFX0VYUEVDVEVEEAUqzgEKC0NoZWNrU3RhdHVzEhwKGENIRUNLX1NUQVRVU19VTlNQRUNJRklFRBAAEhcKE0NIRUNLX1NUQVRVU19RVUVVRUQQARIcChhDSEVDS19TVEFUVVNfSU5fUFJPR1JFU1MQAhIaChZDSEVDS19TVEFUVVNfQ09NUExFVEVEEAMSGAoUQ0hFQ0tfU1RBVFVTX1dBSVRJTkcQBBIYChRDSEVDS19TVEFUVVNfUEVORElORxAFEhoKFkNIRUNLX1NUQVRVU19SRVFVRVNURUQQBirTAgoPQ2hlY2tDb25jbHVzaW9uEiAKHENIRUNLX0NPTkNMVVNJT05fVU5TUEVDSUZJRUQQABIcChhDSEVDS19DT05DTFVTSU9OX1NVQ0NFU1MQARIcChhDSEVDS19DT05DTFVTSU9OX0ZBSUxVUkUQAhIcChhDSEVDS19DT05DTFVTSU9OX05FVVRSQUwQAxIeChpDSEVDS19DT05DTFVTSU9OX0NBTkNFTExFRBAEEhwKGENIRUNLX0NPTkNMVVNJT05fU0tJUFBFRBAFEh4KGkNIRUNLX0NPTkNMVVNJT05fVElNRURfT1VUEAYSJAogQ0hFQ0tfQ09OQ0xVU0lPTl9BQ1RJT05fUkVRVUlSRUQQBxIaChZDSEVDS19DT05DTFVTSU9OX1NUQUxFEAgSJAogQ0hFQ0tfQ09OQ0xVU0lPTl9TVEFSVFVQX0ZBSUxVUkUQCTKaBwoJR2hTZXJ2aWNlElIKCUdldFZpZXdlchIgLmNvZGVmb3VuZHJ5LnYxLkdldFZpZXdlclJlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5HZXRWaWV3ZXJSZXNwb25zZSIAEmEKDkdldFB1bGxSZXF1ZXN0EiUuY29kZWZvdW5kcnkudjEuR2V0UHVsbFJlcXVlc3RSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuR2V0UHVsbFJlcXVlc3RSZXNwb25zZSIAElUKCkxpc3RDaGVja3MSIS5jb2RlZm91bmRyeS52MS5MaXN0Q2hlY2tzUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLkxpc3RDaGVja3NSZXNwb25zZSIAElAKB1JlZnJlc2gSIC5jb2RlZm91bmRyeS52MS5SZWZyZXNoR2hSZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuUmVmcmVzaEdoUmVzcG9uc2UiABJSCgVUcmFjaxIiLmNvZGVmb3VuZHJ5LnYxLlRyYWNrR2hSZXBvUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlRyYWNrR2hSZXBvUmVzcG9uc2UiABJYCgdVbnRyYWNrEiQuY29kZWZvdW5kcnkudjEuVW50cmFja0doUmVwb1JlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5VbnRyYWNrR2hSZXBvUmVzcG9uc2UiABJECgVXYXRjaBIeLmNvZGVmb3VuZHJ5LnYxLldhdGNoR2hSZXF1ZXN0GhcuY29kZWZvdW5kcnkudjEuR2hFdmVudCIAMAESWwoMR2V0RGFzaGJvYXJkEiMuY29kZWZvdW5kcnkudjEuR2V0RGFzaGJvYXJkUmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLkdldERhc2hib2FyZFJlc3BvbnNlIgASZAoPR2V0UmVwb0FjdGl2aXR5EiYuY29kZWZvdW5kcnkudjEuR2V0UmVwb0FjdGl2aXR5UmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLkdldFJlcG9BY3Rpdml0eVJlc3BvbnNlIgASdgoVR2V0QnJhbmNoUHVsbFJlcXVlc3RzEiwuY29kZWZvdW5kcnkudjEuR2V0QnJhbmNoUHVsbFJlcXVlc3RzUmVxdWVzdBotLmNvZGVmb3VuZHJ5LnYxLkdldEJyYW5jaFB1bGxSZXF1ZXN0c1Jlc3BvbnNlIgBCvwEKEmNvbS5jb2RlZm91bmRyeS52MUIHR2hQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp]);
+  fileDesc("Chdjb2RlZm91bmRyeS92MS9naC5wcm90bxIOY29kZWZvdW5kcnkudjEiSAoIR2hWaWV3ZXISDQoFbG9naW4YASABKAkSDAoEbmFtZRgCIAEoCRISCgphdmF0YXJfdXJsGAMgASgJEgsKA3VybBgEIAEoCSKPAQoLQ2hlY2tSb2xsdXASLwoFc3RhdGUYASABKA4yIC5jb2RlZm91bmRyeS52MS5DaGVja1JvbGx1cFN0YXRlEg0KBXRvdGFsGAIgASgFEg4KBnBhc3NlZBgDIAEoBRIOCgZmYWlsZWQYBCABKAUSDwoHcGVuZGluZxgFIAEoBRIPCgdza2lwcGVkGAYgASgFIrcGCgtQdWxsUmVxdWVzdBIRCglyZXBvX3NsdWcYASABKAkSDgoGbnVtYmVyGAIgASgFEg0KBXRpdGxlGAMgASgJEg4KBmF1dGhvchgEIAEoCRIQCghoZWFkX3JlZhgFIAEoCRIQCghoZWFkX3NoYRgGIAEoCRIQCghiYXNlX3JlZhgHIAEoCRINCgVkcmFmdBgIIAEoCBI3Cg9yZXZpZXdfZGVjaXNpb24YCSABKA4yHi5jb2RlZm91bmRyeS52MS5SZXZpZXdEZWNpc2lvbhIsCgltZXJnZWFibGUYCiABKA4yGS5jb2RlZm91bmRyeS52MS5NZXJnZWFibGUSPAoSbWVyZ2Vfc3RhdGVfc3RhdHVzGAsgASgOMiAuY29kZWZvdW5kcnkudjEuTWVyZ2VTdGF0ZVN0YXR1cxIbChNpc19jcm9zc19yZXBvc2l0b3J5GAwgASgIEhYKDmhlYWRfcmVwb19zbHVnGA0gASgJEgsKA3VybBgOIAEoCRIuCgp1cGRhdGVkX2F0GA8gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgZjaGVja3MYECABKAsyGy5jb2RlZm91bmRyeS52MS5DaGVja1JvbGx1cBIvCgVzdGF0ZRgRIAEoDjIgLmNvZGVmb3VuZHJ5LnYxLlB1bGxSZXF1ZXN0U3RhdGUSLgoKY3JlYXRlZF9hdBgSIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLQoJbWVyZ2VkX2F0GBMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIRCglhZGRpdGlvbnMYFCABKAUSEQoJZGVsZXRpb25zGBUgASgFEhUKDWNoYW5nZWRfZmlsZXMYFiABKAUSFQoNY29tbWVudF9jb3VudBgXIAEoBRIUCgxyZXZpZXdfY291bnQYGCABKAUSOQoObGF0ZXN0X3Jldmlld3MYGSADKAsyIS5jb2RlZm91bmRyeS52MS5QdWxsUmVxdWVzdFJldmlldxIXCg9yZXZpZXdfcmVxdWVzdHMYGiADKAkSDwoHcGFydGlhbBgbIAEoCCKMAQoRUHVsbFJlcXVlc3RSZXZpZXcSDgoGYXV0aG9yGAEgASgJEjUKBXN0YXRlGAIgASgOMiYuY29kZWZvdW5kcnkudjEuUHVsbFJlcXVlc3RSZXZpZXdTdGF0ZRIwCgxzdWJtaXR0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIpACCghDaGVja1J1bhIMCgRuYW1lGAEgASgJEhAKCHdvcmtmbG93GAIgASgJEisKBnN0YXR1cxgDIAEoDjIbLmNvZGVmb3VuZHJ5LnYxLkNoZWNrU3RhdHVzEjMKCmNvbmNsdXNpb24YBCABKA4yHy5jb2RlZm91bmRyeS52MS5DaGVja0NvbmNsdXNpb24SCwoDdXJsGAUgASgJEhMKC2Rlc2NyaXB0aW9uGAYgASgJEi4KCnN0YXJ0ZWRfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGNvbXBsZXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiEgoQR2V0Vmlld2VyUmVxdWVzdCKYAQoRR2V0Vmlld2VyUmVzcG9uc2USKAoGdmlld2VyGAEgASgLMhguY29kZWZvdW5kcnkudjEuR2hWaWV3ZXISFQoNYXV0aGVudGljYXRlZBgCIAEoCBIuCgpmZXRjaGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpsYXN0X2Vycm9yGAQgASgJIjoKFUdldFB1bGxSZXF1ZXN0UmVxdWVzdBIRCglyZXBvX3NsdWcYASABKAkSDgoGbnVtYmVyGAIgASgFIrkBChZHZXRQdWxsUmVxdWVzdFJlc3BvbnNlEjEKDHB1bGxfcmVxdWVzdBgBIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLlB1bGxSZXF1ZXN0EigKBmNoZWNrcxgCIAMoCzIYLmNvZGVmb3VuZHJ5LnYxLkNoZWNrUnVuEi4KCmZldGNoZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmxhc3RfZXJyb3IYBCABKAkiMwoRTGlzdENoZWNrc1JlcXVlc3QSEQoJcmVwb19zbHVnGAEgASgJEgsKA3JlZhgCIAEoCSK8AQoSTGlzdENoZWNrc1Jlc3BvbnNlEgsKA3NoYRgBIAEoCRIrCgZyb2xsdXAYAiABKAsyGy5jb2RlZm91bmRyeS52MS5DaGVja1JvbGx1cBIoCgZjaGVja3MYAyADKAsyGC5jb2RlZm91bmRyeS52MS5DaGVja1J1bhIuCgpmZXRjaGVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpsYXN0X2Vycm9yGAUgASgJIiUKEFJlZnJlc2hHaFJlcXVlc3QSEQoJcmVwb19zbHVnGAEgASgJIhMKEVJlZnJlc2hHaFJlc3BvbnNlIicKElRyYWNrR2hSZXBvUmVxdWVzdBIRCglyZXBvX3NsdWcYASABKAkiFQoTVHJhY2tHaFJlcG9SZXNwb25zZSIpChRVbnRyYWNrR2hSZXBvUmVxdWVzdBIRCglyZXBvX3NsdWcYASABKAkiFwoVVW50cmFja0doUmVwb1Jlc3BvbnNlIhAKDldhdGNoR2hSZXF1ZXN0IskHCgdHaEV2ZW50Ej8KDnZpZXdlcl91cGRhdGVkGAIgASgLMiUuY29kZWZvdW5kcnkudjEuR2hFdmVudC5WaWV3ZXJVcGRhdGVkSAASRQoRZGFzaGJvYXJkX3VwZGF0ZWQYAyABKAsyKC5jb2RlZm91bmRyeS52MS5HaEV2ZW50LkRhc2hib2FyZFVwZGF0ZWRIABJMChVyZXBvX2FjdGl2aXR5X3VwZGF0ZWQYBCABKAsyKy5jb2RlZm91bmRyeS52MS5HaEV2ZW50LlJlcG9BY3Rpdml0eVVwZGF0ZWRIABJZChxicmFuY2hfcHVsbF9yZXF1ZXN0c191cGRhdGVkGAUgASgLMjEuY29kZWZvdW5kcnkudjEuR2hFdmVudC5CcmFuY2hQdWxsUmVxdWVzdHNVcGRhdGVkSAASMAoGcG9sbGVkGAYgASgLMh4uY29kZWZvdW5kcnkudjEuR2hFdmVudC5Qb2xsZWRIABJXChtwdWxsX3JlcXVlc3RfZGV0YWlsX3VwZGF0ZWQYByABKAsyMC5jb2RlZm91bmRyeS52MS5HaEV2ZW50LlB1bGxSZXF1ZXN0RGV0YWlsVXBkYXRlZEgAGj0KGFB1bGxSZXF1ZXN0RGV0YWlsVXBkYXRlZBIRCglyZXBvX3NsdWcYASABKAkSDgoGbnVtYmVyGAIgASgFGkIKEERhc2hib2FyZFVwZGF0ZWQSLgoKZmV0Y2hlZF9hdBgBIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAaWAoTUmVwb0FjdGl2aXR5VXBkYXRlZBIRCglyZXBvX3NsdWcYASABKAkSLgoKZmV0Y2hlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAacAoZQnJhbmNoUHVsbFJlcXVlc3RzVXBkYXRlZBIRCglyZXBvX3NsdWcYASABKAkSEAoIaGVhZF9yZWYYAiABKAkSLgoKZmV0Y2hlZF9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAaPwoNVmlld2VyVXBkYXRlZBIuCgpmZXRjaGVkX2F0GAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBpMCgZQb2xsZWQSLgoKZmV0Y2hlZF9hdBgBIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEgoKbGFzdF9lcnJvchgCIAEoCUIHCgVldmVudEoECAEQAlIVcHVsbF9yZXF1ZXN0c191cGRhdGVkIj8KDU1vbnRoQWN0aXZpdHkSDQoFbW9udGgYASABKAkSDwoHY29tbWl0cxgCIAEoBRIOCgZtZXJnZWQYAyABKAUi0QEKDUFjdGl2aXR5U3RhdHMSMQoKdGhpc19tb250aBgBIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLk1vbnRoQWN0aXZpdHkSMQoKbGFzdF9tb250aBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLk1vbnRoQWN0aXZpdHkSFgoOY29tbWl0c19zb3VyY2UYAyABKAkSLgoKZmV0Y2hlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEgoKbGFzdF9lcnJvchgFIAEoCSIwChNHZXREYXNoYm9hcmRSZXF1ZXN0EhkKEWluY2x1ZGVfdW50cmFja2VkGAEgASgIIsgDChRHZXREYXNoYm9hcmRSZXNwb25zZRIoCgZ2aWV3ZXIYASABKAsyGC5jb2RlZm91bmRyeS52MS5HaFZpZXdlchIVCg1hdXRoZW50aWNhdGVkGAIgASgIEi0KCGF1dGhvcmVkGAMgAygLMhsuY29kZWZvdW5kcnkudjEuUHVsbFJlcXVlc3QSNQoQcmV2aWV3X3JlcXVlc3RlZBgEIAMoCzIbLmNvZGVmb3VuZHJ5LnYxLlB1bGxSZXF1ZXN0EjQKD3JlY2VudGx5X21lcmdlZBgFIAMoCzIbLmNvZGVmb3VuZHJ5LnYxLlB1bGxSZXF1ZXN0EiwKBXN0YXRzGAYgASgLMh0uY29kZWZvdW5kcnkudjEuQWN0aXZpdHlTdGF0cxIuCgpmZXRjaGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpsYXN0X2Vycm9yGAggASgJEhUKDXRyYWNrZWRfc2x1Z3MYCSADKAkSLQoIcmV2aWV3ZWQYCiADKAsyGy5jb2RlZm91bmRyeS52MS5QdWxsUmVxdWVzdBIbChNkYXNoYm9hcmRzX2Rpc2FibGVkGAsgASgIIisKFkdldFJlcG9BY3Rpdml0eVJlcXVlc3QSEQoJcmVwb19zbHVnGAEgASgJIpICChNEZWZhdWx0QnJhbmNoU3RhdHVzEg4KBmJyYW5jaBgBIAEoCRILCgNzaGEYAiABKAkSEAoIaGVhZGxpbmUYAyABKAkSMAoMY29tbWl0dGVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgZyb2xsdXAYBSABKAsyGy5jb2RlZm91bmRyeS52MS5DaGVja1JvbGx1cBIpCgdmYWlsaW5nGAYgAygLMhguY29kZWZvdW5kcnkudjEuQ2hlY2tSdW4SLgoKZmV0Y2hlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEgoKbGFzdF9lcnJvchgIIAEoCSLeAQoXR2V0UmVwb0FjdGl2aXR5UmVzcG9uc2USEQoJcmVwb19zbHVnGAEgASgJEg8KB3RyYWNrZWQYAiABKAgSLAoFc3RhdHMYAyABKAsyHS5jb2RlZm91bmRyeS52MS5BY3Rpdml0eVN0YXRzEjsKDmRlZmF1bHRfYnJhbmNoGAQgASgLMiMuY29kZWZvdW5kcnkudjEuRGVmYXVsdEJyYW5jaFN0YXR1cxI0Cg9yZWNlbnRseV9tZXJnZWQYBSADKAsyGy5jb2RlZm91bmRyeS52MS5QdWxsUmVxdWVzdCJDChxHZXRCcmFuY2hQdWxsUmVxdWVzdHNSZXF1ZXN0EhEKCXJlcG9fc2x1ZxgBIAEoCRIQCghoZWFkX3JlZhgCIAEoCSKXAQodR2V0QnJhbmNoUHVsbFJlcXVlc3RzUmVzcG9uc2USMgoNcHVsbF9yZXF1ZXN0cxgBIAMoCzIbLmNvZGVmb3VuZHJ5LnYxLlB1bGxSZXF1ZXN0Ei4KCmZldGNoZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmxhc3RfZXJyb3IYAyABKAkiUQobR2V0UHVsbFJlcXVlc3REZXRhaWxSZXF1ZXN0EhEKCXJlcG9fc2x1ZxgBIAEoCRIOCgZudW1iZXIYAiABKAUSDwoHcmVmcmVzaBgDIAEoCCJRChxHZXRQdWxsUmVxdWVzdERldGFpbFJlc3BvbnNlEjEKBmRldGFpbBgBIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLlB1bGxSZXF1ZXN0RGV0YWlsIpoHChFQdWxsUmVxdWVzdERldGFpbBIxCgxwdWxsX3JlcXVlc3QYASABKAsyGy5jb2RlZm91bmRyeS52MS5QdWxsUmVxdWVzdBIMCgRib2R5GAIgASgJEjAKBmxhYmVscxgDIAMoCzIgLmNvZGVmb3VuZHJ5LnYxLlB1bGxSZXF1ZXN0TGFiZWwSNgoJcmV2aWV3ZXJzGAQgAygLMiMuY29kZWZvdW5kcnkudjEuUHVsbFJlcXVlc3RSZXZpZXdlchIyCgdjb21taXRzGAUgAygLMiEuY29kZWZvdW5kcnkudjEuUHVsbFJlcXVlc3RDb21taXQSFAoMY29tbWl0X2NvdW50GAYgASgFEjQKCGNvbW1lbnRzGAcgAygLMiIuY29kZWZvdW5kcnkudjEuUHVsbFJlcXVlc3RDb21tZW50EhoKEmNvbW1lbnRzX3RydW5jYXRlZBgIIAEoCBI/Cg5yZXZpZXdfdGhyZWFkcxgJIAMoCzInLmNvZGVmb3VuZHJ5LnYxLlB1bGxSZXF1ZXN0UmV2aWV3VGhyZWFkEiAKGHJldmlld190aHJlYWRzX3RydW5jYXRlZBgKIAEoCBIoCgZjaGVja3MYCyADKAsyGC5jb2RlZm91bmRyeS52MS5DaGVja1J1bhIYChBtZXJnZV9jb21taXRfc2hhGAwgASgJEhEKCW1lcmdlZF9ieRgNIAEoCRItCgljbG9zZWRfYXQYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg8KB25vZGVfaWQYDyABKAkSGQoRdmlld2VyX2Nhbl91cGRhdGUYECABKAgSLgoKZmV0Y2hlZF9hdBgRIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEgoKbGFzdF9lcnJvchgSIAEoCRIZChF2aWV3ZXJfcGVybWlzc2lvbhgTIAEoCRIYChBsYWJlbHNfdHJ1bmNhdGVkGBQgASgIEhsKE3Jldmlld2Vyc190cnVuY2F0ZWQYFSABKAgSGAoQY2hlY2tzX3RydW5jYXRlZBgWIAEoCBJFChVtZXJnZV9tZXRob2RzX2FsbG93ZWQYFyADKA4yJi5jb2RlZm91bmRyeS52MS5QdWxsUmVxdWVzdE1lcmdlTWV0aG9kEhoKEmF1dG9fbWVyZ2VfZW5hYmxlZBgYIAEoCBIWCg5kZWZhdWx0X2JyYW5jaBgZIAEoCSIvChBQdWxsUmVxdWVzdExhYmVsEgwKBG5hbWUYASABKAkSDQoFY29sb3IYAiABKAki5AEKE1B1bGxSZXF1ZXN0UmV2aWV3ZXISDQoFbG9naW4YASABKAkSDwoHaXNfdGVhbRgCIAEoCBI1CgVzdGF0ZRgDIAEoDjImLmNvZGVmb3VuZHJ5LnYxLlB1bGxSZXF1ZXN0UmV2aWV3U3RhdGUSMAoMc3VibWl0dGVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIRCglyZXF1ZXN0ZWQYBSABKAgSDQoFc3RhbGUYBiABKAgSEgoKYXZhdGFyX3VybBgHIAEoCRIOCgZpc19ib3QYCCABKAgijwEKEVB1bGxSZXF1ZXN0Q29tbWl0EgsKA3NoYRgBIAEoCRIQCghoZWFkbGluZRgCIAEoCRIUCgxhdXRob3JfbG9naW4YAyABKAkSEwoLYXV0aG9yX25hbWUYBCABKAkSMAoMY29tbWl0dGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCLCAgoSUHVsbFJlcXVlc3RDb21tZW50EgoKAmlkGAEgASgJEjQKBGtpbmQYAiABKA4yJi5jb2RlZm91bmRyeS52MS5QdWxsUmVxdWVzdENvbW1lbnRLaW5kEg4KBmF1dGhvchgDIAEoCRIVCg1hdXRob3JfaXNfYm90GAQgASgIEhkKEWF1dGhvcl9hdmF0YXJfdXJsGAUgASgJEgwKBGJvZHkYBiABKAkSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASCwoDdXJsGAggASgJEgwKBHBhdGgYCSABKAkSPAoMcmV2aWV3X3N0YXRlGAogASgOMiYuY29kZWZvdW5kcnkudjEuUHVsbFJlcXVlc3RSZXZpZXdTdGF0ZRIRCglyZXZpZXdfaWQYCyABKAki5QEKF1B1bGxSZXF1ZXN0UmV2aWV3VGhyZWFkEgoKAmlkGAEgASgJEgwKBHBhdGgYAiABKAkSDAoEbGluZRgDIAEoBRImCgRzaWRlGAQgASgOMhguY29kZWZvdW5kcnkudjEuRGlmZlNpZGUSEwoLaXNfcmVzb2x2ZWQYBSABKAgSEwoLaXNfb3V0ZGF0ZWQYBiABKAgSNAoIY29tbWVudHMYByADKAsyIi5jb2RlZm91bmRyeS52MS5QdWxsUmVxdWVzdENvbW1lbnQSGgoSY29tbWVudHNfdHJ1bmNhdGVkGAggASgIIkIKHUxpc3RSZXZpZXdlckNhbmRpZGF0ZXNSZXF1ZXN0EhEKCXJlcG9fc2x1ZxgBIAEoCRIOCgZudW1iZXIYAiABKAUiagoeTGlzdFJldmlld2VyQ2FuZGlkYXRlc1Jlc3BvbnNlEjUKCmNhbmRpZGF0ZXMYASADKAsyIS5jb2RlZm91bmRyeS52MS5SZXZpZXdlckNhbmRpZGF0ZRIRCgl0cnVuY2F0ZWQYAiABKAgikgEKEVJldmlld2VyQ2FuZGlkYXRlEgoKAmlkGAEgASgJEioKBGtpbmQYAiABKA4yHC5jb2RlZm91bmRyeS52MS5SZXZpZXdlcktpbmQSDQoFbG9naW4YAyABKAkSDAoEbmFtZRgEIAEoCRISCgphdmF0YXJfdXJsGAUgASgJEhQKDGlzX3JlcXVlc3RlZBgGIAEoCCKKAQoXU2V0UmV2aWV3UmVxdWVzdFJlcXVlc3QSEQoJcmVwb19zbHVnGAEgASgJEg4KBm51bWJlchgCIAEoBRINCgVsb2dpbhgDIAEoCRIqCgRraW5kGAQgASgOMhwuY29kZWZvdW5kcnkudjEuUmV2aWV3ZXJLaW5kEhEKCXJlcXVlc3RlZBgFIAEoCCItChhTZXRSZXZpZXdSZXF1ZXN0UmVzcG9uc2USEQoJcmVxdWVzdGVkGAEgAygJIj0KGFJldmVydFB1bGxSZXF1ZXN0UmVxdWVzdBIRCglyZXBvX3NsdWcYASABKAkSDgoGbnVtYmVyGAIgASgFIjgKGVJldmVydFB1bGxSZXF1ZXN0UmVzcG9uc2USDgoGbnVtYmVyGAEgASgFEgsKA3VybBgCIAEoCSKmAQoXTWVyZ2VQdWxsUmVxdWVzdFJlcXVlc3QSEQoJcmVwb19zbHVnGAEgASgJEg4KBm51bWJlchgCIAEoBRI2CgZtZXRob2QYAyABKA4yJi5jb2RlZm91bmRyeS52MS5QdWxsUmVxdWVzdE1lcmdlTWV0aG9kEhUKDWRlbGV0ZV9icmFuY2gYBCABKAgSGQoRZXhwZWN0ZWRfaGVhZF9zaGEYBSABKAkiYAoYTWVyZ2VQdWxsUmVxdWVzdFJlc3BvbnNlEg4KBm1lcmdlZBgBIAEoCBILCgNzaGEYAiABKAkSDwoHbWVzc2FnZRgDIAEoCRIWCg5icmFuY2hfZGVsZXRlZBgEIAEoCCqRAQoQUHVsbFJlcXVlc3RTdGF0ZRIiCh5QVUxMX1JFUVVFU1RfU1RBVEVfVU5TUEVDSUZJRUQQABIbChdQVUxMX1JFUVVFU1RfU1RBVEVfT1BFThABEh0KGVBVTExfUkVRVUVTVF9TVEFURV9DTE9TRUQQAhIdChlQVUxMX1JFUVVFU1RfU1RBVEVfTUVSR0VEEAMqmwEKDlJldmlld0RlY2lzaW9uEh8KG1JFVklFV19ERUNJU0lPTl9VTlNQRUNJRklFRBAAEhwKGFJFVklFV19ERUNJU0lPTl9BUFBST1ZFRBABEiUKIVJFVklFV19ERUNJU0lPTl9DSEFOR0VTX1JFUVVFU1RFRBACEiMKH1JFVklFV19ERUNJU0lPTl9SRVZJRVdfUkVRVUlSRUQQAypxCglNZXJnZWFibGUSGQoVTUVSR0VBQkxFX1VOU1BFQ0lGSUVEEAASFwoTTUVSR0VBQkxFX01FUkdFQUJMRRABEhkKFU1FUkdFQUJMRV9DT05GTElDVElORxACEhUKEU1FUkdFQUJMRV9VTktOT1dOEAMqsgIKEE1lcmdlU3RhdGVTdGF0dXMSIgoeTUVSR0VfU1RBVEVfU1RBVFVTX1VOU1BFQ0lGSUVEEAASHQoZTUVSR0VfU1RBVEVfU1RBVFVTX0JFSElORBABEh4KGk1FUkdFX1NUQVRFX1NUQVRVU19CTE9DS0VEEAISHAoYTUVSR0VfU1RBVEVfU1RBVFVTX0NMRUFOEAMSHAoYTUVSR0VfU1RBVEVfU1RBVFVTX0RJUlRZEAQSIAocTUVSR0VfU1RBVEVfU1RBVFVTX0hBU19IT09LUxAFEh4KGk1FUkdFX1NUQVRFX1NUQVRVU19VTktOT1dOEAYSHwobTUVSR0VfU1RBVEVfU1RBVFVTX1VOU1RBQkxFEAcSHAoYTUVSR0VfU1RBVEVfU1RBVFVTX0RSQUZUEAgqlQIKFlB1bGxSZXF1ZXN0UmV2aWV3U3RhdGUSKQolUFVMTF9SRVFVRVNUX1JFVklFV19TVEFURV9VTlNQRUNJRklFRBAAEiUKIVBVTExfUkVRVUVTVF9SRVZJRVdfU1RBVEVfUEVORElORxABEicKI1BVTExfUkVRVUVTVF9SRVZJRVdfU1RBVEVfQ09NTUVOVEVEEAISJgoiUFVMTF9SRVFVRVNUX1JFVklFV19TVEFURV9BUFBST1ZFRBADEi8KK1BVTExfUkVRVUVTVF9SRVZJRVdfU1RBVEVfQ0hBTkdFU19SRVFVRVNURUQQBBInCiNQVUxMX1JFUVVFU1RfUkVWSUVXX1NUQVRFX0RJU01JU1NFRBAFKtUBChBDaGVja1JvbGx1cFN0YXRlEiIKHkNIRUNLX1JPTExVUF9TVEFURV9VTlNQRUNJRklFRBAAEh4KGkNIRUNLX1JPTExVUF9TVEFURV9QRU5ESU5HEAESHgoaQ0hFQ0tfUk9MTFVQX1NUQVRFX1NVQ0NFU1MQAhIeChpDSEVDS19ST0xMVVBfU1RBVEVfRkFJTFVSRRADEhwKGENIRUNLX1JPTExVUF9TVEFURV9FUlJPUhAEEh8KG0NIRUNLX1JPTExVUF9TVEFURV9FWFBFQ1RFRBAFKs4BCgtDaGVja1N0YXR1cxIcChhDSEVDS19TVEFUVVNfVU5TUEVDSUZJRUQQABIXChNDSEVDS19TVEFUVVNfUVVFVUVEEAESHAoYQ0hFQ0tfU1RBVFVTX0lOX1BST0dSRVNTEAISGgoWQ0hFQ0tfU1RBVFVTX0NPTVBMRVRFRBADEhgKFENIRUNLX1NUQVRVU19XQUlUSU5HEAQSGAoUQ0hFQ0tfU1RBVFVTX1BFTkRJTkcQBRIaChZDSEVDS19TVEFUVVNfUkVRVUVTVEVEEAYq0wIKD0NoZWNrQ29uY2x1c2lvbhIgChxDSEVDS19DT05DTFVTSU9OX1VOU1BFQ0lGSUVEEAASHAoYQ0hFQ0tfQ09OQ0xVU0lPTl9TVUNDRVNTEAESHAoYQ0hFQ0tfQ09OQ0xVU0lPTl9GQUlMVVJFEAISHAoYQ0hFQ0tfQ09OQ0xVU0lPTl9ORVVUUkFMEAMSHgoaQ0hFQ0tfQ09OQ0xVU0lPTl9DQU5DRUxMRUQQBBIcChhDSEVDS19DT05DTFVTSU9OX1NLSVBQRUQQBRIeChpDSEVDS19DT05DTFVTSU9OX1RJTUVEX09VVBAGEiQKIENIRUNLX0NPTkNMVVNJT05fQUNUSU9OX1JFUVVJUkVEEAcSGgoWQ0hFQ0tfQ09OQ0xVU0lPTl9TVEFMRRAIEiQKIENIRUNLX0NPTkNMVVNJT05fU1RBUlRVUF9GQUlMVVJFEAkqTgoIRGlmZlNpZGUSGQoVRElGRl9TSURFX1VOU1BFQ0lGSUVEEAASEgoORElGRl9TSURFX0xFRlQQARITCg9ESUZGX1NJREVfUklHSFQQAirEAQoWUHVsbFJlcXVlc3RDb21tZW50S2luZBIpCiVQVUxMX1JFUVVFU1RfQ09NTUVOVF9LSU5EX1VOU1BFQ0lGSUVEEAASKwonUFVMTF9SRVFVRVNUX0NPTU1FTlRfS0lORF9JU1NVRV9DT01NRU5UEAESJAogUFVMTF9SRVFVRVNUX0NPTU1FTlRfS0lORF9SRVZJRVcQAhIsCihQVUxMX1JFUVVFU1RfQ09NTUVOVF9LSU5EX1JFVklFV19DT01NRU5UEAMqXQoMUmV2aWV3ZXJLaW5kEh0KGVJFVklFV0VSX0tJTkRfVU5TUEVDSUZJRUQQABIWChJSRVZJRVdFUl9LSU5EX1VTRVIQARIWChJSRVZJRVdFUl9LSU5EX1RFQU0QAiq0AQoWUHVsbFJlcXVlc3RNZXJnZU1ldGhvZBIpCiVQVUxMX1JFUVVFU1RfTUVSR0VfTUVUSE9EX1VOU1BFQ0lGSUVEEAASIwofUFVMTF9SRVFVRVNUX01FUkdFX01FVEhPRF9NRVJHRRABEiQKIFBVTExfUkVRVUVTVF9NRVJHRV9NRVRIT0RfU1FVQVNIEAISJAogUFVMTF9SRVFVRVNUX01FUkdFX01FVEhPRF9SRUJBU0UQAzLICwoJR2hTZXJ2aWNlElIKCUdldFZpZXdlchIgLmNvZGVmb3VuZHJ5LnYxLkdldFZpZXdlclJlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5HZXRWaWV3ZXJSZXNwb25zZSIAEmEKDkdldFB1bGxSZXF1ZXN0EiUuY29kZWZvdW5kcnkudjEuR2V0UHVsbFJlcXVlc3RSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuR2V0UHVsbFJlcXVlc3RSZXNwb25zZSIAElUKCkxpc3RDaGVja3MSIS5jb2RlZm91bmRyeS52MS5MaXN0Q2hlY2tzUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLkxpc3RDaGVja3NSZXNwb25zZSIAElAKB1JlZnJlc2gSIC5jb2RlZm91bmRyeS52MS5SZWZyZXNoR2hSZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuUmVmcmVzaEdoUmVzcG9uc2UiABJSCgVUcmFjaxIiLmNvZGVmb3VuZHJ5LnYxLlRyYWNrR2hSZXBvUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlRyYWNrR2hSZXBvUmVzcG9uc2UiABJYCgdVbnRyYWNrEiQuY29kZWZvdW5kcnkudjEuVW50cmFja0doUmVwb1JlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5VbnRyYWNrR2hSZXBvUmVzcG9uc2UiABJECgVXYXRjaBIeLmNvZGVmb3VuZHJ5LnYxLldhdGNoR2hSZXF1ZXN0GhcuY29kZWZvdW5kcnkudjEuR2hFdmVudCIAMAESWwoMR2V0RGFzaGJvYXJkEiMuY29kZWZvdW5kcnkudjEuR2V0RGFzaGJvYXJkUmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLkdldERhc2hib2FyZFJlc3BvbnNlIgASZAoPR2V0UmVwb0FjdGl2aXR5EiYuY29kZWZvdW5kcnkudjEuR2V0UmVwb0FjdGl2aXR5UmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLkdldFJlcG9BY3Rpdml0eVJlc3BvbnNlIgASdgoVR2V0QnJhbmNoUHVsbFJlcXVlc3RzEiwuY29kZWZvdW5kcnkudjEuR2V0QnJhbmNoUHVsbFJlcXVlc3RzUmVxdWVzdBotLmNvZGVmb3VuZHJ5LnYxLkdldEJyYW5jaFB1bGxSZXF1ZXN0c1Jlc3BvbnNlIgAScwoUR2V0UHVsbFJlcXVlc3REZXRhaWwSKy5jb2RlZm91bmRyeS52MS5HZXRQdWxsUmVxdWVzdERldGFpbFJlcXVlc3QaLC5jb2RlZm91bmRyeS52MS5HZXRQdWxsUmVxdWVzdERldGFpbFJlc3BvbnNlIgASeQoWTGlzdFJldmlld2VyQ2FuZGlkYXRlcxItLmNvZGVmb3VuZHJ5LnYxLkxpc3RSZXZpZXdlckNhbmRpZGF0ZXNSZXF1ZXN0Gi4uY29kZWZvdW5kcnkudjEuTGlzdFJldmlld2VyQ2FuZGlkYXRlc1Jlc3BvbnNlIgASZwoQU2V0UmV2aWV3UmVxdWVzdBInLmNvZGVmb3VuZHJ5LnYxLlNldFJldmlld1JlcXVlc3RSZXF1ZXN0GiguY29kZWZvdW5kcnkudjEuU2V0UmV2aWV3UmVxdWVzdFJlc3BvbnNlIgASagoRUmV2ZXJ0UHVsbFJlcXVlc3QSKC5jb2RlZm91bmRyeS52MS5SZXZlcnRQdWxsUmVxdWVzdFJlcXVlc3QaKS5jb2RlZm91bmRyeS52MS5SZXZlcnRQdWxsUmVxdWVzdFJlc3BvbnNlIgASZwoQTWVyZ2VQdWxsUmVxdWVzdBInLmNvZGVmb3VuZHJ5LnYxLk1lcmdlUHVsbFJlcXVlc3RSZXF1ZXN0GiguY29kZWZvdW5kcnkudjEuTWVyZ2VQdWxsUmVxdWVzdFJlc3BvbnNlIgBCvwEKEmNvbS5jb2RlZm91bmRyeS52MUIHR2hQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.GhViewer
@@ -665,6 +665,12 @@ export type GhEvent = Message<"codefoundry.v1.GhEvent"> & {
      */
     value: GhEvent_Polled;
     case: "polled";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.GhEvent.PullRequestDetailUpdated pull_request_detail_updated = 7;
+     */
+    value: GhEvent_PullRequestDetailUpdated;
+    case: "pullRequestDetailUpdated";
   } | { case: undefined; value?: undefined };
 };
 
@@ -674,6 +680,31 @@ export type GhEvent = Message<"codefoundry.v1.GhEvent"> & {
  */
 export const GhEventSchema: GenMessage<GhEvent> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_gh, 18);
+
+/**
+ * A pull request's cached detail changed or went stale (a poll saw the pull request
+ * change, or a review request was set). Re-read with GetPullRequestDetail.
+ *
+ * @generated from message codefoundry.v1.GhEvent.PullRequestDetailUpdated
+ */
+export type GhEvent_PullRequestDetailUpdated = Message<"codefoundry.v1.GhEvent.PullRequestDetailUpdated"> & {
+  /**
+   * @generated from field: string repo_slug = 1;
+   */
+  repoSlug: string;
+
+  /**
+   * @generated from field: int32 number = 2;
+   */
+  number: number;
+};
+
+/**
+ * Describes the message codefoundry.v1.GhEvent.PullRequestDetailUpdated.
+ * Use `create(GhEvent_PullRequestDetailUpdatedSchema)` to create a new message.
+ */
+export const GhEvent_PullRequestDetailUpdatedSchema: GenMessage<GhEvent_PullRequestDetailUpdated> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 18, 0);
 
 /**
  * The dashboards, the global monthly stats, their fetch errors, or the tracked set
@@ -693,7 +724,7 @@ export type GhEvent_DashboardUpdated = Message<"codefoundry.v1.GhEvent.Dashboard
  * Use `create(GhEvent_DashboardUpdatedSchema)` to create a new message.
  */
 export const GhEvent_DashboardUpdatedSchema: GenMessage<GhEvent_DashboardUpdated> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_gh, 18, 0);
+  messageDesc(file_codefoundry_v1_gh, 18, 1);
 
 /**
  * A repository's monthly stats or default branch CI (or their errors, or whether it
@@ -718,7 +749,7 @@ export type GhEvent_RepoActivityUpdated = Message<"codefoundry.v1.GhEvent.RepoAc
  * Use `create(GhEvent_RepoActivityUpdatedSchema)` to create a new message.
  */
 export const GhEvent_RepoActivityUpdatedSchema: GenMessage<GhEvent_RepoActivityUpdated> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_gh, 18, 1);
+  messageDesc(file_codefoundry_v1_gh, 18, 2);
 
 /**
  * A watched branch's pull requests changed (or were polled for the first time).
@@ -748,7 +779,7 @@ export type GhEvent_BranchPullRequestsUpdated = Message<"codefoundry.v1.GhEvent.
  * Use `create(GhEvent_BranchPullRequestsUpdatedSchema)` to create a new message.
  */
 export const GhEvent_BranchPullRequestsUpdatedSchema: GenMessage<GhEvent_BranchPullRequestsUpdated> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_gh, 18, 2);
+  messageDesc(file_codefoundry_v1_gh, 18, 3);
 
 /**
  * The viewer or authentication state changed.
@@ -767,7 +798,7 @@ export type GhEvent_ViewerUpdated = Message<"codefoundry.v1.GhEvent.ViewerUpdate
  * Use `create(GhEvent_ViewerUpdatedSchema)` to create a new message.
  */
 export const GhEvent_ViewerUpdatedSchema: GenMessage<GhEvent_ViewerUpdated> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_gh, 18, 3);
+  messageDesc(file_codefoundry_v1_gh, 18, 4);
 
 /**
  * A poll finished. Sent after every poll (and in the EventService snapshot) so
@@ -797,7 +828,7 @@ export type GhEvent_Polled = Message<"codefoundry.v1.GhEvent.Polled"> & {
  * Use `create(GhEvent_PolledSchema)` to create a new message.
  */
 export const GhEvent_PolledSchema: GenMessage<GhEvent_Polled> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_gh, 18, 4);
+  messageDesc(file_codefoundry_v1_gh, 18, 5);
 
 /**
  * One calendar month (in the daemon's time zone) of the viewer's activity.
@@ -1153,6 +1184,803 @@ export type GetBranchPullRequestsResponse = Message<"codefoundry.v1.GetBranchPul
  */
 export const GetBranchPullRequestsResponseSchema: GenMessage<GetBranchPullRequestsResponse> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_gh, 27);
+
+/**
+ * @generated from message codefoundry.v1.GetPullRequestDetailRequest
+ */
+export type GetPullRequestDetailRequest = Message<"codefoundry.v1.GetPullRequestDetailRequest"> & {
+  /**
+   * @generated from field: string repo_slug = 1;
+   */
+  repoSlug: string;
+
+  /**
+   * @generated from field: int32 number = 2;
+   */
+  number: number;
+
+  /**
+   * Fetch from GitHub even when the cached detail is fresh.
+   *
+   * @generated from field: bool refresh = 3;
+   */
+  refresh: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.GetPullRequestDetailRequest.
+ * Use `create(GetPullRequestDetailRequestSchema)` to create a new message.
+ */
+export const GetPullRequestDetailRequestSchema: GenMessage<GetPullRequestDetailRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 28);
+
+/**
+ * @generated from message codefoundry.v1.GetPullRequestDetailResponse
+ */
+export type GetPullRequestDetailResponse = Message<"codefoundry.v1.GetPullRequestDetailResponse"> & {
+  /**
+   * @generated from field: codefoundry.v1.PullRequestDetail detail = 1;
+   */
+  detail?: PullRequestDetail | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.GetPullRequestDetailResponse.
+ * Use `create(GetPullRequestDetailResponseSchema)` to create a new message.
+ */
+export const GetPullRequestDetailResponseSchema: GenMessage<GetPullRequestDetailResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 29);
+
+/**
+ * @generated from message codefoundry.v1.PullRequestDetail
+ */
+export type PullRequestDetail = Message<"codefoundry.v1.PullRequestDetail"> & {
+  /**
+   * The summary fields, as GetPullRequest returns them. checks is the head commit's
+   * rollup.
+   *
+   * @generated from field: codefoundry.v1.PullRequest pull_request = 1;
+   */
+  pullRequest?: PullRequest | undefined;
+
+  /**
+   * Markdown, as written.
+   *
+   * @generated from field: string body = 2;
+   */
+  body: string;
+
+  /**
+   * @generated from field: repeated codefoundry.v1.PullRequestLabel labels = 3;
+   */
+  labels: PullRequestLabel[];
+
+  /**
+   * One entry per reviewer: a latest review, a pending request, or both. Requested
+   * first, then most recent review first.
+   *
+   * @generated from field: repeated codefoundry.v1.PullRequestReviewer reviewers = 4;
+   */
+  reviewers: PullRequestReviewer[];
+
+  /**
+   * The last 100 commits, oldest first.
+   *
+   * @generated from field: repeated codefoundry.v1.PullRequestCommit commits = 5;
+   */
+  commits: PullRequestCommit[];
+
+  /**
+   * All commits on the pull request (commits holds the last 100).
+   *
+   * @generated from field: int32 commit_count = 6;
+   */
+  commitCount: number;
+
+  /**
+   * Issue comments and submitted reviews (the last 100 of each), oldest first. Inline
+   * review comments are in review_threads, and so are the reviews that only carried
+   * them (COMMENTED with an empty body, as GitHub records each inline comment and
+   * reply): those are left out here.
+   *
+   * @generated from field: repeated codefoundry.v1.PullRequestComment comments = 7;
+   */
+  comments: PullRequestComment[];
+
+  /**
+   * Covers both streams: more than 100 issue comments, or more than 100 reviews, exist.
+   *
+   * @generated from field: bool comments_truncated = 8;
+   */
+  commentsTruncated: boolean;
+
+  /**
+   * The last 50 review threads, oldest first.
+   *
+   * @generated from field: repeated codefoundry.v1.PullRequestReviewThread review_threads = 9;
+   */
+  reviewThreads: PullRequestReviewThread[];
+
+  /**
+   * More review threads exist than review_threads holds.
+   *
+   * @generated from field: bool review_threads_truncated = 10;
+   */
+  reviewThreadsTruncated: boolean;
+
+  /**
+   * Every check on the head commit, failed first (see checks_truncated).
+   *
+   * @generated from field: repeated codefoundry.v1.CheckRun checks = 11;
+   */
+  checks: CheckRun[];
+
+  /**
+   * Merged pull requests: the merge commit and who merged.
+   *
+   * @generated from field: string merge_commit_sha = 12;
+   */
+  mergeCommitSha: string;
+
+  /**
+   * @generated from field: string merged_by = 13;
+   */
+  mergedBy: string;
+
+  /**
+   * Closed or merged pull requests.
+   *
+   * @generated from field: google.protobuf.Timestamp closed_at = 14;
+   */
+  closedAt?: Timestamp | undefined;
+
+  /**
+   * GitHub's node id.
+   *
+   * @generated from field: string node_id = 15;
+   */
+  nodeId: string;
+
+  /**
+   * The viewer has write access to the repository (viewer_permission admin, maintain,
+   * or write): they may request reviewers and revert.
+   *
+   * @generated from field: bool viewer_can_update = 16;
+   */
+  viewerCanUpdate: boolean;
+
+  /**
+   * When this detail was fetched; unset if never.
+   *
+   * @generated from field: google.protobuf.Timestamp fetched_at = 17;
+   */
+  fetchedAt?: Timestamp | undefined;
+
+  /**
+   * The last fetch's error when this is the cached copy, or why checks is incomplete
+   * (a page of checks beyond the first failed).
+   *
+   * @generated from field: string last_error = 18;
+   */
+  lastError: string;
+
+  /**
+   * The viewer's permission on the repository, lower case ("admin", "maintain",
+   * "write", "triage", "read"); empty if unknown.
+   *
+   * @generated from field: string viewer_permission = 19;
+   */
+  viewerPermission: string;
+
+  /**
+   * labels holds the first 20 of more.
+   *
+   * @generated from field: bool labels_truncated = 20;
+   */
+  labelsTruncated: boolean;
+
+  /**
+   * More than 50 latest reviews or more than 50 pending review requests exist than
+   * reviewers was built from.
+   *
+   * @generated from field: bool reviewers_truncated = 21;
+   */
+  reviewersTruncated: boolean;
+
+  /**
+   * checks is incomplete: a page beyond the first failed (last_error says why), or the
+   * head commit has more checks than the daemon fetches.
+   *
+   * @generated from field: bool checks_truncated = 22;
+   */
+  checksTruncated: boolean;
+
+  /**
+   * The merge methods the repository allows (merge commit, squash, rebase), in that
+   * order; empty if unknown.
+   *
+   * @generated from field: repeated codefoundry.v1.PullRequestMergeMethod merge_methods_allowed = 23;
+   */
+  mergeMethodsAllowed: PullRequestMergeMethod[];
+
+  /**
+   * Auto-merge is enabled: GitHub merges the pull request once its requirements pass.
+   *
+   * @generated from field: bool auto_merge_enabled = 24;
+   */
+  autoMergeEnabled: boolean;
+
+  /**
+   * The repository's default branch; empty if unknown. MergePullRequest never deletes
+   * it (nor the base branch).
+   *
+   * @generated from field: string default_branch = 25;
+   */
+  defaultBranch: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.PullRequestDetail.
+ * Use `create(PullRequestDetailSchema)` to create a new message.
+ */
+export const PullRequestDetailSchema: GenMessage<PullRequestDetail> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 30);
+
+/**
+ * @generated from message codefoundry.v1.PullRequestLabel
+ */
+export type PullRequestLabel = Message<"codefoundry.v1.PullRequestLabel"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * Hex color without "#", e.g. "d73a4a".
+   *
+   * @generated from field: string color = 2;
+   */
+  color: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.PullRequestLabel.
+ * Use `create(PullRequestLabelSchema)` to create a new message.
+ */
+export const PullRequestLabelSchema: GenMessage<PullRequestLabel> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 31);
+
+/**
+ * @generated from message codefoundry.v1.PullRequestReviewer
+ */
+export type PullRequestReviewer = Message<"codefoundry.v1.PullRequestReviewer"> & {
+  /**
+   * User login, or "org/team" for a team.
+   *
+   * @generated from field: string login = 1;
+   */
+  login: string;
+
+  /**
+   * @generated from field: bool is_team = 2;
+   */
+  isTeam: boolean;
+
+  /**
+   * The latest submitted review's state; UNSPECIFIED when the reviewer has only been
+   * requested.
+   *
+   * @generated from field: codefoundry.v1.PullRequestReviewState state = 3;
+   */
+  state: PullRequestReviewState;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp submitted_at = 4;
+   */
+  submittedAt?: Timestamp | undefined;
+
+  /**
+   * A review request is pending (after a review too: re-requested).
+   *
+   * @generated from field: bool requested = 5;
+   */
+  requested: boolean;
+
+  /**
+   * Commits landed after the latest review (it reviewed an older head).
+   *
+   * @generated from field: bool stale = 6;
+   */
+  stale: boolean;
+
+  /**
+   * @generated from field: string avatar_url = 7;
+   */
+  avatarUrl: string;
+
+  /**
+   * @generated from field: bool is_bot = 8;
+   */
+  isBot: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.PullRequestReviewer.
+ * Use `create(PullRequestReviewerSchema)` to create a new message.
+ */
+export const PullRequestReviewerSchema: GenMessage<PullRequestReviewer> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 32);
+
+/**
+ * @generated from message codefoundry.v1.PullRequestCommit
+ */
+export type PullRequestCommit = Message<"codefoundry.v1.PullRequestCommit"> & {
+  /**
+   * @generated from field: string sha = 1;
+   */
+  sha: string;
+
+  /**
+   * @generated from field: string headline = 2;
+   */
+  headline: string;
+
+  /**
+   * GitHub login of the commit author; empty when the email maps to no account.
+   *
+   * @generated from field: string author_login = 3;
+   */
+  authorLogin: string;
+
+  /**
+   * Git author name.
+   *
+   * @generated from field: string author_name = 4;
+   */
+  authorName: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp committed_at = 5;
+   */
+  committedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.PullRequestCommit.
+ * Use `create(PullRequestCommitSchema)` to create a new message.
+ */
+export const PullRequestCommitSchema: GenMessage<PullRequestCommit> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 33);
+
+/**
+ * @generated from message codefoundry.v1.PullRequestComment
+ */
+export type PullRequestComment = Message<"codefoundry.v1.PullRequestComment"> & {
+  /**
+   * GitHub's node id.
+   *
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: codefoundry.v1.PullRequestCommentKind kind = 2;
+   */
+  kind: PullRequestCommentKind;
+
+  /**
+   * Author login; empty for deleted accounts.
+   *
+   * @generated from field: string author = 3;
+   */
+  author: string;
+
+  /**
+   * @generated from field: bool author_is_bot = 4;
+   */
+  authorIsBot: boolean;
+
+  /**
+   * @generated from field: string author_avatar_url = 5;
+   */
+  authorAvatarUrl: string;
+
+  /**
+   * Markdown, as written.
+   *
+   * @generated from field: string body = 6;
+   */
+  body: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 7;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string url = 8;
+   */
+  url: string;
+
+  /**
+   * Review comments: the file.
+   *
+   * @generated from field: string path = 9;
+   */
+  path: string;
+
+  /**
+   * Reviews: the review's state.
+   *
+   * @generated from field: codefoundry.v1.PullRequestReviewState review_state = 10;
+   */
+  reviewState: PullRequestReviewState;
+
+  /**
+   * Review comments: the node id of the review they belong to, to group a review's
+   * inline comments.
+   *
+   * @generated from field: string review_id = 11;
+   */
+  reviewId: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.PullRequestComment.
+ * Use `create(PullRequestCommentSchema)` to create a new message.
+ */
+export const PullRequestCommentSchema: GenMessage<PullRequestComment> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 34);
+
+/**
+ * @generated from message codefoundry.v1.PullRequestReviewThread
+ */
+export type PullRequestReviewThread = Message<"codefoundry.v1.PullRequestReviewThread"> & {
+  /**
+   * GitHub's node id.
+   *
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string path = 2;
+   */
+  path: string;
+
+  /**
+   * The line in the current diff or, when outdated, the line it was written on.
+   *
+   * @generated from field: int32 line = 3;
+   */
+  line: number;
+
+  /**
+   * @generated from field: codefoundry.v1.DiffSide side = 4;
+   */
+  side: DiffSide;
+
+  /**
+   * @generated from field: bool is_resolved = 5;
+   */
+  isResolved: boolean;
+
+  /**
+   * The diff moved on: the line no longer exists as commented.
+   *
+   * @generated from field: bool is_outdated = 6;
+   */
+  isOutdated: boolean;
+
+  /**
+   * The first 20 comments, oldest first (kind REVIEW_COMMENT).
+   *
+   * @generated from field: repeated codefoundry.v1.PullRequestComment comments = 7;
+   */
+  comments: PullRequestComment[];
+
+  /**
+   * @generated from field: bool comments_truncated = 8;
+   */
+  commentsTruncated: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.PullRequestReviewThread.
+ * Use `create(PullRequestReviewThreadSchema)` to create a new message.
+ */
+export const PullRequestReviewThreadSchema: GenMessage<PullRequestReviewThread> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 35);
+
+/**
+ * @generated from message codefoundry.v1.ListReviewerCandidatesRequest
+ */
+export type ListReviewerCandidatesRequest = Message<"codefoundry.v1.ListReviewerCandidatesRequest"> & {
+  /**
+   * @generated from field: string repo_slug = 1;
+   */
+  repoSlug: string;
+
+  /**
+   * @generated from field: int32 number = 2;
+   */
+  number: number;
+};
+
+/**
+ * Describes the message codefoundry.v1.ListReviewerCandidatesRequest.
+ * Use `create(ListReviewerCandidatesRequestSchema)` to create a new message.
+ */
+export const ListReviewerCandidatesRequestSchema: GenMessage<ListReviewerCandidatesRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 36);
+
+/**
+ * @generated from message codefoundry.v1.ListReviewerCandidatesResponse
+ */
+export type ListReviewerCandidatesResponse = Message<"codefoundry.v1.ListReviewerCandidatesResponse"> & {
+  /**
+   * @generated from field: repeated codefoundry.v1.ReviewerCandidate candidates = 1;
+   */
+  candidates: ReviewerCandidate[];
+
+  /**
+   * The repository has more assignable users than were listed (100).
+   *
+   * @generated from field: bool truncated = 2;
+   */
+  truncated: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.ListReviewerCandidatesResponse.
+ * Use `create(ListReviewerCandidatesResponseSchema)` to create a new message.
+ */
+export const ListReviewerCandidatesResponseSchema: GenMessage<ListReviewerCandidatesResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 37);
+
+/**
+ * @generated from message codefoundry.v1.ReviewerCandidate
+ */
+export type ReviewerCandidate = Message<"codefoundry.v1.ReviewerCandidate"> & {
+  /**
+   * GitHub's node id.
+   *
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: codefoundry.v1.ReviewerKind kind = 2;
+   */
+  kind: ReviewerKind;
+
+  /**
+   * User login, or "org/team" for a team.
+   *
+   * @generated from field: string login = 3;
+   */
+  login: string;
+
+  /**
+   * @generated from field: string name = 4;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string avatar_url = 5;
+   */
+  avatarUrl: string;
+
+  /**
+   * A review request is pending.
+   *
+   * @generated from field: bool is_requested = 6;
+   */
+  isRequested: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.ReviewerCandidate.
+ * Use `create(ReviewerCandidateSchema)` to create a new message.
+ */
+export const ReviewerCandidateSchema: GenMessage<ReviewerCandidate> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 38);
+
+/**
+ * @generated from message codefoundry.v1.SetReviewRequestRequest
+ */
+export type SetReviewRequestRequest = Message<"codefoundry.v1.SetReviewRequestRequest"> & {
+  /**
+   * @generated from field: string repo_slug = 1;
+   */
+  repoSlug: string;
+
+  /**
+   * @generated from field: int32 number = 2;
+   */
+  number: number;
+
+  /**
+   * User login, or the team as "org/team" (or its slug alone).
+   *
+   * @generated from field: string login = 3;
+   */
+  login: string;
+
+  /**
+   * UNSPECIFIED means USER.
+   *
+   * @generated from field: codefoundry.v1.ReviewerKind kind = 4;
+   */
+  kind: ReviewerKind;
+
+  /**
+   * True requests a review; false withdraws the request.
+   *
+   * @generated from field: bool requested = 5;
+   */
+  requested: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.SetReviewRequestRequest.
+ * Use `create(SetReviewRequestRequestSchema)` to create a new message.
+ */
+export const SetReviewRequestRequestSchema: GenMessage<SetReviewRequestRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 39);
+
+/**
+ * @generated from message codefoundry.v1.SetReviewRequestResponse
+ */
+export type SetReviewRequestResponse = Message<"codefoundry.v1.SetReviewRequestResponse"> & {
+  /**
+   * The pending requests afterwards, as GitHub reports them: user logins and
+   * "org/team".
+   *
+   * @generated from field: repeated string requested = 1;
+   */
+  requested: string[];
+};
+
+/**
+ * Describes the message codefoundry.v1.SetReviewRequestResponse.
+ * Use `create(SetReviewRequestResponseSchema)` to create a new message.
+ */
+export const SetReviewRequestResponseSchema: GenMessage<SetReviewRequestResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 40);
+
+/**
+ * @generated from message codefoundry.v1.RevertPullRequestRequest
+ */
+export type RevertPullRequestRequest = Message<"codefoundry.v1.RevertPullRequestRequest"> & {
+  /**
+   * @generated from field: string repo_slug = 1;
+   */
+  repoSlug: string;
+
+  /**
+   * @generated from field: int32 number = 2;
+   */
+  number: number;
+};
+
+/**
+ * Describes the message codefoundry.v1.RevertPullRequestRequest.
+ * Use `create(RevertPullRequestRequestSchema)` to create a new message.
+ */
+export const RevertPullRequestRequestSchema: GenMessage<RevertPullRequestRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 41);
+
+/**
+ * @generated from message codefoundry.v1.RevertPullRequestResponse
+ */
+export type RevertPullRequestResponse = Message<"codefoundry.v1.RevertPullRequestResponse"> & {
+  /**
+   * The new pull request that reverts the merged one.
+   *
+   * @generated from field: int32 number = 1;
+   */
+  number: number;
+
+  /**
+   * @generated from field: string url = 2;
+   */
+  url: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.RevertPullRequestResponse.
+ * Use `create(RevertPullRequestResponseSchema)` to create a new message.
+ */
+export const RevertPullRequestResponseSchema: GenMessage<RevertPullRequestResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 42);
+
+/**
+ * @generated from message codefoundry.v1.MergePullRequestRequest
+ */
+export type MergePullRequestRequest = Message<"codefoundry.v1.MergePullRequestRequest"> & {
+  /**
+   * @generated from field: string repo_slug = 1;
+   */
+  repoSlug: string;
+
+  /**
+   * @generated from field: int32 number = 2;
+   */
+  number: number;
+
+  /**
+   * Required (UNSPECIFIED is INVALID_ARGUMENT).
+   *
+   * @generated from field: codefoundry.v1.PullRequestMergeMethod method = 3;
+   */
+  method: PullRequestMergeMethod;
+
+  /**
+   * Delete the head branch on GitHub after the merge (ignored for a fork's branch, the
+   * default branch, and the base branch).
+   *
+   * @generated from field: bool delete_branch = 4;
+   */
+  deleteBranch: boolean;
+
+  /**
+   * The head commit the client showed (full SHA). When set, the merge is refused with
+   * FAILED_PRECONDITION unless GitHub's head is still this commit, so commits pushed
+   * since are never merged unseen. Clients that show the pull request should set it.
+   *
+   * @generated from field: string expected_head_sha = 5;
+   */
+  expectedHeadSha: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.MergePullRequestRequest.
+ * Use `create(MergePullRequestRequestSchema)` to create a new message.
+ */
+export const MergePullRequestRequestSchema: GenMessage<MergePullRequestRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 43);
+
+/**
+ * @generated from message codefoundry.v1.MergePullRequestResponse
+ */
+export type MergePullRequestResponse = Message<"codefoundry.v1.MergePullRequestResponse"> & {
+  /**
+   * GitHub reports the pull request merged.
+   *
+   * @generated from field: bool merged = 1;
+   */
+  merged: boolean;
+
+  /**
+   * The merge commit (for squash and rebase, the last commit on the base branch).
+   *
+   * @generated from field: string sha = 2;
+   */
+  sha: string;
+
+  /**
+   * What happened, for people: the merge and, when asked for, the branch deletion
+   * ("deleted origin/x", or why it was kept).
+   *
+   * @generated from field: string message = 3;
+   */
+  message: string;
+
+  /**
+   * The head branch was deleted (or GitHub had already deleted it).
+   *
+   * @generated from field: bool branch_deleted = 4;
+   */
+  branchDeleted: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.MergePullRequestResponse.
+ * Use `create(MergePullRequestResponseSchema)` to create a new message.
+ */
+export const MergePullRequestResponseSchema: GenMessage<MergePullRequestResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_gh, 44);
 
 /**
  * GitHub's pull request state.
@@ -1517,6 +2345,142 @@ export const CheckConclusionSchema: GenEnum<CheckConclusion> = /*@__PURE__*/
   enumDesc(file_codefoundry_v1_gh, 7);
 
 /**
+ * Which side of a diff a review thread is anchored to.
+ *
+ * @generated from enum codefoundry.v1.DiffSide
+ */
+export enum DiffSide {
+  /**
+   * @generated from enum value: DIFF_SIDE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * The base (deleted lines).
+   *
+   * @generated from enum value: DIFF_SIDE_LEFT = 1;
+   */
+  LEFT = 1,
+
+  /**
+   * The head (added and context lines).
+   *
+   * @generated from enum value: DIFF_SIDE_RIGHT = 2;
+   */
+  RIGHT = 2,
+}
+
+/**
+ * Describes the enum codefoundry.v1.DiffSide.
+ */
+export const DiffSideSchema: GenEnum<DiffSide> = /*@__PURE__*/
+  enumDesc(file_codefoundry_v1_gh, 8);
+
+/**
+ * What a PullRequestComment is.
+ *
+ * @generated from enum codefoundry.v1.PullRequestCommentKind
+ */
+export enum PullRequestCommentKind {
+  /**
+   * @generated from enum value: PULL_REQUEST_COMMENT_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * A comment on the conversation tab.
+   *
+   * @generated from enum value: PULL_REQUEST_COMMENT_KIND_ISSUE_COMMENT = 1;
+   */
+  ISSUE_COMMENT = 1,
+
+  /**
+   * A submitted review (its summary body may be empty); review_state is set.
+   *
+   * @generated from enum value: PULL_REQUEST_COMMENT_KIND_REVIEW = 2;
+   */
+  REVIEW = 2,
+
+  /**
+   * An inline comment on a diff line (in review threads); path is set.
+   *
+   * @generated from enum value: PULL_REQUEST_COMMENT_KIND_REVIEW_COMMENT = 3;
+   */
+  REVIEW_COMMENT = 3,
+}
+
+/**
+ * Describes the enum codefoundry.v1.PullRequestCommentKind.
+ */
+export const PullRequestCommentKindSchema: GenEnum<PullRequestCommentKind> = /*@__PURE__*/
+  enumDesc(file_codefoundry_v1_gh, 9);
+
+/**
+ * @generated from enum codefoundry.v1.ReviewerKind
+ */
+export enum ReviewerKind {
+  /**
+   * @generated from enum value: REVIEWER_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: REVIEWER_KIND_USER = 1;
+   */
+  USER = 1,
+
+  /**
+   * @generated from enum value: REVIEWER_KIND_TEAM = 2;
+   */
+  TEAM = 2,
+}
+
+/**
+ * Describes the enum codefoundry.v1.ReviewerKind.
+ */
+export const ReviewerKindSchema: GenEnum<ReviewerKind> = /*@__PURE__*/
+  enumDesc(file_codefoundry_v1_gh, 10);
+
+/**
+ * GitHub's PullRequestMergeMethod.
+ *
+ * @generated from enum codefoundry.v1.PullRequestMergeMethod
+ */
+export enum PullRequestMergeMethod {
+  /**
+   * @generated from enum value: PULL_REQUEST_MERGE_METHOD_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * A merge commit.
+   *
+   * @generated from enum value: PULL_REQUEST_MERGE_METHOD_MERGE = 1;
+   */
+  MERGE = 1,
+
+  /**
+   * One commit with every change, on the base branch.
+   *
+   * @generated from enum value: PULL_REQUEST_MERGE_METHOD_SQUASH = 2;
+   */
+  SQUASH = 2,
+
+  /**
+   * Each commit replayed onto the base branch.
+   *
+   * @generated from enum value: PULL_REQUEST_MERGE_METHOD_REBASE = 3;
+   */
+  REBASE = 3,
+}
+
+/**
+ * Describes the enum codefoundry.v1.PullRequestMergeMethod.
+ */
+export const PullRequestMergeMethodSchema: GenEnum<PullRequestMergeMethod> = /*@__PURE__*/
+  enumDesc(file_codefoundry_v1_gh, 11);
+
+/**
  * GhService exposes GitHub data scoped to the viewer: their pull requests (authored,
  * review requested, reviewed, recently merged), the default-branch CI of tracked
  * repositories, their pull requests on watched branches, and monthly stats. The daemon
@@ -1645,6 +2609,75 @@ export const GhService: GenService<{
     methodKind: "unary";
     input: typeof GetBranchPullRequestsRequestSchema;
     output: typeof GetBranchPullRequestsResponseSchema;
+  },
+  /**
+   * GetPullRequestDetail returns everything the pull request detail panel shows: the
+   * summary, body, labels, reviewers, commits, comments and reviews, review threads, and
+   * checks. On demand (one GraphQL request, more only for checks beyond 100), cached per
+   * pull request. The cache serves until refresh is set, the entry is older than the
+   * poll interval, or a poll saw the pull request change (updated, pushed, state, or
+   * check counts); pull_request_detail_updated says so. On fetch failure the cached
+   * copy is returned with last_error set.
+   *
+   * @generated from rpc codefoundry.v1.GhService.GetPullRequestDetail
+   */
+  getPullRequestDetail: {
+    methodKind: "unary";
+    input: typeof GetPullRequestDetailRequestSchema;
+    output: typeof GetPullRequestDetailResponseSchema;
+  },
+  /**
+   * ListReviewerCandidates returns who can be asked to review a pull request: the
+   * repository's assignable users (first 100) and the current requests (users and
+   * teams). Requested first, then by login; the pull request's author is left out.
+   * Fetched on every call (not cached).
+   *
+   * @generated from rpc codefoundry.v1.GhService.ListReviewerCandidates
+   */
+  listReviewerCandidates: {
+    methodKind: "unary";
+    input: typeof ListReviewerCandidatesRequestSchema;
+    output: typeof ListReviewerCandidatesResponseSchema;
+  },
+  /**
+   * SetReviewRequest requests (or withdraws a request for) a review from a user or
+   * team. The pull request's cached detail is invalidated and
+   * pull_request_detail_updated is sent.
+   *
+   * @generated from rpc codefoundry.v1.GhService.SetReviewRequest
+   */
+  setReviewRequest: {
+    methodKind: "unary";
+    input: typeof SetReviewRequestRequestSchema;
+    output: typeof SetReviewRequestResponseSchema;
+  },
+  /**
+   * RevertPullRequest opens a pull request that reverts a merged one (GitHub's revert
+   * button). FAILED_PRECONDITION when the pull request is not merged.
+   *
+   * @generated from rpc codefoundry.v1.GhService.RevertPullRequest
+   */
+  revertPullRequest: {
+    methodKind: "unary";
+    input: typeof RevertPullRequestRequestSchema;
+    output: typeof RevertPullRequestResponseSchema;
+  },
+  /**
+   * MergePullRequest merges an open pull request (GitHub's merge button) with the given
+   * method, guarded by expected_head_sha (the head the client showed) or else the head
+   * commit the daemon last fetched: FAILED_PRECONDITION when the pull request is not
+   * open, is a draft, its head is not that commit, or GitHub refuses (conflicts, branch
+   * protection). With delete_branch the head branch is deleted on GitHub after a
+   * successful merge, unless it lives in a fork or is the default or base branch; local
+   * branches and worktrees are never touched. The detail is invalidated and
+   * pull_request_detail_updated is sent.
+   *
+   * @generated from rpc codefoundry.v1.GhService.MergePullRequest
+   */
+  mergePullRequest: {
+    methodKind: "unary";
+    input: typeof MergePullRequestRequestSchema;
+    output: typeof MergePullRequestResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_codefoundry_v1_gh, 0);

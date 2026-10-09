@@ -352,6 +352,10 @@ func classifyHTTP(res httpResult) error {
 		if rle := rateLimitFromHTTP(res.status, res.header, lower, msg); rle != nil {
 			return rle
 		}
+		if res.status == http.StatusForbidden {
+			// Permissions, SSO enforcement, a missing scope.
+			return fmt.Errorf("%w: %s", ErrPermissionDenied, msg)
+		}
 	case http.StatusNotFound:
 		return fmt.Errorf("%w: %s", ErrNotFound, msg)
 	case http.StatusBadGateway, http.StatusGatewayTimeout:

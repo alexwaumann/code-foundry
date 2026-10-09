@@ -8,7 +8,7 @@ import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { zoomFont } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
-import { showView, toggleHelp } from "@/stores/views";
+import { showView, toggleHelp, togglePanelCommand } from "@/stores/views";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -165,6 +165,11 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   "view.settings": () => showView("settings"),
   "view.help": () => {
     toggleHelp();
+    return true;
+  },
+  // Window-local like view.settings: toggles this window's panel for its selection.
+  "view.panel.toggle": () => {
+    togglePanelCommand();
     return true;
   },
   // Like cmd+k: opens this window's palette without a round trip. Deferred so that

@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 import { create } from "zustand";
 import { invokeCommand } from "@/api/command";
-import { getBranchPullRequests, getDashboard, getRepoActivity, type GhEventView } from "@/api/gh";
+import { getBranchPullRequests, getDashboard, getPullRequestDetail, getRepoActivity, type GhEventView } from "@/api/gh";
 import { errorMessage } from "@/api/stream";
 import { getUiContext } from "./context";
 import { createResource } from "./resource";
@@ -68,6 +68,35 @@ export const branchPullRequestsResource = createResource(
   { keepAliveMs: 5 * 60_000 },
 );
 
+/** Key of pullRequestDetailResource: "owner/name#number" (slug lower case, like the daemon's). */
+export const pullRequestKey = (slug: string, number: number): string => `${slug.toLowerCase()}#${String(number)}`;
+
+function parsePullRequestKey(key: string): [string, number] {
+  const i = key.lastIndexOf("#");
+  return [key.slice(0, i), Number(key.slice(i + 1))];
+}
+
+/**
+ * How often an open detail is re-read: the daemon's default poll interval
+ * (github.poll_interval_seconds). Reads are cache hits until the daemon's entry is older
+ * than the poll interval; then the read fetches. That keeps a PR the poll does not cover
+ * (not on a dashboard or watched branch, so no pull_request_detail_updated) from going stale.
+ */
+export const PULL_REQUEST_DETAIL_KEEPALIVE_MS = 60_000;
+
+/**
+ * Key: pullRequestKey(slug, number). The daemon caches the detail and announces a change
+ * (pull_request_detail_updated) when a poll sees the PR move or a review request is set;
+ * the re-read then fetches from GitHub.
+ */
+export const pullRequestDetailResource = createResource(
+  (key, signal) => {
+    const [slug, number] = parsePullRequestKey(key);
+    return getPullRequestDetail(slug, number, false, undefined, signal);
+  },
+  { keepAliveMs: PULL_REQUEST_DETAIL_KEEPALIVE_MS },
+);
+
 /** Routes one gh notification to the views it affects. */
 export function applyGhEvent(ev: GhEventView): void {
   switch (ev.kind) {
@@ -85,6 +114,9 @@ export function applyGhEvent(ev: GhEventView): void {
       break;
     case "branchPullRequests":
       branchPullRequestsResource.invalidate(branchKey(ev.repoSlug, ev.headRef));
+      break;
+    case "pullRequestDetail":
+      pullRequestDetailResource.invalidate(pullRequestKey(ev.repoSlug, ev.number));
       break;
   }
 }

@@ -30,6 +30,8 @@ type fakeGitHub struct {
 	cost                     int
 	// fail makes the next request of an operation fail with err (then clears).
 	fail map[string]error
+	// detail is the detail panel's extra state (fakegithub_detail_test.go).
+	detail fakeDetail
 }
 
 type fakeRepo struct {
@@ -153,6 +155,10 @@ func (g *fakeGitHub) respond(op, doc string, vars map[string]any) (json.RawMessa
 			data[a] = map[string]any{"object": map[string]any{"oid": r.sha,
 				"statusCheckRollup": map[string]any{"state": string(r.rollup.State), "contexts": ctx}}}
 		}
+	case "PullRequestFull", "ReviewerCandidates", "RevertPullRequest":
+		g.detailOp(op, vars, data, &errs) // fakegithub_detail_test.go
+	case "MergePullRequest":
+		g.mergeOp(vars, data, &errs) // fakegithub_merge_test.go
 	default:
 		return nil, fmt.Errorf("fakeGitHub: unexpected op %s", op)
 	}
@@ -289,7 +295,8 @@ func rollupJSONMap(r CheckRollup) map[string]any {
 func toGraphQLErrors(errs []map[string]any) []graphQLError {
 	out := make([]graphQLError, 0, len(errs))
 	for _, e := range errs {
-		out = append(out, graphQLError{Type: e["type"].(string), Message: e["message"].(string), Path: e["path"].([]any)})
+		typ, _ := e["type"].(string) // GitHub leaves it out of some errors
+		out = append(out, graphQLError{Type: typ, Message: e["message"].(string), Path: e["path"].([]any)})
 	}
 	return out
 }

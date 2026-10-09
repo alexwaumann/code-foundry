@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { toast } from "sonner";
-import { confirmationOf, invokeCommand, listCommands, type CommandView, type UiContextView } from "@/api/command";
+import { confirmationOf, invokeCommand, listCommands, type CommandView, type InvokeResultView, type UiContextView } from "@/api/command";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { isGitOpFailure, isGitOpResult } from "@/api/gitops";
 import { errorMessage, isAbort } from "@/api/stream";
@@ -103,16 +103,31 @@ export async function invokeConfirmed(name: string, args: Record<string, string>
  * again with confirmed set if the user agrees; declining returns false quietly.
  */
 export async function runCommand(name: string, args: Record<string, string> = {}, ctx: UiContextView = getUiContext()): Promise<boolean> {
+  return (await runCommandForResult(name, args, { ctx })) !== null;
+}
+
+/**
+ * runCommand that hands back the command's result (null when it failed or the user
+ * declined). `quiet` skips the success toast, for callers that report the result their
+ * own way; failures are always toasted, after `onError` (for callers that also show the
+ * failure in place).
+ */
+export async function runCommandForResult(
+  name: string,
+  args: Record<string, string> = {},
+  opts: { ctx?: UiContextView; quiet?: boolean; onError?: (message: string) => void } = {},
+): Promise<InvokeResultView | null> {
   const title = useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name;
   try {
-    const res = await invokeConfirmed(name, args, ctx);
-    if (!res) return false;
+    const res = await invokeConfirmed(name, args, opts.ctx ?? getUiContext());
+    if (!res) return null;
     // Git operations report through their own toast (gitops events); skip the duplicate.
-    if (res.message && !isGitOpResult(res.resultJson)) toast.success(res.message);
-    return true;
+    if (!opts.quiet && res.message && !isGitOpResult(res.resultJson)) toast.success(res.message);
+    return res;
   } catch (err) {
+    opts.onError?.(errorMessage(err));
     if (!isGitOpFailure(err)) toast.error(`${title} failed`, { description: errorMessage(err) });
-    return false;
+    return null;
   } finally {
     void refreshCommands();
   }

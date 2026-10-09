@@ -117,7 +117,9 @@ daemon:
 
 ### Operations
 
-* **fetch**: `git fetch --prune` (the default remote).
+* **fetch**: `git fetch --prune` (the default remote). *Later: `GitFetchRequest.remote`
+  and `branch` fetch one remote, or one branch of it into its remote-tracking ref
+  (pr-thread-commands.md); `git.fetch` does not use them.*
 * **pull**: `git pull --ff-only`, or `--rebase`. If a rebase stops (rebase-merge or
   rebase-apply exists after the failure), the store runs `git rebase --abort` and fails
   with "rebase stopped on conflicts and was aborted; the worktree is unchanged". Agents

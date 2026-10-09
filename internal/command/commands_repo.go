@@ -9,8 +9,9 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
-// RepoBackend is the slice of RepoService the repo.* commands need, in generated Connect
-// signatures (see TerminalBackend for why). The repo step's (1b) API handler, any
+// RepoBackend is the slice of RepoService the repo.* commands (and the pull request
+// session commands, which list repositories) need, in generated Connect signatures (see
+// TerminalBackend for why). The repo step's (1b) API handler, any
 // RepoServiceHandler, and a RepoServiceClient satisfy it. Until it is wired,
 // codefoundryv1connect.UnimplementedRepoServiceHandler stands in.
 type RepoBackend interface {
@@ -19,6 +20,7 @@ type RepoBackend interface {
 	CreateWorktree(context.Context, *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error)
 	RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error)
 	Refresh(context.Context, *connect.Request[v1.RefreshRepoRequest]) (*connect.Response[v1.RefreshRepoResponse], error)
+	List(context.Context, *connect.Request[v1.ListReposRequest]) (*connect.Response[v1.ListReposResponse], error)
 }
 
 var (

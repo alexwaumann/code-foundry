@@ -1,0 +1,8 @@
+# Merges an open pull request (MergePullRequest). expectedHeadOid is the head the store
+# last fetched: GitHub refuses the merge when the branch moved since ("Head branch was
+# modified"), so commits nobody reviewed in the panel are never merged.
+mutation MergePullRequest($id: ID!, $method: PullRequestMergeMethod!, $head: GitObjectID!) {
+  mergePullRequest(input: { pullRequestId: $id, mergeMethod: $method, expectedHeadOid: $head }) {
+    pullRequest { merged state mergeCommit { oid } }
+  }
+}

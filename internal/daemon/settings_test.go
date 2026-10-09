@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 )
@@ -87,6 +88,18 @@ func TestApplySettings(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
+	if err := command.RegisterPullRequestSessions(reg, command.PullRequestSessionDeps{Emitter: &commandtest.Emitter{}}); err != nil {
+		t.Fatal(err)
+	}
+	argDefault := func(c command.Command, name string) string {
+		for _, a := range c.Args {
+			if a.Name == name {
+				return a.Default
+			}
+		}
+		t.Fatalf("%s has no arg %s", c.Name, name)
+		return ""
+	}
 	level := new(slog.LevelVar)
 	applySettings(st, reg, level, false)
 
@@ -99,6 +112,13 @@ func TestApplySettings(t *testing.T) {
 	c, _ := reg.Get("session.new")
 	if c.Args[0].Default != "opus" || c.Args[1].Default != "high" || !slices.Equal(c.Keybindings, []string{"cmd+t"}) {
 		t.Errorf("session.new = defaults %q/%q keybindings %v", c.Args[0].Default, c.Args[1].Default, c.Keybindings)
+	}
+	// The pull request session commands start sessions too, with the same defaults.
+	for _, name := range []string{"pr.ask", "pr.explain", "pr.fix.findings"} {
+		c, _ := reg.Get(name)
+		if m, e := argDefault(c, "model"), argDefault(c, "effort"); m != "opus" || e != "high" {
+			t.Errorf("%s defaults = %q/%q, want opus/high", name, m, e)
+		}
 	}
 	if c, _ := reg.Get("terminal.new"); len(c.Keybindings) != 0 {
 		t.Errorf("terminal.new keybindings = %v, want unbound", c.Keybindings)
@@ -113,6 +133,9 @@ func TestApplySettings(t *testing.T) {
 	}
 	if c, _ := reg.Get("session.new"); c.Args[0].Default != "opus" || c.Args[1].Default != "high" {
 		t.Errorf("defaults after reset = %q/%q", c.Args[0].Default, c.Args[1].Default)
+	}
+	if c, _ := reg.Get("pr.fix.findings"); argDefault(c, "model") != "opus" || argDefault(c, "effort") != "high" {
+		t.Errorf("pr.fix.findings defaults after reset = %q/%q", argDefault(c, "model"), argDefault(c, "effort"))
 	}
 }
 

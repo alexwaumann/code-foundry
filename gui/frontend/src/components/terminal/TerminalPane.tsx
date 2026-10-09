@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CircleX, GitFork, Loader2, OctagonX, Pencil, Power, RefreshCw } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
+import { PanelToggle } from "@/components/panel/PanelToggle";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { SessionIndicator, SessionTitle } from "@/components/session/SessionParts";
 import { attachTerminal, resizeTerminal, writeTerminal } from "@/api/terminal";
@@ -68,6 +69,7 @@ function HeaderActions({ session }: { session: boolean }) {
       ) : (
         <CommandButton command="terminal.kill" icon={OctagonX} />
       )}
+      <PanelToggle />
     </span>
   );
 }
@@ -149,6 +151,8 @@ export function TerminalPane({ terminalId, sessionId }: { terminalId: string; se
   const fontFamily = useTerminalFontFamily();
   const scrollback = useScrollbackLines();
   const focusSeq = useUiStore((s) => s.terminalFocusSeq);
+  // A request to focus the content pane (e.g. the side panel hid) means the terminal here.
+  const contentFocusSeq = useUiStore((s) => s.contentFocusSeq);
 
   // Renderer + controller live for the pane's lifetime.
   useEffect(() => {
@@ -224,7 +228,7 @@ export function TerminalPane({ terminalId, sessionId }: { terminalId: string; se
 
   useEffect(() => {
     ctlRef.current?.renderer.focus();
-  }, [focusSeq, terminalId]);
+  }, [focusSeq, contentFocusSeq, terminalId]);
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label={sessionId ? "Thread" : "Terminal"} data-session-id={sessionId}>

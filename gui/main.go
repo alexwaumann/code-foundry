@@ -62,6 +62,10 @@ func main() {
 		Title:  "Code Foundry",
 		Width:  1200,
 		Height: 780,
+		// Room for the content pane (360px minimum) beside a full-width sidebar; the side
+		// panel shrinks, then hides, when it does not fit (stores/ui.ts panelMax).
+		MinWidth:  900,
+		MinHeight: 500,
 		// The dark sheet colour (--sheet in index.css, #000000), so launch does not
 		// flash a different colour before the page paints.
 		BackgroundColour: application.NewRGB(0, 0, 0),

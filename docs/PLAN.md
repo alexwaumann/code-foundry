@@ -13,6 +13,7 @@ Phases 0–3 are done and merged on `main`. Each step's note is in `docs/notes/`
 * **Phase 2** done: sessions, status detection, session GUI, one EventService stream; memory gate in `docs/perf.md` (`phase2a`–`phase2c`, `phase2-integration.md`).
 * **Phase 3** done: Pull Requests page and worktree overview, settings/help/confirm, git operations, packaging and updater (`phase3a`–`phase3d`, `phase3-integration.md`).
 * **New thread composer** done (2026-10-09): project picker + in-pane composer, positional prompt, permission mode, `cf/<slug>` worktrees, image attachments, opus/high defaults, "thread" copy (`new-thread-composer.md`).
+* **Side panel + PR surface** done: per-selection side panel with a surface registry, the Pull request surface (summary, timeline, reviewers, refresh, revert), and its menu starting `pr.ask` / `pr.explain` / `pr.fix.findings` sessions (`side-panel.md`, `gh-pr-detail.md`, `pr-thread-commands.md`).
 
 ### Open items
 
@@ -35,6 +36,11 @@ Collected from the step notes; none blocks daily use.
   * Dashboards are fetched unfiltered (50 per list) and filtered to tracked repos at read time. A viewer with many PRs outside registered repos can crowd out registered ones.
   * The poll (`gh-viewer-polling.md`) keeps richer PR detail (merge state, size, reviews, review requests) and a "reviewed by you" list that no view shows yet.
   * Branch PRs on the overview show only the viewer's own, non-fork PRs.
+* **Side panel + PR surface** (`side-panel.md`)
+  * Files and Diff surfaces, and the PR surface's Code tab, are disabled placeholders.
+  * The PR menu has no Check out, Copy PR number, description editing, labels or replies; the picker lists org teams only when already requested.
+  * PR sessions use the settings' model and effort (no picker in the menu), and the menu does not say beforehand which worktree a session will start in.
+  * Not run in the real Wails window.
 * **Settings**
   * Saving from the app rewrites `settings.toml`, which drops user comments and unknown keys.
 * **Packaging and updates**

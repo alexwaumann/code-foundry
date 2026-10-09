@@ -1,0 +1,82 @@
+# Everything the pull request detail panel shows, in one request: the summary fields
+# (PullRequestDetail), body, labels, each reviewer's latest review with the commit it
+# reviewed, pending review requests, the last 100 commits, the last 100 issue comments
+# and reviews, the last 50 review threads (first 20 comments each, with the review each
+# belongs to), the first page of head commit checks, and what the merge button needs
+# (the repository's allowed merge methods and default branch, auto-merge). Fetched on demand by GetPullRequestDetail and cached per pull
+# request (docs/notes/gh-pr-detail.md); never polled.
+#
+# Fields that PullRequestDetail selects with other arguments are aliased (GraphQL
+# rejects one response name with two argument sets): reviewers, requestedReviewers,
+# reviewList.
+query PullRequestFull($owner: String!, $name: String!, $number: Int!) {
+  rateLimit { ...RateLimitFields }
+  repository(owner: $owner, name: $name) {
+    viewerPermission
+    mergeCommitAllowed
+    squashMergeAllowed
+    rebaseMergeAllowed
+    defaultBranchRef { name }
+    pullRequest(number: $number) {
+      ...PullRequestDetail
+      autoMergeRequest { enabledAt }
+      body
+      closedAt
+      mergeCommit { oid }
+      mergedBy { login }
+      labels(first: 20) { totalCount nodes { name color } }
+      reviewers: latestReviews(first: 50) {
+        totalCount
+        nodes {
+          author { ...ActorFields }
+          state
+          submittedAt
+          commit { oid }
+        }
+      }
+      requestedReviewers: reviewRequests(first: 50) {
+        totalCount
+        nodes { requestedReviewer { ...RequestedReviewerFields } }
+      }
+      commits(last: 100) {
+        totalCount
+        nodes {
+          commit {
+            oid
+            messageHeadline
+            committedDate
+            author { name user { login } }
+          }
+        }
+      }
+      issueComments: comments(last: 100) {
+        totalCount
+        nodes { id author { ...ActorFields } body createdAt url }
+      }
+      reviewList: reviews(last: 100) {
+        totalCount
+        nodes { id author { ...ActorFields } body state createdAt submittedAt url }
+      }
+      reviewThreads(last: 50) {
+        totalCount
+        nodes {
+          id
+          path
+          line
+          originalLine
+          diffSide
+          isResolved
+          isOutdated
+          comments(first: 20) {
+            totalCount
+            nodes { id author { ...ActorFields } body createdAt url path pullRequestReview { id } }
+          }
+        }
+      }
+      checks: statusCheckRollup {
+        state
+        contexts(first: 100) { ...CheckContexts }
+      }
+    }
+  }
+}

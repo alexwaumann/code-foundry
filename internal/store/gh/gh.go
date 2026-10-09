@@ -53,6 +53,22 @@ type Service interface {
 	// branch head of the repository, and keeps that branch in the poll for a while
 	// (activity.go). It never waits on GitHub.
 	BranchPullRequests(ctx context.Context, slug, head string) (BranchPullRequests, error)
+	// FullPullRequest returns everything the detail panel shows about one pull request,
+	// from cache unless refresh is set or the entry is stale (pr_detail.go). On fetch
+	// failure the cached copy comes back with LastError set.
+	FullPullRequest(ctx context.Context, slug string, number int, refresh bool) (FullPullRequest, error)
+	// ReviewerCandidates returns who can be asked to review a pull request.
+	ReviewerCandidates(ctx context.Context, slug string, number int) (ReviewerCandidates, error)
+	// SetReviewRequest requests or withdraws a review and returns the pending requests
+	// afterwards (logins and "org/team").
+	SetReviewRequest(ctx context.Context, slug string, number int, r ReviewRequest) ([]string, error)
+	// RevertPullRequest opens a pull request reverting a merged one
+	// (ErrFailedPrecondition when it is not merged).
+	RevertPullRequest(ctx context.Context, slug string, number int) (RevertResult, error)
+	// MergePullRequest merges an open pull request, guarded by the cached head commit
+	// (ErrFailedPrecondition when it is not open, a draft, its head moved, or GitHub
+	// refuses), and optionally deletes its head branch.
+	MergePullRequest(ctx context.Context, slug string, number int, r MergeRequest) (MergeResult, error)
 }
 
 // Errors returned by the store and the runner. Match with errors.Is.
@@ -74,6 +90,10 @@ var (
 	ErrInvalidSlug = errors.New(`invalid repository slug (want "owner/name")`)
 	// ErrInvalidArgument covers other malformed arguments (PR number, ref).
 	ErrInvalidArgument = errors.New("invalid argument")
+	// ErrPermissionDenied means GitHub refused the request for lack of access: GraphQL
+	// FORBIDDEN, or an HTTP 403 that is not a rate limit (missing scope, SSO, no write
+	// access to the repository).
+	ErrPermissionDenied = errors.New("permission denied on github")
 )
 
 // slugRE matches GitHub owner/name pairs. Owners are alphanumerics and hyphens;

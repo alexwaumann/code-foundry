@@ -19,6 +19,9 @@ const (
 	activityDefaultBranch = "default_branch:"
 	activityBranch        = "branch:"
 	activityPoll          = "poll"
+	// activityFull prefixes a FullPullRequest's key: "pr_detail:<slug>#<number>"
+	// (pr_detail.go).
+	activityFull = "pr_detail:"
 )
 
 // pollRow is the "poll" row: when the last successful poll finished.
@@ -59,8 +62,9 @@ func loadActivityRow[T any](ctx context.Context, c cache, key string) (T, bool, 
 }
 
 // loadActivity fills snap with the cached dashboard, stats, per-repository activity,
-// and last poll time. Branch rows are loaded on demand; those older than
-// cacheRetention are pruned. Failures are logged: the cache is an optimization.
+// and last poll time. Branch and pull request detail rows are loaded on demand; those
+// older than cacheRetention are pruned. Failures are logged: the cache is an
+// optimization.
 func (s *Store) loadActivity(ctx context.Context, snap *Snapshot) {
 	if err := s.loadActivityRows(ctx, snap); err != nil {
 		s.log.Warn("gh activity cache load failed", "err", err)
@@ -75,11 +79,14 @@ func (s *Store) loadActivity(ctx context.Context, snap *Snapshot) {
 
 func (s *Store) loadActivityRows(ctx context.Context, snap *Snapshot) error {
 	cutoff := toMillis(s.opts.Now().Add(-cacheRetention))
+	// Branch and pull request detail rows are read on demand, so they are pruned here
+	// and not loaded.
 	if _, err := s.cache.db.ExecContext(ctx,
-		`DELETE FROM gh_activity WHERE key LIKE 'branch:%' AND fetched_at < ?`, cutoff); err != nil {
+		`DELETE FROM gh_activity WHERE (key LIKE 'branch:%' OR key LIKE 'pr_detail:%') AND fetched_at < ?`, cutoff); err != nil {
 		return fmt.Errorf("gh: prune activity: %w", err)
 	}
-	rows, err := s.cache.db.QueryContext(ctx, `SELECT key, payload FROM gh_activity WHERE key NOT LIKE 'branch:%'`)
+	rows, err := s.cache.db.QueryContext(ctx,
+		`SELECT key, payload FROM gh_activity WHERE key NOT LIKE 'branch:%' AND key NOT LIKE 'pr_detail:%'`)
 	if err != nil {
 		return fmt.Errorf("gh: load activity: %w", err)
 	}

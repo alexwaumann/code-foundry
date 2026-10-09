@@ -328,6 +328,86 @@ func TestCreateWorktreeBranchResolution(t *testing.T) {
 	}
 }
 
+// A new branch tracks its base only when the base is origin/<the branch itself>.
+func TestCreateWorktreeUpstream(t *testing.T) {
+	f := newFixture(t)
+	h := startHarness(t, "", Options{})
+	ctx := context.Background()
+	r, err := h.store.Register(ctx, f.repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	git(t, f.other, "checkout", "-q", "-b", "pr-head")
+	git(t, f.other, "commit", "-q", "--allow-empty", "-m", "pr")
+	git(t, f.other, "push", "-q", "origin", "pr-head")
+	git(t, f.repo, "fetch", "-q")
+	prHead := git(t, f.repo, "rev-parse", "origin/pr-head")
+	tests := []struct {
+		name, branch, base   string
+		wantUpstream, wantAt string
+	}{
+		{name: "the branch's own remote branch is tracked", branch: "pr-head", base: "origin/pr-head", wantUpstream: "origin/pr-head", wantAt: prHead},
+		{name: "another remote branch is not", branch: "pr-copy", base: "origin/pr-head", wantAt: prHead},
+		{name: "the default branch is not", branch: "from-main", base: "origin/main"},
+		{name: "a local ref is not", branch: "from-head", base: "HEAD"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{RepoID: r.ID, Branch: tt.branch, BaseRef: tt.base})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if w.Branch != tt.branch || w.Status.Upstream != tt.wantUpstream {
+				t.Errorf("branch %q upstream %q, want %q %q", w.Branch, w.Status.Upstream, tt.branch, tt.wantUpstream)
+			}
+			if tt.wantAt != "" && w.Head != tt.wantAt {
+				t.Errorf("head = %s, want %s", w.Head, tt.wantAt)
+			}
+		})
+	}
+
+	// A single-branch clone that fetched the branch by an explicit refspec: git refuses
+	// --track there, so the branch is created without an upstream.
+	t.Run("single-branch clone", func(t *testing.T) {
+		git(t, f.other, "checkout", "-q", "-b", "pr-two")
+		git(t, f.other, "commit", "-q", "--allow-empty", "-m", "pr two")
+		git(t, f.other, "push", "-q", "origin", "pr-two")
+		git(t, f.repo, "config", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/main")
+		git(t, f.repo, "fetch", "-q", "origin", "+refs/heads/pr-two:refs/remotes/origin/pr-two")
+		w, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{RepoID: r.ID, Branch: "pr-two", BaseRef: "origin/pr-two"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if w.Status.Upstream != "" || w.Head != git(t, f.repo, "rev-parse", "origin/pr-two") {
+			t.Errorf("upstream %q head %s", w.Status.Upstream, w.Head)
+		}
+	})
+}
+
+func TestRefspecWrites(t *testing.T) {
+	const ref = "refs/remotes/origin/feat/x"
+	tests := []struct {
+		spec string
+		want bool
+	}{
+		{"+refs/heads/*:refs/remotes/origin/*", true},
+		{"refs/heads/*:refs/remotes/origin/*", true},
+		{"+refs/heads/main:refs/remotes/origin/main", false},
+		{"+refs/heads/feat/x:refs/remotes/origin/feat/x", true},
+		{"+refs/heads/feat/*:refs/remotes/origin/feat/*", true},
+		{"+refs/heads/*-pr:refs/remotes/origin/*-pr", false},
+		{"+refs/heads/*:refs/remotes/upstream/*", false},
+		{"^refs/heads/feat/x", false},
+		{"refs/heads/feat/x", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		if got := refspecWrites(tt.spec, ref); got != tt.want {
+			t.Errorf("refspecWrites(%q) = %v, want %v", tt.spec, got, tt.want)
+		}
+	}
+}
+
 func TestExternalWorktreeAddAndRemoveAreDetected(t *testing.T) {
 	f := newFixture(t)
 	h := startHarness(t, "", Options{})

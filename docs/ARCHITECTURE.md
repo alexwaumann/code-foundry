@@ -121,7 +121,9 @@ Services (v1):
   viewer's PR dashboards, monthly stats, default-branch CI, the viewer's PRs on a
   branch), GetPullRequest and ListChecks (on demand), Refresh, Track, Untrack, Watch.
   Data events go out only when data changed; `Polled` after every poll carries the
-  freshness time.
+  freshness time. The PR detail panel: GetPullRequestDetail (on demand, cached per PR,
+  invalidated by the poll's fingerprints), ListReviewerCandidates, SetReviewRequest,
+  RevertPullRequest (`docs/notes/gh-pr-detail.md`).
 * `GitOpsService` — Fetch, Pull, Push, CreatePullRequest, OpenPullRequest, OpenEditor,
   Reveal, OpenUrl, List, Watch. One operation at a time per worktree; a failed operation
   is a result (state FAILED, output), not an RPC error. The GUI reaches it only through
@@ -205,6 +207,11 @@ context from flags or none. The palette, keybindings, and CLI subcommands are th
 doors to this one registry. Adding a feature means registering commands, not editing a
 switch.
 
+Pull request commands: the detail panel's actions (`pr.merge`, `pr.revert`,
+`pr.review.request`, `pr.refresh`; docs/notes/gh-pr-detail.md) and the session starters `pr.ask`,
+`pr.explain`, `pr.fix.findings`, which pick or create a worktree and type a prompt built
+from the pull request (docs/notes/pr-thread-commands.md).
+
 ## 8. Frontend
 
 * React 19, Vite, TypeScript strict, Tailwind v4, shadcn/ui, Zustand, `cmdk` for the palette.
@@ -225,7 +232,11 @@ switch.
 * Layout: a draggable title strip under the hidden-inset traffic lights, sidebar (repos →
   worktrees → sessions, with a status row at its foot), content (terminal or overview
   page), command palette overlay. Strip and sidebar sit on one background (the sheet);
-  the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Every
+  the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Each
+  selection can open a side panel right of the content: a second pane with tabs whose
+  bodies come from the surface registry (`src/surfaces`, `docs/notes/side-panel.md`); the
+  Pull request surface's menu starts sessions about the pull request through `pr.ask`,
+  `pr.explain` and `pr.fix.findings`. Every
   palette command is reachable without the mouse, and common ones also have buttons that
   invoke the same registry command. Chords are listed only in the palette and the
   Keyboard Shortcuts overlay (`docs/notes/phase3-ui-buttons.md`).

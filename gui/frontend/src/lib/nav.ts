@@ -3,12 +3,15 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 /**
  * Keyboard cursor over a page's rows (the Pull Requests page, the worktree overview).
  * The page lists every navigable row in display order; rows render through NavRow.
- * ↑/↓ (or k/j), Home/End move; Enter activates; →/← expand or collapse. The page's
+ * ↑/↓ (or k/j), Home/End move; Enter activates (cmd+Enter: the secondary action); →/←
+ * expand or collapse. The page's
  * container holds focus and points at the cursor row with aria-activedescendant.
  */
 export interface NavItem {
   key: string;
   activate?: () => void;
+  /** cmd+Enter on the row (e.g. open a pull request on GitHub instead of in the panel). */
+  secondary?: () => void;
   /** For tree rows: expand (true) or collapse (false). Returns false if nothing changed. */
   toggle?: (open: boolean) => boolean;
 }
@@ -43,9 +46,15 @@ export function useNav(items: readonly NavItem[]) {
     if (it) setCursorState(it.key);
   };
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.metaKey || e.ctrlKey || e.altKey || e.target !== e.currentTarget || items.length === 0) return;
+    if (e.target !== e.currentTarget || items.length === 0) return;
     const cur = cursorKey === null ? -1 : (byKey.get(cursorKey)?.i ?? -1);
     const item = cur >= 0 ? items[cur] : undefined;
+    if (e.key === "Enter" && e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && item?.secondary) {
+      e.preventDefault();
+      item.secondary();
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
     switch (e.key) {
       case "ArrowDown":
       case "j":

@@ -29,19 +29,72 @@ func (m *Manager) resolveRemote(worktreePath string) (target, error) {
 	return t, err
 }
 
-// Fetch implements Store: `git fetch --prune`.
+// Fetch implements Store: `git fetch --prune`, or `git fetch --prune -- <remote>
+// [+refs/heads/<branch>:refs/remotes/<remote>/<branch>]`.
 func (m *Manager) Fetch(ctx context.Context, o FetchOptions) (Op, error) {
+	args, err := fetchArgs(o)
+	if err != nil {
+		return Op{}, err
+	}
 	t, err := m.resolveRemote(o.WorktreePath)
 	if err != nil {
 		return Op{}, err
 	}
-	return m.submit(ctx, KindFetch, "Fetch "+t.label(), t, true, func(ctx context.Context, x *run) (string, string, error) {
-		res, err := x.git(ctx, "fetch", "--prune")
+	title := "Fetch " + t.label()
+	if o.Branch != "" {
+		title = "Fetch " + o.Remote + "/" + o.Branch
+	}
+	return m.submit(ctx, KindFetch, title, t, true, func(ctx context.Context, x *run) (string, string, error) {
+		res, err := x.git(ctx, args...)
 		if err != nil {
 			return "", "", err
 		}
 		return fetchSummary(res.Combined), "", nil
 	})
+}
+
+// fetchArgs builds Fetch's git arguments. A remote or branch that could be read as an
+// option, or a branch that is not a plain ref name, is ErrInvalidArgument.
+func fetchArgs(o FetchOptions) ([]string, error) {
+	args := []string{"fetch", "--prune"}
+	if o.Remote == "" {
+		if o.Branch != "" {
+			return nil, fmt.Errorf("%w: a branch to fetch needs a remote", ErrInvalidArgument)
+		}
+		return args, nil
+	}
+	if !validRefPart(o.Remote) || strings.Contains(o.Remote, "/") {
+		return nil, fmt.Errorf("%w: invalid remote name %q", ErrInvalidArgument, o.Remote)
+	}
+	args = append(args, "--", o.Remote)
+	if o.Branch != "" {
+		if !validRefPart(o.Branch) {
+			return nil, fmt.Errorf("%w: invalid branch name %q", ErrInvalidArgument, o.Branch)
+		}
+		args = append(args, "+refs/heads/"+o.Branch+":refs/remotes/"+o.Remote+"/"+o.Branch)
+	}
+	return args, nil
+}
+
+// validRefPart is a conservative git check-ref-format: no leading "-", no characters
+// git forbids in ref names (and none that would change a refspec), no "..", "@{", "//",
+// and no component that starts with "." or ends with ".lock".
+func validRefPart(s string) bool {
+	if s == "" || s == "@" || strings.HasPrefix(s, "-") || strings.HasPrefix(s, "/") || strings.HasSuffix(s, "/") || strings.HasSuffix(s, ".") ||
+		strings.Contains(s, "..") || strings.Contains(s, "@{") || strings.Contains(s, "//") {
+		return false
+	}
+	for _, r := range s {
+		if r <= ' ' || r == 0x7f || strings.ContainsRune("~^:?*[\\", r) {
+			return false
+		}
+	}
+	for c := range strings.SplitSeq(s, "/") {
+		if strings.HasPrefix(c, ".") || strings.HasSuffix(c, ".lock") {
+			return false
+		}
+	}
+	return true
 }
 
 // Pull implements Store: `git pull --ff-only`, or `--rebase`. A rebase that stops on
