@@ -652,6 +652,87 @@ test("Ask from the Pull Requests page sends no worktree; while it starts, Cancel
   await expect(page.getByTestId("pr-ask")).toHaveCount(0);
 });
 
+test("choosing Ask again with the composer open focuses it; the menu reopened right after Ask stays open", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "authored", 145).click();
+  await openAsk(page);
+  await askInput(page).pressSequentially("draft");
+  // Focus leaves the composer.
+  await page.getByTestId("pr-title").click();
+  await expect(askInput(page)).not.toBeFocused();
+
+  await openAsk(page);
+  await expect(askInput(page)).toHaveValue("draft");
+  // And it stays there once the menu's close has run.
+  await expect(page.getByTestId("pr-menu")).toHaveCount(0);
+  await expect(askInput(page)).toBeFocused();
+
+  // Reopened while the menu is still fading out from choosing Ask: it stays open.
+  await page.getByTestId("pr-menu-button").click();
+  await page.getByTestId("pr-menu-ask").click();
+  await page.getByTestId("pr-menu-button").click();
+  await expect(page.getByTestId("pr-menu")).toBeVisible();
+  await page.waitForTimeout(500);
+  await expect(page.getByTestId("pr-menu")).toBeVisible();
+  await expect(page.getByTestId("pr-menu")).toHaveAttribute("data-state", "open");
+  // A later close returns focus to the menu button, as usual.
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pr-menu")).toHaveCount(0);
+  await expect(page.getByTestId("pr-menu-button")).toBeFocused();
+  await expect(askInput(page)).toHaveValue("draft");
+  // The ⋯ button still closes an open menu.
+  await page.getByTestId("pr-menu-button").click();
+  await expect(page.getByTestId("pr-menu")).toHaveAttribute("data-state", "open");
+  await page.getByTestId("pr-menu-button").click();
+  await expect(page.getByTestId("pr-menu")).toHaveCount(0);
+});
+
+test("a pull request's running sessions show on every surface that shows it", async ({ page }) => {
+  // Ask from session s-1's panel, then look at #145 on the Pull Requests page meanwhile.
+  await openApp(page);
+  await row(page, "s:s-1").click();
+  await openPr(page, 145);
+  await mockPost("gh/pr-delay?ms=2000");
+  await openAsk(page);
+  await askInput(page).pressSequentially("From s-1");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("pr-ask-send")).toHaveAttribute("aria-busy", "true");
+
+  await page.getByTestId("nav-pullrequests").click();
+  await prRow(page, "authored", 145).click();
+  await expect(tabs(page)).toHaveText(["#145"]);
+  await openAsk(page);
+  await expect(page.getByTestId("pr-ask-hint")).toHaveText("Already starting a thread for this pull request");
+  await expect(page.getByTestId("pr-ask-send")).toHaveAttribute("aria-busy", "true");
+  await expect(page.getByTestId("pr-ask-send")).toBeDisabled();
+  await askInput(page).pressSequentially("From the page");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("pr-ask-hint")).toHaveText("Already starting a thread for this pull request");
+  await expect(askInput(page)).toHaveValue("From the page");
+
+  // s-1's question starts its session; this one was never sent.
+  await expect(selectedSession(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
+  expect(await sessionInvocations("pr.ask")).toEqual([{ args: { "repo-slug": SLUG, number: "145", question: "From s-1" }, worktree: CF }]);
+
+  // Explain from the Pull Requests page; s-1's menu shows it running and disabled.
+  await page.getByTestId("nav-pullrequests").click();
+  await page.getByTestId("pr-menu-button").click();
+  await page.getByTestId("pr-menu-explain").click();
+  await expect(page.getByTestId("pr-menu-explain")).toHaveAttribute("aria-busy", "true");
+  await expect(page.getByTestId("pr-menu-explain")).toHaveAttribute("aria-disabled", "true");
+  await row(page, "s:s-1").click();
+  await expect(tabs(page)).toHaveText(["#145"]);
+  await page.getByTestId("pr-menu-button").click();
+  await expect(page.getByTestId("pr-menu-explain")).toHaveAttribute("aria-busy", "true");
+  await expect(page.getByTestId("pr-menu-explain")).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByTestId("pr-menu-fix")).not.toHaveAttribute("aria-disabled");
+  // aria-disabled keeps it focusable; a select sends nothing (Playwright will not click it unforced).
+  await page.getByTestId("pr-menu-explain").click({ force: true });
+  await expect(selectedSession(page)).not.toHaveAttribute("data-row-key", /^s:s-1$/);
+  await expect(page.getByText(/^Started session s-new-\d+ for PR #145$/)).toHaveCount(2);
+  expect(await sessionInvocations("pr.explain")).toHaveLength(1);
+});
+
 test("at 280px the composer's hint fits and its field grows to six rows, then scrolls", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 145).click();

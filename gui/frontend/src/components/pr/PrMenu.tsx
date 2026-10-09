@@ -1,5 +1,5 @@
 import { ArrowUpRight, BookOpen, Ellipsis, Hammer, Link2, Loader2, MessageCircleQuestion, RefreshCw, Undo2 } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { updatedAgo } from "@/components/prs/format";
@@ -45,8 +45,10 @@ function useStarting(prRef: PrRef, kind: PrSessionKind): boolean {
 
 /**
  * The header's ⋯ menu, in T3 Code's order. Every action is a registry command or a store
- * action. Ask a question opens the surface's composer (onAsk); Explain and Fix findings
- * start their session at once, keeping the menu open with a spinner until it has started.
+ * action. Ask a question opens the surface's composer (onAsk), or focuses it again when it
+ * is open; Explain and Fix findings start their session at once, keeping the menu
+ * open with a spinner until it has started. A running item is aria-disabled (it stays
+ * focusable; a second select sends nothing) wherever the pull request is shown.
  */
 export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detail: PullRequestDetailView; panelKey: string; onAsk: () => void }) {
   const busy = usePrPanelStore((s) => s.refreshing[pullRequestKey(prRef.slug, prRef.number)] ?? false);
@@ -63,9 +65,30 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
   const pr = detail.pullRequest;
   const url = pr.url || `https://github.com/${prRef.slug}/pull/${String(prRef.number)}`;
   const canRevert = pr.state === "merged" && detail.viewerCanUpdate;
-  const { ref, boundary } = usePanelBoundary();
+  const { ref: boundaryRef, boundary } = usePanelBoundary();
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  // The last press outside the menu was on the ⋯ button (see onPointerDownOutside).
+  const pressedTrigger = useRef(false);
+  const ref = useCallback(
+    (el: HTMLButtonElement | null) => {
+      trigger.current = el;
+      boundaryRef(el);
+    },
+    [boundaryRef],
+  );
   return (
-    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
+    <DropdownMenu
+      modal={false}
+      open={open}
+      onOpenChange={(next) => {
+        // Reopened before the last close's focus handling ran: that close is over.
+        if (next) {
+          keepFocus.current = false;
+          pressedTrigger.current = false;
+        }
+        setOpen(next);
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <button
           ref={ref}
@@ -86,10 +109,23 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
         data-testid="pr-menu"
         data-region="panel"
         onKeyDown={stopPlainKeys}
+        onPointerDownOutside={(e) => {
+          // The ⋯ button toggles the menu itself. While the menu fades out its layer is
+          // still mounted, and would take a reopening press as an outside one and shut it.
+          pressedTrigger.current = e.target instanceof Node && (trigger.current?.contains(e.target) ?? false);
+          if (pressedTrigger.current) e.preventDefault();
+        }}
         onCloseAutoFocus={(e) => {
-          if (!keepFocus.current) return;
-          keepFocus.current = false;
-          e.preventDefault();
+          if (keepFocus.current) {
+            keepFocus.current = false;
+            e.preventDefault();
+          } else if (pressedTrigger.current) {
+            // Radix counts that press as an outside interaction and would leave focus
+            // wherever it is; it was on the button, so focus goes back there.
+            e.preventDefault();
+            trigger.current?.focus();
+          }
+          pressedTrigger.current = false;
         }}
       >
         <DropdownMenuItem
@@ -114,6 +150,7 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
         <DropdownMenuItem
           data-testid="pr-menu-explain"
           aria-busy={explaining || undefined}
+          aria-disabled={explaining || undefined}
           onSelect={(e) => {
             // Stay open with a spinner until the session has started.
             e.preventDefault();
@@ -125,6 +162,7 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
         <DropdownMenuItem
           data-testid="pr-menu-fix"
           aria-busy={fixing || undefined}
+          aria-disabled={fixing || undefined}
           onSelect={(e) => {
             e.preventDefault();
             start("fix");
