@@ -24,12 +24,11 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-          # The Go build cache bakes pkg-config output (the libghostty-vt link path) into
-          # compiled cgo packages without keying on it, so a stale cache links a library
-          # that no longer exists. Key the cache on the vendored library's MANIFEST too.
+          # Go bakes the pkg-config link path of libghostty-vt into compiled cgo packages
+          # without keying on it, so key the build cache on the library pins as well.
           cache-dependency-path: |
             go.sum
-            third_party/libghostty-vt/MANIFEST
+            scripts/ghostty-vt.sh
 
       - uses: pnpm/action-setup@v6
         with:
@@ -41,7 +40,20 @@ jobs:
           cache: pnpm
           cache-dependency-path: gui/frontend/pnpm-lock.yaml
 
+      # libghostty-vt (static) from the pinned ghostty commit with zig 0.16.0, cached on
+      # both pins. The .pc files hardcode the absolute prefix, which is stable on runners.
+      # A cold build downloads zig and the ghostty source and takes about a minute.
+      - name: libghostty-vt cache key
+        id: ghostty-vt
+        run: echo "key=$(./scripts/ghostty-vt.sh --print-key)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v6
+        with:
+          path: third_party/ghostty-vt
+          key: ${{ runner.os }}-${{ steps.ghostty-vt.outputs.key }}
+
+      - run: make ghostty-vt
+
       # go vet + staticcheck + go test -race, then frontend typecheck + lint + test.
-      # Generated code (buf, Wails bindings) and libghostty-vt (third_party/libghostty-vt,
-      # prebuilt) are committed, so neither buf, wails3, nor zig is needed.
+      # Generated code (buf, Wails bindings) is committed, so neither buf nor wails3 is needed.
       - run: make check

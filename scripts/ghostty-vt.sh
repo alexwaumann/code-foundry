@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# Rebuilds the vendored libghostty-vt (third_party/libghostty-vt) from source: downloads
-# a pinned zig and shallow-fetches a pinned ghostty commit into third_party/build/
-# (gitignored), builds the static library, and replaces the vendored lib/, include/, and
-# MANIFEST. Always rebuilds. Called by `make ghostty-vt-rebuild`; only needed when bumping.
-# See docs/notes/vendored-libghostty-vt.md.
+# Builds libghostty-vt (static) from a pinned ghostty commit with a pinned zig into
+# third_party/ghostty-vt. Idempotent: exits early when the pkg-config file exists.
+# Called by `make ghostty-vt`. See docs/notes/phase1a-terminal.md.
 #
 # The Go bindings (go.mitchellh.com/libghostty, pinned in go.mod) track a specific
 # ghostty commit; bump GHOSTTY_COMMIT only together with that module version.
@@ -13,40 +11,44 @@ set -euo pipefail
 GHOSTTY_REPO="https://github.com/ghostty-org/ghostty.git"
 GHOSTTY_COMMIT="34f39002c6e3974b54e6a6d400bd83777c5ea558"
 ZIG_VERSION="0.16.0"
-# sha256 from https://ziglang.org/download/index.json (cross-checked at download).
+# sha256 values from https://ziglang.org/download/index.json (cross-checked at download).
 ZIG_SHA256_aarch64="b23d70deaa879b5c2d486ed3316f7eaa53e84acf6fc9cc747de152450d401489"
-OPTIMIZE="ReleaseFast"
-# strip -S drops debug info only (11.1 MB -> 2.6 MB); the Go binary is the same size
-# either way. With ZERO_AR_DATE=1 the stripped archive is byte-for-byte reproducible
-# (same pins -> same sha256); the unstripped one embeds build paths. STRIP=0 vendors
-# the unstripped library.
-STRIP="${STRIP:-1}"
+ZIG_SHA256_x86_64="0387557ed1877bc6a2e1802c8391953baddba76081876301c522f52977b52ba7"
 # ----------------------------------------------------------------------------------------
 
+# `ghostty-vt.sh --print-key` prints a cache key for CI.
+if [[ "${1:-}" == "--print-key" ]]; then
+	printf 'ghostty-vt-%s-zig-%s-%s\n' "${GHOSTTY_COMMIT}" "${ZIG_VERSION}" "$(uname -m)"
+	exit 0
+fi
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BUILD="${ROOT}/third_party/build"
-SRC="${BUILD}/ghostty-src"
-ZIG_DIR="${BUILD}/zig"
-PREFIX="${BUILD}/ghostty-vt"
-VENDOR="${ROOT}/third_party/libghostty-vt"
+THIRD_PARTY="${ROOT}/third_party"
+PREFIX="${THIRD_PARTY}/ghostty-vt"
+SRC="${THIRD_PARTY}/ghostty-src"
+ZIG_DIR="${THIRD_PARTY}/zig"
+PC="${PREFIX}/share/pkgconfig/libghostty-vt-static.pc"
 
 log() { printf 'ghostty-vt: %s\n' "$*" >&2; }
 
-# The vendored library ships darwin-arm64 only.
-if [[ "$(uname -s)/$(uname -m)" != "Darwin/arm64" ]]; then
-	log "rebuild on an Apple silicon Mac (the vendored library is darwin-arm64)"
-	exit 1
-fi
-ARCH=aarch64
-ZIG_SHA256="${ZIG_SHA256_aarch64}"
-
-bindings="$(awk '$1 == "go.mitchellh.com/libghostty" { print $2 }' "${ROOT}/go.mod")"
-if [[ -z "${bindings}" ]]; then
-	log "go.mitchellh.com/libghostty not found in go.mod"
-	exit 1
+if [[ -f "${PC}" ]]; then
+	exit 0
 fi
 
-mkdir -p "${BUILD}"
+if [[ "$(uname -s)" != "Darwin" ]]; then
+	log "only macOS is supported"
+	exit 1
+fi
+case "$(uname -m)" in
+arm64 | aarch64) ARCH=aarch64 ZIG_SHA256="${ZIG_SHA256_aarch64}" ;;
+x86_64) ARCH=x86_64 ZIG_SHA256="${ZIG_SHA256_x86_64}" ;;
+*)
+	log "unsupported arch $(uname -m)"
+	exit 1
+	;;
+esac
+
+mkdir -p "${THIRD_PARTY}"
 
 # ---- zig -------------------------------------------------------------------------------
 ZIG_NAME="zig-${ARCH}-macos-${ZIG_VERSION}"
@@ -92,59 +94,19 @@ fi
 
 # ---- build -----------------------------------------------------------------------------
 # -Demit-xcframework=false: the xcframework step needs full Xcode, not just the CLT.
-# zig fetches ghostty's build dependencies (some from codeberg.org) on a cold cache.
-log "building libghostty-vt (${OPTIMIZE}) into ${PREFIX}"
+# The generated .pc files hardcode PREFIX, so the output cannot be moved afterwards.
+log "building libghostty-vt into ${PREFIX}"
 rm -rf "${PREFIX}"
 (
 	cd "${SRC}"
 	"${ZIG}" build \
 		-Demit-lib-vt \
 		-Demit-xcframework=false \
-		-Doptimize="${OPTIMIZE}" \
+		-Doptimize=ReleaseFast \
 		--prefix "${PREFIX}"
 )
-LIB="${PREFIX}/lib/libghostty-vt.a"
-PC="${PREFIX}/share/pkgconfig/libghostty-vt-static.pc"
-for f in "${LIB}" "${PC}" "${PREFIX}/include/ghostty/vt.h"; do
-	if [[ ! -f "${f}" ]]; then
-		log "build finished but ${f} is missing"
-		exit 1
-	fi
-done
-lib_arch="$(lipo -archs "${LIB}")"
-if [[ "${lib_arch}" != "arm64" ]]; then
-	log "built ${LIB} for '${lib_arch}', want arm64"
+if [[ ! -f "${PC}" ]]; then
+	log "build finished but ${PC} is missing"
 	exit 1
 fi
-lib_version="$(awk -F': ' '$1 == "Version" { print $2 }' "${PC}")"
-
-# ---- vendor ----------------------------------------------------------------------------
-staged="$(mktemp -d)"
-trap 'rm -rf "${staged}"' EXIT
-cp "${LIB}" "${staged}/libghostty-vt.a"
-stripped=false
-if [[ "${STRIP}" == "1" ]]; then
-	ZERO_AR_DATE=1 strip -S "${staged}/libghostty-vt.a"
-	stripped=true
-fi
-size_before="$(stat -f %z "${LIB}")"
-size_after="$(stat -f %z "${staged}/libghostty-vt.a")"
-
-log "vendoring into ${VENDOR} (${size_before} -> ${size_after} bytes)"
-mkdir -p "${VENDOR}/lib"
-rm -rf "${VENDOR}/include" "${VENDOR}/share"
-cp -R "${PREFIX}/include" "${VENDOR}/include"
-mv "${staged}/libghostty-vt.a" "${VENDOR}/lib/libghostty-vt.a"
-cat >"${VENDOR}/MANIFEST" <<MANIFEST
-ghostty_repo: ${GHOSTTY_REPO}
-ghostty_commit: ${GHOSTTY_COMMIT}
-go_bindings_version: ${bindings}
-zig_version: ${ZIG_VERSION}
-optimize: ${OPTIMIZE}
-arch: ${lib_arch}
-lib_version: ${lib_version}
-built: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-stripped: ${stripped}
-sha256: $(shasum -a 256 "${VENDOR}/lib/libghostty-vt.a" | cut -d' ' -f1)
-MANIFEST
-log "done; run make check and commit third_party/libghostty-vt"
+log "done"

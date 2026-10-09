@@ -87,10 +87,9 @@ It builds only the bare executable and removes any `gui/bin/CodeFoundry.app`, an
 `code-foundry gui` then launches the executable instead. That build is not a bundle, so
 the in-app updater does not apply to it; everything else works.
 
-No zig or ghostty checkout is needed: libghostty-vt is vendored prebuilt in
-[third_party/libghostty-vt](third_party/libghostty-vt). `make ghostty-vt-rebuild` rebuilds
-it from source and is only for bumping it
-([docs/notes/vendored-libghostty-vt.md](docs/notes/vendored-libghostty-vt.md)).
+`make build` also builds libghostty-vt from a pinned ghostty commit with a pinned zig,
+both downloaded into the gitignored `third_party/` on first use (about a minute; needs
+network access to ziglang.org, github.com and codeberg.org).
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/PLAN.md](docs/PLAN.md), and
-[CLAUDE.md](CLAUDE.md) for the rest of the build commands.
+[CLAUDE.md](CLAUDE.md) for the build commands.

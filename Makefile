@@ -12,24 +12,20 @@ BUF    ?= $(shell command -v buf 2>/dev/null || echo $(GOBIN_DIR)/buf)
 WAILS3 ?= $(shell command -v wails3 2>/dev/null || echo $(GOBIN_DIR)/wails3)
 
 # One macOS deployment target for every cgo object we link, so the linker does not warn
-# "built for newer macOS version". The vendored libghostty-vt was built by zig for
-# ghostty's minimum, macOS 13.0, so Go builds target 13.0. (The Wails Taskfile still
-# builds the GUI binary for 12.0; it does not link libghostty-vt.)
+# "built for newer macOS version". libghostty-vt is built by zig for ghostty's minimum,
+# macOS 13.0, so Go builds target 13.0. (The Wails Taskfile still builds the GUI binary
+# for 12.0; it does not link libghostty-vt.)
 export MACOSX_DEPLOYMENT_TARGET := 13.0
 export CGO_CFLAGS  := -mmacosx-version-min=13.0
 export CGO_LDFLAGS := -mmacosx-version-min=13.0
 
-# libghostty-vt (static, darwin-arm64) is vendored prebuilt in third_party/libghostty-vt
-# (lib/, include/, MANIFEST); no zig or ghostty checkout is needed to build. The Go
-# bindings link it via `#cgo pkg-config: --static libghostty-vt-static`, so `make
-# ghostty-vt` writes that .pc with this checkout's absolute prefix into the gitignored
-# share/pkgconfig. `make ghostty-vt-rebuild` rebuilds the vendored files from source
-# (scripts/ghostty-vt.sh holds the pins). See docs/notes/vendored-libghostty-vt.md.
-GHOSTTY_VT_DIR      := $(CURDIR)/third_party/libghostty-vt
-GHOSTTY_VT_MANIFEST := $(GHOSTTY_VT_DIR)/MANIFEST
-GHOSTTY_VT_PC_DIR   := $(GHOSTTY_VT_DIR)/share/pkgconfig
-GHOSTTY_VT_PC       := $(GHOSTTY_VT_PC_DIR)/libghostty-vt-static.pc
-export PKG_CONFIG_PATH := $(GHOSTTY_VT_PC_DIR)$(if $(PKG_CONFIG_PATH),:$(PKG_CONFIG_PATH))
+# libghostty-vt (static) is built from a pinned ghostty commit into third_party/ghostty-vt
+# by `make ghostty-vt` (scripts/ghostty-vt.sh holds the pins). The Go bindings find it via
+# pkg-config. The generated .pc hardcodes this absolute prefix, so the directory cannot
+# be moved after building.
+GHOSTTY_VT_PREFIX := $(CURDIR)/third_party/ghostty-vt
+GHOSTTY_VT_PC     := $(GHOSTTY_VT_PREFIX)/share/pkgconfig/libghostty-vt-static.pc
+export PKG_CONFIG_PATH := $(GHOSTTY_VT_PREFIX)/share/pkgconfig$(if $(PKG_CONFIG_PATH),:$(PKG_CONFIG_PATH))
 
 VERSION  ?= dev
 # GitHub repository the in-app updater and install.sh download releases from.
@@ -41,8 +37,7 @@ FRONTEND := gui/frontend
 PNPM     := pnpm --dir $(FRONTEND)
 
 .PHONY: all gen build check go-check frontend-check frontend-deps gui-dist-stub \
-        dev gui-build gui-bin gui-dev gui-e2e gui-mock ghostty-vt ghostty-vt-rebuild package \
-        release clean
+        dev gui-build gui-bin gui-dev gui-e2e gui-mock ghostty-vt package release clean
 
 all: build
 
@@ -121,45 +116,10 @@ package: ghostty-vt frontend-deps
 release:
 	./scripts/release.sh $(if $(DRY_RUN),--dry-run) $(filter-out dev,$(VERSION))
 
-## ghostty-vt: check the vendored libghostty-vt against its MANIFEST (sha256, go.mod
-## bindings version) and write its pkg-config file for this checkout. Cheap; runs every build.
+## ghostty-vt: build libghostty-vt from the pinned ghostty commit with zig 0.16.0 (both
+## downloaded into third_party/, gitignored). No-op once the pkg-config file exists.
 ghostty-vt:
-	@manifest() { awk -v k="$$1:" '$$1 == k { print $$2 }' "$(GHOSTTY_VT_MANIFEST)"; }; \
-	want="$$(manifest sha256)"; \
-	got="$$(shasum -a 256 "$(GHOSTTY_VT_DIR)/lib/libghostty-vt.a" | cut -d' ' -f1)"; \
-	if [ -z "$$want" ] || [ "$$got" != "$$want" ]; then \
-		echo "ghostty-vt: third_party/libghostty-vt/lib/libghostty-vt.a has sha256 $$got," >&2; \
-		echo "ghostty-vt: MANIFEST says '$$want'. Restore it with git or run 'make ghostty-vt-rebuild'." >&2; \
-		exit 1; \
-	fi; \
-	bindings="$$(awk '$$1 == "go.mitchellh.com/libghostty" { print $$2 }' go.mod)"; \
-	if [ "$$bindings" != "$$(manifest go_bindings_version)" ]; then \
-		echo "ghostty-vt: go.mod pins go.mitchellh.com/libghostty $$bindings, but the vendored library" >&2; \
-		echo "ghostty-vt: was built for $$(manifest go_bindings_version). Bump GHOSTTY_COMMIT in" >&2; \
-		echo "ghostty-vt: scripts/ghostty-vt.sh to match and run 'make ghostty-vt-rebuild'." >&2; \
-		exit 1; \
-	fi; \
-	mkdir -p "$(GHOSTTY_VT_PC_DIR)"; \
-	{ \
-		echo 'prefix=$(GHOSTTY_VT_DIR)'; \
-		echo 'includedir=$${prefix}/include'; \
-		echo 'libdir=$${prefix}/lib'; \
-		echo; \
-		echo 'Name: libghostty-vt-static'; \
-		echo 'URL: https://github.com/ghostty-org/ghostty'; \
-		echo 'Description: Ghostty VT library (static, vendored)'; \
-		echo "Version: $$(manifest lib_version)"; \
-		echo 'Cflags: -I$${includedir}'; \
-		echo 'Libs: $${libdir}/libghostty-vt.a'; \
-	} > "$(GHOSTTY_VT_PC).tmp"; \
-	mv "$(GHOSTTY_VT_PC).tmp" "$(GHOSTTY_VT_PC)"
+	@./scripts/ghostty-vt.sh
 
-## ghostty-vt-rebuild: rebuild the vendored libghostty-vt from source (downloads zig and
-## the pinned ghostty commit into third_party/build/). Only for bumping; commit the result.
-ghostty-vt-rebuild:
-	./scripts/ghostty-vt.sh
-	@$(MAKE) --no-print-directory ghostty-vt
-
-## clean: remove build output. Never touches the vendored libghostty-vt files.
 clean:
-	rm -rf bin gui/bin dist $(FRONTEND)/dist $(GHOSTTY_VT_DIR)/share third_party/build
+	rm -rf bin gui/bin dist $(FRONTEND)/dist

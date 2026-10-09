@@ -6,9 +6,6 @@ loopback Connect endpoint with zsh, a short-lived command, and a real interactiv
 
 ## How to run
 
-> Since 2026-10-09 libghostty-vt is vendored prebuilt and `make ghostty-vt` only writes the
-> pkg-config file; see [vendored-libghostty-vt.md](vendored-libghostty-vt.md). The rest of this note describes the original source build.
-
 ```sh
 make ghostty-vt      # once: zig 0.16.0 + ghostty@34f39002 -> third_party/ (~1 min cold, no-op after)
 make check           # depends on ghostty-vt; exports PKG_CONFIG_PATH for cgo
