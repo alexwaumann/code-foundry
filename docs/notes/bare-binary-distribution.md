@@ -19,7 +19,7 @@ There is one layout, with no bundle path kept alongside it.
 ```
 ~/.code-foundry/app/          $CODE_FOUNDRY_HOME/app; installer flag --app-dir
   code-foundry                daemon + CLI (ad-hoc signed)
-  CodeFoundry                 Wails GUI (ad-hoc signed; name kept for now)
+  Code Foundry                Wails GUI (ad-hoc signed; renamed from CodeFoundry, see "Icon and name")
   VERSION                     the tag, e.g. "v0.2.0\n"; what makes a dir an install
 ~/.local/bin/code-foundry  -> ~/.code-foundry/app/code-foundry     (--bin-dir)
 ```
@@ -38,7 +38,7 @@ the Info.plist reader.
 
 | Asset | What |
 |---|---|
-| `code-foundry-darwin-arm64.tar.gz` | `code-foundry`, `CodeFoundry` and `VERSION` at the top level, with no directory prefix (about 22 MB) |
+| `code-foundry-darwin-arm64.tar.gz` | `code-foundry`, `Code Foundry` (was `CodeFoundry`) and `VERSION` at the top level, with no directory prefix (about 22 MB) |
 | `install.sh` | the installer, with `DEFAULT_REPO` set to the release repo |
 | `checksums.txt` | sha256 of the two above |
 
@@ -53,7 +53,8 @@ The zip (`CodeFoundry-darwin-arm64.zip`) and the standalone CLI asset are gone.
 3. Runs `codesign --force --sign -` on both binaries, then `codesign --verify --strict`.
 4. Refuses to finish unless all three agree:
    * `code-foundry version` prints `code-foundry vX.Y.Z …`
-   * `CodeFoundry --version` prints `CodeFoundry vX.Y.Z`
+   * `"Code Foundry" --version` prints `Code Foundry vX.Y.Z` (was `CodeFoundry …`), and
+     its embedded Info.plist has `CodeFoundryVersion` vX.Y.Z
    * `VERSION` holds `vX.Y.Z`
 5. Runs `COPYFILE_DISABLE=1 tar -czf`, then checks that the listing is exactly the three
    names.
@@ -128,8 +129,9 @@ No Info.plist, `ditto`, `wails3 package` or `create:app:bundle` is involved any 
 
 ## Launch (`code-foundry gui`)
 
-* **What it starts.** `guiBinary` picks `CodeFoundry` next to the CLI's resolved path.
-  For a repo CLI (`./bin/code-foundry`) it falls back to `gui/bin/CodeFoundry`.
+* **What it starts.** `guiBinary` picks `Code Foundry` (was `CodeFoundry`) next to the
+  CLI's resolved path. For a repo CLI (`./bin/code-foundry`) it falls back to
+  `gui/bin/Code Foundry`.
 * **How.** It starts that executable directly:
   * `Setsid`, with stdio on /dev/null
   * the environment inherited, plus `CODE_FOUNDRY_BIN=<cli>`
@@ -250,11 +252,12 @@ No Info.plist, `ditto`, `wails3 package` or `create:app:bundle` is involved any 
   into the dotfiles repo. A verification install without `--skip-path` appended the
   marker and a `/tmp/cf-bare-bin` PATH line there. It was removed right away (exact
   three-line suffix). Use `--skip-path` for test installs.
-* **WebKit storage follows the executable name.** It moves from the bundle id
-  (`~/Library/WebKit/dev.awaumann.codefoundry`) to `~/Library/WebKit/CodeFoundry`. The
-  only localStorage user (side panel widths, `stores/panel.ts`) resets once on
-  migration, and again when the follow-up renames the executable. A test GUI under
-  another `CODE_FOUNDRY_HOME` shares this storage with any bare dev GUI.
+* **WebKit storage follows the main bundle's id, else the executable name.** Without
+  an Info.plist it moved from the bundle id to `~/Library/WebKit/CodeFoundry`. The
+  embedded plist ("Icon and name") brings it back to
+  `~/Library/WebKit/dev.alexwaumann.codefoundry`, the bundle's dir, so side panel
+  widths (`stores/panel.ts`) come back. A test GUI under another `CODE_FOUNDRY_HOME`
+  shares this storage with every other GUI build.
 * **Daemon restart race (seen once, not new).**
   * In the first live run, a client connected during the ~1s shutdown window. It spawned
     a daemon that lost the lock (`another daemon is already running for this config
@@ -262,8 +265,7 @@ No Info.plist, `ditto`, `wails3 package` or `create:app:bundle` is involved any 
   * Two reruns with only the GUI as a client came back in 2s, as in phase3d.
   * The bundle flow has the same code path.
 * **No Finder or Launchpad entry.** Double-clicking a bare executable opens Terminal, so
-  launch with `code-foundry gui`. The Dock shows a generic icon and the name
-  "CodeFoundry" (follow-up).
+  launch with `code-foundry gui`. The Dock icon and name: see "Icon and name".
 
 ## Migrating from the bundle (first bare release)
 
@@ -286,9 +288,71 @@ No Info.plist, `ditto`, `wails3 package` or `create:app:bundle` is involved any 
 * **Why the old app must quit first.** Its relaunch watcher would otherwise auto-start the
   old bundled daemon.
 
-## Left for the follow-up (icon and name)
+## Icon and name (follow-up, branch `cf/app-identity`)
 
-* the Dock icon for a bare executable (`NSApplication` icon at runtime)
-* the executable name (`CodeFoundry`), which also moves the WebKit storage dir
+* **Icon: set at runtime, works.** `gui/icon.go` embeds `gui/build/dockicon.png`
+  (`appicon.png` at 512px, see docs/brand) and passes it as Wails' `Options.Icon`. On
+  darwin Wails sets `NSApp.applicationIconImage` from it after launch, so no
+  Objective-C of our own was needed. It also becomes the About panel's icon.
+* **Embedded Info.plist: kept, but it does not name the app.** Production
+  `wails3 build`s link `gui/build/darwin/Info.embedded.plist` into
+  `__TEXT,__info_plist` (`-extldflags=-Wl,-sectcreate,…` in
+  `gui/build/darwin/Taskfile.yml`). The Taskfile stamps `VERSION`
+  (`CodeFoundryVersion` v1.2.3, `CFBundle*Version` 1.2.3; dev and 0.0.0 for dev builds).
+  Fields: CFBundleName and CFBundleDisplayName "Code Foundry", CFBundleIdentifier
+  `dev.alexwaumann.codefoundry` (the old bundle's id per `config.yml`; the brief's
+  `dev.awaumann.codefoundry` is an older one, also still in `~/Library/WebKit`),
+  NSHighResolutionCapable, ATS local networking.
+  * In-process it works: `Bundle.main` has that id and CFBundleName. So WebKit storage is
+    `~/Library/WebKit/dev.alexwaumann.codefoundry` again (seen with lsof on the running
+    GUI). `codesign` takes the id as its identifier (`Info.plist entries=11`).
+  * Launch Services ignores it: with only the plist, `lsappinfo` named the process
+    "CodeFoundry" with `bundleID=NULL`. System Events, the CGWindow owner and
+    `NSRunningApplication.localizedName` said the same. A small Swift test executable
+    with the same plist (with and without CFBundleExecutable) behaved the same way.
+    The Dock label comes from that name.
+* **So the executable is renamed to `Code Foundry`.** After the rename, `lsappinfo`, System
+  Events (`… Code, Code Foundry`), the window owner and `localizedName` all say "Code
+  Foundry". Touched: Taskfile `APP_NAME`, `update.GUIName` (`guiBinary` and its dev
+  fallback `gui/bin/Code Foundry`), the template's Info.plist `CFBundleExecutable`
+  (for `wails3 dev`), install.sh's archive check, package.sh (quoted name, `LC_ALL=C`
+  listing check, and a new check that the embedded plist has the version and bundle id
+  via `segedit -extract`), `make gui-build` (also removes a stale `gui/bin/CodeFoundry`),
+  tests, README. `"Code Foundry" --version` prints `Code Foundry vX.Y.Z`.
+* **Why BUILD_FLAGS has no quotes.** The Wails template also passes BUILD_FLAGS
+  single-quoted to `wails3 generate bindings -f`. A quoted `-extldflags '…'` failed
+  there with "unmatched quote". So the plist path is the relative `bin/Info.embedded.plist`:
+  go build runs the external linker in `gui/`. Go does not relink when only the plist
+  changed, so the Taskfile removes the old output first.
+* **Not seen on screen.** The display was asleep behind the lock screen, and every
+  `screencapture` (full screen and `-l <window>`) came back black or failed. So there is
+  no screenshot of the Dock tile or the app menu. The evidence for the name is the Launch
+  Services and System Events output above. The Dock label is that name. The app menu
+  title most likely is too, but it was not read: System Events lacks assistive access
+  here. The evidence for the icon:
+  * the code path (`Options.Icon` → `setApplicationIcon` → `[NSApp
+    setApplicationIconImage:]`)
+  * `NSImage(data:)` decodes the embedded PNG at 512x512
+  * `NSRunningApplication.icon` cannot show it: that is Launch Services' static generic
+    "exec" icon, not the runtime one
+
+  **Check the Dock tile, its hover label and the bold app menu title by eye once.**
+* **Verified** with `CODE_FOUNDRY_HOME=/tmp/cf-identity-home`:
+  * `make package VERSION=v9.9.9` passed every check.
+  * `release.sh --local` published it and `install.sh --skip-path --skip-link` installed
+    `code-foundry`, `Code Foundry` and `VERSION`.
+  * `code-foundry gui` started `…/app/Code Foundry`, which started its sibling daemon.
+  * `app version` said `Code Foundry v9.9.9`.
+  * `app relaunch` brought the GUI back under a new pid from the spaced path.
+* **Updating across the rename needs the one-liner.** An install of a release that still
+  ships `CodeFoundry` updates with the installer embedded in its daemon. That installer
+  requires `CodeFoundry` in the archive, so the in-app update and `code-foundry update`
+  fail with "the archive has no CodeFoundry executable". Run the install one-liner, quit
+  the old GUI (its relaunch would exec the removed `CodeFoundry`), then run
+  `code-foundry daemon restart` and `code-foundry gui`. No compatibility shim: Alex is the
+  only user.
+
+## Left for a follow-up
+
 * the Wails template's bundle tasks (`package`, `run` builds a `.dev.app` for `wails3
   dev`), which nothing of ours calls. They can go once nothing needs a bundle.

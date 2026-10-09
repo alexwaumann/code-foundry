@@ -6,7 +6,7 @@
         <key>CFBundleName</key>
             <string>Code Foundry</string>
         <key>CFBundleExecutable</key>
-            <string>CodeFoundry</string>
+            <string>Code Foundry</string>
         <key>CFBundleIdentifier</key>
             <string>dev.alexwaumann.codefoundry</string>
         <key>CFBundleVersion</key>

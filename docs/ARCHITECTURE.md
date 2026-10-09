@@ -42,7 +42,7 @@ Three processes, one protocol.
 
 Two binaries from one version stamp, installed side by side as plain executables (no
 `.app` bundle; managed Macs often block unsigned bundles) in `~/.code-foundry/app`:
-`CodeFoundry` (the Wails GUI), `code-foundry` (daemon + CLI; `~/.local/bin/code-foundry`
+`Code Foundry` (the Wails GUI), `code-foundry` (daemon + CLI; `~/.local/bin/code-foundry`
 links to it) and `VERSION` (the release tag the updater reads). `code-foundry gui` starts
 the GUI next to it. `code-foundry daemon` runs the daemon in the foreground. Every client
 auto-starts the daemon if the socket is absent. Packaging and updates:

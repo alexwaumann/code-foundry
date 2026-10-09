@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Linked into the bare GUI executable's __TEXT,__info_plist section by the production
+  build (build/darwin/Taskfile.yml, -extldflags -sectcreate), so the executable has
+  bundle metadata without being a bundle. @VERSION@ and @SHORT_VERSION@ are filled in
+  from the build's VERSION (v1.2.3 and 1.2.3; dev and 0.0.0 for dev builds).
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>Code Foundry</string>
+	<key>CFBundleDisplayName</key>
+	<string>Code Foundry</string>
+	<key>CFBundleIdentifier</key>
+	<string>dev.alexwaumann.codefoundry</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>@SHORT_VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@SHORT_VERSION@</string>
+	<key>CodeFoundryVersion</key>
+	<string>@VERSION@</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>(c) 2026 Alejandro Waumann</string>
+	<!-- The frontend calls the daemon at http://127.0.0.1:<port>. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

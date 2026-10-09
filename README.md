@@ -20,7 +20,7 @@ gh release download --repo alexwaumann/code-foundry --pattern install.sh -O - | 
 The installer downloads the latest release, verifies its checksum, and:
 
 * installs the app into `~/.code-foundry/app`: `code-foundry` (the daemon and CLI),
-  `CodeFoundry` (the window) and a `VERSION` file
+  `Code Foundry` (the window) and a `VERSION` file
 * links `~/.local/bin/code-foundry` to the CLI
 * adds `~/.local/bin` to your PATH in `~/.zshrc`, once, if it is not already there
 
@@ -86,10 +86,10 @@ pnpm. The GUI also needs `wails3`
 ```sh
 make build       # ./bin/code-foundry
 make check       # what CI runs
-make gui-build   # gui/bin/CodeFoundry, a bare executable (no .app bundle)
+make gui-build   # "gui/bin/Code Foundry", a bare executable (no .app bundle)
 ```
 
-`./bin/code-foundry gui` starts `gui/bin/CodeFoundry` and points it at that CLI. Dev
+`./bin/code-foundry gui` starts `gui/bin/Code Foundry` and points it at that CLI. Dev
 builds never check for updates.
 
 `make build` also builds libghostty-vt from a pinned ghostty commit with a pinned zig,

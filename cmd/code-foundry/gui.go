@@ -12,8 +12,8 @@ import (
 )
 
 // runGUI is `code-foundry gui`: starts the GUI executable installed next to this CLI
-// (<app dir>/CodeFoundry), else, for a repo CLI (./bin/code-foundry), the dev build
-// gui/bin/CodeFoundry from `make gui-build`. The GUI is a bare executable, not an .app,
+// (<app dir>/Code Foundry), else, for a repo CLI (./bin/code-foundry), the dev build
+// "gui/bin/Code Foundry" from `make gui-build`. The GUI is a bare executable, not an .app,
 // so it is started directly: detached from this terminal, inheriting the environment
 // (CODE_FOUNDRY_HOME and friends), and pointed at this CLI to auto-start the daemon.
 func runGUI(_ context.Context, cl *cli, args []string) error {

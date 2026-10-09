@@ -12,7 +12,7 @@ import (
 
 // fakeRelease publishes a fake release for tag into a local release directory (the
 // CODE_FOUNDRY_RELEASE_DIR layout) and returns the tarball's path. The tarball holds
-// code-foundry, CodeFoundry and VERSION at the top level, like scripts/package.sh
+// code-foundry, "Code Foundry" and VERSION at the top level, like scripts/package.sh
 // writes it; appVersion is what VERSION and the fake CLI claim (normally tag).
 func fakeRelease(t *testing.T, relDir, tag, appVersion string) string {
 	t.Helper()
@@ -23,7 +23,7 @@ func fakeRelease(t *testing.T, relDir, tag, appVersion string) string {
 		}
 	}
 	write(filepath.Join(build, "VERSION"), appVersion+"\n", 0o644)
-	write(filepath.Join(build, "CodeFoundry"), "#!/bin/sh\necho gui\n", 0o755)
+	write(filepath.Join(build, "Code Foundry"), "#!/bin/sh\necho gui\n", 0o755)
 	write(filepath.Join(build, "code-foundry"), "#!/bin/sh\necho \"code-foundry "+appVersion+"\"\n", 0o755)
 
 	dir := filepath.Join(relDir, tag)
@@ -31,7 +31,7 @@ func fakeRelease(t *testing.T, relDir, tag, appVersion string) string {
 		t.Fatal(err)
 	}
 	tgz := filepath.Join(dir, "code-foundry-darwin-arm64.tar.gz")
-	if out, err := exec.Command("/usr/bin/tar", "-czf", tgz, "-C", build, "code-foundry", "CodeFoundry", "VERSION").CombinedOutput(); err != nil {
+	if out, err := exec.Command("/usr/bin/tar", "-czf", tgz, "-C", build, "code-foundry", "Code Foundry", "VERSION").CombinedOutput(); err != nil {
 		t.Fatalf("tar: %v\n%s", err, out)
 	}
 	b, err := os.ReadFile(tgz)
@@ -158,7 +158,7 @@ func TestInstallFreshUpgradeIdempotent(t *testing.T) {
 	if names := dirNames(t, filepath.Dir(e.app())); strings.Join(names, " ") != "app" {
 		t.Fatalf("~/.code-foundry holds %v, want just app (no app.new / app.old)", names)
 	}
-	if names := dirNames(t, e.app()); strings.Join(names, " ") != "CodeFoundry VERSION code-foundry" {
+	if names := dirNames(t, e.app()); strings.Join(names, "|") != "Code Foundry|VERSION|code-foundry" {
 		t.Fatalf("app dir holds %v", names)
 	}
 

@@ -4,7 +4,7 @@
 #
 #   dist/code-foundry-darwin-arm64.tar.gz   the app directory's contents (no prefix):
 #       code-foundry   daemon + CLI (the GUI auto-starts it; ~/.local/bin links to it)
-#       CodeFoundry    the Wails GUI, a bare executable
+#       Code Foundry   the Wails GUI, a bare executable with an embedded Info.plist
 #       VERSION        the tag, e.g. v0.2.0 (what the installer and updater read)
 #   dist/install.sh                         the installer, defaulting to RELEASE_REPO
 #   dist/checksums.txt                      sha256 of the above
@@ -33,7 +33,8 @@ fi
 PKG="github.com/alexwaumann/code-foundry/internal/version"
 VERSION_LDFLAGS="-X $PKG.Version=$VERSION -X $PKG.ReleaseRepo=$RELEASE_REPO"
 TARBALL="code-foundry-darwin-arm64.tar.gz"
-FILES="code-foundry CodeFoundry VERSION"
+# The GUI's file name is what the Dock and the app menu show (gui/Taskfile.yml APP_NAME).
+GUI="Code Foundry"
 
 die() {
 	echo "package: $*" >&2
@@ -45,27 +46,28 @@ echo "==> package $VERSION (release repo: ${RELEASE_REPO:-none})"
 # 1. Daemon/CLI, with the same version ldflags as the GUI.
 "$MAKE" build VERSION="$VERSION" RELEASE_REPO="$RELEASE_REPO"
 
-# 2. GUI executable (gui/build/darwin/Taskfile.yml appends EXTRA_LDFLAGS to -ldflags).
-# The Taskfile runs `wails3 tool ...` by name, so wails3's directory must be on PATH; a
-# failed build must not leave the previous gui/bin/CodeFoundry to be packaged.
+# 2. GUI executable (gui/build/darwin/Taskfile.yml appends EXTRA_LDFLAGS to -ldflags and
+# stamps VERSION into the Info.plist it links in). The Taskfile runs `wails3 tool ...` by
+# name, so wails3's directory must be on PATH; a failed build must not leave the previous
+# GUI executable to be packaged.
 case "$WAILS3" in
 */*) PATH="$(cd "$(dirname "$WAILS3")" && pwd):$PATH" ;;
 esac
 export PATH
-rm -f gui/bin/CodeFoundry
-(cd gui && "$WAILS3" build EXTRA_LDFLAGS="$VERSION_LDFLAGS")
-[ -x gui/bin/CodeFoundry ] || die "wails3 build did not produce gui/bin/CodeFoundry"
+rm -f "gui/bin/$GUI" gui/bin/CodeFoundry
+(cd gui && "$WAILS3" build EXTRA_LDFLAGS="$VERSION_LDFLAGS" VERSION="$VERSION")
+[ -x "gui/bin/$GUI" ] || die "wails3 build did not produce gui/bin/$GUI"
 
 # 3. Stage the app directory, sign, and check what we built.
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/code-foundry-package.XXXXXX")"
 trap 'rm -rf "$STAGE"' EXIT
 cp bin/code-foundry "$STAGE/code-foundry"
-cp gui/bin/CodeFoundry "$STAGE/CodeFoundry"
+cp "gui/bin/$GUI" "$STAGE/$GUI"
 printf '%s\n' "$VERSION" >"$STAGE/VERSION"
-chmod 755 "$STAGE/code-foundry" "$STAGE/CodeFoundry"
+chmod 755 "$STAGE/code-foundry" "$STAGE/$GUI"
 chmod 644 "$STAGE/VERSION"
-xattr -c "$STAGE/code-foundry" "$STAGE/CodeFoundry" 2>/dev/null || true
-for bin in code-foundry CodeFoundry; do
+xattr -c "$STAGE/code-foundry" "$STAGE/$GUI" 2>/dev/null || true
+for bin in code-foundry "$GUI"; do
 	codesign --force --sign - "$STAGE/$bin"
 	codesign --verify --strict "$STAGE/$bin" || die "$bin: signature does not verify"
 done
@@ -76,18 +78,24 @@ case "$cli_version" in
 *) die "the CLI reports '$cli_version', want $VERSION" ;;
 esac
 # The GUI is linked with the same -X flag and prints it without opening a window.
-gui_version="$("$STAGE/CodeFoundry" --version)"
-[ "$gui_version" = "CodeFoundry $VERSION" ] || die "the GUI reports '$gui_version', want $VERSION"
+gui_version="$("$STAGE/$GUI" --version)"
+[ "$gui_version" = "Code Foundry $VERSION" ] || die "the GUI reports '$gui_version', want $VERSION"
+# The Info.plist linked into the GUI (__TEXT,__info_plist) carries the same version.
+segedit "$STAGE/$GUI" -extract __TEXT __info_plist "$STAGE/Info.plist" || die "the GUI has no embedded Info.plist"
+plist_version="$(plutil -extract CodeFoundryVersion raw "$STAGE/Info.plist")"
+plist_id="$(plutil -extract CFBundleIdentifier raw "$STAGE/Info.plist")"
+rm -f "$STAGE/Info.plist"
+[ "$plist_version" = "$VERSION" ] || die "the GUI's Info.plist says '$plist_version', want $VERSION"
+[ "$plist_id" = "dev.alexwaumann.codefoundry" ] || die "the GUI's Info.plist has bundle id '$plist_id'"
 file_version="$(cat "$STAGE/VERSION")"
 [ "$file_version" = "$VERSION" ] || die "VERSION says '$file_version', want $VERSION"
 
 # 4. Assets. COPYFILE_DISABLE keeps macOS tar from adding ._ AppleDouble entries.
 mkdir -p dist
 rm -f "dist/$TARBALL" dist/install.sh dist/checksums.txt dist/CodeFoundry-darwin-arm64.zip dist/code-foundry-darwin-arm64
-# shellcheck disable=SC2086 # FILES is a fixed list of plain names
-COPYFILE_DISABLE=1 tar -czf "dist/$TARBALL" -C "$STAGE" $FILES
-listing="$(tar -tzf "dist/$TARBALL" | sort | tr '\n' ' ')"
-[ "$listing" = "CodeFoundry VERSION code-foundry " ] || die "unexpected tarball contents: $listing"
+COPYFILE_DISABLE=1 tar -czf "dist/$TARBALL" -C "$STAGE" code-foundry "$GUI" VERSION
+listing="$(tar -tzf "dist/$TARBALL" | LC_ALL=C sort | tr '\n' '|')"
+[ "$listing" = "$GUI|VERSION|code-foundry|" ] || die "unexpected tarball contents: $listing"
 if [ -n "$RELEASE_REPO" ]; then
 	sed "s|^DEFAULT_REPO=.*|DEFAULT_REPO=\"$RELEASE_REPO\"|" scripts/install.sh >dist/install.sh
 else

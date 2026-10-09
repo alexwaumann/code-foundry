@@ -81,12 +81,12 @@ frontend-check: frontend-deps
 dev: build
 	exec ./bin/code-foundry daemon --dev
 
-## gui-build: build the Wails GUI as the bare executable gui/bin/CodeFoundry, which is what
-## `code-foundry gui` launches from a dev CLI. No .app bundle (managed Macs often block
-## unsigned bundles); a stale gui/bin/CodeFoundry.app from older builds is removed.
+## gui-build: build the Wails GUI as the bare executable "gui/bin/Code Foundry", which is
+## what `code-foundry gui` launches from a dev CLI. No .app bundle (managed Macs often block
+## unsigned bundles); stale gui/bin/CodeFoundry(.app) from older builds are removed.
 gui-build: build
 	cd gui && $(WAILS3) build
-	rm -rf gui/bin/CodeFoundry.app
+	rm -rf gui/bin/CodeFoundry.app gui/bin/CodeFoundry
 
 ## gui-e2e: Playwright (WebKit + Chromium) against the mock daemon. Not part of `check`:
 ## it needs browser binaries (`pnpm --dir gui/frontend exec playwright install webkit chromium`).
@@ -102,7 +102,7 @@ gui-dev: build
 	cd gui && $(WAILS3) dev
 
 ## package: release assets in dist/ (VERSION=vX.Y.Z required): the app tarball
-## (code-foundry, CodeFoundry, VERSION), install.sh, checksums.txt. See scripts/package.sh.
+## (code-foundry, "Code Foundry", VERSION), install.sh, checksums.txt. See scripts/package.sh.
 package: ghostty-vt frontend-deps
 	VERSION=$(VERSION) RELEASE_REPO=$(RELEASE_REPO) WAILS3=$(WAILS3) MAKE=$(MAKE) ./scripts/package.sh
 
