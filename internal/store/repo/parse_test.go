@@ -174,6 +174,23 @@ func TestParseGitHubSlug(t *testing.T) {
 	}
 }
 
+func TestParseRemotes(t *testing.T) {
+	tests := []struct {
+		in   string
+		want []string
+	}{
+		{"", nil},
+		{"\n", nil},
+		{"origin\n", []string{"origin"}},
+		{"upstream\norigin\nbackup\n", []string{"backup", "origin", "upstream"}},
+	}
+	for _, tt := range tests {
+		if got := parseRemotes([]byte(tt.in)); !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("parseRemotes(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
 func TestParseOriginHead(t *testing.T) {
 	for in, want := range map[string]string{
 		"refs/remotes/origin/main\n":  "main",

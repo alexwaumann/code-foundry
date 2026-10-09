@@ -52,6 +52,9 @@ const (
 	SessionServiceRemoveProcedure = "/codefoundry.v1.SessionService/Remove"
 	// SessionServiceWatchProcedure is the fully-qualified name of the SessionService's Watch RPC.
 	SessionServiceWatchProcedure = "/codefoundry.v1.SessionService/Watch"
+	// SessionServiceStageAttachmentProcedure is the fully-qualified name of the SessionService's
+	// StageAttachment RPC.
+	SessionServiceStageAttachmentProcedure = "/codefoundry.v1.SessionService/StageAttachment"
 )
 
 // SessionServiceClient is a client for the codefoundry.v1.SessionService service.
@@ -75,6 +78,11 @@ type SessionServiceClient interface {
 	Remove(context.Context, *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error)
 	// Watch streams session changes. The first event is a snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchSessionsRequest]) (*connect.ServerStreamForClient[v1.SessionEvent], error)
+	// StageAttachment stores an image the first prompt refers to and returns its path.
+	// Create appends "Attached image: <path>" lines for CreateSessionRequest.attachments;
+	// Claude reads them with its Read tool. Only image types are accepted, with size
+	// limits; unused staged files are reaped by the daemon.
+	StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error)
 }
 
 // NewSessionServiceClient constructs a client for the codefoundry.v1.SessionService service. By
@@ -142,20 +150,27 @@ func NewSessionServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(sessionServiceMethods.ByName("Watch")),
 			connect.WithClientOptions(opts...),
 		),
+		stageAttachment: connect.NewClient[v1.StageAttachmentRequest, v1.StageAttachmentResponse](
+			httpClient,
+			baseURL+SessionServiceStageAttachmentProcedure,
+			connect.WithSchema(sessionServiceMethods.ByName("StageAttachment")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // sessionServiceClient implements SessionServiceClient.
 type sessionServiceClient struct {
-	create    *connect.Client[v1.CreateSessionRequest, v1.CreateSessionResponse]
-	fork      *connect.Client[v1.ForkSessionRequest, v1.ForkSessionResponse]
-	list      *connect.Client[v1.ListSessionsRequest, v1.ListSessionsResponse]
-	get       *connect.Client[v1.GetSessionRequest, v1.GetSessionResponse]
-	rename    *connect.Client[v1.RenameSessionRequest, v1.RenameSessionResponse]
-	close     *connect.Client[v1.CloseSessionRequest, v1.CloseSessionResponse]
-	reconnect *connect.Client[v1.ReconnectSessionRequest, v1.ReconnectSessionResponse]
-	remove    *connect.Client[v1.RemoveSessionRequest, v1.RemoveSessionResponse]
-	watch     *connect.Client[v1.WatchSessionsRequest, v1.SessionEvent]
+	create          *connect.Client[v1.CreateSessionRequest, v1.CreateSessionResponse]
+	fork            *connect.Client[v1.ForkSessionRequest, v1.ForkSessionResponse]
+	list            *connect.Client[v1.ListSessionsRequest, v1.ListSessionsResponse]
+	get             *connect.Client[v1.GetSessionRequest, v1.GetSessionResponse]
+	rename          *connect.Client[v1.RenameSessionRequest, v1.RenameSessionResponse]
+	close           *connect.Client[v1.CloseSessionRequest, v1.CloseSessionResponse]
+	reconnect       *connect.Client[v1.ReconnectSessionRequest, v1.ReconnectSessionResponse]
+	remove          *connect.Client[v1.RemoveSessionRequest, v1.RemoveSessionResponse]
+	watch           *connect.Client[v1.WatchSessionsRequest, v1.SessionEvent]
+	stageAttachment *connect.Client[v1.StageAttachmentRequest, v1.StageAttachmentResponse]
 }
 
 // Create calls codefoundry.v1.SessionService.Create.
@@ -203,6 +218,11 @@ func (c *sessionServiceClient) Watch(ctx context.Context, req *connect.Request[v
 	return c.watch.CallServerStream(ctx, req)
 }
 
+// StageAttachment calls codefoundry.v1.SessionService.StageAttachment.
+func (c *sessionServiceClient) StageAttachment(ctx context.Context, req *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error) {
+	return c.stageAttachment.CallUnary(ctx, req)
+}
+
 // SessionServiceHandler is an implementation of the codefoundry.v1.SessionService service.
 type SessionServiceHandler interface {
 	// Create spawns claude in a worktree and returns the session in STARTING state.
@@ -224,6 +244,11 @@ type SessionServiceHandler interface {
 	Remove(context.Context, *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error)
 	// Watch streams session changes. The first event is a snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchSessionsRequest], *connect.ServerStream[v1.SessionEvent]) error
+	// StageAttachment stores an image the first prompt refers to and returns its path.
+	// Create appends "Attached image: <path>" lines for CreateSessionRequest.attachments;
+	// Claude reads them with its Read tool. Only image types are accepted, with size
+	// limits; unused staged files are reaped by the daemon.
+	StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error)
 }
 
 // NewSessionServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -287,6 +312,12 @@ func NewSessionServiceHandler(svc SessionServiceHandler, opts ...connect.Handler
 		connect.WithSchema(sessionServiceMethods.ByName("Watch")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sessionServiceStageAttachmentHandler := connect.NewUnaryHandler(
+		SessionServiceStageAttachmentProcedure,
+		svc.StageAttachment,
+		connect.WithSchema(sessionServiceMethods.ByName("StageAttachment")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.SessionService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SessionServiceCreateProcedure:
@@ -307,6 +338,8 @@ func NewSessionServiceHandler(svc SessionServiceHandler, opts ...connect.Handler
 			sessionServiceRemoveHandler.ServeHTTP(w, r)
 		case SessionServiceWatchProcedure:
 			sessionServiceWatchHandler.ServeHTTP(w, r)
+		case SessionServiceStageAttachmentProcedure:
+			sessionServiceStageAttachmentHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -350,4 +383,8 @@ func (UnimplementedSessionServiceHandler) Remove(context.Context, *connect.Reque
 
 func (UnimplementedSessionServiceHandler) Watch(context.Context, *connect.Request[v1.WatchSessionsRequest], *connect.ServerStream[v1.SessionEvent]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SessionService.Watch is not implemented"))
+}
+
+func (UnimplementedSessionServiceHandler) StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SessionService.StageAttachment is not implemented"))
 }

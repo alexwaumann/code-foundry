@@ -30,6 +30,9 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     disconnectReason: "",
     lastError: "",
     parentId: "",
+    permissionMode: "auto",
+    baseRef: "",
+    createdWorktree: false,
     ...over,
   };
 }
@@ -91,7 +94,8 @@ describe("deriveContext for a session", () => {
       name: "app",
       defaultBranch: "main",
       githubSlug: "",
-      worktrees: [{ repoId: "r1", path: "/src/app", branch: "main", head: "", isMain: true, status: { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null } }],
+      remotes: [],
+      worktrees: [{ repoId: "r1", path: "/src/app", branch: "main", head: "", detached: false, isMain: true, status: { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null } }],
     },
   ]);
   it("carries session, its terminal, and its worktree", () => {

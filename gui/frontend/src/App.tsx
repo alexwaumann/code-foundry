@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { Composer } from "@/components/compose/Composer";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
 import { Dashboard } from "@/components/Dashboard";
 import { HelpOverlay } from "@/components/help/HelpOverlay";
@@ -61,7 +62,7 @@ function startApp(): () => void {
 
 /**
  * Exactly one thing fills the content area. A session shows its live terminal when it
- * has one, otherwise the "Not connected" panel. TerminalPane stays mounted across
+ * has one, otherwise the "Not connected" panel; "compose" is the new-thread composer. TerminalPane stays mounted across
  * terminal/session switches (same element position), so its renderer is reused.
  */
 function Content() {
@@ -69,6 +70,7 @@ function Content() {
   const sessionTerminal = useSessionsStore((s) => (sel.kind === "session" ? s.byId[sel.id]?.terminalId || null : null));
   if (sel.kind === "terminal") return <TerminalPane terminalId={sel.id} />;
   if (sel.kind === "view" && sel.name === "pullrequests") return <PullRequestsPage />;
+  if (sel.kind === "compose") return <Composer key={sel.repoId} repoId={sel.repoId} />;
   if (sel.kind === "session") {
     return sessionTerminal ? <TerminalPane terminalId={sessionTerminal} sessionId={sel.id} /> : <SessionDisconnected id={sel.id} />;
   }

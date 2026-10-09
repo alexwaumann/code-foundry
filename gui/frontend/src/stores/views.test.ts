@@ -3,7 +3,7 @@ import { getPanel, usePanelStore } from "./panel";
 import { useUiStore, type FocusRegion } from "./ui";
 import { togglePanelCommand, useViewsStore } from "./views";
 
-const closedPalette = { open: false, query: "", commandName: null, returnTo: "content" as FocusRegion };
+const closedPalette = { open: false, query: "", commandName: null, page: "commands" as const, returnTo: "content" as FocusRegion };
 
 describe("togglePanelCommand", () => {
   beforeEach(() => {

@@ -32,6 +32,7 @@ func focusIntent(id string) *v1.UiIntent {
 
 func TestSessionCommands(t *testing.T) {
 	t.Setenv("HOME", "/Users/me")
+	auto := v1.PermissionMode_PERMISSION_MODE_AUTO
 	disconnected := &v1.Session{State: v1.SessionState_SESSION_STATE_DISCONNECTED}
 	tests := []struct {
 		name       string
@@ -49,34 +50,47 @@ func TestSessionCommands(t *testing.T) {
 	}{
 		{name: "new from worktree context", cmd: "session.new", ctx: command.Context{ActiveWorktreePath: "/wt"},
 			args:     map[string]string{"model": "opus", "effort": "high"},
-			wantMsg:  "created session s1 in /wt",
-			wantReqs: []proto.Message{&v1.CreateSessionRequest{WorktreePath: "/wt", Model: "opus", Effort: "high"}}, wantIntent: focusIntent("s1")},
+			wantMsg:  "created thread s1 in /wt",
+			wantReqs: []proto.Message{&v1.CreateSessionRequest{WorktreePath: "/wt", Model: "opus", Effort: "high", PermissionMode: auto}}, wantIntent: focusIntent("s1")},
 		{name: "new with explicit worktree and prompt", cmd: "session.new",
 			args:     map[string]string{"worktree": "~/src/app", "name": "fix-it", "prompt": "hello"},
-			wantMsg:  "created session fix-it (s1) in /Users/me/src/app",
-			wantReqs: []proto.Message{&v1.CreateSessionRequest{WorktreePath: "/Users/me/src/app", Name: "fix-it", InitialPrompt: "hello"}}},
+			wantMsg:  "created thread fix-it (s1) in /Users/me/src/app",
+			wantReqs: []proto.Message{&v1.CreateSessionRequest{WorktreePath: "/Users/me/src/app", Name: "fix-it", InitialPrompt: "hello", PermissionMode: auto}}},
 		{name: "new from repo context", cmd: "session.new", ctx: command.Context{ActiveRepoID: "r1"},
-			wantReqs: []proto.Message{&v1.CreateSessionRequest{RepoId: "r1"}}},
+			wantReqs: []proto.Message{&v1.CreateSessionRequest{RepoId: "r1", PermissionMode: auto}}},
+		{name: "new supervised", cmd: "session.new", args: map[string]string{"repo": "r1", "permission": "supervised"},
+			wantReqs: []proto.Message{&v1.CreateSessionRequest{RepoId: "r1", PermissionMode: v1.PermissionMode_PERMISSION_MODE_SUPERVISED}}},
+		{name: "new accept edits", cmd: "session.new", args: map[string]string{"repo": "r1", "permission": "accept-edits"},
+			wantReqs: []proto.Message{&v1.CreateSessionRequest{RepoId: "r1", PermissionMode: v1.PermissionMode_PERMISSION_MODE_ACCEPT_EDITS}}},
+		{name: "new refuses full access", cmd: "session.new", args: map[string]string{"repo": "r1", "permission": "bypassPermissions"}, wantErr: command.ErrInvalidArgs},
+		{name: "new worktree with base and attachments", cmd: "session.new", ctx: command.Context{ActiveRepoID: "r1"},
+			args:    map[string]string{"new-worktree": "true", "base": "origin/dev", "prompt": "look", "attachments": " /a/1.png, ,/a/2.png "},
+			wantMsg: "created thread s1 in /worktrees/s1 (new worktree from origin/dev)",
+			wantReqs: []proto.Message{&v1.CreateSessionRequest{RepoId: "r1", InitialPrompt: "look", PermissionMode: auto,
+				NewWorktree: &v1.NewWorktree{BaseRef: "origin/dev"}, Attachments: []string{"/a/1.png", "/a/2.png"}}}},
+		{name: "new worktree with default base", cmd: "session.new", args: map[string]string{"repo": "r1", "new-worktree": "true"},
+			wantReqs: []proto.Message{&v1.CreateSessionRequest{RepoId: "r1", PermissionMode: auto, NewWorktree: &v1.NewWorktree{}}}},
+		{name: "base needs new worktree", cmd: "session.new", args: map[string]string{"repo": "r1", "base": "main"}, wantErr: command.ErrInvalidArgs},
 		{name: "new unavailable without context", cmd: "session.new", wantErr: command.ErrUnavailable},
 		{name: "new bad effort", cmd: "session.new", args: map[string]string{"worktree": "/wt", "effort": "huge"}, wantErr: command.ErrInvalidArgs},
 		{name: "new bad model", cmd: "session.new", args: map[string]string{"worktree": "/wt", "model": "gpt"}, wantErr: command.ErrInvalidArgs},
 		{name: "close from context", cmd: "session.close", ctx: command.Context{ActiveSessionID: "s5"},
-			wantMsg: "closed session s5", wantReqs: []proto.Message{&v1.CloseSessionRequest{Id: "s5"}}},
+			wantMsg: "closed thread s5", wantReqs: []proto.Message{&v1.CloseSessionRequest{Id: "s5"}}},
 		{name: "close explicit id", cmd: "session.close", args: map[string]string{"id": "s6"},
 			wantReqs: []proto.Message{&v1.CloseSessionRequest{Id: "s6"}}},
 		{name: "close unavailable", cmd: "session.close", wantErr: command.ErrUnavailable},
 		{name: "reconnect disconnected", cmd: "session.reconnect", args: map[string]string{"id": "s5"}, current: disconnected,
-			wantMsg:  "reconnecting session s5",
+			wantMsg:  "reconnecting thread s5",
 			wantReqs: []proto.Message{&v1.GetSessionRequest{Id: "s5"}, &v1.ReconnectSessionRequest{Id: "s5"}}},
 		{name: "reconnect refused while connected", cmd: "session.reconnect", args: map[string]string{"id": "s5"},
 			wantCode: connect.CodeFailedPrecondition, wantReqs: []proto.Message{&v1.GetSessionRequest{Id: "s5"}}},
 		{name: "rename", cmd: "session.rename", ctx: command.Context{ActiveSessionID: "s5"}, args: map[string]string{"name": "new"},
-			wantMsg: "renamed session new (s5)", wantReqs: []proto.Message{&v1.RenameSessionRequest{Id: "s5", Name: "new"}}},
+			wantMsg: "renamed thread new (s5)", wantReqs: []proto.Message{&v1.RenameSessionRequest{Id: "s5", Name: "new"}}},
 		{name: "rename needs a name", cmd: "session.rename", ctx: command.Context{ActiveSessionID: "s5"}, wantErr: command.ErrInvalidArgs},
 		{name: "fork", cmd: "session.fork", ctx: command.Context{ActiveSessionID: "s5"},
 			wantMsg: "forked s5 into s2", wantReqs: []proto.Message{&v1.ForkSessionRequest{Id: "s5"}}, wantIntent: focusIntent("s2")},
 		{name: "remove", cmd: "session.remove", args: map[string]string{"id": "s5"},
-			wantMsg: "removed session s5", wantReqs: []proto.Message{&v1.RemoveSessionRequest{Id: "s5"}}},
+			wantMsg: "removed thread s5", wantReqs: []proto.Message{&v1.RemoveSessionRequest{Id: "s5"}}},
 		{name: "focus", cmd: "session.focus", ctx: command.Context{ActiveSessionID: "s7"}, wantMsg: "delivered=1", wantIntent: focusIntent("s7")},
 		{name: "list", cmd: "session.list", current: &v1.Session{Id: "s1", Name: "n", State: v1.SessionState_SESSION_STATE_DISCONNECTED, DisconnectReason: "closed"},
 			wantReqs: []proto.Message{&v1.ListSessionsRequest{}}, wantIn: []string{"s1", "n", "disconnected", "unspecified", "closed"}},
@@ -127,8 +141,18 @@ func TestSessionCommands(t *testing.T) {
 func TestSessionNewKeybindingAndEnums(t *testing.T) {
 	reg, _, _ := newSessionRegistry(t)
 	c, ok := reg.Get("session.new")
-	if !ok || !slices.Contains(c.Keybindings, "cmd+n") {
-		t.Fatalf("session.new keybindings = %v", c.Keybindings)
+	if !ok || !slices.Contains(c.Keybindings, "cmd+n") || c.Title != "New Thread" {
+		t.Fatalf("session.new = %q keybindings %v", c.Title, c.Keybindings)
+	}
+	// The GUI composer invokes session.new with exactly these args.
+	var names []string
+	for _, a := range c.Args {
+		names = append(names, a.Name)
+	}
+	for _, want := range []string{"repo", "worktree", "model", "effort", "permission", "new-worktree", "base", "name", "prompt", "attachments"} {
+		if !slices.Contains(names, want) {
+			t.Errorf("session.new has no %q arg (args %v)", want, names)
+		}
 	}
 	for _, a := range c.Args {
 		switch a.Name {
@@ -139,6 +163,10 @@ func TestSessionNewKeybindingAndEnums(t *testing.T) {
 		case "effort":
 			if !slices.Equal(a.Enum, []string{"low", "medium", "high", "xhigh", "max"}) {
 				t.Errorf("effort enum = %v", a.Enum)
+			}
+		case "permission":
+			if !slices.Equal(a.Enum, []string{"supervised", "accept-edits", "auto"}) || a.Default != "auto" {
+				t.Errorf("permission = %v default %q", a.Enum, a.Default)
 			}
 		}
 	}

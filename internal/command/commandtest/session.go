@@ -26,16 +26,21 @@ func (s *Session) do(m proto.Message) error {
 	return s.Err
 }
 
-// Create echoes the request as a STARTING session "s1".
+// Create echoes the request as a STARTING session "s1". With new_worktree the session
+// is in /worktrees/s1 with created_worktree and base_ref set.
 func (s *Session) Create(_ context.Context, r *connect.Request[v1.CreateSessionRequest]) (*connect.Response[v1.CreateSessionResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
 	}
 	m := r.Msg
-	return connect.NewResponse(&v1.CreateSessionResponse{Session: &v1.Session{
+	out := &v1.Session{
 		Id: "s1", RepoId: m.GetRepoId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
-		Name: m.GetName(), State: v1.SessionState_SESSION_STATE_STARTING,
-	}}), nil
+		Name: m.GetName(), State: v1.SessionState_SESSION_STATE_STARTING, PermissionMode: m.GetPermissionMode(),
+	}
+	if nw := m.GetNewWorktree(); nw != nil {
+		out.WorktreePath, out.CreatedWorktree, out.BaseRef = "/worktrees/s1", true, nw.GetBaseRef()
+	}
+	return connect.NewResponse(&v1.CreateSessionResponse{Session: out}), nil
 }
 
 // Fork returns session "s2" with ParentId set.

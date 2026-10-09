@@ -3,7 +3,8 @@ import { ChevronRight, CornerDownLeft } from "lucide-react";
 import type { CommandView, UiContextView } from "@/api/command";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { presentCommand } from "@/keys/bindings";
+import { ProjectPicker } from "@/components/compose/ProjectPicker";
+import { isStartable, presentCommand, presentInPalette } from "@/keys/bindings";
 import { formatChord } from "@/keys/chord";
 import { argChoices, groupByCategory, previousArg, promptedArgs, startPrompt, submitArg, UNSET_CHOICE, type ArgPrompt } from "@/palette/args";
 import { refreshCommands, runCommand, useCommandsStore } from "@/stores/commands";
@@ -64,7 +65,7 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
     void refreshCommands(context);
   }, [context]);
 
-  const available = useMemo(() => commands.filter((c) => c.available), [commands]);
+  const available = useMemo(() => commands.filter(isStartable), [commands]);
   const groups = useMemo(() => groupByCategory(available), [available]);
 
   const invoke = (c: CommandView, values: Record<string, string>) => {
@@ -79,6 +80,11 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
   };
 
   const pick = (c: CommandView) => {
+    // session.new: the project picker replaces the model/effort prompts.
+    if (presentInPalette(c.name)) {
+      close();
+      return;
+    }
     const p = startPrompt(c);
     if (p.specs.length === 0) {
       // Commands with their own UI (e.g. the update dialog) present themselves.
@@ -263,6 +269,7 @@ export function CommandPalette() {
   const open = useUiStore((s) => s.palette.open);
   const query = useUiStore((s) => s.palette.query);
   const commandName = useUiStore((s) => s.palette.commandName);
+  const page = useUiStore((s) => s.palette.page);
   const close = useUiStore((s) => s.closePalette);
   return (
     <Dialog
@@ -278,9 +285,13 @@ export function CommandPalette() {
           e.preventDefault();
         }}
       >
-        <DialogTitle className="sr-only">Command palette</DialogTitle>
-        <DialogDescription className="sr-only">Run a command in the current context</DialogDescription>
-        <PaletteBody key={`${query}\u0000${commandName ?? ""}`} initialQuery={query} initialCommand={commandName} close={close} />
+        <DialogTitle className="sr-only">{page === "projects" ? "New thread" : "Command palette"}</DialogTitle>
+        <DialogDescription className="sr-only">{page === "projects" ? "Pick the project for a new thread" : "Run a command in the current context"}</DialogDescription>
+        {page === "projects" ? (
+          <ProjectPicker close={close} />
+        ) : (
+          <PaletteBody key={`${query}\u0000${commandName ?? ""}`} initialQuery={query} initialCommand={commandName} close={close} />
+        )}
       </DialogContent>
     </Dialog>
   );

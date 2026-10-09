@@ -76,7 +76,7 @@ describe("closePalette", () => {
     ["content", "content"],
   ];
   it.each(cases)("returns focus to %s", (returnTo, bumped) => {
-    useUiStore.setState({ terminalFocusSeq: 0, sidebarFocusSeq: 0, panelFocusSeq: 0, contentFocusSeq: 0, palette: { open: true, query: "", commandName: null, returnTo } });
+    useUiStore.setState({ terminalFocusSeq: 0, sidebarFocusSeq: 0, panelFocusSeq: 0, contentFocusSeq: 0, palette: { open: true, query: "", commandName: null, page: "commands", returnTo } });
     useUiStore.getState().closePalette();
     const want = { terminal: 0, sidebar: 0, panel: 0, content: 0, [bumped]: 1 };
     expect(seqs()).toEqual(want);

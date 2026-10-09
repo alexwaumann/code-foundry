@@ -25,7 +25,7 @@ function useNow(ms = 30_000): number {
 
 /** Left side of the terminal header when the terminal belongs to a session. */
 export function SessionTitle({ id }: { id: string }) {
-  const name = useSessionsStore((s) => s.byId[id]?.name || "New session");
+  const name = useSessionsStore((s) => s.byId[id]?.name || id);
   const model = useSessionsStore((s) => [s.byId[id]?.model, s.byId[id]?.effort].filter(Boolean).join(" · "));
   const path = useSessionsStore((s) => s.byId[id]?.worktreePath ?? "");
   const badge = useSessionsStore((s) => sessionBadge(s.byId[id]));
@@ -78,7 +78,7 @@ export function SessionDisconnected({ id }: { id: string }) {
   if (!s) {
     return (
       <section className="flex flex-1 items-center justify-center p-10 text-sm text-muted-foreground outline-none" tabIndex={-1} data-focus-root data-region="content" data-testid="session-missing">
-        {loaded ? "This session no longer exists." : "Loading session…"}
+        {loaded ? "This thread no longer exists." : "Loading thread…"}
       </section>
     );
   }
@@ -102,7 +102,7 @@ export function SessionDisconnected({ id }: { id: string }) {
       tabIndex={-1}
       data-focus-root
       data-region="content"
-      aria-label="Session"
+      aria-label="Thread"
       data-testid="session-disconnected"
     >
       <PanelToggle className="absolute top-1.5 right-1.5" />
@@ -112,7 +112,7 @@ export function SessionDisconnected({ id }: { id: string }) {
         </div>
         <div className="flex flex-col gap-1">
           <h1 className="text-lg font-semibold" data-testid="session-title">
-            {s.name || "New session"}
+            {s.name || s.id}
           </h1>
           <p className="text-sm text-muted-foreground">
             Not connected · <span data-testid="disconnect-reason">{disconnectReason(s)}</span>

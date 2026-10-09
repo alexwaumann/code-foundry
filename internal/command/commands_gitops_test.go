@@ -19,9 +19,11 @@ func newGitOpsRegistry(t *testing.T) (*command.Registry, *commandtest.GitOps) {
 	reg := command.NewRegistry()
 	be := &commandtest.GitOps{}
 	slugs := map[string]string{"/gh": "me/repo"}
+	local := map[string]bool{"/local": true}
 	err := command.RegisterGitOps(reg, command.GitOpsDeps{
 		Backend:    be,
 		GitHubSlug: func(c command.Context) string { return slugs[c.ActiveWorktreePath] },
+		LocalOnly:  func(c command.Context) bool { return local[c.ActiveWorktreePath] },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -33,6 +35,7 @@ func TestGitOpsAvailability(t *testing.T) {
 	reg, _ := newGitOpsRegistry(t)
 	wt := command.Context{ActiveRepoID: "r", ActiveWorktreePath: "/wt"}
 	gh := command.Context{ActiveRepoID: "r", ActiveWorktreePath: "/gh"}
+	local := command.Context{ActiveRepoID: "l", ActiveWorktreePath: "/local"}
 	tests := []struct {
 		cmd  string
 		ctx  command.Context
@@ -51,6 +54,15 @@ func TestGitOpsAvailability(t *testing.T) {
 		{"pr.open", wt, false},
 		{"pr.open", gh, true},
 		{"view.open.url", command.Context{}, true},
+		// A local-only repository: nothing that talks to a remote.
+		{"git.fetch", local, false},
+		{"git.pull", local, false},
+		{"git.push", local, false},
+		{"pr.create", local, false},
+		{"pr.open", local, false},
+		{"worktree.open.editor", local, true},
+		{"worktree.reveal", local, true},
+		{"view.open.url", local, true},
 	}
 	for _, tt := range tests {
 		c, ok := reg.Get(tt.cmd)
@@ -60,6 +72,48 @@ func TestGitOpsAvailability(t *testing.T) {
 		if got := c.Available(tt.ctx); got != tt.want {
 			t.Errorf("%s available in %+v = %v, want %v", tt.cmd, tt.ctx, got, tt.want)
 		}
+	}
+}
+
+// Without a LocalOnly dependency every worktree is assumed to have a remote.
+func TestGitOpsAvailabilityWithoutLocalOnly(t *testing.T) {
+	reg := command.NewRegistry()
+	if err := command.RegisterGitOps(reg, command.GitOpsDeps{Backend: &commandtest.GitOps{}}); err != nil {
+		t.Fatal(err)
+	}
+	c, _ := reg.Get("git.push")
+	if !c.Available(command.Context{ActiveWorktreePath: "/local"}) {
+		t.Error("git.push unavailable with a nil LocalOnly")
+	}
+}
+
+func TestGitOpsUnavailableSaysWhy(t *testing.T) {
+	tests := []struct {
+		cmd     string
+		ctx     command.Context
+		args    map[string]string
+		wantMsg string
+	}{
+		{"git.fetch", command.Context{ActiveWorktreePath: "/local"}, nil, "git.fetch: not available in this context: repository has no remote"},
+		{"git.pull", command.Context{}, map[string]string{"worktree": "/local"}, "git.pull: not available in this context: repository has no remote"},
+		{"git.push", command.Context{ActiveWorktreePath: "/local"}, nil, "git.push: not available in this context: repository has no remote"},
+		{"pr.create", command.Context{ActiveWorktreePath: "/local"}, nil, "pr.create: not available in this context: repository has no remote"},
+		{"pr.open", command.Context{ActiveWorktreePath: "/local"}, nil, "pr.open: not available in this context: repository has no remote"},
+		{"pr.open", command.Context{ActiveWorktreePath: "/wt"}, nil, "pr.open: not available in this context: repository is not on GitHub"},
+		{"git.fetch", command.Context{}, nil, "git.fetch: not available in this context"},
+		{"pr.create", command.Context{}, nil, "pr.create: not available in this context"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.wantMsg, func(t *testing.T) {
+			reg, be := newGitOpsRegistry(t)
+			_, err := reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args)
+			if !errors.Is(err, command.ErrUnavailable) || err.Error() != tt.wantMsg {
+				t.Fatalf("err = %v, want %q", err, tt.wantMsg)
+			}
+			if n := len(be.Requests()); n != 0 {
+				t.Errorf("%d backend requests, want none", n)
+			}
+		})
 	}
 }
 

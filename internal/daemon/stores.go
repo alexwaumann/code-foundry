@@ -101,7 +101,8 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 	if s.session, err = session.New(ctx, session.Options{
 		DB: s.db, Terminals: s.terminal, Repos: s.repo, Bus: s.bus, Log: log.With("store", "session"),
 		NewDetector: newDetector, Claude: claude, CloseTimeout: cfg.CloseGrace(),
-		Namer: settingsNamer(s.settings, session.ClaudeNamer(claude, "/tmp")),
+		Namer:          settingsNamer(s.settings, session.ClaudeNamer(claude, "/tmp")),
+		AttachmentsDir: p.Attachments(), WorktreePath: settingsWorktreePath(s.settings),
 	}); err != nil {
 		return nil, err
 	}

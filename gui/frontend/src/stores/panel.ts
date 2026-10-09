@@ -45,6 +45,8 @@ export function keyOf(sel: Selection): string | null {
       return `worktree:${sel.repoId}:${sel.path}`;
     case "view":
       return `view:${sel.name}`;
+    case "compose":
+      return `compose:${sel.repoId}`;
   }
 }
 

@@ -41,7 +41,7 @@ func TestFieldParse(t *testing.T) {
 		{key: KeyFontSize, in: "13.5", err: `want an integer, got "13.5"`},
 		{key: KeyFetchInterval, in: "0", want: "0"},
 		{key: KeyDefaultModel, in: "opus", want: "opus"},
-		{key: KeyDefaultModel, in: "gpt-5", err: `want one of "", "fable", "opus", "sonnet", "haiku", got "gpt-5"`},
+		{key: KeyDefaultModel, in: "gpt-5", err: `want one of "fable", "opus", "sonnet", "haiku", got "gpt-5"`},
 		{key: KeyTheme, in: "Dark", err: `want one of "system", "dark", "light", got "Dark"`},
 		{key: KeyWorktreeDir, in: "~/wt/{repo}", want: "~/wt/{repo}"},
 		{key: KeyWorktreeDir, in: "wt", err: `want an absolute path, got "wt"`},

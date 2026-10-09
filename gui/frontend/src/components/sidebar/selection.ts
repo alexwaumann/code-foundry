@@ -11,6 +11,7 @@ export function selectionKey(sel: Selection): string | null {
     case "session":
       return sessionKey(sel.id);
     case "repo":
+    case "compose":
       return repoKey(sel.repoId);
     case "worktree":
       return worktreeKey(sel.repoId, sel.path);

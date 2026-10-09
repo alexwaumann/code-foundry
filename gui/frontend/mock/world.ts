@@ -8,7 +8,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { EventSource, type EventSchema } from "../src/gen/codefoundry/v1/events_pb";
 import type { RepoEventSchema, RepoSchema, WorktreeSchema } from "../src/gen/codefoundry/v1/repo_pb";
-import { SessionState, SessionStatus, type SessionEventSchema, type SessionSchema } from "../src/gen/codefoundry/v1/session_pb";
+import { PermissionMode, SessionState, SessionStatus, type SessionEventSchema, type SessionSchema } from "../src/gen/codefoundry/v1/session_pb";
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import { MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
@@ -45,8 +45,14 @@ interface MockSession {
   lastActivityAt: Date;
   exitCode: number;
   disconnectReason: string;
+  permissionMode: PermissionMode;
+  baseRef: string;
+  createdWorktree: boolean;
   /** Mock-only: seconds left before a STARTING/CLOSING session settles. */
   settleIn: number;
+  /** Mock-only: seconds until an unnamed session gets `pendingName` (background naming). */
+  nameIn: number;
+  pendingName: string;
 }
 
 interface ArgDef {
@@ -100,6 +106,8 @@ interface MockWorktree {
   path: string;
   branch: string;
   head: string;
+  /** HEAD is detached (branch is ""). */
+  detached?: boolean;
   isMain: boolean;
   status: { upstream: string; ahead: number; behind: number; staged: number; modified: number; untracked: number; dirty: boolean; baseRef?: string; baseAhead?: number; baseBehind?: number };
 }
@@ -110,6 +118,10 @@ interface MockRepo {
   name: string;
   defaultBranch: string;
   githubSlug: string;
+  /** git remotes; empty for a local-only repository (no fetch, pull, push or PRs). */
+  remotes: string[];
+  /** Local branches with no worktree (ListRefs lists them too). */
+  branches?: string[];
   worktrees: MockWorktree[];
 }
 
@@ -145,7 +157,22 @@ const HOME = "/Users/dev";
 const CF = `${HOME}/src/code-foundry`;
 const CFW = `${HOME}/src/code-foundry.worktrees`;
 const GP = `${HOME}/src/ghostty-playground`;
+const SK = `${HOME}/src/sketches`;
 const enc = new TextEncoder();
+
+/** session.new's `permission` arg values. */
+const permissionModes: Record<string, PermissionMode> = {
+  supervised: PermissionMode.SUPERVISED,
+  "accept-edits": PermissionMode.ACCEPT_EDITS,
+  auto: PermissionMode.AUTO,
+};
+
+/** "Add a dark mode toggle!" -> "add-a-dark-mode" (what the daemon's haiku naming stands in for). */
+export function promptSlug(prompt: string): string {
+  return prompt.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean).slice(0, 4).join("-");
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const HISTORY_CAP = 256 * 1024;
 
 function clean(over: Partial<MockWorktree["status"]> = {}): MockWorktree["status"] {
@@ -160,6 +187,7 @@ function initialRepos(): MockRepo[] {
       name: "code-foundry",
       defaultBranch: "main",
       githubSlug: "alexwaumann/code-foundry",
+      remotes: ["origin"],
       worktrees: [
         { path: CF, branch: "main", head: "3c3c4651", isMain: true, status: clean() },
         { path: `${CFW}/feat-sidebar`, branch: "feat/sidebar", head: "9a8b7c6d", isMain: false, status: clean({ upstream: "origin/feat/sidebar", ahead: 2, modified: 3, untracked: 1, dirty: true, baseAhead: 3, baseBehind: 1 }) },
@@ -172,6 +200,7 @@ function initialRepos(): MockRepo[] {
       name: "ghostty-playground",
       defaultBranch: "main",
       githubSlug: "alexwaumann/ghostty-playground",
+      remotes: ["origin"],
       worktrees: [{ path: GP, branch: "main", head: "77aa55cc", isMain: true, status: clean({ staged: 1, dirty: true }) }],
     },
     {
@@ -180,7 +209,20 @@ function initialRepos(): MockRepo[] {
       name: "dotfiles",
       defaultBranch: "main",
       githubSlug: "",
+      // A remote that is not GitHub: fetch/pull/push work, PRs do not.
+      remotes: ["origin"],
       worktrees: [{ path: `${HOME}/dotfiles`, branch: "main", head: "0badc0de", isMain: true, status: clean({ upstream: "", baseRef: "" }) }],
+    },
+    {
+      // Local only: no remote at all. Refs are local branches; the default base is "main".
+      id: "repo-sk",
+      path: SK,
+      name: "sketches",
+      defaultBranch: "main",
+      githubSlug: "",
+      remotes: [],
+      branches: ["experiment/shaders"],
+      worktrees: [{ path: SK, branch: "main", head: "5ca1ab1e", isMain: true, status: clean({ upstream: "", baseRef: "" }) }],
     },
   ];
 }
@@ -215,6 +257,12 @@ export class World {
   );
   /** EventService watchers that include UI intents (they count toward Emit's `delivered`). */
   uiEventWatchers = 0;
+  /** SessionService.StageAttachment uploads, by returned path. */
+  attachments = new Map<string, { name: string; mimeType: string; size: number }>();
+  /** How long session.new takes to create a worktree (ms). */
+  worktreeDelayMs = 700;
+  /** Bumped by reset(), so a session.new still sleeping from before a reset does nothing. */
+  private generation = 0;
   invocations: Invocation[] = [];
   writes: { id: string; data: string }[] = [];
   resizes: { id: string; cols: number; rows: number }[] = [];
@@ -231,6 +279,9 @@ export class World {
     this.terms.clear();
     this.repos.clear();
     this.invocations = [];
+    this.attachments.clear();
+    this.worktreeDelayMs = 700;
+    this.generation++;
     this.gitops.reset();
     this.settings.reset();
     this.writes = [];
@@ -277,7 +328,12 @@ export class World {
       lastActivityAt: new Date(),
       exitCode: 0,
       disconnectReason: "",
+      permissionMode: PermissionMode.AUTO,
+      baseRef: "",
+      createdWorktree: false,
       settleIn: 0,
+      nameIn: 0,
+      pendingName: "",
       ...o,
       state,
       terminalId,
@@ -311,6 +367,9 @@ export class World {
       lastActivityAt: timestampFromDate(s.lastActivityAt),
       exitCode: s.exitCode,
       disconnectReason: s.disconnectReason,
+      permissionMode: s.permissionMode,
+      baseRef: s.baseRef,
+      createdWorktree: s.createdWorktree,
     };
   }
 
@@ -366,9 +425,13 @@ export class World {
     return this.intents.publish(intent) + this.uiEventWatchers;
   }
 
-  private createSession(repoId: string, path: string, model: string, effort: string): MockSession {
+  /**
+   * A new session in STARTING. Unnamed for ~1s, then named `pendingName` (the daemon
+   * names it in the background), connected after ~2s.
+   */
+  private createSession(repoId: string, path: string, model: string, effort: string, extra: Partial<MockSession> = {}): MockSession {
     const id = `s-new-${String(this.nextId++)}`;
-    const s = this.addSession({ id, repoId, worktreePath: path, name: "", model, effort, state: SessionState.STARTING, settleIn: 2, createdAt: new Date() });
+    const s = this.addSession({ id, repoId, worktreePath: path, name: "", model, effort, state: SessionState.STARTING, settleIn: 2, nameIn: 1, pendingName: `thread-${id}`, createdAt: new Date(), ...extra });
     const t = this.terms.get(s.terminalId);
     if (t) this.publishTerm(t);
     this.publishSession(s);
@@ -388,13 +451,14 @@ export class World {
 
   private tickSessions(): void {
     for (const s of this.sessions.values()) {
+      if (s.nameIn > 0 && --s.nameIn === 0 && !s.name) {
+        s.name = s.pendingName;
+        this.publishSession(s);
+      }
       if (s.settleIn > 0 && --s.settleIn === 0) {
         if (s.state === SessionState.STARTING) {
           s.state = SessionState.CONNECTED;
           s.status = SessionStatus.IDLE;
-          if (!s.name) {
-            s.name = "New session";
-          }
           this.publishSession(s);
         } else if (s.state === SessionState.CLOSING) {
           this.disconnectSession(s.id, "closed", 0);
@@ -650,14 +714,107 @@ export class World {
     this.termEvents.publish({ event: { case: "removedId", value: id } });
   }
 
+  /**
+   * session.new like the daemon: an explicit worktree, or (new-worktree) a cf/<slug>
+   * worktree made from `base` first, which takes a moment. A prompt containing FAIL
+   * fails the way a git error would, before any session exists.
+   */
+  private async newSession(ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> {
+    const repo = this.repos.get(args.repo || ctx?.activeRepoId || "") ?? this.worktreeOf(ctx)?.repo;
+    if (!repo) throw new CommandError("invalid", "a worktree or repository is required");
+    const prompt = args.prompt ?? "";
+    const permission = args.permission ?? "";
+    if (permission && !(permission in permissionModes)) throw new CommandError("invalid", `permission must be supervised, accept-edits or auto`);
+    for (const p of (args.attachments ?? "").split(",").filter(Boolean)) {
+      if (!this.attachments.has(p)) throw new CommandError("invalid", `attachment ${p} was not staged`);
+    }
+    const slug = promptSlug(prompt);
+    const gen = this.generation;
+    const settle = async (ms: number) => {
+      await sleep(ms);
+      if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while session.new ran");
+    };
+    let path = args.worktree ?? "";
+    let baseRef = "";
+    const created = args["new-worktree"] === "true";
+    if (created) {
+      baseRef = args.base || (repo.remotes.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch);
+      await settle(this.worktreeDelayMs);
+      if (prompt.includes("FAIL")) {
+        throw new CommandError("unavailable", repo.remotes.length > 0 ? `create worktree: git fetch origin ${baseRef.replace(/^origin\//, "")}: exit status 128` : `create worktree: git worktree add: invalid reference: ${baseRef}`);
+      }
+      const branch = `cf/${slug || `s-new-${String(this.nextId)}`}`;
+      const w: MockWorktree = {
+        path: `${HOME}/.code-foundry/worktrees/${repo.githubSlug || `_local/${repo.name}`}/${branch.replace(/\//g, "-")}`,
+        branch,
+        head: "c0ffee00",
+        isMain: false,
+        status: clean({ upstream: "", baseRef }),
+      };
+      repo.worktrees.push(w);
+      this.repoEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(repo.id, w) } });
+      path = w.path;
+    } else {
+      path ||= repo.worktrees.find((w) => w.isMain)?.path ?? repo.path;
+      if (!repo.worktrees.some((w) => w.path === path)) throw new CommandError("invalid", `worktree ${path} is not in ${repo.name}`);
+      await settle(150);
+      if (prompt.includes("FAIL")) throw new CommandError("unavailable", "start claude: exec: \"claude\": executable file not found in $PATH");
+    }
+    const model = args.model || "opus";
+    const s = this.createSession(repo.id, path, model, args.effort ?? "", {
+      name: args.name ?? "",
+      autoNamed: !args.name,
+      // Named in the background a moment after it starts (1–2 ticks), like the daemon.
+      nameIn: args.name ? 0 : 2,
+      pendingName: slug || `thread-${String(this.nextId)}`,
+      permissionMode: permissionModes[permission] ?? PermissionMode.UNSPECIFIED,
+      baseRef,
+      createdWorktree: created,
+    });
+    this.focusSession(s.id);
+    return { message: `created session ${s.id} in ${path}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path }) };
+  }
+
+  /** SessionService.StageAttachment: keeps the bytes' size, returns a fake path. */
+  stageAttachment(name: string, mimeType: string, size: number): string {
+    if (!["image/png", "image/jpeg", "image/gif", "image/webp"].includes(mimeType)) throw new CommandError("invalid", `unsupported attachment type ${mimeType}`);
+    if (size > 10 * 1024 * 1024) throw new CommandError("invalid", "attachment larger than 10 MiB");
+    const ext = (/\.[a-z0-9]+$/i.exec(name)?.[0] ?? "").toLowerCase();
+    const path = `${HOME}/.code-foundry/attachments/att-${String(this.attachments.size + 1)}${ext}`;
+    this.attachments.set(path, { name, mimeType, size });
+    return path;
+  }
+
+  /** RepoService.ListRefs: local branches, then remote-tracking refs, and the default base. */
+  listRefs(repoId: string): { refs: string[]; defaultRef: string } {
+    const repo = this.repos.get(repoId);
+    if (!repo) throw new CommandError("notfound", `repo ${repoId} not found`);
+    const local = [...new Set([...repo.worktrees.map((w) => w.branch), ...(repo.branches ?? [])].filter(Boolean))].sort();
+    const remote = !repo.remotes.includes("origin") ? [] : repo.githubSlug ? ["origin/main", "origin/release/v0.3", "origin/feat/sidebar"].sort() : [`origin/${repo.defaultBranch}`];
+    return { refs: [...local, ...remote], defaultRef: remote.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch };
+  }
+
+  /** Test control: the worktree at `path` checks out `branch` ("" detaches HEAD). False when there is no such worktree. */
+  checkout(path: string, branch: string): boolean {
+    for (const repo of this.repos.values()) {
+      const w = repo.worktrees.find((x) => x.path === path);
+      if (!w) continue;
+      w.branch = branch;
+      w.detached = branch === "";
+      this.repoEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(repo.id, w) } });
+      return true;
+    }
+    return false;
+  }
+
   // ---- Repo API -----------------------------------------------------------------
 
   worktreeMsg(repoId: string, w: MockWorktree): WorktreeInit {
-    return { repoId, path: w.path, branch: w.branch, head: w.head, isMain: w.isMain, status: { ...w.status, refreshedAt: timestampFromDate(new Date()) } };
+    return { repoId, path: w.path, branch: w.branch, head: w.head, detached: w.detached ?? false, isMain: w.isMain, status: { ...w.status, refreshedAt: timestampFromDate(new Date()) } };
   }
 
   repoMsg(r: MockRepo): RepoInit {
-    return { id: r.id, path: r.path, name: r.name, defaultBranch: r.defaultBranch, githubSlug: r.githubSlug, worktrees: r.worktrees.map((w) => this.worktreeMsg(r.id, w)) };
+    return { id: r.id, path: r.path, name: r.name, defaultBranch: r.defaultBranch, githubSlug: r.githubSlug, remotes: r.remotes, worktrees: r.worktrees.map((w) => this.worktreeMsg(r.id, w)) };
   }
 
   // ---- Commands -----------------------------------------------------------------
@@ -817,27 +974,28 @@ export class World {
       {
         cmd: {
           name: "session.new",
-          title: "New Claude Session",
+          title: "New Thread",
           category: "Session",
-          description: "Start claude in the active worktree",
+          description: "Start Claude Code in a worktree (or a new one), with a first prompt",
           keybindings: ["cmd+n"],
           args: [
-            { name: "model", type: ArgType.ENUM, required: false, description: "Model", enumValues: ["opus", "sonnet", "haiku"], defaultValue: "opus" },
-            { name: "effort", type: ArgType.ENUM, required: false, description: "Effort", enumValues: ["low", "medium", "high", "xhigh", "max"] },
+            { name: "repo", type: ArgType.STRING, required: false, description: "Repository id" },
+            { name: "worktree", type: ArgType.PATH, required: false, description: "Worktree path" },
+            { name: "model", type: ArgType.ENUM, required: false, description: "Model", enumValues: ["fable", "opus", "sonnet", "haiku"], defaultValue: "opus" },
+            { name: "effort", type: ArgType.ENUM, required: false, description: "Effort", enumValues: ["low", "medium", "high", "xhigh", "max"], defaultValue: "high" },
+            { name: "permission", type: ArgType.ENUM, required: false, description: "Permission mode", enumValues: ["supervised", "accept-edits", "auto"] },
+            { name: "new-worktree", type: ArgType.BOOL, required: false, description: "Create a worktree for the thread" },
+            { name: "base", type: ArgType.STRING, required: false, description: "Base ref for the new worktree" },
+            { name: "name", type: ArgType.STRING, required: false, description: "Thread name" },
+            { name: "prompt", type: ArgType.STRING, required: false, description: "First prompt" },
+            { name: "attachments", type: ArgType.STRING, required: false, description: "Staged attachment paths, comma-separated" },
           ],
         },
-        when: (ctx) => this.worktreeOf(ctx) !== null,
-        run: (ctx, args) => {
-          const w = this.worktreeOf(ctx);
-          if (!w) throw new CommandError("unavailable", "no active worktree");
-          const model = args.model ?? "opus";
-          const s = this.createSession(w.repo.id, w.wt.path, model, args.effort ?? "");
-          this.focusSession(s.id);
-          return `Started Claude (${model}${args.effort ? `, ${args.effort}` : ""}) in ${w.wt.branch}`;
-        },
+        when: (ctx) => this.worktreeOf(ctx) !== null || Boolean(ctx?.activeRepoId && this.repos.has(ctx.activeRepoId)),
+        run: (ctx, args) => this.newSession(ctx, args),
       },
       {
-        cmd: { name: "session.close", title: "Close Session", category: "Session", description: "Exit Claude gracefully; the session stays, disconnected", keybindings: ["cmd+shift+w"], args: [] },
+        cmd: { name: "session.close", title: "Close Thread", category: "Session", description: "Exit Claude gracefully; the session stays, disconnected", keybindings: ["cmd+shift+w"], args: [] },
         when: (ctx) => activeSession(ctx)?.state === SessionState.CONNECTED,
         run: (ctx) => {
           const s = activeSession(ctx);
@@ -849,18 +1007,18 @@ export class World {
         },
       },
       {
-        cmd: { name: "session.fork", title: "Fork Session", category: "Session", description: "Start a new session that continues this one's conversation", keybindings: [], args: [{ name: "name", type: ArgType.STRING, required: false, description: "Name for the fork" }] },
+        cmd: { name: "session.fork", title: "Fork Thread", category: "Session", description: "Start a new session that continues this one's conversation", keybindings: [], args: [{ name: "name", type: ArgType.STRING, required: false, description: "Name for the fork" }] },
         when: (ctx) => activeSession(ctx) !== undefined,
         run: (ctx) => {
           const s = activeSession(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
-          const f = this.createSession(s.repoId, s.worktreePath, s.model, s.effort);
+          const f = this.createSession(s.repoId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode });
           this.focusSession(f.id);
           return `Forked ${s.name || s.id}`;
         },
       },
       {
-        cmd: { name: "session.reconnect", title: "Reconnect Session", category: "Session", description: "Resume the session in a new terminal (claude --resume)", keybindings: ["cmd+shift+r"], args: [] },
+        cmd: { name: "session.reconnect", title: "Reconnect Thread", category: "Session", description: "Resume the session in a new terminal (claude --resume)", keybindings: ["cmd+shift+r"], args: [] },
         when: (ctx) => activeSession(ctx)?.state === SessionState.DISCONNECTED,
         run: (ctx) => {
           const s = activeSession(ctx);
@@ -870,7 +1028,7 @@ export class World {
         },
       },
       {
-        cmd: { name: "session.rename", title: "Rename Session", category: "Session", description: "Set the session's name", keybindings: ["cmd+r"], args: [{ name: "name", type: ArgType.STRING, required: true, description: "New name" }] },
+        cmd: { name: "session.rename", title: "Rename Thread", category: "Session", description: "Set the session's name", keybindings: ["cmd+r"], args: [{ name: "name", type: ArgType.STRING, required: true, description: "New name" }] },
         when: (ctx) => activeSession(ctx) !== undefined,
         run: (ctx, args) => {
           const s = activeSession(ctx);
@@ -883,7 +1041,7 @@ export class World {
       },
       {
         cmd: {
-          name: "session.remove", title: "Remove Session", category: "Session", description: "Forget the session (closes it first if connected)", keybindings: [], args: [],
+          name: "session.remove", title: "Remove Thread", category: "Session", description: "Forget the session (closes it first if connected)", keybindings: [], args: [],
           confirm: (ctx) => `Remove session ${ctx?.activeSessionId ?? ""}? It is closed first if connected, and its row is forgotten.`,
         },
         when: (ctx) => activeSession(ctx) !== undefined,
@@ -935,7 +1093,7 @@ export class World {
           const path = (args.path ?? "").replace(/^~(?=\/|$)/, HOME).replace(/\/+$/, "");
           const name = path.split("/").pop() || path;
           const id = `repo-${name}`;
-          const repo: MockRepo = { id, path, name, defaultBranch: "main", githubSlug: "", worktrees: [{ path, branch: "main", head: "deadbeef", isMain: true, status: clean() }] };
+          const repo: MockRepo = { id, path, name, defaultBranch: "main", githubSlug: "", remotes: [], worktrees: [{ path, branch: "main", head: "deadbeef", isMain: true, status: clean() }] };
           this.repos.set(id, repo);
           this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
           return `Registered ${name}`;
@@ -1028,7 +1186,7 @@ export class World {
       ...this.gitops.entries((path) => {
         for (const repo of this.repos.values()) {
           const wt = repo.worktrees.find((w) => w.path === path);
-          if (wt) return { repoId: repo.id, path: wt.path, branch: wt.branch, githubSlug: repo.githubSlug };
+          if (wt) return { repoId: repo.id, path: wt.path, branch: wt.branch, githubSlug: repo.githubSlug, hasRemote: repo.remotes.length > 0 };
         }
         return null;
       }),

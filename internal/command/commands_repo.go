@@ -61,7 +61,7 @@ func RegisterRepo(r *Registry, b RepoBackend) error {
 			Category:    "Repository",
 			Args:        []ArgSpec{repoArg},
 			When:        hasRepo,
-			Confirm:     "Stop tracking repository {repo}? Its sessions lose their worktree; nothing on disk is touched.",
+			Confirm:     "Stop tracking repository {repo}? Its threads lose their worktree; nothing on disk is touched.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("repo")
 				if _, err := b.Unregister(ctx, connect.NewRequest(&v1.UnregisterRepoRequest{Id: id})); err != nil {
@@ -79,6 +79,7 @@ func RegisterRepo(r *Registry, b RepoBackend) error {
 				repoArg,
 				{Name: "branch", Type: String, Required: true, Description: "Branch to check out"},
 				{Name: "base", Type: String, Description: "Ref to branch from (default: the default branch)"},
+				{Name: "fetch", Type: Bool, Default: "true", Description: "Fetch the remote base branch first (bounded; a failed fetch uses the local copy)"},
 			},
 			When: hasRepo,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -86,6 +87,7 @@ func RegisterRepo(r *Registry, b RepoBackend) error {
 					RepoId:  a.String("repo"),
 					Branch:  a.String("branch"),
 					BaseRef: a.String("base"),
+					Fetch:   a.Bool("fetch"),
 				}))
 				if err != nil {
 					return Result{}, err

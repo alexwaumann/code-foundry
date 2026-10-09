@@ -38,8 +38,8 @@ type Settings struct {
 
 // Sessions are defaults for new Claude Code sessions.
 type Sessions struct {
-	DefaultModel      string // "" = Claude's default
-	DefaultEffort     string // "" = Claude's default
+	DefaultModel      string // default "opus"
+	DefaultEffort     string // default "high"
 	AutoName          bool
 	CloseGraceSeconds int
 	ScrollbackLines   int

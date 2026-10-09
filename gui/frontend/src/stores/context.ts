@@ -30,7 +30,7 @@ function allWorktrees(repos: ReposData): WorktreeRef[] {
 /**
  * Derives the UiContext the daemon sees from the current selection. A terminal's
  * repo/worktree come from the same placement the sidebar uses. Selecting a repo row
- * counts as looking at its main worktree. A session contributes its attached terminal
+ * counts as looking at its main worktree; the composer only at its repo. A session contributes its attached terminal
  * (if any) so terminal.* commands apply to it.
  */
 export function deriveContext(sel: Selection, terminals: TerminalsData, repos: ReposData, sessions: SessionsData = { byId: {}, order: [] }): UiContextView {
@@ -68,6 +68,10 @@ export function deriveContext(sel: Selection, terminals: TerminalsData, repos: R
     }
     case "worktree":
       return { ...emptyContext, activeRepoId: sel.repoId, activeWorktreePath: sel.path, activeView: "worktree" };
+    // The composer has no worktree yet (it may make one): only the repo, which is
+    // what session.new needs to be available.
+    case "compose":
+      return { ...emptyContext, activeRepoId: sel.repoId, activeView: "compose" };
     case "view":
       return { ...emptyContext, activeView: sel.name };
   }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
+	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 )
 
@@ -30,6 +31,22 @@ func TestWorktreePath(t *testing.T) {
 		if got := worktreePath(tt.dir, tt.repo, tt.branch); got != tt.want {
 			t.Errorf("worktreePath(%q, %q, %q) = %q, want %q", tt.dir, tt.repo, tt.branch, got, tt.want)
 		}
+	}
+}
+
+// repos.worktree_dir applies live to the worktrees new threads create.
+func TestSettingsWorktreePath(t *testing.T) {
+	st := openSettings(t)
+	pick := settingsWorktreePath(st)
+	r := repo.Repo{ID: "r1", Name: "cf"}
+	if got := pick(r, "cf/fix-x"); got != "" {
+		t.Errorf("unset setting = %q, want the repo store's default", got)
+	}
+	if _, err := st.Update(context.Background(), map[string]string{settings.KeyWorktreeDir: "/wt/{repo}"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := pick(r, "cf/fix-x"); got != "/wt/cf/cf-fix-x" {
+		t.Errorf("with setting = %q", got)
 	}
 }
 
@@ -110,14 +127,14 @@ func TestApplySettings(t *testing.T) {
 		t.Errorf("log level = %v", level.Level())
 	}
 
-	// Back to Claude's defaults.
-	if _, err := st.Update(context.Background(), map[string]string{settings.KeyDefaultModel: ""}); err != nil {
+	// Reset: back to the settings defaults (opus, high).
+	if _, err := st.Update(context.Background(), map[string]string{settings.KeyDefaultModel: "", settings.KeyDefaultEffort: ""}); err != nil {
 		t.Fatal(err)
 	}
-	if c, _ := reg.Get("session.new"); c.Args[0].Default != "" {
-		t.Errorf("model default after reset = %q", c.Args[0].Default)
+	if c, _ := reg.Get("session.new"); c.Args[0].Default != "opus" || c.Args[1].Default != "high" {
+		t.Errorf("defaults after reset = %q/%q", c.Args[0].Default, c.Args[1].Default)
 	}
-	if c, _ := reg.Get("pr.fix.findings"); argDefault(c, "model") != "" || argDefault(c, "effort") != "high" {
+	if c, _ := reg.Get("pr.fix.findings"); argDefault(c, "model") != "opus" || argDefault(c, "effort") != "high" {
 		t.Errorf("pr.fix.findings defaults after reset = %q/%q", argDefault(c, "model"), argDefault(c, "effort"))
 	}
 }

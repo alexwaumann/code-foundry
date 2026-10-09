@@ -107,12 +107,16 @@ start; the Wails host reads them and injects them into the page before load.
 Services (v1):
 
 * `SessionService` — Create, Fork, List, Get, Rename, Close, Reconnect, Remove, Watch
-  (server stream). A session carries lifecycle `state` (starting, connected, closing,
+  (server stream), StageAttachment (images the first prompt refers to). Create can make
+  the worktree first (`new_worktree`), passes the first prompt as claude's positional
+  argument, and carries a permission mode (never bypassPermissions); see
+  `docs/notes/new-thread-composer.md`. A session carries lifecycle `state` (starting, connected, closing,
   disconnected) and detector `status` (busy, idle, needs-attention) with `status_reason`.
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
   chunks), Write (input bytes), Resize, Detach.
-* `RepoService` — Register, Unregister, List, ListWorktrees, CreateWorktree, Watch,
-  GetWorktreeDetail (files and log against the base branch, Phase 3a).
+* `RepoService` — Register, Unregister, List, ListWorktrees, CreateWorktree (optionally
+  fetching the base first), ListRefs, Watch, GetWorktreeDetail (files and log against
+  the base branch, Phase 3a).
 * `GhService` — GetViewer, GetDashboard, GetRepoActivity, GetBranchPullRequests (the
   viewer's PR dashboards, monthly stats, default-branch CI, the viewer's PRs on a
   branch), GetPullRequest and ListChecks (on demand), Refresh, Track, Untrack, Watch.
@@ -172,7 +176,8 @@ PTY (creack/pty) ──reader goroutine──► tee ──► libghostty-vt (fe
 
 Layers Claude-specific knowledge on top of terminal:
 
-* Spawns `claude` in a worktree with the chosen model/effort flags, records the Claude
+* Spawns `claude` in a worktree with the chosen model/effort/permission-mode flags and
+  the first prompt as a positional argument, records the Claude
   session id (from `~/.claude/projects/<slug>/*.jsonl`) so dead sessions can be resumed
   with `claude --resume`.
 * **Status detection** (busy / idle / needs-attention) derives from observing the output

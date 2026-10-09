@@ -24,11 +24,12 @@ type Fake struct {
 	// Err, when set, is returned by every mutating method.
 	Err error
 
-	mu    sync.Mutex
-	next  int
-	byID  map[string]session.Session
-	snap  *session.Snapshot
-	calls []string
+	mu     sync.Mutex
+	next   int
+	staged int
+	byID   map[string]session.Session
+	snap   *session.Snapshot
+	calls  []string
 }
 
 var _ session.Store = (*Fake)(nil)
@@ -128,11 +129,45 @@ func (f *Fake) add(call string, s session.Session) (session.Session, error) {
 	return s, nil
 }
 
-// Create records the call and adds a STARTING session ("s-N", terminal "t-N").
+// Create records the call and adds a STARTING session ("s-N", terminal "t-N"). With
+// NewWorktree the session's worktree is /worktrees/cf-<N> (CreatedWorktree, BaseRef as
+// requested). The call reads "Create <repo> <path> <model> <effort>", then " perm=<n>",
+// " new-worktree=<base>", " prompt=<text>" and " attachments=<a,b>" when set.
 func (f *Fake) Create(_ context.Context, o session.CreateOptions) (session.Session, error) {
-	return f.add(fmt.Sprintf("Create %s %s %s %s", o.RepoID, o.WorktreePath, o.Model, o.Effort), session.Session{
+	call := fmt.Sprintf("Create %s %s %s %s", o.RepoID, o.WorktreePath, o.Model, o.Effort)
+	s := session.Session{
 		RepoID: o.RepoID, WorktreePath: o.WorktreePath, Model: o.Model, Effort: o.Effort, Name: o.Name,
-	})
+		PermissionMode: o.PermissionMode,
+	}
+	if o.PermissionMode != session.PermissionDefault {
+		call += fmt.Sprintf(" perm=%d", o.PermissionMode)
+	}
+	if o.NewWorktree != nil {
+		call += " new-worktree=" + o.NewWorktree.BaseRef
+		f.mu.Lock()
+		s.WorktreePath = fmt.Sprintf("/worktrees/cf-%d", f.next+1)
+		f.mu.Unlock()
+		s.CreatedWorktree, s.BaseRef = true, o.NewWorktree.BaseRef
+	}
+	if o.InitialPrompt != "" {
+		call += " prompt=" + o.InitialPrompt
+	}
+	if len(o.Attachments) > 0 {
+		call += " attachments=" + strings.Join(o.Attachments, ",")
+	}
+	return f.add(call, s)
+}
+
+// StageAttachment records "StageAttachment <name> <mime> <len>" and returns
+// /attachments/<N>-<name>.
+func (f *Fake) StageAttachment(_ context.Context, name, mimeType string, data []byte) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.record(fmt.Sprintf("StageAttachment %s %s %d", name, mimeType, len(data))); err != nil {
+		return "", err
+	}
+	f.staged++
+	return fmt.Sprintf("/attachments/%d-%s", f.staged, name), nil
 }
 
 // Fork adds a STARTING session with ParentID set.
@@ -145,7 +180,7 @@ func (f *Fake) Fork(_ context.Context, id, name string) (session.Session, error)
 	}
 	return f.add("Fork "+id, session.Session{
 		RepoID: parent.RepoID, WorktreePath: parent.WorktreePath, Model: parent.Model, Effort: parent.Effort,
-		Name: name, ParentID: id,
+		Name: name, ParentID: id, PermissionMode: parent.PermissionMode,
 	})
 }
 

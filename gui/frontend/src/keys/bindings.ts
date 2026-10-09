@@ -3,6 +3,7 @@ import { promptedArgs } from "@/palette/args";
 import { leafOrder, nextAfter, sessionOrder } from "@/lib/tree";
 import { refreshCommands, runCommand, useCommandsStore, whenListed } from "@/stores/commands";
 import { contextKey, getTreeInputs, getUiContext } from "@/stores/context";
+import { openNewThreadPicker } from "@/stores/compose";
 import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { zoomFont } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
@@ -71,7 +72,7 @@ export const viewActions: readonly ViewAction[] = [
   { chord: "cmd+k", title: "Command palette", run: togglePalette },
   { chord: "cmd+shift+p", title: "Command palette", run: togglePalette },
   { chord: "cmd+b", title: "Toggle sidebar", run: toggleSidebar },
-  { chord: "cmd+shift+a", title: "Next session needing attention", run: () => void jumpToAttention() },
+  { chord: "cmd+shift+a", title: "Next thread needing attention", run: () => void jumpToAttention() },
   ...Array.from({ length: 9 }, (_, i) => ({
     chord: `cmd+${String(i + 1)}`,
     title: `Jump to item ${String(i + 1)}`,
@@ -91,14 +92,29 @@ export function isViewActionChord(chord: string): boolean {
   return viewActionMap.has(normalizeChord(chord) ?? chord);
 }
 
+/**
+ * Commands whose GUI presenter supplies the context the daemon needs: session.new's
+ * project picker picks the repo. They start (palette, chord, button) even where the
+ * daemon lists them as unavailable, e.g. with nothing selected.
+ */
+const contextSupplied: ReadonlySet<string> = new Set(["session.new"]);
+
+/** Whether the GUI can start this command here (see contextSupplied). */
+export function isStartable(c: CommandView): boolean {
+  return c.available || contextSupplied.has(c.name);
+}
+
+/** Presenters that also replace the palette's arg prompts when the command is picked there. */
+const paletteSupplied: ReadonlySet<string> = new Set(["session.new"]);
+
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
-/** chord -> command, from Command.keybindings. Only available commands bind. */
+/** chord -> command, from Command.keybindings. Only startable commands bind. */
 export function commandBindings(commands: readonly CommandView[]): Map<string, CommandView> {
   if (bindingCache?.commands === commands) return bindingCache.map;
   const map = new Map<string, CommandView>();
   for (const c of commands) {
-    if (!c.available) continue;
+    if (!isStartable(c)) continue;
     for (const k of c.keybindings) {
       const chord = normalizeChord(k);
       if (chord && !map.has(chord)) map.set(chord, c);
@@ -139,6 +155,11 @@ export function beginRename(sessionId: string | null = getUiContext().activeSess
  */
 const commandPresenters: Readonly<Record<string, () => boolean>> = {
   "session.rename": () => beginRename(),
+  // The project picker, then the composer; the composer invokes session.new.
+  "session.new": () => {
+    openNewThreadPicker();
+    return true;
+  },
   // Window-local: only this window opens, without a round trip (the CLI and palette
   // reach every window through UiIntent.ShowView instead).
   "view.settings": () => showView("settings"),
@@ -177,6 +198,11 @@ export function presentCommand(name: string): boolean {
   return commandPresenters[name]?.() ?? false;
 }
 
+/** Picked in the palette: runs its presenter instead of the arg prompts, if it has that kind. */
+export function presentInPalette(name: string): boolean {
+  return paletteSupplied.has(name) && presentCommand(name);
+}
+
 /** Starts a command from the keyboard or palette: prompts for args it needs, else invokes. */
 export function startCommand(c: CommandView): void {
   if (presentCommand(c.name)) return;
@@ -186,7 +212,7 @@ export function startCommand(c: CommandView): void {
 
 /** startCommand for a command by name, when it is available in the current context. */
 export function startCommandNamed(name: string): boolean {
-  const c = useCommandsStore.getState().commands.find((x) => x.name === name && x.available);
+  const c = useCommandsStore.getState().commands.find((x) => x.name === name && isStartable(x));
   if (c) startCommand(c);
   return c !== undefined;
 }
@@ -199,7 +225,8 @@ function isEditable(el: Element | null): boolean {
 
 /**
  * Key precedence:
- *  1. Global view actions (cmd+k, cmd+shift+p, cmd+b, cmd+shift+a, cmd+1..9, zoom) always win.
+ *  1. Global view actions (cmd+k, cmd+shift+p, cmd+b, cmd+shift+a, cmd+1..9, zoom) always win
+ *     (cmd+1..9 belong to the project picker while it is open).
  *  2. A focused terminal consumes everything else, except cmd chords bound to commands
  *     (see terminalYields).
  *  3. A focused text field (palette input, rename field) consumes everything else.
@@ -212,6 +239,9 @@ export function handleKeyDown(e: KeyboardEvent): void {
   if (e.target instanceof Element && e.target.closest("[data-key-recorder]")) return;
   const chord = chordFromEvent(e);
   if (!chord) return;
+  // The project picker takes cmd+1..9 for its rows (the picker handles them itself).
+  const palette = useUiStore.getState().palette;
+  if (palette.open && palette.page === "projects" && /^cmd\+[1-9]$/.test(chord)) return;
   const action = viewActionMap.get(chord);
   if (action) {
     e.preventDefault();

@@ -77,7 +77,7 @@ func newWorld(t *testing.T, opts Options) *world {
 	git(t, root, "clone", "-q", w.origin, w.b)
 
 	w.repos = repotest.New(w.bus)
-	w.repos.Put(repo.Repo{ID: "ra", Path: w.a, Name: "a", GitHubSlug: "me/a", Worktrees: []repo.Worktree{{RepoID: "ra", Path: w.a, Branch: "main", IsMain: true}}})
+	w.repos.Put(repo.Repo{ID: "ra", Path: w.a, Name: "a", GitHubSlug: "me/a", Remotes: []string{"origin"}, Worktrees: []repo.Worktree{{RepoID: "ra", Path: w.a, Branch: "main", IsMain: true}}})
 	opts.Bus, opts.Repos = w.bus, w.repos
 	w.m = New(opts)
 	t.Cleanup(func() { _ = w.m.Close() })
@@ -383,5 +383,56 @@ func TestGitHubSlug(t *testing.T) {
 		if got := w.m.GitHubSlug(tt.repoID, tt.path); got != tt.want {
 			t.Errorf("GitHubSlug(%q, %q) = %q, want %q", tt.repoID, tt.path, got, tt.want)
 		}
+	}
+}
+
+func TestLocalOnly(t *testing.T) {
+	w := newWorld(t, Options{})
+	local := resolved(t, t.TempDir())
+	git(t, local, "init", "-q")
+	commit(t, local, "README", "local\n", "initial")
+	main := []repo.Worktree{{RepoID: "rl", Path: local, Branch: "main", IsMain: true}}
+	w.repos.Put(repo.Repo{ID: "rl", Path: local, Name: "momentum", Worktrees: main})
+	// Not reconciled yet (no worktrees) and failing to reconcile: remotes unknown.
+	w.repos.Put(repo.Repo{ID: "pending", Path: "/nowhere/pending", Name: "pending"})
+	w.repos.Put(repo.Repo{ID: "broken", Path: "/nowhere/broken", Name: "broken", Error: "gone",
+		Worktrees: []repo.Worktree{{RepoID: "broken", Path: "/nowhere/broken", IsMain: true}}})
+
+	tests := []struct {
+		repoID, path string
+		want         bool
+	}{
+		{"rl", "", true},
+		{"", local, true},
+		{"ra", local, true}, // the worktree path wins over the repo id
+		{"rl", w.a, false},
+		{"ra", "", false},
+		{"", w.b, false}, // unregistered: unknown, so not local-only
+		{"nope", "", false},
+		{"pending", "", false},
+		{"broken", "", false},
+		{"", "", false},
+	}
+	for _, tt := range tests {
+		if got := w.m.LocalOnly(tt.repoID, tt.path); got != tt.want {
+			t.Errorf("LocalOnly(%q, %q) = %v, want %v", tt.repoID, tt.path, got, tt.want)
+		}
+	}
+
+	ctx := context.Background()
+	ops := map[string]func() (Op, error){
+		"fetch":     func() (Op, error) { return w.m.Fetch(ctx, FetchOptions{WorktreePath: local}) },
+		"pull":      func() (Op, error) { return w.m.Pull(ctx, PullOptions{WorktreePath: local}) },
+		"push":      func() (Op, error) { return w.m.Push(ctx, PushOptions{WorktreePath: local}) },
+		"create pr": func() (Op, error) { return w.m.CreatePR(ctx, CreatePROptions{WorktreePath: local}) },
+		"open pr":   func() (Op, error) { return w.m.OpenPR(ctx, local) },
+	}
+	for name, op := range ops {
+		if _, err := op(); !errors.Is(err, ErrNoRemote) || !strings.Contains(err.Error(), "momentum: repository has no remote") {
+			t.Errorf("%s: err = %v, want ErrNoRemote", name, err)
+		}
+	}
+	if n := len(w.m.Snapshot().Ops); n != 0 {
+		t.Errorf("%d ops recorded, want none", n)
 	}
 }

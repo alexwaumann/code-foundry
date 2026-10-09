@@ -43,10 +43,10 @@ function RestartSection() {
   return (
     <section className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3" data-testid="update-restart-section">
       <p className="text-amber-300">
-        Daemon restart pending; <span data-testid="restart-sessions">{plural(sessions, "session")}</span> will close.
+        Daemon restart pending; <span data-testid="restart-sessions">{plural(sessions, "thread")}</span> will close.
       </p>
       <p className="text-xs text-muted-foreground">
-        The daemon keeps running the old version, with your sessions, until it restarts. Closed sessions stay in the sidebar and can be reconnected.
+        The daemon keeps running the old version, with your threads, until it restarts. Closed threads stay in the sidebar and can be reconnected.
       </p>
       <ActionButton action="restart" variant="outline">
         Restart daemon…
@@ -102,7 +102,7 @@ function Body({ st, guiVersion }: { st: UpdateStatusView; guiVersion: string | n
           {(st.state === "installed" || guiStale) && guiVersion !== target && (
             <section className="space-y-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3" data-testid="update-relaunch-section">
               <p className="text-emerald-300">Ready: relaunch to apply.</p>
-              <p className="text-xs text-muted-foreground">The window reopens on the new version. Sessions keep running.</p>
+              <p className="text-xs text-muted-foreground">The window reopens on the new version. Threads keep running.</p>
               <ActionButton action="relaunch">Relaunch</ActionButton>
             </section>
           )}

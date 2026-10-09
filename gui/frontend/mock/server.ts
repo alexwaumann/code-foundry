@@ -15,6 +15,12 @@
  *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
  *   POST /__mock/sessions-service?enabled=false   (simulate a daemon without SessionService)
+ *   POST /__mock/missing-rpc?rpc=RepoService/ListRefs&rpc=SessionService/StageAttachment
+ *                                                 (simulate a daemon older than those RPCs: 404)
+ *   POST /__mock/session-new?delay=700            (how long session.new takes to make a worktree)
+ *   POST /__mock/worktree/checkout?path=…&branch=…   (the worktree switches branch; no branch detaches HEAD)
+ *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size)
+ *   session.new with a prompt containing FAIL fails (after the worktree delay, if any).
  *   POST /__mock/gitops?fail=git.push&delay=800   (next git.push fails; ops take 800ms)
  *   GET  /__mock/gitops
  *   GET  /__mock/settings                          ({ raw, values } of the settings "file")
@@ -63,6 +69,8 @@ const token = process.env.MOCK_TOKEN ?? "dev-mock-token";
 const world = new World();
 /** False simulates a pre-Phase-2a daemon (see POST /__mock/sessions-service). */
 let sessionsEnabled = true;
+/** "Service/Method" paths that 404 like a daemon built before they existed. */
+const missingRpcs = new Set<string>();
 
 function rpcError(err: unknown): ConnectError {
   if (err instanceof ConnectError) return err;
@@ -157,6 +165,7 @@ function routes(router: ConnectRouter): void {
       throw new ConnectError("use the worktree.remove command in the mock", Code.Unimplemented);
     },
     refresh: () => ({}),
+    listRefs: (req) => guard(() => world.listRefs(req.repoId)),
     getWorktreeDetail: (req) => {
       const detail = world.gh.getWorktreeDetail(req.repoId, req.path);
       if (!detail) throw new ConnectError(`worktree ${req.path} not found`, Code.NotFound);
@@ -239,6 +248,7 @@ function routes(router: ConnectRouter): void {
     remove: () => {
       throw new ConnectError("use the session.remove command in the mock", Code.Unimplemented);
     },
+    stageAttachment: (req) => guard(() => ({ path: world.stageAttachment(req.name, req.mimeType, req.data.length) })),
     watch: (_req, ctx) => tracked("SessionService/Watch", world.sessionEvents.subscribe(ctx.signal, [world.sessionSnapshot()])),
   });
 
@@ -415,11 +425,28 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       sessionsEnabled = q.get("enabled") !== "false";
       json(res, 200, { enabled: sessionsEnabled });
       break;
+    case "POST /__mock/missing-rpc":
+      for (const rpc of q.getAll("rpc")) missingRpcs.add(rpc);
+      json(res, 200, { missing: [...missingRpcs] });
+      break;
     case "POST /__mock/gitops":
       // fail=git.push makes that command's next op fail; delay=ms sets how long ops run.
       for (const name of q.getAll("fail")) world.gitops.failNext.add(name);
       if (q.has("delay")) world.gitops.delayMs = Number(q.get("delay"));
       json(res, 200, { fail: [...world.gitops.failNext], delayMs: world.gitops.delayMs });
+      break;
+    case "POST /__mock/worktree/checkout": {
+      // path=…&branch=… (no branch, or empty: detached HEAD).
+      const ok = world.checkout(q.get("path") ?? "", q.get("branch") ?? "");
+      json(res, ok ? 200 : 404, { ok });
+      break;
+    }
+    case "POST /__mock/session-new":
+      if (q.has("delay")) world.worktreeDelayMs = Number(q.get("delay"));
+      json(res, 200, { delayMs: world.worktreeDelayMs });
+      break;
+    case "GET /__mock/attachments":
+      json(res, 200, [...world.attachments].map(([path, a]) => ({ path, ...a })));
       break;
     case "GET /__mock/gitops":
       json(res, 200, world.gitops.summaries());
@@ -490,6 +517,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/reset":
       sessionsEnabled = true;
+      missingRpcs.clear();
       world.reset();
       json(res, 200, { ok: true });
       break;
@@ -520,6 +548,11 @@ const server = createServer((req, res) => {
     return;
   }
   if (!sessionsEnabled && url.pathname.startsWith("/codefoundry.v1.SessionService/")) {
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end("404 page not found\n");
+    return;
+  }
+  if (missingRpcs.has(url.pathname.replace(/^\/codefoundry\.v1\./, ""))) {
     res.writeHead(404, { "Content-Type": "text/plain" });
     res.end("404 page not found\n");
     return;

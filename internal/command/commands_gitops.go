@@ -37,7 +37,14 @@ type GitOpsDeps struct {
 	// GitHubSlug returns the GitHub "owner/name" of the context's worktree (or repo), or
 	// "". pr.* are available only when it is non-empty. Nil means never.
 	GitHubSlug func(Context) string
+	// LocalOnly reports whether the context's worktree (or repo) belongs to a registered
+	// repository with no git remote. git.fetch, git.pull, git.push and pr.* are
+	// unavailable then. Nil means never.
+	LocalOnly func(Context) bool
 }
+
+// noRemote is why remote operations are unavailable in a local-only repository.
+const noRemote = "repository has no remote"
 
 func hasActiveWorktree(c Context) bool { return c.ActiveWorktreePath != "" }
 
@@ -94,17 +101,41 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 	if slug == nil {
 		slug = func(Context) string { return "" }
 	}
-	hasGitHub := func(c Context) bool { return c.ActiveWorktreePath != "" && slug(c) != "" }
+	localOnly := d.LocalOnly
+	if localOnly == nil {
+		localOnly = func(Context) bool { return false }
+	}
+	hasRemote := func(c Context) bool { return hasActiveWorktree(c) && !localOnly(c) }
+	hasGitHub := func(c Context) bool { return hasRemote(c) && slug(c) != "" }
+	// whyNoGitHub explains an unavailable pr.* command once a worktree is known.
+	whyNoGitHub := func(c Context) string {
+		switch {
+		case !hasActiveWorktree(c):
+			return ""
+		case localOnly(c):
+			return noRemote
+		case slug(c) == "":
+			return "repository is not on GitHub"
+		}
+		return ""
+	}
+	whyNoRemote := func(c Context) string {
+		if hasActiveWorktree(c) && localOnly(c) {
+			return noRemote
+		}
+		return ""
+	}
 	wt := ArgSpec{Name: "worktree", Type: Path, Required: true, Context: ContextWorktree, Description: "Worktree path"}
 	return r.RegisterAll(
 		Command{
-			Name:        "git.fetch",
-			Title:       "Git: Fetch",
-			Description: "Fetch from the remote and prune deleted branches (git fetch --prune).",
-			Category:    "Git",
-			Keybindings: []string{"cmd+shift+f"},
-			Args:        []ArgSpec{wt},
-			When:        hasActiveWorktree,
+			Name:           "git.fetch",
+			Title:          "Git: Fetch",
+			Description:    "Fetch from the remote and prune deleted branches (git fetch --prune).",
+			Category:       "Git",
+			Keybindings:    []string{"cmd+shift+f"},
+			Args:           []ArgSpec{wt},
+			When:           hasRemote,
+			WhyUnavailable: whyNoRemote,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Fetch(ctx, connect.NewRequest(&v1.GitFetchRequest{WorktreePath: a.Path("worktree")}))
 				return opResult(res, err)
@@ -119,7 +150,8 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 			Args: []ArgSpec{wt,
 				{Name: "rebase", Type: Bool, Description: "Rebase local commits onto the upstream instead of requiring a fast-forward"},
 			},
-			When: hasActiveWorktree,
+			When:           hasRemote,
+			WhyUnavailable: whyNoRemote,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Pull(ctx, connect.NewRequest(&v1.GitPullRequest{WorktreePath: a.Path("worktree"), Rebase: a.Bool("rebase")}))
 				return opResult(res, err)
@@ -134,7 +166,8 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 			Args: []ArgSpec{wt,
 				{Name: "force-with-lease", Type: Bool, Description: "Overwrite the remote branch if it is where we last saw it"},
 			},
-			When: hasActiveWorktree,
+			When:           hasRemote,
+			WhyUnavailable: whyNoRemote,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Push(ctx, connect.NewRequest(&v1.GitPushRequest{WorktreePath: a.Path("worktree"), ForceWithLease: a.Bool("force-with-lease")}))
 				return opResult(res, err)
@@ -151,7 +184,8 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 				{Name: "draft", Type: Bool, Description: "Open as a draft"},
 				{Name: "base", Type: String, Description: "Base branch (default: the repository's default branch)"},
 			},
-			When: hasGitHub,
+			When:           hasGitHub,
+			WhyUnavailable: whyNoGitHub,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.CreatePullRequest(ctx, connect.NewRequest(&v1.CreatePullRequestRequest{
 					WorktreePath: a.Path("worktree"), Title: a.String("title"), Body: a.String("body"), Draft: a.Bool("draft"), Base: a.String("base"),
@@ -160,12 +194,13 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 			},
 		},
 		Command{
-			Name:        "pr.open",
-			Title:       "Open Pull Request in Browser",
-			Description: "Open the current branch's pull request on GitHub.",
-			Category:    "Pull Request",
-			Args:        []ArgSpec{wt},
-			When:        hasGitHub,
+			Name:           "pr.open",
+			Title:          "Open Pull Request in Browser",
+			Description:    "Open the current branch's pull request on GitHub.",
+			Category:       "Pull Request",
+			Args:           []ArgSpec{wt},
+			When:           hasGitHub,
+			WhyUnavailable: whyNoGitHub,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.OpenPullRequest(ctx, connect.NewRequest(&v1.OpenPullRequestRequest{WorktreePath: a.Path("worktree")}))
 				return opResult(res, err)

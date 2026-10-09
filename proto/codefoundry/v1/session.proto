@@ -27,6 +27,24 @@ service SessionService {
   rpc Remove(RemoveSessionRequest) returns (RemoveSessionResponse) {}
   // Watch streams session changes. The first event is a snapshot.
   rpc Watch(WatchSessionsRequest) returns (stream SessionEvent) {}
+  // StageAttachment stores an image the first prompt refers to and returns its path.
+  // Create appends "Attached image: <path>" lines for CreateSessionRequest.attachments;
+  // Claude reads them with its Read tool. Only image types are accepted, with size
+  // limits; unused staged files are reaped by the daemon.
+  rpc StageAttachment(StageAttachmentRequest) returns (StageAttachmentResponse) {}
+}
+
+// PermissionMode maps to claude --permission-mode. Full access (bypassPermissions) is
+// deliberately not offered.
+enum PermissionMode {
+  // Claude's default (manual).
+  PERMISSION_MODE_UNSPECIFIED = 0;
+  // --permission-mode manual: every tool call is confirmed.
+  PERMISSION_MODE_SUPERVISED = 1;
+  // --permission-mode acceptEdits: file edits are accepted, the rest is confirmed.
+  PERMISSION_MODE_ACCEPT_EDITS = 2;
+  // --permission-mode auto: Claude's auto-mode classifier decides.
+  PERMISSION_MODE_AUTO = 3;
 }
 
 // SessionState is the lifecycle of the Claude process behind a session.
@@ -81,6 +99,12 @@ message Session {
   // Short explanation of status from the detector, e.g. "finished", "at prompt",
   // "permission: Do you want to proceed?". Empty when unknown or DISCONNECTED.
   string status_reason = 18;
+  // Permission mode passed to claude; re-passed on Reconnect.
+  PermissionMode permission_mode = 19;
+  // Ref the session's worktree branch was created from, when Create made the worktree.
+  string base_ref = 20;
+  // Create made the worktree for this session (new_worktree was set).
+  bool created_worktree = 21;
 }
 
 message CreateSessionRequest {
@@ -90,8 +114,32 @@ message CreateSessionRequest {
   string effort = 4;
   // Optional explicit name; disables auto-naming.
   string name = 5;
-  // Optional first prompt sent once Claude is ready.
+  // Optional first prompt, passed to claude as its positional prompt argument.
   string initial_prompt = 6;
+  PermissionMode permission_mode = 7;
+  // When set, Create makes a new worktree for the session before claude starts and
+  // worktree_path is ignored. The branch is cf/<slug>, the slug named from
+  // initial_prompt (bounded wait), else cf/<session id>.
+  NewWorktree new_worktree = 8;
+  // Paths returned by StageAttachment, appended to initial_prompt.
+  repeated string attachments = 9;
+}
+
+message NewWorktree {
+  // Ref to branch from. Defaults to origin/<default branch>, else <default branch>.
+  string base_ref = 1;
+}
+
+message StageAttachmentRequest {
+  // Original file name (for the extension only).
+  string name = 1;
+  // image/png, image/jpeg, image/gif or image/webp.
+  string mime_type = 2;
+  bytes data = 3;
+}
+
+message StageAttachmentResponse {
+  string path = 1;
 }
 
 message CreateSessionResponse {

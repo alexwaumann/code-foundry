@@ -69,7 +69,7 @@ test("install shows progress, then relaunch and daemon restart", async ({ page }
   await expect(indicator(page)).toHaveText("relaunch to apply");
   const restart = d.getByTestId("update-restart-section");
   await expect(restart).toContainText("Daemon restart pending;");
-  await expect(restart.getByTestId("restart-sessions")).toHaveText(new RegExp(`^${String(await liveSessions())} sessions?$`));
+  await expect(restart.getByTestId("restart-sessions")).toHaveText(new RegExp(`^${String(await liveSessions())} threads?$`));
 
   // Relaunch goes through the registry; the daemon asks GUIs to relaunch (outside
   // Wails that is a toast), and only the daemon restart is left.

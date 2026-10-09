@@ -150,6 +150,11 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 		return Result{}, fmt.Errorf("%s: %w", name, err)
 	}
 	if !c.Available(eff) {
+		if c.WhyUnavailable != nil {
+			if why := c.WhyUnavailable(eff); why != "" {
+				return Result{}, fmt.Errorf("%s: %w: %s", name, ErrUnavailable, why)
+			}
+		}
 		return Result{}, fmt.Errorf("%s: %w", name, ErrUnavailable)
 	}
 	if err := checkRequired(c.Args, args); err != nil {

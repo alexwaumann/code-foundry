@@ -588,16 +588,58 @@ func TestSessionsSurviveRestartAsDisconnected(t *testing.T) {
 	}
 }
 
-func TestInitialPromptIsTypedAfterConnect(t *testing.T) {
+func TestInitialPromptIsPositional(t *testing.T) {
 	e := newEnv(t)
-	s := e.connected(CreateOptions{InitialPrompt: "do the thing"})
-	// Nothing is typed until the input box is on screen.
-	time.Sleep(700 * time.Millisecond)
-	if w := e.terms.Written(s.TerminalID); len(w) != 0 {
-		t.Fatalf("typed %q before the prompt was drawn", w)
+	s := e.connected(CreateOptions{InitialPrompt: "  -do the thing\n", PermissionMode: PermissionAuto})
+	spec, _ := e.terms.Spec(s.TerminalID)
+	n := len(spec.Argv)
+	if n < 2 || spec.Argv[n-2] != "--" || spec.Argv[n-1] != "-do the thing" || argOf(spec.Argv, "--permission-mode") != "auto" {
+		t.Fatalf("argv = %q", spec.Argv)
 	}
+	// Nothing is typed into the terminal: Claude submits the argument itself.
 	_ = e.terms.SetScreen(s.TerminalID, promptScreen)
-	e.waitWritten(s.TerminalID, "do the thing"+keyEnter)
+	time.Sleep(200 * time.Millisecond)
+	if w := e.terms.Written(s.TerminalID); len(w) != 0 {
+		t.Fatalf("typed %q", w)
+	}
+	if s.PermissionMode != PermissionAuto {
+		t.Errorf("session = %+v", s)
+	}
+}
+
+func TestPermissionModeIsKeptForReconnectAndFork(t *testing.T) {
+	e := newEnv(t)
+	s := e.connected(CreateOptions{PermissionMode: PermissionAcceptEdits, InitialPrompt: "hi"})
+	spec, _ := e.terms.Spec(s.TerminalID)
+	cid := argOf(spec.Argv, "--session-id")
+	e.writeTranscript(cid, userLine("hi"))
+	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := e.m.Shutdown(ctx); err != nil {
+		t.Fatal(err)
+	}
+	e.open()
+	got, _ := e.m.Get(e.ctx(), s.ID)
+	if got.PermissionMode != PermissionAcceptEdits {
+		t.Fatalf("after restart = %+v", got)
+	}
+	r, err := e.m.Reconnect(e.ctx(), s.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, _ = e.terms.Spec(r.TerminalID)
+	if argOf(spec.Argv, "--resume") != cid || argOf(spec.Argv, "--permission-mode") != "acceptEdits" || slices.Contains(spec.Argv, "--") {
+		t.Errorf("reconnect argv = %q", spec.Argv)
+	}
+	f, err := e.m.Fork(e.ctx(), s.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, _ = e.terms.Spec(f.TerminalID)
+	if f.PermissionMode != PermissionAcceptEdits || argOf(spec.Argv, "--permission-mode") != "acceptEdits" || slices.Contains(spec.Argv, "--") {
+		t.Errorf("fork = %+v argv = %q", f, spec.Argv)
+	}
 }
 
 func TestEventsAndSnapshot(t *testing.T) {

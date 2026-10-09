@@ -11,11 +11,22 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 )
 
+// ghTracker is the part of *gh.Store startGh drives.
+type ghTracker interface {
+	Run(ctx context.Context) error
+	Track(slug string) error
+	Untrack(slug string) error
+}
+
+var _ ghTracker = (*gh.Store)(nil)
+
 // startGh runs the GitHub poller and keeps its tracked set equal to the GitHub slugs of
-// the registered repositories. The tracked set is not persisted, so this runs on every
-// daemon start: subscribe first, then seed from the snapshot, so no event is missed.
-// The returned func stops both and waits for them.
-func startGh(ctx context.Context, log *slog.Logger, store *gh.Store, repos *repo.Git, b *bus.Bus) func() {
+// the registered repositories. A repository without a GitHub origin (including a
+// local-only one, which has no remote at all) has no slug and is never tracked. The
+// tracked set is not persisted, so this runs on every daemon start: subscribe first,
+// then seed from the snapshot, so no event is missed. The returned func stops both and
+// waits for them.
+func startGh(ctx context.Context, log *slog.Logger, store ghTracker, repos interface{ Snapshot() *repo.Snapshot }, b *bus.Bus) func() {
 	runCtx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 

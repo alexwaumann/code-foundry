@@ -19,6 +19,16 @@ func (t target) label() string {
 	return filepath.Base(t.path)
 }
 
+// resolveRemote is resolve for operations that talk to a remote: a worktree of a
+// local-only repository fails with ErrNoRemote before any operation is recorded.
+func (m *Manager) resolveRemote(worktreePath string) (target, error) {
+	t, err := m.resolve(worktreePath)
+	if err == nil && IsLocalOnly(t.repo) {
+		return target{}, fmt.Errorf("%s: %w", t.repo.Name, ErrNoRemote)
+	}
+	return t, err
+}
+
 // Fetch implements Store: `git fetch --prune`, or `git fetch --prune -- <remote>
 // [+refs/heads/<branch>:refs/remotes/<remote>/<branch>]`.
 func (m *Manager) Fetch(ctx context.Context, o FetchOptions) (Op, error) {
@@ -26,7 +36,7 @@ func (m *Manager) Fetch(ctx context.Context, o FetchOptions) (Op, error) {
 	if err != nil {
 		return Op{}, err
 	}
-	t, err := m.resolve(o.WorktreePath)
+	t, err := m.resolveRemote(o.WorktreePath)
 	if err != nil {
 		return Op{}, err
 	}
@@ -90,7 +100,7 @@ func validRefPart(s string) bool {
 // Pull implements Store: `git pull --ff-only`, or `--rebase`. A rebase that stops on
 // conflicts is aborted so the worktree is left as it was.
 func (m *Manager) Pull(ctx context.Context, o PullOptions) (Op, error) {
-	t, err := m.resolve(o.WorktreePath)
+	t, err := m.resolveRemote(o.WorktreePath)
 	if err != nil {
 		return Op{}, err
 	}
@@ -126,7 +136,7 @@ func (x *run) rebaseInProgress(ctx context.Context) bool {
 
 // Push implements Store.
 func (m *Manager) Push(ctx context.Context, o PushOptions) (Op, error) {
-	t, err := m.resolve(o.WorktreePath)
+	t, err := m.resolveRemote(o.WorktreePath)
 	if err != nil {
 		return Op{}, err
 	}
@@ -191,7 +201,7 @@ func (x *run) push(ctx context.Context, branch string, force bool) (string, stri
 // `gh pr create`. An existing pull request for the branch counts as success and
 // returns its URL.
 func (m *Manager) CreatePR(ctx context.Context, o CreatePROptions) (Op, error) {
-	t, err := m.resolve(o.WorktreePath)
+	t, err := m.resolveRemote(o.WorktreePath)
 	if err != nil {
 		return Op{}, err
 	}
@@ -250,7 +260,7 @@ func (m *Manager) CreatePR(ctx context.Context, o CreatePROptions) (Op, error) {
 // OpenPR implements Store: find the branch's pull request with gh and open it in the
 // default browser.
 func (m *Manager) OpenPR(ctx context.Context, worktreePath string) (Op, error) {
-	t, err := m.resolve(worktreePath)
+	t, err := m.resolveRemote(worktreePath)
 	if err != nil {
 		return Op{}, err
 	}

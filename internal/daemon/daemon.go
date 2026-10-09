@@ -112,6 +112,7 @@ func Run(ctx context.Context, opts Options) error {
 		GitOps: command.GitOpsDeps{
 			Backend:    gitopsAPI,
 			GitHubSlug: func(c command.Context) string { return st.gitops.GitHubSlug(c.ActiveRepoID, c.ActiveWorktreePath) },
+			LocalOnly:  func(c command.Context) bool { return st.gitops.LocalOnly(c.ActiveRepoID, c.ActiveWorktreePath) },
 		},
 		Gh:       ghAPI,
 		Settings: settingsAPI,

@@ -40,6 +40,28 @@ var (
 	SessionEfforts = []string{"low", "medium", "high", "xhigh", "max"}
 )
 
+// SessionPermissions are session.new's permission values, mapped to the claude
+// --permission-mode they select by sessionPermissionModes. Full access
+// (bypassPermissions) is deliberately not offered.
+var SessionPermissions = []string{"supervised", "accept-edits", "auto"}
+
+var sessionPermissionModes = map[string]v1.PermissionMode{
+	"supervised":   v1.PermissionMode_PERMISSION_MODE_SUPERVISED,
+	"accept-edits": v1.PermissionMode_PERMISSION_MODE_ACCEPT_EDITS,
+	"auto":         v1.PermissionMode_PERMISSION_MODE_AUTO,
+}
+
+// splitList splits a comma-separated arg, dropping blanks.
+func splitList(v string) []string {
+	var out []string
+	for _, p := range strings.Split(v, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func hasSession(c Context) bool { return c.ActiveSessionID != "" }
 
 func hasRepoOrWorktree(c Context) bool { return c.ActiveRepoID != "" || c.ActiveWorktreePath != "" }
@@ -57,49 +79,68 @@ func sessionStateName(s v1.SessionState) string {
 }
 
 // RegisterSession registers session.new, session.list, session.focus, session.close,
-// session.reconnect, session.rename, session.fork, and session.remove.
+// session.reconnect, session.rename, session.fork, and session.remove. The user-facing
+// word is "thread" (titles, descriptions, messages); command names and identifiers
+// keep "session".
 func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
-	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextSession, Description: "Session id"}
+	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextSession, Description: "Thread id"}
 	focus := func(id string) int {
 		return e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusSession_{FocusSession: &v1.UiIntent_FocusSession{SessionId: id}}})
 	}
 	return r.RegisterAll(
 		Command{
 			Name:        "session.new",
-			Title:       "New Session",
-			Description: "Start Claude Code in a worktree (default: the active worktree, else the active repository's main worktree).",
-			Category:    "Session",
+			Title:       "New Thread",
+			Description: "Start Claude Code in a worktree (default: the active worktree, else the active repository's main worktree), or in a new worktree.",
+			Category:    "Thread",
 			Keybindings: []string{"cmd+n"},
 			Args: []ArgSpec{
 				{Name: "repo", Type: String, Context: ContextRepo, Description: "Repository id"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path"},
-				{Name: "model", Type: Enum, Enum: SessionModels, Description: "Model (default: settings sessions.default_model, else Claude's default)"},
-				{Name: "effort", Type: Enum, Enum: SessionEfforts, Description: "Effort level (default: settings sessions.default_effort, else Claude's default)"},
-				{Name: "name", Type: String, Description: "Session name (default: generated from the first message)"},
-				{Name: "prompt", Type: String, Description: "First prompt to send once Claude is ready"},
+				{Name: "model", Type: Enum, Enum: SessionModels, Description: "Model (default: settings sessions.default_model)"},
+				{Name: "effort", Type: Enum, Enum: SessionEfforts, Description: "Effort level (default: settings sessions.default_effort)"},
+				{Name: "permission", Type: Enum, Enum: SessionPermissions, Default: "auto",
+					Description: "Permissions: supervised (confirm every tool call), accept-edits (file edits allowed), or auto (Claude's auto mode)"},
+				{Name: "new-worktree", Type: Bool, Description: "Create a new worktree for the thread (branch cf/<name from the prompt>)"},
+				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: origin/<default branch>); needs new-worktree"},
+				{Name: "name", Type: String, Description: "Thread name (default: generated from the first message)"},
+				{Name: "prompt", Type: String, Description: "First prompt, passed to Claude as it starts"},
+				{Name: "attachments", Type: String, Description: "Comma-separated image paths from StageAttachment, appended to the prompt"},
 			},
 			When: hasRepoOrWorktree,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				if a.String("repo") == "" && a.Path("worktree") == "" {
 					return Result{}, InvalidArg("worktree", "a worktree or repository is required")
 				}
-				res, err := b.Create(ctx, connect.NewRequest(&v1.CreateSessionRequest{
+				req := &v1.CreateSessionRequest{
 					RepoId: a.String("repo"), WorktreePath: a.Path("worktree"), Model: a.String("model"),
 					Effort: a.String("effort"), Name: a.String("name"), InitialPrompt: a.String("prompt"),
-				}))
+					PermissionMode: sessionPermissionModes[a.String("permission")], Attachments: splitList(a.String("attachments")),
+				}
+				switch {
+				case a.Bool("new-worktree"):
+					req.NewWorktree = &v1.NewWorktree{BaseRef: a.String("base")}
+				case a.String("base") != "":
+					return Result{}, InvalidArg("base", "only applies with new-worktree")
+				}
+				res, err := b.Create(ctx, connect.NewRequest(req))
 				if err != nil {
 					return Result{}, err
 				}
 				s := res.Msg.GetSession()
 				focus(s.GetId())
-				return Result{Message: "created session " + sessionLabel(s) + " in " + s.GetWorktreePath(), JSON: s}, nil
+				msg := "created thread " + sessionLabel(s) + " in " + s.GetWorktreePath()
+				if s.GetCreatedWorktree() {
+					msg += " (new worktree from " + s.GetBaseRef() + ")"
+				}
+				return Result{Message: msg, JSON: s}, nil
 			},
 		},
 		Command{
 			Name:        "session.list",
-			Title:       "List Sessions",
-			Description: "List every session, connected and disconnected.",
-			Category:    "Session",
+			Title:       "List Threads",
+			Description: "List every thread, connected and disconnected.",
+			Category:    "Thread",
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
 				res, err := b.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))
 				if err != nil {
@@ -124,9 +165,9 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 		},
 		Command{
 			Name:        "session.focus",
-			Title:       "Focus Session",
-			Description: "Show a session in every connected window.",
-			Category:    "Session",
+			Title:       "Focus Thread",
+			Description: "Show a thread in every connected window.",
+			Category:    "Thread",
 			Args:        []ArgSpec{idArg},
 			When:        hasSession,
 			Run: func(_ context.Context, _ Context, a Args) (Result, error) {
@@ -136,9 +177,9 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 		},
 		Command{
 			Name:        "session.close",
-			Title:       "Close Session",
-			Description: "End Claude gracefully. The session stays listed, disconnected, until removed.",
-			Category:    "Session",
+			Title:       "Close Thread",
+			Description: "End Claude gracefully. The thread stays listed, disconnected, until removed.",
+			Category:    "Thread",
 			// Not cmd+w: the side panel closes its active tab with it (ReservedChords).
 			Keybindings: []string{"cmd+shift+w"},
 			Args:        []ArgSpec{idArg},
@@ -148,14 +189,14 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				if _, err := b.Close(ctx, connect.NewRequest(&v1.CloseSessionRequest{Id: id})); err != nil {
 					return Result{}, err
 				}
-				return Result{Message: "closed session " + id}, nil
+				return Result{Message: "closed thread " + id}, nil
 			},
 		},
 		Command{
 			Name:        "session.reconnect",
-			Title:       "Reconnect Session",
-			Description: "Resume a disconnected session's conversation in a new Claude process.",
-			Category:    "Session",
+			Title:       "Reconnect Thread",
+			Description: "Resume a disconnected thread's conversation in a new Claude process.",
+			Category:    "Thread",
 			Keybindings: []string{"cmd+shift+r"},
 			Args:        []ArgSpec{idArg},
 			When:        hasSession,
@@ -167,14 +208,14 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				}
 				if st := cur.Msg.GetSession().GetState(); st != v1.SessionState_SESSION_STATE_DISCONNECTED {
 					return Result{}, connect.NewError(connect.CodeFailedPrecondition,
-						fmt.Errorf("session %s is %s; only a disconnected session can be reconnected", id, sessionStateName(st)))
+						fmt.Errorf("thread %s is %s; only a disconnected thread can be reconnected", id, sessionStateName(st)))
 				}
 				res, err := b.Reconnect(ctx, connect.NewRequest(&v1.ReconnectSessionRequest{Id: id}))
 				if err != nil {
 					return Result{}, err
 				}
 				s := res.Msg.GetSession()
-				msg := "reconnecting session " + sessionLabel(s)
+				msg := "reconnecting thread " + sessionLabel(s)
 				if s.GetLastError() != "" {
 					msg += ": " + s.GetLastError()
 				}
@@ -183,9 +224,9 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 		},
 		Command{
 			Name:        "session.rename",
-			Title:       "Rename Session",
-			Description: "Set the session's name. Turns off automatic naming.",
-			Category:    "Session",
+			Title:       "Rename Thread",
+			Description: "Set the thread's name. Turns off automatic naming.",
+			Category:    "Thread",
 			Keybindings: []string{"cmd+r"},
 			Args:        []ArgSpec{idArg, {Name: "name", Type: String, Required: true, Description: "New name"}},
 			When:        hasSession,
@@ -194,14 +235,14 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				if err != nil {
 					return Result{}, err
 				}
-				return Result{Message: "renamed session " + sessionLabel(res.Msg.GetSession()), JSON: res.Msg.GetSession()}, nil
+				return Result{Message: "renamed thread " + sessionLabel(res.Msg.GetSession()), JSON: res.Msg.GetSession()}, nil
 			},
 		},
 		Command{
 			Name:        "session.fork",
-			Title:       "Fork Session",
-			Description: "Start a new session that continues this session's conversation.",
-			Category:    "Session",
+			Title:       "Fork Thread",
+			Description: "Start a new thread that continues this thread's conversation.",
+			Category:    "Thread",
 			Args:        []ArgSpec{idArg, {Name: "name", Type: String, Description: "Name for the fork"}},
 			When:        hasSession,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -216,18 +257,18 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 		},
 		Command{
 			Name:        "session.remove",
-			Title:       "Remove Session",
-			Description: "Forget a session, closing it first if it is connected.",
-			Category:    "Session",
+			Title:       "Remove Thread",
+			Description: "Forget a thread, closing it first if it is connected.",
+			Category:    "Thread",
 			Args:        []ArgSpec{idArg},
 			When:        hasSession,
-			Confirm:     "Remove session {id}? It is closed first if connected, and its row is forgotten.",
+			Confirm:     "Remove thread {id}? It is closed first if connected, and its row is forgotten.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("id")
 				if _, err := b.Remove(ctx, connect.NewRequest(&v1.RemoveSessionRequest{Id: id})); err != nil {
 					return Result{}, err
 				}
-				return Result{Message: "removed session " + id}, nil
+				return Result{Message: "removed thread " + id}, nil
 			},
 		},
 	)

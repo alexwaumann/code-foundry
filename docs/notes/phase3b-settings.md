@@ -33,8 +33,8 @@ Status: done on this branch.
 
   ```toml
   [sessions]
-  # Default model. Model for new sessions when none is picked. ... One of: "", "fable", ...
-  # default_model = ""
+  # Default model. Model for new threads when none is picked. One of: "fable", ...
+  # default_model = "opus"
   auto_name = false
 
   [appearance]
@@ -88,8 +88,8 @@ Status: done on this branch.
 
 | Key | Type | Default | Applied |
 |---|---|---|---|
-| `sessions.default_model` | enum `"", fable, opus, sonnet, haiku` | `""` (Claude's) | live: session.new's `model` default |
-| `sessions.default_effort` | enum `"", low … max` | `""` | live: session.new's `effort` default |
+| `sessions.default_model` | enum `fable, opus, sonnet, haiku` | `opus` (was `""`, Claude's, until the new-thread step) | live: session.new's `model` default |
+| `sessions.default_effort` | enum `low … max` | `high` (was `""` until the new-thread step) | live: session.new's `effort` default |
 | `sessions.auto_name` | bool | true | live (Namer wrapper) |
 | `sessions.close_grace_seconds` | int 1–120 | 10 | **restart** (session `CloseTimeout`) |
 | `sessions.scrollback_lines` | int 1000–100000 | 10000 | **restart** (terminal `MaxScrollbackLines`); the GUI's xterm scrollback follows live |

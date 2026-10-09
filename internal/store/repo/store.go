@@ -30,6 +30,9 @@ const (
 	// which may check out or delete a large tree.
 	fetchTimeout    = 2 * time.Minute
 	worktreeTimeout = 5 * time.Minute
+	// startFetchTimeout bounds CreateWorktree's fetch of its start point: the user is
+	// waiting, and a stale start point is better than a long hang.
+	startFetchTimeout = 20 * time.Second
 )
 
 // Options configures Start.
@@ -67,7 +70,15 @@ type repoMeta struct {
 	DefaultBranch string
 	GitHubSlug    string
 	OriginURL     string
+	Remotes       []string // sorted; replaced, never mutated in place
 	Error         string
+}
+
+// equal reports whether m and o hold the same metadata. Update it with the fields.
+func (m *repoMeta) equal(o *repoMeta) bool {
+	return m.ID == o.ID && m.Path == o.Path && m.Name == o.Name && m.RegisteredAt.Equal(o.RegisteredAt) &&
+		m.DefaultBranch == o.DefaultBranch && m.GitHubSlug == o.GitHubSlug && m.OriginURL == o.OriginURL &&
+		slices.Equal(m.Remotes, o.Remotes) && m.Error == o.Error
 }
 
 func (m *repoMeta) commonDir() string { return filepath.Join(m.Path, ".git") }
@@ -247,7 +258,7 @@ func (g *Git) buildLocked() *Snapshot {
 		m := st.meta.Load()
 		r := Repo{
 			ID: m.ID, Path: m.Path, Name: m.Name, RegisteredAt: m.RegisteredAt,
-			DefaultBranch: m.DefaultBranch, GitHubSlug: m.GitHubSlug, Error: m.Error,
+			DefaultBranch: m.DefaultBranch, GitHubSlug: m.GitHubSlug, Remotes: m.Remotes, Error: m.Error,
 			Worktrees: make([]Worktree, 0, len(st.wts)),
 		}
 		for _, slot := range st.wts {
@@ -491,13 +502,22 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 	local := g.refExists(ctx, m.Path, "refs/heads/"+opts.Branch)
 	remote := g.refExists(ctx, m.Path, "refs/remotes/origin/"+opts.Branch)
 	var args []string
-	if local || (remote && opts.BaseRef == "") {
-		// Existing branch, or git's DWIM: create <branch> tracking origin/<branch>.
+	switch {
+	case local:
 		args = []string{"worktree", "add", path, opts.Branch}
-	} else {
+	case remote && opts.BaseRef == "":
+		// git's DWIM: create <branch> tracking origin/<branch>.
+		if opts.Fetch {
+			g.fetchStartPoint(ctx, m, "origin/"+opts.Branch)
+		}
+		args = []string{"worktree", "add", path, opts.Branch}
+	default:
 		base := opts.BaseRef
 		if base == "" {
 			base = g.defaultBase(ctx, m)
+		}
+		if opts.Fetch {
+			g.fetchStartPoint(ctx, m, base)
 		}
 		// --no-track: branching from origin/main must not make origin/main the
 		// upstream, or ahead/behind and `git push` would target main. The exception is
@@ -561,6 +581,71 @@ func refspecWrites(spec, ref string) bool {
 		return dst == ref
 	}
 	return len(ref) > len(pre)+len(post) && strings.HasPrefix(ref, pre) && strings.HasSuffix(ref, post)
+}
+
+// fetchStartPoint fetches ref's branch from its remote when ref is a remote-tracking
+// ref ("<remote>/<branch>" for a configured remote), so a new branch starts at the
+// remote's current tip. Anything else (a local branch, a sha, a tag) is left alone.
+// The fetch is bounded by startFetchTimeout. A failure is logged and ignored: the
+// worktree is then created from the existing, possibly stale, ref.
+func (g *Git) fetchStartPoint(ctx context.Context, m *repoMeta, ref string) {
+	out, err := g.runner.Run(ctx, m.Path, "remote")
+	if err != nil {
+		g.log.Warn("fetch before worktree: listing remotes failed", "repo", m.ID, "ref", ref, "err", err)
+		return
+	}
+	remote, branch := splitRemoteRef(strings.Fields(string(out)), ref)
+	if remote == "" {
+		return
+	}
+	fctx, cancel := context.WithTimeout(ctx, startFetchTimeout)
+	defer cancel()
+	// An explicit refspec updates refs/remotes/<remote>/<branch> whatever the
+	// remote's configured fetch refspec is; "+" because remote branches may be
+	// force-pushed.
+	refspec := "+refs/heads/" + branch + ":refs/remotes/" + remote + "/" + branch
+	start := time.Now()
+	if _, err := g.runner.Run(fctx, m.Path, "fetch", "--quiet", "--no-tags", remote, refspec); err != nil {
+		g.log.Warn("fetch before worktree failed; using the existing ref", "repo", m.ID, "ref", ref, "err", err)
+		return
+	}
+	g.log.Debug("fetched start point", "repo", m.ID, "ref", ref, "took", time.Since(start))
+}
+
+// splitRemoteRef splits ref into (remote, branch) when it starts with "<remote>/" for
+// one of remotes, preferring the longest remote name (names may contain "/"). It
+// returns empty strings when ref names no remote branch.
+func splitRemoteRef(remotes []string, ref string) (remote, branch string) {
+	for _, r := range remotes {
+		if b, ok := strings.CutPrefix(ref, r+"/"); ok && b != "" && b != "HEAD" && len(r) > len(remote) {
+			remote, branch = r, b
+		}
+	}
+	return remote, branch
+}
+
+// ListRefs implements Store.
+func (g *Git) ListRefs(ctx context.Context, repoID string) (Refs, error) {
+	st := g.repo(repoID)
+	if st == nil {
+		return Refs{}, fmt.Errorf("%w: repo %q", ErrNotFound, repoID)
+	}
+	m := st.meta.Load()
+	out, err := g.runner.Run(ctx, m.Path, "for-each-ref", refsFormat, "refs/heads", "refs/remotes")
+	if err != nil {
+		return Refs{}, fmt.Errorf("repo: list refs of %s: %w", m.ID, err)
+	}
+	refs := parseRefs(out)
+	// DefaultBranch is empty until the repo's first reconcile after a daemon start.
+	def := m.DefaultBranch
+	if def == "" {
+		def = g.defaultBranch(ctx, m.Path, "")
+	}
+	refs.DefaultRef = def
+	if _, ok := slices.BinarySearch(refs.Remote, "origin/"+def); ok {
+		refs.DefaultRef = "origin/" + def
+	}
+	return refs, nil
 }
 
 // defaultBase is origin/<default branch> when that ref exists, else <default branch>.
@@ -696,7 +781,7 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 			setChanged = true
 		}
 	}
-	metaChanged := next != *prev
+	metaChanged := !next.equal(prev)
 	if metaChanged {
 		st.meta.Store(&next)
 	}
@@ -790,9 +875,22 @@ func (g *Git) inspect(ctx context.Context, m *repoMeta) ([]listedWorktree, error
 		listed = append(listed, l)
 	}
 
+	// One `git remote` per reconcile; origin's URL is read only when origin exists. A
+	// failed listing keeps the previous remotes rather than reporting a local-only repo.
+	listedRemotes := true
+	if out, err := g.runner.Run(ctx, m.Path, "remote"); err == nil {
+		m.Remotes = parseRemotes(out)
+	} else {
+		listedRemotes = false
+		if ctx.Err() == nil {
+			g.log.Warn("listing remotes failed", "repo", m.ID, "err", err)
+		}
+	}
 	m.OriginURL = ""
-	if out, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin"); err == nil {
-		m.OriginURL = string(trimNL(out))
+	if !listedRemotes || slices.Contains(m.Remotes, "origin") {
+		if out, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin"); err == nil {
+			m.OriginURL = string(trimNL(out))
+		}
 	}
 	m.GitHubSlug = parseGitHubSlug(m.OriginURL)
 	m.DefaultBranch = g.defaultBranch(ctx, m.Path, listed[0].Branch)

@@ -12,13 +12,17 @@ Phases 0–3 are done and merged on `main`. Each step's note is in `docs/notes/`
 * **Phase 1** done: terminal (libghostty-vt actors), repo, GitHub, command registry and GUI shell (`phase1a`–`phase1e`).
 * **Phase 2** done: sessions, status detection, session GUI, one EventService stream; memory gate in `docs/perf.md` (`phase2a`–`phase2c`, `phase2-integration.md`).
 * **Phase 3** done: Pull Requests page and worktree overview, settings/help/confirm, git operations, packaging and updater (`phase3a`–`phase3d`, `phase3-integration.md`).
+* **New thread composer** done (2026-10-09): project picker + in-pane composer, positional prompt, permission mode, `cf/<slug>` worktrees, image attachments, opus/high defaults, "thread" copy (`new-thread-composer.md`).
 * **Side panel + PR surface** done: per-selection side panel with a surface registry, the Pull request surface (summary, timeline, reviewers, refresh, revert), and its menu starting `pr.ask` / `pr.explain` / `pr.fix.findings` sessions (`side-panel.md`, `gh-pr-detail.md`, `pr-thread-commands.md`).
 
 ### Open items
 
 Collected from the step notes; none blocks daily use.
 
-* **Sessions**
+* **Threads / sessions**
+  * Removing a thread does not offer to remove the worktree `session.new` created for it.
+  * The composer prompt is a TipTap editor (inline image chips); the main bundle is over Vite's 500 kB warning, unmeasured whether TipTap pushed it there.
+  * Copy says "thread"; identifiers (`session.*`, `SessionService`, settings keys) still say session. Full rename is a separate pass.
   * The GUI does not show `Session.status_reason` (the CLI does). A badge tooltip or the session header could.
   * "Viewed" means "has an Attach subscriber": a minimized or occluded window keeps acknowledging finished turns. Detaching on `visibilitychange` would fix it.
   * Status detection is untested against real output for subagent permission prompts, auto-compaction, usage-limit menus, login "Press Enter" screens and MCP auth prompts (`phase2b-status.md`, Known blind spots).
