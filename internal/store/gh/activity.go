@@ -228,16 +228,16 @@ func (s *Store) BranchPullRequests(ctx context.Context, slug, head string) (Bran
 	return st, nil
 }
 
-// keepViewerPullRequests keeps pull requests from the repository itself (a fork's
+// keepViewerFingerprints keeps pull requests from the repository itself (a fork's
 // branch of the same name is someone else's) authored by login (any case; empty keeps
 // every author).
-func keepViewerPullRequests(prs []PullRequest, login string) []PullRequest {
-	out := make([]PullRequest, 0, len(prs))
-	for _, p := range prs {
-		if p.IsCrossRepository || (login != "" && !strings.EqualFold(p.Author, login)) {
+func keepViewerFingerprints(fps []prFingerprint, login string) []prFingerprint {
+	out := make([]prFingerprint, 0, len(fps))
+	for _, f := range fps {
+		if f.IsCross || (login != "" && !strings.EqualFold(f.Author, login)) {
 			continue
 		}
-		out = append(out, p)
+		out = append(out, f)
 	}
 	return out
 }

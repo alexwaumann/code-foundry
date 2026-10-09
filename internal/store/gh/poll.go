@@ -227,9 +227,19 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 	for _, sec := range plan.sections {
 		add(res.Sections[sec.name].PRs)
 	}
+	// Only the viewer's own branch PRs are kept, so only they get details (a watched
+	// default branch of a busy repository lists other people's PRs).
+	login := res.Viewer.Login
+	if s.opts.SearchAs != "" {
+		login = s.opts.SearchAs
+	}
 	for _, rp := range plan.repos {
+		rr := res.Repos[rp.slug]
 		for _, head := range rp.branches {
-			add(res.Repos[rp.slug].Branches[head])
+			if fps, ok := rr.Branches[head]; ok {
+				rr.Branches[head] = keepViewerFingerprints(fps, login)
+				add(rr.Branches[head])
+			}
 		}
 	}
 	var need []prFingerprint
@@ -338,10 +348,6 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 		st BranchPullRequests
 	}
 	var branchUpdates []branchUpdate
-	login := res.Viewer.Login
-	if s.opts.SearchAs != "" {
-		login = s.opts.SearchAs
-	}
 	for _, rp := range plan.repos {
 		rr := res.Repos[rp.slug]
 		for _, head := range rp.branches {
@@ -351,7 +357,7 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 			if err := cmpErr(rr.Err, rr.BranchErr[head]); err != nil {
 				st.LastError = err.Error()
 			} else {
-				st.PullRequests = keepViewerPullRequests(resolveAll(rr.Branches[head]), login)
+				st.PullRequests = resolveAll(rr.Branches[head])
 				st.FetchedAt = now
 			}
 			changed := !had || prev.FetchedAt.IsZero() || prev.LastError != st.LastError || !sameJSON(prev.PullRequests, st.PullRequests)

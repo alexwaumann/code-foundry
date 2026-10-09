@@ -289,8 +289,17 @@ func TestPollBranchWatch(t *testing.T) {
 		t.Errorf("poll vars = %v, want the branch and no dashboards (nothing tracked)", last.vars)
 	}
 
-	// Unchanged: no event. Changed: one.
-	pollOnce(t, s, f)
+	// Other people's PRs on the branch (forks, other authors) never get details.
+	calls, _ = f.snapshot()
+	for _, c := range calls {
+		if c.op == "PullRequestDetails" && fmt.Sprint(anyStrings(c.vars["open"])) != "[PR_mine]" {
+			t.Errorf("details asked for %v", c.vars["open"])
+		}
+	}
+	// Unchanged: no event, one request. Changed: one.
+	if ops := pollOnce(t, s, f); fmt.Sprint(ops) != "[Poll]" {
+		t.Errorf("unchanged branch poll sent %v", ops)
+	}
 	if n := drain(events); n != 0 {
 		t.Errorf("unchanged branch published %d events", n)
 	}
