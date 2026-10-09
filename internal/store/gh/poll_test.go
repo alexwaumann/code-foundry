@@ -473,6 +473,12 @@ func TestPollCacheRestart(t *testing.T) {
 		st, _ := s.branches.get(branchKey{"o/r", "branch-1"})
 		return len(s.Snapshot().Dashboard.Authored) == 1 && len(st.PullRequests) == 1
 	})
+	// The poll row is the last cache write of a poll, after the rows the snapshot above
+	// reflects; the restart below must see it.
+	waitFor(t, "poll row", func() bool {
+		p, ok, err := loadActivityRow[pollRow](context.Background(), s.cache, activityPoll)
+		return err == nil && ok && !p.FetchedAt.IsZero()
+	})
 
 	// Restart: the snapshot comes from the cache before any request, the first poll
 	// waits out the interval, and an immediate poll fetches no details.
