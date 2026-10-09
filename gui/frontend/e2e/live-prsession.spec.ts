@@ -3,7 +3,7 @@
  * which reads the pull request through `gh`, picks a worktree of a registered clone and
  * starts Claude Code with the explain prompt. Opt-in (LIVE_DAEMON=1), run with
  * playwright.live.config.ts. It starts nothing itself; the session it starts is left
- * running for the caller to close (`code-foundry session close <id>`).
+ * running for the caller to close (`code-foundry session close --id <id>`).
  *
  * Recipe (docs/notes/side-panel.md, chunk 4): an isolated daemon (CODE_FOUNDRY_HOME) with
  * a clone of LIVE_PR_SLUG registered and sessions.default_model=haiku, the Vite dev server

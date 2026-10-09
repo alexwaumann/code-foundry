@@ -652,6 +652,29 @@ test("Ask from the Pull Requests page sends no worktree; while it starts, Cancel
   await expect(page.getByTestId("pr-ask")).toHaveCount(0);
 });
 
+test("a failed pr.ask is toasted and keeps the question for a retry", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "authored", 145).click();
+  await mockPost("gh/pr-fail?command=pr.ask");
+  await openAsk(page);
+  await askInput(page).pressSequentially("Is the retry bounded?");
+  await page.keyboard.press("Enter");
+
+  await expect(page.getByText("Ask About Pull Request failed")).toBeVisible();
+  await expect(page.getByText("read #145: github graphql: 502 Bad Gateway")).toBeVisible();
+  await expect(selectedSession(page)).toHaveCount(0);
+  await expect(page.getByTestId("pr-ask")).toBeVisible();
+  await expect(askInput(page)).toHaveValue("Is the retry bounded?");
+  await expect(askInput(page)).toHaveJSProperty("readOnly", false);
+  await expect(page.getByTestId("pr-ask-hint")).toHaveText("⏎ send · ⇧⏎ newline");
+  await expect(page.getByTestId("pr-ask-cancel")).toBeEnabled();
+
+  // The retry goes through.
+  await page.getByTestId("pr-ask-send").click();
+  await expect(selectedSession(page)).toHaveAttribute("data-row-key", /^s:s-new-\d+$/);
+  expect((await sessionInvocations("pr.ask")).map((i) => i.args.question)).toEqual(["Is the retry bounded?", "Is the retry bounded?"]);
+});
+
 test("choosing Ask again with the composer open focuses it; the menu reopened right after Ask stays open", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 145).click();

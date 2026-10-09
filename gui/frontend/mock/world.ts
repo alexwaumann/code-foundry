@@ -4,6 +4,7 @@
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { EventSource, type EventSchema } from "../src/gen/codefoundry/v1/events_pb";
 import type { RepoEventSchema, RepoSchema, WorktreeSchema } from "../src/gen/codefoundry/v1/repo_pb";
@@ -691,13 +692,15 @@ export class World {
         if (!slug.trim()) throw new CommandError("invalid", "repo-slug is required");
         if (!Number.isInteger(n) || n <= 0) throw new CommandError("invalid", "number must be a positive pull request number");
         // POST /__mock/gh/pr-fail?command=pr.fix.findings (or pr.ask, pr.explain): the next run fails.
+        // Codes as the daemon's (internal/command/commands_prsession.go): the fork is a
+        // FailedPrecondition, a GitHub 502 while reading the pull request is Unavailable.
         if (this.gh.prDetails.failNext.delete(fix ? "pr.fix.findings" : (args.question ?? "") !== "" ? "pr.ask" : "pr.explain")) {
-          throw new CommandError(
-            "unavailable",
-            fix
-              ? `#${String(n)} comes from a fork and no worktree of ${slug} has its head checked out: check it out (for example \`gh pr checkout ${String(n)}\` in a worktree) and pass --worktree`
-              : `read #${String(n)}: github graphql: 502 Bad Gateway`,
-          );
+          throw fix
+            ? new ConnectError(
+                `#${String(n)} comes from a fork and no worktree of ${slug} has its head checked out: check it out (for example \`gh pr checkout ${String(n)}\` in a worktree) and pass --worktree`,
+                Code.FailedPrecondition,
+              )
+            : new ConnectError(`read #${String(n)}: github graphql: 502 Bad Gateway`, Code.Unavailable);
         }
         const pr = prDetailCall(() => this.gh.prDetails.get(slug, n, fix)).pullRequest;
         const head = pr?.headRef ?? "";
