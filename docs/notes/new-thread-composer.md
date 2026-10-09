@@ -81,9 +81,49 @@ scratch daemon on haiku.
   repeated prompt got `-2`, reconnect and fork re-passed the permission mode, a bad
   `--base` created nothing.
 
+## Feedback pass (2026-10-09, after Alex tried it)
+
+* **Composer centering.** It was positioned with `mt-[14vh]` against the window; it now
+  sits at `m-auto` in a flex column so it is centered in the content pane at every size,
+  scrolling from the top when the draft is taller than the pane.
+* **Inline image chips (T3 Code parity).** The prompt is a TipTap 3 editor (Document,
+  Paragraph, Text, History, HardBreak plus one inline atom node), chosen because T3
+  Code's chip is a ProseMirror atom and a plain textarea cannot hold a styled inline pill
+  that moves as one unit. The draft text stays a string; a chip is the token
+  `![name](cf-attachment://<id>)`. T3's rules: a chip is inserted at the caret only when
+  the prompt already has prose or a selection is replaced (an image pasted into an empty
+  prompt gets only the thumbnail); a space before unless whitespace precedes, always one
+  after. Arrow keys step over a chip; Backspace/Delete remove it as one unit and leave
+  the thumbnail; undo restores it. × on a referenced thumbnail opens a centered confirm
+  ("Remove <name> from the message?" / "It is referenced in your text; removing it also
+  removes every reference.", destructive Confirm); unreferenced thumbnails are removed
+  with no dialog. On send each chip becomes `[Image: <name>; ref=<staged path>]` in
+  place, and `attachments` still carries the staged paths (the daemon appends its own
+  `Attached image:` lines). Source studied: github.com/pingdotgg/t3code
+  (`ComposerPromptEditorTiptap.tsx`, `ChatComposer.tsx`, `ContextChip.tsx`).
+* **Local-only repositories.** `Repo.remotes` (sorted remote names) is filled from
+  `git remote` on every check; empty before the first check too, so empty is only
+  "local-only" once the repo has been checked. `git.fetch`, `git.pull`, `git.push`,
+  `pr.create`, `pr.open` are unavailable for such repos (`Command.WhyUnavailable` →
+  "repository has no remote"); GitOpsService refuses them before recording an op.
+  `ListRefs` returns local branches with `default_ref: "main"`; `--fetch` is a no-op.
+  The picker subtitle says "Local only", else the GitHub slug or remote name.
+* **Outdated daemon.** Connect maps HTTP 404 to `Unimplemented`; `listRefs` and
+  `stageAttachment` turn that into "The running daemon is older than the app. Restart
+  it…" (`src/api/errors.ts`). Alex hit this because the GUI was talking to the daemon
+  from the main checkout.
+* **Mock controls** added: `POST /__mock/missing-rpc?rpc=…` (404 for a call),
+  `GET /__mock/attachments`, `POST /__mock/session-new?delay=`; a local-only repo
+  `sketches` in the mock world. Drag-and-drop now has an e2e.
+* Verified again on a scratch daemon with a repo that has no remote: picker shows "Local
+  only", base picker lists `main` (default) and `feature-x`, a pasted image became a chip,
+  Enter created `cf/describe-project-overview` from `main`, and the argv carried
+  `… -- Describe … [Image: shot.png; ref=<staged path>]\n\nAttached image: <path>`.
+
 ## Open
 
 * Removing a thread does not offer to remove the worktree it created.
-* No e2e for drag-and-drop images (wired, checked by hand in code).
 * Remaining "session" copy that comes from the daemon: the restart/remove confirm
   messages and the "Sessions" settings group title.
+* The main bundle is over Vite's 500 kB warning; unmeasured whether TipTap pushed it
+  there.

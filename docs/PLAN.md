@@ -20,6 +20,7 @@ Collected from the step notes; none blocks daily use.
 
 * **Threads / sessions**
   * Removing a thread does not offer to remove the worktree `session.new` created for it.
+  * The composer prompt is a TipTap editor (inline image chips); the main bundle is over Vite's 500 kB warning, unmeasured whether TipTap pushed it there.
   * Copy says "thread"; identifiers (`session.*`, `SessionService`, settings keys) still say session. Full rename is a separate pass.
   * The GUI does not show `Session.status_reason` (the CLI does). A badge tooltip or the session header could.
   * "Viewed" means "has an Attach subscriber": a minimized or occluded window keeps acknowledging finished turns. Detaching on `visibilitychange` would fix it.
