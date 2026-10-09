@@ -759,3 +759,83 @@ Status: `make check` green (45 vitest files / 644 tests; Go packages all ok). `m
   "dragging starts from the rendered width after the room shrinks" now shows the stored
   width coming back when the window grows again. `e2e/pr-panel.spec.ts`'s
   `setPanelWidth` helper goes through the panel store.
+
+## Chunk 7: panes reach the window top; headers take the title band
+
+The full-width title strip is gone. The content pane and the side panel start 8px from
+the window top, and their headers fill the 52px title band beside the sidebar's band
+(the traffic-light gutter and the Repositories header). Window dragging moved from the
+native band to the Wails runtime. Layout and drag details: `phase3-ui-panes.md` ("Panes
+reach the window top", "How dragging is wired").
+
+Status: `make check` green (Go packages all ok, 46 vitest files / 647 tests). `make gui-e2e` passes 238/238 (119 WebKit, 119 Chromium), with `e2e/layout.spec.ts` at 6 tests and `e2e/panel.spec.ts` at 16 per browser.
+
+### Pieces
+
+| File | Change |
+|---|---|
+| `components/window/titleBand.ts` | `TITLE_BAND_HEIGHT` (52, was `TITLE_STRIP_HEIGHT`), `TRAFFIC_LIGHT_GUTTER` (80). `TitleStrip.tsx` deleted |
+| `components/window/PaneHeader.tsx` | The content pane header: `h-11`, border, `[--wails-draggable:drag]`, 80px left padding while the sidebar is hidden |
+| `components/sidebar/Sidebar.tsx` | `SidebarBand`: 52px, gutter + Repositories header, drag; controls `no-drag`. Pull Requests and the tree follow below |
+| `App.tsx` | `ContentPane` is `m-2` (was `mx-2 mb-2`); the root holds an 8px `window-drag-edge` strip |
+| `components/panel/SidePanel.tsx` | Wrapper `mt-2`; `PanelHeader` always `h-11`, drag; tabs `no-drag` |
+| `components/panel/PanelToggle.tsx` | Always `no-drag` |
+| terminal, overview, PR and settings pages | Their headers are `PaneHeader`s (the terminal's grows from `h-9` to `h-11`); controls `no-drag` |
+| `session/SessionParts.tsx` | The disconnected page's toggle at `top-2.5`, centred in the 44px band |
+| `index.css` | Base rule: buttons, links, form fields, tabs and separators are `no-drag` |
+| `gui/main.go` | `InvisibleTitleBarHeight: 0`; the Go `titleStripHeight` constant is gone |
+
+### Decisions
+
+* **Panel header height.** `PanelHeader` no longer picks `h-9` or `h-11` by the panel
+  key. Every content pane header is 44px now, so one height lines up with all of them.
+* **Runtime drag only.** A native band (`InvisibleTitleBarHeight`) drags on the
+  mouse-down itself, before the page sees it, so `no-drag` cannot exempt a button in
+  it. Now that headers with buttons sit in the band, the native band is off.
+* **Hidden sidebar.** The content pane's corner runs under the traffic lights, so
+  `PaneHeader` pads its content past the 80px gutter while the sidebar is hidden. The
+  side panel is never under the lights, so its header has no such padding.
+* **Window-top drag edge.** With the sidebar hidden and a page without a header
+  (dashboard, composer, disconnected thread), no header is left to drag by. The 8px
+  sheet strip above the panes always drags.
+* **Dashboard.** No header band. The welcome block sits well below the top and looked
+  right.
+* **Geometry.** The pane's 1px border puts a header at y 9 to 53. Its bottom border is
+  the first row below the 52px band. The e2e pins this.
+
+### Tests
+
+* `e2e/layout.spec.ts`, rewritten:
+  * the sidebar band: 52px at the top, the empty 80px gutter, the title right of it,
+    drag, controls `no-drag`, and Pull Requests and the tree below it without drag;
+  * the 8px window-top drag strip;
+  * with the sidebar shown and hidden: the content pane and the panel wrapper at top 8,
+    and the terminal and panel headers 44px, aligned, ending on the band, with drag
+    and `no-drag` set as above. The resize handle starts at 8 and is `no-drag`, the
+    terminal is not draggable, and with the sidebar hidden the title starts past the
+    gutter;
+  * the overview, Pull Requests and Settings headers: 44px at y 9 to 53, drag, controls
+    `no-drag`;
+  * the disconnected page's toggle centred in the band.
+* `e2e/panel.spec.ts`: the panel header is 44px and matches the terminal header's top
+  and bottom; the tab strip's empty space drags, tabs and their × do not.
+* `e2e/buttons.spec.ts`: the terminal header is 44px (was 36).
+* `components/window/PaneHeader.test.tsx`: the sidebar-hidden padding (table), and it
+  following the sidebar being toggled.
+
+### Live check
+
+Built with `wails3 build` (not `make gui-build`) from this branch plus a temporary,
+uncommitted probe, then run against an isolated daemon with a terminal focused and the
+panel opened through the CLI. Full details are in `phase3-ui-panes.md` ("Verification
+(panes reach the top)").
+
+* Screenshots: the traffic lights sit in the sidebar band. The terminal header and the
+  panel header share top and bottom (y 9 to 53). The toggle sits at the panel header's
+  right end. With the sidebar hidden, the header content starts past the lights.
+* In the real WKWebView, a mouse-down then move on the panel header, the terminal header
+  and the sidebar band sent `wails:drag`, and a double-click sent
+  `wails:drag:doubleclick`. The panel toggle and the panel resize handle sent neither.
+* Not live: the window moving, zoom, real clicks on header buttons, or a real drag on
+  the resize handle near the top. The process has no Accessibility permission, so it
+  cannot post mouse events.

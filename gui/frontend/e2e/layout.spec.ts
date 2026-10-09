@@ -16,34 +16,130 @@ function bg(page: Page, selector: string) {
   return page.locator(selector).first().evaluate((el) => getComputedStyle(el).backgroundColor);
 }
 
-test("the title strip spans the window, drags it, and keeps the traffic-light gutter", async ({ page }) => {
-  await openApp(page);
-  const strip = page.getByTestId("title-strip");
-  await expect(strip).toBeVisible();
-  expect(await strip.evaluate((el) => getComputedStyle(el).getPropertyValue("--wails-draggable").trim())).toBe("drag");
-  const s = await box(page, "title-strip");
-  const viewport = page.viewportSize();
-  expect(s.top).toBe(0);
-  expect(s.height).toBe(52);
-  expect(s.width).toBe(viewport?.width);
-  expect((await box(page, "traffic-light-gutter")).width).toBe(80);
+/** Computed `--wails-draggable` of the element (inherited), "" when unset. */
+function drag(page: Page, selector: string) {
+  return page.locator(selector).first().evaluate((el) => getComputedStyle(el).getPropertyValue("--wails-draggable").trim());
+}
 
-  // The sidebar and the content pane start below the strip; hiding the sidebar keeps it.
+// Window geometry (components/window/titleBand.ts): a 52px title band with no full-width
+// strip. The sidebar's band (80px traffic-light gutter, then the Repositories header) is
+// 52px; the panes start 8px down and their 44px headers end on the band (their 1px
+// bottom border is the first row below it: the pane's own 1px border puts the header
+// at 9..53).
+const BAND = 52;
+const HEADER = 44;
+
+test("the sidebar band holds the empty traffic-light gutter and the Repositories header, and drags the window", async ({ page }) => {
+  await openApp(page);
+  const viewport = page.viewportSize();
+  const band = await box(page, "sidebar-band");
+  expect(band.top).toBe(0);
+  expect(band.left).toBe(0);
+  expect(band.height).toBe(BAND);
+  expect(band.width).toBe((await box(page, "sidebar")).width);
+  expect(await drag(page, '[data-testid="sidebar-band"]')).toBe("drag");
+
+  const gutter = await box(page, "traffic-light-gutter");
+  expect([gutter.left, gutter.top, gutter.width, gutter.height]).toEqual([0, 0, 80, BAND]);
+  // Nothing sits on the lights.
+  expect(await page.getByTestId("traffic-light-gutter").evaluate((el) => [el.childElementCount, el.textContent])).toEqual([0, ""]);
+  const title = page.getByTestId("sidebar-band").getByText("Repositories");
+  expect(await title.evaluate((el) => el.getBoundingClientRect().left)).toBeGreaterThanOrEqual(80);
+  expect(await drag(page, '[data-testid="sidebar-band"] header > span:first-child')).toBe("drag");
+  // Its controls click instead of dragging.
+  expect(await drag(page, '[data-testid="sidebar-band-controls"]')).toBe("no-drag");
+  expect(await drag(page, '[data-testid="sidebar-new-terminal"]')).toBe("no-drag");
+  // Pull Requests and the tree sit below the band and do not drag.
+  expect((await box(page, "nav-pullrequests")).top).toBeGreaterThanOrEqual(BAND);
+  expect(await drag(page, '[data-testid="nav-pullrequests"]')).toBe("no-drag");
+  expect(await drag(page, '[role="tree"]')).toBe("");
+
+  // The sheet above the panes drags too; the panes themselves do not.
+  const edge = await box(page, "window-drag-edge");
+  expect([edge.top, edge.left, edge.width, edge.height]).toEqual([0, 0, viewport?.width, 8]);
+  expect(await drag(page, '[data-testid="window-drag-edge"]')).toBe("drag");
+  expect(await drag(page, '[data-testid="content-pane"]')).toBe("");
+});
+
+test("the panes start 8px from the top and their 44px headers drag the window, with the sidebar shown and hidden", async ({ page }) => {
+  await openApp(page);
+  const viewport = page.viewportSize();
+  await row(page, "s:s-1").click();
+  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
+  await page.getByTestId("terminal-header").getByTestId("panel-toggle").click();
+  await expect(page.getByTestId("side-panel")).toBeVisible();
+
   for (const visible of [true, false]) {
     if (!visible) {
       await page.keyboard.press("Meta+b");
       await expect(page.getByTestId("sidebar")).toHaveCount(0);
-    } else {
-      expect((await box(page, "sidebar")).top).toBeGreaterThanOrEqual(52);
     }
     const pane = await box(page, "content-pane");
-    expect(pane.top).toBeGreaterThanOrEqual(52);
-    expect(pane.left).toBeGreaterThanOrEqual(8);
-    expect(viewport && viewport.width - pane.right).toBe(8);
-    // No footer: the pane stops 8px above the window's bottom edge.
+    expect(pane.top).toBe(8);
+    expect(pane.left).toBe(visible ? (await box(page, "sidebar")).right + 8 : 8);
     expect(viewport && viewport.height - pane.bottom).toBe(8);
+
+    const header = await box(page, "terminal-header");
+    expect(header.top).toBe(pane.top + 1);
+    expect(header.height).toBe(HEADER);
+    expect(header.bottom - 1).toBe(BAND);
+    expect(await drag(page, '[data-testid="terminal-header"]')).toBe("drag");
+    expect(await drag(page, '[data-testid="terminal-title"]')).toBe("drag");
+    expect(await drag(page, '[data-testid="pane-actions"]')).toBe("no-drag");
+    // The terminal itself never drags.
+    expect(await drag(page, '[data-testid="terminal-host"]')).toBe("");
+
+    // The side panel: same top, same header, ending on the band.
+    const wrapper = await box(page, "side-panel-wrapper");
+    expect(wrapper.top).toBe(8);
+    expect(viewport && viewport.width - wrapper.right).toBe(8);
+    const panelHeader = await box(page, "panel-header");
+    expect(panelHeader.top).toBe(header.top);
+    expect(panelHeader.height).toBe(HEADER);
+    expect(panelHeader.bottom).toBe(header.bottom);
+    expect(await drag(page, '[data-testid="panel-header"]')).toBe("drag");
+    expect(await drag(page, '[data-testid="panel-header"] [data-testid="panel-toggle"]')).toBe("no-drag");
+    expect(await drag(page, '[data-testid="panel-empty"]')).toBe("");
+    // The resize handle runs from the panel's top (just below the window's 8px edge) and never drags.
+    const handle = await box(page, "panel-resize-handle");
+    expect(handle.top).toBe(8);
+    expect(await drag(page, '[data-testid="panel-resize-handle"]')).toBe("no-drag");
+
+    // Hidden sidebar: the pane runs under the traffic lights, so the header content
+    // starts past the gutter.
+    const title = await box(page, "terminal-title");
+    if (!visible) expect(title.left).toBeGreaterThanOrEqual(80 + 8);
   }
   await expect(page.getByTestId("hints")).toHaveCount(0);
+});
+
+test("every page header is 44px, ends on the band and drags; its controls do not", async ({ page }) => {
+  await openApp(page);
+  const check = async (header: string, noDrag: string[]) => {
+    const h = await page.locator(header).first().evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { top: r.top, height: r.height, bottom: r.bottom };
+    });
+    expect(h, header).toEqual({ top: 9, height: HEADER, bottom: BAND + 1 });
+    expect(await drag(page, header)).toBe("drag");
+    for (const sel of noDrag) expect(await drag(page, `${header} ${sel}`), sel).toBe("no-drag");
+  };
+
+  await row(page, "r:repo-cf").click();
+  await check('[data-testid="overview-page"] > header', ['[data-testid="panel-toggle"]']);
+  await page.getByTestId("nav-pullrequests").click();
+  await check('[data-testid="prs-page"] > header', ['[data-testid="prs-scope"]', '[data-testid="panel-toggle"]']);
+  await page.keyboard.press("Meta+Comma");
+  await expect(page.getByTestId("settings-page")).toBeVisible();
+  await check('[data-testid="settings-page"] > header', ['input[type="search"]', '[data-testid="reveal-settings"]', 'button[aria-label="Close settings"]']);
+  await page.getByRole("button", { name: "Close settings" }).click();
+
+  // A disconnected thread has no header: its panel toggle sits centred where one would be.
+  await row(page, "s:s-3").click();
+  await expect(page.getByTestId("session-disconnected")).toBeVisible();
+  const toggle = await box(page, "panel-toggle");
+  expect((toggle.top + toggle.bottom) / 2).toBe((9 + BAND + 1) / 2);
+  expect(await drag(page, '[data-testid="panel-toggle"]')).toBe("no-drag");
 });
 
 test("the daemon status and update indicator sit at the bottom of the sidebar", async ({ page }) => {

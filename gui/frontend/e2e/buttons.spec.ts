@@ -81,7 +81,8 @@ test("session pane header: rename, fork and close buttons run the session comman
   await row(page, "s:s-1").click();
   const header = page.getByTestId("terminal-header");
   await expect(header.getByTestId("terminal-title")).toHaveText("Refactor sidebar tree");
-  expect((await header.boundingBox())?.height).toBe(36);
+  // 44px, like every pane header (window/PaneHeader; layout.spec.ts).
+  expect((await header.boundingBox())?.height).toBe(44);
 
   // Rename is presented inline in the sidebar, as from the palette.
   await header.getByRole("button", { name: "Rename Thread" }).click();

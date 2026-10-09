@@ -107,9 +107,12 @@ test("the header toggle shows the empty surface list and hides the panel again",
   expect(viewport && viewport.height - side.bottom).toBe(8);
   expect(side.top).toBe(content.top);
   expect(side.width).toBe(420);
-  // The panel header is the content pane header's height.
+  // The panel header lines up with the content pane header: 44px, same top and bottom
+  // (layout.spec.ts covers the band geometry and the other selection kinds).
   const header = await box(page, "panel-header");
-  expect(header.bottom - header.top).toBe((await box(page, "terminal-header")).bottom - (await box(page, "terminal-header")).top);
+  const terminalHeader = await box(page, "terminal-header");
+  expect(header.bottom - header.top).toBe(44);
+  expect([header.top, header.bottom]).toEqual([terminalHeader.top, terminalHeader.bottom]);
 
   await panelToggle.click();
   await expect(panel(page)).toHaveCount(0);
@@ -313,6 +316,11 @@ test("tabs: cmd+w activates the neighbour, the × and middle click close, the la
   const tabs = panel(page).getByRole("tab");
   await expect(tabs).toHaveText(["Files", "Diff", "#12", "#13"]);
   await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "pullrequest?number=13");
+  // The header drags the window from the strip's empty space, never from a tab or its ×.
+  const dragOf = (sel: string) => panel(page).locator(sel).first().evaluate((el) => getComputedStyle(el).getPropertyValue("--wails-draggable").trim());
+  expect(await dragOf('[data-testid="panel-tabs"]')).toBe("drag");
+  expect(await dragOf("[data-tab-id]")).toBe("no-drag");
+  expect(await dragOf('[aria-label="Close Files"]')).toBe("no-drag");
 
   // cmd+w closes the active (last) tab; its left neighbour becomes active.
   await tabs.filter({ hasText: "Diff" }).click();
