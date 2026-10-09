@@ -14,6 +14,15 @@ type fakeDetail struct {
 	comments   map[string][]string
 	assignable []ReviewerCandidate
 	reverted   []string // PR ids the RevertPullRequest mutation was called for
+	// revertRefusal, when set, is the GraphQL error type every RevertPullRequest gets
+	// (FORBIDDEN: the viewer cannot push).
+	revertRefusal string
+}
+
+func (g *fakeGitHub) refuseReverts(errType string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.detail.revertRefusal = errType
 }
 
 func (g *fakeGitHub) setBody(id, body string) {
@@ -81,6 +90,12 @@ func (g *fakeGitHub) detailOp(op string, vars map[string]any, data map[string]an
 		delete(data, "rateLimit") // the mutation does not select it
 		id := vars["id"].(string)
 		p, ok := g.prs[id]
+		if t := g.detail.revertRefusal; t != "" {
+			data["revertPullRequest"] = nil
+			*errs = append(*errs, map[string]any{"type": t, "path": []any{"revertPullRequest"},
+				"message": "Resource not accessible by integration"})
+			return
+		}
 		if !ok || p.State != PullRequestMerged {
 			data["revertPullRequest"] = nil
 			*errs = append(*errs, map[string]any{"type": "UNPROCESSABLE", "path": []any{"revertPullRequest"},

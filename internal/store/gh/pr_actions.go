@@ -103,26 +103,30 @@ func (s *Store) SetReviewRequest(ctx context.Context, slug string, number int, r
 }
 
 // RevertPullRequest implements Service. The pull request must be merged; its node id
-// comes from the detail (cached, or fetched). A second call within revertMemoTTL
-// returns the first's result instead of opening another revert.
+// comes from the detail (cached, or fetched). Within revertMemoTTL of a revert, another
+// call returns the first's outcome instead of sending the mutation again: the pull
+// request it opened or, when GitHub did not answer, the error saying it may have
+// opened one.
 func (s *Store) RevertPullRequest(ctx context.Context, slug string, number int) (RevertResult, error) {
 	k, err := fullKeyOf(slug, number)
 	if err != nil {
 		return RevertResult{}, err
 	}
-	if r, ok := s.full.recentRevert(k, s.opts.Now()); ok {
-		return r, nil
+	if m, ok := s.full.recentRevert(k, s.opts.Now()); ok {
+		return m.res, m.err
 	}
 	d, err := s.FullPullRequest(ctx, k.slug, k.number, false)
-	if err == nil && d.PullRequest.State != PullRequestMerged {
-		// Merged is final, so only a pull request not yet merged is worth a fresh look.
-		d, err = s.FullPullRequest(ctx, k.slug, k.number, true)
+	if err != nil {
+		return RevertResult{}, err
+	}
+	if d.PullRequest.State != PullRequestMerged {
+		// Merged is final, so only a pull request not yet merged is worth a fresh look,
+		// and that look must succeed: the cached copy cannot confirm anything.
+		if d, err = s.fetchFullJob(ctx, k); err != nil {
+			return RevertResult{}, fmt.Errorf("pull request #%d: cannot confirm it is merged: %w", k.number, err)
+		}
 	}
 	switch {
-	case err != nil:
-		return RevertResult{}, err
-	case d.PullRequest.State != PullRequestMerged && d.LastError != "":
-		return RevertResult{}, fmt.Errorf("pull request #%d: cannot confirm it is merged: %s", k.number, d.LastError)
 	case d.PullRequest.State != PullRequestMerged:
 		return RevertResult{}, fmt.Errorf("%w: pull request #%d is %s, not merged", ErrFailedPrecondition, k.number,
 			strings.ToLower(string(d.PullRequest.State)))
@@ -132,18 +136,30 @@ func (s *Store) RevertPullRequest(ctx context.Context, slug string, number int) 
 	nodeID := d.PullRequest.ID
 	res, err := submitFunc(ctx, s, "revert|"+k.String(), func(ctx context.Context) (RevertResult, error) {
 		// The worker is serial, so a concurrent second revert sees the first's memo.
-		if r, ok := s.full.recentRevert(k, s.opts.Now()); ok {
-			return r, nil
+		if m, ok := s.full.recentRevert(k, s.opts.Now()); ok {
+			return m.res, m.err
 		}
 		data, err := s.call(ctx, queryRevertPullRequest, map[string]any{"id": nodeID})
-		if err != nil {
+		var pe *PartialError
+		switch {
+		case errors.As(err, &pe):
+			// GitHub refused the mutation (FORBIDDEN, UNPROCESSABLE): nothing was opened.
+			return RevertResult{}, pe.Unwrap()
+		case revertOutcomeUnknown(err):
+			now := s.opts.Now()
+			err = fmt.Errorf("pull request #%d: GitHub did not confirm the revert, and it may have opened one; "+
+				"check GitHub before trying again (until %s a retry returns this error): %w",
+				k.number, now.Add(revertMemoTTL).Local().Format(time.TimeOnly), err)
+			s.full.rememberRevert(k, revertMemo{err: err, at: now})
+			return RevertResult{}, err
+		case err != nil:
 			return RevertResult{}, err
 		}
 		r, err := decodeRevert(data)
 		if err != nil {
 			return RevertResult{}, err
 		}
-		s.full.rememberRevert(k, r, s.opts.Now())
+		s.full.rememberRevert(k, revertMemo{res: r, at: s.opts.Now()})
 		return r, nil
 	})
 	if err != nil {
@@ -157,6 +173,12 @@ func (s *Store) RevertPullRequest(ctx context.Context, slug string, number int) 
 	s.mu.Unlock()
 	s.nudge()
 	return res, nil
+}
+
+// revertOutcomeUnknown reports whether a failed revert mutation may still have run:
+// GitHub timed out (502/504) or the connection failed after the request may have left.
+func revertOutcomeUnknown(err error) bool {
+	return errors.Is(err, ErrServerTimeout) || errors.Is(err, ErrNetwork) || errors.Is(err, context.DeadlineExceeded)
 }
 
 // restWrite sends one paced REST write and applies its global effects (auth state,

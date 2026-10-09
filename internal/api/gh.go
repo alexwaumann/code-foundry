@@ -167,9 +167,11 @@ func ghViewerEvent(e gh.ViewerUpdated) *v1.GhEvent {
 	}}}
 }
 
-// ghErrorCodes maps store errors to Connect codes, first match wins. Not-authenticated
-// is FailedPrecondition, not Unauthenticated: the caller is authenticated to the
-// daemon; it is gh that needs `gh auth login`.
+// ghErrorCodes maps store errors to Connect codes, first match wins. Each sentinel has
+// its own code so clients can tell them apart: Unauthenticated means gh needs `gh auth
+// login` (the daemon's own clients are never unauthenticated), PermissionDenied that
+// GitHub refused the viewer, FailedPrecondition that the pull request's state forbids
+// the operation.
 var ghErrorCodes = []struct {
 	err  error
 	code connect.Code
@@ -178,7 +180,8 @@ var ghErrorCodes = []struct {
 	{gh.ErrInvalidArgument, connect.CodeInvalidArgument},
 	{gh.ErrNotFound, connect.CodeNotFound},
 	{gh.ErrFailedPrecondition, connect.CodeFailedPrecondition},
-	{gh.ErrNotAuthenticated, connect.CodeFailedPrecondition},
+	{gh.ErrPermissionDenied, connect.CodePermissionDenied},
+	{gh.ErrNotAuthenticated, connect.CodeUnauthenticated},
 	{gh.ErrRateLimited, connect.CodeResourceExhausted},
 	{gh.ErrNetwork, connect.CodeUnavailable},
 	{gh.ErrServerTimeout, connect.CodeUnavailable},

@@ -52,8 +52,11 @@ type fullEntry struct {
 	stale bool // the poll saw the pull request change since d was fetched
 }
 
+// revertMemo is a revert's outcome for revertMemoTTL: the pull request it opened or,
+// when GitHub did not answer (err), that it may have opened one.
 type revertMemo struct {
 	res RevertResult
+	err error
 	at  time.Time
 }
 
@@ -152,28 +155,29 @@ func (c *fullCache) staleMoved(fps []prFingerprint) []fullKey {
 	return out
 }
 
-func (c *fullCache) recentRevert(k fullKey, now time.Time) (RevertResult, bool) {
+// recentRevert returns the outcome of a revert of k within revertMemoTTL of now.
+func (c *fullCache) recentRevert(k fullKey, now time.Time) (revertMemo, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	m, ok := c.reverts[k]
 	if !ok || now.Sub(m.at) > revertMemoTTL {
-		return RevertResult{}, false
+		return revertMemo{}, false
 	}
-	return m.res, true
+	return m, true
 }
 
-func (c *fullCache) rememberRevert(k fullKey, r RevertResult, now time.Time) {
+func (c *fullCache) rememberRevert(k fullKey, m revertMemo) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.reverts == nil {
 		c.reverts = map[fullKey]revertMemo{}
 	}
-	for key, m := range c.reverts {
-		if now.Sub(m.at) > revertMemoTTL {
+	for key, old := range c.reverts {
+		if m.at.Sub(old.at) > revertMemoTTL {
 			delete(c.reverts, key)
 		}
 	}
-	c.reverts[k] = revertMemo{res: r, at: now}
+	c.reverts[k] = m
 }
 
 // fingerprintMoved reports whether the poll's fingerprint of a pull request differs

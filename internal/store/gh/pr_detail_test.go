@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -170,6 +171,10 @@ func TestSetReviewRequestREST(t *testing.T) {
 		case r.URL.Path == "/repos/o/r/pulls/2/requested_reviewers":
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			_, _ = w.Write([]byte(`{"message":"Validation Failed","errors":["Review cannot be requested from pull request author."],"status":"422"}`))
+		case r.URL.Path == "/repos/o/r/pulls/3/requested_reviewers":
+			w.Header().Set("X-Ratelimit-Remaining", "4999")
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"message":"Must have push access to repository","status":"403"}`))
 		case r.Method == http.MethodPost:
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"number":1,"requested_reviewers":[{"login":"kim"}],"requested_teams":[{"slug":"core"}],"base":{"repo":{"owner":{"login":"o"}}}}`))
@@ -213,6 +218,9 @@ func TestSetReviewRequestREST(t *testing.T) {
 		{name: "GitHub refuses (422)", number: 2, req: ReviewRequest{Login: "octocat", Kind: ReviewerUser, Requested: true},
 			method: "POST", body: `{"reviewers":["octocat"],"team_reviewers":[]}`, err: ErrFailedPrecondition,
 			errContain: "Review cannot be requested from pull request author."},
+		{name: "no push access (403, not a rate limit)", number: 3, req: ReviewRequest{Login: "kim", Requested: true},
+			method: "POST", body: `{"reviewers":["kim"],"team_reviewers":[]}`, err: ErrPermissionDenied,
+			errContain: "Must have push access to repository"},
 		{name: "invalid login: nothing sent", number: 1, req: ReviewRequest{Login: "not a login", Requested: true}, err: ErrInvalidArgument},
 		{name: "invalid kind: nothing sent", number: 1, req: ReviewRequest{Login: "kim", Kind: "ROBOT"}, err: ErrInvalidArgument},
 	}
@@ -233,7 +241,7 @@ func TestSetReviewRequestREST(t *testing.T) {
 					t.Fatalf("sent %d requests, want 1", len(sent))
 				}
 				r := sent[0]
-				if r.method != tt.method || r.path != "/repos/o/r/pulls/"+map[int]string{1: "1", 2: "2"}[tt.number]+"/requested_reviewers" ||
+				if r.method != tt.method || r.path != "/repos/o/r/pulls/"+strconv.Itoa(tt.number)+"/requested_reviewers" ||
 					r.contentType != "application/json" || r.auth != "Bearer tok" {
 					t.Errorf("request = %s %s (%s, %s)", r.method, r.path, r.contentType, r.auth)
 				}

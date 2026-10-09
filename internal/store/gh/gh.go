@@ -86,6 +86,10 @@ var (
 	ErrInvalidSlug = errors.New(`invalid repository slug (want "owner/name")`)
 	// ErrInvalidArgument covers other malformed arguments (PR number, ref).
 	ErrInvalidArgument = errors.New("invalid argument")
+	// ErrPermissionDenied means GitHub refused the request for lack of access: GraphQL
+	// FORBIDDEN, or an HTTP 403 that is not a rate limit (missing scope, SSO, no write
+	// access to the repository).
+	ErrPermissionDenied = errors.New("permission denied on github")
 )
 
 // slugRE matches GitHub owner/name pairs. Owners are alphanumerics and hyphens;
