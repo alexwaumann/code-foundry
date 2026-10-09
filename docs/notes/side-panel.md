@@ -408,9 +408,9 @@ The three "Coming next" slots in the PR surface's ⋯ menu now start a Claude se
 the pull request through the registry commands `pr.ask`, `pr.explain` and
 `pr.fix.findings` (daemon side: `pr-thread-commands.md`).
 
-Status: `make check` green (39 vitest files / 522 tests, plus the Go suite). `make
-gui-e2e` passes 190/190 (95 per engine), with `e2e/pr-panel.spec.ts` at 17 tests per
-engine. Screenshots (WebKit, dark, 1400x900): `/tmp/cf-shots/chunk4-menu.png` (menu with
+Status: `make check` green (39 vitest files / 535 tests, plus the Go suite). `make
+gui-e2e` passes 200/200 (100 per engine), with `e2e/pr-panel.spec.ts` at 22 tests per
+engine (after the review fixes below; first landed at 522 / 190). Screenshots (WebKit, dark, 1400x900): `/tmp/cf-shots/chunk4-menu.png` (menu with
 the three actions enabled, mock daemon), `chunk4-ask.png` (composer with a two-line
 question, mock daemon), `chunk4-live-explain.png` (real daemon, below). Not run in the
 real Wails window.
@@ -419,9 +419,9 @@ real Wails window.
 
 | File | Role |
 |---|---|
-| `stores/prSessions.ts` | `PR_SESSION_COMMANDS`, `prSessionArgs` (pure), `startPrSession` (runs the command, busy flag per pull request and kind, the fix-findings toast), `usePrSessionsStore` |
+| `stores/prSessions.ts` | `PR_SESSION_COMMANDS`, `prSessionArgs` (pure), `startPrSession` (runs the command, busy flag per pull request and kind, the fix-findings toast, the success toast's Open action), `openStartedSession`, `usePrSessionsStore` |
 | `components/pr/PrAskComposer.tsx` | The inline composer under the header |
-| `components/pr/keys.ts` | `composerKeyAction` (pure): Enter sends, Shift+Enter newline, Escape cancels, IME composition ignored |
+| `components/pr/keys.ts` | `composerKeyAction` (pure): Enter sends, Shift+Enter newline, Escape cancels, IME composition ignored (`isComposing` or `keyCode` 229) |
 | `components/pr/PrMenu.tsx` | The three items enabled; controlled open state; spinners |
 | `api/gh.ts` | `parseSessionResult`: the session id in the command's result (protojson of `Session`) |
 | `mock/world.ts`, `mock/prDetail.ts`, `mock/server.ts` | The mock commands answer with the session JSON; `pr-fail` and the new `pr-delay` controls |
@@ -444,25 +444,54 @@ real Wails window.
   280px panel left no room for a multi-line question, and the composer keeps the PR in
   view. The menu item sets the surface's local `asking` state; the menu's
   `onCloseAutoFocus` is prevented for that item so focus lands in the textarea, not back
-  on the ⋯ button. Enter (or cmd+Enter) sends, Shift+Enter is a newline, Alt/Ctrl+Enter
-  do nothing, Escape cancels and hands focus to the panel `<aside>` (panel keys keep
-  working). A blank question sends nothing and the Ask button is disabled. While pr.ask
-  runs the textarea is read-only with "Starting a session…". On success the composer
-  closes (in practice the selection has already moved, which unmounts it); on failure the
+  on the ⋯ button. Choosing Ask again while the composer is open moves focus back into it
+  (the surface bumps a `focusRequest` counter the composer's focus effect depends on).
+  Enter (or cmd+Enter) sends, Shift+Enter is a newline, Alt/Ctrl+Enter do nothing, Escape
+  cancels and hands focus to the panel `<aside>` (panel keys keep working). A blank
+  question sends nothing and the Ask button is disabled. While its pr.ask runs the textarea
+  is read-only with "Starting a session…", Cancel is disabled and Escape does nothing (it
+  is still kept from the panel): the session starts either way, so the composer stays with
+  its spinner rather than pretending to cancel. On success the composer closes through the
+  same path as Cancel, handing focus to the panel (in practice the selection has already
+  moved, which unmounts it; this covers a FocusSession that never arrives); on failure the
   generic error toast shows and the text stays for a retry. The composer is local state of
   the surface, so it never comes back when the user returns.
+* **Busy across surfaces.** The busy flag lives in the store per pull request and kind, so
+  every surface showing the pull request sees it (in practice: send from a session's panel,
+  switch to the Pull Requests page and open the same PR). The composer tells its own send
+  (local `sending`) from another surface's: the Ask button shows the shared spinner, and the
+  hint says "Already starting a thread for this pull request"; its text stays editable,
+  Cancel works, and Enter sends nothing. Running Explain and Fix findings items are
+  `aria-busy` and `aria-disabled` (still focusable, as ARIA intends; a select sends
+  nothing). Ask a question is never disabled: it only opens the composer.
+* **Composer at 280px.** The idle hint is "⏎ send · ⇧⏎ newline" (the long form was cut).
+  The textarea starts at 3 rows, grows with its text up to 6 (`max-h-[calc(6lh+1rem+2px)]`,
+  height set from `scrollHeight` in a layout effect), then scrolls.
 * **Explain and Fix findings** keep the menu open (`preventDefault` on select, as Refresh
   does) with a spinner on the item (`aria-busy`) until the command answers; success closes
   it. A second click on a running item sends nothing (busy flag per pull request and
   kind). A failure leaves the menu open for a retry; the error is the generic
   `runCommandForResult` toast ("Fix Pull Request Findings failed" with the daemon's
   message, e.g. the fork's `gh pr checkout N` hint).
+* **The menu reopened while it fades out stays open.** Pressing ⋯ within the menu's exit
+  animation (about 150 ms after choosing any closing item, Ask or Copy link alike) opened it
+  and shut it again in the same press: the fading content's dismissable layer was still
+  mounted and took the press as an outside one. `onPointerDownOutside` now ignores presses
+  on the ⋯ button (it toggles the menu itself). Radix still counts that press as an outside
+  interaction and then skips returning focus to the button on the next close, so
+  `onCloseAutoFocus` does it when the last outside press was the button. A reopen also
+  clears a `keepFocus` left by an Ask whose close never ran its focus handling.
 * **Fix findings toast.** "Preparing worktree for #N…" (sonner `loading`) shows only if
   the command is still running after 200 ms, so a quick answer (the fork error) does not
   flash it, and is dismissed when the command answers. Merged and closed pull requests
   keep the item enabled, as asked.
-* **Success toast.** The command's message ("Started session <id> for PR #N") is shown as
-  usual; the new session is also selected, so this is a confirmation, not the only cue.
+* **Success toast.** `startPrSession` shows the command's message ("Started session <id>
+  for PR #N") itself (`runCommandForResult` with `quiet`) with an **Open** action when the
+  result names the session. The daemon's FocusSession normally selects it first, so this is
+  a confirmation; Open (`openStartedSession`) selects the session with terminal focus unless
+  it is already selected, which covers an event stream that missed the FocusSession. An
+  explicit Open always selects it, even if the user has moved elsewhere since: reading
+  "unless the selection has already moved" as "unless it is already on the session".
 
 ### Gotchas
 
@@ -473,6 +502,12 @@ real Wails window.
   `setTimeout(0)` queued after sonner's add (timeouts of equal delay run in order), and
   the 200 ms show delay avoids the case for quick answers. Unit test with fake timers; the
   e2e checks no "Preparing" toast is left after the instant failure.
+* **WebKit's IME Enter.** WebKit fires `compositionend` before the keydown of the Enter
+  that confirms a candidate, so that keydown has `isComposing === false`; its `keyCode` is
+  229. `composerKeyAction` ignores both (the composer passes `e.nativeEvent.keyCode`, with
+  an eslint exception for the deprecated property).
+* **Playwright will not click an `aria-disabled` item** (it waits for "enabled"); the
+  cross-surface e2e forces the click to check a busy item sends nothing.
 * **Menu screenshots** need the fade-in to finish (`el.getAnimations({ subtree: true })`),
   or the menu is captured half transparent over the summary.
 * **Playwright runs share `test-results/`.** A live run started while `make gui-e2e` was
@@ -481,7 +516,8 @@ real Wails window.
 * **`session close` takes `--id`**, not a positional id (`code-foundry session close --id
   s-…`); without it it closes the active session from the context.
 * The mock's `pr-fail` control now covers `pr.ask`, `pr.explain` and `pr.fix.findings`
-  (fix: the fork precondition message; ask/explain: a 502 reading the pull request), and
+  (fix: the fork message as `FailedPrecondition`; ask/explain: a 502 reading the pull
+  request as `Unavailable`, the daemon's codes), and
   `POST /__mock/gh/pr-delay?ms=800` makes the three commands take that long, so e2e can
   see the spinner and the toast. The commands answer with the created session as JSON
   (`id`, `repoId`, `worktreePath`, `model`, `effort`), like the daemon (protojson of
@@ -491,10 +527,14 @@ real Wails window.
 
 * `stores/prSessions.test.ts`: args per kind (no worktree/model/effort), each command and
   its id, blank question, busy guard, the preparing toast (delay, deferred dismissal,
-  none for a quick answer), failure.
-* `components/pr/PrAskComposer.test.tsx`: `composerKeyAction` table, Enter sends and
-  closes, Shift+Enter does not send, blank, Escape, failure keeps the text, read-only
-  while running.
+  none for a quick answer), failure, the success toast's Open action (none without an id),
+  `openStartedSession` table.
+* `components/pr/PrAskComposer.test.tsx`: `composerKeyAction` table (with `keyCode` 229
+  rows), Enter sends, closes and hands focus to the panel, IME Enter, the idle hint,
+  Shift+Enter, blank, Escape, failure keeps the text; while sending: read-only, Cancel
+  disabled, Escape and Enter ignored, closes when the session starts; another surface's
+  pr.ask: shared spinner, the "Already starting" hint, nothing sent; two composers on one
+  PR share the spinner; a new `focusRequest` refocuses the open composer.
 * `e2e/pr-panel.spec.ts`: the menu test now checks the three items are enabled with
   their subtitles. Explain: the spinner, `pr.explain` with slug and number and no
   worktree, the new session selected with no panel, and #145 still open on the Pull
@@ -502,7 +542,13 @@ real Wails window.
   Shift+Enter, Enter sends the two-line question with s-1's worktree in the context (not
   in the args), and s-1's panel keeps #145. Fix findings: the fork error toast, no stray
   "Preparing" toast, the menu open for a retry, then the spinner and the toast, the
-  session selected.
+  session selected. Review fixes: Ask from the Pull Requests page (no worktree in the
+  context) with Cancel disabled and Escape ignored while it starts; a failed pr.ask (the
+  toast, the text kept, the retry); choosing Ask again refocuses the composer, the menu
+  reopened right after Ask stays open, focus returns to ⋯ after, ⋯ still closes it; the
+  same PR on two surfaces (session s-1 and the Pull Requests page) shares Ask's spinner
+  with the "Already starting" hint and Explain's `aria-busy`/`aria-disabled`, and nothing
+  is sent twice; at 280px the hint fits and the field grows to 6 rows, then scrolls.
 * `e2e/live-prsession.spec.ts`: opt-in live run (below).
 
 ### Live run (scratch daemon, 2026-10-09)
