@@ -36,20 +36,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: gui/frontend/pnpm-lock.yaml
 
-      # libghostty-vt (static) from the pinned ghostty commit with zig 0.16.0, cached on
-      # both pins. The .pc files hardcode the absolute prefix, which is stable on runners.
-      # A cold build downloads zig and the ghostty source and takes about a minute.
-      - name: libghostty-vt cache key
-        id: ghostty-vt
-        run: echo "key=$(./scripts/ghostty-vt.sh --print-key)" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/cache@v6
-        with:
-          path: third_party/ghostty-vt
-          key: ${{ runner.os }}-${{ steps.ghostty-vt.outputs.key }}
-
-      - run: make ghostty-vt
-
       # go vet + staticcheck + go test -race, then frontend typecheck + lint + test.
-      # Generated code (buf, Wails bindings) is committed, so neither buf nor wails3 is needed.
+      # Generated code (buf, Wails bindings) and libghostty-vt (third_party/libghostty-vt,
+      # prebuilt) are committed, so neither buf, wails3, nor zig is needed.
       - run: make check
