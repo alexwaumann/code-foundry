@@ -9,6 +9,7 @@ import { prTabKey, setInnerTab, usePrPanelStore, type PrInnerTab } from "@/store
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
 import { ago, checksHeadline, commentCount, stateBadge, timeline, type Tone } from "./model";
+import { MergeButton } from "./MergeButton";
 import { PrAskComposer } from "./PrAskComposer";
 import { PrMenu } from "./PrMenu";
 import { OrderToggle, PrSummary } from "./PrSummary";
@@ -76,6 +77,7 @@ function Header({ d, prRef, panelKey, onAsk }: { d: PullRequestDetailView; prRef
           <ExternalLink className="size-3 shrink-0" aria-hidden />
         </button>
         <span className="ml-auto flex shrink-0 items-center gap-1" data-testid="pr-actions">
+          <MergeButton prRef={prRef} detail={d} />
           <PrMenu prRef={prRef} detail={d} panelKey={panelKey} onAsk={onAsk} />
         </span>
       </div>

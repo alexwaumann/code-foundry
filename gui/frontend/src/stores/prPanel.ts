@@ -2,12 +2,13 @@
  * The Pull request surface's state and actions (components/pr). Inner view state lives
  * per panel tab, keyed by panel key + tab id, so switching panel tabs (or selections)
  * keeps it, and closing the tab drops it. Actions are registry commands (pr.refresh,
- * pr.review.request, pr.revert) or existing store actions (openUrl, copyText); components
+ * pr.review.request, pr.revert, pr.merge) or existing store actions (openUrl, copyText); components
  * call these, never RPCs.
  */
 import { toast } from "sonner";
 import { create } from "zustand";
-import { listReviewerCandidates, parseRefreshResult, parseRevertResult } from "@/api/gh";
+import { listReviewerCandidates, parseMergeResult, parseRefreshResult, parseRevertResult, type MergeMethodView } from "@/api/gh";
+import { mergeArgs } from "@/components/pr/merge";
 import { copyText } from "@/lib/clipboard";
 import { pullRequestTab, type PrRef } from "@/surfaces/pullrequestTarget";
 import { runCommand, runCommandForResult } from "./commands";
@@ -40,9 +41,11 @@ interface PrPanelState {
   refreshing: Readonly<Record<string, boolean>>;
   /** pullRequestKey + "\u0000" + login → a pr.review.request in flight. */
   requesting: Readonly<Record<string, boolean>>;
+  /** pullRequestKey → a pr.merge in flight (from its confirmation on). */
+  merging: Readonly<Record<string, boolean>>;
 }
 
-export const usePrPanelStore = create<PrPanelState>()(() => ({ byTab: {}, refreshing: {}, requesting: {} }));
+export const usePrPanelStore = create<PrPanelState>()(() => ({ byTab: {}, refreshing: {}, requesting: {}, merging: {} }));
 
 export const prTabKey = (panelKey: string, tabId: string): string => `${panelKey}\u0000${tabId}`;
 
@@ -191,6 +194,33 @@ export async function revertPullRequest(ref: PrRef, panel: PanelTarget): Promise
   const next = { slug: ref.slug, number: made.number };
   openSurface(panel, pullRequestTab(next));
   return next;
+}
+
+/**
+ * The merge button: pr.merge (the daemon asks for confirmation; the confirm dialog
+ * handles it). On success, toasts the daemon's message ("Merged #N (sha)", with the
+ * branch deletion as the description). Either way the detail is read again: the daemon
+ * also announces it, and after a refusal (the head moved) it shows GitHub's state.
+ * Returns whether it merged; a second call while one runs sends nothing.
+ */
+export async function mergePullRequest(ref: PrRef, method: MergeMethodView, deleteBranch: boolean): Promise<boolean> {
+  const key = pullRequestKey(ref.slug, ref.number);
+  if (usePrPanelStore.getState().merging[key]) return false;
+  usePrPanelStore.setState((s) => ({ merging: { ...s.merging, [key]: true } }));
+  try {
+    const res = await runCommandForResult("pr.merge", mergeArgs(ref, method, deleteBranch), { quiet: true });
+    if (!res) return false;
+    const message = parseMergeResult(res.resultJson)?.message || res.message || `Merged #${String(ref.number)}`;
+    const [title = message, ...rest] = message.split("; ");
+    toast.success(title, rest.length > 0 ? { description: rest.join("; ") } : undefined);
+    return true;
+  } finally {
+    pullRequestDetailResource.invalidate(key);
+    usePrPanelStore.setState((s) => {
+      const { [key]: _done, ...others } = s.merging;
+      return { merging: others };
+    });
+  }
 }
 
 /** Menu → Copy link (and shift+cmd+c in the panel). */

@@ -10,6 +10,7 @@ import {
   MergeStateStatus,
   PullRequestCommentKind,
   PullRequestDetailSchema,
+  PullRequestMergeMethod,
   PullRequestReviewState,
   PullRequestSchema,
   PullRequestState,
@@ -278,14 +279,21 @@ export interface PullRequestDetailView {
   closedAtMs: number | null;
   /** GitHub's node id. */
   nodeId: string;
-  /** Write access: may request reviewers and revert. */
+  /** Write access: may request reviewers, merge, and revert. */
   viewerCanUpdate: boolean;
+  /** The merge methods the repository allows, in GitHub's order; empty if unknown. */
+  mergeMethods: MergeMethodView[];
+  /** Auto-merge is enabled: GitHub merges it once its requirements pass. */
+  autoMergeEnabled: boolean;
   /** "admin" | "maintain" | "write" | "triage" | "read" | "". */
   viewerPermission: string;
   fetchedAtMs: number | null;
   /** The last fetch's error when this is the cached copy, or why checks is incomplete. */
   lastError: string;
 }
+
+/** pr.merge's method arg: a merge commit, squash, or rebase. */
+export type MergeMethodView = "merge" | "squash" | "rebase";
 
 export interface ReviewerCandidateView {
   id: string;
@@ -327,6 +335,13 @@ const mergeables: Record<Mergeable, MergeableView> = {
   [Mergeable.MERGEABLE]: "mergeable",
   [Mergeable.CONFLICTING]: "conflicting",
   [Mergeable.UNKNOWN]: "unknown",
+};
+
+const mergeMethodViews: Record<PullRequestMergeMethod, MergeMethodView | null> = {
+  [PullRequestMergeMethod.UNSPECIFIED]: null,
+  [PullRequestMergeMethod.MERGE]: "merge",
+  [PullRequestMergeMethod.SQUASH]: "squash",
+  [PullRequestMergeMethod.REBASE]: "rebase",
 };
 
 /** Lower-cased enum name without its prefix; "" for UNSPECIFIED. */
@@ -576,6 +591,8 @@ export function toPullRequestDetailView(d: PullRequestDetail): PullRequestDetail
     closedAtMs: ms(d.closedAt),
     nodeId: d.nodeId,
     viewerCanUpdate: d.viewerCanUpdate,
+    mergeMethods: d.mergeMethodsAllowed.map((m) => mergeMethodViews[m]).filter((m): m is MergeMethodView => m !== null),
+    autoMergeEnabled: d.autoMergeEnabled,
     viewerPermission: d.viewerPermission,
     fetchedAtMs: ms(d.fetchedAt),
     lastError: d.lastError,
@@ -619,6 +636,22 @@ export function parseRevertResult(resultJson: string): { number: number; url: st
     const number = Number(v.number);
     if (!Number.isInteger(number) || number <= 0) return null;
     return { number, url: typeof v.url === "string" ? v.url : "" };
+  } catch {
+    return null;
+  }
+}
+
+/** What pr.merge did, from its result JSON (MergePullRequestResponse); null if it is not one. */
+export function parseMergeResult(resultJson: string): { merged: boolean; sha: string; message: string; branchDeleted: boolean } | null {
+  try {
+    const v = JSON.parse(resultJson) as { merged?: unknown; sha?: unknown; message?: unknown; branchDeleted?: unknown } | null;
+    if (!v || typeof v !== "object") return null;
+    return {
+      merged: v.merged === true,
+      sha: typeof v.sha === "string" ? v.sha : "",
+      message: typeof v.message === "string" ? v.message : "",
+      branchDeleted: v.branchDeleted === true,
+    };
   } catch {
     return null;
   }
