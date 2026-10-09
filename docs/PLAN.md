@@ -128,8 +128,9 @@ Decisions (Alex, 2026-10-08), modeled on the work TUI's screens:
   **Log** of commits on the branch not on base. This is the baseline; Alex had further
   updates planned and will direct them later.
 * **Settings** live in a file under the config home and are editable in the UI.
-* **Packaging and updates**: a GitHub release per version holding the app bundle (with the
-  CLI/daemon inside it) and a curl-able `install.sh` that uses `gh release download` into a
+* **Packaging and updates**: a GitHub release per version holding the app (originally a
+  bundle with the CLI/daemon inside it; now a tarball of the two executables, see
+  `docs/notes/bare-binary-distribution.md`) and a curl-able `install.sh` that uses `gh release download` into a
   user-owned location with PATH setup; an in-app updater that checks every 24h via `gh`,
   surfaces "update ready" in the footer and palette, installs on request, and reports
   "ready on next restart". The daemon must not be restarted automatically (it would kill

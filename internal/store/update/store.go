@@ -9,10 +9,10 @@
 //	  └──check finds nothing───────┘                       └──error──► Failed  ▼
 //	                                                         (Install retries) RestartRequired
 //
-// Nothing restarts automatically. Installed means the bundle on disk is newer than the
+// Nothing restarts automatically. Installed means the install on disk is newer than the
 // running daemon: the GUI relaunches on request, and the daemon keeps running the old
 // version until `daemon.restart` (which closes every session). A daemon that starts from
-// the new bundle is simply up to date.
+// the new install is simply up to date.
 package update
 
 import (
@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -127,9 +126,10 @@ type Options struct {
 	// Source and Installer are required unless disabled.
 	Source    Source
 	Installer Installer
-	// InstalledVersion reports the version of the bundle on disk that this binary runs
+	// InstalledVersion reports the version of the install on disk that this binary runs
 	// from ("" when unknown). Lets the store notice an update installed by someone else
-	// (`code-foundry update`). Defaults to reading the running bundle's Info.plist.
+	// (`code-foundry update`). Defaults to re-reading VERSION in the directory of the
+	// running executable.
 	InstalledVersion func() (string, error)
 	Bus              *bus.Bus
 	Log              *slog.Logger
@@ -144,10 +144,11 @@ type Options struct {
 func DefaultOptions(current string) Options {
 	o := Options{Current: current, Repo: version.Repo()}
 	dir := version.ReleaseDir()
-	appDir := ""
-	if b := RunningBundle(); b != "" {
-		appDir = filepath.Dir(b)
-	}
+	// Updates go beside the running daemon, wherever it was installed: not to the
+	// configured home's default, which a CODE_FOUNDRY_HOME override may point elsewhere.
+	// Read once at start; the installer swaps the directory but keeps its path.
+	appDir := RunningDir()
+	o.InstalledVersion = installedVersionIn(appDir)
 	switch {
 	case !IsSemver(current):
 		o.DisabledReason = "dev build"
@@ -201,7 +202,7 @@ func Start(ctx context.Context, opts Options) *Store {
 		opts.Interval = DefaultInterval
 	}
 	if opts.InstalledVersion == nil {
-		opts.InstalledVersion = installedVersion
+		opts.InstalledVersion = installedVersionIn(RunningDir())
 	}
 	if opts.DisabledReason == "" && (opts.Source == nil || opts.Installer == nil) {
 		opts.DisabledReason = "no release source configured"
@@ -220,8 +221,8 @@ func Start(ctx context.Context, opts Options) *Store {
 		return s
 	}
 	// An update installed while this daemon was down cannot be newer than us (we start
-	// from the bundle), but one installed by `code-foundry update` with a daemon from an
-	// older bundle still running can: notice it without waiting for the first check.
+	// from the install), but one installed by `code-foundry update` with a daemon from an
+	// older install still running can: notice it without waiting for the first check.
 	s.mu.Lock()
 	s.applyOnDisk()
 	s.mu.Unlock()
@@ -308,7 +309,7 @@ func (s *Store) applyLatest(tag string) {
 	s.moveTo(next, target)
 }
 
-// applyOnDisk notices a newer bundle on disk. Caller holds mu.
+// applyOnDisk notices a newer install on disk. Caller holds mu.
 func (s *Store) applyOnDisk() {
 	if v := s.onDisk(); Newer(v, s.opts.Current) {
 		s.moveTo(Installed, v)
@@ -318,7 +319,7 @@ func (s *Store) applyOnDisk() {
 func (s *Store) onDisk() string {
 	v, err := s.opts.InstalledVersion()
 	if err != nil {
-		s.log.Debug("read installed bundle version", "err", err)
+		s.log.Debug("read installed version", "err", err)
 		return ""
 	}
 	if !IsSemver(v) {
@@ -347,7 +348,7 @@ func (s *Store) moveTo(state State, target string) {
 }
 
 // decide is the state after a successful check that saw latest, given the current state
-// and target, the running version, and the version of the bundle on disk ("" unknown).
+// and target, the running version, and the version of the install on disk ("" unknown).
 func decide(state State, target, current, onDisk, latest string) (State, string) {
 	if state == Downloading {
 		return state, target // the install decides

@@ -5,8 +5,6 @@ import { Info } from "../../bindings/github.com/alexwaumann/code-foundry/gui/app
 export interface AppInfoView {
   /** The GUI binary's version (same ldflag as the daemon's). */
   version: string;
-  /** The .app the GUI runs from; "" for a dev binary. */
-  bundle: string;
 }
 
 /** Emitted by the app menu's "Check for Updates…" (gui/app.go EventCheckForUpdates). */
@@ -22,7 +20,7 @@ let info: Promise<AppInfoView | null> | null = null;
  */
 export function appInfo(): Promise<AppInfoView | null> {
   info ??= Promise.race([
-    Info().then((i): AppInfoView => ({ version: i.version, bundle: i.bundle })),
+    Info().then((i): AppInfoView => ({ version: i.version })),
     new Promise<null>((resolve) => setTimeout(() => {
       resolve(null);
     }, INFO_TIMEOUT_MS)),

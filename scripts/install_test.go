@@ -3,7 +3,6 @@ package scripts
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,54 +10,43 @@ import (
 	"testing"
 )
 
-// fakeRelease publishes a fake CodeFoundry.app for tag into a local release directory
-// (the CODE_FOUNDRY_RELEASE_DIR layout) and returns the zip's path. bundleVersion is the
-// version the bundle claims (normally tag).
-func fakeRelease(t *testing.T, relDir, tag, bundleVersion string) string {
+// fakeRelease publishes a fake release for tag into a local release directory (the
+// CODE_FOUNDRY_RELEASE_DIR layout) and returns the tarball's path. The tarball holds
+// code-foundry, CodeFoundry and VERSION at the top level, like scripts/package.sh
+// writes it; appVersion is what VERSION and the fake CLI claim (normally tag).
+func fakeRelease(t *testing.T, relDir, tag, appVersion string) string {
 	t.Helper()
 	build := t.TempDir()
-	app := filepath.Join(build, "CodeFoundry.app")
-	macos := filepath.Join(app, "Contents", "MacOS")
-	if err := os.MkdirAll(macos, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	plist := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-<key>CFBundleExecutable</key><string>CodeFoundry</string>
-<key>CFBundleShortVersionString</key><string>%s</string>
-<key>CodeFoundryVersion</key><string>%s</string>
-</dict></plist>
-`, strings.TrimPrefix(bundleVersion, "v"), bundleVersion)
 	write := func(p, s string, mode os.FileMode) {
 		if err := os.WriteFile(p, []byte(s), mode); err != nil {
 			t.Fatal(err)
 		}
 	}
-	write(filepath.Join(app, "Contents", "Info.plist"), plist, 0o644)
-	write(filepath.Join(macos, "CodeFoundry"), "#!/bin/sh\necho gui\n", 0o755)
-	write(filepath.Join(macos, "code-foundry"), "#!/bin/sh\necho \"code-foundry "+bundleVersion+"\"\n", 0o755)
+	write(filepath.Join(build, "VERSION"), appVersion+"\n", 0o644)
+	write(filepath.Join(build, "CodeFoundry"), "#!/bin/sh\necho gui\n", 0o755)
+	write(filepath.Join(build, "code-foundry"), "#!/bin/sh\necho \"code-foundry "+appVersion+"\"\n", 0o755)
 
 	dir := filepath.Join(relDir, tag)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	zip := filepath.Join(dir, "CodeFoundry-darwin-arm64.zip")
-	if out, err := exec.Command("/usr/bin/ditto", "-c", "-k", "--keepParent", app, zip).CombinedOutput(); err != nil {
-		t.Fatalf("ditto: %v\n%s", err, out)
+	tgz := filepath.Join(dir, "code-foundry-darwin-arm64.tar.gz")
+	if out, err := exec.Command("/usr/bin/tar", "-czf", tgz, "-C", build, "code-foundry", "CodeFoundry", "VERSION").CombinedOutput(); err != nil {
+		t.Fatalf("tar: %v\n%s", err, out)
 	}
-	b, err := os.ReadFile(zip)
+	b, err := os.ReadFile(tgz)
 	if err != nil {
 		t.Fatal(err)
 	}
 	sum := sha256.Sum256(b)
-	write(filepath.Join(dir, "checksums.txt"), hex.EncodeToString(sum[:])+"  CodeFoundry-darwin-arm64.zip\n", 0o644)
+	write(filepath.Join(dir, "checksums.txt"), hex.EncodeToString(sum[:])+"  code-foundry-darwin-arm64.tar.gz\n", 0o644)
 	write(filepath.Join(relDir, "latest"), tag+"\n", 0o644)
-	return zip
+	return tgz
 }
 
 type installEnv struct {
 	home, rel string
+	env       []string // extra environment
 }
 
 // run runs install.sh non-interactively (no TTY) with HOME and the release dir set.
@@ -72,19 +60,21 @@ func (e installEnv) run(t *testing.T, args ...string) (string, error) {
 		"TMPDIR=" + os.TempDir(),
 		"CODE_FOUNDRY_RELEASE_DIR=" + e.rel,
 	}
+	cmd.Env = append(cmd.Env, e.env...)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
 
-func (e installEnv) app() string { return filepath.Join(e.home, "Applications", "CodeFoundry.app") }
+// app is the default app directory: $HOME/.code-foundry/app.
+func (e installEnv) app() string { return filepath.Join(e.home, ".code-foundry", "app") }
 
 func (e installEnv) installedVersion(t *testing.T) string {
 	t.Helper()
-	out, err := exec.Command("/usr/bin/plutil", "-extract", "CodeFoundryVersion", "raw", "-o", "-", filepath.Join(e.app(), "Contents", "Info.plist")).Output()
+	b, err := os.ReadFile(filepath.Join(e.app(), "VERSION"))
 	if err != nil {
 		t.Fatalf("read installed version: %v", err)
 	}
-	return strings.TrimSpace(string(out))
+	return strings.TrimSpace(string(b))
 }
 
 func (e installEnv) cli(t *testing.T) string {
@@ -153,7 +143,7 @@ func TestInstallFreshUpgradeIdempotent(t *testing.T) {
 		t.Fatalf("zshrc markers after rerun = %d", n)
 	}
 
-	// Upgrade without a TTY: no prompt, old bundle swapped out, nothing left behind.
+	// Upgrade without a TTY: no prompt, old version swapped out, nothing left behind.
 	fakeRelease(t, e.rel, "v0.2.0", "v0.2.0")
 	out, err = e.run(t)
 	if err != nil || !strings.Contains(out, "upgrading Code Foundry v0.1.0 -> v0.2.0") {
@@ -165,13 +155,11 @@ func TestInstallFreshUpgradeIdempotent(t *testing.T) {
 	if got := e.cli(t); got != "code-foundry v0.2.0" {
 		t.Fatalf("linked CLI says %q after upgrade", got)
 	}
-	entries, _ := os.ReadDir(filepath.Join(e.home, "Applications"))
-	if len(entries) != 1 {
-		var names []string
-		for _, en := range entries {
-			names = append(names, en.Name())
-		}
-		t.Fatalf("leftovers in ~/Applications: %v", names)
+	if names := dirNames(t, filepath.Dir(e.app())); strings.Join(names, " ") != "app" {
+		t.Fatalf("~/.code-foundry holds %v, want just app (no app.new / app.old)", names)
+	}
+	if names := dirNames(t, e.app()); strings.Join(names, " ") != "CodeFoundry VERSION code-foundry" {
+		t.Fatalf("app dir holds %v", names)
 	}
 
 	// An explicit older version is a downgrade the user asked for.
@@ -181,12 +169,25 @@ func TestInstallFreshUpgradeIdempotent(t *testing.T) {
 	}
 }
 
+func dirNames(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, en := range entries {
+		names = append(names, en.Name())
+	}
+	return names
+}
+
 func TestInstallSkipPathAndCustomDirs(t *testing.T) {
 	e := newInstallEnv(t)
 	fakeRelease(t, e.rel, "v0.1.0", "v0.1.0")
-	apps := filepath.Join(e.home, "Apps")
+	app := filepath.Join(e.home, "Apps", "cf") + "/" // a trailing slash is dropped
 	bin := filepath.Join(e.home, "bin")
-	out, err := e.run(t, "--skip-path", "--app-dir", apps, "--bin-dir", bin)
+	out, err := e.run(t, "--skip-path", "--app-dir", app, "--bin-dir", bin)
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
@@ -194,8 +195,106 @@ func TestInstallSkipPathAndCustomDirs(t *testing.T) {
 		t.Fatal("--skip-path edited ~/.zshrc")
 	}
 	target, err := os.Readlink(filepath.Join(bin, "code-foundry"))
-	if err != nil || target != filepath.Join(apps, "CodeFoundry.app", "Contents", "MacOS", "code-foundry") {
+	if err != nil || target != filepath.Join(e.home, "Apps", "cf", "code-foundry") {
 		t.Fatalf("link -> %q, %v", target, err)
+	}
+}
+
+// Updates of an existing install (in-app, `code-foundry update`) leave the link alone:
+// it may point at another install.
+func TestInstallSkipLink(t *testing.T) {
+	e := newInstallEnv(t)
+	fakeRelease(t, e.rel, "v0.1.0", "v0.1.0")
+	side := filepath.Join(e.home, "side", "app")
+	out, err := e.run(t, "--skip-path", "--skip-link", "--app-dir", side)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if _, err := os.Lstat(filepath.Join(e.home, ".local", "bin", "code-foundry")); !os.IsNotExist(err) {
+		t.Fatalf("--skip-link created the link (%v)\n%s", err, out)
+	}
+	if strings.Contains(out, "linked") {
+		t.Fatalf("output mentions a link:\n%s", out)
+	}
+}
+
+// The default app dir follows CODE_FOUNDRY_HOME, then CODE_FOUNDRY_APP_DIR overrides it.
+func TestInstallDefaultAppDir(t *testing.T) {
+	tests := []struct {
+		name string
+		env  func(e installEnv) []string
+		want func(e installEnv) string
+	}{
+		{"home", func(installEnv) []string { return nil }, func(e installEnv) string { return e.app() }},
+		{
+			"CODE_FOUNDRY_HOME",
+			func(e installEnv) []string { return []string{"CODE_FOUNDRY_HOME=" + filepath.Join(e.home, "cfhome")} },
+			func(e installEnv) string { return filepath.Join(e.home, "cfhome", "app") },
+		},
+		{
+			"CODE_FOUNDRY_APP_DIR wins",
+			func(e installEnv) []string {
+				return []string{"CODE_FOUNDRY_HOME=" + filepath.Join(e.home, "cfhome"), "CODE_FOUNDRY_APP_DIR=" + filepath.Join(e.home, "elsewhere")}
+			},
+			func(e installEnv) string { return filepath.Join(e.home, "elsewhere") },
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newInstallEnv(t)
+			e.env = tt.env(e)
+			fakeRelease(t, e.rel, "v0.1.0", "v0.1.0")
+			if out, err := e.run(t); err != nil {
+				t.Fatalf("%v\n%s", err, out)
+			}
+			want := tt.want(e)
+			if b, err := os.ReadFile(filepath.Join(want, "VERSION")); err != nil || strings.TrimSpace(string(b)) != "v0.1.0" {
+				t.Fatalf("VERSION in %s: %q, %v", want, b, err)
+			}
+			if target, _ := os.Readlink(filepath.Join(e.home, ".local", "bin", "code-foundry")); target != filepath.Join(want, "code-foundry") {
+				t.Fatalf("link -> %q", target)
+			}
+		})
+	}
+}
+
+// The app dir is replaced as a whole, so a directory that is not an install is refused.
+func TestInstallRefusesForeignAppDir(t *testing.T) {
+	e := newInstallEnv(t)
+	fakeRelease(t, e.rel, "v0.1.0", "v0.1.0")
+	dir := filepath.Join(e.home, "bin")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "precious"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := e.run(t, "--app-dir", dir)
+	if err == nil || !strings.Contains(out, "not a Code Foundry install") {
+		t.Fatalf("err = %v\n%s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "precious")); err != nil {
+		t.Fatalf("foreign dir touched: %v", err)
+	}
+}
+
+// A run killed between its two renames leaves only app.old; the next run restores it
+// before deciding what is installed.
+func TestInstallRestoresInterruptedSwap(t *testing.T) {
+	e := newInstallEnv(t)
+	fakeRelease(t, e.rel, "v0.1.0", "v0.1.0")
+	if out, err := e.run(t); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if err := os.Rename(e.app(), e.app()+".old"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := e.run(t)
+	if err != nil || !strings.Contains(out, "already installed") {
+		t.Fatalf("err = %v\n%s", err, out)
+	}
+	if v := e.installedVersion(t); v != "v0.1.0" {
+		t.Fatalf("installed %s", v)
 	}
 }
 
@@ -208,8 +307,8 @@ func TestInstallRejectsBadArchives(t *testing.T) {
 		{
 			name: "checksum mismatch",
 			prepare: func(t *testing.T, e installEnv) {
-				zip := fakeRelease(t, e.rel, "v0.2.0", "v0.2.0")
-				f, err := os.OpenFile(zip, os.O_APPEND|os.O_WRONLY, 0)
+				tgz := fakeRelease(t, e.rel, "v0.2.0", "v0.2.0")
+				f, err := os.OpenFile(tgz, os.O_APPEND|os.O_WRONLY, 0)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -219,7 +318,7 @@ func TestInstallRejectsBadArchives(t *testing.T) {
 			want: "checksum mismatch",
 		},
 		{
-			name:    "bundle version differs from the tag",
+			name:    "VERSION differs from the tag",
 			prepare: func(t *testing.T, e installEnv) { fakeRelease(t, e.rel, "v0.2.0", "v0.1.9") },
 			want:    "expected v0.2.0",
 		},
@@ -262,10 +361,10 @@ func TestInstallRejectsBadArchives(t *testing.T) {
 
 func TestInstallRemovesQuarantine(t *testing.T) {
 	e := newInstallEnv(t)
-	zip := fakeRelease(t, e.rel, "v0.1.0", "v0.1.0")
-	// Simulate an archive that arrived through a quarantining app; ditto propagates the
+	tgz := fakeRelease(t, e.rel, "v0.1.0", "v0.1.0")
+	// Simulate an archive that arrived through a quarantining app; tar propagates the
 	// attribute to what it extracts.
-	if out, err := exec.Command("/usr/bin/xattr", "-w", "com.apple.quarantine", "0081;00000000;Safari;", zip).CombinedOutput(); err != nil {
+	if out, err := exec.Command("/usr/bin/xattr", "-w", "com.apple.quarantine", "0081;00000000;Safari;", tgz).CombinedOutput(); err != nil {
 		t.Fatalf("xattr -w: %v\n%s", err, out)
 	}
 	if out, err := e.run(t); err != nil {
@@ -273,7 +372,7 @@ func TestInstallRemovesQuarantine(t *testing.T) {
 	}
 	out, _ := exec.Command("/usr/bin/xattr", "-r", e.app()).CombinedOutput()
 	if strings.Contains(string(out), "com.apple.quarantine") {
-		t.Fatalf("installed bundle is quarantined:\n%s", out)
+		t.Fatalf("installed app is quarantined:\n%s", out)
 	}
 }
 

@@ -182,7 +182,7 @@ func TestInstallerMismatchFails(t *testing.T) {
 	if _, err := r.store.Check(ctx); err != nil {
 		t.Fatal(err)
 	}
-	// The installer exits 0 but the bundle on disk reports another version.
+	// The installer exits 0 but the install on disk reports another version.
 	r.installer.InstallAs = "v0.1.5"
 	if _, err := r.store.Install(ctx); err != nil {
 		t.Fatal(err)
@@ -278,7 +278,7 @@ func TestPeriodicChecks(t *testing.T) {
 	}
 }
 
-func TestNewerBundleOnDiskAtStart(t *testing.T) {
+func TestNewerInstallOnDiskAtStart(t *testing.T) {
 	r := newRig(t, "v0.2.0", func(o *update.Options) {
 		disk := updatetest.NewOnDisk("v0.2.0")
 		o.InstalledVersion = disk.Version

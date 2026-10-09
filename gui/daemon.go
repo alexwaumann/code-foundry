@@ -70,8 +70,8 @@ func (s *DaemonService) connect(ctx context.Context) (*client.Client, error) {
 	return c, nil
 }
 
-// exportDaemonBinary sets CODE_FOUNDRY_BIN to the CLI this app auto-starts (the one in
-// its own bundle when packaged), so the daemon and the sessions it spawns inherit it and
+// exportDaemonBinary sets CODE_FOUNDRY_BIN to the CLI this app auto-starts (the
+// code-foundry next to it when installed), so the daemon and the sessions it spawns inherit it and
 // can call the CLI without it being on PATH.
 func exportDaemonBinary(log *slog.Logger) {
 	if os.Getenv(EnvDaemonBinary) != "" {
@@ -86,7 +86,7 @@ func exportDaemonBinary(log *slog.Logger) {
 }
 
 // daemonBinary finds the code-foundry CLI to spawn: $CODE_FOUNDRY_BIN, then a sibling
-// of this executable (CodeFoundry.app/Contents/MacOS/code-foundry), then
+// of this executable (<app dir>/code-foundry when installed), then
 // ../bin/code-foundry relative to the working directory (`wails3 dev` from gui/ after
 // `make build`), then $PATH.
 func daemonBinary() (string, error) {

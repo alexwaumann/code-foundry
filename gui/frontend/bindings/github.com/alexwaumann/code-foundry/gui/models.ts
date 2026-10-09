@@ -9,11 +9,6 @@ export interface AppInfo {
      * Version is this GUI binary's version (same ldflag as the daemon's).
      */
     "version": string;
-
-    /**
-     * Bundle is the .app this GUI runs from, or "" for a dev binary.
-     */
-    "bundle": string;
 }
 
 /**

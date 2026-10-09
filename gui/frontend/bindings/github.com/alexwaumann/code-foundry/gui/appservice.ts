@@ -16,16 +16,18 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
- * Info returns the GUI's version and bundle path.
+ * Info returns the GUI's version.
  */
 export function Info(): $CancellablePromise<$models.AppInfo> {
     return $Call.ByID(3943185810);
 }
 
 /**
- * Relaunch quits the app and opens it again once this process has exited, so the new
- * process runs whatever bundle is on disk now (an installed update). Sessions are
- * unaffected: they live in the daemon.
+ * Relaunch quits the app and starts this executable again once this process has
+ * exited, so the new process runs whatever is on disk at this path now (an installed
+ * update swaps the app directory in place). It keeps the arguments and the environment
+ * (CODE_FOUNDRY_HOME, CODE_FOUNDRY_BIN, the adopted PATH, ...). Sessions are unaffected:
+ * they live in the daemon.
  */
 export function Relaunch(): $CancellablePromise<void> {
     return $Call.ByID(3512615560);

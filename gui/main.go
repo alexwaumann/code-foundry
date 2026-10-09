@@ -7,18 +7,26 @@ package main
 import (
 	"context"
 	"embed"
+	"fmt"
 	"log/slog"
 	"os"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
+	// `CodeFoundry --version` prints the build's version without opening a window
+	// (scripts/package.sh checks it against the CLI's and VERSION).
+	if len(os.Args) == 2 && os.Args[1] == "--version" {
+		fmt.Println("CodeFoundry " + version.Version)
+		return
+	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	p, err := paths.Resolve()
 	if err != nil {
@@ -26,7 +34,7 @@ func main() {
 		os.Exit(1)
 	}
 	// Before anything spawns the daemon: give it the user's PATH (Finder launches get
-	// launchd's minimal one) and point it and its sessions at the bundled CLI.
+	// launchd's minimal one) and point it and its sessions at the CLI installed next to this executable.
 	adoptLoginShellPath(log)
 	exportDaemonBinary(log)
 

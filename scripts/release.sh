@@ -67,7 +67,7 @@ run() {
 	[ "$DRY_RUN" = 1 ] || "$@"
 }
 
-ASSETS=(dist/CodeFoundry-darwin-arm64.zip dist/code-foundry-darwin-arm64 dist/install.sh dist/checksums.txt)
+ASSETS=(dist/code-foundry-darwin-arm64.tar.gz dist/install.sh dist/checksums.txt)
 
 # slug_from_url turns a GitHub remote URL into owner/name.
 slug_from_url() {

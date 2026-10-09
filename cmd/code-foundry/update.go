@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"connectrpc.com/connect"
@@ -42,19 +41,17 @@ func runUpdate(ctx context.Context, cl *cli, args []string) error {
 		return errors.New("this build has no release repository; set " + version.EnvReleaseRepo + "=owner/name")
 	}
 
-	// Compare against the installed app: the bundle this CLI lives in, else (standalone
-	// CLI) the default install location.
+	// Compare against the install this CLI runs from, else (a dev CLI) the default app
+	// directory the installer would use.
 	installed := version.Version
-	bundle := update.RunningBundle()
-	target := bundle
+	appDir := update.RunningInstall()
+	target := appDir
 	if target == "" {
-		if home, err := os.UserHomeDir(); err == nil {
-			target = filepath.Join(home, "Applications", update.BundleName)
-		}
+		target = update.DefaultAppDir()
 	}
-	if v, err := update.BundleVersion(target); err == nil && update.IsSemver(v) {
+	if v, err := update.InstalledVersion(target); err == nil && update.IsSemver(v) {
 		installed = v
-	} else if bundle == "" {
+	} else if appDir == "" {
 		installed = "(not installed)"
 	}
 	if *tag == "" {
@@ -81,8 +78,11 @@ func runUpdate(ctx context.Context, cl *cli, args []string) error {
 		Repo: repo, ReleaseDir: dir,
 		Stdin: os.Stdin, Stdout: cl.stdout, Stderr: cl.stderr,
 	}
-	if bundle != "" {
-		inst.AppDir = filepath.Dir(bundle)
+	if appDir != "" {
+		// Update this install, wherever it is, and leave the link and ~/.zshrc alone:
+		// the first install set them up, and the link may point at another install.
+		inst.AppDir = appDir
+		inst.Args = append(inst.Args, "--skip-link", "--skip-path")
 	}
 	if *yes {
 		inst.Args = append(inst.Args, "--yes")
@@ -109,7 +109,7 @@ func (cl *cli) afterUpdate(ctx context.Context) {
 	c := client.New(p)
 	ping, err := c.Ping(ctx)
 	if err != nil {
-		return // no daemon running: the next one starts from the new bundle
+		return // no daemon running: the next one starts from the new install
 	}
 	_, _ = c.Update.Check(ctx, connect.NewRequest(&v1.CheckForUpdateRequest{}))
 	sessions := 0

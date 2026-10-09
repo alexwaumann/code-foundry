@@ -3,22 +3,31 @@
 #
 #   gh release download --repo alexwaumann/code-foundry --pattern install.sh -O - | bash
 #
-# Downloads CodeFoundry-darwin-arm64.zip and checksums.txt from the latest GitHub release
-# (or --version) with the authenticated gh CLI, verifies the checksum, installs
-# CodeFoundry.app into ~/Applications (replacing an existing bundle by unpacking next to
-# it and swapping with mv), links ~/.local/bin/code-foundry to the CLI inside the bundle,
-# and adds ~/.local/bin to PATH in ~/.zshrc once (marker line).
+# Downloads code-foundry-darwin-arm64.tar.gz and checksums.txt from the latest GitHub
+# release (or --version) with the authenticated gh CLI, verifies the checksum, and
+# installs the app directory ~/.code-foundry/app: code-foundry (daemon + CLI),
+# CodeFoundry (the GUI) and VERSION. Plain executables, not an .app bundle: managed Macs
+# often block unsigned bundles. An existing install is replaced by unpacking next to it
+# (app.new) and swapping with mv (the old one moves to app.old and is restored if the
+# swap fails). Then it links ~/.local/bin/code-foundry to the CLI and adds ~/.local/bin
+# to PATH in ~/.zshrc once (marker line).
 #
 # Interactive when a terminal is attached (prompts read /dev/tty); with --yes or without
 # a terminal it never prompts: it upgrades and sets up PATH silently. The in-app updater
 # and `code-foundry update` run the copy of this script embedded in the binary.
+#
+# Uninstall: rm -rf ~/.code-foundry/app ~/.local/bin/code-foundry
 #
 # Options:
 #   --version vX.Y.Z   install that release instead of the latest
 #   --yes              never prompt
 #   --force            reinstall even if that version is already installed
 #   --skip-path        do not touch ~/.zshrc
-#   --app-dir DIR      where CodeFoundry.app goes (default ~/Applications)
+#   --skip-link        do not create or replace the code-foundry link (updates of an
+#                      existing install: the in-app updater and `code-foundry update`)
+#   --app-dir DIR      the app directory (default $CODE_FOUNDRY_HOME/app, i.e.
+#                      ~/.code-foundry/app); replaced as a whole, so it must be a
+#                      previous install or absent
 #   --bin-dir DIR      where the code-foundry link goes (default ~/.local/bin)
 #
 # Environment:
@@ -26,25 +35,26 @@
 #   CODE_FOUNDRY_RELEASE_DIR   local release source instead of GitHub: DIR/latest holds
 #                              the latest tag, DIR/<tag>/ holds that release's assets
 #   CODE_FOUNDRY_GH            gh executable (default: gh on PATH, then Homebrew)
+#   CODE_FOUNDRY_HOME          the daemon's config home (default ~/.code-foundry)
 #   CODE_FOUNDRY_APP_DIR, CODE_FOUNDRY_BIN_DIR   defaults for --app-dir / --bin-dir
 set -euo pipefail
 
 # Default release repository. scripts/package.sh rewrites this line for the release asset.
 DEFAULT_REPO="alexwaumann/code-foundry"
 
-APP_NAME="CodeFoundry.app"
-ZIP="CodeFoundry-darwin-arm64.zip"
+ARCHIVE="code-foundry-darwin-arm64.tar.gz"
 SUMS="checksums.txt"
 MARKER="# Added by the Code Foundry installer"
 
 REPO="${CODE_FOUNDRY_RELEASE_REPO:-$DEFAULT_REPO}"
 RELEASE_DIR="${CODE_FOUNDRY_RELEASE_DIR:-}"
-APP_DIR="${CODE_FOUNDRY_APP_DIR:-$HOME/Applications}"
+APP_DIR="${CODE_FOUNDRY_APP_DIR:-${CODE_FOUNDRY_HOME:-$HOME/.code-foundry}/app}"
 BIN_DIR="${CODE_FOUNDRY_BIN_DIR:-$HOME/.local/bin}"
 TAG=""
 YES=0
 FORCE=0
 SKIP_PATH=0
+SKIP_LINK=0
 
 say() { printf '==> %s\n' "$*"; }
 warn() { printf 'warning: %s\n' "$*" >&2; }
@@ -57,7 +67,7 @@ usage() {
 	if [ -f "$0" ]; then
 		sed -n '2,/^set -euo/p' "$0" | sed -e '$d' -e 's/^# \{0,1\}//'
 	else
-		echo "usage: install.sh [--version vX.Y.Z] [--yes] [--force] [--skip-path] [--app-dir DIR] [--bin-dir DIR]"
+		echo "usage: install.sh [--version vX.Y.Z] [--yes] [--force] [--skip-path] [--skip-link] [--app-dir DIR] [--bin-dir DIR]"
 	fi
 }
 
@@ -82,6 +92,10 @@ while [ $# -gt 0 ]; do
 		;;
 	--skip-path)
 		SKIP_PATH=1
+		shift
+		;;
+	--skip-link)
+		SKIP_LINK=1
 		shift
 		;;
 	--app-dir)
@@ -125,16 +139,11 @@ is_tag() {
 	printf '%s' "$1" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
 }
 
-# bundle_version APP -> the version a bundle was built as ("" if unknown).
-bundle_version() {
-	local plist="$1/Contents/Info.plist" v
-	[ -f "$plist" ] || return 0
-	v="$(/usr/bin/plutil -extract CodeFoundryVersion raw -o - "$plist" 2>/dev/null || true)"
-	if [ -z "$v" ]; then
-		v="$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "$plist" 2>/dev/null || true)"
-		[ -z "$v" ] || v="v$v"
-	fi
-	printf '%s' "$v"
+# installed_version DIR -> the version an app directory was installed as: its VERSION
+# file ("" if there is none).
+installed_version() {
+	[ -f "$1/VERSION" ] || return 0
+	head -n 1 "$1/VERSION" | tr -d '[:space:]'
 }
 
 # ---- platform -----------------------------------------------------------------------
@@ -177,15 +186,35 @@ is_tag "$TAG" || die "not a release version: '$TAG' (want vMAJOR.MINOR.PATCH)"
 
 # ---- already installed? ---------------------------------------------------------------
 
-TARGET="$APP_DIR/$APP_NAME"
+# Absolute, without trailing slashes: the CLI link must not be relative, and the staging
+# and backup directories are siblings named after it.
+case "$APP_DIR" in
+/*) ;;
+*) APP_DIR="$PWD/$APP_DIR" ;;
+esac
+while [ "${APP_DIR%/}" != "$APP_DIR" ] && [ "$APP_DIR" != "/" ]; do APP_DIR="${APP_DIR%/}"; done
+STAGE="$APP_DIR.new"
+OLD="$APP_DIR.old"
+
+# A previous run killed between its two renames left only the backup: put it back.
+if [ ! -e "$APP_DIR" ] && [ -d "$OLD" ] && [ -f "$OLD/VERSION" ]; then
+	warn "restoring $APP_DIR from an interrupted install"
+	mv "$OLD" "$APP_DIR"
+fi
+
 CURRENT=""
-if [ -d "$TARGET" ]; then
-	CURRENT="$(bundle_version "$TARGET")"
+if [ -f "$APP_DIR/VERSION" ]; then
+	CURRENT="$(installed_version "$APP_DIR")"
+elif [ -e "$APP_DIR" ] && { [ ! -d "$APP_DIR" ] || [ -n "$(ls -A "$APP_DIR" 2>/dev/null)" ]; }; then
+	# The whole directory is replaced: never do that to something we did not install.
+	die "$APP_DIR exists and is not a Code Foundry install (no VERSION file); remove it or pass another --app-dir"
 fi
 
 link_cli() {
+	[ "$SKIP_LINK" = 0 ] || return 0
 	mkdir -p "$BIN_DIR"
-	ln -sfn "$TARGET/Contents/MacOS/code-foundry" "$BIN_DIR/code-foundry"
+	ln -sfn "$APP_DIR/code-foundry" "$BIN_DIR/code-foundry"
+	say "linked $BIN_DIR/code-foundry -> $APP_DIR/code-foundry"
 }
 
 setup_path() {
@@ -214,7 +243,7 @@ setup_path() {
 }
 
 if [ -n "$CURRENT" ] && [ "$CURRENT" = "$TAG" ] && [ "$FORCE" = 0 ]; then
-	say "Code Foundry $TAG is already installed at $TARGET"
+	say "Code Foundry $TAG is already installed in $APP_DIR"
 	link_cli
 	setup_path
 	exit 0
@@ -223,9 +252,9 @@ fi
 if [ -n "$CURRENT" ]; then
 	confirm "Replace Code Foundry $CURRENT with $TAG?" || die "cancelled"
 	say "upgrading Code Foundry $CURRENT -> $TAG"
-elif [ -d "$TARGET" ]; then
-	confirm "Replace the existing $TARGET with Code Foundry $TAG?" || die "cancelled"
-	say "installing Code Foundry $TAG over $TARGET"
+elif [ -f "$APP_DIR/VERSION" ]; then
+	confirm "Replace the existing install in $APP_DIR with Code Foundry $TAG?" || die "cancelled"
+	say "installing Code Foundry $TAG over $APP_DIR"
 else
 	say "installing Code Foundry $TAG"
 fi
@@ -233,65 +262,75 @@ fi
 # ---- download and verify ---------------------------------------------------------------
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/code-foundry-install.XXXXXX")"
-STAGE=""
-OLD=""
+SWAPPED=0
 cleanup() {
-	rm -rf "$TMP"
-	[ -z "$STAGE" ] || rm -rf "$STAGE"
-	[ -z "$OLD" ] || [ ! -d "$OLD" ] || rm -rf "$OLD"
+	rm -rf "$TMP" "$STAGE"
+	if [ "$SWAPPED" = 1 ]; then
+		rm -rf "$OLD"
+	elif [ ! -e "$APP_DIR" ] && [ -d "$OLD" ]; then
+		mv "$OLD" "$APP_DIR" # interrupted between the renames
+	fi
 }
 trap cleanup EXIT
 
 if [ -n "$RELEASE_DIR" ]; then
-	say "copying $ZIP from $RELEASE_DIR/$TAG"
-	[ -f "$RELEASE_DIR/$TAG/$ZIP" ] || die "$RELEASE_DIR/$TAG/$ZIP not found"
+	say "copying $ARCHIVE from $RELEASE_DIR/$TAG"
+	[ -f "$RELEASE_DIR/$TAG/$ARCHIVE" ] || die "$RELEASE_DIR/$TAG/$ARCHIVE not found"
 	[ -f "$RELEASE_DIR/$TAG/$SUMS" ] || die "$RELEASE_DIR/$TAG/$SUMS not found"
-	cp "$RELEASE_DIR/$TAG/$ZIP" "$RELEASE_DIR/$TAG/$SUMS" "$TMP/"
+	cp "$RELEASE_DIR/$TAG/$ARCHIVE" "$RELEASE_DIR/$TAG/$SUMS" "$TMP/"
 else
-	say "downloading $ZIP from $REPO $TAG"
-	"$GH" release download "$TAG" --repo "$REPO" --pattern "$ZIP" --pattern "$SUMS" --dir "$TMP" ||
+	say "downloading $ARCHIVE from $REPO $TAG"
+	"$GH" release download "$TAG" --repo "$REPO" --pattern "$ARCHIVE" --pattern "$SUMS" --dir "$TMP" ||
 		die "download failed"
 fi
 
 say "verifying checksum"
-EXPECTED="$(awk -v f="$ZIP" '$2 == f || $2 == "*"f { print $1 }' "$TMP/$SUMS")"
-[ -n "$EXPECTED" ] || die "$SUMS has no entry for $ZIP"
-ACTUAL="$(/usr/bin/shasum -a 256 "$TMP/$ZIP" | awk '{ print $1 }')"
-[ "$EXPECTED" = "$ACTUAL" ] || die "checksum mismatch for $ZIP: expected $EXPECTED, got $ACTUAL"
+EXPECTED="$(awk -v f="$ARCHIVE" '$2 == f || $2 == "*"f { print $1 }' "$TMP/$SUMS")"
+[ -n "$EXPECTED" ] || die "$SUMS has no entry for $ARCHIVE"
+ACTUAL="$(/usr/bin/shasum -a 256 "$TMP/$ARCHIVE" | awk '{ print $1 }')"
+[ "$EXPECTED" = "$ACTUAL" ] || die "checksum mismatch for $ARCHIVE: expected $EXPECTED, got $ACTUAL"
 
 # ---- install -----------------------------------------------------------------------------
 
-# Unpack inside APP_DIR so the swap is two renames on one filesystem.
-mkdir -p "$APP_DIR"
-STAGE="$(mktemp -d "$APP_DIR/.code-foundry-stage.XXXXXX")"
+# Unpack beside APP_DIR so the swap is two renames on one filesystem.
+mkdir -p "$(dirname "$APP_DIR")"
+rm -rf "$STAGE"
+mkdir "$STAGE"
 say "unpacking"
-/usr/bin/ditto -x -k "$TMP/$ZIP" "$STAGE"
-[ -x "$STAGE/$APP_NAME/Contents/MacOS/CodeFoundry" ] || die "the archive does not contain $APP_NAME"
-[ -x "$STAGE/$APP_NAME/Contents/MacOS/code-foundry" ] || die "the archive's $APP_NAME has no code-foundry CLI"
-GOT="$(bundle_version "$STAGE/$APP_NAME")"
+/usr/bin/tar -xzf "$TMP/$ARCHIVE" -C "$STAGE" || die "could not unpack $ARCHIVE"
+[ -f "$STAGE/code-foundry" ] && [ -x "$STAGE/code-foundry" ] || die "the archive has no code-foundry executable"
+[ -f "$STAGE/CodeFoundry" ] && [ -x "$STAGE/CodeFoundry" ] || die "the archive has no CodeFoundry executable"
+GOT="$(installed_version "$STAGE")"
 [ "$GOT" = "$TAG" ] || die "the archive contains version '$GOT', expected $TAG"
-# Belt and braces: gh does not quarantine downloads, but a copied archive might be.
-/usr/bin/xattr -dr com.apple.quarantine "$STAGE/$APP_NAME" 2>/dev/null || true
+# Belt and braces: gh does not quarantine downloads, but a copied archive might be, and
+# tar propagates the attribute to what it extracts.
+/usr/bin/xattr -dr com.apple.quarantine "$STAGE" 2>/dev/null || true
 
-if [ -e "$TARGET" ]; then
-	OLD="$APP_DIR/.code-foundry-old.$$"
-	rm -rf "$OLD"
-	mv "$TARGET" "$OLD"
+# Running processes keep their open executables across the renames; they pick up the new
+# version when they are restarted.
+rm -rf "$OLD"
+if [ -e "$APP_DIR" ]; then
+	mv "$APP_DIR" "$OLD"
 fi
-if ! mv "$STAGE/$APP_NAME" "$TARGET"; then
-	[ -z "$OLD" ] || mv "$OLD" "$TARGET"
-	OLD=""
-	die "could not move the new bundle into place"
+if ! mv "$STAGE" "$APP_DIR"; then
+	[ ! -d "$OLD" ] || mv "$OLD" "$APP_DIR"
+	die "could not move the new version into $APP_DIR"
 fi
-say "installed $TARGET"
+SWAPPED=1
+say "installed $APP_DIR"
 
 link_cli
-say "linked $BIN_DIR/code-foundry -> $TARGET/Contents/MacOS/code-foundry"
 setup_path
 
 say "Code Foundry $TAG is installed."
-echo "    Launch it:  open \"$TARGET\"   (or: code-foundry gui)"
+echo "    Launch it:  code-foundry gui   (or: \"$APP_DIR/code-foundry\" gui)"
 if [ -n "$CURRENT" ]; then
 	echo "    A running app keeps its old version until relaunched. A running daemon keeps"
 	echo "    its sessions and its old version until: code-foundry daemon restart"
 fi
+for old_app in "$HOME/Applications/CodeFoundry.app" "/Applications/CodeFoundry.app"; do
+	if [ -d "$old_app" ]; then
+		echo "    The old app bundle $old_app is no longer used; quit it and remove it:"
+		echo "      rm -rf \"$old_app\""
+	fi
+done

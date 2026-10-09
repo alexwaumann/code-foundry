@@ -31,7 +31,7 @@ var subcommands = []subcommand{
 	{"status", "Show daemon status, starting it if needed", runStatus},
 	{"version", "Print version information", runVersion},
 	{"commands", "List daemon commands and their availability (--context-* flags)", runCommands},
-	{"gui", "Open the app (the bundle this CLI belongs to, the dev build, or the installed app)", runGUI},
+	{"gui", "Start the app (the GUI installed next to this CLI, or the dev build)", runGUI},
 	{"update", "Install the latest release (also --update; --version, --force, --yes)", runUpdate},
 }
 
