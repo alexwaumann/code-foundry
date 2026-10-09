@@ -41,4 +41,9 @@ out.paste(art, ((CANVAS-ICON)//2,)*2, art)
 out.save('appicon.png')
 EOF
 wails3 generate icons -input appicon.png -windowsfilename "" -macfilename darwin/icons.icns -iconcomposerinput appicon.icon -macassetdir darwin
+sips -Z 512 appicon.png --out dockicon.png
 ```
+
+`gui/build/dockicon.png` is `appicon.png` at 512px. The GUI ships as a bare executable
+with no bundle for `icons.icns`, so it embeds this PNG and sets it as the Dock icon at
+startup (`gui/icon.go`).
