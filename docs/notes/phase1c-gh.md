@@ -37,7 +37,8 @@ a daemon with a temp `CODE_FOUNDRY_HOME`, real `gh` 2.83.2 against `ghostty-org/
 
 ## Decisions
 
-* **Only gh, never a token.** Every request is
+* **Only gh, never a token.** (Superseded: the store now sends HTTP requests itself with
+  the token from `gh auth token`; see `gh-http-transport.md`.) Every request was
   `gh api graphql -f query=<doc> [-f str=…] [-F int=…]`. String variables use `-f` (raw)
   so a repo named `true` or `123` is not type-converted. Auth checks use
   `gh auth status --json hosts --hostname github.com`, which exits 0 regardless of auth

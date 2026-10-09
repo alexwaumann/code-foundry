@@ -72,7 +72,7 @@ internal/
     terminal/              PTY + libghostty-vt actor per terminal; output tee; snapshots
     session/               Claude sessions layered on terminal: spawn, naming, status, resume
     repo/                  registered repos, worktrees, git status, filesystem watcher
-    gh/                    gh GraphQL polling, PR/CI cache
+    gh/                    GitHub GraphQL/REST polling over HTTP (token via gh), PR/CI cache
     gitops/                git/gh operations per worktree (fetch, pull, push, PR); editor, Finder, browser
     update/                release checks via gh, installs with the embedded installer
   db/                      SQLite (modernc.org/sqlite, WAL) + migrations
@@ -229,8 +229,10 @@ switch.
   create/list/remove and status (branch, ahead/behind, dirty). One filesystem watcher
   (fsnotify) across all registered roots feeds a debounced reconcile. Workers write
   disjoint per-path snapshot pointers.
-* `gh`: `gh api graphql` for PRs, checks, viewer. Polled on a paced loop; results cached in
-  SQLite so startup is instant and offline is tolerable.
+* `gh`: GitHub GraphQL (and a little REST) for PRs, checks, viewer, sent in-process over
+  one keep-alive HTTP client with the token from `gh auth token` (github.com only; see
+  `docs/notes/gh-http-transport.md`). Polled on a paced loop; results cached in SQLite so
+  startup is instant and offline is tolerable.
 
 ## 10. Conventions
 
