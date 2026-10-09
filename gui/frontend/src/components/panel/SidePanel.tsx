@@ -7,7 +7,8 @@ import { PANEL_MIN, panelMax, useUiStore, visibleSidebarWidth } from "@/stores/u
 import { useViewsStore } from "@/stores/views";
 import { surfaceOf, surfaces, useAvailability, type SurfaceContext, type SurfaceSpec } from "@/surfaces/registry";
 import { PanelResizeHandle } from "./PanelResizeHandle";
-import { panelKeyAction } from "./keys";
+import { isPanelChord, panelKeyAction } from "./keys";
+import { revealTab } from "./reveal";
 
 const BODY_ID = "side-panel-body";
 
@@ -107,12 +108,19 @@ function onTabListKeyDown(e: KeyboardEvent<HTMLElement>): void {
 function TabStrip({ panelKey }: { panelKey: string }) {
   const tabs = usePanelStore((s) => s.byKey[panelKey]?.tabs ?? emptyEntry.tabs);
   const activeTabId = usePanelStore((s) => s.byKey[panelKey]?.activeTabId ?? null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  // A new or activated tab may sit past the strip's scrolled edge (e.g. a PR row opened
+  // its tenth tab): bring it into view.
+  useEffect(() => {
+    if (stripRef.current && activeTabId !== null) revealTab(stripRef.current, activeTabId);
+  }, [activeTabId, tabs.length]);
   return (
     <div
+      ref={stripRef}
       role="tablist"
       aria-label="Side panel tabs"
       aria-orientation="horizontal"
-      className="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b border-pane-border px-1.5 [scrollbar-width:none]"
+      className="relative flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b border-pane-border px-1.5 [scrollbar-width:none]"
       data-testid="panel-tabs"
       onKeyDown={onTabListKeyDown}
     >
@@ -183,6 +191,8 @@ function Body({ panelKey }: { panelKey: string }) {
       role="tabpanel"
       aria-labelledby={tabDomId(active.id)}
       className="flex min-h-0 flex-1 flex-col overflow-auto"
+      // Long surface lists virtualize against this scroll box (components/pr/VirtualStack).
+      data-scroll-root
       data-testid="panel-body"
       data-surface={active.kind}
       data-tab-id={active.id}
@@ -216,7 +226,8 @@ function Panel({ panelKey, width, max, asideRef }: { panelKey: string; width: nu
     if (!chord) return;
     // cmd+w applies in text fields too (it is no editing chord); letters do not.
     if (chord !== "cmd+w" && isEditable(e.target)) return;
-    if (chord !== "cmd+w" && surfaceKey(panelKey, chord)) {
+    // The panel's own keys (cmd+w, the surface letters) are never offered to a surface.
+    if (!isPanelChord(chord) && surfaceKey(panelKey, chord)) {
       e.preventDefault();
       e.stopPropagation();
       return;

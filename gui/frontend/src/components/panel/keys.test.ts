@@ -3,11 +3,24 @@ import { emptyEntry, makeTab, type PanelEntry } from "@/stores/panel";
 import { filesSurface } from "@/surfaces/files";
 import { surfaceByHotkey, surfaceOf, surfaces } from "@/surfaces/registry";
 import type { SurfaceContext } from "@/surfaces/types";
-import { panelKeyAction } from "./keys";
+import { isPanelChord, panelKeyAction } from "./keys";
 
 const ctx: SurfaceContext = { selection: { kind: "session", id: "s-1" }, panelKey: "session:s-1" };
 const files = makeTab("files", "Files");
 const withTab: PanelEntry = { open: true, tabs: [files], activeTabId: files.id };
+
+describe("isPanelChord", () => {
+  it.each([
+    ["cmd+w", true],
+    ["p", true],
+    ["f", true],
+    ["q", false],
+    ["cmd+shift+c", false],
+    ["cmd+p", false],
+  ])("%s -> %s", (chord, want) => {
+    expect(isPanelChord(chord)).toBe(want);
+  });
+});
 
 describe("panelKeyAction", () => {
   const cases: [string, string, PanelEntry, ReturnType<typeof panelKeyAction>][] = [

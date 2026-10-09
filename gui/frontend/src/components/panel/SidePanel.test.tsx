@@ -7,6 +7,7 @@ import { PANEL_MIN, useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { filesSurface } from "@/surfaces/files";
 import { pullRequestSurface } from "@/surfaces/pullrequest";
+import { revealTab } from "./reveal";
 import { SidePanel } from "./SidePanel";
 
 const KEY = "session:a";
@@ -86,5 +87,62 @@ describe("SidePanel", () => {
     expect(useUiStore.getState().panelWidth).toBe(372);
     fireEvent.keyDown(sep, { key: "Home" });
     expect(useUiStore.getState().panelWidth).toBe(PANEL_MIN);
+  });
+
+  it("offers the active surface chords, but never the panel's own (cmd+w, surface letters)", () => {
+    vi.spyOn(pullRequestSurface, "render").mockImplementation(() => <p data-testid="probe">body</p>);
+    const onKey = vi.fn(() => true);
+    const prev = pullRequestSurface.onKey;
+    pullRequestSurface.onKey = onKey;
+    try {
+      const one = makeTab("pullrequest", "#1", { number: "1" });
+      const two = makeTab("pullrequest", "#2", { number: "2" });
+      act(() => {
+        openSurface(KEY, one);
+        openSurface(KEY, two);
+      });
+      render(<SidePanel />);
+      const body = screen.getByTestId("probe");
+      fireEvent.keyDown(body, { key: "p" });
+      fireEvent.keyDown(body, { key: "f" });
+      expect(onKey).not.toHaveBeenCalled();
+      fireEvent.keyDown(body, { key: "c", metaKey: true, shiftKey: true });
+      expect(onKey).toHaveBeenCalledWith("cmd+shift+c", expect.objectContaining({ id: two.id }));
+      fireEvent.keyDown(body, { key: "q" });
+      expect(onKey).toHaveBeenLastCalledWith("q", expect.objectContaining({ id: two.id }));
+      onKey.mockClear();
+      fireEvent.keyDown(body, { key: "w", metaKey: true });
+      expect(onKey).not.toHaveBeenCalled();
+      expect(usePanelStore.getState().byKey[KEY]?.tabs.map((t) => t.id)).toEqual([one.id]);
+    } finally {
+      pullRequestSurface.onKey = prev;
+    }
+  });
+});
+
+describe("revealTab", () => {
+  function strip(scrollLeft: number): HTMLElement {
+    const el = document.createElement("div");
+    Object.defineProperty(el, "clientWidth", { value: 100 });
+    el.scrollLeft = scrollLeft;
+    [0, 90, 180].forEach((left, i) => {
+      const t = document.createElement("div");
+      t.dataset.tabId = `t${String(i)}`;
+      Object.defineProperty(t, "offsetLeft", { value: left });
+      Object.defineProperty(t, "offsetWidth", { value: 80 });
+      el.append(t);
+    });
+    return el;
+  }
+
+  it.each([
+    ["a tab past the right edge scrolls into view", 0, "t2", 166],
+    ["a tab past the left edge scrolls into view", 150, "t0", 0],
+    ["a visible tab does not scroll", 0, "t0", 0],
+    ["an unknown tab does not scroll", 40, "nope", 40],
+  ])("%s", (_name, from, id, want) => {
+    const el = strip(from);
+    revealTab(el, id);
+    expect(el.scrollLeft).toBe(want);
   });
 });

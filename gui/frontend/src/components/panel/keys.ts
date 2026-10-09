@@ -1,6 +1,14 @@
 import { surfaceByHotkey, type SurfaceContext } from "@/surfaces/registry";
 import type { PanelEntry, Tab } from "@/stores/panel";
 
+/**
+ * Whether a chord is the panel's own: cmd+w, or a bare letter some surface uses as its
+ * hotkey (whether or not that surface is enabled now). SurfaceSpec.onKey never sees these.
+ */
+export function isPanelChord(chord: string): boolean {
+  return chord === "cmd+w" || (/^[a-z]$/.test(chord) && surfaceByHotkey(chord) !== undefined);
+}
+
 export type PanelKeyAction = { kind: "close"; tabId: string } | { kind: "hide" } | { kind: "open"; tab: Tab };
 
 /**
