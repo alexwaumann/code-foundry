@@ -14,6 +14,7 @@ import { parseSessionResult } from "@/api/gh";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { runCommandForResult } from "./commands";
 import { pullRequestKey } from "./gh";
+import { useUiStore } from "./ui";
 
 export type PrSessionKind = "ask" | "explain" | "fix";
 
@@ -63,11 +64,23 @@ function preparingToast(ref: PrRef): () => void {
 }
 
 /**
+ * The "Started session …" toast's Open action: selects the new session (with terminal
+ * focus, as FocusSession does) unless it is selected already. The daemon's FocusSession
+ * normally gets there first; this covers a stream that missed it.
+ */
+export function openStartedSession(id: string): void {
+  const ui = useUiStore.getState();
+  if (ui.selection.kind === "session" && ui.selection.id === id) return;
+  ui.select({ kind: "session", id }, { focusTerminal: true });
+}
+
+/**
  * Runs the command for kind. Resolves the new session's id (an empty string when the
  * result names none), or null when it failed (toasted by runCommandForResult), the
  * question is blank, or the same command for this pull request is already running.
  * pr.fix.findings shows a "Preparing worktree" toast while it runs (preparingToast), as it
- * may fetch and create a worktree.
+ * may fetch and create a worktree. The success toast has an Open action
+ * (openStartedSession) when the result names the session.
  */
 export async function startPrSession(kind: PrSessionKind, ref: PrRef, question = ""): Promise<string | null> {
   const args = prSessionArgs(kind, ref, question);
@@ -77,9 +90,16 @@ export async function startPrSession(kind: PrSessionKind, ref: PrRef, question =
   usePrSessionsStore.setState((s) => ({ starting: { ...s.starting, [busy]: true } }));
   const preparing = kind === "fix" ? preparingToast(ref) : undefined;
   try {
-    const res = await runCommandForResult(PR_SESSION_COMMANDS[kind], args);
+    const res = await runCommandForResult(PR_SESSION_COMMANDS[kind], args, { quiet: true });
     if (!res) return null;
-    return parseSessionResult(res.resultJson) ?? "";
+    const id = parseSessionResult(res.resultJson) ?? "";
+    if (res.message) {
+      const open = () => {
+        openStartedSession(id);
+      };
+      toast.success(res.message, id ? { action: { label: "Open", onClick: open } } : undefined);
+    }
+    return id;
   } finally {
     preparing?.();
     usePrSessionsStore.setState((s) => {

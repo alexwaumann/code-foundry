@@ -7,7 +7,8 @@ vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), loading: vi.fn(() => "t1"), dismiss: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
-const { PREPARING_TOAST_DELAY_MS, prSessionArgs, startingKey, startPrSession, usePrSessionsStore } = await import("./prSessions");
+const { PREPARING_TOAST_DELAY_MS, openStartedSession, prSessionArgs, startingKey, startPrSession, usePrSessionsStore } = await import("./prSessions");
+const { useUiStore } = await import("./ui");
 
 const REF = { slug: "acme/repo", number: 12 };
 const started = (id: string) => ({ message: `Started session ${id} for PR #12`, resultJson: JSON.stringify({ id, worktreePath: "/w" }) });
@@ -50,7 +51,11 @@ describe("startPrSession", () => {
     invokeCommand.mockResolvedValueOnce(started("s-9"));
     await expect(startPrSession(kind, REF, question)).resolves.toBe("s-9");
     expect(invokeCommand).toHaveBeenCalledWith(name, expect.anything(), { "repo-slug": "acme/repo", number: "12", ...extra });
-    expect(toast.success).toHaveBeenCalledWith("Started session s-9 for PR #12");
+    expect(toast.success).toHaveBeenCalledTimes(1); // runCommandForResult's own toast is skipped
+    const [message, opts] = toast.success.mock.calls[0] as [string, { action: { label: string; onClick: unknown } }];
+    expect(message).toBe("Started session s-9 for PR #12");
+    expect(opts.action.label).toBe("Open");
+    expect(typeof opts.action.onClick).toBe("function");
     expect(usePrSessionsStore.getState().starting).toEqual({});
   });
 
@@ -118,8 +123,33 @@ describe("startPrSession", () => {
     expect(usePrSessionsStore.getState().starting).toEqual({});
   });
 
-  it("a result without a session id still counts as started", async () => {
+  it("a result without a session id still counts as started, with no Open action", async () => {
     invokeCommand.mockResolvedValueOnce({ message: "Started", resultJson: "" });
     await expect(startPrSession("explain", REF)).resolves.toBe("");
+    expect(toast.success).toHaveBeenCalledWith("Started", undefined);
+  });
+
+  it("the toast's Open selects the new session when no FocusSession moved the selection", async () => {
+    useUiStore.setState({ selection: { kind: "view", name: "pullrequests" }, terminalFocusSeq: 0 });
+    invokeCommand.mockResolvedValueOnce(started("s-9"));
+    await startPrSession("explain", REF);
+    const opts = toast.success.mock.calls[0]?.[1] as { action: { onClick: () => void } };
+    opts.action.onClick();
+    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s-9" });
+    expect(useUiStore.getState().terminalFocusSeq).toBe(1);
+  });
+});
+
+describe("openStartedSession", () => {
+  it.each([
+    ["the Pull Requests page", { kind: "view", name: "pullrequests" }, 1],
+    ["another session", { kind: "session", id: "s-1" }, 1],
+    // FocusSession got there first: nothing changes (no second terminal focus).
+    ["the new session", { kind: "session", id: "s-9" }, 0],
+  ] as const)("from %s", (_, selection, focusSeq) => {
+    useUiStore.setState({ selection, terminalFocusSeq: 0 });
+    openStartedSession("s-9");
+    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s-9" });
+    expect(useUiStore.getState().terminalFocusSeq).toBe(focusSeq);
   });
 });
