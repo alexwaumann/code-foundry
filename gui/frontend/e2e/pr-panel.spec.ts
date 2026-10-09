@@ -780,3 +780,128 @@ test("at 280px the composer's hint fits and its field grows to six rows, then sc
   await askInput(page).fill("short");
   expect((await size()).height).toBe(three.height);
 });
+
+/** Resolves once el's open animations (a menu's fade-in) have finished. */
+async function settledAnimations(page: Page, testId: string): Promise<void> {
+  await page.getByTestId(testId).evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+}
+
+const merges = async () => (await invocations()).filter((i) => i.name === "pr.merge").map((i) => [i.args, Boolean(i.confirmed)]);
+
+test("#142 merges: Squash and merge confirms, runs pr.merge with squash and the branch deleted, and the state turns Merged", async ({ page }) => {
+  await shotViewport(page);
+  await openPrPage(page);
+  await prRow(page, "authored", 142).click();
+  await expect(page.getByTestId("pr-state")).toHaveText("Open");
+  const button = page.getByTestId("pr-merge-button");
+  await expect(button).toBeVisible();
+  await expect(button).toHaveText("Merge");
+  await expect(button).not.toHaveAttribute("aria-disabled");
+  // Left of the ⋯ menu, on the repo row.
+  const b = await boxOf(page, "pr-merge-button");
+  const m = await boxOf(page, "pr-menu-button");
+  expect(b.x + b.width).toBeLessThanOrEqual(m.x);
+  expect(Math.abs(b.y + b.height / 2 - (m.y + m.height / 2))).toBeLessThan(2);
+
+  await button.click();
+  const menu = page.getByTestId("pr-merge-menu");
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("menuitem")).toHaveText([/^Create a merge commit/, /^Squash and merge/, /^Rebase and merge/]);
+  const del = page.getByTestId("pr-merge-delete-branch");
+  await expect(del).toHaveAttribute("aria-checked", "true");
+  await expect(del).toContainText("feat/sidebar");
+  expect(inside(await boxOf(page, "pr-merge-menu"), await boxOf(page, "side-panel"))).toBe(true);
+  await settledAnimations(page, "pr-merge-menu");
+  await shot(page, "merge-button");
+
+  await page.getByTestId("pr-merge-method-squash").click();
+  const dialog = page.getByTestId("confirm-dialog");
+  await expect(dialog).toContainText("Merge #142 into main with squash? Branch feat/sidebar is deleted afterwards.");
+  await page.getByTestId("confirm-ok").click();
+  const args = { "repo-slug": SLUG, number: "142", method: "squash", "delete-branch": "true" };
+  await expect.poll(merges).toEqual([
+    [args, false],
+    [args, true],
+  ]);
+  await expect(page.getByTestId("pr-state")).toHaveText("Merged");
+  await expect(button).toHaveCount(0);
+  await expect(page.getByText("Merged #142 (e2e0142)")).toBeVisible();
+  await expect(page.getByText("deleted branch feat/sidebar")).toBeVisible();
+  // The dashboard moved it to recently merged.
+  await expect(prRow(page, "merged", 142)).toBeVisible();
+  await expect(prRow(page, "authored", 142)).toHaveCount(0);
+});
+
+test("the merge button: draft, read-only and merged pull requests; unchecking the branch, declining, a spinner, a refusal", async ({ page }) => {
+  await openPrPage(page);
+  // #145 is a draft: disabled with the reason, and a click opens nothing.
+  await prRow(page, "authored", 145).click();
+  const button = page.getByTestId("pr-merge-button");
+  await expect(button).toHaveAttribute("aria-disabled", "true");
+  await expect(button).toHaveAttribute("title", "Draft pull requests cannot be merged");
+  await expect(button).toHaveAccessibleDescription("Draft pull requests cannot be merged");
+  // Playwright will not click an aria-disabled element; force it: it must open nothing.
+  await button.click({ force: true });
+  await expect(page.getByTestId("pr-merge-menu")).toHaveCount(0);
+  // #138 is merged: no button.
+  await prRow(page, "merged", 138).click();
+  await expect(page.getByTestId("pr-state")).toHaveText("Merged");
+  await expect(button).toHaveCount(0);
+  // #140: read access only.
+  await openPr(page, 140);
+  await expect(button).toHaveAttribute("title", "Merging needs write access");
+
+  // #142: keep the branch, then decline: nothing is sent.
+  await prRow(page, "authored", 142).click();
+  await button.click();
+  await page.getByTestId("pr-merge-delete-branch").click();
+  await expect(page.getByTestId("pr-merge-delete-branch")).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByTestId("pr-merge-menu")).toBeVisible();
+  await page.getByTestId("pr-merge-method-merge").click();
+  await expect(page.getByTestId("confirm-dialog")).toContainText("Merge #142 into main with a merge commit?");
+  await expect(page.getByTestId("confirm-dialog")).not.toContainText("deleted afterwards");
+  await page.getByTestId("confirm-cancel").click();
+  // The dialog hands focus back as it unmounts: a menu opened before that would close.
+  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
+  // Declined: the button is idle again and its menu does not come back by itself.
+  await expect(button).not.toHaveAttribute("aria-busy");
+  await expect(page.getByTestId("pr-merge-menu")).toHaveCount(0);
+  expect((await merges()).filter(([, confirmed]) => confirmed)).toEqual([]);
+
+  // GitHub refuses (the head moved): toasted, still open, the button usable again.
+  await mockPost("gh/pr-fail?command=pr.merge");
+  await mockPost("gh/pr-delay?ms=800");
+  await button.click();
+  await expect(page.getByTestId("pr-merge-delete-branch")).toHaveAttribute("aria-checked", "false");
+  await page.getByTestId("pr-merge-method-rebase").click();
+  await page.getByTestId("confirm-ok").click();
+  await expect(button).toHaveAttribute("aria-busy", "true");
+  await expect(button).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByText("Merge Pull Request failed")).toBeVisible();
+  await expect(page.getByText(/changed on GitHub since it was loaded/)).toBeVisible();
+  await expect(button).not.toHaveAttribute("aria-busy");
+  await expect(button).not.toHaveAttribute("aria-disabled");
+  await expect(page.getByTestId("pr-state")).toHaveText("Open");
+  expect((await merges()).filter(([, confirmed]) => confirmed)).toEqual([[{ "repo-slug": SLUG, number: "142", method: "rebase", "delete-branch": "false" }, true]]);
+});
+
+test("at 280px the merge button keeps its icons and its dropdown stays inside the panel", async ({ page }) => {
+  await shotViewport(page);
+  await openPrPage(page);
+  await prRow(page, "authored", 142).click();
+  await setPanelWidth(page, 280);
+  const button = page.getByTestId("pr-merge-button");
+  await expect(button).toBeVisible();
+  expect(await overflowX(page, "pr-header")).toBeLessThanOrEqual(0);
+  // The label is for screen readers only; the icon and chevron stay.
+  expect((await boxOf(page, "pr-merge-button")).width).toBeLessThan(48);
+  await expect(button).toHaveAccessibleName("Merge");
+  expect(inside(await boxOf(page, "pr-actions"), await boxOf(page, "pr-header"))).toBe(true);
+  await button.click();
+  await expect(page.getByTestId("pr-merge-menu")).toBeVisible();
+  expect(inside(await boxOf(page, "pr-merge-menu"), await boxOf(page, "side-panel"))).toBe(true);
+  const cut = await page.getByTestId("pr-merge-menu").evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(cut).toBeLessThanOrEqual(0);
+  await settledAnimations(page, "pr-merge-menu");
+  await shot(page, "merge-button-280");
+});
