@@ -625,6 +625,19 @@ export function parseRevertResult(resultJson: string): { number: number; url: st
 }
 
 /**
+ * The session id in pr.ask's, pr.explain's or pr.fix.findings' result JSON (protojson of
+ * the created Session); null when there is none.
+ */
+export function parseSessionResult(resultJson: string): string | null {
+  try {
+    const v = JSON.parse(resultJson) as { id?: unknown } | null;
+    return typeof v?.id === "string" && v.id !== "" ? v.id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The detail in pr.refresh's result JSON (protojson of PullRequestDetail, what the daemon
  * just fetched); null when it is not one (an older daemon, or no pull request in it).
  */

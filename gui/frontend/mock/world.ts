@@ -683,11 +683,20 @@ export class World {
     const effortArg = { name: "effort", type: ArgType.ENUM, required: false, description: "Effort level (default: settings sessions.default_effort, else Claude's default)", enumValues: ["low", "medium", "high", "xhigh", "max"] };
     const start =
       (fix: boolean) =>
-      (ctx: UiContext | undefined, args: Record<string, string>): string => {
+      (ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> => {
         const slug = args["repo-slug"] ?? "";
         const n = Number(args.number);
         if (!slug.trim()) throw new CommandError("invalid", "repo-slug is required");
         if (!Number.isInteger(n) || n <= 0) throw new CommandError("invalid", "number must be a positive pull request number");
+        // POST /__mock/gh/pr-fail?command=pr.fix.findings (or pr.ask, pr.explain): the next run fails.
+        if (this.gh.prDetails.failNext.delete(fix ? "pr.fix.findings" : (args.question ?? "") !== "" ? "pr.ask" : "pr.explain")) {
+          throw new CommandError(
+            "unavailable",
+            fix
+              ? `#${String(n)} comes from a fork and no worktree of ${slug} has its head checked out: check it out (for example \`gh pr checkout ${String(n)}\` in a worktree) and pass --worktree`
+              : `read #${String(n)}: github graphql: 502 Bad Gateway`,
+          );
+        }
         const pr = prDetailCall(() => this.gh.prDetails.get(slug, n, fix)).pullRequest;
         const head = pr?.headRef ?? "";
         const headSha = pr?.headSha ?? "";
@@ -733,7 +742,11 @@ export class World {
         const defaults = this.sessionDefaults();
         const s = this.createSession(target.repoId, target.path, args.model ?? defaults.model, args.effort ?? defaults.effort);
         this.focusSession(s.id);
-        return `Started session ${s.id} for PR #${String(n)}`;
+        // Like the daemon: the result JSON is the created Session (protojson).
+        return Promise.resolve({
+          message: `Started session ${s.id} for PR #${String(n)}`,
+          resultJson: JSON.stringify({ id: s.id, repoId: s.repoId, worktreePath: s.worktreePath, model: s.model, effort: s.effort }),
+        });
       };
     const always = () => true;
     return [

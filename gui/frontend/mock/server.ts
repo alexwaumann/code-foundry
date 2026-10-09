@@ -27,7 +27,8 @@
  *   POST /__mock/update/disabled?reason=dev%20build
  *   POST /__mock/gh/update | poll | stale | auth?ok=false | touch?path=…   (GitHub + detail)
  *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts)
- *   POST /__mock/gh/pr-fail?command=pr.refresh             (that command's next run fails)
+ *   POST /__mock/gh/pr-fail?command=pr.refresh             (that command's next run fails;
+ *        also pr.ask, pr.explain, pr.fix.findings)
  *   POST /__mock/gh/pr-comment?repo=o/r&number=145&body=…   (a new comment on a PR detail;
  *        pull_request_detail_updated). PR detail fixtures: mock/prDetail.ts (#145 open,
  *        #138 merged, #131 closed, #140 read-only); its commands are pr.revert,

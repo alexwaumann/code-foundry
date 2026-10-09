@@ -27,3 +27,14 @@ export function usePanelBoundary(): { ref: (el: HTMLElement | null) => void; bou
 /** Never wider than the room Radix measured inside the collision boundary (less its padding). */
 export const POPUP_FIT = "max-w-[calc(var(--radix-popper-available-width)-8px)]";
 export const POPUP_COLLISION_PADDING = 8;
+
+/**
+ * The ask composer's keys: Enter sends, Shift+Enter is a newline, Escape cancels. Enter
+ * while an input method is composing belongs to the IME.
+ */
+export function composerKeyAction(e: { key: string; shiftKey: boolean; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean; isComposing?: boolean }): "send" | "cancel" | null {
+  if (e.isComposing) return null;
+  if (e.key === "Escape") return "cancel";
+  if (e.key === "Enter" && !e.shiftKey && !e.altKey && !e.ctrlKey) return "send";
+  return null;
+}

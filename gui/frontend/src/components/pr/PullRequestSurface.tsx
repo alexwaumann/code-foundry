@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowLeft, CircleCheck, CircleDashed, CircleDot, CircleX, ExternalLink, FileDiff, GitCommitHorizontal, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, History, MessageSquare, SearchX, TriangleAlert } from "lucide-react";
 import { isNotFoundMessage, type PullRequestDetailView } from "@/api/gh";
 import { useNow } from "@/lib/clock";
@@ -9,6 +9,7 @@ import { prTabKey, setInnerTab, usePrPanelStore, type PrInnerTab } from "@/store
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
 import { ago, checksHeadline, commentCount, stateBadge, timeline, type Tone } from "./model";
+import { PrAskComposer } from "./PrAskComposer";
 import { PrMenu } from "./PrMenu";
 import { OrderToggle, PrSummary } from "./PrSummary";
 import { PrTimeline } from "./PrTimeline";
@@ -55,7 +56,7 @@ export function ChecksHeadline({ d }: { d: PullRequestDetailView }) {
  * The repo link on its own row (as in T3 Code), then state, comment count and the menu;
  * the title; author and age; branches, with the diffstat wrapping below in a narrow panel.
  */
-function Header({ d, prRef, panelKey }: { d: PullRequestDetailView; prRef: PrRef; panelKey: string }) {
+function Header({ d, prRef, panelKey, onAsk }: { d: PullRequestDetailView; prRef: PrRef; panelKey: string; onAsk: () => void }) {
   const pr = d.pullRequest;
   const now = useNow(30_000);
   const comments = commentCount(d);
@@ -79,7 +80,7 @@ function Header({ d, prRef, panelKey }: { d: PullRequestDetailView; prRef: PrRef
           {comments}
         </span>
         <span className="ml-auto shrink-0">
-          <PrMenu prRef={prRef} detail={d} panelKey={panelKey} />
+          <PrMenu prRef={prRef} detail={d} panelKey={panelKey} onAsk={onAsk} />
         </span>
       </div>
       <h2 className="text-[15px] leading-snug font-semibold break-words select-text" data-testid="pr-title">
@@ -239,6 +240,7 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
   const d = pullRequestDetailResource.store((s) => s.entries[key]?.data ?? null);
   const error = pullRequestDetailResource.store((s) => s.entries[key]?.error ?? null);
   const inner = usePrPanelStore((s) => s.byTab[tabKey]?.inner ?? "summary");
+  const [asking, setAsking] = useState(false);
 
   if (!d) {
     if (isNotFoundMessage(error)) {
@@ -260,7 +262,12 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
   return (
     // @container: the header, tab bar and summary rows adapt to the panel's width.
     <div className="@container flex min-w-0 flex-col" data-testid="pr-surface" data-pr={`${slug}#${String(number)}`}>
-      <Header d={d} prRef={prRef} panelKey={panelKey} />
+      <Header d={d} prRef={prRef} panelKey={panelKey} onAsk={() => {
+          setAsking(true);
+        }} />
+      {asking && <PrAskComposer prRef={prRef} onClose={() => {
+            setAsking(false);
+          }} />}
       {d.lastError && !d.checksTruncated && <StaleBanner fetchedAtMs={d.fetchedAtMs} lastError={d.lastError} />}
       {error && <Banner testId="pr-refresh-error">Could not refresh: {error}</Banner>}
       <InnerTabBar d={d} tabKey={tabKey} inner={inner} />

@@ -1,5 +1,5 @@
 import { ArrowUpRight, BookOpen, Ellipsis, Hammer, Link2, Loader2, MessageCircleQuestion, RefreshCw, Undo2 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { updatedAgo } from "@/components/prs/format";
@@ -8,6 +8,7 @@ import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { openUrl, pullRequestKey, useFreshness } from "@/stores/gh";
 import { copyPullRequestLink, refreshPullRequest, revertPullRequest, usePrPanelStore } from "@/stores/prPanel";
+import { startingKey, startPrSession, usePrSessionsStore, type PrSessionKind } from "@/stores/prSessions";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { COPY_LINK_CHORD, POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
 
@@ -37,18 +38,34 @@ function RefreshHint({ fetchedAtMs, lastError, busy }: { fetchedAtMs: number | n
   );
 }
 
-/** "Coming next" slots: the AI actions arrive in the next chunk. */
-const comingNext = "Coming next";
+/** Whether kind's command is running for ref (its menu item shows a spinner). */
+function useStarting(prRef: PrRef, kind: PrSessionKind): boolean {
+  return usePrSessionsStore((s) => s.starting[startingKey(prRef, kind)] ?? false);
+}
 
-/** The header's ⋯ menu, in T3 Code's order. Every action is a registry command or a store action. */
-export function PrMenu({ prRef, detail, panelKey }: { prRef: PrRef; detail: PullRequestDetailView; panelKey: string }) {
+/**
+ * The header's ⋯ menu, in T3 Code's order. Every action is a registry command or a store
+ * action. Ask a question opens the surface's composer (onAsk); Explain and Fix findings
+ * start their session at once, keeping the menu open with a spinner until it has started.
+ */
+export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detail: PullRequestDetailView; panelKey: string; onAsk: () => void }) {
   const busy = usePrPanelStore((s) => s.refreshing[pullRequestKey(prRef.slug, prRef.number)] ?? false);
+  const explaining = useStarting(prRef, "explain");
+  const fixing = useStarting(prRef, "fix");
+  const [open, setOpen] = useState(false);
+  // Ask hands focus to the composer, so the menu must not take it back to its button.
+  const keepFocus = useRef(false);
+  const start = (kind: PrSessionKind) => {
+    void startPrSession(kind, prRef).then((id) => {
+      if (id !== null) setOpen(false);
+    });
+  };
   const pr = detail.pullRequest;
   const url = pr.url || `https://github.com/${prRef.slug}/pull/${String(prRef.number)}`;
   const canRevert = pr.state === "merged" && detail.viewerCanUpdate;
   const { ref, boundary } = usePanelBoundary();
   return (
-    <DropdownMenu modal={false}>
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button
           ref={ref}
@@ -69,6 +86,11 @@ export function PrMenu({ prRef, detail, panelKey }: { prRef: PrRef; detail: Pull
         data-testid="pr-menu"
         data-region="panel"
         onKeyDown={stopPlainKeys}
+        onCloseAutoFocus={(e) => {
+          if (!keepFocus.current) return;
+          keepFocus.current = false;
+          e.preventDefault();
+        }}
       >
         <DropdownMenuItem
           data-testid="pr-menu-refresh"
@@ -80,14 +102,35 @@ export function PrMenu({ prRef, detail, panelKey }: { prRef: PrRef; detail: Pull
         >
           <Item icon={busy ? <Loader2 className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />} title="Refresh" hint={<RefreshHint fetchedAtMs={detail.fetchedAtMs} lastError={detail.lastError} busy={busy} />} />
         </DropdownMenuItem>
-        <DropdownMenuItem disabled title={comingNext} data-testid="pr-menu-ask">
-          <Item icon={<MessageCircleQuestion aria-hidden />} title="Ask a question" hint="Opens a thread that knows which pull request you mean." />
+        <DropdownMenuItem
+          data-testid="pr-menu-ask"
+          onSelect={() => {
+            keepFocus.current = true;
+            onAsk();
+          }}
+        >
+          <Item icon={<MessageCircleQuestion aria-hidden />} title="Ask a question" hint="Starts a thread that knows which pull request you mean." />
         </DropdownMenuItem>
-        <DropdownMenuItem disabled title={comingNext} data-testid="pr-menu-explain">
-          <Item icon={<BookOpen aria-hidden />} title="Explain this PR" hint="A walk through the diff and what to read closely." />
+        <DropdownMenuItem
+          data-testid="pr-menu-explain"
+          aria-busy={explaining || undefined}
+          onSelect={(e) => {
+            // Stay open with a spinner until the session has started.
+            e.preventDefault();
+            start("explain");
+          }}
+        >
+          <Item icon={explaining ? <Loader2 className="animate-spin" aria-hidden /> : <BookOpen aria-hidden />} title="Explain this PR" hint="A walk through the diff and what to read closely." />
         </DropdownMenuItem>
-        <DropdownMenuItem disabled title={comingNext} data-testid="pr-menu-fix">
-          <Item icon={<Hammer aria-hidden />} title="Fix findings in a thread" />
+        <DropdownMenuItem
+          data-testid="pr-menu-fix"
+          aria-busy={fixing || undefined}
+          onSelect={(e) => {
+            e.preventDefault();
+            start("fix");
+          }}
+        >
+          <Item icon={fixing ? <Loader2 className="animate-spin" aria-hidden /> : <Hammer aria-hidden />} title="Fix findings in a thread" />
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem data-testid="pr-menu-open" onSelect={() => void openUrl(url)}>
