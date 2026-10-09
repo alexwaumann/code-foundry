@@ -159,13 +159,41 @@ test("dragging the handle resizes the panel within its bounds, and the width per
   await expect(handle).toHaveAttribute("aria-valuenow", String(max));
   await expect(handle).toHaveAttribute("aria-valuemax", String(max));
 
-  // The width is saved; open/tabs are not (the panel starts hidden after a reload).
+  await injectTab(page, "files", "Files");
+  await injectTab(page, "diff", "Diff");
+
+  // Each selection's panel has its own width: s-2's opens at the default, and sizing it
+  // leaves s-1's alone.
+  await selectSession(page, "s-2");
+  await page.getByTestId("panel-toggle").click();
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-2");
+  expect((await box(page, "side-panel")).width).toBe(420);
+  await handle.focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(436);
+  await selectSession(page, "s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  expect((await box(page, "side-panel")).width).toBe(max);
+
+  // Widths, open state, tabs and the active tab all survive a reload.
   await page.reload();
   await expect(row(page, "s:s-1")).toBeVisible();
   await selectSession(page, "s-1");
-  await expect(panel(page)).toHaveCount(0);
-  await page.getByTestId("panel-toggle").click();
+  await expect(panel(page)).toBeVisible();
   expect((await box(page, "side-panel")).width).toBe(max);
+  await expect(panel(page).getByRole("tab")).toHaveText(["Files", "Diff"]);
+  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "diff");
+  await selectSession(page, "s-2");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-2");
+  expect((await box(page, "side-panel")).width).toBe(436);
+  await expect(panel(page).getByTestId("panel-empty")).toBeVisible();
+
+  // Double-click resets only that panel to the default.
+  await selectSession(page, "s-1");
+  await handle.dblclick();
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(420);
+  await selectSession(page, "s-2");
+  expect((await box(page, "side-panel")).width).toBe(436);
 });
 
 test("surface hotkeys do nothing while their surfaces are disabled", async ({ page }) => {
@@ -393,7 +421,12 @@ test("dragging starts from the rendered width after the room shrinks", async ({ 
   // At 1280 with the 260px sidebar the room bound is 636.
   await expect.poll(async () => (await box(page, "side-panel")).width).toBe(620);
 
-  // The window shrinks: the stored width is re-clamped (1000-260-24-360 = 356).
+  // The window shrinks: the panel renders at the room (1000-260-24-360 = 356), and the
+  // stored width is kept, so it comes back with the room.
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(356);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(620);
   await page.setViewportSize({ width: 1000, height: 800 });
   await expect.poll(async () => (await box(page, "side-panel")).width).toBe(356);
   await dragHandle(page, 30);

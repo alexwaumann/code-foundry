@@ -8,13 +8,16 @@ import {
   makeTab,
   openSurface,
   openTab,
+  resetPanelWidth,
+  setPanelWidth,
+  setWidth,
   tabId,
   toggle,
   togglePanel,
   usePanelStore,
   type PanelEntry,
 } from "./panel";
-import { useUiStore, type Selection } from "./ui";
+import { PANEL_MIN, panelMax, useUiStore, type Selection } from "./ui";
 
 const files = makeTab("files", "Files");
 const diff = makeTab("diff", "Diff");
@@ -114,10 +117,77 @@ describe("toggle", () => {
   });
 });
 
+describe("width", () => {
+  const sized: PanelEntry = { ...entry(true, [files], files.id), width: 500 };
+  const cases: [string, PanelEntry, number | undefined, PanelEntry][] = [
+    ["sets a width", entry(true, [files], files.id), 500, sized],
+    ["changes it", sized, 600, { ...sized, width: 600 }],
+    ["undefined drops it (back to the default)", sized, undefined, entry(true, [files], files.id)],
+  ];
+  it.each(cases)("setWidth %s", (_name, before, w, want) => {
+    expect(setWidth(before, w)).toEqual(want);
+  });
+
+  it("setWidth returns the same entry when nothing changes", () => {
+    expect(setWidth(sized, 500)).toBe(sized);
+    expect(setWidth(emptyEntry, undefined)).toBe(emptyEntry);
+  });
+
+  it("survives the other reducers, including closing the last tab and reopening", () => {
+    const closed = closeTab(sized, files.id);
+    expect(closed).toEqual({ ...entry(false, [], null), width: 500 });
+    expect(openTab(closed, diff).width).toBe(500);
+    expect(toggle(sized).width).toBe(500);
+    expect(activateTab({ ...sized, tabs: [files, diff] }, diff.id).width).toBe(500);
+  });
+});
+
 describe("panel store", () => {
   beforeEach(() => {
     usePanelStore.setState({ byKey: {} });
-    useUiStore.setState({ selection: { kind: "session", id: "a" }, focus: "content", panelFocusSeq: 0 });
+    useUiStore.setState({ selection: { kind: "session", id: "a" }, focus: "content", panelFocusSeq: 0, windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260 });
+  });
+
+  it("setPanelWidth sizes one panel, clamped to the current window and sidebar", () => {
+    setPanelWidth("current", 500);
+    expect(getPanel("session:a").width).toBe(500);
+    expect(getPanel("session:b")).not.toHaveProperty("width");
+    setPanelWidth("session:b", 2000);
+    expect(getPanel("session:b").width).toBe(panelMax(1400, 260));
+    useUiStore.setState({ sidebarVisible: false });
+    setPanelWidth("session:b", 2000);
+    expect(getPanel("session:b").width).toBe(840);
+    setPanelWidth("session:b", 10);
+    expect(getPanel("session:b").width).toBe(PANEL_MIN);
+    expect(getPanel("session:a").width).toBe(500);
+    // Sizing does not open the panel.
+    expect(getPanel("session:b").open).toBe(false);
+  });
+
+  it("resetPanelWidth drops one panel's width", () => {
+    setPanelWidth("session:a", 500);
+    setPanelWidth("session:b", 600);
+    resetPanelWidth("session:a");
+    expect(getPanel("session:a")).not.toHaveProperty("width");
+    expect(getPanel("session:b").width).toBe(600);
+  });
+
+  it("a window resize does not change stored widths", () => {
+    setPanelWidth("current", 700);
+    useUiStore.getState().setWindowWidth(1000);
+    expect(getPanel().width).toBe(700);
+  });
+
+  it("is persisted whole and comes back on rehydrate", async () => {
+    expect(usePanelStore.persist.getOptions().name).toBe("code-foundry.panel");
+    openSurface("current", pr);
+    setPanelWidth("current", 500);
+    const saved = localStorage.getItem("code-foundry.panel");
+    expect(saved).not.toBeNull();
+    usePanelStore.setState({ byKey: {} });
+    localStorage.setItem("code-foundry.panel", saved ?? "");
+    await usePanelStore.persist.rehydrate();
+    expect(getPanel("session:a")).toEqual({ ...entry(true, [pr], pr.id), width: 500 });
   });
 
   it("keeps state per selection", () => {

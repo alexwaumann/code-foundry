@@ -25,15 +25,15 @@ and `/tmp/cf-shots/chunk1-hidden.png`. Not run in the real Wails window.
 
 | File | Role |
 |---|---|
-| `stores/panel.ts` | Per-selection state (`byKey`), pure reducers, `openSurface`/`togglePanel` API |
-| `stores/ui.ts` | `panelWidth` (global, persisted in `partialize`), `PANEL_MIN` 280, `panelMax(window, sidebar)`, `windowWidth`, `FocusRegion` `"panel"`, `panelFocusSeq`, `contentFocusSeq` |
+| `stores/panel.ts` | Per-selection state (`byKey`: open, tabs, active tab, width since chunk 6), pure reducers, `openSurface`/`togglePanel`/`setPanelWidth` API. Persisted since chunk 6 |
+| `stores/ui.ts` | `PANEL_DEFAULT` 420, `PANEL_MIN` 280, `clampPanelWidth`, `panelMax(window, sidebar)`, `windowWidth`, `FocusRegion` `"panel"`, `panelFocusSeq`, `contentFocusSeq` |
 | `stores/views.ts` | `togglePanelCommand` (view.panel.toggle): settings guard and focus moves |
 | `surfaces/types.ts`, `surfaces/registry.ts` | `SurfaceSpec` and the ordered list, with `surfaceOf`, `surfaceByHotkey`, `useAvailability` |
 | `surfaces/files.ts`, `diff.ts`, `pullrequest.ts` | One spec per file. Files and Diff are `"disabled"` for now (`Placeholder.tsx` is their body); Pull request is real since chunk 3 (below) |
 | `components/panel/SidePanel.tsx` | Pane, tab strip, body via the registry, and the empty "Open a surface" list |
 | `components/panel/keys.ts` | `panelKeyAction`, a pure function: cmd+w closes the active tab (or hides an empty panel), and a bare letter opens an enabled surface; `isPanelChord` (the keys a surface's `onKey` never sees) |
 | `components/panel/reveal.ts` | `revealTab`: scrolls the tab strip (only the strip) so the active tab is fully visible |
-| `components/panel/PanelResizeHandle.tsx` | Same pattern as the sidebar's `ResizeHandle`, mirrored. Double-click resets to 420. Focusable, arrow keys resize |
+| `components/panel/PanelResizeHandle.tsx` | Same pattern as the sidebar's `ResizeHandle`, mirrored. Double-click resets its panel to 420. Focusable, arrow keys resize |
 | `components/panel/PanelToggle.tsx` | `CommandButton` for `view.panel.toggle`, `aria-pressed` while open |
 | `internal/command/commands_view.go` | `view.panel.toggle` (cmd+shift+e), emits `UiIntent.ShowView{name: "panel.toggle"}` |
 
@@ -44,9 +44,10 @@ and `/tmp/cf-shots/chunk1-hidden.png`. Not run in the real Wails window.
   a no-op. Tab ids are `kind` plus sorted, URI-encoded params
   (`pullrequest?number=12`), so opening the same thing twice activates the existing tab.
   `openTab` on an existing id refreshes its title.
-* **Only the width persists**, in the ui store, as asked. Open state and tabs live in
-  memory and reset on reload. Panel state for deleted sessions is never pruned. That is
-  harmless at this size (a few bytes per key).
+* **Persistence** (superseded in chunk 6). Chunk 1 persisted only one global width, in
+  the ui store. Since chunk 6 each panel has its own width and the whole panel store
+  (open state, tabs, active tab, width) is persisted. Panel state for deleted sessions is
+  never pruned. That is harmless at this size (a few bytes per key).
 * **Toggle command.** I chose a ShowView name over a new intent: no proto change, and it
   matches `view.settings`/`view.help`. The GUI handles it locally through a presenter in
   `keys/bindings.ts` (no round trip, no toast). The CLI reaches every window through
@@ -102,10 +103,9 @@ and `/tmp/cf-shots/chunk1-hidden.png`. Not run in the real Wails window.
 * **Width bounds.** `panelMax(window, sidebar) = min(60% of window, window - sidebar (0
   if hidden) - 24px gaps - 360px CONTENT_MIN)`. The setter clamps the stored width to
   [280, max(280, panelMax)]. The ui store tracks `windowWidth` (resize listener in
-  `startApp`). A resize re-clamps the stored width, so it can shrink but never grows back
-  on its own. The panel renders at `min(stored, panelMax)`. That covers a sidebar
-  widened after the panel was sized, which does not re-clamp, so dragging the sidebar back
-  and forth does not eat the user's width.
+  `startApp`). The panel renders at `min(stored, panelMax)`. Neither a window resize nor
+  a wider sidebar re-clamps the stored width (since chunk 6; chunk 1 re-clamped on window
+  resize), so a width saved with more room comes back when the room does.
 * **No room hides the panel.** When `panelMax < 280` (e.g. 1000px window, 520px sidebar),
   `SidePanel` renders nothing, but the panel stays open in the panel store, and the
   toggle stays pressed. It comes back as soon as there is room (hide the sidebar, widen
@@ -386,9 +386,9 @@ PullRequestSurface (tab body; watches pullRequestDetailResource)
   shrink below its text, which then paints over its neighbour (the first try at the
   timeline counts did this at 420px). The counts are `shrink-0` and hide by container
   query instead; only truncating text gets `min-w-0`.
-* e2e: the panel width persists in localStorage, so a second `page.goto` in the same
-  test keeps the width set earlier. Set it explicitly (`setPanelWidth`, through the
-  app's ui store).
+* e2e: panel state (width, open state, tabs) persists in localStorage, so a second
+  `page.goto` in the same test keeps what was set earlier. Set the width explicitly
+  (`setPanelWidth`, through the app's panel store).
 * The mock's `pr.refresh` now answers with the detail (protojson), like the daemon.
   `POST /__mock/gh/pr-fail?command=pr.refresh` fails the next one with UNAVAILABLE.
 
@@ -698,3 +698,64 @@ e2e "#146 from a fork: the branch cannot be deleted, and a merge asking anyway k
 confirmation, "kept patch-1: it is in a fork"). Screenshots: `/tmp/cf-shots/merge-button.png`
 (420px) and `/tmp/cf-shots/merge-button-280.png`.
 
+
+## Chunk 6: per-panel width and persistence
+
+(Asked for as "Chunk 4"; numbered 6 because chunks 4 and 5 above already exist.)
+
+Status: `make check` green (45 vitest files / 644 tests; Go packages all ok). `make gui-e2e` passes 234/234 (117 WebKit, 117 Chromium), with
+`e2e/panel.spec.ts` at 16 tests per browser.
+
+### Pieces
+
+| File | Change |
+|---|---|
+| `stores/panel.ts` | `PanelEntry.width?` (absent = `PANEL_DEFAULT`); pure `setWidth(e, w \| undefined)`; `setPanelWidth(target, w)` (clamps with `clampPanelWidth` from ui.ts) and `resetPanelWidth(target)`; `usePanelWidth(key)`; the store is wrapped in `persist` (`code-foundry.panel`, version 1, `byKey` only) |
+| `stores/ui.ts` | `panelWidth`/`setPanelWidth` gone; `setWindowWidth` only records the width; persist version 2 with a `migrate` that drops the old `panelWidth` key |
+| `components/panel/PanelResizeHandle.tsx` | Takes `panelKey`; drags and keys write that panel's width, double-click resets it |
+| `components/panel/SidePanel.tsx` | `Panel` reads its own width (`usePanelWidth`) and renders `min(width, panelMax)` |
+
+### Decisions
+
+* **One width per panel key** (`keyOf(selection)`: session, terminal, repo, worktree,
+  view, compose). A panel with no saved width opens at 420. Dragging or the separator
+  keys change only that panel. Double-click drops the stored width rather than storing
+  420, so a reset panel in a narrow window still follows the default when room returns.
+* **The whole panel store persists**: open state, tabs, active tab and width survive a
+  reload, as the user asked. The selection itself is not persisted (ui store), so after a
+  reload a panel shows once its selection is picked again. `emptyEntry` keeps its
+  meaning; an entry without `width` is at the default.
+* **No re-clamp on window resize.** Chunk 1 re-clamped the stored width when the window
+  shrank, so it could never grow back. Now the stored width stays and the panel renders at
+  `min(stored, panelMax)`, so a width saved in a wider window comes back when there is
+  room again. A drag or key press still starts from the rendered width and stores a
+  clamped value.
+* **Reducers keep the width.** `openTab` and `closeTab` (last tab) used to build a fresh
+  entry and would have dropped it; they now spread the old entry.
+* **No pruning.** Panel state for deleted sessions (and other gone keys) accumulates in
+  localStorage. Sole user, a few bytes per key: acceptable, not pruned.
+* **Old ui key.** The ui store's persist version went 1 to 2; `migrate` strips
+  `panelWidth`, and `partialize` no longer lists it, so the stale value is not re-saved.
+  The old global width is not carried over into any panel.
+* **e2e isolation.** Nothing in `e2e/fixtures.ts` clears storage: Playwright gives every
+  test a fresh browser context, so localStorage (the ui and now the panel store) starts
+  empty in each test. Only a reload or second `page.goto` inside one test sees saved panel
+  state.
+
+### Tests
+
+* `stores/panel.test.ts`: `setWidth` table, the width surviving the other reducers,
+  `setPanelWidth` clamping per key, `resetPanelWidth`, a window resize leaving stored
+  widths alone, and a persist round trip through localStorage and `rehydrate`.
+* `stores/ui.test.ts`: `setWindowWidth` only records the width; the v1 to v2 `migrate`
+  drops `panelWidth`; `partialize` does not save it.
+* `SidePanel.test.tsx`: keys write the current panel's width; two sessions keep their own
+  widths and double-click resets only one; a stored width above the room renders at the
+  room and comes back when the window grows.
+* `e2e/panel.spec.ts`: "dragging the handle resizes the panel within its bounds, and the
+  width persists" now also opens s-2's panel at 420 after s-1 was resized, sizes s-2 by
+  keyboard without touching s-1, reloads and finds s-1's width, open state, tabs and
+  active tab and s-2's width, then double-clicks s-1 back to 420 with s-2 unchanged.
+  "dragging starts from the rendered width after the room shrinks" now shows the stored
+  width coming back when the window grows again. `e2e/pr-panel.spec.ts`'s
+  `setPanelWidth` helper goes through the panel store.
