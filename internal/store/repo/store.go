@@ -499,8 +499,17 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 			base = g.defaultBase(ctx, m)
 		}
 		// --no-track: branching from origin/main must not make origin/main the
-		// upstream, or ahead/behind and `git push` would target main.
-		args = []string{"worktree", "add", "--no-track", "-b", opts.Branch, path, base}
+		// upstream, or ahead/behind and `git push` would target main. The exception is
+		// a base of origin/<branch> itself (pr.fix.findings checking out a pull
+		// request's branch): that is the branch's own upstream, so track it, and
+		// ahead/behind, pull and a bare push work from the start. git's DWIM would do
+		// the same, but it silently branches from the default branch when
+		// origin/<branch> is missing, where an explicit base fails.
+		track := "--no-track"
+		if base == "origin/"+opts.Branch {
+			track = "--track"
+		}
+		args = []string{"worktree", "add", track, "-b", opts.Branch, path, base}
 	}
 	if _, err := g.runner.Run(ctx, m.Path, args...); err != nil {
 		return Worktree{}, fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
