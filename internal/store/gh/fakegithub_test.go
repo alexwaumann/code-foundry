@@ -30,6 +30,8 @@ type fakeGitHub struct {
 	cost                     int
 	// fail makes the next request of an operation fail with err (then clears).
 	fail map[string]error
+	// detail is the detail panel's extra state (fakegithub_detail_test.go).
+	detail fakeDetail
 }
 
 type fakeRepo struct {
@@ -153,6 +155,8 @@ func (g *fakeGitHub) respond(op, doc string, vars map[string]any) (json.RawMessa
 			data[a] = map[string]any{"object": map[string]any{"oid": r.sha,
 				"statusCheckRollup": map[string]any{"state": string(r.rollup.State), "contexts": ctx}}}
 		}
+	case "PullRequestFull", "ReviewerCandidates", "RevertPullRequest":
+		g.detailOp(op, vars, data, &errs) // fakegithub_detail_test.go
 	default:
 		return nil, fmt.Errorf("fakeGitHub: unexpected op %s", op)
 	}

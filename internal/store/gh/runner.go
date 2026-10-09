@@ -102,6 +102,12 @@ func classifyGraphQLErrors(errs []graphQLError) error {
 			return fmt.Errorf("%w: %s", ErrNotFound, msg)
 		case "RATE_LIMITED":
 			return &RateLimitError{Msg: msg, Secondary: strings.Contains(strings.ToLower(msg), "secondary")}
+		case "FORBIDDEN":
+			return fmt.Errorf("%w: %s", ErrPermissionDenied, msg)
+		case "UNPROCESSABLE":
+			// GitHub refused a mutation in the object's current state (reverting a pull
+			// request that is not merged, say).
+			return fmt.Errorf("%w: %s", ErrFailedPrecondition, msg)
 		}
 	}
 	return fmt.Errorf("github graphql: %s", msg)

@@ -27,6 +27,10 @@
  *   POST /__mock/update/disabled?reason=dev%20build
  *   POST /__mock/gh/update | poll | stale | auth?ok=false | touch?path=…   (GitHub + detail)
  *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts)
+ *   POST /__mock/gh/pr-comment?repo=o/r&number=145&body=…   (a new comment on a PR detail;
+ *        pull_request_detail_updated). PR detail fixtures: mock/prDetail.ts (#145 open,
+ *        #138 merged, #131 closed, #140 read-only); its commands are pr.revert,
+ *        pr.review.request and pr.refresh
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
@@ -46,6 +50,7 @@ import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb"
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { ghEvent } from "./github";
+import { prDetailCall } from "./prDetail";
 import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
 
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -166,6 +171,11 @@ function routes(router: ConnectRouter): void {
       return world.gh.getBranchPullRequests(req.repoSlug.toLowerCase(), req.headRef);
     },
     refresh: () => ({}),
+    getPullRequestDetail: (req) => prDetailCall(() => ({ detail: world.gh.prDetails.get(req.repoSlug, req.number, req.refresh) })),
+    listReviewerCandidates: (req) => prDetailCall(() => world.gh.prDetails.listCandidates(req.repoSlug, req.number)),
+    setReviewRequest: (req) =>
+      prDetailCall(() => ({ requested: world.gh.prDetails.setReviewRequest(req.repoSlug, req.number, req.login, req.kind, req.requested) })),
+    revertPullRequest: (req) => prDetailCall(() => world.gh.prDetails.revert(req.repoSlug, req.number)),
   });
 
   router.service(CommandService, {
@@ -436,6 +446,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "GET /__mock/gh/calls":
       json(res, 200, world.gh.calls);
       break;
+    case "POST /__mock/gh/pr-comment": {
+      // A poll saw a new comment on a pull request with a detail: pull_request_detail_updated.
+      const ok = world.gh.prDetails.addComment(q.get("repo") ?? "alexwaumann/code-foundry", Number(q.get("number") ?? "145"), q.get("body") ?? "New comment");
+      json(res, ok ? 200 : 404, { ok });
+      break;
+    }
     case "GET /__mock/streams":
       json(res, 200, Object.fromEntries(openStreams));
       break;

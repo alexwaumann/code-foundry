@@ -132,6 +132,7 @@ type Store struct {
 	queue          []*job
 
 	branches branchStates // per-branch results (activity.go)
+	full     fullCache    // pull request detail panel cache (pr_detail.go)
 
 	// Worker goroutine only.
 	lastEnd     time.Time      // when the previous request finished
@@ -154,23 +155,32 @@ const (
 	jobAuth
 	jobPullRequest
 	jobChecks
+	// jobFunc runs job.run; job.id identifies it for coalescing (pr_detail.go).
+	jobFunc
 )
 
 type job struct {
-	kind    jobKind
-	slug    string
-	number  int
-	ref     string
+	kind   jobKind
+	slug   string
+	number int
+	ref    string
+	// id and run: jobFunc only.
+	id      string
+	run     func(context.Context) (any, error)
 	waiters []chan jobResult
 }
 
 func (j *job) key() string {
+	if j.kind == jobFunc {
+		return fmt.Sprintf("%d|%s", j.kind, j.id)
+	}
 	return fmt.Sprintf("%d|%s|%d|%s", j.kind, j.slug, j.number, j.ref)
 }
 
 type jobResult struct {
 	detail PullRequestDetail
 	checks RefChecks
+	value  any // jobFunc
 	err    error
 }
 
@@ -505,6 +515,8 @@ func (s *Store) execute(ctx context.Context, j *job) {
 		res.detail, res.err = s.fetchPullRequest(ctx, j.slug, j.number)
 	case jobChecks:
 		res.checks, res.err = s.fetchChecks(ctx, j.slug, j.ref)
+	case jobFunc:
+		res.value, res.err = j.run(ctx)
 	}
 	j.reply(res)
 }

@@ -23,6 +23,7 @@ type Store struct {
 	branch  map[string]gh.BranchPullRequests
 	err     error
 	calls   []string
+	detail  detailState // detail.go
 }
 
 var _ gh.Service = (*Store)(nil)

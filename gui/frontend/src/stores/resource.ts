@@ -17,6 +17,11 @@ export interface Resource<V> {
   watch: (key: string) => () => void;
   /** Re-fetches key (or every key matching pred) if anything is watching it. */
   invalidate: (keyOrPred: string | ((key: string) => boolean)) => void;
+  /**
+   * Writes key's entry from a read made outside the resource (a refresh): its data, or an
+   * error that keeps the data. A fetch of key in flight is superseded; its result is dropped.
+   */
+  set: (key: string, value: { data: V } | { error: string }) => void;
   /** Keys currently watched (tests, diagnostics). */
   watched: () => string[];
 }
@@ -34,6 +39,8 @@ export function createResource<V>(fetcher: (key: string, signal: AbortSignal) =>
   const inflight = new Map<string, AbortController>();
   const rerun = new Set<string>();
   const timers = new Map<string, ReturnType<typeof setInterval>>();
+  /** Bumped by set: a fetch that started before a set must not overwrite it. */
+  const gens = new Map<string, number>();
 
   const patch = (key: string, p: Partial<ResourceEntry<V>>) => {
     store.setState((s) => {
@@ -49,15 +56,17 @@ export function createResource<V>(fetcher: (key: string, signal: AbortSignal) =>
     }
     const ctl = new AbortController();
     inflight.set(key, ctl);
+    const gen = gens.get(key) ?? 0;
+    const current = () => (gens.get(key) ?? 0) === gen;
     patch(key, { loading: true });
     fetcher(key, ctl.signal)
       .then((data) => {
-        patch(key, { data, error: null, loading: false });
+        patch(key, current() ? { data, error: null, loading: false } : { loading: false });
       })
       .catch((err: unknown) => {
         if (isAbort(err)) return;
         invalidateOnTransportError(err);
-        patch(key, { error: errorMessage(err), loading: false });
+        patch(key, current() ? { error: errorMessage(err), loading: false } : { loading: false });
       })
       .finally(() => {
         inflight.delete(key);
@@ -96,6 +105,10 @@ export function createResource<V>(fetcher: (key: string, signal: AbortSignal) =>
       }
     },
     watched: () => [...interest.keys()],
+    set: (key, value) => {
+      gens.set(key, (gens.get(key) ?? 0) + 1);
+      patch(key, "data" in value ? { data: value.data, error: null, loading: false } : { error: value.error, loading: false });
+    },
   };
 }
 

@@ -143,3 +143,19 @@ fragment DefaultBranchFingerprint on Repository {
     }
   }
 }
+
+# A comment or review author. __typename tells bots apart (Bot logins have no "[bot]").
+fragment ActorFields on Actor {
+  __typename
+  login
+  avatarUrl
+}
+
+# A requested reviewer with what the reviewer picker shows.
+fragment RequestedReviewerFields on RequestedReviewer {
+  __typename
+  ... on User { id login name avatarUrl }
+  ... on Bot { id login avatarUrl }
+  ... on Mannequin { id login avatarUrl }
+  ... on Team { id slug name avatarUrl organization { login } }
+}

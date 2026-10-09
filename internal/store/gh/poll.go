@@ -242,6 +242,7 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 			}
 		}
 	}
+	s.staleFullDetails(fps) // cached detail panels of what moved (pr_detail.go)
 	var need []prFingerprint
 	for _, f := range fps {
 		k, ok := known[f.ID]

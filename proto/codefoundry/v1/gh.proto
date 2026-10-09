@@ -50,6 +50,26 @@ service GhService {
   // for 10 minutes after the last call. A first call returns an empty list with
   // fetched_at unset; a branch_pull_requests_updated event follows the next poll.
   rpc GetBranchPullRequests(GetBranchPullRequestsRequest) returns (GetBranchPullRequestsResponse) {}
+  // GetPullRequestDetail returns everything the pull request detail panel shows: the
+  // summary, body, labels, reviewers, commits, comments and reviews, review threads, and
+  // checks. On demand (one GraphQL request, more only for checks beyond 100), cached per
+  // pull request. The cache serves until refresh is set, the entry is older than the
+  // poll interval, or a poll saw the pull request change (updated, pushed, state, or
+  // check counts); pull_request_detail_updated says so. On fetch failure the cached
+  // copy is returned with last_error set.
+  rpc GetPullRequestDetail(GetPullRequestDetailRequest) returns (GetPullRequestDetailResponse) {}
+  // ListReviewerCandidates returns who can be asked to review a pull request: the
+  // repository's assignable users (first 100) and the current requests (users and
+  // teams). Requested first, then by login; the pull request's author is left out.
+  // Fetched on every call (not cached).
+  rpc ListReviewerCandidates(ListReviewerCandidatesRequest) returns (ListReviewerCandidatesResponse) {}
+  // SetReviewRequest requests (or withdraws a request for) a review from a user or
+  // team. The pull request's cached detail is invalidated and
+  // pull_request_detail_updated is sent.
+  rpc SetReviewRequest(SetReviewRequestRequest) returns (SetReviewRequestResponse) {}
+  // RevertPullRequest opens a pull request that reverts a merged one (GitHub's revert
+  // button). FAILED_PRECONDITION when the pull request is not merged.
+  rpc RevertPullRequest(RevertPullRequestRequest) returns (RevertPullRequestResponse) {}
 }
 
 // GitHub's pull request state.
@@ -294,6 +314,14 @@ message GhEvent {
     RepoActivityUpdated repo_activity_updated = 4;
     BranchPullRequestsUpdated branch_pull_requests_updated = 5;
     Polled polled = 6;
+    PullRequestDetailUpdated pull_request_detail_updated = 7;
+  }
+
+  // A pull request's cached detail changed or went stale (a poll saw the pull request
+  // change, or a review request was set). Re-read with GetPullRequestDetail.
+  message PullRequestDetailUpdated {
+    string repo_slug = 1;
+    int32 number = 2;
   }
 
   // The dashboards, the global monthly stats, their fetch errors, or the tracked set
@@ -426,4 +454,221 @@ message GetBranchPullRequestsResponse {
   repeated PullRequest pull_requests = 1;
   google.protobuf.Timestamp fetched_at = 2;
   string last_error = 3;
+}
+
+// ---- Pull request detail (GetPullRequestDetail) -----------------------------------
+
+message GetPullRequestDetailRequest {
+  string repo_slug = 1;
+  int32 number = 2;
+  // Fetch from GitHub even when the cached detail is fresh.
+  bool refresh = 3;
+}
+
+message GetPullRequestDetailResponse {
+  PullRequestDetail detail = 1;
+}
+
+// Which side of a diff a review thread is anchored to.
+enum DiffSide {
+  DIFF_SIDE_UNSPECIFIED = 0;
+  // The base (deleted lines).
+  DIFF_SIDE_LEFT = 1;
+  // The head (added and context lines).
+  DIFF_SIDE_RIGHT = 2;
+}
+
+// What a PullRequestComment is.
+enum PullRequestCommentKind {
+  PULL_REQUEST_COMMENT_KIND_UNSPECIFIED = 0;
+  // A comment on the conversation tab.
+  PULL_REQUEST_COMMENT_KIND_ISSUE_COMMENT = 1;
+  // A submitted review (its summary body may be empty); review_state is set.
+  PULL_REQUEST_COMMENT_KIND_REVIEW = 2;
+  // An inline comment on a diff line (in review threads); path is set.
+  PULL_REQUEST_COMMENT_KIND_REVIEW_COMMENT = 3;
+}
+
+message PullRequestDetail {
+  // The summary fields, as GetPullRequest returns them. checks is the head commit's
+  // rollup.
+  PullRequest pull_request = 1;
+  // Markdown, as written.
+  string body = 2;
+  repeated PullRequestLabel labels = 3;
+  // One entry per reviewer: a latest review, a pending request, or both. Requested
+  // first, then most recent review first.
+  repeated PullRequestReviewer reviewers = 4;
+  // The last 100 commits, oldest first.
+  repeated PullRequestCommit commits = 5;
+  // All commits on the pull request (commits holds the last 100).
+  int32 commit_count = 6;
+  // Issue comments and submitted reviews (the last 100 of each), oldest first. Inline
+  // review comments are in review_threads, and so are the reviews that only carried
+  // them (COMMENTED with an empty body, as GitHub records each inline comment and
+  // reply): those are left out here.
+  repeated PullRequestComment comments = 7;
+  // Covers both streams: more than 100 issue comments, or more than 100 reviews, exist.
+  bool comments_truncated = 8;
+  // The last 50 review threads, oldest first.
+  repeated PullRequestReviewThread review_threads = 9;
+  // More review threads exist than review_threads holds.
+  bool review_threads_truncated = 10;
+  // Every check on the head commit, failed first (see checks_truncated).
+  repeated CheckRun checks = 11;
+  // Merged pull requests: the merge commit and who merged.
+  string merge_commit_sha = 12;
+  string merged_by = 13;
+  // Closed or merged pull requests.
+  google.protobuf.Timestamp closed_at = 14;
+  // GitHub's node id.
+  string node_id = 15;
+  // The viewer has write access to the repository (viewer_permission admin, maintain,
+  // or write): they may request reviewers and revert.
+  bool viewer_can_update = 16;
+  // When this detail was fetched; unset if never.
+  google.protobuf.Timestamp fetched_at = 17;
+  // The last fetch's error when this is the cached copy, or why checks is incomplete
+  // (a page of checks beyond the first failed).
+  string last_error = 18;
+  // The viewer's permission on the repository, lower case ("admin", "maintain",
+  // "write", "triage", "read"); empty if unknown.
+  string viewer_permission = 19;
+  // labels holds the first 20 of more.
+  bool labels_truncated = 20;
+  // More than 50 latest reviews or more than 50 pending review requests exist than
+  // reviewers was built from.
+  bool reviewers_truncated = 21;
+  // checks is incomplete: a page beyond the first failed (last_error says why), or the
+  // head commit has more checks than the daemon fetches.
+  bool checks_truncated = 22;
+}
+
+message PullRequestLabel {
+  string name = 1;
+  // Hex color without "#", e.g. "d73a4a".
+  string color = 2;
+}
+
+message PullRequestReviewer {
+  // User login, or "org/team" for a team.
+  string login = 1;
+  bool is_team = 2;
+  // The latest submitted review's state; UNSPECIFIED when the reviewer has only been
+  // requested.
+  PullRequestReviewState state = 3;
+  google.protobuf.Timestamp submitted_at = 4;
+  // A review request is pending (after a review too: re-requested).
+  bool requested = 5;
+  // Commits landed after the latest review (it reviewed an older head).
+  bool stale = 6;
+  string avatar_url = 7;
+  bool is_bot = 8;
+}
+
+message PullRequestCommit {
+  string sha = 1;
+  string headline = 2;
+  // GitHub login of the commit author; empty when the email maps to no account.
+  string author_login = 3;
+  // Git author name.
+  string author_name = 4;
+  google.protobuf.Timestamp committed_at = 5;
+}
+
+message PullRequestComment {
+  // GitHub's node id.
+  string id = 1;
+  PullRequestCommentKind kind = 2;
+  // Author login; empty for deleted accounts.
+  string author = 3;
+  bool author_is_bot = 4;
+  string author_avatar_url = 5;
+  // Markdown, as written.
+  string body = 6;
+  google.protobuf.Timestamp created_at = 7;
+  string url = 8;
+  // Review comments: the file.
+  string path = 9;
+  // Reviews: the review's state.
+  PullRequestReviewState review_state = 10;
+  // Review comments: the node id of the review they belong to, to group a review's
+  // inline comments.
+  string review_id = 11;
+}
+
+message PullRequestReviewThread {
+  // GitHub's node id.
+  string id = 1;
+  string path = 2;
+  // The line in the current diff or, when outdated, the line it was written on.
+  int32 line = 3;
+  DiffSide side = 4;
+  bool is_resolved = 5;
+  // The diff moved on: the line no longer exists as commented.
+  bool is_outdated = 6;
+  // The first 20 comments, oldest first (kind REVIEW_COMMENT).
+  repeated PullRequestComment comments = 7;
+  bool comments_truncated = 8;
+}
+
+// ---- Reviewer requests (ListReviewerCandidates, SetReviewRequest) -----------------
+
+enum ReviewerKind {
+  REVIEWER_KIND_UNSPECIFIED = 0;
+  REVIEWER_KIND_USER = 1;
+  REVIEWER_KIND_TEAM = 2;
+}
+
+message ListReviewerCandidatesRequest {
+  string repo_slug = 1;
+  int32 number = 2;
+}
+
+message ListReviewerCandidatesResponse {
+  repeated ReviewerCandidate candidates = 1;
+  // The repository has more assignable users than were listed (100).
+  bool truncated = 2;
+}
+
+message ReviewerCandidate {
+  // GitHub's node id.
+  string id = 1;
+  ReviewerKind kind = 2;
+  // User login, or "org/team" for a team.
+  string login = 3;
+  string name = 4;
+  string avatar_url = 5;
+  // A review request is pending.
+  bool is_requested = 6;
+}
+
+message SetReviewRequestRequest {
+  string repo_slug = 1;
+  int32 number = 2;
+  // User login, or the team as "org/team" (or its slug alone).
+  string login = 3;
+  // UNSPECIFIED means USER.
+  ReviewerKind kind = 4;
+  // True requests a review; false withdraws the request.
+  bool requested = 5;
+}
+
+message SetReviewRequestResponse {
+  // The pending requests afterwards, as GitHub reports them: user logins and
+  // "org/team".
+  repeated string requested = 1;
+}
+
+// ---- Revert (RevertPullRequest) ---------------------------------------------------
+
+message RevertPullRequestRequest {
+  string repo_slug = 1;
+  int32 number = 2;
+}
+
+message RevertPullRequestResponse {
+  // The new pull request that reverts the merged one.
+  int32 number = 1;
+  string url = 2;
 }

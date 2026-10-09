@@ -13,6 +13,10 @@ func TestQueriesAssemble(t *testing.T) {
 		queryPullRequest:        {"CheckContexts", "PullRequestDetail", "PullRequestSummary", "RateLimitFields", "RollupCounts", "RollupFingerprint"},
 		queryChecks:             {"CheckContexts", "RateLimitFields", "RollupCounts"},
 		queryPullRequestDetails: {"PullRequestDetail", "PullRequestSummary", "RateLimitFields", "RollupCounts", "RollupFingerprint"},
+		queryPullRequestFull: {"ActorFields", "CheckContexts", "PullRequestDetail", "PullRequestSummary", "RateLimitFields",
+			"RequestedReviewerFields", "RollupCounts", "RollupFingerprint"},
+		queryReviewerCandidates: {"RateLimitFields", "RequestedReviewerFields"},
+		queryRevertPullRequest:  nil,
 	}
 	if qs, _ := loadQueries(); len(qs) != len(wantFrags) {
 		t.Errorf("queries = %d files, want %d", len(qs), len(wantFrags))

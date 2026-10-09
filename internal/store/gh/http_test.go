@@ -73,7 +73,7 @@ func TestClassifyHTTP(t *testing.T) {
 		{"403 retry-after only", 403, header("Retry-After", "5"), `{"message":"slow down"}`, ErrRateLimited,
 			&wantRL{secondary: true, retryAfter: 5 * time.Second}, ""},
 		{"403 permissions", 403, header("X-Ratelimit-Remaining", "4999"),
-			`{"message":"Resource not accessible by integration"}`, nil, nil, "Resource not accessible by integration (HTTP 403)"},
+			`{"message":"Resource not accessible by integration"}`, ErrPermissionDenied, nil, "Resource not accessible by integration (HTTP 403)"},
 		{"404", 404, nil, `{"message":"Not Found"}`, ErrNotFound, nil, "Not Found (HTTP 404)"},
 		{"502 graphql timeout", 502, nil, "", ErrServerTimeout, nil, "Bad Gateway (HTTP 502)"},
 		{"504", 504, nil, "", ErrServerTimeout, nil, ""},
@@ -163,11 +163,17 @@ func TestParseGraphQLResponse(t *testing.T) {
 			t.Errorf("%s: err = %v, want a non-global error", body, err)
 		}
 	}
-	// Errors that are neither NOT_FOUND nor RATE_LIMITED fail the request, unclassified.
+	// FORBIDDEN fails the request as permission denied, not globally.
 	_, err := parseGraphQLResponse(httpResult{status: 200,
 		body: []byte(`{"data":{"x":1},"errors":[{"type":"FORBIDDEN","message":"nope"}]}`)})
-	if err == nil || isGlobal(err) || !strings.Contains(err.Error(), "nope") {
+	if !errors.Is(err, ErrPermissionDenied) || isGlobal(err) || !strings.Contains(err.Error(), "nope") {
 		t.Errorf("FORBIDDEN: err = %v", err)
+	}
+	// Other types fail it unclassified.
+	_, err = parseGraphQLResponse(httpResult{status: 200,
+		body: []byte(`{"data":{"x":1},"errors":[{"type":"SOMETHING_ELSE","message":"odd"}]}`)})
+	if err == nil || isGlobal(err) || errors.Is(err, ErrPermissionDenied) || !strings.Contains(err.Error(), "odd") {
+		t.Errorf("unknown type: err = %v", err)
 	}
 	// With data alongside the errors, the data comes back too, with a *PartialError
 	// that places each error under its top-level field.

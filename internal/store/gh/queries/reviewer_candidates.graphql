@@ -1,0 +1,18 @@
+# Who can be asked to review a pull request: the repository's assignable users (first
+# 100) plus whoever is requested now (users and teams). Fetched on demand by
+# ListReviewerCandidates; never cached.
+query ReviewerCandidates($owner: String!, $name: String!, $number: Int!) {
+  rateLimit { ...RateLimitFields }
+  repository(owner: $owner, name: $name) {
+    assignableUsers(first: 100) {
+      totalCount
+      nodes { id login name avatarUrl }
+    }
+    pullRequest(number: $number) {
+      author { login }
+      reviewRequests(first: 50) {
+        nodes { requestedReviewer { ...RequestedReviewerFields } }
+      }
+    }
+  }
+}
