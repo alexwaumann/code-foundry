@@ -24,6 +24,9 @@ type Deps struct {
 	// GitOps backs git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url.
 	// A nil Backend works like Terminal.
 	GitOps command.GitOpsDeps
+	// Gh backs pr.revert, pr.review.request and pr.refresh (the pull request detail
+	// panel's actions). Nil works like Terminal.
+	Gh command.GhBackend
 	// Settings backs settings.*. Nil works like Terminal.
 	Settings command.SettingsBackend
 	// Reveal shows a file in Finder (settings.reveal). Nil: command.RevealInFinder.
@@ -61,6 +64,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterRepo(r, d.Repo),
 		command.RegisterSession(r, d.Session, d.Emitter),
 		command.RegisterGitOps(r, d.GitOps),
+		command.RegisterPullRequest(r, d.Gh),
 		command.RegisterSettings(r, d.Settings, d.Emitter, d.Reveal),
 		command.RegisterUpdate(r, command.UpdateDeps{Update: d.Update, Session: d.Session, Restart: d.Restart, Daemon: d.Daemon}),
 		command.RegisterView(r, d.Emitter),
