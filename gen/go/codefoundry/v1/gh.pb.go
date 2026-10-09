@@ -2913,8 +2913,11 @@ type PullRequestDetail struct {
 	MergeMethodsAllowed []PullRequestMergeMethod `protobuf:"varint,23,rep,packed,name=merge_methods_allowed,json=mergeMethodsAllowed,proto3,enum=codefoundry.v1.PullRequestMergeMethod" json:"merge_methods_allowed,omitempty"`
 	// Auto-merge is enabled: GitHub merges the pull request once its requirements pass.
 	AutoMergeEnabled bool `protobuf:"varint,24,opt,name=auto_merge_enabled,json=autoMergeEnabled,proto3" json:"auto_merge_enabled,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// The repository's default branch; empty if unknown. MergePullRequest never deletes
+	// it (nor the base branch).
+	DefaultBranch string `protobuf:"bytes,25,opt,name=default_branch,json=defaultBranch,proto3" json:"default_branch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PullRequestDetail) Reset() {
@@ -3113,6 +3116,13 @@ func (x *PullRequestDetail) GetAutoMergeEnabled() bool {
 		return x.AutoMergeEnabled
 	}
 	return false
+}
+
+func (x *PullRequestDetail) GetDefaultBranch() string {
+	if x != nil {
+		return x.DefaultBranch
+	}
+	return ""
 }
 
 type PullRequestLabel struct {
@@ -4014,10 +4024,15 @@ type MergePullRequestRequest struct {
 	Number   int32                  `protobuf:"varint,2,opt,name=number,proto3" json:"number,omitempty"`
 	// Required (UNSPECIFIED is INVALID_ARGUMENT).
 	Method PullRequestMergeMethod `protobuf:"varint,3,opt,name=method,proto3,enum=codefoundry.v1.PullRequestMergeMethod" json:"method,omitempty"`
-	// Delete the head branch after the merge (ignored for a fork's branch).
-	DeleteBranch  bool `protobuf:"varint,4,opt,name=delete_branch,json=deleteBranch,proto3" json:"delete_branch,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Delete the head branch on GitHub after the merge (ignored for a fork's branch, the
+	// default branch, and the base branch).
+	DeleteBranch bool `protobuf:"varint,4,opt,name=delete_branch,json=deleteBranch,proto3" json:"delete_branch,omitempty"`
+	// The head commit the client showed (full SHA). When set, the merge is refused with
+	// FAILED_PRECONDITION unless GitHub's head is still this commit, so commits pushed
+	// since are never merged unseen. Clients that show the pull request should set it.
+	ExpectedHeadSha string `protobuf:"bytes,5,opt,name=expected_head_sha,json=expectedHeadSha,proto3" json:"expected_head_sha,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *MergePullRequestRequest) Reset() {
@@ -4078,6 +4093,13 @@ func (x *MergePullRequestRequest) GetDeleteBranch() bool {
 	return false
 }
 
+func (x *MergePullRequestRequest) GetExpectedHeadSha() string {
+	if x != nil {
+		return x.ExpectedHeadSha
+	}
+	return ""
+}
+
 type MergePullRequestResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// GitHub reports the pull request merged.
@@ -4085,7 +4107,7 @@ type MergePullRequestResponse struct {
 	// The merge commit (for squash and rebase, the last commit on the base branch).
 	Sha string `protobuf:"bytes,2,opt,name=sha,proto3" json:"sha,omitempty"`
 	// What happened, for people: the merge and, when asked for, the branch deletion
-	// ("deleted branch x", or why it was kept).
+	// ("deleted origin/x", or why it was kept).
 	Message string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
 	// The head branch was deleted (or GitHub had already deleted it).
 	BranchDeleted bool `protobuf:"varint,4,opt,name=branch_deleted,json=branchDeleted,proto3" json:"branch_deleted,omitempty"`
@@ -4668,7 +4690,7 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x18\n" +
 	"\arefresh\x18\x03 \x01(\bR\arefresh\"Y\n" +
 	"\x1cGetPullRequestDetailResponse\x129\n" +
-	"\x06detail\x18\x01 \x01(\v2!.codefoundry.v1.PullRequestDetailR\x06detail\"\xcc\t\n" +
+	"\x06detail\x18\x01 \x01(\v2!.codefoundry.v1.PullRequestDetailR\x06detail\"\xf3\t\n" +
 	"\x11PullRequestDetail\x12>\n" +
 	"\fpull_request\x18\x01 \x01(\v2\x1b.codefoundry.v1.PullRequestR\vpullRequest\x12\x12\n" +
 	"\x04body\x18\x02 \x01(\tR\x04body\x128\n" +
@@ -4696,7 +4718,8 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\x13reviewers_truncated\x18\x15 \x01(\bR\x12reviewersTruncated\x12)\n" +
 	"\x10checks_truncated\x18\x16 \x01(\bR\x0fchecksTruncated\x12Z\n" +
 	"\x15merge_methods_allowed\x18\x17 \x03(\x0e2&.codefoundry.v1.PullRequestMergeMethodR\x13mergeMethodsAllowed\x12,\n" +
-	"\x12auto_merge_enabled\x18\x18 \x01(\bR\x10autoMergeEnabled\"<\n" +
+	"\x12auto_merge_enabled\x18\x18 \x01(\bR\x10autoMergeEnabled\x12%\n" +
+	"\x0edefault_branch\x18\x19 \x01(\tR\rdefaultBranch\"<\n" +
 	"\x10PullRequestLabel\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05color\x18\x02 \x01(\tR\x05color\"\xab\x02\n" +
@@ -4771,12 +4794,13 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\"E\n" +
 	"\x19RevertPullRequestResponse\x12\x16\n" +
 	"\x06number\x18\x01 \x01(\x05R\x06number\x12\x10\n" +
-	"\x03url\x18\x02 \x01(\tR\x03url\"\xb3\x01\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\"\xdf\x01\n" +
 	"\x17MergePullRequestRequest\x12\x1b\n" +
 	"\trepo_slug\x18\x01 \x01(\tR\brepoSlug\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12>\n" +
 	"\x06method\x18\x03 \x01(\x0e2&.codefoundry.v1.PullRequestMergeMethodR\x06method\x12#\n" +
-	"\rdelete_branch\x18\x04 \x01(\bR\fdeleteBranch\"\x85\x01\n" +
+	"\rdelete_branch\x18\x04 \x01(\bR\fdeleteBranch\x12*\n" +
+	"\x11expected_head_sha\x18\x05 \x01(\tR\x0fexpectedHeadSha\"\x85\x01\n" +
 	"\x18MergePullRequestResponse\x12\x16\n" +
 	"\x06merged\x18\x01 \x01(\bR\x06merged\x12\x10\n" +
 	"\x03sha\x18\x02 \x01(\tR\x03sha\x12\x18\n" +

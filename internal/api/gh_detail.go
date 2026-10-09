@@ -75,7 +75,7 @@ func (h *Gh) MergePullRequest(ctx context.Context, req *connect.Request[v1.Merge
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("method is required: merge, squash, or rebase"))
 	}
 	r, err := h.store.MergePullRequest(ctx, req.Msg.GetRepoSlug(), int(req.Msg.GetNumber()),
-		gh.MergeRequest{Method: method, DeleteBranch: req.Msg.GetDeleteBranch()})
+		gh.MergeRequest{Method: method, DeleteBranch: req.Msg.GetDeleteBranch(), ExpectedHeadSHA: req.Msg.GetExpectedHeadSha()})
 	if err != nil {
 		return nil, ghError(err)
 	}
@@ -121,6 +121,7 @@ func fullPullRequestToProto(slug string, d *gh.FullPullRequest) *v1.PullRequestD
 		ReviewersTruncated:     d.ReviewersTruncated,
 		ChecksTruncated:        d.ChecksTruncated,
 		AutoMergeEnabled:       d.AutoMerge,
+		DefaultBranch:          d.DefaultBranch,
 	}
 	for _, m := range d.MergeMethods {
 		out.MergeMethodsAllowed = append(out.MergeMethodsAllowed,

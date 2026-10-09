@@ -130,10 +130,12 @@ type GhServiceClient interface {
 	// button). FAILED_PRECONDITION when the pull request is not merged.
 	RevertPullRequest(context.Context, *connect.Request[v1.RevertPullRequestRequest]) (*connect.Response[v1.RevertPullRequestResponse], error)
 	// MergePullRequest merges an open pull request (GitHub's merge button) with the given
-	// method, guarded by the head commit the daemon last fetched: FAILED_PRECONDITION when
-	// the pull request is not open, is a draft, its head moved since, or GitHub refuses
-	// (conflicts, branch protection). With delete_branch the head branch is deleted after
-	// a successful merge, unless it lives in a fork. The detail is invalidated and
+	// method, guarded by expected_head_sha (the head the client showed) or else the head
+	// commit the daemon last fetched: FAILED_PRECONDITION when the pull request is not
+	// open, is a draft, its head is not that commit, or GitHub refuses (conflicts, branch
+	// protection). With delete_branch the head branch is deleted on GitHub after a
+	// successful merge, unless it lives in a fork or is the default or base branch; local
+	// branches and worktrees are never touched. The detail is invalidated and
 	// pull_request_detail_updated is sent.
 	MergePullRequest(context.Context, *connect.Request[v1.MergePullRequestRequest]) (*connect.Response[v1.MergePullRequestResponse], error)
 }
@@ -393,10 +395,12 @@ type GhServiceHandler interface {
 	// button). FAILED_PRECONDITION when the pull request is not merged.
 	RevertPullRequest(context.Context, *connect.Request[v1.RevertPullRequestRequest]) (*connect.Response[v1.RevertPullRequestResponse], error)
 	// MergePullRequest merges an open pull request (GitHub's merge button) with the given
-	// method, guarded by the head commit the daemon last fetched: FAILED_PRECONDITION when
-	// the pull request is not open, is a draft, its head moved since, or GitHub refuses
-	// (conflicts, branch protection). With delete_branch the head branch is deleted after
-	// a successful merge, unless it lives in a fork. The detail is invalidated and
+	// method, guarded by expected_head_sha (the head the client showed) or else the head
+	// commit the daemon last fetched: FAILED_PRECONDITION when the pull request is not
+	// open, is a draft, its head is not that commit, or GitHub refuses (conflicts, branch
+	// protection). With delete_branch the head branch is deleted on GitHub after a
+	// successful merge, unless it lives in a fork or is the default or base branch; local
+	// branches and worktrees are never touched. The detail is invalidated and
 	// pull_request_detail_updated is sent.
 	MergePullRequest(context.Context, *connect.Request[v1.MergePullRequestRequest]) (*connect.Response[v1.MergePullRequestResponse], error)
 }
