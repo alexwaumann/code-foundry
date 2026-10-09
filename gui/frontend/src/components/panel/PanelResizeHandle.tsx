@@ -1,21 +1,23 @@
 import { useRef, type KeyboardEvent } from "react";
-import { PANEL_DEFAULT, PANEL_MIN, useUiStore } from "@/stores/ui";
+import { resetPanelWidth, setPanelWidth } from "@/stores/panel";
+import { PANEL_MIN } from "@/stores/ui";
 
 /** Arrow-key step; with Shift, four times that. */
 const STEP = 16;
 
 /**
  * Drag handle in the 8px gap left of the side panel (same pattern as the sidebar's
- * ResizeHandle, mirrored: dragging left widens the panel). Double-click resets the width.
+ * ResizeHandle, mirrored: dragging left widens the panel). It sizes one panel (`panelKey`): every
+ * selection's panel has its own width. Double-click resets that panel to PANEL_DEFAULT.
  * Focusable: Left/Right resize (Left widens), Home/End go to the minimum/maximum.
  *
  * `width` is the rendered width, which is below the stored one when the room shrank
  * (window, sidebar); drags and keys start from it, so they act at once.
  */
-export function PanelResizeHandle({ width, max }: { width: number; max: number }) {
+export function PanelResizeHandle({ panelKey, width, max }: { panelKey: string; width: number; max: number }) {
   const drag = useRef<{ x: number; w: number } | null>(null);
   const set = (w: number) => {
-    useUiStore.getState().setPanelWidth(w);
+    setPanelWidth(panelKey, w);
   };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -58,7 +60,7 @@ export function PanelResizeHandle({ width, max }: { width: number; max: number }
       }}
       onKeyDown={onKeyDown}
       onDoubleClick={() => {
-        set(PANEL_DEFAULT);
+        resetPanelWidth(panelKey);
       }}
     />
   );

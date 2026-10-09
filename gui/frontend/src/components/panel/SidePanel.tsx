@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, type KeyboardEvent, type RefObject } from "
 import { X } from "lucide-react";
 import { chordFromEvent } from "@/keys/chord";
 import { cn } from "@/lib/utils";
-import { activatePanelTab, closePanelTab, emptyEntry, getPanel, openSurface, togglePanel, useCurrentPanelKey, usePanelStore, type Tab } from "@/stores/panel";
+import { activatePanelTab, closePanelTab, emptyEntry, getPanel, openSurface, togglePanel, useCurrentPanelKey, usePanelStore, usePanelWidth, type Tab } from "@/stores/panel";
 import { PANEL_MIN, panelMax, useUiStore, visibleSidebarWidth } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { surfaceOf, surfaces, useAvailability, type SurfaceContext, type SurfaceSpec } from "@/surfaces/registry";
@@ -225,7 +225,10 @@ function PanelHeader({ panelKey, hasTabs }: { panelKey: string; hasTabs: boolean
   );
 }
 
-function Panel({ panelKey, width, max, asideRef }: { panelKey: string; width: number; max: number; asideRef: RefObject<HTMLElement | null> }) {
+function Panel({ panelKey, max, asideRef }: { panelKey: string; max: number; asideRef: RefObject<HTMLElement | null> }) {
+  // This panel's own width, bounded by the room there is now (the stored one comes back
+  // when the room does).
+  const width = Math.min(usePanelWidth(panelKey), max);
   const hasTabs = usePanelStore((s) => (s.byKey[panelKey]?.tabs.length ?? 0) > 0);
 
   // Surfaces keep what their availability reads loaded while this panel shows.
@@ -260,7 +263,7 @@ function Panel({ panelKey, width, max, asideRef }: { panelKey: string; width: nu
   return (
     // The wrapper is not clipped so the resize handle can sit in the gap to its left.
     <div className="relative mr-2 mb-2 flex shrink-0" style={{ width }} data-testid="side-panel-wrapper">
-      <PanelResizeHandle width={width} max={max} />
+      <PanelResizeHandle panelKey={panelKey} width={width} max={max} />
       <aside
         ref={asideRef}
         tabIndex={-1}
@@ -293,7 +296,6 @@ export function SidePanel() {
   const panelKey = useCurrentPanelKey();
   const open = usePanelStore((s) => (panelKey === null ? false : (s.byKey[panelKey]?.open ?? false)));
   const settingsOpen = useViewsStore((s) => s.settingsOpen);
-  const stored = useUiStore((s) => s.panelWidth);
   const max = useUiStore((s) => panelMax(s.windowWidth, visibleSidebarWidth(s)));
   const focusSeq = useUiStore((s) => s.panelFocusSeq);
   const asideRef = useRef<HTMLElement>(null);
@@ -306,5 +308,5 @@ export function SidePanel() {
   }, [focusSeq]);
 
   if (panelKey === null || !open || settingsOpen || max < PANEL_MIN) return null;
-  return <Panel key={panelKey} panelKey={panelKey} width={Math.min(stored, max)} max={max} asideRef={asideRef} />;
+  return <Panel key={panelKey} panelKey={panelKey} max={max} asideRef={asideRef} />;
 }

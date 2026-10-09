@@ -27,7 +27,7 @@ beforeEach(() => {
   useSessionsStore.setState({ byId: { s1: session }, order: ["s1"] });
   usePanelStore.setState({ byKey: { "session:s1": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });
-  useUiStore.setState({ selection: { kind: "session", id: "s1" }, windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, panelWidth: 420 });
+  useUiStore.setState({ selection: { kind: "session", id: "s1" }, windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260 });
 });
 
 afterEach(() => {
