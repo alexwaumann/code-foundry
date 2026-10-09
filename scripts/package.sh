@@ -2,15 +2,15 @@
 # Builds the release assets into dist/. Run through `make package VERSION=vX.Y.Z`,
 # which exports the cgo/pkg-config environment and LDFLAGS.
 #
-#   dist/CodeFoundry-darwin-arm64.zip   CodeFoundry.app (GUI + bundled daemon/CLI), ditto --keepParent
-#   dist/code-foundry-darwin-arm64      the same CLI, standalone, for scripting
-#   dist/install.sh                     the installer, defaulting to RELEASE_REPO
-#   dist/checksums.txt                  sha256 of the above
+#   dist/code-foundry-darwin-arm64.tar.gz   the app directory's contents (no prefix):
+#       code-foundry   daemon + CLI (the GUI auto-starts it; ~/.local/bin links to it)
+#       CodeFoundry    the Wails GUI, a bare executable
+#       VERSION        the tag, e.g. v0.2.0 (what the installer and updater read)
+#   dist/install.sh                         the installer, defaulting to RELEASE_REPO
+#   dist/checksums.txt                      sha256 of the above
 #
-# Bundle layout:
-#   CodeFoundry.app/Contents/MacOS/CodeFoundry     Wails GUI
-#   CodeFoundry.app/Contents/MacOS/code-foundry    daemon + CLI (auto-started by the GUI)
-#   CodeFoundry.app/Contents/Info.plist            CFBundleShortVersionString X.Y.Z, CodeFoundryVersion vX.Y.Z
+# No .app bundle: managed Macs often block unsigned bundles but allow bare executables.
+# Both binaries are ad-hoc signed.
 set -euo pipefail
 
 VERSION="${VERSION:-}"
@@ -32,47 +32,61 @@ fi
 
 PKG="github.com/alexwaumann/code-foundry/internal/version"
 VERSION_LDFLAGS="-X $PKG.Version=$VERSION -X $PKG.ReleaseRepo=$RELEASE_REPO"
-APP="gui/bin/CodeFoundry.app"
-ZIP="CodeFoundry-darwin-arm64.zip"
-CLI="code-foundry-darwin-arm64"
+TARBALL="code-foundry-darwin-arm64.tar.gz"
+FILES="code-foundry CodeFoundry VERSION"
+
+die() {
+	echo "package: $*" >&2
+	exit 1
+}
 
 echo "==> package $VERSION (release repo: ${RELEASE_REPO:-none})"
 
 # 1. Daemon/CLI, with the same version ldflags as the GUI.
 "$MAKE" build VERSION="$VERSION" RELEASE_REPO="$RELEASE_REPO"
 
-# 2. GUI bundle with the CLI inside (gui/build/darwin/Taskfile.yml create:app:bundle).
-(cd gui && "$WAILS3" package VERSION="$VERSION" EXTRA_LDFLAGS="$VERSION_LDFLAGS" CLI_BIN="$ROOT/bin/code-foundry")
+# 2. GUI executable (gui/build/darwin/Taskfile.yml appends EXTRA_LDFLAGS to -ldflags).
+(cd gui && "$WAILS3" build EXTRA_LDFLAGS="$VERSION_LDFLAGS")
 
-# 3. Check what we built.
-[ -x "$APP/Contents/MacOS/CodeFoundry" ] || { echo "package: $APP has no GUI binary" >&2; exit 1; }
-[ -x "$APP/Contents/MacOS/code-foundry" ] || { echo "package: $APP has no code-foundry CLI" >&2; exit 1; }
-got="$(plutil -extract CodeFoundryVersion raw -o - "$APP/Contents/Info.plist")"
-[ "$got" = "$VERSION" ] || { echo "package: Info.plist says $got, want $VERSION" >&2; exit 1; }
-cli_version="$("$APP/Contents/MacOS/code-foundry" version)"
+# 3. Stage the app directory, sign, and check what we built.
+STAGE="$(mktemp -d "${TMPDIR:-/tmp}/code-foundry-package.XXXXXX")"
+trap 'rm -rf "$STAGE"' EXIT
+cp bin/code-foundry "$STAGE/code-foundry"
+cp gui/bin/CodeFoundry "$STAGE/CodeFoundry"
+printf '%s\n' "$VERSION" >"$STAGE/VERSION"
+chmod 755 "$STAGE/code-foundry" "$STAGE/CodeFoundry"
+chmod 644 "$STAGE/VERSION"
+xattr -c "$STAGE/code-foundry" "$STAGE/CodeFoundry" 2>/dev/null || true
+for bin in code-foundry CodeFoundry; do
+	codesign --force --sign - "$STAGE/$bin"
+	codesign --verify --strict "$STAGE/$bin" || die "$bin: signature does not verify"
+done
+
+cli_version="$("$STAGE/code-foundry" version)"
 case "$cli_version" in
 "code-foundry $VERSION "*) ;;
-*)
-	echo "package: bundled CLI reports '$cli_version', want $VERSION" >&2
-	exit 1
-	;;
+*) die "the CLI reports '$cli_version', want $VERSION" ;;
 esac
-# The GUI binary carries the same string (it is linked with the same -X flag).
-grep -q "$VERSION" "$APP/Contents/MacOS/CodeFoundry" || { echo "package: GUI binary lacks $VERSION" >&2; exit 1; }
-codesign --verify --deep --strict "$APP"
+# The GUI is linked with the same -X flag; the build info records it.
+gui_version="$(go version -m "$STAGE/CodeFoundry" | sed -n 's|.*internal/version\.Version=\([^ "]*\).*|\1|p' | head -n 1)"
+[ "$gui_version" = "$VERSION" ] || die "the GUI binary was built as '$gui_version', want $VERSION"
+file_version="$(cat "$STAGE/VERSION")"
+[ "$file_version" = "$VERSION" ] || die "VERSION says '$file_version', want $VERSION"
 
-# 4. Assets.
+# 4. Assets. COPYFILE_DISABLE keeps macOS tar from adding ._ AppleDouble entries.
 mkdir -p dist
-rm -f "dist/$ZIP" "dist/$CLI" dist/install.sh dist/checksums.txt
-ditto -c -k --keepParent "$APP" "dist/$ZIP"
-cp bin/code-foundry "dist/$CLI"
+rm -f "dist/$TARBALL" dist/install.sh dist/checksums.txt dist/CodeFoundry-darwin-arm64.zip dist/code-foundry-darwin-arm64
+# shellcheck disable=SC2086 # FILES is a fixed list of plain names
+COPYFILE_DISABLE=1 tar -czf "dist/$TARBALL" -C "$STAGE" $FILES
+listing="$(tar -tzf "dist/$TARBALL" | sort | tr '\n' ' ')"
+[ "$listing" = "CodeFoundry VERSION code-foundry " ] || die "unexpected tarball contents: $listing"
 if [ -n "$RELEASE_REPO" ]; then
 	sed "s|^DEFAULT_REPO=.*|DEFAULT_REPO=\"$RELEASE_REPO\"|" scripts/install.sh >dist/install.sh
 else
 	cp scripts/install.sh dist/install.sh
 fi
-chmod +x dist/install.sh "dist/$CLI"
-(cd dist && shasum -a 256 "$ZIP" "$CLI" install.sh >checksums.txt)
+chmod +x dist/install.sh
+(cd dist && shasum -a 256 "$TARBALL" install.sh >checksums.txt)
 
 echo "==> dist/"
 ls -l dist

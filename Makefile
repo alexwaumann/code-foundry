@@ -37,7 +37,7 @@ FRONTEND := gui/frontend
 PNPM     := pnpm --dir $(FRONTEND)
 
 .PHONY: all gen build check go-check frontend-check frontend-deps gui-dist-stub \
-        dev gui-build gui-bin gui-dev gui-e2e gui-mock ghostty-vt package release clean
+        dev gui-build gui-dev gui-e2e gui-mock ghostty-vt package release clean
 
 all: build
 
@@ -81,15 +81,10 @@ frontend-check: frontend-deps
 dev: build
 	exec ./bin/code-foundry daemon --dev
 
-## gui-build: build the Wails GUI and bundle it as gui/bin/CodeFoundry.app (ad-hoc signed),
-## which is what `code-foundry gui` launches from a dev CLI. Also leaves gui/bin/CodeFoundry.
+## gui-build: build the Wails GUI as the bare executable gui/bin/CodeFoundry, which is what
+## `code-foundry gui` launches from a dev CLI. No .app bundle (managed Macs often block
+## unsigned bundles); a stale gui/bin/CodeFoundry.app from older builds is removed.
 gui-build: build
-	cd gui && $(WAILS3) package
-
-## gui-bin: build only the bare GUI executable, gui/bin/CodeFoundry, with no .app bundle,
-## for machines whose MDM blocks unsigned bundles. Removes a stale gui/bin/CodeFoundry.app
-## so `code-foundry gui` launches the executable (it prefers the bundle when one exists).
-gui-bin: build
 	cd gui && $(WAILS3) build
 	rm -rf gui/bin/CodeFoundry.app
 
@@ -106,8 +101,8 @@ gui-mock: frontend-deps
 gui-dev: build
 	cd gui && $(WAILS3) dev
 
-## package: release assets in dist/ (VERSION=vX.Y.Z required): the app zip with the CLI
-## inside, the standalone CLI, install.sh, checksums.txt. See scripts/package.sh.
+## package: release assets in dist/ (VERSION=vX.Y.Z required): the app tarball
+## (code-foundry, CodeFoundry, VERSION), install.sh, checksums.txt. See scripts/package.sh.
 package: ghostty-vt frontend-deps
 	VERSION=$(VERSION) RELEASE_REPO=$(RELEASE_REPO) WAILS3=$(WAILS3) MAKE=$(MAKE) ./scripts/package.sh
 
