@@ -229,6 +229,60 @@ test("a failed start keeps the draft editable and shows why", async ({ page }) =
   expect(await sessionCount()).toBe(before + 1);
 });
 
+test("an existing worktree or the current checkout shows its branch, read-only and live", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  await page.keyboard.type("Look around");
+  const indicator = page.getByTestId("composer-checkout-branch");
+  const worktree = page.getByTestId("composer-worktree");
+  const options = page.getByTestId("composer-worktree-list").getByRole("option");
+  // New worktree: the base picker, no indicator.
+  await expect(page.getByTestId("composer-base")).toBeVisible();
+  await expect(indicator).toHaveCount(0);
+
+  await worktree.click();
+  await options.filter({ hasText: "Current checkout" }).click();
+  await expect(page.getByTestId("composer-base")).toHaveCount(0);
+  await expect(indicator).toHaveText("On main");
+  await expect(indicator).toHaveAccessibleName("Current checkout is on main");
+  await expect(page.getByRole("note", { name: "Current checkout is on main" })).toBeVisible();
+
+  // Not focusable: no tabindex, focus() is a no-op, and Tab goes worktree → send (and back).
+  await expect(indicator).not.toHaveAttribute("tabindex");
+  expect(
+    await indicator.evaluate((el) => {
+      (el as HTMLElement).focus();
+      return document.activeElement === el;
+    }),
+  ).toBe(false);
+  await worktree.focus();
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("composer-send")).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(worktree).toBeFocused();
+
+  // Follows the repo store: a checkout elsewhere, then a detached HEAD.
+  await mockPost(`worktree/checkout?path=${encodeURIComponent(CF)}&branch=release%2Fv0.3`);
+  await expect(indicator).toHaveText("On release/v0.3");
+  await mockPost(`worktree/checkout?path=${encodeURIComponent(CF)}`);
+  await expect(indicator).toHaveText("Detached at 3c3c465");
+  await expect(indicator).toHaveAccessibleName("Current checkout is detached at 3c3c465");
+
+  // An existing worktree: its branch. The option labels keep branch + path.
+  await worktree.click();
+  await expect(options).toHaveText([/^New worktree/, /^Current checkout\s*3c3c465 · ~\/src\/code-foundry/, /^feat\/sidebar/, /^fix\/resize/]);
+  await options.filter({ hasText: "feat/sidebar" }).click();
+  await expect(worktree).toHaveText("Existing worktree: feat/sidebar");
+  await expect(indicator).toHaveText("On feat/sidebar");
+  await expect(indicator).toHaveAccessibleName("Worktree is on feat/sidebar");
+
+  // Back to a new worktree: the base picker returns in the same slot.
+  await worktree.click();
+  await options.filter({ hasText: "New worktree" }).click();
+  await expect(indicator).toHaveCount(0);
+  await expect(page.getByTestId("composer-base")).toHaveText("From origin/main");
+});
+
 test("attachments: picked, rejected, removed, staged on send", async ({ page }) => {
   await openApp(page);
   await compose(page);

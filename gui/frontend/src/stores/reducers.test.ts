@@ -29,6 +29,7 @@ function wt(repoId: string, path: string, over: Partial<WorktreeView> = {}): Wor
     path,
     branch: path.split("/").pop() ?? "",
     head: "abc",
+    detached: false,
     isMain: false,
     status: { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null },
     ...over,

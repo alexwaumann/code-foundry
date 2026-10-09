@@ -51,6 +51,19 @@ export function pickDefault(choices: readonly Choice[], setting: string | undefi
 /** Where the thread runs: a worktree session.new creates, or an existing one (the main one is the current checkout). */
 export type WorktreeChoice = { kind: "new" } | { kind: "existing"; path: string };
 
+/**
+ * The read-only branch indicator for an existing worktree or the current checkout:
+ * `text` for the pill ("On main", "Detached at 3c3c465") and `label` for assistive tech
+ * ("Current checkout is on main", "Worktree is detached at 3c3c465").
+ */
+export function checkoutBranch(w: { branch: string; head: string; detached: boolean; isMain: boolean }): { text: string; label: string } {
+  const subject = w.isMain ? "Current checkout" : "Worktree";
+  if (w.branch && !w.detached) return { text: `On ${w.branch}`, label: `${subject} is on ${w.branch}` };
+  const short = w.head.slice(0, 7);
+  if (short) return { text: `Detached at ${short}`, label: `${subject} is detached at ${short}` };
+  return { text: "Detached HEAD", label: `${subject} has a detached HEAD` };
+}
+
 export const MAX_ATTACHMENTS = 10;
 export const ATTACHMENT_TYPE_NAMES = "PNG, JPEG, GIF or WebP";
 

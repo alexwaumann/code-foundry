@@ -31,6 +31,8 @@ export interface WorktreeView {
   path: string;
   branch: string;
   head: string;
+  /** HEAD is detached (branch is ""). */
+  detached: boolean;
   isMain: boolean;
   status: GitStatusView;
 }
@@ -89,7 +91,7 @@ export function toGitStatusView(s: GitStatus | undefined): GitStatusView {
 }
 
 export function toWorktreeView(w: Worktree): WorktreeView {
-  return { repoId: w.repoId, path: w.path, branch: w.branch, head: w.head, isMain: w.isMain, status: toGitStatusView(w.status) };
+  return { repoId: w.repoId, path: w.path, branch: w.branch, head: w.head, detached: w.detached, isMain: w.isMain, status: toGitStatusView(w.status) };
 }
 
 export function toRepoView(r: Repo): RepoView {

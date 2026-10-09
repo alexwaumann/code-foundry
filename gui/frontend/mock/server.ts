@@ -18,6 +18,7 @@
  *   POST /__mock/missing-rpc?rpc=RepoService/ListRefs&rpc=SessionService/StageAttachment
  *                                                 (simulate a daemon older than those RPCs: 404)
  *   POST /__mock/session-new?delay=700            (how long session.new takes to make a worktree)
+ *   POST /__mock/worktree/checkout?path=…&branch=…   (the worktree switches branch; no branch detaches HEAD)
  *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size)
  *   session.new with a prompt containing FAIL fails (after the worktree delay, if any).
  *   POST /__mock/gitops?fail=git.push&delay=800   (next git.push fails; ops take 800ms)
@@ -421,6 +422,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       if (q.has("delay")) world.gitops.delayMs = Number(q.get("delay"));
       json(res, 200, { fail: [...world.gitops.failNext], delayMs: world.gitops.delayMs });
       break;
+    case "POST /__mock/worktree/checkout": {
+      // path=…&branch=… (no branch, or empty: detached HEAD).
+      const ok = world.checkout(q.get("path") ?? "", q.get("branch") ?? "");
+      json(res, ok ? 200 : 404, { ok });
+      break;
+    }
     case "POST /__mock/session-new":
       if (q.has("delay")) world.worktreeDelayMs = Number(q.get("delay"));
       json(res, 200, { delayMs: world.worktreeDelayMs });

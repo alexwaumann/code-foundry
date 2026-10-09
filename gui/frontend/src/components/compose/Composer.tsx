@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ArrowUp, Brain, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Loader2, Paperclip, ShieldCheck, X } from "lucide-react";
 import { AttachmentPreview } from "./AttachmentPreview";
+import { BranchIndicator } from "./BranchIndicator";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { PromptEditor, type PromptEditorHandle } from "./PromptEditor";
 import { ATTACHMENT_MIME_TYPES } from "@/api/session";
@@ -49,20 +50,28 @@ function useDefaults(): { model: string; effort: string } {
 
 interface WorktreeOption {
   path: string;
+  /** "" when detached. */
   branch: string;
+  head: string;
+  detached: boolean;
   isMain: boolean;
 }
 
-/** The repo's worktrees (main first), as a shallow-stable list. */
+/** The branch name a worktree goes by in the picker: its branch, else its short head. */
+function worktreeName(w: WorktreeOption): string {
+  return w.branch || w.head.slice(0, 7);
+}
+
+/** The repo's worktrees (main first), as a shallow-stable list that follows branch changes live. */
 function useWorktrees(repoId: string): WorktreeOption[] {
   const keys = useReposStore(
-    useShallow((s) => (s.byId[repoId]?.worktrees ?? []).map((w) => [w.path, w.branch || w.head.slice(0, 7), w.isMain ? "1" : ""].join(SEP))),
+    useShallow((s) => (s.byId[repoId]?.worktrees ?? []).map((w) => [w.path, w.branch, w.head, w.detached ? "1" : "", w.isMain ? "1" : ""].join(SEP))),
   );
   return useMemo(
     () =>
       keys.map((k) => {
-        const [path = "", branch = "", main = ""] = k.split(SEP);
-        return { path, branch, isMain: main === "1" };
+        const [path = "", branch = "", head = "", detached = "", main = ""] = k.split(SEP);
+        return { path, branch, head, detached: detached === "1", isMain: main === "1" };
       }),
     [keys],
   );
@@ -161,8 +170,10 @@ function cycleStops(e: React.KeyboardEvent<HTMLElement>): void {
 
 /**
  * The card: attachments, the prompt, the model/effort/permission pickers, attach and
- * send; below it the worktree and base-ref pickers. Grid placement keeps the send button
- * inside the card while Tab goes textarea → pickers (worktree and base included) → send.
+ * send; below it the worktree picker and, beside it, the base-ref picker for a new
+ * worktree or the chosen worktree's branch (read-only, not a Tab stop) otherwise. Grid
+ * placement keeps the send button inside the card while Tab goes textarea → pickers
+ * (worktree and base included) → send.
  */
 function ComposerCard({ repoId }: { repoId: string }) {
   const defaults = useDefaults();
@@ -230,15 +241,15 @@ function ComposerCard({ repoId }: { repoId: string }) {
         heading: "Existing",
         options: worktrees.map((w) => ({
           value: w.path,
-          label: w.isMain ? "Current checkout" : w.branch,
-          detail: w.isMain ? `${w.branch} · ${tildify(w.path)}` : tildify(w.path),
+          label: w.isMain ? "Current checkout" : worktreeName(w),
+          detail: w.isMain ? `${worktreeName(w)} · ${tildify(w.path)}` : tildify(w.path),
         })),
       },
     ],
     [worktrees],
   );
   const chosen = worktree.kind === "existing" ? worktrees.find((w) => w.path === worktree.path) : undefined;
-  const worktreeText = !chosen ? "New worktree" : chosen.isMain ? "Current checkout" : `Existing worktree: ${chosen.branch}`;
+  const worktreeText = !chosen ? "New worktree" : chosen.isMain ? "Current checkout" : `Existing worktree: ${worktreeName(chosen)}`;
 
   // ListRefs order (local branches, then remote-tracking refs), the default first.
   const refGroups = useMemo<PickerGroup[]>(() => {
@@ -394,6 +405,7 @@ function ComposerCard({ repoId }: { repoId: string }) {
           contentClassName="w-80"
           data-testid="composer-worktree"
         />
+        {chosen && <BranchIndicator worktree={chosen} />}
         {worktree.kind === "new" && (
           <ComposerPicker
             label="Base"

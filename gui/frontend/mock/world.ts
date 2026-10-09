@@ -104,6 +104,8 @@ interface MockWorktree {
   path: string;
   branch: string;
   head: string;
+  /** HEAD is detached (branch is ""). */
+  detached?: boolean;
   isMain: boolean;
   status: { upstream: string; ahead: number; behind: number; staged: number; modified: number; untracked: number; dirty: boolean; baseRef?: string; baseAhead?: number; baseBehind?: number };
 }
@@ -790,10 +792,23 @@ export class World {
     return { refs: [...local, ...remote], defaultRef: remote.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch };
   }
 
+  /** Test control: the worktree at `path` checks out `branch` ("" detaches HEAD). False when there is no such worktree. */
+  checkout(path: string, branch: string): boolean {
+    for (const repo of this.repos.values()) {
+      const w = repo.worktrees.find((x) => x.path === path);
+      if (!w) continue;
+      w.branch = branch;
+      w.detached = branch === "";
+      this.repoEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(repo.id, w) } });
+      return true;
+    }
+    return false;
+  }
+
   // ---- Repo API -----------------------------------------------------------------
 
   worktreeMsg(repoId: string, w: MockWorktree): WorktreeInit {
-    return { repoId, path: w.path, branch: w.branch, head: w.head, isMain: w.isMain, status: { ...w.status, refreshedAt: timestampFromDate(new Date()) } };
+    return { repoId, path: w.path, branch: w.branch, head: w.head, detached: w.detached ?? false, isMain: w.isMain, status: { ...w.status, refreshedAt: timestampFromDate(new Date()) } };
   }
 
   repoMsg(r: MockRepo): RepoInit {

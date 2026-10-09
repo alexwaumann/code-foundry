@@ -128,6 +128,9 @@ scratch daemon on haiku.
   before a backdrop click dismisses it (predates this; the confirm dialog behaves the same).
 * **Reaping.** Staged images are kept 7 days and reaped at daemon start and daily
   (`AttachmentMaxAge`, `AttachmentReapInterval`; injectable via session.Options).
+* **Branch indicator.** For Current checkout and existing worktrees the base-ref slot
+  shows a read-only, non-focusable pill "On <branch>" (or "Detached at <short head>")
+  from the repo store, so it follows checkout changes live.
 
 ## Open
 

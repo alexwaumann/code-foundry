@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkAttachments, createdSessionId, pickDefault, MODEL_CHOICES, projectHue, projectInitials, repoSource, sessionNewArgs, type DraftArgsInput } from "./compose";
+import { checkAttachments, checkoutBranch, createdSessionId, pickDefault, MODEL_CHOICES, projectHue, projectInitials, repoSource, sessionNewArgs, type DraftArgsInput } from "./compose";
 
 const MB = 1024 * 1024;
 const opts = { types: ["image/png", "image/jpeg"], maxBytes: 10 * MB };
@@ -37,6 +37,20 @@ describe("sessionNewArgs", () => {
     ],
   ])("%s", (_name, over, staged, want) => {
     expect(sessionNewArgs("r", { ...base, ...over }, staged)).toEqual(want);
+  });
+});
+
+describe("checkoutBranch", () => {
+  it.each([
+    [{ branch: "main", head: "3c3c4651aa", detached: false, isMain: true }, "On main", "Current checkout is on main"],
+    [{ branch: "feat/sidebar", head: "9a8b7c6d", detached: false, isMain: false }, "On feat/sidebar", "Worktree is on feat/sidebar"],
+    [{ branch: "", head: "3c3c4651aa", detached: true, isMain: true }, "Detached at 3c3c465", "Current checkout is detached at 3c3c465"],
+    [{ branch: "", head: "9a8b7c6d", detached: true, isMain: false }, "Detached at 9a8b7c6", "Worktree is detached at 9a8b7c6"],
+    // A stale branch name never wins over the detached flag.
+    [{ branch: "main", head: "abc1234", detached: true, isMain: true }, "Detached at abc1234", "Current checkout is detached at abc1234"],
+    [{ branch: "", head: "", detached: true, isMain: false }, "Detached HEAD", "Worktree has a detached HEAD"],
+  ])("checkoutBranch(%j)", (w, text, label) => {
+    expect(checkoutBranch(w)).toEqual({ text, label });
   });
 });
 

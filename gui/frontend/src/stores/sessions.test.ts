@@ -95,7 +95,7 @@ describe("deriveContext for a session", () => {
       defaultBranch: "main",
       githubSlug: "",
       remotes: [],
-      worktrees: [{ repoId: "r1", path: "/src/app", branch: "main", head: "", isMain: true, status: { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null } }],
+      worktrees: [{ repoId: "r1", path: "/src/app", branch: "main", head: "", detached: false, isMain: true, status: { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null } }],
     },
   ]);
   it("carries session, its terminal, and its worktree", () => {
