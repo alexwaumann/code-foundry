@@ -37,7 +37,13 @@ func ClaudeNamer(claude, cwd string) Namer {
 		cmd.Stderr = &stderr
 		out, err := cmd.Output()
 		if err != nil {
-			return "", fmt.Errorf("claude -p: %w: %s", err, strings.TrimSpace(stderr.String()))
+			// claude -p reports API errors (429, overloaded) on stdout; keep both so
+			// isRateLimit can see them.
+			detail := strings.TrimSpace(stderr.String() + "\n" + string(out))
+			if len(detail) > 500 {
+				detail = detail[:500]
+			}
+			return "", fmt.Errorf("claude -p: %w: %s", err, detail)
 		}
 		slug := slugify(string(out))
 		if slug == "" {
@@ -45,6 +51,17 @@ func ClaudeNamer(claude, cwd string) Namer {
 		}
 		return slug, nil
 	}
+}
+
+// isRateLimit reports whether a naming error looks like an API rate limit, the one
+// failure worth retrying.
+func isRateLimit(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "429") || strings.Contains(msg, "rate limit") ||
+		strings.Contains(msg, "rate_limit") || strings.Contains(msg, "ratelimit")
 }
 
 var slugJunk = regexp.MustCompile(`[^a-z0-9]+`)

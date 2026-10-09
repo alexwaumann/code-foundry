@@ -12,7 +12,11 @@ import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 
 interface CommandsState {
-  /** Commands available in `contextKey`'s context, as returned by CommandService.List. */
+  /**
+   * Every command, with `available` for `contextKey`'s context, as returned by
+   * CommandService.List (include_unavailable). Consumers filter: see isStartable in
+   * keys/bindings.ts.
+   */
   commands: readonly CommandView[];
   contextKey: string | null;
   loading: boolean;
@@ -35,7 +39,9 @@ export async function refreshCommands(ctx: UiContextView = getUiContext()): Prom
   inflight = ctl;
   useCommandsStore.setState({ loading: true });
   try {
-    const fresh = await listCommands(ctx, { signal: ctl.signal });
+    // Unavailable ones too: session.new's keybinding and title are needed with nothing
+    // selected, where the project picker supplies the repo (keys/bindings.ts).
+    const fresh = await listCommands(ctx, { includeUnavailable: true, signal: ctl.signal });
     if (inflight !== ctl) return;
     // Keep the old array when nothing changed, so an open palette does not re-render
     // (and lose its highlighted item) on every refresh.

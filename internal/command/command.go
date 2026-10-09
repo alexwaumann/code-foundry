@@ -38,6 +38,9 @@ type Command struct {
 	// On Invoke it sees the caller's context with explicitly passed context-bound args
 	// overlaid (see ArgSpec.Context), so it must be a pure function of Context.
 	When func(Context) bool
+	// WhyUnavailable, when set, explains a false When in the error Invoke returns, e.g.
+	// "repository has no remote". It sees the same context as When; "" adds nothing.
+	WhyUnavailable func(Context) string
 	// Run executes the command with validated args.
 	Run func(ctx context.Context, uctx Context, args Args) (Result, error)
 	// Confirm, when set, makes the command destructive: Invoke refuses to run it unless

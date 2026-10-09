@@ -8,6 +8,8 @@ export type Selection =
   | { kind: "session"; id: string }
   | { kind: "repo"; repoId: string }
   | { kind: "worktree"; repoId: string; path: string }
+  /** The new-thread composer for a repo (picked in the project picker). */
+  | { kind: "compose"; repoId: string }
   /** A top-level page that is not a sidebar row (see components/prs). */
   | { kind: "view"; name: string };
 
@@ -16,6 +18,9 @@ export const viewNames: readonly string[] = ["pullrequests"];
 
 /** Which region has keyboard focus; the palette returns focus to it on close. */
 export type FocusRegion = "sidebar" | "terminal" | "content" | "palette";
+
+/** What the palette dialog shows: the command list (and arg prompts) or the project picker. */
+export type PalettePage = "commands" | "projects";
 
 export const SIDEBAR_MIN = 180;
 export const SIDEBAR_MAX = 520;
@@ -33,7 +38,9 @@ interface UiState {
   /** Row key the sidebar keyboard cursor is on. */
   cursorKey: string | null;
   collapsed: Readonly<Record<string, boolean>>;
-  palette: { open: boolean; query: string; commandName: string | null; returnTo: FocusRegion };
+  palette: { open: boolean; query: string; commandName: string | null; page: PalettePage; returnTo: FocusRegion };
+  /** Incremented to ask the composer to take focus. */
+  composerFocusSeq: number;
   /** Session whose sidebar row is in inline-rename mode. */
   renamingSessionId: string | null;
 
@@ -48,7 +55,10 @@ interface UiState {
   setCursor: (key: string | null) => void;
   toggleCollapsed: (key: string, collapsed?: boolean) => void;
   openPalette: (query?: string, commandName?: string | null) => void;
+  /** Opens the palette on the project picker (session.new's presenter). */
+  openProjectPicker: (returnTo?: FocusRegion) => void;
   closePalette: () => void;
+  focusComposer: () => void;
   setRenaming: (sessionId: string | null) => void;
   toggleSidebar: () => void;
   setSidebarWidth: (w: number) => void;
@@ -68,6 +78,7 @@ export function sameSelection(a: Selection, b: Selection): boolean {
     case "session":
       return a.id === (b as typeof a).id;
     case "repo":
+    case "compose":
       return a.repoId === (b as typeof a).repoId;
     case "worktree":
       return a.repoId === (b as typeof a).repoId && a.path === (b as typeof a).path;
@@ -85,7 +96,8 @@ export const useUiStore = create<UiState>()(
       sidebarFocusSeq: 0,
       cursorKey: null,
       collapsed: {},
-      palette: { open: false, query: "", commandName: null, returnTo: "content" },
+      palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" },
+      composerFocusSeq: 0,
       renamingSessionId: null,
       sidebarVisible: true,
       sidebarWidth: 260,
@@ -119,12 +131,18 @@ export const useUiStore = create<UiState>()(
         });
       },
       openPalette: (query = "", commandName = null) => {
-        set((s) => ({ palette: { open: true, query, commandName, returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
+        set((s) => ({ palette: { open: true, query, commandName, page: "commands", returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
+      },
+      openProjectPicker: (returnTo) => {
+        set((s) => ({ palette: { open: true, query: "", commandName: null, page: "projects", returnTo: returnTo ?? (s.palette.open ? s.palette.returnTo : s.focus) } }));
+      },
+      focusComposer: () => {
+        set((s) => ({ composerFocusSeq: s.composerFocusSeq + 1 }));
       },
       closePalette: () => {
         // Hand focus back to where it was before the palette opened.
         set((s) => ({
-          palette: { open: false, query: "", commandName: null, returnTo: "content" },
+          palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" },
           terminalFocusSeq: s.palette.returnTo === "terminal" ? s.terminalFocusSeq + 1 : s.terminalFocusSeq,
           sidebarFocusSeq: s.palette.returnTo === "sidebar" ? s.sidebarFocusSeq + 1 : s.sidebarFocusSeq,
         }));

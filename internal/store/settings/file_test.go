@@ -54,7 +54,7 @@ func TestRenderRoundTrip(t *testing.T) {
 	text := string(out)
 	for _, want := range []string{
 		"[sessions]\n", "auto_name = false\n", "font_size = 15\n", `font_family = "Weird \"Font\" \\ Name"` + "\n",
-		"# default_model = \"\"\n", "# scrollback_lines = 10000\n", `"session.new" = "cmd+shift+n"` + "\n",
+		"# default_model = \"opus\"\n", "# default_effort = \"high\"\n", "# scrollback_lines = 10000\n", `"session.new" = "cmd+shift+n"` + "\n",
 		"Applies after a daemon restart.",
 	} {
 		if !strings.Contains(text, want) {

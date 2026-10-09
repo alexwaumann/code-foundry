@@ -24,7 +24,7 @@ function useNow(ms = 30_000): number {
 
 /** Left side of the terminal header when the terminal belongs to a session. */
 export function SessionTitle({ id }: { id: string }) {
-  const name = useSessionsStore((s) => s.byId[id]?.name || "New session");
+  const name = useSessionsStore((s) => s.byId[id]?.name || id);
   const model = useSessionsStore((s) => [s.byId[id]?.model, s.byId[id]?.effort].filter(Boolean).join(" · "));
   const path = useSessionsStore((s) => s.byId[id]?.worktreePath ?? "");
   const badge = useSessionsStore((s) => sessionBadge(s.byId[id]));
@@ -77,7 +77,7 @@ export function SessionDisconnected({ id }: { id: string }) {
   if (!s) {
     return (
       <section className="flex flex-1 items-center justify-center p-10 text-sm text-muted-foreground" data-region="content" data-testid="session-missing">
-        {loaded ? "This session no longer exists." : "Loading session…"}
+        {loaded ? "This thread no longer exists." : "Loading thread…"}
       </section>
     );
   }
@@ -96,14 +96,14 @@ export function SessionDisconnected({ id }: { id: string }) {
   };
 
   return (
-    <section className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto p-10" data-region="content" aria-label="Session" data-testid="session-disconnected">
+    <section className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto p-10" data-region="content" aria-label="Thread" data-testid="session-disconnected">
       <div className="mt-[14vh] flex w-full max-w-md flex-col items-center gap-5 text-center">
         <div className="flex size-12 items-center justify-center rounded-full border bg-muted/40">
           <Unplug className="size-5 text-muted-foreground" />
         </div>
         <div className="flex flex-col gap-1">
           <h1 className="text-lg font-semibold" data-testid="session-title">
-            {s.name || "New session"}
+            {s.name || s.id}
           </h1>
           <p className="text-sm text-muted-foreground">
             Not connected · <span data-testid="disconnect-reason">{disconnectReason(s)}</span>

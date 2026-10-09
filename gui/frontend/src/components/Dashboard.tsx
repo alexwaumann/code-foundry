@@ -30,7 +30,7 @@ function EmptyState({ text, children }: { text: string; children: React.ReactNod
   );
 }
 
-/** Session and (unowned) terminal ids placed under the given worktree (or any worktree of the repo). */
+/** Thread (session) and (unowned) terminal ids placed under the given worktree (or any worktree of the repo). */
 function useItemsIn(repoId: string, path: string | null): { sessions: string[]; terminals: string[] } {
   const repoKeys = useRepoStructureKeys();
   const termKeys = useTerminalPlacementKeys();
@@ -49,7 +49,7 @@ function useItemsIn(repoId: string, path: string | null): { sessions: string[]; 
 }
 
 function SessionLink({ id }: { id: string }) {
-  const name = useSessionsStore((s) => s.byId[id]?.name || "New session");
+  const name = useSessionsStore((s) => s.byId[id]?.name || id);
   const badge = useSessionsStore((s) => badgeLabels[sessionBadge(s.byId[id])]);
   return (
     <button
@@ -100,10 +100,10 @@ export function WorktreeItems({ repoId, path }: { repoId: string; path: string |
     <div className="flex flex-col gap-6">
       {sessionsAvailable && (
         <section>
-          <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Sessions</h2>
+          <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Threads</h2>
           {sessions.length === 0 ? (
-            <EmptyState text="No sessions here.">
-              <CommandButton command="session.new" icon={Sparkles} label="New session" variant="outline" size="xs" keepFocus={false} data-testid="empty-new-session" />
+            <EmptyState text="No threads here.">
+              <CommandButton command="session.new" icon={Sparkles} label="New thread" variant="outline" size="xs" keepFocus={false} data-testid="empty-new-session" />
             </EmptyState>
           ) : (
             <div className="flex flex-col">
@@ -142,17 +142,17 @@ function Welcome() {
       <div>
         <h1 className="text-lg font-semibold">Nothing selected</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {repos} {repos === 1 ? "repository" : "repositories"} · {sessions} connected {sessions === 1 ? "session" : "sessions"}
+          {repos} {repos === 1 ? "repository" : "repositories"} · {sessions} connected {sessions === 1 ? "thread" : "threads"}
           {waiting > 0 && ` · ${String(waiting)} waiting on you`}
         </p>
       </div>
       <div className="flex flex-wrap justify-center gap-2" data-testid="welcome-actions">
-        <CommandButton command="session.new" icon={Sparkles} label="New session" variant="outline" whenUnavailable="disable" keepFocus={false} />
+        <CommandButton command="session.new" icon={Sparkles} label="New thread" variant="outline" whenUnavailable="disable" keepFocus={false} />
         <CommandButton command="terminal.new" icon={SquareTerminal} label="New terminal" variant="outline" keepFocus={false} />
         <CommandButton command="ui.palette.open" icon={Command} label="Command palette" title="Command Palette" variant="outline" keepFocus={false} />
       </div>
       <p className="text-sm text-muted-foreground">
-        Sessions start in the worktree selected in the sidebar. Shortcuts are listed under{" "}
+        A new thread starts by picking a project, then describing what to build. Shortcuts are listed under{" "}
         <button
           type="button"
           className="underline underline-offset-2 hover:text-foreground"

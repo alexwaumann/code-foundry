@@ -122,15 +122,15 @@ func KeybindingKey(command string) string { return keybindingKeyPrefix + command
 var staticFields = []Field{
 	{
 		Key: KeyDefaultModel, Group: GroupSessions, Type: Enum, Title: "Default model",
-		Description: "Model for new sessions when none is picked. Empty uses Claude's own default.",
-		Enum:        append([]string{""}, command.SessionModels...),
-		bind:        func(s *Settings) any { return &s.Sessions.DefaultModel },
+		Description: "Model for new threads when none is picked.",
+		Enum:        command.SessionModels, Default: "opus",
+		bind: func(s *Settings) any { return &s.Sessions.DefaultModel },
 	},
 	{
 		Key: KeyDefaultEffort, Group: GroupSessions, Type: Enum, Title: "Default effort",
-		Description: "Effort level for new sessions when none is picked. Empty uses Claude's own default.",
-		Enum:        append([]string{""}, command.SessionEfforts...),
-		bind:        func(s *Settings) any { return &s.Sessions.DefaultEffort },
+		Description: "Effort level for new threads when none is picked.",
+		Enum:        command.SessionEfforts, Default: "high",
+		bind: func(s *Settings) any { return &s.Sessions.DefaultEffort },
 	},
 	{
 		Key: KeyAutoName, Group: GroupSessions, Type: Bool, Title: "Name sessions automatically",

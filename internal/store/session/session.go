@@ -58,6 +58,39 @@ func (s State) String() string {
 	}
 }
 
+// PermissionMode is the claude --permission-mode a session runs with. Values mirror
+// codefoundry.v1.PermissionMode. Full access (bypassPermissions) is deliberately not
+// representable.
+type PermissionMode int
+
+// Permission modes.
+const (
+	// PermissionDefault passes no flag: Claude's own default (manual).
+	PermissionDefault PermissionMode = iota
+	// PermissionSupervised: --permission-mode manual, every tool call is confirmed.
+	PermissionSupervised
+	// PermissionAcceptEdits: --permission-mode acceptEdits.
+	PermissionAcceptEdits
+	// PermissionAuto: --permission-mode auto, Claude's auto-mode classifier decides.
+	PermissionAuto
+)
+
+// Flag is the --permission-mode value, or "" for PermissionDefault.
+func (p PermissionMode) Flag() string {
+	switch p {
+	case PermissionSupervised:
+		return "manual"
+	case PermissionAcceptEdits:
+		return "acceptEdits"
+	case PermissionAuto:
+		return "auto"
+	default:
+		return ""
+	}
+}
+
+func (p PermissionMode) valid() bool { return p >= PermissionDefault && p <= PermissionAuto }
+
 // Disconnect reasons recorded in Session.DisconnectReason.
 const (
 	ReasonClosed         = "closed"           // closed through Close/Remove
@@ -90,6 +123,12 @@ type Session struct {
 	DisconnectReason string
 	LastError        string
 	ParentID         string
+	// PermissionMode is passed to claude on every spawn (Create, Reconnect, Fork).
+	PermissionMode PermissionMode
+	// BaseRef is the ref the worktree's branch was created from, when Create made the
+	// worktree (CreatedWorktree).
+	BaseRef         string
+	CreatedWorktree bool
 }
 
 // Snapshot is every session, sorted by creation time then id. Never mutate it.
@@ -137,8 +176,27 @@ type CreateOptions struct {
 	Effort string
 	// Name, if set, is the display name and disables auto-naming.
 	Name string
-	// InitialPrompt is typed into Claude once its UI is up.
+	// InitialPrompt is passed to claude as its positional prompt argument (after
+	// "--", so a prompt starting with "-" is not read as a flag).
 	InitialPrompt string
+	// PermissionMode selects claude --permission-mode.
+	PermissionMode PermissionMode
+	// NewWorktree, when set, makes Create branch a new worktree for the session before
+	// claude starts; WorktreePath is then ignored. The branch is cf/<slug>, the slug
+	// named from InitialPrompt with a bounded wait (Options.SlugTimeout), else
+	// cf/<session id>.
+	NewWorktree *NewWorktree
+	// Attachments are paths returned by StageAttachment. Each becomes an
+	// "Attached image: <path>" line after the prompt; Claude reads them with its Read
+	// tool. Paths outside the attachments directory are rejected.
+	Attachments []string
+}
+
+// NewWorktree configures the worktree Create makes.
+type NewWorktree struct {
+	// BaseRef to branch from. Empty means origin/<default branch>, else <default
+	// branch>.
+	BaseRef string
 }
 
 // Store is the session store API. *Manager implements it; sessiontest.Fake is an
@@ -157,6 +215,10 @@ type Store interface {
 	Reconnect(ctx context.Context, id string) (Session, error)
 	// Remove closes the session if needed and forgets it.
 	Remove(ctx context.Context, id string) error
+	// StageAttachment stores an image for a first prompt and returns its absolute
+	// path. mimeType must be one of AttachmentTypes; data at most MaxAttachmentBytes.
+	// name is the user's file name, used only in logs.
+	StageAttachment(ctx context.Context, name, mimeType string, data []byte) (string, error)
 	// Snapshot returns the current immutable snapshot.
 	Snapshot() *Snapshot
 }

@@ -28,6 +28,9 @@ service RepoService {
   // worktree has been asked about in the last 10 minutes, every status refresh of it
   // recomputes the detail and announces changes as worktree_detail_updated.
   rpc GetWorktreeDetail(GetWorktreeDetailRequest) returns (GetWorktreeDetailResponse) {}
+  // ListRefs returns the refs a worktree can be based on: local branches and
+  // remote-tracking branches (origin/<name>), plus the default base.
+  rpc ListRefs(ListRefsRequest) returns (ListRefsResponse) {}
 }
 
 message Repo {
@@ -46,6 +49,9 @@ message Repo {
   // Non-empty when the last reconcile failed (for example, the directory was moved or
   // deleted). The repo stays registered; worktrees are empty until it recovers.
   string error = 8;
+  // Configured git remotes ("origin", …), sorted. Empty for a local-only repository:
+  // fetch, pull, push and pull-request actions are unavailable then.
+  repeated string remotes = 9;
 }
 
 message Worktree {
@@ -117,6 +123,9 @@ message CreateWorktreeRequest {
   // Optional explicit path. Defaults to <config home>/worktrees/<owner>/<repo>/<branch>
   // (_local/<repo name> in place of owner/repo when origin is not on GitHub).
   string path = 4;
+  // Fetch base_ref's remote branch first when base_ref is a remote-tracking ref
+  // (origin/<name>). Bounded; a failed fetch is logged and the stale ref is used.
+  bool fetch = 5;
 }
 
 message CreateWorktreeResponse {
@@ -131,6 +140,17 @@ message RemoveWorktreeRequest {
 }
 
 message RemoveWorktreeResponse {}
+
+message ListRefsRequest {
+  string repo_id = 1;
+}
+
+message ListRefsResponse {
+  // Local branch names, then remote-tracking refs ("origin/main"), each sorted.
+  repeated string refs = 1;
+  // "origin/<default branch>" when it exists, else "<default branch>".
+  string default_ref = 2;
+}
 
 message RefreshRepoRequest {
   string id = 1;

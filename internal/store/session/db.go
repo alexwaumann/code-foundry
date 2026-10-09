@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Persistence for the sessions table (migration 0003). Terminal id and status are not
+// Persistence for the sessions table (migrations 0003 and 0006). Terminal id and status are not
 // persisted: no process survives a daemon restart.
 
 func millis(t time.Time) int64 {
@@ -27,8 +27,9 @@ func fromMillis(ms int64) time.Time {
 func saveSession(ctx context.Context, db *sql.DB, s Session) error {
 	_, err := db.ExecContext(ctx, `INSERT INTO sessions (
 			id, claude_session_id, repo_id, worktree_path, name, auto_named, model, effort,
-			created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
+			permission_mode, base_ref, created_worktree)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET
 			claude_session_id = excluded.claude_session_id,
 			repo_id = excluded.repo_id,
@@ -42,9 +43,13 @@ func saveSession(ctx context.Context, db *sql.DB, s Session) error {
 			state = excluded.state,
 			disconnect_reason = excluded.disconnect_reason,
 			exit_code = excluded.exit_code,
-			last_error = excluded.last_error`,
+			last_error = excluded.last_error,
+			permission_mode = excluded.permission_mode,
+			base_ref = excluded.base_ref,
+			created_worktree = excluded.created_worktree`,
 		s.ID, s.ClaudeSessionID, s.RepoID, s.WorktreePath, s.Name, s.AutoNamed, s.Model, s.Effort,
-		millis(s.CreatedAt), millis(s.LastActivityAt), s.ParentID, int(s.State), s.DisconnectReason, s.ExitCode, s.LastError)
+		millis(s.CreatedAt), millis(s.LastActivityAt), s.ParentID, int(s.State), s.DisconnectReason, s.ExitCode, s.LastError,
+		int(s.PermissionMode), s.BaseRef, s.CreatedWorktree)
 	if err != nil {
 		return fmt.Errorf("session: save %s: %w", s.ID, err)
 	}
@@ -60,7 +65,8 @@ func deleteSession(ctx context.Context, db *sql.DB, id string) error {
 
 func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 	rows, err := db.QueryContext(ctx, `SELECT id, claude_session_id, repo_id, worktree_path, name, auto_named,
-			model, effort, created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error
+			model, effort, created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
+			permission_mode, base_ref, created_worktree
 		FROM sessions ORDER BY created_at, id`)
 	if err != nil {
 		return nil, fmt.Errorf("session: load: %w", err)
@@ -70,12 +76,16 @@ func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 	for rows.Next() {
 		var s Session
 		var created, active int64
-		var state int
+		var state, perm int
 		if err := rows.Scan(&s.ID, &s.ClaudeSessionID, &s.RepoID, &s.WorktreePath, &s.Name, &s.AutoNamed,
-			&s.Model, &s.Effort, &created, &active, &s.ParentID, &state, &s.DisconnectReason, &s.ExitCode, &s.LastError); err != nil {
+			&s.Model, &s.Effort, &created, &active, &s.ParentID, &state, &s.DisconnectReason, &s.ExitCode, &s.LastError,
+			&perm, &s.BaseRef, &s.CreatedWorktree); err != nil {
 			return nil, fmt.Errorf("session: load: %w", err)
 		}
 		s.CreatedAt, s.LastActivityAt, s.State = fromMillis(created), fromMillis(active), State(state)
+		if s.PermissionMode = PermissionMode(perm); !s.PermissionMode.valid() {
+			s.PermissionMode = PermissionDefault
+		}
 		out = append(out, s)
 	}
 	if err := rows.Err(); err != nil {

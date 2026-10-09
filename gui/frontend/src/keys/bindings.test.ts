@@ -32,6 +32,9 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     disconnectReason: "",
     lastError: "",
     parentId: "",
+    permissionMode: "",
+    baseRef: "",
+    createdWorktree: false,
     ...over,
   };
 }
@@ -66,13 +69,14 @@ describe("handleKeyDown precedence", () => {
     outside = document.getElementById("out") as HTMLElement;
     input = document.getElementById("in") as HTMLInputElement;
     window.addEventListener("keydown", handleKeyDown, { capture: true });
-    useUiStore.setState({ palette: { open: false, query: "", commandName: null, returnTo: "content" }, sidebarVisible: true });
+    useUiStore.setState({ palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" }, sidebarVisible: true });
     useCommandsStore.setState({
       commands: [
         cmd({ name: "terminal.new", keybindings: ["cmd+t"] }),
         cmd({ name: "terminal.clear", keybindings: ["ctrl+l"] }),
         cmd({ name: "edit.copy", keybindings: ["cmd+c"] }),
-        cmd({ name: "session.new", keybindings: ["cmd+n"], args: [{ name: "model", type: "enum", required: true, description: "", enumValues: ["opus"], defaultValue: "" }] }),
+        cmd({ name: "session.new", keybindings: ["cmd+n"], available: false, args: [{ name: "model", type: "enum", required: true, description: "", enumValues: ["opus"], defaultValue: "" }] }),
+        cmd({ name: "worktree.create", keybindings: ["cmd+alt+n"], args: [{ name: "branch", type: "string", required: true, description: "", enumValues: [], defaultValue: "" }] }),
         cmd({ name: "session.rename", keybindings: ["cmd+r"], args: [{ name: "name", type: "string", required: true, description: "", enumValues: [], defaultValue: "" }] }),
       ],
     });
@@ -146,9 +150,24 @@ describe("handleKeyDown precedence", () => {
   });
 
   it("commands with required args open the palette prompt instead of running", () => {
-    press(outside, { key: "n", code: "KeyN", metaKey: true });
+    press(outside, { key: "n", code: "KeyN", metaKey: true, altKey: true });
     expect(runCommand).not.toHaveBeenCalled();
-    expect(useUiStore.getState().palette).toMatchObject({ open: true, commandName: "session.new" });
+    expect(useUiStore.getState().palette).toMatchObject({ open: true, commandName: "worktree.create", page: "commands" });
+  });
+
+  it("session.new's chord opens the project picker, even where the daemon lists it unavailable", async () => {
+    const e = press(terminal, { key: "n", code: "KeyN", metaKey: true });
+    expect(e.defaultPrevented).toBe(true);
+    await Promise.resolve();
+    expect(runCommand).not.toHaveBeenCalled();
+    expect(useUiStore.getState().palette).toMatchObject({ open: true, page: "projects", commandName: null });
+  });
+
+  it("cmd+1..9 belong to the open project picker", () => {
+    useUiStore.setState({ palette: { open: true, query: "", commandName: null, page: "projects", returnTo: "content" }, selection: { kind: "none" } });
+    const e = press(outside, { key: "1", code: "Digit1", metaKey: true });
+    expect(e.defaultPrevented).toBe(false);
+    expect(useUiStore.getState().selection).toEqual({ kind: "none" });
   });
 
   it("cmd+b toggles the sidebar", () => {

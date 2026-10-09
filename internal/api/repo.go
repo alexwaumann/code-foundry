@@ -72,11 +72,24 @@ func (h *Repo) CreateWorktree(ctx context.Context, req *connect.Request[v1.Creat
 	m := req.Msg
 	w, err := h.store.CreateWorktree(ctx, repo.CreateWorktreeOptions{
 		RepoID: m.GetRepoId(), Branch: m.GetBranch(), BaseRef: m.GetBaseRef(), Path: m.GetPath(),
+		Fetch: m.GetFetch(),
 	})
 	if err != nil {
 		return nil, repoError(err)
 	}
 	return connect.NewResponse(&v1.CreateWorktreeResponse{Worktree: worktreeToProto(w)}), nil
+}
+
+// ListRefs lists the refs a new branch can start from: local branches, then
+// remote-tracking refs.
+func (h *Repo) ListRefs(ctx context.Context, req *connect.Request[v1.ListRefsRequest]) (*connect.Response[v1.ListRefsResponse], error) {
+	refs, err := h.store.ListRefs(ctx, req.Msg.GetRepoId())
+	if err != nil {
+		return nil, repoError(err)
+	}
+	all := make([]string, 0, len(refs.Local)+len(refs.Remote))
+	all = append(append(all, refs.Local...), refs.Remote...)
+	return connect.NewResponse(&v1.ListRefsResponse{Refs: all, DefaultRef: refs.DefaultRef}), nil
 }
 
 // RemoveWorktree removes a worktree.
@@ -186,7 +199,7 @@ func reposToProto(rs []repo.Repo) []*v1.Repo {
 func repoToProto(r repo.Repo) *v1.Repo {
 	p := &v1.Repo{
 		Id: r.ID, Path: r.Path, Name: r.Name, DefaultBranch: r.DefaultBranch,
-		GithubSlug: r.GitHubSlug, Error: r.Error,
+		GithubSlug: r.GitHubSlug, Error: r.Error, Remotes: r.Remotes,
 		Worktrees: make([]*v1.Worktree, len(r.Worktrees)),
 	}
 	if !r.RegisteredAt.IsZero() {

@@ -26,7 +26,8 @@ import (
 //     overrides (CommandService.List reports the effective values);
 //   - log level -> the log file handler's LevelVar;
 //   - auto-naming -> a Namer that checks the current value per session;
-//   - worktree directory -> repo.worktree.new's default path.
+//   - worktree directory -> repo.worktree.new's default path, and the path of the
+//     worktree a new thread creates (session.Options.WorktreePath).
 //   - editor command -> gitops' Editor func (stores.go), read on every open.
 //   - github.poll_interval_seconds and github.dashboards_enabled -> the gh store's
 //     Config func (stores.go), read before every poll.
@@ -84,6 +85,15 @@ func settingsNamer(st *settings.Store, next session.Namer) session.Namer {
 	}
 }
 
+// settingsWorktreePath applies repos.worktree_dir to the worktrees the session store
+// makes for new threads (session.Options.WorktreePath), the same way worktreeDirRepo
+// does for repo.worktree.new. "" leaves the repo store's default.
+func settingsWorktreePath(st *settings.Store) func(repo.Repo, string) string {
+	return func(r repo.Repo, branch string) string {
+		return worktreePath(st.Settings().Repos.WorktreeDir, r.Name, branch)
+	}
+}
+
 // worktreeDirRepo applies repos.worktree_dir to repo.worktree.new: when the request has
 // no explicit path and the setting is set, the worktree goes to
 // <dir with {repo} expanded>/<branch, "/" -> "-">.
@@ -96,7 +106,7 @@ type worktreeDirRepo struct {
 func (w worktreeDirRepo) CreateWorktree(ctx context.Context, req *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error) {
 	if req.Msg.GetPath() == "" {
 		if r, ok := w.repos.Snapshot().Repo(req.Msg.GetRepoId()); ok {
-			if p := worktreePath(w.settings.Settings().Repos.WorktreeDir, r.Name, req.Msg.GetBranch()); p != "" {
+			if p := settingsWorktreePath(w.settings)(r, req.Msg.GetBranch()); p != "" {
 				m := proto.CloneOf(req.Msg)
 				m.Path = p
 				req = connect.NewRequest(m)

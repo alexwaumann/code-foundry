@@ -1,6 +1,7 @@
 import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { answerConfirm, useConfirmStore } from "@/stores/confirm";
 
 /**
@@ -16,7 +17,7 @@ export function ConfirmDialog() {
         if (!open) answerConfirm(false);
       }}
     >
-      <DialogContent className="max-w-md p-5" data-testid="confirm-dialog">
+      <DialogContent className={cn("max-w-md p-5", pending?.centered && "top-1/2 -translate-y-1/2")} data-testid="confirm-dialog">
         <div className="flex gap-3">
           <TriangleAlert className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden />
           <div className="min-w-0 space-y-2">

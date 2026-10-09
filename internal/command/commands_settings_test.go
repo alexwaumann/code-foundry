@@ -18,7 +18,7 @@ import (
 func newSettingsRegistry(t *testing.T) (*command.Registry, *commandtest.Emitter, *settingstest.Fake, *[]string) {
 	t.Helper()
 	store, err := settingstest.New(context.Background(), t.TempDir(), nil, []settings.CommandInfo{
-		{Name: "session.new", Title: "New Session", Category: "Session", Keybindings: []string{"cmd+n"}},
+		{Name: "session.new", Title: "New Thread", Category: "Thread", Keybindings: []string{"cmd+n"}},
 	})
 	if err != nil {
 		t.Fatal(err)

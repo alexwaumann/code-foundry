@@ -156,6 +156,8 @@ func gitopsError(err error) error {
 	switch {
 	case errors.Is(err, gitops.ErrInvalidArgument):
 		code = connect.CodeInvalidArgument
+	case errors.Is(err, gitops.ErrNoRemote):
+		code = connect.CodeFailedPrecondition
 	case errors.Is(err, gitops.ErrClosed):
 		code = connect.CodeUnavailable
 	case errors.Is(err, context.Canceled):

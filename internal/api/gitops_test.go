@@ -115,6 +115,7 @@ func TestGitOpsErrors(t *testing.T) {
 	}{
 		{fmt.Errorf("%w: bad path", gitops.ErrInvalidArgument), connect.CodeInvalidArgument},
 		{gitops.ErrClosed, connect.CodeUnavailable},
+		{fmt.Errorf("momentum: %w", gitops.ErrNoRemote), connect.CodeFailedPrecondition},
 		{context.Canceled, connect.CodeCanceled},
 		{errors.New("boom"), connect.CodeInternal},
 	}

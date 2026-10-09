@@ -58,7 +58,8 @@ test("palette opens with cmd+k and lists only commands available in context", as
   const palette = page.getByTestId("palette");
   await expect(palette.locator('[data-command="terminal.new"]')).toBeVisible();
   await expect(palette.locator('[data-command="terminal.kill"]')).toHaveCount(0);
-  await expect(palette.locator('[data-command="session.new"]')).toHaveCount(0);
+  // session.new is unavailable with nothing selected, but its project picker supplies the repo.
+  await expect(palette.locator('[data-command="session.new"]')).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(palette).toHaveCount(0);
 
@@ -128,16 +129,15 @@ test("required args are prompted inline before invoking", async ({ page }) => {
   // The command emits FocusRepo for the new worktree, created under ~/.code-foundry/worktrees/<owner>/<repo>.
   await expect(row(page, "w:repo-cf::/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/feat-palette")).toHaveAttribute("aria-selected", "true");
 
-  // Enum args list their values (optional enums too); "Default (not set)" omits the arg.
+  // Enum args list their values, the default highlighted.
   await page.keyboard.press("Meta+k");
-  await page.keyboard.type("new claude");
+  await page.keyboard.type("test notification");
   await page.keyboard.press("Enter");
-  await expect(palette.getByRole("option", { name: "sonnet" })).toBeVisible();
-  await palette.getByRole("option", { name: "sonnet" }).click();
-  await expect(palette.getByRole("option", { name: /Default/ })).toBeVisible();
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
-  expect((await invocations()).at(-1)?.args).toEqual({ model: "sonnet" });
+  await expect(palette.getByRole("option", { name: /^info/ })).toBeVisible();
+  await palette.getByRole("option", { name: /^warning/ }).click();
+  await expect(palette).toHaveCount(0);
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("ui.notify");
+  expect((await invocations()).at(-1)?.args).toEqual({ level: "warning" });
 });
 
 test("FocusTerminal intent switches the selection", async ({ page }) => {

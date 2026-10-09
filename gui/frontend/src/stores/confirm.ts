@@ -9,6 +9,8 @@ export interface ConfirmRequest {
   title: string;
   message: string;
   confirmLabel: string;
+  /** Centered in the window instead of near the top (questions about the content under it). */
+  centered?: boolean;
 }
 
 interface ConfirmState {

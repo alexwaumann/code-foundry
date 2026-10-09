@@ -31,8 +31,11 @@ type Repo struct {
 	RegisteredAt  time.Time
 	DefaultBranch string
 	GitHubSlug    string // "owner/name" when origin is on GitHub
-	Error         string // last reconcile error, if any
-	Worktrees     []Worktree
+	// Remotes are the configured git remote names, sorted; empty for a local-only
+	// repository (and until the first reconcile).
+	Remotes   []string
+	Error     string // last reconcile error, if any
+	Worktrees []Worktree
 }
 
 // Worktree is one checkout of a repository. The main worktree comes first.
@@ -141,6 +144,24 @@ type CreateWorktreeOptions struct {
 	// Path defaults to <Options.WorktreeRoot>/<owner>/<repo>/<branch, "/" -> "-">, with
 	// _local/<repo name> in place of owner/repo when origin is not on GitHub.
 	Path string
+	// Fetch refreshes the start point before branching from it: when the new branch
+	// starts at a remote-tracking ref ("<remote>/<branch>": BaseRef, the default base
+	// origin/<default>, or origin/<Branch> for git's DWIM), that one remote branch is
+	// fetched first. The fetch is bounded; on failure it is logged and the existing
+	// (possibly stale) ref is used. Ignored when Branch already exists locally.
+	Fetch bool
+}
+
+// Refs lists the refs a new branch can start from (Store.ListRefs).
+type Refs struct {
+	// Local holds local branch names, sorted.
+	Local []string
+	// Remote holds remote-tracking refs as "<remote>/<branch>", sorted, without the
+	// symbolic "<remote>/HEAD".
+	Remote []string
+	// DefaultRef is "origin/<default branch>" when that ref exists, else
+	// "<default branch>". It is what CreateWorktree branches from without a BaseRef.
+	DefaultRef string
 }
 
 // RemoveWorktreeOptions configures Store.RemoveWorktree.
@@ -165,6 +186,9 @@ type Store interface {
 	Unregister(ctx context.Context, id string) error
 	CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (Worktree, error)
 	RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) error
+	// ListRefs lists the repo's local branches and remote-tracking refs, read from git
+	// on each call (not from the snapshot).
+	ListRefs(ctx context.Context, repoID string) (Refs, error)
 	// Refresh reconciles one repo (or all when id is empty) and waits for its status.
 	Refresh(ctx context.Context, id string) error
 	// WorktreeDetail returns the files changed and commits on a worktree against its

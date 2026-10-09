@@ -29,6 +29,7 @@ function wt(repoId: string, path: string, over: Partial<WorktreeView> = {}): Wor
     path,
     branch: path.split("/").pop() ?? "",
     head: "abc",
+    detached: false,
     isMain: false,
     status: { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null },
     ...over,
@@ -36,7 +37,7 @@ function wt(repoId: string, path: string, over: Partial<WorktreeView> = {}): Wor
 }
 
 function repo(id: string, name: string, worktrees: WorktreeView[]): RepoView {
-  return { id, path: worktrees[0]?.path ?? "", name, defaultBranch: "main", githubSlug: "", worktrees };
+  return { id, path: worktrees[0]?.path ?? "", name, defaultBranch: "main", githubSlug: "", remotes: [], worktrees };
 }
 
 describe("terminals reducer", () => {
@@ -150,6 +151,7 @@ describe("deriveContext", () => {
       { kind: "worktree", repoId: "r1", path: "/src/app.worktrees/feat" } as const,
       { ...emptyContext, activeRepoId: "r1", activeWorktreePath: "/src/app.worktrees/feat", activeView: "worktree" },
     ],
+    ["composer: the repo only (session.new is available, no worktree yet)", { kind: "compose", repoId: "r1" } as const, { ...emptyContext, activeRepoId: "r1", activeView: "compose" }],
   ])("%s", (_name, sel, want) => {
     expect(deriveContext(sel, terms, repos)).toEqual(want);
   });
