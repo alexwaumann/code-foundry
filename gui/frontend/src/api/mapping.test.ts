@@ -163,6 +163,7 @@ describe("gh mapping", () => {
       reviewRequests: ["acme/core"],
       isCrossRepository: true,
       partial: true,
+      headSha: "abc123",
     });
     const v = toPullRequestView(p);
     expect(v).toMatchObject({
@@ -182,8 +183,9 @@ describe("gh mapping", () => {
       reviewRequests: ["acme/core"],
       isCrossRepository: true,
       partial: true,
+      headSha: "abc123",
     });
-    expect(toPullRequestView(create(PullRequestSchema, {}))).toMatchObject({ mergeable: null, mergeState: "", partial: false });
+    expect(toPullRequestView(create(PullRequestSchema, {}))).toMatchObject({ mergeable: null, mergeState: "", partial: false, headSha: "" });
   });
 
   it("maps a pull request detail", () => {

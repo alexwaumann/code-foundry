@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MergeableView, MergeMethodView, PrStateView, PullRequestDetailView } from "@/api/gh";
-import { canDeleteBranch, mergeArgs, mergeAvailability, mergeMethodHint } from "./merge";
+import { branchDelete, mergeArgs, mergeAvailability, mergeMethodHint } from "./merge";
 
 interface Shape {
   state?: PrStateView;
@@ -12,6 +12,8 @@ interface Shape {
   autoMerge?: boolean;
   fork?: boolean;
   headRef?: string;
+  baseRef?: string;
+  defaultBranch?: string;
 }
 
 /** Only the fields the merge logic reads. */
@@ -22,13 +24,14 @@ function detail(s: Shape = {}): PullRequestDetailView {
       draft: s.draft ?? false,
       mergeable: s.mergeable ?? "mergeable",
       mergeState: s.mergeState ?? "clean",
-      baseRef: "main",
+      baseRef: s.baseRef ?? "main",
       headRef: s.headRef ?? "feat/x",
       isCrossRepository: s.fork ?? false,
     },
     viewerCanUpdate: s.viewerCanUpdate ?? true,
     mergeMethods: s.methods ?? ["merge", "squash", "rebase"],
     autoMergeEnabled: s.autoMerge ?? false,
+    defaultBranch: s.defaultBranch ?? "main",
   } as PullRequestDetailView;
 }
 
@@ -48,7 +51,8 @@ describe("mergeAvailability", () => {
     { name: "unstable is allowed, with a note", d: { mergeState: "unstable" }, visible: true, reason: null, notes: ["Some checks that are not required are failing."] },
     { name: "mergeability not computed yet is allowed", d: { mergeable: "unknown", mergeState: "unknown" }, visible: true, reason: null },
     { name: "auto-merge note", d: { autoMerge: true }, visible: true, reason: null, notes: ["Auto-merge is on: GitHub merges it once its requirements pass."] },
-    { name: "no method", d: { methods: [] }, visible: true, reason: "This repository allows no merge method" },
+    { name: "methods unknown: all three", d: { methods: [] }, visible: true, reason: null, methods: ["merge", "squash", "rebase"] },
+    { name: "has hooks is allowed, no note", d: { mergeState: "has_hooks" }, visible: true, reason: null, methods: ["merge", "squash", "rebase"] },
     { name: "methods in GitHub's order", d: { methods: ["rebase", "squash"] }, visible: true, reason: null, methods: ["squash", "rebase"] },
   ];
   it.each(cases)("$name", ({ d, visible, reason, methods, notes }) => {
@@ -61,17 +65,26 @@ describe("mergeAvailability", () => {
 });
 
 describe("merge args and labels", () => {
-  it("builds pr.merge's args", () => {
-    expect(mergeArgs({ slug: "o/r", number: 142 }, "squash", true)).toEqual({ "repo-slug": "o/r", number: "142", method: "squash", "delete-branch": "true" });
-    expect(mergeArgs({ slug: "o/r", number: 7 }, "merge", false)).toEqual({ "repo-slug": "o/r", number: "7", method: "merge", "delete-branch": "false" });
+  it("builds pr.merge's args, with the head shown", () => {
+    const sha = "e2e0142e2e0142e2e0142e2e0142e2e0142e2e01";
+    expect(mergeArgs({ slug: "o/r", number: 142 }, "squash", true, sha)).toEqual({ "repo-slug": "o/r", number: "142", method: "squash", "delete-branch": "true", "head-sha": sha });
+    expect(mergeArgs({ slug: "o/r", number: 7 }, "merge", false, "")).toEqual({ "repo-slug": "o/r", number: "7", method: "merge", "delete-branch": "false" });
   });
 
   it.each([
-    { name: "own branch", d: {}, want: true },
-    { name: "fork", d: { fork: true }, want: false },
-    { name: "no head ref", d: { headRef: "" }, want: false },
-  ])("deletes the branch by default: $name", ({ d, want }) => {
-    expect(canDeleteBranch(detail(d))).toBe(want);
+    { name: "own branch", d: {}, deletable: true, subtitle: "Deletes origin/feat/x; local branches and worktrees are untouched" },
+    { name: "fork", d: { fork: true }, deletable: false, subtitle: "The branch is in a fork" },
+    { name: "no head ref", d: { headRef: "" }, deletable: false, subtitle: "The branch is unknown" },
+    { name: "the default branch", d: { headRef: "main", baseRef: "release" }, deletable: false, subtitle: "origin/main is the default branch" },
+    { name: "the base branch", d: { headRef: "release", baseRef: "release" }, deletable: false, subtitle: "origin/release is the base branch" },
+    {
+      name: "default branch unknown: the daemon decides",
+      d: { defaultBranch: "" },
+      deletable: true,
+      subtitle: "Deletes origin/feat/x; local branches and worktrees are untouched",
+    },
+  ])("branch delete: $name", ({ d, deletable, subtitle }) => {
+    expect(branchDelete(detail(d))).toEqual({ deletable, subtitle });
   });
 
   it.each([

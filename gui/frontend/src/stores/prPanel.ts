@@ -197,18 +197,19 @@ export async function revertPullRequest(ref: PrRef, panel: PanelTarget): Promise
 }
 
 /**
- * The merge button: pr.merge (the daemon asks for confirmation; the confirm dialog
+ * The merge button: pr.merge with the head commit the panel shows (the daemon refuses
+ * if GitHub's head moved since; the daemon asks for confirmation and the confirm dialog
  * handles it). On success, toasts the daemon's message ("Merged #N (sha)", with the
  * branch deletion as the description). Either way the detail is read again: the daemon
  * also announces it, and after a refusal (the head moved) it shows GitHub's state.
  * Returns whether it merged; a second call while one runs sends nothing.
  */
-export async function mergePullRequest(ref: PrRef, method: MergeMethodView, deleteBranch: boolean): Promise<boolean> {
+export async function mergePullRequest(ref: PrRef, method: MergeMethodView, deleteBranch: boolean, headSha: string): Promise<boolean> {
   const key = pullRequestKey(ref.slug, ref.number);
   if (usePrPanelStore.getState().merging[key]) return false;
   usePrPanelStore.setState((s) => ({ merging: { ...s.merging, [key]: true } }));
   try {
-    const res = await runCommandForResult("pr.merge", mergeArgs(ref, method, deleteBranch), { quiet: true });
+    const res = await runCommandForResult("pr.merge", mergeArgs(ref, method, deleteBranch, headSha), { quiet: true });
     if (!res) return false;
     const message = parseMergeResult(res.resultJson)?.message || res.message || `Merged #${String(ref.number)}`;
     const [title = message, ...rest] = message.split("; ");

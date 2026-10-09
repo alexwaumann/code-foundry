@@ -4,13 +4,17 @@ import { PullRequestDetailSchema, PullRequestMergeMethod } from "@/gen/codefound
 import { parseMergeResult, toPullRequestDetailView } from "./gh";
 
 describe("merge fields", () => {
-  it("maps the allowed methods and auto-merge", () => {
+  it("maps the allowed methods, auto-merge, the default branch and the head commit", () => {
     const d = create(PullRequestDetailSchema, {
+      pullRequest: { headSha: "e2e0142e2e0142e2e0142e2e0142e2e0142e2e01" },
       mergeMethodsAllowed: [PullRequestMergeMethod.MERGE, PullRequestMergeMethod.UNSPECIFIED, PullRequestMergeMethod.REBASE],
       autoMergeEnabled: true,
+      defaultBranch: "main",
     });
-    expect(toPullRequestDetailView(d)).toMatchObject({ mergeMethods: ["merge", "rebase"], autoMergeEnabled: true });
-    expect(toPullRequestDetailView(create(PullRequestDetailSchema, {}))).toMatchObject({ mergeMethods: [], autoMergeEnabled: false });
+    const v = toPullRequestDetailView(d);
+    expect(v).toMatchObject({ mergeMethods: ["merge", "rebase"], autoMergeEnabled: true, defaultBranch: "main" });
+    expect(v.pullRequest.headSha).toBe("e2e0142e2e0142e2e0142e2e0142e2e0142e2e01");
+    expect(toPullRequestDetailView(create(PullRequestDetailSchema, {}))).toMatchObject({ mergeMethods: [], autoMergeEnabled: false, defaultBranch: "" });
   });
 
   it.each([

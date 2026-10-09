@@ -69,6 +69,8 @@ export interface PullRequestView {
   state: PrStateView;
   draft: boolean;
   headRef: string;
+  /** The head commit (full SHA); "" if unknown. The merge button sends it as pr.merge's head-sha. */
+  headSha: string;
   baseRef: string;
   review: ReviewView;
   checks: CheckRollupView;
@@ -285,6 +287,8 @@ export interface PullRequestDetailView {
   mergeMethods: MergeMethodView[];
   /** Auto-merge is enabled: GitHub merges it once its requirements pass. */
   autoMergeEnabled: boolean;
+  /** The repository's default branch; "" if unknown. A merge never deletes it. */
+  defaultBranch: string;
   /** "admin" | "maintain" | "write" | "triage" | "read" | "". */
   viewerPermission: string;
   fetchedAtMs: number | null;
@@ -382,6 +386,7 @@ export function toPullRequestView(p: PullRequest): PullRequestView {
     state: prStates[p.state],
     draft: p.draft,
     headRef: p.headRef,
+    headSha: p.headSha,
     baseRef: p.baseRef,
     review: reviews[p.reviewDecision],
     checks: toRollupView(p.checks),
@@ -593,6 +598,7 @@ export function toPullRequestDetailView(d: PullRequestDetail): PullRequestDetail
     viewerCanUpdate: d.viewerCanUpdate,
     mergeMethods: d.mergeMethodsAllowed.map((m) => mergeMethodViews[m]).filter((m): m is MergeMethodView => m !== null),
     autoMergeEnabled: d.autoMergeEnabled,
+    defaultBranch: d.defaultBranch,
     viewerPermission: d.viewerPermission,
     fetchedAtMs: ms(d.fetchedAt),
     lastError: d.lastError,

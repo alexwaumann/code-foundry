@@ -32,7 +32,9 @@ export interface MergeAvailability {
  */
 export function mergeAvailability(d: PullRequestDetailView): MergeAvailability {
   const pr = d.pullRequest;
-  const methods = MERGE_METHOD_ORDER.filter((m) => d.mergeMethods.includes(m));
+  // No methods means unknown (a detail cached before they were fetched; GitHub always
+  // allows one): offer all three and let the daemon refuse.
+  const methods = d.mergeMethods.length === 0 ? [...MERGE_METHOD_ORDER] : MERGE_METHOD_ORDER.filter((m) => d.mergeMethods.includes(m));
   const notes: string[] = [];
   if (d.autoMergeEnabled) notes.push("Auto-merge is on: GitHub merges it once its requirements pass.");
   if (pr.mergeState === "behind") notes.push(`Behind ${pr.baseRef || "the base branch"}: it merges as is.`);
@@ -43,18 +45,40 @@ export function mergeAvailability(d: PullRequestDetailView): MergeAvailability {
   if (!d.viewerCanUpdate) return out("Merging needs write access");
   if (pr.mergeable === "conflicting" || pr.mergeState === "dirty") return out("Resolve conflicts first");
   if (pr.mergeState === "blocked") return out("Blocked: required checks or reviews are missing");
-  if (methods.length === 0) return out("This repository allows no merge method");
   return out(null);
 }
 
-/** The branch is deleted after the merge by default unless it lives in a fork (never deleted). */
-export function canDeleteBranch(d: PullRequestDetailView): boolean {
-  return !d.pullRequest.isCrossRepository && d.pullRequest.headRef !== "";
+export interface BranchDelete {
+  /** "Delete branch after merge" can be checked (it starts checked when it can). */
+  deletable: boolean;
+  /** The line under it: what it deletes, or why it cannot. */
+  subtitle: string;
 }
 
-/** pr.merge's args. */
-export function mergeArgs(ref: PrRef, method: MergeMethodView, deleteBranch: boolean): Record<string, string> {
-  return { "repo-slug": ref.slug, number: String(ref.number), method, "delete-branch": String(deleteBranch) };
+/**
+ * Whether the merge may delete the head branch on GitHub (origin), and the line saying
+ * so. Never a fork's branch, the default branch, or the base branch (the daemon checks
+ * again, also when the default branch is unknown here). Local branches and worktrees
+ * are never touched.
+ */
+export function branchDelete(d: PullRequestDetailView): BranchDelete {
+  const { headRef, baseRef, isCrossRepository } = d.pullRequest;
+  const remote = `origin/${headRef}`;
+  if (headRef === "") return { deletable: false, subtitle: "The branch is unknown" };
+  if (isCrossRepository) return { deletable: false, subtitle: "The branch is in a fork" };
+  if (headRef === d.defaultBranch) return { deletable: false, subtitle: `${remote} is the default branch` };
+  if (headRef === baseRef) return { deletable: false, subtitle: `${remote} is the base branch` };
+  return { deletable: true, subtitle: `Deletes ${remote}; local branches and worktrees are untouched` };
+}
+
+/**
+ * pr.merge's args. headSha is the head commit the panel shows: the daemon refuses the
+ * merge if GitHub's head is another one, so nothing unseen is merged.
+ */
+export function mergeArgs(ref: PrRef, method: MergeMethodView, deleteBranch: boolean, headSha: string): Record<string, string> {
+  const args: Record<string, string> = { "repo-slug": ref.slug, number: String(ref.number), method, "delete-branch": String(deleteBranch) };
+  if (headSha) args["head-sha"] = headSha;
+  return args;
 }
 
 /** The line under a method in the dropdown, after GitHub's descriptions. */

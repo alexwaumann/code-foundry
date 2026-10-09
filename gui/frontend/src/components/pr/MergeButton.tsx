@@ -7,11 +7,12 @@ import { pullRequestKey } from "@/stores/gh";
 import { mergePullRequest, usePrPanelStore } from "@/stores/prPanel";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
-import { canDeleteBranch, MERGE_METHOD_LABELS, mergeAvailability, mergeMethodHint } from "./merge";
+import { branchDelete, MERGE_METHOD_LABELS, mergeAvailability, mergeMethodHint } from "./merge";
 
 /**
  * The header's Merge button, left of the ⋯ menu: a dropdown of the methods the repository
- * allows and "Delete branch after merge". Choosing a method runs pr.merge (the daemon's
+ * allows and "Delete branch after merge" (origin's branch only; on unless it cannot be
+ * deleted). Choosing a method runs pr.merge with the head shown (the daemon's
  * confirmation goes through the confirm dialog), with a spinner until it answers. Shown
  * only for an open pull request; disabled, with the reason as its tooltip, when GitHub
  * would refuse (draft, conflicts, blocked, no write access, no method). Below 340px it
@@ -21,8 +22,9 @@ export function MergeButton({ prRef, detail }: { prRef: PrRef; detail: PullReque
   const a = useMemo(() => mergeAvailability(detail), [detail]);
   const busy = usePrPanelStore((s) => s.merging[pullRequestKey(prRef.slug, prRef.number)] ?? false);
   const [open, setOpen] = useState(false);
-  const deletable = canDeleteBranch(detail);
-  const [deleteBranch, setDeleteBranch] = useState(deletable);
+  const del = branchDelete(detail);
+  const deletable = del.deletable;
+  const [deleteBranch, setDeleteBranch] = useState(true);
   const { ref, boundary } = usePanelBoundary();
   const reasonId = useId();
   if (!a.visible) return null;
@@ -90,7 +92,7 @@ export function MergeButton({ prRef, detail }: { prRef: PrRef; detail: PullReque
               // event, so the controlled `open` is already false and Radix would skip
               // onOpenChange, leaving `open` set to reopen the menu once the merge ends.
               setOpen(false);
-              void mergePullRequest(prRef, m, deleteBranch && deletable);
+              void mergePullRequest(prRef, m, deleteBranch && deletable, pr.headSha);
             }}
           >
             <span className="flex min-w-0 flex-1 flex-col">
@@ -102,6 +104,9 @@ export function MergeButton({ prRef, detail }: { prRef: PrRef; detail: PullReque
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
           data-testid="pr-merge-delete-branch"
+          // pl-9: the box sits 12px from the menu's edge (4px menu padding + 8px); leave
+          // the same 12px between it and the label.
+          className="pl-9"
           checked={deleteBranch && deletable}
           disabled={!deletable}
           onCheckedChange={(v) => {
@@ -114,8 +119,8 @@ export function MergeButton({ prRef, detail }: { prRef: PrRef; detail: PullReque
         >
           <span className="flex min-w-0 flex-1 flex-col">
             <span>Delete branch after merge</span>
-            <span className="truncate font-mono text-xs text-muted-foreground" title={pr.headRef}>
-              {deletable ? pr.headRef : "The branch is in a fork"}
+            <span className="text-xs [overflow-wrap:anywhere] text-muted-foreground" data-testid="pr-merge-delete-branch-note">
+              {del.subtitle}
             </span>
           </span>
         </DropdownMenuCheckboxItem>
