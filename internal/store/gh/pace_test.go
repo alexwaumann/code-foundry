@@ -85,3 +85,36 @@ func TestNormalizeSlug(t *testing.T) {
 		}
 	}
 }
+
+func TestRateLimitPause(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	fallback := time.Minute
+	tests := []struct {
+		name        string
+		rle         RateLimitError
+		lastResetAt time.Time
+		want        time.Time
+	}{
+		{"secondary, retry-after honored exactly", RateLimitError{Secondary: true, RetryAfter: 10 * time.Second},
+			time.Time{}, now.Add(10*time.Second + retryAfterSlack)},
+		{"secondary, retry-after longer than fallback", RateLimitError{Secondary: true, RetryAfter: 5 * time.Minute},
+			time.Time{}, now.Add(5*time.Minute + retryAfterSlack)},
+		{"secondary without retry-after waits the fallback", RateLimitError{Secondary: true},
+			now.Add(time.Hour), now.Add(fallback)},
+		{"primary, header reset", RateLimitError{ResetAt: now.Add(20 * time.Minute)},
+			now.Add(time.Hour), now.Add(20*time.Minute + rateLimitSlack)},
+		{"primary, last seen resetAt", RateLimitError{}, now.Add(30 * time.Minute), now.Add(30*time.Minute + rateLimitSlack)},
+		{"primary, stale header reset falls back to last seen", RateLimitError{ResetAt: now.Add(-time.Minute)},
+			now.Add(30 * time.Minute), now.Add(30*time.Minute + rateLimitSlack)},
+		{"primary, nothing known", RateLimitError{}, now.Add(-time.Minute), now.Add(fallback)},
+		{"primary, retry-after and reset: the later", RateLimitError{RetryAfter: time.Minute, ResetAt: now.Add(10 * time.Minute)},
+			time.Time{}, now.Add(10*time.Minute + rateLimitSlack)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := rateLimitPause(&tt.rle, now, tt.lastResetAt, fallback); !got.Equal(tt.want) {
+				t.Errorf("until = %v, want %v", got.Sub(now), tt.want.Sub(now))
+			}
+		})
+	}
+}

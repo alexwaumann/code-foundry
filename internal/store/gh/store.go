@@ -18,7 +18,8 @@ import (
 // Options configures a Store. Zero durations and counts take the Default* values.
 type Options struct {
 	DB DB
-	// Runner talks to GitHub. Defaults to ExecRunner{} (gh on $PATH).
+	// Runner talks to GitHub. Defaults to an HTTPRunner whose token comes from gh on
+	// $PATH (or Homebrew).
 	Runner Runner
 	// Bus receives PullRequestsUpdated and ViewerUpdated. Optional.
 	Bus *bus.Bus
@@ -77,11 +78,11 @@ func (o *Options) setDefaults() {
 	if o.StatsInterval == 0 {
 		o.StatsInterval = DefaultStatsInterval
 	}
-	if o.Runner == nil {
-		o.Runner = ExecRunner{}
-	}
 	if o.Log == nil {
 		o.Log = slog.New(slog.DiscardHandler)
+	}
+	if o.Runner == nil {
+		o.Runner = NewHTTPRunner(HTTPOptions{Log: o.Log})
 	}
 	if o.Now == nil {
 		o.Now = time.Now
@@ -551,11 +552,8 @@ func (s *Store) noteResult(ctx context.Context, err error, rl *rateLimitJSON) {
 	case errors.As(err, &rle):
 		s.mu.Lock()
 		s.globalFailures++
-		until := now.Add(backoff(s.opts.SecondaryBackoff, s.opts.MaxBackoff, s.globalFailures, s.opts.Rand()))
-		// A primary limit resets at the resetAt of the last response we saw.
-		if !rle.Secondary && s.lastResetAt.After(now) {
-			until = s.lastResetAt.Add(rateLimitSlack)
-		}
+		until := rateLimitPause(rle, now, s.lastResetAt,
+			backoff(s.opts.SecondaryBackoff, s.opts.MaxBackoff, s.globalFailures, s.opts.Rand()))
 		s.pauseUntil, s.pauseErr = until, err
 		s.mu.Unlock()
 		s.log.Warn("gh rate limited, pausing", "err", err, "until", until)

@@ -2,28 +2,29 @@ package gh
 
 import "time"
 
-// Pacing defaults. Rationale (see docs/notes/phase1c-gh.md):
+// Pacing defaults. Rationale (see docs/notes/phase1c-gh.md and
+// docs/notes/gh-http-transport.md):
 //
-//   - Every request is a fresh `gh` process: it reads the token from the macOS keychain
-//     through securityd and performs a new TLS handshake (also securityd-verified).
-//     Bursts of parallel gh processes make securityd spike CPU and serialize anyway, so
-//     there is one request in flight and at least MinGap of idle between requests.
+//   - Requests go over one keep-alive HTTP client (HTTPRunner), one in flight. Until
+//     2026-10 each request was a fresh `gh` process (keychain read through securityd,
+//     new TLS handshake), which is what a 2s gap protected; that cost is gone.
 //   - GitHub's secondary rate limits penalize concurrency and bursts (no more than ~100
-//     concurrent requests, ~2,000 GraphQL points per minute, and "make requests serially,
-//     wait at least one second between mutative requests"). Serial requests at a 2s gap
-//     cap us at 30 requests/minute, far inside those limits.
-//   - The GraphQL primary limit is 5,000 points/hour. A PR-list page costs ~1 point, so
-//     one repo every 60s is ~60 points/hour; dozens of tracked repos fit comfortably. The
-//     store reads rateLimit from every response and pauses until resetAt when fewer
-//     than MinRemaining points remain.
+//     concurrent requests, ~2,000 GraphQL points per minute, serial requests). One
+//     request in flight with a 1s gap caps us below 60 requests/minute.
+//   - The GraphQL primary limit is 5,000 points/hour. The shortest request measured
+//     ~0.2s, so a worker that never idled would make at most 3600/1.2 = 3,000
+//     requests/hour at a 1s gap: even a runaway schedule cannot drain the budget past
+//     MinRemaining. A 0.5s gap would allow ~5,100. The store also reads rateLimit from
+//     every response and pauses until resetAt when fewer than MinRemaining points remain.
 const (
-	DefaultMinGap         = 2 * time.Second
+	DefaultMinGap         = time.Second
 	DefaultRepoInterval   = 60 * time.Second
 	DefaultViewerInterval = 10 * time.Minute
 	DefaultAuthRetry      = 60 * time.Second
 	DefaultNetworkBackoff = 15 * time.Second
 	// DefaultSecondaryBackoff follows GitHub's guidance to wait at least a minute after a
-	// secondary rate limit response without a retry-after header (gh does not surface it).
+	// secondary rate limit response without a retry-after header. With one, the store
+	// waits exactly that long (rateLimitPause).
 	DefaultSecondaryBackoff = 60 * time.Second
 	DefaultMaxBackoff       = 15 * time.Minute
 	DefaultDetailTTL        = 30 * time.Second
@@ -41,6 +42,8 @@ const (
 	jitterFraction = 0.2
 	// rateLimitSlack is added to resetAt before resuming, to absorb clock skew.
 	rateLimitSlack = 5 * time.Second
+	// retryAfterSlack is added to a retry-after header's wait.
+	retryAfterSlack = time.Second
 )
 
 // backoff returns the delay before retry number n (n >= 1): base doubled n-1 times,
@@ -73,6 +76,30 @@ func budgetPause(rl *rateLimitJSON, minRemaining int, now time.Time) time.Time {
 		return time.Time{}
 	}
 	return rl.ResetAt.Add(rateLimitSlack)
+}
+
+// rateLimitPause returns when to resume after a rate-limit error. GitHub's guidance:
+// honor retry-after when present; after a primary limit wait for x-ratelimit-reset (or
+// the resetAt of the last successful response); otherwise wait at least a minute
+// (fallback, the jittered SecondaryBackoff).
+func rateLimitPause(rle *RateLimitError, now, lastResetAt time.Time, fallback time.Duration) time.Time {
+	var until time.Time
+	if rle.RetryAfter > 0 {
+		until = now.Add(rle.RetryAfter + retryAfterSlack)
+	}
+	if !rle.Secondary {
+		reset := rle.ResetAt
+		if !reset.After(now) {
+			reset = lastResetAt
+		}
+		if reset.After(now) {
+			until = laterOf(until, reset.Add(rateLimitSlack))
+		}
+	}
+	if until.IsZero() {
+		until = now.Add(fallback)
+	}
+	return until
 }
 
 func laterOf(a, b time.Time) time.Time {

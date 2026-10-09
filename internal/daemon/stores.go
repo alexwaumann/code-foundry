@@ -74,9 +74,12 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 	if !cfg.GitHub.DashboardsEnabled {
 		ghOpts.DashboardInterval = -1 // negative disables the dashboard poll
 	}
-	if ghPath := settings.ExpandedPath(cfg.Advanced.GhPath); ghPath != "" {
-		ghOpts.Runner = gh.ExecRunner{Path: ghPath}
-	}
+	// GitHub is reached over HTTP with the token `gh auth token` prints.
+	ghOpts.Runner = gh.NewHTTPRunner(gh.HTTPOptions{
+		Tokens:    gh.GhToken{Path: settings.ExpandedPath(cfg.Advanced.GhPath)},
+		UserAgent: "code-foundry/" + version.Version,
+		Log:       ghOpts.Log,
+	})
 	if s.gh, err = gh.New(ctx, ghOpts); err != nil {
 		return nil, err
 	}

@@ -51,9 +51,9 @@ func (s *Store) pollViewer(ctx context.Context) {
 	})
 }
 
-// checkAuth runs while gh is known to be unauthenticated. `gh auth status` validates the
-// token locally and with one API call; on success, normal polling resumes and the next
-// GraphQL success clears the auth state.
+// checkAuth runs while gh is known to be unauthenticated. Runner.AuthStatus asks gh for
+// its token again and validates it with one REST call (GET /user); on success, normal
+// polling resumes and the next GraphQL success clears the auth state.
 func (s *Store) checkAuth(ctx context.Context) {
 	if err := s.pace(ctx); err != nil {
 		return
@@ -66,7 +66,7 @@ func (s *Store) checkAuth(ctx context.Context) {
 	now := s.opts.Now()
 	s.mu.Lock()
 	if err == nil && st.LoggedIn {
-		// Resume polling. authFailures is kept so that a token gh accepts but GraphQL
+		// Resume polling. authFailures is kept so that a token REST accepts but GraphQL
 		// rejects keeps backing off instead of looping at AuthRetry.
 		s.authBad = false
 		s.viewerNext = now

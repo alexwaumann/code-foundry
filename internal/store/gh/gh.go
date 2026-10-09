@@ -3,11 +3,13 @@
 // check details. Phase 3a adds the viewer's dashboards, monthly stats, default-branch
 // CI, and per-branch pull requests (activity*.go).
 //
-// All GitHub access goes through the user's authenticated `gh` CLI (`gh api graphql`,
-// `gh auth status`) via a Runner. A single worker goroutine owns the network: one
+// All GitHub access goes through a Runner: HTTPRunner calls api.github.com (GraphQL and
+// REST) over one keep-alive HTTP client with the token `gh auth token` prints, so the
+// user's gh login is the only credential. A single worker goroutine owns the network: one
 // request in flight at a time, at least MinGap between requests, per-repo polling every
 // RepoInterval, exponential backoff with jitter on errors, and a global pause when
-// GitHub's rate limit runs low. See docs/notes/phase1c-gh.md for the pacing rationale.
+// GitHub's rate limit runs low. See docs/notes/phase1c-gh.md and
+// docs/notes/gh-http-transport.md for the pacing rationale.
 //
 // Results are cached in SQLite (Migrate creates the gh_* tables), so reads are served
 // from the last-known state immediately on daemon start. Readers get an immutable
@@ -207,8 +209,8 @@ type CheckRun struct {
 type ViewerState struct {
 	// Viewer is nil until the first successful fetch or cache load.
 	Viewer *Viewer
-	// Authenticated is false once gh reported missing or bad credentials, and true
-	// again after a successful request or `gh auth status` check.
+	// Authenticated is false once there was no token or GitHub rejected it, and true
+	// again after a successful request or auth check (Runner.AuthStatus).
 	Authenticated bool
 	FetchedAt     time.Time
 	LastError     string

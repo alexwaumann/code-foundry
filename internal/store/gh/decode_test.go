@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Fixtures in testdata/ are real `gh api graphql` responses captured from
+// Fixtures in testdata/ are real GitHub GraphQL response bodies captured from
 // ghostty-org/ghostty with the queries in queries/ (viewer identity sanitized), except
 // files named *_synthetic.json. See docs/notes/phase1c-gh.md.
 
@@ -25,7 +25,7 @@ func fixture(t *testing.T, name string) []byte {
 // fixtureData returns a fixture's "data" object, as Runner.GraphQL does.
 func fixtureData(t *testing.T, name string) json.RawMessage {
 	t.Helper()
-	data, err := parseGraphQLOutput(0, fixture(t, name), nil)
+	data, err := parseGraphQLResponse(httpResult{status: 200, body: fixture(t, name)})
 	if err != nil {
 		t.Fatalf("%s: %v", name, err)
 	}

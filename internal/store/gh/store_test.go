@@ -337,6 +337,29 @@ func TestStoreRateLimitBudgetPauses(t *testing.T) {
 	}
 }
 
+func TestStoreSecondaryLimitHonorsRetryAfter(t *testing.T) {
+	f := &fakeRunner{}
+	f.set(func(string, map[string]any) (json.RawMessage, error) {
+		return nil, &RateLimitError{Secondary: true, Msg: "secondary rate limit (HTTP 403)", RetryAfter: 2 * time.Minute}
+	})
+	before := time.Now()
+	s := startStore(t, testOptions(openTestDB(t), f, nil)) // SecondaryBackoff is 30ms here
+	waitFor(t, "pause", func() bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return !s.pauseUntil.IsZero()
+	})
+	s.mu.Lock()
+	until := s.pauseUntil
+	s.mu.Unlock()
+	if lo, hi := before.Add(2*time.Minute), time.Now().Add(2*time.Minute+retryAfterSlack); until.Before(lo) || until.After(hi) {
+		t.Errorf("pauseUntil in %v, want retry-after (2m)", time.Until(until).Round(time.Second))
+	}
+	if !errors.Is(s.Refresh(context.Background(), "a/b"), ErrRateLimited) {
+		t.Error("Refresh during the pause should fail fast with ErrRateLimited")
+	}
+}
+
 func TestStoreRepoErrorBackoff(t *testing.T) {
 	b := bus.New()
 	events := bus.Subscribe[PullRequestsUpdated](b, 16)
@@ -346,7 +369,7 @@ func TestStoreRepoErrorBackoff(t *testing.T) {
 		if op == "Viewer" {
 			return viewer, nil
 		}
-		return parseGraphQLOutput(1, fixture(t, "graphql_repo_not_found.json"), nil)
+		return parseGraphQLResponse(httpResult{status: 200, body: fixture(t, "graphql_repo_not_found.json")})
 	})
 	opts := testOptions(openTestDB(t), f, b)
 	opts.RepoInterval = 40 * time.Millisecond
