@@ -25,9 +25,9 @@ and `/tmp/cf-shots/chunk1-hidden.png`. Not run in the real Wails window.
 
 | File | Role |
 |---|---|
-| `stores/panel.ts` | Per-selection state (`byKey`: open, tabs, active tab, width since chunk 6), pure reducers, `openSurface`/`togglePanel`/`setPanelWidth` API. Persisted since chunk 6 |
+| `stores/panel.ts` | Per-selection state (`byKey`: open, tabs, active tab, width since chunk 6, expanded since chunk 8), pure reducers, `openSurface`/`togglePanel`/`setPanelWidth`/`expandPanel` API. Persisted since chunk 6 |
 | `stores/ui.ts` | `PANEL_DEFAULT` 420, `PANEL_MIN` 280, `clampPanelWidth`, `panelMax(window, sidebar)`, `windowWidth`, `FocusRegion` `"panel"`, `panelFocusSeq`, `contentFocusSeq` |
-| `stores/views.ts` | `togglePanelCommand` (view.panel.toggle): settings guard and focus moves |
+| `stores/views.ts` | `togglePanelCommand` (view.panel.toggle) and `expandPanelCommand` (view.panel.expand, chunk 8): settings guard and focus moves |
 | `surfaces/types.ts`, `surfaces/registry.ts` | `SurfaceSpec` and the ordered list, with `surfaceOf`, `surfaceByHotkey`, `useAvailability` |
 | `surfaces/files.ts`, `diff.ts`, `pullrequest.ts` | One spec per file. Files and Diff are `"disabled"` for now (`Placeholder.tsx` is their body); Pull request is real since chunk 3 (below) |
 | `components/panel/SidePanel.tsx` | Pane, tab strip, body via the registry, and the empty "Open a surface" list |
@@ -35,7 +35,8 @@ and `/tmp/cf-shots/chunk1-hidden.png`. Not run in the real Wails window.
 | `components/panel/reveal.ts` | `revealTab`: scrolls the tab strip (only the strip) so the active tab is fully visible |
 | `components/panel/PanelResizeHandle.tsx` | Same pattern as the sidebar's `ResizeHandle`, mirrored. Double-click resets its panel to 420. Focusable, arrow keys resize |
 | `components/panel/PanelToggle.tsx` | `CommandButton` for `view.panel.toggle`, `aria-pressed` while open |
-| `internal/command/commands_view.go` | `view.panel.toggle` (cmd+shift+e), emits `UiIntent.ShowView{name: "panel.toggle"}` |
+| `components/panel/PanelExpand.tsx` | `CommandButton` for `view.panel.expand` left of the toggle in the panel header: `Maximize2`, or `Minimize2` with `aria-pressed` while expanded (chunk 8) |
+| `internal/command/commands_view.go` | `view.panel.toggle` (cmd+shift+e), emits `UiIntent.ShowView{name: "panel.toggle"}`; `view.panel.expand` (no chord), emits `"panel.expand"` |
 
 ### Decisions
 
@@ -839,3 +840,128 @@ panel opened through the CLI. Full details are in `phase3-ui-panes.md` ("Verific
 * Not live: the window moving, zoom, real clicks on header buttons, or a real drag on
   the resize handle near the top. The process has no Accessibility permission, so it
   cannot post mouse events.
+
+## Chunk 8: expand to full width
+
+A per-panel "expand": the side panel takes the whole content area (the row the content
+pane and the panel normally share), and the content pane hides without unmounting.
+
+Status: `make check` green (Go packages all ok, 46 vitest files / 668 tests). `make gui-e2e` passes 244/244 (122 WebKit, 122 Chromium), with `e2e/panel.spec.ts` at 19 tests per browser.
+
+### Pieces
+
+| File | Change |
+|---|---|
+| `internal/command/commands_view.go` | `view.panel.expand` ("Expand Side Panel", View, no keybinding), emits `ShowView{Name: ViewPanelExpand}` (`"panel.expand"`) |
+| `stores/panel.ts` | `PanelEntry.expanded?`; pure `setExpanded(e, expanded?)`; `expandPanel(target, expanded?, {focus})`; `usePanelExpanded()` (current panel open and expanded) |
+| `stores/views.ts` | `showView("panel.expand")` and `expandPanelCommand` |
+| `keys/bindings.ts` | Local presenter for `view.panel.expand` (no round trip) |
+| `components/panel/PanelExpand.tsx` | The header button (`data-testid="panel-expand"`, `no-drag`) |
+| `components/panel/SidePanel.tsx` | Expanded: the wrapper is `m-2 flex-1` with no width style and no resize handle, and it ignores the room check. The expand and toggle buttons sit together at the header's right end |
+| `components/panel/PanelToggle.tsx` | `usePanelShown` counts an expanded panel as shown whatever the room |
+| `App.tsx` | `ContentPane hidden` (Tailwind `hidden`, i.e. `display: none`) while the current panel is open, expanded, and settings is closed |
+| `terminal/xterm.ts` | `fit()` does nothing while the host measures 0 wide or 0 high |
+| `components/terminal/TerminalPane.tsx` | A focus request for a terminal hidden under an expanded panel goes to the panel |
+| `mock/world.ts` | Lists `view.panel.expand` |
+
+### Decisions
+
+* **State.** `expanded` is per panel key and persisted with the rest of the entry. It is
+  optional, like `width`: absent means false. `setExpanded(e, false)` drops the key
+  instead of storing `false`, so `emptyEntry` keeps its shape. Entries saved before this
+  chunk, and entries never expanded, look the same, and no migration is needed. The
+  reducers that build entries (`openTab`, `closeTab`, `toggle`, `setWidth`) all spread the
+  old entry, so they keep `expanded`. A test pins this.
+* **Hide keeps it.** Toggling the panel off leaves `expanded` set, so showing it again
+  (button, chord, CLI) brings it back full width. `expandPanel` opens the panel whenever
+  its result is expanded. `expandPanelCommand` on a hidden panel always expands (it
+  forces `true` rather than flipping), so a hidden panel that was expanded comes back
+  expanded instead of turning into a hidden split panel. Restoring the split never
+  changes the open state.
+* **Layout.** Expanded, the panel wrapper uses the content pane's own `m-2` and
+  `flex-1`. Its left edge is 8px right of the sidebar (or of the window, with the sidebar
+  hidden), and its right, top and bottom edges are 8px in. The stored width is untouched,
+  and the split comes back at it. No resize handle renders while expanded: there is
+  nothing to resize against. The room check (`panelMax < PANEL_MIN` hides the panel)
+  does not apply, because an expanded panel does not share the row. The settings page
+  still hides the panel. While it is up, the content pane is visible (it shows settings)
+  and the expanded panel returns when settings closes.
+* **Content pane stays mounted.** `<main>` gets `display: none` (Tailwind `hidden`,
+  replacing its `flex`), not an unmount. The terminal keeps its Attach stream and its
+  xterm state (scrollback, selection, WebGL renderer). Hidden, its host measures 0x0. The
+  ResizeObserver still fires, and the fit addon would propose its minimum. In Chromium,
+  without the guard, the e2e saw 11x6, and that resize would also go to the PTY through
+  `onResize`, reflowing Claude Code. `XtermRenderer.fit()` now returns early while the host
+  has no width or height. The observer fires again when the pane shows, and the terminal
+  refits to the split. A snapshot that arrives while the pane is hidden (a session selected
+  with its panel expanded) sizes the terminal to the PTY, and the guarded fit leaves it
+  there, so no Resize RPC is sent until the pane shows.
+* **Button title.** The tooltip and `aria-label` are the command title ("Expand Side
+  Panel") in both states, and the state is `aria-pressed`, with the icon flipping from
+  `Maximize2` to `Minimize2`. This matches `PanelToggle`, the only other pressed
+  `CommandButton`, which keeps "Toggle Side Panel" while open. A label that changes with
+  the state would also contradict `aria-pressed`. The pressed button gets the toggle's
+  accent background.
+* **No chord.** As the user asked, `Keybindings` is empty. The command is still in the
+  palette and the CLI, and it can be bound in settings. The Help overlay lists only bound
+  commands (`keys/help.ts`), so it shows the command only once the user binds it. Nothing
+  was added there by hand.
+* **Focus.**
+  * Expanding hides the content pane. If focus was there (`terminal` or `content`), the
+    command bumps `panelFocusSeq` after the state change, and the panel takes focus. From
+    the sidebar or the panel, focus stays put. Restoring never moves focus (from the
+    panel it stays in the panel).
+  * From the palette, its `returnTo` moves to `"panel"` when it pointed at the hidden
+    content. Restoring leaves `returnTo` alone.
+  * Other requests for the hidden terminal (selecting a session whose panel is expanded,
+    closing settings, `terminalFocusSeq`/`contentFocusSeq`) go to the panel instead:
+    TerminalPane's focus effect checks `getPanel()` (open and expanded) and bumps
+    `panelFocusSeq`. Focusing a `display: none` xterm would do nothing, leaving focus on
+    `<body>` with no key handling.
+* **Command path.** The same shape as `view.panel.toggle`. The GUI's button, the palette
+  and a bound chord run the local presenter. The CLI and any other caller reach every
+  window through `ShowView "panel.expand"`. It is a no-op while settings is open or with
+  nothing selected.
+
+### Gotchas
+
+* Measuring xterm's size in e2e right after a layout change catches a stale size. The
+  observer refits one animation frame later. The e2e waits for each narrowing step (no
+  panel, then 420, then 436) before it records the split size.
+* The panel's left edge is at the sidebar's right + 8 only once the expanded render
+  lands. The e2e polls the wrapper's left edge rather than reading it once.
+
+### Tests
+
+* `stores/panel.test.ts`: the `setExpanded` table (flip, force, drop the key, open state
+  untouched), identity on no-op, `expanded` surviving `toggle`/`closeTab`/`openTab`/
+  `activateTab`/`setWidth`, `expandPanel` (shows a hidden panel, per key, kept across
+  hide/show, restore does not show, focus only when asked and only when expanded, no-op
+  with nothing selected), and the persist round trip now carries `expanded`.
+* `stores/views.test.ts`: `expandPanelCommand` flips, opens a hidden panel expanded, a
+  focus table (terminal and content go to the panel, sidebar and panel stay), restoring
+  leaves focus, the settings and nothing-selected no-ops, the palette's `returnTo`, and
+  `showView("panel.expand")`.
+* `SidePanel.test.tsx`: expanded, the wrapper fills (`flex-1`, no width style) with no
+  separator, even without room. Settings hides it, and back in the split the stored
+  width and the handle return.
+* `e2e/panel.spec.ts` (3 new tests per browser):
+  * The button fills the area: the wrapper starts at sidebar right + 8 and is 8px in on
+    the other sides. The content pane is `display: none`, and the terminal host is still
+    there, hidden, `live`, at its split size, with one Attach stream. There is no handle,
+    and the icon and `aria-pressed` flip. It still shows in a 1000px window with a 520px
+    sidebar. Restoring gives back 436px and the terminal's size. No daemon invocation.
+    With the fit guard reverted, this test fails in Chromium (11x6).
+  * Per panel: s-1 expanded leaves s-2 split. Re-selecting s-1 puts focus in the panel.
+    Hiding, then showing, comes back expanded. After a reload s-1 is expanded and live,
+    and s-2 is not.
+  * Palette (opens expanded, focus to the panel; restoring keeps focus in the panel), CLI
+    (`CommandService.Invoke view.panel.expand` from a focused terminal: expanded, focus in
+    the panel), and settings (hides it; `ShowView "panel.expand"` is a no-op while it is
+    up; closing it brings the expanded panel back with focus).
+
+### Not done
+
+* Not run in the real Wails window (no `make gui-build`, per the task). WKWebView should
+  behave like the e2e's WebKit for `display: none` and ResizeObserver, but that is not
+  verified live.
