@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -22,8 +21,6 @@ const EventCheckForUpdates = "app:check-for-updates"
 type AppInfo struct {
 	// Version is this GUI binary's version (same ldflag as the daemon's).
 	Version string `json:"version"`
-	// Bundle is the .app this GUI runs from, or "" for a dev binary.
-	Bundle string `json:"bundle"`
 }
 
 // AppService is bound to the frontend: the GUI's own version and relaunching itself.
@@ -35,75 +32,49 @@ type AppService struct {
 // NewAppService returns an AppService.
 func NewAppService(log *slog.Logger) *AppService { return &AppService{log: log} }
 
-// Info returns the GUI's version and bundle path.
+// Info returns the GUI's version.
 func (s *AppService) Info() AppInfo {
-	return AppInfo{Version: version.Version, Bundle: runningBundle()}
+	return AppInfo{Version: version.Version}
 }
 
-// Relaunch quits the app and opens it again once this process has exited, so the new
-// process runs whatever bundle is on disk now (an installed update). Sessions are
-// unaffected: they live in the daemon.
+// Relaunch quits the app and starts this executable again once this process has
+// exited, so the new process runs whatever is on disk at this path now (an installed
+// update swaps the app directory in place). It keeps the arguments and the environment
+// (CODE_FOUNDRY_HOME, CODE_FOUNDRY_BIN, the adopted PATH, ...). Sessions are unaffected:
+// they live in the daemon.
 func (s *AppService) Relaunch() error {
 	s.log.Info("relaunch requested")
-	argv, err := relaunchCommand(os.Getpid(), runningBundle(), os.Getenv)
+	// On darwin os.Executable is the path this process was started from, not wherever
+	// its (since replaced) file has moved to.
+	exe, err := os.Executable()
 	if err != nil {
-		return err
+		return fmt.Errorf("relaunch: %w", err)
 	}
-	cmd := exec.Command("/bin/sh", "-c", argv)
+	script := relaunchCommand(os.Getpid(), exe, os.Args[1:])
+	// Detached, stdio on /dev/null: the shell outlives this process.
+	cmd := exec.Command("/bin/sh", "-c", script)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("relaunch: %w", err)
 	}
 	go func() { _ = cmd.Wait() }()
-	s.log.Info("relaunching", "cmd", argv)
+	s.log.Info("relaunching", "cmd", script)
 	application.Get().Quit()
 	return nil
 }
 
-// relaunchCommand is a shell script that waits for pid to exit, then reopens bundle
-// (through LaunchServices, forwarding CODE_FOUNDRY_* settings with `open --env`), or
-// re-executes this binary when there is no bundle (dev).
-func relaunchCommand(pid int, bundle string, getenv func(string) string) (string, error) {
+// relaunchCommand is a shell script that waits for pid to exit, then executes exe with
+// args (two windows never run at once).
+func relaunchCommand(pid int, exe string, args []string) string {
 	var b strings.Builder
-	b.WriteString("while kill -0 " + strconv.Itoa(pid) + " 2>/dev/null; do sleep 0.1; done; ")
-	if bundle != "" {
-		b.WriteString("exec /usr/bin/open")
-		for _, k := range []string{"CODE_FOUNDRY_HOME", version.EnvReleaseRepo, version.EnvReleaseDir, "CODE_FOUNDRY_UPDATE_DELAY"} {
-			if v := getenv(k); v != "" {
-				b.WriteString(" --env " + shellQuote(k+"="+v))
-			}
-		}
-		b.WriteString(" " + shellQuote(bundle))
-		return b.String(), nil
+	b.WriteString("while kill -0 " + strconv.Itoa(pid) + " 2>/dev/null; do sleep 0.1; done; exec " + shellQuote(exe))
+	for _, a := range args {
+		b.WriteString(" " + shellQuote(a))
 	}
-	exe, err := os.Executable()
-	if err != nil {
-		return "", fmt.Errorf("relaunch: %w", err)
-	}
-	b.WriteString("exec " + shellQuote(exe))
-	return b.String(), nil
+	return b.String()
 }
 
 func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
-
-// runningBundle is the .app containing this executable, or "".
-func runningBundle() string {
-	exe, err := os.Executable()
-	if err != nil {
-		return ""
-	}
-	if r, err := filepath.EvalSymlinks(exe); err == nil {
-		exe = r
-	}
-	dir := filepath.Dir(exe)
-	if filepath.Base(dir) != "MacOS" || filepath.Base(filepath.Dir(dir)) != "Contents" {
-		return ""
-	}
-	if b := filepath.Dir(filepath.Dir(dir)); strings.HasSuffix(b, ".app") {
-		return b
-	}
-	return ""
-}
 
 // appMenu is the default macOS menu with "Check for Updates…" in the app menu, which
 // asks the frontend to open the update dialog and check. The View menu is custom: the

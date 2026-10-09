@@ -1,23 +1,31 @@
 package main
 
-import (
-	"strings"
-	"testing"
-)
+import "testing"
 
 func TestRelaunchCommand(t *testing.T) {
-	env := map[string]string{"CODE_FOUNDRY_HOME": "/tmp/cf home", "CODE_FOUNDRY_RELEASE_DIR": "/tmp/rel"}
-	got, err := relaunchCommand(42, "/Users/a/Applications/CodeFoundry.app", func(k string) string { return env[k] })
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name, exe string
+		args      []string
+		want      string
+	}{
+		{
+			name: "installed GUI",
+			exe:  "/Users/a/.code-foundry/app/CodeFoundry",
+			want: "while kill -0 42 2>/dev/null; do sleep 0.1; done; exec '/Users/a/.code-foundry/app/CodeFoundry'",
+		},
+		{
+			name: "arguments and spaces are kept",
+			exe:  "/tmp/cf home/app/CodeFoundry",
+			args: []string{"--flag", "it's"},
+			want: `while kill -0 42 2>/dev/null; do sleep 0.1; done; exec '/tmp/cf home/app/CodeFoundry' '--flag' 'it'\''s'`,
+		},
 	}
-	want := "while kill -0 42 2>/dev/null; do sleep 0.1; done; exec /usr/bin/open --env 'CODE_FOUNDRY_HOME=/tmp/cf home' --env 'CODE_FOUNDRY_RELEASE_DIR=/tmp/rel' '/Users/a/Applications/CodeFoundry.app'"
-	if got != want {
-		t.Fatalf("got  %s\nwant %s", got, want)
-	}
-	dev, err := relaunchCommand(42, "", func(string) string { return "" })
-	if err != nil || !strings.Contains(dev, "; exec '") {
-		t.Fatalf("dev relaunch %q, %v", dev, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := relaunchCommand(42, tt.exe, tt.args); got != tt.want {
+				t.Fatalf("got  %s\nwant %s", got, tt.want)
+			}
+		})
 	}
 }
 
