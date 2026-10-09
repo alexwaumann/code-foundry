@@ -7,6 +7,7 @@ import {
   type Worktree,
 } from "@/gen/codefoundry/v1/repo_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { orOutdatedDaemon } from "./errors";
 
 export interface GitStatusView {
   upstream: string;
@@ -40,6 +41,8 @@ export interface RepoView {
   name: string;
   defaultBranch: string;
   githubSlug: string;
+  /** Configured git remotes ("origin", …), sorted; empty for a local-only repository. */
+  remotes: string[];
   worktrees: WorktreeView[];
 }
 
@@ -96,6 +99,7 @@ export function toRepoView(r: Repo): RepoView {
     name: r.name,
     defaultBranch: r.defaultBranch,
     githubSlug: r.githubSlug,
+    remotes: [...r.remotes],
     worktrees: r.worktrees.map(toWorktreeView),
   };
 }
@@ -129,13 +133,20 @@ export async function listRepos(conn: DaemonConnection = daemon, signal?: AbortS
 export interface RefsView {
   /** Local branches, then remote-tracking refs ("origin/main"), each sorted. */
   refs: string[];
-  /** "origin/<default branch>" when it exists, else "<default branch>". */
+  /** "origin/<default branch>" when it exists, else "<default branch>" (always so without a remote). */
   defaultRef: string;
 }
 
-/** Refs a new worktree can be based on (RepoService.ListRefs). */
+/**
+ * Refs a new worktree can be based on (RepoService.ListRefs). A daemon older than the
+ * RPC fails with OutdatedDaemonError.
+ */
 export async function listRefs(repoId: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<RefsView> {
   const c = await conn.client(RepoService);
-  const res = await c.listRefs({ repoId }, { signal });
-  return { refs: [...res.refs], defaultRef: res.defaultRef };
+  try {
+    const res = await c.listRefs({ repoId }, { signal });
+    return { refs: [...res.refs], defaultRef: res.defaultRef };
+  } catch (err) {
+    throw orOutdatedDaemon(err);
+  }
 }

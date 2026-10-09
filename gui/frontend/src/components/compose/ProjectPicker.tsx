@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { formatChord } from "@/keys/chord";
-import { projectHue, projectInitials } from "@/lib/compose";
+import { projectHue, projectInitials, repoSource } from "@/lib/compose";
 import { tildify } from "@/lib/path";
 import { composeIn } from "@/stores/compose";
 import { getUiContext } from "@/stores/context";
@@ -26,10 +26,14 @@ export function ProjectBadge({ name, className }: { name: string; className?: st
 function ProjectRow({ id, index, onPick }: { id: string; index: number; onPick: (id: string) => void }) {
   const name = useReposStore((s) => s.byId[id]?.name ?? id);
   const path = useReposStore((s) => s.byId[id]?.path ?? "");
+  const source = useReposStore((s) => {
+    const r = s.byId[id];
+    return r ? repoSource(r) : "";
+  });
   return (
     <CommandItem
       value={id}
-      keywords={[name, path]}
+      keywords={[name, path, source]}
       onSelect={() => {
         onPick(id);
       }}
@@ -39,7 +43,9 @@ function ProjectRow({ id, index, onPick }: { id: string; index: number; onPick: 
       <ProjectBadge name={name} />
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-medium">{name}</span>
-        <span className="truncate text-xs text-muted-foreground">Local · {tildify(path)}</span>
+        <span className="truncate text-xs text-muted-foreground" data-testid="project-source">
+          {source} · {tildify(path)}
+        </span>
       </span>
       {index < 9 && <CommandShortcut>{formatChord(`cmd+${String(index + 1)}`)}</CommandShortcut>}
     </CommandItem>

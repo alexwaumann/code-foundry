@@ -1,6 +1,7 @@
 import { timestampMs } from "@bufbuild/protobuf/wkt";
 import { PermissionMode, SessionService, SessionState, SessionStatus, type Session, type SessionEvent } from "@/gen/codefoundry/v1/session_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { orOutdatedDaemon } from "./errors";
 
 export type SessionStateView = "starting" | "connected" | "closing" | "disconnected" | "unknown";
 export type SessionStatusView = "busy" | "idle" | "attention" | "unknown";
@@ -114,10 +115,17 @@ export async function listSessions(conn: DaemonConnection = daemon, signal?: Abo
 export const ATTACHMENT_MIME_TYPES: readonly string[] = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
-/** Uploads an image for a new thread's first prompt; returns the daemon-side path. */
+/**
+ * Uploads an image for a new thread's first prompt; returns the daemon-side path. A
+ * daemon older than the RPC fails with OutdatedDaemonError.
+ */
 export async function stageAttachment(file: { name: string; type: string; arrayBuffer(): Promise<ArrayBuffer> }, conn: DaemonConnection = daemon): Promise<string> {
   const c = await conn.client(SessionService);
   const data = new Uint8Array(await file.arrayBuffer());
-  const res = await c.stageAttachment({ name: file.name, mimeType: file.type, data });
-  return res.path;
+  try {
+    const res = await c.stageAttachment({ name: file.name, mimeType: file.type, data });
+    return res.path;
+  } catch (err) {
+    throw orOutdatedDaemon(err);
+  }
 }

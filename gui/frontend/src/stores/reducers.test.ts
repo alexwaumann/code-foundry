@@ -36,7 +36,7 @@ function wt(repoId: string, path: string, over: Partial<WorktreeView> = {}): Wor
 }
 
 function repo(id: string, name: string, worktrees: WorktreeView[]): RepoView {
-  return { id, path: worktrees[0]?.path ?? "", name, defaultBranch: "main", githubSlug: "", worktrees };
+  return { id, path: worktrees[0]?.path ?? "", name, defaultBranch: "main", githubSlug: "", remotes: [], worktrees };
 }
 
 describe("terminals reducer", () => {

@@ -114,6 +114,10 @@ interface MockRepo {
   name: string;
   defaultBranch: string;
   githubSlug: string;
+  /** git remotes; empty for a local-only repository (no fetch, pull, push or PRs). */
+  remotes: string[];
+  /** Local branches with no worktree (ListRefs lists them too). */
+  branches?: string[];
   worktrees: MockWorktree[];
 }
 
@@ -149,6 +153,7 @@ const HOME = "/Users/dev";
 const CF = `${HOME}/src/code-foundry`;
 const CFW = `${HOME}/src/code-foundry.worktrees`;
 const GP = `${HOME}/src/ghostty-playground`;
+const SK = `${HOME}/src/sketches`;
 const enc = new TextEncoder();
 
 /** session.new's `permission` arg values. */
@@ -178,6 +183,7 @@ function initialRepos(): MockRepo[] {
       name: "code-foundry",
       defaultBranch: "main",
       githubSlug: "alexwaumann/code-foundry",
+      remotes: ["origin"],
       worktrees: [
         { path: CF, branch: "main", head: "3c3c4651", isMain: true, status: clean() },
         { path: `${CFW}/feat-sidebar`, branch: "feat/sidebar", head: "9a8b7c6d", isMain: false, status: clean({ upstream: "origin/feat/sidebar", ahead: 2, modified: 3, untracked: 1, dirty: true, baseAhead: 3, baseBehind: 1 }) },
@@ -190,6 +196,7 @@ function initialRepos(): MockRepo[] {
       name: "ghostty-playground",
       defaultBranch: "main",
       githubSlug: "alexwaumann/ghostty-playground",
+      remotes: ["origin"],
       worktrees: [{ path: GP, branch: "main", head: "77aa55cc", isMain: true, status: clean({ staged: 1, dirty: true }) }],
     },
     {
@@ -198,7 +205,20 @@ function initialRepos(): MockRepo[] {
       name: "dotfiles",
       defaultBranch: "main",
       githubSlug: "",
+      // A remote that is not GitHub: fetch/pull/push work, PRs do not.
+      remotes: ["origin"],
       worktrees: [{ path: `${HOME}/dotfiles`, branch: "main", head: "0badc0de", isMain: true, status: clean({ upstream: "", baseRef: "" }) }],
+    },
+    {
+      // Local only: no remote at all. Refs are local branches; the default base is "main".
+      id: "repo-sk",
+      path: SK,
+      name: "sketches",
+      defaultBranch: "main",
+      githubSlug: "",
+      remotes: [],
+      branches: ["experiment/shaders"],
+      worktrees: [{ path: SK, branch: "main", head: "5ca1ab1e", isMain: true, status: clean({ upstream: "", baseRef: "" }) }],
     },
   ];
 }
@@ -714,9 +734,11 @@ export class World {
     let baseRef = "";
     const created = args["new-worktree"] === "true";
     if (created) {
-      baseRef = args.base || "origin/main";
+      baseRef = args.base || (repo.remotes.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch);
       await settle(this.worktreeDelayMs);
-      if (prompt.includes("FAIL")) throw new CommandError("unavailable", `create worktree: git fetch origin ${baseRef.replace(/^origin\//, "")}: exit status 128`);
+      if (prompt.includes("FAIL")) {
+        throw new CommandError("unavailable", repo.remotes.length > 0 ? `create worktree: git fetch origin ${baseRef.replace(/^origin\//, "")}: exit status 128` : `create worktree: git worktree add: invalid reference: ${baseRef}`);
+      }
       const branch = `cf/${slug || `s-new-${String(this.nextId)}`}`;
       const w: MockWorktree = {
         path: `${HOME}/.code-foundry/worktrees/${repo.githubSlug || `_local/${repo.name}`}/${branch.replace(/\//g, "-")}`,
@@ -763,9 +785,9 @@ export class World {
   listRefs(repoId: string): { refs: string[]; defaultRef: string } {
     const repo = this.repos.get(repoId);
     if (!repo) throw new CommandError("notfound", `repo ${repoId} not found`);
-    const local = [...new Set(repo.worktrees.map((w) => w.branch).filter(Boolean))].sort();
-    const remote = repo.githubSlug ? ["origin/main", "origin/release/v0.3", "origin/feat/sidebar"].sort() : [];
-    return { refs: [...local, ...remote], defaultRef: remote.length > 0 ? "origin/main" : repo.defaultBranch };
+    const local = [...new Set([...repo.worktrees.map((w) => w.branch), ...(repo.branches ?? [])].filter(Boolean))].sort();
+    const remote = !repo.remotes.includes("origin") ? [] : repo.githubSlug ? ["origin/main", "origin/release/v0.3", "origin/feat/sidebar"].sort() : [`origin/${repo.defaultBranch}`];
+    return { refs: [...local, ...remote], defaultRef: remote.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch };
   }
 
   // ---- Repo API -----------------------------------------------------------------
@@ -775,7 +797,7 @@ export class World {
   }
 
   repoMsg(r: MockRepo): RepoInit {
-    return { id: r.id, path: r.path, name: r.name, defaultBranch: r.defaultBranch, githubSlug: r.githubSlug, worktrees: r.worktrees.map((w) => this.worktreeMsg(r.id, w)) };
+    return { id: r.id, path: r.path, name: r.name, defaultBranch: r.defaultBranch, githubSlug: r.githubSlug, remotes: r.remotes, worktrees: r.worktrees.map((w) => this.worktreeMsg(r.id, w)) };
   }
 
   // ---- Commands -----------------------------------------------------------------
@@ -928,7 +950,7 @@ export class World {
           const path = (args.path ?? "").replace(/^~(?=\/|$)/, HOME).replace(/\/+$/, "");
           const name = path.split("/").pop() || path;
           const id = `repo-${name}`;
-          const repo: MockRepo = { id, path, name, defaultBranch: "main", githubSlug: "", worktrees: [{ path, branch: "main", head: "deadbeef", isMain: true, status: clean() }] };
+          const repo: MockRepo = { id, path, name, defaultBranch: "main", githubSlug: "", remotes: [], worktrees: [{ path, branch: "main", head: "deadbeef", isMain: true, status: clean() }] };
           this.repos.set(id, repo);
           this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
           return `Registered ${name}`;
@@ -1021,7 +1043,7 @@ export class World {
       ...this.gitops.entries((path) => {
         for (const repo of this.repos.values()) {
           const wt = repo.worktrees.find((w) => w.path === path);
-          if (wt) return { repoId: repo.id, path: wt.path, branch: wt.branch, githubSlug: repo.githubSlug };
+          if (wt) return { repoId: repo.id, path: wt.path, branch: wt.branch, githubSlug: repo.githubSlug, hasRemote: repo.remotes.length > 0 };
         }
         return null;
       }),

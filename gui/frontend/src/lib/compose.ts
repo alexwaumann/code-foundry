@@ -90,7 +90,7 @@ export interface DraftArgsInput {
   effort: string;
   permission: string;
   worktree: WorktreeChoice;
-  /** Base ref for a new worktree; "" lets the daemon pick (origin/<default branch>). */
+  /** Base ref for a new worktree; "" lets the daemon pick (origin/<default branch>, or the default branch without a remote). */
   base: string;
 }
 
@@ -125,6 +125,12 @@ export function createdSessionId(resultJson: string): string | null {
     // Not JSON: the daemon's focus intent still selects the thread.
   }
   return null;
+}
+
+/** The project picker's subtitle source: "Local only" without remotes, else the GitHub slug or the remote's name. */
+export function repoSource(r: { githubSlug: string; remotes: readonly string[] }): string {
+  if (r.remotes.length === 0) return "Local only";
+  return r.githubSlug || (r.remotes.includes("origin") ? "origin" : (r.remotes[0] ?? ""));
 }
 
 /** Two-letter badge text for a project: initials of its first two words, else its first two letters. */

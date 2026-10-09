@@ -79,6 +79,8 @@ describe("repo mapping", () => {
   it("defaults a missing git status to clean", () => {
     const r = toRepoView(create(RepoSchema, { id: "r", name: "app", worktrees: [{ repoId: "r", path: "/a", isMain: true }] }));
     expect(r.worktrees[0]?.status).toMatchObject({ dirty: false, ahead: 0, refreshedAtMs: null });
+    expect(r.remotes).toEqual([]);
+    expect(toRepoView(create(RepoSchema, { id: "r", remotes: ["origin", "upstream"] })).remotes).toEqual(["origin", "upstream"]);
   });
 
   it.each([

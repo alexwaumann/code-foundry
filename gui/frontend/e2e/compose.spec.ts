@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { CF, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
+const OUTDATED = "The running daemon is older than the app. Restart it (Daemon → Restart) to use this feature.";
+
 /** A 1x1 transparent PNG. */
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
 
@@ -27,6 +29,23 @@ async function compose(page: Page, n = 1): Promise<void> {
   await expect(page.getByTestId("composer-input")).toBeFocused();
 }
 
+/** The prompt as the draft stores it (chips as `![name](cf-attachment://id)` tokens). */
+function prompt(page: Page) {
+  return page.getByTestId("composer-prompt");
+}
+
+/** Pastes an image into the prompt the way WebKit/Chromium deliver a clipboard image. */
+async function pasteImage(page: Page, name: string): Promise<void> {
+  await page.getByTestId("composer-input").evaluate(
+    (el, [file, bytes]) => {
+      const dt = new DataTransfer();
+      dt.items.add(new File([new Uint8Array(bytes as number[])], file, { type: "image/png" }));
+      el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    },
+    [name, [...PNG]] as const,
+  );
+}
+
 function terminalFocused(page: Page): Promise<boolean> {
   return page.evaluate(() => document.activeElement?.closest("[data-terminal-host]") != null);
 }
@@ -38,10 +57,16 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   const palette = page.getByTestId("palette");
   await expect(palette).toHaveAttribute("data-mode", "projects");
   const projects = palette.locator("[data-project]");
-  await expect(projects).toHaveCount(3);
+  await expect(projects).toHaveCount(4);
   await expect(projects.nth(0)).toContainText("CF");
   await expect(projects.nth(0)).toContainText("code-foundry");
-  await expect(projects.nth(0)).toContainText("Local · ~/src/code-foundry");
+  // The subtitle names where the repo lives: its GitHub slug, a remote, or "Local only".
+  await expect(projects.getByTestId("project-source")).toHaveText([
+    "alexwaumann/code-foundry · ~/src/code-foundry",
+    "origin · ~/dotfiles",
+    "alexwaumann/ghostty-playground · ~/src/ghostty-playground",
+    "Local only · ~/src/sketches",
+  ]);
   await expect(projects.nth(0)).toContainText("⌘1");
   await expect(projects.nth(2)).toContainText("⌘3");
   await expect(page.getByTestId("picker-hints")).toHaveText(/↑↓\s*Navigate\s*Enter\s*Select\s*Backspace\s*Back\s*Esc\s*Close/);
@@ -53,7 +78,8 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
 
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in code-foundry?");
   await expect(page.getByTestId("composer-input")).toBeFocused();
-  await expect(page.getByTestId("composer-input")).toHaveAttribute("placeholder", "Describe what to build…");
+  await expect(page.getByTestId("composer-input")).toHaveAttribute("aria-placeholder", "Describe what to build…");
+  await expect(page.getByTestId("composer")).toContainText("Describe what to build…");
   await expect(row(page, "r:repo-cf")).toHaveAttribute("aria-selected", "true");
   // Defaults: settings (opus / high), Auto, a new worktree from ListRefs' default ref.
   await expect(page.getByTestId("composer-model")).toHaveText("Opus 5.5");
@@ -65,7 +91,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   await page.keyboard.type("Add a dark mode toggle");
   await page.keyboard.press("Shift+Enter");
   await page.keyboard.type("in settings");
-  await expect(page.getByTestId("composer-input")).toHaveValue("Add a dark mode toggle\nin settings");
+  await expect(prompt(page)).toHaveAttribute("data-value", "Add a dark mode toggle\nin settings");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("composer-send")).toHaveText("Creating worktree…");
   await expect(page.getByTestId("composer-input")).toBeDisabled();
@@ -101,7 +127,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
 
   // The draft was cleared: a new composer for the repo starts empty.
   await compose(page);
-  await expect(page.getByTestId("composer-input")).toHaveValue("");
+  await expect(prompt(page)).toHaveAttribute("data-value", "");
 });
 
 test("pickers are keyboard operable; Tab goes prompt → pickers → send", async ({ page }) => {
@@ -182,7 +208,7 @@ test("a failed start keeps the draft editable and shows why", async ({ page }) =
   await expect(error).toHaveText("create worktree: git fetch origin main: exit status 128");
   const input = page.getByTestId("composer-input");
   await expect(input).toBeEnabled();
-  await expect(input).toHaveValue("Please FAIL here");
+  await expect(prompt(page)).toHaveAttribute("data-value", "Please FAIL here");
   await expect(input).toBeFocused();
   await expect(page.getByTestId("composer")).toBeVisible();
   expect(await sessionCount()).toBe(before);
@@ -211,26 +237,26 @@ test("attachments: picked, rejected, removed, staged on send", async ({ page }) 
     { name: "shot.png", mimeType: "image/png", buffer: PNG },
     { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hi") },
   ]);
-  const chips = page.getByTestId("attachment");
-  await expect(chips).toHaveCount(1);
-  await expect(chips.first().locator("img")).toHaveAttribute("src", /^blob:/);
+  const thumbs = page.getByTestId("attachment");
+  await expect(thumbs).toHaveCount(1);
+  await expect(thumbs.first().locator("img")).toHaveAttribute("src", /^blob:/);
   await expect(page.getByTestId("composer-notice")).toHaveText("notes.txt: not a PNG, JPEG, GIF or WebP image");
 
   await input.setInputFiles([{ name: "other.png", mimeType: "image/png", buffer: PNG }]);
-  await expect(chips).toHaveCount(2);
+  await expect(thumbs).toHaveCount(2);
   await expect(page.getByTestId("composer-notice")).toHaveCount(0);
+  // Not referenced in the (empty) text: × removes it without asking.
   await page.getByRole("button", { name: "Remove other.png" }).click();
-  await expect(chips).toHaveCount(1);
+  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
+  await expect(thumbs).toHaveCount(1);
 
-  // A pasted image lands as a chip too.
-  await page.getByTestId("composer-input").evaluate((el, bytes) => {
-    const dt = new DataTransfer();
-    dt.items.add(new File([new Uint8Array(bytes)], "pasted.png", { type: "image/png" }));
-    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
-  }, [...PNG]);
-  await expect(chips).toHaveCount(2);
+  // A pasted image lands as a thumbnail too; into an empty prompt, with no chip.
+  await pasteImage(page, "pasted.png");
+  await expect(thumbs).toHaveCount(2);
+  await expect(page.getByTestId("prompt-chip")).toHaveCount(0);
 
   await page.getByTestId("composer-input").fill("Match these screenshots");
+  await expect(page.getByTestId("prompt-chip")).toHaveCount(0);
   await page.getByTestId("composer-input").press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
   const up = await staged();
@@ -263,7 +289,7 @@ test("the draft survives switching away; Backspace goes back; Esc on an empty dr
   await page.keyboard.press("Escape");
   await expect(palette).toHaveCount(0);
   await compose(page, 3);
-  await expect(page.getByTestId("composer-input")).toHaveValue("Half-written idea");
+  await expect(prompt(page)).toHaveAttribute("data-value", "Half-written idea");
 
   // Esc with text does nothing; with an empty draft it returns to the repo overview.
   await page.keyboard.press("Escape");
@@ -272,4 +298,186 @@ test("the draft survives switching away; Backspace goes back; Esc on an empty dr
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("composer")).toHaveCount(0);
   await expect(row(page, "r:repo-gp")).toHaveAttribute("aria-selected", "true");
+});
+
+test("image chips: inserted at the caret, one unit for arrows and Backspace, × asks while referenced, sent as references", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  const input = page.getByTestId("composer-input");
+  const chips = page.getByTestId("prompt-chip");
+  const thumbs = page.getByTestId("attachment");
+
+  await page.keyboard.type("Compare");
+  await pasteImage(page, "image.png");
+  await expect(thumbs).toHaveCount(1);
+  await expect(chips).toHaveCount(1);
+  await expect(chips.first()).toHaveAttribute("aria-label", "Image attachment, image.png, 1 KB");
+  await expect(chips.first()).toContainText("image.png");
+  await expect(chips.first()).toContainText("1 KB");
+  const id = (await chips.first().getAttribute("data-attachment-id")) ?? "";
+  expect(id).toMatch(/^a\d+$/);
+  const chip = `![image.png](cf-attachment://${id})`;
+  // A space before (after a word) and after the chip; typing continues after it.
+  await expect(prompt(page)).toHaveAttribute("data-value", `Compare ${chip} `);
+  await page.keyboard.type("with the header");
+  await expect(prompt(page)).toHaveAttribute("data-value", `Compare ${chip} with the header`);
+
+  // The arrows step over the chip in one press.
+  for (let i = 0; i < " with the header".length; i++) await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.type("|");
+  await expect(prompt(page)).toHaveAttribute("data-value", `Compare |${chip} with the header`);
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.type("|");
+  await expect(prompt(page)).toHaveAttribute("data-value", `Compare |${chip}| with the header`);
+  await page.keyboard.press("Backspace");
+
+  // Backspace removes the chip as one unit and only the reference: the thumbnail stays.
+  await page.keyboard.press("Backspace");
+  await expect(chips).toHaveCount(0);
+  await expect(prompt(page)).toHaveAttribute("data-value", "Compare | with the header");
+  await expect(thumbs).toHaveCount(1);
+  // Undo brings the reference back.
+  await page.keyboard.press("Meta+z");
+  await expect(prompt(page)).toHaveAttribute("data-value", `Compare |${chip} with the header`);
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Backspace");
+  await expect(prompt(page)).toHaveAttribute("data-value", `Compare ${chip} with the header`);
+  // A selection extends across the chip; typing replaces it like any text.
+  await page.waitForTimeout(600); // a separate undo step (ProseMirror groups edits within 500 ms)
+  await page.keyboard.press("Shift+ArrowRight");
+  await page.keyboard.press("Shift+ArrowRight");
+  await page.keyboard.type("X ");
+  await expect(prompt(page)).toHaveAttribute("data-value", "Compare X with the header");
+  await expect(thumbs).toHaveCount(1);
+  await page.keyboard.press("Meta+z");
+  await expect(prompt(page)).toHaveAttribute("data-value", `Compare ${chip} with the header`);
+
+  // × on a referenced thumbnail asks first (centered); Cancel keeps both.
+  const dialog = page.getByTestId("confirm-dialog");
+  await page.getByRole("button", { name: "Remove image.png" }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("heading")).toHaveText("Remove image.png from the message?");
+  await expect(dialog).toContainText("It is referenced in your text; removing it also removes every reference.");
+  await expect(dialog.getByTestId("confirm-ok")).toHaveText("Confirm");
+  const box = await dialog.boundingBox();
+  const vp = page.viewportSize();
+  expect(Math.abs((box?.y ?? 0) + (box?.height ?? 0) / 2 - (vp?.height ?? 0) / 2)).toBeLessThan(2);
+  await dialog.getByTestId("confirm-cancel").click();
+  await expect(dialog).toHaveCount(0);
+  await expect(thumbs).toHaveCount(1);
+  await expect(chips).toHaveCount(1);
+
+  // Confirm removes the image and every reference to it.
+  await page.getByRole("button", { name: "Remove image.png" }).click();
+  await dialog.getByTestId("confirm-ok").click();
+  await expect(thumbs).toHaveCount(0);
+  await expect(chips).toHaveCount(0);
+  await expect(prompt(page)).toHaveAttribute("data-value", "Compare with the header");
+  await expect(input).toBeFocused();
+
+  // Send: each chip becomes [Image: name; ref=<staged path>] where it stands.
+  await page.keyboard.press("End");
+  await page.keyboard.type(" and");
+  await pasteImage(page, "logo.png");
+  await page.keyboard.type("please");
+  await expect(chips).toHaveCount(1);
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
+  const [up] = await staged();
+  const args = (await invocations()).at(-1)?.args;
+  expect(args?.prompt).toBe(`Compare with the header and [Image: logo.png; ref=${up?.path ?? ""}] please`);
+  expect(args?.attachments).toBe(up?.path);
+});
+
+test("the composer stays centered in the content pane at any size, as the draft grows and on errors", async ({ page }) => {
+  await mockPost("session-new?delay=100");
+  await openApp(page);
+  await compose(page);
+  const centered = async () => {
+    const pane = await page.getByTestId("content-pane").boundingBox();
+    const body = await page.getByTestId("composer-body").boundingBox();
+    if (!pane || !body) return { dx: Infinity, dy: Infinity };
+    return {
+      dx: Math.round(Math.abs(body.x + body.width / 2 - (pane.x + pane.width / 2))),
+      dy: Math.round(Math.abs(body.y + body.height / 2 - (pane.y + pane.height / 2))),
+    };
+  };
+  for (const size of [
+    { width: 1280, height: 800 },
+    { width: 900, height: 560 },
+    { width: 1680, height: 1050 },
+  ]) {
+    await page.setViewportSize(size);
+    await expect.poll(centered).toEqual({ dx: 0, dy: 0 });
+  }
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.keyboard.type("Please FAIL here");
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press("Shift+Enter");
+    await page.keyboard.type(`line ${String(i)}`);
+  }
+  await expect.poll(centered).toEqual({ dx: 0, dy: 0 });
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("composer-error")).toBeVisible();
+  await expect.poll(centered).toEqual({ dx: 0, dy: 0 });
+});
+
+test("a local-only repository: local refs from main, no remote git commands", async ({ page }) => {
+  await openApp(page);
+  await compose(page, 4);
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in sketches?");
+  await expect(page.getByTestId("composer-base")).toHaveText("From main");
+  await page.getByTestId("composer-base").click();
+  const refs = page.getByTestId("composer-base-list").getByRole("option");
+  await expect(refs).toHaveText([/^main\s*default$/, /^experiment\/shaders$/]);
+  await page.keyboard.press("Escape");
+  await page.getByTestId("composer-input").click();
+  await page.keyboard.type("Try a new shader");
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
+  expect((await invocations()).at(-1)?.args).toMatchObject({ repo: "repo-sk", "new-worktree": "true", base: "main" });
+  await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
+
+  // Its overview shows no git buttons, and fetch/pull/push/PR are not offered for it.
+  await row(page, "w:repo-sk::/Users/dev/src/sketches").click();
+  await expect(page.getByTestId("overview-page")).toBeVisible();
+  await expect(page.locator('[data-command-button^="git."], [data-command-button^="pr."]')).toHaveCount(0);
+  await page.keyboard.press("Meta+k");
+  const palette = page.getByTestId("palette");
+  await expect(palette.locator('[data-command="terminal.new"]')).toBeVisible();
+  for (const name of ["git.fetch", "git.pull", "git.push", "pr.create", "pr.open"]) await expect(palette.locator(`[data-command="${name}"]`)).toHaveCount(0);
+});
+
+test("a daemon older than ListRefs/StageAttachment: a clear restart hint, not HTTP 404", async ({ page }) => {
+  await mockPost("missing-rpc?rpc=RepoService/ListRefs&rpc=SessionService/StageAttachment");
+  await openApp(page);
+  await compose(page);
+  await expect(page.getByTestId("composer-base")).toHaveText("From the default branch");
+  await page.getByTestId("composer-base").click();
+  await expect(page.getByTestId("composer-base-list").getByRole("status")).toHaveText(OUTDATED);
+  await page.keyboard.press("Escape");
+  await page.getByTestId("composer-file-input").setInputFiles([{ name: "shot.png", mimeType: "image/png", buffer: PNG }]);
+  await page.getByTestId("composer-input").click();
+  await page.keyboard.type("Match it");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("composer-error")).toHaveText(OUTDATED);
+  await expect(page.getByTestId("composer")).toBeVisible();
+});
+
+test("an image dropped on the prompt attaches it and puts a chip at the caret", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  await page.keyboard.type("Use this logo");
+  await page.getByTestId("composer-input").evaluate((el, bytes) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([new Uint8Array(bytes)], "drop.png", { type: "image/png" }));
+    for (const type of ["dragenter", "dragover", "drop"]) el.dispatchEvent(new DragEvent(type, { dataTransfer: dt, bubbles: true, cancelable: true }));
+  }, [...PNG]);
+  await expect(page.getByTestId("attachment")).toHaveCount(1);
+  const chip = page.getByTestId("prompt-chip");
+  await expect(chip).toHaveCount(1);
+  const id = (await chip.getAttribute("data-attachment-id")) ?? "";
+  await expect(prompt(page)).toHaveAttribute("data-value", `Use this logo ![drop.png](cf-attachment://${id}) `);
+  await expect(page.getByTestId("composer-card")).not.toHaveAttribute("data-dragging");
 });

@@ -4,14 +4,20 @@
  * attachments do not survive a reload anyway. Also caches each repo's base refs
  * (RepoService.ListRefs) for the base-ref picker.
  *
+ * The draft's text is the prompt with inline image chips as tokens (lib/prompt.ts); the
+ * attachments are the images themselves (the thumbnails). A chip refers to an attachment
+ * by id; removing a chip from the text keeps the attachment.
+ *
  * Sending stages the attachments (SessionService.StageAttachment) and invokes the
  * session.new registry command, like every other user action.
  */
 import { create } from "zustand";
 import { listRefs } from "@/api/repo";
 import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIME_TYPES, stageAttachment } from "@/api/session";
+import { isOutdatedDaemon } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
 import { checkAttachments, createdSessionId, DEFAULT_PERMISSION, sessionNewArgs, type ComposePermission, type WorktreeChoice } from "@/lib/compose";
+import { projectPrompt, removeReferences } from "@/lib/prompt";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { getUiContext } from "./context";
 import { useReposStore } from "./repos";
@@ -31,6 +37,7 @@ export interface DraftAttachment {
 export type DraftPhase = "idle" | "attaching" | "starting";
 
 export interface Draft {
+  /** The prompt, chips as `![name](cf-attachment://<id>)` tokens. */
   text: string;
   attachments: readonly DraftAttachment[];
   /** null: the settings default (sessions.default_model / default_effort). */
@@ -52,6 +59,8 @@ export interface RefsState {
   refs: readonly string[];
   defaultRef: string;
   error: string | null;
+  /** The daemon predates ListRefs (error is the restart hint). */
+  outdated: boolean;
 }
 
 interface ComposeState {
@@ -93,21 +102,26 @@ export function isDraftEmpty(d: Pick<Draft, "text" | "attachments">): boolean {
 
 let nextAttachmentId = 1;
 
-/** Adds pasted, dropped or picked files; rejects other types, oversized files and more than 10. */
-export function addAttachments(repoId: string, files: readonly File[]): void {
-  if (files.length === 0) return;
+/**
+ * Adds pasted, dropped or picked files; rejects other types, oversized files and more
+ * than 10. Returns the ones added (the editor puts chips for them into the text).
+ */
+export function addAttachments(repoId: string, files: readonly File[]): DraftAttachment[] {
+  if (files.length === 0) return [];
   const d = getDraft(repoId);
   const { accepted, rejected } = checkAttachments(files, d.attachments.length, { types: ATTACHMENT_MIME_TYPES, maxBytes: ATTACHMENT_MAX_BYTES });
   const added = accepted.map<DraftAttachment>((file) => ({ id: `a${String(nextAttachmentId++)}`, file, url: URL.createObjectURL(file), stagedPath: null }));
   updateDraft(repoId, { attachments: [...d.attachments, ...added], notice: rejected.length > 0 ? rejected.join(" · ") : null });
+  return added;
 }
 
+/** Removes an attachment and every chip that refers to it. */
 export function removeAttachment(repoId: string, id: string): void {
   const d = getDraft(repoId);
   const gone = d.attachments.find((a) => a.id === id);
   if (!gone) return;
   URL.revokeObjectURL(gone.url);
-  updateDraft(repoId, { attachments: d.attachments.filter((a) => a !== gone), notice: null });
+  updateDraft(repoId, { attachments: d.attachments.filter((a) => a !== gone), text: removeReferences(d.text, id), notice: null });
 }
 
 export function clearDraft(repoId: string): void {
@@ -144,13 +158,13 @@ export async function loadRefs(repoId: string): Promise<void> {
   const set = (r: RefsState) => {
     useComposeStore.setState((s) => ({ refs: { ...s.refs, [repoId]: r } }));
   };
-  if (!prev) set({ status: "loading", refs: [], defaultRef: "", error: null });
+  if (!prev) set({ status: "loading", refs: [], defaultRef: "", error: null, outdated: false });
   try {
     const res = await listRefs(repoId);
-    set({ status: "ready", refs: res.refs, defaultRef: res.defaultRef, error: null });
+    set({ status: "ready", refs: res.refs, defaultRef: res.defaultRef, error: null, outdated: false });
   } catch (err) {
     if (prev?.status === "ready") return;
-    set({ status: "error", refs: [], defaultRef: "", error: errorMessage(err) });
+    set({ status: "error", refs: [], defaultRef: "", error: errorMessage(err), outdated: isOutdatedDaemon(err) });
   }
 }
 
@@ -180,10 +194,15 @@ export async function sendDraft(repoId: string, defaults: { model: string; effor
     updateDraft(repoId, { phase: "starting" });
     const cur = getDraft(repoId);
     const refs = useComposeStore.getState().refs[repoId];
+    const staged = new Map(cur.attachments.map((a) => [a.id, a]));
+    const text = projectPrompt(cur.text, (id) => {
+      const a = staged.get(id);
+      return a?.stagedPath ? { name: a.file.name, ref: a.stagedPath } : undefined;
+    });
     const args = sessionNewArgs(
       repoId,
       {
-        text: cur.text,
+        text,
         model: cur.model ?? defaults.model,
         effort: cur.effort ?? defaults.effort,
         permission: cur.permission,

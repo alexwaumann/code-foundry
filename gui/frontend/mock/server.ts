@@ -15,6 +15,8 @@
  *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
  *   POST /__mock/sessions-service?enabled=false   (simulate a daemon without SessionService)
+ *   POST /__mock/missing-rpc?rpc=RepoService/ListRefs&rpc=SessionService/StageAttachment
+ *                                                 (simulate a daemon older than those RPCs: 404)
  *   POST /__mock/session-new?delay=700            (how long session.new takes to make a worktree)
  *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size)
  *   session.new with a prompt containing FAIL fails (after the worktree delay, if any).
@@ -58,6 +60,8 @@ const token = process.env.MOCK_TOKEN ?? "dev-mock-token";
 const world = new World();
 /** False simulates a pre-Phase-2a daemon (see POST /__mock/sessions-service). */
 let sessionsEnabled = true;
+/** "Service/Method" paths that 404 like a daemon built before they existed. */
+const missingRpcs = new Set<string>();
 
 function rpcError(err: unknown): ConnectError {
   if (err instanceof ConnectError) return err;
@@ -407,6 +411,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       sessionsEnabled = q.get("enabled") !== "false";
       json(res, 200, { enabled: sessionsEnabled });
       break;
+    case "POST /__mock/missing-rpc":
+      for (const rpc of q.getAll("rpc")) missingRpcs.add(rpc);
+      json(res, 200, { missing: [...missingRpcs] });
+      break;
     case "POST /__mock/gitops":
       // fail=git.push makes that command's next op fail; delay=ms sets how long ops run.
       for (const name of q.getAll("fail")) world.gitops.failNext.add(name);
@@ -474,6 +482,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/reset":
       sessionsEnabled = true;
+      missingRpcs.clear();
       world.reset();
       json(res, 200, { ok: true });
       break;
@@ -504,6 +513,11 @@ const server = createServer((req, res) => {
     return;
   }
   if (!sessionsEnabled && url.pathname.startsWith("/codefoundry.v1.SessionService/")) {
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end("404 page not found\n");
+    return;
+  }
+  if (missingRpcs.has(url.pathname.replace(/^\/codefoundry\.v1\./, ""))) {
     res.writeHead(404, { "Content-Type": "text/plain" });
     res.end("404 page not found\n");
     return;

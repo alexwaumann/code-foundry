@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkAttachments, createdSessionId, pickDefault, MODEL_CHOICES, projectHue, projectInitials, sessionNewArgs, type DraftArgsInput } from "./compose";
+import { checkAttachments, createdSessionId, pickDefault, MODEL_CHOICES, projectHue, projectInitials, repoSource, sessionNewArgs, type DraftArgsInput } from "./compose";
 
 const MB = 1024 * 1024;
 const opts = { types: ["image/png", "image/jpeg"], maxBytes: 10 * MB };
@@ -63,6 +63,15 @@ describe("helpers", () => {
     ["", "?"],
   ])("projectInitials(%j) = %s", (name, want) => {
     expect(projectInitials(name)).toBe(want);
+  });
+
+  it.each([
+    [{ githubSlug: "", remotes: [] }, "Local only"],
+    [{ githubSlug: "alexwaumann/app", remotes: ["origin"] }, "alexwaumann/app"],
+    [{ githubSlug: "", remotes: ["gitlab", "origin"] }, "origin"],
+    [{ githubSlug: "", remotes: ["upstream"] }, "upstream"],
+  ])("repoSource(%j) = %s", (r, want) => {
+    expect(repoSource(r)).toBe(want);
   });
 
   it("projectHue is stable and in range", () => {

@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ArrowUp, Brain, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Loader2, Paperclip, ShieldCheck, X } from "lucide-react";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
+import { PromptEditor, type PromptEditorHandle } from "./PromptEditor";
 import { ATTACHMENT_MIME_TYPES } from "@/api/session";
 import {
   choiceLabel,
@@ -15,6 +16,7 @@ import {
   type WorktreeChoice,
 } from "@/lib/compose";
 import { tildify } from "@/lib/path";
+import { formatAttachmentSize, isReferenced } from "@/lib/prompt";
 import { cn } from "@/lib/utils";
 import {
   addAttachments,
@@ -26,13 +28,14 @@ import {
   updateDraft,
   useComposeStore,
   useDraft,
+  type DraftAttachment,
   type DraftPhase,
 } from "@/stores/compose";
+import { requestConfirm } from "@/stores/confirm";
 import { useReposStore } from "@/stores/repos";
 import { useSettingValue } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 
-const TEXTAREA_MAX_PX = 320;
 const SEP = "\u0001";
 
 /** Model and effort the composer starts with: the settings defaults, else opus / high. */
@@ -73,13 +76,37 @@ function phaseText(phase: DraftPhase, newWorktree: boolean): string {
   return newWorktree ? "Creating worktree…" : "Starting Claude…";
 }
 
-function Attachments({ repoId, disabled }: { repoId: string; disabled: boolean }) {
+/**
+ * Removes an attachment from the draft. Still referenced by a chip in the text: asks
+ * first, then removes the image and every reference; unreferenced: removes it at once.
+ */
+async function removeWithConfirm(repoId: string, a: DraftAttachment, refocus: () => void): Promise<void> {
+  if (isReferenced(getDraft(repoId).text, a.id)) {
+    const yes = await requestConfirm({
+      title: `Remove ${a.file.name} from the message?`,
+      message: "It is referenced in your text; removing it also removes every reference.",
+      confirmLabel: "Confirm",
+      centered: true,
+    });
+    if (!yes) return;
+  }
+  removeAttachment(repoId, a.id);
+  refocus();
+}
+
+function Attachments({ repoId, disabled, refocus }: { repoId: string; disabled: boolean; refocus: () => void }) {
   const attachments = useDraft(repoId, "attachments");
   if (attachments.length === 0) return null;
   return (
     <ul className="flex flex-wrap gap-2 px-3 pt-3" aria-label="Attached images">
       {attachments.map((a) => (
-        <li key={a.id} className="group relative size-16 overflow-hidden rounded-lg border bg-muted/40" data-testid="attachment" title={a.file.name}>
+        <li
+          key={a.id}
+          className="group relative size-16 overflow-hidden rounded-lg border bg-muted/40"
+          data-testid="attachment"
+          data-attachment-id={a.id}
+          title={`${a.file.name}\n${formatAttachmentSize(a.file.size)}`}
+        >
           <img src={a.url} alt={a.file.name} className="size-full object-cover" />
           <button
             type="button"
@@ -87,7 +114,7 @@ function Attachments({ repoId, disabled }: { repoId: string; disabled: boolean }
             aria-label={`Remove ${a.file.name}`}
             className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-black/70 text-white opacity-80 hover:opacity-100 focus-visible:opacity-100 disabled:hidden"
             onClick={() => {
-              removeAttachment(repoId, a.id);
+              void removeWithConfirm(repoId, a, refocus);
             }}
           >
             <X className="size-3" />
@@ -138,11 +165,12 @@ function ComposerCard({ repoId }: { repoId: string }) {
   const notice = useDraft(repoId, "notice");
   const refsStatus = useComposeStore((s) => s.refs[repoId]?.status ?? "loading");
   const refsError = useComposeStore((s) => s.refs[repoId]?.error ?? null);
+  const refsOutdated = useComposeStore((s) => s.refs[repoId]?.outdated ?? false);
   const refs = useComposeStore((s) => s.refs[repoId]?.refs);
   const defaultRef = useComposeStore((s) => s.refs[repoId]?.defaultRef ?? "");
   const worktrees = useWorktrees(repoId);
   const focusSeq = useUiStore((s) => s.composerFocusSeq);
-  const textRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<PromptEditorHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -158,7 +186,7 @@ function ComposerCard({ repoId }: { repoId: string }) {
   // Focus on mount and on request (the picker, the sidebar "+"). Deferred a frame so the
   // closing palette dialog has released focus.
   useEffect(() => {
-    const raf = requestAnimationFrame(() => textRef.current?.focus());
+    const raf = requestAnimationFrame(() => editorRef.current?.focus());
     return () => {
       cancelAnimationFrame(raf);
     };
@@ -167,21 +195,20 @@ function ComposerCard({ repoId }: { repoId: string }) {
   // Back to editable after a failed send: the prompt takes focus again.
   const wasBusy = useRef(busy);
   useEffect(() => {
-    if (wasBusy.current && !busy) textRef.current?.focus();
+    if (wasBusy.current && !busy) editorRef.current?.focus();
     wasBusy.current = busy;
   }, [busy]);
-
-  // Auto-grow up to TEXTAREA_MAX_PX, then scroll.
-  useLayoutEffect(() => {
-    const el = textRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${String(Math.min(el.scrollHeight, TEXTAREA_MAX_PX))}px`;
-  }, [text]);
 
   const send = () => {
     if (canSend) void sendDraft(repoId, defaults);
   };
+
+  /** Pasted, dropped or picked files: thumbnails, and chips at the caret. */
+  const attach = (files: File[]) => {
+    const added = addAttachments(repoId, files);
+    editorRef.current?.insertChips(added.map((a) => ({ id: a.id, name: a.file.name })));
+  };
+  const refocus = () => editorRef.current?.focus();
 
   const worktreeGroups = useMemo<PickerGroup[]>(
     () => [
@@ -228,7 +255,7 @@ function ComposerCard({ repoId }: { repoId: string }) {
         const files = filesOf(e.dataTransfer.files);
         if (files.length === 0) return;
         e.preventDefault();
-        addAttachments(repoId, files);
+        attach(files);
       }}
     >
       {/* The card's surface, behind the prompt and its toolbar (rows 1–2). */}
@@ -240,37 +267,23 @@ function ComposerCard({ repoId }: { repoId: string }) {
         )}
       />
       <div className="col-span-2 col-start-1 row-start-1 flex min-w-0 flex-col">
-        <Attachments repoId={repoId} disabled={busy} />
-        <textarea
-          ref={textRef}
-          rows={2}
+        <Attachments repoId={repoId} disabled={busy} refocus={refocus} />
+        <PromptEditor
+          handleRef={editorRef}
+          repoId={repoId}
           value={text}
           disabled={busy}
           placeholder="Describe what to build…"
-          aria-label="Prompt"
-          data-compose-stop
-          data-testid="composer-input"
-          className="min-h-16 w-full resize-none overflow-y-auto bg-transparent px-4 pt-3.5 pb-1 text-sm leading-6 outline-none placeholder:text-muted-foreground disabled:opacity-70"
-          onChange={(e) => {
-            updateDraft(repoId, { text: e.target.value, error: null });
+          onChange={(t) => {
+            updateDraft(repoId, { text: t, error: null });
           }}
-          onKeyDown={(e) => {
-            if (e.nativeEvent.isComposing) return;
-            if (e.key === "Enter" && !e.shiftKey && !e.altKey) {
-              e.preventDefault();
-              send();
-            } else if (e.key === "Escape" && isDraftEmpty(getDraft(repoId))) {
-              e.preventDefault();
-              useUiStore.getState().select({ kind: "repo", repoId });
-            }
+          onSubmit={send}
+          onEscape={() => {
+            if (!isDraftEmpty(getDraft(repoId))) return false;
+            useUiStore.getState().select({ kind: "repo", repoId });
+            return true;
           }}
-          onPaste={(e) => {
-            const files = filesOf(e.clipboardData.files);
-            if (files.length === 0) return;
-            // A plain image paste would insert nothing; keep text when there is some.
-            if (!e.clipboardData.types.includes("text/plain")) e.preventDefault();
-            addAttachments(repoId, files);
-          }}
+          onPasteFiles={attach}
         />
       </div>
       <div className="col-start-1 row-start-2 flex min-w-0 flex-wrap items-center gap-0.5 px-2 pb-2">
@@ -333,7 +346,7 @@ function ComposerCard({ repoId }: { repoId: string }) {
           hidden
           data-testid="composer-file-input"
           onChange={(e) => {
-            addAttachments(repoId, filesOf(e.target.files));
+            attach(filesOf(e.target.files));
             e.target.value = "";
           }}
         />
@@ -377,7 +390,15 @@ function ComposerCard({ repoId }: { repoId: string }) {
               updateDraft(repoId, { base: v });
             }}
             filterPlaceholder="Filter refs…"
-            status={refsStatus === "loading" ? "Loading refs…" : refsStatus === "error" ? `Cannot list refs: ${refsError ?? "unknown error"}. The default branch is used.` : null}
+            status={
+              refsStatus === "loading"
+                ? "Loading refs…"
+                : refsStatus === "error"
+                  ? refsOutdated
+                    ? refsError
+                    : `Cannot list refs: ${refsError ?? "unknown error"}. The default branch is used.`
+                  : null
+            }
             disabled={busy}
             contentClassName="w-72"
             data-testid="composer-base"
@@ -418,11 +439,14 @@ export function Composer({ repoId }: { repoId: string }) {
   const name = useReposStore((s) => s.byId[repoId]?.name ?? null);
   const loaded = useReposStore((s) => s.loaded);
   return (
-    <section className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto p-10" data-region="content" aria-label="New thread" data-testid="composer">
+    // Centered in the pane both ways at any size: auto margins in a column flexbox center
+    // the block and, unlike justify-center, fall back to 0 (scrollable from the top) when
+    // the draft outgrows the pane.
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-10" data-region="content" aria-label="New thread" data-testid="composer">
       {name === null ? (
-        <p className="mt-[18vh] text-sm text-muted-foreground">{loaded ? "This repository is no longer registered." : "Loading…"}</p>
+        <p className="m-auto text-sm text-muted-foreground">{loaded ? "This repository is no longer registered." : "Loading…"}</p>
       ) : (
-        <div className="mt-[14vh] w-full max-w-2xl">
+        <div className="m-auto w-full max-w-2xl" data-testid="composer-body">
           <h1 className="mb-6 text-center text-2xl font-semibold tracking-tight" data-testid="composer-heading">
             What should we build in <span className="text-foreground">{name}</span>?
           </h1>
