@@ -14,6 +14,7 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 	}{
 		{command: "view.pullrequests", view: command.ViewPullRequests},
 		{command: "view.panel.toggle", view: command.ViewPanelToggle},
+		{command: "view.panel.expand", view: command.ViewPanelExpand},
 	}
 	for _, tt := range tests {
 		t.Run(tt.command, func(t *testing.T) {
