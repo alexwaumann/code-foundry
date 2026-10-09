@@ -41,8 +41,8 @@ FRONTEND := gui/frontend
 PNPM     := pnpm --dir $(FRONTEND)
 
 .PHONY: all gen build check go-check frontend-check frontend-deps gui-dist-stub \
-        dev gui-build gui-dev gui-e2e gui-mock ghostty-vt ghostty-vt-rebuild package release \
-        clean
+        dev gui-build gui-bin gui-dev gui-e2e gui-mock ghostty-vt ghostty-vt-rebuild package \
+        release clean
 
 all: build
 
@@ -90,6 +90,13 @@ dev: build
 ## which is what `code-foundry gui` launches from a dev CLI. Also leaves gui/bin/CodeFoundry.
 gui-build: build
 	cd gui && $(WAILS3) package
+
+## gui-bin: build only the bare GUI executable, gui/bin/CodeFoundry, with no .app bundle,
+## for machines whose MDM blocks unsigned bundles. Removes a stale gui/bin/CodeFoundry.app
+## so `code-foundry gui` launches the executable (it prefers the bundle when one exists).
+gui-bin: build
+	cd gui && $(WAILS3) build
+	rm -rf gui/bin/CodeFoundry.app
 
 ## gui-e2e: Playwright (WebKit + Chromium) against the mock daemon. Not part of `check`:
 ## it needs browser binaries (`pnpm --dir gui/frontend exec playwright install webkit chromium`).
