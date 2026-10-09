@@ -6,6 +6,7 @@ import { activatePanelTab, closePanelTab, emptyEntry, getPanel, openSurface, tog
 import { PANEL_MIN, panelMax, useUiStore, visibleSidebarWidth } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { surfaceOf, surfaces, useAvailability, type SurfaceContext, type SurfaceSpec } from "@/surfaces/registry";
+import { PanelToggle } from "./PanelToggle";
 import { PanelResizeHandle } from "./PanelResizeHandle";
 import { isPanelChord, panelKeyAction } from "./keys";
 import { revealTab } from "./reveal";
@@ -120,7 +121,7 @@ function TabStrip({ panelKey }: { panelKey: string }) {
       role="tablist"
       aria-label="Side panel tabs"
       aria-orientation="horizontal"
-      className="relative flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b border-pane-border px-1.5 [scrollbar-width:none]"
+      className="relative flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none]"
       data-testid="panel-tabs"
       onKeyDown={onTabListKeyDown}
     >
@@ -209,6 +210,21 @@ function surfaceKey(panelKey: string, chord: string): boolean {
   return tab ? (surfaceOf(tab.kind)?.onKey?.(chord, tab) ?? false) : false;
 }
 
+/**
+ * The panel's header: tabs on the left, the toggle at the far right. It is as tall as the
+ * header of the pane beside it: the terminal's (h-9) for sessions and terminals, the
+ * page headers' (h-11) for everything else.
+ */
+function PanelHeader({ panelKey, hasTabs }: { panelKey: string; hasTabs: boolean }) {
+  const beside = panelKey.startsWith("session:") || panelKey.startsWith("terminal:") ? "h-9" : "h-11";
+  return (
+    <div className={cn("flex shrink-0 items-center gap-2 border-b border-pane-border pr-2 pl-1.5", beside)} data-testid="panel-header">
+      {hasTabs ? <TabStrip panelKey={panelKey} /> : <div className="min-w-0 flex-1" />}
+      <PanelToggle inPanel />
+    </div>
+  );
+}
+
 function Panel({ panelKey, width, max, asideRef }: { panelKey: string; width: number; max: number; asideRef: RefObject<HTMLElement | null> }) {
   const hasTabs = usePanelStore((s) => (s.byKey[panelKey]?.tabs.length ?? 0) > 0);
 
@@ -255,7 +271,7 @@ function Panel({ panelKey, width, max, asideRef }: { panelKey: string; width: nu
         className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs outline-none"
         onKeyDown={onKeyDown}
       >
-        {hasTabs && <TabStrip panelKey={panelKey} />}
+        <PanelHeader panelKey={panelKey} hasTabs={hasTabs} />
         <Body panelKey={panelKey} />
       </aside>
     </div>

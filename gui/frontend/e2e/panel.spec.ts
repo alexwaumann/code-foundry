@@ -84,7 +84,10 @@ test("the header toggle shows the empty surface list and hides the panel again",
 
   await toggle.click();
   await expect(panel(page)).toBeVisible();
-  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  // Open, the toggle moves to the panel's header (far right), out of the pane header.
+  await expect(toggle).toHaveCount(0);
+  const panelToggle = panel(page).getByTestId("panel-header").getByTestId("panel-toggle");
+  await expect(panelToggle).toHaveAttribute("aria-pressed", "true");
   const empty = panel(page).getByTestId("panel-empty");
   await expect(empty.getByRole("heading", { name: "Open a surface" })).toBeVisible();
   const entries = empty.locator("[data-surface]");
@@ -104,9 +107,13 @@ test("the header toggle shows the empty surface list and hides the panel again",
   expect(viewport && viewport.height - side.bottom).toBe(8);
   expect(side.top).toBe(content.top);
   expect(side.width).toBe(420);
+  // The panel header is the content pane header's height.
+  const header = await box(page, "panel-header");
+  expect(header.bottom - header.top).toBe((await box(page, "terminal-header")).bottom - (await box(page, "terminal-header")).top);
 
-  await toggle.click();
+  await panelToggle.click();
   await expect(panel(page)).toHaveCount(0);
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("panel-resize-handle")).toHaveCount(0);
   expect(viewport && viewport.width - (await box(page, "content-pane")).right).toBe(8);
   // The button runs the registry command through its local presenter: no daemon call.
