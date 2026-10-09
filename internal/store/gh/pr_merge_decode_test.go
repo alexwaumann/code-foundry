@@ -9,8 +9,8 @@ import (
 func TestDecodeMergeFields(t *testing.T) {
 	// Captures from before the merge fields: no methods known, no auto-merge.
 	d, _, err := decodeFullPullRequest(fixtureData(t, "pull_request_full_cf_1.json"))
-	if err != nil || d.MergeMethods != nil || d.AutoMerge {
-		t.Errorf("capture: methods %v, auto-merge %t, %v", d.MergeMethods, d.AutoMerge, err)
+	if err != nil || d.MergeMethods != nil || d.AutoMerge || d.DefaultBranch != "" {
+		t.Errorf("capture: methods %v, auto-merge %t, default branch %q, %v", d.MergeMethods, d.AutoMerge, d.DefaultBranch, err)
 	}
 	tests := []struct {
 		name string
@@ -18,9 +18,10 @@ func TestDecodeMergeFields(t *testing.T) {
 		pr   string // pull request fields
 		want []MergeMethod
 		auto bool
+		def  string // default branch
 	}{
-		{name: "all three", repo: `"mergeCommitAllowed":true,"squashMergeAllowed":true,"rebaseMergeAllowed":true`,
-			want: []MergeMethod{MergeCommit, MergeSquash, MergeRebase}},
+		{name: "all three", repo: `"mergeCommitAllowed":true,"squashMergeAllowed":true,"rebaseMergeAllowed":true,"defaultBranchRef":{"name":"trunk"}`,
+			want: []MergeMethod{MergeCommit, MergeSquash, MergeRebase}, def: "trunk"},
 		{name: "squash only, auto-merge on", repo: `"mergeCommitAllowed":false,"squashMergeAllowed":true,"rebaseMergeAllowed":false`,
 			pr: `"autoMergeRequest":{"enabledAt":"2026-10-09T10:00:00Z"},`, want: []MergeMethod{MergeSquash}, auto: true},
 		{name: "none allowed", repo: `"mergeCommitAllowed":false,"squashMergeAllowed":false,"rebaseMergeAllowed":false`,
@@ -30,8 +31,8 @@ func TestDecodeMergeFields(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			doc := `{"repository":{"viewerPermission":"WRITE",` + tt.repo + `,"pullRequest":{` + tt.pr + `"number":7,"state":"OPEN"}}}`
 			d, _, err := decodeFullPullRequest([]byte(doc))
-			if err != nil || !slices.Equal(d.MergeMethods, tt.want) || d.AutoMerge != tt.auto {
-				t.Errorf("methods %v, auto-merge %t, %v; want %v, %t", d.MergeMethods, d.AutoMerge, err, tt.want, tt.auto)
+			if err != nil || !slices.Equal(d.MergeMethods, tt.want) || d.AutoMerge != tt.auto || d.DefaultBranch != tt.def {
+				t.Errorf("methods %v, auto-merge %t, default %q, %v; want %v, %t, %q", d.MergeMethods, d.AutoMerge, d.DefaultBranch, err, tt.want, tt.auto, tt.def)
 			}
 		})
 	}
@@ -66,15 +67,30 @@ func TestDecodeMerge(t *testing.T) {
 	}
 }
 
-func TestHeadMoved(t *testing.T) {
-	for msg, want := range map[string]bool{
-		"Head branch was modified. Review and try the merge again.": true,
-		"Expected head sha does not match":                          true,
-		"Pull Request is not mergeable":                             false,
+func TestBranchMoved(t *testing.T) {
+	for msg, want := range map[string]string{
+		"Head branch was modified. Review and try the merge again.": "head",
+		"Expected head sha does not match":                          "head",
+		"Base branch was modified. Review and try the merge again.": "base",
+		"Pull Request is not mergeable":                             "",
 	} {
 		pe := &PartialError{Errors: []graphQLError{{Type: "UNPROCESSABLE", Message: msg}}}
-		if got := headMoved(pe); got != want {
-			t.Errorf("headMoved(%q) = %t, want %t", msg, got, want)
+		if got := branchMoved(pe); got != want {
+			t.Errorf("branchMoved(%q) = %q, want %q", msg, got, want)
+		}
+	}
+}
+
+func TestIsCommitSHA(t *testing.T) {
+	for s, want := range map[string]bool{
+		strings.Repeat("a", 40): true,
+		strings.Repeat("F", 64): true,
+		"abc1234":               false,
+		strings.Repeat("g", 40): false,
+		"":                      false,
+	} {
+		if got := isCommitSHA(s); got != want {
+			t.Errorf("isCommitSHA(%q) = %t, want %t", s, got, want)
 		}
 	}
 }

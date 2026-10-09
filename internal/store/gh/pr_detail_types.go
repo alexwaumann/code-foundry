@@ -51,6 +51,9 @@ type FullPullRequest struct {
 	MergeMethods []MergeMethod `json:"mergeMethods,omitempty"`
 	// AutoMerge: auto-merge is enabled on the pull request.
 	AutoMerge bool `json:"autoMerge,omitempty"`
+	// DefaultBranch is the repository's default branch; empty if unknown (a row cached
+	// before it was fetched). A merge never deletes it.
+	DefaultBranch string `json:"defaultBranch,omitempty"`
 	// ViewerPermission is GitHub's RepositoryPermission (ADMIN, MAINTAIN, WRITE, TRIAGE,
 	// READ); empty if unknown.
 	ViewerPermission string    `json:"viewerPermission,omitempty"`
@@ -204,9 +207,13 @@ const (
 // MergeRequest is how MergePullRequest merges.
 type MergeRequest struct {
 	Method MergeMethod
-	// DeleteBranch deletes the head branch after a successful merge, unless it lives
-	// in a fork.
+	// DeleteBranch deletes the head branch on GitHub after a successful merge, unless it
+	// lives in a fork or is the repository's default branch or the base branch.
 	DeleteBranch bool
+	// ExpectedHeadSHA is the head commit the client showed (optional). When set, the
+	// merge is refused unless GitHub's head is still this commit, and it is the
+	// mutation's expectedHeadOid.
+	ExpectedHeadSHA string
 }
 
 // MergeResult is what MergePullRequest did.

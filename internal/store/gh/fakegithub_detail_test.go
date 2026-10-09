@@ -75,7 +75,10 @@ func (g *fakeGitHub) detailOp(op string, vars map[string]any, data map[string]an
 			notFound("repository", fmt.Sprintf("Could not resolve to a PullRequest with the number of %d.", number))
 			return
 		}
-		repo := map[string]any{"viewerPermission": perm, "pullRequest": g.fullJSON(p)}
+		repo := map[string]any{"viewerPermission": perm, "pullRequest": g.fullJSON(p), "defaultBranchRef": nil}
+		if r := g.repos[owner+"/"+name]; r != nil {
+			repo["defaultBranchRef"] = map[string]any{"name": r.branch}
+		}
 		g.mergeSettings(repo)
 		data["repository"] = repo
 	case "ReviewerCandidates":

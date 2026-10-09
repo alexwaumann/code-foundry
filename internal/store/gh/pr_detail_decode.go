@@ -113,10 +113,13 @@ type pullRequestFullData struct {
 	Repository *struct {
 		ViewerPermission string `json:"viewerPermission"`
 		// Pointers: a row decoded from a response without them knows no methods.
-		MergeCommitAllowed *bool                `json:"mergeCommitAllowed"`
-		SquashMergeAllowed *bool                `json:"squashMergeAllowed"`
-		RebaseMergeAllowed *bool                `json:"rebaseMergeAllowed"`
-		PullRequest        *pullRequestFullJSON `json:"pullRequest"`
+		MergeCommitAllowed *bool `json:"mergeCommitAllowed"`
+		SquashMergeAllowed *bool `json:"squashMergeAllowed"`
+		RebaseMergeAllowed *bool `json:"rebaseMergeAllowed"`
+		DefaultBranchRef   *struct {
+			Name string `json:"name"`
+		} `json:"defaultBranchRef"`
+		PullRequest *pullRequestFullJSON `json:"pullRequest"`
 	} `json:"repository"`
 }
 
@@ -137,6 +140,9 @@ func decodeFullPullRequest(data []byte) (FullPullRequest, checksPage, error) {
 		ClosedAt:         p.ClosedAt,
 		ViewerPermission: d.Repository.ViewerPermission,
 		AutoMerge:        p.AutoMergeRequest != nil,
+	}
+	if r := d.Repository.DefaultBranchRef; r != nil {
+		out.DefaultBranch = r.Name
 	}
 	for _, m := range []struct {
 		allowed *bool

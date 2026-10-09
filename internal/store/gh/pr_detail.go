@@ -98,9 +98,10 @@ type fullCache struct {
 	mu sync.Mutex
 	m  map[fullKey]*fullEntry
 	// reverts and merges answer repeats of a recent revert or merge (pr_actions.go,
-	// pr_merge.go).
-	reverts writeMemos[RevertResult]
-	merges  writeMemos[MergeResult]
+	// pr_merge.go); mergeLocks runs one merge of a pull request at a time.
+	reverts    writeMemos[RevertResult]
+	merges     writeMemos[mergeMemo]
+	mergeLocks keyLocks
 }
 
 func (c *fullCache) get(k fullKey) (d FullPullRequest, stale, ok bool) {

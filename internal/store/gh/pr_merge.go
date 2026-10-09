@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -27,9 +28,11 @@ const branchDeleteTimeout = 30 * time.Second
 
 // MergePullRequest implements Service. The pull request must be open and not a draft,
 // and the method allowed by the repository; the cached detail (refetched once before
-// refusing) supplies the node id and the head commit GitHub must still have. Within
-// writeMemoTTL of a merge, another call returns the first's outcome instead of sending
-// the mutation again.
+// refusing) supplies the node id and the head commit GitHub must still have. With
+// r.ExpectedHeadSHA (the head the client showed) the merge is refused unless the head
+// is still that commit, so a detail refetched since cannot slip unseen commits in.
+// Merges of one pull request run one at a time; within writeMemoTTL of a merge,
+// another call returns the first's outcome instead of sending the mutation again.
 func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r MergeRequest) (MergeResult, error) {
 	k, err := fullKeyOf(slug, number)
 	if err != nil {
@@ -40,16 +43,25 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 	default:
 		return MergeResult{}, fmt.Errorf("%w: merge method %q", ErrInvalidArgument, r.Method)
 	}
+	if r.ExpectedHeadSHA != "" && !isCommitSHA(r.ExpectedHeadSHA) {
+		return MergeResult{}, fmt.Errorf("%w: expected head %q is not a full commit SHA", ErrInvalidArgument, r.ExpectedHeadSHA)
+	}
+	unlock, err := s.full.mergeLocks.lock(ctx, k)
+	if err != nil {
+		return MergeResult{}, err
+	}
+	defer unlock()
 	if m, ok := s.full.merges.recent(k, s.opts.Now()); ok {
-		return m.res, m.err
+		return repeatMerge(m, r)
 	}
 	d, err := s.FullPullRequest(ctx, k.slug, k.number, false)
 	if err != nil {
 		return MergeResult{}, err
 	}
-	if mergeRefusal(&d, r.Method) != "" {
-		// The cached copy may be behind (marked ready, reopened, settings changed): only
-		// a fresh look may refuse, and it must succeed.
+	if mergeRefusal(&d, r.Method) != "" || headDiffers(&d, r) || (r.DeleteBranch && d.DefaultBranch == "") {
+		// The cached copy may be behind (marked ready, reopened, settings changed,
+		// pushed to, a row cached before the default branch was fetched): only a fresh
+		// look may refuse, and it must succeed.
 		if d, err = s.fetchFullJob(ctx, k); err != nil {
 			return MergeResult{}, fmt.Errorf("pull request #%d: cannot confirm it can be merged: %w", k.number, err)
 		}
@@ -61,27 +73,31 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 	if pr.ID == "" || pr.HeadSHA == "" {
 		return MergeResult{}, fmt.Errorf("pull request #%d: no node id or head commit", k.number)
 	}
-	res, err := submitFunc(ctx, s, "merge|"+k.String(), func(ctx context.Context) (MergeResult, error) {
-		// The worker is serial, so a concurrent second merge sees the first's memo.
-		if m, ok := s.full.merges.recent(k, s.opts.Now()); ok {
-			return m.res, m.err
+	head := pr.HeadSHA
+	if r.ExpectedHeadSHA != "" {
+		if headDiffers(&d, r) {
+			// The client shows other commits than GitHub has: it must re-read first.
+			s.invalidateFull(k)
+			return MergeResult{}, fmt.Errorf("%w: pull request #%d changed since it was shown (head %s, shown %s); refresh and try again",
+				ErrFailedPrecondition, k.number, short(pr.HeadSHA), short(r.ExpectedHeadSHA))
 		}
-		data, err := s.call(ctx, queryMergePullRequest, map[string]any{"id": pr.ID, "method": string(r.Method), "head": pr.HeadSHA})
+		head = r.ExpectedHeadSHA
+	}
+	var unknown bool
+	res, err := submitFunc(ctx, s, "merge|"+k.String(), func(ctx context.Context) (MergeResult, error) {
+		data, err := s.call(ctx, queryMergePullRequest, map[string]any{"id": pr.ID, "method": string(r.Method), "head": head})
 		var pe *PartialError
 		switch {
 		case errors.As(err, &pe):
 			// GitHub refused the merge (conflicts, protection, head moved): nothing merged.
-			if headMoved(pe) {
-				return MergeResult{}, fmt.Errorf("%w: pull request #%d changed on GitHub since it was loaded (%s has new commits); "+
-					"refresh and review it before merging", ErrFailedPrecondition, k.number, pr.HeadRef)
-			}
-			return MergeResult{}, pe.Unwrap()
+			return MergeResult{}, mergeRefused(k, &pr, pe)
 		case outcomeUnknown(err):
 			now := s.opts.Now()
 			err = fmt.Errorf("pull request #%d: GitHub did not confirm the merge, and it may have merged; "+
 				"check GitHub before trying again (until %s a retry returns this error): %w",
 				k.number, now.Add(writeMemoTTL).Local().Format(time.TimeOnly), err)
-			s.full.merges.remember(k, writeMemo[MergeResult]{err: err, at: now})
+			s.full.merges.remember(k, writeMemo[mergeMemo]{err: err, at: now})
+			unknown = true
 			return MergeResult{}, err
 		case err != nil:
 			return MergeResult{}, err
@@ -90,21 +106,17 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 		if err != nil {
 			return MergeResult{}, err
 		}
-		res := MergeResult{Merged: o.Merged || o.State == PullRequestMerged, SHA: o.SHA}
-		s.full.merges.remember(k, writeMemo[MergeResult]{res: res, at: s.opts.Now()})
-		return res, nil
+		return MergeResult{Merged: o.Merged || o.State == PullRequestMerged, SHA: o.SHA}, nil
 	})
 	if err != nil {
-		if errors.Is(err, ErrFailedPrecondition) {
-			// GitHub knows a state the cache does not: let clients re-read.
+		if unknown || errors.Is(err, ErrFailedPrecondition) {
+			// GitHub knows a state the cache does not (or may: it did not answer): let
+			// clients re-read.
 			s.invalidateFull(k)
 		}
 		return MergeResult{}, err
 	}
-	if res.Message == "" {
-		// The first call for this merge (a memoized result already has its message).
-		res = s.finishMerge(ctx, k, pr, r, res)
-	}
+	res = s.finishMerge(ctx, k, &d, r, res)
 	s.log.Info("gh pull request merged", "pr", k.String(), "method", r.Method, "merged", res.Merged,
 		"sha", res.SHA, "branch_deleted", res.BranchDeleted)
 	s.invalidateFull(k)
@@ -116,35 +128,154 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 	return res, nil
 }
 
-// finishMerge deletes the head branch when asked, writes the message, and remembers the
-// complete result for repeats.
-func (s *Store) finishMerge(ctx context.Context, k fullKey, pr PullRequest, r MergeRequest, res MergeResult) MergeResult {
+// mergeMemo is a merge's complete result, and whether it was asked to delete the branch.
+type mergeMemo struct {
+	res         MergeResult
+	deleteAsked bool
+}
+
+// repeatMerge answers a merge within writeMemoTTL of the first: its outcome, plus that
+// the branch stays when only the repeat asks to delete it.
+func repeatMerge(m writeMemo[mergeMemo], r MergeRequest) (MergeResult, error) {
+	if m.err != nil {
+		return MergeResult{}, m.err
+	}
+	res := m.res.res
+	if r.DeleteBranch && !m.res.deleteAsked && res.Merged {
+		res.Message += "; branch not deleted: the first merge did not ask"
+	}
+	return res, nil
+}
+
+// finishMerge deletes the head branch on GitHub when asked and allowed, writes the
+// message, and remembers the complete result for repeats.
+func (s *Store) finishMerge(ctx context.Context, k fullKey, d *FullPullRequest, r MergeRequest, res MergeResult) MergeResult {
+	pr := d.PullRequest
 	if !res.Merged {
 		res.Message = fmt.Sprintf("GitHub accepted the merge of #%d, but it is not merged yet", k.number)
 	} else {
 		res.Message = fmt.Sprintf("Merged #%d", k.number)
 		if res.SHA != "" {
-			res.Message += fmt.Sprintf(" (%s)", res.SHA[:min(7, len(res.SHA))])
+			res.Message += fmt.Sprintf(" (%s)", short(res.SHA))
 		}
+		remote := "origin/" + pr.HeadRef
 		switch {
 		case !r.DeleteBranch || pr.HeadRef == "":
 		case pr.IsCrossRepository:
-			res.Message += fmt.Sprintf("; kept branch %s: it is in a fork", pr.HeadRef)
+			// Not on origin: named as the fork has it.
+			res.Message += fmt.Sprintf("; kept %s: it is in a fork", pr.HeadRef)
+		case keepBranch(d) != "":
+			res.Message += fmt.Sprintf("; kept %s: %s", remote, keepBranch(d))
 		default:
 			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), branchDeleteTimeout)
 			err := s.deleteBranch(ctx, k, pr.HeadRef)
 			cancel()
 			if err != nil {
 				s.log.Warn("gh head branch delete failed", "pr", k.String(), "branch", pr.HeadRef, "err", err)
-				res.Message += fmt.Sprintf("; kept branch %s: %v", pr.HeadRef, err)
+				res.Message += fmt.Sprintf("; kept %s: %v", remote, err)
 			} else {
 				res.BranchDeleted = true
-				res.Message += fmt.Sprintf("; deleted branch %s", pr.HeadRef)
+				res.Message += fmt.Sprintf("; deleted %s", remote)
 			}
 		}
 	}
-	s.full.merges.remember(k, writeMemo[MergeResult]{res: res, at: s.opts.Now()})
+	s.full.merges.remember(k, writeMemo[mergeMemo]{res: mergeMemo{res: res, deleteAsked: r.DeleteBranch}, at: s.opts.Now()})
 	return res
+}
+
+// keepBranch says why a merge must not delete d's head branch even when asked (a
+// fork's branch aside), or "". The default branch and the base branch are never
+// deleted; an unknown default branch could be either.
+func keepBranch(d *FullPullRequest) string {
+	head := d.PullRequest.HeadRef
+	switch {
+	case d.DefaultBranch == "":
+		return "the repository's default branch is unknown"
+	case head == d.DefaultBranch:
+		return "it is the repository's default branch"
+	case head == d.PullRequest.BaseRef:
+		return "it is the base branch"
+	}
+	return ""
+}
+
+// mergeRefused maps GitHub's refusal of a merge mutation. Rate limits, permissions and
+// a missing pull request keep their kinds; anything else (UNPROCESSABLE, or a part with
+// no or an unknown type) is a failed precondition with GitHub's message, and a moved
+// head or base says so.
+func mergeRefused(k fullKey, pr *PullRequest, pe *PartialError) error {
+	cls := pe.Unwrap()
+	if errors.Is(cls, ErrRateLimited) || errors.Is(cls, ErrPermissionDenied) || errors.Is(cls, ErrNotFound) {
+		return cls
+	}
+	switch branchMoved(pe) {
+	case "head":
+		return fmt.Errorf("%w: pull request #%d changed on GitHub since it was loaded (%s has new commits); "+
+			"refresh and review it before merging", ErrFailedPrecondition, k.number, pr.HeadRef)
+	case "base":
+		return fmt.Errorf("%w: pull request #%d: its base branch %s changed on GitHub during the merge; "+
+			"refresh and try again", ErrFailedPrecondition, k.number, pr.BaseRef)
+	}
+	msgs := make([]string, 0, len(pe.Errors))
+	for _, e := range pe.Errors {
+		msgs = append(msgs, e.Message)
+	}
+	return fmt.Errorf("%w: %s", ErrFailedPrecondition, strings.Join(msgs, "; "))
+}
+
+// headDiffers reports whether the client expects another head than d has.
+func headDiffers(d *FullPullRequest, r MergeRequest) bool {
+	return r.ExpectedHeadSHA != "" && !strings.EqualFold(d.PullRequest.HeadSHA, r.ExpectedHeadSHA)
+}
+
+// isCommitSHA reports whether s is a full hex commit id (SHA-1 or SHA-256).
+func isCommitSHA(s string) bool {
+	if len(s) != 40 && len(s) != 64 {
+		return false
+	}
+	for _, c := range s {
+		if !strings.ContainsRune("0123456789abcdefABCDEF", c) {
+			return false
+		}
+	}
+	return true
+}
+
+// short is a commit's first seven characters.
+func short(sha string) string { return sha[:min(7, len(sha))] }
+
+// keyLocks serializes work per pull request. The zero value is ready to use.
+type keyLocks struct {
+	mu sync.Mutex
+	m  map[fullKey]chan struct{}
+}
+
+// lock waits until no one holds k (or ctx ends) and holds it until unlock.
+func (l *keyLocks) lock(ctx context.Context, k fullKey) (unlock func(), err error) {
+	for {
+		l.mu.Lock()
+		held, busy := l.m[k]
+		if !busy {
+			if l.m == nil {
+				l.m = map[fullKey]chan struct{}{}
+			}
+			ch := make(chan struct{})
+			l.m[k] = ch
+			l.mu.Unlock()
+			return func() {
+				l.mu.Lock()
+				delete(l.m, k)
+				l.mu.Unlock()
+				close(ch)
+			}, nil
+		}
+		l.mu.Unlock()
+		select {
+		case <-held:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
 }
 
 // deleteBranch deletes a branch of k's repository through REST. A branch GitHub already
@@ -195,14 +326,18 @@ func mergeMethodName(m MergeMethod) string {
 	return "a merge commit"
 }
 
-// headMoved reports whether GitHub refused a merge because the head is no longer the
-// expected one ("Head branch was modified. Review and try the merge again.").
-func headMoved(pe *PartialError) bool {
+// branchMoved says which branch GitHub reports moved when it refused a merge: "head"
+// ("Head branch was modified. Review and try the merge again."), "base" ("Base branch
+// was modified."), or "".
+func branchMoved(pe *PartialError) string {
 	for _, e := range pe.Errors {
 		m := strings.ToLower(e.Message)
-		if strings.Contains(m, "head branch was modified") || strings.Contains(m, "expected head") {
-			return true
+		switch {
+		case strings.Contains(m, "head branch was modified") || strings.Contains(m, "expected head"):
+			return "head"
+		case strings.Contains(m, "base branch was modified"):
+			return "base"
 		}
 	}
-	return false
+	return ""
 }

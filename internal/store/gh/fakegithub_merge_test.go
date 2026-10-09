@@ -14,8 +14,8 @@ type fakeMerge struct {
 	disallowed map[MergeMethod]bool
 	autoMerge  map[string]bool // by PR id
 	calls      []fakeMergeCall
-	// refusal, when set, is the GraphQL error type every MergePullRequest gets
-	// (FORBIDDEN: the viewer cannot push), with refusalMsg.
+	// refusalMsg, when set, is the GraphQL error every MergePullRequest gets, with the
+	// type refusal (FORBIDDEN: the viewer cannot push; empty: no type).
 	refusal, refusalMsg string
 }
 
@@ -66,11 +66,15 @@ func (g *fakeGitHub) mergeOp(vars map[string]any, data map[string]any, errs *[]m
 	g.detail.merge.calls = append(g.detail.merge.calls, fakeMergeCall{id, method, head})
 	refuse := func(errType, msg string) {
 		data["mergePullRequest"] = nil
-		*errs = append(*errs, map[string]any{"type": errType, "path": []any{"mergePullRequest"}, "message": msg})
+		e := map[string]any{"path": []any{"mergePullRequest"}, "message": msg}
+		if errType != "" {
+			e["type"] = errType
+		}
+		*errs = append(*errs, e)
 	}
 	p, ok := g.prs[id]
 	switch {
-	case g.detail.merge.refusal != "":
+	case g.detail.merge.refusalMsg != "":
 		refuse(g.detail.merge.refusal, g.detail.merge.refusalMsg)
 	case !ok || p.State != PullRequestOpen:
 		refuse("UNPROCESSABLE", "Pull Request is not mergeable")

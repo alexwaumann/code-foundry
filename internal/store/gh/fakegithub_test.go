@@ -295,7 +295,8 @@ func rollupJSONMap(r CheckRollup) map[string]any {
 func toGraphQLErrors(errs []map[string]any) []graphQLError {
 	out := make([]graphQLError, 0, len(errs))
 	for _, e := range errs {
-		out = append(out, graphQLError{Type: e["type"].(string), Message: e["message"].(string), Path: e["path"].([]any)})
+		typ, _ := e["type"].(string) // GitHub leaves it out of some errors
+		out = append(out, graphQLError{Type: typ, Message: e["message"].(string), Path: e["path"].([]any)})
 	}
 	return out
 }
