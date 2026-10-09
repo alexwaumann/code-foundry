@@ -19,7 +19,8 @@ import (
 var guiEnv = []string{paths.EnvHome, "CODE_FOUNDRY_RELEASE_REPO", "CODE_FOUNDRY_RELEASE_DIR", update.EnvInitialDelay}
 
 // runGUI is `code-foundry gui`: opens the app this CLI belongs to (the bundle it lives
-// in), else the dev build next to it (gui/bin after `make gui-build`), else the
+// in), else the dev bundle next to it (gui/bin/CodeFoundry.app from `make gui-build`,
+// then the bare gui/bin/CodeFoundry from `wails3 build`), else the
 // installed app.
 func runGUI(_ context.Context, cl *cli, args []string) error {
 	fs := cl.newFlagSet("gui")

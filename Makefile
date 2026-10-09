@@ -81,9 +81,10 @@ frontend-check: frontend-deps
 dev: build
 	exec ./bin/code-foundry daemon --dev
 
-## gui-build: build the Wails GUI binary to gui/bin/CodeFoundry.
+## gui-build: build the Wails GUI and bundle it as gui/bin/CodeFoundry.app (ad-hoc signed),
+## which is what `code-foundry gui` launches from a dev CLI. Also leaves gui/bin/CodeFoundry.
 gui-build: build
-	cd gui && $(WAILS3) build
+	cd gui && $(WAILS3) package
 
 ## gui-e2e: Playwright (WebKit + Chromium) against the mock daemon. Not part of `check`:
 ## it needs browser binaries (`pnpm --dir gui/frontend exec playwright install webkit chromium`).
