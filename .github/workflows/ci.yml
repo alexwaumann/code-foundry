@@ -24,7 +24,12 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-          cache-dependency-path: go.sum
+          # The Go build cache bakes pkg-config output (the libghostty-vt link path) into
+          # compiled cgo packages without keying on it, so a stale cache links a library
+          # that no longer exists. Key the cache on the vendored library's MANIFEST too.
+          cache-dependency-path: |
+            go.sum
+            third_party/libghostty-vt/MANIFEST
 
       - uses: pnpm/action-setup@v6
         with:

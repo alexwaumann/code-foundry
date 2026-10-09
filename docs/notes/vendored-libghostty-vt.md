@@ -113,6 +113,15 @@ gzip-compressed.
   `/Users/alex/...` paths into the library. The stripped one has none.
 * **Archive members have mode 000.** zig writes them that way. Linking does not care, but
   `ar x` gives unreadable files; `chmod` them before comparing.
+* **Go's build cache does not key on pkg-config output.** The link path from the `.pc`
+  file is baked into the compiled cgo package, and `go build` reuses that package as long
+  as the Go sources and env flags match. The first CI run of this branch failed with
+  `no such file or directory: .../third_party/ghostty-vt/lib/libghostty-vt.a`: setup-go
+  restored main's build cache, which still pointed at the old source-build path. Both
+  workflows now add `third_party/libghostty-vt/MANIFEST` to the cache key, so a bump or
+  a move invalidates it. Locally, after pulling this change (or after any future bump),
+  run `go clean -cache` once; an existing checkout otherwise keeps linking whatever
+  library its cache remembers, silently, for as long as that file still exists.
 * **pkg-config is not part of the Xcode CLT.** The bindings use `#cgo pkg-config`, so it
   is still needed (`brew install pkgconf`; GitHub's macOS runners have it).
 * The vendored library was rebuilt by the new script from ghostty 34f39002 with zig
