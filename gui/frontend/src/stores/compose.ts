@@ -63,9 +63,20 @@ export interface RefsState {
   outdated: boolean;
 }
 
+/** The attachment shown in the preview lightbox. */
+export interface AttachmentPreview {
+  repoId: string;
+  id: string;
+  /** Focused again when the preview closes (the thumbnail, or the prompt for a chip). */
+  returnFocus: HTMLElement | null;
+  /** False while closing: the last preview stays for the exit animation and focus return. */
+  open: boolean;
+}
+
 interface ComposeState {
   drafts: Readonly<Record<string, Draft>>;
   refs: Readonly<Record<string, RefsState>>;
+  preview: AttachmentPreview | null;
 }
 
 export const emptyDraft: Draft = {
@@ -81,7 +92,7 @@ export const emptyDraft: Draft = {
   notice: null,
 };
 
-export const useComposeStore = create<ComposeState>()(() => ({ drafts: {}, refs: {} }));
+export const useComposeStore = create<ComposeState>()(() => ({ drafts: {}, refs: {}, preview: null }));
 
 export function getDraft(repoId: string): Draft {
   return useComposeStore.getState().drafts[repoId] ?? emptyDraft;
@@ -122,6 +133,17 @@ export function removeAttachment(repoId: string, id: string): void {
   if (!gone) return;
   URL.revokeObjectURL(gone.url);
   updateDraft(repoId, { attachments: d.attachments.filter((a) => a !== gone), text: removeReferences(d.text, id), notice: null });
+}
+
+/** Opens the preview of a draft's attachment; does nothing when the attachment is gone. */
+export function openPreview(repoId: string, id: string, returnFocus: HTMLElement | null): boolean {
+  if (!getDraft(repoId).attachments.some((a) => a.id === id)) return false;
+  useComposeStore.setState({ preview: { repoId, id, returnFocus, open: true } });
+  return true;
+}
+
+export function closePreview(): void {
+  useComposeStore.setState((s) => (s.preview?.open ? { preview: { ...s.preview, open: false } } : s));
 }
 
 export function clearDraft(repoId: string): void {

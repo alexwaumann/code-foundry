@@ -121,6 +121,13 @@ scratch daemon on haiku.
   only", base picker lists `main` (default) and `feature-x`, a pasted image became a chip,
   Enter created `cf/describe-project-overview` from `main`, and the argv carried
   `… -- Describe … [Image: shot.png; ref=<staged path>]\n\nAttached image: <path>`.
+* **Attachment preview.** A lightbox opens from a thumbnail click, a chip click, or Space
+  on a selected chip. The chip is not focusable (a focusable element inside ProseMirror
+  breaks node selection and arrow-skipping); Enter still sends; missing (dashed) chips do
+  nothing; focus returns to the thumbnail or the prompt. Chromium needs the pointer moved
+  before a backdrop click dismisses it (predates this; the confirm dialog behaves the same).
+* **Reaping.** Staged images are kept 7 days and reaped at daemon start and daily
+  (`AttachmentMaxAge`, `AttachmentReapInterval`; injectable via session.Options).
 
 ## Open
 

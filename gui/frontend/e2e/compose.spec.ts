@@ -481,3 +481,127 @@ test("an image dropped on the prompt attaches it and puts a chip at the caret", 
   await expect(prompt(page)).toHaveAttribute("data-value", `Use this logo ![drop.png](cf-attachment://${id}) `);
   await expect(page.getByTestId("composer-card")).not.toHaveAttribute("data-dragging");
 });
+
+/** Pastes plain text into the prompt (chip tokens in it become chips). */
+async function pasteText(page: Page, text: string): Promise<void> {
+  await page.getByTestId("composer-input").evaluate((el, t) => {
+    const dt = new DataTransfer();
+    dt.setData("text/plain", t);
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, text);
+}
+
+test("attachment preview: from the thumbnail; Esc, ×, and the backdrop close it and focus returns", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  await page.getByTestId("composer-file-input").setInputFiles([{ name: "shot.png", mimeType: "image/png", buffer: PNG }]);
+  const open = page.getByTestId("attachment-open");
+  await expect(open).toHaveAttribute("title", "Open preview");
+  await expect(open).toHaveCSS("cursor", "pointer");
+  const preview = page.getByTestId("attachment-preview");
+  await expect(preview).toHaveCount(0);
+
+  await open.click();
+  await expect(preview).toBeVisible();
+  await expect(preview.getByRole("heading")).toHaveText("shot.png");
+  await expect(page.getByTestId("attachment-preview-size")).toHaveText("1 KB");
+  const src = await page.getByTestId("attachment").locator("img").getAttribute("src");
+  await expect(preview.locator("img")).toHaveAttribute("src", src ?? "");
+  // Centered in the window.
+  const box = await preview.boundingBox();
+  const vp = page.viewportSize();
+  expect(Math.abs((box?.y ?? 0) + (box?.height ?? 0) / 2 - (vp?.height ?? 0) / 2)).toBeLessThan(2);
+  expect(Math.abs((box?.x ?? 0) + (box?.width ?? 0) / 2 - (vp?.width ?? 0) / 2)).toBeLessThan(2);
+
+  await page.keyboard.press("Escape");
+  await expect(preview).toHaveCount(0);
+  await expect(open).toBeFocused();
+  await expect(page.getByTestId("composer")).toBeVisible(); // Esc did not leave the composer
+
+  await open.click();
+  await page.getByTestId("attachment-preview-close").click();
+  await expect(preview).toHaveCount(0);
+  await expect(open).toBeFocused();
+
+  await open.click();
+  await expect(preview).toBeVisible();
+  // The backdrop. Moved onto first: Chromium misses Radix's outside-press when the
+  // pointer jumps there and presses in one go (the confirm dialog too); WebKit does not.
+  await page.mouse.move(8, 8);
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(preview).toHaveCount(0);
+  await expect(open).toBeFocused();
+
+  // × still removes (unreferenced: no confirm), and opens no preview.
+  await page.getByRole("button", { name: "Remove shot.png" }).click();
+  await expect(page.getByTestId("attachment")).toHaveCount(0);
+  await expect(preview).toHaveCount(0);
+});
+
+test("attachment preview: from an inline chip by click or Space; Enter next to a chip still sends", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  const input = page.getByTestId("composer-input");
+  const chip = page.getByTestId("prompt-chip");
+  const preview = page.getByTestId("attachment-preview");
+  await page.keyboard.type("Compare");
+  await pasteImage(page, "image.png");
+  await page.keyboard.type("with the header");
+  await expect(chip).toHaveAttribute("title", "Open preview");
+  await expect(chip).toHaveCSS("cursor", "pointer");
+  const id = (await chip.getAttribute("data-attachment-id")) ?? "";
+  const value = `Compare ![image.png](cf-attachment://${id}) with the header`;
+  await expect(prompt(page)).toHaveAttribute("data-value", value);
+
+  await chip.click();
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute("data-attachment-id", id);
+  await expect(preview.getByRole("heading")).toHaveText("image.png");
+  await page.keyboard.press("Escape");
+  await expect(preview).toHaveCount(0);
+  await expect(input).toBeFocused();
+
+  // The chip is still selected: Space opens the preview again rather than replacing it.
+  await page.keyboard.press("Space");
+  await expect(preview).toBeVisible();
+  await page.getByTestId("attachment-preview-close").click();
+  await expect(preview).toHaveCount(0);
+  await expect(input).toBeFocused();
+  await expect(prompt(page)).toHaveAttribute("data-value", value);
+
+  // From the keyboard: the caret next to the chip, Shift+Arrow selects it, Space previews.
+  await page.keyboard.press("ArrowRight"); // off the selected chip: the caret right after it
+  await page.keyboard.press("Space");
+  await expect(prompt(page)).toHaveAttribute("data-value", value.replace(") with", ")  with"));
+  await expect(preview).toHaveCount(0);
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Shift+ArrowLeft");
+  await page.keyboard.press("Space");
+  await expect(preview).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(input).toBeFocused();
+  await expect(prompt(page)).toHaveAttribute("data-value", value);
+
+  // Enter with the caret right after the chip sends the thread.
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
+  await expect(preview).toHaveCount(0);
+});
+
+test("attachment preview: a chip whose image is gone opens nothing", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  await page.keyboard.type("See");
+  await pasteText(page, " ![gone.png](cf-attachment://a999) ");
+  const chip = page.getByTestId("prompt-chip");
+  await expect(chip).toHaveAttribute("data-missing", "true");
+  await expect(chip).toHaveAttribute("title", "gone.png (removed)");
+  await expect(chip).not.toHaveCSS("cursor", "pointer");
+  await chip.click();
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(300);
+  await expect(page.getByTestId("attachment-preview")).toHaveCount(0);
+  await expect(page.getByTestId("composer-input")).toBeFocused();
+});

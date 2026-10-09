@@ -3,7 +3,7 @@ import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { ImageIcon } from "lucide-react";
 import { formatAttachmentSize, middleTruncate } from "@/lib/prompt";
 import { cn } from "@/lib/utils";
-import { useComposeStore } from "@/stores/compose";
+import { openPreview, useComposeStore } from "@/stores/compose";
 import { ChipRepoContext } from "./chipContext";
 
 const DEFAULT_ACCENT = "oklch(0.62 0.16 16)";
@@ -59,10 +59,11 @@ function useAccent(url: string | undefined): string {
 
 /**
  * An inline image chip in the prompt: mini thumbnail, (middle-truncated) name and size.
- * A chip whose attachment is gone (pasted from elsewhere, or the image was removed while
- * the text was being undone) still renders, with a dashed border.
+ * A click opens the image preview. A chip whose attachment is gone (pasted from
+ * elsewhere, or the image was removed while the text was being undone) still renders,
+ * with a dashed border, and a click on it only selects it.
  */
-export function AttachmentChipView({ node, selected }: NodeViewProps) {
+export function AttachmentChipView({ node, selected, editor }: NodeViewProps) {
   const repoId = useContext(ChipRepoContext);
   const id = String(node.attrs.id ?? "");
   const label = String(node.attrs.name ?? "");
@@ -78,13 +79,23 @@ export function AttachmentChipView({ node, selected }: NodeViewProps) {
       data-missing={att ? undefined : "true"}
       role="img"
       aria-label={size ? `Image attachment, ${name}, ${size}` : `Image attachment, ${name} (removed)`}
-      title={size ? `${name}\n${size}` : `${name} (removed)`}
+      title={att ? "Open preview" : `${name} (removed)`}
+      aria-keyshortcuts={att ? "Space" : undefined}
+      // A click selects the node (ProseMirror, on mousedown) and opens the preview; focus
+      // returns to the prompt with the chip still selected, where Space opens it again.
+      onClick={
+        att
+          ? () => {
+              openPreview(repoId, id, editor.view.dom);
+            }
+          : undefined
+      }
       style={{ "--chip-accent": accent }}
       className={cn(
         "relative mx-px inline-flex h-[1.41em] max-w-72 items-center gap-[0.33em] rounded-[0.5em] border px-[0.5em] align-middle text-[0.86em] leading-none font-medium select-none",
         "border-[color-mix(in_oklab,var(--chip-accent)_34%,var(--color-border))] bg-[color-mix(in_oklab,var(--chip-accent)_11%,transparent)] text-[color-mix(in_oklab,var(--chip-accent)_22%,var(--color-foreground))]",
         "hover:border-[color-mix(in_oklab,var(--chip-accent)_48%,var(--color-border))] hover:bg-[color-mix(in_oklab,var(--chip-accent)_17%,transparent)]",
-        !att && "border-dashed",
+        att ? "cursor-pointer" : "border-dashed",
         selected && "after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:bg-[Highlight]/30",
       )}
     >

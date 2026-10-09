@@ -11,6 +11,7 @@ import type { EditorView } from "@tiptap/pm/view";
 import { chipInsertText, chipToken, parseLine, parsePrompt, proseOf, serializePrompt, type PromptPiece } from "@/lib/prompt";
 import { ChipRepoContext, CHIP_NODE } from "./chipContext";
 import { AttachmentChipNode } from "./chipNode";
+import { selectedChipId } from "./chipSelection";
 
 export interface PromptEditorHandle {
   focus(): void;
@@ -34,6 +35,8 @@ interface PromptEditorProps {
   onEscape: () => boolean;
   /** Pasted image files (a paste with files inserts no text). */
   onPasteFiles: (files: File[]) => void;
+  /** Space on a selected chip: preview its attachment; false when it has none. */
+  onPreviewChip: (id: string, returnFocus: HTMLElement) => boolean;
   handleRef: Ref<PromptEditorHandle>;
 }
 
@@ -86,18 +89,18 @@ function textSlice(view: EditorView, text: string): Slice {
 /**
  * The prompt input: a TipTap (ProseMirror) editor with paragraphs, text and inline image
  * chips, nothing else (no marks, no Markdown). Enter sends, Shift+Enter starts a new
- * line; chips are atoms, so Backspace/Delete remove one whole and the arrows step over
+ * line; Space on a selected chip previews its image; chips are atoms, so Backspace/Delete remove one whole and the arrows step over
  * one in a single press; undo restores a deleted chip. Copy writes the token text; a
  * pasted token becomes a chip again.
  */
-export function PromptEditor({ repoId, value, disabled, placeholder, onChange, onSubmit, onEscape, onPasteFiles, handleRef }: PromptEditorProps) {
+export function PromptEditor({ repoId, value, disabled, placeholder, onChange, onSubmit, onEscape, onPasteFiles, onPreviewChip, handleRef }: PromptEditorProps) {
   // What the editor last reported (or was set to): a store value that differs came from
   // outside (a removed attachment, a cleared draft) and replaces the document.
   const shown = useRef(value);
   const focused = useRef(false);
-  const cb = useRef({ onChange, onSubmit, onEscape, onPasteFiles });
+  const cb = useRef({ onChange, onSubmit, onEscape, onPasteFiles, onPreviewChip });
   useLayoutEffect(() => {
-    cb.current = { onChange, onSubmit, onEscape, onPasteFiles };
+    cb.current = { onChange, onSubmit, onEscape, onPasteFiles, onPreviewChip };
   });
 
   const attributes = useMemo(
@@ -135,6 +138,12 @@ export function PromptEditor({ repoId, value, disabled, placeholder, onChange, o
         }
         if (e.key === "Escape" && plain) return cb.current.onEscape();
         const sel = view.state.selection;
+        // Space on a selected chip (clicked, or Shift+Arrow over it) previews its image
+        // instead of replacing it. Enter is left alone: it sends.
+        if (e.key === " " && plain) {
+          const id = selectedChipId(sel);
+          return id !== null && cb.current.onPreviewChip(id, view.dom);
+        }
         if (!sel.empty || !plain) return false;
         const { $from } = sel;
         // Step over a chip in one press (ProseMirror would select it first).

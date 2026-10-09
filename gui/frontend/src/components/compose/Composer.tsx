@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ArrowUp, Brain, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Loader2, Paperclip, ShieldCheck, X } from "lucide-react";
+import { AttachmentPreview } from "./AttachmentPreview";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { PromptEditor, type PromptEditorHandle } from "./PromptEditor";
 import { ATTACHMENT_MIME_TYPES } from "@/api/session";
@@ -23,6 +24,7 @@ import {
   getDraft,
   isDraftEmpty,
   loadRefs,
+  openPreview,
   removeAttachment,
   sendDraft,
   updateDraft,
@@ -105,9 +107,20 @@ function Attachments({ repoId, disabled, refocus }: { repoId: string; disabled: 
           className="group relative size-16 overflow-hidden rounded-lg border bg-muted/40"
           data-testid="attachment"
           data-attachment-id={a.id}
-          title={`${a.file.name}\n${formatAttachmentSize(a.file.size)}`}
         >
-          <img src={a.url} alt={a.file.name} className="size-full object-cover" />
+          <button
+            type="button"
+            title="Open preview"
+            aria-label={`Preview ${a.file.name}, ${formatAttachmentSize(a.file.size)}`}
+            aria-haspopup="dialog"
+            data-testid="attachment-open"
+            className="block size-full cursor-pointer rounded-[inherit] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset"
+            onClick={(e) => {
+              openPreview(repoId, a.id, e.currentTarget);
+            }}
+          >
+            <img src={a.url} alt={a.file.name} draggable={false} className="size-full object-cover" />
+          </button>
           <button
             type="button"
             disabled={disabled}
@@ -268,6 +281,7 @@ function ComposerCard({ repoId }: { repoId: string }) {
       />
       <div className="col-span-2 col-start-1 row-start-1 flex min-w-0 flex-col">
         <Attachments repoId={repoId} disabled={busy} refocus={refocus} />
+        <AttachmentPreview repoId={repoId} />
         <PromptEditor
           handleRef={editorRef}
           repoId={repoId}
@@ -284,6 +298,7 @@ function ComposerCard({ repoId }: { repoId: string }) {
             return true;
           }}
           onPasteFiles={attach}
+          onPreviewChip={(id, el) => openPreview(repoId, id, el)}
         />
       </div>
       <div className="col-start-1 row-start-2 flex min-w-0 flex-wrap items-center gap-0.5 px-2 pb-2">
