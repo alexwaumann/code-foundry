@@ -79,7 +79,7 @@ func (f *Gh) MergePullRequest(_ context.Context, r *connect.Request[v1.MergePull
 	res.Message = "Merged #" + strconv.Itoa(int(r.Msg.GetNumber())) + " (5e1f00d)"
 	if r.Msg.GetDeleteBranch() {
 		res.BranchDeleted = true
-		res.Message += "; deleted branch b"
+		res.Message += "; deleted origin/b"
 	}
 	return connect.NewResponse(res), nil
 }
