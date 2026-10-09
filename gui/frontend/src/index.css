@@ -95,8 +95,8 @@
     /* Black; gui/main.go's BackgroundColour, so launch does not flash. */
     --sheet: #000000;
     /* Equals the dark xterm background (src/terminal/theme.ts). */
-    --pane: #0a0a0a;
-    /* A touch stronger than light's 8%: the pane is only 10/255 above the sheet. */
+    --pane: #060606;
+    /* A touch stronger than light's 8%: the pane is only 6/255 above the sheet. */
     --pane-border: oklch(1 0 0 / 11%);
     --background: var(--sheet);
     --foreground: oklch(0.985 0 0);

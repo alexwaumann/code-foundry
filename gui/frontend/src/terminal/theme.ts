@@ -8,10 +8,10 @@ export const TERMINAL_FONT_FAMILY = '"JetBrains Mono", "SF Mono", ui-monospace, 
 // `background` is the pane colour: it must equal --pane in src/index.css (.dark and
 // :root) so the terminal reads as part of the pane it sits in.
 const dark: ITheme = {
-  background: "#0a0a0a",
+  background: "#060606",
   foreground: "#d8dadf",
   cursor: "#e6e6e6",
-  cursorAccent: "#0a0a0a",
+  cursorAccent: "#060606",
   selectionBackground: "#3a4a6b",
   selectionInactiveBackground: "#2c3446",
   black: "#1d1f23",

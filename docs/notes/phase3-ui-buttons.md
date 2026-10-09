@@ -10,12 +10,12 @@ against a daemon with an isolated `CODE_FOUNDRY_HOME` in dark mode.
 | Token | Dark before | Dark now |
 |---|---|---|
 | `--sheet` | `oklch(0.13 0 0)` (#070707) | `#000000` |
-| `--pane` | `#101010` | `#0a0a0a` |
+| `--pane` | `#101010` | `#060606` (via `#0a0a0a`) |
 | `--pane-border` | `oklch(1 0 0 / 8%)` | `oklch(1 0 0 / 11%)` |
 
 These stay tied together:
 
-* `src/terminal/theme.ts` dark `background` and `cursorAccent` are `#0a0a0a`, equal to `--pane`.
+* `src/terminal/theme.ts` dark `background` and `cursorAccent` are `#060606`, equal to `--pane`.
 * `gui/main.go` `BackgroundColour` is `NewRGB(0, 0, 0)`, equal to `--sheet`.
 
 Light mode is unchanged. The border alpha went up because the pane is now only 10/255
