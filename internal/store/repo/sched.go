@@ -15,6 +15,8 @@ const (
 	jobStatus
 	// jobDetail owns one worktree's cached detail (detail.go).
 	jobDetail
+	// jobBase owns a repo's resolved base sha (base.go).
+	jobBase
 )
 
 // jobKey identifies a job. A key is never run by two workers at once, which is what

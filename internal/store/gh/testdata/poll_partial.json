@@ -1,0 +1,384 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4649,
+      "resetAt": "2026-10-09T01:38:55Z"
+    },
+    "viewer": {
+      "id": "MDQ6VXNlcjU4MzIzMQ==",
+      "login": "octocat",
+      "name": "The Octocat",
+      "avatarUrl": "https://avatars.githubusercontent.com/u/583231?v=4",
+      "url": "https://github.com/octocat"
+    },
+    "s_authored": {
+      "issueCount": 0,
+      "nodes": []
+    },
+    "s_review": {
+      "issueCount": 0,
+      "nodes": []
+    },
+    "s_reviewed": {
+      "issueCount": 0,
+      "nodes": []
+    },
+    "s_merged": {
+      "issueCount": 0,
+      "nodes": []
+    },
+    "r0": {
+      "defaultBranchRef": {
+        "name": "main",
+        "target": {
+          "oid": "a0a498be5609f463418f939f9d333c898770393b",
+          "committedDate": "2026-10-09T01:14:17Z",
+          "messageHeadline": "feat(gui): painted foundry app icon",
+          "statusCheckRollup": {
+            "state": "SUCCESS",
+            "contexts": {
+              "checkRunCount": 1,
+              "checkRunCountsByState": [
+                {
+                  "state": "ACTION_REQUIRED",
+                  "count": 0
+                },
+                {
+                  "state": "CANCELLED",
+                  "count": 0
+                },
+                {
+                  "state": "COMPLETED",
+                  "count": 0
+                },
+                {
+                  "state": "FAILURE",
+                  "count": 0
+                },
+                {
+                  "state": "IN_PROGRESS",
+                  "count": 0
+                },
+                {
+                  "state": "NEUTRAL",
+                  "count": 0
+                },
+                {
+                  "state": "PENDING",
+                  "count": 0
+                },
+                {
+                  "state": "QUEUED",
+                  "count": 0
+                },
+                {
+                  "state": "SKIPPED",
+                  "count": 0
+                },
+                {
+                  "state": "STALE",
+                  "count": 0
+                },
+                {
+                  "state": "STARTUP_FAILURE",
+                  "count": 0
+                },
+                {
+                  "state": "SUCCESS",
+                  "count": 1
+                },
+                {
+                  "state": "TIMED_OUT",
+                  "count": 0
+                },
+                {
+                  "state": "WAITING",
+                  "count": 0
+                }
+              ],
+              "statusContextCount": 0,
+              "statusContextCountsByState": [
+                {
+                  "state": "EXPECTED",
+                  "count": 0
+                },
+                {
+                  "state": "ERROR",
+                  "count": 0
+                },
+                {
+                  "state": "FAILURE",
+                  "count": 0
+                },
+                {
+                  "state": "PENDING",
+                  "count": 0
+                },
+                {
+                  "state": "SUCCESS",
+                  "count": 0
+                }
+              ]
+            }
+          }
+        }
+      },
+      "b0": {
+        "nodes": []
+      },
+      "b1": {
+        "nodes": []
+      },
+      "history": {
+        "target": {
+          "thisMonth": {
+            "totalCount": 135
+          },
+          "lastMonth": {
+            "totalCount": 0
+          }
+        }
+      }
+    },
+    "r1": {
+      "defaultBranchRef": {
+        "name": "main",
+        "target": {
+          "oid": "c770410dbb57909ff4f6921a6497688a957f85db",
+          "committedDate": "2026-10-08T22:22:42Z",
+          "messageHeadline": "cli/list-themes: fix keypad page down binding (#14605)",
+          "statusCheckRollup": {
+            "state": "SUCCESS",
+            "contexts": {
+              "checkRunCount": 103,
+              "checkRunCountsByState": [
+                {
+                  "state": "ACTION_REQUIRED",
+                  "count": 0
+                },
+                {
+                  "state": "CANCELLED",
+                  "count": 0
+                },
+                {
+                  "state": "COMPLETED",
+                  "count": 0
+                },
+                {
+                  "state": "FAILURE",
+                  "count": 0
+                },
+                {
+                  "state": "IN_PROGRESS",
+                  "count": 0
+                },
+                {
+                  "state": "NEUTRAL",
+                  "count": 0
+                },
+                {
+                  "state": "PENDING",
+                  "count": 0
+                },
+                {
+                  "state": "QUEUED",
+                  "count": 0
+                },
+                {
+                  "state": "SKIPPED",
+                  "count": 5
+                },
+                {
+                  "state": "STALE",
+                  "count": 0
+                },
+                {
+                  "state": "STARTUP_FAILURE",
+                  "count": 0
+                },
+                {
+                  "state": "SUCCESS",
+                  "count": 98
+                },
+                {
+                  "state": "TIMED_OUT",
+                  "count": 0
+                },
+                {
+                  "state": "WAITING",
+                  "count": 0
+                }
+              ],
+              "statusContextCount": 0,
+              "statusContextCountsByState": [
+                {
+                  "state": "EXPECTED",
+                  "count": 0
+                },
+                {
+                  "state": "ERROR",
+                  "count": 0
+                },
+                {
+                  "state": "FAILURE",
+                  "count": 0
+                },
+                {
+                  "state": "PENDING",
+                  "count": 0
+                },
+                {
+                  "state": "SUCCESS",
+                  "count": 0
+                }
+              ]
+            }
+          }
+        }
+      },
+      "history": {
+        "target": {
+          "thisMonth": {
+            "totalCount": 0
+          },
+          "lastMonth": {
+            "totalCount": 0
+          }
+        }
+      }
+    },
+    "r2": {
+      "defaultBranchRef": {
+        "name": "master",
+        "target": {
+          "oid": "402a494f47808442f3de9266b147b274f8c7a5be",
+          "committedDate": "2026-10-08T18:02:25Z",
+          "messageHeadline": "build(deps): bump tree-sitter to v0.27.1",
+          "statusCheckRollup": {
+            "state": "SUCCESS",
+            "contexts": {
+              "checkRunCount": 31,
+              "checkRunCountsByState": [
+                {
+                  "state": "ACTION_REQUIRED",
+                  "count": 0
+                },
+                {
+                  "state": "CANCELLED",
+                  "count": 0
+                },
+                {
+                  "state": "COMPLETED",
+                  "count": 0
+                },
+                {
+                  "state": "FAILURE",
+                  "count": 0
+                },
+                {
+                  "state": "IN_PROGRESS",
+                  "count": 0
+                },
+                {
+                  "state": "NEUTRAL",
+                  "count": 0
+                },
+                {
+                  "state": "PENDING",
+                  "count": 0
+                },
+                {
+                  "state": "QUEUED",
+                  "count": 0
+                },
+                {
+                  "state": "SKIPPED",
+                  "count": 0
+                },
+                {
+                  "state": "STALE",
+                  "count": 0
+                },
+                {
+                  "state": "STARTUP_FAILURE",
+                  "count": 0
+                },
+                {
+                  "state": "SUCCESS",
+                  "count": 31
+                },
+                {
+                  "state": "TIMED_OUT",
+                  "count": 0
+                },
+                {
+                  "state": "WAITING",
+                  "count": 0
+                }
+              ],
+              "statusContextCount": 0,
+              "statusContextCountsByState": [
+                {
+                  "state": "EXPECTED",
+                  "count": 0
+                },
+                {
+                  "state": "ERROR",
+                  "count": 0
+                },
+                {
+                  "state": "FAILURE",
+                  "count": 0
+                },
+                {
+                  "state": "PENDING",
+                  "count": 0
+                },
+                {
+                  "state": "SUCCESS",
+                  "count": 0
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "r3": null,
+    "mergedThis": {
+      "issueCount": 0
+    },
+    "mergedLast": {
+      "issueCount": 0
+    },
+    "mergedRecent": {
+      "issueCount": 0,
+      "nodes": []
+    },
+    "contributions": {
+      "thisMonth": {
+        "totalCommitContributions": 214
+      },
+      "lastMonth": {
+        "totalCommitContributions": 0
+      }
+    }
+  },
+  "errors": [
+    {
+      "type": "NOT_FOUND",
+      "path": [
+        "r3"
+      ],
+      "locations": [
+        {
+          "line": 21,
+          "column": 3
+        }
+      ],
+      "message": "Could not resolve to a Repository with the name 'alexwaumann/does-not-exist-xyz'."
+    }
+  ]
+}

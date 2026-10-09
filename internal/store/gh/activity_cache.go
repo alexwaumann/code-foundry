@@ -18,7 +18,13 @@ const (
 	activityRepoStats     = "repo_stats:"
 	activityDefaultBranch = "default_branch:"
 	activityBranch        = "branch:"
+	activityPoll          = "poll"
 )
+
+// pollRow is the "poll" row: when the last successful poll finished.
+type pollRow struct {
+	FetchedAt time.Time `json:"fetchedAt"`
+}
 
 func activityBranchKey(k branchKey) string { return activityBranch + k.slug + ":" + k.head }
 
@@ -52,23 +58,18 @@ func loadActivityRow[T any](ctx context.Context, c cache, key string) (T, bool, 
 	return v, ok, nil
 }
 
-// loadActivity initializes the activity state and fills snap with the cached
-// dashboard, stats, and per-repository activity. Branch rows are loaded on demand;
-// those older than cacheRetention are pruned. Failures are logged: the cache is an
-// optimization.
+// loadActivity fills snap with the cached dashboard, stats, per-repository activity,
+// and last poll time. Branch rows are loaded on demand; those older than
+// cacheRetention are pruned. Failures are logged: the cache is an optimization.
 func (s *Store) loadActivity(ctx context.Context, snap *Snapshot) {
-	s.act.repoStats = map[string]*schedule{}
-	s.act.branches = map[branchKey]*branchWatch{}
-	s.act.searchFirst = map[string]int{}
-	s.act.branchStates = map[branchKey]BranchPullRequests{}
 	if err := s.loadActivityRows(ctx, snap); err != nil {
 		s.log.Warn("gh activity cache load failed", "err", err)
 	}
-	if f := snap.Dashboard.FetchedAt; !f.IsZero() {
-		s.act.dashboardNext = f.Add(s.opts.DashboardInterval)
+	if snap.Poll.FetchedAt.After(snap.Dashboard.FetchedAt) {
+		snap.Dashboard.FetchedAt = snap.Poll.FetchedAt
 	}
 	if f := snap.Dashboard.Stats.FetchedAt; !f.IsZero() {
-		s.act.statsNext = f.Add(s.opts.StatsInterval)
+		s.statsNext = f.Add(s.opts.StatsInterval)
 	}
 }
 
@@ -100,6 +101,10 @@ func (s *Store) loadActivityRows(ctx context.Context, snap *Snapshot) error {
 				stats := snap.Dashboard.Stats
 				snap.Dashboard = d
 				snap.Dashboard.Stats = stats
+			}
+		case key == activityPoll:
+			if p, ok := decodePayload[pollRow](payload); ok {
+				snap.Poll.FetchedAt = p.FetchedAt
 			}
 		case key == activityStats:
 			if st, ok := decodePayload[MonthlyStats](payload); ok {

@@ -20,14 +20,16 @@ func (h *Gh) GetDashboard(_ context.Context, req *connect.Request[v1.GetDashboar
 		return req.Msg.GetIncludeUntracked() || slices.Contains(tracked, p.Repo)
 	}
 	res := &v1.GetDashboardResponse{
-		Authenticated:   snap.Viewer.Authenticated,
-		Authored:        searchPullRequestsToProto(d.Authored, keep),
-		ReviewRequested: searchPullRequestsToProto(d.ReviewRequested, keep),
-		RecentlyMerged:  searchPullRequestsToProto(d.RecentlyMerged, keep),
-		Stats:           statsToProto(d.Stats),
-		FetchedAt:       timestamp(d.FetchedAt),
-		LastError:       d.LastError,
-		TrackedSlugs:    tracked,
+		Authenticated:      snap.Viewer.Authenticated,
+		Authored:           searchPullRequestsToProto(d.Authored, keep),
+		ReviewRequested:    searchPullRequestsToProto(d.ReviewRequested, keep),
+		Reviewed:           searchPullRequestsToProto(d.Reviewed, keep),
+		RecentlyMerged:     searchPullRequestsToProto(d.RecentlyMerged, keep),
+		Stats:              statsToProto(d.Stats),
+		FetchedAt:          timestamp(d.FetchedAt),
+		LastError:          d.LastError,
+		TrackedSlugs:       tracked,
+		DashboardsDisabled: d.Disabled,
 	}
 	if v := snap.Viewer.Viewer; v != nil {
 		res.Viewer = &v1.GhViewer{Login: v.Login, Name: v.Name, AvatarUrl: v.AvatarURL, Url: v.URL}
@@ -49,7 +51,7 @@ func (h *Gh) GetRepoActivity(_ context.Context, req *connect.Request[v1.GetRepoA
 		Stats:          statsToProto(r.Activity.Stats),
 		RecentlyMerged: searchPullRequestsToProto(snap.Dashboard.RecentlyMerged, func(p gh.PullRequest) bool { return p.Repo == slug }),
 	}
-	if ci := r.Activity.DefaultBranch; !ci.FetchedAt.IsZero() {
+	if ci := r.Activity.DefaultBranch; !ci.FetchedAt.IsZero() || ci.LastError != "" {
 		res.DefaultBranch = &v1.DefaultBranchStatus{
 			Branch:      ci.Branch,
 			Sha:         ci.SHA,
@@ -58,6 +60,7 @@ func (h *Gh) GetRepoActivity(_ context.Context, req *connect.Request[v1.GetRepoA
 			Rollup:      rollupToProto(ci.Rollup),
 			Failing:     checkRunsToProto(ci.Failing),
 			FetchedAt:   timestamp(ci.FetchedAt),
+			LastError:   ci.LastError,
 		}
 	}
 	return connect.NewResponse(res), nil

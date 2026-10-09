@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"time"
@@ -49,26 +50,6 @@ func (h *Gh) GetViewer(context.Context, *connect.Request[v1.GetViewerRequest]) (
 	}
 	if v := vs.Viewer; v != nil {
 		res.Viewer = &v1.GhViewer{Login: v.Login, Name: v.Name, AvatarUrl: v.AvatarURL, Url: v.URL}
-	}
-	return connect.NewResponse(res), nil
-}
-
-// ListPullRequests returns a repository's cached open pull requests.
-func (h *Gh) ListPullRequests(_ context.Context, req *connect.Request[v1.ListPullRequestsRequest]) (*connect.Response[v1.ListPullRequestsResponse], error) {
-	slug, err := gh.NormalizeSlug(req.Msg.GetRepoSlug())
-	if err != nil {
-		return nil, ghError(err)
-	}
-	r := h.store.Snapshot().Repos[slug]
-	res := &v1.ListPullRequestsResponse{
-		PullRequests: make([]*v1.PullRequest, 0, len(r.PullRequests)),
-		Tracked:      r.Tracked,
-		FetchedAt:    timestamp(r.FetchedAt),
-		LastError:    r.LastError,
-		TotalCount:   int32(r.TotalCount),
-	}
-	for i := range r.PullRequests {
-		res.PullRequests = append(res.PullRequests, pullRequestToProto(slug, &r.PullRequests[i]))
 	}
 	return connect.NewResponse(res), nil
 }
@@ -129,8 +110,8 @@ func (h *Gh) Untrack(_ context.Context, req *connect.Request[v1.UntrackGhRepoReq
 
 // Watch streams change notifications until the client cancels or the daemon stops.
 func (h *Gh) Watch(ctx context.Context, _ *connect.Request[v1.WatchGhRequest], stream *connect.ServerStream[v1.GhEvent]) error {
-	prs := bus.Subscribe[gh.PullRequestsUpdated](h.bus, ghWatchBuffer)
-	defer prs.Close()
+	polled := bus.Subscribe[gh.Polled](h.bus, ghWatchBuffer)
+	defer polled.Close()
 	viewer := bus.Subscribe[gh.ViewerUpdated](h.bus, ghWatchBuffer)
 	defer viewer.Close()
 	dash := bus.Subscribe[gh.DashboardUpdated](h.bus, ghWatchBuffer)
@@ -152,8 +133,8 @@ func (h *Gh) Watch(ctx context.Context, _ *connect.Request[v1.WatchGhRequest], s
 			return nil
 		case <-h.done:
 			return nil
-		case e := <-prs.C():
-			ev = ghPullRequestsEvent(e)
+		case e := <-polled.C():
+			ev = ghPolledEvent(e)
 		case e := <-viewer.C():
 			ev = ghViewerEvent(e)
 		case e := <-dash.C():
@@ -169,10 +150,10 @@ func (h *Gh) Watch(ctx context.Context, _ *connect.Request[v1.WatchGhRequest], s
 	}
 }
 
-// ghPullRequestsEvent and ghViewerEvent map gh bus events; shared with EventService.
-func ghPullRequestsEvent(e gh.PullRequestsUpdated) *v1.GhEvent {
-	return &v1.GhEvent{Event: &v1.GhEvent_PullRequestsUpdated_{PullRequestsUpdated: &v1.GhEvent_PullRequestsUpdated{
-		RepoSlug: e.Slug, FetchedAt: timestamp(e.FetchedAt),
+// ghPolledEvent and ghViewerEvent map gh bus events; shared with EventService.
+func ghPolledEvent(e gh.Polled) *v1.GhEvent {
+	return &v1.GhEvent{Event: &v1.GhEvent_Polled_{Polled: &v1.GhEvent_Polled{
+		FetchedAt: timestamp(e.FetchedAt), LastError: e.LastError,
 	}}}
 }
 
@@ -226,8 +207,8 @@ func enumOf[E ~int32](values map[string]int32, prefix, s string) E {
 }
 
 func pullRequestToProto(slug string, p *gh.PullRequest) *v1.PullRequest {
-	return &v1.PullRequest{
-		RepoSlug:          slug,
+	out := &v1.PullRequest{
+		RepoSlug:          cmp.Or(p.Repo, slug),
 		Number:            int32(p.Number),
 		Title:             p.Title,
 		Author:            p.Author,
@@ -246,7 +227,22 @@ func pullRequestToProto(slug string, p *gh.PullRequest) *v1.PullRequest {
 		State:             enumOf[v1.PullRequestState](v1.PullRequestState_value, "PULL_REQUEST_STATE_", string(p.State)),
 		CreatedAt:         timestamp(p.CreatedAt),
 		MergedAt:          timestamp(p.MergedAt),
+		Additions:         int32(p.Additions),
+		Deletions:         int32(p.Deletions),
+		ChangedFiles:      int32(p.ChangedFiles),
+		CommentCount:      int32(p.Comments),
+		ReviewCount:       int32(p.Reviews),
+		ReviewRequests:    p.ReviewRequests,
+		Partial:           p.Partial,
 	}
+	for _, r := range p.LatestReviews {
+		out.LatestReviews = append(out.LatestReviews, &v1.PullRequestReview{
+			Author:      r.Author,
+			State:       enumOf[v1.PullRequestReviewState](v1.PullRequestReviewState_value, "PULL_REQUEST_REVIEW_STATE_", r.State),
+			SubmittedAt: timestamp(r.SubmittedAt),
+		})
+	}
+	return out
 }
 
 func rollupToProto(r gh.CheckRollup) *v1.CheckRollup {

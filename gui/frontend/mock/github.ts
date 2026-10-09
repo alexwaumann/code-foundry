@@ -10,6 +10,8 @@ import {
   CheckConclusion,
   CheckRollupState,
   CheckStatus,
+  Mergeable,
+  MergeStateStatus,
   PullRequestState,
   ReviewDecision,
   type DefaultBranchStatusSchema,
@@ -35,13 +37,23 @@ interface PrInit {
   mergedAt?: Timestamp;
   checks: { state: CheckRollupState; total: number; passed: number; failed: number; pending: number; skipped: number };
   reviewDecision: ReviewDecision;
+  mergeable?: Mergeable;
+  mergeStateStatus?: MergeStateStatus;
+  additions?: number;
+  deletions?: number;
+  changedFiles?: number;
+  commentCount?: number;
+  reviewCount?: number;
+  reviewRequests?: string[];
 }
 interface DashboardInit {
   viewer: { login: string; name: string; url: string };
   authenticated: boolean;
   authored: PrInit[];
   reviewRequested: PrInit[];
+  reviewed: PrInit[];
   recentlyMerged: PrInit[];
+  dashboardsDisabled?: boolean;
   stats: MessageInitShape<typeof ActivityStatsSchema>;
   fetchedAt?: Timestamp;
   lastError: string;
@@ -121,6 +133,13 @@ export class GhWorld {
       mergedAt: mergedAgoMs !== undefined ? this.at(mergedAgoMs) : undefined,
       checks: rollup(CheckRollupState.SUCCESS, 12),
       reviewDecision: ReviewDecision.REVIEW_REQUIRED,
+      mergeable: mergedAgoMs !== undefined ? Mergeable.UNSPECIFIED : Mergeable.MERGEABLE,
+      mergeStateStatus: mergedAgoMs !== undefined ? MergeStateStatus.UNSPECIFIED : MergeStateStatus.BLOCKED,
+      additions: 10 * number,
+      deletions: number,
+      changedFiles: 3,
+      commentCount: 2,
+      reviewCount: 1,
       ...rest,
     };
   }
@@ -158,6 +177,7 @@ export class GhWorld {
         this.pr(cf, 139, "feat(session): JSONL transcript discovery", { author: "teammate-kim", headRef: "jsonl", checks: rollup(CheckRollupState.SUCCESS, 30), ageMs: 3 * HOUR }),
         this.pr("other-org/lib", 77, "chore: bump deps", { author: "renovate", checks: rollup(CheckRollupState.SUCCESS, 4), ageMs: 6 * HOUR }),
       ],
+      reviewed: [this.pr(cf, 133, "refactor(api): one events stream", { author: "teammate-kim", headRef: "events", ageMs: 9 * HOUR })],
       recentlyMerged: [
         this.pr(cf, 138, "chore(gh): pace requests through one worker", { headRef: "gh-pacing", mergedAgoMs: 1 * DAY, ageMs: 1 * DAY }),
         this.pr(cf, 136, "fix(repo): ignore Chmod-only fs events", { author: "teammate-kim", headRef: "kqueue-chmod", mergedAgoMs: 2 * DAY, ageMs: 2 * DAY }),
@@ -264,6 +284,7 @@ export class GhWorld {
       authenticated: this.authenticated,
       authored: d.authored.filter(keep),
       reviewRequested: d.reviewRequested.filter(keep),
+      reviewed: d.reviewed.filter(keep),
       recentlyMerged: d.recentlyMerged.filter(keep),
       trackedSlugs: tracked,
     };
@@ -288,17 +309,32 @@ export class GhWorld {
 
   // ---- controls (POST /__mock/gh/...) -------------------------------------------------
 
-  /** A poll found a new PR: add it and announce the dashboard. */
+  /** The polled event: the daemon sends it after every poll and in its gh snapshot. */
+  polledEvent(): GhEventInit {
+    return { event: { case: "polled", value: { fetchedAt: this.dashboard.fetchedAt, lastError: this.dashboard.lastError } } };
+  }
+
+  /** A poll found a new PR: add it and announce the dashboard (and the poll). */
   update(): void {
     const pr = this.pr("alexwaumann/code-foundry", 150, "feat(gui): Pull Requests page", { headRef: "phase3a", checks: rollup(CheckRollupState.PENDING, 3, 0, 5), ageMs: 0 });
     this.dashboard = { ...this.dashboard, authored: [pr, ...this.dashboard.authored], fetchedAt: timestampFromDate(new Date()) };
     this.publishGh({ event: { case: "dashboardUpdated", value: { fetchedAt: this.dashboard.fetchedAt } } });
+    this.publishGh(this.polledEvent());
   }
 
-  /** The last successful poll was 10 minutes ago, and the latest one failed. */
+  /**
+   * The last successful poll was 10 minutes ago, and the latest one failed. Like the
+   * daemon, only the polled event says so: nothing re-reads the dashboard.
+   */
   stale(): void {
     this.dashboard = { ...this.dashboard, fetchedAt: timestampFromDate(new Date(Date.now() - 10 * MIN)), lastError: "github rate limit (secondary): paused" };
-    this.publishGh({ event: { case: "dashboardUpdated", value: { fetchedAt: this.dashboard.fetchedAt } } });
+    this.publishGh(this.polledEvent());
+  }
+
+  /** A poll that changed nothing: only the polled event, with a fresh time. */
+  poll(): void {
+    this.dashboard = { ...this.dashboard, fetchedAt: timestampFromDate(new Date()), lastError: "" };
+    this.publishGh(this.polledEvent());
   }
 
   /** A file appeared in a worktree: recompute and announce. */

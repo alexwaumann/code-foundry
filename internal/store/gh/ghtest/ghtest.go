@@ -43,11 +43,19 @@ func (s *Store) SetViewer(v gh.ViewerState) {
 }
 
 // SetRepo replaces a repository's state (keyed by r.Slug) and publishes
-// gh.PullRequestsUpdated.
+// gh.RepoActivityUpdated.
 func (s *Store) SetRepo(r gh.RepoState) {
 	s.update(func(n *gh.Snapshot) { n.Repos[r.Slug] = r })
 	if s.bus != nil {
-		bus.Publish(s.bus, gh.PullRequestsUpdated{Slug: r.Slug, FetchedAt: r.FetchedAt})
+		bus.Publish(s.bus, gh.RepoActivityUpdated{Slug: r.Slug, FetchedAt: r.Activity.DefaultBranch.FetchedAt})
+	}
+}
+
+// SetPoll replaces the last poll's state and publishes gh.Polled.
+func (s *Store) SetPoll(p gh.PollState) {
+	s.update(func(n *gh.Snapshot) { n.Poll = p })
+	if s.bus != nil {
+		bus.Publish(s.bus, gh.Polled(p))
 	}
 }
 
@@ -89,7 +97,7 @@ func (s *Store) update(fn func(*gh.Snapshot)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	old := s.snap.Load()
-	n := &gh.Snapshot{Viewer: old.Viewer, Dashboard: old.Dashboard, Repos: make(map[string]gh.RepoState, len(old.Repos)+1)}
+	n := &gh.Snapshot{Viewer: old.Viewer, Dashboard: old.Dashboard, Poll: old.Poll, Repos: make(map[string]gh.RepoState, len(old.Repos)+1)}
 	for k, v := range old.Repos {
 		n.Repos[k] = v
 	}

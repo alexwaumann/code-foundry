@@ -80,7 +80,7 @@ const (
 // Groups in display order (also the order of tables in the file).
 var Groups = []Group{
 	{GroupSessions, "Sessions", "Defaults for new Claude Code sessions."},
-	{GroupGitHub, "GitHub", "Polling of pull requests and checks through gh."},
+	{GroupGitHub, "GitHub", "Your pull requests and default-branch checks, polled with gh's login."},
 	{GroupRepos, "Repositories", "Git fetching and where new worktrees go."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
 	{GroupAppearance, "Appearance", "Theme, terminal font, and density. Applied live in every window."},
@@ -152,15 +152,15 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeyGhPollInterval, Group: GroupGitHub, Type: Int, Title: "Poll interval (seconds)",
-		Description: "How often each repository's pull requests and checks are refreshed through gh.",
-		Default:     strconv.Itoa(defaultGhPollSeconds), Min: 15, Max: 3600, Restart: true,
+		Description: "How often one request checks your pull requests, watched branches, and tracked default branches for changes. Details are fetched only for what changed.",
+		Default:     strconv.Itoa(defaultGhPollSeconds), Min: 15, Max: 3600,
 		bind: func(s *Settings) any { return &s.GitHub.PollIntervalSeconds },
 	},
 	{
 		Key: KeyDashboards, Group: GroupGitHub, Type: Bool, Title: "Pull request dashboards",
-		Description: "Fetch the viewer's dashboards (open, awaiting review, recently merged) for the Pull Requests page.",
-		Default:     "true", Restart: true,
-		bind: func(s *Settings) any { return &s.GitHub.DashboardsEnabled },
+		Description: "Poll your pull requests (authored, awaiting your review, reviewed, recently merged) for the Pull Requests page. Off leaves only default-branch CI and watched branches.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.GitHub.DashboardsEnabled },
 	},
 	{
 		Key: KeyFetchInterval, Group: GroupRepos, Type: Int, Title: "Fetch interval (seconds)",

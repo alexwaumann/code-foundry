@@ -91,11 +91,39 @@ func (WorktreeDetailUpdated) isRepoEvent() {}
 
 type wtKey struct{ repoID, path string }
 
-// detailState is the Git store's detail cache. Zero value is ready to use.
+// detailState is the Git store's detail cache. Zero value is ready to use. Each
+// worktree's entries in cache and heads are written only by its jobDetail.
 type detailState struct {
 	mu        sync.Mutex
 	requested map[wtKey]time.Time
 	cache     map[wtKey]WorktreeDetail
+	heads     map[wtKey]*headPart
+}
+
+// headKey is what the HEAD-only part of a detail depends on.
+type headKey struct {
+	head    string // HEAD sha; empty on an unborn branch
+	baseRef string // as shown (WorktreeDetail.BaseRef)
+	baseSHA string // baseRef resolved
+}
+
+// headPart is the part of a detail that is a pure function of its key: the merge
+// base, the committed changes and the log (merge-base, diff --name-status <mb> <head>,
+// log, rev-list --count), plus, once a clean recompute needed them, the files of a
+// clean worktree (diff --numstat <mb> <head>). Immutable once stored.
+type headPart struct {
+	key       headKey
+	mergeBase string
+	committed []nameStatus
+	log       []LogEntry
+	logTotal  int
+	// clean is the file list of a clean worktree at key; nil until first needed.
+	clean *cleanFiles
+}
+
+type cleanFiles struct {
+	files     []FileChange
+	truncated bool
 }
 
 // WorktreeDetail implements Store.
@@ -111,9 +139,7 @@ func (g *Git) WorktreeDetail(ctx context.Context, repoID, path string) (Worktree
 	now := g.now()
 	ds := &g.details
 	ds.mu.Lock()
-	if ds.requested == nil {
-		ds.requested, ds.cache = map[wtKey]time.Time{}, map[wtKey]WorktreeDetail{}
-	}
+	ds.initLocked()
 	last, watched := ds.requested[k]
 	ds.requested[k] = now
 	d, cached := ds.cache[k]
@@ -149,7 +175,8 @@ func (g *Git) detailAfterStatus(repoID, path string) {
 	}
 }
 
-// detail is the jobDetail body: the only writer of a worktree's cached detail.
+// detail is the jobDetail body: the only writer of a worktree's cached detail and
+// head part.
 func (g *Git) detail(ctx context.Context, repoID, path string) {
 	k := wtKey{repoID, path}
 	ds := &g.details
@@ -157,30 +184,36 @@ func (g *Git) detail(ctx context.Context, repoID, path string) {
 	if st == nil || slot == nil {
 		ds.mu.Lock()
 		delete(ds.cache, k)
+		delete(ds.heads, k)
 		delete(ds.requested, k)
 		ds.mu.Unlock()
 		return
 	}
 	wt := *slot.cur.Load()
 	d := WorktreeDetail{RepoID: repoID, Path: path, Head: wt.Head}
-	d.BaseRef = g.detailBase(ctx, st.meta.Load(), wt)
+	var baseSHA string
+	d.BaseRef, baseSHA = g.detailBase(ctx, st, wt)
 	// The status job that triggered this ran just before, so a clean status is current.
 	clean := !wt.Status.Dirty && wt.Status.Error == "" && !wt.Status.RefreshedAt.IsZero()
-	err := g.fillDetail(ctx, &d, clean)
+	ds.mu.Lock()
+	hp := ds.heads[k]
+	ds.mu.Unlock()
+	hp, runs, err := g.fillDetail(ctx, &d, baseSHA, clean, hp)
 	if ctx.Err() != nil {
 		return
 	}
+	g.log.Debug("worktree detail", "repo", repoID, "path", path, "head", shortSHA(d.Head),
+		"base", d.BaseRef, "clean", clean, "git_runs", runs, "err", err)
 	ds.mu.Lock()
+	ds.initLocked()
 	prev, had := ds.cache[k]
 	if err != nil {
-		g.log.Debug("worktree detail failed", "repo", repoID, "path", path, "err", err)
 		d = prev
 		d.RepoID, d.Path, d.Error = repoID, path, err.Error()
+	} else {
+		ds.heads[k] = hp
 	}
 	d.ComputedAt = g.now()
-	if ds.cache == nil {
-		ds.requested, ds.cache = map[wtKey]time.Time{}, map[wtKey]WorktreeDetail{}
-	}
 	ds.cache[k] = d
 	ds.mu.Unlock()
 	if had && sameDetail(prev, d) {
@@ -191,20 +224,32 @@ func (g *Git) detail(ctx context.Context, repoID, path string) {
 	})
 }
 
-// detailBase picks the ref to compare against: origin/<default> when status found it,
-// else the local default branch if the worktree is on another branch.
-func (g *Git) detailBase(ctx context.Context, m *repoMeta, wt Worktree) string {
-	if wt.Status.BaseRef != "" {
-		return wt.Status.BaseRef
+// initLocked allocates the maps; ds.mu must be held.
+func (ds *detailState) initLocked() {
+	if ds.cache == nil {
+		ds.requested, ds.cache, ds.heads = map[wtKey]time.Time{}, map[wtKey]WorktreeDetail{}, map[wtKey]*headPart{}
 	}
-	def := m.DefaultBranch
-	if def == "" || wt.Branch == def || wt.Head == "" {
-		return ""
+}
+
+// detailBase picks the ref to compare against, and its sha: origin/<default> when the
+// repo has it (as resolved by jobBase, the same sha status compared with), else the
+// local default branch if the worktree is on another branch. An unborn HEAD has no base.
+func (g *Git) detailBase(ctx context.Context, st *repoState, wt Worktree) (ref, sha string) {
+	if wt.Head == "" {
+		return "", ""
 	}
-	if g.refExists(ctx, wt.Path, "refs/heads/"+def) {
-		return def
+	if b := st.base.Load(); b != nil && b.sha != "" {
+		return b.ref, b.sha
 	}
-	return ""
+	def := st.meta.Load().DefaultBranch
+	if def == "" || wt.Branch == def {
+		return "", ""
+	}
+	out, err := g.runner.Run(ctx, wt.Path, "rev-parse", "--verify", "--quiet", "refs/heads/"+def+"^{commit}")
+	if err != nil {
+		return "", ""
+	}
+	return def, string(trimNL(out))
 }
 
 // gitDiff builds `git diff` arguments that stay machine-readable regardless of user
@@ -214,78 +259,111 @@ func gitDiff(extra ...string) []string {
 	return append(args, extra...)
 }
 
-// fillDetail runs git and fills d's files and log. d.BaseRef and d.Head are set. A clean
-// worktree (per status) skips the working-tree scans: the uncommitted diff and the
-// untracked listing are empty, and counts come from a tree-to-tree diff (measured on a
-// neovim checkout: ~0.5s -> ~0.1s).
-func (g *Git) fillDetail(ctx context.Context, d *WorktreeDetail, clean bool) error {
+// fillDetail fills d's merge base, files, and log, and returns the head part it used
+// (hp when its key still matches, else a fresh one) and how many git commands ran.
+// d.BaseRef and d.Head are set; baseSHA is d.BaseRef resolved.
+//
+// Every command names commits by sha, never HEAD or the base ref, so the head part is
+// exactly a function of its key even if a ref moves while this runs (the status job
+// that sees the move schedules another detail).
+//
+// A clean worktree (per status) skips the working-tree scans: the uncommitted diff and
+// the untracked listing are empty, and counts come from a tree-to-tree diff, which is
+// itself cached in the head part. A clean worktree whose key did not change therefore
+// runs no git at all.
+func (g *Git) fillDetail(ctx context.Context, d *WorktreeDetail, baseSHA string, clean bool, hp *headPart) (*headPart, int, error) {
 	dir := d.Path
-	from := "HEAD"
+	runs := 0
+	run := func(args ...string) ([]byte, error) {
+		runs++
+		return g.runner.Run(ctx, dir, args...)
+	}
 	if d.Head == "" {
-		from, d.BaseRef = emptyTree, ""
+		d.BaseRef, baseSHA = "", ""
 	}
-	var committed []nameStatus
-	if d.BaseRef != "" {
-		out, err := g.runner.Run(ctx, dir, "merge-base", "HEAD", d.BaseRef)
-		if err == nil {
-			d.MergeBase = string(trimNL(out))
+	key := headKey{head: d.Head, baseRef: d.BaseRef, baseSHA: baseSHA}
+	if hp == nil || hp.key != key {
+		var err error
+		if hp, err = computeHeadPart(key, run); err != nil {
+			return nil, runs, err
 		}
-		// No merge base (unrelated histories) leaves the comparison to uncommitted
-		// changes, like having no base.
 	}
-	if d.MergeBase != "" {
-		from = d.MergeBase
-		out, err := g.runner.Run(ctx, dir, gitDiff("--name-status", d.MergeBase, "HEAD")...)
-		if err != nil {
-			return err
-		}
-		committed = parseNameStatusZ(out)
-		if out, err = g.runner.Run(ctx, dir, "log", "-n", strconv.Itoa(DetailLogMax), "--no-color",
-			"--format="+logFormat, d.BaseRef+"..HEAD"); err != nil {
-			return err
-		}
-		d.Log = parseLog(out)
-		if out, err = g.runner.Run(ctx, dir, "rev-list", "--count", d.BaseRef+"..HEAD"); err != nil {
-			return err
-		}
-		d.LogTotal, _ = strconv.Atoi(string(trimNL(out)))
-	}
-	var (
-		uncommitted []nameStatus
-		untracked   []string
-	)
-	numstat := gitDiff("--numstat", from) // from the merge base to the working tree
+	d.MergeBase, d.Log, d.LogTotal = hp.mergeBase, hp.log, hp.logTotal
+
 	if clean && d.Head != "" {
-		numstat = gitDiff("--numstat", from, "HEAD")
-	} else {
-		ref := "HEAD"
-		if d.Head == "" {
-			ref = emptyTree
+		if hp.clean == nil {
+			c := &cleanFiles{}
+			if hp.mergeBase != "" { // without a base there is nothing to compare
+				out, err := run(gitDiff("--numstat", hp.mergeBase, d.Head)...)
+				if err != nil {
+					return nil, runs, err
+				}
+				c.files, c.truncated = mergeFiles(hp.committed, nil, parseNumstatZ(out), nil)
+			}
+			next := *hp
+			next.clean = c
+			hp = &next
 		}
-		out, err := g.runner.Run(ctx, dir, gitDiff("--name-status", ref)...)
-		if err != nil {
-			return err
-		}
-		uncommitted = parseNameStatusZ(out)
-		if out, err = g.runner.Run(ctx, dir, "ls-files", "--others", "--exclude-standard", "--directory",
-			"--no-empty-directory", "-z"); err != nil {
-			return err
-		}
-		untracked = splitZ(out)
+		d.Files, d.FilesTruncated = hp.clean.files, hp.clean.truncated
+		return hp, runs, nil
 	}
-	out, err := g.runner.Run(ctx, dir, numstat...)
+
+	from := cmp.Or(hp.mergeBase, d.Head, emptyTree)
+	out, err := run(gitDiff("--name-status", cmp.Or(d.Head, emptyTree))...)
 	if err != nil {
-		return err
+		return nil, runs, err
 	}
-	counts := parseNumstatZ(out)
-	d.Files, d.FilesTruncated = mergeFiles(committed, uncommitted, counts, untracked)
+	uncommitted := parseNameStatusZ(out)
+	if out, err = run("ls-files", "--others", "--exclude-standard", "--directory", "--no-empty-directory", "-z"); err != nil {
+		return nil, runs, err
+	}
+	untracked := splitZ(out)
+	if out, err = run(gitDiff("--numstat", from)...); err != nil { // merge base to working tree
+		return nil, runs, err
+	}
+	d.Files, d.FilesTruncated = mergeFiles(hp.committed, uncommitted, parseNumstatZ(out), untracked)
 	for i := range d.Files {
 		f := &d.Files[i]
 		if f.Status == "?" && !f.IsDir {
 			f.Added, f.Binary = countLines(filepath.Join(dir, f.Path))
 		}
 	}
-	return nil
+	return hp, runs, nil
+}
+
+// computeHeadPart runs the HEAD-only commands for key: merge-base, the committed
+// name-status, the log, and its total. No base (or no merge base) leaves them empty.
+func computeHeadPart(key headKey, run func(...string) ([]byte, error)) (*headPart, error) {
+	hp := &headPart{key: key}
+	if key.baseSHA == "" {
+		return hp, nil
+	}
+	out, err := run("merge-base", key.head, key.baseSHA)
+	switch {
+	case err == nil:
+		hp.mergeBase = string(trimNL(out))
+	case isExit(err, 1):
+		// No merge base (unrelated histories, or beyond a shallow boundary): compare
+		// only uncommitted changes, like having no base. Exit 1 is git's answer, so it
+		// is cached; any other failure is an error and is not.
+		return hp, nil
+	default:
+		return nil, err
+	}
+	if out, err = run(gitDiff("--name-status", hp.mergeBase, key.head)...); err != nil {
+		return nil, err
+	}
+	hp.committed = parseNameStatusZ(out)
+	rng := key.baseSHA + ".." + key.head
+	if out, err = run("log", "-n", strconv.Itoa(DetailLogMax), "--no-color", "--format="+logFormat, rng); err != nil {
+		return nil, err
+	}
+	hp.log = parseLog(out)
+	if out, err = run("rev-list", "--count", rng); err != nil {
+		return nil, err
+	}
+	hp.logTotal, _ = strconv.Atoi(string(trimNL(out)))
+	return hp, nil
 }
 
 // mergeFiles combines branch and working tree changes into one sorted, capped list.

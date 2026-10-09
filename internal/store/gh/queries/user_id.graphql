@@ -1,6 +1,0 @@
-# A user's node id by login. Only used with Options.SearchAs (the viewer's id comes
-# from viewer.graphql).
-query UserID($login: String!) {
-  rateLimit { ...RateLimitFields }
-  user(login: $login) { id login }
-}

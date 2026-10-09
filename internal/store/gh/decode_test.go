@@ -1,138 +1,32 @@
 package gh
 
 import (
-	"encoding/json"
 	"errors"
-	"os"
-	"path/filepath"
 	"testing"
-	"time"
 )
-
-// Fixtures in testdata/ are real `gh api graphql` responses captured from
-// ghostty-org/ghostty with the queries in queries/ (viewer identity sanitized), except
-// files named *_synthetic.json. See docs/notes/phase1c-gh.md.
-
-func fixture(t *testing.T, name string) []byte {
-	t.Helper()
-	b, err := os.ReadFile(filepath.Join("testdata", name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return b
-}
-
-// fixtureData returns a fixture's "data" object, as Runner.GraphQL does.
-func fixtureData(t *testing.T, name string) json.RawMessage {
-	t.Helper()
-	data, err := parseGraphQLOutput(0, fixture(t, name), nil)
-	if err != nil {
-		t.Fatalf("%s: %v", name, err)
-	}
-	return data
-}
-
-func TestDecodeViewer(t *testing.T) {
-	v, rl, err := decodeViewer(fixtureData(t, "viewer.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := Viewer{ID: "MDQ6VXNlcjU4MzIzMQ==", Login: "octocat", Name: "The Octocat",
-		AvatarURL: "https://avatars.githubusercontent.com/u/583231?v=4", URL: "https://github.com/octocat"}
-	if v != want {
-		t.Errorf("viewer = %+v, want %+v", v, want)
-	}
-	if rl == nil || rl.Limit != 5000 || rl.Cost != 1 || rl.ResetAt.IsZero() {
-		t.Errorf("rateLimit = %+v", rl)
-	}
-	if _, _, err := decodeViewer([]byte(`{"viewer":null}`)); !errors.Is(err, ErrNotAuthenticated) {
-		t.Errorf("null viewer err = %v, want ErrNotAuthenticated", err)
-	}
-}
-
-func TestDecodePullRequestsPage(t *testing.T) {
-	page, rl, err := decodePullRequestsPage(fixtureData(t, "pull_requests_page1.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if rl == nil || rl.Remaining == 0 {
-		t.Errorf("rateLimit = %+v", rl)
-	}
-	if page.TotalCount != 129 || len(page.PullRequests) != 25 {
-		t.Fatalf("total=%d len=%d, want 129/25", page.TotalCount, len(page.PullRequests))
-	}
-	if !page.Next.HasNextPage || page.Next.EndCursor == "" {
-		t.Errorf("pageInfo = %+v, want a next page", page.Next)
-	}
-	byNum := map[int]PullRequest{}
-	for _, pr := range page.PullRequests {
-		byNum[pr.Number] = pr
-	}
-
-	got := byNum[13745]
-	want := PullRequest{
-		Number: 13745, Title: "macos,gtk: add broadcast support to sync across panes",
-		Author: "dave92082", HeadRef: "feature/multi-pane-broadcast",
-		HeadSHA: "72607587674b4d15922dcc024d6911d87b0b2711", BaseRef: "main",
-		ReviewDecision: ReviewChangesRequested, Mergeable: MergeableMergeable,
-		IsCrossRepository: true, URL: "https://github.com/ghostty-org/ghostty/pull/13745",
-		UpdatedAt: time.Date(2026, 10, 8, 6, 1, 42, 0, time.UTC),
-		Checks:    CheckRollup{State: RollupSuccess, Total: 102, Passed: 97, Skipped: 5},
-	}
-	if !got.UpdatedAt.Equal(want.UpdatedAt) {
-		t.Errorf("updatedAt = %v, want %v", got.UpdatedAt, want.UpdatedAt)
-	}
-	got.UpdatedAt = want.UpdatedAt
-	if got != want {
-		t.Errorf("PR 13745 =\n %+v\nwant\n %+v", got, want)
-	}
-
-	rollups := []struct {
-		number int
-		want   CheckRollup
-	}{
-		{14586, CheckRollup{State: RollupSuccess, Total: 104, Passed: 96, Skipped: 8}},
-		{13776, CheckRollup{State: RollupFailure, Total: 103, Passed: 99, Failed: 2, Skipped: 2}},
-		{13605, CheckRollup{}}, // statusCheckRollup: null (no checks ran)
-	}
-	for _, tt := range rollups {
-		if got := byNum[tt.number].Checks; got != tt.want {
-			t.Errorf("PR %d checks = %+v, want %+v", tt.number, got, tt.want)
-		}
-	}
-	if pr := byNum[14055]; !pr.Draft || pr.Checks.State != RollupPending || pr.Checks.Pending != 4 {
-		t.Errorf("PR 14055 = draft %v checks %+v, want draft with 4 pending", pr.Draft, pr.Checks)
-	}
-
-	page2, _, err := decodePullRequestsPage(fixtureData(t, "pull_requests_page2.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(page2.PullRequests) != 25 || page2.PullRequests[0].Number != 13779 {
-		t.Errorf("page2 len=%d first=%d", len(page2.PullRequests), page2.PullRequests[0].Number)
-	}
-}
 
 func TestDecodePullRequest(t *testing.T) {
 	pr, p1, _, err := decodePullRequest(fixtureData(t, "pull_request_14586_page1.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pr.Number != 14586 || pr.HeadRepoSlug != "kgni/ghostty" || pr.MergeStateStatus != "BLOCKED" ||
-		pr.HeadSHA != "7b60f9bf5f057394038f81653eaa7cc5a55bb5df" {
+	if pr.Number != 14586 || pr.HeadRepoSlug != "kgni/ghostty" || pr.ReviewDecision != ReviewApproved || pr.Author != "kgni" ||
+		pr.HeadSHA != "7b60f9bf5f057394038f81653eaa7cc5a55bb5df" || pr.ID != "PR_kwDOHFhdAs8AAAABHIegzw" ||
+		pr.Comments != 9 || pr.Reviews != 2 || len(pr.LatestReviews) != 2 || pr.LatestReviews[1].Author != "trag1c" ||
+		pr.LatestReviews[1].State != "APPROVED" || pr.Additions != 51 || pr.MergedAt.IsZero() {
 		t.Errorf("pr = %+v", pr)
 	}
 	if p1.SHA != pr.HeadSHA || len(p1.Runs) != 100 || !p1.Next.HasNextPage || p1.Next.EndCursor != "MTAw" {
 		t.Errorf("page1 sha=%s runs=%d next=%+v", p1.SHA, len(p1.Runs), p1.Next)
 	}
-	wantRollup := CheckRollup{State: RollupSuccess, Total: 104, Passed: 96, Skipped: 8}
+	wantRollup := CheckRollup{State: RollupSuccess, Total: 105, Passed: 97, Skipped: 8}
 	if p1.Rollup != wantRollup || pr.Checks != wantRollup {
 		t.Errorf("rollup = %+v / %+v, want %+v", p1.Rollup, pr.Checks, wantRollup)
 	}
 	first := p1.Runs[0]
-	if first.Name != "check-zig-cache-hash" || first.Workflow != "Nix" || first.Status != StatusCompleted ||
+	if first.Name != "Milestone Update" || first.Workflow != "Milestone Action" || first.Status != StatusCompleted ||
 		first.Conclusion != ConclusionSuccess || first.StartedAt.IsZero() || first.CompletedAt.IsZero() ||
-		first.URL != "https://github.com/ghostty-org/ghostty/actions/runs/37631637544/job/112890661487" {
+		first.URL != "https://github.com/ghostty-org/ghostty/actions/runs/37739181637/job/113185665976" {
 		t.Errorf("first run = %+v", first)
 	}
 
@@ -140,8 +34,11 @@ func TestDecodePullRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(p2.Runs) != 4 || p2.Next.HasNextPage {
+	if len(p2.Runs) != 5 || p2.Next.HasNextPage {
 		t.Errorf("page2 runs=%d next=%+v", len(p2.Runs), p2.Next)
+	}
+	if _, _, _, err := decodePullRequest(fixtureData(t, "graphql_pr_not_found.json")); !errors.Is(err, ErrNotFound) {
+		t.Errorf("not found err = %v", err)
 	}
 }
 

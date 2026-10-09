@@ -12,12 +12,13 @@ import (
 //go:embed queries/*.graphql
 var queryFS embed.FS
 
-// Query names (file basenames under queries/).
+// Query names: file basenames under queries/, plus the documents poll_query.go builds.
 const (
-	queryViewer       = "viewer"
-	queryPullRequests = "pull_requests"
-	queryPullRequest  = "pull_request"
-	queryChecks       = "checks"
+	queryPullRequest         = "pull_request"
+	queryChecks              = "checks"
+	queryPullRequestDetails  = "pull_request_details"
+	queryPoll                = "poll"                  // built by pollPlan.build
+	queryDefaultBranchChecks = "default_branch_checks" // built by defaultBranchChecksDoc
 )
 
 var (
@@ -30,6 +31,25 @@ var (
 var loadQueries = sync.OnceValues(func() (map[string]string, error) {
 	return buildQueries(queryFS)
 })
+
+// loadFragments returns queries/fragments.graphql's fragments by name, for documents
+// built at run time.
+var loadFragments = sync.OnceValues(func() (map[string]string, error) {
+	b, err := queryFS.ReadFile("queries/fragments.graphql")
+	if err != nil {
+		return nil, fmt.Errorf("gh: read fragments: %w", err)
+	}
+	return parseFragments(stripComments(string(b)))
+})
+
+// assemble appends the fragments doc uses to a document built at run time.
+func assemble(doc string) (string, error) {
+	frags, err := loadFragments()
+	if err != nil {
+		return "", err
+	}
+	return withFragments(doc, frags)
+}
 
 // query returns the assembled document for name.
 func query(name string) (string, error) {

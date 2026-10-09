@@ -23,7 +23,7 @@ export const PATH = "/Users/dev/.code-foundry/settings.toml";
 
 export const groups: GroupInit[] = [
   { id: "sessions", title: "Sessions", description: "Defaults for new Claude Code sessions." },
-  { id: "github", title: "GitHub", description: "Polling of pull requests and checks through gh." },
+  { id: "github", title: "GitHub", description: "Your pull requests and default-branch checks, polled with gh's login." },
   { id: "repos", title: "Repositories", description: "Git fetching and where new worktrees go." },
   { id: "gitops", title: "Git operations", description: "How worktrees are handed to other apps." },
   { id: "appearance", title: "Appearance", description: "Theme, terminal font, and density. Applied live in every window." },
@@ -38,8 +38,8 @@ const staticFields: FieldInit[] = [
   { key: "sessions.auto_name", group: "sessions", type: S.BOOL, title: "Name sessions automatically", description: "Name a new session from its first message with a short claude -p call.", defaultValue: "true" },
   { key: "sessions.close_grace_seconds", group: "sessions", type: S.INT, title: "Close grace (seconds)", description: "How long closing a session waits for Claude to exit.", defaultValue: "10", min: 1n, max: 120n, restartRequired: true },
   { key: "sessions.scrollback_lines", group: "sessions", type: S.INT, title: "Scrollback lines", description: "Lines of history each terminal keeps.", defaultValue: "10000", min: 1000n, max: 100000n, restartRequired: true },
-  { key: "github.poll_interval_seconds", group: "github", type: S.INT, title: "Poll interval (seconds)", description: "How often pull requests and checks are refreshed.", defaultValue: "60", min: 15n, max: 3600n, restartRequired: true },
-  { key: "github.dashboards_enabled", group: "github", type: S.BOOL, title: "Pull request dashboards", description: "Fetch the viewer's dashboards for the Pull Requests page.", defaultValue: "true", restartRequired: true },
+  { key: "github.poll_interval_seconds", group: "github", type: S.INT, title: "Poll interval (seconds)", description: "How often one request checks your pull requests, watched branches, and tracked default branches for changes.", defaultValue: "60", min: 15n, max: 3600n },
+  { key: "github.dashboards_enabled", group: "github", type: S.BOOL, title: "Pull request dashboards", description: "Poll your pull requests for the Pull Requests page.", defaultValue: "true" },
   { key: "repos.fetch_interval_seconds", group: "repos", type: S.INT, title: "Fetch interval (seconds)", description: "How often each repository runs git fetch --prune. 0 turns it off.", defaultValue: "120", min: 0n, max: 86400n, restartRequired: true },
   { key: "repos.worktree_dir", group: "repos", type: S.PATH, title: "Worktree directory", description: "Where New Worktree puts worktrees. {repo} is replaced by the repository's name. Empty uses ~/.code-foundry/worktrees/<owner>/<repo>.", defaultValue: "", placeholder: "~/worktrees/{repo}" },
   { key: "gitops.editor_command", group: "gitops", type: S.STRING, title: "Editor command", description: "Command that opens a worktree (Open in Editor). {path} is replaced by the worktree path. Empty detects an editor.", defaultValue: "", placeholder: "auto-detect" },

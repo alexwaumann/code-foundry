@@ -1,17 +1,26 @@
-// Package gh is the GitHub store: the authenticated viewer, open pull requests of
-// tracked repositories with a check rollup each, and on-demand pull request and ref
-// check details. Phase 3a adds the viewer's dashboards, monthly stats, default-branch
-// CI, and per-branch pull requests (activity*.go).
+// Package gh is the GitHub store: the authenticated viewer, the viewer's pull requests
+// (authored, review requested, reviewed, recently merged), the default-branch CI of
+// tracked repositories, the viewer's pull requests on watched branches, monthly stats,
+// and on-demand pull request and ref check details.
 //
-// All GitHub access goes through the user's authenticated `gh` CLI (`gh api graphql`,
-// `gh auth status`) via a Runner. A single worker goroutine owns the network: one
-// request in flight at a time, at least MinGap between requests, per-repo polling every
-// RepoInterval, exponential backoff with jitter on errors, and a global pause when
-// GitHub's rate limit runs low. See docs/notes/phase1c-gh.md for the pacing rationale.
+// All GitHub access goes through a Runner: HTTPRunner calls api.github.com (GraphQL and
+// REST) over one keep-alive HTTP client with the token `gh auth token` prints, so the
+// user's gh login is the only credential. A single worker goroutine owns the network: one
+// request in flight at a time, at least MinGap between requests, exponential backoff with
+// jitter on errors, and a global pause when GitHub's rate limit runs low.
+//
+// Polling is viewer-scoped and change-driven (poll.go): every PollInterval one GraphQL
+// request fetches a cheap fingerprint of everything (the viewer's PR lists, each PR's
+// updatedAt, head and check counts, each tracked default branch's head and check counts,
+// watched branches, and the monthly stats when due). Details are fetched only for pull
+// requests whose fingerprint changed, and failing-check lists only for default branches
+// whose failure count or head changed. See docs/notes/gh-viewer-polling.md.
 //
 // Results are cached in SQLite (Migrate creates the gh_* tables), so reads are served
 // from the last-known state immediately on daemon start. Readers get an immutable
-// Snapshot; changes are announced on the bus as PullRequestsUpdated and ViewerUpdated.
+// Snapshot; changes are announced on the bus only when the data changed (ViewerUpdated,
+// DashboardUpdated, RepoActivityUpdated, BranchPullRequestsUpdated), plus a small Polled
+// event after every poll for freshness displays.
 package gh
 
 import (
@@ -28,19 +37,20 @@ import (
 type Service interface {
 	// Snapshot returns the current immutable state. Never nil.
 	Snapshot() *Snapshot
-	// Track adds a repository ("owner/name") to the polling loop.
+	// Track adds a repository ("owner/name") to the poll: its default branch CI is
+	// watched and the dashboards count its pull requests as tracked.
 	Track(slug string) error
-	// Untrack removes a repository from the polling loop. Its cache is kept.
+	// Untrack removes a repository from the poll. Its cache is kept.
 	Untrack(slug string) error
-	// Refresh fetches a repository's pull requests now and waits for the result. An
-	// empty slug marks everything due and returns immediately.
+	// Refresh polls now. With a slug it waits for that poll to finish and returns its
+	// error; an empty slug only marks the poll due and returns immediately.
 	Refresh(ctx context.Context, slug string) error
 	// PullRequest returns one pull request with its head commit's checks.
 	PullRequest(ctx context.Context, slug string, number int) (PullRequestDetail, error)
 	// Checks returns the checks on the commit a ref resolves to.
 	Checks(ctx context.Context, slug, ref string) (RefChecks, error)
 	// BranchPullRequests returns the viewer's cached pull requests whose head is
-	// branch head of the repository, and keeps that branch polled for a while
+	// branch head of the repository, and keeps that branch in the poll for a while
 	// (activity.go). It never waits on GitHub.
 	BranchPullRequests(ctx context.Context, slug, head string) (BranchPullRequests, error)
 }
@@ -164,8 +174,11 @@ type CheckRollup struct {
 	Skipped int         `json:"skipped"`
 }
 
-// PullRequest is one open pull request with its head commit's check rollup.
+// PullRequest is one pull request in the viewer's scope with its head commit's check
+// rollup. Polled pull requests carry every field; GetPullRequest fills the same set.
 type PullRequest struct {
+	// ID is GitHub's node id (the poll's key).
+	ID                string           `json:"id,omitempty"`
 	Number            int              `json:"number"`
 	Title             string           `json:"title"`
 	Author            string           `json:"author,omitempty"`
@@ -181,13 +194,33 @@ type PullRequest struct {
 	URL               string           `json:"url"`
 	UpdatedAt         time.Time        `json:"updatedAt"`
 	Checks            CheckRollup      `json:"checks"`
-	// Repo is the "owner/name" (lower case) of search and branch results.
-	// Set for pull requests found by search or head branch (see activity.go); the
-	// open-PR list leaves them empty.
+	// Repo is the "owner/name" (lower case) of the pull request's repository.
 	Repo      string           `json:"repo,omitempty"`
 	State     PullRequestState `json:"state,omitempty"`
 	CreatedAt time.Time        `json:"createdAt,omitzero"`
 	MergedAt  time.Time        `json:"mergedAt,omitzero"`
+	// Size of the change.
+	Additions    int `json:"additions,omitempty"`
+	Deletions    int `json:"deletions,omitempty"`
+	ChangedFiles int `json:"changedFiles,omitempty"`
+	// Comments counts issue and review comments; Reviews counts submitted reviews.
+	// Open pull requests only (closed and merged ones are fetched with the summary).
+	Comments int `json:"comments,omitempty"`
+	Reviews  int `json:"reviews,omitempty"`
+	// LatestReviews is each reviewer's latest review (up to 10).
+	LatestReviews []Review `json:"latestReviews,omitempty"`
+	// ReviewRequests are the pending review requests: user logins and "org/team" slugs.
+	ReviewRequests []string `json:"reviewRequests,omitempty"`
+	// Partial is set while only the poll's fingerprint is known (the detail fetch is
+	// pending or failed): Title and the detail fields are empty.
+	Partial bool `json:"partial,omitempty"`
+}
+
+// Review is one reviewer's latest review.
+type Review struct {
+	Author      string    `json:"author,omitempty"`
+	State       string    `json:"state"` // APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED, PENDING
+	SubmittedAt time.Time `json:"submittedAt,omitzero"`
 }
 
 // CheckRun is one check on a commit: a check run (GitHub Actions job, app check) or a
@@ -207,25 +240,27 @@ type CheckRun struct {
 type ViewerState struct {
 	// Viewer is nil until the first successful fetch or cache load.
 	Viewer *Viewer
-	// Authenticated is false once gh reported missing or bad credentials, and true
-	// again after a successful request or `gh auth status` check.
+	// Authenticated is false once there was no token or GitHub rejected it, and true
+	// again after a successful request or auth check (Runner.AuthStatus).
 	Authenticated bool
 	FetchedAt     time.Time
 	LastError     string
 }
 
-// RepoState is one repository's cached open pull requests plus fetch status.
+// RepoState is one repository's activity: the viewer's monthly stats there and its
+// default branch CI, each with its own fetch time and error.
 type RepoState struct {
-	Slug         string
-	Tracked      bool
-	PullRequests []PullRequest
-	// TotalCount is the number of open PRs on GitHub (PullRequests may be capped).
-	TotalCount int
-	FetchedAt  time.Time
-	LastError  string
-	// Activity is the viewer's monthly stats here and the default branch's CI
-	// (activity.go). Its fetch times and errors are its own.
+	Slug     string
+	Tracked  bool
 	Activity RepoActivity
+}
+
+// PollState is the outcome of the last poll.
+type PollState struct {
+	// FetchedAt is when the last successful poll finished.
+	FetchedAt time.Time
+	// LastError is the last poll's error; empty after a success.
+	LastError string
 }
 
 // PullRequestDetail is one pull request with every check on its head commit.
@@ -255,6 +290,7 @@ type Snapshot struct {
 	// Dashboard is the viewer's pull request dashboards and global monthly stats
 	// (activity.go), unfiltered: readers keep the tracked repositories they want.
 	Dashboard Dashboard
+	Poll      PollState
 }
 
 // Repo returns the state for slug (any case). ok is false for an unknown or invalid slug.
@@ -268,18 +304,21 @@ func (s *Snapshot) Repo(slug string) (RepoState, bool) {
 }
 
 func (s *Snapshot) clone() *Snapshot {
-	n := &Snapshot{Viewer: s.Viewer, Dashboard: s.Dashboard, Repos: make(map[string]RepoState, len(s.Repos)+1)}
+	n := &Snapshot{Viewer: s.Viewer, Dashboard: s.Dashboard, Poll: s.Poll, Repos: make(map[string]RepoState, len(s.Repos)+1)}
 	for k, v := range s.Repos {
 		n.Repos[k] = v
 	}
 	return n
 }
 
-// PullRequestsUpdated is published on the bus when a repository's pull requests or
-// fetch status change (including every completed poll, so fetched_at stays current).
-type PullRequestsUpdated struct {
-	Slug      string
+// Polled is published after every poll, successful or not. It is how clients keep an
+// "updated Ns ago" display current without re-reading anything: the data events are
+// published only when data changed.
+type Polled struct {
+	// FetchedAt is when the last successful poll finished (it may be older than this
+	// poll when this one failed).
 	FetchedAt time.Time
+	LastError string
 }
 
 // ViewerUpdated is published on the bus when the viewer or authentication state changes.

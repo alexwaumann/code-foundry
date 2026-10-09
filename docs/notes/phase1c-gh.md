@@ -1,5 +1,10 @@
 # Phase 1c: GitHub store
 
+> **Polling superseded** by `gh-viewer-polling.md`: the store no longer polls every open
+> PR of tracked repositories; `ListPullRequests`, `PullRequestsUpdated` and the
+> `gh_pull_requests` table are gone. The pacing, error classification, and on-demand
+> GetPullRequest/ListChecks below still hold.
+
 Status: done on branch. `make check` is green. The behavior was exercised end to end:
 a daemon with a temp `CODE_FOUNDRY_HOME`, real `gh` 2.83.2 against `ghostty-org/ghostty`,
 `buf curl` over the Unix socket, then a second daemon start.
@@ -37,7 +42,8 @@ a daemon with a temp `CODE_FOUNDRY_HOME`, real `gh` 2.83.2 against `ghostty-org/
 
 ## Decisions
 
-* **Only gh, never a token.** Every request is
+* **Only gh, never a token.** (Superseded: the store now sends HTTP requests itself with
+  the token from `gh auth token`; see `gh-http-transport.md`.) Every request was
   `gh api graphql -f query=<doc> [-f str=…] [-F int=…]`. String variables use `-f` (raw)
   so a repo named `true` or `123` is not type-converted. Auth checks use
   `gh auth status --json hosts --hostname github.com`, which exits 0 regardless of auth

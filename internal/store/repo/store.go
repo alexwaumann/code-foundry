@@ -73,6 +73,8 @@ func (m *repoMeta) commonDir() string { return filepath.Join(m.Path, ".git") }
 
 type repoState struct {
 	meta atomic.Pointer[repoMeta]
+	// base is origin/<default> resolved to a sha; written only by the repo's jobBase.
+	base atomic.Pointer[repoBase]
 	// wts is guarded by Git.mu; only the repo's reconcile job adds or removes slots.
 	wts map[string]*wtSlot
 }
@@ -80,7 +82,10 @@ type repoState struct {
 // wtSlot is one worktree's snapshot slot, written only by its status job (and seeded
 // by the reconcile job that creates it).
 type wtSlot struct {
-	cur   atomic.Pointer[Worktree]
+	cur atomic.Pointer[Worktree]
+	// base memoizes the last base ahead/behind by (HEAD, base sha); written only by
+	// the status job.
+	base  atomic.Pointer[baseCount]
 	admin string // linked worktree admin dir; guarded by Git.mu
 }
 
@@ -315,9 +320,13 @@ func (g *Git) repoIDs() []string {
 	return ids
 }
 
-// refresh reconciles repo id and then refreshes every worktree's status, waiting for both.
+// refresh reconciles repo id, re-resolves its base, and then refreshes every
+// worktree's status, waiting for each step so the statuses see the new base.
 func (g *Git) refresh(ctx context.Context, id string) error {
 	if err := g.sched.wait(ctx, jobKey{kind: jobReconcile, repoID: id}); err != nil {
+		return err
+	}
+	if err := g.sched.wait(ctx, jobKey{kind: jobBase, repoID: id}); err != nil {
 		return err
 	}
 	return g.sched.wait(ctx, g.statusKeys(id)...)
@@ -576,11 +585,14 @@ func (g *Git) runJob(ctx context.Context, k jobKey) {
 		g.detailAfterStatus(k.repoID, k.path)
 	case jobDetail:
 		g.detail(ctx, k.repoID, k.path)
+	case jobBase:
+		g.resolveBase(ctx, k.repoID)
 	}
 }
 
 // reconcile re-lists a repo's worktrees and metadata, syncs slots and watches,
-// publishes, then requests a status refresh of every worktree.
+// publishes, then requests jobBase, which re-resolves the base and refreshes the
+// status of every worktree.
 func (g *Git) reconcile(ctx context.Context, id string) {
 	st := g.repo(id)
 	if st == nil {
@@ -673,9 +685,7 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 			return append(evs, repoUpdated(id)(s)...)
 		})
 	}
-	for _, k := range g.statusKeys(id) {
-		g.sched.request(k)
-	}
+	g.sched.request(jobKey{kind: jobBase, repoID: id})
 }
 
 // syncWatches removes stale watches and adds wanted ones. Directories that do not
@@ -801,12 +811,11 @@ func (g *Git) status(ctx context.Context, repoID, path string) {
 			Dirty:       info.Staged+info.Modified+info.Untracked+info.Conflicted > 0,
 			RefreshedAt: now,
 		}
-		if def := st.meta.Load().DefaultBranch; def != "" && info.Head != "" {
-			ref := "refs/remotes/origin/" + def
-			if out, err := g.runner.Run(ctx, path, "rev-list", "--left-right", "--count", "HEAD..."+ref); err == nil {
-				if a, b, err := parseLeftRightCount(out); err == nil {
-					next.Status.BaseRef, next.Status.BaseAhead, next.Status.BaseBehind = "origin/"+def, a, b
-				}
+		if c, ok, reused := g.baseCounts(ctx, st, slot, path, info.Head); ok {
+			next.Status.BaseRef, next.Status.BaseAhead, next.Status.BaseBehind = c.ref, c.ahead, c.behind
+			if reused {
+				g.log.Debug("base counts reused", "repo", repoID, "path", path,
+					"head", shortSHA(c.head), "base", shortSHA(c.sha))
 			}
 		}
 	}
@@ -818,7 +827,13 @@ func (g *Git) status(ctx context.Context, repoID, path string) {
 	changed := next.Branch != prev.Branch || next.Head != prev.Head || next.Detached != prev.Detached ||
 		!next.Status.equalIgnoringTime(prev.Status)
 	if !changed {
-		g.commit(nil)
+		// Nothing but RefreshedAt moved. The snapshot is rebuilt only for the first
+		// refresh (unset RefreshedAt means "status not known yet"); later ones leave
+		// the snapshot's RefreshedAt at the last refresh that changed something (or
+		// that some other commit picked up). No API client reads it without an event.
+		if prev.Status.RefreshedAt.IsZero() {
+			g.commit(nil)
+		}
 		return
 	}
 	g.commit(func(s *Snapshot) []Event {
@@ -878,7 +893,9 @@ func (g *Git) keysFor(ev fsnotify.Event) []jobKey {
 	case actStatus:
 		return []jobKey{{kind: jobStatus, repoID: t.repoID, path: t.wtPath}}
 	case actStatusAll:
-		return g.statusKeys(t.repoID)
+		// A remote-tracking ref moved: re-resolve the base, which then refreshes
+		// every worktree (upstream and base ahead/behind).
+		return []jobKey{{kind: jobBase, repoID: t.repoID}}
 	case actReconcile:
 		return []jobKey{{kind: jobReconcile, repoID: t.repoID}}
 	}
@@ -945,9 +962,9 @@ func (g *Git) pollLoop(ctx context.Context, every time.Duration) {
 				g.sched.request(jobKey{kind: jobReconcile, repoID: id})
 				continue
 			}
-			for _, k := range g.statusKeys(id) {
-				g.sched.request(k)
-			}
+			// Re-resolving the base each round covers ref moves the watcher cannot
+			// see; jobBase then refreshes every worktree's status.
+			g.sched.request(jobKey{kind: jobBase, repoID: id})
 		}
 	}
 }

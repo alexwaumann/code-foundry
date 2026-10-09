@@ -1,5 +1,6 @@
 # Shared fragments. queries.go appends to each query exactly the fragments it references,
-# transitively (GitHub rejects documents with unused fragments).
+# transitively (GitHub rejects documents with unused fragments). The poll query is built
+# in poll_query.go from these fragments.
 
 fragment RateLimitFields on RateLimit {
   limit
@@ -8,29 +9,26 @@ fragment RateLimitFields on RateLimit {
   resetAt
 }
 
-# Fields cheap enough for the list query. Measured on ghostty-org/ghostty (~300 open
-# PRs) at 100 PRs per page: mergeStateStatus alone exceeds GitHub's 10s GraphQL timeout
-# (HTTP 502) and headRepository adds ~3s, so both live only in pull_request.graphql.
-fragment PullRequestFields on PullRequest {
-  number
-  title
+fragment ViewerFields on User {
+  id
+  login
+  name
+  avatarUrl
   url
-  updatedAt
-  isDraft
-  isCrossRepository
-  author { login }
-  headRefName
-  headRefOid
-  baseRefName
-  reviewDecision
-  mergeable
 }
 
+# Per-state check counts. The aggregates count the whole connection, so a commit with
+# 100+ checks costs no more than one with none, and no first: is needed.
 fragment RollupCounts on StatusCheckRollupContextConnection {
   checkRunCount
   checkRunCountsByState { state count }
   statusContextCount
   statusContextCountsByState { state count }
+}
+
+fragment RollupFingerprint on StatusCheckRollup {
+  state
+  contexts { ...RollupCounts }
 }
 
 fragment CheckContexts on StatusCheckRollupContextConnection {
@@ -57,10 +55,31 @@ fragment CheckContexts on StatusCheckRollupContextConnection {
   }
 }
 
-# Phase 3a. A pull request found by search or by head branch (any repository): cheap
-# identity fields only. reviewDecision and the check counts dominate server time, so
-# they are a separate fragment that only the open-PR lists select.
+# What the poll selects for every pull request in the viewer's lists and on watched
+# branches: enough to tell whether it changed. Measured ~11ms of server time per PR
+# (2026-10, 91 busy PRs). reviewDecision is not here: it alone costs ~40-60ms per PR,
+# and a review bumps updatedAt anyway. PullRequest.statusCheckRollup is the head
+# commit's rollup (no commits(last: 1) connection needed).
+fragment PullRequestIdentity on PullRequest {
+  id
+  number
+  updatedAt
+  state
+  headRefOid
+  isCrossRepository
+  author { login }
+  repository { nameWithOwner }
+}
+
+fragment PullRequestFingerprint on PullRequest {
+  ...PullRequestIdentity
+  statusCheckRollup { ...RollupFingerprint }
+}
+
+# A pull request's display fields, for closed and merged ones (and the base of the open
+# detail). ~40ms per PR.
 fragment PullRequestSummary on PullRequest {
+  id
   number
   title
   url
@@ -75,26 +94,43 @@ fragment PullRequestSummary on PullRequest {
   headRefOid
   baseRefName
   isCrossRepository
+  additions
+  deletions
+  changedFiles
+  statusCheckRollup { ...RollupFingerprint }
 }
 
-fragment PullRequestReview on PullRequest {
+# Everything the store keeps about an open pull request. Fetched only when the poll's
+# fingerprint changed. ~300ms of server time per PR on busy repositories, dominated by
+# mergeStateStatus (~150ms) and reviewDecision (~60ms), so detail requests are small
+# (DefaultDetailBatch).
+fragment PullRequestDetail on PullRequest {
+  ...PullRequestSummary
+  headRepository { nameWithOwner }
   reviewDecision
-  commits(last: 1) {
+  mergeable
+  mergeStateStatus
+  totalCommentsCount
+  reviews { totalCount }
+  latestReviews(first: 10) {
+    nodes { author { login } state submittedAt }
+  }
+  reviewRequests(first: 10) {
     nodes {
-      commit {
-        oid
-        statusCheckRollup {
-          state
-          contexts { ...RollupCounts }
-        }
+      requestedReviewer {
+        __typename
+        ... on User { login }
+        ... on Bot { login }
+        ... on Mannequin { login }
+        ... on Team { slug organization { login } }
       }
     }
   }
 }
 
-# The default branch's head commit with its checks: the first page of contexts. Later
-# pages come from checks.graphql with the commit's oid.
-fragment DefaultBranchFields on Repository {
+# A repository's default branch head commit with its check counts (the poll), or with
+# the first page of its checks (DefaultBranchChecks).
+fragment DefaultBranchFingerprint on Repository {
   defaultBranchRef {
     name
     target {
@@ -102,10 +138,7 @@ fragment DefaultBranchFields on Repository {
         oid
         committedDate
         messageHeadline
-        statusCheckRollup {
-          state
-          contexts(first: 100) { ...CheckContexts }
-        }
+        statusCheckRollup { ...RollupFingerprint }
       }
     }
   }

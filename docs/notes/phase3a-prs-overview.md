@@ -1,5 +1,9 @@
 # Phase 3a: Pull Requests page and worktree overview
 
+> **Polling superseded** by `gh-viewer-polling.md`: the three searches, stats, default-branch
+> CI, and branch PRs below are now parts of one fingerprint poll per interval, with
+> details fetched only for what changed. The page and overview behave as described.
+
 Status: done on branch `phase3a-prs-overview`. `make check` is green and `make gui-e2e`
 passes (WebKit and Chromium). The behaviour was exercised live against a real daemon with
 three repos registered:
@@ -110,6 +114,9 @@ re-calls every 5 minutes while the page is open, which keeps the window open.
 HEAD`, a tree-to-tree diff. The status job that triggered the detail ran just before it,
 so "clean" is current. On the neovim checkout (~4k files) steps 4 and 5 took about 200ms
 each, because they stat the whole tree. With the shortcut the detail takes about 0.1s.
+
+Later: steps 1–3 (and the clean step 5) are cached by (HEAD sha, base sha), so an
+unchanged clean worktree runs no git for its detail. See `repo-detail-cache.md`.
 
 ## GUI
 

@@ -10,7 +10,7 @@ import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
 import { tildify } from "@/lib/path";
 import { cn } from "@/lib/utils";
-import { branchKey, branchPullRequestsResource, openUrl, repoActivityResource } from "@/stores/gh";
+import { branchKey, branchPullRequestsResource, openUrl, repoActivityResource, useFreshness } from "@/stores/gh";
 import { findWorktree, useReposStore } from "@/stores/repos";
 import { useResource } from "@/stores/resource";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
@@ -238,6 +238,10 @@ function OverviewBody({ repo, wt, items }: { repo: RepoView; wt: WorktreeView; i
   const detail: WorktreeDetailView | null = detailEntry?.data ?? null;
   const activity = activityEntry?.data ?? null;
   const branchPrs = { prs: branchEntry?.data?.pullRequests ?? [], fetchedAtMs: branchEntry?.data?.fetchedAtMs ?? null, error: branchEntry?.data?.lastError || branchEntry?.error || "" };
+  // A tracked repository's default branch is in every poll: the last poll confirms it.
+  const ci = activity?.defaultBranch ?? null;
+  const ciFreshness = useFreshness(ci?.fetchedAtMs ?? null, ci?.lastError ?? "", activity?.tracked ?? false);
+  const ciFresh = ci ? ciFreshness : null;
 
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const fileRows = useMemo(() => buildFileRows(detail?.files ?? [], overrides), [detail, overrides]);
@@ -302,7 +306,7 @@ function OverviewBody({ repo, wt, items }: { repo: RepoView; wt: WorktreeView; i
         }}
       >
         <SyncLine st={wt.status} />
-        <Section title="GitHub activity" testId="section-github" extra={activity?.defaultBranch && <Freshness fetchedAtMs={activity.defaultBranch.fetchedAtMs} lastError="" staleAfterMs={5 * 60_000} />}>
+        <Section title="GitHub activity" testId="section-github" extra={ciFresh && <Freshness fetchedAtMs={ciFresh.fetchedAtMs} lastError={ciFresh.lastError} staleAfterMs={5 * 60_000} testId="gh-updated" />}>
           {slug ? (
             <GithubActivity activity={activity} activityError={activityEntry?.error ?? null} branch={wt.branch} branchPrs={branchPrs} />
           ) : (

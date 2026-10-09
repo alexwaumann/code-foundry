@@ -27,6 +27,7 @@ func TestGhDashboardFiltersToTracked(t *testing.T) {
 	store.SetDashboard(gh.Dashboard{
 		Authored:        []gh.PullRequest{pr("o/tracked", 1, gh.PullRequestOpen), pr("x/other", 2, gh.PullRequestOpen)},
 		ReviewRequested: []gh.PullRequest{pr("x/other", 9, gh.PullRequestOpen)},
+		Reviewed:        []gh.PullRequest{pr("o/tracked", 4, gh.PullRequestOpen), pr("x/other", 5, gh.PullRequestOpen)},
 		RecentlyMerged:  []gh.PullRequest{merged},
 		FetchedAt:       at,
 		LastError:       "partial",
@@ -47,8 +48,8 @@ func TestGhDashboardFiltersToTracked(t *testing.T) {
 		t.Errorf("header = %v", m)
 	}
 	if len(m.GetAuthored()) != 1 || m.GetAuthored()[0].GetNumber() != 1 || len(m.GetReviewRequested()) != 0 ||
-		len(m.GetRecentlyMerged()) != 1 {
-		t.Errorf("filtered lists: %d/%d/%d", len(m.GetAuthored()), len(m.GetReviewRequested()), len(m.GetRecentlyMerged()))
+		len(m.GetReviewed()) != 1 || m.GetReviewed()[0].GetNumber() != 4 || len(m.GetRecentlyMerged()) != 1 || m.GetDashboardsDisabled() {
+		t.Errorf("filtered lists: %d/%d/%d/%d", len(m.GetAuthored()), len(m.GetReviewRequested()), len(m.GetReviewed()), len(m.GetRecentlyMerged()))
 	}
 	p := m.GetAuthored()[0]
 	if p.GetRepoSlug() != "o/tracked" || p.GetState() != v1.PullRequestState_PULL_REQUEST_STATE_OPEN ||
@@ -69,8 +70,14 @@ func TestGhDashboardFiltersToTracked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(all.Msg.GetAuthored()) != 2 || len(all.Msg.GetReviewRequested()) != 1 {
+	if len(all.Msg.GetAuthored()) != 2 || len(all.Msg.GetReviewRequested()) != 1 || len(all.Msg.GetReviewed()) != 2 {
 		t.Errorf("include_untracked lists: %d/%d", len(all.Msg.GetAuthored()), len(all.Msg.GetReviewRequested()))
+	}
+
+	store.SetDashboard(gh.Dashboard{Disabled: true, FetchedAt: at})
+	off, err := client.GetDashboard(ctx, connect.NewRequest(&v1.GetDashboardRequest{}))
+	if err != nil || !off.Msg.GetDashboardsDisabled() || len(off.Msg.GetAuthored()) != 0 {
+		t.Errorf("disabled = %v, %v", off.Msg, err)
 	}
 }
 
@@ -112,6 +119,12 @@ func TestGhRepoActivityAndBranch(t *testing.T) {
 	if res.Msg.GetStats().GetThisMonth().GetCommits() != 3 || len(res.Msg.GetRecentlyMerged()) != 1 ||
 		res.Msg.GetRecentlyMerged()[0].GetNumber() != 7 {
 		t.Errorf("activity = %v", res.Msg)
+	}
+	// A repository that failed in the last poll keeps its last state, with the error.
+	store.SetActivity("o/gone", gh.RepoActivity{DefaultBranch: gh.BranchCI{LastError: "not found on github"}})
+	gone, err := client.GetRepoActivity(ctx, connect.NewRequest(&v1.GetRepoActivityRequest{RepoSlug: "o/gone"}))
+	if err != nil || gone.Msg.GetDefaultBranch().GetLastError() != "not found on github" {
+		t.Errorf("failed repository = %v, %v", gone.Msg, err)
 	}
 	if _, err := client.GetRepoActivity(ctx, connect.NewRequest(&v1.GetRepoActivityRequest{RepoSlug: "bad"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Errorf("bad slug err = %v", err)

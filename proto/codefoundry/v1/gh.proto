@@ -4,57 +4,55 @@ package codefoundry.v1;
 
 import "google/protobuf/timestamp.proto";
 
-// GhService exposes GitHub data (viewer, open pull requests, checks) for tracked
-// repositories. The daemon polls GitHub through the user's authenticated `gh` CLI on a
-// paced loop and caches results in SQLite, so reads are served from the last-known state
-// and never wait on the network. Every response carries fetched_at so the UI can show
-// staleness; an unset fetched_at means "never fetched".
+// GhService exposes GitHub data scoped to the viewer: their pull requests (authored,
+// review requested, reviewed, recently merged), the default-branch CI of tracked
+// repositories, their pull requests on watched branches, and monthly stats. The daemon
+// polls GitHub with one cheap fingerprint request per interval and fetches details only
+// for what changed (docs/notes/gh-viewer-polling.md); results are cached in SQLite, so
+// reads are served from the last-known state and never wait on the network. Every
+// response carries fetched_at so the UI can show staleness; an unset fetched_at means
+// "never fetched".
 //
 // Repositories are identified by their "owner/name" slug (RepoService's github_slug).
 // Slugs are case-insensitive and are normalised to lower case.
 service GhService {
   // GetViewer returns the authenticated GitHub user.
   rpc GetViewer(GetViewerRequest) returns (GetViewerResponse) {}
-  // ListPullRequests returns the cached open pull requests of a repository, most recently
-  // updated first, each with a rollup of its head commit's checks. It never blocks on
-  // GitHub; use Refresh to force a fetch. An untracked, never-fetched repository returns
-  // an empty list with fetched_at unset.
-  rpc ListPullRequests(ListPullRequestsRequest) returns (ListPullRequestsResponse) {}
   // GetPullRequest returns one pull request with the full list of its head commit's
-  // checks. Served from cache when fresh (30s), otherwise fetched through the paced
-  // queue; on fetch failure the stale cached copy is returned with last_error set.
+  // checks. On demand only (nothing polls it): served from cache when fresh (30s),
+  // otherwise fetched through the paced queue; on fetch failure the stale cached copy
+  // is returned with last_error set.
   rpc GetPullRequest(GetPullRequestRequest) returns (GetPullRequestResponse) {}
   // ListChecks returns the checks for a ref (branch name, tag, or commit SHA). Same
   // caching rules as GetPullRequest.
   rpc ListChecks(ListChecksRequest) returns (ListChecksResponse) {}
-  // Refresh fetches a repository's pull requests now (through the paced queue) and
-  // returns when the fetch has completed. An empty repo_slug marks every tracked
-  // repository and the viewer due immediately and returns without waiting.
+  // Refresh polls now. With a repo_slug it returns when that poll has completed (with
+  // its error); an empty repo_slug only marks the poll due and returns without waiting.
   rpc Refresh(RefreshGhRequest) returns (RefreshGhResponse) {}
-  // Track adds a repository to the polling loop. RepoService calls this for every
-  // registered repository with a GitHub remote; it is exposed for the CLI and debugging.
+  // Track adds a repository to the poll (its default branch CI; the dashboards count
+  // its pull requests as tracked). RepoService's repositories with a GitHub remote are
+  // tracked automatically; this is exposed for the CLI and debugging.
   rpc Track(TrackGhRepoRequest) returns (TrackGhRepoResponse) {}
-  // Untrack removes a repository from the polling loop. Its cache is kept.
+  // Untrack removes a repository from the poll. Its cache is kept.
   rpc Untrack(UntrackGhRepoRequest) returns (UntrackGhRepoResponse) {}
-  // Watch streams change notifications. Clients re-read with the List/Get RPCs.
+  // Watch streams change notifications. Clients re-read with the Get RPCs.
   rpc Watch(WatchGhRequest) returns (stream GhEvent) {}
   // GetDashboard returns the viewer's pull request dashboards (open PRs they authored,
-  // PRs awaiting their review, PRs merged in the last 7 days involving them) and their
-  // monthly stats across GitHub. Served from the last poll (every 2 minutes; stats
-  // every 15). The lists hold only tracked repositories unless include_untracked.
+  // PRs awaiting their review, open PRs they reviewed, PRs merged in the last 7 days
+  // involving them) and their monthly stats across GitHub, from the last poll. The
+  // lists hold only tracked repositories unless include_untracked.
   rpc GetDashboard(GetDashboardRequest) returns (GetDashboardResponse) {}
   // GetRepoActivity returns the viewer's monthly stats in one repository, its default
   // branch's CI, and the dashboard's recently merged PRs in it. Served from cache.
   rpc GetRepoActivity(GetRepoActivityRequest) returns (GetRepoActivityResponse) {}
   // GetBranchPullRequests returns the viewer's pull requests (any state) whose head is
-  // head_ref in the repository itself, from cache, and keeps that branch polled (with
-  // the PR list cadence) for 10 minutes after the last call. A first call returns an
-  // empty list with fetched_at unset; a branch_pull_requests_updated event follows.
+  // head_ref in the repository itself, from cache, and keeps that branch in the poll
+  // for 10 minutes after the last call. A first call returns an empty list with
+  // fetched_at unset; a branch_pull_requests_updated event follows the next poll.
   rpc GetBranchPullRequests(GetBranchPullRequestsRequest) returns (GetBranchPullRequestsResponse) {}
 }
 
-// GitHub's pull request state. Set on pull requests from GetDashboard and
-// GetBranchPullRequests; the open-PR list leaves it unspecified.
+// GitHub's pull request state.
 enum PullRequestState {
   PULL_REQUEST_STATE_UNSPECIFIED = 0;
   PULL_REQUEST_STATE_OPEN = 1;
@@ -91,6 +89,16 @@ enum MergeStateStatus {
   MERGE_STATE_STATUS_UNKNOWN = 6;
   MERGE_STATE_STATUS_UNSTABLE = 7;
   MERGE_STATE_STATUS_DRAFT = 8;
+}
+
+// A review's state.
+enum PullRequestReviewState {
+  PULL_REQUEST_REVIEW_STATE_UNSPECIFIED = 0;
+  PULL_REQUEST_REVIEW_STATE_PENDING = 1;
+  PULL_REQUEST_REVIEW_STATE_COMMENTED = 2;
+  PULL_REQUEST_REVIEW_STATE_APPROVED = 3;
+  PULL_REQUEST_REVIEW_STATE_CHANGES_REQUESTED = 4;
+  PULL_REQUEST_REVIEW_STATE_DISMISSED = 5;
 }
 
 // Combined state of all checks on a commit (GitHub's StatusCheckRollup.state).
@@ -162,23 +170,44 @@ message PullRequest {
   string head_sha = 6;
   string base_ref = 7;
   bool draft = 8;
+  // Open pull requests only (also merge_state_status, mergeable, head_repo_slug,
+  // comment_count, review_count, latest_reviews, review_requests): closed and merged
+  // ones are fetched with the summary fields.
   ReviewDecision review_decision = 9;
   Mergeable mergeable = 10;
-  // Set by GetPullRequest only: GitHub computes it per PR and it is too slow for lists
-  // (measured: 100 PRs per page exceeds GitHub's 10s query timeout).
   MergeStateStatus merge_state_status = 11;
   // True when the head branch lives in a fork.
   bool is_cross_repository = 12;
-  // "owner/name" of the head repository; empty when the fork was deleted. Set by
-  // GetPullRequest only.
+  // "owner/name" of the head repository; empty when the fork was deleted.
   string head_repo_slug = 13;
   string url = 14;
   google.protobuf.Timestamp updated_at = 15;
   CheckRollup checks = 16;
-  // Set by GetDashboard and GetBranchPullRequests.
   PullRequestState state = 17;
   google.protobuf.Timestamp created_at = 18;
   google.protobuf.Timestamp merged_at = 19;
+  // Size of the change.
+  int32 additions = 20;
+  int32 deletions = 21;
+  int32 changed_files = 22;
+  // Issue and review comments.
+  int32 comment_count = 23;
+  // Submitted reviews.
+  int32 review_count = 24;
+  // Each reviewer's latest review (up to 10).
+  repeated PullRequestReview latest_reviews = 25;
+  // Pending review requests: user logins and "org/team" slugs (up to 10).
+  repeated string review_requests = 26;
+  // Only the poll's fingerprint is known so far (the detail fetch is pending or
+  // failed): title and the detail fields are empty. The next poll retries.
+  bool partial = 27;
+}
+
+message PullRequestReview {
+  // Reviewer login; empty for deleted accounts.
+  string author = 1;
+  PullRequestReviewState state = 2;
+  google.protobuf.Timestamp submitted_at = 3;
 }
 
 message CheckRun {
@@ -205,21 +234,6 @@ message GetViewerResponse {
   google.protobuf.Timestamp fetched_at = 3;
   // The last fetch error, cleared on success.
   string last_error = 4;
-}
-
-message ListPullRequestsRequest {
-  string repo_slug = 1;
-}
-
-message ListPullRequestsResponse {
-  repeated PullRequest pull_requests = 1;
-  // Whether the repository is in the polling loop.
-  bool tracked = 2;
-  google.protobuf.Timestamp fetched_at = 3;
-  string last_error = 4;
-  // Total open pull requests on GitHub. pull_requests holds at most the 100 most
-  // recently updated.
-  int32 total_count = 5;
 }
 
 message GetPullRequestRequest {
@@ -271,43 +285,51 @@ message UntrackGhRepoResponse {}
 message WatchGhRequest {}
 
 message GhEvent {
+  reserved 1;
+  reserved "pull_requests_updated";
+
   oneof event {
-    PullRequestsUpdated pull_requests_updated = 1;
     ViewerUpdated viewer_updated = 2;
     DashboardUpdated dashboard_updated = 3;
     RepoActivityUpdated repo_activity_updated = 4;
     BranchPullRequestsUpdated branch_pull_requests_updated = 5;
+    Polled polled = 6;
   }
 
-  // The dashboards or the global monthly stats were fetched (every poll) or their
-  // fetch status changed. Re-read with GetDashboard.
+  // The dashboards, the global monthly stats, their fetch errors, or the tracked set
+  // changed. Re-read with GetDashboard.
   message DashboardUpdated {
     google.protobuf.Timestamp fetched_at = 1;
   }
 
-  // A repository's monthly stats were fetched, or its default branch CI changed.
-  // Re-read with GetRepoActivity.
+  // A repository's monthly stats or default branch CI (or their errors, or whether it
+  // is tracked) changed. Re-read with GetRepoActivity.
   message RepoActivityUpdated {
     string repo_slug = 1;
     google.protobuf.Timestamp fetched_at = 2;
   }
 
-  // A watched branch was polled. Re-read with GetBranchPullRequests.
+  // A watched branch's pull requests changed (or were polled for the first time).
+  // Re-read with GetBranchPullRequests.
   message BranchPullRequestsUpdated {
     string repo_slug = 1;
     string head_ref = 2;
     google.protobuf.Timestamp fetched_at = 3;
   }
 
-  // A repository's pull request list (or its fetch status) changed.
-  message PullRequestsUpdated {
-    string repo_slug = 1;
-    google.protobuf.Timestamp fetched_at = 2;
-  }
-
   // The viewer or authentication state changed.
   message ViewerUpdated {
     google.protobuf.Timestamp fetched_at = 1;
+  }
+
+  // A poll finished. Sent after every poll (and in the EventService snapshot) so
+  // clients can show "updated Ns ago" without re-reading: the events above are sent
+  // only when data changed, so the fetched_at of a re-read can be older than this.
+  message Polled {
+    // When the last successful poll finished; unset if never.
+    google.protobuf.Timestamp fetched_at = 1;
+    // This poll's error; empty when it succeeded.
+    string last_error = 2;
   }
 }
 
@@ -355,6 +377,11 @@ message GetDashboardResponse {
   string last_error = 8;
   // The tracked repositories the lists were filtered to (lower case).
   repeated string tracked_slugs = 9;
+  // Open pull requests the viewer reviewed and did not author, except those in
+  // review_requested, most recently updated first.
+  repeated PullRequest reviewed = 10;
+  // github.dashboards_enabled is off: the lists are empty and not polled.
+  bool dashboards_disabled = 11;
 }
 
 message GetRepoActivityRequest {
@@ -372,7 +399,11 @@ message DefaultBranchStatus {
   // Failed checks (failure, error, cancelled, timed out, action required, startup
   // failure), failed first by workflow and name.
   repeated CheckRun failing = 6;
+  // When a poll last confirmed this state.
   google.protobuf.Timestamp fetched_at = 7;
+  // The last poll's error for this repository (e.g. not found); the fields above are
+  // then the last known state.
+  string last_error = 8;
 }
 
 message GetRepoActivityResponse {
@@ -380,7 +411,7 @@ message GetRepoActivityResponse {
   bool tracked = 2;
   // The viewer's activity in this repository.
   ActivityStats stats = 3;
-  // Unset until the repository's PR list was polled once.
+  // Unset until a poll included the repository.
   DefaultBranchStatus default_branch = 4;
   // The dashboard's recently merged pull requests in this repository.
   repeated PullRequest recently_merged = 5;

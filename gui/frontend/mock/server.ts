@@ -25,7 +25,7 @@
  *   POST /__mock/update/latest?version=v0.2.0     (what the next check finds)
  *   POST /__mock/update/fail?reason=…             (the next install fails)
  *   POST /__mock/update/disabled?reason=dev%20build
- *   POST /__mock/gh/update | stale | auth?ok=false | touch?path=…   (Phase 3a GitHub + detail)
+ *   POST /__mock/gh/update | poll | stale | auth?ok=false | touch?path=…   (GitHub + detail)
  *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts)
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -45,6 +45,7 @@ import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
+import { ghEvent } from "./github";
 import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
 
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -164,7 +165,6 @@ function routes(router: ConnectRouter): void {
       if (!req.headRef) throw new ConnectError("head_ref is required", Code.InvalidArgument);
       return world.gh.getBranchPullRequests(req.repoSlug.toLowerCase(), req.headRef);
     },
-    listPullRequests: () => ({ pullRequests: [] }),
     refresh: () => ({}),
   });
 
@@ -251,6 +251,7 @@ function routes(router: ConnectRouter): void {
         { source: EventSource.REPO, event: { event: { case: "repo", value: { event: { case: "snapshot", value: { repos: [...world.repos.values()].map((r) => world.repoMsg(r)) } } } } } },
         ...[...world.terms.values()].map((t) => ({ source: EventSource.TERMINAL, event: { event: { case: "terminal" as const, value: { event: { case: "updated" as const, value: world.terminalMsg(t) } } } } })),
         { source: EventSource.SESSION, event: { event: { case: "session", value: world.sessionSnapshot() } } },
+        ghEvent(world.gh.polledEvent()),
         { source: EventSource.GITOPS, event: { event: { case: "gitops", value: world.gitops.snapshot() } } },
         { source: EventSource.SETTINGS, event: { event: { case: "settings", value: { event: { case: "snapshot", value: world.settings.snapshot() } } } } },
         { source: EventSource.UPDATE, event: { event: { case: "update", value: world.update.event() } } },
@@ -415,6 +416,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/gh/update":
       world.gh.update();
+      json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/gh/poll":
+      world.gh.poll();
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/gh/stale":

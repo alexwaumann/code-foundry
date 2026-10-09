@@ -72,7 +72,7 @@ internal/
     terminal/              PTY + libghostty-vt actor per terminal; output tee; snapshots
     session/               Claude sessions layered on terminal: spawn, naming, status, resume
     repo/                  registered repos, worktrees, git status, filesystem watcher
-    gh/                    gh GraphQL polling, PR/CI cache
+    gh/                    GitHub GraphQL/REST polling over HTTP (token via gh), PR/CI cache
     gitops/                git/gh operations per worktree (fetch, pull, push, PR); editor, Finder, browser
     update/                release checks via gh, installs with the embedded installer
   db/                      SQLite (modernc.org/sqlite, WAL) + migrations
@@ -113,9 +113,11 @@ Services (v1):
   chunks), Write (input bytes), Resize, Detach.
 * `RepoService` — Register, Unregister, List, ListWorktrees, CreateWorktree, Watch,
   GetWorktreeDetail (files and log against the base branch, Phase 3a).
-* `GhService` — ListPullRequests, GetChecks, Watch; GetDashboard, GetRepoActivity,
-  GetBranchPullRequests (the viewer's PR dashboards, monthly stats, default-branch CI,
-  Phase 3a).
+* `GhService` — GetViewer, GetDashboard, GetRepoActivity, GetBranchPullRequests (the
+  viewer's PR dashboards, monthly stats, default-branch CI, the viewer's PRs on a
+  branch), GetPullRequest and ListChecks (on demand), Refresh, Track, Untrack, Watch.
+  Data events go out only when data changed; `Polled` after every poll carries the
+  freshness time.
 * `GitOpsService` — Fetch, Pull, Push, CreatePullRequest, OpenPullRequest, OpenEditor,
   Reveal, OpenUrl, List, Watch. One operation at a time per worktree; a failed operation
   is a result (state FAILED, output), not an RPC error. The GUI reaches it only through
@@ -229,8 +231,13 @@ switch.
   create/list/remove and status (branch, ahead/behind, dirty). One filesystem watcher
   (fsnotify) across all registered roots feeds a debounced reconcile. Workers write
   disjoint per-path snapshot pointers.
-* `gh`: `gh api graphql` for PRs, checks, viewer. Polled on a paced loop; results cached in
-  SQLite so startup is instant and offline is tolerable.
+* `gh`: GitHub GraphQL (and a little REST) sent in-process over one keep-alive HTTP
+  client with the token from `gh auth token` (github.com only; see
+  `docs/notes/gh-http-transport.md`). Scoped to the viewer: their PRs (authored, review
+  requested, reviewed, recently merged), tracked repositories' default-branch CI, and
+  their PRs on watched branches. One fingerprint request per poll interval; details only
+  for what changed (`docs/notes/gh-viewer-polling.md`). Results cached in SQLite so
+  startup is instant and offline is tolerable.
 
 ## 10. Conventions
 

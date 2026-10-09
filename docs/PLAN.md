@@ -28,9 +28,9 @@ Collected from the step notes; none blocks daily use.
   * `CODE_FOUNDRY_EDITOR` remains as a fallback when `gitops.editor_command` is empty.
 * **GitHub / Pull Requests page**
   * Populated PR lists have only been seen live through the `CODE_FOUNDRY_GH_SEARCH_AS` dev knob. The owner's account has no PRs, so with the real login the GUI has only ever shown empty lists.
-  * Dashboards are fetched unfiltered (50/30/50) and filtered to tracked repos at read time. A viewer with many PRs outside registered repos can crowd out registered ones.
+  * Dashboards are fetched unfiltered (50 per list) and filtered to tracked repos at read time. A viewer with many PRs outside registered repos can crowd out registered ones.
+  * The poll (`gh-viewer-polling.md`) keeps richer PR detail (merge state, size, reviews, review requests) and a "reviewed by you" list that no view shows yet.
   * Branch PRs on the overview show only the viewer's own, non-fork PRs.
-  * `github.dashboards_enabled` applies after a daemon restart, and the page does not say the dashboards are off. It shows the last cached data.
 * **Settings**
   * Saving from the app rewrites `settings.toml`, which drops user comments and unknown keys.
 * **Packaging and updates**
