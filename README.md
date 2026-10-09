@@ -79,7 +79,13 @@ pnpm. The GUI also needs `wails3`
 make build       # ./bin/code-foundry
 make check       # what CI runs
 make gui-build   # gui/bin/CodeFoundry.app
+make gui-bin     # gui/bin/CodeFoundry only, no .app bundle (see below)
 ```
+
+If your machine's management software blocks unsigned app bundles, use `make gui-bin`.
+It builds only the bare executable and removes any `gui/bin/CodeFoundry.app`, and
+`code-foundry gui` then launches the executable instead. That build is not a bundle, so
+the in-app updater does not apply to it; everything else works.
 
 No zig or ghostty checkout is needed: libghostty-vt is vendored prebuilt in
 [third_party/libghostty-vt](third_party/libghostty-vt). `make ghostty-vt-rebuild` rebuilds
