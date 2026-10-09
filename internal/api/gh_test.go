@@ -46,16 +46,6 @@ func TestGhReads(t *testing.T) {
 	}
 
 	store.SetViewer(gh.ViewerState{Viewer: &gh.Viewer{Login: "octocat", Name: "The Octocat"}, Authenticated: true, FetchedAt: at})
-	store.SetRepo(gh.RepoState{
-		Slug: "ghostty-org/ghostty", Tracked: true, TotalCount: 129, FetchedAt: at, LastError: "stale",
-		PullRequests: []gh.PullRequest{{
-			Number: 14586, Title: "i18n", Author: "kgni", HeadRef: "i18n/da_DK", HeadSHA: "7b60f9b", BaseRef: "main",
-			Draft: true, ReviewDecision: gh.ReviewRequired, Mergeable: gh.MergeableConflicting,
-			IsCrossRepository: true, URL: "https://github.com/ghostty-org/ghostty/pull/14586", UpdatedAt: at,
-			Checks: gh.CheckRollup{State: gh.RollupFailure, Total: 10, Passed: 6, Failed: 1, Pending: 2, Skipped: 1},
-		}},
-	})
-
 	v, err = client.GetViewer(ctx, connect.NewRequest(&v1.GetViewerRequest{}))
 	if err != nil {
 		t.Fatal(err)
@@ -64,31 +54,37 @@ func TestGhReads(t *testing.T) {
 		t.Errorf("viewer = %v", v.Msg)
 	}
 
-	list, err := client.ListPullRequests(ctx, connect.NewRequest(&v1.ListPullRequestsRequest{RepoSlug: "Ghostty-Org/Ghostty"}))
+	// Every pull request field maps (GetPullRequest; the dashboards share the mapping).
+	store.SetPullRequest("ghostty-org/ghostty", gh.PullRequestDetail{
+		PullRequest: gh.PullRequest{
+			ID: "PR_1", Number: 14000, Title: "i18n", Author: "kgni", HeadRef: "i18n/da_DK", HeadSHA: "7b60f9b", BaseRef: "main",
+			Draft: true, ReviewDecision: gh.ReviewRequired, Mergeable: gh.MergeableConflicting, MergeStateStatus: "DIRTY",
+			IsCrossRepository: true, URL: "https://github.com/ghostty-org/ghostty/pull/14000", UpdatedAt: at,
+			Checks: gh.CheckRollup{State: gh.RollupFailure, Total: 10, Passed: 6, Failed: 1, Pending: 2, Skipped: 1},
+			Repo:   "ghostty-org/ghostty", State: gh.PullRequestOpen, Additions: 51, Deletions: 52, ChangedFiles: 1,
+			Comments: 9, Reviews: 2, ReviewRequests: []string{"kim", "acme/core"}, Partial: true,
+			LatestReviews: []gh.Review{{Author: "trag1c", State: "CHANGES_REQUESTED", SubmittedAt: at}, {Author: "x", State: "NEW_STATE"}},
+		},
+		FetchedAt: at,
+	})
+	full, err := client.GetPullRequest(ctx, connect.NewRequest(&v1.GetPullRequestRequest{RepoSlug: "ghostty-org/ghostty", Number: 14000}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	m := list.Msg
-	if !m.GetTracked() || m.GetTotalCount() != 129 || m.GetLastError() != "stale" || len(m.GetPullRequests()) != 1 {
-		t.Fatalf("list = %v", m)
-	}
-	pr := m.GetPullRequests()[0]
-	if pr.GetRepoSlug() != "ghostty-org/ghostty" || pr.GetNumber() != 14586 || !pr.GetDraft() ||
+	pr := full.Msg.GetPullRequest()
+	if pr.GetRepoSlug() != "ghostty-org/ghostty" || pr.GetNumber() != 14000 || !pr.GetDraft() ||
 		pr.GetReviewDecision() != v1.ReviewDecision_REVIEW_DECISION_REVIEW_REQUIRED ||
 		pr.GetMergeable() != v1.Mergeable_MERGEABLE_CONFLICTING ||
-		pr.GetMergeStateStatus() != v1.MergeStateStatus_MERGE_STATE_STATUS_UNSPECIFIED ||
+		pr.GetMergeStateStatus() != v1.MergeStateStatus_MERGE_STATE_STATUS_DIRTY ||
 		pr.GetChecks().GetState() != v1.CheckRollupState_CHECK_ROLLUP_STATE_FAILURE ||
-		pr.GetChecks().GetPending() != 2 || !pr.GetUpdatedAt().AsTime().Equal(at) {
+		pr.GetChecks().GetPending() != 2 || !pr.GetUpdatedAt().AsTime().Equal(at) ||
+		pr.GetState() != v1.PullRequestState_PULL_REQUEST_STATE_OPEN || pr.GetAdditions() != 51 || pr.GetDeletions() != 52 ||
+		pr.GetChangedFiles() != 1 || pr.GetCommentCount() != 9 || pr.GetReviewCount() != 2 || !pr.GetPartial() ||
+		fmt.Sprint(pr.GetReviewRequests()) != "[kim acme/core]" || len(pr.GetLatestReviews()) != 2 ||
+		pr.GetLatestReviews()[0].GetState() != v1.PullRequestReviewState_PULL_REQUEST_REVIEW_STATE_CHANGES_REQUESTED ||
+		pr.GetLatestReviews()[0].GetAuthor() != "trag1c" || !pr.GetLatestReviews()[0].GetSubmittedAt().AsTime().Equal(at) ||
+		pr.GetLatestReviews()[1].GetState() != v1.PullRequestReviewState_PULL_REQUEST_REVIEW_STATE_UNSPECIFIED {
 		t.Errorf("pr = %v", pr)
-	}
-
-	unknown, err := client.ListPullRequests(ctx, connect.NewRequest(&v1.ListPullRequestsRequest{RepoSlug: "a/b"}))
-	if err != nil || unknown.Msg.GetTracked() || unknown.Msg.GetFetchedAt() != nil || len(unknown.Msg.GetPullRequests()) != 0 {
-		t.Errorf("unknown repo = %v, %v", unknown.Msg, err)
-	}
-	_, err = client.ListPullRequests(ctx, connect.NewRequest(&v1.ListPullRequestsRequest{RepoSlug: "nope"}))
-	if connect.CodeOf(err) != connect.CodeInvalidArgument {
-		t.Errorf("bad slug err = %v", err)
 	}
 
 	store.SetPullRequest("ghostty-org/ghostty", gh.PullRequestDetail{
@@ -172,9 +168,18 @@ func TestGhTrackAndWatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	for stream.Receive() {
-		if ev := stream.Msg().GetPullRequestsUpdated(); ev != nil {
+		if ev := stream.Msg().GetRepoActivityUpdated(); ev != nil {
 			if ev.GetRepoSlug() != "ghostty-org/ghostty" || ev.GetFetchedAt() != nil {
-				t.Errorf("pr event = %v", ev)
+				t.Errorf("activity event = %v", ev)
+			}
+			break
+		}
+	}
+	store.SetPoll(gh.PollState{FetchedAt: at, LastError: "boom"})
+	for stream.Receive() {
+		if ev := stream.Msg().GetPolled(); ev != nil {
+			if !ev.GetFetchedAt().AsTime().Equal(at) || ev.GetLastError() != "boom" {
+				t.Errorf("polled event = %v", ev)
 			}
 			break
 		}

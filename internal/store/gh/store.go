@@ -21,37 +21,53 @@ type Options struct {
 	// Runner talks to GitHub. Defaults to an HTTPRunner whose token comes from gh on
 	// $PATH (or Homebrew).
 	Runner Runner
-	// Bus receives PullRequestsUpdated and ViewerUpdated. Optional.
+	// Bus receives the store's events (gh.go, activity.go). Optional.
 	Bus *bus.Bus
 	Log *slog.Logger
 
-	MinGap           time.Duration
-	RepoInterval     time.Duration
-	ViewerInterval   time.Duration
+	MinGap time.Duration
+	// PollInterval is the default for Config().PollInterval.
+	PollInterval time.Duration
+	// IdleInterval is the poll cadence while nothing is tracked or watched.
+	IdleInterval     time.Duration
 	AuthRetry        time.Duration
 	NetworkBackoff   time.Duration
 	SecondaryBackoff time.Duration
 	MaxBackoff       time.Duration
 	DetailTTL        time.Duration
 	MinRemaining     int
-	PageSize         int
-	MaxPages         int
+	// MaxPages caps the pages of checks (100 each) fetched for one commit.
+	MaxPages int
+	// DetailBatch is how many open pull requests one detail request carries.
+	DetailBatch int
 
-	// Phase 3a activity polling (activity.go). Zero takes the default; negative
-	// disables that poll.
-	DashboardInterval time.Duration
-	StatsInterval     time.Duration
-	// BranchWatch is how long a branch stays polled after BranchPullRequests asked
-	// for it.
+	// StatsInterval is how often the monthly stats ride along with the poll. Negative
+	// disables them.
+	StatsInterval time.Duration
+	// BranchWatch is how long a branch stays in the poll after BranchPullRequests
+	// asked for it.
 	BranchWatch time.Duration
 	// SearchAs replaces @me in the viewer searches and stats with this login (and the
 	// branch filter with it). A development aid for capturing populated dashboards
 	// from an account that has no pull requests; empty in normal use.
 	SearchAs string
 
+	// Config returns the user settings the poll follows. It is read before every poll,
+	// so changes apply from the next one. Nil means PollInterval with dashboards on.
+	Config func() Config
+
 	// Now and Rand are injectable for tests.
 	Now  func() time.Time
 	Rand func() float64
+}
+
+// Config is the user-tunable part of the poll (github.* settings).
+type Config struct {
+	// PollInterval is the time between the end of one poll and the start of the next.
+	// Zero takes Options.PollInterval.
+	PollInterval time.Duration
+	// Dashboards includes the viewer's pull request searches in the poll.
+	Dashboards bool
 }
 
 func (o *Options) setDefaults() {
@@ -61,20 +77,17 @@ func (o *Options) setDefaults() {
 		}
 	}
 	def(&o.MinGap, DefaultMinGap)
-	def(&o.RepoInterval, DefaultRepoInterval)
-	def(&o.ViewerInterval, DefaultViewerInterval)
+	def(&o.PollInterval, DefaultPollInterval)
+	def(&o.IdleInterval, DefaultIdleInterval)
 	def(&o.AuthRetry, DefaultAuthRetry)
 	def(&o.NetworkBackoff, DefaultNetworkBackoff)
 	def(&o.SecondaryBackoff, DefaultSecondaryBackoff)
 	def(&o.MaxBackoff, DefaultMaxBackoff)
 	def(&o.DetailTTL, DefaultDetailTTL)
 	o.MinRemaining = cmp.Or(o.MinRemaining, DefaultMinRemaining)
-	o.PageSize = cmp.Or(o.PageSize, DefaultPageSize)
 	o.MaxPages = cmp.Or(o.MaxPages, DefaultMaxPages)
+	o.DetailBatch = cmp.Or(o.DetailBatch, DefaultDetailBatch)
 	def(&o.BranchWatch, DefaultBranchWatch)
-	if o.DashboardInterval == 0 {
-		o.DashboardInterval = DefaultDashboardInterval
-	}
 	if o.StatsInterval == 0 {
 		o.StatsInterval = DefaultStatsInterval
 	}
@@ -102,9 +115,13 @@ type Store struct {
 	snap   atomic.Pointer[Snapshot]
 
 	mu             sync.Mutex
-	tracked        map[string]*schedule
-	viewerNext     time.Time
-	viewerFailures int
+	tracked        map[string]bool
+	watches        branchWatches
+	pollNext       time.Time
+	pollAgain      bool // a poll was asked for while one was running
+	pollFailures   int
+	statsNext      time.Time
+	statsFailures  int
 	authBad        bool
 	authNext       time.Time
 	authFailures   int
@@ -114,32 +131,29 @@ type Store struct {
 	lastResetAt    time.Time // rateLimit.resetAt of the last successful response
 	queue          []*job
 
-	// Worker goroutine only.
-	lastEnd   time.Time      // when the previous request finished
-	pageSizes map[string]int // per-repo PR page size after 502/504 shrinking
+	branches branchStates // per-branch results (activity.go)
 
-	act activity // Phase 3a scheduling and branch state (activity.go)
+	// Worker goroutine only.
+	lastEnd     time.Time      // when the previous request finished
+	searchFirst map[string]int // per-section search size after 502/504 shrinking
+	detailBatch int            // open PRs per detail request after 502/504 shrinking
+	recheck     map[string]int // PR id -> detail refetches left while mergeable is UNKNOWN
+	failingKey  map[string]string
+	searchAsID  string // node id of Options.SearchAs
+	cycle       cycleStats
 
 	wake chan struct{}
 }
 
 var _ Service = (*Store)(nil)
 
-type schedule struct {
-	next     time.Time
-	failures int
-}
-
 type jobKind int
 
 const (
-	jobViewer jobKind = iota
+	jobPoll jobKind = iota
 	jobAuth
-	jobPullRequests
 	jobPullRequest
 	jobChecks
-	// jobActivity runs j.run (activity.go); j.ref names it for coalescing.
-	jobActivity
 )
 
 type job struct {
@@ -147,7 +161,6 @@ type job struct {
 	slug    string
 	number  int
 	ref     string
-	run     func(context.Context) error
 	waiters []chan jobResult
 }
 
@@ -168,12 +181,17 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 	}
 	opts.setDefaults()
 	s := &Store{
-		opts:      opts,
-		log:       opts.Log,
-		cache:     cache{db: opts.DB},
-		tracked:   map[string]*schedule{},
-		pageSizes: map[string]int{},
-		wake:      make(chan struct{}, 1),
+		opts:        opts,
+		log:         opts.Log,
+		cache:       cache{db: opts.DB},
+		tracked:     map[string]bool{},
+		watches:     branchWatches{},
+		branches:    branchStates{m: map[branchKey]BranchPullRequests{}},
+		searchFirst: map[string]int{},
+		detailBatch: opts.DetailBatch,
+		recheck:     map[string]int{},
+		failingKey:  map[string]string{},
+		wake:        make(chan struct{}, 1),
 	}
 	now := opts.Now()
 	if err := s.cache.prune(ctx, now); err != nil {
@@ -185,19 +203,61 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 	}
 	s.loadActivity(ctx, snap)
 	s.snap.Store(snap)
-	s.viewerNext = now
-	if snap.Viewer.Viewer != nil && snap.Viewer.Viewer.ID != "" {
-		s.viewerNext = laterOf(now, snap.Viewer.FetchedAt.Add(opts.ViewerInterval))
+	// A recent poll in the cache (with the viewer's id, which stats need) waits out its
+	// interval, so restarts do not poll in a burst.
+	s.pollNext = now
+	if v := snap.Viewer.Viewer; v != nil && v.ID != "" && !snap.Poll.FetchedAt.IsZero() {
+		s.pollNext = laterOf(now, snap.Poll.FetchedAt.Add(s.config().PollInterval))
 	}
-	s.log.Info("gh store loaded cache", "repos", len(snap.Repos), "viewer", snap.Viewer.Viewer != nil)
+	for slug, r := range snap.Repos {
+		s.failingKey[slug] = failingKeyOf(r.Activity.DefaultBranch)
+	}
+	s.log.Info("gh store loaded cache", "repos", len(snap.Repos), "viewer", snap.Viewer.Viewer != nil,
+		"first_poll_in", s.pollNext.Sub(now).Round(time.Second).String())
 	return s, nil
+}
+
+// config returns the current Config with defaults applied.
+func (s *Store) config() Config {
+	c := Config{PollInterval: s.opts.PollInterval, Dashboards: true}
+	if s.opts.Config != nil {
+		c = s.opts.Config()
+	}
+	if c.PollInterval <= 0 {
+		c.PollInterval = s.opts.PollInterval
+	}
+	return c
+}
+
+// pollDebounce lets a burst of Track/BranchPullRequests calls (daemon start, a client
+// opening several views) share one poll.
+const pollDebounce = 500 * time.Millisecond
+
+// pollSoonLocked moves the next poll to within pollDebounce. A poll that is running
+// now (it may have planned without the caller's change) is followed by another one.
+// Called with s.mu held.
+func (s *Store) pollSoonLocked(now time.Time) {
+	s.pollAgain = true
+	if at := now.Add(pollDebounce); s.pollNext.After(at) {
+		s.pollNext = at
+	}
+}
+
+// schedulePollLocked sets the next poll after one finished: at next, or right away if
+// a poll was asked for meanwhile. Called with s.mu held.
+func (s *Store) schedulePollLocked(now, next time.Time) {
+	if s.pollAgain && next.After(now) {
+		next = now
+	}
+	s.pollAgain = false
+	s.pollNext = next
 }
 
 // Snapshot implements Service.
 func (s *Store) Snapshot() *Snapshot { return s.snap.Load() }
 
-// Track implements Service. A repository whose cached list is younger than
-// RepoInterval is first polled when that cache expires, not immediately.
+// Track implements Service. A repository without cached default-branch CI makes the
+// next poll come soon; otherwise it joins the regular cadence.
 func (s *Store) Track(slug string) error {
 	key, err := NormalizeSlug(slug)
 	if err != nil {
@@ -205,21 +265,22 @@ func (s *Store) Track(slug string) error {
 	}
 	now := s.opts.Now()
 	s.mu.Lock()
-	if _, ok := s.tracked[key]; ok {
+	if s.tracked[key] {
 		s.mu.Unlock()
 		return nil
 	}
-	next := now
-	if r, ok := s.Snapshot().Repos[key]; ok && !r.FetchedAt.IsZero() {
-		next = laterOf(now, r.FetchedAt.Add(s.opts.RepoInterval))
+	s.tracked[key] = true
+	a := s.Snapshot().Repos[key].Activity
+	if a.DefaultBranch.FetchedAt.IsZero() {
+		s.pollSoonLocked(now)
 	}
-	s.tracked[key] = &schedule{next: next}
+	if a.Stats.FetchedAt.IsZero() {
+		s.statsNext = now // the next poll brings its stats (and refreshes the others)
+	}
 	s.mu.Unlock()
-
-	r := s.updateRepo(key, func(r *RepoState) { r.Tracked = true })
-	s.publishRepo(r)
+	s.setTracked(key, true)
 	s.nudge()
-	s.log.Info("gh tracking repo", "slug", key, "first_poll_in", next.Sub(now).Round(time.Second).String())
+	s.log.Info("gh tracking repo", "slug", key)
 	return nil
 }
 
@@ -230,36 +291,39 @@ func (s *Store) Untrack(slug string) error {
 		return err
 	}
 	s.mu.Lock()
-	_, ok := s.tracked[key]
+	ok := s.tracked[key]
 	delete(s.tracked, key)
 	s.mu.Unlock()
 	if !ok {
 		return nil
 	}
-	r := s.updateRepo(key, func(r *RepoState) { r.Tracked = false })
-	s.publishRepo(r)
+	s.setTracked(key, false)
 	s.log.Info("gh untracked repo", "slug", key)
 	return nil
+}
+
+// setTracked records a repository's tracked flag and announces it: GetRepoActivity
+// reports it and GetDashboard filters by it.
+func (s *Store) setTracked(slug string, tracked bool) {
+	r := s.updateRepo(slug, func(r *RepoState) { r.Tracked = tracked })
+	publish(s, RepoActivityUpdated{Slug: slug, FetchedAt: r.Activity.DefaultBranch.FetchedAt})
+	publish(s, DashboardUpdated{FetchedAt: s.Snapshot().Dashboard.FetchedAt})
 }
 
 // Refresh implements Service.
 func (s *Store) Refresh(ctx context.Context, slug string) error {
 	if slug == "" {
-		now := s.opts.Now()
 		s.mu.Lock()
-		s.viewerNext = now
-		for _, sc := range s.tracked {
-			sc.next = now
-		}
+		s.pollAgain = true
+		s.pollNext = s.opts.Now()
 		s.mu.Unlock()
 		s.nudge()
 		return nil
 	}
-	key, err := NormalizeSlug(slug)
-	if err != nil {
+	if _, err := NormalizeSlug(slug); err != nil {
 		return err
 	}
-	return s.submit(ctx, &job{kind: jobPullRequests, slug: key}).err
+	return s.submit(ctx, &job{kind: jobPoll}).err
 }
 
 // PullRequest implements Service.
@@ -360,7 +424,7 @@ func (s *Store) nudge() {
 // ctx is cancelled.
 func (s *Store) Run(ctx context.Context) error {
 	s.log.Info("gh poller started",
-		"min_gap", s.opts.MinGap.String(), "repo_interval", s.opts.RepoInterval.String())
+		"min_gap", s.opts.MinGap.String(), "poll_interval", s.config().PollInterval.String())
 	timer := time.NewTimer(time.Hour)
 	defer timer.Stop()
 	for {
@@ -387,9 +451,9 @@ func (s *Store) Run(ctx context.Context) error {
 
 // next picks the next job and how long until it may start. When the wait is <= 0 the
 // job has been claimed (removed from the queue). On-demand jobs come first; then the
-// earliest of the viewer and tracked repos (or only the auth check while gh is not
-// authenticated). Nothing starts within MinGap of the previous request's end, and
-// scheduled work waits out a rate-limit or network pause.
+// poll (or only the auth check while gh is not authenticated). Nothing starts within
+// MinGap of the previous request's end, and the poll waits out a rate-limit or network
+// pause.
 func (s *Store) next() (*job, time.Duration) {
 	now := s.opts.Now()
 	earliest := s.lastEnd.Add(s.opts.MinGap)
@@ -408,16 +472,7 @@ func (s *Store) next() (*job, time.Duration) {
 	if s.authBad {
 		j, at = &job{kind: jobAuth}, s.authNext
 	} else {
-		j, at = &job{kind: jobViewer}, s.viewerNext
-		for slug, sc := range s.tracked {
-			if sc.next.Before(at) || (sc.next.Equal(at) && j.kind == jobPullRequests && slug < j.slug) {
-				j, at = &job{kind: jobPullRequests, slug: slug}, sc.next
-			}
-		}
-		if aj, aat := s.nextActivityLocked(now); aj != nil && aat.Before(at) {
-			j, at = aj, aat
-		}
-		at = laterOf(at, s.pauseUntil)
+		j, at = &job{kind: jobPoll}, laterOf(s.pollNext, s.pauseUntil)
 	}
 	at = laterOf(at, earliest)
 	return j, at.Sub(now)
@@ -442,37 +497,39 @@ func (j *job) reply(r jobResult) {
 func (s *Store) execute(ctx context.Context, j *job) {
 	var res jobResult
 	switch j.kind {
-	case jobViewer:
-		s.pollViewer(ctx)
+	case jobPoll:
+		res.err = s.poll(ctx)
 	case jobAuth:
 		s.checkAuth(ctx)
-	case jobPullRequests:
-		res.err = s.pollPullRequests(ctx, j.slug)
 	case jobPullRequest:
 		res.detail, res.err = s.fetchPullRequest(ctx, j.slug, j.number)
 	case jobChecks:
 		res.checks, res.err = s.fetchChecks(ctx, j.slug, j.ref)
-	case jobActivity:
-		res.err = j.run(ctx)
 	}
 	j.reply(res)
 }
 
-// call runs one paced GraphQL request and applies its global effects (auth state,
-// rate-limit budget, pauses). It sleeps out MinGap since the previous request first.
+// call runs one paced GraphQL request from queries/ and applies its global effects.
 func (s *Store) call(ctx context.Context, name string, vars map[string]any) (json.RawMessage, error) {
 	q, err := query(name)
 	if err != nil {
 		return nil, err
 	}
+	return s.callDoc(ctx, name, q, vars)
+}
+
+// callDoc runs one paced GraphQL document and applies its global effects (auth state,
+// rate-limit budget, pauses). It sleeps out MinGap since the previous request first. A
+// *PartialError comes back with its data and counts as a success globally.
+func (s *Store) callDoc(ctx context.Context, name, doc string, vars map[string]any) (json.RawMessage, error) {
 	if err := s.pace(ctx); err != nil {
 		return nil, err
 	}
 	start := s.opts.Now()
-	data, err := s.opts.Runner.GraphQL(ctx, q, vars)
+	data, err := s.opts.Runner.GraphQL(ctx, doc, vars)
 	s.lastEnd = s.opts.Now()
 	var rl *rateLimitJSON
-	if err == nil {
+	if data != nil {
 		var env struct {
 			RateLimit *rateLimitJSON `json:"rateLimit"`
 		}
@@ -480,7 +537,10 @@ func (s *Store) call(ctx context.Context, name string, vars map[string]any) (jso
 			rl = env.RateLimit
 		}
 	}
-	attrs := []any{"query", name, "vars", vars, "dur", s.lastEnd.Sub(start).Round(time.Millisecond).String()}
+	attrs := []any{"query", name, "dur", s.lastEnd.Sub(start).Round(time.Millisecond).String(), "bytes", len(data)}
+	if name != queryPoll { // the poll's variables are logged by poll.go in summary form
+		attrs = append(attrs, "vars", vars)
+	}
 	if rl != nil {
 		attrs = append(attrs, "cost", rl.Cost, "remaining", rl.Remaining)
 	}
@@ -488,7 +548,15 @@ func (s *Store) call(ctx context.Context, name string, vars map[string]any) (jso
 		attrs = append(attrs, "err", err)
 	}
 	s.log.Debug("gh request", attrs...)
-	s.noteResult(ctx, err, rl)
+	s.cycle.requests++
+	if rl != nil {
+		s.cycle.cost += rl.Cost
+	}
+	global := err
+	if isPartial(err) {
+		global = nil
+	}
+	s.noteResult(ctx, global, rl)
 	return data, err
 }
 
@@ -519,10 +587,7 @@ func (s *Store) noteResult(ctx context.Context, err error, rl *rateLimitJSON) {
 	case err == nil:
 		s.mu.Lock()
 		if s.authBad { // an on-demand request succeeded while polling was paused
-			s.viewerNext = now
-			for _, sc := range s.tracked {
-				sc.next = now
-			}
+			s.pollNext = now
 		}
 		s.authBad, s.authFailures, s.globalFailures = false, 0, 0
 		if rl != nil {

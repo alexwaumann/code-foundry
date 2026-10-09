@@ -3,6 +3,9 @@ import {
   CheckConclusion,
   CheckRollupState,
   GhService,
+  Mergeable,
+  MergeStateStatus,
+  PullRequestReviewState,
   PullRequestState,
   ReviewDecision,
   type ActivityStats,
@@ -14,7 +17,7 @@ import {
 } from "@/gen/codefoundry/v1/gh_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 
-// View models for GhService's Phase 3a RPCs. Generated types stay in src/api.
+// View models for GhService's reads. Generated types stay in src/api.
 
 export type RollupStateView = "none" | "pending" | "success" | "failure" | "error" | "expected";
 export type ReviewView = "approved" | "changes_requested" | "review_required" | null;
@@ -36,6 +39,15 @@ export interface CheckRunView {
   conclusion: string; // lower case GitHub conclusion, "" while running
 }
 
+export type MergeableView = "mergeable" | "conflicting" | "unknown" | null;
+
+export interface ReviewEntryView {
+  author: string;
+  /** Lower case GitHub review state ("approved", "changes_requested", ...); "" if unknown. */
+  state: string;
+  submittedAtMs: number | null;
+}
+
 export interface PullRequestView {
   repoSlug: string;
   number: number;
@@ -51,6 +63,22 @@ export interface PullRequestView {
   createdAtMs: number | null;
   updatedAtMs: number | null;
   mergedAtMs: number | null;
+  // Detail the poll keeps for every PR in the viewer's scope (open PRs only for the
+  // review and merge fields). Not shown yet; available to views.
+  mergeable: MergeableView;
+  /** Lower case GitHub merge state ("clean", "blocked", "behind", ...); "" if unknown. */
+  mergeState: string;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  comments: number;
+  reviews: number;
+  latestReviews: ReviewEntryView[];
+  /** Pending review requests: logins and "org/team". */
+  reviewRequests: string[];
+  isCrossRepository: boolean;
+  /** Only the poll's fingerprint is known yet (title and details empty). */
+  partial: boolean;
 }
 
 export interface MonthView {
@@ -79,7 +107,11 @@ export interface DashboardView {
   authenticated: boolean;
   authored: PullRequestView[];
   reviewRequested: PullRequestView[];
+  /** Open PRs the viewer reviewed and did not author (not shown yet). */
+  reviewed: PullRequestView[];
   recentlyMerged: PullRequestView[];
+  /** github.dashboards_enabled is off: the lists are empty and not polled. */
+  dashboardsDisabled: boolean;
   stats: StatsView;
   fetchedAtMs: number | null;
   lastError: string;
@@ -94,6 +126,7 @@ export interface DefaultBranchView {
   rollup: CheckRollupView;
   failing: CheckRunView[];
   fetchedAtMs: number | null;
+  lastError: string;
 }
 
 export interface RepoActivityView {
@@ -110,9 +143,12 @@ export interface BranchPullRequestsView {
   lastError: string;
 }
 
-/** GhService change notification (re-read the cached data). */
+/**
+ * GhService notification: re-read the cached data, except "polled", which carries the
+ * last poll's time and error itself (sent after every poll; the others only on change).
+ */
 export type GhEventView =
-  | { kind: "pullRequests"; repoSlug: string }
+  | { kind: "polled"; fetchedAtMs: number | null; lastError: string }
   | { kind: "viewer" }
   | { kind: "dashboard" }
   | { kind: "repoActivity"; repoSlug: string }
@@ -135,6 +171,18 @@ const reviews: Record<ReviewDecision, ReviewView> = {
   [ReviewDecision.CHANGES_REQUESTED]: "changes_requested",
   [ReviewDecision.REVIEW_REQUIRED]: "review_required",
 };
+
+const mergeables: Record<Mergeable, MergeableView> = {
+  [Mergeable.UNSPECIFIED]: null,
+  [Mergeable.MERGEABLE]: "mergeable",
+  [Mergeable.CONFLICTING]: "conflicting",
+  [Mergeable.UNKNOWN]: "unknown",
+};
+
+/** Lower-cased enum name without its prefix; "" for UNSPECIFIED. */
+function enumName(names: Record<number, string>, v: number): string {
+  return v === 0 ? "" : (names[v] ?? "").toLowerCase();
+}
 
 const prStates: Record<PullRequestState, PrStateView> = {
   [PullRequestState.UNSPECIFIED]: "unknown",
@@ -175,6 +223,17 @@ export function toPullRequestView(p: PullRequest): PullRequestView {
     createdAtMs: ms(p.createdAt),
     updatedAtMs: ms(p.updatedAt),
     mergedAtMs: ms(p.mergedAt),
+    mergeable: mergeables[p.mergeable],
+    mergeState: enumName(MergeStateStatus, p.mergeStateStatus),
+    additions: p.additions,
+    deletions: p.deletions,
+    changedFiles: p.changedFiles,
+    comments: p.commentCount,
+    reviews: p.reviewCount,
+    latestReviews: p.latestReviews.map((r) => ({ author: r.author, state: enumName(PullRequestReviewState, r.state), submittedAtMs: ms(r.submittedAt) })),
+    reviewRequests: p.reviewRequests,
+    isCrossRepository: p.isCrossRepository,
+    partial: p.partial,
   };
 }
 
@@ -195,8 +254,8 @@ export function toStatsView(s: ActivityStats | undefined): StatsView {
 export function toGhEventView(e: GhEvent): GhEventView | null {
   const g = e.event;
   switch (g.case) {
-    case "pullRequestsUpdated":
-      return { kind: "pullRequests", repoSlug: g.value.repoSlug };
+    case "polled":
+      return { kind: "polled", fetchedAtMs: ms(g.value.fetchedAt), lastError: g.value.lastError };
     case "viewerUpdated":
       return { kind: "viewer" };
     case "dashboardUpdated":
@@ -218,7 +277,9 @@ export async function getDashboard(includeUntracked = false, conn: DaemonConnect
     authenticated: r.authenticated,
     authored: r.authored.map(toPullRequestView),
     reviewRequested: r.reviewRequested.map(toPullRequestView),
+    reviewed: r.reviewed.map(toPullRequestView),
     recentlyMerged: r.recentlyMerged.map(toPullRequestView),
+    dashboardsDisabled: r.dashboardsDisabled,
     stats: toStatsView(r.stats),
     fetchedAtMs: ms(r.fetchedAt),
     lastError: r.lastError,
@@ -243,6 +304,7 @@ export async function getRepoActivity(repoSlug: string, conn: DaemonConnection =
           rollup: toRollupView(d.rollup),
           failing: d.failing.map(toCheckRunView),
           fetchedAtMs: ms(d.fetchedAt),
+          lastError: d.lastError,
         }
       : null,
     recentlyMerged: r.recentlyMerged.map(toPullRequestView),

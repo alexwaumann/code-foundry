@@ -301,7 +301,8 @@ func (r *HTTPRunner) send(ctx context.Context, method, u string, body []byte, to
 
 // parseGraphQLResponse turns a /graphql response into data or a classified error. A
 // body with GraphQL errors is classified by them even alongside data (GitHub answers
-// NOT_FOUND and RATE_LIMITED with HTTP 200); non-2xx without an errors array is
+// NOT_FOUND and RATE_LIMITED with HTTP 200); with data as well (and not rate limited)
+// the data comes back with a *PartialError. Non-2xx without an errors array is
 // classified by status.
 func parseGraphQLResponse(res httpResult) (json.RawMessage, error) {
 	var resp graphQLResponse
@@ -311,6 +312,10 @@ func parseGraphQLResponse(res httpResult) (json.RawMessage, error) {
 		var rle *RateLimitError
 		if errors.As(err, &rle) {
 			applyRateLimitHeaders(rle, res.header)
+			return nil, err
+		}
+		if res.ok() && len(resp.Data) > 0 && string(resp.Data) != "null" {
+			return resp.Data, &PartialError{Errors: resp.Errors}
 		}
 		return nil, err
 	}

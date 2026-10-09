@@ -105,9 +105,16 @@ test.describe("Pull Requests page", () => {
     await expect(prRows(page, "authored")).toHaveCount(4);
     await expect(prRows(page, "authored").first()).toContainText("#150");
     expect((await ghCalls()).GetDashboard ?? 0).toBeGreaterThan(before);
+    // A failed poll arrives as a polled event only: no re-read, the header turns red.
+    const reads = (await ghCalls()).GetDashboard ?? 0;
     await mockPost("gh/stale");
     await expect(page.getByTestId("prs-updated")).toHaveAttribute("data-freshness", "error");
     await expect(page.getByTestId("prs-updated")).toContainText("updated 10m ago");
+    // A poll that changed nothing freshens the header, still without a re-read.
+    await mockPost("gh/poll");
+    await expect(page.getByTestId("prs-updated")).toHaveAttribute("data-freshness", "fresh");
+    await expect(page.getByTestId("prs-updated")).toContainText(/updated \d+s ago/);
+    expect((await ghCalls()).GetDashboard ?? 0).toBe(reads);
   });
 });
 

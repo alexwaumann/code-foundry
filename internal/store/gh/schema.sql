@@ -10,14 +10,6 @@ CREATE TABLE IF NOT EXISTS gh_viewer (
   payload    TEXT    NOT NULL
 );
 
--- Open pull requests per repository (the polled list).
-CREATE TABLE IF NOT EXISTS gh_pull_requests (
-  slug        TEXT    PRIMARY KEY,
-  fetched_at  INTEGER NOT NULL,
-  total_count INTEGER NOT NULL,
-  payload     TEXT    NOT NULL
-);
-
 -- One pull request with its checks (fetched on demand).
 CREATE TABLE IF NOT EXISTS gh_pull_request_details (
   slug       TEXT    NOT NULL,
@@ -39,9 +31,10 @@ CREATE TABLE IF NOT EXISTS gh_ref_checks (
 CREATE INDEX IF NOT EXISTS gh_pull_request_details_fetched_at ON gh_pull_request_details (fetched_at);
 CREATE INDEX IF NOT EXISTS gh_ref_checks_fetched_at ON gh_ref_checks (fetched_at);
 
--- Phase 3a activity (activity_cache.go): the viewer dashboards ("dashboard"), global
+-- The polled state (activity_cache.go): the viewer dashboards ("dashboard"), global
 -- monthly stats ("stats"), per-repository stats ("repo_stats:<slug>") and default-branch
--- CI ("default_branch:<slug>"), and per-branch pull requests ("branch:<slug>:<head>").
+-- CI ("default_branch:<slug>"), per-branch pull requests ("branch:<slug>:<head>"), and
+-- the last successful poll ("poll").
 CREATE TABLE IF NOT EXISTS gh_activity (
   key        TEXT    PRIMARY KEY,
   fetched_at INTEGER NOT NULL,

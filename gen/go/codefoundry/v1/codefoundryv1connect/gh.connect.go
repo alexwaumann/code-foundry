@@ -35,9 +35,6 @@ const (
 const (
 	// GhServiceGetViewerProcedure is the fully-qualified name of the GhService's GetViewer RPC.
 	GhServiceGetViewerProcedure = "/codefoundry.v1.GhService/GetViewer"
-	// GhServiceListPullRequestsProcedure is the fully-qualified name of the GhService's
-	// ListPullRequests RPC.
-	GhServiceListPullRequestsProcedure = "/codefoundry.v1.GhService/ListPullRequests"
 	// GhServiceGetPullRequestProcedure is the fully-qualified name of the GhService's GetPullRequest
 	// RPC.
 	GhServiceGetPullRequestProcedure = "/codefoundry.v1.GhService/GetPullRequest"
@@ -65,41 +62,37 @@ const (
 type GhServiceClient interface {
 	// GetViewer returns the authenticated GitHub user.
 	GetViewer(context.Context, *connect.Request[v1.GetViewerRequest]) (*connect.Response[v1.GetViewerResponse], error)
-	// ListPullRequests returns the cached open pull requests of a repository, most recently
-	// updated first, each with a rollup of its head commit's checks. It never blocks on
-	// GitHub; use Refresh to force a fetch. An untracked, never-fetched repository returns
-	// an empty list with fetched_at unset.
-	ListPullRequests(context.Context, *connect.Request[v1.ListPullRequestsRequest]) (*connect.Response[v1.ListPullRequestsResponse], error)
 	// GetPullRequest returns one pull request with the full list of its head commit's
-	// checks. Served from cache when fresh (30s), otherwise fetched through the paced
-	// queue; on fetch failure the stale cached copy is returned with last_error set.
+	// checks. On demand only (nothing polls it): served from cache when fresh (30s),
+	// otherwise fetched through the paced queue; on fetch failure the stale cached copy
+	// is returned with last_error set.
 	GetPullRequest(context.Context, *connect.Request[v1.GetPullRequestRequest]) (*connect.Response[v1.GetPullRequestResponse], error)
 	// ListChecks returns the checks for a ref (branch name, tag, or commit SHA). Same
 	// caching rules as GetPullRequest.
 	ListChecks(context.Context, *connect.Request[v1.ListChecksRequest]) (*connect.Response[v1.ListChecksResponse], error)
-	// Refresh fetches a repository's pull requests now (through the paced queue) and
-	// returns when the fetch has completed. An empty repo_slug marks every tracked
-	// repository and the viewer due immediately and returns without waiting.
+	// Refresh polls now. With a repo_slug it returns when that poll has completed (with
+	// its error); an empty repo_slug only marks the poll due and returns without waiting.
 	Refresh(context.Context, *connect.Request[v1.RefreshGhRequest]) (*connect.Response[v1.RefreshGhResponse], error)
-	// Track adds a repository to the polling loop. RepoService calls this for every
-	// registered repository with a GitHub remote; it is exposed for the CLI and debugging.
+	// Track adds a repository to the poll (its default branch CI; the dashboards count
+	// its pull requests as tracked). RepoService's repositories with a GitHub remote are
+	// tracked automatically; this is exposed for the CLI and debugging.
 	Track(context.Context, *connect.Request[v1.TrackGhRepoRequest]) (*connect.Response[v1.TrackGhRepoResponse], error)
-	// Untrack removes a repository from the polling loop. Its cache is kept.
+	// Untrack removes a repository from the poll. Its cache is kept.
 	Untrack(context.Context, *connect.Request[v1.UntrackGhRepoRequest]) (*connect.Response[v1.UntrackGhRepoResponse], error)
-	// Watch streams change notifications. Clients re-read with the List/Get RPCs.
+	// Watch streams change notifications. Clients re-read with the Get RPCs.
 	Watch(context.Context, *connect.Request[v1.WatchGhRequest]) (*connect.ServerStreamForClient[v1.GhEvent], error)
 	// GetDashboard returns the viewer's pull request dashboards (open PRs they authored,
-	// PRs awaiting their review, PRs merged in the last 7 days involving them) and their
-	// monthly stats across GitHub. Served from the last poll (every 2 minutes; stats
-	// every 15). The lists hold only tracked repositories unless include_untracked.
+	// PRs awaiting their review, open PRs they reviewed, PRs merged in the last 7 days
+	// involving them) and their monthly stats across GitHub, from the last poll. The
+	// lists hold only tracked repositories unless include_untracked.
 	GetDashboard(context.Context, *connect.Request[v1.GetDashboardRequest]) (*connect.Response[v1.GetDashboardResponse], error)
 	// GetRepoActivity returns the viewer's monthly stats in one repository, its default
 	// branch's CI, and the dashboard's recently merged PRs in it. Served from cache.
 	GetRepoActivity(context.Context, *connect.Request[v1.GetRepoActivityRequest]) (*connect.Response[v1.GetRepoActivityResponse], error)
 	// GetBranchPullRequests returns the viewer's pull requests (any state) whose head is
-	// head_ref in the repository itself, from cache, and keeps that branch polled (with
-	// the PR list cadence) for 10 minutes after the last call. A first call returns an
-	// empty list with fetched_at unset; a branch_pull_requests_updated event follows.
+	// head_ref in the repository itself, from cache, and keeps that branch in the poll
+	// for 10 minutes after the last call. A first call returns an empty list with
+	// fetched_at unset; a branch_pull_requests_updated event follows the next poll.
 	GetBranchPullRequests(context.Context, *connect.Request[v1.GetBranchPullRequestsRequest]) (*connect.Response[v1.GetBranchPullRequestsResponse], error)
 }
 
@@ -118,12 +111,6 @@ func NewGhServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			httpClient,
 			baseURL+GhServiceGetViewerProcedure,
 			connect.WithSchema(ghServiceMethods.ByName("GetViewer")),
-			connect.WithClientOptions(opts...),
-		),
-		listPullRequests: connect.NewClient[v1.ListPullRequestsRequest, v1.ListPullRequestsResponse](
-			httpClient,
-			baseURL+GhServiceListPullRequestsProcedure,
-			connect.WithSchema(ghServiceMethods.ByName("ListPullRequests")),
 			connect.WithClientOptions(opts...),
 		),
 		getPullRequest: connect.NewClient[v1.GetPullRequestRequest, v1.GetPullRequestResponse](
@@ -186,7 +173,6 @@ func NewGhServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 // ghServiceClient implements GhServiceClient.
 type ghServiceClient struct {
 	getViewer             *connect.Client[v1.GetViewerRequest, v1.GetViewerResponse]
-	listPullRequests      *connect.Client[v1.ListPullRequestsRequest, v1.ListPullRequestsResponse]
 	getPullRequest        *connect.Client[v1.GetPullRequestRequest, v1.GetPullRequestResponse]
 	listChecks            *connect.Client[v1.ListChecksRequest, v1.ListChecksResponse]
 	refresh               *connect.Client[v1.RefreshGhRequest, v1.RefreshGhResponse]
@@ -201,11 +187,6 @@ type ghServiceClient struct {
 // GetViewer calls codefoundry.v1.GhService.GetViewer.
 func (c *ghServiceClient) GetViewer(ctx context.Context, req *connect.Request[v1.GetViewerRequest]) (*connect.Response[v1.GetViewerResponse], error) {
 	return c.getViewer.CallUnary(ctx, req)
-}
-
-// ListPullRequests calls codefoundry.v1.GhService.ListPullRequests.
-func (c *ghServiceClient) ListPullRequests(ctx context.Context, req *connect.Request[v1.ListPullRequestsRequest]) (*connect.Response[v1.ListPullRequestsResponse], error) {
-	return c.listPullRequests.CallUnary(ctx, req)
 }
 
 // GetPullRequest calls codefoundry.v1.GhService.GetPullRequest.
@@ -257,41 +238,37 @@ func (c *ghServiceClient) GetBranchPullRequests(ctx context.Context, req *connec
 type GhServiceHandler interface {
 	// GetViewer returns the authenticated GitHub user.
 	GetViewer(context.Context, *connect.Request[v1.GetViewerRequest]) (*connect.Response[v1.GetViewerResponse], error)
-	// ListPullRequests returns the cached open pull requests of a repository, most recently
-	// updated first, each with a rollup of its head commit's checks. It never blocks on
-	// GitHub; use Refresh to force a fetch. An untracked, never-fetched repository returns
-	// an empty list with fetched_at unset.
-	ListPullRequests(context.Context, *connect.Request[v1.ListPullRequestsRequest]) (*connect.Response[v1.ListPullRequestsResponse], error)
 	// GetPullRequest returns one pull request with the full list of its head commit's
-	// checks. Served from cache when fresh (30s), otherwise fetched through the paced
-	// queue; on fetch failure the stale cached copy is returned with last_error set.
+	// checks. On demand only (nothing polls it): served from cache when fresh (30s),
+	// otherwise fetched through the paced queue; on fetch failure the stale cached copy
+	// is returned with last_error set.
 	GetPullRequest(context.Context, *connect.Request[v1.GetPullRequestRequest]) (*connect.Response[v1.GetPullRequestResponse], error)
 	// ListChecks returns the checks for a ref (branch name, tag, or commit SHA). Same
 	// caching rules as GetPullRequest.
 	ListChecks(context.Context, *connect.Request[v1.ListChecksRequest]) (*connect.Response[v1.ListChecksResponse], error)
-	// Refresh fetches a repository's pull requests now (through the paced queue) and
-	// returns when the fetch has completed. An empty repo_slug marks every tracked
-	// repository and the viewer due immediately and returns without waiting.
+	// Refresh polls now. With a repo_slug it returns when that poll has completed (with
+	// its error); an empty repo_slug only marks the poll due and returns without waiting.
 	Refresh(context.Context, *connect.Request[v1.RefreshGhRequest]) (*connect.Response[v1.RefreshGhResponse], error)
-	// Track adds a repository to the polling loop. RepoService calls this for every
-	// registered repository with a GitHub remote; it is exposed for the CLI and debugging.
+	// Track adds a repository to the poll (its default branch CI; the dashboards count
+	// its pull requests as tracked). RepoService's repositories with a GitHub remote are
+	// tracked automatically; this is exposed for the CLI and debugging.
 	Track(context.Context, *connect.Request[v1.TrackGhRepoRequest]) (*connect.Response[v1.TrackGhRepoResponse], error)
-	// Untrack removes a repository from the polling loop. Its cache is kept.
+	// Untrack removes a repository from the poll. Its cache is kept.
 	Untrack(context.Context, *connect.Request[v1.UntrackGhRepoRequest]) (*connect.Response[v1.UntrackGhRepoResponse], error)
-	// Watch streams change notifications. Clients re-read with the List/Get RPCs.
+	// Watch streams change notifications. Clients re-read with the Get RPCs.
 	Watch(context.Context, *connect.Request[v1.WatchGhRequest], *connect.ServerStream[v1.GhEvent]) error
 	// GetDashboard returns the viewer's pull request dashboards (open PRs they authored,
-	// PRs awaiting their review, PRs merged in the last 7 days involving them) and their
-	// monthly stats across GitHub. Served from the last poll (every 2 minutes; stats
-	// every 15). The lists hold only tracked repositories unless include_untracked.
+	// PRs awaiting their review, open PRs they reviewed, PRs merged in the last 7 days
+	// involving them) and their monthly stats across GitHub, from the last poll. The
+	// lists hold only tracked repositories unless include_untracked.
 	GetDashboard(context.Context, *connect.Request[v1.GetDashboardRequest]) (*connect.Response[v1.GetDashboardResponse], error)
 	// GetRepoActivity returns the viewer's monthly stats in one repository, its default
 	// branch's CI, and the dashboard's recently merged PRs in it. Served from cache.
 	GetRepoActivity(context.Context, *connect.Request[v1.GetRepoActivityRequest]) (*connect.Response[v1.GetRepoActivityResponse], error)
 	// GetBranchPullRequests returns the viewer's pull requests (any state) whose head is
-	// head_ref in the repository itself, from cache, and keeps that branch polled (with
-	// the PR list cadence) for 10 minutes after the last call. A first call returns an
-	// empty list with fetched_at unset; a branch_pull_requests_updated event follows.
+	// head_ref in the repository itself, from cache, and keeps that branch in the poll
+	// for 10 minutes after the last call. A first call returns an empty list with
+	// fetched_at unset; a branch_pull_requests_updated event follows the next poll.
 	GetBranchPullRequests(context.Context, *connect.Request[v1.GetBranchPullRequestsRequest]) (*connect.Response[v1.GetBranchPullRequestsResponse], error)
 }
 
@@ -306,12 +283,6 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 		GhServiceGetViewerProcedure,
 		svc.GetViewer,
 		connect.WithSchema(ghServiceMethods.ByName("GetViewer")),
-		connect.WithHandlerOptions(opts...),
-	)
-	ghServiceListPullRequestsHandler := connect.NewUnaryHandler(
-		GhServiceListPullRequestsProcedure,
-		svc.ListPullRequests,
-		connect.WithSchema(ghServiceMethods.ByName("ListPullRequests")),
 		connect.WithHandlerOptions(opts...),
 	)
 	ghServiceGetPullRequestHandler := connect.NewUnaryHandler(
@@ -372,8 +343,6 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 		switch r.URL.Path {
 		case GhServiceGetViewerProcedure:
 			ghServiceGetViewerHandler.ServeHTTP(w, r)
-		case GhServiceListPullRequestsProcedure:
-			ghServiceListPullRequestsHandler.ServeHTTP(w, r)
 		case GhServiceGetPullRequestProcedure:
 			ghServiceGetPullRequestHandler.ServeHTTP(w, r)
 		case GhServiceListChecksProcedure:
@@ -403,10 +372,6 @@ type UnimplementedGhServiceHandler struct{}
 
 func (UnimplementedGhServiceHandler) GetViewer(context.Context, *connect.Request[v1.GetViewerRequest]) (*connect.Response[v1.GetViewerResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.GetViewer is not implemented"))
-}
-
-func (UnimplementedGhServiceHandler) ListPullRequests(context.Context, *connect.Request[v1.ListPullRequestsRequest]) (*connect.Response[v1.ListPullRequestsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.ListPullRequests is not implemented"))
 }
 
 func (UnimplementedGhServiceHandler) GetPullRequest(context.Context, *connect.Request[v1.GetPullRequestRequest]) (*connect.Response[v1.GetPullRequestResponse], error) {

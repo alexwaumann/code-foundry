@@ -18,7 +18,7 @@ import (
 )
 
 // Settings consumers. Values the stores read only at start (intervals, scrollback,
-// close grace, executable paths, github.dashboards_enabled) are passed as store options in openStores; the
+// close grace, executable paths) are passed as store options in openStores; the
 // settings page marks them "applies after a daemon restart". Everything below applies
 // live:
 //
@@ -28,6 +28,8 @@ import (
 //   - auto-naming -> a Namer that checks the current value per session;
 //   - worktree directory -> repo.worktree.new's default path.
 //   - editor command -> gitops' Editor func (stores.go), read on every open.
+//   - github.poll_interval_seconds and github.dashboards_enabled -> the gh store's
+//     Config func (stores.go), read before every poll.
 
 // applySettings tells the settings store which commands exist (enabling keybinding
 // fields and validation) and keeps the registry and log level in sync with it. The

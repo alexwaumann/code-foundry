@@ -124,8 +124,8 @@ func describe(ev *v1.Event) string {
 			return "session.other"
 		}
 	case *v1.Event_Gh:
-		if p := e.Gh.GetPullRequestsUpdated(); p != nil {
-			return "gh.prs " + p.GetRepoSlug()
+		if p := e.Gh.GetPolled(); p != nil {
+			return "gh.polled " + p.GetLastError()
 		}
 		if e.Gh.GetDashboardUpdated() != nil {
 			return "gh.dashboard"
@@ -188,9 +188,10 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 		"terminal.updated " + t2.ID,
 		"session.snapshot(1)",
 		"gh.viewer",
+		"gh.polled ",
 		"gh.dashboard",
-		"gh.prs o/a",
-		"gh.prs o/b",
+		"gh.activity o/a",
+		"gh.activity o/b",
 		"gitops.snapshot(1)",
 		"settings.snapshot(1)",
 		"update.status UPDATE_STATE_IDLE",
@@ -221,6 +222,10 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	f.gh.SetViewer(gh.ViewerState{Authenticated: true})
 	if got := describe(s.next()); got != "gh.viewer" {
 		t.Fatalf("got %q, want gh.viewer", got)
+	}
+	f.gh.SetPoll(gh.PollState{FetchedAt: time.Now(), LastError: "boom"})
+	if got := describe(s.next()); got != "gh.polled boom" {
+		t.Fatalf("got %q, want gh.polled boom", got)
 	}
 	_, _ = f.gitops.Push(ctx, gitops.PushOptions{WorktreePath: "/code/a"})
 	for _, w := range []string{"gitops.started GIT_OP_KIND_PUSH", "gitops.finished GIT_OP_KIND_PUSH GIT_OP_STATE_SUCCEEDED"} {

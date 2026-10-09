@@ -67,12 +67,14 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 		return nil, err
 	}
 	// CODE_FOUNDRY_GH_SEARCH_AS is a development aid (see gh.Options.SearchAs).
+	// The github.* settings apply live: the store reads them before every poll.
 	ghOpts := gh.Options{
-		DB: s.db, Bus: s.bus, Log: log.With("store", "gh"), RepoInterval: cfg.GhPollInterval(),
+		DB: s.db, Bus: s.bus, Log: log.With("store", "gh"), PollInterval: cfg.GhPollInterval(),
 		SearchAs: os.Getenv("CODE_FOUNDRY_GH_SEARCH_AS"),
-	}
-	if !cfg.GitHub.DashboardsEnabled {
-		ghOpts.DashboardInterval = -1 // negative disables the dashboard poll
+		Config: func() gh.Config {
+			c := s.settings.Settings()
+			return gh.Config{PollInterval: c.GhPollInterval(), Dashboards: c.GitHub.DashboardsEnabled}
+		},
 	}
 	// GitHub is reached over HTTP with the token `gh auth token` prints.
 	ghOpts.Runner = gh.NewHTTPRunner(gh.HTTPOptions{

@@ -38,8 +38,8 @@ func TestMigrateIdempotent(t *testing.T) {
 	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name LIKE 'gh_%'`).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	if n != 5 {
-		t.Errorf("gh tables = %d, want 5", n)
+	if n != 4 {
+		t.Errorf("gh tables = %d, want 4", n)
 	}
 }
 
@@ -57,29 +57,21 @@ func TestCacheRoundTrip(t *testing.T) {
 	}
 
 	v := Viewer{Login: "octocat", Name: "The Octocat"}
-	prs := []PullRequest{{Number: 1, Title: "one", UpdatedAt: at, Checks: CheckRollup{State: RollupSuccess, Total: 2, Passed: 2}}}
+	prs := []PullRequest{{ID: "PR_1", Number: 1, Title: "one", UpdatedAt: at, Checks: CheckRollup{State: RollupSuccess, Total: 2, Passed: 2}}}
 	if err := c.saveViewer(ctx, v, at); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.savePullRequests(ctx, "o/r", prs, 7, at); err != nil {
-		t.Fatal(err)
-	}
 	// Upsert replaces.
-	prs[0].Title = "one (edited)"
-	if err := c.savePullRequests(ctx, "o/r", prs, 8, at.Add(time.Minute)); err != nil {
+	if err := c.saveViewer(ctx, Viewer{Login: "octocat", Name: "Mona"}, at.Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
+	v.Name = "Mona"
 	snap, err := c.loadSnapshot(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snap.Viewer.Viewer == nil || *snap.Viewer.Viewer != v || !snap.Viewer.FetchedAt.Equal(at) {
+	if snap.Viewer.Viewer == nil || *snap.Viewer.Viewer != v || !snap.Viewer.FetchedAt.Equal(at.Add(time.Minute)) {
 		t.Errorf("viewer = %+v", snap.Viewer)
-	}
-	r := snap.Repos["o/r"]
-	if r.Slug != "o/r" || r.TotalCount != 8 || len(r.PullRequests) != 1 || r.PullRequests[0].Title != "one (edited)" ||
-		!r.FetchedAt.Equal(at.Add(time.Minute)) || r.Tracked {
-		t.Errorf("repo = %+v", r)
 	}
 
 	d := PullRequestDetail{PullRequest: prs[0], Checks: []CheckRun{{Name: "ci", Status: StatusCompleted}}, FetchedAt: at}
@@ -112,23 +104,27 @@ func TestCacheRoundTrip(t *testing.T) {
 	if _, ok, _ := c.loadChecks(ctx, "o/r", "main"); ok {
 		t.Error("checks survived prune")
 	}
-	if snap, _ := c.loadSnapshot(ctx); len(snap.Repos) != 1 {
-		t.Error("prune dropped the PR list")
+	if snap, _ := c.loadSnapshot(ctx); snap.Viewer.Viewer == nil {
+		t.Error("prune dropped the viewer")
 	}
 }
 
 func TestCacheIgnoresOtherVersions(t *testing.T) {
 	ctx := context.Background()
 	db := openTestDB(t)
-	if _, err := db.Exec(`INSERT INTO gh_pull_requests (slug, fetched_at, total_count, payload)
-		VALUES ('o/old', 1, 1, '{"v":0,"data":[{"number":1}]}'), ('o/bad', 1, 1, 'not json')`); err != nil {
+	if _, err := db.Exec(`INSERT INTO gh_viewer (id, fetched_at, payload) VALUES (1, 1, '{"v":1,"data":{"login":"old"}}')`); err != nil {
 		t.Fatal(err)
 	}
-	snap, err := cache{db: db}.loadSnapshot(ctx)
+	if _, err := db.Exec(`INSERT INTO gh_activity (key, fetched_at, payload)
+		VALUES ('dashboard', 1, '{"v":1,"data":{"authored":[{"number":1}]}}'), ('default_branch:o/r', 1, 'not json')`); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(ctx, Options{DB: db, Runner: &fakeRunner{}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(snap.Repos) != 0 {
-		t.Errorf("repos = %+v, want stale rows ignored", snap.Repos)
+	snap := s.Snapshot()
+	if snap.Viewer.Viewer != nil || len(snap.Dashboard.Authored) != 0 || len(snap.Repos) != 0 {
+		t.Errorf("snapshot = %+v, want stale rows ignored", snap)
 	}
 }

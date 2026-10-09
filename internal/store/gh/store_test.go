@@ -16,7 +16,7 @@ import (
 // fakeRunner answers GraphQL by query operation name and records call timing.
 type fakeRunner struct {
 	mu          sync.Mutex
-	graphql     func(op string, vars map[string]any) (json.RawMessage, error)
+	graphql     func(op, doc string, vars map[string]any) (json.RawMessage, error)
 	auth        func() (AuthStatus, error)
 	delay       time.Duration
 	calls       []fakeCall
@@ -44,7 +44,7 @@ func (f *fakeRunner) GraphQL(ctx context.Context, q string, vars map[string]any)
 	if f.delay > 0 {
 		time.Sleep(f.delay)
 	}
-	data, err := h(op, vars)
+	data, err := h(op, q, vars)
 	f.mu.Lock()
 	f.inflight--
 	f.calls = append(f.calls, fakeCall{op: op, vars: vars, start: start, end: time.Now()})
@@ -63,10 +63,21 @@ func (f *fakeRunner) AuthStatus(context.Context) (AuthStatus, error) {
 	return h()
 }
 
+// set installs a handler that does not need the document.
 func (f *fakeRunner) set(h func(op string, vars map[string]any) (json.RawMessage, error)) {
+	f.setDoc(func(op, _ string, vars map[string]any) (json.RawMessage, error) { return h(op, vars) })
+}
+
+func (f *fakeRunner) setDoc(h func(op, doc string, vars map[string]any) (json.RawMessage, error)) {
 	f.mu.Lock()
 	f.graphql = h
 	f.mu.Unlock()
+}
+
+// serve answers from g.
+func (f *fakeRunner) serve(g *fakeGitHub) *fakeRunner {
+	f.setDoc(g.respond)
+	return f
 }
 
 func (f *fakeRunner) snapshot() (calls []fakeCall, authCalls int) {
@@ -86,51 +97,34 @@ func (f *fakeRunner) count(op string) int {
 	return n
 }
 
-// fixtureHandler serves the captured ghostty fixtures.
-func fixtureHandler(t *testing.T) func(op string, vars map[string]any) (json.RawMessage, error) {
-	viewer := fixtureData(t, "viewer.json")
-	prs1, prs2 := fixtureData(t, "pull_requests_page1.json"), fixtureData(t, "pull_requests_page2.json")
-	pr1, pr2 := fixtureData(t, "pull_request_14586_page1.json"), fixtureData(t, "pull_request_14586_page2.json")
-	checks := fixtureData(t, "checks_main.json")
-	unknownRef := fixtureData(t, "checks_unknown_ref.json")
-	return func(op string, vars map[string]any) (json.RawMessage, error) {
-		_, paged := vars["after"]
-		switch {
-		case op == "Viewer":
-			return viewer, nil
-		case op == "PullRequests" && !paged:
-			return prs1, nil
-		case op == "PullRequests":
-			return prs2, nil
-		case op == "PullRequest" && !paged:
-			return pr1, nil
-		case op == "PullRequest":
-			return pr2, nil
-		case op == "Checks" && vars["ref"] == "main":
-			return checks, nil
-		case op == "Checks":
-			return unknownRef, nil
-		}
-		return nil, fmt.Errorf("unexpected op %s", op)
+// opsSince lists the operations called since call index from.
+func (f *fakeRunner) opsSince(from int) []string {
+	calls, _ := f.snapshot()
+	var out []string
+	for _, c := range calls[min(from, len(calls)):] {
+		out = append(out, c.op)
 	}
+	return out
+}
+
+func (f *fakeRunner) ncalls() int {
+	calls, _ := f.snapshot()
+	return len(calls)
 }
 
 func testOptions(db DB, r Runner, b *bus.Bus) Options {
 	return Options{
 		DB: db, Runner: r, Bus: b,
 		MinGap:           20 * time.Millisecond,
-		RepoInterval:     time.Hour, // polls only happen when a test asks for them
-		ViewerInterval:   time.Hour,
+		PollInterval:     time.Hour, // polls only happen when a test asks for them
+		IdleInterval:     time.Hour,
 		AuthRetry:        30 * time.Millisecond,
 		NetworkBackoff:   30 * time.Millisecond,
 		SecondaryBackoff: 30 * time.Millisecond,
 		MaxBackoff:       time.Second,
-		PageSize:         25,
 		MaxPages:         2,
-		// Phase 3a polls are off here; activity_test.go turns them on.
-		DashboardInterval: -1,
-		StatsInterval:     -1,
-		Rand:              func() float64 { return 0.5 },
+		StatsInterval:    -1, // the stats test turns them on
+		Rand:             func() float64 { return 0.5 },
 	}
 }
 
@@ -164,91 +158,20 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	}
 }
 
-func TestStorePollsTracksAndServesCacheOnRestart(t *testing.T) {
-	db := openTestDB(t)
-	b := bus.New()
-	prEvents := bus.Subscribe[PullRequestsUpdated](b, 16)
-	viewerEvents := bus.Subscribe[ViewerUpdated](b, 16)
-	f := &fakeRunner{}
-	f.set(fixtureHandler(t))
-	s := startStore(t, testOptions(db, f, b))
-
-	if err := s.Track("Ghostty-Org/Ghostty"); err != nil {
-		t.Fatal(err)
-	}
-	if r, ok := s.Snapshot().Repo("ghostty-org/ghostty"); !ok || !r.Tracked || !r.FetchedAt.IsZero() {
-		t.Fatalf("after Track: %+v ok=%v", r, ok)
-	}
-	if ev := <-prEvents.C(); ev.Slug != "ghostty-org/ghostty" || !ev.FetchedAt.IsZero() {
-		t.Errorf("track event = %+v", ev)
-	}
-	waitFor(t, "first poll", func() bool {
-		r, _ := s.Snapshot().Repo("ghostty-org/ghostty")
-		return !r.FetchedAt.IsZero()
-	})
-	if ev := <-prEvents.C(); ev.FetchedAt.IsZero() {
-		t.Errorf("poll event = %+v", ev)
-	}
-	r, _ := s.Snapshot().Repo("ghostty-org/ghostty")
-	if len(r.PullRequests) != 50 || r.TotalCount != 129 || r.LastError != "" {
-		t.Errorf("repo: %d PRs, total %d, err %q", len(r.PullRequests), r.TotalCount, r.LastError)
-	}
-	if r.PullRequests[0].Number != 13745 || r.PullRequests[25].Number != 13779 {
-		t.Errorf("order: first %d, 26th %d", r.PullRequests[0].Number, r.PullRequests[25].Number)
-	}
-	calls, _ := f.snapshot()
-	for _, c := range calls {
-		if c.op == "PullRequests" && (c.vars["owner"] != "ghostty-org" || c.vars["name"] != "ghostty" || c.vars["first"] != 25) {
-			t.Errorf("vars = %v", c.vars)
-		}
-	}
-	waitFor(t, "viewer", func() bool { return s.Snapshot().Viewer.Viewer != nil })
-	<-viewerEvents.C()
-	if v := s.Snapshot().Viewer; v.Viewer.Login != "octocat" || !v.Authenticated || v.FetchedAt.IsZero() {
-		t.Errorf("viewer = %+v", v)
-	}
-
-	// A second store on the same DB serves the cache before any request.
-	f2 := &fakeRunner{}
-	f2.set(func(string, map[string]any) (json.RawMessage, error) { return nil, errors.New("offline") })
-	s2, err := New(context.Background(), testOptions(db, f2, nil))
-	if err != nil {
-		t.Fatal(err)
-	}
-	r2, ok := s2.Snapshot().Repo("ghostty-org/ghostty")
-	// The cache keeps millisecond precision.
-	if !ok || len(r2.PullRequests) != 50 || r2.Tracked || !r2.FetchedAt.Equal(r.FetchedAt.Truncate(time.Millisecond)) {
-		t.Errorf("cached repo = %d PRs tracked=%v fetched=%v", len(r2.PullRequests), r2.Tracked, r2.FetchedAt)
-	}
-	if v := s2.Snapshot().Viewer.Viewer; v == nil || v.Login != "octocat" {
-		t.Errorf("cached viewer = %+v", v)
-	}
-	// Tracking a freshly cached repo waits for the cache to expire.
-	if err := s2.Track("ghostty-org/ghostty"); err != nil {
-		t.Fatal(err)
-	}
-	s2.mu.Lock()
-	next := s2.tracked["ghostty-org/ghostty"].next
-	s2.mu.Unlock()
-	if want := r2.FetchedAt.Add(time.Hour); !next.Equal(want) {
-		t.Errorf("first poll at %v, want %v", next, want)
-	}
-}
-
 func TestStorePacing(t *testing.T) {
-	f := &fakeRunner{delay: 5 * time.Millisecond}
-	f.set(fixtureHandler(t))
+	g := newFakeGitHub()
+	f := (&fakeRunner{delay: 5 * time.Millisecond}).serve(g)
 	opts := testOptions(openTestDB(t), f, nil)
 	opts.MinGap = 40 * time.Millisecond
-	opts.RepoInterval = 10 * time.Millisecond // always due: the gap is the only limit
-	opts.MaxPages = 1
+	opts.PollInterval = 10 * time.Millisecond // always due: the gap is the only limit
 	s := startStore(t, opts)
 	for _, slug := range []string{"a/one", "a/two", "a/three"} {
+		g.setRepo(slug, &fakeRepo{branch: "main", sha: "s1"})
 		if err := s.Track(slug); err != nil {
 			t.Fatal(err)
 		}
 	}
-	waitFor(t, "8 requests", func() bool { c, _ := f.snapshot(); return len(c) >= 8 })
+	waitFor(t, "6 requests", func() bool { return f.ncalls() >= 6 })
 	calls, _ := f.snapshot()
 	for i := 1; i < len(calls); i++ {
 		if gap := calls[i].start.Sub(calls[i-1].end); gap < opts.MinGap {
@@ -258,22 +181,20 @@ func TestStorePacing(t *testing.T) {
 	if f.maxInflight != 1 {
 		t.Errorf("max in flight = %d, want 1", f.maxInflight)
 	}
-	seen := map[string]bool{}
-	for _, c := range calls {
-		if c.op == "PullRequests" {
-			seen[c.vars["name"].(string)] = true
-		}
-	}
-	if len(seen) != 3 {
-		t.Errorf("polled repos = %v, want all three", seen)
+	// One request per poll covers every repository.
+	last := calls[len(calls)-1]
+	if last.op != "Poll" || last.vars["r0n"] != "one" || last.vars["r1n"] != "three" || last.vars["r2n"] != "two" {
+		t.Errorf("last request = %s %v, want a poll of all three repositories", last.op, last.vars)
 	}
 }
 
 func TestStoreAuthPauseAndRecovery(t *testing.T) {
 	b := bus.New()
 	viewerEvents := bus.Subscribe[ViewerUpdated](b, 16)
+	g := newFakeGitHub()
+	g.setRepo("a/b", &fakeRepo{branch: "main", sha: "s1"})
 	f := &fakeRunner{}
-	notAuthed := fmt.Errorf("%w: To get started with GitHub CLI, please run:  gh auth login", ErrNotAuthenticated)
+	notAuthed := fmt.Errorf("%w: Bad credentials (HTTP 401)", ErrNotAuthenticated)
 	f.set(func(string, map[string]any) (json.RawMessage, error) { return nil, notAuthed })
 	var loggedIn sync.Mutex
 	authOK := false
@@ -293,27 +214,28 @@ func TestStoreAuthPauseAndRecovery(t *testing.T) {
 		t.Errorf("viewer = %+v, want an error", v)
 	}
 	waitFor(t, "auth checks", func() bool { _, n := f.snapshot(); return n >= 2 })
-	if n := len(func() []fakeCall { c, _ := f.snapshot(); return c }()); n != 1 {
+	if n := f.ncalls(); n != 1 {
 		t.Errorf("GraphQL calls while unauthenticated = %d, want 1 (only auth checks after)", n)
 	}
 
-	f.set(fixtureHandler(t))
+	f.serve(g)
 	loggedIn.Lock()
 	authOK = true
 	loggedIn.Unlock()
 	waitFor(t, "recovery", func() bool {
-		v := s.Snapshot().Viewer
-		r, _ := s.Snapshot().Repo("a/b")
-		return v.Authenticated && v.Viewer != nil && v.LastError == "" && !r.FetchedAt.IsZero()
+		snap := s.Snapshot()
+		v := snap.Viewer
+		return v.Authenticated && v.Viewer != nil && v.LastError == "" && !snap.Repos["a/b"].Activity.DefaultBranch.FetchedAt.IsZero()
 	})
 }
 
 func TestStoreRateLimitBudgetPauses(t *testing.T) {
+	g := newFakeGitHub()
 	f := &fakeRunner{}
 	reset := time.Now().Add(time.Hour).UTC().Truncate(time.Second)
 	f.set(func(op string, _ map[string]any) (json.RawMessage, error) {
 		return json.RawMessage(fmt.Sprintf(`{"rateLimit":{"limit":5000,"cost":1,"remaining":10,"resetAt":%q},
-			"viewer":{"login":"octocat"}}`, reset.Format(time.RFC3339))), nil
+			"viewer":{"id":"V","login":"octocat"}}`, reset.Format(time.RFC3339))), nil
 	})
 	s := startStore(t, testOptions(openTestDB(t), f, nil))
 	waitFor(t, "viewer", func() bool { return s.Snapshot().Viewer.Viewer != nil })
@@ -324,6 +246,7 @@ func TestStoreRateLimitBudgetPauses(t *testing.T) {
 		t.Errorf("pauseUntil = %v, want %v", until, reset.Add(rateLimitSlack))
 	}
 	// Scheduled work waits; on-demand work fails fast instead of queueing for an hour.
+	f.serve(g)
 	if err := s.Track("a/b"); err != nil {
 		t.Fatal(err)
 	}
@@ -332,8 +255,8 @@ func TestStoreRateLimitBudgetPauses(t *testing.T) {
 		t.Errorf("Refresh err = %v, want ErrRateLimited", err)
 	}
 	time.Sleep(100 * time.Millisecond)
-	if n := f.count("PullRequests"); n != 0 {
-		t.Errorf("PullRequests calls during pause = %d", n)
+	if n := f.ncalls(); n != 1 {
+		t.Errorf("requests during the pause = %d, want none", n-1)
 	}
 }
 
@@ -358,93 +281,50 @@ func TestStoreSecondaryLimitHonorsRetryAfter(t *testing.T) {
 	if !errors.Is(s.Refresh(context.Background(), "a/b"), ErrRateLimited) {
 		t.Error("Refresh during the pause should fail fast with ErrRateLimited")
 	}
+	waitFor(t, "poll error recorded", func() bool { return s.Snapshot().Poll.LastError != "" })
+	if p := s.Snapshot().Poll; !p.FetchedAt.IsZero() {
+		t.Errorf("poll state = %+v, want no success yet", p)
+	}
 }
 
-func TestStoreRepoErrorBackoff(t *testing.T) {
+func TestStorePollErrorBackoff(t *testing.T) {
 	b := bus.New()
-	events := bus.Subscribe[PullRequestsUpdated](b, 16)
+	polled := bus.Subscribe[Polled](b, 16)
 	f := &fakeRunner{}
-	viewer := fixtureData(t, "viewer.json")
-	f.set(func(op string, _ map[string]any) (json.RawMessage, error) {
-		if op == "Viewer" {
-			return viewer, nil
-		}
-		return parseGraphQLResponse(httpResult{status: 200, body: fixture(t, "graphql_repo_not_found.json")})
+	f.set(func(string, map[string]any) (json.RawMessage, error) {
+		return nil, errors.New("github graphql: Something went wrong")
 	})
 	opts := testOptions(openTestDB(t), f, b)
-	opts.RepoInterval = 40 * time.Millisecond
+	opts.PollInterval = 40 * time.Millisecond
 	opts.MaxBackoff = 80 * time.Millisecond
 	s := startStore(t, opts)
-	if err := s.Track("ghostty-org/no-such-repo-cf1c"); err != nil {
-		t.Fatal(err)
-	}
-	<-events.C() // tracked
-	waitFor(t, "3 failed polls", func() bool { return f.count("PullRequests") >= 3 })
-	r, _ := s.Snapshot().Repo("ghostty-org/no-such-repo-cf1c")
-	if r.LastError == "" || !r.FetchedAt.IsZero() {
-		t.Errorf("repo = %+v", r)
-	}
-	// The error is announced once, not on every retry.
-	<-events.C()
-	select {
-	case ev := <-events.C():
-		t.Errorf("unexpected second event %+v", ev)
-	default:
-	}
+	waitFor(t, "3 failed polls", func() bool { return f.count("Poll") >= 3 })
 	calls, _ := f.snapshot()
-	var starts []time.Time
-	for _, c := range calls {
-		if c.op == "PullRequests" {
-			starts = append(starts, c.start)
-		}
-	}
-	// Retry n waits RepoInterval*2^(n-1) capped at MaxBackoff: 40ms, then 80ms.
-	if d := starts[2].Sub(starts[1]); d < 75*time.Millisecond {
+	// Retry n waits PollInterval*2^(n-1) capped at MaxBackoff: 40ms, then 80ms.
+	if d := calls[2].start.Sub(calls[1].start); d < 75*time.Millisecond {
 		t.Errorf("second retry after %v, want >= 80ms (backoff)", d)
 	}
-	// Viewer is unaffected by a repo error.
-	if s.Snapshot().Viewer.LastError != "" {
-		t.Errorf("viewer error = %q", s.Snapshot().Viewer.LastError)
+	ev := <-polled.C()
+	if ev.LastError == "" || !ev.FetchedAt.IsZero() {
+		t.Errorf("Polled = %+v, want the error", ev)
 	}
-}
-
-func TestStoreServerTimeoutShrinksPageSize(t *testing.T) {
-	f := &fakeRunner{}
-	page := fixtureData(t, "pull_requests_page2.json") // hasNextPage: true, MaxPages 1 stops
-	f.set(func(op string, vars map[string]any) (json.RawMessage, error) {
-		if op == "PullRequests" && vars["first"] == 25 {
-			return nil, fmt.Errorf("%w: HTTP 502", ErrServerTimeout)
-		}
-		if op == "PullRequests" {
-			return page, nil
-		}
-		return fixtureData(t, "viewer.json"), nil
-	})
-	opts := testOptions(openTestDB(t), f, nil)
-	opts.MaxPages = 1
-	s := startStore(t, opts)
-	if err := s.Track("a/b"); err != nil {
-		t.Fatal(err)
-	}
-	waitFor(t, "retry at smaller page", func() bool {
-		r, _ := s.Snapshot().Repo("a/b")
-		return !r.FetchedAt.IsZero()
-	})
-	var sizes []any
-	calls, _ := f.snapshot()
-	for _, c := range calls {
-		if c.op == "PullRequests" {
-			sizes = append(sizes, c.vars["first"])
-		}
-	}
-	if fmt.Sprint(sizes) != "[25 12]" {
-		t.Errorf("page sizes = %v, want [25 12]", sizes)
+	if d := s.Snapshot().Dashboard; d.LastError == "" {
+		t.Errorf("dashboard error not set: %+v", d)
 	}
 }
 
 func TestStorePullRequestDetail(t *testing.T) {
 	f := &fakeRunner{}
-	f.set(fixtureHandler(t))
+	p1, p2 := fixtureData(t, "pull_request_14586_page1.json"), fixtureData(t, "pull_request_14586_page2.json")
+	f.set(func(op string, vars map[string]any) (json.RawMessage, error) {
+		if op != "PullRequest" {
+			return nil, fmt.Errorf("unexpected %s", op)
+		}
+		if _, paged := vars["after"]; paged {
+			return p2, nil
+		}
+		return p1, nil
+	})
 	opts := testOptions(openTestDB(t), f, nil)
 	opts.MaxPages = 5
 	opts.DetailTTL = time.Hour
@@ -474,6 +354,10 @@ func TestStorePullRequestDetail(t *testing.T) {
 		defer s.mu.Unlock()
 		return len(s.queue) == 1 && len(s.queue[0].waiters) == 2
 	})
+	// Hold the poll off: only the on-demand job runs.
+	s.mu.Lock()
+	s.pollNext = time.Now().Add(time.Hour)
+	s.mu.Unlock()
 	runCtx, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
 	go func() { defer close(done); _ = s.Run(runCtx) }()
@@ -481,13 +365,10 @@ func TestStorePullRequestDetail(t *testing.T) {
 
 	d := <-results
 	<-results
-	if d.PullRequest.Number != 14586 || len(d.Checks) != 104 || d.PullRequest.Checks.Total != 104 ||
-		d.PullRequest.HeadRepoSlug != "kgni/ghostty" || d.LastError != "" {
-		t.Errorf("detail: pr %+v, %d checks", d.PullRequest, len(d.Checks))
-	}
-	// Sorted: no failures or pending, so passed (SUCCESS) come before skipped.
-	if d.Checks[0].Conclusion != ConclusionSuccess || d.Checks[103].Conclusion != "SKIPPED" {
-		t.Errorf("order: first %+v last %+v", d.Checks[0], d.Checks[103])
+	pr := d.PullRequest
+	if pr.Number != 14586 || len(d.Checks) != 105 || pr.Checks.Total != 105 || pr.HeadRepoSlug != "kgni/ghostty" ||
+		pr.State != PullRequestMerged || pr.Repo != "ghostty-org/ghostty" || pr.ID == "" || d.LastError != "" {
+		t.Errorf("detail: pr %+v, %d checks", pr, len(d.Checks))
 	}
 	if n := f.count("PullRequest"); n != 2 {
 		t.Errorf("PullRequest requests = %d, want 2 (two pages, one fetch)", n)
@@ -500,10 +381,10 @@ func TestStorePullRequestDetail(t *testing.T) {
 	// Past the TTL with GitHub failing: stale copy with the error.
 	advance(2 * time.Hour)
 	f.set(func(string, map[string]any) (json.RawMessage, error) {
-		return nil, errors.New("gh exited 1: boom")
+		return nil, errors.New("github graphql: boom")
 	})
 	stale, err := s.PullRequest(ctx, "ghostty-org/ghostty", 14586)
-	if err != nil || stale.LastError == "" || len(stale.Checks) != 104 {
+	if err != nil || stale.LastError == "" || len(stale.Checks) != 105 {
 		t.Errorf("stale read: err=%v lastError=%q checks=%d", err, stale.LastError, len(stale.Checks))
 	}
 	// No cache and failing: the error.
@@ -522,7 +403,17 @@ func TestStorePullRequestDetail(t *testing.T) {
 
 func TestStoreChecks(t *testing.T) {
 	f := &fakeRunner{}
-	f.set(fixtureHandler(t))
+	checks, unknown := fixtureData(t, "checks_main.json"), fixtureData(t, "checks_unknown_ref.json")
+	g := newFakeGitHub()
+	f.setDoc(func(op, doc string, vars map[string]any) (json.RawMessage, error) {
+		switch {
+		case op == "Checks" && vars["ref"] == "main":
+			return checks, nil
+		case op == "Checks":
+			return unknown, nil
+		}
+		return g.respond(op, doc, vars)
+	})
 	s := startStore(t, testOptions(openTestDB(t), f, nil))
 	ctx := context.Background()
 	rc, err := s.Checks(ctx, "ghostty-org/ghostty", "main")
@@ -540,36 +431,60 @@ func TestStoreChecks(t *testing.T) {
 	}
 }
 
-func TestStoreRefreshAndUntrack(t *testing.T) {
+func TestStoreTrackRefreshUntrack(t *testing.T) {
 	b := bus.New()
-	events := bus.Subscribe[PullRequestsUpdated](b, 16)
-	f := &fakeRunner{}
-	f.set(fixtureHandler(t))
-	opts := testOptions(openTestDB(t), f, b)
-	opts.MaxPages = 1
-	s := startStore(t, opts)
+	dash := bus.Subscribe[DashboardUpdated](b, 16)
+	act := bus.Subscribe[RepoActivityUpdated](b, 16)
+	g := newFakeGitHub()
+	g.setRepo("ghostty-org/ghostty", &fakeRepo{branch: "main", sha: "s1", rollup: CheckRollup{State: RollupSuccess, Total: 1, Passed: 1}})
+	f := (&fakeRunner{}).serve(g)
+	s := startStore(t, testOptions(openTestDB(t), f, b))
 	ctx := context.Background()
 
-	// Refresh of an untracked repo fetches synchronously and caches it untracked.
+	// With nothing tracked, the first poll fetches only the viewer.
+	waitFor(t, "idle poll", func() bool { return !s.Snapshot().Poll.FetchedAt.IsZero() })
+	if c, _ := f.snapshot(); len(c) != 1 || c[0].vars["q_authored"] != nil || c[0].vars["r0o"] != nil {
+		t.Errorf("idle poll = %+v", c)
+	}
+
+	// Tracking announces the tracked flag (dashboard filter and repo activity) and
+	// polls soon.
+	if err := s.Track("Ghostty-Org/Ghostty"); err != nil {
+		t.Fatal(err)
+	}
+	if ev := <-act.C(); ev.Slug != "ghostty-org/ghostty" {
+		t.Errorf("activity event %+v", ev)
+	}
+	<-dash.C()
+	waitFor(t, "default branch", func() bool {
+		return s.Snapshot().Repos["ghostty-org/ghostty"].Activity.DefaultBranch.SHA == "s1"
+	})
+	if r := s.Snapshot().Repos["ghostty-org/ghostty"]; !r.Tracked {
+		t.Errorf("repo = %+v", r)
+	}
+
+	// Refresh(slug) polls and waits.
+	before := f.count("Poll")
 	if err := s.Refresh(ctx, "ghostty-org/ghostty"); err != nil {
 		t.Fatal(err)
 	}
-	r, ok := s.Snapshot().Repo("ghostty-org/ghostty")
-	if !ok || r.Tracked || len(r.PullRequests) != 25 {
-		t.Errorf("after refresh: ok=%v %+v", ok, r)
+	if n := f.count("Poll"); n != before+1 {
+		t.Errorf("polls after Refresh = %d, want %d", n, before+1)
 	}
-	if ev := <-events.C(); ev.Slug != "ghostty-org/ghostty" {
-		t.Errorf("event %+v", ev)
+	if err := s.Refresh(ctx, "bad slug"); !errors.Is(err, ErrInvalidSlug) {
+		t.Errorf("Refresh(bad) = %v", err)
 	}
-
-	if err := s.Track("ghostty-org/ghostty"); err != nil {
+	// Refresh("") marks the poll due and returns immediately.
+	if err := s.Refresh(ctx, ""); err != nil {
 		t.Fatal(err)
 	}
+	waitFor(t, `poll after Refresh("")`, func() bool { return f.count("Poll") > before+1 })
+
 	if err := s.Untrack("ghostty-org/ghostty"); err != nil {
 		t.Fatal(err)
 	}
-	if r, _ := s.Snapshot().Repo("ghostty-org/ghostty"); r.Tracked || len(r.PullRequests) != 25 {
-		t.Errorf("after untrack: %+v", r)
+	if r := s.Snapshot().Repos["ghostty-org/ghostty"]; r.Tracked || r.Activity.DefaultBranch.SHA != "s1" {
+		t.Errorf("after untrack (cache kept): %+v", r)
 	}
 	if err := s.Untrack("never/tracked"); err != nil {
 		t.Errorf("untrack unknown: %v", err)
@@ -577,13 +492,4 @@ func TestStoreRefreshAndUntrack(t *testing.T) {
 	if err := s.Track("bad slug"); !errors.Is(err, ErrInvalidSlug) {
 		t.Errorf("track bad slug: %v", err)
 	}
-
-	// Refresh("") marks everything due and returns immediately. Wait out the first
-	// viewer poll: a Refresh("") while it is in flight is satisfied by it.
-	waitFor(t, "first viewer poll", func() bool { return !s.Snapshot().Viewer.FetchedAt.IsZero() })
-	before := f.count("Viewer")
-	if err := s.Refresh(ctx, ""); err != nil {
-		t.Fatal(err)
-	}
-	waitFor(t, "viewer refetch", func() bool { return f.count("Viewer") > before })
 }

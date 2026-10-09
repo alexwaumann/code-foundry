@@ -3,6 +3,7 @@ package gh
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,7 +12,9 @@ import (
 // Runner executes GitHub requests. HTTPRunner talks to api.github.com; tests use fakes.
 type Runner interface {
 	// GraphQL runs a query and returns the raw "data" object. GraphQL-level errors are
-	// returned as classified errors (ErrNotFound, *RateLimitError, ...).
+	// returned as classified errors (ErrNotFound, *RateLimitError, ...). When the
+	// response has data as well as errors (some fields failed, the rest resolved), it
+	// returns both: the data and a *PartialError.
 	GraphQL(ctx context.Context, query string, vars map[string]any) (json.RawMessage, error)
 	// AuthStatus re-resolves the token and reports whether GitHub accepts it. Used
 	// while the store is paused as not authenticated.
@@ -35,6 +38,56 @@ type graphQLResponse struct {
 type graphQLError struct {
 	Type    string `json:"type"`
 	Message string `json:"message"`
+	// Path is where in the response the error happened, e.g. ["r1"] for an aliased
+	// repository that does not exist.
+	Path []any `json:"path,omitempty"`
+}
+
+// PartialError is a GraphQL response with both data and errors: some fields failed
+// (an aliased repository that does not exist, say) and the rest resolved. Runner.GraphQL
+// returns it alongside the data. errors.Is classifies it like a plain GraphQL error
+// (ErrNotFound when any part was NOT_FOUND), so callers that ignore partial data keep
+// treating it as a failure.
+type PartialError struct {
+	Errors []graphQLError
+}
+
+func (e *PartialError) Error() string { return "partial result: " + e.Unwrap().Error() }
+
+// Unwrap returns the classified error of all parts.
+func (e *PartialError) Unwrap() error { return classifyGraphQLErrors(e.Errors) }
+
+// At returns the classified error of the parts under the top-level field alias, or nil.
+func (e *PartialError) At(alias string) error {
+	var errs []graphQLError
+	for _, ge := range e.Errors {
+		if len(ge.Path) > 0 && ge.Path[0] == alias {
+			errs = append(errs, ge)
+		}
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return classifyGraphQLErrors(errs)
+}
+
+// Unplaced returns the classified error of the parts with no top-level path, or nil.
+func (e *PartialError) Unplaced() error {
+	var errs []graphQLError
+	for _, ge := range e.Errors {
+		if len(ge.Path) == 0 {
+			errs = append(errs, ge)
+		}
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return classifyGraphQLErrors(errs)
+}
+
+func isPartial(err error) bool {
+	var pe *PartialError
+	return errors.As(err, &pe)
 }
 
 func classifyGraphQLErrors(errs []graphQLError) error {

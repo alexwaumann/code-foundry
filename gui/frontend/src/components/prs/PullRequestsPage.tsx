@@ -6,14 +6,14 @@ import { useNow } from "@/lib/clock";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
-import { dashboardResource, openUrl } from "@/stores/gh";
+import { dashboardResource, openUrl, useFreshness } from "@/stores/gh";
 import { useResource } from "@/stores/resource";
 import { useUiStore } from "@/stores/ui";
 import { monthName, prKey, repoName } from "./format";
 import { Age, ChecksBadge, Freshness, PrStateIcon, ReviewBadge, SectionTitle } from "./PrBits";
 import { RowList } from "./RowList";
 
-/** Dashboards are polled every 2 minutes; older than two polls plus slack is stale. */
+/** The daemon polls every minute by default; older than a few polls plus slack is stale. */
 const STALE_AFTER_MS = 5 * 60_000;
 const ROW_H = 28;
 
@@ -148,6 +148,11 @@ function Body({ d, includeAll }: { d: DashboardView; includeAll: boolean }) {
         }}
       >
         {!d.authenticated && <Banner tone="warn">gh is not authenticated. Run `gh auth login`; the lists below are from the last successful poll.</Banner>}
+        {d.dashboardsDisabled && (
+          <Banner tone="info">
+            Pull request dashboards are turned off (<span className="font-mono">github.dashboards_enabled</span> in Settings), so the lists are empty.
+          </Banner>
+        )}
         {!includeAll && d.trackedSlugs.length === 0 && (
           <Banner tone="info">
             No registered repository has a GitHub remote, so the lists are empty.{" "}
@@ -174,6 +179,7 @@ export function PullRequestsPage() {
   const toggle = usePrPageStore((s) => s.toggle);
   const entry = useResource(dashboardResource, includeAll ? "all" : "tracked");
   const d = entry?.data ?? null;
+  const fresh = useFreshness(d?.fetchedAtMs ?? null, d?.lastError || entry?.error || "", true);
   return (
     <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label="Pull Requests" data-testid="prs-page">
       <header className="flex h-11 shrink-0 items-center gap-3 border-b border-pane-border px-5">
@@ -195,7 +201,7 @@ export function PullRequestsPage() {
             </span>
           )}
           {d && <span aria-hidden>·</span>}
-          {d && <Freshness fetchedAtMs={d.fetchedAtMs} lastError={d.lastError || entry?.error || ""} staleAfterMs={STALE_AFTER_MS} testId="prs-updated" />}
+          {d && <Freshness fetchedAtMs={fresh.fetchedAtMs} lastError={fresh.lastError} staleAfterMs={STALE_AFTER_MS} testId="prs-updated" />}
         </span>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">

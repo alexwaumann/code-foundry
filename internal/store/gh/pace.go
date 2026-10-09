@@ -8,6 +8,7 @@ import "time"
 //   - Requests go over one keep-alive HTTP client (HTTPRunner), one in flight. Until
 //     2026-10 each request was a fresh `gh` process (keychain read through securityd,
 //     new TLS handshake), which is what a 2s gap protected; that cost is gone.
+//   - The poll is one request per PollInterval; details follow only for what changed.
 //   - GitHub's secondary rate limits penalize concurrency and bursts (no more than ~100
 //     concurrent requests, ~2,000 GraphQL points per minute, serial requests). One
 //     request in flight with a 1s gap caps us below 60 requests/minute.
@@ -17,9 +18,13 @@ import "time"
 //     MinRemaining. A 0.5s gap would allow ~5,100. The store also reads rateLimit from
 //     every response and pauses until resetAt when fewer than MinRemaining points remain.
 const (
-	DefaultMinGap         = time.Second
-	DefaultRepoInterval   = 60 * time.Second
-	DefaultViewerInterval = 10 * time.Minute
+	DefaultMinGap = time.Second
+	// DefaultPollInterval is how often the fingerprint poll runs while any repository
+	// is tracked or branch watched (github.poll_interval_seconds). One request, cost 1.
+	DefaultPollInterval = 60 * time.Second
+	// DefaultIdleInterval is the poll cadence with nothing tracked or watched: only the
+	// viewer is fetched.
+	DefaultIdleInterval   = 10 * time.Minute
 	DefaultAuthRetry      = 60 * time.Second
 	DefaultNetworkBackoff = 15 * time.Second
 	// DefaultSecondaryBackoff follows GitHub's guidance to wait at least a minute after a
@@ -29,16 +34,19 @@ const (
 	DefaultMaxBackoff       = 15 * time.Minute
 	DefaultDetailTTL        = 30 * time.Second
 	DefaultMinRemaining     = 200
-	// DefaultPageSize keeps a PR-list page around 2.5s of GitHub server time (~95ms per
-	// PR measured on ghostty-org/ghostty); 100 per page hit GitHub's 10s timeout (502).
-	DefaultPageSize = 25
-	// DefaultMaxPages caps a poll at the 100 most recently updated open PRs. TotalCount
-	// still reports the real number.
+	// DefaultMaxPages caps check pages (100 checks each) fetched for one commit.
 	DefaultMaxPages = 4
-	// minPageSize is the floor when a 502/504 halves a repo's page size.
-	minPageSize = 5
-	// jitterFraction spreads retries and polls by +/-20% so repos tracked at the same
-	// moment drift apart instead of firing back to back forever.
+	// DefaultDetailBatch is how many open pull requests one detail request asks for.
+	// Measured ~300ms of server time per busy PR (mergeStateStatus and reviewDecision
+	// dominate): 10 took ~4.5s, 20 ~6.5s, 40 hit GitHub's 10s timeout (HTTP 502). A
+	// 502/504 halves it (sticky, floor minDetailBatch).
+	DefaultDetailBatch = 10
+	minDetailBatch     = 1
+	// closedPerOpen is how many closed/merged PRs (summary only, ~40ms each) one detail
+	// request carries per open PR slot.
+	closedPerOpen = 3
+	// jitterFraction spreads retries by +/-20% so failures that happen together
+	// drift apart instead of retrying back to back forever.
 	jitterFraction = 0.2
 	// rateLimitSlack is added to resetAt before resuming, to absorb clock skew.
 	rateLimitSlack = 5 * time.Second

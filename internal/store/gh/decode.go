@@ -1,6 +1,7 @@
 package gh
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -70,53 +71,69 @@ type commitJSON struct {
 	StatusCheckRollup *rollupJSON `json:"statusCheckRollup"`
 }
 
+type loginJSON struct {
+	Login string `json:"login"`
+}
+
+type nameWithOwnerJSON struct {
+	NameWithOwner string `json:"nameWithOwner"`
+}
+
+type totalJSON struct {
+	TotalCount int `json:"totalCount"`
+}
+
+// pullRequestJSON is a PullRequestSummary or PullRequestDetail node (fragments.graphql).
 type pullRequestJSON struct {
-	Number            int       `json:"number"`
-	Title             string    `json:"title"`
-	URL               string    `json:"url"`
-	UpdatedAt         time.Time `json:"updatedAt"`
-	IsDraft           bool      `json:"isDraft"`
-	IsCrossRepository bool      `json:"isCrossRepository"`
-	Author            *struct {
-		Login string `json:"login"`
-	} `json:"author"`
-	HeadRefName    string `json:"headRefName"`
-	HeadRefOid     string `json:"headRefOid"`
-	BaseRefName    string `json:"baseRefName"`
-	HeadRepository *struct {
-		NameWithOwner string `json:"nameWithOwner"`
-	} `json:"headRepository"`
-	ReviewDecision   string `json:"reviewDecision"`
-	Mergeable        string `json:"mergeable"`
-	MergeStateStatus string `json:"mergeStateStatus"`
-	Commits          struct {
+	Typename          string             `json:"__typename"`
+	ID                string             `json:"id"`
+	Number            int                `json:"number"`
+	Title             string             `json:"title"`
+	URL               string             `json:"url"`
+	State             string             `json:"state"`
+	IsDraft           bool               `json:"isDraft"`
+	CreatedAt         time.Time          `json:"createdAt"`
+	UpdatedAt         time.Time          `json:"updatedAt"`
+	MergedAt          time.Time          `json:"mergedAt"`
+	Author            *loginJSON         `json:"author"`
+	Repository        *nameWithOwnerJSON `json:"repository"`
+	HeadRefName       string             `json:"headRefName"`
+	HeadRefOid        string             `json:"headRefOid"`
+	BaseRefName       string             `json:"baseRefName"`
+	IsCrossRepository bool               `json:"isCrossRepository"`
+	Additions         int                `json:"additions"`
+	Deletions         int                `json:"deletions"`
+	ChangedFiles      int                `json:"changedFiles"`
+	StatusCheckRollup *rollupJSON        `json:"statusCheckRollup"`
+	// PullRequestDetail only.
+	HeadRepository     *nameWithOwnerJSON `json:"headRepository"`
+	ReviewDecision     string             `json:"reviewDecision"`
+	Mergeable          string             `json:"mergeable"`
+	MergeStateStatus   string             `json:"mergeStateStatus"`
+	TotalCommentsCount int                `json:"totalCommentsCount"`
+	Reviews            *totalJSON         `json:"reviews"`
+	LatestReviews      *struct {
 		Nodes []struct {
-			Commit commitJSON `json:"commit"`
+			Author      *loginJSON `json:"author"`
+			State       string     `json:"state"`
+			SubmittedAt time.Time  `json:"submittedAt"`
 		} `json:"nodes"`
-	} `json:"commits"`
+	} `json:"latestReviews"`
+	ReviewRequests *struct {
+		Nodes []struct {
+			RequestedReviewer *requestedReviewerJSON `json:"requestedReviewer"`
+		} `json:"nodes"`
+	} `json:"reviewRequests"`
+	// pull_request.graphql's paged checks (alias of statusCheckRollup).
+	Checks *rollupJSON `json:"checks"`
 }
 
-func (p *pullRequestJSON) headCommit() *commitJSON {
-	if n := len(p.Commits.Nodes); n > 0 {
-		return &p.Commits.Nodes[n-1].Commit
-	}
-	return nil
-}
-
-type viewerData struct {
-	RateLimit *rateLimitJSON `json:"rateLimit"`
-	Viewer    *Viewer        `json:"viewer"`
-}
-
-type pullRequestsData struct {
-	RateLimit  *rateLimitJSON `json:"rateLimit"`
-	Repository *struct {
-		PullRequests struct {
-			TotalCount int               `json:"totalCount"`
-			PageInfo   pageInfoJSON      `json:"pageInfo"`
-			Nodes      []pullRequestJSON `json:"nodes"`
-		} `json:"pullRequests"`
-	} `json:"repository"`
+// requestedReviewerJSON is a User, Bot, Mannequin (login) or Team (slug, organization).
+type requestedReviewerJSON struct {
+	Typename     string     `json:"__typename"`
+	Login        string     `json:"login"`
+	Slug         string     `json:"slug"`
+	Organization *loginJSON `json:"organization"`
 }
 
 type pullRequestData struct {
@@ -131,43 +148,6 @@ type checksData struct {
 	Repository *struct {
 		Object *commitJSON `json:"object"`
 	} `json:"repository"`
-}
-
-// decodeViewer maps a Viewer query response.
-func decodeViewer(data []byte) (Viewer, *rateLimitJSON, error) {
-	var d viewerData
-	if err := json.Unmarshal(data, &d); err != nil {
-		return Viewer{}, nil, fmt.Errorf("decode viewer: %w", err)
-	}
-	if d.Viewer == nil || d.Viewer.Login == "" {
-		return Viewer{}, d.RateLimit, fmt.Errorf("decode viewer: %w", ErrNotAuthenticated)
-	}
-	return *d.Viewer, d.RateLimit, nil
-}
-
-// prPage is one decoded page of open pull requests.
-type prPage struct {
-	PullRequests []PullRequest
-	TotalCount   int
-	Next         pageInfoJSON
-}
-
-// decodePullRequestsPage maps one PullRequests query page.
-func decodePullRequestsPage(data []byte) (prPage, *rateLimitJSON, error) {
-	var d pullRequestsData
-	if err := json.Unmarshal(data, &d); err != nil {
-		return prPage{}, nil, fmt.Errorf("decode pull requests: %w", err)
-	}
-	if d.Repository == nil {
-		return prPage{}, d.RateLimit, fmt.Errorf("decode pull requests: repository: %w", ErrNotFound)
-	}
-	conn := d.Repository.PullRequests
-	page := prPage{TotalCount: conn.TotalCount, Next: conn.PageInfo}
-	page.PullRequests = make([]PullRequest, 0, len(conn.Nodes))
-	for i := range conn.Nodes {
-		page.PullRequests = append(page.PullRequests, mapPullRequest(&conn.Nodes[i]))
-	}
-	return page, d.RateLimit, nil
 }
 
 // checksPage is one decoded page of a commit's checks.
@@ -188,8 +168,9 @@ func decodePullRequest(data []byte) (PullRequest, checksPage, *rateLimitJSON, er
 	if d.Repository == nil || d.Repository.PullRequest == nil {
 		return PullRequest{}, checksPage{}, d.RateLimit, fmt.Errorf("decode pull request: %w", ErrNotFound)
 	}
-	pr := mapPullRequest(d.Repository.PullRequest)
-	return pr, mapChecksPage(d.Repository.PullRequest.headCommit()), d.RateLimit, nil
+	p := d.Repository.PullRequest
+	pr := mapPullRequest(p)
+	return pr, mapChecksPage(&commitJSON{Oid: p.HeadRefOid, StatusCheckRollup: p.Checks}), d.RateLimit, nil
 }
 
 // decodeChecks maps a Checks query page.
@@ -225,6 +206,7 @@ func mapChecksPage(c *commitJSON) checksPage {
 
 func mapPullRequest(p *pullRequestJSON) PullRequest {
 	pr := PullRequest{
+		ID:                p.ID,
 		Number:            p.Number,
 		Title:             p.Title,
 		HeadRef:           p.HeadRefName,
@@ -237,17 +219,60 @@ func mapPullRequest(p *pullRequestJSON) PullRequest {
 		IsCrossRepository: p.IsCrossRepository,
 		URL:               p.URL,
 		UpdatedAt:         p.UpdatedAt,
+		State:             PullRequestState(p.State),
+		CreatedAt:         p.CreatedAt,
+		MergedAt:          p.MergedAt,
+		Additions:         p.Additions,
+		Deletions:         p.Deletions,
+		ChangedFiles:      p.ChangedFiles,
+		Comments:          p.TotalCommentsCount,
 	}
 	if p.Author != nil {
 		pr.Author = p.Author.Login
 	}
+	if p.Repository != nil {
+		pr.Repo, _ = NormalizeSlug(p.Repository.NameWithOwner)
+	}
 	if p.HeadRepository != nil {
 		pr.HeadRepoSlug = p.HeadRepository.NameWithOwner
 	}
-	if c := p.headCommit(); c != nil && c.StatusCheckRollup != nil {
-		pr.Checks = mapRollup(c.StatusCheckRollup)
+	if r := cmp.Or(p.StatusCheckRollup, p.Checks); r != nil {
+		pr.Checks = mapRollup(r)
+	}
+	if p.Reviews != nil {
+		pr.Reviews = p.Reviews.TotalCount
+	}
+	if p.LatestReviews != nil {
+		for _, n := range p.LatestReviews.Nodes {
+			r := Review{State: n.State, SubmittedAt: n.SubmittedAt}
+			if n.Author != nil {
+				r.Author = n.Author.Login
+			}
+			pr.LatestReviews = append(pr.LatestReviews, r)
+		}
+	}
+	if p.ReviewRequests != nil {
+		for _, n := range p.ReviewRequests.Nodes {
+			if who := reviewerName(n.RequestedReviewer); who != "" {
+				pr.ReviewRequests = append(pr.ReviewRequests, who)
+			}
+		}
 	}
 	return pr
+}
+
+// reviewerName is a requested reviewer's login, or "org/team" for a team.
+func reviewerName(r *requestedReviewerJSON) string {
+	switch {
+	case r == nil:
+		return ""
+	case r.Typename == "Team" && r.Organization != nil:
+		return r.Organization.Login + "/" + r.Slug
+	case r.Typename == "Team":
+		return r.Slug
+	default:
+		return r.Login
+	}
 }
 
 // checkBucket is the display bucket of one check state.

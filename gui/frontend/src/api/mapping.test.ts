@@ -3,7 +3,7 @@ import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { describe, expect, it } from "vitest";
 import { ArgType, CommandSchema } from "@/gen/codefoundry/v1/command_pb";
 import { EventSchema } from "@/gen/codefoundry/v1/events_pb";
-import { GhEventSchema } from "@/gen/codefoundry/v1/gh_pb";
+import { GhEventSchema, Mergeable, MergeStateStatus, PullRequestReviewState, PullRequestSchema, PullRequestState } from "@/gen/codefoundry/v1/gh_pb";
 import { RepoEventSchema, RepoSchema } from "@/gen/codefoundry/v1/repo_pb";
 import { SessionEventSchema, SessionSchema, SessionState, SessionStatus } from "@/gen/codefoundry/v1/session_pb";
 import { AttachEventSchema, TerminalEventSchema, TerminalSchema, TerminalState } from "@/gen/codefoundry/v1/terminal_pb";
@@ -11,6 +11,7 @@ import { UiIntent_Notify_Level, UiIntentSchema } from "@/gen/codefoundry/v1/ui_p
 import { toCommandView } from "./command";
 import { overrideEndpoint } from "./endpoint";
 import { toEventView } from "./events";
+import { toPullRequestView } from "./gh";
 import { toRepoEventView, toRepoView } from "./repo";
 import { toSessionView } from "./session";
 import { toAttachEventView, toTerminalEventView, toTerminalView } from "./terminal";
@@ -127,12 +128,55 @@ describe("ui intent mapping", () => {
   });
 });
 
+describe("gh mapping", () => {
+  it("maps a pull request with its detail fields", () => {
+    const p = create(PullRequestSchema, {
+      repoSlug: "o/r",
+      number: 7,
+      title: "t",
+      state: PullRequestState.OPEN,
+      mergeable: Mergeable.CONFLICTING,
+      mergeStateStatus: MergeStateStatus.HAS_HOOKS,
+      additions: 5,
+      deletions: 1,
+      changedFiles: 2,
+      commentCount: 3,
+      reviewCount: 4,
+      latestReviews: [{ author: "kim", state: PullRequestReviewState.CHANGES_REQUESTED, submittedAt: timestampFromMs(9000) }, { author: "x" }],
+      reviewRequests: ["acme/core"],
+      isCrossRepository: true,
+      partial: true,
+    });
+    const v = toPullRequestView(p);
+    expect(v).toMatchObject({
+      repoSlug: "o/r",
+      state: "open",
+      mergeable: "conflicting",
+      mergeState: "has_hooks",
+      additions: 5,
+      deletions: 1,
+      changedFiles: 2,
+      comments: 3,
+      reviews: 4,
+      latestReviews: [
+        { author: "kim", state: "changes_requested", submittedAtMs: 9000 },
+        { author: "x", state: "", submittedAtMs: null },
+      ],
+      reviewRequests: ["acme/core"],
+      isCrossRepository: true,
+      partial: true,
+    });
+    expect(toPullRequestView(create(PullRequestSchema, {}))).toMatchObject({ mergeable: null, mergeState: "", partial: false });
+  });
+});
+
 describe("events mapping", () => {
   it.each([
     [{ case: "repo" as const, value: create(RepoEventSchema, { event: { case: "snapshot", value: { repos: [] } } }) }, { source: "repo", event: { kind: "snapshot", repos: [] } }],
     [{ case: "terminal" as const, value: create(TerminalEventSchema, { event: { case: "removedId", value: "t1" } }) }, { source: "terminal", event: { kind: "removed", id: "t1" } }],
     [{ case: "session" as const, value: create(SessionEventSchema, { event: { case: "removedId", value: "s1" } }) }, { source: "session", event: { kind: "removed", id: "s1" } }],
-    [{ case: "gh" as const, value: create(GhEventSchema, { event: { case: "pullRequestsUpdated", value: { repoSlug: "o/r" } } }) }, { source: "gh", event: { kind: "pullRequests", repoSlug: "o/r" } }],
+    [{ case: "gh" as const, value: create(GhEventSchema, { event: { case: "polled", value: { fetchedAt: timestampFromMs(5000), lastError: "boom" } } }) }, { source: "gh", event: { kind: "polled", fetchedAtMs: 5000, lastError: "boom" } }],
+    [{ case: "gh" as const, value: create(GhEventSchema, { event: { case: "repoActivityUpdated", value: { repoSlug: "o/r" } } }) }, { source: "gh", event: { kind: "repoActivity", repoSlug: "o/r" } }],
     [{ case: "ui" as const, value: create(UiIntentSchema, { intent: { case: "openPalette", value: { query: "q" } } }) }, { source: "ui", event: { kind: "openPalette", query: "q" } }],
   ])("maps %#", (event, want) => {
     expect(toEventView(create(EventSchema, { event }))).toEqual(want);

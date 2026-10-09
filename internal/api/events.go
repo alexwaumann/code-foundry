@@ -349,7 +349,7 @@ func (s sessionSource) snapshot(context.Context) []*v1.Event {
 // ---- gh ------------------------------------------------------------------------
 
 // ghSource events are notifications to re-read, so its snapshot is a notification for
-// the viewer and for every cached repository.
+// the viewer, the last poll, the dashboard, and every cached repository's activity.
 type ghSource struct {
 	store gh.Service
 	bus   *bus.Bus
@@ -361,7 +361,7 @@ func ghWrap(e *v1.GhEvent) *v1.Event { return &v1.Event{Event: &v1.Event_Gh{Gh: 
 
 func (s ghSource) subscribe(ctx context.Context) <-chan *v1.Event {
 	return fanIn(ctx,
-		newTap(s.bus, ghWatchBuffer, func(e gh.PullRequestsUpdated) *v1.Event { return ghWrap(ghPullRequestsEvent(e)) }),
+		newTap(s.bus, ghWatchBuffer, func(e gh.Polled) *v1.Event { return ghWrap(ghPolledEvent(e)) }),
 		newTap(s.bus, ghWatchBuffer, func(e gh.ViewerUpdated) *v1.Event { return ghWrap(ghViewerEvent(e)) }),
 		newTap(s.bus, ghWatchBuffer, func(e gh.DashboardUpdated) *v1.Event { return ghWrap(ghDashboardEvent(e)) }),
 		newTap(s.bus, ghWatchBuffer, func(e gh.RepoActivityUpdated) *v1.Event { return ghWrap(ghRepoActivityEvent(e)) }),
@@ -373,6 +373,7 @@ func (s ghSource) snapshot(context.Context) []*v1.Event {
 	snap := s.store.Snapshot()
 	out := []*v1.Event{
 		ghWrap(ghViewerEvent(gh.ViewerUpdated{FetchedAt: snap.Viewer.FetchedAt})),
+		ghWrap(ghPolledEvent(gh.Polled{FetchedAt: snap.Poll.FetchedAt, LastError: snap.Poll.LastError})),
 		ghWrap(ghDashboardEvent(gh.DashboardUpdated{FetchedAt: snap.Dashboard.FetchedAt})),
 	}
 	slugs := make([]string, 0, len(snap.Repos))
@@ -381,7 +382,7 @@ func (s ghSource) snapshot(context.Context) []*v1.Event {
 	}
 	slices.Sort(slugs)
 	for _, slug := range slugs {
-		out = append(out, ghWrap(ghPullRequestsEvent(gh.PullRequestsUpdated{Slug: slug, FetchedAt: snap.Repos[slug].FetchedAt})))
+		out = append(out, ghWrap(ghRepoActivityEvent(gh.RepoActivityUpdated{Slug: slug, FetchedAt: snap.Repos[slug].Activity.DefaultBranch.FetchedAt})))
 	}
 	return out
 }

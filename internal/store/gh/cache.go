@@ -22,8 +22,9 @@ type DB interface {
 var schemaSQL string
 
 // cacheVersion is bumped when the cached JSON shape changes incompatibly. Rows with
-// another version are treated as missing.
-const cacheVersion = 1
+// another version are treated as missing. 2: viewer-scoped polling (pull requests carry
+// ids and detail fields; the dashboard has the reviewed list).
+const cacheVersion = 2
 
 // cacheRetention is how long on-demand detail rows (PR details, ref checks) are kept.
 const cacheRetention = 7 * 24 * time.Hour
@@ -90,10 +91,9 @@ type cache struct {
 	db DB
 }
 
-// loadSnapshot reads the viewer and every repository's PR list.
+// loadSnapshot reads the viewer. loadActivity (activity_cache.go) adds the rest.
 func (c cache) loadSnapshot(ctx context.Context) (*Snapshot, error) {
 	snap := &Snapshot{Viewer: ViewerState{Authenticated: true}, Repos: map[string]RepoState{}}
-
 	var fetched int64
 	var payload string
 	err := c.db.QueryRowContext(ctx, `SELECT fetched_at, payload FROM gh_viewer WHERE id = 1`).Scan(&fetched, &payload)
@@ -105,27 +105,6 @@ func (c cache) loadSnapshot(ctx context.Context) (*Snapshot, error) {
 		}
 	case !errors.Is(err, sql.ErrNoRows):
 		return nil, fmt.Errorf("gh: load viewer: %w", err)
-	}
-
-	rows, err := c.db.QueryContext(ctx, `SELECT slug, fetched_at, total_count, payload FROM gh_pull_requests`)
-	if err != nil {
-		return nil, fmt.Errorf("gh: load pull requests: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	for rows.Next() {
-		var slug string
-		var total int
-		if err := rows.Scan(&slug, &fetched, &total, &payload); err != nil {
-			return nil, fmt.Errorf("gh: load pull requests: %w", err)
-		}
-		prs, ok := decodePayload[[]PullRequest](payload)
-		if !ok {
-			continue
-		}
-		snap.Repos[slug] = RepoState{Slug: slug, PullRequests: prs, TotalCount: total, FetchedAt: fromMillis(fetched)}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("gh: load pull requests: %w", err)
 	}
 	return snap, nil
 }
@@ -141,22 +120,6 @@ func (c cache) saveViewer(ctx context.Context, v Viewer, at time.Time) error {
 		toMillis(at), payload)
 	if err != nil {
 		return fmt.Errorf("gh: save viewer: %w", err)
-	}
-	return nil
-}
-
-func (c cache) savePullRequests(ctx context.Context, slug string, prs []PullRequest, total int, at time.Time) error {
-	payload, err := encodePayload(prs)
-	if err != nil {
-		return err
-	}
-	_, err = c.db.ExecContext(ctx,
-		`INSERT INTO gh_pull_requests (slug, fetched_at, total_count, payload) VALUES (?, ?, ?, ?)
-		 ON CONFLICT (slug) DO UPDATE SET fetched_at = excluded.fetched_at,
-		   total_count = excluded.total_count, payload = excluded.payload`,
-		slug, toMillis(at), total, payload)
-	if err != nil {
-		return fmt.Errorf("gh: save pull requests: %w", err)
 	}
 	return nil
 }

@@ -1,0 +1,636 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4646,
+      "resetAt": "2026-10-09T01:38:55Z"
+    },
+    "open": [
+      {
+        "__typename": "PullRequest",
+        "id": "PR_kwDOHFhdAs7jWSZB",
+        "number": 12938,
+        "title": "renderer: glyph protocol",
+        "url": "https://github.com/ghostty-org/ghostty/pull/12938",
+        "state": "OPEN",
+        "isDraft": false,
+        "createdAt": "2026-06-06T03:45:36Z",
+        "updatedAt": "2026-06-06T04:25:07Z",
+        "mergedAt": null,
+        "author": {
+          "login": "mitchellh"
+        },
+        "repository": {
+          "nameWithOwner": "ghostty-org/ghostty"
+        },
+        "headRefName": "push-tuwykoykluyz",
+        "headRefOid": "4b1d34c4a960a74746a73753b7d131fd46f20ba8",
+        "baseRefName": "main",
+        "isCrossRepository": false,
+        "additions": 809,
+        "deletions": 43,
+        "changedFiles": 6,
+        "statusCheckRollup": {
+          "state": "SUCCESS",
+          "contexts": {
+            "checkRunCount": 186,
+            "checkRunCountsByState": [
+              {
+                "state": "ACTION_REQUIRED",
+                "count": 0
+              },
+              {
+                "state": "CANCELLED",
+                "count": 0
+              },
+              {
+                "state": "COMPLETED",
+                "count": 0
+              },
+              {
+                "state": "FAILURE",
+                "count": 0
+              },
+              {
+                "state": "IN_PROGRESS",
+                "count": 0
+              },
+              {
+                "state": "NEUTRAL",
+                "count": 0
+              },
+              {
+                "state": "PENDING",
+                "count": 0
+              },
+              {
+                "state": "QUEUED",
+                "count": 0
+              },
+              {
+                "state": "SKIPPED",
+                "count": 12
+              },
+              {
+                "state": "STALE",
+                "count": 0
+              },
+              {
+                "state": "STARTUP_FAILURE",
+                "count": 0
+              },
+              {
+                "state": "SUCCESS",
+                "count": 174
+              },
+              {
+                "state": "TIMED_OUT",
+                "count": 0
+              },
+              {
+                "state": "WAITING",
+                "count": 0
+              }
+            ],
+            "statusContextCount": 0,
+            "statusContextCountsByState": [
+              {
+                "state": "EXPECTED",
+                "count": 0
+              },
+              {
+                "state": "ERROR",
+                "count": 0
+              },
+              {
+                "state": "FAILURE",
+                "count": 0
+              },
+              {
+                "state": "PENDING",
+                "count": 0
+              },
+              {
+                "state": "SUCCESS",
+                "count": 0
+              }
+            ]
+          }
+        },
+        "headRepository": {
+          "nameWithOwner": "ghostty-org/ghostty"
+        },
+        "reviewDecision": "REVIEW_REQUIRED",
+        "mergeable": "CONFLICTING",
+        "mergeStateStatus": "DIRTY",
+        "totalCommentsCount": 1,
+        "reviews": {
+          "totalCount": 0
+        },
+        "latestReviews": {
+          "nodes": []
+        },
+        "reviewRequests": {
+          "nodes": [
+            {
+              "requestedReviewer": null
+            },
+            {
+              "requestedReviewer": null
+            },
+            {
+              "requestedReviewer": null
+            }
+          ]
+        }
+      },
+      {
+        "__typename": "PullRequest",
+        "id": "PR_kwDORsed9c7fGr98",
+        "number": 15,
+        "title": "add mouse selection",
+        "url": "https://github.com/ghostty-org/ghostling/pull/15",
+        "state": "OPEN",
+        "isDraft": false,
+        "createdAt": "2026-05-25T16:16:20Z",
+        "updatedAt": "2026-05-25T16:16:20Z",
+        "mergedAt": null,
+        "author": {
+          "login": "mitchellh"
+        },
+        "repository": {
+          "nameWithOwner": "ghostty-org/ghostling"
+        },
+        "headRefName": "push-mmwrpxttnpuq",
+        "headRefOid": "34087e776e5beb338c8b31980cff1ec4f7d5bec2",
+        "baseRefName": "main",
+        "isCrossRepository": false,
+        "additions": 437,
+        "deletions": 8,
+        "changedFiles": 1,
+        "statusCheckRollup": {
+          "state": "SUCCESS",
+          "contexts": {
+            "checkRunCount": 4,
+            "checkRunCountsByState": [
+              {
+                "state": "ACTION_REQUIRED",
+                "count": 0
+              },
+              {
+                "state": "CANCELLED",
+                "count": 0
+              },
+              {
+                "state": "COMPLETED",
+                "count": 0
+              },
+              {
+                "state": "FAILURE",
+                "count": 0
+              },
+              {
+                "state": "IN_PROGRESS",
+                "count": 0
+              },
+              {
+                "state": "NEUTRAL",
+                "count": 0
+              },
+              {
+                "state": "PENDING",
+                "count": 0
+              },
+              {
+                "state": "QUEUED",
+                "count": 0
+              },
+              {
+                "state": "SKIPPED",
+                "count": 0
+              },
+              {
+                "state": "STALE",
+                "count": 0
+              },
+              {
+                "state": "STARTUP_FAILURE",
+                "count": 0
+              },
+              {
+                "state": "SUCCESS",
+                "count": 4
+              },
+              {
+                "state": "TIMED_OUT",
+                "count": 0
+              },
+              {
+                "state": "WAITING",
+                "count": 0
+              }
+            ],
+            "statusContextCount": 0,
+            "statusContextCountsByState": [
+              {
+                "state": "EXPECTED",
+                "count": 0
+              },
+              {
+                "state": "ERROR",
+                "count": 0
+              },
+              {
+                "state": "FAILURE",
+                "count": 0
+              },
+              {
+                "state": "PENDING",
+                "count": 0
+              },
+              {
+                "state": "SUCCESS",
+                "count": 0
+              }
+            ]
+          }
+        },
+        "headRepository": {
+          "nameWithOwner": "ghostty-org/ghostling"
+        },
+        "reviewDecision": null,
+        "mergeable": "MERGEABLE",
+        "mergeStateStatus": "CLEAN",
+        "totalCommentsCount": 0,
+        "reviews": {
+          "totalCount": 0
+        },
+        "latestReviews": {
+          "nodes": []
+        },
+        "reviewRequests": {
+          "nodes": []
+        }
+      },
+      {
+        "__typename": "PullRequest",
+        "id": "PR_kwDOHFhdAs8AAAABHcPXLA",
+        "number": 14608,
+        "title": "windows: build and test the core on Windows again",
+        "url": "https://github.com/ghostty-org/ghostty/pull/14608",
+        "state": "OPEN",
+        "isDraft": false,
+        "createdAt": "2026-10-09T00:16:02Z",
+        "updatedAt": "2026-10-09T00:16:22Z",
+        "mergedAt": null,
+        "author": {
+          "login": "marler8997"
+        },
+        "repository": {
+          "nameWithOwner": "ghostty-org/ghostty"
+        },
+        "headRefName": "windows-core-build",
+        "headRefOid": "349ce6e51026016ab1b72fc7ffeb850ce7d218ec",
+        "baseRefName": "main",
+        "isCrossRepository": true,
+        "additions": 25,
+        "deletions": 5,
+        "changedFiles": 5,
+        "statusCheckRollup": {
+          "state": "SUCCESS",
+          "contexts": {
+            "checkRunCount": 1,
+            "checkRunCountsByState": [
+              {
+                "state": "ACTION_REQUIRED",
+                "count": 0
+              },
+              {
+                "state": "CANCELLED",
+                "count": 0
+              },
+              {
+                "state": "COMPLETED",
+                "count": 0
+              },
+              {
+                "state": "FAILURE",
+                "count": 0
+              },
+              {
+                "state": "IN_PROGRESS",
+                "count": 0
+              },
+              {
+                "state": "NEUTRAL",
+                "count": 0
+              },
+              {
+                "state": "PENDING",
+                "count": 0
+              },
+              {
+                "state": "QUEUED",
+                "count": 0
+              },
+              {
+                "state": "SKIPPED",
+                "count": 0
+              },
+              {
+                "state": "STALE",
+                "count": 0
+              },
+              {
+                "state": "STARTUP_FAILURE",
+                "count": 0
+              },
+              {
+                "state": "SUCCESS",
+                "count": 1
+              },
+              {
+                "state": "TIMED_OUT",
+                "count": 0
+              },
+              {
+                "state": "WAITING",
+                "count": 0
+              }
+            ],
+            "statusContextCount": 0,
+            "statusContextCountsByState": [
+              {
+                "state": "EXPECTED",
+                "count": 0
+              },
+              {
+                "state": "ERROR",
+                "count": 0
+              },
+              {
+                "state": "FAILURE",
+                "count": 0
+              },
+              {
+                "state": "PENDING",
+                "count": 0
+              },
+              {
+                "state": "SUCCESS",
+                "count": 0
+              }
+            ]
+          }
+        },
+        "headRepository": {
+          "nameWithOwner": "marler8997/ghostty"
+        },
+        "reviewDecision": "REVIEW_REQUIRED",
+        "mergeable": "MERGEABLE",
+        "mergeStateStatus": "BLOCKED",
+        "totalCommentsCount": 0,
+        "reviews": {
+          "totalCount": 0
+        },
+        "latestReviews": {
+          "nodes": []
+        },
+        "reviewRequests": {
+          "nodes": [
+            {
+              "requestedReviewer": null
+            }
+          ]
+        }
+      }
+    ],
+    "closed": [
+      {
+        "__typename": "PullRequest",
+        "id": "PR_kwDOHFhdAs8AAAABHOg8hA",
+        "number": 14588,
+        "title": "formatter: write the cursor position relative to the margins in origin mode",
+        "url": "https://github.com/ghostty-org/ghostty/pull/14588",
+        "state": "MERGED",
+        "isDraft": false,
+        "createdAt": "2026-10-08T00:02:30Z",
+        "updatedAt": "2026-10-08T15:23:07Z",
+        "mergedAt": "2026-10-08T15:22:40Z",
+        "author": {
+          "login": "robmorgan"
+        },
+        "repository": {
+          "nameWithOwner": "ghostty-org/ghostty"
+        },
+        "headRefName": "formatter-origin-cursor",
+        "headRefOid": "23c7a3e5a68aefee51b30a780e706771f80b5f97",
+        "baseRefName": "main",
+        "isCrossRepository": true,
+        "additions": 98,
+        "deletions": 2,
+        "changedFiles": 1,
+        "statusCheckRollup": {
+          "state": "SUCCESS",
+          "contexts": {
+            "checkRunCount": 105,
+            "checkRunCountsByState": [
+              {
+                "state": "ACTION_REQUIRED",
+                "count": 0
+              },
+              {
+                "state": "CANCELLED",
+                "count": 0
+              },
+              {
+                "state": "COMPLETED",
+                "count": 0
+              },
+              {
+                "state": "FAILURE",
+                "count": 0
+              },
+              {
+                "state": "IN_PROGRESS",
+                "count": 0
+              },
+              {
+                "state": "NEUTRAL",
+                "count": 0
+              },
+              {
+                "state": "PENDING",
+                "count": 0
+              },
+              {
+                "state": "QUEUED",
+                "count": 0
+              },
+              {
+                "state": "SKIPPED",
+                "count": 7
+              },
+              {
+                "state": "STALE",
+                "count": 0
+              },
+              {
+                "state": "STARTUP_FAILURE",
+                "count": 0
+              },
+              {
+                "state": "SUCCESS",
+                "count": 98
+              },
+              {
+                "state": "TIMED_OUT",
+                "count": 0
+              },
+              {
+                "state": "WAITING",
+                "count": 0
+              }
+            ],
+            "statusContextCount": 0,
+            "statusContextCountsByState": [
+              {
+                "state": "EXPECTED",
+                "count": 0
+              },
+              {
+                "state": "ERROR",
+                "count": 0
+              },
+              {
+                "state": "FAILURE",
+                "count": 0
+              },
+              {
+                "state": "PENDING",
+                "count": 0
+              },
+              {
+                "state": "SUCCESS",
+                "count": 0
+              }
+            ]
+          }
+        }
+      },
+      {
+        "__typename": "PullRequest",
+        "id": "PR_kwDOHFhdAs8AAAABGjTVOA",
+        "number": 14530,
+        "title": "libghostty-vt: zero the decode_png output before the callback",
+        "url": "https://github.com/ghostty-org/ghostty/pull/14530",
+        "state": "MERGED",
+        "isDraft": false,
+        "createdAt": "2026-10-04T13:14:08Z",
+        "updatedAt": "2026-10-08T07:43:34Z",
+        "mergedAt": "2026-10-04T13:31:41Z",
+        "author": {
+          "login": "mitchellh"
+        },
+        "repository": {
+          "nameWithOwner": "ghostty-org/ghostty"
+        },
+        "headRefName": "vt-png-mem",
+        "headRefOid": "aca9bf031821c1b9dedfec24e93fb609468a274f",
+        "baseRefName": "main",
+        "isCrossRepository": false,
+        "additions": 96,
+        "deletions": 12,
+        "changedFiles": 2,
+        "statusCheckRollup": {
+          "state": "FAILURE",
+          "contexts": {
+            "checkRunCount": 208,
+            "checkRunCountsByState": [
+              {
+                "state": "ACTION_REQUIRED",
+                "count": 0
+              },
+              {
+                "state": "CANCELLED",
+                "count": 0
+              },
+              {
+                "state": "COMPLETED",
+                "count": 0
+              },
+              {
+                "state": "FAILURE",
+                "count": 2
+              },
+              {
+                "state": "IN_PROGRESS",
+                "count": 0
+              },
+              {
+                "state": "NEUTRAL",
+                "count": 0
+              },
+              {
+                "state": "PENDING",
+                "count": 0
+              },
+              {
+                "state": "QUEUED",
+                "count": 0
+              },
+              {
+                "state": "SKIPPED",
+                "count": 12
+              },
+              {
+                "state": "STALE",
+                "count": 0
+              },
+              {
+                "state": "STARTUP_FAILURE",
+                "count": 0
+              },
+              {
+                "state": "SUCCESS",
+                "count": 194
+              },
+              {
+                "state": "TIMED_OUT",
+                "count": 0
+              },
+              {
+                "state": "WAITING",
+                "count": 0
+              }
+            ],
+            "statusContextCount": 0,
+            "statusContextCountsByState": [
+              {
+                "state": "EXPECTED",
+                "count": 0
+              },
+              {
+                "state": "ERROR",
+                "count": 0
+              },
+              {
+                "state": "FAILURE",
+                "count": 0
+              },
+              {
+                "state": "PENDING",
+                "count": 0
+              },
+              {
+                "state": "SUCCESS",
+                "count": 0
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

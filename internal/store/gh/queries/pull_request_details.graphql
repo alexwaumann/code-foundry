@@ -1,0 +1,14 @@
+# The pull requests whose poll fingerprint changed, by node id: open ones with every
+# detail field, closed and merged ones with the summary. Batched (DefaultDetailBatch open
+# PRs per request; a 502/504 halves it) to stay well under GitHub's ~10s budget.
+query PullRequestDetails($open: [ID!]!, $closed: [ID!]!) {
+  rateLimit { ...RateLimitFields }
+  open: nodes(ids: $open) {
+    __typename
+    ...PullRequestDetail
+  }
+  closed: nodes(ids: $closed) {
+    __typename
+    ...PullRequestSummary
+  }
+}

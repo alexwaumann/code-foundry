@@ -169,6 +169,19 @@ func TestParseGraphQLResponse(t *testing.T) {
 	if err == nil || isGlobal(err) || !strings.Contains(err.Error(), "nope") {
 		t.Errorf("FORBIDDEN: err = %v", err)
 	}
+	// With data alongside the errors, the data comes back too, with a *PartialError
+	// that places each error under its top-level field.
+	data, err := parseGraphQLResponse(httpResult{status: 200, body: fixture(t, "graphql_repo_not_found.json")})
+	var pe *PartialError
+	if !errors.As(err, &pe) || len(data) == 0 || !errors.Is(pe.At("repository"), ErrNotFound) ||
+		pe.At("rateLimit") != nil || pe.Unplaced() != nil {
+		t.Errorf("partial: data=%s err=%v", data, err)
+	}
+	// Without data it is a plain error.
+	if _, err := parseGraphQLResponse(httpResult{status: 200,
+		body: []byte(`{"data":null,"errors":[{"type":"NOT_FOUND","message":"gone"}]}`)}); isPartial(err) || !errors.Is(err, ErrNotFound) {
+		t.Errorf("null data: err = %v", err)
+	}
 }
 
 // fakeTokens hands out tokens in order (repeating the last) and counts calls.
@@ -270,7 +283,10 @@ func TestHTTPRunnerRequests(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v, _, err := decodeViewer(data); err != nil || v.Login != "octocat" {
+	var v struct {
+		Viewer Viewer `json:"viewer"`
+	}
+	if err := json.Unmarshal(data, &v); err != nil || v.Viewer.Login != "octocat" {
 		t.Errorf("viewer = %+v, %v", v, err)
 	}
 	body, err := r.REST(ctx, "search/commits", map[string]string{"q": "author:@me author-date:2026-10-01..2026-10-31", "per_page": "1"})
