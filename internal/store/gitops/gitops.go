@@ -131,6 +131,11 @@ type Snapshot struct {
 // FetchOptions configures Store.Fetch.
 type FetchOptions struct {
 	WorktreePath string
+	// Remote names the remote to fetch; empty uses git's default.
+	Remote string
+	// Branch, with Remote, fetches only refs/heads/<Branch> into
+	// refs/remotes/<Remote>/<Branch>, whatever the remote's configured refspec.
+	Branch string
 }
 
 // PullOptions configures Store.Pull.

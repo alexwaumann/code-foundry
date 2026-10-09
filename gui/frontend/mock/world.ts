@@ -11,6 +11,7 @@ import { SessionState, SessionStatus, type SessionEventSchema, type SessionSchem
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import { MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
+import { prDetailCall } from "./prDetail";
 import { GhWorld, ghEvent, viewCommands } from "./github";
 import { Hub } from "./hub";
 import { MockSettings } from "./settings";
@@ -669,6 +670,115 @@ export class World {
     return null;
   }
 
+  /**
+   * pr.ask, pr.explain and pr.fix.findings (internal/command/commands_prsession.go): start a
+   * session about a pull request and focus it. The worktree rules follow the daemon's
+   * pickPRWorktree; the prompt is not built here (the mock's sessions never read it).
+   */
+  private prSessionCommands(): ReturnType<World["registry"]> {
+    const slugArg = { name: "repo-slug", type: ArgType.STRING, required: true, description: 'GitHub repository, "owner/name"' };
+    const numberArg = { name: "number", type: ArgType.INT, required: true, description: "Pull request number" };
+    const worktreeArg = { name: "worktree", type: ArgType.PATH, required: false, description: "Worktree to start the session in (default: picked from the registered clones of repo-slug and the pull request's branch)" };
+    const modelArg = { name: "model", type: ArgType.ENUM, required: false, description: "Model (default: settings sessions.default_model, else Claude's default)", enumValues: ["fable", "opus", "sonnet", "haiku"] };
+    const effortArg = { name: "effort", type: ArgType.ENUM, required: false, description: "Effort level (default: settings sessions.default_effort, else Claude's default)", enumValues: ["low", "medium", "high", "xhigh", "max"] };
+    const start =
+      (fix: boolean) =>
+      (ctx: UiContext | undefined, args: Record<string, string>): string => {
+        const slug = args["repo-slug"] ?? "";
+        const n = Number(args.number);
+        if (!slug.trim()) throw new CommandError("invalid", "repo-slug is required");
+        if (!Number.isInteger(n) || n <= 0) throw new CommandError("invalid", "number must be a positive pull request number");
+        const pr = prDetailCall(() => this.gh.prDetails.get(slug, n, fix)).pullRequest;
+        const head = pr?.headRef ?? "";
+        const headSha = pr?.headSha ?? "";
+        const cross = pr?.isCrossRepository ?? false;
+        // checkedOutIn: a same-repository head by branch name; a fork's head by commit, or
+        // by an upstream <remote>/<head> on a remote other than origin.
+        const onHead = (w: MockWorktree): boolean => {
+          if (!cross) return head !== "" && w.branch === head;
+          if (headSha && w.head.toLowerCase() === headSha.toLowerCase()) return true;
+          if (!head || !w.status.upstream.endsWith(`/${head}`)) return false;
+          const remote = w.status.upstream.slice(0, -head.length - 1);
+          return remote !== "" && remote !== "origin";
+        };
+        const clones = [...this.repos.values()].filter((r) => r.githubSlug !== "" && r.githubSlug.toLowerCase() === slug.toLowerCase());
+        const find = (pred: (w: MockWorktree) => boolean): { repoId: string; path: string } | null => {
+          for (const r of clones) {
+            const w = r.worktrees.find(pred);
+            if (w) return { repoId: r.id, path: w.path };
+          }
+          return null;
+        };
+        let target: { repoId: string; path: string } | null = null;
+        if (args.worktree) {
+          const owner = [...this.repos.values()].find((r) => r.worktrees.some((w) => w.path === args.worktree));
+          target = { repoId: owner?.id ?? "", path: args.worktree };
+        } else {
+          const first = clones[0];
+          if (!first) throw new CommandError("unavailable", `no registered repository is a clone of ${slug}: add one with \`code-foundry repo register <path>\`, or pass --worktree`);
+          const active = ctx?.activeWorktreePath;
+          if (!fix && active) target = find((w) => w.path === active);
+          if (!target) target = find(onHead);
+          if (!target && !fix) target = { repoId: first.id, path: first.worktrees.find((w) => w.isMain)?.path ?? first.path };
+          if (!target) {
+            if (!head) throw new CommandError("unavailable", `#${String(n)} has no head branch to check out: pass --worktree`);
+            if (cross) throw new CommandError("unavailable", `#${String(n)} comes from a fork and no worktree of ${slug} has its head checked out: check it out (for example \`gh pr checkout ${String(n)}\` in a worktree) and pass --worktree`);
+            // The daemon fetches origin/<head> and creates the branch tracking it.
+            const w: MockWorktree = { path: `${HOME}/.code-foundry/worktrees/${first.githubSlug}/${head.replace(/\//g, "-")}`, branch: head, head: pr?.headSha ?? "c0ffee00", isMain: false, status: clean({ upstream: `origin/${head}`, baseRef: "" }) };
+            first.worktrees.push(w);
+            this.repoEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(first.id, w) } });
+            target = { repoId: first.id, path: w.path };
+          }
+        }
+        const defaults = this.sessionDefaults();
+        const s = this.createSession(target.repoId, target.path, args.model ?? defaults.model, args.effort ?? defaults.effort);
+        this.focusSession(s.id);
+        return `Started session ${s.id} for PR #${String(n)}`;
+      };
+    const always = () => true;
+    return [
+      {
+        cmd: {
+          name: "pr.ask",
+          title: "Ask About Pull Request",
+          category: "Pull Request",
+          description: "Start a Claude session that answers a question about a pull request without changing code.",
+          keybindings: [],
+          args: [slugArg, numberArg, { name: "question", type: ArgType.STRING, required: true, description: "What to ask" }, worktreeArg, modelArg, effortArg],
+        },
+        when: always,
+        run: (ctx, args) => {
+          if (!(args.question ?? "").trim()) throw new CommandError("invalid", "question is required");
+          return start(false)(ctx, args);
+        },
+      },
+      {
+        cmd: {
+          name: "pr.explain",
+          title: "Explain Pull Request",
+          category: "Pull Request",
+          description: "Start a Claude session that walks through a pull request for a first-time reviewer.",
+          keybindings: [],
+          args: [slugArg, numberArg, worktreeArg, modelArg, effortArg],
+        },
+        when: always,
+        run: start(false),
+      },
+      {
+        cmd: {
+          name: "pr.fix.findings",
+          title: "Fix Pull Request Findings",
+          category: "Pull Request",
+          description: "Start a Claude session on the pull request's branch that fixes its unresolved review comments and failing checks.",
+          keybindings: [],
+          args: [slugArg, numberArg, worktreeArg, modelArg, effortArg],
+        },
+        when: always,
+        run: start(true),
+      },
+    ];
+  }
+
   /** The registry: definitions plus a `when` predicate over the caller's context. */
   private registry(): { cmd: CmdDef; when: (ctx: UiContext | undefined) => boolean; run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut> }[] {
     const activeTerm = (ctx: UiContext | undefined) => (ctx?.activeTerminalId ? this.terms.get(ctx.activeTerminalId) : undefined);
@@ -905,6 +1015,7 @@ export class World {
         return null;
       }),
       ...this.gh.prDetails.commands(),
+      ...this.prSessionCommands(),
       {
         cmd: { name: "view.settings", title: "Open Settings", category: "View", description: "Open the settings page", keybindings: ["cmd+,"], args: [] },
         when: always,
@@ -935,16 +1046,30 @@ export class World {
   }
 
   /** The registry with settings applied: keybinding overrides and session.new defaults. */
+  /** sessions.default_model and sessions.default_effort ("" when unset). */
+  private sessionDefaults(): { model: string; effort: string } {
+    const v = this.settings.values();
+    return { model: v["sessions.default_model"] ?? "", effort: v["sessions.default_effort"] ?? "" };
+  }
+
+  /**
+   * The registry with settings applied: keybinding overrides, and the session defaults on
+   * every command that starts a session (internal/daemon/settings.go registryOverrides).
+   */
   private effectiveRegistry(): ReturnType<World["registry"]> {
     const entries = this.registry();
     const kb = this.settings.keybindings();
-    const model = this.settings.values()["sessions.default_model"] ?? "";
+    const defaults: Record<string, string> = this.sessionDefaults();
+    const startsSession = new Set(["session.new", "pr.ask", "pr.explain", "pr.fix.findings"]);
     return entries.map((e) => ({
       ...e,
       cmd: {
         ...e.cmd,
         keybindings: kb[e.cmd.name] ?? e.cmd.keybindings,
-        args: e.cmd.args.map((a) => (e.cmd.name === "session.new" && a.name === "model" && model && a.enumValues?.includes(model) ? { ...a, defaultValue: model } : a)),
+        args: e.cmd.args.map((a) => {
+          const d = startsSession.has(e.cmd.name) && (a.name === "model" || a.name === "effort") ? defaults[a.name] : "";
+          return d && a.enumValues?.includes(d) ? { ...a, defaultValue: d } : a;
+        }),
       },
     }));
   }

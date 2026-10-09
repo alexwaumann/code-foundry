@@ -57,7 +57,10 @@ func registryOverrides(s settings.Settings) command.Overrides {
 	return command.Overrides{
 		Keybindings: settings.KeybindingOverrides(s.Keybindings),
 		ArgDefaults: map[string]map[string]string{
-			"session.new": {"model": s.Sessions.DefaultModel, "effort": s.Sessions.DefaultEffort},
+			"session.new":     {"model": s.Sessions.DefaultModel, "effort": s.Sessions.DefaultEffort},
+			"pr.ask":          {"model": s.Sessions.DefaultModel, "effort": s.Sessions.DefaultEffort},
+			"pr.explain":      {"model": s.Sessions.DefaultModel, "effort": s.Sessions.DefaultEffort},
+			"pr.fix.findings": {"model": s.Sessions.DefaultModel, "effort": s.Sessions.DefaultEffort},
 		},
 	}
 }

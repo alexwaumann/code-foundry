@@ -60,7 +60,8 @@ const (
 
 // GitOpsServiceClient is a client for the codefoundry.v1.GitOpsService service.
 type GitOpsServiceClient interface {
-	// Fetch runs `git fetch --prune` in the worktree.
+	// Fetch runs `git fetch --prune` in the worktree, optionally for one remote or one
+	// branch of it.
 	Fetch(context.Context, *connect.Request[v1.GitFetchRequest]) (*connect.Response[v1.GitFetchResponse], error)
 	// Pull runs `git pull --ff-only` (or `--rebase`). A rebase that stops on conflicts is
 	// aborted, leaving the worktree as it was.
@@ -225,7 +226,8 @@ func (c *gitOpsServiceClient) Watch(ctx context.Context, req *connect.Request[v1
 
 // GitOpsServiceHandler is an implementation of the codefoundry.v1.GitOpsService service.
 type GitOpsServiceHandler interface {
-	// Fetch runs `git fetch --prune` in the worktree.
+	// Fetch runs `git fetch --prune` in the worktree, optionally for one remote or one
+	// branch of it.
 	Fetch(context.Context, *connect.Request[v1.GitFetchRequest]) (*connect.Response[v1.GitFetchResponse], error)
 	// Pull runs `git pull --ff-only` (or `--rebase`). A rebase that stops on conflicts is
 	// aborted, leaving the worktree as it was.

@@ -93,7 +93,11 @@ func (f *Fake) do(kind gitops.Kind, path, call string) (gitops.Op, error) {
 
 // Fetch implements gitops.Store.
 func (f *Fake) Fetch(_ context.Context, o gitops.FetchOptions) (gitops.Op, error) {
-	return f.do(gitops.KindFetch, o.WorktreePath, "Fetch "+o.WorktreePath)
+	call := "Fetch " + o.WorktreePath
+	if o.Remote != "" || o.Branch != "" {
+		call += fmt.Sprintf(" remote=%q branch=%q", o.Remote, o.Branch)
+	}
+	return f.do(gitops.KindFetch, o.WorktreePath, call)
 }
 
 // Pull implements gitops.Store.
