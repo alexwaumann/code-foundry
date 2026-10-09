@@ -49,6 +49,9 @@ message Repo {
   // Non-empty when the last reconcile failed (for example, the directory was moved or
   // deleted). The repo stays registered; worktrees are empty until it recovers.
   string error = 8;
+  // Configured git remotes ("origin", …), sorted. Empty for a local-only repository:
+  // fetch, pull, push and pull-request actions are unavailable then.
+  repeated string remotes = 9;
 }
 
 message Worktree {

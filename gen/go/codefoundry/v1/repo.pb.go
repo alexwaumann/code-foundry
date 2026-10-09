@@ -38,7 +38,10 @@ type Repo struct {
 	RegisteredAt *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=registered_at,json=registeredAt,proto3" json:"registered_at,omitempty"`
 	// Non-empty when the last reconcile failed (for example, the directory was moved or
 	// deleted). The repo stays registered; worktrees are empty until it recovers.
-	Error         string `protobuf:"bytes,8,opt,name=error,proto3" json:"error,omitempty"`
+	Error string `protobuf:"bytes,8,opt,name=error,proto3" json:"error,omitempty"`
+	// Configured git remotes ("origin", …), sorted. Empty for a local-only repository:
+	// fetch, pull, push and pull-request actions are unavailable then.
+	Remotes       []string `protobuf:"bytes,9,rep,name=remotes,proto3" json:"remotes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -127,6 +130,13 @@ func (x *Repo) GetError() string {
 		return x.Error
 	}
 	return ""
+}
+
+func (x *Repo) GetRemotes() []string {
+	if x != nil {
+		return x.Remotes
+	}
+	return nil
 }
 
 type Worktree struct {
@@ -1885,7 +1895,7 @@ var File_codefoundry_v1_repo_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_repo_proto_rawDesc = "" +
 	"\n" +
-	"\x19codefoundry/v1/repo.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x95\x02\n" +
+	"\x19codefoundry/v1/repo.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xaf\x02\n" +
 	"\x04Repo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x12\n" +
@@ -1895,7 +1905,8 @@ const file_codefoundry_v1_repo_proto_rawDesc = "" +
 	"githubSlug\x126\n" +
 	"\tworktrees\x18\x06 \x03(\v2\x18.codefoundry.v1.WorktreeR\tworktrees\x12?\n" +
 	"\rregistered_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\fregisteredAt\x12\x14\n" +
-	"\x05error\x18\b \x01(\tR\x05error\"\xcb\x01\n" +
+	"\x05error\x18\b \x01(\tR\x05error\x12\x18\n" +
+	"\aremotes\x18\t \x03(\tR\aremotes\"\xcb\x01\n" +
 	"\bWorktree\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x16\n" +
