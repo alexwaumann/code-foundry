@@ -14,10 +14,12 @@ import { Toaster } from "@/components/ui/sonner";
 import { UpdateDialog } from "@/components/update/UpdateDialog";
 import { installKeybindings } from "@/keys/bindings";
 import { syncDocumentScheme, useColorScheme } from "@/lib/theme";
+import { cn } from "@/lib/utils";
 import { useWindowTitle } from "@/lib/title";
 import { startCommandSync } from "@/stores/commands";
 import { startEventSync } from "@/stores/events";
 import { startHealthPolling } from "@/stores/health";
+import { usePanelExpanded } from "@/stores/panel";
 import { useAttentionCount, useSessionsStore } from "@/stores/sessions";
 import { CONTENT_MIN, useUiStore, type FocusRegion } from "@/stores/ui";
 import { startViewSync, useViewsStore } from "@/stores/views";
@@ -77,11 +79,13 @@ function Content() {
 }
 
 /**
- * The content pane. On a focus request (ui contentFocusSeq) it focuses the page's
+ * The content pane. Hidden (display: none), not unmounted, while the side panel is
+ * expanded over it: the terminal keeps its Attach stream and xterm state, and its fit
+ * skips the zero-size host (terminal/xterm.ts). On a focus request (ui contentFocusSeq) it focuses the page's
  * `[data-focus-root]` element (a page's keyboard list or its root section); a terminal
  * answers the same request itself (TerminalPane), and has no focus root.
  */
-function ContentPane({ children }: { children: ReactNode }) {
+function ContentPane({ hidden, children }: { hidden: boolean; children: ReactNode }) {
   const ref = useRef<HTMLElement>(null);
   const focusSeq = useUiStore((s) => s.contentFocusSeq);
   useEffect(() => {
@@ -91,7 +95,7 @@ function ContentPane({ children }: { children: ReactNode }) {
   return (
     <main
       ref={ref}
-      className="m-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs"
+      className={cn("m-2 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs", hidden ? "hidden" : "flex")}
       // The side panel shrinks, then hides, before the content pane gets narrower than this.
       style={{ minWidth: CONTENT_MIN }}
       data-testid="content-pane"
@@ -105,6 +109,8 @@ export function App() {
   useEffect(() => startApp(), []);
   const scheme = useColorScheme();
   const settingsOpen = useViewsStore((s) => s.settingsOpen);
+  // Settings hides the panel, so the content pane shows the settings page even then.
+  const panelExpanded = usePanelExpanded() && !settingsOpen;
   useWindowTitle(useAttentionCount());
 
   return (
@@ -120,7 +126,7 @@ export function App() {
       <div className="absolute inset-x-0 top-0 h-2 [--wails-draggable:drag]" data-testid="window-drag-edge" aria-hidden />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <ContentPane>{settingsOpen ? <SettingsPage /> : <Content />}</ContentPane>
+        <ContentPane hidden={panelExpanded}>{settingsOpen ? <SettingsPage /> : <Content />}</ContentPane>
         <SidePanel />
       </div>
       <CommandPalette />

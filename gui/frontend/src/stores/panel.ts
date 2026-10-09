@@ -1,7 +1,8 @@
 /**
  * The side panel ("surface panel") to the right of the content pane. Each selection
  * (session, terminal, worktree, repo, top-level page) has its own panel: whether it is
- * open, its tabs, the active tab, and its width. Switching selection shows that
+ * open, its tabs, the active tab, its width, and whether it is expanded to the full width
+ * of the content area. Switching selection shows that
  * selection's panel. All of it is persisted (localStorage "code-foundry.panel"), so it
  * survives a reload. Entries are never pruned: a deleted session's panel stays stored.
  * See docs/notes/side-panel.md.
@@ -34,6 +35,12 @@ export interface PanelEntry {
    * window comes back when there is room again.
    */
   width?: number;
+  /**
+   * Fills the content area (the content pane hides) while open. Absent means false: the
+   * reducers drop it rather than store false, so entries saved before it existed and
+   * entries never expanded look the same. Hiding the panel keeps it.
+   */
+  expanded?: boolean;
 }
 
 export const emptyEntry: PanelEntry = { open: false, tabs: [], activeTabId: null };
@@ -113,6 +120,15 @@ export function setWidth(e: PanelEntry, width: number | undefined): PanelEntry {
   return rest;
 }
 
+/** Expands (true), restores the split (false), or flips it (undefined). Open state is untouched. */
+export function setExpanded(e: PanelEntry, expanded?: boolean): PanelEntry {
+  const next = expanded ?? !e.expanded;
+  if (next === (e.expanded ?? false)) return e;
+  if (next) return { ...e, expanded: true };
+  const { expanded: _old, ...rest } = e;
+  return rest;
+}
+
 export interface PanelState {
   byKey: Readonly<Record<string, PanelEntry>>;
 }
@@ -188,6 +204,24 @@ export function activatePanelTab(target: PanelTarget, id: string): void {
   update(target, (e) => activateTab(e, id));
 }
 
+/**
+ * Expands a panel to the full width of the content area, restores its split (`expanded`
+ * false), or flips it. Expanding shows a hidden panel. With `focus`, an expanded result
+ * asks the panel to take focus. Returns whether the panel is now open and expanded. The
+ * view.panel.expand command is expandPanelCommand (stores/views.ts).
+ */
+export function expandPanel(target: PanelTarget = "current", expanded?: boolean, opts: { focus?: boolean } = {}): boolean {
+  const key = update(target, (e) => {
+    const next = setExpanded(e, expanded);
+    return next.expanded ? toggle(next, true) : next;
+  });
+  if (key === null) return false;
+  const result = usePanelStore.getState().byKey[key]?.expanded ?? false;
+  // After the state change, so the panel it shows is mounted when SidePanel acts on it.
+  if (result && opts.focus) useUiStore.setState((s) => ({ panelFocusSeq: s.panelFocusSeq + 1 }));
+  return result;
+}
+
 /** Sets one panel's width, clamped to [PANEL_MIN, panelMax] for the current window and sidebar. */
 export function setPanelWidth(target: PanelTarget, w: number): void {
   const ui = useUiStore.getState();
@@ -208,6 +242,15 @@ export function useCurrentPanelKey(): string | null {
 /** A panel's stored width (PANEL_DEFAULT when it has none); not yet bounded by panelMax. */
 export function usePanelWidth(key: string): number {
   return usePanelStore((s) => s.byKey[key]?.width ?? PANEL_DEFAULT);
+}
+
+/** Whether the current selection's panel is open and expanded (it then fills the content area). */
+export function usePanelExpanded(): boolean {
+  const key = useCurrentPanelKey();
+  return usePanelStore((s) => {
+    const e = key === null ? undefined : s.byKey[key];
+    return (e?.open ?? false) && (e?.expanded ?? false);
+  });
 }
 
 /** Whether the current selection's panel is open. */

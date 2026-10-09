@@ -10,6 +10,7 @@ import { isGlobalChord } from "@/keys/bindings";
 import { useColorScheme } from "@/lib/theme";
 import { useScrollbackLines, useTerminalFontFamily } from "@/stores/settings";
 import { tildify, terminalLabel } from "@/lib/path";
+import { getPanel } from "@/stores/panel";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { AttachController, type AttachState } from "@/terminal/attach";
@@ -228,6 +229,13 @@ export function TerminalPane({ terminalId, sessionId }: { terminalId: string; se
   }, [scrollback]);
 
   useEffect(() => {
+    // Hidden under an expanded side panel: the panel is what shows, so it takes the focus
+    // meant for the terminal (selection switch, settings closing).
+    const panel = getPanel();
+    if (panel.open && panel.expanded) {
+      useUiStore.setState((s) => ({ panelFocusSeq: s.panelFocusSeq + 1 }));
+      return;
+    }
     ctlRef.current?.renderer.focus();
   }, [focusSeq, contentFocusSeq, terminalId]);
 

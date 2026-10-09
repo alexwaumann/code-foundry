@@ -151,6 +151,12 @@ export class XtermRenderer implements TerminalRenderer {
 
   fit(): void {
     if (!this.mounted) return;
+    // A hidden host (display: none, e.g. the content pane under an expanded side panel)
+    // measures 0x0, and the fit addon would shrink the terminal (and the PTY, via
+    // onResize) to its 2-column minimum. Keep the size; the host's ResizeObserver refits
+    // when it shows again.
+    const host = this.term.element?.parentElement;
+    if (!host || host.clientWidth === 0 || host.clientHeight === 0) return;
     const dims = this.fitAddon.proposeDimensions();
     if (!dims || !Number.isFinite(dims.cols) || !Number.isFinite(dims.rows)) return;
     const cols = Math.max(2, dims.cols);
