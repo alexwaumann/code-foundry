@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { startCommandNamed } from "@/keys/bindings";
+import { isStartable, startCommandNamed } from "@/keys/bindings";
 import { useCommandsStore } from "@/stores/commands";
 
 type ButtonProps = ComponentProps<typeof Button>;
@@ -31,7 +31,7 @@ interface CommandButtonProps {
  * A button for a registry command. It does exactly what picking the command in the
  * palette does (startCommand: GUI presenters, arg prompts, confirmation), so it adds no
  * user action of its own. Availability comes from CommandService.List for the current
- * context, which only lists available commands.
+ * context (isStartable: available, or presented with a context of its own).
  */
 export function CommandButton({
   command,
@@ -45,7 +45,7 @@ export function CommandButton({
   className,
   "data-testid": testId,
 }: CommandButtonProps) {
-  const commandTitle = useCommandsStore((s) => s.commands.find((c) => c.name === command && c.available)?.title ?? null);
+  const commandTitle = useCommandsStore((s) => s.commands.find((c) => c.name === command && isStartable(c))?.title ?? null);
   if (commandTitle === null && whenUnavailable === "hide") return null;
   const name = title ?? commandTitle ?? label ?? command;
   return (

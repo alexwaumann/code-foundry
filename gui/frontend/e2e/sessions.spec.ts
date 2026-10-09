@@ -106,26 +106,23 @@ test("needs-attention: count badge, window title, and cmd+shift+a", async ({ pag
   await expect(page).toHaveTitle("Code Foundry (1)");
 });
 
-test("new session: cmd+n prompts model and effort from the ArgSpec, then attaches", async ({ page }) => {
+test("new thread: the sidebar + on a worktree opens the composer with that worktree", async ({ page }) => {
   await openApp(page);
-  await row(page, `w:repo-cf::${FIX_RESIZE}`).click();
-  await page.keyboard.press("Meta+n");
-  const palette = page.getByTestId("palette");
-  await expect(palette).toHaveAttribute("data-mode", "args");
-  const option = (v: string) => palette.getByRole("option", { name: new RegExp(`^${v}( default)?$`) });
-  for (const m of ["opus", "sonnet", "haiku"]) await expect(option(m)).toBeVisible();
-  await expect(option("opus")).toContainText("default"); // ArgSpec.default_value is highlighted
-  await option("haiku").click();
-  for (const e of ["low", "medium", "high", "xhigh", "max"]) await expect(option(e)).toBeVisible();
-  await page.keyboard.type("max");
+  const wt = row(page, `w:repo-cf::${FIX_RESIZE}`);
+  await wt.hover();
+  await wt.getByTestId("new-session").click();
+  await expect(page.getByTestId("palette")).toHaveCount(0);
+  await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in code-foundry?");
+  await expect(page.getByTestId("composer-worktree")).toHaveText("Existing worktree: fix/resize");
+  // No base ref for an existing worktree.
+  await expect(page.getByTestId("composer-base")).toHaveCount(0);
+  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await page.keyboard.type("Fix the resize race");
   await page.keyboard.press("Enter");
-  await expect(palette).toHaveCount(0);
-
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
   const last = (await invocations()).at(-1);
-  expect(last?.name).toBe("session.new");
-  expect(last?.args).toEqual({ model: "haiku", effort: "max" });
-  expect(last?.context?.activeWorktreePath).toBe(FIX_RESIZE);
-  // The new session row appears under the worktree, selected, with its terminal attached.
+  expect(last?.args).toEqual({ repo: "repo-cf", worktree: FIX_RESIZE, model: "opus", effort: "high", permission: "auto", prompt: "Fix the resize race" });
+  // The thread lands under that worktree, selected and attached.
   const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
   await expect(created).toBeVisible();
   const key = await created.getAttribute("data-row-key");
@@ -133,21 +130,6 @@ test("new session: cmd+n prompts model and effort from the ArgSpec, then attache
   expect(keys.indexOf(key)).toBeGreaterThan(keys.indexOf(`w:repo-cf::${FIX_RESIZE}`));
   expect(keys.indexOf(key)).toBeLessThan(keys.indexOf("t:t-tests"));
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
-});
-
-test("new session: the sidebar + on a worktree opens the same prompts for that worktree", async ({ page }) => {
-  await openApp(page);
-  const wt = row(page, `w:repo-cf::${FIX_RESIZE}`);
-  await wt.hover();
-  await wt.getByTestId("new-session").click();
-  const palette = page.getByTestId("palette");
-  await expect(palette).toHaveAttribute("data-mode", "args");
-  await page.keyboard.press("Enter"); // model: default (opus)
-  await page.keyboard.press("Enter"); // effort: Default (not set)
-  await expect(palette).toHaveCount(0);
-  const last = (await invocations()).at(-1);
-  expect(last).toMatchObject({ name: "session.new", args: { model: "opus" } });
-  expect(last?.context?.activeWorktreePath).toBe(FIX_RESIZE);
 });
 
 test("rename inline: double-click commits via session.rename, cmd+r from the terminal, Escape cancels", async ({ page }) => {
@@ -232,7 +214,7 @@ test("the whole app runs on one events stream plus one Attach", async ({ page })
 test("a daemon without SessionService degrades to 'service unavailable'", async ({ page }) => {
   await mockPost("sessions-service?enabled=false");
   await openApp(page);
-  await expect(page.getByTestId("sessions-unavailable")).toHaveText("Sessions: service unavailable");
+  await expect(page.getByTestId("sessions-unavailable")).toHaveText("Threads: service unavailable");
   // Repos and terminals still work; session terminals show as plain terminals.
   await expect(row(page, "t:t-claude")).toBeVisible();
   await expect(page.locator('[data-row-kind="session"]')).toHaveCount(0);

@@ -12,7 +12,7 @@ import { setHelpOpen, useViewsStore } from "@/stores/views";
  * palette) is the one place chords are listed; the rest of the UI uses buttons.
  */
 const extraChords: LocalChord[] = [
-  { chord: "f2", title: "Rename the selected session" },
+  { chord: "f2", title: "Rename the selected thread" },
   { chord: "escape", title: "Close the palette, dialog, or settings" },
   { chord: "arrowup", title: "Move in the sidebar and lists" },
   { chord: "arrowdown", title: "Move in the sidebar and lists" },
@@ -62,12 +62,13 @@ function HelpBody() {
         <DialogDescription asChild>
           <div className="space-y-3">
             <p>
-              <span className="font-medium text-foreground">Sessions</span> are Claude Code running in a terminal the daemon owns. They keep
-              running when the window closes. A closed session stays listed, disconnected, and Reconnect resumes its conversation.
+              <span className="font-medium text-foreground">Threads</span> are Claude Code running in a terminal the daemon owns. They keep
+              running when the window closes. A closed thread stays listed, disconnected, and Reconnect resumes its conversation.
             </p>
             <p>
-              <span className="font-medium text-foreground">Worktrees</span> give each session its own checkout of a registered repository,
-              so sessions never edit each other's files. The sidebar groups sessions under their worktree.
+              <span className="font-medium text-foreground">Worktrees</span> give each thread its own checkout of a registered repository,
+              so threads never edit each other's files. A new thread can make its own worktree. The sidebar groups threads under their
+              worktree.
             </p>
             <p>
               <span className="font-medium text-foreground">The palette</span> (⌘K) lists every action available for what you are looking

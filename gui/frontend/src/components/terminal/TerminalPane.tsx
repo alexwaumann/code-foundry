@@ -227,7 +227,7 @@ export function TerminalPane({ terminalId, sessionId }: { terminalId: string; se
   }, [focusSeq, terminalId]);
 
   return (
-    <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label={sessionId ? "Session" : "Terminal"} data-session-id={sessionId}>
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label={sessionId ? "Thread" : "Terminal"} data-session-id={sessionId}>
       <TerminalHeader id={terminalId} sessionId={sessionId} size={size} renderer={rendererKind} />
       <div className="relative min-h-0 flex-1 bg-[var(--terminal-bg)] py-1 pl-2">
         <div

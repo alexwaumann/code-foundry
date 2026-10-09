@@ -143,7 +143,7 @@ function SidebarTree() {
     <div
       ref={scrollRef}
       role="tree"
-      aria-label="Repositories, sessions and terminals"
+      aria-label="Repositories, threads and terminals"
       tabIndex={0}
       data-region="sidebar"
       aria-activedescendant={activeRow ? `row-${activeRow.key}` : undefined}
@@ -175,7 +175,7 @@ function SidebarTree() {
 function AttentionBadge() {
   const count = useAttentionCount();
   if (count === 0) return null;
-  const label = `${String(count)} ${count === 1 ? "session needs" : "sessions need"} attention`;
+  const label = `${String(count)} ${count === 1 ? "thread needs" : "threads need"} attention`;
   return (
     <button
       type="button"
@@ -201,7 +201,7 @@ function SessionsUnavailable() {
   if (!unavailable) return null;
   return (
     <p className="shrink-0 border-t border-sidebar-border px-3 py-1.5 text-[11px] text-muted-foreground" data-testid="sessions-unavailable" title={error ?? ""}>
-      Sessions: service unavailable
+      Threads: service unavailable
     </p>
   );
 }
@@ -219,7 +219,7 @@ export function Sidebar() {
         <span className="flex items-center gap-2">
           <AttentionBadge />
           <span className="tabular-nums">{repoCount > 0 ? repoCount : ""}</span>
-          {/* New session/terminal in the selected worktree, as session.new / terminal.new from the palette. */}
+          {/* New thread (the project picker) and new terminal in the selected worktree, as session.new / terminal.new from the palette. */}
           <span className="-mr-1.5 flex items-center normal-case">
             <CommandButton command="session.new" icon={Sparkles} whenUnavailable="disable" data-testid="sidebar-new-session" />
             <CommandButton command="terminal.new" icon={SquareTerminal} whenUnavailable="disable" data-testid="sidebar-new-terminal" />

@@ -150,6 +150,7 @@ describe("deriveContext", () => {
       { kind: "worktree", repoId: "r1", path: "/src/app.worktrees/feat" } as const,
       { ...emptyContext, activeRepoId: "r1", activeWorktreePath: "/src/app.worktrees/feat", activeView: "worktree" },
     ],
+    ["composer: the repo only (session.new is available, no worktree yet)", { kind: "compose", repoId: "r1" } as const, { ...emptyContext, activeRepoId: "r1", activeView: "compose" }],
   ])("%s", (_name, sel, want) => {
     expect(deriveContext(sel, terms, repos)).toEqual(want);
   });

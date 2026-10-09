@@ -23,7 +23,7 @@ export const badgeLabels: Record<SessionBadge, string> = {
   busy: "busy",
   idle: "idle",
   attention: "needs attention",
-  unknown: "session",
+  unknown: "thread",
 };
 
 /** Why a session is not connected, for the "Not connected" panel. */

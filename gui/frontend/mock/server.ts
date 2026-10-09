@@ -15,6 +15,9 @@
  *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
  *   POST /__mock/sessions-service?enabled=false   (simulate a daemon without SessionService)
+ *   POST /__mock/session-new?delay=700            (how long session.new takes to make a worktree)
+ *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size)
+ *   session.new with a prompt containing FAIL fails (after the worktree delay, if any).
  *   POST /__mock/gitops?fail=git.push&delay=800   (next git.push fails; ops take 800ms)
  *   GET  /__mock/gitops
  *   GET  /__mock/settings                          ({ raw, values } of the settings "file")
@@ -149,6 +152,7 @@ function routes(router: ConnectRouter): void {
       throw new ConnectError("use the worktree.remove command in the mock", Code.Unimplemented);
     },
     refresh: () => ({}),
+    listRefs: (req) => guard(() => world.listRefs(req.repoId)),
     getWorktreeDetail: (req) => {
       const detail = world.gh.getWorktreeDetail(req.repoId, req.path);
       if (!detail) throw new ConnectError(`worktree ${req.path} not found`, Code.NotFound);
@@ -226,6 +230,7 @@ function routes(router: ConnectRouter): void {
     remove: () => {
       throw new ConnectError("use the session.remove command in the mock", Code.Unimplemented);
     },
+    stageAttachment: (req) => guard(() => ({ path: world.stageAttachment(req.name, req.mimeType, req.data.length) })),
     watch: (_req, ctx) => tracked("SessionService/Watch", world.sessionEvents.subscribe(ctx.signal, [world.sessionSnapshot()])),
   });
 
@@ -407,6 +412,13 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       for (const name of q.getAll("fail")) world.gitops.failNext.add(name);
       if (q.has("delay")) world.gitops.delayMs = Number(q.get("delay"));
       json(res, 200, { fail: [...world.gitops.failNext], delayMs: world.gitops.delayMs });
+      break;
+    case "POST /__mock/session-new":
+      if (q.has("delay")) world.worktreeDelayMs = Number(q.get("delay"));
+      json(res, 200, { delayMs: world.worktreeDelayMs });
+      break;
+    case "GET /__mock/attachments":
+      json(res, 200, [...world.attachments].map(([path, a]) => ({ path, ...a })));
       break;
     case "GET /__mock/gitops":
       json(res, 200, world.gitops.summaries());

@@ -36,7 +36,7 @@ test("cmd+, opens settings rendered from the schema", async ({ page }) => {
     await expect(settings.getByRole("heading", { name: title, exact: true })).toBeVisible();
   }
   await expect(setting(page, "appearance.font_size").getByRole("spinbutton")).toHaveValue("13");
-  await expect(setting(page, "sessions.default_model").getByRole("combobox")).toHaveValue("");
+  await expect(setting(page, "sessions.default_model").getByRole("combobox")).toHaveValue("opus");
   // Restart-required fields say so; live ones do not.
   await expect(setting(page, "sessions.scrollback_lines").getByTestId("restart-hint")).toBeVisible();
   await expect(setting(page, "appearance.theme").getByTestId("restart-hint")).toHaveCount(0);

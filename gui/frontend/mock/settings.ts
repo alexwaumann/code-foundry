@@ -33,8 +33,8 @@ export const groups: GroupInit[] = [
 
 const S = SettingType;
 const staticFields: FieldInit[] = [
-  { key: "sessions.default_model", group: "sessions", type: S.ENUM, title: "Default model", description: "Model for new sessions when none is picked. Empty uses Claude's own default.", enumValues: ["", "fable", "opus", "sonnet", "haiku"], defaultValue: "" },
-  { key: "sessions.default_effort", group: "sessions", type: S.ENUM, title: "Default effort", description: "Effort level for new sessions when none is picked.", enumValues: ["", "low", "medium", "high", "xhigh", "max"], defaultValue: "" },
+  { key: "sessions.default_model", group: "sessions", type: S.ENUM, title: "Default model", description: "Model for new sessions when none is picked. Empty uses Claude's own default.", enumValues: ["", "fable", "opus", "sonnet", "haiku"], defaultValue: "opus" },
+  { key: "sessions.default_effort", group: "sessions", type: S.ENUM, title: "Default effort", description: "Effort level for new sessions when none is picked.", enumValues: ["", "low", "medium", "high", "xhigh", "max"], defaultValue: "high" },
   { key: "sessions.auto_name", group: "sessions", type: S.BOOL, title: "Name sessions automatically", description: "Name a new session from its first message with a short claude -p call.", defaultValue: "true" },
   { key: "sessions.close_grace_seconds", group: "sessions", type: S.INT, title: "Close grace (seconds)", description: "How long closing a session waits for Claude to exit.", defaultValue: "10", min: 1n, max: 120n, restartRequired: true },
   { key: "sessions.scrollback_lines", group: "sessions", type: S.INT, title: "Scrollback lines", description: "Lines of history each terminal keeps.", defaultValue: "10000", min: 1000n, max: 100000n, restartRequired: true },

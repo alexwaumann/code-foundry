@@ -125,3 +125,17 @@ export async function listRepos(conn: DaemonConnection = daemon, signal?: AbortS
   const res = await c.list({}, { signal });
   return res.repos.map(toRepoView);
 }
+
+export interface RefsView {
+  /** Local branches, then remote-tracking refs ("origin/main"), each sorted. */
+  refs: string[];
+  /** "origin/<default branch>" when it exists, else "<default branch>". */
+  defaultRef: string;
+}
+
+/** Refs a new worktree can be based on (RepoService.ListRefs). */
+export async function listRefs(repoId: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<RefsView> {
+  const c = await conn.client(RepoService);
+  const res = await c.listRefs({ repoId }, { signal });
+  return { refs: [...res.refs], defaultRef: res.defaultRef };
+}

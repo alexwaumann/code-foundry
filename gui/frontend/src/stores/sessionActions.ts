@@ -5,7 +5,6 @@
  */
 import { runCommand, useCommandsStore } from "./commands";
 import { getUiContext } from "./context";
-import { useUiStore } from "./ui";
 
 export const SESSION_COMMANDS = {
   create: "session.new",
@@ -16,13 +15,6 @@ export const SESSION_COMMANDS = {
 
 function sessionContext(id: string) {
   return getUiContext({ kind: "session", id });
-}
-
-/** Opens the palette on session.new for a worktree (its model/effort prompts come from the ArgSpec). */
-export function newSessionIn(repoId: string, path: string): void {
-  const ui = useUiStore.getState();
-  ui.select({ kind: "worktree", repoId, path });
-  ui.openPalette("", SESSION_COMMANDS.create);
 }
 
 /** The arg session.rename takes the new name in: its first required string arg, else "name". */

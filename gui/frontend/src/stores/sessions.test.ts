@@ -30,6 +30,9 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     disconnectReason: "",
     lastError: "",
     parentId: "",
+    permissionMode: "auto",
+    baseRef: "",
+    createdWorktree: false,
     ...over,
   };
 }

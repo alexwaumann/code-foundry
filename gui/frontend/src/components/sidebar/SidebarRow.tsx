@@ -21,7 +21,8 @@ import { basename, terminalLabel } from "@/lib/path";
 import { sessionBadge } from "@/lib/session";
 import { isLeaf, type Row } from "@/lib/tree";
 import { findWorktree, useReposStore } from "@/stores/repos";
-import { newSessionIn, renameSession } from "@/stores/sessionActions";
+import { composeIn } from "@/stores/compose";
+import { renameSession } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
@@ -166,7 +167,7 @@ function RenameField({ id, name }: { id: string; name: string }) {
       ref={ref}
       autoFocus
       defaultValue={name}
-      aria-label="Session name"
+      aria-label="Thread name"
       data-testid="rename-input"
       className="h-5 min-w-0 flex-1 rounded-sm border border-sidebar-ring bg-background px-1 text-[13px] outline-none"
       onClick={(e) => {
@@ -188,7 +189,8 @@ function RenameField({ id, name }: { id: string; name: string }) {
 }
 
 function SessionLabel({ id }: { id: string }) {
-  const name = useSessionsStore((s) => s.byId[id]?.name || "New session");
+  // Unnamed until the daemon names it from the first prompt: the id stands in.
+  const name = useSessionsStore((s) => s.byId[id]?.name ?? "");
   const model = useSessionsStore((s) => s.byId[id]?.model ?? "");
   const disconnected = useSessionsStore((s) => s.byId[id]?.state === "disconnected");
   const attention = useSessionsStore((s) => sessionBadge(s.byId[id]) === "attention");
@@ -202,8 +204,8 @@ function SessionLabel({ id }: { id: string }) {
         <RenameField id={id} name={name} />
       ) : (
         <>
-          <span className={cn("truncate", disconnected && "text-muted-foreground", attention && "font-medium text-amber-200")} data-testid="session-name">
-            {name}
+          <span className={cn("truncate", (disconnected || !name) && "text-muted-foreground", attention && "font-medium text-amber-200")} data-testid="session-name">
+            {name || id}
           </span>
           {model && <span className="shrink-0 truncate text-xs text-muted-foreground">{model}</span>}
         </>
@@ -212,18 +214,19 @@ function SessionLabel({ id }: { id: string }) {
   );
 }
 
-function NewSessionButton({ repoId, path }: { repoId: string; path: string }) {
+/** "+" on a worktree row: the composer for its repo, with this worktree picked. */
+function NewThreadButton({ repoId, path }: { repoId: string; path: string }) {
   return (
     <button
       type="button"
       tabIndex={-1}
-      aria-label="New session"
-      title="New session"
+      aria-label="New thread here"
+      title="New thread here"
       data-testid="new-session"
       className="ml-1 hidden size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground group-hover/row:flex hover:bg-sidebar-accent hover:text-foreground"
       onClick={(e) => {
         e.stopPropagation();
-        newSessionIn(repoId, path);
+        composeIn(repoId, path);
       }}
     >
       <Plus className="size-3.5" />
@@ -269,7 +272,7 @@ export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onAc
           {row.kind === "worktree" && (
             <>
               <WorktreeLabel repoId={row.repoId} path={row.path} />
-              <NewSessionButton repoId={row.repoId} path={row.path} />
+              <NewThreadButton repoId={row.repoId} path={row.path} />
             </>
           )}
           {row.kind === "group" && (

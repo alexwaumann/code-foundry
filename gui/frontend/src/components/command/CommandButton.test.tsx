@@ -6,7 +6,7 @@ import { useCommandsStore } from "@/stores/commands";
 import { CommandButton } from "./CommandButton";
 
 const startCommandNamed = vi.hoisted(() => vi.fn(() => true));
-vi.mock("@/keys/bindings", () => ({ startCommandNamed }));
+vi.mock("@/keys/bindings", async (orig) => ({ ...(await orig<typeof import("@/keys/bindings")>()), startCommandNamed }));
 
 afterEach(() => {
   cleanup();
@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 function cmd(over: Partial<CommandView>): CommandView {
-  return { name: "session.new", title: "New Session", description: "", category: "Session", args: [], keybindings: ["cmd+n"], available: true, ...over };
+  return { name: "terminal.new", title: "New Terminal", description: "", category: "Terminal", args: [], keybindings: ["cmd+t"], available: true, ...over };
 }
 
 describe("CommandButton", () => {
@@ -25,28 +25,34 @@ describe("CommandButton", () => {
     ["listed unavailable, disable", [cmd({ available: false })], "disable" as const, { present: true, disabled: true }],
   ])("%s", (_name, commands, whenUnavailable, want) => {
     useCommandsStore.setState({ commands });
-    render(<CommandButton command="session.new" icon={Plus} whenUnavailable={whenUnavailable} data-testid="b" />);
+    render(<CommandButton command="terminal.new" icon={Plus} whenUnavailable={whenUnavailable} data-testid="b" />);
     const b = screen.queryByTestId("b");
     expect(b !== null).toBe(want.present);
     if (!b) return;
     expect((b as HTMLButtonElement).disabled).toBe(want.disabled);
   });
 
+  it("session.new stays enabled where the daemon lists it unavailable (the project picker supplies the repo)", () => {
+    useCommandsStore.setState({ commands: [cmd({ name: "session.new", title: "New Thread", available: false })] });
+    render(<CommandButton command="session.new" icon={Plus} whenUnavailable="disable" data-testid="b" />);
+    expect(screen.getByTestId<HTMLButtonElement>("b").disabled).toBe(false);
+  });
+
   it("starts the command like the palette and names no chord", () => {
     useCommandsStore.setState({ commands: [cmd({})] });
-    render(<CommandButton command="session.new" icon={Plus} data-testid="b" />);
+    render(<CommandButton command="terminal.new" icon={Plus} data-testid="b" />);
     const b = screen.getByTestId("b");
-    expect(b.getAttribute("title")).toBe("New Session");
-    expect(b.getAttribute("aria-label")).toBe("New Session");
+    expect(b.getAttribute("title")).toBe("New Terminal");
+    expect(b.getAttribute("aria-label")).toBe("New Terminal");
     expect(b.tabIndex).toBe(-1);
     fireEvent.click(b);
-    expect(startCommandNamed).toHaveBeenCalledWith("session.new");
+    expect(startCommandNamed).toHaveBeenCalledWith("terminal.new");
   });
 
   it("a labelled button can take focus", () => {
     useCommandsStore.setState({ commands: [cmd({})] });
-    render(<CommandButton command="session.new" icon={Plus} label="New session" keepFocus={false} />);
-    const b = screen.getByRole("button", { name: "New session" });
+    render(<CommandButton command="terminal.new" icon={Plus} label="New terminal" keepFocus={false} />);
+    const b = screen.getByRole("button", { name: "New terminal" });
     expect(b.tabIndex).toBe(0);
   });
 });
