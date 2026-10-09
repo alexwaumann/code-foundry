@@ -139,7 +139,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 			Title:       "Close Session",
 			Description: "End Claude gracefully. The session stays listed, disconnected, until removed.",
 			Category:    "Session",
-			// Not cmd+w: the Wails app menu closes the window with it.
+			// Not cmd+w: the side panel closes its active tab with it (ReservedChords).
 			Keybindings: []string{"cmd+shift+w"},
 			Args:        []ArgSpec{idArg},
 			When:        hasSession,

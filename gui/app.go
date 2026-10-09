@@ -112,6 +112,12 @@ func runningBundle() string {
 // terminal font size. A menu chord fires whenever the page leaves the key unhandled,
 // so cmd+r with no session selected would reload the whole GUI. Keep the chords left
 // here in command.ReservedChords.
+//
+// The File menu is custom too: the default role binds Close Window to cmd+w, and the
+// side panel owns cmd+w (close the active tab). With the role, any cmd+w the page left
+// unhandled closed the only window, which quits the app
+// (ApplicationShouldTerminateAfterLastWindowClosed). Close Window stays in the menu,
+// without a key equivalent; the red traffic light still closes the window.
 func appMenu(app *application.App) *application.Menu {
 	menu := application.NewMenu()
 	m := menu.AddSubmenu("Code Foundry")
@@ -127,7 +133,12 @@ func appMenu(app *application.App) *application.Menu {
 	m.AddRole(application.UnHide)
 	m.AddSeparator()
 	m.AddRole(application.Quit)
-	menu.AddRole(application.FileMenu)
+	file := menu.AddSubmenu("File")
+	file.Add("Close Window").OnClick(func(*application.Context) {
+		if w := app.Window.Current(); w != nil {
+			w.Close()
+		}
+	})
 	menu.AddRole(application.EditMenu)
 	view := menu.AddSubmenu("View")
 	view.AddRole(application.OpenDevTools) // nil, so skipped, in production builds

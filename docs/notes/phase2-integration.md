@@ -82,7 +82,7 @@ hardcodes the list and points at the frontend sources.
 |---|---|
 | GUI view actions (`src/keys/bindings.ts` `viewActions`) | cmd+k, cmd+shift+p, cmd+b, cmd+shift+a, cmd+1..9, cmd+=, cmd+-, cmd+0 |
 | Editing chords (`src/keys/chord.ts` `editingChords`) | cmd+c, cmd+v, cmd+x, cmd+a, cmd+z, cmd+shift+z |
-| App menu | cmd+w, cmd+q |
+| App menu | cmd+q (cmd+w is the side panel's since `docs/notes/side-panel.md`; the menu's Close Window has no key) |
 
 The only collision found was ui.palette.open on cmd+k. In the GUI, cmd+k is a view action
 that opens the palette locally, so the command's binding could never fire. It was removed
