@@ -116,6 +116,34 @@ func TestRepoUnaryAndErrorCodes(t *testing.T) {
 	}
 }
 
+func TestRepoRemotes(t *testing.T) {
+	fake, c := newRepoServer(t)
+	ctx := context.Background()
+	fake.Put(repo.Repo{ID: "gh", Name: "gh", Remotes: []string{"fork", "origin"}, GitHubSlug: "o/gh"})
+	fake.Put(repo.Repo{ID: "local", Name: "local"})
+	fake.Remotes = []string{"origin"}
+	reg, err := c.Register(ctx, connect.NewRequest(&v1.RegisterRepoRequest{Path: "/code/one"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := reg.Msg.GetRepo().GetRemotes(); !slices.Equal(got, []string{"origin"}) {
+		t.Errorf("Register remotes = %q", got)
+	}
+	list, err := c.List(ctx, connect.NewRequest(&v1.ListReposRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string][]string{"gh": {"fork", "origin"}, "local": nil, repotest.ID("/code/one"): {"origin"}}
+	for _, r := range list.Msg.GetRepos() {
+		if w, ok := want[r.GetId()]; !ok || !slices.Equal(r.GetRemotes(), w) {
+			t.Errorf("repo %s remotes = %q, want %q", r.GetId(), r.GetRemotes(), w)
+		}
+	}
+	if n := len(list.Msg.GetRepos()); n != len(want) {
+		t.Errorf("listed %d repos, want %d", n, len(want))
+	}
+}
+
 func TestRepoWatch(t *testing.T) {
 	fake, c := newRepoServer(t)
 	ctx, cancel := context.WithCancel(context.Background())

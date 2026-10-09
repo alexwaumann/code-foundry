@@ -196,8 +196,20 @@ func (m *Manager) lookup(path string) (repo.Repo, repo.Worktree, bool) {
 
 // GitHubSlug implements Store.
 func (m *Manager) GitHubSlug(repoID, worktreePath string) string {
+	r, _ := m.repoFor(repoID, worktreePath)
+	return r.GitHubSlug
+}
+
+// LocalOnly implements Store.
+func (m *Manager) LocalOnly(repoID, worktreePath string) bool {
+	r, ok := m.repoFor(repoID, worktreePath)
+	return ok && IsLocalOnly(r)
+}
+
+// repoFor returns the registered repo containing worktreePath, else repo repoID.
+func (m *Manager) repoFor(repoID, worktreePath string) (repo.Repo, bool) {
 	if m.opts.Repos == nil {
-		return ""
+		return repo.Repo{}, false
 	}
 	if worktreePath != "" {
 		p := worktreePath
@@ -205,15 +217,13 @@ func (m *Manager) GitHubSlug(repoID, worktreePath string) string {
 			p = rp
 		}
 		if r, _, ok := m.lookup(p); ok {
-			return r.GitHubSlug
+			return r, true
 		}
 	}
 	if repoID != "" {
-		if r, ok := m.opts.Repos.Snapshot().Repo(repoID); ok {
-			return r.GitHubSlug
-		}
+		return m.opts.Repos.Snapshot().Repo(repoID)
 	}
-	return ""
+	return repo.Repo{}, false
 }
 
 // body is an operation's work. It returns the summary and URL on success; on error,

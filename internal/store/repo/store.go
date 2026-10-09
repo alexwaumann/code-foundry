@@ -70,7 +70,15 @@ type repoMeta struct {
 	DefaultBranch string
 	GitHubSlug    string
 	OriginURL     string
+	Remotes       []string // sorted; replaced, never mutated in place
 	Error         string
+}
+
+// equal reports whether m and o hold the same metadata. Update it with the fields.
+func (m *repoMeta) equal(o *repoMeta) bool {
+	return m.ID == o.ID && m.Path == o.Path && m.Name == o.Name && m.RegisteredAt.Equal(o.RegisteredAt) &&
+		m.DefaultBranch == o.DefaultBranch && m.GitHubSlug == o.GitHubSlug && m.OriginURL == o.OriginURL &&
+		slices.Equal(m.Remotes, o.Remotes) && m.Error == o.Error
 }
 
 func (m *repoMeta) commonDir() string { return filepath.Join(m.Path, ".git") }
@@ -250,7 +258,7 @@ func (g *Git) buildLocked() *Snapshot {
 		m := st.meta.Load()
 		r := Repo{
 			ID: m.ID, Path: m.Path, Name: m.Name, RegisteredAt: m.RegisteredAt,
-			DefaultBranch: m.DefaultBranch, GitHubSlug: m.GitHubSlug, Error: m.Error,
+			DefaultBranch: m.DefaultBranch, GitHubSlug: m.GitHubSlug, Remotes: m.Remotes, Error: m.Error,
 			Worktrees: make([]Worktree, 0, len(st.wts)),
 		}
 		for _, slot := range st.wts {
@@ -730,7 +738,7 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 			setChanged = true
 		}
 	}
-	metaChanged := next != *prev
+	metaChanged := !next.equal(prev)
 	if metaChanged {
 		st.meta.Store(&next)
 	}
@@ -824,9 +832,22 @@ func (g *Git) inspect(ctx context.Context, m *repoMeta) ([]listedWorktree, error
 		listed = append(listed, l)
 	}
 
+	// One `git remote` per reconcile; origin's URL is read only when origin exists. A
+	// failed listing keeps the previous remotes rather than reporting a local-only repo.
+	listedRemotes := true
+	if out, err := g.runner.Run(ctx, m.Path, "remote"); err == nil {
+		m.Remotes = parseRemotes(out)
+	} else {
+		listedRemotes = false
+		if ctx.Err() == nil {
+			g.log.Warn("listing remotes failed", "repo", m.ID, "err", err)
+		}
+	}
 	m.OriginURL = ""
-	if out, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin"); err == nil {
-		m.OriginURL = string(trimNL(out))
+	if !listedRemotes || slices.Contains(m.Remotes, "origin") {
+		if out, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin"); err == nil {
+			m.OriginURL = string(trimNL(out))
+		}
 	}
 	m.GitHubSlug = parseGitHubSlug(m.OriginURL)
 	m.DefaultBranch = g.defaultBranch(ctx, m.Path, listed[0].Branch)

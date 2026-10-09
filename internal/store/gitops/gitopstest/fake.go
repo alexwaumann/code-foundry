@@ -30,6 +30,8 @@ type Fake struct {
 	URL string
 	// Slugs maps a repo id or worktree path to its GitHub slug for GitHubSlug.
 	Slugs map[string]string
+	// LocalOnlyRepos holds the repo ids and worktree paths LocalOnly reports true for.
+	LocalOnlyRepos map[string]bool
 	// Calls records calls, e.g. "Push /w force=true".
 	Calls []string
 }
@@ -37,7 +39,9 @@ type Fake struct {
 var _ gitops.Store = (*Fake)(nil)
 
 // New returns a fake publishing to b (which may be nil).
-func New(b *bus.Bus) *Fake { return &Fake{bus: b, Slugs: map[string]string{}} }
+func New(b *bus.Bus) *Fake {
+	return &Fake{bus: b, Slugs: map[string]string{}, LocalOnlyRepos: map[string]bool{}}
+}
 
 // Snapshot implements gitops.Store.
 func (f *Fake) Snapshot() *gitops.Snapshot {
@@ -139,4 +143,15 @@ func (f *Fake) GitHubSlug(repoID, worktreePath string) string {
 		return s
 	}
 	return f.Slugs[repoID]
+}
+
+// LocalOnly implements gitops.Store: LocalOnlyRepos[worktreePath], else
+// LocalOnlyRepos[repoID].
+func (f *Fake) LocalOnly(repoID, worktreePath string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if worktreePath != "" && f.LocalOnlyRepos[worktreePath] {
+		return true
+	}
+	return f.LocalOnlyRepos[repoID]
 }

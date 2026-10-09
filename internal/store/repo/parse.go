@@ -194,6 +194,17 @@ func parseLeftRightCount(out []byte) (left, right int, err error) {
 	return left, right, nil
 }
 
+// parseRemotes parses `git remote` output (one name per line) into sorted names, nil
+// when there are none.
+func parseRemotes(out []byte) []string {
+	names := strings.Fields(string(out))
+	if len(names) == 0 {
+		return nil
+	}
+	slices.Sort(names)
+	return slices.Compact(names)
+}
+
 // parseOriginHead maps `git symbolic-ref refs/remotes/origin/HEAD` output
 // ("refs/remotes/origin/main") to the branch name ("main").
 func parseOriginHead(out []byte) string {

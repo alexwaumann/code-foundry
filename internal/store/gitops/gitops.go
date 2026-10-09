@@ -27,6 +27,9 @@ import (
 var (
 	ErrInvalidArgument = errors.New("invalid argument")
 	ErrClosed          = errors.New("gitops store closed")
+	// ErrNoRemote is returned by Fetch, Pull, Push, CreatePR and OpenPR for a worktree
+	// of a registered repository that has no git remote (see LocalOnly).
+	ErrNoRemote = errors.New("repository has no remote")
 )
 
 // Kind is the kind of operation.
@@ -174,6 +177,15 @@ type Store interface {
 	// GitHubSlug returns the GitHub "owner/name" of the registered repo containing
 	// worktreePath, else of repo repoID, else "".
 	GitHubSlug(repoID, worktreePath string) string
+	// LocalOnly reports whether the registered repo containing worktreePath (else repo
+	// repoID) has no git remote. It is false for an unknown path or repo and for a repo
+	// not yet (or not currently) reconciled, so it never hides an action by mistake.
+	LocalOnly(repoID, worktreePath string) bool
+}
+
+// IsLocalOnly reports whether r is a reconciled repository with no git remote.
+func IsLocalOnly(r repo.Repo) bool {
+	return r.ID != "" && r.Error == "" && len(r.Worktrees) > 0 && len(r.Remotes) == 0
 }
 
 // Repos is the part of the repo store gitops uses: the snapshot to map a path to its

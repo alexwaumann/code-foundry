@@ -31,8 +31,11 @@ type Repo struct {
 	RegisteredAt  time.Time
 	DefaultBranch string
 	GitHubSlug    string // "owner/name" when origin is on GitHub
-	Error         string // last reconcile error, if any
-	Worktrees     []Worktree
+	// Remotes are the configured git remote names, sorted; empty for a local-only
+	// repository (and until the first reconcile).
+	Remotes   []string
+	Error     string // last reconcile error, if any
+	Worktrees []Worktree
 }
 
 // Worktree is one checkout of a repository. The main worktree comes first.

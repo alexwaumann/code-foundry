@@ -33,6 +33,9 @@ type Fake struct {
 	// WorktreeRoot is where CreateWorktree puts worktrees without a path, like
 	// repo.Options.WorktreeRoot. New sets it to DefaultWorktreeRoot.
 	WorktreeRoot string
+	// Remotes are given to repos created by Register (cloned). Nil, the default,
+	// registers local-only repos; Put sets any remotes directly.
+	Remotes []string
 	// Err, when set, is returned by every mutating method.
 	Err error
 	// Calls records method calls, e.g. "Register /x", "Refresh r1".
@@ -105,9 +108,10 @@ func (f *Fake) Register(_ context.Context, path string) (repo.Repo, error) {
 		f.mu.Unlock()
 		return r, nil
 	}
+	remotes := slices.Clone(f.Remotes)
 	f.mu.Unlock()
 	r := repo.Repo{
-		ID: id, Path: path, Name: filepath.Base(path), RegisteredAt: time.Now(), DefaultBranch: "main",
+		ID: id, Path: path, Name: filepath.Base(path), RegisteredAt: time.Now(), DefaultBranch: "main", Remotes: remotes,
 		Worktrees: []repo.Worktree{{RepoID: id, Path: path, Branch: "main", IsMain: true}},
 	}
 	f.Put(r)

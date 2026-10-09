@@ -199,7 +199,7 @@ func reposToProto(rs []repo.Repo) []*v1.Repo {
 func repoToProto(r repo.Repo) *v1.Repo {
 	p := &v1.Repo{
 		Id: r.ID, Path: r.Path, Name: r.Name, DefaultBranch: r.DefaultBranch,
-		GithubSlug: r.GitHubSlug, Error: r.Error,
+		GithubSlug: r.GitHubSlug, Error: r.Error, Remotes: r.Remotes,
 		Worktrees: make([]*v1.Worktree, len(r.Worktrees)),
 	}
 	if !r.RegisteredAt.IsZero() {
