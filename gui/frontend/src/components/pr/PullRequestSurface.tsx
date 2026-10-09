@@ -9,6 +9,7 @@ import { prTabKey, setInnerTab, usePrPanelStore, type PrInnerTab } from "@/store
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
 import { ago, checksHeadline, commentCount, stateBadge, type Tone } from "./model";
+import { PrMenu } from "./PrMenu";
 import { OrderToggle, PrSummary } from "./PrSummary";
 import { PrTimeline } from "./PrTimeline";
 import { toneBadge, toneText } from "./tones";
@@ -38,7 +39,7 @@ export function ChecksHeadline({ d }: { d: PullRequestDetailView }) {
   );
 }
 
-function Header({ d, prRef }: { d: PullRequestDetailView; prRef: PrRef }) {
+function Header({ d, prRef, panelKey }: { d: PullRequestDetailView; prRef: PrRef; panelKey: string }) {
   const pr = d.pullRequest;
   const now = useNow(30_000);
   const comments = commentCount(d);
@@ -62,6 +63,7 @@ function Header({ d, prRef }: { d: PullRequestDetailView; prRef: PrRef }) {
             {comments}
           </span>
           <StateBadge d={d} />
+          <PrMenu prRef={prRef} detail={d} panelKey={panelKey} />
         </span>
       </div>
       <h2 className="text-[15px] leading-snug font-semibold select-text" data-testid="pr-title">
@@ -221,7 +223,7 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
   }
   return (
     <div className="flex flex-col" data-testid="pr-surface" data-pr={`${slug}#${String(number)}`}>
-      <Header d={d} prRef={prRef} />
+      <Header d={d} prRef={prRef} panelKey={panelKey} />
       {d.lastError && !d.checksTruncated && (
         <Banner testId="pr-stale">
           Showing the copy from {ago(d.fetchedAtMs, now) || "earlier"}: the last fetch from GitHub failed ({d.lastError}).
@@ -229,7 +231,7 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
       )}
       {error && <Banner testId="pr-refresh-error">Could not refresh: {error}</Banner>}
       <InnerTabBar d={d} tabKey={tabKey} inner={inner} />
-      {inner === "timeline" ? <PrTimeline d={d} tabKey={tabKey} /> : <PrSummary d={d} tabKey={tabKey} />}
+      {inner === "timeline" ? <PrTimeline d={d} tabKey={tabKey} /> : <PrSummary d={d} prRef={prRef} tabKey={tabKey} />}
     </div>
   );
 }

@@ -5,9 +5,11 @@ import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import { sectionOpenByDefault, toggleOrder, toggleSection, usePrPanelStore, type PrSection } from "@/stores/prPanel";
+import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
 import { Markdown } from "./Markdown";
 import { ago, checkDuration, checkTone, commentCount, conversation, reviewerStatus, reviewVerb, threadLocation, type ConversationItem, type ReviewerStatus } from "./model";
+import { ReviewerPicker } from "./ReviewerPicker";
 import { toneText } from "./tones";
 
 function useSectionOpen(tabKey: string, section: PrSection): boolean {
@@ -266,7 +268,7 @@ function OrderToggle({ tabKey, which }: { tabKey: string; which: "commentOrder" 
 export { OrderToggle };
 
 /** Summary: reviewers, labels, description, checks, and the conversation. */
-export function PrSummary({ d, tabKey }: { d: PullRequestDetailView; tabKey: string }) {
+export function PrSummary({ d, prRef, tabKey }: { d: PullRequestDetailView; prRef: PrRef; tabKey: string }) {
   const order = usePrPanelStore((s) => s.byTab[tabKey]?.commentOrder ?? "newest");
   const items = useMemo(() => conversation(d, order), [d, order]);
   return (
@@ -278,6 +280,7 @@ export function PrSummary({ d, tabKey }: { d: PullRequestDetailView; tabKey: str
             <Reviewer key={r.login} r={r} />
           ))}
           {d.reviewersTruncated && <span className="text-xs text-muted-foreground" data-testid="pr-truncated">and more on GitHub</span>}
+          <ReviewerPicker prRef={prRef} canUpdate={d.viewerCanUpdate} />
         </Row>
         <Row icon={Tag} label="Labels" testId="pr-labels">
           {d.labels.length === 0 ? (

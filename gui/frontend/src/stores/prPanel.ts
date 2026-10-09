@@ -6,12 +6,12 @@
  */
 import { toast } from "sonner";
 import { create } from "zustand";
-import { listReviewerCandidates } from "@/api/gh";
+import { listReviewerCandidates, parseRevertResult } from "@/api/gh";
 import { copyText } from "@/lib/clipboard";
 import { pullRequestTab, type PrRef } from "@/surfaces/pullrequestTarget";
-import { runCommand } from "./commands";
-import { pullRequestDetailResource, pullRequestKey } from "./gh";
-import { openSurface } from "./panel";
+import { runCommand, runCommandForResult } from "./commands";
+import { openUrl, pullRequestDetailResource, pullRequestKey } from "./gh";
+import { openSurface, type PanelTarget } from "./panel";
 import { createResource } from "./resource";
 
 export type PrInnerTab = "summary" | "timeline";
@@ -115,6 +115,30 @@ export async function setReviewRequest(ref: PrRef, login: string, kind: "user" |
       return { requesting: rest };
     });
   }
+}
+
+/**
+ * Menu → Revert changes: pr.revert (the daemon asks for confirmation; the confirm dialog
+ * handles it). On success, toasts the new pull request and opens it as another tab of
+ * the same panel. Returns the new pull request, or null.
+ */
+export async function revertPullRequest(ref: PrRef, panel: PanelTarget): Promise<PrRef | null> {
+  const res = await runCommandForResult("pr.revert", prArgs(ref), { quiet: true });
+  if (!res) return null;
+  const made = parseRevertResult(res.resultJson);
+  pullRequestDetailResource.invalidate(pullRequestKey(ref.slug, ref.number));
+  if (!made) {
+    if (res.message) toast.success(res.message);
+    return null;
+  }
+  const url = made.url || pullRequestUrl({ slug: ref.slug, number: made.number });
+  toast.success(`Opened #${String(made.number)} to revert #${String(ref.number)}`, {
+    description: url,
+    action: { label: "Open on GitHub", onClick: () => void openUrl(url) },
+  });
+  const next = { slug: ref.slug, number: made.number };
+  openSurface(panel, pullRequestTab(next));
+  return next;
 }
 
 /** Menu → Copy link (and shift+cmd+c in the panel). */
