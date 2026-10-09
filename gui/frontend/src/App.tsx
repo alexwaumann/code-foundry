@@ -6,6 +6,7 @@ import { SettingsPage } from "@/components/settings/SettingsPage";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { PullRequestsPage } from "@/components/prs/PullRequestsPage";
 import { SessionDisconnected } from "@/components/session/SessionParts";
+import { SidePanel } from "@/components/panel/SidePanel";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { TerminalPane } from "@/components/terminal/TerminalPane";
 import { Toaster } from "@/components/ui/sonner";
@@ -24,7 +25,7 @@ import { startUpdateSync } from "@/stores/update";
 
 function regionOf(el: EventTarget | null): FocusRegion {
   const region = el instanceof Element ? el.closest("[data-region]")?.getAttribute("data-region") : null;
-  return region === "sidebar" || region === "terminal" || region === "palette" ? region : "content";
+  return region === "sidebar" || region === "terminal" || region === "palette" || region === "panel" ? region : "content";
 }
 
 /**
@@ -74,9 +75,10 @@ export function App() {
   useWindowTitle(useAttentionCount());
 
   return (
-    // The sheet: one background under the title strip and sidebar. The content area is
-    // the one pane floating on it (rounded, lighter, 8px in from its neighbours and the
-    // window's right and bottom edges).
+    // The sheet: one background under the title strip and sidebar. The content area is a
+    // pane floating on it (rounded, lighter, 8px in from its neighbours and the window's
+    // right and bottom edges); the selection's side panel, when open, is a second pane
+    // to its right (components/panel, docs/notes/side-panel.md).
     <div className="flex h-screen flex-col overflow-hidden bg-sheet text-foreground">
       <TitleStrip />
       <div className="flex min-h-0 flex-1">
@@ -84,6 +86,7 @@ export function App() {
         <main className="mx-2 mb-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs" data-testid="content-pane">
           {settingsOpen ? <SettingsPage /> : <Content />}
         </main>
+        <SidePanel />
       </div>
       <CommandPalette />
       <HelpOverlay />

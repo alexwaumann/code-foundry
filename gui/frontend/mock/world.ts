@@ -915,6 +915,11 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "help" } } }))}`,
       },
       {
+        cmd: { name: "view.panel.toggle", title: "Toggle Side Panel", category: "View", description: "Show or hide the side panel", keybindings: ["cmd+shift+e"], args: [] },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.toggle" } } }))}`,
+      },
+      {
         cmd: { name: "settings.reveal", title: "Reveal Settings File", category: "Settings", description: "Show the settings file in Finder", keybindings: [], args: [] },
         when: always,
         run: () => "revealed settings.toml",

@@ -15,10 +15,14 @@ export type Selection =
 export const viewNames: readonly string[] = ["pullrequests"];
 
 /** Which region has keyboard focus; the palette returns focus to it on close. */
-export type FocusRegion = "sidebar" | "terminal" | "content" | "palette";
+export type FocusRegion = "sidebar" | "terminal" | "content" | "palette" | "panel";
 
 export const SIDEBAR_MIN = 180;
 export const SIDEBAR_MAX = 520;
+/** Side panel width bounds; the upper bound is also a share of the window (panelMax). */
+export const PANEL_MIN = 280;
+export const PANEL_MAX_FRACTION = 0.6;
+export const PANEL_DEFAULT = 420;
 export const FONT_MIN = 9;
 export const FONT_MAX = 28;
 export const FONT_DEFAULT = 13;
@@ -40,6 +44,8 @@ interface UiState {
   // Persisted settings.
   sidebarVisible: boolean;
   sidebarWidth: number;
+  /** Side panel width (one value for every selection's panel; see stores/panel.ts). */
+  panelWidth: number;
   fontSize: number;
 
   select: (sel: Selection, opts?: { focusTerminal?: boolean }) => void;
@@ -52,11 +58,17 @@ interface UiState {
   setRenaming: (sessionId: string | null) => void;
   toggleSidebar: () => void;
   setSidebarWidth: (w: number) => void;
+  setPanelWidth: (w: number, windowWidth?: number) => void;
   setFontSize: (n: number) => void;
 }
 
 export function clamp(n: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, n));
+}
+
+/** Widest the side panel may be in a window this wide (never below PANEL_MIN). */
+export function panelMax(windowWidth: number): number {
+  return Math.max(PANEL_MIN, Math.floor(windowWidth * PANEL_MAX_FRACTION));
 }
 
 export function sameSelection(a: Selection, b: Selection): boolean {
@@ -89,6 +101,7 @@ export const useUiStore = create<UiState>()(
       renamingSessionId: null,
       sidebarVisible: true,
       sidebarWidth: 260,
+      panelWidth: PANEL_DEFAULT,
       fontSize: FONT_DEFAULT,
 
       select: (sel, opts) => {
@@ -135,6 +148,9 @@ export const useUiStore = create<UiState>()(
       setSidebarWidth: (w) => {
         set({ sidebarWidth: clamp(Math.round(w), SIDEBAR_MIN, SIDEBAR_MAX) });
       },
+      setPanelWidth: (w, windowWidth = window.innerWidth) => {
+        set({ panelWidth: clamp(Math.round(w), PANEL_MIN, panelMax(windowWidth)) });
+      },
       setFontSize: (n) => {
         set({ fontSize: clamp(Math.round(n), FONT_MIN, FONT_MAX) });
       },
@@ -142,7 +158,13 @@ export const useUiStore = create<UiState>()(
     {
       name: "code-foundry.ui",
       version: 1,
-      partialize: (s) => ({ sidebarVisible: s.sidebarVisible, sidebarWidth: s.sidebarWidth, fontSize: s.fontSize, collapsed: s.collapsed }),
+      partialize: (s) => ({
+        sidebarVisible: s.sidebarVisible,
+        sidebarWidth: s.sidebarWidth,
+        panelWidth: s.panelWidth,
+        fontSize: s.fontSize,
+        collapsed: s.collapsed,
+      }),
     },
   ),
 );

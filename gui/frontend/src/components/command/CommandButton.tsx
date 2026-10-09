@@ -24,6 +24,8 @@ interface CommandButtonProps {
   variant?: ButtonProps["variant"];
   size?: ButtonProps["size"];
   className?: string;
+  /** For toggles: rendered as aria-pressed. */
+  pressed?: boolean;
   "data-testid"?: string;
 }
 
@@ -43,6 +45,7 @@ export function CommandButton({
   variant = "ghost",
   size,
   className,
+  pressed,
   "data-testid": testId,
 }: CommandButtonProps) {
   const commandTitle = useCommandsStore((s) => s.commands.find((c) => c.name === command && c.available)?.title ?? null);
@@ -57,6 +60,7 @@ export function CommandButton({
       disabled={commandTitle === null}
       title={name}
       aria-label={label ? undefined : name}
+      aria-pressed={pressed}
       tabIndex={keepFocus ? -1 : undefined}
       data-command-button={command}
       data-testid={testId}

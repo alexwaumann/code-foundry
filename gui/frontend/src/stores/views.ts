@@ -5,6 +5,7 @@
  * presented locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon.
  */
 import { create } from "zustand";
+import { togglePanelCommand } from "./panel";
 import { useUiStore, viewNames } from "./ui";
 
 interface ViewsState {
@@ -22,6 +23,10 @@ export function showView(name: string): boolean {
       return true;
     case "help":
       useViewsStore.setState({ helpOpen: true });
+      return true;
+    case "panel.toggle":
+      // view.panel.toggle: an action on the current selection's side panel, not a page.
+      togglePanelCommand();
       return true;
     default:
       // Top-level pages (the Pull Requests page) are selections. Closing settings here

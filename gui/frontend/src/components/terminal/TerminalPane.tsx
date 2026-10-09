@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CircleX, GitFork, Loader2, OctagonX, Pencil, Power, RefreshCw } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
+import { PanelToggle } from "@/components/panel/PanelToggle";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { SessionIndicator, SessionTitle } from "@/components/session/SessionParts";
 import { attachTerminal, resizeTerminal, writeTerminal } from "@/api/terminal";
@@ -68,6 +69,7 @@ function HeaderActions({ session }: { session: boolean }) {
       ) : (
         <CommandButton command="terminal.kill" icon={OctagonX} />
       )}
+      <PanelToggle />
     </span>
   );
 }

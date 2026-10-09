@@ -6,6 +6,7 @@ import type { LogEntryView, WorktreeDetailView } from "@/api/worktreeDetail";
 import { checksSummary } from "@/components/prs/format";
 import { Age, ChecksBadge, Freshness, PrStateIcon, ReviewBadge } from "@/components/prs/PrBits";
 import { RowList } from "@/components/prs/RowList";
+import { PanelToggle } from "@/components/panel/PanelToggle";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
 import { tildify } from "@/lib/path";
@@ -389,6 +390,7 @@ export function WorktreeOverview({ repoId, path, items }: { repoId: string; path
           {wt?.branch || (wt?.head ? wt.head.slice(0, 8) : "")}
         </h1>
         <span className="ml-auto truncate font-mono text-xs text-muted-foreground">{tildify(wtPath)}</span>
+        <PanelToggle className="-mr-2" />
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         <div className="mx-auto max-w-6xl">

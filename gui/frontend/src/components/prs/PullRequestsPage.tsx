@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { create } from "zustand";
 import { GitPullRequest } from "lucide-react";
 import type { DashboardView, MonthView, PullRequestView } from "@/api/gh";
+import { PanelToggle } from "@/components/panel/PanelToggle";
 import { useNow } from "@/lib/clock";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
@@ -203,6 +204,7 @@ export function PullRequestsPage() {
           {d && <span aria-hidden>·</span>}
           {d && <Freshness fetchedAtMs={fresh.fetchedAtMs} lastError={fresh.lastError} staleAfterMs={STALE_AFTER_MS} testId="prs-updated" />}
         </span>
+        <PanelToggle className="-mr-2" />
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {d ? (

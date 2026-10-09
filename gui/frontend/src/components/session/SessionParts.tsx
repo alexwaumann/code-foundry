@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Loader2, RotateCcw, Trash2, Unplug } from "lucide-react";
 import { SessionStatusIcon } from "./SessionStatusIcon";
 import { Button } from "@/components/ui/button";
+import { PanelToggle } from "@/components/panel/PanelToggle";
 import { basename, tildify } from "@/lib/path";
 import { badgeLabels, disconnectReason, formatAgo, sessionBadge } from "@/lib/session";
 import { reconnectSession, removeSession } from "@/stores/sessionActions";
@@ -96,7 +97,8 @@ export function SessionDisconnected({ id }: { id: string }) {
   };
 
   return (
-    <section className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto p-10" data-region="content" aria-label="Session" data-testid="session-disconnected">
+    <section className="relative flex min-h-0 flex-1 items-start justify-center overflow-y-auto p-10" data-region="content" aria-label="Session" data-testid="session-disconnected">
+      <PanelToggle className="absolute top-1.5 right-1.5" />
       <div className="mt-[14vh] flex w-full max-w-md flex-col items-center gap-5 text-center">
         <div className="flex size-12 items-center justify-center rounded-full border bg-muted/40">
           <Unplug className="size-5 text-muted-foreground" />
