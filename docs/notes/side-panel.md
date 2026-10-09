@@ -600,6 +600,10 @@ A Merge button on the PR header's repo row, left of the ⋯ menu (daemon side:
 Status: `make check` green (45 vitest files / 628 tests, plus the Go suite). `make
 gui-e2e` passes 232/232 (116 per engine), with `e2e/pr-panel.spec.ts` at 25 tests per
 engine; the declined-confirmation assertion was checked to fail with its fix reverted.
+After the review fixes: `make check` green (45 vitest files / 632 tests, plus the Go
+suite); `make gui-e2e` passes 234/234 (117 per engine, `e2e/pr-panel.spec.ts` at 26 per
+engine); the new store tests for the head guard and the unknown outcome were checked to
+fail with their fix reverted.
 Screenshots (WebKit, dark, 1400x900, mock daemon): `/tmp/cf-shots/merge-button.png`
 (#142 at 420px, dropdown open) and `/tmp/cf-shots/merge-button-280.png`. Not run in the
 real Wails window, and no merge was sent to GitHub.
@@ -608,10 +612,10 @@ real Wails window, and no merge was sent to GitHub.
 
 | File | Role |
 |---|---|
-| `components/pr/MergeButton.tsx` | The button (`pr-merge-button`) and its dropdown (`pr-merge-menu`): a "Merge into <base>" label, notes, one item per allowed method (`pr-merge-method-<m>`), and the "Delete branch after merge" checkbox item (`pr-merge-delete-branch`) |
-| `components/pr/merge.ts` | Pure: `mergeAvailability` (visible, disabled reason, methods, notes), `canDeleteBranch`, `mergeArgs`, `mergeMethodHint`, labels |
-| `stores/prPanel.ts` | `mergePullRequest` (pr.merge through `runCommandForResult`, quiet; `merging` busy flag per pull request) |
-| `api/gh.ts` | `mergeMethods`, `autoMergeEnabled` on the detail view; `parseMergeResult` |
+| `components/pr/MergeButton.tsx` | The button (`pr-merge-button`) and its dropdown (`pr-merge-menu`): a "Merge into <base>" label, notes, one item per allowed method (`pr-merge-method-<m>`), and the "Delete branch after merge" checkbox item (`pr-merge-delete-branch`, its line `pr-merge-delete-branch-note`) |
+| `components/pr/merge.ts` | Pure: `mergeAvailability` (visible, disabled reason, methods, notes), `branchDelete` (deletable, the line under it), `mergeArgs` (with `head-sha`), `mergeMethodHint`, labels |
+| `stores/prPanel.ts` | `mergePullRequest` (pr.merge with the shown head through `runCommandForResult`, quiet; `merging` busy flag per pull request) |
+| `api/gh.ts` | `mergeMethods`, `autoMergeEnabled`, `defaultBranch` on the detail view, `headSha` on the pull request view; `parseMergeResult` |
 | `components/ui/dropdown-menu.tsx` | shadcn `DropdownMenuCheckboxItem` and `DropdownMenuLabel` |
 
 ### Decisions
@@ -620,22 +624,34 @@ real Wails window, and no merge was sent to GitHub.
   Disabled reasons, first match wins: draft (or merge state `draft`) "Draft pull requests
   cannot be merged"; no write access "Merging needs write access"; `mergeable`
   conflicting or merge state `dirty` "Resolve conflicts first"; merge state `blocked`
-  "Blocked: required checks or reviews are missing"; no allowed method "This repository
-  allows no merge method". Write access comes before conflicts: someone without it can do
-  nothing about them. Behind, unstable (non-required checks failing), auto-merge on and
-  mergeability not computed yet are allowed; the first three get a note in the dropdown.
+  "Blocked: required checks or reviews are missing". Write access comes before
+  conflicts: someone without it can do nothing about them. Behind, unstable
+  (non-required checks failing), has hooks, auto-merge on and mergeability not computed
+  yet are allowed; behind, unstable and auto-merge get a note in the dropdown. Empty
+  `mergeMethods` means unknown (a detail cached before the field), not "none allowed":
+  all three are offered and the daemon refuses a disallowed one.
+* **The head it shows is the head it merges.** Every merge sends
+  `detail.pullRequest.headSha` as pr.merge's `head-sha`; the daemon refuses ("changed
+  since it was shown; refresh and try again") if GitHub's head is another commit, and
+  the detail re-reads.
 * **Disabled is `aria-disabled`, not `disabled`**, so the button stays focusable and its
   `title` tooltip shows; the reason is also its accessible description. The dropdown
   refuses to open while disabled or busy (`onOpenChange` ignores opening).
-* **Branch default.** "Delete branch after merge" starts on unless the head is in a fork
-  (then it is disabled, "The branch is in a fork"). The choice is local to the tab's
-  surface and stays while the dropdown is reopened. Toggling keeps the menu open.
+* **Branch default.** "Delete branch after merge" starts on (Alex's decision; the review
+  proposed off) unless the branch cannot be deleted: a fork's ("The branch is in a
+  fork"), the default branch ("origin/main is the default branch") or the base branch;
+  then it is disabled and unchecked. Its line says what it deletes: "Deletes
+  origin/feat/x; local branches and worktrees are untouched" (wraps; long names break
+  anywhere). The choice is local to the tab's surface and stays while the dropdown is
+  reopened. Toggling keeps the menu open. The item has `pl-9`, so the box sits 12px
+  from the menu's edge (4px menu padding + 8px) and 12px from its label; the e2e
+  measures both.
 * **Running.** Choosing a method closes the menu, then runs pr.merge; the daemon's
-  confirmation ("Merge #142 into main with squash? Branch feat/sidebar is deleted
+  confirmation ("Merge #142 into main with squash? Branch origin/feat/sidebar is deleted
   afterwards.") goes through the ConfirmDialog. The button shows a spinner and is
   `aria-busy` from the confirmation until the answer, and a second run meanwhile sends
   nothing. Success toasts the daemon's message, split at "; " into title and description
-  ("Merged #142 (e2e0142)", "deleted branch feat/sidebar"). Either way the detail is
+  ("Merged #142 (e2e0142)", "deleted origin/feat/sidebar"). Either way the detail is
   invalidated (the daemon also sends the event), so a refusal like a moved head shows
   GitHub's state; the refusal itself is the generic "Merge Pull Request failed" toast.
 * **Style.** `bg-primary` (near white in dark, near black in light), 28px high like the
@@ -654,6 +670,8 @@ real Wails window, and no merge was sent to GitHub.
   to prove it opens nothing.
 * The mock's `pr-fail?command=pr.merge` fails the next merge like a moved head, and
   `pr-delay` now also delays pr.merge (for the spinner).
+* A Radix checkbox item's box is a `span.flex` too: measure the label from
+  `pr-merge-delete-branch-note`'s parent, and after the menu's open animation.
 
 ### Open items
 
@@ -663,4 +681,20 @@ real Wails window, and no merge was sent to GitHub.
 * No commit message editing (GitHub's squash title/body), no "merge when ready" (enabling
   auto-merge), no admin bypass of branch protection.
 * Deleting the branch does not check for other open pull requests based on it.
+* No mock control pushes to a fixture's head, so the GUI's "changed since it was shown"
+  refusal is covered by unit tests (store, API, mock contract), not an e2e.
+
+### Review fixes (2026-10-09)
+
+The merge review's findings (daemon side: `gh-pr-detail.md`, "Merge review fixes"). In
+the GUI: pr.merge sends the shown head (`head-sha`); empty `mergeMethods` offers all
+three instead of disabling the button (`merge.test.ts`, with `has_hooks`); the delete
+item names `origin/<branch>`, says local branches and worktrees are untouched, stays on
+by default, and is disabled for the default and base branch (`branchDelete` table); more
+space between its box and label. The mock now matches the daemon for forks, the default
+and base branch, `head-sha`, and repeats; new fixture #146 (open, from a fork) and the
+e2e "#146 from a fork: the branch cannot be deleted, and a merge asking anyway keeps it"
+(runs pr.merge with `delete-branch` on, as the CLI can: no delete sentence in the
+confirmation, "kept patch-1: it is in a fork"). Screenshots: `/tmp/cf-shots/merge-button.png`
+(420px) and `/tmp/cf-shots/merge-button-280.png`.
 

@@ -18,7 +18,7 @@ mock daemon.
 | `ListReviewerCandidates(repo_slug, number)` | `queries/reviewer_candidates.graphql` | none |
 | `SetReviewRequest(repo_slug, number, login, kind, requested)` → pending requests | REST `POST`/`DELETE repos/{o}/{r}/pulls/{n}/requested_reviewers` | marks the detail stale |
 | `RevertPullRequest(repo_slug, number)` → number, url | GraphQL mutation `revertPullRequest(input: {pullRequestId})` | marks the detail stale, polls soon |
-| `MergePullRequest(repo_slug, number, method, delete_branch)` → merged, sha, message, branch_deleted | GraphQL `mergePullRequest(input: {pullRequestId, mergeMethod, expectedHeadOid})`, then REST `DELETE repos/{o}/{r}/git/refs/heads/{branch}` | marks the detail stale, polls soon (see "Merge" below) |
+| `MergePullRequest(repo_slug, number, method, delete_branch, expected_head_sha)` → merged, sha, message, branch_deleted | GraphQL `mergePullRequest(input: {pullRequestId, mergeMethod, expectedHeadOid})`, then REST `DELETE repos/{o}/{r}/git/refs/heads/{branch}` | marks the detail stale, polls soon (see "Merge" below) |
 
 The two writes are user actions, so they are commands too (`internal/command/commands_pr.go`),
 and the GUI runs them with `runCommand` like the palette and the CLI do. The TS client
@@ -28,7 +28,7 @@ and the GUI runs them with `runCommand` like the palette and the CLI do. The TS 
 |---|---|---|
 | `pr.revert` | `repo-slug`, `number` (positional) | RevertPullRequest. Confirm: "This opens a new pull request that reverses the changes merged by #N."; result "Opened #M to revert #N: <url>" |
 | `pr.review.request` | `repo-slug`, `number`, `login` (positional), `--kind user\|team` (default user), `--requested` (default true; `--requested=false` withdraws) | SetReviewRequest |
-| `pr.merge` | `repo-slug`, `number` (positional), `--method merge\|squash\|rebase` (required), `--delete-branch` | MergePullRequest. Confirm: "Merge #N into <base> with <method>?" (base from the cached detail; " Branch <head> is deleted afterwards." when it will be); result: the daemon's message, "Merged #N (<sha7>)" plus "; deleted branch <head>" or "; kept branch <head>: <why>" |
+| `pr.merge` | `repo-slug`, `number` (positional), `--method merge\|squash\|rebase` (required), `--delete-branch` (default false), `--head-sha <full sha>` | MergePullRequest. Confirm: "Merge #N into <base> with <method>?" (base from the cached detail); without `--head-sha` "Merge #N (3 commits, head e2e0142) into …" so the user sees what merges; " Branch origin/<head> is deleted afterwards." when it will be (not a fork's, the default or the base branch); result: the daemon's message, "Merged #N (<sha7>)" plus "; deleted origin/<head>", "; kept origin/<head>: <why>", or "; kept <head>: it is in a fork" |
 | `pr.refresh` | `repo-slug`, `number` (positional) | GetPullRequestDetail with refresh. If the daemon answers with its cached copy (`last_error` set), the command fails with UNAVAILABLE and that error |
 
 Their `When` (`hasPullRequest`) is always true: the pull request is named by args, and
@@ -58,7 +58,10 @@ re-read. The GUI's `pullRequestDetailResource` (key `slug#number`) is invalidate
 * `merge_methods_allowed` (the repository's `mergeCommitAllowed`, `squashMergeAllowed`,
   `rebaseMergeAllowed`, in that order) and `auto_merge_enabled` (`autoMergeRequest` is
   set). A row cached before these fields has no methods; rows read from SQLite start
-  stale, so the first read refetches them.
+  stale, so the first read refetches them. Empty means unknown, never "none allowed"
+  (GitHub always allows one): the GUI then offers all three.
+* `default_branch` (`repository.defaultBranchRef.name`); empty if unknown. A merge
+  never deletes it.
 * `fetched_at`, `last_error`, and the truncation flags:
   * `labels_truncated`: more than 20 labels
   * `reviewers_truncated`: more than 50 latest reviews or more than 50 pending requests
@@ -169,31 +172,57 @@ Added 2026-10-09 for the panel's Merge button (`side-panel.md`, chunk 5). No mer
 sent to GitHub: the store ran against the fake GitHub and an HTTP test server, the GUI
 against the mock daemon.
 
-* **Head guard.** The mutation sends the cached detail's node id and head SHA as
-  `expectedHeadOid`, so commits pushed after the panel loaded are never merged. GitHub's
-  refusal ("Head branch was modified. Review and try the merge again.", matched by
-  message: "head branch was modified" or "expected head") becomes
-  `ErrFailedPrecondition` "pull request #N changed on GitHub since it was loaded (<head>
-  has new commits); refresh and review it before merging". The message match is an
-  assumption from GitHub's REST wording; it was not seen live.
+* **Head guard.** The client sends the head it showed (`expected_head_sha`, pr.merge's
+  `--head-sha`; the GUI always sends `detail.pullRequest.headSha`). The store reads the
+  detail (`FullPullRequest`, which may refetch an aged or stale entry); if its head
+  differs from the client's, it looks once more (fresh fetch: the cache may be behind
+  the client too), and if it still differs it refuses with FAILED_PRECONDITION "pull
+  request #N changed since it was shown (head <new7>, shown <old7>); refresh and try
+  again", invalidates the detail (event), and sends nothing. Otherwise the client's sha
+  is the mutation's `expectedHeadOid`, so GitHub refuses if the branch moved after that.
+  Without it (the CLI), the store sends the head it has then; the confirmation names
+  that head's sha7 and commit count, so the user sees what will merge, and a careful
+  caller passes `--head-sha`. The earlier note claimed the cached head guarded the
+  merge; it did not, because the read before the merge may refetch silently, so the
+  merge could include commits nobody saw.
+* **GitHub's refusals.** The mutation's `*PartialError` is mapped in the merge job:
+  RATE_LIMITED, FORBIDDEN and NOT_FOUND keep their kinds; anything else (UNPROCESSABLE,
+  no `type`, an unknown type) is FAILED_PRECONDITION with GitHub's message. "Head branch
+  was modified" / "expected head" says "pull request #N changed on GitHub since it was
+  loaded (<head> has new commits); refresh and review it before merging"; "Base branch
+  was modified" says "its base branch <base> changed on GitHub during the merge; refresh
+  and try again". Every FAILED_PRECONDITION invalidates the detail and sends the event.
+  The messages are matched as GitHub's REST wording; not seen live.
 * **Refusals before the mutation.** Not open, a draft, or a method missing from
   `merge_methods_allowed` (when known) are refused with FAILED_PRECONDITION after one
   confirming fetch (the cached copy may be behind), like revert. Conflicts, branch
-  protection and permissions are left to GitHub: UNPROCESSABLE → FAILED_PRECONDITION,
-  FORBIDDEN → PERMISSION_DENIED. Any FAILED_PRECONDITION from GitHub also invalidates the
-  detail and sends the event, so the panel shows GitHub's state.
-* **Branch delete.** Only after `merged`, only with `delete_branch`, never for a
-  cross-repository head (the message says "kept branch x: it is in a fork"). The ref path
-  is escaped per segment (`feat/a#b` → `feat/a%23b`). It is its own paced job, with its
-  own 30 s timeout detached from the caller (the merge happened; the user asked for the
+  protection and permissions are left to GitHub (above).
+* **Branch delete.** Product decision (Alex, 2026-10-09): the GUI's "Delete branch after
+  merge" stays on by default; the command's `--delete-branch` defaults to false. It
+  deletes the branch on GitHub only, never local branches or worktrees, and every
+  message names it `origin/<branch>` ("Deletes origin/feat/x; local branches and
+  worktrees are untouched", "Branch origin/feat/x is deleted afterwards.", "deleted
+  origin/feat/x", "kept origin/feat/x: …"). Only after `merged`, only when asked, and
+  never for a cross-repository head ("kept patch-1: it is in a fork": named without
+  `origin/`, because it is not on origin), the repository's default branch ("kept
+  origin/main: it is the repository's default branch"), or the pull request's base
+  branch. If the cached detail has no default branch (a row from before the field), the
+  store fetches once before merging; still unknown keeps the branch. The ref path is
+  escaped per segment (`feat/a#b` → `feat/a%23b`). It is its own paced job, with its own
+  30 s timeout detached from the caller (the merge happened; the user asked for the
   delete). A 422 "Reference does not exist" (the repository deletes head branches on
-  merge) counts as deleted. Any other failure keeps the merge's success and goes into the
-  message. Branches other open pull requests target are not checked.
-* **Dedupe.** The revert memo is now generic (`writeMemos[T]` in `pr_detail.go`,
-  `writeMemoTTL` 2 minutes) and merges have their own. A success answers repeats (any
-  method) for the window; 502/504, network errors and deadlines leave "outcome unknown"
-  ("it may have merged; check GitHub before trying again") for the window, and send no
-  branch delete; refusals are not remembered.
+  merge) counts as deleted. Any other failure keeps the merge's success and goes into
+  the message. Branches other open pull requests target are not checked.
+* **One at a time, and dedupe.** Merges of one pull request are serialized (`keyLocks`
+  in `pr_merge.go`, waiting honours the caller's context), so a concurrent second call
+  waits and gets the first's outcome. The revert memo is generic (`writeMemos[T]` in
+  `pr_detail.go`, `writeMemoTTL` 2 minutes); a merge's success is remembered only by
+  `finishMerge`, with the complete message and whether it was asked to delete the
+  branch. A repeat (any method) within the window returns it; a repeat that asks for
+  the branch when the first did not adds "; branch not deleted: the first merge did not
+  ask". 502/504, network errors and deadlines leave "outcome unknown" ("it may have
+  merged; check GitHub before trying again") for the window, invalidate the detail
+  (event: it may be merged now), and send no branch delete; refusals are not remembered.
 * **Afterwards.** The detail is invalidated (event), and a poll is due soon so the
   dashboards move the pull request to recently merged.
 * `merged: false` without an error (not seen; a merge queue refuses instead) answers
@@ -271,13 +300,23 @@ Calls were made with
   `fakeWriter` recording REST writes): squash, merge commit with the branch deleted, the
   escaped branch path, a fork's branch kept, an already deleted branch, a failed delete
   keeping the merge, head moved (event sent, nothing merged), merged and draft refused
-  without the mutation, a disallowed method, FORBIDDEN, UNPROCESSABLE (protection), bad
-  arguments; the mutation's variables (node id, `SQUASH`, the cached head); the
-  outcome-unknown window, a success's window, refusals not remembered; fail-fast while
-  paused; the DELETE through `HTTPRunner` (method, path, no body, 422 tolerated).
-  `pr_merge_decode_test.go`: the new detail fields, `decodeMerge`, `headMoved`.
+  without the mutation, a disallowed method, FORBIDDEN, UNPROCESSABLE (protection), a
+  refusal with no type and with an unknown type (FAILED_PRECONDITION, event), untyped
+  head moved, base moved, NOT_FOUND, the default branch and the base branch kept, a
+  short `ExpectedHeadSHA`, bad arguments; the mutation's variables (node id, `SQUASH`,
+  the cached head); `TestMergePullRequestExpectedHead`: an aged and a stale cache
+  refetched with new commits refuse without a mutation (event sent), a cache behind the
+  client merges after the fresh look with the client's sha, a matching head merges with
+  it, no expected head sends the store's; the outcome-unknown window, a success's
+  window, refusals not remembered, a repeat asking for the branch, the unknown outcome
+  invalidating the detail, four concurrent merges sending one mutation and one delete;
+  fail-fast while paused; the DELETE through `HTTPRunner` (method, path, no body, 422
+  tolerated); `keepBranch`. `pr_merge_decode_test.go`: the new detail fields (with
+  `defaultBranchRef`), `decodeMerge`, `branchMoved`, `isCommitSHA`.
   `internal/api/gh_merge_test.go` and `internal/command/commands_pr_merge_test.go`: the
-  RPC table (method mapping, codes) and the command (args, confirmation texts, result).
+  RPC table (method mapping, codes, `expected_head_sha` passed and a changed head
+  refused, `default_branch` mapped) and the command (args, `--head-sha`, confirmation
+  texts with and without it, the default and base branch not promised, result).
 * `internal/api/gh_detail_test.go`: table tests of the four RPCs (every field mapped, the
   error codes, and the Watch event); `gh_test.go` has the full code table.
 * `internal/command/commands_pr_test.go`: availability, confirmation and its message,
@@ -306,8 +345,14 @@ Calls were made with
   * any other listed PR: a minimal detail from its summary
 
   Revert of #138 adds PR #151 to the dashboard and returns the same result on repeats.
-  #142 is mergeable (approved, merge state clean, checks passing); `pr.merge` flips it to
-  merged and moves it to recently merged. Every open fixture allows all three methods.
+  #142 is mergeable (approved, merge state clean, checks passing, head
+  `5eb1d0a142…`); `pr.merge` flips it to merged and moves it to recently merged. #146
+  (open, from a fork `patch-1`, approved, the viewer an admin; on no dashboard) merges
+  and keeps its branch ("kept patch-1: it is in a fork"). Every open fixture allows all
+  three methods, every detail's default branch is main. The mock's pr.merge follows the
+  daemon: `head-sha` other than the fixture's head is refused, the confirmation names
+  the commits without it and `origin/<branch>` only when it will be deleted, and a
+  repeat asking for the branch says it was not deleted.
   Reverting an open or closed PR returns FAILED_PRECONDITION.
 * `POST /__mock/gh/pr-comment?repo=…&number=…&body=…` adds a comment and sends
   `pull_request_detail_updated`, as a poll would.
@@ -358,3 +403,22 @@ above.
 13. Key comments and the "existing prefix" claim were out of date.
 14. Mock fixtures lacked a closed PR, a read-only PR, and several reviewer and check
     states.
+
+## Merge review fixes (2026-10-09)
+
+The review of MergePullRequest found the problems below; each is fixed and tested as
+listed above ("Merge", "Tests", "Mock daemon").
+
+1. HIGH: the merge could include commits the user never saw (the read before the
+   mutation may refetch, and its head was sent). `expected_head_sha` / `--head-sha`;
+   the CLI's confirmation names the head and commit count.
+2. A GraphQL refusal with no or an unknown `type` came back UNKNOWN and skipped the
+   detail invalidation and the moved message; "Base branch was modified" was not
+   recognised.
+3. The default and base branch could be deleted; the delete is now named
+   `origin/<branch>` everywhere and said to touch GitHub only. The GUI default stays on
+   (Alex's decision; the review proposed off).
+4. The 2-minute memo ignored options and was written before the branch delete.
+5. "Outcome unknown" did not invalidate the cached detail.
+6. GUI: empty `mergeMethods` disabled the button ("allows no merge method").
+7. Mock parity: forks in the confirmation and the result.
