@@ -54,6 +54,8 @@ const (
 	// RepoServiceGetWorktreeDetailProcedure is the fully-qualified name of the RepoService's
 	// GetWorktreeDetail RPC.
 	RepoServiceGetWorktreeDetailProcedure = "/codefoundry.v1.RepoService/GetWorktreeDetail"
+	// RepoServiceListRefsProcedure is the fully-qualified name of the RepoService's ListRefs RPC.
+	RepoServiceListRefsProcedure = "/codefoundry.v1.RepoService/ListRefs"
 )
 
 // RepoServiceClient is a client for the codefoundry.v1.RepoService service.
@@ -80,6 +82,9 @@ type RepoServiceClient interface {
 	// worktree has been asked about in the last 10 minutes, every status refresh of it
 	// recomputes the detail and announces changes as worktree_detail_updated.
 	GetWorktreeDetail(context.Context, *connect.Request[v1.GetWorktreeDetailRequest]) (*connect.Response[v1.GetWorktreeDetailResponse], error)
+	// ListRefs returns the refs a worktree can be based on: local branches and
+	// remote-tracking branches (origin/<name>), plus the default base.
+	ListRefs(context.Context, *connect.Request[v1.ListRefsRequest]) (*connect.Response[v1.ListRefsResponse], error)
 }
 
 // NewRepoServiceClient constructs a client for the codefoundry.v1.RepoService service. By default,
@@ -147,6 +152,12 @@ func NewRepoServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(repoServiceMethods.ByName("GetWorktreeDetail")),
 			connect.WithClientOptions(opts...),
 		),
+		listRefs: connect.NewClient[v1.ListRefsRequest, v1.ListRefsResponse](
+			httpClient,
+			baseURL+RepoServiceListRefsProcedure,
+			connect.WithSchema(repoServiceMethods.ByName("ListRefs")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -161,6 +172,7 @@ type repoServiceClient struct {
 	refresh           *connect.Client[v1.RefreshRepoRequest, v1.RefreshRepoResponse]
 	watch             *connect.Client[v1.WatchReposRequest, v1.RepoEvent]
 	getWorktreeDetail *connect.Client[v1.GetWorktreeDetailRequest, v1.GetWorktreeDetailResponse]
+	listRefs          *connect.Client[v1.ListRefsRequest, v1.ListRefsResponse]
 }
 
 // Register calls codefoundry.v1.RepoService.Register.
@@ -208,6 +220,11 @@ func (c *repoServiceClient) GetWorktreeDetail(ctx context.Context, req *connect.
 	return c.getWorktreeDetail.CallUnary(ctx, req)
 }
 
+// ListRefs calls codefoundry.v1.RepoService.ListRefs.
+func (c *repoServiceClient) ListRefs(ctx context.Context, req *connect.Request[v1.ListRefsRequest]) (*connect.Response[v1.ListRefsResponse], error) {
+	return c.listRefs.CallUnary(ctx, req)
+}
+
 // RepoServiceHandler is an implementation of the codefoundry.v1.RepoService service.
 type RepoServiceHandler interface {
 	// Register adds a repository by path (any path inside the repo is accepted).
@@ -232,6 +249,9 @@ type RepoServiceHandler interface {
 	// worktree has been asked about in the last 10 minutes, every status refresh of it
 	// recomputes the detail and announces changes as worktree_detail_updated.
 	GetWorktreeDetail(context.Context, *connect.Request[v1.GetWorktreeDetailRequest]) (*connect.Response[v1.GetWorktreeDetailResponse], error)
+	// ListRefs returns the refs a worktree can be based on: local branches and
+	// remote-tracking branches (origin/<name>), plus the default base.
+	ListRefs(context.Context, *connect.Request[v1.ListRefsRequest]) (*connect.Response[v1.ListRefsResponse], error)
 }
 
 // NewRepoServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -295,6 +315,12 @@ func NewRepoServiceHandler(svc RepoServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(repoServiceMethods.ByName("GetWorktreeDetail")),
 		connect.WithHandlerOptions(opts...),
 	)
+	repoServiceListRefsHandler := connect.NewUnaryHandler(
+		RepoServiceListRefsProcedure,
+		svc.ListRefs,
+		connect.WithSchema(repoServiceMethods.ByName("ListRefs")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.RepoService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RepoServiceRegisterProcedure:
@@ -315,6 +341,8 @@ func NewRepoServiceHandler(svc RepoServiceHandler, opts ...connect.HandlerOption
 			repoServiceWatchHandler.ServeHTTP(w, r)
 		case RepoServiceGetWorktreeDetailProcedure:
 			repoServiceGetWorktreeDetailHandler.ServeHTTP(w, r)
+		case RepoServiceListRefsProcedure:
+			repoServiceListRefsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -358,4 +386,8 @@ func (UnimplementedRepoServiceHandler) Watch(context.Context, *connect.Request[v
 
 func (UnimplementedRepoServiceHandler) GetWorktreeDetail(context.Context, *connect.Request[v1.GetWorktreeDetailRequest]) (*connect.Response[v1.GetWorktreeDetailResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.GetWorktreeDetail is not implemented"))
+}
+
+func (UnimplementedRepoServiceHandler) ListRefs(context.Context, *connect.Request[v1.ListRefsRequest]) (*connect.Response[v1.ListRefsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.ListRefs is not implemented"))
 }

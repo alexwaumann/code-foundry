@@ -216,3 +216,8 @@ func sessionError(err error) error {
 	}
 	return connect.NewError(code, err)
 }
+
+// StageAttachment is implemented in the new-thread step.
+func (h *Session) StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("StageAttachment: not implemented"))
+}

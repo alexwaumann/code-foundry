@@ -215,3 +215,8 @@ func worktreeToProto(w repo.Worktree) *v1.Worktree {
 		IsMain: w.IsMain, Detached: w.Detached, Status: st,
 	}
 }
+
+// ListRefs is implemented in the new-thread step.
+func (h *Repo) ListRefs(context.Context, *connect.Request[v1.ListRefsRequest]) (*connect.Response[v1.ListRefsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("ListRefs: not implemented"))
+}
