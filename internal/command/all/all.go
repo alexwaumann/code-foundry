@@ -24,7 +24,7 @@ type Deps struct {
 	// GitOps backs git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url.
 	// A nil Backend works like Terminal.
 	GitOps command.GitOpsDeps
-	// Gh backs pr.revert, pr.review.request and pr.refresh (the pull request detail
+	// Gh backs pr.revert, pr.merge, pr.review.request and pr.refresh (the pull request detail
 	// panel's actions), and reads the pull request for pr.ask, pr.explain and
 	// pr.fix.findings (which also use Repo, Session, GitOps.Backend and Emitter). Nil
 	// works like Terminal.
