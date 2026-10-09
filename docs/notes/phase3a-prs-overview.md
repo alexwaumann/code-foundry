@@ -115,6 +115,9 @@ HEAD`, a tree-to-tree diff. The status job that triggered the detail ran just be
 so "clean" is current. On the neovim checkout (~4k files) steps 4 and 5 took about 200ms
 each, because they stat the whole tree. With the shortcut the detail takes about 0.1s.
 
+Later: steps 1–3 (and the clean step 5) are cached by (HEAD sha, base sha), so an
+unchanged clean worktree runs no git for its detail. See `repo-detail-cache.md`.
+
 ## GUI
 
 * **Pull Requests page.** It is reachable three ways:

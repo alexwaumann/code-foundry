@@ -147,7 +147,10 @@ branches, heads, and staged/modified/untracked counts. `github_slug`, upstream, 
   FETCH_HEAD. Tests disable it (`FetchInterval: -1`).
 * **Backstop poll (addition).** Every `PollInterval` (default 30s), every worktree's status
   is refreshed, and every repo in error is reconciled. This covers what the
-  non-recursive watcher can't see (below). Tests disable it.
+  non-recursive watcher can't see (below). Tests disable it. Since
+  `repo-detail-cache.md`, "every worktree's status" always goes through `jobBase` first
+  (one `rev-parse` of `origin/<default>` per repo), and the base ahead/behind is reused
+  when neither HEAD nor that sha moved.
 * **Daemon wiring**: `internal/daemon/stores.go` owns bus + DB + stores. `daemon.go` has
   `openStores` + `defer st.close()` + one route line. `daemon.go` also gained a
   **daemon-wide fix**: `http.Server.BaseContext` derives request contexts from a context
@@ -166,7 +169,7 @@ deeper. Watched directories per repo (`<common>` = `<main>/.git`):
 |---|---|
 | `<common>` | `HEAD`, `index` → status(main). `FETCH_HEAD`, `packed-refs`, `config`, `worktrees` → reconcile |
 | `<common>/logs` | `HEAD` (reflog append: commit, reset, rebase, merge, pull, checkout) → status(main) |
-| `<common>/refs/remotes/origin` | anything → status(all worktrees) (push or fetch moved a remote-tracking ref) |
+| `<common>/refs/remotes/origin` | anything → base(repo), which then runs status(all worktrees) (push or fetch moved a remote-tracking ref) |
 | `<common>/worktrees` | entry created, removed, or renamed → reconcile (`git worktree add/remove/prune` from anywhere) |
 | `<common>/worktrees/<name>` | `HEAD`, `index` → status(that worktree) |
 | `<common>/worktrees/<name>/logs` | `HEAD` → status(that worktree) |
