@@ -79,7 +79,10 @@ func runUpdate(ctx context.Context, cl *cli, args []string) error {
 		Stdin: os.Stdin, Stdout: cl.stdout, Stderr: cl.stderr,
 	}
 	if appDir != "" {
-		inst.AppDir = appDir // update this install, wherever it is
+		// Update this install, wherever it is, and leave the link alone: the first
+		// install made it, and it may point at another install.
+		inst.AppDir = appDir
+		inst.Args = append(inst.Args, "--skip-link")
 	}
 	if *yes {
 		inst.Args = append(inst.Args, "--yes")

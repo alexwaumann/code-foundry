@@ -28,7 +28,7 @@ echo "==> done"
 		{
 			name: "success",
 			wantLine: []string{
-				"args: --version v0.2.0 --yes --skip-path --app-dir /tmp/apps",
+				"args: --version v0.2.0 --yes --skip-path --skip-link --app-dir /tmp/apps",
 				"repo: owner/name",
 				"dir: /tmp/rel",
 				"==> done",

@@ -28,8 +28,9 @@ type Installer interface {
 const installTimeout = 10 * time.Minute
 
 // ScriptInstaller runs the installer embedded in the binary (scripts/install.sh)
-// non-interactively: --yes (no prompts), --skip-path (PATH was set up by the first
-// install; an update must not edit ~/.zshrc).
+// non-interactively: --yes (no prompts), --skip-path and --skip-link (the first install
+// set up PATH and the code-foundry link; an update must not edit ~/.zshrc or repoint a
+// link that may belong to another install).
 type ScriptInstaller struct {
 	// Script is the installer; scripts.InstallSh when nil.
 	Script []byte
@@ -73,7 +74,7 @@ func (i ScriptInstaller) Install(ctx context.Context, tag string, progress func(
 	interactive := i.Stdin != nil
 	args := []string{f.Name(), "--version", tag}
 	if !interactive {
-		args = append(args, "--yes", "--skip-path")
+		args = append(args, "--yes", "--skip-path", "--skip-link")
 	}
 	if i.AppDir != "" {
 		args = append(args, "--app-dir", i.AppDir)

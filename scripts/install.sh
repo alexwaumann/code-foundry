@@ -23,6 +23,8 @@
 #   --yes              never prompt
 #   --force            reinstall even if that version is already installed
 #   --skip-path        do not touch ~/.zshrc
+#   --skip-link        do not create or replace the code-foundry link (updates of an
+#                      existing install: the in-app updater and `code-foundry update`)
 #   --app-dir DIR      the app directory (default $CODE_FOUNDRY_HOME/app, i.e.
 #                      ~/.code-foundry/app); replaced as a whole, so it must be a
 #                      previous install or absent
@@ -52,6 +54,7 @@ TAG=""
 YES=0
 FORCE=0
 SKIP_PATH=0
+SKIP_LINK=0
 
 say() { printf '==> %s\n' "$*"; }
 warn() { printf 'warning: %s\n' "$*" >&2; }
@@ -64,7 +67,7 @@ usage() {
 	if [ -f "$0" ]; then
 		sed -n '2,/^set -euo/p' "$0" | sed -e '$d' -e 's/^# \{0,1\}//'
 	else
-		echo "usage: install.sh [--version vX.Y.Z] [--yes] [--force] [--skip-path] [--app-dir DIR] [--bin-dir DIR]"
+		echo "usage: install.sh [--version vX.Y.Z] [--yes] [--force] [--skip-path] [--skip-link] [--app-dir DIR] [--bin-dir DIR]"
 	fi
 }
 
@@ -89,6 +92,10 @@ while [ $# -gt 0 ]; do
 		;;
 	--skip-path)
 		SKIP_PATH=1
+		shift
+		;;
+	--skip-link)
+		SKIP_LINK=1
 		shift
 		;;
 	--app-dir)
@@ -204,8 +211,10 @@ elif [ -e "$APP_DIR" ] && { [ ! -d "$APP_DIR" ] || [ -n "$(ls -A "$APP_DIR" 2>/d
 fi
 
 link_cli() {
+	[ "$SKIP_LINK" = 0 ] || return 0
 	mkdir -p "$BIN_DIR"
 	ln -sfn "$APP_DIR/code-foundry" "$BIN_DIR/code-foundry"
+	say "linked $BIN_DIR/code-foundry -> $APP_DIR/code-foundry"
 }
 
 setup_path() {
@@ -311,7 +320,6 @@ SWAPPED=1
 say "installed $APP_DIR"
 
 link_cli
-say "linked $BIN_DIR/code-foundry -> $APP_DIR/code-foundry"
 setup_path
 
 say "Code Foundry $TAG is installed."

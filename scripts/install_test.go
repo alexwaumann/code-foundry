@@ -200,6 +200,24 @@ func TestInstallSkipPathAndCustomDirs(t *testing.T) {
 	}
 }
 
+// Updates of an existing install (in-app, `code-foundry update`) leave the link alone:
+// it may point at another install.
+func TestInstallSkipLink(t *testing.T) {
+	e := newInstallEnv(t)
+	fakeRelease(t, e.rel, "v0.1.0", "v0.1.0")
+	side := filepath.Join(e.home, "side", "app")
+	out, err := e.run(t, "--skip-path", "--skip-link", "--app-dir", side)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if _, err := os.Lstat(filepath.Join(e.home, ".local", "bin", "code-foundry")); !os.IsNotExist(err) {
+		t.Fatalf("--skip-link created the link (%v)\n%s", err, out)
+	}
+	if strings.Contains(out, "linked") {
+		t.Fatalf("output mentions a link:\n%s", out)
+	}
+}
+
 // The default app dir follows CODE_FOUNDRY_HOME, then CODE_FOUNDRY_APP_DIR overrides it.
 func TestInstallDefaultAppDir(t *testing.T) {
 	tests := []struct {
