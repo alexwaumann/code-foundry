@@ -147,7 +147,7 @@ re-read. The GUI's `pullRequestDetailResource` (key `slug#number`) is invalidate
   | `ErrNotFound` | NOT_FOUND |
   | `ErrFailedPrecondition` (not merged, HTTP 422, GraphQL UNPROCESSABLE) | FAILED_PRECONDITION |
   | `ErrPermissionDenied` (GraphQL FORBIDDEN, HTTP 403 that is not a rate limit) | PERMISSION_DENIED |
-  | `ErrNotAuthenticated` (gh needs `gh auth login`) | UNAUTHENTICATED |
+  | `ErrNotAuthenticated` (gh needs `gh auth login`) | FAILED_PRECONDITION (not UNAUTHENTICATED: the GUI drops its daemon endpoint on that code) |
   | `ErrRateLimited` | RESOURCE_EXHAUSTED |
   | `ErrNetwork`, `ErrServerTimeout` | UNAVAILABLE |
 * **Viewer drafts.** PENDING reviews are the viewer's own unsubmitted drafts. They are
@@ -273,9 +273,10 @@ Calls were made with
   (`createResource.set`) instead of re-reading: a re-read would lose the refresh's
   `last_error`. `set` bumps a per-key generation, so a read already in flight cannot
   overwrite it.
-* UNAUTHENTICATED (gh not logged in) makes the GUI's `invalidateOnTransportError` drop
-  the cached daemon endpoint, as UNAVAILABLE (gh network errors) already did. The next
-  call re-resolves the same daemon, so it costs one lookup.
+* gh-not-logged-in stays FAILED_PRECONDITION. A first cut used UNAUTHENTICATED, but the
+  GUI's `invalidateOnTransportError` reads that code as a stale daemon bearer token and
+  drops the cached endpoint. The GUI already learns about gh auth from `authenticated` on
+  the viewer and dashboard reads.
 * The CLI prints "Run `code-foundry help <cmd>` for usage" after FAILED_PRECONDITION and
   NOT_FOUND (its rule for caller mistakes), so a refused revert gets that hint too.
 * The fixtures were recaptured for `pullRequestReview { id }` and the reviewer

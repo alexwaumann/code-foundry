@@ -126,7 +126,7 @@ func TestGhErrorCodes(t *testing.T) {
 		want connect.Code
 	}{
 		{fmt.Errorf("%w: x", gh.ErrNotFound), connect.CodeNotFound},
-		{fmt.Errorf("%w: x", gh.ErrNotAuthenticated), connect.CodeUnauthenticated},
+		{fmt.Errorf("%w: x", gh.ErrNotAuthenticated), connect.CodeFailedPrecondition},
 		{fmt.Errorf("%w: Resource not accessible by integration", gh.ErrPermissionDenied), connect.CodePermissionDenied},
 		// Wrapped by the store (a revert that could not confirm the merge, or whose outcome
 		// is unknown): the cause's code.
