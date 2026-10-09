@@ -82,22 +82,6 @@ func TestParseTrustDialog(t *testing.T) {
 	}
 }
 
-func TestPromptReady(t *testing.T) {
-	tests := map[string]bool{
-		promptScreen:   true,
-		trustScreenNo:  false,
-		trustScreenYes: false,
-		"":             false,
-		" ▐▛███▛█   Claude Code v2.1.294\n\n": false,
-		"⏺ pong\n────\n❯ \n────":              true,
-	}
-	for screen, want := range tests {
-		if got := promptReady(screen); got != want {
-			t.Errorf("promptReady(%q) = %v, want %v", screen, got, want)
-		}
-	}
-}
-
 func TestSetTrusted(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -210,22 +194,38 @@ func TestProjectSlug(t *testing.T) {
 
 func TestLaunchArgv(t *testing.T) {
 	tests := []struct {
-		name   string
-		l      launch
-		model  string
-		effort string
-		want   string
-		id     string
+		name string
+		l    launch
+		a    spawnArgs
+		want []string
+		id   string
 	}{
-		{"new", launch{newID: "N"}, "opus", "high", "claude --session-id N --model opus --effort high", "N"},
-		{"new defaults", launch{newID: "N"}, "", "", "claude --session-id N", "N"},
-		{"resume", launch{resume: "R"}, "opus", "", "claude --resume R --model opus", "R"},
-		{"resume ignores newID", launch{resume: "R", newID: "N"}, "", "low", "claude --resume R --effort low", "R"},
-		{"fork", launch{resume: "R", fork: true, newID: "N"}, "sonnet", "max", "claude --resume R --fork-session --session-id N --model sonnet --effort max", "N"},
+		{"new", launch{newID: "N"}, spawnArgs{model: "opus", effort: "high", perm: PermissionDefault},
+			[]string{"claude", "--session-id", "N", "--model", "opus", "--effort", "high"}, "N"},
+		{"new defaults", launch{newID: "N"}, spawnArgs{}, []string{"claude", "--session-id", "N"}, "N"},
+		{"resume", launch{resume: "R"}, spawnArgs{model: "opus", effort: "", perm: PermissionDefault}, []string{"claude", "--resume", "R", "--model", "opus"}, "R"},
+		{"resume ignores newID", launch{resume: "R", newID: "N"}, spawnArgs{model: "", effort: "low", perm: PermissionDefault},
+			[]string{"claude", "--resume", "R", "--effort", "low"}, "R"},
+		{"fork", launch{resume: "R", fork: true, newID: "N"}, spawnArgs{model: "sonnet", effort: "max", perm: PermissionDefault},
+			[]string{"claude", "--resume", "R", "--fork-session", "--session-id", "N", "--model", "sonnet", "--effort", "max"}, "N"},
+		{"supervised", launch{newID: "N"}, spawnArgs{perm: PermissionSupervised},
+			[]string{"claude", "--session-id", "N", "--permission-mode", "manual"}, "N"},
+		{"accept edits", launch{newID: "N"}, spawnArgs{perm: PermissionAcceptEdits},
+			[]string{"claude", "--session-id", "N", "--permission-mode", "acceptEdits"}, "N"},
+		{"auto with prompt", launch{newID: "N"}, spawnArgs{model: "opus", effort: "high", perm: PermissionAuto, prompt: "fix it"},
+			[]string{"claude", "--session-id", "N", "--model", "opus", "--effort", "high", "--permission-mode", "auto", "--", "fix it"}, "N"},
+		{"prompt that looks like a flag", launch{newID: "N"}, spawnArgs{perm: PermissionDefault, prompt: "--help me\nplease"},
+			[]string{"claude", "--session-id", "N", "--", "--help me\nplease"}, "N"},
+		{"resume keeps the mode", launch{resume: "R"}, spawnArgs{perm: PermissionAuto},
+			[]string{"claude", "--resume", "R", "--permission-mode", "auto"}, "R"},
+		{"add dirs before the prompt", launch{newID: "N"}, spawnArgs{perm: PermissionAuto, prompt: "x", addDirs: []string{"/att"}},
+			[]string{"claude", "--session-id", "N", "--permission-mode", "auto", "--add-dir", "/att", "--", "x"}, "N"},
+		{"unknown mode passes nothing", launch{newID: "N"}, spawnArgs{perm: PermissionMode(9)},
+			[]string{"claude", "--session-id", "N"}, "N"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := strings.Join(tt.l.argv("claude", tt.model, tt.effort), " "); got != tt.want {
+			if got := tt.l.argv("claude", tt.a); !slices.Equal(got, tt.want) {
 				t.Errorf("argv = %q, want %q", got, tt.want)
 			}
 			if got := tt.l.claudeID(); got != tt.id {

@@ -19,9 +19,11 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 )
 
-// RepoSource is the part of the repo store sessions need: resolving worktrees.
+// RepoSource is the part of the repo store sessions need: resolving worktrees and
+// creating one for a new session. *repo.Git implements it.
 type RepoSource interface {
 	Snapshot() *repo.Snapshot
+	CreateWorktree(ctx context.Context, opts repo.CreateWorktreeOptions) (repo.Worktree, error)
 }
 
 // Options configures a Manager. DB and Terminals are required.
@@ -44,6 +46,17 @@ type Options struct {
 	// Namer names sessions from their first user message. Default ClaudeNamer in
 	// /tmp.
 	Namer Namer
+	// AttachmentsDir is where StageAttachment writes images. Empty disables
+	// attachments. New creates it and removes files older than AttachmentMaxAge;
+	// every claude gets --add-dir for it so Read of an attachment does not ask.
+	AttachmentsDir string
+	// WorktreePath, when set, picks the path of a worktree Create makes for branch in
+	// r; "" leaves it to the repo store's default. The daemon applies the
+	// repos.worktree_dir setting with it, as repo.worktree.new does.
+	WorktreePath func(r repo.Repo, branch string) string
+	// RefExists reports whether ref exists in the repository at dir; Create uses it
+	// to keep new worktree branches unique. Default: git rev-parse --verify.
+	RefExists func(ctx context.Context, dir, ref string) bool
 	// DisablePreTrust skips writing folder trust into Claude's config before spawning
 	// (the on-screen dialog is still answered). For tests.
 	DisablePreTrust bool
@@ -55,6 +68,12 @@ type Options struct {
 	CloseTimeout   time.Duration // graceful close before Kill; default 10s
 	Tick           time.Duration // detector tick and transcript poll; default 1s
 	StatusDebounce time.Duration // default 100ms
+	// SlugTimeout bounds how long Create waits for the namer before naming a new
+	// worktree's branch after the session id. Default 6s.
+	SlugTimeout time.Duration
+	// NamingRetryDelay is the pause before the one retry of a rate-limited naming
+	// call. Default 2s.
+	NamingRetryDelay time.Duration
 	// ActivityPublish is the minimum interval between updates published only because
 	// last_activity_at moved. Default 15s: an idle Claude still redraws every few
 	// seconds, so this is mostly noise. It is persisted at most every 30s.
@@ -88,6 +107,9 @@ func (o Options) withDefaults() (Options, error) {
 	if o.Namer == nil {
 		o.Namer = ClaudeNamer(o.Claude, "/tmp")
 	}
+	if o.RefExists == nil {
+		o.RefExists = gitRefExists
+	}
 	if o.Cols == 0 || o.Rows == 0 {
 		o.Cols, o.Rows = 120, 40
 	}
@@ -97,6 +119,8 @@ func (o Options) withDefaults() (Options, error) {
 		}
 	}
 	def(&o.NamingTimeout, 20*time.Second)
+	def(&o.SlugTimeout, 6*time.Second)
+	def(&o.NamingRetryDelay, 2*time.Second)
 	def(&o.StartTimeout, 15*time.Second)
 	def(&o.CloseTimeout, 10*time.Second)
 	def(&o.Tick, time.Second)
@@ -155,6 +179,18 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	m.mu.Lock()
 	m.rebuildLocked()
 	m.mu.Unlock()
+	if opts.AttachmentsDir != "" {
+		// Exists for claude --add-dir (see spawn) before anything is staged.
+		if err := os.MkdirAll(opts.AttachmentsDir, 0o700); err != nil {
+			m.log.Warn("create attachments dir", "dir", opts.AttachmentsDir, "err", err)
+		}
+		n, err := reapAttachments(opts.AttachmentsDir, opts.Now().Add(-AttachmentMaxAge))
+		if err != nil {
+			m.log.Warn("reap staged attachments", "dir", opts.AttachmentsDir, "removed", n, "err", err)
+		} else if n > 0 {
+			m.log.Info("reaped staged attachments", "dir", opts.AttachmentsDir, "removed", n)
+		}
+	}
 	return m, nil
 }
 
@@ -220,18 +256,27 @@ func (m *Manager) record(id string) (*record, error) {
 	return rec, nil
 }
 
-// Create spawns claude in a worktree. The session is returned STARTING.
+// Create spawns claude in a worktree. The session is returned STARTING. With
+// NewWorktree it first creates the worktree (synchronously: on failure nothing is
+// persisted); see newWorktree.
 func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) {
 	if err := validateModelEffort(o.Model, o.Effort); err != nil {
 		return Session{}, err
+	}
+	if !o.PermissionMode.valid() {
+		return Session{}, fmt.Errorf("%w: permission mode %d", ErrInvalidArgument, o.PermissionMode)
 	}
 	name, err := cleanName(o.Name, true)
 	if err != nil {
 		return Session{}, err
 	}
-	repoID, wt, err := m.resolveWorktree(o.RepoID, o.WorktreePath)
+	attachments, err := checkAttachments(m.opts.AttachmentsDir, o.Attachments)
 	if err != nil {
 		return Session{}, err
+	}
+	prompt := buildPrompt(o.InitialPrompt, attachments)
+	if strings.ContainsRune(prompt, 0) {
+		return Session{}, fmt.Errorf("%w: prompt contains a NUL byte", ErrInvalidArgument)
 	}
 	id, err := newSessionID()
 	if err != nil {
@@ -241,23 +286,42 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 	if err != nil {
 		return Session{}, err
 	}
-	now := m.opts.Now()
 	s := Session{
-		ID: id, RepoID: repoID, WorktreePath: wt, Name: name, Model: o.Model, Effort: o.Effort,
-		State: StateStarting, CreatedAt: now, LastActivityAt: now,
+		ID: id, Name: name, Model: o.Model, Effort: o.Effort, PermissionMode: o.PermissionMode, State: StateStarting,
 	}
+	namingTried := name != ""
+	var late <-chan namingResult
+	if o.NewWorktree != nil {
+		nw, err := m.newWorktree(ctx, id, name, o)
+		if err != nil {
+			return Session{}, err
+		}
+		s.RepoID, s.WorktreePath, s.BaseRef, s.CreatedWorktree = nw.repoID, nw.path, nw.baseRef, true
+		if nw.name != "" {
+			s.Name, s.AutoNamed = nw.name, true
+		}
+		namingTried = namingTried || nw.namerCalled
+		late = nw.late
+	} else if s.RepoID, s.WorktreePath, err = m.resolveWorktree(o.RepoID, o.WorktreePath); err != nil {
+		return Session{}, err
+	}
+	now := m.opts.Now()
+	s.CreatedAt, s.LastActivityAt = now, now
 	m.mu.Lock()
 	if m.closed {
 		m.mu.Unlock()
 		return Session{}, ErrClosed
 	}
-	m.recs[id] = &record{s: s, namingTried: name != ""}
+	m.recs[id] = &record{s: s, namingTried: namingTried}
 	m.mu.Unlock()
-	if err := m.spawn(ctx, id, launch{newID: cid}, o.InitialPrompt); err != nil {
+	if err := m.spawn(ctx, id, launch{newID: cid}, prompt); err != nil {
 		m.mu.Lock()
 		delete(m.recs, id)
 		m.mu.Unlock()
 		return Session{}, err
+	}
+	if late != nil {
+		m.applyLateName(id, late)
 	}
 	return m.Get(ctx, id)
 }
@@ -305,8 +369,8 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Session, error) {
 	now := m.opts.Now()
 	s := Session{
 		ID: newID, RepoID: parent.RepoID, WorktreePath: parent.WorktreePath, Name: name, AutoNamed: autoNamed,
-		Model: parent.Model, Effort: parent.Effort, State: StateStarting, CreatedAt: now, LastActivityAt: now,
-		ParentID: parent.ID,
+		Model: parent.Model, Effort: parent.Effort, PermissionMode: parent.PermissionMode,
+		State: StateStarting, CreatedAt: now, LastActivityAt: now, ParentID: parent.ID,
 	}
 	m.mu.Lock()
 	// The fork's transcript starts with the copied history, so its first user
@@ -403,8 +467,14 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 		}
 	}
 
-	r := newRunner(m, id, s.WorktreePath, l, prompt)
-	argv := l.argv(m.opts.Claude, s.Model, s.Effort)
+	r := newRunner(m, id, s.WorktreePath, l)
+	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode, prompt: prompt}
+	if m.opts.AttachmentsDir != "" {
+		// Every spawn (not only the first prompt's): a resumed or forked conversation
+		// may read its images again.
+		sa.addDirs = []string{m.opts.AttachmentsDir}
+	}
+	argv := l.argv(m.opts.Claude, sa)
 	term, err := m.opts.Terminals.Create(ctx, terminal.Spec{
 		Argv:     argv,
 		Cwd:      s.WorktreePath,
@@ -428,7 +498,11 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 	m.commitLocked(rec, true)
 	m.wg.Add(1)
 	m.mu.Unlock()
-	m.log.Info("session spawned", "session", id, "terminal", term.ID, "pid", term.Pid, "argv", argv, "cwd", s.WorktreePath)
+	logArgv := argv
+	if prompt != "" { // the prompt is the user's text: log its size, not its content
+		logArgv = append(slices.Clone(argv[:len(argv)-1]), fmt.Sprintf("<prompt: %d bytes>", len(prompt)))
+	}
+	m.log.Info("session spawned", "session", id, "terminal", term.ID, "pid", term.Pid, "argv", logArgv, "cwd", s.WorktreePath)
 	go func() {
 		defer m.wg.Done()
 		r.run()

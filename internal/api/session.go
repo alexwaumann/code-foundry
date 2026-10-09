@@ -34,10 +34,15 @@ func (h *Session) Route(opts ...connect.HandlerOption) Route {
 // Create spawns claude in a worktree.
 func (h *Session) Create(ctx context.Context, req *connect.Request[v1.CreateSessionRequest]) (*connect.Response[v1.CreateSessionResponse], error) {
 	m := req.Msg
-	s, err := h.store.Create(ctx, session.CreateOptions{
+	o := session.CreateOptions{
 		RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
-		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(),
-	})
+		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(), PermissionMode: session.PermissionMode(m.GetPermissionMode()),
+		Attachments: m.GetAttachments(),
+	}
+	if nw := m.GetNewWorktree(); nw != nil {
+		o.NewWorktree = &session.NewWorktree{BaseRef: nw.GetBaseRef()}
+	}
+	s, err := h.store.Create(ctx, o)
 	if err != nil {
 		return nil, sessionError(err)
 	}
@@ -175,6 +180,9 @@ func sessionToProto(s session.Session) *v1.Session {
 		DisconnectReason: s.DisconnectReason,
 		LastError:        s.LastError,
 		ParentId:         s.ParentID,
+		PermissionMode:   v1.PermissionMode(s.PermissionMode),
+		BaseRef:          s.BaseRef,
+		CreatedWorktree:  s.CreatedWorktree,
 	}
 	if !s.CreatedAt.IsZero() {
 		p.CreatedAt = timestamppb.New(s.CreatedAt)
@@ -217,7 +225,12 @@ func sessionError(err error) error {
 	return connect.NewError(code, err)
 }
 
-// StageAttachment is implemented in the new-thread step.
-func (h *Session) StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("StageAttachment: not implemented"))
+// StageAttachment stores an image for a first prompt and returns its path.
+func (h *Session) StageAttachment(ctx context.Context, req *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error) {
+	m := req.Msg
+	path, err := h.store.StageAttachment(ctx, m.GetName(), m.GetMimeType(), m.GetData())
+	if err != nil {
+		return nil, sessionError(err)
+	}
+	return connect.NewResponse(&v1.StageAttachmentResponse{Path: path}), nil
 }

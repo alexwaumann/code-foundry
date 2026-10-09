@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -257,4 +258,29 @@ func defaultWorktreePath(root, slug, name, branch string) string {
 		slug = localOwner + "/" + name
 	}
 	return filepath.Join(root, filepath.FromSlash(slug), worktreeDirName(branch))
+}
+
+// refsFormat is the for-each-ref format parseRefs reads. Ref names cannot contain
+// spaces, so one separates the name from its symbolic-ref target.
+const refsFormat = "--format=%(refname) %(symref)"
+
+// parseRefs parses `git for-each-ref <refsFormat> refs/heads refs/remotes` into
+// sorted local branch names and "<remote>/<branch>" names. Symbolic refs (each
+// remote's HEAD) are dropped.
+func parseRefs(out []byte) Refs {
+	var r Refs
+	for line := range strings.Lines(string(out)) {
+		name, symref, _ := strings.Cut(strings.TrimRight(line, "\r\n"), " ")
+		if symref != "" {
+			continue
+		}
+		if b, ok := strings.CutPrefix(name, "refs/heads/"); ok && b != "" {
+			r.Local = append(r.Local, b)
+		} else if rr, ok := strings.CutPrefix(name, "refs/remotes/"); ok && rr != "" {
+			r.Remote = append(r.Remote, rr)
+		}
+	}
+	slices.Sort(r.Local)
+	slices.Sort(r.Remote)
+	return r
 }

@@ -20,6 +20,18 @@ import (
 //	--fork-session       with --resume: continue under a new session id
 //	-p, --print          non-interactive; skips the trust dialog
 //	--no-session-persistence, --tools "", --strict-mcp-config (with -p, for naming)
+//
+// and Claude Code 2.1.295:
+//
+//	--permission-mode <mode>  acceptEdits, auto, bypassPermissions, manual, dontAsk, plan
+//	[prompt]                  positional first prompt; interactive mode submits it once
+//	                          the UI is up (also after the trust dialog is answered)
+//	--add-dir <dir>           also allow tool access to dir; without it, Read of a staged
+//	                          attachment outside the worktree asks for permission even
+//	                          in auto mode ("Allow this read outside the working
+//	                          directories?")
+//	--                        ends options: `claude -- "-hello"` sends "-hello", while
+//	                          `claude "-hello"` fails with "unknown option"
 
 // Efforts are the valid --effort levels.
 var Efforts = []string{"low", "medium", "high", "xhigh", "max"}
@@ -60,8 +72,16 @@ func (l launch) claudeID() string {
 	return l.newID
 }
 
-// argv builds the claude command line.
-func (l launch) argv(claude, model, effort string) []string {
+// spawnArgs are the per-spawn claude options besides the conversation (launch).
+type spawnArgs struct {
+	model, effort string
+	perm          PermissionMode
+	addDirs       []string
+	prompt        string
+}
+
+// argv builds the claude command line. A non-empty prompt goes last, after "--".
+func (l launch) argv(claude string, a spawnArgs) []string {
 	argv := []string{claude}
 	if l.resume != "" {
 		argv = append(argv, "--resume", l.resume)
@@ -72,13 +92,40 @@ func (l launch) argv(claude, model, effort string) []string {
 	if l.newID != "" && (l.resume == "" || l.fork) {
 		argv = append(argv, "--session-id", l.newID)
 	}
-	if model != "" {
-		argv = append(argv, "--model", model)
+	if a.model != "" {
+		argv = append(argv, "--model", a.model)
 	}
-	if effort != "" {
-		argv = append(argv, "--effort", effort)
+	if a.effort != "" {
+		argv = append(argv, "--effort", a.effort)
+	}
+	if f := a.perm.Flag(); f != "" {
+		argv = append(argv, "--permission-mode", f)
+	}
+	for _, d := range a.addDirs {
+		argv = append(argv, "--add-dir", d)
+	}
+	if a.prompt != "" {
+		argv = append(argv, "--", a.prompt)
 	}
 	return argv
+}
+
+// buildPrompt is the first prompt claude gets: the user's text, then, after a blank
+// line, one "Attached image: <path>" line per attachment. A prompt of only whitespace
+// counts as none.
+func buildPrompt(text string, attachments []string) string {
+	text = strings.TrimSpace(text)
+	if len(attachments) == 0 {
+		return text
+	}
+	lines := make([]string, len(attachments))
+	for i, a := range attachments {
+		lines[i] = "Attached image: " + a
+	}
+	if text == "" {
+		return strings.Join(lines, "\n")
+	}
+	return text + "\n\n" + strings.Join(lines, "\n")
 }
 
 // newUUID returns a random (version 4) UUID string.

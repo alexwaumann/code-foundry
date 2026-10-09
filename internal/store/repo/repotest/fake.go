@@ -27,6 +27,8 @@ type Fake struct {
 	snap  *repo.Snapshot
 	// details backs WorktreeDetail (detail.go); nil until SetDetail.
 	details map[string]repo.WorktreeDetail
+	// refs backs ListRefs; nil until SetRefs.
+	refs map[string]repo.Refs
 
 	// WorktreeRoot is where CreateWorktree puts worktrees without a path, like
 	// repo.Options.WorktreeRoot. New sets it to DefaultWorktreeRoot.
@@ -35,6 +37,8 @@ type Fake struct {
 	Err error
 	// Calls records method calls, e.g. "Register /x", "Refresh r1".
 	Calls []string
+	// Creates records every CreateWorktree's options, in call order.
+	Creates []repo.CreateWorktreeOptions
 }
 
 var _ repo.Store = (*Fake)(nil)
@@ -133,6 +137,7 @@ func (f *Fake) Unregister(_ context.Context, id string) error {
 func (f *Fake) CreateWorktree(_ context.Context, o repo.CreateWorktreeOptions) (repo.Worktree, error) {
 	f.mu.Lock()
 	f.Calls = append(f.Calls, "CreateWorktree "+o.RepoID+" "+o.Branch)
+	f.Creates = append(f.Creates, o)
 	if f.Err != nil {
 		defer f.mu.Unlock()
 		return repo.Worktree{}, f.Err
@@ -201,6 +206,39 @@ func (f *Fake) Refresh(_ context.Context, id string) error {
 		return fmt.Errorf("%w: repo %q", repo.ErrNotFound, id)
 	}
 	return nil
+}
+
+// SetRefs sets what ListRefs returns for repoID.
+func (f *Fake) SetRefs(repoID string, refs repo.Refs) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.refs == nil {
+		f.refs = map[string]repo.Refs{}
+	}
+	f.refs[repoID] = refs
+}
+
+// ListRefs implements repo.Store. Without SetRefs, a known repo lists its worktrees'
+// branches as local refs and its default branch as DefaultRef.
+func (f *Fake) ListRefs(_ context.Context, repoID string) (repo.Refs, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Calls = append(f.Calls, "ListRefs "+repoID)
+	r, ok := f.repos[repoID]
+	if !ok {
+		return repo.Refs{}, fmt.Errorf("%w: repo %q", repo.ErrNotFound, repoID)
+	}
+	if refs, ok := f.refs[repoID]; ok {
+		return refs, nil
+	}
+	var local []string
+	for _, w := range r.Worktrees {
+		if w.Branch != "" {
+			local = append(local, w.Branch)
+		}
+	}
+	slices.Sort(local)
+	return repo.Refs{Local: slices.Compact(local), DefaultRef: r.DefaultBranch}, nil
 }
 
 func (f *Fake) rebuild() {

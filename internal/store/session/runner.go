@@ -3,7 +3,6 @@ package session
 import (
 	"context"
 	"errors"
-	"strings"
 	"sync"
 	"time"
 
@@ -26,15 +25,12 @@ const (
 	closeRepeat      = 2 * time.Second
 )
 
-// Startup and input timing.
+// Startup timing. The first prompt is not typed: it is claude's positional argument
+// (launch.argv), which Claude submits itself once its UI is up.
 const (
 	trustKeyGap        = 300 * time.Millisecond // between dialog keystrokes
 	maxTrustKeys       = 12
 	screenCheckGap     = 100 * time.Millisecond // ScreenText at most this often while STARTING
-	promptDelay        = 500 * time.Millisecond // after CONNECTED, before typing the initial prompt
-	promptEnterDelay   = 300 * time.Millisecond // between the prompt text and Enter
-	promptPoll         = 200 * time.Millisecond // while waiting for the input box
-	maxPromptWaits     = 50                     // then type anyway (after ~10s)
 	activityPersistGap = 30 * time.Second
 	screenTextTimeout  = 2 * time.Second
 )
@@ -84,11 +80,6 @@ type runner struct {
 	tail  *tailer
 	state State
 
-	prompt      string
-	promptStep  int
-	promptWaits int
-	promptTimer *time.Timer
-
 	trustKeys    int
 	lastTrustKey time.Time
 	lastScreen   time.Time
@@ -113,9 +104,9 @@ type runner struct {
 	viewers int
 }
 
-func newRunner(m *Manager, id, cwd string, l launch, prompt string) *runner {
+func newRunner(m *Manager, id, cwd string, l launch) *runner {
 	return &runner{
-		m: m, id: id, cwd: cwd, launch: l, prompt: prompt,
+		m: m, id: id, cwd: cwd, launch: l,
 		mb:       mailbox{sig: make(chan struct{}, 1)},
 		closeReq: make(chan struct{}, 1),
 		stopReq:  make(chan struct{}, 1),
@@ -197,8 +188,6 @@ func (r *runner) run() {
 		case <-timerC(r.debounce):
 			r.debounce = nil
 			r.publishStatus()
-		case <-timerC(r.promptTimer):
-			r.promptNext()
 		case <-r.stopReq:
 			r.finish(func(s *Session) {
 				s.State, s.DisconnectReason, s.TerminalID = StateDisconnected, ReasonDaemonStopped, ""
@@ -316,20 +305,6 @@ func (r *runner) checkStartup(force bool) {
 	}
 }
 
-// promptReady reports whether Claude's input box is on screen: a line starting with
-// the "❯" prompt marker and no trust dialog.
-func promptReady(screen string) bool {
-	if parseTrustDialog(screen).Visible {
-		return false
-	}
-	for _, line := range strings.Split(screen, "\n") {
-		if strings.HasPrefix(strings.TrimLeft(line, " "), "❯") {
-			return true
-		}
-	}
-	return false
-}
-
 // connect moves STARTING -> CONNECTED.
 func (r *runner) connect(why string) {
 	r.state = StateConnected
@@ -341,32 +316,6 @@ func (r *runner) connect(why string) {
 	})
 	r.pubActivity = r.activity
 	r.log().info("session connected", "why", why, "after", time.Since(r.term.StartedAt).Round(time.Millisecond).String())
-	if r.prompt != "" {
-		r.promptTimer = time.NewTimer(promptDelay)
-	}
-}
-
-func (r *runner) promptNext() {
-	r.promptTimer = nil
-	if r.closing {
-		return
-	}
-	switch r.promptStep {
-	case 0:
-		// CONNECTED fires on the title/alt-screen switch, before the input box is
-		// drawn; keystrokes sent earlier can be lost. Wait for the prompt line.
-		if screen, err := r.screen(); err == nil && !promptReady(screen) && r.promptWaits < maxPromptWaits {
-			r.promptWaits++
-			r.promptTimer = time.NewTimer(promptPoll)
-			return
-		}
-		r.write(r.prompt)
-		r.promptStep = 1
-		r.promptTimer = time.NewTimer(promptEnterDelay)
-	case 1:
-		r.write(keyEnter)
-		r.promptStep = 2
-	}
 }
 
 func (r *runner) onTick(now time.Time) {
@@ -497,7 +446,7 @@ func (r *runner) onExit(code int) {
 // finish detaches the runner, applying the final state.
 func (r *runner) finish(fn func(*Session)) {
 	r.finished = true
-	for _, t := range []*time.Timer{r.closeTimer, r.debounce, r.promptTimer} {
+	for _, t := range []*time.Timer{r.closeTimer, r.debounce} {
 		if t != nil {
 			t.Stop()
 		}

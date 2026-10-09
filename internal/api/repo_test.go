@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -188,6 +189,55 @@ func TestRepoWatchResyncsAfterDrops(t *testing.T) {
 		}
 		if s := stream.Msg().GetSnapshot(); s != nil && len(s.GetRepos()) == 3 {
 			return
+		}
+	}
+}
+
+func TestRepoListRefsAndCreateFetch(t *testing.T) {
+	fake, c := newRepoServer(t)
+	ctx := context.Background()
+	r, _ := fake.Register(ctx, "/code/proj")
+	fake.SetRefs(r.ID, repo.Refs{
+		Local: []string{"cf/x", "main"}, Remote: []string{"origin/main", "upstream/dev"}, DefaultRef: "origin/main",
+	})
+
+	tests := []struct {
+		name        string
+		repoID      string
+		wantRefs    []string
+		wantDefault string
+		wantCode    connect.Code
+	}{
+		{"locals then remotes", r.ID, []string{"cf/x", "main", "origin/main", "upstream/dev"}, "origin/main", 0},
+		{"unknown repo", "nope", nil, "", connect.CodeNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := c.ListRefs(ctx, connect.NewRequest(&v1.ListRefsRequest{RepoId: tt.repoID}))
+			if tt.wantCode != 0 {
+				if got := connect.CodeOf(err); got != tt.wantCode {
+					t.Fatalf("code = %v, want %v", got, tt.wantCode)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(res.Msg.GetRefs(), tt.wantRefs) || res.Msg.GetDefaultRef() != tt.wantDefault {
+				t.Fatalf("ListRefs = %v", res.Msg)
+			}
+		})
+	}
+
+	for _, fetch := range []bool{true, false} {
+		if _, err := c.CreateWorktree(ctx, connect.NewRequest(&v1.CreateWorktreeRequest{
+			RepoId: r.ID, Branch: fmt.Sprint("b-", fetch), BaseRef: "origin/main", Fetch: fetch,
+		})); err != nil {
+			t.Fatal(err)
+		}
+		got := fake.Creates[len(fake.Creates)-1]
+		if got.Fetch != fetch || got.BaseRef != "origin/main" {
+			t.Fatalf("store got %+v, want Fetch=%v", got, fetch)
 		}
 	}
 }

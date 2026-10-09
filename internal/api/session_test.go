@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -71,6 +72,53 @@ func TestSessionUnaryAndErrorCodes(t *testing.T) {
 		got.Msg.GetSession().GetState() != v1.SessionState_SESSION_STATE_CONNECTED ||
 		got.Msg.GetSession().GetStatusReason() != "finished" {
 		t.Errorf("enum mapping = %v", got.Msg.GetSession())
+	}
+}
+
+func TestSessionCreateNewThreadFields(t *testing.T) {
+	fake, c := newSessionServer(t)
+	ctx := context.Background()
+	res, err := c.Create(ctx, connect.NewRequest(&v1.CreateSessionRequest{
+		RepoId: "r1", InitialPrompt: "fix it", PermissionMode: v1.PermissionMode_PERMISSION_MODE_ACCEPT_EDITS,
+		NewWorktree: &v1.NewWorktree{BaseRef: "origin/dev"}, Attachments: []string{"/a/1.png", "/a/2.png"},
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := res.Msg.GetSession()
+	if s.GetPermissionMode() != v1.PermissionMode_PERMISSION_MODE_ACCEPT_EDITS || !s.GetCreatedWorktree() ||
+		s.GetBaseRef() != "origin/dev" || s.GetWorktreePath() != "/worktrees/cf-1" {
+		t.Fatalf("Create = %v", s)
+	}
+	want := "Create r1    perm=2 new-worktree=origin/dev prompt=fix it attachments=/a/1.png,/a/2.png"
+	if calls := fake.Calls(); len(calls) != 1 || calls[0] != want {
+		t.Errorf("calls = %q, want %q", calls, want)
+	}
+	// Without new_worktree nothing is created.
+	if _, err := c.Create(ctx, connect.NewRequest(&v1.CreateSessionRequest{RepoId: "r1"})); err != nil {
+		t.Fatal(err)
+	}
+	if calls := fake.Calls(); calls[1] != "Create r1   " {
+		t.Errorf("calls = %q", calls)
+	}
+}
+
+func TestSessionStageAttachment(t *testing.T) {
+	fake, c := newSessionServer(t)
+	ctx := context.Background()
+	res, err := c.StageAttachment(ctx, connect.NewRequest(&v1.StageAttachmentRequest{Name: "shot.png", MimeType: "image/png", Data: []byte("abc")}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Msg.GetPath() != "/attachments/1-shot.png" {
+		t.Errorf("path = %q", res.Msg.GetPath())
+	}
+	if calls := fake.Calls(); len(calls) != 1 || calls[0] != "StageAttachment shot.png image/png 3" {
+		t.Errorf("calls = %q", calls)
+	}
+	fake.Err = fmt.Errorf("%w: attachment type", session.ErrInvalidArgument)
+	if _, err := c.StageAttachment(ctx, connect.NewRequest(&v1.StageAttachmentRequest{MimeType: "text/plain"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("rejected attachment: %v", err)
 	}
 }
 
