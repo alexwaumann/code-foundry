@@ -126,7 +126,8 @@ test.describe("worktree overview", () => {
     const sync = page.getByTestId("sync-line");
     await expect(sync).toContainText("Upstream origin/feat/sidebar: ↑2");
     await expect(sync).toContainText("Base origin/main: ↑3 ↓1");
-    await expect(sync).toContainText("3 modified · 1 new");
+    // The mock flips the modified count between 3 and 4 every 8s (World tick).
+    await expect(sync).toContainText(/[34] modified · 1 new/);
 
     const gh = page.getByTestId("gh-activity");
     await expect(page.getByTestId("gh-merged-stats")).toHaveText("My PRs merged: 2 this month · 7 last month");

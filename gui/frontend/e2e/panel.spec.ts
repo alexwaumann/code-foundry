@@ -241,6 +241,10 @@ test("toggling while the settings page is up does nothing", async ({ page }) => 
   // Neither the chord nor the CLI flips the hidden panel's state.
   await page.keyboard.press("Meta+Shift+e");
   expect(await emit({ showView: { name: "panel.toggle" } })).toBeGreaterThan(0);
+  // Emit returns once the intent is queued. A Notify behind it on the same stream shows
+  // when the toggle has been handled, so it cannot land after settings closes.
+  expect(await emit({ notify: { level: "LEVEL_INFO", title: "after-toggle", body: "" } })).toBeGreaterThan(0);
+  await expect(page.getByText("after-toggle")).toBeVisible();
   await page.keyboard.press("Meta+Shift+e");
   await expect(page.getByTestId("settings-page")).toBeVisible();
   await page.keyboard.press("Escape");
