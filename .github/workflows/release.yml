@@ -4,12 +4,12 @@ name: release
 # v* tag (scripts/next-version.sh), assets from `make package`, tag + `gh release create`
 # by scripts/release.sh (idempotent, so a failed run can simply be re-run).
 #
-# Automatic releases are OFF. Two switches turn them on (docs/notes/phase3d-packaging.md,
-# "Enabling automatic releases"): uncomment the push trigger below, and set the
-# repository variable RELEASE_ENABLED to "true". The variable also gates manual runs.
+# Automatic releases are ON: every push to main releases (docs/notes/phase3d-packaging.md,
+# "Enabling automatic releases"). The repository variable RELEASE_ENABLED gates both the
+# push trigger and manual runs; set it to anything but "true" to pause releases.
 on:
-  # push:
-  #   branches: [main] # enable when ready for the first automatic release
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       version:

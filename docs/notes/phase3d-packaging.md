@@ -63,7 +63,7 @@ package.sh refuses to finish when:
 
 ## Releases
 
-### Automatic (GitHub Actions, off for now)
+### Automatic (GitHub Actions, on since 2026-10-09)
 
 `.github/workflows/release.yml` uses the same setup as `ci.yml`: checkout with full
 history and tags, setup-go from go.mod, pnpm 12.8.1, node 24, the libghostty-vt cache
@@ -74,17 +74,16 @@ merges instead of racing them. `workflow_dispatch` takes an optional explicit ve
 
 ### Enabling automatic releases
 
-Nothing publishes on merge until Alex flips **both** switches:
+Both switches were flipped on 2026-10-09:
 
-1. In `.github/workflows/release.yml`, uncomment the `push: branches: [main]` trigger
-   (marked "enable when ready for the first automatic release").
-2. Set the repository variable `RELEASE_ENABLED` to `true` (Settings → Secrets and
+1. `.github/workflows/release.yml` has the `push: branches: [main]` trigger.
+2. The repository variable `RELEASE_ENABLED` is `true` (Settings → Secrets and
    variables → Actions → Variables). The job's `if: vars.RELEASE_ENABLED == 'true'` also
    gates manual `workflow_dispatch` runs.
 
-Once both are on, the next push to main publishes **v0.1.0**, because there are no tags
-yet. After that, every push to main releases. A docs-only commit still bumps the patch
-version, which Alex accepted.
+The first push to main after that publishes **v0.1.0**, because there were no tags yet.
+After that, every push to main releases. A docs-only commit still bumps the patch
+version, which Alex accepted. To pause releases, set `RELEASE_ENABLED` to `false`.
 
 ### Versions (`scripts/next-version.sh`)
 
