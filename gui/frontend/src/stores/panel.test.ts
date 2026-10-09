@@ -3,12 +3,14 @@ import {
   activateTab,
   closeTab,
   emptyEntry,
+  expandPanel,
   getPanel,
   keyOf,
   makeTab,
   openSurface,
   openTab,
   resetPanelWidth,
+  setExpanded,
   setPanelWidth,
   setWidth,
   tabId,
@@ -142,6 +144,36 @@ describe("width", () => {
   });
 });
 
+describe("expanded", () => {
+  const open = entry(true, [files], files.id);
+  const expanded: PanelEntry = { ...open, expanded: true };
+  const cases: [string, PanelEntry, boolean | undefined, PanelEntry][] = [
+    ["flips a split panel to expanded", open, undefined, expanded],
+    ["flips an expanded panel back (the key is dropped)", expanded, undefined, open],
+    ["forces expanded", open, true, expanded],
+    ["forces the split", expanded, false, open],
+    ["leaves the open state alone", emptyEntry, true, { ...emptyEntry, expanded: true }],
+  ];
+  it.each(cases)("setExpanded %s", (_name, before, x, want) => {
+    expect(setExpanded(before, x)).toEqual(want);
+  });
+
+  it("setExpanded returns the same entry when nothing changes", () => {
+    expect(setExpanded(expanded, true)).toBe(expanded);
+    expect(setExpanded(open, false)).toBe(open);
+  });
+
+  it("survives the other reducers: hiding, closing the last tab, reopening, resizing", () => {
+    expect(toggle(expanded)).toEqual({ ...entry(false, [files], files.id), expanded: true });
+    const closed = closeTab(expanded, files.id);
+    expect(closed).toEqual({ ...entry(false, [], null), expanded: true });
+    expect(openTab(closed, diff).expanded).toBe(true);
+    expect(activateTab({ ...expanded, tabs: [files, diff] }, diff.id).expanded).toBe(true);
+    expect(setWidth(expanded, 500)).toEqual({ ...expanded, width: 500 });
+    expect(setWidth({ ...expanded, width: 500 }, undefined)).toEqual(expanded);
+  });
+});
+
 describe("panel store", () => {
   beforeEach(() => {
     usePanelStore.setState({ byKey: {} });
@@ -182,12 +214,13 @@ describe("panel store", () => {
     expect(usePanelStore.persist.getOptions().name).toBe("code-foundry.panel");
     openSurface("current", pr);
     setPanelWidth("current", 500);
+    expandPanel("current", true);
     const saved = localStorage.getItem("code-foundry.panel");
     expect(saved).not.toBeNull();
     usePanelStore.setState({ byKey: {} });
     localStorage.setItem("code-foundry.panel", saved ?? "");
     await usePanelStore.persist.rehydrate();
-    expect(getPanel("session:a")).toEqual({ ...entry(true, [pr], pr.id), width: 500 });
+    expect(getPanel("session:a")).toEqual({ ...entry(true, [pr], pr.id), width: 500, expanded: true });
   });
 
   it("keeps state per selection", () => {
@@ -208,6 +241,39 @@ describe("panel store", () => {
     expect(openSurface("worktree:r:/p", diff)).toBe(true);
     expect(getPanel("worktree:r:/p")).toEqual(entry(true, [diff], diff.id));
     expect(getPanel().open).toBe(false);
+    expect(useUiStore.getState().panelFocusSeq).toBe(0);
+  });
+
+  it("expandPanel shows a hidden panel expanded, flips per key, and keeps it when hidden", () => {
+    expect(expandPanel("current", true)).toBe(true);
+    expect(getPanel("session:a")).toEqual({ ...emptyEntry, open: true, expanded: true });
+    expect(getPanel("session:b")).toEqual(emptyEntry);
+    // Hiding keeps it; showing brings the panel back expanded.
+    togglePanel("current", false);
+    expect(getPanel()).toEqual({ ...emptyEntry, expanded: true });
+    togglePanel("current", true);
+    expect(getPanel()).toEqual({ ...emptyEntry, open: true, expanded: true });
+    // Flipping restores the split without hiding.
+    expect(expandPanel()).toBe(false);
+    expect(getPanel()).toEqual({ ...emptyEntry, open: true });
+    // Restoring a hidden panel does not show it.
+    expect(expandPanel("session:b", false)).toBe(false);
+    expect(getPanel("session:b")).toEqual(emptyEntry);
+  });
+
+  it("expandPanel asks for focus only when told to and only when it expands", () => {
+    expandPanel("current", true);
+    expect(useUiStore.getState().panelFocusSeq).toBe(0);
+    expandPanel("current", false, { focus: true });
+    expect(useUiStore.getState().panelFocusSeq).toBe(0);
+    expandPanel("current", true, { focus: true });
+    expect(useUiStore.getState().panelFocusSeq).toBe(1);
+  });
+
+  it("expandPanel does nothing with nothing selected", () => {
+    useUiStore.getState().select({ kind: "none" });
+    expect(expandPanel("current", true, { focus: true })).toBe(false);
+    expect(usePanelStore.getState().byKey).toEqual({});
     expect(useUiStore.getState().panelFocusSeq).toBe(0);
   });
 

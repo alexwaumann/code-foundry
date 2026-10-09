@@ -78,6 +78,29 @@ describe("SidePanel", () => {
     expect(sep.getAttribute("aria-valuemax")).toBe("600");
   });
 
+  it("expanded, it fills the row without a resize handle, shows without room, and settings still hides it", () => {
+    usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null, width: 500, expanded: true } } });
+    useUiStore.setState({ windowWidth: 1000, sidebarWidth: 520 });
+    render(<SidePanel />);
+    const wrapper = screen.getByTestId("side-panel-wrapper");
+    expect(wrapper.getAttribute("data-expanded")).toBe("true");
+    expect(wrapper.style.width).toBe("");
+    expect(wrapper.className).toContain("flex-1");
+    expect(screen.queryByRole("separator")).toBeNull();
+    act(() => {
+      useViewsStore.setState({ settingsOpen: true });
+    });
+    expect(screen.queryByTestId("side-panel")).toBeNull();
+    // Back to the split: the stored width and the handle return (the room allows it again).
+    act(() => {
+      useViewsStore.setState({ settingsOpen: false });
+      useUiStore.setState({ windowWidth: 1400, sidebarWidth: 260 });
+      usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null, width: 500 } } });
+    });
+    expect(screen.getByTestId("side-panel-wrapper").style.width).toBe("500px");
+    expect(screen.getByRole("separator")).toBeTruthy();
+  });
+
   it("resizes with arrow keys on the separator (Left widens)", () => {
     render(<SidePanel />);
     const sep = screen.getByRole("separator");
