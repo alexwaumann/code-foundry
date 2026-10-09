@@ -79,10 +79,10 @@ func runUpdate(ctx context.Context, cl *cli, args []string) error {
 		Stdin: os.Stdin, Stdout: cl.stdout, Stderr: cl.stderr,
 	}
 	if appDir != "" {
-		// Update this install, wherever it is, and leave the link alone: the first
-		// install made it, and it may point at another install.
+		// Update this install, wherever it is, and leave the link and ~/.zshrc alone:
+		// the first install set them up, and the link may point at another install.
 		inst.AppDir = appDir
-		inst.Args = append(inst.Args, "--skip-link")
+		inst.Args = append(inst.Args, "--skip-link", "--skip-path")
 	}
 	if *yes {
 		inst.Args = append(inst.Args, "--yes")
