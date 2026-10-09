@@ -397,7 +397,152 @@ PullRequestSurface (tab body; watches pullRequestDetailResource)
 * The Code tab (the diff), shown disabled.
 * Check out (T3's "Check out" button and `gh pr checkout N` hint), and per-commit `+/−`
   in the timeline (the detail has no per-commit stats).
-* Ask a question / Explain this PR / Fix findings in a thread (the next chunk).
+* ~~Ask a question / Explain this PR / Fix findings in a thread~~ (done in chunk 4).
 * Copy PR number (in T3's menu), editing the description, adding labels, and replying.
 * Org teams in the picker (the daemon lists teams only when already requested; see
   `gh-pr-detail.md`).
+
+## Chunk 4: the menu starts pull request sessions
+
+The three "Coming next" slots in the PR surface's ⋯ menu now start a Claude session about
+the pull request through the registry commands `pr.ask`, `pr.explain` and
+`pr.fix.findings` (daemon side: `pr-thread-commands.md`).
+
+Status: `make check` green (39 vitest files / 522 tests, plus the Go suite). `make
+gui-e2e` passes 190/190 (95 per engine), with `e2e/pr-panel.spec.ts` at 17 tests per
+engine. Screenshots (WebKit, dark, 1400x900): `/tmp/cf-shots/chunk4-menu.png` (menu with
+the three actions enabled, mock daemon), `chunk4-ask.png` (composer with a two-line
+question, mock daemon), `chunk4-live-explain.png` (real daemon, below). Not run in the
+real Wails window.
+
+### Pieces
+
+| File | Role |
+|---|---|
+| `stores/prSessions.ts` | `PR_SESSION_COMMANDS`, `prSessionArgs` (pure), `startPrSession` (runs the command, busy flag per pull request and kind, the fix-findings toast), `usePrSessionsStore` |
+| `components/pr/PrAskComposer.tsx` | The inline composer under the header |
+| `components/pr/keys.ts` | `composerKeyAction` (pure): Enter sends, Shift+Enter newline, Escape cancels, IME composition ignored |
+| `components/pr/PrMenu.tsx` | The three items enabled; controlled open state; spinners |
+| `api/gh.ts` | `parseSessionResult`: the session id in the command's result (protojson of `Session`) |
+| `mock/world.ts`, `mock/prDetail.ts`, `mock/server.ts` | The mock commands answer with the session JSON; `pr-fail` and the new `pr-delay` controls |
+
+### Decisions
+
+* **Args.** `{ "repo-slug", number }`, plus `question` (trimmed) for `pr.ask`. No `worktree`:
+  `getUiContext()` already sends the selection's worktree as `active_worktree_path`, and
+  pr.ask/pr.explain read it from there (pr.fix.findings ignores it by design). Passing it
+  as `worktree` would also change its meaning ("use this one as is") and skip the clone
+  check. No `model`/`effort`: the daemon fills them from `sessions.default_*`.
+* **Selection.** The daemon emits `FocusSession` for the new session (as `session.new`
+  does), and `stores/intents.ts` already selects it with terminal focus. The GUI adds no
+  second selection from the result: two paths would race the user if they clicked away
+  meanwhile. `startPrSession` still parses and returns the id (tests and callers).
+* **Panels.** Nothing is opened in the new session's panel. Panel state is per
+  selection, so the originating selection (the Pull Requests page, a session, a worktree)
+  keeps its PR tab; e2e checks both the Pull Requests page and a session.
+* **Ask** opens an inline composer under the header, not a popover: a popover inside a
+  280px panel left no room for a multi-line question, and the composer keeps the PR in
+  view. The menu item sets the surface's local `asking` state; the menu's
+  `onCloseAutoFocus` is prevented for that item so focus lands in the textarea, not back
+  on the ⋯ button. Enter (or cmd+Enter) sends, Shift+Enter is a newline, Alt/Ctrl+Enter
+  do nothing, Escape cancels and hands focus to the panel `<aside>` (panel keys keep
+  working). A blank question sends nothing and the Ask button is disabled. While pr.ask
+  runs the textarea is read-only with "Starting a session…". On success the composer
+  closes (in practice the selection has already moved, which unmounts it); on failure the
+  generic error toast shows and the text stays for a retry. The composer is local state of
+  the surface, so it never comes back when the user returns.
+* **Explain and Fix findings** keep the menu open (`preventDefault` on select, as Refresh
+  does) with a spinner on the item (`aria-busy`) until the command answers; success closes
+  it. A second click on a running item sends nothing (busy flag per pull request and
+  kind). A failure leaves the menu open for a retry; the error is the generic
+  `runCommandForResult` toast ("Fix Pull Request Findings failed" with the daemon's
+  message, e.g. the fork's `gh pr checkout N` hint).
+* **Fix findings toast.** "Preparing worktree for #N…" (sonner `loading`) shows only if
+  the command is still running after 200 ms, so a quick answer (the fork error) does not
+  flash it, and is dismissed when the command answers. Merged and closed pull requests
+  keep the item enabled, as asked.
+* **Success toast.** The command's message ("Started session <id> for PR #N") is shown as
+  usual; the new session is also selected, so this is a confirmation, not the only cue.
+
+### Gotchas
+
+* **A sonner toast dismissed before it is added stays up.** Sonner's Toaster adds a toast
+  on a `setTimeout(0)` but marks it deleted on a `requestAnimationFrame`; when the mock's
+  fork error answered at once, the dismissal ran first, found nothing, and the toast was
+  added afterwards and never left (seen in WebKit). The dismissal now goes through a
+  `setTimeout(0)` queued after sonner's add (timeouts of equal delay run in order), and
+  the 200 ms show delay avoids the case for quick answers. Unit test with fake timers; the
+  e2e checks no "Preparing" toast is left after the instant failure.
+* **Menu screenshots** need the fade-in to finish (`el.getAnimations({ subtree: true })`),
+  or the menu is captured half transparent over the summary.
+* **Playwright runs share `test-results/`.** A live run started while `make gui-e2e` was
+  running cleaned that directory and failed one unrelated e2e with ENOENT on its trace.
+  Run the live config with `--output <elsewhere>`, or not at the same time.
+* **`session close` takes `--id`**, not a positional id (`code-foundry session close --id
+  s-…`); without it it closes the active session from the context.
+* The mock's `pr-fail` control now covers `pr.ask`, `pr.explain` and `pr.fix.findings`
+  (fix: the fork precondition message; ask/explain: a 502 reading the pull request), and
+  `POST /__mock/gh/pr-delay?ms=800` makes the three commands take that long, so e2e can
+  see the spinner and the toast. The commands answer with the created session as JSON
+  (`id`, `repoId`, `worktreePath`, `model`, `effort`), like the daemon (protojson of
+  `Session`), rather than a `{sessionId}` shape.
+
+### Tests
+
+* `stores/prSessions.test.ts`: args per kind (no worktree/model/effort), each command and
+  its id, blank question, busy guard, the preparing toast (delay, deferred dismissal,
+  none for a quick answer), failure.
+* `components/pr/PrAskComposer.test.tsx`: `composerKeyAction` table, Enter sends and
+  closes, Shift+Enter does not send, blank, Escape, failure keeps the text, read-only
+  while running.
+* `e2e/pr-panel.spec.ts`: the menu test now checks the three items are enabled with
+  their subtitles. Explain: the spinner, `pr.explain` with slug and number and no
+  worktree, the new session selected with no panel, and #145 still open on the Pull
+  Requests page. Ask (from session s-1): Escape cancels and leaves focus in the panel,
+  Shift+Enter, Enter sends the two-line question with s-1's worktree in the context (not
+  in the args), and s-1's panel keeps #145. Fix findings: the fork error toast, no stray
+  "Preparing" toast, the menu open for a retry, then the spinner and the toast, the
+  session selected.
+* `e2e/live-prsession.spec.ts`: opt-in live run (below).
+
+### Live run (scratch daemon, 2026-10-09)
+
+```
+$ make build
+$ CODE_FOUNDRY_HOME=/tmp/cf-c4-home.XXXX ./bin/code-foundry daemon &         # port 63592
+$ git clone --depth 5 https://github.com/alexwaumann/code-foundry.git /tmp/cf-c4-clone.XXXX/code-foundry
+$ code-foundry repo register --path …/code-foundry          # registered code-foundry (79b248ba670c)
+$ code-foundry settings set sessions.default_model haiku
+$ code-foundry settings set sessions.default_effort medium
+$ VITE_DAEMON_URL=http://127.0.0.1:63592 VITE_DAEMON_TOKEN=… WAILS_VITE_PORT=9372 pnpm run dev --host 127.0.0.1 &
+$ LIVE_DAEMON=1 LIVE_APP_URL=http://127.0.0.1:9372 LIVE_REPO=code-foundry LIVE_PR=1 \
+  LIVE_SHOTS=/tmp/cf-shots pnpm run e2e:live e2e/live-prsession.spec.ts --output /tmp/cf-c4-live-results
+session s-7e2d05ba7839
+  ✓ Explain this PR starts a real Claude session with the explain prompt (4.8s)
+```
+
+The spec selects the clone's repo row, opens #1 (merged) through
+`openPullRequestInPanel`, and clicks Explain this PR. The real daemon read #1, picked the
+clone's main worktree (the active worktree of the repo row), started Claude Code 2.1.295
+with Haiku 5.5 at medium effort (the settings defaults; no model or effort was passed),
+and focused it: the new session row was selected (the whole test took 4.8 s), and
+the explain prompt appeared in its terminal, pasted as one message with all its lines.
+Claude was already running `gh pr view 1 … && gh pr diff 1 --stat`
+(`/tmp/cf-shots/chunk4-live-explain.png`). Back on the repo row, its panel still showed
+the #1 tab. A first attempt, started while `make gui-e2e` ran, passed its steps too
+(session s-545d810c93f9) but failed on the shared `test-results/` directory (Gotchas). Both
+sessions ended when the daemon was stopped (the `session close s-…` form I tried first is
+not the CLI's; see Gotchas); no Claude process was left, nothing was pushed, and the home
+and clone directories were removed.
+
+### Open items
+
+* The composer has no history and no attachments, and its text is lost when the selection
+  changes before sending.
+* No way to pick a model or effort from the menu (the settings defaults only); the
+  palette's `pr.ask`/`pr.explain` prompts for them.
+* Ask and Explain start in the selection's worktree when it is a clone of the slug; from
+  the Pull Requests page (no worktree) the daemon picks the head's worktree or the main
+  one. The menu does not say which beforehand.
+* Not run in the real Wails window.
+

@@ -5,7 +5,7 @@ modeled on T3 Code's PR actions, except that the session starts at once. Each co
 reads the pull request, picks a worktree (pr.fix.findings may create one), starts a
 session there with `SessionService.Create` and an `initial_prompt` (the same path as
 `session.new --prompt`), and emits `FocusSession`, as `session.new` does. This note covers
-the daemon side only; the GUI buttons are separate work.
+the daemon side; the GUI menu actions are in `side-panel.md` (chunk 4).
 
 Code: `internal/command/commands_prsession.go` (commands and `pickPRWorktree`) and
 `internal/command/prprompt.go` (the prompt builders, which are pure functions). Tests:

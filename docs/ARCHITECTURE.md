@@ -229,7 +229,9 @@ from the pull request (docs/notes/pr-thread-commands.md).
   page), command palette overlay. Strip and sidebar sit on one background (the sheet);
   the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Each
   selection can open a side panel right of the content: a second pane with tabs whose
-  bodies come from the surface registry (`src/surfaces`, `docs/notes/side-panel.md`). Every
+  bodies come from the surface registry (`src/surfaces`, `docs/notes/side-panel.md`); the
+  Pull request surface's menu starts sessions about the pull request through `pr.ask`,
+  `pr.explain` and `pr.fix.findings`. Every
   palette command is reachable without the mouse, and common ones also have buttons that
   invoke the same registry command. Chords are listed only in the palette and the
   Keyboard Shortcuts overlay (`docs/notes/phase3-ui-buttons.md`).
