@@ -13,6 +13,7 @@ make check    # gofmt, go vet, staticcheck, go test ./..., frontend typecheck + 
 make gui-e2e  # Playwright (WebKit + Chromium) against the mock daemon; not part of check
 make dev      # daemon in foreground with text logs
 make package VERSION=vX.Y.Z   # release assets in dist/ (app zip with the CLI inside, install.sh)
+make ghostty-vt-rebuild   # rebuild vendored third_party/libghostty-vt from source; only when bumping it
 make release  # manual release fallback (DRY_RUN=1 prints the commands); the workflow is off
 cd gui && wails3 dev   # GUI with hot reload (needs a running daemon or auto-starts one)
 ```

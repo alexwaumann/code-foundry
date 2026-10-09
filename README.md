@@ -70,5 +70,21 @@ Remove it too if you want a clean slate.
 
 ## Developing
 
+Requirements: an Apple silicon Mac with the Xcode Command Line Tools, Go 1.26 (go.mod's
+toolchain directive fetches it), `pkg-config` (`brew install pkgconf`), and Node 24 with
+pnpm. The GUI also needs `wails3`
+(`go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.28`).
+
+```sh
+make build       # ./bin/code-foundry
+make check       # what CI runs
+make gui-build   # gui/bin/CodeFoundry.app
+```
+
+No zig or ghostty checkout is needed: libghostty-vt is vendored prebuilt in
+[third_party/libghostty-vt](third_party/libghostty-vt). `make ghostty-vt-rebuild` rebuilds
+it from source and is only for bumping it
+([docs/notes/vendored-libghostty-vt.md](docs/notes/vendored-libghostty-vt.md)).
+
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/PLAN.md](docs/PLAN.md), and
-[CLAUDE.md](CLAUDE.md) for the build commands.
+[CLAUDE.md](CLAUDE.md) for the rest of the build commands.

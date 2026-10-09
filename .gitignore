@@ -8,8 +8,11 @@
 # Dependencies
 node_modules/
 
-# zig, ghostty source, and libghostty-vt build output (see `make ghostty-vt`)
-/third_party/
+# third_party/libghostty-vt is vendored and committed. Ignore the scratch space for
+# source rebuilds (zig, ghostty source, build output; `make ghostty-vt-rebuild`) and the
+# per-checkout pkg-config file written by `make ghostty-vt`.
+/third_party/build/
+/third_party/libghostty-vt/share/
 
 # macOS
 .DS_Store
