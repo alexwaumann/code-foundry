@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -504,9 +505,12 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 		// request's branch): that is the branch's own upstream, so track it, and
 		// ahead/behind, pull and a bare push work from the start. git's DWIM would do
 		// the same, but it silently branches from the default branch when
-		// origin/<branch> is missing, where an explicit base fails.
+		// origin/<branch> is missing, where an explicit base fails. git refuses
+		// --track ("starting point is not a branch") when origin's fetch refspec does
+		// not map the ref (a single-branch clone that fetched it by an explicit
+		// refspec); the branch then has no upstream, as before.
 		track := "--no-track"
-		if base == "origin/"+opts.Branch {
+		if base == "origin/"+opts.Branch && g.originFetches(ctx, m.Path, "refs/remotes/"+base) {
 			track = "--track"
 		}
 		args = []string{"worktree", "add", track, "-b", opts.Branch, path, base}
@@ -526,6 +530,37 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 		return Worktree{}, fmt.Errorf("repo: created worktree %s is missing from git worktree list", path)
 	}
 	return wt, nil
+}
+
+// originFetches reports whether one of origin's configured fetch refspecs writes the
+// remote-tracking ref ref (git sets up --track only for such a ref).
+func (g *Git) originFetches(ctx context.Context, dir, ref string) bool {
+	out, err := g.runner.Run(ctx, dir, "config", "--get-all", "remote.origin.fetch")
+	if err != nil {
+		return false
+	}
+	for spec := range strings.Lines(string(out)) {
+		if refspecWrites(strings.TrimSpace(spec), ref) {
+			return true
+		}
+	}
+	return false
+}
+
+// refspecWrites reports whether the fetch refspec spec ("[+]src:dst", dst with at most
+// one "*") writes ref. Negative refspecs ("^…") and refspecs without a destination
+// write nothing.
+func refspecWrites(spec, ref string) bool {
+	spec = strings.TrimPrefix(spec, "+")
+	_, dst, ok := strings.Cut(spec, ":")
+	if !ok || strings.HasPrefix(spec, "^") || dst == "" {
+		return false
+	}
+	pre, post, glob := strings.Cut(dst, "*")
+	if !glob {
+		return dst == ref
+	}
+	return len(ref) > len(pre)+len(post) && strings.HasPrefix(ref, pre) && strings.HasSuffix(ref, post)
 }
 
 // defaultBase is origin/<default branch> when that ref exists, else <default branch>.

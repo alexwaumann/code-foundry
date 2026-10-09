@@ -365,6 +365,47 @@ func TestCreateWorktreeUpstream(t *testing.T) {
 			}
 		})
 	}
+
+	// A single-branch clone that fetched the branch by an explicit refspec: git refuses
+	// --track there, so the branch is created without an upstream.
+	t.Run("single-branch clone", func(t *testing.T) {
+		git(t, f.other, "checkout", "-q", "-b", "pr-two")
+		git(t, f.other, "commit", "-q", "--allow-empty", "-m", "pr two")
+		git(t, f.other, "push", "-q", "origin", "pr-two")
+		git(t, f.repo, "config", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/main")
+		git(t, f.repo, "fetch", "-q", "origin", "+refs/heads/pr-two:refs/remotes/origin/pr-two")
+		w, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{RepoID: r.ID, Branch: "pr-two", BaseRef: "origin/pr-two"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if w.Status.Upstream != "" || w.Head != git(t, f.repo, "rev-parse", "origin/pr-two") {
+			t.Errorf("upstream %q head %s", w.Status.Upstream, w.Head)
+		}
+	})
+}
+
+func TestRefspecWrites(t *testing.T) {
+	const ref = "refs/remotes/origin/feat/x"
+	tests := []struct {
+		spec string
+		want bool
+	}{
+		{"+refs/heads/*:refs/remotes/origin/*", true},
+		{"refs/heads/*:refs/remotes/origin/*", true},
+		{"+refs/heads/main:refs/remotes/origin/main", false},
+		{"+refs/heads/feat/x:refs/remotes/origin/feat/x", true},
+		{"+refs/heads/feat/*:refs/remotes/origin/feat/*", true},
+		{"+refs/heads/*-pr:refs/remotes/origin/*-pr", false},
+		{"+refs/heads/*:refs/remotes/upstream/*", false},
+		{"^refs/heads/feat/x", false},
+		{"refs/heads/feat/x", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		if got := refspecWrites(tt.spec, ref); got != tt.want {
+			t.Errorf("refspecWrites(%q) = %v, want %v", tt.spec, got, tt.want)
+		}
+	}
 }
 
 func TestExternalWorktreeAddAndRemoveAreDetected(t *testing.T) {
