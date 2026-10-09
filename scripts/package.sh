@@ -67,9 +67,9 @@ case "$cli_version" in
 "code-foundry $VERSION "*) ;;
 *) die "the CLI reports '$cli_version', want $VERSION" ;;
 esac
-# The GUI is linked with the same -X flag; the build info records it.
-gui_version="$(go version -m "$STAGE/CodeFoundry" | sed -n 's|.*internal/version\.Version=\([^ "]*\).*|\1|p' | head -n 1)"
-[ "$gui_version" = "$VERSION" ] || die "the GUI binary was built as '$gui_version', want $VERSION"
+# The GUI is linked with the same -X flag and prints it without opening a window.
+gui_version="$("$STAGE/CodeFoundry" --version)"
+[ "$gui_version" = "CodeFoundry $VERSION" ] || die "the GUI reports '$gui_version', want $VERSION"
 file_version="$(cat "$STAGE/VERSION")"
 [ "$file_version" = "$VERSION" ] || die "VERSION says '$file_version', want $VERSION"
 
