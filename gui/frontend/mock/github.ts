@@ -158,6 +158,8 @@ export class GhWorld {
     const sidebarPr = this.pr(cf, 142, "feat(gui): virtualized sidebar tree with session rows", {
       headRef: "feat/sidebar",
       reviewDecision: ReviewDecision.APPROVED,
+      // Ready to merge (mock/prDetail.ts): approved, checks passing, no conflicts.
+      mergeStateStatus: MergeStateStatus.CLEAN,
       checks: rollup(CheckRollupState.SUCCESS, 31, 0, 0, 2),
       ageMs: 40 * MIN,
     });
@@ -266,6 +268,21 @@ export class GhWorld {
       addAuthored: (pr) => {
         this.dashboard = { ...this.dashboard, authored: [pr, ...this.dashboard.authored], fetchedAt: timestampFromDate(new Date()) };
         this.publishGh({ event: { case: "dashboardUpdated", value: { fetchedAt: this.dashboard.fetchedAt } } });
+      },
+      markMerged: (pr) => {
+        const d = this.dashboard;
+        this.dashboard = {
+          ...d,
+          authored: d.authored.filter((p) => p !== pr),
+          recentlyMerged: [pr, ...d.recentlyMerged.filter((p) => p !== pr)],
+          fetchedAt: timestampFromDate(new Date()),
+        };
+        this.publishGh({ event: { case: "dashboardUpdated", value: { fetchedAt: this.dashboard.fetchedAt } } });
+        for (const [k, prs] of this.branches) {
+          if (!prs.includes(pr)) continue;
+          const [repoSlug = "", headRef = ""] = k.split("\u0000");
+          this.publishGh({ event: { case: "branchPullRequestsUpdated", value: { repoSlug, headRef, fetchedAt: this.dashboard.fetchedAt } } });
+        }
       },
       count: (rpc) => {
         this.count(rpc);

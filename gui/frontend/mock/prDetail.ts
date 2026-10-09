@@ -1,6 +1,7 @@
 /**
  * Mock GhService pull request detail panel: GetPullRequestDetail, ListReviewerCandidates,
- * SetReviewRequest, RevertPullRequest. Two rich fixtures on alexwaumann/code-foundry:
+ * SetReviewRequest, RevertPullRequest, MergePullRequest. Two rich fixtures on
+ * alexwaumann/code-foundry, and the mergeable one:
  *
  *   #145 open, draft, failing, in-progress and queued checks, changes requested by a
  *        reviewer who is stale and re-requested, a team and a user pending, a bot
@@ -11,15 +12,19 @@
  *   #131 closed without merging (revert: FAILED_PRECONDITION); two passed checks
  *   #140 open, someone else's, the viewer has read access only (viewer_can_update false);
  *        one check queued (a first-time contributor's workflow awaiting approval)
+ *   #142 open, approved, checks passing, merge state clean: the merge button works, and a
+ *        merge flips it to merged (it moves to the dashboard's recently merged)
  *
  * #131 and #140 are on no dashboard: open them by number. Every other pull request the
  * dashboards or branches list gets a minimal detail built from its summary, so any row
  * the GUI shows can open the panel.
  *
- * The panel's actions are commands (pr.revert, pr.review.request, pr.refresh; see
- * commands()), like the daemon's; the RPCs they wrap are served too. pr.refresh answers
+ * The panel's actions are commands (pr.revert, pr.merge, pr.review.request, pr.refresh;
+ * see commands()), like the daemon's; the RPCs they wrap are served too. Every open pull
+ * request allows all three merge methods. pr.refresh answers
  * with the detail (protojson), as the daemon does. POST /__mock/gh/pr-fail?command=pr.refresh
- * makes that command's next run fail (UNAVAILABLE, like a refresh GitHub refused).
+ * makes that command's next run fail (UNAVAILABLE, like a refresh GitHub refused);
+ * ?command=pr.merge fails the next merge like a moved head (FAILED_PRECONDITION).
  */
 import { create, toJson, type MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate, type Timestamp } from "@bufbuild/protobuf/wkt";
@@ -37,6 +42,9 @@ import {
   ReviewerKind,
   type GhEventSchema,
   PullRequestDetailSchema,
+  PullRequestMergeMethod,
+  MergeStateStatus,
+  Mergeable,
   type ReviewerCandidateSchema,
 } from "../src/gen/codefoundry/v1/gh_pb";
 import type { PrInit } from "./github";
@@ -63,14 +71,19 @@ type GhEventInit = MessageInitShape<typeof GhEventSchema>;
 /** Thrown for RPC errors; prDetailCall maps `code` to a ConnectError code. */
 export class PrDetailError extends Error {
   constructor(
-    readonly code: "not_found" | "failed_precondition" | "invalid_argument",
+    readonly code: "not_found" | "failed_precondition" | "invalid_argument" | "permission_denied",
     message: string,
   ) {
     super(message);
   }
 }
 
-const prDetailCodes = { not_found: Code.NotFound, failed_precondition: Code.FailedPrecondition, invalid_argument: Code.InvalidArgument };
+const prDetailCodes = {
+  not_found: Code.NotFound,
+  failed_precondition: Code.FailedPrecondition,
+  invalid_argument: Code.InvalidArgument,
+  permission_denied: Code.PermissionDenied,
+};
 
 /** Runs a pull request detail RPC or command, mapping PrDetailError to its Connect code. */
 export function prDetailCall<T>(fn: () => T): T {
@@ -87,6 +100,18 @@ const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 const CF = "alexwaumann/code-foundry";
 
+const ALL_METHODS = [PullRequestMergeMethod.MERGE, PullRequestMergeMethod.SQUASH, PullRequestMergeMethod.REBASE];
+const methodNames: Record<string, PullRequestMergeMethod> = { merge: PullRequestMergeMethod.MERGE, squash: PullRequestMergeMethod.SQUASH, rebase: PullRequestMergeMethod.REBASE };
+const methodWords: Record<string, string> = { merge: "a merge commit", squash: "squash", rebase: "rebase" };
+
+/** MergePullRequestResponse, as JSON (the command's result) and the RPC's answer. */
+interface MergeOut {
+  merged: boolean;
+  sha: string;
+  message: string;
+  branchDeleted: boolean;
+}
+
 const avatar = (login: string) => `https://avatars.example.com/${login.replace("/", "-")}.png`;
 const key = (slug: string, number: number) => `${slug.toLowerCase()}#${String(number)}`;
 
@@ -98,6 +123,8 @@ export interface PrDetailHooks {
   findPr: (slug: string, number: number) => PrInit | undefined;
   /** A new pull request authored by the viewer (a revert): add it to the dashboard. */
   addAuthored: (pr: PrInit) => void;
+  /** pr (its state already MERGED) leaves the authored list for recently merged; announce it. */
+  markMerged: (pr: PrInit) => void;
   /** A pull request summary built like the dashboards' (for fixtures on no dashboard). */
   makePr: (slug: string, number: number, title: string, o?: Partial<PrInit> & { ageMs?: number }) => PrInit;
   count: (rpc: string) => void;
@@ -107,10 +134,11 @@ export class PrDetailWorld {
   private readonly details = new Map<string, DetailInit>();
   private readonly candidates = new Map<string, CandidateInit[]>();
   private readonly reverts = new Map<string, { number: number; url: string }>();
+  private readonly merges = new Map<string, MergeOut>();
   private nextNumber = 151;
   /** Commands whose next run fails (POST /__mock/gh/pr-fail?command=…). */
   readonly failNext = new Set<string>();
-  /** How long pr.ask, pr.explain and pr.fix.findings take (POST /__mock/gh/pr-delay?ms=…). */
+  /** How long pr.ask, pr.explain, pr.fix.findings and pr.merge take (POST /__mock/gh/pr-delay?ms=…). */
   sessionDelayMs = 0;
 
   constructor(private readonly h: PrDetailHooks) {
@@ -238,6 +266,7 @@ export class PrDetailWorld {
         { name: "release-notes", workflow: "Release", status: CheckStatus.COMPLETED, conclusion: CheckConclusion.SKIPPED, startedAt: this.at(100 * MIN), completedAt: this.at(100 * MIN) },
       ],
       nodeId: "PR_kwMock145",
+      mergeMethodsAllowed: ALL_METHODS,
       viewerCanUpdate: true,
       viewerPermission: "admin",
       fetchedAt: this.at(20_000),
@@ -333,6 +362,7 @@ export class PrDetailWorld {
       commitCount: 1,
       checks: [{ name: "build", workflow: "CI", status: CheckStatus.QUEUED, description: "Waiting for a maintainer to approve the workflow run" }],
       nodeId: "PR_kwMock140",
+      mergeMethodsAllowed: ALL_METHODS,
       viewerCanUpdate: false,
       viewerPermission: "read",
       fetchedAt: this.at(20_000),
@@ -346,6 +376,7 @@ export class PrDetailWorld {
       body: "",
       reviewers: (pr.reviewRequests ?? []).map((login) => ({ login, isTeam: login.includes("/"), requested: true, avatarUrl: avatar(login) })),
       nodeId: `PR_kwMock${String(pr.number)}`,
+      mergeMethodsAllowed: ALL_METHODS,
       viewerCanUpdate: pr.author === this.h.viewer,
       viewerPermission: pr.author === this.h.viewer ? "admin" : "read",
       mergedBy: pr.state === PullRequestState.MERGED ? pr.author : "",
@@ -434,6 +465,39 @@ export class PrDetailWorld {
     const always = () => true;
     const out = (message: string, json: unknown): Promise<InvokeOut> => Promise.resolve({ message, resultJson: JSON.stringify(json) });
     return [
+      {
+        cmd: {
+          name: "pr.merge",
+          title: "Merge Pull Request",
+          category: "Pull Request",
+          description: "Merge an open pull request with a merge commit, squash, or rebase (GitHub's merge button); --delete-branch deletes its branch afterwards.",
+          keybindings: [],
+          args: [
+            slugArg,
+            numberArg,
+            { name: "method", type: ArgType.ENUM, required: true, description: "How to merge: a merge commit, squash, or rebase", enumValues: ["merge", "squash", "rebase"] },
+            { name: "delete-branch", type: ArgType.BOOL, required: false, description: "Delete the head branch after the merge (never a fork's)" },
+          ],
+          // Like the daemon's DynamicConfirm: the base from the detail, and the branch it deletes.
+          confirm: (_ctx: UiContext | undefined, args: Record<string, string>) => {
+            const method = args.method ?? "";
+            const pr = this.details.get(key(args["repo-slug"] ?? "", Number(args.number)))?.pullRequest ?? this.h.findPr(args["repo-slug"] ?? "", Number(args.number));
+            if (!pr?.baseRef) return `Merge #${args.number ?? ""} with ${method}?`;
+            let msg = `Merge #${args.number ?? ""} into ${pr.baseRef} with ${methodWords[method] ?? method}?`;
+            if (args["delete-branch"] === "true" && pr.headRef) msg += ` Branch ${pr.headRef} is deleted afterwards.`;
+            return msg;
+          },
+        },
+        when: always,
+        run: async (_ctx: UiContext | undefined, args: Record<string, string>) => {
+          const [slug, n] = target(args);
+          const method = methodNames[args.method ?? ""];
+          if (method === undefined) throw new ConnectError("method must be merge, squash, or rebase", Code.InvalidArgument);
+          if (this.sessionDelayMs > 0) await new Promise((r) => setTimeout(r, this.sessionDelayMs));
+          const r = prDetailCall(() => this.merge(slug, n, method, args["delete-branch"] === "true"));
+          return out(r.message, r);
+        },
+      },
       {
         cmd: {
           name: "pr.revert",
@@ -526,6 +590,56 @@ export class PrDetailWorld {
       createdAt: timestampFromDate(new Date()),
       updatedAt: timestampFromDate(new Date()),
     });
+    this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
+    return res;
+  }
+
+  /**
+   * Merges an open pull request (once; repeats in the session return the same), like the
+   * daemon: refused when it is not open, a draft, conflicting, blocked, the method is not
+   * allowed, or the viewer cannot write. A success marks it merged, moves it to the
+   * dashboard's recently merged and announces it.
+   */
+  merge(slug: string, number: number, method: PullRequestMergeMethod, deleteBranch: boolean): MergeOut {
+    this.h.count("MergePullRequest");
+    const k = key(slug, number);
+    const done = this.merges.get(k);
+    if (done) return done;
+    const d = this.detailOf(slug, number);
+    const pr = d.pullRequest;
+    if (method === PullRequestMergeMethod.UNSPECIFIED) throw new PrDetailError("invalid_argument", "method is required: merge, squash, or rebase");
+    if (!pr) throw new PrDetailError("not_found", `Could not resolve to a PullRequest with the number of ${String(number)}.`);
+    const refuse = (why: string) => new PrDetailError("failed_precondition", `failed precondition: ${why}`);
+    if (pr.state !== PullRequestState.OPEN) throw refuse(`pull request #${String(number)} is ${pr.state === PullRequestState.MERGED ? "merged" : "closed"}, not open`);
+    if (pr.draft) throw refuse(`pull request #${String(number)} is a draft`);
+    if (!(d.mergeMethodsAllowed ?? []).includes(method)) throw refuse(`pull request #${String(number)} cannot be merged with ${methodWords[PullRequestMergeMethod[method].toLowerCase()] ?? "it"}: the repository does not allow it`);
+    if (!d.viewerCanUpdate) throw new PrDetailError("permission_denied", "permission denied on github: Resource not accessible by integration");
+    if (this.failNext.delete("pr.merge")) {
+      throw refuse(`pull request #${String(number)} changed on GitHub since it was loaded (${pr.headRef ?? ""} has new commits); refresh and review it before merging`);
+    }
+    if (pr.mergeable === Mergeable.CONFLICTING) throw refuse("Pull Request is not mergeable");
+    if (pr.mergeStateStatus === MergeStateStatus.BLOCKED) throw refuse("At least 1 approving review is required by reviewers with write access.");
+    const now = timestampFromDate(new Date());
+    const sha = `e2e${String(number).padStart(4, "0")}${"0".repeat(33)}`;
+    pr.state = PullRequestState.MERGED;
+    pr.mergedAt = now;
+    pr.updatedAt = now;
+    pr.mergeable = Mergeable.UNSPECIFIED;
+    pr.mergeStateStatus = MergeStateStatus.UNSPECIFIED;
+    d.mergeCommitSha = sha;
+    d.mergedBy = this.h.viewer;
+    d.closedAt = now;
+    d.fetchedAt = now;
+    const found = this.h.findPr(slug, number);
+    if (found) this.h.markMerged(found);
+    const branchDeleted = deleteBranch && Boolean(pr.headRef);
+    const res: MergeOut = {
+      merged: true,
+      sha,
+      message: `Merged #${String(number)} (${sha.slice(0, 7)})${branchDeleted ? `; deleted branch ${pr.headRef ?? ""}` : ""}`,
+      branchDeleted,
+    };
+    this.merges.set(k, res);
     this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
     return res;
   }
