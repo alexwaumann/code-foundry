@@ -97,21 +97,6 @@ export const pullRequestDetailResource = createResource(
   { keepAliveMs: PULL_REQUEST_DETAIL_KEEPALIVE_MS },
 );
 
-/**
- * Fetches the detail from GitHub now (refresh) and writes the answer into the resource:
- * the fresh detail, or the daemon's cached copy with lastError when the fetch failed. An
- * RPC error (no cached copy) is recorded as the entry's error and rethrown.
- */
-export async function refreshPullRequestDetail(slug: string, number: number): Promise<void> {
-  const key = pullRequestKey(slug, number);
-  try {
-    pullRequestDetailResource.set(key, { data: await getPullRequestDetail(slug, number, true) });
-  } catch (err) {
-    pullRequestDetailResource.set(key, { error: errorMessage(err) });
-    throw err;
-  }
-}
-
 /** Routes one gh notification to the views it affects. */
 export function applyGhEvent(ev: GhEventView): void {
   switch (ev.kind) {

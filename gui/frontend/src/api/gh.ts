@@ -1,4 +1,4 @@
-import { create } from "@bufbuild/protobuf";
+import { create, fromJsonString } from "@bufbuild/protobuf";
 import { timestampMs, type Timestamp } from "@bufbuild/protobuf/wkt";
 import {
   CheckConclusion,
@@ -619,6 +619,19 @@ export function parseRevertResult(resultJson: string): { number: number; url: st
     const number = Number(v.number);
     if (!Number.isInteger(number) || number <= 0) return null;
     return { number, url: typeof v.url === "string" ? v.url : "" };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The detail in pr.refresh's result JSON (protojson of PullRequestDetail, what the daemon
+ * just fetched); null when it is not one (an older daemon, or no pull request in it).
+ */
+export function parseRefreshResult(resultJson: string): PullRequestDetailView | null {
+  try {
+    const d = fromJsonString(PullRequestDetailSchema, resultJson, { ignoreUnknownFields: true });
+    return d.pullRequest ? toPullRequestDetailView(d) : null;
   } catch {
     return null;
   }

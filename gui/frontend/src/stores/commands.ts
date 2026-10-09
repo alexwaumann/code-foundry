@@ -103,12 +103,13 @@ export async function runCommand(name: string, args: Record<string, string> = {}
 /**
  * runCommand that hands back the command's result (null when it failed or the user
  * declined). `quiet` skips the success toast, for callers that report the result their
- * own way; failures are always toasted.
+ * own way; failures are always toasted, after `onError` (for callers that also show the
+ * failure in place).
  */
 export async function runCommandForResult(
   name: string,
   args: Record<string, string> = {},
-  opts: { ctx?: UiContextView; quiet?: boolean } = {},
+  opts: { ctx?: UiContextView; quiet?: boolean; onError?: (message: string) => void } = {},
 ): Promise<InvokeResultView | null> {
   const title = useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name;
   try {
@@ -118,6 +119,7 @@ export async function runCommandForResult(
     if (!opts.quiet && res.message && !isGitOpResult(res.resultJson)) toast.success(res.message);
     return res;
   } catch (err) {
+    opts.onError?.(errorMessage(err));
     if (!isGitOpFailure(err)) toast.error(`${title} failed`, { description: errorMessage(err) });
     return null;
   } finally {

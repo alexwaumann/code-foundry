@@ -1,18 +1,19 @@
 /**
  * The Pull request surface's state and actions (components/pr). Inner view state lives
  * per panel tab, keyed by panel key + tab id, so switching panel tabs (or selections)
- * keeps it. Actions are registry commands (pr.refresh, pr.review.request, pr.revert) or
- * existing store actions (openUrl, copyText); components call these, never RPCs.
+ * keeps it, and closing the tab drops it. Actions are registry commands (pr.refresh,
+ * pr.review.request, pr.revert) or existing store actions (openUrl, copyText); components
+ * call these, never RPCs.
  */
 import { toast } from "sonner";
 import { create } from "zustand";
-import { listReviewerCandidates, parseRevertResult } from "@/api/gh";
+import { listReviewerCandidates, parseRefreshResult, parseRevertResult } from "@/api/gh";
 import { copyText } from "@/lib/clipboard";
 import { pullRequestTab, type PrRef } from "@/surfaces/pullrequestTarget";
 import { runCommand, runCommandForResult } from "./commands";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "./gh";
-import { openSurface, type PanelTarget } from "./panel";
-import { createResource } from "./resource";
+import { openSurface, usePanelStore, type PanelState, type PanelTarget } from "./panel";
+import { createResource, type Resource } from "./resource";
 
 export type PrInnerTab = "summary" | "timeline";
 export type SortOrder = "newest" | "oldest";
@@ -44,6 +45,21 @@ interface PrPanelState {
 export const usePrPanelStore = create<PrPanelState>()(() => ({ byTab: {}, refreshing: {}, requesting: {} }));
 
 export const prTabKey = (panelKey: string, tabId: string): string => `${panelKey}\u0000${tabId}`;
+
+/** Drops inner state of tabs no panel holds any more (a closed tab reopens fresh). */
+function pruneClosedTabs(panels: PanelState): void {
+  const byTab = usePrPanelStore.getState().byTab;
+  const keys = Object.keys(byTab);
+  if (keys.length === 0) return;
+  const live = new Set<string>();
+  for (const [panelKey, e] of Object.entries(panels.byKey)) for (const t of e.tabs) live.add(prTabKey(panelKey, t.id));
+  if (keys.every((k) => live.has(k))) return;
+  usePrPanelStore.setState({ byTab: Object.fromEntries(Object.entries(byTab).filter(([k]) => live.has(k))) });
+}
+
+usePanelStore.subscribe((s, prev) => {
+  if (s.byKey !== prev.byKey) pruneClosedTabs(s);
+});
 
 export function updatePrTab(key: string, f: (s: PrTabState) => PrTabState): void {
   usePrPanelStore.setState((s) => ({ byTab: { ...s.byTab, [key]: f(s.byTab[key] ?? defaultPrTabState) } }));
@@ -81,15 +97,30 @@ export function pullRequestUrl(ref: PrRef): string {
   return `https://github.com/${ref.slug}/pull/${String(ref.number)}`;
 }
 
-/** Menu → Refresh: pr.refresh fetches from GitHub; the resource then re-reads the fresh cache. */
+/**
+ * Menu → Refresh: pr.refresh fetches from GitHub, quietly (the menu shows the progress and
+ * the new time). Its result is the fresh detail, written straight into the resource: no
+ * second read. A failure is toasted and recorded as the entry's error over the copy shown
+ * ("Could not refresh"), which keeps its own lastError.
+ */
 export async function refreshPullRequest(ref: PrRef): Promise<boolean> {
   const key = pullRequestKey(ref.slug, ref.number);
   if (usePrPanelStore.getState().refreshing[key]) return false;
   usePrPanelStore.setState((s) => ({ refreshing: { ...s.refreshing, [key]: true } }));
   try {
-    return await runCommand("pr.refresh", prArgs(ref));
+    const res = await runCommandForResult("pr.refresh", prArgs(ref), {
+      quiet: true,
+      onError: (message) => {
+        pullRequestDetailResource.set(key, { error: message });
+      },
+    });
+    if (!res) return false;
+    const fresh = parseRefreshResult(res.resultJson);
+    // An older daemon's result carries no detail: read the (fresh) cache instead.
+    if (fresh) pullRequestDetailResource.set(key, { data: fresh });
+    else pullRequestDetailResource.invalidate(key);
+    return true;
   } finally {
-    pullRequestDetailResource.invalidate(key);
     usePrPanelStore.setState((s) => {
       const { [key]: _done, ...rest } = s.refreshing;
       return { refreshing: rest };
@@ -97,19 +128,40 @@ export async function refreshPullRequest(ref: PrRef): Promise<boolean> {
   }
 }
 
+/** Resolves once key's entry is not loading (at once when nothing reads it), or after timeoutMs. */
+function settled<V>(r: Resource<V>, key: string, timeoutMs = 15_000): Promise<void> {
+  if (!r.store.getState().entries[key]?.loading) return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      unsub();
+      resolve();
+    };
+    const timer = setTimeout(done, timeoutMs);
+    const unsub = r.store.subscribe((s) => {
+      if (!s.entries[key]?.loading) done();
+    });
+  });
+}
+
 export const requestingKey = (ref: PrRef, login: string): string => `${pullRequestKey(ref.slug, ref.number)}\u0000${login}`;
 
-/** Reviewer picker: requests a review from login, or withdraws the pending request. */
+/**
+ * Reviewer picker: requests a review from login, or withdraws the pending request. The
+ * row stays busy until the picker's candidates are read again, so it never shows the old
+ * state after the request, and a second click cannot repeat the same request.
+ */
 export async function setReviewRequest(ref: PrRef, login: string, kind: "user" | "team", requested: boolean): Promise<boolean> {
   const busy = requestingKey(ref, login);
   if (usePrPanelStore.getState().requesting[busy]) return false;
   usePrPanelStore.setState((s) => ({ requesting: { ...s.requesting, [busy]: true } }));
+  const key = pullRequestKey(ref.slug, ref.number);
   try {
     return await runCommand("pr.review.request", { ...prArgs(ref), login, kind, requested: String(requested) });
   } finally {
-    const key = pullRequestKey(ref.slug, ref.number);
     pullRequestDetailResource.invalidate(key);
     reviewerCandidatesResource.invalidate(key);
+    await settled(reviewerCandidatesResource, key);
     usePrPanelStore.setState((s) => {
       const { [busy]: _done, ...rest } = s.requesting;
       return { requesting: rest };

@@ -95,7 +95,7 @@ export function toggle(e: PanelEntry, open?: boolean): PanelEntry {
   return next === e.open ? e : { ...e, open: next };
 }
 
-interface PanelState {
+export interface PanelState {
   byKey: Readonly<Record<string, PanelEntry>>;
 }
 
