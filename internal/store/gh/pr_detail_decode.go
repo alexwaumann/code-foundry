@@ -27,6 +27,10 @@ type commentJSON struct {
 	SubmittedAt time.Time  `json:"submittedAt"`
 	URL         string     `json:"url"`
 	Path        string     `json:"path"`
+	// PullRequestReview is the review an inline comment belongs to (review threads).
+	PullRequestReview *struct {
+		ID string `json:"id"`
+	} `json:"pullRequestReview"`
 }
 
 type commentsJSON struct {
@@ -50,7 +54,8 @@ type oidJSON struct {
 }
 
 type reviewRequestsJSON struct {
-	Nodes []struct {
+	TotalCount int `json:"totalCount"`
+	Nodes      []struct {
 		RequestedReviewer *requestedReviewerJSON `json:"requestedReviewer"`
 	} `json:"nodes"`
 }
@@ -68,7 +73,8 @@ type pullRequestFullJSON struct {
 		Nodes      []Label `json:"nodes"`
 	} `json:"labels"`
 	Reviewers *struct {
-		Nodes []struct {
+		TotalCount int `json:"totalCount"`
+		Nodes      []struct {
 			Author      *actorJSON `json:"author"`
 			State       string     `json:"state"`
 			SubmittedAt time.Time  `json:"submittedAt"`
@@ -131,8 +137,15 @@ func decodeFullPullRequest(data []byte) (FullPullRequest, checksPage, error) {
 	}
 	if p.Labels != nil {
 		out.Labels = p.Labels.Nodes
+		out.LabelsTruncated = p.Labels.TotalCount > len(p.Labels.Nodes)
 	}
 	out.Reviewers = mapReviewers(p)
+	if r := p.Reviewers; r != nil && r.TotalCount > len(r.Nodes) {
+		out.ReviewersTruncated = true
+	}
+	if r := p.RequestedReviewers; r != nil && r.TotalCount > len(r.Nodes) {
+		out.ReviewersTruncated = true
+	}
 	if p.Commits != nil {
 		out.CommitCount = p.Commits.TotalCount
 		for _, n := range p.Commits.Nodes {
@@ -215,16 +228,24 @@ func mapComment(n commentJSON, kind CommentKind) Comment {
 	if a := n.Author; a != nil {
 		c.Author, c.AuthorBot, c.AuthorAvatar = a.Login, a.Typename == "Bot", a.AvatarURL
 	}
-	if kind == CommentReview {
+	switch kind {
+	case CommentReview:
 		c.ReviewState = n.State
 		if !n.SubmittedAt.IsZero() {
 			c.CreatedAt = n.SubmittedAt
+		}
+	case CommentReviewComment:
+		if n.PullRequestReview != nil {
+			c.ReviewID = n.PullRequestReview.ID
 		}
 	}
 	return c
 }
 
-// mapConversation merges issue comments and submitted reviews, oldest first.
+// mapConversation merges issue comments and submitted reviews, oldest first. Drafts
+// (PENDING) are left out, and so are COMMENTED reviews without a body: GitHub records
+// every inline comment and thread reply as one, and their text is in the threads.
+// truncated covers both streams.
 func mapConversation(issue, reviews *commentsJSON) ([]Comment, bool) {
 	var out []Comment
 	truncated := false
@@ -237,7 +258,7 @@ func mapConversation(issue, reviews *commentsJSON) ([]Comment, bool) {
 	if reviews != nil {
 		truncated = truncated || reviews.TotalCount > len(reviews.Nodes)
 		for _, n := range reviews.Nodes {
-			if n.State == "PENDING" {
+			if n.State == "PENDING" || n.State == "COMMENTED" && strings.TrimSpace(n.Body) == "" {
 				continue
 			}
 			out = append(out, mapComment(n, CommentReview))

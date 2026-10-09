@@ -1,8 +1,8 @@
 # Everything the pull request detail panel shows, in one request: the summary fields
 # (PullRequestDetail), body, labels, each reviewer's latest review with the commit it
 # reviewed, pending review requests, the last 100 commits, the last 100 issue comments
-# and reviews, the last 50 review threads (first 20 comments each), and the first page
-# of head commit checks. Fetched on demand by GetPullRequestDetail and cached per pull
+# and reviews, the last 50 review threads (first 20 comments each, with the review each
+# belongs to), and the first page of head commit checks. Fetched on demand by GetPullRequestDetail and cached per pull
 # request (docs/notes/gh-pr-detail.md); never polled.
 #
 # Fields that PullRequestDetail selects with other arguments are aliased (GraphQL
@@ -20,6 +20,7 @@ query PullRequestFull($owner: String!, $name: String!, $number: Int!) {
       mergedBy { login }
       labels(first: 20) { totalCount nodes { name color } }
       reviewers: latestReviews(first: 50) {
+        totalCount
         nodes {
           author { ...ActorFields }
           state
@@ -28,6 +29,7 @@ query PullRequestFull($owner: String!, $name: String!, $number: Int!) {
         }
       }
       requestedReviewers: reviewRequests(first: 50) {
+        totalCount
         nodes { requestedReviewer { ...RequestedReviewerFields } }
       }
       commits(last: 100) {
@@ -61,7 +63,7 @@ query PullRequestFull($owner: String!, $name: String!, $number: Int!) {
           isOutdated
           comments(first: 20) {
             totalCount
-            nodes { id author { ...ActorFields } body createdAt url path }
+            nodes { id author { ...ActorFields } body createdAt url path pullRequestReview { id } }
           }
         }
       }

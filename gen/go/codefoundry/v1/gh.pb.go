@@ -2814,15 +2814,17 @@ type PullRequestDetail struct {
 	// All commits on the pull request (commits holds the last 100).
 	CommitCount int32 `protobuf:"varint,6,opt,name=commit_count,json=commitCount,proto3" json:"commit_count,omitempty"`
 	// Issue comments and submitted reviews (the last 100 of each), oldest first. Inline
-	// review comments are in review_threads.
+	// review comments are in review_threads, and so are the reviews that only carried
+	// them (COMMENTED with an empty body, as GitHub records each inline comment and
+	// reply): those are left out here.
 	Comments []*PullRequestComment `protobuf:"bytes,7,rep,name=comments,proto3" json:"comments,omitempty"`
-	// More issue comments or reviews exist than comments holds.
+	// Covers both streams: more than 100 issue comments, or more than 100 reviews, exist.
 	CommentsTruncated bool `protobuf:"varint,8,opt,name=comments_truncated,json=commentsTruncated,proto3" json:"comments_truncated,omitempty"`
 	// The last 50 review threads, oldest first.
 	ReviewThreads []*PullRequestReviewThread `protobuf:"bytes,9,rep,name=review_threads,json=reviewThreads,proto3" json:"review_threads,omitempty"`
 	// More review threads exist than review_threads holds.
 	ReviewThreadsTruncated bool `protobuf:"varint,10,opt,name=review_threads_truncated,json=reviewThreadsTruncated,proto3" json:"review_threads_truncated,omitempty"`
-	// Every check on the head commit, failed first.
+	// Every check on the head commit, failed first (see checks_truncated).
 	Checks []*CheckRun `protobuf:"bytes,11,rep,name=checks,proto3" json:"checks,omitempty"`
 	// Merged pull requests: the merge commit and who merged.
 	MergeCommitSha string `protobuf:"bytes,12,opt,name=merge_commit_sha,json=mergeCommitSha,proto3" json:"merge_commit_sha,omitempty"`
@@ -2836,13 +2838,22 @@ type PullRequestDetail struct {
 	ViewerCanUpdate bool `protobuf:"varint,16,opt,name=viewer_can_update,json=viewerCanUpdate,proto3" json:"viewer_can_update,omitempty"`
 	// When this detail was fetched; unset if never.
 	FetchedAt *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=fetched_at,json=fetchedAt,proto3" json:"fetched_at,omitempty"`
-	// The last fetch's error when this is the cached copy.
+	// The last fetch's error when this is the cached copy, or why checks is incomplete
+	// (a page of checks beyond the first failed).
 	LastError string `protobuf:"bytes,18,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
 	// The viewer's permission on the repository, lower case ("admin", "maintain",
 	// "write", "triage", "read"); empty if unknown.
 	ViewerPermission string `protobuf:"bytes,19,opt,name=viewer_permission,json=viewerPermission,proto3" json:"viewer_permission,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// labels holds the first 20 of more.
+	LabelsTruncated bool `protobuf:"varint,20,opt,name=labels_truncated,json=labelsTruncated,proto3" json:"labels_truncated,omitempty"`
+	// More than 50 latest reviews or more than 50 pending review requests exist than
+	// reviewers was built from.
+	ReviewersTruncated bool `protobuf:"varint,21,opt,name=reviewers_truncated,json=reviewersTruncated,proto3" json:"reviewers_truncated,omitempty"`
+	// checks is incomplete: a page beyond the first failed (last_error says why), or the
+	// head commit has more checks than the daemon fetches.
+	ChecksTruncated bool `protobuf:"varint,22,opt,name=checks_truncated,json=checksTruncated,proto3" json:"checks_truncated,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *PullRequestDetail) Reset() {
@@ -3006,6 +3017,27 @@ func (x *PullRequestDetail) GetViewerPermission() string {
 		return x.ViewerPermission
 	}
 	return ""
+}
+
+func (x *PullRequestDetail) GetLabelsTruncated() bool {
+	if x != nil {
+		return x.LabelsTruncated
+	}
+	return false
+}
+
+func (x *PullRequestDetail) GetReviewersTruncated() bool {
+	if x != nil {
+		return x.ReviewersTruncated
+	}
+	return false
+}
+
+func (x *PullRequestDetail) GetChecksTruncated() bool {
+	if x != nil {
+		return x.ChecksTruncated
+	}
+	return false
 }
 
 type PullRequestLabel struct {
@@ -3260,7 +3292,10 @@ type PullRequestComment struct {
 	// Review comments: the file.
 	Path string `protobuf:"bytes,9,opt,name=path,proto3" json:"path,omitempty"`
 	// Reviews: the review's state.
-	ReviewState   PullRequestReviewState `protobuf:"varint,10,opt,name=review_state,json=reviewState,proto3,enum=codefoundry.v1.PullRequestReviewState" json:"review_state,omitempty"`
+	ReviewState PullRequestReviewState `protobuf:"varint,10,opt,name=review_state,json=reviewState,proto3,enum=codefoundry.v1.PullRequestReviewState" json:"review_state,omitempty"`
+	// Review comments: the node id of the review they belong to, to group a review's
+	// inline comments.
+	ReviewId      string `protobuf:"bytes,11,opt,name=review_id,json=reviewId,proto3" json:"review_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3363,6 +3398,13 @@ func (x *PullRequestComment) GetReviewState() PullRequestReviewState {
 		return x.ReviewState
 	}
 	return PullRequestReviewState_PULL_REQUEST_REVIEW_STATE_UNSPECIFIED
+}
+
+func (x *PullRequestComment) GetReviewId() string {
+	if x != nil {
+		return x.ReviewId
+	}
+	return ""
 }
 
 type PullRequestReviewThread struct {
@@ -4408,7 +4450,7 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x18\n" +
 	"\arefresh\x18\x03 \x01(\bR\arefresh\"Y\n" +
 	"\x1cGetPullRequestDetailResponse\x129\n" +
-	"\x06detail\x18\x01 \x01(\v2!.codefoundry.v1.PullRequestDetailR\x06detail\"\xbb\a\n" +
+	"\x06detail\x18\x01 \x01(\v2!.codefoundry.v1.PullRequestDetailR\x06detail\"\xc2\b\n" +
 	"\x11PullRequestDetail\x12>\n" +
 	"\fpull_request\x18\x01 \x01(\v2\x1b.codefoundry.v1.PullRequestR\vpullRequest\x12\x12\n" +
 	"\x04body\x18\x02 \x01(\tR\x04body\x128\n" +
@@ -4431,7 +4473,10 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"fetched_at\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\tfetchedAt\x12\x1d\n" +
 	"\n" +
 	"last_error\x18\x12 \x01(\tR\tlastError\x12+\n" +
-	"\x11viewer_permission\x18\x13 \x01(\tR\x10viewerPermission\"<\n" +
+	"\x11viewer_permission\x18\x13 \x01(\tR\x10viewerPermission\x12)\n" +
+	"\x10labels_truncated\x18\x14 \x01(\bR\x0flabelsTruncated\x12/\n" +
+	"\x13reviewers_truncated\x18\x15 \x01(\bR\x12reviewersTruncated\x12)\n" +
+	"\x10checks_truncated\x18\x16 \x01(\bR\x0fchecksTruncated\"<\n" +
 	"\x10PullRequestLabel\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05color\x18\x02 \x01(\tR\x05color\"\xab\x02\n" +
@@ -4451,7 +4496,7 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\fauthor_login\x18\x03 \x01(\tR\vauthorLogin\x12\x1f\n" +
 	"\vauthor_name\x18\x04 \x01(\tR\n" +
 	"authorName\x12=\n" +
-	"\fcommitted_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\vcommittedAt\"\x88\x03\n" +
+	"\fcommitted_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\vcommittedAt\"\xa5\x03\n" +
 	"\x12PullRequestComment\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12:\n" +
 	"\x04kind\x18\x02 \x01(\x0e2&.codefoundry.v1.PullRequestCommentKindR\x04kind\x12\x16\n" +
@@ -4464,7 +4509,8 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\x03url\x18\b \x01(\tR\x03url\x12\x12\n" +
 	"\x04path\x18\t \x01(\tR\x04path\x12I\n" +
 	"\freview_state\x18\n" +
-	" \x01(\x0e2&.codefoundry.v1.PullRequestReviewStateR\vreviewState\"\xb0\x02\n" +
+	" \x01(\x0e2&.codefoundry.v1.PullRequestReviewStateR\vreviewState\x12\x1b\n" +
+	"\treview_id\x18\v \x01(\tR\breviewId\"\xb0\x02\n" +
 	"\x17PullRequestReviewThread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x12\n" +

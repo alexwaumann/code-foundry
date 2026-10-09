@@ -94,6 +94,9 @@ func fullPullRequestToProto(slug string, d *gh.FullPullRequest) *v1.PullRequestD
 		ViewerPermission:       strings.ToLower(d.ViewerPermission),
 		FetchedAt:              timestamp(d.FetchedAt),
 		LastError:              d.LastError,
+		LabelsTruncated:        d.LabelsTruncated,
+		ReviewersTruncated:     d.ReviewersTruncated,
+		ChecksTruncated:        d.ChecksTruncated,
 	}
 	for _, l := range d.Labels {
 		out.Labels = append(out.Labels, &v1.PullRequestLabel{Name: l.Name, Color: l.Color})
@@ -137,5 +140,6 @@ func commentToProto(c *gh.Comment) *v1.PullRequestComment {
 		Url:             c.URL,
 		Path:            c.Path,
 		ReviewState:     reviewStateOf(c.ReviewState),
+		ReviewId:        c.ReviewID,
 	}
 }

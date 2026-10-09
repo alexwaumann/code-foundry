@@ -504,15 +504,17 @@ message PullRequestDetail {
   // All commits on the pull request (commits holds the last 100).
   int32 commit_count = 6;
   // Issue comments and submitted reviews (the last 100 of each), oldest first. Inline
-  // review comments are in review_threads.
+  // review comments are in review_threads, and so are the reviews that only carried
+  // them (COMMENTED with an empty body, as GitHub records each inline comment and
+  // reply): those are left out here.
   repeated PullRequestComment comments = 7;
-  // More issue comments or reviews exist than comments holds.
+  // Covers both streams: more than 100 issue comments, or more than 100 reviews, exist.
   bool comments_truncated = 8;
   // The last 50 review threads, oldest first.
   repeated PullRequestReviewThread review_threads = 9;
   // More review threads exist than review_threads holds.
   bool review_threads_truncated = 10;
-  // Every check on the head commit, failed first.
+  // Every check on the head commit, failed first (see checks_truncated).
   repeated CheckRun checks = 11;
   // Merged pull requests: the merge commit and who merged.
   string merge_commit_sha = 12;
@@ -526,11 +528,20 @@ message PullRequestDetail {
   bool viewer_can_update = 16;
   // When this detail was fetched; unset if never.
   google.protobuf.Timestamp fetched_at = 17;
-  // The last fetch's error when this is the cached copy.
+  // The last fetch's error when this is the cached copy, or why checks is incomplete
+  // (a page of checks beyond the first failed).
   string last_error = 18;
   // The viewer's permission on the repository, lower case ("admin", "maintain",
   // "write", "triage", "read"); empty if unknown.
   string viewer_permission = 19;
+  // labels holds the first 20 of more.
+  bool labels_truncated = 20;
+  // More than 50 latest reviews or more than 50 pending review requests exist than
+  // reviewers was built from.
+  bool reviewers_truncated = 21;
+  // checks is incomplete: a page beyond the first failed (last_error says why), or the
+  // head commit has more checks than the daemon fetches.
+  bool checks_truncated = 22;
 }
 
 message PullRequestLabel {
@@ -581,6 +592,9 @@ message PullRequestComment {
   string path = 9;
   // Reviews: the review's state.
   PullRequestReviewState review_state = 10;
+  // Review comments: the node id of the review they belong to, to group a review's
+  // inline comments.
+  string review_id = 11;
 }
 
 message PullRequestReviewThread {

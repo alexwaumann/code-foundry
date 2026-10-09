@@ -221,7 +221,9 @@ func (s *Store) FullPullRequest(ctx context.Context, slug string, number int, re
 }
 
 // fetchFull runs on the worker: the detail request, more check pages when there are
-// over 100 checks, then the cache and, when it changed, PullRequestDetailUpdated.
+// over 100 checks, then the cache and, when it changed, PullRequestDetailUpdated. A
+// failed checks page keeps the checks fetched so far: ChecksTruncated and LastError say
+// so.
 func (s *Store) fetchFull(ctx context.Context, k fullKey) (FullPullRequest, error) {
 	owner, name := splitSlug(k.slug)
 	data, err := s.call(ctx, queryPullRequestFull, map[string]any{"owner": owner, "name": name, "number": k.number})
@@ -253,12 +255,14 @@ func (s *Store) fetchFull(ctx context.Context, k fullKey) (FullPullRequest, erro
 		}
 		if err != nil {
 			s.log.Warn("gh pull request detail checks page failed", "pr", k.String(), "err", err)
+			d.LastError = fmt.Sprintf("checks after the first %d: %v", len(runs), err)
 			break
 		}
 		runs, next = append(runs, cp.Runs...), cp.Next
 	}
 	sortRuns(runs)
 	d.Checks = runs
+	d.ChecksTruncated = next.HasNextPage
 	d.FetchedAt = s.opts.Now()
 	prev, had := s.full.put(k, d)
 	if err := s.cache.saveActivity(ctx, activityFull+k.String(), d.FetchedAt, d); err != nil {

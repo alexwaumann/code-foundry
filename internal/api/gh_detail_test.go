@@ -35,13 +35,16 @@ func detailFixture(at time.Time) gh.FullPullRequest {
 		CommentsTruncated: true,
 		Threads: []gh.ReviewThread{{
 			ID: "PRRT_1", Path: "main.go", Line: 12, Side: "LEFT", Outdated: true, CommentsTruncated: true,
-			Comments: []gh.Comment{{ID: "PRRC_1", Kind: gh.CommentReviewComment, Author: "github-actions", AuthorBot: true, Path: "main.go", Body: "lint"}},
+			Comments: []gh.Comment{{ID: "PRRC_1", Kind: gh.CommentReviewComment, Author: "github-actions", AuthorBot: true, Path: "main.go", Body: "lint", ReviewID: "PRR_9"}},
 		}},
-		ThreadsTruncated: true,
-		Checks:           []gh.CheckRun{{Name: "test", Status: gh.StatusCompleted, Conclusion: gh.ConclusionFailure}},
-		ViewerPermission: "WRITE",
-		FetchedAt:        at,
-		LastError:        "stale",
+		ThreadsTruncated:   true,
+		LabelsTruncated:    true,
+		ReviewersTruncated: true,
+		ChecksTruncated:    true,
+		Checks:             []gh.CheckRun{{Name: "test", Status: gh.StatusCompleted, Conclusion: gh.ConclusionFailure}},
+		ViewerPermission:   "WRITE",
+		FetchedAt:          at,
+		LastError:          "stale",
 	}
 }
 
@@ -74,7 +77,8 @@ func TestGhGetPullRequestDetail(t *testing.T) {
 				}
 				if d.GetBody() != "## Summary\nIt fixes the thing." || d.GetNodeId() != "PR_7" || !d.GetViewerCanUpdate() ||
 					d.GetViewerPermission() != "write" || !d.GetFetchedAt().AsTime().Equal(at) || d.GetLastError() != "stale" ||
-					d.GetCommitCount() != 120 || !d.GetCommentsTruncated() || !d.GetReviewThreadsTruncated() {
+					d.GetCommitCount() != 120 || !d.GetCommentsTruncated() || !d.GetReviewThreadsTruncated() ||
+					!d.GetLabelsTruncated() || !d.GetReviewersTruncated() || !d.GetChecksTruncated() {
 					t.Errorf("detail = %v", d)
 				}
 				if l := d.GetLabels(); len(l) != 1 || l[0].GetName() != "bug" || l[0].GetColor() != "d73a4a" {
@@ -99,7 +103,8 @@ func TestGhGetPullRequestDetail(t *testing.T) {
 				if len(th) != 1 || th[0].GetSide() != v1.DiffSide_DIFF_SIDE_LEFT || th[0].GetLine() != 12 || !th[0].GetIsOutdated() ||
 					th[0].GetIsResolved() || !th[0].GetCommentsTruncated() || len(th[0].GetComments()) != 1 ||
 					th[0].GetComments()[0].GetKind() != v1.PullRequestCommentKind_PULL_REQUEST_COMMENT_KIND_REVIEW_COMMENT ||
-					!th[0].GetComments()[0].GetAuthorIsBot() || th[0].GetComments()[0].GetPath() != "main.go" {
+					!th[0].GetComments()[0].GetAuthorIsBot() || th[0].GetComments()[0].GetPath() != "main.go" ||
+					th[0].GetComments()[0].GetReviewId() != "PRR_9" || c[1].GetReviewId() != "" {
 					t.Errorf("threads = %v", th)
 				}
 				if ch := d.GetChecks(); len(ch) != 1 || ch[0].GetConclusion() != v1.CheckConclusion_CHECK_CONCLUSION_FAILURE {
@@ -113,6 +118,7 @@ func TestGhGetPullRequestDetail(t *testing.T) {
 			check: func(t *testing.T, d *v1.PullRequestDetail) {
 				if d.GetMergeCommitSha() != "def" || d.GetMergedBy() != "kim" || !d.GetClosedAt().AsTime().Equal(at) ||
 					d.GetViewerCanUpdate() || d.GetViewerPermission() != "read" || d.GetLastError() != "" ||
+					d.GetLabelsTruncated() || d.GetReviewersTruncated() || d.GetChecksTruncated() ||
 					d.GetPullRequest().GetState() != v1.PullRequestState_PULL_REQUEST_STATE_MERGED {
 					t.Errorf("merged = %v", d)
 				}

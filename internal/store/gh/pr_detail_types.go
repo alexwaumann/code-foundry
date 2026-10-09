@@ -9,8 +9,8 @@ import (
 // (ListReviewerCandidates, SetReviewRequest), and revert. See docs/notes/gh-pr-detail.md.
 
 // ErrFailedPrecondition means GitHub (or the store) refuses the operation in the pull
-// request's current state: reverting one that is not merged, requesting a review from
-// someone who cannot review (HTTP 422).
+// request's current state: reverting one that is not merged (GraphQL UNPROCESSABLE),
+// requesting a review from someone who cannot review (HTTP 422).
 var ErrFailedPrecondition = errors.New("failed precondition")
 
 // FullPullRequest is everything the detail panel shows about one pull request. Fetched
@@ -20,28 +20,37 @@ type FullPullRequest struct {
 	// PullRequest is the summary, as GetPullRequest returns it (ID is the node id).
 	PullRequest PullRequest `json:"pullRequest"`
 	Body        string      `json:"body,omitempty"`
-	Labels      []Label     `json:"labels,omitempty"`
+	// Labels are the first 20; LabelsTruncated says there are more.
+	Labels          []Label `json:"labels,omitempty"`
+	LabelsTruncated bool    `json:"labelsTruncated,omitempty"`
 	// Reviewers: one per login, requested first, then most recent review first.
-	Reviewers []Reviewer `json:"reviewers,omitempty"`
+	// ReviewersTruncated: more than 50 latest reviews or 50 pending requests exist.
+	Reviewers          []Reviewer `json:"reviewers,omitempty"`
+	ReviewersTruncated bool       `json:"reviewersTruncated,omitempty"`
 	// Commits are the last 100, oldest first; CommitCount counts all of them.
 	Commits     []Commit `json:"commits,omitempty"`
 	CommitCount int      `json:"commitCount,omitempty"`
 	// Comments are issue comments and submitted reviews (the last 100 of each), oldest
-	// first. Inline review comments are in Threads.
+	// first. Inline review comments are in Threads, and so are the reviews that only
+	// carried them (COMMENTED with an empty body): those are left out here.
+	// CommentsTruncated covers both streams: either has more than 100.
 	Comments          []Comment      `json:"comments,omitempty"`
 	CommentsTruncated bool           `json:"commentsTruncated,omitempty"`
 	Threads           []ReviewThread `json:"threads,omitempty"`
 	ThreadsTruncated  bool           `json:"threadsTruncated,omitempty"`
-	// Checks are every check on the head commit, failed first.
-	Checks         []CheckRun `json:"checks,omitempty"`
-	MergeCommitSHA string     `json:"mergeCommitSha,omitempty"`
-	MergedBy       string     `json:"mergedBy,omitempty"`
-	ClosedAt       time.Time  `json:"closedAt,omitzero"`
+	// Checks are every check on the head commit, failed first. ChecksTruncated: some
+	// were not fetched (a page failed, which LastError reports, or MaxPages ran out).
+	Checks          []CheckRun `json:"checks,omitempty"`
+	ChecksTruncated bool       `json:"checksTruncated,omitempty"`
+	MergeCommitSHA  string     `json:"mergeCommitSha,omitempty"`
+	MergedBy        string     `json:"mergedBy,omitempty"`
+	ClosedAt        time.Time  `json:"closedAt,omitzero"`
 	// ViewerPermission is GitHub's RepositoryPermission (ADMIN, MAINTAIN, WRITE, TRIAGE,
 	// READ); empty if unknown.
 	ViewerPermission string    `json:"viewerPermission,omitempty"`
 	FetchedAt        time.Time `json:"fetchedAt"`
-	// LastError is set when a refresh failed and this is the cached copy.
+	// LastError is set when a refresh failed and this is the cached copy, or when a
+	// page of checks beyond the first failed (ChecksTruncated).
 	LastError string `json:"-"`
 }
 
@@ -113,6 +122,9 @@ type Comment struct {
 	// ReviewState is a review's state (APPROVED, CHANGES_REQUESTED, COMMENTED,
 	// DISMISSED).
 	ReviewState string `json:"reviewState,omitempty"`
+	// ReviewID is the node id of the review an inline review comment belongs to, so
+	// a client can group a review's inline comments; empty for other kinds.
+	ReviewID string `json:"reviewId,omitempty"`
 }
 
 // ReviewThread is an inline review conversation on one diff line.

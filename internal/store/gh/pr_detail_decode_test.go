@@ -56,8 +56,10 @@ func TestDecodeFullPullRequestBusy(t *testing.T) {
 		t.Errorf("commits = %d/%d %+v", len(d.Commits), d.CommitCount, d.Commits[0])
 	}
 
-	// 19 issue comments and 18 reviews, oldest first.
-	if len(d.Comments) != 37 || d.CommentsTruncated {
+	// 19 issue comments and 18 reviews, oldest first. 14 of the reviews are COMMENTED
+	// with an empty body: GitHub's record of each inline comment and thread reply, whose
+	// text is in the threads. They are left out.
+	if len(d.Comments) != 23 || d.CommentsTruncated {
 		t.Errorf("comments = %d truncated %v", len(d.Comments), d.CommentsTruncated)
 	}
 	kinds := map[CommentKind]int{}
@@ -73,8 +75,11 @@ func TestDecodeFullPullRequestBusy(t *testing.T) {
 			t.Errorf("comment %d incomplete: %+v", i, c)
 		}
 	}
-	if kinds[CommentIssue] != 19 || kinds[CommentReview] != 18 {
+	if kinds[CommentIssue] != 19 || kinds[CommentReview] != 4 {
 		t.Errorf("comment kinds = %v", kinds)
+	}
+	if d.LabelsTruncated || d.ReviewersTruncated || d.ChecksTruncated {
+		t.Errorf("truncated: labels %v reviewers %v checks %v", d.LabelsTruncated, d.ReviewersTruncated, d.ChecksTruncated)
 	}
 
 	if len(d.Threads) != 15 || d.ThreadsTruncated {
@@ -91,6 +96,19 @@ func TestDecodeFullPullRequestBusy(t *testing.T) {
 	}
 	if open.Resolved || open.Path != "src/a11y/text.zig" || open.Line != 125 {
 		t.Errorf("unresolved thread = %+v", open)
+	}
+	// Every inline comment names its review, so a client can group them.
+	reviews := 0
+	for _, th := range d.Threads {
+		for _, c := range th.Comments {
+			if !strings.HasPrefix(c.ReviewID, "PRR_") {
+				t.Errorf("thread %s comment %s: review id %q", th.ID, c.ID, c.ReviewID)
+			}
+			reviews++
+		}
+	}
+	if reviews != 28 {
+		t.Errorf("inline comments = %d, want 28", reviews)
 	}
 
 	// No CI on this fork PR.
@@ -122,6 +140,129 @@ func TestDecodeFullPullRequestMerged(t *testing.T) {
 	}
 	if len(page.Runs) != 1 || page.Next.HasNextPage || pr.Checks.Total != 1 || pr.Checks.State != RollupSuccess {
 		t.Errorf("checks = %+v rollup %+v", page.Runs, pr.Checks)
+	}
+}
+
+// Synthetic shapes the captures do not cover.
+func TestDecodeFullPullRequestShapes(t *testing.T) {
+	const head = `"id":"PR_1","number":7,"title":"t","url":"https://github.com/o/r/pull/7","state":"MERGED",` +
+		`"headRefName":"h","headRefOid":"abc","baseRefName":"main","repository":{"nameWithOwner":"o/r"}`
+	wrap := func(fields string) []byte {
+		return []byte(`{"repository":{"viewerPermission":"WRITE","pullRequest":{` + head + `,` + fields + `}}}`)
+	}
+	tests := []struct {
+		name   string
+		fields string
+		check  func(t *testing.T, d FullPullRequest)
+	}{
+		{
+			name: "null authors: comments, reviews, thread comments",
+			fields: `"issueComments":{"totalCount":1,"nodes":[{"id":"IC_1","author":null,"body":"ghost says hi","createdAt":"2026-01-01T00:00:00Z","url":"u1"}]},
+				"reviewList":{"totalCount":1,"nodes":[{"id":"PRR_1","author":null,"body":"lgtm","state":"APPROVED","createdAt":"2026-01-02T00:00:00Z","submittedAt":"2026-01-02T00:00:00Z","url":"u2"}]},
+				"reviewers":{"totalCount":1,"nodes":[{"author":null,"state":"APPROVED","submittedAt":"2026-01-02T00:00:00Z","commit":{"oid":"abc"}}]},
+				"reviewThreads":{"totalCount":1,"nodes":[{"id":"T1","path":"a.go","line":3,"diffSide":"RIGHT","comments":{"totalCount":1,
+					"nodes":[{"id":"C1","author":null,"body":"nit","createdAt":"2026-01-02T00:00:00Z","url":"u3","path":"a.go","pullRequestReview":null}]}}]}`,
+			check: func(t *testing.T, d FullPullRequest) {
+				if len(d.Comments) != 2 || d.Comments[0].Author != "" || d.Comments[0].Body != "ghost says hi" ||
+					d.Comments[1].Author != "" || d.Comments[1].ReviewState != "APPROVED" {
+					t.Errorf("comments = %+v", d.Comments)
+				}
+				if len(d.Reviewers) != 0 {
+					t.Errorf("a deleted reviewer is listed: %+v", d.Reviewers)
+				}
+				if c := d.Threads[0].Comments[0]; c.Author != "" || c.Body != "nit" || c.ReviewID != "" {
+					t.Errorf("thread comment = %+v", c)
+				}
+			},
+		},
+		{
+			name: "PENDING drafts and empty COMMENTED reviews are left out",
+			fields: `"reviewList":{"totalCount":4,"nodes":[
+					{"id":"PRR_draft","author":{"login":"me"},"body":"draft","state":"PENDING","createdAt":"2026-01-01T00:00:00Z","url":"u"},
+					{"id":"PRR_inline","author":{"login":"kim"},"body":" \n","state":"COMMENTED","createdAt":"2026-01-02T00:00:00Z","url":"u"},
+					{"id":"PRR_said","author":{"login":"kim"},"body":"see inline","state":"COMMENTED","createdAt":"2026-01-03T00:00:00Z","url":"u"},
+					{"id":"PRR_ok","author":{"login":"ana"},"body":"","state":"APPROVED","createdAt":"2026-01-04T00:00:00Z","url":"u"}]},
+				"reviewers":{"totalCount":2,"nodes":[
+					{"author":{"login":"me"},"state":"PENDING","submittedAt":null,"commit":{"oid":"abc"}},
+					{"author":{"login":"ana"},"state":"APPROVED","submittedAt":"2026-01-04T00:00:00Z","commit":{"oid":"abc"}}]},
+				"reviewThreads":{"totalCount":1,"nodes":[{"id":"T1","path":"a.go","line":3,"diffSide":"RIGHT","comments":{"totalCount":1,
+					"nodes":[{"id":"C1","author":{"login":"kim"},"body":"nit","createdAt":"2026-01-02T00:00:00Z","url":"u","pullRequestReview":{"id":"PRR_inline"}}]}}]}`,
+			check: func(t *testing.T, d FullPullRequest) {
+				var ids []string
+				for _, c := range d.Comments {
+					ids = append(ids, c.ID)
+				}
+				if !slices.Equal(ids, []string{"PRR_said", "PRR_ok"}) {
+					t.Errorf("comments = %v", ids)
+				}
+				if len(d.Reviewers) != 1 || d.Reviewers[0].Login != "ana" {
+					t.Errorf("reviewers = %+v", d.Reviewers)
+				}
+				if c := d.Threads[0].Comments[0]; c.ReviewID != "PRR_inline" || c.Path != "a.go" {
+					t.Errorf("thread comment = %+v", c)
+				}
+			},
+		},
+		{
+			name: "team and user requested, a stale review re-requested",
+			fields: `"reviewers":{"totalCount":1,"nodes":[{"author":{"__typename":"User","login":"kim"},"state":"CHANGES_REQUESTED","submittedAt":"2026-01-02T00:00:00Z","commit":{"oid":"old"}}]},
+				"requestedReviewers":{"totalCount":2,"nodes":[
+					{"requestedReviewer":{"__typename":"Team","id":"T_1","slug":"core","name":"Core","organization":{"login":"acme"}}},
+					{"requestedReviewer":{"__typename":"User","id":"U_kim","login":"Kim"}}]}`,
+			check: func(t *testing.T, d FullPullRequest) {
+				var got []string
+				for _, r := range d.Reviewers {
+					got = append(got, fmt.Sprintf("%s:team=%v:%s:req=%v:stale=%v", r.Login, r.Team, r.State, r.Requested, r.Stale))
+				}
+				want := []string{"kim:team=false:CHANGES_REQUESTED:req=true:stale=true", "acme/core:team=true::req=true:stale=false"}
+				if !slices.Equal(got, want) {
+					t.Errorf("reviewers = %v, want %v", got, want)
+				}
+			},
+		},
+		{
+			name:   "merged by a deleted account",
+			fields: `"mergeCommit":{"oid":"m1"},"mergedBy":null,"closedAt":"2026-01-05T00:00:00Z"`,
+			check: func(t *testing.T, d FullPullRequest) {
+				if d.MergeCommitSHA != "m1" || d.MergedBy != "" || d.ClosedAt.IsZero() || !d.ViewerCanUpdate() {
+					t.Errorf("merge = %q by %q at %v", d.MergeCommitSHA, d.MergedBy, d.ClosedAt)
+				}
+			},
+		},
+		{
+			name: "every truncation flag",
+			fields: `"labels":{"totalCount":21,"nodes":[{"name":"a","color":"fff"}]},
+				"reviewers":{"totalCount":51,"nodes":[]},
+				"requestedReviewers":{"totalCount":0,"nodes":[]},
+				"issueComments":{"totalCount":101,"nodes":[]},
+				"reviewList":{"totalCount":0,"nodes":[]},
+				"reviewThreads":{"totalCount":51,"nodes":[{"id":"T1","path":"a.go","comments":{"totalCount":21,"nodes":[]}}]}`,
+			check: func(t *testing.T, d FullPullRequest) {
+				if !d.LabelsTruncated || !d.ReviewersTruncated || !d.CommentsTruncated || !d.ThreadsTruncated || !d.Threads[0].CommentsTruncated {
+					t.Errorf("flags: labels %v reviewers %v comments %v threads %v thread comments %v", d.LabelsTruncated,
+						d.ReviewersTruncated, d.CommentsTruncated, d.ThreadsTruncated, d.Threads[0].CommentsTruncated)
+				}
+			},
+		},
+		{
+			name:   "pending requests alone truncate reviewers; reviews alone truncate comments",
+			fields: `"requestedReviewers":{"totalCount":51,"nodes":[]},"reviewList":{"totalCount":101,"nodes":[]}`,
+			check: func(t *testing.T, d FullPullRequest) {
+				if !d.ReviewersTruncated || !d.CommentsTruncated || d.LabelsTruncated || d.ThreadsTruncated {
+					t.Errorf("flags: reviewers %v comments %v labels %v threads %v", d.ReviewersTruncated, d.CommentsTruncated,
+						d.LabelsTruncated, d.ThreadsTruncated)
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d, _, err := decodeFullPullRequest(wrap(tt.fields))
+			if err != nil {
+				t.Fatal(err)
+			}
+			tt.check(t, d)
+		})
 	}
 }
 
