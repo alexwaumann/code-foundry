@@ -60,7 +60,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"session.new", "session.list", "session.focus", "session.close", "session.reconnect",
 		"session.rename", "session.fork", "session.remove",
 		"git.fetch", "git.pull", "git.push", "pr.create", "pr.open",
-		"pr.revert", "pr.review.request", "pr.refresh",
+		"pr.revert", "pr.review.request", "pr.refresh", "pr.ask", "pr.explain", "pr.fix.findings",
 		"worktree.open.editor", "worktree.reveal", "view.open.url",
 		"settings.get", "settings.set", "settings.reset", "settings.path", "settings.reveal",
 		"view.settings", "view.help",

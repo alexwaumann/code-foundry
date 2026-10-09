@@ -92,10 +92,12 @@ func (t *Terminal) Remove(_ context.Context, r *connect.Request[v1.RemoveTermina
 	return connect.NewResponse(&v1.RemoveTerminalResponse{}), t.Err
 }
 
-// Repo is a fake command.RepoBackend. Err, when set, is returned by every call.
+// Repo is a fake command.RepoBackend. Err, when set, is returned by every call. List
+// returns Repos.
 type Repo struct {
 	Calls
-	Err error
+	Err   error
+	Repos []*v1.Repo
 }
 
 var _ command.RepoBackend = (*Repo)(nil)
@@ -130,6 +132,19 @@ func (f *Repo) CreateWorktree(_ context.Context, r *connect.Request[v1.CreateWor
 func (f *Repo) RemoveWorktree(_ context.Context, r *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error) {
 	f.record(r.Msg)
 	return connect.NewResponse(&v1.RemoveWorktreeResponse{}), f.Err
+}
+
+// List records the request and returns copies of Repos.
+func (f *Repo) List(_ context.Context, r *connect.Request[v1.ListReposRequest]) (*connect.Response[v1.ListReposResponse], error) {
+	f.record(r.Msg)
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	out := make([]*v1.Repo, len(f.Repos))
+	for i, repo := range f.Repos {
+		out[i] = proto.CloneOf(repo)
+	}
+	return connect.NewResponse(&v1.ListReposResponse{Repos: out}), nil
 }
 
 // Refresh records the request.

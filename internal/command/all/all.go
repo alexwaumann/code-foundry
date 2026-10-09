@@ -25,7 +25,9 @@ type Deps struct {
 	// A nil Backend works like Terminal.
 	GitOps command.GitOpsDeps
 	// Gh backs pr.revert, pr.review.request and pr.refresh (the pull request detail
-	// panel's actions). Nil works like Terminal.
+	// panel's actions), and reads the pull request for pr.ask, pr.explain and
+	// pr.fix.findings (which also use Repo, Session, GitOps.Backend and Emitter). Nil
+	// works like Terminal.
 	Gh command.GhBackend
 	// Settings backs settings.*. Nil works like Terminal.
 	Settings command.SettingsBackend
@@ -65,6 +67,9 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterSession(r, d.Session, d.Emitter),
 		command.RegisterGitOps(r, d.GitOps),
 		command.RegisterPullRequest(r, d.Gh),
+		command.RegisterPullRequestSessions(r, command.PullRequestSessionDeps{
+			Gh: d.Gh, Repo: d.Repo, Session: d.Session, GitOps: d.GitOps.Backend, Emitter: d.Emitter,
+		}),
 		command.RegisterSettings(r, d.Settings, d.Emitter, d.Reveal),
 		command.RegisterUpdate(r, command.UpdateDeps{Update: d.Update, Session: d.Session, Restart: d.Restart, Daemon: d.Daemon}),
 		command.RegisterView(r, d.Emitter),
