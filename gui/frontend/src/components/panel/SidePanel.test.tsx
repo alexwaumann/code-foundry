@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { create } from "zustand";
-import { makeTab, openSurface, usePanelStore } from "@/stores/panel";
+import { getPanel, makeTab, openSurface, usePanelStore } from "@/stores/panel";
 import { PANEL_MIN, useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { filesSurface } from "@/surfaces/files";
@@ -15,7 +15,7 @@ const KEY = "session:a";
 beforeEach(() => {
   usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });
-  useUiStore.setState({ selection: { kind: "session", id: "a" }, windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, panelWidth: 420 });
+  useUiStore.setState({ selection: { kind: "session", id: "a" }, windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260 });
 });
 
 afterEach(() => {
@@ -78,15 +78,76 @@ describe("SidePanel", () => {
     expect(sep.getAttribute("aria-valuemax")).toBe("600");
   });
 
+  it("expanded, it fills the row without a resize handle, shows without room, and settings still hides it", () => {
+    usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null, width: 500, expanded: true } } });
+    useUiStore.setState({ windowWidth: 1000, sidebarWidth: 520 });
+    render(<SidePanel />);
+    const wrapper = screen.getByTestId("side-panel-wrapper");
+    expect(wrapper.getAttribute("data-expanded")).toBe("true");
+    expect(wrapper.style.width).toBe("");
+    expect(wrapper.className).toContain("flex-1");
+    expect(screen.queryByRole("separator")).toBeNull();
+    act(() => {
+      useViewsStore.setState({ settingsOpen: true });
+    });
+    expect(screen.queryByTestId("side-panel")).toBeNull();
+    // Back to the split: the stored width and the handle return (the room allows it again).
+    act(() => {
+      useViewsStore.setState({ settingsOpen: false });
+      useUiStore.setState({ windowWidth: 1400, sidebarWidth: 260 });
+      usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null, width: 500 } } });
+    });
+    expect(screen.getByTestId("side-panel-wrapper").style.width).toBe("500px");
+    expect(screen.getByRole("separator")).toBeTruthy();
+  });
+
   it("resizes with arrow keys on the separator (Left widens)", () => {
     render(<SidePanel />);
     const sep = screen.getByRole("separator");
     fireEvent.keyDown(sep, { key: "ArrowLeft" });
-    expect(useUiStore.getState().panelWidth).toBe(436);
+    expect(getPanel(KEY).width).toBe(436);
     fireEvent.keyDown(sep, { key: "ArrowRight", shiftKey: true });
-    expect(useUiStore.getState().panelWidth).toBe(372);
+    expect(getPanel(KEY).width).toBe(372);
     fireEvent.keyDown(sep, { key: "Home" });
-    expect(useUiStore.getState().panelWidth).toBe(PANEL_MIN);
+    expect(getPanel(KEY).width).toBe(PANEL_MIN);
+  });
+
+  it("sizes only the current selection's panel; double-click resets it to the default", () => {
+    usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null }, "session:b": { open: true, tabs: [], activeTabId: null, width: 500 } } });
+    render(<SidePanel />);
+    const sep = () => screen.getByRole("separator");
+    const wrapper = () => screen.getByTestId("side-panel-wrapper");
+    expect(wrapper().style.width).toBe("420px");
+    fireEvent.keyDown(sep(), { key: "ArrowLeft" });
+    expect(wrapper().style.width).toBe("436px");
+    expect(getPanel("session:b").width).toBe(500);
+
+    // The other selection's panel shows at its own width.
+    act(() => {
+      useUiStore.getState().select({ kind: "session", id: "b" });
+    });
+    expect(wrapper().style.width).toBe("500px");
+    expect(sep().getAttribute("aria-valuenow")).toBe("500");
+    fireEvent.doubleClick(sep());
+    expect(wrapper().style.width).toBe("420px");
+    expect(getPanel("session:b")).not.toHaveProperty("width");
+    expect(getPanel(KEY).width).toBe(436);
+  });
+
+  it("renders a stored width above the room at the room, and keeps it for when the room comes back", () => {
+    usePanelStore.setState({ byKey: { [KEY]: { open: true, tabs: [], activeTabId: null, width: 800 } } });
+    render(<SidePanel />);
+    // 1400 - 260 - 24 - 360 = 756.
+    expect(screen.getByTestId("side-panel-wrapper").style.width).toBe("756px");
+    act(() => {
+      useUiStore.getState().setWindowWidth(1100);
+    });
+    expect(screen.getByTestId("side-panel-wrapper").style.width).toBe("456px");
+    expect(getPanel(KEY).width).toBe(800);
+    act(() => {
+      useUiStore.getState().setWindowWidth(1600);
+    });
+    expect(screen.getByTestId("side-panel-wrapper").style.width).toBe("800px");
   });
 
   it("offers the active surface chords, but never the panel's own (cmd+w, surface letters)", () => {

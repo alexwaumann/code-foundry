@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, type KeyboardEvent, type RefObject } from "
 import { X } from "lucide-react";
 import { chordFromEvent } from "@/keys/chord";
 import { cn } from "@/lib/utils";
-import { activatePanelTab, closePanelTab, emptyEntry, getPanel, openSurface, togglePanel, useCurrentPanelKey, usePanelStore, type Tab } from "@/stores/panel";
+import { activatePanelTab, closePanelTab, emptyEntry, getPanel, openSurface, togglePanel, useCurrentPanelKey, usePanelExpanded, usePanelStore, usePanelWidth, type Tab } from "@/stores/panel";
 import { PANEL_MIN, panelMax, useUiStore, visibleSidebarWidth } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { surfaceOf, surfaces, useAvailability, type SurfaceContext, type SurfaceSpec } from "@/surfaces/registry";
+import { PanelExpand } from "./PanelExpand";
 import { PanelToggle } from "./PanelToggle";
 import { PanelResizeHandle } from "./PanelResizeHandle";
 import { isPanelChord, panelKeyAction } from "./keys";
@@ -48,7 +49,7 @@ function TabButton({ panelKey, tab, active }: { panelKey: string; tab: Tab; acti
       role="presentation"
       data-tab-id={tab.id}
       className={cn(
-        "group flex h-7 max-w-48 shrink-0 items-center rounded-md pr-1 text-xs",
+        "group flex h-7 max-w-48 shrink-0 items-center rounded-md pr-1 text-xs [--wails-draggable:no-drag]",
         active ? "bg-accent text-accent-foreground dark:bg-accent/50" : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
       )}
       onMouseDown={(e) => {
@@ -211,21 +212,29 @@ function surfaceKey(panelKey: string, chord: string): boolean {
 }
 
 /**
- * The panel's header: tabs on the left, the toggle at the far right. It is as tall as the
- * header of the pane beside it: the terminal's (h-9) for sessions and terminals, the
- * page headers' (h-11) for everything else.
+ * The panel's header: tabs on the left, the expand button and the toggle at the far
+ * right. 44px (h-11) like
+ * every content pane header (window/PaneHeader), so it ends on the title band's bottom
+ * edge beside them (window/titleBand.ts). Like them it drags the window: the empty
+ * space around the tabs does, each tab and both buttons are `no-drag`.
  */
 function PanelHeader({ panelKey, hasTabs }: { panelKey: string; hasTabs: boolean }) {
-  const beside = panelKey.startsWith("session:") || panelKey.startsWith("terminal:") ? "h-9" : "h-11";
   return (
-    <div className={cn("flex shrink-0 items-center gap-2 border-b border-pane-border pr-2 pl-1.5", beside)} data-testid="panel-header">
+    <div className="flex h-11 shrink-0 items-center gap-2 border-b border-pane-border pr-2 pl-1.5 [--wails-draggable:drag]" data-testid="panel-header">
       {hasTabs ? <TabStrip panelKey={panelKey} /> : <div className="min-w-0 flex-1" />}
-      <PanelToggle inPanel />
+      <span className="flex shrink-0 items-center gap-0.5">
+        <PanelExpand />
+        <PanelToggle inPanel />
+      </span>
     </div>
   );
 }
 
-function Panel({ panelKey, width, max, asideRef }: { panelKey: string; width: number; max: number; asideRef: RefObject<HTMLElement | null> }) {
+function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: number; expanded: boolean; asideRef: RefObject<HTMLElement | null> }) {
+  // This panel's own width, bounded by the room there is now (the stored one comes back
+  // when the room does). Expanded, it takes the whole row instead and keeps the width
+  // for when the split comes back.
+  const width = Math.min(usePanelWidth(panelKey), max);
   const hasTabs = usePanelStore((s) => (s.byKey[panelKey]?.tabs.length ?? 0) > 0);
 
   // Surfaces keep what their availability reads loaded while this panel shows.
@@ -259,8 +268,15 @@ function Panel({ panelKey, width, max, asideRef }: { panelKey: string; width: nu
 
   return (
     // The wrapper is not clipped so the resize handle can sit in the gap to its left.
-    <div className="relative mr-2 mb-2 flex shrink-0" style={{ width }} data-testid="side-panel-wrapper">
-      <PanelResizeHandle width={width} max={max} />
+    // Expanded, the content pane is hidden: the wrapper fills the row with the content
+    // pane's own 8px margins, and there is nothing to resize against.
+    <div
+      className={cn("relative flex", expanded ? "m-2 min-w-0 flex-1" : "mt-2 mr-2 mb-2 shrink-0")}
+      style={expanded ? undefined : { width }}
+      data-testid="side-panel-wrapper"
+      data-expanded={expanded || undefined}
+    >
+      {!expanded && <PanelResizeHandle panelKey={panelKey} width={width} max={max} />}
       <aside
         ref={asideRef}
         tabIndex={-1}
@@ -282,7 +298,8 @@ function Panel({ panelKey, width, max, asideRef }: { panelKey: string; width: nu
  * The current selection's side panel, right of the content pane. Unmounted (with its
  * resize handle) when the selection has none open, while the settings page is up, and
  * while the window has no room for it beside the content pane (panelMax < PANEL_MIN; it
- * stays open and comes back when there is room).
+ * stays open and comes back when there is room). An expanded panel always shows: it
+ * replaces the content pane (App.tsx hides it) instead of sharing the row.
  *
  * Focus requests (ui panelFocusSeq) are handled here, not in the panel: this component
  * stays mounted, so a request with no panel showing is dropped instead of being acted on
@@ -292,8 +309,8 @@ function Panel({ panelKey, width, max, asideRef }: { panelKey: string; width: nu
 export function SidePanel() {
   const panelKey = useCurrentPanelKey();
   const open = usePanelStore((s) => (panelKey === null ? false : (s.byKey[panelKey]?.open ?? false)));
+  const expanded = usePanelExpanded();
   const settingsOpen = useViewsStore((s) => s.settingsOpen);
-  const stored = useUiStore((s) => s.panelWidth);
   const max = useUiStore((s) => panelMax(s.windowWidth, visibleSidebarWidth(s)));
   const focusSeq = useUiStore((s) => s.panelFocusSeq);
   const asideRef = useRef<HTMLElement>(null);
@@ -305,6 +322,6 @@ export function SidePanel() {
     asideRef.current?.focus({ preventScroll: true });
   }, [focusSeq]);
 
-  if (panelKey === null || !open || settingsOpen || max < PANEL_MIN) return null;
-  return <Panel key={panelKey} panelKey={panelKey} width={Math.min(stored, max)} max={max} asideRef={asideRef} />;
+  if (panelKey === null || !open || settingsOpen || (max < PANEL_MIN && !expanded)) return null;
+  return <Panel key={panelKey} panelKey={panelKey} max={max} expanded={expanded} asideRef={asideRef} />;
 }

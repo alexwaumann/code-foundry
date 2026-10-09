@@ -1,12 +1,15 @@
 /**
  * The side panel ("surface panel") to the right of the content pane. Each selection
  * (session, terminal, worktree, repo, top-level page) has its own panel: whether it is
- * open, its tabs, and the active tab. Switching selection shows that selection's panel.
- * The width is global and lives in the ui store (persisted); nothing here is persisted.
+ * open, its tabs, the active tab, its width, and whether it is expanded to the full width
+ * of the content area. Switching selection shows that
+ * selection's panel. All of it is persisted (localStorage "code-foundry.panel"), so it
+ * survives a reload. Entries are never pruned: a deleted session's panel stays stored.
  * See docs/notes/side-panel.md.
  */
 import { create } from "zustand";
-import { useUiStore, type Selection } from "./ui";
+import { persist } from "zustand/middleware";
+import { PANEL_DEFAULT, clampPanelWidth, useUiStore, visibleSidebarWidth, type Selection } from "./ui";
 
 /**
  * What a panel tab shows: a SurfaceSpec kind from surfaces/registry.ts. A plain string,
@@ -26,6 +29,18 @@ export interface PanelEntry {
   open: boolean;
   tabs: readonly Tab[];
   activeTabId: string | null;
+  /**
+   * Stored width, clamped to [PANEL_MIN, panelMax] when it was set. Absent means
+   * PANEL_DEFAULT. The panel renders at min(width, panelMax), so a width saved in a wider
+   * window comes back when there is room again.
+   */
+  width?: number;
+  /**
+   * Fills the content area (the content pane hides) while open. Absent means false: the
+   * reducers drop it rather than store false, so entries saved before it existed and
+   * entries never expanded look the same. Hiding the panel keeps it.
+   */
+  expanded?: boolean;
 }
 
 export const emptyEntry: PanelEntry = { open: false, tabs: [], activeTabId: null };
@@ -68,7 +83,7 @@ export function makeTab(kind: SurfaceKind, title: string, params: Readonly<Recor
 export function openTab(e: PanelEntry, tab: Tab): PanelEntry {
   const i = e.tabs.findIndex((t) => t.id === tab.id);
   const tabs = i < 0 ? [...e.tabs, tab] : e.tabs[i]?.title === tab.title ? e.tabs : e.tabs.map((t, j) => (j === i ? { ...t, title: tab.title } : t));
-  return { open: true, tabs, activeTabId: tab.id };
+  return { ...e, open: true, tabs, activeTabId: tab.id };
 }
 
 /**
@@ -79,7 +94,7 @@ export function closeTab(e: PanelEntry, id: string): PanelEntry {
   const i = e.tabs.findIndex((t) => t.id === id);
   if (i < 0) return e;
   const tabs = e.tabs.filter((t) => t.id !== id);
-  if (tabs.length === 0) return { open: false, tabs, activeTabId: null };
+  if (tabs.length === 0) return { ...e, open: false, tabs, activeTabId: null };
   if (e.activeTabId !== id) return { ...e, tabs };
   const next = tabs[i] ?? tabs[i - 1] ?? null;
   return { ...e, tabs, activeTabId: next?.id ?? null };
@@ -97,12 +112,38 @@ export function toggle(e: PanelEntry, open?: boolean): PanelEntry {
   return next === e.open ? e : { ...e, open: next };
 }
 
+/** Sets the stored width (already clamped by the caller); undefined drops it, back to PANEL_DEFAULT. */
+export function setWidth(e: PanelEntry, width: number | undefined): PanelEntry {
+  if (e.width === width) return e;
+  if (width !== undefined) return { ...e, width };
+  const { width: _old, ...rest } = e;
+  return rest;
+}
+
+/** Expands (true), restores the split (false), or flips it (undefined). Open state is untouched. */
+export function setExpanded(e: PanelEntry, expanded?: boolean): PanelEntry {
+  const next = expanded ?? !e.expanded;
+  if (next === (e.expanded ?? false)) return e;
+  if (next) return { ...e, expanded: true };
+  const { expanded: _old, ...rest } = e;
+  return rest;
+}
+
 export interface PanelState {
   byKey: Readonly<Record<string, PanelEntry>>;
 }
 
-/** Focus requests for the panel go through the ui store (panelFocusSeq), which the palette also uses. */
-export const usePanelStore = create<PanelState>()(() => ({ byKey: {} }));
+/**
+ * Focus requests for the panel go through the ui store (panelFocusSeq), which the palette
+ * also uses. Persisted whole: open state, tabs, active tab and width survive a reload.
+ */
+export const usePanelStore = create<PanelState>()(
+  persist(() => ({ byKey: {} }), {
+    name: "code-foundry.panel",
+    version: 1,
+    partialize: (s) => ({ byKey: s.byKey }),
+  }),
+);
 
 /** A panel key (keyOf), or "current" for the window's selection. */
 export type PanelTarget = string;
@@ -163,9 +204,53 @@ export function activatePanelTab(target: PanelTarget, id: string): void {
   update(target, (e) => activateTab(e, id));
 }
 
+/**
+ * Expands a panel to the full width of the content area, restores its split (`expanded`
+ * false), or flips it. Expanding shows a hidden panel. With `focus`, an expanded result
+ * asks the panel to take focus. Returns whether the panel is now open and expanded. The
+ * view.panel.expand command is expandPanelCommand (stores/views.ts).
+ */
+export function expandPanel(target: PanelTarget = "current", expanded?: boolean, opts: { focus?: boolean } = {}): boolean {
+  const key = update(target, (e) => {
+    const next = setExpanded(e, expanded);
+    return next.expanded ? toggle(next, true) : next;
+  });
+  if (key === null) return false;
+  const result = usePanelStore.getState().byKey[key]?.expanded ?? false;
+  // After the state change, so the panel it shows is mounted when SidePanel acts on it.
+  if (result && opts.focus) useUiStore.setState((s) => ({ panelFocusSeq: s.panelFocusSeq + 1 }));
+  return result;
+}
+
+/** Sets one panel's width, clamped to [PANEL_MIN, panelMax] for the current window and sidebar. */
+export function setPanelWidth(target: PanelTarget, w: number): void {
+  const ui = useUiStore.getState();
+  const width = clampPanelWidth(w, ui.windowWidth, visibleSidebarWidth(ui));
+  update(target, (e) => setWidth(e, width));
+}
+
+/** Puts one panel back at PANEL_DEFAULT (drops its stored width). */
+export function resetPanelWidth(target: PanelTarget): void {
+  update(target, (e) => setWidth(e, undefined));
+}
+
 /** The current selection's panel key (a string, so the selector is cheap and stable). */
 export function useCurrentPanelKey(): string | null {
   return useUiStore((s) => keyOf(s.selection));
+}
+
+/** A panel's stored width (PANEL_DEFAULT when it has none); not yet bounded by panelMax. */
+export function usePanelWidth(key: string): number {
+  return usePanelStore((s) => s.byKey[key]?.width ?? PANEL_DEFAULT);
+}
+
+/** Whether the current selection's panel is open and expanded (it then fills the content area). */
+export function usePanelExpanded(): boolean {
+  const key = useCurrentPanelKey();
+  return usePanelStore((s) => {
+    const e = key === null ? undefined : s.byKey[key];
+    return (e?.open ?? false) && (e?.expanded ?? false);
+  });
 }
 
 /** Whether the current selection's panel is open. */

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, invocations, openApp, resetMock, row } from "./fixtures";
+import { MOCK_TOKEN } from "../playwright.config";
+import { emit, invocations, mockUrl, openApp, openStreams, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -107,9 +108,12 @@ test("the header toggle shows the empty surface list and hides the panel again",
   expect(viewport && viewport.height - side.bottom).toBe(8);
   expect(side.top).toBe(content.top);
   expect(side.width).toBe(420);
-  // The panel header is the content pane header's height.
+  // The panel header lines up with the content pane header: 44px, same top and bottom
+  // (layout.spec.ts covers the band geometry and the other selection kinds).
   const header = await box(page, "panel-header");
-  expect(header.bottom - header.top).toBe((await box(page, "terminal-header")).bottom - (await box(page, "terminal-header")).top);
+  const terminalHeader = await box(page, "terminal-header");
+  expect(header.bottom - header.top).toBe(44);
+  expect([header.top, header.bottom]).toEqual([terminalHeader.top, terminalHeader.bottom]);
 
   await panelToggle.click();
   await expect(panel(page)).toHaveCount(0);
@@ -159,13 +163,41 @@ test("dragging the handle resizes the panel within its bounds, and the width per
   await expect(handle).toHaveAttribute("aria-valuenow", String(max));
   await expect(handle).toHaveAttribute("aria-valuemax", String(max));
 
-  // The width is saved; open/tabs are not (the panel starts hidden after a reload).
+  await injectTab(page, "files", "Files");
+  await injectTab(page, "diff", "Diff");
+
+  // Each selection's panel has its own width: s-2's opens at the default, and sizing it
+  // leaves s-1's alone.
+  await selectSession(page, "s-2");
+  await page.getByTestId("panel-toggle").click();
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-2");
+  expect((await box(page, "side-panel")).width).toBe(420);
+  await handle.focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(436);
+  await selectSession(page, "s-1");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  expect((await box(page, "side-panel")).width).toBe(max);
+
+  // Widths, open state, tabs and the active tab all survive a reload.
   await page.reload();
   await expect(row(page, "s:s-1")).toBeVisible();
   await selectSession(page, "s-1");
-  await expect(panel(page)).toHaveCount(0);
-  await page.getByTestId("panel-toggle").click();
+  await expect(panel(page)).toBeVisible();
   expect((await box(page, "side-panel")).width).toBe(max);
+  await expect(panel(page).getByRole("tab")).toHaveText(["Files", "Diff"]);
+  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "diff");
+  await selectSession(page, "s-2");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-2");
+  expect((await box(page, "side-panel")).width).toBe(436);
+  await expect(panel(page).getByTestId("panel-empty")).toBeVisible();
+
+  // Double-click resets only that panel to the default.
+  await selectSession(page, "s-1");
+  await handle.dblclick();
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(420);
+  await selectSession(page, "s-2");
+  expect((await box(page, "side-panel")).width).toBe(436);
 });
 
 test("surface hotkeys do nothing while their surfaces are disabled", async ({ page }) => {
@@ -285,6 +317,11 @@ test("tabs: cmd+w activates the neighbour, the × and middle click close, the la
   const tabs = panel(page).getByRole("tab");
   await expect(tabs).toHaveText(["Files", "Diff", "#12", "#13"]);
   await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "pullrequest?number=13");
+  // The header drags the window from the strip's empty space, never from a tab or its ×.
+  const dragOf = (sel: string) => panel(page).locator(sel).first().evaluate((el) => getComputedStyle(el).getPropertyValue("--wails-draggable").trim());
+  expect(await dragOf('[data-testid="panel-tabs"]')).toBe("drag");
+  expect(await dragOf("[data-tab-id]")).toBe("no-drag");
+  expect(await dragOf('[aria-label="Close Files"]')).toBe("no-drag");
 
   // cmd+w closes the active (last) tab; its left neighbour becomes active.
   await tabs.filter({ hasText: "Diff" }).click();
@@ -393,7 +430,12 @@ test("dragging starts from the rendered width after the room shrinks", async ({ 
   // At 1280 with the 260px sidebar the room bound is 636.
   await expect.poll(async () => (await box(page, "side-panel")).width).toBe(620);
 
-  // The window shrinks: the stored width is re-clamped (1000-260-24-360 = 356).
+  // The window shrinks: the panel renders at the room (1000-260-24-360 = 356), and the
+  // stored width is kept, so it comes back with the room.
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(356);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(620);
   await page.setViewportSize({ width: 1000, height: 800 });
   await expect.poll(async () => (await box(page, "side-panel")).width).toBe(356);
   await dragHandle(page, 30);
@@ -478,4 +520,184 @@ test("worktrees and the Pull Requests page have their own panels and toggles", a
   await expect(panel(page)).toHaveCount(0);
   await page.getByTestId("session-disconnected").getByTestId("panel-toggle").click();
   await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-3");
+});
+
+/** The renderer's columns and rows (dev hook in TerminalPane). */
+function termSize(page: Page) {
+  return page.evaluate(() => {
+    const t = (window as unknown as { __cfTerminal?: { renderer: { size: { cols: number; rows: number } } } }).__cfTerminal;
+    return t ? t.renderer.size : null;
+  });
+}
+
+/** The icon the expand button shows: "maximize" or "minimize". */
+function expandIcon(page: Page) {
+  return panel(page)
+    .getByTestId("panel-expand")
+    .locator("svg")
+    .evaluate((el) => (el.classList.contains("lucide-minimize-2") ? "minimize" : el.classList.contains("lucide-maximize-2") ? "maximize" : el.getAttribute("class")));
+}
+
+test("expand fills the content area, keeps the terminal mounted, and restores the split", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  // Each step narrows the terminal; wait for each refit, so `split` is the settled size.
+  const cols = async () => (await termSize(page))?.cols ?? 0;
+  await expect.poll(cols).toBeGreaterThan(20);
+  const full = await cols();
+  await page.getByTestId("panel-toggle").click();
+  await expect.poll(cols).toBeLessThan(full);
+  const at420 = await cols();
+  // A non-default width, to see it come back.
+  await page.getByTestId("panel-resize-handle").focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(436);
+  await expect.poll(cols).toBeLessThan(at420);
+  const split = await termSize(page);
+
+  const expand = panel(page).getByTestId("panel-header").getByTestId("panel-expand");
+  await expect(expand).toHaveAttribute("aria-pressed", "false");
+  await expect(expand).toHaveAttribute("title", "Expand Side Panel");
+  expect(await expandIcon(page)).toBe("maximize");
+  // Left of the toggle, and not a window drag surface.
+  expect((await box(page, "panel-expand")).right).toBeLessThanOrEqual((await panel(page).getByTestId("panel-toggle").boundingBox())?.x ?? 0);
+  expect(await expand.evaluate((el) => getComputedStyle(el).getPropertyValue("--wails-draggable").trim())).toBe("no-drag");
+
+  await expand.click();
+  // The panel takes the content pane's place: 8px right of the sidebar, 8px in from the
+  // window's right, top and bottom edges.
+  const vp = page.viewportSize();
+  const sidebar = await box(page, "sidebar");
+  await expect.poll(async () => (await box(page, "side-panel-wrapper")).left).toBe(sidebar.right + 8);
+  const wrapper = await box(page, "side-panel-wrapper");
+  expect(vp && vp.width - wrapper.right).toBe(8);
+  expect(wrapper.top).toBe(8);
+  expect(vp && vp.height - wrapper.bottom).toBe(8);
+  await expect(page.getByTestId("content-pane")).toBeHidden();
+  expect(await page.getByTestId("content-pane").evaluate((el) => getComputedStyle(el).display)).toBe("none");
+  // The terminal stays mounted and attached, at its size (a hidden host is not fitted).
+  await expect(page.getByTestId("terminal-host")).toHaveCount(1);
+  await expect(page.getByTestId("terminal-host")).toBeHidden();
+  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
+  expect(await termSize(page)).toEqual(split);
+  expect((await openStreams())["TerminalService/Attach"]).toBe(1);
+  await expect(page.getByTestId("panel-resize-handle")).toHaveCount(0);
+  await expect(expand).toHaveAttribute("aria-pressed", "true");
+  expect(await expandIcon(page)).toBe("minimize");
+  // The toggle stays in the panel's header.
+  await expect(panel(page).getByTestId("panel-toggle")).toHaveAttribute("aria-pressed", "true");
+
+  // Expanded, it shows even where a split panel would have no room.
+  await setSidebarWidth(page, 520);
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await expect.poll(async () => (await box(page, "side-panel-wrapper")).left).toBe(520 + 8);
+  await expect(panel(page)).toBeVisible();
+  await setSidebarWidth(page, 260);
+  await page.setViewportSize({ width: 1280, height: 800 });
+
+  // Restoring brings the split back at the panel's width, and the terminal at its size.
+  await expand.click();
+  await expect(page.getByTestId("content-pane")).toBeVisible();
+  await expect.poll(async () => (await box(page, "side-panel")).width).toBe(436);
+  await expect(page.getByTestId("panel-resize-handle")).toBeVisible();
+  await expect.poll(() => termSize(page)).toEqual(split);
+  expect(await expandIcon(page)).toBe("maximize");
+  // The button runs the command through its local presenter: no daemon call.
+  expect((await invocations()).map((i) => i.name)).not.toContain("view.panel.expand");
+});
+
+test("expanded is per panel, survives a reload, and outlives hiding the panel", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await page.getByTestId("panel-toggle").click();
+  await panel(page).getByTestId("panel-expand").click();
+  await expect(page.getByTestId("content-pane")).toBeHidden();
+
+  // s-2's panel is its own: hidden, then split when shown.
+  await selectSession(page, "s-2");
+  await expect(panel(page)).toHaveCount(0);
+  await expect(page.getByTestId("content-pane")).toBeVisible();
+  await page.getByTestId("panel-toggle").click();
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-2");
+  await expect(panel(page).getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByTestId("content-pane")).toBeVisible();
+  expect((await box(page, "side-panel")).width).toBe(420);
+
+  await row(page, "s:s-1").click();
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await expect(page.getByTestId("content-pane")).toBeHidden();
+  // Selecting a session focuses its terminal; hidden, the panel takes that focus.
+  await expect.poll(() => region(page)).toBe("panel");
+
+  // Hiding keeps it expanded: showing it again comes back full width.
+  await panel(page).getByTestId("panel-toggle").click();
+  await expect(panel(page)).toHaveCount(0);
+  await expect(page.getByTestId("content-pane")).toBeVisible();
+  await expect.poll(() => region(page)).toBe("terminal");
+  await page.getByTestId("terminal-header").getByTestId("panel-toggle").click();
+  await expect(page.getByTestId("content-pane")).toBeHidden();
+  await expect(panel(page).getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "true");
+
+  await page.reload();
+  await expect(row(page, "s:s-1")).toBeVisible();
+  await row(page, "s:s-1").click();
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await expect(page.getByTestId("content-pane")).toBeHidden();
+  await expect(panel(page).getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
+  await selectSession(page, "s-2");
+  await expect(panel(page).getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "false");
+});
+
+test("view.panel.expand from the palette and the CLI; focus follows the hidden terminal", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await page.getByTestId("terminal-host").click();
+  await expect.poll(() => region(page)).toBe("terminal");
+
+  // The palette: a hidden panel opens expanded, and the palette returns focus to it.
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("Expand Side Panel");
+  await page.getByTestId("palette").locator('[data-command="view.panel.expand"]').click();
+  await expect(page.getByTestId("palette")).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+  await expect(page.getByTestId("content-pane")).toBeHidden();
+  await expect.poll(() => region(page)).toBe("panel");
+  // Restoring from the palette leaves focus in the panel.
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("Expand Side Panel");
+  await page.getByTestId("palette").locator('[data-command="view.panel.expand"]').click();
+  await expect(page.getByTestId("content-pane")).toBeVisible();
+  await expect.poll(() => region(page)).toBe("panel");
+
+  // The CLI: CommandService.Invoke emits ShowView "panel.expand" to every window.
+  await page.getByTestId("terminal-host").click();
+  await expect.poll(() => region(page)).toBe("terminal");
+  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
+    body: JSON.stringify({ name: "view.panel.expand" }),
+  });
+  expect(res.ok).toBe(true);
+  await expect(page.getByTestId("content-pane")).toBeHidden();
+  // The terminal had focus and is hidden now: the panel takes it.
+  await expect.poll(() => region(page)).toBe("panel");
+  expect((await invocations()).map((i) => i.name)).toContain("view.panel.expand");
+
+  // Settings hides the panel and shows in the content pane; closing it brings the
+  // expanded panel back.
+  await page.keyboard.press("Meta+,");
+  await expect(page.getByTestId("settings-page")).toBeVisible();
+  await expect(panel(page)).toHaveCount(0);
+  // A no-op while settings is up.
+  expect(await emit({ showView: { name: "panel.expand" } })).toBeGreaterThan(0);
+  expect(await emit({ notify: { level: "LEVEL_INFO", title: "after-expand", body: "" } })).toBeGreaterThan(0);
+  await expect(page.getByText("after-expand")).toBeVisible();
+  await page.getByRole("heading", { name: "Settings", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("settings-page")).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+  await expect(page.getByTestId("content-pane")).toBeHidden();
+  await expect(panel(page).getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => region(page)).toBe("panel");
 });

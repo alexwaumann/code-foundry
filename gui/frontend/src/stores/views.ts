@@ -5,7 +5,7 @@
  * presented locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon.
  */
 import { create } from "zustand";
-import { getPanel, togglePanel } from "./panel";
+import { expandPanel, getPanel, togglePanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
 
 interface ViewsState {
@@ -27,6 +27,10 @@ export function showView(name: string): boolean {
     case "panel.toggle":
       // view.panel.toggle: an action on the current selection's side panel, not a page.
       togglePanelCommand();
+      return true;
+    case "panel.expand":
+      // view.panel.expand: like panel.toggle, an action on the current selection's panel.
+      expandPanelCommand();
       return true;
     default:
       // Top-level pages (the Pull Requests page) are selections. Closing settings here
@@ -60,6 +64,29 @@ export function togglePanelCommand(): boolean {
     ui.focusContent();
   }
   return open;
+}
+
+/**
+ * view.panel.expand for the current selection: flips its panel between the split and the
+ * full width of the content area. A hidden panel is shown expanded. A no-op while the
+ * settings page is up (it hides the panel) and with nothing selected.
+ *
+ * Focus stays where it was, unless it was in the content pane, which expanding hides:
+ * then it moves to the panel. With the palette open, its return target moves instead.
+ * Restoring the split leaves focus alone (in the panel, typically).
+ */
+export function expandPanelCommand(): boolean {
+  if (useViewsStore.getState().settingsOpen) {
+    const e = getPanel();
+    return e.open && (e.expanded ?? false);
+  }
+  const ui = useUiStore.getState();
+  const inPalette = ui.palette.open;
+  const from: FocusRegion = inPalette ? ui.palette.returnTo : ui.focus;
+  const fromContent = from === "terminal" || from === "content";
+  const expanded = expandPanel("current", getPanel().open ? undefined : true, { focus: fromContent && !inPalette });
+  if (inPalette && expanded && fromContent) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
+  return expanded;
 }
 
 export function closeSettings(): void {

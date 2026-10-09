@@ -55,9 +55,9 @@ async function openPr(page: Page, number: number): Promise<void> {
   await page.evaluate(`import("/src/stores/prPanel.ts").then((m) => m.openPullRequestInPanel({ slug: "${SLUG}", number: ${String(number)} }))`);
 }
 
-/** Sets the side panel's width through the app's own ui store, and waits for it. */
+/** Sets the current selection's side panel width through the app's own panel store, and waits for it. */
 async function setPanelWidth(page: Page, width: number): Promise<void> {
-  await page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setPanelWidth(${String(width)}))`);
+  await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.setPanelWidth("current", ${String(width)}))`);
   await expect.poll(async () => (await panel(page).boundingBox())?.width).toBe(width);
 }
 

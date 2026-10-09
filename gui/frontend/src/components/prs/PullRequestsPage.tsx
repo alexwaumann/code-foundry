@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { GitPullRequest } from "lucide-react";
 import type { DashboardView, MonthView, PullRequestView } from "@/api/gh";
 import { PanelToggle } from "@/components/panel/PanelToggle";
+import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNow } from "@/lib/clock";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
@@ -198,13 +199,13 @@ export function PullRequestsPage() {
   const fresh = useFreshness(d?.fetchedAtMs ?? null, d?.lastError || entry?.error || "", true);
   return (
     <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label="Pull Requests" data-testid="prs-page">
-      <header className="flex h-11 shrink-0 items-center gap-3 border-b border-pane-border px-5">
+      <PaneHeader className="gap-3 px-5">
         <GitPullRequest className="size-4 text-muted-foreground" aria-hidden />
         <h1 className="text-sm font-semibold">Pull Requests</h1>
         <button
           type="button"
           onClick={toggle}
-          className="rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-accent"
+          className="rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground [--wails-draggable:no-drag] hover:bg-accent"
           title="Switch between registered and all repositories"
           data-testid="prs-scope"
         >
@@ -220,7 +221,7 @@ export function PullRequestsPage() {
           {d && <Freshness fetchedAtMs={fresh.fetchedAtMs} lastError={fresh.lastError} staleAfterMs={STALE_AFTER_MS} testId="prs-updated" />}
         </span>
         <PanelToggle className="-mr-2" />
-      </header>
+      </PaneHeader>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {d ? (
           <div className="mx-auto max-w-6xl">

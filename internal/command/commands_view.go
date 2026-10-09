@@ -14,9 +14,15 @@ const ViewPullRequests = "pullrequests"
 // panel state (gui/frontend/src/stores/panel.ts) and stays on the current selection.
 const ViewPanelToggle = "panel.toggle"
 
-// RegisterView registers view.pullrequests, which shows the Pull Requests page, and
-// view.panel.toggle, which shows or hides the side panel (both emitted as
-// UiIntent.ShowView). Links open through view.open.url (RegisterGitOps).
+// ViewPanelExpand is the ShowView name that toggles the selection's side panel between
+// its split width and the full width of the content area. Like ViewPanelToggle it is an
+// action on per-selection GUI state, not a page; expanding a hidden panel shows it.
+const ViewPanelExpand = "panel.expand"
+
+// RegisterView registers view.pullrequests, which shows the Pull Requests page,
+// view.panel.toggle, which shows or hides the side panel, and view.panel.expand, which
+// switches it between split and full width (all emitted as UiIntent.ShowView). Links
+// open through view.open.url (RegisterGitOps).
 func RegisterView(r *Registry, e Emitter) error {
 	show := func(name string) Result {
 		n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: name}}})
@@ -43,6 +49,16 @@ func RegisterView(r *Registry, e Emitter) error {
 			Keybindings: []string{"cmd+shift+e"},
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return show(ViewPanelToggle), nil
+			},
+		},
+		Command{
+			Name:        "view.panel.expand",
+			Title:       "Expand Side Panel",
+			Description: "Toggle the side panel between its split width and the full width of the content area for the selected session, terminal, worktree, or page.",
+			Category:    "View",
+			// No default chord (the user's choice); bindable in settings.
+			Run: func(context.Context, Context, Args) (Result, error) {
+				return show(ViewPanelExpand), nil
 			},
 		},
 	)

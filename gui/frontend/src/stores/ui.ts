@@ -67,8 +67,6 @@ interface UiState {
   // Persisted settings.
   sidebarVisible: boolean;
   sidebarWidth: number;
-  /** Side panel width (one value for every selection's panel; see stores/panel.ts). */
-  panelWidth: number;
   fontSize: number;
 
   select: (sel: Selection, opts?: { focusTerminal?: boolean }) => void;
@@ -84,9 +82,10 @@ interface UiState {
   setRenaming: (sessionId: string | null) => void;
   toggleSidebar: () => void;
   setSidebarWidth: (w: number) => void;
-  /** Clamps to [PANEL_MIN, panelMax] for the current window and sidebar. */
-  setPanelWidth: (w: number) => void;
-  /** Records a window resize and re-clamps the stored panel width to the new room. */
+  /**
+   * Records a window resize. Stored panel widths (stores/panel.ts, one per panel) are not
+   * re-clamped: the panel renders at min(stored, panelMax).
+   */
   setWindowWidth: (w: number) => void;
   focusContent: () => void;
   setFontSize: (n: number) => void;
@@ -110,7 +109,7 @@ export function visibleSidebarWidth(s: { sidebarVisible: boolean; sidebarWidth: 
   return s.sidebarVisible ? s.sidebarWidth : 0;
 }
 
-/** A stored panel width clamped to [PANEL_MIN, panelMax] (PANEL_MIN when the panel does not fit). */
+/** A panel width clamped to [PANEL_MIN, panelMax] (PANEL_MIN when the panel does not fit). */
 export function clampPanelWidth(w: number, windowWidth: number, sidebarWidth: number): number {
   return clamp(Math.round(w), PANEL_MIN, Math.max(PANEL_MIN, panelMax(windowWidth, sidebarWidth)));
 }
@@ -150,7 +149,6 @@ export const useUiStore = create<UiState>()(
       renamingSessionId: null,
       sidebarVisible: true,
       sidebarWidth: 260,
-      panelWidth: PANEL_DEFAULT,
       fontSize: FONT_DEFAULT,
 
       select: (sel, opts) => {
@@ -209,11 +207,8 @@ export const useUiStore = create<UiState>()(
       setSidebarWidth: (w) => {
         set({ sidebarWidth: clamp(Math.round(w), SIDEBAR_MIN, SIDEBAR_MAX) });
       },
-      setPanelWidth: (w) => {
-        set((s) => ({ panelWidth: clampPanelWidth(w, s.windowWidth, visibleSidebarWidth(s)) }));
-      },
       setWindowWidth: (windowWidth) => {
-        set((s) => ({ windowWidth, panelWidth: clampPanelWidth(s.panelWidth, windowWidth, visibleSidebarWidth(s)) }));
+        set({ windowWidth });
       },
       focusContent: () => {
         set((s) => ({ contentFocusSeq: s.contentFocusSeq + 1 }));
@@ -224,11 +219,15 @@ export const useUiStore = create<UiState>()(
     }),
     {
       name: "code-foundry.ui",
-      version: 1,
+      // 2: the global panelWidth moved to per-panel widths in the panel store; drop it.
+      version: 2,
+      migrate: (persisted) => {
+        const { panelWidth: _old, ...rest } = (persisted ?? {}) as Record<string, unknown>;
+        return rest as Partial<UiState> as UiState;
+      },
       partialize: (s) => ({
         sidebarVisible: s.sidebarVisible,
         sidebarWidth: s.sidebarWidth,
-        panelWidth: s.panelWidth,
         fontSize: s.fontSize,
         collapsed: s.collapsed,
       }),

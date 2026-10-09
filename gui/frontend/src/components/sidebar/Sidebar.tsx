@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { BellRing, Sparkles, SquareTerminal } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
+import { TITLE_BAND_HEIGHT, TRAFFIC_LIGHT_GUTTER } from "@/components/window/titleBand";
 import { jumpToAttention } from "@/keys/bindings";
 import { buildRows, isLeaf, type Row } from "@/lib/tree";
 import {
@@ -206,19 +207,21 @@ function SessionsUnavailable() {
   );
 }
 
-export function Sidebar() {
-  const visible = useUiStore((s) => s.sidebarVisible);
-  const width = useUiStore((s) => s.sidebarWidth);
-  const repoCount = useReposStore((s) => s.order.length);
-  if (!visible) return null;
+/**
+ * The sidebar's share of the title band (components/window/titleBand.ts): the
+ * traffic-light gutter, kept empty for the lights, then the Repositories header. The
+ * whole band drags the window (Wails runtime, `--wails-draggable`) except its controls.
+ * No repository count here: beside the gutter the default 260px sidebar has room for the
+ * label and the controls, not a count the tree already shows.
+ */
+function SidebarBand() {
   return (
-    <aside className="relative flex shrink-0 flex-col bg-sidebar" style={{ width }} data-testid="sidebar">
-      <PullRequestsNav />
-      <header className="flex h-9 shrink-0 items-center justify-between gap-2 px-3 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-        <span>Repositories</span>
-        <span className="flex items-center gap-2">
+    <div className="flex shrink-0 items-center [--wails-draggable:drag]" style={{ height: TITLE_BAND_HEIGHT }} data-testid="sidebar-band">
+      <div className="h-full shrink-0" style={{ width: TRAFFIC_LIGHT_GUTTER }} data-testid="traffic-light-gutter" aria-hidden />
+      <header className="flex h-full min-w-0 flex-1 items-center justify-between gap-2 pr-3 pl-2 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+        <span className="min-w-0 truncate">Repositories</span>
+        <span className="flex shrink-0 items-center gap-2 [--wails-draggable:no-drag]" data-testid="sidebar-band-controls">
           <AttentionBadge />
-          <span className="tabular-nums">{repoCount > 0 ? repoCount : ""}</span>
           {/* New thread (the project picker) and new terminal in the selected worktree, as session.new / terminal.new from the palette. */}
           <span className="-mr-1.5 flex items-center normal-case">
             <CommandButton command="session.new" icon={Sparkles} whenUnavailable="disable" data-testid="sidebar-new-session" />
@@ -226,6 +229,18 @@ export function Sidebar() {
           </span>
         </span>
       </header>
+    </div>
+  );
+}
+
+export function Sidebar() {
+  const visible = useUiStore((s) => s.sidebarVisible);
+  const width = useUiStore((s) => s.sidebarWidth);
+  if (!visible) return null;
+  return (
+    <aside className="relative flex shrink-0 flex-col bg-sidebar" style={{ width }} data-testid="sidebar">
+      <SidebarBand />
+      <PullRequestsNav />
       <SidebarTree />
       <SessionsUnavailable />
       <SidebarStatus />

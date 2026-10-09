@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { CONTENT_MIN, PANE_GAPS, PANEL_MIN, clampPanelWidth, panelMax, useUiStore, type FocusRegion } from "./ui";
 
 describe("panelMax", () => {
@@ -37,30 +37,26 @@ describe("clampPanelWidth", () => {
   });
 });
 
-describe("panel width in the store", () => {
-  beforeEach(() => {
-    useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, panelWidth: 420 });
-  });
-
-  it("setPanelWidth clamps to the current window and sidebar", () => {
-    useUiStore.getState().setPanelWidth(2000);
-    expect(useUiStore.getState().panelWidth).toBe(panelMax(1400, 260));
-    useUiStore.setState({ sidebarVisible: false });
-    useUiStore.getState().setPanelWidth(2000);
-    expect(useUiStore.getState().panelWidth).toBe(840);
-    useUiStore.getState().setPanelWidth(10);
-    expect(useUiStore.getState().panelWidth).toBe(PANEL_MIN);
-  });
-
-  it("setWindowWidth re-clamps the stored width to the smaller room", () => {
-    useUiStore.getState().setPanelWidth(700);
-    expect(useUiStore.getState().panelWidth).toBe(700);
+describe("window width", () => {
+  it("setWindowWidth only records the width (panel widths live in stores/panel.ts)", () => {
     useUiStore.getState().setWindowWidth(1100);
     expect(useUiStore.getState().windowWidth).toBe(1100);
-    expect(useUiStore.getState().panelWidth).toBe(panelMax(1100, 260));
-    // Growing the window again does not grow the stored width.
-    useUiStore.getState().setWindowWidth(1600);
-    expect(useUiStore.getState().panelWidth).toBe(panelMax(1100, 260));
+    expect(useUiStore.getState()).not.toHaveProperty("panelWidth");
+  });
+});
+
+describe("ui persistence", () => {
+  it("migrating from version 1 drops the old global panelWidth and keeps the rest", async () => {
+    const migrate = useUiStore.persist.getOptions().migrate;
+    expect(useUiStore.persist.getOptions().version).toBe(2);
+    const v1 = { sidebarVisible: false, sidebarWidth: 300, panelWidth: 600, fontSize: 14, collapsed: { a: true } };
+    expect(await migrate?.(v1, 1)).toEqual({ sidebarVisible: false, sidebarWidth: 300, fontSize: 14, collapsed: { a: true } });
+  });
+
+  it("does not save a panel width", () => {
+    const saved = useUiStore.persist.getOptions().partialize?.(useUiStore.getState());
+    expect(saved).not.toHaveProperty("panelWidth");
+    expect(saved).toHaveProperty("sidebarWidth");
   });
 });
 
