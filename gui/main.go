@@ -43,6 +43,7 @@ func main() {
 	app := application.New(application.Options{
 		Name:        "Code Foundry",
 		Description: "Supervise fleets of Claude Code sessions",
+		Icon:        appIcon,
 		Services: []application.Service{
 			application.NewService(daemonService),
 			application.NewService(appService),
