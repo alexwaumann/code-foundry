@@ -29,6 +29,11 @@ describe("composerKeyAction", () => {
     [{ key: "Enter", shiftKey: false, isComposing: true }, null],
     [{ key: "Escape", shiftKey: false }, "cancel"],
     [{ key: "Escape", shiftKey: false, isComposing: true }, null],
+    // WebKit: compositionend comes before the confirming Enter, whose keyCode is 229.
+    [{ key: "Enter", shiftKey: false, isComposing: false, keyCode: 229 }, null],
+    [{ key: "Escape", shiftKey: false, isComposing: false, keyCode: 229 }, null],
+    [{ key: "Enter", shiftKey: false, isComposing: false, keyCode: 13 }, "send"],
+    [{ key: "Escape", shiftKey: false, keyCode: 27 }, "cancel"],
     [{ key: "a", shiftKey: false }, null],
   ] as const)("%j → %s", (e, want) => {
     expect(composerKeyAction(e)).toBe(want);
@@ -48,6 +53,14 @@ describe("PrAskComposer", () => {
     await vi.waitFor(() => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("an IME Enter (keyCode 229) does not send", () => {
+    render(<PrAskComposer prRef={REF} onClose={vi.fn()} />);
+    fireEvent.change(input(), { target: { value: "日本" } });
+    const notPrevented = fireEvent.keyDown(input(), { key: "Enter", keyCode: 229 });
+    expect(notPrevented).toBe(true);
+    expect(startPrSession).not.toHaveBeenCalled();
   });
 
   it("Shift+Enter does not send", () => {

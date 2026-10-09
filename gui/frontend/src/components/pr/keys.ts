@@ -28,12 +28,25 @@ export function usePanelBoundary(): { ref: (el: HTMLElement | null) => void; bou
 export const POPUP_FIT = "max-w-[calc(var(--radix-popper-available-width)-8px)]";
 export const POPUP_COLLISION_PADDING = 8;
 
+/** The keyCode of a keydown an input method processes. */
+const IME_KEY_CODE = 229;
+
 /**
- * The ask composer's keys: Enter sends, Shift+Enter is a newline, Escape cancels. Enter
- * while an input method is composing belongs to the IME.
+ * The ask composer's keys: Enter sends, Shift+Enter is a newline, Escape cancels. Keys
+ * while an input method is composing belong to the IME. WebKit fires compositionend
+ * before the Enter that confirms a candidate, so that keydown has isComposing false; its
+ * keyCode is still 229 (pass the native event's keyCode).
  */
-export function composerKeyAction(e: { key: string; shiftKey: boolean; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean; isComposing?: boolean }): "send" | "cancel" | null {
-  if (e.isComposing) return null;
+export function composerKeyAction(e: {
+  key: string;
+  shiftKey: boolean;
+  metaKey?: boolean;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+  isComposing?: boolean;
+  keyCode?: number;
+}): "send" | "cancel" | null {
+  if (e.isComposing || e.keyCode === IME_KEY_CODE) return null;
   if (e.key === "Escape") return "cancel";
   if (e.key === "Enter" && !e.shiftKey && !e.altKey && !e.ctrlKey) return "send";
   return null;

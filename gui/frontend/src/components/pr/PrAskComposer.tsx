@@ -36,7 +36,17 @@ export function PrAskComposer({ prRef, onClose }: { prRef: PrRef; onClose: () =>
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    const action = composerKeyAction({ key: e.key, shiftKey: e.shiftKey, metaKey: e.metaKey, ctrlKey: e.ctrlKey, altKey: e.altKey, isComposing: e.nativeEvent.isComposing });
+    const action = composerKeyAction({
+      key: e.key,
+      shiftKey: e.shiftKey,
+      metaKey: e.metaKey,
+      ctrlKey: e.ctrlKey,
+      altKey: e.altKey,
+      isComposing: e.nativeEvent.isComposing,
+      // Deprecated, but the only sign of WebKit's IME-confirming Enter (keys.ts).
+      // eslint-disable-next-line @typescript-eslint/no-deprecated
+      keyCode: e.nativeEvent.keyCode,
+    });
     if (!action) return;
     e.preventDefault();
     e.stopPropagation();
