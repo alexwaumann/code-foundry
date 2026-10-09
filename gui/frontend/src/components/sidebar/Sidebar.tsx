@@ -211,9 +211,10 @@ function SessionsUnavailable() {
  * The sidebar's share of the title band (components/window/titleBand.ts): the
  * traffic-light gutter, kept empty for the lights, then the Repositories header. The
  * whole band drags the window (Wails runtime, `--wails-draggable`) except its controls.
+ * No repository count here: beside the gutter the default 260px sidebar has room for the
+ * label and the controls, not a count the tree already shows.
  */
 function SidebarBand() {
-  const repoCount = useReposStore((s) => s.order.length);
   return (
     <div className="flex shrink-0 items-center [--wails-draggable:drag]" style={{ height: TITLE_BAND_HEIGHT }} data-testid="sidebar-band">
       <div className="h-full shrink-0" style={{ width: TRAFFIC_LIGHT_GUTTER }} data-testid="traffic-light-gutter" aria-hidden />
@@ -221,7 +222,6 @@ function SidebarBand() {
         <span className="min-w-0 truncate">Repositories</span>
         <span className="flex shrink-0 items-center gap-2 [--wails-draggable:no-drag]" data-testid="sidebar-band-controls">
           <AttentionBadge />
-          <span className="tabular-nums">{repoCount > 0 ? repoCount : ""}</span>
           {/* New thread (the project picker) and new terminal in the selected worktree, as session.new / terminal.new from the palette. */}
           <span className="-mr-1.5 flex items-center normal-case">
             <CommandButton command="session.new" icon={Sparkles} whenUnavailable="disable" data-testid="sidebar-new-session" />
