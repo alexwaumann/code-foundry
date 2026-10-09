@@ -214,14 +214,24 @@
 .cf-markdown li + li {
   margin-top: 0.2em;
 }
+/* Task lists: the checkbox hangs in the gutter, so wrapped lines align with the text. */
+.cf-markdown li.task-list-item,
 .cf-markdown li:has(> input[type="checkbox"]) {
+  position: relative;
   list-style: none;
-  margin-left: -1.3em;
+  margin-left: -1.4em;
+  padding-left: 1.4em;
+}
+.cf-markdown li.task-list-item input[type="checkbox"],
+.cf-markdown li > input[type="checkbox"] {
+  position: absolute;
+  left: 0;
+  top: 0.3em;
+  margin: 0;
 }
 .cf-markdown input[type="checkbox"] {
-  margin-right: 0.4em;
-  vertical-align: -0.1em;
-  accent-color: var(--muted-foreground);
+  opacity: 1;
+  accent-color: oklch(0.588 0.158 241.966);
 }
 .cf-markdown a {
   color: oklch(0.588 0.158 241.966);
@@ -272,6 +282,24 @@
 .cf-markdown img {
   max-width: 100%;
   border-radius: 4px;
+}
+.cf-markdown details {
+  margin: 0.5em 0;
+}
+.cf-markdown summary {
+  cursor: pointer;
+  color: var(--muted-foreground);
+}
+.cf-markdown details[open] > summary {
+  margin-bottom: 0.4em;
+}
+.cf-markdown kbd {
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 0.3em;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.85em;
 }
 .dark .cf-markdown :where(pre, :not(pre) > code) {
   background: oklch(1 0 0 / 5%);
