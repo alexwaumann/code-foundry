@@ -58,10 +58,13 @@ type Status struct {
 	Dirty      bool
 	// BaseRef is the remote-tracking default branch ("origin/main") that BaseAhead and
 	// BaseBehind compare HEAD against. Empty when it does not exist.
-	BaseRef     string
-	BaseAhead   int
-	BaseBehind  int
-	Error       string // last refresh error; other fields are stale when set
+	BaseRef    string
+	BaseAhead  int
+	BaseBehind int
+	Error      string // last refresh error; other fields are stale when set
+	// RefreshedAt is zero until the first refresh. After that, in a Snapshot it is the
+	// last refresh that changed something (refreshes that change nothing do not
+	// rebuild the snapshot), so it is not a "last checked" time.
 	RefreshedAt time.Time
 }
 

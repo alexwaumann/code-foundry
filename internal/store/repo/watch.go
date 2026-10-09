@@ -59,7 +59,7 @@ type action uint8
 const (
 	actNone      action = iota
 	actStatus           // refresh the target's worktree
-	actStatusAll        // refresh every worktree of the repo
+	actStatusAll        // re-resolve the repo's base (jobBase), then refresh every worktree
 	actReconcile        // re-list worktrees and repo metadata, then refresh all
 )
 
