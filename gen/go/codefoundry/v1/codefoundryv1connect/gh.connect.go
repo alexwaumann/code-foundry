@@ -68,6 +68,9 @@ const (
 	// GhServiceRevertPullRequestProcedure is the fully-qualified name of the GhService's
 	// RevertPullRequest RPC.
 	GhServiceRevertPullRequestProcedure = "/codefoundry.v1.GhService/RevertPullRequest"
+	// GhServiceMergePullRequestProcedure is the fully-qualified name of the GhService's
+	// MergePullRequest RPC.
+	GhServiceMergePullRequestProcedure = "/codefoundry.v1.GhService/MergePullRequest"
 )
 
 // GhServiceClient is a client for the codefoundry.v1.GhService service.
@@ -126,6 +129,13 @@ type GhServiceClient interface {
 	// RevertPullRequest opens a pull request that reverts a merged one (GitHub's revert
 	// button). FAILED_PRECONDITION when the pull request is not merged.
 	RevertPullRequest(context.Context, *connect.Request[v1.RevertPullRequestRequest]) (*connect.Response[v1.RevertPullRequestResponse], error)
+	// MergePullRequest merges an open pull request (GitHub's merge button) with the given
+	// method, guarded by the head commit the daemon last fetched: FAILED_PRECONDITION when
+	// the pull request is not open, is a draft, its head moved since, or GitHub refuses
+	// (conflicts, branch protection). With delete_branch the head branch is deleted after
+	// a successful merge, unless it lives in a fork. The detail is invalidated and
+	// pull_request_detail_updated is sent.
+	MergePullRequest(context.Context, *connect.Request[v1.MergePullRequestRequest]) (*connect.Response[v1.MergePullRequestResponse], error)
 }
 
 // NewGhServiceClient constructs a client for the codefoundry.v1.GhService service. By default, it
@@ -223,6 +233,12 @@ func NewGhServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(ghServiceMethods.ByName("RevertPullRequest")),
 			connect.WithClientOptions(opts...),
 		),
+		mergePullRequest: connect.NewClient[v1.MergePullRequestRequest, v1.MergePullRequestResponse](
+			httpClient,
+			baseURL+GhServiceMergePullRequestProcedure,
+			connect.WithSchema(ghServiceMethods.ByName("MergePullRequest")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -242,6 +258,7 @@ type ghServiceClient struct {
 	listReviewerCandidates *connect.Client[v1.ListReviewerCandidatesRequest, v1.ListReviewerCandidatesResponse]
 	setReviewRequest       *connect.Client[v1.SetReviewRequestRequest, v1.SetReviewRequestResponse]
 	revertPullRequest      *connect.Client[v1.RevertPullRequestRequest, v1.RevertPullRequestResponse]
+	mergePullRequest       *connect.Client[v1.MergePullRequestRequest, v1.MergePullRequestResponse]
 }
 
 // GetViewer calls codefoundry.v1.GhService.GetViewer.
@@ -314,6 +331,11 @@ func (c *ghServiceClient) RevertPullRequest(ctx context.Context, req *connect.Re
 	return c.revertPullRequest.CallUnary(ctx, req)
 }
 
+// MergePullRequest calls codefoundry.v1.GhService.MergePullRequest.
+func (c *ghServiceClient) MergePullRequest(ctx context.Context, req *connect.Request[v1.MergePullRequestRequest]) (*connect.Response[v1.MergePullRequestResponse], error) {
+	return c.mergePullRequest.CallUnary(ctx, req)
+}
+
 // GhServiceHandler is an implementation of the codefoundry.v1.GhService service.
 type GhServiceHandler interface {
 	// GetViewer returns the authenticated GitHub user.
@@ -370,6 +392,13 @@ type GhServiceHandler interface {
 	// RevertPullRequest opens a pull request that reverts a merged one (GitHub's revert
 	// button). FAILED_PRECONDITION when the pull request is not merged.
 	RevertPullRequest(context.Context, *connect.Request[v1.RevertPullRequestRequest]) (*connect.Response[v1.RevertPullRequestResponse], error)
+	// MergePullRequest merges an open pull request (GitHub's merge button) with the given
+	// method, guarded by the head commit the daemon last fetched: FAILED_PRECONDITION when
+	// the pull request is not open, is a draft, its head moved since, or GitHub refuses
+	// (conflicts, branch protection). With delete_branch the head branch is deleted after
+	// a successful merge, unless it lives in a fork. The detail is invalidated and
+	// pull_request_detail_updated is sent.
+	MergePullRequest(context.Context, *connect.Request[v1.MergePullRequestRequest]) (*connect.Response[v1.MergePullRequestResponse], error)
 }
 
 // NewGhServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -463,6 +492,12 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(ghServiceMethods.ByName("RevertPullRequest")),
 		connect.WithHandlerOptions(opts...),
 	)
+	ghServiceMergePullRequestHandler := connect.NewUnaryHandler(
+		GhServiceMergePullRequestProcedure,
+		svc.MergePullRequest,
+		connect.WithSchema(ghServiceMethods.ByName("MergePullRequest")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.GhService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case GhServiceGetViewerProcedure:
@@ -493,6 +528,8 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 			ghServiceSetReviewRequestHandler.ServeHTTP(w, r)
 		case GhServiceRevertPullRequestProcedure:
 			ghServiceRevertPullRequestHandler.ServeHTTP(w, r)
+		case GhServiceMergePullRequestProcedure:
+			ghServiceMergePullRequestHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -556,4 +593,8 @@ func (UnimplementedGhServiceHandler) SetReviewRequest(context.Context, *connect.
 
 func (UnimplementedGhServiceHandler) RevertPullRequest(context.Context, *connect.Request[v1.RevertPullRequestRequest]) (*connect.Response[v1.RevertPullRequestResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.RevertPullRequest is not implemented"))
+}
+
+func (UnimplementedGhServiceHandler) MergePullRequest(context.Context, *connect.Request[v1.MergePullRequestRequest]) (*connect.Response[v1.MergePullRequestResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.MergePullRequest is not implemented"))
 }

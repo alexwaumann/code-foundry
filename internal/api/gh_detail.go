@@ -143,3 +143,8 @@ func commentToProto(c *gh.Comment) *v1.PullRequestComment {
 		ReviewId:        c.ReviewID,
 	}
 }
+
+// MergePullRequest is not implemented yet.
+func (h *Gh) MergePullRequest(context.Context, *connect.Request[v1.MergePullRequestRequest]) (*connect.Response[v1.MergePullRequestResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, nil)
+}

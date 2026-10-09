@@ -70,6 +70,13 @@ service GhService {
   // RevertPullRequest opens a pull request that reverts a merged one (GitHub's revert
   // button). FAILED_PRECONDITION when the pull request is not merged.
   rpc RevertPullRequest(RevertPullRequestRequest) returns (RevertPullRequestResponse) {}
+  // MergePullRequest merges an open pull request (GitHub's merge button) with the given
+  // method, guarded by the head commit the daemon last fetched: FAILED_PRECONDITION when
+  // the pull request is not open, is a draft, its head moved since, or GitHub refuses
+  // (conflicts, branch protection). With delete_branch the head branch is deleted after
+  // a successful merge, unless it lives in a fork. The detail is invalidated and
+  // pull_request_detail_updated is sent.
+  rpc MergePullRequest(MergePullRequestRequest) returns (MergePullRequestResponse) {}
 }
 
 // GitHub's pull request state.
@@ -542,6 +549,11 @@ message PullRequestDetail {
   // checks is incomplete: a page beyond the first failed (last_error says why), or the
   // head commit has more checks than the daemon fetches.
   bool checks_truncated = 22;
+  // The merge methods the repository allows (merge commit, squash, rebase), in that
+  // order; empty if unknown.
+  repeated PullRequestMergeMethod merge_methods_allowed = 23;
+  // Auto-merge is enabled: GitHub merges the pull request once its requirements pass.
+  bool auto_merge_enabled = 24;
 }
 
 message PullRequestLabel {
@@ -671,4 +683,38 @@ message RevertPullRequestResponse {
   // The new pull request that reverts the merged one.
   int32 number = 1;
   string url = 2;
+}
+
+// ---- Merge (MergePullRequest) -----------------------------------------------------
+
+// GitHub's PullRequestMergeMethod.
+enum PullRequestMergeMethod {
+  PULL_REQUEST_MERGE_METHOD_UNSPECIFIED = 0;
+  // A merge commit.
+  PULL_REQUEST_MERGE_METHOD_MERGE = 1;
+  // One commit with every change, on the base branch.
+  PULL_REQUEST_MERGE_METHOD_SQUASH = 2;
+  // Each commit replayed onto the base branch.
+  PULL_REQUEST_MERGE_METHOD_REBASE = 3;
+}
+
+message MergePullRequestRequest {
+  string repo_slug = 1;
+  int32 number = 2;
+  // Required (UNSPECIFIED is INVALID_ARGUMENT).
+  PullRequestMergeMethod method = 3;
+  // Delete the head branch after the merge (ignored for a fork's branch).
+  bool delete_branch = 4;
+}
+
+message MergePullRequestResponse {
+  // GitHub reports the pull request merged.
+  bool merged = 1;
+  // The merge commit (for squash and rebase, the last commit on the base branch).
+  string sha = 2;
+  // What happened, for people: the merge and, when asked for, the branch deletion
+  // ("deleted branch x", or why it was kept).
+  string message = 3;
+  // The head branch was deleted (or GitHub had already deleted it).
+  bool branch_deleted = 4;
 }
