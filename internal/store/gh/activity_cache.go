@@ -19,6 +19,9 @@ const (
 	activityDefaultBranch = "default_branch:"
 	activityBranch        = "branch:"
 	activityPoll          = "poll"
+	// activityFull prefixes a FullPullRequest's key: "pr_detail:<slug>#<number>"
+	// (pr_detail.go).
+	activityFull = "pr_detail:"
 )
 
 // pollRow is the "poll" row: when the last successful poll finished.

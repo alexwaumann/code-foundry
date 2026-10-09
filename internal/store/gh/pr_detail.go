@@ -18,13 +18,12 @@ import (
 // read fetches). A fetch whose result differs from a fresh previous entry (a refresh,
 // or one past its age) publishes it too, for the other clients showing it.
 // Entries live in memory (fullCacheMax) and in gh_activity ("pr_detail:<slug>#<n>"),
-// which serves as the fallback when a fetch fails, also after a restart.
+// which serves as the fallback when a fetch fails, also after a restart. A row read
+// back from SQLite starts stale: polls that ran while it was not in memory (evicted, or
+// the daemon was down) could not mark it.
 
 // fullCacheMax bounds the in-memory entries; the least recently fetched go first.
 const fullCacheMax = 64
-
-// activityFull prefixes a FullPullRequest's gh_activity key.
-const activityFull = "pr_detail:"
 
 // revertMemoTTL is how long a revert's result answers repeated revert calls for the
 // same pull request instead of opening another revert.
@@ -79,13 +78,19 @@ func (c *fullCache) get(k fullKey) (d FullPullRequest, stale, ok bool) {
 func (c *fullCache) put(k fullKey, d FullPullRequest) (prev fullEntry, had bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.putLocked(k, &fullEntry{d: d})
+}
+
+// putLocked stores e, evicting the least recently fetched beyond fullCacheMax. c.mu is
+// held.
+func (c *fullCache) putLocked(k fullKey, e *fullEntry) (prev fullEntry, had bool) {
 	if c.m == nil {
 		c.m = map[fullKey]*fullEntry{}
 	}
-	if e, ok := c.m[k]; ok {
-		prev, had = *e, true
+	if old, ok := c.m[k]; ok {
+		prev, had = *old, true
 	}
-	c.m[k] = &fullEntry{d: d}
+	c.m[k] = e
 	for len(c.m) > fullCacheMax {
 		var oldest fullKey
 		first := true
@@ -99,14 +104,16 @@ func (c *fullCache) put(k fullKey, d FullPullRequest) (prev fullEntry, had bool)
 	return prev, had
 }
 
-// adopt stores d (loaded from SQLite) unless an entry exists.
-func (c *fullCache) adopt(k fullKey, d FullPullRequest) {
+// adopt stores d (loaded from SQLite) as stale unless an entry exists, in one step, and
+// returns the entry cached afterwards.
+func (c *fullCache) adopt(k fullKey, d FullPullRequest) (FullPullRequest, bool) {
 	c.mu.Lock()
-	ok := c.m[k] != nil
-	c.mu.Unlock()
-	if !ok {
-		c.put(k, d)
+	defer c.mu.Unlock()
+	if e, ok := c.m[k]; ok {
+		return e.d, e.stale
 	}
+	c.putLocked(k, &fullEntry{d: d, stale: true})
+	return d, true
 }
 
 // markStale marks k stale; it reports whether there was a fresh entry.
@@ -193,23 +200,11 @@ func (s *Store) FullPullRequest(ctx context.Context, slug string, number int, re
 	if err != nil {
 		return FullPullRequest{}, err
 	}
-	cached, stale, ok := s.full.get(k)
-	if !ok {
-		d, found, err := loadActivityRow[FullPullRequest](ctx, s.cache, activityFull+k.String())
-		if err != nil {
-			s.log.Warn("gh cache read failed", "err", err)
-		}
-		if found {
-			s.full.adopt(k, d)
-			cached, ok = d, true
-		}
-	}
+	cached, stale, ok := s.cachedFull(ctx, k)
 	if ok && !refresh && !stale && s.opts.Now().Sub(cached.FetchedAt) < s.config().PollInterval {
 		return cached, nil
 	}
-	d, err := submitFunc(ctx, s, "full|"+k.String(), func(ctx context.Context) (FullPullRequest, error) {
-		return s.fetchFull(ctx, k)
-	})
+	d, err := s.fetchFullJob(ctx, k)
 	if err != nil {
 		if ok && ctx.Err() == nil {
 			cached.LastError = err.Error()
@@ -218,6 +213,36 @@ func (s *Store) FullPullRequest(ctx context.Context, slug string, number int, re
 		return FullPullRequest{}, err
 	}
 	return d, nil
+}
+
+// cachedFull returns the cached detail of k from memory or, failing that, SQLite.
+func (s *Store) cachedFull(ctx context.Context, k fullKey) (d FullPullRequest, stale, ok bool) {
+	if d, stale, ok = s.full.get(k); ok {
+		return d, stale, true
+	}
+	row, found, err := loadActivityRow[FullPullRequest](ctx, s.cache, activityFull+k.String())
+	if err != nil {
+		s.log.Warn("gh cache read failed", "err", err)
+	}
+	if !found {
+		return FullPullRequest{}, false, false
+	}
+	d, stale = s.full.adopt(k, row)
+	return d, stale, true
+}
+
+// fetchFullJob fetches k on the worker and returns GitHub's error, if any. Jobs with
+// the same id coalesce only while queued, so a job that finds an entry fetched after
+// it was submitted (by one that was already running) returns that instead of fetching
+// again.
+func (s *Store) fetchFullJob(ctx context.Context, k fullKey) (FullPullRequest, error) {
+	submitted := s.opts.Now()
+	return submitFunc(ctx, s, "full|"+k.String(), func(ctx context.Context) (FullPullRequest, error) {
+		if d, stale, ok := s.full.get(k); ok && !stale && d.FetchedAt.After(submitted) {
+			return d, nil
+		}
+		return s.fetchFull(ctx, k)
+	})
 }
 
 // fetchFull runs on the worker: the detail request, more check pages when there are
