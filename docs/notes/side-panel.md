@@ -31,7 +31,8 @@ and `/tmp/cf-shots/chunk1-hidden.png`. Not run in the real Wails window.
 | `surfaces/types.ts`, `surfaces/registry.ts` | `SurfaceSpec` and the ordered list, with `surfaceOf`, `surfaceByHotkey`, `useAvailability` |
 | `surfaces/files.ts`, `diff.ts`, `pullrequest.ts` | One spec per file. Files and Diff are `"disabled"` for now (`Placeholder.tsx` is their body); Pull request is real since chunk 3 (below) |
 | `components/panel/SidePanel.tsx` | Pane, tab strip, body via the registry, and the empty "Open a surface" list |
-| `components/panel/keys.ts` | `panelKeyAction`, a pure function: cmd+w closes the active tab (or hides an empty panel), and a bare letter opens an enabled surface |
+| `components/panel/keys.ts` | `panelKeyAction`, a pure function: cmd+w closes the active tab (or hides an empty panel), and a bare letter opens an enabled surface; `isPanelChord` (the keys a surface's `onKey` never sees) |
+| `components/panel/reveal.ts` | `revealTab`: scrolls the tab strip (only the strip) so the active tab is fully visible |
 | `components/panel/PanelResizeHandle.tsx` | Same pattern as the sidebar's `ResizeHandle`, mirrored. Double-click resets to 420. Focusable, arrow keys resize |
 | `components/panel/PanelToggle.tsx` | `CommandButton` for `view.panel.toggle`, `aria-pressed` while open |
 | `internal/command/commands_view.go` | `view.panel.toggle` (cmd+shift+e), emits `UiIntent.ShowView{name: "panel.toggle"}` |
@@ -175,19 +176,35 @@ mock daemon): `/tmp/cf-shots/chunk3-summary.png`, `chunk3-timeline.png`,
 in the real Wails window or against a real daemon (the daemon side was exercised end to
 end in chunk 2, `gh-pr-detail.md`).
 
+Review fixes (after `2a3c984`, 21 findings): `make check` green (37 vitest files / 493
+tests, plus the Go suite). `make gui-e2e` passes 184/184 (92 per engine), with
+`e2e/pr-panel.spec.ts` at 14 tests per engine. New unit tests: `Markdown.test.tsx`,
+`Avatar.test.tsx`, `stores/prPanel.test.ts` (refresh, failed refresh, reviewer busy
+until the re-read, failed request, revert without a number, inner state pruning),
+`surfaces/pullrequest.test.tsx` (availability follows a worktree's branch switch), plus
+cases in `model.test.ts`, `panel/keys.test.ts`, `SidePanel.test.tsx` and
+`validate.test.ts`. New e2e: 280px (header and tab bar `scrollWidth <= clientWidth`,
+logins, popups inside the panel, tab reveal), quiet and failed Refresh, inner state
+after close and reopen, virtualized lists. The close-and-reopen and the 420px Timeline
+bar e2e were checked to fail with their fix reverted. Screenshots (WebKit, dark unless
+named, 1400x900, mock daemon): `/tmp/cf-shots/chunk3b-summary-280.png`,
+`chunk3b-timeline-280.png`, `chunk3b-summary.png` (420px), `chunk3b-light-summary.png`.
+Not run in the real Wails window.
+
 ### Pieces
 
 | File | Role |
 |---|---|
 | `surfaces/pullrequest.ts` | The spec: availability, `watches`, `warm`, `onKey` (shift+cmd+c), `render`, `openDefault` |
 | `surfaces/pullrequestTarget.ts` | Pure: `selectionPullRequest` (selection → worktree → branch → branch PRs), `pickPullRequest`, `pullRequestTab`, `prRefOfTab` |
-| `stores/prPanel.ts` | Inner view state per panel tab (`byTab`), in-flight flags, `reviewerCandidatesResource`, and the actions: `refreshPullRequest` (pr.refresh), `setReviewRequest` (pr.review.request), `revertPullRequest` (pr.revert), `copyPullRequestLink`, `openPullRequestInPanel` |
+| `stores/prPanel.ts` | Inner view state per panel tab (`byTab`, pruned when a tab closes), in-flight flags, `reviewerCandidatesResource`, and the actions: `refreshPullRequest` (pr.refresh), `setReviewRequest` (pr.review.request), `revertPullRequest` (pr.revert), `copyPullRequestLink`, `openPullRequestInPanel` |
 | `components/pr/PullRequestSurface.tsx` | Root: resource watch, skeleton / error / not found, header, stale banners, inner tab bar |
 | `components/pr/PrSummary.tsx` | Reviewers, labels, description, checks, comments and threads |
 | `components/pr/PrTimeline.tsx` | The timeline rail |
 | `components/pr/ReviewerPicker.tsx`, `PrMenu.tsx` | The add-reviewer popover and the ⋯ menu |
 | `components/pr/model.ts` | Pure view logic (state badge, checks headline, check tone/duration, reviewer status, `conversation`, `timeline`, `resolveLink`), table-tested in `model.test.ts` |
-| `components/pr/Markdown.tsx`, `Avatar.tsx`, `tones.ts`, `keys.ts` | Markdown bodies, avatars with an initial fallback, colours per tone, the copy chord and popup key guard |
+| `components/pr/Markdown.tsx`, `Avatar.tsx`, `tones.ts`, `keys.ts` | Markdown bodies, avatars with an initial fallback, colours per tone, the copy chord, the popup key guard and `usePanelBoundary` (popups stay inside the panel) |
+| `components/pr/VirtualStack.tsx` | Variable-height list that virtualizes over 40 items against the panel body's scroll box |
 | `components/ui/popover.tsx`, `dropdown-menu.tsx` | shadcn primitives over `radix-ui` (already a dependency) |
 
 Component tree:
@@ -227,8 +244,11 @@ PullRequestSurface (tab body; watches pullRequestDetailResource)
   is hidden, so P right after showing the panel waits for that read.
 * **`onKey`** (new optional `SurfaceSpec` hook). The active tab's surface sees chords
   before `panelKeyAction`, outside text fields. The PR surface handles shift+cmd+c (copy
-  link; the URL comes from the tab's params, so it works before the detail loads). cmd+w
-  is never offered to a surface.
+  link; the URL comes from the tab's params, so it works before the detail loads). The
+  panel's own keys (cmd+w and every surface's hotkey letter, enabled or not;
+  `isPanelChord`) are never offered to a surface. cmd+shift+c is in `ReservedChords`
+  (chord.go), the settings validator's `menuChords` and the mock's reserved list, so no
+  command can bind a chord the panel would swallow.
 * **Opening from rows.** On the Pull Requests page and the worktree overview (branch PR
   rows and the "merged in the last 7 days" rows), a click or Enter calls
   `openPullRequestInPanel` (`openSurface("current", pullRequestTab(...))`). The list
@@ -239,11 +259,19 @@ PullRequestSurface (tab body; watches pullRequestDetailResource)
   its branch rows, for consistency with the Pull Requests page.
 * **Inner state** (`stores/prPanel.ts`) is keyed by panel key + tab id, not the tab id
   alone, because the same pull request can be a tab in two selections' panels. It holds
-  the inner tab, the comment and timeline orders, and folded sections. It is in memory
-  and never pruned (a few bytes per tab), like the panel store.
-* **Actions are commands.** Refresh runs `pr.refresh`, then invalidates the resource.
-  The daemon's cache is fresh by then, so the re-read is a cache hit. Toggling a reviewer
-  runs `pr.review.request`, then invalidates the detail and the candidates. Revert runs
+  the inner tab, the comment and timeline orders, and folded sections. It is in memory.
+  A subscription to the panel store drops the entries of tabs no panel holds, so a
+  closed tab reopens on Summary, newest first.
+* **Actions are commands.** Refresh runs `pr.refresh` quietly (the menu shows the
+  spinner and then "Updated 0s ago"; no toast). The command's result is the detail the
+  daemon just fetched (protojson of `PullRequestDetail`); `parseRefreshResult`
+  (`api/gh.ts`) maps it and `resource.set` writes it, so there is no second read. A
+  failure is toasted, and `runCommandForResult`'s new `onError` records it as the
+  entry's error over the copy ("Could not refresh: …"), which keeps its own `lastError`.
+  `refreshPullRequestDetail` (stores/gh.ts), the RPC path, was unused and is gone.
+  Toggling a reviewer runs `pr.review.request`, then invalidates the detail and the
+  candidates, and the row stays busy (spinner) until the candidates' re-read lands, so
+  it never shows the old state, and a second click meanwhile sends nothing. Revert runs
   `pr.revert` through `runCommandForResult` (a new variant of `runCommand` that returns
   the result; `quiet` skips the default toast). The daemon's confirmation goes through
   the existing ConfirmDialog. On success it shows a toast with the new URL and an "Open
@@ -258,16 +286,22 @@ PullRequestSurface (tab body; watches pullRequestDetailResource)
   through.
 * **Checks headline** comes from the rollup (`pullRequest.checks`), not from the
   listed checks, which can be truncated: "N failing" wins over "N pending", then "All
-  checks passed"; "No checks" when the rollup is empty.
+  checks passed"; "No checks" when the rollup is empty. A failing or pending state with
+  no count says "Checks failing" / "Checks pending" (no invented 1).
 * **Comments.** Issue comments and reviews are listed together with review threads, by
   time (a thread sorts by its first comment). Thread comments are always oldest first
-  inside the thread. The count includes every thread comment. Reviews show a verdict
+  inside the thread. The count (header and the Comments section) includes every thread
+  comment. The Timeline leaves thread comments out, so its bar counts "N entries" (a
+  history icon) instead of comments, and the numbers never disagree. Reviews show a verdict
   ("approved" green, "requested changes" red). The thread header keeps the file name
   and line visible and truncates the directory.
 * **Timeline**: merged (or closed), opened, commits, issue comments and reviews, newest
   first by default, with a toggle. At the same timestamp: end state, review, comment,
-  commit, opened. Unknown times go last. Inline review comments stay in the summary's
-  threads.
+  commit, opened. Unknown times go last, except the end state, which is always the
+  latest event. Inline review comments stay in the summary's threads. Each entry draws
+  its own piece of the rail, so the line runs from the first icon to the last one (and
+  survives virtualization). A commit's avatar comes from its GitHub login only; without
+  one it shows the git author name's initial (a name is not a login).
 * **Menu order** follows T3's screenshot: Refresh, then the three "Coming next" slots
   (Ask a question, Explain this PR, Fix findings in a thread; disabled, `title="Coming
   next"`), a separator, Open on GitHub and Copy link (⇧⌘C), and then a separator and
@@ -278,18 +312,45 @@ PullRequestSurface (tab body; watches pullRequestDetailResource)
   disabled search field and "Asking someone to review needs write access on this
   repository." This was clearer than a dead button with a tooltip, and it matches T3's
   layout.
-* **Markdown**: `react-markdown` 10.1.0 + `remark-gfm` 4.0.1 (pinned like the other
-  dependencies). `skipHtml` drops raw HTML, and the default `urlTransform` strips unsafe
-  schemes. Links never navigate the webview: relative ones resolve against github.com,
-  and they open through `openUrl`. Images load only from https. The styles are a small
-  `.cf-markdown` block in `index.css` (no typography plugin), and the text is
-  selectable.
+* **Markdown**: `react-markdown` 10.1.0 + `remark-gfm` 4.0.1 + `rehype-raw` 7.0.0 +
+  `rehype-sanitize` 6.0.0 (pinned like the other dependencies). Raw HTML is parsed, then
+  sanitized with GitHub's schema narrowed to markdown's own elements plus `img`,
+  `details`, `summary`, `br`, `sub`, `sup` and `kbd`; script, style and event handlers
+  go, and image sources must be https. The default `urlTransform` also strips unsafe
+  schemes. A link whose target was stripped renders as plain text (no pointer). Links
+  never navigate the webview: relative ones resolve against github.com, and they open
+  through `openUrl`. The styles are a small `.cf-markdown` block in `index.css` (no
+  typography plugin): task-list checkboxes hang in the gutter with a visible accent,
+  and the text is selectable.
 * **Avatars.** The daemon's avatar URL when it has one, else
   `https://github.com/<login>.png`. Teams and deleted accounts get an icon or "?". A
   failed load (offline, or the mock's `avatars.example.com`) falls back to the
   initial.
 * **Colours** use `text-*-600` in light and `-400` in dark (`tones.ts`). Label chips tint
   the label colour at about 13% with a dot, so any GitHub colour reads in both schemes.
+  Stale reviewer chips are at 70% opacity and the disabled Code tab at 55%, which still
+  read in light mode.
+* **Narrow panels.** The surface root is a CSS container (`@container`), and the parts
+  give way by container queries rather than the window width. Header: the repo link has
+  its own row (as in T3), then state, comment count and the menu; the branch row wraps
+  the diffstat. Inner tab bar, measured in WebKit (tabs 208px, timeline counts 119px,
+  order toggle 96px): below 480px the order toggle keeps only its icon (so the default
+  420px panel shows the counts and the icon), below 400px the counts go, and below 340px
+  the checks headline keeps its icon and number. Its right cluster clips rather than
+  overflowing. Reviewers and Labels stack their label above the chips below 340px.
+  Comment and timeline headers wrap the verdict and age under a long login.
+* **Popups** (menu, reviewer picker) use the panel's `<aside>` as Radix's
+  `collisionBoundary` (`usePanelBoundary`), with 8px padding and a max width from
+  `--radix-popper-available-width`, so at 280px they fit inside the panel.
+* **Long lists.** The Summary's conversation and the Timeline virtualize over 40 items
+  (`VirtualStack`). Rows have variable heights, so it uses TanStack Virtual (as
+  `RowList` does) with `measureElement`, against the panel body (`data-scroll-root`),
+  offset by `scrollMargin` (the list's distance from the top of the scroll content,
+  re-measured by a ResizeObserver when content above it changes size). Checks tick every
+  second only while one is running (else every 30 s), and the stale banner owns its
+  30 s clock, so the surface root does not re-render on it.
+* **The new tab is revealed.** The tab strip scrolls a new or activated tab into view
+  (`revealTab`), so the tenth pull request opened from a row is not off-screen.
 * **The Pull Requests table** now uses only flexible columns (`minmax(floor, n fr)`).
   With the panel open, the old fixed maxima (repo up to 12rem, checks and review 8.5rem)
   grew before the `1fr` title got any room, which squeezed the title to nothing.
@@ -316,6 +377,20 @@ PullRequestSurface (tab body; watches pullRequestDetailResource)
   are on no dashboard.
 * The e2e default ports (7799/9255) can be taken by another worktree's run. Use
   `E2E_MOCK_PORT`/`E2E_VITE_PORT`.
+* **ResizeObserver loop errors.** TanStack Virtual re-renders inside its size observer
+  with `flushSync` by default, which resized the observed rows in the same frame
+  ("ResizeObserver loop completed with undelivered notifications" in the console).
+  `useFlushSync: false` fixes it. `VirtualStack`'s own observer defers to the next
+  frame for the same reason.
+* **A shrinking flex child overlaps.** `min-w-0` on a `whitespace-nowrap` span lets it
+  shrink below its text, which then paints over its neighbour (the first try at the
+  timeline counts did this at 420px). The counts are `shrink-0` and hide by container
+  query instead; only truncating text gets `min-w-0`.
+* e2e: the panel width persists in localStorage, so a second `page.goto` in the same
+  test keeps the width set earlier. Set it explicitly (`setPanelWidth`, through the
+  app's ui store).
+* The mock's `pr.refresh` now answers with the detail (protojson), like the daemon.
+  `POST /__mock/gh/pr-fail?command=pr.refresh` fails the next one with UNAVAILABLE.
 
 ### Deferred
 
