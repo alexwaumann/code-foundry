@@ -56,10 +56,6 @@ function TerminalTitle({ id }: { id: string }) {
   );
 }
 
-/**
- * The pane's own commands, run against the current selection (this pane) exactly as the
- * palette runs them. Each hides when the daemon does not list it as available.
- */
 /** view.panel.linked-prs with the thread's link count; only once the thread has linked a pull request. */
 function LinkedPrsButton({ sessionId }: { sessionId: string }) {
   const count = useSessionsStore((s) => s.byId[sessionId]?.linkedPullRequests.length ?? 0);
@@ -67,6 +63,10 @@ function LinkedPrsButton({ sessionId }: { sessionId: string }) {
   return <CommandButton command="view.panel.linked-prs" icon={GitPullRequest} count={count} data-testid="pane-linked-prs" />;
 }
 
+/**
+ * The pane's own commands, run against the current selection (this pane) exactly as the
+ * palette runs them. Each hides when the daemon does not list it as available.
+ */
 function HeaderActions({ sessionId }: { sessionId: string | undefined }) {
   return (
     <span className="-mr-1.5 flex items-center [--wails-draggable:no-drag]" data-testid="pane-actions">

@@ -274,8 +274,11 @@ from the pull request (docs/notes/pr-thread-commands.md).
   request through `pr.ask`, `pr.explain` and `pr.fix.findings`, Workspace (a workspace
   thread's members with their git, PR and CI state, add/remove, Run in; opened by W,
   `view.panel.workspace`, the sidebar's workspace badge, the thread header and the
-  Projects page) and Worktree (a member's worktree overview as a tab, opened only from
-  the Workspace surface; `docs/notes/workspaces-5-panel.md`). Every
+  Projects page), Worktree (a member's worktree overview as a tab, opened only from
+  the Workspace surface; `docs/notes/workspaces-5-panel.md`) and Linked PRs (the
+  thread's linked pull requests, newest first, each opening as a PR tab; opened by L,
+  `view.panel.linked-prs`, the thread header and the sidebar's PR badge;
+  `docs/notes/linked-prs.md`). Every
   palette command is reachable without the mouse, and common ones also have buttons that
   invoke the same registry command. Chords are listed only in the palette and the
   Keyboard Shortcuts overlay (`docs/notes/phase3-ui-buttons.md`).
