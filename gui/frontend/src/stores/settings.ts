@@ -17,6 +17,7 @@ export const KEYS = {
   fontFamily: "appearance.font_family",
   fontSize: "appearance.font_size",
   density: "appearance.density",
+  backdrop: "appearance.backdrop",
   scrollback: "sessions.scrollback_lines",
 } as const;
 

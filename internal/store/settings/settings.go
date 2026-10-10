@@ -68,6 +68,7 @@ type Appearance struct {
 	FontFamily string
 	FontSize   int
 	Density    string // compact, comfortable
+	Backdrop   string // forest, none
 }
 
 // Advanced holds executable overrides and logging.

@@ -22,6 +22,8 @@
  *   POST /__mock/workspace?name=login&repos=repo-cf,repo-gp[&branch=cf/login]
  *                                                 (a workspace: a cf/<name> worktree in each repo)
  *   GET  /__mock/workspaces                       (id, name, branch, members)
+ *   POST /__mock/empty                            (a fresh install: no projects, threads or terminals)
+ *   POST /__mock/threads?repo=repo-cf&count=3&status=busy|idle|attention[&prefix=Job]
  *   POST /__mock/workspace-thread?workspace=login[&repo=repo-gp&name=driver&status=busy]
  *                                                 (a connected thread owned by the workspace)
  *   POST /__mock/workspace-mixed?name=checkout    (a workspace over code-foundry, ghostty-playground
@@ -493,6 +495,19 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/workspace-mixed":
       try {
         json(res, 200, world.addMixedWorkspace(q.get("name") ?? "checkout"));
+      } catch (err) {
+        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
+    case "POST /__mock/empty":
+      world.empty();
+      json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/threads":
+      // repo=repo-cf&count=3&status=busy|idle|attention[&prefix=Job]: connected threads in the repo's main worktree.
+      try {
+        const list = world.addThreads(q.get("repo") ?? "repo-cf", Number(q.get("count") ?? "1"), statusNames[q.get("status") ?? "busy"] ?? SessionStatus.BUSY, q.get("prefix") ?? "Thread");
+        json(res, 200, list.map((s) => s.id));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }

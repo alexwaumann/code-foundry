@@ -89,6 +89,37 @@ export function attentionIds(data: SessionsData): string[] {
   });
 }
 
+/** The session is working: busy and not disconnected. */
+export function isRunning(s: Pick<SessionView, "status" | "state">): boolean {
+  return s.status === "busy" && s.state !== "disconnected";
+}
+
+/** Sessions that are not disconnected (starting, connected, closing, unknown). */
+export function connectedCount(data: SessionsData): number {
+  let n = 0;
+  for (const id of data.order) if (data.byId[id] && data.byId[id].state !== "disconnected") n++;
+  return n;
+}
+
+/** Sessions that are running (isRunning). */
+export function runningCount(data: SessionsData): number {
+  let n = 0;
+  for (const id of data.order) {
+    const s = data.byId[id];
+    if (s && isRunning(s)) n++;
+  }
+  return n;
+}
+
+/** The start page's thread list: sessions waiting on the user, then running ones, each in `order`. */
+export function activeThreadIds(data: SessionsData): string[] {
+  const running = data.order.filter((id) => {
+    const s = data.byId[id];
+    return s !== undefined && isRunning(s);
+  });
+  return [...attentionIds(data), ...running];
+}
+
 /** Number of sessions needing attention (a narrow, primitive selector). */
 export function useAttentionCount(): number {
   return useSessionsStore((s) => attentionIds(s).length);
