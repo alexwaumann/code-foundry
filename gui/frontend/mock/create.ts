@@ -1,6 +1,7 @@
 /**
- * RepoService.Create, ListPublishOwners and Publish, and the repo.create and
- * repo.github.publish commands (the Add Project dialog's New tab and the publish dialog).
+ * RepoService.Create, ListPublishOwners, Publish and Delete, and the repo.create,
+ * repo.github.publish and repo.delete commands (the Add Project dialog's New tab and the
+ * publish dialog).
  *
  * - Create makes a git project on main at ~/.code-foundry/projects/<name>; the daemon's
  *   name rules (src/lib/publish.ts); a name taken by any project path is AlreadyExists.
@@ -8,6 +9,8 @@
  *   (Public and Internal only), "acme" whose policy GitHub does not show (all three).
  * - Publish takes ~400ms. It fails like gh when the visibility is private for octo-org
  *   or the name is "taken"; otherwise the project gets origin and the dev/<name> slug.
+ * - Delete removes a project directly under ~/.code-foundry/projects (what Create makes)
+ *   and refuses any other, like the daemon.
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
@@ -35,20 +38,32 @@ export const GH_NAME_TAKEN = "GraphQL: Name already exists on this account (crea
 /** What World offers this module (mock/world.ts). */
 export interface ProjectWorld {
   projectPaths(): string[];
-  repoInfo(id: string): { name: string; git: boolean; remotes: string[] } | undefined;
+  repoInfo(id: string): { name: string; path: string; git: boolean; remotes: string[] } | undefined;
   addCreated(name: string, path: string): { id: string; name: string; path: string };
   setOrigin(id: string, slug: string): void;
+  removeRepo(id: string): void;
 }
 
-/** Every Create and Publish ("create <name>", "publish <id> <owner>/<name> <visibility>"). */
+/** Every Create, Publish and Delete ("create <name>", "publish <id> <owner>/<name> <visibility>", "delete <id>"). */
 export const projectCalls: string[] = [];
 
 export function resetProjects(): void {
   projectCalls.length = 0;
 }
 
-export function listPublishOwners(): { owners: PublishOwnerInit[] } {
-  return { owners: publishOwners };
+export function listPublishOwners(): { owners: PublishOwnerInit[]; stale: boolean } {
+  return { owners: publishOwners, stale: false };
+}
+
+/** RepoService.Delete and repo.delete. */
+export function deleteProject(world: ProjectWorld, repoId: string): void {
+  projectCalls.push(`delete ${repoId}`);
+  const repo = world.repoInfo(repoId);
+  if (!repo) throw new ConnectError(`project not found: "${repoId}"`, Code.NotFound);
+  if (repo.path.slice(0, repo.path.lastIndexOf("/")) !== PROJECTS) {
+    throw new ConnectError(`failed precondition: ${repo.path} is not in the projects directory ${PROJECTS}`, Code.FailedPrecondition);
+  }
+  world.removeRepo(repoId);
 }
 
 /** RepoService.Create and repo.create. */
@@ -104,16 +119,22 @@ interface CommandEntry {
     description: string;
     keybindings: string[];
     args: { name: string; type: ArgType; required: boolean; description: string; enumValues?: string[] }[];
+    /** Destructive: Invoke needs confirmed=true (the GUI's cancel path sends it). */
+    confirm?: (ctx: UiContext | undefined, args: Record<string, string>) => string;
   };
   when: (ctx: UiContext | undefined) => boolean;
   run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut>;
 }
 
-/** repo.create and repo.github.publish, as internal/command/commands_repo_create.go. */
+/** repo.create, repo.github.publish and repo.delete, as internal/command/commands_repo_create.go. */
 export function projectCommands(world: ProjectWorld): CommandEntry[] {
   const publishable = (id: string): boolean => {
     const r = world.repoInfo(id);
     return r !== undefined && r.git && !r.remotes.includes("origin");
+  };
+  const deletable = (id: string): boolean => {
+    const r = world.repoInfo(id);
+    return r !== undefined && r.path.slice(0, r.path.lastIndexOf("/")) === PROJECTS;
   };
   return [
     {
@@ -153,6 +174,24 @@ export function projectCommands(world: ProjectWorld): CommandEntry[] {
         const vis = args.visibility ?? "";
         const r = await publishProject(world, id, args.owner ?? "", args.name ?? "", vis);
         return { message: `published ${r.name} to https://github.com/${r.slug} (${vis})`, resultJson: JSON.stringify({ id, name: r.name, githubSlug: r.slug, remotes: ["origin"], git: true }) };
+      },
+    },
+    {
+      cmd: {
+        name: "repo.delete",
+        title: "Delete Project",
+        category: "Project",
+        description:
+          "Stop tracking a project made by New Project and delete its folder in ~/.code-foundry/projects. Only projects there can be deleted; a repository on GitHub is not touched.",
+        keybindings: [],
+        args: [{ name: "repo", type: ArgType.STRING, required: true, description: "Repository id" }],
+        confirm: (ctx, args) => `Delete project ${args.repo || ctx?.activeRepoId || ""} and its folder on disk? This cannot be undone.`,
+      },
+      when: (ctx) => deletable(ctx?.activeRepoId ?? ""),
+      run: (ctx, args) => {
+        const id = args.repo || ctx?.activeRepoId || "";
+        deleteProject(world, id);
+        return Promise.resolve({ message: `deleted ${id}`, resultJson: "" });
       },
     },
   ];

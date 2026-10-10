@@ -102,12 +102,14 @@ test("the project picker's empty state opens the dialog", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(picker).toHaveCount(0);
   await expect(dialog(page)).toBeVisible();
-  // No projects yet: it opens on New.
-  await expect(dialog(page)).toHaveAttribute("data-tab", "new");
-  await expect(page.getByTestId("add-project-new-name")).toBeFocused();
+  // Local folder even with no projects yet, its path focused; the close button closes.
+  await expect(dialog(page)).toHaveAttribute("data-tab", "local");
+  await expect(page.getByTestId("add-project-local-input")).toBeFocused();
+  await page.getByTestId("add-project-close").click();
+  await expect(dialog(page)).toHaveCount(0);
 });
 
-test("tabs are New, Local folder, GitHub; with projects it opens on Local folder", async ({ page }) => {
+test("tabs are New, Local folder, GitHub; it opens on Local folder", async ({ page }) => {
   await openApp(page);
   await page.getByTestId("sidebar-add-project").click();
   const tabs = page.getByTestId("add-project-tabs").getByRole("tab");
@@ -125,16 +127,15 @@ test("Local folder: Tab completes, Enter adds, and the new project opens", async
   const input = page.getByTestId("add-project-local-input");
   await expect(input).toBeFocused();
 
-  // A refused path shows the daemon's reason in place.
-  await input.fill("/tmp");
+  // Nothing typed yet: Enter asks for a path and the dialog stays.
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("add-project-local-message")).toContainText("/tmp is outside your home directory");
+  await expect(page.getByTestId("add-project-local-message")).toContainText("Type a folder path");
   await expect(dialog(page)).toBeVisible();
 
-  await input.fill("~/src/ne");
+  await input.fill("src/ne");
   await expect(page.getByTestId("path-entry")).toHaveCount(1);
   await page.keyboard.press("Tab");
-  await expect(input).toHaveValue("~/src/new-app/");
+  await expect(input).toHaveValue("src/new-app/");
   await expect(page.getByTestId("path-entry").first()).toHaveAttribute("data-entry-name", "api");
   await page.keyboard.press("Enter");
   await expect(dialog(page)).toHaveCount(0);
@@ -149,19 +150,19 @@ test("Local folder: a plain folder has no git, and a folder inside a project ope
   const before = (await listRepos()).length;
   await page.getByTestId("sidebar-add-project").click();
   const input = page.getByTestId("add-project-local-input");
-  await input.fill("~/src/Notebook");
+  await input.fill("src/Notebook");
   await page.keyboard.press("Enter");
   await expect(dialog(page)).toHaveCount(0);
   expect(await repoAt("/Users/dev/src/Notebook")).toMatchObject({ name: "Notebook", git: false });
 
   // A folder that does not exist is refused in place.
   await page.getByTestId("sidebar-add-project").click();
-  await input.fill("~/src/nope");
+  await input.fill("src/nope");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("add-project-local-message")).toContainText("/Users/dev/src/nope: no such file or directory");
 
   // Inside an added repository: that repository, not a new project.
-  await input.fill("~/src/code-foundry/src");
+  await input.fill("src/code-foundry/src");
   await page.keyboard.press("Enter");
   await expect(dialog(page)).toHaveCount(0);
   expect((await listRepos()).length).toBe(before + 1);

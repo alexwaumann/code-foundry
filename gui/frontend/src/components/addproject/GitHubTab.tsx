@@ -6,7 +6,7 @@ import { errorMessage, isAbort } from "@/api/stream";
 import { Button } from "@/components/ui/button";
 import { parseGitHubInput } from "@/lib/githubRef";
 import { tildify } from "@/lib/path";
-import { closeAddProject, registerFolder, selectAddedProject } from "@/stores/addProject";
+import { finishAddProject, registerFolder, selectAddedProject } from "@/stores/addProject";
 
 /** What the tab shows under the input. */
 type View =
@@ -110,7 +110,7 @@ function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (
         ac.signal,
       );
       toast.success(`Cloned ${repo.slug}`);
-      closeAddProject();
+      finishAddProject();
       selectAddedProject(added.id);
     } catch (err) {
       if (isAbort(err) || ac.signal.aborted) return;
@@ -124,7 +124,7 @@ function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (
     try {
       const added = await registerFolder(repo.clonePath);
       toast.success(`Added ${added.name}`);
-      closeAddProject();
+      finishAddProject();
       selectAddedProject(added.id);
     } catch (err) {
       setClone({ state: "failed", lines: [], error: errorMessage(err) });

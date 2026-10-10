@@ -34,8 +34,9 @@ CREATE INDEX IF NOT EXISTS gh_ref_checks_fetched_at ON gh_ref_checks (fetched_at
 -- The polled state (activity_cache.go): the viewer dashboards ("dashboard"), global
 -- monthly stats ("stats"), per-repository stats ("repo_stats:<slug>") and default-branch
 -- CI ("default_branch:<slug>"), per-branch pull requests ("branch:<slug>:<head>"), the
--- last successful poll ("poll"), and the pull request detail panel's on-demand fetches
--- ("pr_detail:<slug>#<number>", pr_detail.go).
+-- last successful poll ("poll"), the pull request detail panel's on-demand fetches
+-- ("pr_detail:<slug>#<number>", pr_detail.go), and the last publish owner list
+-- ("publish_owners", owners.go).
 CREATE TABLE IF NOT EXISTS gh_activity (
   key        TEXT    PRIMARY KEY,
   fetched_at INTEGER NOT NULL,

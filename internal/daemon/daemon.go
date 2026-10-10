@@ -132,6 +132,10 @@ func Run(ctx context.Context, opts Options) error {
 				r, ok := st.repo.Snapshot().Owner(c.ActiveRepoID, c.ActiveWorktreePath)
 				return ok && slices.Contains(r.Remotes, "origin")
 			},
+			Deletable: func(c command.Context) bool {
+				r, ok := st.repo.Snapshot().Owner(c.ActiveRepoID, c.ActiveWorktreePath)
+				return ok && st.projects.Deletable(r.Path)
+			},
 		},
 		NotGit: func(c command.Context) bool {
 			r, ok := st.repo.Snapshot().Owner(c.ActiveRepoID, c.ActiveWorktreePath)

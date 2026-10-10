@@ -27,12 +27,23 @@ export function toPublishOwnerView(o: PublishOwner): PublishOwnerView {
   };
 }
 
-/** The viewer's account first, then their organizations. */
-export async function listPublishOwners(conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<PublishOwnerView[]> {
+export interface PublishOwnersResult {
+  /** The viewer's account first, then their organizations. */
+  owners: PublishOwnerView[];
+  /** The list is older than the daemon's TTL (only with allowStale): ask again for a fresh one. */
+  stale: boolean;
+}
+
+/**
+ * The accounts the viewer can publish to. With allowStale the daemon answers its last
+ * fetched list at once however old it is (stale says when it is old); otherwise a list
+ * older than its TTL is fetched again first.
+ */
+export async function listPublishOwners(opts: { allowStale?: boolean } = {}, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<PublishOwnersResult> {
   const c = await conn.client(RepoService);
   try {
-    const res = await c.listPublishOwners({}, { signal });
-    return res.owners.map(toPublishOwnerView);
+    const res = await c.listPublishOwners({ allowStale: opts.allowStale ?? false }, { signal });
+    return { owners: res.owners.map(toPublishOwnerView), stale: res.stale };
   } catch (err) {
     throw orOutdatedDaemon(err);
   }
