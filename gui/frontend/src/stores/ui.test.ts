@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONTENT_MIN, PANE_GAPS, PANEL_MIN, SIDEBAR_MAX, SIDEBAR_MIN, clampPanelWidth, panelMax, useUiStore, type FocusRegion } from "./ui";
+import { CONTENT_MIN, PANE_GAPS, PANEL_MIN, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, clampPanelWidth, panelMax, useUiStore, type FocusRegion } from "./ui";
 
 describe("panelMax", () => {
   const cases: [string, number, number, number][] = [
@@ -52,6 +52,24 @@ describe("ui persistence", () => {
     const v1 = { sidebarVisible: false, sidebarWidth: 300, panelWidth: 600, fontSize: 14, collapsed: { a: true } };
     expect(await migrate?.(v1, 1)).toEqual({ sidebarVisible: false, sidebarWidth: 300, fontSize: 14 });
     expect(await migrate?.({ sidebarWidth: 280, collapsed: {} }, 2)).toEqual({ sidebarWidth: 280 });
+  });
+
+  const widths: [string, unknown, number][] = [
+    ["a width saved under the old 180 minimum is raised", { sidebarWidth: 180 }, SIDEBAR_MIN],
+    ["a width above the maximum is lowered", { sidebarWidth: 900 }, SIDEBAR_MAX],
+    ["a width inside the bounds is kept, rounded", { sidebarWidth: 300.4 }, 300],
+    ["no saved width keeps the default", { fontSize: 14 }, SIDEBAR_DEFAULT],
+    ["nothing saved keeps the default", undefined, SIDEBAR_DEFAULT],
+  ];
+  it.each(widths)("loading: %s", (_name, persisted, want) => {
+    const merge = useUiStore.persist.getOptions().merge;
+    const current = { ...useUiStore.getState(), sidebarWidth: SIDEBAR_DEFAULT };
+    expect(merge?.(persisted, current).sidebarWidth).toBe(want);
+  });
+
+  it("loading keeps the other saved fields", () => {
+    const merged = useUiStore.persist.getOptions().merge?.({ sidebarVisible: false, sidebarWidth: 180, fontSize: 15 }, useUiStore.getState());
+    expect(merged).toMatchObject({ sidebarVisible: false, sidebarWidth: SIDEBAR_MIN, fontSize: 15 });
   });
 
   it("does not save a panel width", () => {

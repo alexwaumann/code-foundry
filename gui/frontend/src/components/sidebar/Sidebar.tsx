@@ -236,7 +236,10 @@ function SidebarBand() {
     <div className="flex shrink-0 items-center [--wails-draggable:drag]" style={{ height: TITLE_BAND_HEIGHT }} data-testid="sidebar-band">
       <div className="h-full shrink-0" style={{ width: TRAFFIC_LIGHT_GUTTER }} data-testid="traffic-light-gutter" aria-hidden />
       <header className="flex h-full min-w-0 flex-1 items-center justify-between gap-2 pr-3 pl-3">
-        <h1 className="min-w-0 truncate text-[13px] leading-none font-semibold tracking-tight text-foreground select-none">Code Foundry</h1>
+        {/* A span, not a heading: every page in the content pane has its own h1. */}
+        <span className="min-w-0 truncate text-[13px] leading-none font-semibold tracking-tight text-sidebar-foreground select-none" data-testid="sidebar-app-name">
+          Code Foundry
+        </span>
         <span className="flex shrink-0 items-center gap-2 [--wails-draggable:no-drag]" data-testid="sidebar-band-controls">
           <AttentionBadge />
           {/* New thread (the project picker), as session.new from the palette. New terminal is palette, ⌘T and row menu only. */}

@@ -43,10 +43,11 @@ test("the sidebar band holds the empty traffic-light gutter and the app name, an
   expect([gutter.left, gutter.top, gutter.width, gutter.height]).toEqual([0, 0, 80, BAND]);
   // Nothing sits on the lights.
   expect(await page.getByTestId("traffic-light-gutter").evaluate((el) => [el.childElementCount, el.textContent])).toEqual([0, ""]);
-  const title = page.getByTestId("sidebar-band").getByRole("heading", { name: "Code Foundry", level: 1 });
+  const title = page.getByTestId("sidebar-app-name");
+  await expect(title).toHaveText("Code Foundry");
   // 12px after the gutter.
   expect(await title.evaluate((el) => el.getBoundingClientRect().left)).toBe(80 + 12);
-  expect(await drag(page, '[data-testid="sidebar-band"] header > h1')).toBe("drag");
+  expect(await drag(page, '[data-testid="sidebar-app-name"]')).toBe("drag");
   // Its controls click instead of dragging.
   expect(await drag(page, '[data-testid="sidebar-band-controls"]')).toBe("no-drag");
   expect(await drag(page, '[data-testid="sidebar-new-session"]')).toBe("no-drag");
