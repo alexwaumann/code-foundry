@@ -8,3 +8,5 @@ minimumReleaseAgeExclude:
 # platform package, so its postinstall script is not needed.
 allowBuilds:
   esbuild: false
+patchedDependencies:
+  '@wailsio/runtime@3.0.0-beta.28': patches/@wailsio__runtime@3.0.0-beta.28.patch

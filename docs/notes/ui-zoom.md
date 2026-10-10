@@ -56,3 +56,19 @@ with `y = round(52 * zoomFactor / 2 - 7)` so they stay centred in the zoomed top
 Alternatives considered: HTML-drawn buttons with the native ones hidden (zoom for free,
 but lose the native look, full-screen behaviour and accessibility); keeping the band at
 52 screen px by shrinking its layout height (breaks the pane headers' alignment).
+
+## Drag zones
+
+The window drags from the sidebar band, the pane headers and the 8 px sheet edge
+(`--wails-draggable: drag`, handled by the Wails JS runtime). Under zoom only the
+top-left 1/zoom of each surface dragged: the runtime's `isDraggableEvent` (drag.ts) keeps
+the press inside the target with `offsetX < clientWidth && offsetY < clientHeight` (to
+skip scrollbars), and under CSS zoom WebKit reports `offsetX/Y` in viewport px while
+`clientWidth/Height` stay layout px (probe-verified). Fixed with a pnpm patch
+(`gui/frontend/patches/@wailsio__runtime@3.0.0-beta.28.patch`, wired in
+pnpm-workspace.yaml `patchedDependencies`): the client box is scaled by the target's
+effective zoom (`getBoundingClientRect().width / offsetWidth`). The patch is pinned to
+the runtime version, so a Wails upgrade fails install loudly until it is re-applied or
+upstreamed. Verified live with synthesized CGEvent drags (a 20-line Swift tool; cliclick
+and pyobjc are not installed): at 150% the window followed drags from the band's lower
+part and from the far right of a pane header, and still drags everywhere at 100%.
