@@ -107,7 +107,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				{Name: "repo", Type: String, Context: ContextRepo, Description: "Repository id (with workspace or repos: the member the thread runs in, by id or name)"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path (with workspace: a member worktree)"},
 				{Name: "workspace", Type: String, Description: "Workspace id or name the thread belongs to; it runs in the member repo or worktree names (default: the first member)"},
-				{Name: "repos", Type: String, Description: "With new-worktree: comma-separated repositories (id, name, or path) for a new workspace, a cf/<name> worktree in each; repo picks the member the thread runs in (default: the first)"},
+				{Name: "repos", Type: String, Description: "With new-worktree: comma-separated repositories (id, name, or path; repo:base gives that one its own base) for a new workspace, a cf/<name> worktree in each; repo picks the member the thread runs in (default: the first)"},
 				{Name: "model", Type: Enum, Enum: SessionModels, Description: "Model (default: settings sessions.default_model)"},
 				{Name: "effort", Type: Enum, Enum: SessionEfforts, Description: "Effort level (default: settings sessions.default_effort)"},
 				{Name: "permission", Type: Enum, Enum: SessionPermissions, Default: "auto",

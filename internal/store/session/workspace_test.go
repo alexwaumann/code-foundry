@@ -1,6 +1,7 @@
 package session
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"os"
@@ -172,6 +173,7 @@ func TestCreateNewWorkspace(t *testing.T) {
 		wantBranch string
 		wantRepo   string
 		wantName   string // session name
+		wantBase   string // session base ref; default: the request's
 		wantErr    error
 	}{
 		{name: "slug names branch, workspace and thread; first repo is the cwd",
@@ -183,6 +185,13 @@ func TestCreateNewWorkspace(t *testing.T) {
 		{name: "repo picks the cwd member",
 			o:        CreateOptions{RepoID: "r2", InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "r2"}, BaseRef: "origin/dev"}},
 			wantCall: "Create named-fix r1,r2", wantBranch: "cf/named-fix", wantRepo: "r2", wantName: "named-fix"},
+		{name: "a member's own base; the cwd member's base is the thread's",
+			o:        CreateOptions{RepoID: "r2", InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "api: origin/feat"}, BaseRef: "origin/dev"}},
+			wantCall: "Create named-fix r1,r2:origin/feat", wantBranch: "cf/named-fix", wantRepo: "r2", wantName: "named-fix", wantBase: "origin/feat"},
+		{name: "a member's own base; another member is the cwd",
+			o:        CreateOptions{InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "r2:origin/feat"}}},
+			wantCall: "Create named-fix r1,r2:origin/feat", wantBranch: "cf/named-fix", wantRepo: "r1", wantName: "named-fix"},
+		{name: "a bad member base", o: CreateOptions{NewWorkspace: &NewWorkspace{Repos: []string{"r1:-x"}}}, wantErr: ErrInvalidArgument},
 		{name: "a branch taken in any member gets a suffix",
 			o:     CreateOptions{InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "r2"}}},
 			taken: []string{"refs/remotes/origin/cf/named-fix"}, wantCall: "Create named-fix-2 r1,r2", wantBranch: "cf/named-fix-2",
@@ -231,7 +240,7 @@ func TestCreateNewWorkspace(t *testing.T) {
 			if s.RepoID != tt.wantRepo || s.WorktreePath != mem.WorktreePath || !s.CreatedWorktree || s.Name != tt.wantName {
 				t.Errorf("session = %+v, want cwd %s in %s", s, mem.WorktreePath, tt.wantRepo)
 			}
-			if base := tt.o.NewWorkspace.BaseRef; base != "" && s.BaseRef != base {
+			if base := cmp.Or(tt.wantBase, tt.o.NewWorkspace.BaseRef); base != "" && s.BaseRef != base {
 				t.Errorf("base = %q, want %q", s.BaseRef, base)
 			}
 		})
