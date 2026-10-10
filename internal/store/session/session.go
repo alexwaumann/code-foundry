@@ -138,6 +138,8 @@ type Session struct {
 	// PendingWorktreePath is the member a queued RunIn moves the thread to once it is
 	// idle at its prompt; empty when nothing is queued. Not persisted.
 	PendingWorktreePath string
+	// Pinned is the user's pin (Store.Pin). Persisted.
+	Pinned bool
 }
 
 // Snapshot is every session, sorted by creation time then id. Never mutate it.
@@ -244,6 +246,8 @@ type Store interface {
 	// once the live thread is idle at its prompt (the row's cwd changes when it is
 	// sent), or the row's cwd at once for a disconnected thread.
 	RunIn(ctx context.Context, id string, target RunInTarget) (Session, error)
+	// Pin sets or clears the user's pin, in any state.
+	Pin(ctx context.Context, id string, pinned bool) (Session, error)
 	// StageAttachment stores an image for a first prompt and returns its absolute
 	// path. mimeType must be one of AttachmentTypes; data at most MaxAttachmentBytes.
 	// name is the user's file name, used only in logs.

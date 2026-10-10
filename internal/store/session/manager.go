@@ -593,6 +593,22 @@ func (m *Manager) Rename(_ context.Context, id, name string) (Session, error) {
 	return rec.s, nil
 }
 
+// Pin sets or clears the user's pin. It works in any state and is persisted.
+func (m *Manager) Pin(_ context.Context, id string, pinned bool) (Session, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	rec, err := m.record(id)
+	if err != nil {
+		return Session{}, err
+	}
+	if rec.s.Pinned == pinned {
+		return rec.s, nil
+	}
+	rec.s.Pinned = pinned
+	m.commitLocked(rec, true)
+	return rec.s, nil
+}
+
 // Close ends the process gracefully and waits until the session is DISCONNECTED.
 func (m *Manager) Close(ctx context.Context, id string) error {
 	m.mu.Lock()

@@ -217,6 +217,14 @@ func (f *Fake) Rename(_ context.Context, id, name string) (session.Session, erro
 	})
 }
 
+// Pin records "Pin <id> <pinned>" and sets Pinned.
+func (f *Fake) Pin(_ context.Context, id string, pinned bool) (session.Session, error) {
+	return f.mutate(fmt.Sprintf("Pin %s %t", id, pinned), id, func(s *session.Session) error {
+		s.Pinned = pinned
+		return nil
+	})
+}
+
 // Close disconnects the session with reason "closed".
 func (f *Fake) Close(_ context.Context, id string) error {
 	_, err := f.mutate("Close "+id, id, func(s *session.Session) error {

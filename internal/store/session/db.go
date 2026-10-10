@@ -28,8 +28,8 @@ func saveSession(ctx context.Context, db *sql.DB, s Session) error {
 	_, err := db.ExecContext(ctx, `INSERT INTO sessions (
 			id, claude_session_id, repo_id, worktree_path, name, auto_named, model, effort,
 			created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
-			permission_mode, base_ref, created_worktree, workspace_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			permission_mode, base_ref, created_worktree, workspace_id, pinned)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET
 			claude_session_id = excluded.claude_session_id,
 			repo_id = excluded.repo_id,
@@ -47,10 +47,11 @@ func saveSession(ctx context.Context, db *sql.DB, s Session) error {
 			permission_mode = excluded.permission_mode,
 			base_ref = excluded.base_ref,
 			created_worktree = excluded.created_worktree,
-			workspace_id = excluded.workspace_id`,
+			workspace_id = excluded.workspace_id,
+			pinned = excluded.pinned`,
 		s.ID, s.ClaudeSessionID, s.RepoID, s.WorktreePath, s.Name, s.AutoNamed, s.Model, s.Effort,
 		millis(s.CreatedAt), millis(s.LastActivityAt), s.ParentID, int(s.State), s.DisconnectReason, s.ExitCode, s.LastError,
-		int(s.PermissionMode), s.BaseRef, s.CreatedWorktree, s.WorkspaceID)
+		int(s.PermissionMode), s.BaseRef, s.CreatedWorktree, s.WorkspaceID, s.Pinned)
 	if err != nil {
 		return fmt.Errorf("session: save %s: %w", s.ID, err)
 	}
@@ -67,7 +68,7 @@ func deleteSession(ctx context.Context, db *sql.DB, id string) error {
 func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 	rows, err := db.QueryContext(ctx, `SELECT id, claude_session_id, repo_id, worktree_path, name, auto_named,
 			model, effort, created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
-			permission_mode, base_ref, created_worktree, workspace_id
+			permission_mode, base_ref, created_worktree, workspace_id, pinned
 		FROM sessions ORDER BY created_at, id`)
 	if err != nil {
 		return nil, fmt.Errorf("session: load: %w", err)
@@ -80,7 +81,7 @@ func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 		var state, perm int
 		if err := rows.Scan(&s.ID, &s.ClaudeSessionID, &s.RepoID, &s.WorktreePath, &s.Name, &s.AutoNamed,
 			&s.Model, &s.Effort, &created, &active, &s.ParentID, &state, &s.DisconnectReason, &s.ExitCode, &s.LastError,
-			&perm, &s.BaseRef, &s.CreatedWorktree, &s.WorkspaceID); err != nil {
+			&perm, &s.BaseRef, &s.CreatedWorktree, &s.WorkspaceID, &s.Pinned); err != nil {
 			return nil, fmt.Errorf("session: load: %w", err)
 		}
 		s.CreatedAt, s.LastActivityAt, s.State = fromMillis(created), fromMillis(active), State(state)
