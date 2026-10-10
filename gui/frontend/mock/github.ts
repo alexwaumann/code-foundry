@@ -421,9 +421,17 @@ export function ghEvent(e: GhEventInit) {
   return { source: EventSource.GH, event: { event: { case: "gh" as const, value: e } } };
 }
 
-/** view.pullrequests in the mock registry (view.open.url is in mock/gitops.ts, like 3c). */
+/** view.dashboard, view.pullrequests and view.projects in the mock registry (view.open.url is in mock/gitops.ts, like 3c). */
 export function viewCommands(emit: (intent: IntentInit) => number) {
   return [
+    {
+      cmd: { name: "view.dashboard", title: "Show Dashboard", category: "View", description: "Show the dashboard.", keybindings: [], args: [] },
+      when: () => true,
+      run: () => {
+        emit({ intent: { case: "showView", value: { name: "dashboard" } } });
+        return ""; // like the daemon: no toast
+      },
+    },
     {
       cmd: { name: "view.pullrequests", title: "Show Pull Requests", category: "View", description: "Show the Pull Requests page", keybindings: ["cmd+shift+d"], args: [] },
       when: () => true,

@@ -6,6 +6,10 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
+// ViewDashboard is the ShowView name of the dashboard: the start page, and what the
+// GUI selects when it loads.
+const ViewDashboard = "dashboard"
+
 // ViewPullRequests is the ShowView name of the Pull Requests page.
 const ViewPullRequests = "pullrequests"
 
@@ -53,13 +57,13 @@ func hasWorkspaceThreadContext(c Context) bool {
 // hasWorktreeThreadContext is view.panel.worktree's availability: a thread or a terminal
 // is active and it sits in a registered worktree (the GUI passes the placement as
 // ActiveRepoID and ActiveWorktreePath; the CLI with --context-session or
-// --context-terminal plus --context-repo and --context-worktree). A worktree or repo
-// page has the overview as its content already, so it is left out.
+// --context-terminal plus --context-repo and --context-worktree).
 func hasWorktreeThreadContext(c Context) bool {
 	return (hasSession(c) || hasTerminal(c)) && hasWorktree(c)
 }
 
-// RegisterView registers view.pullrequests, which shows the Pull Requests page,
+// RegisterView registers view.dashboard, which shows the dashboard,
+// view.pullrequests, which shows the Pull Requests page,
 // view.projects, which shows the Projects page, view.panel.toggle, which shows or hides
 // the side panel, view.panel.expand, which switches it between split and full width, and
 // view.panel.workspace, which opens the workspace surface in it,
@@ -74,6 +78,16 @@ func RegisterView(r *Registry, e Emitter) error {
 		return Result{JSON: EmitResult{Delivered: n}}
 	}
 	return r.RegisterAll(
+		Command{
+			Name:        "view.dashboard",
+			Title:       "Show Dashboard",
+			Description: "Show the dashboard.",
+			Category:    "View",
+			// No default chord; bindable in settings.
+			Run: func(context.Context, Context, Args) (Result, error) {
+				return show(ViewDashboard), nil
+			},
+		},
 		Command{
 			Name:        "view.pullrequests",
 			Title:       "Show Pull Requests",

@@ -32,6 +32,7 @@ function entry(open: boolean, tabs: PanelEntry["tabs"], activeTabId: string | nu
 describe("keyOf", () => {
   const cases: [string, Selection, string | null][] = [
     ["none has no panel", { kind: "none" }, null],
+    ["the dashboard has no panel", { kind: "view", name: "dashboard" }, null],
     ["session", { kind: "session", id: "s-1" }, "session:s-1"],
     ["terminal", { kind: "terminal", id: "t-1" }, "terminal:t-1"],
     ["composer", { kind: "compose", repoId: "r-1" }, "compose:r-1"],

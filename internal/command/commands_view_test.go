@@ -12,6 +12,7 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 	tests := []struct {
 		command, view string
 	}{
+		{command: "view.dashboard", view: command.ViewDashboard},
 		{command: "view.pullrequests", view: command.ViewPullRequests},
 		{command: "view.projects", view: command.ViewProjects},
 		{command: "view.panel.toggle", view: command.ViewPanelToggle},

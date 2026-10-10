@@ -6,6 +6,10 @@ proto changes, no daemon restart.
 
 ## What changed
 
+> Superseded by `sidebar-toolbar.md`: the band now holds only the gutter and the name (16px);
+> the attention badge, New thread and Add project moved to a toolbar row below it, and the
+> name is no longer measured.
+
 * **The app name replaces the section label.** `SidebarBand` (components/sidebar/Sidebar.tsx)
   shows "Code Foundry" as a `span` (`sidebar-app-name`): 13px, semibold, `leading-none`,
   `tracking-tight`, `text-sidebar-foreground` (as SidebarRow), `select-none`, truncating.

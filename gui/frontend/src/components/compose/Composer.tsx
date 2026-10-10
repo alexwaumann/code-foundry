@@ -47,7 +47,7 @@ import {
 import { requestConfirm } from "@/stores/confirm";
 import { useReposStore } from "@/stores/repos";
 import { useSettingValue } from "@/stores/settings";
-import { useUiStore } from "@/stores/ui";
+import { DASHBOARD, useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
 const SEP = "\u0001";
@@ -454,8 +454,10 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
             onSubmit={send}
             onEscape={() => {
               if (!isDraftEmpty(getDraft(draftKey))) return false;
-              // Back to the Projects page, where the composer is reached from.
-              useUiStore.getState().select({ kind: "view", name: "projects" });
+              // Back to the Projects page (the worktree overview is a panel tab there,
+              // not a page); the dashboard when the composer has no project at all.
+              const back = target.kind === "project" ? target.repoId : primary;
+              useUiStore.getState().select(back ? { kind: "view", name: "projects" } : DASHBOARD);
               return true;
             }}
             onPasteFiles={attach}

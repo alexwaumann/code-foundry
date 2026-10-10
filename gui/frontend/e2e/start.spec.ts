@@ -17,6 +17,9 @@ test("onboarding: no projects shows the welcome and Add a project", async ({ pag
   await page.goto(appPath);
   await expect(start(page)).toHaveAttribute("data-state", "onboarding");
   await expect(page.getByTestId("start-heading")).toHaveText("Welcome to Code Foundry");
+  // The sidebar's thread list is simply empty: no placeholder text.
+  await expect(page.getByTestId("thread-list")).toHaveText("");
+  await expect(page.getByTestId("thread-list-empty")).toHaveCount(0);
   await expect(page.getByTestId("onboarding-steps")).toHaveCount(0);
   await expect(page.getByTestId("backdrop")).toHaveCount(1);
 
