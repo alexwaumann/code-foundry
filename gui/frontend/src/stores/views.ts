@@ -7,6 +7,7 @@
 import { create } from "zustand";
 import { expandPanel, getPanel, togglePanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
+import { openWorkspaceSurface } from "./workspacePanel";
 
 interface ViewsState {
   settingsOpen: boolean;
@@ -31,6 +32,10 @@ export function showView(name: string): boolean {
     case "panel.expand":
       // view.panel.expand: like panel.toggle, an action on the current selection's panel.
       expandPanelCommand();
+      return true;
+    case "panel.workspace":
+      // view.panel.workspace: the workspace surface in the current workspace thread's panel.
+      workspacePanelCommand();
       return true;
     default:
       // Top-level pages (the Pull Requests page) are selections. Closing settings here
@@ -87,6 +92,25 @@ export function expandPanelCommand(): boolean {
   const expanded = expandPanel("current", getPanel().open ? undefined : true, { focus: fromContent && !inPalette });
   if (inPalette && expanded && fromContent) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
   return expanded;
+}
+
+/**
+ * view.panel.workspace for the current selection: opens (or activates) the workspace
+ * surface's tab in the selected workspace thread's panel and shows the panel. A no-op
+ * while the settings page is up and when the selection is no workspace thread (a window
+ * reached through the CLI's ShowView may have anything selected).
+ *
+ * Focus moves to the panel, like toggling it on; with the palette open, its return target
+ * moves there instead.
+ */
+export function workspacePanelCommand(): boolean {
+  if (useViewsStore.getState().settingsOpen) return false;
+  const key = openWorkspaceSurface();
+  if (key === null) return false;
+  const inPalette = useUiStore.getState().palette.open;
+  togglePanel(key, true, { focus: !inPalette });
+  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
+  return true;
 }
 
 export function closeSettings(): void {

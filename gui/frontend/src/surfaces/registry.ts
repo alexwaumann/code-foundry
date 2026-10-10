@@ -9,13 +9,15 @@ import { diffSurface } from "./diff";
 import { filesSurface } from "./files";
 import { pullRequestSurface } from "./pullrequest";
 import type { SurfaceAvailability, SurfaceContext, SurfaceSpec } from "./types";
+import { workspaceSurface } from "./workspace";
+import { worktreeSurface } from "./worktree";
 
 export type { Subscribable, SurfaceAvailability, SurfaceContext, SurfaceSpec } from "./types";
 
-export const surfaces: readonly SurfaceSpec[] = [filesSurface, diffSurface, pullRequestSurface];
+export const surfaces: readonly SurfaceSpec[] = [filesSurface, diffSurface, pullRequestSurface, workspaceSurface, worktreeSurface];
 
 const byKind = new Map<SurfaceKind, SurfaceSpec>(surfaces.map((s) => [s.kind, s]));
-const byHotkey = new Map<string, SurfaceSpec>(surfaces.map((s) => [s.hotkey.toLowerCase(), s]));
+const byHotkey = new Map<string, SurfaceSpec>(surfaces.flatMap((s) => (s.hotkey ? [[s.hotkey.toLowerCase(), s] as const] : [])));
 
 export function surfaceOf(kind: SurfaceKind): SurfaceSpec | undefined {
   return byKind.get(kind);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addableRepos, memberKey, pageItems, projectKey, projectsModel, projectWorktreeKey, repoRef, workspaceKey, type ProjectsRepos, type ProjectsWorkspaces } from "./projects";
+import { addableRepos, memberKey, pageItems, projectKey, projectsModel, projectWorktreeKey, repoRef, threadAt, workspaceKey, type ProjectsRepos, type ProjectsWorkspaces } from "./projects";
 
 const repos: ProjectsRepos = {
   order: ["api", "dot", "web"],
@@ -75,5 +75,21 @@ describe("addableRepos and repoRef", () => {
     // Once the other is renamed, the name is unique again.
     expect(repoRef({ ...repos, byId: { ...repos.byId, web: { id: "web", name: "site", worktrees: [] } } }, "dot")).toBe("web");
     expect(repoRef(repos, "nope")).toBe("nope");
+  });
+});
+
+describe("threadAt (the workspace surface's member markers)", () => {
+  const API = "/wt/api/cf-demo";
+  const WEB = "/wt/web/cf-demo";
+  it.each<[string, { worktreePath: string; pendingWorktreePath: string } | undefined, string, "current" | "queued" | null]>([
+    ["the thread's cwd is the member", { worktreePath: API, pendingWorktreePath: "" }, API, "current"],
+    ["a cwd inside the member counts", { worktreePath: `${API}/internal`, pendingWorktreePath: "" }, API, "current"],
+    ["a sibling path with the same prefix does not", { worktreePath: `${API}-old`, pendingWorktreePath: "" }, API, null],
+    ["another member", { worktreePath: WEB, pendingWorktreePath: "" }, API, null],
+    ["a queued Run in marks its target", { worktreePath: WEB, pendingWorktreePath: API }, API, "queued"],
+    ["the source of a queued move is still current", { worktreePath: WEB, pendingWorktreePath: API }, WEB, "current"],
+    ["no thread (the Projects page)", undefined, API, null],
+  ])("%s", (_name, thread, member, want) => {
+    expect(threadAt(thread, member)).toBe(want);
   });
 });
