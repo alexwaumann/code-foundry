@@ -18,6 +18,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
+	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
 // terminalWatchBuffer matches terminal.Manager.Watch's per-topic bus buffer.
@@ -34,6 +35,8 @@ type EventsDeps struct {
 	GitOps   gitops.Store
 	Settings settings.Service
 	Update   update.Service
+	// Workspace is the workspace store (branch sets).
+	Workspace workspace.Store
 	// Done ends every stream when closed (daemon shutdown). May be nil.
 	Done <-chan struct{}
 }
@@ -71,13 +74,16 @@ type eventSource interface {
 }
 
 // sources lists the stream's sources in the order their snapshots are sent (see
-// events.proto: repo, terminal, session, gh, gitops, settings, update), followed by UI
-// intents.
+// events.proto: repo, workspace, terminal, session, gh, gitops, settings, update),
+// followed by UI intents.
 func (h *Events) sources() []eventSource {
 	d := h.deps
 	var out []eventSource
 	if d.Repo != nil {
 		out = append(out, repoSource{store: d.Repo, bus: d.Bus})
+	}
+	if d.Workspace != nil {
+		out = append(out, workspaceSource{store: d.Workspace, bus: d.Bus})
 	}
 	if d.Terminal != nil {
 		out = append(out, &terminalSource{store: d.Terminal, bus: d.Bus, known: map[string]bool{}})
@@ -260,6 +266,32 @@ func (s repoSource) snapshot(context.Context) []*v1.Event {
 	return []*v1.Event{{Event: &v1.Event_Repo{Repo: &v1.RepoEvent{Event: &v1.RepoEvent_Snapshot{
 		Snapshot: &v1.RepoSnapshot{Repos: reposToProto(s.store.Snapshot().Repos)},
 	}}}}}
+}
+
+// ---- workspace -----------------------------------------------------------------
+
+// workspaceSource reuses WorkspaceService's mapping (api/workspace.go). The store
+// publishes one bus type, workspace.Event; its snapshot is a WorkspaceEvent.snapshot.
+type workspaceSource struct {
+	store workspace.Store
+	bus   *bus.Bus
+}
+
+func (workspaceSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_WORKSPACE }
+
+func workspaceWrap(ev workspace.Event) *v1.Event {
+	if m := workspaceEventToProto(ev); m != nil {
+		return &v1.Event{Event: &v1.Event_Workspace{Workspace: m}}
+	}
+	return nil
+}
+
+func (s workspaceSource) subscribe(ctx context.Context) <-chan *v1.Event {
+	return fanIn(ctx, newTap(s.bus, watchBuffer, workspaceWrap))
+}
+
+func (s workspaceSource) snapshot(context.Context) []*v1.Event {
+	return []*v1.Event{workspaceWrap(s.store.Snapshot())}
 }
 
 // ---- terminal ------------------------------------------------------------------

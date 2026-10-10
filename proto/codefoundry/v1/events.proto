@@ -10,6 +10,7 @@ import "codefoundry/v1/settings.proto";
 import "codefoundry/v1/terminal.proto";
 import "codefoundry/v1/ui.proto";
 import "codefoundry/v1/update.proto";
+import "codefoundry/v1/workspace.proto";
 
 // EventService multiplexes every store's Watch stream and UI intents onto one server
 // stream. Browsers reach the daemon over HTTP/1.1 with a 6-connection-per-origin limit,
@@ -17,8 +18,8 @@ import "codefoundry/v1/update.proto";
 // Watch RPCs remain for the CLI and tests.
 service EventService {
   // Watch streams all events. Each store's snapshot event is sent first, in the order
-  // repo, terminal, session, gh, gitops, settings, update, so a client can replace its
-  // state wholesale on connect.
+  // repo, workspace, terminal, session, gh, gitops, settings, update, so a client can
+  // replace its state wholesale on connect.
   rpc Watch(WatchEventsRequest) returns (stream Event) {}
 }
 
@@ -40,6 +41,9 @@ enum EventSource {
   // Phase 3d. Numbered 10 to stay clear of the parallel Phase 3 steps. Sent after
   // settings, before UI intents.
   EVENT_SOURCE_UPDATE = 10;
+  // Workspaces (branch sets). Sent right after repo, before terminal: members name
+  // repositories, and sessions name workspaces.
+  EVENT_SOURCE_WORKSPACE = 11;
 }
 
 message Event {
@@ -53,5 +57,7 @@ message Event {
     SettingsEvent settings = 7;
     // Update status (snapshot: the current status) and relaunch requests.
     UpdateEvent update = 10;
+    // Workspaces: a snapshot, then updated / removed_id.
+    WorkspaceEvent workspace = 11;
   }
 }

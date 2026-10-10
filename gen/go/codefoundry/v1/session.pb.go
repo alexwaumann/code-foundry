@@ -626,10 +626,10 @@ func (x *NewWorktree) GetBaseRef() string {
 type NewWorkspace struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Repositories (id, name when unique, or an absolute path inside one), in member
-	// order. At least one.
+	// order. At least one. "<repo>:<base ref>" gives that member its own base.
 	Repos []string `protobuf:"bytes,1,rep,name=repos,proto3" json:"repos,omitempty"`
-	// Ref every member branches from. Defaults to origin/<default branch>, else
-	// <default branch>, per repository.
+	// Ref every member without its own base branches from. Defaults to
+	// origin/<default branch>, else <default branch>, per repository.
 	BaseRef string `protobuf:"bytes,2,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
 	// Workspace name. Default: the slug (cf/<slug> without the prefix).
 	Name          string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`

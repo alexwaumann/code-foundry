@@ -28,6 +28,8 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
+	"github.com/alexwaumann/code-foundry/internal/store/workspace"
+	"github.com/alexwaumann/code-foundry/internal/store/workspace/workspacetest"
 )
 
 type eventsFixture struct {
@@ -39,6 +41,7 @@ type eventsFixture struct {
 	gitops *gitopstest.Fake
 	set    *settingstest.Fake
 	update *update.Store
+	ws     *workspacetest.Fake
 	done   chan struct{}
 	client codefoundryv1connect.EventServiceClient
 }
@@ -54,8 +57,8 @@ func newEventsFixture(t *testing.T) *eventsFixture {
 	// A disabled updater: its snapshot is the status and it never checks.
 	upd := update.Start(context.Background(), update.Options{Current: "dev", DisabledReason: "dev build", Bus: b, InitialDelay: time.Hour})
 	t.Cleanup(upd.Close)
-	f := &eventsFixture{bus: b, repo: repotest.New(b), term: terminaltest.New(b), sess: sessiontest.New(b), gh: ghtest.New(b), gitops: gitopstest.New(b), set: set, update: upd, done: make(chan struct{})}
-	route := NewEvents(EventsDeps{Bus: b, Repo: f.repo, Terminal: f.term, Session: f.sess, Gh: f.gh, GitOps: f.gitops, Settings: f.set, Update: f.update, Done: f.done}).Route()
+	f := &eventsFixture{bus: b, repo: repotest.New(b), term: terminaltest.New(b), sess: sessiontest.New(b), gh: ghtest.New(b), gitops: gitopstest.New(b), set: set, update: upd, ws: workspacetest.New(b), done: make(chan struct{})}
+	route := NewEvents(EventsDeps{Bus: b, Repo: f.repo, Terminal: f.term, Session: f.sess, Gh: f.gh, GitOps: f.gitops, Settings: f.set, Update: f.update, Workspace: f.ws, Done: f.done}).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
 	// HTTP/2 like the repo drop test: flow-control windows bound how much the handler
@@ -106,6 +109,17 @@ func describe(ev *v1.Event) string {
 			return "repo.detail " + r.WorktreeDetailUpdated.GetPath()
 		default:
 			return "repo.other"
+		}
+	case *v1.Event_Workspace:
+		switch w := e.Workspace.GetEvent().(type) {
+		case *v1.WorkspaceEvent_Snapshot:
+			return fmt.Sprintf("workspace.snapshot(%d)", len(w.Snapshot.GetWorkspaces()))
+		case *v1.WorkspaceEvent_Updated:
+			return "workspace.updated " + w.Updated.GetName()
+		case *v1.WorkspaceEvent_RemovedId:
+			return "workspace.removed " + w.RemovedId
+		default:
+			return "workspace.other"
 		}
 	case *v1.Event_Terminal:
 		if u := e.Terminal.GetUpdated(); u != nil {
@@ -180,10 +194,12 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	f.gh.SetRepo(gh.RepoState{Slug: "o/b"})
 	f.gh.SetRepo(gh.RepoState{Slug: "o/a"})
 	f.gitops.Put(gitops.Op{ID: "op-0", Kind: gitops.KindFetch, State: gitops.StateRunning})
+	f.ws.Put(workspace.Workspace{ID: "w-1", Name: "login", Branch: "cf/login", Members: []workspace.Member{{RepoID: "a", WorktreePath: "/wt/a"}}})
 
 	s := f.watch(t, ctx)
 	want := []string{
 		"repo.snapshot(1)",
+		"workspace.snapshot(1)",
 		"terminal.updated " + t1.ID,
 		"terminal.updated " + t2.ID,
 		"session.snapshot(1)",
@@ -206,6 +222,16 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	_, _ = f.repo.Register(ctx, "/code/b")
 	if got := describe(s.next()); got != "repo.updated b" {
 		t.Fatalf("got %q, want repo.updated b", got)
+	}
+	f.ws.Put(workspace.Workspace{ID: "w-2", Name: "billing", Branch: "cf/billing"})
+	if got := describe(s.next()); got != "workspace.updated billing" {
+		t.Fatalf("got %q, want workspace.updated billing", got)
+	}
+	if err := f.ws.Remove(ctx, workspace.RemoveOptions{Workspace: "w-2"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := describe(s.next()); got != "workspace.removed w-2" {
+		t.Fatalf("got %q, want workspace.removed w-2", got)
 	}
 	_ = f.term.Exit(t1.ID, 0)
 	if got := describe(s.next()); got != "terminal.updated "+t1.ID {
@@ -274,6 +300,7 @@ func TestEventsSourceFilter(t *testing.T) {
 		{"gitops only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_GITOPS}, "gitops.snapshot(0)"},
 		{"settings only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_SETTINGS}, "settings.snapshot(1)"},
 		{"update only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_UPDATE}, "update.status UPDATE_STATE_IDLE"},
+		{"workspace only", []v1.EventSource{v1.EventSource_EVENT_SOURCE_WORKSPACE}, "workspace.snapshot(0)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
