@@ -140,6 +140,7 @@ function SidebarList() {
   };
 
   const activeRow = rows[cursorIndex];
+  const emptyText = unavailable ? "Threads are unavailable on this daemon." : loaded ? null : streamError ? `Cannot list threads: ${streamError}. Retrying…` : "Loading…";
   return (
     <ContextMenu
       modal={false}
@@ -161,15 +162,12 @@ function SidebarList() {
           onContextMenu={onContextMenu}
         >
           {rows.length === 0 ? (
-            <p className="px-3 py-4 text-xs break-words text-muted-foreground" data-testid="thread-list-empty">
-              {unavailable
-                ? "Threads are unavailable on this daemon."
-                : loaded
-                  ? "No threads yet. Start one with New thread; projects and their worktrees are on the Projects page."
-                  : streamError
-                    ? `Cannot list threads: ${streamError}. Retrying…`
-                    : "Loading…"}
-            </p>
+            // No threads (once loaded): the list is simply empty.
+            emptyText !== null && (
+              <p className="px-3 py-4 text-xs break-words text-muted-foreground" data-testid="thread-list-empty">
+                {emptyText}
+              </p>
+            )
           ) : (
             <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
               {virtualizer.getVirtualItems().map((vi) => {
