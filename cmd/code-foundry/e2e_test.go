@@ -95,7 +95,6 @@ func TestCLIAgainstDaemon(t *testing.T) {
 		{"repo add prints the CLI hint", []string{"repo", "add"}, nil, "code-foundry repo add <folder>", ""},
 		{"repo add resolves a relative folder against the working directory", []string{"repo", "add", "rel"}, errUsage, "",
 			"code-foundry repo.add: invalid argument: /work/rel: lstat /work: no such file or directory"},
-		{"repo register is gone", []string{"repo", "register", "--path", "/x"}, errUsage, "", `unknown command "repo register"`},
 		{"repo clone refuses ssh before the daemon runs gh", []string{"repo", "clone", "git@github.com:o/r.git"}, errUsage, "",
 			"code-foundry repo.clone: invalid argument: SSH URLs are not supported"},
 		{"repo clone needs a repo", []string{"repo", "clone"}, errUsage, "", "no repository given"},

@@ -1,5 +1,7 @@
 # Pull request sessions: pr.ask, pr.explain, pr.fix.findings
 
+> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
+
 Three registry commands that start a Claude session about a pull request. They are
 modeled on T3 Code's PR actions, except that the session starts at once. Each command
 reads the pull request, picks a worktree (pr.fix.findings may create one), starts a

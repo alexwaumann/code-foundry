@@ -1,5 +1,7 @@
 # gh store: in-process HTTP transport
 
+> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
+
 Status: done on branch `t3code/review-gh-git-diff-services`. `make check` is green. The
 change was exercised end to end with scratch daemons (`CODE_FOUNDRY_HOME=$(mktemp -d)`):
 one logged in as `alexwaumann`, and one started with `GH_TOKEN=bogus`.

@@ -1,5 +1,7 @@
 # Phase 3a: Pull Requests page and worktree overview
 
+> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
+
 > **Polling superseded** by `gh-viewer-polling.md`: the three searches, stats, default-branch
 > CI, and branch PRs below are now parts of one fingerprint poll per interval, with
 > details fetched only for what changed. The page and overview behave as described.

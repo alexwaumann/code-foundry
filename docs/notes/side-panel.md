@@ -1,5 +1,7 @@
 # Side panel ("surface panel")
 
+> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
+
 A second pane right of the content pane, modeled on T3 Code's right panel. Each
 selection has its own panel. Later chunks add surfaces (the Pull request surface first)
 and extend this note.

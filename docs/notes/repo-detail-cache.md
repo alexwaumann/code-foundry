@@ -1,5 +1,7 @@
 # Repo detail cache: reuse HEAD-only git results
 
+> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
+
 Status: done. `make check` is green. Verified end to end against a scratch daemon
 (`CODE_FOUNDRY_HOME` in a temp dir) with a scratch repo and a bare origin.
 
