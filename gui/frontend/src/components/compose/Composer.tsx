@@ -16,8 +16,10 @@ import {
   draftMembers,
   EFFORT_CHOICES,
   MODEL_CHOICES,
+  NEW_BRANCH,
   PERMISSION_CHOICES,
   pickDefault,
+  projectChipBranch,
   type ComposePermission,
   type ComposeTarget,
   type WorktreeChoice,
@@ -96,8 +98,6 @@ function phaseText(phase: DraftPhase, newWorktrees: number): string {
   return newWorktrees === 1 ? "Creating worktree…" : "Starting Claude…";
 }
 
-const NEW_BRANCH = "cf/…";
-
 /** A workspace's members (repo id + worktree path), shallow-stable. */
 function useWorkspaceMembers(workspaceId: string | null): { repoId: string; worktreePath: string }[] {
   const keys = useWorkspacesStore(useShallow((s) => (workspaceId ? (s.byId[workspaceId]?.members ?? []).map((m) => m.repoId + SEP + m.worktreePath) : [])));
@@ -141,8 +141,19 @@ function useMembers(target: ComposeTarget, key: string) {
   }, [target, alsoIn, primaryChoice, known, wsMembers]);
 }
 
-/** A workspace member's chip: the branch its worktree has checked out (else the workspace branch). */
-function useMemberChips(target: ComposeTarget, repoIds: readonly string[], wsMembers: readonly { repoId: string; worktreePath: string }[], newWorktrees: boolean): MemberChipModel[] {
+/**
+ * The member chips. A workspace member's: the branch its worktree has checked out (else the
+ * workspace branch), "cf/…" in new-worktree mode. A project's: `projectChip`
+ * (projectChipBranch), the same for every project of the draft (with Also in projects the
+ * mode is always new worktrees).
+ */
+function useMemberChips(
+  target: ComposeTarget,
+  repoIds: readonly string[],
+  wsMembers: readonly { repoId: string; worktreePath: string }[],
+  newWorktrees: boolean,
+  projectChip: { branch: string; noGit: boolean },
+): MemberChipModel[] {
   const wsId = target.kind === "workspace" ? target.workspaceId : "";
   const branches = useReposStore(
     useShallow((s) =>
@@ -156,11 +167,11 @@ function useMemberChips(target: ComposeTarget, repoIds: readonly string[], wsMem
   return useMemo(
     () =>
       repoIds.map((repoId, i) => {
-        if (target.kind === "project") return { repoId, branch: NEW_BRANCH, removable: i > 0 };
+        if (target.kind === "project") return { repoId, branch: projectChip.branch, noGit: projectChip.noGit, removable: i > 0 };
         const j = wsMembers.findIndex((m) => m.repoId === repoId);
         return { repoId, branch: newWorktrees ? NEW_BRANCH : branches[j] || wsBranch, removable: false };
       }),
-    [target, repoIds, wsMembers, branches, wsBranch, newWorktrees],
+    [target, repoIds, wsMembers, branches, wsBranch, newWorktrees, projectChip.branch, projectChip.noGit],
   );
 }
 
@@ -303,7 +314,6 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
           ? { kind: "new" }
           : resolveWorktree(choice, worktrees);
   const newWorktrees = worktree.kind !== "new" ? 0 : target.kind === "workspace" || multi ? repoIds.length : 1;
-  const chips = useMemberChips(target, repoIds, wsMembers, worktree.kind === "new");
   const base = baseChoice ?? defaultRef;
   const canSend = !busy && (text.trim() !== "" || hasAttachments);
 
@@ -365,6 +375,13 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
     ];
   }, [target.kind, multi, wsBranch, projects, worktrees, noGitPath]);
   const chosen = worktree.kind === "existing" ? worktrees.find((w) => w.path === worktree.path) : undefined;
+  const chips = useMemberChips(
+    target,
+    repoIds,
+    wsMembers,
+    worktree.kind === "new",
+    projectChipBranch({ noGit: noGitPath !== undefined, newWorktree: worktree.kind === "new", checkout: chosen }),
+  );
   const worktreeText =
     noGitPath !== undefined
       ? "Current checkout"

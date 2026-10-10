@@ -8,6 +8,7 @@ import {
   isWorkspaceKey,
   pickDefault,
   MODEL_CHOICES,
+  projectChipBranch,
   projectHue,
   projectInitials,
   repoSource,
@@ -160,6 +161,19 @@ describe("checkoutBranch", () => {
     [{ branch: "", head: "", detached: true, isMain: false }, "Detached HEAD", "Worktree has a detached HEAD"],
   ])("checkoutBranch(%j)", (w, text, label) => {
     expect(checkoutBranch(w)).toEqual({ text, label });
+  });
+});
+
+describe("projectChipBranch", () => {
+  it.each<[string, Parameters<typeof projectChipBranch>[0], ReturnType<typeof projectChipBranch>]>([
+    ["a project without git: no branch, the badge", { noGit: true, newWorktree: false, checkout: { branch: "", head: "" } }, { branch: "", noGit: true }],
+    ["without git, even if a draft asked for a new worktree", { noGit: true, newWorktree: true }, { branch: "", noGit: true }],
+    ["a new worktree: the cf/… placeholder", { noGit: false, newWorktree: true, checkout: { branch: "main", head: "3c3c4651" } }, { branch: "cf/…", noGit: false }],
+    ["the current checkout: its branch", { noGit: false, newWorktree: false, checkout: { branch: "main", head: "3c3c4651" } }, { branch: "main", noGit: false }],
+    ["an existing worktree, detached: its short head", { noGit: false, newWorktree: false, checkout: { branch: "", head: "9a8b7c6d5e" } }, { branch: "9a8b7c6", noGit: false }],
+    ["an existing checkout not known yet", { noGit: false, newWorktree: false }, { branch: "", noGit: false }],
+  ])("%s", (_name, p, want) => {
+    expect(projectChipBranch(p)).toEqual(want);
   });
 });
 

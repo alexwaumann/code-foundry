@@ -155,6 +155,20 @@ export function threadPlace(d: PlaceInput, env: PlaceEnv): ThreadPlace | null {
   return { kind: "workspace", workspaceId: env.workspace.id, repoId: primary, worktreePath: member.worktreePath };
 }
 
+/** The branch placeholder a new cf/<slug> worktree shows before its name exists. */
+export const NEW_BRANCH = "cf/…";
+
+/**
+ * What a project's member chip shows in its branch slot: nothing (and the No git badge)
+ * for a project without git, "cf/…" for a new worktree, else the chosen checkout's
+ * branch (its short head when detached; "" when it is not known).
+ */
+export function projectChipBranch(p: { noGit: boolean; newWorktree: boolean; checkout?: { branch: string; head: string } }): { branch: string; noGit: boolean } {
+  if (p.noGit) return { branch: "", noGit: true };
+  if (p.newWorktree) return { branch: NEW_BRANCH, noGit: false };
+  return { branch: p.checkout ? p.checkout.branch || p.checkout.head.slice(0, 7) : "", noGit: false };
+}
+
 /**
  * The read-only branch indicator for an existing worktree or the current checkout:
  * `text` for the pill ("On main", "Detached at 3c3c465") and `label` for assistive tech
