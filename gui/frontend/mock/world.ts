@@ -11,6 +11,7 @@ import type { RepoEventSchema, RepoSchema, WorktreeSchema } from "../src/gen/cod
 import { PermissionMode, SessionState, SessionStatus, type SessionEventSchema, type SessionSchema } from "../src/gen/codefoundry/v1/session_pb";
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
+import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefoundry/v1/workspace_pb";
 import { MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
 import { prDetailCall } from "./prDetail";
 import { GhWorld, ghEvent, viewCommands } from "./github";
@@ -28,6 +29,17 @@ type RepoEventInit = MessageInitShape<typeof RepoEventSchema>;
 type SessionInit = MessageInitShape<typeof SessionSchema>;
 type SessionEventInit = MessageInitShape<typeof SessionEventSchema>;
 export type EventInit = MessageInitShape<typeof EventSchema>;
+type WorkspaceInit = MessageInitShape<typeof WorkspaceSchema>;
+type WorkspaceEventInit = MessageInitShape<typeof WorkspaceEventSchema>;
+
+/** A workspace: one branch as a worktree in several repos (the daemon's workspace store). */
+export interface MockWorkspace {
+  id: string;
+  name: string;
+  branch: string;
+  members: { repoId: string; worktreePath: string }[];
+  createdAt: Date;
+}
 
 interface MockSession {
   id: string;
@@ -48,6 +60,8 @@ interface MockSession {
   permissionMode: PermissionMode;
   baseRef: string;
   createdWorktree: boolean;
+  /** The owning workspace; "" for a project thread. */
+  workspaceId: string;
   /** Mock-only: seconds left before a STARTING/CLOSING session settles. */
   settleIn: number;
   /** Mock-only: seconds until an unnamed session gets `pendingName` (background naming). */
@@ -232,10 +246,12 @@ export class World {
   terms = new Map<string, MockTerm>();
   repos = new Map<string, MockRepo>();
   sessions = new Map<string, MockSession>();
+  workspaces = new Map<string, MockWorkspace>();
   /** EventService: every hub below tees into this one, so its order is publish order. */
   readonly events = new Hub<{ source: EventSource; event: EventInit }>();
   readonly termEvents = new Hub<TerminalEventInit>((v) => this.events.publish({ source: EventSource.TERMINAL, event: { event: { case: "terminal", value: v } } }));
   readonly repoEvents = new Hub<RepoEventInit>((v) => this.events.publish({ source: EventSource.REPO, event: { event: { case: "repo", value: v } } }));
+  readonly workspaceEvents = new Hub<WorkspaceEventInit>((v) => this.events.publish({ source: EventSource.WORKSPACE, event: { event: { case: "workspace", value: v } } }));
   readonly sessionEvents = new Hub<SessionEventInit>((v) => this.events.publish({ source: EventSource.SESSION, event: { event: { case: "session", value: v } } }));
   readonly intents = new Hub<UiIntentInit>((v) => this.events.publish({ source: EventSource.UI, event: { event: { case: "ui", value: v } } }));
   readonly gitopsEvents = new Hub<GitOpsEventInit>((v) => this.events.publish({ source: EventSource.GITOPS, event: { event: { case: "gitops", value: v } } }));
@@ -278,6 +294,7 @@ export class World {
     for (const t of this.terms.values()) t.attach.publish("end");
     this.terms.clear();
     this.repos.clear();
+    this.workspaces.clear();
     this.invocations = [];
     this.attachments.clear();
     this.worktreeDelayMs = 700;
@@ -308,8 +325,71 @@ export class World {
     // Republish so connected watchers converge on the reset state.
     for (const t of this.terms.values()) this.termEvents.publish({ event: { case: "updated", value: this.terminalMsg(t) } });
     for (const r of this.repos.values()) this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(r) } });
+    this.workspaceEvents.publish(this.workspaceSnapshot());
     this.sessionEvents.publish(this.sessionSnapshot());
     this.update.reset();
+  }
+
+  // ---- Workspaces ---------------------------------------------------------------
+
+  workspaceMsg(w: MockWorkspace): WorkspaceInit {
+    return { id: w.id, name: w.name, branch: w.branch, members: w.members.map((m) => ({ ...m })), createdAt: timestampFromDate(w.createdAt) };
+  }
+
+  workspaceSnapshot(): WorkspaceEventInit {
+    const list = [...this.workspaces.values()].sort((a, b) => a.name.localeCompare(b.name));
+    return { event: { case: "snapshot", value: { workspaces: list.map((w) => this.workspaceMsg(w)) } } };
+  }
+
+  /** A repo by id or (unique) name, like the daemon's repo refs. */
+  private repoRef(ref: string): MockRepo {
+    const r = this.repos.get(ref) ?? [...this.repos.values()].find((x) => x.name === ref);
+    if (!r) throw new CommandError("notfound", `repository ${ref} not found`);
+    return r;
+  }
+
+  /** A new worktree on `branch` in `repo` (published), where the daemon would put it. */
+  private addWorktree(repo: MockRepo, branch: string, baseRef: string): MockWorktree {
+    const w: MockWorktree = {
+      path: `${HOME}/.code-foundry/worktrees/${repo.githubSlug || `_local/${repo.name}`}/${branch.replace(/\//g, "-")}`,
+      branch,
+      head: "c0ffee00",
+      isMain: false,
+      status: clean({ upstream: "", baseRef }),
+    };
+    repo.worktrees.push(w);
+    this.repoEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(repo.id, w) } });
+    return w;
+  }
+
+  /**
+   * workspace.new: a worktree on cf/<name> (or `branch`) in every repo ("<repo>[:<base>]"
+   * refs, by id or name), then the workspace. Test control: POST /__mock/workspace.
+   */
+  addWorkspace(name: string, refs: readonly string[], branch = `cf/${name}`): MockWorkspace {
+    if ([...this.workspaces.values()].some((w) => w.name === name)) throw new CommandError("unavailable", `a workspace named "${name}" exists`);
+    if (refs.length === 0) throw new CommandError("invalid", "a workspace needs at least one repository");
+    const specs = refs.map((ref) => {
+      const [id = "", base = ""] = ref.split(":");
+      const repo = this.repoRef(id.trim());
+      return { repo, base: base.trim() || (repo.remotes.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch) };
+    });
+    const w: MockWorkspace = {
+      id: `w-${String(this.workspaces.size + 1).padStart(12, "0")}`,
+      name,
+      branch,
+      members: specs.map(({ repo, base }) => ({ repoId: repo.id, worktreePath: this.addWorktree(repo, branch, base).path })),
+      createdAt: new Date(),
+    };
+    this.workspaces.set(w.id, w);
+    this.workspaceEvents.publish({ event: { case: "updated", value: this.workspaceMsg(w) } });
+    return w;
+  }
+
+  private workspaceRef(ref: string): MockWorkspace {
+    const w = this.workspaces.get(ref) ?? [...this.workspaces.values()].find((x) => x.name === ref);
+    if (!w) throw new CommandError("notfound", `workspace ${ref} not found`);
+    return w;
   }
 
   // ---- Sessions -----------------------------------------------------------------
@@ -331,6 +411,7 @@ export class World {
       permissionMode: PermissionMode.AUTO,
       baseRef: "",
       createdWorktree: false,
+      workspaceId: "",
       settleIn: 0,
       nameIn: 0,
       pendingName: "",
@@ -370,6 +451,7 @@ export class World {
       permissionMode: s.permissionMode,
       baseRef: s.baseRef,
       createdWorktree: s.createdWorktree,
+      workspaceId: s.workspaceId,
     };
   }
 
@@ -720,6 +802,7 @@ export class World {
    * fails the way a git error would, before any session exists.
    */
   private async newSession(ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> {
+    if (args.workspace || args.repos) return this.newWorkspaceSession(args);
     const repo = this.repos.get(args.repo || ctx?.activeRepoId || "") ?? this.worktreeOf(ctx)?.repo;
     if (!repo) throw new CommandError("invalid", "a worktree or repository is required");
     const prompt = args.prompt ?? "";
@@ -744,16 +827,7 @@ export class World {
         throw new CommandError("unavailable", repo.remotes.length > 0 ? `create worktree: git fetch origin ${baseRef.replace(/^origin\//, "")}: exit status 128` : `create worktree: git worktree add: invalid reference: ${baseRef}`);
       }
       const branch = `cf/${slug || `s-new-${String(this.nextId)}`}`;
-      const w: MockWorktree = {
-        path: `${HOME}/.code-foundry/worktrees/${repo.githubSlug || `_local/${repo.name}`}/${branch.replace(/\//g, "-")}`,
-        branch,
-        head: "c0ffee00",
-        isMain: false,
-        status: clean({ upstream: "", baseRef }),
-      };
-      repo.worktrees.push(w);
-      this.repoEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(repo.id, w) } });
-      path = w.path;
+      path = this.addWorktree(repo, branch, baseRef).path;
     } else {
       path ||= repo.worktrees.find((w) => w.isMain)?.path ?? repo.path;
       if (!repo.worktrees.some((w) => w.path === path)) throw new CommandError("invalid", `worktree ${path} is not in ${repo.name}`);
@@ -773,6 +847,65 @@ export class World {
     });
     this.focusSession(s.id);
     return { message: `created session ${s.id} in ${path}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path }) };
+  }
+
+  /**
+   * session.new with `workspace` (a thread owned by it, in the member `worktree` or
+   * `repo` names, else the first) or `repos` with new-worktree (a new workspace named
+   * from the prompt with cf/<slug> in every repo, the thread in `repo`'s member).
+   */
+  private async newWorkspaceSession(args: Record<string, string>): Promise<InvokeOut> {
+    const created = args["new-worktree"] === "true";
+    const prompt = args.prompt ?? "";
+    const permission = args.permission ?? "";
+    if (args.workspace && created) throw new CommandError("invalid", "a workspace thread runs in an existing member; for a new workspace use new-worktree with repos");
+    if (args.repos && !created) throw new CommandError("invalid", "repos only applies with new-worktree");
+    for (const p of (args.attachments ?? "").split(",").filter(Boolean)) {
+      if (!this.attachments.has(p)) throw new CommandError("invalid", `attachment ${p} was not staged`);
+    }
+    const gen = this.generation;
+    const settle = async (ms: number) => {
+      await sleep(ms);
+      if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while session.new ran");
+    };
+    const slug = promptSlug(prompt);
+    let ws: MockWorkspace;
+    let baseRef = "";
+    if (args.workspace) {
+      ws = this.workspaceRef(args.workspace);
+      await settle(150);
+      if (prompt.includes("FAIL")) throw new CommandError("unavailable", "start claude: exec: \"claude\": executable file not found in $PATH");
+    } else {
+      const refs = (args.repos ?? "").split(",").map((r) => r.trim()).filter(Boolean);
+      for (const ref of refs) this.repoRef(ref.split(":")[0] ?? "");
+      await settle(this.worktreeDelayMs);
+      if (prompt.includes("FAIL")) throw new CommandError("unavailable", "create workspace: git worktree add: invalid reference: origin/nope");
+      let name = slug || `s-new-${String(this.nextId)}`;
+      for (let i = 2; [...this.workspaces.values()].some((w) => w.name === name); i++) name = `${slug}-${String(i)}`;
+      ws = this.addWorkspace(name, refs);
+      const own = refs.find((r) => this.repoRef(r.split(":")[0] ?? "").id === (args.repo ? this.repoRef(args.repo).id : ws.members[0]?.repoId));
+      baseRef = own?.split(":")[1] ?? "";
+    }
+    const byPath = args.worktree ? ws.members.find((m) => m.worktreePath === args.worktree) : undefined;
+    if (args.worktree && !byPath) throw new CommandError("unavailable", `${args.worktree} is not a member worktree of workspace ${ws.name}`);
+    const repoId = args.repo ? this.repoRef(args.repo).id : "";
+    if (byPath && repoId && byPath.repoId !== repoId) throw new CommandError("invalid", `worktree ${byPath.worktreePath} belongs to repo ${byPath.repoId}, not ${repoId}`);
+    const member = byPath ?? (repoId ? ws.members.find((m) => m.repoId === repoId) : ws.members[0]);
+    if (!member) throw new CommandError("unavailable", `repo ${repoId} is not a member of workspace ${ws.name}`);
+    const repo = this.repoRef(member.repoId);
+    if (created && !baseRef) baseRef = repo.remotes.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch;
+    const s = this.createSession(member.repoId, member.worktreePath, args.model || "opus", args.effort ?? "", {
+      name: args.name ?? "",
+      autoNamed: !args.name,
+      nameIn: args.name ? 0 : 2,
+      pendingName: slug || `thread-${String(this.nextId)}`,
+      permissionMode: permissionModes[permission] ?? PermissionMode.UNSPECIFIED,
+      baseRef,
+      createdWorktree: created,
+      workspaceId: ws.id,
+    });
+    this.focusSession(s.id);
+    return { message: `created thread ${s.id} in ${member.worktreePath} (workspace ${ws.id})`, resultJson: JSON.stringify({ id: s.id, worktreePath: member.worktreePath, workspaceId: ws.id }) };
   }
 
   /** SessionService.StageAttachment: keeps the bytes' size, returns a fake path. */
@@ -981,6 +1114,8 @@ export class World {
           args: [
             { name: "repo", type: ArgType.STRING, required: false, description: "Repository id" },
             { name: "worktree", type: ArgType.PATH, required: false, description: "Worktree path" },
+            { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name the thread belongs to" },
+            { name: "repos", type: ArgType.STRING, required: false, description: "With new-worktree: repositories for a new workspace (repo[:base], comma-separated)" },
             { name: "model", type: ArgType.ENUM, required: false, description: "Model", enumValues: ["fable", "opus", "sonnet", "haiku"], defaultValue: "opus" },
             { name: "effort", type: ArgType.ENUM, required: false, description: "Effort", enumValues: ["low", "medium", "high", "xhigh", "max"], defaultValue: "high" },
             { name: "permission", type: ArgType.ENUM, required: false, description: "Permission mode", enumValues: ["supervised", "accept-edits", "auto"] },

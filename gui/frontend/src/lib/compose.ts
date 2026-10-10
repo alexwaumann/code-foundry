@@ -48,8 +48,108 @@ export function pickDefault(choices: readonly Choice[], setting: string | undefi
   return setting && choices.some((c) => c.value === setting) ? setting : fallback;
 }
 
-/** Where the thread runs: a worktree session.new creates, or an existing one (the main one is the current checkout). */
-export type WorktreeChoice = { kind: "new" } | { kind: "existing"; path: string };
+/**
+ * Where the thread runs: a worktree session.new creates, an existing one (the main one is
+ * the current checkout), or, for a workspace, the workspace's own member worktrees.
+ */
+export type WorktreeChoice = { kind: "new" } | { kind: "existing"; path: string } | { kind: "members" };
+
+/** A project's worktree choice (a workspace's "members" never applies to a project). */
+export type ProjectWorktree = Exclude<WorktreeChoice, { kind: "members" }>;
+
+/** What a composer starts a thread in: a project, or a workspace and its members. */
+export type ComposeTarget = { kind: "project"; repoId: string } | { kind: "workspace"; workspaceId: string };
+
+const WORKSPACE_KEY = "ws:";
+
+/** The compose store's key for a target's draft: the repo id, or "ws:<workspace id>". */
+export function draftKey(t: ComposeTarget): string {
+  return t.kind === "project" ? t.repoId : WORKSPACE_KEY + t.workspaceId;
+}
+
+export function isWorkspaceKey(key: string): boolean {
+  return key.startsWith(WORKSPACE_KEY);
+}
+
+/** The draft fields that decide where a thread starts. */
+export interface PlaceInput {
+  target: ComposeTarget;
+  worktree: WorktreeChoice;
+  /** The base the user picked for the primary member; null: its default. */
+  base: string | null;
+  /** Other projects a project's thread also works in (a new workspace on send). */
+  alsoIn: readonly string[];
+  /** Repo id of the member the thread runs in; null: the project, or the workspace's first member. */
+  primary: string | null;
+}
+
+export interface WorkspaceMembersInput {
+  id: string;
+  members: readonly { repoId: string; worktreePath: string }[];
+}
+
+/**
+ * The repositories a draft's thread works in, in member order, and the one it runs in
+ * (its cwd). A project: itself, then its registered "Also in" projects. A workspace: its
+ * members (none when it is gone). A primary that is not among them falls back to the
+ * first.
+ */
+export function draftMembers(
+  d: Pick<PlaceInput, "target" | "alsoIn" | "primary">,
+  workspace: WorkspaceMembersInput | undefined,
+  isRepo: (id: string) => boolean,
+): { repoIds: string[]; primary: string } {
+  let repoIds: string[];
+  if (d.target.kind === "project") {
+    repoIds = [d.target.repoId];
+    for (const id of d.alsoIn) if (isRepo(id) && !repoIds.includes(id)) repoIds.push(id);
+  } else {
+    repoIds = workspace ? workspace.members.map((m) => m.repoId) : [];
+  }
+  const primary = d.primary !== null && repoIds.includes(d.primary) ? d.primary : (repoIds[0] ?? "");
+  return { repoIds, primary };
+}
+
+/**
+ * Where session.new starts the thread: in a project (a new or existing worktree, exactly
+ * as before workspaces), in a workspace's member worktree (the thread belongs to the
+ * workspace), or in a new workspace with a cf/<slug> worktree in every member (a
+ * project with "Also in" projects, or a workspace in new-worktree mode).
+ */
+export type ThreadPlace =
+  | { kind: "project"; repoId: string; worktree: ProjectWorktree; base: string }
+  | { kind: "workspace"; workspaceId: string; repoId: string; worktreePath: string }
+  /** `base` applies to the primary member only ("" : every member's default). */
+  | { kind: "new-workspace"; repoIds: readonly string[]; repoId: string; base: string };
+
+export interface PlaceEnv {
+  /** The target workspace; undefined when it is gone. */
+  workspace?: WorkspaceMembersInput;
+  isRepo: (id: string) => boolean;
+  hasWorktree: (repoId: string, path: string) => boolean;
+  /** The primary repository's default base (ListRefs.default_ref); "" when unknown. */
+  defaultRef: string;
+}
+
+/** Where a draft's thread starts, or null when its workspace is gone or has no members. */
+export function threadPlace(d: PlaceInput, env: PlaceEnv): ThreadPlace | null {
+  const { repoIds, primary } = draftMembers(d, env.workspace, env.isRepo);
+  if (d.target.kind === "project") {
+    if (repoIds.length > 1) return { kind: "new-workspace", repoIds, repoId: primary, base: d.base ?? "" };
+    const repoId = d.target.repoId;
+    const worktree: ProjectWorktree = d.worktree.kind === "existing" && env.hasWorktree(repoId, d.worktree.path) ? d.worktree : { kind: "new" };
+    return { kind: "project", repoId, worktree, base: d.base ?? env.defaultRef };
+  }
+  const member = env.workspace?.members.find((m) => m.repoId === primary);
+  if (!env.workspace || !member) return null;
+  if (d.worktree.kind === "new") return { kind: "new-workspace", repoIds, repoId: primary, base: d.base ?? "" };
+  return { kind: "workspace", workspaceId: env.workspace.id, repoId: primary, worktreePath: member.worktreePath };
+}
+
+/** True when the thread gets new worktrees (the send button's progress text). */
+export function makesWorktrees(p: ThreadPlace | null): boolean {
+  return p !== null && (p.kind === "new-workspace" || (p.kind === "project" && p.worktree.kind === "new"));
+}
 
 /**
  * The read-only branch indicator for an existing worktree or the current checkout:
@@ -97,27 +197,50 @@ export function checkAttachments<F extends FileLike>(
   return { accepted, rejected };
 }
 
-export interface DraftArgsInput {
+/** The prompt and Claude options of a draft, as session.new takes them. */
+export interface PromptArgsInput {
   text: string;
   model: string;
   effort: string;
   permission: string;
-  worktree: WorktreeChoice;
+}
+
+export interface DraftArgsInput extends PromptArgsInput {
+  worktree: ProjectWorktree;
   /** Base ref for a new worktree; "" lets the daemon pick (origin/<default branch>, or the default branch without a remote). */
   base: string;
 }
 
-/**
- * session.new's args for a draft. Empty values are omitted so the daemon applies its
- * defaults; `worktree` is the path for an existing worktree, `new-worktree` + `base`
- * otherwise.
- */
+/** session.new's args for a project draft (threadArgs with a project place). */
 export function sessionNewArgs(repoId: string, d: DraftArgsInput, attachments: readonly string[]): Record<string, string> {
-  const args: Record<string, string> = { repo: repoId };
-  if (d.worktree.kind === "existing") args.worktree = d.worktree.path;
-  else {
-    args["new-worktree"] = "true";
-    if (d.base) args.base = d.base;
+  return threadArgs({ kind: "project", repoId, worktree: d.worktree, base: d.base }, d, attachments);
+}
+
+/**
+ * session.new's args for a thread. Empty values are omitted so the daemon applies its
+ * defaults. A project: `worktree` is the path for an existing worktree, `new-worktree` +
+ * `base` otherwise. A workspace: `workspace` and the member (`repo` + its `worktree`).
+ * A new workspace: `new-worktree` + `repos`, the primary's own base as `<repo>:<base>`,
+ * `repo` the member the thread runs in.
+ */
+export function threadArgs(place: ThreadPlace, d: PromptArgsInput, attachments: readonly string[]): Record<string, string> {
+  const args: Record<string, string> = { repo: place.repoId };
+  switch (place.kind) {
+    case "project":
+      if (place.worktree.kind === "existing") args.worktree = place.worktree.path;
+      else {
+        args["new-worktree"] = "true";
+        if (place.base) args.base = place.base;
+      }
+      break;
+    case "workspace":
+      args.workspace = place.workspaceId;
+      args.worktree = place.worktreePath;
+      break;
+    case "new-workspace":
+      args["new-worktree"] = "true";
+      args.repos = place.repoIds.map((id) => (id === place.repoId && place.base ? `${id}:${place.base}` : id)).join(",");
+      break;
   }
   if (d.model) args.model = d.model;
   if (d.effort) args.effort = d.effort;
