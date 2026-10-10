@@ -1124,6 +1124,24 @@ export class World {
     return { id: r.id, path: r.path, name: r.name, defaultBranch: r.defaultBranch, githubSlug: r.githubSlug, remotes: r.remotes, git: r.git !== false, worktrees: r.worktrees.map((w) => this.worktreeMsg(r.id, w)) };
   }
 
+  /** RepoService.Clone's last step: a cloned GitHub repository registered at path. */
+  addClone(owner: string, name: string, path: string): MockRepo {
+    let id = `repo-${name.toLowerCase()}`;
+    for (let n = 2; this.repos.has(id); n++) id = `repo-${name.toLowerCase()}-${String(n)}`;
+    const repo: MockRepo = {
+      id,
+      path,
+      name,
+      defaultBranch: "main",
+      githubSlug: `${owner}/${name}`,
+      remotes: ["origin"],
+      worktrees: [{ path, branch: "main", head: "c1013ed0", isMain: true, status: clean() }],
+    };
+    this.repos.set(id, repo);
+    this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
+    return repo;
+  }
+
   /**
    * RepoService.InitGit and repo.git.init: a project without git becomes a git repository
    * on main (the empty "Initial commit"), its folder the main worktree on that branch.
@@ -1511,7 +1529,14 @@ export class World {
         },
       },
       {
-        cmd: { name: "repo.register", title: "Add Project", category: "Project", description: "Track a git repository as a project", keybindings: [], args: [{ name: "path", type: ArgType.PATH, required: true, description: "Path inside the repository" }] },
+        cmd: {
+          name: "repo.register",
+          title: "Add Project (local folder)",
+          category: "Project",
+          description: "Start tracking a folder as a project. A path inside a git repository adds that repository; any other folder is added as a project without git.",
+          keybindings: [],
+          args: [{ name: "path", type: ArgType.PATH, required: true, description: "Project folder (a git repository or any folder)" }],
+        },
         when: always,
         run: (_ctx, args) => {
           const path = (args.path ?? "").replace(/^~(?=\/|$)/, HOME).replace(/\/+$/, "");
@@ -1521,7 +1546,34 @@ export class World {
           const repo: MockRepo = { id, path, name, defaultBranch: "main", githubSlug: "", remotes: [], worktrees: [{ path, branch: "main", head: "deadbeef", isMain: true, status: clean() }] };
           this.repos.set(id, repo);
           this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
-          return `Registered ${name}`;
+          // Like the daemon: the registered Repo as the result (the dialog selects it).
+          return Promise.resolve({ message: `registered ${name} (${id})`, resultJson: JSON.stringify({ id, path, name, git: true }) });
+        },
+      },
+      {
+        cmd: {
+          name: "repo.add",
+          title: "Add Project",
+          category: "Project",
+          description: "Add a project: start a new one, add a folder on this Mac, or clone a repository from GitHub. Opens the Add Project dialog in the app.",
+          keybindings: [],
+          args: [],
+        },
+        when: always,
+        run: () => "Add a project from the CLI with `code-foundry repo register --path <folder>` or `code-foundry repo clone <owner/repo>`.",
+      },
+      {
+        cmd: {
+          name: "repo.clone",
+          title: "Clone from GitHub",
+          category: "Project",
+          description: "Clone a github.com repository with `gh repo clone` into ~/.code-foundry/projects/<owner>/<repo> and add it as a project.",
+          keybindings: [],
+          args: [{ name: "repo", type: ArgType.STRING, required: true, description: "owner/repo or https://github.com/owner/repo" }],
+        },
+        when: always,
+        run: () => {
+          throw new CommandError("unavailable", "the mock clones through RepoService.Clone (the Add Project dialog)");
         },
       },
       {

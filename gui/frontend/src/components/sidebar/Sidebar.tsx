@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { BellRing, SquarePen } from "lucide-react";
+import { BellRing, FolderPlus, SquarePen } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { ProjectsNav } from "@/components/projects/ProjectsPage";
@@ -273,9 +273,10 @@ function SidebarBand() {
         <AppName />
         <span className="flex shrink-0 items-center gap-1.5 [--wails-draggable:no-drag]" data-testid="sidebar-band-controls">
           <AttentionBadge />
-          {/* New thread (the project picker), as session.new from the palette. New terminal is palette, ⌘T and row menu only. */}
+          {/* New thread (the project picker) and the Add Project dialog, as session.new / repo.add from the palette. New terminal is palette, ⌘T and row menu only. */}
           <span className="-mr-1.5 flex items-center">
             <CommandButton command="session.new" icon={SquarePen} whenUnavailable="disable" data-testid="sidebar-new-session" />
+            <CommandButton command="repo.add" icon={FolderPlus} data-testid="sidebar-add-project" />
           </span>
         </span>
       </header>

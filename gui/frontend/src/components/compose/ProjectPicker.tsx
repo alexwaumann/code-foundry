@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Layers } from "lucide-react";
+import { FolderPlus, Layers } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { formatChord } from "@/keys/chord";
 import { projectHue, projectInitials, repoSource } from "@/lib/compose";
 import { tildify } from "@/lib/path";
 import { composeIn, composeInWorkspace } from "@/stores/compose";
+import { addProject } from "@/stores/projectActions";
 import { getUiContext } from "@/stores/context";
 import { useReposStore } from "@/stores/repos";
 import { useSessionsStore } from "@/stores/sessions";
@@ -159,7 +160,25 @@ export function ProjectPicker({ close }: { close: () => void }) {
         aria-label={workspaces.length > 0 ? "Search workspaces and projects" : "Search projects"}
       />
       <CommandList>
-        <CommandEmpty>{!loaded ? "Loading projects…" : order.length === 0 ? "No projects registered. Add one with Add Project, or on the Projects page." : "No matching projects."}</CommandEmpty>
+        <CommandEmpty>{!loaded ? "Loading projects…" : order.length === 0 ? "No projects yet." : "No matching projects."}</CommandEmpty>
+        {loaded && order.length === 0 && (
+          // The empty state's way forward: the Add Project dialog (repo.add).
+          <CommandGroup heading="No projects yet">
+            <CommandItem
+              forceMount
+              value="__add-project"
+              onSelect={() => {
+                close();
+                addProject();
+              }}
+              data-testid="picker-add-project"
+              className="gap-3 py-2"
+            >
+              <FolderPlus />
+              Add a project…
+            </CommandItem>
+          </CommandGroup>
+        )}
         {workspaces.length > 0 && (
           <CommandGroup heading="Workspaces">
             {workspaces.map((id) => (
