@@ -17,6 +17,7 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 		{command: "view.panel.toggle", view: command.ViewPanelToggle},
 		{command: "view.panel.expand", view: command.ViewPanelExpand},
 		{command: "view.panel.workspace", view: command.ViewPanelWorkspace},
+		{command: "view.panel.linked-prs", view: command.ViewPanelLinkedPRs},
 	}
 	for _, tt := range tests {
 		t.Run(tt.command, func(t *testing.T) {
@@ -65,6 +66,41 @@ func TestViewPanelWorkspaceAvailability(t *testing.T) {
 			got := false
 			for _, c := range reg.List(tt.ctx, false) {
 				if c.Name == "view.panel.workspace" {
+					got = true
+				}
+			}
+			if got != tt.want {
+				t.Errorf("available = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestViewPanelLinkedPRsAvailability(t *testing.T) {
+	tests := []struct {
+		name string
+		ctx  command.Context
+		want bool
+	}{
+		{name: "project thread in the GUI", ctx: command.Context{ActiveSessionID: "s1", ActiveView: "session"}, want: true},
+		{name: "workspace thread", ctx: command.Context{ActiveSessionID: "s1", ActiveWorkspaceID: "w1", ActiveView: "session"}, want: true},
+		{name: "thread's terminal", ctx: command.Context{ActiveSessionID: "s1", ActiveTerminalID: "t1", ActiveView: "terminal"}, want: true},
+		{name: "plain terminal", ctx: command.Context{ActiveTerminalID: "t1", ActiveView: "terminal"}, want: false},
+		{name: "worktree", ctx: command.Context{ActiveRepoID: "r1", ActiveWorktreePath: "/wt", ActiveView: "worktree"}, want: false},
+		{name: "workspace composer (no thread)", ctx: command.Context{ActiveRepoID: "r1", ActiveWorkspaceID: "w1", ActiveView: "compose"}, want: false},
+		{name: "nothing selected", ctx: command.Context{ActiveView: "dashboard"}, want: false},
+		{name: "CLI without context", ctx: command.Context{}, want: false},
+		{name: "CLI with --context-session", ctx: command.Context{ActiveSessionID: "s1"}, want: true},
+	}
+	reg := command.NewRegistry()
+	if err := command.RegisterView(reg, &commandtest.Emitter{Delivered: 1}); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := false
+			for _, c := range reg.List(tt.ctx, false) {
+				if c.Name == "view.panel.linked-prs" {
 					got = true
 				}
 			}
