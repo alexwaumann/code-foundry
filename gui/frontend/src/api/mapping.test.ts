@@ -23,6 +23,7 @@ import { RepoEventSchema, RepoSchema } from "@/gen/codefoundry/v1/repo_pb";
 import { SessionEventSchema, SessionSchema, SessionState, SessionStatus } from "@/gen/codefoundry/v1/session_pb";
 import { AttachEventSchema, TerminalEventSchema, TerminalSchema, TerminalState } from "@/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "@/gen/codefoundry/v1/ui_pb";
+import { WorkspaceEventSchema } from "@/gen/codefoundry/v1/workspace_pb";
 import { toCommandView } from "./command";
 import { overrideEndpoint } from "./endpoint";
 import { toEventView } from "./events";
@@ -31,6 +32,7 @@ import { toRepoEventView, toRepoView } from "./repo";
 import { toSessionView } from "./session";
 import { toAttachEventView, toTerminalEventView, toTerminalView } from "./terminal";
 import { toUiIntentView } from "./ui";
+import { toWorkspaceEventView } from "./workspace";
 
 describe("terminal mapping", () => {
   it("maps a Terminal to its view model", () => {
@@ -301,6 +303,7 @@ describe("events mapping", () => {
     [{ case: "gh" as const, value: create(GhEventSchema, { event: { case: "polled", value: { fetchedAt: timestampFromMs(5000), lastError: "boom" } } }) }, { source: "gh", event: { kind: "polled", fetchedAtMs: 5000, lastError: "boom" } }],
     [{ case: "gh" as const, value: create(GhEventSchema, { event: { case: "repoActivityUpdated", value: { repoSlug: "o/r" } } }) }, { source: "gh", event: { kind: "repoActivity", repoSlug: "o/r" } }],
     [{ case: "ui" as const, value: create(UiIntentSchema, { intent: { case: "openPalette", value: { query: "q" } } }) }, { source: "ui", event: { kind: "openPalette", query: "q" } }],
+    [{ case: "workspace" as const, value: create(WorkspaceEventSchema, { event: { case: "removedId", value: "w-1" } }) }, { source: "workspace", event: { kind: "removed", id: "w-1" } }],
   ])("maps %#", (event, want) => {
     expect(toEventView(create(EventSchema, { event }))).toEqual(want);
   });
@@ -319,10 +322,43 @@ describe("events mapping", () => {
       disconnectReason: "crashed",
     });
     expect(toSessionView(s)).toMatchObject({ id: "s1", state: "disconnected", status: "attention", lastActivityAtMs: 5000, createdAtMs: null, exitCode: 1, disconnectReason: "crashed" });
+    expect(toSessionView(s).workspaceId).toBe("");
+    expect(toSessionView(create(SessionSchema, { id: "s2", repoId: "web", workspaceId: "w-1" }))).toMatchObject({ repoId: "web", workspaceId: "w-1" });
   });
 
   it("empty events map to null", () => {
     expect(toEventView(create(EventSchema, {}))).toBeNull();
+  });
+});
+
+describe("workspace mapping", () => {
+  it("maps a snapshot and an update, members in order", () => {
+    const login = {
+      id: "w-1",
+      name: "login",
+      branch: "cf/login",
+      members: [
+        { repoId: "web", worktreePath: "/wt/web/cf-login" },
+        { repoId: "api", worktreePath: "/wt/api/cf-login" },
+      ],
+      createdAt: timestampFromMs(7000),
+    };
+    const want = {
+      id: "w-1",
+      name: "login",
+      branch: "cf/login",
+      members: [
+        { repoId: "web", worktreePath: "/wt/web/cf-login" },
+        { repoId: "api", worktreePath: "/wt/api/cf-login" },
+      ],
+      createdAtMs: 7000,
+    };
+    expect(toWorkspaceEventView(create(WorkspaceEventSchema, { event: { case: "snapshot", value: { workspaces: [login] } } }))).toEqual({ kind: "snapshot", workspaces: [want] });
+    expect(toWorkspaceEventView(create(WorkspaceEventSchema, { event: { case: "updated", value: { ...login, createdAt: undefined } } }))).toEqual({
+      kind: "updated",
+      workspace: { ...want, createdAtMs: null },
+    });
+    expect(toWorkspaceEventView(create(WorkspaceEventSchema, {}))).toBeNull();
   });
 });
 

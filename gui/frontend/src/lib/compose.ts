@@ -146,11 +146,6 @@ export function threadPlace(d: PlaceInput, env: PlaceEnv): ThreadPlace | null {
   return { kind: "workspace", workspaceId: env.workspace.id, repoId: primary, worktreePath: member.worktreePath };
 }
 
-/** True when the thread gets new worktrees (the send button's progress text). */
-export function makesWorktrees(p: ThreadPlace | null): boolean {
-  return p !== null && (p.kind === "new-workspace" || (p.kind === "project" && p.worktree.kind === "new"));
-}
-
 /**
  * The read-only branch indicator for an existing worktree or the current checkout:
  * `text` for the pill ("On main", "Detached at 3c3c465") and `label` for assistive tech
