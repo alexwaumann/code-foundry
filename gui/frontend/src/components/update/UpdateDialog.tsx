@@ -86,7 +86,7 @@ function Meta({ items }: { items: ReactNode[] }) {
 
 function ProgressBar({ className }: { className?: string }) {
   return (
-    <div className={cn("h-1 overflow-hidden rounded-sm bg-accent", className)} role="progressbar" aria-busy>
+    <div className={cn("h-1 overflow-hidden rounded-sm bg-foreground/10", className)} role="progressbar" aria-busy>
       <div className="h-full w-1/3 animate-[cf-indeterminate_1.4s_ease-in-out_infinite] rounded-sm bg-foreground" />
     </div>
   );
