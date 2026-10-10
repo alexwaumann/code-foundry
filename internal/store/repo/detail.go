@@ -135,6 +135,11 @@ func (g *Git) WorktreeDetail(ctx context.Context, repoID, path string) (Worktree
 	if _, ok := g.Snapshot().Worktree(repoID, path); !ok {
 		return WorktreeDetail{}, fmt.Errorf("%w: worktree %q in repo %q", ErrNotFound, path, repoID)
 	}
+	if st := g.repo(repoID); st != nil {
+		if err := requireGit(st.meta.Load()); err != nil {
+			return WorktreeDetail{}, err
+		}
+	}
 	k := wtKey{repoID, path}
 	now := g.now()
 	ds := &g.details

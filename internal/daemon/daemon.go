@@ -124,7 +124,11 @@ func Run(ctx context.Context, opts Options) error {
 		Emitter:  command.BusEmitter{Bus: events},
 		Terminal: terminalAPI,
 		Repo:     worktreeDirRepo{RepoBackend: repoAPI, repos: st.repo, settings: st.settings},
-		Session:  sessionAPI,
+		NotGit: func(c command.Context) bool {
+			r, ok := st.repo.Snapshot().Owner(c.ActiveRepoID, c.ActiveWorktreePath)
+			return ok && !r.Git
+		},
+		Session: sessionAPI,
 		GitOps: command.GitOpsDeps{
 			Backend:    gitopsAPI,
 			GitHubSlug: func(c command.Context) string { return st.gitops.GitHubSlug(c.ActiveRepoID, c.ActiveWorktreePath) },

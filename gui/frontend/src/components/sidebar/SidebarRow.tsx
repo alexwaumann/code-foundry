@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef } from "react";
 import { AppWindow, ArrowRightLeft, Circle, CircleCheck, CircleX, Layers, Pin, SquareTerminal } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
+import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { SessionStatusIcon } from "@/components/session/SessionStatusIcon";
 import { cn } from "@/lib/utils";
 import { basename, terminalLabel } from "@/lib/path";
@@ -167,6 +168,7 @@ function ThreadPlace({ id }: { id: string }) {
   const ws = useWorkspacesStore((st) => (s.workspaceId ? st.byId[s.workspaceId] : undefined));
   const project = useReposStore((st) => threadRowModel(s, st, NO_WORKSPACES).project);
   const branch = useReposStore((st) => threadRowModel(s, st, NO_WORKSPACES).branch);
+  const noGit = useReposStore((st) => threadRowModel(s, st, NO_WORKSPACES).noGit);
   const movingTo = useReposStore((st) => threadRowModel(s, st, { byId: ws ? { [s.workspaceId]: ws } : {} }).movingTo);
   const m = { project, branch, movingTo };
   return (
@@ -180,9 +182,13 @@ function ThreadPlace({ id }: { id: string }) {
         <span className="min-w-0 truncate">
           <span data-testid="row-project">{m.project}</span>
           <span aria-hidden> · </span>
-          <span className="font-mono" data-testid="row-branch">
-            {m.branch}
-          </span>
+          {noGit ? (
+            <NoGitBadge className="align-[1px]" />
+          ) : (
+            <span className="font-mono" data-testid="row-branch">
+              {m.branch}
+            </span>
+          )}
         </span>
       )}
     </span>

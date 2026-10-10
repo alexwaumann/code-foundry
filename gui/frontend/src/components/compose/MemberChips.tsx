@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Plus, X } from "lucide-react";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
+import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { tildify } from "@/lib/path";
 import { cn } from "@/lib/utils";
 import { addAlsoIn, removeAlsoIn, setPrimary } from "@/stores/compose";
@@ -10,8 +11,13 @@ import { useReposStore } from "@/stores/repos";
 /** One project the thread works in, as the chip row shows it. */
 export interface MemberChipModel {
   repoId: string;
-  /** The branch the thread works on there: the member worktree's, or "cf/…" for new worktrees. */
+  /**
+   * The branch the thread works on there: the member worktree's or the chosen checkout's,
+   * or "cf/…" for new worktrees. "" when there is none to show.
+   */
   branch: string;
+  /** A project without git: the No git badge instead of a branch. */
+  noGit?: boolean;
   /** An "Also in" project (removable); the project itself and workspace members are not. */
   removable: boolean;
 }
@@ -32,7 +38,7 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
         type="button"
         disabled={disabled}
         aria-pressed={primary}
-        aria-label={`${name} on ${member.branch}${primary ? ", primary: the thread runs here" : ""}`}
+        aria-label={`${name}${member.noGit ? ", not a git repository" : member.branch ? ` on ${member.branch}` : ""}${primary ? ", primary: the thread runs here" : ""}`}
         title={primary ? "The thread runs here" : `Run the thread in ${name}`}
         data-compose-stop
         className={cn(
@@ -45,7 +51,15 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
       >
         <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", primary ? "bg-primary" : "bg-muted-foreground/40")} />
         <span className="truncate font-medium">{name}</span>
-        <span className="truncate font-mono text-[11px] text-muted-foreground">{member.branch}</span>
+        {member.noGit ? (
+          <NoGitBadge />
+        ) : (
+          member.branch && (
+            <span className="truncate font-mono text-[11px] text-muted-foreground" data-testid="composer-member-branch">
+              {member.branch}
+            </span>
+          )
+        )}
         {primary && (
           <span className="shrink-0 rounded-sm bg-primary/10 px-1 text-[10px] font-medium text-primary" data-testid="composer-member-primary">
             primary
@@ -73,13 +87,14 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
 
 const SEP = "\u0001";
 
-/** "Also in": registered projects the thread does not work in yet. */
+/** "Also in": registered git projects the thread does not work in yet. */
 function AddProject({ draftKey, exclude, first, disabled }: { draftKey: string; exclude: readonly string[]; first: boolean; disabled: boolean }) {
   const keys = useReposStore(
     useShallow((s) =>
       s.order.flatMap((id) => {
         const r = s.byId[id];
-        return r && !exclude.includes(id) ? [[id, r.name, r.path].join(SEP)] : [];
+        // Git projects only: a new workspace makes a worktree in each.
+        return r?.git && !exclude.includes(id) ? [[id, r.name, r.path].join(SEP)] : [];
       }),
     ),
   );

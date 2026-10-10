@@ -76,7 +76,7 @@ func newEnv(t *testing.T, mutate ...func(*Options)) *env {
 	if err := os.MkdirAll(e.wt, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	e.repos.Put(repo.Repo{ID: "r1", Path: e.wt, Name: "repo", Worktrees: []repo.Worktree{{RepoID: "r1", Path: e.wt, IsMain: true}}})
+	e.repos.Put(repo.Repo{ID: "r1", Path: e.wt, Name: "repo", Git: true, Worktrees: []repo.Worktree{{RepoID: "r1", Path: e.wt, IsMain: true}}})
 	e.paths = ClaudePaths{Dir: filepath.Join(dir, "claude"), Config: filepath.Join(dir, "claude.json")}
 	e.dbPath = filepath.Join(dir, "cf.db")
 	e.namer = func(msg string) (string, error) { return "named-" + strings.Fields(msg)[0], nil }

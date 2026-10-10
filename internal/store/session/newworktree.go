@@ -71,6 +71,10 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 	if !ok {
 		return nw, fmt.Errorf("%w: repo %s", ErrNotFound, repoID)
 	}
+	if !r.Git {
+		// Before the namer: a project without git runs threads in its one checkout.
+		return nw, fmt.Errorf("%w: %s is not a git repository; threads run in its current checkout", ErrFailedPrecondition, r.Name)
+	}
 
 	sl, err := m.waitSlug(ctx, id, name, o.InitialPrompt)
 	if err != nil {

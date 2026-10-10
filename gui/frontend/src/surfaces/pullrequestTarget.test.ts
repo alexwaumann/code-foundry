@@ -8,8 +8,8 @@ import { pickPullRequest, prRefOfTab, pullRequestTab, selectionPullRequest, type
 
 const status = { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null };
 const wt = (path: string, branch: string, isMain = false): WorktreeView => ({ repoId: "r1", path, branch, head: "abc", detached: false, isMain, status });
-const repo: RepoView = { id: "r1", path: "/src/cf", name: "cf", defaultBranch: "main", githubSlug: "Alex/CF", remotes: ["origin"], worktrees: [wt("/src/cf", "main", true), wt("/src/cf-fix", "fix/resize"), wt("/src/cf-nopr", "feat/nopr")] };
-const local: RepoView = { id: "r2", path: "/src/local", name: "local", defaultBranch: "main", githubSlug: "", remotes: [], worktrees: [{ ...wt("/src/local", "main", true), repoId: "r2" }] };
+const repo: RepoView = { id: "r1", path: "/src/cf", name: "cf", defaultBranch: "main", githubSlug: "Alex/CF", remotes: ["origin"], git: true, worktrees: [wt("/src/cf", "main", true), wt("/src/cf-fix", "fix/resize"), wt("/src/cf-nopr", "feat/nopr")] };
+const local: RepoView = { id: "r2", path: "/src/local", name: "local", defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [{ ...wt("/src/local", "main", true), repoId: "r2" }] };
 const session = (id: string, worktreePath: string): SessionView => ({ id, worktreePath, repoId: "r1", terminalId: "" }) as SessionView;
 
 const stores: SelectionStores = {

@@ -56,11 +56,15 @@ const (
 	RepoServiceGetWorktreeDetailProcedure = "/codefoundry.v1.RepoService/GetWorktreeDetail"
 	// RepoServiceListRefsProcedure is the fully-qualified name of the RepoService's ListRefs RPC.
 	RepoServiceListRefsProcedure = "/codefoundry.v1.RepoService/ListRefs"
+	// RepoServiceInitGitProcedure is the fully-qualified name of the RepoService's InitGit RPC.
+	RepoServiceInitGitProcedure = "/codefoundry.v1.RepoService/InitGit"
 )
 
 // RepoServiceClient is a client for the codefoundry.v1.RepoService service.
 type RepoServiceClient interface {
-	// Register adds a repository by path (any path inside the repo is accepted).
+	// Register adds a project by path. A path inside a git repository registers that
+	// repository (its main worktree); any other existing directory registers as a
+	// project without git (Repo.git false).
 	Register(context.Context, *connect.Request[v1.RegisterRepoRequest]) (*connect.Response[v1.RegisterRepoResponse], error)
 	// Unregister forgets a repository. Worktrees on disk are not touched.
 	Unregister(context.Context, *connect.Request[v1.UnregisterRepoRequest]) (*connect.Response[v1.UnregisterRepoResponse], error)
@@ -85,6 +89,10 @@ type RepoServiceClient interface {
 	// ListRefs returns the refs a worktree can be based on: local branches and
 	// remote-tracking branches (origin/<name>), plus the default base.
 	ListRefs(context.Context, *connect.Request[v1.ListRefsRequest]) (*connect.Response[v1.ListRefsResponse], error)
+	// InitGit turns a project without git into a git repository: `git init -b
+	// <init.defaultBranch, else main>`, an empty "Initial commit", then a refresh.
+	// FailedPrecondition when the project is already a git repository.
+	InitGit(context.Context, *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error)
 }
 
 // NewRepoServiceClient constructs a client for the codefoundry.v1.RepoService service. By default,
@@ -158,6 +166,12 @@ func NewRepoServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(repoServiceMethods.ByName("ListRefs")),
 			connect.WithClientOptions(opts...),
 		),
+		initGit: connect.NewClient[v1.InitGitRequest, v1.InitGitResponse](
+			httpClient,
+			baseURL+RepoServiceInitGitProcedure,
+			connect.WithSchema(repoServiceMethods.ByName("InitGit")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -173,6 +187,7 @@ type repoServiceClient struct {
 	watch             *connect.Client[v1.WatchReposRequest, v1.RepoEvent]
 	getWorktreeDetail *connect.Client[v1.GetWorktreeDetailRequest, v1.GetWorktreeDetailResponse]
 	listRefs          *connect.Client[v1.ListRefsRequest, v1.ListRefsResponse]
+	initGit           *connect.Client[v1.InitGitRequest, v1.InitGitResponse]
 }
 
 // Register calls codefoundry.v1.RepoService.Register.
@@ -225,9 +240,16 @@ func (c *repoServiceClient) ListRefs(ctx context.Context, req *connect.Request[v
 	return c.listRefs.CallUnary(ctx, req)
 }
 
+// InitGit calls codefoundry.v1.RepoService.InitGit.
+func (c *repoServiceClient) InitGit(ctx context.Context, req *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error) {
+	return c.initGit.CallUnary(ctx, req)
+}
+
 // RepoServiceHandler is an implementation of the codefoundry.v1.RepoService service.
 type RepoServiceHandler interface {
-	// Register adds a repository by path (any path inside the repo is accepted).
+	// Register adds a project by path. A path inside a git repository registers that
+	// repository (its main worktree); any other existing directory registers as a
+	// project without git (Repo.git false).
 	Register(context.Context, *connect.Request[v1.RegisterRepoRequest]) (*connect.Response[v1.RegisterRepoResponse], error)
 	// Unregister forgets a repository. Worktrees on disk are not touched.
 	Unregister(context.Context, *connect.Request[v1.UnregisterRepoRequest]) (*connect.Response[v1.UnregisterRepoResponse], error)
@@ -252,6 +274,10 @@ type RepoServiceHandler interface {
 	// ListRefs returns the refs a worktree can be based on: local branches and
 	// remote-tracking branches (origin/<name>), plus the default base.
 	ListRefs(context.Context, *connect.Request[v1.ListRefsRequest]) (*connect.Response[v1.ListRefsResponse], error)
+	// InitGit turns a project without git into a git repository: `git init -b
+	// <init.defaultBranch, else main>`, an empty "Initial commit", then a refresh.
+	// FailedPrecondition when the project is already a git repository.
+	InitGit(context.Context, *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error)
 }
 
 // NewRepoServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -321,6 +347,12 @@ func NewRepoServiceHandler(svc RepoServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(repoServiceMethods.ByName("ListRefs")),
 		connect.WithHandlerOptions(opts...),
 	)
+	repoServiceInitGitHandler := connect.NewUnaryHandler(
+		RepoServiceInitGitProcedure,
+		svc.InitGit,
+		connect.WithSchema(repoServiceMethods.ByName("InitGit")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.RepoService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RepoServiceRegisterProcedure:
@@ -343,6 +375,8 @@ func NewRepoServiceHandler(svc RepoServiceHandler, opts ...connect.HandlerOption
 			repoServiceGetWorktreeDetailHandler.ServeHTTP(w, r)
 		case RepoServiceListRefsProcedure:
 			repoServiceListRefsHandler.ServeHTTP(w, r)
+		case RepoServiceInitGitProcedure:
+			repoServiceInitGitHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -390,4 +424,8 @@ func (UnimplementedRepoServiceHandler) GetWorktreeDetail(context.Context, *conne
 
 func (UnimplementedRepoServiceHandler) ListRefs(context.Context, *connect.Request[v1.ListRefsRequest]) (*connect.Response[v1.ListRefsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.ListRefs is not implemented"))
+}
+
+func (UnimplementedRepoServiceHandler) InitGit(context.Context, *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.InitGit is not implemented"))
 }

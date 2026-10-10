@@ -6,7 +6,9 @@ import "google/protobuf/timestamp.proto";
 
 // RepoService tracks registered git repositories, their worktrees, and git status.
 service RepoService {
-  // Register adds a repository by path (any path inside the repo is accepted).
+  // Register adds a project by path. A path inside a git repository registers that
+  // repository (its main worktree); any other existing directory registers as a
+  // project without git (Repo.git false).
   rpc Register(RegisterRepoRequest) returns (RegisterRepoResponse) {}
   // Unregister forgets a repository. Worktrees on disk are not touched.
   rpc Unregister(UnregisterRepoRequest) returns (UnregisterRepoResponse) {}
@@ -31,6 +33,10 @@ service RepoService {
   // ListRefs returns the refs a worktree can be based on: local branches and
   // remote-tracking branches (origin/<name>), plus the default base.
   rpc ListRefs(ListRefsRequest) returns (ListRefsResponse) {}
+  // InitGit turns a project without git into a git repository: `git init -b
+  // <init.defaultBranch, else main>`, an empty "Initial commit", then a refresh.
+  // FailedPrecondition when the project is already a git repository.
+  rpc InitGit(InitGitRequest) returns (InitGitResponse) {}
 }
 
 message Repo {
@@ -52,6 +58,10 @@ message Repo {
   // Configured git remotes ("origin", …), sorted. Empty for a local-only repository:
   // fetch, pull, push and pull-request actions are unavailable then.
   repeated string remotes = 9;
+  // The project is a git repository. A project without git has one synthetic main
+  // worktree at path with empty branch and head and a zero status, no remotes and no
+  // default branch; worktree, ref, detail and git operations are unavailable for it.
+  bool git = 10;
 }
 
 message Worktree {
@@ -150,6 +160,14 @@ message ListRefsResponse {
   repeated string refs = 1;
   // "origin/<default branch>" when it exists, else "<default branch>".
   string default_ref = 2;
+}
+
+message InitGitRequest {
+  string id = 1;
+}
+
+message InitGitResponse {
+  Repo repo = 1;
 }
 
 message RefreshRepoRequest {

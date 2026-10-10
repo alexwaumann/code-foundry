@@ -143,7 +143,18 @@ interface MockRepo {
   remotes: string[];
   /** Local branches with no worktree (ListRefs lists them too). */
   branches?: string[];
+  /**
+   * false: a project without git (a plain folder). One synthetic main worktree with no
+   * branch, head or status; no worktrees, refs, workspaces or git commands until
+   * repo.git.init. Absent means git.
+   */
+  git?: boolean;
   worktrees: MockWorktree[];
+}
+
+/** A project without git refuses what needs git, like the daemon (FailedPrecondition). */
+function requireGit(repo: MockRepo, what = "this"): void {
+  if (repo.git === false) throw new CommandError("unavailable", `${repo.name} is not a git repository; ${what} needs git`);
 }
 
 export interface Invocation {
@@ -179,6 +190,7 @@ const CF = `${HOME}/src/code-foundry`;
 const CFW = `${HOME}/src/code-foundry.worktrees`;
 const GP = `${HOME}/src/ghostty-playground`;
 const SK = `${HOME}/src/sketches`;
+const WR = `${HOME}/Documents/writing`;
 const enc = new TextEncoder();
 
 /** session.new's `permission` arg values. */
@@ -244,6 +256,18 @@ function initialRepos(): MockRepo[] {
       remotes: [],
       branches: ["experiment/shaders"],
       worktrees: [{ path: SK, branch: "main", head: "5ca1ab1e", isMain: true, status: clean({ upstream: "", baseRef: "" }) }],
+    },
+    {
+      // Not a git repository: a plain folder. Its one checkout is the folder itself;
+      // repo.git.init makes it a git repository on main with an empty first commit.
+      id: "repo-wr",
+      path: WR,
+      name: "writing",
+      defaultBranch: "",
+      githubSlug: "",
+      remotes: [],
+      git: false,
+      worktrees: [{ path: WR, branch: "", head: "", isMain: true, status: { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false } }],
     },
   ];
 }
@@ -355,8 +379,16 @@ export class World {
     return r;
   }
 
+  /** A workspace member's repo: like repoRef, and never a project without git. */
+  private memberRepoRef(ref: string): MockRepo {
+    const r = this.repoRef(ref);
+    if (r.git === false) throw new CommandError("unavailable", `${r.name} is not a git repository; workspaces need git in every project`);
+    return r;
+  }
+
   /** A new worktree on `branch` in `repo` (published), where the daemon would put it. */
   private addWorktree(repo: MockRepo, branch: string, baseRef: string): MockWorktree {
+    requireGit(repo, "a new worktree");
     const w: MockWorktree = {
       path: `${HOME}/.code-foundry/worktrees/${repo.githubSlug || `_local/${repo.name}`}/${branch.replace(/\//g, "-")}`,
       branch,
@@ -378,7 +410,7 @@ export class World {
     if (refs.length === 0) throw new CommandError("invalid", "a workspace needs at least one repository");
     const specs = refs.map((ref) => {
       const [id = "", base = ""] = ref.split(":");
-      const repo = this.repoRef(id.trim());
+      const repo = this.memberRepoRef(id.trim());
       return { repo, base: base.trim() || (repo.remotes.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch) };
     });
     const w: MockWorkspace = {
@@ -476,7 +508,7 @@ export class World {
   /** workspace.add-repo: a worktree on the workspace branch in another repo. */
   addWorkspaceRepo(workspace: string, repoRef: string, base: string): MockWorkspace {
     const ws = this.workspaceRef(workspace);
-    const repo = this.repoRef(repoRef);
+    const repo = this.memberRepoRef(repoRef);
     if (ws.members.some((m) => m.repoId === repo.id)) throw new CommandError("unavailable", `${repo.name} is already a member of workspace ${ws.name}`);
     const w = this.addWorktree(repo, ws.branch, base || (repo.remotes.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch));
     ws.members.push({ repoId: repo.id, worktreePath: w.path });
@@ -960,6 +992,7 @@ export class World {
     let path = args.worktree ?? "";
     let baseRef = "";
     const created = args["new-worktree"] === "true";
+    if (created) requireGit(repo, "a new worktree");
     if (created) {
       baseRef = args.base || (repo.remotes.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch);
       await settle(this.worktreeDelayMs);
@@ -1017,7 +1050,7 @@ export class World {
       if (prompt.includes("FAIL")) throw new CommandError("unavailable", "start claude: exec: \"claude\": executable file not found in $PATH");
     } else {
       const refs = (args.repos ?? "").split(",").map((r) => r.trim()).filter(Boolean);
-      for (const ref of refs) this.repoRef(ref.split(":")[0] ?? "");
+      for (const ref of refs) this.memberRepoRef(ref.split(":")[0] ?? "");
       await settle(this.worktreeDelayMs);
       if (prompt.includes("FAIL")) throw new CommandError("unavailable", "create workspace: git worktree add: invalid reference: origin/nope");
       let name = slug || `s-new-${String(this.nextId)}`;
@@ -1062,6 +1095,7 @@ export class World {
   listRefs(repoId: string): { refs: string[]; defaultRef: string } {
     const repo = this.repos.get(repoId);
     if (!repo) throw new CommandError("notfound", `repo ${repoId} not found`);
+    requireGit(repo, "listing refs");
     const local = [...new Set([...repo.worktrees.map((w) => w.branch), ...(repo.branches ?? [])].filter(Boolean))].sort();
     const remote = !repo.remotes.includes("origin") ? [] : repo.githubSlug ? ["origin/main", "origin/release/v0.3", "origin/feat/sidebar"].sort() : [`origin/${repo.defaultBranch}`];
     return { refs: [...local, ...remote], defaultRef: remote.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch };
@@ -1087,7 +1121,22 @@ export class World {
   }
 
   repoMsg(r: MockRepo): RepoInit {
-    return { id: r.id, path: r.path, name: r.name, defaultBranch: r.defaultBranch, githubSlug: r.githubSlug, remotes: r.remotes, worktrees: r.worktrees.map((w) => this.worktreeMsg(r.id, w)) };
+    return { id: r.id, path: r.path, name: r.name, defaultBranch: r.defaultBranch, githubSlug: r.githubSlug, remotes: r.remotes, git: r.git !== false, worktrees: r.worktrees.map((w) => this.worktreeMsg(r.id, w)) };
+  }
+
+  /**
+   * RepoService.InitGit and repo.git.init: a project without git becomes a git repository
+   * on main (the empty "Initial commit"), its folder the main worktree on that branch.
+   */
+  initGit(id: string): MockRepo {
+    const repo = this.repos.get(id);
+    if (!repo) throw new CommandError("notfound", `repo ${id} not found`);
+    if (repo.git !== false) throw new CommandError("unavailable", `${repo.name} is already a git repository`);
+    repo.git = true;
+    repo.defaultBranch = "main";
+    repo.worktrees = repo.worktrees.map((w) => (w.isMain ? { ...w, branch: "main", head: "1a1t1a10", status: clean({ upstream: "", baseRef: "", untracked: 3, dirty: true }) } : w));
+    this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
+    return repo;
   }
 
   // ---- Commands -----------------------------------------------------------------
@@ -1489,6 +1538,22 @@ export class World {
         },
       },
       {
+        cmd: {
+          name: "repo.git.init",
+          title: "Initialize Git",
+          category: "Project",
+          description: "Make a project without git a git repository: git init on the default branch (init.defaultBranch, else main) and an empty initial commit, so worktrees can branch from it.",
+          keybindings: [],
+          args: [{ name: "repo", type: ArgType.STRING, required: false, description: "Repository id (default: the active repository)" }],
+        },
+        // Like the daemon: a project is active and it is not a git repository.
+        when: (ctx) => this.repos.get(ctx?.activeRepoId ?? "")?.git === false,
+        run: (ctx, args) => {
+          const repo = this.initGit(args.repo || ctx?.activeRepoId || "");
+          return `initialized git in ${repo.name} on ${repo.defaultBranch}`;
+        },
+      },
+      {
         cmd: { name: "repo.refresh", title: "Refresh Git Status", category: "Repository", description: "Reconcile git status now", keybindings: ["cmd+alt+r"], args: [] },
         when: always,
         run: () => {
@@ -1508,10 +1573,11 @@ export class World {
             { name: "base_ref", type: ArgType.STRING, required: false, description: "Base ref" },
           ],
         },
-        when: (ctx) => Boolean(ctx?.activeRepoId && this.repos.has(ctx.activeRepoId)),
+        when: (ctx) => this.repos.get(ctx?.activeRepoId ?? "")?.git !== false && Boolean(ctx?.activeRepoId && this.repos.has(ctx.activeRepoId)),
         run: (ctx, args) => {
           const repo = this.repos.get(ctx?.activeRepoId ?? "");
           if (!repo) throw new CommandError("unavailable", "no active repository");
+          requireGit(repo, "a new worktree");
           const branch = args.branch ?? "";
           const w: MockWorktree = { path: `${HOME}/.code-foundry/worktrees/${repo.githubSlug || `_local/${repo.name}`}/${branch.replace(/\//g, "-")}`, branch, head: "c0ffee00", isMain: false, status: clean({ upstream: "", baseRef: "" }) };
           repo.worktrees.push(w);

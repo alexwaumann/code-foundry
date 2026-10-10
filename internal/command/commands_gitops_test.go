@@ -19,11 +19,13 @@ func newGitOpsRegistry(t *testing.T) (*command.Registry, *commandtest.GitOps) {
 	reg := command.NewRegistry()
 	be := &commandtest.GitOps{}
 	slugs := map[string]string{"/gh": "me/repo"}
-	local := map[string]bool{"/local": true}
+	// A project without git has no remotes either, so LocalOnly reports it too.
+	local := map[string]bool{"/local": true, "/plain": true}
 	err := command.RegisterGitOps(reg, command.GitOpsDeps{
 		Backend:    be,
 		GitHubSlug: func(c command.Context) string { return slugs[c.ActiveWorktreePath] },
 		LocalOnly:  func(c command.Context) bool { return local[c.ActiveWorktreePath] },
+		NotGit:     func(c command.Context) bool { return c.ActiveWorktreePath == "/plain" },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -36,6 +38,7 @@ func TestGitOpsAvailability(t *testing.T) {
 	wt := command.Context{ActiveRepoID: "r", ActiveWorktreePath: "/wt"}
 	gh := command.Context{ActiveRepoID: "r", ActiveWorktreePath: "/gh"}
 	local := command.Context{ActiveRepoID: "l", ActiveWorktreePath: "/local"}
+	plain := command.Context{ActiveRepoID: "p", ActiveWorktreePath: "/plain"}
 	tests := []struct {
 		cmd  string
 		ctx  command.Context
@@ -63,6 +66,12 @@ func TestGitOpsAvailability(t *testing.T) {
 		{"worktree.open.editor", local, true},
 		{"worktree.reveal", local, true},
 		{"view.open.url", local, true},
+		// A project without git: only the folder actions.
+		{"git.fetch", plain, false},
+		{"git.pull", plain, false},
+		{"pr.create", plain, false},
+		{"worktree.open.editor", plain, true},
+		{"worktree.reveal", plain, true},
 	}
 	for _, tt := range tests {
 		c, ok := reg.Get(tt.cmd)
@@ -102,6 +111,8 @@ func TestGitOpsUnavailableSaysWhy(t *testing.T) {
 		{"pr.open", command.Context{ActiveWorktreePath: "/wt"}, nil, "pr.open: not available in this context: repository is not on GitHub"},
 		{"git.fetch", command.Context{}, nil, "git.fetch: not available in this context"},
 		{"pr.create", command.Context{}, nil, "pr.create: not available in this context"},
+		{"git.push", command.Context{ActiveWorktreePath: "/plain"}, nil, "git.push: not available in this context: project is not a git repository"},
+		{"pr.open", command.Context{ActiveWorktreePath: "/plain"}, nil, "pr.open: not available in this context: project is not a git repository"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.wantMsg, func(t *testing.T) {

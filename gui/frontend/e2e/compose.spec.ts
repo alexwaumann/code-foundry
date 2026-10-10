@@ -57,7 +57,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   const palette = page.getByTestId("palette");
   await expect(palette).toHaveAttribute("data-mode", "projects");
   const projects = palette.locator("[data-project]");
-  await expect(projects).toHaveCount(4);
+  await expect(projects).toHaveCount(5);
   await expect(projects.nth(0)).toContainText("CF");
   await expect(projects.nth(0)).toContainText("code-foundry");
   // The subtitle names where the repo lives: its GitHub slug, a remote, or "Local only".
@@ -66,6 +66,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
     "origin · ~/dotfiles",
     "alexwaumann/ghostty-playground · ~/src/ghostty-playground",
     "Local only · ~/src/sketches",
+    "No git · ~/Documents/writing",
   ]);
   await expect(projects.nth(0)).toContainText("⌘1");
   await expect(projects.nth(2)).toContainText("⌘3");

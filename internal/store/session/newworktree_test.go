@@ -270,6 +270,31 @@ func TestCreateNewWorktreeFailures(t *testing.T) {
 	}
 }
 
+// A project without git has only its current checkout: a new worktree is refused
+// before the namer runs, and a plain thread there still starts.
+func TestCreateNewWorktreeInProjectWithoutGit(t *testing.T) {
+	e, rr := newWorktreeEnv(t, nil)
+	dir := t.TempDir()
+	rr.Put(repo.Repo{ID: "plain", Path: dir, Name: "notes", Worktrees: []repo.Worktree{{RepoID: "plain", Path: dir, IsMain: true}}})
+	_, err := e.m.Create(e.ctx(), CreateOptions{RepoID: "plain", NewWorktree: &NewWorktree{}, InitialPrompt: "fix it"})
+	if !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "notes is not a git repository") {
+		t.Fatalf("err = %v", err)
+	}
+	if len(rr.created()) != 0 {
+		t.Fatalf("worktrees created: %+v", rr.created())
+	}
+	e.mu.Lock()
+	named := slices.Clone(e.named)
+	e.mu.Unlock()
+	if len(named) != 0 {
+		t.Fatalf("namer called: %v", named)
+	}
+	s, err := e.m.Create(e.ctx(), CreateOptions{RepoID: "plain"})
+	if err != nil || s.WorktreePath != dir {
+		t.Fatalf("thread in the checkout = %+v, %v", s, err)
+	}
+}
+
 func TestCreateNewWorktreeNeedsRepoStore(t *testing.T) {
 	e := newEnv(t, func(o *Options) { o.Repos = nil })
 	if _, err := e.m.Create(e.ctx(), CreateOptions{RepoID: "r1", NewWorktree: &NewWorktree{}}); !errors.Is(err, ErrFailedPrecondition) {

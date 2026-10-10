@@ -69,6 +69,12 @@ func newHarness(t *testing.T) *harness {
 			t.Fatal(err)
 		}
 	}
+	// A project without git: never a member.
+	h.repos.NotGit = true
+	if _, err := h.repos.Register(ctx, "/src/notes"); err != nil {
+		t.Fatal(err)
+	}
+	h.repos.NotGit = false
 	h.m = h.open()
 	return h
 }
@@ -189,6 +195,7 @@ func TestCreateRefusals(t *testing.T) {
 		{"repo twice", CreateOptions{Name: "x", Members: []MemberSpec{{Repo: "web"}, {Repo: id("web")}}}, ErrInvalidArgument, "twice"},
 		{"bad base", CreateOptions{Name: "x", Members: []MemberSpec{{Repo: "web", BaseRef: "--upload-pack=x"}}}, ErrInvalidArgument, "base ref"},
 		{"name taken", CreateOptions{Name: "taken", Members: []MemberSpec{{Repo: "lib"}}}, ErrFailedPrecondition, "exists"},
+		{"project without git", CreateOptions{Name: "x", Members: []MemberSpec{{Repo: "web"}, {Repo: "notes"}}}, ErrFailedPrecondition, "notes is not a git repository"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -245,6 +252,7 @@ func TestAddRepo(t *testing.T) {
 		{"by cwd", AddRepoOptions{Ref: Ref{Cwd: h.wt("web", "cf/x") + "/src"}, Member: MemberSpec{Repo: "api"}, Fetch: true}, nil, ""},
 		{"already a member", AddRepoOptions{Ref: Ref{Workspace: "x"}, Member: MemberSpec{Repo: "web"}}, ErrFailedPrecondition, "already in workspace x"},
 		{"unknown workspace", AddRepoOptions{Ref: Ref{Workspace: "y"}, Member: MemberSpec{Repo: "lib"}}, ErrNotFound, "workspace"},
+		{"project without git", AddRepoOptions{Ref: Ref{Workspace: "x"}, Member: MemberSpec{Repo: "notes"}}, ErrFailedPrecondition, "not a git repository"},
 		{"cwd outside", AddRepoOptions{Ref: Ref{Cwd: "/elsewhere"}, Member: MemberSpec{Repo: "lib"}}, ErrNotFound, "not inside"},
 		{"by id with base", AddRepoOptions{Ref: Ref{Workspace: w.ID}, Member: MemberSpec{Repo: "lib", BaseRef: "v1.2"}}, nil, ""},
 	}

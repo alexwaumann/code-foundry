@@ -41,6 +41,10 @@ type GitOpsDeps struct {
 	// repository with no git remote. git.fetch, git.pull, git.push and pr.* are
 	// unavailable then. Nil means never.
 	LocalOnly func(Context) bool
+	// NotGit reports a project without git: git.fetch, git.pull, git.push and pr.* are
+	// unavailable there, explained as such rather than as a missing remote. Nil means
+	// never.
+	NotGit NotGitFunc
 }
 
 // noRemote is why remote operations are unavailable in a local-only repository.
@@ -105,13 +109,16 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 	if localOnly == nil {
 		localOnly = func(Context) bool { return false }
 	}
-	hasRemote := func(c Context) bool { return hasActiveWorktree(c) && !localOnly(c) }
+	notGit := d.NotGit.or()
+	hasRemote := func(c Context) bool { return hasActiveWorktree(c) && !notGit(c) && !localOnly(c) }
 	hasGitHub := func(c Context) bool { return hasRemote(c) && slug(c) != "" }
 	// whyNoGitHub explains an unavailable pr.* command once a worktree is known.
 	whyNoGitHub := func(c Context) string {
 		switch {
 		case !hasActiveWorktree(c):
 			return ""
+		case notGit(c):
+			return notGitReason
 		case localOnly(c):
 			return noRemote
 		case slug(c) == "":
@@ -120,7 +127,12 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 		return ""
 	}
 	whyNoRemote := func(c Context) string {
-		if hasActiveWorktree(c) && localOnly(c) {
+		switch {
+		case !hasActiveWorktree(c):
+			return ""
+		case notGit(c):
+			return notGitReason
+		case localOnly(c):
 			return noRemote
 		}
 		return ""

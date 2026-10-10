@@ -71,7 +71,7 @@ func newWSEnv(t *testing.T, mutate ...func(*Options)) *wsEnv {
 	if err := os.MkdirAll(we.wt2, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	we.repos.Put(repo.Repo{ID: "r2", Path: we.wt2, Name: "api", Worktrees: []repo.Worktree{{RepoID: "r2", Path: we.wt2, IsMain: true}}})
+	we.repos.Put(repo.Repo{ID: "r2", Path: we.wt2, Name: "api", Git: true, Worktrees: []repo.Worktree{{RepoID: "r2", Path: we.wt2, IsMain: true}}})
 	ws.Put(workspace.Workspace{ID: "w-login", Name: "login", Branch: "cf/login", Members: []workspace.Member{
 		{RepoID: "r1", WorktreePath: we.wt}, {RepoID: "r2", WorktreePath: we.wt2},
 	}})
@@ -206,6 +206,7 @@ func TestCreateNewWorkspace(t *testing.T) {
 		{name: "repository twice", o: CreateOptions{NewWorkspace: &NewWorkspace{Repos: []string{"r1", "repo"}}}, wantErr: ErrInvalidArgument},
 		{name: "cwd repo not listed", o: CreateOptions{RepoID: "r2", NewWorkspace: &NewWorkspace{Repos: []string{"r1"}}}, wantErr: ErrInvalidArgument},
 		{name: "no repositories", o: CreateOptions{NewWorkspace: &NewWorkspace{}}, wantErr: ErrInvalidArgument},
+		{name: "a project without git", o: CreateOptions{NewWorkspace: &NewWorkspace{Repos: []string{"r1", "notes"}}}, wantErr: ErrFailedPrecondition},
 		{name: "bad base", o: CreateOptions{NewWorkspace: &NewWorkspace{Repos: []string{"r1"}, BaseRef: "-x"}}, wantErr: ErrInvalidArgument},
 		{name: "not with a new worktree", o: CreateOptions{NewWorktree: &NewWorktree{}, NewWorkspace: &NewWorkspace{Repos: []string{"r1"}}}, wantErr: ErrInvalidArgument},
 	}
@@ -215,6 +216,7 @@ func TestCreateNewWorkspace(t *testing.T) {
 				o.RefExists = func(_ context.Context, _, ref string) bool { return slices.Contains(tt.taken, ref) }
 			})
 			e.namer = func(string) (string, error) { return "named-fix", nil }
+			e.repos.Put(repo.Repo{ID: "r3", Path: "/src/notes", Name: "notes", Worktrees: []repo.Worktree{{RepoID: "r3", Path: "/src/notes", IsMain: true}}})
 			if tt.existing != "" {
 				e.ws.Put(workspace.Workspace{ID: "w-old", Name: tt.existing, Branch: "cf/other"})
 			}

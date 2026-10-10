@@ -40,6 +40,9 @@ type Fake struct {
 	// Remotes are given to repos created by Register (cloned). Nil, the default,
 	// registers local-only repos; Put sets any remotes directly.
 	Remotes []string
+	// NotGit makes Register create projects without git (Git false, one main worktree
+	// with no branch), like the real store for a plain directory.
+	NotGit bool
 	// Err, when set, is returned by every mutating method.
 	Err error
 	// Calls records method calls, e.g. "Register /x", "Refresh r1".
@@ -116,12 +119,51 @@ func (f *Fake) Register(_ context.Context, path string) (repo.Repo, error) {
 		f.mu.Unlock()
 		return r, nil
 	}
-	remotes := slices.Clone(f.Remotes)
+	remotes, notGit := slices.Clone(f.Remotes), f.NotGit
 	f.mu.Unlock()
 	r := repo.Repo{
 		ID: id, Path: path, Name: filepath.Base(path), RegisteredAt: time.Now(), DefaultBranch: "main", Remotes: remotes,
+		Git:       true,
 		Worktrees: []repo.Worktree{{RepoID: id, Path: path, Branch: "main", IsMain: true}},
 	}
+	if notGit {
+		r.DefaultBranch, r.Remotes, r.Git = "", nil, false
+		r.Worktrees = []repo.Worktree{{RepoID: id, Path: path, IsMain: true}}
+	}
+	f.Put(r)
+	return r, nil
+}
+
+// notGit returns the real store's error for a git operation on a project without
+// git, or nil. f.mu must be held.
+func notGit(r repo.Repo) error {
+	if r.Git {
+		return nil
+	}
+	return fmt.Errorf("%w: %s is %w", repo.ErrFailedPrecondition, r.Name, repo.ErrNotGit)
+}
+
+// InitGit implements repo.Store: the project becomes a git project on main with the
+// main worktree on main.
+func (f *Fake) InitGit(_ context.Context, id string) (repo.Repo, error) {
+	f.mu.Lock()
+	f.Calls = append(f.Calls, "InitGit "+id)
+	if f.Err != nil {
+		defer f.mu.Unlock()
+		return repo.Repo{}, f.Err
+	}
+	r, ok := f.repos[id]
+	if !ok {
+		f.mu.Unlock()
+		return repo.Repo{}, fmt.Errorf("%w: repo %q", repo.ErrNotFound, id)
+	}
+	if r.Git {
+		f.mu.Unlock()
+		return repo.Repo{}, fmt.Errorf("%w: %s is already a git repository", repo.ErrFailedPrecondition, r.Name)
+	}
+	f.mu.Unlock()
+	r.Git, r.DefaultBranch = true, "main"
+	r.Worktrees = []repo.Worktree{{RepoID: id, Path: r.Path, Branch: "main", Head: strings.Repeat("0", 40), IsMain: true}}
 	f.Put(r)
 	return r, nil
 }
@@ -158,6 +200,10 @@ func (f *Fake) CreateWorktree(_ context.Context, o repo.CreateWorktreeOptions) (
 	if !ok {
 		f.mu.Unlock()
 		return repo.Worktree{}, fmt.Errorf("%w: repo %q", repo.ErrNotFound, o.RepoID)
+	}
+	if err := notGit(r); err != nil {
+		f.mu.Unlock()
+		return repo.Worktree{}, err
 	}
 	if o.Branch == "" {
 		f.mu.Unlock()
@@ -239,6 +285,9 @@ func (f *Fake) ListRefs(_ context.Context, repoID string) (repo.Refs, error) {
 	r, ok := f.repos[repoID]
 	if !ok {
 		return repo.Refs{}, fmt.Errorf("%w: repo %q", repo.ErrNotFound, repoID)
+	}
+	if err := notGit(r); err != nil {
+		return repo.Refs{}, err
 	}
 	if refs, ok := f.refs[repoID]; ok {
 		return refs, nil

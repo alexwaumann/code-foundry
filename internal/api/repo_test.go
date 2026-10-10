@@ -144,6 +144,39 @@ func TestRepoRemotes(t *testing.T) {
 	}
 }
 
+func TestRepoWithoutGitAndInitGit(t *testing.T) {
+	fake, c := newRepoServer(t)
+	ctx := context.Background()
+	fake.NotGit = true
+	reg, err := c.Register(ctx, connect.NewRequest(&v1.RegisterRepoRequest{Path: "/code/notes"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := reg.Msg.GetRepo()
+	if r.GetGit() || len(r.GetWorktrees()) != 1 || r.GetWorktrees()[0].GetBranch() != "" || !r.GetWorktrees()[0].GetIsMain() {
+		t.Fatalf("Register = %v", r)
+	}
+	_, err = c.CreateWorktree(ctx, connect.NewRequest(&v1.CreateWorktreeRequest{RepoId: r.GetId(), Branch: "x"}))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "not a git repository") {
+		t.Fatalf("CreateWorktree err = %v", err)
+	}
+	init, err := c.InitGit(ctx, connect.NewRequest(&v1.InitGitRequest{Id: r.GetId()}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g := init.Msg.GetRepo(); !g.GetGit() || g.GetDefaultBranch() != "main" || g.GetWorktrees()[0].GetBranch() != "main" {
+		t.Fatalf("InitGit = %v", g)
+	}
+	for _, tt := range []struct {
+		id   string
+		code connect.Code
+	}{{r.GetId(), connect.CodeFailedPrecondition}, {"nope", connect.CodeNotFound}} {
+		if _, err := c.InitGit(ctx, connect.NewRequest(&v1.InitGitRequest{Id: tt.id})); connect.CodeOf(err) != tt.code {
+			t.Errorf("InitGit(%s) code = %v, want %v", tt.id, connect.CodeOf(err), tt.code)
+		}
+	}
+}
+
 func TestRepoWatch(t *testing.T) {
 	fake, c := newRepoServer(t)
 	ctx, cancel := context.WithCancel(context.Background())

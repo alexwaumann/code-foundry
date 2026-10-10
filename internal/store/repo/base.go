@@ -40,6 +40,10 @@ func (g *Git) resolveBase(ctx context.Context, repoID string) {
 	}
 	m := st.meta.Load()
 	next := &repoBase{}
+	if !m.Git {
+		st.base.Store(next) // no base, and no status to refresh (nogit.go)
+		return
+	}
 	if m.Error == "" && m.DefaultBranch != "" {
 		next.ref = "origin/" + m.DefaultBranch
 		// ^{commit} peels a tag and fails for a non-commit, which rev-list would too.

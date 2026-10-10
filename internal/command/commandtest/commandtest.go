@@ -165,3 +165,12 @@ func (f *Repo) Refresh(_ context.Context, r *connect.Request[v1.RefreshRepoReque
 	f.record(r.Msg)
 	return connect.NewResponse(&v1.RefreshRepoResponse{}), f.Err
 }
+
+// InitGit records the request and returns a git repo on main with that id.
+func (f *Repo) InitGit(_ context.Context, r *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error) {
+	f.record(r.Msg)
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	return connect.NewResponse(&v1.InitGitResponse{Repo: &v1.Repo{Id: r.Msg.GetId(), Name: "notes", Git: true, DefaultBranch: "main"}}), nil
+}

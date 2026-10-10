@@ -68,6 +68,13 @@ describe("addableRepos and repoRef", () => {
     expect(addableRepos(workspaces.byId["w-1"], repos)).toEqual(["dot"]);
     expect(addableRepos(undefined, repos)).toEqual(["api", "dot", "web"]);
   });
+  it("addable: never a project without git", () => {
+    const withNotes: ProjectsRepos = {
+      order: [...repos.order, "notes"],
+      byId: { ...repos.byId, dot: { id: "dot", name: "web", git: true, worktrees: [] }, notes: { id: "notes", name: "notes", git: false, worktrees: [{ path: "/src/notes", isMain: true }] } },
+    };
+    expect(addableRepos(undefined, withNotes)).toEqual(["api", "dot", "web"]);
+  });
   it("repoRef: the name when unique, else the id", () => {
     expect(repoRef(repos, "api")).toBe("api");
     // "dot" is named web too: the name is ambiguous, so its id.

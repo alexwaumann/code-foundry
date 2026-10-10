@@ -21,6 +21,7 @@ type RepoBackend interface {
 	RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error)
 	Refresh(context.Context, *connect.Request[v1.RefreshRepoRequest]) (*connect.Response[v1.RefreshRepoResponse], error)
 	List(context.Context, *connect.Request[v1.ListReposRequest]) (*connect.Response[v1.ListReposResponse], error)
+	InitGit(context.Context, *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error)
 }
 
 var (
@@ -32,18 +33,43 @@ func hasRepo(c Context) bool { return c.ActiveRepoID != "" }
 
 func hasWorktree(c Context) bool { return c.ActiveRepoID != "" && c.ActiveWorktreePath != "" }
 
+// NotGitFunc reports whether the context's worktree (else repo) belongs to a
+// registered project that is not a git repository. Worktree, git and pull request
+// commands are unavailable there; repo.git.init is available only there. A nil
+// NotGitFunc means never (every project is git).
+type NotGitFunc func(Context) bool
+
+// notGitReason is why git commands are unavailable in a project without git.
+const notGitReason = "project is not a git repository"
+
+func (f NotGitFunc) or() NotGitFunc {
+	if f == nil {
+		return func(Context) bool { return false }
+	}
+	return f
+}
+
+// whyNotGit explains an unavailable git command once a project is known.
+func (f NotGitFunc) whyNotGit(c Context) string {
+	if (c.ActiveRepoID != "" || c.ActiveWorktreePath != "") && f(c) {
+		return notGitReason
+	}
+	return ""
+}
+
 // RegisterRepo registers repo.register, repo.unregister, repo.worktree.new,
-// repo.worktree.remove, and repo.refresh.
-func RegisterRepo(r *Registry, b RepoBackend) error {
+// repo.worktree.remove, repo.refresh and repo.git.init.
+func RegisterRepo(r *Registry, b RepoBackend, notGit NotGitFunc) error {
+	notGit = notGit.or()
 	repoArg := ArgSpec{Name: "repo", Type: String, Required: true, Context: ContextRepo, Description: "Repository id"}
 	return r.RegisterAll(
 		Command{
 			Name:        "repo.register",
 			Title:       "Add Project",
-			Description: "Start tracking a git repository as a project. Any path inside the repository works.",
+			Description: "Start tracking a folder as a project. A path inside a git repository adds that repository; any other folder is added as a project without git.",
 			Category:    "Project",
 			Args: []ArgSpec{
-				{Name: "path", Type: Path, Required: true, Description: "Path inside the repository"},
+				{Name: "path", Type: Path, Required: true, Description: "Folder, or a path inside a git repository"},
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Register(ctx, connect.NewRequest(&v1.RegisterRepoRequest{Path: a.Path("path")}))
@@ -81,7 +107,8 @@ func RegisterRepo(r *Registry, b RepoBackend) error {
 				{Name: "base", Type: String, Description: "Ref to branch from (default: the default branch)"},
 				{Name: "fetch", Type: Bool, Default: "true", Description: "Fetch the remote base branch first (bounded; a failed fetch uses the local copy)"},
 			},
-			When: hasRepo,
+			When:           func(c Context) bool { return hasRepo(c) && !notGit(c) },
+			WhyUnavailable: notGit.whyNotGit,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.CreateWorktree(ctx, connect.NewRequest(&v1.CreateWorktreeRequest{
 					RepoId:  a.String("repo"),
@@ -107,8 +134,9 @@ func RegisterRepo(r *Registry, b RepoBackend) error {
 				{Name: "delete-branch", Type: Bool, Description: "Also delete the branch"},
 				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes"},
 			},
-			When:    hasWorktree,
-			Confirm: "Remove worktree {path}? This deletes files on disk.",
+			When:           func(c Context) bool { return hasWorktree(c) && !notGit(c) },
+			WhyUnavailable: notGit.whyNotGit,
+			Confirm:        "Remove worktree {path}? This deletes files on disk.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				path := a.Path("path")
 				if _, err := b.RemoveWorktree(ctx, connect.NewRequest(&v1.RemoveWorktreeRequest{
@@ -141,5 +169,6 @@ func RegisterRepo(r *Registry, b RepoBackend) error {
 				return Result{Message: "refreshed " + id}, nil
 			},
 		},
+		gitInitCommand(b, repoArg, notGit),
 	)
 }

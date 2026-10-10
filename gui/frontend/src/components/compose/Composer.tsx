@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { ArrowUp, Brain, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, Paperclip, ShieldCheck, X } from "lucide-react";
+import { ArrowUp, Brain, Folder, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, Paperclip, ShieldCheck, X } from "lucide-react";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { BranchIndicator } from "./BranchIndicator";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { MemberChips, type MemberChipModel } from "./MemberChips";
 import { PromptEditor, type PromptEditorHandle } from "./PromptEditor";
+import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { ATTACHMENT_MIME_TYPES } from "@/api/session";
 import {
   choiceLabel,
@@ -15,8 +16,10 @@ import {
   draftMembers,
   EFFORT_CHOICES,
   MODEL_CHOICES,
+  NEW_BRANCH,
   PERMISSION_CHOICES,
   pickDefault,
+  projectChipBranch,
   type ComposePermission,
   type ComposeTarget,
   type WorktreeChoice,
@@ -29,6 +32,7 @@ import {
   getDraft,
   isDraftEmpty,
   loadRefs,
+  noGitCheckout,
   openPreview,
   removeAttachment,
   sendDraft,
@@ -94,8 +98,6 @@ function phaseText(phase: DraftPhase, newWorktrees: number): string {
   return newWorktrees === 1 ? "Creating worktree…" : "Starting Claude…";
 }
 
-const NEW_BRANCH = "cf/…";
-
 /** A workspace's members (repo id + worktree path), shallow-stable. */
 function useWorkspaceMembers(workspaceId: string | null): { repoId: string; worktreePath: string }[] {
   const keys = useWorkspacesStore(useShallow((s) => (workspaceId ? (s.byId[workspaceId]?.members ?? []).map((m) => m.repoId + SEP + m.worktreePath) : [])));
@@ -129,7 +131,8 @@ function useCheckout(repoId: string, path: string): WorktreeOption | undefined {
 function useMembers(target: ComposeTarget, key: string) {
   const alsoIn = useDraft(key, "alsoIn");
   const primaryChoice = useDraft(key, "primary");
-  const known = useReposStore(useShallow((s) => s.order));
+  // Git projects only: a project without git is never an Also in project.
+  const known = useReposStore(useShallow((s) => s.order.filter((id) => s.byId[id]?.git === true)));
   const wsMembers = useWorkspaceMembers(target.kind === "workspace" ? target.workspaceId : null);
   return useMemo(() => {
     const workspace = target.kind === "workspace" ? { id: target.workspaceId, members: wsMembers } : undefined;
@@ -138,8 +141,19 @@ function useMembers(target: ComposeTarget, key: string) {
   }, [target, alsoIn, primaryChoice, known, wsMembers]);
 }
 
-/** A workspace member's chip: the branch its worktree has checked out (else the workspace branch). */
-function useMemberChips(target: ComposeTarget, repoIds: readonly string[], wsMembers: readonly { repoId: string; worktreePath: string }[], newWorktrees: boolean): MemberChipModel[] {
+/**
+ * The member chips. A workspace member's: the branch its worktree has checked out (else the
+ * workspace branch), "cf/…" in new-worktree mode. A project's: `projectChip`
+ * (projectChipBranch), the same for every project of the draft (with Also in projects the
+ * mode is always new worktrees).
+ */
+function useMemberChips(
+  target: ComposeTarget,
+  repoIds: readonly string[],
+  wsMembers: readonly { repoId: string; worktreePath: string }[],
+  newWorktrees: boolean,
+  projectChip: { branch: string; noGit: boolean },
+): MemberChipModel[] {
   const wsId = target.kind === "workspace" ? target.workspaceId : "";
   const branches = useReposStore(
     useShallow((s) =>
@@ -153,11 +167,11 @@ function useMemberChips(target: ComposeTarget, repoIds: readonly string[], wsMem
   return useMemo(
     () =>
       repoIds.map((repoId, i) => {
-        if (target.kind === "project") return { repoId, branch: NEW_BRANCH, removable: i > 0 };
+        if (target.kind === "project") return { repoId, branch: projectChip.branch, noGit: projectChip.noGit, removable: i > 0 };
         const j = wsMembers.findIndex((m) => m.repoId === repoId);
         return { repoId, branch: newWorktrees ? NEW_BRANCH : branches[j] || wsBranch, removable: false };
       }),
-    [target, repoIds, wsMembers, branches, wsBranch, newWorktrees],
+    [target, repoIds, wsMembers, branches, wsBranch, newWorktrees, projectChip.branch, projectChip.noGit],
   );
 }
 
@@ -278,6 +292,8 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   const defaultRef = useComposeStore((s) => s.refs[primary]?.defaultRef ?? "");
   const projectId = target.kind === "project" ? target.repoId : "";
   const worktrees = useWorktrees(projectId);
+  // A project without git runs threads in its folder only: Current checkout, no base.
+  const noGitPath = useReposStore((s) => noGitCheckout(s.byId[projectId]));
   const wsBranch = useWorkspacesStore((s) => (target.kind === "workspace" ? (s.byId[target.workspaceId]?.branch ?? "") : ""));
   const primaryCheckout = useCheckout(primary, wsMembers.find((m) => m.repoId === primary)?.worktreePath ?? "");
   const focusSeq = useUiStore((s) => s.composerFocusSeq);
@@ -288,15 +304,22 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   const busy = phase !== "idle";
   const multi = target.kind === "project" && repoIds.length > 1;
   const worktree: WorktreeChoice =
-    target.kind === "workspace" ? (choice.kind === "new" ? choice : { kind: "members" }) : multi ? { kind: "new" } : resolveWorktree(choice, worktrees);
+    target.kind === "workspace"
+      ? choice.kind === "new"
+        ? choice
+        : { kind: "members" }
+      : noGitPath !== undefined
+        ? { kind: "existing", path: noGitPath }
+        : multi
+          ? { kind: "new" }
+          : resolveWorktree(choice, worktrees);
   const newWorktrees = worktree.kind !== "new" ? 0 : target.kind === "workspace" || multi ? repoIds.length : 1;
-  const chips = useMemberChips(target, repoIds, wsMembers, worktree.kind === "new");
   const base = baseChoice ?? defaultRef;
   const canSend = !busy && (text.trim() !== "" || hasAttachments);
 
   useEffect(() => {
-    if (primary) void loadRefs(primary);
-  }, [primary]);
+    if (primary && noGitPath === undefined) void loadRefs(primary);
+  }, [primary, noGitPath]);
 
   // Focus on mount and on request (the picker, the sidebar "+"). Deferred a frame so the
   // closing palette dialog has released focus.
@@ -337,6 +360,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
         },
       ];
     }
+    if (noGitPath !== undefined) return [{ options: [{ value: noGitPath, label: "Current checkout", detail: `${tildify(noGitPath)} · not a git repository` }] }];
     if (multi) return [{ options: [{ value: "new", label: "New worktree", detail: NEW_IN_EVERY }] }];
     return [
       { options: [{ value: "new", label: "New worktree", detail: "A cf/… branch named from the prompt" }] },
@@ -349,10 +373,26 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
         })),
       },
     ];
-  }, [target.kind, multi, wsBranch, projects, worktrees]);
+  }, [target.kind, multi, wsBranch, projects, worktrees, noGitPath]);
   const chosen = worktree.kind === "existing" ? worktrees.find((w) => w.path === worktree.path) : undefined;
-  const worktreeText = worktree.kind === "members" ? "Workspace worktrees" : !chosen ? "New worktree" : chosen.isMain ? "Current checkout" : `Existing worktree: ${worktreeName(chosen)}`;
-  const worktreeIcon = worktree.kind === "members" ? Layers : !chosen ? GitBranchPlus : chosen.isMain ? FolderGit2 : GitBranch;
+  const chips = useMemberChips(
+    target,
+    repoIds,
+    wsMembers,
+    worktree.kind === "new",
+    projectChipBranch({ noGit: noGitPath !== undefined, newWorktree: worktree.kind === "new", checkout: chosen }),
+  );
+  const worktreeText =
+    noGitPath !== undefined
+      ? "Current checkout"
+      : worktree.kind === "members"
+        ? "Workspace worktrees"
+        : !chosen
+          ? "New worktree"
+          : chosen.isMain
+            ? "Current checkout"
+            : `Existing worktree: ${worktreeName(chosen)}`;
+  const worktreeIcon = noGitPath !== undefined ? Folder : worktree.kind === "members" ? Layers : !chosen ? GitBranchPlus : chosen.isMain ? FolderGit2 : GitBranch;
 
   // ListRefs order (local branches, then remote-tracking refs), the default first.
   const refGroups = useMemo<PickerGroup[]>(() => {
@@ -363,7 +403,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
 
   return (
     <div onKeyDown={cycleStops}>
-      <MemberChips draftKey={draftKey} members={chips} primary={primary} canAdd={target.kind === "project"} disabled={busy} />
+      <MemberChips draftKey={draftKey} members={chips} primary={primary} canAdd={target.kind === "project" && noGitPath === undefined} disabled={busy} />
       <div
         className="grid grid-cols-[minmax(0,1fr)_auto]"
         data-testid="composer-card"
@@ -510,7 +550,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
             contentClassName="w-80"
             data-testid="composer-worktree"
           />
-          {chosen && <BranchIndicator worktree={chosen} />}
+          {noGitPath !== undefined ? <NoGitBadge className="mx-1 h-6 rounded-md px-1.5 text-xs" /> : chosen && <BranchIndicator worktree={chosen} />}
           {worktree.kind === "members" && primaryCheckout && <BranchIndicator worktree={primaryCheckout} />}
           {worktree.kind === "new" && (
             <ComposerPicker

@@ -46,6 +46,10 @@ clone`) needs both; PR 4 (`repo.create`, publish via `gh repo create`) needs 3.
 
 * PR 1 (`FilesystemService.ListDirectories`, palette path completion, native folder
   picker, `repo.Options.AllowedRoot`) done: `docs/notes/add-project-1-paths.md`.
+* PR 2 (projects without git: `Repo.git`, the synthetic checkout, `RepoService.InitGit`
+  and `repo.git.init`, git gating of worktree/git/pr commands and workspaces, the No git
+  badge and overview, Publish to GitHub placeholder for remoteless repos) done:
+  `docs/notes/add-project-2-nogit.md`.
 
 ### Open items
 

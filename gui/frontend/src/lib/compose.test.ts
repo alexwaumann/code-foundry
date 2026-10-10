@@ -8,6 +8,7 @@ import {
   isWorkspaceKey,
   pickDefault,
   MODEL_CHOICES,
+  projectChipBranch,
   projectHue,
   projectInitials,
   repoSource,
@@ -111,6 +112,18 @@ describe("workspaces", () => {
     ["a workspace in new-worktree mode: a new workspace with its projects", { ...workspace, worktree: { kind: "new" }, base: "origin/x" }, {}, { kind: "new-workspace", repoIds: ["web", "api"], repoId: "web", base: "origin/x" }],
     ["a workspace that is gone", workspace, { workspace: undefined }, null],
     ["a workspace with no members", workspace, { workspace: { id: "w-1", members: [] } }, null],
+    [
+      "a project without git: its current checkout, whatever the draft says",
+      { ...project, target: { kind: "project", repoId: "notes" }, alsoIn: ["api"], base: "origin/dev" },
+      { noGitCheckout: (id) => (id === "notes" ? "/src/notes" : undefined) },
+      { kind: "project", repoId: "notes", worktree: { kind: "existing", path: "/src/notes" }, base: "" },
+    ],
+    [
+      "a git project is unaffected by noGitCheckout",
+      project,
+      { noGitCheckout: (id) => (id === "notes" ? "/src/notes" : undefined) },
+      { kind: "project", repoId: "web", worktree: { kind: "new" }, base: "origin/main" },
+    ],
   ])("threadPlace: %s", (_name, d, over, want) => {
     expect(threadPlace(d, { ...env, ...over })).toEqual(want);
   });
@@ -151,6 +164,19 @@ describe("checkoutBranch", () => {
   });
 });
 
+describe("projectChipBranch", () => {
+  it.each<[string, Parameters<typeof projectChipBranch>[0], ReturnType<typeof projectChipBranch>]>([
+    ["a project without git: no branch, the badge", { noGit: true, newWorktree: false, checkout: { branch: "", head: "" } }, { branch: "", noGit: true }],
+    ["without git, even if a draft asked for a new worktree", { noGit: true, newWorktree: true }, { branch: "", noGit: true }],
+    ["a new worktree: the cf/… placeholder", { noGit: false, newWorktree: true, checkout: { branch: "main", head: "3c3c4651" } }, { branch: "cf/…", noGit: false }],
+    ["the current checkout: its branch", { noGit: false, newWorktree: false, checkout: { branch: "main", head: "3c3c4651" } }, { branch: "main", noGit: false }],
+    ["an existing worktree, detached: its short head", { noGit: false, newWorktree: false, checkout: { branch: "", head: "9a8b7c6d5e" } }, { branch: "9a8b7c6", noGit: false }],
+    ["an existing checkout not known yet", { noGit: false, newWorktree: false }, { branch: "", noGit: false }],
+  ])("%s", (_name, p, want) => {
+    expect(projectChipBranch(p)).toEqual(want);
+  });
+});
+
 describe("helpers", () => {
   it("createdSessionId reads the Session JSON", () => {
     expect(createdSessionId('{"id":"s-1a2b","worktreePath":"/x"}')).toBe("s-1a2b");
@@ -178,6 +204,8 @@ describe("helpers", () => {
 
   it.each([
     [{ githubSlug: "", remotes: [] }, "Local only"],
+    [{ githubSlug: "", remotes: [], git: true }, "Local only"],
+    [{ githubSlug: "", remotes: [], git: false }, "No git"],
     [{ githubSlug: "alexwaumann/app", remotes: ["origin"] }, "alexwaumann/app"],
     [{ githubSlug: "", remotes: ["gitlab", "origin"] }, "origin"],
     [{ githubSlug: "", remotes: ["upstream"] }, "upstream"],

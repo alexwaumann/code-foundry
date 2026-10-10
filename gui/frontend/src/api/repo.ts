@@ -45,7 +45,21 @@ export interface RepoView {
   githubSlug: string;
   /** Configured git remotes ("origin", …), sorted; empty for a local-only repository. */
   remotes: string[];
+  /**
+   * The project is a git repository. Without git it has one synthetic main worktree
+   * (its folder) with an empty branch and head and a zero status, which nothing may
+   * render as a real branch or status: show the "No git" state instead.
+   */
+  git: boolean;
   worktrees: WorktreeView[];
+}
+
+/**
+ * A git repository with no remote (not one without git): offers Publish to GitHub.
+ * Shown only once the repo has been reconciled (it has a worktree).
+ */
+export function isRemoteless(r: Pick<RepoView, "git" | "remotes" | "worktrees">): boolean {
+  return r.git && r.remotes.length === 0 && r.worktrees.length > 0;
 }
 
 export type RepoEventView =
@@ -102,6 +116,7 @@ export function toRepoView(r: Repo): RepoView {
     defaultBranch: r.defaultBranch,
     githubSlug: r.githubSlug,
     remotes: [...r.remotes],
+    git: r.git,
     worktrees: r.worktrees.map(toWorktreeView),
   };
 }

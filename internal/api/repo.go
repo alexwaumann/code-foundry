@@ -103,6 +103,15 @@ func (h *Repo) RemoveWorktree(ctx context.Context, req *connect.Request[v1.Remov
 	return connect.NewResponse(&v1.RemoveWorktreeResponse{}), nil
 }
 
+// InitGit makes a project without git a git repository.
+func (h *Repo) InitGit(ctx context.Context, req *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error) {
+	r, err := h.store.InitGit(ctx, req.Msg.GetId())
+	if err != nil {
+		return nil, repoError(err)
+	}
+	return connect.NewResponse(&v1.InitGitResponse{Repo: repoToProto(r)}), nil
+}
+
 // Refresh reconciles one repo (or all) and waits for fresh status.
 func (h *Repo) Refresh(ctx context.Context, req *connect.Request[v1.RefreshRepoRequest]) (*connect.Response[v1.RefreshRepoResponse], error) {
 	if err := h.store.Refresh(ctx, req.Msg.GetId()); err != nil {
@@ -199,7 +208,7 @@ func reposToProto(rs []repo.Repo) []*v1.Repo {
 func repoToProto(r repo.Repo) *v1.Repo {
 	p := &v1.Repo{
 		Id: r.ID, Path: r.Path, Name: r.Name, DefaultBranch: r.DefaultBranch,
-		GithubSlug: r.GitHubSlug, Error: r.Error, Remotes: r.Remotes,
+		GithubSlug: r.GitHubSlug, Error: r.Error, Remotes: r.Remotes, Git: r.Git,
 		Worktrees: make([]*v1.Worktree, len(r.Worktrees)),
 	}
 	if !r.RegisteredAt.IsZero() {

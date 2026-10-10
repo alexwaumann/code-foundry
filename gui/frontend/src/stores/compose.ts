@@ -13,7 +13,7 @@
  * session.new registry command, like every other user action.
  */
 import { create } from "zustand";
-import { listRefs } from "@/api/repo";
+import { listRefs, type RepoView } from "@/api/repo";
 import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIME_TYPES, stageAttachment } from "@/api/session";
 import { isOutdatedDaemon } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
@@ -265,7 +265,8 @@ export async function loadRefs(repoId: string): Promise<void> {
 export function draftPlace(target: ComposeTarget, d: Draft): ThreadPlace | null {
   const repos = useReposStore.getState().byId;
   const workspace = target.kind === "workspace" ? useWorkspacesStore.getState().byId[target.workspaceId] : undefined;
-  const isRepo = (id: string) => id in repos;
+  // A project without git is never an Also in project (a new workspace needs git).
+  const isRepo = (id: string) => repos[id]?.git === true;
   const { primary } = draftMembers({ target, alsoIn: d.alsoIn, primary: d.primary }, workspace, isRepo);
   return threadPlace(
     { target, worktree: d.worktree, base: d.base, alsoIn: d.alsoIn, primary: d.primary },
@@ -274,8 +275,15 @@ export function draftPlace(target: ComposeTarget, d: Draft): ThreadPlace | null 
       isRepo,
       hasWorktree: (repoId, path) => repos[repoId]?.worktrees.some((w) => w.path === path) ?? false,
       defaultRef: useComposeStore.getState().refs[primary]?.defaultRef ?? "",
+      noGitCheckout: (repoId) => noGitCheckout(repos[repoId]),
     },
   );
+}
+
+/** The one checkout of a project without git (its main worktree, else its path); undefined for git or unknown. */
+export function noGitCheckout(r: Pick<RepoView, "git" | "path" | "worktrees"> | undefined): string | undefined {
+  if (!r || r.git) return undefined;
+  return r.worktrees.find((w) => w.isMain)?.path ?? r.path;
 }
 
 /**

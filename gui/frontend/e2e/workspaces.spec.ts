@@ -54,7 +54,7 @@ test("pick a workspace: member chips, the primary is changeable, the thread is t
   await expect(options.first()).toHaveAttribute("data-workspace", "w-000000000001");
   await expect(options.first()).toContainText("login");
   await expect(options.first().getByTestId("workspace-detail")).toHaveText("cf/login · code-foundry, ghostty-playground");
-  await expect(palette.locator("[data-project]")).toHaveCount(4);
+  await expect(palette.locator("[data-project]")).toHaveCount(5);
   await expect(palette.locator("[cmdk-group-heading]")).toHaveText(["Workspaces", "Projects"]);
   await expect(page.getByPlaceholder("Search workspaces and projects…")).toBeFocused();
   // Nothing in context: the first row (the workspace) is highlighted; Enter picks it.

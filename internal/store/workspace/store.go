@@ -146,6 +146,9 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Workspace, error
 		if err != nil {
 			return Workspace{}, err
 		}
+		if err := RequireGit(r); err != nil {
+			return Workspace{}, err
+		}
 		if slices.ContainsFunc(plans, func(p plan) bool { return p.r.ID == r.ID }) {
 			return Workspace{}, fmt.Errorf("%w: repository %s is listed twice", ErrInvalidArgument, r.Name)
 		}
@@ -197,6 +200,9 @@ func (m *Manager) AddRepo(ctx context.Context, o AddRepoOptions) (Workspace, err
 	}
 	r, err := ResolveRepo(m.opts.Repos.Snapshot(), o.Member.Repo)
 	if err != nil {
+		return Workspace{}, err
+	}
+	if err := RequireGit(r); err != nil {
 		return Workspace{}, err
 	}
 	if mem, ok := w.Member(r.ID); ok {
