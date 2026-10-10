@@ -50,6 +50,8 @@
  *   POST /__mock/update/latest?version=v0.2.0     (what the next check finds)
  *   POST /__mock/update/fail?reason=…             (the next install fails)
  *   POST /__mock/update/disabled?reason=dev%20build
+ *        app.restart (Restart Now) and daemon.restart come back as the installed version;
+ *        GET /__mock/update counts app.restart runs (restarts)
  *   POST /__mock/gh/update | poll | stale | auth?ok=false | touch?path=…   (GitHub + detail)
  *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts)
  *   POST /__mock/gh/pr-fail?command=pr.refresh             (that command's next run fails;
@@ -389,7 +391,7 @@ function updateControl(res: ServerResponse, action: string, q: URLSearchParams):
 
 function updateSummary(): Record<string, unknown> {
   const s = world.update.status;
-  return { state: UpdateState[s.state], current: s.currentVersion, target: s.targetVersion, progress: s.progress, relaunches: world.update.relaunches };
+  return { state: UpdateState[s.state], current: s.currentVersion, target: s.targetVersion, progress: s.progress, relaunches: world.update.relaunches, restarts: world.update.restarts };
 }
 
 async function* filterEvents(src: AsyncGenerator<{ source: EventSource; event: EventInit }>, want: Set<EventSource>): AsyncGenerator<EventInit> {

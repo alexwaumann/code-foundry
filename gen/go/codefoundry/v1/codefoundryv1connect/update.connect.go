@@ -41,6 +41,9 @@ const (
 	UpdateServiceInstallProcedure = "/codefoundry.v1.UpdateService/Install"
 	// UpdateServiceRelaunchProcedure is the fully-qualified name of the UpdateService's Relaunch RPC.
 	UpdateServiceRelaunchProcedure = "/codefoundry.v1.UpdateService/Relaunch"
+	// UpdateServiceRequestRestartProcedure is the fully-qualified name of the UpdateService's
+	// RequestRestart RPC.
+	UpdateServiceRequestRestartProcedure = "/codefoundry.v1.UpdateService/RequestRestart"
 	// UpdateServiceWatchProcedure is the fully-qualified name of the UpdateService's Watch RPC.
 	UpdateServiceWatchProcedure = "/codefoundry.v1.UpdateService/Watch"
 )
@@ -60,7 +63,13 @@ type UpdateServiceClient interface {
 	// Relaunch asks every connected GUI to relaunch itself (to pick up an installed
 	// update). Moves INSTALLED to RESTART_REQUIRED.
 	Relaunch(context.Context, *connect.Request[v1.RelaunchAppRequest]) (*connect.Response[v1.RelaunchAppResponse], error)
-	// Watch streams the status on connect and on every change, plus relaunch requests.
+	// RequestRestart tells every connected GUI that the daemon is about to restart: each
+	// relaunches once its Watch stream ends. It does not restart anything itself and does
+	// not change the status; the `app.restart` command calls it right before stopping the
+	// daemon. Clients wanting a restart invoke `app.restart`, not this.
+	RequestRestart(context.Context, *connect.Request[v1.RequestRestartRequest]) (*connect.Response[v1.RequestRestartResponse], error)
+	// Watch streams the status on connect and on every change, plus relaunch and restart
+	// requests.
 	Watch(context.Context, *connect.Request[v1.WatchUpdateRequest]) (*connect.ServerStreamForClient[v1.UpdateEvent], error)
 }
 
@@ -99,6 +108,12 @@ func NewUpdateServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(updateServiceMethods.ByName("Relaunch")),
 			connect.WithClientOptions(opts...),
 		),
+		requestRestart: connect.NewClient[v1.RequestRestartRequest, v1.RequestRestartResponse](
+			httpClient,
+			baseURL+UpdateServiceRequestRestartProcedure,
+			connect.WithSchema(updateServiceMethods.ByName("RequestRestart")),
+			connect.WithClientOptions(opts...),
+		),
 		watch: connect.NewClient[v1.WatchUpdateRequest, v1.UpdateEvent](
 			httpClient,
 			baseURL+UpdateServiceWatchProcedure,
@@ -110,11 +125,12 @@ func NewUpdateServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 
 // updateServiceClient implements UpdateServiceClient.
 type updateServiceClient struct {
-	get      *connect.Client[v1.GetUpdateStatusRequest, v1.GetUpdateStatusResponse]
-	check    *connect.Client[v1.CheckForUpdateRequest, v1.CheckForUpdateResponse]
-	install  *connect.Client[v1.InstallUpdateRequest, v1.InstallUpdateResponse]
-	relaunch *connect.Client[v1.RelaunchAppRequest, v1.RelaunchAppResponse]
-	watch    *connect.Client[v1.WatchUpdateRequest, v1.UpdateEvent]
+	get            *connect.Client[v1.GetUpdateStatusRequest, v1.GetUpdateStatusResponse]
+	check          *connect.Client[v1.CheckForUpdateRequest, v1.CheckForUpdateResponse]
+	install        *connect.Client[v1.InstallUpdateRequest, v1.InstallUpdateResponse]
+	relaunch       *connect.Client[v1.RelaunchAppRequest, v1.RelaunchAppResponse]
+	requestRestart *connect.Client[v1.RequestRestartRequest, v1.RequestRestartResponse]
+	watch          *connect.Client[v1.WatchUpdateRequest, v1.UpdateEvent]
 }
 
 // Get calls codefoundry.v1.UpdateService.Get.
@@ -137,6 +153,11 @@ func (c *updateServiceClient) Relaunch(ctx context.Context, req *connect.Request
 	return c.relaunch.CallUnary(ctx, req)
 }
 
+// RequestRestart calls codefoundry.v1.UpdateService.RequestRestart.
+func (c *updateServiceClient) RequestRestart(ctx context.Context, req *connect.Request[v1.RequestRestartRequest]) (*connect.Response[v1.RequestRestartResponse], error) {
+	return c.requestRestart.CallUnary(ctx, req)
+}
+
 // Watch calls codefoundry.v1.UpdateService.Watch.
 func (c *updateServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchUpdateRequest]) (*connect.ServerStreamForClient[v1.UpdateEvent], error) {
 	return c.watch.CallServerStream(ctx, req)
@@ -157,7 +178,13 @@ type UpdateServiceHandler interface {
 	// Relaunch asks every connected GUI to relaunch itself (to pick up an installed
 	// update). Moves INSTALLED to RESTART_REQUIRED.
 	Relaunch(context.Context, *connect.Request[v1.RelaunchAppRequest]) (*connect.Response[v1.RelaunchAppResponse], error)
-	// Watch streams the status on connect and on every change, plus relaunch requests.
+	// RequestRestart tells every connected GUI that the daemon is about to restart: each
+	// relaunches once its Watch stream ends. It does not restart anything itself and does
+	// not change the status; the `app.restart` command calls it right before stopping the
+	// daemon. Clients wanting a restart invoke `app.restart`, not this.
+	RequestRestart(context.Context, *connect.Request[v1.RequestRestartRequest]) (*connect.Response[v1.RequestRestartResponse], error)
+	// Watch streams the status on connect and on every change, plus relaunch and restart
+	// requests.
 	Watch(context.Context, *connect.Request[v1.WatchUpdateRequest], *connect.ServerStream[v1.UpdateEvent]) error
 }
 
@@ -192,6 +219,12 @@ func NewUpdateServiceHandler(svc UpdateServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(updateServiceMethods.ByName("Relaunch")),
 		connect.WithHandlerOptions(opts...),
 	)
+	updateServiceRequestRestartHandler := connect.NewUnaryHandler(
+		UpdateServiceRequestRestartProcedure,
+		svc.RequestRestart,
+		connect.WithSchema(updateServiceMethods.ByName("RequestRestart")),
+		connect.WithHandlerOptions(opts...),
+	)
 	updateServiceWatchHandler := connect.NewServerStreamHandler(
 		UpdateServiceWatchProcedure,
 		svc.Watch,
@@ -208,6 +241,8 @@ func NewUpdateServiceHandler(svc UpdateServiceHandler, opts ...connect.HandlerOp
 			updateServiceInstallHandler.ServeHTTP(w, r)
 		case UpdateServiceRelaunchProcedure:
 			updateServiceRelaunchHandler.ServeHTTP(w, r)
+		case UpdateServiceRequestRestartProcedure:
+			updateServiceRequestRestartHandler.ServeHTTP(w, r)
 		case UpdateServiceWatchProcedure:
 			updateServiceWatchHandler.ServeHTTP(w, r)
 		default:
@@ -233,6 +268,10 @@ func (UnimplementedUpdateServiceHandler) Install(context.Context, *connect.Reque
 
 func (UnimplementedUpdateServiceHandler) Relaunch(context.Context, *connect.Request[v1.RelaunchAppRequest]) (*connect.Response[v1.RelaunchAppResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.UpdateService.Relaunch is not implemented"))
+}
+
+func (UnimplementedUpdateServiceHandler) RequestRestart(context.Context, *connect.Request[v1.RequestRestartRequest]) (*connect.Response[v1.RequestRestartResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.UpdateService.RequestRestart is not implemented"))
 }
 
 func (UnimplementedUpdateServiceHandler) Watch(context.Context, *connect.Request[v1.WatchUpdateRequest], *connect.ServerStream[v1.UpdateEvent]) error {

@@ -34,7 +34,8 @@ Three processes, one protocol.
   deliberately thin: window, menu, native dialogs, and injecting the daemon's address and
   token into the page. It also adopts the user's login-shell PATH when it was started
   with launchd's minimal one, auto-starts the daemon from the CLI installed next to it,
-  and relaunches itself when the daemon asks (`app.relaunch`). No business logic lives
+  and relaunches itself when the daemon asks (`app.relaunch` at once, `app.restart` once
+  the daemon has exited). No business logic lives
   in the Wails host.
 * **CLI** subcommands (`code-foundry new-session --repo foo`, `code-foundry focus <id>`, …)
   are clients of the same daemon API. A Claude Code session running inside the app can call
@@ -161,10 +162,13 @@ Services (v1):
   stream; the per-service Watch RPCs remain for the CLI and tests.
 * `SettingsService` — GetSchema, Get, Update, Watch over `$CONFIG/settings.toml` (TOML,
   hand-editable, reloaded on change). See `docs/notes/phase3b-settings.md`.
-* `UpdateService` — Get, Check, Install, Relaunch, Watch. The 24h release check, install
-  progress, and relaunch requests. Nothing restarts automatically; `daemon.restart`
-  (a confirmed command: it closes every live session) exits, and the next client starts
-  the installed binary.
+* `UpdateService` — Get, Check, Install, Relaunch, RequestRestart, Watch. The 24h release
+  check, install progress, and relaunch and restart requests. Nothing restarts
+  automatically. `app.restart` (the GUI's "Restart Now"; confirmed, warning about busy
+  threads) publishes `restart_requested`, then the daemon exits like `daemon.restart`;
+  GUI hosts relaunch once their Watch stream ends and the new window auto-starts the
+  installed daemon. `app.relaunch` and `daemon.restart` do the halves separately. See
+  `docs/notes/update-restart.md`.
 * `WorkspaceService` — List, Create, AddRepo, RemoveRepo, Remove, Members (by id, name,
   or a path inside a member worktree), Watch. See `docs/notes/workspaces-1-store.md`.
   The GUI gets workspaces from EventService's `workspace` source (a `workspaces` slice),

@@ -72,6 +72,8 @@ export class MockUpdater {
   /** Install progress step interval. */
   stepMs = 250;
   relaunches = 0;
+  /** app.restart runs (Restart Now). */
+  restarts = 0;
   private timers: ReturnType<typeof setTimeout>[] = [];
 
   constructor(
@@ -87,6 +89,7 @@ export class MockUpdater {
     this.latest = "v0.1.0";
     this.failNext = "";
     this.relaunches = 0;
+    this.restarts = 0;
     this.status = {
       state: UpdateState.IDLE,
       currentVersion: "v0.1.0",
@@ -230,6 +233,28 @@ export class MockUpdater {
         cmd: { name: "app.relaunch", title: "Relaunch App", category: "App", description: "Quit and reopen the app window", keybindings: [], args: [] },
         when: always,
         run: () => (this.relaunch() === 0 ? "no app window is connected; open it with `code-foundry gui`" : "relaunching the app"),
+      },
+      {
+        // The update dialog's Restart Now (confirmed: the dialog is the confirmation). The
+        // real daemon closes sessions, asks the window host to relaunch once it has exited,
+        // and exits; the mock comes back as the installed version, like daemon.restart.
+        cmd: {
+          name: "app.restart",
+          title: "Restart Code Foundry",
+          category: "App",
+          description: "Close every session, restart the daemon and reopen the app window",
+          keybindings: [],
+          args: [],
+          confirm: () => {
+            const n = this.liveSessions();
+            return `Close ${String(n)} session${n === 1 ? "" : "s"} and restart Code Foundry?`;
+          },
+        },
+        when: always,
+        run: () => {
+          this.restarts++;
+          return this.restart().replace("restarting the daemon", "restarting Code Foundry");
+        },
       },
       {
         cmd: {

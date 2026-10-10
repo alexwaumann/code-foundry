@@ -11,7 +11,8 @@ import (
 )
 
 // Update is a fake command.UpdateBackend. Every call returns Status (Install moves it to
-// DOWNLOADING first); Err, when set, is returned instead. Relaunch reports Delivered.
+// DOWNLOADING first); Err, when set, is returned instead. Relaunch and RequestRestart
+// report Delivered.
 type Update struct {
 	Calls
 	Err       error
@@ -69,4 +70,13 @@ func (u *Update) Relaunch(_ context.Context, r *connect.Request[v1.RelaunchAppRe
 		return nil, u.Err
 	}
 	return connect.NewResponse(&v1.RelaunchAppResponse{Delivered: u.Delivered}), nil
+}
+
+// RequestRestart reports Delivered.
+func (u *Update) RequestRestart(_ context.Context, r *connect.Request[v1.RequestRestartRequest]) (*connect.Response[v1.RequestRestartResponse], error) {
+	u.record(r.Msg)
+	if u.Err != nil {
+		return nil, u.Err
+	}
+	return connect.NewResponse(&v1.RequestRestartResponse{Delivered: u.Delivered}), nil
 }

@@ -12,11 +12,14 @@ import (
 
 // Session is a fake command.SessionBackend. Err, when set, is returned by every call.
 // Sessions returned by Create/Fork/Reconnect/Rename echo the request; Get returns
-// Current (default: a CONNECTED session with the requested id).
+// Current (default: a CONNECTED session with the requested id). List returns Current
+// and Others.
 type Session struct {
 	Calls
 	Err     error
 	Current *v1.Session
+	// Others are listed after Current.
+	Others []*v1.Session
 }
 
 var _ command.SessionBackend = (*Session)(nil)
@@ -60,7 +63,7 @@ func (s *Session) Fork(_ context.Context, r *connect.Request[v1.ForkSessionReque
 	return connect.NewResponse(&v1.ForkSessionResponse{Session: &v1.Session{Id: "s2", ParentId: r.Msg.GetId(), Name: r.Msg.GetName()}}), nil
 }
 
-// List returns Current, if set.
+// List returns Current, if set, then Others.
 func (s *Session) List(_ context.Context, r *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
@@ -69,6 +72,7 @@ func (s *Session) List(_ context.Context, r *connect.Request[v1.ListSessionsRequ
 	if s.Current != nil {
 		out = append(out, s.Current)
 	}
+	out = append(out, s.Others...)
 	return connect.NewResponse(&v1.ListSessionsResponse{Sessions: out}), nil
 }
 
