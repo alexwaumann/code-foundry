@@ -101,6 +101,16 @@ func realPath(p string) string {
 	return filepath.Join(realPath(parent), filepath.Base(p))
 }
 
+// RequireGit refuses a project without git as a workspace member: a member is a
+// worktree on the workspace branch, which needs git. Repositories without a remote
+// are fine.
+func RequireGit(r repo.Repo) error {
+	if r.Git {
+		return nil
+	}
+	return fmt.Errorf("%w: %s is not a git repository; workspaces need git in every project", ErrFailedPrecondition, r.Name)
+}
+
 // ResolveRepo finds a registered repository by id, by name when exactly one has it,
 // or by an absolute path inside its main worktree or any of its worktrees.
 func ResolveRepo(snap *repo.Snapshot, ref string) (repo.Repo, error) {

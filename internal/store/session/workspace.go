@@ -196,6 +196,9 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 		if err != nil {
 			return cw, workspaceError("repository", err)
 		}
+		if err := workspace.RequireGit(r); err != nil {
+			return cw, workspaceError("repository", err)
+		}
 		if slices.Contains(ids, r.ID) {
 			return cw, fmt.Errorf("%w: repository %s is listed twice", ErrInvalidArgument, r.Name)
 		}
