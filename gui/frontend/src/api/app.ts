@@ -1,5 +1,5 @@
 import { Browser, Events } from "@wailsio/runtime";
-import { Info, PickDirectory, SetZoom } from "../../bindings/github.com/alexwaumann/code-foundry/gui/appservice";
+import { Info, PickDirectory, Relaunch, SetZoom } from "../../bindings/github.com/alexwaumann/code-foundry/gui/appservice";
 
 /** The Wails host (window shell). */
 export interface AppInfoView {
@@ -58,6 +58,17 @@ export async function setHostZoom(percent: number): Promise<void> {
   } catch (err: unknown) {
     console.warn("host zoom", err);
   }
+}
+
+/**
+ * Asks the Wails host to quit and start its executable again (gui/app.go Relaunch), so the
+ * window runs what is on disk and reconnects to whichever daemon is running then.
+ * Resolves false without a host; with one the promise may never settle (the page goes away).
+ */
+export async function relaunchApp(): Promise<boolean> {
+  if (!(await appInfo())) return false;
+  await Relaunch();
+  return true;
 }
 
 /** Calls fn when the app menu's "Check for Updates…" is chosen. Returns an unsubscribe. */

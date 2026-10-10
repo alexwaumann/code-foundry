@@ -1,5 +1,5 @@
 import { create } from "@bufbuild/protobuf";
-import { ConnectError } from "@connectrpc/connect";
+import { Code, ConnectError } from "@connectrpc/connect";
 import {
   ArgType,
   CommandService,
@@ -95,6 +95,11 @@ export function confirmationOf(err: unknown): ConfirmationView | null {
   if (!(err instanceof ConnectError)) return null;
   const [d] = err.findDetails(ConfirmationRequiredSchema);
   return d ? { command: d.command, title: d.title, message: d.message } : null;
+}
+
+/** Invoke failed because the daemon has no such command (an older daemon): NotFound. */
+export function isUnknownCommand(err: unknown): boolean {
+  return err instanceof ConnectError && err.code === Code.NotFound;
 }
 
 export function toUiContext(ctx: UiContextView): UiContext {

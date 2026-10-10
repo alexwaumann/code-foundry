@@ -1,11 +1,13 @@
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
-import { appInfo, onCheckForUpdatesMenu } from "@/api/app";
+import { appInfo, onCheckForUpdatesMenu, relaunchApp } from "@/api/app";
+import { invokeCommand, isUnknownCommand } from "@/api/command";
 import { errorMessage } from "@/api/stream";
 import type { UpdateEventView, UpdateStatusView } from "@/api/update";
-import { invokeConfirmed, refreshCommands } from "./commands";
+import { invokeConfirmed, refreshCommands, useCommandsStore } from "./commands";
 import { getUiContext } from "./context";
-import { useSessionsStore } from "./sessions";
+import { isRunning, useSessionsStore } from "./sessions";
 
 export type UpdateAction = "check" | "install" | "relaunch" | "restart";
 
@@ -17,6 +19,8 @@ interface UpdateSlice {
   dialogOpen: boolean;
   /** An action the dialog started and is waiting on. */
   pending: UpdateAction | null;
+  /** Restart Now succeeded: the dialog shows "Restarting…" until the window goes away. */
+  restarting: boolean;
   error: string | null;
 }
 
@@ -25,6 +29,7 @@ export const useUpdateStore = create<UpdateSlice>()(() => ({
   guiVersion: null,
   dialogOpen: false,
   pending: null,
+  restarting: false,
   error: null,
 }));
 
@@ -43,9 +48,27 @@ export function applyUpdateEvent(ev: UpdateEventView): void {
   if (prev?.state !== ev.status.state || prev.targetVersion !== ev.status.targetVersion) void refreshCommands();
 }
 
-/** Sessions with a running process: the ones a daemon restart closes. */
+/** Sessions with a running process: the ones a restart closes. */
 export function useLiveSessionCount(): number {
-  return useSessionsStore((s) => Object.values(s.byId).filter((x) => x.state !== "disconnected").length);
+  return useSessionsStore((s) => {
+    let n = 0;
+    for (const id of s.order) if (s.byId[id] && s.byId[id].state !== "disconnected") n++;
+    return n;
+  });
+}
+
+/** Names of the live sessions that are mid-turn (busy), in sidebar order. */
+export function useBusyThreadNames(): string[] {
+  return useSessionsStore(
+    useShallow((s) => {
+      const names: string[] = [];
+      for (const id of s.order) {
+        const x = s.byId[id];
+        if (x && isRunning(x)) names.push(x.name || "Untitled thread");
+      }
+      return names;
+    }),
+  );
 }
 
 export function openUpdateDialog(opts: { check?: boolean } = {}): void {
@@ -54,31 +77,55 @@ export function openUpdateDialog(opts: { check?: boolean } = {}): void {
 }
 
 export function closeUpdateDialog(): void {
-  useUpdateStore.setState({ dialogOpen: false, pending: null, error: null });
+  useUpdateStore.setState({ dialogOpen: false, pending: null, restarting: false, error: null });
 }
 
-const actionCommands: Record<UpdateAction, string> = {
+const actionCommands: Record<Exclude<UpdateAction, "restart">, string> = {
   check: "app.update.check",
   install: "app.update",
   relaunch: "app.relaunch",
-  restart: "daemon.restart",
 };
 
 /**
- * Runs an update command through the registry (like every user action). The dialog
+ * Restart Now: app.restart closes the sessions, asks the window host to relaunch once
+ * the daemon has exited, and exits. The dialog is the confirmation, so it goes in with
+ * confirmed set (no second confirm dialog). A daemon older than app.restart (absent
+ * from the command list, or NotFound) gets daemon.restart and the host's own Relaunch.
+ */
+async function restartApp(): Promise<void> {
+  const ctx = getUiContext();
+  const commands = useCommandsStore.getState().commands;
+  const known = commands.length === 0 || commands.some((c) => c.name === "app.restart");
+  if (known) {
+    try {
+      await invokeCommand("app.restart", ctx, {}, undefined, { confirmed: true });
+      return;
+    } catch (err) {
+      if (!isUnknownCommand(err)) throw err;
+    }
+  }
+  await invokeCommand("daemon.restart", ctx, {}, undefined, { confirmed: true });
+  // Without a host (browser dev) there is nothing to relaunch; the page reconnects.
+  void relaunchApp().catch((err: unknown) => {
+    console.warn("relaunch", err);
+  });
+}
+
+/**
+ * Runs an update action through the registry (like every user action). The dialog
  * renders progress from the status events; errors land in the dialog, not a toast.
- * daemon.restart is a confirmed command: the registry's confirm dialog asks first (with
- * the live-session count) and declining leaves the dialog as it was.
+ * Restart switches the dialog to "Restarting…" and keeps it open: the window goes away.
  */
 export async function runUpdateAction(action: UpdateAction): Promise<boolean> {
   useUpdateStore.setState({ pending: action, error: null });
   try {
+    if (action === "restart") {
+      await restartApp();
+      useUpdateStore.setState({ restarting: true, dialogOpen: true });
+      return true;
+    }
     const res = await invokeConfirmed(actionCommands[action], {}, getUiContext());
     if (!res) return false;
-    if (action === "restart") {
-      toast.info("Restarting the daemon", { description: res.message });
-      closeUpdateDialog();
-    }
     if (action === "relaunch" && res.message.startsWith("no app window")) toast.info(res.message);
     return true;
   } catch (err) {
