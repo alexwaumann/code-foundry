@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CircleX, GitFork, Loader2, OctagonX, Pencil, Power, RefreshCw } from "lucide-react";
+import { CircleX, GitFork, Layers, Loader2, OctagonX, Pencil, Power, RefreshCw } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { PaneHeader } from "@/components/window/PaneHeader";
@@ -67,6 +67,8 @@ function HeaderActions({ session }: { session: boolean }) {
           <CommandButton command="session.rename" icon={Pencil} />
           <CommandButton command="session.fork" icon={GitFork} />
           <CommandButton command="session.close" icon={Power} />
+          {/* Only listed for a workspace thread (view.panel.workspace's availability). */}
+          <CommandButton command="view.panel.workspace" icon={Layers} data-testid="pane-workspace" />
         </>
       ) : (
         <CommandButton command="terminal.kill" icon={OctagonX} />

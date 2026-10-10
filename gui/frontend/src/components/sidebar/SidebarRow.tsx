@@ -13,6 +13,7 @@ import { useSessionsStore } from "@/stores/sessions";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
+import { openWorkspaceSurface } from "@/stores/workspacePanel";
 
 interface RowProps {
   row: Row;
@@ -134,10 +135,15 @@ function WorkspaceBadge({ id }: { id: string }) {
   const workspace = useWorkspacesStore((st) => threadRowModel(s, NO_REPOS, st).workspace);
   if (workspace === null) return null;
   return (
+    // A click opens the workspace surface in the thread's side panel; the click goes on
+    // to the row, which selects the thread (and so shows that panel).
     <span
-      className="flex max-w-24 min-w-0 items-center gap-0.5 rounded-sm bg-violet-400/15 px-1 text-[10px] leading-4 font-medium text-violet-300"
-      title={`Workspace ${workspace}`}
+      className="flex max-w-24 min-w-0 cursor-pointer items-center gap-0.5 rounded-sm bg-violet-400/15 px-1 text-[10px] leading-4 font-medium text-violet-300 hover:bg-violet-400/30"
+      title={`Workspace ${workspace}: show its members in the side panel`}
       data-testid="row-workspace"
+      onClick={() => {
+        openWorkspaceSurface({ kind: "session", id });
+      }}
     >
       <Layers className="size-2.5 shrink-0" aria-hidden />
       <span className="truncate">{workspace}</span>

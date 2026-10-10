@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { FolderGit2, FolderOpen, FolderPlus, Layers, Sparkles, SquareTerminal, Trash2, Unlink } from "lucide-react";
+import { FolderGit2, FolderOpen, FolderPlus, Layers, PanelRight, Sparkles, SquareTerminal, Trash2, Unlink } from "lucide-react";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { SectionTitle } from "@/components/prs/PrBits";
 import { RowList } from "@/components/prs/RowList";
@@ -13,8 +13,11 @@ import { cn } from "@/lib/utils";
 import { composeIn, composeInWorkspace } from "@/stores/compose";
 import { newTerminalIn, openProject, openWorktree, registerProject, removeWorkspace, removeWorktree, unregisterProject } from "@/stores/projectActions";
 import { findWorktree, useReposStore } from "@/stores/repos";
+import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
+import { showWorkspaceInThread } from "@/stores/workspacePanel";
 import { useWorkspacesStore } from "@/stores/workspaces";
+import { liveWorkspaceThread } from "@/surfaces/workspaceTarget";
 import { WorkspaceMembers } from "./WorkspaceMembers";
 import { RowAction, WorktreeState } from "./WorktreeState";
 
@@ -119,6 +122,9 @@ function ProjectBlock({ project }: { project: ProjectModel }) {
 function WorkspaceBlock({ id }: { id: string }) {
   const name = useWorkspacesStore((s) => s.byId[id]?.name ?? id);
   const branch = useWorkspacesStore((s) => s.byId[id]?.branch ?? "");
+  // A live thread of the workspace: the row can show the workspace surface in its panel.
+  const thread = useSessionsStore((s) => liveWorkspaceThread(s, id));
+  const threadName = useSessionsStore((s) => (thread ? s.byId[thread]?.name || thread : ""));
   return (
     <section className="rounded-md border" data-testid="workspace" data-workspace={id}>
       <NavRow navKey={workspaceKey(id)} className="group/ws flex h-9 items-center gap-2 rounded-b-none border-b px-2" title="Enter or double-click: new thread in this workspace">
@@ -130,6 +136,11 @@ function WorkspaceBlock({ id }: { id: string }) {
           {branch}
         </span>
         <span className="ml-auto flex shrink-0 items-center">
+          {thread && (
+            <RowAction label={`Show in ${threadName}'s side panel`} testId="workspace-show-panel" onClick={() => { showWorkspaceInThread(thread); }}>
+              <PanelRight />
+            </RowAction>
+          )}
           <RowAction label="New thread in this workspace" testId="workspace-new-thread" onClick={() => { composeInWorkspace(id); }}>
             <Sparkles />
           </RowAction>
