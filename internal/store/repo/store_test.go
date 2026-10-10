@@ -551,8 +551,11 @@ func TestRegisterErrors(t *testing.T) {
 	base, _ := filepath.EvalSymlinks(t.TempDir())
 	bare := filepath.Join(base, "bare.git")
 	git(t, base, "init", "-q", "--bare", bare)
+	// A file outside any repository: a project is a directory.
+	file := filepath.Join(base, "notes.txt")
+	writeFile(t, file, "x\n")
 	h := startHarness(t, "", Options{})
-	for _, p := range []string{"", base, bare, filepath.Join(base, "missing")} {
+	for _, p := range []string{"", bare, filepath.Join(base, "missing"), file} {
 		if _, err := h.store.Register(context.Background(), p); !errors.Is(err, ErrInvalidArgument) {
 			t.Errorf("Register(%q) err = %v, want ErrInvalidArgument", p, err)
 		}

@@ -41,7 +41,11 @@ type Repo struct {
 	Error string `protobuf:"bytes,8,opt,name=error,proto3" json:"error,omitempty"`
 	// Configured git remotes ("origin", …), sorted. Empty for a local-only repository:
 	// fetch, pull, push and pull-request actions are unavailable then.
-	Remotes       []string `protobuf:"bytes,9,rep,name=remotes,proto3" json:"remotes,omitempty"`
+	Remotes []string `protobuf:"bytes,9,rep,name=remotes,proto3" json:"remotes,omitempty"`
+	// The project is a git repository. A project without git has one synthetic main
+	// worktree at path with empty branch and head and a zero status, no remotes and no
+	// default branch; worktree, ref, detail and git operations are unavailable for it.
+	Git           bool `protobuf:"varint,10,opt,name=git,proto3" json:"git,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -137,6 +141,13 @@ func (x *Repo) GetRemotes() []string {
 		return x.Remotes
 	}
 	return nil
+}
+
+func (x *Repo) GetGit() bool {
+	if x != nil {
+		return x.Git
+	}
+	return false
 }
 
 type Worktree struct {
@@ -1041,6 +1052,94 @@ func (x *ListRefsResponse) GetDefaultRef() string {
 	return ""
 }
 
+type InitGitRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InitGitRequest) Reset() {
+	*x = InitGitRequest{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InitGitRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InitGitRequest) ProtoMessage() {}
+
+func (x *InitGitRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InitGitRequest.ProtoReflect.Descriptor instead.
+func (*InitGitRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *InitGitRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type InitGitResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Repo          *Repo                  `protobuf:"bytes,1,opt,name=repo,proto3" json:"repo,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InitGitResponse) Reset() {
+	*x = InitGitResponse{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InitGitResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InitGitResponse) ProtoMessage() {}
+
+func (x *InitGitResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InitGitResponse.ProtoReflect.Descriptor instead.
+func (*InitGitResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *InitGitResponse) GetRepo() *Repo {
+	if x != nil {
+		return x.Repo
+	}
+	return nil
+}
+
 type RefreshRepoRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1050,7 +1149,7 @@ type RefreshRepoRequest struct {
 
 func (x *RefreshRepoRequest) Reset() {
 	*x = RefreshRepoRequest{}
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1062,7 +1161,7 @@ func (x *RefreshRepoRequest) String() string {
 func (*RefreshRepoRequest) ProtoMessage() {}
 
 func (x *RefreshRepoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1075,7 +1174,7 @@ func (x *RefreshRepoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshRepoRequest.ProtoReflect.Descriptor instead.
 func (*RefreshRepoRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{17}
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *RefreshRepoRequest) GetId() string {
@@ -1093,7 +1192,7 @@ type RefreshRepoResponse struct {
 
 func (x *RefreshRepoResponse) Reset() {
 	*x = RefreshRepoResponse{}
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1105,7 +1204,7 @@ func (x *RefreshRepoResponse) String() string {
 func (*RefreshRepoResponse) ProtoMessage() {}
 
 func (x *RefreshRepoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1118,7 +1217,7 @@ func (x *RefreshRepoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshRepoResponse.ProtoReflect.Descriptor instead.
 func (*RefreshRepoResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{18}
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{20}
 }
 
 // The first event of every Watch stream is a snapshot of all repositories; live changes
@@ -1133,7 +1232,7 @@ type WatchReposRequest struct {
 
 func (x *WatchReposRequest) Reset() {
 	*x = WatchReposRequest{}
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1145,7 +1244,7 @@ func (x *WatchReposRequest) String() string {
 func (*WatchReposRequest) ProtoMessage() {}
 
 func (x *WatchReposRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1158,7 +1257,7 @@ func (x *WatchReposRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchReposRequest.ProtoReflect.Descriptor instead.
 func (*WatchReposRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{19}
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{21}
 }
 
 type RepoEvent struct {
@@ -1178,7 +1277,7 @@ type RepoEvent struct {
 
 func (x *RepoEvent) Reset() {
 	*x = RepoEvent{}
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1190,7 +1289,7 @@ func (x *RepoEvent) String() string {
 func (*RepoEvent) ProtoMessage() {}
 
 func (x *RepoEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1203,7 +1302,7 @@ func (x *RepoEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RepoEvent.ProtoReflect.Descriptor instead.
 func (*RepoEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{20}
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *RepoEvent) GetEvent() isRepoEvent_Event {
@@ -1322,7 +1421,7 @@ type WorktreeDetailRef struct {
 
 func (x *WorktreeDetailRef) Reset() {
 	*x = WorktreeDetailRef{}
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1334,7 +1433,7 @@ func (x *WorktreeDetailRef) String() string {
 func (*WorktreeDetailRef) ProtoMessage() {}
 
 func (x *WorktreeDetailRef) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1347,7 +1446,7 @@ func (x *WorktreeDetailRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorktreeDetailRef.ProtoReflect.Descriptor instead.
 func (*WorktreeDetailRef) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{21}
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *WorktreeDetailRef) GetRepoId() string {
@@ -1381,7 +1480,7 @@ type GetWorktreeDetailRequest struct {
 
 func (x *GetWorktreeDetailRequest) Reset() {
 	*x = GetWorktreeDetailRequest{}
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1393,7 +1492,7 @@ func (x *GetWorktreeDetailRequest) String() string {
 func (*GetWorktreeDetailRequest) ProtoMessage() {}
 
 func (x *GetWorktreeDetailRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1406,7 +1505,7 @@ func (x *GetWorktreeDetailRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorktreeDetailRequest.ProtoReflect.Descriptor instead.
 func (*GetWorktreeDetailRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{22}
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetWorktreeDetailRequest) GetRepoId() string {
@@ -1432,7 +1531,7 @@ type GetWorktreeDetailResponse struct {
 
 func (x *GetWorktreeDetailResponse) Reset() {
 	*x = GetWorktreeDetailResponse{}
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1444,7 +1543,7 @@ func (x *GetWorktreeDetailResponse) String() string {
 func (*GetWorktreeDetailResponse) ProtoMessage() {}
 
 func (x *GetWorktreeDetailResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1457,7 +1556,7 @@ func (x *GetWorktreeDetailResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorktreeDetailResponse.ProtoReflect.Descriptor instead.
 func (*GetWorktreeDetailResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{23}
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *GetWorktreeDetailResponse) GetDetail() *WorktreeDetail {
@@ -1498,7 +1597,7 @@ type WorktreeDetail struct {
 
 func (x *WorktreeDetail) Reset() {
 	*x = WorktreeDetail{}
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1510,7 +1609,7 @@ func (x *WorktreeDetail) String() string {
 func (*WorktreeDetail) ProtoMessage() {}
 
 func (x *WorktreeDetail) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1523,7 +1622,7 @@ func (x *WorktreeDetail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorktreeDetail.ProtoReflect.Descriptor instead.
 func (*WorktreeDetail) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{24}
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *WorktreeDetail) GetRepoId() string {
@@ -1627,7 +1726,7 @@ type FileChange struct {
 
 func (x *FileChange) Reset() {
 	*x = FileChange{}
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[25]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1639,7 +1738,7 @@ func (x *FileChange) String() string {
 func (*FileChange) ProtoMessage() {}
 
 func (x *FileChange) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[25]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1652,7 +1751,7 @@ func (x *FileChange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileChange.ProtoReflect.Descriptor instead.
 func (*FileChange) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{25}
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *FileChange) GetPath() string {
@@ -1725,7 +1824,7 @@ type LogEntry struct {
 
 func (x *LogEntry) Reset() {
 	*x = LogEntry{}
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[26]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1737,7 +1836,7 @@ func (x *LogEntry) String() string {
 func (*LogEntry) ProtoMessage() {}
 
 func (x *LogEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[26]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1750,7 +1849,7 @@ func (x *LogEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogEntry.ProtoReflect.Descriptor instead.
 func (*LogEntry) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{26}
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *LogEntry) GetSha() string {
@@ -1804,7 +1903,7 @@ type RepoSnapshot struct {
 
 func (x *RepoSnapshot) Reset() {
 	*x = RepoSnapshot{}
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[27]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1816,7 +1915,7 @@ func (x *RepoSnapshot) String() string {
 func (*RepoSnapshot) ProtoMessage() {}
 
 func (x *RepoSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[27]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1829,7 +1928,7 @@ func (x *RepoSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RepoSnapshot.ProtoReflect.Descriptor instead.
 func (*RepoSnapshot) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{27}
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *RepoSnapshot) GetRepos() []*Repo {
@@ -1849,7 +1948,7 @@ type WorktreeRef struct {
 
 func (x *WorktreeRef) Reset() {
 	*x = WorktreeRef{}
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[28]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1861,7 +1960,7 @@ func (x *WorktreeRef) String() string {
 func (*WorktreeRef) ProtoMessage() {}
 
 func (x *WorktreeRef) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_repo_proto_msgTypes[28]
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1874,7 +1973,7 @@ func (x *WorktreeRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorktreeRef.ProtoReflect.Descriptor instead.
 func (*WorktreeRef) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{28}
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *WorktreeRef) GetRepoId() string {
@@ -1895,7 +1994,7 @@ var File_codefoundry_v1_repo_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_repo_proto_rawDesc = "" +
 	"\n" +
-	"\x19codefoundry/v1/repo.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xaf\x02\n" +
+	"\x19codefoundry/v1/repo.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc1\x02\n" +
 	"\x04Repo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x12\n" +
@@ -1906,7 +2005,9 @@ const file_codefoundry_v1_repo_proto_rawDesc = "" +
 	"\tworktrees\x18\x06 \x03(\v2\x18.codefoundry.v1.WorktreeR\tworktrees\x12?\n" +
 	"\rregistered_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\fregisteredAt\x12\x14\n" +
 	"\x05error\x18\b \x01(\tR\x05error\x12\x18\n" +
-	"\aremotes\x18\t \x03(\tR\aremotes\"\xcb\x01\n" +
+	"\aremotes\x18\t \x03(\tR\aremotes\x12\x10\n" +
+	"\x03git\x18\n" +
+	" \x01(\bR\x03git\"\xcb\x01\n" +
 	"\bWorktree\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x16\n" +
@@ -1967,7 +2068,11 @@ const file_codefoundry_v1_repo_proto_rawDesc = "" +
 	"\x10ListRefsResponse\x12\x12\n" +
 	"\x04refs\x18\x01 \x03(\tR\x04refs\x12\x1f\n" +
 	"\vdefault_ref\x18\x02 \x01(\tR\n" +
-	"defaultRef\"$\n" +
+	"defaultRef\" \n" +
+	"\x0eInitGitRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\";\n" +
+	"\x0fInitGitResponse\x12(\n" +
+	"\x04repo\x18\x01 \x01(\v2\x14.codefoundry.v1.RepoR\x04repo\"$\n" +
 	"\x12RefreshRepoRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x15\n" +
 	"\x13RefreshRepoResponse\"\x13\n" +
@@ -2028,7 +2133,7 @@ const file_codefoundry_v1_repo_proto_rawDesc = "" +
 	"\x05repos\x18\x01 \x03(\v2\x14.codefoundry.v1.RepoR\x05repos\":\n" +
 	"\vWorktreeRef\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path2\x82\a\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path2\xd0\a\n" +
 	"\vRepoService\x12W\n" +
 	"\bRegister\x12#.codefoundry.v1.RegisterRepoRequest\x1a$.codefoundry.v1.RegisterRepoResponse\"\x00\x12]\n" +
 	"\n" +
@@ -2040,7 +2145,8 @@ const file_codefoundry_v1_repo_proto_rawDesc = "" +
 	"\aRefresh\x12\".codefoundry.v1.RefreshRepoRequest\x1a#.codefoundry.v1.RefreshRepoResponse\"\x00\x12I\n" +
 	"\x05Watch\x12!.codefoundry.v1.WatchReposRequest\x1a\x19.codefoundry.v1.RepoEvent\"\x000\x01\x12j\n" +
 	"\x11GetWorktreeDetail\x12(.codefoundry.v1.GetWorktreeDetailRequest\x1a).codefoundry.v1.GetWorktreeDetailResponse\"\x00\x12O\n" +
-	"\bListRefs\x12\x1f.codefoundry.v1.ListRefsRequest\x1a .codefoundry.v1.ListRefsResponse\"\x00B\xc1\x01\n" +
+	"\bListRefs\x12\x1f.codefoundry.v1.ListRefsRequest\x1a .codefoundry.v1.ListRefsResponse\"\x00\x12L\n" +
+	"\aInitGit\x12\x1e.codefoundry.v1.InitGitRequest\x1a\x1f.codefoundry.v1.InitGitResponse\"\x00B\xc1\x01\n" +
 	"\x12com.codefoundry.v1B\tRepoProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
@@ -2055,7 +2161,7 @@ func file_codefoundry_v1_repo_proto_rawDescGZIP() []byte {
 	return file_codefoundry_v1_repo_proto_rawDescData
 }
 
-var file_codefoundry_v1_repo_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
+var file_codefoundry_v1_repo_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_codefoundry_v1_repo_proto_goTypes = []any{
 	(*Repo)(nil),                      // 0: codefoundry.v1.Repo
 	(*Worktree)(nil),                  // 1: codefoundry.v1.Worktree
@@ -2074,66 +2180,71 @@ var file_codefoundry_v1_repo_proto_goTypes = []any{
 	(*RemoveWorktreeResponse)(nil),    // 14: codefoundry.v1.RemoveWorktreeResponse
 	(*ListRefsRequest)(nil),           // 15: codefoundry.v1.ListRefsRequest
 	(*ListRefsResponse)(nil),          // 16: codefoundry.v1.ListRefsResponse
-	(*RefreshRepoRequest)(nil),        // 17: codefoundry.v1.RefreshRepoRequest
-	(*RefreshRepoResponse)(nil),       // 18: codefoundry.v1.RefreshRepoResponse
-	(*WatchReposRequest)(nil),         // 19: codefoundry.v1.WatchReposRequest
-	(*RepoEvent)(nil),                 // 20: codefoundry.v1.RepoEvent
-	(*WorktreeDetailRef)(nil),         // 21: codefoundry.v1.WorktreeDetailRef
-	(*GetWorktreeDetailRequest)(nil),  // 22: codefoundry.v1.GetWorktreeDetailRequest
-	(*GetWorktreeDetailResponse)(nil), // 23: codefoundry.v1.GetWorktreeDetailResponse
-	(*WorktreeDetail)(nil),            // 24: codefoundry.v1.WorktreeDetail
-	(*FileChange)(nil),                // 25: codefoundry.v1.FileChange
-	(*LogEntry)(nil),                  // 26: codefoundry.v1.LogEntry
-	(*RepoSnapshot)(nil),              // 27: codefoundry.v1.RepoSnapshot
-	(*WorktreeRef)(nil),               // 28: codefoundry.v1.WorktreeRef
-	(*timestamppb.Timestamp)(nil),     // 29: google.protobuf.Timestamp
+	(*InitGitRequest)(nil),            // 17: codefoundry.v1.InitGitRequest
+	(*InitGitResponse)(nil),           // 18: codefoundry.v1.InitGitResponse
+	(*RefreshRepoRequest)(nil),        // 19: codefoundry.v1.RefreshRepoRequest
+	(*RefreshRepoResponse)(nil),       // 20: codefoundry.v1.RefreshRepoResponse
+	(*WatchReposRequest)(nil),         // 21: codefoundry.v1.WatchReposRequest
+	(*RepoEvent)(nil),                 // 22: codefoundry.v1.RepoEvent
+	(*WorktreeDetailRef)(nil),         // 23: codefoundry.v1.WorktreeDetailRef
+	(*GetWorktreeDetailRequest)(nil),  // 24: codefoundry.v1.GetWorktreeDetailRequest
+	(*GetWorktreeDetailResponse)(nil), // 25: codefoundry.v1.GetWorktreeDetailResponse
+	(*WorktreeDetail)(nil),            // 26: codefoundry.v1.WorktreeDetail
+	(*FileChange)(nil),                // 27: codefoundry.v1.FileChange
+	(*LogEntry)(nil),                  // 28: codefoundry.v1.LogEntry
+	(*RepoSnapshot)(nil),              // 29: codefoundry.v1.RepoSnapshot
+	(*WorktreeRef)(nil),               // 30: codefoundry.v1.WorktreeRef
+	(*timestamppb.Timestamp)(nil),     // 31: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_repo_proto_depIdxs = []int32{
 	1,  // 0: codefoundry.v1.Repo.worktrees:type_name -> codefoundry.v1.Worktree
-	29, // 1: codefoundry.v1.Repo.registered_at:type_name -> google.protobuf.Timestamp
+	31, // 1: codefoundry.v1.Repo.registered_at:type_name -> google.protobuf.Timestamp
 	2,  // 2: codefoundry.v1.Worktree.status:type_name -> codefoundry.v1.GitStatus
-	29, // 3: codefoundry.v1.GitStatus.refreshed_at:type_name -> google.protobuf.Timestamp
+	31, // 3: codefoundry.v1.GitStatus.refreshed_at:type_name -> google.protobuf.Timestamp
 	0,  // 4: codefoundry.v1.RegisterRepoResponse.repo:type_name -> codefoundry.v1.Repo
 	0,  // 5: codefoundry.v1.ListReposResponse.repos:type_name -> codefoundry.v1.Repo
 	0,  // 6: codefoundry.v1.GetRepoResponse.repo:type_name -> codefoundry.v1.Repo
 	1,  // 7: codefoundry.v1.CreateWorktreeResponse.worktree:type_name -> codefoundry.v1.Worktree
-	0,  // 8: codefoundry.v1.RepoEvent.repo_updated:type_name -> codefoundry.v1.Repo
-	1,  // 9: codefoundry.v1.RepoEvent.worktree_updated:type_name -> codefoundry.v1.Worktree
-	28, // 10: codefoundry.v1.RepoEvent.worktree_removed:type_name -> codefoundry.v1.WorktreeRef
-	27, // 11: codefoundry.v1.RepoEvent.snapshot:type_name -> codefoundry.v1.RepoSnapshot
-	21, // 12: codefoundry.v1.RepoEvent.worktree_detail_updated:type_name -> codefoundry.v1.WorktreeDetailRef
-	29, // 13: codefoundry.v1.WorktreeDetailRef.computed_at:type_name -> google.protobuf.Timestamp
-	24, // 14: codefoundry.v1.GetWorktreeDetailResponse.detail:type_name -> codefoundry.v1.WorktreeDetail
-	25, // 15: codefoundry.v1.WorktreeDetail.files:type_name -> codefoundry.v1.FileChange
-	26, // 16: codefoundry.v1.WorktreeDetail.log:type_name -> codefoundry.v1.LogEntry
-	29, // 17: codefoundry.v1.WorktreeDetail.computed_at:type_name -> google.protobuf.Timestamp
-	29, // 18: codefoundry.v1.LogEntry.authored_at:type_name -> google.protobuf.Timestamp
-	0,  // 19: codefoundry.v1.RepoSnapshot.repos:type_name -> codefoundry.v1.Repo
-	3,  // 20: codefoundry.v1.RepoService.Register:input_type -> codefoundry.v1.RegisterRepoRequest
-	5,  // 21: codefoundry.v1.RepoService.Unregister:input_type -> codefoundry.v1.UnregisterRepoRequest
-	7,  // 22: codefoundry.v1.RepoService.List:input_type -> codefoundry.v1.ListReposRequest
-	9,  // 23: codefoundry.v1.RepoService.Get:input_type -> codefoundry.v1.GetRepoRequest
-	11, // 24: codefoundry.v1.RepoService.CreateWorktree:input_type -> codefoundry.v1.CreateWorktreeRequest
-	13, // 25: codefoundry.v1.RepoService.RemoveWorktree:input_type -> codefoundry.v1.RemoveWorktreeRequest
-	17, // 26: codefoundry.v1.RepoService.Refresh:input_type -> codefoundry.v1.RefreshRepoRequest
-	19, // 27: codefoundry.v1.RepoService.Watch:input_type -> codefoundry.v1.WatchReposRequest
-	22, // 28: codefoundry.v1.RepoService.GetWorktreeDetail:input_type -> codefoundry.v1.GetWorktreeDetailRequest
-	15, // 29: codefoundry.v1.RepoService.ListRefs:input_type -> codefoundry.v1.ListRefsRequest
-	4,  // 30: codefoundry.v1.RepoService.Register:output_type -> codefoundry.v1.RegisterRepoResponse
-	6,  // 31: codefoundry.v1.RepoService.Unregister:output_type -> codefoundry.v1.UnregisterRepoResponse
-	8,  // 32: codefoundry.v1.RepoService.List:output_type -> codefoundry.v1.ListReposResponse
-	10, // 33: codefoundry.v1.RepoService.Get:output_type -> codefoundry.v1.GetRepoResponse
-	12, // 34: codefoundry.v1.RepoService.CreateWorktree:output_type -> codefoundry.v1.CreateWorktreeResponse
-	14, // 35: codefoundry.v1.RepoService.RemoveWorktree:output_type -> codefoundry.v1.RemoveWorktreeResponse
-	18, // 36: codefoundry.v1.RepoService.Refresh:output_type -> codefoundry.v1.RefreshRepoResponse
-	20, // 37: codefoundry.v1.RepoService.Watch:output_type -> codefoundry.v1.RepoEvent
-	23, // 38: codefoundry.v1.RepoService.GetWorktreeDetail:output_type -> codefoundry.v1.GetWorktreeDetailResponse
-	16, // 39: codefoundry.v1.RepoService.ListRefs:output_type -> codefoundry.v1.ListRefsResponse
-	30, // [30:40] is the sub-list for method output_type
-	20, // [20:30] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	0,  // 8: codefoundry.v1.InitGitResponse.repo:type_name -> codefoundry.v1.Repo
+	0,  // 9: codefoundry.v1.RepoEvent.repo_updated:type_name -> codefoundry.v1.Repo
+	1,  // 10: codefoundry.v1.RepoEvent.worktree_updated:type_name -> codefoundry.v1.Worktree
+	30, // 11: codefoundry.v1.RepoEvent.worktree_removed:type_name -> codefoundry.v1.WorktreeRef
+	29, // 12: codefoundry.v1.RepoEvent.snapshot:type_name -> codefoundry.v1.RepoSnapshot
+	23, // 13: codefoundry.v1.RepoEvent.worktree_detail_updated:type_name -> codefoundry.v1.WorktreeDetailRef
+	31, // 14: codefoundry.v1.WorktreeDetailRef.computed_at:type_name -> google.protobuf.Timestamp
+	26, // 15: codefoundry.v1.GetWorktreeDetailResponse.detail:type_name -> codefoundry.v1.WorktreeDetail
+	27, // 16: codefoundry.v1.WorktreeDetail.files:type_name -> codefoundry.v1.FileChange
+	28, // 17: codefoundry.v1.WorktreeDetail.log:type_name -> codefoundry.v1.LogEntry
+	31, // 18: codefoundry.v1.WorktreeDetail.computed_at:type_name -> google.protobuf.Timestamp
+	31, // 19: codefoundry.v1.LogEntry.authored_at:type_name -> google.protobuf.Timestamp
+	0,  // 20: codefoundry.v1.RepoSnapshot.repos:type_name -> codefoundry.v1.Repo
+	3,  // 21: codefoundry.v1.RepoService.Register:input_type -> codefoundry.v1.RegisterRepoRequest
+	5,  // 22: codefoundry.v1.RepoService.Unregister:input_type -> codefoundry.v1.UnregisterRepoRequest
+	7,  // 23: codefoundry.v1.RepoService.List:input_type -> codefoundry.v1.ListReposRequest
+	9,  // 24: codefoundry.v1.RepoService.Get:input_type -> codefoundry.v1.GetRepoRequest
+	11, // 25: codefoundry.v1.RepoService.CreateWorktree:input_type -> codefoundry.v1.CreateWorktreeRequest
+	13, // 26: codefoundry.v1.RepoService.RemoveWorktree:input_type -> codefoundry.v1.RemoveWorktreeRequest
+	19, // 27: codefoundry.v1.RepoService.Refresh:input_type -> codefoundry.v1.RefreshRepoRequest
+	21, // 28: codefoundry.v1.RepoService.Watch:input_type -> codefoundry.v1.WatchReposRequest
+	24, // 29: codefoundry.v1.RepoService.GetWorktreeDetail:input_type -> codefoundry.v1.GetWorktreeDetailRequest
+	15, // 30: codefoundry.v1.RepoService.ListRefs:input_type -> codefoundry.v1.ListRefsRequest
+	17, // 31: codefoundry.v1.RepoService.InitGit:input_type -> codefoundry.v1.InitGitRequest
+	4,  // 32: codefoundry.v1.RepoService.Register:output_type -> codefoundry.v1.RegisterRepoResponse
+	6,  // 33: codefoundry.v1.RepoService.Unregister:output_type -> codefoundry.v1.UnregisterRepoResponse
+	8,  // 34: codefoundry.v1.RepoService.List:output_type -> codefoundry.v1.ListReposResponse
+	10, // 35: codefoundry.v1.RepoService.Get:output_type -> codefoundry.v1.GetRepoResponse
+	12, // 36: codefoundry.v1.RepoService.CreateWorktree:output_type -> codefoundry.v1.CreateWorktreeResponse
+	14, // 37: codefoundry.v1.RepoService.RemoveWorktree:output_type -> codefoundry.v1.RemoveWorktreeResponse
+	20, // 38: codefoundry.v1.RepoService.Refresh:output_type -> codefoundry.v1.RefreshRepoResponse
+	22, // 39: codefoundry.v1.RepoService.Watch:output_type -> codefoundry.v1.RepoEvent
+	25, // 40: codefoundry.v1.RepoService.GetWorktreeDetail:output_type -> codefoundry.v1.GetWorktreeDetailResponse
+	16, // 41: codefoundry.v1.RepoService.ListRefs:output_type -> codefoundry.v1.ListRefsResponse
+	18, // 42: codefoundry.v1.RepoService.InitGit:output_type -> codefoundry.v1.InitGitResponse
+	32, // [32:43] is the sub-list for method output_type
+	21, // [21:32] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_repo_proto_init() }
@@ -2141,7 +2252,7 @@ func file_codefoundry_v1_repo_proto_init() {
 	if File_codefoundry_v1_repo_proto != nil {
 		return
 	}
-	file_codefoundry_v1_repo_proto_msgTypes[20].OneofWrappers = []any{
+	file_codefoundry_v1_repo_proto_msgTypes[22].OneofWrappers = []any{
 		(*RepoEvent_RepoUpdated)(nil),
 		(*RepoEvent_RepoRemovedId)(nil),
 		(*RepoEvent_WorktreeUpdated)(nil),
@@ -2155,7 +2266,7 @@ func file_codefoundry_v1_repo_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_repo_proto_rawDesc), len(file_codefoundry_v1_repo_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   29,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

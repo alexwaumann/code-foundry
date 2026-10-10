@@ -75,14 +75,17 @@ type repoMeta struct {
 	GitHubSlug    string
 	OriginURL     string
 	Remotes       []string // sorted; replaced, never mutated in place
-	Error         string
+	// Git: the project has .git (nogit.go). Seeded from disk on load and register,
+	// then kept by reconcile.
+	Git   bool
+	Error string
 }
 
 // equal reports whether m and o hold the same metadata. Update it with the fields.
 func (m *repoMeta) equal(o *repoMeta) bool {
 	return m.ID == o.ID && m.Path == o.Path && m.Name == o.Name && m.RegisteredAt.Equal(o.RegisteredAt) &&
 		m.DefaultBranch == o.DefaultBranch && m.GitHubSlug == o.GitHubSlug && m.OriginURL == o.OriginURL &&
-		slices.Equal(m.Remotes, o.Remotes) && m.Error == o.Error
+		slices.Equal(m.Remotes, o.Remotes) && m.Git == o.Git && m.Error == o.Error
 }
 
 func (m *repoMeta) commonDir() string { return filepath.Join(m.Path, ".git") }
@@ -252,6 +255,9 @@ func (g *Git) load(ctx context.Context) ([]*repoMeta, error) {
 			return nil, fmt.Errorf("repo: load: %w", err)
 		}
 		m.RegisteredAt = time.UnixMilli(ms)
+		// Known before the first reconcile, so a git project never shows as one
+		// without git while the daemon starts.
+		m.Git = hasDotGit(m.Path)
 		out = append(out, &m)
 	}
 	if err := rows.Err(); err != nil {
@@ -285,7 +291,7 @@ func (g *Git) buildLocked() *Snapshot {
 		m := st.meta.Load()
 		r := Repo{
 			ID: m.ID, Path: m.Path, Name: m.Name, RegisteredAt: m.RegisteredAt,
-			DefaultBranch: m.DefaultBranch, GitHubSlug: m.GitHubSlug, Remotes: m.Remotes, Error: m.Error,
+			DefaultBranch: m.DefaultBranch, GitHubSlug: m.GitHubSlug, Remotes: m.Remotes, Git: m.Git, Error: m.Error,
 			Worktrees: make([]Worktree, 0, len(st.wts)),
 		}
 		for _, slot := range st.wts {
@@ -385,16 +391,9 @@ func (g *Git) Register(ctx context.Context, path string) (Repo, error) {
 	if !fsx.Within(g.root, dir) {
 		return Repo{}, outsideRoot(path)
 	}
-	out, err := g.runner.Run(ctx, dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
-	if err != nil {
-		return Repo{}, fmt.Errorf("%w: %s is not inside a git repository: %w", ErrInvalidArgument, path, err)
-	}
-	mainPath, err := mainWorktreeFromCommonDir(string(out))
+	mainPath, isGit, err := g.projectRoot(ctx, path, dir)
 	if err != nil {
 		return Repo{}, err
-	}
-	if real, err := filepath.EvalSymlinks(mainPath); err == nil {
-		mainPath = real
 	}
 	// A linked worktree under home can belong to a repository outside it.
 	if !fsx.Within(g.root, mainPath) {
@@ -402,7 +401,7 @@ func (g *Git) Register(ctx context.Context, path string) (Repo, error) {
 	}
 	m := &repoMeta{
 		ID: repoID(mainPath), Path: mainPath, Name: filepath.Base(mainPath),
-		RegisteredAt: g.now().Truncate(time.Millisecond),
+		RegisteredAt: g.now().Truncate(time.Millisecond), Git: isGit,
 	}
 
 	g.mu.Lock()
@@ -442,6 +441,30 @@ func (g *Git) Register(ctx context.Context, path string) (Repo, error) {
 // outsideRoot is Register's error for a path outside the allowed root.
 func outsideRoot(path string) error {
 	return fmt.Errorf("%w: %s is outside your home directory", ErrInvalidArgument, path)
+}
+
+// projectRoot returns the project directory to register for path (resolved to dir):
+// the main worktree of the git repository containing it, else dir itself as a project
+// without git when path names a directory.
+func (g *Git) projectRoot(ctx context.Context, path, dir string) (root string, isGit bool, err error) {
+	out, err := g.runner.Run(ctx, dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		if !isNotARepository(err) {
+			return "", false, fmt.Errorf("%w: %s: %w", ErrInvalidArgument, path, err)
+		}
+		if fi, serr := os.Stat(path); serr != nil || !fi.IsDir() {
+			return "", false, fmt.Errorf("%w: %s is not a directory", ErrInvalidArgument, path)
+		}
+		return dir, false, nil
+	}
+	mainPath, err := mainWorktreeFromCommonDir(string(out))
+	if err != nil {
+		return "", false, err
+	}
+	if real, err := filepath.EvalSymlinks(mainPath); err == nil {
+		mainPath = real
+	}
+	return mainPath, true, nil
 }
 
 // resolveDir makes path absolute, resolves symlinks (git reports real paths, and on
@@ -516,6 +539,9 @@ func (g *Git) CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (W
 		return Worktree{}, fmt.Errorf("%w: repo %q", ErrNotFound, opts.RepoID)
 	}
 	m := st.meta.Load()
+	if err := requireGit(m); err != nil {
+		return Worktree{}, err
+	}
 	if opts.Branch == "" {
 		return Worktree{}, fmt.Errorf("%w: branch is required", ErrInvalidArgument)
 	}
@@ -670,6 +696,9 @@ func (g *Git) ListRefs(ctx context.Context, repoID string) (Refs, error) {
 		return Refs{}, fmt.Errorf("%w: repo %q", ErrNotFound, repoID)
 	}
 	m := st.meta.Load()
+	if err := requireGit(m); err != nil {
+		return Refs{}, err
+	}
 	out, err := g.runner.Run(ctx, m.Path, "for-each-ref", refsFormat, "refs/heads", "refs/remotes")
 	if err != nil {
 		return Refs{}, fmt.Errorf("repo: list refs of %s: %w", m.ID, err)
@@ -678,7 +707,8 @@ func (g *Git) ListRefs(ctx context.Context, repoID string) (Refs, error) {
 	// DefaultBranch is empty until the repo's first reconcile after a daemon start.
 	def := m.DefaultBranch
 	if def == "" {
-		def = g.defaultBranch(ctx, m.Path, "")
+		_, err := g.runner.Run(ctx, m.Path, "remote", "get-url", "origin")
+		def = g.defaultBranch(ctx, m.Path, "", err == nil)
 	}
 	refs.DefaultRef = def
 	if _, ok := slices.BinarySearch(refs.Remote, "origin/"+def); ok {
@@ -708,6 +738,9 @@ func (g *Git) RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) er
 		return fmt.Errorf("%w: repo %q", ErrNotFound, opts.RepoID)
 	}
 	m := st.meta.Load()
+	if err := requireGit(m); err != nil {
+		return err
+	}
 	path := filepath.Clean(opts.Path)
 	if real, err := filepath.EvalSymlinks(path); err == nil {
 		path = real
@@ -769,7 +802,16 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 	prev := st.meta.Load()
 	next := *prev
 	next.Error = ""
-	listed, err := g.inspect(ctx, &next)
+	var listed []listedWorktree
+	isGit, err := probeGit(next.Path)
+	switch {
+	case err != nil:
+	case isGit:
+		next.Git = true
+		listed, err = g.inspect(ctx, &next)
+	default:
+		listed = plainCheckout(&next) // no git command for a project without git
+	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return
@@ -778,6 +820,9 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 		listed = nil
 		g.log.Warn("reconcile failed", "repo", id, "path", next.Path, "err", err)
 	}
+	// A project that gained (or lost) .git reseeds its worktree from the listing, so
+	// the first event after the flip already carries the branch.
+	gitChanged := next.Git != prev.Git
 
 	// Resolve linked worktrees' admin dirs outside the lock (file reads).
 	admins := make(map[string]string, len(listed))
@@ -802,7 +847,7 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 		seen[l.Path] = true
 		isMain := i == 0
 		slot := st.wts[l.Path]
-		if slot == nil {
+		if slot == nil || gitChanged {
 			slot = &wtSlot{}
 			slot.cur.Store(&Worktree{
 				RepoID: id, Path: l.Path, Branch: l.Branch, Head: l.Head, IsMain: isMain, Detached: l.Detached,
@@ -825,7 +870,7 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 		st.meta.Store(&next)
 	}
 	var want map[string]watchTarget
-	if next.Error == "" {
+	if next.Error == "" && next.Git {
 		want = desiredWatches(id, next.Path, next.commonDir(), wwts)
 	}
 	var toRemove []string
@@ -853,7 +898,9 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 			return append(evs, repoUpdated(id)(s)...)
 		})
 	}
-	g.sched.request(jobKey{kind: jobBase, repoID: id})
+	if next.Git {
+		g.sched.request(jobKey{kind: jobBase, repoID: id})
+	}
 }
 
 // syncWatches removes stale watches and adds wanted ones. Directories that do not
@@ -932,15 +979,25 @@ func (g *Git) inspect(ctx context.Context, m *repoMeta) ([]listedWorktree, error
 		}
 	}
 	m.GitHubSlug = parseGitHubSlug(m.OriginURL)
-	m.DefaultBranch = g.defaultBranch(ctx, m.Path, listed[0].Branch)
+	hasOrigin := !listedRemotes || slices.Contains(m.Remotes, "origin")
+	m.DefaultBranch = g.defaultBranch(ctx, m.Path, listed[0].Branch, hasOrigin)
 	return listed, nil
 }
 
-// defaultBranch is origin/HEAD's target, else main or master if they exist locally,
-// else the main worktree's branch, else "main".
-func (g *Git) defaultBranch(ctx context.Context, dir, mainBranch string) string {
-	if out, err := g.runner.Run(ctx, dir, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"); err == nil {
-		if b := parseOriginHead(out); b != "" {
+// defaultBranch is origin/HEAD's target with an origin remote, else (no origin) the
+// branch HEAD of the main worktree dir names; then main or master if they exist
+// locally, else the main worktree's branch, else "main".
+func (g *Git) defaultBranch(ctx context.Context, dir, mainBranch string, hasOrigin bool) string {
+	if hasOrigin {
+		if out, err := g.runner.Run(ctx, dir, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"); err == nil {
+			if b := parseOriginHead(out); b != "" {
+				return b
+			}
+		}
+	} else if out, err := g.runner.Run(ctx, dir, "symbolic-ref", "--quiet", "--short", "HEAD"); err == nil {
+		// A repository without origin has no remote default: the main checkout's
+		// branch is the one new worktrees branch from (an unborn one included).
+		if b := string(trimNL(out)); b != "" {
 			return b
 		}
 	}
@@ -964,8 +1021,8 @@ func trimNL(b []byte) []byte {
 func (g *Git) status(ctx context.Context, repoID, path string) {
 	st := g.repo(repoID)
 	slot := g.slot(repoID, path)
-	if st == nil || slot == nil {
-		return
+	if st == nil || slot == nil || !st.meta.Load().Git {
+		return // a project without git keeps its zero status
 	}
 	prev := *slot.cur.Load()
 	next := prev
@@ -1138,8 +1195,10 @@ func (g *Git) pollLoop(ctx context.Context, every time.Duration) {
 		case <-t.C:
 		}
 		for _, id := range g.repoIDs() {
-			if st := g.repo(id); st != nil && st.meta.Load().Error != "" {
+			if st := g.repo(id); st != nil && (st.meta.Load().Error != "" || !st.meta.Load().Git) {
 				// Failed repos have no watches left; retry so a moved-back repo recovers.
+				// A project without git has none either: its reconcile is a stat that
+				// notices a .git created outside the app.
 				g.sched.request(jobKey{kind: jobReconcile, repoID: id})
 				continue
 			}

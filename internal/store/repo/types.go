@@ -23,7 +23,7 @@ var (
 	ErrFailedPrecondition = errors.New("failed precondition")
 )
 
-// Repo is a registered repository.
+// Repo is a registered project: a git repository, or (Git false) a plain directory.
 type Repo struct {
 	ID            string
 	Path          string // main worktree path, symlinks resolved
@@ -33,7 +33,13 @@ type Repo struct {
 	GitHubSlug    string // "owner/name" when origin is on GitHub
 	// Remotes are the configured git remote names, sorted; empty for a local-only
 	// repository (and until the first reconcile).
-	Remotes   []string
+	Remotes []string
+	// Git is false for a project that is not a git repository (no .git at Path). Such
+	// a project has exactly one synthetic main Worktree at Path with empty Branch and
+	// Head and a zero Status, no remotes and no DefaultBranch. No git command runs for
+	// it; it becomes a git project when .git appears (InitGit, or `git init` outside
+	// the app, seen on the next refresh or poll).
+	Git       bool
 	Error     string // last reconcile error, if any
 	Worktrees []Worktree
 }
@@ -179,11 +185,15 @@ type RemoveWorktreeOptions struct {
 type Store interface {
 	// Snapshot returns the current immutable snapshot. It never returns nil.
 	Snapshot() *Snapshot
-	// Register adds the repository containing path. It is idempotent: registering a
-	// path inside an already registered repo returns that repo.
+	// Register adds the repository containing path, or, when path is a directory
+	// outside any git repository, that directory as a project without git. It is
+	// idempotent: registering a path inside an already registered repo returns that
+	// repo.
 	Register(ctx context.Context, path string) (Repo, error)
 	// Unregister forgets a repo. Nothing on disk is touched.
 	Unregister(ctx context.Context, id string) error
+	// CreateWorktree, RemoveWorktree, ListRefs and WorktreeDetail fail with
+	// ErrFailedPrecondition for a project without git.
 	CreateWorktree(ctx context.Context, opts CreateWorktreeOptions) (Worktree, error)
 	RemoveWorktree(ctx context.Context, opts RemoveWorktreeOptions) error
 	// ListRefs lists the repo's local branches and remote-tracking refs, read from git
@@ -194,4 +204,12 @@ type Store interface {
 	// WorktreeDetail returns the files changed and commits on a worktree against its
 	// base (detail.go), computing them if needed.
 	WorktreeDetail(ctx context.Context, repoID, path string) (WorktreeDetail, error)
+	// InitGit makes a project without git a git repository (`git init -b <default>`
+	// and an empty "Initial commit") and refreshes it, returning the git project.
+	// ErrFailedPrecondition when it already is one.
+	InitGit(ctx context.Context, id string) (Repo, error)
 }
+
+// ErrNotGit is wrapped (with ErrFailedPrecondition) by operations that need git on a
+// project without it.
+var ErrNotGit = errors.New("not a git repository")
