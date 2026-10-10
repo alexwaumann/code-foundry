@@ -22,6 +22,9 @@
  *   POST /__mock/workspace?name=login&repos=repo-cf,repo-gp[&branch=cf/login]
  *                                                 (a workspace: a cf/<name> worktree in each repo)
  *   GET  /__mock/workspaces                       (id, name, branch, members)
+ *   POST /__mock/workspace-thread?workspace=login[&repo=repo-gp&name=driver&status=busy]
+ *                                                 (a connected thread owned by the workspace)
+ *   session.run-in queues a move (pendingWorktreePath) that lands ~2s after the thread is not busy.
  *   session.new takes workspace (a member thread) or new-worktree + repos (a new workspace).
  *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size)
  *   session.new with a prompt containing FAIL fails (after the worktree delay, if any).
@@ -378,7 +381,18 @@ function json(res: ServerResponse, status: number, body: unknown): void {
 /** JSON-safe session summary (proto timestamps carry bigints). */
 function sessionSummary(id: string): Record<string, unknown> {
   const s = world.session(id);
-  return { id: s.id, name: s.name, state: SessionState[s.state], status: SessionStatus[s.status], terminalId: s.terminalId, repoId: s.repoId, worktreePath: s.worktreePath, workspaceId: s.workspaceId };
+  return {
+    id: s.id,
+    name: s.name,
+    state: SessionState[s.state],
+    status: SessionStatus[s.status],
+    terminalId: s.terminalId,
+    repoId: s.repoId,
+    worktreePath: s.worktreePath,
+    workspaceId: s.workspaceId,
+    pendingWorktreePath: s.pendingWorktreePath,
+    pinned: s.pinned,
+  };
 }
 
 const statusNames: Record<string, SessionStatus> = { busy: SessionStatus.BUSY, idle: SessionStatus.IDLE, attention: SessionStatus.NEEDS_ATTENTION };
@@ -451,6 +465,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       try {
         const w = world.addWorkspace(q.get("name") ?? "", (q.get("repos") ?? "").split(",").filter(Boolean), q.get("branch") ?? undefined);
         json(res, 200, w);
+      } catch (err) {
+        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
+    case "POST /__mock/workspace-thread":
+      // workspace=login[&repo=repo-gp][&name=driver][&status=busy]: a connected thread owned by the workspace.
+      try {
+        const s = world.addWorkspaceThread(q.get("workspace") ?? "", q.get("repo") ?? "", q.get("name") ?? "driver", statusNames[q.get("status") ?? "idle"] ?? SessionStatus.IDLE);
+        json(res, 200, sessionSummary(s.id));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }

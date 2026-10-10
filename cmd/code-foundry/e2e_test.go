@@ -120,7 +120,7 @@ func TestCLIAgainstDaemon(t *testing.T) {
 	}{
 		{"commands shows availability", []string{"commands"}, `(?m)^Terminal\s+terminal\.kill\s+no\s+Kill Terminal$`},
 		{"commands with context", []string{"commands", "--context-terminal", "t1"}, `(?m)^Terminal\s+terminal\.kill\s+yes\s`},
-		{"repo context enables worktree.new", []string{"commands", "--context-repo", "r1"}, `(?m)^Repository\s+repo\.worktree\.new\s+yes\s`},
+		{"repo context enables worktree.new", []string{"commands", "--context-repo", "r1"}, `(?m)^Project\s+repo\.worktree\.new\s+yes\s`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			r := runCLI(c, tt.args...)

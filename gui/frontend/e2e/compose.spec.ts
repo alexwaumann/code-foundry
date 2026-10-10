@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { CF, invocations, mockPost, mockUrl, openApp, resetMock, row, selectWorktree } from "./fixtures";
 
 const OUTDATED = "The running daemon is older than the app. Restart it (Daemon → Restart) to use this feature.";
 
@@ -80,7 +80,8 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   await expect(page.getByTestId("composer-input")).toBeFocused();
   await expect(page.getByTestId("composer-input")).toHaveAttribute("aria-placeholder", "Describe what to build…");
   await expect(page.getByTestId("composer")).toContainText("Describe what to build…");
-  await expect(row(page, "r:repo-cf")).toHaveAttribute("aria-selected", "true");
+  // A composer has no sidebar row: nothing in the thread list is selected.
+  await expect(page.getByTestId("thread-list").locator('[aria-selected="true"]')).toHaveCount(0);
   // Defaults: settings (opus / high), Auto, a new worktree from ListRefs' default ref.
   await expect(page.getByTestId("composer-model")).toHaveText("Opus 5.5");
   await expect(page.getByTestId("composer-effort")).toHaveText("High");
@@ -119,11 +120,11 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
     permission: "auto",
     prompt: "Add a dark mode toggle\nin settings",
   });
-  // The new worktree is in the sidebar with the thread under it.
-  const wt = "w:repo-cf::/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-add-a-dark-mode";
-  await expect(row(page, wt)).toBeVisible();
-  const keys = await page.getByRole("tree").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
-  expect(keys.indexOf(key)).toBe(keys.indexOf(wt) + 1);
+  // The thread's row names its project and the new worktree's branch; it is the newest thread.
+  await expect(created.getByTestId("row-project")).toHaveText("code-foundry");
+  await expect(created.getByTestId("row-branch")).toHaveText("cf/add-a-dark-mode");
+  const keys = await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
+  expect(keys.indexOf(key)).toBe(keys.indexOf("h:threads") + 1);
 
   // The draft was cleared: a new composer for the repo starts empty.
   await compose(page);
@@ -351,7 +352,7 @@ test("the draft survives switching away; Backspace goes back; Esc on an empty dr
   await page.getByTestId("composer-input").fill("");
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("composer")).toHaveCount(0);
-  await expect(row(page, "r:repo-gp")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("overview-title")).toHaveText("ghostty-playground@main");
 });
 
 test("image chips: inserted at the caret, one unit for arrows and Backspace, × asks while referenced, sent as references", async ({ page }) => {
@@ -494,7 +495,7 @@ test("a local-only repository: local refs from main, no remote git commands", as
   await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
 
   // Its overview shows no git buttons, and fetch/pull/push/PR are not offered for it.
-  await row(page, "w:repo-sk::/Users/dev/src/sketches").click();
+  await selectWorktree(page, "repo-sk", "/Users/dev/src/sketches");
   await expect(page.getByTestId("overview-page")).toBeVisible();
   await expect(page.locator('[data-command-button^="git."], [data-command-button^="pr."]')).toHaveCount(0);
   await page.keyboard.press("Meta+k");

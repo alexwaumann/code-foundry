@@ -58,14 +58,14 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"terminal.new", "terminal.kill", "terminal.remove",
 		"repo.register", "repo.unregister", "repo.worktree.new", "repo.worktree.remove", "repo.refresh",
 		"session.new", "session.list", "session.focus", "session.close", "session.reconnect",
-		"session.rename", "session.fork", "session.remove", "session.run-in",
+		"session.rename", "session.fork", "session.remove", "session.run-in", "session.pin",
 		"git.fetch", "git.pull", "git.push", "pr.create", "pr.open",
 		"pr.revert", "pr.merge", "pr.review.request", "pr.refresh", "pr.ask", "pr.explain", "pr.fix.findings",
 		"worktree.open.editor", "worktree.reveal", "view.open.url",
 		"settings.get", "settings.set", "settings.reset", "settings.path", "settings.reveal",
 		"view.settings", "view.help",
 		"app.version", "app.update.check", "app.update", "app.relaunch", "daemon.restart",
-		"view.pullrequests", "view.panel.toggle", "view.panel.expand",
+		"view.pullrequests", "view.projects", "view.panel.toggle", "view.panel.expand",
 		"workspace.new", "workspace.list", "workspace.members", "workspace.add-repo", "workspace.remove-repo", "workspace.remove",
 	}
 	for _, n := range want {

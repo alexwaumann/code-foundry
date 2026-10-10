@@ -1,7 +1,7 @@
 /**
- * Session actions behind buttons and inline edits. Each one is a registry command invoked
- * with an explicit session context, so the palette, keybindings, CLI, and these buttons
- * all reach the same code in the daemon.
+ * Session actions behind buttons, menus and inline edits. Each one is a registry command
+ * invoked with an explicit session context, so the palette, keybindings, CLI, and these
+ * buttons all reach the same code in the daemon.
  */
 import { runCommand, useCommandsStore } from "./commands";
 import { getUiContext } from "./context";
@@ -11,9 +11,14 @@ export const SESSION_COMMANDS = {
   rename: "session.rename",
   reconnect: "session.reconnect",
   remove: "session.remove",
+  close: "session.close",
+  fork: "session.fork",
+  pin: "session.pin",
+  runIn: "session.run-in",
 } as const;
 
-function sessionContext(id: string) {
+/** The context of a thread (its worktree and workspace too), whether or not it is selected. */
+export function sessionContext(id: string) {
   return getUiContext({ kind: "session", id });
 }
 
@@ -33,4 +38,22 @@ export function reconnectSession(id: string): Promise<boolean> {
 
 export function removeSession(id: string): Promise<boolean> {
   return runCommand(SESSION_COMMANDS.remove, {}, sessionContext(id));
+}
+
+export function closeSession(id: string): Promise<boolean> {
+  return runCommand(SESSION_COMMANDS.close, {}, sessionContext(id));
+}
+
+export function forkSession(id: string): Promise<boolean> {
+  return runCommand(SESSION_COMMANDS.fork, {}, sessionContext(id));
+}
+
+/** session.pin with an explicit value (the menu knows the current pin). */
+export function pinSession(id: string, pinned: boolean): Promise<boolean> {
+  return runCommand(SESSION_COMMANDS.pin, { pinned: String(pinned) }, sessionContext(id));
+}
+
+/** session.run-in ("Run in…"): moves a workspace thread to the member in repoId. */
+export function runSessionIn(id: string, repoId: string): Promise<boolean> {
+  return runCommand(SESSION_COMMANDS.runIn, { repo: repoId }, sessionContext(id));
 }

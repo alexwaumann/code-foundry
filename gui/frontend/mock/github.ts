@@ -422,5 +422,20 @@ export function viewCommands(emit: (intent: IntentInit) => number) {
         return ""; // like the daemon: no toast
       },
     },
+    {
+      cmd: {
+        name: "view.projects",
+        title: "Show Projects",
+        category: "View",
+        description: "Show the Projects page: each project's worktrees and each workspace's members",
+        keybindings: ["cmd+shift+j"],
+        args: [],
+      },
+      when: () => true,
+      run: () => {
+        emit({ intent: { case: "showView", value: { name: "projects" } } });
+        return "";
+      },
+    },
   ];
 }

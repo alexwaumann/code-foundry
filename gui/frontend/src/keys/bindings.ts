@@ -2,7 +2,7 @@ import type { CommandView } from "@/api/command";
 import { promptedArgs } from "@/palette/args";
 import { leafOrder, nextAfter, sessionOrder } from "@/lib/tree";
 import { refreshCommands, runCommand, useCommandsStore, whenListed } from "@/stores/commands";
-import { contextKey, getTreeInputs, getUiContext } from "@/stores/context";
+import { contextKey, getListInputs, getUiContext } from "@/stores/context";
 import { openNewThreadPicker } from "@/stores/compose";
 import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { zoomFont } from "@/stores/settings";
@@ -22,10 +22,10 @@ export interface ViewAction {
   run: () => void;
 }
 
-/** Selects the Nth session or terminal in sidebar order (ignoring collapse). */
+/** Selects the Nth thread or terminal in sidebar order. */
 function jumpTo(n: number): void {
-  const { repos, terminals, sessions } = getTreeInputs();
-  const row = leafOrder(repos, terminals, sessions)[n - 1];
+  const { sessions, terminals } = getListInputs();
+  const row = leafOrder(sessions, terminals)[n - 1];
   if (!row) return;
   const sel = row.kind === "session" ? ({ kind: "session", id: row.sessionId } as const) : ({ kind: "terminal", id: row.terminalId } as const);
   useUiStore.getState().select(sel, { focusTerminal: true });
@@ -33,10 +33,10 @@ function jumpTo(n: number): void {
 
 /** Selects the next session that needs attention after the current one, wrapping. */
 export function jumpToAttention(): boolean {
-  const { repos, terminals, sessions } = getTreeInputs();
+  const { sessions, terminals } = getListInputs();
   const waiting = new Set(attentionIds(useSessionsStore.getState()));
   const sel = useUiStore.getState().selection;
-  const next = nextAfter(sessionOrder(repos, terminals, sessions), sel.kind === "session" ? sel.id : null, (id) => waiting.has(id));
+  const next = nextAfter(sessionOrder(sessions, terminals), sel.kind === "session" ? sel.id : null, (id) => waiting.has(id));
   if (next === null) return false;
   useUiStore.getState().select({ kind: "session", id: next }, { focusTerminal: true });
   return true;
@@ -105,7 +105,7 @@ export function isStartable(c: CommandView): boolean {
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
-const paletteSupplied: ReadonlySet<string> = new Set(["session.new"]);
+const paletteSupplied: ReadonlySet<string> = new Set(["session.new", "session.run-in"]);
 
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
@@ -139,6 +139,21 @@ export function isGlobalChord(chord: string): boolean {
   return viewActionMap.has(chord) || terminalYields(chord) !== undefined;
 }
 
+/**
+ * Opens the "Run in…" member picker for a workspace thread. False for a project thread
+ * (or none), so the command falls back to its default presentation.
+ */
+export function openRunInPicker(sessionId: string): boolean {
+  if (!useSessionsStore.getState().byId[sessionId]?.workspaceId) return false;
+  const ui = useUiStore.getState();
+  const returnTo = ui.palette.open ? ui.palette.returnTo : ui.focus;
+  // Deferred: picked inside the palette, the palette closes after the presenter runs.
+  queueMicrotask(() => {
+    useUiStore.getState().openRunInPicker(sessionId, returnTo);
+  });
+  return true;
+}
+
 /** Starts inline rename of the active session's sidebar row. */
 export function beginRename(sessionId: string | null = getUiContext().activeSessionId || null): boolean {
   if (!sessionId || !useSessionsStore.getState().byId[sessionId]) return false;
@@ -160,6 +175,8 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
     openNewThreadPicker();
     return true;
   },
+  // "Run in…": the member picker for the active workspace thread; it invokes session.run-in.
+  "session.run-in": () => openRunInPicker(getUiContext().activeSessionId),
   // Window-local: only this window opens, without a round trip (the CLI and palette
   // reach every window through UiIntent.ShowView instead).
   "view.settings": () => showView("settings"),

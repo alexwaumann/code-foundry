@@ -5,6 +5,7 @@ import { Dashboard } from "@/components/Dashboard";
 import { HelpOverlay } from "@/components/help/HelpOverlay";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { CommandPalette } from "@/components/palette/CommandPalette";
+import { ProjectsPage } from "@/components/projects/ProjectsPage";
 import { PullRequestsPage } from "@/components/prs/PullRequestsPage";
 import { SessionDisconnected } from "@/components/session/SessionParts";
 import { SidePanel } from "@/components/panel/SidePanel";
@@ -71,6 +72,7 @@ function Content() {
   const sessionTerminal = useSessionsStore((s) => (sel.kind === "session" ? s.byId[sel.id]?.terminalId || null : null));
   if (sel.kind === "terminal") return <TerminalPane terminalId={sel.id} />;
   if (sel.kind === "view" && sel.name === "pullrequests") return <PullRequestsPage />;
+  if (sel.kind === "view" && sel.name === "projects") return <ProjectsPage />;
   if (sel.kind === "compose") return <Composer key={sel.workspaceId ? `ws:${sel.workspaceId}` : sel.repoId} repoId={sel.repoId} workspaceId={sel.workspaceId} />;
   if (sel.kind === "session") {
     return sessionTerminal ? <TerminalPane terminalId={sessionTerminal} sessionId={sel.id} /> : <SessionDisconnected id={sel.id} />;

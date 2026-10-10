@@ -9,6 +9,10 @@ import (
 // ViewPullRequests is the ShowView name of the Pull Requests page.
 const ViewPullRequests = "pullrequests"
 
+// ViewProjects is the ShowView name of the Projects page: every project (registered
+// repository) with its worktrees, and every workspace with its members.
+const ViewProjects = "projects"
+
 // ViewPanelToggle is the ShowView name that toggles the side panel of whatever the
 // window has selected. It is an action, not a page: the GUI toggles its per-selection
 // panel state (gui/frontend/src/stores/panel.ts) and stays on the current selection.
@@ -20,7 +24,7 @@ const ViewPanelToggle = "panel.toggle"
 const ViewPanelExpand = "panel.expand"
 
 // RegisterView registers view.pullrequests, which shows the Pull Requests page,
-// view.panel.toggle, which shows or hides the side panel, and view.panel.expand, which
+// view.projects, which shows the Projects page, view.panel.toggle, which shows or hides the side panel, and view.panel.expand, which
 // switches it between split and full width (all emitted as UiIntent.ShowView). Links
 // open through view.open.url (RegisterGitOps).
 func RegisterView(r *Registry, e Emitter) error {
@@ -39,6 +43,16 @@ func RegisterView(r *Registry, e Emitter) error {
 			Keybindings: []string{"cmd+shift+d"},
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return show(ViewPullRequests), nil
+			},
+		},
+		Command{
+			Name:        "view.projects",
+			Title:       "Show Projects",
+			Description: "Show the Projects page: each project's worktrees and each workspace's members, with their git state and actions.",
+			Category:    "View",
+			Keybindings: []string{"cmd+shift+j"},
+			Run: func(context.Context, Context, Args) (Result, error) {
+				return show(ViewProjects), nil
 			},
 		},
 		Command{

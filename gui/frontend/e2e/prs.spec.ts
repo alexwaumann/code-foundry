@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, emit, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { CF, emit, invocations, mockPost, mockUrl, openApp, resetMock, row, selectProject, selectWorktree } from "./fixtures";
 
 /**
  * Phase 3a: the Pull Requests page and the worktree overview, against the mock daemon
@@ -91,7 +91,7 @@ test.describe("Pull Requests page", () => {
 
   test("cmd+shift+d runs view.pullrequests and the ShowView intent switches the page", async ({ page }) => {
     await openApp(page);
-    await row(page, `w:repo-cf::${CFW}/feat-sidebar`).click();
+    await selectWorktree(page, "repo-cf", `${CFW}/feat-sidebar`);
     await expect(page.getByTestId("overview-page")).toBeVisible();
     await page.keyboard.press("Meta+Shift+d");
     await expect(page.getByTestId("prs-page")).toBeVisible();
@@ -132,7 +132,7 @@ test.describe("Pull Requests page", () => {
 test.describe("worktree overview", () => {
   test("feature worktree: sync line, GitHub activity, sessions, files tree, log", async ({ page }) => {
     await openApp(page);
-    await row(page, `w:repo-cf::${CFW}/feat-sidebar`).click();
+    await selectWorktree(page, "repo-cf", `${CFW}/feat-sidebar`);
     await expect(page.getByTestId("overview-title")).toHaveText("code-foundry@feat/sidebar");
     const sync = page.getByTestId("sync-line");
     await expect(sync).toContainText("Upstream origin/feat/sidebar: ↑2");
@@ -168,7 +168,7 @@ test.describe("worktree overview", () => {
 
   test("keyboard: fold directories, open failing checks and commits", async ({ page }) => {
     await openApp(page);
-    await row(page, `w:repo-cf::${CFW}/feat-sidebar`).click();
+    await selectWorktree(page, "repo-cf", `${CFW}/feat-sidebar`);
     const list = page.getByTestId("overview-list");
     await expect(list).toBeFocused();
     await expect(page.getByTestId("files-list")).toBeVisible();
@@ -196,7 +196,7 @@ test.describe("worktree overview", () => {
 
   test("long file lists start collapsed and virtualize when expanded", async ({ page }) => {
     await openApp(page);
-    await row(page, `w:repo-cf::${CFW}/fix-resize`).click();
+    await selectWorktree(page, "repo-cf", `${CFW}/fix-resize`);
     await expect(page.getByTestId("section-files")).toContainText("120 files");
     const files = page.getByTestId("files-list");
     await expect(files).toHaveAttribute("data-virtual", "false");
@@ -218,7 +218,7 @@ test.describe("worktree overview", () => {
 
   test("detail updates live; main worktree shows untracked files and an empty log", async ({ page }) => {
     await openApp(page);
-    await row(page, `r:repo-cf`).click();
+    await selectProject(page, "repo-cf");
     await expect(page.getByTestId("overview-title")).toHaveText("code-foundry@main");
     await expect(page.locator('[data-nav-key="f:.pr1853.diff"]')).toContainText("+1368");
     await expect(page.locator('[data-nav-key="f:notes/"] [data-status]')).toHaveText("?");
@@ -233,7 +233,7 @@ test.describe("worktree overview", () => {
 
   test("a repo without a GitHub remote says so", async ({ page }) => {
     await openApp(page);
-    await row(page, `r:repo-dot`).click();
+    await selectProject(page, "repo-dot");
     await expect(page.getByTestId("section-github")).toContainText("No GitHub remote");
   });
 });

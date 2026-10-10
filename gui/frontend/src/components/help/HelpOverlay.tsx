@@ -69,9 +69,10 @@ function HelpBody() {
               running when the window closes. A closed thread stays listed, disconnected, and Reconnect resumes its conversation.
             </p>
             <p>
-              <span className="font-medium text-foreground">Worktrees</span> give each thread its own checkout of a registered repository,
-              so threads never edit each other's files. A new thread can make its own worktree. The sidebar groups threads under their
-              worktree.
+              <span className="font-medium text-foreground">Worktrees</span> give each thread its own checkout of a project (a registered
+              repository), so threads never edit each other's files. A new thread can make its own worktree. The sidebar lists threads,
+              newest first, with pinned and waiting ones on top; the Projects page lists each project's worktrees and each workspace (one
+              branch across several projects) with its members.
             </p>
             <p>
               <span className="font-medium text-foreground">The palette</span> (⌘K) lists every action available for what you are looking

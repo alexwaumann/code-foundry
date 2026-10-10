@@ -1,99 +1,95 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { BellRing, Sparkles, SquareTerminal } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
+import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { ProjectsNav } from "@/components/projects/ProjectsPage";
 import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
 import { TITLE_BAND_HEIGHT, TRAFFIC_LIGHT_GUTTER } from "@/components/window/titleBand";
 import { jumpToAttention } from "@/keys/bindings";
-import { buildRows, isLeaf, type Row } from "@/lib/tree";
-import {
-  decodeRepoKeys,
-  decodeSessionKeys,
-  decodeTerminalKeys,
-  useRepoStructureKeys,
-  useSessionPlacementKeys,
-  useTerminalPlacementKeys,
-} from "@/stores/context";
+import { buildRows, isLeaf, type LeafRow, type Row } from "@/lib/tree";
+import { decodeSessionListKeys, decodeTerminalKeys, useSessionListKeys, useTerminalPlacementKeys } from "@/stores/context";
 import { useEventsStore } from "@/stores/events";
-import { useReposStore } from "@/stores/repos";
 import { useAttentionCount, useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
+import { useRowHeight } from "@/stores/settings";
+import { RowMenu } from "./RowMenu";
 import { rowSelection, selectionKey } from "./selection";
 import { ResizeHandle } from "./ResizeHandle";
-import { useRowHeight } from "@/stores/settings";
 import { SidebarRow } from "./SidebarRow";
 import { SidebarStatus } from "./SidebarStatus";
 
-/** Index of the nearest row above `i` with a smaller depth (the parent). */
-function parentIndex(rows: readonly Row[], i: number): number {
-  const depth = rows[i]?.depth ?? 0;
-  for (let j = i - 1; j >= 0; j--) if ((rows[j]?.depth ?? 0) < depth) return j;
-  return -1;
-}
+/** Section header height; thread and terminal rows are two lines (rowHeight + this). */
+const HEADER_HEIGHT = 26;
+const SECOND_LINE = 15;
 
 function useRows(): Row[] {
-  const repoKeys = useRepoStructureKeys();
+  const sessionKeys = useSessionListKeys();
   const termKeys = useTerminalPlacementKeys();
-  const sessionKeys = useSessionPlacementKeys();
-  const collapsed = useUiStore((s) => s.collapsed);
-  return useMemo(
-    () => buildRows(decodeRepoKeys(repoKeys), decodeTerminalKeys(termKeys), collapsed, decodeSessionKeys(sessionKeys)),
-    [repoKeys, termKeys, sessionKeys, collapsed],
-  );
+  return useMemo(() => buildRows(decodeSessionListKeys(sessionKeys), decodeTerminalKeys(termKeys)), [sessionKeys, termKeys]);
 }
 
-function SidebarTree() {
+/** Index of the next leaf row from i in direction dir (skipping headers); i itself when none. */
+function stepLeaf(rows: readonly Row[], i: number, dir: 1 | -1): number {
+  for (let j = i + dir; j >= 0 && j < rows.length; j += dir) if (rows[j] && isLeaf(rows[j] as Row)) return j;
+  return i;
+}
+
+function SidebarList() {
   const rows = useRows();
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedKey = useUiStore((s) => selectionKey(s.selection));
   const cursorKey = useUiStore((s) => s.cursorKey);
   const focusSeq = useUiStore((s) => s.sidebarFocusSeq);
-  const loaded = useReposStore((s) => s.loaded);
+  const loaded = useSessionsStore((s) => s.loaded);
+  const unavailable = useSessionsStore((s) => s.availability === "unavailable");
   const streamError = useEventsStore((s) => s.streamError);
   const rowHeight = useRowHeight();
+  const leafHeight = rowHeight + SECOND_LINE;
+  // The row the context menu is open for (right-clicked), or null.
+  const [menuRow, setMenuRow] = useState<LeafRow | null>(null);
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => rowHeight,
+    estimateSize: (i) => (rows[i]?.kind === "header" ? HEADER_HEIGHT : leafHeight),
+    getItemKey: (i) => rows[i]?.key ?? i,
     overscan: 10,
     paddingStart: 4,
     paddingEnd: 8,
   });
 
-  // appearance.density changes the row height; drop the cached sizes.
+  // appearance.density changes the row height, and sections come and go; drop the cached sizes.
   useEffect(() => {
     virtualizer.measure();
-  }, [virtualizer, rowHeight]);
+  }, [virtualizer, leafHeight, rows]);
 
   const cursorIndex = useMemo(() => {
     const key = cursorKey ?? selectedKey;
-    const i = key ? rows.findIndex((r) => r.key === key) : -1;
-    return i;
+    return key ? rows.findIndex((r) => r.key === key && isLeaf(r)) : -1;
   }, [rows, cursorKey, selectedKey]);
 
   useEffect(() => {
     if (focusSeq > 0) scrollRef.current?.focus();
   }, [focusSeq]);
 
-  const activate = useCallback((row: Row, how: "click" | "toggle" | "enter") => {
+  const activate = useCallback((row: Row) => {
+    const sel = rowSelection(row);
+    if (!sel) return;
     const ui = useUiStore.getState();
     ui.setCursor(row.key);
-    if (how === "toggle" || row.kind === "group") {
-      if (!isLeaf(row)) ui.toggleCollapsed(row.key);
-      return;
-    }
-    const sel = rowSelection(row);
-    if (sel) ui.select(sel, { focusTerminal: isLeaf(row) });
+    ui.select(sel, { focusTerminal: true });
   }, []);
 
   const moveCursor = (i: number) => {
-    const row = rows[Math.max(0, Math.min(rows.length - 1, i))];
-    if (!row) return;
+    const row = rows[i];
+    if (!row || !isLeaf(row)) return;
     useUiStore.getState().setCursor(row.key);
-    virtualizer.scrollToIndex(rows.indexOf(row), { align: "auto" });
+    virtualizer.scrollToIndex(i, { align: "auto" });
   };
+  const firstLeaf = () => stepLeaf(rows, -1, 1);
+  const lastLeaf = () => stepLeaf(rows, rows.length, -1);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey || e.altKey || e.target !== e.currentTarget) return;
@@ -101,33 +97,24 @@ function SidebarTree() {
     const ui = useUiStore.getState();
     switch (e.key) {
       case "ArrowDown":
-        moveCursor(cursorIndex < 0 ? 0 : cursorIndex + 1);
+        moveCursor(cursorIndex < 0 ? firstLeaf() : stepLeaf(rows, cursorIndex, 1));
         break;
       case "ArrowUp":
-        moveCursor(cursorIndex < 0 ? rows.length - 1 : cursorIndex - 1);
+        moveCursor(cursorIndex < 0 ? lastLeaf() : stepLeaf(rows, cursorIndex, -1));
         break;
       case "Home":
-        moveCursor(0);
+        moveCursor(firstLeaf());
         break;
       case "End":
-        moveCursor(rows.length - 1);
+        moveCursor(lastLeaf());
         break;
       case "Enter":
       case " ":
-        if (row) activate(row, "enter");
-        break;
-      case "ArrowRight":
-        if (!row || isLeaf(row)) break;
-        if (!row.expanded) ui.toggleCollapsed(row.key, false);
-        else if (row.hasChildren) moveCursor(cursorIndex + 1);
-        break;
-      case "ArrowLeft":
-        if (row && !isLeaf(row) && row.expanded && row.hasChildren) ui.toggleCollapsed(row.key, true);
-        else moveCursor(parentIndex(rows, cursorIndex));
+        if (row) activate(row);
         break;
       case "F2":
         if (row?.kind !== "session") return;
-        activate(row, "click");
+        activate(row);
         ui.setRenaming(row.sessionId);
         break;
       case "Escape":
@@ -139,36 +126,67 @@ function SidebarTree() {
     e.preventDefault();
   };
 
+  // Right-click on a thread or terminal row opens its menu; anywhere else, none.
+  const onContextMenu = (e: React.MouseEvent) => {
+    const key = (e.target as Element).closest("[data-row-key]")?.getAttribute("data-row-key");
+    const row = rows.find((r) => r.key === key);
+    if (!row || !isLeaf(row)) {
+      e.preventDefault();
+      setMenuRow(null);
+      return;
+    }
+    setMenuRow(row);
+    useUiStore.getState().setCursor(row.key);
+  };
+
   const activeRow = rows[cursorIndex];
   return (
-    <div
-      ref={scrollRef}
-      role="tree"
-      aria-label="Repositories, threads and terminals"
-      tabIndex={0}
-      data-region="sidebar"
-      aria-activedescendant={activeRow ? `row-${activeRow.key}` : undefined}
-      className="group min-h-0 flex-1 overflow-y-auto px-1.5 outline-none"
-      onKeyDown={onKeyDown}
+    <ContextMenu
+      modal={false}
+      onOpenChange={(open) => {
+        if (!open) setMenuRow(null);
+      }}
     >
-      {rows.length === 0 ? (
-        <p className="px-3 py-4 text-xs break-words text-muted-foreground">
-          {loaded ? "No repositories registered." : streamError ? `Cannot list repositories: ${streamError}. Retrying…` : "Loading…"}
-        </p>
-      ) : (
-        <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-          {virtualizer.getVirtualItems().map((vi) => {
-            const row = rows[vi.index];
-            if (!row) return null;
-            return (
-              <div key={row.key} style={{ position: "absolute", top: 0, left: 0, right: 0, height: vi.size, transform: `translateY(${String(vi.start)}px)` }}>
-                <SidebarRow row={row} selected={row.key === selectedKey} cursor={vi.index === cursorIndex && cursorKey !== null} onActivate={activate} />
-              </div>
-            );
-          })}
+      <ContextMenuTrigger asChild>
+        <div
+          ref={scrollRef}
+          role="listbox"
+          aria-label="Threads and terminals"
+          tabIndex={0}
+          data-region="sidebar"
+          data-testid="thread-list"
+          aria-activedescendant={activeRow ? `row-${activeRow.key}` : undefined}
+          className="group min-h-0 flex-1 overflow-y-auto px-1.5 outline-none"
+          onKeyDown={onKeyDown}
+          onContextMenu={onContextMenu}
+        >
+          {rows.length === 0 ? (
+            <p className="px-3 py-4 text-xs break-words text-muted-foreground" data-testid="thread-list-empty">
+              {unavailable
+                ? "Threads are unavailable on this daemon."
+                : loaded
+                  ? "No threads yet. Start one with New thread; projects and their worktrees are on the Projects page."
+                  : streamError
+                    ? `Cannot list threads: ${streamError}. Retrying…`
+                    : "Loading…"}
+            </p>
+          ) : (
+            <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+              {virtualizer.getVirtualItems().map((vi) => {
+                const row = rows[vi.index];
+                if (!row) return null;
+                return (
+                  <div key={row.key} style={{ position: "absolute", top: 0, left: 0, right: 0, height: vi.size, transform: `translateY(${String(vi.start)}px)` }}>
+                    <SidebarRow row={row} selected={row.key === selectedKey} cursor={vi.index === cursorIndex && cursorKey !== null} onActivate={activate} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </ContextMenuTrigger>
+      {menuRow && <RowMenu row={menuRow} />}
+    </ContextMenu>
   );
 }
 
@@ -209,20 +227,18 @@ function SessionsUnavailable() {
 
 /**
  * The sidebar's share of the title band (components/window/titleBand.ts): the
- * traffic-light gutter, kept empty for the lights, then the Repositories header. The
+ * traffic-light gutter, kept empty for the lights, then the Threads header. The
  * whole band drags the window (Wails runtime, `--wails-draggable`) except its controls.
- * No repository count here: beside the gutter the default 260px sidebar has room for the
- * label and the controls, not a count the tree already shows.
  */
 function SidebarBand() {
   return (
     <div className="flex shrink-0 items-center [--wails-draggable:drag]" style={{ height: TITLE_BAND_HEIGHT }} data-testid="sidebar-band">
       <div className="h-full shrink-0" style={{ width: TRAFFIC_LIGHT_GUTTER }} data-testid="traffic-light-gutter" aria-hidden />
       <header className="flex h-full min-w-0 flex-1 items-center justify-between gap-2 pr-3 pl-2 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-        <span className="min-w-0 truncate">Repositories</span>
+        <span className="min-w-0 truncate">Threads</span>
         <span className="flex shrink-0 items-center gap-2 [--wails-draggable:no-drag]" data-testid="sidebar-band-controls">
           <AttentionBadge />
-          {/* New thread (the project picker) and new terminal in the selected worktree, as session.new / terminal.new from the palette. */}
+          {/* New thread (the project picker) and a new terminal in the selected thread's worktree, as session.new / terminal.new from the palette. */}
           <span className="-mr-1.5 flex items-center normal-case">
             <CommandButton command="session.new" icon={Sparkles} whenUnavailable="disable" data-testid="sidebar-new-session" />
             <CommandButton command="terminal.new" icon={SquareTerminal} whenUnavailable="disable" data-testid="sidebar-new-terminal" />
@@ -240,8 +256,11 @@ export function Sidebar() {
   return (
     <aside className="relative flex shrink-0 flex-col bg-sidebar" style={{ width }} data-testid="sidebar">
       <SidebarBand />
-      <PullRequestsNav />
-      <SidebarTree />
+      <nav className="flex shrink-0 flex-col" aria-label="Pages">
+        <PullRequestsNav />
+        <ProjectsNav />
+      </nav>
+      <SidebarList />
       <SessionsUnavailable />
       <SidebarStatus />
       <ResizeHandle />

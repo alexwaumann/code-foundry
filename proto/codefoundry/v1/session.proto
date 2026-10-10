@@ -32,6 +32,9 @@ service SessionService {
   // changes at once; the next reconnect resumes there. Refused for a project thread or
   // a target that is not a member.
   rpc RunIn(RunInSessionRequest) returns (RunInSessionResponse) {}
+  // Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
+  // the GUI's thread list. Persisted; any state.
+  rpc Pin(PinSessionRequest) returns (PinSessionResponse) {}
   // Watch streams session changes. The first event is a snapshot.
   rpc Watch(WatchSessionsRequest) returns (stream SessionEvent) {}
   // StageAttachment stores an image the first prompt refers to and returns its path.
@@ -126,6 +129,8 @@ message Session {
   // nothing is queued. Not persisted: a thread that disconnects first moves its row
   // there instead.
   string pending_worktree_path = 23;
+  // The user pinned the thread (SessionService.Pin). Persisted.
+  bool pinned = 24;
 }
 
 message CreateSessionRequest {
@@ -249,6 +254,15 @@ message RunInSessionRequest {
 }
 
 message RunInSessionResponse {
+  Session session = 1;
+}
+
+message PinSessionRequest {
+  string id = 1;
+  bool pinned = 2;
+}
+
+message PinSessionResponse {
   Session session = 1;
 }
 

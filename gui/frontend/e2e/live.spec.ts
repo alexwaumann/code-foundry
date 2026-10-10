@@ -71,7 +71,7 @@ async function badgeLog(page: Page): Promise<string[]> {
 
 async function openApp(page: Page): Promise<void> {
   await page.goto("/");
-  await expect(page.getByRole("treeitem").filter({ hasText: "code-foundry" }).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("thread-list")).toBeVisible({ timeout: 15_000 });
 }
 
 test.skip(!LIVE, "live daemon e2e: set LIVE_DAEMON=1 (see playwright.live.config.ts)");

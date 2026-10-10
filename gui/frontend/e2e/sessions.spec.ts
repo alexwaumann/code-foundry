@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { CF, emit, invocations, mockPost, openApp, openStreams, resetMock, row } from "./fixtures";
+import { CF, emit, invocations, mockPost, openApp, openProjects, openStreams, resetMock, row } from "./fixtures";
 
 const FIX_RESIZE = `${CF}.worktrees/fix-resize`;
 
@@ -11,9 +11,9 @@ function badge(page: Page, sessionId: string) {
   return row(page, `s:${sessionId}`).locator("[data-session-badge]");
 }
 
-test("session rows render first under their worktree with status badges", async ({ page }) => {
+test("session rows render with status badges, above the terminals no thread owns", async ({ page }) => {
   await openApp(page);
-  const tree = page.getByRole("tree");
+  const tree = page.getByTestId("thread-list");
   await expect(badge(page, "s-1")).toHaveAttribute("data-session-badge", /^(busy|idle)$/);
   await expect(badge(page, "s-2")).toHaveAttribute("data-session-badge", "attention");
   await expect(badge(page, "s-3")).toHaveAttribute("data-session-badge", "disconnected");
@@ -23,7 +23,7 @@ test("session rows render first under their worktree with status badges", async 
   // Session-owned terminals have no row of their own.
   await expect(row(page, "t:t-claude")).toHaveCount(0);
   await expect(row(page, "t:t-ghostty")).toHaveCount(0);
-  // Sessions come before plain terminals under a worktree.
+  // Threads come before plain terminals.
   const keys = await tree.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
   expect(keys.indexOf("s:s-4")).toBeLessThan(keys.indexOf("t:t-top"));
   expect(keys.indexOf("s:s-5")).toBeLessThan(keys.indexOf("t:t-top"));
@@ -91,13 +91,14 @@ test("needs-attention: count badge, window title, and cmd+shift+a", async ({ pag
   await expect(page).toHaveTitle("Code Foundry (2)");
   await expect(badge(page, "s-1")).toHaveAttribute("data-session-badge", "attention");
 
-  // Sidebar order: s-1 (code-foundry) before s-2 (ghostty-playground); wraps around.
+  // Both sit under Needs attention, newest first: s-2 (40 min old) before s-1 (42 min); wraps around.
+  await expect.poll(async () => (await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).slice(0, 3)).toEqual(["h:attention", "s:s-2", "s:s-1"]);
   await page.keyboard.press("Meta+Shift+a");
-  await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Meta+Shift+a"); // from inside the focused terminal
   await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
-  await count.click();
+  await page.keyboard.press("Meta+Shift+a"); // from inside the focused terminal
   await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
+  await count.click();
+  await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
 
   // Typing into a session that needed attention clears it (mock: input -> busy).
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
@@ -106,11 +107,12 @@ test("needs-attention: count badge, window title, and cmd+shift+a", async ({ pag
   await expect(page).toHaveTitle("Code Foundry (1)");
 });
 
-test("new thread: the sidebar + on a worktree opens the composer with that worktree", async ({ page }) => {
+test("new thread: a worktree's + on the Projects page opens the composer with that worktree", async ({ page }) => {
   await openApp(page);
-  const wt = row(page, `w:repo-cf::${FIX_RESIZE}`);
+  await openProjects(page);
+  const wt = page.locator(`[data-nav-key="pw:repo-cf::${FIX_RESIZE}"]`);
   await wt.hover();
-  await wt.getByTestId("new-session").click();
+  await wt.getByTestId("worktree-new-thread").click();
   await expect(page.getByTestId("palette")).toHaveCount(0);
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in code-foundry?");
   await expect(page.getByTestId("composer-worktree")).toHaveText("Existing worktree: fix/resize");
@@ -122,13 +124,13 @@ test("new thread: the sidebar + on a worktree opens the composer with that workt
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
   const last = (await invocations()).at(-1);
   expect(last?.args).toEqual({ repo: "repo-cf", worktree: FIX_RESIZE, model: "opus", effort: "high", permission: "auto", prompt: "Fix the resize race" });
-  // The thread lands under that worktree, selected and attached.
+  // The thread is the newest row, in that worktree, selected and attached.
   const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
   await expect(created).toBeVisible();
+  await expect(created.getByTestId("row-branch")).toHaveText("fix/resize");
   const key = await created.getAttribute("data-row-key");
-  const keys = await page.getByRole("tree").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
-  expect(keys.indexOf(key)).toBeGreaterThan(keys.indexOf(`w:repo-cf::${FIX_RESIZE}`));
-  expect(keys.indexOf(key)).toBeLessThan(keys.indexOf("t:t-tests"));
+  const keys = await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
+  expect(keys.indexOf(key)).toBe(keys.indexOf("h:threads") + 1);
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
 });
 

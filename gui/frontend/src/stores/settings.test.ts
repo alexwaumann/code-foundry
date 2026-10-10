@@ -70,7 +70,7 @@ describe("runCommand confirmation", () => {
     [false, 1],
   ])("confirm=%s invokes %i time(s)", async (yes, calls) => {
     invokeCommand.mockRejectedValueOnce(needsConfirm).mockResolvedValue({ message: "", resultJson: "" });
-    const ctx = { activeTerminalId: "", activeSessionId: "s1", activeRepoId: "", activeWorktreePath: "", activeView: "session" };
+    const ctx = { activeTerminalId: "", activeSessionId: "s1", activeRepoId: "", activeWorktreePath: "", activeView: "session", activeWorkspaceId: "" };
     const done = runCommand("session.remove", {}, ctx);
     await vi.waitFor(() => {
       expect(useConfirmStore.getState().pending?.message).toBe("Remove session s1?");

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { CF, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { CF, invocations, mockPost, mockUrl, openApp, resetMock, selectWorktree } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -10,7 +10,7 @@ const toast = (page: Page, title: string) => page.locator("[data-sonner-toast]")
 
 async function selectMainWorktree(page: Page): Promise<void> {
   await openApp(page);
-  await row(page, `w:repo-cf::${CF}`).click();
+  await selectWorktree(page, "repo-cf", CF);
 }
 
 test("a git op shows a progress toast, then its result (no duplicate command toast)", async ({ page }) => {
@@ -82,14 +82,14 @@ test("ops started outside the GUI (CLI) get toasts too", async ({ page }) => {
 test("pr.create needs a GitHub repo; its result offers to open the PR", async ({ page }) => {
   await mockPost("gitops?delay=200");
   await openApp(page);
-  await row(page, "w:repo-dot::/Users/dev/dotfiles").click();
+  await selectWorktree(page, "repo-dot", "/Users/dev/dotfiles");
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
   await expect(palette.locator('[data-command="git.fetch"]')).toBeVisible();
   await expect(palette.locator('[data-command="pr.create"]')).toHaveCount(0);
   await page.keyboard.press("Escape");
 
-  await row(page, `w:repo-cf::${CF}.worktrees/feat-sidebar`).click();
+  await selectWorktree(page, "repo-cf", `${CF}.worktrees/feat-sidebar`);
   await page.keyboard.press("Meta+k");
   await palette.locator('[data-command="pr.create"]').click();
   const created = toast(page, "Create PR for feat/sidebar");

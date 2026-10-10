@@ -39,9 +39,9 @@ func RegisterRepo(r *Registry, b RepoBackend) error {
 	return r.RegisterAll(
 		Command{
 			Name:        "repo.register",
-			Title:       "Add Repository",
-			Description: "Start tracking a git repository. Any path inside the repository works.",
-			Category:    "Repository",
+			Title:       "Add Project",
+			Description: "Start tracking a git repository as a project. Any path inside the repository works.",
+			Category:    "Project",
 			Args: []ArgSpec{
 				{Name: "path", Type: Path, Required: true, Description: "Path inside the repository"},
 			},
@@ -56,12 +56,12 @@ func RegisterRepo(r *Registry, b RepoBackend) error {
 		},
 		Command{
 			Name:        "repo.unregister",
-			Title:       "Remove Repository",
-			Description: "Stop tracking a repository. Nothing on disk is touched.",
-			Category:    "Repository",
+			Title:       "Remove Project",
+			Description: "Stop tracking a project (a registered repository). Nothing on disk is touched.",
+			Category:    "Project",
 			Args:        []ArgSpec{repoArg},
 			When:        hasRepo,
-			Confirm:     "Stop tracking repository {repo}? Its threads lose their worktree; nothing on disk is touched.",
+			Confirm:     "Stop tracking project {repo}? Its threads lose their worktree; nothing on disk is touched.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("repo")
 				if _, err := b.Unregister(ctx, connect.NewRequest(&v1.UnregisterRepoRequest{Id: id})); err != nil {
@@ -74,7 +74,7 @@ func RegisterRepo(r *Registry, b RepoBackend) error {
 			Name:        "repo.worktree.new",
 			Title:       "New Worktree",
 			Description: "Create a worktree for a branch, creating the branch from base when it does not exist.",
-			Category:    "Repository",
+			Category:    "Project",
 			Args: []ArgSpec{
 				repoArg,
 				{Name: "branch", Type: String, Required: true, Description: "Branch to check out"},
@@ -100,7 +100,7 @@ func RegisterRepo(r *Registry, b RepoBackend) error {
 			Name:        "repo.worktree.remove",
 			Title:       "Remove Worktree",
 			Description: "Remove a worktree from disk, optionally deleting its branch.",
-			Category:    "Repository",
+			Category:    "Project",
 			Args: []ArgSpec{
 				repoArg,
 				{Name: "path", Type: Path, Required: true, Context: ContextWorktree, Description: "Worktree path"},
@@ -124,9 +124,9 @@ func RegisterRepo(r *Registry, b RepoBackend) error {
 		},
 		Command{
 			Name:        "repo.refresh",
-			Title:       "Refresh Repository Status",
-			Description: "Re-read git status now, for one repository or all of them.",
-			Category:    "Repository",
+			Title:       "Refresh Project Status",
+			Description: "Re-read git status now, for one project or all of them.",
+			Category:    "Project",
 			Args: []ArgSpec{
 				{Name: "repo", Type: String, Context: ContextRepo, Description: "Repository id (default: all)"},
 			},

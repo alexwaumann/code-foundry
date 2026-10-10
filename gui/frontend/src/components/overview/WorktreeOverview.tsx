@@ -406,7 +406,7 @@ export function WorktreeOverview({ repoId, path, items }: { repoId: string; path
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         <div className="mx-auto max-w-6xl">
           {!repo ? (
-            <p className="text-sm text-muted-foreground">Repository not found.</p>
+            <p className="text-sm text-muted-foreground">Project not found.</p>
           ) : !wt ? (
             <p className="text-sm text-muted-foreground">Loading worktree…</p>
           ) : (

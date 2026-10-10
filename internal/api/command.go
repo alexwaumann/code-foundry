@@ -92,6 +92,7 @@ func contextFromProto(c *v1.UiContext) command.Context {
 		ActiveRepoID:       c.GetActiveRepoId(),
 		ActiveWorktreePath: c.GetActiveWorktreePath(),
 		ActiveView:         c.GetActiveView(),
+		ActiveWorkspaceID:  c.GetActiveWorkspaceId(),
 	}
 }
 

@@ -84,6 +84,15 @@ func (h *Session) Rename(ctx context.Context, req *connect.Request[v1.RenameSess
 	return connect.NewResponse(&v1.RenameSessionResponse{Session: sessionToProto(s)}), nil
 }
 
+// Pin sets or clears the user's pin.
+func (h *Session) Pin(ctx context.Context, req *connect.Request[v1.PinSessionRequest]) (*connect.Response[v1.PinSessionResponse], error) {
+	s, err := h.store.Pin(ctx, req.Msg.GetId(), req.Msg.GetPinned())
+	if err != nil {
+		return nil, sessionError(err)
+	}
+	return connect.NewResponse(&v1.PinSessionResponse{Session: sessionToProto(s)}), nil
+}
+
 // Close ends the process gracefully; it returns once the session is DISCONNECTED.
 func (h *Session) Close(ctx context.Context, req *connect.Request[v1.CloseSessionRequest]) (*connect.Response[v1.CloseSessionResponse], error) {
 	if err := h.store.Close(ctx, req.Msg.GetId()); err != nil {
@@ -198,6 +207,7 @@ func sessionToProto(s session.Session) *v1.Session {
 		CreatedWorktree:     s.CreatedWorktree,
 		WorkspaceId:         s.WorkspaceID,
 		PendingWorktreePath: s.PendingWorktreePath,
+		Pinned:              s.Pinned,
 	}
 	if !s.CreatedAt.IsZero() {
 		p.CreatedAt = timestamppb.New(s.CreatedAt)

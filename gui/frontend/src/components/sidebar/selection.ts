@@ -1,23 +1,18 @@
-import { repoKey, sessionKey, terminalKey, worktreeKey, type Row } from "@/lib/tree";
+import { sessionKey, terminalKey, type Row } from "@/lib/tree";
 import type { Selection } from "@/stores/ui";
 
-/** Sidebar row key for a selection. */
+/**
+ * Sidebar row key for a selection. Only threads and terminals have rows; projects,
+ * worktrees, composers and pages are reached elsewhere (the Projects page, the nav
+ * entries above the list).
+ */
 export function selectionKey(sel: Selection): string | null {
   switch (sel.kind) {
-    case "none":
-      return null;
     case "terminal":
       return terminalKey(sel.id);
     case "session":
       return sessionKey(sel.id);
-    case "repo":
-      return repoKey(sel.repoId);
-    // A workspace's composer has no sidebar row (workspaces are not in the tree yet).
-    case "compose":
-      return sel.workspaceId ? null : repoKey(sel.repoId);
-    case "worktree":
-      return worktreeKey(sel.repoId, sel.path);
-    case "view":
+    default:
       return null;
   }
 }
@@ -28,11 +23,7 @@ export function rowSelection(row: Row): Selection | null {
       return { kind: "terminal", id: row.terminalId };
     case "session":
       return { kind: "session", id: row.sessionId };
-    case "repo":
-      return { kind: "repo", repoId: row.repoId };
-    case "worktree":
-      return { kind: "worktree", repoId: row.repoId, path: row.path };
-    case "group":
+    case "header":
       return null;
   }
 }

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { emit, invocations, mockPost, mockUrl, openApp, resetMock, row, selectWorktree } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -102,15 +102,15 @@ test("a keybinding override rejects a reserved chord and applies a valid one", a
   await expect(setting(page, "keybindings.session.new").getByTestId("setting-error")).toContainText("already bound to terminal.new");
 
   await recorder.click();
-  await page.keyboard.press("Meta+Shift+j");
-  await expect(recorder).toHaveText("⇧⌘J");
-  await expect.poll(async () => (await mockSettings()).raw["keybindings.session.new"]).toBe("cmd+shift+j");
+  await page.keyboard.press("Meta+Shift+y");
+  await expect(recorder).toHaveText("⇧⌘Y");
+  await expect.poll(async () => (await mockSettings()).raw["keybindings.session.new"]).toBe("cmd+shift+y");
 
   // CommandService.List reports the override: the palette shows the new chord.
   await page.keyboard.press("Escape");
-  await row(page, `w:repo-cf::/Users/dev/src/code-foundry`).click();
+  await selectWorktree(page, "repo-cf", `/Users/dev/src/code-foundry`);
   await page.keyboard.press("Meta+k");
-  await expect(page.getByTestId("palette").locator('[data-command="session.new"]')).toContainText("⇧⌘J");
+  await expect(page.getByTestId("palette").locator('[data-command="session.new"]')).toContainText("⇧⌘Y");
 });
 
 test("hand edits to the file update the open page and the terminal font", async ({ page }) => {

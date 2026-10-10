@@ -62,6 +62,12 @@ interface MockSession {
   createdWorktree: boolean;
   /** The owning workspace; "" for a project thread. */
   workspaceId: string;
+  /** A queued session.run-in target; "" when none (published, not "persisted"). */
+  pendingWorktreePath: string;
+  /** session.pin. */
+  pinned: boolean;
+  /** Mock-only: seconds a queued run-in waits once the thread is not busy (the daemon waits for its prompt). */
+  moveIn: number;
   /** Mock-only: seconds left before a STARTING/CLOSING session settles. */
   settleIn: number;
   /** Mock-only: seconds until an unnamed session gets `pendingName` (background naming). */
@@ -392,6 +398,109 @@ export class World {
     return w;
   }
 
+  /** Test control: a connected thread owned by the workspace, running in `repo`'s member (else the first). */
+  addWorkspaceThread(workspace: string, repo: string, name: string, status: SessionStatus = SessionStatus.IDLE): MockSession {
+    const ws = this.workspaceRef(workspace);
+    const member = repo ? ws.members.find((m) => m.repoId === this.repoRef(repo).id) : ws.members[0];
+    if (!member) throw new CommandError("unavailable", `repo ${repo} is not a member of workspace ${ws.name}`);
+    const s = this.addSession({ id: `s-ws-${String(this.nextId++)}`, repoId: member.repoId, worktreePath: member.worktreePath, name, model: "haiku", effort: "", workspaceId: ws.id, status, createdAt: new Date() });
+    const t = this.terms.get(s.terminalId);
+    if (t) this.publishTerm(t);
+    this.publishSession(s);
+    return s;
+  }
+
+  /**
+   * session.run-in: a disconnected thread moves at once; a live one gets the target as
+   * pendingWorktreePath and moves ~2s after it stops being busy (MockSession.moveIn).
+   * Asking for the current member cancels a queued move.
+   */
+  runIn(s: MockSession, repoRef: string, worktree: string): MockSession {
+    if (!s.workspaceId) throw new CommandError("unavailable", `thread ${s.id} does not belong to a workspace`);
+    const ws = this.workspaceRef(s.workspaceId);
+    const member = worktree ? ws.members.find((m) => m.worktreePath === worktree) : ws.members.find((m) => m.repoId === this.repoRef(repoRef).id);
+    if (!member) throw new CommandError("unavailable", `${repoRef || worktree} is not a member of workspace ${ws.name}`);
+    if (s.state === SessionState.CLOSING) throw new CommandError("unavailable", `thread ${s.id} is closing`);
+    if (s.state === SessionState.DISCONNECTED || member.worktreePath === s.worktreePath) {
+      s.pendingWorktreePath = "";
+      if (member.worktreePath !== s.worktreePath) {
+        s.worktreePath = member.worktreePath;
+        s.repoId = member.repoId;
+      }
+    } else {
+      s.pendingWorktreePath = member.worktreePath;
+      s.moveIn = 2;
+    }
+    this.publishSession(s);
+    return s;
+  }
+
+  private applyMove(s: MockSession): void {
+    const path = s.pendingWorktreePath;
+    const ws = this.workspaces.get(s.workspaceId);
+    const member = ws?.members.find((m) => m.worktreePath === path);
+    s.pendingWorktreePath = "";
+    if (member) {
+      s.worktreePath = member.worktreePath;
+      s.repoId = member.repoId;
+      const t = this.terms.get(s.terminalId);
+      if (t) this.output(t, `\r\n\x1b[2m⎿  Moved to ${path}\x1b[0m\r\n`);
+    }
+    this.publishSession(s);
+  }
+
+  /** workspace.add-repo: a worktree on the workspace branch in another repo. */
+  addWorkspaceRepo(workspace: string, repoRef: string, base: string): MockWorkspace {
+    const ws = this.workspaceRef(workspace);
+    const repo = this.repoRef(repoRef);
+    if (ws.members.some((m) => m.repoId === repo.id)) throw new CommandError("unavailable", `${repo.name} is already a member of workspace ${ws.name}`);
+    const w = this.addWorktree(repo, ws.branch, base || (repo.remotes.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch));
+    ws.members.push({ repoId: repo.id, worktreePath: w.path });
+    this.workspaceEvents.publish({ event: { case: "updated", value: this.workspaceMsg(ws) } });
+    return ws;
+  }
+
+  /** Live threads whose cwd is in one of these worktrees (the daemon's removal guard). */
+  private threadsIn(paths: readonly string[]): MockSession[] {
+    return [...this.sessions.values()].filter((s) => s.state !== SessionState.DISCONNECTED && paths.some((p) => s.worktreePath === p || s.worktreePath.startsWith(`${p}/`)));
+  }
+
+  private dropWorktree(path: string): void {
+    for (const repo of this.repos.values()) {
+      if (!repo.worktrees.some((w) => w.path === path)) continue;
+      repo.worktrees = repo.worktrees.filter((w) => w.path !== path);
+      this.repoEvents.publish({ event: { case: "worktreeRemoved", value: { repoId: repo.id, path } } });
+    }
+  }
+
+  /** workspace.remove-repo: refused while a live thread runs there or with changes (unless force). */
+  removeWorkspaceRepo(workspace: string, repoRef: string, force: boolean): MockWorkspace {
+    const ws = this.workspaceRef(workspace);
+    const member = ws.members.find((m) => m.worktreePath === repoRef) ?? ws.members.find((m) => m.repoId === this.repoRef(repoRef).id);
+    if (!member) throw new CommandError("unavailable", `${repoRef} is not a member of workspace ${ws.name}`);
+    const busy = this.threadsIn([member.worktreePath])[0];
+    if (busy) throw new CommandError("unavailable", `thread ${busy.name || busy.id} (${busy.id}) running in ${member.worktreePath}; close it first`);
+    const wt = [...this.repos.values()].flatMap((r) => r.worktrees).find((w) => w.path === member.worktreePath);
+    if (wt?.status.dirty && !force) throw new CommandError("unavailable", `remove worktree ${member.worktreePath}: it has uncommitted changes; use --force`);
+    this.dropWorktree(member.worktreePath);
+    ws.members = ws.members.filter((m) => m !== member);
+    this.workspaceEvents.publish({ event: { case: "updated", value: this.workspaceMsg(ws) } });
+    return ws;
+  }
+
+  /** workspace.remove: every member worktree, then the workspace. */
+  removeWorkspace(workspace: string, force: boolean): void {
+    const ws = this.workspaceRef(workspace);
+    const busy = this.threadsIn(ws.members.map((m) => m.worktreePath))[0];
+    if (busy) throw new CommandError("unavailable", `thread ${busy.name || busy.id} (${busy.id}) running in ${busy.worktreePath}; close it first`);
+    const paths = new Set(ws.members.map((m) => m.worktreePath));
+    const dirty = [...this.repos.values()].flatMap((r) => r.worktrees).find((w) => paths.has(w.path) && w.status.dirty);
+    if (dirty && !force) throw new CommandError("unavailable", `worktree ${dirty.path} has uncommitted changes; use --force`);
+    for (const m of ws.members) this.dropWorktree(m.worktreePath);
+    this.workspaces.delete(ws.id);
+    this.workspaceEvents.publish({ event: { case: "removedId", value: ws.id } });
+  }
+
   // ---- Sessions -----------------------------------------------------------------
 
   private addSession(o: Partial<MockSession> & Pick<MockSession, "id" | "repoId" | "worktreePath" | "name" | "model" | "effort">): MockSession {
@@ -412,6 +521,9 @@ export class World {
       baseRef: "",
       createdWorktree: false,
       workspaceId: "",
+      pendingWorktreePath: "",
+      pinned: false,
+      moveIn: 0,
       settleIn: 0,
       nameIn: 0,
       pendingName: "",
@@ -452,6 +564,8 @@ export class World {
       baseRef: s.baseRef,
       createdWorktree: s.createdWorktree,
       workspaceId: s.workspaceId,
+      pendingWorktreePath: s.pendingWorktreePath,
+      pinned: s.pinned,
     };
   }
 
@@ -533,6 +647,8 @@ export class World {
 
   private tickSessions(): void {
     for (const s of this.sessions.values()) {
+      // A queued run-in: the daemon types /cd once the thread is idle at its prompt.
+      if (s.pendingWorktreePath && s.status !== SessionStatus.BUSY && --s.moveIn <= 0) this.applyMove(s);
       if (s.nameIn > 0 && --s.nameIn === 0 && !s.name) {
         s.name = s.pendingName;
         this.publishSession(s);
@@ -1176,6 +1292,106 @@ export class World {
       },
       {
         cmd: {
+          name: "session.run-in",
+          title: "Run Thread In…",
+          category: "Thread",
+          description: "Move a workspace thread to another member worktree of its workspace.",
+          keybindings: [],
+          args: [
+            { name: "repo", type: ArgType.STRING, required: false, description: "Member repository (id or name)" },
+            { name: "worktree", type: ArgType.PATH, required: false, description: "Member worktree path" },
+          ],
+        },
+        // Like the daemon: the GUI passes the thread's workspace; the CLI (no view) names the thread.
+        when: (ctx) => activeSession(ctx) !== undefined && Boolean(ctx?.activeWorkspaceId || !ctx?.activeView),
+        run: (ctx, args) => {
+          const s = activeSession(ctx);
+          if (!s) throw new CommandError("unavailable", "no active session");
+          if (!args.repo && !args.worktree) throw new CommandError("invalid", "name the member: a repository or a worktree path");
+          const out = this.runIn(s, args.repo ?? "", args.worktree ?? "");
+          const label = out.name ? `${out.name} (${out.id})` : out.id;
+          return out.pendingWorktreePath ? `thread ${label} moves to ${out.pendingWorktreePath} once it is idle (/cd)` : `thread ${label} runs in ${out.worktreePath}`;
+        },
+      },
+      {
+        cmd: {
+          name: "session.pin",
+          title: "Pin or Unpin Thread",
+          category: "Thread",
+          description: "Pin a thread to the top of the thread list, or unpin it. Without pinned, toggles the current pin.",
+          keybindings: [],
+          args: [{ name: "pinned", type: ArgType.BOOL, required: false, description: "Pin (true) or unpin (false)" }],
+        },
+        when: (ctx) => activeSession(ctx) !== undefined,
+        run: (ctx, args) => {
+          const s = activeSession(ctx);
+          if (!s) throw new CommandError("unavailable", "no active session");
+          s.pinned = args.pinned === undefined || args.pinned === "" ? !s.pinned : args.pinned === "true";
+          this.publishSession(s);
+          return `${s.pinned ? "pinned" : "unpinned"} thread ${s.name ? `${s.name} (${s.id})` : s.id}`;
+        },
+      },
+      {
+        cmd: {
+          name: "workspace.add-repo",
+          title: "Add Project to Workspace",
+          category: "Workspace",
+          description: "Create a worktree on the workspace branch in another repository and add it to the workspace.",
+          keybindings: [],
+          args: [
+            { name: "repo", type: ArgType.STRING, required: true, description: "Repository id, name, or absolute path" },
+            { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name" },
+            { name: "base", type: ArgType.STRING, required: false, description: "Ref to branch from" },
+          ],
+        },
+        when: always,
+        run: (_ctx, args) => {
+          const ws = this.addWorkspaceRepo(args.workspace ?? "", args.repo ?? "", args.base ?? "");
+          const last = ws.members[ws.members.length - 1];
+          return `added ${args.repo ?? ""} to workspace ${ws.name}: ${last?.worktreePath ?? ""} on ${ws.branch}`;
+        },
+      },
+      {
+        cmd: {
+          name: "workspace.remove-repo",
+          title: "Remove Project from Workspace",
+          category: "Workspace",
+          description: "Delete a member repository's worktree and drop it from the workspace.",
+          keybindings: [],
+          args: [
+            { name: "repo", type: ArgType.STRING, required: true, description: "Repository id, name, or path" },
+            { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name" },
+            { name: "force", type: ArgType.BOOL, required: false, description: "Remove even with uncommitted changes" },
+          ],
+          confirm: (_ctx, args) => `Remove project ${args.repo ?? ""} from its workspace? This deletes its worktree from disk.`,
+        },
+        when: always,
+        run: (_ctx, args) => {
+          const ws = this.removeWorkspaceRepo(args.workspace ?? "", args.repo ?? "", args.force === "true");
+          return `removed ${args.repo ?? ""} from workspace ${ws.name} (${String(ws.members.length)} left)`;
+        },
+      },
+      {
+        cmd: {
+          name: "workspace.remove",
+          title: "Remove Workspace",
+          category: "Workspace",
+          description: "Delete every member worktree and forget the workspace.",
+          keybindings: [],
+          args: [
+            { name: "workspace", type: ArgType.STRING, required: true, description: "Workspace id or name" },
+            { name: "force", type: ArgType.BOOL, required: false, description: "Remove even with uncommitted changes" },
+          ],
+          confirm: (_ctx, args) => `Remove workspace ${args.workspace ?? ""}? This deletes every member worktree from disk.`,
+        },
+        when: always,
+        run: (_ctx, args) => {
+          this.removeWorkspace(args.workspace ?? "", args.force === "true");
+          return `removed workspace ${args.workspace ?? ""}`;
+        },
+      },
+      {
+        cmd: {
           name: "session.remove", title: "Remove Thread", category: "Session", description: "Forget the session (closes it first if connected)", keybindings: [], args: [],
           confirm: (ctx) => `Remove session ${ctx?.activeSessionId ?? ""}? It is closed first if connected, and its row is forgotten.`,
         },
@@ -1222,7 +1438,7 @@ export class World {
         },
       },
       {
-        cmd: { name: "repo.register", title: "Register Repository", category: "Repository", description: "Track a git repository", keybindings: [], args: [{ name: "path", type: ArgType.PATH, required: true, description: "Path inside the repository" }] },
+        cmd: { name: "repo.register", title: "Add Project", category: "Project", description: "Track a git repository as a project", keybindings: [], args: [{ name: "path", type: ArgType.PATH, required: true, description: "Path inside the repository" }] },
         when: always,
         run: (_ctx, args) => {
           const path = (args.path ?? "").replace(/^~(?=\/|$)/, HOME).replace(/\/+$/, "");
@@ -1236,8 +1452,8 @@ export class World {
       },
       {
         cmd: {
-          name: "repo.unregister", title: "Unregister Repository", category: "Repository", description: "Stop tracking the active repository", keybindings: [], args: [],
-          confirm: (ctx) => `Stop tracking repository ${ctx?.activeRepoId ?? ""}? Nothing on disk is touched.`,
+          name: "repo.unregister", title: "Remove Project", category: "Project", description: "Stop tracking the active project", keybindings: [], args: [],
+          confirm: (ctx) => `Stop tracking project ${ctx?.activeRepoId ?? ""}? Nothing on disk is touched.`,
         },
         when: (ctx) => Boolean(ctx?.activeRepoId && this.repos.has(ctx.activeRepoId)),
         run: (ctx) => {
@@ -1281,8 +1497,8 @@ export class World {
       },
       {
         cmd: {
-          name: "worktree.remove", title: "Remove Worktree", category: "Worktree", description: "Remove the active worktree", keybindings: [],
-          args: [{ name: "force", type: ArgType.BOOL, required: true, description: "Discard local changes?", defaultValue: "false" }],
+          name: "repo.worktree.remove", title: "Remove Worktree", category: "Worktree", description: "Remove the active worktree", keybindings: [],
+          args: [{ name: "force", type: ArgType.BOOL, required: false, description: "Remove even with uncommitted changes" }],
           confirm: (ctx) => `Remove worktree ${ctx?.activeWorktreePath ?? ""}? This deletes files on disk.`,
         },
         when: (ctx) => {
@@ -1401,7 +1617,14 @@ export class World {
     this.invocations.push({
       name,
       context: ctx
-        ? { activeTerminalId: ctx.activeTerminalId, activeSessionId: ctx.activeSessionId, activeRepoId: ctx.activeRepoId, activeWorktreePath: ctx.activeWorktreePath, activeView: ctx.activeView }
+        ? {
+            activeTerminalId: ctx.activeTerminalId,
+            activeSessionId: ctx.activeSessionId,
+            activeRepoId: ctx.activeRepoId,
+            activeWorktreePath: ctx.activeWorktreePath,
+            activeView: ctx.activeView,
+            activeWorkspaceId: ctx.activeWorkspaceId,
+          }
         : null,
       args,
       confirmed,

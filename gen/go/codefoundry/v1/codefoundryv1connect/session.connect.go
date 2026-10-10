@@ -52,6 +52,8 @@ const (
 	SessionServiceRemoveProcedure = "/codefoundry.v1.SessionService/Remove"
 	// SessionServiceRunInProcedure is the fully-qualified name of the SessionService's RunIn RPC.
 	SessionServiceRunInProcedure = "/codefoundry.v1.SessionService/RunIn"
+	// SessionServicePinProcedure is the fully-qualified name of the SessionService's Pin RPC.
+	SessionServicePinProcedure = "/codefoundry.v1.SessionService/Pin"
 	// SessionServiceWatchProcedure is the fully-qualified name of the SessionService's Watch RPC.
 	SessionServiceWatchProcedure = "/codefoundry.v1.SessionService/Watch"
 	// SessionServiceStageAttachmentProcedure is the fully-qualified name of the SessionService's
@@ -85,6 +87,9 @@ type SessionServiceClient interface {
 	// changes at once; the next reconnect resumes there. Refused for a project thread or
 	// a target that is not a member.
 	RunIn(context.Context, *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error)
+	// Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
+	// the GUI's thread list. Persisted; any state.
+	Pin(context.Context, *connect.Request[v1.PinSessionRequest]) (*connect.Response[v1.PinSessionResponse], error)
 	// Watch streams session changes. The first event is a snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchSessionsRequest]) (*connect.ServerStreamForClient[v1.SessionEvent], error)
 	// StageAttachment stores an image the first prompt refers to and returns its path.
@@ -159,6 +164,12 @@ func NewSessionServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(sessionServiceMethods.ByName("RunIn")),
 			connect.WithClientOptions(opts...),
 		),
+		pin: connect.NewClient[v1.PinSessionRequest, v1.PinSessionResponse](
+			httpClient,
+			baseURL+SessionServicePinProcedure,
+			connect.WithSchema(sessionServiceMethods.ByName("Pin")),
+			connect.WithClientOptions(opts...),
+		),
 		watch: connect.NewClient[v1.WatchSessionsRequest, v1.SessionEvent](
 			httpClient,
 			baseURL+SessionServiceWatchProcedure,
@@ -185,6 +196,7 @@ type sessionServiceClient struct {
 	reconnect       *connect.Client[v1.ReconnectSessionRequest, v1.ReconnectSessionResponse]
 	remove          *connect.Client[v1.RemoveSessionRequest, v1.RemoveSessionResponse]
 	runIn           *connect.Client[v1.RunInSessionRequest, v1.RunInSessionResponse]
+	pin             *connect.Client[v1.PinSessionRequest, v1.PinSessionResponse]
 	watch           *connect.Client[v1.WatchSessionsRequest, v1.SessionEvent]
 	stageAttachment *connect.Client[v1.StageAttachmentRequest, v1.StageAttachmentResponse]
 }
@@ -234,6 +246,11 @@ func (c *sessionServiceClient) RunIn(ctx context.Context, req *connect.Request[v
 	return c.runIn.CallUnary(ctx, req)
 }
 
+// Pin calls codefoundry.v1.SessionService.Pin.
+func (c *sessionServiceClient) Pin(ctx context.Context, req *connect.Request[v1.PinSessionRequest]) (*connect.Response[v1.PinSessionResponse], error) {
+	return c.pin.CallUnary(ctx, req)
+}
+
 // Watch calls codefoundry.v1.SessionService.Watch.
 func (c *sessionServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchSessionsRequest]) (*connect.ServerStreamForClient[v1.SessionEvent], error) {
 	return c.watch.CallServerStream(ctx, req)
@@ -270,6 +287,9 @@ type SessionServiceHandler interface {
 	// changes at once; the next reconnect resumes there. Refused for a project thread or
 	// a target that is not a member.
 	RunIn(context.Context, *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error)
+	// Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
+	// the GUI's thread list. Persisted; any state.
+	Pin(context.Context, *connect.Request[v1.PinSessionRequest]) (*connect.Response[v1.PinSessionResponse], error)
 	// Watch streams session changes. The first event is a snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchSessionsRequest], *connect.ServerStream[v1.SessionEvent]) error
 	// StageAttachment stores an image the first prompt refers to and returns its path.
@@ -340,6 +360,12 @@ func NewSessionServiceHandler(svc SessionServiceHandler, opts ...connect.Handler
 		connect.WithSchema(sessionServiceMethods.ByName("RunIn")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sessionServicePinHandler := connect.NewUnaryHandler(
+		SessionServicePinProcedure,
+		svc.Pin,
+		connect.WithSchema(sessionServiceMethods.ByName("Pin")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sessionServiceWatchHandler := connect.NewServerStreamHandler(
 		SessionServiceWatchProcedure,
 		svc.Watch,
@@ -372,6 +398,8 @@ func NewSessionServiceHandler(svc SessionServiceHandler, opts ...connect.Handler
 			sessionServiceRemoveHandler.ServeHTTP(w, r)
 		case SessionServiceRunInProcedure:
 			sessionServiceRunInHandler.ServeHTTP(w, r)
+		case SessionServicePinProcedure:
+			sessionServicePinHandler.ServeHTTP(w, r)
 		case SessionServiceWatchProcedure:
 			sessionServiceWatchHandler.ServeHTTP(w, r)
 		case SessionServiceStageAttachmentProcedure:
@@ -419,6 +447,10 @@ func (UnimplementedSessionServiceHandler) Remove(context.Context, *connect.Reque
 
 func (UnimplementedSessionServiceHandler) RunIn(context.Context, *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SessionService.RunIn is not implemented"))
+}
+
+func (UnimplementedSessionServiceHandler) Pin(context.Context, *connect.Request[v1.PinSessionRequest]) (*connect.Response[v1.PinSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SessionService.Pin is not implemented"))
 }
 
 func (UnimplementedSessionServiceHandler) Watch(context.Context, *connect.Request[v1.WatchSessionsRequest], *connect.ServerStream[v1.SessionEvent]) error {

@@ -1,26 +1,20 @@
 import { expect, test } from "@playwright/test";
-import { CF, emit, expectTerminalText, invocations, openApp, resetMock, row, writes } from "./fixtures";
+import { CF, emit, expectTerminalText, invocations, openApp, openProjects, resetMock, row, selectWorktree, writes } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
 });
 
-test("sidebar renders repos, worktrees and grouped terminals", async ({ page }) => {
+test("sidebar lists threads, then terminals no thread owns; repos and worktrees are on the Projects page", async ({ page }) => {
   await openApp(page);
-  const tree = page.getByRole("tree");
-  for (const name of ["code-foundry", "ghostty-playground", "dotfiles"]) {
-    await expect(tree.locator('[data-row-kind="repo"]').filter({ hasText: name })).toBeVisible();
-  }
-  await expect(tree.locator('[data-row-kind="worktree"]').filter({ hasText: "feat/sidebar" })).toBeVisible();
-  // Grouped by worktree_path (session s-1) and by cwd prefix (t-logs under main, t-top under feat/sidebar).
-  const keys = await tree.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
-  const idx = (k: string) => keys.indexOf(k);
-  expect(idx(`w:repo-cf::${CF}`)).toBeLessThan(idx("s:s-1"));
-  expect(idx("s:s-1")).toBeLessThan(idx("t:t-logs"));
-  expect(idx("t:t-logs")).toBeLessThan(idx(`w:repo-cf::${CF}.worktrees/feat-sidebar`));
-  expect(idx("t:t-top")).toBeGreaterThan(idx(`w:repo-cf::${CF}.worktrees/feat-sidebar`));
-  // Unplaceable terminals land under "Other terminals".
-  expect(idx("t:t-tmp")).toBeGreaterThan(idx("g:other"));
+  const list = page.getByTestId("thread-list");
+  const keys = await list.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
+  // Sessions own t-claude and t-ghostty, so those terminals have no rows of their own.
+  expect(keys).toEqual(["h:attention", "s:s-2", "h:threads", "s:s-5", "s:s-1", "s:s-6", "s:s-4", "s:s-3", "h:terminals", "t:t-logs", "t:t-top", "t:t-tests", "t:t-tmp"]);
+  await expect(list.locator('[data-row-kind="repo"], [data-row-kind="worktree"]')).toHaveCount(0);
+  await openProjects(page);
+  await expect(page.getByTestId("project-name")).toHaveText(["code-foundry", "dotfiles", "ghostty-playground", "sketches"]);
+  await expect(page.locator('[data-testid="project"][data-repo="repo-cf"]').getByTestId("worktree-branch")).toHaveText(["main", "feat/sidebar", "fix/resize"]);
   await expect(page.getByTestId("daemon-status")).toContainText("mock");
 });
 
@@ -93,6 +87,7 @@ test("invoking a command sends the current context", async ({ page }) => {
     activeRepoId: "repo-cf",
     activeWorktreePath: CF,
     activeView: "terminal",
+    activeWorkspaceId: "",
   });
 
   // A session contributes its id, terminal and worktree.
@@ -108,12 +103,13 @@ test("invoking a command sends the current context", async ({ page }) => {
     activeRepoId: "repo-cf",
     activeWorktreePath: CF,
     activeView: "session",
+    activeWorkspaceId: "",
   });
 });
 
 test("required args are prompted inline before invoking", async ({ page }) => {
   await openApp(page);
-  await row(page, `w:repo-cf::${CF}.worktrees/feat-sidebar`).click();
+  await selectWorktree(page, "repo-cf", `${CF}.worktrees/feat-sidebar`);
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("create worktree");
   await page.keyboard.press("Enter");
@@ -126,8 +122,8 @@ test("required args are prompted inline before invoking", async ({ page }) => {
   expect(last?.name).toBe("worktree.create");
   expect(last?.args).toEqual({ branch: "feat/palette" });
   expect(last?.context?.activeWorktreePath).toBe(`${CF}.worktrees/feat-sidebar`);
-  // The command emits FocusRepo for the new worktree, created under ~/.code-foundry/worktrees/<owner>/<repo>.
-  await expect(row(page, "w:repo-cf::/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/feat-palette")).toHaveAttribute("aria-selected", "true");
+  // The command emits FocusRepo for the new worktree, created under ~/.code-foundry/worktrees/<owner>/<repo>: its overview shows.
+  await expect(page.getByTestId("overview-title")).toHaveText("code-foundry@feat/palette");
 
   // Enum args list their values, the default highlighted.
   await page.keyboard.press("Meta+k");
@@ -159,23 +155,20 @@ test("OpenPalette and Notify intents", async ({ page }) => {
 
 test("sidebar is keyboard navigable", async ({ page }) => {
   await openApp(page);
-  await page.getByRole("tree").focus();
-  await page.keyboard.press("Home");
-  await page.keyboard.press("ArrowDown"); // main worktree
-  await page.keyboard.press("ArrowDown"); // session s-1 (sessions come first)
+  const list = page.getByTestId("thread-list");
+  await list.focus();
+  await page.keyboard.press("Home"); // s-2 (needs attention, on top)
+  await page.keyboard.press("ArrowDown"); // s-5 (headers are skipped)
+  await page.keyboard.press("ArrowDown"); // s-1
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-claude");
-  // Collapse the first repo with ArrowLeft from its row.
-  await page.getByRole("tree").focus();
-  await page.keyboard.press("Home");
-  await page.keyboard.press("ArrowLeft");
-  await expect(row(page, "r:repo-cf")).toHaveAttribute("aria-expanded", "false");
-  await expect(row(page, "s:s-1")).toHaveCount(0);
-  // cmd+N jumps to the Nth session or terminal in sidebar order even when collapsed:
-  // s-1, t-logs, s-4, s-5, t-top, …
-  await page.keyboard.press("Meta+2");
+  await list.focus();
+  await page.keyboard.press("End");
+  await expect(list).toHaveAttribute("aria-activedescendant", "row-t:t-tmp");
+  // cmd+N jumps to the Nth thread or terminal in sidebar order: s-2, s-5, s-1, s-6, s-4, s-3, t-logs, t-top, …
+  await page.keyboard.press("Meta+7");
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-logs");
-  await page.keyboard.press("Meta+5");
+  await page.keyboard.press("Meta+8");
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-top");
 });
 

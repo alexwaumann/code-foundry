@@ -17,13 +17,16 @@ export type Selection =
   | { kind: "view"; name: string };
 
 /** Top-level page names (UiIntent.ShowView); unknown names are ignored. */
-export const viewNames: readonly string[] = ["pullrequests"];
+export const viewNames: readonly string[] = ["pullrequests", "projects"];
 
 /** Which region has keyboard focus; the palette returns focus to it on close. */
 export type FocusRegion = "sidebar" | "terminal" | "content" | "palette" | "panel";
 
-/** What the palette dialog shows: the command list (and arg prompts) or the project picker. */
-export type PalettePage = "commands" | "projects";
+/**
+ * What the palette dialog shows: the command list (and arg prompts), the project picker,
+ * or the member picker of "Run in…" (for `palette.sessionId`).
+ */
+export type PalettePage = "commands" | "projects" | "runin";
 
 export const SIDEBAR_MIN = 180;
 export const SIDEBAR_MAX = 520;
@@ -60,8 +63,7 @@ interface UiState {
   windowWidth: number;
   /** Row key the sidebar keyboard cursor is on. */
   cursorKey: string | null;
-  collapsed: Readonly<Record<string, boolean>>;
-  palette: { open: boolean; query: string; commandName: string | null; page: PalettePage; returnTo: FocusRegion };
+  palette: { open: boolean; query: string; commandName: string | null; page: PalettePage; returnTo: FocusRegion; sessionId?: string };
   /** Incremented to ask the composer to take focus. */
   composerFocusSeq: number;
   /** Session whose sidebar row is in inline-rename mode. */
@@ -76,10 +78,11 @@ interface UiState {
   setFocus: (f: FocusRegion) => void;
   focusSidebar: () => void;
   setCursor: (key: string | null) => void;
-  toggleCollapsed: (key: string, collapsed?: boolean) => void;
   openPalette: (query?: string, commandName?: string | null) => void;
   /** Opens the palette on the project picker (session.new's presenter). */
   openProjectPicker: (returnTo?: FocusRegion) => void;
+  /** Opens the palette on the "Run in…" member picker for a thread (session.run-in's presenter). */
+  openRunInPicker: (sessionId: string, returnTo?: FocusRegion) => void;
   closePalette: () => void;
   focusComposer: () => void;
   setRenaming: (sessionId: string | null) => void;
@@ -147,7 +150,6 @@ export const useUiStore = create<UiState>()(
       contentFocusSeq: 0,
       windowWidth: typeof window === "undefined" ? 1280 : window.innerWidth,
       cursorKey: null,
-      collapsed: {},
       palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" },
       composerFocusSeq: 0,
       renamingSessionId: null,
@@ -174,19 +176,14 @@ export const useUiStore = create<UiState>()(
       setCursor: (cursorKey) => {
         set({ cursorKey });
       },
-      toggleCollapsed: (key, collapsed) => {
-        set((s) => {
-          const next = collapsed ?? !s.collapsed[key];
-          if (Boolean(s.collapsed[key]) === next) return s;
-          const { [key]: _old, ...rest } = s.collapsed;
-          return { collapsed: next ? { ...rest, [key]: true } : rest };
-        });
-      },
       openPalette: (query = "", commandName = null) => {
         set((s) => ({ palette: { open: true, query, commandName, page: "commands", returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
       },
       openProjectPicker: (returnTo) => {
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "projects", returnTo: returnTo ?? (s.palette.open ? s.palette.returnTo : s.focus) } }));
+      },
+      openRunInPicker: (sessionId, returnTo) => {
+        set((s) => ({ palette: { open: true, query: "", commandName: null, page: "runin", sessionId, returnTo: returnTo ?? (s.palette.open ? s.palette.returnTo : s.focus) } }));
       },
       focusComposer: () => {
         set((s) => ({ composerFocusSeq: s.composerFocusSeq + 1 }));
@@ -224,16 +221,16 @@ export const useUiStore = create<UiState>()(
     {
       name: "code-foundry.ui",
       // 2: the global panelWidth moved to per-panel widths in the panel store; drop it.
-      version: 2,
+      // 3: the sidebar is a flat thread list (no collapsible repos or worktrees); drop collapsed.
+      version: 3,
       migrate: (persisted) => {
-        const { panelWidth: _old, ...rest } = (persisted ?? {}) as Record<string, unknown>;
+        const { panelWidth: _old, collapsed: _gone, ...rest } = (persisted ?? {}) as Record<string, unknown>;
         return rest as Partial<UiState> as UiState;
       },
       partialize: (s) => ({
         sidebarVisible: s.sidebarVisible,
         sidebarWidth: s.sidebarWidth,
         fontSize: s.fontSize,
-        collapsed: s.collapsed,
       }),
     },
   ),

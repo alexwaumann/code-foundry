@@ -5,13 +5,14 @@ import {
   placeTerminal,
   SESSION_LABEL,
   WORKTREE_LABEL,
+  type ListSession,
   type PlaceableTerminal,
   type TreeRepo,
   type TreeSession,
   type WorktreeRef,
 } from "@/lib/tree";
 import { useReposStore, type ReposData } from "./repos";
-import { useSessionsStore, type SessionsData } from "./sessions";
+import { isAttention, useSessionsStore, type SessionsData } from "./sessions";
 import { useTerminalsStore, type TerminalsData } from "./terminals";
 import { useUiStore, type Selection } from "./ui";
 
@@ -21,6 +22,7 @@ export const emptyContext: UiContextView = {
   activeRepoId: "",
   activeWorktreePath: "",
   activeView: "dashboard",
+  activeWorkspaceId: "",
 };
 
 function allWorktrees(repos: ReposData): WorktreeRef[] {
@@ -40,10 +42,12 @@ export function deriveContext(sel: Selection, terminals: TerminalsData, repos: R
     case "terminal": {
       const t = terminals.byId[sel.id];
       const place = t ? placeTerminal({ cwd: t.cwd, worktreeLabel: t.labels[WORKTREE_LABEL] ?? "" }, allWorktrees(repos)) : null;
+      const sessionId = t?.labels[SESSION_LABEL] ?? "";
       return {
         ...emptyContext,
         activeTerminalId: sel.id,
-        activeSessionId: t?.labels[SESSION_LABEL] ?? "",
+        activeSessionId: sessionId,
+        activeWorkspaceId: sessions.byId[sessionId]?.workspaceId ?? "",
         activeRepoId: place?.repoId ?? "",
         activeWorktreePath: place?.path ?? "",
         activeView: "terminal",
@@ -59,6 +63,7 @@ export function deriveContext(sel: Selection, terminals: TerminalsData, repos: R
         activeRepoId: place?.repoId ?? s?.repoId ?? "",
         activeWorktreePath: place?.path ?? s?.worktreePath ?? "",
         activeView: "session",
+        activeWorkspaceId: s?.workspaceId ?? "",
       };
     }
     case "repo": {
@@ -71,14 +76,14 @@ export function deriveContext(sel: Selection, terminals: TerminalsData, repos: R
     // The composer has no worktree yet (it may make one): only the repo, which is
     // what session.new needs to be available.
     case "compose":
-      return { ...emptyContext, activeRepoId: sel.repoId, activeView: "compose" };
+      return { ...emptyContext, activeRepoId: sel.repoId, activeView: "compose", activeWorkspaceId: sel.workspaceId ?? "" };
     case "view":
       return { ...emptyContext, activeView: sel.name };
   }
 }
 
 export function contextKey(c: UiContextView): string {
-  return [c.activeView, c.activeTerminalId, c.activeSessionId, c.activeRepoId, c.activeWorktreePath].join("\u0000");
+  return [c.activeView, c.activeTerminalId, c.activeSessionId, c.activeRepoId, c.activeWorktreePath, c.activeWorkspaceId].join("\u0000");
 }
 
 /** Current context, read imperatively (keybindings, invoke). */
@@ -138,17 +143,40 @@ export function decodeSessionKeys(keys: readonly string[]): TreeSession[] {
   });
 }
 
-/** Tree inputs read imperatively (cmd+1..9, cmd+shift+a). */
-export function getTreeInputs(): { repos: TreeRepo[]; terminals: PlaceableTerminal[]; sessions: TreeSession[] } {
-  const r = useReposStore.getState();
+/**
+ * One string per session for the sidebar list: id + attached terminal + pin + attention
+ * (name, model and busy/idle changes don't rebuild the list). In the store's order.
+ */
+export function useSessionListKeys(): string[] {
+  return useSessionsStore(
+    useShallow((s) =>
+      s.order.map((id) => {
+        const x = s.byId[id];
+        return [id, x?.terminalId ?? "", x?.pinned ? "1" : "", x && isAttention(x) ? "1" : ""].join(SEP);
+      }),
+    ),
+  );
+}
+
+export function decodeSessionListKeys(keys: readonly string[]): ListSession[] {
+  return keys.map((k) => {
+    const [id = "", terminalId = "", pinned = "", attention = ""] = k.split(SEP);
+    return { id, terminalId, pinned: pinned === "1", attention: attention === "1" };
+  });
+}
+
+/** Sidebar list inputs read imperatively (cmd+1..9, cmd+shift+a). */
+export function getListInputs(): { sessions: ListSession[]; terminals: PlaceableTerminal[] } {
   const t = useTerminalsStore.getState();
   const s = useSessionsStore.getState();
   return {
-    repos: r.order.map((id) => ({ id, worktreePaths: r.byId[id]?.worktrees.map((w) => w.path) ?? [] })),
+    sessions: s.order.flatMap((id) => {
+      const x = s.byId[id];
+      return x ? [{ id, terminalId: x.terminalId, pinned: x.pinned, attention: isAttention(x) }] : [];
+    }),
     terminals: t.order.map((id) => {
       const term = t.byId[id];
       return { id, cwd: term?.cwd ?? "", worktreeLabel: term?.labels[WORKTREE_LABEL] ?? "", sessionLabel: term?.labels[SESSION_LABEL] ?? "" };
     }),
-    sessions: s.order.map((id) => ({ id, worktreePath: s.byId[id]?.worktreePath ?? "", terminalId: s.byId[id]?.terminalId ?? "" })),
   };
 }

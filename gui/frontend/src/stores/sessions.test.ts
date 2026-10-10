@@ -34,6 +34,8 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     baseRef: "",
     createdWorktree: false,
     workspaceId: "",
+    pendingWorktreePath: "",
+    pinned: false,
     ...over,
   };
 }
@@ -107,7 +109,16 @@ describe("deriveContext for a session", () => {
       activeRepoId: "r1",
       activeWorktreePath: "/src/app",
       activeView: "session",
+      activeWorkspaceId: "",
     });
+  });
+  it("a workspace thread carries its workspace (session.run-in's availability)", () => {
+    const sessions = replaceSessions(emptySessions, [session("s1", { terminalId: "t9", workspaceId: "w-1" })]);
+    expect(deriveContext({ kind: "session", id: "s1" }, emptyTerminals, repos, sessions).activeWorkspaceId).toBe("w-1");
+    // Its terminal, selected directly, too.
+    const terms = { byId: { t9: { id: "t9", argv: ["claude"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running" as const, exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, labels: { session: "s1" } } }, order: ["t9"] };
+    expect(deriveContext({ kind: "terminal", id: "t9" }, terms, repos, sessions).activeWorkspaceId).toBe("w-1");
+    expect(deriveContext({ kind: "compose", repoId: "r1", workspaceId: "w-2" }, emptyTerminals, repos, sessions).activeWorkspaceId).toBe("w-2");
   });
   it("disconnected: no terminal; unknown session keeps the id", () => {
     const sessions = replaceSessions(emptySessions, [session("s1", { terminalId: "", state: "disconnected" })]);

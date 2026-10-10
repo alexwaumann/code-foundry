@@ -14,7 +14,7 @@ export async function resetMock(): Promise<void> {
 
 export interface Invocation {
   name: string;
-  context: { activeTerminalId: string; activeSessionId: string; activeRepoId: string; activeWorktreePath: string; activeView: string } | null;
+  context: { activeTerminalId: string; activeSessionId: string; activeRepoId: string; activeWorktreePath: string; activeView: string; activeWorkspaceId?: string } | null;
   args: Record<string, string>;
   confirmed?: boolean;
 }
@@ -55,7 +55,31 @@ export async function emit(intent: Record<string, unknown>): Promise<number> {
 
 export async function openApp(page: Page): Promise<void> {
   await page.goto(appPath);
-  await expect(page.getByRole("treeitem").filter({ hasText: "code-foundry" }).first()).toBeVisible();
+  await expect(page.getByTestId("thread-list").locator("[data-row-key]").first()).toBeVisible();
+}
+
+/** Shows the Projects page from its sidebar entry. */
+export async function openProjects(page: Page): Promise<void> {
+  await page.getByTestId("nav-projects").click();
+  await expect(page.getByTestId("projects-page")).toBeVisible();
+}
+
+/**
+ * Selects a worktree (its overview) the way the sidebar tree used to: from the Projects
+ * page, a project's worktree row, or a workspace member row when `workspaceId` is given.
+ */
+export async function selectWorktree(page: Page, repoId: string, path: string, workspaceId?: string): Promise<void> {
+  await openProjects(page);
+  const key = workspaceId ? `m:${workspaceId}::${repoId}` : `pw:${repoId}::${path}`;
+  await page.locator(`[data-nav-key="${key}"]`).dblclick();
+  await expect(page.getByTestId("projects-page")).toHaveCount(0);
+}
+
+/** Selects a project (its overview) from the Projects page. */
+export async function selectProject(page: Page, repoId: string): Promise<void> {
+  await openProjects(page);
+  await page.locator(`[data-nav-key="p:${repoId}"]`).dblclick();
+  await expect(page.getByTestId("projects-page")).toHaveCount(0);
 }
 
 export function row(page: Page, key: string) {

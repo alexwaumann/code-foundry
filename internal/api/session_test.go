@@ -63,6 +63,13 @@ func TestSessionUnaryAndErrorCodes(t *testing.T) {
 	if _, err := c.Rename(ctx, connect.NewRequest(&v1.RenameSessionRequest{Id: "s-1", Name: " "})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Errorf("Rename empty: %v", err)
 	}
+	pinned, err := c.Pin(ctx, connect.NewRequest(&v1.PinSessionRequest{Id: "s-1", Pinned: true}))
+	if err != nil || !pinned.Msg.GetSession().GetPinned() {
+		t.Fatalf("Pin = %v, %v", pinned, err)
+	}
+	if _, err := c.Pin(ctx, connect.NewRequest(&v1.PinSessionRequest{Id: "nope", Pinned: true})); connect.CodeOf(err) != connect.CodeNotFound {
+		t.Errorf("Pin unknown: %v", err)
+	}
 	list, err := c.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))
 	if err != nil || len(list.Msg.GetSessions()) != 1 {
 		t.Fatalf("List = %v, %v", list, err)

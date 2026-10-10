@@ -1,7 +1,10 @@
 /**
- * Sidebar tree: repos -> worktrees -> sessions, then terminals, flattened into rows for a
- * virtual list. Pure functions over the minimal inputs that affect structure, so the
- * sidebar only rebuilds when membership or placement changes (not on title/state updates).
+ * Sidebar list: a flat list of threads (sessions), pinned and needs-attention sections
+ * on top, then terminals that belong to no thread, as rows for a virtual list. No repo or
+ * worktree rows: worktrees live on the Projects page. Pure functions over the minimal
+ * inputs that affect structure, so the sidebar only rebuilds when membership, order,
+ * pin or attention changes (not on name/state updates). Placement helpers (which
+ * worktree a terminal or thread sits in) are here too; the command context uses them.
  */
 
 /** Label a terminal's creator sets to the worktree path it belongs to. */
@@ -35,28 +38,34 @@ export interface TreeRepo {
   worktreePaths: readonly string[];
 }
 
-export type Row =
-  | { key: string; kind: "repo"; depth: 0; repoId: string; expanded: boolean; hasChildren: boolean }
-  | { key: string; kind: "worktree"; depth: 1; repoId: string; path: string; expanded: boolean; hasChildren: boolean }
-  | { key: string; kind: "group"; depth: 0; label: string; expanded: boolean; hasChildren: boolean }
-  | { key: string; kind: "session"; depth: 1 | 2; sessionId: string }
-  | { key: string; kind: "terminal"; depth: 1 | 2; terminalId: string };
+/** One thread as the sidebar list needs it. */
+export interface ListSession {
+  id: string;
+  /** Currently attached terminal, or "". */
+  terminalId: string;
+  pinned: boolean;
+  /** Needs the user (connected and needs-attention). */
+  attention: boolean;
+}
 
-/** Rows with no children of their own. */
+export type Section = "pinned" | "attention" | "threads" | "terminals";
+
+export type Row =
+  | { key: string; kind: "header"; section: Section; label: string }
+  | { key: string; kind: "session"; section: Exclude<Section, "terminals">; sessionId: string }
+  | { key: string; kind: "terminal"; section: "terminals"; terminalId: string };
+
+/** Rows that select something (threads and terminals); headers do not. */
 export type LeafRow = Extract<Row, { kind: "session" | "terminal" }>;
 
 export function isLeaf(row: Row): row is LeafRow {
   return row.kind === "session" || row.kind === "terminal";
 }
 
-export const OTHER_GROUP_KEY = "g:other";
+export function headerKey(section: Section): string {
+  return `h:${section}`;
+}
 
-export function repoKey(repoId: string): string {
-  return `r:${repoId}`;
-}
-export function worktreeKey(repoId: string, path: string): string {
-  return `w:${repoId}::${path}`;
-}
 export function terminalKey(id: string): string {
   return `t:${id}`;
 }
@@ -99,85 +108,59 @@ export function placeSession(s: Pick<TreeSession, "worktreePath">, worktrees: re
 }
 
 /** Terminals that belong to a known session are reached through the session row. */
-export function ownedTerminalIds(sessions: readonly TreeSession[], terminals: readonly PlaceableTerminal[]): Set<string> {
+export function ownedTerminalIds(sessions: readonly Pick<TreeSession, "id" | "terminalId">[], terminals: readonly PlaceableTerminal[]): Set<string> {
   const ids = new Set(sessions.map((s) => s.id));
   const owned = new Set(sessions.map((s) => s.terminalId).filter(Boolean));
   for (const t of terminals) if (t.sessionLabel && ids.has(t.sessionLabel)) owned.add(t.id);
   return owned;
 }
 
-function push(map: Map<string, string[]>, k: string, v: string): void {
-  const list = map.get(k);
-  if (list) list.push(v);
-  else map.set(k, [v]);
-}
+const sectionLabels: Record<Section, string> = {
+  pinned: "Pinned",
+  attention: "Needs attention",
+  threads: "Threads",
+  terminals: "Terminals",
+};
 
-export function buildRows(
-  repos: readonly TreeRepo[],
-  terminals: readonly PlaceableTerminal[],
-  collapsed: Readonly<Record<string, boolean>>,
-  sessions: readonly TreeSession[] = [],
-): Row[] {
-  const worktrees: WorktreeRef[] = repos.flatMap((r) => r.worktreePaths.map((path) => ({ repoId: r.id, path })));
+/**
+ * The sidebar rows. Threads newest first (`sessions` comes in creation order, the
+ * sessions store's order): pinned ones under Pinned, unpinned ones that need the user
+ * under Needs attention, the rest under Threads (that header only shows below another
+ * section). Then terminals no thread owns, in `terminals` order, under Terminals.
+ * Empty sections have no header.
+ */
+export function buildRows(sessions: readonly ListSession[], terminals: readonly PlaceableTerminal[]): Row[] {
   const owned = ownedTerminalIds(sessions, terminals);
-  const termsBy = new Map<string, string[]>();
-  const sessionsBy = new Map<string, string[]>();
-  const otherTerms: string[] = [];
-  const otherSessions: string[] = [];
-  for (const s of sessions) {
-    const w = placeSession(s, worktrees);
-    if (w) push(sessionsBy, worktreeKey(w.repoId, w.path), s.id);
-    else otherSessions.push(s.id);
-  }
-  for (const t of terminals) {
-    if (owned.has(t.id)) continue;
-    const w = placeTerminal(t, worktrees);
-    if (w) push(termsBy, worktreeKey(w.repoId, w.path), t.id);
-    else otherTerms.push(t.id);
-  }
-
+  const newest = [...sessions].reverse();
+  const pinned = newest.filter((s) => s.pinned);
+  const attention = newest.filter((s) => !s.pinned && s.attention);
+  const rest = newest.filter((s) => !s.pinned && !s.attention);
+  const loose = terminals.filter((t) => !owned.has(t.id));
   const rows: Row[] = [];
-  for (const r of repos) {
-    const rk = repoKey(r.id);
-    const rExpanded = !collapsed[rk];
-    rows.push({ key: rk, kind: "repo", depth: 0, repoId: r.id, expanded: rExpanded, hasChildren: r.worktreePaths.length > 0 });
-    if (!rExpanded) continue;
-    for (const path of r.worktreePaths) {
-      const wk = worktreeKey(r.id, path);
-      const sess = sessionsBy.get(wk) ?? [];
-      const terms = termsBy.get(wk) ?? [];
-      const wExpanded = !collapsed[wk];
-      rows.push({ key: wk, kind: "worktree", depth: 1, repoId: r.id, path, expanded: wExpanded, hasChildren: sess.length + terms.length > 0 });
-      if (!wExpanded) continue;
-      for (const id of sess) rows.push({ key: sessionKey(id), kind: "session", depth: 2, sessionId: id });
-      for (const id of terms) rows.push({ key: terminalKey(id), kind: "terminal", depth: 2, terminalId: id });
-    }
-  }
-  if (otherSessions.length + otherTerms.length > 0) {
-    const expanded = !collapsed[OTHER_GROUP_KEY];
-    const label = otherSessions.length > 0 ? "Other" : "Other terminals";
-    rows.push({ key: OTHER_GROUP_KEY, kind: "group", depth: 0, label, expanded, hasChildren: true });
-    if (expanded) {
-      for (const id of otherSessions) rows.push({ key: sessionKey(id), kind: "session", depth: 1, sessionId: id });
-      for (const id of otherTerms) rows.push({ key: terminalKey(id), kind: "terminal", depth: 1, terminalId: id });
-    }
+  const header = (section: Section) => rows.push({ key: headerKey(section), kind: "header", section, label: sectionLabels[section] });
+  const threads = (section: Exclude<Section, "terminals">, list: readonly ListSession[]) => {
+    if (list.length === 0) return;
+    if (section !== "threads" || rows.length > 0) header(section);
+    for (const s of list) rows.push({ key: sessionKey(s.id), kind: "session", section, sessionId: s.id });
+  };
+  threads("pinned", pinned);
+  threads("attention", attention);
+  threads("threads", rest);
+  if (loose.length > 0) {
+    header("terminals");
+    for (const t of loose) rows.push({ key: terminalKey(t.id), kind: "terminal", section: "terminals", terminalId: t.id });
   }
   return rows;
 }
 
-/** Leaf rows (sessions and terminals) in sidebar order regardless of collapse state (cmd+1..9). */
-export function leafOrder(repos: readonly TreeRepo[], terminals: readonly PlaceableTerminal[], sessions: readonly TreeSession[] = []): LeafRow[] {
-  return buildRows(repos, terminals, {}, sessions).filter(isLeaf);
+/** Thread and terminal rows in sidebar order (cmd+1..9). */
+export function leafOrder(sessions: readonly ListSession[], terminals: readonly PlaceableTerminal[]): LeafRow[] {
+  return buildRows(sessions, terminals).filter(isLeaf);
 }
 
-/** Terminal ids in sidebar order regardless of collapse state. */
-export function terminalOrder(repos: readonly TreeRepo[], terminals: readonly PlaceableTerminal[], sessions: readonly TreeSession[] = []): string[] {
-  return leafOrder(repos, terminals, sessions).flatMap((r) => (r.kind === "terminal" ? [r.terminalId] : []));
-}
-
-/** Session ids in sidebar order regardless of collapse state. */
-export function sessionOrder(repos: readonly TreeRepo[], terminals: readonly PlaceableTerminal[], sessions: readonly TreeSession[]): string[] {
-  return leafOrder(repos, terminals, sessions).flatMap((r) => (r.kind === "session" ? [r.sessionId] : []));
+/** Session ids in sidebar order (cmd+shift+a). */
+export function sessionOrder(sessions: readonly ListSession[], terminals: readonly PlaceableTerminal[]): string[] {
+  return leafOrder(sessions, terminals).flatMap((r) => (r.kind === "session" ? [r.sessionId] : []));
 }
 
 /**

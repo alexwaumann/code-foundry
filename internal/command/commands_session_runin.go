@@ -8,6 +8,14 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
+// hasWorkspaceThread is session.run-in's availability: a thread is active and, in the
+// GUI, it belongs to a workspace (the GUI passes the thread's workspace as
+// ActiveWorkspaceID). A CLI caller (no active view) names the thread with --id, which
+// When cannot look up, so the daemon refuses a project thread instead.
+func hasWorkspaceThread(c Context) bool {
+	return hasSession(c) && (c.ActiveWorkspaceID != "" || c.ActiveView == "")
+}
+
 // sessionRunIn is session.run-in: move a workspace thread to another member worktree
 // ("Run in…"). The daemon types `/cd <path>` once the thread is idle at its prompt.
 func sessionRunIn(b SessionBackend, idArg ArgSpec) Command {
@@ -22,7 +30,7 @@ func sessionRunIn(b SessionBackend, idArg ArgSpec) Command {
 			{Name: "repo", Type: String, Positional: true, Description: "Member repository (id or name)"},
 			{Name: "worktree", Type: Path, Description: "Member worktree path"},
 		},
-		When: hasSession,
+		When: hasWorkspaceThread,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			if a.String("repo") == "" && a.Path("worktree") == "" {
 				return Result{}, InvalidArg("repo", "name the member: a repository or a worktree path")

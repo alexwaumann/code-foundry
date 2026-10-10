@@ -26,9 +26,9 @@ async function shot(page: Page, name: string): Promise<void> {
 
 test("Pull Requests page with real GitHub data", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("treeitem").first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("thread-list")).toBeVisible({ timeout: 20_000 });
   // The registry command and the daemon's ShowView intent, end to end.
-  await page.getByRole("tree").focus();
+  await page.getByTestId("thread-list").focus();
   await page.keyboard.press("Meta+Shift+d");
   await expect(page.getByTestId("prs-page")).toBeVisible();
   await expect(page.getByTestId("prs-viewer")).toHaveText(/^@\S+/, { timeout: 30_000 });
@@ -49,7 +49,9 @@ test("Pull Requests page with real GitHub data", async ({ page }) => {
 test("worktree overview of a GitHub-backed clone", async ({ page }) => {
   test.skip(!REPO, "set LIVE_REPO to a registered repo's name");
   await page.goto("/");
-  await page.locator('[data-row-kind="repo"]').filter({ hasText: REPO }).first().click();
+  // Projects live on the Projects page (docs/notes/workspaces-4-sidebar.md).
+  await page.getByTestId("nav-projects").click();
+  await page.locator('[data-testid="project"]').filter({ has: page.getByTestId("project-name").getByText(REPO, { exact: true }) }).locator("[data-nav-key^='p:']").dblclick();
   await expect(page.getByTestId("overview-page")).toBeVisible();
   await expect(page.getByTestId("gh-default-branch")).not.toHaveAttribute("data-ci", "unknown", { timeout: 120_000 });
   await expect(page.getByTestId("gh-commit-stats")).toContainText("this month");
@@ -61,10 +63,10 @@ test("worktree overview of a GitHub-backed clone", async ({ page }) => {
 test("worktree overview of this worktree (files and log vs origin/main)", async ({ page }) => {
   test.skip(!WORKTREE, "set LIVE_WORKTREE to a registered worktree path");
   await page.goto("/");
-  await expect(page.getByRole("treeitem").first()).toBeVisible({ timeout: 20_000 });
-  const wt = page.locator(`[data-row-kind="worktree"][data-row-key$="::${WORKTREE}"]`);
+  await page.getByTestId("nav-projects").click({ timeout: 20_000 });
+  const wt = page.locator(`[data-nav-key$="::${WORKTREE}"]`).first();
   await wt.scrollIntoViewIfNeeded();
-  await wt.click();
+  await wt.dblclick();
   await expect(page.getByTestId("files-list")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("section-files")).toContainText("vs origin/main");
   await expect(page.getByTestId("log-list").locator("[data-nav-key]").first()).toBeVisible();

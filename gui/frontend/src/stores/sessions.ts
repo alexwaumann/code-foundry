@@ -76,11 +76,16 @@ export const useSessionsStore = create<SessionsState>()(() => ({
   error: null,
 }));
 
+/** The session needs the user: needs-attention and not disconnected. */
+export function isAttention(s: Pick<SessionView, "status" | "state">): boolean {
+  return s.status === "attention" && s.state !== "disconnected";
+}
+
 /** Session ids that need the user, in `order`. */
 export function attentionIds(data: SessionsData): string[] {
   return data.order.filter((id) => {
     const s = data.byId[id];
-    return s !== undefined && s.status === "attention" && s.state !== "disconnected";
+    return s !== undefined && isAttention(s);
   });
 }
 
