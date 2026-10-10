@@ -4,7 +4,7 @@ import type { SessionView } from "@/api/session";
 import { useCommandsStore } from "@/stores/commands";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
-import { commandBindings, handleKeyDown, isGlobalChord } from "./bindings";
+import { commandBindings, handleKeyDown, isGlobalChord, openRunInPicker } from "./bindings";
 
 const runCommand = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommand }));
@@ -36,6 +36,8 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     baseRef: "",
     createdWorktree: false,
     workspaceId: "",
+    pendingWorktreePath: "",
+    pinned: false,
     ...over,
   };
 }
@@ -125,18 +127,18 @@ describe("handleKeyDown precedence", () => {
     expect(useUiStore.getState().renamingSessionId).toBe("s1");
   });
 
-  it("cmd+shift+a cycles through sessions needing attention", () => {
+  it("cmd+shift+a cycles through sessions needing attention in sidebar order (newest first)", () => {
     useSessionsStore.setState({
       byId: { a: session("a", { status: "attention" }), b: session("b"), c: session("c", { status: "attention" }) },
       order: ["a", "b", "c"],
     });
     const jump = () => press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
     jump();
-    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "a" });
-    jump();
     expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "c" });
     jump();
     expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "a" });
+    jump();
+    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "c" });
   });
 
   it("text fields consume command chords", () => {
@@ -176,5 +178,27 @@ describe("handleKeyDown precedence", () => {
     expect(useUiStore.getState().sidebarVisible).toBe(false);
     press(terminal, { key: "b", code: "KeyB", metaKey: true });
     expect(useUiStore.getState().sidebarVisible).toBe(true);
+  });
+});
+
+describe("Run in… presentation (session.run-in)", () => {
+  beforeEach(() => {
+    useUiStore.setState({ palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" } });
+  });
+
+  it("opens the member picker for a workspace thread", async () => {
+    useSessionsStore.setState({ byId: { s1: session("s1", { workspaceId: "w-1" }) }, order: ["s1"] });
+    expect(openRunInPicker("s1")).toBe(true);
+    await Promise.resolve();
+    expect(useUiStore.getState().palette).toMatchObject({ open: true, page: "runin", sessionId: "s1" });
+  });
+
+  it("is not offered for a project thread or an unknown one", async () => {
+    useSessionsStore.setState({ byId: { s1: session("s1") }, order: ["s1"] });
+    expect(openRunInPicker("s1")).toBe(false);
+    expect(openRunInPicker("nope")).toBe(false);
+    expect(openRunInPicker("")).toBe(false);
+    await Promise.resolve();
+    expect(useUiStore.getState().palette.open).toBe(false);
   });
 });

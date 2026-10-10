@@ -159,7 +159,7 @@ export function ProjectPicker({ close }: { close: () => void }) {
         aria-label={workspaces.length > 0 ? "Search workspaces and projects" : "Search projects"}
       />
       <CommandList>
-        <CommandEmpty>{!loaded ? "Loading projects…" : order.length === 0 ? "No repositories registered. Register one with Register Repository." : "No matching projects."}</CommandEmpty>
+        <CommandEmpty>{!loaded ? "Loading projects…" : order.length === 0 ? "No projects registered. Add one with Add Project, or on the Projects page." : "No matching projects."}</CommandEmpty>
         {workspaces.length > 0 && (
           <CommandGroup heading="Workspaces">
             {workspaces.map((id) => (

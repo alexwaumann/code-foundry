@@ -1,21 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildRows,
-  leafOrder,
-  nextAfter,
-  OTHER_GROUP_KEY,
-  ownedTerminalIds,
-  placeTerminal,
-  repoKey,
-  sessionKey,
-  sessionOrder,
-  terminalKey,
-  terminalOrder,
-  worktreeKey,
-  type PlaceableTerminal,
-  type TreeRepo,
-  type TreeSession,
-} from "./tree";
+import { buildRows, leafOrder, nextAfter, ownedTerminalIds, placeTerminal, sessionKey, sessionOrder, terminalKey, type ListSession, type PlaceableTerminal } from "./tree";
 
 const W = [
   { repoId: "r1", path: "/src/app" },
@@ -39,91 +23,55 @@ describe("placeTerminal", () => {
   });
 });
 
-const repos: TreeRepo[] = [
-  { id: "r1", worktreePaths: ["/src/app", "/src/app.worktrees/feat"] },
-  { id: "r2", worktreePaths: ["/src/lib"] },
-];
 const terms: PlaceableTerminal[] = [
   { id: "a", cwd: "/src/app", worktreeLabel: "" },
   { id: "b", cwd: "/tmp", worktreeLabel: "" },
-  { id: "c", cwd: "/x", worktreeLabel: "/src/app.worktrees/feat" },
-  { id: "d", cwd: "/src/lib/sub", worktreeLabel: "" },
+  { id: "c", cwd: "/x", worktreeLabel: "/src/app.worktrees/feat", sessionLabel: "s9" }, // unknown session: shown
+  { id: "f", cwd: "/src/lib", worktreeLabel: "", sessionLabel: "s2" }, // owned by label: hidden
 ];
 
-describe("buildRows", () => {
-  it("nests terminals under worktrees and collects the rest under Other", () => {
-    const keys = buildRows(repos, terms, {}).map((r) => `${String(r.depth)}:${r.key}`);
-    expect(keys).toEqual([
-      `0:${repoKey("r1")}`,
-      `1:${worktreeKey("r1", "/src/app")}`,
-      `2:${terminalKey("a")}`,
-      `1:${worktreeKey("r1", "/src/app.worktrees/feat")}`,
-      `2:${terminalKey("c")}`,
-      `0:${repoKey("r2")}`,
-      `1:${worktreeKey("r2", "/src/lib")}`,
-      `2:${terminalKey("d")}`,
-      `0:${OTHER_GROUP_KEY}`,
-      `1:${terminalKey("b")}`,
+const thread = (id: string, over: Partial<ListSession> = {}): ListSession => ({ id, terminalId: "", pinned: false, attention: false, ...over });
+
+/** "<kind>:<key>" per row, headers as "# Label". */
+function shape(rows: ReturnType<typeof buildRows>): string[] {
+  return rows.map((r) => (r.kind === "header" ? `# ${r.label}` : r.key));
+}
+
+describe("buildRows (the flat thread list)", () => {
+  it("lists threads newest first with no header when there is only one section, then loose terminals", () => {
+    const sessions = [thread("s1", { terminalId: "a" }), thread("s2"), thread("s3")];
+    expect(shape(buildRows(sessions, terms))).toEqual([sessionKey("s3"), sessionKey("s2"), sessionKey("s1"), "# Terminals", terminalKey("b"), terminalKey("c")]);
+  });
+
+  it("puts pinned threads, then unpinned ones needing attention, above the rest", () => {
+    const sessions = [thread("s1", { attention: true }), thread("s2", { pinned: true }), thread("s3"), thread("s4", { pinned: true, attention: true }), thread("s5", { attention: true })];
+    expect(shape(buildRows(sessions, []))).toEqual([
+      "# Pinned",
+      sessionKey("s4"),
+      sessionKey("s2"),
+      "# Needs attention",
+      sessionKey("s5"),
+      sessionKey("s1"),
+      "# Threads",
+      sessionKey("s3"),
     ]);
+    expect(buildRows(sessions, []).find((r) => r.key === sessionKey("s4"))).toMatchObject({ section: "pinned" });
   });
 
-  it("hides children of collapsed nodes", () => {
-    const rows = buildRows(repos, terms, { [repoKey("r1")]: true, [worktreeKey("r2", "/src/lib")]: true, [OTHER_GROUP_KEY]: true });
-    expect(rows.map((r) => r.key)).toEqual([repoKey("r1"), repoKey("r2"), worktreeKey("r2", "/src/lib"), OTHER_GROUP_KEY]);
-    expect(rows[0]).toMatchObject({ kind: "repo", expanded: false, hasChildren: true });
-    expect(rows[2]).toMatchObject({ kind: "worktree", expanded: false, hasChildren: true });
-  });
-
-  it("marks empty worktrees as leaf rows and omits Other when empty", () => {
-    const rows = buildRows(repos, [], {});
-    expect(rows.every((r) => r.kind !== "group")).toBe(true);
-    expect(rows.flatMap((r) => (r.kind === "worktree" ? [r.hasChildren] : []))).toEqual([false, false, false]);
-  });
-
-  it("terminalOrder ignores collapse state", () => {
-    expect(terminalOrder(repos, terms)).toEqual(["a", "c", "d", "b"]);
-  });
-});
-
-describe("buildRows with sessions", () => {
-  const sessions: TreeSession[] = [
-    { id: "s1", worktreePath: "/src/app", terminalId: "a" },
-    { id: "s2", worktreePath: "/src/app", terminalId: "" },
-    { id: "s3", worktreePath: "/gone", terminalId: "" },
-  ];
-  const withLabels: PlaceableTerminal[] = [
-    ...terms,
-    { id: "e", cwd: "/src/lib", worktreeLabel: "", sessionLabel: "s9" }, // unknown session: shown
-    { id: "f", cwd: "/src/lib", worktreeLabel: "", sessionLabel: "s2" }, // owned by label: hidden
-  ];
-
-  it("lists sessions first under their worktree and hides their terminals", () => {
-    const keys = buildRows(repos, withLabels, {}, sessions).map((r) => `${String(r.depth)}:${r.key}`);
-    expect(keys).toEqual([
-      `0:${repoKey("r1")}`,
-      `1:${worktreeKey("r1", "/src/app")}`,
-      `2:${sessionKey("s1")}`,
-      `2:${sessionKey("s2")}`,
-      `1:${worktreeKey("r1", "/src/app.worktrees/feat")}`,
-      `2:${terminalKey("c")}`,
-      `0:${repoKey("r2")}`,
-      `1:${worktreeKey("r2", "/src/lib")}`,
-      `2:${terminalKey("d")}`,
-      `2:${terminalKey("e")}`,
-      `0:${OTHER_GROUP_KEY}`,
-      `1:${sessionKey("s3")}`,
-      `1:${terminalKey("b")}`,
-    ]);
-    expect(buildRows(repos, withLabels, {}, sessions).find((r) => r.key === OTHER_GROUP_KEY)).toMatchObject({ label: "Other" });
+  it("drops empty sections and their headers", () => {
+    expect(shape(buildRows([thread("s1", { attention: true })], []))).toEqual(["# Needs attention", sessionKey("s1")]);
+    expect(shape(buildRows([], [terms[1] as PlaceableTerminal]))).toEqual(["# Terminals", terminalKey("b")]);
+    expect(buildRows([], [])).toEqual([]);
   });
 
   it("ownedTerminalIds uses both terminal_id and labels.session", () => {
-    expect([...ownedTerminalIds(sessions, withLabels)].sort()).toEqual(["a", "f"]);
+    expect([...ownedTerminalIds([thread("s1", { terminalId: "a" }), thread("s2")], terms)].sort()).toEqual(["a", "f"]);
   });
 
-  it("orders leaves and sessions regardless of collapse", () => {
-    expect(sessionOrder(repos, withLabels, sessions)).toEqual(["s1", "s2", "s3"]);
-    expect(leafOrder(repos, withLabels, sessions).map((r) => r.key)).toEqual(["s:s1", "s:s2", "t:c", "t:d", "t:e", "s:s3", "t:b"]);
+  it("orders leaves (cmd+1..9) and threads (cmd+shift+a) as shown, headers skipped", () => {
+    const sessions = [thread("s1"), thread("s2", { attention: true }), thread("s3", { terminalId: "a" })];
+    expect(leafOrder(sessions, terms).map((r) => r.key)).toEqual(["s:s2", "s:s3", "s:s1", "t:b", "t:c"]);
+    expect(sessionOrder(sessions, terms)).toEqual(["s2", "s3", "s1"]);
   });
 });
 

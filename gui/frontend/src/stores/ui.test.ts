@@ -46,11 +46,12 @@ describe("window width", () => {
 });
 
 describe("ui persistence", () => {
-  it("migrating from version 1 drops the old global panelWidth and keeps the rest", async () => {
+  it("migrating drops the old global panelWidth and the tree's collapsed rows, and keeps the rest", async () => {
     const migrate = useUiStore.persist.getOptions().migrate;
-    expect(useUiStore.persist.getOptions().version).toBe(2);
+    expect(useUiStore.persist.getOptions().version).toBe(3);
     const v1 = { sidebarVisible: false, sidebarWidth: 300, panelWidth: 600, fontSize: 14, collapsed: { a: true } };
-    expect(await migrate?.(v1, 1)).toEqual({ sidebarVisible: false, sidebarWidth: 300, fontSize: 14, collapsed: { a: true } });
+    expect(await migrate?.(v1, 1)).toEqual({ sidebarVisible: false, sidebarWidth: 300, fontSize: 14 });
+    expect(await migrate?.({ sidebarWidth: 280, collapsed: {} }, 2)).toEqual({ sidebarWidth: 280 });
   });
 
   it("does not save a panel width", () => {

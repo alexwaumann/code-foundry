@@ -1,105 +1,24 @@
 import { memo, useEffect, useRef } from "react";
-import {
-  AppWindow,
-  ArrowDown,
-  ArrowUp,
-  ChevronDown,
-  ChevronRight,
-  Circle,
-  CircleCheck,
-  CircleDot,
-  CircleX,
-  FolderGit2,
-  GitBranch,
-  Layers,
-  Plus,
-  SquareTerminal,
-} from "lucide-react";
+import { AppWindow, ArrowRightLeft, Circle, CircleCheck, CircleX, Layers, Pin, SquareTerminal } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import { SessionStatusIcon } from "@/components/session/SessionStatusIcon";
 import { cn } from "@/lib/utils";
 import { basename, terminalLabel } from "@/lib/path";
 import { sessionBadge } from "@/lib/session";
-import { isLeaf, type Row } from "@/lib/tree";
-import { findWorktree, useReposStore } from "@/stores/repos";
-import { composeIn } from "@/stores/compose";
+import { terminalPlace, threadRowModel, type RepoLookup, type WorkspaceLookup } from "@/lib/threadRow";
+import { WORKTREE_LABEL, type Row } from "@/lib/tree";
+import { useReposStore } from "@/stores/repos";
 import { renameSession } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
-
-export const ROW_HEIGHT = 26;
+import { useWorkspacesStore } from "@/stores/workspaces";
 
 interface RowProps {
   row: Row;
   selected: boolean;
   cursor: boolean;
-  onActivate: (row: Row, how: "click" | "toggle") => void;
-}
-
-function Chevron({ row, onActivate }: { row: Exclude<Row, { kind: "session" | "terminal" }>; onActivate: RowProps["onActivate"] }) {
-  if (!row.hasChildren) return <span className="size-4 shrink-0" />;
-  const Icon = row.expanded ? ChevronDown : ChevronRight;
-  return (
-    <button
-      type="button"
-      tabIndex={-1}
-      aria-label={row.expanded ? "Collapse" : "Expand"}
-      className="flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-      onClick={(e) => {
-        e.stopPropagation();
-        onActivate(row, "toggle");
-      }}
-    >
-      <Icon className="size-3.5" />
-    </button>
-  );
-}
-
-function RepoLabel({ repoId }: { repoId: string }) {
-  const name = useReposStore((s) => s.byId[repoId]?.name ?? repoId);
-  const slug = useReposStore((s) => s.byId[repoId]?.githubSlug ?? "");
-  return (
-    <>
-      <FolderGit2 className="size-4 shrink-0 text-sky-400/90" aria-hidden />
-      <span className="max-w-[80%] shrink-0 truncate font-medium">{name}</span>
-      {slug && <span className="min-w-0 truncate text-xs text-muted-foreground">{slug}</span>}
-    </>
-  );
-}
-
-function WorktreeLabel({ repoId, path }: { repoId: string; path: string }) {
-  const w = useReposStore((s) => findWorktree(s, repoId, path));
-  const branch = w?.branch || (w?.head ? w.head.slice(0, 7) : basename(path));
-  const st = w?.status;
-  const changes = st ? st.staged + st.modified + st.untracked : 0;
-  return (
-    <>
-      <GitBranch className={cn("size-3.5 shrink-0", w?.isMain ? "text-muted-foreground" : "text-violet-400/90")} aria-hidden />
-      <span className="truncate" title={path}>
-        {branch}
-      </span>
-      <span className="ml-auto flex shrink-0 items-center gap-1.5 pl-1 text-[11px] text-muted-foreground tabular-nums">
-        {st?.dirty && (
-          <span className="flex items-center gap-0.5 text-amber-400" title={`${String(changes)} changed`}>
-            <CircleDot className="size-3" aria-label="dirty" />
-            {changes > 0 && changes}
-          </span>
-        )}
-        {st && st.ahead > 0 && (
-          <span className="flex items-center" title={`${String(st.ahead)} ahead`}>
-            <ArrowUp className="size-3" />
-            {st.ahead}
-          </span>
-        )}
-        {st && st.behind > 0 && (
-          <span className="flex items-center" title={`${String(st.behind)} behind`}>
-            <ArrowDown className="size-3" />
-            {st.behind}
-          </span>
-        )}
-      </span>
-    </>
-  );
+  onActivate: (row: Row, how: "click") => void;
 }
 
 function TerminalStatusIcon({ id }: { id: string }) {
@@ -123,6 +42,7 @@ function TerminalStatusIcon({ id }: { id: string }) {
   return <SquareTerminal className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />;
 }
 
+/** A terminal no thread owns: a terminal glyph, its title, and where it runs. */
 function TerminalLabel({ id }: { id: string }) {
   const label = useTerminalsStore((s) => {
     const t = s.byId[id];
@@ -133,13 +53,25 @@ function TerminalLabel({ id }: { id: string }) {
     return t?.title && t.argv[0] ? basename(t.argv[0]) : "";
   });
   const exited = useTerminalsStore((s) => s.byId[id]?.state === "exited");
+  const where = useTerminalsStore(useShallow((s) => ({ cwd: s.byId[id]?.cwd ?? "", worktreeLabel: s.byId[id]?.labels[WORKTREE_LABEL] ?? "" })));
+  const place = useReposStore((s) => terminalPlace(s, where));
   return (
     <>
-      <span className="flex size-4 shrink-0 items-center justify-center">
+      <span className="flex size-4 shrink-0 items-center justify-center self-start pt-0.5">
         <TerminalStatusIcon id={id} />
       </span>
-      <span className={cn("truncate", exited && "text-muted-foreground")}>{label}</span>
-      {prog && <span className="truncate text-xs text-muted-foreground">{prog}</span>}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <SquareTerminal className="size-3.5 shrink-0 text-muted-foreground" aria-label="terminal" />
+          <span className={cn("truncate", exited && "text-muted-foreground")} data-testid="terminal-name">
+            {label}
+          </span>
+          {prog && <span className="truncate text-xs text-muted-foreground">{prog}</span>}
+        </span>
+        <span className="truncate text-[11px] text-muted-foreground" data-testid="row-place">
+          {place}
+        </span>
+      </span>
     </>
   );
 }
@@ -188,101 +120,139 @@ function RenameField({ id, name }: { id: string; name: string }) {
   );
 }
 
+const NO_REPOS: RepoLookup = { byId: {} };
+const NO_WORKSPACES: WorkspaceLookup = { byId: {} };
+
+/** The badge of the workspace that owns the thread; nothing for a project thread. */
+function WorkspaceBadge({ id }: { id: string }) {
+  const s = useSessionsStore(
+    useShallow((st) => {
+      const x = st.byId[id];
+      return { repoId: x?.repoId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
+    }),
+  );
+  const workspace = useWorkspacesStore((st) => threadRowModel(s, NO_REPOS, st).workspace);
+  if (workspace === null) return null;
+  return (
+    <span
+      className="flex max-w-24 min-w-0 items-center gap-0.5 rounded-sm bg-violet-400/15 px-1 text-[10px] leading-4 font-medium text-violet-300"
+      title={`Workspace ${workspace}`}
+      data-testid="row-workspace"
+    >
+      <Layers className="size-2.5 shrink-0" aria-hidden />
+      <span className="truncate">{workspace}</span>
+    </span>
+  );
+}
+
+/**
+ * The thread's second line: the project and branch it runs in, or a queued "Run in…"
+ * move until the thread's worktree changes.
+ */
+function ThreadPlace({ id }: { id: string }) {
+  const s = useSessionsStore(
+    useShallow((st) => {
+      const x = st.byId[id];
+      return { repoId: x?.repoId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: x?.pendingWorktreePath ?? "" };
+    }),
+  );
+  // Narrow selectors over the one tested model: each returns a string, so a row only
+  // re-renders when its own project, branch, workspace or move changes.
+  const ws = useWorkspacesStore((st) => (s.workspaceId ? st.byId[s.workspaceId] : undefined));
+  const project = useReposStore((st) => threadRowModel(s, st, NO_WORKSPACES).project);
+  const branch = useReposStore((st) => threadRowModel(s, st, NO_WORKSPACES).branch);
+  const movingTo = useReposStore((st) => threadRowModel(s, st, { byId: ws ? { [s.workspaceId]: ws } : {} }).movingTo);
+  const m = { project, branch, movingTo };
+  return (
+    <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground" data-testid="row-place">
+      {m.movingTo !== null ? (
+        <span className="flex min-w-0 items-center gap-1 text-amber-300" data-testid="row-moving" title={`Runs in ${m.movingTo} once it is idle at its prompt (/cd)`}>
+          <ArrowRightLeft className="size-3 shrink-0" aria-hidden />
+          <span className="truncate">moving to {m.movingTo}…</span>
+        </span>
+      ) : (
+        <span className="min-w-0 truncate">
+          <span data-testid="row-project">{m.project}</span>
+          <span aria-hidden> · </span>
+          <span className="font-mono" data-testid="row-branch">
+            {m.branch}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
 function SessionLabel({ id }: { id: string }) {
   // Unnamed until the daemon names it from the first prompt: the id stands in.
   const name = useSessionsStore((s) => s.byId[id]?.name ?? "");
   const model = useSessionsStore((s) => s.byId[id]?.model ?? "");
+  const pinned = useSessionsStore((s) => s.byId[id]?.pinned ?? false);
   const disconnected = useSessionsStore((s) => s.byId[id]?.state === "disconnected");
   const attention = useSessionsStore((s) => sessionBadge(s.byId[id]) === "attention");
   const renaming = useUiStore((s) => s.renamingSessionId === id);
   return (
     <>
-      <span className="flex size-4 shrink-0 items-center justify-center">
+      <span className="flex size-4 shrink-0 items-center justify-center self-start pt-0.5">
         <SessionStatusIcon id={id} />
       </span>
-      {renaming ? (
-        <RenameField id={id} name={name} />
-      ) : (
-        <>
-          <span className={cn("truncate", (disconnected || !name) && "text-muted-foreground", attention && "font-medium text-amber-200")} data-testid="session-name">
-            {name || id}
-          </span>
-          {model && <span className="shrink-0 truncate text-xs text-muted-foreground">{model}</span>}
-        </>
-      )}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="flex min-w-0 items-center gap-1.5">
+          {renaming ? (
+            <RenameField id={id} name={name} />
+          ) : (
+            <>
+              <span className={cn("truncate", (disconnected || !name) && "text-muted-foreground", attention && "font-medium text-amber-200")} data-testid="session-name">
+                {name || id}
+              </span>
+              {model && <span className="shrink-0 truncate text-xs text-muted-foreground">{model}</span>}
+              <span className="ml-auto flex min-w-0 shrink-0 items-center gap-1 pl-1">
+                <WorkspaceBadge id={id} />
+                {pinned && <Pin className="size-3 shrink-0 text-muted-foreground" aria-label="pinned" data-testid="row-pinned" />}
+              </span>
+            </>
+          )}
+        </span>
+        <ThreadPlace id={id} />
+      </span>
     </>
   );
 }
 
-/** "+" on a worktree row: the composer for its repo, with this worktree picked. */
-function NewThreadButton({ repoId, path }: { repoId: string; path: string }) {
-  return (
-    <button
-      type="button"
-      tabIndex={-1}
-      aria-label="New thread here"
-      title="New thread here"
-      data-testid="new-session"
-      className="ml-1 hidden size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground group-hover/row:flex hover:bg-sidebar-accent hover:text-foreground"
-      onClick={(e) => {
-        e.stopPropagation();
-        composeIn(repoId, path);
-      }}
-    >
-      <Plus className="size-3.5" />
-    </button>
-  );
+function HeaderLabel({ label }: { label: string }) {
+  return <span className="truncate pt-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">{label}</span>;
 }
 
 export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onActivate }: RowProps) {
-  const indent = 8 + row.depth * 14;
-  const leaf = isLeaf(row);
+  if (row.kind === "header") {
+    return (
+      <div id={`row-${row.key}`} role="presentation" data-row-kind="header" data-row-key={row.key} className="flex h-full items-end px-2 pb-1 select-none">
+        <HeaderLabel label={row.label} />
+      </div>
+    );
+  }
   return (
     <div
       id={`row-${row.key}`}
-      role="treeitem"
-      aria-level={row.depth + 1}
+      role="option"
       aria-selected={selected}
-      aria-expanded={leaf ? undefined : row.expanded}
       data-row-kind={row.kind}
       data-row-key={row.key}
+      data-section={row.section}
       data-cursor={cursor || undefined}
       className={cn(
-        "group/row flex h-full cursor-default items-center gap-1.5 rounded-md pr-2 text-[13px] select-none",
+        "group/row flex h-full cursor-default items-center gap-1.5 rounded-md pr-2 pl-2 text-[13px] select-none",
         selected ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/90 hover:bg-sidebar-accent/50",
         cursor && "group-focus:ring-1 group-focus:ring-sidebar-ring group-focus:ring-inset",
       )}
-      style={{ paddingLeft: indent }}
       onClick={() => {
         onActivate(row, "click");
       }}
       onDoubleClick={() => {
         if (row.kind === "session") useUiStore.getState().setRenaming(row.sessionId);
-        else if (!leaf) onActivate(row, "toggle");
       }}
     >
-      {row.kind === "terminal" ? (
-        <TerminalLabel id={row.terminalId} />
-      ) : row.kind === "session" ? (
-        <SessionLabel id={row.sessionId} />
-      ) : (
-        <>
-          <Chevron row={row} onActivate={onActivate} />
-          {row.kind === "repo" && <RepoLabel repoId={row.repoId} />}
-          {row.kind === "worktree" && (
-            <>
-              <WorktreeLabel repoId={row.repoId} path={row.path} />
-              <NewThreadButton repoId={row.repoId} path={row.path} />
-            </>
-          )}
-          {row.kind === "group" && (
-            <>
-              <Layers className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              <span className="truncate text-muted-foreground">{row.label}</span>
-            </>
-          )}
-        </>
-      )}
+      {row.kind === "terminal" ? <TerminalLabel id={row.terminalId} /> : <SessionLabel id={row.sessionId} />}
     </div>
   );
 });

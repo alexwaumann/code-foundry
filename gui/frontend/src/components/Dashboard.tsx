@@ -142,7 +142,7 @@ function Welcome() {
       <div>
         <h1 className="text-lg font-semibold">Nothing selected</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {repos} {repos === 1 ? "repository" : "repositories"} · {sessions} connected {sessions === 1 ? "thread" : "threads"}
+          {repos} {repos === 1 ? "project" : "projects"} · {sessions} connected {sessions === 1 ? "thread" : "threads"}
           {waiting > 0 && ` · ${String(waiting)} waiting on you`}
         </p>
       </div>

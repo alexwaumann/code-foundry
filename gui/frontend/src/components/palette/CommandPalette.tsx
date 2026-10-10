@@ -4,6 +4,7 @@ import type { CommandView, UiContextView } from "@/api/command";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { ProjectPicker } from "@/components/compose/ProjectPicker";
+import { RunInPicker } from "./RunInPicker";
 import { isStartable, presentCommand, presentInPalette } from "@/keys/bindings";
 import { formatChord } from "@/keys/chord";
 import { argChoices, groupByCategory, previousArg, promptedArgs, startPrompt, submitArg, UNSET_CHOICE, type ArgPrompt } from "@/palette/args";
@@ -270,7 +271,11 @@ export function CommandPalette() {
   const query = useUiStore((s) => s.palette.query);
   const commandName = useUiStore((s) => s.palette.commandName);
   const page = useUiStore((s) => s.palette.page);
+  const runInSession = useUiStore((s) => s.palette.sessionId ?? "");
   const close = useUiStore((s) => s.closePalette);
+  const title = page === "projects" ? "New thread" : page === "runin" ? "Run thread in" : "Command palette";
+  const description =
+    page === "projects" ? "Pick the project for a new thread" : page === "runin" ? "Pick the workspace member the thread moves to" : "Run a command in the current context";
   return (
     <Dialog
       open={open}
@@ -285,10 +290,12 @@ export function CommandPalette() {
           e.preventDefault();
         }}
       >
-        <DialogTitle className="sr-only">{page === "projects" ? "New thread" : "Command palette"}</DialogTitle>
-        <DialogDescription className="sr-only">{page === "projects" ? "Pick the project for a new thread" : "Run a command in the current context"}</DialogDescription>
+        <DialogTitle className="sr-only">{title}</DialogTitle>
+        <DialogDescription className="sr-only">{description}</DialogDescription>
         {page === "projects" ? (
           <ProjectPicker close={close} />
+        ) : page === "runin" ? (
+          <RunInPicker sessionId={runInSession} close={close} />
         ) : (
           <PaletteBody key={`${query}\u0000${commandName ?? ""}`} initialQuery={query} initialCommand={commandName} close={close} />
         )}

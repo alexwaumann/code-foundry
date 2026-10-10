@@ -48,6 +48,8 @@ export interface UiContextView {
   activeRepoId: string;
   activeWorktreePath: string;
   activeView: string;
+  /** The workspace that owns the active thread (or the composer's workspace); "" otherwise. */
+  activeWorkspaceId: string;
 }
 
 export interface InvokeResultView {

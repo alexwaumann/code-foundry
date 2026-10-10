@@ -39,6 +39,13 @@ export interface SessionView {
    * repoId/worktreePath are where it runs either way.
    */
   workspaceId: string;
+  /**
+   * The member worktree a queued "Run in…" moves the thread to once it is idle at its
+   * prompt; "" when nothing is queued. worktreePath changes when the move happens.
+   */
+  pendingWorktreePath: string;
+  /** The user pinned the thread (session.pin): it sits in the sidebar's Pinned section. */
+  pinned: boolean;
 }
 
 export type SessionEventView =
@@ -91,6 +98,8 @@ export function toSessionView(s: Session): SessionView {
     baseRef: s.baseRef,
     createdWorktree: s.createdWorktree,
     workspaceId: s.workspaceId,
+    pendingWorktreePath: s.pendingWorktreePath,
+    pinned: s.pinned,
   };
 }
 

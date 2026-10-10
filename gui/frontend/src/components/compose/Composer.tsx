@@ -577,7 +577,7 @@ export function Composer({ repoId, workspaceId }: { repoId: string; workspaceId?
   const workspacesLoaded = useWorkspacesStore((s) => s.loaded);
   const name = workspaceId ? workspaceName : projectName;
   const loaded = workspaceId ? workspacesLoaded : reposLoaded;
-  const gone = workspaceId ? "This workspace no longer exists." : "This repository is no longer registered.";
+  const gone = workspaceId ? "This workspace no longer exists." : "This project is no longer registered.";
   return (
     // Centered in the pane both ways at any size: auto margins in a column flexbox center
     // the block and, unlike justify-center, fall back to 0 (scrollable from the top) when
