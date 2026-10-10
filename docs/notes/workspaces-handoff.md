@@ -119,7 +119,11 @@ Each step: `make check` green, exercised end to end, a `docs/notes/` entry.
 
 ## 6. Open checks before step 2/4
 
-* `/cd` in auto mode on a pre-trusted member: prompt or not?
+* ~~`/cd` in auto mode on a pre-trusted member: prompt or not?~~ **Answered (step 2,
+  2026-10-09, Claude Code 2.1.296, haiku, auto mode): no prompt.** `/cd <member>`
+  printed `Moved to <path>` with no trust or confirmation dialog; `pwd` in the next turn
+  was the new member. Typed mid-turn, Claude queues it and runs it after the turn. See
+  `workspaces-2-launch.md`.
 * `--add-dir` on a sibling worktree under the work sandbox: can `git commit` there
   write the sibling's main-repo `.git`? Alex says `permissions.additionalDirectories`
   with `~/` makes this moot at work, and it is not sandboxed at home; still worth one

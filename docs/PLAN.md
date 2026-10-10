@@ -21,7 +21,10 @@ Design settled 2026-10-09. Decisions, scope, build order and open checks are in
 `docs/notes/workspaces-handoff.md`. Start there.
 
 * Step 1 (store, `WorkspaceService`, `workspace.*` commands, session endpoint env + CLI
-  loopback preference) done: `docs/notes/workspaces-1-store.md`. Next: step 2 (launch).
+  loopback preference) done: `docs/notes/workspaces-1-store.md`.
+* Step 2 (thread owner `workspace_id`, workspace and new-workspace threads, `--add-dir`
+  siblings + CLAUDE.md env + prompt line on every spawn, `session.run-in` via `/cd`)
+  done: `docs/notes/workspaces-2-launch.md`. Next: step 3 (composer).
 
 ### Open items
 

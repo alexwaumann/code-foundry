@@ -112,11 +112,13 @@ start; the Wails host reads them and injects them into the page before load.
 
 Services (v1):
 
-* `SessionService` — Create, Fork, List, Get, Rename, Close, Reconnect, Remove, Watch
-  (server stream), StageAttachment (images the first prompt refers to). Create can make
-  the worktree first (`new_worktree`), passes the first prompt as claude's positional
-  argument, and carries a permission mode (never bypassPermissions); see
-  `docs/notes/new-thread-composer.md`. A session carries lifecycle `state` (starting, connected, closing,
+* `SessionService` — Create, Fork, List, Get, Rename, Close, Reconnect, Remove, RunIn,
+  Watch (server stream), StageAttachment (images the first prompt refers to). Create can
+  make the worktree first (`new_worktree`), start a thread in a workspace member
+  (`workspace_id`) or in a new workspace (`new_workspace`), passes the first prompt as
+  claude's positional argument, and carries a permission mode (never
+  bypassPermissions); see `docs/notes/new-thread-composer.md` and
+  `docs/notes/workspaces-2-launch.md`. A session carries lifecycle `state` (starting, connected, closing,
   disconnected) and detector `status` (busy, idle, needs-attention) with `status_reason`.
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
   chunks), Write (input bytes), Resize, Detach.
@@ -188,6 +190,14 @@ Layers Claude-specific knowledge on top of terminal:
   the first prompt as a positional argument, records the Claude
   session id (from `~/.claude/projects/<slug>/*.jsonl`) so dead sessions can be resumed
   with `claude --resume`.
+* A thread has one owner: its workspace when `workspace_id` is set, else its project
+  (`repo_id`). `repo_id`/`worktree_path` are the cwd. Every spawn of a workspace thread
+  (create, reconnect, fork) reads the workspace's current members from the workspace
+  store and adds `--add-dir` for each other member,
+  `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`, and one static
+  `--append-system-prompt` line pointing at `code-foundry workspace members`.
+  `SessionService.RunIn` moves a workspace thread to another member by typing `/cd`
+  once it is idle at its prompt (`docs/notes/workspaces-2-launch.md`).
 * **Status detection** (busy / idle / needs-attention) derives from observing the output
   stream and the JSONL transcript. It is a pure function over observed events with table
   tests. It is never inferred from rendering.
