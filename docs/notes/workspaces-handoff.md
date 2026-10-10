@@ -1,6 +1,6 @@
 # Multi-repo workspaces — handoff
 
-Status: **design settled, nothing built.** Decided with Alex on 2026-10-09 in a design
+Status: **built** (all five steps of section 5; notes listed there). Decided with Alex on 2026-10-09 in a design
 conversation; this note is the record so a fresh agent can pick it up. Read
 `ARCHITECTURE.md` and `PLAN.md` first, then `new-thread-composer.md` (composer branch
 `t3code/new-thread-initial-prompt-ui`) and the side panel note (branch
@@ -104,6 +104,9 @@ session** in any member worktree that edits, commits, and opens PRs across all m
   CLAUDE.md discovery and trust handling).
 
 ## 5. Build order
+
+All five steps are done: 1 `workspaces-1-store.md`, 2 `workspaces-2-launch.md`,
+3 `workspaces-3-composer.md`, 4 `workspaces-4-sidebar.md`, 5 `workspaces-5-panel.md`.
 
 1. `internal/store/workspace` + proto (`workspace.proto`, `make gen`) + commands
    `workspace.new | add-repo | remove-repo | remove | members` + CLI; session env

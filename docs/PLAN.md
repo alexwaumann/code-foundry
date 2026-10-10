@@ -15,10 +15,12 @@ Phases 0–3 are done and merged on `main`. Each step's note is in `docs/notes/`
 * **New thread composer** done (2026-10-09): project picker + in-pane composer, positional prompt, permission mode, `cf/<slug>` worktrees, image attachments, opus/high defaults, "thread" copy (`new-thread-composer.md`).
 * **Side panel + PR surface** done: per-selection side panel with a surface registry, the Pull request surface (summary, timeline, reviewers, refresh, revert), and its menu starting `pr.ask` / `pr.explain` / `pr.fix.findings` sessions (`side-panel.md`, `gh-pr-detail.md`, `pr-thread-commands.md`).
 
-### Next: multi-repo workspaces
+### Multi-repo workspaces: the five steps are built
 
-Design settled 2026-10-09. Decisions, scope, build order and open checks are in
-`docs/notes/workspaces-handoff.md`. Start there.
+Design settled 2026-10-09 (`docs/notes/workspaces-handoff.md`); all five steps of its
+build order are built, each with a note: `workspaces-1-store.md`,
+`workspaces-2-launch.md`, `workspaces-3-composer.md`, `workspaces-4-sidebar.md`,
+`workspaces-5-panel.md` (all in `docs/notes/`).
 
 * Step 1 (store, `WorkspaceService`, `workspace.*` commands, session endpoint env + CLI
   loopback preference) done: `docs/notes/workspaces-1-store.md`.
@@ -30,8 +32,10 @@ Design settled 2026-10-09. Decisions, scope, build order and open checks are in
   on send) done: `docs/notes/workspaces-3-composer.md`.
 * Step 4 (flat thread sidebar with Pinned / Needs attention / Terminals sections and
   `session.pin`, the Projects page with `WorkspaceMembers`, "Run in…" from the row menu
-  and the palette) done: `docs/notes/workspaces-4-sidebar.md`. Next: step 5 (right panel
-  workspace surface).
+  and the palette) done: `docs/notes/workspaces-4-sidebar.md`.
+* Step 5 (the side panel's workspace surface: members with branch, changes, ahead/behind,
+  PR and CI, add/remove, Run in, members as worktree tabs; `view.panel.workspace`; badge,
+  header and Projects page entry points) done: `docs/notes/workspaces-5-panel.md`.
 
 ### Open items
 
