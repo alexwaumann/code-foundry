@@ -124,9 +124,9 @@ func scanPRLinks(path string, limit int64) ([]LinkedPullRequest, error) {
 }
 
 // linkPullRequests adds the links whose URL the session does not have yet, persists
-// them, and publishes the session. Links without a time get now (links is the
-// caller's to give up: it is modified). Returns how many
-// were new; a repeat of a known URL changes nothing and publishes nothing.
+// them, and publishes the session. Links without a time get now (links is modified:
+// the caller gives it up). Returns how many were new; a repeat of a known URL changes
+// nothing and publishes nothing.
 func (m *Manager) linkPullRequests(id string, links []LinkedPullRequest) int {
 	if len(links) == 0 {
 		return 0
