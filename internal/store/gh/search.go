@@ -3,6 +3,7 @@ package gh
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"unicode/utf8"
@@ -80,8 +81,12 @@ func (s *Store) LookupRepository(ctx context.Context, owner, name string) (Repos
 	}
 	return submitFunc(ctx, s, "lookup|"+slug, func(ctx context.Context) (Repository, error) {
 		data, err := s.call(ctx, queryLookupRepository, map[string]any{"owner": owner, "name": name})
-		if err != nil {
+		var pe *PartialError
+		if errors.As(err, &pe) {
 			// A missing repository is a NOT_FOUND part next to "repository": null.
+			return Repository{}, pe.Unwrap()
+		}
+		if err != nil {
 			return Repository{}, err
 		}
 		return decodeLookupRepository(data)

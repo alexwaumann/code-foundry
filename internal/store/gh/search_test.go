@@ -131,8 +131,8 @@ func TestSearchAndLookup(t *testing.T) {
 				t.Errorf("request sent = %t, want %t", sent, tt.request)
 			}
 			if tt.err != nil {
-				if !errors.Is(err, tt.err) {
-					t.Fatalf("err = %v, want %v", err, tt.err)
+				if !errors.Is(err, tt.err) || isPartial(err) {
+					t.Fatalf("err = %v, want %v (not a partial result)", err, tt.err)
 				}
 				return
 			}
