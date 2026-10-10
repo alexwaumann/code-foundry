@@ -96,20 +96,8 @@ func (p Paths) Worktrees() string { return filepath.Join(p.home, "worktrees") }
 
 // Projects is where projects the app creates live: clones at
 // <Projects>/<owner>/<repo> (RepoService.Clone), new projects at <Projects>/<name>.
-// Not configurable. EnsureProjects creates it on demand.
+// Not configurable. The clone store creates it (0700) on first use.
 func (p Paths) Projects() string { return filepath.Join(p.home, "projects") }
-
-// EnsureProjects creates Projects with 0700 permissions (and the home, if missing).
-func (p Paths) EnsureProjects() (string, error) {
-	if p.home == "" {
-		return "", errors.New("paths: empty home")
-	}
-	dir := p.Projects()
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", fmt.Errorf("paths: create %s: %w", dir, err)
-	}
-	return dir, nil
-}
 
 // Attachments is where images staged for a new thread's first prompt are kept
 // (SessionService.StageAttachment). The session store creates it on demand and

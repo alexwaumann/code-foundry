@@ -88,24 +88,3 @@ func TestEnsure(t *testing.T) {
 		})
 	}
 }
-
-func TestEnsureProjects(t *testing.T) {
-	home := filepath.Join(t.TempDir(), "cf")
-	dir, err := New(home).EnsureProjects()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if dir != filepath.Join(home, "projects") {
-		t.Fatalf("dir = %q", dir)
-	}
-	fi, err := os.Stat(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !fi.IsDir() || fi.Mode().Perm() != 0o700 {
-		t.Fatalf("mode = %v, want a 0700 directory", fi.Mode())
-	}
-	if _, err := New("").EnsureProjects(); err == nil {
-		t.Fatal("empty home: want error")
-	}
-}
