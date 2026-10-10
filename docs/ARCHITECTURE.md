@@ -123,9 +123,11 @@ Services (v1):
   disconnected) and detector `status` (busy, idle, needs-attention) with `status_reason`.
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
   chunks), Write (input bytes), Resize, Detach.
-* `RepoService` — Register, Unregister, List, ListWorktrees, CreateWorktree (optionally
-  fetching the base first), ListRefs, Watch, GetWorktreeDetail (files and log against
-  the base branch, Phase 3a).
+* `RepoService` — Register (a git repository, or any folder as a project without git),
+  Unregister, List, ListWorktrees, CreateWorktree (optionally fetching the base first),
+  ListRefs, Watch, GetWorktreeDetail (files and log against the base branch, Phase 3a),
+  InitGit (`git init` and an empty first commit in a project without git;
+  `docs/notes/add-project-2-nogit.md`).
 * `GhService` — GetViewer, GetDashboard, GetRepoActivity, GetBranchPullRequests (the
   viewer's PR dashboards, monthly stats, default-branch CI, the viewer's PRs on a
   branch), GetPullRequest and ListChecks (on demand), Refresh, Track, Untrack, Watch.
@@ -280,7 +282,9 @@ from the pull request (docs/notes/pr-thread-commands.md).
 * `repo`: registered repositories and their worktrees. Shells out to `git` for worktree
   create/list/remove and status (branch, ahead/behind, dirty). One filesystem watcher
   (fsnotify) across all registered roots feeds a debounced reconcile. Workers write
-  disjoint per-path snapshot pointers.
+  disjoint per-path snapshot pointers. A project may be a plain folder (`Repo.Git`
+  false): one synthetic checkout, no git commands or watches, the poll notices a later
+  `git init` (`docs/notes/add-project-2-nogit.md`).
 * `gh`: GitHub GraphQL (and a little REST) sent in-process over one keep-alive HTTP
   client with the token from `gh auth token` (github.com only; see
   `docs/notes/gh-http-transport.md`). Scoped to the viewer: their PRs (authored, review
