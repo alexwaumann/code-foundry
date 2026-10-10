@@ -69,6 +69,10 @@ type Context struct {
 	ActiveWorktreePath string
 	// ActiveView is a logical view name ("terminal", "repo", ...). Empty from the CLI.
 	ActiveView string
+	// ActiveWorkspaceID is the workspace that owns what is active (the active thread's
+	// workspace, or the workspace a composer or page is for). Empty for a project
+	// thread and, unless --context-workspace is given, from the CLI.
+	ActiveWorkspaceID string
 }
 
 // ContextField names a Context field an argument can default from.
@@ -155,7 +159,7 @@ var argNamePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 // ReservedArgNames are CLI flags every generated verb has; commands may not use them.
 var ReservedArgNames = []string{
 	"json", "help", "h", "yes",
-	"context-terminal", "context-session", "context-repo", "context-worktree",
+	"context-terminal", "context-session", "context-repo", "context-worktree", "context-workspace",
 }
 
 // Sentinel errors. Use errors.Is; internal/api maps them to Connect codes.

@@ -88,9 +88,12 @@ type UiContext struct {
 	ActiveRepoId       string                 `protobuf:"bytes,3,opt,name=active_repo_id,json=activeRepoId,proto3" json:"active_repo_id,omitempty"`
 	ActiveWorktreePath string                 `protobuf:"bytes,4,opt,name=active_worktree_path,json=activeWorktreePath,proto3" json:"active_worktree_path,omitempty"`
 	// Logical view name, e.g. "terminal", "repo", "dashboard". Empty from the CLI.
-	ActiveView    string `protobuf:"bytes,5,opt,name=active_view,json=activeView,proto3" json:"active_view,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ActiveView string `protobuf:"bytes,5,opt,name=active_view,json=activeView,proto3" json:"active_view,omitempty"`
+	// Workspace that owns what is active: the active thread's workspace, or the workspace
+	// a composer or page is for. Empty for project threads and from the CLI.
+	ActiveWorkspaceId string `protobuf:"bytes,6,opt,name=active_workspace_id,json=activeWorkspaceId,proto3" json:"active_workspace_id,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *UiContext) Reset() {
@@ -154,6 +157,13 @@ func (x *UiContext) GetActiveWorktreePath() string {
 func (x *UiContext) GetActiveView() string {
 	if x != nil {
 		return x.ActiveView
+	}
+	return ""
+}
+
+func (x *UiContext) GetActiveWorkspaceId() string {
+	if x != nil {
+		return x.ActiveWorkspaceId
 	}
 	return ""
 }
@@ -655,14 +665,15 @@ var File_codefoundry_v1_command_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccodefoundry/v1/command.proto\x12\x0ecodefoundry.v1\"\xde\x01\n" +
+	"\x1ccodefoundry/v1/command.proto\x12\x0ecodefoundry.v1\"\x8e\x02\n" +
 	"\tUiContext\x12,\n" +
 	"\x12active_terminal_id\x18\x01 \x01(\tR\x10activeTerminalId\x12*\n" +
 	"\x11active_session_id\x18\x02 \x01(\tR\x0factiveSessionId\x12$\n" +
 	"\x0eactive_repo_id\x18\x03 \x01(\tR\factiveRepoId\x120\n" +
 	"\x14active_worktree_path\x18\x04 \x01(\tR\x12activeWorktreePath\x12\x1f\n" +
 	"\vactive_view\x18\x05 \x01(\tR\n" +
-	"activeView\"\x94\x02\n" +
+	"activeView\x12.\n" +
+	"\x13active_workspace_id\x18\x06 \x01(\tR\x11activeWorkspaceId\"\x94\x02\n" +
 	"\aArgSpec\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12+\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x17.codefoundry.v1.ArgTypeR\x04type\x12\x1a\n" +

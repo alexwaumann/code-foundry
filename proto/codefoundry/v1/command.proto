@@ -20,6 +20,9 @@ message UiContext {
   string active_worktree_path = 4;
   // Logical view name, e.g. "terminal", "repo", "dashboard". Empty from the CLI.
   string active_view = 5;
+  // Workspace that owns what is active: the active thread's workspace, or the workspace
+  // a composer or page is for. Empty for project threads and from the CLI.
+  string active_workspace_id = 6;
 }
 
 enum ArgType {

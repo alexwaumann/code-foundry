@@ -31,7 +31,7 @@ func quietHelp(err error) error {
 // contextFlags are the --context-* flags that set UiContext for availability checks
 // and context-defaulted args.
 type contextFlags struct {
-	terminal, session, repo, worktree string
+	terminal, session, repo, worktree, workspace string
 }
 
 func (cl *cli) addContextFlags(fs *flag.FlagSet) *contextFlags {
@@ -40,6 +40,7 @@ func (cl *cli) addContextFlags(fs *flag.FlagSet) *contextFlags {
 	fs.StringVar(&cf.session, "context-session", "", "active session `id`")
 	fs.StringVar(&cf.repo, "context-repo", "", "active repository `id`")
 	fs.StringVar(&cf.worktree, "context-worktree", "", "active worktree `path`")
+	fs.StringVar(&cf.workspace, "context-workspace", "", "active workspace `id`")
 	return cf
 }
 
@@ -53,6 +54,7 @@ func (cl *cli) uiContext(cf *contextFlags) (*v1.UiContext, error) {
 		ActiveSessionId:    cf.session,
 		ActiveRepoId:       cf.repo,
 		ActiveWorktreePath: wt,
+		ActiveWorkspaceId:  cf.workspace,
 	}, nil
 }
 
@@ -289,6 +291,7 @@ func printCommandHelp(w io.Writer, cmd *v1.Command) {
 	fmt.Fprintln(tw, "  --context-session id\tactive session")
 	fmt.Fprintln(tw, "  --context-repo id\tactive repository")
 	fmt.Fprintln(tw, "  --context-worktree path\tactive worktree")
+	fmt.Fprintln(tw, "  --context-workspace id\tactive workspace")
 	_ = tw.Flush()
 	if kb := cmd.GetKeybindings(); len(kb) > 0 {
 		fmt.Fprintf(w, "\nKeybindings: %s\n", strings.Join(kb, ", "))
