@@ -140,8 +140,8 @@ Services (v1):
 * `UiService` — WatchIntents (server stream: focus session, open palette, …); Emit (from
   CLI).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
-  intents (sources repo, terminal, session, gh, gitops, settings, update, ui; filterable). On connect it sends each
-  source's snapshot in that order, then live events; a source that drops events for a
+  intents (sources repo, workspace, terminal, session, gh, gitops, settings, update, ui;
+  filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream; the per-service Watch RPCs remain for the CLI and tests.
 * `SettingsService` — GetSchema, Get, Update, Watch over `$CONFIG/settings.toml` (TOML,
@@ -152,6 +152,8 @@ Services (v1):
   the installed binary.
 * `WorkspaceService` — List, Create, AddRepo, RemoveRepo, Remove, Members (by id, name,
   or a path inside a member worktree), Watch. See `docs/notes/workspaces-1-store.md`.
+  The GUI gets workspaces from EventService's `workspace` source (a `workspaces` slice),
+  and the composer starts threads in them (`docs/notes/workspaces-3-composer.md`).
 * `HealthService` — Ping, Version.
 
 Rules:
