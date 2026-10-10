@@ -24,7 +24,11 @@ Design settled 2026-10-09. Decisions, scope, build order and open checks are in
   loopback preference) done: `docs/notes/workspaces-1-store.md`.
 * Step 2 (thread owner `workspace_id`, workspace and new-workspace threads, `--add-dir`
   siblings + CLAUDE.md env + prompt line on every spawn, `session.run-in` via `/cd`)
-  done: `docs/notes/workspaces-2-launch.md`. Next: step 3 (composer).
+  done: `docs/notes/workspaces-2-launch.md`.
+* Step 3 (composer: `workspace` source on the GUI event stream, workspaces above projects
+  in the picker, member chips with a changeable primary, "Also in" making a new workspace
+  on send) done: `docs/notes/workspaces-3-composer.md`. Next: step 4 (sidebar, projects
+  page, "Run in…").
 
 ### Open items
 

@@ -296,15 +296,15 @@ export const NewWorktreeSchema: GenMessage<NewWorktree> = /*@__PURE__*/
 export type NewWorkspace = Message<"codefoundry.v1.NewWorkspace"> & {
   /**
    * Repositories (id, name when unique, or an absolute path inside one), in member
-   * order. At least one.
+   * order. At least one. "<repo>:<base ref>" gives that member its own base.
    *
    * @generated from field: repeated string repos = 1;
    */
   repos: string[];
 
   /**
-   * Ref every member branches from. Defaults to origin/<default branch>, else
-   * <default branch>, per repository.
+   * Ref every member without its own base branches from. Defaults to
+   * origin/<default branch>, else <default branch>, per repository.
    *
    * @generated from field: string base_ref = 2;
    */

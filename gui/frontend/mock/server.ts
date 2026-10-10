@@ -19,6 +19,10 @@
  *                                                 (simulate a daemon older than those RPCs: 404)
  *   POST /__mock/session-new?delay=700            (how long session.new takes to make a worktree)
  *   POST /__mock/worktree/checkout?path=…&branch=…   (the worktree switches branch; no branch detaches HEAD)
+ *   POST /__mock/workspace?name=login&repos=repo-cf,repo-gp[&branch=cf/login]
+ *                                                 (a workspace: a cf/<name> worktree in each repo)
+ *   GET  /__mock/workspaces                       (id, name, branch, members)
+ *   session.new takes workspace (a member thread) or new-worktree + repos (a new workspace).
  *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size)
  *   session.new with a prompt containing FAIL fails (after the worktree delay, if any).
  *   POST /__mock/gitops?fail=git.push&delay=800   (next git.push fails; ops take 800ms)
@@ -262,17 +266,18 @@ function routes(router: ConnectRouter): void {
   });
 
   router.service(EventService, {
-    // Snapshots first in the order events.proto promises (repo, terminal, session, gh,
-    // gitops, settings), then everything published, filtered by `sources`.
+    // Snapshots first in the order events.proto promises (repo, workspace, terminal,
+    // session, gh, gitops, settings, update), then everything published, filtered by `sources`.
     watch: (req, ctx) => {
       const want = new Set(
         req.sources.length > 0
           ? req.sources
-          : [EventSource.REPO, EventSource.TERMINAL, EventSource.SESSION, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI],
+          : [EventSource.REPO, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.SESSION, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI],
       );
       if (!sessionsEnabled) want.delete(EventSource.SESSION);
       const initial: { source: EventSource; event: EventInit }[] = [
         { source: EventSource.REPO, event: { event: { case: "repo", value: { event: { case: "snapshot", value: { repos: [...world.repos.values()].map((r) => world.repoMsg(r)) } } } } } },
+        { source: EventSource.WORKSPACE, event: { event: { case: "workspace", value: world.workspaceSnapshot() } } },
         ...[...world.terms.values()].map((t) => ({ source: EventSource.TERMINAL, event: { event: { case: "terminal" as const, value: { event: { case: "updated" as const, value: world.terminalMsg(t) } } } } })),
         { source: EventSource.SESSION, event: { event: { case: "session", value: world.sessionSnapshot() } } },
         ghEvent(world.gh.polledEvent()),
@@ -373,7 +378,7 @@ function json(res: ServerResponse, status: number, body: unknown): void {
 /** JSON-safe session summary (proto timestamps carry bigints). */
 function sessionSummary(id: string): Record<string, unknown> {
   const s = world.session(id);
-  return { id: s.id, name: s.name, state: SessionState[s.state], status: SessionStatus[s.status], terminalId: s.terminalId };
+  return { id: s.id, name: s.name, state: SessionState[s.state], status: SessionStatus[s.status], terminalId: s.terminalId, repoId: s.repoId, worktreePath: s.worktreePath, workspaceId: s.workspaceId };
 }
 
 const statusNames: Record<string, SessionStatus> = { busy: SessionStatus.BUSY, idle: SessionStatus.IDLE, attention: SessionStatus.NEEDS_ATTENTION };
@@ -442,6 +447,17 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, ok ? 200 : 404, { ok });
       break;
     }
+    case "POST /__mock/workspace":
+      try {
+        const w = world.addWorkspace(q.get("name") ?? "", (q.get("repos") ?? "").split(",").filter(Boolean), q.get("branch") ?? undefined);
+        json(res, 200, w);
+      } catch (err) {
+        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
+    case "GET /__mock/workspaces":
+      json(res, 200, [...world.workspaces.values()]);
+      break;
     case "POST /__mock/session-new":
       if (q.has("delay")) world.worktreeDelayMs = Number(q.get("delay"));
       json(res, 200, { delayMs: world.worktreeDelayMs });

@@ -20,13 +20,15 @@ import type { UiIntent } from "./ui_pb";
 import { file_codefoundry_v1_ui } from "./ui_pb";
 import type { UpdateEvent } from "./update_pb";
 import { file_codefoundry_v1_update } from "./update_pb";
+import type { WorkspaceEvent } from "./workspace_pb";
+import { file_codefoundry_v1_workspace } from "./workspace_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file codefoundry/v1/events.proto.
  */
 export const file_codefoundry_v1_events: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIkIKEldhdGNoRXZlbnRzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygOMhsuY29kZWZvdW5kcnkudjEuRXZlbnRTb3VyY2Ui/wIKBUV2ZW50EikKBHJlcG8YASABKAsyGS5jb2RlZm91bmRyeS52MS5SZXBvRXZlbnRIABIxCgh0ZXJtaW5hbBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsRXZlbnRIABIvCgdzZXNzaW9uGAMgASgLMhwuY29kZWZvdW5kcnkudjEuU2Vzc2lvbkV2ZW50SAASJQoCZ2gYBCABKAsyFy5jb2RlZm91bmRyeS52MS5HaEV2ZW50SAASJgoCdWkYBSABKAsyGC5jb2RlZm91bmRyeS52MS5VaUludGVudEgAEi0KBmdpdG9wcxgGIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkdpdE9wc0V2ZW50SAASMQoIc2V0dGluZ3MYByABKAsyHS5jb2RlZm91bmRyeS52MS5TZXR0aW5nc0V2ZW50SAASLQoGdXBkYXRlGAogASgLMhsuY29kZWZvdW5kcnkudjEuVXBkYXRlRXZlbnRIAEIHCgVldmVudCruAQoLRXZlbnRTb3VyY2USHAoYRVZFTlRfU09VUkNFX1VOU1BFQ0lGSUVEEAASFQoRRVZFTlRfU09VUkNFX1JFUE8QARIZChVFVkVOVF9TT1VSQ0VfVEVSTUlOQUwQAhIYChRFVkVOVF9TT1VSQ0VfU0VTU0lPThADEhMKD0VWRU5UX1NPVVJDRV9HSBAEEhMKD0VWRU5UX1NPVVJDRV9VSRAFEhcKE0VWRU5UX1NPVVJDRV9HSVRPUFMQBhIZChVFVkVOVF9TT1VSQ0VfU0VUVElOR1MQBxIXChNFVkVOVF9TT1VSQ0VfVVBEQVRFEAoyVgoMRXZlbnRTZXJ2aWNlEkYKBVdhdGNoEiIuY29kZWZvdW5kcnkudjEuV2F0Y2hFdmVudHNSZXF1ZXN0GhUuY29kZWZvdW5kcnkudjEuRXZlbnQiADABQsMBChJjb20uY29kZWZvdW5kcnkudjFCC0V2ZW50c1Byb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_gh, file_codefoundry_v1_gitops, file_codefoundry_v1_repo, file_codefoundry_v1_session, file_codefoundry_v1_settings, file_codefoundry_v1_terminal, file_codefoundry_v1_ui, file_codefoundry_v1_update]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIkIKEldhdGNoRXZlbnRzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygOMhsuY29kZWZvdW5kcnkudjEuRXZlbnRTb3VyY2UitAMKBUV2ZW50EikKBHJlcG8YASABKAsyGS5jb2RlZm91bmRyeS52MS5SZXBvRXZlbnRIABIxCgh0ZXJtaW5hbBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsRXZlbnRIABIvCgdzZXNzaW9uGAMgASgLMhwuY29kZWZvdW5kcnkudjEuU2Vzc2lvbkV2ZW50SAASJQoCZ2gYBCABKAsyFy5jb2RlZm91bmRyeS52MS5HaEV2ZW50SAASJgoCdWkYBSABKAsyGC5jb2RlZm91bmRyeS52MS5VaUludGVudEgAEi0KBmdpdG9wcxgGIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkdpdE9wc0V2ZW50SAASMQoIc2V0dGluZ3MYByABKAsyHS5jb2RlZm91bmRyeS52MS5TZXR0aW5nc0V2ZW50SAASLQoGdXBkYXRlGAogASgLMhsuY29kZWZvdW5kcnkudjEuVXBkYXRlRXZlbnRIABIzCgl3b3Jrc3BhY2UYCyABKAsyHi5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2VFdmVudEgAQgcKBWV2ZW50KooCCgtFdmVudFNvdXJjZRIcChhFVkVOVF9TT1VSQ0VfVU5TUEVDSUZJRUQQABIVChFFVkVOVF9TT1VSQ0VfUkVQTxABEhkKFUVWRU5UX1NPVVJDRV9URVJNSU5BTBACEhgKFEVWRU5UX1NPVVJDRV9TRVNTSU9OEAMSEwoPRVZFTlRfU09VUkNFX0dIEAQSEwoPRVZFTlRfU09VUkNFX1VJEAUSFwoTRVZFTlRfU09VUkNFX0dJVE9QUxAGEhkKFUVWRU5UX1NPVVJDRV9TRVRUSU5HUxAHEhcKE0VWRU5UX1NPVVJDRV9VUERBVEUQChIaChZFVkVOVF9TT1VSQ0VfV09SS1NQQUNFEAsyVgoMRXZlbnRTZXJ2aWNlEkYKBVdhdGNoEiIuY29kZWZvdW5kcnkudjEuV2F0Y2hFdmVudHNSZXF1ZXN0GhUuY29kZWZvdW5kcnkudjEuRXZlbnQiADABQsMBChJjb20uY29kZWZvdW5kcnkudjFCC0V2ZW50c1Byb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_gh, file_codefoundry_v1_gitops, file_codefoundry_v1_repo, file_codefoundry_v1_session, file_codefoundry_v1_settings, file_codefoundry_v1_terminal, file_codefoundry_v1_ui, file_codefoundry_v1_update, file_codefoundry_v1_workspace]);
 
 /**
  * @generated from message codefoundry.v1.WatchEventsRequest
@@ -104,6 +106,14 @@ export type Event = Message<"codefoundry.v1.Event"> & {
      */
     value: UpdateEvent;
     case: "update";
+  } | {
+    /**
+     * Workspaces: a snapshot, then updated / removed_id.
+     *
+     * @generated from field: codefoundry.v1.WorkspaceEvent workspace = 11;
+     */
+    value: WorkspaceEvent;
+    case: "workspace";
   } | { case: undefined; value?: undefined };
 };
 
@@ -167,6 +177,14 @@ export enum EventSource {
    * @generated from enum value: EVENT_SOURCE_UPDATE = 10;
    */
   UPDATE = 10,
+
+  /**
+   * Workspaces (branch sets). Sent right after repo, before terminal: members name
+   * repositories, and sessions name workspaces.
+   *
+   * @generated from enum value: EVENT_SOURCE_WORKSPACE = 11;
+   */
+  WORKSPACE = 11,
 }
 
 /**
@@ -186,8 +204,8 @@ export const EventSourceSchema: GenEnum<EventSource> = /*@__PURE__*/
 export const EventService: GenService<{
   /**
    * Watch streams all events. Each store's snapshot event is sent first, in the order
-   * repo, terminal, session, gh, gitops, settings, update, so a client can replace its
-   * state wholesale on connect.
+   * repo, workspace, terminal, session, gh, gitops, settings, update, so a client can
+   * replace its state wholesale on connect.
    *
    * @generated from rpc codefoundry.v1.EventService.Watch
    */

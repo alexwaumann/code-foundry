@@ -1,8 +1,9 @@
 /**
- * New-thread drafts, one per repo, so switching the selection away and back keeps what
- * was typed and attached. Kept in memory only (not persisted): the files behind the
- * attachments do not survive a reload anyway. Also caches each repo's base refs
- * (RepoService.ListRefs) for the base-ref picker.
+ * New-thread drafts, one per project and one per workspace (keyed by draftKey in
+ * lib/compose.ts: the repo id, or "ws:<workspace id>"), so switching the selection away
+ * and back keeps what was typed and attached. Kept in memory only (not persisted): the
+ * files behind the attachments do not survive a reload anyway. Also caches each repo's
+ * base refs (RepoService.ListRefs) for the base-ref picker.
  *
  * The draft's text is the prompt with inline image chips as tokens (lib/prompt.ts); the
  * attachments are the images themselves (the thumbnails). A chip refers to an attachment
@@ -16,13 +17,27 @@ import { listRefs } from "@/api/repo";
 import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIME_TYPES, stageAttachment } from "@/api/session";
 import { isOutdatedDaemon } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
-import { checkAttachments, createdSessionId, DEFAULT_PERMISSION, sessionNewArgs, type ComposePermission, type WorktreeChoice } from "@/lib/compose";
+import {
+  checkAttachments,
+  createdSessionId,
+  DEFAULT_PERMISSION,
+  draftKey,
+  draftMembers,
+  isWorkspaceKey,
+  threadArgs,
+  threadPlace,
+  type ComposePermission,
+  type ComposeTarget,
+  type ThreadPlace,
+  type WorktreeChoice,
+} from "@/lib/compose";
 import { projectPrompt, removeReferences } from "@/lib/prompt";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { getUiContext } from "./context";
 import { useReposStore } from "./repos";
 import { SESSION_COMMANDS } from "./sessionActions";
-import { useUiStore } from "./ui";
+import { useUiStore, type Selection } from "./ui";
+import { useWorkspacesStore } from "./workspaces";
 
 export interface DraftAttachment {
   id: string;
@@ -45,8 +60,12 @@ export interface Draft {
   effort: string | null;
   permission: ComposePermission;
   worktree: WorktreeChoice;
-  /** null: the repo's default base ref (ListRefs.default_ref). */
+  /** null: the primary repo's default base ref (ListRefs.default_ref). */
   base: string | null;
+  /** Project drafts: other projects the thread also works in (a new workspace on send). */
+  alsoIn: readonly string[];
+  /** Repo id of the member the thread runs in; null: the project, or the workspace's first member. */
+  primary: string | null;
   phase: DraftPhase;
   /** Why the last send failed. */
   error: string | null;
@@ -65,7 +84,8 @@ export interface RefsState {
 
 /** The attachment shown in the preview lightbox. */
 export interface AttachmentPreview {
-  repoId: string;
+  /** The draft (draftKey) the attachment belongs to. */
+  draftKey: string;
   id: string;
   /** Focused again when the preview closes (the thumbnail, or the prompt for a chip). */
   returnFocus: HTMLElement | null;
@@ -87,24 +107,58 @@ export const emptyDraft: Draft = {
   permission: DEFAULT_PERMISSION,
   worktree: { kind: "new" },
   base: null,
+  alsoIn: [],
+  primary: null,
   phase: "idle",
   error: null,
   notice: null,
 };
 
+/** A workspace draft starts in the workspace's own worktrees. */
+export const emptyWorkspaceDraft: Draft = { ...emptyDraft, worktree: { kind: "members" } };
+
+function blankDraft(key: string): Draft {
+  return isWorkspaceKey(key) ? emptyWorkspaceDraft : emptyDraft;
+}
+
 export const useComposeStore = create<ComposeState>()(() => ({ drafts: {}, refs: {}, preview: null }));
 
-export function getDraft(repoId: string): Draft {
-  return useComposeStore.getState().drafts[repoId] ?? emptyDraft;
+export function getDraft(key: string): Draft {
+  return useComposeStore.getState().drafts[key] ?? blankDraft(key);
 }
 
-/** One field of a repo's draft (narrow selector). */
-export function useDraft<K extends keyof Draft>(repoId: string, key: K): Draft[K] {
-  return useComposeStore((s) => (s.drafts[repoId] ?? emptyDraft)[key]);
+/** One field of a draft (narrow selector). */
+export function useDraft<K extends keyof Draft>(key: string, field: K): Draft[K] {
+  return useComposeStore((s) => (s.drafts[key] ?? blankDraft(key))[field]);
 }
 
-export function updateDraft(repoId: string, patch: Partial<Draft>): void {
-  useComposeStore.setState((s) => ({ drafts: { ...s.drafts, [repoId]: { ...(s.drafts[repoId] ?? emptyDraft), ...patch } } }));
+export function updateDraft(key: string, patch: Partial<Draft>): void {
+  useComposeStore.setState((s) => ({ drafts: { ...s.drafts, [key]: { ...(s.drafts[key] ?? blankDraft(key)), ...patch } } }));
+}
+
+/** Runs the thread in another member. The base picker lists that repo's refs, so its choice resets. */
+export function setPrimary(key: string, repoId: string): void {
+  const d = getDraft(key);
+  if (d.primary === repoId) return;
+  updateDraft(key, { primary: repoId, base: null, error: null });
+}
+
+/** Adds a project the thread also works in ("Also in"). */
+export function addAlsoIn(key: string, repoId: string): void {
+  const d = getDraft(key);
+  if (d.alsoIn.includes(repoId)) return;
+  updateDraft(key, { alsoIn: [...d.alsoIn, repoId], error: null });
+}
+
+/** Drops an "Also in" project; if the thread was to run there, it runs in the project again. */
+export function removeAlsoIn(key: string, repoId: string): void {
+  const d = getDraft(key);
+  if (!d.alsoIn.includes(repoId)) return;
+  updateDraft(key, {
+    alsoIn: d.alsoIn.filter((id) => id !== repoId),
+    ...(d.primary === repoId ? { primary: null, base: null } : {}),
+    error: null,
+  });
 }
 
 export function isDraftEmpty(d: Pick<Draft, "text" | "attachments">): boolean {
@@ -117,28 +171,28 @@ let nextAttachmentId = 1;
  * Adds pasted, dropped or picked files; rejects other types, oversized files and more
  * than 10. Returns the ones added (the editor puts chips for them into the text).
  */
-export function addAttachments(repoId: string, files: readonly File[]): DraftAttachment[] {
+export function addAttachments(key: string, files: readonly File[]): DraftAttachment[] {
   if (files.length === 0) return [];
-  const d = getDraft(repoId);
+  const d = getDraft(key);
   const { accepted, rejected } = checkAttachments(files, d.attachments.length, { types: ATTACHMENT_MIME_TYPES, maxBytes: ATTACHMENT_MAX_BYTES });
   const added = accepted.map<DraftAttachment>((file) => ({ id: `a${String(nextAttachmentId++)}`, file, url: URL.createObjectURL(file), stagedPath: null }));
-  updateDraft(repoId, { attachments: [...d.attachments, ...added], notice: rejected.length > 0 ? rejected.join(" · ") : null });
+  updateDraft(key, { attachments: [...d.attachments, ...added], notice: rejected.length > 0 ? rejected.join(" · ") : null });
   return added;
 }
 
 /** Removes an attachment and every chip that refers to it. */
-export function removeAttachment(repoId: string, id: string): void {
-  const d = getDraft(repoId);
+export function removeAttachment(key: string, id: string): void {
+  const d = getDraft(key);
   const gone = d.attachments.find((a) => a.id === id);
   if (!gone) return;
   URL.revokeObjectURL(gone.url);
-  updateDraft(repoId, { attachments: d.attachments.filter((a) => a !== gone), text: removeReferences(d.text, id), notice: null });
+  updateDraft(key, { attachments: d.attachments.filter((a) => a !== gone), text: removeReferences(d.text, id), notice: null });
 }
 
 /** Opens the preview of a draft's attachment; does nothing when the attachment is gone. */
-export function openPreview(repoId: string, id: string, returnFocus: HTMLElement | null): boolean {
-  if (!getDraft(repoId).attachments.some((a) => a.id === id)) return false;
-  useComposeStore.setState({ preview: { repoId, id, returnFocus, open: true } });
+export function openPreview(key: string, id: string, returnFocus: HTMLElement | null): boolean {
+  if (!getDraft(key).attachments.some((a) => a.id === id)) return false;
+  useComposeStore.setState({ preview: { draftKey: key, id, returnFocus, open: true } });
   return true;
 }
 
@@ -146,12 +200,12 @@ export function closePreview(): void {
   useComposeStore.setState((s) => (s.preview?.open ? { preview: { ...s.preview, open: false } } : s));
 }
 
-export function clearDraft(repoId: string): void {
-  const d = useComposeStore.getState().drafts[repoId];
+export function clearDraft(key: string): void {
+  const d = useComposeStore.getState().drafts[key];
   if (!d) return;
   for (const a of d.attachments) URL.revokeObjectURL(a.url);
   useComposeStore.setState((s) => {
-    const { [repoId]: _gone, ...drafts } = s.drafts;
+    const { [key]: _gone, ...drafts } = s.drafts;
     return { drafts };
   });
 }
@@ -174,6 +228,23 @@ export function composeIn(repoId: string, worktreePath?: string): void {
   ui.focusComposer();
 }
 
+/**
+ * Shows the composer for a workspace and focuses it. The selection carries the first
+ * member's repo for the command context (session.new's availability); the draft names
+ * the member the thread runs in.
+ */
+export function composeInWorkspace(workspaceId: string): void {
+  const first = useWorkspacesStore.getState().byId[workspaceId]?.members[0]?.repoId ?? "";
+  const ui = useUiStore.getState();
+  ui.select({ kind: "compose", repoId: first, workspaceId });
+  ui.focusComposer();
+}
+
+/** The composer target a compose selection shows. */
+export function composeTarget(sel: Extract<Selection, { kind: "compose" }>): ComposeTarget {
+  return sel.workspaceId ? { kind: "workspace", workspaceId: sel.workspaceId } : { kind: "project", repoId: sel.repoId };
+}
+
 /** Loads the repo's base refs (once per composer mount; the previous list shows meanwhile). */
 export async function loadRefs(repoId: string): Promise<void> {
   const prev = useComposeStore.getState().refs[repoId];
@@ -190,62 +261,68 @@ export async function loadRefs(repoId: string): Promise<void> {
   }
 }
 
-/** The worktree choice, falling back to a new worktree when the chosen one is gone. */
-export function effectiveWorktree(repoId: string, choice: WorktreeChoice): WorktreeChoice {
-  if (choice.kind === "new") return choice;
-  const exists = useReposStore.getState().byId[repoId]?.worktrees.some((w) => w.path === choice.path) ?? false;
-  return exists ? choice : { kind: "new" };
+/** Where a draft's thread would start now (null: its workspace is gone). */
+export function draftPlace(target: ComposeTarget, d: Draft): ThreadPlace | null {
+  const repos = useReposStore.getState().byId;
+  const workspace = target.kind === "workspace" ? useWorkspacesStore.getState().byId[target.workspaceId] : undefined;
+  const isRepo = (id: string) => id in repos;
+  const { primary } = draftMembers({ target, alsoIn: d.alsoIn, primary: d.primary }, workspace, isRepo);
+  return threadPlace(
+    { target, worktree: d.worktree, base: d.base, alsoIn: d.alsoIn, primary: d.primary },
+    {
+      workspace,
+      isRepo,
+      hasWorktree: (repoId, path) => repos[repoId]?.worktrees.some((w) => w.path === path) ?? false,
+      defaultRef: useComposeStore.getState().refs[primary]?.defaultRef ?? "",
+    },
+  );
 }
 
 /**
- * Sends a repo's draft: stages its images one by one, then invokes session.new. On
- * success the draft is cleared and the new thread selected (the daemon's FocusSession
- * intent usually got there first). On failure the draft stays, with the error.
+ * Sends a draft: stages its images one by one, then invokes session.new. On success the
+ * draft is cleared and the new thread selected (the daemon's FocusSession intent usually
+ * got there first). On failure the draft stays, with the error.
  */
-export async function sendDraft(repoId: string, defaults: { model: string; effort: string }): Promise<boolean> {
-  const d = getDraft(repoId);
+export async function sendDraft(target: ComposeTarget, defaults: { model: string; effort: string }): Promise<boolean> {
+  const key = draftKey(target);
+  const d = getDraft(key);
   if (d.phase !== "idle" || isDraftEmpty(d)) return false;
   const pending = d.attachments.filter((a) => a.stagedPath === null);
-  updateDraft(repoId, { phase: pending.length > 0 ? "attaching" : "starting", error: null, notice: null });
+  updateDraft(key, { phase: pending.length > 0 ? "attaching" : "starting", error: null, notice: null });
   try {
     for (const a of pending) {
       const path = await stageAttachment(a.file);
-      const cur = getDraft(repoId);
-      updateDraft(repoId, { attachments: cur.attachments.map((x) => (x.id === a.id ? { ...x, stagedPath: path } : x)) });
+      const cur = getDraft(key);
+      updateDraft(key, { attachments: cur.attachments.map((x) => (x.id === a.id ? { ...x, stagedPath: path } : x)) });
     }
-    updateDraft(repoId, { phase: "starting" });
-    const cur = getDraft(repoId);
-    const refs = useComposeStore.getState().refs[repoId];
+    updateDraft(key, { phase: "starting" });
+    const cur = getDraft(key);
+    const place = draftPlace(target, cur);
+    if (!place) throw new Error("This workspace no longer exists.");
     const staged = new Map(cur.attachments.map((a) => [a.id, a]));
     const text = projectPrompt(cur.text, (id) => {
       const a = staged.get(id);
       return a?.stagedPath ? { name: a.file.name, ref: a.stagedPath } : undefined;
     });
-    const args = sessionNewArgs(
-      repoId,
-      {
-        text,
-        model: cur.model ?? defaults.model,
-        effort: cur.effort ?? defaults.effort,
-        permission: cur.permission,
-        worktree: effectiveWorktree(repoId, cur.worktree),
-        base: cur.base ?? refs?.defaultRef ?? "",
-      },
+    const args = threadArgs(
+      place,
+      { text, model: cur.model ?? defaults.model, effort: cur.effort ?? defaults.effort, permission: cur.permission },
       cur.attachments.flatMap((a) => (a.stagedPath ? [a.stagedPath] : [])),
     );
-    const res = await invokeConfirmed(SESSION_COMMANDS.create, args, getUiContext({ kind: "compose", repoId }));
+    const sel: Selection = target.kind === "project" ? { kind: "compose", repoId: target.repoId } : { kind: "compose", repoId: place.repoId, workspaceId: target.workspaceId };
+    const res = await invokeConfirmed(SESSION_COMMANDS.create, args, getUiContext(sel));
     if (!res) {
-      updateDraft(repoId, { phase: "idle" });
+      updateDraft(key, { phase: "idle" });
       return false;
     }
-    clearDraft(repoId);
+    clearDraft(key);
     const id = createdSessionId(res.resultJson);
     const ui = useUiStore.getState();
     // Replace the composer with the new thread unless the user has moved on.
-    if (id && ui.selection.kind === "compose" && ui.selection.repoId === repoId) ui.select({ kind: "session", id }, { focusTerminal: true });
+    if (id && ui.selection.kind === "compose" && draftKey(composeTarget(ui.selection)) === key) ui.select({ kind: "session", id }, { focusTerminal: true });
     return true;
   } catch (err) {
-    updateDraft(repoId, { phase: "idle", error: errorMessage(err) });
+    updateDraft(key, { phase: "idle", error: errorMessage(err) });
     return false;
   } finally {
     void refreshCommands();

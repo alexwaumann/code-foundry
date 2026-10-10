@@ -4,7 +4,7 @@ import { ImageIcon } from "lucide-react";
 import { formatAttachmentSize, middleTruncate } from "@/lib/prompt";
 import { cn } from "@/lib/utils";
 import { openPreview, useComposeStore } from "@/stores/compose";
-import { ChipRepoContext } from "./chipContext";
+import { ChipDraftContext } from "./chipContext";
 
 const DEFAULT_ACCENT = "oklch(0.62 0.16 16)";
 const accents = new Map<string, string | null>();
@@ -64,10 +64,10 @@ function useAccent(url: string | undefined): string {
  * with a dashed border, and a click on it only selects it.
  */
 export function AttachmentChipView({ node, selected, editor }: NodeViewProps) {
-  const repoId = useContext(ChipRepoContext);
+  const draftKey = useContext(ChipDraftContext);
   const id = String(node.attrs.id ?? "");
   const label = String(node.attrs.name ?? "");
-  const att = useComposeStore((s) => s.drafts[repoId]?.attachments.find((a) => a.id === id));
+  const att = useComposeStore((s) => s.drafts[draftKey]?.attachments.find((a) => a.id === id));
   const accent = useAccent(att?.url);
   const name = att?.file.name ?? label;
   const size = att ? formatAttachmentSize(att.file.size) : "";
@@ -86,7 +86,7 @@ export function AttachmentChipView({ node, selected, editor }: NodeViewProps) {
       onClick={
         att
           ? () => {
-              openPreview(repoId, id, editor.view.dom);
+              openPreview(draftKey, id, editor.view.dom);
             }
           : undefined
       }

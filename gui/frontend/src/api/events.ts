@@ -8,6 +8,7 @@ import { toSettingsSnapshotView, type SettingsSnapshotView } from "./settings";
 import { toTerminalEventView, type TerminalEventView } from "./terminal";
 import { toUiIntentView, type UiIntentView } from "./ui";
 import { toUpdateEventView, type UpdateEventView } from "./update";
+import { toWorkspaceEventView, type WorkspaceEventView } from "./workspace";
 
 export type { GhEventView } from "./gh";
 
@@ -17,6 +18,7 @@ export type { GhEventView } from "./gh";
  */
 export type EventView =
   | { source: "repo"; event: RepoEventView }
+  | { source: "workspace"; event: WorkspaceEventView }
   | { source: "terminal"; event: TerminalEventView }
   | { source: "session"; event: SessionEventView }
   | { source: "gh"; event: GhEventView }
@@ -31,6 +33,10 @@ export function toEventView(ev: Event): EventView | null {
     case "repo": {
       const v = toRepoEventView(e.value);
       return v && { source: "repo", event: v };
+    }
+    case "workspace": {
+      const v = toWorkspaceEventView(e.value);
+      return v && { source: "workspace", event: v };
     }
     case "terminal": {
       const v = toTerminalEventView(e.value);

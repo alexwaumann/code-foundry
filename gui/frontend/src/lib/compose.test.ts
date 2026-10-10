@@ -1,5 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { checkAttachments, checkoutBranch, createdSessionId, pickDefault, MODEL_CHOICES, projectHue, projectInitials, repoSource, sessionNewArgs, type DraftArgsInput } from "./compose";
+import {
+  checkAttachments,
+  checkoutBranch,
+  createdSessionId,
+  draftKey,
+  draftMembers,
+  isWorkspaceKey,
+  pickDefault,
+  MODEL_CHOICES,
+  projectHue,
+  projectInitials,
+  repoSource,
+  sessionNewArgs,
+  threadArgs,
+  threadPlace,
+  type DraftArgsInput,
+  type PlaceEnv,
+  type PlaceInput,
+  type ThreadPlace,
+} from "./compose";
 
 const MB = 1024 * 1024;
 const opts = { types: ["image/png", "image/jpeg"], maxBytes: 10 * MB };
@@ -37,6 +56,84 @@ describe("sessionNewArgs", () => {
     ],
   ])("%s", (_name, over, staged, want) => {
     expect(sessionNewArgs("r", { ...base, ...over }, staged)).toEqual(want);
+  });
+});
+
+describe("workspaces", () => {
+  const login = {
+    id: "w-1",
+    members: [
+      { repoId: "web", worktreePath: "/wt/web/cf-login" },
+      { repoId: "api", worktreePath: "/wt/api/cf-login" },
+    ],
+  };
+  const repos = new Set(["web", "api", "lib"]);
+  const env: PlaceEnv = {
+    workspace: login,
+    isRepo: (id) => repos.has(id),
+    hasWorktree: (repoId, path) => repoId === "web" && path === "/src/web-fix",
+    defaultRef: "origin/main",
+  };
+  const project: PlaceInput = { target: { kind: "project", repoId: "web" }, worktree: { kind: "new" }, base: null, alsoIn: [], primary: null };
+  const workspace: PlaceInput = { target: { kind: "workspace", workspaceId: "w-1" }, worktree: { kind: "members" }, base: null, alsoIn: [], primary: null };
+
+  it("draft keys keep projects as repo ids and prefix workspaces", () => {
+    expect(draftKey({ kind: "project", repoId: "web" })).toBe("web");
+    expect(draftKey({ kind: "workspace", workspaceId: "w-1" })).toBe("ws:w-1");
+    expect(isWorkspaceKey("ws:w-1")).toBe(true);
+    expect(isWorkspaceKey("web")).toBe(false);
+  });
+
+  it.each<[string, PlaceInput, string[], string]>([
+    ["a project alone", project, ["web"], "web"],
+    ["a project with Also in, unknown and duplicate ones dropped", { ...project, alsoIn: ["api", "gone", "web", "api"] }, ["web", "api"], "web"],
+    ["the primary can be an Also in project", { ...project, alsoIn: ["api"], primary: "api" }, ["web", "api"], "api"],
+    ["a primary no longer listed falls back to the project", { ...project, alsoIn: [], primary: "api" }, ["web"], "web"],
+    ["a workspace: its members, the first by default", workspace, ["web", "api"], "web"],
+    ["a workspace primary", { ...workspace, primary: "api" }, ["web", "api"], "api"],
+    ["a workspace ignores Also in", { ...workspace, alsoIn: ["lib"] }, ["web", "api"], "web"],
+  ])("draftMembers: %s", (_name, d, repoIds, primary) => {
+    expect(draftMembers(d, login, (id) => repos.has(id))).toEqual({ repoIds, primary });
+  });
+
+  it.each<[string, PlaceInput, Partial<PlaceEnv>, ThreadPlace | null]>([
+    ["a project, new worktree, default base", project, {}, { kind: "project", repoId: "web", worktree: { kind: "new" }, base: "origin/main" }],
+    ["a project, existing worktree", { ...project, worktree: { kind: "existing", path: "/src/web-fix" } }, {}, { kind: "project", repoId: "web", worktree: { kind: "existing", path: "/src/web-fix" }, base: "origin/main" }],
+    ["a project whose chosen worktree is gone: a new one", { ...project, worktree: { kind: "existing", path: "/gone" } }, {}, { kind: "project", repoId: "web", worktree: { kind: "new" }, base: "origin/main" }],
+    [
+      "Also in: a new workspace, every project's default base",
+      { ...project, worktree: { kind: "existing", path: "/src/web-fix" }, alsoIn: ["api"] },
+      {},
+      { kind: "new-workspace", repoIds: ["web", "api"], repoId: "web", base: "" },
+    ],
+    ["Also in with a picked base and another primary", { ...project, alsoIn: ["api"], primary: "api", base: "origin/dev" }, {}, { kind: "new-workspace", repoIds: ["web", "api"], repoId: "api", base: "origin/dev" }],
+    ["a workspace's worktrees: the primary member", { ...workspace, primary: "api" }, {}, { kind: "workspace", workspaceId: "w-1", repoId: "api", worktreePath: "/wt/api/cf-login" }],
+    ["a workspace in new-worktree mode: a new workspace with its projects", { ...workspace, worktree: { kind: "new" }, base: "origin/x" }, {}, { kind: "new-workspace", repoIds: ["web", "api"], repoId: "web", base: "origin/x" }],
+    ["a workspace that is gone", workspace, { workspace: undefined }, null],
+    ["a workspace with no members", workspace, { workspace: { id: "w-1", members: [] } }, null],
+  ])("threadPlace: %s", (_name, d, over, want) => {
+    expect(threadPlace(d, { ...env, ...over })).toEqual(want);
+  });
+
+  const prompt = { text: " Fix login ", model: "haiku", effort: "medium", permission: "auto" };
+  it.each<[string, ThreadPlace, Record<string, string>]>([
+    [
+      "a workspace member",
+      { kind: "workspace", workspaceId: "w-1", repoId: "api", worktreePath: "/wt/api/cf-login" },
+      { repo: "api", workspace: "w-1", worktree: "/wt/api/cf-login", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
+    ],
+    [
+      "a new workspace, default bases",
+      { kind: "new-workspace", repoIds: ["web", "api"], repoId: "web", base: "" },
+      { repo: "web", "new-worktree": "true", repos: "web,api", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
+    ],
+    [
+      "a new workspace, the primary's own base",
+      { kind: "new-workspace", repoIds: ["web", "api"], repoId: "api", base: "origin/dev" },
+      { repo: "api", "new-worktree": "true", repos: "web,api:origin/dev", model: "haiku", effort: "medium", permission: "auto", prompt: "Fix login" },
+    ],
+  ])("threadArgs: %s", (_name, place, want) => {
+    expect(threadArgs(place, prompt, [])).toEqual(want);
   });
 });
 

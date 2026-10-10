@@ -35,6 +35,7 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     permissionMode: "",
     baseRef: "",
     createdWorktree: false,
+    workspaceId: "",
     ...over,
   };
 }

@@ -15,6 +15,7 @@ import { applySettingsSnapshot } from "./settings";
 import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./terminals";
 import { applyUpdateEvent } from "./update";
 import { useUiStore } from "./ui";
+import { applyWorkspaceEvent, useWorkspacesStore } from "./workspaces";
 import { applyRepoEventToDetails } from "./worktreeDetail";
 
 interface EventsState {
@@ -35,6 +36,9 @@ const handlers: Handlers = {
   repo: (ev) => {
     useReposStore.setState((s) => applyRepoEvent(s, ev));
     applyRepoEventToDetails(ev);
+  },
+  workspace: (ev) => {
+    useWorkspacesStore.setState((s) => ({ ...applyWorkspaceEvent(s, ev), loaded: true }));
   },
   terminal: (ev) => {
     useTerminalsStore.setState((s) => applyTerminalEvent(s, ev));

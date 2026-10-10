@@ -9,7 +9,7 @@ import { Fragment, Slice, type Node as PMNode } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import { chipInsertText, chipToken, parseLine, parsePrompt, proseOf, serializePrompt, type PromptPiece } from "@/lib/prompt";
-import { ChipRepoContext, CHIP_NODE } from "./chipContext";
+import { ChipDraftContext, CHIP_NODE } from "./chipContext";
 import { AttachmentChipNode } from "./chipNode";
 import { selectedChipId } from "./chipSelection";
 
@@ -23,7 +23,8 @@ export interface PromptEditorHandle {
 }
 
 interface PromptEditorProps {
-  repoId: string;
+  /** The draft (draftKey) the prompt belongs to. */
+  draftKey: string;
   /** The prompt with chip tokens (lib/prompt.ts); the store's copy is the source of truth. */
   value: string;
   disabled: boolean;
@@ -93,7 +94,7 @@ function textSlice(view: EditorView, text: string): Slice {
  * one in a single press; undo restores a deleted chip. Copy writes the token text; a
  * pasted token becomes a chip again.
  */
-export function PromptEditor({ repoId, value, disabled, placeholder, onChange, onSubmit, onEscape, onPasteFiles, onPreviewChip, handleRef }: PromptEditorProps) {
+export function PromptEditor({ draftKey, value, disabled, placeholder, onChange, onSubmit, onEscape, onPasteFiles, onPreviewChip, handleRef }: PromptEditorProps) {
   // What the editor last reported (or was set to): a store value that differs came from
   // outside (a removed attachment, a cleared draft) and replaces the document.
   const shown = useRef(value);
@@ -232,7 +233,7 @@ export function PromptEditor({ repoId, value, disabled, placeholder, onChange, o
   );
 
   return (
-    <ChipRepoContext.Provider value={repoId}>
+    <ChipDraftContext.Provider value={draftKey}>
       {/* data-value: the prompt as stored (chip tokens included), for tests and debugging. */}
       <div className="relative" data-testid="composer-prompt" data-value={value}>
         {value === "" && (
@@ -242,6 +243,6 @@ export function PromptEditor({ repoId, value, disabled, placeholder, onChange, o
         )}
         <EditorContent editor={editor} />
       </div>
-    </ChipRepoContext.Provider>
+    </ChipDraftContext.Provider>
   );
 }

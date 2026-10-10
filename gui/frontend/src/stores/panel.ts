@@ -61,7 +61,7 @@ export function keyOf(sel: Selection): string | null {
     case "view":
       return `view:${sel.name}`;
     case "compose":
-      return `compose:${sel.repoId}`;
+      return sel.workspaceId ? `compose:ws:${sel.workspaceId}` : `compose:${sel.repoId}`;
   }
 }
 

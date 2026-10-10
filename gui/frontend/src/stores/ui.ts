@@ -8,8 +8,11 @@ export type Selection =
   | { kind: "session"; id: string }
   | { kind: "repo"; repoId: string }
   | { kind: "worktree"; repoId: string; path: string }
-  /** The new-thread composer for a repo (picked in the project picker). */
-  | { kind: "compose"; repoId: string }
+  /**
+   * The new-thread composer (picked in the project picker): for a project, or with
+   * workspaceId for a workspace, repoId then being a member's (for the command context).
+   */
+  | { kind: "compose"; repoId: string; workspaceId?: string }
   /** A top-level page that is not a sidebar row (see components/prs). */
   | { kind: "view"; name: string };
 
@@ -123,8 +126,9 @@ export function sameSelection(a: Selection, b: Selection): boolean {
     case "session":
       return a.id === (b as typeof a).id;
     case "repo":
-    case "compose":
       return a.repoId === (b as typeof a).repoId;
+    case "compose":
+      return a.repoId === (b as typeof a).repoId && a.workspaceId === (b as typeof a).workspaceId;
     case "worktree":
       return a.repoId === (b as typeof a).repoId && a.path === (b as typeof a).path;
     case "view":

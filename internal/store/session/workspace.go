@@ -80,10 +80,12 @@ type WorkspaceSource interface {
 // NewWorkspace configures the workspace Create makes for a new workspace thread.
 type NewWorkspace struct {
 	// Repos are repository refs (id, name when unique, or an absolute path inside
-	// one), in member order. CreateOptions.RepoID picks the member the thread runs in
-	// (default: the first).
+	// one), in member order, each optionally followed by ":<base ref>" for that member
+	// (as `workspace new --repos`). CreateOptions.RepoID picks the member the thread
+	// runs in (default: the first).
 	Repos []string
-	// BaseRef every member branches from. Empty: each repository's default.
+	// BaseRef every member without its own base branches from. Empty: each
+	// repository's default.
 	BaseRef string
 	// Name of the workspace. Empty: the branch slug (cf/<slug> without "cf/").
 	Name string
@@ -183,8 +185,13 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 	}
 	// Resolve every repository before waiting for a name, so a typo fails fast.
 	snap := m.opts.Repos.Snapshot()
-	var ids, paths []string
-	for _, ref := range nw.Repos {
+	var ids, paths, bases []string
+	for _, item := range nw.Repos {
+		ref, own, _ := strings.Cut(item, ":")
+		ref, own = strings.TrimSpace(ref), strings.TrimSpace(own)
+		if err := validateRef(own); err != nil {
+			return cw, err
+		}
 		r, err := workspace.ResolveRepo(snap, ref)
 		if err != nil {
 			return cw, workspaceError("repository", err)
@@ -192,7 +199,7 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 		if slices.Contains(ids, r.ID) {
 			return cw, fmt.Errorf("%w: repository %s is listed twice", ErrInvalidArgument, r.Name)
 		}
-		ids, paths = append(ids, r.ID), append(paths, r.Path)
+		ids, paths, bases = append(ids, r.ID), append(paths, r.Path), append(bases, own)
 	}
 	cwdRepo := ids[0]
 	if o.RepoID != "" {
@@ -227,8 +234,12 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 		wsName = strings.TrimPrefix(branch, branchPrefix)
 	}
 	specs := make([]workspace.MemberSpec, len(ids))
+	cwdBase := base
 	for i, rid := range ids {
-		specs[i] = workspace.MemberSpec{Repo: rid}
+		specs[i] = workspace.MemberSpec{Repo: rid, BaseRef: bases[i]}
+		if rid == cwdRepo && bases[i] != "" {
+			cwdBase = bases[i]
+		}
 	}
 	w, err := m.opts.Workspaces.Create(ctx, workspace.CreateOptions{
 		Name: wsName, Branch: branch, Members: specs, BaseRef: base, Fetch: true,
@@ -241,7 +252,7 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 		return cw, fmt.Errorf("%w: workspace %s has no member for repo %s", ErrFailedPrecondition, w.ID, cwdRepo)
 	}
 	cw.workspaceID, cw.repoID, cw.path = w.ID, mem.RepoID, mem.WorktreePath
-	cw.baseRef = base
+	cw.baseRef = cwdBase
 	if cw.baseRef == "" {
 		if r, ok := m.opts.Repos.Snapshot().Repo(cwdRepo); ok {
 			cw.baseRef = r.DefaultBranch

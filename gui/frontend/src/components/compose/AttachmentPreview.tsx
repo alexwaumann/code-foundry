@@ -8,9 +8,9 @@ import { closePreview, useComposeStore } from "@/stores/compose";
  * the image at natural size, capped to the window, under a line with its name and size.
  * Escape, the backdrop and × close it; focus goes back to where it was opened from.
  */
-export function AttachmentPreview({ repoId }: { repoId: string }) {
-  const preview = useComposeStore((s) => (s.preview?.repoId === repoId ? s.preview : null));
-  const att = useComposeStore((s) => (preview ? s.drafts[repoId]?.attachments.find((a) => a.id === preview.id) : undefined));
+export function AttachmentPreview({ draftKey }: { draftKey: string }) {
+  const preview = useComposeStore((s) => (s.preview?.draftKey === draftKey ? s.preview : null));
+  const att = useComposeStore((s) => (preview ? s.drafts[draftKey]?.attachments.find((a) => a.id === preview.id) : undefined));
   return (
     <Dialog
       open={preview?.open === true && att !== undefined}

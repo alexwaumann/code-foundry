@@ -33,6 +33,7 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     permissionMode: "auto",
     baseRef: "",
     createdWorktree: false,
+    workspaceId: "",
     ...over,
   };
 }
