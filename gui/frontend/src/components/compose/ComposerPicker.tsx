@@ -56,12 +56,20 @@ export function ComposerPicker({
   "data-testid": testId,
 }: ComposerPickerProps) {
   const [open, setOpen] = useState(false);
+  // Controlled so every opening starts unfiltered (the content can outlive a close).
+  const [search, setSearch] = useState("");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const hasOptions = groups.some((g) => g.options.length > 0);
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        if (o) setSearch("");
+        setOpen(o);
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           ref={triggerRef}
@@ -77,6 +85,7 @@ export function ComposerPicker({
           onKeyDown={(e) => {
             if (e.key === "ArrowDown" || e.key === "ArrowUp") {
               e.preventDefault();
+              setSearch("");
               setOpen(true);
             }
           }}
@@ -96,7 +105,7 @@ export function ComposerPicker({
         }}
       >
         <Command ref={rootRef} loop defaultValue={value} label={label} className="rounded-lg outline-hidden">
-          {filterPlaceholder && <CommandInput ref={inputRef} placeholder={filterPlaceholder} />}
+          {filterPlaceholder && <CommandInput ref={inputRef} placeholder={filterPlaceholder} value={search} onValueChange={setSearch} />}
           <CommandList className="max-h-72">
             {status ? (
               <div className="px-3 py-3 text-xs text-muted-foreground" role="status">

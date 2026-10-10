@@ -378,7 +378,7 @@ function json(res: ServerResponse, status: number, body: unknown): void {
 /** JSON-safe session summary (proto timestamps carry bigints). */
 function sessionSummary(id: string): Record<string, unknown> {
   const s = world.session(id);
-  return { id: s.id, name: s.name, state: SessionState[s.state], status: SessionStatus[s.status], terminalId: s.terminalId };
+  return { id: s.id, name: s.name, state: SessionState[s.state], status: SessionStatus[s.status], terminalId: s.terminalId, repoId: s.repoId, worktreePath: s.worktreePath, workspaceId: s.workspaceId };
 }
 
 const statusNames: Record<string, SessionStatus> = { busy: SessionStatus.BUSY, idle: SessionStatus.IDLE, attention: SessionStatus.NEEDS_ATTENTION };
