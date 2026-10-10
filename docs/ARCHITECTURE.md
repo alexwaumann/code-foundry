@@ -78,6 +78,7 @@ internal/
     gh/                    GitHub GraphQL/REST polling over HTTP (token via gh), PR/CI cache
     gitops/                git/gh operations per worktree (fetch, pull, push, PR); editor, Finder, browser
     clone/                 gh repo clone into the projects dir with streamed output, then register
+    project/               new projects in the projects dir (git init, register); gh repo create to publish
     update/                release checks via gh, installs with the embedded installer
     workspace/             branch sets: one branch as a worktree in several repos
                            (docs/notes/workspaces-1-store.md)
@@ -131,7 +132,12 @@ Services (v1):
   `docs/notes/add-project-2-nogit.md`), SearchGitHub and LookupGitHub (GraphQL through
   the gh store, for the Add Project dialog), Clone (server stream: `gh repo clone` into
   `<config home>/projects/<owner>/<repo>`, output lines, then the registered project;
-  `docs/notes/add-project-3-dialog.md`).
+  `docs/notes/add-project-3-dialog.md`), Create (a new project in
+  `<config home>/projects/<name>`: git init, an empty first commit, register),
+  ListPublishOwners (the viewer and their organizations with the visibilities each
+  allows when GitHub says) and Publish (`gh repo create --source --remote origin --push`
+  for a git project without origin; gh's error verbatim;
+  `docs/notes/add-project-4-create.md`).
 * `GhService` — GetViewer, GetDashboard, GetRepoActivity, GetBranchPullRequests (the
   viewer's PR dashboards, monthly stats, default-branch CI, the viewer's PRs on a
   branch), GetPullRequest and ListChecks (on demand), Refresh, Track, Untrack, Watch.

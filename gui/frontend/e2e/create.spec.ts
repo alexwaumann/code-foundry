@@ -54,11 +54,12 @@ test("New: the name is checked as typed, Create makes the project and opens it",
   await expect(page.getByTestId("add-project-create")).toBeDisabled();
   await expect(page.getByTestId("add-project-new-dest")).toHaveText("~/.code-foundry/projects/<name>");
 
-  for (const [bad, why] of [
+  const refused: [string, string][] = [
     [".hidden", "cannot start with"],
     ["a/b", "letters, digits"],
     ["two words", "letters, digits"],
-  ]) {
+  ];
+  for (const [bad, why] of refused) {
     await name.fill(bad);
     await expect(page.getByTestId("add-project-new-error")).toContainText(why);
   }

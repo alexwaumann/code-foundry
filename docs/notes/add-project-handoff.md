@@ -106,6 +106,8 @@ name, and clones by `owner/repo` or URL into a picked folder. We copy that shape
 
 ## PR 4: create and publish (`cf/add-project-create`), after 3
 
+* Status: PR 3 merged as #23. PR 4 built on `cf/add-project-create`:
+  `docs/notes/add-project-4-create.md`.
 * `RepoService.Create(name)` -> `<projects>/<name>`, `git init -b <default>`, initial
   commit, register. `repo.create` command; the New tab.
 * `RepoService.Publish(repo_id, owner, name, visibility)` runs `gh repo create

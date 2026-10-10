@@ -54,6 +54,13 @@ clone`) needs both; PR 4 (`repo.create`, publish via `gh repo create`) needs 3.
   `RepoService.SearchGitHub` / `LookupGitHub` over GraphQL, streaming `RepoService.Clone`
   via `gh repo clone` into `paths.Projects()`, `repo.clone` with CLI progress) done:
   `docs/notes/add-project-3-dialog.md`.
+* PR 4 (`RepoService.Create` / `repo.create` and the New tab, `ListPublishOwners` with
+  each org's visibility policy, `RepoService.Publish` / `repo.github.publish` via `gh repo
+  create`, the shared owner/visibility picker, the overview's live Publish to GitHub)
+  done: `docs/notes/add-project-4-create.md`.
+
+**Adding projects: done.** All four PRs are built: register any folder under home with
+completion or the folder picker, clone from GitHub, start a new project, publish it.
 
 ### Open items
 
