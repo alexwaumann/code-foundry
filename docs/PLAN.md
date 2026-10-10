@@ -37,6 +37,13 @@ build order are built, each with a note: `workspaces-1-store.md`,
   PR and CI, add/remove, Run in, members as worktree tabs; `view.panel.workspace`; badge,
   header and Projects page entry points) done: `docs/notes/workspaces-5-panel.md`.
 
+### Adding projects: four PRs (design 2026-10-10)
+
+Design and Alex's decisions in `docs/notes/add-project-handoff.md`. PR 1 (path completion
++ native folder picker, home-only enforcement) and PR 2 (non-git and remoteless projects,
+`repo.git.init`) run in parallel; PR 3 (Add Project dialog, GitHub search + `gh repo
+clone`) needs both; PR 4 (`repo.create`, publish via `gh repo create`) needs 3.
+
 ### Open items
 
 Collected from the step notes; none blocks daily use.
