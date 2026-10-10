@@ -68,10 +68,9 @@ test("every entry point opens the dialog", async ({ page }) => {
   await expect(page.getByTestId("add-project-github-input")).toBeFocused();
   await page.keyboard.press("Escape");
 
-  // The title band's button, next to New thread and New terminal.
+  // The title band's button, next to New thread (New terminal left the band in #21).
   const band = page.getByTestId("sidebar-band-controls");
   await expect(band.getByTestId("sidebar-new-session")).toBeVisible();
-  await expect(band.getByTestId("sidebar-new-terminal")).toBeVisible();
   await band.getByTestId("sidebar-add-project").click();
   await expect(dialog(page)).toBeVisible();
   await page.keyboard.press("Escape");

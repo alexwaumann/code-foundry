@@ -26,7 +26,7 @@ merged). PR 3 of `add-project-handoff.md`. `make check`, `make gui-e2e` and
 | `gui/frontend/src/components/palette/pathCompletion.tsx`, `usePathListing.ts` | Path completion factored out of the palette: `usePathCompletion`, `PathSuggestions`, `PickFolderButton` (the palette and the Local folder tab share them) |
 | `gui/frontend/src/stores/addProject.ts` | Open state, `registerFolder`, `selectAddedProject` |
 | `gui/frontend/src/keys/bindings.ts` | Presenters: `repo.add` opens the dialog, `repo.clone` opens it on GitHub (and replaces its palette prompt) |
-| Entry points | Palette `repo.add`; title band button `sidebar-add-project` (beside New thread and New terminal); Projects page "Add project"; the project picker's empty state |
+| Entry points | Palette `repo.add`; title band button `sidebar-add-project` (beside New thread; the band has no New terminal button since #21); Projects page "Add project"; the project picker's empty state |
 | `gui/frontend/mock/clone.ts` | Mock GitHub (12 repositories), lookup, search, clone (5 lines over ~1.5 s; `fail` fails; `octo-org/already-here` exists); `GET /__mock/github/calls` |
 | `gui/frontend/e2e/addproject.spec.ts`, `e2e/live-addproject.spec.ts` | 8 mock tests per engine; an opt-in live clone |
 
