@@ -421,6 +421,36 @@ export class World {
     return ws;
   }
 
+  /** Test control: a fresh install, with no projects, workspaces, threads or terminals. POST /__mock/empty. */
+  empty(): void {
+    for (const [id, t] of this.terms) {
+      t.attach.publish("end");
+      this.termEvents.publish({ event: { case: "removedId", value: id } });
+    }
+    this.terms.clear();
+    this.sessions.clear();
+    this.workspaces.clear();
+    for (const id of [...this.repos.keys()]) this.repoEvents.publish({ event: { case: "repoRemovedId", value: id } });
+    this.repos.clear();
+    this.workspaceEvents.publish(this.workspaceSnapshot());
+    this.sessionEvents.publish(this.sessionSnapshot());
+  }
+
+  /** Test control: `count` connected project threads with `status` in `repo`'s main worktree. POST /__mock/threads. */
+  addThreads(repo: string, count: number, status: SessionStatus, prefix: string): MockSession[] {
+    const r = this.repoRef(repo);
+    const path = r.worktrees.find((w) => w.isMain)?.path ?? r.path;
+    const out: MockSession[] = [];
+    for (let i = 1; i <= count; i++) {
+      const s = this.addSession({ id: `s-t-${String(this.nextId++)}`, repoId: r.id, worktreePath: path, name: `${prefix} ${String(i)}`, model: "haiku", effort: "", status, createdAt: new Date() });
+      const t = this.terms.get(s.terminalId);
+      if (t) this.publishTerm(t);
+      this.publishSession(s);
+      out.push(s);
+    }
+    return out;
+  }
+
   /** Test control: a connected thread owned by the workspace, running in `repo`'s member (else the first). */
   addWorkspaceThread(workspace: string, repo: string, name: string, status: SessionStatus = SessionStatus.IDLE): MockSession {
     const ws = this.workspaceRef(workspace);
