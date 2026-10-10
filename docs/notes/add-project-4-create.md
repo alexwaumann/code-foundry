@@ -106,4 +106,57 @@ PR 4 of `add-project-handoff.md`, the last one. `make check`, `make gui-e2e` and
 
 ## Verified
 
-VERIFIED_PLACEHOLDER
+* `make check` green. New Go tests: `TestValidateName`, `TestCreate` (8 cases),
+  `TestCreateRealGit`, `TestPublish` (11 cases), `TestPublishBusyAndTimeout`,
+  `TestDecodeOrgPolicy`, `TestPublishOwners` (order, policy, 10 minute cache, a partial
+  list not cached), `TestPublishOwnersWithoutREST`, `TestCreateRepo`,
+  `TestListPublishOwners`, `TestPublishRepo` (gh's message exact), `TestRepoCreateAndPublish`,
+  `TestInvokeFailed`, CLI e2e rows. Vitest: `lib/publish.test.ts`, `api/publish.test.ts`.
+* `make gui-e2e`: 337 of 338 on the first full run; the one failure was
+  `workspaces.spec.ts` "a single-project thread sends exactly what it did before" on
+  Chromium (the composer sent before the refs' default base arrived, unrelated to this
+  change), green 15/15 on `--repeat-each=3` of that spec. `e2e/create.spec.ts`, 6 per
+  engine: New without publish (live name errors, destination, AlreadyExists in place, the
+  new project's overview); New with publish to octo-org (dev first with Public/Private,
+  octo-org Public/Internal, Public selected, no Private); acme unknown (all three, the
+  hint, Public; a choice kept or dropped across owners); a refused publish ("taken": gh's
+  text exact under the picker, picker kept, project registered, name locked, retry, Keep
+  it local); the overview's button on sketches (refusal, then publish as
+  acme/sketchbook private); the palette's `repo.github.publish` and `repo.create`.
+* `make gui-build` green.
+* Scratch daemon (`CODE_FOUNDRY_HOME=~/.cf-create-scratch`, `bin/code-foundry daemon
+  --dev`):
+  * `code-foundry repo create cf-scratch-test` -> "created cf-scratch-test in
+    ~/.cf-create-scratch/projects/cf-scratch-test (58d9ac133ea1)"; registered as git on
+    `main` with one commit; projects dir `drwx------`, project `drwxr-xr-x`. Again ->
+    "already exists (already_exists)"; `repo create .bad` -> the name rule, exit 2.
+  * `ListPublishOwners` over loopback: alexwaumann (user, Public+Private) and two orgs
+    Alex owns, each known with Public+Private (no internal field: not enterprise orgs).
+  * `repo github publish --repo 58d9ac133ea1 --owner github --visibility public` ->
+    "GraphQL: alexwaumann does not have the correct permissions to execute
+    `CreateRepository` (createRepository)", gh's words; nothing created.
+  * `repo create cf-scratch-publish-test`, then `repo github publish --repo <id> --owner
+    alexwaumann --visibility public` -> "published cf-scratch-publish-test to
+    https://github.com/alexwaumann/cf-scratch-publish-test (public)". The project then had
+    `remotes: [origin]`, slug `alexwaumann/cf-scratch-publish-test`, upstream
+    `origin/main`; `.git/config` has origin at the https URL and main tracking it; GitHub
+    shows a PUBLIC repository whose `main` is the local "Initial commit" (same sha).
+    Publishing again -> "not available in this context: project already has an origin
+    remote".
+  * `e2e/live-create.spec.ts` (WebKit, Vite dev server on the scratch daemon): created a
+    project with the New tab (destination read `~/.cf-create-scratch/projects/<name>`),
+    the picker listed alexwaumann first with Public/Private (Public) and the two orgs, the
+    overview's Publish to GitHub opened the dialog with the project's name; nothing was
+    published; the project was unregistered and deleted.
+  * `gh repo delete alexwaumann/cf-scratch-publish-test --yes` failed: the gh token lacks
+    the `delete_repo` scope. **The public repository
+    `alexwaumann/cf-scratch-publish-test` still exists** (one empty commit); delete it by
+    hand or after `gh auth refresh -h github.com -s delete_repo`. The scratch home is
+    removed.
+
+## Not verified
+
+* Publishing from the GUI against real GitHub (only the CLI published for real; the GUI
+  publish path is the same command, covered against the mock).
+* An organization with internal repositories, or one whose policy is unknown, against
+  real GitHub: Alex's orgs are owned by him and not on an enterprise plan.
