@@ -12,6 +12,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 )
 
@@ -27,6 +28,10 @@ type Repo struct {
 	// nil answers Unimplemented.
 	github gh.Finder
 	cloner clone.Service
+	// projects and owners back Create, Publish and ListPublishOwners
+	// (repo_create.go); nil answers Unimplemented.
+	projects project.Service
+	owners   gh.Owners
 }
 
 var _ codefoundryv1connect.RepoServiceHandler = (*Repo)(nil)

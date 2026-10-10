@@ -75,6 +75,55 @@ func (RepositoryVisibility) EnumDescriptor() ([]byte, []int) {
 	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{0}
 }
 
+type PublishOwnerKind int32
+
+const (
+	PublishOwnerKind_PUBLISH_OWNER_KIND_UNSPECIFIED  PublishOwnerKind = 0
+	PublishOwnerKind_PUBLISH_OWNER_KIND_USER         PublishOwnerKind = 1
+	PublishOwnerKind_PUBLISH_OWNER_KIND_ORGANIZATION PublishOwnerKind = 2
+)
+
+// Enum value maps for PublishOwnerKind.
+var (
+	PublishOwnerKind_name = map[int32]string{
+		0: "PUBLISH_OWNER_KIND_UNSPECIFIED",
+		1: "PUBLISH_OWNER_KIND_USER",
+		2: "PUBLISH_OWNER_KIND_ORGANIZATION",
+	}
+	PublishOwnerKind_value = map[string]int32{
+		"PUBLISH_OWNER_KIND_UNSPECIFIED":  0,
+		"PUBLISH_OWNER_KIND_USER":         1,
+		"PUBLISH_OWNER_KIND_ORGANIZATION": 2,
+	}
+)
+
+func (x PublishOwnerKind) Enum() *PublishOwnerKind {
+	p := new(PublishOwnerKind)
+	*p = x
+	return p
+}
+
+func (x PublishOwnerKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PublishOwnerKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_codefoundry_v1_repo_proto_enumTypes[1].Descriptor()
+}
+
+func (PublishOwnerKind) Type() protoreflect.EnumType {
+	return &file_codefoundry_v1_repo_proto_enumTypes[1]
+}
+
+func (x PublishOwnerKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PublishOwnerKind.Descriptor instead.
+func (PublishOwnerKind) EnumDescriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{1}
+}
+
 type Repo struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Stable id derived from the main worktree path.
@@ -2530,6 +2579,365 @@ func (x *CloneProgress) GetTransient() bool {
 	return false
 }
 
+type CreateRepoRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The folder name under the projects directory.
+	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateRepoRequest) Reset() {
+	*x = CreateRepoRequest{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateRepoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateRepoRequest) ProtoMessage() {}
+
+func (x *CreateRepoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateRepoRequest.ProtoReflect.Descriptor instead.
+func (*CreateRepoRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *CreateRepoRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type CreateRepoResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Repo          *Repo                  `protobuf:"bytes,1,opt,name=repo,proto3" json:"repo,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateRepoResponse) Reset() {
+	*x = CreateRepoResponse{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateRepoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateRepoResponse) ProtoMessage() {}
+
+func (x *CreateRepoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateRepoResponse.ProtoReflect.Descriptor instead.
+func (*CreateRepoResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *CreateRepoResponse) GetRepo() *Repo {
+	if x != nil {
+		return x.Repo
+	}
+	return nil
+}
+
+type ListPublishOwnersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPublishOwnersRequest) Reset() {
+	*x = ListPublishOwnersRequest{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPublishOwnersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPublishOwnersRequest) ProtoMessage() {}
+
+func (x *ListPublishOwnersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPublishOwnersRequest.ProtoReflect.Descriptor instead.
+func (*ListPublishOwnersRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{41}
+}
+
+type ListPublishOwnersResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The viewer first, then organizations by login.
+	Owners        []*PublishOwner `protobuf:"bytes,1,rep,name=owners,proto3" json:"owners,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPublishOwnersResponse) Reset() {
+	*x = ListPublishOwnersResponse{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPublishOwnersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPublishOwnersResponse) ProtoMessage() {}
+
+func (x *ListPublishOwnersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPublishOwnersResponse.ProtoReflect.Descriptor instead.
+func (*ListPublishOwnersResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *ListPublishOwnersResponse) GetOwners() []*PublishOwner {
+	if x != nil {
+		return x.Owners
+	}
+	return nil
+}
+
+// An account the viewer can create repositories in.
+type PublishOwner struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Login string                 `protobuf:"bytes,1,opt,name=login,proto3" json:"login,omitempty"`
+	Kind  PublishOwnerKind       `protobuf:"varint,2,opt,name=kind,proto3,enum=codefoundry.v1.PublishOwnerKind" json:"kind,omitempty"`
+	// Visibilities a repository created here may have, most open first (public,
+	// internal, private). All three when known is false.
+	Allowed []RepositoryVisibility `protobuf:"varint,3,rep,packed,name=allowed,proto3,enum=codefoundry.v1.RepositoryVisibility" json:"allowed,omitempty"`
+	// allowed is the organization's policy (or the personal account's fixed choices).
+	// False when GitHub did not say (it tells only org owners): a choice it refuses
+	// fails at publish time.
+	Known         bool `protobuf:"varint,4,opt,name=known,proto3" json:"known,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublishOwner) Reset() {
+	*x = PublishOwner{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishOwner) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishOwner) ProtoMessage() {}
+
+func (x *PublishOwner) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishOwner.ProtoReflect.Descriptor instead.
+func (*PublishOwner) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *PublishOwner) GetLogin() string {
+	if x != nil {
+		return x.Login
+	}
+	return ""
+}
+
+func (x *PublishOwner) GetKind() PublishOwnerKind {
+	if x != nil {
+		return x.Kind
+	}
+	return PublishOwnerKind_PUBLISH_OWNER_KIND_UNSPECIFIED
+}
+
+func (x *PublishOwner) GetAllowed() []RepositoryVisibility {
+	if x != nil {
+		return x.Allowed
+	}
+	return nil
+}
+
+func (x *PublishOwner) GetKnown() bool {
+	if x != nil {
+		return x.Known
+	}
+	return false
+}
+
+type PublishRepoRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	RepoId string                 `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	// GitHub user or organization login.
+	Owner string `protobuf:"bytes,2,opt,name=owner,proto3" json:"owner,omitempty"`
+	// Repository name on GitHub; the project's name when empty.
+	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	// PUBLIC, INTERNAL or PRIVATE.
+	Visibility    RepositoryVisibility `protobuf:"varint,4,opt,name=visibility,proto3,enum=codefoundry.v1.RepositoryVisibility" json:"visibility,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublishRepoRequest) Reset() {
+	*x = PublishRepoRequest{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishRepoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishRepoRequest) ProtoMessage() {}
+
+func (x *PublishRepoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishRepoRequest.ProtoReflect.Descriptor instead.
+func (*PublishRepoRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *PublishRepoRequest) GetRepoId() string {
+	if x != nil {
+		return x.RepoId
+	}
+	return ""
+}
+
+func (x *PublishRepoRequest) GetOwner() string {
+	if x != nil {
+		return x.Owner
+	}
+	return ""
+}
+
+func (x *PublishRepoRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PublishRepoRequest) GetVisibility() RepositoryVisibility {
+	if x != nil {
+		return x.Visibility
+	}
+	return RepositoryVisibility_REPOSITORY_VISIBILITY_UNSPECIFIED
+}
+
+type PublishRepoResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Repo          *Repo                  `protobuf:"bytes,1,opt,name=repo,proto3" json:"repo,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublishRepoResponse) Reset() {
+	*x = PublishRepoResponse{}
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishRepoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishRepoResponse) ProtoMessage() {}
+
+func (x *PublishRepoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_repo_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishRepoResponse.ProtoReflect.Descriptor instead.
+func (*PublishRepoResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_repo_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *PublishRepoResponse) GetRepo() *Repo {
+	if x != nil {
+		return x.Repo
+	}
+	return nil
+}
+
 var File_codefoundry_v1_repo_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_repo_proto_rawDesc = "" +
@@ -2708,12 +3116,37 @@ const file_codefoundry_v1_repo_proto_rawDesc = "" +
 	"\x05event\"A\n" +
 	"\rCloneProgress\x12\x12\n" +
 	"\x04line\x18\x01 \x01(\tR\x04line\x12\x1c\n" +
-	"\ttransient\x18\x02 \x01(\bR\ttransient*\xa6\x01\n" +
+	"\ttransient\x18\x02 \x01(\bR\ttransient\"'\n" +
+	"\x11CreateRepoRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\">\n" +
+	"\x12CreateRepoResponse\x12(\n" +
+	"\x04repo\x18\x01 \x01(\v2\x14.codefoundry.v1.RepoR\x04repo\"\x1a\n" +
+	"\x18ListPublishOwnersRequest\"Q\n" +
+	"\x19ListPublishOwnersResponse\x124\n" +
+	"\x06owners\x18\x01 \x03(\v2\x1c.codefoundry.v1.PublishOwnerR\x06owners\"\xb0\x01\n" +
+	"\fPublishOwner\x12\x14\n" +
+	"\x05login\x18\x01 \x01(\tR\x05login\x124\n" +
+	"\x04kind\x18\x02 \x01(\x0e2 .codefoundry.v1.PublishOwnerKindR\x04kind\x12>\n" +
+	"\aallowed\x18\x03 \x03(\x0e2$.codefoundry.v1.RepositoryVisibilityR\aallowed\x12\x14\n" +
+	"\x05known\x18\x04 \x01(\bR\x05known\"\x9d\x01\n" +
+	"\x12PublishRepoRequest\x12\x17\n" +
+	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x14\n" +
+	"\x05owner\x18\x02 \x01(\tR\x05owner\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12D\n" +
+	"\n" +
+	"visibility\x18\x04 \x01(\x0e2$.codefoundry.v1.RepositoryVisibilityR\n" +
+	"visibility\"?\n" +
+	"\x13PublishRepoResponse\x12(\n" +
+	"\x04repo\x18\x01 \x01(\v2\x14.codefoundry.v1.RepoR\x04repo*\xa6\x01\n" +
 	"\x14RepositoryVisibility\x12%\n" +
 	"!REPOSITORY_VISIBILITY_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cREPOSITORY_VISIBILITY_PUBLIC\x10\x01\x12!\n" +
 	"\x1dREPOSITORY_VISIBILITY_PRIVATE\x10\x02\x12\"\n" +
-	"\x1eREPOSITORY_VISIBILITY_INTERNAL\x10\x032\xd9\t\n" +
+	"\x1eREPOSITORY_VISIBILITY_INTERNAL\x10\x03*x\n" +
+	"\x10PublishOwnerKind\x12\"\n" +
+	"\x1ePUBLISH_OWNER_KIND_UNSPECIFIED\x10\x00\x12\x1b\n" +
+	"\x17PUBLISH_OWNER_KIND_USER\x10\x01\x12#\n" +
+	"\x1fPUBLISH_OWNER_KIND_ORGANIZATION\x10\x022\xee\v\n" +
 	"\vRepoService\x12W\n" +
 	"\bRegister\x12#.codefoundry.v1.RegisterRepoRequest\x1a$.codefoundry.v1.RegisterRepoResponse\"\x00\x12]\n" +
 	"\n" +
@@ -2729,7 +3162,10 @@ const file_codefoundry_v1_repo_proto_rawDesc = "" +
 	"\aInitGit\x12\x1e.codefoundry.v1.InitGitRequest\x1a\x1f.codefoundry.v1.InitGitResponse\"\x00\x12[\n" +
 	"\fSearchGitHub\x12#.codefoundry.v1.SearchGitHubRequest\x1a$.codefoundry.v1.SearchGitHubResponse\"\x00\x12[\n" +
 	"\fLookupGitHub\x12#.codefoundry.v1.LookupGitHubRequest\x1a$.codefoundry.v1.LookupGitHubResponse\"\x00\x12M\n" +
-	"\x05Clone\x12 .codefoundry.v1.CloneRepoRequest\x1a\x1e.codefoundry.v1.CloneRepoEvent\"\x000\x01B\xc1\x01\n" +
+	"\x05Clone\x12 .codefoundry.v1.CloneRepoRequest\x1a\x1e.codefoundry.v1.CloneRepoEvent\"\x000\x01\x12Q\n" +
+	"\x06Create\x12!.codefoundry.v1.CreateRepoRequest\x1a\".codefoundry.v1.CreateRepoResponse\"\x00\x12j\n" +
+	"\x11ListPublishOwners\x12(.codefoundry.v1.ListPublishOwnersRequest\x1a).codefoundry.v1.ListPublishOwnersResponse\"\x00\x12T\n" +
+	"\aPublish\x12\".codefoundry.v1.PublishRepoRequest\x1a#.codefoundry.v1.PublishRepoResponse\"\x00B\xc1\x01\n" +
 	"\x12com.codefoundry.v1B\tRepoProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
@@ -2744,111 +3180,131 @@ func file_codefoundry_v1_repo_proto_rawDescGZIP() []byte {
 	return file_codefoundry_v1_repo_proto_rawDescData
 }
 
-var file_codefoundry_v1_repo_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_repo_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
+var file_codefoundry_v1_repo_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_codefoundry_v1_repo_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
 var file_codefoundry_v1_repo_proto_goTypes = []any{
 	(RepositoryVisibility)(0),         // 0: codefoundry.v1.RepositoryVisibility
-	(*Repo)(nil),                      // 1: codefoundry.v1.Repo
-	(*Worktree)(nil),                  // 2: codefoundry.v1.Worktree
-	(*GitStatus)(nil),                 // 3: codefoundry.v1.GitStatus
-	(*RegisterRepoRequest)(nil),       // 4: codefoundry.v1.RegisterRepoRequest
-	(*RegisterRepoResponse)(nil),      // 5: codefoundry.v1.RegisterRepoResponse
-	(*UnregisterRepoRequest)(nil),     // 6: codefoundry.v1.UnregisterRepoRequest
-	(*UnregisterRepoResponse)(nil),    // 7: codefoundry.v1.UnregisterRepoResponse
-	(*ListReposRequest)(nil),          // 8: codefoundry.v1.ListReposRequest
-	(*ListReposResponse)(nil),         // 9: codefoundry.v1.ListReposResponse
-	(*GetRepoRequest)(nil),            // 10: codefoundry.v1.GetRepoRequest
-	(*GetRepoResponse)(nil),           // 11: codefoundry.v1.GetRepoResponse
-	(*CreateWorktreeRequest)(nil),     // 12: codefoundry.v1.CreateWorktreeRequest
-	(*CreateWorktreeResponse)(nil),    // 13: codefoundry.v1.CreateWorktreeResponse
-	(*RemoveWorktreeRequest)(nil),     // 14: codefoundry.v1.RemoveWorktreeRequest
-	(*RemoveWorktreeResponse)(nil),    // 15: codefoundry.v1.RemoveWorktreeResponse
-	(*ListRefsRequest)(nil),           // 16: codefoundry.v1.ListRefsRequest
-	(*ListRefsResponse)(nil),          // 17: codefoundry.v1.ListRefsResponse
-	(*InitGitRequest)(nil),            // 18: codefoundry.v1.InitGitRequest
-	(*InitGitResponse)(nil),           // 19: codefoundry.v1.InitGitResponse
-	(*RefreshRepoRequest)(nil),        // 20: codefoundry.v1.RefreshRepoRequest
-	(*RefreshRepoResponse)(nil),       // 21: codefoundry.v1.RefreshRepoResponse
-	(*WatchReposRequest)(nil),         // 22: codefoundry.v1.WatchReposRequest
-	(*RepoEvent)(nil),                 // 23: codefoundry.v1.RepoEvent
-	(*WorktreeDetailRef)(nil),         // 24: codefoundry.v1.WorktreeDetailRef
-	(*GetWorktreeDetailRequest)(nil),  // 25: codefoundry.v1.GetWorktreeDetailRequest
-	(*GetWorktreeDetailResponse)(nil), // 26: codefoundry.v1.GetWorktreeDetailResponse
-	(*WorktreeDetail)(nil),            // 27: codefoundry.v1.WorktreeDetail
-	(*FileChange)(nil),                // 28: codefoundry.v1.FileChange
-	(*LogEntry)(nil),                  // 29: codefoundry.v1.LogEntry
-	(*RepoSnapshot)(nil),              // 30: codefoundry.v1.RepoSnapshot
-	(*WorktreeRef)(nil),               // 31: codefoundry.v1.WorktreeRef
-	(*GitHubRepository)(nil),          // 32: codefoundry.v1.GitHubRepository
-	(*SearchGitHubRequest)(nil),       // 33: codefoundry.v1.SearchGitHubRequest
-	(*SearchGitHubResponse)(nil),      // 34: codefoundry.v1.SearchGitHubResponse
-	(*LookupGitHubRequest)(nil),       // 35: codefoundry.v1.LookupGitHubRequest
-	(*LookupGitHubResponse)(nil),      // 36: codefoundry.v1.LookupGitHubResponse
-	(*CloneRepoRequest)(nil),          // 37: codefoundry.v1.CloneRepoRequest
-	(*CloneRepoEvent)(nil),            // 38: codefoundry.v1.CloneRepoEvent
-	(*CloneProgress)(nil),             // 39: codefoundry.v1.CloneProgress
-	(*timestamppb.Timestamp)(nil),     // 40: google.protobuf.Timestamp
+	(PublishOwnerKind)(0),             // 1: codefoundry.v1.PublishOwnerKind
+	(*Repo)(nil),                      // 2: codefoundry.v1.Repo
+	(*Worktree)(nil),                  // 3: codefoundry.v1.Worktree
+	(*GitStatus)(nil),                 // 4: codefoundry.v1.GitStatus
+	(*RegisterRepoRequest)(nil),       // 5: codefoundry.v1.RegisterRepoRequest
+	(*RegisterRepoResponse)(nil),      // 6: codefoundry.v1.RegisterRepoResponse
+	(*UnregisterRepoRequest)(nil),     // 7: codefoundry.v1.UnregisterRepoRequest
+	(*UnregisterRepoResponse)(nil),    // 8: codefoundry.v1.UnregisterRepoResponse
+	(*ListReposRequest)(nil),          // 9: codefoundry.v1.ListReposRequest
+	(*ListReposResponse)(nil),         // 10: codefoundry.v1.ListReposResponse
+	(*GetRepoRequest)(nil),            // 11: codefoundry.v1.GetRepoRequest
+	(*GetRepoResponse)(nil),           // 12: codefoundry.v1.GetRepoResponse
+	(*CreateWorktreeRequest)(nil),     // 13: codefoundry.v1.CreateWorktreeRequest
+	(*CreateWorktreeResponse)(nil),    // 14: codefoundry.v1.CreateWorktreeResponse
+	(*RemoveWorktreeRequest)(nil),     // 15: codefoundry.v1.RemoveWorktreeRequest
+	(*RemoveWorktreeResponse)(nil),    // 16: codefoundry.v1.RemoveWorktreeResponse
+	(*ListRefsRequest)(nil),           // 17: codefoundry.v1.ListRefsRequest
+	(*ListRefsResponse)(nil),          // 18: codefoundry.v1.ListRefsResponse
+	(*InitGitRequest)(nil),            // 19: codefoundry.v1.InitGitRequest
+	(*InitGitResponse)(nil),           // 20: codefoundry.v1.InitGitResponse
+	(*RefreshRepoRequest)(nil),        // 21: codefoundry.v1.RefreshRepoRequest
+	(*RefreshRepoResponse)(nil),       // 22: codefoundry.v1.RefreshRepoResponse
+	(*WatchReposRequest)(nil),         // 23: codefoundry.v1.WatchReposRequest
+	(*RepoEvent)(nil),                 // 24: codefoundry.v1.RepoEvent
+	(*WorktreeDetailRef)(nil),         // 25: codefoundry.v1.WorktreeDetailRef
+	(*GetWorktreeDetailRequest)(nil),  // 26: codefoundry.v1.GetWorktreeDetailRequest
+	(*GetWorktreeDetailResponse)(nil), // 27: codefoundry.v1.GetWorktreeDetailResponse
+	(*WorktreeDetail)(nil),            // 28: codefoundry.v1.WorktreeDetail
+	(*FileChange)(nil),                // 29: codefoundry.v1.FileChange
+	(*LogEntry)(nil),                  // 30: codefoundry.v1.LogEntry
+	(*RepoSnapshot)(nil),              // 31: codefoundry.v1.RepoSnapshot
+	(*WorktreeRef)(nil),               // 32: codefoundry.v1.WorktreeRef
+	(*GitHubRepository)(nil),          // 33: codefoundry.v1.GitHubRepository
+	(*SearchGitHubRequest)(nil),       // 34: codefoundry.v1.SearchGitHubRequest
+	(*SearchGitHubResponse)(nil),      // 35: codefoundry.v1.SearchGitHubResponse
+	(*LookupGitHubRequest)(nil),       // 36: codefoundry.v1.LookupGitHubRequest
+	(*LookupGitHubResponse)(nil),      // 37: codefoundry.v1.LookupGitHubResponse
+	(*CloneRepoRequest)(nil),          // 38: codefoundry.v1.CloneRepoRequest
+	(*CloneRepoEvent)(nil),            // 39: codefoundry.v1.CloneRepoEvent
+	(*CloneProgress)(nil),             // 40: codefoundry.v1.CloneProgress
+	(*CreateRepoRequest)(nil),         // 41: codefoundry.v1.CreateRepoRequest
+	(*CreateRepoResponse)(nil),        // 42: codefoundry.v1.CreateRepoResponse
+	(*ListPublishOwnersRequest)(nil),  // 43: codefoundry.v1.ListPublishOwnersRequest
+	(*ListPublishOwnersResponse)(nil), // 44: codefoundry.v1.ListPublishOwnersResponse
+	(*PublishOwner)(nil),              // 45: codefoundry.v1.PublishOwner
+	(*PublishRepoRequest)(nil),        // 46: codefoundry.v1.PublishRepoRequest
+	(*PublishRepoResponse)(nil),       // 47: codefoundry.v1.PublishRepoResponse
+	(*timestamppb.Timestamp)(nil),     // 48: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_repo_proto_depIdxs = []int32{
-	2,  // 0: codefoundry.v1.Repo.worktrees:type_name -> codefoundry.v1.Worktree
-	40, // 1: codefoundry.v1.Repo.registered_at:type_name -> google.protobuf.Timestamp
-	3,  // 2: codefoundry.v1.Worktree.status:type_name -> codefoundry.v1.GitStatus
-	40, // 3: codefoundry.v1.GitStatus.refreshed_at:type_name -> google.protobuf.Timestamp
-	1,  // 4: codefoundry.v1.RegisterRepoResponse.repo:type_name -> codefoundry.v1.Repo
-	1,  // 5: codefoundry.v1.ListReposResponse.repos:type_name -> codefoundry.v1.Repo
-	1,  // 6: codefoundry.v1.GetRepoResponse.repo:type_name -> codefoundry.v1.Repo
-	2,  // 7: codefoundry.v1.CreateWorktreeResponse.worktree:type_name -> codefoundry.v1.Worktree
-	1,  // 8: codefoundry.v1.InitGitResponse.repo:type_name -> codefoundry.v1.Repo
-	1,  // 9: codefoundry.v1.RepoEvent.repo_updated:type_name -> codefoundry.v1.Repo
-	2,  // 10: codefoundry.v1.RepoEvent.worktree_updated:type_name -> codefoundry.v1.Worktree
-	31, // 11: codefoundry.v1.RepoEvent.worktree_removed:type_name -> codefoundry.v1.WorktreeRef
-	30, // 12: codefoundry.v1.RepoEvent.snapshot:type_name -> codefoundry.v1.RepoSnapshot
-	24, // 13: codefoundry.v1.RepoEvent.worktree_detail_updated:type_name -> codefoundry.v1.WorktreeDetailRef
-	40, // 14: codefoundry.v1.WorktreeDetailRef.computed_at:type_name -> google.protobuf.Timestamp
-	27, // 15: codefoundry.v1.GetWorktreeDetailResponse.detail:type_name -> codefoundry.v1.WorktreeDetail
-	28, // 16: codefoundry.v1.WorktreeDetail.files:type_name -> codefoundry.v1.FileChange
-	29, // 17: codefoundry.v1.WorktreeDetail.log:type_name -> codefoundry.v1.LogEntry
-	40, // 18: codefoundry.v1.WorktreeDetail.computed_at:type_name -> google.protobuf.Timestamp
-	40, // 19: codefoundry.v1.LogEntry.authored_at:type_name -> google.protobuf.Timestamp
-	1,  // 20: codefoundry.v1.RepoSnapshot.repos:type_name -> codefoundry.v1.Repo
+	3,  // 0: codefoundry.v1.Repo.worktrees:type_name -> codefoundry.v1.Worktree
+	48, // 1: codefoundry.v1.Repo.registered_at:type_name -> google.protobuf.Timestamp
+	4,  // 2: codefoundry.v1.Worktree.status:type_name -> codefoundry.v1.GitStatus
+	48, // 3: codefoundry.v1.GitStatus.refreshed_at:type_name -> google.protobuf.Timestamp
+	2,  // 4: codefoundry.v1.RegisterRepoResponse.repo:type_name -> codefoundry.v1.Repo
+	2,  // 5: codefoundry.v1.ListReposResponse.repos:type_name -> codefoundry.v1.Repo
+	2,  // 6: codefoundry.v1.GetRepoResponse.repo:type_name -> codefoundry.v1.Repo
+	3,  // 7: codefoundry.v1.CreateWorktreeResponse.worktree:type_name -> codefoundry.v1.Worktree
+	2,  // 8: codefoundry.v1.InitGitResponse.repo:type_name -> codefoundry.v1.Repo
+	2,  // 9: codefoundry.v1.RepoEvent.repo_updated:type_name -> codefoundry.v1.Repo
+	3,  // 10: codefoundry.v1.RepoEvent.worktree_updated:type_name -> codefoundry.v1.Worktree
+	32, // 11: codefoundry.v1.RepoEvent.worktree_removed:type_name -> codefoundry.v1.WorktreeRef
+	31, // 12: codefoundry.v1.RepoEvent.snapshot:type_name -> codefoundry.v1.RepoSnapshot
+	25, // 13: codefoundry.v1.RepoEvent.worktree_detail_updated:type_name -> codefoundry.v1.WorktreeDetailRef
+	48, // 14: codefoundry.v1.WorktreeDetailRef.computed_at:type_name -> google.protobuf.Timestamp
+	28, // 15: codefoundry.v1.GetWorktreeDetailResponse.detail:type_name -> codefoundry.v1.WorktreeDetail
+	29, // 16: codefoundry.v1.WorktreeDetail.files:type_name -> codefoundry.v1.FileChange
+	30, // 17: codefoundry.v1.WorktreeDetail.log:type_name -> codefoundry.v1.LogEntry
+	48, // 18: codefoundry.v1.WorktreeDetail.computed_at:type_name -> google.protobuf.Timestamp
+	48, // 19: codefoundry.v1.LogEntry.authored_at:type_name -> google.protobuf.Timestamp
+	2,  // 20: codefoundry.v1.RepoSnapshot.repos:type_name -> codefoundry.v1.Repo
 	0,  // 21: codefoundry.v1.GitHubRepository.visibility:type_name -> codefoundry.v1.RepositoryVisibility
-	32, // 22: codefoundry.v1.SearchGitHubResponse.repositories:type_name -> codefoundry.v1.GitHubRepository
-	32, // 23: codefoundry.v1.LookupGitHubResponse.repository:type_name -> codefoundry.v1.GitHubRepository
-	39, // 24: codefoundry.v1.CloneRepoEvent.progress:type_name -> codefoundry.v1.CloneProgress
-	1,  // 25: codefoundry.v1.CloneRepoEvent.repo:type_name -> codefoundry.v1.Repo
-	4,  // 26: codefoundry.v1.RepoService.Register:input_type -> codefoundry.v1.RegisterRepoRequest
-	6,  // 27: codefoundry.v1.RepoService.Unregister:input_type -> codefoundry.v1.UnregisterRepoRequest
-	8,  // 28: codefoundry.v1.RepoService.List:input_type -> codefoundry.v1.ListReposRequest
-	10, // 29: codefoundry.v1.RepoService.Get:input_type -> codefoundry.v1.GetRepoRequest
-	12, // 30: codefoundry.v1.RepoService.CreateWorktree:input_type -> codefoundry.v1.CreateWorktreeRequest
-	14, // 31: codefoundry.v1.RepoService.RemoveWorktree:input_type -> codefoundry.v1.RemoveWorktreeRequest
-	20, // 32: codefoundry.v1.RepoService.Refresh:input_type -> codefoundry.v1.RefreshRepoRequest
-	22, // 33: codefoundry.v1.RepoService.Watch:input_type -> codefoundry.v1.WatchReposRequest
-	25, // 34: codefoundry.v1.RepoService.GetWorktreeDetail:input_type -> codefoundry.v1.GetWorktreeDetailRequest
-	16, // 35: codefoundry.v1.RepoService.ListRefs:input_type -> codefoundry.v1.ListRefsRequest
-	18, // 36: codefoundry.v1.RepoService.InitGit:input_type -> codefoundry.v1.InitGitRequest
-	33, // 37: codefoundry.v1.RepoService.SearchGitHub:input_type -> codefoundry.v1.SearchGitHubRequest
-	35, // 38: codefoundry.v1.RepoService.LookupGitHub:input_type -> codefoundry.v1.LookupGitHubRequest
-	37, // 39: codefoundry.v1.RepoService.Clone:input_type -> codefoundry.v1.CloneRepoRequest
-	5,  // 40: codefoundry.v1.RepoService.Register:output_type -> codefoundry.v1.RegisterRepoResponse
-	7,  // 41: codefoundry.v1.RepoService.Unregister:output_type -> codefoundry.v1.UnregisterRepoResponse
-	9,  // 42: codefoundry.v1.RepoService.List:output_type -> codefoundry.v1.ListReposResponse
-	11, // 43: codefoundry.v1.RepoService.Get:output_type -> codefoundry.v1.GetRepoResponse
-	13, // 44: codefoundry.v1.RepoService.CreateWorktree:output_type -> codefoundry.v1.CreateWorktreeResponse
-	15, // 45: codefoundry.v1.RepoService.RemoveWorktree:output_type -> codefoundry.v1.RemoveWorktreeResponse
-	21, // 46: codefoundry.v1.RepoService.Refresh:output_type -> codefoundry.v1.RefreshRepoResponse
-	23, // 47: codefoundry.v1.RepoService.Watch:output_type -> codefoundry.v1.RepoEvent
-	26, // 48: codefoundry.v1.RepoService.GetWorktreeDetail:output_type -> codefoundry.v1.GetWorktreeDetailResponse
-	17, // 49: codefoundry.v1.RepoService.ListRefs:output_type -> codefoundry.v1.ListRefsResponse
-	19, // 50: codefoundry.v1.RepoService.InitGit:output_type -> codefoundry.v1.InitGitResponse
-	34, // 51: codefoundry.v1.RepoService.SearchGitHub:output_type -> codefoundry.v1.SearchGitHubResponse
-	36, // 52: codefoundry.v1.RepoService.LookupGitHub:output_type -> codefoundry.v1.LookupGitHubResponse
-	38, // 53: codefoundry.v1.RepoService.Clone:output_type -> codefoundry.v1.CloneRepoEvent
-	40, // [40:54] is the sub-list for method output_type
-	26, // [26:40] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	33, // 22: codefoundry.v1.SearchGitHubResponse.repositories:type_name -> codefoundry.v1.GitHubRepository
+	33, // 23: codefoundry.v1.LookupGitHubResponse.repository:type_name -> codefoundry.v1.GitHubRepository
+	40, // 24: codefoundry.v1.CloneRepoEvent.progress:type_name -> codefoundry.v1.CloneProgress
+	2,  // 25: codefoundry.v1.CloneRepoEvent.repo:type_name -> codefoundry.v1.Repo
+	2,  // 26: codefoundry.v1.CreateRepoResponse.repo:type_name -> codefoundry.v1.Repo
+	45, // 27: codefoundry.v1.ListPublishOwnersResponse.owners:type_name -> codefoundry.v1.PublishOwner
+	1,  // 28: codefoundry.v1.PublishOwner.kind:type_name -> codefoundry.v1.PublishOwnerKind
+	0,  // 29: codefoundry.v1.PublishOwner.allowed:type_name -> codefoundry.v1.RepositoryVisibility
+	0,  // 30: codefoundry.v1.PublishRepoRequest.visibility:type_name -> codefoundry.v1.RepositoryVisibility
+	2,  // 31: codefoundry.v1.PublishRepoResponse.repo:type_name -> codefoundry.v1.Repo
+	5,  // 32: codefoundry.v1.RepoService.Register:input_type -> codefoundry.v1.RegisterRepoRequest
+	7,  // 33: codefoundry.v1.RepoService.Unregister:input_type -> codefoundry.v1.UnregisterRepoRequest
+	9,  // 34: codefoundry.v1.RepoService.List:input_type -> codefoundry.v1.ListReposRequest
+	11, // 35: codefoundry.v1.RepoService.Get:input_type -> codefoundry.v1.GetRepoRequest
+	13, // 36: codefoundry.v1.RepoService.CreateWorktree:input_type -> codefoundry.v1.CreateWorktreeRequest
+	15, // 37: codefoundry.v1.RepoService.RemoveWorktree:input_type -> codefoundry.v1.RemoveWorktreeRequest
+	21, // 38: codefoundry.v1.RepoService.Refresh:input_type -> codefoundry.v1.RefreshRepoRequest
+	23, // 39: codefoundry.v1.RepoService.Watch:input_type -> codefoundry.v1.WatchReposRequest
+	26, // 40: codefoundry.v1.RepoService.GetWorktreeDetail:input_type -> codefoundry.v1.GetWorktreeDetailRequest
+	17, // 41: codefoundry.v1.RepoService.ListRefs:input_type -> codefoundry.v1.ListRefsRequest
+	19, // 42: codefoundry.v1.RepoService.InitGit:input_type -> codefoundry.v1.InitGitRequest
+	34, // 43: codefoundry.v1.RepoService.SearchGitHub:input_type -> codefoundry.v1.SearchGitHubRequest
+	36, // 44: codefoundry.v1.RepoService.LookupGitHub:input_type -> codefoundry.v1.LookupGitHubRequest
+	38, // 45: codefoundry.v1.RepoService.Clone:input_type -> codefoundry.v1.CloneRepoRequest
+	41, // 46: codefoundry.v1.RepoService.Create:input_type -> codefoundry.v1.CreateRepoRequest
+	43, // 47: codefoundry.v1.RepoService.ListPublishOwners:input_type -> codefoundry.v1.ListPublishOwnersRequest
+	46, // 48: codefoundry.v1.RepoService.Publish:input_type -> codefoundry.v1.PublishRepoRequest
+	6,  // 49: codefoundry.v1.RepoService.Register:output_type -> codefoundry.v1.RegisterRepoResponse
+	8,  // 50: codefoundry.v1.RepoService.Unregister:output_type -> codefoundry.v1.UnregisterRepoResponse
+	10, // 51: codefoundry.v1.RepoService.List:output_type -> codefoundry.v1.ListReposResponse
+	12, // 52: codefoundry.v1.RepoService.Get:output_type -> codefoundry.v1.GetRepoResponse
+	14, // 53: codefoundry.v1.RepoService.CreateWorktree:output_type -> codefoundry.v1.CreateWorktreeResponse
+	16, // 54: codefoundry.v1.RepoService.RemoveWorktree:output_type -> codefoundry.v1.RemoveWorktreeResponse
+	22, // 55: codefoundry.v1.RepoService.Refresh:output_type -> codefoundry.v1.RefreshRepoResponse
+	24, // 56: codefoundry.v1.RepoService.Watch:output_type -> codefoundry.v1.RepoEvent
+	27, // 57: codefoundry.v1.RepoService.GetWorktreeDetail:output_type -> codefoundry.v1.GetWorktreeDetailResponse
+	18, // 58: codefoundry.v1.RepoService.ListRefs:output_type -> codefoundry.v1.ListRefsResponse
+	20, // 59: codefoundry.v1.RepoService.InitGit:output_type -> codefoundry.v1.InitGitResponse
+	35, // 60: codefoundry.v1.RepoService.SearchGitHub:output_type -> codefoundry.v1.SearchGitHubResponse
+	37, // 61: codefoundry.v1.RepoService.LookupGitHub:output_type -> codefoundry.v1.LookupGitHubResponse
+	39, // 62: codefoundry.v1.RepoService.Clone:output_type -> codefoundry.v1.CloneRepoEvent
+	42, // 63: codefoundry.v1.RepoService.Create:output_type -> codefoundry.v1.CreateRepoResponse
+	44, // 64: codefoundry.v1.RepoService.ListPublishOwners:output_type -> codefoundry.v1.ListPublishOwnersResponse
+	47, // 65: codefoundry.v1.RepoService.Publish:output_type -> codefoundry.v1.PublishRepoResponse
+	49, // [49:66] is the sub-list for method output_type
+	32, // [32:49] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_repo_proto_init() }
@@ -2873,8 +3329,8 @@ func file_codefoundry_v1_repo_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_repo_proto_rawDesc), len(file_codefoundry_v1_repo_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   39,
+			NumEnums:      2,
+			NumMessages:   46,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

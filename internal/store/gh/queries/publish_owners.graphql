@@ -1,0 +1,10 @@
+# Where the viewer can publish a repository (RepoService.ListPublishOwners): their own
+# account and the organizations they belong to. Each organization's repository policy
+# comes from REST GET /orgs/{org} (owners.go). Cached for 10 minutes.
+query PublishOwners {
+  rateLimit { ...RateLimitFields }
+  viewer {
+    login
+    organizations(first: 100) { nodes { login } }
+  }
+}

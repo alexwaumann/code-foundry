@@ -108,7 +108,7 @@ func Run(ctx context.Context, opts Options) error {
 
 	started := time.Now()
 	events := st.bus
-	repoAPI := api.NewRepo(st.repo, events).WithGitHub(st.gh, st.cloner)
+	repoAPI := api.NewRepo(st.repo, events).WithGitHub(st.gh, st.cloner).WithProjects(st.projects, st.gh)
 	terminalAPI := api.NewTerminal(st.terminal)
 	sessionAPI := api.NewSession(st.session, events)
 	gitopsAPI := api.NewGitOps(st.gitops, events, ctx.Done())
