@@ -23,10 +23,24 @@ const ViewPanelToggle = "panel.toggle"
 // action on per-selection GUI state, not a page; expanding a hidden panel shows it.
 const ViewPanelExpand = "panel.expand"
 
+// ViewPanelWorkspace is the ShowView name that opens (or reveals) the workspace surface
+// in the side panel of the selected workspace thread: the workspace's members with their
+// git and pull request state. Like ViewPanelToggle it is an action on per-selection GUI
+// state, not a page; a window whose selection is not a workspace thread ignores it.
+const ViewPanelWorkspace = "panel.workspace"
+
+// hasWorkspaceThreadContext is view.panel.workspace's availability: a thread is active
+// and it belongs to a workspace (the GUI passes the thread's workspace as
+// ActiveWorkspaceID; the CLI with --context-session and --context-workspace).
+func hasWorkspaceThreadContext(c Context) bool {
+	return hasSession(c) && c.ActiveWorkspaceID != ""
+}
+
 // RegisterView registers view.pullrequests, which shows the Pull Requests page,
-// view.projects, which shows the Projects page, view.panel.toggle, which shows or hides the side panel, and view.panel.expand, which
-// switches it between split and full width (all emitted as UiIntent.ShowView). Links
-// open through view.open.url (RegisterGitOps).
+// view.projects, which shows the Projects page, view.panel.toggle, which shows or hides
+// the side panel, view.panel.expand, which switches it between split and full width, and
+// view.panel.workspace, which opens the workspace surface in it (all emitted as
+// UiIntent.ShowView). Links open through view.open.url (RegisterGitOps).
 func RegisterView(r *Registry, e Emitter) error {
 	show := func(name string) Result {
 		n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: name}}})
@@ -73,6 +87,18 @@ func RegisterView(r *Registry, e Emitter) error {
 			// No default chord (the user's choice); bindable in settings.
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return show(ViewPanelExpand), nil
+			},
+		},
+		Command{
+			Name:  "view.panel.workspace",
+			Title: "Show Workspace in Side Panel",
+			Description: "Open the workspace surface in the selected workspace thread's side panel: " +
+				"its members with branch, changes, ahead/behind and pull request, add and remove members, Run in.",
+			Category: "View",
+			// No default chord, like view.panel.expand (W opens it while the panel has focus).
+			When: hasWorkspaceThreadContext,
+			Run: func(context.Context, Context, Args) (Result, error) {
+				return show(ViewPanelWorkspace), nil
 			},
 		},
 	)

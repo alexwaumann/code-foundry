@@ -70,6 +70,18 @@ export function repoRef(repos: ProjectsRepos, repoId: string): string {
   return n === 1 ? name : repoId;
 }
 
+/**
+ * Where a thread is relative to a workspace member (the side panel's member rows): it
+ * runs there (its cwd is the member worktree or inside it), a queued "Run in…" moves it
+ * there, or neither. No thread (the Projects page) is always neither.
+ */
+export function threadAt(thread: { worktreePath: string; pendingWorktreePath: string } | undefined, memberPath: string): "current" | "queued" | null {
+  if (!thread || !memberPath) return null;
+  const cwd = thread.worktreePath;
+  if (cwd === memberPath || cwd.startsWith(`${memberPath}/`)) return "current";
+  return thread.pendingWorktreePath === memberPath && thread.pendingWorktreePath !== cwd ? "queued" : null;
+}
+
 /** Keyboard row keys of the page. */
 export const projectKey = (repoId: string): string => `p:${repoId}`;
 export const projectWorktreeKey = (repoId: string, path: string): string => `pw:${repoId}::${path}`;

@@ -27,8 +27,12 @@ export interface SurfaceSpec {
   kind: SurfaceKind;
   title: string;
   icon: LucideIcon;
-  /** Single lowercase letter that opens the surface while the panel has focus. */
-  hotkey: string;
+  /**
+   * Single lowercase letter that opens the surface while the panel has focus. None for a
+   * surface that is only opened from elsewhere (it is then also "hidden" in the empty
+   * list), e.g. a workspace member's worktree, opened from the workspace surface.
+   */
+  hotkey?: string;
   /**
    * Availability right now. Pure and cheap: it runs during render (the empty list) and
    * in key and click handlers. It may read other stores with getState(), but every store

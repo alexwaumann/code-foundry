@@ -295,6 +295,16 @@ export class GhWorld {
     });
   }
 
+  /**
+   * Test control (workspace fixtures): an open pull request by the viewer on `head` with
+   * failing checks (2 of 9), served by GetBranchPullRequests and announced like a poll.
+   */
+  addBranchPullRequest(slug: string, head: string, number: number, title: string): void {
+    const pr = this.pr(slug, number, title, { headRef: head, checks: rollup(CheckRollupState.FAILURE, 6, 2, 0, 1), ageMs: 2 * HOUR });
+    this.branches.set(`${slug}\u0000${head}`, [pr]);
+    this.publishGh({ event: { case: "branchPullRequestsUpdated", value: { repoSlug: slug, headRef: head, fetchedAt: timestampFromDate(new Date()) } } });
+  }
+
   /** A pull request any dashboard list or watched branch holds. */
   findPr(slug: string, number: number): PrInit | undefined {
     const d = this.dashboard;

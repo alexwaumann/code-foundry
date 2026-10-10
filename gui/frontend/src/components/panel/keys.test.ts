@@ -43,10 +43,13 @@ describe("panelKeyAction", () => {
 });
 
 describe("surface registry", () => {
-  it("has unique kinds and single-letter hotkeys", () => {
+  it("has unique kinds and single-letter hotkeys (a surface opened only from elsewhere has none)", () => {
     expect(new Set(surfaces.map((s) => s.kind)).size).toBe(surfaces.length);
-    expect(new Set(surfaces.map((s) => s.hotkey)).size).toBe(surfaces.length);
-    for (const s of surfaces) expect(s.hotkey).toMatch(/^[a-z]$/);
+    const hotkeys = surfaces.flatMap((s) => (s.hotkey ? [s.hotkey] : []));
+    expect(new Set(hotkeys).size).toBe(hotkeys.length);
+    for (const k of hotkeys) expect(k).toMatch(/^[a-z]$/);
+    // cmd+w is the panel's; a bare w is the workspace surface's letter.
+    expect(isPanelChord("w")).toBe(true);
   });
 
   it("looks surfaces up by kind and hotkey", () => {
@@ -54,9 +57,13 @@ describe("surface registry", () => {
       ["files", "f"],
       ["diff", "d"],
       ["pullrequest", "p"],
+      ["workspace", "w"],
+      ["worktree", undefined],
     ]);
     expect(surfaceOf("diff")?.title).toBe("Diff");
     expect(surfaceByHotkey("P")?.kind).toBe("pullrequest");
-    for (const s of surfaces) expect(s.available(ctx)).toBe("disabled");
+    expect(surfaceByHotkey("W")?.kind).toBe("workspace");
+    // s-1 is unknown here: no pull request, no workspace thread; the worktree tab is never listed.
+    expect(surfaces.map((s) => s.available(ctx))).toEqual(["disabled", "disabled", "disabled", "hidden", "hidden"]);
   });
 });

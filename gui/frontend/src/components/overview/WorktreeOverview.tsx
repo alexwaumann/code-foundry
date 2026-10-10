@@ -59,7 +59,7 @@ function SyncLine({ st }: { st: GitStatusView }) {
 function Section({ title, extra, children, testId }: { title: ReactNode; extra?: ReactNode; children: ReactNode; testId?: string }) {
   return (
     <section data-testid={testId}>
-      <h2 className="mb-1.5 flex items-baseline gap-3 border-b pb-1 text-sm font-semibold">
+      <h2 className="mb-1.5 flex flex-wrap items-baseline gap-x-3 border-b pb-1 text-sm font-semibold">
         <span>{title}</span>
         {extra && <span className="ml-auto text-xs font-normal text-muted-foreground">{extra}</span>}
       </h2>
@@ -112,21 +112,25 @@ function FileLine({ row }: { row: FileRow }) {
 
 function LogLine({ e }: { e: LogEntryView }) {
   return (
-    <NavRow navKey={`l:${e.sha}`} title={`${e.sha}\n${e.authorName} <${e.authorEmail}>`} className="grid h-full grid-cols-[4.5rem_minmax(0,1fr)_3rem_minmax(6rem,10rem)] items-center gap-3 px-2 text-xs">
+    <NavRow
+      navKey={`l:${e.sha}`}
+      title={`${e.sha}\n${e.authorName} <${e.authorEmail}>`}
+      className="grid h-full grid-cols-[4.5rem_minmax(0,1fr)_3rem_minmax(6rem,10rem)] items-center gap-3 px-2 text-xs @max-[420px]:grid-cols-[4rem_minmax(0,1fr)_2.5rem] @max-[420px]:gap-2"
+    >
       <span className="font-mono text-amber-200/80">{e.shortSha}</span>
       <span className="truncate">{e.subject}</span>
       <Age ms={e.authoredAtMs} className="text-right" />
-      <span className="truncate text-muted-foreground">{e.authorName}</span>
+      <span className="truncate text-muted-foreground @max-[420px]:hidden">{e.authorName}</span>
     </NavRow>
   );
 }
 
 function CheckLine({ c }: { c: CheckRunView }) {
   return (
-    <NavRow navKey={`c:${c.url || c.name}`} title={c.url} className="flex h-6 items-center gap-2 px-2 pl-6 font-mono text-xs">
-      {c.workflow && <span className="text-muted-foreground">{c.workflow}:</span>}
-      <span className="truncate text-red-400">{c.name}</span>
-      <span className="text-muted-foreground">{c.conclusion.replace(/_/g, " ")}</span>
+    <NavRow navKey={`c:${c.url || c.name}`} title={c.url} className="flex h-6 items-center gap-2 px-2 pl-6 font-mono text-xs @max-[420px]:pl-2">
+      {c.workflow && <span className="min-w-0 shrink truncate text-muted-foreground">{c.workflow}:</span>}
+      <span className="min-w-0 truncate text-red-400">{c.name}</span>
+      <span className="shrink-0 text-muted-foreground @max-[420px]:hidden">{c.conclusion.replace(/_/g, " ")}</span>
     </NavRow>
   );
 }
@@ -139,19 +143,23 @@ function PrLine({ pr, prefix, viewer }: { pr: PullRequestView; prefix: string; v
       title={`${pr.url}\nClick or Enter: open in the side panel · ⌘-click or ⌘↵: open on GitHub`}
       activateOnClick
       onCmdClick={() => void openUrl(pr.url)}
-      className="flex h-6 items-center gap-2 px-2 pl-6 text-xs"
+      className="flex h-6 items-center gap-2 px-2 pl-6 text-xs @max-[420px]:pl-2"
     >
       <PrStateIcon state={pr.state} draft={pr.draft} />
       <span className="text-muted-foreground tabular-nums">#{pr.number}</span>
-      <span className="text-muted-foreground capitalize">{pr.state}</span>
-      {by && <span className="text-muted-foreground">@{by}</span>}
-      <span className="shrink-0 font-mono text-muted-foreground">
+      <span className="text-muted-foreground capitalize @max-[420px]:hidden">{pr.state}</span>
+      {by && <span className="text-muted-foreground @max-[420px]:hidden">@{by}</span>}
+      <span className="shrink-0 font-mono text-muted-foreground @max-[420px]:hidden">
         {pr.headRef} → {pr.baseRef}
       </span>
-      <span className="truncate">— {pr.title}</span>
+      <span className="min-w-0 truncate">— {pr.title}</span>
       <span className="ml-auto flex shrink-0 items-center gap-3">
         {pr.state === "open" && <ChecksBadge checks={pr.checks} />}
-        {pr.state === "open" && <ReviewBadge review={pr.review} />}
+        {pr.state === "open" && (
+          <span className="@max-[420px]:hidden">
+            <ReviewBadge review={pr.review} />
+          </span>
+        )}
         <Age ms={pr.state === "merged" ? pr.mergedAtMs : pr.updatedAtMs} />
       </span>
     </NavRow>
@@ -200,7 +208,7 @@ function GithubActivity({ activity, activityError, branch, branchPrs }: {
         )}
         {stats.lastError && <span className="ml-2 text-red-400" title={stats.lastError}>(last poll failed)</span>}
       </div>
-      <div className="flex items-center gap-1.5" data-testid="gh-default-branch" data-ci={summary?.tone ?? "unknown"}>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5" data-testid="gh-default-branch" data-ci={summary?.tone ?? "unknown"}>
         {ci && summary ? (
           <>
             <CiIcon tone={summary.tone} />
@@ -211,7 +219,7 @@ function GithubActivity({ activity, activityError, branch, branchPrs }: {
             </span>
             <span className="text-muted-foreground">·</span>
             <Age ms={ci.committedAtMs} />
-            <span className="truncate text-muted-foreground">{ci.headline}</span>
+            <span className="min-w-0 truncate text-muted-foreground">{ci.headline}</span>
           </>
         ) : (
           <span className="text-muted-foreground">Default branch CI: not polled yet</span>
@@ -239,7 +247,12 @@ function GithubActivity({ activity, activityError, branch, branchPrs }: {
   );
 }
 
-function OverviewBody({ repo, wt, items }: { repo: RepoView; wt: WorktreeView; items: ReactNode }) {
+/**
+ * The overview's body for one worktree. `inPanel` is the side panel's member tab
+ * (WorktreePanelView): it does not take focus when it mounts and is not the content
+ * pane's focus root; the panel is a CSS container, so its rows narrow by container query.
+ */
+function OverviewBody({ repo, wt, items, inPanel = false }: { repo: RepoView; wt: WorktreeView; items: ReactNode; inPanel?: boolean }) {
   const slug = repo.githubSlug.toLowerCase();
   const detailEntry = useResource(worktreeDetailResource, detailKey(repo.id, wt.path));
   const activityEntry = useResource(repoActivityResource, slug || null);
@@ -285,8 +298,8 @@ function OverviewBody({ repo, wt, items }: { repo: RepoView; wt: WorktreeView; i
 
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    rootRef.current?.focus({ preventScroll: true });
-  }, [wt.path]);
+    if (!inPanel) rootRef.current?.focus({ preventScroll: true });
+  }, [wt.path, inPanel]);
 
   const expandAll = (open: boolean) => {
     const dirs: Record<string, boolean> = {};
@@ -305,9 +318,9 @@ function OverviewBody({ repo, wt, items }: { repo: RepoView; wt: WorktreeView; i
         role="listbox"
         aria-label="Worktree overview"
         aria-activedescendant={nav.activeDescendant}
-        className="flex flex-col gap-6 outline-none"
+        className={cn("flex flex-col outline-none", inPanel ? "gap-4" : "gap-6")}
         data-testid="overview-list"
-        data-focus-root
+        data-focus-root={inPanel ? undefined : true}
         onKeyDown={(e) => {
           if ((e.key === "e" || e.key === "E") && !e.metaKey && !e.ctrlKey && !e.altKey) {
             expandAll(e.key === "e");
@@ -415,5 +428,43 @@ export function WorktreeOverview({ repoId, path, items }: { repoId: string; path
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * A worktree's overview in a side panel tab (the workspace surface's member tabs): a
+ * compact header (project@branch, path), then the same body as the overview page (sync
+ * state, GitHub activity, files and log). No threads/terminals section: its buttons act on
+ * the selection, which is the thread, not this worktree.
+ */
+export function WorktreePanelView({ repoId, path }: { repoId: string; path: string }) {
+  const repo = useReposStore((s) => s.byId[repoId]);
+  const wt = useReposStore((s) => findWorktree(s, repoId, path));
+  return (
+    // @container: log, check and pull request rows narrow with the panel.
+    <div className="@container flex min-w-0 flex-col gap-3 px-4 py-3 @max-[340px]:px-3" data-testid="worktree-surface" data-repo={repoId} data-path={path}>
+      <header className="flex min-w-0 flex-col gap-0.5 border-b border-pane-border pb-2" data-testid="worktree-surface-header">
+        <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
+          <GitBranch className="size-4 shrink-0 text-violet-400" aria-hidden />
+          <span className="min-w-0 truncate" data-testid="worktree-surface-title">
+            {repo?.name ?? repoId}
+            <span className="text-muted-foreground">@</span>
+            {wt?.branch || (wt?.head ? wt.head.slice(0, 8) : "")}
+          </span>
+        </h2>
+        <span className="min-w-0 truncate font-mono text-xs text-muted-foreground" title={path}>
+          {tildify(path)}
+        </span>
+      </header>
+      {!repo ? (
+        <p className="text-sm text-muted-foreground">Project not found.</p>
+      ) : !wt ? (
+        <p className="text-sm text-muted-foreground" data-testid="worktree-surface-missing">
+          This worktree is gone (removed from the workspace, or deleted).
+        </p>
+      ) : (
+        <OverviewBody key={wt.path} repo={repo} wt={wt} items={null} inPanel />
+      )}
+    </div>
   );
 }
