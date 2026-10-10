@@ -8,7 +8,8 @@ repo, since macOS never renders an icon above 1024px (512pt @2x).
 ## macOS icon assets
 
 - `gui/build/appicon.icon/Assets/logo-art.png` is the source of truth: the painting at
-  1024x1024, no alpha, white outside its painted frame. It is the single layer of the
+  1024x1024, no alpha, full bleed (the earlier version had a painted metal frame; it was
+  replaced on 2026-10-10 with a frameless rendering of the same scene). It is the single layer of the
   Icon Composer bundle for macOS 26 (`appicon.icon/icon.json`: scale 1.0, system mask,
   specular on, translucency off). Compiling the bundle to `darwin/Assets.car` needs
   `actool` from a full Xcode install; the stale Wails `Assets.car` was removed so the
@@ -16,8 +17,6 @@ repo, since macOS never renders an icon above 1024px (512pt @2x).
 - `gui/build/appicon.png` is the same painting masked to a superellipse (n=5, close to
   Apple's squircle) at 824px on a transparent 1024px canvas, the Apple icon grid.
   `wails3 generate icons` turns it into `gui/build/darwin/icons.icns`.
-- The painting's own thin metal frame sits inside the Apple mask; it reads as a bezel at
-  dock size and is intentional.
 
 Regenerate everything from the layer PNG, from `gui/build`:
 
