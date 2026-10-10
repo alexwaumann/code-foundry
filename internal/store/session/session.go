@@ -103,11 +103,14 @@ const (
 
 // Session is an immutable snapshot of one session. Field meanings follow
 // codefoundry.v1.Session.
+//
+// Owner: WorkspaceID when set, else the project RepoID. RepoID and WorktreePath are
+// the cwd (for a workspace thread, the member worktree it runs in), never the owner.
 type Session struct {
 	ID              string
 	ClaudeSessionID string // set once the transcript file is discovered
-	RepoID          string
-	WorktreePath    string
+	RepoID          string // repository of the cwd; the owner when WorkspaceID is empty
+	WorktreePath    string // the cwd
 	Name            string
 	AutoNamed       bool
 	Model           string
@@ -129,6 +132,12 @@ type Session struct {
 	// worktree (CreatedWorktree).
 	BaseRef         string
 	CreatedWorktree bool
+	// WorkspaceID is the owner workspace; empty for a project thread. Each spawn reads
+	// the workspace's current members from the workspace store.
+	WorkspaceID string
+	// PendingWorktreePath is the member a queued RunIn moves the thread to once it is
+	// idle at its prompt; empty when nothing is queued. Not persisted.
+	PendingWorktreePath string
 }
 
 // Snapshot is every session, sorted by creation time then id. Never mutate it.
@@ -167,9 +176,18 @@ func (*Snapshot) isSessionEvent() {}
 // CreateOptions configures Store.Create.
 type CreateOptions struct {
 	// RepoID and WorktreePath select the worktree. Either may be empty: a repo alone
-	// means its main worktree; a path alone is looked up among registered repos.
+	// means its main worktree; a path alone is looked up among registered repos. With
+	// WorkspaceID or NewWorkspace they pick the member worktree instead.
 	RepoID       string
 	WorktreePath string
+	// WorkspaceID (an id or a name), when set, makes the workspace the thread's owner.
+	// The thread runs in the member WorktreePath or RepoID names, else the first
+	// member. Exclusive with NewWorktree and NewWorkspace.
+	WorkspaceID string
+	// NewWorkspace, when set, makes Create make a workspace (a worktree on cf/<slug>
+	// in every repository, the slug as for NewWorktree) and run the thread in the
+	// member RepoID names, else the first. Exclusive with NewWorktree and WorkspaceID.
+	NewWorkspace *NewWorkspace
 	// Model is a claude --model value (alias like "opus" or a full model name).
 	Model string
 	// Effort is a claude --effort level: low, medium, high, xhigh, max.
@@ -190,6 +208,13 @@ type CreateOptions struct {
 	// "Attached image: <path>" line after the prompt; Claude reads them with its Read
 	// tool. Paths outside the attachments directory are rejected.
 	Attachments []string
+}
+
+// RunInTarget names the member a workspace thread should run in: its repository id or
+// its worktree path (both, if given, must agree).
+type RunInTarget struct {
+	RepoID       string
+	WorktreePath string
 }
 
 // NewWorktree configures the worktree Create makes.
@@ -215,6 +240,10 @@ type Store interface {
 	Reconnect(ctx context.Context, id string) (Session, error)
 	// Remove closes the session if needed and forgets it.
 	Remove(ctx context.Context, id string) error
+	// RunIn moves a workspace thread to another member worktree: `/cd <path>` typed
+	// once the live thread is idle at its prompt (the row's cwd changes when it is
+	// sent), or the row's cwd at once for a disconnected thread.
+	RunIn(ctx context.Context, id string, target RunInTarget) (Session, error)
 	// StageAttachment stores an image for a first prompt and returns its absolute
 	// path. mimeType must be one of AttachmentTypes; data at most MaxAttachmentBytes.
 	// name is the user's file name, used only in logs.

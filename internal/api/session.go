@@ -37,10 +37,13 @@ func (h *Session) Create(ctx context.Context, req *connect.Request[v1.CreateSess
 	o := session.CreateOptions{
 		RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
 		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(), PermissionMode: session.PermissionMode(m.GetPermissionMode()),
-		Attachments: m.GetAttachments(),
+		Attachments: m.GetAttachments(), WorkspaceID: m.GetWorkspaceId(),
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
 		o.NewWorktree = &session.NewWorktree{BaseRef: nw.GetBaseRef()}
+	}
+	if nw := m.GetNewWorkspace(); nw != nil {
+		o.NewWorkspace = &session.NewWorkspace{Repos: nw.GetRepos(), BaseRef: nw.GetBaseRef(), Name: nw.GetName()}
 	}
 	s, err := h.store.Create(ctx, o)
 	if err != nil {
@@ -106,6 +109,16 @@ func (h *Session) Remove(ctx context.Context, req *connect.Request[v1.RemoveSess
 	return connect.NewResponse(&v1.RemoveSessionResponse{}), nil
 }
 
+// RunIn moves a workspace thread to another member worktree.
+func (h *Session) RunIn(ctx context.Context, req *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error) {
+	m := req.Msg
+	s, err := h.store.RunIn(ctx, m.GetId(), session.RunInTarget{RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath()})
+	if err != nil {
+		return nil, sessionError(err)
+	}
+	return connect.NewResponse(&v1.RunInSessionResponse{Session: sessionToProto(s)}), nil
+}
+
 // Watch sends a snapshot, then every session event. If the client falls behind and
 // events are dropped, it sends a fresh snapshot.
 func (h *Session) Watch(ctx context.Context, _ *connect.Request[v1.WatchSessionsRequest], stream *connect.ServerStream[v1.SessionEvent]) error {
@@ -164,25 +177,27 @@ func sessionsToProto(snap *session.Snapshot) []*v1.Session {
 
 func sessionToProto(s session.Session) *v1.Session {
 	p := &v1.Session{
-		Id:               s.ID,
-		ClaudeSessionId:  s.ClaudeSessionID,
-		RepoId:           s.RepoID,
-		WorktreePath:     s.WorktreePath,
-		Name:             s.Name,
-		AutoNamed:        s.AutoNamed,
-		Model:            s.Model,
-		Effort:           s.Effort,
-		TerminalId:       s.TerminalID,
-		State:            v1.SessionState(s.State),
-		Status:           v1.SessionStatus(s.Status),
-		StatusReason:     s.StatusReason,
-		ExitCode:         int32(s.ExitCode),
-		DisconnectReason: s.DisconnectReason,
-		LastError:        s.LastError,
-		ParentId:         s.ParentID,
-		PermissionMode:   v1.PermissionMode(s.PermissionMode),
-		BaseRef:          s.BaseRef,
-		CreatedWorktree:  s.CreatedWorktree,
+		Id:                  s.ID,
+		ClaudeSessionId:     s.ClaudeSessionID,
+		RepoId:              s.RepoID,
+		WorktreePath:        s.WorktreePath,
+		Name:                s.Name,
+		AutoNamed:           s.AutoNamed,
+		Model:               s.Model,
+		Effort:              s.Effort,
+		TerminalId:          s.TerminalID,
+		State:               v1.SessionState(s.State),
+		Status:              v1.SessionStatus(s.Status),
+		StatusReason:        s.StatusReason,
+		ExitCode:            int32(s.ExitCode),
+		DisconnectReason:    s.DisconnectReason,
+		LastError:           s.LastError,
+		ParentId:            s.ParentID,
+		PermissionMode:      v1.PermissionMode(s.PermissionMode),
+		BaseRef:             s.BaseRef,
+		CreatedWorktree:     s.CreatedWorktree,
+		WorkspaceId:         s.WorkspaceID,
+		PendingWorktreePath: s.PendingWorktreePath,
 	}
 	if !s.CreatedAt.IsZero() {
 		p.CreatedAt = timestamppb.New(s.CreatedAt)

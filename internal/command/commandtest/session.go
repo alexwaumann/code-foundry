@@ -27,7 +27,9 @@ func (s *Session) do(m proto.Message) error {
 }
 
 // Create echoes the request as a STARTING session "s1". With new_worktree the session
-// is in /worktrees/s1 with created_worktree and base_ref set.
+// is in /worktrees/s1 with created_worktree and base_ref set. workspace_id is echoed;
+// with new_workspace the session belongs to "w-new" and runs in /worktrees/<repo>
+// (repo_id, else the first repo).
 func (s *Session) Create(_ context.Context, r *connect.Request[v1.CreateSessionRequest]) (*connect.Response[v1.CreateSessionResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
@@ -36,9 +38,16 @@ func (s *Session) Create(_ context.Context, r *connect.Request[v1.CreateSessionR
 	out := &v1.Session{
 		Id: "s1", RepoId: m.GetRepoId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
 		Name: m.GetName(), State: v1.SessionState_SESSION_STATE_STARTING, PermissionMode: m.GetPermissionMode(),
+		WorkspaceId: m.GetWorkspaceId(),
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
 		out.WorktreePath, out.CreatedWorktree, out.BaseRef = "/worktrees/s1", true, nw.GetBaseRef()
+	}
+	if nw := m.GetNewWorkspace(); nw != nil && len(nw.GetRepos()) > 0 {
+		if out.RepoId == "" {
+			out.RepoId = nw.GetRepos()[0]
+		}
+		out.WorkspaceId, out.WorktreePath, out.CreatedWorktree, out.BaseRef = "w-new", "/worktrees/"+out.RepoId, true, nw.GetBaseRef()
 	}
 	return connect.NewResponse(&v1.CreateSessionResponse{Session: out}), nil
 }
@@ -106,4 +115,28 @@ func (s *Session) Remove(_ context.Context, r *connect.Request[v1.RemoveSessionR
 		return nil, err
 	}
 	return connect.NewResponse(&v1.RemoveSessionResponse{}), nil
+}
+
+// RunIn returns Current (default: a CONNECTED session in workspace "w-1") with the
+// requested id. A disconnected session runs in the target at once; a live one gets it
+// as pending_worktree_path. The target is worktree_path, else /worktrees/<repo_id>.
+func (s *Session) RunIn(_ context.Context, r *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error) {
+	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	cur := &v1.Session{State: v1.SessionState_SESSION_STATE_CONNECTED, WorkspaceId: "w-1"}
+	if s.Current != nil {
+		cur = proto.CloneOf(s.Current)
+	}
+	cur.Id = r.Msg.GetId()
+	path := r.Msg.GetWorktreePath()
+	if path == "" {
+		path = "/worktrees/" + r.Msg.GetRepoId()
+	}
+	if cur.GetState() == v1.SessionState_SESSION_STATE_DISCONNECTED {
+		cur.WorktreePath = path
+	} else {
+		cur.PendingWorktreePath = path
+	}
+	return connect.NewResponse(&v1.RunInSessionResponse{Session: cur}), nil
 }

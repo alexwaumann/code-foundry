@@ -19,6 +19,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
+	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
@@ -42,11 +43,16 @@ type stores struct {
 	session *session.Manager
 	// update checks for and installs new releases (disabled in dev builds).
 	update *update.Store
+	// workspace holds branch sets across repos; it creates and removes worktrees
+	// through repo and asks session which threads are live. Opened before session,
+	// which reads workspace members at launch.
+	workspace *workspace.Manager
 }
 
 // openStores opens the database, applies migrations, and starts every store. On
-// error, whatever was started is closed again.
-func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores, err error) {
+// error, whatever was started is closed again. sessionEnv is added to every Claude
+// session's environment (see sessionEnv in daemon.go).
+func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv []string) (_ *stores, err error) {
 	s := &stores{bus: bus.New()}
 	defer func() {
 		if err != nil {
@@ -97,12 +103,34 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 	s.terminal = terminal.New(terminal.Options{
 		Bus: s.bus, Logger: log.With("store", "terminal"), MaxScrollbackLines: uint(cfg.Sessions.ScrollbackLines),
 	})
+	// Workspaces open before sessions: a session reads a workspace thread's members at
+	// every spawn, and the workspace store asks sessions about live threads (and
+	// pre-trusts worktrees) only through these closures, which run after both exist.
+	if s.workspace, err = workspace.New(ctx, workspace.Options{
+		DB: s.db, Repos: s.repo, Bus: s.bus, Log: log.With("store", "workspace"),
+		Threads: func() []workspace.Thread {
+			if s.session == nil {
+				return nil
+			}
+			return liveThreads(s.session.Snapshot())
+		},
+		Trust: func(dir string) error {
+			if s.session == nil {
+				return nil
+			}
+			return s.session.PreTrust(dir)
+		},
+		WorktreePath: settingsWorktreePath(s.settings),
+	}); err != nil {
+		return nil, err
+	}
 	claude := cmp.Or(settings.ExpandedPath(cfg.Advanced.ClaudePath), "claude")
 	if s.session, err = session.New(ctx, session.Options{
-		DB: s.db, Terminals: s.terminal, Repos: s.repo, Bus: s.bus, Log: log.With("store", "session"),
+		DB: s.db, Terminals: s.terminal, Repos: s.repo, Workspaces: s.workspace, Bus: s.bus, Log: log.With("store", "session"),
 		NewDetector: newDetector, Claude: claude, CloseTimeout: cfg.CloseGrace(),
 		Namer:          settingsNamer(s.settings, session.ClaudeNamer(claude, "/tmp")),
 		AttachmentsDir: p.Attachments(), WorktreePath: settingsWorktreePath(s.settings),
+		Env: sessionEnv,
 	}); err != nil {
 		return nil, err
 	}
@@ -110,6 +138,21 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 	uo.Bus, uo.Log = s.bus, log.With("store", "update")
 	s.update = update.Start(ctx, uo)
 	return s, nil
+}
+
+// liveThreads lists the sessions with a process, for the workspace store's removal
+// guard.
+func liveThreads(snap *session.Snapshot) []workspace.Thread {
+	var out []workspace.Thread
+	if snap == nil {
+		return nil
+	}
+	for _, s := range snap.Sessions {
+		if s.State != session.StateDisconnected {
+			out = append(out, workspace.Thread{ID: s.ID, Name: s.Name, Cwd: s.WorktreePath})
+		}
+	}
+	return out
 }
 
 // close stops the stores in reverse order of start, then closes the database.

@@ -62,7 +62,7 @@ func (b *mailbox) drain() []terminal.ObserveEvent {
 }
 
 // runner owns one connected terminal of a session. All fields below are touched only
-// by run (the goroutine), except mb (observer side), closeReq, stopReq and done.
+// by run (the goroutine), except mb (observer side), closeReq, cdReq, stopReq and done.
 type runner struct {
 	m      *Manager
 	id     string
@@ -71,6 +71,7 @@ type runner struct {
 	mb     mailbox
 
 	closeReq chan struct{}
+	cdReq    chan cdRequest // RunIn; capacity 1, latest wins
 	stopReq  chan struct{}
 	done     chan struct{}
 
@@ -83,6 +84,17 @@ type runner struct {
 	trustKeys    int
 	lastTrustKey time.Time
 	lastScreen   time.Time
+
+	// pendingCd is a RunIn move waiting for the prompt; cdSending one typed and
+	// waiting for cdTimer to press Enter (runin.go).
+	pendingCd *cdRequest
+	cdSending cdRequest
+	cdTimer   *time.Timer
+	// awaitFirstPrompt: spawned with a positional prompt that has not shown up in the
+	// transcript (nor made Claude busy) yet. atPromptSince: when AtPrompt last became
+	// true; zero while it is false.
+	awaitFirstPrompt bool
+	atPromptSince    time.Time
 
 	closing    bool
 	closeStep  int
@@ -109,6 +121,7 @@ func newRunner(m *Manager, id, cwd string, l launch) *runner {
 		m: m, id: id, cwd: cwd, launch: l,
 		mb:       mailbox{sig: make(chan struct{}, 1)},
 		closeReq: make(chan struct{}, 1),
+		cdReq:    make(chan cdRequest, 1),
 		stopReq:  make(chan struct{}, 1),
 		done:     make(chan struct{}),
 		state:    StateStarting,
@@ -171,6 +184,7 @@ func (r *runner) run() {
 				r.checkStartup(false)
 			}
 			r.checkStatus()
+			r.tryCd()
 		case <-r.tail.events():
 			r.pollTranscript()
 		case err := <-r.tail.errors():
@@ -183,6 +197,10 @@ func (r *runner) run() {
 			}
 		case <-r.closeReq:
 			r.beginClose()
+		case req := <-r.cdReq:
+			r.onCdRequest(req)
+		case <-timerC(r.cdTimer):
+			r.sendCd()
 		case <-timerC(r.closeTimer):
 			r.closeNext()
 		case <-timerC(r.debounce):
@@ -330,6 +348,7 @@ func (r *runner) onTick(now time.Time) {
 	}
 	r.pollTranscript()
 	r.checkStatus()
+	r.tryCd()
 	if r.activity.After(r.pubActivity) && now.Sub(r.pubActivity) >= r.m.opts.ActivityPublish {
 		persist := now.Sub(r.savedActivity) >= activityPersistGap
 		r.pubActivity = r.activity
@@ -352,6 +371,7 @@ func (r *runner) pollTranscript() {
 		if !r.namingSeen {
 			if msg, ok := firstUserText(line); ok {
 				r.namingSeen = true
+				r.awaitFirstPrompt = false
 				r.m.startNaming(r.id, msg)
 			}
 		}
@@ -446,13 +466,19 @@ func (r *runner) onExit(code int) {
 // finish detaches the runner, applying the final state.
 func (r *runner) finish(fn func(*Session)) {
 	r.finished = true
-	for _, t := range []*time.Timer{r.closeTimer, r.debounce} {
+	for _, t := range []*time.Timer{r.closeTimer, r.debounce, r.cdTimer} {
 		if t != nil {
 			t.Stop()
 		}
 	}
 	r.m.detach(r, func(s *Session) {
 		fn(s)
+		// Under m.mu, which RunIn holds while it queues: nothing can be queued after.
+		if owed := r.unsentCd(); owed != nil {
+			// The process is gone; the next reconnect resumes in the requested member.
+			s.WorktreePath, s.RepoID = owed.path, owed.repoID
+		}
+		s.PendingWorktreePath = ""
 		s.Status, s.StatusReason = StatusUnknown, ""
 		if r.activity.After(s.LastActivityAt) {
 			s.LastActivityAt = r.activity

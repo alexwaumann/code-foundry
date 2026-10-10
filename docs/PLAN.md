@@ -15,6 +15,17 @@ Phases 0–3 are done and merged on `main`. Each step's note is in `docs/notes/`
 * **New thread composer** done (2026-10-09): project picker + in-pane composer, positional prompt, permission mode, `cf/<slug>` worktrees, image attachments, opus/high defaults, "thread" copy (`new-thread-composer.md`).
 * **Side panel + PR surface** done: per-selection side panel with a surface registry, the Pull request surface (summary, timeline, reviewers, refresh, revert), and its menu starting `pr.ask` / `pr.explain` / `pr.fix.findings` sessions (`side-panel.md`, `gh-pr-detail.md`, `pr-thread-commands.md`).
 
+### Next: multi-repo workspaces
+
+Design settled 2026-10-09. Decisions, scope, build order and open checks are in
+`docs/notes/workspaces-handoff.md`. Start there.
+
+* Step 1 (store, `WorkspaceService`, `workspace.*` commands, session endpoint env + CLI
+  loopback preference) done: `docs/notes/workspaces-1-store.md`.
+* Step 2 (thread owner `workspace_id`, workspace and new-workspace threads, `--add-dir`
+  siblings + CLAUDE.md env + prompt line on every spawn, `session.run-in` via `/cd`)
+  done: `docs/notes/workspaces-2-launch.md`. Next: step 3 (composer).
+
 ### Open items
 
 Collected from the step notes; none blocks daily use.

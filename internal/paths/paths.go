@@ -22,6 +22,14 @@ import (
 // EnvHome overrides the config home directory.
 const EnvHome = "CODE_FOUNDRY_HOME"
 
+// The daemon sets these in every Claude session it spawns: its loopback endpoint
+// (http://127.0.0.1:<port>) and bearer token. The CLI prefers them over the Unix
+// socket (client.EndpointFromEnv); sandboxed sessions cannot connect to sockets.
+const (
+	EnvEndpoint = "CODE_FOUNDRY_ENDPOINT"
+	EnvToken    = "CODE_FOUNDRY_TOKEN"
+)
+
 // DirName is the default config home's name inside the user's home directory.
 const DirName = ".code-foundry"
 

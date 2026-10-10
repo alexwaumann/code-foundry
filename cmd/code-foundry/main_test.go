@@ -124,3 +124,31 @@ func TestFormatVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestConnectOptionsFromEnv(t *testing.T) {
+	tests := []struct {
+		name    string
+		env     map[string]string
+		wantURL string // "" means the Unix socket
+		wantErr bool
+	}{
+		{"outside a session", nil, "", false},
+		{"inside a session", map[string]string{"CODE_FOUNDRY_ENDPOINT": "http://127.0.0.1:5555", "CODE_FOUNDRY_TOKEN": "t"}, "http://127.0.0.1:5555", false},
+		{"endpoint without token", map[string]string{"CODE_FOUNDRY_ENDPOINT": "http://127.0.0.1:5555"}, "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts, err := connectOptions(func(k string) string { return tt.env[k] })
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v", err)
+			}
+			got := ""
+			if opts.Endpoint != nil {
+				got = opts.Endpoint.BaseURL
+			}
+			if got != tt.wantURL {
+				t.Fatalf("endpoint = %q, want %q", got, tt.wantURL)
+			}
+		})
+	}
+}

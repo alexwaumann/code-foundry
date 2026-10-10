@@ -220,6 +220,12 @@ func TestLaunchArgv(t *testing.T) {
 			[]string{"claude", "--resume", "R", "--permission-mode", "auto"}, "R"},
 		{"add dirs before the prompt", launch{newID: "N"}, spawnArgs{perm: PermissionAuto, prompt: "x", addDirs: []string{"/att"}},
 			[]string{"claude", "--session-id", "N", "--permission-mode", "auto", "--add-dir", "/att", "--", "x"}, "N"},
+		{"workspace: add dirs and the prompt line before the prompt", launch{newID: "N"},
+			spawnArgs{perm: PermissionAuto, prompt: "x", addDirs: []string{"/att", "/wt/api"}, appendSystemPrompt: "line"},
+			[]string{"claude", "--session-id", "N", "--permission-mode", "auto", "--add-dir", "/att", "--add-dir", "/wt/api",
+				"--append-system-prompt", "line", "--", "x"}, "N"},
+		{"workspace on resume, no prompt", launch{resume: "R"}, spawnArgs{addDirs: []string{"/wt/api"}, appendSystemPrompt: "line"},
+			[]string{"claude", "--resume", "R", "--add-dir", "/wt/api", "--append-system-prompt", "line"}, "R"},
 		{"unknown mode passes nothing", launch{newID: "N"}, spawnArgs{perm: PermissionMode(9)},
 			[]string{"claude", "--session-id", "N"}, "N"},
 	}

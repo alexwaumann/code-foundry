@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -100,6 +101,45 @@ func TestSessionCreateNewThreadFields(t *testing.T) {
 	}
 	if calls := fake.Calls(); calls[1] != "Create r1   " {
 		t.Errorf("calls = %q", calls)
+	}
+}
+
+func TestSessionCreateWorkspaceFields(t *testing.T) {
+	fake, c := newSessionServer(t)
+	ctx := context.Background()
+	res, err := c.Create(ctx, connect.NewRequest(&v1.CreateSessionRequest{WorkspaceId: "login", RepoId: "api"}))
+	if err != nil || res.Msg.GetSession().GetWorkspaceId() != "login" {
+		t.Fatalf("Create in workspace = %v, %v", res, err)
+	}
+	res, err = c.Create(ctx, connect.NewRequest(&v1.CreateSessionRequest{
+		RepoId: "api", NewWorkspace: &v1.NewWorkspace{Repos: []string{"web", "api"}, BaseRef: "origin/dev", Name: "login"},
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := res.Msg.GetSession(); s.GetWorkspaceId() != "w-new" || s.GetWorktreePath() != "/worktrees/api" || !s.GetCreatedWorktree() {
+		t.Errorf("Create new workspace = %v", s)
+	}
+	want := []string{"Create api    workspace=login", "Create api    new-workspace=web,api"}
+	if calls := fake.Calls(); !slices.Equal(calls, want) {
+		t.Errorf("calls = %q, want %q", calls, want)
+	}
+}
+
+func TestSessionRunIn(t *testing.T) {
+	fake, c := newSessionServer(t)
+	ctx := context.Background()
+	fake.Put(session.Session{ID: "s-1", WorkspaceID: "w-1", WorktreePath: "/wt/web", State: session.StateConnected})
+	fake.Put(session.Session{ID: "s-2", WorktreePath: "/src/app", State: session.StateConnected})
+	res, err := c.RunIn(ctx, connect.NewRequest(&v1.RunInSessionRequest{Id: "s-1", RepoId: "api"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := res.Msg.GetSession(); s.GetPendingWorktreePath() != "/worktrees/api" || s.GetWorktreePath() != "/wt/web" || s.GetWorkspaceId() != "w-1" {
+		t.Errorf("RunIn = %v", s)
+	}
+	if _, err := c.RunIn(ctx, connect.NewRequest(&v1.RunInSessionRequest{Id: "s-2", RepoId: "api"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Errorf("RunIn on a project thread = %v", err)
 	}
 }
 

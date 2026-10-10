@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -35,9 +36,12 @@ func runStatus(ctx context.Context, cl *cli, args []string) error {
 	if err != nil {
 		return fmt.Errorf("daemon version: %w", err)
 	}
-	loopback := "unavailable"
+	loopback, transport := "unavailable", "unix socket"
 	if ep, err := client.ReadEndpoint(p); err == nil {
 		loopback = ep.BaseURL
+	}
+	if ep, ok, err := client.EndpointFromEnv(os.Getenv); ok && err == nil {
+		loopback, transport = ep.BaseURL, "loopback ("+client.EnvEndpoint+")"
 	}
 
 	w := tabwriter.NewWriter(cl.stdout, 0, 0, 2, ' ', 0)
@@ -46,6 +50,7 @@ func runStatus(ctx context.Context, cl *cli, args []string) error {
 	fmt.Fprintf(w, "uptime\t%s\n", ping.GetUptime().AsDuration().Round(time.Second))
 	fmt.Fprintf(w, "socket\t%s\n", p.Socket())
 	fmt.Fprintf(w, "loopback\t%s\n", loopback)
+	fmt.Fprintf(w, "transport\t%s\n", transport)
 	fmt.Fprintf(w, "home\t%s\n", p.Home())
 	return w.Flush()
 }

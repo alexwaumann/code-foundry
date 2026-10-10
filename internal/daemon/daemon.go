@@ -75,8 +75,9 @@ func Run(ctx context.Context, opts Options) error {
 	defer func() { _ = logFile.Close() }()
 
 	// Before any store starts a process: children must not inherit an enclosing
-	// Claude Code session's variables.
+	// Claude Code session's variables, or another daemon's endpoint.
 	scrubClaudeEnv(log)
+	scrubEndpointEnv(log)
 
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -85,7 +86,21 @@ func Run(ctx context.Context, opts Options) error {
 	ctx, restart := context.WithCancelCause(ctx)
 	defer restart(nil)
 
-	st, err := openStores(ctx, log, p)
+	// The loopback listener and its token exist before the stores: every Claude
+	// session gets them in its environment (sessionEnv), so the CLI inside a session
+	// reaches this daemon over TCP. Sandboxed sessions cannot use the Unix socket.
+	token, err := newToken()
+	if err != nil {
+		return err
+	}
+	tcpLn, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return fmt.Errorf("listen loopback: %w", err)
+	}
+	defer func() { _ = tcpLn.Close() }() // no-op once the server has shut it down
+	port := tcpLn.Addr().(*net.TCPAddr).Port
+
+	st, err := openStores(ctx, log, p, sessionEnv(port, token))
 	if err != nil {
 		return err
 	}
@@ -100,6 +115,7 @@ func Run(ctx context.Context, opts Options) error {
 	ghAPI := api.NewGh(st.gh, events, ctx.Done())
 	settingsAPI := api.NewSettings(st.settings)
 	updateAPI := api.NewUpdate(st.update, events, ctx.Done())
+	workspaceAPI := api.NewWorkspace(st.workspace, events)
 	commands := command.NewRegistry()
 	if err := all.Register(commands, all.Deps{
 		Daemon: command.DaemonInfo{
@@ -114,9 +130,10 @@ func Run(ctx context.Context, opts Options) error {
 			GitHubSlug: func(c command.Context) string { return st.gitops.GitHubSlug(c.ActiveRepoID, c.ActiveWorktreePath) },
 			LocalOnly:  func(c command.Context) bool { return st.gitops.LocalOnly(c.ActiveRepoID, c.ActiveWorktreePath) },
 		},
-		Gh:       ghAPI,
-		Settings: settingsAPI,
-		Update:   updateAPI,
+		Gh:        ghAPI,
+		Settings:  settingsAPI,
+		Update:    updateAPI,
+		Workspace: workspaceAPI,
 		Restart: func() {
 			// Let the command's response reach the caller first.
 			time.AfterFunc(restartDelay, func() { restart(errRestartRequested) })
@@ -136,16 +153,12 @@ func Run(ctx context.Context, opts Options) error {
 		gitopsAPI.Route(),
 		settingsAPI.Route(),
 		updateAPI.Route(),
+		workspaceAPI.Route(),
 		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Session: st.session, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Done: ctx.Done()}).Route(),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {
 		mux.Handle(r.Path, r.Handler)
-	}
-
-	token, err := newToken()
-	if err != nil {
-		return err
 	}
 
 	// We hold the lock, so any socket file left behind is from a dead daemon.
@@ -161,22 +174,14 @@ func Run(ctx context.Context, opts Options) error {
 		_ = unixLn.Close()
 		return fmt.Errorf("chmod socket: %w", err)
 	}
-	tcpLn, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		_ = unixLn.Close()
-		return fmt.Errorf("listen loopback: %w", err)
-	}
-	port := tcpLn.Addr().(*net.TCPAddr).Port
 
 	defer removeRuntimeFiles(log, p)
 	if err := writeFileAtomic(p.Token(), []byte(token+"\n"), 0o600); err != nil {
 		_ = unixLn.Close()
-		_ = tcpLn.Close()
 		return err
 	}
 	if err := writeFileAtomic(p.Port(), []byte(strconv.Itoa(port)+"\n"), 0o600); err != nil {
 		_ = unixLn.Close()
-		_ = tcpLn.Close()
 		return err
 	}
 

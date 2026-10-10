@@ -194,6 +194,10 @@ func (SessionStatus) EnumDescriptor() ([]byte, []int) {
 	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{2}
 }
 
+// Ownership: a thread belongs to exactly one owner. When workspace_id is set the owner
+// is that workspace; otherwise it is the project (repository) repo_id. repo_id and
+// worktree_path are facts about the thread's cwd (for a workspace thread, the member
+// worktree it runs in) and never decide the owner.
 type Session struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Our stable id (survives reconnects).
@@ -201,8 +205,10 @@ type Session struct {
 	// Claude's own session id, once discovered from the transcript directory. Needed for
 	// resume; empty until known.
 	ClaudeSessionId string `protobuf:"bytes,2,opt,name=claude_session_id,json=claudeSessionId,proto3" json:"claude_session_id,omitempty"`
-	RepoId          string `protobuf:"bytes,3,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
-	WorktreePath    string `protobuf:"bytes,4,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
+	// Repository of the cwd. The owner when workspace_id is empty.
+	RepoId string `protobuf:"bytes,3,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	// The cwd: the worktree claude runs in.
+	WorktreePath string `protobuf:"bytes,4,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
 	// Display name. Auto-generated unless the user renamed it.
 	Name      string `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
 	AutoNamed bool   `protobuf:"varint,6,opt,name=auto_named,json=autoNamed,proto3" json:"auto_named,omitempty"`
@@ -229,10 +235,18 @@ type Session struct {
 	PermissionMode PermissionMode `protobuf:"varint,19,opt,name=permission_mode,json=permissionMode,proto3,enum=codefoundry.v1.PermissionMode" json:"permission_mode,omitempty"`
 	// Ref the session's worktree branch was created from, when Create made the worktree.
 	BaseRef string `protobuf:"bytes,20,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
-	// Create made the worktree for this session (new_worktree was set).
+	// Create made the worktree for this session (new_worktree or new_workspace was set).
 	CreatedWorktree bool `protobuf:"varint,21,opt,name=created_worktree,json=createdWorktree,proto3" json:"created_worktree,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Owner workspace (see the ownership rule above); empty for a project thread. Every
+	// spawn of a workspace thread gets --add-dir for the workspace's other member
+	// worktrees, read from the workspace store at launch.
+	WorkspaceId string `protobuf:"bytes,22,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// Member worktree a queued RunIn will move the thread to once it is idle; empty when
+	// nothing is queued. Not persisted: a thread that disconnects first moves its row
+	// there instead.
+	PendingWorktreePath string `protobuf:"bytes,23,opt,name=pending_worktree_path,json=pendingWorktreePath,proto3" json:"pending_worktree_path,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *Session) Reset() {
@@ -412,6 +426,20 @@ func (x *Session) GetCreatedWorktree() bool {
 	return false
 }
 
+func (x *Session) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *Session) GetPendingWorktreePath() string {
+	if x != nil {
+		return x.PendingWorktreePath
+	}
+	return ""
+}
+
 type CreateSessionRequest struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	RepoId       string                 `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
@@ -428,7 +456,17 @@ type CreateSessionRequest struct {
 	// initial_prompt (bounded wait), else cf/<session id>.
 	NewWorktree *NewWorktree `protobuf:"bytes,8,opt,name=new_worktree,json=newWorktree,proto3" json:"new_worktree,omitempty"`
 	// Paths returned by StageAttachment, appended to initial_prompt.
-	Attachments   []string `protobuf:"bytes,9,rep,name=attachments,proto3" json:"attachments,omitempty"`
+	Attachments []string `protobuf:"bytes,9,rep,name=attachments,proto3" json:"attachments,omitempty"`
+	// Workspace (id or name) the thread belongs to. repo_id or worktree_path then pick
+	// the member worktree it runs in (default: the first member); a worktree_path must
+	// be a member's worktree. Not with new_worktree or new_workspace.
+	WorkspaceId string `protobuf:"bytes,10,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// When set, Create makes a new workspace for the thread before claude starts: a
+	// worktree on branch cf/<slug> in every repository listed (the slug as for
+	// new_worktree, after the same single bounded wait), then runs the thread in the
+	// member repo_id names (default: the first). worktree_path is ignored. Not with
+	// new_worktree or workspace_id.
+	NewWorkspace  *NewWorkspace `protobuf:"bytes,11,opt,name=new_workspace,json=newWorkspace,proto3" json:"new_workspace,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -526,6 +564,20 @@ func (x *CreateSessionRequest) GetAttachments() []string {
 	return nil
 }
 
+func (x *CreateSessionRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *CreateSessionRequest) GetNewWorkspace() *NewWorkspace {
+	if x != nil {
+		return x.NewWorkspace
+	}
+	return nil
+}
+
 type NewWorktree struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Ref to branch from. Defaults to origin/<default branch>, else <default branch>.
@@ -571,6 +623,71 @@ func (x *NewWorktree) GetBaseRef() string {
 	return ""
 }
 
+type NewWorkspace struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Repositories (id, name when unique, or an absolute path inside one), in member
+	// order. At least one.
+	Repos []string `protobuf:"bytes,1,rep,name=repos,proto3" json:"repos,omitempty"`
+	// Ref every member branches from. Defaults to origin/<default branch>, else
+	// <default branch>, per repository.
+	BaseRef string `protobuf:"bytes,2,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
+	// Workspace name. Default: the slug (cf/<slug> without the prefix).
+	Name          string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NewWorkspace) Reset() {
+	*x = NewWorkspace{}
+	mi := &file_codefoundry_v1_session_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NewWorkspace) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NewWorkspace) ProtoMessage() {}
+
+func (x *NewWorkspace) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_session_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NewWorkspace.ProtoReflect.Descriptor instead.
+func (*NewWorkspace) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *NewWorkspace) GetRepos() []string {
+	if x != nil {
+		return x.Repos
+	}
+	return nil
+}
+
+func (x *NewWorkspace) GetBaseRef() string {
+	if x != nil {
+		return x.BaseRef
+	}
+	return ""
+}
+
+func (x *NewWorkspace) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 type StageAttachmentRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Original file name (for the extension only).
@@ -584,7 +701,7 @@ type StageAttachmentRequest struct {
 
 func (x *StageAttachmentRequest) Reset() {
 	*x = StageAttachmentRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[3]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -596,7 +713,7 @@ func (x *StageAttachmentRequest) String() string {
 func (*StageAttachmentRequest) ProtoMessage() {}
 
 func (x *StageAttachmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[3]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -609,7 +726,7 @@ func (x *StageAttachmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StageAttachmentRequest.ProtoReflect.Descriptor instead.
 func (*StageAttachmentRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{3}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *StageAttachmentRequest) GetName() string {
@@ -642,7 +759,7 @@ type StageAttachmentResponse struct {
 
 func (x *StageAttachmentResponse) Reset() {
 	*x = StageAttachmentResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -654,7 +771,7 @@ func (x *StageAttachmentResponse) String() string {
 func (*StageAttachmentResponse) ProtoMessage() {}
 
 func (x *StageAttachmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[4]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -667,7 +784,7 @@ func (x *StageAttachmentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StageAttachmentResponse.ProtoReflect.Descriptor instead.
 func (*StageAttachmentResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{4}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *StageAttachmentResponse) GetPath() string {
@@ -686,7 +803,7 @@ type CreateSessionResponse struct {
 
 func (x *CreateSessionResponse) Reset() {
 	*x = CreateSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -698,7 +815,7 @@ func (x *CreateSessionResponse) String() string {
 func (*CreateSessionResponse) ProtoMessage() {}
 
 func (x *CreateSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -711,7 +828,7 @@ func (x *CreateSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateSessionResponse.ProtoReflect.Descriptor instead.
 func (*CreateSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{5}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CreateSessionResponse) GetSession() *Session {
@@ -731,7 +848,7 @@ type ForkSessionRequest struct {
 
 func (x *ForkSessionRequest) Reset() {
 	*x = ForkSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -743,7 +860,7 @@ func (x *ForkSessionRequest) String() string {
 func (*ForkSessionRequest) ProtoMessage() {}
 
 func (x *ForkSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[6]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -756,7 +873,7 @@ func (x *ForkSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForkSessionRequest.ProtoReflect.Descriptor instead.
 func (*ForkSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{6}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ForkSessionRequest) GetId() string {
@@ -782,7 +899,7 @@ type ForkSessionResponse struct {
 
 func (x *ForkSessionResponse) Reset() {
 	*x = ForkSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -794,7 +911,7 @@ func (x *ForkSessionResponse) String() string {
 func (*ForkSessionResponse) ProtoMessage() {}
 
 func (x *ForkSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[7]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -807,7 +924,7 @@ func (x *ForkSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForkSessionResponse.ProtoReflect.Descriptor instead.
 func (*ForkSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{7}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ForkSessionResponse) GetSession() *Session {
@@ -825,7 +942,7 @@ type ListSessionsRequest struct {
 
 func (x *ListSessionsRequest) Reset() {
 	*x = ListSessionsRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -837,7 +954,7 @@ func (x *ListSessionsRequest) String() string {
 func (*ListSessionsRequest) ProtoMessage() {}
 
 func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[8]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -850,7 +967,7 @@ func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSessionsRequest.ProtoReflect.Descriptor instead.
 func (*ListSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{8}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{9}
 }
 
 type ListSessionsResponse struct {
@@ -862,7 +979,7 @@ type ListSessionsResponse struct {
 
 func (x *ListSessionsResponse) Reset() {
 	*x = ListSessionsResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -874,7 +991,7 @@ func (x *ListSessionsResponse) String() string {
 func (*ListSessionsResponse) ProtoMessage() {}
 
 func (x *ListSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -887,7 +1004,7 @@ func (x *ListSessionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSessionsResponse.ProtoReflect.Descriptor instead.
 func (*ListSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{9}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListSessionsResponse) GetSessions() []*Session {
@@ -906,7 +1023,7 @@ type GetSessionRequest struct {
 
 func (x *GetSessionRequest) Reset() {
 	*x = GetSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -918,7 +1035,7 @@ func (x *GetSessionRequest) String() string {
 func (*GetSessionRequest) ProtoMessage() {}
 
 func (x *GetSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[10]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -931,7 +1048,7 @@ func (x *GetSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSessionRequest.ProtoReflect.Descriptor instead.
 func (*GetSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{10}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetSessionRequest) GetId() string {
@@ -950,7 +1067,7 @@ type GetSessionResponse struct {
 
 func (x *GetSessionResponse) Reset() {
 	*x = GetSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -962,7 +1079,7 @@ func (x *GetSessionResponse) String() string {
 func (*GetSessionResponse) ProtoMessage() {}
 
 func (x *GetSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -975,7 +1092,7 @@ func (x *GetSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSessionResponse.ProtoReflect.Descriptor instead.
 func (*GetSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{11}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetSessionResponse) GetSession() *Session {
@@ -995,7 +1112,7 @@ type RenameSessionRequest struct {
 
 func (x *RenameSessionRequest) Reset() {
 	*x = RenameSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1007,7 +1124,7 @@ func (x *RenameSessionRequest) String() string {
 func (*RenameSessionRequest) ProtoMessage() {}
 
 func (x *RenameSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1020,7 +1137,7 @@ func (x *RenameSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenameSessionRequest.ProtoReflect.Descriptor instead.
 func (*RenameSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{12}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RenameSessionRequest) GetId() string {
@@ -1046,7 +1163,7 @@ type RenameSessionResponse struct {
 
 func (x *RenameSessionResponse) Reset() {
 	*x = RenameSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1058,7 +1175,7 @@ func (x *RenameSessionResponse) String() string {
 func (*RenameSessionResponse) ProtoMessage() {}
 
 func (x *RenameSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1071,7 +1188,7 @@ func (x *RenameSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenameSessionResponse.ProtoReflect.Descriptor instead.
 func (*RenameSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{13}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *RenameSessionResponse) GetSession() *Session {
@@ -1090,7 +1207,7 @@ type CloseSessionRequest struct {
 
 func (x *CloseSessionRequest) Reset() {
 	*x = CloseSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1102,7 +1219,7 @@ func (x *CloseSessionRequest) String() string {
 func (*CloseSessionRequest) ProtoMessage() {}
 
 func (x *CloseSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1115,7 +1232,7 @@ func (x *CloseSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloseSessionRequest.ProtoReflect.Descriptor instead.
 func (*CloseSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{14}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CloseSessionRequest) GetId() string {
@@ -1133,7 +1250,7 @@ type CloseSessionResponse struct {
 
 func (x *CloseSessionResponse) Reset() {
 	*x = CloseSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[15]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1145,7 +1262,7 @@ func (x *CloseSessionResponse) String() string {
 func (*CloseSessionResponse) ProtoMessage() {}
 
 func (x *CloseSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[15]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1158,7 +1275,7 @@ func (x *CloseSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloseSessionResponse.ProtoReflect.Descriptor instead.
 func (*CloseSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{15}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{16}
 }
 
 type ReconnectSessionRequest struct {
@@ -1170,7 +1287,7 @@ type ReconnectSessionRequest struct {
 
 func (x *ReconnectSessionRequest) Reset() {
 	*x = ReconnectSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1182,7 +1299,7 @@ func (x *ReconnectSessionRequest) String() string {
 func (*ReconnectSessionRequest) ProtoMessage() {}
 
 func (x *ReconnectSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1195,7 +1312,7 @@ func (x *ReconnectSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReconnectSessionRequest.ProtoReflect.Descriptor instead.
 func (*ReconnectSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{16}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ReconnectSessionRequest) GetId() string {
@@ -1214,7 +1331,7 @@ type ReconnectSessionResponse struct {
 
 func (x *ReconnectSessionResponse) Reset() {
 	*x = ReconnectSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1226,7 +1343,7 @@ func (x *ReconnectSessionResponse) String() string {
 func (*ReconnectSessionResponse) ProtoMessage() {}
 
 func (x *ReconnectSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1239,7 +1356,7 @@ func (x *ReconnectSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReconnectSessionResponse.ProtoReflect.Descriptor instead.
 func (*ReconnectSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{17}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ReconnectSessionResponse) GetSession() *Session {
@@ -1258,7 +1375,7 @@ type RemoveSessionRequest struct {
 
 func (x *RemoveSessionRequest) Reset() {
 	*x = RemoveSessionRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1270,7 +1387,7 @@ func (x *RemoveSessionRequest) String() string {
 func (*RemoveSessionRequest) ProtoMessage() {}
 
 func (x *RemoveSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1283,7 +1400,7 @@ func (x *RemoveSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveSessionRequest.ProtoReflect.Descriptor instead.
 func (*RemoveSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{18}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *RemoveSessionRequest) GetId() string {
@@ -1301,7 +1418,7 @@ type RemoveSessionResponse struct {
 
 func (x *RemoveSessionResponse) Reset() {
 	*x = RemoveSessionResponse{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1313,7 +1430,7 @@ func (x *RemoveSessionResponse) String() string {
 func (*RemoveSessionResponse) ProtoMessage() {}
 
 func (x *RemoveSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1326,7 +1443,113 @@ func (x *RemoveSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveSessionResponse.ProtoReflect.Descriptor instead.
 func (*RemoveSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{19}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{20}
+}
+
+type RunInSessionRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// The member to run in: its repository id, or its worktree path. One is required;
+	// both must name the same member.
+	RepoId        string `protobuf:"bytes,2,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	WorktreePath  string `protobuf:"bytes,3,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunInSessionRequest) Reset() {
+	*x = RunInSessionRequest{}
+	mi := &file_codefoundry_v1_session_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunInSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunInSessionRequest) ProtoMessage() {}
+
+func (x *RunInSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_session_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunInSessionRequest.ProtoReflect.Descriptor instead.
+func (*RunInSessionRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *RunInSessionRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RunInSessionRequest) GetRepoId() string {
+	if x != nil {
+		return x.RepoId
+	}
+	return ""
+}
+
+func (x *RunInSessionRequest) GetWorktreePath() string {
+	if x != nil {
+		return x.WorktreePath
+	}
+	return ""
+}
+
+type RunInSessionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Session       *Session               `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunInSessionResponse) Reset() {
+	*x = RunInSessionResponse{}
+	mi := &file_codefoundry_v1_session_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunInSessionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunInSessionResponse) ProtoMessage() {}
+
+func (x *RunInSessionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_session_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunInSessionResponse.ProtoReflect.Descriptor instead.
+func (*RunInSessionResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *RunInSessionResponse) GetSession() *Session {
+	if x != nil {
+		return x.Session
+	}
+	return nil
 }
 
 type WatchSessionsRequest struct {
@@ -1337,7 +1560,7 @@ type WatchSessionsRequest struct {
 
 func (x *WatchSessionsRequest) Reset() {
 	*x = WatchSessionsRequest{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1349,7 +1572,7 @@ func (x *WatchSessionsRequest) String() string {
 func (*WatchSessionsRequest) ProtoMessage() {}
 
 func (x *WatchSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1362,7 +1585,7 @@ func (x *WatchSessionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchSessionsRequest.ProtoReflect.Descriptor instead.
 func (*WatchSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{20}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{23}
 }
 
 type SessionEvent struct {
@@ -1379,7 +1602,7 @@ type SessionEvent struct {
 
 func (x *SessionEvent) Reset() {
 	*x = SessionEvent{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1391,7 +1614,7 @@ func (x *SessionEvent) String() string {
 func (*SessionEvent) ProtoMessage() {}
 
 func (x *SessionEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1404,7 +1627,7 @@ func (x *SessionEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionEvent.ProtoReflect.Descriptor instead.
 func (*SessionEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{21}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *SessionEvent) GetEvent() isSessionEvent_Event {
@@ -1472,7 +1695,7 @@ type SessionSnapshot struct {
 
 func (x *SessionSnapshot) Reset() {
 	*x = SessionSnapshot{}
-	mi := &file_codefoundry_v1_session_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1484,7 +1707,7 @@ func (x *SessionSnapshot) String() string {
 func (*SessionSnapshot) ProtoMessage() {}
 
 func (x *SessionSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_session_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_session_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1497,7 +1720,7 @@ func (x *SessionSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionSnapshot.ProtoReflect.Descriptor instead.
 func (*SessionSnapshot) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{22}
+	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *SessionSnapshot) GetSessions() []*Session {
@@ -1511,7 +1734,7 @@ var File_codefoundry_v1_session_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccodefoundry/v1/session.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xab\x06\n" +
+	"\x1ccodefoundry/v1/session.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x82\a\n" +
 	"\aSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x17\n" +
@@ -1538,7 +1761,9 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\rstatus_reason\x18\x12 \x01(\tR\fstatusReason\x12G\n" +
 	"\x0fpermission_mode\x18\x13 \x01(\x0e2\x1e.codefoundry.v1.PermissionModeR\x0epermissionMode\x12\x19\n" +
 	"\bbase_ref\x18\x14 \x01(\tR\abaseRef\x12)\n" +
-	"\x10created_worktree\x18\x15 \x01(\bR\x0fcreatedWorktree\"\xe8\x02\n" +
+	"\x10created_worktree\x18\x15 \x01(\bR\x0fcreatedWorktree\x12!\n" +
+	"\fworkspace_id\x18\x16 \x01(\tR\vworkspaceId\x122\n" +
+	"\x15pending_worktree_path\x18\x17 \x01(\tR\x13pendingWorktreePath\"\xce\x03\n" +
 	"\x14CreateSessionRequest\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12#\n" +
 	"\rworktree_path\x18\x02 \x01(\tR\fworktreePath\x12\x14\n" +
@@ -1548,9 +1773,16 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\x0einitial_prompt\x18\x06 \x01(\tR\rinitialPrompt\x12G\n" +
 	"\x0fpermission_mode\x18\a \x01(\x0e2\x1e.codefoundry.v1.PermissionModeR\x0epermissionMode\x12>\n" +
 	"\fnew_worktree\x18\b \x01(\v2\x1b.codefoundry.v1.NewWorktreeR\vnewWorktree\x12 \n" +
-	"\vattachments\x18\t \x03(\tR\vattachments\"(\n" +
+	"\vattachments\x18\t \x03(\tR\vattachments\x12!\n" +
+	"\fworkspace_id\x18\n" +
+	" \x01(\tR\vworkspaceId\x12A\n" +
+	"\rnew_workspace\x18\v \x01(\v2\x1c.codefoundry.v1.NewWorkspaceR\fnewWorkspace\"(\n" +
 	"\vNewWorktree\x12\x19\n" +
-	"\bbase_ref\x18\x01 \x01(\tR\abaseRef\"]\n" +
+	"\bbase_ref\x18\x01 \x01(\tR\abaseRef\"S\n" +
+	"\fNewWorkspace\x12\x14\n" +
+	"\x05repos\x18\x01 \x03(\tR\x05repos\x12\x19\n" +
+	"\bbase_ref\x18\x02 \x01(\tR\abaseRef\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\"]\n" +
 	"\x16StageAttachmentRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
 	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x12\n" +
@@ -1585,7 +1817,13 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\asession\x18\x01 \x01(\v2\x17.codefoundry.v1.SessionR\asession\"&\n" +
 	"\x14RemoveSessionRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x17\n" +
-	"\x15RemoveSessionResponse\"\x16\n" +
+	"\x15RemoveSessionResponse\"c\n" +
+	"\x13RunInSessionRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\arepo_id\x18\x02 \x01(\tR\x06repoId\x12#\n" +
+	"\rworktree_path\x18\x03 \x01(\tR\fworktreePath\"I\n" +
+	"\x14RunInSessionResponse\x121\n" +
+	"\asession\x18\x01 \x01(\v2\x17.codefoundry.v1.SessionR\asession\"\x16\n" +
 	"\x14WatchSessionsRequest\"\xac\x01\n" +
 	"\fSessionEvent\x12=\n" +
 	"\bsnapshot\x18\x01 \x01(\v2\x1f.codefoundry.v1.SessionSnapshotH\x00R\bsnapshot\x123\n" +
@@ -1610,7 +1848,7 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\x1aSESSION_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13SESSION_STATUS_BUSY\x10\x01\x12\x17\n" +
 	"\x13SESSION_STATUS_IDLE\x10\x02\x12\"\n" +
-	"\x1eSESSION_STATUS_NEEDS_ATTENTION\x10\x032\x82\a\n" +
+	"\x1eSESSION_STATUS_NEEDS_ATTENTION\x10\x032\xd8\a\n" +
 	"\x0eSessionService\x12W\n" +
 	"\x06Create\x12$.codefoundry.v1.CreateSessionRequest\x1a%.codefoundry.v1.CreateSessionResponse\"\x00\x12Q\n" +
 	"\x04Fork\x12\".codefoundry.v1.ForkSessionRequest\x1a#.codefoundry.v1.ForkSessionResponse\"\x00\x12S\n" +
@@ -1619,7 +1857,8 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\x06Rename\x12$.codefoundry.v1.RenameSessionRequest\x1a%.codefoundry.v1.RenameSessionResponse\"\x00\x12T\n" +
 	"\x05Close\x12#.codefoundry.v1.CloseSessionRequest\x1a$.codefoundry.v1.CloseSessionResponse\"\x00\x12`\n" +
 	"\tReconnect\x12'.codefoundry.v1.ReconnectSessionRequest\x1a(.codefoundry.v1.ReconnectSessionResponse\"\x00\x12W\n" +
-	"\x06Remove\x12$.codefoundry.v1.RemoveSessionRequest\x1a%.codefoundry.v1.RemoveSessionResponse\"\x00\x12O\n" +
+	"\x06Remove\x12$.codefoundry.v1.RemoveSessionRequest\x1a%.codefoundry.v1.RemoveSessionResponse\"\x00\x12T\n" +
+	"\x05RunIn\x12#.codefoundry.v1.RunInSessionRequest\x1a$.codefoundry.v1.RunInSessionResponse\"\x00\x12O\n" +
 	"\x05Watch\x12$.codefoundry.v1.WatchSessionsRequest\x1a\x1c.codefoundry.v1.SessionEvent\"\x000\x01\x12d\n" +
 	"\x0fStageAttachment\x12&.codefoundry.v1.StageAttachmentRequest\x1a'.codefoundry.v1.StageAttachmentResponse\"\x00B\xc4\x01\n" +
 	"\x12com.codefoundry.v1B\fSessionProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
@@ -1637,7 +1876,7 @@ func file_codefoundry_v1_session_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_session_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_codefoundry_v1_session_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_codefoundry_v1_session_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_codefoundry_v1_session_proto_goTypes = []any{
 	(PermissionMode)(0),              // 0: codefoundry.v1.PermissionMode
 	(SessionState)(0),                // 1: codefoundry.v1.SessionState
@@ -1645,70 +1884,77 @@ var file_codefoundry_v1_session_proto_goTypes = []any{
 	(*Session)(nil),                  // 3: codefoundry.v1.Session
 	(*CreateSessionRequest)(nil),     // 4: codefoundry.v1.CreateSessionRequest
 	(*NewWorktree)(nil),              // 5: codefoundry.v1.NewWorktree
-	(*StageAttachmentRequest)(nil),   // 6: codefoundry.v1.StageAttachmentRequest
-	(*StageAttachmentResponse)(nil),  // 7: codefoundry.v1.StageAttachmentResponse
-	(*CreateSessionResponse)(nil),    // 8: codefoundry.v1.CreateSessionResponse
-	(*ForkSessionRequest)(nil),       // 9: codefoundry.v1.ForkSessionRequest
-	(*ForkSessionResponse)(nil),      // 10: codefoundry.v1.ForkSessionResponse
-	(*ListSessionsRequest)(nil),      // 11: codefoundry.v1.ListSessionsRequest
-	(*ListSessionsResponse)(nil),     // 12: codefoundry.v1.ListSessionsResponse
-	(*GetSessionRequest)(nil),        // 13: codefoundry.v1.GetSessionRequest
-	(*GetSessionResponse)(nil),       // 14: codefoundry.v1.GetSessionResponse
-	(*RenameSessionRequest)(nil),     // 15: codefoundry.v1.RenameSessionRequest
-	(*RenameSessionResponse)(nil),    // 16: codefoundry.v1.RenameSessionResponse
-	(*CloseSessionRequest)(nil),      // 17: codefoundry.v1.CloseSessionRequest
-	(*CloseSessionResponse)(nil),     // 18: codefoundry.v1.CloseSessionResponse
-	(*ReconnectSessionRequest)(nil),  // 19: codefoundry.v1.ReconnectSessionRequest
-	(*ReconnectSessionResponse)(nil), // 20: codefoundry.v1.ReconnectSessionResponse
-	(*RemoveSessionRequest)(nil),     // 21: codefoundry.v1.RemoveSessionRequest
-	(*RemoveSessionResponse)(nil),    // 22: codefoundry.v1.RemoveSessionResponse
-	(*WatchSessionsRequest)(nil),     // 23: codefoundry.v1.WatchSessionsRequest
-	(*SessionEvent)(nil),             // 24: codefoundry.v1.SessionEvent
-	(*SessionSnapshot)(nil),          // 25: codefoundry.v1.SessionSnapshot
-	(*timestamppb.Timestamp)(nil),    // 26: google.protobuf.Timestamp
+	(*NewWorkspace)(nil),             // 6: codefoundry.v1.NewWorkspace
+	(*StageAttachmentRequest)(nil),   // 7: codefoundry.v1.StageAttachmentRequest
+	(*StageAttachmentResponse)(nil),  // 8: codefoundry.v1.StageAttachmentResponse
+	(*CreateSessionResponse)(nil),    // 9: codefoundry.v1.CreateSessionResponse
+	(*ForkSessionRequest)(nil),       // 10: codefoundry.v1.ForkSessionRequest
+	(*ForkSessionResponse)(nil),      // 11: codefoundry.v1.ForkSessionResponse
+	(*ListSessionsRequest)(nil),      // 12: codefoundry.v1.ListSessionsRequest
+	(*ListSessionsResponse)(nil),     // 13: codefoundry.v1.ListSessionsResponse
+	(*GetSessionRequest)(nil),        // 14: codefoundry.v1.GetSessionRequest
+	(*GetSessionResponse)(nil),       // 15: codefoundry.v1.GetSessionResponse
+	(*RenameSessionRequest)(nil),     // 16: codefoundry.v1.RenameSessionRequest
+	(*RenameSessionResponse)(nil),    // 17: codefoundry.v1.RenameSessionResponse
+	(*CloseSessionRequest)(nil),      // 18: codefoundry.v1.CloseSessionRequest
+	(*CloseSessionResponse)(nil),     // 19: codefoundry.v1.CloseSessionResponse
+	(*ReconnectSessionRequest)(nil),  // 20: codefoundry.v1.ReconnectSessionRequest
+	(*ReconnectSessionResponse)(nil), // 21: codefoundry.v1.ReconnectSessionResponse
+	(*RemoveSessionRequest)(nil),     // 22: codefoundry.v1.RemoveSessionRequest
+	(*RemoveSessionResponse)(nil),    // 23: codefoundry.v1.RemoveSessionResponse
+	(*RunInSessionRequest)(nil),      // 24: codefoundry.v1.RunInSessionRequest
+	(*RunInSessionResponse)(nil),     // 25: codefoundry.v1.RunInSessionResponse
+	(*WatchSessionsRequest)(nil),     // 26: codefoundry.v1.WatchSessionsRequest
+	(*SessionEvent)(nil),             // 27: codefoundry.v1.SessionEvent
+	(*SessionSnapshot)(nil),          // 28: codefoundry.v1.SessionSnapshot
+	(*timestamppb.Timestamp)(nil),    // 29: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_session_proto_depIdxs = []int32{
 	1,  // 0: codefoundry.v1.Session.state:type_name -> codefoundry.v1.SessionState
 	2,  // 1: codefoundry.v1.Session.status:type_name -> codefoundry.v1.SessionStatus
-	26, // 2: codefoundry.v1.Session.created_at:type_name -> google.protobuf.Timestamp
-	26, // 3: codefoundry.v1.Session.last_activity_at:type_name -> google.protobuf.Timestamp
+	29, // 2: codefoundry.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	29, // 3: codefoundry.v1.Session.last_activity_at:type_name -> google.protobuf.Timestamp
 	0,  // 4: codefoundry.v1.Session.permission_mode:type_name -> codefoundry.v1.PermissionMode
 	0,  // 5: codefoundry.v1.CreateSessionRequest.permission_mode:type_name -> codefoundry.v1.PermissionMode
 	5,  // 6: codefoundry.v1.CreateSessionRequest.new_worktree:type_name -> codefoundry.v1.NewWorktree
-	3,  // 7: codefoundry.v1.CreateSessionResponse.session:type_name -> codefoundry.v1.Session
-	3,  // 8: codefoundry.v1.ForkSessionResponse.session:type_name -> codefoundry.v1.Session
-	3,  // 9: codefoundry.v1.ListSessionsResponse.sessions:type_name -> codefoundry.v1.Session
-	3,  // 10: codefoundry.v1.GetSessionResponse.session:type_name -> codefoundry.v1.Session
-	3,  // 11: codefoundry.v1.RenameSessionResponse.session:type_name -> codefoundry.v1.Session
-	3,  // 12: codefoundry.v1.ReconnectSessionResponse.session:type_name -> codefoundry.v1.Session
-	25, // 13: codefoundry.v1.SessionEvent.snapshot:type_name -> codefoundry.v1.SessionSnapshot
-	3,  // 14: codefoundry.v1.SessionEvent.updated:type_name -> codefoundry.v1.Session
-	3,  // 15: codefoundry.v1.SessionSnapshot.sessions:type_name -> codefoundry.v1.Session
-	4,  // 16: codefoundry.v1.SessionService.Create:input_type -> codefoundry.v1.CreateSessionRequest
-	9,  // 17: codefoundry.v1.SessionService.Fork:input_type -> codefoundry.v1.ForkSessionRequest
-	11, // 18: codefoundry.v1.SessionService.List:input_type -> codefoundry.v1.ListSessionsRequest
-	13, // 19: codefoundry.v1.SessionService.Get:input_type -> codefoundry.v1.GetSessionRequest
-	15, // 20: codefoundry.v1.SessionService.Rename:input_type -> codefoundry.v1.RenameSessionRequest
-	17, // 21: codefoundry.v1.SessionService.Close:input_type -> codefoundry.v1.CloseSessionRequest
-	19, // 22: codefoundry.v1.SessionService.Reconnect:input_type -> codefoundry.v1.ReconnectSessionRequest
-	21, // 23: codefoundry.v1.SessionService.Remove:input_type -> codefoundry.v1.RemoveSessionRequest
-	23, // 24: codefoundry.v1.SessionService.Watch:input_type -> codefoundry.v1.WatchSessionsRequest
-	6,  // 25: codefoundry.v1.SessionService.StageAttachment:input_type -> codefoundry.v1.StageAttachmentRequest
-	8,  // 26: codefoundry.v1.SessionService.Create:output_type -> codefoundry.v1.CreateSessionResponse
-	10, // 27: codefoundry.v1.SessionService.Fork:output_type -> codefoundry.v1.ForkSessionResponse
-	12, // 28: codefoundry.v1.SessionService.List:output_type -> codefoundry.v1.ListSessionsResponse
-	14, // 29: codefoundry.v1.SessionService.Get:output_type -> codefoundry.v1.GetSessionResponse
-	16, // 30: codefoundry.v1.SessionService.Rename:output_type -> codefoundry.v1.RenameSessionResponse
-	18, // 31: codefoundry.v1.SessionService.Close:output_type -> codefoundry.v1.CloseSessionResponse
-	20, // 32: codefoundry.v1.SessionService.Reconnect:output_type -> codefoundry.v1.ReconnectSessionResponse
-	22, // 33: codefoundry.v1.SessionService.Remove:output_type -> codefoundry.v1.RemoveSessionResponse
-	24, // 34: codefoundry.v1.SessionService.Watch:output_type -> codefoundry.v1.SessionEvent
-	7,  // 35: codefoundry.v1.SessionService.StageAttachment:output_type -> codefoundry.v1.StageAttachmentResponse
-	26, // [26:36] is the sub-list for method output_type
-	16, // [16:26] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	6,  // 7: codefoundry.v1.CreateSessionRequest.new_workspace:type_name -> codefoundry.v1.NewWorkspace
+	3,  // 8: codefoundry.v1.CreateSessionResponse.session:type_name -> codefoundry.v1.Session
+	3,  // 9: codefoundry.v1.ForkSessionResponse.session:type_name -> codefoundry.v1.Session
+	3,  // 10: codefoundry.v1.ListSessionsResponse.sessions:type_name -> codefoundry.v1.Session
+	3,  // 11: codefoundry.v1.GetSessionResponse.session:type_name -> codefoundry.v1.Session
+	3,  // 12: codefoundry.v1.RenameSessionResponse.session:type_name -> codefoundry.v1.Session
+	3,  // 13: codefoundry.v1.ReconnectSessionResponse.session:type_name -> codefoundry.v1.Session
+	3,  // 14: codefoundry.v1.RunInSessionResponse.session:type_name -> codefoundry.v1.Session
+	28, // 15: codefoundry.v1.SessionEvent.snapshot:type_name -> codefoundry.v1.SessionSnapshot
+	3,  // 16: codefoundry.v1.SessionEvent.updated:type_name -> codefoundry.v1.Session
+	3,  // 17: codefoundry.v1.SessionSnapshot.sessions:type_name -> codefoundry.v1.Session
+	4,  // 18: codefoundry.v1.SessionService.Create:input_type -> codefoundry.v1.CreateSessionRequest
+	10, // 19: codefoundry.v1.SessionService.Fork:input_type -> codefoundry.v1.ForkSessionRequest
+	12, // 20: codefoundry.v1.SessionService.List:input_type -> codefoundry.v1.ListSessionsRequest
+	14, // 21: codefoundry.v1.SessionService.Get:input_type -> codefoundry.v1.GetSessionRequest
+	16, // 22: codefoundry.v1.SessionService.Rename:input_type -> codefoundry.v1.RenameSessionRequest
+	18, // 23: codefoundry.v1.SessionService.Close:input_type -> codefoundry.v1.CloseSessionRequest
+	20, // 24: codefoundry.v1.SessionService.Reconnect:input_type -> codefoundry.v1.ReconnectSessionRequest
+	22, // 25: codefoundry.v1.SessionService.Remove:input_type -> codefoundry.v1.RemoveSessionRequest
+	24, // 26: codefoundry.v1.SessionService.RunIn:input_type -> codefoundry.v1.RunInSessionRequest
+	26, // 27: codefoundry.v1.SessionService.Watch:input_type -> codefoundry.v1.WatchSessionsRequest
+	7,  // 28: codefoundry.v1.SessionService.StageAttachment:input_type -> codefoundry.v1.StageAttachmentRequest
+	9,  // 29: codefoundry.v1.SessionService.Create:output_type -> codefoundry.v1.CreateSessionResponse
+	11, // 30: codefoundry.v1.SessionService.Fork:output_type -> codefoundry.v1.ForkSessionResponse
+	13, // 31: codefoundry.v1.SessionService.List:output_type -> codefoundry.v1.ListSessionsResponse
+	15, // 32: codefoundry.v1.SessionService.Get:output_type -> codefoundry.v1.GetSessionResponse
+	17, // 33: codefoundry.v1.SessionService.Rename:output_type -> codefoundry.v1.RenameSessionResponse
+	19, // 34: codefoundry.v1.SessionService.Close:output_type -> codefoundry.v1.CloseSessionResponse
+	21, // 35: codefoundry.v1.SessionService.Reconnect:output_type -> codefoundry.v1.ReconnectSessionResponse
+	23, // 36: codefoundry.v1.SessionService.Remove:output_type -> codefoundry.v1.RemoveSessionResponse
+	25, // 37: codefoundry.v1.SessionService.RunIn:output_type -> codefoundry.v1.RunInSessionResponse
+	27, // 38: codefoundry.v1.SessionService.Watch:output_type -> codefoundry.v1.SessionEvent
+	8,  // 39: codefoundry.v1.SessionService.StageAttachment:output_type -> codefoundry.v1.StageAttachmentResponse
+	29, // [29:40] is the sub-list for method output_type
+	18, // [18:29] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_session_proto_init() }
@@ -1716,7 +1962,7 @@ func file_codefoundry_v1_session_proto_init() {
 	if File_codefoundry_v1_session_proto != nil {
 		return
 	}
-	file_codefoundry_v1_session_proto_msgTypes[21].OneofWrappers = []any{
+	file_codefoundry_v1_session_proto_msgTypes[24].OneofWrappers = []any{
 		(*SessionEvent_Snapshot)(nil),
 		(*SessionEvent_Updated)(nil),
 		(*SessionEvent_RemovedId)(nil),
@@ -1727,7 +1973,7 @@ func file_codefoundry_v1_session_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_session_proto_rawDesc), len(file_codefoundry_v1_session_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   23,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

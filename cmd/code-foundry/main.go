@@ -74,7 +74,22 @@ func connectDaemon(ctx context.Context) (*client.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return client.Connect(ctx, p, client.ConnectOptions{})
+	opts, err := connectOptions(os.Getenv)
+	if err != nil {
+		return nil, err
+	}
+	return client.Connect(ctx, p, opts)
+}
+
+// connectOptions prefers the loopback endpoint a session's environment names
+// (client.EnvEndpoint, client.EnvToken) over the Unix socket. Sandboxed sessions
+// cannot reach Unix sockets, and Connect never auto-starts a daemon for an endpoint.
+func connectOptions(getenv func(string) string) (client.ConnectOptions, error) {
+	ep, ok, err := client.EndpointFromEnv(getenv)
+	if err != nil || !ok {
+		return client.ConnectOptions{}, err
+	}
+	return client.ConnectOptions{Endpoint: &ep}, nil
 }
 
 // dispatch runs a local verb, or else a daemon command. A local verb followed by a bare

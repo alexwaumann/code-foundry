@@ -4,7 +4,10 @@ import (
 	"log/slog"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
+
+	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
 // claudeSessionVars are variables a running Claude Code session sets for its children
@@ -41,4 +44,30 @@ func scrubClaudeEnv(log *slog.Logger) []string {
 		log.Info("removed inherited Claude Code variables from the daemon environment", "vars", vars)
 	}
 	return vars
+}
+
+// sessionEnv is what every Claude session gets on top of the daemon's environment:
+// this daemon's loopback endpoint and bearer token. The CLI prefers them over the
+// Unix socket (client.EndpointFromEnv), which sandboxed sessions cannot connect to.
+func sessionEnv(port int, token string) []string {
+	return []string{
+		paths.EnvEndpoint + "=http://127.0.0.1:" + strconv.Itoa(port),
+		paths.EnvToken + "=" + token,
+	}
+}
+
+// scrubEndpointEnv removes an inherited endpoint and token (a daemon started by hand
+// from inside a session), so this daemon's plain terminals do not point the CLI at
+// the other daemon. Sessions get this daemon's own values (sessionEnv).
+func scrubEndpointEnv(log *slog.Logger) {
+	var vars []string
+	for _, k := range []string{paths.EnvEndpoint, paths.EnvToken} {
+		if _, ok := os.LookupEnv(k); ok {
+			_ = os.Unsetenv(k)
+			vars = append(vars, k)
+		}
+	}
+	if len(vars) > 0 {
+		log.Info("removed an inherited daemon endpoint from the daemon environment", "vars", vars)
+	}
 }

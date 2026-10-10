@@ -144,8 +144,9 @@ type Result struct {
 }
 
 // NamePattern is the required shape of command names: lowercase dotted segments, at
-// least two, e.g. "terminal.new", "repo.worktree.new".
-var NamePattern = regexp.MustCompile(`^[a-z]+(\.[a-z][a-z0-9]*)+$`)
+// least two, e.g. "terminal.new", "repo.worktree.new". Segments after the first may be
+// kebab-case ("workspace.add-repo"), which the CLI accepts as a word as it is.
+var NamePattern = regexp.MustCompile(`^[a-z]+(\.[a-z][a-z0-9]*(-[a-z0-9]+)*)+$`)
 
 // argNamePattern is the required shape of argument names. Kebab-case, so names map
 // one-to-one onto CLI flags (--delete-branch).

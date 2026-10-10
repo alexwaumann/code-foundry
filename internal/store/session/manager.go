@@ -17,6 +17,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
 // RepoSource is the part of the repo store sessions need: resolving worktrees and
@@ -33,8 +34,12 @@ type Options struct {
 	// Repos resolves repo ids and worktree paths. Nil accepts any existing directory
 	// as a worktree (tests); the daemon always sets it.
 	Repos RepoSource
-	Bus   *bus.Bus     // default: a private bus
-	Log   *slog.Logger // default: slog.Default()
+	// Workspaces lists workspaces (a workspace thread's members at every spawn) and
+	// makes one for a new workspace thread. Nil refuses workspace threads; the daemon
+	// always sets it.
+	Workspaces WorkspaceSource
+	Bus        *bus.Bus     // default: a private bus
+	Log        *slog.Logger // default: slog.Default()
 	// Claude is the claude executable (resolved against PATH). Default "claude".
 	Claude string
 	// Paths locates Claude's config dir and global config. Default
@@ -64,6 +69,10 @@ type Options struct {
 	// RefExists reports whether ref exists in the repository at dir; Create uses it
 	// to keep new worktree branches unique. Default: git rev-parse --verify.
 	RefExists func(ctx context.Context, dir, ref string) bool
+	// Env entries ("KEY=VALUE") are added to every claude process's environment
+	// (Create, Reconnect, Fork). The daemon passes its loopback endpoint and token so
+	// the CLI inside a session reaches it without the Unix socket.
+	Env []string
 	// DisablePreTrust skips writing folder trust into Claude's config before spawning
 	// (the on-screen dialog is still answered). For tests.
 	DisablePreTrust bool
@@ -302,7 +311,28 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 	}
 	namingTried := name != ""
 	var late <-chan namingResult
-	if o.NewWorktree != nil {
+	if (o.NewWorkspace != nil && (o.NewWorktree != nil || o.WorkspaceID != "")) || (o.NewWorktree != nil && o.WorkspaceID != "") {
+		return Session{}, fmt.Errorf("%w: new workspace, new worktree and workspace are exclusive", ErrInvalidArgument)
+	}
+	switch {
+	case o.NewWorkspace != nil:
+		cw, err := m.newWorkspace(ctx, id, name, o)
+		if err != nil {
+			return Session{}, err
+		}
+		s.WorkspaceID, s.RepoID, s.WorktreePath, s.BaseRef, s.CreatedWorktree = cw.workspaceID, cw.repoID, cw.path, cw.baseRef, true
+		if cw.name != "" {
+			s.Name, s.AutoNamed = cw.name, true
+		}
+		namingTried = namingTried || cw.namerCalled
+		late = cw.late
+	case o.WorkspaceID != "":
+		w, mem, err := m.workspaceMember(o.WorkspaceID, o.RepoID, o.WorktreePath)
+		if err != nil {
+			return Session{}, err
+		}
+		s.WorkspaceID, s.RepoID, s.WorktreePath = w.ID, mem.RepoID, mem.WorktreePath
+	case o.NewWorktree != nil:
 		nw, err := m.newWorktree(ctx, id, name, o)
 		if err != nil {
 			return Session{}, err
@@ -313,8 +343,10 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 		}
 		namingTried = namingTried || nw.namerCalled
 		late = nw.late
-	} else if s.RepoID, s.WorktreePath, err = m.resolveWorktree(o.RepoID, o.WorktreePath); err != nil {
-		return Session{}, err
+	default:
+		if s.RepoID, s.WorktreePath, err = m.resolveWorktree(o.RepoID, o.WorktreePath); err != nil {
+			return Session{}, err
+		}
 	}
 	now := m.opts.Now()
 	s.CreatedAt, s.LastActivityAt = now, now
@@ -379,7 +411,8 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Session, error) {
 	}
 	now := m.opts.Now()
 	s := Session{
-		ID: newID, RepoID: parent.RepoID, WorktreePath: parent.WorktreePath, Name: name, AutoNamed: autoNamed,
+		ID: newID, RepoID: parent.RepoID, WorktreePath: parent.WorktreePath, WorkspaceID: parent.WorkspaceID,
+		Name: name, AutoNamed: autoNamed,
 		Model: parent.Model, Effort: parent.Effort, PermissionMode: parent.PermissionMode,
 		State: StateStarting, CreatedAt: now, LastActivityAt: now, ParentID: parent.ID,
 	}
@@ -479,16 +512,38 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 	}
 
 	r := newRunner(m, id, s.WorktreePath, l)
+	r.awaitFirstPrompt = prompt != ""
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode, prompt: prompt}
 	if m.opts.AttachmentsDir != "" {
 		// Every spawn (not only the first prompt's): a resumed or forked conversation
 		// may read its images again.
 		sa.addDirs = []string{m.opts.AttachmentsDir}
 	}
+	env := m.opts.Env
+	if s.WorkspaceID != "" {
+		// The current members, every spawn (create, reconnect, fork): a repo added to
+		// the workspace since the row was written is included.
+		var ws *workspace.Snapshot
+		if m.opts.Workspaces != nil {
+			ws = m.opts.Workspaces.Snapshot()
+		}
+		if wl, ok := workspaceLaunch(ws, s.WorkspaceID, s.WorktreePath, isDir); ok {
+			sa.addDirs = append(sa.addDirs, wl.addDirs...)
+			sa.appendSystemPrompt = wl.prompt
+			env = append(slices.Clip(env), wl.env...)
+			if len(wl.missing) > 0 {
+				m.log.Warn("workspace member worktrees missing; not passed to claude", "session", id,
+					"workspace", s.WorkspaceID, "paths", wl.missing)
+			}
+		} else {
+			m.log.Warn("workspace of thread not found; starting without its members", "session", id, "workspace", s.WorkspaceID)
+		}
+	}
 	argv := l.argv(m.opts.Claude, sa)
 	term, err := m.opts.Terminals.Create(ctx, terminal.Spec{
 		Argv:     argv,
 		Cwd:      s.WorktreePath,
+		Env:      env,
 		Cols:     m.opts.Cols,
 		Rows:     m.opts.Rows,
 		Labels:   map[string]string{"session": id, "worktree": s.WorktreePath},

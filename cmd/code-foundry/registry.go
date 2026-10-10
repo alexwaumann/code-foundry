@@ -164,6 +164,15 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	}
 	vals := make(map[string]string, len(flags))
 	for _, f := range flags {
+		if !f.set && f.spec.GetDefaultToCwd() {
+			wd, err := cl.getwd()
+			if err != nil {
+				return fmt.Errorf("--%s defaults to the working directory: %w", f.spec.GetName(), err)
+			}
+			f.value, f.set = wd, true
+		}
+	}
+	for _, f := range flags {
 		if !f.set {
 			continue
 		}

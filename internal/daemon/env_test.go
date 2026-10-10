@@ -61,3 +61,26 @@ func TestScrubClaudeEnv(t *testing.T) {
 		t.Errorf("log leaks a value: %s", log)
 	}
 }
+
+func TestSessionEnv(t *testing.T) {
+	got := sessionEnv(4321, "tok")
+	want := []string{"CODE_FOUNDRY_ENDPOINT=http://127.0.0.1:4321", "CODE_FOUNDRY_TOKEN=tok"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("sessionEnv = %q, want %q", got, want)
+	}
+}
+
+func TestScrubEndpointEnv(t *testing.T) {
+	t.Setenv("CODE_FOUNDRY_ENDPOINT", "http://127.0.0.1:1")
+	t.Setenv("CODE_FOUNDRY_TOKEN", "other-daemon")
+	var logs bytes.Buffer
+	scrubEndpointEnv(slog.New(slog.NewTextHandler(&logs, nil)))
+	for _, k := range []string{"CODE_FOUNDRY_ENDPOINT", "CODE_FOUNDRY_TOKEN"} {
+		if _, ok := os.LookupEnv(k); ok {
+			t.Errorf("%s still set", k)
+		}
+	}
+	if strings.Contains(logs.String(), "other-daemon") || !strings.Contains(logs.String(), "CODE_FOUNDRY_TOKEN") {
+		t.Errorf("log = %q", logs.String())
+	}
+}
