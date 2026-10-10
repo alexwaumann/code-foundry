@@ -1,10 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { invocations, mockUrl, openApp, openProjects, resetMock } from "./fixtures";
+import { invocations, listRepos, mockUrl, openApp, openProjects, repoAt, resetMock } from "./fixtures";
 
 // The Add Project dialog (repo.add): its entry points, the tab order, the Local folder
-// tab (repo.register with path completion), and the GitHub tab (lookup, search, clone
-// with streamed progress) against the mock's GitHub (mock/clone.ts).
+// tab (RepoService.Register with path completion; completion itself is e2e/paths.spec.ts),
+// and the GitHub tab (lookup, search, clone with streamed progress) against the mock's
+// GitHub (mock/clone.ts).
 
 test.beforeEach(async () => {
   await resetMock();
@@ -49,11 +50,12 @@ async function openGitHub(page: Page) {
 test("every entry point opens the dialog", async ({ page }) => {
   await openApp(page);
 
-  // The palette has one "Add Project" (repo.add); the folder prompt is its own entry.
+  // The palette has one "Add Project" (repo.add), and no separate folder prompt.
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
+  await page.keyboard.type("add project");
   await expect(palette.locator('[data-command="repo.add"]')).toContainText("Add Project");
-  await expect(palette.locator('[data-command="repo.register"]')).toContainText("Add Project (local folder)");
+  await expect(palette.getByText("Add Project (local folder)")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await openFromPalette(page, "repo.add");
   await expect(dialog(page)).toBeVisible();
@@ -136,10 +138,33 @@ test("Local folder: Tab completes, Enter adds, and the new project opens", async
   await expect(page.getByTestId("path-entry").first()).toHaveAttribute("data-entry-name", "api");
   await page.keyboard.press("Enter");
   await expect(dialog(page)).toHaveCount(0);
-  const last = (await invocations()).at(-1);
-  expect(last?.name).toBe("repo.register");
-  expect(last?.args).toEqual({ path: "~/src/new-app" });
+  // RepoService.Register, not a command: "~" expanded, the trailing slash dropped.
+  expect(await repoAt("/Users/dev/src/new-app")).toMatchObject({ name: "new-app", git: true });
+  expect((await invocations()).filter((i) => i.name.startsWith("repo."))).toEqual([]);
   await expect(page.getByTestId("overview-title")).toHaveText("new-app@main");
+});
+
+test("Local folder: a plain folder has no git, and a folder inside a project opens that project", async ({ page }) => {
+  await openApp(page);
+  const before = (await listRepos()).length;
+  await page.getByTestId("sidebar-add-project").click();
+  const input = page.getByTestId("add-project-local-input");
+  await input.fill("~/src/Notebook");
+  await page.keyboard.press("Enter");
+  await expect(dialog(page)).toHaveCount(0);
+  expect(await repoAt("/Users/dev/src/Notebook")).toMatchObject({ name: "Notebook", git: false });
+
+  // A folder that does not exist is refused in place.
+  await page.getByTestId("sidebar-add-project").click();
+  await input.fill("~/src/nope");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("add-project-local-message")).toContainText("/Users/dev/src/nope: no such file or directory");
+
+  // Inside an added repository: that repository, not a new project.
+  await input.fill("~/src/code-foundry/src");
+  await page.keyboard.press("Enter");
+  await expect(dialog(page)).toHaveCount(0);
+  expect((await listRepos()).length).toBe(before + 1);
 });
 
 test("GitHub: Enter looks up owner/repo and URLs; bad input is refused without a request", async ({ page }) => {
@@ -238,7 +263,6 @@ test("GitHub: an existing destination is added as a folder instead", async ({ pa
   await expect(page.getByTestId("add-project-clone-exists")).toBeVisible();
   await page.getByTestId("add-project-add-existing").click();
   await expect(dialog(page)).toHaveCount(0);
-  const last = (await invocations()).at(-1);
-  expect(last?.name).toBe("repo.register");
-  expect(last?.args).toEqual({ path: "/Users/dev/.code-foundry/projects/octo-org/already-here" });
+  expect(await repoAt("/Users/dev/.code-foundry/projects/octo-org/already-here")).toMatchObject({ name: "already-here", git: true });
+  await expect(page.getByTestId("overview-title")).toHaveText("already-here@main");
 });

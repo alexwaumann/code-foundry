@@ -11,7 +11,7 @@ import { closeAddProject, registerFolder, selectAddedProject } from "@/stores/ad
 
 /**
  * Local folder: a path with the palette's folder completion (Tab, `/`, the folder
- * picker), added with repo.register. Any folder under home works: a git repository adds
+ * picker), added with RepoService.Register. Any folder under home works: a git repository adds
  * that repository, any other folder a project without git.
  */
 export function LocalFolderTab() {

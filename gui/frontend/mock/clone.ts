@@ -50,6 +50,11 @@ const existing = new Set<string>();
 /** Every SearchGitHub, LookupGitHub and Clone call ("search <q>", ...), for tests. */
 export const githubCalls: string[] = [];
 
+/** Whether a clone destination exists on the mock's disk (RepoService.Register adds it as git). */
+export function cloneExists(path: string): boolean {
+  return existing.has(path.toLowerCase());
+}
+
 export function resetClones(): void {
   githubCalls.length = 0;
   existing.clear();

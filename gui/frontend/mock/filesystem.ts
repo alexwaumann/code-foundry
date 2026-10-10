@@ -117,3 +117,17 @@ export function listDirectories(rawPrefix: string, registered: ReadonlySet<strin
     truncated: names.length > MAX_ENTRIES,
   };
 }
+
+/**
+ * The project folder RepoService.Register adds for an absolute, clean path under home,
+ * like repo.Register: the nearest enclosing git repository, else the folder itself as a
+ * project without git. Undefined when the folder is not on the fake disk.
+ */
+export function projectFolder(abs: string): { path: string; git: boolean } | undefined {
+  if (!lookup(abs)) return undefined;
+  for (let dir = abs; within(dir); dir = dir.slice(0, dir.lastIndexOf("/")) || "/") {
+    if (lookup(dir)?.git) return { path: dir, git: true };
+    if (dir === HOME) break;
+  }
+  return { path: abs, git: false };
+}
