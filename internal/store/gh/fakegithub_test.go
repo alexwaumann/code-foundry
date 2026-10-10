@@ -32,6 +32,8 @@ type fakeGitHub struct {
 	fail map[string]error
 	// detail is the detail panel's extra state (fakegithub_detail_test.go).
 	detail fakeDetail
+	// cards are the repositories search and lookup find (fakegithub_search_test.go).
+	cards []Repository
 }
 
 type fakeRepo struct {
@@ -159,6 +161,8 @@ func (g *fakeGitHub) respond(op, doc string, vars map[string]any) (json.RawMessa
 		g.detailOp(op, vars, data, &errs) // fakegithub_detail_test.go
 	case "MergePullRequest":
 		g.mergeOp(vars, data, &errs) // fakegithub_merge_test.go
+	case "SearchRepositories", "LookupRepository":
+		g.searchOp(op, vars, data, &errs) // fakegithub_search_test.go
 	default:
 		return nil, fmt.Errorf("fakeGitHub: unexpected op %s", op)
 	}

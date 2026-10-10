@@ -1,0 +1,9 @@
+# Repository search for the Add Project dialog: the first 20 matches of the user's text in
+# GitHub's best-match order. Sent on Enter, never per keystroke; never cached.
+query SearchRepositories($q: String!) {
+  rateLimit { ...RateLimitFields }
+  search(type: REPOSITORY, query: $q, first: 20) {
+    repositoryCount
+    nodes { ... on Repository { ...RepositoryCard } }
+  }
+}

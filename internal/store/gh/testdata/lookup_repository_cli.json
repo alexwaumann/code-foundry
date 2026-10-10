@@ -1,0 +1,21 @@
+{
+    "data": {
+        "rateLimit": {
+            "limit": 5000,
+            "cost": 1,
+            "remaining": 4756,
+            "resetAt": "2026-10-10T08:53:02Z"
+        },
+        "repository": {
+            "name": "cli",
+            "owner": {
+                "login": "cli"
+            },
+            "description": "GitHub\u2019s official command line tool",
+            "visibility": "PUBLIC",
+            "isArchived": false,
+            "isFork": false,
+            "url": "https://github.com/cli/cli"
+        }
+    }
+}

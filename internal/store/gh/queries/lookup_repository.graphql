@@ -1,0 +1,6 @@
+# One repository by owner and name, for the Add Project dialog's exact owner/repo or URL
+# input. NOT_FOUND when it does not exist or the viewer cannot see it.
+query LookupRepository($owner: String!, $name: String!) {
+  rateLimit { ...RateLimitFields }
+  repository(owner: $owner, name: $name) { ...RepositoryCard }
+}
