@@ -512,6 +512,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 	}
 
 	r := newRunner(m, id, s.WorktreePath, l)
+	r.awaitFirstPrompt = prompt != ""
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode, prompt: prompt}
 	if m.opts.AttachmentsDir != "" {
 		// Every spawn (not only the first prompt's): a resumed or forked conversation

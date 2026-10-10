@@ -104,7 +104,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 			Category:    "Thread",
 			Keybindings: []string{"cmd+n"},
 			Args: []ArgSpec{
-				{Name: "repo", Type: String, Context: ContextRepo, Description: "Repository id (with workspace or repos: the member the thread runs in)"},
+				{Name: "repo", Type: String, Context: ContextRepo, Description: "Repository id (with workspace or repos: the member the thread runs in, by id or name)"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path (with workspace: a member worktree)"},
 				{Name: "workspace", Type: String, Description: "Workspace id or name the thread belongs to; it runs in the member repo or worktree names (default: the first member)"},
 				{Name: "repos", Type: String, Description: "With new-worktree: comma-separated repositories (id, name, or path) for a new workspace, a cf/<name> worktree in each; repo picks the member the thread runs in (default: the first)"},

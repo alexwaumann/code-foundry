@@ -194,7 +194,14 @@ func (m *Manager) newWorkspace(ctx context.Context, id, name string, o CreateOpt
 		}
 		ids, paths = append(ids, r.ID), append(paths, r.Path)
 	}
-	cwdRepo := cmp.Or(o.RepoID, ids[0])
+	cwdRepo := ids[0]
+	if o.RepoID != "" {
+		// An id, or a name or path like the repository refs.
+		cwdRepo = o.RepoID
+		if r, err := workspace.ResolveRepo(snap, o.RepoID); err == nil {
+			cwdRepo = r.ID
+		}
+	}
 	if !slices.Contains(ids, cwdRepo) {
 		return cw, fmt.Errorf("%w: repo %s is not among the new workspace's repositories", ErrInvalidArgument, cwdRepo)
 	}

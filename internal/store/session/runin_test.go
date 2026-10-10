@@ -127,3 +127,21 @@ func TestRunInWithoutAProcess(t *testing.T) {
 		t.Errorf("reconnect cwd = %s argv = %q", spec.Cwd, spec.Argv)
 	}
 }
+
+// With a positional first prompt, Claude is "at its prompt" (idle title) before it
+// submits it; /cd waits until the prompt shows up in the transcript.
+func TestRunInWaitsForTheFirstPrompt(t *testing.T) {
+	e := newWSEnv(t)
+	e.det.set(StatusIdle, "at prompt")
+	s := e.connected(CreateOptions{WorkspaceID: "login", InitialPrompt: "fix it"})
+	if _, err := e.m.RunIn(e.ctx(), s.ID, RunInTarget{RepoID: "r2"}); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(cdSettle + 300*time.Millisecond)
+	if w := e.terms.Written(s.TerminalID); len(w) != 0 {
+		t.Fatalf("typed before the first prompt was submitted: %q", w)
+	}
+	e.writeTranscript(argOf(mustSpec(t, e.env, s).Argv, "--session-id"), userLine("fix it"))
+	e.waitWritten(s.TerminalID, "/cd "+e.wt2)
+	e.waitFor(s.ID, "moved", func(s Session) bool { return s.WorktreePath == e.wt2 })
+}

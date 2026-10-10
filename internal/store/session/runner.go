@@ -90,6 +90,11 @@ type runner struct {
 	pendingCd *cdRequest
 	cdSending cdRequest
 	cdTimer   *time.Timer
+	// awaitFirstPrompt: spawned with a positional prompt that has not shown up in the
+	// transcript (nor made Claude busy) yet. atPromptSince: when AtPrompt last became
+	// true; zero while it is false.
+	awaitFirstPrompt bool
+	atPromptSince    time.Time
 
 	closing    bool
 	closeStep  int
@@ -366,6 +371,7 @@ func (r *runner) pollTranscript() {
 		if !r.namingSeen {
 			if msg, ok := firstUserText(line); ok {
 				r.namingSeen = true
+				r.awaitFirstPrompt = false
 				r.m.startNaming(r.id, msg)
 			}
 		}

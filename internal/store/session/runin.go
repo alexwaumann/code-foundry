@@ -21,6 +21,12 @@ import (
 // "\r" can be taken as a paste, which inserts a newline instead of submitting.
 const cdEnterGap = 400 * time.Millisecond
 
+// cdSettle is how long Claude must have been at its prompt before `/cd` is typed, so a
+// momentary "at prompt" (the idle title before the first prompt is submitted, the
+// instant after the user presses Enter) does not count. Input typed during a turn is
+// queued by Claude and runs after it (observed), but the row would move too early.
+const cdSettle = time.Second
+
 // cdRequest is a queued move. An empty path cancels the queued move.
 type cdRequest struct {
 	path, repoID string
@@ -104,8 +110,10 @@ func (r *runner) onCdRequest(req cdRequest) {
 	r.tryCd()
 }
 
-// tryCd types the queued `/cd` once Claude is connected, not closing, and at its
-// prompt. Enter follows after cdEnterGap (sendCd).
+// tryCd types the queued `/cd` once Claude is connected, not closing, past its first
+// prompt (a positional prompt is submitted only after the UI is up), and has been at
+// its prompt for cdSettle. Enter follows after cdEnterGap (sendCd). It runs after every
+// output batch and tick, so it also keeps atPromptSince current.
 func (r *runner) tryCd() {
 	// Take a newer request first (select picks among ready cases at random, so a
 	// cancel may still sit in the channel when a tick gets here).
@@ -118,7 +126,16 @@ func (r *runner) tryCd() {
 		}
 	default:
 	}
-	if r.pendingCd == nil || r.cdTimer != nil || r.closing || r.state != StateConnected || !atPrompt(r.det) {
+	if st, _ := r.det.Status(); st == StatusBusy {
+		r.awaitFirstPrompt = false
+	}
+	if !atPrompt(r.det) {
+		r.atPromptSince = time.Time{}
+	} else if r.atPromptSince.IsZero() {
+		r.atPromptSince = time.Now()
+	}
+	if r.pendingCd == nil || r.cdTimer != nil || r.closing || r.state != StateConnected || r.awaitFirstPrompt ||
+		r.atPromptSince.IsZero() || time.Since(r.atPromptSince) < cdSettle {
 		return
 	}
 	req := *r.pendingCd
@@ -146,6 +163,9 @@ func (r *runner) sendCd() {
 	r.cdSending = cdRequest{}
 	r.write(keyEnter)
 	r.cwd = req.path
+	// Claude moves the transcript into the new cwd's project dir (a rename: the open
+	// file keeps being read). Watch the new dir, and reopen there if the file closes.
+	r.tail.cwd = req.path
 	r.m.update(r.id, true, func(rec *record) {
 		rec.s.WorktreePath, rec.s.RepoID = req.path, req.repoID
 		if rec.s.PendingWorktreePath == req.path {
