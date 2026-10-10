@@ -3,7 +3,6 @@ import { invocations, mockPost, mockUrl, openApp, resetMock } from "./fixtures";
 
 /** Where the mock (like the daemon) puts a repo's worktree for a cf/<name> branch. */
 const WT = "/Users/dev/.code-foundry/worktrees/alexwaumann";
-const CF_LOGIN = `${WT}/code-foundry/cf-login`;
 const GP_LOGIN = `${WT}/ghostty-playground/cf-login`;
 
 interface SessionSummary {
