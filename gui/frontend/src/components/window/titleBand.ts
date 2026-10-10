@@ -17,3 +17,13 @@ export const TITLE_BAND_HEIGHT = 52;
 
 /** Width of the traffic-light gutter at the window's left edge (the zoom button ends at x=79). */
 export const TRAFFIC_LIGHT_GUTTER = 80;
+
+/**
+ * The gutter in layout px at a page zoom (percent, stores/ui.ts). The lights are native
+ * and do not zoom with the page (lib/zoom.ts), so the gutter is kept at 80 screen px:
+ * narrower in layout px when zoomed in, wider when zoomed out. The band's height does
+ * zoom (like T3 Code's top bar), so above 100% the lights sit a little above its centre.
+ */
+export function trafficLightGutter(zoom: number): number {
+  return Math.round((TRAFFIC_LIGHT_GUTTER * 100) / zoom);
+}

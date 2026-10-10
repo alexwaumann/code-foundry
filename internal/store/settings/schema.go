@@ -103,6 +103,7 @@ const (
 	KeyTheme             = "appearance.theme"
 	KeyFontFamily        = "appearance.font_family"
 	KeyFontSize          = "appearance.font_size"
+	KeyZoom              = "appearance.zoom"
 	KeyDensity           = "appearance.density"
 	KeyBackdrop          = "appearance.backdrop"
 	KeyClaudePath        = "advanced.claude_path"
@@ -197,9 +198,15 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeyFontSize, Group: GroupAppearance, Type: Int, Title: "Terminal font size",
-		Description: "In points. cmd+= and cmd+- change it too.",
+		Description: "In points, before zoom.",
 		Default:     "13", Min: 9, Max: 28,
 		bind: func(s *Settings) any { return &s.Appearance.FontSize },
+	},
+	{
+		Key: KeyZoom, Group: GroupAppearance, Type: Int, Title: "Zoom",
+		Description: "Scale of the whole window in percent, terminal included. cmd+=, cmd+- and cmd+0 change it too.",
+		Default:     "100", Min: 90, Max: 200,
+		bind: func(s *Settings) any { return &s.Appearance.Zoom },
 	},
 	{
 		Key: KeyDensity, Group: GroupAppearance, Type: Enum, Title: "Density",

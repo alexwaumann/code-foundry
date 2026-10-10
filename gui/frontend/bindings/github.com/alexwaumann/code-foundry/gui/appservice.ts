@@ -43,3 +43,12 @@ export function PickDirectory(startDir: string): $CancellablePromise<string> {
 export function Relaunch(): $CancellablePromise<void> {
     return $Call.ByID(3512615560);
 }
+
+/**
+ * SetZoom tells the host the page zoom in percent (appearance.zoom; the frontend applies
+ * it as CSS zoom). The host keeps the native traffic lights centred on the zoomed title
+ * band (trafficlights_darwin.go). Called on start and after each change.
+ */
+export function SetZoom(percent: number): $CancellablePromise<void> {
+    return $Call.ByID(4242696881, percent);
+}

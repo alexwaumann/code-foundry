@@ -10,12 +10,13 @@ import { errorMessage } from "@/api/stream";
 import { setThemePreference } from "@/lib/theme";
 import { DEFAULT_TERMINAL_FONT_FAMILY, FONT_FALLBACKS } from "@/terminal/fonts";
 import { refreshCommands } from "./commands";
-import { FONT_DEFAULT, useUiStore } from "./ui";
+import { nextZoom, useUiStore, ZOOM_DEFAULT } from "./ui";
 
 export const KEYS = {
   theme: "appearance.theme",
   fontFamily: "appearance.font_family",
   fontSize: "appearance.font_size",
+  zoom: "appearance.zoom",
   density: "appearance.density",
   backdrop: "appearance.backdrop",
   scrollback: "sessions.scrollback_lines",
@@ -51,10 +52,14 @@ export function applySettingsSnapshot(next: SettingsSnapshotView): void {
   useSettingsStore.setState({ snapshot: next });
   const theme = next.values[KEYS.theme];
   if (theme === "system" || theme === "dark" || theme === "light") setThemePreference(theme);
-  // Only a changed value moves the font size, so a zoom still being saved is not undone.
   if (changed(prev, next, KEYS.fontSize)) {
     const n = Number(next.values[KEYS.fontSize]);
     if (Number.isFinite(n) && n > 0) useUiStore.getState().setFontSize(n);
+  }
+  // Only a changed value moves the zoom, so a zoom still being saved is not undone.
+  if (changed(prev, next, KEYS.zoom)) {
+    const n = Number(next.values[KEYS.zoom]);
+    if (Number.isFinite(n) && n > 0) useUiStore.getState().setZoom(n);
   }
   document.documentElement.dataset.density = next.values[KEYS.density] === "comfortable" ? "comfortable" : "compact";
   // CommandService.List reports keybinding overrides; the daemon applied them before
@@ -115,17 +120,17 @@ export async function saveSettings(values: Record<string, string>): Promise<Save
 let zoomTimer: ReturnType<typeof setTimeout> | undefined;
 
 /**
- * cmd+= / cmd+- / cmd+0: changes the font size now and saves it to the settings file
- * shortly after the last press (one write per burst). Without a settings service the
- * size is only kept locally.
+ * cmd+= / cmd+- / cmd+0: steps the page zoom now (the whole window, terminal included,
+ * like a browser or T3 Code) and saves it to the settings file shortly after the last
+ * press (one write per burst). Without a settings service the zoom is only kept locally.
  */
-export function zoomFont(delta: number | null): void {
+export function zoomUi(direction: 1 | -1 | null): void {
   const ui = useUiStore.getState();
-  ui.setFontSize(delta === null ? FONT_DEFAULT : ui.fontSize + delta);
+  ui.setZoom(direction === null ? ZOOM_DEFAULT : nextZoom(ui.zoom, direction));
   if (!useSettingsStore.getState().snapshot) return;
   clearTimeout(zoomTimer);
   zoomTimer = setTimeout(() => {
-    const size = useUiStore.getState().fontSize;
-    void saveSettings({ [KEYS.fontSize]: size === FONT_DEFAULT ? "" : String(size) });
+    const zoom = useUiStore.getState().zoom;
+    void saveSettings({ [KEYS.zoom]: zoom === ZOOM_DEFAULT ? "" : String(zoom) });
   }, 400);
 }

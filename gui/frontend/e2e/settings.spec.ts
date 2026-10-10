@@ -125,9 +125,13 @@ test("hand edits to the file update the open page and the terminal font", async 
   await expect(page.getByTestId("settings-load-error")).toHaveCount(0);
   await expect(setting(page, "appearance.font_size").getByRole("spinbutton")).toHaveValue("13");
 
-  // cmd+= saves the font size to the file.
+  // cmd+= zooms the whole page (CSS zoom on <html>) and saves the zoom to the file.
   await page.keyboard.press("Meta+Equal");
-  await expect.poll(async () => (await mockSettings()).raw["appearance.font_size"]).toBe("14");
+  await expect(page.locator("html")).toHaveCSS("zoom", "1.1");
+  await expect.poll(async () => (await mockSettings()).raw["appearance.zoom"]).toBe("110");
+  await page.keyboard.press("Meta+Digit0");
+  await expect(page.locator("html")).toHaveCSS("zoom", "1");
+  await expect.poll(async () => (await mockSettings()).raw["appearance.zoom"]).toBeUndefined();
 });
 
 test("reveal settings file runs settings.reveal", async ({ page }) => {

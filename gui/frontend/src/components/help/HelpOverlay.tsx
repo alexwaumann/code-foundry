@@ -59,7 +59,7 @@ function HelpBody() {
   const sections = useMemo(() => helpSections(commands ?? [], [...viewActions, ...extraChords]), [commands]);
 
   return (
-    <div className="grid max-h-[72vh] grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-6 overflow-y-auto p-5">
+    <div className="grid max-h-[calc(72vh/var(--cf-zoom))] grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-6 overflow-y-auto p-5">
       <section className="space-y-3 text-sm text-muted-foreground" aria-label="How code-foundry works">
         <DialogTitle className="text-base text-foreground">How code-foundry works</DialogTitle>
         <DialogDescription asChild>
@@ -115,7 +115,7 @@ export function HelpOverlay() {
   const open = useViewsStore((s) => s.helpOpen);
   return (
     <Dialog open={open} onOpenChange={setHelpOpen}>
-      <DialogContent className="top-[8vh] max-w-3xl" data-testid="help-overlay">
+      <DialogContent className="top-[calc(8vh/var(--cf-zoom))] max-w-3xl" data-testid="help-overlay">
         {open && <HelpBody />}
       </DialogContent>
     </Dialog>

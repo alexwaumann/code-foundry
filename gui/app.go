@@ -28,6 +28,8 @@ type AppInfo struct {
 // Updates are installed by the daemon; the host only quits and reopens the window.
 type AppService struct {
 	log *slog.Logger
+	// window is the main window, set by main after it is created (for SetZoom).
+	window *application.WebviewWindow
 }
 
 // NewAppService returns an AppService.
@@ -36,6 +38,20 @@ func NewAppService(log *slog.Logger) *AppService { return &AppService{log: log} 
 // Info returns the GUI's version.
 func (s *AppService) Info() AppInfo {
 	return AppInfo{Version: version.Version}
+}
+
+// SetZoom tells the host the page zoom in percent (appearance.zoom; the frontend applies
+// it as CSS zoom). The host keeps the native traffic lights centred on the zoomed title
+// band (trafficlights_darwin.go). Called on start and after each change.
+func (s *AppService) SetZoom(percent int) error {
+	if percent < 10 || percent > 1000 {
+		return fmt.Errorf("set zoom: %d%% out of range", percent)
+	}
+	if s.window == nil {
+		return nil
+	}
+	positionWindowButtons(s.window.NativeWindow(), percent)
+	return nil
 }
 
 // Relaunch quits the app and starts this executable again once this process has
@@ -81,7 +97,7 @@ func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''
 // asks the frontend to open the update dialog and check. The View menu is custom: the
 // default one binds Reload (cmd+r) and Force Reload (cmd+shift+r), which are
 // session.rename and session.reconnect, and Zoom (cmd+0/=/-), which the GUI uses for
-// terminal font size. A menu chord fires whenever the page leaves the key unhandled,
+// its own page zoom (appearance.zoom; CSS zoom on <html>, see gui/frontend/src/lib/zoom.ts). A menu chord fires whenever the page leaves the key unhandled,
 // so cmd+r with no session selected would reload the whole GUI. Keep the chords left
 // here in command.ReservedChords.
 //

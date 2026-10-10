@@ -71,7 +71,7 @@ func main() {
 	// top band and the pane headers fill it, and they drag the window through the Wails
 	// runtime (`--wails-draggable: drag`), so their buttons still click. The title stays
 	// set for Mission Control and the app switcher even though the bar no longer shows it.
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
+	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "Code Foundry",
 		Width:  1200,
 		Height: 780,
@@ -90,6 +90,7 @@ func main() {
 			InvisibleTitleBarHeight: 0,
 		},
 	})
+	appService.window = window
 
 	// `app.relaunch` (e.g. after an update is installed) reaches the host directly.
 	watchCtx, stopWatch := context.WithCancel(context.Background())

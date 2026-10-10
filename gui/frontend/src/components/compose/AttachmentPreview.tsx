@@ -22,7 +22,7 @@ export function AttachmentPreview({ draftKey }: { draftKey: string }) {
         data-testid="attachment-preview"
         data-attachment-id={att?.id}
         overlayClassName="bg-black/80"
-        className="top-1/2 flex w-auto max-w-[90vw] min-w-72 -translate-y-1/2 flex-col overflow-hidden bg-popover/95 p-0"
+        className="top-1/2 flex w-auto max-w-[calc(90vw/var(--cf-zoom))] min-w-72 -translate-y-1/2 flex-col overflow-hidden bg-popover/95 p-0"
         onCloseAutoFocus={(e) => {
           const el = preview?.returnFocus;
           if (!el?.isConnected) return;
@@ -48,7 +48,7 @@ export function AttachmentPreview({ draftKey }: { draftKey: string }) {
             <X className="size-4" />
           </button>
         </div>
-        {att && <img src={att.url} alt={att.file.name} draggable={false} className="mx-auto block h-auto max-h-[85vh] w-auto max-w-[90vw] object-contain" />}
+        {att && <img src={att.url} alt={att.file.name} draggable={false} className="mx-auto block h-auto max-h-[calc(85vh/var(--cf-zoom))] w-auto max-w-[calc(90vw/var(--cf-zoom))] object-contain" />}
       </DialogContent>
     </Dialog>
   );

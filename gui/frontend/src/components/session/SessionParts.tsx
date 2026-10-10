@@ -107,7 +107,7 @@ export function SessionDisconnected({ id }: { id: string }) {
     >
       {/* Centred in the 44px band where the other pages have their header (window/PaneHeader). */}
       <PanelToggle className="absolute top-2.5 right-1.5" />
-      <div className="mt-[14vh] flex w-full max-w-md flex-col items-center gap-5 text-center">
+      <div className="mt-[calc(14vh/var(--cf-zoom))] flex w-full max-w-md flex-col items-center gap-5 text-center">
         <div className="flex size-12 items-center justify-center rounded-full border bg-muted/40">
           <Unplug className="size-5 text-muted-foreground" />
         </div>

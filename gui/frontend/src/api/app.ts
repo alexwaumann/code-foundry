@@ -1,5 +1,5 @@
 import { Browser, Events } from "@wailsio/runtime";
-import { Info, PickDirectory } from "../../bindings/github.com/alexwaumann/code-foundry/gui/appservice";
+import { Info, PickDirectory, SetZoom } from "../../bindings/github.com/alexwaumann/code-foundry/gui/appservice";
 
 /** The Wails host (window shell). */
 export interface AppInfoView {
@@ -45,6 +45,19 @@ export async function openExternal(url: string): Promise<void> {
 export async function pickDirectory(startDir: string): Promise<string | null> {
   const path = await PickDirectory(startDir);
   return path === "" ? null : path;
+}
+
+/**
+ * Tells the Wails host the page zoom in percent, so it keeps the native traffic lights
+ * centred on the zoomed title band (gui/trafficlights_darwin.go). No-op without a host.
+ */
+export async function setHostZoom(percent: number): Promise<void> {
+  if (!(await appInfo())) return;
+  try {
+    await SetZoom(percent);
+  } catch (err: unknown) {
+    console.warn("host zoom", err);
+  }
 }
 
 /** Calls fn when the app menu's "Check for Updates…" is chosen. Returns an unsubscribe. */

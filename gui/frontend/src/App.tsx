@@ -23,6 +23,7 @@ import { startEventSync } from "@/stores/events";
 import { startHealthPolling } from "@/stores/health";
 import { usePanelExpanded } from "@/stores/panel";
 import { useAttentionCount, useSessionsStore } from "@/stores/sessions";
+import { layoutWidth, startZoomSync } from "@/lib/zoom";
 import { CONTENT_MIN, useUiStore, type FocusRegion } from "@/stores/ui";
 import { startViewSync, useViewsStore } from "@/stores/views";
 import { startUpdateSync } from "@/stores/update";
@@ -41,13 +42,15 @@ function startApp(): () => void {
     useUiStore.getState().setFocus(regionOf(e.target));
   };
   document.addEventListener("focusin", onFocusIn);
-  // The side panel's bounds depend on the window width (stores/ui.ts panelMax).
+  // The side panel's bounds depend on the window width in layout px (stores/ui.ts
+  // panelMax), which the page zoom divides (lib/zoom.ts layoutWidth).
   const onResize = () => {
-    useUiStore.getState().setWindowWidth(window.innerWidth);
+    useUiStore.getState().setWindowWidth(layoutWidth());
   };
   window.addEventListener("resize", onResize);
   onResize();
   const stops = [
+    startZoomSync(onResize),
     syncDocumentScheme(),
     startHealthPolling(2000),
     startEventSync(),
@@ -122,7 +125,7 @@ export function App() {
     // and bottom edges); the selection's side panel, when open, is a second pane to its
     // right (components/panel, docs/notes/side-panel.md). Nothing spans the title band
     // (components/window/titleBand.ts): the sidebar's top band and the pane headers fill it.
-    <div className="relative flex h-screen flex-col overflow-hidden bg-sheet text-foreground">
+    <div className="relative flex h-full flex-col overflow-hidden bg-sheet text-foreground">
       {/* The sheet above the panes drags the window too (as the sidebar band and the pane
           headers do), so a page without a header (dashboard, composer, a disconnected
           thread) still has a drag surface when the sidebar is hidden. */}
