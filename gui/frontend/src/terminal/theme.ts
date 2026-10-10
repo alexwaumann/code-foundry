@@ -1,10 +1,6 @@
 import type { ITheme } from "@xterm/xterm";
 import type { ColorScheme } from "./renderer";
 
-/** System font stack. JetBrains Mono when installed, else SF Mono (exposed to WebKit as
- * ui-monospace), else Menlo. No web font, so cell metrics are known at open time. */
-export const TERMINAL_FONT_FAMILY = '"JetBrains Mono", "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
-
 // `background` is the pane colour: it must equal --pane in src/index.css (.dark and
 // :root) so the terminal reads as part of the pane it sits in.
 const dark: ITheme = {
