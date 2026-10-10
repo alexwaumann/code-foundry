@@ -136,7 +136,15 @@ func TestSessionCommands(t *testing.T) {
 		{name: "list shows the workspace", cmd: "session.list",
 			current: &v1.Session{Id: "s3", Name: "w", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_IDLE,
 				StatusReason: "idle", WorkspaceId: "w-1", WorktreePath: "/wt/api"},
-			wantIn: []string{"s3", "w", "connected", "idle", "idle", "w-1", "/wt/api"}},
+			wantIn: []string{"s3", "w", "connected", "idle", "idle", "w-1", "-", "/wt/api"}},
+		{name: "list shows linked pull requests", cmd: "session.list",
+			current: &v1.Session{Id: "s4", Name: "p", State: v1.SessionState_SESSION_STATE_CONNECTED, LinkedPullRequests: []*v1.LinkedPullRequest{
+				{Slug: "o/api", Number: 5, Url: "https://github.com/o/api/pull/5"}, {Slug: "o/api", Number: 7, Url: "https://github.com/o/api/pull/7"}}},
+			wantIn: []string{"s4", "p", "connected", "unspecified", "-", "#5,#7"}},
+		{name: "list prefixes linked pull requests of several repositories", cmd: "session.list",
+			current: &v1.Session{Id: "s4", Name: "p", State: v1.SessionState_SESSION_STATE_CONNECTED, LinkedPullRequests: []*v1.LinkedPullRequest{
+				{Slug: "o/api", Number: 5, Url: "https://github.com/o/api/pull/5"}, {Slug: "o/web", Number: 2, Url: "https://github.com/o/web/pull/2"}}},
+			wantIn: []string{"s4", "p", "connected", "unspecified", "-", "api#5,web#2"}},
 		{name: "backend error passes through", cmd: "session.close", args: map[string]string{"id": "s5"},
 			backendErr: connect.NewError(connect.CodeNotFound, errors.New("nope")), wantCode: connect.CodeNotFound},
 	}

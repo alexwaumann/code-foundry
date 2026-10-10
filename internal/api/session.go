@@ -215,6 +215,13 @@ func sessionToProto(s session.Session) *v1.Session {
 	if !s.LastActivityAt.IsZero() {
 		p.LastActivityAt = timestamppb.New(s.LastActivityAt)
 	}
+	for _, l := range s.LinkedPullRequests {
+		lp := &v1.LinkedPullRequest{Slug: l.Slug, Number: int32(l.Number), Url: l.URL}
+		if !l.LinkedAt.IsZero() {
+			lp.LinkedAt = timestamppb.New(l.LinkedAt)
+		}
+		p.LinkedPullRequests = append(p.LinkedPullRequests, lp)
+	}
 	return p
 }
 

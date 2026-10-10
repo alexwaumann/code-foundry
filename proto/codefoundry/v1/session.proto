@@ -131,6 +131,23 @@ message Session {
   string pending_worktree_path = 23;
   // The user pinned the thread (SessionService.Pin). Persisted.
   bool pinned = 24;
+  // Pull requests Claude linked to the conversation. Source: the "pr-link" records Claude
+  // Code writes to the session's transcript whenever it sees a pull request for the
+  // repository (created in the session, by a subagent, or named in a prompt). Claude
+  // re-emits the record at nearly every turn and it can flip back to an earlier pull
+  // request, so this is every distinct URL (deduplicated by URL) in first-seen order;
+  // entries are never removed. A reconnected thread is backfilled from its transcript's
+  // history. Persisted. See docs/notes/linked-prs.md.
+  repeated LinkedPullRequest linked_pull_requests = 25;
+}
+
+// A pull request Claude linked to a session (Session.linked_pull_requests).
+message LinkedPullRequest {
+  string slug = 1; // "owner/name"
+  int32 number = 2;
+  string url = 3;
+  // The first pr-link record for url (when it was seen, if the record had no time).
+  google.protobuf.Timestamp linked_at = 4;
 }
 
 message CreateSessionRequest {

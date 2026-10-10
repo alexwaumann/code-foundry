@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"text/tabwriter"
 
@@ -81,6 +82,25 @@ func sessionLabel(s *v1.Session) string {
 		return s.GetName() + " (" + s.GetId() + ")"
 	}
 	return s.GetId()
+}
+
+// linkedPRs is session.list's PRS cell: "#5,#6", each prefixed with its repository's
+// name when the thread linked pull requests in more than one; "-" when none.
+func linkedPRs(s *v1.Session) string {
+	links := s.GetLinkedPullRequests()
+	if len(links) == 0 {
+		return "-"
+	}
+	mixed := slices.ContainsFunc(links, func(l *v1.LinkedPullRequest) bool { return l.GetSlug() != links[0].GetSlug() })
+	out := make([]string, len(links))
+	for i, l := range links {
+		out[i] = fmt.Sprintf("#%d", l.GetNumber())
+		if mixed {
+			_, name, _ := strings.Cut(l.GetSlug(), "/")
+			out[i] = name + out[i]
+		}
+	}
+	return strings.Join(out, ",")
 }
 
 func sessionStateName(s v1.SessionState) string {
@@ -171,7 +191,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				}
 				var sb strings.Builder
 				tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
-				_, _ = fmt.Fprintln(tw, "ID\tNAME\tSTATE\tSTATUS\tREASON\tWORKSPACE\tWORKTREE")
+				_, _ = fmt.Fprintln(tw, "ID\tNAME\tSTATE\tSTATUS\tREASON\tWORKSPACE\tPRS\tWORKTREE")
 				for _, s := range res.Msg.GetSessions() {
 					status := strings.ToLower(strings.TrimPrefix(s.GetStatus().String(), "SESSION_STATUS_"))
 					// The reason explains the state when disconnected, else the status.
@@ -179,8 +199,8 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 					if s.GetState() == v1.SessionState_SESSION_STATE_DISCONNECTED {
 						reason = s.GetDisconnectReason()
 					}
-					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), s.GetName(), sessionStateName(s.GetState()),
-						status, reason, cmp.Or(s.GetWorkspaceId(), "-"), s.GetWorktreePath())
+					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), s.GetName(), sessionStateName(s.GetState()),
+						status, reason, cmp.Or(s.GetWorkspaceId(), "-"), linkedPRs(s), s.GetWorktreePath())
 				}
 				_ = tw.Flush()
 				return Result{Message: strings.TrimRight(sb.String(), "\n"), JSON: res.Msg}, nil
