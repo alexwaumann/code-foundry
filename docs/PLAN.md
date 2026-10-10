@@ -44,6 +44,9 @@ Design and Alex's decisions in `docs/notes/add-project-handoff.md`. PR 1 (path c
 `repo.git.init`) run in parallel; PR 3 (Add Project dialog, GitHub search + `gh repo
 clone`) needs both; PR 4 (`repo.create`, publish via `gh repo create`) needs 3.
 
+* PR 1 (`FilesystemService.ListDirectories`, palette path completion, native folder
+  picker, `repo.Options.AllowedRoot`) done: `docs/notes/add-project-1-paths.md`.
+
 ### Open items
 
 Collected from the step notes; none blocks daily use.
