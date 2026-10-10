@@ -19,9 +19,11 @@ func (d detectorAdapter) Status() (session.Status, string) {
 	return session.Status(st), reason
 }
 
-// The session store calls these optional methods when present (user input, and a
-// viewer attached to the session's terminal); keep them reachable through the adapter.
+// The session store calls these optional methods when present (user input, a viewer
+// attached to the session's terminal, and whether queued input such as RunIn's /cd may
+// be typed now); keep them reachable through the adapter.
 var _ interface {
 	Input([]byte)
 	Acknowledge()
+	AtPrompt() bool
 } = detectorAdapter{}

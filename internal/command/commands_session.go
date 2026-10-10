@@ -25,6 +25,7 @@ type SessionBackend interface {
 	Close(context.Context, *connect.Request[v1.CloseSessionRequest]) (*connect.Response[v1.CloseSessionResponse], error)
 	Reconnect(context.Context, *connect.Request[v1.ReconnectSessionRequest]) (*connect.Response[v1.ReconnectSessionResponse], error)
 	Remove(context.Context, *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error)
+	RunIn(context.Context, *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error)
 }
 
 var (
@@ -86,7 +87,7 @@ func sessionStateName(s v1.SessionState) string {
 }
 
 // RegisterSession registers session.new, session.list, session.focus, session.close,
-// session.reconnect, session.rename, session.fork, and session.remove. The user-facing
+// session.reconnect, session.rename, session.fork, session.remove, and session.run-in. The user-facing
 // word is "thread" (titles, descriptions, messages); command names and identifiers
 // keep "session".
 func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
@@ -292,5 +293,6 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				return Result{Message: "removed thread " + id}, nil
 			},
 		},
+		sessionRunIn(b, idArg),
 	)
 }

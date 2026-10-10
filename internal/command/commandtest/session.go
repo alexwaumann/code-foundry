@@ -116,3 +116,27 @@ func (s *Session) Remove(_ context.Context, r *connect.Request[v1.RemoveSessionR
 	}
 	return connect.NewResponse(&v1.RemoveSessionResponse{}), nil
 }
+
+// RunIn returns Current (default: a CONNECTED session in workspace "w-1") with the
+// requested id. A disconnected session runs in the target at once; a live one gets it
+// as pending_worktree_path. The target is worktree_path, else /worktrees/<repo_id>.
+func (s *Session) RunIn(_ context.Context, r *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error) {
+	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	cur := &v1.Session{State: v1.SessionState_SESSION_STATE_CONNECTED, WorkspaceId: "w-1"}
+	if s.Current != nil {
+		cur = proto.CloneOf(s.Current)
+	}
+	cur.Id = r.Msg.GetId()
+	path := r.Msg.GetWorktreePath()
+	if path == "" {
+		path = "/worktrees/" + r.Msg.GetRepoId()
+	}
+	if cur.GetState() == v1.SessionState_SESSION_STATE_DISCONNECTED {
+		cur.WorktreePath = path
+	} else {
+		cur.PendingWorktreePath = path
+	}
+	return connect.NewResponse(&v1.RunInSessionResponse{Session: cur}), nil
+}

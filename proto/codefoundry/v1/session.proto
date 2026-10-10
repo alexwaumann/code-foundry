@@ -25,6 +25,13 @@ service SessionService {
   rpc Reconnect(ReconnectSessionRequest) returns (ReconnectSessionResponse) {}
   // Remove forgets a session. Closes it first if connected.
   rpc Remove(RemoveSessionRequest) returns (RemoveSessionResponse) {}
+  // RunIn moves a workspace thread's cwd to another member worktree of its workspace.
+  // A live thread gets `/cd <path>` typed once it is idle at its prompt
+  // (pending_worktree_path shows the queued target until then) and the row's
+  // worktree_path and repo_id change when it is sent. A disconnected thread's row
+  // changes at once; the next reconnect resumes there. Refused for a project thread or
+  // a target that is not a member.
+  rpc RunIn(RunInSessionRequest) returns (RunInSessionResponse) {}
   // Watch streams session changes. The first event is a snapshot.
   rpc Watch(WatchSessionsRequest) returns (stream SessionEvent) {}
   // StageAttachment stores an image the first prompt refers to and returns its path.
@@ -115,6 +122,10 @@ message Session {
   // spawn of a workspace thread gets --add-dir for the workspace's other member
   // worktrees, read from the workspace store at launch.
   string workspace_id = 22;
+  // Member worktree a queued RunIn will move the thread to once it is idle; empty when
+  // nothing is queued. Not persisted: a thread that disconnects first moves its row
+  // there instead.
+  string pending_worktree_path = 23;
 }
 
 message CreateSessionRequest {
@@ -228,6 +239,18 @@ message RemoveSessionRequest {
 }
 
 message RemoveSessionResponse {}
+
+message RunInSessionRequest {
+  string id = 1;
+  // The member to run in: its repository id, or its worktree path. One is required;
+  // both must name the same member.
+  string repo_id = 2;
+  string worktree_path = 3;
+}
+
+message RunInSessionResponse {
+  Session session = 1;
+}
 
 message WatchSessionsRequest {}
 

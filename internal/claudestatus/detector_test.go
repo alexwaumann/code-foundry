@@ -21,6 +21,8 @@ type step struct {
 	want   Status
 	reason string // expected reason prefix ("" = don't check)
 	check  bool
+	// prompt, when set, is the expected AtPrompt.
+	prompt *bool
 }
 
 func out(ms int, s string) step { return step{ms: ms, out: s} }
@@ -31,6 +33,7 @@ func scr(ms int, s string) step { return step{ms: ms, screen: &s} }
 func want(ms int, st Status, why string) step {
 	return step{ms: ms, want: st, reason: why, check: true}
 }
+func atPrompt(ms int, v bool) step { return step{ms: ms, prompt: &v} }
 
 func title(t string) string { return "\x1b]0;" + t + "\x07" }
 
@@ -72,6 +75,11 @@ func runSteps(t *testing.T, withScreen bool, steps []step) {
 			d.Acknowledge()
 		case s.tick:
 			d.Tick(now)
+		case s.prompt != nil:
+			if got := d.AtPrompt(); got != *s.prompt {
+				st, reason := d.Status()
+				t.Fatalf("step %d @%dms: AtPrompt = %v, want %v (status %v %q)", i, s.ms, got, *s.prompt, st, reason)
+			}
 		case s.check:
 			st, reason := d.Status()
 			if st != s.want || !strings.HasPrefix(reason, s.reason) {
@@ -89,20 +97,20 @@ func TestDetectorTransitions(t *testing.T) {
 		steps  []step
 	}{
 		{"startup is unknown", true, []step{
-			want(0, Unknown, "starting"),
-			tick(0), want(0, Unknown, "no prompt visible"),
+			want(0, Unknown, "starting"), atPrompt(0, false),
+			tick(0), want(0, Unknown, "no prompt visible"), atPrompt(0, false),
 		}},
 		{"idle title before any screen read", true, []step{
 			out(100, title("✳ Claude Code")), want(100, Idle, "at prompt"),
 		}},
 		{"busy, then finished after a fresh screen read", true, []step{
-			scr(0, promptScreen), out(0, title("✳ Claude Code")), tick(0), want(0, Idle, "at prompt"),
+			scr(0, promptScreen), out(0, title("✳ Claude Code")), tick(0), want(0, Idle, "at prompt"), atPrompt(0, true),
 			in(900, "hi\r"),
-			out(1000, title("◐ Claude Code")), want(1000, Busy, "working: Claude Code"),
+			out(1000, title("◐ Claude Code")), want(1000, Busy, "working: Claude Code"), atPrompt(1000, false),
 			out(1960, title("◑ Say hi")), want(1960, Busy, "working: Say hi"),
-			out(2500, title("✳ Say hi")), want(2500, Busy, ""), // hysteresis: no fresh screen yet
+			out(2500, title("✳ Say hi")), want(2500, Busy, ""), atPrompt(2500, false), // hysteresis: no fresh screen yet
 			tick(2600), want(2600, Busy, ""), // within settle: screen not read yet
-			tick(3000), want(3000, NeedsAttention, "finished"),
+			tick(3000), want(3000, NeedsAttention, "finished"), atPrompt(3000, true), // unseen, but at the prompt
 			in(4000, "x"), want(4000, Idle, "at prompt"),
 		}},
 		{"transcript turn end with idle title decides without the screen", true, []step{
@@ -117,7 +125,7 @@ func TestDetectorTransitions(t *testing.T) {
 			in(900, "\r"), out(1000, title("◐ t")), tr(1100, lineUserPrompt),
 			scr(1990, permScreen), out(2000, title("✳ t")), tr(2100, lineToolUse),
 			want(2100, Busy, ""), // the screen read at 0 showed a prompt; it is not used
-			tick(3000), want(3000, NeedsAttention, "permission: Do you want to proceed?"),
+			tick(3000), want(3000, NeedsAttention, "permission: Do you want to proceed?"), atPrompt(3000, false),
 			in(5000, "\r"), want(5000, NeedsAttention, "permission"), // the dialog is still drawn
 			scr(5010, promptScreen), out(5020, title("◐ t")), want(5020, Busy, "running Bash"),
 			tr(5300, lineToolResult), want(5300, Busy, "working: t"),
@@ -141,7 +149,7 @@ func TestDetectorTransitions(t *testing.T) {
 			scr(0, "Pick a flavour\n  vanilla\n  chocolate"), out(0, title("◐ t")), tr(100, lineUserPrompt),
 			out(1000, title("✳ t")), tick(1500), want(1500, Busy, ""), // screen read, grace not up
 			tick(2000), want(2000, Busy, ""),
-			tick(2600), want(2600, NeedsAttention, "waiting for input"),
+			tick(2600), want(2600, NeedsAttention, "waiting for input"), atPrompt(2600, false),
 		}},
 		{"open turn with the prompt visible is idle (interrupt without a transcript record)", true, []step{
 			scr(0, promptScreen), out(0, title("◐ t")), tr(100, lineUserPrompt), in(900, "\x03"),
@@ -155,13 +163,13 @@ func TestDetectorTransitions(t *testing.T) {
 		{"api error", true, []step{
 			scr(0, promptScreen), in(0, "\r"), out(10, title("◐ t")), tr(20, lineUserPrompt),
 			out(300, title("✳ t")), tr(400, lineAPIError), tr(401, lineTurnEnd),
-			want(401, NeedsAttention, "error: rate_limit"),
+			want(401, NeedsAttention, "error: rate_limit"), atPrompt(401, true),
 			ack(500), want(500, Idle, ""),
 		}},
 		{"notification", false, []step{
 			out(0, title("✳ t")), want(0, Idle, ""),
 			out(100, "\x1b]777;notify;Claude Code;Claude needs your permission\x07"),
-			want(100, NeedsAttention, "notification: Claude needs your permission"),
+			want(100, NeedsAttention, "notification: Claude needs your permission"), atPrompt(100, false),
 			in(200, "1"), want(200, Idle, ""),
 		}},
 		{"idle reminder notification is not attention", false, []step{
@@ -169,7 +177,7 @@ func TestDetectorTransitions(t *testing.T) {
 			out(100, "\x1b]9;Claude is waiting for your input\x07"), want(100, Idle, ""),
 		}},
 		{"bell", false, []step{
-			out(0, title("✳ t")), out(100, "\x07"), want(100, NeedsAttention, "bell"),
+			out(0, title("✳ t")), out(100, "\x07"), want(100, NeedsAttention, "bell"), atPrompt(100, false),
 			ack(200), want(200, Idle, ""),
 		}},
 		{"program status protocol", false, []step{
@@ -196,7 +204,7 @@ func TestDetectorTransitions(t *testing.T) {
 		}},
 		{"trust dialog at startup", true, []step{
 			scr(0, rule+"\n Quick safety check: Is this a project you created or one you trust?\n ❯ No, exit\n   Yes, I trust this folder\n\n Enter to confirm · Esc to cancel"),
-			tick(1000), want(1000, NeedsAttention, "trust"),
+			tick(1000), want(1000, NeedsAttention, "trust"), atPrompt(1000, false),
 		}},
 		{"exit clears the title", true, []step{
 			scr(0, promptScreen), out(0, title("✳ t")), tick(0), want(0, Idle, ""),

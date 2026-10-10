@@ -126,6 +126,23 @@ func TestSessionCreateWorkspaceFields(t *testing.T) {
 	}
 }
 
+func TestSessionRunIn(t *testing.T) {
+	fake, c := newSessionServer(t)
+	ctx := context.Background()
+	fake.Put(session.Session{ID: "s-1", WorkspaceID: "w-1", WorktreePath: "/wt/web", State: session.StateConnected})
+	fake.Put(session.Session{ID: "s-2", WorktreePath: "/src/app", State: session.StateConnected})
+	res, err := c.RunIn(ctx, connect.NewRequest(&v1.RunInSessionRequest{Id: "s-1", RepoId: "api"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := res.Msg.GetSession(); s.GetPendingWorktreePath() != "/worktrees/api" || s.GetWorktreePath() != "/wt/web" || s.GetWorkspaceId() != "w-1" {
+		t.Errorf("RunIn = %v", s)
+	}
+	if _, err := c.RunIn(ctx, connect.NewRequest(&v1.RunInSessionRequest{Id: "s-2", RepoId: "api"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Errorf("RunIn on a project thread = %v", err)
+	}
+}
+
 func TestSessionStageAttachment(t *testing.T) {
 	fake, c := newSessionServer(t)
 	ctx := context.Background()

@@ -99,7 +99,7 @@ type createdWorkspace struct {
 }
 
 // workspaceMember resolves the member a thread of workspace ref (id or name) runs in;
-// see pickMember.
+// see pickMember. repoID may also be a repository name.
 func (m *Manager) workspaceMember(ref, repoID, path string) (workspace.Workspace, workspace.Member, error) {
 	if m.opts.Workspaces == nil {
 		return workspace.Workspace{}, workspace.Member{}, fmt.Errorf("%w: workspace threads need the workspace store", ErrFailedPrecondition)
@@ -110,6 +110,12 @@ func (m *Manager) workspaceMember(ref, repoID, path string) (workspace.Workspace
 	w, err := workspace.ResolveWorkspace(m.opts.Workspaces.Snapshot(), workspace.Ref{Workspace: ref})
 	if err != nil {
 		return workspace.Workspace{}, workspace.Member{}, workspaceError("workspace", err)
+	}
+	if _, ok := w.Member(repoID); repoID != "" && !ok && m.opts.Repos != nil {
+		// A repository name (or path) instead of the id.
+		if r, err := workspace.ResolveRepo(m.opts.Repos.Snapshot(), repoID); err == nil {
+			repoID = r.ID
+		}
 	}
 	mem, err := pickMember(w, repoID, path)
 	return w, mem, err

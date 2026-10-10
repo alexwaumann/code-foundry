@@ -148,6 +148,10 @@ type Detector struct {
 	status       Status
 	reason       string
 	since        time.Time
+	// restAtPrompt: the last resting status came from the prompt being up (idle, or a
+	// finished turn or API error not yet seen), not from a dialog, a notification, or
+	// missing evidence. See AtPrompt.
+	restAtPrompt bool
 }
 
 // New returns a Detector. screen returns the current plain-text screen (rows joined by
@@ -278,6 +282,17 @@ func (d *Detector) Status() (Status, string) {
 	return d.status, d.reason
 }
 
+// AtPrompt reports whether Claude is at its prompt with nothing open, so typed input
+// becomes the next prompt: Idle, or NeedsAttention only because a finished turn (or
+// an API error) has not been seen yet. False while busy, while a dialog, a
+// notification or a bell asks for the user, and when the status is unknown. The
+// session store uses it to type queued commands (/cd) without waiting for a viewer.
+func (d *Detector) AtPrompt() bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.restAtPrompt && (d.status == Idle || d.status == NeedsAttention)
+}
+
 // needScreen decides whether Tick should read the screen. The lock is held.
 func (d *Detector) needScreen(now time.Time) bool {
 	if d.screen == nil {
@@ -383,6 +398,7 @@ func (d *Detector) busyReason() string {
 
 // restingStatus classifies a session that is not working. The lock is held.
 func (d *Detector) restingStatus(now time.Time) (Status, string) {
+	d.restAtPrompt = false
 	// A screen read before the last busy period says nothing about now.
 	fresh := d.screenRead && !d.screenAt.Before(d.busyEndAt)
 	if fresh && d.info.Dialog != DialogNone {
@@ -412,6 +428,7 @@ func (d *Detector) restingStatus(now time.Time) (Status, string) {
 		return NeedsAttention, "bell"
 	}
 	if promptVisible || d.tKind == titleIdle || d.psState == "idle" || d.psState == "done" {
+		d.restAtPrompt = true
 		if d.workAt.After(d.ackAt) {
 			if d.apiError != "" {
 				return NeedsAttention, "error: " + d.apiError

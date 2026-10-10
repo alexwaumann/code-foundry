@@ -50,6 +50,8 @@ const (
 	SessionServiceReconnectProcedure = "/codefoundry.v1.SessionService/Reconnect"
 	// SessionServiceRemoveProcedure is the fully-qualified name of the SessionService's Remove RPC.
 	SessionServiceRemoveProcedure = "/codefoundry.v1.SessionService/Remove"
+	// SessionServiceRunInProcedure is the fully-qualified name of the SessionService's RunIn RPC.
+	SessionServiceRunInProcedure = "/codefoundry.v1.SessionService/RunIn"
 	// SessionServiceWatchProcedure is the fully-qualified name of the SessionService's Watch RPC.
 	SessionServiceWatchProcedure = "/codefoundry.v1.SessionService/Watch"
 	// SessionServiceStageAttachmentProcedure is the fully-qualified name of the SessionService's
@@ -76,6 +78,13 @@ type SessionServiceClient interface {
 	Reconnect(context.Context, *connect.Request[v1.ReconnectSessionRequest]) (*connect.Response[v1.ReconnectSessionResponse], error)
 	// Remove forgets a session. Closes it first if connected.
 	Remove(context.Context, *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error)
+	// RunIn moves a workspace thread's cwd to another member worktree of its workspace.
+	// A live thread gets `/cd <path>` typed once it is idle at its prompt
+	// (pending_worktree_path shows the queued target until then) and the row's
+	// worktree_path and repo_id change when it is sent. A disconnected thread's row
+	// changes at once; the next reconnect resumes there. Refused for a project thread or
+	// a target that is not a member.
+	RunIn(context.Context, *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error)
 	// Watch streams session changes. The first event is a snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchSessionsRequest]) (*connect.ServerStreamForClient[v1.SessionEvent], error)
 	// StageAttachment stores an image the first prompt refers to and returns its path.
@@ -144,6 +153,12 @@ func NewSessionServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(sessionServiceMethods.ByName("Remove")),
 			connect.WithClientOptions(opts...),
 		),
+		runIn: connect.NewClient[v1.RunInSessionRequest, v1.RunInSessionResponse](
+			httpClient,
+			baseURL+SessionServiceRunInProcedure,
+			connect.WithSchema(sessionServiceMethods.ByName("RunIn")),
+			connect.WithClientOptions(opts...),
+		),
 		watch: connect.NewClient[v1.WatchSessionsRequest, v1.SessionEvent](
 			httpClient,
 			baseURL+SessionServiceWatchProcedure,
@@ -169,6 +184,7 @@ type sessionServiceClient struct {
 	close           *connect.Client[v1.CloseSessionRequest, v1.CloseSessionResponse]
 	reconnect       *connect.Client[v1.ReconnectSessionRequest, v1.ReconnectSessionResponse]
 	remove          *connect.Client[v1.RemoveSessionRequest, v1.RemoveSessionResponse]
+	runIn           *connect.Client[v1.RunInSessionRequest, v1.RunInSessionResponse]
 	watch           *connect.Client[v1.WatchSessionsRequest, v1.SessionEvent]
 	stageAttachment *connect.Client[v1.StageAttachmentRequest, v1.StageAttachmentResponse]
 }
@@ -213,6 +229,11 @@ func (c *sessionServiceClient) Remove(ctx context.Context, req *connect.Request[
 	return c.remove.CallUnary(ctx, req)
 }
 
+// RunIn calls codefoundry.v1.SessionService.RunIn.
+func (c *sessionServiceClient) RunIn(ctx context.Context, req *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error) {
+	return c.runIn.CallUnary(ctx, req)
+}
+
 // Watch calls codefoundry.v1.SessionService.Watch.
 func (c *sessionServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchSessionsRequest]) (*connect.ServerStreamForClient[v1.SessionEvent], error) {
 	return c.watch.CallServerStream(ctx, req)
@@ -242,6 +263,13 @@ type SessionServiceHandler interface {
 	Reconnect(context.Context, *connect.Request[v1.ReconnectSessionRequest]) (*connect.Response[v1.ReconnectSessionResponse], error)
 	// Remove forgets a session. Closes it first if connected.
 	Remove(context.Context, *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error)
+	// RunIn moves a workspace thread's cwd to another member worktree of its workspace.
+	// A live thread gets `/cd <path>` typed once it is idle at its prompt
+	// (pending_worktree_path shows the queued target until then) and the row's
+	// worktree_path and repo_id change when it is sent. A disconnected thread's row
+	// changes at once; the next reconnect resumes there. Refused for a project thread or
+	// a target that is not a member.
+	RunIn(context.Context, *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error)
 	// Watch streams session changes. The first event is a snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchSessionsRequest], *connect.ServerStream[v1.SessionEvent]) error
 	// StageAttachment stores an image the first prompt refers to and returns its path.
@@ -306,6 +334,12 @@ func NewSessionServiceHandler(svc SessionServiceHandler, opts ...connect.Handler
 		connect.WithSchema(sessionServiceMethods.ByName("Remove")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sessionServiceRunInHandler := connect.NewUnaryHandler(
+		SessionServiceRunInProcedure,
+		svc.RunIn,
+		connect.WithSchema(sessionServiceMethods.ByName("RunIn")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sessionServiceWatchHandler := connect.NewServerStreamHandler(
 		SessionServiceWatchProcedure,
 		svc.Watch,
@@ -336,6 +370,8 @@ func NewSessionServiceHandler(svc SessionServiceHandler, opts ...connect.Handler
 			sessionServiceReconnectHandler.ServeHTTP(w, r)
 		case SessionServiceRemoveProcedure:
 			sessionServiceRemoveHandler.ServeHTTP(w, r)
+		case SessionServiceRunInProcedure:
+			sessionServiceRunInHandler.ServeHTTP(w, r)
 		case SessionServiceWatchProcedure:
 			sessionServiceWatchHandler.ServeHTTP(w, r)
 		case SessionServiceStageAttachmentProcedure:
@@ -379,6 +415,10 @@ func (UnimplementedSessionServiceHandler) Reconnect(context.Context, *connect.Re
 
 func (UnimplementedSessionServiceHandler) Remove(context.Context, *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SessionService.Remove is not implemented"))
+}
+
+func (UnimplementedSessionServiceHandler) RunIn(context.Context, *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SessionService.RunIn is not implemented"))
 }
 
 func (UnimplementedSessionServiceHandler) Watch(context.Context, *connect.Request[v1.WatchSessionsRequest], *connect.ServerStream[v1.SessionEvent]) error {

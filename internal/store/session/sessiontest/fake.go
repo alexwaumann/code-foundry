@@ -239,6 +239,27 @@ func (f *Fake) Reconnect(_ context.Context, id string) (session.Session, error) 
 	})
 }
 
+// RunIn records "RunIn <id> <repo> <path>". It requires a workspace thread. A
+// disconnected session moves at once to the path (else /worktrees/<repo>); a live one
+// gets it as PendingWorktreePath.
+func (f *Fake) RunIn(_ context.Context, id string, t session.RunInTarget) (session.Session, error) {
+	return f.mutate("RunIn "+id+" "+t.RepoID+" "+t.WorktreePath, id, func(s *session.Session) error {
+		if s.WorkspaceID == "" {
+			return fmt.Errorf("%w: thread %s does not belong to a workspace", session.ErrFailedPrecondition, id)
+		}
+		path := t.WorktreePath
+		if path == "" {
+			path = "/worktrees/" + t.RepoID
+		}
+		if s.State == session.StateDisconnected {
+			s.WorktreePath, s.RepoID = path, t.RepoID
+		} else {
+			s.PendingWorktreePath = path
+		}
+		return nil
+	})
+}
+
 // Remove forgets a session and publishes Removed.
 func (f *Fake) Remove(_ context.Context, id string) error {
 	f.mu.Lock()

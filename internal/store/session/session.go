@@ -135,6 +135,9 @@ type Session struct {
 	// WorkspaceID is the owner workspace; empty for a project thread. Each spawn reads
 	// the workspace's current members from the workspace store.
 	WorkspaceID string
+	// PendingWorktreePath is the member a queued RunIn moves the thread to once it is
+	// idle at its prompt; empty when nothing is queued. Not persisted.
+	PendingWorktreePath string
 }
 
 // Snapshot is every session, sorted by creation time then id. Never mutate it.
@@ -207,6 +210,13 @@ type CreateOptions struct {
 	Attachments []string
 }
 
+// RunInTarget names the member a workspace thread should run in: its repository id or
+// its worktree path (both, if given, must agree).
+type RunInTarget struct {
+	RepoID       string
+	WorktreePath string
+}
+
 // NewWorktree configures the worktree Create makes.
 type NewWorktree struct {
 	// BaseRef to branch from. Empty means origin/<default branch>, else <default
@@ -230,6 +240,10 @@ type Store interface {
 	Reconnect(ctx context.Context, id string) (Session, error)
 	// Remove closes the session if needed and forgets it.
 	Remove(ctx context.Context, id string) error
+	// RunIn moves a workspace thread to another member worktree: `/cd <path>` typed
+	// once the live thread is idle at its prompt (the row's cwd changes when it is
+	// sent), or the row's cwd at once for a disconnected thread.
+	RunIn(ctx context.Context, id string, target RunInTarget) (Session, error)
 	// StageAttachment stores an image for a first prompt and returns its absolute
 	// path. mimeType must be one of AttachmentTypes; data at most MaxAttachmentBytes.
 	// name is the user's file name, used only in logs.
