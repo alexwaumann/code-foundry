@@ -50,6 +50,10 @@ clone`) needs both; PR 4 (`repo.create`, publish via `gh repo create`) needs 3.
   and `repo.git.init`, git gating of worktree/git/pr commands and workspaces, the No git
   badge and overview, Publish to GitHub placeholder for remoteless repos) done:
   `docs/notes/add-project-2-nogit.md`.
+* PR 3 (the Add Project dialog with New / Local folder / GitHub tabs, `repo.add`,
+  `RepoService.SearchGitHub` / `LookupGitHub` over GraphQL, streaming `RepoService.Clone`
+  via `gh repo clone` into `paths.Projects()`, `repo.clone` with CLI progress) done:
+  `docs/notes/add-project-3-dialog.md`.
 
 ### Open items
 

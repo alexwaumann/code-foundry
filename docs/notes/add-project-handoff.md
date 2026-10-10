@@ -90,7 +90,8 @@ name, and clones by `owner/repo` or URL into a picked folder. We copy that shape
 
 ## PR 3: Add Project dialog and GitHub clone (`cf/add-project-dialog`), after 1 and 2
 
-* Status: PR 1 merged as #18, PR 2 as #20 (2026-10-10).
+* Status: PR 1 merged as #18, PR 2 as #20 (2026-10-10). PR 3 built on
+  `cf/add-project-dialog`: `docs/notes/add-project-3-dialog.md`.
 * `repo.add` command opens the dialog (GUI-only presentation, like `session.new` opening
   the composer). Tabs New / Local folder / GitHub. Local folder = PR 1 completion + picker
   + register. New tab is wired in PR 4 (shows a disabled placeholder until then).
