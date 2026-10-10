@@ -1,16 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { BellRing, FolderPlus, SquarePen } from "lucide-react";
-import { CommandButton } from "@/components/command/CommandButton";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { ProjectsNav } from "@/components/projects/ProjectsPage";
 import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
 import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
-import { jumpToAttention } from "@/keys/bindings";
 import { buildRows, isLeaf, type LeafRow, type Row } from "@/lib/tree";
 import { decodeSessionListKeys, decodeTerminalKeys, useSessionListKeys, useTerminalPlacementKeys } from "@/stores/context";
 import { useEventsStore } from "@/stores/events";
-import { useAttentionCount, useSessionsStore } from "@/stores/sessions";
+import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
 import { useRowHeight } from "@/stores/settings";
 import { RowMenu } from "./RowMenu";
@@ -18,6 +15,7 @@ import { rowSelection, selectionKey } from "./selection";
 import { ResizeHandle } from "./ResizeHandle";
 import { SidebarRow } from "./SidebarRow";
 import { SidebarStatus } from "./SidebarStatus";
+import { SidebarToolbar } from "./SidebarToolbar";
 
 /** Section header height; thread and terminal rows are two lines (rowHeight + this). */
 const HEADER_HEIGHT = 26;
@@ -140,6 +138,7 @@ function SidebarList() {
   };
 
   const activeRow = rows[cursorIndex];
+  const emptyText = unavailable ? "Threads are unavailable on this daemon." : loaded ? null : streamError ? `Cannot list threads: ${streamError}. Retrying…` : "Loading…";
   return (
     <ContextMenu
       modal={false}
@@ -161,15 +160,12 @@ function SidebarList() {
           onContextMenu={onContextMenu}
         >
           {rows.length === 0 ? (
-            <p className="px-3 py-4 text-xs break-words text-muted-foreground" data-testid="thread-list-empty">
-              {unavailable
-                ? "Threads are unavailable on this daemon."
-                : loaded
-                  ? "No threads yet. Start one with New thread; projects and their worktrees are on the Projects page."
-                  : streamError
-                    ? `Cannot list threads: ${streamError}. Retrying…`
-                    : "Loading…"}
-            </p>
+            // No threads (once loaded): the list is simply empty.
+            emptyText !== null && (
+              <p className="px-3 py-4 text-xs break-words text-muted-foreground" data-testid="thread-list-empty">
+                {emptyText}
+              </p>
+            )
           ) : (
             <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
               {virtualizer.getVirtualItems().map((vi) => {
@@ -190,29 +186,6 @@ function SidebarList() {
   );
 }
 
-/** Count of sessions waiting on the user; click jumps to the next one. */
-function AttentionBadge() {
-  const count = useAttentionCount();
-  if (count === 0) return null;
-  const label = `${String(count)} ${count === 1 ? "thread needs" : "threads need"} attention`;
-  return (
-    <button
-      type="button"
-      tabIndex={-1}
-      title={label}
-      aria-label={label}
-      data-testid="attention-badge"
-      className="flex h-5 items-center gap-1 rounded-full bg-amber-400/15 px-1.5 text-[11px] font-semibold text-amber-300 tabular-nums hover:bg-amber-400/25"
-      onClick={() => {
-        jumpToAttention();
-      }}
-    >
-      <BellRing className="size-3" aria-hidden />
-      {count}
-    </button>
-  );
-}
-
 /** Shown when the daemon has no SessionService (older daemon): everything else still works. */
 function SessionsUnavailable() {
   const unavailable = useSessionsStore((s) => s.availability === "unavailable");
@@ -227,58 +200,25 @@ function SessionsUnavailable() {
 
 /**
  * The sidebar's share of the title band (components/window/titleBand.ts): the
- * traffic-light gutter, kept empty for the lights, then the app name and the controls
- * (attention badge, New thread). The whole band drags the window (Wails runtime,
- * `--wails-draggable`) except its controls. See docs/notes/sidebar-title-band.md.
+ * traffic-light gutter, kept empty for the lights, then the app name. The whole band
+ * drags the window (Wails runtime, `--wails-draggable`); the controls are in the toolbar
+ * below it (SidebarToolbar). See docs/notes/sidebar-toolbar.md.
+ *
+ * The name is a span, not a heading: every page in the content pane has its own h1. At
+ * 16px it fits beside the gutter at SIDEBAR_MIN, so it is not measured; the overflow
+ * clip only guards against an unexpected font.
  */
-/**
- * The app name is all-or-nothing: when the band is too narrow for the whole name beside
- * the controls (a wide attention badge, a narrow sidebar), it is hidden rather than
- * truncated. The span stays in the layout so it can be measured again when room returns.
- */
-function AppName() {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [fits, setFits] = useState(true);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const measure = () => {
-      setFits(el.scrollWidth <= el.clientWidth);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => {
-      ro.disconnect();
-    };
-  }, []);
-  // A span, not a heading: every page in the content pane has its own h1.
-  return (
-    <span
-      ref={ref}
-      className={`min-w-0 overflow-hidden text-[13px] leading-none font-semibold tracking-tight whitespace-nowrap text-sidebar-foreground select-none ${fits ? "" : "invisible"}`}
-      data-testid="sidebar-app-name"
-      data-fits={fits}
-    >
-      Code Foundry
-    </span>
-  );
-}
-
 function SidebarBand() {
   const gutter = useUiStore((s) => trafficLightGutter(s.zoom));
   return (
     <div className="flex shrink-0 items-center [--wails-draggable:drag]" style={{ height: TITLE_BAND_HEIGHT }} data-testid="sidebar-band">
       <div className="h-full shrink-0" style={{ width: gutter }} data-testid="traffic-light-gutter" aria-hidden />
-      <header className="flex h-full min-w-0 flex-1 items-center justify-between gap-1.5 pr-3 pl-3">
-        <AppName />
-        <span className="flex shrink-0 items-center gap-1.5 [--wails-draggable:no-drag]" data-testid="sidebar-band-controls">
-          <AttentionBadge />
-          {/* New thread (the project picker) and the Add Project dialog, as session.new / repo.add from the palette. New terminal is palette, ⌘T and row menu only. */}
-          <span className="-mr-1.5 flex items-center">
-            <CommandButton command="session.new" icon={SquarePen} whenUnavailable="disable" data-testid="sidebar-new-session" />
-            <CommandButton command="repo.add" icon={FolderPlus} data-testid="sidebar-add-project" />
-          </span>
+      <header className="flex h-full min-w-0 flex-1 items-center pr-3 pl-3">
+        <span
+          className="min-w-0 overflow-hidden text-base leading-none font-semibold tracking-tight whitespace-nowrap text-sidebar-foreground select-none"
+          data-testid="sidebar-app-name"
+        >
+          Code Foundry
         </span>
       </header>
     </div>
@@ -292,6 +232,7 @@ export function Sidebar() {
   return (
     <aside className="relative flex shrink-0 flex-col bg-sidebar" style={{ width }} data-testid="sidebar">
       <SidebarBand />
+      <SidebarToolbar />
       <nav className="flex shrink-0 flex-col" aria-label="Pages">
         <PullRequestsNav />
         <ProjectsNav />

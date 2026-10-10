@@ -5,7 +5,7 @@
  * centres them with 19 px above and below.
  *
  * Nothing spans the band. The sidebar's top band (the traffic-light gutter, then the
- * app name and its controls) is this tall. The content pane and the side panel start 8 px
+ * app name) is this tall. The content pane and the side panel start 8 px
  * down (the gap they keep on every side), and their headers are 44 px (`h-11`,
  * PaneHeader), so every header ends on the band's bottom edge.
  *

@@ -17,7 +17,18 @@ export type Selection =
   | { kind: "view"; name: string };
 
 /** Top-level page names (UiIntent.ShowView); unknown names are ignored. */
-export const viewNames: readonly string[] = ["pullrequests", "projects"];
+export const viewNames: readonly string[] = ["dashboard", "pullrequests", "projects"];
+
+/**
+ * The dashboard page (view.dashboard): what the window selects when it loads and when its
+ * selection goes away. `none` still renders the same page (App.tsx), but only this one
+ * highlights the sidebar's Dashboard button. Selections are not persisted.
+ */
+export const DASHBOARD: Selection = { kind: "view", name: "dashboard" };
+
+export function isDashboard(sel: Selection): boolean {
+  return sel.kind === "none" || (sel.kind === "view" && sel.name === "dashboard");
+}
 
 /** Which region has keyboard focus; the palette returns focus to it on close. */
 export type FocusRegion = "sidebar" | "terminal" | "content" | "palette" | "panel";
@@ -29,8 +40,8 @@ export type FocusRegion = "sidebar" | "terminal" | "content" | "palette" | "pane
 export type PalettePage = "commands" | "projects" | "runin";
 
 /**
- * The sidebar band must fit the 80px traffic-light gutter, the app name, the attention
- * badge and the New thread button (components/sidebar/Sidebar.tsx); 180 squeezed the name out.
+ * The sidebar band must fit the 80px traffic-light gutter and the app name
+ * (components/sidebar/Sidebar.tsx); the toolbar below it is four icon buttons.
  */
 export const SIDEBAR_MIN = 220;
 export const SIDEBAR_MAX = 520;
@@ -170,7 +181,7 @@ export function sameSelection(a: Selection, b: Selection): boolean {
 export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
-      selection: { kind: "none" },
+      selection: DASHBOARD,
       focus: "content",
       terminalFocusSeq: 0,
       sidebarFocusSeq: 0,

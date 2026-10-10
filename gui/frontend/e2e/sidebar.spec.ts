@@ -48,6 +48,50 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
+test("the window starts on the dashboard; the toolbar's Dashboard button returns to it and shows it is current", async ({ page }) => {
+  await openApp(page);
+  const dashboard = page.getByTestId("sidebar-dashboard");
+  await expect(page.getByTestId("start-page")).toBeVisible();
+  await expect(dashboard).toHaveAttribute("aria-current", "page");
+  await expect(dashboard).toHaveClass(/bg-sidebar-accent/);
+
+  await page.getByTestId("nav-projects").click();
+  await expect(page.getByTestId("projects-page")).toBeVisible();
+  await expect(dashboard).not.toHaveAttribute("aria-current", "page");
+
+  // view.dashboard through the daemon (ShowView), like the Pull Requests and Projects chords.
+  await dashboard.click();
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("view.dashboard");
+  await expect(page.getByTestId("start-page")).toBeVisible();
+  await expect(dashboard).toHaveAttribute("aria-current", "page");
+
+  // A selected thread is not restored: a reload starts on the dashboard again.
+  await row(page, "s:s-2").click();
+  await expect(dashboard).not.toHaveAttribute("aria-current", "page");
+  await page.reload();
+  await expect(page.getByTestId("start-page")).toBeVisible();
+  await expect(dashboard).toHaveAttribute("aria-current", "page");
+});
+
+test("Notifications: the count over the bell jumps to the waiting thread; with none it is a no-op", async ({ page }) => {
+  await openApp(page);
+  const bell = page.getByTestId("sidebar-notifications");
+  // The mock's s-2 waits on the user.
+  await expect(bell.getByTestId("attention-badge")).toHaveText("1");
+  await expect(bell).toHaveAttribute("title", "1 thread needs attention");
+  await bell.click();
+  await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
+
+  await mockPost("session/status?id=s-2&status=idle");
+  await expect(bell).toHaveAttribute("title", "No threads need attention");
+  await expect(bell).toHaveAttribute("aria-disabled", "true");
+  await expect(bell.getByTestId("attention-badge")).toHaveCount(0);
+  // aria-disabled, not disabled, so the tooltip still shows; a forced click does nothing.
+  await page.getByTestId("nav-projects").click();
+  await bell.click({ force: true });
+  await expect(page.getByTestId("projects-page")).toBeVisible();
+});
+
 test("the sidebar is a flat thread list: sections on top, workspace badges, no repo or worktree rows", async ({ page }) => {
   const driver = await workspaceWithThread();
   await openApp(page);
