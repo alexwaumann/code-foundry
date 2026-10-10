@@ -1,5 +1,6 @@
-import { CloudDownload, FolderOpen, Sparkles } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { CloudDownload, FolderOpen, Sparkles, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { closeAddProject, setAddProjectTab, useAddProjectStore, type AddProjectTab } from "@/stores/addProject";
 import { GitHubTab } from "./GitHubTab";
@@ -14,12 +15,15 @@ const tabs: { id: AddProjectTab; label: string; icon: typeof Sparkles }[] = [
 
 /**
  * The Add Project dialog (repo.add's presenter): New, Local folder, GitHub. Each opening
- * starts fresh; closing it cancels a clone in flight.
+ * starts fresh. Closing it (Escape, the overlay, the close button) cancels a clone in
+ * flight and deletes a project the New tab created but did not keep; it is not possible
+ * while the New tab is creating or publishing.
  */
 export function AddProjectDialog() {
   const open = useAddProjectStore((s) => s.open);
   const tab = useAddProjectStore((s) => s.tab);
   const seq = useAddProjectStore((s) => s.seq);
+  const busy = useAddProjectStore((s) => s.busy);
   return (
     <Dialog
       open={open}
@@ -30,6 +34,11 @@ export function AddProjectDialog() {
       <DialogContent className="max-w-xl p-4" data-testid="add-project-dialog" data-tab={tab}>
         <DialogTitle>Add Project</DialogTitle>
         <DialogDescription className="sr-only">Start a new project, add a folder on this Mac, or clone a repository from GitHub.</DialogDescription>
+        <DialogClose asChild>
+          <Button type="button" variant="ghost" size="icon-sm" className="absolute top-2.5 right-2.5" aria-label="Close" disabled={busy} data-testid="add-project-close">
+            <X aria-hidden />
+          </Button>
+        </DialogClose>
         <Tabs
           key={seq}
           value={tab}
@@ -51,7 +60,7 @@ export function AddProjectDialog() {
             <NewTab active={tab === "new"} />
           </TabsContent>
           <TabsContent value="local">
-            <LocalFolderTab />
+            <LocalFolderTab active={tab === "local"} />
           </TabsContent>
           {/* Kept mounted when hidden, so switching tabs does not cancel a clone. */}
           <TabsContent value="github" forceMount className="data-[state=inactive]:hidden">

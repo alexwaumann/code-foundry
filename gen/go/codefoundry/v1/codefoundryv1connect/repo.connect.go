@@ -73,6 +73,8 @@ const (
 	RepoServiceListPublishOwnersProcedure = "/codefoundry.v1.RepoService/ListPublishOwners"
 	// RepoServicePublishProcedure is the fully-qualified name of the RepoService's Publish RPC.
 	RepoServicePublishProcedure = "/codefoundry.v1.RepoService/Publish"
+	// RepoServiceDeleteProcedure is the fully-qualified name of the RepoService's Delete RPC.
+	RepoServiceDeleteProcedure = "/codefoundry.v1.RepoService/Delete"
 )
 
 // RepoServiceClient is a client for the codefoundry.v1.RepoService service.
@@ -128,9 +130,10 @@ type RepoServiceClient interface {
 	// letters, digits, "-", "_" and "."; AlreadyExists when the folder exists.
 	Create(context.Context, *connect.Request[v1.CreateRepoRequest]) (*connect.Response[v1.CreateRepoResponse], error)
 	// ListPublishOwners lists where the viewer can publish a repository: their own
-	// account (public and private) and every organization they belong to, with the
-	// visibilities the organization lets members create when GitHub says (it tells only
-	// org owners). Cached for 10 minutes.
+	// account (public and private) and every organization they belong to that lets them
+	// create repositories (GitHub's viewerCanCreateRepositories), with the visibilities
+	// the organization lets members create when GitHub says (it tells only org owners).
+	// Cached for 10 minutes in memory and on disk; allow_stale serves an older list.
 	ListPublishOwners(context.Context, *connect.Request[v1.ListPublishOwnersRequest]) (*connect.Response[v1.ListPublishOwnersResponse], error)
 	// Publish creates <owner>/<name> on GitHub from a git project without an origin
 	// remote: `gh repo create <owner>/<name> --source <path> --remote origin --push
@@ -138,6 +141,11 @@ type RepoServiceClient interface {
 	// not git or already has origin; a gh failure carries gh's last lines verbatim.
 	// Bounded at 5 minutes.
 	Publish(context.Context, *connect.Request[v1.PublishRepoRequest]) (*connect.Response[v1.PublishRepoResponse], error)
+	// Delete unregisters a project made by Create and removes its folder from disk. Only
+	// a project directly inside the projects directory can be deleted (FailedPrecondition
+	// otherwise); nothing on GitHub is touched. The Add Project dialog calls it when a
+	// new project is cancelled before it is kept or published.
+	Delete(context.Context, *connect.Request[v1.DeleteRepoRequest]) (*connect.Response[v1.DeleteRepoResponse], error)
 }
 
 // NewRepoServiceClient constructs a client for the codefoundry.v1.RepoService service. By default,
@@ -253,6 +261,12 @@ func NewRepoServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(repoServiceMethods.ByName("Publish")),
 			connect.WithClientOptions(opts...),
 		),
+		delete: connect.NewClient[v1.DeleteRepoRequest, v1.DeleteRepoResponse](
+			httpClient,
+			baseURL+RepoServiceDeleteProcedure,
+			connect.WithSchema(repoServiceMethods.ByName("Delete")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -275,6 +289,7 @@ type repoServiceClient struct {
 	create            *connect.Client[v1.CreateRepoRequest, v1.CreateRepoResponse]
 	listPublishOwners *connect.Client[v1.ListPublishOwnersRequest, v1.ListPublishOwnersResponse]
 	publish           *connect.Client[v1.PublishRepoRequest, v1.PublishRepoResponse]
+	delete            *connect.Client[v1.DeleteRepoRequest, v1.DeleteRepoResponse]
 }
 
 // Register calls codefoundry.v1.RepoService.Register.
@@ -362,6 +377,11 @@ func (c *repoServiceClient) Publish(ctx context.Context, req *connect.Request[v1
 	return c.publish.CallUnary(ctx, req)
 }
 
+// Delete calls codefoundry.v1.RepoService.Delete.
+func (c *repoServiceClient) Delete(ctx context.Context, req *connect.Request[v1.DeleteRepoRequest]) (*connect.Response[v1.DeleteRepoResponse], error) {
+	return c.delete.CallUnary(ctx, req)
+}
+
 // RepoServiceHandler is an implementation of the codefoundry.v1.RepoService service.
 type RepoServiceHandler interface {
 	// Register adds a project by path. A path inside a git repository registers that
@@ -415,9 +435,10 @@ type RepoServiceHandler interface {
 	// letters, digits, "-", "_" and "."; AlreadyExists when the folder exists.
 	Create(context.Context, *connect.Request[v1.CreateRepoRequest]) (*connect.Response[v1.CreateRepoResponse], error)
 	// ListPublishOwners lists where the viewer can publish a repository: their own
-	// account (public and private) and every organization they belong to, with the
-	// visibilities the organization lets members create when GitHub says (it tells only
-	// org owners). Cached for 10 minutes.
+	// account (public and private) and every organization they belong to that lets them
+	// create repositories (GitHub's viewerCanCreateRepositories), with the visibilities
+	// the organization lets members create when GitHub says (it tells only org owners).
+	// Cached for 10 minutes in memory and on disk; allow_stale serves an older list.
 	ListPublishOwners(context.Context, *connect.Request[v1.ListPublishOwnersRequest]) (*connect.Response[v1.ListPublishOwnersResponse], error)
 	// Publish creates <owner>/<name> on GitHub from a git project without an origin
 	// remote: `gh repo create <owner>/<name> --source <path> --remote origin --push
@@ -425,6 +446,11 @@ type RepoServiceHandler interface {
 	// not git or already has origin; a gh failure carries gh's last lines verbatim.
 	// Bounded at 5 minutes.
 	Publish(context.Context, *connect.Request[v1.PublishRepoRequest]) (*connect.Response[v1.PublishRepoResponse], error)
+	// Delete unregisters a project made by Create and removes its folder from disk. Only
+	// a project directly inside the projects directory can be deleted (FailedPrecondition
+	// otherwise); nothing on GitHub is touched. The Add Project dialog calls it when a
+	// new project is cancelled before it is kept or published.
+	Delete(context.Context, *connect.Request[v1.DeleteRepoRequest]) (*connect.Response[v1.DeleteRepoResponse], error)
 }
 
 // NewRepoServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -536,6 +562,12 @@ func NewRepoServiceHandler(svc RepoServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(repoServiceMethods.ByName("Publish")),
 		connect.WithHandlerOptions(opts...),
 	)
+	repoServiceDeleteHandler := connect.NewUnaryHandler(
+		RepoServiceDeleteProcedure,
+		svc.Delete,
+		connect.WithSchema(repoServiceMethods.ByName("Delete")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.RepoService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RepoServiceRegisterProcedure:
@@ -572,6 +604,8 @@ func NewRepoServiceHandler(svc RepoServiceHandler, opts ...connect.HandlerOption
 			repoServiceListPublishOwnersHandler.ServeHTTP(w, r)
 		case RepoServicePublishProcedure:
 			repoServicePublishHandler.ServeHTTP(w, r)
+		case RepoServiceDeleteProcedure:
+			repoServiceDeleteHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -647,4 +681,8 @@ func (UnimplementedRepoServiceHandler) ListPublishOwners(context.Context, *conne
 
 func (UnimplementedRepoServiceHandler) Publish(context.Context, *connect.Request[v1.PublishRepoRequest]) (*connect.Response[v1.PublishRepoResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.Publish is not implemented"))
+}
+
+func (UnimplementedRepoServiceHandler) Delete(context.Context, *connect.Request[v1.DeleteRepoRequest]) (*connect.Response[v1.DeleteRepoResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.Delete is not implemented"))
 }

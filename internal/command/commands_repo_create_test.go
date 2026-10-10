@@ -15,8 +15,10 @@ import (
 
 func TestRepoCreateAndPublish(t *testing.T) {
 	// r-plain has no git, r-origin has origin; anything else is a git project without it.
+	// r-made is the one in the projects directory.
 	notGit := func(c command.Context) bool { return c.ActiveRepoID == "r-plain" }
 	hasOrigin := func(c command.Context) bool { return c.ActiveRepoID == "r-origin" }
+	deletable := func(c command.Context) bool { return c.ActiveRepoID == "r-made" }
 	ghErr := connect.NewError(connect.CodeUnknown, errors.New("GraphQL: Name already exists on this account (createRepository)"))
 	tests := []struct {
 		name     string
@@ -51,15 +53,20 @@ func TestRepoCreateAndPublish(t *testing.T) {
 			args: map[string]string{"owner": "me", "visibility": "private"}, err: ghErr,
 			wantErr:  "GraphQL: Name already exists on this account (createRepository)",
 			wantCall: `repo_id:"r1" owner:"me" visibility:REPOSITORY_VISIBILITY_PRIVATE`},
+		{name: "delete a project in the projects directory", cmd: "repo.delete", uctx: command.Context{ActiveRepoID: "r-made"},
+			wantMsg: "deleted r-made", wantCall: `id:"r-made"`},
+		{name: "delete is unavailable elsewhere", cmd: "repo.delete", uctx: command.Context{ActiveRepoID: "r1"},
+			wantErr: "not in the projects directory"},
+		{name: "delete needs a project", cmd: "repo.delete", wantErr: "not available"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &commandtest.Projects{Err: tt.err}
 			reg := command.NewRegistry()
-			if err := command.RegisterProjects(reg, command.ProjectDeps{Backend: b, NotGit: notGit, HasOrigin: hasOrigin}); err != nil {
+			if err := command.RegisterProjects(reg, command.ProjectDeps{Backend: b, NotGit: notGit, HasOrigin: hasOrigin, Deletable: deletable}); err != nil {
 				t.Fatal(err)
 			}
-			res, err := reg.Invoke(context.Background(), tt.uctx, tt.cmd, tt.args)
+			res, err := reg.Invoke(context.Background(), tt.uctx, tt.cmd, tt.args, command.Confirmed(true))
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 					t.Fatalf("err = %v, want containing %q", err, tt.wantErr)

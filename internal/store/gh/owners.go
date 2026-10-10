@@ -14,15 +14,28 @@ import (
 
 // Publish owners (RepoService.ListPublishOwners): the accounts the viewer can create a
 // repository in, for the publish picker. One GraphQL request lists the viewer and their
-// organizations; one REST GET /orgs/{org} per organization reads its repository policy
+// organizations (those with viewerCanCreateRepositories: an organization that lets only
+// owners create repositories, or whose enterprise disables it, is left out); one REST
+// GET /orgs/{org} per organization reads its repository policy
 // (members_can_create_{public,internal,private}_repositories). GitHub returns those
 // fields only to organization owners, so for most organizations the policy is unknown
-// and the picker offers every visibility. The list is cached for OwnersTTL.
+// and the picker offers every visibility. The list is cached for OwnersTTL in memory
+// and kept in the gh_activity table, so a restarted daemon still has the last one;
+// CachedPublishOwners serves it however old it is.
 
 const queryPublishOwners = "publish_owners"
 
 // OwnersTTL is how long ListPublishOwners serves a cached list.
 const OwnersTTL = 10 * time.Minute
+
+// activityOwners is the gh_activity key of the last complete owner list (ownersRow).
+const activityOwners = "publish_owners"
+
+// ownersRow is the persisted owner list.
+type ownersRow struct {
+	FetchedAt time.Time      `json:"fetchedAt"`
+	Owners    []PublishOwner `json:"owners"`
+}
 
 // Repository visibilities, as GitHub's GraphQL spells them (Repository.Visibility).
 const (
@@ -49,8 +62,11 @@ type PublishOwner struct {
 // Owners lists publish owners. *Store implements it; ghtest.Store fakes it.
 type Owners interface {
 	// PublishOwners returns the viewer's account first, then their organizations by
-	// login.
+	// login. A list younger than OwnersTTL is served from the cache.
 	PublishOwners(ctx context.Context) ([]PublishOwner, error)
+	// CachedPublishOwners returns the last fetched list however old it is, and whether
+	// it is older than OwnersTTL. ok is false when nothing was fetched yet.
+	CachedPublishOwners(ctx context.Context) (owners []PublishOwner, stale, ok bool)
 }
 
 var _ Owners = (*Store)(nil)
@@ -62,19 +78,47 @@ type ownersCache struct {
 	owners []PublishOwner
 }
 
+// get returns the cached list when it is younger than OwnersTTL.
 func (c *ownersCache) get(now time.Time) ([]PublishOwner, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.owners == nil || now.Sub(c.at) >= OwnersTTL {
+	owners, stale, ok := c.any(now)
+	if !ok || stale {
 		return nil, false
 	}
-	return clonePublishOwners(c.owners), true
+	return owners, true
+}
+
+// any returns the cached list however old it is, and whether it is stale.
+func (c *ownersCache) any(now time.Time) (owners []PublishOwner, stale, ok bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.owners == nil {
+		return nil, false, false
+	}
+	return clonePublishOwners(c.owners), now.Sub(c.at) >= OwnersTTL, true
 }
 
 func (c *ownersCache) put(now time.Time, owners []PublishOwner) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.at, c.owners = now, clonePublishOwners(owners)
+}
+
+// loadOwners fills the in-memory owner cache from the gh_activity row, if any.
+func (s *Store) loadOwners(ctx context.Context) {
+	row, ok, err := loadActivityRow[ownersRow](ctx, s.cache, activityOwners)
+	if err != nil {
+		s.log.Warn("gh owners cache load failed", "err", err)
+		return
+	}
+	if !ok || row.Owners == nil {
+		return
+	}
+	s.owners.put(row.FetchedAt, row.Owners)
+}
+
+// CachedPublishOwners implements Owners.
+func (s *Store) CachedPublishOwners(context.Context) ([]PublishOwner, bool, bool) {
+	return s.owners.any(s.opts.Now())
 }
 
 func clonePublishOwners(in []PublishOwner) []PublishOwner {
@@ -125,7 +169,11 @@ func (s *Store) PublishOwners(ctx context.Context) ([]PublishOwner, error) {
 		return nil, err
 	}
 	if r.complete {
-		s.owners.put(s.opts.Now(), r.owners)
+		now := s.opts.Now()
+		s.owners.put(now, r.owners)
+		if err := s.cache.saveActivity(ctx, activityOwners, now, ownersRow{FetchedAt: now, Owners: r.owners}); err != nil {
+			s.log.Warn("gh owners cache save failed", "err", err)
+		}
 	}
 	return clonePublishOwners(r.owners), nil
 }
@@ -160,13 +208,16 @@ func isNotFoundOrDenied(err error) bool {
 	return errors.Is(err, ErrNotFound) || errors.Is(err, ErrPermissionDenied)
 }
 
+// decodePublishOwners returns the viewer's login and the organizations the viewer can
+// create repositories in (viewerCanCreateRepositories), sorted by login.
 func decodePublishOwners(data []byte) (login string, orgs []string, err error) {
 	var d struct {
 		Viewer *struct {
 			Login         string `json:"login"`
 			Organizations *struct {
 				Nodes []*struct {
-					Login string `json:"login"`
+					Login     string `json:"login"`
+					CanCreate bool   `json:"viewerCanCreateRepositories"`
 				} `json:"nodes"`
 			} `json:"organizations"`
 		} `json:"viewer"`
@@ -179,7 +230,7 @@ func decodePublishOwners(data []byte) (login string, orgs []string, err error) {
 	}
 	if d.Viewer.Organizations != nil {
 		for _, n := range d.Viewer.Organizations.Nodes {
-			if n != nil && n.Login != "" {
+			if n != nil && n.Login != "" && n.CanCreate {
 				orgs = append(orgs, n.Login)
 			}
 		}

@@ -15,7 +15,7 @@
  *   GET  /__mock/github/calls                     ("search <q>", "lookup <o/n>", "clone <o/n>")
  *   RepoService.Create / ListPublishOwners / Publish, repo.create, repo.github.publish:
  *        mock/create.ts (publishing private to octo-org, or a repository named "taken", fails like gh)
- *   GET  /__mock/projects/calls                   ("create <name>", "publish <id> <o/n> <visibility>")
+ *   GET  /__mock/projects/calls                   ("create <name>", "publish <id> <o/n> <visibility>", "delete <id>")
  *   POST /__mock/session/attention?id=s-1
  *   POST /__mock/session/status?id=s-1&status=busy|idle|attention
  *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139
@@ -81,7 +81,7 @@ import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { listDirectories } from "./filesystem";
 import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from "./clone";
-import { createProject, listPublishOwners, projectCalls, publishProject, resetProjects, visibilityFlag } from "./create";
+import { createProject, deleteProject, listPublishOwners, projectCalls, publishProject, resetProjects, visibilityFlag } from "./create";
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
 import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
@@ -203,6 +203,10 @@ function routes(router: ConnectRouter): void {
       return { repo: world.repoMsg(repo) };
     },
     listPublishOwners: () => listPublishOwners(),
+    delete: (req) => {
+      deleteProject(world, req.id);
+      return {};
+    },
     publish: async (req) => {
       const vis = visibilityFlag(req.visibility);
       await publishProject(world, req.repoId, req.owner, req.name, vis);

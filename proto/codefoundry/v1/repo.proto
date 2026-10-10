@@ -57,9 +57,10 @@ service RepoService {
   // letters, digits, "-", "_" and "."; AlreadyExists when the folder exists.
   rpc Create(CreateRepoRequest) returns (CreateRepoResponse) {}
   // ListPublishOwners lists where the viewer can publish a repository: their own
-  // account (public and private) and every organization they belong to, with the
-  // visibilities the organization lets members create when GitHub says (it tells only
-  // org owners). Cached for 10 minutes.
+  // account (public and private) and every organization they belong to that lets them
+  // create repositories (GitHub's viewerCanCreateRepositories), with the visibilities
+  // the organization lets members create when GitHub says (it tells only org owners).
+  // Cached for 10 minutes in memory and on disk; allow_stale serves an older list.
   rpc ListPublishOwners(ListPublishOwnersRequest) returns (ListPublishOwnersResponse) {}
   // Publish creates <owner>/<name> on GitHub from a git project without an origin
   // remote: `gh repo create <owner>/<name> --source <path> --remote origin --push
@@ -67,6 +68,11 @@ service RepoService {
   // not git or already has origin; a gh failure carries gh's last lines verbatim.
   // Bounded at 5 minutes.
   rpc Publish(PublishRepoRequest) returns (PublishRepoResponse) {}
+  // Delete unregisters a project made by Create and removes its folder from disk. Only
+  // a project directly inside the projects directory can be deleted (FailedPrecondition
+  // otherwise); nothing on GitHub is touched. The Add Project dialog calls it when a
+  // new project is cancelled before it is kept or published.
+  rpc Delete(DeleteRepoRequest) returns (DeleteRepoResponse) {}
 }
 
 message Repo {
@@ -377,12 +383,25 @@ message CreateRepoResponse {
   Repo repo = 1;
 }
 
-message ListPublishOwnersRequest {}
+message ListPublishOwnersRequest {
+  // Answer with the last fetched list however old it is, when there is one (the
+  // publish picker shows it at once and asks again for a fresh one). Without it, a list
+  // older than 10 minutes is fetched again first.
+  bool allow_stale = 1;
+}
 
 message ListPublishOwnersResponse {
   // The viewer first, then organizations by login.
   repeated PublishOwner owners = 1;
+  // The list is older than 10 minutes (only with allow_stale).
+  bool stale = 2;
 }
+
+message DeleteRepoRequest {
+  string id = 1;
+}
+
+message DeleteRepoResponse {}
 
 enum PublishOwnerKind {
   PUBLISH_OWNER_KIND_UNSPECIFIED = 0;

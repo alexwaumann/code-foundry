@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -52,6 +53,7 @@ type ownersGitHub struct {
 	mu       sync.Mutex
 	login    string
 	orgs     []string
+	denied   []string          // orgs with viewerCanCreateRepositories false
 	policies map[string]string // org -> body
 	errs     map[string]error  // org -> REST error
 	rest     []string
@@ -65,7 +67,7 @@ func (g *ownersGitHub) graphql(op string, _ map[string]any) (json.RawMessage, er
 	defer g.mu.Unlock()
 	nodes := []any{}
 	for _, o := range g.orgs {
-		nodes = append(nodes, map[string]any{"login": o})
+		nodes = append(nodes, map[string]any{"login": o, "viewerCanCreateRepositories": !slices.Contains(g.denied, o)})
 	}
 	return json.Marshal(map[string]any{
 		"rateLimit": map[string]any{"limit": 5000, "cost": 1, "remaining": 4000, "resetAt": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)},
@@ -110,8 +112,9 @@ func ownerSummary(os []PublishOwner) []string {
 
 func TestPublishOwners(t *testing.T) {
 	g := &ownersGitHub{
-		login: "octocat",
-		orgs:  []string{"zeta", "octo-org", "Acme", "gone"},
+		login:  "octocat",
+		orgs:   []string{"zeta", "octo-org", "Acme", "gone", "owners-only"},
+		denied: []string{"owners-only"},
 		policies: map[string]string{
 			"octo-org": `{"members_can_create_public_repositories":true,"members_can_create_internal_repositories":true,"members_can_create_private_repositories":false}`,
 		},
@@ -144,7 +147,11 @@ func TestPublishOwners(t *testing.T) {
 		t.Fatalf("owners:\n got %v\nwant %v", ownerSummary(got), want)
 	}
 	if calls := g.restCalls(); len(calls) != 4 {
-		t.Errorf("REST calls = %v, want one per org", calls)
+		t.Errorf("REST calls = %v, want one per allowed org (none for owners-only)", calls)
+	}
+	// The cached list is served however old it is by CachedPublishOwners.
+	if cached, stale, ok := s.CachedPublishOwners(ctx); !ok || stale || fmt.Sprint(ownerSummary(cached)) != fmt.Sprint(want) {
+		t.Errorf("cached = %v stale=%t ok=%t", ownerSummary(cached), stale, ok)
 	}
 
 	// Cached: no request for 10 minutes, and callers cannot change the cache.
@@ -161,8 +168,11 @@ func TestPublishOwners(t *testing.T) {
 		t.Errorf("PublishOwners requests = %d, want 1 (cached)", n)
 	}
 
-	// Expired: asked again.
+	// Expired: stale for CachedPublishOwners, asked again by PublishOwners.
 	age(2 * time.Minute)
+	if cached, stale, ok := s.CachedPublishOwners(ctx); !ok || !stale || len(cached) != 5 {
+		t.Errorf("expired cached = %v stale=%t ok=%t, want the old list, stale", ownerSummary(cached), stale, ok)
+	}
 	if _, err := s.PublishOwners(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -187,6 +197,41 @@ func TestPublishOwners(t *testing.T) {
 	}
 	if n := f.count("PublishOwners"); n != 4 {
 		t.Errorf("PublishOwners requests = %d, want 4 (a partial list is not cached)", n)
+	}
+}
+
+// A complete list survives a restart: a new store over the same database serves it
+// from the cache (stale after OwnersTTL) without asking GitHub.
+func TestPublishOwnersPersisted(t *testing.T) {
+	g := &ownersGitHub{login: "octocat", orgs: []string{"octo-org"}}
+	f := &fakeRunner{}
+	f.set(g.graphql)
+	dbPath := filepath.Join(t.TempDir(), "gh.sqlite")
+	db := openTestDBAt(t, dbPath)
+	s := startStore(t, testOptions(db, f, nil))
+	ctx := context.Background()
+	if _, err := s.PublishOwners(ctx); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"octocat user PUBLIC+PRIVATE known=true", "octo-org org PUBLIC+INTERNAL+PRIVATE known=false"}
+
+	f2 := &fakeRunner{}
+	f2.set(g.graphql)
+	s2 := startStore(t, testOptions(db, f2, nil))
+	if cached, stale, ok := s2.CachedPublishOwners(ctx); !ok || stale || fmt.Sprint(ownerSummary(cached)) != fmt.Sprint(want) {
+		t.Fatalf("restarted: cached = %v stale=%t ok=%t, want %v", ownerSummary(cached), stale, ok, want)
+	}
+	if _, err := s2.PublishOwners(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if n := f2.count("PublishOwners"); n != 0 {
+		t.Errorf("PublishOwners requests after restart = %d, want 0 (served from the database)", n)
+	}
+
+	// Nothing fetched yet: no cached list at all.
+	s3 := startStore(t, testOptions(openTestDB(t), f2, nil))
+	if _, _, ok := s3.CachedPublishOwners(ctx); ok {
+		t.Error("fresh store has a cached list")
 	}
 }
 

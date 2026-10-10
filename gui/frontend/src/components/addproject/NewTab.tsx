@@ -6,8 +6,8 @@ import { PublishPicker } from "@/components/publish/PublishPicker";
 import { usePublishOwners, type PublishChoice } from "@/components/publish/usePublishOwners";
 import { Button } from "@/components/ui/button";
 import { tildify } from "@/lib/path";
-import { projectNameError, projectsDirFrom } from "@/lib/publish";
-import { closeAddProject, selectAddedProject } from "@/stores/addProject";
+import { projectNameError, projectsDirFrom, type PublishOwnerView } from "@/lib/publish";
+import { finishAddProject, selectAddedProject, setAddProjectBusy, setCreatedProject } from "@/stores/addProject";
 import { createProject, publishProject, type CreatedProject } from "@/stores/publish";
 import { useSettingsStore } from "@/stores/settings";
 
@@ -16,7 +16,8 @@ import { useSettingsStore } from "@/stores/settings";
  * to GitHub step (owner and visibility), and Create. Create runs repo.create, then
  * repo.github.publish when asked. A refused publish keeps the project (it exists
  * locally) and the picker, with gh's error under it, so another owner or visibility can
- * be tried, or the project kept local.
+ * be tried, or the project kept local. Cancelling the dialog instead deletes it again
+ * (the dialog's store does that).
  */
 export function NewTab({ active }: { active: boolean }) {
   const [name, setName] = useState("");
@@ -31,8 +32,9 @@ export function NewTab({ active }: { active: boolean }) {
   const projectsDir = useSettingsStore((s) => projectsDirFrom(s.snapshot?.path));
   const owners = usePublishOwners(
     publish,
-    useCallback((first: PublishChoice) => {
-      setChoice((cur) => (cur.owner ? cur : first));
+    // Keep the current owner while the arriving list still has it; else the viewer.
+    useCallback((first: PublishChoice, list: PublishOwnerView[]) => {
+      setChoice((cur) => (cur.owner && list.some((o) => o.login === cur.owner) ? cur : first));
     }, []),
   );
 
@@ -47,13 +49,22 @@ export function NewTab({ active }: { active: boolean }) {
     };
   }, [active]);
 
+  // The dialog refuses to close while creating or publishing, and deletes a created
+  // project that was neither kept nor published when it is cancelled.
+  useEffect(() => {
+    setAddProjectBusy(busy !== null);
+  }, [busy]);
+  useEffect(() => {
+    setCreatedProject(created);
+  }, [created]);
+
   const nameError = projectNameError(name);
   const destination = `${tildify(projectsDir)}/${name || "<name>"}`;
   const canPublish = !publish || (choice.owner !== "" && choice.visibility !== null);
 
   const finish = (project: CreatedProject, message: string) => {
     toast.success(message);
-    closeAddProject();
+    finishAddProject();
     selectAddedProject(project.id);
   };
 
@@ -89,6 +100,9 @@ export function NewTab({ active }: { active: boolean }) {
   };
 
   const nameMessage = createError ?? (touched || name !== "" ? nameError : null);
+  const label = busy === "create" ? "Creating…" : busy === "publish" ? "Publishing…" : created ? (publish ? "Publish" : "Done") : publish ? "Create and publish" : "Create project";
+  // Done (a created project kept as it is) has no icon; the others say what they do.
+  const icon = busy ? <Loader2 className="animate-spin" aria-hidden /> : created && !publish ? null : publish ? <CloudUpload aria-hidden /> : <Sparkles aria-hidden />;
   return (
     <form
       className="flex flex-col gap-3"
@@ -127,7 +141,7 @@ export function NewTab({ active }: { active: boolean }) {
         )}
         {created && (
           <span className="text-xs text-emerald-400" data-testid="add-project-new-created">
-            Created {created.name}. It stays a local project until it is published.
+            Created {created.name}. It stays a local project until it is published; closing this dialog deletes it.
           </span>
         )}
       </div>
@@ -150,7 +164,7 @@ export function NewTab({ active }: { active: boolean }) {
         {publish && <PublishPicker owners={owners} value={choice} onChange={setChoice} disabled={busy !== null} error={publishError} />}
       </div>
       <div className="flex items-center justify-end gap-2">
-        {created && (
+        {created && publish && (
           <Button
             type="button"
             size="sm"
@@ -165,18 +179,8 @@ export function NewTab({ active }: { active: boolean }) {
           </Button>
         )}
         <Button type="submit" size="sm" disabled={busy !== null || (!created && name === "") || !canPublish} data-testid="add-project-create">
-          {busy ? <Loader2 className="animate-spin" aria-hidden /> : publish ? <CloudUpload aria-hidden /> : <Sparkles aria-hidden />}
-          {busy === "create"
-            ? "Creating…"
-            : busy === "publish"
-              ? "Publishing…"
-              : created
-                ? publish
-                  ? "Publish"
-                  : "Done"
-                : publish
-                  ? "Create and publish"
-                  : "Create project"}
+          {icon}
+          {label}
         </Button>
       </div>
     </form>

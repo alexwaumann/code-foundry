@@ -46,6 +46,10 @@ function DialogContent({
   )
 }
 
+function DialogClose({ ...props }: React.ComponentProps<typeof DialogPrimitive.Close>) {
+  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
+}
+
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
   return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-sm font-semibold", className)} {...props} />
 }
@@ -60,4 +64,4 @@ function DialogDescription({ className, ...props }: React.ComponentProps<typeof 
   )
 }
 
-export { Dialog, DialogContent, DialogTitle, DialogDescription }
+export { Dialog, DialogClose, DialogContent, DialogTitle, DialogDescription }

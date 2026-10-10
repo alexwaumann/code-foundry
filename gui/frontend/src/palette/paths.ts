@@ -1,3 +1,5 @@
+import { tildify } from "@/lib/path";
+
 /**
  * Path completion in the palette's `path` prompts. The daemon lists directories
  * (FilesystemService.ListDirectories); these pure helpers turn a listing and a key into
@@ -28,4 +30,28 @@ export function tabCompletion(query: string, completion: string | null, highligh
   if (highlighted !== null) return descendInto(query, highlighted);
   if (completion !== null && completion !== query) return completion;
   return null;
+}
+
+/** The prefix every Local folder path starts with: the input shows it permanently. */
+export const HOME_PREFIX = "~/";
+
+/**
+ * The full path for what was typed, pasted or picked into the Local folder input, whose
+ * "~/" is fixed: "src/x" -> "~/src/x"; a pasted "~/src/x" or "~" is not doubled; an
+ * absolute path under a macOS home becomes "~/..." (tildify); any other absolute path is
+ * taken relative to home, since the input cannot name anything outside it.
+ */
+export function homeRelative(input: string): string {
+  let rest = input;
+  if (rest.startsWith("~")) rest = rest.slice(1);
+  else if (rest.startsWith("/")) {
+    const t = tildify(rest);
+    rest = t.startsWith("~") ? t.slice(1) : rest;
+  }
+  return HOME_PREFIX + rest.replace(/^\/+/, "");
+}
+
+/** What the Local folder input shows for a full path: everything after "~/". */
+export function homeDisplay(path: string): string {
+  return path.startsWith(HOME_PREFIX) ? path.slice(HOME_PREFIX.length) : path === "~" ? "" : path;
 }
