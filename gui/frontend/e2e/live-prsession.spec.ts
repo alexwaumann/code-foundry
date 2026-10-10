@@ -39,7 +39,7 @@ test("Explain this PR starts a real Claude session with the explain prompt", asy
     await page.locator('[data-testid="project"]').filter({ has: page.getByTestId("project-name").getByText(REPO, { exact: true }) }).locator("[data-nav-key^='p:']").dblclick();
   };
   await openRepo();
-  await expect(page.getByTestId("overview-page")).toBeVisible();
+  await expect(page.getByTestId("worktree-surface")).toBeVisible();
   // Through the app's own store module, as a pull request row would.
   await page.evaluate(`import("/src/stores/prPanel.ts").then((m) => m.openPullRequestInPanel({ slug: "${SLUG}", number: ${String(NUMBER)} }))`);
   await expect(page.getByTestId("pr-title")).toBeVisible({ timeout: 60_000 });

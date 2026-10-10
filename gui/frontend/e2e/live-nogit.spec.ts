@@ -45,7 +45,7 @@ test("register a plain folder, see No git everywhere, then repo git init turns i
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-projects.png") });
 
     await page.locator(`[data-nav-key="p:${repo.id}"]`).dblclick();
-    await expect(page.getByTestId("overview-page")).toHaveAttribute("data-git", "false");
+    await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-git", "false");
     await expect(page.getByTestId("section-nogit")).toContainText("Not a git repository");
     await expect(page.getByTestId("init-git")).toBeEnabled();
     await expect(page.getByTestId("section-files")).toHaveCount(0);
@@ -57,8 +57,8 @@ test("register a plain folder, see No git everywhere, then repo git init turns i
     expect(branch).not.toBe("");
 
     // The open overview follows the repo event: the normal git overview, no remote.
-    await expect(page.getByTestId("overview-page")).toHaveAttribute("data-git", "true");
-    await expect(page.getByTestId("overview-title")).toHaveText(`${repo.name}@${branch}`);
+    await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-git", "true");
+    await expect(page.getByTestId("worktree-surface-title")).toHaveText(`${repo.name}@${branch}`);
     await expect(page.getByTestId("sync-line")).toBeVisible();
     await expect(page.getByTestId("publish-github")).toBeEnabled();
     await expect(row.getByTestId("row-place")).toHaveText(`${repo.name} · ${branch}`);

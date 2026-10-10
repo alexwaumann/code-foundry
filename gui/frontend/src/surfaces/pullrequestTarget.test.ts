@@ -28,11 +28,8 @@ const entryOf = (slug: string, branch: string) => entries[`${slug} ${branch}`];
 describe("selectionPullRequest", () => {
   it.each<[string, Selection, { slug: string; number: number } | null]>([
     ["session on a branch with an open PR", { kind: "session", id: "s1" }, { slug: "alex/cf", number: 145 }],
-    ["worktree row", { kind: "worktree", repoId: "r1", path: "/src/cf-fix" }, { slug: "alex/cf", number: 145 }],
     ["session on main (no PR)", { kind: "session", id: "s2" }, null],
-    ["repo row (main worktree, no PR)", { kind: "repo", repoId: "r1" }, null],
-    ["branch not loaded yet", { kind: "worktree", repoId: "r1", path: "/src/cf-nopr" }, null],
-    ["repo without a GitHub remote", { kind: "repo", repoId: "r2" }, null],
+    ["composer (a repo, no worktree)", { kind: "compose", repoId: "r1" }, null],
     ["session whose worktree is gone", { kind: "session", id: "s3" }, null],
     ["unknown session", { kind: "session", id: "nope" }, null],
     ["Pull Requests page", { kind: "view", name: "pullrequests" }, null],

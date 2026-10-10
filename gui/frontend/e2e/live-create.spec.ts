@@ -60,7 +60,7 @@ test("create a project with the New tab; the publish picker lists the viewer", a
   try {
     await page.getByTestId("add-project-create").click();
     await expect(page.getByTestId("add-project-dialog")).toHaveCount(0);
-    await expect(page.getByTestId("overview-title")).toHaveText(new RegExp(`^${name}@`));
+    await expect(page.getByTestId("worktree-surface-title")).toHaveText(new RegExp(`^${name}@`));
     expect(await projectAt(dest)).not.toBe("");
 
     await page.getByTestId("publish-github").click();

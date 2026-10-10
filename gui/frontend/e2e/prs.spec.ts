@@ -92,7 +92,7 @@ test.describe("Pull Requests page", () => {
   test("cmd+shift+d runs view.pullrequests and the ShowView intent switches the page", async ({ page }) => {
     await openApp(page);
     await selectWorktree(page, "repo-cf", `${CFW}/feat-sidebar`);
-    await expect(page.getByTestId("overview-page")).toBeVisible();
+    await expect(page.getByTestId("worktree-surface")).toBeVisible();
     await page.keyboard.press("Meta+Shift+d");
     await expect(page.getByTestId("prs-page")).toBeVisible();
     expect((await invocations()).some((i) => i.name === "view.pullrequests")).toBe(true);
@@ -130,10 +130,10 @@ test.describe("Pull Requests page", () => {
 });
 
 test.describe("worktree overview", () => {
-  test("feature worktree: sync line, GitHub activity, sessions, files tree, log", async ({ page }) => {
+  test("feature worktree: sync line, GitHub activity, files tree, log", async ({ page }) => {
     await openApp(page);
     await selectWorktree(page, "repo-cf", `${CFW}/feat-sidebar`);
-    await expect(page.getByTestId("overview-title")).toHaveText("code-foundry@feat/sidebar");
+    await expect(page.getByTestId("worktree-surface-title")).toHaveText("code-foundry@feat/sidebar");
     const sync = page.getByTestId("sync-line");
     await expect(sync).toContainText("Upstream origin/feat/sidebar: ↑2");
     await expect(sync).toContainText("Base origin/main: ↑3 ↓1");
@@ -149,9 +149,6 @@ test.describe("worktree overview", () => {
     await expect(gh.locator('[data-nav-key^="c:"]').nth(1)).toContainText("continuous-integration/jenkins/branch");
     await expect(gh.locator('[data-nav-key^="m:"]')).toHaveCount(2); // #138 and #136 (code-foundry only)
     await expect(gh.locator('[data-nav-key="b:142"]')).toContainText("feat/sidebar → main");
-
-    // Sessions on this worktree (2c) are still listed.
-    await expect(page.getByRole("button", { name: /Investigate flaky e2e/ })).toBeVisible();
 
     const files = page.getByTestId("files-list");
     await expect(files).toHaveAttribute("data-virtual", "false");
@@ -169,8 +166,9 @@ test.describe("worktree overview", () => {
   test("keyboard: fold directories, open failing checks and commits", async ({ page }) => {
     await openApp(page);
     await selectWorktree(page, "repo-cf", `${CFW}/feat-sidebar`);
+    // In the panel the list does not take focus on its own.
     const list = page.getByTestId("overview-list");
-    await expect(list).toBeFocused();
+    await list.focus();
     await expect(page.getByTestId("files-list")).toBeVisible();
     // First row: the first failing check; Enter opens its log.
     await list.press("ArrowDown");
@@ -219,7 +217,7 @@ test.describe("worktree overview", () => {
   test("detail updates live; main worktree shows untracked files and an empty log", async ({ page }) => {
     await openApp(page);
     await selectProject(page, "repo-cf");
-    await expect(page.getByTestId("overview-title")).toHaveText("code-foundry@main");
+    await expect(page.getByTestId("worktree-surface-title")).toHaveText("code-foundry@main");
     await expect(page.locator('[data-nav-key="f:.pr1853.diff"]')).toContainText("+1368");
     await expect(page.locator('[data-nav-key="f:notes/"] [data-status]')).toHaveText("?");
     await expect(page.getByTestId("section-log")).toContainText("no commits in range");

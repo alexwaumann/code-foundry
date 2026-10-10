@@ -21,11 +21,15 @@ func TestClassify(t *testing.T) {
 		op   fsnotify.Op
 		want action
 	}{
-		// lock files never trigger, whatever the directory
+		// lock files never trigger, whatever the directory, except <common>/config.lock
+		// appearing (config is about to be rewritten; kqueue may drop the rename onto it)
 		{wkCommon, "index.lock", c, actNone},
 		{wkCommon, "HEAD.lock", r, actNone},
 		{wkRoot, "foo.lock", w, actNone},
 		{wkRemoteRefs, "main.lock", c, actNone},
+		{wkCommon, "config.lock", c, actReconcile},
+		{wkCommon, "config.lock", r, actNone},
+		{wkCommon, "config.lock", w, actNone},
 
 		// attribute-only events never trigger (git reading the index fires one)
 		{wkCommon, "index", a, actNone},

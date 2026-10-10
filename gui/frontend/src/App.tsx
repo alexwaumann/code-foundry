@@ -3,7 +3,7 @@ import { Composer } from "@/components/compose/Composer";
 import { AddProjectDialog } from "@/components/addproject/AddProjectDialog";
 import { PublishDialog } from "@/components/publish/PublishDialog";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
-import { Dashboard } from "@/components/Dashboard";
+import { StartPage } from "@/components/start/StartPage";
 import { HelpOverlay } from "@/components/help/HelpOverlay";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { CommandPalette } from "@/components/palette/CommandPalette";
@@ -76,14 +76,14 @@ function Content() {
   const sel = useUiStore((s) => s.selection);
   const sessionTerminal = useSessionsStore((s) => (sel.kind === "session" ? s.byId[sel.id]?.terminalId || null : null));
   if (sel.kind === "terminal") return <TerminalPane terminalId={sel.id} />;
-  if (sel.kind === "view" && sel.name === "dashboard") return <Dashboard />;
+  if (sel.kind === "view" && sel.name === "dashboard") return <StartPage />;
   if (sel.kind === "view" && sel.name === "pullrequests") return <PullRequestsPage />;
   if (sel.kind === "view" && sel.name === "projects") return <ProjectsPage />;
   if (sel.kind === "compose") return <Composer key={sel.workspaceId ? `ws:${sel.workspaceId}` : sel.repoId} repoId={sel.repoId} workspaceId={sel.workspaceId} />;
   if (sel.kind === "session") {
     return sessionTerminal ? <TerminalPane terminalId={sessionTerminal} sessionId={sel.id} /> : <SessionDisconnected id={sel.id} />;
   }
-  return <Dashboard />;
+  return <StartPage />;
 }
 
 /**

@@ -1850,6 +1850,19 @@ export class World {
       },
       {
         cmd: {
+          name: "view.panel.worktree",
+          title: "Show Worktree in Side Panel",
+          category: "View",
+          description: "Open the Worktree surface in the selected thread's side panel: the overview of the worktree it runs in, with sync state, GitHub activity, changed files and log.",
+          keybindings: [],
+          args: [],
+        },
+        // Like the daemon: a thread or terminal is active and it sits in a registered worktree.
+        when: (ctx) => Boolean((ctx?.activeSessionId || ctx?.activeTerminalId) && ctx.activeRepoId && ctx.activeWorktreePath),
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.worktree" } } }))}`,
+      },
+      {
+        cmd: {
           name: "view.panel.linked-prs",
           title: "Show Linked PRs in Side Panel",
           category: "View",

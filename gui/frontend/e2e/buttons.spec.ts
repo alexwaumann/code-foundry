@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { CF, invocations, openApp, resetMock, row, selectWorktree } from "./fixtures";
+import { CF, invocations, openApp, openProjects, resetMock, row } from "./fixtures";
 
 const FIX_RESIZE = `${CF}.worktrees/fix-resize`;
 const DOTFILES = "/Users/dev/dotfiles";
@@ -128,8 +128,11 @@ test("empty states and the welcome panel offer buttons", async ({ page }) => {
   await expect(page.getByTestId("palette")).toBeVisible();
   await page.keyboard.press("Escape");
 
-  await selectWorktree(page, "repo-dot", DOTFILES);
-  await page.getByTestId("empty-new-terminal").click();
+  // The Projects page's rows carry their worktree as the command's context.
+  await openProjects(page);
+  const dot = page.locator(`[data-nav-key="pw:repo-dot::${DOTFILES}"]`);
+  await dot.hover();
+  await dot.getByTestId("worktree-new-terminal").click();
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("terminal.new");
   const last = (await invocations()).at(-1);
   expect(last?.name).toBe("terminal.new");

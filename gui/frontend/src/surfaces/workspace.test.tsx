@@ -50,8 +50,8 @@ describe("Workspace surface availability", () => {
     render(<SidePanel />);
     expect(row()?.getAttribute("data-availability")).toBe("enabled");
     expect(row()?.textContent).toContain("W");
-    // The member tab surface (worktree) is never listed.
-    expect(screen.getByTestId("panel-empty").querySelector('[data-surface="worktree"]')).toBeNull();
+    // The Worktree surface is listed too: the thread sits in a member worktree.
+    expect(screen.getByTestId("panel-empty").querySelector('[data-surface="worktree"]')?.getAttribute("data-availability")).toBe("enabled");
     act(() => {
       select("s-proj");
     });

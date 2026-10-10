@@ -4,6 +4,7 @@ import { sessionOfTerminal, useSessionsStore } from "./sessions";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 import { showView } from "./views";
+import { showWorktreeOnProjectsPage } from "./worktreePanel";
 
 /** Applies one UI intent (delivered on the shared events stream) to the GUI. */
 export function applyIntent(intent: UiIntentView): void {
@@ -21,8 +22,8 @@ export function applyIntent(intent: UiIntentView): void {
       ui.select({ kind: "session", id: intent.sessionId }, { focusTerminal: true });
       break;
     case "focusRepo":
-      if (intent.worktreePath) ui.select({ kind: "worktree", repoId: intent.repoId, path: intent.worktreePath });
-      else ui.select({ kind: "repo", repoId: intent.repoId });
+      // The Projects page with the worktree (default: the project's main one) in its panel.
+      showWorktreeOnProjectsPage(intent.repoId, intent.worktreePath);
       break;
     case "openPalette":
       ui.openPalette(intent.query);

@@ -168,7 +168,7 @@ deeper. Watched directories per repo (`<common>` = `<main>/.git`):
 
 | Directory | Entry → action |
 |---|---|
-| `<common>` | `HEAD`, `index` → status(main). `FETCH_HEAD`, `packed-refs`, `config`, `worktrees` → reconcile |
+| `<common>` | `HEAD`, `index` → status(main). `FETCH_HEAD`, `packed-refs`, `config`, `worktrees` → reconcile. `config.lock` created → reconcile too (see below) |
 | `<common>/logs` | `HEAD` (reflog append: commit, reset, rebase, merge, pull, checkout) → status(main) |
 | `<common>/refs/remotes/origin` | anything → base(repo), which then runs status(all worktrees) (push or fetch moved a remote-tracking ref) |
 | `<common>/worktrees` | entry created, removed, or renamed → reconcile (`git worktree add/remove/prune` from anywhere) |
@@ -177,7 +177,10 @@ deeper. Watched directories per repo (`<common>` = `<main>/.git`):
 | each worktree root | any entry except `.git` → status(that worktree) |
 | a watched dir itself removed or renamed | → reconcile (worktree deleted by hand, repo moved) |
 
-Always ignored: names ending in `.lock`, and Chmod-only (attribute) events. Each job key is
+Always ignored: names ending in `.lock` (except `<common>/config.lock` being created:
+kqueue was seen to drop the rename of `config.lock` onto `config`, so a remote removal
+went unnoticed on a CI runner; the lock's creation is a reliable directory-entry event
+and the debounce window outlasts git's rewrite), and Chmod-only (attribute) events. Each job key is
 debounced: the first event arms a 300ms timer, later events in the window are absorbed, and
 the job then fires once. Latency stays bounded under a continuous stream of events.
 `classify()` in `watch.go` is the source of truth and has a table test.

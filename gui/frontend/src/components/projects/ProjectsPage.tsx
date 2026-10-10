@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Folder, FolderGit2, FolderOpen, FolderPlus, Layers, PanelRight, Sparkles, SquareTerminal, Trash2, Unlink } from "lucide-react";
+import { Folder, FolderGit2, FolderPlus, Layers, PanelRight, Sparkles, SquareTerminal, Trash2, Unlink } from "lucide-react";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { SectionTitle } from "@/components/prs/PrBits";
 import { RowList } from "@/components/prs/RowList";
@@ -11,11 +11,12 @@ import { NavProvider, NavRow } from "@/lib/NavRow";
 import { pageItems, projectKey, projectsModel, projectWorktreeKey, workspaceKey, type ProjectModel, type ProjectsWorkspaces } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { composeIn, composeInWorkspace } from "@/stores/compose";
-import { addProject, newTerminalIn, openProject, openWorktree, removeWorkspace, removeWorktree, unregisterProject } from "@/stores/projectActions";
-import { findWorktree, useReposStore } from "@/stores/repos";
+import { addProject, newTerminalIn, removeWorkspace, removeWorktree, unregisterProject } from "@/stores/projectActions";
+import { findWorktree, mainWorktreePath, useReposStore } from "@/stores/repos";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
 import { showWorkspaceInThread } from "@/stores/workspacePanel";
+import { showWorktreeInPanel } from "@/stores/worktreePanel";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { liveWorkspaceThread } from "@/surfaces/workspaceTarget";
 import { WorkspaceMembers } from "./WorkspaceMembers";
@@ -58,14 +59,11 @@ function decode(repoKeys: readonly string[], wsKeys: readonly string[]) {
 function WorktreeRow({ repoId, path }: { repoId: string; path: string }) {
   const isMain = useReposStore((s) => findWorktree(s, repoId, path)?.isMain ?? false);
   return (
-    <NavRow navKey={projectWorktreeKey(repoId, path)} className="group/wt flex h-full items-center gap-2 pr-2 pl-6 text-sm" title={`${path}\nEnter or double-click: open the worktree`}>
+    <NavRow navKey={projectWorktreeKey(repoId, path)} className="group/wt flex h-full items-center gap-2 pr-2 pl-6 text-sm" title={`${path}\nEnter or double-click: show the worktree in the side panel`}>
       <span className="flex h-full min-w-0 flex-1 items-center" data-testid="project-worktree" data-path={path}>
         <WorktreeState repoId={repoId} path={path} />
       </span>
       <span className="flex shrink-0 items-center opacity-0 group-hover/wt:opacity-100 group-aria-selected/wt:opacity-100">
-        <RowAction label="Open worktree" testId="worktree-open" onClick={() => { openWorktree(repoId, path); }}>
-          <FolderOpen />
-        </RowAction>
         <RowAction label="New thread here" testId="worktree-new-thread" onClick={() => { composeIn(repoId, path); }}>
           <Sparkles />
         </RowAction>
@@ -91,7 +89,7 @@ function ProjectBlock({ project }: { project: ProjectModel }) {
   const Icon = noGit ? Folder : FolderGit2;
   return (
     <section className="rounded-md border" data-testid="project" data-repo={repoId} data-git={!noGit}>
-      <NavRow navKey={projectKey(repoId)} className="group/p flex h-9 items-center gap-2 rounded-b-none border-b px-2" title="Enter or double-click: open the project's overview">
+      <NavRow navKey={projectKey(repoId)} className="group/p flex h-9 items-center gap-2 rounded-b-none border-b px-2" title="Enter or double-click: show the project in the side panel">
         <Icon className={cn("size-4 shrink-0", noGit ? "text-muted-foreground" : "text-sky-400/90")} aria-hidden />
         <span className="truncate font-medium" data-testid="project-name">
           {name}
@@ -163,7 +161,8 @@ function WorkspaceBlock({ id }: { id: string }) {
  * own worktrees with git and pull request state and actions (new thread, new terminal,
  * remove worktree, unregister); per workspace its members (add, remove, remove the
  * workspace). Workspace member worktrees are listed under their workspace only.
- * Keyboard: ↑/↓ move, Enter opens (a worktree's overview, a workspace's composer).
+ * Keyboard: ↑/↓ move, Enter (like double-click) shows a project or worktree in the page's
+ * side panel, or opens a workspace's composer.
  */
 export function ProjectsPage() {
   const structure = useStructure();
@@ -176,11 +175,12 @@ export function ProjectsPage() {
     () =>
       items.map((it) => {
         switch (it.kind) {
+          // Enter or double-click shows the worktree (a project's main one) in the page's side panel.
           case "project":
-            return { key: it.key, activate: () => { openProject(it.repoId); } };
+            return { key: it.key, activate: () => { showWorktreeInPanel(it.repoId, mainWorktreePath(useReposStore.getState(), it.repoId)); } };
           case "worktree":
           case "member":
-            return { key: it.key, activate: () => { openWorktree(it.repoId, it.path); } };
+            return { key: it.key, activate: () => { showWorktreeInPanel(it.repoId, it.path); } };
           case "workspace":
             return { key: it.key, activate: () => { composeInWorkspace(it.workspaceId); } };
         }

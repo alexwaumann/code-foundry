@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, resetMock, row, selectProject } from "./fixtures";
+import { openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -158,8 +158,6 @@ test("every page header is 44px, ends on the band and drags; its controls do not
     for (const sel of noDrag) expect(await drag(page, `${header} ${sel}`), sel).toBe("no-drag");
   };
 
-  await selectProject(page, "repo-cf");
-  await check('[data-testid="overview-page"] > header', ['[data-testid="panel-toggle"]']);
   await page.getByTestId("nav-pullrequests").click();
   await check('[data-testid="prs-page"] > header', ['[data-testid="prs-scope"]', '[data-testid="panel-toggle"]']);
   await page.getByTestId("nav-projects").click();

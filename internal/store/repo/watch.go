@@ -71,8 +71,16 @@ func (a action) String() string {
 // action. It is the single source of truth for what triggers a refresh; the table in
 // docs/notes/phase1b-repo.md mirrors it.
 func classify(kind watchKind, name string, op fsnotify.Op) action {
-	// Lock files come and go during every git operation; the rename onto the real
-	// name that follows is the event that matters.
+	// <common>/config.lock appearing means config is about to be rewritten (remote
+	// add/remove, url change). kqueue has been seen to drop the rename of config.lock
+	// onto config (a remote removal went unnoticed on a slow CI runner), so the lock
+	// itself triggers a reconcile too: its debounce window outlasts the rewrite, and
+	// the rename's own event, when it does arrive, is absorbed or re-runs the job.
+	if kind == wkCommon && name == "config.lock" && op.Has(fsnotify.Create) {
+		return actReconcile
+	}
+	// Other lock files come and go during every git operation; the rename onto the
+	// real name that follows is the event that matters.
 	if strings.HasSuffix(name, ".lock") {
 		return actNone
 	}

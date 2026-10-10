@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, invocations, mockPost, mockUrl, openApp, resetMock, row, selectWorktree } from "./fixtures";
+import { emit, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -108,7 +108,7 @@ test("a keybinding override rejects a reserved chord and applies a valid one", a
 
   // CommandService.List reports the override: the palette shows the new chord.
   await page.keyboard.press("Escape");
-  await selectWorktree(page, "repo-cf", `/Users/dev/src/code-foundry`);
+  await row(page, "s:s-1").click();
   await page.keyboard.press("Meta+k");
   await expect(page.getByTestId("palette").locator('[data-command="session.new"]')).toContainText("⇧⌘Y");
 });

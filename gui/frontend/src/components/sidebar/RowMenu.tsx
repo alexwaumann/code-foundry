@@ -20,6 +20,7 @@ import { useSessionsStore } from "@/stores/sessions";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
+import { showWorktreeInThread } from "@/stores/worktreePanel";
 
 function MemberItem({ sessionId, repoId, path, current, queued }: { sessionId: string; repoId: string; path: string; current: boolean; queued: boolean }) {
   const name = useReposStore((s) => s.byId[repoId]?.name ?? repoId);
@@ -68,17 +69,10 @@ function RunInMenu({ sessionId, workspaceId }: { sessionId: string; workspaceId:
   );
 }
 
-/** Shows a worktree's overview page (the Projects page reaches it too). */
-function showWorktree(repoId: string, path: string): void {
-  if (repoId && path) useUiStore.getState().select({ kind: "worktree", repoId, path });
-}
-
 function ThreadMenu({ id }: { id: string }) {
   const pinned = useSessionsStore((s) => s.byId[id]?.pinned ?? false);
   const state = useSessionsStore((s) => s.byId[id]?.state ?? "unknown");
   const workspaceId = useSessionsStore((s) => s.byId[id]?.workspaceId ?? "");
-  const repoId = useSessionsStore((s) => s.byId[id]?.repoId ?? "");
-  const path = useSessionsStore((s) => s.byId[id]?.worktreePath ?? "");
   return (
     <ContextMenuContent
       data-testid="row-menu"
@@ -117,7 +111,7 @@ function ThreadMenu({ id }: { id: string }) {
       </ContextMenuItem>
       <ContextMenuItem
         onSelect={() => {
-          showWorktree(repoId, path);
+          showWorktreeInThread(id);
         }}
       >
         <FolderGit2 />

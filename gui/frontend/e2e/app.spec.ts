@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { CF, emit, expectTerminalText, invocations, openApp, openProjects, resetMock, row, selectWorktree, writes } from "./fixtures";
+import { CF, emit, expectTerminalText, invocations, openApp, openProjects, resetMock, row, writes } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -109,7 +109,8 @@ test("invoking a command sends the current context", async ({ page }) => {
 
 test("required args are prompted inline before invoking", async ({ page }) => {
   await openApp(page);
-  await selectWorktree(page, "repo-cf", `${CF}.worktrees/feat-sidebar`);
+  // A thread on feat/sidebar: worktree.create takes its repo from the selection.
+  await row(page, "s:s-4").click();
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("create worktree");
   await page.keyboard.press("Enter");
@@ -122,8 +123,10 @@ test("required args are prompted inline before invoking", async ({ page }) => {
   expect(last?.name).toBe("worktree.create");
   expect(last?.args).toEqual({ branch: "feat/palette" });
   expect(last?.context?.activeWorktreePath).toBe(`${CF}.worktrees/feat-sidebar`);
-  // The command emits FocusRepo for the new worktree, created under ~/.code-foundry/worktrees/<owner>/<repo>: its overview shows.
-  await expect(page.getByTestId("overview-title")).toHaveText("code-foundry@feat/palette");
+  // The command emits FocusRepo for the new worktree, created under ~/.code-foundry/worktrees/<owner>/<repo>:
+  // the Projects page shows it in its side panel.
+  await expect(page.getByTestId("projects-page")).toBeVisible();
+  await expect(page.getByTestId("worktree-surface-title")).toHaveText("code-foundry@feat/palette");
 
   // Enum args list their values, the default highlighted.
   await page.keyboard.press("Meta+k");

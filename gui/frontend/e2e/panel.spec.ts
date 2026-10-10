@@ -92,11 +92,13 @@ test("the header toggle shows the empty surface list and hides the panel again",
   const empty = panel(page).getByTestId("panel-empty");
   await expect(empty.getByRole("heading", { name: "Open a surface" })).toBeVisible();
   const entries = empty.locator("[data-surface]");
-  await expect(entries).toHaveCount(3);
-  await expect(entries).toHaveText(["FilesF", "DiffD", "Pull requestP"]);
+  await expect(entries).toHaveCount(4);
+  await expect(entries).toHaveText(["FilesF", "DiffD", "Pull requestP", "WorktreeT"]);
   for (const kind of ["files", "diff", "pullrequest"]) {
     await expect(empty.locator(`[data-surface="${kind}"]`)).toBeDisabled();
   }
+  // The thread sits in a worktree, so its Worktree entry is live (worktree-panel.spec.ts).
+  await expect(empty.locator('[data-surface="worktree"]')).toBeEnabled();
   await expect(panel(page).getByTestId("panel-tabs")).toHaveCount(0);
 
   // Two panes, 8px apart, the panel 8px in from the window's right and bottom edges.

@@ -10,7 +10,7 @@ import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
-import { expandPanelCommand, linkedPrsPanelCommand, showView, toggleHelp, togglePanelCommand, workspacePanelCommand } from "@/stores/views";
+import { expandPanelCommand, linkedPrsPanelCommand, showView, toggleHelp, togglePanelCommand, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -223,6 +223,11 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // And for the Linked PRs surface: this window's thread's panel (or a toast without links).
   "view.panel.linked-prs": () => {
     linkedPrsPanelCommand();
+    return true;
+  },
+  // And for the Worktree surface: this window's thread's own worktree in its panel.
+  "view.panel.worktree": () => {
+    worktreePanelCommand();
     return true;
   },
   // Like cmd+k: opens this window's palette without a round trip. Deferred so that

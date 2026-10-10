@@ -454,8 +454,10 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
             onSubmit={send}
             onEscape={() => {
               if (!isDraftEmpty(getDraft(draftKey))) return false;
+              // Back to the Projects page (the worktree overview is a panel tab there,
+              // not a page); the dashboard when the composer has no project at all.
               const back = target.kind === "project" ? target.repoId : primary;
-              useUiStore.getState().select(back ? { kind: "repo", repoId: back } : DASHBOARD);
+              useUiStore.getState().select(back ? { kind: "view", name: "projects" } : DASHBOARD);
               return true;
             }}
             onPasteFiles={attach}

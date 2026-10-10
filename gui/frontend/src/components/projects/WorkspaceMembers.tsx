@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { ArrowRightLeft, FolderGit2, FolderOpen, PanelRightOpen, Plus, SquareTerminal, X } from "lucide-react";
+import { ArrowRightLeft, FolderGit2, PanelRightOpen, Plus, SquareTerminal, X } from "lucide-react";
 import { ComposerPicker, type PickerGroup } from "@/components/compose/ComposerPicker";
 import { RowList } from "@/components/prs/RowList";
 import { NavRow } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
 import { addableRepos, memberKey, threadAt } from "@/lib/projects";
-import { addToWorkspace, newTerminalIn, openWorktree, removeFromWorkspace } from "@/stores/projectActions";
+import { addToWorkspace, newTerminalIn, removeFromWorkspace } from "@/stores/projectActions";
+import { openWorktreeTab } from "@/stores/worktreePanel";
 import { useReposStore } from "@/stores/repos";
 import { runSessionIn } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
@@ -47,7 +48,7 @@ function PanelMemberRow({ workspaceId, member, threadId, onOpen }: RowOptions & 
   const name = useReposStore((s) => s.byId[member.repoId]?.name ?? member.repoId);
   const at = useThreadAt(threadId, member.path);
   const open = () => {
-    (onOpen ?? openWorktree)(member.repoId, member.path);
+    (onOpen ?? ((repoId, path) => openWorktreeTab("current", repoId, path)))(member.repoId, member.path);
   };
   return (
     <NavRow navKey={memberKey(workspaceId, member.repoId)} className="group/member flex h-full flex-col justify-center gap-0.5 px-2 text-sm" title={`${member.path}\nEnter or double-click: open`}>
@@ -92,7 +93,7 @@ function PanelMemberRow({ workspaceId, member, threadId, onOpen }: RowOptions & 
 function MemberRow({ workspaceId, member }: { workspaceId: string; member: Member }) {
   const name = useReposStore((s) => s.byId[member.repoId]?.name ?? member.repoId);
   return (
-    <NavRow navKey={memberKey(workspaceId, member.repoId)} className="group/member flex h-full items-center gap-2 px-2 text-sm" title={member.path}>
+    <NavRow navKey={memberKey(workspaceId, member.repoId)} className="group/member flex h-full items-center gap-2 px-2 text-sm" title={`${member.path}\nEnter or double-click: show the worktree in the side panel`}>
       <span className="flex h-full min-w-0 flex-1 items-center gap-2" data-testid="workspace-member" data-repo={member.repoId}>
         <FolderGit2 className="size-3.5 shrink-0 text-sky-400/90" aria-hidden />
         <span className="w-32 shrink-0 truncate font-medium" data-testid="member-name">
@@ -101,9 +102,6 @@ function MemberRow({ workspaceId, member }: { workspaceId: string; member: Membe
         <WorktreeState repoId={member.repoId} path={member.path} />
       </span>
       <span className="flex shrink-0 items-center opacity-0 group-hover/member:opacity-100 group-aria-selected/member:opacity-100">
-        <RowAction label="Open worktree" onClick={() => { openWorktree(member.repoId, member.path); }}>
-          <FolderOpen />
-        </RowAction>
         <RowAction label="New terminal here" onClick={() => void newTerminalIn(member.repoId, member.path)}>
           <SquareTerminal />
         </RowAction>

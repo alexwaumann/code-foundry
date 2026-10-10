@@ -51,8 +51,9 @@ test("worktree overview of a GitHub-backed clone", async ({ page }) => {
   await page.goto("/");
   // Projects live on the Projects page (docs/notes/workspaces-4-sidebar.md).
   await page.getByTestId("nav-projects").click();
-  await page.locator('[data-testid="project"]').filter({ has: page.getByTestId("project-name").getByText(REPO, { exact: true }) }).locator("[data-nav-key^='p:']").dblclick();
-  await expect(page.getByTestId("overview-page")).toBeVisible();
+  const project = page.locator('[data-testid="project"]').filter({ has: page.getByTestId("project-name").getByText(REPO, { exact: true }) }).locator("[data-nav-key^='p:']");
+  await project.dblclick();
+  await expect(page.getByTestId("worktree-surface")).toBeVisible();
   await expect(page.getByTestId("gh-default-branch")).not.toHaveAttribute("data-ci", "unknown", { timeout: 120_000 });
   await expect(page.getByTestId("gh-commit-stats")).toContainText("this month");
   await expect(page.getByTestId("section-files")).toContainText(/Files/);
