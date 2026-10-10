@@ -109,6 +109,10 @@ func startHarness(t *testing.T, dbPath string, opts Options) *harness {
 	if opts.WorktreeRoot == "" {
 		opts.WorktreeRoot = filepath.Join(t.TempDir(), "worktrees")
 	}
+	// Fixtures live in temp dirs, not under $HOME.
+	if opts.AllowedRoot == "" {
+		opts.AllowedRoot = os.TempDir()
+	}
 	opts.Debounce = 50 * time.Millisecond
 	if opts.FetchInterval == 0 {
 		opts.FetchInterval = -1
@@ -488,6 +492,58 @@ func TestUnregisterAndReloadFromDB(t *testing.T) {
 		u, ok := ev.(RepoUpdated)
 		return ok && u.Repo.ID == r2.ID && len(u.Repo.Worktrees) == 1
 	})
+}
+
+// TestRegisterAllowedRoot covers the home boundary: a project must resolve inside
+// Options.AllowedRoot, through symlinks and linked worktrees.
+func TestRegisterAllowedRoot(t *testing.T) {
+	isolateGit(t)
+	base, _ := filepath.EvalSymlinks(t.TempDir())
+	root, outside := filepath.Join(base, "home"), filepath.Join(base, "outside")
+	for _, d := range []string{root, outside} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	inside := filepath.Join(root, "proj")
+	git(t, base, "init", "-q", "-b", "main", inside)
+	git(t, inside, "commit", "-q", "--allow-empty", "-m", "init")
+	git(t, base, "init", "-q", "-b", "main", filepath.Join(outside, "proj"))
+	git(t, filepath.Join(outside, "proj"), "commit", "-q", "--allow-empty", "-m", "init")
+	git(t, filepath.Join(outside, "proj"), "worktree", "add", "-q", "-b", "wt", filepath.Join(root, "wt"))
+	if err := os.Symlink(filepath.Join(outside, "proj"), filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+	h := startHarness(t, "", Options{AllowedRoot: root})
+
+	tests := []struct {
+		name, path string
+		wantErr    string // empty: registers
+	}{
+		{"inside", inside, ""},
+		{"inside subdirectory spelled with dotdot", filepath.Join(root, "x", "..", "proj"), ""},
+		{"outside", filepath.Join(outside, "proj"), filepath.Join(outside, "proj") + " is outside your home directory"},
+		{"dotdot escape", filepath.Join(root, "..", "outside", "proj"), "is outside your home directory"},
+		{"symlink to outside", filepath.Join(root, "link"), filepath.Join(root, "link") + " is outside your home directory"},
+		{"worktree of an outside repo", filepath.Join(root, "wt"), filepath.Join(outside, "proj") + " is outside your home directory"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := h.store.Register(context.Background(), tt.path)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("Register(%q): %v", tt.path, err)
+				}
+				return
+			}
+			if !errors.Is(err, ErrInvalidArgument) || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("Register(%q) err = %v, want ErrInvalidArgument containing %q", tt.path, err, tt.wantErr)
+			}
+		})
+	}
+	if n := len(h.store.Snapshot().Repos); n != 1 {
+		t.Errorf("registered %d repos, want 1", n)
+	}
 }
 
 func TestRegisterErrors(t *testing.T) {

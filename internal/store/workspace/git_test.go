@@ -65,7 +65,7 @@ func TestWithGit(t *testing.T) {
 	}
 	defer func() { _ = d.Close() }()
 	b := bus.New()
-	repos, err := repo.Start(ctx, repo.Options{DB: d, Bus: b, WorktreeRoot: filepath.Join(base, "worktrees"),
+	repos, err := repo.Start(ctx, repo.Options{DB: d, Bus: b, WorktreeRoot: filepath.Join(base, "worktrees"), AllowedRoot: base,
 		FetchInterval: -1, PollInterval: -1})
 	if err != nil {
 		t.Fatal(err)
