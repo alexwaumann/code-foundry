@@ -81,6 +81,17 @@ func (h *Repo) CloneRepo(ctx context.Context, owner, name string, progress func(
 	return repoToProto(r), nil
 }
 
+// CloneRef is CloneRepo for a reference the user typed: owner/repo or an
+// https://github.com URL (gh.ParseRepoRef). A malformed one is InvalidArgument. It is
+// the repo.clone command's backend (command.CloneFunc).
+func (h *Repo) CloneRef(ctx context.Context, ref string, progress func(*v1.CloneProgress)) (*v1.Repo, error) {
+	owner, name, err := gh.ParseRepoRef(ref)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	return h.CloneRepo(ctx, owner, name, progress)
+}
+
 func (h *Repo) githubRepoToProto(r gh.Repository) *v1.GitHubRepository {
 	path, exists := h.cloner.Destination(r.Owner, r.Name)
 	return &v1.GitHubRepository{

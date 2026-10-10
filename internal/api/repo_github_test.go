@@ -182,3 +182,38 @@ func TestGitHubUnconfigured(t *testing.T) {
 		t.Errorf("clone: %v", err)
 	}
 }
+
+func TestCloneRef(t *testing.T) {
+	b := bus.New()
+	cloner := clonetest.New("/p")
+	h := NewRepo(repotest.New(b), b).WithGitHub(ghtest.New(b), cloner)
+	tests := []struct {
+		ref  string
+		code connect.Code // 0: success
+		slug string
+	}{
+		{"octo/hello", 0, "octo/hello"},
+		{"https://github.com/Octo/World.git", 0, "Octo/World"},
+		{"git@github.com:octo/hello.git", connect.CodeInvalidArgument, ""},
+		{"https://gitlab.com/octo/hello", connect.CodeInvalidArgument, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.ref, func(t *testing.T) {
+			before := len(cloner.Calls())
+			r, err := h.CloneRef(context.Background(), tt.ref, nil)
+			if tt.code == 0 && err != nil || tt.code != 0 && connect.CodeOf(err) != tt.code {
+				t.Fatalf("err = %v, want %v", err, tt.code)
+			}
+			calls := cloner.Calls()[before:]
+			if tt.slug == "" {
+				if len(calls) != 0 || r != nil {
+					t.Fatalf("cloned %v", calls)
+				}
+				return
+			}
+			if len(calls) != 1 || calls[0] != tt.slug || r.GetPath() != "/p/"+tt.slug {
+				t.Fatalf("calls %v, repo %v", calls, r)
+			}
+		})
+	}
+}
