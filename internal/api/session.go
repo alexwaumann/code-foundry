@@ -37,10 +37,13 @@ func (h *Session) Create(ctx context.Context, req *connect.Request[v1.CreateSess
 	o := session.CreateOptions{
 		RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
 		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(), PermissionMode: session.PermissionMode(m.GetPermissionMode()),
-		Attachments: m.GetAttachments(),
+		Attachments: m.GetAttachments(), WorkspaceID: m.GetWorkspaceId(),
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
 		o.NewWorktree = &session.NewWorktree{BaseRef: nw.GetBaseRef()}
+	}
+	if nw := m.GetNewWorkspace(); nw != nil {
+		o.NewWorkspace = &session.NewWorkspace{Repos: nw.GetRepos(), BaseRef: nw.GetBaseRef(), Name: nw.GetName()}
 	}
 	s, err := h.store.Create(ctx, o)
 	if err != nil {

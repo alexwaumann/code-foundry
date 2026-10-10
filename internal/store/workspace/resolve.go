@@ -101,9 +101,9 @@ func realPath(p string) string {
 	return filepath.Join(realPath(parent), filepath.Base(p))
 }
 
-// resolveRepo finds a registered repository by id, by name when exactly one has it,
+// ResolveRepo finds a registered repository by id, by name when exactly one has it,
 // or by an absolute path inside its main worktree or any of its worktrees.
-func resolveRepo(snap *repo.Snapshot, ref string) (repo.Repo, error) {
+func ResolveRepo(snap *repo.Snapshot, ref string) (repo.Repo, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
 		return repo.Repo{}, fmt.Errorf("%w: a repository is required", ErrInvalidArgument)
@@ -177,7 +177,7 @@ func memberFor(w Workspace, repos *repo.Snapshot, ref string) (Member, error) {
 			}
 		}
 	}
-	r, err := resolveRepo(repos, ref)
+	r, err := ResolveRepo(repos, ref)
 	if err == nil {
 		if m, ok := w.Member(r.ID); ok {
 			return m, nil

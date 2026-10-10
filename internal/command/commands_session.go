@@ -67,6 +67,12 @@ func hasSession(c Context) bool { return c.ActiveSessionID != "" }
 
 func hasRepoOrWorktree(c Context) bool { return c.ActiveRepoID != "" || c.ActiveWorktreePath != "" }
 
+// canStartThread is session.new's availability: a GUI caller needs an active
+// repository or worktree. A CLI caller (no active view) names everything with flags,
+// and --workspace or --repos alone are enough, which When cannot see, so Run
+// validates instead.
+func canStartThread(c Context) bool { return hasRepoOrWorktree(c) || c.ActiveView == "" }
+
 // sessionLabel is "name (id)" or just the id.
 func sessionLabel(s *v1.Session) string {
 	if s.GetName() != "" {
@@ -90,14 +96,17 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 	}
 	return r.RegisterAll(
 		Command{
-			Name:        "session.new",
-			Title:       "New Thread",
-			Description: "Start Claude Code in a worktree (default: the active worktree, else the active repository's main worktree), or in a new worktree.",
+			Name:  "session.new",
+			Title: "New Thread",
+			Description: "Start Claude Code in a worktree (default: the active worktree, else the active repository's main worktree), or in a new worktree. " +
+				"With workspace the thread belongs to that workspace and runs in one of its member worktrees; with new-worktree and repos it gets a new workspace.",
 			Category:    "Thread",
 			Keybindings: []string{"cmd+n"},
 			Args: []ArgSpec{
-				{Name: "repo", Type: String, Context: ContextRepo, Description: "Repository id"},
-				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path"},
+				{Name: "repo", Type: String, Context: ContextRepo, Description: "Repository id (with workspace or repos: the member the thread runs in)"},
+				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path (with workspace: a member worktree)"},
+				{Name: "workspace", Type: String, Description: "Workspace id or name the thread belongs to; it runs in the member repo or worktree names (default: the first member)"},
+				{Name: "repos", Type: String, Description: "With new-worktree: comma-separated repositories (id, name, or path) for a new workspace, a cf/<name> worktree in each; repo picks the member the thread runs in (default: the first)"},
 				{Name: "model", Type: Enum, Enum: SessionModels, Description: "Model (default: settings sessions.default_model)"},
 				{Name: "effort", Type: Enum, Enum: SessionEfforts, Description: "Effort level (default: settings sessions.default_effort)"},
 				{Name: "permission", Type: Enum, Enum: SessionPermissions, Default: "auto",
@@ -108,17 +117,25 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				{Name: "prompt", Type: String, Description: "First prompt, passed to Claude as it starts"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image paths from StageAttachment, appended to the prompt"},
 			},
-			When: hasRepoOrWorktree,
+			When: canStartThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				if a.String("repo") == "" && a.Path("worktree") == "" {
-					return Result{}, InvalidArg("worktree", "a worktree or repository is required")
+				ws, repos := a.String("workspace"), splitList(a.String("repos"))
+				if a.String("repo") == "" && a.Path("worktree") == "" && ws == "" && len(repos) == 0 {
+					return Result{}, InvalidArg("worktree", "a worktree, repository, or workspace is required")
 				}
 				req := &v1.CreateSessionRequest{
 					RepoId: a.String("repo"), WorktreePath: a.Path("worktree"), Model: a.String("model"),
 					Effort: a.String("effort"), Name: a.String("name"), InitialPrompt: a.String("prompt"),
 					PermissionMode: sessionPermissionModes[a.String("permission")], Attachments: splitList(a.String("attachments")),
+					WorkspaceId: ws,
 				}
 				switch {
+				case len(repos) > 0 && !a.Bool("new-worktree"):
+					return Result{}, InvalidArg("repos", "only applies with new-worktree (a new workspace); for an existing one use workspace")
+				case ws != "" && a.Bool("new-worktree"):
+					return Result{}, InvalidArg("workspace", "a workspace thread runs in an existing member; for a new workspace use new-worktree with repos")
+				case len(repos) > 0:
+					req.NewWorkspace = &v1.NewWorkspace{Repos: repos, BaseRef: a.String("base")}
 				case a.Bool("new-worktree"):
 					req.NewWorktree = &v1.NewWorktree{BaseRef: a.String("base")}
 				case a.String("base") != "":

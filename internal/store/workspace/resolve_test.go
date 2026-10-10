@@ -118,7 +118,7 @@ func TestResolveRepo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, err := resolveRepo(snap, tt.ref)
+			r, err := ResolveRepo(snap, tt.ref)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}

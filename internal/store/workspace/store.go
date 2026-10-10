@@ -142,7 +142,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Workspace, error
 	}
 	plans := make([]plan, 0, len(o.Members))
 	for _, spec := range o.Members {
-		r, err := resolveRepo(repos, spec.Repo)
+		r, err := ResolveRepo(repos, spec.Repo)
 		if err != nil {
 			return Workspace{}, err
 		}
@@ -195,7 +195,7 @@ func (m *Manager) AddRepo(ctx context.Context, o AddRepoOptions) (Workspace, err
 	if err != nil {
 		return Workspace{}, err
 	}
-	r, err := resolveRepo(m.opts.Repos.Snapshot(), o.Member.Repo)
+	r, err := ResolveRepo(m.opts.Repos.Snapshot(), o.Member.Repo)
 	if err != nil {
 		return Workspace{}, err
 	}

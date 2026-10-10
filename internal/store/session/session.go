@@ -173,9 +173,18 @@ func (*Snapshot) isSessionEvent() {}
 // CreateOptions configures Store.Create.
 type CreateOptions struct {
 	// RepoID and WorktreePath select the worktree. Either may be empty: a repo alone
-	// means its main worktree; a path alone is looked up among registered repos.
+	// means its main worktree; a path alone is looked up among registered repos. With
+	// WorkspaceID or NewWorkspace they pick the member worktree instead.
 	RepoID       string
 	WorktreePath string
+	// WorkspaceID (an id or a name), when set, makes the workspace the thread's owner.
+	// The thread runs in the member WorktreePath or RepoID names, else the first
+	// member. Exclusive with NewWorktree and NewWorkspace.
+	WorkspaceID string
+	// NewWorkspace, when set, makes Create make a workspace (a worktree on cf/<slug>
+	// in every repository, the slug as for NewWorktree) and run the thread in the
+	// member RepoID names, else the first. Exclusive with NewWorktree and WorkspaceID.
+	NewWorkspace *NewWorkspace
 	// Model is a claude --model value (alias like "opus" or a full model name).
 	Model string
 	// Effort is a claude --effort level: low, medium, high, xhigh, max.

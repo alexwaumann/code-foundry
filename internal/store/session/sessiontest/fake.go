@@ -131,8 +131,11 @@ func (f *Fake) add(call string, s session.Session) (session.Session, error) {
 
 // Create records the call and adds a STARTING session ("s-N", terminal "t-N"). With
 // NewWorktree the session's worktree is /worktrees/cf-<N> (CreatedWorktree, BaseRef as
-// requested). The call reads "Create <repo> <path> <model> <effort>", then " perm=<n>",
-// " new-worktree=<base>", " prompt=<text>" and " attachments=<a,b>" when set.
+// requested). WorkspaceID is copied as is. With NewWorkspace the session belongs to
+// workspace "w-new" and runs in /worktrees/<repo>, repo being RepoID or the first repo.
+// The call reads "Create <repo> <path> <model> <effort>", then " perm=<n>",
+// " new-worktree=<base>", " workspace=<id>", " new-workspace=<a,b>", " prompt=<text>"
+// and " attachments=<a,b>" when set.
 func (f *Fake) Create(_ context.Context, o session.CreateOptions) (session.Session, error) {
 	call := fmt.Sprintf("Create %s %s %s %s", o.RepoID, o.WorktreePath, o.Model, o.Effort)
 	s := session.Session{
@@ -148,6 +151,18 @@ func (f *Fake) Create(_ context.Context, o session.CreateOptions) (session.Sessi
 		s.WorktreePath = fmt.Sprintf("/worktrees/cf-%d", f.next+1)
 		f.mu.Unlock()
 		s.CreatedWorktree, s.BaseRef = true, o.NewWorktree.BaseRef
+	}
+	if o.WorkspaceID != "" {
+		call += " workspace=" + o.WorkspaceID
+		s.WorkspaceID = o.WorkspaceID
+	}
+	if nw := o.NewWorkspace; nw != nil && len(nw.Repos) > 0 {
+		call += " new-workspace=" + strings.Join(nw.Repos, ",")
+		s.RepoID = o.RepoID
+		if s.RepoID == "" {
+			s.RepoID = nw.Repos[0]
+		}
+		s.WorkspaceID, s.WorktreePath, s.CreatedWorktree, s.BaseRef = "w-new", "/worktrees/"+s.RepoID, true, nw.BaseRef
 	}
 	if o.InitialPrompt != "" {
 		call += " prompt=" + o.InitialPrompt
@@ -180,7 +195,7 @@ func (f *Fake) Fork(_ context.Context, id, name string) (session.Session, error)
 	}
 	return f.add("Fork "+id, session.Session{
 		RepoID: parent.RepoID, WorktreePath: parent.WorktreePath, Model: parent.Model, Effort: parent.Effort,
-		Name: name, ParentID: id, PermissionMode: parent.PermissionMode,
+		Name: name, ParentID: id, PermissionMode: parent.PermissionMode, WorkspaceID: parent.WorkspaceID,
 	})
 }
 

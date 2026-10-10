@@ -33,8 +33,12 @@ type Options struct {
 	// Repos resolves repo ids and worktree paths. Nil accepts any existing directory
 	// as a worktree (tests); the daemon always sets it.
 	Repos RepoSource
-	Bus   *bus.Bus     // default: a private bus
-	Log   *slog.Logger // default: slog.Default()
+	// Workspaces lists workspaces (a workspace thread's members at every spawn) and
+	// makes one for a new workspace thread. Nil refuses workspace threads; the daemon
+	// always sets it.
+	Workspaces WorkspaceSource
+	Bus        *bus.Bus     // default: a private bus
+	Log        *slog.Logger // default: slog.Default()
 	// Claude is the claude executable (resolved against PATH). Default "claude".
 	Claude string
 	// Paths locates Claude's config dir and global config. Default
@@ -306,7 +310,28 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 	}
 	namingTried := name != ""
 	var late <-chan namingResult
-	if o.NewWorktree != nil {
+	if (o.NewWorkspace != nil && (o.NewWorktree != nil || o.WorkspaceID != "")) || (o.NewWorktree != nil && o.WorkspaceID != "") {
+		return Session{}, fmt.Errorf("%w: new workspace, new worktree and workspace are exclusive", ErrInvalidArgument)
+	}
+	switch {
+	case o.NewWorkspace != nil:
+		cw, err := m.newWorkspace(ctx, id, name, o)
+		if err != nil {
+			return Session{}, err
+		}
+		s.WorkspaceID, s.RepoID, s.WorktreePath, s.BaseRef, s.CreatedWorktree = cw.workspaceID, cw.repoID, cw.path, cw.baseRef, true
+		if cw.name != "" {
+			s.Name, s.AutoNamed = cw.name, true
+		}
+		namingTried = namingTried || cw.namerCalled
+		late = cw.late
+	case o.WorkspaceID != "":
+		w, mem, err := m.workspaceMember(o.WorkspaceID, o.RepoID, o.WorktreePath)
+		if err != nil {
+			return Session{}, err
+		}
+		s.WorkspaceID, s.RepoID, s.WorktreePath = w.ID, mem.RepoID, mem.WorktreePath
+	case o.NewWorktree != nil:
 		nw, err := m.newWorktree(ctx, id, name, o)
 		if err != nil {
 			return Session{}, err
@@ -317,8 +342,10 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 		}
 		namingTried = namingTried || nw.namerCalled
 		late = nw.late
-	} else if s.RepoID, s.WorktreePath, err = m.resolveWorktree(o.RepoID, o.WorktreePath); err != nil {
-		return Session{}, err
+	default:
+		if s.RepoID, s.WorktreePath, err = m.resolveWorktree(o.RepoID, o.WorktreePath); err != nil {
+			return Session{}, err
+		}
 	}
 	now := m.opts.Now()
 	s.CreatedAt, s.LastActivityAt = now, now
@@ -383,7 +410,8 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Session, error) {
 	}
 	now := m.opts.Now()
 	s := Session{
-		ID: newID, RepoID: parent.RepoID, WorktreePath: parent.WorktreePath, Name: name, AutoNamed: autoNamed,
+		ID: newID, RepoID: parent.RepoID, WorktreePath: parent.WorktreePath, WorkspaceID: parent.WorkspaceID,
+		Name: name, AutoNamed: autoNamed,
 		Model: parent.Model, Effort: parent.Effort, PermissionMode: parent.PermissionMode,
 		State: StateStarting, CreatedAt: now, LastActivityAt: now, ParentID: parent.ID,
 	}

@@ -72,35 +72,12 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 		return nw, fmt.Errorf("%w: repo %s", ErrNotFound, repoID)
 	}
 
-	slug := slugify(name)
-	if name == "" && strings.TrimSpace(o.InitialPrompt) != "" {
-		ch, err := m.startSlug(id, o.InitialPrompt)
-		if err != nil {
-			return nw, err
-		}
-		nw.namerCalled = true
-		start := time.Now()
-		timer := time.NewTimer(m.opts.SlugTimeout)
-		select {
-		case res := <-ch:
-			timer.Stop()
-			if res.err != nil {
-				m.log.Warn("naming new worktree branch failed; using the session id", "session", id, "err", res.err)
-			} else {
-				slug, nw.name = res.name, res.name
-				m.log.Info("session auto-named", "session", id, "name", res.name,
-					"took", time.Since(start).Round(time.Millisecond).String())
-			}
-		case <-timer.C:
-			m.log.Info("naming new worktree branch timed out; using the session id", "session", id,
-				"timeout", m.opts.SlugTimeout.String())
-			nw.late = ch
-		case <-ctx.Done():
-			timer.Stop()
-			return nw, ctx.Err()
-		}
+	sl, err := m.waitSlug(ctx, id, name, o.InitialPrompt)
+	if err != nil {
+		return nw, err
 	}
-	branch := m.pickBranch(ctx, r.Path, slug, id)
+	nw.name, nw.namerCalled, nw.late = sl.name, sl.namerCalled, sl.late
+	branch := m.pickBranch(ctx, []string{r.Path}, sl.slug, id, nil)
 	path := ""
 	if m.opts.WorktreePath != nil {
 		path = m.opts.WorktreePath(r, branch)
@@ -116,6 +93,55 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 	m.log.Info("worktree created for session", "session", id, "repo", r.ID, "branch", branch,
 		"path", wt.Path, "base", nw.baseRef)
 	return nw, nil
+}
+
+// slugWait is the outcome of waitSlug.
+type slugWait struct {
+	// slug for the branch: the explicit name slugified, else the namer's answer, else
+	// "" (the caller falls back to the session id).
+	slug string
+	// name is the namer's slug when it arrived within SlugTimeout.
+	name string
+	// namerCalled: the namer was started for this session (in time or not).
+	namerCalled bool
+	// late delivers the namer's answer when it did not arrive in time.
+	late <-chan namingResult
+}
+
+// waitSlug picks the slug a new worktree's (or workspace's) branch is named after:
+// name slugified when set, else the namer's answer for the first prompt, waiting at
+// most Options.SlugTimeout.
+func (m *Manager) waitSlug(ctx context.Context, id, name, prompt string) (slugWait, error) {
+	sw := slugWait{slug: slugify(name)}
+	if name != "" || strings.TrimSpace(prompt) == "" {
+		return sw, nil
+	}
+	ch, err := m.startSlug(id, prompt)
+	if err != nil {
+		return sw, err
+	}
+	sw.namerCalled = true
+	start := time.Now()
+	timer := time.NewTimer(m.opts.SlugTimeout)
+	select {
+	case res := <-ch:
+		timer.Stop()
+		if res.err != nil {
+			m.log.Warn("naming new worktree branch failed; using the session id", "session", id, "err", res.err)
+		} else {
+			sw.slug, sw.name = res.name, res.name
+			m.log.Info("session auto-named", "session", id, "name", res.name,
+				"took", time.Since(start).Round(time.Millisecond).String())
+		}
+	case <-timer.C:
+		m.log.Info("naming new worktree branch timed out; using the session id", "session", id,
+			"timeout", m.opts.SlugTimeout.String())
+		sw.late = ch
+	case <-ctx.Done():
+		timer.Stop()
+		return sw, ctx.Err()
+	}
+	return sw, nil
 }
 
 // startSlug runs the namer for a first prompt in the background, retrying once after
@@ -183,18 +209,27 @@ func (m *Manager) applyLateName(id string, ch <-chan namingResult) {
 }
 
 // pickBranch returns cf/<slug>, or cf/<slug>-N when that branch exists locally or on
-// origin, or cf/<id> when the slug is empty or every suffix is taken.
-func (m *Manager) pickBranch(ctx context.Context, repoPath, slug, id string) string {
+// origin in any of repoPaths (or taken reports its name part, "<slug>" or
+// "<slug>-N", as used), or cf/<id> when the slug is empty or every suffix is taken.
+func (m *Manager) pickBranch(ctx context.Context, repoPaths []string, slug, id string, taken func(string) bool) string {
 	if slug == "" {
 		return branchPrefix + id
 	}
-	for i := 1; i <= maxBranchSuffix; i++ {
-		b := branchPrefix + slug
-		if i > 1 {
-			b += "-" + strconv.Itoa(i)
+	free := func(b string) bool {
+		for _, p := range repoPaths {
+			if m.opts.RefExists(ctx, p, "refs/heads/"+b) || m.opts.RefExists(ctx, p, "refs/remotes/origin/"+b) {
+				return false
+			}
 		}
-		if !m.opts.RefExists(ctx, repoPath, "refs/heads/"+b) && !m.opts.RefExists(ctx, repoPath, "refs/remotes/origin/"+b) {
-			return b
+		return true
+	}
+	for i := 1; i <= maxBranchSuffix; i++ {
+		s := slug
+		if i > 1 {
+			s += "-" + strconv.Itoa(i)
+		}
+		if (taken == nil || !taken(s)) && free(branchPrefix+s) {
+			return branchPrefix + s
 		}
 	}
 	return branchPrefix + id
