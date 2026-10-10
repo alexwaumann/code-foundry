@@ -29,27 +29,25 @@ function drag(page: Page, selector: string) {
 const BAND = 52;
 const HEADER = 44;
 
-test("the app name shows whole or not at all: hidden at the minimum sidebar width beside the badge, back when room returns", async ({ page }) => {
+test("the app name is 16px semibold and fits whole at the minimum sidebar width, zoomed out too", async ({ page }) => {
   await openApp(page);
   const title = page.getByTestId("sidebar-app-name");
-  // The mock has one thread needing attention, so the badge is in the band at the 260px default.
-  await expect(page.getByTestId("attention-badge")).toHaveText("1");
-  await expect(title).toHaveAttribute("data-fits", "true");
-  await expect(title).toBeVisible();
-
+  await expect(title).toHaveCSS("font-size", "16px");
+  await expect(title).toHaveCSS("font-weight", "600");
   const setWidth = (w: number) => page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setSidebarWidth(${String(w)}))`);
+  const setZoom = (z: number) => page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(z)}))`);
+  const fits = () => title.evaluate((el) => el.scrollWidth <= el.clientWidth);
   await setWidth(220);
-  await expect(title).toHaveAttribute("data-fits", "false");
-  await expect(title).toBeHidden();
-  // Never an ellipsis: the whole name or nothing.
-  expect(await title.evaluate((el) => getComputedStyle(el).textOverflow)).toBe("clip");
-
-  await setWidth(400);
-  await expect(title).toHaveAttribute("data-fits", "true");
+  await expect.poll(async () => (await box(page, "sidebar")).width).toBe(220);
+  expect(await fits()).toBe(true);
+  // Zoomed out, the gutter is wider in layout px (80 screen px over 0.9): the tightest case.
+  await setZoom(90);
+  await expect(page.getByTestId("traffic-light-gutter")).toHaveAttribute("style", /width: 89px/);
+  expect(await fits()).toBe(true);
   await expect(title).toBeVisible();
 });
 
-test("the sidebar band holds the empty traffic-light gutter and the app name, and drags the window", async ({ page }) => {
+test("the sidebar band holds only the empty traffic-light gutter and the app name, and drags the window", async ({ page }) => {
   await openApp(page);
   const viewport = page.viewportSize();
   const band = await box(page, "sidebar-band");
@@ -58,6 +56,7 @@ test("the sidebar band holds the empty traffic-light gutter and the app name, an
   expect(band.height).toBe(BAND);
   expect(band.width).toBe((await box(page, "sidebar")).width);
   expect(await drag(page, '[data-testid="sidebar-band"]')).toBe("drag");
+  await expect(page.getByTestId("sidebar-band").locator("button")).toHaveCount(0);
 
   const gutter = await box(page, "traffic-light-gutter");
   expect([gutter.left, gutter.top, gutter.width, gutter.height]).toEqual([0, 0, 80, BAND]);
@@ -68,13 +67,22 @@ test("the sidebar band holds the empty traffic-light gutter and the app name, an
   // 12px after the gutter.
   expect(await title.evaluate((el) => el.getBoundingClientRect().left)).toBe(80 + 12);
   expect(await drag(page, '[data-testid="sidebar-app-name"]')).toBe("drag");
-  // Its controls click instead of dragging.
-  expect(await drag(page, '[data-testid="sidebar-band-controls"]')).toBe("no-drag");
+
+  // The toolbar sits right under the band, 32px tall, its buttons in order from 12px in; it does not drag.
+  const toolbar = await box(page, "sidebar-toolbar");
+  expect([toolbar.top, toolbar.left, toolbar.height]).toEqual([BAND, 0, 32]);
+  expect(await drag(page, '[data-testid="sidebar-toolbar"]')).toBe("no-drag");
   expect(await drag(page, '[data-testid="sidebar-new-session"]')).toBe("no-drag");
-  // New terminal is not in the band (palette, cmd+t and the row menu only).
+  const buttons = await page
+    .getByTestId("sidebar-toolbar")
+    .locator("button")
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
+  expect(buttons).toEqual(["sidebar-dashboard", "sidebar-notifications", "sidebar-add-project", "sidebar-new-session"]);
+  expect((await box(page, "sidebar-dashboard")).left).toBe(12);
+  // New terminal is not in the sidebar (palette, cmd+t and the row menu only).
   await expect(page.getByTestId("sidebar-new-terminal")).toHaveCount(0);
-  // Pull Requests, Projects and the thread list sit below the band and do not drag.
-  expect((await box(page, "nav-pullrequests")).top).toBeGreaterThanOrEqual(BAND);
+  // Pull Requests, Projects and the thread list sit below the toolbar and do not drag.
+  expect((await box(page, "nav-pullrequests")).top).toBeGreaterThanOrEqual(BAND + 32);
   expect(await drag(page, '[data-testid="nav-pullrequests"]')).toBe("no-drag");
   expect(await drag(page, '[data-testid="nav-projects"]')).toBe("no-drag");
   expect(await drag(page, '[data-testid="thread-list"]')).toBe("");
