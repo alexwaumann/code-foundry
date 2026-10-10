@@ -765,7 +765,8 @@ Status: `make check` green (45 vitest files / 644 tests; Go packages all ok). `m
 
 The full-width title strip is gone. The content pane and the side panel start 8px from
 the window top, and their headers fill the 52px title band beside the sidebar's band
-(the traffic-light gutter and the Repositories header). Window dragging moved from the
+(the traffic-light gutter and the Repositories header; superseded, see
+sidebar-title-band.md). Window dragging moved from the
 native band to the Wails runtime. Layout and drag details: `phase3-ui-panes.md` ("Panes
 reach the window top", "How dragging is wired").
 
@@ -777,7 +778,7 @@ Status: `make check` green (Go packages all ok, 46 vitest files / 647 tests). `m
 |---|---|
 | `components/window/titleBand.ts` | `TITLE_BAND_HEIGHT` (52, was `TITLE_STRIP_HEIGHT`), `TRAFFIC_LIGHT_GUTTER` (80). `TitleStrip.tsx` deleted |
 | `components/window/PaneHeader.tsx` | The content pane header: `h-11`, border, `[--wails-draggable:drag]`, 80px left padding while the sidebar is hidden |
-| `components/sidebar/Sidebar.tsx` | `SidebarBand`: 52px, gutter + Repositories header, drag; controls `no-drag`. Pull Requests and the tree follow below |
+| `components/sidebar/Sidebar.tsx` | `SidebarBand`: 52px, gutter + Repositories header, drag; controls `no-drag`. Pull Requests and the tree follow below (header superseded, see sidebar-title-band.md) |
 | `App.tsx` | `ContentPane` is `m-2` (was `mx-2 mb-2`); the root holds an 8px `window-drag-edge` strip |
 | `components/panel/SidePanel.tsx` | Wrapper `mt-2`; `PanelHeader` always `h-11`, drag; tabs `no-drag` |
 | `components/panel/PanelToggle.tsx` | Always `no-drag` |

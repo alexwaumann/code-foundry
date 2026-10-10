@@ -7,8 +7,9 @@ proto changes, no daemon restart.
 ## What changed
 
 * **The app name replaces the section label.** `SidebarBand` (components/sidebar/Sidebar.tsx)
-  shows "Code Foundry" as an `h1`: 13px, semibold, `leading-none`, `tracking-tight`,
-  `text-foreground`, `select-none`, truncating. The old uppercase, muted, 11px "Threads"
+  shows "Code Foundry" as a `span` (`sidebar-app-name`): 13px, semibold, `leading-none`,
+  `tracking-tight`, `text-sidebar-foreground` (as SidebarRow), `select-none`, truncating.
+  It is not a heading because every content-pane page has its own `h1`. The old uppercase, muted, 11px "Threads"
   label is gone. The list's own "Threads" section row still labels the threads. The
   header's left padding after the 80px traffic-light gutter is 12px (`pl-3`), right 12px.
   The band is still `TITLE_BAND_HEIGHT` (52px) and the drag split is unchanged: the band
@@ -35,6 +36,8 @@ proto changes, no daemon restart.
   263px. So at 220 with the badge it reads "Cod…", and at the 260px default with the
   badge it is about 2px short ("Code Foun…"). Each extra badge digit costs about 7px. A
   wider minimum (about 264) or default (about 280) would fix that if it matters.
-* Saved sidebar widths are not clamped on load. A width under 220 saved before this
-  change stays until the next resize drag clamps it (`setSidebarWidth`). No migration:
-  Alex is the only user.
+* **Saved sidebar widths are clamped on load.** The ui store's persist `merge` clamps
+  `sidebarWidth` to [SIDEBAR_MIN, SIDEBAR_MAX], so a width saved under the old 180
+  minimum loads as 220. It is a clamp, not a migration (the persist version stays 3).
+  `SIDEBAR_DEFAULT` (260) is the initial width and what double-clicking the resize handle
+  restores.
