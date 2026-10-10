@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace/workspacetest"
 )
@@ -232,4 +233,131 @@ func TestCreateNewWorkspace(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWorkspaceLaunch(t *testing.T) {
+	snap := &workspace.Snapshot{Workspaces: []workspace.Workspace{{ID: "w-1", Name: "login", Members: []workspace.Member{
+		{RepoID: "web", WorktreePath: "/wt/web"}, {RepoID: "api", WorktreePath: "/wt/api"}, {RepoID: "lib", WorktreePath: "/wt/lib"},
+	}}}}
+	line := "This thread belongs to workspace login. Run `code-foundry workspace members` for the current worktrees."
+	exists := func(p string) bool { return p != "/wt/lib" }
+	tests := []struct {
+		name        string
+		snap        *workspace.Snapshot
+		id, cwd     string
+		wantOK      bool
+		wantDirs    []string
+		wantMissing []string
+	}{
+		{name: "every other member, in order", snap: snap, id: "w-1", cwd: "/wt/api", wantOK: true,
+			wantDirs: []string{"/wt/web"}, wantMissing: []string{"/wt/lib"}},
+		{name: "cwd compared cleaned", snap: snap, id: "w-1", cwd: "/wt/web/", wantOK: true,
+			wantDirs: []string{"/wt/api"}, wantMissing: []string{"/wt/lib"}},
+		{name: "cwd no longer a member: every member", snap: snap, id: "w-1", cwd: "/elsewhere", wantOK: true,
+			wantDirs: []string{"/wt/web", "/wt/api"}, wantMissing: []string{"/wt/lib"}},
+		{name: "workspace gone", snap: snap, id: "w-2", cwd: "/wt/web"},
+		{name: "no snapshot", id: "w-1", cwd: "/wt/web"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := workspaceLaunch(tt.snap, tt.id, tt.cwd, exists)
+			if ok != tt.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, tt.wantOK)
+			}
+			if !ok {
+				return
+			}
+			if !slices.Equal(got.addDirs, tt.wantDirs) || !slices.Equal(got.missing, tt.wantMissing) {
+				t.Errorf("dirs = %q missing = %q, want %q and %q", got.addDirs, got.missing, tt.wantDirs, tt.wantMissing)
+			}
+			if !slices.Equal(got.env, []string{"CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1"}) || got.prompt != line {
+				t.Errorf("env = %q prompt = %q", got.env, got.prompt)
+			}
+		})
+	}
+}
+
+// addDirs returns every --add-dir value in argv.
+func addDirs(argv []string) []string {
+	var out []string
+	for i, a := range argv {
+		if a == "--add-dir" && i+1 < len(argv) {
+			out = append(out, argv[i+1])
+		}
+	}
+	return out
+}
+
+// A workspace thread's every spawn reads the current members: create, reconnect and
+// fork. The attachments dir stays first; the daemon env is kept.
+func TestWorkspaceThreadSpawn(t *testing.T) {
+	att := filepath.Join(t.TempDir(), "attachments")
+	base := []string{"CODE_FOUNDRY_ENDPOINT=http://127.0.0.1:1", "CODE_FOUNDRY_TOKEN=t"}
+	e := newWSEnv(t, func(o *Options) { o.AttachmentsDir, o.Env = att, base })
+	line := "This thread belongs to workspace login. Run `code-foundry workspace members` for the current worktrees."
+	wantEnv := append(slices.Clone(base), "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1")
+	check := func(what string, s Session, wantDirs ...string) {
+		t.Helper()
+		spec, ok := e.terms.Spec(s.TerminalID)
+		if !ok {
+			t.Fatalf("%s: no terminal", what)
+		}
+		if got := addDirs(spec.Argv); !slices.Equal(got, append([]string{att}, wantDirs...)) {
+			t.Errorf("%s: --add-dir = %q, want %q", what, got, append([]string{att}, wantDirs...))
+		}
+		if got := argOf(spec.Argv, "--append-system-prompt"); got != line {
+			t.Errorf("%s: --append-system-prompt = %q", what, got)
+		}
+		if !slices.Equal(spec.Env, wantEnv) {
+			t.Errorf("%s: env = %q, want %q", what, spec.Env, wantEnv)
+		}
+	}
+	s := e.connected(CreateOptions{WorkspaceID: "login", InitialPrompt: "hi"})
+	check("create", s, e.wt2)
+	if spec, _ := e.terms.Spec(s.TerminalID); spec.Argv[len(spec.Argv)-2] != "--" {
+		t.Errorf("the prompt is not last: %q", spec.Argv)
+	}
+	cid := argOf(mustSpec(t, e.env, s).Argv, "--session-id")
+	e.writeTranscript(cid, userLine("hi"))
+	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
+
+	// A repo added since: reconnect and fork see it. A member whose worktree is gone is
+	// skipped (claude refuses a missing --add-dir).
+	lib := filepath.Join(t.TempDir(), "lib")
+	if err := os.MkdirAll(lib, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	w, _ := e.ws.Snapshot().Workspace("w-login")
+	w.Members = append(slices.Clone(w.Members), workspace.Member{RepoID: "r3", WorktreePath: lib},
+		workspace.Member{RepoID: "r4", WorktreePath: filepath.Join(lib, "gone")})
+	e.ws.Put(w)
+	_ = e.terms.Exit(s.TerminalID, 0)
+	e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	r, err := e.m.Reconnect(e.ctx(), s.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("reconnect", r, e.wt2, lib)
+	f, err := e.m.Fork(e.ctx(), s.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("fork", f, e.wt2, lib)
+
+	// A project thread gets none of it.
+	p := e.connected(CreateOptions{})
+	spec, _ := e.terms.Spec(p.TerminalID)
+	if got := addDirs(spec.Argv); !slices.Equal(got, []string{att}) || argOf(spec.Argv, "--append-system-prompt") != "" ||
+		!slices.Equal(spec.Env, base) {
+		t.Errorf("project thread argv = %q env = %q", spec.Argv, spec.Env)
+	}
+}
+
+func mustSpec(t *testing.T, e *env, s Session) terminal.Spec {
+	t.Helper()
+	spec, ok := e.terms.Spec(s.TerminalID)
+	if !ok {
+		t.Fatalf("no terminal for %s", s.ID)
+	}
+	return spec
 }

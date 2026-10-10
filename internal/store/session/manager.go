@@ -17,6 +17,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
 // RepoSource is the part of the repo store sessions need: resolving worktrees and
@@ -517,11 +518,31 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 		// may read its images again.
 		sa.addDirs = []string{m.opts.AttachmentsDir}
 	}
+	env := m.opts.Env
+	if s.WorkspaceID != "" {
+		// The current members, every spawn (create, reconnect, fork): a repo added to
+		// the workspace since the row was written is included.
+		var ws *workspace.Snapshot
+		if m.opts.Workspaces != nil {
+			ws = m.opts.Workspaces.Snapshot()
+		}
+		if wl, ok := workspaceLaunch(ws, s.WorkspaceID, s.WorktreePath, isDir); ok {
+			sa.addDirs = append(sa.addDirs, wl.addDirs...)
+			sa.appendSystemPrompt = wl.prompt
+			env = append(slices.Clip(env), wl.env...)
+			if len(wl.missing) > 0 {
+				m.log.Warn("workspace member worktrees missing; not passed to claude", "session", id,
+					"workspace", s.WorkspaceID, "paths", wl.missing)
+			}
+		} else {
+			m.log.Warn("workspace of thread not found; starting without its members", "session", id, "workspace", s.WorkspaceID)
+		}
+	}
 	argv := l.argv(m.opts.Claude, sa)
 	term, err := m.opts.Terminals.Create(ctx, terminal.Spec{
 		Argv:     argv,
 		Cwd:      s.WorktreePath,
-		Env:      m.opts.Env,
+		Env:      env,
 		Cols:     m.opts.Cols,
 		Rows:     m.opts.Rows,
 		Labels:   map[string]string{"session": id, "worktree": s.WorktreePath},

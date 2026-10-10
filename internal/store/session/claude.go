@@ -32,6 +32,11 @@ import (
 //	                          directories?")
 //	--                        ends options: `claude -- "-hello"` sends "-hello", while
 //	                          `claude "-hello"` fails with "unknown option"
+//	--append-system-prompt <prompt>
+//	                          appended to the default system prompt; recorded on the
+//	                          conversation's first request and reused verbatim on every
+//	                          later request and resume until compaction
+//	                          (--system-prompt-snapshot, default on)
 
 // Efforts are the valid --effort levels.
 var Efforts = []string{"low", "medium", "high", "xhigh", "max"}
@@ -77,7 +82,9 @@ type spawnArgs struct {
 	model, effort string
 	perm          PermissionMode
 	addDirs       []string
-	prompt        string
+	// appendSystemPrompt is passed as --append-system-prompt when set.
+	appendSystemPrompt string
+	prompt             string
 }
 
 // argv builds the claude command line. A non-empty prompt goes last, after "--".
@@ -103,6 +110,9 @@ func (l launch) argv(claude string, a spawnArgs) []string {
 	}
 	for _, d := range a.addDirs {
 		argv = append(argv, "--add-dir", d)
+	}
+	if a.appendSystemPrompt != "" {
+		argv = append(argv, "--append-system-prompt", a.appendSystemPrompt)
 	}
 	if a.prompt != "" {
 		argv = append(argv, "--", a.prompt)

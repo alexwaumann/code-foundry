@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -19,6 +20,54 @@ import (
 // thread runs in. The session store reads workspaces from the workspace store (never
 // the other way round: the workspace store learns about live threads from a function
 // the daemon hands it).
+
+// AdditionalDirsClaudeMDEnv makes claude load CLAUDE.md and .claude/rules from
+// --add-dir directories too (without it, added directories give file access and
+// skills/commands/agents only). Set for every workspace thread.
+const AdditionalDirsClaudeMDEnv = "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1"
+
+// workspacePrompt is the one line a workspace thread's system prompt gets. It must stay
+// small and static: claude records the system prompt on the first request and reuses
+// it until compaction, so the member list itself is looked up with the CLI instead.
+func workspacePrompt(name string) string {
+	return "This thread belongs to workspace " + name + ". Run `code-foundry workspace members` for the current worktrees."
+}
+
+// wsLaunch is what a workspace thread's spawn adds to claude's.
+type wsLaunch struct {
+	addDirs []string // the other members' worktrees, in member order
+	missing []string // other members' worktrees that do not exist (claude refuses them)
+	env     []string
+	prompt  string
+}
+
+// workspaceLaunch reads workspace id's current members from snap for a thread running
+// in cwd: --add-dir for every other member whose worktree exists, the CLAUDE.md env,
+// and the prompt line. ok is false when the workspace is gone.
+func workspaceLaunch(snap *workspace.Snapshot, id, cwd string, exists func(string) bool) (l wsLaunch, ok bool) {
+	w, ok := snap.Workspace(id)
+	if !ok {
+		return l, false
+	}
+	for _, mem := range w.Members {
+		switch {
+		case samePath(mem.WorktreePath, cwd):
+		case exists(mem.WorktreePath):
+			l.addDirs = append(l.addDirs, mem.WorktreePath)
+		default:
+			l.missing = append(l.missing, mem.WorktreePath)
+		}
+	}
+	l.env = []string{AdditionalDirsClaudeMDEnv}
+	l.prompt = workspacePrompt(w.Name)
+	return l, true
+}
+
+// isDir reports whether path is an existing directory.
+func isDir(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.IsDir()
+}
 
 // WorkspaceSource is the part of the workspace store sessions need: the current
 // members at every spawn, and making a workspace for a new workspace thread.
