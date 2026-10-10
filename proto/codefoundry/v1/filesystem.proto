@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+// FilesystemService answers questions about the local filesystem that the GUI cannot
+// (the frontend has no filesystem access). Every path it accepts or returns is under
+// the user's home directory.
+service FilesystemService {
+  // ListDirectories completes a typed path prefix ("~", "~/co", "/Users/me/co") to the
+  // directories it could name. The prefix's last segment is matched case-insensitively
+  // against the entries of its parent directory; a prefix ending in "/" lists that
+  // directory. Dot-directories are listed only when the last segment starts with ".".
+  // A prefix that resolves outside the home directory is InvalidArgument.
+  rpc ListDirectories(ListDirectoriesRequest) returns (ListDirectoriesResponse) {}
+}
+
+message ListDirectoriesRequest {
+  // A path prefix as typed: "~", "~/", "~/co", or an absolute path.
+  string prefix = 1;
+}
+
+message DirectoryEntry {
+  // Absolute path of the directory, with no trailing slash.
+  string path = 1;
+  // Base name.
+  string name = 2;
+  // The directory contains a ".git" entry (a repository or a worktree).
+  bool is_git = 3;
+  // The directory is already a registered project.
+  bool registered = 4;
+}
+
+message ListDirectoriesResponse {
+  // Matching directories, sorted by name (case-insensitively), at most 200.
+  repeated DirectoryEntry entries = 1;
+  // The longest completion of the prefix every entry shares, in the prefix's own
+  // spelling ("~/co" -> "~/code-"; the entry plus "/" when exactly one matches).
+  // Equal to the prefix when nothing extends it.
+  string completion = 2;
+  // More directories matched than were returned.
+  bool truncated = 3;
+}
