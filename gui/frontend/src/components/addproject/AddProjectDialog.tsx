@@ -1,33 +1,10 @@
 import { CloudDownload, FolderOpen, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { closeAddProject, setAddProjectTab, useAddProjectStore, type AddProjectTab } from "@/stores/addProject";
 import { GitHubTab } from "./GitHubTab";
 import { LocalFolderTab } from "./LocalFolderTab";
-
-/** New: starting a project from a name lands in a later change (repo.create). */
-function NewTab() {
-  return (
-    <div className="flex flex-col gap-3" data-testid="add-project-new">
-      <p className="text-xs text-muted-foreground">Start an empty project in ~/.code-foundry/projects with git initialized, and optionally publish it to GitHub.</p>
-      <input
-        disabled
-        placeholder="Project name"
-        aria-label="Project name"
-        className="h-9 rounded-md border bg-transparent px-3 text-sm placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
-      />
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground" data-testid="add-project-new-soon">
-          Coming soon
-        </span>
-        <Button type="button" size="sm" disabled>
-          Create project
-        </Button>
-      </div>
-    </div>
-  );
-}
+import { NewTab } from "./NewTab";
 
 const tabs: { id: AddProjectTab; label: string; icon: typeof Sparkles }[] = [
   { id: "new", label: "New", icon: Sparkles },
@@ -69,8 +46,9 @@ export function AddProjectDialog() {
               </TabsTrigger>
             ))}
           </TabsList>
-          <TabsContent value="new">
-            <NewTab />
+          {/* Kept mounted when hidden, so a created project and a refused publish survive a tab switch. */}
+          <TabsContent value="new" forceMount className="data-[state=inactive]:hidden">
+            <NewTab active={tab === "new"} />
           </TabsContent>
           <TabsContent value="local">
             <LocalFolderTab />

@@ -100,9 +100,12 @@ test("the project picker's empty state opens the dialog", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(picker).toHaveCount(0);
   await expect(dialog(page)).toBeVisible();
+  // No projects yet: it opens on New.
+  await expect(dialog(page)).toHaveAttribute("data-tab", "new");
+  await expect(page.getByTestId("add-project-new-name")).toBeFocused();
 });
 
-test("tabs are New, Local folder, GitHub; New is coming soon", async ({ page }) => {
+test("tabs are New, Local folder, GitHub; with projects it opens on Local folder", async ({ page }) => {
   await openApp(page);
   await page.getByTestId("sidebar-add-project").click();
   const tabs = page.getByTestId("add-project-tabs").getByRole("tab");
@@ -110,10 +113,8 @@ test("tabs are New, Local folder, GitHub; New is coming soon", async ({ page }) 
   await expect(page.getByTestId("add-project-tab-local")).toHaveAttribute("data-state", "active");
   await page.getByTestId("add-project-tab-new").click();
   await expect(dialog(page)).toHaveAttribute("data-tab", "new");
-  const tab = page.getByTestId("add-project-new");
-  await expect(tab.getByTestId("add-project-new-soon")).toHaveText("Coming soon");
-  await expect(tab.getByRole("button", { name: "Create project" })).toBeDisabled();
-  await expect(tab.getByRole("textbox")).toBeDisabled();
+  await expect(page.getByTestId("add-project-new-name")).toBeFocused();
+  // New lives in e2e/create.spec.ts.
 });
 
 test("Local folder: Tab completes, Enter adds, and the new project opens", async ({ page }) => {

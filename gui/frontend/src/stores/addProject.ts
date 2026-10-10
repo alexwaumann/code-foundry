@@ -18,11 +18,19 @@ interface AddProjectState {
 export const useAddProjectStore = create<AddProjectState>()(() => ({ open: false, tab: "local", seq: 0 }));
 
 /**
+ * The tab the dialog opens on when the caller does not say: New when there are no
+ * projects yet (start one), else Local folder.
+ */
+export function defaultAddProjectTab(projectCount: number): AddProjectTab {
+  return projectCount === 0 ? "new" : "local";
+}
+
+/**
  * Opens the Add Project dialog (repo.add's presenter; repo.clone opens it on GitHub).
  * Deferred, so that a palette closing after its presenter ran does not take focus back
  * from the dialog.
  */
-export function openAddProject(tab: AddProjectTab = "local"): void {
+export function openAddProject(tab: AddProjectTab = defaultAddProjectTab(useReposStore.getState().order.length)): void {
   queueMicrotask(() => {
     useAddProjectStore.setState((s) => ({ open: true, tab, seq: s.seq + 1 }));
   });

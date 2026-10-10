@@ -16,6 +16,7 @@ import { MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
 import { prDetailCall } from "./prDetail";
 import { GhWorld, ghEvent, viewCommands } from "./github";
 import { HOME } from "./filesystem";
+import { projectCommands } from "./create";
 import { Hub } from "./hub";
 import { MockSettings } from "./settings";
 import { MockUpdater } from "./update";
@@ -1187,6 +1188,46 @@ export class World {
     return repo;
   }
 
+  // ---- New projects and publishing (mock/create.ts) --------------------------------
+
+  /** Every project's folder (repo.create refuses a taken one). */
+  projectPaths(): string[] {
+    return [...this.repos.values()].map((r) => r.path);
+  }
+
+  repoInfo(id: string): { name: string; git: boolean; remotes: string[] } | undefined {
+    const r = this.repos.get(id);
+    return r && { name: r.name, git: r.git !== false, remotes: r.remotes };
+  }
+
+  /** RepoService.Create: a git project on main with its empty first commit, no remote. */
+  addCreated(name: string, path: string): { id: string; name: string; path: string } {
+    let id = `repo-${name.toLowerCase()}`;
+    for (let n = 2; this.repos.has(id); n++) id = `repo-${name.toLowerCase()}-${String(n)}`;
+    const repo: MockRepo = {
+      id,
+      path,
+      name,
+      defaultBranch: "main",
+      githubSlug: "",
+      remotes: [],
+      worktrees: [{ path, branch: "main", head: "1n1t1a10", isMain: true, status: clean({ upstream: "", baseRef: "" }) }],
+    };
+    this.repos.set(id, repo);
+    this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
+    return { id, name, path };
+  }
+
+  /** RepoService.Publish succeeded: origin on GitHub, main tracking origin/main. */
+  setOrigin(id: string, slug: string): void {
+    const repo = this.repos.get(id);
+    if (!repo) return;
+    repo.remotes = ["origin"];
+    repo.githubSlug = slug;
+    repo.worktrees = repo.worktrees.map((w) => (w.isMain ? { ...w, status: { ...w.status, upstream: "origin/main", baseRef: "origin/main" } } : w));
+    this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
+  }
+
   // ---- Commands -----------------------------------------------------------------
 
   private worktreeOf(ctx: UiContext | undefined): { repo: MockRepo; wt: MockWorktree } | null {
@@ -1716,6 +1757,7 @@ export class World {
       }),
       ...this.gh.prDetails.commands(),
       ...this.prSessionCommands(),
+      ...projectCommands(this),
       {
         cmd: { name: "view.settings", title: "Open Settings", category: "View", description: "Open the settings page", keybindings: ["cmd+,"], args: [] },
         when: always,
