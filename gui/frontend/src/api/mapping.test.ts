@@ -28,7 +28,7 @@ import { toCommandView } from "./command";
 import { overrideEndpoint } from "./endpoint";
 import { toEventView } from "./events";
 import { toGhEventView, toPullRequestDetailView, toPullRequestView, toReviewerCandidateView } from "./gh";
-import { toRepoEventView, toRepoView } from "./repo";
+import { isRemoteless, toRepoEventView, toRepoView } from "./repo";
 import { toSessionView } from "./session";
 import { toAttachEventView, toTerminalEventView, toTerminalView } from "./terminal";
 import { toUiIntentView } from "./ui";
@@ -98,6 +98,16 @@ describe("repo mapping", () => {
     expect(r.worktrees[0]?.status).toMatchObject({ dirty: false, ahead: 0, refreshedAtMs: null });
     expect(r.remotes).toEqual([]);
     expect(toRepoView(create(RepoSchema, { id: "r", remotes: ["origin", "upstream"] })).remotes).toEqual(["origin", "upstream"]);
+  });
+
+  it("maps git, and tells a remoteless git repository from one without git", () => {
+    const wt = [{ repoId: "r", path: "/a", isMain: true }];
+    const plain = toRepoView(create(RepoSchema, { id: "r", worktrees: wt }));
+    const local = toRepoView(create(RepoSchema, { id: "r", git: true, worktrees: wt }));
+    const cloned = toRepoView(create(RepoSchema, { id: "r", git: true, remotes: ["origin"], worktrees: wt }));
+    const pending = toRepoView(create(RepoSchema, { id: "r", git: true }));
+    expect([plain.git, local.git]).toEqual([false, true]);
+    expect([plain, local, cloned, pending].map(isRemoteless)).toEqual([false, true, false, false]);
   });
 
   it.each([

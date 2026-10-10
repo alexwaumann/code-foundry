@@ -129,10 +129,19 @@ export interface PlaceEnv {
   hasWorktree: (repoId: string, path: string) => boolean;
   /** The primary repository's default base (ListRefs.default_ref); "" when unknown. */
   defaultRef: string;
+  /**
+   * The one checkout of a project without git (its folder); undefined for a git project.
+   * Such a project's thread always runs there: no new worktree, no Also in.
+   */
+  noGitCheckout?: (repoId: string) => string | undefined;
 }
 
 /** Where a draft's thread starts, or null when its workspace is gone or has no members. */
 export function threadPlace(d: PlaceInput, env: PlaceEnv): ThreadPlace | null {
+  const checkout = d.target.kind === "project" ? env.noGitCheckout?.(d.target.repoId) : undefined;
+  if (d.target.kind === "project" && checkout !== undefined) {
+    return { kind: "project", repoId: d.target.repoId, worktree: { kind: "existing", path: checkout }, base: "" };
+  }
   const { repoIds, primary } = draftMembers(d, env.workspace, env.isRepo);
   if (d.target.kind === "project") {
     if (repoIds.length > 1) return { kind: "new-workspace", repoIds, repoId: primary, base: d.base ?? "" };
@@ -258,8 +267,12 @@ export function createdSessionId(resultJson: string): string | null {
   return null;
 }
 
-/** The project picker's subtitle source: "Local only" without remotes, else the GitHub slug or the remote's name. */
-export function repoSource(r: { githubSlug: string; remotes: readonly string[] }): string {
+/**
+ * The project picker's subtitle source: "No git" for a project without git, "Local only"
+ * without remotes, else the GitHub slug or the remote's name.
+ */
+export function repoSource(r: { githubSlug: string; remotes: readonly string[]; git?: boolean }): string {
+  if (r.git === false) return "No git";
   if (r.remotes.length === 0) return "Local only";
   return r.githubSlug || (r.remotes.includes("origin") ? "origin" : (r.remotes[0] ?? ""));
 }

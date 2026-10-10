@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { FolderGit2, FolderOpen, FolderPlus, Layers, PanelRight, Sparkles, SquareTerminal, Trash2, Unlink } from "lucide-react";
+import { Folder, FolderGit2, FolderOpen, FolderPlus, Layers, PanelRight, Sparkles, SquareTerminal, Trash2, Unlink } from "lucide-react";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { SectionTitle } from "@/components/prs/PrBits";
 import { RowList } from "@/components/prs/RowList";
@@ -87,10 +87,12 @@ function ProjectBlock({ project }: { project: ProjectModel }) {
   const name = useReposStore((s) => s.byId[repoId]?.name ?? repoId);
   const slug = useReposStore((s) => s.byId[repoId]?.githubSlug ?? "");
   const main = useReposStore((s) => s.byId[repoId]?.worktrees.find((w) => w.isMain)?.path ?? s.byId[repoId]?.path ?? "");
+  const noGit = useReposStore((s) => s.byId[repoId]?.git === false);
+  const Icon = noGit ? Folder : FolderGit2;
   return (
-    <section className="rounded-md border" data-testid="project" data-repo={repoId}>
+    <section className="rounded-md border" data-testid="project" data-repo={repoId} data-git={!noGit}>
       <NavRow navKey={projectKey(repoId)} className="group/p flex h-9 items-center gap-2 rounded-b-none border-b px-2" title="Enter or double-click: open the project's overview">
-        <FolderGit2 className="size-4 shrink-0 text-sky-400/90" aria-hidden />
+        <Icon className={cn("size-4 shrink-0", noGit ? "text-muted-foreground" : "text-sky-400/90")} aria-hidden />
         <span className="truncate font-medium" data-testid="project-name">
           {name}
         </span>
@@ -231,7 +233,7 @@ export function ProjectsPage() {
             <div className="flex flex-col gap-3" data-testid="projects-section">
               <SectionTitle count={model.projects.length}>Projects</SectionTitle>
               {model.projects.length === 0 ? (
-                <p className="px-2 text-sm text-muted-foreground">{loaded ? "No projects registered. Add a git repository to start threads in it." : "Loading…"}</p>
+                <p className="px-2 text-sm text-muted-foreground">{loaded ? "No projects registered. Add a folder or a git repository to start threads in it." : "Loading…"}</p>
               ) : (
                 model.projects.map((p) => <ProjectBlock key={p.repoId} project={p} />)
               )}

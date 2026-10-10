@@ -73,13 +73,14 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
 
 const SEP = "\u0001";
 
-/** "Also in": registered projects the thread does not work in yet. */
+/** "Also in": registered git projects the thread does not work in yet. */
 function AddProject({ draftKey, exclude, first, disabled }: { draftKey: string; exclude: readonly string[]; first: boolean; disabled: boolean }) {
   const keys = useReposStore(
     useShallow((s) =>
       s.order.flatMap((id) => {
         const r = s.byId[id];
-        return r && !exclude.includes(id) ? [[id, r.name, r.path].join(SEP)] : [];
+        // Git projects only: a new workspace makes a worktree in each.
+        return r?.git && !exclude.includes(id) ? [[id, r.name, r.path].join(SEP)] : [];
       }),
     ),
   );

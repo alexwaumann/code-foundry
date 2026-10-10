@@ -8,7 +8,8 @@ import type { WorktreeView } from "@/api/repo";
 import type { WorkspaceView } from "@/api/workspace";
 
 export interface ProjectsRepos {
-  byId: Readonly<Record<string, { id: string; name: string; worktrees: readonly Pick<WorktreeView, "path" | "isMain">[] } | undefined>>;
+  /** `git` false: a project without git (never a workspace member); absent counts as git. */
+  byId: Readonly<Record<string, { id: string; name: string; git?: boolean; worktrees: readonly Pick<WorktreeView, "path" | "isMain">[] } | undefined>>;
   /** Sorted by name. */
   order: readonly string[];
 }
@@ -52,10 +53,17 @@ export function projectsModel(repos: ProjectsRepos, workspaces: ProjectsWorkspac
   };
 }
 
-/** Projects that can be added to the workspace: registered and not yet members, by name. */
+/**
+ * Projects that can be added to the workspace: registered, git (a member is a worktree on
+ * the workspace branch; a repository without a remote is fine), and not yet members, by
+ * name.
+ */
 export function addableRepos(ws: Pick<WorkspaceView, "members"> | undefined, repos: ProjectsRepos): string[] {
   const inWs = new Set(ws?.members.map((m) => m.repoId) ?? []);
-  return repos.order.filter((id) => !inWs.has(id) && repos.byId[id] !== undefined);
+  return repos.order.filter((id) => {
+    const r = repos.byId[id];
+    return !inWs.has(id) && r !== undefined && r.git !== false;
+  });
 }
 
 /**

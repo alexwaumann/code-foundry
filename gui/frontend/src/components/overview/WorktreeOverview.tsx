@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, CircleCheck, CircleDashed, CircleDot, CircleX, FolderGit2, GitBranch } from "lucide-react";
+import { ChevronDown, ChevronRight, CircleCheck, CircleDashed, CircleDot, CircleX, Folder, FolderGit2, GitBranch, GitBranchPlus, CloudUpload } from "lucide-react";
 import type { CheckRunView, PullRequestView, RepoActivityView } from "@/api/gh";
-import type { GitStatusView, RepoView, WorktreeView } from "@/api/repo";
+import { isRemoteless, type GitStatusView, type RepoView, type WorktreeView } from "@/api/repo";
+import { CommandButton } from "@/components/command/CommandButton";
+import { NoGitBadge } from "@/components/projects/NoGitBadge";
+import { Button } from "@/components/ui/button";
 import type { LogEntryView, WorktreeDetailView } from "@/api/worktreeDetail";
 import { checksSummary } from "@/components/prs/format";
 import { Age, ChecksBadge, Freshness, PrStateIcon, ReviewBadge } from "@/components/prs/PrBits";
@@ -248,6 +251,63 @@ function GithubActivity({ activity, activityError, branch, branchPrs }: {
 }
 
 /**
+ * A git repository with no remote: nothing to show from GitHub yet, and the way to put it
+ * there. The button is a placeholder until repo.github.publish exists (add-project PR 4).
+ */
+function PublishToGitHub() {
+  return (
+    <div className="flex flex-wrap items-center gap-3" data-testid="no-remote">
+      <p className="text-xs text-muted-foreground">No remote: this repository is only on this Mac.</p>
+      {/* A disabled button gets no hover events in every engine: the tooltip is on its wrapper. */}
+      <span title="Coming soon" data-testid="publish-github-wrapper">
+        <Button type="button" variant="outline" size="xs" disabled data-testid="publish-github">
+          <CloudUpload aria-hidden />
+          Publish to GitHub
+        </Button>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The overview of a project without git: what it is instead of branch, status, GitHub,
+ * files and log (none of which exist for it), the Initialize Git button (repo.git.init),
+ * then its threads and terminals.
+ */
+function NoGitBody({ items }: { items: ReactNode }) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    rootRef.current?.focus({ preventScroll: true });
+  }, []);
+  return (
+    <div ref={rootRef} tabIndex={0} className="flex flex-col gap-6 outline-none" data-testid="overview-nogit" data-focus-root>
+      <section className="rounded-md border border-dashed px-4 py-3" data-testid="section-nogit">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
+          <Folder className="size-4 text-muted-foreground" aria-hidden />
+          Not a git repository
+        </h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Threads and terminals run in this folder. Branches, worktrees, diffs and pull requests need git: initializing makes an empty first commit on the
+          default branch.
+        </p>
+        <CommandButton
+          command="repo.git.init"
+          icon={GitBranchPlus}
+          label="Initialize Git"
+          variant="outline"
+          size="sm"
+          whenUnavailable="disable"
+          keepFocus={false}
+          className="mt-3"
+          data-testid="init-git"
+        />
+      </section>
+      {items}
+    </div>
+  );
+}
+
+/**
  * The overview's body for one worktree. `inPanel` is the side panel's member tab
  * (WorktreePanelView): it does not take focus when it mounts and is not the content
  * pane's focus root; the panel is a CSS container, so its rows narrow by container query.
@@ -334,6 +394,8 @@ function OverviewBody({ repo, wt, items, inPanel = false }: { repo: RepoView; wt
         <Section title="GitHub activity" testId="section-github" extra={ciFresh && <Freshness fetchedAtMs={ciFresh.fetchedAtMs} lastError={ciFresh.lastError} staleAfterMs={5 * 60_000} testId="gh-updated" />}>
           {slug ? (
             <GithubActivity activity={activity} activityError={activityEntry?.error ?? null} branch={wt.branch} branchPrs={branchPrs} />
+          ) : isRemoteless(repo) ? (
+            <PublishToGitHub />
           ) : (
             <p className="text-xs text-muted-foreground">No GitHub remote: origin is not on github.com.</p>
           )}
@@ -404,15 +466,29 @@ export function WorktreeOverview({ repoId, path, items }: { repoId: string; path
   const mainPath = repo?.worktrees.find((w) => w.isMain)?.path ?? repo?.path ?? "";
   const wtPath = path ?? mainPath;
   const wt = useReposStore((s) => findWorktree(s, repoId, wtPath));
+  const noGit = repo?.git === false;
   return (
-    <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label="Worktree overview" data-testid="overview-page">
+    <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label="Worktree overview" data-testid="overview-page" data-git={repo ? !noGit : undefined}>
       <PaneHeader className="gap-2 px-5">
-        {path ? <GitBranch className="size-4 text-violet-400" aria-hidden /> : <FolderGit2 className="size-4 text-sky-400" aria-hidden />}
-        <h1 className="truncate text-sm font-semibold" data-testid="overview-title">
-          {repo?.name ?? "Repository"}
-          <span className="text-muted-foreground">@</span>
-          {wt?.branch || (wt?.head ? wt.head.slice(0, 8) : "")}
-        </h1>
+        {noGit ? (
+          <Folder className="size-4 text-muted-foreground" aria-hidden />
+        ) : path ? (
+          <GitBranch className="size-4 text-violet-400" aria-hidden />
+        ) : (
+          <FolderGit2 className="size-4 text-sky-400" aria-hidden />
+        )}
+        {noGit ? (
+          <h1 className="flex min-w-0 items-center gap-2 text-sm font-semibold" data-testid="overview-title">
+            <span className="truncate">{repo.name}</span>
+            <NoGitBadge />
+          </h1>
+        ) : (
+          <h1 className="truncate text-sm font-semibold" data-testid="overview-title">
+            {repo?.name ?? "Repository"}
+            <span className="text-muted-foreground">@</span>
+            {wt?.branch || (wt?.head ? wt.head.slice(0, 8) : "")}
+          </h1>
+        )}
         <span className="ml-auto truncate font-mono text-xs text-muted-foreground">{tildify(wtPath)}</span>
         <PanelToggle className="-mr-2" />
       </PaneHeader>
@@ -420,6 +496,8 @@ export function WorktreeOverview({ repoId, path, items }: { repoId: string; path
         <div className="mx-auto max-w-6xl">
           {!repo ? (
             <p className="text-sm text-muted-foreground">Project not found.</p>
+          ) : noGit ? (
+            <NoGitBody items={items} />
           ) : !wt ? (
             <p className="text-sm text-muted-foreground">Loading worktree…</p>
           ) : (

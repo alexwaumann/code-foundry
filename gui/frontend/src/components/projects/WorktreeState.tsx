@@ -1,5 +1,6 @@
-import { ArrowDown, ArrowUp, CircleDot, GitBranch } from "lucide-react";
+import { ArrowDown, ArrowUp, CircleDot, Folder, GitBranch } from "lucide-react";
 import { ChecksBadge, PrStateIcon } from "@/components/prs/PrBits";
+import { NoGitBadge } from "./NoGitBadge";
 import { tildify } from "@/lib/path";
 import { worktreeBranch } from "@/lib/threadRow";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,22 @@ export function WorktreeState({ repoId, path, showPath = true }: { repoId: strin
   });
   const ahead = useReposStore((s) => findWorktree(s, repoId, path)?.status.ahead ?? 0);
   const behind = useReposStore((s) => findWorktree(s, repoId, path)?.status.behind ?? 0);
+  const noGit = useReposStore((s) => s.byId[repoId]?.git === false);
+  if (noGit) {
+    // The folder itself: no branch, status or pull request to show.
+    return (
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        <NoGitBadge />
+        {showPath && (
+          <span className="min-w-0 truncate text-xs text-muted-foreground" title={path}>
+            {tildify(path)}
+          </span>
+        )}
+        {missing && <span className="ml-auto shrink-0 pl-1 text-[11px] text-amber-300">missing</span>}
+      </span>
+    );
+  }
   return (
     <span className="flex min-w-0 flex-1 items-center gap-2">
       <GitBranch className={cn("size-3.5 shrink-0", isMain ? "text-muted-foreground" : "text-violet-400/90")} aria-hidden />

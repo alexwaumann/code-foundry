@@ -111,6 +111,18 @@ describe("workspaces", () => {
     ["a workspace in new-worktree mode: a new workspace with its projects", { ...workspace, worktree: { kind: "new" }, base: "origin/x" }, {}, { kind: "new-workspace", repoIds: ["web", "api"], repoId: "web", base: "origin/x" }],
     ["a workspace that is gone", workspace, { workspace: undefined }, null],
     ["a workspace with no members", workspace, { workspace: { id: "w-1", members: [] } }, null],
+    [
+      "a project without git: its current checkout, whatever the draft says",
+      { ...project, target: { kind: "project", repoId: "notes" }, alsoIn: ["api"], base: "origin/dev" },
+      { noGitCheckout: (id) => (id === "notes" ? "/src/notes" : undefined) },
+      { kind: "project", repoId: "notes", worktree: { kind: "existing", path: "/src/notes" }, base: "" },
+    ],
+    [
+      "a git project is unaffected by noGitCheckout",
+      project,
+      { noGitCheckout: (id) => (id === "notes" ? "/src/notes" : undefined) },
+      { kind: "project", repoId: "web", worktree: { kind: "new" }, base: "origin/main" },
+    ],
   ])("threadPlace: %s", (_name, d, over, want) => {
     expect(threadPlace(d, { ...env, ...over })).toEqual(want);
   });
@@ -178,6 +190,8 @@ describe("helpers", () => {
 
   it.each([
     [{ githubSlug: "", remotes: [] }, "Local only"],
+    [{ githubSlug: "", remotes: [], git: true }, "Local only"],
+    [{ githubSlug: "", remotes: [], git: false }, "No git"],
     [{ githubSlug: "alexwaumann/app", remotes: ["origin"] }, "alexwaumann/app"],
     [{ githubSlug: "", remotes: ["gitlab", "origin"] }, "origin"],
     [{ githubSlug: "", remotes: ["upstream"] }, "upstream"],
