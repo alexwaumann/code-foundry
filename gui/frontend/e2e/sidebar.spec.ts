@@ -229,11 +229,17 @@ test("the Projects page lists projects with their own worktrees and workspaces w
   await expect(page.getByText(/running in .*ghostty-playground\/cf-login; close it first/)).toBeVisible();
   await expect(ws.getByTestId("member-name")).toHaveText(["ghostty-playground", "dotfiles"]);
 
-  // Enter on a worktree row opens its overview.
+  // Enter on a worktree row shows it in the page's side panel (worktree-panel.spec.ts);
+  // the row's Open button goes to its overview page.
   await page.getByTestId("projects-list").focus();
   await page.keyboard.press("Home");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
+  await expect(page.getByTestId("worktree-surface").getByTestId("worktree-surface-title")).toHaveText("code-foundry@main");
+  await expect(page.getByTestId("projects-page")).toBeVisible();
+  const mainRow = page.locator(`[data-nav-key="pw:repo-cf::${CF}"]`);
+  await mainRow.hover();
+  await mainRow.getByTestId("worktree-open").click();
   await expect(page.getByTestId("overview-title")).toHaveText("code-foundry@main");
 });
 

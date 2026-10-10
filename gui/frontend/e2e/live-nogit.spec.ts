@@ -44,7 +44,9 @@ test("register a plain folder, see No git everywhere, then repo git init turns i
     await expect(project.getByTestId("worktree-branch")).toHaveCount(0);
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-projects.png") });
 
-    await page.locator(`[data-nav-key="p:${repo.id}"]`).dblclick();
+    const projectRow = page.locator(`[data-nav-key="p:${repo.id}"]`);
+    await projectRow.hover();
+    await projectRow.getByTestId("project-open").click();
     await expect(page.getByTestId("overview-page")).toHaveAttribute("data-git", "false");
     await expect(page.getByTestId("section-nogit")).toContainText("Not a git repository");
     await expect(page.getByTestId("init-git")).toBeEnabled();

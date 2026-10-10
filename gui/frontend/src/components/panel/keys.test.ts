@@ -43,7 +43,7 @@ describe("panelKeyAction", () => {
 });
 
 describe("surface registry", () => {
-  it("has unique kinds and single-letter hotkeys (a surface opened only from elsewhere has none)", () => {
+  it("has unique kinds and single-letter hotkeys", () => {
     expect(new Set(surfaces.map((s) => s.kind)).size).toBe(surfaces.length);
     const hotkeys = surfaces.flatMap((s) => (s.hotkey ? [s.hotkey] : []));
     expect(new Set(hotkeys).size).toBe(hotkeys.length);
@@ -59,14 +59,15 @@ describe("surface registry", () => {
       ["pullrequest", "p"],
       ["linkedprs", "l"],
       ["workspace", "w"],
-      ["worktree", undefined],
+      ["worktree", "t"],
     ]);
     expect(surfaceOf("diff")?.title).toBe("Diff");
     expect(surfaceByHotkey("P")?.kind).toBe("pullrequest");
     expect(surfaceByHotkey("W")?.kind).toBe("workspace");
     expect(surfaceByHotkey("l")?.kind).toBe("linkedprs");
-    // s-1 is unknown here: no pull request, no linked pull requests, no workspace thread;
-    // the worktree tab is never listed.
+    expect(surfaceByHotkey("T")?.kind).toBe("worktree");
+    // s-1 is unknown here: no pull request, no linked pull requests, no workspace thread,
+    // no worktree to place it in.
     expect(surfaces.map((s) => s.available(ctx))).toEqual(["disabled", "disabled", "disabled", "hidden", "hidden", "hidden"]);
   });
 });

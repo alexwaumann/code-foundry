@@ -36,6 +36,13 @@ const ViewPanelWorkspace = "panel.workspace"
 // thread has no linked pull requests says so instead of opening an empty surface.
 const ViewPanelLinkedPRs = "panel.linked-prs"
 
+// ViewPanelWorktree is the ShowView name that opens (or reveals) the Worktree surface in
+// the side panel of the selected thread or terminal: the overview of the worktree it runs
+// in (sync state, GitHub activity, files, log). An action on per-selection GUI state like
+// ViewPanelWorkspace; a window whose selection is not a thread or terminal in a
+// registered worktree ignores it.
+const ViewPanelWorktree = "panel.worktree"
+
 // hasWorkspaceThreadContext is view.panel.workspace's availability: a thread is active
 // and it belongs to a workspace (the GUI passes the thread's workspace as
 // ActiveWorkspaceID; the CLI with --context-session and --context-workspace).
@@ -43,12 +50,22 @@ func hasWorkspaceThreadContext(c Context) bool {
 	return hasSession(c) && c.ActiveWorkspaceID != ""
 }
 
+// hasWorktreeThreadContext is view.panel.worktree's availability: a thread or a terminal
+// is active and it sits in a registered worktree (the GUI passes the placement as
+// ActiveRepoID and ActiveWorktreePath; the CLI with --context-session or
+// --context-terminal plus --context-repo and --context-worktree). A worktree or repo
+// page has the overview as its content already, so it is left out.
+func hasWorktreeThreadContext(c Context) bool {
+	return (hasSession(c) || hasTerminal(c)) && hasWorktree(c)
+}
+
 // RegisterView registers view.pullrequests, which shows the Pull Requests page,
 // view.projects, which shows the Projects page, view.panel.toggle, which shows or hides
 // the side panel, view.panel.expand, which switches it between split and full width, and
-// view.panel.workspace, which opens the workspace surface in it, and
-// view.panel.linked-prs, which opens the thread's linked pull requests in it (all
-// emitted as UiIntent.ShowView). Links open through view.open.url (RegisterGitOps).
+// view.panel.workspace, which opens the workspace surface in it,
+// view.panel.linked-prs, which opens the thread's linked pull requests in it, and
+// view.panel.worktree, which opens the thread's own worktree in it (all emitted as
+// UiIntent.ShowView). Links open through view.open.url (RegisterGitOps).
 func RegisterView(r *Registry, e Emitter) error {
 	show := func(name string) Result {
 		n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: name}}})
@@ -121,6 +138,18 @@ func RegisterView(r *Registry, e Emitter) error {
 			When: hasSession,
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return show(ViewPanelLinkedPRs), nil
+			},
+		},
+		Command{
+			Name:  "view.panel.worktree",
+			Title: "Show Worktree in Side Panel",
+			Description: "Open the Worktree surface in the selected thread's side panel: " +
+				"the overview of the worktree it runs in, with sync state, GitHub activity, changed files and log.",
+			Category: "View",
+			// No default chord, like view.panel.workspace (T opens it while the panel has focus).
+			When: hasWorktreeThreadContext,
+			Run: func(context.Context, Context, Args) (Result, error) {
+				return show(ViewPanelWorktree), nil
 			},
 		},
 	)

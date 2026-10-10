@@ -51,7 +51,9 @@ test("worktree overview of a GitHub-backed clone", async ({ page }) => {
   await page.goto("/");
   // Projects live on the Projects page (docs/notes/workspaces-4-sidebar.md).
   await page.getByTestId("nav-projects").click();
-  await page.locator('[data-testid="project"]').filter({ has: page.getByTestId("project-name").getByText(REPO, { exact: true }) }).locator("[data-nav-key^='p:']").dblclick();
+  const project = page.locator('[data-testid="project"]').filter({ has: page.getByTestId("project-name").getByText(REPO, { exact: true }) }).locator("[data-nav-key^='p:']");
+  await project.hover();
+  await project.getByTestId("project-open").click();
   await expect(page.getByTestId("overview-page")).toBeVisible();
   await expect(page.getByTestId("gh-default-branch")).not.toHaveAttribute("data-ci", "unknown", { timeout: 120_000 });
   await expect(page.getByTestId("gh-commit-stats")).toContainText("this month");
@@ -66,7 +68,8 @@ test("worktree overview of this worktree (files and log vs origin/main)", async 
   await page.getByTestId("nav-projects").click({ timeout: 20_000 });
   const wt = page.locator(`[data-nav-key$="::${WORKTREE}"]`).first();
   await wt.scrollIntoViewIfNeeded();
-  await wt.dblclick();
+  await wt.hover();
+  await wt.getByTestId("worktree-open").click();
   await expect(page.getByTestId("files-list")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("section-files")).toContainText("vs origin/main");
   await expect(page.getByTestId("log-list").locator("[data-nav-key]").first()).toBeVisible();

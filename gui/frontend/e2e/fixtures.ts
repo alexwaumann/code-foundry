@@ -82,20 +82,25 @@ export async function openProjects(page: Page): Promise<void> {
 }
 
 /**
- * Selects a worktree (its overview) the way the sidebar tree used to: from the Projects
- * page, a project's worktree row, or a workspace member row when `workspaceId` is given.
+ * Selects a worktree (its overview page) from the Projects page through the row's Open
+ * button: a project's worktree row, or a workspace member row when `workspaceId` is
+ * given. (Enter or double-click on a row shows the worktree in the page's side panel.)
  */
 export async function selectWorktree(page: Page, repoId: string, path: string, workspaceId?: string): Promise<void> {
   await openProjects(page);
   const key = workspaceId ? `m:${workspaceId}::${repoId}` : `pw:${repoId}::${path}`;
-  await page.locator(`[data-nav-key="${key}"]`).dblclick();
+  const r = page.locator(`[data-nav-key="${key}"]`);
+  await r.hover();
+  await r.getByTestId(workspaceId ? "member-open-overview" : "worktree-open").click();
   await expect(page.getByTestId("projects-page")).toHaveCount(0);
 }
 
-/** Selects a project (its overview) from the Projects page. */
+/** Selects a project (its overview page) from the Projects page through the row's Open button. */
 export async function selectProject(page: Page, repoId: string): Promise<void> {
   await openProjects(page);
-  await page.locator(`[data-nav-key="p:${repoId}"]`).dblclick();
+  const r = page.locator(`[data-nav-key="p:${repoId}"]`);
+  await r.hover();
+  await r.getByTestId("project-open").click();
   await expect(page.getByTestId("projects-page")).toHaveCount(0);
 }
 

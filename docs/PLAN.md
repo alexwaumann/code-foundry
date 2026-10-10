@@ -36,6 +36,10 @@ build order are built, each with a note: `workspaces-1-store.md`,
 * Step 5 (the side panel's workspace surface: members with branch, changes, ahead/behind,
   PR and CI, add/remove, Run in, members as worktree tabs; `view.panel.workspace`; badge,
   header and Projects page entry points) done: `docs/notes/workspaces-5-panel.md`.
+* Worktree tabs everywhere (2026-10-10): the Projects page's project and worktree rows
+  open the worktree in the page's side panel on Enter or double-click, and a thread's
+  panel lists Worktree (T, `view.panel.worktree`) for its own worktree:
+  `docs/notes/worktree-panel-tab.md`.
 
 ### Adding projects: four PRs (design 2026-10-10)
 

@@ -16,6 +16,7 @@ import { findWorktree, useReposStore } from "@/stores/repos";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
 import { showWorkspaceInThread } from "@/stores/workspacePanel";
+import { showWorktreeInPanel } from "@/stores/worktreePanel";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { liveWorkspaceThread } from "@/surfaces/workspaceTarget";
 import { WorkspaceMembers } from "./WorkspaceMembers";
@@ -23,6 +24,12 @@ import { RowAction, WorktreeState } from "./WorktreeState";
 
 const ROW_H = 32;
 const SEP = "\u0001";
+
+/** A project's main worktree (its checkout for a project without git), read when a row activates. */
+function mainWorktree(repoId: string): string {
+  const repo = useReposStore.getState().byId[repoId];
+  return repo?.worktrees.find((w) => w.isMain)?.path ?? repo?.path ?? "";
+}
 
 /** The page's structure inputs as strings, so it rebuilds on membership changes only (not git status). */
 function useStructure(): { repos: string[]; workspaces: string[] } {
@@ -58,12 +65,12 @@ function decode(repoKeys: readonly string[], wsKeys: readonly string[]) {
 function WorktreeRow({ repoId, path }: { repoId: string; path: string }) {
   const isMain = useReposStore((s) => findWorktree(s, repoId, path)?.isMain ?? false);
   return (
-    <NavRow navKey={projectWorktreeKey(repoId, path)} className="group/wt flex h-full items-center gap-2 pr-2 pl-6 text-sm" title={`${path}\nEnter or double-click: open the worktree`}>
+    <NavRow navKey={projectWorktreeKey(repoId, path)} className="group/wt flex h-full items-center gap-2 pr-2 pl-6 text-sm" title={`${path}\nEnter or double-click: show the worktree in the side panel`}>
       <span className="flex h-full min-w-0 flex-1 items-center" data-testid="project-worktree" data-path={path}>
         <WorktreeState repoId={repoId} path={path} />
       </span>
       <span className="flex shrink-0 items-center opacity-0 group-hover/wt:opacity-100 group-aria-selected/wt:opacity-100">
-        <RowAction label="Open worktree" testId="worktree-open" onClick={() => { openWorktree(repoId, path); }}>
+        <RowAction label="Open worktree overview" testId="worktree-open" onClick={() => { openWorktree(repoId, path); }}>
           <FolderOpen />
         </RowAction>
         <RowAction label="New thread here" testId="worktree-new-thread" onClick={() => { composeIn(repoId, path); }}>
@@ -91,13 +98,16 @@ function ProjectBlock({ project }: { project: ProjectModel }) {
   const Icon = noGit ? Folder : FolderGit2;
   return (
     <section className="rounded-md border" data-testid="project" data-repo={repoId} data-git={!noGit}>
-      <NavRow navKey={projectKey(repoId)} className="group/p flex h-9 items-center gap-2 rounded-b-none border-b px-2" title="Enter or double-click: open the project's overview">
+      <NavRow navKey={projectKey(repoId)} className="group/p flex h-9 items-center gap-2 rounded-b-none border-b px-2" title="Enter or double-click: show the project in the side panel">
         <Icon className={cn("size-4 shrink-0", noGit ? "text-muted-foreground" : "text-sky-400/90")} aria-hidden />
         <span className="truncate font-medium" data-testid="project-name">
           {name}
         </span>
         {slug && <span className="min-w-0 truncate text-xs text-muted-foreground">{slug}</span>}
         <span className="ml-auto flex shrink-0 items-center">
+          <RowAction label="Open project overview" testId="project-open" onClick={() => { openProject(repoId); }}>
+            <FolderOpen />
+          </RowAction>
           <RowAction label="New thread" testId="project-new-thread" onClick={() => { composeIn(repoId); }}>
             <Sparkles />
           </RowAction>
@@ -163,7 +173,8 @@ function WorkspaceBlock({ id }: { id: string }) {
  * own worktrees with git and pull request state and actions (new thread, new terminal,
  * remove worktree, unregister); per workspace its members (add, remove, remove the
  * workspace). Workspace member worktrees are listed under their workspace only.
- * Keyboard: ↑/↓ move, Enter opens (a worktree's overview, a workspace's composer).
+ * Keyboard: ↑/↓ move, Enter (like double-click) shows a project or worktree in the page's
+ * side panel, or opens a workspace's composer.
  */
 export function ProjectsPage() {
   const structure = useStructure();
@@ -176,11 +187,13 @@ export function ProjectsPage() {
     () =>
       items.map((it) => {
         switch (it.kind) {
+          // Enter or double-click shows the worktree (a project's main one) in the
+          // page's side panel; the rows' Open buttons go to the overview page.
           case "project":
-            return { key: it.key, activate: () => { openProject(it.repoId); } };
+            return { key: it.key, activate: () => { showWorktreeInPanel(it.repoId, mainWorktree(it.repoId)); } };
           case "worktree":
           case "member":
-            return { key: it.key, activate: () => { openWorktree(it.repoId, it.path); } };
+            return { key: it.key, activate: () => { showWorktreeInPanel(it.repoId, it.path); } };
           case "workspace":
             return { key: it.key, activate: () => { composeInWorkspace(it.workspaceId); } };
         }

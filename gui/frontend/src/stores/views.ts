@@ -10,6 +10,7 @@ import { linkedPrsTarget, openLinkedPrsSurface } from "./linkedPrsPanel";
 import { expandPanel, getPanel, togglePanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
 import { openWorkspaceSurface } from "./workspacePanel";
+import { openWorktreeSurface } from "./worktreePanel";
 
 interface ViewsState {
   settingsOpen: boolean;
@@ -42,6 +43,10 @@ export function showView(name: string): boolean {
     case "panel.linked-prs":
       // view.panel.linked-prs: the Linked PRs surface in the current thread's panel.
       linkedPrsPanelCommand();
+      return true;
+    case "panel.worktree":
+      // view.panel.worktree: the thread's own worktree in the current thread's panel.
+      worktreePanelCommand();
       return true;
     default:
       // Top-level pages (the Pull Requests page) are selections. Closing settings here
@@ -112,6 +117,24 @@ export function expandPanelCommand(): boolean {
 export function workspacePanelCommand(): boolean {
   if (useViewsStore.getState().settingsOpen) return false;
   const key = openWorkspaceSurface();
+  if (key === null) return false;
+  const inPalette = useUiStore.getState().palette.open;
+  togglePanel(key, true, { focus: !inPalette });
+  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
+  return true;
+}
+
+/**
+ * view.panel.worktree for the current selection: opens (or activates) the worktree tab of
+ * the selected thread's (or terminal's) own worktree in its panel and shows the panel,
+ * like view.panel.workspace. A no-op while the settings page is up and when the selection
+ * is not in a registered worktree (a page, a composer, a thread whose cwd is elsewhere).
+ *
+ * Focus moves to the panel; with the palette open, its return target moves there instead.
+ */
+export function worktreePanelCommand(): boolean {
+  if (useViewsStore.getState().settingsOpen) return false;
+  const key = openWorktreeSurface();
   if (key === null) return false;
   const inPalette = useUiStore.getState().palette.open;
   togglePanel(key, true, { focus: !inPalette });
