@@ -24,6 +24,8 @@
  *   GET  /__mock/workspaces                       (id, name, branch, members)
  *   POST /__mock/workspace-thread?workspace=login[&repo=repo-gp&name=driver&status=busy]
  *                                                 (a connected thread owned by the workspace)
+ *   POST /__mock/workspace-mixed?name=checkout    (a workspace over code-foundry, ghostty-playground
+ *                                                 and dotfiles: an open PR with failing CI, 2 ahead, dirty)
  *   session.run-in queues a move (pendingWorktreePath) that lands ~2s after the thread is not busy.
  *   session.new takes workspace (a member thread) or new-worktree + repos (a new workspace).
  *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size)
@@ -474,6 +476,13 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       try {
         const s = world.addWorkspaceThread(q.get("workspace") ?? "", q.get("repo") ?? "", q.get("name") ?? "driver", statusNames[q.get("status") ?? "idle"] ?? SessionStatus.IDLE);
         json(res, 200, sessionSummary(s.id));
+      } catch (err) {
+        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
+    case "POST /__mock/workspace-mixed":
+      try {
+        json(res, 200, world.addMixedWorkspace(q.get("name") ?? "checkout"));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }

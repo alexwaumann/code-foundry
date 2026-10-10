@@ -398,6 +398,29 @@ export class World {
     return w;
   }
 
+  /**
+   * Test control: workspace `name` over code-foundry, ghostty-playground and dotfiles with
+   * mixed member state: code-foundry's member has an open pull request with failing CI,
+   * ghostty-playground's is 2 commits ahead of its upstream, and dotfiles' (local only) has
+   * uncommitted changes. POST /__mock/workspace-mixed.
+   */
+  addMixedWorkspace(name: string): MockWorkspace {
+    const ws = this.addWorkspace(name, ["repo-cf", "repo-gp", "repo-dot"]);
+    const set = (repoId: string, status: Partial<MockWorktree["status"]>) => {
+      const repo = this.repos.get(repoId);
+      const path = ws.members.find((m) => m.repoId === repoId)?.worktreePath;
+      const w = repo?.worktrees.find((x) => x.path === path);
+      if (!repo || !w) return;
+      w.status = { ...w.status, ...status };
+      this.repoEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(repo.id, w) } });
+    };
+    set("repo-cf", { upstream: `origin/${ws.branch}` });
+    set("repo-gp", { upstream: `origin/${ws.branch}`, ahead: 2, baseAhead: 2 });
+    set("repo-dot", { modified: 2, untracked: 1, dirty: true });
+    this.gh.addBranchPullRequest("alexwaumann/code-foundry", ws.branch, 151, `${name}: one change across three projects`);
+    return ws;
+  }
+
   /** Test control: a connected thread owned by the workspace, running in `repo`'s member (else the first). */
   addWorkspaceThread(workspace: string, repo: string, name: string, status: SessionStatus = SessionStatus.IDLE): MockSession {
     const ws = this.workspaceRef(workspace);
@@ -1562,6 +1585,19 @@ export class World {
         cmd: { name: "view.panel.expand", title: "Expand Side Panel", category: "View", description: "Toggle the side panel between its split width and the full width of the content area for the selected session, terminal, worktree, or page.", keybindings: [], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.expand" } } }))}`,
+      },
+      {
+        cmd: {
+          name: "view.panel.workspace",
+          title: "Show Workspace in Side Panel",
+          category: "View",
+          description: "Open the workspace surface in the selected workspace thread's side panel: its members with branch, changes, ahead/behind and pull request, add and remove members, Run in.",
+          keybindings: [],
+          args: [],
+        },
+        // Like the daemon: a thread is active and it belongs to a workspace.
+        when: (ctx) => Boolean(ctx?.activeSessionId && ctx.activeWorkspaceId),
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.workspace" } } }))}`,
       },
       {
         cmd: { name: "settings.reveal", title: "Reveal Settings File", category: "Settings", description: "Show the settings file in Finder", keybindings: [], args: [] },
