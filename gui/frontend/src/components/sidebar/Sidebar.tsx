@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { BellRing, SquarePen } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
@@ -202,7 +202,7 @@ function AttentionBadge() {
       title={label}
       aria-label={label}
       data-testid="attention-badge"
-      className="flex h-5 items-center gap-1 rounded-full bg-amber-400/15 px-2 text-[11px] font-semibold text-amber-300 tabular-nums hover:bg-amber-400/25"
+      className="flex h-5 items-center gap-1 rounded-full bg-amber-400/15 px-1.5 text-[11px] font-semibold text-amber-300 tabular-nums hover:bg-amber-400/25"
       onClick={() => {
         jumpToAttention();
       }}
@@ -231,16 +231,47 @@ function SessionsUnavailable() {
  * (attention badge, New thread). The whole band drags the window (Wails runtime,
  * `--wails-draggable`) except its controls. See docs/notes/sidebar-title-band.md.
  */
+/**
+ * The app name is all-or-nothing: when the band is too narrow for the whole name beside
+ * the controls (a wide attention badge, a narrow sidebar), it is hidden rather than
+ * truncated. The span stays in the layout so it can be measured again when room returns.
+ */
+function AppName() {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [fits, setFits] = useState(true);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      setFits(el.scrollWidth <= el.clientWidth);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+    };
+  }, []);
+  // A span, not a heading: every page in the content pane has its own h1.
+  return (
+    <span
+      ref={ref}
+      className={`min-w-0 overflow-hidden text-[13px] leading-none font-semibold tracking-tight whitespace-nowrap text-sidebar-foreground select-none ${fits ? "" : "invisible"}`}
+      data-testid="sidebar-app-name"
+      data-fits={fits}
+    >
+      Code Foundry
+    </span>
+  );
+}
+
 function SidebarBand() {
   return (
     <div className="flex shrink-0 items-center [--wails-draggable:drag]" style={{ height: TITLE_BAND_HEIGHT }} data-testid="sidebar-band">
       <div className="h-full shrink-0" style={{ width: TRAFFIC_LIGHT_GUTTER }} data-testid="traffic-light-gutter" aria-hidden />
-      <header className="flex h-full min-w-0 flex-1 items-center justify-between gap-2 pr-3 pl-3">
-        {/* A span, not a heading: every page in the content pane has its own h1. */}
-        <span className="min-w-0 truncate text-[13px] leading-none font-semibold tracking-tight text-sidebar-foreground select-none" data-testid="sidebar-app-name">
-          Code Foundry
-        </span>
-        <span className="flex shrink-0 items-center gap-2 [--wails-draggable:no-drag]" data-testid="sidebar-band-controls">
+      <header className="flex h-full min-w-0 flex-1 items-center justify-between gap-1.5 pr-3 pl-3">
+        <AppName />
+        <span className="flex shrink-0 items-center gap-1.5 [--wails-draggable:no-drag]" data-testid="sidebar-band-controls">
           <AttentionBadge />
           {/* New thread (the project picker), as session.new from the palette. New terminal is palette, ⌘T and row menu only. */}
           <span className="-mr-1.5 flex items-center">

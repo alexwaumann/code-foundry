@@ -31,11 +31,14 @@ proto changes, no daemon restart.
 
 ## Gotchas
 
-* **220 keeps the name visible, but not always whole.** "Code Foundry" is about 85px wide.
-  Without the badge it fits from 215px. With a one-digit badge the whole name needs about
-  263px. So at 220 with the badge it reads "Cod…", and at the 260px default with the
-  badge it is about 2px short ("Code Foun…"). Each extra badge digit costs about 7px. A
-  wider minimum (about 264) or default (about 280) would fix that if it matters.
+* **The name shows whole or not at all.** Alex preferred hiding over an ellipsis
+  (2026-10-10). `AppName` measures its span with a ResizeObserver and sets `invisible`
+  when `scrollWidth > clientWidth` (`data-fits` carries the state for tests). The span
+  stays in the layout so it is remeasured when room returns. "Code Foundry" is about
+  85px wide; with a one-digit badge it needs 260px of sidebar, so it shows at the 260px
+  default (the band's gaps are 6px and the badge's padding 6px to make that fit with a
+  couple of px to spare) and hides between 220 and about 258. Each extra badge digit
+  costs about 7px. Without the badge it fits from about 211px.
 * **Saved sidebar widths are clamped on load.** The ui store's persist `merge` clamps
   `sidebarWidth` to [SIDEBAR_MIN, SIDEBAR_MAX], so a width saved under the old 180
   minimum loads as 220. It is a clamp, not a migration (the persist version stays 3).

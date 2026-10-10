@@ -29,6 +29,26 @@ function drag(page: Page, selector: string) {
 const BAND = 52;
 const HEADER = 44;
 
+test("the app name shows whole or not at all: hidden at the minimum sidebar width beside the badge, back when room returns", async ({ page }) => {
+  await openApp(page);
+  const title = page.getByTestId("sidebar-app-name");
+  // The mock has one thread needing attention, so the badge is in the band at the 260px default.
+  await expect(page.getByTestId("attention-badge")).toHaveText("1");
+  await expect(title).toHaveAttribute("data-fits", "true");
+  await expect(title).toBeVisible();
+
+  const setWidth = (w: number) => page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setSidebarWidth(${String(w)}))`);
+  await setWidth(220);
+  await expect(title).toHaveAttribute("data-fits", "false");
+  await expect(title).toBeHidden();
+  // Never an ellipsis: the whole name or nothing.
+  expect(await title.evaluate((el) => getComputedStyle(el).textOverflow)).toBe("clip");
+
+  await setWidth(400);
+  await expect(title).toHaveAttribute("data-fits", "true");
+  await expect(title).toBeVisible();
+});
+
 test("the sidebar band holds the empty traffic-light gutter and the app name, and drags the window", async ({ page }) => {
   await openApp(page);
   const viewport = page.viewportSize();
