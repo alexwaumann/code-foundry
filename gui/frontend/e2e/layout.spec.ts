@@ -22,14 +22,14 @@ function drag(page: Page, selector: string) {
 }
 
 // Window geometry (components/window/titleBand.ts): a 52px title band with no full-width
-// strip. The sidebar's band (80px traffic-light gutter, then the Threads header) is
+// strip. The sidebar's band (80px traffic-light gutter, then the app name) is
 // 52px; the panes start 8px down and their 44px headers end on the band (their 1px
 // bottom border is the first row below it: the pane's own 1px border puts the header
 // at 9..53).
 const BAND = 52;
 const HEADER = 44;
 
-test("the sidebar band holds the empty traffic-light gutter and the Threads header, and drags the window", async ({ page }) => {
+test("the sidebar band holds the empty traffic-light gutter and the app name, and drags the window", async ({ page }) => {
   await openApp(page);
   const viewport = page.viewportSize();
   const band = await box(page, "sidebar-band");
@@ -43,12 +43,15 @@ test("the sidebar band holds the empty traffic-light gutter and the Threads head
   expect([gutter.left, gutter.top, gutter.width, gutter.height]).toEqual([0, 0, 80, BAND]);
   // Nothing sits on the lights.
   expect(await page.getByTestId("traffic-light-gutter").evaluate((el) => [el.childElementCount, el.textContent])).toEqual([0, ""]);
-  const title = page.getByTestId("sidebar-band").getByText("Threads");
-  expect(await title.evaluate((el) => el.getBoundingClientRect().left)).toBeGreaterThanOrEqual(80);
-  expect(await drag(page, '[data-testid="sidebar-band"] header > span:first-child')).toBe("drag");
+  const title = page.getByTestId("sidebar-band").getByRole("heading", { name: "Code Foundry", level: 1 });
+  // 12px after the gutter.
+  expect(await title.evaluate((el) => el.getBoundingClientRect().left)).toBe(80 + 12);
+  expect(await drag(page, '[data-testid="sidebar-band"] header > h1')).toBe("drag");
   // Its controls click instead of dragging.
   expect(await drag(page, '[data-testid="sidebar-band-controls"]')).toBe("no-drag");
-  expect(await drag(page, '[data-testid="sidebar-new-terminal"]')).toBe("no-drag");
+  expect(await drag(page, '[data-testid="sidebar-new-session"]')).toBe("no-drag");
+  // New terminal is not in the band (palette, cmd+t and the row menu only).
+  await expect(page.getByTestId("sidebar-new-terminal")).toHaveCount(0);
   // Pull Requests, Projects and the thread list sit below the band and do not drag.
   expect((await box(page, "nav-pullrequests")).top).toBeGreaterThanOrEqual(BAND);
   expect(await drag(page, '[data-testid="nav-pullrequests"]')).toBe("no-drag");

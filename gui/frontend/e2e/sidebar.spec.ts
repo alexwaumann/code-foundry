@@ -52,7 +52,7 @@ test("the sidebar is a flat thread list: sections on top, workspace badges, no r
   const driver = await workspaceWithThread();
   await openApp(page);
   await expect(row(page, `s:${driver}`)).toBeVisible();
-  await expect(page.getByTestId("sidebar-band")).toContainText("Threads");
+  await expect(page.getByTestId("sidebar-band")).toContainText("Code Foundry");
   // Needs attention (s-2) on top, then threads newest first, then terminals no thread owns.
   await expect.poll(() => rowKeys(page)).toEqual([
     "# Needs attention",
