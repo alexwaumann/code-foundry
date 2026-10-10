@@ -7,6 +7,10 @@ import (
 )
 
 func TestDaemonBinary(t *testing.T) {
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
 	onPath := t.TempDir()
 	bin := filepath.Join(onPath, "code-foundry")
 	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o755); err != nil {
@@ -22,6 +26,8 @@ func TestDaemonBinary(t *testing.T) {
 		{"env override wins", "/opt/cf/code-foundry", onPath, "/opt/cf/code-foundry", false},
 		{"found on PATH", "", onPath, bin, false},
 		{"not found", "", t.TempDir(), "", true},
+		// Spawning the GUI as the daemon would open a window per spawn, forever.
+		{"env pointing at this executable is rejected", self, onPath, "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

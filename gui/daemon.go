@@ -63,7 +63,9 @@ func (s *DaemonService) connect(ctx context.Context) (*client.Client, error) {
 	if err != nil {
 		s.log.Debug("no code-foundry binary found; can only use an already running daemon", "err", err)
 	}
-	c, err := client.Connect(ctx, s.paths, client.ConnectOptions{DaemonBinary: bin, Logger: s.log})
+	// NoAutoStart when bin is empty: client.Connect would otherwise default to
+	// os.Executable(), which here is the GUI, and spawn windows recursively.
+	c, err := client.Connect(ctx, s.paths, client.ConnectOptions{DaemonBinary: bin, NoAutoStart: bin == "", Logger: s.log})
 	if err != nil {
 		return nil, fmt.Errorf("connect to daemon: %w", err)
 	}
@@ -88,8 +90,37 @@ func exportDaemonBinary(log *slog.Logger) {
 // daemonBinary finds the code-foundry CLI to spawn: $CODE_FOUNDRY_BIN, then a sibling
 // of this executable (<app dir>/code-foundry when installed), then
 // ../bin/code-foundry relative to the working directory (`wails3 dev` from gui/ after
-// `make build`), then $PATH.
+// `make build`), then $PATH. It never returns this executable: spawning the GUI as
+// the daemon opens another window, which spawns another, without end.
 func daemonBinary() (string, error) {
+	bin, err := lookupDaemonBinary()
+	if err != nil {
+		return "", err
+	}
+	if isSelf(bin) {
+		return "", fmt.Errorf("%s resolves to this GUI executable (%s), not the code-foundry CLI", EnvDaemonBinary, bin)
+	}
+	return bin, nil
+}
+
+// isSelf reports whether path is the running executable.
+func isSelf(path string) bool {
+	exe, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	a, err := os.Stat(exe)
+	if err != nil {
+		return false
+	}
+	b, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return os.SameFile(a, b)
+}
+
+func lookupDaemonBinary() (string, error) {
 	if b := os.Getenv(EnvDaemonBinary); b != "" {
 		return b, nil
 	}
