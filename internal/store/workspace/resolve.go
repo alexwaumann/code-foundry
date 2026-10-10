@@ -86,12 +86,19 @@ func within(path, root string) bool {
 	return false
 }
 
-// realPath resolves symlinks, returning the cleaned input if that fails.
+// realPath resolves symlinks. For a path that does not exist (yet), it resolves the
+// longest existing ancestor and keeps the rest, so /tmp/x/missing still compares
+// equal to /private/tmp/x/missing.
 func realPath(p string) string {
+	p = filepath.Clean(p)
 	if r, err := filepath.EvalSymlinks(p); err == nil {
 		return r
 	}
-	return filepath.Clean(p)
+	parent := filepath.Dir(p)
+	if parent == p {
+		return p
+	}
+	return filepath.Join(realPath(parent), filepath.Base(p))
 }
 
 // resolveRepo finds a registered repository by id, by name when exactly one has it,
@@ -143,7 +150,7 @@ func resolveRepo(snap *repo.Snapshot, ref string) (repo.Repo, error) {
 			return best, nil
 		}
 	}
-	return repo.Repo{}, fmt.Errorf("%w: repository %q is not registered (register it with `code-foundry repo register <path>`)", ErrNotFound, ref)
+	return repo.Repo{}, fmt.Errorf("%w: repository %q is not registered (register it with `code-foundry repo register --path <path>`)", ErrNotFound, ref)
 }
 
 // memberFor finds the member of w that ref names: a path inside its worktree, its

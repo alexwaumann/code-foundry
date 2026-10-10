@@ -71,6 +71,9 @@ func TestWithinResolvesSymlinks(t *testing.T) {
 		{filepath.Join(link, "wt", "src"), filepath.Join(real, "wt"), true},
 		{filepath.Join(real, "wt"), filepath.Join(link, "wt"), true},
 		{filepath.Join(real, "other"), filepath.Join(link, "wt"), false},
+		{filepath.Join(link, "wt", "missing", "x"), filepath.Join(real, "wt"), true},
+		{filepath.Join(real, "wt", "missing"), filepath.Join(link, "wt"), true},
+		{filepath.Join(link, "missing"), filepath.Join(real, "wt"), false},
 		{"", "/x", false},
 		{"/x", "", false},
 	}
