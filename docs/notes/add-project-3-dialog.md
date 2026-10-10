@@ -104,7 +104,7 @@ merged). PR 3 of `add-project-handoff.md`. `make check`, `make gui-e2e` and
   `TestLineWriter`, `TestExecRunner`, `TestSearchAndLookupGitHub`, `TestCloneStream`,
   `TestCloneRef`, `TestRepoAddAndClone`, `TestPresentClone`, CLI e2e rows; vitest
   `githubRef.test.ts`, `addProject.test.ts`).
-* `make gui-e2e` (WebKit + Chromium), including `e2e/addproject.spec.ts`: every entry
+* `make gui-e2e` 310/310 (WebKit + Chromium), including `e2e/addproject.spec.ts`: every entry
   point, tab order and New's placeholder, Local folder completion + register + error,
   lookup (owner/repo and URL, case), missing repository, ssh and other-host refusals,
   no request while typing (`/__mock/github/calls`), search + pick + back, clone success
