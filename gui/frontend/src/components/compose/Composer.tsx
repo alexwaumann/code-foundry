@@ -8,6 +8,7 @@ import { MemberChips, type MemberChipModel } from "./MemberChips";
 import { PromptEditor, type PromptEditorHandle } from "./PromptEditor";
 import { ATTACHMENT_MIME_TYPES } from "@/api/session";
 import { Backdrop } from "@/components/backdrop/Backdrop";
+import { DragBand } from "@/components/window/DragBand";
 import {
   choiceLabel,
   DEFAULT_EFFORT,
@@ -601,6 +602,7 @@ export function Composer({ repoId, workspaceId }: { repoId: string; workspaceId?
           </div>
         )}
       </section>
+      <DragBand />
     </div>
   );
 }

@@ -9,11 +9,12 @@ onboarding, projects and composer states).
   the content pane both ways with the composer's `m-auto` column-flex trick (it falls back
   to scrolling from the top when the pane is too short). The old `mt-[18vh]` offset was
   window-relative and is gone.
-  * **Onboarding** (repos loaded and zero projects): logo tile, "Welcome to Code Foundry",
+  * **Onboarding** (repos loaded and zero projects): "Welcome to Code Foundry",
     Add a project (`repo.register`, the palette asks for a path) and Command palette.
     Three "01/02/03" step cards and a "Start by adding a project" line were tried and
-    removed on 2026-10-10 as too much chrome. The logo tile is 96 px (the asset is 256 px,
-    so it is 1:1 on retina).
+    removed on 2026-10-10 as too much chrome. A painted logo tile above the
+    heading was tried at 40, 64 and 96 px and dropped the same day: the page reads
+    quieter without it.
   * **Fleet** (any project): a time-of-day greeting (computed per render from the local
     clock; it does not tick), `N connected · N running · N waiting on you` (connected =
     state not disconnected, running = busy and not disconnected, waiting =
@@ -51,8 +52,9 @@ onboarding, projects and composer states).
   `cwebp -q 80 -resize 2048 0` to `src/assets/backdrop/forest-{4-3,16-9}.webp`, 160 KB and
   130 KB. Originals are not committed. Imported through Vite, so they are hashed into
   `dist/` and embedded in the binary.
-* **Logo tile:** `src/assets/logo.webp` (8 KB) is `gui/build/appicon.png` cropped to the
-  squircle (its transparent 100 px margin removed) and scaled to 256 px (the tile is 96 px, so 1:1 at 2x; first 128 px, then 256 px when the tile grew on 2026-10-10).
+* **Drag band:** headerless panes (start page, composer) get `window/DragBand`, a
+  transparent 44 px `--wails-draggable: drag` strip at the pane top, so the window drags
+  from the same band as on panes with a header.
 * **Layout:** the backdrop sits in a `relative` wrapper beside the scrolling section (not
   inside it), so it stays put when the content scrolls; the section is `relative` so it
   paints above the absolutely positioned layer.

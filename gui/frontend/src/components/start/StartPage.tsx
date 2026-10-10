@@ -1,9 +1,9 @@
 import { useMemo, type ReactNode } from "react";
 import { Command, FolderPlus, Sparkles } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import logo from "@/assets/logo.webp";
 import { Backdrop } from "@/components/backdrop/Backdrop";
 import { CommandButton } from "@/components/command/CommandButton";
+import { DragBand } from "@/components/window/DragBand";
 import { SessionLink } from "@/components/session/SessionLink";
 import { startCommandNamed } from "@/keys/bindings";
 import { greeting } from "@/lib/greeting";
@@ -16,18 +16,15 @@ import { activeThreadIds, attentionIds, connectedCount, isAttention, runningCoun
 /** Rows in the start page's thread list before "+N more". */
 const MAX_THREADS = 6;
 
-/** The logo tile, a heading and a muted line under it. */
+/** A heading and a muted line under it. */
 function Header({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <>
-      <img src={logo} alt="" draggable={false} className="size-24 rounded-3xl shadow-md" />
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight" data-testid="start-heading">
-          {title}
-        </h1>
-        <div className="mt-1 text-sm text-muted-foreground">{children}</div>
-      </div>
-    </>
+    <div>
+      <h1 className="text-xl font-semibold tracking-tight" data-testid="start-heading">
+        {title}
+      </h1>
+      <div className="mt-1 text-sm text-muted-foreground">{children}</div>
+    </div>
   );
 }
 
@@ -142,6 +139,7 @@ export function StartPage() {
       >
         <div className="m-auto flex w-full max-w-[440px] flex-col items-center gap-[18px] text-center">{onboarding ? <Onboarding /> : <Fleet />}</div>
       </section>
+      <DragBand />
     </div>
   );
 }
