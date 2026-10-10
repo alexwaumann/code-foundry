@@ -336,6 +336,21 @@ describe("events mapping", () => {
     expect(toSessionView(create(SessionSchema, { id: "s2", repoId: "web", workspaceId: "w-1" }))).toMatchObject({ repoId: "web", workspaceId: "w-1" });
   });
 
+  it("maps linked pull requests in order", () => {
+    expect(toSessionView(create(SessionSchema, { id: "s1" })).linkedPullRequests).toEqual([]);
+    const s = create(SessionSchema, {
+      id: "s1",
+      linkedPullRequests: [
+        { slug: "o/r", number: 5, url: "https://github.com/o/r/pull/5", linkedAt: timestampFromMs(9000) },
+        { slug: "o/r", number: 6, url: "https://github.com/o/r/pull/6" },
+      ],
+    });
+    expect(toSessionView(s).linkedPullRequests).toEqual([
+      { slug: "o/r", number: 5, url: "https://github.com/o/r/pull/5", linkedAt: 9000 },
+      { slug: "o/r", number: 6, url: "https://github.com/o/r/pull/6", linkedAt: null },
+    ]);
+  });
+
   it("empty events map to null", () => {
     expect(toEventView(create(EventSchema, {}))).toBeNull();
   });

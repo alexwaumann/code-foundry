@@ -38,6 +38,7 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     workspaceId: "",
     pendingWorktreePath: "",
     pinned: false,
+    linkedPullRequests: [],
     ...over,
   };
 }

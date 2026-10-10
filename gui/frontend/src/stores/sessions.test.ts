@@ -36,6 +36,7 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     workspaceId: "",
     pendingWorktreePath: "",
     pinned: false,
+    linkedPullRequests: [],
     ...over,
   };
 }
@@ -70,6 +71,15 @@ describe("session reducers", () => {
   it("an identical update returns the same state", () => {
     const prev = replaceSessions(emptySessions, [session("a")]);
     expect(applySessionEvent(prev, { kind: "updated", session: session("a") })).toBe(prev);
+  });
+
+  it("linked pull requests compare by content", () => {
+    const pr = (n: number) => ({ slug: "o/r", number: n, url: `https://github.com/o/r/pull/${String(n)}`, linkedAt: 1000 });
+    const prev = replaceSessions(emptySessions, [session("a", { linkedPullRequests: [pr(5)] })]);
+    expect(applySessionEvent(prev, { kind: "updated", session: session("a", { linkedPullRequests: [pr(5)] }) })).toBe(prev);
+    const next = applySessionEvent(prev, { kind: "updated", session: session("a", { linkedPullRequests: [pr(5), pr(6)] }) });
+    expect(next).not.toBe(prev);
+    expect(next.byId.a?.linkedPullRequests.map((l) => l.number)).toEqual([5, 6]);
   });
 
   it("attentionIds ignores disconnected sessions", () => {

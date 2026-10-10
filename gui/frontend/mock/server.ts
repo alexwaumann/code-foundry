@@ -14,6 +14,8 @@
  *   POST /__mock/session/status?id=s-1&status=busy|idle|attention
  *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
+ *   POST /__mock/link-pr?session=s-1&slug=owner/name&number=12   (Claude linked a pull request;
+ *                                                 deduplicated by URL like the daemon)
  *   POST /__mock/sessions-service?enabled=false   (simulate a daemon without SessionService)
  *   POST /__mock/missing-rpc?rpc=RepoService/ListRefs&rpc=SessionService/StageAttachment
  *                                                 (simulate a daemon older than those RPCs: 404)
@@ -404,6 +406,7 @@ function sessionSummary(id: string): Record<string, unknown> {
     workspaceId: s.workspaceId,
     pendingWorktreePath: s.pendingWorktreePath,
     pinned: s.pinned,
+    linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url })),
   };
 }
 
@@ -495,6 +498,16 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, 200, world.addMixedWorkspace(q.get("name") ?? "checkout"));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
+    case "POST /__mock/link-pr":
+      // session=s-1&slug=owner/name&number=12: a pr-link record; the session is republished if the URL is new.
+      try {
+        const id = q.get("session") ?? "";
+        const added = world.linkPullRequest(id, q.get("slug") ?? "", Number(q.get("number") ?? ""));
+        json(res, 200, { added, ...sessionSummary(id) });
+      } catch (err) {
+        json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
     case "GET /__mock/workspaces":

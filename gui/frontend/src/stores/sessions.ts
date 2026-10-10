@@ -24,7 +24,12 @@ export const emptySessions: SessionsData = { byId: {}, order: [] };
 
 /** Structural equality, so unchanged sessions keep their identity and rows don't re-render. */
 export function sameSession(a: SessionView, b: SessionView): boolean {
-  return (Object.keys(a) as (keyof SessionView)[]).every((k) => a[k] === b[k]);
+  return (Object.keys(a) as (keyof SessionView)[]).every((k) => (k === "linkedPullRequests" ? sameLinks(a[k], b[k]) : a[k] === b[k]));
+}
+
+/** Links only ever grow, in order, and a URL's entry never changes: compare URLs. */
+function sameLinks(a: SessionView["linkedPullRequests"], b: SessionView["linkedPullRequests"]): boolean {
+  return a === b || (a.length === b.length && a.every((l, i) => l.url === b[i]?.url));
 }
 
 function sortedOrder(byId: Readonly<Record<string, SessionView>>): string[] {

@@ -67,6 +67,8 @@ interface MockSession {
   pendingWorktreePath: string;
   /** session.pin. */
   pinned: boolean;
+  /** Claude's pr-link records: one per URL, first-seen order (POST /__mock/link-pr). */
+  linkedPullRequests: { slug: string; number: number; url: string; linkedAt: Date }[];
   /** Mock-only: seconds a queued run-in waits once the thread is not busy (the daemon waits for its prompt). */
   moveIn: number;
   /** Mock-only: seconds left before a STARTING/CLOSING session settles. */
@@ -579,6 +581,7 @@ export class World {
       workspaceId: "",
       pendingWorktreePath: "",
       pinned: false,
+      linkedPullRequests: [],
       moveIn: 0,
       settleIn: 0,
       nameIn: 0,
@@ -622,6 +625,7 @@ export class World {
       workspaceId: s.workspaceId,
       pendingWorktreePath: s.pendingWorktreePath,
       pinned: s.pinned,
+      linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
     };
   }
 
@@ -656,6 +660,20 @@ export class World {
       this.kill(t.id, code, false);
       this.remove(t.id);
     }
+  }
+
+  /**
+   * Claude linked a pull request to the session (a pr-link transcript record): appended
+   * unless its URL is already linked, like the daemon. Returns whether it was new.
+   */
+  linkPullRequest(id: string, slug: string, number: number): boolean {
+    const s = this.session(id);
+    if (!/^[^/\s]+\/[^/\s]+$/.test(slug) || !Number.isInteger(number) || number <= 0) throw new CommandError("invalid", "slug must be owner/name and number a positive integer");
+    const url = `https://github.com/${slug}/pull/${String(number)}`;
+    if (s.linkedPullRequests.some((l) => l.url === url)) return false;
+    s.linkedPullRequests = [...s.linkedPullRequests, { slug, number, url, linkedAt: new Date() }];
+    this.publishSession(s);
+    return true;
   }
 
   setSessionStatus(id: string, status: SessionStatus): void {
