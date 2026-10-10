@@ -162,16 +162,7 @@ export class PrDetailWorld {
     this.details.set(key(CF, 146), this.forkDetail());
     // #147: the viewer's open pull request whose checks fail, on no dashboard (the
     // Linked PRs surface's fixtures link it with /__mock/link-pr).
-    this.details.set(
-      key(CF, 147),
-      this.fromSummary(
-        h.makePr(CF, 147, "feat(session): link pull requests from pr-link transcript records", {
-          headRef: "cf/linked-prs",
-          ageMs: 25 * MIN,
-          checks: { state: CheckRollupState.FAILURE, total: 14, passed: 11, failed: 2, pending: 0, skipped: 1 },
-        }),
-      ),
-    );
+    this.details.set(key(CF, 147), this.linkedDetail());
     for (const d of this.details.values()) d.defaultBranch = "main";
     this.candidates.set(key(CF, 145), [
       { id: "T_core", kind: ReviewerKind.TEAM, login: "acme/core", name: "Core", avatarUrl: avatar("acme/core"), isRequested: true },
@@ -413,6 +404,60 @@ export class PrDetailWorld {
       commitCount: 1,
       checks: [{ name: "build", workflow: "CI", status: CheckStatus.COMPLETED, conclusion: CheckConclusion.SUCCESS, startedAt: this.at(6 * HOUR), completedAt: this.at(6 * HOUR - 3 * MIN) }],
       nodeId: "PR_kwMock146",
+      mergeMethodsAllowed: ALL_METHODS,
+      viewerCanUpdate: true,
+      viewerPermission: "admin",
+      fetchedAt: this.at(20_000),
+    };
+  }
+
+  /**
+   * #147: the viewer's open pull request with 14 checks, 2 of them failing (the rollup
+   * the Linked PRs row shows matches the runs the PR tab lists).
+   */
+  private linkedDetail(): DetailInit {
+    const pr = this.h.makePr(CF, 147, "feat(session): link pull requests from pr-link transcript records", {
+      headRef: "cf/linked-prs",
+      headSha: "a71c147000000000000000000000000000000000",
+      ageMs: 25 * MIN,
+      checks: { state: CheckRollupState.FAILURE, total: 14, passed: 11, failed: 2, pending: 0, skipped: 1 },
+    });
+    const run = (n: number) => `https://github.com/${CF}/actions/runs/147/job/${String(n)}`;
+    const ok = (name: string, n: number, workflow = "CI") => ({
+      name,
+      workflow,
+      status: CheckStatus.COMPLETED,
+      conclusion: CheckConclusion.SUCCESS,
+      url: run(n),
+      startedAt: this.at(24 * MIN),
+      completedAt: this.at(24 * MIN - (2 + n) * 30_000),
+    });
+    return {
+      pullRequest: pr,
+      body: "Claude Code writes a `pr-link` record to the session transcript whenever it sees a pull request. The runner parses them, stores every distinct URL per thread and publishes `Session.linked_pull_requests`.\n\n- migration 0010 `session_pull_requests`\n- backfill on reconnect from the skipped transcript bytes\n- `session list` PRS column",
+      commits: [
+        { sha: "e589570000000000000000000000000000000000", headline: "feat(session): linked pull requests from Claude's pr-link transcript records", authorLogin: this.h.viewer, authorName: "Alex", committedAt: this.at(40 * MIN) },
+        { sha: "f6990c6000000000000000000000000000000000", headline: "feat(api): Session.linked_pull_requests in the proto, API and session.list", authorLogin: this.h.viewer, authorName: "Alex", committedAt: this.at(33 * MIN) },
+        { sha: "a71c147000000000000000000000000000000000", headline: "feat(gui): map linked pull requests into SessionView", authorLogin: this.h.viewer, authorName: "Alex", committedAt: this.at(25 * MIN) },
+      ],
+      commitCount: 3,
+      checks: [
+        { name: "test (macos-15)", workflow: "CI", status: CheckStatus.COMPLETED, conclusion: CheckConclusion.FAILURE, url: run(1), startedAt: this.at(24 * MIN), completedAt: this.at(16 * MIN) },
+        { name: "e2e (webkit)", workflow: "CI", status: CheckStatus.COMPLETED, conclusion: CheckConclusion.FAILURE, url: run(2), startedAt: this.at(24 * MIN), completedAt: this.at(13 * MIN) },
+        ok("build", 3),
+        ok("lint", 4),
+        ok("vet", 5),
+        ok("staticcheck", 6),
+        ok("gofmt", 7),
+        ok("test (ubuntu-24.04)", 8),
+        ok("frontend typecheck", 9),
+        ok("frontend lint", 10),
+        ok("frontend test", 11),
+        ok("e2e (chromium)", 12),
+        ok("buf lint", 13),
+        { name: "release-notes", workflow: "Release", status: CheckStatus.COMPLETED, conclusion: CheckConclusion.SKIPPED, url: run(14), startedAt: this.at(24 * MIN), completedAt: this.at(24 * MIN) },
+      ],
+      nodeId: "PR_kwMock147",
       mergeMethodsAllowed: ALL_METHODS,
       viewerCanUpdate: true,
       viewerPermission: "admin",
