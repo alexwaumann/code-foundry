@@ -160,7 +160,7 @@ func ResolveRepo(snap *repo.Snapshot, ref string) (repo.Repo, error) {
 			return best, nil
 		}
 	}
-	return repo.Repo{}, fmt.Errorf("%w: repository %q is not registered (register it with `code-foundry repo register --path <path>`)", ErrNotFound, ref)
+	return repo.Repo{}, fmt.Errorf("%w: repository %q is not registered (add it with `code-foundry repo add <folder>`)", ErrNotFound, ref)
 }
 
 // memberFor finds the member of w that ref names: a path inside its worktree, its

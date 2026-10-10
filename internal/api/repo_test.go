@@ -116,6 +116,32 @@ func TestRepoUnaryAndErrorCodes(t *testing.T) {
 	}
 }
 
+func TestRepoRegisterExpandsHome(t *testing.T) {
+	t.Setenv("HOME", "/Users/me")
+	tests := []struct {
+		name, path, wantCall string
+		want                 connect.Code
+	}{
+		{"tilde", "~/code/proj/", "Register /Users/me/code/proj", 0},
+		{"absolute is cleaned", "/code/a/../b", "Register /code/b", 0},
+		{"tilde user", "~bob/x", "", connect.CodeInvalidArgument},
+		{"relative", "rel", "", connect.CodeInvalidArgument},
+		{"empty goes to the store", "", "Register ", connect.CodeInvalidArgument},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake, c := newRepoServer(t)
+			_, err := c.Register(context.Background(), connect.NewRequest(&v1.RegisterRepoRequest{Path: tt.path}))
+			if got := connect.CodeOf(err); err != nil && got != tt.want || err == nil && tt.want != 0 {
+				t.Fatalf("err = %v, want code %v", err, tt.want)
+			}
+			if got := strings.Join(fake.Calls, ","); got != tt.wantCall {
+				t.Errorf("store calls = %q, want %q", got, tt.wantCall)
+			}
+		})
+	}
+}
+
 func TestRepoRemotes(t *testing.T) {
 	fake, c := newRepoServer(t)
 	ctx := context.Background()

@@ -274,7 +274,7 @@ func (x *ArgSpec) GetDefaultToCwd() bool {
 
 type Command struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Dotted, stable identifier, e.g. "terminal.new", "repo.register".
+	// Dotted, stable identifier, e.g. "terminal.new", "repo.add".
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Palette title, e.g. "New Terminal".
 	Title       string `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`

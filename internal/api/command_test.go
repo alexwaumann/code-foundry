@@ -53,7 +53,7 @@ func newTestRegistry(t *testing.T) *command.Registry {
 			},
 		},
 		command.Command{
-			Name: "repo.register", Title: "Add Repository", Category: "Repository",
+			Name: "fake.register", Title: "Fake Register", Category: "Fake",
 			Args: []command.ArgSpec{{Name: "path", Type: command.Path, Required: true}},
 			Run: func(context.Context, command.Context, command.Args) (command.Result, error) {
 				return command.Result{}, nil
@@ -74,8 +74,8 @@ func TestCommandList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := len(res.Msg.GetCommands()); n != 1 || res.Msg.GetCommands()[0].GetName() != "repo.register" {
-		t.Fatalf("available commands = %v, want only repo.register", res.Msg.GetCommands())
+	if n := len(res.Msg.GetCommands()); n != 1 || res.Msg.GetCommands()[0].GetName() != "fake.register" {
+		t.Fatalf("available commands = %v, want only fake.register", res.Msg.GetCommands())
 	}
 
 	res, err = h.List(ctx, connect.NewRequest(&v1.ListCommandsRequest{
@@ -86,8 +86,8 @@ func TestCommandList(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmds := res.Msg.GetCommands()
-	if len(cmds) != 2 || cmds[0].GetName() != "repo.register" || cmds[1].GetName() != "terminal.kill" {
-		t.Fatalf("commands = %v, want repo.register, terminal.kill", cmds)
+	if len(cmds) != 2 || cmds[0].GetName() != "fake.register" || cmds[1].GetName() != "terminal.kill" {
+		t.Fatalf("commands = %v, want fake.register, terminal.kill", cmds)
 	}
 	kill := cmds[1]
 	if !kill.GetAvailable() || kill.GetCategory() != "Terminal" || kill.GetKeybindings()[0] != "cmd+shift+w" {
@@ -118,11 +118,11 @@ func TestCommandInvoke(t *testing.T) {
 			0, "killed t1", `{"id":"t1"}`},
 		{"explicit arg", &v1.InvokeCommandRequest{Name: "terminal.kill", Args: map[string]string{"id": "t2"}},
 			0, "killed t2", `{"id":"t2"}`},
-		{"no json", &v1.InvokeCommandRequest{Name: "repo.register", Args: map[string]string{"path": "/r"}}, 0, "", ""},
+		{"no json", &v1.InvokeCommandRequest{Name: "fake.register", Args: map[string]string{"path": "/r"}}, 0, "", ""},
 		{"unknown", &v1.InvokeCommandRequest{Name: "nope.nope"}, connect.CodeNotFound, "", ""},
 		{"unavailable", &v1.InvokeCommandRequest{Name: "terminal.kill"}, connect.CodeFailedPrecondition, "", ""},
-		{"missing arg", &v1.InvokeCommandRequest{Name: "repo.register"}, connect.CodeInvalidArgument, "", ""},
-		{"bad arg", &v1.InvokeCommandRequest{Name: "repo.register", Args: map[string]string{"path": "rel"}}, connect.CodeInvalidArgument, "", ""},
+		{"missing arg", &v1.InvokeCommandRequest{Name: "fake.register"}, connect.CodeInvalidArgument, "", ""},
+		{"bad arg", &v1.InvokeCommandRequest{Name: "fake.register", Args: map[string]string{"path": "rel"}}, connect.CodeInvalidArgument, "", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
