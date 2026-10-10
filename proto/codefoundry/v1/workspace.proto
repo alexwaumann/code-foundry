@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// WorkspaceService manages workspaces: one branch checked out as a worktree in each of
+// several repositories (a branch set), for changes that span repositories. See
+// docs/notes/workspaces-handoff.md and docs/notes/workspaces-1-store.md.
+service WorkspaceService {
+  // List returns every workspace.
+  rpc List(ListWorkspacesRequest) returns (ListWorkspacesResponse) {}
+  // Create makes a workspace and one worktree per member repository on its branch
+  // (fetching each base first). All or nothing: on failure, worktrees it made are
+  // removed again.
+  rpc Create(CreateWorkspaceRequest) returns (CreateWorkspaceResponse) {}
+  // AddRepo creates a worktree on the workspace branch in another repository.
+  rpc AddRepo(AddWorkspaceRepoRequest) returns (AddWorkspaceRepoResponse) {}
+  // RemoveRepo removes a member's worktree (refused while a live thread runs in it, or
+  // when it has uncommitted changes and force is not set) and drops the member.
+  rpc RemoveRepo(RemoveWorkspaceRepoRequest) returns (RemoveWorkspaceRepoResponse) {}
+  // Remove removes every member worktree (same guards as RemoveRepo) and forgets the
+  // workspace.
+  rpc Remove(RemoveWorkspaceRequest) returns (RemoveWorkspaceResponse) {}
+  // Members resolves a workspace by id, name, or a path inside one of its member
+  // worktrees, and lists its members with repository names and checked-out branches.
+  rpc Members(WorkspaceMembersRequest) returns (WorkspaceMembersResponse) {}
+  // Watch sends a snapshot, then every change. A client that falls behind gets a new
+  // snapshot.
+  rpc Watch(WatchWorkspacesRequest) returns (stream WorkspaceEvent) {}
+}
+
+message Workspace {
+  // "w-" + 12 hex digits.
+  string id = 1;
+  // Unique display name.
+  string name = 2;
+  // The branch every member worktree was created on.
+  string branch = 3;
+  // In the order they were added.
+  repeated WorkspaceMember members = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message WorkspaceMember {
+  string repo_id = 1;
+  string worktree_path = 2;
+}
+
+// MemberInfo is a member joined with the repository store's current state.
+message WorkspaceMemberInfo {
+  string repo_id = 1;
+  // Empty when the repository is no longer registered.
+  string repo_name = 2;
+  string worktree_path = 3;
+  // The branch checked out in the worktree now; the workspace branch when unknown.
+  string branch = 4;
+  // The worktree is not among the repository's worktrees (deleted by hand, or the
+  // repository is unregistered or not reconciled yet).
+  bool missing = 5;
+  // The request's cwd is inside this worktree.
+  bool current = 6;
+}
+
+// WorkspaceMemberSpec names a repository to add and the ref its branch starts from.
+message WorkspaceMemberSpec {
+  // Repository id, name (when unique), or a path inside it.
+  string repo = 1;
+  // Ref to branch from when the branch does not exist yet. Empty: the request's
+  // base_ref, else origin/<default branch>, else <default branch>.
+  string base_ref = 2;
+}
+
+message ListWorkspacesRequest {}
+
+message ListWorkspacesResponse {
+  repeated Workspace workspaces = 1;
+}
+
+message CreateWorkspaceRequest {
+  string name = 1;
+  // Branch for every member. Empty: cf/<name as a slug>.
+  string branch = 2;
+  repeated WorkspaceMemberSpec members = 3;
+  // Default base ref for members without their own.
+  string base_ref = 4;
+  // Fetch each remote-tracking base first (bounded; a failed fetch uses the local copy).
+  bool fetch = 5;
+}
+
+message CreateWorkspaceResponse {
+  Workspace workspace = 1;
+}
+
+message AddWorkspaceRepoRequest {
+  // Workspace id or name. Empty: the workspace whose member contains cwd.
+  string workspace = 1;
+  string cwd = 2;
+  // Repository id, name (when unique), or a path inside it.
+  string repo = 3;
+  string base_ref = 4;
+  bool fetch = 5;
+}
+
+message AddWorkspaceRepoResponse {
+  Workspace workspace = 1;
+}
+
+message RemoveWorkspaceRepoRequest {
+  // Workspace id or name. Empty: the workspace whose member contains cwd.
+  string workspace = 1;
+  string cwd = 2;
+  // Repository id, name, or a path inside it (or the member worktree path).
+  string repo = 3;
+  // Remove the worktree even with uncommitted changes.
+  bool force = 4;
+  // Also delete the member's branch.
+  bool delete_branch = 5;
+}
+
+message RemoveWorkspaceRepoResponse {
+  Workspace workspace = 1;
+}
+
+message RemoveWorkspaceRequest {
+  // Workspace id or name.
+  string workspace = 1;
+  bool force = 2;
+  bool delete_branch = 3;
+}
+
+message RemoveWorkspaceResponse {}
+
+message WorkspaceMembersRequest {
+  // Workspace id or name. Empty: the workspace whose member contains cwd.
+  string workspace = 1;
+  // An absolute path; marks the member it is in as current.
+  string cwd = 2;
+}
+
+message WorkspaceMembersResponse {
+  Workspace workspace = 1;
+  repeated WorkspaceMemberInfo members = 2;
+}
+
+message WatchWorkspacesRequest {}
+
+message WorkspaceEvent {
+  oneof event {
+    WorkspaceSnapshot snapshot = 1;
+    Workspace updated = 2;
+    string removed_id = 3;
+  }
+}
+
+message WorkspaceSnapshot {
+  repeated Workspace workspaces = 1;
+}

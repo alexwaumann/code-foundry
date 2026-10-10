@@ -168,7 +168,10 @@ type ArgSpec struct {
 	DefaultValue string                 `protobuf:"bytes,6,opt,name=default_value,json=defaultValue,proto3" json:"default_value,omitempty"`
 	// Positional args take bare words on the CLI, in declaration order
 	// (`code-foundry settings set <key> <value>`). The flag form still works.
-	Positional    bool `protobuf:"varint,7,opt,name=positional,proto3" json:"positional,omitempty"`
+	Positional bool `protobuf:"varint,7,opt,name=positional,proto3" json:"positional,omitempty"`
+	// The CLI sends its working directory when the flag is not given (a Claude session
+	// runs `code-foundry workspace members` from the worktree it works in).
+	DefaultToCwd  bool `protobuf:"varint,8,opt,name=default_to_cwd,json=defaultToCwd,proto3" json:"default_to_cwd,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -248,6 +251,13 @@ func (x *ArgSpec) GetDefaultValue() string {
 func (x *ArgSpec) GetPositional() bool {
 	if x != nil {
 		return x.Positional
+	}
+	return false
+}
+
+func (x *ArgSpec) GetDefaultToCwd() bool {
+	if x != nil {
+		return x.DefaultToCwd
 	}
 	return false
 }
@@ -652,7 +662,7 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\x0eactive_repo_id\x18\x03 \x01(\tR\factiveRepoId\x120\n" +
 	"\x14active_worktree_path\x18\x04 \x01(\tR\x12activeWorktreePath\x12\x1f\n" +
 	"\vactive_view\x18\x05 \x01(\tR\n" +
-	"activeView\"\xee\x01\n" +
+	"activeView\"\x94\x02\n" +
 	"\aArgSpec\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12+\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x17.codefoundry.v1.ArgTypeR\x04type\x12\x1a\n" +
@@ -663,7 +673,8 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\rdefault_value\x18\x06 \x01(\tR\fdefaultValue\x12\x1e\n" +
 	"\n" +
 	"positional\x18\a \x01(\bR\n" +
-	"positional\"\x93\x02\n" +
+	"positional\x12$\n" +
+	"\x0edefault_to_cwd\x18\b \x01(\bR\fdefaultToCwd\"\x93\x02\n" +
 	"\aCommand\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +

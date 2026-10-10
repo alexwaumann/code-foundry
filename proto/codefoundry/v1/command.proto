@@ -42,6 +42,9 @@ message ArgSpec {
   // Positional args take bare words on the CLI, in declaration order
   // (`code-foundry settings set <key> <value>`). The flag form still works.
   bool positional = 7;
+  // The CLI sends its working directory when the flag is not given (a Claude session
+  // runs `code-foundry workspace members` from the worktree it works in).
+  bool default_to_cwd = 8;
 }
 
 message Command {
