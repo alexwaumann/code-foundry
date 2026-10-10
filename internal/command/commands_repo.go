@@ -57,29 +57,12 @@ func (f NotGitFunc) whyNotGit(c Context) string {
 	return ""
 }
 
-// RegisterRepo registers repo.register, repo.unregister, repo.worktree.new,
-// repo.worktree.remove, repo.refresh and repo.git.init.
+// RegisterRepo registers repo.unregister, repo.worktree.new, repo.worktree.remove,
+// repo.refresh and repo.git.init. Adding a project is repo.add (commands_repo_add.go).
 func RegisterRepo(r *Registry, b RepoBackend, notGit NotGitFunc) error {
 	notGit = notGit.or()
 	repoArg := ArgSpec{Name: "repo", Type: String, Required: true, Context: ContextRepo, Description: "Repository id"}
 	return r.RegisterAll(
-		Command{
-			Name:        "repo.register",
-			Title:       "Add Project (local folder)",
-			Description: "Start tracking a folder as a project. A path inside a git repository adds that repository; any other folder is added as a project without git.",
-			Category:    "Project",
-			Args: []ArgSpec{
-				{Name: "path", Type: Path, Required: true, Description: "Project folder (a git repository or any folder)"},
-			},
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.Register(ctx, connect.NewRequest(&v1.RegisterRepoRequest{Path: a.Path("path")}))
-				if err != nil {
-					return Result{}, err
-				}
-				repo := res.Msg.GetRepo()
-				return Result{Message: "registered " + repo.GetName() + " (" + repo.GetId() + ")", JSON: repo}, nil
-			},
-		},
 		Command{
 			Name:        "repo.unregister",
 			Title:       "Remove Project",

@@ -125,7 +125,9 @@ Services (v1):
   disconnected) and detector `status` (busy, idle, needs-attention) with `status_reason`.
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
   chunks), Write (input bytes), Resize, Detach.
-* `RepoService` — Register (a git repository, or any folder as a project without git),
+* `RepoService` — Register (a git repository, or any folder as a project without git;
+  "~" expands, the path must be absolute; the Add Project dialog's Local folder tab calls
+  it directly, the CLI through `repo add <folder>`),
   Unregister, List, ListWorktrees, CreateWorktree (optionally fetching the base first),
   ListRefs, Watch, GetWorktreeDetail (files and log against the base branch, Phase 3a),
   InitGit (`git init` and an empty first commit in a project without git;
@@ -169,7 +171,7 @@ Services (v1):
   and the composer starts threads in them (`docs/notes/workspaces-3-composer.md`).
 * `FilesystemService` — ListDirectories: completes a typed path prefix to directories
   under the user's home (is_git, registered, common completion), for the palette's
-  `path` prompts. Every project path must resolve under home; `repo.Register` enforces
+  `path` prompts and the Add Project dialog's Local folder tab. Every project path must resolve under home; `repo.Register` enforces
   it too (`docs/notes/add-project-1-paths.md`).
 * `HealthService` — Ping, Version.
 

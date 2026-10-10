@@ -51,7 +51,7 @@ message ArgSpec {
 }
 
 message Command {
-  // Dotted, stable identifier, e.g. "terminal.new", "repo.register".
+  // Dotted, stable identifier, e.g. "terminal.new", "repo.add".
   string name = 1;
   // Palette title, e.g. "New Terminal".
   string title = 2;

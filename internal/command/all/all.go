@@ -84,7 +84,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterUI(r, d.Emitter),
 		command.RegisterTerminal(r, d.Terminal),
 		command.RegisterRepo(r, d.Repo, d.NotGit),
-		command.RegisterRepoAdd(r, d.Clone),
+		command.RegisterRepoAdd(r, d.Repo, d.Clone),
 		command.RegisterProjects(r, d.Projects),
 		command.RegisterSession(r, d.Session, d.Emitter),
 		command.RegisterGitOps(r, d.GitOps),

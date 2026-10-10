@@ -1,5 +1,7 @@
 # Adding projects: design handoff
 
+> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
+
 Decided with Alex on 2026-10-10. Four PRs, each on its own `cf/<name>` branch off `main`
 with a `docs/notes/add-project-<n>-*.md` note. Alex's answers to the open questions are
 folded in below; do not reopen them.

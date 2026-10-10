@@ -1,5 +1,7 @@
 # Phase 2 integration
 
+> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
+
 Status: done on `main`. `make check` is green and `make gui-e2e` passes 44/44, with none
 skipped (the FocusSession test now runs). The opt-in live e2e (`e2e/live.spec.ts`)
 passed against a real daemon and Claude Code 2.1.294 in WebKit. A full run takes about

@@ -176,9 +176,8 @@ function routes(router: ConnectRouter): void {
       if (!r) throw new ConnectError(`repo ${req.id} not found`, Code.NotFound);
       return { repo: world.repoMsg(r) };
     },
-    register: () => {
-      throw new ConnectError("use the repo.register command in the mock", Code.Unimplemented);
-    },
+    // The Add Project dialog's Local folder tab and an existing clone destination.
+    register: (req) => guard(() => ({ repo: world.repoMsg(world.registerFolder(req.path)) })),
     unregister: () => {
       throw new ConnectError("use the repo.unregister command in the mock", Code.Unimplemented);
     },

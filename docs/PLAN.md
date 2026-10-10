@@ -61,6 +61,8 @@ clone`) needs both; PR 4 (`repo.create`, publish via `gh repo create`) needs 3.
 
 **Adding projects: done.** All four PRs are built: register any folder under home with
 completion or the folder picker, clone from GitHub, start a new project, publish it.
+`repo.add` is the one command for it (`code-foundry repo add <folder>` on the CLI); the
+old "Add Project (local folder)" command is gone: `docs/notes/add-project-remove-register.md`.
 
 ### Open items
 

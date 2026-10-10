@@ -1,5 +1,7 @@
 # Adding projects PR 2: projects without git, and remoteless repositories
 
+> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
+
 Status: done on branch `cf/add-project-nogit` (off `main` at the handoff commit). PR 2 of
 `add-project-handoff.md`; built in parallel with PR 1 (path completion and the home-only
 boundary in `repo.Register`, which this PR does not touch). `make check`, `make gui-e2e`

@@ -10,6 +10,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
@@ -47,9 +48,19 @@ func (h *Repo) Route(opts ...connect.HandlerOption) Route {
 	return Route{Path: path, Handler: handler}
 }
 
-// Register adds the repository containing the given path.
+// Register adds the repository containing the given path (or the folder, as a project
+// without git). The path is what a user typed: "~" expands to home, and it must be
+// absolute (the Add Project dialog calls this directly; the CLI goes through repo.add).
 func (h *Repo) Register(ctx context.Context, req *connect.Request[v1.RegisterRepoRequest]) (*connect.Response[v1.RegisterRepoResponse], error) {
-	r, err := h.store.Register(ctx, req.Msg.GetPath())
+	path := req.Msg.GetPath()
+	if path != "" {
+		p, err := command.ExpandPath(path)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		path = p
+	}
+	r, err := h.store.Register(ctx, path)
 	if err != nil {
 		return nil, repoError(err)
 	}

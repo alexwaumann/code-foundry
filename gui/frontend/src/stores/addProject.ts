@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { invokeConfirmed, refreshCommands } from "./commands";
+import { registerRepo, type AddedProjectView } from "@/api/addProject";
+import { refreshCommands } from "./commands";
 import { openProject } from "./projectActions";
 import { useReposStore } from "./repos";
 
@@ -45,17 +46,14 @@ export function setAddProjectTab(tab: AddProjectTab): void {
 }
 
 /**
- * repo.register for a folder (the Local folder tab, and an existing clone destination):
- * resolves with the project's id and name. Errors reject with the daemon's message;
- * nothing is toasted (the dialog shows them in place).
+ * Adds a folder as a project (the Local folder tab, and an existing clone destination)
+ * over RepoService.Register: resolves with the project's id and name. Errors reject with
+ * the daemon's message; nothing is toasted (the dialog shows them in place). Commands
+ * are refreshed afterwards so their When guards see the new project.
  */
-export async function registerFolder(path: string): Promise<{ id: string; name: string }> {
+export async function registerFolder(path: string): Promise<AddedProjectView> {
   try {
-    const res = await invokeConfirmed("repo.register", { path: path.length > 1 ? path.replace(/\/+$/, "") : path });
-    if (!res) throw new Error("cancelled");
-    const repo = JSON.parse(res.resultJson || "{}") as { id?: string; name?: string };
-    if (!repo.id) throw new Error(res.message || "the daemon did not say which project it added");
-    return { id: repo.id, name: repo.name ?? repo.id };
+    return await registerRepo(path.length > 1 ? path.replace(/\/+$/, "") : path);
   } finally {
     void refreshCommands();
   }

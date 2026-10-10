@@ -1,5 +1,7 @@
 # Adding projects PR 3: the Add Project dialog and GitHub clone
 
+> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
+
 Status: done on branch `cf/add-project-dialog` (off the handoff commit after PRs 1 and 2
 merged). PR 3 of `add-project-handoff.md`. `make check`, `make gui-e2e` and
 `make gui-build` green; exercised against a scratch daemon with the CLI and the GUI
@@ -17,7 +19,7 @@ merged). PR 3 of `add-project-handoff.md`. `make check`, `make gui-e2e` and
 | `proto/codefoundry/v1/repo.proto` | `RepoService.SearchGitHub`, `LookupGitHub`, `Clone` (server streaming `CloneRepoEvent`: `progress` lines, then `repo`); `GitHubRepository` (with `clone_path`, `clone_path_exists`), `RepositoryVisibility` |
 | `internal/api/repo_github.go` | Handlers; `CloneRepo` / `CloneRef` (no stream) back the `repo.clone` command |
 | `internal/command/commands_repo_add.go` | `repo.add` (Title "Add Project"; the GUI presents it as the dialog, the CLI prints a hint) and `repo.clone <repo>` |
-| `internal/command/commands_repo.go` | `repo.register` is now "Add Project (local folder)", path described as "Project folder (a git repository or any folder)" |
+| `internal/command/commands_repo.go` | `repo.register` is now "Add Project (local folder)", path described as "Project folder (a git repository or any folder)" (superseded: removed; `repo.add <folder>` on the CLI) |
 | `cmd/code-foundry/clone.go` | `cliPresenters`: `repo.clone` streams `RepoService.Clone` and prints progress |
 | `internal/daemon` | The cloner (gh from `advanced.gh_path`, else PATH, else Homebrew), wired into the Repo handler and `all.Deps.Clone` |
 | `gui/frontend/src/lib/githubRef.ts` | `parseGitHubInput`: repo / search / error, table tested |
@@ -68,7 +70,8 @@ merged). PR 3 of `add-project-handoff.md`. `make check`, `make gui-e2e` and
   `repo.add` and `repo.clone` are presenters that open the dialog, so the palette never
   runs a 15-minute unary Invoke.
 * **One "Add Project" in the palette:** `repo.add`. `repo.register` keeps the palette path
-  prompt as "Add Project (local folder)".
+  prompt as "Add Project (local folder)". (Superseded: `repo.register` is gone; the
+  dialog calls `RepoService.Register` directly.)
 * **GitHub input:** Enter (or the Look up / Search button) is the only trigger. An exact
   `owner/repo` or a github.com URL looks up (a card, already selected); other text
   searches (a list; picking one shows its card, Back returns to the list). ssh, http and
@@ -76,7 +79,7 @@ merged). PR 3 of `add-project-handoff.md`. `make check`, `make gui-e2e` and
   `user:x` and the like are searches; `c++/rust` (not a valid pair) too.
 * **Destination already there:** search and lookup carry `clone_path` and
   `clone_path_exists` (the daemon stats it), so the list says "already cloned" and the
-  card offers **Add existing folder** (`repo.register` on that path) instead of Clone.
+  card offers **Add existing folder** (`repo.register` on that path; now `RepoService.Register`) instead of Clone.
 * **After success** the dialog closes and selects the new project's overview once the repo
   event has arrived (`selectAddedProject` waits up to 5 s for the repos store).
 * **New tab** is a disabled placeholder ("Coming soon"). The dialog opens on Local folder.

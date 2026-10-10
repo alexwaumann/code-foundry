@@ -124,7 +124,7 @@ export const ArgSpecSchema: GenMessage<ArgSpec> = /*@__PURE__*/
  */
 export type Command = Message<"codefoundry.v1.Command"> & {
   /**
-   * Dotted, stable identifier, e.g. "terminal.new", "repo.register".
+   * Dotted, stable identifier, e.g. "terminal.new", "repo.add".
    *
    * @generated from field: string name = 1;
    */

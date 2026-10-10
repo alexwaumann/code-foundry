@@ -140,7 +140,7 @@ func pickPRWorktree(kind prSessionKind, repos []*v1.Repo, slug string, number in
 	clones := clonesOf(repos, slug)
 	if len(clones) == 0 {
 		return prWorktreePick{}, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf(
-			"no registered repository is a clone of %s: add one with `code-foundry repo register <path>`, or pass --worktree", slug))
+			"no registered repository is a clone of %s: add one with `code-foundry repo add <folder>`, or pass --worktree", slug))
 	}
 	if kind == prSessionRead && active != "" {
 		active = filepath.Clean(active)

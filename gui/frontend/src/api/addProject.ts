@@ -4,7 +4,28 @@ import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
 import { toRepoView, type RepoView } from "./repo";
 
-/** The Add Project dialog's GitHub tab: RepoService.SearchGitHub, LookupGitHub and Clone. */
+/**
+ * The Add Project dialog's Local folder tab (RepoService.Register) and GitHub tab
+ * (RepoService.SearchGitHub, LookupGitHub and Clone).
+ */
+
+/** A project just added: what the dialog needs to say so and open it. */
+export interface AddedProjectView {
+  id: string;
+  name: string;
+}
+
+/**
+ * Adds a folder under home as a project (RepoService.Register): a git repository adds
+ * that repository, any other folder a project without git. The daemon expands "~" and
+ * refuses paths outside home; errors are the daemon's ConnectError.
+ */
+export async function registerRepo(path: string, conn: DaemonConnection = daemon): Promise<AddedProjectView> {
+  const c = await conn.client(RepoService);
+  const res = await c.register({ path });
+  if (!res.repo) throw new Error("the daemon did not say which project it added");
+  return { id: res.repo.id, name: res.repo.name || res.repo.id };
+}
 
 export type RepoVisibility = "public" | "private" | "internal" | "";
 

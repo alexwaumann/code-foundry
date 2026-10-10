@@ -1,8 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, openApp, resetMock } from "./fixtures";
+import { openApp, repoAt, resetMock } from "./fixtures";
 
-// Path prompts (repo.register's "path") complete against FilesystemService.ListDirectories
-// over the mock's fake home (mock/filesystem.ts).
+// Folder completion against FilesystemService.ListDirectories over the mock's fake home
+// (mock/filesystem.ts), driven through the Add Project dialog's Local folder tab. The
+// palette's path prompts use the same completion (usePathCompletion, pathCompletion.tsx).
 
 test.beforeEach(async () => {
   await resetMock();
@@ -10,21 +11,20 @@ test.beforeEach(async () => {
 
 async function openAddProject(page: Page) {
   await openApp(page);
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("add project local folder");
-  await page.keyboard.press("Enter");
-  const palette = page.getByTestId("palette");
-  await expect(palette).toHaveAttribute("data-mode", "args");
-  return palette;
+  await page.getByTestId("sidebar-add-project").click();
+  const dialog = page.getByTestId("add-project-dialog");
+  await expect(dialog).toHaveAttribute("data-tab", "local");
+  await expect(page.getByTestId("add-project-local-input")).toBeFocused();
+  return dialog;
 }
 
 function entry(page: Page, name: string) {
   return page.getByTestId("path-entry").and(page.locator(`[data-entry-name="${name}"]`));
 }
 
-test("Add Project completes paths with Tab and submits with Enter", async ({ page }) => {
-  const palette = await openAddProject(page);
-  const input = palette.locator("input");
+test("Local folder completes paths with Tab and submits with Enter", async ({ page }) => {
+  const dialog = await openAddProject(page);
+  const input = page.getByTestId("add-project-local-input");
 
   // Empty input lists home, without dot-directories.
   await expect(entry(page, "src")).toBeVisible();
@@ -63,14 +63,13 @@ test("Add Project completes paths with Tab and submits with Enter", async ({ pag
   await page.keyboard.press("Tab");
   await expect(input).toHaveValue("~/src/new-app/");
   await page.keyboard.press("Enter");
-  await expect(palette).toHaveCount(0);
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("repo.register");
-  expect((await invocations()).at(-1)?.args).toEqual({ path: "~/src/new-app" });
+  await expect(dialog).toHaveCount(0);
+  expect(await repoAt("/Users/dev/src/new-app")).toMatchObject({ name: "new-app", git: true });
 });
 
 test("a highlighted folder: / descends, Tab descends, Enter submits it", async ({ page }) => {
-  const palette = await openAddProject(page);
-  const input = palette.locator("input");
+  const dialog = await openAddProject(page);
+  const input = page.getByTestId("add-project-local-input");
   await input.fill("~/Documents/");
   await expect(entry(page, "Projects")).toBeVisible();
   await page.keyboard.press("ArrowDown");
@@ -87,20 +86,20 @@ test("a highlighted folder: / descends, Tab descends, Enter submits it", async (
   await expect(entry(page, "side-project")).toBeVisible();
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
-  await expect(palette).toHaveCount(0);
-  await expect.poll(async () => (await invocations()).at(-1)?.args).toEqual({ path: "~/Documents/Projects/side-project" });
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(async () => (await repoAt("/Users/dev/Documents/Projects/side-project"))?.name).toBe("side-project");
 });
 
 test("outside home is refused and long listings are bounded", async ({ page }) => {
-  const palette = await openAddProject(page);
-  const input = palette.locator("input");
+  const dialog = await openAddProject(page);
+  const input = page.getByTestId("add-project-local-input");
   await input.fill("/etc/");
   await expect(page.getByTestId("path-message")).toContainText("/etc/ is outside your home directory");
   await expect(page.getByTestId("path-entry")).toHaveCount(0);
 
   await input.fill("~/many/");
   await expect(page.getByTestId("path-entry")).toHaveCount(200);
-  await expect(palette.getByText("Folders (first 200)")).toBeVisible();
+  await expect(dialog.getByText("Folders (first 200)")).toBeVisible();
   await page.keyboard.press("Tab");
   await expect(input).toHaveValue("~/many/d");
 });

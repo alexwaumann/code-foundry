@@ -1,5 +1,7 @@
 # Phase 1d: Command registry, CommandService, UiService, CLI verbs
 
+> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
+
 Status: done on branch. `make check` is green. Exercised end to end with the built binary
 on a temp `CODE_FOUNDRY_HOME`: `commands`, the registry path (`daemon.status`, `daemon status`,
 `--json`), `ui notify` with no watcher (`delivered=0`) and with a Go client holding

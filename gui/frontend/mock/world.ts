@@ -15,7 +15,8 @@ import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefound
 import { MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
 import { prDetailCall } from "./prDetail";
 import { GhWorld, ghEvent, viewCommands } from "./github";
-import { HOME } from "./filesystem";
+import { cloneExists } from "./clone";
+import { HOME, projectFolder } from "./filesystem";
 import { projectCommands } from "./create";
 import { Hub } from "./hub";
 import { MockSettings } from "./settings";
@@ -1175,6 +1176,53 @@ export class World {
     return { id: r.id, path: r.path, name: r.name, defaultBranch: r.defaultBranch, githubSlug: r.githubSlug, remotes: r.remotes, git: r.git !== false, worktrees: r.worktrees.map((w) => this.worktreeMsg(r.id, w)) };
   }
 
+  /**
+   * RepoService.Register (the Add Project dialog's Local folder tab and an existing clone
+   * destination), with the daemon's rules: "~" expands, the path must be absolute and
+   * under home, a folder inside a git repository adds that repository, any other folder
+   * a project without git, and an already registered project is returned unchanged.
+   */
+  registerFolder(raw: string): MockRepo {
+    if (raw === "") throw new CommandError("invalid", "invalid argument: path is required");
+    if (raw.startsWith("~") && raw !== "~" && !raw.startsWith("~/")) throw new CommandError("invalid", `~user paths are not supported: "${raw}"`);
+    const expanded = raw.replace(/^~(?=\/|$)/, HOME);
+    if (!expanded.startsWith("/")) throw new CommandError("invalid", `want an absolute path, got "${raw}"`);
+    const segs: string[] = [];
+    for (const seg of expanded.split("/")) {
+      if (seg === "" || seg === ".") continue;
+      if (seg === "..") segs.pop();
+      else segs.push(seg);
+    }
+    const path = `/${segs.join("/")}`;
+    if (path !== HOME && !path.startsWith(`${HOME}/`)) throw new CommandError("invalid", `invalid argument: ${path} is outside your home directory`);
+    const registered = (p: string) =>
+      [...this.repos.values()].find((r) => r.path === p || p.startsWith(`${r.path}/`) || r.worktrees.some((w) => w.path === p || p.startsWith(`${w.path}/`)));
+    const known = registered(path);
+    if (known) return known;
+    const folder = projectFolder(path) ?? (cloneExists(path) ? { path, git: true } : undefined);
+    if (!folder) throw new CommandError("invalid", `invalid argument: ${path}: no such file or directory`);
+    const again = registered(folder.path);
+    if (again) return again;
+    const name = folder.path.split("/").pop() || folder.path;
+    let id = `repo-${name.toLowerCase()}`;
+    for (let n = 2; this.repos.has(id); n++) id = `repo-${name.toLowerCase()}-${String(n)}`;
+    const repo: MockRepo = folder.git
+      ? { id, path: folder.path, name, defaultBranch: "main", githubSlug: "", remotes: [], worktrees: [{ path: folder.path, branch: "main", head: "deadbeef", isMain: true, status: clean() }] }
+      : {
+          id,
+          path: folder.path,
+          name,
+          defaultBranch: "",
+          githubSlug: "",
+          remotes: [],
+          git: false,
+          worktrees: [{ path: folder.path, branch: "", head: "", isMain: true, status: clean() }],
+        };
+    this.repos.set(id, repo);
+    this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
+    return repo;
+  }
+
   /** RepoService.Clone's last step: a cloned GitHub repository registered at path. */
   addClone(owner: string, name: string, path: string): MockRepo {
     let id = `repo-${name.toLowerCase()}`;
@@ -1317,7 +1365,7 @@ export class World {
           target = { repoId: owner?.id ?? "", path: args.worktree };
         } else {
           const first = clones[0];
-          if (!first) throw new CommandError("unavailable", `no registered repository is a clone of ${slug}: add one with \`code-foundry repo register <path>\`, or pass --worktree`);
+          if (!first) throw new CommandError("unavailable", `no registered repository is a clone of ${slug}: add one with \`code-foundry repo add <folder>\`, or pass --worktree`);
           const active = ctx?.activeWorktreePath;
           if (!fix && active) target = find((w) => w.path === active);
           if (!target) target = find(onHead);
@@ -1621,37 +1669,20 @@ export class World {
       },
       {
         cmd: {
-          name: "repo.register",
-          title: "Add Project (local folder)",
-          category: "Project",
-          description: "Start tracking a folder as a project. A path inside a git repository adds that repository; any other folder is added as a project without git.",
-          keybindings: [],
-          args: [{ name: "path", type: ArgType.PATH, required: true, description: "Project folder (a git repository or any folder)" }],
-        },
-        when: always,
-        run: (_ctx, args) => {
-          const path = (args.path ?? "").replace(/^~(?=\/|$)/, HOME).replace(/\/+$/, "");
-          if (path !== HOME && !path.startsWith(`${HOME}/`)) throw new CommandError("invalid", `${path} is outside your home directory`);
-          const name = path.split("/").pop() || path;
-          const id = `repo-${name}`;
-          const repo: MockRepo = { id, path, name, defaultBranch: "main", githubSlug: "", remotes: [], worktrees: [{ path, branch: "main", head: "deadbeef", isMain: true, status: clean() }] };
-          this.repos.set(id, repo);
-          this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
-          // Like the daemon: the registered Repo as the result (the dialog selects it).
-          return Promise.resolve({ message: `registered ${name} (${id})`, resultJson: JSON.stringify({ id, path, name, git: true }) });
-        },
-      },
-      {
-        cmd: {
           name: "repo.add",
           title: "Add Project",
           category: "Project",
           description: "Add a project: start a new one, add a folder on this Mac, or clone a repository from GitHub. Opens the Add Project dialog in the app.",
           keybindings: [],
-          args: [],
+          args: [{ name: "path", type: ArgType.PATH, required: false, description: "Project folder to add without the dialog (a git repository or any folder under home)" }],
         },
         when: always,
-        run: () => "Add a project from the CLI with `code-foundry repo register --path <folder>` or `code-foundry repo clone <owner/repo>`.",
+        // The GUI presents it (the dialog); this is the CLI's answer, like the daemon.
+        run: (_ctx, args) => {
+          if (!args.path) return "Add a project from the CLI with `code-foundry repo add <folder>` or `code-foundry repo clone <owner/repo>`; in the app, repo.add opens the Add Project dialog.";
+          const repo = this.registerFolder(args.path);
+          return Promise.resolve({ message: `registered ${repo.name} (${repo.id})`, resultJson: JSON.stringify(this.repoMsg(repo)) });
+        },
       },
       {
         cmd: {

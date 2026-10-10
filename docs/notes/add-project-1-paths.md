@@ -1,5 +1,7 @@
 # Adding projects PR 1: path completion and folder picker
 
+> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
+
 Status: done on branch `cf/add-project-paths`. First of the four PRs in
 `add-project-handoff.md` ("PR 1: path completion and folder picker"). `make check`,
 `make gui-e2e` and `make gui-build` green; exercised against a scratch daemon (below).

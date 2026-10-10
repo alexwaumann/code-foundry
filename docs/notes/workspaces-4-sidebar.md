@@ -1,5 +1,7 @@
 # Workspaces step 4: flat thread sidebar, Projects page, "Run in…"
 
+> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
+
 Status: done on branch `cf/workspaces-sidebar` (stacked on `cf/workspaces-composer`).
 `make check`, `make gui-e2e` and `make gui-build` green. Exercised against a scratch
 daemon with real haiku threads (below). Design record: `workspaces-handoff.md` (section 3:

@@ -1,5 +1,7 @@
 # Start page and backdrop
 
+> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
+
 Decided 2026-10-10 (Alex), from the approved "glow" sketch (a static HTML mock with
 onboarding, projects and composer states).
 
@@ -10,7 +12,7 @@ onboarding, projects and composer states).
   to scrolling from the top when the pane is too short). The old `mt-[18vh]` offset was
   window-relative and is gone.
   * **Onboarding** (repos loaded and zero projects): "Welcome to Code Foundry",
-    Add a project (`repo.register`, the palette asks for a path) and Command palette.
+    Add a project (`repo.register`, the palette asks for a path; superseded: now `repo.add`, which opens the Add Project dialog) and Command palette.
     Three "01/02/03" step cards and a "Start by adding a project" line were tried and
     removed on 2026-10-10 as too much chrome. A painted logo tile above the
     heading was tried at 40, 64 and 96 px and dropped the same day: the page reads

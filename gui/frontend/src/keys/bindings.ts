@@ -179,8 +179,9 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   },
   // "Run in…": the member picker for the active workspace thread; it invokes session.run-in.
   "session.run-in": () => openRunInPicker(getUiContext().activeSessionId),
-  // The Add Project dialog; its tabs invoke repo.register, or stream RepoService.Clone
-  // (repo.clone's CLI form). repo.clone opens it on the GitHub tab.
+  // The Add Project dialog; its tabs call RepoService.Register (repo.add's CLI form with
+  // a folder), stream RepoService.Clone (repo.clone's CLI form), or invoke repo.create.
+  // repo.add's optional path is never prompted for. repo.clone opens it on the GitHub tab.
   "repo.add": () => {
     openAddProject();
     return true;

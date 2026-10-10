@@ -1,5 +1,7 @@
 # Phase 3 UI: near-black panes, no footer, command buttons
 
+> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
+
 Status: done on `t3code/customize-window-title-bar`, after `phase3-ui-panes.md`.
 `make check` is green (Go, 23 vitest files / 293 tests). `make gui-e2e` passes 124/124
 (62 WebKit, 62 Chromium). The real app (`make gui-build`, `gui/bin/CodeFoundry`) ran

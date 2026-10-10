@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, mockPost, openApp, resetMock, row } from "./fixtures";
+import { appPath, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -20,9 +20,12 @@ test("onboarding: no projects shows the welcome and Add a project", async ({ pag
   await expect(page.getByTestId("onboarding-steps")).toHaveCount(0);
   await expect(page.getByTestId("backdrop")).toHaveCount(1);
 
-  // Add a project is repo.register: the palette asks for the path.
+  // Add a project is repo.add: the Add Project dialog, on New (there are no projects yet).
   await page.getByTestId("welcome-actions").getByRole("button", { name: "Add a project" }).click();
-  await expect(page.getByTestId("palette")).toBeVisible();
+  await expect(page.getByTestId("add-project-dialog")).toBeVisible();
+  await expect(page.getByTestId("add-project-dialog")).toHaveAttribute("data-tab", "new");
+  await expect(page.getByTestId("palette")).toHaveCount(0);
+  expect((await invocations()).filter((i) => i.name.startsWith("repo."))).toEqual([]);
 });
 
 test("with projects: greeting, counts, actions, and no New terminal", async ({ page }) => {
