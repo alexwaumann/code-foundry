@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONTENT_MIN, PANE_GAPS, PANEL_MIN, clampPanelWidth, panelMax, useUiStore, type FocusRegion } from "./ui";
+import { CONTENT_MIN, PANE_GAPS, PANEL_MIN, SIDEBAR_MAX, SIDEBAR_MIN, clampPanelWidth, panelMax, useUiStore, type FocusRegion } from "./ui";
 
 describe("panelMax", () => {
   const cases: [string, number, number, number][] = [
@@ -15,7 +15,7 @@ describe("panelMax", () => {
 
   it("leaves the content pane its minimum whenever the panel fits", () => {
     for (const windowWidth of [900, 1000, 1280, 1600]) {
-      for (const sidebar of [0, 180, 260, 520]) {
+      for (const sidebar of [0, SIDEBAR_MIN, 260, SIDEBAR_MAX]) {
         const max = panelMax(windowWidth, sidebar);
         if (max < PANEL_MIN) continue;
         expect(windowWidth - sidebar - PANE_GAPS - max).toBeGreaterThanOrEqual(CONTENT_MIN);

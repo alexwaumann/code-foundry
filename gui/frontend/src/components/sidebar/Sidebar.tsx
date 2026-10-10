@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { BellRing, Sparkles, SquareTerminal } from "lucide-react";
+import { BellRing, SquarePen } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { ProjectsNav } from "@/components/projects/ProjectsPage";
@@ -202,7 +202,7 @@ function AttentionBadge() {
       title={label}
       aria-label={label}
       data-testid="attention-badge"
-      className="flex h-5 items-center gap-1 rounded-full bg-amber-400/15 px-2 font-semibold tracking-normal text-amber-300 tabular-nums normal-case hover:bg-amber-400/25"
+      className="flex h-5 items-center gap-1 rounded-full bg-amber-400/15 px-2 text-[11px] font-semibold text-amber-300 tabular-nums hover:bg-amber-400/25"
       onClick={() => {
         jumpToAttention();
       }}
@@ -227,21 +227,21 @@ function SessionsUnavailable() {
 
 /**
  * The sidebar's share of the title band (components/window/titleBand.ts): the
- * traffic-light gutter, kept empty for the lights, then the Threads header. The
- * whole band drags the window (Wails runtime, `--wails-draggable`) except its controls.
+ * traffic-light gutter, kept empty for the lights, then the app name and the controls
+ * (attention badge, New thread). The whole band drags the window (Wails runtime,
+ * `--wails-draggable`) except its controls. See docs/notes/sidebar-title-band.md.
  */
 function SidebarBand() {
   return (
     <div className="flex shrink-0 items-center [--wails-draggable:drag]" style={{ height: TITLE_BAND_HEIGHT }} data-testid="sidebar-band">
       <div className="h-full shrink-0" style={{ width: TRAFFIC_LIGHT_GUTTER }} data-testid="traffic-light-gutter" aria-hidden />
-      <header className="flex h-full min-w-0 flex-1 items-center justify-between gap-2 pr-3 pl-2 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-        <span className="min-w-0 truncate">Threads</span>
+      <header className="flex h-full min-w-0 flex-1 items-center justify-between gap-2 pr-3 pl-3">
+        <h1 className="min-w-0 truncate text-[13px] leading-none font-semibold tracking-tight text-foreground select-none">Code Foundry</h1>
         <span className="flex shrink-0 items-center gap-2 [--wails-draggable:no-drag]" data-testid="sidebar-band-controls">
           <AttentionBadge />
-          {/* New thread (the project picker) and a new terminal in the selected thread's worktree, as session.new / terminal.new from the palette. */}
-          <span className="-mr-1.5 flex items-center normal-case">
-            <CommandButton command="session.new" icon={Sparkles} whenUnavailable="disable" data-testid="sidebar-new-session" />
-            <CommandButton command="terminal.new" icon={SquareTerminal} whenUnavailable="disable" data-testid="sidebar-new-terminal" />
+          {/* New thread (the project picker), as session.new from the palette. New terminal is palette, ⌘T and row menu only. */}
+          <span className="-mr-1.5 flex items-center">
+            <CommandButton command="session.new" icon={SquarePen} whenUnavailable="disable" data-testid="sidebar-new-session" />
           </span>
         </span>
       </header>

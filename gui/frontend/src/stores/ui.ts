@@ -28,7 +28,11 @@ export type FocusRegion = "sidebar" | "terminal" | "content" | "palette" | "pane
  */
 export type PalettePage = "commands" | "projects" | "runin";
 
-export const SIDEBAR_MIN = 180;
+/**
+ * The sidebar band must fit the 80px traffic-light gutter, the app name, the attention
+ * badge and the New thread button (components/sidebar/Sidebar.tsx); 180 squeezed the name out.
+ */
+export const SIDEBAR_MIN = 220;
 export const SIDEBAR_MAX = 520;
 /** Side panel width bounds; the upper bound depends on the window and sidebar (panelMax). */
 export const PANEL_MIN = 280;
