@@ -100,6 +100,7 @@ func Run(ctx context.Context, opts Options) error {
 	ghAPI := api.NewGh(st.gh, events, ctx.Done())
 	settingsAPI := api.NewSettings(st.settings)
 	updateAPI := api.NewUpdate(st.update, events, ctx.Done())
+	workspaceAPI := api.NewWorkspace(st.workspace, events)
 	commands := command.NewRegistry()
 	if err := all.Register(commands, all.Deps{
 		Daemon: command.DaemonInfo{
@@ -114,9 +115,10 @@ func Run(ctx context.Context, opts Options) error {
 			GitHubSlug: func(c command.Context) string { return st.gitops.GitHubSlug(c.ActiveRepoID, c.ActiveWorktreePath) },
 			LocalOnly:  func(c command.Context) bool { return st.gitops.LocalOnly(c.ActiveRepoID, c.ActiveWorktreePath) },
 		},
-		Gh:       ghAPI,
-		Settings: settingsAPI,
-		Update:   updateAPI,
+		Gh:        ghAPI,
+		Settings:  settingsAPI,
+		Update:    updateAPI,
+		Workspace: workspaceAPI,
 		Restart: func() {
 			// Let the command's response reach the caller first.
 			time.AfterFunc(restartDelay, func() { restart(errRestartRequested) })
@@ -136,6 +138,7 @@ func Run(ctx context.Context, opts Options) error {
 		gitopsAPI.Route(),
 		settingsAPI.Route(),
 		updateAPI.Route(),
+		workspaceAPI.Route(),
 		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Session: st.session, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Done: ctx.Done()}).Route(),
 	}
 	mux := http.NewServeMux()

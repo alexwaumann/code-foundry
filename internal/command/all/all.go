@@ -37,6 +37,8 @@ type Deps struct {
 	Update command.UpdateBackend
 	// Restart backs daemon.restart (see command.UpdateDeps). Nil makes it fail.
 	Restart func()
+	// Workspace backs workspace.*. Nil works like Terminal.
+	Workspace command.WorkspaceBackend
 }
 
 // Register registers every domain's commands into r.
@@ -56,6 +58,9 @@ func Register(r *command.Registry, d Deps) error {
 	if d.Settings == nil {
 		d.Settings = codefoundryv1connect.UnimplementedSettingsServiceHandler{}
 	}
+	if d.Workspace == nil {
+		d.Workspace = codefoundryv1connect.UnimplementedWorkspaceServiceHandler{}
+	}
 	if d.Update == nil {
 		d.Update = codefoundryv1connect.UnimplementedUpdateServiceHandler{}
 	}
@@ -73,5 +78,6 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterSettings(r, d.Settings, d.Emitter, d.Reveal),
 		command.RegisterUpdate(r, command.UpdateDeps{Update: d.Update, Session: d.Session, Restart: d.Restart, Daemon: d.Daemon}),
 		command.RegisterView(r, d.Emitter),
+		command.RegisterWorkspace(r, d.Workspace),
 	)
 }

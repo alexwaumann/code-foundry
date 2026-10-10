@@ -66,6 +66,10 @@ type ArgSpec struct {
 	// Positional args also take bare words on the CLI, in declaration order:
 	// `code-foundry settings set <key> <value>`.
 	Positional bool
+	// DefaultToCwd makes the CLI send its working directory when the flag is not
+	// given (Path args only). A Claude session runs the CLI from its worktree, so
+	// `code-foundry workspace members` finds the session's workspace.
+	DefaultToCwd bool
 }
 
 // validate checks the spec's static shape at Register time.
@@ -87,6 +91,8 @@ func (s ArgSpec) validate() error {
 		return fmt.Errorf("unknown context field %d", s.Context)
 	case s.Context != NoContext && s.Type != String && s.Type != Path:
 		return errors.New("context-bound arg must be a string or path")
+	case s.DefaultToCwd && s.Type != Path:
+		return errors.New("only a path arg can default to the working directory")
 	}
 	if s.Default != "" {
 		if _, err := s.parse(s.Default); err != nil {

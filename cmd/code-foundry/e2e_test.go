@@ -88,6 +88,10 @@ func TestCLIAgainstDaemon(t *testing.T) {
 		{"unavailable", []string{"terminal", "kill"}, errUsage, "", "terminal.kill: not available in this context"},
 		{"unknown flag", []string{"ui.notify", "--nope"}, errUsage, "", "flag provided but not defined: -nope"},
 		{"stray positional", []string{"ui.notify", "--title", "x", "extra"}, errUsage, "", "unexpected arguments [extra]"},
+		{"workspace list", []string{"workspace", "list"}, nil, "no workspaces", ""},
+		{"workspace members defaults to the working directory", []string{"workspace", "members"}, errUsage, "", "/work is not inside a workspace worktree"},
+		{"kebab-case verb with a positional", []string{"workspace", "add-repo", "api", "--fetch=false"}, errUsage, "", "workspace.add-repo: not found: /work is not inside"},
+		{"explicit --cwd wins", []string{"workspace", "members", "--cwd", "/elsewhere"}, errUsage, "", "/elsewhere is not inside"},
 		// terminal.* is registered against the Unimplemented stub until 1a is wired.
 		{"store-backed stub", []string{"terminal.kill", "--id", "t1"}, errAny, "", ""},
 	}

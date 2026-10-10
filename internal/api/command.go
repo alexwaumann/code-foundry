@@ -121,6 +121,7 @@ func commandToProto(c command.Listed) *v1.Command {
 			EnumValues:   a.Enum,
 			DefaultValue: a.Default,
 			Positional:   a.Positional,
+			DefaultToCwd: a.DefaultToCwd,
 		}
 	}
 	return &v1.Command{
