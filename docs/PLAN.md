@@ -17,8 +17,11 @@ Phases 0–3 are done and merged on `main`. Each step's note is in `docs/notes/`
 
 ### Next: multi-repo workspaces
 
-Design settled 2026-10-09, not built. Decisions, scope, build order and open checks are in
+Design settled 2026-10-09. Decisions, scope, build order and open checks are in
 `docs/notes/workspaces-handoff.md`. Start there.
+
+* Step 1 (store, `WorkspaceService`, `workspace.*` commands, session endpoint env + CLI
+  loopback preference) done: `docs/notes/workspaces-1-store.md`. Next: step 2 (launch).
 
 ### Open items
 

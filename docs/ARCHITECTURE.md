@@ -78,6 +78,8 @@ internal/
     gh/                    GitHub GraphQL/REST polling over HTTP (token via gh), PR/CI cache
     gitops/                git/gh operations per worktree (fetch, pull, push, PR); editor, Finder, browser
     update/                release checks via gh, installs with the embedded installer
+    workspace/             branch sets: one branch as a worktree in several repos
+                           (docs/notes/workspaces-1-store.md)
   db/                      SQLite (modernc.org/sqlite, WAL) + migrations
   client/                  Go client for the daemon API, used by CLI and the Wails host
   paths/                   XDG-ish paths: config dir, socket, token, db, logs
@@ -103,6 +105,7 @@ Transport:
 |---|---|---|
 | CLI, Wails host | Unix socket `$CONFIG/daemon.sock` | filesystem permissions (0600) |
 | Frontend | `http://127.0.0.1:<random port>` | bearer token from `$CONFIG/daemon.token` (0600) |
+| CLI inside a session | `CODE_FOUNDRY_ENDPOINT` (the loopback listener) | `CODE_FOUNDRY_TOKEN`; both set in every session's env, never auto-starts a daemon |
 
 Both listeners serve the same handlers. The port and token are written by the daemon on
 start; the Wails host reads them and injects them into the page before load.
@@ -145,6 +148,8 @@ Services (v1):
   progress, and relaunch requests. Nothing restarts automatically; `daemon.restart`
   (a confirmed command: it closes every live session) exits, and the next client starts
   the installed binary.
+* `WorkspaceService` — List, Create, AddRepo, RemoveRepo, Remove, Members (by id, name,
+  or a path inside a member worktree), Watch. See `docs/notes/workspaces-1-store.md`.
 * `HealthService` — Ping, Version.
 
 Rules:
