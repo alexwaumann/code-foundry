@@ -215,6 +215,9 @@ Layers Claude-specific knowledge on top of terminal:
   stream and the JSONL transcript. It is a pure function over observed events with table
   tests. It is never inferred from rendering.
 * Auto-naming via an independent `claude -p` call producing a slug.
+* **Linked pull requests** come from Claude's own `pr-link` transcript records: every
+  distinct URL in first-seen order, persisted in `session_pull_requests`, backfilled from
+  the transcript's history when a thread is resumed (`docs/notes/linked-prs.md`).
 * Persists session metadata in SQLite so the sidebar can show resumable sessions after a
   daemon restart. v1 does not keep PTYs alive across daemon restarts.
 
@@ -276,8 +279,11 @@ from the pull request (docs/notes/pr-thread-commands.md).
   request through `pr.ask`, `pr.explain` and `pr.fix.findings`, Workspace (a workspace
   thread's members with their git, PR and CI state, add/remove, Run in; opened by W,
   `view.panel.workspace`, the sidebar's workspace badge, the thread header and the
-  Projects page) and Worktree (a member's worktree overview as a tab, opened only from
-  the Workspace surface; `docs/notes/workspaces-5-panel.md`). Every
+  Projects page), Worktree (a member's worktree overview as a tab, opened only from
+  the Workspace surface; `docs/notes/workspaces-5-panel.md`) and Linked PRs (the
+  thread's linked pull requests, newest first, each opening as a PR tab; opened by L,
+  `view.panel.linked-prs`, the thread header and the sidebar's PR badge;
+  `docs/notes/linked-prs.md`). Every
   palette command is reachable without the mouse, and common ones also have buttons that
   invoke the same registry command. Chords are listed only in the palette and the
   Keyboard Shortcuts overlay (`docs/notes/phase3-ui-buttons.md`).

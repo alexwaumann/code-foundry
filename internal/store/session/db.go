@@ -7,8 +7,9 @@ import (
 	"time"
 )
 
-// Persistence for the sessions table (migrations 0003, 0006 and 0008). Terminal id and status are not
-// persisted: no process survives a daemon restart.
+// Persistence for the sessions table (migrations 0003, 0006, 0008 and 0009) and
+// session_pull_requests (0010). Terminal id and status are not persisted: no process
+// survives a daemon restart.
 
 func millis(t time.Time) int64 {
 	if t.IsZero() {
@@ -92,6 +93,60 @@ func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("session: load: %w", err)
+	}
+	links, err := loadLinks(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	for i := range out {
+		out[i].LinkedPullRequests = links[out[i].ID]
+	}
+	return out, nil
+}
+
+// saveLinks records newly linked pull requests. A URL the session already has is
+// ignored.
+func saveLinks(ctx context.Context, db *sql.DB, sessionID string, links []LinkedPullRequest) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("session: save links of %s: %w", sessionID, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, l := range links {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO session_pull_requests (session_id, slug, number, url, linked_at)
+			VALUES (?, ?, ?, ?, ?) ON CONFLICT (session_id, url) DO NOTHING`,
+			sessionID, l.Slug, l.Number, l.URL, millis(l.LinkedAt)); err != nil {
+			return fmt.Errorf("session: save links of %s: %w", sessionID, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("session: save links of %s: %w", sessionID, err)
+	}
+	return nil
+}
+
+// loadLinks returns every session's linked pull requests in first-seen (insertion)
+// order.
+func loadLinks(ctx context.Context, db *sql.DB) (map[string][]LinkedPullRequest, error) {
+	rows, err := db.QueryContext(ctx, `SELECT session_id, slug, number, url, linked_at
+		FROM session_pull_requests ORDER BY session_id, rowid`)
+	if err != nil {
+		return nil, fmt.Errorf("session: load links: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	out := map[string][]LinkedPullRequest{}
+	for rows.Next() {
+		var id string
+		var l LinkedPullRequest
+		var at int64
+		if err := rows.Scan(&id, &l.Slug, &l.Number, &l.URL, &at); err != nil {
+			return nil, fmt.Errorf("session: load links: %w", err)
+		}
+		l.LinkedAt = fromMillis(at)
+		out[id] = append(out[id], l)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("session: load links: %w", err)
 	}
 	return out, nil
 }

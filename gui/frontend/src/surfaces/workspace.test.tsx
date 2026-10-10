@@ -22,7 +22,7 @@ const status = { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untr
 const wt = (repoId: string, path: string, branch: string, isMain = false): WorktreeView => ({ repoId, path, branch, head: "abc", detached: false, isMain, status });
 const repo = (id: string, extra: WorktreeView[] = []): RepoView => ({ id, path: `/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [wt(id, `/src/${id}`, "main", true), ...extra] });
 const ws: WorkspaceView = { id: "w1", name: "demo", branch: "cf/demo", members: [{ repoId: "web", worktreePath: WEB }, { repoId: "api", worktreePath: API }], createdAtMs: null };
-const thread = (id: string, o: Partial<SessionView>) => ({ id, repoId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", ...o }) as SessionView;
+const thread = (id: string, o: Partial<SessionView>) => ({ id, repoId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", linkedPullRequests: [], ...o }) as SessionView;
 
 function select(id: string): void {
   useUiStore.setState({ selection: { kind: "session", id } });

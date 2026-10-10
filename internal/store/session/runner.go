@@ -365,7 +365,11 @@ func (r *runner) pollTranscript() {
 		cid := r.tail.id
 		r.log().info("transcript discovered", "claude_session_id", cid, "path", r.tail.path)
 		r.m.update(r.id, true, func(rec *record) { rec.s.ClaudeSessionID = cid })
+		if r.tail.skipped > 0 {
+			r.backfillLinks(r.tail.path, r.tail.skipped)
+		}
 	}
+	var links []LinkedPullRequest
 	for _, line := range lines {
 		r.det.Transcript(line)
 		if !r.namingSeen {
@@ -375,6 +379,12 @@ func (r *runner) pollTranscript() {
 				r.m.startNaming(r.id, msg)
 			}
 		}
+		if l, ok := parsePRLink(line); ok {
+			links = append(links, l)
+		}
+	}
+	if len(links) > 0 {
+		r.m.linkPullRequests(r.id, links)
 	}
 	if len(lines) > 0 {
 		// The turn-end record trails the last output chunk by ~120 ms and counts as
@@ -382,6 +392,22 @@ func (r *runner) pollTranscript() {
 		r.acknowledgeIfViewed()
 		r.checkStatus()
 	}
+}
+
+// backfillLinks reads the pr-link records in the part of a resumed transcript the
+// tailer skipped (the history is not news for status, but its links are: a thread
+// reconnected after linking pull requests, or one that linked them before this
+// existed). It runs once per discovered file, before any new line, so first-seen
+// order holds.
+func (r *runner) backfillLinks(path string, limit int64) {
+	start := time.Now()
+	links, err := scanPRLinks(path, limit)
+	if err != nil {
+		r.log().warn("backfill linked pull requests", "path", path, "err", err)
+	}
+	n := r.m.linkPullRequests(r.id, links)
+	r.log().debug("backfilled linked pull requests", "records", len(links), "new", n,
+		"bytes", limit, "took", time.Since(start).Round(time.Millisecond).String())
 }
 
 // checkStatus schedules a debounced publish when the detector's answer changed.

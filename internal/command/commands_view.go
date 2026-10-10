@@ -29,6 +29,13 @@ const ViewPanelExpand = "panel.expand"
 // state, not a page; a window whose selection is not a workspace thread ignores it.
 const ViewPanelWorkspace = "panel.workspace"
 
+// ViewPanelLinkedPRs is the ShowView name that opens (or reveals) the Linked PRs surface
+// in the side panel of the selected thread: the pull requests Claude linked to it (its
+// pr-link transcript records). An action on per-selection GUI state like
+// ViewPanelWorkspace; a window whose selection is not a thread ignores it, and one whose
+// thread has no linked pull requests says so instead of opening an empty surface.
+const ViewPanelLinkedPRs = "panel.linked-prs"
+
 // hasWorkspaceThreadContext is view.panel.workspace's availability: a thread is active
 // and it belongs to a workspace (the GUI passes the thread's workspace as
 // ActiveWorkspaceID; the CLI with --context-session and --context-workspace).
@@ -39,8 +46,9 @@ func hasWorkspaceThreadContext(c Context) bool {
 // RegisterView registers view.pullrequests, which shows the Pull Requests page,
 // view.projects, which shows the Projects page, view.panel.toggle, which shows or hides
 // the side panel, view.panel.expand, which switches it between split and full width, and
-// view.panel.workspace, which opens the workspace surface in it (all emitted as
-// UiIntent.ShowView). Links open through view.open.url (RegisterGitOps).
+// view.panel.workspace, which opens the workspace surface in it, and
+// view.panel.linked-prs, which opens the thread's linked pull requests in it (all
+// emitted as UiIntent.ShowView). Links open through view.open.url (RegisterGitOps).
 func RegisterView(r *Registry, e Emitter) error {
 	show := func(name string) Result {
 		n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: name}}})
@@ -99,6 +107,20 @@ func RegisterView(r *Registry, e Emitter) error {
 			When: hasWorkspaceThreadContext,
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return show(ViewPanelWorkspace), nil
+			},
+		},
+		Command{
+			Name:  "view.panel.linked-prs",
+			Title: "Show Linked PRs in Side Panel",
+			Description: "Open the Linked PRs surface in the selected thread's side panel: " +
+				"the pull requests the thread created or touched, newest first, with state, checks and branch.",
+			Category: "View",
+			// No default chord, like view.panel.workspace (L opens it while the panel has
+			// focus). Available for any thread, even one without links, so the palette
+			// finds it and the GUI can say there are none yet.
+			When: hasSession,
+			Run: func(context.Context, Context, Args) (Result, error) {
+				return show(ViewPanelLinkedPRs), nil
 			},
 		},
 	)

@@ -140,6 +140,11 @@ type Session struct {
 	PendingWorktreePath string
 	// Pinned is the user's pin (Store.Pin). Persisted.
 	Pinned bool
+	// LinkedPullRequests are the pull requests Claude linked to the conversation
+	// (pr-link transcript records; prlink.go), one per URL, in first-seen order. Never
+	// shrinks. Persisted. Copy on write: a new slice replaces the old one, the backing
+	// array is never written, so snapshots may share it.
+	LinkedPullRequests []LinkedPullRequest
 }
 
 // Snapshot is every session, sorted by creation time then id. Never mutate it.

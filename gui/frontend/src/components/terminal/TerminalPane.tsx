@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CircleX, GitFork, Layers, Loader2, OctagonX, Pencil, Power, RefreshCw } from "lucide-react";
+import { CircleX, GitFork, GitPullRequest, Layers, Loader2, OctagonX, Pencil, Power, RefreshCw } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { PaneHeader } from "@/components/window/PaneHeader";
@@ -11,6 +11,7 @@ import { useColorScheme } from "@/lib/theme";
 import { useScrollbackLines, useTerminalFontFamily } from "@/stores/settings";
 import { tildify, terminalLabel } from "@/lib/path";
 import { getPanel } from "@/stores/panel";
+import { useSessionsStore } from "@/stores/sessions";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { AttachController, type AttachState } from "@/terminal/attach";
@@ -55,18 +56,26 @@ function TerminalTitle({ id }: { id: string }) {
   );
 }
 
+/** view.panel.linked-prs with the thread's link count; only once the thread has linked a pull request. */
+function LinkedPrsButton({ sessionId }: { sessionId: string }) {
+  const count = useSessionsStore((s) => s.byId[sessionId]?.linkedPullRequests.length ?? 0);
+  if (count === 0) return null;
+  return <CommandButton command="view.panel.linked-prs" icon={GitPullRequest} count={count} data-testid="pane-linked-prs" />;
+}
+
 /**
  * The pane's own commands, run against the current selection (this pane) exactly as the
  * palette runs them. Each hides when the daemon does not list it as available.
  */
-function HeaderActions({ session }: { session: boolean }) {
+function HeaderActions({ sessionId }: { sessionId: string | undefined }) {
   return (
     <span className="-mr-1.5 flex items-center [--wails-draggable:no-drag]" data-testid="pane-actions">
-      {session ? (
+      {sessionId !== undefined ? (
         <>
           <CommandButton command="session.rename" icon={Pencil} />
           <CommandButton command="session.fork" icon={GitFork} />
           <CommandButton command="session.close" icon={Power} />
+          <LinkedPrsButton sessionId={sessionId} />
           {/* Only listed for a workspace thread (view.panel.workspace's availability). */}
           <CommandButton command="view.panel.workspace" icon={Layers} data-testid="pane-workspace" />
         </>
@@ -99,7 +108,7 @@ function TerminalHeader({
             {size.cols}×{size.rows}
           </span>
         )}
-        <HeaderActions session={sessionId !== undefined} />
+        <HeaderActions sessionId={sessionId} />
       </span>
     </PaneHeader>
   );

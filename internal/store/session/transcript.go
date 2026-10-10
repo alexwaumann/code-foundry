@@ -38,8 +38,8 @@ type tailer struct {
 	path    string
 	f       *os.File
 	off     int64
-	partial []byte
-	skip    bool // discarding the rest of an over-long line
+	skipped int64 // bytes fromEnd skipped when the file was opened (backfillLinks reads them)
+	lineSplitter
 
 	w       *fsnotify.Watcher // nil if fsnotify is unavailable; polling still works
 	watched map[string]bool
@@ -76,7 +76,7 @@ func (t *tailer) follow(id string, fromEnd bool) {
 	}
 	t.closeFile()
 	t.id, t.fromEnd = id, fromEnd
-	t.path, t.off, t.partial, t.skip = "", 0, nil, false
+	t.path, t.off, t.skipped, t.lineSplitter = "", 0, 0, lineSplitter{}
 }
 
 func (t *tailer) closeFile() {
@@ -112,13 +112,13 @@ func (t *tailer) poll() (lines [][]byte, discovered bool) {
 		t.f, t.path, discovered = f, p, true
 		if t.fromEnd {
 			if fi, err := f.Stat(); err == nil {
-				t.off = fi.Size()
+				t.off, t.skipped = fi.Size(), fi.Size()
 			}
 		}
 		t.watch(filepath.Dir(p))
 	}
 	if fi, err := t.f.Stat(); err == nil && fi.Size() < t.off {
-		t.off, t.partial, t.skip = 0, nil, false // truncated or replaced
+		t.off, t.lineSplitter = 0, lineSplitter{} // truncated or replaced
 	}
 	buf := make([]byte, tailReadChunk)
 	for {
@@ -136,7 +136,15 @@ func (t *tailer) poll() (lines [][]byte, discovered bool) {
 	}
 }
 
-func (t *tailer) split(lines [][]byte, data []byte) [][]byte {
+// lineSplitter cuts a byte stream into lines. Lines longer than maxLineBytes are
+// skipped (huge attachments), never buffered whole.
+type lineSplitter struct {
+	partial []byte
+	skip    bool // discarding the rest of an over-long line
+}
+
+// split appends the complete non-empty lines in data to lines, each a copy.
+func (t *lineSplitter) split(lines [][]byte, data []byte) [][]byte {
 	for len(data) > 0 {
 		i := bytes.IndexByte(data, '\n')
 		if i < 0 {

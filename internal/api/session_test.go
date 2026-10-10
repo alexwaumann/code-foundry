@@ -81,6 +81,17 @@ func TestSessionUnaryAndErrorCodes(t *testing.T) {
 		got.Msg.GetSession().GetStatusReason() != "finished" {
 		t.Errorf("enum mapping = %v", got.Msg.GetSession())
 	}
+	linkedAt := time.Date(2026, 10, 9, 18, 24, 11, 0, time.UTC)
+	fake.Put(session.Session{ID: "s-10", State: session.StateDisconnected, LinkedPullRequests: []session.LinkedPullRequest{
+		{Slug: "o/r", Number: 5, URL: "https://github.com/o/r/pull/5", LinkedAt: linkedAt},
+		{Slug: "o/r", Number: 6, URL: "https://github.com/o/r/pull/6"},
+	}})
+	got, _ = c.Get(ctx, connect.NewRequest(&v1.GetSessionRequest{Id: "s-10"}))
+	links := got.Msg.GetSession().GetLinkedPullRequests()
+	if len(links) != 2 || links[0].GetSlug() != "o/r" || links[0].GetNumber() != 5 || links[0].GetUrl() != "https://github.com/o/r/pull/5" ||
+		!links[0].GetLinkedAt().AsTime().Equal(linkedAt) || links[1].GetNumber() != 6 || links[1].GetLinkedAt() != nil {
+		t.Errorf("linked pull requests = %v", links)
+	}
 }
 
 func TestSessionCreateNewThreadFields(t *testing.T) {

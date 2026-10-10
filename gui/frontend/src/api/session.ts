@@ -46,6 +46,21 @@ export interface SessionView {
   pendingWorktreePath: string;
   /** The user pinned the thread (session.pin): it sits in the sidebar's Pinned section. */
   pinned: boolean;
+  /**
+   * Pull requests Claude linked to the conversation (its pr-link transcript records), one
+   * per URL, in first-seen order; never shrinks. docs/notes/linked-prs.md.
+   */
+  linkedPullRequests: LinkedPullRequestView[];
+}
+
+/** A pull request linked to a thread. */
+export interface LinkedPullRequestView {
+  /** "owner/name" */
+  slug: string;
+  number: number;
+  url: string;
+  /** When Claude first linked it, epoch ms; null if unknown. */
+  linkedAt: number | null;
 }
 
 export type SessionEventView =
@@ -100,6 +115,12 @@ export function toSessionView(s: Session): SessionView {
     workspaceId: s.workspaceId,
     pendingWorktreePath: s.pendingWorktreePath,
     pinned: s.pinned,
+    linkedPullRequests: s.linkedPullRequests.map((l) => ({
+      slug: l.slug,
+      number: l.number,
+      url: l.url,
+      linkedAt: l.linkedAt ? timestampMs(l.linkedAt) : null,
+    })),
   };
 }
 
