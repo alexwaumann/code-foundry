@@ -12,7 +12,7 @@ onboarding, projects and composer states).
   * **Onboarding** (repos loaded and zero projects): logo tile, "Welcome to Code Foundry",
     Add a project (`repo.register`, the palette asks for a path) and Command palette.
     Three "01/02/03" step cards and a "Start by adding a project" line were tried and
-    removed on 2026-10-10 as too much chrome. The logo tile is 64 px (the asset is 128 px,
+    removed on 2026-10-10 as too much chrome. The logo tile is 96 px (the asset is 256 px,
     so it is 1:1 on retina).
   * **Fleet** (any project): a time-of-day greeting (computed per render from the local
     clock; it does not tick), `N connected · N running · N waiting on you` (connected =
@@ -52,7 +52,7 @@ onboarding, projects and composer states).
   130 KB. Originals are not committed. Imported through Vite, so they are hashed into
   `dist/` and embedded in the binary.
 * **Logo tile:** `src/assets/logo.webp` (8 KB) is `gui/build/appicon.png` cropped to the
-  squircle (its transparent 100 px margin removed) and scaled to 128 px.
+  squircle (its transparent 100 px margin removed) and scaled to 256 px (the tile is 96 px, so 1:1 at 2x; first 128 px, then 256 px when the tile grew on 2026-10-10).
 * **Layout:** the backdrop sits in a `relative` wrapper beside the scrolling section (not
   inside it), so it stays put when the content scrolls; the section is `relative` so it
   paints above the absolutely positioned layer.

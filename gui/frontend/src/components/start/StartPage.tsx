@@ -20,7 +20,7 @@ const MAX_THREADS = 6;
 function Header({ title, children }: { title: string; children: ReactNode }) {
   return (
     <>
-      <img src={logo} alt="" draggable={false} className="size-16 rounded-2xl shadow-md" />
+      <img src={logo} alt="" draggable={false} className="size-24 rounded-3xl shadow-md" />
       <div>
         <h1 className="text-xl font-semibold tracking-tight" data-testid="start-heading">
           {title}
