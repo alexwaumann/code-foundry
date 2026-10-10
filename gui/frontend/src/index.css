@@ -6,16 +6,15 @@
 
 /* Bundled terminal font (public/fonts, see its README). The family name is the one inside
  * the TTFs; src/terminal/fonts.ts uses the same string and loads these before the first
- * terminal opens. local() first so an installed copy skips the fetch. */
+ * terminal opens. url() only, no local(): WebKit does not let canvas text use a face that
+ * resolved to a user-installed font, and xterm measures and (WebGL) draws glyphs on a
+ * canvas, so an installed copy would leave the terminal on the fallback font. */
 @font-face {
   font-family: "JetBrainsMono Nerd Font Mono";
   font-style: normal;
   font-weight: 400;
   font-display: block;
-  src:
-    local("JetBrainsMono NFM Regular"),
-    local("JetBrainsMonoNFM-Regular"),
-    url("/fonts/JetBrainsMonoNerdFontMono-Regular.ttf") format("truetype");
+  src: url("/fonts/JetBrainsMonoNerdFontMono-Regular.ttf") format("truetype");
 }
 
 @font-face {
@@ -23,10 +22,7 @@
   font-style: normal;
   font-weight: 700;
   font-display: block;
-  src:
-    local("JetBrainsMono NFM Bold"),
-    local("JetBrainsMonoNFM-Bold"),
-    url("/fonts/JetBrainsMonoNerdFontMono-Bold.ttf") format("truetype");
+  src: url("/fonts/JetBrainsMonoNerdFontMono-Bold.ttf") format("truetype");
 }
 
 @theme inline {
