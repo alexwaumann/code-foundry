@@ -177,6 +177,7 @@ function routes(router: ConnectRouter): void {
     },
     refresh: () => ({}),
     listRefs: (req) => guard(() => world.listRefs(req.repoId)),
+    initGit: (req) => guard(() => ({ repo: world.repoMsg(world.initGit(req.id)) })),
     getWorktreeDetail: (req) => {
       const detail = world.gh.getWorktreeDetail(req.repoId, req.path);
       if (!detail) throw new ConnectError(`worktree ${req.path} not found`, Code.NotFound);

@@ -181,8 +181,8 @@ test("the Projects page lists projects with their own worktrees and workspaces w
   await page.keyboard.press("Meta+Shift+j");
   await expect(page.getByTestId("projects-page")).toBeVisible();
   await expect(page.getByTestId("nav-projects")).toHaveAttribute("aria-current", "page");
-  await expect(page.getByTestId("projects-counts")).toHaveText("4 projects · 1 workspace");
-  await expect(page.getByTestId("project-name")).toHaveText(["code-foundry", "dotfiles", "ghostty-playground", "sketches"]);
+  await expect(page.getByTestId("projects-counts")).toHaveText("5 projects · 1 workspace");
+  await expect(page.getByTestId("project-name")).toHaveText(["code-foundry", "dotfiles", "ghostty-playground", "sketches", "writing"]);
 
   // code-foundry's own worktrees; its cf/login worktree is listed under the workspace only.
   const cf = page.locator('[data-testid="project"][data-repo="repo-cf"]');

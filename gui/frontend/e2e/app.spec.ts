@@ -13,7 +13,7 @@ test("sidebar lists threads, then terminals no thread owns; repos and worktrees 
   expect(keys).toEqual(["h:attention", "s:s-2", "h:threads", "s:s-5", "s:s-1", "s:s-6", "s:s-4", "s:s-3", "h:terminals", "t:t-logs", "t:t-top", "t:t-tests", "t:t-tmp"]);
   await expect(list.locator('[data-row-kind="repo"], [data-row-kind="worktree"]')).toHaveCount(0);
   await openProjects(page);
-  await expect(page.getByTestId("project-name")).toHaveText(["code-foundry", "dotfiles", "ghostty-playground", "sketches"]);
+  await expect(page.getByTestId("project-name")).toHaveText(["code-foundry", "dotfiles", "ghostty-playground", "sketches", "writing"]);
   await expect(page.locator('[data-testid="project"][data-repo="repo-cf"]').getByTestId("worktree-branch")).toHaveText(["main", "feat/sidebar", "fix/resize"]);
   await expect(page.getByTestId("daemon-status")).toContainText("mock");
 });
