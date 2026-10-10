@@ -10,8 +10,10 @@ onboarding, projects and composer states).
   to scrolling from the top when the pane is too short). The old `mt-[18vh]` offset was
   window-relative and is gone.
   * **Onboarding** (repos loaded and zero projects): logo tile, "Welcome to Code Foundry",
-    Add a project (`repo.register`, the palette asks for a path), Command palette, and
-    three frosted step cards.
+    Add a project (`repo.register`, the palette asks for a path) and Command palette.
+    Three "01/02/03" step cards and a "Start by adding a project" line were tried and
+    removed on 2026-10-10 as too much chrome. The logo tile is 64 px (the asset is 128 px,
+    so it is 1:1 on retina).
   * **Fleet** (any project): a time-of-day greeting (computed per render from the local
     clock; it does not tick), `N connected · N running · N waiting on you` (connected =
     state not disconnected, running = busy and not disconnected, waiting =

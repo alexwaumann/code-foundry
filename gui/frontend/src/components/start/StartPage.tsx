@@ -16,17 +16,11 @@ import { activeThreadIds, attentionIds, connectedCount, isAttention, runningCoun
 /** Rows in the start page's thread list before "+N more". */
 const MAX_THREADS = 6;
 
-const STEPS = [
-  { n: "01", title: "Add a project", text: "Clone from GitHub or pick a local repo." },
-  { n: "02", title: "Start a thread", text: "Each thread gets its own worktree and branch." },
-  { n: "03", title: "Ship it", text: "Review the diff, open the PR, merge from here." },
-] as const;
-
 /** The logo tile, a heading and a muted line under it. */
 function Header({ title, children }: { title: string; children: ReactNode }) {
   return (
     <>
-      <img src={logo} alt="" draggable={false} className="size-10 rounded-[10px] shadow-sm" />
+      <img src={logo} alt="" draggable={false} className="size-16 rounded-2xl shadow-md" />
       <div>
         <h1 className="text-xl font-semibold tracking-tight" data-testid="start-heading">
           {title}
@@ -37,27 +31,17 @@ function Header({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** Zero projects: what the app is, how to start, and the three steps. */
+/** Zero projects: what the app is and the one way to start. */
 function Onboarding() {
   return (
     <>
       <Header title="Welcome to Code Foundry">
         <p>Run fleets of Claude Code threads across git worktrees.</p>
-        <p>Start by adding a project.</p>
       </Header>
       <div className="flex flex-wrap justify-center gap-2" data-testid="welcome-actions">
         <CommandButton command="repo.register" icon={FolderPlus} label="Add a project" variant="default" whenUnavailable="disable" keepFocus={false} />
         <CommandButton command="ui.palette.open" icon={Command} label="Command palette" title="Command Palette" variant="outline" className="backdrop-blur-sm" keepFocus={false} />
       </div>
-      <ol className="mt-1.5 grid w-full grid-cols-3 gap-2 text-left" data-testid="onboarding-steps">
-        {STEPS.map((s) => (
-          <li key={s.n} className="rounded-[10px] border border-border bg-pane/70 px-3 py-2.5 backdrop-blur-md">
-            <span className="mb-1 block text-[10px] tracking-wide text-muted-foreground/80">{s.n}</span>
-            <span className="mb-0.5 block text-xs font-semibold">{s.title}</span>
-            <span className="block text-[11.5px] leading-snug text-muted-foreground">{s.text}</span>
-          </li>
-        ))}
-      </ol>
     </>
   );
 }

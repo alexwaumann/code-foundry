@@ -12,16 +12,12 @@ async function steadyFleet(): Promise<void> {
   for (const id of ["s-1", "s-5", "s-6"]) await mockPost(`session/disconnect?id=${id}&reason=closed&code=0`);
 }
 
-test("onboarding: no projects shows the welcome, Add a project and the three steps", async ({ page }) => {
+test("onboarding: no projects shows the welcome and Add a project", async ({ page }) => {
   await mockPost("empty");
   await page.goto(appPath);
   await expect(start(page)).toHaveAttribute("data-state", "onboarding");
   await expect(page.getByTestId("start-heading")).toHaveText("Welcome to Code Foundry");
-  const steps = page.getByTestId("onboarding-steps").locator("li");
-  await expect(steps).toHaveCount(3);
-  await expect(steps.nth(0)).toContainText("Add a project");
-  await expect(steps.nth(1)).toContainText("Start a thread");
-  await expect(steps.nth(2)).toContainText("Ship it");
+  await expect(page.getByTestId("onboarding-steps")).toHaveCount(0);
   await expect(page.getByTestId("backdrop")).toHaveCount(1);
 
   // Add a project is repo.register: the palette asks for the path.
