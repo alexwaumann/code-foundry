@@ -1,6 +1,8 @@
 // Package client is the Go client for the code-foundry daemon, used by the CLI and the
 // Wails host. It talks to the daemon over the Unix socket and can start the daemon
-// on demand.
+// on demand. Inside a Claude session the daemon spawned, the CLI uses the loopback
+// endpoint from the session's environment instead (EndpointFromEnv) and never starts
+// a daemon.
 package client
 
 import (
@@ -9,6 +11,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -72,6 +75,36 @@ func (c *Client) Ping(ctx context.Context) (*v1.PingResponse, error) {
 type Endpoint struct {
 	BaseURL string `json:"baseUrl"`
 	Token   string `json:"token"`
+}
+
+// Environment variables the daemon sets in every Claude session it spawns, so the CLI
+// inside the session reaches the daemon over loopback TCP: sandboxed sessions cannot
+// connect to Unix sockets.
+const (
+	EnvEndpoint = paths.EnvEndpoint // http://127.0.0.1:<port>
+	EnvToken    = paths.EnvToken    // the loopback bearer token
+)
+
+// EndpointFromEnv reads EnvEndpoint and EnvToken with getenv (os.Getenv). ok is false
+// when EnvEndpoint is unset. A set endpoint without a token, or one that is not an
+// http URL on a loopback host, is an error.
+func EndpointFromEnv(getenv func(string) string) (ep Endpoint, ok bool, err error) {
+	raw := strings.TrimSpace(getenv(EnvEndpoint))
+	if raw == "" {
+		return Endpoint{}, false, nil
+	}
+	token := strings.TrimSpace(getenv(EnvToken))
+	if token == "" {
+		return Endpoint{}, true, fmt.Errorf("%s is set but %s is not", EnvEndpoint, EnvToken)
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "http" || u.Port() == "" || u.Path != "" && u.Path != "/" {
+		return Endpoint{}, true, fmt.Errorf("%s=%q: want http://127.0.0.1:<port>", EnvEndpoint, raw)
+	}
+	if ip := net.ParseIP(u.Hostname()); u.Hostname() != "localhost" && (ip == nil || !ip.IsLoopback()) {
+		return Endpoint{}, true, fmt.Errorf("%s=%q: the daemon listens on loopback only", EnvEndpoint, raw)
+	}
+	return Endpoint{BaseURL: "http://" + u.Host, Token: token}, true, nil
 }
 
 // ReadEndpoint reads the loopback port and token files written by a running daemon.

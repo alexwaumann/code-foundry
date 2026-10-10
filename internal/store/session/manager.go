@@ -64,6 +64,10 @@ type Options struct {
 	// RefExists reports whether ref exists in the repository at dir; Create uses it
 	// to keep new worktree branches unique. Default: git rev-parse --verify.
 	RefExists func(ctx context.Context, dir, ref string) bool
+	// Env entries ("KEY=VALUE") are added to every claude process's environment
+	// (Create, Reconnect, Fork). The daemon passes its loopback endpoint and token so
+	// the CLI inside a session reaches it without the Unix socket.
+	Env []string
 	// DisablePreTrust skips writing folder trust into Claude's config before spawning
 	// (the on-screen dialog is still answered). For tests.
 	DisablePreTrust bool
@@ -489,6 +493,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 	term, err := m.opts.Terminals.Create(ctx, terminal.Spec{
 		Argv:     argv,
 		Cwd:      s.WorktreePath,
+		Env:      m.opts.Env,
 		Cols:     m.opts.Cols,
 		Rows:     m.opts.Rows,
 		Labels:   map[string]string{"session": id, "worktree": s.WorktreePath},

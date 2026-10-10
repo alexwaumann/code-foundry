@@ -23,13 +23,29 @@ type ConnectOptions struct {
 	StartTimeout time.Duration
 	// Logger receives auto-start diagnostics. Defaults to slog.Default().
 	Logger *slog.Logger
+	// Endpoint, when set, is used instead of the Unix socket (the CLI sets it from
+	// EndpointFromEnv inside a session). Connect then only checks that the daemon
+	// answers; it never starts one, since the endpoint names a daemon that is already
+	// running (a new one would listen on another port with another token).
+	Endpoint *Endpoint
 }
 
 const probeTimeout = time.Second
 
 // Connect returns a client for the daemon at p, starting the daemon if its socket is
-// absent or does not answer Ping.
+// absent or does not answer Ping. With opts.Endpoint it talks to that loopback
+// endpoint instead and never starts a daemon.
 func Connect(ctx context.Context, p paths.Paths, opts ConnectOptions) (*Client, error) {
+	if ep := opts.Endpoint; ep != nil {
+		c := NewLoopback(ep.BaseURL, ep.Token)
+		pctx, cancel := context.WithTimeout(ctx, probeTimeout)
+		defer cancel()
+		if _, err := c.Ping(pctx); err != nil {
+			return nil, fmt.Errorf("daemon at %s (%s) is not reachable; not starting one from inside a session: %w",
+				ep.BaseURL, EnvEndpoint, err)
+		}
+		return c, nil
+	}
 	if opts.StartTimeout <= 0 {
 		opts.StartTimeout = 10 * time.Second
 	}

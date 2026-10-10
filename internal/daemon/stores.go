@@ -49,8 +49,9 @@ type stores struct {
 }
 
 // openStores opens the database, applies migrations, and starts every store. On
-// error, whatever was started is closed again.
-func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores, err error) {
+// error, whatever was started is closed again. sessionEnv is added to every Claude
+// session's environment (see sessionEnv in daemon.go).
+func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv []string) (_ *stores, err error) {
 	s := &stores{bus: bus.New()}
 	defer func() {
 		if err != nil {
@@ -107,6 +108,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 		NewDetector: newDetector, Claude: claude, CloseTimeout: cfg.CloseGrace(),
 		Namer:          settingsNamer(s.settings, session.ClaudeNamer(claude, "/tmp")),
 		AttachmentsDir: p.Attachments(), WorktreePath: settingsWorktreePath(s.settings),
+		Env: sessionEnv,
 	}); err != nil {
 		return nil, err
 	}

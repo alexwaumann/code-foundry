@@ -75,8 +75,9 @@ func Run(ctx context.Context, opts Options) error {
 	defer func() { _ = logFile.Close() }()
 
 	// Before any store starts a process: children must not inherit an enclosing
-	// Claude Code session's variables.
+	// Claude Code session's variables, or another daemon's endpoint.
 	scrubClaudeEnv(log)
+	scrubEndpointEnv(log)
 
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -85,7 +86,21 @@ func Run(ctx context.Context, opts Options) error {
 	ctx, restart := context.WithCancelCause(ctx)
 	defer restart(nil)
 
-	st, err := openStores(ctx, log, p)
+	// The loopback listener and its token exist before the stores: every Claude
+	// session gets them in its environment (sessionEnv), so the CLI inside a session
+	// reaches this daemon over TCP. Sandboxed sessions cannot use the Unix socket.
+	token, err := newToken()
+	if err != nil {
+		return err
+	}
+	tcpLn, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return fmt.Errorf("listen loopback: %w", err)
+	}
+	defer func() { _ = tcpLn.Close() }() // no-op once the server has shut it down
+	port := tcpLn.Addr().(*net.TCPAddr).Port
+
+	st, err := openStores(ctx, log, p, sessionEnv(port, token))
 	if err != nil {
 		return err
 	}
@@ -146,11 +161,6 @@ func Run(ctx context.Context, opts Options) error {
 		mux.Handle(r.Path, r.Handler)
 	}
 
-	token, err := newToken()
-	if err != nil {
-		return err
-	}
-
 	// We hold the lock, so any socket file left behind is from a dead daemon.
 	if err := os.Remove(p.Socket()); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("remove stale socket: %w", err)
@@ -164,22 +174,14 @@ func Run(ctx context.Context, opts Options) error {
 		_ = unixLn.Close()
 		return fmt.Errorf("chmod socket: %w", err)
 	}
-	tcpLn, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		_ = unixLn.Close()
-		return fmt.Errorf("listen loopback: %w", err)
-	}
-	port := tcpLn.Addr().(*net.TCPAddr).Port
 
 	defer removeRuntimeFiles(log, p)
 	if err := writeFileAtomic(p.Token(), []byte(token+"\n"), 0o600); err != nil {
 		_ = unixLn.Close()
-		_ = tcpLn.Close()
 		return err
 	}
 	if err := writeFileAtomic(p.Port(), []byte(strconv.Itoa(port)+"\n"), 0o600); err != nil {
 		_ = unixLn.Close()
-		_ = tcpLn.Close()
 		return err
 	}
 
