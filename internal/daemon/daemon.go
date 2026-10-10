@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"syscall"
 	"time"
@@ -125,6 +126,13 @@ func Run(ctx context.Context, opts Options) error {
 		Terminal: terminalAPI,
 		Repo:     worktreeDirRepo{RepoBackend: repoAPI, repos: st.repo, settings: st.settings},
 		Clone:    repoAPI.CloneRef,
+		Projects: command.ProjectDeps{
+			Backend: repoAPI,
+			HasOrigin: func(c command.Context) bool {
+				r, ok := st.repo.Snapshot().Owner(c.ActiveRepoID, c.ActiveWorktreePath)
+				return ok && slices.Contains(r.Remotes, "origin")
+			},
+		},
 		NotGit: func(c command.Context) bool {
 			r, ok := st.repo.Snapshot().Owner(c.ActiveRepoID, c.ActiveWorktreePath)
 			return ok && !r.Git

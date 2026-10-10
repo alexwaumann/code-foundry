@@ -25,6 +25,9 @@ type Deps struct {
 	NotGit command.NotGitFunc
 	// Clone backs repo.clone. Nil makes it fail with Unimplemented.
 	Clone command.CloneFunc
+	// Projects backs repo.create and repo.github.publish (its NotGit defaults to
+	// NotGit). A nil Backend works like Terminal.
+	Projects command.ProjectDeps
 	// Session backs session.*. Nil works like Terminal.
 	Session command.SessionBackend
 	// GitOps backs git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url.
@@ -73,12 +76,16 @@ func Register(r *command.Registry, d Deps) error {
 	if d.GitOps.NotGit == nil {
 		d.GitOps.NotGit = d.NotGit
 	}
+	if d.Projects.NotGit == nil {
+		d.Projects.NotGit = d.NotGit
+	}
 	return errors.Join(
 		command.RegisterDaemon(r, d.Daemon),
 		command.RegisterUI(r, d.Emitter),
 		command.RegisterTerminal(r, d.Terminal),
 		command.RegisterRepo(r, d.Repo, d.NotGit),
 		command.RegisterRepoAdd(r, d.Clone),
+		command.RegisterProjects(r, d.Projects),
 		command.RegisterSession(r, d.Session, d.Emitter),
 		command.RegisterGitOps(r, d.GitOps),
 		command.RegisterPullRequest(r, d.Gh),
