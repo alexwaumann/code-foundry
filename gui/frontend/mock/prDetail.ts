@@ -160,6 +160,18 @@ export class PrDetailWorld {
     this.details.set(key(CF, 131), this.closedDetail());
     this.details.set(key(CF, 140), this.readOnlyDetail());
     this.details.set(key(CF, 146), this.forkDetail());
+    // #147: the viewer's open pull request whose checks fail, on no dashboard (the
+    // Linked PRs surface's fixtures link it with /__mock/link-pr).
+    this.details.set(
+      key(CF, 147),
+      this.fromSummary(
+        h.makePr(CF, 147, "feat(session): link pull requests from pr-link transcript records", {
+          headRef: "cf/linked-prs",
+          ageMs: 25 * MIN,
+          checks: { state: CheckRollupState.FAILURE, total: 14, passed: 11, failed: 2, pending: 0, skipped: 1 },
+        }),
+      ),
+    );
     for (const d of this.details.values()) d.defaultBranch = "main";
     this.candidates.set(key(CF, 145), [
       { id: "T_core", kind: ReviewerKind.TEAM, login: "acme/core", name: "Core", avatarUrl: avatar("acme/core"), isRequested: true },

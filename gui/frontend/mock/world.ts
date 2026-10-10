@@ -664,14 +664,16 @@ export class World {
 
   /**
    * Claude linked a pull request to the session (a pr-link transcript record): appended
-   * unless its URL is already linked, like the daemon. Returns whether it was new.
+   * unless its URL is already linked, like the daemon. agoMs backdates linkedAt (the
+   * record's timestamp). Returns whether it was new.
    */
-  linkPullRequest(id: string, slug: string, number: number): boolean {
+  linkPullRequest(id: string, slug: string, number: number, agoMs = 0): boolean {
     const s = this.session(id);
     if (!/^[^/\s]+\/[^/\s]+$/.test(slug) || !Number.isInteger(number) || number <= 0) throw new CommandError("invalid", "slug must be owner/name and number a positive integer");
+    if (!Number.isFinite(agoMs) || agoMs < 0) throw new CommandError("invalid", "ago must be a non-negative number of milliseconds");
     const url = `https://github.com/${slug}/pull/${String(number)}`;
     if (s.linkedPullRequests.some((l) => l.url === url)) return false;
-    s.linkedPullRequests = [...s.linkedPullRequests, { slug, number, url, linkedAt: new Date() }];
+    s.linkedPullRequests = [...s.linkedPullRequests, { slug, number, url, linkedAt: new Date(Date.now() - agoMs) }];
     this.publishSession(s);
     return true;
   }
@@ -1684,6 +1686,19 @@ export class World {
         // Like the daemon: a thread is active and it belongs to a workspace.
         when: (ctx) => Boolean(ctx?.activeSessionId && ctx.activeWorkspaceId),
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.workspace" } } }))}`,
+      },
+      {
+        cmd: {
+          name: "view.panel.linked-prs",
+          title: "Show Linked PRs in Side Panel",
+          category: "View",
+          description: "Open the Linked PRs surface in the selected thread's side panel: the pull requests the thread created or touched, newest first, with state, checks and branch.",
+          keybindings: [],
+          args: [],
+        },
+        // Like the daemon: a thread is active (with or without linked pull requests).
+        when: (ctx) => Boolean(ctx?.activeSessionId),
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.linked-prs" } } }))}`,
       },
       {
         cmd: { name: "settings.reveal", title: "Reveal Settings File", category: "Settings", description: "Show the settings file in Finder", keybindings: [], args: [] },
