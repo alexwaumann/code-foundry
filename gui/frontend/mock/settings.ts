@@ -26,7 +26,7 @@ export const groups: GroupInit[] = [
   { id: "github", title: "GitHub", description: "Your pull requests and default-branch checks, polled with gh's login." },
   { id: "repos", title: "Repositories", description: "Git fetching and where new worktrees go." },
   { id: "gitops", title: "Git operations", description: "How worktrees are handed to other apps." },
-  { id: "appearance", title: "Appearance", description: "Theme, terminal font, and density. Applied live in every window." },
+  { id: "appearance", title: "Appearance", description: "Theme, terminal font, density, and backdrop. Applied live in every window." },
   { id: "keybindings", title: "Keybindings", description: 'Override a command\'s chord, or "none" to unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) cannot be bound.' },
   { id: "advanced", title: "Advanced", description: "Executables and logging." },
 ];
@@ -47,6 +47,7 @@ const staticFields: FieldInit[] = [
   { key: "appearance.font_family", group: "appearance", type: S.STRING, title: "Terminal font family", description: "Comma-separated font families, first installed wins.", defaultValue: "JetBrains Mono, SF Mono, Menlo", placeholder: "JetBrains Mono, SF Mono, Menlo" },
   { key: "appearance.font_size", group: "appearance", type: S.INT, title: "Terminal font size", description: "In points. cmd+= and cmd+- change it too.", defaultValue: "13", min: 9n, max: 28n },
   { key: "appearance.density", group: "appearance", type: S.ENUM, title: "Density", description: "Row height and spacing in the sidebar and lists.", enumValues: ["compact", "comfortable"], defaultValue: "compact" },
+  { key: "appearance.backdrop", group: "appearance", type: S.ENUM, title: "Backdrop", description: "Faint artwork behind the start page and the new-thread composer.", enumValues: ["forest", "none"], defaultValue: "forest" },
   { key: "advanced.claude_path", group: "advanced", type: S.PATH, title: "claude executable", description: "Absolute path to claude. Empty finds it on PATH.", defaultValue: "", placeholder: "claude (from PATH)", restartRequired: true },
   { key: "advanced.gh_path", group: "advanced", type: S.PATH, title: "gh executable", description: "Absolute path to gh. Empty finds it on PATH.", defaultValue: "", placeholder: "gh (from PATH)", restartRequired: true },
   { key: "advanced.log_level", group: "advanced", type: S.ENUM, title: "Log level", description: "Minimum level written to the daemon's log file.", enumValues: ["debug", "info", "warn", "error"], defaultValue: "info" },

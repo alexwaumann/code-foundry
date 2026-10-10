@@ -102,6 +102,7 @@ Status: done on this branch.
 | `appearance.font_family` | string | `JetBrains Mono, SF Mono, Menlo` | live (GUI, fallbacks always appended) |
 | `appearance.font_size` | int 9–28 | 13 | live (GUI; cmd+= / cmd+- / cmd+0 save it) |
 | `appearance.density` | enum compact/comfortable | compact | live (GUI: sidebar rows 26 / 30 px) |
+| `appearance.backdrop` | enum forest/none | forest | live (GUI: artwork behind the start page and composer; `backdrop-empty-state.md`) |
 | `keybindings.<command>` | keybinding | the command's chord | live (CommandService.List) |
 | `advanced.claude_path` | path, executable | `""` (PATH) | **restart** (session `Claude`, namer) |
 | `advanced.gh_path` | path, executable | `""` (PATH / Homebrew) | **restart** (gh `ExecRunner.Path`) |
