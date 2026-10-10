@@ -39,12 +39,12 @@ func TestLayout(t *testing.T) {
 	got := map[string]string{
 		"socket": p.Socket(), "token": p.Token(), "port": p.Port(), "lock": p.Lock(),
 		"db": p.DB(), "logs": p.Logs(), "daemonlog": p.DaemonLog(), "worktrees": p.Worktrees(),
-		"attachments": p.Attachments(),
+		"attachments": p.Attachments(), "projects": p.Projects(),
 	}
 	want := map[string]string{
 		"socket": "/h/daemon.sock", "token": "/h/daemon.token", "port": "/h/daemon.port",
 		"lock": "/h/daemon.lock", "db": "/h/db.sqlite", "logs": "/h/logs", "daemonlog": "/h/logs/daemon.log",
-		"worktrees": "/h/worktrees", "attachments": "/h/attachments",
+		"worktrees": "/h/worktrees", "attachments": "/h/attachments", "projects": "/h/projects",
 	}
 	for k, w := range want {
 		if got[k] != w {
@@ -86,5 +86,26 @@ func TestEnsure(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestEnsureProjects(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "cf")
+	dir, err := New(home).EnsureProjects()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dir != filepath.Join(home, "projects") {
+		t.Fatalf("dir = %q", dir)
+	}
+	fi, err := os.Stat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !fi.IsDir() || fi.Mode().Perm() != 0o700 {
+		t.Fatalf("mode = %v, want a 0700 directory", fi.Mode())
+	}
+	if _, err := New("").EnsureProjects(); err == nil {
+		t.Fatal("empty home: want error")
 	}
 }
