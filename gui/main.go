@@ -27,6 +27,12 @@ func main() {
 		fmt.Println("Code Foundry " + version.Version)
 		return
 	}
+	// The GUI takes no other arguments. Refusing them is what stops a misconfigured
+	// CODE_FOUNDRY_BIN (pointed at this app) from opening a window per `daemon` spawn.
+	if len(os.Args) > 1 {
+		fmt.Fprintf(os.Stderr, "Code Foundry: unexpected argument %q; this is the GUI, not the code-foundry CLI\n", os.Args[1])
+		os.Exit(2)
+	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	p, err := paths.Resolve()
 	if err != nil {

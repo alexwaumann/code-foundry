@@ -259,3 +259,11 @@ func stopProcess(t *testing.T, pid int, p paths.Paths) {
 	}
 	t.Errorf("daemon %d did not remove its socket after SIGTERM", pid)
 }
+
+func TestConnectNoAutoStart(t *testing.T) {
+	p := shortHome(t)
+	_, err := Connect(context.Background(), p, ConnectOptions{NoAutoStart: true, DaemonBinary: os.Args[0]})
+	if !errors.Is(err, ErrDaemonNotRunning) {
+		t.Fatalf("err = %v, want ErrDaemonNotRunning", err)
+	}
+}
