@@ -65,7 +65,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"settings.get", "settings.set", "settings.reset", "settings.path", "settings.reveal",
 		"view.settings", "view.help",
 		"app.version", "app.update.check", "app.update", "app.relaunch", "daemon.restart",
-		"view.pullrequests", "view.panel.toggle", "view.panel.expand",
+		"view.pullrequests", "view.projects", "view.panel.toggle", "view.panel.expand",
 		"workspace.new", "workspace.list", "workspace.members", "workspace.add-repo", "workspace.remove-repo", "workspace.remove",
 	}
 	for _, n := range want {

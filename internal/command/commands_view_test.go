@@ -13,6 +13,7 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 		command, view string
 	}{
 		{command: "view.pullrequests", view: command.ViewPullRequests},
+		{command: "view.projects", view: command.ViewProjects},
 		{command: "view.panel.toggle", view: command.ViewPanelToggle},
 		{command: "view.panel.expand", view: command.ViewPanelExpand},
 	}
