@@ -51,6 +51,22 @@ service RepoService {
   // carry gh's last lines. Bounded at 15 minutes. Cancelling the stream kills the clone
   // and removes what it wrote.
   rpc Clone(CloneRepoRequest) returns (stream CloneRepoEvent) {}
+  // Create starts a new project at <config home>/projects/<name>: mkdir, `git init -b
+  // <init.defaultBranch, else main>`, an empty "Initial commit", then registers it.
+  // InvalidArgument for a name that is empty, starts with ".", or has anything but
+  // letters, digits, "-", "_" and "."; AlreadyExists when the folder exists.
+  rpc Create(CreateRepoRequest) returns (CreateRepoResponse) {}
+  // ListPublishOwners lists where the viewer can publish a repository: their own
+  // account (public and private) and every organization they belong to, with the
+  // visibilities the organization lets members create when GitHub says (it tells only
+  // org owners). Cached for 10 minutes.
+  rpc ListPublishOwners(ListPublishOwnersRequest) returns (ListPublishOwnersResponse) {}
+  // Publish creates <owner>/<name> on GitHub from a git project without an origin
+  // remote: `gh repo create <owner>/<name> --source <path> --remote origin --push
+  // --<visibility>`, then refreshes the project. FailedPrecondition when the project is
+  // not git or already has origin; a gh failure carries gh's last lines verbatim.
+  // Bounded at 5 minutes.
+  rpc Publish(PublishRepoRequest) returns (PublishRepoResponse) {}
 }
 
 message Repo {
@@ -350,4 +366,53 @@ message CloneProgress {
   string line = 1;
   // The line ended in a carriage return (progress counters): the next line replaces it.
   bool transient = 2;
+}
+
+message CreateRepoRequest {
+  // The folder name under the projects directory.
+  string name = 1;
+}
+
+message CreateRepoResponse {
+  Repo repo = 1;
+}
+
+message ListPublishOwnersRequest {}
+
+message ListPublishOwnersResponse {
+  // The viewer first, then organizations by login.
+  repeated PublishOwner owners = 1;
+}
+
+enum PublishOwnerKind {
+  PUBLISH_OWNER_KIND_UNSPECIFIED = 0;
+  PUBLISH_OWNER_KIND_USER = 1;
+  PUBLISH_OWNER_KIND_ORGANIZATION = 2;
+}
+
+// An account the viewer can create repositories in.
+message PublishOwner {
+  string login = 1;
+  PublishOwnerKind kind = 2;
+  // Visibilities a repository created here may have, most open first (public,
+  // internal, private). All three when known is false.
+  repeated RepositoryVisibility allowed = 3;
+  // allowed is the organization's policy (or the personal account's fixed choices).
+  // False when GitHub did not say (it tells only org owners): a choice it refuses
+  // fails at publish time.
+  bool known = 4;
+}
+
+message PublishRepoRequest {
+  string repo_id = 1;
+  // GitHub user or organization login.
+  string owner = 2;
+  // Repository name on GitHub; the project's name when empty.
+  string name = 3;
+  // PUBLIC, INTERNAL or PRIVATE.
+  RepositoryVisibility visibility = 4;
+}
+
+message PublishRepoResponse {
+  Repo repo = 1;
 }

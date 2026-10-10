@@ -17,6 +17,7 @@ import { tildify } from "@/lib/path";
 import { cn } from "@/lib/utils";
 import { branchKey, branchPullRequestsResource, openUrl, repoActivityResource, useFreshness } from "@/stores/gh";
 import { openPullRequestInPanel } from "@/stores/prPanel";
+import { openPublishDialog } from "@/stores/publish";
 import { findWorktree, useReposStore } from "@/stores/repos";
 import { useResource } from "@/stores/resource";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
@@ -252,19 +253,24 @@ function GithubActivity({ activity, activityError, branch, branchPrs }: {
 
 /**
  * A git repository with no remote: nothing to show from GitHub yet, and the way to put it
- * there. The button is a placeholder until repo.github.publish exists (add-project PR 4).
+ * there: the publish dialog (repo.github.publish's presenter).
  */
-function PublishToGitHub() {
+function PublishToGitHub({ repoId }: { repoId: string }) {
   return (
     <div className="flex flex-wrap items-center gap-3" data-testid="no-remote">
       <p className="text-xs text-muted-foreground">No remote: this repository is only on this Mac.</p>
-      {/* A disabled button gets no hover events in every engine: the tooltip is on its wrapper. */}
-      <span title="Coming soon" data-testid="publish-github-wrapper">
-        <Button type="button" variant="outline" size="xs" disabled data-testid="publish-github">
-          <CloudUpload aria-hidden />
-          Publish to GitHub
-        </Button>
-      </span>
+      <Button
+        type="button"
+        variant="outline"
+        size="xs"
+        onClick={() => {
+          openPublishDialog(repoId);
+        }}
+        data-testid="publish-github"
+      >
+        <CloudUpload aria-hidden />
+        Publish to GitHub
+      </Button>
     </div>
   );
 }
@@ -395,7 +401,7 @@ function OverviewBody({ repo, wt, items, inPanel = false }: { repo: RepoView; wt
           {slug ? (
             <GithubActivity activity={activity} activityError={activityEntry?.error ?? null} branch={wt.branch} branchPrs={branchPrs} />
           ) : isRemoteless(repo) ? (
-            <PublishToGitHub />
+            <PublishToGitHub repoId={repo.id} />
           ) : (
             <p className="text-xs text-muted-foreground">No GitHub remote: origin is not on github.com.</p>
           )}

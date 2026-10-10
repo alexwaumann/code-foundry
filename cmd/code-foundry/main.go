@@ -61,7 +61,7 @@ func main() {
 	case err == nil:
 	case errors.Is(err, errUsage):
 		os.Exit(2)
-	case errors.Is(err, errCancelled):
+	case errors.Is(err, errCancelled), errors.Is(err, errReported):
 		os.Exit(1)
 	default:
 		fmt.Fprintln(os.Stderr, "code-foundry:", err)

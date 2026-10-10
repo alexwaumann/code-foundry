@@ -66,6 +66,13 @@ const (
 	RepoServiceLookupGitHubProcedure = "/codefoundry.v1.RepoService/LookupGitHub"
 	// RepoServiceCloneProcedure is the fully-qualified name of the RepoService's Clone RPC.
 	RepoServiceCloneProcedure = "/codefoundry.v1.RepoService/Clone"
+	// RepoServiceCreateProcedure is the fully-qualified name of the RepoService's Create RPC.
+	RepoServiceCreateProcedure = "/codefoundry.v1.RepoService/Create"
+	// RepoServiceListPublishOwnersProcedure is the fully-qualified name of the RepoService's
+	// ListPublishOwners RPC.
+	RepoServiceListPublishOwnersProcedure = "/codefoundry.v1.RepoService/ListPublishOwners"
+	// RepoServicePublishProcedure is the fully-qualified name of the RepoService's Publish RPC.
+	RepoServicePublishProcedure = "/codefoundry.v1.RepoService/Publish"
 )
 
 // RepoServiceClient is a client for the codefoundry.v1.RepoService service.
@@ -115,6 +122,22 @@ type RepoServiceClient interface {
 	// carry gh's last lines. Bounded at 15 minutes. Cancelling the stream kills the clone
 	// and removes what it wrote.
 	Clone(context.Context, *connect.Request[v1.CloneRepoRequest]) (*connect.ServerStreamForClient[v1.CloneRepoEvent], error)
+	// Create starts a new project at <config home>/projects/<name>: mkdir, `git init -b
+	// <init.defaultBranch, else main>`, an empty "Initial commit", then registers it.
+	// InvalidArgument for a name that is empty, starts with ".", or has anything but
+	// letters, digits, "-", "_" and "."; AlreadyExists when the folder exists.
+	Create(context.Context, *connect.Request[v1.CreateRepoRequest]) (*connect.Response[v1.CreateRepoResponse], error)
+	// ListPublishOwners lists where the viewer can publish a repository: their own
+	// account (public and private) and every organization they belong to, with the
+	// visibilities the organization lets members create when GitHub says (it tells only
+	// org owners). Cached for 10 minutes.
+	ListPublishOwners(context.Context, *connect.Request[v1.ListPublishOwnersRequest]) (*connect.Response[v1.ListPublishOwnersResponse], error)
+	// Publish creates <owner>/<name> on GitHub from a git project without an origin
+	// remote: `gh repo create <owner>/<name> --source <path> --remote origin --push
+	// --<visibility>`, then refreshes the project. FailedPrecondition when the project is
+	// not git or already has origin; a gh failure carries gh's last lines verbatim.
+	// Bounded at 5 minutes.
+	Publish(context.Context, *connect.Request[v1.PublishRepoRequest]) (*connect.Response[v1.PublishRepoResponse], error)
 }
 
 // NewRepoServiceClient constructs a client for the codefoundry.v1.RepoService service. By default,
@@ -212,6 +235,24 @@ func NewRepoServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(repoServiceMethods.ByName("Clone")),
 			connect.WithClientOptions(opts...),
 		),
+		create: connect.NewClient[v1.CreateRepoRequest, v1.CreateRepoResponse](
+			httpClient,
+			baseURL+RepoServiceCreateProcedure,
+			connect.WithSchema(repoServiceMethods.ByName("Create")),
+			connect.WithClientOptions(opts...),
+		),
+		listPublishOwners: connect.NewClient[v1.ListPublishOwnersRequest, v1.ListPublishOwnersResponse](
+			httpClient,
+			baseURL+RepoServiceListPublishOwnersProcedure,
+			connect.WithSchema(repoServiceMethods.ByName("ListPublishOwners")),
+			connect.WithClientOptions(opts...),
+		),
+		publish: connect.NewClient[v1.PublishRepoRequest, v1.PublishRepoResponse](
+			httpClient,
+			baseURL+RepoServicePublishProcedure,
+			connect.WithSchema(repoServiceMethods.ByName("Publish")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -231,6 +272,9 @@ type repoServiceClient struct {
 	searchGitHub      *connect.Client[v1.SearchGitHubRequest, v1.SearchGitHubResponse]
 	lookupGitHub      *connect.Client[v1.LookupGitHubRequest, v1.LookupGitHubResponse]
 	clone             *connect.Client[v1.CloneRepoRequest, v1.CloneRepoEvent]
+	create            *connect.Client[v1.CreateRepoRequest, v1.CreateRepoResponse]
+	listPublishOwners *connect.Client[v1.ListPublishOwnersRequest, v1.ListPublishOwnersResponse]
+	publish           *connect.Client[v1.PublishRepoRequest, v1.PublishRepoResponse]
 }
 
 // Register calls codefoundry.v1.RepoService.Register.
@@ -303,6 +347,21 @@ func (c *repoServiceClient) Clone(ctx context.Context, req *connect.Request[v1.C
 	return c.clone.CallServerStream(ctx, req)
 }
 
+// Create calls codefoundry.v1.RepoService.Create.
+func (c *repoServiceClient) Create(ctx context.Context, req *connect.Request[v1.CreateRepoRequest]) (*connect.Response[v1.CreateRepoResponse], error) {
+	return c.create.CallUnary(ctx, req)
+}
+
+// ListPublishOwners calls codefoundry.v1.RepoService.ListPublishOwners.
+func (c *repoServiceClient) ListPublishOwners(ctx context.Context, req *connect.Request[v1.ListPublishOwnersRequest]) (*connect.Response[v1.ListPublishOwnersResponse], error) {
+	return c.listPublishOwners.CallUnary(ctx, req)
+}
+
+// Publish calls codefoundry.v1.RepoService.Publish.
+func (c *repoServiceClient) Publish(ctx context.Context, req *connect.Request[v1.PublishRepoRequest]) (*connect.Response[v1.PublishRepoResponse], error) {
+	return c.publish.CallUnary(ctx, req)
+}
+
 // RepoServiceHandler is an implementation of the codefoundry.v1.RepoService service.
 type RepoServiceHandler interface {
 	// Register adds a project by path. A path inside a git repository registers that
@@ -350,6 +409,22 @@ type RepoServiceHandler interface {
 	// carry gh's last lines. Bounded at 15 minutes. Cancelling the stream kills the clone
 	// and removes what it wrote.
 	Clone(context.Context, *connect.Request[v1.CloneRepoRequest], *connect.ServerStream[v1.CloneRepoEvent]) error
+	// Create starts a new project at <config home>/projects/<name>: mkdir, `git init -b
+	// <init.defaultBranch, else main>`, an empty "Initial commit", then registers it.
+	// InvalidArgument for a name that is empty, starts with ".", or has anything but
+	// letters, digits, "-", "_" and "."; AlreadyExists when the folder exists.
+	Create(context.Context, *connect.Request[v1.CreateRepoRequest]) (*connect.Response[v1.CreateRepoResponse], error)
+	// ListPublishOwners lists where the viewer can publish a repository: their own
+	// account (public and private) and every organization they belong to, with the
+	// visibilities the organization lets members create when GitHub says (it tells only
+	// org owners). Cached for 10 minutes.
+	ListPublishOwners(context.Context, *connect.Request[v1.ListPublishOwnersRequest]) (*connect.Response[v1.ListPublishOwnersResponse], error)
+	// Publish creates <owner>/<name> on GitHub from a git project without an origin
+	// remote: `gh repo create <owner>/<name> --source <path> --remote origin --push
+	// --<visibility>`, then refreshes the project. FailedPrecondition when the project is
+	// not git or already has origin; a gh failure carries gh's last lines verbatim.
+	// Bounded at 5 minutes.
+	Publish(context.Context, *connect.Request[v1.PublishRepoRequest]) (*connect.Response[v1.PublishRepoResponse], error)
 }
 
 // NewRepoServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -443,6 +518,24 @@ func NewRepoServiceHandler(svc RepoServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(repoServiceMethods.ByName("Clone")),
 		connect.WithHandlerOptions(opts...),
 	)
+	repoServiceCreateHandler := connect.NewUnaryHandler(
+		RepoServiceCreateProcedure,
+		svc.Create,
+		connect.WithSchema(repoServiceMethods.ByName("Create")),
+		connect.WithHandlerOptions(opts...),
+	)
+	repoServiceListPublishOwnersHandler := connect.NewUnaryHandler(
+		RepoServiceListPublishOwnersProcedure,
+		svc.ListPublishOwners,
+		connect.WithSchema(repoServiceMethods.ByName("ListPublishOwners")),
+		connect.WithHandlerOptions(opts...),
+	)
+	repoServicePublishHandler := connect.NewUnaryHandler(
+		RepoServicePublishProcedure,
+		svc.Publish,
+		connect.WithSchema(repoServiceMethods.ByName("Publish")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.RepoService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RepoServiceRegisterProcedure:
@@ -473,6 +566,12 @@ func NewRepoServiceHandler(svc RepoServiceHandler, opts ...connect.HandlerOption
 			repoServiceLookupGitHubHandler.ServeHTTP(w, r)
 		case RepoServiceCloneProcedure:
 			repoServiceCloneHandler.ServeHTTP(w, r)
+		case RepoServiceCreateProcedure:
+			repoServiceCreateHandler.ServeHTTP(w, r)
+		case RepoServiceListPublishOwnersProcedure:
+			repoServiceListPublishOwnersHandler.ServeHTTP(w, r)
+		case RepoServicePublishProcedure:
+			repoServicePublishHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -536,4 +635,16 @@ func (UnimplementedRepoServiceHandler) LookupGitHub(context.Context, *connect.Re
 
 func (UnimplementedRepoServiceHandler) Clone(context.Context, *connect.Request[v1.CloneRepoRequest], *connect.ServerStream[v1.CloneRepoEvent]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.Clone is not implemented"))
+}
+
+func (UnimplementedRepoServiceHandler) Create(context.Context, *connect.Request[v1.CreateRepoRequest]) (*connect.Response[v1.CreateRepoResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.Create is not implemented"))
+}
+
+func (UnimplementedRepoServiceHandler) ListPublishOwners(context.Context, *connect.Request[v1.ListPublishOwnersRequest]) (*connect.Response[v1.ListPublishOwnersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.ListPublishOwners is not implemented"))
+}
+
+func (UnimplementedRepoServiceHandler) Publish(context.Context, *connect.Request[v1.PublishRepoRequest]) (*connect.Response[v1.PublishRepoResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.Publish is not implemented"))
 }

@@ -13,6 +13,9 @@
  *   RepoService.SearchGitHub / LookupGitHub / Clone: mock/clone.ts (a repo named "fail" fails
  *        to clone; octo-org/already-here's destination exists)
  *   GET  /__mock/github/calls                     ("search <q>", "lookup <o/n>", "clone <o/n>")
+ *   RepoService.Create / ListPublishOwners / Publish, repo.create, repo.github.publish:
+ *        mock/create.ts (publishing private to octo-org, or a repository named "taken", fails like gh)
+ *   GET  /__mock/projects/calls                   ("create <name>", "publish <id> <o/n> <visibility>")
  *   POST /__mock/session/attention?id=s-1
  *   POST /__mock/session/status?id=s-1&status=busy|idle|attention
  *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139
@@ -78,6 +81,7 @@ import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { listDirectories } from "./filesystem";
 import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from "./clone";
+import { createProject, listPublishOwners, projectCalls, publishProject, resetProjects, visibilityFlag } from "./create";
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
 import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
@@ -191,6 +195,22 @@ function routes(router: ConnectRouter): void {
     searchGitHub: (req) => searchGitHub(req.query),
     lookupGitHub: (req) => lookupGitHub(req.owner, req.name),
     clone: (req, ctx) => cloneRepo(world, req.owner, req.name, ctx.signal),
+    // The New tab and the publish dialog (mock/create.ts); the GUI goes through the
+    // repo.create and repo.github.publish commands, these serve the RPCs themselves.
+    create: (req) => {
+      const r = createProject(world, req.name);
+      const repo = world.repos.get(r.id);
+      if (!repo) throw new ConnectError("created project vanished", Code.Internal);
+      return { repo: world.repoMsg(repo) };
+    },
+    listPublishOwners: () => listPublishOwners(),
+    publish: async (req) => {
+      const vis = visibilityFlag(req.visibility);
+      await publishProject(world, req.repoId, req.owner, req.name, vis);
+      const repo = world.repos.get(req.repoId);
+      if (!repo) throw new ConnectError("published project vanished", Code.Internal);
+      return { repo: world.repoMsg(repo) };
+    },
     getWorktreeDetail: (req) => {
       const detail = world.gh.getWorktreeDetail(req.repoId, req.path);
       if (!detail) throw new ConnectError(`worktree ${req.path} not found`, Code.NotFound);
@@ -569,6 +589,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/gh/touch":
       json(res, world.gh.touch(q.get("path") ?? "") ? 200 : 404, { ok: true });
       break;
+    case "GET /__mock/projects/calls":
+      json(res, 200, projectCalls);
+      break;
     case "GET /__mock/github/calls":
       json(res, 200, githubCalls);
       break;
@@ -619,6 +642,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       missingRpcs.clear();
       world.reset();
       resetClones();
+      resetProjects();
       json(res, 200, { ok: true });
       break;
     default:

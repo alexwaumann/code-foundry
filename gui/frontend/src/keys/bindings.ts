@@ -5,6 +5,7 @@ import { refreshCommands, runCommand, useCommandsStore, whenListed } from "@/sto
 import { contextKey, getListInputs, getUiContext } from "@/stores/context";
 import { openAddProject } from "@/stores/addProject";
 import { openNewThreadPicker } from "@/stores/compose";
+import { openPublishDialog } from "@/stores/publish";
 import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
@@ -106,7 +107,7 @@ export function isStartable(c: CommandView): boolean {
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
-const paletteSupplied: ReadonlySet<string> = new Set(["session.new", "session.run-in", "repo.clone"]);
+const paletteSupplied: ReadonlySet<string> = new Set(["session.new", "session.run-in", "repo.clone", "repo.create", "repo.github.publish"]);
 
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
@@ -188,6 +189,14 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
     openAddProject("github");
     return true;
   },
+  // The New tab invokes repo.create itself; from the palette it opens the dialog there.
+  "repo.create": () => {
+    openAddProject("new");
+    return true;
+  },
+  // The publish dialog (owner and visibility pickers) for the active project; it
+  // invokes repo.github.publish.
+  "repo.github.publish": () => openPublishDialog(getUiContext().activeRepoId),
   // Window-local: only this window opens, without a round trip (the CLI and palette
   // reach every window through UiIntent.ShowView instead).
   "view.settings": () => showView("settings"),

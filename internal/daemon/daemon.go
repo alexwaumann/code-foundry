@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"syscall"
 	"time"
@@ -108,7 +109,7 @@ func Run(ctx context.Context, opts Options) error {
 
 	started := time.Now()
 	events := st.bus
-	repoAPI := api.NewRepo(st.repo, events).WithGitHub(st.gh, st.cloner)
+	repoAPI := api.NewRepo(st.repo, events).WithGitHub(st.gh, st.cloner).WithProjects(st.projects, st.gh)
 	terminalAPI := api.NewTerminal(st.terminal)
 	sessionAPI := api.NewSession(st.session, events)
 	gitopsAPI := api.NewGitOps(st.gitops, events, ctx.Done())
@@ -125,6 +126,13 @@ func Run(ctx context.Context, opts Options) error {
 		Terminal: terminalAPI,
 		Repo:     worktreeDirRepo{RepoBackend: repoAPI, repos: st.repo, settings: st.settings},
 		Clone:    repoAPI.CloneRef,
+		Projects: command.ProjectDeps{
+			Backend: repoAPI,
+			HasOrigin: func(c command.Context) bool {
+				r, ok := st.repo.Snapshot().Owner(c.ActiveRepoID, c.ActiveWorktreePath)
+				return ok && slices.Contains(r.Remotes, "origin")
+			},
+		},
 		NotGit: func(c command.Context) bool {
 			r, ok := st.repo.Snapshot().Owner(c.ActiveRepoID, c.ActiveWorktreePath)
 			return ok && !r.Git

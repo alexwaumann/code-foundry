@@ -111,14 +111,14 @@ test("the composer in a project without git offers only its current checkout; th
   await expect(row.getByTestId("row-branch")).toHaveCount(0);
 });
 
-test("a git repository without a remote: Publish to GitHub is there, disabled, coming soon", async ({ page }) => {
+test("a git repository without a remote: Publish to GitHub is there", async ({ page }) => {
   await openApp(page);
   await selectProject(page, "repo-sk");
   await expect(page.getByTestId("overview-title")).toHaveText("sketches@main");
   await expect(page.getByTestId("no-remote")).toContainText("No remote");
-  await expect(page.getByTestId("publish-github")).toBeDisabled();
+  // Live since add-project PR 4 (e2e/create.spec.ts publishes with it).
+  await expect(page.getByTestId("publish-github")).toBeEnabled();
   await expect(page.getByTestId("publish-github")).toHaveText("Publish to GitHub");
-  await expect(page.getByTestId("publish-github-wrapper")).toHaveAttribute("title", "Coming soon");
   // Worktrees and files work as for any git repository.
   await expect(page.getByTestId("sync-line")).toBeVisible();
   await expect(page.getByTestId("section-files")).toBeVisible();

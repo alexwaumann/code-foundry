@@ -16,6 +16,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/session"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
@@ -37,6 +38,9 @@ type stores struct {
 	// cloner clones GitHub repositories into the projects dir and registers them in
 	// repo. It holds no resources: a clone in flight dies with its request.
 	cloner *clone.Cloner
+	// projects creates new projects in the projects dir and publishes projects to
+	// GitHub with gh; like cloner, it holds no resources.
+	projects *project.Store
 	// stopGh cancels the gh poller and the repo→gh tracking glue, and waits for both.
 	stopGh func()
 	// gitops runs git/gh operations and refreshes repo afterwards; closed before repo.
@@ -113,6 +117,11 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 	}
 	if s.cloner, err = clone.New(clone.Options{
 		Root: p.Projects(), AllowedRoot: s.home, Repos: s.repo, Gh: ghBin, Log: log.With("store", "clone"),
+	}); err != nil {
+		return nil, err
+	}
+	if s.projects, err = project.New(project.Options{
+		Root: p.Projects(), AllowedRoot: s.home, Repos: s.repo, Gh: ghBin, Log: log.With("store", "project"),
 	}); err != nil {
 		return nil, err
 	}

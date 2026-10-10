@@ -96,6 +96,12 @@ func TestCLIAgainstDaemon(t *testing.T) {
 		{"repo clone refuses ssh before the daemon runs gh", []string{"repo", "clone", "git@github.com:o/r.git"}, errUsage, "",
 			"code-foundry repo.clone: invalid argument: SSH URLs are not supported"},
 		{"repo clone needs a repo", []string{"repo", "clone"}, errUsage, "", "no repository given"},
+		{"repo create refuses a dot name", []string{"repo", "create", ".hidden"}, errUsage, "",
+			`code-foundry repo.create: invalid argument: a project name cannot start with "."`},
+		// The test daemon's config home is under /tmp, outside the home directory.
+		{"repo create keeps projects under home", []string{"repo", "create", "demo"}, errUsage, "", "outside your home directory"},
+		{"repo github publish needs a project", []string{"repo", "github", "publish", "--owner", "me", "--visibility", "public"}, errUsage, "",
+			"repo.github.publish: not available in this context"},
 		// terminal.* is registered against the Unimplemented stub until 1a is wired.
 		{"store-backed stub", []string{"terminal.kill", "--id", "t1"}, errAny, "", ""},
 	}

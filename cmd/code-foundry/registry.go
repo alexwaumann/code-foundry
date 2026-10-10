@@ -222,10 +222,18 @@ func (cl *cli) invokeFailed(name string, err error) error {
 		fmt.Fprintf(cl.stderr, "code-foundry %s: %s\n", name, msg)
 		fmt.Fprintf(cl.stderr, "Run `code-foundry help %s` for usage.\n", name)
 		return errUsage
-	default:
-		return fmt.Errorf("%s: %s (%s)", name, msg, ce.Code())
+	case connect.CodeUnknown:
+		// The tool's own words (several lines from gh repo clone or create): as is.
+		if strings.Contains(msg, "\n") {
+			fmt.Fprintf(cl.stderr, "code-foundry %s failed:\n%s\n", name, msg)
+			return errReported
+		}
 	}
+	return fmt.Errorf("%s: %s (%s)", name, msg, ce.Code())
 }
+
+// errReported marks a failure already printed in full (exit 1).
+var errReported = errors.New("reported")
 
 // runCommands lists every daemon command with its availability in the given context.
 func runCommands(ctx context.Context, cl *cli, args []string) error {
