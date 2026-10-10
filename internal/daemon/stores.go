@@ -19,6 +19,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
+	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
@@ -42,6 +43,9 @@ type stores struct {
 	session *session.Manager
 	// update checks for and installs new releases (disabled in dev builds).
 	update *update.Store
+	// workspace holds branch sets across repos; it creates and removes worktrees
+	// through repo and asks session which threads are live.
+	workspace *workspace.Manager
 }
 
 // openStores opens the database, applies migrations, and starts every store. On
@@ -106,10 +110,32 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths) (_ *stores
 	}); err != nil {
 		return nil, err
 	}
+	if s.workspace, err = workspace.New(ctx, workspace.Options{
+		DB: s.db, Repos: s.repo, Bus: s.bus, Log: log.With("store", "workspace"),
+		Threads: func() []workspace.Thread { return liveThreads(s.session.Snapshot()) },
+		Trust:   s.session.PreTrust, WorktreePath: settingsWorktreePath(s.settings),
+	}); err != nil {
+		return nil, err
+	}
 	uo := update.DefaultOptions(version.Version)
 	uo.Bus, uo.Log = s.bus, log.With("store", "update")
 	s.update = update.Start(ctx, uo)
 	return s, nil
+}
+
+// liveThreads lists the sessions with a process, for the workspace store's removal
+// guard.
+func liveThreads(snap *session.Snapshot) []workspace.Thread {
+	var out []workspace.Thread
+	if snap == nil {
+		return nil
+	}
+	for _, s := range snap.Sessions {
+		if s.State != session.StateDisconnected {
+			out = append(out, workspace.Thread{ID: s.ID, Name: s.Name, Cwd: s.WorktreePath})
+		}
+	}
+	return out
 }
 
 // close stops the stores in reverse order of start, then closes the database.

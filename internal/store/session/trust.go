@@ -199,3 +199,21 @@ const (
 	keyDown  = "\x1b[B"
 	keyEnter = "\r"
 )
+
+// PreTrust marks dir as trusted in Claude's config, as spawn does for a session's
+// worktree, so a session started (or moved with /cd) there later gets no trust
+// dialog. The workspace store calls it for member worktrees. It is a no-op with
+// Options.DisablePreTrust.
+func (m *Manager) PreTrust(dir string) error {
+	if m.opts.DisablePreTrust {
+		return nil
+	}
+	changed, err := trustWorktree(m.opts.Paths.Config, dir)
+	if err != nil {
+		return err
+	}
+	if changed {
+		m.log.Info("pre-trusted worktree in claude config", "path", realPath(dir))
+	}
+	return nil
+}
