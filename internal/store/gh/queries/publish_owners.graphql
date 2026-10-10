@@ -1,10 +1,13 @@
 # Where the viewer can publish a repository (RepoService.ListPublishOwners): their own
-# account and the organizations they belong to. Each organization's repository policy
-# comes from REST GET /orgs/{org} (owners.go). Cached for 10 minutes.
+# account and the organizations they belong to. viewerCanCreateRepositories is false
+# for an organization that restricts creation to owners, or whose enterprise policy
+# disables it; those are left out (github.com greys them out the same way). Each
+# remaining organization's repository policy comes from REST GET /orgs/{org}
+# (owners.go). Cached for 10 minutes.
 query PublishOwners {
   rateLimit { ...RateLimitFields }
   viewer {
     login
-    organizations(first: 100) { nodes { login } }
+    organizations(first: 100) { nodes { login viewerCanCreateRepositories } }
   }
 }

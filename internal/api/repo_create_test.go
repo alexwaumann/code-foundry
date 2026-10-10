@@ -89,9 +89,53 @@ func TestListPublishOwners(t *testing.T) {
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("owners:\n got %v\nwant %v", got, want)
 	}
+	// allow_stale serves the fake's list as cached, never stale.
+	res, err = c.ListPublishOwners(context.Background(), connect.NewRequest(&v1.ListPublishOwnersRequest{AllowStale: true}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Msg.GetOwners()) != 3 || res.Msg.GetStale() {
+		t.Errorf("allow_stale: %d owners, stale=%t", len(res.Msg.GetOwners()), res.Msg.GetStale())
+	}
 	owners.SetError(fmt.Errorf("%w: run gh auth login", gh.ErrNotAuthenticated))
 	if _, err := c.ListPublishOwners(context.Background(), connect.NewRequest(&v1.ListPublishOwnersRequest{})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Errorf("unauthenticated: err = %v", err)
+	}
+	// With nothing cached, allow_stale fetches and fails the same way.
+	owners.SetPublishOwners()
+	if _, err := c.ListPublishOwners(context.Background(), connect.NewRequest(&v1.ListPublishOwnersRequest{AllowStale: true})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Errorf("unauthenticated, allow_stale: err = %v", err)
+	}
+}
+
+func TestDeleteRepo(t *testing.T) {
+	projects, _, c := newProjectRepoServer(t, true)
+	ctx := context.Background()
+	if _, err := c.Create(ctx, connect.NewRequest(&v1.CreateRepoRequest{Name: "demo"})); err != nil {
+		t.Fatal(err)
+	}
+	projects.AddRepo(repo.Repo{ID: "r1", Name: "elsewhere", Path: "/home/me/elsewhere", Git: true})
+	tests := []struct {
+		name string
+		id   string
+		code connect.Code
+	}{
+		{"a created project", "repo-demo", 0},
+		{"again: gone", "repo-demo", connect.CodeNotFound},
+		{"outside the projects directory", "r1", connect.CodeFailedPrecondition},
+		{"unknown", "nope", connect.CodeNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := c.Delete(ctx, connect.NewRequest(&v1.DeleteRepoRequest{Id: tt.id}))
+			if (err == nil) != (tt.code == 0) || (err != nil && connect.CodeOf(err) != tt.code) {
+				t.Fatalf("err = %v, want %v", err, tt.code)
+			}
+		})
+	}
+	want := []string{"create demo", "delete repo-demo", "delete repo-demo", "delete r1", "delete nope"}
+	if got := projects.Calls(); fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("calls = %v, want %v", got, want)
 	}
 }
 
@@ -155,5 +199,8 @@ func TestProjectsNotConfigured(t *testing.T) {
 	}
 	if _, err := c.Publish(ctx, connect.NewRequest(&v1.PublishRepoRequest{})); connect.CodeOf(err) != connect.CodeUnimplemented {
 		t.Errorf("publish: %v", err)
+	}
+	if _, err := c.Delete(ctx, connect.NewRequest(&v1.DeleteRepoRequest{Id: "x"})); connect.CodeOf(err) != connect.CodeUnimplemented {
+		t.Errorf("delete: %v", err)
 	}
 }

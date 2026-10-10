@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { errorMessage } from "@/api/stream";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { projectNameError } from "@/lib/publish";
+import { projectNameError, type PublishOwnerView } from "@/lib/publish";
 import { closePublishDialog, publishProject, usePublishDialogStore } from "@/stores/publish";
 import { useReposStore } from "@/stores/repos";
 import { PublishPicker } from "./PublishPicker";
@@ -23,8 +23,8 @@ function PublishBody({ repoId }: { repoId: string }) {
   const [error, setError] = useState<string | null>(null);
   const owners = usePublishOwners(
     true,
-    useCallback((first: PublishChoice) => {
-      setChoice((cur) => (cur.owner ? cur : first));
+    useCallback((first: PublishChoice, list: PublishOwnerView[]) => {
+      setChoice((cur) => (cur.owner && list.some((o) => o.login === cur.owner) ? cur : first));
     }, []),
   );
   const nameError = name === "" ? null : projectNameError(name);

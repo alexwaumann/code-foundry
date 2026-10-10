@@ -213,6 +213,7 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 		return nil, err
 	}
 	s.loadActivity(ctx, snap)
+	s.loadOwners(ctx)
 	s.snap.Store(snap)
 	// A recent poll in the cache (with the viewer's id, which stats need) waits out its
 	// interval, so restarts do not poll in a burst.

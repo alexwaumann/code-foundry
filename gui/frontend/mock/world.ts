@@ -1263,9 +1263,15 @@ export class World {
     return [...this.repos.values()].map((r) => r.path);
   }
 
-  repoInfo(id: string): { name: string; git: boolean; remotes: string[] } | undefined {
+  repoInfo(id: string): { name: string; path: string; git: boolean; remotes: string[] } | undefined {
     const r = this.repos.get(id);
-    return r && { name: r.name, git: r.git !== false, remotes: r.remotes };
+    return r && { name: r.name, path: r.path, git: r.git !== false, remotes: r.remotes };
+  }
+
+  /** RepoService.Delete (and repo.unregister): the project is gone. */
+  removeRepo(id: string): void {
+    this.repos.delete(id);
+    this.repoEvents.publish({ event: { case: "repoRemovedId", value: id } });
   }
 
   /** RepoService.Create: a git project on main with its empty first commit, no remote. */

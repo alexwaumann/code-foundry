@@ -59,7 +59,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"ui.palette.open", "ui.notify", "ui.focus.terminal", "ui.focus.repo",
 		"terminal.new", "terminal.kill", "terminal.remove",
 		"repo.unregister", "repo.worktree.new", "repo.worktree.remove", "repo.refresh", "repo.git.init",
-		"repo.add", "repo.clone", "repo.create", "repo.github.publish",
+		"repo.add", "repo.clone", "repo.create", "repo.github.publish", "repo.delete",
 		"session.new", "session.list", "session.focus", "session.close", "session.reconnect",
 		"session.rename", "session.fork", "session.remove", "session.run-in", "session.pin",
 		"git.fetch", "git.pull", "git.push", "pr.create", "pr.open",
@@ -67,7 +67,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"worktree.open.editor", "worktree.reveal", "view.open.url",
 		"settings.get", "settings.set", "settings.reset", "settings.path", "settings.reveal",
 		"view.settings", "view.help",
-		"app.version", "app.update.check", "app.update", "app.relaunch", "daemon.restart",
+		"app.version", "app.update.check", "app.update", "app.relaunch", "app.restart", "daemon.restart",
 		"view.pullrequests", "view.projects", "view.panel.toggle", "view.panel.expand", "view.panel.workspace", "view.panel.linked-prs", "view.panel.worktree",
 		"workspace.new", "workspace.list", "workspace.members", "workspace.add-repo", "workspace.remove-repo", "workspace.remove",
 	}

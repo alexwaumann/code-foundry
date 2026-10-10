@@ -1,15 +1,17 @@
 import { create } from "zustand";
+import { invokeCommand } from "@/api/command";
 import type { Visibility } from "@/lib/publish";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { getUiContext } from "./context";
 import { useReposStore } from "./repos";
 
 /**
- * Creating a project (repo.create, the Add Project dialog's New tab) and publishing one
- * to GitHub (repo.github.publish: the New tab's second step, and the publish dialog the
- * overview's Publish to GitHub button and the palette open). Errors reject with the
- * daemon's message, which for a refused publish is gh's own words; nothing is toasted
- * here (the dialogs show errors in place).
+ * Creating a project (repo.create, the Add Project dialog's New tab), publishing one to
+ * GitHub (repo.github.publish: the New tab's second step, and the publish dialog the
+ * overview's Publish to GitHub button and the palette open) and deleting one the New
+ * tab made and then cancelled (repo.delete). Errors reject with the daemon's message,
+ * which for a refused publish is gh's own words; nothing is toasted here (the dialogs
+ * show errors in place).
  */
 
 interface PublishDialogState {
@@ -75,6 +77,19 @@ export async function publishProject(req: PublishRequest): Promise<string> {
     const res = await invokeConfirmed("repo.github.publish", { repo: req.repoId, owner: req.owner, name: req.name, visibility: req.visibility }, ctx);
     if (!res) throw new Error("cancelled");
     return res.message;
+  } finally {
+    void refreshCommands();
+  }
+}
+
+/**
+ * repo.delete for a project the New tab created: unregisters it and removes its folder.
+ * Invoked as already confirmed: the user cancelled the dialog, which is the decision.
+ */
+export async function deleteProject(repoId: string): Promise<void> {
+  const ctx = { ...getUiContext(), activeRepoId: repoId, activeWorktreePath: "", activeSessionId: "", activeTerminalId: "", activeWorkspaceId: "" };
+  try {
+    await invokeCommand("repo.delete", ctx, { repo: repoId }, undefined, { confirmed: true });
   } finally {
     void refreshCommands();
   }

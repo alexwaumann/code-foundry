@@ -11,10 +11,10 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
-// The Add Project dialog's New tab and the Publish to GitHub button: Create (the
-// project store), ListPublishOwners (the gh store) and Publish (the project store).
+// The Add Project dialog's New tab and the Publish to GitHub button: Create, Publish and
+// Delete (the project store) and ListPublishOwners (the gh store).
 
-// WithProjects sets what Create, ListPublishOwners and Publish use, and returns h.
+// WithProjects sets what Create, ListPublishOwners, Publish and Delete use, and returns h.
 func (h *Repo) WithProjects(projects project.Service, owners gh.Owners) *Repo {
 	h.projects, h.owners = projects, owners
 	return h
@@ -34,14 +34,23 @@ func (h *Repo) Create(ctx context.Context, req *connect.Request[v1.CreateRepoReq
 	return connect.NewResponse(&v1.CreateRepoResponse{Repo: repoToProto(r)}), nil
 }
 
-// ListPublishOwners lists the accounts the viewer can publish to.
-func (h *Repo) ListPublishOwners(ctx context.Context, _ *connect.Request[v1.ListPublishOwnersRequest]) (*connect.Response[v1.ListPublishOwnersResponse], error) {
+// ListPublishOwners lists the accounts the viewer can publish to. With allow_stale, the
+// last fetched list is answered however old it is (stale says when it is older than
+// the TTL); when nothing was fetched yet, or without allow_stale, a fresh one is fetched.
+func (h *Repo) ListPublishOwners(ctx context.Context, req *connect.Request[v1.ListPublishOwnersRequest]) (*connect.Response[v1.ListPublishOwnersResponse], error) {
 	if h.owners == nil {
 		return nil, errNoProjects
 	}
-	owners, err := h.owners.PublishOwners(ctx)
-	if err != nil {
-		return nil, ghError(err)
+	var owners []gh.PublishOwner
+	var stale, ok bool
+	if req.Msg.GetAllowStale() {
+		owners, stale, ok = h.owners.CachedPublishOwners(ctx)
+	}
+	if !ok {
+		var err error
+		if owners, err = h.owners.PublishOwners(ctx); err != nil {
+			return nil, ghError(err)
+		}
 	}
 	out := make([]*v1.PublishOwner, len(owners))
 	for i, o := range owners {
@@ -54,7 +63,18 @@ func (h *Repo) ListPublishOwners(ctx context.Context, _ *connect.Request[v1.List
 		}
 		out[i] = p
 	}
-	return connect.NewResponse(&v1.ListPublishOwnersResponse{Owners: out}), nil
+	return connect.NewResponse(&v1.ListPublishOwnersResponse{Owners: out, Stale: stale}), nil
+}
+
+// Delete unregisters a project made by Create and removes its folder.
+func (h *Repo) Delete(ctx context.Context, req *connect.Request[v1.DeleteRepoRequest]) (*connect.Response[v1.DeleteRepoResponse], error) {
+	if h.projects == nil {
+		return nil, errNoProjects
+	}
+	if err := h.projects.Delete(ctx, req.Msg.GetId()); err != nil {
+		return nil, projectError(err)
+	}
+	return connect.NewResponse(&v1.DeleteRepoResponse{}), nil
 }
 
 // visibilityFlags maps the proto visibility to gh's flag spelling.

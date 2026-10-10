@@ -123,6 +123,48 @@ func TestUpdateServiceFlow(t *testing.T) {
 	}
 }
 
+// TestUpdateRequestRestart: RequestRestart reaches Watch and EventService streams as
+// restart_requested and leaves the status alone.
+func TestUpdateRequestRestart(t *testing.T) {
+	f := newUpdateFixture(t, "v0.1.0")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	w, err := f.update.Watch(ctx, connect.NewRequest(&v1.WatchUpdateRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = w.Close() }()
+	e, err := f.events.Watch(ctx, connect.NewRequest(&v1.WatchEventsRequest{Sources: []v1.EventSource{v1.EventSource_EVENT_SOURCE_UPDATE}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = e.Close() }()
+	// The snapshot arrives after the stream subscribed.
+	if !w.Receive() || w.Msg().GetStatus() == nil {
+		t.Fatalf("watch snapshot %v (%v)", w.Msg(), w.Err())
+	}
+	if !e.Receive() || e.Msg().GetUpdate().GetStatus() == nil {
+		t.Fatalf("events snapshot %v (%v)", e.Msg(), e.Err())
+	}
+
+	rr, err := f.update.RequestRestart(ctx, connect.NewRequest(&v1.RequestRestartRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rr.Msg.GetDelivered() != 2 { // the Watch and the events stream
+		t.Fatalf("delivered %d, want 2", rr.Msg.GetDelivered())
+	}
+	if !w.Receive() || w.Msg().GetRestartRequested() == nil {
+		t.Fatalf("watch: want restart_requested, got %v (%v)", w.Msg(), w.Err())
+	}
+	if !e.Receive() || e.Msg().GetUpdate().GetRestartRequested() == nil {
+		t.Fatalf("events: want restart_requested, got %v (%v)", e.Msg(), e.Err())
+	}
+	if st := f.store.Snapshot(); st.State != update.Idle {
+		t.Fatalf("state %v after RequestRestart, want idle", st.State)
+	}
+}
+
 func TestUpdateServiceDisabled(t *testing.T) {
 	f := newUpdateFixture(t, "dev")
 	ctx := context.Background()

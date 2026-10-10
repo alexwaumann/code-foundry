@@ -25,8 +25,8 @@ type Deps struct {
 	NotGit command.NotGitFunc
 	// Clone backs repo.clone. Nil makes it fail with Unimplemented.
 	Clone command.CloneFunc
-	// Projects backs repo.create and repo.github.publish (its NotGit defaults to
-	// NotGit). A nil Backend works like Terminal.
+	// Projects backs repo.create, repo.github.publish and repo.delete (its NotGit
+	// defaults to NotGit). A nil Backend works like Terminal.
 	Projects command.ProjectDeps
 	// Session backs session.*. Nil works like Terminal.
 	Session command.SessionBackend

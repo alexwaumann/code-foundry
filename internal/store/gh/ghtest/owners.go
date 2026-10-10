@@ -31,3 +31,19 @@ func (s *Store) PublishOwners(context.Context) ([]gh.PublishOwner, error) {
 	}
 	return out, nil
 }
+
+// CachedPublishOwners implements gh.Owners: the set owners, never stale, or nothing
+// when none were set.
+func (s *Store) CachedPublishOwners(ctx context.Context) ([]gh.PublishOwner, bool, bool) {
+	s.mu.Lock()
+	n := len(s.owners)
+	s.mu.Unlock()
+	if n == 0 {
+		return nil, false, false
+	}
+	owners, err := s.PublishOwners(ctx)
+	if err != nil {
+		return nil, false, false
+	}
+	return owners, false, true
+}

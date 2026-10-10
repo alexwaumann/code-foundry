@@ -20,12 +20,14 @@ import (
 // fakeRepos is an in-memory Repos: Register adds a git project at the path, Refresh
 // applies onRefresh (what the reconcile would discover).
 type fakeRepos struct {
-	mu         sync.Mutex
-	repos      map[string]repo.Repo
-	registered []string
-	refreshed  []string
-	regErr     error
-	onRefresh  func(*repo.Repo)
+	mu           sync.Mutex
+	repos        map[string]repo.Repo
+	registered   []string
+	refreshed    []string
+	unregistered []string
+	regErr       error
+	unregErr     error
+	onRefresh    func(*repo.Repo)
 }
 
 func newFakeRepos(rs ...repo.Repo) *fakeRepos {
@@ -70,6 +72,20 @@ func (f *fakeRepos) Refresh(_ context.Context, id string) error {
 		f.onRefresh(&r)
 		f.repos[id] = r
 	}
+	return nil
+}
+
+func (f *fakeRepos) Unregister(_ context.Context, id string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.unregistered = append(f.unregistered, id)
+	if f.unregErr != nil {
+		return f.unregErr
+	}
+	if _, ok := f.repos[id]; !ok {
+		return fmt.Errorf("%w: %s", repo.ErrNotFound, id)
+	}
+	delete(f.repos, id)
 	return nil
 }
 
@@ -402,5 +418,111 @@ func TestPublishBusyAndTimeout(t *testing.T) {
 	}()
 	if _, err := s.Publish(ctx, PublishOptions{RepoID: "r1", Owner: "me", Visibility: Public}); !errors.Is(err, context.Canceled) {
 		t.Errorf("err = %v, want Canceled", err)
+	}
+}
+
+func TestDelete(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "projects")
+	mk := func(t *testing.T, rel string) string {
+		p := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Join(p, ".git"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	tests := []struct {
+		name         string
+		id           string
+		repos        func(t *testing.T) *fakeRepos
+		unregErr     error
+		err          error
+		errText      string
+		wantDir      bool // the folder still exists afterwards
+		unregistered []string
+	}{
+		{name: "deletes a created project", id: "p", unregistered: []string{"p"},
+			repos: func(t *testing.T) *fakeRepos {
+				return newFakeRepos(repo.Repo{ID: "p", Name: "demo", Path: mk(t, "demo"), Git: true})
+			}},
+		{name: "unknown project", id: "nope", err: ErrNotFound, repos: func(*testing.T) *fakeRepos { return newFakeRepos() }},
+		{name: "outside the projects directory", id: "o", err: ErrFailedPrecondition, wantDir: true,
+			repos: func(t *testing.T) *fakeRepos {
+				p := filepath.Join(t.TempDir(), "elsewhere")
+				if err := os.MkdirAll(p, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				return newFakeRepos(repo.Repo{ID: "o", Name: "elsewhere", Path: p})
+			}},
+		{name: "nested under the projects directory", id: "n", err: ErrFailedPrecondition, wantDir: true,
+			repos: func(t *testing.T) *fakeRepos {
+				return newFakeRepos(repo.Repo{ID: "n", Name: "deep", Path: mk(t, "a/deep")})
+			}},
+		{name: "the projects directory itself", id: "r", err: ErrFailedPrecondition, wantDir: true,
+			repos: func(t *testing.T) *fakeRepos {
+				mk(t, "x")
+				return newFakeRepos(repo.Repo{ID: "r", Name: "projects", Path: root})
+			}},
+		{name: "unregister fails: the folder stays", id: "u", unregErr: errors.New("boom"), errText: "unregister demo: boom", wantDir: true,
+			unregistered: []string{"u"},
+			repos: func(t *testing.T) *fakeRepos {
+				return newFakeRepos(repo.Repo{ID: "u", Name: "demo", Path: mk(t, "demo"), Git: true})
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := os.RemoveAll(root); err != nil {
+				t.Fatal(err)
+			}
+			repos := tt.repos(t)
+			repos.unregErr = tt.unregErr
+			s, err := New(Options{Root: root, Repos: repos})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var path string
+			if r, ok := repos.Snapshot().Repo(tt.id); ok {
+				path = r.Path
+			}
+			err = s.Delete(context.Background(), tt.id)
+			switch {
+			case tt.err != nil && !errors.Is(err, tt.err):
+				t.Fatalf("err = %v, want %v", err, tt.err)
+			case tt.errText != "" && (err == nil || !strings.Contains(err.Error(), tt.errText)):
+				t.Fatalf("err = %v, want %q", err, tt.errText)
+			case tt.err == nil && tt.errText == "" && err != nil:
+				t.Fatalf("err = %v", err)
+			}
+			if path != "" {
+				_, statErr := os.Lstat(path)
+				if exists := statErr == nil; exists != tt.wantDir {
+					t.Errorf("folder exists = %t, want %t", exists, tt.wantDir)
+				}
+			}
+			if fmt.Sprint(repos.unregistered) != fmt.Sprint(tt.unregistered) {
+				t.Errorf("unregistered = %v, want %v", repos.unregistered, tt.unregistered)
+			}
+		})
+	}
+}
+
+func TestDeleteWhilePublishing(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "projects")
+	p := filepath.Join(root, "demo")
+	if err := os.MkdirAll(p, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	repos := newFakeRepos(repo.Repo{ID: "p", Name: "demo", Path: p, Git: true})
+	s, err := New(Options{Root: root, Repos: repos})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !s.claim("p") {
+		t.Fatal("claim")
+	}
+	if err := s.Delete(context.Background(), "p"); !errors.Is(err, ErrFailedPrecondition) {
+		t.Errorf("err = %v, want ErrFailedPrecondition", err)
+	}
+	if _, err := os.Lstat(p); err != nil {
+		t.Error("folder removed while publishing")
 	}
 }

@@ -1,6 +1,7 @@
 // Package project starts new projects in the projects directory (RepoService.Create,
-// the repo.create command) and publishes git projects to GitHub (RepoService.Publish,
-// repo.github.publish).
+// the repo.create command), publishes git projects to GitHub (RepoService.Publish,
+// repo.github.publish) and deletes projects it made (RepoService.Delete, repo.delete:
+// unregister, then remove the folder).
 //
 // Create makes <projects>/<name>, runs the repo store's InitRepository there (git init
 // on init.defaultBranch, else main, and an empty "Initial commit") and registers the
@@ -106,6 +107,9 @@ type Service interface {
 	// Publish creates the project's GitHub repository, pushes, and returns the
 	// refreshed project.
 	Publish(ctx context.Context, opts PublishOptions) (repo.Repo, error)
+	// Delete unregisters a project directly inside the projects directory and removes
+	// its folder. ErrFailedPrecondition for any other project.
+	Delete(ctx context.Context, id string) error
 }
 
 var _ Service = (*Store)(nil)
@@ -115,6 +119,7 @@ type Repos interface {
 	Snapshot() *repo.Snapshot
 	Register(ctx context.Context, path string) (repo.Repo, error)
 	Refresh(ctx context.Context, id string) error
+	Unregister(ctx context.Context, id string) error
 }
 
 // Options configures a Store.
@@ -312,6 +317,41 @@ func (s *Store) Publish(ctx context.Context, opts PublishOptions) (repo.Repo, er
 		return repo.Repo{}, fmt.Errorf("%w: %s was removed while it was published", ErrNotFound, r.Name)
 	}
 	return out, nil
+}
+
+// Delete implements Service. Only a project whose folder is directly inside the
+// projects directory (what Create makes) can be deleted; anything else, including a
+// project being published, is refused. The project is unregistered first, so a failed
+// removal leaves a folder but no project; nothing on GitHub is touched.
+func (s *Store) Delete(ctx context.Context, id string) error {
+	r, ok := s.opts.Repos.Snapshot().Repo(id)
+	if !ok {
+		return fmt.Errorf("%w: %q", ErrNotFound, id)
+	}
+	if !s.Deletable(r.Path) {
+		return fmt.Errorf("%w: %s is not in the projects directory %s", ErrFailedPrecondition, r.Path, s.opts.Root)
+	}
+	if !s.claim(r.ID) {
+		return fmt.Errorf("%w: %s is being published", ErrFailedPrecondition, r.Name)
+	}
+	defer s.release(r.ID)
+	log := s.opts.Log.With("repo", r.ID, "path", r.Path)
+	if err := s.opts.Repos.Unregister(ctx, r.ID); err != nil {
+		return fmt.Errorf("unregister %s: %w", r.Name, err)
+	}
+	if err := os.RemoveAll(r.Path); err != nil {
+		log.Warn("delete: remove failed", "err", err)
+		return fmt.Errorf("%w: removed the project %s but not its folder: %w", ErrFailed, r.Name, err)
+	}
+	log.Info("project deleted")
+	return nil
+}
+
+// Deletable reports whether path is directly inside the projects directory (compared
+// lexically after cleaning, like Destination builds it), so Delete would accept it.
+func (s *Store) Deletable(path string) bool {
+	cleaned := filepath.Clean(path)
+	return cleaned != s.opts.Root && filepath.Dir(cleaned) == filepath.Clean(s.opts.Root)
 }
 
 // classify turns a runner error into one of the package errors.

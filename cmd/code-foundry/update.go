@@ -98,7 +98,8 @@ func runUpdate(ctx context.Context, cl *cli, args []string) error {
 }
 
 // afterUpdate tells a running daemon (without starting one) to re-check, so the app
-// shows the installed update, and says what still runs the old version.
+// shows the installed update, and says what still runs the old version and how to
+// restart it (`app restart`).
 func (cl *cli) afterUpdate(ctx context.Context) {
 	p, err := paths.Resolve()
 	if err != nil {
@@ -123,7 +124,7 @@ func (cl *cli) afterUpdate(ctx context.Context) {
 			}
 		}
 	}
-	fmt.Fprintf(cl.stdout, "\nRelaunch the app to use the new version (palette: Relaunch App).\n")
-	fmt.Fprintf(cl.stdout, "The daemon (pid %d, %s) keeps running %d session(s) on the old version until:\n", ping.GetPid(), ping.GetVersion(), sessions)
-	fmt.Fprintf(cl.stdout, "  code-foundry daemon restart\n")
+	fmt.Fprintf(cl.stdout, "\nThe app and the daemon (pid %d, %s, %d open session(s)) keep running the old version\n", ping.GetPid(), ping.GetVersion(), sessions)
+	fmt.Fprintf(cl.stdout, "until you restart Code Foundry (Restart Now in the app, or palette: Restart Code Foundry):\n")
+	fmt.Fprintf(cl.stdout, "  code-foundry app restart\n")
 }

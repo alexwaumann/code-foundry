@@ -169,6 +169,51 @@ test("a refused publish shows gh's error, keeps the picker, and the project exis
   await expect(page.getByTestId("publish-github")).toBeVisible();
 });
 
+test("cancelling after a refused publish deletes the new project; Keep it local needs the publish step", async ({ page }) => {
+  const name = await openNew(page);
+  await name.fill("taken");
+  // Without the publish step there is no Keep it local, and Create project has an icon.
+  await expect(page.getByTestId("add-project-keep-local")).toHaveCount(0);
+  await page.getByTestId("add-project-new-publish").check();
+  await expect(page.getByTestId("publish-owner")).toHaveAttribute("data-owner", "dev");
+  await page.getByTestId("add-project-create").click();
+  await expect(page.getByTestId("publish-error")).toHaveText(GH_NAME_TAKEN);
+  await expect(page.getByTestId("add-project-new")).toHaveAttribute("data-created", "repo-taken");
+  await expect(page.getByTestId("add-project-keep-local")).toBeVisible();
+
+  // Unchecking the publish step hides Keep it local; the primary becomes a bare Done.
+  await page.getByTestId("add-project-new-publish").uncheck();
+  await expect(page.getByTestId("add-project-keep-local")).toHaveCount(0);
+  const done = page.getByTestId("add-project-create");
+  await expect(done).toHaveText("Done");
+  await expect(done.locator("svg")).toHaveCount(0);
+  await page.getByTestId("add-project-new-publish").check();
+  await expect(page.getByTestId("add-project-create")).toHaveText("Publish");
+  await expect(page.getByTestId("add-project-create").locator("svg")).toHaveCount(1);
+
+  // Cancelling (Escape) deletes the project again: repo.delete, confirmed, and it is gone.
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toHaveCount(0);
+  await expect.poll(projectCalls).toEqual(["create taken", "publish repo-taken dev/taken public", "delete repo-taken"]);
+  const del = await lastInvocation("repo.delete");
+  expect(del).toMatchObject({ name: "repo.delete", args: { repo: "repo-taken" }, confirmed: true });
+  const res = await fetch(`${mockUrl}/codefoundry.v1.RepoService/List`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
+    body: "{}",
+  });
+  const projects = (await res.json()) as { repos: { id: string }[] };
+  expect(projects.repos.find((r) => r.id === "repo-taken")).toBeUndefined();
+  await expect(page.getByText("Deleted taken")).toBeVisible();
+
+  // The close button is the same cancel; nothing to delete this time.
+  await page.getByTestId("sidebar-add-project").click();
+  await page.getByTestId("add-project-tab-new").click();
+  await page.getByTestId("add-project-close").click();
+  await expect(dialog(page)).toHaveCount(0);
+  expect((await projectCalls()).filter((c) => c.startsWith("delete"))).toEqual(["delete repo-taken"]);
+});
+
 test("the overview's Publish to GitHub opens the publish dialog for sketches", async ({ page }) => {
   await openApp(page);
   await selectProject(page, "repo-sk");

@@ -1,6 +1,9 @@
+import { toast } from "sonner";
 import { create } from "zustand";
 import { registerRepo, type AddedProjectView } from "@/api/addProject";
+import { errorMessage } from "@/api/stream";
 import { refreshCommands } from "./commands";
+import { deleteProject, type CreatedProject } from "./publish";
 import { useReposStore } from "./repos";
 import { showWorktreeOnProjectsPage } from "./worktreePanel";
 
@@ -14,31 +17,62 @@ interface AddProjectState {
   tab: AddProjectTab;
   /** Incremented on every open, so the dialog's body starts fresh. */
   seq: number;
+  /**
+   * A project the New tab created that is not kept or published yet (its publish was
+   * refused). Closing the dialog any other way than Keep it local or a successful
+   * publish deletes it again.
+   */
+  created: CreatedProject | null;
+  /** The New tab is creating or publishing: the dialog cannot be closed meanwhile. */
+  busy: boolean;
 }
 
-export const useAddProjectStore = create<AddProjectState>()(() => ({ open: false, tab: "local", seq: 0 }));
+export const useAddProjectStore = create<AddProjectState>()(() => ({ open: false, tab: "local", seq: 0, created: null, busy: false }));
 
 /**
- * The tab the dialog opens on when the caller does not say: New when there are no
- * projects yet (start one), else Local folder.
+ * Opens the Add Project dialog (repo.add's presenter; repo.clone opens it on GitHub,
+ * repo.create on New), on Local folder unless the caller says. Deferred, so that a
+ * palette closing after its presenter ran does not take focus back from the dialog.
  */
-export function defaultAddProjectTab(projectCount: number): AddProjectTab {
-  return projectCount === 0 ? "new" : "local";
-}
-
-/**
- * Opens the Add Project dialog (repo.add's presenter; repo.clone opens it on GitHub).
- * Deferred, so that a palette closing after its presenter ran does not take focus back
- * from the dialog.
- */
-export function openAddProject(tab: AddProjectTab = defaultAddProjectTab(useReposStore.getState().order.length)): void {
+export function openAddProject(tab: AddProjectTab = "local"): void {
   queueMicrotask(() => {
-    useAddProjectStore.setState((s) => ({ open: true, tab, seq: s.seq + 1 }));
+    useAddProjectStore.setState((s) => ({ open: true, tab, seq: s.seq + 1, created: null, busy: false }));
   });
 }
 
+/**
+ * Cancels the dialog (Escape, the overlay, the close button). Ignored while the New tab
+ * is creating or publishing. A project the New tab created and did not keep is deleted
+ * again (repo.delete), folder included.
+ */
 export function closeAddProject(): void {
-  useAddProjectStore.setState({ open: false });
+  const s = useAddProjectStore.getState();
+  if (!s.open || s.busy) return;
+  useAddProjectStore.setState({ open: false, created: null });
+  if (s.created) void discardCreated(s.created);
+}
+
+/** Closes the dialog keeping what it made (a project added, created, kept or published). */
+export function finishAddProject(): void {
+  useAddProjectStore.setState({ open: false, created: null, busy: false });
+}
+
+/** The New tab's project awaiting Keep it local or a publish (null once decided). */
+export function setCreatedProject(created: CreatedProject | null): void {
+  useAddProjectStore.setState({ created });
+}
+
+export function setAddProjectBusy(busy: boolean): void {
+  useAddProjectStore.setState({ busy });
+}
+
+async function discardCreated(p: CreatedProject): Promise<void> {
+  try {
+    await deleteProject(p.id);
+    toast(`Deleted ${p.name}`, { description: "The project was not kept." });
+  } catch (err) {
+    toast.error(`Could not delete ${p.name}: ${errorMessage(err)}`);
+  }
 }
 
 export function setAddProjectTab(tab: AddProjectTab): void {

@@ -12,7 +12,7 @@ import (
 
 // Projects is a fake command.ProjectBackend. Err, when set, is returned by every call.
 // Create answers a git project under /p; Publish answers the project with origin and
-// the owner/name slug.
+// the owner/name slug; Delete answers nothing.
 type Projects struct {
 	Calls
 	Err error
@@ -42,4 +42,13 @@ func (f *Projects) Publish(_ context.Context, r *connect.Request[v1.PublishRepoR
 	}
 	return connect.NewResponse(&v1.PublishRepoResponse{Repo: &v1.Repo{Id: r.Msg.GetRepoId(), Name: "demo", Git: true,
 		Remotes: []string{"origin"}, GithubSlug: strings.ToLower(r.Msg.GetOwner() + "/" + name)}}), nil
+}
+
+// Delete records the request.
+func (f *Projects) Delete(_ context.Context, r *connect.Request[v1.DeleteRepoRequest]) (*connect.Response[v1.DeleteRepoResponse], error) {
+	f.record(r.Msg)
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	return connect.NewResponse(&v1.DeleteRepoResponse{}), nil
 }
