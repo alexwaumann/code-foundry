@@ -47,7 +47,11 @@ const fixtures: Fixture[] = [
 /** Destinations that exist on the mock's disk (clones add theirs). */
 const existing = new Set<string>();
 
+/** Every SearchGitHub, LookupGitHub and Clone call ("search <q>", ...), for tests. */
+export const githubCalls: string[] = [];
+
 export function resetClones(): void {
+  githubCalls.length = 0;
   existing.clear();
   existing.add(`${PROJECTS}/octo-org/already-here`.toLowerCase());
 }
@@ -73,6 +77,7 @@ function toMsg(f: Fixture): GitHubRepoInit {
 }
 
 export function searchGitHub(query: string): { repositories: GitHubRepoInit[] } {
+  githubCalls.push(`search ${query}`);
   const q = query.trim().toLowerCase();
   if (!q) throw new ConnectError("invalid argument: empty search", Code.InvalidArgument);
   const hits = fixtures.filter((f) => `${f.owner}/${f.name} ${f.description ?? ""}`.toLowerCase().includes(q));
@@ -84,6 +89,7 @@ function find(owner: string, name: string): Fixture | undefined {
 }
 
 export function lookupGitHub(owner: string, name: string): { repository: GitHubRepoInit } {
+  githubCalls.push(`lookup ${owner}/${name}`);
   const f = find(owner, name);
   if (!f) throw new ConnectError(`not found on github: Could not resolve to a Repository with the name '${owner}/${name}'.`, Code.NotFound);
   return { repository: toMsg(f) };
@@ -102,6 +108,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 const progress = (line: string, transient = false): CloneEventInit => ({ event: { case: "progress", value: { line, transient } } });
 
 export async function* cloneRepo(world: World, owner: string, name: string, signal: AbortSignal): AsyncGenerator<CloneEventInit> {
+  githubCalls.push(`clone ${owner}/${name}`);
   const f = find(owner, name);
   const dest = destination(f?.owner ?? owner, f?.name ?? name);
   if (existing.has(dest.toLowerCase())) throw new ConnectError(`${dest} already exists`, Code.AlreadyExists);

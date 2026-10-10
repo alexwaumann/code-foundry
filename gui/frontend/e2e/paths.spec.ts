@@ -11,7 +11,7 @@ test.beforeEach(async () => {
 async function openAddProject(page: Page) {
   await openApp(page);
   await page.keyboard.press("Meta+k");
-  await page.keyboard.type("add project");
+  await page.keyboard.type("add project local folder");
   await page.keyboard.press("Enter");
   const palette = page.getByTestId("palette");
   await expect(palette).toHaveAttribute("data-mode", "args");

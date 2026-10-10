@@ -59,6 +59,9 @@ function ProjectRow({ id, index, onPick }: { id: string; index: number; onPick: 
 /** cmdk value of a workspace row (project rows use the repo id). */
 const workspaceValue = (id: string) => `ws:${id}`;
 
+/** cmdk value of the empty state's row (repo.add). */
+const ADD_PROJECT_VALUE = "__add-project";
+
 function WorkspaceRow({ id, onPick }: { id: string; onPick: (id: string) => void }) {
   const name = useWorkspacesStore((s) => s.byId[id]?.name ?? id);
   const branch = useWorkspacesStore((s) => s.byId[id]?.branch ?? "");
@@ -116,7 +119,8 @@ export function ProjectPicker({ close }: { close: () => void }) {
   const loaded = useReposStore((s) => s.loaded);
   const workspaces = useWorkspaceOrder();
   // Highlight what the user was looking at when the picker opened.
-  const [initial] = useState(initialValue);
+  // With no projects, the empty state's Add a project row.
+  const [initial] = useState(() => initialValue() ?? (useReposStore.getState().order.length === 0 ? ADD_PROJECT_VALUE : undefined));
   const [query, setQuery] = useState("");
 
   const leave = () => {
@@ -166,7 +170,7 @@ export function ProjectPicker({ close }: { close: () => void }) {
           <CommandGroup heading="No projects yet">
             <CommandItem
               forceMount
-              value="__add-project"
+              value={ADD_PROJECT_VALUE}
               onSelect={() => {
                 close();
                 addProject();

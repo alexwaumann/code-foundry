@@ -189,8 +189,15 @@ export function GitHubTab({ active }: { active: boolean }) {
   const [text, setText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   // The tab stays mounted while hidden (a clone keeps running): focus it when shown.
+  // Next frame: a click on the tab focuses the tab after its mousedown switched tabs.
   useEffect(() => {
-    if (active) inputRef.current?.focus();
+    if (!active) return;
+    const raf = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+    };
   }, [active]);
   const [view, setView] = useState<View>({ kind: "idle" });
   const [inputError, setInputError] = useState<string | null>(null);

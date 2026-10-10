@@ -12,6 +12,7 @@
  *   POST /__mock/reset
  *   RepoService.SearchGitHub / LookupGitHub / Clone: mock/clone.ts (a repo named "fail" fails
  *        to clone; octo-org/already-here's destination exists)
+ *   GET  /__mock/github/calls                     ("search <q>", "lookup <o/n>", "clone <o/n>")
  *   POST /__mock/session/attention?id=s-1
  *   POST /__mock/session/status?id=s-1&status=busy|idle|attention
  *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139
@@ -71,7 +72,7 @@ import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb"
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { listDirectories } from "./filesystem";
-import { cloneRepo, lookupGitHub, resetClones, searchGitHub } from "./clone";
+import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from "./clone";
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
 import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
@@ -538,6 +539,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/gh/touch":
       json(res, world.gh.touch(q.get("path") ?? "") ? 200 : 404, { ok: true });
+      break;
+    case "GET /__mock/github/calls":
+      json(res, 200, githubCalls);
       break;
     case "GET /__mock/gh/calls":
       json(res, 200, world.gh.calls);
