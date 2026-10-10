@@ -211,6 +211,9 @@ Layers Claude-specific knowledge on top of terminal:
   stream and the JSONL transcript. It is a pure function over observed events with table
   tests. It is never inferred from rendering.
 * Auto-naming via an independent `claude -p` call producing a slug.
+* **Linked pull requests** come from Claude's own `pr-link` transcript records: every
+  distinct URL in first-seen order, persisted in `session_pull_requests`, backfilled from
+  the transcript's history when a thread is resumed (`docs/notes/linked-prs.md`).
 * Persists session metadata in SQLite so the sidebar can show resumable sessions after a
   daemon restart. v1 does not keep PTYs alive across daemon restarts.
 
