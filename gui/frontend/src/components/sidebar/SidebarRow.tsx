@@ -15,6 +15,8 @@ import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { openWorkspaceSurface } from "@/stores/workspacePanel";
+import { openLinkedPrsSurface } from "@/stores/linkedPrsPanel";
+import { prBadge } from "@/surfaces/linkedprsTarget";
 
 interface RowProps {
   row: Row;
@@ -152,6 +154,26 @@ function WorkspaceBadge({ id }: { id: string }) {
   );
 }
 
+/** "N PRs" when the thread linked pull requests; nothing otherwise. */
+function LinkedPrsBadge({ id }: { id: string }) {
+  const count = useSessionsStore((st) => st.byId[id]?.linkedPullRequests.length ?? 0);
+  if (count === 0) return null;
+  return (
+    // Like the workspace badge: a click opens the Linked PRs surface in the thread's side
+    // panel, and goes on to the row, which selects the thread (and so shows that panel).
+    <span
+      className="flex shrink-0 cursor-pointer items-center rounded-sm bg-emerald-500/15 px-1 text-[10px] leading-4 font-medium text-emerald-700 tabular-nums hover:bg-emerald-500/30 dark:text-emerald-300"
+      title={`${prBadge(count)} linked: show them in the side panel`}
+      data-testid="row-linked-prs"
+      onClick={() => {
+        openLinkedPrsSurface({ kind: "session", id });
+      }}
+    >
+      {prBadge(count)}
+    </span>
+  );
+}
+
 /**
  * The thread's second line: the project and branch it runs in, or a queued "Run in…"
  * move until the thread's worktree changes.
@@ -219,6 +241,7 @@ function SessionLabel({ id }: { id: string }) {
               </span>
               {model && <span className="shrink-0 truncate text-xs text-muted-foreground">{model}</span>}
               <span className="ml-auto flex min-w-0 shrink-0 items-center gap-1 pl-1">
+                <LinkedPrsBadge id={id} />
                 <WorkspaceBadge id={id} />
                 {pinned && <Pin className="size-3 shrink-0 text-muted-foreground" aria-label="pinned" data-testid="row-pinned" />}
               </span>

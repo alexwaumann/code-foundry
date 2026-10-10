@@ -57,13 +57,16 @@ describe("surface registry", () => {
       ["files", "f"],
       ["diff", "d"],
       ["pullrequest", "p"],
+      ["linkedprs", "l"],
       ["workspace", "w"],
       ["worktree", undefined],
     ]);
     expect(surfaceOf("diff")?.title).toBe("Diff");
     expect(surfaceByHotkey("P")?.kind).toBe("pullrequest");
     expect(surfaceByHotkey("W")?.kind).toBe("workspace");
-    // s-1 is unknown here: no pull request, no workspace thread; the worktree tab is never listed.
-    expect(surfaces.map((s) => s.available(ctx))).toEqual(["disabled", "disabled", "disabled", "hidden", "hidden"]);
+    expect(surfaceByHotkey("l")?.kind).toBe("linkedprs");
+    // s-1 is unknown here: no pull request, no linked pull requests, no workspace thread;
+    // the worktree tab is never listed.
+    expect(surfaces.map((s) => s.available(ctx))).toEqual(["disabled", "disabled", "disabled", "hidden", "hidden", "hidden"]);
   });
 });

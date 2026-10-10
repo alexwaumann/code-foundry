@@ -4,7 +4,9 @@
  * the Pull Requests page) are routed to `select`. Opened by view.settings / view.help (their chords are
  * presented locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon.
  */
+import { toast } from "sonner";
 import { create } from "zustand";
+import { linkedPrsTarget, openLinkedPrsSurface } from "./linkedPrsPanel";
 import { expandPanel, getPanel, togglePanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
 import { openWorkspaceSurface } from "./workspacePanel";
@@ -36,6 +38,10 @@ export function showView(name: string): boolean {
     case "panel.workspace":
       // view.panel.workspace: the workspace surface in the current workspace thread's panel.
       workspacePanelCommand();
+      return true;
+    case "panel.linked-prs":
+      // view.panel.linked-prs: the Linked PRs surface in the current thread's panel.
+      linkedPrsPanelCommand();
       return true;
     default:
       // Top-level pages (the Pull Requests page) are selections. Closing settings here
@@ -106,6 +112,29 @@ export function expandPanelCommand(): boolean {
 export function workspacePanelCommand(): boolean {
   if (useViewsStore.getState().settingsOpen) return false;
   const key = openWorkspaceSurface();
+  if (key === null) return false;
+  const inPalette = useUiStore.getState().palette.open;
+  togglePanel(key, true, { focus: !inPalette });
+  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
+  return true;
+}
+
+/**
+ * view.panel.linked-prs for the current selection: opens (or activates) the Linked PRs tab
+ * in the selected thread's panel and shows the panel, like view.panel.workspace. A thread
+ * without linked pull requests gets a brief "No linked PRs yet" toast instead. A no-op
+ * while the settings page is up and when the selection is no thread.
+ *
+ * Focus moves to the panel; with the palette open, its return target moves there instead.
+ */
+export function linkedPrsPanelCommand(): boolean {
+  if (useViewsStore.getState().settingsOpen) return false;
+  const target = linkedPrsTarget();
+  if (target !== "linked") {
+    if (target === "none") toast("No linked PRs yet", { description: "Pull requests this thread creates or mentions show up here." });
+    return false;
+  }
+  const key = openLinkedPrsSurface();
   if (key === null) return false;
   const inPalette = useUiStore.getState().palette.open;
   togglePanel(key, true, { focus: !inPalette });

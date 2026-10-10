@@ -26,6 +26,8 @@ interface CommandButtonProps {
   className?: string;
   /** For toggles: rendered as aria-pressed. */
   pressed?: boolean;
+  /** A small number after the icon (e.g. how many items the command shows); part of the label. */
+  count?: number;
   "data-testid"?: string;
 }
 
@@ -46,6 +48,7 @@ export function CommandButton({
   size,
   className,
   pressed,
+  count,
   "data-testid": testId,
 }: CommandButtonProps) {
   const commandTitle = useCommandsStore((s) => s.commands.find((c) => c.name === command && isStartable(c))?.title ?? null);
@@ -55,11 +58,11 @@ export function CommandButton({
     <Button
       type="button"
       variant={variant}
-      size={size ?? (label ? "sm" : "icon-xs")}
+      size={size ?? (label ? "sm" : count !== undefined ? "xs" : "icon-xs")}
       className={className}
       disabled={commandTitle === null}
       title={name}
-      aria-label={label ? undefined : name}
+      aria-label={label ? undefined : count !== undefined ? `${name} (${String(count)})` : name}
       aria-pressed={pressed}
       tabIndex={keepFocus ? -1 : undefined}
       data-command-button={command}
@@ -76,6 +79,11 @@ export function CommandButton({
       }}
     >
       <Icon aria-hidden className={label ? undefined : "size-3.5"} />
+      {count !== undefined && (
+        <span className="text-[11px] font-medium tabular-nums" aria-hidden data-count>
+          {count}
+        </span>
+      )}
       {label}
     </Button>
   );
