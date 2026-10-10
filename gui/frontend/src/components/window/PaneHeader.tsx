@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui";
-import { TRAFFIC_LIGHT_GUTTER } from "./titleBand";
+import { trafficLightGutter } from "./titleBand";
 
 /**
  * Header of a page in the content pane: 44 px (`h-11`), so below the pane's 8 px top
@@ -16,12 +16,13 @@ import { TRAFFIC_LIGHT_GUTTER } from "./titleBand";
  */
 export function PaneHeader({ className, style, ...rest }: ComponentProps<"header">) {
   const sidebarHidden = useUiStore((s) => !s.sidebarVisible);
+  const gutter = useUiStore((s) => trafficLightGutter(s.zoom));
   return (
     <header
       {...rest}
       data-pane-header
       className={cn("flex h-11 shrink-0 items-center border-b border-pane-border [--wails-draggable:drag]", className)}
-      style={sidebarHidden ? { ...style, paddingLeft: TRAFFIC_LIGHT_GUTTER } : style}
+      style={sidebarHidden ? { ...style, paddingLeft: gutter } : style}
     />
   );
 }

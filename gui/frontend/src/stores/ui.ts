@@ -50,6 +50,24 @@ export const PANE_GAPS = 24;
 export const FONT_MIN = 9;
 export const FONT_MAX = 28;
 export const FONT_DEFAULT = 13;
+/**
+ * Page zoom steps in percent (cmd+= / cmd+-), the browser ladder from 90%. The zoom scales the
+ * whole window: CSS `zoom` on <html> (lib/zoom.ts), and the terminal font with it.
+ */
+export const ZOOM_LEVELS: readonly number[] = [90, 100, 110, 125, 150, 175, 200];
+export const ZOOM_DEFAULT = 100;
+export const ZOOM_MIN = ZOOM_LEVELS[0] ?? 90;
+export const ZOOM_MAX = ZOOM_LEVELS[ZOOM_LEVELS.length - 1] ?? 200;
+
+/** The ladder step after `zoom` in the given direction; the end of the ladder repeats. */
+export function nextZoom(zoom: number, direction: 1 | -1): number {
+  if (direction === 1) return ZOOM_LEVELS.find((z) => z > zoom) ?? ZOOM_MAX;
+  for (let i = ZOOM_LEVELS.length - 1; i >= 0; i--) {
+    const z = ZOOM_LEVELS[i];
+    if (z !== undefined && z < zoom) return z;
+  }
+  return ZOOM_MIN;
+}
 
 interface UiState {
   selection: Selection;
@@ -78,7 +96,10 @@ interface UiState {
   // Persisted settings.
   sidebarVisible: boolean;
   sidebarWidth: number;
+  /** Terminal font size in px before zoom (appearance.font_size). */
   fontSize: number;
+  /** Page zoom in percent (appearance.zoom). */
+  zoom: number;
 
   select: (sel: Selection, opts?: { focusTerminal?: boolean }) => void;
   setFocus: (f: FocusRegion) => void;
@@ -101,6 +122,7 @@ interface UiState {
   setWindowWidth: (w: number) => void;
   focusContent: () => void;
   setFontSize: (n: number) => void;
+  setZoom: (percent: number) => void;
 }
 
 export function clamp(n: number, lo: number, hi: number): number {
@@ -162,6 +184,7 @@ export const useUiStore = create<UiState>()(
       sidebarVisible: true,
       sidebarWidth: SIDEBAR_DEFAULT,
       fontSize: FONT_DEFAULT,
+      zoom: ZOOM_DEFAULT,
 
       select: (sel, opts) => {
         set((s) => ({
@@ -223,6 +246,9 @@ export const useUiStore = create<UiState>()(
       setFontSize: (n) => {
         set({ fontSize: clamp(Math.round(n), FONT_MIN, FONT_MAX) });
       },
+      setZoom: (percent) => {
+        set({ zoom: clamp(Math.round(percent), ZOOM_MIN, ZOOM_MAX) });
+      },
     }),
     {
       name: "code-foundry.ui",
@@ -244,6 +270,7 @@ export const useUiStore = create<UiState>()(
         sidebarVisible: s.sidebarVisible,
         sidebarWidth: s.sidebarWidth,
         fontSize: s.fontSize,
+        zoom: s.zoom,
       }),
     },
   ),

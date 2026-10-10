@@ -2,7 +2,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { useUiStore } from "@/stores/ui";
 import { PaneHeader } from "./PaneHeader";
-import { TRAFFIC_LIGHT_GUTTER } from "./titleBand";
+import { TRAFFIC_LIGHT_GUTTER, trafficLightGutter } from "./titleBand";
 
 afterEach(() => {
   cleanup();
@@ -34,5 +34,19 @@ describe("PaneHeader", () => {
       useUiStore.setState({ sidebarVisible: true });
     });
     expect(screen.getByTestId("h").style.paddingLeft).toBe("");
+  });
+});
+
+describe("trafficLightGutter", () => {
+  it("keeps the gutter at 80 screen px across zooms", () => {
+    expect(trafficLightGutter(100)).toBe(80);
+    expect(trafficLightGutter(150)).toBe(53);
+    expect(trafficLightGutter(90)).toBe(89);
+  });
+
+  it("the pane header's gutter follows the zoom", () => {
+    useUiStore.setState({ sidebarVisible: false, zoom: 200 });
+    render(<PaneHeader data-testid="z" />);
+    expect(screen.getByTestId("z").style.paddingLeft).toBe("40px");
   });
 });

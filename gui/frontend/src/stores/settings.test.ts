@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SettingsSnapshotView } from "@/api/settings";
 import { effectiveScheme } from "@/lib/theme";
 import { answerConfirm, useConfirmStore } from "./confirm";
-import { applySettingsSnapshot, terminalFontFamily, useSettingsStore } from "./settings";
+import { applySettingsSnapshot, terminalFontFamily, useSettingsStore, zoomUi } from "./settings";
 import { useUiStore } from "./ui";
 import { showView, useViewsStore } from "./views";
 
@@ -22,7 +22,7 @@ function snap(values: Record<string, string>, revision = 1): SettingsSnapshotVie
 describe("applySettingsSnapshot", () => {
   beforeEach(() => {
     useSettingsStore.setState({ snapshot: null });
-    useUiStore.setState({ fontSize: 13 });
+    useUiStore.setState({ fontSize: 13, zoom: 100 });
   });
 
   it("applies theme, font size and density", () => {
@@ -44,10 +44,49 @@ describe("applySettingsSnapshot", () => {
     expect(useUiStore.getState().fontSize).toBe(20);
   });
 
+  it("moves the zoom only when the setting changes", () => {
+    applySettingsSnapshot(snap({ "appearance.zoom": "125" }));
+    expect(useUiStore.getState().zoom).toBe(125);
+    useUiStore.getState().setZoom(150); // a zoom not saved yet
+    applySettingsSnapshot(snap({ "appearance.zoom": "125", "appearance.theme": "dark" }, 2));
+    expect(useUiStore.getState().zoom).toBe(150);
+    applySettingsSnapshot(snap({ "appearance.zoom": "90" }, 3));
+    expect(useUiStore.getState().zoom).toBe(90);
+  });
+
   it("builds the terminal font stack", () => {
     expect(terminalFontFamily("Iosevka")).toMatch(/^Iosevka, "SF Mono", ui-monospace/);
     expect(terminalFontFamily("  ")).toMatch(/^"JetBrainsMono Nerd Font Mono", "JetBrains Mono", "SF Mono"/);
     expect(terminalFontFamily(undefined)).toBe(terminalFontFamily(""));
+  });
+});
+
+describe("zoomUi", () => {
+  beforeEach(() => {
+    useSettingsStore.setState({ snapshot: null });
+    useUiStore.setState({ zoom: 100 });
+  });
+
+  it("steps the browser zoom ladder and resets to 100", () => {
+    zoomUi(1);
+    expect(useUiStore.getState().zoom).toBe(110);
+    zoomUi(1);
+    expect(useUiStore.getState().zoom).toBe(125);
+    zoomUi(-1);
+    zoomUi(-1);
+    zoomUi(-1);
+    expect(useUiStore.getState().zoom).toBe(90);
+    zoomUi(-1);
+    expect(useUiStore.getState().zoom).toBe(90);
+    zoomUi(null);
+    expect(useUiStore.getState().zoom).toBe(100);
+  });
+
+  it("stops at the ends of the ladder", () => {
+    for (let i = 0; i < 20; i++) zoomUi(1);
+    expect(useUiStore.getState().zoom).toBe(200);
+    for (let i = 0; i < 20; i++) zoomUi(-1);
+    expect(useUiStore.getState().zoom).toBe(90);
   });
 });
 

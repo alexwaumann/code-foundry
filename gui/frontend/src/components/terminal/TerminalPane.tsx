@@ -160,7 +160,11 @@ export function TerminalPane({ terminalId, sessionId }: { terminalId: string; se
   const [rendererKind, setRendererKind] = useState<RendererKind | null>(null);
   const [size, setSize] = useState<{ cols: number; rows: number } | null>(null);
   const scheme = useColorScheme();
-  const fontSize = useUiStore((s) => s.fontSize);
+  // The page zoom (lib/zoom.ts) is undone on the terminal host and applied to the font
+  // size instead: xterm's WebGL canvas is sized from devicePixelRatio, which CSS zoom
+  // does not change, so a zoomed canvas would be resampled and blurry.
+  const zoom = useUiStore((s) => s.zoom);
+  const fontSize = useUiStore((s) => Math.round((s.fontSize * s.zoom) / 100));
   const fontFamily = useTerminalFontFamily();
   const scrollback = useScrollbackLines();
   const focusSeq = useUiStore((s) => s.terminalFocusSeq);
@@ -173,7 +177,7 @@ export function TerminalPane({ terminalId, sessionId }: { terminalId: string; se
     if (!host) return;
     const ui = useUiStore.getState();
     const renderer = new XtermRenderer({
-      fontSize: ui.fontSize,
+      fontSize: Math.round((ui.fontSize * ui.zoom) / 100),
       colorScheme: scheme,
       isGlobalChord,
       onRendererChange: setRendererKind,
@@ -257,6 +261,7 @@ export function TerminalPane({ terminalId, sessionId }: { terminalId: string; se
         <div
           ref={hostRef}
           className="h-full w-full"
+          style={{ zoom: 100 / zoom }}
           data-terminal-host
           data-region="terminal"
           data-testid="terminal-host"

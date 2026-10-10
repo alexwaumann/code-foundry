@@ -5,7 +5,7 @@ import { CommandButton } from "@/components/command/CommandButton";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { ProjectsNav } from "@/components/projects/ProjectsPage";
 import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
-import { TITLE_BAND_HEIGHT, TRAFFIC_LIGHT_GUTTER } from "@/components/window/titleBand";
+import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
 import { jumpToAttention } from "@/keys/bindings";
 import { buildRows, isLeaf, type LeafRow, type Row } from "@/lib/tree";
 import { decodeSessionListKeys, decodeTerminalKeys, useSessionListKeys, useTerminalPlacementKeys } from "@/stores/context";
@@ -266,9 +266,10 @@ function AppName() {
 }
 
 function SidebarBand() {
+  const gutter = useUiStore((s) => trafficLightGutter(s.zoom));
   return (
     <div className="flex shrink-0 items-center [--wails-draggable:drag]" style={{ height: TITLE_BAND_HEIGHT }} data-testid="sidebar-band">
-      <div className="h-full shrink-0" style={{ width: TRAFFIC_LIGHT_GUTTER }} data-testid="traffic-light-gutter" aria-hidden />
+      <div className="h-full shrink-0" style={{ width: gutter }} data-testid="traffic-light-gutter" aria-hidden />
       <header className="flex h-full min-w-0 flex-1 items-center justify-between gap-1.5 pr-3 pl-3">
         <AppName />
         <span className="flex shrink-0 items-center gap-1.5 [--wails-draggable:no-drag]" data-testid="sidebar-band-controls">

@@ -6,7 +6,7 @@ import { contextKey, getListInputs, getUiContext } from "@/stores/context";
 import { openAddProject } from "@/stores/addProject";
 import { openNewThreadPicker } from "@/stores/compose";
 import { attentionIds, useSessionsStore } from "@/stores/sessions";
-import { zoomFont } from "@/stores/settings";
+import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
 import { expandPanelCommand, linkedPrsPanelCommand, showView, toggleHelp, togglePanelCommand, workspacePanelCommand } from "@/stores/views";
@@ -64,9 +64,9 @@ function toggleSidebar(): void {
   }
 }
 
-/** Font size; saved to appearance.font_size in the settings file. */
-function zoom(delta: number | null): void {
-  zoomFont(delta);
+/** Page zoom; saved to appearance.zoom in the settings file. */
+function zoom(direction: 1 | -1 | null): void {
+  zoomUi(direction);
 }
 
 export const viewActions: readonly ViewAction[] = [
@@ -81,9 +81,9 @@ export const viewActions: readonly ViewAction[] = [
       jumpTo(i + 1);
     },
   })),
-  { chord: "cmd+=", title: "Increase font size", run: () => { zoom(1); } },
-  { chord: "cmd+-", title: "Decrease font size", run: () => { zoom(-1); } },
-  { chord: "cmd+0", title: "Reset font size", run: () => { zoom(null); } },
+  { chord: "cmd+=", title: "Zoom in", run: () => { zoom(1); } },
+  { chord: "cmd+-", title: "Zoom out", run: () => { zoom(-1); } },
+  { chord: "cmd+0", title: "Reset zoom", run: () => { zoom(null); } },
 ];
 
 const viewActionMap = new Map(viewActions.map((a) => [normalizeChord(a.chord) ?? a.chord, a]));

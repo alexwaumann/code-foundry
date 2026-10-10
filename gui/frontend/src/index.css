@@ -70,6 +70,8 @@
 }
 
 :root {
+    /* Page zoom factor (lib/zoom.ts); viewport units divide by it, since zoom leaves them whole. */
+    --cf-zoom: 1;
     --radius: 0.625rem;
     /* Sheet and panes. The sheet is the one window background (title strip and
      * sidebar sit on it); panes are the lighter rounded areas floating on it. */

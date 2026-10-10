@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@wailsio/runtime@3.0.0-beta.28': 44fe3747df78fc7ad2cf9634cab69a18caee236493cca7324ce7a3df24ff4002
+
 importers:
 
   .:
@@ -43,7 +46,7 @@ importers:
         version: 3.31.4(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@wailsio/runtime':
         specifier: 3.0.0-beta.28
-        version: 3.0.0-beta.28
+        version: 3.0.0-beta.28(patch_hash=44fe3747df78fc7ad2cf9634cab69a18caee236493cca7324ce7a3df24ff4002)
       '@xterm/addon-fit':
         specifier: 0.11.0
         version: 0.11.0
@@ -5683,7 +5686,7 @@ snapshots:
 
   '@vitest/spy@5.0.3': {}
 
-  '@wailsio/runtime@3.0.0-beta.28': {}
+  '@wailsio/runtime@3.0.0-beta.28(patch_hash=44fe3747df78fc7ad2cf9634cab69a18caee236493cca7324ce7a3df24ff4002)': {}
 
   '@xterm/addon-fit@0.11.0': {}
 
