@@ -211,7 +211,9 @@ Idle ─newer─► Available ─app.update─► Downloading ─ok─► Instal
 * **Updates installed elsewhere count too.** If the bundle on disk is newer than the
   running daemon (for example after `code-foundry update`), the state is Installed: at
   startup, on every check, and when the CLI pokes the daemon after updating.
-* **What restarts what.** Nothing restarts automatically.
+* **What restarts what.** Nothing restarts automatically. (Since
+  `docs/notes/update-restart.md`, `app.restart` does both steps below in one; the two
+  commands remain for the CLI.)
   * The GUI needs a relaunch. `app.relaunch` publishes `RelaunchRequested`. The **Wails
     host** follows UpdateService.Watch over the socket itself (`gui/relaunch.go`); it
     waits for its own exit and reopens the bundle with `open`, forwarding
