@@ -108,7 +108,7 @@ const (
 	KeyGhPath            = "advanced.gh_path"
 	KeyLogLevel          = "advanced.log_level"
 	keybindingKeyPrefix  = GroupKeybindings + "."
-	defaultFontFamily    = "JetBrains Mono, SF Mono, Menlo"
+	defaultFontFamily    = "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo"
 	defaultScrollback    = 10000
 	defaultCloseGrace    = 10
 	defaultGhPollSeconds = 60
@@ -187,8 +187,10 @@ var staticFields = []Field{
 		bind: func(s *Settings) any { return &s.Appearance.Theme },
 	},
 	{
+		// The GUI bundles JetBrainsMono Nerd Font Mono (gui/frontend/public/fonts). Its own
+		// stack, used when this is empty, is DEFAULT_TERMINAL_FONT_FAMILY in src/terminal/fonts.ts.
 		Key: KeyFontFamily, Group: GroupAppearance, Type: String, Title: "Terminal font family",
-		Description: "Comma-separated font families, first installed wins. ui-monospace and Menlo are always appended as fallbacks.",
+		Description: "Comma-separated font families, first available wins. JetBrainsMono Nerd Font Mono ships with the app; ui-monospace and Menlo are always appended as fallbacks.",
 		Default:     defaultFontFamily, Placeholder: defaultFontFamily,
 		bind: func(s *Settings) any { return &s.Appearance.FontFamily },
 	},
