@@ -19,6 +19,10 @@ type Deps struct {
 	Terminal command.TerminalBackend
 	// Repo backs repo.*. Nil works like Terminal.
 	Repo command.RepoBackend
+	// NotGit reports a context in a project without git: it gates repo.worktree.*,
+	// repo.git.init, and (unless GitOps.NotGit is set) git.* and pr.*. Nil: every
+	// project is git.
+	NotGit command.NotGitFunc
 	// Session backs session.*. Nil works like Terminal.
 	Session command.SessionBackend
 	// GitOps backs git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url.
@@ -64,11 +68,14 @@ func Register(r *command.Registry, d Deps) error {
 	if d.Update == nil {
 		d.Update = codefoundryv1connect.UnimplementedUpdateServiceHandler{}
 	}
+	if d.GitOps.NotGit == nil {
+		d.GitOps.NotGit = d.NotGit
+	}
 	return errors.Join(
 		command.RegisterDaemon(r, d.Daemon),
 		command.RegisterUI(r, d.Emitter),
 		command.RegisterTerminal(r, d.Terminal),
-		command.RegisterRepo(r, d.Repo),
+		command.RegisterRepo(r, d.Repo, d.NotGit),
 		command.RegisterSession(r, d.Session, d.Emitter),
 		command.RegisterGitOps(r, d.GitOps),
 		command.RegisterPullRequest(r, d.Gh),

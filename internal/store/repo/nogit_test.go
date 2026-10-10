@@ -354,3 +354,33 @@ func TestDefaultBranch(t *testing.T) {
 		})
 	}
 }
+
+func TestSnapshotOwner(t *testing.T) {
+	s := &Snapshot{Repos: []Repo{
+		{ID: "a", Path: "/a", Worktrees: []Worktree{{RepoID: "a", Path: "/a", IsMain: true}, {RepoID: "a", Path: "/wt/a-x"}}},
+		{ID: "b", Path: "/b", Worktrees: []Worktree{{RepoID: "b", Path: "/b", IsMain: true}}},
+	}}
+	tests := []struct {
+		name         string
+		repoID, path string
+		want         string
+	}{
+		{"worktree wins", "b", "/wt/a-x", "a"},
+		{"main worktree", "", "/b", "b"},
+		{"unknown path falls back to id", "b", "/elsewhere", "b"},
+		{"id only", "a", "", "a"},
+		{"nothing", "", "", ""},
+		{"unknown", "z", "/z", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, ok := s.Owner(tt.repoID, tt.path)
+			if r.ID != tt.want || ok != (tt.want != "") {
+				t.Fatalf("Owner = %q, %v; want %q", r.ID, ok, tt.want)
+			}
+		})
+	}
+	if _, ok := (*Snapshot)(nil).Owner("a", "/a"); ok {
+		t.Fatal("nil snapshot found a repo")
+	}
+}

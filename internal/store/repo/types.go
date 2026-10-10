@@ -116,6 +116,27 @@ func (s *Snapshot) Worktree(repoID, path string) (Worktree, bool) {
 	return Worktree{}, false
 }
 
+// Owner returns the repo with a worktree at worktreePath, else the repo with id
+// repoID. It is how commands find the project a UI context points at.
+func (s *Snapshot) Owner(repoID, worktreePath string) (Repo, bool) {
+	if s == nil {
+		return Repo{}, false
+	}
+	if worktreePath != "" {
+		for _, r := range s.Repos {
+			for _, w := range r.Worktrees {
+				if w.Path == worktreePath {
+					return r, true
+				}
+			}
+		}
+	}
+	if repoID == "" {
+		return Repo{}, false
+	}
+	return s.Repo(repoID)
+}
+
 // Event is published on the bus as bus.Publish[repo.Event]. Subscribe with
 // bus.Subscribe[repo.Event] and type-switch on the concrete types below. All repo
 // events share one topic so subscribers see them in publish order.

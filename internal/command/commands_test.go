@@ -43,6 +43,8 @@ func newFixture(t *testing.T) fixture {
 		Emitter:  f.emit,
 		Terminal: f.term,
 		Repo:     f.repo,
+		// "plain" (at /plain) is a project without git.
+		NotGit: func(c command.Context) bool { return c.ActiveRepoID == "plain" || c.ActiveWorktreePath == "/plain" },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +58,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"daemon.status", "daemon.version",
 		"ui.palette.open", "ui.notify", "ui.focus.terminal", "ui.focus.repo",
 		"terminal.new", "terminal.kill", "terminal.remove",
-		"repo.register", "repo.unregister", "repo.worktree.new", "repo.worktree.remove", "repo.refresh",
+		"repo.register", "repo.unregister", "repo.worktree.new", "repo.worktree.remove", "repo.refresh", "repo.git.init",
 		"session.new", "session.list", "session.focus", "session.close", "session.reconnect",
 		"session.rename", "session.fork", "session.remove", "session.run-in", "session.pin",
 		"git.fetch", "git.pull", "git.push", "pr.create", "pr.open",
@@ -107,6 +109,22 @@ func TestAvailability(t *testing.T) {
 		{"repo.worktree.remove", command.Context{ActiveRepoID: "r1"}, false},
 		{"repo.worktree.remove", command.Context{ActiveRepoID: "r1", ActiveWorktreePath: "/wt"}, true},
 		{"repo.refresh", command.Context{}, true},
+		// A project without git: its one checkout, no worktrees, Initialize Git.
+		{"repo.worktree.new", command.Context{ActiveRepoID: "plain"}, false},
+		{"repo.worktree.remove", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, false},
+		{"repo.git.init", command.Context{}, false},
+		{"repo.git.init", command.Context{ActiveRepoID: "r1"}, false},
+		{"repo.git.init", command.Context{ActiveRepoID: "plain"}, true},
+		{"repo.git.init", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, true},
+		{"repo.unregister", command.Context{ActiveRepoID: "plain"}, true},
+		{"repo.refresh", command.Context{ActiveRepoID: "plain"}, true},
+		{"git.fetch", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, false},
+		{"git.push", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, false},
+		{"pr.create", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, false},
+		{"worktree.reveal", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, true},
+		{"worktree.open.editor", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, true},
+		{"session.new", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, true},
+		{"terminal.new", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, true},
 	}
 	for _, tt := range tests {
 		c, _ := f.reg.Get(tt.cmd)
@@ -185,6 +203,13 @@ func TestBuiltinCommands(t *testing.T) {
 		{name: "repo.refresh all", cmd: "repo.refresh", wantMsg: "refreshed all repositories", wantReq: &v1.RefreshRepoRequest{}},
 		{name: "repo.refresh active", cmd: "repo.refresh", ctx: command.Context{ActiveRepoID: "r1"}, wantMsg: "refreshed r1",
 			wantReq: &v1.RefreshRepoRequest{Id: "r1"}},
+		{name: "repo.git.init from context", cmd: "repo.git.init", ctx: command.Context{ActiveRepoID: "plain"},
+			wantMsg: "initialized git in notes on main", wantJSON: `"git":true`, wantReq: &v1.InitGitRequest{Id: "plain"}},
+		{name: "repo.git.init with an explicit repo", cmd: "repo.git.init", args: map[string]string{"repo": "plain"},
+			wantReq: &v1.InitGitRequest{Id: "plain"}},
+		{name: "repo.git.init in a git project", cmd: "repo.git.init", ctx: command.Context{ActiveRepoID: "r1"}, wantErr: command.ErrUnavailable},
+		{name: "repo.worktree.new in a project without git", cmd: "repo.worktree.new", ctx: command.Context{ActiveRepoID: "plain"},
+			args: map[string]string{"branch": "x"}, wantErr: command.ErrUnavailable},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
