@@ -57,6 +57,7 @@ func main() {
 	})
 
 	app.Menu.Set(appMenu(app))
+	installDockIcon(app)
 
 	// Hidden-inset title bar: the traffic lights float over the web content (centred on
 	// y=26 in the 52pt title band, TITLE_BAND_HEIGHT in
