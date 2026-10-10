@@ -7,7 +7,7 @@ import { basename, tildify } from "@/lib/path";
 import { badgeLabels, disconnectReason, formatAgo, sessionBadge } from "@/lib/session";
 import { reconnectSession, removeSession } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
-import { useUiStore } from "@/stores/ui";
+import { DASHBOARD, useUiStore } from "@/stores/ui";
 
 /** Re-renders every `ms` so relative times stay fresh. */
 function useNow(ms = 30_000): number {
@@ -93,7 +93,7 @@ export function SessionDisconnected({ id }: { id: string }) {
     setPending("remove");
     const ok = await removeSession(id);
     setPending(null);
-    if (ok && useUiStore.getState().selection.kind === "session") useUiStore.getState().select({ kind: "none" });
+    if (ok && useUiStore.getState().selection.kind === "session") useUiStore.getState().select(DASHBOARD);
   };
 
   return (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONTENT_MIN, PANE_GAPS, PANEL_MIN, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, clampPanelWidth, panelMax, useUiStore, type FocusRegion } from "./ui";
+import { CONTENT_MIN, DASHBOARD, PANE_GAPS, PANEL_MIN, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, clampPanelWidth, isDashboard, panelMax, useUiStore, type FocusRegion, type Selection } from "./ui";
 
 describe("panelMax", () => {
   const cases: [string, number, number, number][] = [
@@ -72,6 +72,12 @@ describe("ui persistence", () => {
     expect(merged).toMatchObject({ sidebarVisible: false, sidebarWidth: SIDEBAR_MIN, fontSize: 15 });
   });
 
+  it("does not save the selection: the window always starts on the dashboard", () => {
+    const saved = useUiStore.persist.getOptions().partialize?.(useUiStore.getState());
+    expect(saved).not.toHaveProperty("selection");
+    expect(useUiStore.getInitialState().selection).toEqual({ kind: "view", name: "dashboard" });
+  });
+
   it("does not save a panel width", () => {
     const saved = useUiStore.persist.getOptions().partialize?.(useUiStore.getState());
     expect(saved).not.toHaveProperty("panelWidth");
@@ -96,5 +102,17 @@ describe("closePalette", () => {
     const want = { terminal: 0, sidebar: 0, panel: 0, content: 0, [bumped]: 1 };
     expect(seqs()).toEqual(want);
     expect(useUiStore.getState().palette.open).toBe(false);
+  });
+});
+
+describe("isDashboard", () => {
+  const cases: [string, Selection, boolean][] = [
+    ["the dashboard view", DASHBOARD, true],
+    ["nothing selected (renders the dashboard too)", { kind: "none" }, true],
+    ["another page", { kind: "view", name: "projects" }, false],
+    ["a thread", { kind: "session", id: "s-1" }, false],
+  ];
+  it.each(cases)("%s", (_name, sel, want) => {
+    expect(isDashboard(sel)).toBe(want);
   });
 });

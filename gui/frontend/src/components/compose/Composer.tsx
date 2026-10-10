@@ -47,7 +47,7 @@ import {
 import { requestConfirm } from "@/stores/confirm";
 import { useReposStore } from "@/stores/repos";
 import { useSettingValue } from "@/stores/settings";
-import { useUiStore } from "@/stores/ui";
+import { DASHBOARD, useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
 const SEP = "\u0001";
@@ -455,7 +455,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
             onEscape={() => {
               if (!isDraftEmpty(getDraft(draftKey))) return false;
               const back = target.kind === "project" ? target.repoId : primary;
-              useUiStore.getState().select(back ? { kind: "repo", repoId: back } : { kind: "none" });
+              useUiStore.getState().select(back ? { kind: "repo", repoId: back } : DASHBOARD);
               return true;
             }}
             onPasteFiles={attach}

@@ -147,3 +147,13 @@ describe("expandPanelCommand", () => {
     expect(getPanel()).toMatchObject({ open: true, expanded: true });
   });
 });
+
+describe("showView", () => {
+  it("\"dashboard\" selects the dashboard and closes settings", () => {
+    useUiStore.setState({ selection: { kind: "session", id: "a" } });
+    useViewsStore.setState({ settingsOpen: true, helpOpen: false });
+    expect(showView("dashboard")).toBe(true);
+    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+    expect(useViewsStore.getState().settingsOpen).toBe(false);
+  });
+});
