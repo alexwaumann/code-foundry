@@ -16,8 +16,12 @@ import (
 // ConnectOptions configures Connect.
 type ConnectOptions struct {
 	// DaemonBinary is the code-foundry executable to spawn. Defaults to os.Executable(),
-	// which is right for the CLI; the Wails host must set it.
+	// which is right for the CLI; the Wails host must set it (or set NoAutoStart).
 	DaemonBinary string
+	// NoAutoStart makes Connect fail instead of spawning a daemon when none answers.
+	// The Wails host sets it when it cannot find the CLI: falling back to
+	// os.Executable() there would spawn the GUI itself, which spawns another, forever.
+	NoAutoStart bool
 	// StartTimeout bounds how long to wait for a spawned daemon to answer Ping.
 	// Defaults to 10s.
 	StartTimeout time.Duration
@@ -31,6 +35,9 @@ type ConnectOptions struct {
 }
 
 const probeTimeout = time.Second
+
+// ErrDaemonNotRunning is returned by Connect with NoAutoStart when no daemon answers.
+var ErrDaemonNotRunning = errors.New("daemon is not running")
 
 // Connect returns a client for the daemon at p, starting the daemon if its socket is
 // absent or does not answer Ping. With opts.Endpoint it talks to that loopback
@@ -60,6 +67,9 @@ func Connect(ctx context.Context, p paths.Paths, opts ConnectOptions) (*Client, 
 		return nil, err
 	}
 
+	if opts.NoAutoStart {
+		return nil, ErrDaemonNotRunning
+	}
 	bin := opts.DaemonBinary
 	if bin == "" {
 		exe, err := os.Executable()

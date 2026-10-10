@@ -7,7 +7,7 @@ import { deriveContext } from "./context";
 import { dispatchEvent } from "./events";
 import { applyIntent } from "./intents";
 import { emptyRepos, replaceRepos, useReposStore } from "./repos";
-import { applySessionEvent, attentionIds, emptySessions, replaceSessions, sessionOfTerminal, useSessionsStore } from "./sessions";
+import { activeThreadIds, applySessionEvent, attentionIds, connectedCount, emptySessions, replaceSessions, runningCount, sessionOfTerminal, useSessionsStore } from "./sessions";
 import { emptyTerminals, useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 
@@ -89,6 +89,21 @@ describe("session reducers", () => {
       session("c"),
     ]);
     expect(attentionIds(d)).toEqual(["a"]);
+  });
+
+  it("start page counts and thread list: waiting first, then running; disconnected never", () => {
+    const d = replaceSessions(emptySessions, [
+      session("busy1", { status: "busy", createdAtMs: 1 }),
+      session("idle", { createdAtMs: 2 }),
+      session("wait1", { status: "attention", createdAtMs: 3 }),
+      session("gone", { status: "busy", state: "disconnected", terminalId: "", createdAtMs: 4 }),
+      session("start", { status: "busy", state: "starting", createdAtMs: 5 }),
+      session("wait2", { status: "attention", state: "closing", createdAtMs: 6 }),
+    ]);
+    expect(connectedCount(d)).toBe(5);
+    expect(runningCount(d)).toBe(2);
+    expect(activeThreadIds(d)).toEqual(["wait1", "wait2", "busy1", "start"]);
+    expect(activeThreadIds(emptySessions)).toEqual([]);
   });
 
   it("sessionOfTerminal matches labels.session, then terminal_id", () => {

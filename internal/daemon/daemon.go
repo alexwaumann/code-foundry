@@ -108,7 +108,7 @@ func Run(ctx context.Context, opts Options) error {
 
 	started := time.Now()
 	events := st.bus
-	repoAPI := api.NewRepo(st.repo, events)
+	repoAPI := api.NewRepo(st.repo, events).WithGitHub(st.gh, st.cloner)
 	terminalAPI := api.NewTerminal(st.terminal)
 	sessionAPI := api.NewSession(st.session, events)
 	gitopsAPI := api.NewGitOps(st.gitops, events, ctx.Done())
@@ -124,6 +124,7 @@ func Run(ctx context.Context, opts Options) error {
 		Emitter:  command.BusEmitter{Bus: events},
 		Terminal: terminalAPI,
 		Repo:     worktreeDirRepo{RepoBackend: repoAPI, repos: st.repo, settings: st.settings},
+		Clone:    repoAPI.CloneRef,
 		NotGit: func(c command.Context) bool {
 			r, ok := st.repo.Snapshot().Owner(c.ActiveRepoID, c.ActiveWorktreePath)
 			return ok && !r.Git

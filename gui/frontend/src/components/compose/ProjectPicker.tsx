@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Layers } from "lucide-react";
+import { FolderPlus, Layers } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { formatChord } from "@/keys/chord";
 import { projectHue, projectInitials, repoSource } from "@/lib/compose";
 import { tildify } from "@/lib/path";
 import { composeIn, composeInWorkspace } from "@/stores/compose";
+import { addProject } from "@/stores/projectActions";
 import { getUiContext } from "@/stores/context";
 import { useReposStore } from "@/stores/repos";
 import { useSessionsStore } from "@/stores/sessions";
@@ -57,6 +58,9 @@ function ProjectRow({ id, index, onPick }: { id: string; index: number; onPick: 
 
 /** cmdk value of a workspace row (project rows use the repo id). */
 const workspaceValue = (id: string) => `ws:${id}`;
+
+/** cmdk value of the empty state's row (repo.add). */
+const ADD_PROJECT_VALUE = "__add-project";
 
 function WorkspaceRow({ id, onPick }: { id: string; onPick: (id: string) => void }) {
   const name = useWorkspacesStore((s) => s.byId[id]?.name ?? id);
@@ -115,7 +119,8 @@ export function ProjectPicker({ close }: { close: () => void }) {
   const loaded = useReposStore((s) => s.loaded);
   const workspaces = useWorkspaceOrder();
   // Highlight what the user was looking at when the picker opened.
-  const [initial] = useState(initialValue);
+  // With no projects, the empty state's Add a project row.
+  const [initial] = useState(() => initialValue() ?? (useReposStore.getState().order.length === 0 ? ADD_PROJECT_VALUE : undefined));
   const [query, setQuery] = useState("");
 
   const leave = () => {
@@ -159,7 +164,25 @@ export function ProjectPicker({ close }: { close: () => void }) {
         aria-label={workspaces.length > 0 ? "Search workspaces and projects" : "Search projects"}
       />
       <CommandList>
-        <CommandEmpty>{!loaded ? "Loading projects…" : order.length === 0 ? "No projects registered. Add one with Add Project, or on the Projects page." : "No matching projects."}</CommandEmpty>
+        <CommandEmpty>{!loaded ? "Loading projects…" : order.length === 0 ? "No projects yet." : "No matching projects."}</CommandEmpty>
+        {loaded && order.length === 0 && (
+          // The empty state's way forward: the Add Project dialog (repo.add).
+          <CommandGroup heading="No projects yet">
+            <CommandItem
+              forceMount
+              value={ADD_PROJECT_VALUE}
+              onSelect={() => {
+                close();
+                addProject();
+              }}
+              data-testid="picker-add-project"
+              className="gap-3 py-2"
+            >
+              <FolderPlus />
+              Add a project…
+            </CommandItem>
+          </CommandGroup>
+        )}
         {workspaces.length > 0 && (
           <CommandGroup heading="Workspaces">
             {workspaces.map((id) => (

@@ -92,6 +92,10 @@ func TestCLIAgainstDaemon(t *testing.T) {
 		{"workspace members defaults to the working directory", []string{"workspace", "members"}, errUsage, "", "/work is not inside a workspace worktree"},
 		{"kebab-case verb with a positional", []string{"workspace", "add-repo", "api", "--fetch=false"}, errUsage, "", "workspace.add-repo: not found: /work is not inside"},
 		{"explicit --cwd wins", []string{"workspace", "members", "--cwd", "/elsewhere"}, errUsage, "", "/elsewhere is not inside"},
+		{"repo add prints the CLI hint", []string{"repo", "add"}, nil, "code-foundry repo clone <owner/repo>", ""},
+		{"repo clone refuses ssh before the daemon runs gh", []string{"repo", "clone", "git@github.com:o/r.git"}, errUsage, "",
+			"code-foundry repo.clone: invalid argument: SSH URLs are not supported"},
+		{"repo clone needs a repo", []string{"repo", "clone"}, errUsage, "", "no repository given"},
 		// terminal.* is registered against the Unimplemented stub until 1a is wired.
 		{"store-backed stub", []string{"terminal.kill", "--id", "t1"}, errAny, "", ""},
 	}

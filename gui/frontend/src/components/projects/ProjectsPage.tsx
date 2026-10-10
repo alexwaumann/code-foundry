@@ -11,7 +11,7 @@ import { NavProvider, NavRow } from "@/lib/NavRow";
 import { pageItems, projectKey, projectsModel, projectWorktreeKey, workspaceKey, type ProjectModel, type ProjectsWorkspaces } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { composeIn, composeInWorkspace } from "@/stores/compose";
-import { newTerminalIn, openProject, openWorktree, registerProject, removeWorkspace, removeWorktree, unregisterProject } from "@/stores/projectActions";
+import { addProject, newTerminalIn, openProject, openWorktree, removeWorkspace, removeWorktree, unregisterProject } from "@/stores/projectActions";
 import { findWorktree, useReposStore } from "@/stores/repos";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
@@ -208,7 +208,7 @@ export function ProjectsPage() {
             size="xs"
             data-testid="projects-register"
             onClick={() => {
-              registerProject();
+              addProject();
             }}
           >
             <FolderPlus />

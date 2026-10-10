@@ -3,6 +3,7 @@ import { promptedArgs } from "@/palette/args";
 import { leafOrder, nextAfter, sessionOrder } from "@/lib/tree";
 import { refreshCommands, runCommand, useCommandsStore, whenListed } from "@/stores/commands";
 import { contextKey, getListInputs, getUiContext } from "@/stores/context";
+import { openAddProject } from "@/stores/addProject";
 import { openNewThreadPicker } from "@/stores/compose";
 import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { zoomFont } from "@/stores/settings";
@@ -105,7 +106,7 @@ export function isStartable(c: CommandView): boolean {
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
-const paletteSupplied: ReadonlySet<string> = new Set(["session.new", "session.run-in"]);
+const paletteSupplied: ReadonlySet<string> = new Set(["session.new", "session.run-in", "repo.clone"]);
 
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
@@ -177,6 +178,16 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   },
   // "Run in…": the member picker for the active workspace thread; it invokes session.run-in.
   "session.run-in": () => openRunInPicker(getUiContext().activeSessionId),
+  // The Add Project dialog; its tabs invoke repo.register, or stream RepoService.Clone
+  // (repo.clone's CLI form). repo.clone opens it on the GitHub tab.
+  "repo.add": () => {
+    openAddProject();
+    return true;
+  },
+  "repo.clone": () => {
+    openAddProject("github");
+    return true;
+  },
   // Window-local: only this window opens, without a round trip (the CLI and palette
   // reach every window through UiIntent.ShowView instead).
   "view.settings": () => showView("settings"),

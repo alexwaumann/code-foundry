@@ -1,0 +1,26 @@
+{
+    "data": {
+        "rateLimit": {
+            "limit": 5000,
+            "cost": 1,
+            "remaining": 4755,
+            "resetAt": "2026-10-10T08:53:02Z"
+        },
+        "repository": null
+    },
+    "errors": [
+        {
+            "type": "NOT_FOUND",
+            "path": [
+                "repository"
+            ],
+            "locations": [
+                {
+                    "line": 3,
+                    "column": 3
+                }
+            ],
+            "message": "Could not resolve to a Repository with the name 'alexwaumann/does-not-exist-xyz'."
+        }
+    ]
+}

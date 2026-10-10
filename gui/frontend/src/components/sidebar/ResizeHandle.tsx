@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { useUiStore } from "@/stores/ui";
+import { SIDEBAR_DEFAULT, useUiStore } from "@/stores/ui";
 
 /** Drag handle on the sidebar's right edge. Double-click resets the width. */
 export function ResizeHandle() {
@@ -24,7 +24,7 @@ export function ResizeHandle() {
         e.currentTarget.releasePointerCapture(e.pointerId);
       }}
       onDoubleClick={() => {
-        useUiStore.getState().setSidebarWidth(260);
+        useUiStore.getState().setSidebarWidth(SIDEBAR_DEFAULT);
       }}
     />
   );

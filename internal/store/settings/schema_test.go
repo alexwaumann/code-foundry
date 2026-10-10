@@ -43,6 +43,8 @@ func TestFieldParse(t *testing.T) {
 		{key: KeyDefaultModel, in: "opus", want: "opus"},
 		{key: KeyDefaultModel, in: "gpt-5", err: `want one of "fable", "opus", "sonnet", "haiku", got "gpt-5"`},
 		{key: KeyTheme, in: "Dark", err: `want one of "system", "dark", "light", got "Dark"`},
+		{key: KeyBackdrop, in: "none", want: "none"},
+		{key: KeyBackdrop, in: "aurora", err: `want one of "forest", "none", got "aurora"`},
 		{key: KeyWorktreeDir, in: "~/wt/{repo}", want: "~/wt/{repo}"},
 		{key: KeyWorktreeDir, in: "wt", err: `want an absolute path, got "wt"`},
 		{key: KeyClaudePath, in: exe, want: exe},
@@ -93,7 +95,7 @@ func TestSchemaShape(t *testing.T) {
 		}
 	}
 	d := Defaults()
-	if d.Appearance.FontSize != 13 || !d.Sessions.AutoName || d.Sessions.ScrollbackLines != 10000 || d.Appearance.Theme != "system" ||
+	if d.Appearance.FontSize != 13 || !d.Sessions.AutoName || d.Sessions.ScrollbackLines != 10000 || d.Appearance.Theme != "system" || d.Appearance.Backdrop != "forest" ||
 		d.GitHub.PollIntervalSeconds != 60 || d.Repos.FetchIntervalSeconds != 120 || d.Advanced.LogLevel != "info" {
 		t.Errorf("Defaults() = %+v", d)
 	}

@@ -44,9 +44,14 @@ name, and clones by `owner/repo` or URL into a picked folder. We copy that shape
 * **Dialog tabs, in order: New, Local folder, GitHub.** Entry points: `repo.add` in the
   palette, the Projects page button, the project picker's empty state, and a button in
   the top bar next to New thread and New terminal.
-* **Publish visibility picker:** Internal / Public / Private. Default Internal when the
-  owner is an organization, Private for the personal account (Internal does not exist
-  there). A refused choice shows gh's error verbatim and the picker stays open.
+* **Publish visibility picker (revised 2026-10-10):** read the owner org's
+  `members_can_create_{public,internal,private}_repositories` from REST
+  `GET /orgs/{org}` with the existing token. Those fields are returned only to org
+  owners. When present, offer only the allowed visibilities and default to the most open
+  one, order Public > Internal > Private. When absent, offer all three and default
+  Public. Personal account: Public / Private, default Public. Private is never the
+  default (Alex's org disables it). A refused choice shows gh's error verbatim and the
+  picker stays open.
 * **Initial commit on init/create** (empty, "Initial commit") so worktrees can be created;
   branch from `git config --get init.defaultBranch`, else `main`.
 
@@ -85,6 +90,8 @@ name, and clones by `owner/repo` or URL into a picked folder. We copy that shape
 
 ## PR 3: Add Project dialog and GitHub clone (`cf/add-project-dialog`), after 1 and 2
 
+* Status: PR 1 merged as #18, PR 2 as #20 (2026-10-10). PR 3 built on
+  `cf/add-project-dialog`: `docs/notes/add-project-3-dialog.md`.
 * `repo.add` command opens the dialog (GUI-only presentation, like `session.new` opening
   the composer). Tabs New / Local folder / GitHub. Local folder = PR 1 completion + picker
   + register. New tab is wired in PR 4 (shows a disabled placeholder until then).

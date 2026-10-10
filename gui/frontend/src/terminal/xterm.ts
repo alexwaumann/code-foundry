@@ -7,7 +7,8 @@ import "@xterm/xterm/css/xterm.css";
 import { chordFromEvent } from "@/keys/chord";
 import { copyText } from "@/lib/clipboard";
 import type { ColorScheme, Disposable, TermSize, TerminalRenderer } from "./renderer";
-import { TERMINAL_FONT_FAMILY, terminalTheme } from "./theme";
+import { DEFAULT_TERMINAL_FONT_FAMILY, onBundledFontLoaded } from "./fonts";
+import { terminalTheme } from "./theme";
 
 export type RendererKind = "webgl" | "dom";
 
@@ -47,7 +48,7 @@ export class XtermRenderer implements TerminalRenderer {
 
   constructor(private readonly opts: XtermRendererOptions) {
     this.term = new Terminal({
-      fontFamily: TERMINAL_FONT_FAMILY,
+      fontFamily: DEFAULT_TERMINAL_FONT_FAMILY,
       fontSize: opts.fontSize,
       theme: terminalTheme(opts.colorScheme),
       scrollback: 10_000,
@@ -98,6 +99,24 @@ export class XtermRenderer implements TerminalRenderer {
       }),
     );
     this.enableWebgl();
+    this.fit();
+    const stopFontWatch = onBundledFontLoaded(() => {
+      this.refreshFontMetrics();
+    });
+    this.disposables.push({ dispose: stopFontWatch });
+  }
+
+  /**
+   * Re-measures cells and redraws glyphs after a web font finished loading. xterm measures
+   * only on open and on a font option change, and the WebGL atlas caches glyphs rasterized
+   * with the fallback font, so nudge fontFamily (which re-measures) and clear the atlas.
+   */
+  refreshFontMetrics(): void {
+    if (!this.mounted) return;
+    const family = this.term.options.fontFamily ?? DEFAULT_TERMINAL_FONT_FAMILY;
+    this.term.options.fontFamily = `${family}, monospace`;
+    this.term.options.fontFamily = family;
+    this.term.clearTextureAtlas();
     this.fit();
   }
 

@@ -83,7 +83,7 @@ var Groups = []Group{
 	{GroupGitHub, "GitHub", "Your pull requests and default-branch checks, polled with gh's login."},
 	{GroupRepos, "Repositories", "Git fetching and where new worktrees go."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
-	{GroupAppearance, "Appearance", "Theme, terminal font, and density. Applied live in every window."},
+	{GroupAppearance, "Appearance", "Theme, terminal font, density, and backdrop. Applied live in every window."},
 	{GroupKeybindings, "Keybindings", `Override a command's chord, or "none" to unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) cannot be bound.`},
 	{GroupAdvanced, "Advanced", "Executables and logging."},
 }
@@ -104,11 +104,12 @@ const (
 	KeyFontFamily        = "appearance.font_family"
 	KeyFontSize          = "appearance.font_size"
 	KeyDensity           = "appearance.density"
+	KeyBackdrop          = "appearance.backdrop"
 	KeyClaudePath        = "advanced.claude_path"
 	KeyGhPath            = "advanced.gh_path"
 	KeyLogLevel          = "advanced.log_level"
 	keybindingKeyPrefix  = GroupKeybindings + "."
-	defaultFontFamily    = "JetBrains Mono, SF Mono, Menlo"
+	defaultFontFamily    = "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo"
 	defaultScrollback    = 10000
 	defaultCloseGrace    = 10
 	defaultGhPollSeconds = 60
@@ -187,8 +188,10 @@ var staticFields = []Field{
 		bind: func(s *Settings) any { return &s.Appearance.Theme },
 	},
 	{
+		// The GUI bundles JetBrainsMono Nerd Font Mono (gui/frontend/public/fonts). Its own
+		// stack, used when this is empty, is DEFAULT_TERMINAL_FONT_FAMILY in src/terminal/fonts.ts.
 		Key: KeyFontFamily, Group: GroupAppearance, Type: String, Title: "Terminal font family",
-		Description: "Comma-separated font families, first installed wins. ui-monospace and Menlo are always appended as fallbacks.",
+		Description: "Comma-separated font families, first available wins. JetBrainsMono Nerd Font Mono ships with the app; ui-monospace and Menlo are always appended as fallbacks.",
 		Default:     defaultFontFamily, Placeholder: defaultFontFamily,
 		bind: func(s *Settings) any { return &s.Appearance.FontFamily },
 	},
@@ -203,6 +206,12 @@ var staticFields = []Field{
 		Description: "Row height and spacing in the sidebar and lists.",
 		Enum:        []string{"compact", "comfortable"}, Default: "compact",
 		bind: func(s *Settings) any { return &s.Appearance.Density },
+	},
+	{
+		Key: KeyBackdrop, Group: GroupAppearance, Type: Enum, Title: "Backdrop",
+		Description: "Faint artwork behind the start page and the new-thread composer.",
+		Enum:        []string{"forest", "none"}, Default: "forest",
+		bind: func(s *Settings) any { return &s.Appearance.Backdrop },
 	},
 	{
 		Key: KeyClaudePath, Group: GroupAdvanced, Type: Path, Title: "claude executable",

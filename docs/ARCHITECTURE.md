@@ -77,12 +77,13 @@ internal/
     repo/                  registered repos, worktrees, git status, filesystem watcher
     gh/                    GitHub GraphQL/REST polling over HTTP (token via gh), PR/CI cache
     gitops/                git/gh operations per worktree (fetch, pull, push, PR); editor, Finder, browser
+    clone/                 gh repo clone into the projects dir with streamed output, then register
     update/                release checks via gh, installs with the embedded installer
     workspace/             branch sets: one branch as a worktree in several repos
                            (docs/notes/workspaces-1-store.md)
   db/                      SQLite (modernc.org/sqlite, WAL) + migrations
   client/                  Go client for the daemon API, used by CLI and the Wails host
-  paths/                   XDG-ish paths: config dir, socket, token, db, logs
+  paths/                   XDG-ish paths: config dir, socket, token, db, logs, worktrees, projects
   fsx/                     the home-directory boundary and directory completion
 gui/
   main.go                  Wails v3 host (thin)
@@ -127,7 +128,10 @@ Services (v1):
   Unregister, List, ListWorktrees, CreateWorktree (optionally fetching the base first),
   ListRefs, Watch, GetWorktreeDetail (files and log against the base branch, Phase 3a),
   InitGit (`git init` and an empty first commit in a project without git;
-  `docs/notes/add-project-2-nogit.md`).
+  `docs/notes/add-project-2-nogit.md`), SearchGitHub and LookupGitHub (GraphQL through
+  the gh store, for the Add Project dialog), Clone (server stream: `gh repo clone` into
+  `<config home>/projects/<owner>/<repo>`, output lines, then the registered project;
+  `docs/notes/add-project-3-dialog.md`).
 * `GhService` — GetViewer, GetDashboard, GetRepoActivity, GetBranchPullRequests (the
   viewer's PR dashboards, monthly stats, default-branch CI, the viewer's PRs on a
   branch), GetPullRequest and ListChecks (on demand), Refresh, Track, Untrack, Watch.
@@ -253,7 +257,8 @@ from the pull request (docs/notes/pr-thread-commands.md).
   components subscribe to the narrowest selector. Lists are virtualized. No global
   re-render on daemon events.
 * Connection budget: the GUI holds exactly one `EventService.Watch` stream plus one
-  `TerminalService.Attach` (the visible terminal). Everything else is unary. This keeps
+  `TerminalService.Attach` (the visible terminal). Everything else is unary, except a
+  `RepoService.Clone` stream while the Add Project dialog clones a repository. This keeps
   the browser's six HTTP/1.1 connections per origin mostly free.
 * Only the visible terminal is attached. Switching sessions detaches the old stream and
   attaches the new one. Background sessions cost nothing in the frontend. Attaching is

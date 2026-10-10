@@ -84,8 +84,8 @@ dashboard buttons opt out (`keepFocus={false}`) and are normal tab stops.
 
 | Location | Button | Command |
 |---|---|---|
-| Sidebar "Repositories" header | Sparkles | `session.new` (disabled when no repo/worktree is in context; opens the palette's model/effort prompts) |
-| Sidebar "Repositories" header | SquareTerminal | `terminal.new` (cwd = context worktree, else home) |
+| Sidebar "Repositories" header | Sparkles | `session.new` (disabled when no repo/worktree is in context; opens the palette's model/effort prompts) (superseded: now SquarePen beside the app name, see sidebar-title-band.md) |
+| Sidebar "Repositories" header | SquareTerminal | `terminal.new` (cwd = context worktree, else home) (superseded: removed from the band, see sidebar-title-band.md) |
 | Sidebar status row | Command | `ui.palette.open` |
 | Sidebar status row | CircleHelp | `view.help` |
 | Sidebar status row | Settings | `view.settings` |

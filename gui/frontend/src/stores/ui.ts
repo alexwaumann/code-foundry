@@ -28,8 +28,14 @@ export type FocusRegion = "sidebar" | "terminal" | "content" | "palette" | "pane
  */
 export type PalettePage = "commands" | "projects" | "runin";
 
-export const SIDEBAR_MIN = 180;
+/**
+ * The sidebar band must fit the 80px traffic-light gutter, the app name, the attention
+ * badge and the New thread button (components/sidebar/Sidebar.tsx); 180 squeezed the name out.
+ */
+export const SIDEBAR_MIN = 220;
 export const SIDEBAR_MAX = 520;
+/** The initial width, and what double-clicking the resize handle restores. */
+export const SIDEBAR_DEFAULT = 280;
 /** Side panel width bounds; the upper bound depends on the window and sidebar (panelMax). */
 export const PANEL_MIN = 280;
 export const PANEL_MAX_FRACTION = 0.6;
@@ -154,7 +160,7 @@ export const useUiStore = create<UiState>()(
       composerFocusSeq: 0,
       renamingSessionId: null,
       sidebarVisible: true,
-      sidebarWidth: 260,
+      sidebarWidth: SIDEBAR_DEFAULT,
       fontSize: FONT_DEFAULT,
 
       select: (sel, opts) => {
@@ -226,6 +232,13 @@ export const useUiStore = create<UiState>()(
       migrate: (persisted) => {
         const { panelWidth: _old, collapsed: _gone, ...rest } = (persisted ?? {}) as Record<string, unknown>;
         return rest as Partial<UiState> as UiState;
+      },
+      // A saved width outside [SIDEBAR_MIN, SIDEBAR_MAX] (e.g. 180, saved before the minimum
+      // rose to 220) is clamped on load, so it renders and drags from a valid width.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<UiState>;
+        const merged = { ...current, ...p };
+        return typeof p.sidebarWidth === "number" ? { ...merged, sidebarWidth: clamp(Math.round(p.sidebarWidth), SIDEBAR_MIN, SIDEBAR_MAX) } : merged;
       },
       partialize: (s) => ({
         sidebarVisible: s.sidebarVisible,

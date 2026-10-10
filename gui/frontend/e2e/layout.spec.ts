@@ -22,14 +22,34 @@ function drag(page: Page, selector: string) {
 }
 
 // Window geometry (components/window/titleBand.ts): a 52px title band with no full-width
-// strip. The sidebar's band (80px traffic-light gutter, then the Threads header) is
+// strip. The sidebar's band (80px traffic-light gutter, then the app name) is
 // 52px; the panes start 8px down and their 44px headers end on the band (their 1px
 // bottom border is the first row below it: the pane's own 1px border puts the header
 // at 9..53).
 const BAND = 52;
 const HEADER = 44;
 
-test("the sidebar band holds the empty traffic-light gutter and the Threads header, and drags the window", async ({ page }) => {
+test("the app name shows whole or not at all: hidden at the minimum sidebar width beside the badge, back when room returns", async ({ page }) => {
+  await openApp(page);
+  const title = page.getByTestId("sidebar-app-name");
+  // The mock has one thread needing attention, so the badge is in the band at the 260px default.
+  await expect(page.getByTestId("attention-badge")).toHaveText("1");
+  await expect(title).toHaveAttribute("data-fits", "true");
+  await expect(title).toBeVisible();
+
+  const setWidth = (w: number) => page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setSidebarWidth(${String(w)}))`);
+  await setWidth(220);
+  await expect(title).toHaveAttribute("data-fits", "false");
+  await expect(title).toBeHidden();
+  // Never an ellipsis: the whole name or nothing.
+  expect(await title.evaluate((el) => getComputedStyle(el).textOverflow)).toBe("clip");
+
+  await setWidth(400);
+  await expect(title).toHaveAttribute("data-fits", "true");
+  await expect(title).toBeVisible();
+});
+
+test("the sidebar band holds the empty traffic-light gutter and the app name, and drags the window", async ({ page }) => {
   await openApp(page);
   const viewport = page.viewportSize();
   const band = await box(page, "sidebar-band");
@@ -43,12 +63,16 @@ test("the sidebar band holds the empty traffic-light gutter and the Threads head
   expect([gutter.left, gutter.top, gutter.width, gutter.height]).toEqual([0, 0, 80, BAND]);
   // Nothing sits on the lights.
   expect(await page.getByTestId("traffic-light-gutter").evaluate((el) => [el.childElementCount, el.textContent])).toEqual([0, ""]);
-  const title = page.getByTestId("sidebar-band").getByText("Threads");
-  expect(await title.evaluate((el) => el.getBoundingClientRect().left)).toBeGreaterThanOrEqual(80);
-  expect(await drag(page, '[data-testid="sidebar-band"] header > span:first-child')).toBe("drag");
+  const title = page.getByTestId("sidebar-app-name");
+  await expect(title).toHaveText("Code Foundry");
+  // 12px after the gutter.
+  expect(await title.evaluate((el) => el.getBoundingClientRect().left)).toBe(80 + 12);
+  expect(await drag(page, '[data-testid="sidebar-app-name"]')).toBe("drag");
   // Its controls click instead of dragging.
   expect(await drag(page, '[data-testid="sidebar-band-controls"]')).toBe("no-drag");
-  expect(await drag(page, '[data-testid="sidebar-new-terminal"]')).toBe("no-drag");
+  expect(await drag(page, '[data-testid="sidebar-new-session"]')).toBe("no-drag");
+  // New terminal is not in the band (palette, cmd+t and the row menu only).
+  await expect(page.getByTestId("sidebar-new-terminal")).toHaveCount(0);
   // Pull Requests, Projects and the thread list sit below the band and do not drag.
   expect((await box(page, "nav-pullrequests")).top).toBeGreaterThanOrEqual(BAND);
   expect(await drag(page, '[data-testid="nav-pullrequests"]')).toBe("no-drag");
@@ -143,6 +167,26 @@ test("every page header is 44px, ends on the band and drags; its controls do not
   const toggle = await box(page, "panel-toggle");
   expect((toggle.top + toggle.bottom) / 2).toBe((9 + BAND + 1) / 2);
   expect(await drag(page, '[data-testid="panel-toggle"]')).toBe("no-drag");
+});
+
+test("headerless panes (start page, composer) drag the window from the same 44px band", async ({ page }) => {
+  await openApp(page);
+  const check = async (band: string, content: string) => {
+    const b = await page.locator(band).first().evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { top: r.top, height: r.height, bottom: r.bottom };
+    });
+    expect(b, band).toEqual({ top: 9, height: HEADER, bottom: BAND + 1 });
+    expect(await drag(page, band)).toBe("drag");
+    expect(await drag(page, content)).toBe("");
+  };
+  await expect(page.getByTestId("start-page")).toBeVisible();
+  await check('[data-testid="start-page"] ~ [data-testid="pane-drag-band"]', '[data-testid="welcome-actions"]');
+  await page.keyboard.press("Meta+n");
+  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
+  await page.keyboard.press("Meta+1");
+  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await check('[data-testid="composer"] ~ [data-testid="pane-drag-band"]', '[data-testid="composer-card"]');
 });
 
 test("the daemon status and update indicator sit at the bottom of the sidebar", async ({ page }) => {

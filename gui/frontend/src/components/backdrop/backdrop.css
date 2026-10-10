@@ -1,0 +1,37 @@
+/*
+ * The backdrop ("glow"): a soft oval of artwork behind the centred content of a pane;
+ * the rest of the pane stays plain. The layer is its own size container, so the art
+ * follows the pane's shape (the window, the side panel), not the viewport's.
+ */
+.cf-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  container-type: size;
+}
+
+.cf-backdrop-art {
+  position: absolute;
+  inset: 0;
+  background-image: var(--cf-backdrop-narrow);
+  background-size: cover;
+  background-position: center 40%;
+  background-repeat: no-repeat;
+  opacity: 0.22;
+  filter: saturate(0.85);
+  -webkit-mask-image: radial-gradient(55% 45% at 50% 50%, #000 0%, rgba(0, 0, 0, 0.6) 40%, transparent 100%);
+  mask-image: radial-gradient(55% 45% at 50% 50%, #000 0%, rgba(0, 0, 0, 0.6) 40%, transparent 100%);
+}
+
+.dark .cf-backdrop-art {
+  opacity: 0.38;
+  filter: none;
+}
+
+/* 4:3 for squarer panes, 16:9 for wide ones. Only the shown image is fetched. */
+@container (aspect-ratio > 1.45) {
+  .cf-backdrop-art {
+    background-image: var(--cf-backdrop-wide);
+  }
+}

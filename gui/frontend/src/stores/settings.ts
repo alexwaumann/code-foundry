@@ -8,6 +8,7 @@ import { create } from "zustand";
 import { getSettingsSchema, SettingsValidationError, updateSettings, type SettingsSchemaView, type SettingsSnapshotView } from "@/api/settings";
 import { errorMessage } from "@/api/stream";
 import { setThemePreference } from "@/lib/theme";
+import { DEFAULT_TERMINAL_FONT_FAMILY, FONT_FALLBACKS } from "@/terminal/fonts";
 import { refreshCommands } from "./commands";
 import { FONT_DEFAULT, useUiStore } from "./ui";
 
@@ -16,14 +17,12 @@ export const KEYS = {
   fontFamily: "appearance.font_family",
   fontSize: "appearance.font_size",
   density: "appearance.density",
+  backdrop: "appearance.backdrop",
   scrollback: "sessions.scrollback_lines",
 } as const;
 
 const KEYBINDING_PREFIX = "keybindings.";
 
-/** Always appended to appearance.font_family, so a missing font still renders. */
-export const FONT_FALLBACKS = '"SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
-const DEFAULT_FONT_FAMILY = `"JetBrains Mono", ${FONT_FALLBACKS}`;
 
 export const ROW_HEIGHTS = { compact: 26, comfortable: 30 } as const;
 
@@ -67,10 +66,10 @@ export function useSettingValue(key: string): string | undefined {
   return useSettingsStore((s) => s.snapshot?.values[key]);
 }
 
-/** CSS font-family for the terminal: the setting plus fallbacks. */
+/** CSS font-family for the terminal: the setting plus fallbacks, else the bundled font's stack. */
 export function terminalFontFamily(setting: string | undefined): string {
   const v = setting?.trim();
-  return v ? `${v}, ${FONT_FALLBACKS}` : DEFAULT_FONT_FAMILY;
+  return v ? `${v}, ${FONT_FALLBACKS}` : DEFAULT_TERMINAL_FONT_FAMILY;
 }
 
 export function useTerminalFontFamily(): string {

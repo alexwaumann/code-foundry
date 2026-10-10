@@ -46,7 +46,8 @@ describe("applySettingsSnapshot", () => {
 
   it("builds the terminal font stack", () => {
     expect(terminalFontFamily("Iosevka")).toMatch(/^Iosevka, "SF Mono", ui-monospace/);
-    expect(terminalFontFamily("  ")).toMatch(/^"JetBrains Mono"/);
+    expect(terminalFontFamily("  ")).toMatch(/^"JetBrainsMono Nerd Font Mono", "JetBrains Mono", "SF Mono"/);
+    expect(terminalFontFamily(undefined)).toBe(terminalFontFamily(""));
   });
 });
 

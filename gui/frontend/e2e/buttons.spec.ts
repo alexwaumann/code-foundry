@@ -47,11 +47,14 @@ test("sidebar new-thread button opens the project picker, then the composer", as
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
 });
 
-test("sidebar new-terminal button starts a terminal in the selected thread's worktree", async ({ page }) => {
+// The sidebar band has no New terminal button (docs/notes/sidebar-title-band.md); the
+// palette is the route that replaced it, with the same context.
+test("New Terminal from the palette starts a terminal in the selected thread's worktree", async ({ page }) => {
   await openApp(page);
   // s-3 runs in fix/resize.
   await row(page, "s:s-3").click();
-  await page.getByTestId("sidebar-new-terminal").click();
+  await page.keyboard.press("Meta+k");
+  await page.getByTestId("palette").locator('[data-command="terminal.new"]').click();
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("terminal.new");
   const last = (await invocations()).at(-1);
   expect(last?.name).toBe("terminal.new");

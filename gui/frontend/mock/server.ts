@@ -10,6 +10,9 @@
  *
  *   GET  /__mock/invocations | writes | resizes | sessions | streams
  *   POST /__mock/reset
+ *   RepoService.SearchGitHub / LookupGitHub / Clone: mock/clone.ts (a repo named "fail" fails
+ *        to clone; octo-org/already-here's destination exists)
+ *   GET  /__mock/github/calls                     ("search <q>", "lookup <o/n>", "clone <o/n>")
  *   POST /__mock/session/attention?id=s-1
  *   POST /__mock/session/status?id=s-1&status=busy|idle|attention
  *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139
@@ -24,6 +27,8 @@
  *   POST /__mock/workspace?name=login&repos=repo-cf,repo-gp[&branch=cf/login]
  *                                                 (a workspace: a cf/<name> worktree in each repo)
  *   GET  /__mock/workspaces                       (id, name, branch, members)
+ *   POST /__mock/empty                            (a fresh install: no projects, threads or terminals)
+ *   POST /__mock/threads?repo=repo-cf&count=3&status=busy|idle|attention[&prefix=Job]
  *   POST /__mock/workspace-thread?workspace=login[&repo=repo-gp&name=driver&status=busy]
  *                                                 (a connected thread owned by the workspace)
  *   POST /__mock/workspace-mixed?name=checkout    (a workspace over code-foundry, ghostty-playground
@@ -72,6 +77,7 @@ import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb"
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { listDirectories } from "./filesystem";
+import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from "./clone";
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
 import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
@@ -181,6 +187,10 @@ function routes(router: ConnectRouter): void {
     refresh: () => ({}),
     listRefs: (req) => guard(() => world.listRefs(req.repoId)),
     initGit: (req) => guard(() => ({ repo: world.repoMsg(world.initGit(req.id)) })),
+    // The Add Project dialog's GitHub tab (mock/clone.ts).
+    searchGitHub: (req) => searchGitHub(req.query),
+    lookupGitHub: (req) => lookupGitHub(req.owner, req.name),
+    clone: (req, ctx) => cloneRepo(world, req.owner, req.name, ctx.signal),
     getWorktreeDetail: (req) => {
       const detail = world.gh.getWorktreeDetail(req.repoId, req.path);
       if (!detail) throw new ConnectError(`worktree ${req.path} not found`, Code.NotFound);
@@ -511,6 +521,19 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
+    case "POST /__mock/empty":
+      world.empty();
+      json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/threads":
+      // repo=repo-cf&count=3&status=busy|idle|attention[&prefix=Job]: connected threads in the repo's main worktree.
+      try {
+        const list = world.addThreads(q.get("repo") ?? "repo-cf", Number(q.get("count") ?? "1"), statusNames[q.get("status") ?? "busy"] ?? SessionStatus.BUSY, q.get("prefix") ?? "Thread");
+        json(res, 200, list.map((s) => s.id));
+      } catch (err) {
+        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
     case "GET /__mock/workspaces":
       json(res, 200, [...world.workspaces.values()]);
       break;
@@ -545,6 +568,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/gh/touch":
       json(res, world.gh.touch(q.get("path") ?? "") ? 200 : 404, { ok: true });
+      break;
+    case "GET /__mock/github/calls":
+      json(res, 200, githubCalls);
       break;
     case "GET /__mock/gh/calls":
       json(res, 200, world.gh.calls);
@@ -592,6 +618,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       sessionsEnabled = true;
       missingRpcs.clear();
       world.reset();
+      resetClones();
       json(res, 200, { ok: true });
       break;
     default:

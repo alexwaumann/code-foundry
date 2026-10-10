@@ -58,6 +58,14 @@ const (
 	RepoServiceListRefsProcedure = "/codefoundry.v1.RepoService/ListRefs"
 	// RepoServiceInitGitProcedure is the fully-qualified name of the RepoService's InitGit RPC.
 	RepoServiceInitGitProcedure = "/codefoundry.v1.RepoService/InitGit"
+	// RepoServiceSearchGitHubProcedure is the fully-qualified name of the RepoService's SearchGitHub
+	// RPC.
+	RepoServiceSearchGitHubProcedure = "/codefoundry.v1.RepoService/SearchGitHub"
+	// RepoServiceLookupGitHubProcedure is the fully-qualified name of the RepoService's LookupGitHub
+	// RPC.
+	RepoServiceLookupGitHubProcedure = "/codefoundry.v1.RepoService/LookupGitHub"
+	// RepoServiceCloneProcedure is the fully-qualified name of the RepoService's Clone RPC.
+	RepoServiceCloneProcedure = "/codefoundry.v1.RepoService/Clone"
 )
 
 // RepoServiceClient is a client for the codefoundry.v1.RepoService service.
@@ -93,6 +101,20 @@ type RepoServiceClient interface {
 	// <init.defaultBranch, else main>`, an empty "Initial commit", then a refresh.
 	// FailedPrecondition when the project is already a git repository.
 	InitGit(context.Context, *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error)
+	// SearchGitHub searches github.com repositories with GitHub's search syntax and
+	// returns the first 20 matches, best match first. The Add Project dialog sends it on
+	// Enter, never per keystroke. InvalidArgument for an empty query.
+	SearchGitHub(context.Context, *connect.Request[v1.SearchGitHubRequest]) (*connect.Response[v1.SearchGitHubResponse], error)
+	// LookupGitHub returns one github.com repository. NotFound when it does not exist or
+	// the viewer cannot see it.
+	LookupGitHub(context.Context, *connect.Request[v1.LookupGitHubRequest]) (*connect.Response[v1.LookupGitHubResponse], error)
+	// Clone runs `gh repo clone <owner>/<name> <config home>/projects/<owner>/<name> --
+	// --progress` (the user's gh login and protocol apply), streams its output as
+	// progress events, registers the clone and ends with a repo event. AlreadyExists when
+	// the destination exists; NotFound when GitHub has no such repository; other failures
+	// carry gh's last lines. Bounded at 15 minutes. Cancelling the stream kills the clone
+	// and removes what it wrote.
+	Clone(context.Context, *connect.Request[v1.CloneRepoRequest]) (*connect.ServerStreamForClient[v1.CloneRepoEvent], error)
 }
 
 // NewRepoServiceClient constructs a client for the codefoundry.v1.RepoService service. By default,
@@ -172,6 +194,24 @@ func NewRepoServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(repoServiceMethods.ByName("InitGit")),
 			connect.WithClientOptions(opts...),
 		),
+		searchGitHub: connect.NewClient[v1.SearchGitHubRequest, v1.SearchGitHubResponse](
+			httpClient,
+			baseURL+RepoServiceSearchGitHubProcedure,
+			connect.WithSchema(repoServiceMethods.ByName("SearchGitHub")),
+			connect.WithClientOptions(opts...),
+		),
+		lookupGitHub: connect.NewClient[v1.LookupGitHubRequest, v1.LookupGitHubResponse](
+			httpClient,
+			baseURL+RepoServiceLookupGitHubProcedure,
+			connect.WithSchema(repoServiceMethods.ByName("LookupGitHub")),
+			connect.WithClientOptions(opts...),
+		),
+		clone: connect.NewClient[v1.CloneRepoRequest, v1.CloneRepoEvent](
+			httpClient,
+			baseURL+RepoServiceCloneProcedure,
+			connect.WithSchema(repoServiceMethods.ByName("Clone")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -188,6 +228,9 @@ type repoServiceClient struct {
 	getWorktreeDetail *connect.Client[v1.GetWorktreeDetailRequest, v1.GetWorktreeDetailResponse]
 	listRefs          *connect.Client[v1.ListRefsRequest, v1.ListRefsResponse]
 	initGit           *connect.Client[v1.InitGitRequest, v1.InitGitResponse]
+	searchGitHub      *connect.Client[v1.SearchGitHubRequest, v1.SearchGitHubResponse]
+	lookupGitHub      *connect.Client[v1.LookupGitHubRequest, v1.LookupGitHubResponse]
+	clone             *connect.Client[v1.CloneRepoRequest, v1.CloneRepoEvent]
 }
 
 // Register calls codefoundry.v1.RepoService.Register.
@@ -245,6 +288,21 @@ func (c *repoServiceClient) InitGit(ctx context.Context, req *connect.Request[v1
 	return c.initGit.CallUnary(ctx, req)
 }
 
+// SearchGitHub calls codefoundry.v1.RepoService.SearchGitHub.
+func (c *repoServiceClient) SearchGitHub(ctx context.Context, req *connect.Request[v1.SearchGitHubRequest]) (*connect.Response[v1.SearchGitHubResponse], error) {
+	return c.searchGitHub.CallUnary(ctx, req)
+}
+
+// LookupGitHub calls codefoundry.v1.RepoService.LookupGitHub.
+func (c *repoServiceClient) LookupGitHub(ctx context.Context, req *connect.Request[v1.LookupGitHubRequest]) (*connect.Response[v1.LookupGitHubResponse], error) {
+	return c.lookupGitHub.CallUnary(ctx, req)
+}
+
+// Clone calls codefoundry.v1.RepoService.Clone.
+func (c *repoServiceClient) Clone(ctx context.Context, req *connect.Request[v1.CloneRepoRequest]) (*connect.ServerStreamForClient[v1.CloneRepoEvent], error) {
+	return c.clone.CallServerStream(ctx, req)
+}
+
 // RepoServiceHandler is an implementation of the codefoundry.v1.RepoService service.
 type RepoServiceHandler interface {
 	// Register adds a project by path. A path inside a git repository registers that
@@ -278,6 +336,20 @@ type RepoServiceHandler interface {
 	// <init.defaultBranch, else main>`, an empty "Initial commit", then a refresh.
 	// FailedPrecondition when the project is already a git repository.
 	InitGit(context.Context, *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error)
+	// SearchGitHub searches github.com repositories with GitHub's search syntax and
+	// returns the first 20 matches, best match first. The Add Project dialog sends it on
+	// Enter, never per keystroke. InvalidArgument for an empty query.
+	SearchGitHub(context.Context, *connect.Request[v1.SearchGitHubRequest]) (*connect.Response[v1.SearchGitHubResponse], error)
+	// LookupGitHub returns one github.com repository. NotFound when it does not exist or
+	// the viewer cannot see it.
+	LookupGitHub(context.Context, *connect.Request[v1.LookupGitHubRequest]) (*connect.Response[v1.LookupGitHubResponse], error)
+	// Clone runs `gh repo clone <owner>/<name> <config home>/projects/<owner>/<name> --
+	// --progress` (the user's gh login and protocol apply), streams its output as
+	// progress events, registers the clone and ends with a repo event. AlreadyExists when
+	// the destination exists; NotFound when GitHub has no such repository; other failures
+	// carry gh's last lines. Bounded at 15 minutes. Cancelling the stream kills the clone
+	// and removes what it wrote.
+	Clone(context.Context, *connect.Request[v1.CloneRepoRequest], *connect.ServerStream[v1.CloneRepoEvent]) error
 }
 
 // NewRepoServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -353,6 +425,24 @@ func NewRepoServiceHandler(svc RepoServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(repoServiceMethods.ByName("InitGit")),
 		connect.WithHandlerOptions(opts...),
 	)
+	repoServiceSearchGitHubHandler := connect.NewUnaryHandler(
+		RepoServiceSearchGitHubProcedure,
+		svc.SearchGitHub,
+		connect.WithSchema(repoServiceMethods.ByName("SearchGitHub")),
+		connect.WithHandlerOptions(opts...),
+	)
+	repoServiceLookupGitHubHandler := connect.NewUnaryHandler(
+		RepoServiceLookupGitHubProcedure,
+		svc.LookupGitHub,
+		connect.WithSchema(repoServiceMethods.ByName("LookupGitHub")),
+		connect.WithHandlerOptions(opts...),
+	)
+	repoServiceCloneHandler := connect.NewServerStreamHandler(
+		RepoServiceCloneProcedure,
+		svc.Clone,
+		connect.WithSchema(repoServiceMethods.ByName("Clone")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.RepoService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RepoServiceRegisterProcedure:
@@ -377,6 +467,12 @@ func NewRepoServiceHandler(svc RepoServiceHandler, opts ...connect.HandlerOption
 			repoServiceListRefsHandler.ServeHTTP(w, r)
 		case RepoServiceInitGitProcedure:
 			repoServiceInitGitHandler.ServeHTTP(w, r)
+		case RepoServiceSearchGitHubProcedure:
+			repoServiceSearchGitHubHandler.ServeHTTP(w, r)
+		case RepoServiceLookupGitHubProcedure:
+			repoServiceLookupGitHubHandler.ServeHTTP(w, r)
+		case RepoServiceCloneProcedure:
+			repoServiceCloneHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -428,4 +524,16 @@ func (UnimplementedRepoServiceHandler) ListRefs(context.Context, *connect.Reques
 
 func (UnimplementedRepoServiceHandler) InitGit(context.Context, *connect.Request[v1.InitGitRequest]) (*connect.Response[v1.InitGitResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.InitGit is not implemented"))
+}
+
+func (UnimplementedRepoServiceHandler) SearchGitHub(context.Context, *connect.Request[v1.SearchGitHubRequest]) (*connect.Response[v1.SearchGitHubResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.SearchGitHub is not implemented"))
+}
+
+func (UnimplementedRepoServiceHandler) LookupGitHub(context.Context, *connect.Request[v1.LookupGitHubRequest]) (*connect.Response[v1.LookupGitHubResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.LookupGitHub is not implemented"))
+}
+
+func (UnimplementedRepoServiceHandler) Clone(context.Context, *connect.Request[v1.CloneRepoRequest], *connect.ServerStream[v1.CloneRepoEvent]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.Clone is not implemented"))
 }
