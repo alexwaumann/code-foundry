@@ -7,6 +7,7 @@ import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { MemberChips, type MemberChipModel } from "./MemberChips";
 import { PromptEditor, type PromptEditorHandle } from "./PromptEditor";
 import { ATTACHMENT_MIME_TYPES } from "@/api/session";
+import { Backdrop } from "@/components/backdrop/Backdrop";
 import {
   choiceLabel,
   DEFAULT_EFFORT,
@@ -365,7 +366,9 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
     <div onKeyDown={cycleStops}>
       <MemberChips draftKey={draftKey} members={chips} primary={primary} canAdd={target.kind === "project"} disabled={busy} />
       <div
-        className="grid grid-cols-[minmax(0,1fr)_auto]"
+        // isolate: the surface's backdrop-filter makes it a stacking context, which would
+        // paint over the in-flow prompt and toolbar; -z-10 inside this context keeps it under them.
+        className="isolate grid grid-cols-[minmax(0,1fr)_auto]"
         data-testid="composer-card"
         data-dragging={dragging || undefined}
         onDragOver={(e) => {
@@ -390,8 +393,9 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
         <div
           aria-hidden
           className={cn(
-            "col-span-2 col-start-1 row-span-2 row-start-1 rounded-2xl border bg-card shadow-sm transition-colors",
-            dragging ? "border-sky-400/70 bg-sky-400/5" : "border-border",
+            // Translucent over the backdrop, frosted so the prompt stays readable.
+            "-z-10 col-span-2 col-start-1 row-span-2 row-start-1 rounded-2xl border shadow-sm backdrop-blur-xl transition-colors",
+            dragging ? "border-sky-400/70 bg-sky-400/5" : "border-border bg-card/85",
           )}
         />
         <div className="col-span-2 col-start-1 row-start-1 flex min-w-0 flex-col">
@@ -582,17 +586,21 @@ export function Composer({ repoId, workspaceId }: { repoId: string; workspaceId?
     // Centered in the pane both ways at any size: auto margins in a column flexbox center
     // the block and, unlike justify-center, fall back to 0 (scrollable from the top) when
     // the draft outgrows the pane.
-    <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-10" data-region="content" aria-label="New thread" data-testid="composer">
-      {name === null ? (
-        <p className="m-auto text-sm text-muted-foreground">{loaded ? gone : "Loading…"}</p>
-      ) : (
-        <div className="m-auto w-full max-w-2xl" data-testid="composer-body">
-          <h1 className="mb-6 text-center text-2xl font-semibold tracking-tight" data-testid="composer-heading">
-            What should we build in <span className="text-foreground">{name}</span>?
-          </h1>
-          <ComposerCard target={target} />
-        </div>
-      )}
-    </section>
+    // The backdrop sits behind the scrolling section, so it stays put when a long draft scrolls.
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+      <Backdrop />
+      <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-10" data-region="content" aria-label="New thread" data-testid="composer">
+        {name === null ? (
+          <p className="m-auto text-sm text-muted-foreground">{loaded ? gone : "Loading…"}</p>
+        ) : (
+          <div className="m-auto w-full max-w-2xl" data-testid="composer-body">
+            <h1 className="mb-6 text-center text-2xl font-semibold tracking-tight" data-testid="composer-heading">
+              What should we build in <span className="text-foreground">{name}</span>?
+            </h1>
+            <ComposerCard target={target} />
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
