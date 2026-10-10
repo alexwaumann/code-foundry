@@ -65,7 +65,9 @@ title band, and their headers occupy it.
   names the TS constant.
 * Sidebar (`Sidebar.tsx`, `SidebarBand`): a 52px band, the empty 80px gutter
   (`traffic-light-gutter`), then the Repositories header (title, attention badge, count,
-  new thread, new terminal). Pull Requests and the tree follow below the band.
+  new thread, new terminal). Pull Requests and the tree follow below the band. (Since
+  superseded: the header is the app name with the attention badge and New thread; see
+  sidebar-title-band.md.)
 * Content pane (`App.tsx`): `m-2`, so it floats 8px from the window top as from its
   other edges. The side panel wrapper gains `mt-2`.
 * Every content pane header is a `PaneHeader` (`components/window/PaneHeader.tsx`):

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONTENT_MIN, PANE_GAPS, PANEL_MIN, clampPanelWidth, panelMax, useUiStore, type FocusRegion } from "./ui";
+import { CONTENT_MIN, PANE_GAPS, PANEL_MIN, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, clampPanelWidth, panelMax, useUiStore, type FocusRegion } from "./ui";
 
 describe("panelMax", () => {
   const cases: [string, number, number, number][] = [
@@ -7,7 +7,7 @@ describe("panelMax", () => {
     ["room beside the sidebar when that is less", 1400, 520, 1400 - 520 - PANE_GAPS - CONTENT_MIN],
     ["sidebar hidden", 1000, 0, 600],
     ["no room: below the minimum", 1000, 520, 1000 - 520 - PANE_GAPS - CONTENT_MIN],
-    ["900px minimum window, default sidebar", 900, 260, 900 - 260 - PANE_GAPS - CONTENT_MIN],
+    ["900px minimum window, default sidebar", 900, SIDEBAR_DEFAULT, 900 - SIDEBAR_DEFAULT - PANE_GAPS - CONTENT_MIN],
   ];
   it.each(cases)("%s", (_name, windowWidth, sidebar, want) => {
     expect(panelMax(windowWidth, sidebar)).toBe(want);
@@ -15,7 +15,7 @@ describe("panelMax", () => {
 
   it("leaves the content pane its minimum whenever the panel fits", () => {
     for (const windowWidth of [900, 1000, 1280, 1600]) {
-      for (const sidebar of [0, 180, 260, 520]) {
+      for (const sidebar of [0, SIDEBAR_MIN, 260, SIDEBAR_MAX]) {
         const max = panelMax(windowWidth, sidebar);
         if (max < PANEL_MIN) continue;
         expect(windowWidth - sidebar - PANE_GAPS - max).toBeGreaterThanOrEqual(CONTENT_MIN);
@@ -52,6 +52,24 @@ describe("ui persistence", () => {
     const v1 = { sidebarVisible: false, sidebarWidth: 300, panelWidth: 600, fontSize: 14, collapsed: { a: true } };
     expect(await migrate?.(v1, 1)).toEqual({ sidebarVisible: false, sidebarWidth: 300, fontSize: 14 });
     expect(await migrate?.({ sidebarWidth: 280, collapsed: {} }, 2)).toEqual({ sidebarWidth: 280 });
+  });
+
+  const widths: [string, unknown, number][] = [
+    ["a width saved under the old 180 minimum is raised", { sidebarWidth: 180 }, SIDEBAR_MIN],
+    ["a width above the maximum is lowered", { sidebarWidth: 900 }, SIDEBAR_MAX],
+    ["a width inside the bounds is kept, rounded", { sidebarWidth: 300.4 }, 300],
+    ["no saved width keeps the default", { fontSize: 14 }, SIDEBAR_DEFAULT],
+    ["nothing saved keeps the default", undefined, SIDEBAR_DEFAULT],
+  ];
+  it.each(widths)("loading: %s", (_name, persisted, want) => {
+    const merge = useUiStore.persist.getOptions().merge;
+    const current = { ...useUiStore.getState(), sidebarWidth: SIDEBAR_DEFAULT };
+    expect(merge?.(persisted, current).sidebarWidth).toBe(want);
+  });
+
+  it("loading keeps the other saved fields", () => {
+    const merged = useUiStore.persist.getOptions().merge?.({ sidebarVisible: false, sidebarWidth: 180, fontSize: 15 }, useUiStore.getState());
+    expect(merged).toMatchObject({ sidebarVisible: false, sidebarWidth: SIDEBAR_MIN, fontSize: 15 });
   });
 
   it("does not save a panel width", () => {

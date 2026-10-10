@@ -60,7 +60,9 @@ daemon with real haiku threads (below). Design record: `workspaces-handoff.md` (
   page selections have no sidebar row.
 * **"New terminal" in the band** acts on the selected thread's worktree: `terminal.new`'s
   cwd is context-bound and a thread selection's context is its worktree (unchanged code,
-  new e2e). The welcome panel and empty states are unchanged.
+  new e2e). The welcome panel and empty states are unchanged. (Superseded: the band's
+  New terminal button was removed; terminal.new stays in the palette. See
+  sidebar-title-band.md.)
 * **Pinning is implemented** (it did not exist). `session.pin` toggles (`Get` then `Pin`),
   or sets with `--pinned`; the row menu passes the explicit value. `SessionService.Pin`
   works in any state and persists (`sessions.pinned`, migration 0009). No keybinding
@@ -106,7 +108,8 @@ daemon with real haiku threads (below). Design record: `workspaces-handoff.md` (
 * **"Project" copy.** Daemon command titles, the palette category and confirm prompts for
   `repo.*` and `workspace.add-repo / remove-repo` say project ("Add Project", "Remove
   Project", "Refresh Project Status", "Add Project to Workspace", "Remove Project from
-  Workspace"); GUI copy too (sidebar band "Threads", welcome counts, picker and composer
+  Workspace"); GUI copy too (sidebar band "Threads", since replaced by the app name per
+  sidebar-title-band.md; welcome counts, picker and composer
   messages, overview, help). Command names, args and identifiers keep `repo`. GitHub's
   "repository" stays where it means the GitHub repository (Pull Requests page, reviewers).
 * **Context menus** did not exist before. One Radix `ContextMenu` wraps the list
