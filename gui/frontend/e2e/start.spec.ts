@@ -20,10 +20,11 @@ test("onboarding: no projects shows the welcome and Add a project", async ({ pag
   await expect(page.getByTestId("onboarding-steps")).toHaveCount(0);
   await expect(page.getByTestId("backdrop")).toHaveCount(1);
 
-  // Add a project is repo.add: the Add Project dialog, on New (there are no projects yet).
+  // Add a project is repo.add: the Add Project dialog, on Local folder with the path focused.
   await page.getByTestId("welcome-actions").getByRole("button", { name: "Add a project" }).click();
   await expect(page.getByTestId("add-project-dialog")).toBeVisible();
-  await expect(page.getByTestId("add-project-dialog")).toHaveAttribute("data-tab", "new");
+  await expect(page.getByTestId("add-project-dialog")).toHaveAttribute("data-tab", "local");
+  await expect(page.getByTestId("add-project-local-input")).toBeFocused();
   await expect(page.getByTestId("palette")).toHaveCount(0);
   expect((await invocations()).filter((i) => i.name.startsWith("repo."))).toEqual([]);
 });

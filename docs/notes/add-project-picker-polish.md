@@ -70,8 +70,29 @@ add-project PRs (`add-project-handoff.md`), from Alex's review of the dialog.
   without a request), `TestDelete` (6 cases), `TestDeleteWhilePublishing`,
   `TestDeleteRepo`, `TestListPublishOwners` (`allow_stale`), `repo.delete` rows in
   `TestRepoCreateAndPublish`. Vitest: `homeRelative` / `homeDisplay`.
-* `make gui-e2e`: see the run recorded below.
-* Live checks against a scratch daemon and the built app: below.
+* `make gui-e2e`: 349 passed, 3 failed on the first full run. Two were
+  `start.spec.ts` "onboarding" expecting the New tab (updated to Local folder with the
+  path focused). The third, and two more on a rerun, were `compose.spec.ts` on Chromium
+  timing out on a plain click while another session's Playwright run shared the CPU;
+  one of them failed the same way on `main`. With the machine idle, `compose.spec.ts`
+  on Chromium passed 14/14. `e2e/create.spec.ts`, `addproject.spec.ts`, `paths.spec.ts`:
+  38/38 on both engines.
+* Scratch daemon (`CODE_FOUNDRY_HOME=~/.cf-picker-scratch`, `bin/code-foundry daemon
+  --dev`): `ListPublishOwners {allowStale:true}` fetched in 2.7 s the first time
+  (alexwaumann, black-blossom, dream-shader; both orgs `viewerCanCreateRepositories`
+  true), then 0.4 ms; after a daemon restart the same request answered from sqlite in
+  0.8 ms with no GitHub request in the log. `repo create cf-picker-test` then
+  `repo delete --repo <id> --yes` -> "deleted <id>", folder gone; `repo delete` on this
+  worktree (registered from elsewhere) -> "not available in this context: project is
+  not in the projects directory; use Remove Project". The scratch home must be under
+  `$HOME` (the projects directory is checked against it): `/tmp/...` is refused.
+* Built app on the scratch daemon: the dialog opens on Local folder with the path
+  focused, the close button top right, the permanent `~/` before the typed text.
+  Mock screenshots (Playwright): the owners picker, a refused publish with Keep it
+  local, and the bare Done once the publish step is unchecked.
+* Not verified live: cancelling the dialog from the built app after a real refused
+  publish (covered against the mock in `create.spec.ts`); the native folder picker
+  mapped through `homeRelative`.
 
 ## Gotchas
 
