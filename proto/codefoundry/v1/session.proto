@@ -69,13 +69,19 @@ enum SessionStatus {
   SESSION_STATUS_NEEDS_ATTENTION = 3;
 }
 
+// Ownership: a thread belongs to exactly one owner. When workspace_id is set the owner
+// is that workspace; otherwise it is the project (repository) repo_id. repo_id and
+// worktree_path are facts about the thread's cwd (for a workspace thread, the member
+// worktree it runs in) and never decide the owner.
 message Session {
   // Our stable id (survives reconnects).
   string id = 1;
   // Claude's own session id, once discovered from the transcript directory. Needed for
   // resume; empty until known.
   string claude_session_id = 2;
+  // Repository of the cwd. The owner when workspace_id is empty.
   string repo_id = 3;
+  // The cwd: the worktree claude runs in.
   string worktree_path = 4;
   // Display name. Auto-generated unless the user renamed it.
   string name = 5;
@@ -103,8 +109,12 @@ message Session {
   PermissionMode permission_mode = 19;
   // Ref the session's worktree branch was created from, when Create made the worktree.
   string base_ref = 20;
-  // Create made the worktree for this session (new_worktree was set).
+  // Create made the worktree for this session (new_worktree or new_workspace was set).
   bool created_worktree = 21;
+  // Owner workspace (see the ownership rule above); empty for a project thread. Every
+  // spawn of a workspace thread gets --add-dir for the workspace's other member
+  // worktrees, read from the workspace store at launch.
+  string workspace_id = 22;
 }
 
 message CreateSessionRequest {
@@ -123,11 +133,32 @@ message CreateSessionRequest {
   NewWorktree new_worktree = 8;
   // Paths returned by StageAttachment, appended to initial_prompt.
   repeated string attachments = 9;
+  // Workspace (id or name) the thread belongs to. repo_id or worktree_path then pick
+  // the member worktree it runs in (default: the first member); a worktree_path must
+  // be a member's worktree. Not with new_worktree or new_workspace.
+  string workspace_id = 10;
+  // When set, Create makes a new workspace for the thread before claude starts: a
+  // worktree on branch cf/<slug> in every repository listed (the slug as for
+  // new_worktree, after the same single bounded wait), then runs the thread in the
+  // member repo_id names (default: the first). worktree_path is ignored. Not with
+  // new_worktree or workspace_id.
+  NewWorkspace new_workspace = 11;
 }
 
 message NewWorktree {
   // Ref to branch from. Defaults to origin/<default branch>, else <default branch>.
   string base_ref = 1;
+}
+
+message NewWorkspace {
+  // Repositories (id, name when unique, or an absolute path inside one), in member
+  // order. At least one.
+  repeated string repos = 1;
+  // Ref every member branches from. Defaults to origin/<default branch>, else
+  // <default branch>, per repository.
+  string base_ref = 2;
+  // Workspace name. Default: the slug (cf/<slug> without the prefix).
+  string name = 3;
 }
 
 message StageAttachmentRequest {

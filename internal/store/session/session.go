@@ -103,11 +103,14 @@ const (
 
 // Session is an immutable snapshot of one session. Field meanings follow
 // codefoundry.v1.Session.
+//
+// Owner: WorkspaceID when set, else the project RepoID. RepoID and WorktreePath are
+// the cwd (for a workspace thread, the member worktree it runs in), never the owner.
 type Session struct {
 	ID              string
 	ClaudeSessionID string // set once the transcript file is discovered
-	RepoID          string
-	WorktreePath    string
+	RepoID          string // repository of the cwd; the owner when WorkspaceID is empty
+	WorktreePath    string // the cwd
 	Name            string
 	AutoNamed       bool
 	Model           string
@@ -129,6 +132,9 @@ type Session struct {
 	// worktree (CreatedWorktree).
 	BaseRef         string
 	CreatedWorktree bool
+	// WorkspaceID is the owner workspace; empty for a project thread. Each spawn reads
+	// the workspace's current members from the workspace store.
+	WorkspaceID string
 }
 
 // Snapshot is every session, sorted by creation time then id. Never mutate it.

@@ -183,6 +183,7 @@ func sessionToProto(s session.Session) *v1.Session {
 		PermissionMode:   v1.PermissionMode(s.PermissionMode),
 		BaseRef:          s.BaseRef,
 		CreatedWorktree:  s.CreatedWorktree,
+		WorkspaceId:      s.WorkspaceID,
 	}
 	if !s.CreatedAt.IsZero() {
 		p.CreatedAt = timestamppb.New(s.CreatedAt)

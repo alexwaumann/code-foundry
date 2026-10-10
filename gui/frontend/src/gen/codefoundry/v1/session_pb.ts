@@ -12,9 +12,14 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/session.proto.
  */
 export const file_codefoundry_v1_session: GenFile = /*@__PURE__*/
-  fileDesc("Chxjb2RlZm91bmRyeS92MS9zZXNzaW9uLnByb3RvEg5jb2RlZm91bmRyeS52MSLBBAoHU2Vzc2lvbhIKCgJpZBgBIAEoCRIZChFjbGF1ZGVfc2Vzc2lvbl9pZBgCIAEoCRIPCgdyZXBvX2lkGAMgASgJEhUKDXdvcmt0cmVlX3BhdGgYBCABKAkSDAoEbmFtZRgFIAEoCRISCgphdXRvX25hbWVkGAYgASgIEg0KBW1vZGVsGAcgASgJEg4KBmVmZm9ydBgIIAEoCRITCgt0ZXJtaW5hbF9pZBgJIAEoCRIrCgVzdGF0ZRgKIAEoDjIcLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb25TdGF0ZRItCgZzdGF0dXMYCyABKA4yHS5jb2RlZm91bmRyeS52MS5TZXNzaW9uU3RhdHVzEi4KCmNyZWF0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjQKEGxhc3RfYWN0aXZpdHlfYXQYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhEKCWV4aXRfY29kZRgOIAEoBRIZChFkaXNjb25uZWN0X3JlYXNvbhgPIAEoCRISCgpsYXN0X2Vycm9yGBAgASgJEhEKCXBhcmVudF9pZBgRIAEoCRIVCg1zdGF0dXNfcmVhc29uGBIgASgJEjcKD3Blcm1pc3Npb25fbW9kZRgTIAEoDjIeLmNvZGVmb3VuZHJ5LnYxLlBlcm1pc3Npb25Nb2RlEhAKCGJhc2VfcmVmGBQgASgJEhgKEGNyZWF0ZWRfd29ya3RyZWUYFSABKAgihAIKFENyZWF0ZVNlc3Npb25SZXF1ZXN0Eg8KB3JlcG9faWQYASABKAkSFQoNd29ya3RyZWVfcGF0aBgCIAEoCRINCgVtb2RlbBgDIAEoCRIOCgZlZmZvcnQYBCABKAkSDAoEbmFtZRgFIAEoCRIWCg5pbml0aWFsX3Byb21wdBgGIAEoCRI3Cg9wZXJtaXNzaW9uX21vZGUYByABKA4yHi5jb2RlZm91bmRyeS52MS5QZXJtaXNzaW9uTW9kZRIxCgxuZXdfd29ya3RyZWUYCCABKAsyGy5jb2RlZm91bmRyeS52MS5OZXdXb3JrdHJlZRITCgthdHRhY2htZW50cxgJIAMoCSIfCgtOZXdXb3JrdHJlZRIQCghiYXNlX3JlZhgBIAEoCSJHChZTdGFnZUF0dGFjaG1lbnRSZXF1ZXN0EgwKBG5hbWUYASABKAkSEQoJbWltZV90eXBlGAIgASgJEgwKBGRhdGEYAyABKAwiJwoXU3RhZ2VBdHRhY2htZW50UmVzcG9uc2USDAoEcGF0aBgBIAEoCSJBChVDcmVhdGVTZXNzaW9uUmVzcG9uc2USKAoHc2Vzc2lvbhgBIAEoCzIXLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb24iLgoSRm9ya1Nlc3Npb25SZXF1ZXN0EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkiPwoTRm9ya1Nlc3Npb25SZXNwb25zZRIoCgdzZXNzaW9uGAEgASgLMhcuY29kZWZvdW5kcnkudjEuU2Vzc2lvbiIVChNMaXN0U2Vzc2lvbnNSZXF1ZXN0IkEKFExpc3RTZXNzaW9uc1Jlc3BvbnNlEikKCHNlc3Npb25zGAEgAygLMhcuY29kZWZvdW5kcnkudjEuU2Vzc2lvbiIfChFHZXRTZXNzaW9uUmVxdWVzdBIKCgJpZBgBIAEoCSI+ChJHZXRTZXNzaW9uUmVzcG9uc2USKAoHc2Vzc2lvbhgBIAEoCzIXLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb24iMAoUUmVuYW1lU2Vzc2lvblJlcXVlc3QSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCSJBChVSZW5hbWVTZXNzaW9uUmVzcG9uc2USKAoHc2Vzc2lvbhgBIAEoCzIXLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb24iIQoTQ2xvc2VTZXNzaW9uUmVxdWVzdBIKCgJpZBgBIAEoCSIWChRDbG9zZVNlc3Npb25SZXNwb25zZSIlChdSZWNvbm5lY3RTZXNzaW9uUmVxdWVzdBIKCgJpZBgBIAEoCSJEChhSZWNvbm5lY3RTZXNzaW9uUmVzcG9uc2USKAoHc2Vzc2lvbhgBIAEoCzIXLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb24iIgoUUmVtb3ZlU2Vzc2lvblJlcXVlc3QSCgoCaWQYASABKAkiFwoVUmVtb3ZlU2Vzc2lvblJlc3BvbnNlIhYKFFdhdGNoU2Vzc2lvbnNSZXF1ZXN0Io4BCgxTZXNzaW9uRXZlbnQSMwoIc25hcHNob3QYASABKAsyHy5jb2RlZm91bmRyeS52MS5TZXNzaW9uU25hcHNob3RIABIqCgd1cGRhdGVkGAIgASgLMhcuY29kZWZvdW5kcnkudjEuU2Vzc2lvbkgAEhQKCnJlbW92ZWRfaWQYAyABKAlIAEIHCgVldmVudCI8Cg9TZXNzaW9uU25hcHNob3QSKQoIc2Vzc2lvbnMYASADKAsyFy5jb2RlZm91bmRyeS52MS5TZXNzaW9uKo0BCg5QZXJtaXNzaW9uTW9kZRIfChtQRVJNSVNTSU9OX01PREVfVU5TUEVDSUZJRUQQABIeChpQRVJNSVNTSU9OX01PREVfU1VQRVJWSVNFRBABEiAKHFBFUk1JU1NJT05fTU9ERV9BQ0NFUFRfRURJVFMQAhIYChRQRVJNSVNTSU9OX01PREVfQVVUTxADKqEBCgxTZXNzaW9uU3RhdGUSHQoZU0VTU0lPTl9TVEFURV9VTlNQRUNJRklFRBAAEhoKFlNFU1NJT05fU1RBVEVfU1RBUlRJTkcQARIbChdTRVNTSU9OX1NUQVRFX0NPTk5FQ1RFRBACEhkKFVNFU1NJT05fU1RBVEVfQ0xPU0lORxADEh4KGlNFU1NJT05fU1RBVEVfRElTQ09OTkVDVEVEEAQqhQEKDVNlc3Npb25TdGF0dXMSHgoaU0VTU0lPTl9TVEFUVVNfVU5TUEVDSUZJRUQQABIXChNTRVNTSU9OX1NUQVRVU19CVVNZEAESFwoTU0VTU0lPTl9TVEFUVVNfSURMRRACEiIKHlNFU1NJT05fU1RBVFVTX05FRURTX0FUVEVOVElPThADMoIHCg5TZXNzaW9uU2VydmljZRJXCgZDcmVhdGUSJC5jb2RlZm91bmRyeS52MS5DcmVhdGVTZXNzaW9uUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZVNlc3Npb25SZXNwb25zZSIAElEKBEZvcmsSIi5jb2RlZm91bmRyeS52MS5Gb3JrU2Vzc2lvblJlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5Gb3JrU2Vzc2lvblJlc3BvbnNlIgASUwoETGlzdBIjLmNvZGVmb3VuZHJ5LnYxLkxpc3RTZXNzaW9uc1JlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5MaXN0U2Vzc2lvbnNSZXNwb25zZSIAEk4KA0dldBIhLmNvZGVmb3VuZHJ5LnYxLkdldFNlc3Npb25SZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuR2V0U2Vzc2lvblJlc3BvbnNlIgASVwoGUmVuYW1lEiQuY29kZWZvdW5kcnkudjEuUmVuYW1lU2Vzc2lvblJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5SZW5hbWVTZXNzaW9uUmVzcG9uc2UiABJUCgVDbG9zZRIjLmNvZGVmb3VuZHJ5LnYxLkNsb3NlU2Vzc2lvblJlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5DbG9zZVNlc3Npb25SZXNwb25zZSIAEmAKCVJlY29ubmVjdBInLmNvZGVmb3VuZHJ5LnYxLlJlY29ubmVjdFNlc3Npb25SZXF1ZXN0GiguY29kZWZvdW5kcnkudjEuUmVjb25uZWN0U2Vzc2lvblJlc3BvbnNlIgASVwoGUmVtb3ZlEiQuY29kZWZvdW5kcnkudjEuUmVtb3ZlU2Vzc2lvblJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5SZW1vdmVTZXNzaW9uUmVzcG9uc2UiABJPCgVXYXRjaBIkLmNvZGVmb3VuZHJ5LnYxLldhdGNoU2Vzc2lvbnNSZXF1ZXN0GhwuY29kZWZvdW5kcnkudjEuU2Vzc2lvbkV2ZW50IgAwARJkCg9TdGFnZUF0dGFjaG1lbnQSJi5jb2RlZm91bmRyeS52MS5TdGFnZUF0dGFjaG1lbnRSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuU3RhZ2VBdHRhY2htZW50UmVzcG9uc2UiAELEAQoSY29tLmNvZGVmb3VuZHJ5LnYxQgxTZXNzaW9uUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp]);
+  fileDesc("Chxjb2RlZm91bmRyeS92MS9zZXNzaW9uLnByb3RvEg5jb2RlZm91bmRyeS52MSLXBAoHU2Vzc2lvbhIKCgJpZBgBIAEoCRIZChFjbGF1ZGVfc2Vzc2lvbl9pZBgCIAEoCRIPCgdyZXBvX2lkGAMgASgJEhUKDXdvcmt0cmVlX3BhdGgYBCABKAkSDAoEbmFtZRgFIAEoCRISCgphdXRvX25hbWVkGAYgASgIEg0KBW1vZGVsGAcgASgJEg4KBmVmZm9ydBgIIAEoCRITCgt0ZXJtaW5hbF9pZBgJIAEoCRIrCgVzdGF0ZRgKIAEoDjIcLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb25TdGF0ZRItCgZzdGF0dXMYCyABKA4yHS5jb2RlZm91bmRyeS52MS5TZXNzaW9uU3RhdHVzEi4KCmNyZWF0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjQKEGxhc3RfYWN0aXZpdHlfYXQYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhEKCWV4aXRfY29kZRgOIAEoBRIZChFkaXNjb25uZWN0X3JlYXNvbhgPIAEoCRISCgpsYXN0X2Vycm9yGBAgASgJEhEKCXBhcmVudF9pZBgRIAEoCRIVCg1zdGF0dXNfcmVhc29uGBIgASgJEjcKD3Blcm1pc3Npb25fbW9kZRgTIAEoDjIeLmNvZGVmb3VuZHJ5LnYxLlBlcm1pc3Npb25Nb2RlEhAKCGJhc2VfcmVmGBQgASgJEhgKEGNyZWF0ZWRfd29ya3RyZWUYFSABKAgSFAoMd29ya3NwYWNlX2lkGBYgASgJIs8CChRDcmVhdGVTZXNzaW9uUmVxdWVzdBIPCgdyZXBvX2lkGAEgASgJEhUKDXdvcmt0cmVlX3BhdGgYAiABKAkSDQoFbW9kZWwYAyABKAkSDgoGZWZmb3J0GAQgASgJEgwKBG5hbWUYBSABKAkSFgoOaW5pdGlhbF9wcm9tcHQYBiABKAkSNwoPcGVybWlzc2lvbl9tb2RlGAcgASgOMh4uY29kZWZvdW5kcnkudjEuUGVybWlzc2lvbk1vZGUSMQoMbmV3X3dvcmt0cmVlGAggASgLMhsuY29kZWZvdW5kcnkudjEuTmV3V29ya3RyZWUSEwoLYXR0YWNobWVudHMYCSADKAkSFAoMd29ya3NwYWNlX2lkGAogASgJEjMKDW5ld193b3Jrc3BhY2UYCyABKAsyHC5jb2RlZm91bmRyeS52MS5OZXdXb3Jrc3BhY2UiHwoLTmV3V29ya3RyZWUSEAoIYmFzZV9yZWYYASABKAkiPQoMTmV3V29ya3NwYWNlEg0KBXJlcG9zGAEgAygJEhAKCGJhc2VfcmVmGAIgASgJEgwKBG5hbWUYAyABKAkiRwoWU3RhZ2VBdHRhY2htZW50UmVxdWVzdBIMCgRuYW1lGAEgASgJEhEKCW1pbWVfdHlwZRgCIAEoCRIMCgRkYXRhGAMgASgMIicKF1N0YWdlQXR0YWNobWVudFJlc3BvbnNlEgwKBHBhdGgYASABKAkiQQoVQ3JlYXRlU2Vzc2lvblJlc3BvbnNlEigKB3Nlc3Npb24YASABKAsyFy5jb2RlZm91bmRyeS52MS5TZXNzaW9uIi4KEkZvcmtTZXNzaW9uUmVxdWVzdBIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJIj8KE0ZvcmtTZXNzaW9uUmVzcG9uc2USKAoHc2Vzc2lvbhgBIAEoCzIXLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb24iFQoTTGlzdFNlc3Npb25zUmVxdWVzdCJBChRMaXN0U2Vzc2lvbnNSZXNwb25zZRIpCghzZXNzaW9ucxgBIAMoCzIXLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb24iHwoRR2V0U2Vzc2lvblJlcXVlc3QSCgoCaWQYASABKAkiPgoSR2V0U2Vzc2lvblJlc3BvbnNlEigKB3Nlc3Npb24YASABKAsyFy5jb2RlZm91bmRyeS52MS5TZXNzaW9uIjAKFFJlbmFtZVNlc3Npb25SZXF1ZXN0EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkiQQoVUmVuYW1lU2Vzc2lvblJlc3BvbnNlEigKB3Nlc3Npb24YASABKAsyFy5jb2RlZm91bmRyeS52MS5TZXNzaW9uIiEKE0Nsb3NlU2Vzc2lvblJlcXVlc3QSCgoCaWQYASABKAkiFgoUQ2xvc2VTZXNzaW9uUmVzcG9uc2UiJQoXUmVjb25uZWN0U2Vzc2lvblJlcXVlc3QSCgoCaWQYASABKAkiRAoYUmVjb25uZWN0U2Vzc2lvblJlc3BvbnNlEigKB3Nlc3Npb24YASABKAsyFy5jb2RlZm91bmRyeS52MS5TZXNzaW9uIiIKFFJlbW92ZVNlc3Npb25SZXF1ZXN0EgoKAmlkGAEgASgJIhcKFVJlbW92ZVNlc3Npb25SZXNwb25zZSIWChRXYXRjaFNlc3Npb25zUmVxdWVzdCKOAQoMU2Vzc2lvbkV2ZW50EjMKCHNuYXBzaG90GAEgASgLMh8uY29kZWZvdW5kcnkudjEuU2Vzc2lvblNuYXBzaG90SAASKgoHdXBkYXRlZBgCIAEoCzIXLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb25IABIUCgpyZW1vdmVkX2lkGAMgASgJSABCBwoFZXZlbnQiPAoPU2Vzc2lvblNuYXBzaG90EikKCHNlc3Npb25zGAEgAygLMhcuY29kZWZvdW5kcnkudjEuU2Vzc2lvbiqNAQoOUGVybWlzc2lvbk1vZGUSHwobUEVSTUlTU0lPTl9NT0RFX1VOU1BFQ0lGSUVEEAASHgoaUEVSTUlTU0lPTl9NT0RFX1NVUEVSVklTRUQQARIgChxQRVJNSVNTSU9OX01PREVfQUNDRVBUX0VESVRTEAISGAoUUEVSTUlTU0lPTl9NT0RFX0FVVE8QAyqhAQoMU2Vzc2lvblN0YXRlEh0KGVNFU1NJT05fU1RBVEVfVU5TUEVDSUZJRUQQABIaChZTRVNTSU9OX1NUQVRFX1NUQVJUSU5HEAESGwoXU0VTU0lPTl9TVEFURV9DT05ORUNURUQQAhIZChVTRVNTSU9OX1NUQVRFX0NMT1NJTkcQAxIeChpTRVNTSU9OX1NUQVRFX0RJU0NPTk5FQ1RFRBAEKoUBCg1TZXNzaW9uU3RhdHVzEh4KGlNFU1NJT05fU1RBVFVTX1VOU1BFQ0lGSUVEEAASFwoTU0VTU0lPTl9TVEFUVVNfQlVTWRABEhcKE1NFU1NJT05fU1RBVFVTX0lETEUQAhIiCh5TRVNTSU9OX1NUQVRVU19ORUVEU19BVFRFTlRJT04QAzKCBwoOU2Vzc2lvblNlcnZpY2USVwoGQ3JlYXRlEiQuY29kZWZvdW5kcnkudjEuQ3JlYXRlU2Vzc2lvblJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5DcmVhdGVTZXNzaW9uUmVzcG9uc2UiABJRCgRGb3JrEiIuY29kZWZvdW5kcnkudjEuRm9ya1Nlc3Npb25SZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuRm9ya1Nlc3Npb25SZXNwb25zZSIAElMKBExpc3QSIy5jb2RlZm91bmRyeS52MS5MaXN0U2Vzc2lvbnNSZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuTGlzdFNlc3Npb25zUmVzcG9uc2UiABJOCgNHZXQSIS5jb2RlZm91bmRyeS52MS5HZXRTZXNzaW9uUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLkdldFNlc3Npb25SZXNwb25zZSIAElcKBlJlbmFtZRIkLmNvZGVmb3VuZHJ5LnYxLlJlbmFtZVNlc3Npb25SZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuUmVuYW1lU2Vzc2lvblJlc3BvbnNlIgASVAoFQ2xvc2USIy5jb2RlZm91bmRyeS52MS5DbG9zZVNlc3Npb25SZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuQ2xvc2VTZXNzaW9uUmVzcG9uc2UiABJgCglSZWNvbm5lY3QSJy5jb2RlZm91bmRyeS52MS5SZWNvbm5lY3RTZXNzaW9uUmVxdWVzdBooLmNvZGVmb3VuZHJ5LnYxLlJlY29ubmVjdFNlc3Npb25SZXNwb25zZSIAElcKBlJlbW92ZRIkLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVNlc3Npb25SZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuUmVtb3ZlU2Vzc2lvblJlc3BvbnNlIgASTwoFV2F0Y2gSJC5jb2RlZm91bmRyeS52MS5XYXRjaFNlc3Npb25zUmVxdWVzdBocLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb25FdmVudCIAMAESZAoPU3RhZ2VBdHRhY2htZW50EiYuY29kZWZvdW5kcnkudjEuU3RhZ2VBdHRhY2htZW50UmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLlN0YWdlQXR0YWNobWVudFJlc3BvbnNlIgBCxAEKEmNvbS5jb2RlZm91bmRyeS52MUIMU2Vzc2lvblByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
 
 /**
+ * Ownership: a thread belongs to exactly one owner. When workspace_id is set the owner
+ * is that workspace; otherwise it is the project (repository) repo_id. repo_id and
+ * worktree_path are facts about the thread's cwd (for a workspace thread, the member
+ * worktree it runs in) and never decide the owner.
+ *
  * @generated from message codefoundry.v1.Session
  */
 export type Session = Message<"codefoundry.v1.Session"> & {
@@ -34,11 +39,15 @@ export type Session = Message<"codefoundry.v1.Session"> & {
   claudeSessionId: string;
 
   /**
+   * Repository of the cwd. The owner when workspace_id is empty.
+   *
    * @generated from field: string repo_id = 3;
    */
   repoId: string;
 
   /**
+   * The cwd: the worktree claude runs in.
+   *
    * @generated from field: string worktree_path = 4;
    */
   worktreePath: string;
@@ -143,11 +152,20 @@ export type Session = Message<"codefoundry.v1.Session"> & {
   baseRef: string;
 
   /**
-   * Create made the worktree for this session (new_worktree was set).
+   * Create made the worktree for this session (new_worktree or new_workspace was set).
    *
    * @generated from field: bool created_worktree = 21;
    */
   createdWorktree: boolean;
+
+  /**
+   * Owner workspace (see the ownership rule above); empty for a project thread. Every
+   * spawn of a workspace thread gets --add-dir for the workspace's other member
+   * worktrees, read from the workspace store at launch.
+   *
+   * @generated from field: string workspace_id = 22;
+   */
+  workspaceId: string;
 };
 
 /**
@@ -215,6 +233,26 @@ export type CreateSessionRequest = Message<"codefoundry.v1.CreateSessionRequest"
    * @generated from field: repeated string attachments = 9;
    */
   attachments: string[];
+
+  /**
+   * Workspace (id or name) the thread belongs to. repo_id or worktree_path then pick
+   * the member worktree it runs in (default: the first member); a worktree_path must
+   * be a member's worktree. Not with new_worktree or new_workspace.
+   *
+   * @generated from field: string workspace_id = 10;
+   */
+  workspaceId: string;
+
+  /**
+   * When set, Create makes a new workspace for the thread before claude starts: a
+   * worktree on branch cf/<slug> in every repository listed (the slug as for
+   * new_worktree, after the same single bounded wait), then runs the thread in the
+   * member repo_id names (default: the first). worktree_path is ignored. Not with
+   * new_worktree or workspace_id.
+   *
+   * @generated from field: codefoundry.v1.NewWorkspace new_workspace = 11;
+   */
+  newWorkspace?: NewWorkspace | undefined;
 };
 
 /**
@@ -242,6 +280,41 @@ export type NewWorktree = Message<"codefoundry.v1.NewWorktree"> & {
  */
 export const NewWorktreeSchema: GenMessage<NewWorktree> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_session, 2);
+
+/**
+ * @generated from message codefoundry.v1.NewWorkspace
+ */
+export type NewWorkspace = Message<"codefoundry.v1.NewWorkspace"> & {
+  /**
+   * Repositories (id, name when unique, or an absolute path inside one), in member
+   * order. At least one.
+   *
+   * @generated from field: repeated string repos = 1;
+   */
+  repos: string[];
+
+  /**
+   * Ref every member branches from. Defaults to origin/<default branch>, else
+   * <default branch>, per repository.
+   *
+   * @generated from field: string base_ref = 2;
+   */
+  baseRef: string;
+
+  /**
+   * Workspace name. Default: the slug (cf/<slug> without the prefix).
+   *
+   * @generated from field: string name = 3;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.NewWorkspace.
+ * Use `create(NewWorkspaceSchema)` to create a new message.
+ */
+export const NewWorkspaceSchema: GenMessage<NewWorkspace> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_session, 3);
 
 /**
  * @generated from message codefoundry.v1.StageAttachmentRequest
@@ -272,7 +345,7 @@ export type StageAttachmentRequest = Message<"codefoundry.v1.StageAttachmentRequ
  * Use `create(StageAttachmentRequestSchema)` to create a new message.
  */
 export const StageAttachmentRequestSchema: GenMessage<StageAttachmentRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 3);
+  messageDesc(file_codefoundry_v1_session, 4);
 
 /**
  * @generated from message codefoundry.v1.StageAttachmentResponse
@@ -289,7 +362,7 @@ export type StageAttachmentResponse = Message<"codefoundry.v1.StageAttachmentRes
  * Use `create(StageAttachmentResponseSchema)` to create a new message.
  */
 export const StageAttachmentResponseSchema: GenMessage<StageAttachmentResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 4);
+  messageDesc(file_codefoundry_v1_session, 5);
 
 /**
  * @generated from message codefoundry.v1.CreateSessionResponse
@@ -306,7 +379,7 @@ export type CreateSessionResponse = Message<"codefoundry.v1.CreateSessionRespons
  * Use `create(CreateSessionResponseSchema)` to create a new message.
  */
 export const CreateSessionResponseSchema: GenMessage<CreateSessionResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 5);
+  messageDesc(file_codefoundry_v1_session, 6);
 
 /**
  * @generated from message codefoundry.v1.ForkSessionRequest
@@ -328,7 +401,7 @@ export type ForkSessionRequest = Message<"codefoundry.v1.ForkSessionRequest"> & 
  * Use `create(ForkSessionRequestSchema)` to create a new message.
  */
 export const ForkSessionRequestSchema: GenMessage<ForkSessionRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 6);
+  messageDesc(file_codefoundry_v1_session, 7);
 
 /**
  * @generated from message codefoundry.v1.ForkSessionResponse
@@ -345,7 +418,7 @@ export type ForkSessionResponse = Message<"codefoundry.v1.ForkSessionResponse"> 
  * Use `create(ForkSessionResponseSchema)` to create a new message.
  */
 export const ForkSessionResponseSchema: GenMessage<ForkSessionResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 7);
+  messageDesc(file_codefoundry_v1_session, 8);
 
 /**
  * @generated from message codefoundry.v1.ListSessionsRequest
@@ -358,7 +431,7 @@ export type ListSessionsRequest = Message<"codefoundry.v1.ListSessionsRequest"> 
  * Use `create(ListSessionsRequestSchema)` to create a new message.
  */
 export const ListSessionsRequestSchema: GenMessage<ListSessionsRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 8);
+  messageDesc(file_codefoundry_v1_session, 9);
 
 /**
  * @generated from message codefoundry.v1.ListSessionsResponse
@@ -375,7 +448,7 @@ export type ListSessionsResponse = Message<"codefoundry.v1.ListSessionsResponse"
  * Use `create(ListSessionsResponseSchema)` to create a new message.
  */
 export const ListSessionsResponseSchema: GenMessage<ListSessionsResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 9);
+  messageDesc(file_codefoundry_v1_session, 10);
 
 /**
  * @generated from message codefoundry.v1.GetSessionRequest
@@ -392,7 +465,7 @@ export type GetSessionRequest = Message<"codefoundry.v1.GetSessionRequest"> & {
  * Use `create(GetSessionRequestSchema)` to create a new message.
  */
 export const GetSessionRequestSchema: GenMessage<GetSessionRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 10);
+  messageDesc(file_codefoundry_v1_session, 11);
 
 /**
  * @generated from message codefoundry.v1.GetSessionResponse
@@ -409,7 +482,7 @@ export type GetSessionResponse = Message<"codefoundry.v1.GetSessionResponse"> & 
  * Use `create(GetSessionResponseSchema)` to create a new message.
  */
 export const GetSessionResponseSchema: GenMessage<GetSessionResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 11);
+  messageDesc(file_codefoundry_v1_session, 12);
 
 /**
  * @generated from message codefoundry.v1.RenameSessionRequest
@@ -431,7 +504,7 @@ export type RenameSessionRequest = Message<"codefoundry.v1.RenameSessionRequest"
  * Use `create(RenameSessionRequestSchema)` to create a new message.
  */
 export const RenameSessionRequestSchema: GenMessage<RenameSessionRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 12);
+  messageDesc(file_codefoundry_v1_session, 13);
 
 /**
  * @generated from message codefoundry.v1.RenameSessionResponse
@@ -448,7 +521,7 @@ export type RenameSessionResponse = Message<"codefoundry.v1.RenameSessionRespons
  * Use `create(RenameSessionResponseSchema)` to create a new message.
  */
 export const RenameSessionResponseSchema: GenMessage<RenameSessionResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 13);
+  messageDesc(file_codefoundry_v1_session, 14);
 
 /**
  * @generated from message codefoundry.v1.CloseSessionRequest
@@ -465,7 +538,7 @@ export type CloseSessionRequest = Message<"codefoundry.v1.CloseSessionRequest"> 
  * Use `create(CloseSessionRequestSchema)` to create a new message.
  */
 export const CloseSessionRequestSchema: GenMessage<CloseSessionRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 14);
+  messageDesc(file_codefoundry_v1_session, 15);
 
 /**
  * @generated from message codefoundry.v1.CloseSessionResponse
@@ -478,7 +551,7 @@ export type CloseSessionResponse = Message<"codefoundry.v1.CloseSessionResponse"
  * Use `create(CloseSessionResponseSchema)` to create a new message.
  */
 export const CloseSessionResponseSchema: GenMessage<CloseSessionResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 15);
+  messageDesc(file_codefoundry_v1_session, 16);
 
 /**
  * @generated from message codefoundry.v1.ReconnectSessionRequest
@@ -495,7 +568,7 @@ export type ReconnectSessionRequest = Message<"codefoundry.v1.ReconnectSessionRe
  * Use `create(ReconnectSessionRequestSchema)` to create a new message.
  */
 export const ReconnectSessionRequestSchema: GenMessage<ReconnectSessionRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 16);
+  messageDesc(file_codefoundry_v1_session, 17);
 
 /**
  * @generated from message codefoundry.v1.ReconnectSessionResponse
@@ -512,7 +585,7 @@ export type ReconnectSessionResponse = Message<"codefoundry.v1.ReconnectSessionR
  * Use `create(ReconnectSessionResponseSchema)` to create a new message.
  */
 export const ReconnectSessionResponseSchema: GenMessage<ReconnectSessionResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 17);
+  messageDesc(file_codefoundry_v1_session, 18);
 
 /**
  * @generated from message codefoundry.v1.RemoveSessionRequest
@@ -529,7 +602,7 @@ export type RemoveSessionRequest = Message<"codefoundry.v1.RemoveSessionRequest"
  * Use `create(RemoveSessionRequestSchema)` to create a new message.
  */
 export const RemoveSessionRequestSchema: GenMessage<RemoveSessionRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 18);
+  messageDesc(file_codefoundry_v1_session, 19);
 
 /**
  * @generated from message codefoundry.v1.RemoveSessionResponse
@@ -542,7 +615,7 @@ export type RemoveSessionResponse = Message<"codefoundry.v1.RemoveSessionRespons
  * Use `create(RemoveSessionResponseSchema)` to create a new message.
  */
 export const RemoveSessionResponseSchema: GenMessage<RemoveSessionResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 19);
+  messageDesc(file_codefoundry_v1_session, 20);
 
 /**
  * @generated from message codefoundry.v1.WatchSessionsRequest
@@ -555,7 +628,7 @@ export type WatchSessionsRequest = Message<"codefoundry.v1.WatchSessionsRequest"
  * Use `create(WatchSessionsRequestSchema)` to create a new message.
  */
 export const WatchSessionsRequestSchema: GenMessage<WatchSessionsRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 20);
+  messageDesc(file_codefoundry_v1_session, 21);
 
 /**
  * @generated from message codefoundry.v1.SessionEvent
@@ -590,7 +663,7 @@ export type SessionEvent = Message<"codefoundry.v1.SessionEvent"> & {
  * Use `create(SessionEventSchema)` to create a new message.
  */
 export const SessionEventSchema: GenMessage<SessionEvent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 21);
+  messageDesc(file_codefoundry_v1_session, 22);
 
 /**
  * @generated from message codefoundry.v1.SessionSnapshot
@@ -607,7 +680,7 @@ export type SessionSnapshot = Message<"codefoundry.v1.SessionSnapshot"> & {
  * Use `create(SessionSnapshotSchema)` to create a new message.
  */
 export const SessionSnapshotSchema: GenMessage<SessionSnapshot> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_session, 22);
+  messageDesc(file_codefoundry_v1_session, 23);
 
 /**
  * PermissionMode maps to claude --permission-mode. Full access (bypassPermissions) is

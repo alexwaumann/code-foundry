@@ -1,6 +1,7 @@
 package command
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"strings"
@@ -130,6 +131,9 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				s := res.Msg.GetSession()
 				focus(s.GetId())
 				msg := "created thread " + sessionLabel(s) + " in " + s.GetWorktreePath()
+				if s.GetWorkspaceId() != "" {
+					msg += " (workspace " + s.GetWorkspaceId() + ")"
+				}
 				if s.GetCreatedWorktree() {
 					msg += " (new worktree from " + s.GetBaseRef() + ")"
 				}
@@ -148,7 +152,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				}
 				var sb strings.Builder
 				tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
-				_, _ = fmt.Fprintln(tw, "ID\tNAME\tSTATE\tSTATUS\tREASON\tWORKTREE")
+				_, _ = fmt.Fprintln(tw, "ID\tNAME\tSTATE\tSTATUS\tREASON\tWORKSPACE\tWORKTREE")
 				for _, s := range res.Msg.GetSessions() {
 					status := strings.ToLower(strings.TrimPrefix(s.GetStatus().String(), "SESSION_STATUS_"))
 					// The reason explains the state when disconnected, else the status.
@@ -156,8 +160,8 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 					if s.GetState() == v1.SessionState_SESSION_STATE_DISCONNECTED {
 						reason = s.GetDisconnectReason()
 					}
-					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), s.GetName(), sessionStateName(s.GetState()),
-						status, reason, s.GetWorktreePath())
+					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), s.GetName(), sessionStateName(s.GetState()),
+						status, reason, cmp.Or(s.GetWorkspaceId(), "-"), s.GetWorktreePath())
 				}
 				_ = tw.Flush()
 				return Result{Message: strings.TrimRight(sb.String(), "\n"), JSON: res.Msg}, nil
