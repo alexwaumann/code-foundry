@@ -200,6 +200,8 @@ test("GitHub: search, pick a result, clone with progress, and open the new proje
   await expect(card.getByTestId("add-project-clone-dest")).toHaveText("~/.code-foundry/projects/octo-org/Hello-World");
   await card.getByTestId("add-project-clone").click();
   await expect(card.getByTestId("add-project-clone")).toHaveText("Cloning…");
+  // A new lookup would cancel the clone: the input is locked while it runs.
+  await expect(page.getByTestId("add-project-github-input")).toBeDisabled();
   await expect(card.getByTestId("add-project-clone-line").first()).toHaveText("Cloning into '/Users/dev/.code-foundry/projects/octo-org/Hello-World'...");
   await expect(dialog(page)).toHaveCount(0);
   await expect(page.getByTestId("overview-title")).toHaveText("Hello-World@main");
@@ -225,6 +227,7 @@ test("GitHub: a failed clone shows its progress and gh's error, and can be retri
   await expect(lines).toHaveText(["Cloning into '/Users/dev/.code-foundry/projects/octo-org/fail'...", "remote: Enumerating objects: 128, done.", "Receiving objects:  46% (59/128)"]);
   await expect(lines.last()).toHaveAttribute("data-transient", "true");
   await expect(card.getByTestId("add-project-clone")).toHaveText("Retry clone");
+  await expect(page.getByTestId("add-project-github-input")).toBeEnabled();
   await expect(dialog(page)).toBeVisible();
 });
 

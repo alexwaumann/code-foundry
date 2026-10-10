@@ -74,7 +74,7 @@ function ProgressLog({ lines }: { lines: readonly CloneProgressView[] }) {
 }
 
 /** A repository picked from the results or looked up: where it goes, and Clone. */
-function RepoCard({ repo, onBack }: { repo: GitHubRepoView; onBack: (() => void) | null }) {
+function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (() => void) | null; onRunning: (running: boolean) => void }) {
   const [clone, setClone] = useState<Clone>({ state: "idle" });
   const [adding, setAdding] = useState(false);
   const ctl = useRef<AbortController | null>(null);
@@ -86,6 +86,11 @@ function RepoCard({ repo, onBack }: { repo: GitHubRepoView; onBack: (() => void)
     [],
   );
   const running = clone.state === "running";
+  // The input above is locked while a clone runs: a new lookup would replace (and so
+  // cancel) this card.
+  useEffect(() => {
+    onRunning(running);
+  }, [running, onRunning]);
 
   const start = async () => {
     ctl.current?.abort();
@@ -239,7 +244,8 @@ export function GitHubTab({ active }: { active: boolean }) {
     }
   };
 
-  const busy = view.kind === "loading";
+  const [cloning, setCloning] = useState(false);
+  const busy = view.kind === "loading" || cloning;
   return (
     <div className="flex flex-col gap-3" data-testid="add-project-github">
       <form
@@ -253,6 +259,7 @@ export function GitHubTab({ active }: { active: boolean }) {
           <Search className="size-4 shrink-0 opacity-50" aria-hidden />
           <input
             ref={inputRef}
+            disabled={cloning}
             value={text}
             onChange={(e) => {
               setText(e.target.value);
@@ -309,6 +316,7 @@ export function GitHubTab({ active }: { active: boolean }) {
         ))}
       {view.kind === "repo" && (
         <RepoCard
+          onRunning={setCloning}
           key={view.repo.slug}
           repo={view.repo}
           onBack={
