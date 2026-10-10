@@ -1,12 +1,14 @@
 /**
- * Opening a worktree as a side panel tab (surfaces/worktree.ts): the Projects page's
- * project and worktree rows (into the page's own panel), and the selected thread's own
- * worktree through T in the panel and view.panel.worktree (worktreePanelCommand in
- * stores/views.ts). Workspace member tabs are stores/workspacePanel.ts openMemberTab.
+ * Opening a worktree as a side panel tab (surfaces/worktree.ts), the only place a
+ * worktree's overview shows: the Projects page's project and worktree rows (into the
+ * page's own panel), the daemon's ui.focus.repo and the thread row menu's Show
+ * worktree, and the selected thread's own worktree through T in the panel and
+ * view.panel.worktree (worktreePanelCommand in stores/views.ts). Workspace member tabs
+ * are stores/workspacePanel.ts openMemberTab.
  */
 import { selectionWorktree, worktreeTab } from "@/surfaces/workspaceTarget";
 import { keyOf, openSurface, togglePanel, type PanelTarget } from "./panel";
-import { findWorktree, useReposStore, type ReposData } from "./repos";
+import { findWorktree, mainWorktreePath, useReposStore, type ReposData } from "./repos";
 import { useSessionsStore } from "./sessions";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore, type Selection } from "./ui";
@@ -35,6 +37,32 @@ export function openWorktreeTab(target: PanelTarget, repoId: string, path: strin
 export function showWorktreeInPanel(repoId: string, path: string): boolean {
   if (!openWorktreeTab("current", repoId, path)) return false;
   togglePanel("current", true, { focus: false });
+  return true;
+}
+
+/**
+ * Shows a worktree from anywhere (ui.focus.repo, the Add Project flows): the Projects
+ * page with the worktree's tab in its panel. An empty path means the project's main
+ * worktree. False for an unknown project.
+ */
+export function showWorktreeOnProjectsPage(repoId: string, path = ""): boolean {
+  const repos = useReposStore.getState();
+  const at = path || mainWorktreePath(repos, repoId);
+  if (!repos.byId[repoId] || !at) return false;
+  useUiStore.getState().select({ kind: "view", name: "projects" });
+  return showWorktreeInPanel(repoId, at);
+}
+
+/**
+ * The thread row menu's Show worktree: selects the thread and opens its own worktree's
+ * tab in its panel, which takes focus. False when the thread is in no registered worktree.
+ */
+export function showWorktreeInThread(sessionId: string): boolean {
+  const sel: Selection = { kind: "session", id: sessionId };
+  useUiStore.getState().select(sel);
+  const key = openWorktreeSurface(sel);
+  if (key === null) return false;
+  togglePanel(key, true, { focus: true });
   return true;
 }
 

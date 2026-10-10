@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { registerRepo, type AddedProjectView } from "@/api/addProject";
 import { refreshCommands } from "./commands";
-import { openProject } from "./projectActions";
 import { useReposStore } from "./repos";
+import { showWorktreeOnProjectsPage } from "./worktreePanel";
 
 /** The Add Project dialog's tabs, in display order. */
 export type AddProjectTab = "new" | "local" | "github";
@@ -66,7 +66,7 @@ export async function registerFolder(path: string): Promise<AddedProjectView> {
  */
 export function selectAddedProject(repoId: string, timeoutMs = 5000): void {
   if (useReposStore.getState().byId[repoId]) {
-    openProject(repoId);
+    showWorktreeOnProjectsPage(repoId);
     return;
   }
   const timer = setTimeout(() => {
@@ -76,6 +76,6 @@ export function selectAddedProject(repoId: string, timeoutMs = 5000): void {
     if (!s.byId[repoId]) return;
     clearTimeout(timer);
     unsub();
-    openProject(repoId);
+    showWorktreeOnProjectsPage(repoId);
   });
 }

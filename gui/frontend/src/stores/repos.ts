@@ -78,3 +78,9 @@ export const useReposStore = create<ReposState>()(() => ({
 export function findWorktree(data: ReposData, repoId: string, path: string): WorktreeView | undefined {
   return data.byId[repoId]?.worktrees.find((w) => w.path === path);
 }
+
+/** A project's main worktree path (its checkout for a project without git); "" for an unknown project. */
+export function mainWorktreePath(data: ReposData, repoId: string): string {
+  const repo = data.byId[repoId];
+  return repo?.worktrees.find((w) => w.isMain)?.path ?? repo?.path ?? "";
+}

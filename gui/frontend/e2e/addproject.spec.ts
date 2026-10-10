@@ -141,7 +141,7 @@ test("Local folder: Tab completes, Enter adds, and the new project opens", async
   // RepoService.Register, not a command: "~" expanded, the trailing slash dropped.
   expect(await repoAt("/Users/dev/src/new-app")).toMatchObject({ name: "new-app", git: true });
   expect((await invocations()).filter((i) => i.name.startsWith("repo."))).toEqual([]);
-  await expect(page.getByTestId("overview-title")).toHaveText("new-app@main");
+  await expect(page.getByTestId("worktree-surface-title")).toHaveText("new-app@main");
 });
 
 test("Local folder: a plain folder has no git, and a folder inside a project opens that project", async ({ page }) => {
@@ -229,7 +229,7 @@ test("GitHub: search, pick a result, clone with progress, and open the new proje
   await expect(page.getByTestId("add-project-github-input")).toBeDisabled();
   await expect(card.getByTestId("add-project-clone-line").first()).toHaveText("Cloning into '/Users/dev/.code-foundry/projects/octo-org/Hello-World'...");
   await expect(dialog(page)).toHaveCount(0);
-  await expect(page.getByTestId("overview-title")).toHaveText("Hello-World@main");
+  await expect(page.getByTestId("worktree-surface-title")).toHaveText("Hello-World@main");
 
   // Cloned once: the next lookup says so and offers the existing folder.
   await page.getByTestId("sidebar-add-project").click();
@@ -264,5 +264,5 @@ test("GitHub: an existing destination is added as a folder instead", async ({ pa
   await page.getByTestId("add-project-add-existing").click();
   await expect(dialog(page)).toHaveCount(0);
   expect(await repoAt("/Users/dev/.code-foundry/projects/octo-org/already-here")).toMatchObject({ name: "already-here", git: true });
-  await expect(page.getByTestId("overview-title")).toHaveText("already-here@main");
+  await expect(page.getByTestId("worktree-surface-title")).toHaveText("already-here@main");
 });

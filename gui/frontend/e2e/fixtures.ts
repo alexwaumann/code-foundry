@@ -82,26 +82,23 @@ export async function openProjects(page: Page): Promise<void> {
 }
 
 /**
- * Selects a worktree (its overview page) from the Projects page through the row's Open
- * button: a project's worktree row, or a workspace member row when `workspaceId` is
- * given. (Enter or double-click on a row shows the worktree in the page's side panel.)
+ * Shows a worktree's overview: the Projects page with the worktree's tab in the page's
+ * side panel, by double-clicking its row (a project's worktree row, or a workspace
+ * member row when `workspaceId` is given). The page stays selected: the palette has no
+ * worktree context here; tests that need one select a thread in the worktree.
  */
 export async function selectWorktree(page: Page, repoId: string, path: string, workspaceId?: string): Promise<void> {
   await openProjects(page);
   const key = workspaceId ? `m:${workspaceId}::${repoId}` : `pw:${repoId}::${path}`;
-  const r = page.locator(`[data-nav-key="${key}"]`);
-  await r.hover();
-  await r.getByTestId(workspaceId ? "member-open-overview" : "worktree-open").click();
-  await expect(page.getByTestId("projects-page")).toHaveCount(0);
+  await page.locator(`[data-nav-key="${key}"]`).dblclick();
+  await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-path", path);
 }
 
-/** Selects a project (its overview page) from the Projects page through the row's Open button. */
+/** Shows a project's main worktree in the Projects page's side panel by double-clicking the project row. */
 export async function selectProject(page: Page, repoId: string): Promise<void> {
   await openProjects(page);
-  const r = page.locator(`[data-nav-key="p:${repoId}"]`);
-  await r.hover();
-  await r.getByTestId("project-open").click();
-  await expect(page.getByTestId("projects-page")).toHaveCount(0);
+  await page.locator(`[data-nav-key="p:${repoId}"]`).dblclick();
+  await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-repo", repoId);
 }
 
 export function row(page: Page, key: string) {

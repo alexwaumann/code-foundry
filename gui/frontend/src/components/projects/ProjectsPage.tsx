@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Folder, FolderGit2, FolderOpen, FolderPlus, Layers, PanelRight, Sparkles, SquareTerminal, Trash2, Unlink } from "lucide-react";
+import { Folder, FolderGit2, FolderPlus, Layers, PanelRight, Sparkles, SquareTerminal, Trash2, Unlink } from "lucide-react";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { SectionTitle } from "@/components/prs/PrBits";
 import { RowList } from "@/components/prs/RowList";
@@ -11,8 +11,8 @@ import { NavProvider, NavRow } from "@/lib/NavRow";
 import { pageItems, projectKey, projectsModel, projectWorktreeKey, workspaceKey, type ProjectModel, type ProjectsWorkspaces } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { composeIn, composeInWorkspace } from "@/stores/compose";
-import { addProject, newTerminalIn, openProject, openWorktree, removeWorkspace, removeWorktree, unregisterProject } from "@/stores/projectActions";
-import { findWorktree, useReposStore } from "@/stores/repos";
+import { addProject, newTerminalIn, removeWorkspace, removeWorktree, unregisterProject } from "@/stores/projectActions";
+import { findWorktree, mainWorktreePath, useReposStore } from "@/stores/repos";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
 import { showWorkspaceInThread } from "@/stores/workspacePanel";
@@ -24,12 +24,6 @@ import { RowAction, WorktreeState } from "./WorktreeState";
 
 const ROW_H = 32;
 const SEP = "\u0001";
-
-/** A project's main worktree (its checkout for a project without git), read when a row activates. */
-function mainWorktree(repoId: string): string {
-  const repo = useReposStore.getState().byId[repoId];
-  return repo?.worktrees.find((w) => w.isMain)?.path ?? repo?.path ?? "";
-}
 
 /** The page's structure inputs as strings, so it rebuilds on membership changes only (not git status). */
 function useStructure(): { repos: string[]; workspaces: string[] } {
@@ -70,9 +64,6 @@ function WorktreeRow({ repoId, path }: { repoId: string; path: string }) {
         <WorktreeState repoId={repoId} path={path} />
       </span>
       <span className="flex shrink-0 items-center opacity-0 group-hover/wt:opacity-100 group-aria-selected/wt:opacity-100">
-        <RowAction label="Open worktree overview" testId="worktree-open" onClick={() => { openWorktree(repoId, path); }}>
-          <FolderOpen />
-        </RowAction>
         <RowAction label="New thread here" testId="worktree-new-thread" onClick={() => { composeIn(repoId, path); }}>
           <Sparkles />
         </RowAction>
@@ -105,9 +96,6 @@ function ProjectBlock({ project }: { project: ProjectModel }) {
         </span>
         {slug && <span className="min-w-0 truncate text-xs text-muted-foreground">{slug}</span>}
         <span className="ml-auto flex shrink-0 items-center">
-          <RowAction label="Open project overview" testId="project-open" onClick={() => { openProject(repoId); }}>
-            <FolderOpen />
-          </RowAction>
           <RowAction label="New thread" testId="project-new-thread" onClick={() => { composeIn(repoId); }}>
             <Sparkles />
           </RowAction>
@@ -187,10 +175,9 @@ export function ProjectsPage() {
     () =>
       items.map((it) => {
         switch (it.kind) {
-          // Enter or double-click shows the worktree (a project's main one) in the
-          // page's side panel; the rows' Open buttons go to the overview page.
+          // Enter or double-click shows the worktree (a project's main one) in the page's side panel.
           case "project":
-            return { key: it.key, activate: () => { showWorktreeInPanel(it.repoId, mainWorktree(it.repoId)); } };
+            return { key: it.key, activate: () => { showWorktreeInPanel(it.repoId, mainWorktreePath(useReposStore.getState(), it.repoId)); } };
           case "worktree":
           case "member":
             return { key: it.key, activate: () => { showWorktreeInPanel(it.repoId, it.path); } };

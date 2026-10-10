@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { invocations, mockUrl, openApp, resetMock, selectProject } from "./fixtures";
+import { invocations, mockUrl, openApp, openProjects, resetMock, row, selectProject } from "./fixtures";
 
 // Add-project PR 4: the Add Project dialog's New tab (repo.create, then optionally
 // repo.github.publish) and the overview's Publish to GitHub dialog, against the mock's
@@ -75,7 +75,7 @@ test("New: the name is checked as typed, Create makes the project and opens it",
   await page.getByTestId("add-project-create").click();
 
   await expect(dialog(page)).toHaveCount(0);
-  await expect(page.getByTestId("overview-title")).toHaveText("my-app@main");
+  await expect(page.getByTestId("worktree-surface-title")).toHaveText("my-app@main");
   // A new project has no remote: the overview offers to publish it.
   await expect(page.getByTestId("publish-github")).toBeVisible();
   expect((await lastInvocation("repo.create"))?.args).toEqual({ name: "my-app" });
@@ -108,7 +108,7 @@ test("New with publish to octo-org: Public by default, Private not offered", asy
   await expect(page.getByTestId("add-project-create")).toHaveText("Create and publish");
   await page.getByTestId("add-project-create").click();
   await expect(dialog(page)).toHaveCount(0);
-  await expect(page.getByTestId("overview-title")).toHaveText("octo-app@main");
+  await expect(page.getByTestId("worktree-surface-title")).toHaveText("octo-app@main");
   // Published: origin on GitHub, so no Publish button any more.
   await expect(page.getByTestId("publish-github")).toHaveCount(0);
   expect((await lastInvocation("repo.github.publish"))?.args).toEqual({ repo: "repo-octo-app", owner: "octo-org", name: "octo-app", visibility: "public" });
@@ -165,14 +165,14 @@ test("a refused publish shows gh's error, keeps the picker, and the project exis
   expect((await projectCalls()).filter((c) => c.startsWith("create"))).toEqual(["create taken"]);
   await page.getByTestId("add-project-keep-local").click();
   await expect(dialog(page)).toHaveCount(0);
-  await expect(page.getByTestId("overview-title")).toHaveText("taken@main");
+  await expect(page.getByTestId("worktree-surface-title")).toHaveText("taken@main");
   await expect(page.getByTestId("publish-github")).toBeVisible();
 });
 
 test("the overview's Publish to GitHub opens the publish dialog for sketches", async ({ page }) => {
   await openApp(page);
   await selectProject(page, "repo-sk");
-  await expect(page.getByTestId("overview-title")).toHaveText("sketches@main");
+  await expect(page.getByTestId("worktree-surface-title")).toHaveText("sketches@main");
   await page.getByTestId("publish-github").click();
   const pub = page.getByTestId("publish-dialog");
   await expect(pub).toBeVisible();
@@ -200,7 +200,12 @@ test("the overview's Publish to GitHub opens the publish dialog for sketches", a
 
 test("repo.github.publish in the palette opens the publish dialog; repo.create opens New", async ({ page }) => {
   await openApp(page);
-  await selectProject(page, "repo-sk");
+  // A terminal in sketches gives the palette the project's context (the Projects page has none).
+  await openProjects(page);
+  const sk = page.locator('[data-nav-key="p:repo-sk"]');
+  await sk.hover();
+  await sk.getByTestId("project-new-terminal").click();
+  await expect(page.getByTestId("terminal-host")).toBeVisible();
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
   await palette.locator('[data-command="repo.github.publish"]').click();
@@ -209,7 +214,7 @@ test("repo.github.publish in the palette opens the publish dialog; repo.create o
   await expect(page.getByTestId("publish-dialog")).toHaveCount(0);
 
   // A project with origin does not offer it.
-  await selectProject(page, "repo-cf");
+  await row(page, "s:s-1").click();
   await page.keyboard.press("Meta+k");
   await expect(palette.locator('[data-command="repo.github.publish"]')).toHaveCount(0);
   await palette.locator('[data-command="repo.create"]').click();

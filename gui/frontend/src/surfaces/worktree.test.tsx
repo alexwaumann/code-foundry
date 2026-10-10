@@ -37,7 +37,7 @@ beforeEach(() => {
   });
   useTerminalsStore.setState({ byId: { "t-feat": term("t-feat", `${WEB_FEAT}/src`), "t-tmp": term("t-tmp", "/tmp") }, order: ["t-feat", "t-tmp"] });
   const open = { open: true, tabs: [], activeTabId: null };
-  usePanelStore.setState({ byKey: { "session:s-main": open, "session:s-feat": open, "terminal:t-feat": open, "terminal:t-tmp": open, [`worktree:web:${WEB_FEAT}`]: open } });
+  usePanelStore.setState({ byKey: { "session:s-main": open, "session:s-feat": open, "terminal:t-feat": open, "terminal:t-tmp": open, "view:projects": open } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, palette: { ...useUiStore.getState().palette, open: false } });
   select("s-feat");
@@ -72,7 +72,7 @@ describe("Worktree surface availability", () => {
     expect(row()).toBeNull();
   });
 
-  it("is listed for a terminal placed in a worktree, hidden for one elsewhere and on a worktree page", () => {
+  it("is listed for a terminal placed in a worktree, hidden for one elsewhere and on a page", () => {
     useUiStore.setState({ selection: { kind: "terminal", id: "t-feat" } });
     render(<SidePanel />);
     expect(row()?.getAttribute("data-availability")).toBe("enabled");
@@ -81,7 +81,7 @@ describe("Worktree surface availability", () => {
     });
     expect(row()).toBeNull();
     act(() => {
-      useUiStore.setState({ selection: { kind: "worktree", repoId: "web", path: WEB_FEAT } });
+      useUiStore.setState({ selection: { kind: "view", name: "projects" } });
     });
     expect(row()).toBeNull();
   });

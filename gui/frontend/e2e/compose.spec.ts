@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, mockUrl, openApp, resetMock, row, selectWorktree } from "./fixtures";
+import { CF, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 const OUTDATED = "The running daemon is older than the app. Restart it (Daemon → Restart) to use this feature.";
 
@@ -347,13 +347,13 @@ test("the draft survives switching away; Backspace goes back; Esc on an empty dr
   await compose(page, 3);
   await expect(prompt(page)).toHaveAttribute("data-value", "Half-written idea");
 
-  // Esc with text does nothing; with an empty draft it returns to the repo overview.
+  // Esc with text does nothing; with an empty draft it returns to the Projects page.
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("composer")).toBeVisible();
   await page.getByTestId("composer-input").fill("");
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("composer")).toHaveCount(0);
-  await expect(page.getByTestId("overview-title")).toHaveText("ghostty-playground@main");
+  await expect(page.getByTestId("projects-page")).toBeVisible();
 });
 
 test("image chips: inserted at the caret, one unit for arrows and Backspace, × asks while referenced, sent as references", async ({ page }) => {
@@ -495,10 +495,7 @@ test("a local-only repository: local refs from main, no remote git commands", as
   expect((await invocations()).at(-1)?.args).toMatchObject({ repo: "repo-sk", "new-worktree": "true", base: "main" });
   await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
 
-  // Its overview shows no git buttons, and fetch/pull/push/PR are not offered for it.
-  await selectWorktree(page, "repo-sk", "/Users/dev/src/sketches");
-  await expect(page.getByTestId("overview-page")).toBeVisible();
-  await expect(page.locator('[data-command-button^="git."], [data-command-button^="pr."]')).toHaveCount(0);
+  // The new thread is selected: fetch/pull/push/PR are not offered for a project without git.
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
   await expect(palette.locator('[data-command="terminal.new"]')).toBeVisible();

@@ -7,24 +7,9 @@ import { startCommandNamed } from "@/keys/bindings";
 import { repoRef } from "@/lib/projects";
 import { openAddProject } from "./addProject";
 import { runCommand } from "./commands";
-import { getUiContext } from "./context";
+import { repoContext, worktreeContext } from "./context";
 import { useReposStore } from "./repos";
-import { useUiStore } from "./ui";
 import { useWorkspacesStore } from "./workspaces";
-
-function worktreeContext(repoId: string, path: string) {
-  return getUiContext({ kind: "worktree", repoId, path });
-}
-
-/** The project's overview page (its main worktree). */
-export function openProject(repoId: string): void {
-  useUiStore.getState().select({ kind: "repo", repoId });
-}
-
-/** The worktree's overview page. */
-export function openWorktree(repoId: string, path: string): void {
-  useUiStore.getState().select({ kind: "worktree", repoId, path });
-}
 
 /** terminal.new in the worktree. */
 export function newTerminalIn(repoId: string, path: string): Promise<boolean> {
@@ -38,7 +23,7 @@ export function removeWorktree(repoId: string, path: string): Promise<boolean> {
 
 /** repo.unregister (confirmed). */
 export function unregisterProject(repoId: string): Promise<boolean> {
-  return runCommand("repo.unregister", {}, getUiContext({ kind: "repo", repoId }));
+  return runCommand("repo.unregister", {}, repoContext(repoId));
 }
 
 /**

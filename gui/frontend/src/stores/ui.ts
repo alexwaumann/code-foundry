@@ -6,8 +6,6 @@ export type Selection =
   | { kind: "none" }
   | { kind: "terminal"; id: string }
   | { kind: "session"; id: string }
-  | { kind: "repo"; repoId: string }
-  | { kind: "worktree"; repoId: string; path: string }
   /**
    * The new-thread composer (picked in the project picker): for a project, or with
    * workspaceId for a workspace, repoId then being a member's (for the command context).
@@ -156,12 +154,8 @@ export function sameSelection(a: Selection, b: Selection): boolean {
     case "terminal":
     case "session":
       return a.id === (b as typeof a).id;
-    case "repo":
-      return a.repoId === (b as typeof a).repoId;
     case "compose":
       return a.repoId === (b as typeof a).repoId && a.workspaceId === (b as typeof a).workspaceId;
-    case "worktree":
-      return a.repoId === (b as typeof a).repoId && a.path === (b as typeof a).path;
     case "view":
       return a.name === (b as typeof a).name;
   }

@@ -34,23 +34,16 @@ test("a project without git: No git on the Projects page, its overview, then Ini
   await expect(project.getByTestId("worktree-branch")).toHaveCount(0);
   await expect(project.getByTestId("worktree-dirty")).toHaveCount(0);
 
+  // Its tab in the page's side panel.
   await selectProject(page, "repo-wr");
-  const overview = page.getByTestId("overview-page");
+  const overview = page.getByTestId("worktree-surface");
   await expect(overview).toHaveAttribute("data-git", "false");
-  await expect(page.getByTestId("overview-title")).toHaveText(/^writing\s*No git$/);
+  await expect(page.getByTestId("worktree-surface-title")).toHaveText(/^writing\s*No git$/);
   await expect(page.getByTestId("section-nogit")).toContainText("Not a git repository");
   // Nothing git-shaped renders: sync line, GitHub, files, log.
   for (const id of ["sync-line", "section-github", "section-files", "section-log"]) await expect(page.getByTestId(id)).toHaveCount(0);
-  // Its threads and terminals are still listed (WorktreeItems).
-  await expect(page.getByTestId("empty-new-session")).toBeVisible();
 
-  // The palette offers Initialize Git and nothing that needs git.
-  await page.keyboard.press("Meta+k");
-  const palette = page.getByTestId("palette");
-  await expect(palette.locator('[data-command="repo.git.init"]')).toBeVisible();
-  for (const name of ["worktree.create", "git.fetch", "git.pull", "git.push", "pr.create"]) await expect(palette.locator(`[data-command="${name}"]`)).toHaveCount(0);
-  await page.keyboard.press("Escape");
-
+  // Initialize Git runs repo.git.init on the project (the page itself has no repo context).
   const init = page.getByTestId("init-git");
   await expect(init).toBeEnabled();
   await expect(init).toHaveText("Initialize Git");
@@ -58,15 +51,12 @@ test("a project without git: No git on the Projects page, its overview, then Ini
   await expect.poll(async () => (await lastInvocation("repo.git.init"))?.context?.activeRepoId).toBe("repo-wr");
   // A git repository on main now: the normal overview takes over.
   await expect(overview).toHaveAttribute("data-git", "true");
-  await expect(page.getByTestId("overview-title")).toHaveText("writing@main");
+  await expect(page.getByTestId("worktree-surface-title")).toHaveText("writing@main");
   await expect(page.getByTestId("sync-line")).toBeVisible();
   await expect(page.getByTestId("section-files")).toBeVisible();
   await expect(page.getByTestId("section-nogit")).toHaveCount(0);
   // Still without a remote: Publish to GitHub.
   await expect(page.getByTestId("publish-github")).toBeVisible();
-  await page.keyboard.press("Meta+k");
-  await expect(palette.locator('[data-command="repo.git.init"]')).toHaveCount(0);
-  await page.keyboard.press("Escape");
 
   await openProjects(page);
   await expect(project).toHaveAttribute("data-git", "true");
@@ -114,7 +104,7 @@ test("the composer in a project without git offers only its current checkout; th
 test("a git repository without a remote: Publish to GitHub is there", async ({ page }) => {
   await openApp(page);
   await selectProject(page, "repo-sk");
-  await expect(page.getByTestId("overview-title")).toHaveText("sketches@main");
+  await expect(page.getByTestId("worktree-surface-title")).toHaveText("sketches@main");
   await expect(page.getByTestId("no-remote")).toContainText("No remote");
   // Live since add-project PR 4 (e2e/create.spec.ts publishes with it).
   await expect(page.getByTestId("publish-github")).toBeEnabled();
@@ -126,7 +116,7 @@ test("a git repository without a remote: Publish to GitHub is there", async ({ p
   // A remote that is not GitHub, and a GitHub repository: no Publish button.
   for (const id of ["repo-dot", "repo-cf"]) {
     await selectProject(page, id);
-    await expect(page.getByTestId("overview-page")).toHaveAttribute("data-git", "true");
+    await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-git", "true");
     await expect(page.getByTestId("publish-github")).toHaveCount(0);
   }
 });

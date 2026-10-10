@@ -3,7 +3,7 @@ import { Composer } from "@/components/compose/Composer";
 import { AddProjectDialog } from "@/components/addproject/AddProjectDialog";
 import { PublishDialog } from "@/components/publish/PublishDialog";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
-import { Dashboard } from "@/components/Dashboard";
+import { StartPage } from "@/components/start/StartPage";
 import { HelpOverlay } from "@/components/help/HelpOverlay";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { CommandPalette } from "@/components/palette/CommandPalette";
@@ -82,7 +82,7 @@ function Content() {
   if (sel.kind === "session") {
     return sessionTerminal ? <TerminalPane terminalId={sessionTerminal} sessionId={sel.id} /> : <SessionDisconnected id={sel.id} />;
   }
-  return <Dashboard />;
+  return <StartPage />;
 }
 
 /**

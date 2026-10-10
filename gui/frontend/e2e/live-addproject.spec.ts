@@ -63,7 +63,7 @@ test("search, look up and clone a GitHub repository with the dialog", async ({ p
     await expect(card.getByTestId("add-project-clone-line").first()).toContainText("Cloning into");
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "addproject-cloning.png") });
     await expect(page.getByTestId("add-project-dialog")).toHaveCount(0, { timeout: 120_000 });
-    await expect(page.getByTestId("overview-title")).toContainText(`${name}@`);
+    await expect(page.getByTestId("worktree-surface-title")).toContainText(`${name}@`);
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "addproject-cloned.png") });
     expect(await projectAt(dest)).not.toBe("");
   } finally {

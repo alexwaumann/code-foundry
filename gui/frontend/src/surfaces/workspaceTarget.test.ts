@@ -50,7 +50,6 @@ describe("selectionWorkspaceThread (the surface's availability)", () => {
     ["a project thread", { kind: "session", id: "s-proj" }, null],
     ["an unknown thread", { kind: "session", id: "s-404" }, null],
     ["a plain terminal", { kind: "terminal", id: "t-plain" }, null],
-    ["a member worktree", { kind: "worktree", repoId: "web", path: WEB }, null],
     ["a workspace composer (no thread yet)", { kind: "compose", repoId: "web", workspaceId: "w1" }, null],
     ["the Projects page", { kind: "view", name: "projects" }, null],
     ["nothing", { kind: "none" }, null],

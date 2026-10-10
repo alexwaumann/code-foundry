@@ -46,7 +46,7 @@ test("double-click on a worktree row and on a project row opens their tabs in th
   await expect(tabs(page).and(page.locator('[aria-selected="true"]'))).toHaveText("code-foundry · feat/sidebar");
 });
 
-test("Enter on a workspace member row opens its tab; the Open buttons still go to the overview page", async ({ page }) => {
+test("Enter on a workspace member row opens its tab in the page's panel", async ({ page }) => {
   await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
   await openApp(page);
   await openProjects(page);
@@ -56,17 +56,23 @@ test("Enter on a workspace member row opens its tab; the Open buttons still go t
   await expect(panel(page)).toHaveAttribute("data-panel-key", "view:projects");
   await expect(tabs(page)).toHaveText(["ghostty-playground · cf/login"]);
   await expect(surface(page).getByTestId("worktree-surface-title")).toHaveText("ghostty-playground@cf/login");
+  await expect(page.getByTestId("projects-page")).toBeVisible();
+});
 
-  await member.hover();
-  await member.getByTestId("member-open-overview").click();
-  await expect(page.getByTestId("projects-page")).toHaveCount(0);
-  await expect(page.getByTestId("overview-title")).toHaveText("ghostty-playground@cf/login");
-
+test("a project without git: its tab says so and offers Initialize Git; the thread row menu shows a thread's worktree", async ({ page }) => {
+  await openApp(page);
   await openProjects(page);
-  const project = page.locator('[data-nav-key="p:repo-cf"]');
-  await project.hover();
-  await project.getByTestId("project-open").click();
-  await expect(page.getByTestId("overview-title")).toHaveText("code-foundry@main");
+  await page.locator('[data-nav-key="p:repo-wr"]').dblclick();
+  await expect(surface(page)).toHaveAttribute("data-git", "false");
+  await expect(surface(page).getByTestId("section-nogit")).toContainText("Not a git repository");
+  await expect(surface(page).getByTestId("init-git")).toBeEnabled();
+
+  // Show worktree on a thread row: the thread's own panel, with its worktree tab, focused.
+  await row(page, "s:s-3").click({ button: "right" });
+  await page.getByTestId("row-menu").getByText("Show worktree").click();
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-3");
+  await expect(tabs(page)).toHaveText(["code-foundry · fix/resize"]);
+  await expect.poll(() => inPanel(page)).toBe(true);
 });
 
 test("a thread's panel lists Worktree with T; T, the list entry and the palette command open the thread's own worktree", async ({ page }) => {

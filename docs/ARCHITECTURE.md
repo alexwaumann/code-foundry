@@ -277,9 +277,10 @@ from the pull request (docs/notes/pr-thread-commands.md).
   Requests and Projects entries, then a flat thread list: Pinned and Needs attention
   sections on top, threads newest first with project, branch, status and a workspace
   badge, then terminals no thread owns; a status row at its foot; see
-  `docs/notes/workspaces-4-sidebar.md`), content (terminal, overview page, the Pull
-  Requests page, or the Projects page with each project's worktrees and each workspace's
-  members), command palette overlay. Strip and sidebar sit on one background (the sheet);
+  `docs/notes/workspaces-4-sidebar.md`), content (terminal, the Pull Requests page, the
+  Projects page with each project's worktrees and each workspace's members, or the
+  composer; a worktree's overview is a side panel tab, not a page), command palette
+  overlay. Strip and sidebar sit on one background (the sheet);
   the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Each
   selection can open a side panel right of the content: a second pane with tabs whose
   bodies come from the surface registry (`src/surfaces`, `docs/notes/side-panel.md`):

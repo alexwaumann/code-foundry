@@ -1,20 +1,19 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, CircleCheck, CircleDashed, CircleDot, CircleX, Folder, FolderGit2, GitBranch, GitBranchPlus, CloudUpload } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { ChevronDown, ChevronRight, CircleCheck, CircleDashed, CircleDot, CircleX, Folder, GitBranch, GitBranchPlus, CloudUpload } from "lucide-react";
 import type { CheckRunView, PullRequestView, RepoActivityView } from "@/api/gh";
 import { isRemoteless, type GitStatusView, type RepoView, type WorktreeView } from "@/api/repo";
-import { CommandButton } from "@/components/command/CommandButton";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { Button } from "@/components/ui/button";
 import type { LogEntryView, WorktreeDetailView } from "@/api/worktreeDetail";
 import { checksSummary } from "@/components/prs/format";
 import { Age, ChecksBadge, Freshness, PrStateIcon, ReviewBadge } from "@/components/prs/PrBits";
 import { RowList } from "@/components/prs/RowList";
-import { PanelToggle } from "@/components/panel/PanelToggle";
-import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
 import { tildify } from "@/lib/path";
 import { cn } from "@/lib/utils";
+import { runCommand } from "@/stores/commands";
+import { worktreeContext } from "@/stores/context";
 import { branchKey, branchPullRequestsResource, openUrl, repoActivityResource, useFreshness } from "@/stores/gh";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import { openPublishDialog } from "@/stores/publish";
@@ -277,16 +276,13 @@ function PublishToGitHub({ repoId }: { repoId: string }) {
 
 /**
  * The overview of a project without git: what it is instead of branch, status, GitHub,
- * files and log (none of which exist for it), the Initialize Git button (repo.git.init),
- * then its threads and terminals.
+ * files and log (none of which exist for it), and the Initialize Git button
+ * (repo.git.init on the project, whichever selection the panel belongs to).
  */
-function NoGitBody({ items }: { items: ReactNode }) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    rootRef.current?.focus({ preventScroll: true });
-  }, []);
+function NoGitBody({ repoId, path }: { repoId: string; path: string }) {
+  const [busy, setBusy] = useState(false);
   return (
-    <div ref={rootRef} tabIndex={0} className="flex flex-col gap-6 outline-none" data-testid="overview-nogit" data-focus-root>
+    <div className="flex flex-col gap-6" data-testid="overview-nogit">
       <section className="rounded-md border border-dashed px-4 py-3" data-testid="section-nogit">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
           <Folder className="size-4 text-muted-foreground" aria-hidden />
@@ -296,29 +292,34 @@ function NoGitBody({ items }: { items: ReactNode }) {
           Threads and terminals run in this folder. Branches, worktrees, diffs and pull requests need git: initializing makes an empty first commit on the
           default branch.
         </p>
-        <CommandButton
-          command="repo.git.init"
-          icon={GitBranchPlus}
-          label="Initialize Git"
+        <Button
+          type="button"
           variant="outline"
           size="sm"
-          whenUnavailable="disable"
-          keepFocus={false}
           className="mt-3"
+          disabled={busy}
           data-testid="init-git"
-        />
+          onClick={() => {
+            setBusy(true);
+            void runCommand("repo.git.init", {}, worktreeContext(repoId, path)).finally(() => {
+              setBusy(false);
+            });
+          }}
+        >
+          <GitBranchPlus aria-hidden />
+          Initialize Git
+        </Button>
       </section>
-      {items}
     </div>
   );
 }
 
 /**
- * The overview's body for one worktree. `inPanel` is the side panel's member tab
- * (WorktreePanelView): it does not take focus when it mounts and is not the content
- * pane's focus root; the panel is a CSS container, so its rows narrow by container query.
+ * The overview's body for one worktree, in a side panel tab (WorktreePanelView): it
+ * does not take focus when it mounts and is not the content pane's focus root; the
+ * panel is a CSS container, so its rows narrow by container query.
  */
-function OverviewBody({ repo, wt, items, inPanel = false }: { repo: RepoView; wt: WorktreeView; items: ReactNode; inPanel?: boolean }) {
+function OverviewBody({ repo, wt }: { repo: RepoView; wt: WorktreeView }) {
   const slug = repo.githubSlug.toLowerCase();
   const detailEntry = useResource(worktreeDetailResource, detailKey(repo.id, wt.path));
   const activityEntry = useResource(repoActivityResource, slug || null);
@@ -362,11 +363,6 @@ function OverviewBody({ repo, wt, items, inPanel = false }: { repo: RepoView; wt
   }, [activity, branchPrs.prs, fileRows, detail, slug]);
   const nav = useNav(items_);
 
-  const rootRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!inPanel) rootRef.current?.focus({ preventScroll: true });
-  }, [wt.path, inPanel]);
-
   const expandAll = (open: boolean) => {
     const dirs: Record<string, boolean> = {};
     for (const f of detail?.files ?? []) {
@@ -379,14 +375,12 @@ function OverviewBody({ repo, wt, items, inPanel = false }: { repo: RepoView; wt
   return (
     <NavProvider value={nav.ctx}>
       <div
-        ref={rootRef}
         tabIndex={0}
         role="listbox"
         aria-label="Worktree overview"
         aria-activedescendant={nav.activeDescendant}
-        className={cn("flex flex-col outline-none", inPanel ? "gap-4" : "gap-6")}
+        className="flex flex-col gap-4 outline-none"
         data-testid="overview-list"
-        data-focus-root={inPanel ? undefined : true}
         onKeyDown={(e) => {
           if ((e.key === "e" || e.key === "E") && !e.metaKey && !e.ctrlKey && !e.altKey) {
             expandAll(e.key === "e");
@@ -406,7 +400,6 @@ function OverviewBody({ repo, wt, items, inPanel = false }: { repo: RepoView; wt
             <p className="text-xs text-muted-foreground">No GitHub remote: origin is not on github.com.</p>
           )}
         </Section>
-        {items}
         <Section
           testId="section-files"
           title={
@@ -463,77 +456,31 @@ function OverviewBody({ repo, wt, items, inPanel = false }: { repo: RepoView; wt
 }
 
 /**
- * The worktree overview: sync state, GitHub activity for the repo and branch, the
- * sessions on the worktree, and its files and log against the base branch. A repo row
- * (path null) shows its main worktree, with every session in the repo.
- */
-export function WorktreeOverview({ repoId, path, items }: { repoId: string; path: string | null; items: ReactNode }) {
-  const repo = useReposStore((s) => s.byId[repoId]);
-  const mainPath = repo?.worktrees.find((w) => w.isMain)?.path ?? repo?.path ?? "";
-  const wtPath = path ?? mainPath;
-  const wt = useReposStore((s) => findWorktree(s, repoId, wtPath));
-  const noGit = repo?.git === false;
-  return (
-    <section className="flex min-h-0 flex-1 flex-col" data-region="content" aria-label="Worktree overview" data-testid="overview-page" data-git={repo ? !noGit : undefined}>
-      <PaneHeader className="gap-2 px-5">
-        {noGit ? (
-          <Folder className="size-4 text-muted-foreground" aria-hidden />
-        ) : path ? (
-          <GitBranch className="size-4 text-violet-400" aria-hidden />
-        ) : (
-          <FolderGit2 className="size-4 text-sky-400" aria-hidden />
-        )}
-        {noGit ? (
-          <h1 className="flex min-w-0 items-center gap-2 text-sm font-semibold" data-testid="overview-title">
-            <span className="truncate">{repo.name}</span>
-            <NoGitBadge />
-          </h1>
-        ) : (
-          <h1 className="truncate text-sm font-semibold" data-testid="overview-title">
-            {repo?.name ?? "Repository"}
-            <span className="text-muted-foreground">@</span>
-            {wt?.branch || (wt?.head ? wt.head.slice(0, 8) : "")}
-          </h1>
-        )}
-        <span className="ml-auto truncate font-mono text-xs text-muted-foreground">{tildify(wtPath)}</span>
-        <PanelToggle className="-mr-2" />
-      </PaneHeader>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        <div className="mx-auto max-w-6xl">
-          {!repo ? (
-            <p className="text-sm text-muted-foreground">Project not found.</p>
-          ) : noGit ? (
-            <NoGitBody items={items} />
-          ) : !wt ? (
-            <p className="text-sm text-muted-foreground">Loading worktree…</p>
-          ) : (
-            <OverviewBody key={wt.path} repo={repo} wt={wt} items={items} />
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/**
- * A worktree's overview in a side panel tab (the workspace surface's member tabs): a
- * compact header (project@branch, path), then the same body as the overview page (sync
- * state, GitHub activity, files and log). No threads/terminals section: its buttons act on
- * the selection, which is the thread, not this worktree.
+ * A worktree's overview, the side panel's Worktree surface (surfaces/worktree.ts): a
+ * compact header (project@branch, path), then sync state, GitHub activity, files and log.
+ * A project without git shows what it is instead, with Initialize Git. The threads and
+ * terminals in the worktree are not listed: the sidebar is the thread list.
  */
 export function WorktreePanelView({ repoId, path }: { repoId: string; path: string }) {
   const repo = useReposStore((s) => s.byId[repoId]);
   const wt = useReposStore((s) => findWorktree(s, repoId, path));
+  const noGit = repo?.git === false;
   return (
     // @container: log, check and pull request rows narrow with the panel.
-    <div className="@container flex min-w-0 flex-col gap-3 px-4 py-3 @max-[340px]:px-3" data-testid="worktree-surface" data-repo={repoId} data-path={path}>
+    <div className="@container flex min-w-0 flex-col gap-3 px-4 py-3 @max-[340px]:px-3" data-testid="worktree-surface" data-repo={repoId} data-path={path} data-git={repo ? !noGit : undefined}>
       <header className="flex min-w-0 flex-col gap-0.5 border-b border-pane-border pb-2" data-testid="worktree-surface-header">
         <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
-          <GitBranch className="size-4 shrink-0 text-violet-400" aria-hidden />
-          <span className="min-w-0 truncate" data-testid="worktree-surface-title">
+          {noGit ? <Folder className="size-4 shrink-0 text-muted-foreground" aria-hidden /> : <GitBranch className="size-4 shrink-0 text-violet-400" aria-hidden />}
+          <span className="flex min-w-0 items-center gap-2 truncate" data-testid="worktree-surface-title">
             {repo?.name ?? repoId}
-            <span className="text-muted-foreground">@</span>
-            {wt?.branch || (wt?.head ? wt.head.slice(0, 8) : "")}
+            {noGit ? (
+              <NoGitBadge />
+            ) : (
+              <>
+                <span className="text-muted-foreground">@</span>
+                {wt?.branch || (wt?.head ? wt.head.slice(0, 8) : "")}
+              </>
+            )}
           </span>
         </h2>
         <span className="min-w-0 truncate font-mono text-xs text-muted-foreground" title={path}>
@@ -542,12 +489,14 @@ export function WorktreePanelView({ repoId, path }: { repoId: string; path: stri
       </header>
       {!repo ? (
         <p className="text-sm text-muted-foreground">Project not found.</p>
+      ) : noGit ? (
+        <NoGitBody repoId={repoId} path={path} />
       ) : !wt ? (
         <p className="text-sm text-muted-foreground" data-testid="worktree-surface-missing">
           This worktree is gone (removed from the workspace, or deleted).
         </p>
       ) : (
-        <OverviewBody key={wt.path} repo={repo} wt={wt} items={null} inPanel />
+        <OverviewBody key={wt.path} repo={repo} wt={wt} />
       )}
     </div>
   );

@@ -38,8 +38,9 @@ build order are built, each with a note: `workspaces-1-store.md`,
   header and Projects page entry points) done: `docs/notes/workspaces-5-panel.md`.
 * Worktree tabs everywhere (2026-10-10): the Projects page's project and worktree rows
   open the worktree in the page's side panel on Enter or double-click, and a thread's
-  panel lists Worktree (T, `view.panel.worktree`) for its own worktree:
-  `docs/notes/worktree-panel-tab.md`.
+  panel lists Worktree (T, `view.panel.worktree`) for its own worktree. The main-pane
+  worktree overview page (Phase 3a) is gone with it, with the `repo` and `worktree`
+  selections: `docs/notes/worktree-panel-tab.md`.
 
 ### Adding projects: four PRs (design 2026-10-10)
 

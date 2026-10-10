@@ -29,11 +29,22 @@ function allWorktrees(repos: ReposData): WorktreeRef[] {
   return repos.order.flatMap((id) => repos.byId[id]?.worktrees.map((w) => ({ repoId: id, path: w.path })) ?? []);
 }
 
+/** The context of an action on one worktree (the Projects page's rows, the panel's worktree tab): no selection involved. */
+export function worktreeContext(repoId: string, path: string): UiContextView {
+  return { ...emptyContext, activeRepoId: repoId, activeWorktreePath: path, activeView: "projects" };
+}
+
+/** The context of an action on one project (the Projects page's rows). */
+export function repoContext(repoId: string): UiContextView {
+  return { ...emptyContext, activeRepoId: repoId, activeView: "projects" };
+}
+
 /**
  * Derives the UiContext the daemon sees from the current selection. A terminal's
- * repo/worktree come from the same placement the sidebar uses. Selecting a repo row
- * counts as looking at its main worktree; the composer only at its repo. A session contributes its attached terminal
- * (if any) so terminal.* commands apply to it.
+ * repo/worktree come from the same placement the sidebar uses. The composer looks only
+ * at its repo. A session contributes its attached terminal (if any) so terminal.*
+ * commands apply to it. Actions on a worktree that is not selected (the Projects page,
+ * the panel's worktree tab) build their context with worktreeContext / repoContext.
  */
 export function deriveContext(sel: Selection, terminals: TerminalsData, repos: ReposData, sessions: SessionsData = { byId: {}, order: [] }): UiContextView {
   switch (sel.kind) {
@@ -66,13 +77,6 @@ export function deriveContext(sel: Selection, terminals: TerminalsData, repos: R
         activeWorkspaceId: s?.workspaceId ?? "",
       };
     }
-    case "repo": {
-      const repo = repos.byId[sel.repoId];
-      const main = repo?.worktrees.find((w) => w.isMain)?.path ?? repo?.path ?? "";
-      return { ...emptyContext, activeRepoId: sel.repoId, activeWorktreePath: main, activeView: "repo" };
-    }
-    case "worktree":
-      return { ...emptyContext, activeRepoId: sel.repoId, activeWorktreePath: sel.path, activeView: "worktree" };
     // The composer has no worktree yet (it may make one): only the repo, which is
     // what session.new needs to be available.
     case "compose":

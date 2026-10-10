@@ -77,7 +77,7 @@ func RegisterUI(r *Registry, e Emitter) error {
 		Command{
 			Name:        "ui.focus.repo",
 			Title:       "Focus Repository",
-			Description: "Show a repository (and optionally one of its worktrees) in every connected window.",
+			Description: "Show a project's worktree (default: its main one) in the Projects page's side panel in every connected window.",
 			Category:    "View",
 			Args: []ArgSpec{
 				{Name: "repo", Type: String, Required: true, Context: ContextRepo, Description: "Repository id"},

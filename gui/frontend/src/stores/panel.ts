@@ -1,6 +1,6 @@
 /**
  * The side panel ("surface panel") to the right of the content pane. Each selection
- * (session, terminal, worktree, repo, top-level page) has its own panel: whether it is
+ * (session, terminal, composer, top-level page) has its own panel: whether it is
  * open, its tabs, the active tab, its width, and whether it is expanded to the full width
  * of the content area. Switching selection shows that
  * selection's panel. All of it is persisted (localStorage "code-foundry.panel"), so it
@@ -54,10 +54,6 @@ export function keyOf(sel: Selection): string | null {
       return `session:${sel.id}`;
     case "terminal":
       return `terminal:${sel.id}`;
-    case "repo":
-      return `repo:${sel.repoId}`;
-    case "worktree":
-      return `worktree:${sel.repoId}:${sel.path}`;
     case "view":
       return `view:${sel.name}`;
     case "compose":

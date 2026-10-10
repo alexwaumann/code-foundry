@@ -454,8 +454,8 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
             onSubmit={send}
             onEscape={() => {
               if (!isDraftEmpty(getDraft(draftKey))) return false;
-              const back = target.kind === "project" ? target.repoId : primary;
-              useUiStore.getState().select(back ? { kind: "repo", repoId: back } : { kind: "none" });
+              // Back to the Projects page, where the composer is reached from.
+              useUiStore.getState().select({ kind: "view", name: "projects" });
               return true;
             }}
             onPasteFiles={attach}

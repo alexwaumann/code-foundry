@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { CF, invocations, mockPost, mockUrl, openApp, resetMock, selectWorktree } from "./fixtures";
+import { CF, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -8,9 +8,10 @@ test.beforeEach(async () => {
 
 const toast = (page: Page, title: string) => page.locator("[data-sonner-toast]").filter({ has: page.locator("[data-title]", { hasText: title }) });
 
+/** The thread on code-foundry's main worktree: git commands take their worktree from the selection. */
 async function selectMainWorktree(page: Page): Promise<void> {
   await openApp(page);
-  await selectWorktree(page, "repo-cf", CF);
+  await row(page, "s:s-1").click();
 }
 
 test("a git op shows a progress toast, then its result (no duplicate command toast)", async ({ page }) => {
@@ -82,14 +83,15 @@ test("ops started outside the GUI (CLI) get toasts too", async ({ page }) => {
 test("pr.create needs a GitHub repo; its result offers to open the PR", async ({ page }) => {
   await mockPost("gitops?delay=200");
   await openApp(page);
-  await selectWorktree(page, "repo-dot", "/Users/dev/dotfiles");
+  // The thread in dotfiles (a non-GitHub remote), then one on feat/sidebar.
+  await row(page, "s:s-6").click();
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
   await expect(palette.locator('[data-command="git.fetch"]')).toBeVisible();
   await expect(palette.locator('[data-command="pr.create"]')).toHaveCount(0);
   await page.keyboard.press("Escape");
 
-  await selectWorktree(page, "repo-cf", `${CF}.worktrees/feat-sidebar`);
+  await row(page, "s:s-4").click();
   await page.keyboard.press("Meta+k");
   await palette.locator('[data-command="pr.create"]').click();
   const created = toast(page, "Create PR for feat/sidebar");
