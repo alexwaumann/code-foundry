@@ -35,7 +35,7 @@ export type PalettePage = "commands" | "projects" | "runin";
 export const SIDEBAR_MIN = 220;
 export const SIDEBAR_MAX = 520;
 /** The initial width, and what double-clicking the resize handle restores. */
-export const SIDEBAR_DEFAULT = 260;
+export const SIDEBAR_DEFAULT = 280;
 /** Side panel width bounds; the upper bound depends on the window and sidebar (panelMax). */
 export const PANEL_MIN = 280;
 export const PANEL_MAX_FRACTION = 0.6;

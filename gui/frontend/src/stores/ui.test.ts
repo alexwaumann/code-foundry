@@ -7,7 +7,7 @@ describe("panelMax", () => {
     ["room beside the sidebar when that is less", 1400, 520, 1400 - 520 - PANE_GAPS - CONTENT_MIN],
     ["sidebar hidden", 1000, 0, 600],
     ["no room: below the minimum", 1000, 520, 1000 - 520 - PANE_GAPS - CONTENT_MIN],
-    ["900px minimum window, default sidebar", 900, 260, 900 - 260 - PANE_GAPS - CONTENT_MIN],
+    ["900px minimum window, default sidebar", 900, SIDEBAR_DEFAULT, 900 - SIDEBAR_DEFAULT - PANE_GAPS - CONTENT_MIN],
   ];
   it.each(cases)("%s", (_name, windowWidth, sidebar, want) => {
     expect(panelMax(windowWidth, sidebar)).toBe(want);

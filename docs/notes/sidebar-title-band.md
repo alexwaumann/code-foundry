@@ -35,12 +35,12 @@ proto changes, no daemon restart.
   (2026-10-10). `AppName` measures its span with a ResizeObserver and sets `invisible`
   when `scrollWidth > clientWidth` (`data-fits` carries the state for tests). The span
   stays in the layout so it is remeasured when room returns. "Code Foundry" is about
-  85px wide; with a one-digit badge it needs 260px of sidebar, so it shows at the 260px
-  default (the band's gaps are 6px and the badge's padding 6px to make that fit with a
-  couple of px to spare) and hides between 220 and about 258. Each extra badge digit
+  85px wide; with a one-digit badge it needs about 260px of sidebar (the band's gaps and
+  the badge's padding are 6px), so it shows at the 280px default with room for a two-digit
+  badge and hides between 220 and about 258. Each extra badge digit
   costs about 7px. Without the badge it fits from about 211px.
 * **Saved sidebar widths are clamped on load.** The ui store's persist `merge` clamps
   `sidebarWidth` to [SIDEBAR_MIN, SIDEBAR_MAX], so a width saved under the old 180
   minimum loads as 220. It is a clamp, not a migration (the persist version stays 3).
-  `SIDEBAR_DEFAULT` (260) is the initial width and what double-clicking the resize handle
+  `SIDEBAR_DEFAULT` (280, was 260; Alex 2026-10-10) is the initial width and what double-clicking the resize handle
   restores.
