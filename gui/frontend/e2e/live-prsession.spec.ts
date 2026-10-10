@@ -33,9 +33,12 @@ function terminalText(page: Page): Promise<string> {
 test("Explain this PR starts a real Claude session with the explain prompt", async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 });
   await page.goto("/");
-  const repoRow = page.locator('[data-row-kind="repo"]').filter({ hasText: REPO }).first();
-  await expect(repoRow).toBeVisible({ timeout: 20_000 });
-  await repoRow.click();
+  // Projects live on the Projects page (docs/notes/workspaces-4-sidebar.md).
+  const openRepo = async () => {
+    await page.getByTestId("nav-projects").click({ timeout: 20_000 });
+    await page.locator('[data-testid="project"]').filter({ has: page.getByTestId("project-name").getByText(REPO, { exact: true }) }).locator("[data-nav-key^='p:']").dblclick();
+  };
+  await openRepo();
   await expect(page.getByTestId("overview-page")).toBeVisible();
   // Through the app's own store module, as a pull request row would.
   await page.evaluate(`import("/src/stores/prPanel.ts").then((m) => m.openPullRequestInPanel({ slug: "${SLUG}", number: ${String(NUMBER)} }))`);
@@ -53,6 +56,6 @@ test("Explain this PR starts a real Claude session with the explain prompt", asy
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/chunk4-live-explain.png` });
 
   // The originating selection's panel keeps the pull request.
-  await repoRow.click();
+  await openRepo();
   await expect(page.getByTestId("panel-tabs").getByRole("tab")).toHaveText([`#${String(NUMBER)}`]);
 });

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { CF, invocations, openApp, resetMock, row } from "./fixtures";
+import { CF, invocations, openApp, resetMock, row, selectWorktree } from "./fixtures";
 
 const FIX_RESIZE = `${CF}.worktrees/fix-resize`;
 const DOTFILES = "/Users/dev/dotfiles";
@@ -22,10 +22,11 @@ test("sidebar new-thread button opens the project picker, then the composer", as
   const button = page.getByTestId("sidebar-new-session");
   // Nothing selected: the picker supplies the repo, so the button is enabled anyway.
   await expect(button).toBeEnabled();
-  await row(page, `w:repo-gp::/Users/dev/src/ghostty-playground`).click();
+  // A thread in ghostty-playground (s-2) is selected.
+  await row(page, "s:s-2").click();
   await button.click();
 
-  // The selected repo is highlighted first; Enter picks it.
+  // The selected thread's project is highlighted first; Enter picks it.
   const palette = page.getByTestId("palette");
   await expect(palette).toHaveAttribute("data-mode", "projects");
   await expect(palette.locator('[data-project="repo-gp"]')).toHaveAttribute("data-selected", "true");
@@ -46,9 +47,10 @@ test("sidebar new-thread button opens the project picker, then the composer", as
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
 });
 
-test("sidebar new-terminal button starts a terminal in the selected worktree", async ({ page }) => {
+test("sidebar new-terminal button starts a terminal in the selected thread's worktree", async ({ page }) => {
   await openApp(page);
-  await row(page, `w:repo-cf::${FIX_RESIZE}`).click();
+  // s-3 runs in fix/resize.
+  await row(page, "s:s-3").click();
   await page.getByTestId("sidebar-new-terminal").click();
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("terminal.new");
   const last = (await invocations()).at(-1);
@@ -123,7 +125,7 @@ test("empty states and the welcome panel offer buttons", async ({ page }) => {
   await expect(page.getByTestId("palette")).toBeVisible();
   await page.keyboard.press("Escape");
 
-  await row(page, `w:repo-dot::${DOTFILES}`).click();
+  await selectWorktree(page, "repo-dot", DOTFILES);
   await page.getByTestId("empty-new-terminal").click();
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("terminal.new");
   const last = (await invocations()).at(-1);

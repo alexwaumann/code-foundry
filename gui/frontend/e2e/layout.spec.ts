@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, resetMock, row } from "./fixtures";
+import { openApp, resetMock, row, selectProject } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -22,14 +22,14 @@ function drag(page: Page, selector: string) {
 }
 
 // Window geometry (components/window/titleBand.ts): a 52px title band with no full-width
-// strip. The sidebar's band (80px traffic-light gutter, then the Repositories header) is
+// strip. The sidebar's band (80px traffic-light gutter, then the Threads header) is
 // 52px; the panes start 8px down and their 44px headers end on the band (their 1px
 // bottom border is the first row below it: the pane's own 1px border puts the header
 // at 9..53).
 const BAND = 52;
 const HEADER = 44;
 
-test("the sidebar band holds the empty traffic-light gutter and the Repositories header, and drags the window", async ({ page }) => {
+test("the sidebar band holds the empty traffic-light gutter and the Threads header, and drags the window", async ({ page }) => {
   await openApp(page);
   const viewport = page.viewportSize();
   const band = await box(page, "sidebar-band");
@@ -43,16 +43,17 @@ test("the sidebar band holds the empty traffic-light gutter and the Repositories
   expect([gutter.left, gutter.top, gutter.width, gutter.height]).toEqual([0, 0, 80, BAND]);
   // Nothing sits on the lights.
   expect(await page.getByTestId("traffic-light-gutter").evaluate((el) => [el.childElementCount, el.textContent])).toEqual([0, ""]);
-  const title = page.getByTestId("sidebar-band").getByText("Repositories");
+  const title = page.getByTestId("sidebar-band").getByText("Threads");
   expect(await title.evaluate((el) => el.getBoundingClientRect().left)).toBeGreaterThanOrEqual(80);
   expect(await drag(page, '[data-testid="sidebar-band"] header > span:first-child')).toBe("drag");
   // Its controls click instead of dragging.
   expect(await drag(page, '[data-testid="sidebar-band-controls"]')).toBe("no-drag");
   expect(await drag(page, '[data-testid="sidebar-new-terminal"]')).toBe("no-drag");
-  // Pull Requests and the tree sit below the band and do not drag.
+  // Pull Requests, Projects and the thread list sit below the band and do not drag.
   expect((await box(page, "nav-pullrequests")).top).toBeGreaterThanOrEqual(BAND);
   expect(await drag(page, '[data-testid="nav-pullrequests"]')).toBe("no-drag");
-  expect(await drag(page, '[role="tree"]')).toBe("");
+  expect(await drag(page, '[data-testid="nav-projects"]')).toBe("no-drag");
+  expect(await drag(page, '[data-testid="thread-list"]')).toBe("");
 
   // The sheet above the panes drags too; the panes themselves do not.
   const edge = await box(page, "window-drag-edge");
@@ -125,10 +126,12 @@ test("every page header is 44px, ends on the band and drags; its controls do not
     for (const sel of noDrag) expect(await drag(page, `${header} ${sel}`), sel).toBe("no-drag");
   };
 
-  await row(page, "r:repo-cf").click();
+  await selectProject(page, "repo-cf");
   await check('[data-testid="overview-page"] > header', ['[data-testid="panel-toggle"]']);
   await page.getByTestId("nav-pullrequests").click();
   await check('[data-testid="prs-page"] > header', ['[data-testid="prs-scope"]', '[data-testid="panel-toggle"]']);
+  await page.getByTestId("nav-projects").click();
+  await check('[data-testid="projects-page"] > header', ['[data-testid="projects-register"]', '[data-testid="panel-toggle"]']);
   await page.keyboard.press("Meta+Comma");
   await expect(page.getByTestId("settings-page")).toBeVisible();
   await check('[data-testid="settings-page"] > header', ['input[type="search"]', '[data-testid="reveal-settings"]', 'button[aria-label="Close settings"]']);

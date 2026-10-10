@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { CF, invocations, mockPost, openApp, resetMock, row, selectWorktree } from "./fixtures";
 
 /**
  * The Pull request surface in the side panel, against the mock daemon's fixtures
@@ -371,7 +371,7 @@ test("panel state is per selection; a session or worktree on a PR branch enables
   await expect(page.getByTestId("pr-title")).toContainText("resize race");
 
   // The worktree overview: its branch PR row opens in that selection's panel.
-  await row(page, `w:repo-cf::${CFW}/feat-sidebar`).click();
+  await selectWorktree(page, "repo-cf", `${CFW}/feat-sidebar`);
   await expect(page.getByTestId("overview-page")).toBeVisible();
   await page.locator('[data-nav-key="b:142"]').click();
   await expect(tabs(page)).toHaveText(["#142"]);
