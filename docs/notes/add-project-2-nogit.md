@@ -101,7 +101,8 @@ and `make gui-build` green; exercised against a scratch daemon (below).
 
 ## Verified
 
-* `make check` green; Playwright (mock) all green on WebKit + Chromium, including
+* `make check` green; `make gui-e2e` 288/288 on WebKit + Chromium (one WebKit flake in
+  `panel.spec.ts` under load in an earlier run, green on rerun), including
   `e2e/nogit.spec.ts`: both overviews, Initialize Git from the overview button, the
   composer, the sidebar row, the workspace pickers.
 * Scratch daemon (`CODE_FOUNDRY_HOME=/tmp/cf-nogit-home`, `bin/code-foundry daemon --dev`)
