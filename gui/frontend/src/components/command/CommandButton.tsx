@@ -26,6 +26,8 @@ interface CommandButtonProps {
   className?: string;
   /** For toggles: rendered as aria-pressed. */
   pressed?: boolean;
+  /** For page buttons (view.*): the page is showing; rendered as aria-current="page". */
+  current?: boolean;
   /** A small number after the icon (e.g. how many items the command shows); part of the label. */
   count?: number;
   "data-testid"?: string;
@@ -48,6 +50,7 @@ export function CommandButton({
   size,
   className,
   pressed,
+  current,
   count,
   "data-testid": testId,
 }: CommandButtonProps) {
@@ -64,6 +67,7 @@ export function CommandButton({
       title={name}
       aria-label={label ? undefined : count !== undefined ? `${name} (${String(count)})` : name}
       aria-pressed={pressed}
+      aria-current={current ? "page" : undefined}
       tabIndex={keepFocus ? -1 : undefined}
       data-command-button={command}
       data-testid={testId}
