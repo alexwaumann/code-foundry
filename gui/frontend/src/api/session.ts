@@ -34,6 +34,11 @@ export interface SessionView {
   baseRef: string;
   /** session.new made the worktree for this session. */
   createdWorktree: boolean;
+  /**
+   * The workspace that owns the thread; "" for a project thread (owned by repoId).
+   * repoId/worktreePath are where it runs either way.
+   */
+  workspaceId: string;
 }
 
 export type SessionEventView =
@@ -85,6 +90,7 @@ export function toSessionView(s: Session): SessionView {
     permissionMode: permissionMap[s.permissionMode],
     baseRef: s.baseRef,
     createdWorktree: s.createdWorktree,
+    workspaceId: s.workspaceId,
   };
 }
 
