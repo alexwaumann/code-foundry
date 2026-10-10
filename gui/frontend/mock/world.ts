@@ -15,6 +15,7 @@ import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefound
 import { MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
 import { prDetailCall } from "./prDetail";
 import { GhWorld, ghEvent, viewCommands } from "./github";
+import { HOME } from "./filesystem";
 import { Hub } from "./hub";
 import { MockSettings } from "./settings";
 import { MockUpdater } from "./update";
@@ -173,7 +174,7 @@ export class CommandError extends Error {
   }
 }
 
-const HOME = "/Users/dev";
+// Repo paths under the fake home (mock/filesystem.ts lists the same tree).
 const CF = `${HOME}/src/code-foundry`;
 const CFW = `${HOME}/src/code-foundry.worktrees`;
 const GP = `${HOME}/src/ghostty-playground`;
@@ -1465,6 +1466,7 @@ export class World {
         when: always,
         run: (_ctx, args) => {
           const path = (args.path ?? "").replace(/^~(?=\/|$)/, HOME).replace(/\/+$/, "");
+          if (path !== HOME && !path.startsWith(`${HOME}/`)) throw new CommandError("invalid", `${path} is outside your home directory`);
           const name = path.split("/").pop() || path;
           const id = `repo-${name}`;
           const repo: MockRepo = { id, path, name, defaultBranch: "main", githubSlug: "", remotes: [], worktrees: [{ path, branch: "main", head: "deadbeef", isMain: true, status: clean() }] };

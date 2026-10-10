@@ -1,5 +1,5 @@
 import { Browser, Events } from "@wailsio/runtime";
-import { Info } from "../../bindings/github.com/alexwaumann/code-foundry/gui/appservice";
+import { Info, PickDirectory } from "../../bindings/github.com/alexwaumann/code-foundry/gui/appservice";
 
 /** The Wails host (window shell). */
 export interface AppInfoView {
@@ -35,6 +35,16 @@ export async function openExternal(url: string): Promise<void> {
     return;
   }
   window.open(url, "_blank", "noopener");
+}
+
+/**
+ * Shows the native folder picker, opened at startDir (a typed path; the host falls back
+ * to the nearest existing directory, else home). Resolves to the chosen directory, or
+ * null when cancelled. Only call it when appInfo() found the host.
+ */
+export async function pickDirectory(startDir: string): Promise<string | null> {
+  const path = await PickDirectory(startDir);
+  return path === "" ? null : path;
 }
 
 /** Calls fn when the app menu's "Check for Updates…" is chosen. Returns an unsubscribe. */
