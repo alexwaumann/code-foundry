@@ -7,9 +7,12 @@ import "google/protobuf/timestamp.proto";
 // UpdateService is the in-app updater. The daemon checks the latest GitHub release of
 // the build's release repository through the user's authenticated `gh` (30s after start,
 // then every 24h), and installs it on request by running the installer embedded in the
-// binary. Installing replaces the app directory on disk; nothing restarts by itself. The
-// GUI relaunches on request (Relaunch), and the daemon keeps running the old version
-// until the user runs `daemon.restart`, because restarting it closes every session.
+// binary. Installing replaces the app directory on disk; nothing restarts by itself,
+// because restarting the daemon closes every session. `app.restart` (the GUI's "Restart
+// Now") applies an update in one step: it announces RestartRequested on Watch, then the
+// daemon exits; GUI hosts relaunch once their Watch stream ends, and the relaunched
+// window auto-starts the installed daemon. `app.relaunch` (Relaunch) and
+// `daemon.restart` do the two halves separately.
 //
 // Dev builds (version not strict semver) and builds without a release repository do
 // not check: Get reports enabled=false with the reason.
@@ -27,7 +30,13 @@ service UpdateService {
   // Relaunch asks every connected GUI to relaunch itself (to pick up an installed
   // update). Moves INSTALLED to RESTART_REQUIRED.
   rpc Relaunch(RelaunchAppRequest) returns (RelaunchAppResponse) {}
-  // Watch streams the status on connect and on every change, plus relaunch requests.
+  // RequestRestart tells every connected GUI that the daemon is about to restart: each
+  // relaunches once its Watch stream ends. It does not restart anything itself and does
+  // not change the status; the `app.restart` command calls it right before stopping the
+  // daemon. Clients wanting a restart invoke `app.restart`, not this.
+  rpc RequestRestart(RequestRestartRequest) returns (RequestRestartResponse) {}
+  // Watch streams the status on connect and on every change, plus relaunch and restart
+  // requests.
   rpc Watch(WatchUpdateRequest) returns (stream UpdateEvent) {}
 }
 
@@ -40,10 +49,10 @@ enum UpdateState {
   // The installer is downloading and installing target_version.
   UPDATE_STATE_DOWNLOADING = 3;
   // target_version is installed on disk. The GUI needs a relaunch and the daemon a
-  // restart to run it.
+  // restart to run it (`app.restart` does both).
   UPDATE_STATE_INSTALLED = 4;
   // target_version is installed and the GUI was asked to relaunch; the daemon still
-  // runs current_version until `daemon.restart`.
+  // runs current_version until `daemon.restart` (or `app.restart`).
   UPDATE_STATE_RESTART_REQUIRED = 5;
   // Installing target_version failed (failure_reason). Install may be retried.
   UPDATE_STATE_FAILED = 6;
@@ -80,10 +89,17 @@ message UpdateStatus {
 // RelaunchRequested asks connected GUIs to relaunch themselves.
 message RelaunchRequested {}
 
+// RestartRequested says the daemon is about to exit to restart into the installed
+// version (`app.restart`). A GUI relaunches once its Watch stream ends (the daemon is
+// gone), so the new window auto-starts the new daemon instead of reconnecting to the
+// dying one.
+message RestartRequested {}
+
 message UpdateEvent {
   oneof event {
     UpdateStatus status = 1;
     RelaunchRequested relaunch_requested = 2;
+    RestartRequested restart_requested = 3;
   }
 }
 
@@ -108,6 +124,13 @@ message InstallUpdateResponse {
 message RelaunchAppRequest {}
 
 message RelaunchAppResponse {
+  // GUIs that received the request.
+  int32 delivered = 1;
+}
+
+message RequestRestartRequest {}
+
+message RequestRestartResponse {
   // GUIs that received the request.
   int32 delivered = 1;
 }

@@ -124,6 +124,62 @@ func TestCheckInstallRelaunch(t *testing.T) {
 	}
 }
 
+// TestRequestRestart: the restart announcement reaches bus listeners and leaves the
+// status alone (the daemon is about to exit), unlike RequestRelaunch.
+func TestRequestRestart(t *testing.T) {
+	tests := []struct {
+		name   string
+		onDisk string
+		want   update.State
+	}{
+		{"installed stays installed", "v0.2.0", update.Installed},
+		{"idle stays idle", "v0.1.0", update.Idle},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var b *bus.Bus
+			r := newRig(t, "v0.1.0", func(o *update.Options) {
+				o.InstalledVersion = updatetest.NewOnDisk(tt.onDisk).Version
+				b = o.Bus
+			})
+			restart := bus.Subscribe[update.RestartRequested](b, 8)
+			before := r.store.Snapshot()
+			if before.State != tt.want {
+				t.Fatalf("initial state %v, want %v", before.State, tt.want)
+			}
+			// Only RestartRequested listeners count, not the rig's relaunch subscription.
+			if n := r.store.RequestRestart(); n != 1 {
+				t.Fatalf("RequestRestart delivered %d, want 1", n)
+			}
+			select {
+			case <-restart.C():
+			case <-time.After(5 * time.Second):
+				t.Fatal("RestartRequested not received")
+			}
+			if st := r.store.Snapshot(); st != before {
+				t.Fatalf("status changed: %+v, was %+v", st, before)
+			}
+			select {
+			case ev := <-r.events.C():
+				t.Fatalf("status published: %+v", ev.Status)
+			default:
+			}
+			select {
+			case <-r.relaunch.C():
+				t.Fatal("RequestRestart published RelaunchRequested")
+			default:
+			}
+		})
+	}
+}
+
+func TestRequestRestartWithoutBus(t *testing.T) {
+	r := newRig(t, "v0.1.0", func(o *update.Options) { o.Bus = nil })
+	if n := r.store.RequestRestart(); n != 0 {
+		t.Fatalf("RequestRestart delivered %d without a bus, want 0", n)
+	}
+}
+
 func TestProgressIsPublished(t *testing.T) {
 	r := newRig(t, "v0.2.0", nil)
 	r.installer.Hold = true

@@ -65,7 +65,12 @@ func (h *Update) Relaunch(context.Context, *connect.Request[v1.RelaunchAppReques
 	return connect.NewResponse(&v1.RelaunchAppResponse{Delivered: int32(h.svc.RequestRelaunch())}), nil
 }
 
-// Watch sends the status, then every change and relaunch request.
+// RequestRestart tells connected GUIs the daemon is about to restart (`app.restart`).
+func (h *Update) RequestRestart(context.Context, *connect.Request[v1.RequestRestartRequest]) (*connect.Response[v1.RequestRestartResponse], error) {
+	return connect.NewResponse(&v1.RequestRestartResponse{Delivered: int32(h.svc.RequestRestart())}), nil
+}
+
+// Watch sends the status, then every change and relaunch and restart request.
 func (h *Update) Watch(ctx context.Context, _ *connect.Request[v1.WatchUpdateRequest], stream *connect.ServerStream[v1.UpdateEvent]) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -151,7 +156,7 @@ func updateStatusToProto(s update.Status) *v1.UpdateStatus {
 // ---- EventService source -------------------------------------------------------
 
 // updateSource feeds EventService (and UpdateService.Watch): the status as snapshot,
-// then status changes and relaunch requests.
+// then status changes and relaunch and restart requests.
 type updateSource struct {
 	svc update.Service
 	bus *bus.Bus
@@ -170,6 +175,9 @@ func (s updateSource) subscribe(ctx context.Context) <-chan *v1.Event {
 		newTap(s.bus, updateWatchBuffer, func(e update.Event) *v1.Event { return updateStatusEvent(e.Status) }),
 		newTap(s.bus, updateWatchBuffer, func(update.RelaunchRequested) *v1.Event {
 			return updateWrap(&v1.UpdateEvent{Event: &v1.UpdateEvent_RelaunchRequested{RelaunchRequested: &v1.RelaunchRequested{}}})
+		}),
+		newTap(s.bus, updateWatchBuffer, func(update.RestartRequested) *v1.Event {
+			return updateWrap(&v1.UpdateEvent{Event: &v1.UpdateEvent_RestartRequested{RestartRequested: &v1.RestartRequested{}}})
 		}),
 	)
 }

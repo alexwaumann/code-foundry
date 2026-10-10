@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/update.proto.
  */
 export const file_codefoundry_v1_update: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS91cGRhdGUucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIuECCgxVcGRhdGVTdGF0dXMSKgoFc3RhdGUYASABKA4yGy5jb2RlZm91bmRyeS52MS5VcGRhdGVTdGF0ZRIXCg9jdXJyZW50X3ZlcnNpb24YAiABKAkSDwoHZW5hYmxlZBgDIAEoCBIXCg9kaXNhYmxlZF9yZWFzb24YBCABKAkSFAoMcmVsZWFzZV9yZXBvGAUgASgJEhAKCGNoZWNraW5nGAYgASgIEjMKD2xhc3RfY2hlY2tlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGAoQbGFzdF9jaGVja19lcnJvchgIIAEoCRIWCg5sYXRlc3RfdmVyc2lvbhgJIAEoCRIWCg50YXJnZXRfdmVyc2lvbhgKIAEoCRIRCglub3Rlc191cmwYCyABKAkSEAoIcHJvZ3Jlc3MYDCABKAkSFgoOZmFpbHVyZV9yZWFzb24YDSABKAkiEwoRUmVsYXVuY2hSZXF1ZXN0ZWQihwEKC1VwZGF0ZUV2ZW50Ei4KBnN0YXR1cxgBIAEoCzIcLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZVN0YXR1c0gAEj8KEnJlbGF1bmNoX3JlcXVlc3RlZBgCIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLlJlbGF1bmNoUmVxdWVzdGVkSABCBwoFZXZlbnQiGAoWR2V0VXBkYXRlU3RhdHVzUmVxdWVzdCJHChdHZXRVcGRhdGVTdGF0dXNSZXNwb25zZRIsCgZzdGF0dXMYASABKAsyHC5jb2RlZm91bmRyeS52MS5VcGRhdGVTdGF0dXMiFwoVQ2hlY2tGb3JVcGRhdGVSZXF1ZXN0IkYKFkNoZWNrRm9yVXBkYXRlUmVzcG9uc2USLAoGc3RhdHVzGAEgASgLMhwuY29kZWZvdW5kcnkudjEuVXBkYXRlU3RhdHVzIhYKFEluc3RhbGxVcGRhdGVSZXF1ZXN0IkUKFUluc3RhbGxVcGRhdGVSZXNwb25zZRIsCgZzdGF0dXMYASABKAsyHC5jb2RlZm91bmRyeS52MS5VcGRhdGVTdGF0dXMiFAoSUmVsYXVuY2hBcHBSZXF1ZXN0IigKE1JlbGF1bmNoQXBwUmVzcG9uc2USEQoJZGVsaXZlcmVkGAEgASgFIhQKEldhdGNoVXBkYXRlUmVxdWVzdCrUAQoLVXBkYXRlU3RhdGUSHAoYVVBEQVRFX1NUQVRFX1VOU1BFQ0lGSUVEEAASFQoRVVBEQVRFX1NUQVRFX0lETEUQARIaChZVUERBVEVfU1RBVEVfQVZBSUxBQkxFEAISHAoYVVBEQVRFX1NUQVRFX0RPV05MT0FESU5HEAMSGgoWVVBEQVRFX1NUQVRFX0lOU1RBTExFRBAEEiEKHVVQREFURV9TVEFURV9SRVNUQVJUX1JFUVVJUkVEEAUSFwoTVVBEQVRFX1NUQVRFX0ZBSUxFRBAGMsIDCg1VcGRhdGVTZXJ2aWNlElgKA0dldBImLmNvZGVmb3VuZHJ5LnYxLkdldFVwZGF0ZVN0YXR1c1JlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5HZXRVcGRhdGVTdGF0dXNSZXNwb25zZSIAElgKBUNoZWNrEiUuY29kZWZvdW5kcnkudjEuQ2hlY2tGb3JVcGRhdGVSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuQ2hlY2tGb3JVcGRhdGVSZXNwb25zZSIAElgKB0luc3RhbGwSJC5jb2RlZm91bmRyeS52MS5JbnN0YWxsVXBkYXRlUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLkluc3RhbGxVcGRhdGVSZXNwb25zZSIAElUKCFJlbGF1bmNoEiIuY29kZWZvdW5kcnkudjEuUmVsYXVuY2hBcHBSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuUmVsYXVuY2hBcHBSZXNwb25zZSIAEkwKBVdhdGNoEiIuY29kZWZvdW5kcnkudjEuV2F0Y2hVcGRhdGVSZXF1ZXN0GhsuY29kZWZvdW5kcnkudjEuVXBkYXRlRXZlbnQiADABQsMBChJjb20uY29kZWZvdW5kcnkudjFCC1VwZGF0ZVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS91cGRhdGUucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIuECCgxVcGRhdGVTdGF0dXMSKgoFc3RhdGUYASABKA4yGy5jb2RlZm91bmRyeS52MS5VcGRhdGVTdGF0ZRIXCg9jdXJyZW50X3ZlcnNpb24YAiABKAkSDwoHZW5hYmxlZBgDIAEoCBIXCg9kaXNhYmxlZF9yZWFzb24YBCABKAkSFAoMcmVsZWFzZV9yZXBvGAUgASgJEhAKCGNoZWNraW5nGAYgASgIEjMKD2xhc3RfY2hlY2tlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGAoQbGFzdF9jaGVja19lcnJvchgIIAEoCRIWCg5sYXRlc3RfdmVyc2lvbhgJIAEoCRIWCg50YXJnZXRfdmVyc2lvbhgKIAEoCRIRCglub3Rlc191cmwYCyABKAkSEAoIcHJvZ3Jlc3MYDCABKAkSFgoOZmFpbHVyZV9yZWFzb24YDSABKAkiEwoRUmVsYXVuY2hSZXF1ZXN0ZWQiEgoQUmVzdGFydFJlcXVlc3RlZCLGAQoLVXBkYXRlRXZlbnQSLgoGc3RhdHVzGAEgASgLMhwuY29kZWZvdW5kcnkudjEuVXBkYXRlU3RhdHVzSAASPwoScmVsYXVuY2hfcmVxdWVzdGVkGAIgASgLMiEuY29kZWZvdW5kcnkudjEuUmVsYXVuY2hSZXF1ZXN0ZWRIABI9ChFyZXN0YXJ0X3JlcXVlc3RlZBgDIAEoCzIgLmNvZGVmb3VuZHJ5LnYxLlJlc3RhcnRSZXF1ZXN0ZWRIAEIHCgVldmVudCIYChZHZXRVcGRhdGVTdGF0dXNSZXF1ZXN0IkcKF0dldFVwZGF0ZVN0YXR1c1Jlc3BvbnNlEiwKBnN0YXR1cxgBIAEoCzIcLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZVN0YXR1cyIXChVDaGVja0ZvclVwZGF0ZVJlcXVlc3QiRgoWQ2hlY2tGb3JVcGRhdGVSZXNwb25zZRIsCgZzdGF0dXMYASABKAsyHC5jb2RlZm91bmRyeS52MS5VcGRhdGVTdGF0dXMiFgoUSW5zdGFsbFVwZGF0ZVJlcXVlc3QiRQoVSW5zdGFsbFVwZGF0ZVJlc3BvbnNlEiwKBnN0YXR1cxgBIAEoCzIcLmNvZGVmb3VuZHJ5LnYxLlVwZGF0ZVN0YXR1cyIUChJSZWxhdW5jaEFwcFJlcXVlc3QiKAoTUmVsYXVuY2hBcHBSZXNwb25zZRIRCglkZWxpdmVyZWQYASABKAUiFwoVUmVxdWVzdFJlc3RhcnRSZXF1ZXN0IisKFlJlcXVlc3RSZXN0YXJ0UmVzcG9uc2USEQoJZGVsaXZlcmVkGAEgASgFIhQKEldhdGNoVXBkYXRlUmVxdWVzdCrUAQoLVXBkYXRlU3RhdGUSHAoYVVBEQVRFX1NUQVRFX1VOU1BFQ0lGSUVEEAASFQoRVVBEQVRFX1NUQVRFX0lETEUQARIaChZVUERBVEVfU1RBVEVfQVZBSUxBQkxFEAISHAoYVVBEQVRFX1NUQVRFX0RPV05MT0FESU5HEAMSGgoWVVBEQVRFX1NUQVRFX0lOU1RBTExFRBAEEiEKHVVQREFURV9TVEFURV9SRVNUQVJUX1JFUVVJUkVEEAUSFwoTVVBEQVRFX1NUQVRFX0ZBSUxFRBAGMqUECg1VcGRhdGVTZXJ2aWNlElgKA0dldBImLmNvZGVmb3VuZHJ5LnYxLkdldFVwZGF0ZVN0YXR1c1JlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5HZXRVcGRhdGVTdGF0dXNSZXNwb25zZSIAElgKBUNoZWNrEiUuY29kZWZvdW5kcnkudjEuQ2hlY2tGb3JVcGRhdGVSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuQ2hlY2tGb3JVcGRhdGVSZXNwb25zZSIAElgKB0luc3RhbGwSJC5jb2RlZm91bmRyeS52MS5JbnN0YWxsVXBkYXRlUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLkluc3RhbGxVcGRhdGVSZXNwb25zZSIAElUKCFJlbGF1bmNoEiIuY29kZWZvdW5kcnkudjEuUmVsYXVuY2hBcHBSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuUmVsYXVuY2hBcHBSZXNwb25zZSIAEmEKDlJlcXVlc3RSZXN0YXJ0EiUuY29kZWZvdW5kcnkudjEuUmVxdWVzdFJlc3RhcnRSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuUmVxdWVzdFJlc3RhcnRSZXNwb25zZSIAEkwKBVdhdGNoEiIuY29kZWZvdW5kcnkudjEuV2F0Y2hVcGRhdGVSZXF1ZXN0GhsuY29kZWZvdW5kcnkudjEuVXBkYXRlRXZlbnQiADABQsMBChJjb20uY29kZWZvdW5kcnkudjFCC1VwZGF0ZVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.UpdateStatus
@@ -131,6 +131,24 @@ export const RelaunchRequestedSchema: GenMessage<RelaunchRequested> = /*@__PURE_
   messageDesc(file_codefoundry_v1_update, 1);
 
 /**
+ * RestartRequested says the daemon is about to exit to restart into the installed
+ * version (`app.restart`). A GUI relaunches once its Watch stream ends (the daemon is
+ * gone), so the new window auto-starts the new daemon instead of reconnecting to the
+ * dying one.
+ *
+ * @generated from message codefoundry.v1.RestartRequested
+ */
+export type RestartRequested = Message<"codefoundry.v1.RestartRequested"> & {
+};
+
+/**
+ * Describes the message codefoundry.v1.RestartRequested.
+ * Use `create(RestartRequestedSchema)` to create a new message.
+ */
+export const RestartRequestedSchema: GenMessage<RestartRequested> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_update, 2);
+
+/**
  * @generated from message codefoundry.v1.UpdateEvent
  */
 export type UpdateEvent = Message<"codefoundry.v1.UpdateEvent"> & {
@@ -149,6 +167,12 @@ export type UpdateEvent = Message<"codefoundry.v1.UpdateEvent"> & {
      */
     value: RelaunchRequested;
     case: "relaunchRequested";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.RestartRequested restart_requested = 3;
+     */
+    value: RestartRequested;
+    case: "restartRequested";
   } | { case: undefined; value?: undefined };
 };
 
@@ -157,7 +181,7 @@ export type UpdateEvent = Message<"codefoundry.v1.UpdateEvent"> & {
  * Use `create(UpdateEventSchema)` to create a new message.
  */
 export const UpdateEventSchema: GenMessage<UpdateEvent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 2);
+  messageDesc(file_codefoundry_v1_update, 3);
 
 /**
  * @generated from message codefoundry.v1.GetUpdateStatusRequest
@@ -170,7 +194,7 @@ export type GetUpdateStatusRequest = Message<"codefoundry.v1.GetUpdateStatusRequ
  * Use `create(GetUpdateStatusRequestSchema)` to create a new message.
  */
 export const GetUpdateStatusRequestSchema: GenMessage<GetUpdateStatusRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 3);
+  messageDesc(file_codefoundry_v1_update, 4);
 
 /**
  * @generated from message codefoundry.v1.GetUpdateStatusResponse
@@ -187,7 +211,7 @@ export type GetUpdateStatusResponse = Message<"codefoundry.v1.GetUpdateStatusRes
  * Use `create(GetUpdateStatusResponseSchema)` to create a new message.
  */
 export const GetUpdateStatusResponseSchema: GenMessage<GetUpdateStatusResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 4);
+  messageDesc(file_codefoundry_v1_update, 5);
 
 /**
  * @generated from message codefoundry.v1.CheckForUpdateRequest
@@ -200,7 +224,7 @@ export type CheckForUpdateRequest = Message<"codefoundry.v1.CheckForUpdateReques
  * Use `create(CheckForUpdateRequestSchema)` to create a new message.
  */
 export const CheckForUpdateRequestSchema: GenMessage<CheckForUpdateRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 5);
+  messageDesc(file_codefoundry_v1_update, 6);
 
 /**
  * @generated from message codefoundry.v1.CheckForUpdateResponse
@@ -217,7 +241,7 @@ export type CheckForUpdateResponse = Message<"codefoundry.v1.CheckForUpdateRespo
  * Use `create(CheckForUpdateResponseSchema)` to create a new message.
  */
 export const CheckForUpdateResponseSchema: GenMessage<CheckForUpdateResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 6);
+  messageDesc(file_codefoundry_v1_update, 7);
 
 /**
  * @generated from message codefoundry.v1.InstallUpdateRequest
@@ -230,7 +254,7 @@ export type InstallUpdateRequest = Message<"codefoundry.v1.InstallUpdateRequest"
  * Use `create(InstallUpdateRequestSchema)` to create a new message.
  */
 export const InstallUpdateRequestSchema: GenMessage<InstallUpdateRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 7);
+  messageDesc(file_codefoundry_v1_update, 8);
 
 /**
  * @generated from message codefoundry.v1.InstallUpdateResponse
@@ -247,7 +271,7 @@ export type InstallUpdateResponse = Message<"codefoundry.v1.InstallUpdateRespons
  * Use `create(InstallUpdateResponseSchema)` to create a new message.
  */
 export const InstallUpdateResponseSchema: GenMessage<InstallUpdateResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 8);
+  messageDesc(file_codefoundry_v1_update, 9);
 
 /**
  * @generated from message codefoundry.v1.RelaunchAppRequest
@@ -260,7 +284,7 @@ export type RelaunchAppRequest = Message<"codefoundry.v1.RelaunchAppRequest"> & 
  * Use `create(RelaunchAppRequestSchema)` to create a new message.
  */
 export const RelaunchAppRequestSchema: GenMessage<RelaunchAppRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 9);
+  messageDesc(file_codefoundry_v1_update, 10);
 
 /**
  * @generated from message codefoundry.v1.RelaunchAppResponse
@@ -279,7 +303,39 @@ export type RelaunchAppResponse = Message<"codefoundry.v1.RelaunchAppResponse"> 
  * Use `create(RelaunchAppResponseSchema)` to create a new message.
  */
 export const RelaunchAppResponseSchema: GenMessage<RelaunchAppResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 10);
+  messageDesc(file_codefoundry_v1_update, 11);
+
+/**
+ * @generated from message codefoundry.v1.RequestRestartRequest
+ */
+export type RequestRestartRequest = Message<"codefoundry.v1.RequestRestartRequest"> & {
+};
+
+/**
+ * Describes the message codefoundry.v1.RequestRestartRequest.
+ * Use `create(RequestRestartRequestSchema)` to create a new message.
+ */
+export const RequestRestartRequestSchema: GenMessage<RequestRestartRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_update, 12);
+
+/**
+ * @generated from message codefoundry.v1.RequestRestartResponse
+ */
+export type RequestRestartResponse = Message<"codefoundry.v1.RequestRestartResponse"> & {
+  /**
+   * GUIs that received the request.
+   *
+   * @generated from field: int32 delivered = 1;
+   */
+  delivered: number;
+};
+
+/**
+ * Describes the message codefoundry.v1.RequestRestartResponse.
+ * Use `create(RequestRestartResponseSchema)` to create a new message.
+ */
+export const RequestRestartResponseSchema: GenMessage<RequestRestartResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_update, 13);
 
 /**
  * @generated from message codefoundry.v1.WatchUpdateRequest
@@ -292,7 +348,7 @@ export type WatchUpdateRequest = Message<"codefoundry.v1.WatchUpdateRequest"> & 
  * Use `create(WatchUpdateRequestSchema)` to create a new message.
  */
 export const WatchUpdateRequestSchema: GenMessage<WatchUpdateRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_update, 11);
+  messageDesc(file_codefoundry_v1_update, 14);
 
 /**
  * @generated from enum codefoundry.v1.UpdateState
@@ -326,7 +382,7 @@ export enum UpdateState {
 
   /**
    * target_version is installed on disk. The GUI needs a relaunch and the daemon a
-   * restart to run it.
+   * restart to run it (`app.restart` does both).
    *
    * @generated from enum value: UPDATE_STATE_INSTALLED = 4;
    */
@@ -334,7 +390,7 @@ export enum UpdateState {
 
   /**
    * target_version is installed and the GUI was asked to relaunch; the daemon still
-   * runs current_version until `daemon.restart`.
+   * runs current_version until `daemon.restart` (or `app.restart`).
    *
    * @generated from enum value: UPDATE_STATE_RESTART_REQUIRED = 5;
    */
@@ -358,9 +414,12 @@ export const UpdateStateSchema: GenEnum<UpdateState> = /*@__PURE__*/
  * UpdateService is the in-app updater. The daemon checks the latest GitHub release of
  * the build's release repository through the user's authenticated `gh` (30s after start,
  * then every 24h), and installs it on request by running the installer embedded in the
- * binary. Installing replaces the app directory on disk; nothing restarts by itself. The
- * GUI relaunches on request (Relaunch), and the daemon keeps running the old version
- * until the user runs `daemon.restart`, because restarting it closes every session.
+ * binary. Installing replaces the app directory on disk; nothing restarts by itself,
+ * because restarting the daemon closes every session. `app.restart` (the GUI's "Restart
+ * Now") applies an update in one step: it announces RestartRequested on Watch, then the
+ * daemon exits; GUI hosts relaunch once their Watch stream ends, and the relaunched
+ * window auto-starts the installed daemon. `app.relaunch` (Relaunch) and
+ * `daemon.restart` do the two halves separately.
  *
  * Dev builds (version not strict semver) and builds without a release repository do
  * not check: Get reports enabled=false with the reason.
@@ -414,7 +473,21 @@ export const UpdateService: GenService<{
     output: typeof RelaunchAppResponseSchema;
   },
   /**
-   * Watch streams the status on connect and on every change, plus relaunch requests.
+   * RequestRestart tells every connected GUI that the daemon is about to restart: each
+   * relaunches once its Watch stream ends. It does not restart anything itself and does
+   * not change the status; the `app.restart` command calls it right before stopping the
+   * daemon. Clients wanting a restart invoke `app.restart`, not this.
+   *
+   * @generated from rpc codefoundry.v1.UpdateService.RequestRestart
+   */
+  requestRestart: {
+    methodKind: "unary";
+    input: typeof RequestRestartRequestSchema;
+    output: typeof RequestRestartResponseSchema;
+  },
+  /**
+   * Watch streams the status on connect and on every change, plus relaunch and restart
+   * requests.
    *
    * @generated from rpc codefoundry.v1.UpdateService.Watch
    */

@@ -10,9 +10,12 @@
 //	                                                         (Install retries) RestartRequired
 //
 // Nothing restarts automatically. Installed means the install on disk is newer than the
-// running daemon: the GUI relaunches on request, and the daemon keeps running the old
-// version until `daemon.restart` (which closes every session). A daemon that starts from
-// the new install is simply up to date.
+// running daemon. The user applies it with `app.restart` (the GUI's "Restart Now"):
+// RequestRestart announces RestartRequested, then the daemon exits, closing every
+// session; GUI hosts relaunch once their Watch stream ends, and the relaunched window
+// auto-starts the installed daemon. A daemon that starts from the new install is simply
+// up to date. `app.relaunch` (RequestRelaunch: Installed becomes RestartRequired) and
+// `daemon.restart` remain for doing the two halves separately.
 package update
 
 import (
@@ -89,6 +92,10 @@ type Event struct {
 // RelaunchRequested is published by RequestRelaunch; GUIs relaunch themselves.
 type RelaunchRequested struct{}
 
+// RestartRequested is published by RequestRestart: the daemon is about to exit to
+// restart into the installed version. GUIs relaunch once their connection to it ends.
+type RestartRequested struct{}
+
 // Errors. internal/api maps both to FailedPrecondition.
 var (
 	// ErrDisabled: updates are disabled for this build (Status.DisabledReason).
@@ -105,6 +112,9 @@ type Service interface {
 	// RequestRelaunch asks connected GUIs to relaunch and returns how many listeners
 	// received the request.
 	RequestRelaunch() int
+	// RequestRestart tells connected GUIs the daemon is about to restart and returns
+	// how many listeners received it.
+	RequestRestart() int
 }
 
 // Defaults.
@@ -417,7 +427,7 @@ func (s *Store) runInstall(target string) {
 		s.moveTo(Failed, target)
 		s.status.FailureReason = err.Error()
 	} else {
-		s.log.Info("update installed; relaunch the GUI and restart the daemon to run it", "version", target)
+		s.log.Info("update installed; restart Code Foundry to run it", "version", target)
 		s.moveTo(Installed, target)
 	}
 	s.publishLocked()
@@ -436,6 +446,15 @@ func (s *Store) RequestRelaunch() int {
 		return 0
 	}
 	return bus.Publish(s.opts.Bus, RelaunchRequested{})
+}
+
+// RequestRestart publishes RestartRequested. It leaves the status alone: the daemon is
+// about to exit, and the one that starts from the install is up to date.
+func (s *Store) RequestRestart() int {
+	if s.opts.Bus == nil {
+		return 0
+	}
+	return bus.Publish(s.opts.Bus, RestartRequested{})
 }
 
 // set applies f and publishes. f must not block.
