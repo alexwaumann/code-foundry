@@ -18,6 +18,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/fsx"
 )
 
 // Defaults for Options.
@@ -42,7 +43,10 @@ type Options struct {
 	// WorktreeRoot is where CreateWorktree puts worktrees without an explicit path:
 	// <WorktreeRoot>/<owner>/<repo>/<branch>. Required, absolute.
 	WorktreeRoot string
-	Log          *slog.Logger
+	// AllowedRoot is the directory every registered project must resolve inside
+	// (symlinks followed). Empty means the user's home directory; tests set a temp dir.
+	AllowedRoot string
+	Log         *slog.Logger
 	// Runner runs git. Defaults to ExecRunner{}.
 	Runner Runner
 	// Workers bounds concurrent git refresh jobs. Defaults to DefaultWorkers.
@@ -109,6 +113,8 @@ type Git struct {
 	runner Runner
 	now    func() time.Time
 	wtRoot string
+	// root is Options.AllowedRoot with symlinks resolved.
+	root string
 
 	snap atomic.Pointer[Snapshot]
 
@@ -141,7 +147,12 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 	if !filepath.IsAbs(opts.WorktreeRoot) {
 		return nil, fmt.Errorf("repo: Options.WorktreeRoot must be an absolute path, got %q", opts.WorktreeRoot)
 	}
+	root, err := allowedRoot(opts.AllowedRoot)
+	if err != nil {
+		return nil, err
+	}
 	g := &Git{
+		root:    root,
 		db:      opts.DB,
 		bus:     opts.Bus,
 		wtRoot:  opts.WorktreeRoot,
@@ -187,6 +198,22 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		g.sched.request(jobKey{kind: jobReconcile, repoID: m.ID})
 	}
 	return g, nil
+}
+
+// allowedRoot resolves Options.AllowedRoot, defaulting to the user's home directory.
+func allowedRoot(root string) (string, error) {
+	if root == "" {
+		r, err := fsx.HomeRoot()
+		if err != nil {
+			return "", fmt.Errorf("repo: allowed root: %w", err)
+		}
+		return r, nil
+	}
+	r, err := fsx.ResolveRoot(root)
+	if err != nil {
+		return "", fmt.Errorf("repo: Options.AllowedRoot: %w", err)
+	}
+	return r, nil
 }
 
 func interval(v, def time.Duration) time.Duration {
@@ -355,6 +382,9 @@ func (g *Git) Register(ctx context.Context, path string) (Repo, error) {
 	if err != nil {
 		return Repo{}, err
 	}
+	if !fsx.Within(g.root, dir) {
+		return Repo{}, outsideRoot(path)
+	}
 	out, err := g.runner.Run(ctx, dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	if err != nil {
 		return Repo{}, fmt.Errorf("%w: %s is not inside a git repository: %w", ErrInvalidArgument, path, err)
@@ -365,6 +395,10 @@ func (g *Git) Register(ctx context.Context, path string) (Repo, error) {
 	}
 	if real, err := filepath.EvalSymlinks(mainPath); err == nil {
 		mainPath = real
+	}
+	// A linked worktree under home can belong to a repository outside it.
+	if !fsx.Within(g.root, mainPath) {
+		return Repo{}, outsideRoot(mainPath)
 	}
 	m := &repoMeta{
 		ID: repoID(mainPath), Path: mainPath, Name: filepath.Base(mainPath),
@@ -403,6 +437,11 @@ func (g *Git) Register(ctx context.Context, path string) (Repo, error) {
 		return Repo{}, fmt.Errorf("%w: repo %s was unregistered concurrently", ErrNotFound, m.ID)
 	}
 	return r, nil
+}
+
+// outsideRoot is Register's error for a path outside the allowed root.
+func outsideRoot(path string) error {
+	return fmt.Errorf("%w: %s is outside your home directory", ErrInvalidArgument, path)
 }
 
 // resolveDir makes path absolute, resolves symlinks (git reports real paths, and on

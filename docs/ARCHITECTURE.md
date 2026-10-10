@@ -83,6 +83,7 @@ internal/
   db/                      SQLite (modernc.org/sqlite, WAL) + migrations
   client/                  Go client for the daemon API, used by CLI and the Wails host
   paths/                   XDG-ish paths: config dir, socket, token, db, logs
+  fsx/                     the home-directory boundary and directory completion
 gui/
   main.go                  Wails v3 host (thin)
   frontend/                Vite + React 19 + TypeScript + Tailwind v4 + shadcn + Zustand
@@ -154,6 +155,10 @@ Services (v1):
   or a path inside a member worktree), Watch. See `docs/notes/workspaces-1-store.md`.
   The GUI gets workspaces from EventService's `workspace` source (a `workspaces` slice),
   and the composer starts threads in them (`docs/notes/workspaces-3-composer.md`).
+* `FilesystemService` — ListDirectories: completes a typed path prefix to directories
+  under the user's home (is_git, registered, common completion), for the palette's
+  `path` prompts. Every project path must resolve under home; `repo.Register` enforces
+  it too (`docs/notes/add-project-1-paths.md`).
 * `HealthService` — Ping, Version.
 
 Rules:

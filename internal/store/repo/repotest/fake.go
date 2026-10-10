@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 )
 
@@ -33,6 +34,9 @@ type Fake struct {
 	// WorktreeRoot is where CreateWorktree puts worktrees without a path, like
 	// repo.Options.WorktreeRoot. New sets it to DefaultWorktreeRoot.
 	WorktreeRoot string
+	// AllowedRoot, when set, makes Register refuse paths outside it (compared
+	// lexically), like repo.Options.AllowedRoot. Empty accepts any absolute path.
+	AllowedRoot string
 	// Remotes are given to repos created by Register (cloned). Nil, the default,
 	// registers local-only repos; Put sets any remotes directly.
 	Remotes []string
@@ -102,6 +106,10 @@ func (f *Fake) Register(_ context.Context, path string) (repo.Repo, error) {
 	if path == "" || !filepath.IsAbs(path) {
 		f.mu.Unlock()
 		return repo.Repo{}, fmt.Errorf("%w: path must be absolute", repo.ErrInvalidArgument)
+	}
+	if f.AllowedRoot != "" && !fsx.Within(f.AllowedRoot, filepath.Clean(path)) {
+		f.mu.Unlock()
+		return repo.Repo{}, fmt.Errorf("%w: %s is outside your home directory", repo.ErrInvalidArgument, path)
 	}
 	id := ID(path)
 	if r, ok := f.repos[id]; ok {

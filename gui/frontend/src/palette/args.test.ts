@@ -25,6 +25,8 @@ describe("validateArg", () => {
     ["enum ok", arg({ type: "enum", enumValues: ["opus", "sonnet"] }), "sonnet", { ok: true, value: "sonnet" }],
     ["enum bad", arg({ type: "enum", enumValues: ["opus", "sonnet"] }), "gpt", { ok: false, error: "x must be one of opus, sonnet" }],
     ["path untouched (~ expanded daemon-side)", arg({ type: "path" }), " ~/src ", { ok: true, value: "~/src" }],
+    ["path loses a trailing slash", arg({ type: "path" }), "~/src/app//", { ok: true, value: "~/src/app" }],
+    ["root path stays", arg({ type: "path" }), "/", { ok: true, value: "/" }],
   ])("%s", (_name, spec, raw, want) => {
     expect(validateArg(spec, raw)).toEqual(want);
   });

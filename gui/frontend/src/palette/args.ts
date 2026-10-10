@@ -18,8 +18,8 @@ const truthy = new Set(["true", "yes", "y", "1", "on"]);
 const falsy = new Set(["false", "no", "n", "0", "off"]);
 
 /**
- * Validates and normalizes one raw palette input for an arg. Paths are passed through
- * untouched: "~" expansion happens daemon-side.
+ * Validates and normalizes one raw palette input for an arg. Paths lose a trailing slash
+ * and are otherwise passed through: "~" expansion happens daemon-side.
  */
 export function validateArg(spec: ArgSpecView, raw: string): ArgResult {
   if (raw === UNSET_CHOICE && !spec.required) return { ok: true, value: "" };
@@ -42,8 +42,10 @@ export function validateArg(spec: ArgSpecView, raw: string): ArgResult {
         ? { ok: true, value: v }
         : { ok: false, error: `${spec.name} must be one of ${spec.enumValues.join(", ")}` };
     case "string":
-    case "path":
       return { ok: true, value: v };
+    case "path":
+      // Completion leaves a trailing slash ("~/src/app/"); "/" itself stays.
+      return { ok: true, value: v.replace(/(.)\/+$/, "$1") };
   }
 }
 

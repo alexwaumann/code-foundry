@@ -11,6 +11,7 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/db"
+	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
@@ -47,6 +48,9 @@ type stores struct {
 	// through repo and asks session which threads are live. Opened before session,
 	// which reads workspace members at launch.
 	workspace *workspace.Manager
+	// home is the user's home directory (symlinks resolved): the root every project
+	// path must stay inside, and what FilesystemService completes under.
+	home string
 }
 
 // openStores opens the database, applies migrations, and starts every store. On
@@ -69,7 +73,12 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 	if s.db, err = db.Open(ctx, p.DB()); err != nil {
 		return nil, err
 	}
-	if s.repo, err = repo.Start(ctx, repo.Options{DB: s.db, Bus: s.bus, Log: log, WorktreeRoot: p.Worktrees(), FetchInterval: cfg.FetchInterval()}); err != nil {
+	if s.home, err = fsx.HomeRoot(); err != nil {
+		return nil, err
+	}
+	if s.repo, err = repo.Start(ctx, repo.Options{
+		DB: s.db, Bus: s.bus, Log: log, WorktreeRoot: p.Worktrees(), AllowedRoot: s.home, FetchInterval: cfg.FetchInterval(),
+	}); err != nil {
 		return nil, err
 	}
 	// CODE_FOUNDRY_GH_SEARCH_AS is a development aid (see gh.Options.SearchAs).

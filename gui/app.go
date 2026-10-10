@@ -23,7 +23,8 @@ type AppInfo struct {
 	Version string `json:"version"`
 }
 
-// AppService is bound to the frontend: the GUI's own version and relaunching itself.
+// AppService is bound to the frontend: the GUI's own version, relaunching itself, and
+// the native folder picker (pickdir.go).
 // Updates are installed by the daemon; the host only quits and reopens the window.
 type AppService struct {
 	log *slog.Logger

@@ -19,8 +19,9 @@ function Command({ className, ...props }: React.ComponentProps<typeof CommandPri
 function CommandInput({
   className,
   leading,
+  trailing,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input> & { leading?: React.ReactNode }) {
+}: React.ComponentProps<typeof CommandPrimitive.Input> & { leading?: React.ReactNode; trailing?: React.ReactNode }) {
   return (
     <div data-slot="command-input-wrapper" className="flex h-11 items-center gap-2 border-b px-3">
       {leading ?? <SearchIcon className="size-4 shrink-0 opacity-50" />}
@@ -32,6 +33,7 @@ function CommandInput({
         )}
         {...props}
       />
+      {trailing}
     </div>
   )
 }

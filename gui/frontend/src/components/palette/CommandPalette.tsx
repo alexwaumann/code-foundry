@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, CornerDownLeft } from "lucide-react";
+import { ChevronRight, CornerDownLeft, Folder, FolderGit2, FolderOpen } from "lucide-react";
+import { pickDirectory } from "@/api/app";
 import type { CommandView, UiContextView } from "@/api/command";
+import { listDirectories } from "@/api/filesystem";
+import { errorMessage } from "@/api/stream";
+import { descendInto, entryPath, tabCompletion } from "@/palette/paths";
+import { usePathListing, useAppHost } from "./usePathListing";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { ProjectPicker } from "@/components/compose/ProjectPicker";
@@ -158,6 +163,47 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
 
   const spec = prompt?.specs[prompt.index];
   const choices = spec ? argChoices(spec) : null;
+  const isPath = spec?.type === "path";
+  const paths = usePathListing(query, isPath);
+  const host = useAppHost();
+
+  const changeQuery = (v: string) => {
+    setQuery(v);
+    setArgError(null);
+  };
+
+  /** Name of the highlighted folder suggestion (cmdk keeps the highlight in the DOM). */
+  const highlightedEntry = (): string | null =>
+    rootRef.current?.querySelector('[cmdk-item][data-selected="true"]')?.getAttribute("data-entry-name") ?? null;
+
+  // Tab: descend into the highlighted folder, else extend to the common completion
+  // (asking right away when the debounced listing is not for this input yet).
+  const completePath = async () => {
+    const q = query;
+    const name = highlightedEntry();
+    let completion = paths?.prefix === q ? (paths.listing?.completion ?? null) : null;
+    if (name === null && completion === null) {
+      try {
+        completion = (await listDirectories(q)).completion;
+      } catch {
+        return;
+      }
+    }
+    const next = tabCompletion(q, completion, name);
+    if (next === null) return;
+    setQuery((cur) => (cur === q ? next : cur));
+    setArgError(null);
+  };
+
+  const chooseFolder = async () => {
+    try {
+      const picked = await pickDirectory(query);
+      if (picked) changeQuery(picked);
+    } catch (err) {
+      setArgError(errorMessage(err));
+    }
+    rootRef.current?.querySelector("input")?.focus();
+  };
 
   return (
     <Command
@@ -176,6 +222,19 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
         if (prompt && e.key === "Backspace" && query === "") {
           e.preventDefault();
           back();
+          return;
+        }
+        if (isPath && e.key === "Tab" && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+          e.preventDefault();
+          void completePath();
+          return;
+        }
+        if (isPath && e.key === "/") {
+          const name = highlightedEntry();
+          if (name !== null) {
+            e.preventDefault();
+            changeQuery(descendInto(query, name));
+          }
         }
       }}
       data-testid="palette"
@@ -184,10 +243,23 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
       <CommandInput
         autoFocus
         value={query}
-        onValueChange={(v) => {
-          setQuery(v);
-          setArgError(null);
-        }}
+        onValueChange={changeQuery}
+        trailing={
+          isPath && host ? (
+            <button
+              type="button"
+              className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              title="Choose folder…"
+              aria-label="Choose folder"
+              data-testid="pick-directory"
+              onClick={() => {
+                void chooseFolder();
+              }}
+            >
+              <FolderOpen className="size-4" />
+            </button>
+          ) : undefined
+        }
         placeholder={spec ? spec.description || `${spec.name}${spec.type === "path" ? " (path)" : ""}` : "Type a command…"}
         leading={
           prompt && spec ? (
@@ -254,11 +326,37 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
             </CommandItem>
           </CommandGroup>
         )}
+        {isPath && paths?.message && (
+          <div className="px-3 py-2 text-xs text-muted-foreground" data-testid="path-message">
+            {paths.message}
+          </div>
+        )}
+        {isPath && paths?.listing && paths.listing.entries.length > 0 && (
+          <CommandGroup heading={paths.listing.truncated ? `Folders (first ${String(paths.listing.entries.length)})` : "Folders"}>
+            {paths.listing.entries.map((e) => (
+              <CommandItem
+                key={e.path}
+                value={`dir:${e.path}`}
+                data-entry-name={e.name}
+                data-testid="path-entry"
+                data-git={e.isGit ? "true" : undefined}
+                data-registered={e.registered ? "true" : undefined}
+                onSelect={() => {
+                  submit(entryPath(query, e.name));
+                }}
+              >
+                {e.isGit ? <FolderGit2 className="text-orange-600 dark:text-orange-400" aria-label="git repository" /> : <Folder />}
+                <span className="truncate font-mono">{e.name}</span>
+                {e.registered && <span className="ml-auto shrink-0 text-xs text-muted-foreground">already added</span>}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
       </CommandList>
       {(argError ?? prompt) && (
         <div className="flex items-center justify-between border-t px-3 py-1.5 text-xs">
           <span className={argError ? "text-destructive" : "text-muted-foreground"} role={argError ? "alert" : undefined}>
-            {argError ?? "⌫ on empty input goes back · Esc cancels"}
+            {argError ?? (isPath ? "Tab completes · / opens the highlighted folder · ⌫ on empty input goes back · Esc cancels" : "⌫ on empty input goes back · Esc cancels")}
           </span>
         </div>
       )}

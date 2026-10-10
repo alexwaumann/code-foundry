@@ -4,7 +4,7 @@
  *   pnpm run mock            # http://127.0.0.1:7788, token "dev-mock-token"
  *   MOCK_PORT=7799 MOCK_TOKEN=secret pnpm run mock
  *
- * Serves Health, Terminal, Repo, Session, Command, Ui and Event over Connect (HTTP/1.1,
+ * Serves Health, Terminal, Repo, Filesystem, Session, Command, Ui and Event over Connect (HTTP/1.1,
  * like the real daemon's loopback listener for browsers), with bearer auth and
  * permissive CORS. Non-RPC control endpoints for tests live under /__mock/:
  *
@@ -58,6 +58,7 @@ import { durationFromMs } from "@bufbuild/protobuf/wkt";
 import { CommandService, ConfirmationRequiredSchema } from "../src/gen/codefoundry/v1/command_pb";
 import { SettingsService, SettingsValidationErrorsSchema } from "../src/gen/codefoundry/v1/settings_pb";
 import { EventService, EventSource } from "../src/gen/codefoundry/v1/events_pb";
+import { FilesystemService } from "../src/gen/codefoundry/v1/filesystem_pb";
 import { GhService } from "../src/gen/codefoundry/v1/gh_pb";
 import { HealthService } from "../src/gen/codefoundry/v1/health_pb";
 import { RepoService } from "../src/gen/codefoundry/v1/repo_pb";
@@ -67,6 +68,7 @@ import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
+import { listDirectories } from "./filesystem";
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
 import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
@@ -181,6 +183,13 @@ function routes(router: ConnectRouter): void {
       return { detail };
     },
     watch: (_req, ctx) => tracked("RepoService/Watch", world.repoEvents.subscribe(ctx.signal)),
+  });
+
+  router.service(FilesystemService, {
+    listDirectories: (req) => {
+      const registered = new Set([...world.repos.values()].flatMap((r) => [r.path, ...r.worktrees.map((w) => w.path)]));
+      return listDirectories(req.prefix, registered);
+    },
   });
 
   router.service(GhService, {

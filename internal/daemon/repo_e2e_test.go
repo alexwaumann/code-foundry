@@ -64,6 +64,8 @@ func TestRepoServiceEndToEnd(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(home) })
 	base, _ := filepath.EvalSymlinks(t.TempDir())
+	// Projects must be under the user's home; make the fixture's temp dir home.
+	t.Setenv("HOME", base)
 	origin, repoDir := filepath.Join(base, "origin.git"), filepath.Join(base, "proj")
 	run(t, base, "init", "-q", "--bare", "-b", "main", origin)
 	run(t, base, "init", "-q", "-b", "main", repoDir)
@@ -149,6 +151,20 @@ func TestRepoServiceEndToEnd(t *testing.T) {
 	main := list.Msg.GetRepos()[0].GetWorktrees()[0]
 	if main.GetPath() != repoDir || main.GetBranch() != "main" || main.GetStatus().GetUpstream() != "origin/main" {
 		t.Fatalf("main worktree = %v", main)
+	}
+
+	// The home boundary: outside $HOME is refused; inside, completion marks the project.
+	if _, err := c.Register(cctx, connect.NewRequest(&v1.RegisterRepoRequest{Path: home})); connect.CodeOf(err) != connect.CodeInvalidArgument ||
+		!strings.Contains(err.Error(), "is outside your home directory") {
+		t.Fatalf("Register outside home err = %v", err)
+	}
+	fsc := codefoundryv1connect.NewFilesystemServiceClient(hc, ep.BaseURL)
+	ld, err := fsc.ListDirectories(cctx, connect.NewRequest(&v1.ListDirectoriesRequest{Prefix: "~/pr"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if es := ld.Msg.GetEntries(); ld.Msg.GetCompletion() != "~/proj/" || len(es) != 1 || !es[0].GetIsGit() || !es[0].GetRegistered() {
+		t.Fatalf("ListDirectories(~/pr) = %v", ld.Msg)
 	}
 
 	cw, err := c.CreateWorktree(cctx, connect.NewRequest(&v1.CreateWorktreeRequest{RepoId: id, Branch: "e2e/one"}))
