@@ -154,6 +154,7 @@ func Run(ctx context.Context, opts Options) error {
 		settingsAPI.Route(),
 		updateAPI.Route(),
 		workspaceAPI.Route(),
+		api.NewFilesystem(st.home, st.repo).Route(),
 		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Session: st.session, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Done: ctx.Done()}).Route(),
 	}
 	mux := http.NewServeMux()
