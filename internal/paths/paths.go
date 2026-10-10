@@ -1,6 +1,7 @@
 // Package paths resolves the on-disk locations code-foundry uses: the config home,
 // the daemon's socket, token, port and lock files, the SQLite database, logs, the
-// worktrees New Worktree creates, and staged prompt attachments.
+// worktrees New Worktree creates, cloned and created projects, and staged prompt
+// attachments.
 //
 // The home directory is, in order of precedence:
 //
@@ -92,6 +93,11 @@ func (p Paths) DaemonLog() string { return filepath.Join(p.Logs(), "daemon.log")
 // Worktrees is where New Worktree puts worktrees: <Worktrees>/<owner>/<repo>/<branch>.
 // git creates the directories on demand.
 func (p Paths) Worktrees() string { return filepath.Join(p.home, "worktrees") }
+
+// Projects is where projects the app creates live: clones at
+// <Projects>/<owner>/<repo> (RepoService.Clone), new projects at <Projects>/<name>.
+// Not configurable. The clone store creates it (0700) on first use.
+func (p Paths) Projects() string { return filepath.Join(p.home, "projects") }
 
 // Attachments is where images staged for a new thread's first prompt are kept
 // (SessionService.StageAttachment). The session store creates it on demand and

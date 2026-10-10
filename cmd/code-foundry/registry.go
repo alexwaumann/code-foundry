@@ -187,6 +187,13 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 		vals[f.spec.GetName()] = v
 	}
 
+	if present, ok := cliPresenters[cmd.GetName()]; ok {
+		c, err := cl.connect(ctx)
+		if err != nil {
+			return err
+		}
+		return present(ctx, cl, c, vals, *asJSON)
+	}
 	res, err := cl.invoke(ctx, cmd, uctx, vals, *yes)
 	if err != nil {
 		return err

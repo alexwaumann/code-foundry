@@ -65,11 +65,11 @@ func RegisterRepo(r *Registry, b RepoBackend, notGit NotGitFunc) error {
 	return r.RegisterAll(
 		Command{
 			Name:        "repo.register",
-			Title:       "Add Project",
+			Title:       "Add Project (local folder)",
 			Description: "Start tracking a folder as a project. A path inside a git repository adds that repository; any other folder is added as a project without git.",
 			Category:    "Project",
 			Args: []ArgSpec{
-				{Name: "path", Type: Path, Required: true, Description: "Folder, or a path inside a git repository"},
+				{Name: "path", Type: Path, Required: true, Description: "Project folder (a git repository or any folder)"},
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Register(ctx, connect.NewRequest(&v1.RegisterRepoRequest{Path: a.Path("path")}))

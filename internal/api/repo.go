@@ -10,6 +10,8 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/store/clone"
+	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 )
 
@@ -21,6 +23,10 @@ const watchBuffer = 256
 type Repo struct {
 	store repo.Store
 	bus   *bus.Bus
+	// github and cloner back SearchGitHub, LookupGitHub and Clone (repo_github.go);
+	// nil answers Unimplemented.
+	github gh.Finder
+	cloner clone.Service
 }
 
 var _ codefoundryv1connect.RepoServiceHandler = (*Repo)(nil)

@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, CornerDownLeft, Folder, FolderGit2, FolderOpen } from "lucide-react";
-import { pickDirectory } from "@/api/app";
+import { ChevronRight, CornerDownLeft } from "lucide-react";
 import type { CommandView, UiContextView } from "@/api/command";
-import { listDirectories } from "@/api/filesystem";
 import { errorMessage } from "@/api/stream";
-import { descendInto, entryPath, tabCompletion } from "@/palette/paths";
-import { usePathListing, useAppHost } from "./usePathListing";
+import { entryPath } from "@/palette/paths";
+import { PathSuggestions, PickFolderButton } from "./pathCompletion";
+import { usePathCompletion } from "./usePathListing";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { ProjectPicker } from "@/components/compose/ProjectPicker";
@@ -164,40 +163,24 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
   const spec = prompt?.specs[prompt.index];
   const choices = spec ? argChoices(spec) : null;
   const isPath = spec?.type === "path";
-  const paths = usePathListing(query, isPath);
-  const host = useAppHost();
-
   const changeQuery = (v: string) => {
     setQuery(v);
     setArgError(null);
   };
 
-  /** Name of the highlighted folder suggestion (cmdk keeps the highlight in the DOM). */
-  const highlightedEntry = (): string | null =>
-    rootRef.current?.querySelector('[cmdk-item][data-selected="true"]')?.getAttribute("data-entry-name") ?? null;
+  const { paths, host, handleKey, chooseFolder } = usePathCompletion({
+    query,
+    enabled: isPath,
+    rootRef,
+    replace: (from, next) => {
+      setQuery((cur) => (cur === from ? next : cur));
+      setArgError(null);
+    },
+  });
 
-  // Tab: descend into the highlighted folder, else extend to the common completion
-  // (asking right away when the debounced listing is not for this input yet).
-  const completePath = async () => {
-    const q = query;
-    const name = highlightedEntry();
-    let completion = paths?.prefix === q ? (paths.listing?.completion ?? null) : null;
-    if (name === null && completion === null) {
-      try {
-        completion = (await listDirectories(q)).completion;
-      } catch {
-        return;
-      }
-    }
-    const next = tabCompletion(q, completion, name);
-    if (next === null) return;
-    setQuery((cur) => (cur === q ? next : cur));
-    setArgError(null);
-  };
-
-  const chooseFolder = async () => {
+  const pickFolder = async () => {
     try {
-      const picked = await pickDirectory(query);
+      const picked = await chooseFolder();
       if (picked) changeQuery(picked);
     } catch (err) {
       setArgError(errorMessage(err));
@@ -224,18 +207,7 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
           back();
           return;
         }
-        if (isPath && e.key === "Tab" && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
-          e.preventDefault();
-          void completePath();
-          return;
-        }
-        if (isPath && e.key === "/") {
-          const name = highlightedEntry();
-          if (name !== null) {
-            e.preventDefault();
-            changeQuery(descendInto(query, name));
-          }
-        }
+        handleKey(e);
       }}
       data-testid="palette"
       data-mode={prompt ? "args" : "commands"}
@@ -246,18 +218,11 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
         onValueChange={changeQuery}
         trailing={
           isPath && host ? (
-            <button
-              type="button"
-              className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              title="Choose folder…"
-              aria-label="Choose folder"
-              data-testid="pick-directory"
+            <PickFolderButton
               onClick={() => {
-                void chooseFolder();
+                void pickFolder();
               }}
-            >
-              <FolderOpen className="size-4" />
-            </button>
+            />
           ) : undefined
         }
         placeholder={spec ? spec.description || `${spec.name}${spec.type === "path" ? " (path)" : ""}` : "Type a command…"}
@@ -326,31 +291,13 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
             </CommandItem>
           </CommandGroup>
         )}
-        {isPath && paths?.message && (
-          <div className="px-3 py-2 text-xs text-muted-foreground" data-testid="path-message">
-            {paths.message}
-          </div>
-        )}
-        {isPath && paths?.listing && paths.listing.entries.length > 0 && (
-          <CommandGroup heading={paths.listing.truncated ? `Folders (first ${String(paths.listing.entries.length)})` : "Folders"}>
-            {paths.listing.entries.map((e) => (
-              <CommandItem
-                key={e.path}
-                value={`dir:${e.path}`}
-                data-entry-name={e.name}
-                data-testid="path-entry"
-                data-git={e.isGit ? "true" : undefined}
-                data-registered={e.registered ? "true" : undefined}
-                onSelect={() => {
-                  submit(entryPath(query, e.name));
-                }}
-              >
-                {e.isGit ? <FolderGit2 className="text-orange-600 dark:text-orange-400" aria-label="git repository" /> : <Folder />}
-                <span className="truncate font-mono">{e.name}</span>
-                {e.registered && <span className="ml-auto shrink-0 text-xs text-muted-foreground">already added</span>}
-              </CommandItem>
-            ))}
-          </CommandGroup>
+        {isPath && (
+          <PathSuggestions
+            paths={paths}
+            onPick={(name) => {
+              submit(entryPath(query, name));
+            }}
+          />
         )}
       </CommandList>
       {(argError ?? prompt) && (

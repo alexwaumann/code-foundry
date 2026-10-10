@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Composer } from "@/components/compose/Composer";
+import { AddProjectDialog } from "@/components/addproject/AddProjectDialog";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
 import { Dashboard } from "@/components/Dashboard";
 import { HelpOverlay } from "@/components/help/HelpOverlay";
@@ -135,6 +136,7 @@ export function App() {
       <HelpOverlay />
       <ConfirmDialog />
       <UpdateDialog />
+      <AddProjectDialog />
       <Toaster theme={scheme} position="bottom-right" offset={{ bottom: 20, right: 20 }} />
     </div>
   );

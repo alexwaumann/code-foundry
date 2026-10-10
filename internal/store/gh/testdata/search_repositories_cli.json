@@ -1,0 +1,235 @@
+{
+    "data": {
+        "rateLimit": {
+            "limit": 5000,
+            "cost": 1,
+            "remaining": 4757,
+            "resetAt": "2026-10-10T08:53:02Z"
+        },
+        "search": {
+            "repositoryCount": 2220380,
+            "nodes": [
+                {
+                    "name": "cli",
+                    "owner": {
+                        "login": "cli"
+                    },
+                    "description": "GitHub\u2019s official command line tool",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/cli/cli"
+                },
+                {
+                    "name": "cli",
+                    "owner": {
+                        "login": "httpie"
+                    },
+                    "description": "\ud83e\udd67 HTTPie CLI  \u2014 modern, user-friendly command-line HTTP client for the API era. JSON support, colors, sessions, downloads, plugins & more.",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/httpie/cli"
+                },
+                {
+                    "name": "cli",
+                    "owner": {
+                        "login": "npm"
+                    },
+                    "description": "the package manager for JavaScript",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/npm/cli"
+                },
+                {
+                    "name": "gemini-cli",
+                    "owner": {
+                        "login": "google-gemini"
+                    },
+                    "description": "An open-source AI agent that brings the power of Gemini directly into your terminal.",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/google-gemini/gemini-cli"
+                },
+                {
+                    "name": "cli",
+                    "owner": {
+                        "login": "googleworkspace"
+                    },
+                    "description": "Google Workspace CLI \u2014 one command-line tool for Drive, Gmail, Calendar, Sheets, Docs, Chat, Admin, and more. Dynamically built from Google Discovery Service. Includes AI agent skills.",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/googleworkspace/cli"
+                },
+                {
+                    "name": "cli",
+                    "owner": {
+                        "login": "urfave"
+                    },
+                    "description": "A declarative, simple, fast, and fun package for building command line tools in Go",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/urfave/cli"
+                },
+                {
+                    "name": "cli",
+                    "owner": {
+                        "login": "docker"
+                    },
+                    "description": "The Docker CLI",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/docker/cli"
+                },
+                {
+                    "name": "cli",
+                    "owner": {
+                        "login": "larksuite"
+                    },
+                    "description": "The official Lark/\u98de\u4e66 CLI tool, maintained by the larksuite team \u2014 built for humans and AI Agents. Covers core business domains including Messenger, Docs, Base, Sheets, Calendar, Mail, Tasks, Meetings, and more, with 200+ commands and 20+ AI Agent Skills.",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/larksuite/cli"
+                },
+                {
+                    "name": "angular-cli",
+                    "owner": {
+                        "login": "angular"
+                    },
+                    "description": "CLI tool for Angular",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/angular/angular-cli"
+                },
+                {
+                    "name": "cli",
+                    "owner": {
+                        "login": "spicetify"
+                    },
+                    "description": "Command-line tool to customize Spotify client. Supports Windows, macOS, and Linux.",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/spicetify/cli"
+                },
+                {
+                    "name": "vue-cli",
+                    "owner": {
+                        "login": "vuejs"
+                    },
+                    "description": "\ud83d\udee0\ufe0f webpack-based tooling for Vue.js Development",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/vuejs/vue-cli"
+                },
+                {
+                    "name": "CLI-Anything",
+                    "owner": {
+                        "login": "HKUDS"
+                    },
+                    "description": "\"CLI-Anything: Making ALL Software Agent-Native\" -- CLI-Hub: https://clianything.cc/",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/HKUDS/CLI-Anything"
+                },
+                {
+                    "name": "ClickHouse",
+                    "owner": {
+                        "login": "ClickHouse"
+                    },
+                    "description": "ClickHouse\u00ae is a real-time analytics database management system",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/ClickHouse/ClickHouse"
+                },
+                {
+                    "name": "CLIProxyAPI",
+                    "owner": {
+                        "login": "router-for-me"
+                    },
+                    "description": "Wrap Antigravity, ChatGPT Codex, Claude Code, Grok Build, Muse Code, Devin as an OpenAI/Gemini/Claude/Codex compatible API service, allowing you to enjoy the free Gemini Series, GPT Series, Grok Series, Claude model through API",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/router-for-me/CLIProxyAPI"
+                },
+                {
+                    "name": "aws-cli",
+                    "owner": {
+                        "login": "aws"
+                    },
+                    "description": "Universal Command Line Interface for Amazon Web Services",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/aws/aws-cli"
+                },
+                {
+                    "name": "cli",
+                    "owner": {
+                        "login": "dotnet"
+                    },
+                    "description": "The .NET Core command-line (CLI) tools, used for building .NET Core apps and libraries through your development flow (compiling, NuGet package management, running, testing, ...).",
+                    "visibility": "PUBLIC",
+                    "isArchived": true,
+                    "isFork": false,
+                    "url": "https://github.com/dotnet/cli"
+                },
+                {
+                    "name": "wp-cli",
+                    "owner": {
+                        "login": "wp-cli"
+                    },
+                    "description": "\u2699\ufe0f WP-CLI framework",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/wp-cli/wp-cli"
+                },
+                {
+                    "name": "cli",
+                    "owner": {
+                        "login": "react-native-community"
+                    },
+                    "description": "The React Native Community CLI \u2014 Command line tools to help you build React Native apps",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/react-native-community/cli"
+                },
+                {
+                    "name": "OpenCLI",
+                    "owner": {
+                        "login": "jackwener"
+                    },
+                    "description": "Make Any Website into CLI & Use your logged-in browser by AI agent. ",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/jackwener/OpenCLI"
+                },
+                {
+                    "name": "cli",
+                    "owner": {
+                        "login": "snyk"
+                    },
+                    "description": "Snyk CLI scans and monitors your projects for security vulnerabilities.",
+                    "visibility": "PUBLIC",
+                    "isArchived": false,
+                    "isFork": false,
+                    "url": "https://github.com/snyk/cli"
+                }
+            ]
+        }
+    }
+}

@@ -1,0 +1,75 @@
+import { create } from "zustand";
+import { invokeConfirmed, refreshCommands } from "./commands";
+import { openProject } from "./projectActions";
+import { useReposStore } from "./repos";
+
+/** The Add Project dialog's tabs, in display order. */
+export type AddProjectTab = "new" | "local" | "github";
+
+export const addProjectTabs: readonly AddProjectTab[] = ["new", "local", "github"];
+
+interface AddProjectState {
+  open: boolean;
+  tab: AddProjectTab;
+  /** Incremented on every open, so the dialog's body starts fresh. */
+  seq: number;
+}
+
+export const useAddProjectStore = create<AddProjectState>()(() => ({ open: false, tab: "local", seq: 0 }));
+
+/**
+ * Opens the Add Project dialog (repo.add's presenter; repo.clone opens it on GitHub).
+ * Deferred, so that a palette closing after its presenter ran does not take focus back
+ * from the dialog.
+ */
+export function openAddProject(tab: AddProjectTab = "local"): void {
+  queueMicrotask(() => {
+    useAddProjectStore.setState((s) => ({ open: true, tab, seq: s.seq + 1 }));
+  });
+}
+
+export function closeAddProject(): void {
+  useAddProjectStore.setState({ open: false });
+}
+
+export function setAddProjectTab(tab: AddProjectTab): void {
+  useAddProjectStore.setState({ tab });
+}
+
+/**
+ * repo.register for a folder (the Local folder tab, and an existing clone destination):
+ * resolves with the project's id and name. Errors reject with the daemon's message;
+ * nothing is toasted (the dialog shows them in place).
+ */
+export async function registerFolder(path: string): Promise<{ id: string; name: string }> {
+  try {
+    const res = await invokeConfirmed("repo.register", { path: path.length > 1 ? path.replace(/\/+$/, "") : path });
+    if (!res) throw new Error("cancelled");
+    const repo = JSON.parse(res.resultJson || "{}") as { id?: string; name?: string };
+    if (!repo.id) throw new Error(res.message || "the daemon did not say which project it added");
+    return { id: repo.id, name: repo.name ?? repo.id };
+  } finally {
+    void refreshCommands();
+  }
+}
+
+/**
+ * Shows a project just added (its overview) once the repos store has it: the command or
+ * clone answers before the repo event arrives on the event stream. Gives up after
+ * timeoutMs (the user can open it from the Projects page).
+ */
+export function selectAddedProject(repoId: string, timeoutMs = 5000): void {
+  if (useReposStore.getState().byId[repoId]) {
+    openProject(repoId);
+    return;
+  }
+  const timer = setTimeout(() => {
+    unsub();
+  }, timeoutMs);
+  const unsub = useReposStore.subscribe((s) => {
+    if (!s.byId[repoId]) return;
+    clearTimeout(timer);
+    unsub();
+    openProject(repoId);
+  });
+}

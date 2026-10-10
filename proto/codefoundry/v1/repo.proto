@@ -37,6 +37,20 @@ service RepoService {
   // <init.defaultBranch, else main>`, an empty "Initial commit", then a refresh.
   // FailedPrecondition when the project is already a git repository.
   rpc InitGit(InitGitRequest) returns (InitGitResponse) {}
+  // SearchGitHub searches github.com repositories with GitHub's search syntax and
+  // returns the first 20 matches, best match first. The Add Project dialog sends it on
+  // Enter, never per keystroke. InvalidArgument for an empty query.
+  rpc SearchGitHub(SearchGitHubRequest) returns (SearchGitHubResponse) {}
+  // LookupGitHub returns one github.com repository. NotFound when it does not exist or
+  // the viewer cannot see it.
+  rpc LookupGitHub(LookupGitHubRequest) returns (LookupGitHubResponse) {}
+  // Clone runs `gh repo clone <owner>/<name> <config home>/projects/<owner>/<name> --
+  // --progress` (the user's gh login and protocol apply), streams its output as
+  // progress events, registers the clone and ends with a repo event. AlreadyExists when
+  // the destination exists; NotFound when GitHub has no such repository; other failures
+  // carry gh's last lines. Bounded at 15 minutes. Cancelling the stream kills the clone
+  // and removes what it wrote.
+  rpc Clone(CloneRepoRequest) returns (stream CloneRepoEvent) {}
 }
 
 message Repo {
@@ -273,4 +287,67 @@ message RepoSnapshot {
 message WorktreeRef {
   string repo_id = 1;
   string path = 2;
+}
+
+// GitHub's repository visibility.
+enum RepositoryVisibility {
+  REPOSITORY_VISIBILITY_UNSPECIFIED = 0;
+  REPOSITORY_VISIBILITY_PUBLIC = 1;
+  REPOSITORY_VISIBILITY_PRIVATE = 2;
+  REPOSITORY_VISIBILITY_INTERNAL = 3;
+}
+
+// A github.com repository as the Add Project dialog shows it.
+message GitHubRepository {
+  // GitHub's spelling.
+  string owner = 1;
+  string name = 2;
+  string description = 3;
+  RepositoryVisibility visibility = 4;
+  bool is_archived = 5;
+  // https://github.com/<owner>/<name>
+  string url = 6;
+  bool is_fork = 7;
+  // Where Clone puts it (<config home>/projects/<owner>/<name>), and whether something
+  // is there already (Clone refuses then).
+  string clone_path = 8;
+  bool clone_path_exists = 9;
+}
+
+message SearchGitHubRequest {
+  string query = 1;
+}
+
+message SearchGitHubResponse {
+  repeated GitHubRepository repositories = 1;
+}
+
+message LookupGitHubRequest {
+  string owner = 1;
+  string name = 2;
+}
+
+message LookupGitHubResponse {
+  GitHubRepository repository = 1;
+}
+
+message CloneRepoRequest {
+  string owner = 1;
+  string name = 2;
+}
+
+// One event of a Clone stream: output lines while it runs, then the registered project.
+message CloneRepoEvent {
+  oneof event {
+    CloneProgress progress = 1;
+    // The clone, registered. Always the last event of a successful clone.
+    Repo repo = 2;
+  }
+}
+
+// One line the clone wrote.
+message CloneProgress {
+  string line = 1;
+  // The line ended in a carriage return (progress counters): the next line replaces it.
+  bool transient = 2;
 }

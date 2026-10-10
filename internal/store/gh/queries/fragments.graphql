@@ -159,3 +159,14 @@ fragment RequestedReviewerFields on RequestedReviewer {
   ... on Mannequin { id login avatarUrl }
   ... on Team { id slug name avatarUrl organization { login } }
 }
+
+# A repository as the Add Project dialog lists it (SearchRepositories, LookupRepository).
+fragment RepositoryCard on Repository {
+  name
+  owner { login }
+  description
+  visibility
+  isArchived
+  isFork
+  url
+}

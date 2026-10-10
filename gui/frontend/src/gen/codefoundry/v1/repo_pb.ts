@@ -2,8 +2,8 @@
 // @generated from file codefoundry/v1/repo.proto (package codefoundry.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/repo.proto.
  */
 export const file_codefoundry_v1_repo: GenFile = /*@__PURE__*/
-  fileDesc("Chljb2RlZm91bmRyeS92MS9yZXBvLnByb3RvEg5jb2RlZm91bmRyeS52MSLoAQoEUmVwbxIKCgJpZBgBIAEoCRIMCgRwYXRoGAIgASgJEgwKBG5hbWUYAyABKAkSFgoOZGVmYXVsdF9icmFuY2gYBCABKAkSEwoLZ2l0aHViX3NsdWcYBSABKAkSKwoJd29ya3RyZWVzGAYgAygLMhguY29kZWZvdW5kcnkudjEuV29ya3RyZWUSMQoNcmVnaXN0ZXJlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDQoFZXJyb3IYCCABKAkSDwoHcmVtb3RlcxgJIAMoCRILCgNnaXQYCiABKAgilQEKCFdvcmt0cmVlEg8KB3JlcG9faWQYASABKAkSDAoEcGF0aBgCIAEoCRIOCgZicmFuY2gYAyABKAkSDAoEaGVhZBgEIAEoCRIPCgdpc19tYWluGAUgASgIEikKBnN0YXR1cxgGIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkdpdFN0YXR1cxIQCghkZXRhY2hlZBgHIAEoCCKQAgoJR2l0U3RhdHVzEhAKCHVwc3RyZWFtGAEgASgJEg0KBWFoZWFkGAIgASgFEg4KBmJlaGluZBgDIAEoBRIOCgZzdGFnZWQYBCABKAUSEAoIbW9kaWZpZWQYBSABKAUSEQoJdW50cmFja2VkGAYgASgFEg0KBWRpcnR5GAcgASgIEjAKDHJlZnJlc2hlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEgoKY29uZmxpY3RlZBgJIAEoBRIQCghiYXNlX3JlZhgKIAEoCRISCgpiYXNlX2FoZWFkGAsgASgFEhMKC2Jhc2VfYmVoaW5kGAwgASgFEg0KBWVycm9yGA0gASgJIiMKE1JlZ2lzdGVyUmVwb1JlcXVlc3QSDAoEcGF0aBgBIAEoCSI6ChRSZWdpc3RlclJlcG9SZXNwb25zZRIiCgRyZXBvGAEgASgLMhQuY29kZWZvdW5kcnkudjEuUmVwbyIjChVVbnJlZ2lzdGVyUmVwb1JlcXVlc3QSCgoCaWQYASABKAkiGAoWVW5yZWdpc3RlclJlcG9SZXNwb25zZSISChBMaXN0UmVwb3NSZXF1ZXN0IjgKEUxpc3RSZXBvc1Jlc3BvbnNlEiMKBXJlcG9zGAEgAygLMhQuY29kZWZvdW5kcnkudjEuUmVwbyIcCg5HZXRSZXBvUmVxdWVzdBIKCgJpZBgBIAEoCSI1Cg9HZXRSZXBvUmVzcG9uc2USIgoEcmVwbxgBIAEoCzIULmNvZGVmb3VuZHJ5LnYxLlJlcG8iZwoVQ3JlYXRlV29ya3RyZWVSZXF1ZXN0Eg8KB3JlcG9faWQYASABKAkSDgoGYnJhbmNoGAIgASgJEhAKCGJhc2VfcmVmGAMgASgJEgwKBHBhdGgYBCABKAkSDQoFZmV0Y2gYBSABKAgiRAoWQ3JlYXRlV29ya3RyZWVSZXNwb25zZRIqCgh3b3JrdHJlZRgBIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLldvcmt0cmVlIlwKFVJlbW92ZVdvcmt0cmVlUmVxdWVzdBIPCgdyZXBvX2lkGAEgASgJEgwKBHBhdGgYAiABKAkSFQoNZGVsZXRlX2JyYW5jaBgDIAEoCBINCgVmb3JjZRgEIAEoCCIYChZSZW1vdmVXb3JrdHJlZVJlc3BvbnNlIiIKD0xpc3RSZWZzUmVxdWVzdBIPCgdyZXBvX2lkGAEgASgJIjUKEExpc3RSZWZzUmVzcG9uc2USDAoEcmVmcxgBIAMoCRITCgtkZWZhdWx0X3JlZhgCIAEoCSIcCg5Jbml0R2l0UmVxdWVzdBIKCgJpZBgBIAEoCSI1Cg9Jbml0R2l0UmVzcG9uc2USIgoEcmVwbxgBIAEoCzIULmNvZGVmb3VuZHJ5LnYxLlJlcG8iIAoSUmVmcmVzaFJlcG9SZXF1ZXN0EgoKAmlkGAEgASgJIhUKE1JlZnJlc2hSZXBvUmVzcG9uc2UiEwoRV2F0Y2hSZXBvc1JlcXVlc3QixAIKCVJlcG9FdmVudBIsCgxyZXBvX3VwZGF0ZWQYASABKAsyFC5jb2RlZm91bmRyeS52MS5SZXBvSAASGQoPcmVwb19yZW1vdmVkX2lkGAIgASgJSAASNAoQd29ya3RyZWVfdXBkYXRlZBgDIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLldvcmt0cmVlSAASNwoQd29ya3RyZWVfcmVtb3ZlZBgEIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLldvcmt0cmVlUmVmSAASMAoIc25hcHNob3QYBSABKAsyHC5jb2RlZm91bmRyeS52MS5SZXBvU25hcHNob3RIABJEChd3b3JrdHJlZV9kZXRhaWxfdXBkYXRlZBgGIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLldvcmt0cmVlRGV0YWlsUmVmSABCBwoFZXZlbnQiYwoRV29ya3RyZWVEZXRhaWxSZWYSDwoHcmVwb19pZBgBIAEoCRIMCgRwYXRoGAIgASgJEi8KC2NvbXB1dGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCI5ChhHZXRXb3JrdHJlZURldGFpbFJlcXVlc3QSDwoHcmVwb19pZBgBIAEoCRIMCgRwYXRoGAIgASgJIksKGUdldFdvcmt0cmVlRGV0YWlsUmVzcG9uc2USLgoGZGV0YWlsGAEgASgLMh4uY29kZWZvdW5kcnkudjEuV29ya3RyZWVEZXRhaWwioQIKDldvcmt0cmVlRGV0YWlsEg8KB3JlcG9faWQYASABKAkSDAoEcGF0aBgCIAEoCRIQCghiYXNlX3JlZhgDIAEoCRISCgptZXJnZV9iYXNlGAQgASgJEgwKBGhlYWQYBSABKAkSKQoFZmlsZXMYBiADKAsyGi5jb2RlZm91bmRyeS52MS5GaWxlQ2hhbmdlEhcKD2ZpbGVzX3RydW5jYXRlZBgHIAEoCBIlCgNsb2cYCCADKAsyGC5jb2RlZm91bmRyeS52MS5Mb2dFbnRyeRIRCglsb2dfdG90YWwYCSABKAUSLwoLY29tcHV0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg0KBWVycm9yGAsgASgJIpEBCgpGaWxlQ2hhbmdlEgwKBHBhdGgYASABKAkSEAoIb2xkX3BhdGgYAiABKAkSDgoGc3RhdHVzGAMgASgJEg0KBWFkZGVkGAQgASgFEg8KB2RlbGV0ZWQYBSABKAUSDgoGYmluYXJ5GAYgASgIEhMKC3VuY29tbWl0dGVkGAcgASgIEg4KBmlzX2RpchgIIAEoCCKXAQoITG9nRW50cnkSCwoDc2hhGAEgASgJEhEKCXNob3J0X3NoYRgCIAEoCRIPCgdzdWJqZWN0GAMgASgJEhMKC2F1dGhvcl9uYW1lGAQgASgJEhQKDGF1dGhvcl9lbWFpbBgFIAEoCRIvCgthdXRob3JlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiMwoMUmVwb1NuYXBzaG90EiMKBXJlcG9zGAEgAygLMhQuY29kZWZvdW5kcnkudjEuUmVwbyIsCgtXb3JrdHJlZVJlZhIPCgdyZXBvX2lkGAEgASgJEgwKBHBhdGgYAiABKAky0AcKC1JlcG9TZXJ2aWNlElcKCFJlZ2lzdGVyEiMuY29kZWZvdW5kcnkudjEuUmVnaXN0ZXJSZXBvUmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLlJlZ2lzdGVyUmVwb1Jlc3BvbnNlIgASXQoKVW5yZWdpc3RlchIlLmNvZGVmb3VuZHJ5LnYxLlVucmVnaXN0ZXJSZXBvUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLlVucmVnaXN0ZXJSZXBvUmVzcG9uc2UiABJNCgRMaXN0EiAuY29kZWZvdW5kcnkudjEuTGlzdFJlcG9zUmVxdWVzdBohLmNvZGVmb3VuZHJ5LnYxLkxpc3RSZXBvc1Jlc3BvbnNlIgASSAoDR2V0Eh4uY29kZWZvdW5kcnkudjEuR2V0UmVwb1JlcXVlc3QaHy5jb2RlZm91bmRyeS52MS5HZXRSZXBvUmVzcG9uc2UiABJhCg5DcmVhdGVXb3JrdHJlZRIlLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZVdvcmt0cmVlUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZVdvcmt0cmVlUmVzcG9uc2UiABJhCg5SZW1vdmVXb3JrdHJlZRIlLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVdvcmt0cmVlUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVdvcmt0cmVlUmVzcG9uc2UiABJUCgdSZWZyZXNoEiIuY29kZWZvdW5kcnkudjEuUmVmcmVzaFJlcG9SZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuUmVmcmVzaFJlcG9SZXNwb25zZSIAEkkKBVdhdGNoEiEuY29kZWZvdW5kcnkudjEuV2F0Y2hSZXBvc1JlcXVlc3QaGS5jb2RlZm91bmRyeS52MS5SZXBvRXZlbnQiADABEmoKEUdldFdvcmt0cmVlRGV0YWlsEiguY29kZWZvdW5kcnkudjEuR2V0V29ya3RyZWVEZXRhaWxSZXF1ZXN0GikuY29kZWZvdW5kcnkudjEuR2V0V29ya3RyZWVEZXRhaWxSZXNwb25zZSIAEk8KCExpc3RSZWZzEh8uY29kZWZvdW5kcnkudjEuTGlzdFJlZnNSZXF1ZXN0GiAuY29kZWZvdW5kcnkudjEuTGlzdFJlZnNSZXNwb25zZSIAEkwKB0luaXRHaXQSHi5jb2RlZm91bmRyeS52MS5Jbml0R2l0UmVxdWVzdBofLmNvZGVmb3VuZHJ5LnYxLkluaXRHaXRSZXNwb25zZSIAQsEBChJjb20uY29kZWZvdW5kcnkudjFCCVJlcG9Qcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp]);
+  fileDesc("Chljb2RlZm91bmRyeS92MS9yZXBvLnByb3RvEg5jb2RlZm91bmRyeS52MSLoAQoEUmVwbxIKCgJpZBgBIAEoCRIMCgRwYXRoGAIgASgJEgwKBG5hbWUYAyABKAkSFgoOZGVmYXVsdF9icmFuY2gYBCABKAkSEwoLZ2l0aHViX3NsdWcYBSABKAkSKwoJd29ya3RyZWVzGAYgAygLMhguY29kZWZvdW5kcnkudjEuV29ya3RyZWUSMQoNcmVnaXN0ZXJlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDQoFZXJyb3IYCCABKAkSDwoHcmVtb3RlcxgJIAMoCRILCgNnaXQYCiABKAgilQEKCFdvcmt0cmVlEg8KB3JlcG9faWQYASABKAkSDAoEcGF0aBgCIAEoCRIOCgZicmFuY2gYAyABKAkSDAoEaGVhZBgEIAEoCRIPCgdpc19tYWluGAUgASgIEikKBnN0YXR1cxgGIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkdpdFN0YXR1cxIQCghkZXRhY2hlZBgHIAEoCCKQAgoJR2l0U3RhdHVzEhAKCHVwc3RyZWFtGAEgASgJEg0KBWFoZWFkGAIgASgFEg4KBmJlaGluZBgDIAEoBRIOCgZzdGFnZWQYBCABKAUSEAoIbW9kaWZpZWQYBSABKAUSEQoJdW50cmFja2VkGAYgASgFEg0KBWRpcnR5GAcgASgIEjAKDHJlZnJlc2hlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEgoKY29uZmxpY3RlZBgJIAEoBRIQCghiYXNlX3JlZhgKIAEoCRISCgpiYXNlX2FoZWFkGAsgASgFEhMKC2Jhc2VfYmVoaW5kGAwgASgFEg0KBWVycm9yGA0gASgJIiMKE1JlZ2lzdGVyUmVwb1JlcXVlc3QSDAoEcGF0aBgBIAEoCSI6ChRSZWdpc3RlclJlcG9SZXNwb25zZRIiCgRyZXBvGAEgASgLMhQuY29kZWZvdW5kcnkudjEuUmVwbyIjChVVbnJlZ2lzdGVyUmVwb1JlcXVlc3QSCgoCaWQYASABKAkiGAoWVW5yZWdpc3RlclJlcG9SZXNwb25zZSISChBMaXN0UmVwb3NSZXF1ZXN0IjgKEUxpc3RSZXBvc1Jlc3BvbnNlEiMKBXJlcG9zGAEgAygLMhQuY29kZWZvdW5kcnkudjEuUmVwbyIcCg5HZXRSZXBvUmVxdWVzdBIKCgJpZBgBIAEoCSI1Cg9HZXRSZXBvUmVzcG9uc2USIgoEcmVwbxgBIAEoCzIULmNvZGVmb3VuZHJ5LnYxLlJlcG8iZwoVQ3JlYXRlV29ya3RyZWVSZXF1ZXN0Eg8KB3JlcG9faWQYASABKAkSDgoGYnJhbmNoGAIgASgJEhAKCGJhc2VfcmVmGAMgASgJEgwKBHBhdGgYBCABKAkSDQoFZmV0Y2gYBSABKAgiRAoWQ3JlYXRlV29ya3RyZWVSZXNwb25zZRIqCgh3b3JrdHJlZRgBIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLldvcmt0cmVlIlwKFVJlbW92ZVdvcmt0cmVlUmVxdWVzdBIPCgdyZXBvX2lkGAEgASgJEgwKBHBhdGgYAiABKAkSFQoNZGVsZXRlX2JyYW5jaBgDIAEoCBINCgVmb3JjZRgEIAEoCCIYChZSZW1vdmVXb3JrdHJlZVJlc3BvbnNlIiIKD0xpc3RSZWZzUmVxdWVzdBIPCgdyZXBvX2lkGAEgASgJIjUKEExpc3RSZWZzUmVzcG9uc2USDAoEcmVmcxgBIAMoCRITCgtkZWZhdWx0X3JlZhgCIAEoCSIcCg5Jbml0R2l0UmVxdWVzdBIKCgJpZBgBIAEoCSI1Cg9Jbml0R2l0UmVzcG9uc2USIgoEcmVwbxgBIAEoCzIULmNvZGVmb3VuZHJ5LnYxLlJlcG8iIAoSUmVmcmVzaFJlcG9SZXF1ZXN0EgoKAmlkGAEgASgJIhUKE1JlZnJlc2hSZXBvUmVzcG9uc2UiEwoRV2F0Y2hSZXBvc1JlcXVlc3QixAIKCVJlcG9FdmVudBIsCgxyZXBvX3VwZGF0ZWQYASABKAsyFC5jb2RlZm91bmRyeS52MS5SZXBvSAASGQoPcmVwb19yZW1vdmVkX2lkGAIgASgJSAASNAoQd29ya3RyZWVfdXBkYXRlZBgDIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLldvcmt0cmVlSAASNwoQd29ya3RyZWVfcmVtb3ZlZBgEIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLldvcmt0cmVlUmVmSAASMAoIc25hcHNob3QYBSABKAsyHC5jb2RlZm91bmRyeS52MS5SZXBvU25hcHNob3RIABJEChd3b3JrdHJlZV9kZXRhaWxfdXBkYXRlZBgGIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLldvcmt0cmVlRGV0YWlsUmVmSABCBwoFZXZlbnQiYwoRV29ya3RyZWVEZXRhaWxSZWYSDwoHcmVwb19pZBgBIAEoCRIMCgRwYXRoGAIgASgJEi8KC2NvbXB1dGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCI5ChhHZXRXb3JrdHJlZURldGFpbFJlcXVlc3QSDwoHcmVwb19pZBgBIAEoCRIMCgRwYXRoGAIgASgJIksKGUdldFdvcmt0cmVlRGV0YWlsUmVzcG9uc2USLgoGZGV0YWlsGAEgASgLMh4uY29kZWZvdW5kcnkudjEuV29ya3RyZWVEZXRhaWwioQIKDldvcmt0cmVlRGV0YWlsEg8KB3JlcG9faWQYASABKAkSDAoEcGF0aBgCIAEoCRIQCghiYXNlX3JlZhgDIAEoCRISCgptZXJnZV9iYXNlGAQgASgJEgwKBGhlYWQYBSABKAkSKQoFZmlsZXMYBiADKAsyGi5jb2RlZm91bmRyeS52MS5GaWxlQ2hhbmdlEhcKD2ZpbGVzX3RydW5jYXRlZBgHIAEoCBIlCgNsb2cYCCADKAsyGC5jb2RlZm91bmRyeS52MS5Mb2dFbnRyeRIRCglsb2dfdG90YWwYCSABKAUSLwoLY29tcHV0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg0KBWVycm9yGAsgASgJIpEBCgpGaWxlQ2hhbmdlEgwKBHBhdGgYASABKAkSEAoIb2xkX3BhdGgYAiABKAkSDgoGc3RhdHVzGAMgASgJEg0KBWFkZGVkGAQgASgFEg8KB2RlbGV0ZWQYBSABKAUSDgoGYmluYXJ5GAYgASgIEhMKC3VuY29tbWl0dGVkGAcgASgIEg4KBmlzX2RpchgIIAEoCCKXAQoITG9nRW50cnkSCwoDc2hhGAEgASgJEhEKCXNob3J0X3NoYRgCIAEoCRIPCgdzdWJqZWN0GAMgASgJEhMKC2F1dGhvcl9uYW1lGAQgASgJEhQKDGF1dGhvcl9lbWFpbBgFIAEoCRIvCgthdXRob3JlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiMwoMUmVwb1NuYXBzaG90EiMKBXJlcG9zGAEgAygLMhQuY29kZWZvdW5kcnkudjEuUmVwbyIsCgtXb3JrdHJlZVJlZhIPCgdyZXBvX2lkGAEgASgJEgwKBHBhdGgYAiABKAki4AEKEEdpdEh1YlJlcG9zaXRvcnkSDQoFb3duZXIYASABKAkSDAoEbmFtZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCRI4Cgp2aXNpYmlsaXR5GAQgASgOMiQuY29kZWZvdW5kcnkudjEuUmVwb3NpdG9yeVZpc2liaWxpdHkSEwoLaXNfYXJjaGl2ZWQYBSABKAgSCwoDdXJsGAYgASgJEg8KB2lzX2ZvcmsYByABKAgSEgoKY2xvbmVfcGF0aBgIIAEoCRIZChFjbG9uZV9wYXRoX2V4aXN0cxgJIAEoCCIkChNTZWFyY2hHaXRIdWJSZXF1ZXN0Eg0KBXF1ZXJ5GAEgASgJIk4KFFNlYXJjaEdpdEh1YlJlc3BvbnNlEjYKDHJlcG9zaXRvcmllcxgBIAMoCzIgLmNvZGVmb3VuZHJ5LnYxLkdpdEh1YlJlcG9zaXRvcnkiMgoTTG9va3VwR2l0SHViUmVxdWVzdBINCgVvd25lchgBIAEoCRIMCgRuYW1lGAIgASgJIkwKFExvb2t1cEdpdEh1YlJlc3BvbnNlEjQKCnJlcG9zaXRvcnkYASABKAsyIC5jb2RlZm91bmRyeS52MS5HaXRIdWJSZXBvc2l0b3J5Ii8KEENsb25lUmVwb1JlcXVlc3QSDQoFb3duZXIYASABKAkSDAoEbmFtZRgCIAEoCSJyCg5DbG9uZVJlcG9FdmVudBIxCghwcm9ncmVzcxgBIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLkNsb25lUHJvZ3Jlc3NIABIkCgRyZXBvGAIgASgLMhQuY29kZWZvdW5kcnkudjEuUmVwb0gAQgcKBWV2ZW50IjAKDUNsb25lUHJvZ3Jlc3MSDAoEbGluZRgBIAEoCRIRCgl0cmFuc2llbnQYAiABKAgqpgEKFFJlcG9zaXRvcnlWaXNpYmlsaXR5EiUKIVJFUE9TSVRPUllfVklTSUJJTElUWV9VTlNQRUNJRklFRBAAEiAKHFJFUE9TSVRPUllfVklTSUJJTElUWV9QVUJMSUMQARIhCh1SRVBPU0lUT1JZX1ZJU0lCSUxJVFlfUFJJVkFURRACEiIKHlJFUE9TSVRPUllfVklTSUJJTElUWV9JTlRFUk5BTBADMtkJCgtSZXBvU2VydmljZRJXCghSZWdpc3RlchIjLmNvZGVmb3VuZHJ5LnYxLlJlZ2lzdGVyUmVwb1JlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5SZWdpc3RlclJlcG9SZXNwb25zZSIAEl0KClVucmVnaXN0ZXISJS5jb2RlZm91bmRyeS52MS5VbnJlZ2lzdGVyUmVwb1JlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5VbnJlZ2lzdGVyUmVwb1Jlc3BvbnNlIgASTQoETGlzdBIgLmNvZGVmb3VuZHJ5LnYxLkxpc3RSZXBvc1JlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5MaXN0UmVwb3NSZXNwb25zZSIAEkgKA0dldBIeLmNvZGVmb3VuZHJ5LnYxLkdldFJlcG9SZXF1ZXN0Gh8uY29kZWZvdW5kcnkudjEuR2V0UmVwb1Jlc3BvbnNlIgASYQoOQ3JlYXRlV29ya3RyZWUSJS5jb2RlZm91bmRyeS52MS5DcmVhdGVXb3JrdHJlZVJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5DcmVhdGVXb3JrdHJlZVJlc3BvbnNlIgASYQoOUmVtb3ZlV29ya3RyZWUSJS5jb2RlZm91bmRyeS52MS5SZW1vdmVXb3JrdHJlZVJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5SZW1vdmVXb3JrdHJlZVJlc3BvbnNlIgASVAoHUmVmcmVzaBIiLmNvZGVmb3VuZHJ5LnYxLlJlZnJlc2hSZXBvUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlJlZnJlc2hSZXBvUmVzcG9uc2UiABJJCgVXYXRjaBIhLmNvZGVmb3VuZHJ5LnYxLldhdGNoUmVwb3NSZXF1ZXN0GhkuY29kZWZvdW5kcnkudjEuUmVwb0V2ZW50IgAwARJqChFHZXRXb3JrdHJlZURldGFpbBIoLmNvZGVmb3VuZHJ5LnYxLkdldFdvcmt0cmVlRGV0YWlsUmVxdWVzdBopLmNvZGVmb3VuZHJ5LnYxLkdldFdvcmt0cmVlRGV0YWlsUmVzcG9uc2UiABJPCghMaXN0UmVmcxIfLmNvZGVmb3VuZHJ5LnYxLkxpc3RSZWZzUmVxdWVzdBogLmNvZGVmb3VuZHJ5LnYxLkxpc3RSZWZzUmVzcG9uc2UiABJMCgdJbml0R2l0Eh4uY29kZWZvdW5kcnkudjEuSW5pdEdpdFJlcXVlc3QaHy5jb2RlZm91bmRyeS52MS5Jbml0R2l0UmVzcG9uc2UiABJbCgxTZWFyY2hHaXRIdWISIy5jb2RlZm91bmRyeS52MS5TZWFyY2hHaXRIdWJSZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuU2VhcmNoR2l0SHViUmVzcG9uc2UiABJbCgxMb29rdXBHaXRIdWISIy5jb2RlZm91bmRyeS52MS5Mb29rdXBHaXRIdWJSZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuTG9va3VwR2l0SHViUmVzcG9uc2UiABJNCgVDbG9uZRIgLmNvZGVmb3VuZHJ5LnYxLkNsb25lUmVwb1JlcXVlc3QaHi5jb2RlZm91bmRyeS52MS5DbG9uZVJlcG9FdmVudCIAMAFCwQEKEmNvbS5jb2RlZm91bmRyeS52MUIJUmVwb1Byb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.Repo
@@ -953,6 +953,259 @@ export const WorktreeRefSchema: GenMessage<WorktreeRef> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_repo, 30);
 
 /**
+ * A github.com repository as the Add Project dialog shows it.
+ *
+ * @generated from message codefoundry.v1.GitHubRepository
+ */
+export type GitHubRepository = Message<"codefoundry.v1.GitHubRepository"> & {
+  /**
+   * GitHub's spelling.
+   *
+   * @generated from field: string owner = 1;
+   */
+  owner: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
+
+  /**
+   * @generated from field: codefoundry.v1.RepositoryVisibility visibility = 4;
+   */
+  visibility: RepositoryVisibility;
+
+  /**
+   * @generated from field: bool is_archived = 5;
+   */
+  isArchived: boolean;
+
+  /**
+   * https://github.com/<owner>/<name>
+   *
+   * @generated from field: string url = 6;
+   */
+  url: string;
+
+  /**
+   * @generated from field: bool is_fork = 7;
+   */
+  isFork: boolean;
+
+  /**
+   * Where Clone puts it (<config home>/projects/<owner>/<name>), and whether something
+   * is there already (Clone refuses then).
+   *
+   * @generated from field: string clone_path = 8;
+   */
+  clonePath: string;
+
+  /**
+   * @generated from field: bool clone_path_exists = 9;
+   */
+  clonePathExists: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.GitHubRepository.
+ * Use `create(GitHubRepositorySchema)` to create a new message.
+ */
+export const GitHubRepositorySchema: GenMessage<GitHubRepository> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_repo, 31);
+
+/**
+ * @generated from message codefoundry.v1.SearchGitHubRequest
+ */
+export type SearchGitHubRequest = Message<"codefoundry.v1.SearchGitHubRequest"> & {
+  /**
+   * @generated from field: string query = 1;
+   */
+  query: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.SearchGitHubRequest.
+ * Use `create(SearchGitHubRequestSchema)` to create a new message.
+ */
+export const SearchGitHubRequestSchema: GenMessage<SearchGitHubRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_repo, 32);
+
+/**
+ * @generated from message codefoundry.v1.SearchGitHubResponse
+ */
+export type SearchGitHubResponse = Message<"codefoundry.v1.SearchGitHubResponse"> & {
+  /**
+   * @generated from field: repeated codefoundry.v1.GitHubRepository repositories = 1;
+   */
+  repositories: GitHubRepository[];
+};
+
+/**
+ * Describes the message codefoundry.v1.SearchGitHubResponse.
+ * Use `create(SearchGitHubResponseSchema)` to create a new message.
+ */
+export const SearchGitHubResponseSchema: GenMessage<SearchGitHubResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_repo, 33);
+
+/**
+ * @generated from message codefoundry.v1.LookupGitHubRequest
+ */
+export type LookupGitHubRequest = Message<"codefoundry.v1.LookupGitHubRequest"> & {
+  /**
+   * @generated from field: string owner = 1;
+   */
+  owner: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.LookupGitHubRequest.
+ * Use `create(LookupGitHubRequestSchema)` to create a new message.
+ */
+export const LookupGitHubRequestSchema: GenMessage<LookupGitHubRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_repo, 34);
+
+/**
+ * @generated from message codefoundry.v1.LookupGitHubResponse
+ */
+export type LookupGitHubResponse = Message<"codefoundry.v1.LookupGitHubResponse"> & {
+  /**
+   * @generated from field: codefoundry.v1.GitHubRepository repository = 1;
+   */
+  repository?: GitHubRepository | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.LookupGitHubResponse.
+ * Use `create(LookupGitHubResponseSchema)` to create a new message.
+ */
+export const LookupGitHubResponseSchema: GenMessage<LookupGitHubResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_repo, 35);
+
+/**
+ * @generated from message codefoundry.v1.CloneRepoRequest
+ */
+export type CloneRepoRequest = Message<"codefoundry.v1.CloneRepoRequest"> & {
+  /**
+   * @generated from field: string owner = 1;
+   */
+  owner: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.CloneRepoRequest.
+ * Use `create(CloneRepoRequestSchema)` to create a new message.
+ */
+export const CloneRepoRequestSchema: GenMessage<CloneRepoRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_repo, 36);
+
+/**
+ * One event of a Clone stream: output lines while it runs, then the registered project.
+ *
+ * @generated from message codefoundry.v1.CloneRepoEvent
+ */
+export type CloneRepoEvent = Message<"codefoundry.v1.CloneRepoEvent"> & {
+  /**
+   * @generated from oneof codefoundry.v1.CloneRepoEvent.event
+   */
+  event: {
+    /**
+     * @generated from field: codefoundry.v1.CloneProgress progress = 1;
+     */
+    value: CloneProgress;
+    case: "progress";
+  } | {
+    /**
+     * The clone, registered. Always the last event of a successful clone.
+     *
+     * @generated from field: codefoundry.v1.Repo repo = 2;
+     */
+    value: Repo;
+    case: "repo";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message codefoundry.v1.CloneRepoEvent.
+ * Use `create(CloneRepoEventSchema)` to create a new message.
+ */
+export const CloneRepoEventSchema: GenMessage<CloneRepoEvent> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_repo, 37);
+
+/**
+ * One line the clone wrote.
+ *
+ * @generated from message codefoundry.v1.CloneProgress
+ */
+export type CloneProgress = Message<"codefoundry.v1.CloneProgress"> & {
+  /**
+   * @generated from field: string line = 1;
+   */
+  line: string;
+
+  /**
+   * The line ended in a carriage return (progress counters): the next line replaces it.
+   *
+   * @generated from field: bool transient = 2;
+   */
+  transient: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.CloneProgress.
+ * Use `create(CloneProgressSchema)` to create a new message.
+ */
+export const CloneProgressSchema: GenMessage<CloneProgress> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_repo, 38);
+
+/**
+ * GitHub's repository visibility.
+ *
+ * @generated from enum codefoundry.v1.RepositoryVisibility
+ */
+export enum RepositoryVisibility {
+  /**
+   * @generated from enum value: REPOSITORY_VISIBILITY_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: REPOSITORY_VISIBILITY_PUBLIC = 1;
+   */
+  PUBLIC = 1,
+
+  /**
+   * @generated from enum value: REPOSITORY_VISIBILITY_PRIVATE = 2;
+   */
+  PRIVATE = 2,
+
+  /**
+   * @generated from enum value: REPOSITORY_VISIBILITY_INTERNAL = 3;
+   */
+  INTERNAL = 3,
+}
+
+/**
+ * Describes the enum codefoundry.v1.RepositoryVisibility.
+ */
+export const RepositoryVisibilitySchema: GenEnum<RepositoryVisibility> = /*@__PURE__*/
+  enumDesc(file_codefoundry_v1_repo, 0);
+
+/**
  * RepoService tracks registered git repositories, their worktrees, and git status.
  *
  * @generated from service codefoundry.v1.RepoService
@@ -1076,6 +1329,44 @@ export const RepoService: GenService<{
     methodKind: "unary";
     input: typeof InitGitRequestSchema;
     output: typeof InitGitResponseSchema;
+  },
+  /**
+   * SearchGitHub searches github.com repositories with GitHub's search syntax and
+   * returns the first 20 matches, best match first. The Add Project dialog sends it on
+   * Enter, never per keystroke. InvalidArgument for an empty query.
+   *
+   * @generated from rpc codefoundry.v1.RepoService.SearchGitHub
+   */
+  searchGitHub: {
+    methodKind: "unary";
+    input: typeof SearchGitHubRequestSchema;
+    output: typeof SearchGitHubResponseSchema;
+  },
+  /**
+   * LookupGitHub returns one github.com repository. NotFound when it does not exist or
+   * the viewer cannot see it.
+   *
+   * @generated from rpc codefoundry.v1.RepoService.LookupGitHub
+   */
+  lookupGitHub: {
+    methodKind: "unary";
+    input: typeof LookupGitHubRequestSchema;
+    output: typeof LookupGitHubResponseSchema;
+  },
+  /**
+   * Clone runs `gh repo clone <owner>/<name> <config home>/projects/<owner>/<name> --
+   * --progress` (the user's gh login and protocol apply), streams its output as
+   * progress events, registers the clone and ends with a repo event. AlreadyExists when
+   * the destination exists; NotFound when GitHub has no such repository; other failures
+   * carry gh's last lines. Bounded at 15 minutes. Cancelling the stream kills the clone
+   * and removes what it wrote.
+   *
+   * @generated from rpc codefoundry.v1.RepoService.Clone
+   */
+  clone: {
+    methodKind: "server_streaming";
+    input: typeof CloneRepoRequestSchema;
+    output: typeof CloneRepoEventSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_codefoundry_v1_repo, 0);

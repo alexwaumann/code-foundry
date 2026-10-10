@@ -13,6 +13,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/db"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/store/clone"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
@@ -33,6 +34,9 @@ type stores struct {
 	db       *sql.DB
 	repo     *repo.Git
 	gh       *gh.Store
+	// cloner clones GitHub repositories into the projects dir and registers them in
+	// repo. It holds no resources: a clone in flight dies with its request.
+	cloner *clone.Cloner
 	// stopGh cancels the gh poller and the repo→gh tracking glue, and waits for both.
 	stopGh func()
 	// gitops runs git/gh operations and refreshes repo afterwards; closed before repo.
@@ -101,6 +105,17 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 		return nil, err
 	}
 	s.stopGh = startGh(ctx, log, s.gh, s.repo, s.bus)
+	// Clones use the configured gh, else PATH, else Homebrew's (gh.LookPath), like the
+	// token lookup.
+	ghBin := settings.ExpandedPath(cfg.Advanced.GhPath)
+	if ghBin == "" {
+		ghBin, _ = gh.LookPath() // "" when missing: the clone then fails saying so
+	}
+	if s.cloner, err = clone.New(clone.Options{
+		Root: p.Projects(), AllowedRoot: s.home, Repos: s.repo, Gh: ghBin, Log: log.With("store", "clone"),
+	}); err != nil {
+		return nil, err
+	}
 	s.gitops = gitops.New(gitops.Options{
 		Bus: s.bus, Repos: s.repo, Log: log.With("store", "gitops"),
 		// Read on every open, so gitops.editor_command applies live. CODE_FOUNDRY_EDITOR

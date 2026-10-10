@@ -5,6 +5,7 @@
  */
 import { startCommandNamed } from "@/keys/bindings";
 import { repoRef } from "@/lib/projects";
+import { openAddProject } from "./addProject";
 import { runCommand } from "./commands";
 import { getUiContext } from "./context";
 import { useReposStore } from "./repos";
@@ -40,9 +41,12 @@ export function unregisterProject(repoId: string): Promise<boolean> {
   return runCommand("repo.unregister", {}, getUiContext({ kind: "repo", repoId }));
 }
 
-/** repo.register: the palette asks for the path. */
-export function registerProject(): boolean {
-  return startCommandNamed("repo.register");
+/**
+ * repo.add: the Add Project dialog. Opened directly when the daemon does not list
+ * repo.add (one older than the dialog): its Local folder tab still works there.
+ */
+export function addProject(): void {
+  if (!startCommandNamed("repo.add")) openAddProject();
 }
 
 function wsName(workspaceId: string): string {
