@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import { Command, FolderPlus, Sparkles } from "lucide-react";
+import { Command, FolderPlus, SquarePen } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { Backdrop } from "@/components/backdrop/Backdrop";
 import { CommandButton } from "@/components/command/CommandButton";
@@ -100,7 +100,7 @@ function Fleet() {
         </p>
       </Header>
       <div className="flex flex-wrap justify-center gap-2" data-testid="welcome-actions">
-        <CommandButton command="session.new" icon={Sparkles} label="New thread" variant="default" whenUnavailable="disable" keepFocus={false} />
+        <CommandButton command="session.new" icon={SquarePen} label="New thread" variant="default" whenUnavailable="disable" keepFocus={false} />
         <CommandButton command="ui.palette.open" icon={Command} label="Command palette" title="Command Palette" variant="outline" className="backdrop-blur-sm" keepFocus={false} />
       </div>
       <ActiveThreads />
