@@ -142,7 +142,7 @@ func TestWorkspaceRemovalsNeedConfirmation(t *testing.T) {
 		want string
 	}{
 		{"workspace.remove", map[string]string{"workspace": "base"}, "Remove workspace base? This deletes every member worktree from disk."},
-		{"workspace.remove-repo", map[string]string{"repo": "web"}, "Remove repository web from its workspace? This deletes its worktree from disk."},
+		{"workspace.remove-repo", map[string]string{"repo": "web"}, "Remove project web from its workspace? This deletes its worktree from disk."},
 	} {
 		_, err := reg.Invoke(context.Background(), command.Context{}, tt.cmd, tt.args)
 		var ce *command.ConfirmError

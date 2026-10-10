@@ -116,8 +116,8 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		},
 		Command{
 			Name:        "workspace.add-repo",
-			Title:       "Add Repository to Workspace",
-			Description: "Create a worktree on the workspace branch in another repository and add it to the workspace.",
+			Title:       "Add Project to Workspace",
+			Description: "Create a worktree on the workspace branch in another project (repository) and add it to the workspace.",
 			Category:    "Workspace",
 			Args: []ArgSpec{
 				{Name: "repo", Type: String, Required: true, Positional: true, Description: "Repository id, name, or absolute path"},
@@ -143,7 +143,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 		},
 		Command{
 			Name:  "workspace.remove-repo",
-			Title: "Remove Repository from Workspace",
+			Title: "Remove Project from Workspace",
 			Description: "Delete a member repository's worktree and drop it from the workspace. Refused while a thread runs " +
 				"in that worktree, and when it has uncommitted changes unless --force.",
 			Category: "Workspace",
@@ -153,7 +153,7 @@ func RegisterWorkspace(r *Registry, b WorkspaceBackend) error {
 				{Name: "force", Type: Bool, Description: "Remove even with uncommitted changes"},
 				{Name: "delete-branch", Type: Bool, Description: "Also delete the branch"},
 			},
-			Confirm: "Remove repository {repo} from its workspace? This deletes its worktree from disk.",
+			Confirm: "Remove project {repo} from its workspace? This deletes its worktree from disk.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.RemoveRepo(ctx, connect.NewRequest(&v1.RemoveWorkspaceRepoRequest{
 					Workspace: a.String("workspace"), Cwd: a.Path("cwd"), Repo: a.String("repo"),
