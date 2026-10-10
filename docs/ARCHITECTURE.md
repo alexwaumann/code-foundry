@@ -113,7 +113,7 @@ start; the Wails host reads them and injects them into the page before load.
 Services (v1):
 
 * `SessionService` — Create, Fork, List, Get, Rename, Close, Reconnect, Remove, RunIn,
-  Watch (server stream), StageAttachment (images the first prompt refers to). Create can
+  Pin (the user's pin, persisted; `docs/notes/workspaces-4-sidebar.md`), Watch (server stream), StageAttachment (images the first prompt refers to). Create can
   make the worktree first (`new_worktree`), start a thread in a workspace member
   (`workspace_id`) or in a new workspace (`new_workspace`), passes the first prompt as
   claude's positional argument, and carries a permission mode (never
@@ -222,8 +222,9 @@ type Command struct {
 ```
 
 `Context` is what the caller is looking at: active session, active repo/worktree, active
-view. The GUI sends its context with `List` and `Invoke`; the CLI passes an explicit
-context from flags or none. The palette, keybindings, and CLI subcommands are three front
+view, and the workspace that owns the active thread or composer (so `session.run-in` is
+offered for workspace threads only). The GUI sends its context with `List` and `Invoke`;
+the CLI passes an explicit context from flags or none. The palette, keybindings, and CLI subcommands are three front
 doors to this one registry. Adding a feature means registering commands, not editing a
 switch.
 
@@ -249,9 +250,13 @@ from the pull request (docs/notes/pr-thread-commands.md).
   also how the daemon knows a session is being looked at: while a session's terminal has
   an Attach subscriber, finished turns count as seen (see
   `docs/notes/phase2-integration.md`).
-* Layout: a draggable title strip under the hidden-inset traffic lights, sidebar (repos →
-  worktrees → sessions, with a status row at its foot), content (terminal or overview
-  page), command palette overlay. Strip and sidebar sit on one background (the sheet);
+* Layout: a draggable title strip under the hidden-inset traffic lights, sidebar (Pull
+  Requests and Projects entries, then a flat thread list: Pinned and Needs attention
+  sections on top, threads newest first with project, branch, status and a workspace
+  badge, then terminals no thread owns; a status row at its foot; see
+  `docs/notes/workspaces-4-sidebar.md`), content (terminal, overview page, the Pull
+  Requests page, or the Projects page with each project's worktrees and each workspace's
+  members), command palette overlay. Strip and sidebar sit on one background (the sheet);
   the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Each
   selection can open a side panel right of the content: a second pane with tabs whose
   bodies come from the surface registry (`src/surfaces`, `docs/notes/side-panel.md`); the

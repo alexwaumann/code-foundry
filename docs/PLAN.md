@@ -27,8 +27,11 @@ Design settled 2026-10-09. Decisions, scope, build order and open checks are in
   done: `docs/notes/workspaces-2-launch.md`.
 * Step 3 (composer: `workspace` source on the GUI event stream, workspaces above projects
   in the picker, member chips with a changeable primary, "Also in" making a new workspace
-  on send) done: `docs/notes/workspaces-3-composer.md`. Next: step 4 (sidebar, projects
-  page, "Run in…").
+  on send) done: `docs/notes/workspaces-3-composer.md`.
+* Step 4 (flat thread sidebar with Pinned / Needs attention / Terminals sections and
+  `session.pin`, the Projects page with `WorkspaceMembers`, "Run in…" from the row menu
+  and the palette) done: `docs/notes/workspaces-4-sidebar.md`. Next: step 5 (right panel
+  workspace surface).
 
 ### Open items
 
