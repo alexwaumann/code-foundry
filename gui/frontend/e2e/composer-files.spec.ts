@@ -207,6 +207,46 @@ test("Enter before the first answer does not send the half-typed reference", asy
   expect(await newThreads()).toBe(0);
 });
 
+test("a slow search says Searching… until the rows land; Escape before the first answer keeps the card closed and Enter sends", async ({ page }) => {
+  await mockPost("files/search?delay=900");
+  await openApp(page);
+  await compose(page);
+  await page.keyboard.type("@READ");
+  await expect(card(page).getByTestId("completion-searching")).toHaveText("Searching…");
+  await expect(card(page).getByTestId("completion-hints")).toBeHidden();
+  await expect(labels(page)).toHaveText(["README.md"]);
+  await page.keyboard.press("Enter");
+  await expect(value(page)).toHaveAttribute("data-value", "[README.md](cf-file://repo-cf/README.md) ");
+
+  // A new query nothing has answered (no prefix of it is cached): Escape at once, then the
+  // answer lands.
+  await page.keyboard.type("@manag");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(1300);
+  await expect(card(page)).toHaveCount(0);
+  expect(await searches()).toContain("search repo-cf manag");
+  expect(await newThreads()).toBe(0);
+  await page.keyboard.press("Enter");
+  await expect.poll(newThreads).toBe(1);
+  expect((await invocations()).at(-1)?.args.prompt).toBe("@cf-file://repo-cf/README.md @manag");
+});
+
+test("a failing search: Enter waits for the answer (No files match), the next Enter closes the card, the one after sends", async ({ page }) => {
+  await mockPost("files/search?fail=1&delay=300");
+  await openApp(page);
+  await compose(page);
+  await page.keyboard.type("@READ");
+  await page.keyboard.press("Enter");
+  await expect(card(page).getByTestId("completion-empty")).toHaveText("No files match");
+  expect(await newThreads()).toBe(0);
+  await page.keyboard.press("Enter");
+  await expect(card(page)).toHaveCount(0);
+  expect(await newThreads()).toBe(0);
+  await page.keyboard.press("Enter");
+  await expect.poll(newThreads).toBe(1);
+  expect((await invocations()).at(-1)?.args.prompt).toBe("@READ");
+});
+
 test("a daemon older than SearchFiles: @ is plain text, no card", async ({ page }) => {
   await mockPost("missing-rpc?rpc=FilesystemService/SearchFiles");
   await openApp(page);

@@ -181,9 +181,14 @@ export function setMockFiles(repoId: string, files: string[]): void {
   filesByRepo.set(repoId, files);
 }
 
+/** How SearchFiles answers (POST /__mock/files/search?delay=700&fail=1): after delayMs, failing when fail. */
+export const searchMode = { delayMs: 0, fail: false };
+
 export function resetCompletion(): void {
   filesByRepo.clear();
   completionCalls.length = 0;
+  searchMode.delayMs = 0;
+  searchMode.fail = false;
 }
 
 type SkillInit = MessageInitShape<typeof SkillSchema>;
@@ -252,6 +257,16 @@ export function fileTier(path: string, query: string): number {
   if (base.startsWith(q)) return 3;
   if (isSubsequence(base, q)) return 2;
   return isSubsequence(p, q) ? 1 : 0;
+}
+
+/** searchFiles as the router serves it: logged, then after searchMode.delayMs, failing when searchMode.fail. */
+export async function searchFilesSlow(repos: ReadonlyMap<string, CompletionRepo>, repoId: string, path: string, query: string, limit: number): Promise<SearchInit> {
+  if (searchMode.delayMs > 0) await new Promise((r) => setTimeout(r, searchMode.delayMs));
+  if (searchMode.fail) {
+    completionCalls.push(`search ${repoId} ${query}`);
+    throw new ConnectError("search failed", Code.Internal);
+  }
+  return searchFiles(repos, repoId, path, query, limit);
 }
 
 export function searchFiles(repos: ReadonlyMap<string, CompletionRepo>, repoId: string, path: string, query: string, limit: number): SearchInit {

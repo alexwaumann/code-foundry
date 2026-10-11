@@ -49,6 +49,7 @@
  *   POST /__mock/files?repo=repo-cf&path=a.ts&path=src/b.ts   (that project's files; no path:
  *                                                 none; reset restores DEFAULT_FILES)
  *   GET  /__mock/files/calls                      ("skills <repo,…|-> <includeUser>", "search <repo> <query>")
+ *   POST /__mock/files/search?delay=700&fail=1    (SearchFiles answers after 700ms; fail=1: Internal; reset: at once)
  *   session.new with a prompt containing FAIL fails (after the worktree delay, if any).
  *   POST /__mock/gitops?fail=git.push&delay=800   (next git.push fails; ops take 800ms)
  *   GET  /__mock/gitops
@@ -91,7 +92,7 @@ import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
-import { completionCalls, listDirectories, listSkills, resetCompletion, searchFiles, setMockFiles } from "./filesystem";
+import { completionCalls, listDirectories, listSkills, resetCompletion, searchFilesSlow, searchMode, setMockFiles } from "./filesystem";
 import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from "./clone";
 import { createProject, deleteProject, listPublishOwners, projectCalls, publishProject, resetProjects, visibilityFlag } from "./create";
 import { ghEvent } from "./github";
@@ -247,7 +248,7 @@ function routes(router: ConnectRouter): void {
       return listDirectories(req.prefix, registered);
     },
     listSkills: (req) => ({ skills: listSkills(world.repos, req.sources, req.includeUser) }),
-    searchFiles: (req) => searchFiles(world.repos, req.repoId, req.path, req.query, req.limit),
+    searchFiles: (req) => searchFilesSlow(world.repos, req.repoId, req.path, req.query, req.limit),
   });
 
   router.service(GhService, {
@@ -690,6 +691,11 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { repo: repoId, files: q.getAll("path") });
       break;
     }
+    case "POST /__mock/files/search":
+      if (q.has("delay")) searchMode.delayMs = Number(q.get("delay"));
+      if (q.has("fail")) searchMode.fail = q.get("fail") === "1";
+      json(res, 200, searchMode);
+      break;
     case "GET /__mock/files/calls":
       json(res, 200, completionCalls);
       break;
