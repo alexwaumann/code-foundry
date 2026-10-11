@@ -151,6 +151,8 @@ test('"+" and the empty state start a shell for the thread, which opens there fo
   await expect(host(page)).not.toHaveAttribute("data-terminal-id", second ?? "");
   await expect(tabs(page).nth(2)).toHaveAttribute("aria-selected", "true");
   await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
+  // Three shells in one folder: numbered after the first.
+  await expect(tabs(page)).toHaveText(["ghostty-playground", "ghostty-playground 2", "ghostty-playground 3"]);
   // The thread stays selected: its shells have no sidebar rows.
   await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
 });
@@ -310,7 +312,7 @@ test("the Projects page's panel lists the worktree shells; its + starts one in t
   await bottom(page).getByTestId("bottom-new-terminal").click();
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("terminal.new");
   expect((await invocations()).at(-1)?.context).toMatchObject({ activeRepoId: "repo-cf", activeWorktreePath: `${CFW}/feat-sidebar`, activeSessionId: "" });
-  await expect(tabs(page)).toHaveText(["feat-sidebar", "feat-sidebar"]);
+  await expect(tabs(page)).toHaveText(["feat-sidebar", "feat-sidebar 2"]);
   await expect(tabs(page).nth(1)).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("projects-page")).toBeVisible();
 
@@ -318,7 +320,7 @@ test("the Projects page's panel lists the worktree shells; its + starts one in t
   const dot = page.locator(`[data-nav-key="pw:repo-dot::/Users/dev/dotfiles"]`);
   await dot.hover();
   await dot.getByTestId("worktree-new-terminal").click();
-  await expect(tabs(page)).toHaveText(["feat-sidebar", "feat-sidebar", "dotfiles"]);
+  await expect(tabs(page)).toHaveText(["feat-sidebar", "feat-sidebar 2", "dotfiles"]);
   await expect(tabs(page).nth(2)).toHaveAttribute("aria-selected", "true");
 });
 

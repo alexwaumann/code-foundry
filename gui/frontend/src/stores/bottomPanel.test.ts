@@ -11,6 +11,8 @@ import {
   bottomKeyOf,
   bottomTabIds,
   bottomTabTitle,
+  bottomTabTitleOf,
+  bottomTabTitles,
   emptyBottom,
   getBottom,
   markPendingFocus,
@@ -108,6 +110,44 @@ describe("bottomTabTitle", () => {
   ];
   it.each(cases)("%s", (_name, extra, key, want) => {
     expect(bottomTabTitle(term("t", shell("s1"), extra), key)).toBe(want);
+  });
+});
+
+describe("bottomTabTitles (duplicates numbered)", () => {
+  const terms = (list: TerminalView[]) => ({ byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id) });
+  const cases: [string, TerminalView[], string, Record<string, string>][] = [
+    [
+      "two shells in one folder: the second is numbered",
+      [term("a", shell("s1")), term("b", shell("s1"))],
+      "session:s1",
+      { a: "app", b: "app 2" },
+    ],
+    [
+      "an OSC title wins and takes no number",
+      [term("a", shell("s1")), term("b", shell("s1"), { title: "vim" }), term("c", shell("s1"))],
+      "session:s1",
+      { a: "app", b: "vim", c: "app 2" },
+    ],
+    [
+      "different folders are not numbered; other keys' shells do not count",
+      [term("a", shell("s1")), term("x", shell("s2")), term("b", shell("s1"), { cwd: "/src/app/cmd" }), term("c", shell("s1"))],
+      "session:s1",
+      { a: "app", b: "cmd", c: "app 2" },
+    ],
+    [
+      "the Projects page numbers by worktree folder, in store order",
+      [term("w1", shell("", "/src/x")), term("w2", shell("", "/src/y")), term("w3", shell("", "/src/x"), { title: "top" }), term("w4", shell("", "/src/x"))],
+      "view:projects",
+      { w1: "x", w2: "y", w3: "x 2", w4: "x 3" },
+    ],
+  ];
+  it.each(cases)("%s", (_name, list, key, want) => {
+    expect(bottomTabTitles(terms(list), key)).toEqual(want);
+  });
+  it("bottomTabTitleOf: one tab's title, the id for a stranger", () => {
+    const t = terms([term("a", shell("s1")), term("b", shell("s1"))]);
+    expect(bottomTabTitleOf(t, "session:s1", "b")).toBe("app 2");
+    expect(bottomTabTitleOf(t, "session:s1", "zz")).toBe("zz");
   });
 });
 
