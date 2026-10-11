@@ -26,6 +26,15 @@ export function applyZoom(percent: number): void {
 }
 
 /**
+ * The page zoom factor (1 at 100%): divide a viewport-px distance (getBoundingClientRect,
+ * innerHeight) by it to get layout px, the unit of the CSS values set on zoomed elements.
+ */
+export function zoomFactor(): number {
+  const factor = parseFloat(document.documentElement.style.getPropertyValue("--cf-zoom"));
+  return factor > 0 ? factor : 1;
+}
+
+/**
  * The window's width in layout px: viewport px divided by the zoom. The body's box is
  * laid out under the zoom (the root's clientWidth stays in viewport px in WebKit).
  */

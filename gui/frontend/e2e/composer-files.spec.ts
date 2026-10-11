@@ -46,6 +46,38 @@ async function searches(): Promise<string[]> {
 
 const SESSION_GO = "[session.go](cf-file://repo-cf/internal/api/session.go)";
 
+type Box = { x: number; y: number; width: number; height: number };
+
+async function boxOf(page: Page, testId: string): Promise<Box> {
+  const box = await page.getByTestId(testId).boundingBox();
+  if (!box) throw new Error(`no box for ${testId}`);
+  return box;
+}
+
+/** The composer card and its worktree row (the completion card must move neither). */
+async function composerBoxes(page: Page): Promise<{ composer: Box; row: Box }> {
+  return { composer: await boxOf(page, "composer-card"), row: await boxOf(page, "composer-worktree-row") };
+}
+
+const setZoom = (page: Page, z: number) => page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(z)}))`);
+
+/** The list's height in layout px and how many rows it shows whole. */
+function listFit(page: Page) {
+  return card(page)
+    .getByRole("listbox")
+    .evaluate((list) => {
+      const box = list.getBoundingClientRect();
+      const whole = [...list.querySelectorAll('[role="option"]')].filter((o) => {
+        const r = o.getBoundingClientRect();
+        return r.top >= box.top - 0.5 && r.bottom <= box.bottom + 0.5;
+      }).length;
+      return { height: list.clientHeight, whole, scrolls: list.scrollHeight > list.clientHeight };
+    });
+}
+
+/** 20 files f01…f20 (with their directory src/, 21 rows for @src): more rows than the card shows. */
+const MANY = Array.from({ length: 20 }, (_, i) => `src/f${String(i + 1).padStart(2, "0")}.ts`);
+
 test("type @ses: file rows; Enter inserts the base name and a space without sending; send gets @cf-file://", async ({ page }) => {
   await openApp(page);
   await compose(page);
@@ -261,4 +293,87 @@ test("a daemon older than SearchFiles: @ is plain text, no card", async ({ page 
   await page.keyboard.press("Enter");
   await expect.poll(newThreads).toBe(1);
   expect((await invocations()).at(-1)?.args.prompt).toBe("@sesx");
+});
+
+// The card hangs under the worktree row, out of flow: it moves neither the composer card
+// nor that row, and its height is capped to the window below it (layout px = viewport px
+// over the zoom). 90% is the smallest zoom step.
+for (const zoom of [90, 100, 125, 150]) {
+  test(`at ${String(zoom)}%: the file card hangs under the worktree row, moves nothing and fits the window`, async ({ page }) => {
+    await setFiles("repo-cf", MANY);
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await openApp(page);
+    await setZoom(page, zoom);
+    await expect(page.locator("html")).toHaveCSS("zoom", String(zoom / 100));
+    await compose(page);
+    const before = await composerBoxes(page);
+    await page.keyboard.type("@src");
+    await expect(rows(page)).toHaveCount(21);
+    const after = await composerBoxes(page);
+    expect(after).toEqual(before);
+    const pop = await boxOf(page, "completion-card");
+    expect(pop.y).toBeGreaterThanOrEqual(after.row.y + after.row.height);
+    expect(Math.abs(pop.width - after.composer.width)).toBeLessThan(1);
+    // The visible bottom: the composer's scrolling section (the pane ends 8px above the window).
+    const section = await boxOf(page, "composer");
+    const bottom = Math.min(page.viewportSize()?.height ?? 0, section.y + section.height);
+    // 16 layout px stay free under it (a pixel of rounding).
+    expect(pop.y + pop.height).toBeLessThanOrEqual(bottom - 16 * (zoom / 100) + 1);
+    const fit = await listFit(page);
+    expect(fit.scrolls).toBe(true);
+    // A 1000px window has room for the full card at 90% and 100%: ~8 rows (15.5rem).
+    // Zoomed in, the same window is shorter in layout px: fewer whole rows.
+    if (zoom <= 100) expect(fit.height).toBe(248);
+    else {
+      // Capped to whole rows (28px each, 8px padding), ending at most a row above the
+      // 16 layout px margin: a missing or doubled zoom division would miss both.
+      expect(fit.height).toBeLessThan(248);
+      expect((fit.height - 8) % 28).toBe(0);
+      expect(pop.y + pop.height).toBeGreaterThan(bottom - (16 + 28) * (zoom / 100) - 1);
+    }
+    expect(fit.whole).toBeGreaterThanOrEqual(1);
+
+    // Arrowing to the last row scrolls the list only: the composer stays put.
+    await page.keyboard.press("ArrowUp");
+    await expect(rows(page).nth(20)).toHaveAttribute("aria-selected", "true");
+    expect(await composerBoxes(page)).toEqual(before);
+    const last = await rows(page).nth(20).boundingBox();
+    const list = await card(page).getByRole("listbox").boundingBox();
+    expect(last && list && last.y + last.height <= list.y + list.height + 0.5).toBe(true);
+
+    await page.keyboard.press("Escape");
+    await expect(card(page)).toHaveCount(0);
+    expect(await composerBoxes(page)).toEqual(before);
+  });
+}
+
+test("a short window shows fewer rows; a taller one all eight; a very short one drops the hints", async ({ page }) => {
+  await setFiles("repo-cf", MANY);
+  await page.setViewportSize({ width: 1280, height: 560 });
+  await openApp(page);
+  await compose(page);
+  const before = await composerBoxes(page);
+  await page.keyboard.type("@src");
+  await expect(rows(page)).toHaveCount(21);
+  expect(await composerBoxes(page)).toEqual(before);
+  const pop = await boxOf(page, "completion-card");
+  expect(pop.y + pop.height).toBeLessThanOrEqual(560 - 16 + 1);
+  const short = await listFit(page);
+  expect(short.height).toBeLessThan(248);
+  expect((short.height - 8) % 28).toBe(0);
+  expect(short.whole).toBeGreaterThanOrEqual(1);
+  expect(short.whole).toBeLessThan(8);
+  // Two rows still fit with the hints.
+  await expect(card(page).getByTestId("completion-hints")).toBeVisible();
+
+  // Resizing the window refits the open card.
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await expect.poll(async () => (await listFit(page)).height).toBe(248);
+  await expect(card(page).getByTestId("completion-hints")).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 400 });
+  await expect.poll(async () => (await listFit(page)).height).toBeLessThanOrEqual(short.height);
+  const tiny = await boxOf(page, "completion-card");
+  // Under two rows' room the hints give their space to the rows.
+  await expect(card(page).getByTestId("completion-hints")).toBeHidden();
+  expect(tiny.y + tiny.height).toBeLessThanOrEqual(400 - 16 + 1);
 });
