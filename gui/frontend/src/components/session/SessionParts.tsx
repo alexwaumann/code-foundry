@@ -1,10 +1,15 @@
-import { useEffect, useState } from "react";
-import { Loader2, RotateCcw, Trash2, Unplug } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Loader2, RotateCcw, Trash2 } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import { SessionStatusIcon } from "./SessionStatusIcon";
+import { Backdrop } from "@/components/backdrop/Backdrop";
 import { Button } from "@/components/ui/button";
 import { PanelToggle } from "@/components/panel/PanelToggle";
-import { basename, tildify } from "@/lib/path";
-import { badgeLabels, disconnectReason, formatAgo, sessionBadge } from "@/lib/session";
+import { DragBand } from "@/components/window/DragBand";
+import { tildify } from "@/lib/path";
+import { badgeLabels, disconnectCause, disconnectedPill, formatAgo, modelEffortLabel, sessionBadge, sessionLocation, type PillKind } from "@/lib/session";
+import { cn } from "@/lib/utils";
+import { useReposStore } from "@/stores/repos";
 import { reconnectSession, removeSession } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
 import { DASHBOARD, useUiStore } from "@/stores/ui";
@@ -65,21 +70,128 @@ export function SessionIndicator({ id }: { id: string }) {
   );
 }
 
+/** The disconnected page's frame: the start page's backdrop and centring, and the pane's drag band. */
+function DisconnectedFrame({ testId, children }: { testId: string; children: ReactNode }) {
+  return (
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+      <Backdrop />
+      {/* Auto margins in a column flexbox centre the block and, unlike justify-center,
+          fall back to 0 (scrollable from the top) when it outgrows the pane. */}
+      <section
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-10 outline-none"
+        tabIndex={-1}
+        data-focus-root
+        data-region="content"
+        aria-label="Thread"
+        data-testid={testId}
+      >
+        {children}
+      </section>
+      <DragBand />
+    </div>
+  );
+}
+
+const pillDots: Record<PillKind, string | null> = {
+  interrupted: "size-1.5 rounded-full bg-red-400",
+  attention: "size-1.5 rounded-full bg-amber-400",
+  idle: "size-[7px] rounded-full border-[1.5px] border-muted-foreground",
+  none: null,
+};
+
+/** "<what Claude was doing> · <why it disconnected>", or a spinner while a reconnect runs. */
+function StatusPill({ id, reconnecting }: { id: string; reconnecting: boolean }) {
+  const pill = useSessionsStore(useShallow((st) => disconnectedPill(st.byId[id] ?? { status: "unknown", statusReason: "" })));
+  const cause = useSessionsStore((st) => {
+    const s = st.byId[id];
+    return s ? disconnectCause(s) : "";
+  });
+  const dot = pillDots[pill.kind];
+  return (
+    <span
+      className={cn("inline-flex h-6 max-w-full items-center gap-[7px] rounded-full border bg-card/70 pr-2.5 text-xs text-muted-foreground backdrop-blur-md", dot || reconnecting ? "pl-2" : "pl-2.5")}
+      data-testid="status-pill"
+      data-status-kind={pill.kind}
+    >
+      {reconnecting ? (
+        <>
+          <Loader2 className="size-3 shrink-0 animate-spin" aria-hidden />
+          Reconnecting…
+        </>
+      ) : (
+        <>
+          {dot && <span aria-hidden className={cn("shrink-0", dot)} />}
+          <span className="truncate">
+            {pill.label && `${pill.label} · `}
+            <span data-testid="disconnect-reason">{cause}</span>
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
+function MetaSep() {
+  return (
+    <span aria-hidden className="opacity-50">
+      ·
+    </span>
+  );
+}
+
+/** Last activity · project @ branch · model, centred and wrapping. */
+function MetaLine({ id }: { id: string }) {
+  const now = useNow();
+  const lastActivityAtMs = useSessionsStore((st) => st.byId[id]?.lastActivityAtMs ?? null);
+  const worktreePath = useSessionsStore((st) => st.byId[id]?.worktreePath ?? "");
+  const model = useSessionsStore((st) => {
+    const s = st.byId[id];
+    return s ? modelEffortLabel(s) : "";
+  });
+  const where = useReposStore(useShallow((r) => sessionLocation({ worktreePath }, r)));
+  return (
+    <div className="flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      <span className="text-foreground" data-testid="last-activity" title={lastActivityAtMs ? new Date(lastActivityAtMs).toLocaleString() : ""}>
+        {formatAgo(lastActivityAtMs, now)}
+      </span>
+      <MetaSep />
+      <span className="min-w-0 break-words text-foreground" data-testid="session-location" title={worktreePath}>
+        {where.project}
+        {where.branch && (
+          <>
+            {" "}
+            <span className="text-muted-foreground">@</span> <span className="font-mono">{where.branch}</span>
+          </>
+        )}
+      </span>
+      {model && (
+        <>
+          <MetaSep />
+          <span className="text-foreground" data-testid="session-model">
+            {model}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
 /**
- * The content pane for a session with no terminal: why it stopped, when it was last
- * active, and one primary action (Reconnect). Remove is secondary.
+ * The content pane for a session with no terminal: a pill with what Claude was doing and
+ * why it disconnected, the thread's name, where and when it last ran, and one primary
+ * action (Reconnect). Remove is secondary. Design record: docs/sketches/disconnected-page.
  */
 export function SessionDisconnected({ id }: { id: string }) {
-  const s = useSessionsStore((st) => st.byId[id]);
+  const exists = useSessionsStore((st) => id in st.byId);
+  const name = useSessionsStore((st) => st.byId[id]?.name || id);
   const loaded = useSessionsStore((st) => st.loaded || st.availability !== "unknown");
-  const now = useNow();
   const [pending, setPending] = useState<"reconnect" | "remove" | null>(null);
 
-  if (!s) {
+  if (!exists) {
     return (
-      <section className="flex flex-1 items-center justify-center p-10 text-sm text-muted-foreground outline-none" tabIndex={-1} data-focus-root data-region="content" data-testid="session-missing">
-        {loaded ? "This thread no longer exists." : "Loading thread…"}
-      </section>
+      <DisconnectedFrame testId="session-missing">
+        <p className="m-auto text-sm text-muted-foreground">{loaded ? "This thread no longer exists." : "Loading thread…"}</p>
+      </DisconnectedFrame>
     );
   }
 
@@ -97,44 +209,19 @@ export function SessionDisconnected({ id }: { id: string }) {
   };
 
   return (
-    <section
-      className="relative flex min-h-0 flex-1 items-start justify-center overflow-y-auto p-10 outline-none"
-      tabIndex={-1}
-      data-focus-root
-      data-region="content"
-      aria-label="Thread"
-      data-testid="session-disconnected"
-    >
-      {/* Centred in the 44px band where the other pages have their header (window/PaneHeader). */}
-      <PanelToggle className="absolute top-2.5 right-1.5" />
-      <div className="mt-[calc(14vh/var(--cf-zoom))] flex w-full max-w-md flex-col items-center gap-5 text-center">
-        <div className="flex size-12 items-center justify-center rounded-full border bg-muted/40">
-          <Unplug className="size-5 text-muted-foreground" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold" data-testid="session-title">
-            {s.name || s.id}
+    <DisconnectedFrame testId="session-disconnected">
+      {/* Centred in the 44px band where the other pages have their header (window/PaneHeader);
+          above the drag band (z-10), which would otherwise take its clicks. */}
+      <PanelToggle className="absolute top-2.5 right-1.5 z-20" />
+      <div className="m-auto flex w-full max-w-[480px] flex-col items-center gap-5 text-center">
+        <StatusPill id={id} reconnecting={pending === "reconnect"} />
+        <div className="flex flex-col gap-1.5">
+          <h1 className="text-[22px] font-semibold tracking-tight" data-testid="session-title">
+            {name}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Not connected · <span data-testid="disconnect-reason">{disconnectReason(s)}</span>
-          </p>
+          <p className="text-sm text-muted-foreground">This thread is not connected. Reconnect to pick up where it left off.</p>
         </div>
-        <dl className="grid w-full grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-1.5 rounded-lg border px-4 py-3 text-left text-xs">
-          <dt className="text-muted-foreground">Last activity</dt>
-          <dd data-testid="last-activity" title={s.lastActivityAtMs ? new Date(s.lastActivityAtMs).toLocaleString() : ""}>
-            {formatAgo(s.lastActivityAtMs, now)}
-          </dd>
-          <dt className="text-muted-foreground">Worktree</dt>
-          <dd className="truncate font-mono" title={s.worktreePath}>
-            {basename(s.worktreePath)}
-          </dd>
-          {(s.model || s.effort) && (
-            <>
-              <dt className="text-muted-foreground">Model</dt>
-              <dd>{[s.model, s.effort].filter(Boolean).join(" · ")}</dd>
-            </>
-          )}
-        </dl>
+        <MetaLine id={id} />
         <div className="flex items-center gap-2">
           <Button autoFocus onClick={() => void reconnect()} disabled={pending !== null} data-testid="reconnect">
             {pending === "reconnect" ? <Loader2 className="animate-spin" /> : <RotateCcw />}
@@ -146,6 +233,6 @@ export function SessionDisconnected({ id }: { id: string }) {
           </Button>
         </div>
       </div>
-    </section>
+    </DisconnectedFrame>
   );
 }

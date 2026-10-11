@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+:root{
+  --sheet:oklch(0.955 0 0);--pane:#fff;--pane-border:oklch(0 0 0/8%);
+  --fg:oklch(0.145 0 0);--muted:oklch(0.97 0 0);--muted-fg:oklch(0.556 0 0);
+  --primary:oklch(0.205 0 0);--primary-fg:oklch(0.985 0 0);--border:oklch(0.922 0 0);
+  --card:#fff;--accent:oklch(0.97 0 0);--amber:oklch(0.78 0.16 75);--red:oklch(0.65 0.2 25);
+  --art-op:.22;--art-filter:saturate(.85);
+}
+.dark{
+  --sheet:#000;--pane:#060606;--pane-border:oklch(1 0 0/11%);
+  --fg:oklch(0.985 0 0);--muted:oklch(0.269 0 0);--muted-fg:oklch(0.708 0 0);
+  --primary:oklch(0.922 0 0);--primary-fg:oklch(0.205 0 0);--border:oklch(1 0 0/10%);
+  --card:#060606;--accent:oklch(0.269 0 0);--amber:oklch(0.8 0.15 80);--red:oklch(0.7 0.19 22);
+  --art-op:.38;--art-filter:none;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;font-size:14px;color:var(--fg);background:var(--sheet);-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+.app{display:flex;height:100vh}
+.sidebar{width:240px;padding:44px 8px 8px;display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--muted-fg)}
+.sidebar .row{padding:5px 8px;border-radius:6px;display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sidebar .row.sel{background:var(--muted);color:var(--fg)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted-fg);flex:none}
+.dot.busy{background:oklch(0.75 0.15 240)}
+.dot.off{background:transparent;border:1.5px solid var(--muted-fg)}
+.pane{margin:8px;flex:1;min-width:0;border-radius:8px;border:1px solid var(--pane-border);background:var(--pane);position:relative;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.backdrop{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.backdrop .art{position:absolute;inset:0;background:url(forest.webp) center 40%/cover no-repeat;opacity:var(--art-op);filter:var(--art-filter);
+  -webkit-mask-image:radial-gradient(55% 45% at 50% 50%,#000 0%,rgba(0,0,0,.6) 40%,transparent 100%);mask-image:radial-gradient(55% 45% at 50% 50%,#000 0%,rgba(0,0,0,.6) 40%,transparent 100%)}
+.section{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto;padding:40px}
+.body{margin:auto;width:100%;display:flex;flex-direction:column;align-items:center;text-align:center}
+.toggle{position:absolute;top:10px;right:6px;width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--muted-fg)}
+.toggle svg{width:16px;height:16px}
+h1{margin:0;font-weight:600;letter-spacing:-.01em}
+p{margin:0}
+.muted{color:var(--muted-fg)}
+.btns{display:flex;align-items:center;gap:8px}
+.btn{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 16px;border-radius:6px;font-size:14px;font-weight:500;border:0;font-family:inherit}
+.btn svg{width:16px;height:16px}
+.btn.primary{background:var(--primary);color:var(--primary-fg)}
+.btn.ghost{background:transparent;color:var(--fg)}
+.btn.outline{background:transparent;color:var(--fg);border:1px solid var(--border)}
+.kbd{display:inline-block;padding:0 5px;border:1px solid var(--border);border-radius:4px;font-size:11px;line-height:17px;color:var(--muted-fg);font-family:inherit}
+.icon-ring{width:48px;height:48px;border-radius:50%;border:1px solid var(--border);background:color-mix(in oklab,var(--muted) 40%,transparent);display:flex;align-items:center;justify-content:center;color:var(--muted-fg)}
+.icon-ring svg{width:20px;height:20px}
+.pill{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px 0 8px;border-radius:999px;border:1px solid var(--border);background:color-mix(in oklab,var(--card) 70%,transparent);backdrop-filter:blur(12px);font-size:12px;color:var(--muted-fg)}
+.pill .dot{width:6px;height:6px}
+.pill .dot.amber{background:var(--amber)}
+.pill .dot.red{background:var(--red)}
+.pill .dot.ring{background:transparent;border:1.5px solid var(--muted-fg);width:7px;height:7px}
+.facts{display:flex;gap:0;font-size:12px}
+.facts>div{display:flex;flex-direction:column;gap:3px;padding:0 20px;border-left:1px solid var(--border);align-items:center}
+.facts>div:first-child{border-left:0}
+.facts .k{color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.facts .v{color:var(--fg);font-size:13px}
+.card{border:1px solid var(--border);border-radius:16px;background:color-mix(in oklab,var(--card) 85%,transparent);backdrop-filter:blur(24px);box-shadow:0 1px 2px rgba(0,0,0,.05);width:100%}
+.dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 24px;text-align:left;font-size:12px}
+.dl dt{color:var(--muted-fg)}
+.dl dd{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inline-meta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted-fg);flex-wrap:wrap;justify-content:center}
+.inline-meta .sep{opacity:.5}
+.inline-meta .v{color:var(--fg)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="sidebar">
+    <div class="row" style="font-weight:600;color:var(--fg)">code-foundry</div>
+    <div class="row"><span class="dot busy"></span>side panel tabs</div>
+    <div class="row"><span class="dot"></span>cf/gh-polling</div>
+    <div class="row sel"><span class="dot off"></span>cf/disconnected-page</div>
+    <div class="row"><span class="dot busy"></span>update dialog</div>
+    <div class="row" style="margin-top:8px;font-weight:600;color:var(--fg)">sketchbook</div>
+    <div class="row"><span class="dot"></span>cf/palette-colors</div>
+  </div>
+  <div class="pane">
+    <div class="backdrop"><div class="art"></div></div>
+    <div class="section"><div class="body" id="body"></div></div>
+    <div class="toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div>
+  </div>
+</div>
+<script>
+const q=new URLSearchParams(location.search);
+const v=q.get('v')||'a', theme=q.get('theme')||'dark', reason=q.get('reason')||'exited';
+if(theme==='dark')document.getElementById('app').classList.add('dark'),document.documentElement.classList.add('dark');
+const R={exited:{text:'Claude exited',dot:'ring',tone:''},crashed:{text:'Crashed (exit code 1)',dot:'red',tone:'red'},closed:{text:'Closed',dot:'ring',tone:''},err:{text:'Stopped: worktree is missing',dot:'amber',tone:'amber'}}[reason];
+const plug=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 5 3-3"/><path d="m2 22 3-3"/><path d="M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4Z"/><path d="M7.5 13.5 10 11"/><path d="M10.5 16.5 13 14"/><path d="m12 6 6 6 2.3-2.3a2.4 2.4 0 0 0 0-3.4l-2.6-2.6a2.4 2.4 0 0 0-3.4 0Z"/></svg>`;
+const rot=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`;
+const trash=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`;
+const name=q.get('name')||'Disconnected page redesign', wt='t3code-cbdd5de5', model='opus 5.5 · high', ago='3 h ago';
+const btns=`<div class="btns"><button class="btn primary">${rot}Reconnect</button><button class="btn ghost">${trash}Remove</button></div>`;
+const V={
+a:()=>`<div style="max-width:440px;display:flex;flex-direction:column;align-items:center;gap:20px">
+  <div class="icon-ring">${plug}</div>
+  <div style="display:flex;flex-direction:column;gap:6px"><h1 style="font-size:20px">${name}</h1><p class="muted">Not connected · ${R.text}</p></div>
+  <div class="inline-meta"><span>Last active <span class="v">${ago}</span></span><span class="sep">·</span><span class="mono v">${wt}</span><span class="sep">·</span><span class="v">${model}</span></div>
+  ${btns}
+  <p class="muted" style="font-size:12px">Reconnecting resumes the conversation in the same worktree</p>
+</div>`,
+b:()=>`<div style="max-width:440px;display:flex;flex-direction:column;align-items:center;gap:22px">
+  <span class="pill"><span class="dot ${R.dot}"></span>${R.text}</span>
+  <div style="display:flex;flex-direction:column;gap:8px"><h1 style="font-size:24px;letter-spacing:-.02em">${name}</h1><p class="muted">This thread is not connected. Reconnect to pick up where it left off.</p></div>
+  <div class="facts"><div><span class="k">Last active</span><span class="v">${ago}</span></div><div><span class="k">Worktree</span><span class="v mono">${wt}</span></div><div><span class="k">Model</span><span class="v">${model}</span></div></div>
+  ${btns}
+</div>`,
+c:()=>`<div style="max-width:420px;display:flex;flex-direction:column;align-items:center;gap:20px;width:100%">
+  <div class="icon-ring">${plug}</div>
+  <div style="display:flex;flex-direction:column;gap:6px"><h1 style="font-size:20px">${name}</h1><p class="muted">Not connected · ${R.text}</p></div>
+  <div class="card" style="padding:14px 18px"><dl class="dl"><dt>Last activity</dt><dd>${ago}</dd><dt>Worktree</dt><dd class="mono">${wt}</dd><dt>Model</dt><dd>${model}</dd></dl></div>
+  ${btns}
+</div>`,
+e:()=>{
+  const P={finished:{dot:'ring',label:'Finished · Claude exited'},interrupted:{dot:'red',label:'Interrupted · crashed (exit code 1)'},waiting:{dot:'amber',label:'Was waiting on you · closed'},daemon:{dot:'ring',label:'At prompt · daemon stopped'}}[q.get('pill')||'finished'];
+  const proj=q.get('proj')||'code-foundry', br=q.get('branch'); const sepm=q.get('sep')||'at'; const where=br?(sepm==='at'?`${proj} <span class="sep">@</span> <span class="mono">${br}</span>`:`${proj}</span><span class="sep">·</span><span class="v mono">${br}`):proj;
+  return `<div style="max-width:480px;display:flex;flex-direction:column;align-items:center;gap:20px">
+  <span class="pill"><span class="dot ${P.dot}"></span>${P.label}</span>
+  <div style="display:flex;flex-direction:column;gap:6px"><h1 style="font-size:22px;letter-spacing:-.015em">${name}</h1><p class="muted">This thread is not connected. Reconnect to pick up where it left off.</p></div>
+  <div class="inline-meta"><span class="v">${ago}</span><span class="sep">·</span><span class="v">${where}</span><span class="sep">·</span><span class="v">Opus (high)</span></div>
+  ${btns}
+</div>`},
+d:()=>`<div class="card" style="max-width:460px;padding:36px 40px 32px;display:flex;flex-direction:column;align-items:center;gap:20px">
+  <span class="pill"><span class="dot ${R.dot}"></span>${R.text}</span>
+  <div style="display:flex;flex-direction:column;gap:6px"><h1 style="font-size:22px;letter-spacing:-.02em">${name}</h1><p class="muted">Last active ${ago} in <span class="mono" style="color:var(--fg)">${wt}</span></p></div>
+  <div class="btns"><button class="btn primary">${rot}Reconnect <span class="kbd" style="margin-left:2px;color:inherit;border-color:color-mix(in oklab,var(--primary-fg) 35%,transparent)">⏎</span></button><button class="btn ghost">${trash}Remove</button></div>
+  <p class="muted" style="font-size:12px">${model}</p>
+</div>`
+};
+document.getElementById('body').innerHTML=V[v]();
+</script>
+</body>
+</html>

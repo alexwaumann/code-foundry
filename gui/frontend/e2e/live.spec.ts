@@ -149,7 +149,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
       cli("session", "close", "--id", s1.id);
       const panel = page.getByTestId("session-disconnected");
       await expect(panel).toBeVisible();
-      await expect(panel.getByTestId("disconnect-reason")).toHaveText("Closed");
+      await expect(panel.getByTestId("disconnect-reason")).toHaveText("closed");
       await expect(badge(page, s1.id)).toHaveAttribute("data-session-badge", "disconnected");
       await shot(page, "not-connected.png");
       await panel.getByTestId("reconnect").click();

@@ -35,12 +35,12 @@ test("session rows render with status badges, above the terminals no thread owns
   await expect(badge(page, "s-5")).toHaveAttribute("data-session-badge", /^(idle|busy)$/, { timeout: 12_000 });
 });
 
-test("a disconnected session shows the Not connected panel; Reconnect re-attaches", async ({ page }) => {
+test("a disconnected session shows the disconnected page; Reconnect re-attaches", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-4").click();
   const panel = page.getByTestId("session-disconnected");
   await expect(panel).toBeVisible();
-  await expect(panel.getByTestId("disconnect-reason")).toHaveText("Crashed (exit code 139)");
+  await expect(panel.getByTestId("disconnect-reason")).toHaveText("crashed (exit code 139)");
   await expect(panel.getByTestId("last-activity")).toHaveText(/min ago/);
   await expect(page.getByTestId("terminal-host")).toHaveCount(0);
 
@@ -88,13 +88,45 @@ test("a disconnected thread keeps its status: busy ends interrupted, attention p
   await expect(row(page, "s:s-2").getByTestId("session-body")).toHaveAttribute("data-offline", "true");
 });
 
+test("the disconnected page's pill shows what Claude was doing and why it stopped, the meta line where it ran", async ({ page }) => {
+  await openApp(page);
+  const panel = page.getByTestId("session-disconnected");
+  const pill = panel.getByTestId("status-pill");
+
+  // s-1 (opus/high in code-foundry's main checkout) crashes mid-turn: interrupted.
+  await mockPost("session/disconnect?id=s-1&reason=crashed&code=1&status=busy");
+  await row(page, "s:s-1").click();
+  await expect(pill).toHaveAttribute("data-status-kind", "interrupted");
+  await expect(pill).toHaveText("Interrupted · crashed (exit code 1)");
+  await expect(panel.getByTestId("disconnect-reason")).toHaveText("crashed (exit code 1)");
+  await expect(panel.getByTestId("session-title")).toHaveText("Refactor sidebar tree");
+  await expect(panel.getByTestId("last-activity")).toHaveText("just now");
+  await expect(panel.getByTestId("session-location")).toHaveText("code-foundry @ main");
+  await expect(panel.getByTestId("session-model")).toHaveText("Opus 5.5 (high)");
+
+  // s-2 (sonnet, no effort) was asking for permission when the daemon stopped: attention persists.
+  await mockPost("session/disconnect?id=s-2&reason=daemon%20stopped&code=0");
+  await row(page, "s:s-2").click();
+  await expect(pill).toHaveAttribute("data-status-kind", "attention");
+  await expect(pill).toHaveText("Was waiting on you · daemon stopped");
+  await expect(panel.getByTestId("session-location")).toHaveText("ghostty-playground @ main");
+  await expect(panel.getByTestId("session-model")).toHaveText("Sonnet 5.5");
+
+  // s-3 is seeded idle at its prompt after Claude exited, opus/medium in the fix/resize worktree.
+  await row(page, "s:s-3").click();
+  await expect(pill).toHaveAttribute("data-status-kind", "idle");
+  await expect(pill).toHaveText("At prompt · Claude exited");
+  await expect(panel.getByTestId("session-location")).toHaveText("code-foundry @ fix/resize");
+  await expect(panel.getByTestId("session-model")).toHaveText("Opus 5.5 (medium)");
+});
+
 test("close shows closing… then the panel with the reason", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-2").click();
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
   await page.keyboard.press("Meta+Shift+w"); // session.close, yielded by the focused terminal
   await expect(page.getByTestId("session-indicator")).toHaveText("closing…");
-  await expect(page.getByTestId("disconnect-reason")).toHaveText("Closed", { timeout: 8000 });
+  await expect(page.getByTestId("disconnect-reason")).toHaveText("closed", { timeout: 8000 });
 });
 
 test("needs-attention: count badge, window title, and cmd+shift+a", async ({ page }) => {
