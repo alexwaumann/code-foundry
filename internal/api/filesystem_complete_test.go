@@ -139,6 +139,12 @@ func TestFilesystemListSkills(t *testing.T) {
 
 func TestFilesystemSearchFiles(t *testing.T) {
 	root, outside, c := completionHome(t)
+	// A link under home to a directory outside it, and one to a checkout inside.
+	for link, target := range map[string]string{"escape": outside, "projlink": filepath.Join(root, "proj")} {
+		if err := os.Symlink(target, filepath.Join(root, link)); err != nil {
+			t.Fatal(err)
+		}
+	}
 	tests := []struct {
 		name          string
 		req           *v1.SearchFilesRequest
@@ -158,6 +164,10 @@ func TestFilesystemSearchFiles(t *testing.T) {
 		{name: "unknown repo", req: &v1.SearchFilesRequest{RepoId: "zz"}, code: connect.CodeNotFound},
 		{name: "missing repo id", req: &v1.SearchFilesRequest{Query: "x"}, code: connect.CodeInvalidArgument},
 		{name: "outside home", req: &v1.SearchFilesRequest{RepoId: "p", Path: outside}, code: connect.CodeInvalidArgument},
+		{name: "symlink under home to outside", req: &v1.SearchFilesRequest{RepoId: "p", Path: filepath.Join(root, "escape")}, code: connect.CodeInvalidArgument},
+		{name: "dot-dot out of home", req: &v1.SearchFilesRequest{RepoId: "p", Path: root + "/proj/../../outside"}, code: connect.CodeInvalidArgument},
+		{name: "symlink to a checkout under home", req: &v1.SearchFilesRequest{RepoId: "p", Path: filepath.Join(root, "projlink"), Query: "readme"},
+			want: []string{"README.md"}},
 		{name: "missing checkout", req: &v1.SearchFilesRequest{RepoId: "p", Path: filepath.Join(root, "gone")}, code: connect.CodeNotFound},
 		{name: "a file is not a checkout", req: &v1.SearchFilesRequest{RepoId: "p", Path: filepath.Join(root, "proj", "README.md")}, code: connect.CodeInvalidArgument},
 		{name: "negative limit", req: &v1.SearchFilesRequest{RepoId: "p", Limit: -1}, code: connect.CodeInvalidArgument},
