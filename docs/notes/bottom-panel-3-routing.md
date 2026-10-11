@@ -77,9 +77,12 @@ thread's panel or the Projects page's, and neither does the composer.
 * **create.spec's project context.** The palette had sketches' context through a selected
   shell row. It now opens the composer from sketches' Projects row ("New thread"):
   `{ kind: "compose", repoId }` carries the repo, which `repo.github.publish` needs.
-* **The Projects page's bottom shell gives the palette no project context.**
-  `focusedBottomShell` only sets `activeTerminalId`, so cmd+t from a Projects-page shell
-  still does nothing (as in PR B). Not changed here; it would be a context rule of its own.
+* **Member shells belong to the thread, not the member.** A shell started from a
+  workspace member's "New terminal here" in a thread's side panel is labelled with the
+  thread (`session`) and the thread's worktree (`worktree`), not the member's: the daemon
+  labels a thread's shell with the thread's place and only starts it in `--cwd`. Removing
+  the member's worktree therefore does not reap it (the reaper matches `worktree`);
+  removing the thread does. Its shell sits in a directory that is gone until then.
 * `proto/codefoundry/v1/command.proto` still names `"terminal"` as an example
   `active_view` in a comment. Changing it means a `make gen` for a comment, so it stays;
   `internal/command/command.go`'s comment says `"session", "projects"`.
@@ -125,7 +128,26 @@ feat/sidebar's `t-top` and a shell from dotfiles' row), `sidebar-{dark,light}.pn
 sidebar: threads only). Copies in `/Users/alex/.t3/userdata/attachments/` carry a
 `bottom-panel-3-` prefix.
 
+## Review fixes
+
+Status: `make check` green (Go packages all ok; 85 vitest files / 1646 tests). The touched
+e2e specs on both browsers: `terminal-routing`, `app`, `bottom-panel` (64 passed, 4
+skipped: the WebKit-only screenshot runs), `worktree-panel`, `panel`, `workspace-panel`
+(78 passed, 8 skipped).
+
+| Finding | Change |
+|---|---|
+| A shell this window started could land in a hidden panel | `focusOwnShell`, and a started shell that arrives later (`onNewTerminal`'s own path), call `uncoverBottom` when its key is the selection's: Settings and Usage close, an expanded side panel goes back to split width (what `revealShell` already did). e2e: a member's New terminal here from an expanded side panel |
+| cmd+t did nothing from a Projects-page bottom shell | `deriveContext`'s focused shell is now `{ id, labels }`. For a Projects-page shell (`projectsShellPlace`: owner key `view:projects`, repo and worktree labels, the rule `paneContext` uses for "+") its repo and worktree fill `activeRepoId`/`activeWorktreePath`, so `terminal.new` is available and starts beside it. A thread's shell keeps the thread's place. Unit table in `context.test.ts`; e2e: cmd+t from `t-top` |
+| Pending focusTerminal slots never expired | `pendingTerminal` (intents.ts) and `revealOnArrival` (bottomActions.ts) carry a time and are used only within `PENDING_FOCUS_MS`. A timer drops them then, with a "Terminal <id> not found" toast if the id never arrived (none if it arrived but its thread did not). `clearPendingFocus` drops both on a new focusTerminal, focusSession, showView, and any selection change (a `useUiStore` subscription). Tests reset with `clearPendingFocus` |
+| The reconnect could miss a pending reveal | `events.ts` calls `revealArrived()` after the List's `replaceTerminals`: a pending reveal whose shell is now known is revealed once |
+| Exit overlay lost its e2e | Mock: `POST /__mock/terminal/exit?id=&code=&keep=1` exits a terminal without reaping it (`kill(..., keep)`). `app.spec.ts` checks the bottom shell's overlay ("Process exited with code 1") and the struck-through tab |
+| "selected session, terminal, worktree, or page" | `view.panel.toggle`/`expand`/`new-tab` say "selected thread or page" (Go and mock). `view.panel.worktree` needs a thread: a terminal alone no longer counts (a Projects-page shell now brings a worktree, and that page has no thread). Doc comments and the `ActiveView: "terminal"` test contexts use `"session"` |
+| Two shells in one folder had the same tab title | `bottomTabTitles`/`bottomTabTitleOf` (stores/bottomPanel.ts): the first keeps the folder name, later ones with the same fallback name get " 2", " 3" in the terminals store's order; an OSC title (threads only) shows as is and takes no number. Unit table; `bottom-panel.spec.ts` expects "feat-sidebar 2" and the thread's three numbered tabs |
+
+The screenshots were retaken after these fixes (the thread's second tab reads
+"code-foundry 2").
+
 ## Not done
 
 * No real-app screenshots (screen locked).
-* A Projects-page bottom shell still gives the palette no project context (above).
