@@ -35,7 +35,7 @@ function TextTag({
   data: Record<string, string | undefined>;
 }) {
   return (
-    <Tooltip>
+    <Tooltip disableHoverableContent>
       <TooltipTrigger asChild>
         <NodeViewWrapper as="span" data-testid="prompt-tag" data-tag-kind={kind} {...data} role="img" aria-label={ariaLabel} className={tagClass(selected, TAG_ACCENT[kind])}>
           <span className="truncate">{label}</span>
