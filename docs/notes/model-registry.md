@@ -13,20 +13,22 @@ Haiku 4.5. Pinned versions could not be picked either.
 
   | Value | Label |
   |---|---|
-  | `fable` | Fable (default) |
-  | `opus` | Opus (default) |
+  | `fable` | Fable |
+  | `opus` | Opus |
   | `claude-opus-4-8` | Opus 4.8 |
   | `claude-opus-4-7` | Opus 4.7 |
-  | `sonnet` | Sonnet (default) |
+  | `sonnet` | Sonnet |
   | `claude-sonnet-5` | Sonnet 5 |
   | `claude-sonnet-4-6` | Sonnet 4.6 |
-  | `haiku` | Haiku (default) |
+  | `haiku` | Haiku |
   | `claude-haiku-4-5` | Haiku 4.5 |
 
-  The "(default)" entries pass the bare alias. Claude Code then resolves it to the user's
-  default for that family, including a managed-settings pin. `model.Label(v)` returns the
-  raw value for ids it does not know. The SessionService API still accepts any full model
-  name, guarded only by the session store's `modelPattern`. `model.Default` is `"opus"`.
+  The family entries (Fable, Opus, Sonnet, Haiku) pass the bare alias. Claude Code then
+  resolves it to the user's default for that family, including a managed-settings pin.
+  They are labelled plainly; a "(default)" suffix was tried and dropped in review.
+  `model.Label(v)` returns the raw value for ids it does not know. The SessionService API
+  still accepts any full model name, guarded only by the session store's `modelPattern`.
+  `model.Default` is `"opus"`.
 * **Go consumers derive from it:**
   * `command.SessionModels = model.Values()`: the `--model` enum of session.new and the
     pr.* starters. Validation and the CLI help placeholder therefore list the registry.
@@ -50,12 +52,13 @@ Haiku 4.5. Pinned versions could not be picked either.
   * the sidebar thread tooltip (`threadRow.modelLabel`; it used to capitalize the raw
     value);
   * the settings "Default model" select.
-* **Meta format is now "Opus 4.8 · high"**, a dot instead of "(high)". Labels such as
-  "Opus (default)" already carry parentheses, and "Opus (default) (high)" read badly. The
-  tooltip uses the same dot.
-* **Settings select suffix.** A field's own default option gets " (default)" unless its
-  label already ends in "(default)". So "Opus (default)" is not doubled, and theme still
-  shows "system (default)".
+* **Formats are unchanged:** the meta line and tooltip still read "Opus 4.8 (high)", and
+  the settings select still marks the setting's own default ("Opus (default)").
+* **Composer pickers fit the window.** The model list is nine options now. The picker's
+  popover is capped at the room Radix finds on its side (divided by the page zoom), and
+  the list scrolls. Before the cap, the flipped list at 150% zoom in a short window ran
+  97 px above the window. `zoom-popovers.spec.ts` gives its "opens under the trigger"
+  cases a viewport tall enough for nine options.
 * **Not touched:** `internal/pricing` and the Usage views. They key on the canonical ids
   Claude writes to transcripts (`claude-opus-5-5`, ...), which are a different concern.
 
@@ -75,8 +78,10 @@ falls back to `opus`, like any bad value.
 
 ## Verified
 
-* `make check` green. The Playwright compose, composer-switch, settings, sessions and
-  sidebar specs pass in WebKit and Chromium, and so does the full suite (see the PR).
+* `make check` green after merging main (#46, #49, #50). The Playwright compose,
+  composer-switch, settings, sessions, sidebar, workspaces and zoom-popovers specs pass
+  in WebKit and Chromium. One exception: `zoom-popovers.spec.ts:74` (the row context menu
+  at 125%) is flaky in Chromium, and fails the same way on origin/main.
 * Live, against an isolated daemon (`CODE_FOUNDRY_HOME=/tmp/models-pr`, built `bin/` and
   `gui/bin/Code Foundry`):
   * `help session.new` lists the registry. `--model gpt-9` is rejected with the list.
@@ -85,7 +90,7 @@ falls back to `opus`, like any bad value.
   * The composer picker shows the labels, and picking Opus 4.8 shows it in the trigger.
   * A `--model claude-haiku-4-5 --effort medium` thread spawned
     `claude … --model claude-haiku-4-5`. It reached the prompt (no turn spent), and its
-    disconnected page shows "Haiku 4.5 · medium".
+    disconnected page shows "Haiku 4.5 (medium)".
 
 ![Composer model picker, dark](model-registry/composer-dark.png)
 ![Composer model picker with Opus 4.8 picked, light](model-registry/composer-light.png)
