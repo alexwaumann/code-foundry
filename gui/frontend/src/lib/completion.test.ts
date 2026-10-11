@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 import type { SkillView } from "@/api/filesystem";
-import { dismissCard, findTrigger, groupSkills, LEAF_CHAR, nextCard, skillScore, skillSources, skillSourcesKey, type CardMemo } from "./completion";
+import {
+  dismissCard,
+  emphasis,
+  fileItems,
+  fileSources,
+  findTrigger,
+  groupSkills,
+  LEAF_CHAR,
+  nextCard,
+  skillScore,
+  skillSources,
+  skillSourcesKey,
+  type CardMemo,
+  type FileResults,
+} from "./completion";
 
 describe("findTrigger", () => {
   it.each<[string, string, { query: string; offset: number } | null]>([
@@ -134,5 +148,86 @@ describe("skillSources", () => {
     expect(k([{ repoId: "r1" }])).not.toBe(k([{ repoId: "r1", path: "/h/r1" }]));
     expect(k([{ repoId: "r1" }, { repoId: "r2" }])).not.toBe(k([{ repoId: "r2" }, { repoId: "r1" }]));
     expect(k([])).toBe("");
+  });
+});
+
+describe("fileSources", () => {
+  const ws = [
+    { repoId: "r1", worktreePath: "/h/w/r1" },
+    { repoId: "r2", worktreePath: "/h/w/r2" },
+  ];
+  it.each<[string, Parameters<typeof fileSources>[0], { repoId: string; path?: string }[]]>([
+    ["a project in a new worktree: its main worktree", { target: "project", repoIds: ["r1"], worktree: { kind: "new" }, wsMembers: [] }, [{ repoId: "r1" }]],
+    ["a project in an existing worktree: that one", { target: "project", repoIds: ["r1"], worktree: { kind: "existing", path: "/h/r1-wt" }, wsMembers: [] }, [{ repoId: "r1", path: "/h/r1-wt" }]],
+    ["a project without git: its folder", { target: "project", repoIds: ["r1"], worktree: { kind: "existing", path: "/h/notes" }, wsMembers: [] }, [{ repoId: "r1", path: "/h/notes" }]],
+    ["a project with Also in: main worktrees in member order", { target: "project", repoIds: ["r1", "r3"], worktree: { kind: "new" }, wsMembers: [] }, [{ repoId: "r1" }, { repoId: "r3" }]],
+    ["Also in with a stale existing choice: still main worktrees", { target: "project", repoIds: ["r1", "r3"], worktree: { kind: "existing", path: "/h/r1-wt" }, wsMembers: [] }, [{ repoId: "r1" }, { repoId: "r3" }]],
+    ["a workspace in Workspace worktrees: its member worktrees", { target: "workspace", repoIds: ["r2", "r1"], worktree: { kind: "members" }, wsMembers: ws }, [{ repoId: "r2", path: "/h/w/r2" }, { repoId: "r1", path: "/h/w/r1" }]],
+    ["a workspace in new-worktree mode: main worktrees", { target: "workspace", repoIds: ["r1", "r2"], worktree: { kind: "new" }, wsMembers: ws }, [{ repoId: "r1" }, { repoId: "r2" }]],
+    ["a workspace member without a known worktree: its main worktree", { target: "workspace", repoIds: ["r1", "r9"], worktree: { kind: "members" }, wsMembers: ws }, [{ repoId: "r1", path: "/h/w/r1" }, { repoId: "r9" }]],
+  ])("%s", (_name, input, want) => {
+    expect(fileSources(input)).toEqual(want);
+  });
+});
+
+describe("emphasis", () => {
+  it.each<[string, string, string, [number, number][]]>([
+    ["no query", "internal/api/session.go", "", []],
+    ["a run in the base name", "internal/api/session.go", "ses", [[13, 16]]],
+    ["case-insensitive", "src/components/Composer.tsx", "COMP", [[15, 19]]],
+    ["the base name before an earlier run", "src/api/session.ts", "s", [[8, 9]]],
+    ["spread over the base name", "src/components/ThreadRow.tsx", "trw", [[15, 16], [17, 18], [23, 24]]],
+    ["a run across directories", "src/components/Composer.tsx", "src/comp", [[0, 8]]],
+    ["spread over the path", "internal/store/session", "isse", [[0, 1], [9, 10], [15, 17]]],
+    ["no match", "README.md", "xyz", []],
+    ["a directory (no trailing slash)", "internal/store/session", "sess", [[15, 19]]],
+  ])("%s", (_name, path, query, want) => {
+    expect(emphasis(path, query)).toEqual(want);
+  });
+});
+
+describe("fileItems", () => {
+  const cf: FileResults = {
+    repoId: "cf",
+    matches: [
+      { path: "internal/api/session.go", isDir: false },
+      { path: "internal/store/session", isDir: true },
+    ],
+  };
+  const api: FileResults = { repoId: "api", matches: [{ path: "internal/api/session.go", isDir: false }] };
+
+  it("one project: no heading; base name, path, emphasis and the tag (a directory keeps its /)", () => {
+    const groups = fileItems([cf], "ses", ["cf"], "cf");
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.heading).toBeNull();
+    expect(groups[0]?.items).toEqual([
+      {
+        key: "cf/internal/api/session.go",
+        label: "session.go",
+        mono: true,
+        detail: "internal/api/session.go",
+        emphasis: [[13, 16]],
+        tag: { tagKind: "file", repoId: "cf", path: "internal/api/session.go" },
+      },
+      {
+        key: "cf/internal/store/session/",
+        label: "session/",
+        mono: true,
+        detail: "internal/store/session",
+        emphasis: [[15, 18]],
+        tag: { tagKind: "file", repoId: "cf", path: "internal/store/session/" },
+      },
+    ]);
+  });
+
+  it.each<[string, FileResults[], string[], string, (string | null)[]]>([
+    ["several projects: headings in member order", [cf, api], ["cf", "api"], "cf", ["cf", "api"]],
+    ["the primary first", [cf, api], ["cf", "api"], "api", ["api", "cf"]],
+    ["results in another order: member order", [api, cf], ["cf", "api"], "cf", ["cf", "api"]],
+    ["a project without matches has no group", [cf, { repoId: "api", matches: [] }], ["cf", "api"], "cf", ["cf"]],
+    ["a non-member's results are left out (one project: no heading)", [cf, api], ["cf"], "cf", [null]],
+    ["nothing", [], ["cf", "api"], "cf", []],
+  ])("%s", (_name, results, members, primary, want) => {
+    expect(fileItems(results, "", members, primary).map((g) => (g.heading?.kind === "project" ? g.heading.repoId : null))).toEqual(want);
   });
 });

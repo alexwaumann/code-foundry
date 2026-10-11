@@ -1,12 +1,13 @@
 /**
- * The composer's inline completion: `/` offers skills (stores/skills.ts), `@` files (a
- * later step). Pure pieces only: where a trigger is, when the card shows, and how skills
- * are matched, ranked and grouped. The editor reports triggers
- * (components/compose/PromptEditor.tsx); components/compose/useCompletion.ts runs the
- * card.
+ * The composer's inline completion: `/` offers skills (stores/skills.ts), `@` files
+ * (stores/files.ts). Pure pieces only: where a trigger is, when the card shows, how skills
+ * are matched, ranked and grouped, and how file matches become rows. The editor reports
+ * triggers (components/compose/PromptEditor.tsx); components/compose/useCompletion.ts
+ * runs the card.
  */
-import type { SkillSourceView, SkillView } from "@/api/filesystem";
+import type { FileMatchView, SkillSourceView, SkillView } from "@/api/filesystem";
 import type { WorktreeChoice } from "./compose";
+import type { PromptTag } from "./prompt";
 
 /** The characters that start a completion. */
 export type TriggerChar = "/" | "@";
@@ -17,6 +18,28 @@ export interface Trigger {
   query: string;
   /** Offset of the trigger character in `before`. */
   offset: number;
+}
+
+/** One row of the completion card. */
+export interface CompletionItem {
+  key: string;
+  /** Bold: `/deploy`, `session.go`. */
+  label: string;
+  /** The label in monospace (file names). */
+  mono?: boolean;
+  /** Muted, after the label (may be empty). */
+  detail: string;
+  /** Ranges of `detail` to emphasize ([from, to)): a file path's matched characters. */
+  emphasis?: readonly (readonly [number, number])[];
+  /** What Enter puts into the prompt. */
+  tag: PromptTag;
+}
+
+/** A group of rows under an optional heading: a project (dot + name) or "User". */
+export interface CompletionGroup {
+  key: string;
+  heading: { kind: "project"; repoId: string } | { kind: "user" } | null;
+  items: CompletionItem[];
 }
 
 /** What an inline leaf (a tag) reads as in the text before the caret. */
@@ -162,4 +185,114 @@ export function skillSources(input: SkillSourceInput): SkillSourceView[] {
 /** A stable key for a source list (the skills cache's key). */
 export function skillSourcesKey(sources: readonly SkillSourceView[]): string {
   return sources.map((s) => `${s.repoId}\u0001${s.path ?? ""}`).join("\u0002");
+}
+
+// ---- files -----------------------------------------------------------------------------
+
+/** What the file sources depend on: like skills', but a workspace's mode matters. */
+export interface FileSourceInput {
+  target: "project" | "workspace";
+  /** The draft's projects in member order (lib/compose draftMembers). */
+  repoIds: readonly string[];
+  /** The resolved worktree choice ("members": a workspace's own worktrees). */
+  worktree: WorktreeChoice;
+  /** A workspace's members and their worktrees. */
+  wsMembers: readonly { repoId: string; worktreePath: string }[];
+}
+
+/**
+ * The checkouts "@" searches, in member order: where the thread will find the files. A
+ * workspace in "Workspace worktrees" mode: each member's worktree; a lone project's chosen
+ * existing worktree; else (new worktrees, a project with "Also in" projects) each
+ * project's main worktree (path left out), which the new worktrees start from.
+ */
+export function fileSources(input: FileSourceInput): SkillSourceView[] {
+  return input.repoIds.map((repoId) => {
+    if (input.target === "workspace") {
+      const path = input.worktree.kind === "members" ? input.wsMembers.find((m) => m.repoId === repoId)?.worktreePath : undefined;
+      return path ? { repoId, path } : { repoId };
+    }
+    if (input.repoIds.length === 1 && input.worktree.kind === "existing") return { repoId, path: input.worktree.path };
+    return { repoId };
+  });
+}
+
+/** A stable key for a file source list (the files cache's key). */
+export const fileSourcesKey = skillSourcesKey;
+
+/** Positions of `q` as a greedy subsequence of `s` from `start`, or null. */
+function subsequenceAt(s: string, q: string, start: number): number[] | null {
+  const hits: number[] = [];
+  let j = 0;
+  for (let i = start; i < s.length && j < q.length; i++) {
+    if (s[i] === q[j]) {
+      hits.push(i);
+      j++;
+    }
+  }
+  return j === q.length ? hits : null;
+}
+
+function toRanges(hits: readonly number[]): [number, number][] {
+  const out: [number, number][] = [];
+  for (const i of hits) {
+    const last = out.at(-1);
+    if (last?.[1] === i) last[1] = i + 1;
+    else out.push([i, i + 1]);
+  }
+  return out;
+}
+
+/**
+ * The characters of a path to emphasize for a query (case-insensitive; the daemon ranks,
+ * this only marks): the query as a run in the base name, else spread over the base name,
+ * else as a run anywhere, else spread over the whole path. [] when it does not match.
+ */
+export function emphasis(path: string, query: string): [number, number][] {
+  const q = query.toLowerCase();
+  if (q === "") return [];
+  const p = path.toLowerCase();
+  const base = p.lastIndexOf("/") + 1;
+  const run = (i: number): [number, number][] => [[i, i + q.length]];
+  const inBase = p.indexOf(q, base);
+  if (inBase >= 0) return run(inBase);
+  const spreadBase = subsequenceAt(p, q, base);
+  if (spreadBase) return toRanges(spreadBase);
+  const anywhere = p.indexOf(q);
+  if (anywhere >= 0) return run(anywhere);
+  return toRanges(subsequenceAt(p, q, 0) ?? []);
+}
+
+/** One checkout's answer to a search. */
+export interface FileResults {
+  repoId: string;
+  matches: readonly FileMatchView[];
+}
+
+/**
+ * The card's rows for file matches: a group per project with matches, the primary first,
+ * then member order; headings only when the draft has more than one project. A row is
+ * the base name (a directory's with a trailing "/") and the path with the query's
+ * characters emphasized; it inserts a file tag (a directory's path keeps its "/"). Rows
+ * keep the daemon's order. Results of a project that is not a member are left out.
+ */
+export function fileItems(results: readonly FileResults[], query: string, members: readonly string[], primary: string): CompletionGroup[] {
+  const order = members.includes(primary) ? [primary, ...members.filter((m) => m !== primary)] : [...members];
+  const multi = members.length > 1;
+  return order.flatMap((repoId): CompletionGroup[] => {
+    const matches = results.find((r) => r.repoId === repoId)?.matches ?? [];
+    if (matches.length === 0) return [];
+    const items = matches.map((m): CompletionItem => {
+      const base = m.path.slice(m.path.lastIndexOf("/") + 1);
+      return {
+        key: `${repoId}/${m.path}${m.isDir ? "/" : ""}`,
+        label: m.isDir ? `${base}/` : base,
+        mono: true,
+        detail: m.path,
+        emphasis: emphasis(m.path, query),
+        tag: { tagKind: "file", repoId, path: m.isDir ? `${m.path}/` : m.path },
+      };
+    });
+    return [{ key: repoId, heading: multi ? { kind: "project", repoId } : null, items }];
+  });
 }
