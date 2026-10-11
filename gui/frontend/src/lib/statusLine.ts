@@ -99,3 +99,17 @@ export function statusText(l: StatusLine, now: number): string {
   if (l.at !== null) return l.kind === "finished" ? `${word} ${formatAgo(l.at, now)}` : `${word} · ${formatAgo(l.at, now)}`;
   return l.detail ? `${word} · ${l.detail}` : word;
 }
+
+/** The tones the thread tooltip's status row comes in: waiting on the user, or failed. */
+export type TipStatusTone = Extract<StatusTone, "amber" | "red">;
+
+/**
+ * Whether the thread tooltip shows a status row under the name, and in which tone
+ * (docs/notes/tooltip-status-reason.md): only for a thread that needs the user (amber) or
+ * is in error or was interrupted (red), whose line 2 the row usually truncates. Null for
+ * finished, working, idle, starting and closing. The text is `statusText`, untruncated.
+ */
+export function tipStatusTone(kind: StatusLineKind): TipStatusTone | null {
+  const tone = statusTones[kind];
+  return tone === "amber" || tone === "red" ? tone : null;
+}

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { CF, emit, expectTerminalText, invocations, mockPost, openApp, openProjects, resetMock, row, terminalText, writes } from "./fixtures";
+import { CF, DEFAULT_ORDER, emit, expectTerminalText, invocations, mockPost, openApp, openProjects, resetMock, row, terminalText, writes } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -8,11 +8,12 @@ test.beforeEach(async () => {
 test("sidebar lists threads only; repos and worktrees are on the Projects page, shells in bottom panels", async ({ page }) => {
   await openApp(page);
   const list = page.getByTestId("thread-list");
-  const keys = await list.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
-  // No terminal rows: a thread's Claude terminal shows through its row, shells (t-top,
-  // t-s1-shell) in their owner's bottom panel.
-  expect(keys).toEqual(["s:s-2", "s:s-5", "s:s-1", "s:s-6", "s:s-4", "s:s-3"]);
-  await expect(list.locator('[data-row-kind]:not([data-row-kind="session"])')).toHaveCount(0);
+  // The waiting thread, the idle ones, then the working ones under Working. No terminal rows:
+  // a thread's Claude terminal shows through its row, shells (t-top, t-s1-shell) in their
+  // owner's bottom panel.
+  await expect.poll(() => list.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).toEqual(DEFAULT_ORDER);
+  await expect(list.locator('[data-row-kind]:not([data-row-kind="session"]):not([data-row-kind="header"])')).toHaveCount(0);
+  await expect(list.locator('[data-row-kind="header"]')).toHaveAttribute("data-section", "working");
   await openProjects(page);
   await expect(page.getByTestId("project-name")).toHaveText(["code-foundry", "dotfiles", "ghostty-playground", "sketches", "writing"]);
   await expect(page.locator('[data-testid="project"][data-repo="repo-cf"]').getByTestId("worktree-branch")).toHaveText(["main", "feat/sidebar", "fix/resize"]);
@@ -189,17 +190,20 @@ test("sidebar is keyboard navigable", async ({ page }) => {
   const list = page.getByTestId("thread-list");
   await list.focus();
   await page.keyboard.press("Home"); // s-2 (needs attention, on top)
-  await page.keyboard.press("ArrowDown"); // s-5
-  await page.keyboard.press("ArrowDown"); // s-1
+  for (const want of ["s-6", "s-4", "s-3", "s-5", "s-1"]) {
+    // The Working header between s-3 and s-5 is skipped.
+    await page.keyboard.press("ArrowDown");
+    await expect(list).toHaveAttribute("aria-activedescendant", `row-s:${want}`);
+  }
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-claude");
   await list.focus();
   await page.keyboard.press("End");
-  await expect(list).toHaveAttribute("aria-activedescendant", "row-s:s-3");
-  // cmd+N jumps to the Nth thread in sidebar order: s-2, s-5, s-1, s-6, s-4, s-3.
+  await expect(list).toHaveAttribute("aria-activedescendant", "row-s:s-1");
+  // cmd+N jumps to the Nth thread in sidebar order: s-2, s-6, s-4, s-3, s-5, s-1.
   await page.keyboard.press("Meta+1");
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-ghostty");
-  await page.keyboard.press("Meta+5");
+  await page.keyboard.press("Meta+3");
   await expect(row(page, "s:s-4")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("session-disconnected")).toBeVisible();
   // Past the last thread: nothing changes.

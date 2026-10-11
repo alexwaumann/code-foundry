@@ -62,7 +62,7 @@ test("New Terminal from the palette starts a terminal in the selected thread's w
   // The shell belongs to the thread (labels session=s-3): the thread stays selected, the
   // sidebar gains no row, and the shell opens in the thread's bottom panel.
   await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
-  await expect(page.locator('[data-row-kind]:not([data-row-kind="session"])')).toHaveCount(0);
+  await expect(page.locator('[data-row-kind]:not([data-row-kind="session"]):not([data-row-kind="header"])')).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel").getByRole("tab")).toHaveCount(1);
   await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
 });

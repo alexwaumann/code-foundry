@@ -21,7 +21,7 @@ async function shellLabels(page: Page, id: string): Promise<Record<string, strin
 }
 
 async function noTerminalRows(page: Page): Promise<void> {
-  await expect(page.getByTestId("thread-list").locator('[data-row-kind]:not([data-row-kind="session"])')).toHaveCount(0);
+  await expect(page.getByTestId("thread-list").locator('[data-row-kind]:not([data-row-kind="session"]):not([data-row-kind="header"])')).toHaveCount(0);
 }
 
 test.beforeEach(async () => {

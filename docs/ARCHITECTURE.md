@@ -304,11 +304,13 @@ from the pull request (docs/notes/pr-thread-commands.md).
   an Attach subscriber, finished turns count as seen (see
   `docs/notes/phase2-integration.md`).
 * Layout: a draggable title strip under the hidden-inset traffic lights, sidebar (Pull
-  Requests and Projects entries, then a flat list of threads and nothing else, with no
-  headers: pinned threads, then the ones waiting on the user, then the rest newest first,
-  each row saying its status in words on its second line (or project and branch) with a
-  hover tooltip; a status row at its foot; see `docs/notes/workspaces-4-sidebar.md` and
-  `docs/notes/thread-list.md`), content (a thread's Claude terminal, the Pull Requests
+  Requests and Projects entries, then a flat list of threads and nothing else: pinned
+  threads, then the ones waiting on the user (prompts, then errors), finished turns and
+  idle ones, newest first within each group and with no headers, then the working ones
+  under a collapsible Working header that counts them; each row says its status in words
+  on its second line (or project and branch) with a hover tooltip; a status row at its
+  foot; see `docs/notes/workspaces-4-sidebar.md`, `docs/notes/thread-list.md` and
+  `docs/notes/sidebar-working-section.md`), content (a thread's Claude terminal, the Pull Requests
   page, the Projects page with each project's worktrees and each workspace's members, or
   the composer; a worktree's overview is a side panel tab, not a page; a shell is never
   selected), command palette overlay. Under the content pane, a thread and the Projects

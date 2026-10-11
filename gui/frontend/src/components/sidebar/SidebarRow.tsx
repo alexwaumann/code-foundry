@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { ArrowRightLeft, Folder, FolderGit2, GitBranch, Layers, Pin, type LucideIcon } from "lucide-react";
+import { ArrowRightLeft, ChevronDown, ChevronRight, CircleAlert, Folder, FolderGit2, GitBranch, Layers, OctagonX, Pin, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
@@ -7,9 +7,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { sessionBadge } from "@/lib/session";
-import { showsPlace, statusLine, statusText, statusTones, type StatusLine, type StatusTone } from "@/lib/statusLine";
+import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLine, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
 import { modelLabel, threadRowModel, type RepoLookup, type WorkspaceLookup } from "@/lib/threadRow";
-import type { Row } from "@/lib/tree";
+import type { HeaderRow, Row } from "@/lib/tree";
 import { useReposStore } from "@/stores/repos";
 import { renameSession } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
@@ -257,7 +257,28 @@ function TipIcon({ icon: Icon }: { icon: LucideIcon }) {
   return <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />;
 }
 
-/** The tooltip's body: name, project, branch (git only) and model. Mounted only while open. */
+const tipStatusIcons: Readonly<Record<TipStatusTone, LucideIcon>> = { amber: CircleAlert, red: OctagonX };
+
+/**
+ * The full status text of a thread that needs the user or failed, in the row's line-2 words
+ * and colour, wrapped rather than truncated (line 2 usually cuts it off); nothing for other
+ * statuses (lib/statusLine `tipStatusTone`). A timed line ticks on the shared clock, only
+ * while the tooltip is open (its body is mounted only then).
+ */
+function TipStatus({ id }: { id: string }) {
+  const line = useSessionsStore(useShallow((st) => statusLine(st.byId[id])));
+  const tone = tipStatusTone(line.kind);
+  if (tone === null) return null;
+  const Icon = tipStatusIcons[tone];
+  return (
+    <div className={cn("mb-[3px] flex items-start gap-2 leading-5", toneClasses[tone])} data-testid="tip-status" data-tone={tone}>
+      <Icon className="mt-[3px] size-3.5 shrink-0" aria-hidden />
+      <span className="min-w-0 break-words">{line.at !== null ? <TimedStatusText line={line} /> : statusText(line, 0)}</span>
+    </div>
+  );
+}
+
+/** The tooltip's body: name, status (attention or error only), project, branch (git only) and model. Mounted only while open. */
 function ThreadTipBody({ id }: { id: string }) {
   const name = useSessionsStore((s) => s.byId[id]?.name ?? "");
   const model = useSessionsStore((s) => s.byId[id]?.model ?? "");
@@ -280,6 +301,7 @@ function ThreadTipBody({ id }: { id: string }) {
       <div className="mb-[5px] truncate text-[13px] font-semibold" data-testid="tip-name">
         {name || id}
       </div>
+      <TipStatus id={id} />
       <TipRow icon={<TipIcon icon={m.noGit ? Folder : FolderGit2} />} chip={m.noGit ? "no git" : null} testId="tip-project">
         {m.project}
       </TipRow>
@@ -322,7 +344,44 @@ function ThreadTooltip({ id, children }: { id: string; children: ReactElement })
   );
 }
 
+/**
+ * The Working section's header (design record: /tmp/working-header/index.html?v=2): an
+ * 11px uppercase muted label, the number of working threads after it, and a chevron on the
+ * right saying whether the section is open. A button (aria-expanded) inside the row; the
+ * row itself is role="presentation", so the listbox's cursor never lands on it. Pressing it
+ * with the mouse does not take focus from the list.
+ */
+function WorkingHeader({ row }: { row: HeaderRow }) {
+  const Chevron = row.collapsed ? ChevronRight : ChevronDown;
+  return (
+    <div id={`row-${row.key}`} role="presentation" data-row-kind="header" data-row-key={row.key} data-section={row.section} className="flex h-full items-end select-none">
+      <button
+        type="button"
+        aria-expanded={!row.collapsed}
+        data-testid="working-header"
+        className="flex h-[22px] w-full min-w-0 cursor-default items-center gap-1.5 rounded-md px-2 text-muted-foreground outline-none hover:bg-sidebar-accent/50 focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+        onMouseDown={(e) => {
+          e.preventDefault();
+        }}
+        onClick={() => {
+          useUiStore.getState().toggleWorkingCollapsed();
+        }}
+      >
+        <span className="truncate text-[11px] font-medium tracking-wider uppercase" data-testid="working-label">
+          {row.label}
+        </span>
+        {/* A flex container drops this space visually; it keeps the text and name "Working 2". */}{" "}
+        <span className="shrink-0 text-[11px] tabular-nums opacity-70" data-testid="working-count">
+          {row.count}
+        </span>
+        <Chevron className="ml-auto size-3 shrink-0" aria-hidden />
+      </button>
+    </div>
+  );
+}
+
 export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onActivate }: RowProps) {
+  if (row.kind === "header") return <WorkingHeader row={row} />;
   return (
     <ThreadTooltip id={row.sessionId}>
       <div

@@ -2,7 +2,7 @@ import type { CommandView } from "@/api/command";
 import { promptedArgs } from "@/palette/args";
 import { nextAfter, sessionOrder } from "@/lib/tree";
 import { refreshCommands, runCommand, useCommandsStore, whenListed } from "@/stores/commands";
-import { contextKey, getListSessions, getUiContext } from "@/stores/context";
+import { contextKey, getListOptions, getListSessions, getUiContext } from "@/stores/context";
 import { openAddProject } from "@/stores/addProject";
 import { openNewThreadPicker } from "@/stores/compose";
 import { openPublishDialog } from "@/stores/publish";
@@ -25,9 +25,9 @@ export interface ViewAction {
   run: () => void;
 }
 
-/** Selects the Nth thread in sidebar order. */
+/** Selects the Nth thread in sidebar order (rows of a collapsed section do not count). */
 function jumpTo(n: number): void {
-  const id = sessionOrder(getListSessions())[n - 1];
+  const id = sessionOrder(getListSessions(), getListOptions())[n - 1];
   if (id !== undefined) useUiStore.getState().select({ kind: "session", id }, { focusTerminal: true });
 }
 
@@ -35,7 +35,8 @@ function jumpTo(n: number): void {
 export function jumpToAttention(): boolean {
   const waiting = new Set(attentionIds(useSessionsStore.getState()));
   const sel = useUiStore.getState().selection;
-  const next = nextAfter(sessionOrder(getListSessions()), sel.kind === "session" ? sel.id : null, (id) => waiting.has(id));
+  // Threads that need attention are never in the collapsible Working section (threadGroup).
+  const next = nextAfter(sessionOrder(getListSessions(), getListOptions()), sel.kind === "session" ? sel.id : null, (id) => waiting.has(id));
   if (next === null) return false;
   useUiStore.getState().select({ kind: "session", id: next }, { focusTerminal: true });
   return true;
