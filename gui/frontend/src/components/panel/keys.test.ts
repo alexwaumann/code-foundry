@@ -8,17 +8,23 @@ import { isPanelChord, panelKeyAction } from "./keys";
 const ctx: SurfaceContext = { selection: { kind: "session", id: "s-1" }, panelKey: "session:s-1" };
 const files = makeTab("files", "Files");
 const withTab: PanelEntry = { open: true, tabs: [files], activeTabId: files.id };
+const picking: PanelEntry = { open: true, tabs: [files], activeTabId: null, pickFrom: files.id };
 
 describe("isPanelChord", () => {
   it.each([
-    ["cmd+w", true],
-    ["p", true],
-    ["f", true],
-    ["q", false],
-    ["cmd+shift+c", false],
-    ["cmd+p", false],
-  ])("%s -> %s", (chord, want) => {
-    expect(isPanelChord(chord)).toBe(want);
+    ["cmd+w", false, true],
+    ["p", false, true],
+    ["f", false, true],
+    ["q", false, false],
+    ["cmd+shift+c", false, false],
+    ["cmd+p", false, false],
+    // Surfaces use Escape (popups, the ask composer): the panel's only while picking.
+    ["escape", false, false],
+    ["escape", true, true],
+    ["cmd+w", true, true],
+    ["q", true, false],
+  ])("%s (picking %s) -> %s", (chord, picking, want) => {
+    expect(isPanelChord(chord, picking)).toBe(want);
   });
 });
 
@@ -30,6 +36,11 @@ describe("panelKeyAction", () => {
     ["pull request is disabled for now", "p", withTab, null],
     ["unknown letter does nothing", "q", withTab, null],
     ["modified letter is not a hotkey", "cmd+f", withTab, null],
+    ["cmd+w while picking goes back instead of hiding", "cmd+w", picking, { kind: "stopPicking" }],
+    ["escape while picking goes back", "escape", picking, { kind: "stopPicking" }],
+    ["escape with an active tab does nothing", "escape", withTab, null],
+    ["escape with no tabs does nothing", "escape", { ...emptyEntry, open: true }, null],
+    ["a disabled hotkey while picking does nothing", "f", picking, null],
   ];
   it.each(cases)("%s", (_name, chord, entry, want) => {
     expect(panelKeyAction(chord, entry, ctx)).toEqual(want);
@@ -38,6 +49,8 @@ describe("panelKeyAction", () => {
   it("an enabled surface's hotkey opens its default tab", () => {
     const spy = vi.spyOn(filesSurface, "available").mockReturnValue("enabled");
     expect(panelKeyAction("f", { ...emptyEntry, open: true }, ctx)).toEqual({ kind: "open", tab: files });
+    // While picking too: the letter picks from the list.
+    expect(panelKeyAction("f", picking, ctx)).toEqual({ kind: "open", tab: files });
     spy.mockRestore();
   });
 });

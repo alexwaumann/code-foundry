@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { getPanel, usePanelStore } from "./panel";
+import { getPanel, makeTab, usePanelStore } from "./panel";
 import { useUiStore, type FocusRegion } from "./ui";
-import { closeUsage, expandPanelCommand, showView, startViewSync, togglePanelCommand, usagePanelCommand, useViewsStore } from "./views";
+import { closeUsage, expandPanelCommand, newPanelTabCommand, showView, startViewSync, togglePanelCommand, usagePanelCommand, useViewsStore } from "./views";
 
 const closedPalette = { open: false, query: "", commandName: null, page: "commands" as const, returnTo: "content" as FocusRegion };
 
@@ -145,6 +145,51 @@ describe("expandPanelCommand", () => {
   it("is what ShowView \"panel.expand\" runs", () => {
     expect(showView("panel.expand")).toBe(true);
     expect(getPanel()).toMatchObject({ open: true, expanded: true });
+  });
+});
+
+describe("newPanelTabCommand", () => {
+  const files = makeTab("files", "Files");
+  const diff = makeTab("diff", "Diff");
+  beforeEach(() => {
+    usePanelStore.setState({ byKey: {} });
+    useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
+    useUiStore.setState({ selection: { kind: "session", id: "a" }, focus: "terminal", panelFocusSeq: 0, palette: closedPalette });
+  });
+
+  it("starts picking in a hidden panel with tabs, shows it, and focuses it", () => {
+    usePanelStore.setState({ byKey: { "session:a": { open: false, tabs: [files, diff], activeTabId: diff.id } } });
+    expect(newPanelTabCommand()).toBe(true);
+    expect(getPanel()).toEqual({ open: true, tabs: [files, diff], activeTabId: null, pickFrom: diff.id });
+    expect(useUiStore.getState().panelFocusSeq).toBe(1);
+  });
+
+  it("without tabs only shows the panel (its list shows anyway)", () => {
+    expect(newPanelTabCommand()).toBe(true);
+    expect(getPanel()).toEqual({ open: true, tabs: [], activeTabId: null });
+  });
+
+  it("is a no-op while the settings page is up or with nothing selected", () => {
+    useViewsStore.setState({ settingsOpen: true });
+    expect(newPanelTabCommand()).toBe(false);
+    useViewsStore.setState({ settingsOpen: false });
+    useUiStore.getState().select({ kind: "none" });
+    expect(newPanelTabCommand()).toBe(false);
+    expect(usePanelStore.getState().byKey).toEqual({});
+    expect(useUiStore.getState().panelFocusSeq).toBe(0);
+  });
+
+  it("from the palette moves its return target to the panel instead of focusing", () => {
+    useUiStore.setState({ focus: "palette", palette: { ...closedPalette, open: true, returnTo: "terminal" } });
+    expect(newPanelTabCommand()).toBe(true);
+    expect(useUiStore.getState().palette.returnTo).toBe("panel");
+    expect(useUiStore.getState().panelFocusSeq).toBe(0);
+  });
+
+  it("is what ShowView \"panel.new-tab\" runs", () => {
+    usePanelStore.setState({ byKey: { "session:a": { open: true, tabs: [files], activeTabId: files.id } } });
+    expect(showView("panel.new-tab")).toBe(true);
+    expect(getPanel()).toMatchObject({ activeTabId: null, pickFrom: files.id });
   });
 });
 

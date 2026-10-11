@@ -10,7 +10,7 @@ import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
-import { expandPanelCommand, linkedPrsPanelCommand, showView, toggleHelp, togglePanelCommand, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
+import { expandPanelCommand, linkedPrsPanelCommand, newPanelTabCommand, showView, toggleHelp, togglePanelCommand, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -215,6 +215,11 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // Same for full width: this window's panel for its selection.
   "view.panel.expand": () => {
     expandPanelCommand();
+    return true;
+  },
+  // Same for the surface list ("+"): this window's panel for its selection.
+  "view.panel.new-tab": () => {
+    newPanelTabCommand();
     return true;
   },
   // Same for the workspace surface: this window's workspace thread's panel.
