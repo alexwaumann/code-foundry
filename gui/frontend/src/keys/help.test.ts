@@ -11,8 +11,8 @@ describe("helpSections", () => {
     const local = [
       { chord: "cmd+k", title: "Command palette" },
       { chord: "cmd+shift+p", title: "Command palette" },
-      { chord: "cmd+1", title: "Jump to item 1" },
-      { chord: "cmd+2", title: "Jump to item 2" },
+      { chord: "cmd+1", title: "Jump to thread 1" },
+      { chord: "cmd+2", title: "Jump to thread 2" },
     ];
     const commands = [
       cmd({ name: "session.new", title: "New Session", category: "Session", keybindings: ["cmd+n"] }),
@@ -25,7 +25,7 @@ describe("helpSections", () => {
         title: "App",
         items: [
           { keys: ["⌘K", "⇧⌘P"], label: "Command palette", available: true },
-          { keys: ["⌘1–9"], label: "Jump to item 1–9", available: true },
+          { keys: ["⌘1–9"], label: "Jump to thread 1–9", available: true },
         ],
       },
       { title: "Session", items: [{ keys: ["⌘N"], label: "New Session", command: "session.new", available: true }] },

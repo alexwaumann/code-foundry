@@ -72,13 +72,13 @@ function startApp(): () => void {
 
 /**
  * Exactly one thing fills the content area. A session shows its live terminal when it
- * has one, otherwise the "Not connected" panel; "compose" is the new-thread composer. TerminalPane stays mounted across
- * terminal/session switches (same element position), so its renderer is reused.
+ * has one, otherwise the "Not connected" panel; "compose" is the new-thread composer.
+ * TerminalPane stays mounted across thread switches (same element position), so its
+ * renderer is reused. Shells never show here: they live in the bottom panel.
  */
 function Content() {
   const sel = useUiStore((s) => s.selection);
   const sessionTerminal = useSessionsStore((s) => (sel.kind === "session" ? s.byId[sel.id]?.terminalId || null : null));
-  if (sel.kind === "terminal") return <TerminalPane terminalId={sel.id} />;
   if (sel.kind === "view" && sel.name === "dashboard") return <StartPage />;
   if (sel.kind === "view" && sel.name === "pullrequests") return <PullRequestsPage />;
   if (sel.kind === "view" && sel.name === "projects") return <ProjectsPage />;

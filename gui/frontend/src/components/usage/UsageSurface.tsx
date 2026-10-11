@@ -1,22 +1,18 @@
 import { useMemo, useRef, type CSSProperties } from "react";
 import type { UsageBucketView } from "@/api/session";
-import { SESSION_LABEL } from "@/lib/tree";
 import { fmtRequests, fmtShare, fmtTok, fmtUsd, modelColorVars, SWATCH_BG, TOKEN_KINDS, totalUsage, usageByModel, type ModelUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import { sameUsage, useSessionsStore } from "@/stores/sessions";
-import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 
 const NONE: readonly UsageBucketView[] = [];
 
 /**
- * The thread this panel belongs to: the selected session, or the thread of the selected
- * terminal; "" otherwise (the panel always shows the current selection's panel).
+ * The thread this panel belongs to: the selected session; "" otherwise (the panel always
+ * shows the current selection's panel).
  */
 function useThreadId(): string {
-  const sel = useUiStore((s) => s.selection);
-  const termThread = useTerminalsStore((s) => (sel.kind === "terminal" ? (s.byId[sel.id]?.labels[SESSION_LABEL] ?? "") : ""));
-  return sel.kind === "session" ? sel.id : termThread;
+  return useUiStore((s) => (s.selection.kind === "session" ? s.selection.id : ""));
 }
 
 /**

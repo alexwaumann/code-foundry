@@ -9,8 +9,7 @@ export interface SessionsData {
 
 /**
  * Whether the daemon serves SessionService. "unavailable" (e.g. HTTP 404 from a daemon
- * without Phase 2a) leaves the rest of the UI working: session rows are simply absent and
- * session-labelled terminals show as plain terminals.
+ * without Phase 2a) leaves the rest of the UI working: thread rows are simply absent.
  */
 export type SessionsAvailability = "unknown" | "available" | "unavailable";
 
@@ -174,8 +173,9 @@ export function useAttentionCount(): number {
 }
 
 /**
- * The session a terminal belongs to, if that session is known. Terminals of known
- * sessions are shown through their session row, not as terminal rows.
+ * The session a terminal belongs to, if that session is known (labels.session, else the
+ * session's attached terminal). The focusTerminal intent selects it for its Claude
+ * terminal.
  */
 export function sessionOfTerminal(data: SessionsData, terminal: { id: string; labels: Readonly<Record<string, string>> }): SessionView | undefined {
   const labelled = terminal.labels.session;

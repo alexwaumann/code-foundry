@@ -1,8 +1,8 @@
 import type { CommandView } from "@/api/command";
 import { promptedArgs } from "@/palette/args";
-import { leafOrder, nextAfter, sessionOrder } from "@/lib/tree";
+import { nextAfter, sessionOrder } from "@/lib/tree";
 import { refreshCommands, runCommand, useCommandsStore, whenListed } from "@/stores/commands";
-import { contextKey, getListInputs, getUiContext } from "@/stores/context";
+import { contextKey, getListSessions, getUiContext } from "@/stores/context";
 import { openAddProject } from "@/stores/addProject";
 import { openNewThreadPicker } from "@/stores/compose";
 import { openPublishDialog } from "@/stores/publish";
@@ -25,21 +25,17 @@ export interface ViewAction {
   run: () => void;
 }
 
-/** Selects the Nth thread or terminal in sidebar order. */
+/** Selects the Nth thread in sidebar order. */
 function jumpTo(n: number): void {
-  const { sessions, terminals } = getListInputs();
-  const row = leafOrder(sessions, terminals)[n - 1];
-  if (!row) return;
-  const sel = row.kind === "session" ? ({ kind: "session", id: row.sessionId } as const) : ({ kind: "terminal", id: row.terminalId } as const);
-  useUiStore.getState().select(sel, { focusTerminal: true });
+  const id = sessionOrder(getListSessions())[n - 1];
+  if (id !== undefined) useUiStore.getState().select({ kind: "session", id }, { focusTerminal: true });
 }
 
 /** Selects the next session that needs attention after the current one, wrapping. */
 export function jumpToAttention(): boolean {
-  const { sessions, terminals } = getListInputs();
   const waiting = new Set(attentionIds(useSessionsStore.getState()));
   const sel = useUiStore.getState().selection;
-  const next = nextAfter(sessionOrder(sessions, terminals), sel.kind === "session" ? sel.id : null, (id) => waiting.has(id));
+  const next = nextAfter(sessionOrder(getListSessions()), sel.kind === "session" ? sel.id : null, (id) => waiting.has(id));
   if (next === null) return false;
   useUiStore.getState().select({ kind: "session", id: next }, { focusTerminal: true });
   return true;
@@ -52,8 +48,7 @@ function togglePalette(): void {
 }
 
 function focusContentTerminal(): void {
-  const kind = useUiStore.getState().selection.kind;
-  if (kind === "terminal" || kind === "session") useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
+  if (useUiStore.getState().selection.kind === "session") useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
 }
 
 function toggleSidebar(): void {
@@ -78,7 +73,7 @@ export const viewActions: readonly ViewAction[] = [
   { chord: "cmd+shift+a", title: "Next thread needing attention", run: () => void jumpToAttention() },
   ...Array.from({ length: 9 }, (_, i) => ({
     chord: `cmd+${String(i + 1)}`,
-    title: `Jump to item ${String(i + 1)}`,
+    title: `Jump to thread ${String(i + 1)}`,
     run: () => {
       jumpTo(i + 1);
     },

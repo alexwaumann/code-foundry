@@ -8,18 +8,17 @@ import { memberTab, selectionWorkspaceThread, workspaceTab } from "@/surfaces/wo
 import { keyOf, openSurface, togglePanel, type PanelTarget } from "./panel";
 import { useReposStore } from "./repos";
 import { useSessionsStore } from "./sessions";
-import { useTerminalsStore } from "./terminals";
 import { useUiStore, type Selection } from "./ui";
 import { useWorkspacesStore } from "./workspaces";
 
 /**
  * Opens (or activates) the workspace tab in the selection's panel when the selection is a
- * workspace thread (or its terminal). Returns that panel's key, or null when the
+ * workspace thread. Returns that panel's key, or null when the
  * selection is no workspace thread. It does not request focus.
  */
 export function openWorkspaceSurface(sel: Selection = useUiStore.getState().selection): string | null {
   const key = keyOf(sel);
-  const thread = selectionWorkspaceThread(sel, { repos: useReposStore.getState(), sessions: useSessionsStore.getState(), terminals: useTerminalsStore.getState() });
+  const thread = selectionWorkspaceThread(sel, { repos: useReposStore.getState(), sessions: useSessionsStore.getState() });
   if (key === null || thread === null) return null;
   const name = useWorkspacesStore.getState().byId[thread.workspaceId]?.name ?? "";
   return openSurface(key, workspaceTab(thread.workspaceId, name)) ? key : null;

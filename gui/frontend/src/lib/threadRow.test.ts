@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { memberName, modelLabel, terminalPlace, threadRowModel, worktreeBranch, type RepoLookup, type WorkspaceLookup } from "./threadRow";
+import { memberName, modelLabel, threadRowModel, worktreeBranch, type RepoLookup, type WorkspaceLookup } from "./threadRow";
 
 const repos: RepoLookup & { order: string[] } = {
   order: ["api", "notes", "web"],
@@ -90,15 +90,9 @@ describe("helpers", () => {
     expect(memberName(repos, undefined, "/src/web")).toBe("web");
     expect(memberName(repos, undefined, "/nowhere/x")).toBe("x");
   });
-  it("terminalPlace: project and branch of the worktree it sits in, else its cwd", () => {
-    expect(terminalPlace(repos, { cwd: "/src/web/internal", worktreeLabel: "" })).toBe("web · main");
-    expect(terminalPlace(repos, { cwd: "/tmp", worktreeLabel: "/wt/api/cf-login" })).toBe("api · cf/login");
-    expect(terminalPlace(repos, { cwd: "/Users/dev/notes", worktreeLabel: "" })).toBe("~/notes");
-  });
-  it("a project without git: no branch, the No git badge (No git in text)", () => {
+  it("a project without git: no branch, the No git badge", () => {
     const s = { repoId: "notes", worktreePath: "/Users/dev/writing", workspaceId: "", pendingWorktreePath: "" };
     expect(threadRowModel(s, repos, workspaces)).toEqual({ project: "notes", branch: "", noGit: true, workspace: null, movingTo: null, worktree: false });
     expect(worktreeBranch(repos, "notes", "/Users/dev/writing")).toBe("");
-    expect(terminalPlace(repos, { cwd: "/Users/dev/writing/drafts", worktreeLabel: "" })).toBe("notes · No git");
   });
 });

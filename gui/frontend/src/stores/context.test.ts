@@ -26,8 +26,8 @@ describe("the bottom panel's shell in the command context", () => {
 
   it("deriveContext puts the focused shell in activeTerminalId and keeps the rest", () => {
     const sel = { kind: "session", id: "s1" } as const;
-    const plain = deriveContext(sel, useTerminalsStore.getState(), useReposStore.getState());
-    const focused = deriveContext(sel, useTerminalsStore.getState(), useReposStore.getState(), undefined, "a");
+    const plain = deriveContext(sel, useReposStore.getState());
+    const focused = deriveContext(sel, useReposStore.getState(), undefined, "a");
     expect(focused).toEqual({ ...plain, activeTerminalId: "a" });
     expect(focused.activeSessionId).toBe("s1");
   });

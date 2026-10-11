@@ -4,11 +4,9 @@
  * callers feed it the stores' current state.
  */
 import type { LinkedPullRequestView } from "@/api/session";
-import { deriveContext } from "@/stores/context";
 import { makeTab, type Tab } from "@/stores/panel";
 import type { ReposData } from "@/stores/repos";
 import type { SessionsData } from "@/stores/sessions";
-import type { TerminalsData } from "@/stores/terminals";
 import type { Selection } from "@/stores/ui";
 
 export const LINKED_PRS_KIND = "linkedprs";
@@ -17,18 +15,14 @@ export const LINKED_PRS_TITLE = "Linked PRs";
 export interface SelectionStores {
   repos: ReposData;
   sessions: SessionsData;
-  terminals: TerminalsData;
 }
 
 /**
- * The selection's thread: a session, or a thread's terminal (deriveContext's
- * activeSessionId, which is what view.panel.linked-prs's availability sees), when the
- * sessions store knows it. Null for a plain terminal, a worktree, a page or a composer.
+ * The selection's thread (what view.panel.linked-prs's availability sees), when the
+ * sessions store knows it. Null for a page or a composer.
  */
 export function selectionThread(sel: Selection, s: SelectionStores): string | null {
-  if (sel.kind !== "session" && sel.kind !== "terminal") return null;
-  const id = deriveContext(sel, s.terminals, s.repos, s.sessions).activeSessionId;
-  return id && s.sessions.byId[id] ? id : null;
+  return sel.kind === "session" && s.sessions.byId[sel.id] ? sel.id : null;
 }
 
 /** The selection's thread when it has at least one linked pull request (the surface is enabled); else null. */

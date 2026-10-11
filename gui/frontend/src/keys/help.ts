@@ -32,7 +32,7 @@ export function helpSections(commands: readonly CommandView[], local: readonly L
   for (const a of local) {
     let label = a.title;
     let keys = formatChord(a.chord);
-    // "Jump to item 3" on cmd+3 -> one "Jump to item 1–9" row on ⌘1–9.
+    // "Jump to thread 3" on cmd+3 -> one "Jump to thread 1–9" row on ⌘1–9.
     const numbered = /^(.*) \d$/.exec(a.title);
     if (numbered) {
       label = `${numbered[1] ?? ""} 1–9`;

@@ -187,6 +187,14 @@ describe("focus for this window's own shells (by id)", () => {
     expect(useUiStore.getState().bottomFocusSeq).toBe(0);
   });
 
+  it.each<[string, string | undefined, Record<string, string>]>([
+    ["the row menu: the thread's worktree", undefined, {}],
+    ["a workspace member in the thread's panel: that member's worktree", "/src/api.worktrees/x", { cwd: "/src/api.worktrees/x" }],
+  ])("newThreadTerminal from %s runs in the thread's context", async (_name, cwd, args) => {
+    await newThreadTerminal("s2", cwd);
+    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", args, { ctx: expect.objectContaining({ activeSessionId: "s2", activeView: "session" }) as unknown });
+  });
+
   it("a failed run leaves nothing pending", async () => {
     commands.runCommandForResult.mockResolvedValue(null);
     expect(await newBottomTerminal("session:s1")).toBe(false);

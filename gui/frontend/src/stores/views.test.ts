@@ -306,7 +306,6 @@ describe("toggleBottomCommand", () => {
   const noops: [string, () => void][] = [
     ["a selection without a bottom panel (the dashboard)", () => useUiStore.setState({ selection: { kind: "view", name: "dashboard" } })],
     ["the Pull Requests page", () => useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } })],
-    ["a loose terminal", () => useUiStore.setState({ selection: { kind: "terminal", id: "t" } })],
     ["the settings page", () => { useViewsStore.setState({ settingsOpen: true }); }],
     ["the usage page", () => { useViewsStore.setState({ usageOpen: true }); }],
     ["the side panel expanded", () => usePanelStore.setState({ byKey: { "session:a": { open: true, tabs: [], activeTabId: null, expanded: true } } })],

@@ -61,8 +61,6 @@ export function keyOf(sel: Selection): string | null {
       return null;
     case "session":
       return `session:${sel.id}`;
-    case "terminal":
-      return `terminal:${sel.id}`;
     case "view":
       return `view:${sel.name}`;
     case "compose":

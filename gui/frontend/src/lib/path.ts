@@ -9,10 +9,3 @@ export function basename(p: string): string {
 export function tildify(p: string): string {
   return p.replace(/^\/Users\/[^/]+(?=\/|$)/, "~");
 }
-
-/** Short label for a terminal: its title, else the program name. */
-export function terminalLabel(t: { title: string; argv: readonly string[]; id: string }): string {
-  if (t.title) return t.title;
-  const [prog, ...args] = t.argv;
-  return prog ? [basename(prog), ...args].join(" ") : t.id;
-}

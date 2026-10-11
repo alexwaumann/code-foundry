@@ -45,7 +45,6 @@ describe("bottomKeyOf", () => {
     ["the dashboard", DASHBOARD, null],
     ["nothing", { kind: "none" }, null],
     ["the Pull Requests page", { kind: "view", name: "pullrequests" }, null],
-    ["a loose terminal", { kind: "terminal", id: "t1" }, null],
     ["the composer", { kind: "compose", repoId: "r" }, null],
   ];
   it.each(cases)("%s", (_name, sel, want) => {

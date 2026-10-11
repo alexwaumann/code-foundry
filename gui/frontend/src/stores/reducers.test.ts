@@ -125,28 +125,12 @@ describe("repos reducer", () => {
 
 describe("deriveContext", () => {
   const repos = replaceRepos([repo("r1", "app", [wt("r1", "/src/app", { isMain: true }), wt("r1", "/src/app.worktrees/feat")])]);
-  const terms = replaceTerminals(emptyTerminals, [
-    term("t1", { cwd: "/src/app/internal" }),
-    term("t2", { cwd: "/tmp", labels: { worktree: "/src/app.worktrees/feat", session: "s-9" } }),
-    term("t3", { cwd: "/tmp" }),
-  ]);
 
   it.each([
     ["nothing selected", { kind: "none" } as const, emptyContext],
-    [
-      "terminal placed by cwd",
-      { kind: "terminal", id: "t1" } as const,
-      { ...emptyContext, activeTerminalId: "t1", activeRepoId: "r1", activeWorktreePath: "/src/app", activeView: "terminal" },
-    ],
-    [
-      "terminal placed by label, with session",
-      { kind: "terminal", id: "t2" } as const,
-      { ...emptyContext, activeTerminalId: "t2", activeSessionId: "s-9", activeRepoId: "r1", activeWorktreePath: "/src/app.worktrees/feat", activeView: "terminal" },
-    ],
-    ["unplaced terminal", { kind: "terminal", id: "t3" } as const, { ...emptyContext, activeTerminalId: "t3", activeView: "terminal" }],
-    ["unknown terminal", { kind: "terminal", id: "zz" } as const, { ...emptyContext, activeTerminalId: "zz", activeView: "terminal" }],
+    ["a page", { kind: "view", name: "projects" } as const, { ...emptyContext, activeView: "projects" }],
     ["composer: the repo only (session.new is available, no worktree yet)", { kind: "compose", repoId: "r1" } as const, { ...emptyContext, activeRepoId: "r1", activeView: "compose" }],
   ])("%s", (_name, sel, want) => {
-    expect(deriveContext(sel, terms, repos)).toEqual(want);
+    expect(deriveContext(sel, repos)).toEqual(want);
   });
 });

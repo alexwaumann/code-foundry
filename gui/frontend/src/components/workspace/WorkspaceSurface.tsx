@@ -5,10 +5,8 @@ import { WorkspaceMembers } from "@/components/projects/WorkspaceMembers";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider } from "@/lib/NavRow";
 import { memberKey } from "@/lib/projects";
-import { SESSION_LABEL } from "@/lib/tree";
 import { useCurrentPanelKey } from "@/stores/panel";
 import { useSessionsStore } from "@/stores/sessions";
-import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { openMemberTab } from "@/stores/workspacePanel";
 import { useWorkspacesStore } from "@/stores/workspaces";
@@ -17,13 +15,11 @@ const SEP = "\u0000";
 
 /**
  * The thread this panel belongs to, when it is one of the workspace's threads: the
- * selected session, or the thread of the selected terminal. "" otherwise. (A panel always
+ * selected session. "" otherwise. (A panel always
  * shows the current selection's panel, so the selection is the panel's owner.)
  */
 function useThreadOf(workspaceId: string): string {
-  const sel = useUiStore((s) => s.selection);
-  const termThread = useTerminalsStore((s) => (sel.kind === "terminal" ? (s.byId[sel.id]?.labels[SESSION_LABEL] ?? "") : ""));
-  const id = sel.kind === "session" ? sel.id : termThread;
+  const id = useUiStore((s) => (s.selection.kind === "session" ? s.selection.id : ""));
   const owned = useSessionsStore((s) => id !== "" && s.byId[id]?.workspaceId === workspaceId);
   return owned ? id : "";
 }

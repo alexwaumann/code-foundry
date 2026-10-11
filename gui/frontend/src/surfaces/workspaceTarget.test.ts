@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { RepoView } from "@/api/repo";
 import type { SessionView } from "@/api/session";
-import type { TerminalView } from "@/api/terminal";
 import type { ReposData } from "@/stores/repos";
 import type { SessionsData } from "@/stores/sessions";
-import type { TerminalsData } from "@/stores/terminals";
 import type { Selection } from "@/stores/ui";
 import {
   liveWorkspaceThread,
@@ -34,22 +32,12 @@ function sessions(...list: SessionView[]): SessionsData {
   return { byId: Object.fromEntries(list.map((s) => [s.id, s])), order: list.map((s) => s.id) };
 }
 
-const terminals: TerminalsData = {
-  byId: {
-    "t-ws": { id: "t-ws", cwd: WEB, labels: { session: "s-ws" } } as unknown as TerminalView,
-    "t-plain": { id: "t-plain", cwd: WEB, labels: {} } as unknown as TerminalView,
-  },
-  order: ["t-ws", "t-plain"],
-};
-
 describe("selectionWorkspaceThread (the surface's availability)", () => {
-  const s = { repos, sessions: sessions(session("s-ws", { workspaceId: "w1", terminalId: "t-ws" }), session("s-proj")), terminals };
+  const s = { repos, sessions: sessions(session("s-ws", { workspaceId: "w1", terminalId: "t-ws" }), session("s-proj")) };
   it.each<[string, Selection, { sessionId: string; workspaceId: string } | null]>([
     ["a workspace thread", { kind: "session", id: "s-ws" }, { sessionId: "s-ws", workspaceId: "w1" }],
-    ["a workspace thread's terminal", { kind: "terminal", id: "t-ws" }, { sessionId: "s-ws", workspaceId: "w1" }],
     ["a project thread", { kind: "session", id: "s-proj" }, null],
     ["an unknown thread", { kind: "session", id: "s-404" }, null],
-    ["a plain terminal", { kind: "terminal", id: "t-plain" }, null],
     ["a workspace composer (no thread yet)", { kind: "compose", repoId: "web", workspaceId: "w1" }, null],
     ["the Projects page", { kind: "view", name: "projects" }, null],
     ["nothing", { kind: "none" }, null],

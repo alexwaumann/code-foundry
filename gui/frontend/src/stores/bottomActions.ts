@@ -57,12 +57,12 @@ export function paneContext(key: string): UiContextView | null {
 }
 
 /**
- * Runs terminal.new in `ctx` and puts the keyboard in the shell it returns (by id, from
- * the result JSON): at once if the shell already arrived, else when it does
+ * Runs terminal.new in `ctx` (with `args`) and puts the keyboard in the shell it returns
+ * (by id, from the result JSON): at once if the shell already arrived, else when it does
  * (pendingFocusId). Nothing is left pending when the command fails.
  */
-async function startShell(ctx: UiContextView): Promise<boolean> {
-  const res = await runCommandForResult("terminal.new", {}, { ctx });
+async function startShell(ctx: UiContextView, args: Record<string, string> = {}): Promise<boolean> {
+  const res = await runCommandForResult("terminal.new", args, { ctx });
   if (res === null) return false;
   const id = terminalIdFromResult(res.resultJson);
   if (id !== null) focusOwnShell(id);
@@ -105,9 +105,13 @@ export function markTerminalNewFromHere(): void {
   markPendingFocus(bottomKeyOf(useUiStore.getState().selection));
 }
 
-/** terminal.new for a thread from elsewhere (its sidebar row's menu). */
-export function newThreadTerminal(sessionId: string): Promise<boolean> {
-  return startShell(getUiContext({ kind: "session", id: sessionId }));
+/**
+ * terminal.new for a thread from elsewhere: its sidebar row's menu (in the thread's
+ * worktree), or a member row of its side panel's Workspace surface (`cwd`: that member's
+ * worktree). Either way the thread owns the shell, so it opens in the thread's panel.
+ */
+export function newThreadTerminal(sessionId: string, cwd?: string): Promise<boolean> {
+  return startShell(getUiContext({ kind: "session", id: sessionId }), cwd ? { cwd } : {});
 }
 
 /** terminal.new in a worktree from the Projects page (its rows): the shell lands in the page's panel. */

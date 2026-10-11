@@ -7,11 +7,10 @@ import { linkedPrsTab, selectionLinkedThread, selectionThread } from "@/surfaces
 import { keyOf, openSurface } from "./panel";
 import { useReposStore } from "./repos";
 import { useSessionsStore } from "./sessions";
-import { useTerminalsStore } from "./terminals";
 import { useUiStore, type Selection } from "./ui";
 
 function stores() {
-  return { repos: useReposStore.getState(), sessions: useSessionsStore.getState(), terminals: useTerminalsStore.getState() };
+  return { repos: useReposStore.getState(), sessions: useSessionsStore.getState() };
 }
 
 /** What the selection is for the surface: a thread with links, a thread without any, or no thread. */
@@ -23,7 +22,7 @@ export function linkedPrsTarget(sel: Selection = useUiStore.getState().selection
 
 /**
  * Opens (or activates) the Linked PRs tab in the selection's panel when the selection is
- * a thread (or a thread's terminal) with linked pull requests. Returns that panel's key,
+ * a thread with linked pull requests. Returns that panel's key,
  * or null otherwise. It does not request focus.
  */
 export function openLinkedPrsSurface(sel: Selection = useUiStore.getState().selection): string | null {

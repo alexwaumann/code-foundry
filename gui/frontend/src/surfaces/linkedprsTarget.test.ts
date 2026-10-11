@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { LinkedPullRequestView, SessionView } from "@/api/session";
-import type { TerminalView } from "@/api/terminal";
 import type { ReposData } from "@/stores/repos";
 import type { SessionsData } from "@/stores/sessions";
-import type { TerminalsData } from "@/stores/terminals";
 import type { Selection } from "@/stores/ui";
 import { linkedCount, linkedPrsTab, newestFirst, prBadge, selectionLinkedThread, selectionThread, spansRepos, urlHost } from "./linkedprsTarget";
 
@@ -20,30 +18,15 @@ function sessions(...list: SessionView[]): SessionsData {
   return { byId: Object.fromEntries(list.map((s) => [s.id, s])), order: list.map((s) => s.id) };
 }
 
-const terminals: TerminalsData = {
-  byId: {
-    "t-linked": { id: "t-linked", cwd: WEB, labels: { session: "s-linked" } } as unknown as TerminalView,
-    "t-bare": { id: "t-bare", cwd: WEB, labels: { session: "s-bare" } } as unknown as TerminalView,
-    "t-plain": { id: "t-plain", cwd: WEB, labels: {} } as unknown as TerminalView,
-    "t-gone": { id: "t-gone", cwd: WEB, labels: { session: "s-404" } } as unknown as TerminalView,
-  },
-  order: [],
-};
-
 const s = {
   repos,
   sessions: sessions(session("s-linked", { linkedPullRequests: [link("o/web", 5)], workspaceId: "w1" }), session("s-bare")),
-  terminals,
 };
 
 describe("selectionThread / selectionLinkedThread (the surface's availability)", () => {
   it.each<[string, Selection, string | null, string | null]>([
     ["a thread with links", { kind: "session", id: "s-linked" }, "s-linked", "s-linked"],
     ["a thread without links", { kind: "session", id: "s-bare" }, "s-bare", null],
-    ["a linked thread's terminal", { kind: "terminal", id: "t-linked" }, "s-linked", "s-linked"],
-    ["an unlinked thread's terminal", { kind: "terminal", id: "t-bare" }, "s-bare", null],
-    ["a plain terminal", { kind: "terminal", id: "t-plain" }, null, null],
-    ["a terminal of an unknown thread", { kind: "terminal", id: "t-gone" }, null, null],
     ["an unknown thread", { kind: "session", id: "s-404" }, null, null],
     ["a composer", { kind: "compose", repoId: "web" }, null, null],
     ["a page", { kind: "view", name: "pullrequests" }, null, null],
