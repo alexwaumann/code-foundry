@@ -151,3 +151,15 @@ The screenshots were retaken after these fixes (the thread's second tab reads
 ## Not done
 
 * No real-app screenshots (screen locked).
+
+## Merged with main's Working section (#57)
+
+The stack took main's collapsible Working section (`sidebar-working-section.md`) on top of
+the terminal removal. The list's rows are threads plus the one Working header
+(`Row = HeaderRow | SessionRow` in `lib/tree.ts`, `isSessionRow`); no Terminals header, no
+loose terminals. `buildRows`/`sessionOrder` take sessions and `ListOptions` (no terminals);
+`getListSessions` plus `getListOptions` (the UI store's `workingCollapsed`) feed cmd+1..9
+and cmd+shift+a, so cmd+N jumps to the Nth thread in the rendered order (a collapsed
+Working section's threads do not count). The arrow keys, Home and End skip the header
+again (`stepThread`); a right-click on it opens no menu. e2e: `DEFAULT_ORDER` ends at s-1
+(s-2, s-6, s-4, s-3, Working, s-5, s-1); the "no terminal rows" checks allow the header.
