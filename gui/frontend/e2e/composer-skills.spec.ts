@@ -35,6 +35,36 @@ async function completionCalls(): Promise<string[]> {
   return (await res.json()) as string[];
 }
 
+type Box = { x: number; y: number; width: number; height: number };
+
+async function boxOf(page: Page, testId: string): Promise<Box> {
+  const box = await page.getByTestId(testId).boundingBox();
+  if (!box) throw new Error(`no box for ${testId}`);
+  return box;
+}
+
+/** The composer card and its worktree row, before the completion card opens. */
+async function composerBoxes(page: Page): Promise<{ composer: Box; row: Box }> {
+  return { composer: await boxOf(page, "composer-card"), row: await boxOf(page, "composer-worktree-row") };
+}
+
+/**
+ * The open completion card moved nothing (the composer card and the worktree row keep
+ * their boxes), hangs under the worktree row as wide as the composer card, and ends
+ * inside the window.
+ */
+async function expectAnchored(page: Page, before: { composer: Box; row: Box }): Promise<void> {
+  const after = await composerBoxes(page);
+  expect(after).toEqual(before);
+  const pop = await boxOf(page, "completion-card");
+  expect(pop.y).toBeGreaterThanOrEqual(after.row.y + after.row.height);
+  expect(Math.abs(pop.x - after.composer.x)).toBeLessThan(1);
+  expect(Math.abs(pop.width - after.composer.width)).toBeLessThan(1);
+  expect(pop.y + pop.height).toBeLessThanOrEqual(page.viewportSize()?.height ?? 0);
+}
+
+const setZoom = (page: Page, z: number) => page.evaluate(`import("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(z)}))`);
+
 const DEPLOY = "[/deploy](cf-skill://repo-cf/deploy)";
 const COMMIT = "[/commit](cf-skill://~/commit)";
 
@@ -44,20 +74,17 @@ test("type /dep: the card offers /deploy, Enter inserts a tag and a space withou
   await expect.poll(completionCalls).toContain("skills repo-cf true");
   const skillCalls = async () => (await completionCalls()).filter((c) => c.startsWith("skills ")).length;
   const loaded = await skillCalls();
+  const before = await composerBoxes(page);
   await page.keyboard.type("/dep");
   await expect(card(page)).toBeVisible();
-  // A single project: no project heading; the card sits between the card and the worktree row.
+  // A single project: no project heading; the card hangs under the worktree row.
   await expect(card(page).getByTestId("completion-group")).toHaveCount(0);
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).nth(0)).toContainText("/deploy");
   await expect(rows(page).nth(0)).toContainText("Ship the current branch to staging.");
   await expect(rows(page).nth(0)).toHaveAttribute("aria-selected", "true");
   await expect(card(page).getByTestId("completion-hints")).toHaveText(/↑\s*↓\s*move\s*⏎\s*⇥\s*insert\s*esc\s*dismiss/);
-  const cardBox = await page.getByTestId("composer-card").boundingBox();
-  const popBox = await card(page).boundingBox();
-  const worktreeBox = await page.getByTestId("composer-worktree").boundingBox();
-  expect(popBox && cardBox && popBox.y > cardBox.y && Math.abs(popBox.width - cardBox.width) < 2).toBe(true);
-  expect(popBox && worktreeBox && worktreeBox.y > popBox.y + popBox.height).toBe(true);
+  await expectAnchored(page, before);
   await expect(page.getByTestId("composer-input")).toHaveAttribute("aria-activedescendant", (await rows(page).nth(0).getAttribute("id")) ?? "");
 
   await page.keyboard.press("Enter");
@@ -237,3 +264,24 @@ test("a daemon older than ListSkills: / is plain text, no card", async ({ page }
   await expect.poll(newThreads).toBe(1);
   expect((await invocations()).at(-1)?.args.prompt).toBe("/dep");
 });
+
+for (const zoom of [100, 125]) {
+  test(`at ${String(zoom)}%: the card opens under the worktree row without moving the composer, and closes the same way`, async ({ page }) => {
+    await openApp(page);
+    await setZoom(page, zoom);
+    await expect(page.locator("html")).toHaveCSS("zoom", String(zoom / 100));
+    await compose(page);
+    await expect.poll(completionCalls).toContain("skills repo-cf true");
+    const before = await composerBoxes(page);
+    await page.keyboard.type("/");
+    // Every skill: deploy and review (project), commit (User).
+    await expect(rows(page)).toHaveCount(3);
+    await expectAnchored(page, before);
+    await page.keyboard.type("z");
+    await expect(card(page).getByTestId("completion-empty")).toBeVisible();
+    await expectAnchored(page, before);
+    await page.keyboard.press("Escape");
+    await expect(card(page)).toHaveCount(0);
+    expect(await composerBoxes(page)).toEqual(before);
+  });
+}

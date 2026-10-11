@@ -192,6 +192,20 @@
   }
 }
 
+/* Floating surfaces under page zoom (lib/zoom.ts, docs/notes/zoom-popovers.md). Radix
+   (floating-ui) measures anchors and the viewport with getBoundingClientRect, in viewport
+   px, and writes `transform: translate(x, y)` on this wrapper; under the zoom on <html>
+   that translate (and every --radix-popper-* length) would be scaled again. The wrapper
+   undoes the zoom so its translate lands in viewport px; its content zooms back so the
+   surface is the same size as the page around it. Lengths taken from --radix-*-available-*
+   inside the content divide by --cf-zoom. */
+[data-radix-popper-content-wrapper] {
+  zoom: calc(1 / var(--cf-zoom));
+}
+[data-radix-popper-content-wrapper] > * {
+  zoom: var(--cf-zoom);
+}
+
 /* Thin indeterminate bar for a session that is starting or closing. */
 @keyframes cf-indeterminate {
   0% {

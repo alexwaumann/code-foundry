@@ -52,8 +52,8 @@ const (
 )
 
 // RegisterSettings registers settings.get, settings.set, settings.reset, settings.path,
-// settings.reveal, and the view.settings and view.help commands that open the GUI's
-// settings page and help overlay. reveal may be nil (RevealInFinder).
+// settings.reveal, and the view.settings and view.help commands that toggle the GUI's
+// settings page and open its help overlay. reveal may be nil (RevealInFinder).
 func RegisterSettings(r *Registry, b SettingsBackend, e Emitter, reveal RevealFunc) error {
 	if reveal == nil {
 		reveal = RevealInFinder
@@ -191,8 +191,8 @@ func RegisterSettings(r *Registry, b SettingsBackend, e Emitter, reveal RevealFu
 		},
 		Command{
 			Name:        "view.settings",
-			Title:       "Open Settings",
-			Description: "Open the settings page in every connected window.",
+			Title:       "Settings",
+			Description: "Show the settings page in every connected window, or close it where it already shows.",
 			Category:    "View",
 			Keybindings: []string{"cmd+,"},
 			Run:         func(context.Context, Context, Args) (Result, error) { return show(ViewSettings), nil },

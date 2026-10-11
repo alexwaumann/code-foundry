@@ -19,7 +19,7 @@ import (
 //	-r, --resume <id>    resume a conversation by session id
 //	--fork-session       with --resume: continue under a new session id
 //	-p, --print          non-interactive; skips the trust dialog
-//	--no-session-persistence, --tools "", --strict-mcp-config (with -p, for naming)
+//	--no-session-persistence, --tools "" (with -p, for naming)
 //
 // and Claude Code 2.1.295:
 //
@@ -37,6 +37,13 @@ import (
 //	                          conversation's first request and reused verbatim on every
 //	                          later request and resume until compaction
 //	                          (--system-prompt-snapshot, default on)
+//
+// and Claude Code 2.1.296:
+//
+//	--safe-mode               no user customizations (CLAUDE.md, skills, plugins, hooks,
+//	                          MCP servers); managed settings still apply. Used for
+//	                          naming instead of --strict-mcp-config, which Claude
+//	                          refuses under an enterprise MCP config (naming.go)
 
 // Efforts are the valid --effort levels.
 var Efforts = []string{"low", "medium", "high", "xhigh", "max"}

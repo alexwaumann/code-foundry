@@ -573,12 +573,8 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
             }}
           />
         </div>
-        {/* The completion card, between the card and the worktree row (in flow). */}
-        <div className="col-span-2 col-start-1 row-start-3 min-w-0 empty:hidden">
-          <CompletionCard completion={completion} />
-        </div>
         {(error ?? notice) && (
-          <div className="col-span-2 col-start-1 row-start-4 flex flex-col gap-1 px-2 pt-2 text-sm">
+          <div className="col-span-2 col-start-1 row-start-3 flex flex-col gap-1 px-2 pt-2 text-sm">
             {error && (
               <p role="alert" className="text-destructive" data-testid="composer-error">
                 {error}
@@ -591,7 +587,8 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
             )}
           </div>
         )}
-        <div className="col-span-2 col-start-1 row-start-5 flex flex-wrap items-center gap-0.5 px-1 pt-2">
+        {/* relative: the completion card hangs under this row, out of flow (CompletionCard). */}
+        <div className="relative col-span-2 col-start-1 row-start-4 flex flex-wrap items-center gap-0.5 px-1 pt-2" data-testid="composer-worktree-row">
           <ComposerPicker
             label="Worktree"
             icon={worktreeIcon}
@@ -632,6 +629,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
               data-testid="composer-base"
             />
           )}
+          <CompletionCard completion={completion} />
         </div>
         <div className="col-start-2 row-start-2 flex items-end pr-2 pb-2">
           <button
