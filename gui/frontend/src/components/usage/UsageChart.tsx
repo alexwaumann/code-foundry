@@ -151,8 +151,12 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
             data-testid="usage-page-day"
             data-day={d.day}
             onMouseMove={(e) => {
-              const b = ref.current?.getBoundingClientRect();
-              setHover({ index: i, x: e.clientX - (b?.left ?? 0), y: e.clientY - (b?.top ?? 0) });
+              // Pointer and rect are viewport px; the tooltip's left/top are layout px, so
+              // divide by the page zoom (rendered width over layout width; lib/zoom.ts).
+              const el = ref.current;
+              const b = el?.getBoundingClientRect();
+              const scale = el && b && el.offsetWidth > 0 ? b.width / el.offsetWidth : 1;
+              setHover({ index: i, x: (e.clientX - (b?.left ?? 0)) / scale, y: (e.clientY - (b?.top ?? 0)) / scale });
             }}
             onMouseLeave={() => {
               setHover(null);
