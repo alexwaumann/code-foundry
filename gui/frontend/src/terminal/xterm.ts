@@ -9,6 +9,7 @@ import { copyText } from "@/lib/clipboard";
 import type { ColorScheme, Disposable, TermSize, TerminalRenderer } from "./renderer";
 import { DEFAULT_TERMINAL_FONT_FAMILY, onBundledFontLoaded } from "./fonts";
 import { KeyboardModes, shiftEnterSequence } from "./keyboard";
+import { swallowDaemonAnsweredQueries } from "./queries";
 import { terminalTheme } from "./theme";
 
 export type RendererKind = "webgl" | "dom";
@@ -69,6 +70,7 @@ export class XtermRenderer implements TerminalRenderer {
     );
     this.term.attachCustomKeyEventHandler((e) => this.keyHandler(e));
     this.trackKeyboardModes();
+    this.disposables.push(...swallowDaemonAnsweredQueries(this.term));
   }
 
   /**
