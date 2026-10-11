@@ -147,8 +147,8 @@ function TabButton({ panelKey, tab, active, focusable }: { panelKey: string; tab
 
 /**
  * Left/Right (and Home/End) move focus between tabs; Enter or Space on a tab activates it.
- * alt+Left/Right moves the focused tab one slot (clamped at the ends) and keeps focus on
- * it (or on its ×), revealing it if the move took it past the strip's edge.
+ * alt+Left/Right moves the focused tab one slot (clamped at the ends); focus stays on it
+ * (or on its ×), and the strip scrolls if the move took it past the edge.
  */
 function onTabListKeyDown(e: KeyboardEvent<HTMLElement>, panelKey: string): void {
   const strip = e.currentTarget;
@@ -163,13 +163,11 @@ function onTabListKeyDown(e: KeyboardEvent<HTMLElement>, panelKey: string): void
     const wrapper = tabs[i]?.parentElement;
     const id = wrapper?.dataset.tabId;
     if (!wrapper || id === undefined || to === i) return;
-    const focused = document.activeElement;
-    // Synchronously, so the moved tab is in place to refocus: React moves a node to put
-    // it after its neighbour, which drops its focus.
+    // Synchronously, so the tab is in its new place to reveal. Focus stays where it was:
+    // React restores it after a commit that moved the focused node.
     flushSync(() => {
       movePanelTab(panelKey, id, to);
     });
-    if (focused instanceof HTMLElement && document.activeElement !== focused) focused.focus({ preventScroll: true });
     revealElement(strip, wrapper);
     return;
   }

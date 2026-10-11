@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
 import { emit, invocations, mockUrl, openApp, openStreams, resetMock, row } from "./fixtures";
 
@@ -827,6 +827,206 @@ test("view.panel.new-tab from the palette and the CLI shows a hidden panel picki
   await expect(panel(page)).toHaveAttribute("data-picking", "true");
   expect((await invocations()).map((i) => i.name)).toContain("view.panel.new-tab");
 });
+
+/** The strip's tab titles, in DOM order. */
+function tabTitles(page: Page): Promise<string[]> {
+  return panel(page).getByRole("tab").allTextContents();
+}
+
+/**
+ * Presses the mouse on a tab and moves it, in steps (past the 4px drag threshold), to
+ * `x` on the tab's own row. The mouse stays down: `page.mouse.up()` drops it.
+ */
+async function startTabDrag(page: Page, tab: Locator, x: number): Promise<void> {
+  const b = await tab.boundingBox();
+  if (!b) throw new Error("no tab");
+  const y = b.y + b.height / 2;
+  await page.mouse.move(b.x + Math.min(12, b.width / 2), y);
+  await page.mouse.down();
+  await page.mouse.move(x, y, { steps: 12 });
+}
+
+/** The horizontal centre of an element, for a drop target. */
+async function centerX(l: Locator): Promise<number> {
+  const b = await l.boundingBox();
+  if (!b) throw new Error("no box");
+  return b.x + b.width / 2;
+}
+
+test("dragging a tab onto its neighbour reorders the strip without activating it; the order survives a reload", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await page.getByTestId("panel-toggle").click();
+  await injectTab(page, "files", "Files");
+  await injectTab(page, "diff", "Diff");
+  await injectTab(page, "pullrequest", "#12", { number: "12" });
+  const tabs = panel(page).getByRole("tab");
+  const body = panel(page).getByTestId("panel-body");
+  await expect(tabs).toHaveText(["Files", "Diff", "#12"]);
+
+  // Mid-drag: the tab is lifted (and still never drags the window); its neighbour slid left.
+  const diffLeft = await tabs.nth(1).evaluate((el) => (el.parentElement ?? el).getBoundingClientRect().left);
+  await startTabDrag(page, tabs.first(), (await centerX(tabs.nth(1))) + 12);
+  const lifted = panel(page).locator("[data-dragging]");
+  await expect(lifted).toHaveAttribute("data-tab-id", "files");
+  expect(await lifted.evaluate((el) => getComputedStyle(el).getPropertyValue("--wails-draggable").trim())).toBe("no-drag");
+  await expect.poll(() => tabs.nth(1).evaluate((el) => (el.parentElement ?? el).getBoundingClientRect().left)).toBeLessThan(diffLeft - 20);
+  await page.mouse.up();
+  await expect(tabs).toHaveText(["Diff", "Files", "#12"]);
+  await expect(lifted).toHaveCount(0);
+  // Dropping is not a click: the active tab stays.
+  await expect(body).toHaveAttribute("data-tab-id", "pullrequest?number=12");
+  await expect(tabs.filter({ hasText: "#12" })).toHaveAttribute("aria-selected", "true");
+
+  // A plain click still activates (the sensor waits for 4px; the × and middle click are covered above).
+  await tabs.filter({ hasText: "Files" }).click();
+  await expect(body).toHaveAttribute("data-tab-id", "files");
+
+  await page.reload();
+  await expect(row(page, "s:s-1")).toBeVisible();
+  await row(page, "s:s-1").click();
+  await expect(tabs).toHaveText(["Diff", "Files", "#12"]);
+  await expect(body).toHaveAttribute("data-tab-id", "files");
+});
+
+test("dropping a tab on the + puts it last; dragging back to the first tab puts it first", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await page.getByTestId("panel-toggle").click();
+  await injectTab(page, "files", "Files");
+  await injectTab(page, "diff", "Diff");
+  await injectTab(page, "pullrequest", "#12", { number: "12" });
+  const tabs = panel(page).getByRole("tab");
+  const plus = panel(page).getByTestId("panel-new-tab");
+
+  await startTabDrag(page, tabs.first(), await centerX(plus));
+  await page.mouse.up();
+  await expect(tabs).toHaveText(["Diff", "#12", "Files"]);
+  // The + stays after the last tab.
+  expect(await panel(page).getByTestId("panel-tabs").evaluate((el) => el.lastElementChild?.querySelector('[data-testid="panel-new-tab"]') !== null)).toBe(true);
+
+  await startTabDrag(page, tabs.last(), await centerX(tabs.first()));
+  await page.mouse.up();
+  await expect(tabs).toHaveText(["Files", "Diff", "#12"]);
+
+  // Escape mid-drag cancels: nothing moves.
+  await startTabDrag(page, tabs.first(), await centerX(plus));
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  await expect(tabs).toHaveText(["Files", "Diff", "#12"]);
+});
+
+test("dragging a tab to the strip's edge scrolls the strip and lands it at the far end; alt+Right past the edge scrolls too", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await page.getByTestId("panel-toggle").click();
+  for (let n = 1; n <= 12; n++) await injectTab(page, "pullrequest", `#${String(n)} tab`, { number: String(n) });
+  const tabs = panel(page).getByRole("tab");
+  const strip = panel(page).getByTestId("panel-tabs");
+  await expect(tabs).toHaveCount(12);
+  const scroll = () => strip.evaluate((el) => ({ left: Math.round(el.scrollLeft), max: el.scrollWidth - el.clientWidth }));
+  expect((await scroll()).max).toBeGreaterThan(200);
+
+  // To the right: from the start, hold the dragged first tab at the right edge.
+  await strip.evaluate((el) => {
+    el.scrollLeft = 0;
+  });
+  const s = await strip.boundingBox();
+  if (!s) throw new Error("no strip");
+  await startTabDrag(page, tabs.first(), s.x + s.width - 6);
+  await expect.poll(async () => (await scroll()).left, { timeout: 8_000 }).toBe((await scroll()).max);
+  await page.mouse.up();
+  await expect(tabs.last()).toHaveText("#1 tab");
+  await expect(tabs.first()).toHaveText("#2 tab");
+
+  // And back to the left edge: the last tab lands first.
+  await startTabDrag(page, tabs.last(), s.x + 6);
+  await expect.poll(async () => (await scroll()).left, { timeout: 8_000 }).toBe(0);
+  await page.mouse.up();
+  await expect(tabs.first()).toHaveText("#1 tab");
+  await expect(tabs.nth(1)).toHaveText("#2 tab");
+
+  // alt+Right on the last fully visible tab moves it past the edge: the strip follows it.
+  await strip.evaluate((el) => {
+    el.scrollLeft = 0;
+  });
+  const edge = await strip.evaluate((el) => {
+    const right = el.getBoundingClientRect().right;
+    const wrappers = Array.from(el.querySelectorAll<HTMLElement>("[data-tab-id]"));
+    const last = wrappers.filter((w) => w.getBoundingClientRect().right <= right).pop();
+    last?.querySelector<HTMLElement>('[role="tab"]')?.focus({ preventScroll: true });
+    return last?.dataset.tabId ?? "";
+  });
+  expect(await strip.evaluate((el) => el.scrollLeft)).toBe(0);
+  await page.keyboard.press("Alt+ArrowRight");
+  const moved = strip.locator(`[data-tab-id="${edge}"]`);
+  await expect.poll(() => strip.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  const [m, sb] = await Promise.all([moved.boundingBox(), strip.boundingBox()]);
+  expect(m && sb && m.x + m.width <= sb.x + sb.width + 1).toBe(true);
+  await expect(moved.getByRole("tab")).toBeFocused();
+});
+
+test("alt+Left/Right move the focused tab one slot, keep focus on it, and stop at the ends", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await page.getByTestId("panel-toggle").click();
+  await injectTab(page, "files", "Files");
+  await injectTab(page, "diff", "Diff");
+  await injectTab(page, "pullrequest", "#12", { number: "12" });
+  const tabs = panel(page).getByRole("tab");
+  const files = tabs.filter({ hasText: "Files" });
+  await files.focus();
+  await page.keyboard.press("Alt+ArrowRight");
+  await expect.poll(() => tabTitles(page)).toEqual(["Diff", "Files", "#12"]);
+  await expect(files).toBeFocused();
+  await page.keyboard.press("Alt+ArrowRight");
+  await expect.poll(() => tabTitles(page)).toEqual(["Diff", "#12", "Files"]);
+  await expect(files).toBeFocused();
+  // The last slot: nothing moves, focus stays.
+  await page.keyboard.press("Alt+ArrowRight");
+  await expect.poll(() => tabTitles(page)).toEqual(["Diff", "#12", "Files"]);
+  await expect(files).toBeFocused();
+  await page.keyboard.press("Alt+ArrowLeft");
+  await expect.poll(() => tabTitles(page)).toEqual(["Diff", "Files", "#12"]);
+  await expect(files).toBeFocused();
+  // Moving is not activating; plain arrows still move focus.
+  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "pullrequest?number=12");
+  await page.keyboard.press("ArrowLeft");
+  await expect(tabs.filter({ hasText: "Diff" })).toBeFocused();
+});
+
+/** SHOTS=<dir>: docs/notes/panel-tab-reorder screenshots, mid-drag, WebKit, 1400x900, dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`tab reorder screenshots (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    const suffix = scheme === "light" ? "-light" : "";
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.setViewportSize({ width: 1400, height: 900 });
+    await openApp(page);
+    await selectSession(page, "s-1");
+    await page.getByTestId("panel-toggle").click();
+    const empty = panel(page).getByTestId("panel-empty");
+    await empty.locator('[data-surface="worktree"]').click();
+    await panel(page).getByTestId("panel-new-tab").click();
+    await empty.locator('[data-surface="usage"]').click();
+    await injectTab(page, "pullrequest", "#12", { number: "12" });
+    const tabs = panel(page).getByRole("tab");
+    await expect(tabs).toHaveCount(3);
+    await tabs.first().click();
+    await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-surface", "worktree");
+
+    // Lift Usage and hold it over the worktree tab: that one has slid right to make room.
+    await startTabDrag(page, tabs.nth(1), (await centerX(tabs.first())) - 6);
+    await expect(panel(page).locator("[data-dragging]")).toHaveCount(1);
+    await page.waitForTimeout(400); // the neighbour's 200ms slide
+    await page.screenshot({ path: `${shots ?? ""}/panel-tab-reorder-drag${suffix}.png` });
+    const header = await box(page, "panel-header");
+    await page.screenshot({ path: `${shots ?? ""}/panel-tab-reorder-drag-closeup${suffix}.png`, clip: { x: header.left, y: header.top, width: header.right - header.left, height: header.bottom - header.top + 120 } });
+    await page.mouse.up();
+    await expect(tabs.first()).toHaveText("Usage");
+  });
+}
 
 /** SHOTS=<dir>: docs/notes/panel-new-tab screenshots, WebKit, 1400x900, dark and light. */
 for (const scheme of ["dark", "light"] as const) {
