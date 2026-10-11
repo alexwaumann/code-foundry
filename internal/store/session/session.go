@@ -101,6 +101,9 @@ const (
 	ReasonSpawnFailed    = "spawn failed"     // the terminal could not be created
 )
 
+// ReasonInterrupted is the StatusReason of StatusError: the process ended mid-turn.
+const ReasonInterrupted = "interrupted"
+
 // Session is an immutable snapshot of one session. Field meanings follow
 // codefoundry.v1.Session.
 //
@@ -117,8 +120,15 @@ type Session struct {
 	Effort          string
 	TerminalID      string // empty when disconnected
 	State           State
-	Status          Status
-	StatusReason    string
+	// Status and StatusReason are the detector's reading while connected. Persisted:
+	// once disconnected they keep what they were when the process ended (busy becomes
+	// StatusError ReasonInterrupted; see disconnectedStatus), across daemon restarts,
+	// until a reconnect's detector replaces them.
+	Status       Status
+	StatusReason string
+	// StatusChangedAt is when Status or StatusReason last changed. Persisted; zero if
+	// never known.
+	StatusChangedAt time.Time
 	CreatedAt       time.Time
 	LastActivityAt  time.Time
 	ExitCode        int

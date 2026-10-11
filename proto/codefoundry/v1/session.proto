@@ -77,6 +77,11 @@ enum SessionStatus {
   SESSION_STATUS_IDLE = 2;
   // Claude is waiting on the user: a permission prompt, a question, or a dialog.
   SESSION_STATUS_NEEDS_ATTENTION = 3;
+  // The session's process ended while Claude was working (status_reason
+  // "interrupted"): it crashed, exited, was closed, or the daemon stopped mid-turn. Set
+  // only on a DISCONNECTED session; a reconnect replaces it with the detector's
+  // reading. Claude-reported API errors stay NEEDS_ATTENTION "error: <code>".
+  SESSION_STATUS_ERROR = 4;
 }
 
 // Ownership: a thread belongs to exactly one owner. When workspace_id is set the owner
@@ -113,7 +118,10 @@ message Session {
   // Forked from this session id, if any.
   string parent_id = 17;
   // Short explanation of status from the detector, e.g. "finished", "at prompt",
-  // "permission: Do you want to proceed?". Empty when unknown or DISCONNECTED.
+  // "permission: Do you want to proceed?", or "interrupted" for ERROR. Persisted with
+  // status: a DISCONNECTED session keeps the status and reason it had when its process
+  // ended (a busy one becomes ERROR "interrupted"), across daemon restarts. Empty when
+  // unknown.
   string status_reason = 18;
   // Permission mode passed to claude; re-passed on Reconnect.
   PermissionMode permission_mode = 19;
@@ -139,6 +147,9 @@ message Session {
   // entries are never removed. A reconnected thread is backfilled from its transcript's
   // history. Persisted. See docs/notes/linked-prs.md.
   repeated LinkedPullRequest linked_pull_requests = 25;
+  // When status or status_reason last changed. Persisted with them; unset if never
+  // known (a row from before status persistence).
+  google.protobuf.Timestamp status_changed_at = 26;
 }
 
 // A pull request Claude linked to a session (Session.linked_pull_requests).

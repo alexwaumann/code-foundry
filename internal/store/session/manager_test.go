@@ -444,7 +444,10 @@ func TestStatusFromDetectorIsPublished(t *testing.T) {
 	e.det.set(StatusNeedsAttention, "permission prompt")
 	e.waitFor(s.ID, "needs attention via tick", func(s Session) bool { return s.Status == StatusNeedsAttention })
 	_ = e.terms.Exit(s.TerminalID, 0)
-	e.waitFor(s.ID, "status cleared", func(s Session) bool { return s.State == StateDisconnected && s.Status == StatusUnknown })
+	// Kept once disconnected (status_test.go covers the rules).
+	e.waitFor(s.ID, "status kept", func(s Session) bool {
+		return s.State == StateDisconnected && s.Status == StatusNeedsAttention && s.StatusReason == "permission prompt"
+	})
 }
 
 func TestReconnectResumesOrStartsFresh(t *testing.T) {

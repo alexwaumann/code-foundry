@@ -173,7 +173,9 @@ type record struct {
 var _ Store = (*Manager)(nil)
 
 // New loads persisted sessions and returns the Manager. Sessions that were live when
-// the daemon last stopped without a clean shutdown are marked DISCONNECTED.
+// the daemon last stopped without a clean shutdown are marked DISCONNECTED, keeping
+// their last published status by the same rule as any disconnect
+// (disconnectedStatus: busy becomes interrupted).
 func New(ctx context.Context, opts Options) (*Manager, error) {
 	opts, err := opts.withDefaults()
 	if err != nil {
@@ -188,6 +190,8 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	for _, s := range rows {
 		if s.State != StateDisconnected {
 			s.State, s.DisconnectReason = StateDisconnected, ReasonDaemonRestarts
+			st, reason := disconnectedStatus(s.Status, s.StatusReason)
+			s.setStatus(st, reason, opts.Now())
 			if err := saveSession(ctx, opts.DB, s); err != nil {
 				return nil, err
 			}
@@ -558,7 +562,8 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 	rec.run = r
 	rec.s.TerminalID = term.ID
 	rec.s.State = StateStarting
-	rec.s.Status, rec.s.StatusReason = StatusUnknown, ""
+	// The fresh detector owns status from here: the persisted one is cleared.
+	rec.s.setStatus(StatusUnknown, "", now)
 	rec.s.DisconnectReason, rec.s.ExitCode = "", 0
 	rec.s.LastActivityAt = now
 	m.commitLocked(rec, true)

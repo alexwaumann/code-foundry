@@ -81,6 +81,17 @@ func TestSessionUnaryAndErrorCodes(t *testing.T) {
 		got.Msg.GetSession().GetStatusReason() != "finished" {
 		t.Errorf("enum mapping = %v", got.Msg.GetSession())
 	}
+	if got.Msg.GetSession().GetStatusChangedAt() != nil {
+		t.Errorf("zero StatusChangedAt mapped to %v", got.Msg.GetSession().GetStatusChangedAt())
+	}
+	changed := time.Date(2026, 10, 10, 9, 30, 0, 0, time.UTC)
+	fake.Put(session.Session{ID: "s-11", Status: session.StatusError, StatusReason: session.ReasonInterrupted,
+		StatusChangedAt: changed, State: session.StateDisconnected})
+	got, _ = c.Get(ctx, connect.NewRequest(&v1.GetSessionRequest{Id: "s-11"}))
+	if p := got.Msg.GetSession(); p.GetStatus() != v1.SessionStatus_SESSION_STATUS_ERROR || p.GetStatusReason() != "interrupted" ||
+		!p.GetStatusChangedAt().AsTime().Equal(changed) {
+		t.Errorf("error status mapping = %v", p)
+	}
 	linkedAt := time.Date(2026, 10, 9, 18, 24, 11, 0, time.UTC)
 	fake.Put(session.Session{ID: "s-10", State: session.StateDisconnected, LinkedPullRequests: []session.LinkedPullRequest{
 		{Slug: "o/r", Number: 5, URL: "https://github.com/o/r/pull/5", LinkedAt: linkedAt},

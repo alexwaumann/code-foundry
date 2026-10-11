@@ -107,6 +107,26 @@ func sessionStateName(s v1.SessionState) string {
 	return strings.ToLower(strings.TrimPrefix(s.String(), "SESSION_STATE_"))
 }
 
+// listState is session.list's STATE cell: the state, with the disconnect reason when
+// disconnected ("disconnected (daemon stopped)").
+func listState(s *v1.Session) string {
+	st := sessionStateName(s.GetState())
+	if s.GetState() == v1.SessionState_SESSION_STATE_DISCONNECTED && s.GetDisconnectReason() != "" {
+		st += " (" + s.GetDisconnectReason() + ")"
+	}
+	return st
+}
+
+// listStatus is session.list's STATUS cell: the status, with the reason for ERROR
+// ("error (interrupted)").
+func listStatus(s *v1.Session) string {
+	st := strings.ToLower(strings.TrimPrefix(s.GetStatus().String(), "SESSION_STATUS_"))
+	if s.GetStatus() == v1.SessionStatus_SESSION_STATUS_ERROR && s.GetStatusReason() != "" {
+		st += " (" + s.GetStatusReason() + ")"
+	}
+	return st
+}
+
 // RegisterSession registers session.new, session.list, session.focus, session.close,
 // session.reconnect, session.rename, session.fork, session.remove, session.run-in, and
 // session.pin. The user-facing word is "thread" (titles, descriptions, messages);
@@ -193,14 +213,10 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
 				_, _ = fmt.Fprintln(tw, "ID\tNAME\tSTATE\tSTATUS\tREASON\tWORKSPACE\tPRS\tWORKTREE")
 				for _, s := range res.Msg.GetSessions() {
-					status := strings.ToLower(strings.TrimPrefix(s.GetStatus().String(), "SESSION_STATUS_"))
-					// The reason explains the state when disconnected, else the status.
-					reason := s.GetStatusReason()
-					if s.GetState() == v1.SessionState_SESSION_STATE_DISCONNECTED {
-						reason = s.GetDisconnectReason()
-					}
-					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), s.GetName(), sessionStateName(s.GetState()),
-						status, reason, cmp.Or(s.GetWorkspaceId(), "-"), linkedPRs(s), s.GetWorktreePath())
+					// The status and its reason persist once disconnected (a thread that
+					// was asking a question still is); the state cell says why it is.
+					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), s.GetName(), listState(s),
+						listStatus(s), cmp.Or(s.GetStatusReason(), "-"), cmp.Or(s.GetWorkspaceId(), "-"), linkedPRs(s), s.GetWorktreePath())
 				}
 				_ = tw.Flush()
 				return Result{Message: strings.TrimRight(sb.String(), "\n"), JSON: res.Msg}, nil

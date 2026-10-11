@@ -7,9 +7,10 @@ import (
 	"time"
 )
 
-// Persistence for the sessions table (migrations 0003, 0006, 0008 and 0009) and
-// session_pull_requests (0010). Terminal id and status are not persisted: no process
-// survives a daemon restart.
+// Persistence for the sessions table (migrations 0003, 0006, 0008, 0009 and 0011) and
+// session_pull_requests (0010). The terminal id is not persisted: no process survives
+// a daemon restart. Status, its reason and StatusChangedAt are (0011): a disconnected
+// session keeps the status it ended with.
 
 func millis(t time.Time) int64 {
 	if t.IsZero() {
@@ -29,8 +30,9 @@ func saveSession(ctx context.Context, db *sql.DB, s Session) error {
 	_, err := db.ExecContext(ctx, `INSERT INTO sessions (
 			id, claude_session_id, repo_id, worktree_path, name, auto_named, model, effort,
 			created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
-			permission_mode, base_ref, created_worktree, workspace_id, pinned)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			permission_mode, base_ref, created_worktree, workspace_id, pinned,
+			status, status_reason, status_changed_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET
 			claude_session_id = excluded.claude_session_id,
 			repo_id = excluded.repo_id,
@@ -49,10 +51,14 @@ func saveSession(ctx context.Context, db *sql.DB, s Session) error {
 			base_ref = excluded.base_ref,
 			created_worktree = excluded.created_worktree,
 			workspace_id = excluded.workspace_id,
-			pinned = excluded.pinned`,
+			pinned = excluded.pinned,
+			status = excluded.status,
+			status_reason = excluded.status_reason,
+			status_changed_at = excluded.status_changed_at`,
 		s.ID, s.ClaudeSessionID, s.RepoID, s.WorktreePath, s.Name, s.AutoNamed, s.Model, s.Effort,
 		millis(s.CreatedAt), millis(s.LastActivityAt), s.ParentID, int(s.State), s.DisconnectReason, s.ExitCode, s.LastError,
-		int(s.PermissionMode), s.BaseRef, s.CreatedWorktree, s.WorkspaceID, s.Pinned)
+		int(s.PermissionMode), s.BaseRef, s.CreatedWorktree, s.WorkspaceID, s.Pinned,
+		int(s.Status), s.StatusReason, millis(s.StatusChangedAt))
 	if err != nil {
 		return fmt.Errorf("session: save %s: %w", s.ID, err)
 	}
@@ -69,7 +75,8 @@ func deleteSession(ctx context.Context, db *sql.DB, id string) error {
 func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 	rows, err := db.QueryContext(ctx, `SELECT id, claude_session_id, repo_id, worktree_path, name, auto_named,
 			model, effort, created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
-			permission_mode, base_ref, created_worktree, workspace_id, pinned
+			permission_mode, base_ref, created_worktree, workspace_id, pinned,
+			status, status_reason, status_changed_at
 		FROM sessions ORDER BY created_at, id`)
 	if err != nil {
 		return nil, fmt.Errorf("session: load: %w", err)
@@ -78,17 +85,22 @@ func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 	var out []Session
 	for rows.Next() {
 		var s Session
-		var created, active int64
-		var state, perm int
+		var created, active, statusAt int64
+		var state, perm, status int
 		if err := rows.Scan(&s.ID, &s.ClaudeSessionID, &s.RepoID, &s.WorktreePath, &s.Name, &s.AutoNamed,
 			&s.Model, &s.Effort, &created, &active, &s.ParentID, &state, &s.DisconnectReason, &s.ExitCode, &s.LastError,
-			&perm, &s.BaseRef, &s.CreatedWorktree, &s.WorkspaceID, &s.Pinned); err != nil {
+			&perm, &s.BaseRef, &s.CreatedWorktree, &s.WorkspaceID, &s.Pinned,
+			&status, &s.StatusReason, &statusAt); err != nil {
 			return nil, fmt.Errorf("session: load: %w", err)
 		}
 		s.CreatedAt, s.LastActivityAt, s.State = fromMillis(created), fromMillis(active), State(state)
 		if s.PermissionMode = PermissionMode(perm); !s.PermissionMode.valid() {
 			s.PermissionMode = PermissionDefault
 		}
+		if s.Status = Status(status); !s.Status.valid() {
+			s.Status, s.StatusReason = StatusUnknown, ""
+		}
+		s.StatusChangedAt = fromMillis(statusAt)
 		out = append(out, s)
 	}
 	if err := rows.Err(); err != nil {
