@@ -18,6 +18,7 @@ That wrapper is portaled into `<body>`, under the zoom on `<html>`, so the trans
 Probe, composer model picker at 125% (1280×800): trigger left/bottom 421/485, wrapper
 `translate(421px, 491px)`, list drawn at 526.25/613.75 (= 421 × 1.25, 491 × 1.25). At
 90% the list sat 47 px left of and above its trigger.
+`zoom-popovers/before-model-picker-125-mock.png` is the mock app at 125% without the fix.
 
 The same mismatch hit the lengths Radix exposes as CSS variables
 (`--radix-popper-available-width/height`, `--radix-*-content-available-height`): viewport
