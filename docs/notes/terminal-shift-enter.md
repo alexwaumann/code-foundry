@@ -1,7 +1,8 @@
 # Shift+Enter in the terminal
 
-Status: done. Frontend-only (`gui/frontend/src/terminal/keyboard.ts`, `xterm.ts`). No
-daemon or proto change.
+Status: done. Frontend-only (`gui/frontend/src/terminal/keyboard.ts`, `queries.ts`,
+`xterm.ts`). No daemon or proto change. This PR also stops xterm.js from answering terminal
+queries the daemon already answers (see "Duplicate query replies").
 
 ## Problem
 
@@ -87,29 +88,76 @@ The key handler intercepts keydown **and** keypress for shift+enter, and calls
 * **Global chords:** nothing is bound to shift+enter. The check runs before
   `isGlobalChord`.
 
+## Duplicate query replies
+
+**Symptom.** When a thread was on screen while Claude started, its first line read
+`^[[I^[[?1;2c…6;2$y^[[?1;2c`.
+
+**Cause.** At startup Claude sends DA1, XTVERSION, the kitty `CSI ?u` query, and DECRQM
+`?2026`. The daemon's libghostty emulator answers these at once, from the actor. The
+attached xterm.js *also* answered DA1 (`?1;2c`) and DECRQM (`?2026;2$y`) through
+`onData` → `Write`. That reply arrives a GUI round trip later. Between its setup phases,
+Claude briefly puts the tty back into cooked mode with echo. A late reply landing in that
+window is echoed onto the screen as text.
+
+**Fix (`queries.ts`).** The daemon becomes the only responder. xterm parser handlers that
+return `true` consume the queries before xterm's own handlers can reply:
+
+| Query | xterm's reply | Daemon (libghostty) | Decision |
+|---|---|---|---|
+| DA1 `CSI c`, DA2 `CSI > c` | yes | `vt.go` handler (DA1/2/3) | swallow |
+| DSR `CSI 5n`/`6n`, `CSI ? 6n` | yes | built in | swallow |
+| DECRQM `CSI $p`, `CSI ? $p` | yes | built in | swallow |
+| DECRQSS `DCS $ q` | yes | built in | swallow |
+| OSC 4 palette query (`n;?` only) | yes | built in (its palette) | swallow; OSC 4 *sets* still reach xterm |
+| OSC 10/11/12 color query | yes (theme colors) | no reply (no default fg/bg configured) | **keep**: xterm is the only answer |
+| Focus in/out `CSI I`/`CSI O` | yes (mode 1004) | cannot know focus | **keep**: an event, not a reply |
+| XTVERSION, kitty `CSI ?u`, DA3, XTWINOPS | no (xterm 6 lacks them, window ops are off) | built in / size handler | nothing to do |
+
+**Do programs lose anything?** No. Every swallowed query still gets exactly one answer,
+from the daemon. That answer arrives sooner, does not depend on a GUI being attached, and
+comes once per query rather than once per attached window. vim's DA/DECRQM probing,
+zsh/starship cursor-position queries, and Claude's synchronized-output probe all still
+get answered. Two answers did differ: the daemon reports DA1 as VT220 + ANSI color
+(`?62;22c`) where xterm said `?1;2c`, and its OSC 4 replies use libghostty's default
+palette rather than the xterm theme. In both cases programs already took the daemon's
+answer, because it was always first.
+
+**Side effect on status detection.** `phase2-integration.md` noted that xterm's
+auto-replies reached the detector's `Input` as if the user had typed. With them gone,
+`Input` from a GUI means keys, pastes, mouse, and focus reports only. Acknowledgement does
+not depend on it: `runner.acknowledge` keys off a viewer being attached.
+
+**Kept and not fixed: focus reports.** They are user events: nvim `FocusGained` and
+Claude both use them. If the window gains focus during Claude's brief cooked-mode window,
+`^[[I` can still be echoed. Three visible-at-launch starts in the live check showed
+nothing.
+
+The tests (`queries.test.ts`) write each query into a real, opened xterm in jsdom
+(`matchMedia` stubbed) and assert that `onData` stays silent, and that OSC 10/11 are
+still answered. With the swallowing disabled, 11 of the cases fail. Kitty tracking still
+works alongside (an OSC 4 set followed by a kitty push).
+
 ## Verification
 
 * `keyboard.test.ts`: a table of mode sequences mapped to the expected shift+enter bytes,
   plus stack eviction and masking. `xterm.test.ts`: a real xterm `Terminal` in jsdom
   checks the parser-hook wiring, alt-screen switching, and RIS, and runs the key handler
-  for keydown/keypress, enter, ctrl+enter, and IME composition.
-* Live (`make gui-build`, isolated `CODE_FOUNDRY_HOME=/tmp/shiftenter-pr`): in a haiku
-  thread, text + shift+enter + text gave a multi-line prompt, and Enter then submitted
-  both lines as one message. In a `zsh -il` terminal, shift+enter ran the command like
-  Enter.
+  for keydown/keypress, enter, ctrl+enter, and IME composition. `queries.test.ts`: see
+  above.
+* Live (`make gui-build`, isolated `CODE_FOUNDRY_HOME=/tmp/shiftenter-pr2`, after merging
+  main): three haiku threads were started with the window frontmost and the new thread
+  visible, and none showed replies at the top. Text + shift+enter + text gave a
+  multi-line prompt, and Enter submitted all three lines as one message. In a `zsh -il`
+  terminal, shift+enter ran the command like Enter.
 
+![Thread visible from launch: no echoed replies](terminal-shift-enter/claude-startup-visible.png)
 ![Claude prompt with shift+enter](terminal-shift-enter/claude-shift-enter.png)
-![Enter submits both lines](terminal-shift-enter/claude-enter-submits.png)
+![Enter submits all lines](terminal-shift-enter/claude-enter-submits.png)
 ![zsh: shift+enter runs the line](terminal-shift-enter/zsh-shift-enter.png)
 
 ## Gotchas
 
-* **A thread attached while Claude starts shows its startup query replies as text.** In
-  `claude-enter-submits.png`, the first line reads `^[[I^[[?1;2c…6;2$y`. That is xterm.js
-  answering DA1/DECRQM/focus while Claude's tty is still in cooked mode, and the tty
-  echoes the answer. It is unrelated to this change; `phase2-integration.md` notes that
-  xterm auto-replies. It disappears if the GUI attaches after startup, and the parser
-  hooks suggested in `phase1a-terminal.md` would fix it.
 * **A shared `GOCACHE` across worktrees can link the wrong libghostty.** A throwaway cgo
   build tried to link `libghostty-vt.a` from another worktree's `third_party/` path.
   Use a separate `GOCACHE` for one-off cgo builds outside `make`.
