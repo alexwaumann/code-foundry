@@ -94,8 +94,10 @@ step; nothing under `gui/frontend/src/components` changed.
 * `make check` green. New tests: `internal/store/session/status_test.go` (rule table,
   stamping, every disconnect path persisted and read back, crash-left live rows, reconnect
   handover), CLI list rows, API mapping, `src/lib/session.test.ts` (captured reasons),
-  badge and attention tables, mapping test. `make gui-e2e` green, with a new spec
-  for the persisted badges.
+  badge and attention tables, mapping test. `make gui-e2e`: 371/372, the one failure
+  a chromium timing flake in `gitops.spec.ts:17` (git-op progress toast; passed on webkit
+  and in 3 chromium reruns along with sessions/start specs). New spec for the persisted
+  badges in `sessions.spec.ts`.
 * Live, scratch daemon (`CODE_FOUNDRY_HOME=/tmp/cf-status-e2e`, repo `~/tmp/cf-status-repo`,
   haiku/medium):
   * busy (`working: Numbers 1 to 800 in words`), SIGTERM, restart:
