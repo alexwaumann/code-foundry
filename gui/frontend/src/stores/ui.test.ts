@@ -83,6 +83,21 @@ describe("ui persistence", () => {
     expect(saved).not.toHaveProperty("panelWidth");
     expect(saved).toHaveProperty("sidebarWidth");
   });
+
+  it("saves and loads the Working section's collapsed state; expanded by default and for a bad value", () => {
+    expect(useUiStore.getInitialState().workingCollapsed).toBe(false);
+    const opts = useUiStore.persist.getOptions();
+    const current = useUiStore.getState();
+    useUiStore.setState({ workingCollapsed: false });
+    useUiStore.getState().toggleWorkingCollapsed();
+    expect(useUiStore.getState().workingCollapsed).toBe(true);
+    expect(opts.partialize?.(useUiStore.getState())).toMatchObject({ workingCollapsed: true });
+    expect(opts.merge?.({ workingCollapsed: true }, current).workingCollapsed).toBe(true);
+    expect(opts.merge?.({}, { ...current, workingCollapsed: false }).workingCollapsed).toBe(false);
+    expect(opts.merge?.({ workingCollapsed: "yes" }, { ...current, workingCollapsed: false }).workingCollapsed).toBe(false);
+    useUiStore.getState().toggleWorkingCollapsed();
+    expect(useUiStore.getState().workingCollapsed).toBe(false);
+  });
 });
 
 describe("closePalette", () => {

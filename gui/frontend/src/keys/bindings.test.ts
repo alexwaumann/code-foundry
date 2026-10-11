@@ -91,7 +91,7 @@ describe("handleKeyDown precedence", () => {
       ],
     });
     useSessionsStore.setState({ byId: {}, order: [] });
-    useUiStore.setState({ selection: { kind: "none" }, renamingSessionId: null });
+    useUiStore.setState({ selection: { kind: "none" }, renamingSessionId: null, workingCollapsed: false });
     runCommand.mockClear();
   });
 
@@ -166,6 +166,50 @@ describe("handleKeyDown precedence", () => {
       seen.push(sel.kind === "session" ? sel.id : "");
     }
     expect(seen).toEqual(["b", "c", "a", "b"]);
+  });
+
+  describe("cmd+1..9 follow the sidebar's groups", () => {
+    // Creation order a..f: the sidebar shows f (pinned, busy), d (question), b (interrupted),
+    // e (finished), c (idle), then under Working: a (busy).
+    beforeEach(() => {
+      useSessionsStore.setState({
+        byId: {
+          a: session("a", { status: "busy" }),
+          b: session("b", { state: "disconnected", status: "error", statusReason: "interrupted" }),
+          c: session("c"),
+          d: session("d", { status: "attention", statusReason: "question: Which?" }),
+          e: session("e", { status: "attention", statusReason: "finished" }),
+          f: session("f", { status: "busy", pinned: true }),
+        },
+        order: ["a", "b", "c", "d", "e", "f"],
+      });
+    });
+    const jumpTo = (n: number) => {
+      press(outside, { key: String(n), code: `Digit${String(n)}`, metaKey: true });
+      const sel = useUiStore.getState().selection;
+      return sel.kind === "session" ? sel.id : "";
+    };
+
+    it("expanded: pinned, prompts, errors, finished, idle, working", () => {
+      expect([1, 2, 3, 4, 5, 6].map(jumpTo)).toEqual(["f", "d", "b", "e", "c", "a"]);
+    });
+
+    it("collapsed: the hidden Working rows are skipped (cmd+6 does nothing)", () => {
+      useUiStore.setState({ workingCollapsed: true });
+      expect([1, 2, 3, 4, 5].map(jumpTo)).toEqual(["f", "d", "b", "e", "c"]);
+      expect(jumpTo(6)).toBe("c");
+    });
+
+    it("cmd+shift+a is unchanged by collapsing: only the waiting threads", () => {
+      useUiStore.setState({ workingCollapsed: true });
+      const seen: string[] = [];
+      for (let i = 0; i < 3; i++) {
+        press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
+        const sel = useUiStore.getState().selection;
+        seen.push(sel.kind === "session" ? sel.id : "");
+      }
+      expect(seen).toEqual(["d", "e", "d"]);
+    });
   });
 
   it("text fields consume command chords", () => {
