@@ -49,6 +49,8 @@ const (
 	TerminalServiceKillProcedure = "/codefoundry.v1.TerminalService/Kill"
 	// TerminalServiceRemoveProcedure is the fully-qualified name of the TerminalService's Remove RPC.
 	TerminalServiceRemoveProcedure = "/codefoundry.v1.TerminalService/Remove"
+	// TerminalServiceCloseProcedure is the fully-qualified name of the TerminalService's Close RPC.
+	TerminalServiceCloseProcedure = "/codefoundry.v1.TerminalService/Close"
 	// TerminalServiceWatchProcedure is the fully-qualified name of the TerminalService's Watch RPC.
 	TerminalServiceWatchProcedure = "/codefoundry.v1.TerminalService/Watch"
 )
@@ -73,6 +75,10 @@ type TerminalServiceClient interface {
 	Kill(context.Context, *connect.Request[v1.KillTerminalRequest]) (*connect.Response[v1.KillTerminalResponse], error)
 	// Remove forgets an exited terminal.
 	Remove(context.Context, *connect.Request[v1.RemoveTerminalRequest]) (*connect.Response[v1.RemoveTerminalResponse], error)
+	// Close kills the terminal like Kill, waits for it to exit, and removes it. It returns
+	// once the terminal is gone (Watch has sent `updated` with state EXITED, then
+	// `removed_id`). Closing an exited terminal just removes it.
+	Close(context.Context, *connect.Request[v1.CloseTerminalRequest]) (*connect.Response[v1.CloseTerminalResponse], error)
 	// Watch streams lifecycle and metadata changes for all terminals.
 	Watch(context.Context, *connect.Request[v1.WatchTerminalsRequest]) (*connect.ServerStreamForClient[v1.TerminalEvent], error)
 }
@@ -136,6 +142,12 @@ func NewTerminalServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(terminalServiceMethods.ByName("Remove")),
 			connect.WithClientOptions(opts...),
 		),
+		close: connect.NewClient[v1.CloseTerminalRequest, v1.CloseTerminalResponse](
+			httpClient,
+			baseURL+TerminalServiceCloseProcedure,
+			connect.WithSchema(terminalServiceMethods.ByName("Close")),
+			connect.WithClientOptions(opts...),
+		),
 		watch: connect.NewClient[v1.WatchTerminalsRequest, v1.TerminalEvent](
 			httpClient,
 			baseURL+TerminalServiceWatchProcedure,
@@ -155,6 +167,7 @@ type terminalServiceClient struct {
 	resize *connect.Client[v1.ResizeTerminalRequest, v1.ResizeTerminalResponse]
 	kill   *connect.Client[v1.KillTerminalRequest, v1.KillTerminalResponse]
 	remove *connect.Client[v1.RemoveTerminalRequest, v1.RemoveTerminalResponse]
+	close  *connect.Client[v1.CloseTerminalRequest, v1.CloseTerminalResponse]
 	watch  *connect.Client[v1.WatchTerminalsRequest, v1.TerminalEvent]
 }
 
@@ -198,6 +211,11 @@ func (c *terminalServiceClient) Remove(ctx context.Context, req *connect.Request
 	return c.remove.CallUnary(ctx, req)
 }
 
+// Close calls codefoundry.v1.TerminalService.Close.
+func (c *terminalServiceClient) Close(ctx context.Context, req *connect.Request[v1.CloseTerminalRequest]) (*connect.Response[v1.CloseTerminalResponse], error) {
+	return c.close.CallUnary(ctx, req)
+}
+
 // Watch calls codefoundry.v1.TerminalService.Watch.
 func (c *terminalServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchTerminalsRequest]) (*connect.ServerStreamForClient[v1.TerminalEvent], error) {
 	return c.watch.CallServerStream(ctx, req)
@@ -223,6 +241,10 @@ type TerminalServiceHandler interface {
 	Kill(context.Context, *connect.Request[v1.KillTerminalRequest]) (*connect.Response[v1.KillTerminalResponse], error)
 	// Remove forgets an exited terminal.
 	Remove(context.Context, *connect.Request[v1.RemoveTerminalRequest]) (*connect.Response[v1.RemoveTerminalResponse], error)
+	// Close kills the terminal like Kill, waits for it to exit, and removes it. It returns
+	// once the terminal is gone (Watch has sent `updated` with state EXITED, then
+	// `removed_id`). Closing an exited terminal just removes it.
+	Close(context.Context, *connect.Request[v1.CloseTerminalRequest]) (*connect.Response[v1.CloseTerminalResponse], error)
 	// Watch streams lifecycle and metadata changes for all terminals.
 	Watch(context.Context, *connect.Request[v1.WatchTerminalsRequest], *connect.ServerStream[v1.TerminalEvent]) error
 }
@@ -282,6 +304,12 @@ func NewTerminalServiceHandler(svc TerminalServiceHandler, opts ...connect.Handl
 		connect.WithSchema(terminalServiceMethods.ByName("Remove")),
 		connect.WithHandlerOptions(opts...),
 	)
+	terminalServiceCloseHandler := connect.NewUnaryHandler(
+		TerminalServiceCloseProcedure,
+		svc.Close,
+		connect.WithSchema(terminalServiceMethods.ByName("Close")),
+		connect.WithHandlerOptions(opts...),
+	)
 	terminalServiceWatchHandler := connect.NewServerStreamHandler(
 		TerminalServiceWatchProcedure,
 		svc.Watch,
@@ -306,6 +334,8 @@ func NewTerminalServiceHandler(svc TerminalServiceHandler, opts ...connect.Handl
 			terminalServiceKillHandler.ServeHTTP(w, r)
 		case TerminalServiceRemoveProcedure:
 			terminalServiceRemoveHandler.ServeHTTP(w, r)
+		case TerminalServiceCloseProcedure:
+			terminalServiceCloseHandler.ServeHTTP(w, r)
 		case TerminalServiceWatchProcedure:
 			terminalServiceWatchHandler.ServeHTTP(w, r)
 		default:
@@ -347,6 +377,10 @@ func (UnimplementedTerminalServiceHandler) Kill(context.Context, *connect.Reques
 
 func (UnimplementedTerminalServiceHandler) Remove(context.Context, *connect.Request[v1.RemoveTerminalRequest]) (*connect.Response[v1.RemoveTerminalResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.TerminalService.Remove is not implemented"))
+}
+
+func (UnimplementedTerminalServiceHandler) Close(context.Context, *connect.Request[v1.CloseTerminalRequest]) (*connect.Response[v1.CloseTerminalResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.TerminalService.Close is not implemented"))
 }
 
 func (UnimplementedTerminalServiceHandler) Watch(context.Context, *connect.Request[v1.WatchTerminalsRequest], *connect.ServerStream[v1.TerminalEvent]) error {

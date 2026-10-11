@@ -87,7 +87,21 @@ type Terminal struct {
 	ExitedAt  *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=exited_at,json=exitedAt,proto3" json:"exited_at,omitempty"`
 	// True while the program is on the alternate screen (DECSET 1049/1047/47).
 	AltScreen bool `protobuf:"varint,11,opt,name=alt_screen,json=altScreen,proto3" json:"alt_screen,omitempty"`
-	// Opaque labels set by the creator (e.g. session store). Not interpreted here.
+	// Labels set by the creator. TerminalService does not interpret them; the daemon's
+	// creators follow this contract (internal/store/terminal/termlabel):
+	//
+	//	kind      "shell" on a shell started by the terminal.new command. A session's
+	//	          Claude terminal has no kind. The daemon removes a "shell" terminal as
+	//	          soon as it exits, kills and removes it when its thread is removed
+	//	          (session.remove), and when its worktree is removed.
+	//	session   the thread (session id) the terminal belongs to: on a session's Claude
+	//	          terminal, and on a shell started for a thread.
+	//	repo      the repository id of the worktree a shell belongs to.
+	//	worktree  the worktree path (symlinks resolved) the terminal belongs to: the
+	//	          session's worktree on a Claude terminal; on a shell, its owner worktree
+	//	          (the thread's worktree when it belongs to a thread).
+	//
+	// A terminal created through Create without labels belongs to nothing.
 	Labels        map[string]string `protobuf:"bytes,12,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1006,6 +1020,86 @@ func (*RemoveTerminalResponse) Descriptor() ([]byte, []int) {
 	return file_codefoundry_v1_terminal_proto_rawDescGZIP(), []int{16}
 }
 
+type CloseTerminalRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CloseTerminalRequest) Reset() {
+	*x = CloseTerminalRequest{}
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloseTerminalRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloseTerminalRequest) ProtoMessage() {}
+
+func (x *CloseTerminalRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloseTerminalRequest.ProtoReflect.Descriptor instead.
+func (*CloseTerminalRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_terminal_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *CloseTerminalRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type CloseTerminalResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CloseTerminalResponse) Reset() {
+	*x = CloseTerminalResponse{}
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloseTerminalResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloseTerminalResponse) ProtoMessage() {}
+
+func (x *CloseTerminalResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloseTerminalResponse.ProtoReflect.Descriptor instead.
+func (*CloseTerminalResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_terminal_proto_rawDescGZIP(), []int{18}
+}
+
 type WatchTerminalsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1014,7 +1108,7 @@ type WatchTerminalsRequest struct {
 
 func (x *WatchTerminalsRequest) Reset() {
 	*x = WatchTerminalsRequest{}
-	mi := &file_codefoundry_v1_terminal_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1026,7 +1120,7 @@ func (x *WatchTerminalsRequest) String() string {
 func (*WatchTerminalsRequest) ProtoMessage() {}
 
 func (x *WatchTerminalsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_terminal_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1039,7 +1133,7 @@ func (x *WatchTerminalsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchTerminalsRequest.ProtoReflect.Descriptor instead.
 func (*WatchTerminalsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_terminal_proto_rawDescGZIP(), []int{17}
+	return file_codefoundry_v1_terminal_proto_rawDescGZIP(), []int{19}
 }
 
 type TerminalEvent struct {
@@ -1055,7 +1149,7 @@ type TerminalEvent struct {
 
 func (x *TerminalEvent) Reset() {
 	*x = TerminalEvent{}
-	mi := &file_codefoundry_v1_terminal_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1067,7 +1161,7 @@ func (x *TerminalEvent) String() string {
 func (*TerminalEvent) ProtoMessage() {}
 
 func (x *TerminalEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_terminal_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1080,7 +1174,7 @@ func (x *TerminalEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalEvent.ProtoReflect.Descriptor instead.
 func (*TerminalEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_terminal_proto_rawDescGZIP(), []int{18}
+	return file_codefoundry_v1_terminal_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *TerminalEvent) GetEvent() isTerminalEvent_Event {
@@ -1140,7 +1234,7 @@ type AttachEvent_Snapshot struct {
 
 func (x *AttachEvent_Snapshot) Reset() {
 	*x = AttachEvent_Snapshot{}
-	mi := &file_codefoundry_v1_terminal_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1152,7 +1246,7 @@ func (x *AttachEvent_Snapshot) String() string {
 func (*AttachEvent_Snapshot) ProtoMessage() {}
 
 func (x *AttachEvent_Snapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_terminal_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1205,7 +1299,7 @@ type AttachEvent_Output struct {
 
 func (x *AttachEvent_Output) Reset() {
 	*x = AttachEvent_Output{}
-	mi := &file_codefoundry_v1_terminal_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1217,7 +1311,7 @@ func (x *AttachEvent_Output) String() string {
 func (*AttachEvent_Output) ProtoMessage() {}
 
 func (x *AttachEvent_Output) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_terminal_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1250,7 +1344,7 @@ type AttachEvent_Resized struct {
 
 func (x *AttachEvent_Resized) Reset() {
 	*x = AttachEvent_Resized{}
-	mi := &file_codefoundry_v1_terminal_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1262,7 +1356,7 @@ func (x *AttachEvent_Resized) String() string {
 func (*AttachEvent_Resized) ProtoMessage() {}
 
 func (x *AttachEvent_Resized) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_terminal_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1301,7 +1395,7 @@ type AttachEvent_Exited struct {
 
 func (x *AttachEvent_Exited) Reset() {
 	*x = AttachEvent_Exited{}
-	mi := &file_codefoundry_v1_terminal_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1313,7 +1407,7 @@ func (x *AttachEvent_Exited) String() string {
 func (*AttachEvent_Exited) ProtoMessage() {}
 
 func (x *AttachEvent_Exited) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_terminal_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_terminal_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1414,7 +1508,10 @@ const file_codefoundry_v1_terminal_proto_rawDesc = "" +
 	"\x14KillTerminalResponse\"'\n" +
 	"\x15RemoveTerminalRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x18\n" +
-	"\x16RemoveTerminalResponse\"\x17\n" +
+	"\x16RemoveTerminalResponse\"&\n" +
+	"\x14CloseTerminalRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x17\n" +
+	"\x15CloseTerminalResponse\"\x17\n" +
 	"\x15WatchTerminalsRequest\"o\n" +
 	"\rTerminalEvent\x124\n" +
 	"\aupdated\x18\x01 \x01(\v2\x18.codefoundry.v1.TerminalH\x00R\aupdated\x12\x1f\n" +
@@ -1424,7 +1521,7 @@ const file_codefoundry_v1_terminal_proto_rawDesc = "" +
 	"\rTerminalState\x12\x1e\n" +
 	"\x1aTERMINAL_STATE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16TERMINAL_STATE_RUNNING\x10\x01\x12\x19\n" +
-	"\x15TERMINAL_STATE_EXITED\x10\x022\x95\x06\n" +
+	"\x15TERMINAL_STATE_EXITED\x10\x022\xed\x06\n" +
 	"\x0fTerminalService\x12Y\n" +
 	"\x06Create\x12%.codefoundry.v1.CreateTerminalRequest\x1a&.codefoundry.v1.CreateTerminalResponse\"\x00\x12U\n" +
 	"\x04List\x12$.codefoundry.v1.ListTerminalsRequest\x1a%.codefoundry.v1.ListTerminalsResponse\"\x00\x12P\n" +
@@ -1433,7 +1530,8 @@ const file_codefoundry_v1_terminal_proto_rawDesc = "" +
 	"\x05Write\x12$.codefoundry.v1.WriteTerminalRequest\x1a%.codefoundry.v1.WriteTerminalResponse\"\x00\x12Y\n" +
 	"\x06Resize\x12%.codefoundry.v1.ResizeTerminalRequest\x1a&.codefoundry.v1.ResizeTerminalResponse\"\x00\x12S\n" +
 	"\x04Kill\x12#.codefoundry.v1.KillTerminalRequest\x1a$.codefoundry.v1.KillTerminalResponse\"\x00\x12Y\n" +
-	"\x06Remove\x12%.codefoundry.v1.RemoveTerminalRequest\x1a&.codefoundry.v1.RemoveTerminalResponse\"\x00\x12Q\n" +
+	"\x06Remove\x12%.codefoundry.v1.RemoveTerminalRequest\x1a&.codefoundry.v1.RemoveTerminalResponse\"\x00\x12V\n" +
+	"\x05Close\x12$.codefoundry.v1.CloseTerminalRequest\x1a%.codefoundry.v1.CloseTerminalResponse\"\x00\x12Q\n" +
 	"\x05Watch\x12%.codefoundry.v1.WatchTerminalsRequest\x1a\x1d.codefoundry.v1.TerminalEvent\"\x000\x01B\xc5\x01\n" +
 	"\x12com.codefoundry.v1B\rTerminalProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
@@ -1450,7 +1548,7 @@ func file_codefoundry_v1_terminal_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_terminal_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_terminal_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_codefoundry_v1_terminal_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_codefoundry_v1_terminal_proto_goTypes = []any{
 	(TerminalState)(0),             // 0: codefoundry.v1.TerminalState
 	(*Terminal)(nil),               // 1: codefoundry.v1.Terminal
@@ -1470,29 +1568,31 @@ var file_codefoundry_v1_terminal_proto_goTypes = []any{
 	(*KillTerminalResponse)(nil),   // 15: codefoundry.v1.KillTerminalResponse
 	(*RemoveTerminalRequest)(nil),  // 16: codefoundry.v1.RemoveTerminalRequest
 	(*RemoveTerminalResponse)(nil), // 17: codefoundry.v1.RemoveTerminalResponse
-	(*WatchTerminalsRequest)(nil),  // 18: codefoundry.v1.WatchTerminalsRequest
-	(*TerminalEvent)(nil),          // 19: codefoundry.v1.TerminalEvent
-	nil,                            // 20: codefoundry.v1.Terminal.LabelsEntry
-	nil,                            // 21: codefoundry.v1.CreateTerminalRequest.LabelsEntry
-	(*AttachEvent_Snapshot)(nil),   // 22: codefoundry.v1.AttachEvent.Snapshot
-	(*AttachEvent_Output)(nil),     // 23: codefoundry.v1.AttachEvent.Output
-	(*AttachEvent_Resized)(nil),    // 24: codefoundry.v1.AttachEvent.Resized
-	(*AttachEvent_Exited)(nil),     // 25: codefoundry.v1.AttachEvent.Exited
-	(*timestamppb.Timestamp)(nil),  // 26: google.protobuf.Timestamp
+	(*CloseTerminalRequest)(nil),   // 18: codefoundry.v1.CloseTerminalRequest
+	(*CloseTerminalResponse)(nil),  // 19: codefoundry.v1.CloseTerminalResponse
+	(*WatchTerminalsRequest)(nil),  // 20: codefoundry.v1.WatchTerminalsRequest
+	(*TerminalEvent)(nil),          // 21: codefoundry.v1.TerminalEvent
+	nil,                            // 22: codefoundry.v1.Terminal.LabelsEntry
+	nil,                            // 23: codefoundry.v1.CreateTerminalRequest.LabelsEntry
+	(*AttachEvent_Snapshot)(nil),   // 24: codefoundry.v1.AttachEvent.Snapshot
+	(*AttachEvent_Output)(nil),     // 25: codefoundry.v1.AttachEvent.Output
+	(*AttachEvent_Resized)(nil),    // 26: codefoundry.v1.AttachEvent.Resized
+	(*AttachEvent_Exited)(nil),     // 27: codefoundry.v1.AttachEvent.Exited
+	(*timestamppb.Timestamp)(nil),  // 28: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_terminal_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.Terminal.state:type_name -> codefoundry.v1.TerminalState
-	26, // 1: codefoundry.v1.Terminal.started_at:type_name -> google.protobuf.Timestamp
-	26, // 2: codefoundry.v1.Terminal.exited_at:type_name -> google.protobuf.Timestamp
-	20, // 3: codefoundry.v1.Terminal.labels:type_name -> codefoundry.v1.Terminal.LabelsEntry
-	21, // 4: codefoundry.v1.CreateTerminalRequest.labels:type_name -> codefoundry.v1.CreateTerminalRequest.LabelsEntry
+	28, // 1: codefoundry.v1.Terminal.started_at:type_name -> google.protobuf.Timestamp
+	28, // 2: codefoundry.v1.Terminal.exited_at:type_name -> google.protobuf.Timestamp
+	22, // 3: codefoundry.v1.Terminal.labels:type_name -> codefoundry.v1.Terminal.LabelsEntry
+	23, // 4: codefoundry.v1.CreateTerminalRequest.labels:type_name -> codefoundry.v1.CreateTerminalRequest.LabelsEntry
 	1,  // 5: codefoundry.v1.CreateTerminalResponse.terminal:type_name -> codefoundry.v1.Terminal
 	1,  // 6: codefoundry.v1.ListTerminalsResponse.terminals:type_name -> codefoundry.v1.Terminal
 	1,  // 7: codefoundry.v1.GetTerminalResponse.terminal:type_name -> codefoundry.v1.Terminal
-	22, // 8: codefoundry.v1.AttachEvent.snapshot:type_name -> codefoundry.v1.AttachEvent.Snapshot
-	23, // 9: codefoundry.v1.AttachEvent.output:type_name -> codefoundry.v1.AttachEvent.Output
-	24, // 10: codefoundry.v1.AttachEvent.resized:type_name -> codefoundry.v1.AttachEvent.Resized
-	25, // 11: codefoundry.v1.AttachEvent.exited:type_name -> codefoundry.v1.AttachEvent.Exited
+	24, // 8: codefoundry.v1.AttachEvent.snapshot:type_name -> codefoundry.v1.AttachEvent.Snapshot
+	25, // 9: codefoundry.v1.AttachEvent.output:type_name -> codefoundry.v1.AttachEvent.Output
+	26, // 10: codefoundry.v1.AttachEvent.resized:type_name -> codefoundry.v1.AttachEvent.Resized
+	27, // 11: codefoundry.v1.AttachEvent.exited:type_name -> codefoundry.v1.AttachEvent.Exited
 	1,  // 12: codefoundry.v1.TerminalEvent.updated:type_name -> codefoundry.v1.Terminal
 	2,  // 13: codefoundry.v1.TerminalService.Create:input_type -> codefoundry.v1.CreateTerminalRequest
 	4,  // 14: codefoundry.v1.TerminalService.List:input_type -> codefoundry.v1.ListTerminalsRequest
@@ -1502,18 +1602,20 @@ var file_codefoundry_v1_terminal_proto_depIdxs = []int32{
 	12, // 18: codefoundry.v1.TerminalService.Resize:input_type -> codefoundry.v1.ResizeTerminalRequest
 	14, // 19: codefoundry.v1.TerminalService.Kill:input_type -> codefoundry.v1.KillTerminalRequest
 	16, // 20: codefoundry.v1.TerminalService.Remove:input_type -> codefoundry.v1.RemoveTerminalRequest
-	18, // 21: codefoundry.v1.TerminalService.Watch:input_type -> codefoundry.v1.WatchTerminalsRequest
-	3,  // 22: codefoundry.v1.TerminalService.Create:output_type -> codefoundry.v1.CreateTerminalResponse
-	5,  // 23: codefoundry.v1.TerminalService.List:output_type -> codefoundry.v1.ListTerminalsResponse
-	7,  // 24: codefoundry.v1.TerminalService.Get:output_type -> codefoundry.v1.GetTerminalResponse
-	9,  // 25: codefoundry.v1.TerminalService.Attach:output_type -> codefoundry.v1.AttachEvent
-	11, // 26: codefoundry.v1.TerminalService.Write:output_type -> codefoundry.v1.WriteTerminalResponse
-	13, // 27: codefoundry.v1.TerminalService.Resize:output_type -> codefoundry.v1.ResizeTerminalResponse
-	15, // 28: codefoundry.v1.TerminalService.Kill:output_type -> codefoundry.v1.KillTerminalResponse
-	17, // 29: codefoundry.v1.TerminalService.Remove:output_type -> codefoundry.v1.RemoveTerminalResponse
-	19, // 30: codefoundry.v1.TerminalService.Watch:output_type -> codefoundry.v1.TerminalEvent
-	22, // [22:31] is the sub-list for method output_type
-	13, // [13:22] is the sub-list for method input_type
+	18, // 21: codefoundry.v1.TerminalService.Close:input_type -> codefoundry.v1.CloseTerminalRequest
+	20, // 22: codefoundry.v1.TerminalService.Watch:input_type -> codefoundry.v1.WatchTerminalsRequest
+	3,  // 23: codefoundry.v1.TerminalService.Create:output_type -> codefoundry.v1.CreateTerminalResponse
+	5,  // 24: codefoundry.v1.TerminalService.List:output_type -> codefoundry.v1.ListTerminalsResponse
+	7,  // 25: codefoundry.v1.TerminalService.Get:output_type -> codefoundry.v1.GetTerminalResponse
+	9,  // 26: codefoundry.v1.TerminalService.Attach:output_type -> codefoundry.v1.AttachEvent
+	11, // 27: codefoundry.v1.TerminalService.Write:output_type -> codefoundry.v1.WriteTerminalResponse
+	13, // 28: codefoundry.v1.TerminalService.Resize:output_type -> codefoundry.v1.ResizeTerminalResponse
+	15, // 29: codefoundry.v1.TerminalService.Kill:output_type -> codefoundry.v1.KillTerminalResponse
+	17, // 30: codefoundry.v1.TerminalService.Remove:output_type -> codefoundry.v1.RemoveTerminalResponse
+	19, // 31: codefoundry.v1.TerminalService.Close:output_type -> codefoundry.v1.CloseTerminalResponse
+	21, // 32: codefoundry.v1.TerminalService.Watch:output_type -> codefoundry.v1.TerminalEvent
+	23, // [23:33] is the sub-list for method output_type
+	13, // [13:23] is the sub-list for method input_type
 	13, // [13:13] is the sub-list for extension type_name
 	13, // [13:13] is the sub-list for extension extendee
 	0,  // [0:13] is the sub-list for field type_name
@@ -1530,7 +1632,7 @@ func file_codefoundry_v1_terminal_proto_init() {
 		(*AttachEvent_Resized_)(nil),
 		(*AttachEvent_Exited_)(nil),
 	}
-	file_codefoundry_v1_terminal_proto_msgTypes[18].OneofWrappers = []any{
+	file_codefoundry_v1_terminal_proto_msgTypes[20].OneofWrappers = []any{
 		(*TerminalEvent_Updated)(nil),
 		(*TerminalEvent_RemovedId)(nil),
 	}
@@ -1540,7 +1642,7 @@ func file_codefoundry_v1_terminal_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_terminal_proto_rawDesc), len(file_codefoundry_v1_terminal_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   25,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -133,6 +133,10 @@ func TestTerminalServiceErrors(t *testing.T) {
 			_, err := c.Remove(ctx, connect.NewRequest(&v1.RemoveTerminalRequest{Id: running.ID}))
 			return err
 		}, connect.CodeFailedPrecondition},
+		{"close missing", func() error {
+			_, err := c.Close(ctx, connect.NewRequest(&v1.CloseTerminalRequest{Id: "nope"}))
+			return err
+		}, connect.CodeNotFound},
 		{"attach missing", func() error {
 			s, err := c.Attach(ctx, connect.NewRequest(&v1.AttachRequest{Id: "nope"}))
 			if err != nil {
@@ -178,5 +182,18 @@ func TestTerminalServiceWatchReplaysThenStreams(t *testing.T) {
 	}
 	if !sawTitle || !sawRemove {
 		t.Fatalf("title=%v remove=%v err=%v", sawTitle, sawRemove, stream.Err())
+	}
+}
+
+func TestTerminalServiceCloseKillsThenRemoves(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	c, fake := newTerminalClient(t)
+	term, _ := fake.Create(ctx, terminal.Spec{Argv: []string{"cat"}})
+	if _, err := c.Close(ctx, connect.NewRequest(&v1.CloseTerminalRequest{Id: term.ID})); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fake.Get(ctx, term.ID); !errors.Is(err, terminal.ErrNotFound) {
+		t.Errorf("after Close, Get = %v, want ErrNotFound", err)
 	}
 }
