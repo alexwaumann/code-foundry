@@ -25,7 +25,8 @@ scratch daemon (below).
   scope: `~/.claude/skills/<dir>/SKILL.md` and `~/.claude/commands/*.md` (top level only).
   Sorted by name (case-insensitive) within a source; sources in request order; user last.
   Duplicates across scopes are all returned (the GUI decides). A skill directory that is a
-  symlink is followed.
+  symlink is followed, and so is a `.claude/commands` directory that is one (paths are
+  reported under the symlink).
 * **Descriptions.** The frontmatter's top-level `description:` (plain, quoted, or a `>`/`|`
   block joined on one line) for skills and commands; a command without one falls back to
   its first non-empty, non-heading body line. Whitespace collapsed, clipped to 300 runes.
@@ -41,7 +42,8 @@ scratch daemon (below).
   the store thinks has no git, `.git` is checked at that path.
 * **Cache.** `fsx.FileIndex` caches each checkout's candidate list for 5 s (key: git flag +
   resolved path), at most 32 checkouts, oldest evicted; expired entries are dropped on every
-  miss. Two concurrent misses may both list; that is fine.
+  miss. Two concurrent misses may both list; that is fine. The 5 s count from the end of the
+  listing, so a listing slower than that is still reused.
 * **Ranking.** Tier first: exact base name > base-name prefix > base-name subsequence >
   whole-path subsequence. Within a tier, a bonus per query character landing at a segment
   start or after `/ . - _ space` (4) or right after the previous hit (1), maximised over all
