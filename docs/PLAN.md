@@ -32,7 +32,8 @@ build order are built, each with a note: `workspaces-1-store.md`,
   on send) done: `docs/notes/workspaces-3-composer.md`.
 * Step 4 (flat thread sidebar with Pinned / Needs attention / Terminals sections and
   `session.pin`, the Projects page with `WorkspaceMembers`, "Run in…" from the row menu
-  and the palette) done: `docs/notes/workspaces-4-sidebar.md`.
+  and the palette) done: `docs/notes/workspaces-4-sidebar.md`. (The Terminals section
+  is gone since the bottom panel's PR C: shells live in bottom panels.)
 * Step 5 (the side panel's workspace surface: members with branch, changes, ahead/behind,
   PR and CI, add/remove, Run in, members as worktree tabs; `view.panel.workspace`; badge,
   header and Projects page entry points) done: `docs/notes/workspaces-5-panel.md`.
@@ -85,6 +86,20 @@ after it.
   "Panel surface (PR 3)" in `docs/notes/session-usage.md`.
 * PR 4 (the Usage page and its sidebar toggle, Cache savings from `cache_savings_usd`)
   done: "Usage page (PR 4)" in `docs/notes/session-usage.md`.
+
+### Bottom terminal panel: three PRs (2026-10-11)
+
+Shells move out of the sidebar into a bottom panel under the content pane, one per thread
+and one for the Projects page, keyed like the side panel.
+
+* PR A (owner labels on every shell, `terminal.new` owner resolution, the shell reaper,
+  `TerminalService.Close` / `terminal.close`, `terminal.list`, `view.bottom.toggle` on
+  cmd+j) done: `docs/notes/bottom-panel-1-daemon.md`.
+* PR B (the GUI panel: tabs derived from the terminal list, resize, cmd+w, one bottom
+  Attach stream, new shells auto-open, focusTerminal reveals a shell) done:
+  `docs/notes/bottom-panel-2-gui.md`.
+* PR C (the sidebar's Terminals section and the `terminal` selection kind removed; every
+  entry point lands in a bottom panel) done: `docs/notes/bottom-panel-3-routing.md`.
 
 ### Open items
 

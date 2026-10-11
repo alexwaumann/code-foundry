@@ -91,3 +91,41 @@ test("a project row's New terminal: the Projects page's bottom panel", async ({ 
   await expect(bottom(page).getByRole("tab").nth(1)).toHaveAttribute("aria-selected", "true");
   await noTerminalRows(page);
 });
+
+/** SHOTS=<dir>: the notes' screenshots (docs/notes/bottom-panel-3-routing/), WebKit, 1440x900 at 2x. */
+test.describe("screenshots", () => {
+  test.use({ deviceScaleFactor: 2 });
+  for (const scheme of ["dark", "light"] as const) {
+    test(`screenshots (${scheme})`, async ({ page }, info) => {
+      const shots = process.env.SHOTS;
+      test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+      const shot = (name: string) => page.screenshot({ path: `${String(shots)}/${name}-${scheme}.png` });
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await openApp(page);
+
+      // A thread with two shells: t-s1-shell and one from its row menu, the second active.
+      await row(page, "s:s-1").click();
+      await row(page, "s:s-1").click({ button: "right" });
+      await page.getByTestId("row-menu").getByText("New terminal here").click();
+      await expect(bottom(page).getByRole("tab")).toHaveCount(2);
+      await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
+      await page.keyboard.type("git status");
+      await page.mouse.move(0, 0);
+      await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 10_000 });
+      await shot("thread");
+      await page.getByTestId("sidebar").screenshot({ path: `${String(shots)}/sidebar-${scheme}.png` });
+
+      // The Projects page: t-top, and a shell from dotfiles' row.
+      await openProjects(page);
+      const dot = page.locator('[data-nav-key="p:repo-dot"]');
+      await dot.hover();
+      await dot.getByTestId("project-new-terminal").click();
+      await expect(bottom(page).getByRole("tab")).toHaveCount(2);
+      await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
+      await page.mouse.move(0, 0);
+      await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 10_000 });
+      await shot("projects");
+    });
+  }
+});

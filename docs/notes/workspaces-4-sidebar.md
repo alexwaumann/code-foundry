@@ -5,6 +5,9 @@
 > rest, headerless; Terminals keeps its header), no status icon or model in the row, and
 > line 2 says the status in words; see `thread-list.md`.
 >
+> **Superseded (2026-10-11):** the Terminals section is gone too; shells live in bottom
+> panels (`bottom-panel-3-routing.md`).
+>
 > **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
 
 Status: done on branch `cf/workspaces-sidebar` (stacked on `cf/workspaces-composer`).

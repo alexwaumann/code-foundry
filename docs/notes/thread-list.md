@@ -1,5 +1,8 @@
 # Thread list rows, tooltip and toolbar sides
 
+> **Superseded (2026-10-11):** the sidebar has no terminal rows any more (no Terminals
+> header, no exit chips); shells live in bottom panels. See `bottom-panel-3-routing.md`.
+
 Decided 2026-10-10 (Alex). Design record: the static sketch `/tmp/thread-list/index.html`,
 `?v=14` for the rows and `?v=23` for the tooltip (PNGs in
 `~/.t3/userdata/attachments/thread-list/v14.png`, `v23.png`). Frontend only; it builds on the

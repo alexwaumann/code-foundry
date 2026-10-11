@@ -226,4 +226,5 @@ the Usage page.
 
 * PR C: the sidebar's Terminals section and the `terminal` selection kind are untouched.
   Worktree shells still list there, and clicking one opens it in the content pane.
+  (Done in PR C: `bottom-panel-3-routing.md`.)
 * No drag reorder of tabs (not asked for).
