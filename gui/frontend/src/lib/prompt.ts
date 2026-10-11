@@ -98,7 +98,7 @@ export function chipToken(id: string, name: string): string {
 }
 
 /** The tag a token match stands for, or null when it does not decode. */
-function matchTag(m: RegExpMatchArray): PromptTag | null {
+function matchTag(m: RegExpExecArray): PromptTag | null {
   if (m[2] !== undefined) return { tagKind: "image", id: m[2], name: m[1] ?? "" };
   const slot = m[5] ?? "";
   const rest = decode(m[6] ?? "");
@@ -112,8 +112,8 @@ function matchTag(m: RegExpMatchArray): PromptTag | null {
 }
 
 /** Every well-formed token of the text with its tag, in order. */
-function tokens(text: string): { m: RegExpMatchArray; tag: PromptTag }[] {
-  const out: { m: RegExpMatchArray; tag: PromptTag }[] = [];
+function tokens(text: string): { m: RegExpExecArray; tag: PromptTag }[] {
+  const out: { m: RegExpExecArray; tag: PromptTag }[] = [];
   for (const m of text.matchAll(TOKEN)) {
     const tag = matchTag(m);
     if (tag) out.push({ m, tag });

@@ -5,9 +5,10 @@
  * files behind the attachments do not survive a reload anyway. Also caches each repo's
  * base refs (RepoService.ListRefs) for the base-ref picker.
  *
- * The draft's text is the prompt with inline image chips as tokens (lib/prompt.ts); the
- * attachments are the images themselves (the thumbnails). A chip refers to an attachment
- * by id; removing a chip from the text keeps the attachment.
+ * The draft's text is the prompt with inline tags as tokens (lib/prompt.ts: image chips,
+ * skills, files); the attachments are the images themselves (the thumbnails). A chip
+ * refers to an attachment by id; removing a chip from the text keeps the attachment.
+ * Skill and file tags of a project go when the project leaves the draft.
  *
  * Sending stages the attachments (SessionService.StageAttachment) and invokes the
  * session.new registry command, like every other user action.
@@ -31,7 +32,7 @@ import {
   type ThreadPlace,
   type WorktreeChoice,
 } from "@/lib/compose";
-import { projectPrompt, removeReferences } from "@/lib/prompt";
+import { projectPrompt, removeReferences, removeRepoTags } from "@/lib/prompt";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { getUiContext } from "./context";
 import { useReposStore } from "./repos";
@@ -52,7 +53,7 @@ export interface DraftAttachment {
 export type DraftPhase = "idle" | "attaching" | "starting";
 
 export interface Draft {
-  /** The prompt, chips as `![name](cf-attachment://<id>)` tokens. */
+  /** The prompt, tags as tokens (`![name](cf-attachment://<id>)`, `[/name](cf-skill://…)`, …). */
   text: string;
   attachments: readonly DraftAttachment[];
   /** null: the settings default (sessions.default_model / default_effort). */
@@ -150,12 +151,16 @@ export function addAlsoIn(key: string, repoId: string): void {
   updateDraft(key, { alsoIn: [...d.alsoIn, repoId], error: null });
 }
 
-/** Drops an "Also in" project; if the thread was to run there, it runs in the project again. */
+/**
+ * Drops an "Also in" project and every tag in the text that refers to it (its skills and
+ * files); if the thread was to run there, it runs in the project again.
+ */
 export function removeAlsoIn(key: string, repoId: string): void {
   const d = getDraft(key);
   if (!d.alsoIn.includes(repoId)) return;
   updateDraft(key, {
     alsoIn: d.alsoIn.filter((id) => id !== repoId),
+    text: removeRepoTags(d.text, repoId),
     ...(d.primary === repoId ? { primary: null, base: null } : {}),
     error: null,
   });

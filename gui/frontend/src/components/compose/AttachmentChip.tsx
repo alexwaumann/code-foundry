@@ -2,9 +2,9 @@ import { useContext, useEffect, useState } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { ImageIcon } from "lucide-react";
 import { formatAttachmentSize, middleTruncate } from "@/lib/prompt";
-import { cn } from "@/lib/utils";
 import { openPreview, useComposeStore } from "@/stores/compose";
-import { ChipDraftContext } from "./chipContext";
+import { TagDraftContext } from "./tagContext";
+import { tagClass } from "./tagStyle";
 
 const DEFAULT_ACCENT = "oklch(0.62 0.16 16)";
 const accents = new Map<string, string | null>();
@@ -58,15 +58,13 @@ function useAccent(url: string | undefined): string {
 }
 
 /**
- * An inline image chip in the prompt: mini thumbnail, (middle-truncated) name and size.
- * A click opens the image preview. A chip whose attachment is gone (pasted from
- * elsewhere, or the image was removed while the text was being undone) still renders,
- * with a dashed border, and a click on it only selects it.
+ * An inline image chip in the prompt (a TagView of kind image): mini thumbnail,
+ * (middle-truncated) name and size. A click opens the image preview. A chip whose
+ * attachment is gone (pasted from elsewhere, or the image was removed while the text was
+ * being undone) still renders, with a dashed border, and a click on it only selects it.
  */
-export function AttachmentChipView({ node, selected, editor }: NodeViewProps) {
-  const draftKey = useContext(ChipDraftContext);
-  const id = String(node.attrs.id ?? "");
-  const label = String(node.attrs.name ?? "");
+export function AttachmentChip({ id, label, selected, editor }: { id: string; label: string; selected: boolean; editor: NodeViewProps["editor"] }) {
+  const draftKey = useContext(TagDraftContext);
   const att = useComposeStore((s) => s.drafts[draftKey]?.attachments.find((a) => a.id === id));
   const accent = useAccent(att?.url);
   const name = att?.file.name ?? label;
@@ -75,6 +73,7 @@ export function AttachmentChipView({ node, selected, editor }: NodeViewProps) {
     <NodeViewWrapper
       as="span"
       data-testid="prompt-chip"
+      data-tag-kind="image"
       data-attachment-id={id}
       data-missing={att ? undefined : "true"}
       role="img"
@@ -91,13 +90,7 @@ export function AttachmentChipView({ node, selected, editor }: NodeViewProps) {
           : undefined
       }
       style={{ "--chip-accent": accent }}
-      className={cn(
-        "relative mx-px inline-flex h-[1.41em] max-w-72 items-center gap-[0.33em] rounded-[0.5em] border px-[0.5em] align-middle text-[0.86em] leading-none font-medium select-none",
-        "border-[color-mix(in_oklab,var(--chip-accent)_34%,var(--color-border))] bg-[color-mix(in_oklab,var(--chip-accent)_11%,transparent)] text-[color-mix(in_oklab,var(--chip-accent)_22%,var(--color-foreground))]",
-        "hover:border-[color-mix(in_oklab,var(--chip-accent)_48%,var(--color-border))] hover:bg-[color-mix(in_oklab,var(--chip-accent)_17%,transparent)]",
-        att ? "cursor-pointer" : "border-dashed",
-        selected && "after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:bg-[Highlight]/30",
-      )}
+      className={tagClass(selected, att ? "cursor-pointer" : "border-dashed")}
     >
       {att ? <img src={att.url} alt="" draggable={false} className="size-[1.17em] shrink-0 rounded-sm object-cover" /> : <ImageIcon aria-hidden className="size-[1.17em] shrink-0" />}
       <span className="truncate">{middleTruncate(name)}</span>

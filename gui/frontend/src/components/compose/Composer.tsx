@@ -4,8 +4,10 @@ import { ArrowUp, Brain, Folder, FolderGit2, Gauge, GitBranch, GitBranchPlus, Gi
 import { AttachmentPreview } from "./AttachmentPreview";
 import { BranchIndicator } from "./BranchIndicator";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
+import { CompletionCard } from "./CompletionCard";
 import { MemberChips, type MemberChipModel } from "./MemberChips";
-import { PromptEditor, type PromptEditorHandle } from "./PromptEditor";
+import { PromptEditor, type EditorTrigger, type PromptEditorHandle } from "./PromptEditor";
+import { useCompletion, useSkillSource } from "./useCompletion";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { ATTACHMENT_MIME_TYPES } from "@/api/session";
 import { Backdrop } from "@/components/backdrop/Backdrop";
@@ -26,6 +28,7 @@ import {
   type ComposeTarget,
   type WorktreeChoice,
 } from "@/lib/compose";
+import { skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
 import { tildify } from "@/lib/path";
 import { formatAttachmentSize, isReferenced } from "@/lib/prompt";
 import { cn } from "@/lib/utils";
@@ -47,10 +50,14 @@ import {
 import { requestConfirm } from "@/stores/confirm";
 import { useReposStore } from "@/stores/repos";
 import { useSettingValue } from "@/stores/settings";
+import { loadSkills } from "@/stores/skills";
 import { DASHBOARD, useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
 const SEP = "\u0001";
+
+/** What starts a completion in the prompt: "/" for skills. */
+const TRIGGERS: readonly TriggerChar[] = ["/"];
 
 /** Model and effort the composer starts with: the settings defaults, else opus / high. */
 function useDefaults(): { model: string; effort: string } {
@@ -319,6 +326,20 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   const base = baseChoice ?? defaultRef;
   const canSend = !busy && (text.trim() !== "" || hasAttachments);
 
+  // "/" completion: the skills of the draft's projects (where the thread would run) and
+  // the user's, reloaded on mount and whenever those change.
+  const existingPath = worktree.kind === "existing" ? worktree.path : "";
+  const sources = useMemo(
+    () => skillSources({ target: target.kind, repoIds, worktree: existingPath ? { kind: "existing", path: existingPath } : { kind: "new" }, wsMembers }),
+    [target.kind, repoIds, existingPath, wsMembers],
+  );
+  useEffect(() => {
+    void loadSkills(sources);
+  }, [sources]);
+  const [trigger, setTrigger] = useState<EditorTrigger | null>(null);
+  const skillSource = useSkillSource(trigger, skillSourcesKey(sources), repoIds);
+  const completion = useCompletion(trigger, setTrigger, skillSource, editorRef);
+
   useEffect(() => {
     if (primary && noGitPath === undefined) void loadRefs(primary);
   }, [primary, noGitPath]);
@@ -462,6 +483,10 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
             }}
             onPasteFiles={attach}
             onPreviewChip={(id, el) => openPreview(draftKey, id, el)}
+            triggers={TRIGGERS}
+            onTrigger={completion.onTrigger}
+            onCompletionKey={completion.onKey}
+            completionAria={completion.aria}
           />
         </div>
         <div className="col-start-1 row-start-2 flex min-w-0 flex-wrap items-center gap-0.5 px-2 pb-2">
@@ -529,8 +554,12 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
             }}
           />
         </div>
+        {/* The completion card, between the card and the worktree row (in flow). */}
+        <div className="col-span-2 col-start-1 row-start-3 min-w-0 empty:hidden">
+          <CompletionCard completion={completion} label="Skills" />
+        </div>
         {(error ?? notice) && (
-          <div className="col-span-2 col-start-1 row-start-3 flex flex-col gap-1 px-2 pt-2 text-sm">
+          <div className="col-span-2 col-start-1 row-start-4 flex flex-col gap-1 px-2 pt-2 text-sm">
             {error && (
               <p role="alert" className="text-destructive" data-testid="composer-error">
                 {error}
@@ -543,7 +572,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
             )}
           </div>
         )}
-        <div className="col-span-2 col-start-1 row-start-4 flex flex-wrap items-center gap-0.5 px-1 pt-2">
+        <div className="col-span-2 col-start-1 row-start-5 flex flex-wrap items-center gap-0.5 px-1 pt-2">
           <ComposerPicker
             label="Worktree"
             icon={worktreeIcon}

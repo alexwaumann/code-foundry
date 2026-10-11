@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { tagToken } from "@/lib/prompt";
 import { addAlsoIn, emptyDraft, emptyWorkspaceDraft, getDraft, removeAlsoIn, setPrimary, updateDraft, useComposeStore } from "./compose";
 
 afterEach(() => {
@@ -25,6 +26,15 @@ describe("compose drafts", () => {
     expect(getDraft("repo-cf")).toMatchObject({ alsoIn: ["repo-gp"], primary: "repo-gp", base: "origin/dev" });
     removeAlsoIn("repo-cf", "repo-gp");
     expect(getDraft("repo-cf")).toMatchObject({ alsoIn: [], primary: null, base: null });
+  });
+
+  it("removing an Also in project removes its skill and file tags, nothing else", () => {
+    const sk = (repoId: string) => tagToken({ tagKind: "skill", name: "deploy", repoId });
+    const file = tagToken({ tagKind: "file", repoId: "repo-gp", path: "src/a.ts" });
+    addAlsoIn("repo-cf", "repo-gp");
+    updateDraft("repo-cf", { text: `Use ${sk("repo-gp")} and ${sk("repo-cf")} on ${file} then ${sk("")} ` });
+    removeAlsoIn("repo-cf", "repo-gp");
+    expect(getDraft("repo-cf")).toMatchObject({ alsoIn: [], text: `Use and ${sk("repo-cf")} on then ${sk("")}` });
   });
 
   it("a new primary resets the base (its refs differ)", () => {
