@@ -94,7 +94,11 @@ type Options struct {
 	// last_activity_at moved. Default 15s: an idle Claude still redraws every few
 	// seconds, so this is mostly noise. It is persisted at most every 30s.
 	ActivityPublish time.Duration
-	Now             func() time.Time
+	// AgentIdleClose is the safety net for subagent runs: a run whose transcript has not
+	// grown for this long while its thread sits at the prompt stops being followed
+	// (six times longer for a background run). Default 10m.
+	AgentIdleClose time.Duration
+	Now            func() time.Time
 }
 
 func (o Options) withDefaults() (Options, error) {
@@ -142,6 +146,7 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.Tick, time.Second)
 	def(&o.StatusDebounce, 100*time.Millisecond)
 	def(&o.ActivityPublish, 15*time.Second)
+	def(&o.AgentIdleClose, defaultAgentIdleClose)
 	def(&o.AttachmentMaxAge, AttachmentMaxAge)
 	def(&o.AttachmentReapInterval, AttachmentReapInterval)
 	if o.Now == nil {

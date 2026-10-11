@@ -183,18 +183,52 @@ func (f *usageFold) Line(line []byte) {
 // nil when nothing was counted.
 func (f *usageFold) Buckets() []UsageBucket { return sortedBuckets(f.buckets) }
 
-// setUsage replaces a session's usage with a complete fold's buckets, persists it, and
-// publishes the session when it changed.
-func (m *Manager) setUsage(id string, buckets []UsageBucket) {
+// setUsage replaces a session's usage, runs and changed sources with a complete
+// fold's (threadUsage.snapshot), persists them in one transaction, and publishes the
+// session when its usage or runs changed.
+func (m *Manager) setUsage(id string, up usageUpdate) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, ok := m.recs[id]
-	if !ok || slices.Equal(rec.s.Usage, buckets) {
+	if !ok {
 		return
 	}
-	if err := saveUsage(context.Background(), m.opts.DB, id, buckets); err != nil {
+	same := slices.Equal(rec.s.Usage, up.total) && sameRuns(rec.s.AgentRuns, up.runs)
+	if same && len(up.sources) == 0 {
+		return
+	}
+	var changedRuns []AgentRun
+	for _, r := range up.runs {
+		i := slices.IndexFunc(rec.s.AgentRuns, func(o AgentRun) bool { return o.ID == r.ID })
+		if i < 0 || !sameRunInfo(rec.s.AgentRuns[i], r) {
+			changedRuns = append(changedRuns, r)
+		}
+	}
+	if err := saveUsageUpdate(context.Background(), m.opts.DB, id, up, changedRuns); err != nil {
 		m.log.Error("persist session usage", "session", id, "err", err)
 	}
-	rec.s.Usage = buckets
+	if same {
+		return
+	}
+	rec.s.Usage, rec.s.AgentRuns = up.total, up.runs
 	m.commitLocked(rec, false)
+}
+
+// discoverTranscript records that the thread's conversation is now in transcript cid:
+// it becomes ClaudeSessionID and, if new, the last of Transcripts (persisted).
+func (m *Manager) discoverTranscript(id, cid string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	rec, ok := m.recs[id]
+	if !ok {
+		return
+	}
+	rec.s.ClaudeSessionID = cid
+	if !slices.Contains(rec.s.Transcripts, cid) {
+		if err := saveTranscript(context.Background(), m.opts.DB, id, cid, len(rec.s.Transcripts)); err != nil {
+			m.log.Error("persist session transcript", "session", id, "err", err)
+		}
+		rec.s.Transcripts = append(slices.Clip(rec.s.Transcripts), cid)
+	}
+	m.commitLocked(rec, true)
 }
