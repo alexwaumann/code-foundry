@@ -120,7 +120,8 @@ func (m *Manager) waitSlug(ctx context.Context, id, name, prompt string) (slugWa
 	if name != "" || strings.TrimSpace(prompt) == "" {
 		return sw, nil
 	}
-	ch, err := m.startSlug(id, prompt)
+	// The worktrees do not exist yet: the namer sees file references as relative paths.
+	ch, err := m.startSlug(id, stripFileRefs(prompt))
 	if err != nil {
 		return sw, err
 	}

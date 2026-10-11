@@ -36,6 +36,12 @@ const (
 	// FilesystemServiceListDirectoriesProcedure is the fully-qualified name of the FilesystemService's
 	// ListDirectories RPC.
 	FilesystemServiceListDirectoriesProcedure = "/codefoundry.v1.FilesystemService/ListDirectories"
+	// FilesystemServiceListSkillsProcedure is the fully-qualified name of the FilesystemService's
+	// ListSkills RPC.
+	FilesystemServiceListSkillsProcedure = "/codefoundry.v1.FilesystemService/ListSkills"
+	// FilesystemServiceSearchFilesProcedure is the fully-qualified name of the FilesystemService's
+	// SearchFiles RPC.
+	FilesystemServiceSearchFilesProcedure = "/codefoundry.v1.FilesystemService/SearchFiles"
 )
 
 // FilesystemServiceClient is a client for the codefoundry.v1.FilesystemService service.
@@ -46,6 +52,23 @@ type FilesystemServiceClient interface {
 	// directory. Dot-directories are listed only when the last segment starts with ".".
 	// A prefix that resolves outside the home directory is InvalidArgument.
 	ListDirectories(context.Context, *connect.Request[v1.ListDirectoriesRequest]) (*connect.Response[v1.ListDirectoriesResponse], error)
+	// ListSkills lists the skills and slash commands Claude Code would offer in the given
+	// checkouts (the composer's "/" completion): .claude/skills/<name>/SKILL.md and
+	// .claude/commands/**/*.md in each source, then ~/.claude/skills and
+	// ~/.claude/commands/*.md when include_user. Project skills come in request order,
+	// sorted by name within a source; user skills last. Unreadable entries are skipped,
+	// and so is a source whose project or checkout is gone (logged). A source without a
+	// repo id, or with a path that is relative or outside the home directory, is
+	// InvalidArgument.
+	ListSkills(context.Context, *connect.Request[v1.ListSkillsRequest]) (*connect.Response[v1.ListSkillsResponse], error)
+	// SearchFiles fuzzy-matches query against the files and directories of one checkout
+	// (the composer's "@" completion). A git checkout lists tracked plus untracked, not
+	// ignored files (and their parent directories); a project without git is walked,
+	// skipping .git, node_modules and dot-directories, at most 50,000 entries. The
+	// candidate list is cached for a few seconds per checkout. An empty query returns
+	// the shallowest entries. An unknown repo is NotFound; a path outside the home
+	// directory is InvalidArgument.
+	SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error)
 }
 
 // NewFilesystemServiceClient constructs a client for the codefoundry.v1.FilesystemService service.
@@ -65,17 +88,41 @@ func NewFilesystemServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(filesystemServiceMethods.ByName("ListDirectories")),
 			connect.WithClientOptions(opts...),
 		),
+		listSkills: connect.NewClient[v1.ListSkillsRequest, v1.ListSkillsResponse](
+			httpClient,
+			baseURL+FilesystemServiceListSkillsProcedure,
+			connect.WithSchema(filesystemServiceMethods.ByName("ListSkills")),
+			connect.WithClientOptions(opts...),
+		),
+		searchFiles: connect.NewClient[v1.SearchFilesRequest, v1.SearchFilesResponse](
+			httpClient,
+			baseURL+FilesystemServiceSearchFilesProcedure,
+			connect.WithSchema(filesystemServiceMethods.ByName("SearchFiles")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // filesystemServiceClient implements FilesystemServiceClient.
 type filesystemServiceClient struct {
 	listDirectories *connect.Client[v1.ListDirectoriesRequest, v1.ListDirectoriesResponse]
+	listSkills      *connect.Client[v1.ListSkillsRequest, v1.ListSkillsResponse]
+	searchFiles     *connect.Client[v1.SearchFilesRequest, v1.SearchFilesResponse]
 }
 
 // ListDirectories calls codefoundry.v1.FilesystemService.ListDirectories.
 func (c *filesystemServiceClient) ListDirectories(ctx context.Context, req *connect.Request[v1.ListDirectoriesRequest]) (*connect.Response[v1.ListDirectoriesResponse], error) {
 	return c.listDirectories.CallUnary(ctx, req)
+}
+
+// ListSkills calls codefoundry.v1.FilesystemService.ListSkills.
+func (c *filesystemServiceClient) ListSkills(ctx context.Context, req *connect.Request[v1.ListSkillsRequest]) (*connect.Response[v1.ListSkillsResponse], error) {
+	return c.listSkills.CallUnary(ctx, req)
+}
+
+// SearchFiles calls codefoundry.v1.FilesystemService.SearchFiles.
+func (c *filesystemServiceClient) SearchFiles(ctx context.Context, req *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error) {
+	return c.searchFiles.CallUnary(ctx, req)
 }
 
 // FilesystemServiceHandler is an implementation of the codefoundry.v1.FilesystemService service.
@@ -86,6 +133,23 @@ type FilesystemServiceHandler interface {
 	// directory. Dot-directories are listed only when the last segment starts with ".".
 	// A prefix that resolves outside the home directory is InvalidArgument.
 	ListDirectories(context.Context, *connect.Request[v1.ListDirectoriesRequest]) (*connect.Response[v1.ListDirectoriesResponse], error)
+	// ListSkills lists the skills and slash commands Claude Code would offer in the given
+	// checkouts (the composer's "/" completion): .claude/skills/<name>/SKILL.md and
+	// .claude/commands/**/*.md in each source, then ~/.claude/skills and
+	// ~/.claude/commands/*.md when include_user. Project skills come in request order,
+	// sorted by name within a source; user skills last. Unreadable entries are skipped,
+	// and so is a source whose project or checkout is gone (logged). A source without a
+	// repo id, or with a path that is relative or outside the home directory, is
+	// InvalidArgument.
+	ListSkills(context.Context, *connect.Request[v1.ListSkillsRequest]) (*connect.Response[v1.ListSkillsResponse], error)
+	// SearchFiles fuzzy-matches query against the files and directories of one checkout
+	// (the composer's "@" completion). A git checkout lists tracked plus untracked, not
+	// ignored files (and their parent directories); a project without git is walked,
+	// skipping .git, node_modules and dot-directories, at most 50,000 entries. The
+	// candidate list is cached for a few seconds per checkout. An empty query returns
+	// the shallowest entries. An unknown repo is NotFound; a path outside the home
+	// directory is InvalidArgument.
+	SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error)
 }
 
 // NewFilesystemServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -101,10 +165,26 @@ func NewFilesystemServiceHandler(svc FilesystemServiceHandler, opts ...connect.H
 		connect.WithSchema(filesystemServiceMethods.ByName("ListDirectories")),
 		connect.WithHandlerOptions(opts...),
 	)
+	filesystemServiceListSkillsHandler := connect.NewUnaryHandler(
+		FilesystemServiceListSkillsProcedure,
+		svc.ListSkills,
+		connect.WithSchema(filesystemServiceMethods.ByName("ListSkills")),
+		connect.WithHandlerOptions(opts...),
+	)
+	filesystemServiceSearchFilesHandler := connect.NewUnaryHandler(
+		FilesystemServiceSearchFilesProcedure,
+		svc.SearchFiles,
+		connect.WithSchema(filesystemServiceMethods.ByName("SearchFiles")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.FilesystemService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FilesystemServiceListDirectoriesProcedure:
 			filesystemServiceListDirectoriesHandler.ServeHTTP(w, r)
+		case FilesystemServiceListSkillsProcedure:
+			filesystemServiceListSkillsHandler.ServeHTTP(w, r)
+		case FilesystemServiceSearchFilesProcedure:
+			filesystemServiceSearchFilesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -116,4 +196,12 @@ type UnimplementedFilesystemServiceHandler struct{}
 
 func (UnimplementedFilesystemServiceHandler) ListDirectories(context.Context, *connect.Request[v1.ListDirectoriesRequest]) (*connect.Response[v1.ListDirectoriesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.FilesystemService.ListDirectories is not implemented"))
+}
+
+func (UnimplementedFilesystemServiceHandler) ListSkills(context.Context, *connect.Request[v1.ListSkillsRequest]) (*connect.Response[v1.ListSkillsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.FilesystemService.ListSkills is not implemented"))
+}
+
+func (UnimplementedFilesystemServiceHandler) SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.FilesystemService.SearchFiles is not implemented"))
 }

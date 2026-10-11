@@ -315,6 +315,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 	}
 	namingTried := name != ""
 	var late <-chan namingResult
+	var members []workspace.Member // a workspace thread's, for file references
 	if (o.NewWorkspace != nil && (o.NewWorktree != nil || o.WorkspaceID != "")) || (o.NewWorktree != nil && o.WorkspaceID != "") {
 		return Session{}, fmt.Errorf("%w: new workspace, new worktree and workspace are exclusive", ErrInvalidArgument)
 	}
@@ -325,6 +326,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 			return Session{}, err
 		}
 		s.WorkspaceID, s.RepoID, s.WorktreePath, s.BaseRef, s.CreatedWorktree = cw.workspaceID, cw.repoID, cw.path, cw.baseRef, true
+		members = cw.members
 		if cw.name != "" {
 			s.Name, s.AutoNamed = cw.name, true
 		}
@@ -336,6 +338,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 			return Session{}, err
 		}
 		s.WorkspaceID, s.RepoID, s.WorktreePath = w.ID, mem.RepoID, mem.WorktreePath
+		members = w.Members
 	case o.NewWorktree != nil:
 		nw, err := m.newWorktree(ctx, id, name, o)
 		if err != nil {
@@ -351,6 +354,17 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 		if s.RepoID, s.WorktreePath, err = m.resolveWorktree(o.RepoID, o.WorktreePath); err != nil {
 			return Session{}, err
 		}
+	}
+	// The worktrees exist now: point file references at them (see filerefs.go).
+	prompt, dropped := rewriteFileRefs(prompt, func(repoID string) (string, bool) {
+		if i := slices.IndexFunc(members, func(mem workspace.Member) bool { return mem.RepoID == repoID }); i >= 0 {
+			return members[i].WorktreePath, true
+		}
+		return s.WorktreePath, repoID == s.RepoID
+	})
+	if len(dropped) > 0 {
+		m.log.Warn("file references outside the thread's projects; passing their relative paths",
+			"session", id, "repo", s.RepoID, "workspace", s.WorkspaceID, "refs", dropped)
 	}
 	now := m.opts.Now()
 	s.CreatedAt, s.LastActivityAt = now, now

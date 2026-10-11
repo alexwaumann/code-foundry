@@ -44,6 +44,11 @@
  *   session.run-in queues a move (pendingWorktreePath) that lands ~2s after the thread is not busy.
  *   session.new takes workspace (a member thread) or new-worktree + repos (a new workspace).
  *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size)
+ *   FilesystemService.ListSkills / SearchFiles: mock/filesystem.ts (project skills review and
+ *        deploy in every project, user skill commit; DEFAULT_FILES in every project)
+ *   POST /__mock/files?repo=repo-cf&path=a.ts&path=src/b.ts   (that project's files; no path:
+ *                                                 none; reset restores DEFAULT_FILES)
+ *   GET  /__mock/files/calls                      ("skills <repo,…|-> <includeUser>", "search <repo> <query>")
  *   session.new with a prompt containing FAIL fails (after the worktree delay, if any).
  *   POST /__mock/gitops?fail=git.push&delay=800   (next git.push fails; ops take 800ms)
  *   GET  /__mock/gitops
@@ -86,7 +91,7 @@ import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
-import { listDirectories } from "./filesystem";
+import { completionCalls, listDirectories, listSkills, resetCompletion, searchFiles, setMockFiles } from "./filesystem";
 import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from "./clone";
 import { createProject, deleteProject, listPublishOwners, projectCalls, publishProject, resetProjects, visibilityFlag } from "./create";
 import { ghEvent } from "./github";
@@ -241,6 +246,8 @@ function routes(router: ConnectRouter): void {
       const registered = new Set([...world.repos.values()].flatMap((r) => [r.path, ...r.worktrees.map((w) => w.path)]));
       return listDirectories(req.prefix, registered);
     },
+    listSkills: (req) => ({ skills: listSkills(world.repos, req.sources, req.includeUser) }),
+    searchFiles: (req) => searchFiles(world.repos, req.repoId, req.path, req.query, req.limit),
   });
 
   router.service(GhService, {
@@ -670,7 +677,21 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       seedScenario();
       resetClones();
       resetProjects();
+      resetCompletion();
       json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/files": {
+      const repoId = q.get("repo") ?? "";
+      if (!world.repos.has(repoId)) {
+        json(res, 404, { error: `unknown repo ${repoId}` });
+        break;
+      }
+      setMockFiles(repoId, q.getAll("path"));
+      json(res, 200, { repo: repoId, files: q.getAll("path") });
+      break;
+    }
+    case "GET /__mock/files/calls":
+      json(res, 200, completionCalls);
       break;
     default:
       json(res, 404, { error: "unknown control endpoint" });

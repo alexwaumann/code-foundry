@@ -2,11 +2,17 @@
  * FilesystemService over a fake home directory, mirroring internal/fsx: "~" expansion,
  * case-insensitive prefix match, dot-directories only for a "." segment, a 200-entry
  * bound, and InvalidArgument outside home. The tree holds the mock's registered repos
- * (world.ts) plus a few unregistered folders to add.
+ * (world.ts) plus a few unregistered folders to add. ListSkills and SearchFiles (the
+ * composer's "/" and "@" completion) are at the end.
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
-import type { ListDirectoriesResponseSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
+import {
+  SkillScope,
+  type ListDirectoriesResponseSchema,
+  type SearchFilesResponseSchema,
+  type SkillSchema,
+} from "../src/gen/codefoundry/v1/filesystem_pb";
 
 export const HOME = "/Users/dev";
 const MAX_ENTRIES = 200;
@@ -130,4 +136,138 @@ export function projectFolder(abs: string): { path: string; git: boolean } | und
     if (dir === HOME) break;
   }
   return { path: abs, git: false };
+}
+
+// ---- composer completion: ListSkills and SearchFiles -------------------------------------
+//
+// Every project has the same small file list unless a test sets its own
+// (POST /__mock/files?repo=repo-cf&path=a.ts&path=src/b.ts; no path: an empty project), and
+// the project skills `review` and `deploy`; the user has `commit`. Ranking mirrors
+// internal/fuzzy: exact base name > base name prefix > base name subsequence > path
+// subsequence, then shorter path, then path; an empty query lists the shallowest first.
+
+/** A project the completion RPCs can see: its id and main worktree (world.ts MockRepo). */
+export interface CompletionRepo {
+  id: string;
+  path: string;
+}
+
+export const DEFAULT_FILES: readonly string[] = [
+  "README.md",
+  "package.json",
+  "src/index.ts",
+  "src/components/Composer.tsx",
+  "src/components/ThreadRow.tsx",
+  "docs/notes/x.md",
+  ".claude/skills/review/SKILL.md",
+  ".claude/skills/deploy/SKILL.md",
+];
+
+const PROJECT_SKILLS = [
+  { name: "deploy", description: "Ship the current branch to staging.", file: ".claude/skills/deploy/SKILL.md" },
+  { name: "review", description: "Review the diff against the base branch.", file: ".claude/skills/review/SKILL.md" },
+];
+const USER_SKILLS = [{ name: "commit", description: "Write a commit message and commit.", path: `${HOME}/.claude/skills/commit/SKILL.md` }];
+
+const DEFAULT_FILE_LIMIT = 50;
+const MAX_FILE_LIMIT = 200;
+
+/** Files set by POST /__mock/files, by repo id. */
+const filesByRepo = new Map<string, string[]>();
+/** "skills <repo,repo|-> <user>" and "search <repo> <query>", for specs that assert calls. */
+export const completionCalls: string[] = [];
+
+export function setMockFiles(repoId: string, files: string[]): void {
+  filesByRepo.set(repoId, files);
+}
+
+export function resetCompletion(): void {
+  filesByRepo.clear();
+  completionCalls.length = 0;
+}
+
+type SkillInit = MessageInitShape<typeof SkillSchema>;
+type SearchInit = MessageInitShape<typeof SearchFilesResponseSchema>;
+
+/** The checkout a request names: path (one of the repo's) or the main worktree. */
+function completionCheckout(repos: ReadonlyMap<string, CompletionRepo>, repoId: string, path: string): CompletionRepo {
+  if (repoId === "") throw invalid("repo_id is required");
+  const repo = repos.get(repoId);
+  if (!repo) throw new ConnectError(`repo ${repoId} not found`, Code.NotFound);
+  if (path !== "" && !within(clean(path))) throw invalid(`${path} is outside your home directory`);
+  return repo;
+}
+
+export function listSkills(
+  repos: ReadonlyMap<string, CompletionRepo>,
+  sources: readonly { repoId: string; path: string }[],
+  includeUser: boolean,
+): SkillInit[] {
+  completionCalls.push(`skills ${sources.map((s) => s.repoId).join(",") || "-"} ${String(includeUser)}`);
+  const out: SkillInit[] = [];
+  for (const src of sources) {
+    // Like the daemon: an unknown project is skipped; a malformed source fails.
+    if (src.repoId !== "" && !repos.has(src.repoId)) continue;
+    const repo = completionCheckout(repos, src.repoId, src.path);
+    const dir = src.path || repo.path;
+    for (const s of PROJECT_SKILLS) {
+      out.push({ name: s.name, description: s.description, scope: SkillScope.PROJECT, repoId: repo.id, path: `${dir}/${s.file}` });
+    }
+  }
+  if (includeUser) {
+    for (const s of USER_SKILLS) out.push({ name: s.name, description: s.description, scope: SkillScope.USER, repoId: "", path: s.path });
+  }
+  return out;
+}
+
+/** Files plus every directory they imply, directories first (internal/fsx WithParentDirs). */
+function withParentDirs(files: readonly string[]): { path: string; isDir: boolean }[] {
+  const dirs: string[] = [];
+  const seen = new Set<string>();
+  for (const f of files) {
+    for (let i = f.indexOf("/"); i >= 0; i = f.indexOf("/", i + 1)) {
+      const d = f.slice(0, i);
+      if (!seen.has(d)) {
+        seen.add(d);
+        dirs.push(d);
+      }
+    }
+  }
+  return [...dirs.map((path) => ({ path, isDir: true })), ...files.map((path) => ({ path, isDir: false }))];
+}
+
+function isSubsequence(s: string, q: string): boolean {
+  let j = 0;
+  for (let i = 0; i < s.length && j < q.length; i++) if (s[i] === q[j]) j++;
+  return j === q.length;
+}
+
+/** 4 exact base name, 3 base prefix, 2 base subsequence, 1 path subsequence, 0 none. */
+export function fileTier(path: string, query: string): number {
+  if (query === "") return 1;
+  const p = path.toLowerCase();
+  const q = query.toLowerCase();
+  const base = p.slice(p.lastIndexOf("/") + 1);
+  if (base === q) return 4;
+  if (base.startsWith(q)) return 3;
+  if (isSubsequence(base, q)) return 2;
+  return isSubsequence(p, q) ? 1 : 0;
+}
+
+export function searchFiles(repos: ReadonlyMap<string, CompletionRepo>, repoId: string, path: string, query: string, limit: number): SearchInit {
+  if (limit < 0) throw invalid(`limit ${String(limit)} is negative`);
+  const repo = completionCheckout(repos, repoId, path);
+  completionCalls.push(`search ${repo.id} ${query}`);
+  const q = query.trim();
+  const depth = (p: string) => p.split("/").length;
+  const ranked = withParentDirs(filesByRepo.get(repo.id) ?? DEFAULT_FILES)
+    .map((e) => ({ ...e, tier: fileTier(e.path, q) }))
+    .filter((e) => e.tier > 0)
+    .sort((a, b) =>
+      q === ""
+        ? depth(a.path) - depth(b.path) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
+        : b.tier - a.tier || a.path.length - b.path.length || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0),
+    );
+  const n = Math.min(limit === 0 ? DEFAULT_FILE_LIMIT : limit, MAX_FILE_LIMIT);
+  return { matches: ranked.slice(0, n).map(({ path, isDir }) => ({ path, isDir })), truncated: ranked.length > n };
 }

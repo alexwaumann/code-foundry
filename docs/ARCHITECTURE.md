@@ -178,7 +178,10 @@ Services (v1):
 * `FilesystemService` — ListDirectories: completes a typed path prefix to directories
   under the user's home (is_git, registered, common completion), for the palette's
   `path` prompts and the Add Project dialog's Local folder tab. Every project path must resolve under home; `repo.Register` enforces
-  it too (`docs/notes/add-project-1-paths.md`).
+  it too (`docs/notes/add-project-1-paths.md`). ListSkills (`.claude/skills` and
+  `.claude/commands` of given checkouts, plus the user's) and SearchFiles (fuzzy match over
+  a checkout's git-listed or walked files, cached ~5s) feed the composer's `/` and `@`
+  completion (`docs/notes/composer-tags-1-daemon.md`).
 * `HealthService` — Ping, Version.
 
 Rules:
