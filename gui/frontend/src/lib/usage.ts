@@ -175,8 +175,12 @@ export function fmtTok(n: number): string {
   return String(Math.round(n));
 }
 
-/** USD: cents with thousands separators; four decimals under a cent so small threads are not $0.00. */
+/**
+ * USD: cents with thousands separators; four decimals under a cent so small threads are
+ * not $0.00, and "<$0.0001" for a sliver (a few input tokens) so it is not $0.0000.
+ */
 export function fmtUsd(v: number): string {
+  if (v > 0 && v < 0.00005) return "<$0.0001";
   if (v > 0 && v < 0.01) return `$${v.toFixed(4)}`;
   return `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
