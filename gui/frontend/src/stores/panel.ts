@@ -4,9 +4,8 @@
  * open, its tabs, the active tab, its width, and whether it is expanded to the full width
  * of the content area. A panel with tabs but no active tab is picking: its "+" was
  * clicked and it shows the surface list until a surface (or a tab) is picked. Switching
- * selection shows that
- * selection's panel. All of it is persisted (localStorage "code-foundry.panel"), so it
- * survives a reload. Entries are never pruned: a deleted session's panel stays stored.
+ * selection shows that selection's panel. All of it is persisted (localStorage
+ * "code-foundry.panel"), so it survives a reload. Entries are never pruned: a deleted session's panel stays stored.
  * See docs/notes/side-panel.md.
  */
 import { create } from "zustand";
@@ -183,7 +182,8 @@ export interface PanelState {
 
 /**
  * Focus requests for the panel go through the ui store (panelFocusSeq), which the palette
- * also uses. Persisted whole: open state, tabs, active tab and width survive a reload.
+ * also uses. Persisted whole: open state, tabs, active tab, width, expanded and picking
+ * survive a reload.
  */
 export const usePanelStore = create<PanelState>()(
   persist(() => ({ byKey: {} }), {
