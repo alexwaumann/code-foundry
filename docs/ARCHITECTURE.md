@@ -182,7 +182,7 @@ Services (v1):
   `.claude/commands` of given checkouts, plus the user's) and SearchFiles (fuzzy match over
   a checkout's git-listed or walked files, cached ~5s) feed the composer's `/` and `@`
   completion (`docs/notes/composer-tags-1-daemon.md`; the GUI's tags and `/` card:
-  `docs/notes/composer-tags-3-skills.md`).
+  `docs/notes/composer-tags-3-skills.md`; the `@` card: `docs/notes/composer-tags-4-files.md`).
 * `HealthService` — Ping, Version.
 
 Rules:
