@@ -827,3 +827,32 @@ test("view.panel.new-tab from the palette and the CLI shows a hidden panel picki
   await expect(panel(page)).toHaveAttribute("data-picking", "true");
   expect((await invocations()).map((i) => i.name)).toContain("view.panel.new-tab");
 });
+
+/** SHOTS=<dir>: docs/notes/panel-new-tab screenshots, WebKit, 1400x900, dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`new-tab screenshots (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    const suffix = scheme === "light" ? "-light" : "";
+    const shot = (name: string) => page.screenshot({ path: `${String(shots)}/${name}${suffix}.png` });
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.setViewportSize({ width: 1400, height: 900 });
+    await openApp(page);
+    await selectSession(page, "s-1");
+    await page.getByTestId("panel-toggle").click();
+    const empty = panel(page).getByTestId("panel-empty");
+    await empty.locator('[data-surface="worktree"]').click();
+    await panel(page).getByTestId("panel-new-tab").click();
+    await empty.locator('[data-surface="usage"]').click();
+    await expect(panel(page).getByRole("tab")).toHaveCount(2);
+    await panel(page).getByRole("tab").first().click();
+    await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-surface", "worktree");
+    await page.mouse.move(0, 0);
+    await shot("panel-new-tab-strip");
+
+    await panel(page).getByTestId("panel-new-tab").click();
+    await expect(panel(page)).toHaveAttribute("data-picking", "true");
+    await page.mouse.move(0, 0);
+    await shot("panel-new-tab-picking");
+  });
+}
