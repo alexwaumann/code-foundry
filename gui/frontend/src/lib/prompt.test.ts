@@ -154,6 +154,19 @@ describe("skill and file tags", () => {
     expect(parseLine(token)).toEqual([{ kind: "text", text: token }]);
   });
 
+  it.each([
+    ["before a skill", `see [x ${DEPLOY}`, "see [x ", "see [x /deploy", "see [x"],
+    ["before a file", `a[i ${FILE} b`, "a[i ", "a[i @cf-file://r1/src/my%20notes%20%281%29.md b", "a[i b"],
+    ["before an image", `![ ${A}`, "![ ", "![ [Image: shot.png]", `![ ${A}`],
+  ])("an unclosed [ typed %s stays text", (_name, text, lead, sent, removed) => {
+    const [line = []] = parsePrompt(text);
+    expect(line[0]).toEqual({ kind: "text", text: lead });
+    expect(line.filter((p) => p.kind === "tag")).toHaveLength(1);
+    expect(serializePrompt([line])).toBe(text);
+    expect(projectPrompt(text, () => undefined)).toBe(sent);
+    expect(removeRepoTags(text, "r1")).toBe(removed);
+  });
+
   it("projects skills to /name and files to @cf-file://, each followed by whitespace", () => {
     const staged: Record<string, { name: string; ref: string }> = { a1: { name: "shot.png", ref: "/att/1.png" } };
     expect(projectPrompt(`${DEPLOY} now, ${COMMIT}\n${FILE}${DIR}. ${A}`, (id) => staged[id])).toBe(

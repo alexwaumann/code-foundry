@@ -35,7 +35,8 @@ export type TagKind = PromptTag["tagKind"];
 export type PromptPiece = { kind: "text"; text: string } | ({ kind: "tag" } & PromptTag);
 
 // Groups: 1 image label, 2 attachment id | 3 label, 4 skill|file, 5 repo slot, 6 the rest.
-const TOKEN = /!\[([^\]\n]*)\]\(cf-attachment:\/\/([A-Za-z0-9_-]+)\)|\[([^\]\n]*)\]\(cf-(skill|file):\/\/([A-Za-z0-9_.~-]+)\/([^\s()]+)\)/g;
+// Labels exclude "[" (tokens never have one), so an unclosed "[" typed before a tag stays text.
+const TOKEN = /!\[([^[\]\n]*)\]\(cf-attachment:\/\/([A-Za-z0-9_-]+)\)|\[([^[\]\n]*)\]\(cf-(skill|file):\/\/([A-Za-z0-9_.~-]+)\/([^\s()]+)\)/g;
 
 /** A chip label safe inside the token and the projection: no brackets, semicolons or newlines. */
 export function cleanLabel(name: string): string {
