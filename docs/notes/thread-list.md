@@ -52,6 +52,13 @@ daemon step in `thread-status-persistence.md` (persisted status, `status_reason`
 
 ## Order, headers, keys
 
+> **Superseded (2026-10-11):** the order and headers below. Error / interrupted threads now
+> sort right after the prompts, finished turns get their own group, and working threads
+> (busy or starting, unpinned) moved to a collapsible **Working** section at the bottom,
+> above Terminals; the list key carries a `group` instead of the attention tier, and
+> `data-section` says `pinned`, `attention`, `done`, `idle` or `working`. See
+> `sidebar-working-section.md`. The prompt/done split and `rowCache` still work as described.
+
 * **Headers**: only Terminals. Pinned, Needs attention and Threads are gone.
 * **Order** (`buildRows`): pinned threads (any status), then unpinned threads waiting on the
   user with prompts above finished turns, then everything else; newest first (creation

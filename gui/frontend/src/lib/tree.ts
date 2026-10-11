@@ -1,13 +1,14 @@
 /**
  * Sidebar list: a flat list of threads (sessions), pinned ones first, then the ones waiting
- * on the user, then the rest, then terminals that belong to no thread under the one header
- * (Terminals), as rows for a virtual list. No repo or worktree rows: worktrees live on the
+ * on the user, then finished turns, then idle ones, then the working ones under a
+ * collapsible Working header, then terminals that belong to no thread under a Terminals
+ * header, as rows for a virtual list. No repo or worktree rows: worktrees live on the
  * Projects page. Pure functions over the minimal inputs that affect structure, so the
- * sidebar only rebuilds when membership, order, pin or attention tier changes (not on
- * name/state updates). Placement helpers (which worktree a terminal or thread sits in) are
+ * sidebar only rebuilds when membership, order, pin or group changes (not on name or
+ * status-text updates). Placement helpers (which worktree a terminal or thread sits in) are
  * here too; the command context uses them.
  */
-import type { AttentionTier } from "./session";
+import type { ThreadGroup } from "./session";
 
 
 /** Label a terminal's creator sets to the worktree path it belongs to. */
@@ -47,19 +48,34 @@ export interface ListSession {
   /** Currently attached terminal, or "". */
   terminalId: string;
   pinned: boolean;
-  /** Waits on the user ("prompt"), has an unseen finished turn ("done"), or neither (""); see attentionTier. */
-  attention: AttentionTier;
+  /** Where it sorts when unpinned (lib/session.ts threadGroup). */
+  group: ThreadGroup;
 }
 
 /**
- * The group a row sorts in. Only "terminals" has a header; the thread groups follow each
- * other without one (data-section on the row says which a thread is in).
+ * The group a row sorts in. Only "working" and "terminals" have a header; the other thread
+ * groups follow each other without one (data-section on the row says which a thread is in).
+ * "attention" holds prompts and then error / interrupted threads; "done" unseen finished
+ * turns; "idle" everything else that is not working.
  */
-export type Section = "pinned" | "attention" | "threads" | "terminals";
+export type Section = "pinned" | "attention" | "done" | "idle" | "working" | "terminals";
+
+export type ThreadSection = Exclude<Section, "terminals">;
+
+/** How the list is shown (the UI store's sidebar prefs). */
+export interface ListOptions {
+  /** The Working section is collapsed: its header stays, its rows are not in the list. */
+  workingCollapsed?: boolean;
+}
+
+export type HeaderRow =
+  | { key: string; kind: "header"; section: "terminals"; label: string }
+  /** The Working section's header: a toggle, with the number of threads under it (shown or not). */
+  | { key: string; kind: "header"; section: "working"; label: string; count: number; collapsed: boolean };
 
 export type Row =
-  | { key: string; kind: "header"; section: "terminals"; label: string }
-  | { key: string; kind: "session"; section: Exclude<Section, "terminals">; sessionId: string }
+  | HeaderRow
+  | { key: string; kind: "session"; section: ThreadSection; sessionId: string }
   | { key: string; kind: "terminal"; section: "terminals"; terminalId: string };
 
 /** Rows that select something (threads and terminals); headers do not. */
@@ -124,21 +140,32 @@ export function ownedTerminalIds(sessions: readonly Pick<TreeSession, "id" | "te
 
 /**
  * The sidebar rows. Threads newest first (`sessions` comes in creation order, the sessions
- * store's order) within each group: pinned ones (whatever their status), then unpinned ones
- * waiting on the user (prompts above finished turns), then the rest (error, interrupted and
- * offline threads included). No headers between them. Then terminals no thread owns, in
- * `terminals` order, under a Terminals header (only when there are any).
+ * store's order) within each group, so a thread moves only when it changes group: pinned
+ * ones (whatever their status); then unpinned ones waiting on the user (prompts, then error
+ * and interrupted threads); finished turns; idle ones (idle, unknown, closing, offline);
+ * all without headers. Then the working ones (busy or starting) under a Working header that
+ * counts them (only when there are any; with `workingCollapsed` the header alone). Then
+ * terminals no thread owns, in `terminals` order, under a Terminals header (only when there
+ * are any).
  */
-export function buildRows(sessions: readonly ListSession[], terminals: readonly PlaceableTerminal[]): Row[] {
+export function buildRows(sessions: readonly ListSession[], terminals: readonly PlaceableTerminal[], opts: ListOptions = {}): Row[] {
   const owned = ownedTerminalIds(sessions, terminals);
   const newest = [...sessions].reverse();
-  const groups: [Exclude<Section, "terminals">, ListSession[]][] = [
-    ["pinned", newest.filter((s) => s.pinned)],
-    ["attention", [...newest.filter((s) => !s.pinned && s.attention === "prompt"), ...newest.filter((s) => !s.pinned && s.attention === "done")]],
-    ["threads", newest.filter((s) => !s.pinned && s.attention === "")],
-  ];
+  const unpinned = (...groups: ThreadGroup[]) => groups.flatMap((g) => newest.filter((s) => !s.pinned && s.group === g));
   const rows: Row[] = [];
-  for (const [section, list] of groups) for (const s of list) rows.push({ key: sessionKey(s.id), kind: "session", section, sessionId: s.id });
+  const push = (section: ThreadSection, list: readonly ListSession[]) => {
+    for (const s of list) rows.push({ key: sessionKey(s.id), kind: "session", section, sessionId: s.id });
+  };
+  push("pinned", newest.filter((s) => s.pinned));
+  push("attention", unpinned("prompt", "error"));
+  push("done", unpinned("done"));
+  push("idle", unpinned("idle"));
+  const working = unpinned("working");
+  if (working.length > 0) {
+    const collapsed = opts.workingCollapsed === true;
+    rows.push({ key: headerKey("working"), kind: "header", section: "working", label: "Working", count: working.length, collapsed });
+    if (!collapsed) push("working", working);
+  }
   const loose = terminals.filter((t) => !owned.has(t.id));
   if (loose.length > 0) {
     rows.push({ key: headerKey("terminals"), kind: "header", section: "terminals", label: "Terminals" });
@@ -147,9 +174,18 @@ export function buildRows(sessions: readonly ListSession[], terminals: readonly 
   return rows;
 }
 
+/** Same row content: every field equal (rows are flat objects of strings, numbers and booleans). */
+function sameRow(a: Row, b: Row): boolean {
+  const ra: Record<string, unknown> = a;
+  const rb: Record<string, unknown> = b;
+  const keys = Object.keys(ra);
+  return keys.length === Object.keys(rb).length && keys.every((k) => ra[k] === rb[k]);
+}
+
 /**
- * A row cache for the virtual list: each call returns `rows` with every row whose key and
- * section match the previous call's replaced by the previous object, so memoized row
+ * A row cache for the virtual list: each call returns `rows` with every row equal to the
+ * previous call's row of the same key (same kind and section, and for a header the same
+ * label, count and collapsed state) replaced by the previous object, so memoized row
  * components see the same prop and skip rendering.
  */
 export function rowCache(): (rows: readonly Row[]) => Row[] {
@@ -157,21 +193,21 @@ export function rowCache(): (rows: readonly Row[]) => Row[] {
   return (rows) => {
     const out = rows.map((r) => {
       const old = prev.get(r.key);
-      return old?.kind === r.kind && old.section === r.section ? old : r;
+      return old && sameRow(old, r) ? old : r;
     });
     prev = new Map(out.map((r) => [r.key, r]));
     return out;
   };
 }
 
-/** Thread and terminal rows in sidebar order (cmd+1..9). */
-export function leafOrder(sessions: readonly ListSession[], terminals: readonly PlaceableTerminal[]): LeafRow[] {
-  return buildRows(sessions, terminals).filter(isLeaf);
+/** Thread and terminal rows in sidebar order (cmd+1..9); a collapsed section's rows are not in it. */
+export function leafOrder(sessions: readonly ListSession[], terminals: readonly PlaceableTerminal[], opts: ListOptions = {}): LeafRow[] {
+  return buildRows(sessions, terminals, opts).filter(isLeaf);
 }
 
-/** Session ids in sidebar order (cmd+shift+a). */
-export function sessionOrder(sessions: readonly ListSession[], terminals: readonly PlaceableTerminal[]): string[] {
-  return leafOrder(sessions, terminals).flatMap((r) => (r.kind === "session" ? [r.sessionId] : []));
+/** Session ids in sidebar order (cmd+shift+a); a collapsed section's threads are not in it. */
+export function sessionOrder(sessions: readonly ListSession[], terminals: readonly PlaceableTerminal[], opts: ListOptions = {}): string[] {
+  return leafOrder(sessions, terminals, opts).flatMap((r) => (r.kind === "session" ? [r.sessionId] : []));
 }
 
 /**
