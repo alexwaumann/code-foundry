@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -83,11 +84,39 @@ func TestParseRunEvents(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := parseRunEvents([]byte(tt.line), tt.notBefore, tt.watched)
+			for i := range got {
+				if ts := lineTime([]byte(tt.line)); !got[i].at.Equal(ts) {
+					t.Errorf("event %d at %v; want the record's %v", i, got[i].at, ts)
+				}
+				got[i].at = time.Time{}
+			}
 			if !slices.Equal(got, tt.want) {
 				t.Errorf("parseRunEvents =\n %+v\nwant\n %+v", got, tt.want)
 			}
 		})
 	}
+}
+
+var timestampField = regexp.MustCompile(`"timestamp":"[^"]*"`)
+
+// stamp sets a captured line's timestamp.
+func stamp(line string, at time.Time) string {
+	return timestampField.ReplaceAllString(line, `"timestamp":"`+at.UTC().Format(time.RFC3339Nano)+`"`)
+}
+
+// tick advances the fixture's clock and stamps line with it: lines are written in
+// time order, as Claude writes them.
+func (fx *runFixture) tick(line string) string {
+	fx.now = fx.now.Add(time.Second)
+	return stamp(line, fx.now)
+}
+
+func (fx *runFixture) ticked(lines []string) []string {
+	out := make([]string, len(lines))
+	for i, l := range lines {
+		out[i] = fx.tick(l)
+	}
+	return out
 }
 
 // ---- captured lines with other ids ----
@@ -159,6 +188,7 @@ func appendLines(t *testing.T, path string, lines ...string) {
 // parent writes lines to the thread's transcript and feeds them live, then polls.
 func (fx *runFixture) parent(lines ...string) {
 	fx.t.Helper()
+	lines = fx.ticked(lines)
 	appendLines(fx.t, fx.parentPath(), lines...)
 	for _, l := range lines {
 		fx.u.transcriptLine(fx.f, []byte(l))
@@ -178,6 +208,7 @@ func (fx *runFixture) meta(agent, tool string, depth int, shape string) {
 // agent appends n requests (or the given lines when n is 0) to a run's transcript.
 func (fx *runFixture) agent(agent string, n int, lines ...string) {
 	fx.t.Helper()
+	lines = fx.ticked(lines)
 	for range n {
 		fx.reqs++
 		fx.now = fx.now.Add(time.Second)
@@ -340,13 +371,13 @@ func TestRunRescan(t *testing.T) {
 	c := runLines(t)
 	fx := newRunFixture(t)
 	own := usageLine("r-own", "2026-10-11T11:00:00Z", fixtureCID, "claude-opus-5-5", 1, 1, 1, 0, h1(0), "standard")
-	appendLines(t, fx.parentPath(),
+	appendLines(t, fx.parentPath(), fx.ticked([]string{
 		own,
 		spawnFg(c, "T1"), completed(c, "T1", "A1"), // closed
 		spawnBg(c, "T2"), launched(c, "T2", "A2"), // background, no notification: open
 		spawnBg(c, "T3"), launched(c, "T3", "A3"), notified(c, "A3"), // closed
 		spawnFg(c, "T4"), // in flight: open
-	)
+	})...)
 	fx.meta("A1", "T1", 1, "foreground")
 	fx.agent("A1", 2, spawnFg(c, "T5"), completed(c, "T5", "A5"))
 	fx.meta("A5", "T5", 2, "foreground")
@@ -389,6 +420,24 @@ func TestRunRescan(t *testing.T) {
 	fx.wantRun("A6", true, 2)
 	fx.parent(notified(c, "A2"))
 	fx.wantRun("A2", false, 2)
+
+	// A nested background run: launched in its parent run's file, its notification
+	// enqueued in the thread's transcript (as Claude does). The rescan reads the
+	// thread's file first, yet it ends closed: the older launch does not reopen it.
+	fx.parent(spawnFg(c, "T7"))
+	fx.meta("A7", "T7", 1, "foreground")
+	fx.agent("A7", 1, spawnBg(c, "T8"))
+	fx.meta("A8", "T8", 2, "background")
+	fx.agent("A7", 0, launched(c, "T8", "A8"))
+	fx.agent("A8", 1)
+	fx.u.poll()
+	fx.u.poll()
+	fx.wantRun("A8", true, 1)
+	fx.parent(notifiedQueue(c, "A8"))
+	fx.wantRun("A8", false, 1)
+	fx.agent("A7", 1)
+	fx.parent(completed(c, "T7", "A7"))
+	fx.wantRun("A7", false, 2)
 
 	// And a second rescan of the same files agrees with the live state.
 	again := fx.rescan()

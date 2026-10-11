@@ -96,6 +96,7 @@ const (
 
 type runEvent struct {
 	kind      runEventKind
+	at        time.Time // the record's timestamp; zero if it had none
 	toolUseID string
 	agentID   string
 	status    string // runResult: toolUseResult.status ("completed", "async_launched"); runNotified: <status>
@@ -166,7 +167,7 @@ func unmarshalLoose(data []byte, v any) bool {
 // watched reports whether a tool_result line names a tool use the caller is waiting
 // on (its result may carry no agentId: an error, an interrupt). Records timestamped
 // before notBefore are a fork's copy of its parent's history and are skipped.
-func parseRunEvents(line []byte, notBefore time.Time, watched func([]byte) bool) []runEvent {
+func parseRunEvents(line []byte, notBefore time.Time, watched func([]byte) bool) (out []runEvent) {
 	spawn := bytes.Contains(line, quotedAgentTool) || bytes.Contains(line, quotedTaskTool)
 	result := bytes.Contains(line, quotedToolUseResult) && bytes.Contains(line, quotedToolUseID) &&
 		(bytes.Contains(line, quotedAgentID) || bytes.Contains(line, quotedResumedID) || (watched != nil && watched(line)))
@@ -178,10 +179,15 @@ func parseRunEvents(line []byte, notBefore time.Time, watched func([]byte) bool)
 	if !unmarshalLoose(line, &rec) {
 		return nil
 	}
-	if ts, err := time.Parse(time.RFC3339Nano, rec.Timestamp); err == nil && ts.Before(notBefore) {
+	ts, tsErr := time.Parse(time.RFC3339Nano, rec.Timestamp)
+	if tsErr == nil && ts.Before(notBefore) {
 		return nil
 	}
-	var out []runEvent
+	defer func() {
+		for i := range out {
+			out[i].at = ts
+		}
+	}()
 	switch rec.Type {
 	case "assistant":
 		if rec.Message == nil {
@@ -208,7 +214,8 @@ func parseRunEvents(line []byte, notBefore time.Time, watched func([]byte) bool)
 		}
 		var text string
 		if json.Unmarshal(rec.Message.Content, &text) == nil {
-			return notification(text)
+			out = notification(text)
+			return out
 		}
 		var blocks []contentBlock
 		if !unmarshalLoose(rec.Message.Content, &blocks) {
@@ -232,7 +239,7 @@ func parseRunEvents(line []byte, notBefore time.Time, watched func([]byte) bool)
 	case "queue-operation":
 		var text string
 		if rec.Operation == "enqueue" && json.Unmarshal(rec.Content, &text) == nil {
-			return notification(text)
+			out = notification(text)
 		}
 	}
 	return out
@@ -341,6 +348,11 @@ type runUsage struct {
 	tail       fileTail
 	metaRead   bool
 	lastGrowth time.Time
+	// stateAt is the time of the record that last opened or closed the run. An older
+	// record changes nothing: a rescan reads the thread's file before its runs' files,
+	// so a nested run's notification (enqueued in the thread's transcript) can come
+	// before its launch (in its parent run's file).
+	stateAt time.Time
 }
 
 // spawnInfo is an Agent tool use whose run is not known yet.
@@ -463,11 +475,11 @@ func (u *threadUsage) apply(dir, cid string, depth int, ev runEvent) {
 				r.info.Background = true
 				u.changed = true
 			}
-			u.open(r)
+			u.open(r, ev.at)
 		case known || ev.status == "completed":
 			// The spawn's own result: completed, or an error or interrupt with no agentId.
 			// Any other tool naming the agent (an output read, say) decides nothing.
-			u.close(r)
+			u.close(r, ev.at)
 		}
 	case runNotified:
 		r := u.runs[ev.agentID]
@@ -475,7 +487,7 @@ func (u *threadUsage) apply(dir, cid string, depth int, ev runEvent) {
 			r = u.ensureRun(ev.agentID, dir, cid, "")
 		}
 		if r != nil {
-			u.close(r)
+			u.close(r, ev.at)
 		}
 	case runResumed:
 		r := u.runs[ev.agentID]
@@ -483,7 +495,7 @@ func (u *threadUsage) apply(dir, cid string, depth int, ev runEvent) {
 			r = u.ensureRun(ev.agentID, dir, cid, "")
 		}
 		if r != nil {
-			u.open(r)
+			u.open(r, ev.at)
 		}
 	}
 }
@@ -559,8 +571,18 @@ func (u *threadUsage) mergeMeta(r *runUsage, m agentMeta) {
 	}
 }
 
-// open starts (or resumes) following r from where its fold stopped.
-func (u *threadUsage) open(r *runUsage) {
+// stale reports whether a record at at is older than the one that last set r's state.
+func (r *runUsage) stale(at time.Time) bool { return !at.IsZero() && at.Before(r.stateAt) }
+
+// open starts (or resumes) following r from where its fold stopped, for a record at
+// at (zero: no time, never stale).
+func (u *threadUsage) open(r *runUsage, at time.Time) {
+	if r.stale(at) {
+		return
+	}
+	if !at.IsZero() {
+		r.stateAt = at
+	}
 	if r.info.Open {
 		return
 	}
@@ -572,9 +594,16 @@ func (u *threadUsage) open(r *runUsage) {
 	}
 }
 
-// close drains r one last time and stops following it. Its fold stays.
-func (u *threadUsage) close(r *runUsage) {
+// close drains r one last time and stops following it, for a record at at. Its fold
+// stays.
+func (u *threadUsage) close(r *runUsage, at time.Time) {
 	u.drain(r)
+	if r.stale(at) {
+		return
+	}
+	if !at.IsZero() {
+		r.stateAt = at
+	}
 	r.tail.closeFile()
 	if r.info.Open {
 		r.info.Open = false
@@ -703,10 +732,10 @@ func (u *threadUsage) discover(all bool) {
 			continue
 		}
 		if waiting {
-			u.open(r)
+			u.open(r, time.Time{})
 			u.drain(r)
 		} else {
-			u.close(r)
+			u.close(r, time.Time{})
 		}
 	}
 }
@@ -750,7 +779,7 @@ func (u *threadUsage) closeIdle(atPrompt bool) {
 			limit *= backgroundIdleFactor
 		}
 		if now.Sub(r.lastGrowth) >= limit {
-			u.close(r)
+			u.close(r, time.Time{})
 		}
 	}
 }
