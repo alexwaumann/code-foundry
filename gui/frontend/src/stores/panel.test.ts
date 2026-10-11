@@ -8,6 +8,8 @@ import {
   isPicking,
   keyOf,
   makeTab,
+  movePanelTab,
+  moveTab,
   openSurface,
   openTab,
   resetPanelWidth,
@@ -106,6 +108,47 @@ describe("closeTab", () => {
   it("returns the same entry for an unknown id", () => {
     const e = entry(true, [files], files.id);
     expect(closeTab(e, "nope")).toBe(e);
+  });
+});
+
+describe("moveTab", () => {
+  const three = [files, diff, pr];
+  const cases: [string, PanelEntry, string, number, PanelEntry][] = [
+    ["first to last", entry(true, three, files.id), files.id, 2, entry(true, [diff, pr, files], files.id)],
+    ["last to first", entry(true, three, files.id), pr.id, 0, entry(true, [pr, files, diff], files.id)],
+    ["one slot right", entry(true, three, diff.id), files.id, 1, entry(true, [diff, files, pr], diff.id)],
+    ["one slot left", entry(true, three, diff.id), pr.id, 1, entry(true, [files, pr, diff], diff.id)],
+    ["past the end clamps to last", entry(true, three, files.id), files.id, 9, entry(true, [diff, pr, files], files.id)],
+    ["Infinity clamps to last", entry(true, three, files.id), diff.id, Infinity, entry(true, [files, pr, diff], files.id)],
+    ["before the start clamps to first", entry(true, three, files.id), pr.id, -3, entry(true, [pr, files, diff], files.id)],
+    ["a fraction truncates", entry(true, three, files.id), files.id, 1.7, entry(true, [diff, files, pr], files.id)],
+    ["same index changes nothing", entry(true, three, files.id), diff.id, 1, entry(true, three, files.id)],
+    ["clamped to the same index changes nothing", entry(true, three, files.id), pr.id, 5, entry(true, three, files.id)],
+    ["unknown id changes nothing", entry(true, three, files.id), "nope", 0, entry(true, three, files.id)],
+    ["NaN changes nothing", entry(true, three, files.id), files.id, NaN, entry(true, three, files.id)],
+    ["a single tab cannot move", entry(true, [files], files.id), files.id, 1, entry(true, [files], files.id)],
+    ["a hidden panel keeps hidden", entry(false, three, pr.id), pr.id, 0, entry(false, [pr, files, diff], pr.id)],
+    ["picking keeps picking and pickFrom", picking(three, diff.id), diff.id, 0, picking([diff, files, pr], diff.id)],
+    ["width and expanded are kept", { ...entry(true, three, files.id), width: 500, expanded: true }, files.id, 2, { ...entry(true, [diff, pr, files], files.id), width: 500, expanded: true }],
+  ];
+  it.each(cases)("%s", (_name, before, id, to, want) => {
+    expect(moveTab(before, id, to)).toEqual(want);
+  });
+
+  it.each<[string, string, number]>([
+    ["unknown id", "nope", 0],
+    ["same index", diff.id, 1],
+    ["clamped to the same index", files.id, -1],
+  ])("returns the same entry for %s", (_name, id, to) => {
+    const e = entry(true, three, files.id);
+    expect(moveTab(e, id, to)).toBe(e);
+  });
+
+  it("does not mutate the entry's tabs", () => {
+    const tabs = [...three];
+    const e = entry(true, tabs, files.id);
+    moveTab(e, files.id, 2);
+    expect(tabs).toEqual(three);
   });
 });
 
@@ -298,6 +341,36 @@ describe("panel store", () => {
     localStorage.setItem("code-foundry.panel", saved ?? "");
     await usePanelStore.persist.rehydrate();
     expect(getPanel("session:a")).toEqual({ ...entry(true, [pr], pr.id), width: 500, expanded: true });
+  });
+
+  it("movePanelTab reorders one panel's tabs, and the order is persisted", async () => {
+    openSurface("current", files);
+    openSurface("current", diff);
+    openSurface("current", pr);
+    openSurface("session:b", files);
+    openSurface("session:b", diff);
+    movePanelTab("current", pr.id, 0);
+    expect(getPanel()).toEqual(entry(true, [pr, files, diff], pr.id));
+    expect(getPanel("session:b").tabs).toEqual([files, diff]);
+    movePanelTab("session:b", files.id, 1);
+    expect(getPanel("session:b").tabs).toEqual([diff, files]);
+    // No change, no new state (and no write).
+    const before = usePanelStore.getState();
+    movePanelTab("current", pr.id, 0);
+    movePanelTab("current", "nope", 2);
+    expect(usePanelStore.getState()).toBe(before);
+    const saved = localStorage.getItem("code-foundry.panel") ?? "";
+    usePanelStore.setState({ byKey: {} });
+    localStorage.setItem("code-foundry.panel", saved);
+    await usePanelStore.persist.rehydrate();
+    expect(getPanel("session:a").tabs).toEqual([pr, files, diff]);
+    expect(getPanel("session:b").tabs).toEqual([diff, files]);
+  });
+
+  it("movePanelTab does nothing with nothing selected", () => {
+    useUiStore.getState().select({ kind: "none" });
+    movePanelTab("current", files.id, 0);
+    expect(usePanelStore.getState().byKey).toEqual({});
   });
 
   it("keeps state per selection", () => {

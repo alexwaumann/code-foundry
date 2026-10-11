@@ -3,7 +3,7 @@ import { emptyEntry, makeTab, type PanelEntry } from "@/stores/panel";
 import { filesSurface } from "@/surfaces/files";
 import { surfaceByHotkey, surfaceOf, surfaces } from "@/surfaces/registry";
 import type { SurfaceContext } from "@/surfaces/types";
-import { isPanelChord, panelKeyAction } from "./keys";
+import { isPanelChord, panelKeyAction, tabMoveIndex } from "./keys";
 
 const ctx: SurfaceContext = { selection: { kind: "session", id: "s-1" }, panelKey: "session:s-1" };
 const files = makeTab("files", "Files");
@@ -52,6 +52,24 @@ describe("panelKeyAction", () => {
     // While picking too: the letter picks from the list.
     expect(panelKeyAction("f", picking, ctx)).toEqual({ kind: "open", tab: files });
     spy.mockRestore();
+  });
+});
+
+describe("tabMoveIndex", () => {
+  it.each<[string, string, number, number, number | null]>([
+    ["alt+right moves one slot right", "alt+arrowright", 0, 3, 1],
+    ["alt+left moves one slot left", "alt+arrowleft", 2, 3, 1],
+    ["alt+right on the last tab stays (no wrap)", "alt+arrowright", 2, 3, 2],
+    ["alt+left on the first tab stays (no wrap)", "alt+arrowleft", 0, 3, 0],
+    ["a single tab stays", "alt+arrowright", 0, 1, 0],
+    ["a plain arrow is not a move", "arrowright", 0, 3, null],
+    ["alt+shift+arrow is not a move", "alt+shift+arrowleft", 1, 3, null],
+    ["cmd+alt+arrow is not a move", "cmd+alt+arrowright", 1, 3, null],
+    ["alt+up is not a move", "alt+arrowup", 1, 3, null],
+    ["no focused tab", "alt+arrowright", -1, 3, null],
+    ["an index past the strip", "alt+arrowleft", 3, 3, null],
+  ])("%s", (_name, chord, index, count, want) => {
+    expect(tabMoveIndex(chord, index, count)).toBe(want);
   });
 });
 

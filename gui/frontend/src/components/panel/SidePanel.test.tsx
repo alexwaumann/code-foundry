@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { create } from "zustand";
 import type { CommandView } from "@/api/command";
 import { useCommandsStore } from "@/stores/commands";
-import { getPanel, makeTab, openSurface, usePanelStore } from "@/stores/panel";
+import { closePanelTab, getPanel, isPicking, makeTab, openSurface, startPanelPicking, usePanelStore } from "@/stores/panel";
 import { PANEL_MIN, useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { filesSurface } from "@/surfaces/files";
@@ -337,6 +337,203 @@ describe("the new-tab button and picking", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close #2" }));
     expect(getPanel(KEY)).toEqual({ open: false, tabs: [], activeTabId: null });
     expect(screen.queryByTestId("side-panel")).toBeNull();
+  });
+});
+
+describe("reordering tabs", () => {
+  const one = makeTab("pullrequest", "#1", { number: "1" });
+  const two = makeTab("pullrequest", "#2", { number: "2" });
+  const three = makeTab("pullrequest", "#3", { number: "3" });
+
+  beforeEach(() => {
+    vi.spyOn(pullRequestSurface, "render").mockImplementation((tab) => <p data-testid="probe">{tab.id}</p>);
+    act(() => {
+      openSurface(KEY, one);
+      openSurface(KEY, two);
+      openSurface(KEY, three);
+    });
+  });
+
+  const tab = (name: string) => screen.getByRole("tab", { name });
+  const titles = () => screen.getAllByRole("tab").map((t) => t.textContent);
+  const tabIds = () => getPanel(KEY).tabs.map((t) => t.id);
+
+  it("alt+Right and alt+Left move the focused tab one slot, keep it focused, and keep the active tab", () => {
+    render(<SidePanel />);
+    tab("#1").focus();
+    fireEvent.keyDown(tab("#1"), { key: "ArrowRight", code: "ArrowRight", altKey: true });
+    expect(tabIds()).toEqual([two.id, one.id, three.id]);
+    expect(titles()).toEqual(["#2", "#1", "#3"]);
+    expect(document.activeElement).toBe(tab("#1"));
+    fireEvent.keyDown(tab("#1"), { key: "ArrowRight", code: "ArrowRight", altKey: true });
+    expect(titles()).toEqual(["#2", "#3", "#1"]);
+    expect(document.activeElement).toBe(tab("#1"));
+    fireEvent.keyDown(tab("#1"), { key: "ArrowLeft", code: "ArrowLeft", altKey: true });
+    expect(titles()).toEqual(["#2", "#1", "#3"]);
+    expect(document.activeElement).toBe(tab("#1"));
+    // Moving is not activating: #3 stays the active tab.
+    expect(getPanel(KEY).activeTabId).toBe(three.id);
+    expect(tab("#3").getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("clamps at the ends (no wrap), and still handles the key there", () => {
+    const onKey = vi.fn(() => true);
+    const prev = pullRequestSurface.onKey;
+    pullRequestSurface.onKey = onKey;
+    try {
+      render(<SidePanel />);
+      tab("#1").focus();
+      const before = usePanelStore.getState();
+      expect(fireEvent.keyDown(tab("#1"), { key: "ArrowLeft", code: "ArrowLeft", altKey: true })).toBe(false);
+      tab("#3").focus();
+      expect(fireEvent.keyDown(tab("#3"), { key: "ArrowRight", code: "ArrowRight", altKey: true })).toBe(false);
+      expect(usePanelStore.getState()).toBe(before);
+      expect(document.activeElement).toBe(tab("#3"));
+      // Handled by the strip: the surface never sees it.
+      expect(onKey).not.toHaveBeenCalled();
+    } finally {
+      pullRequestSurface.onKey = prev;
+    }
+  });
+
+  it("from a tab's ×, moves that tab and keeps focus on the ×", () => {
+    render(<SidePanel />);
+    const close = screen.getByRole("button", { name: "Close #3" });
+    close.focus();
+    fireEvent.keyDown(close, { key: "ArrowLeft", code: "ArrowLeft", altKey: true });
+    expect(titles()).toEqual(["#1", "#3", "#2"]);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close #3" }));
+  });
+
+  it("plain arrows still only move focus, and alt+shift+arrows do nothing", () => {
+    render(<SidePanel />);
+    tab("#2").focus();
+    fireEvent.keyDown(tab("#2"), { key: "ArrowRight", code: "ArrowRight" });
+    expect(document.activeElement).toBe(tab("#3"));
+    fireEvent.keyDown(tab("#3"), { key: "ArrowLeft", code: "ArrowLeft", altKey: true, shiftKey: true });
+    expect(tabIds()).toEqual([one.id, two.id, three.id]);
+  });
+
+  it("a click (pointer down and up without moving 4px) still activates the tab", () => {
+    render(<SidePanel />);
+    const t = tab("#1");
+    fireEvent.pointerDown(t, { isPrimary: true, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(t, { isPrimary: true, clientX: 12, clientY: 11 });
+    fireEvent.pointerUp(t, { isPrimary: true, button: 0, clientX: 12, clientY: 11 });
+    fireEvent.click(t);
+    expect(getPanel(KEY).activeTabId).toBe(one.id);
+    expect(screen.getByTestId("probe").textContent).toBe(one.id);
+  });
+
+  it("a drag past 4px is not a click: the tab is not activated on release", () => {
+    render(<SidePanel />);
+    const t = tab("#1");
+    fireEvent.pointerDown(t, { isPrimary: true, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(t, { isPrimary: true, clientX: 40, clientY: 10 });
+    expect(t.parentElement?.getAttribute("data-dragging")).toBe("true");
+    fireEvent.pointerUp(t, { isPrimary: true, button: 0, clientX: 40, clientY: 10 });
+    fireEvent.click(t);
+    expect(getPanel(KEY).activeTabId).toBe(three.id);
+    expect(t.parentElement?.hasAttribute("data-dragging")).toBe(false);
+  });
+
+  it("mid-drag, Escape cancels the drag even while picking (which keeps picking), and alt+arrows wait for the drop", () => {
+    render(<SidePanel />);
+    // Not a click on the +: the drag test before this one leaves dnd-kit's click swallower on the document for 50ms.
+    act(() => {
+      startPanelPicking(KEY);
+    });
+    expect(isPicking(getPanel(KEY))).toBe(true);
+    const t = tab("#1");
+    t.focus();
+    fireEvent.pointerDown(t, { isPrimary: true, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(t, { isPrimary: true, clientX: 40, clientY: 10 });
+    expect(t.parentElement?.getAttribute("data-dragging")).toBe("true");
+    fireEvent.keyDown(t, { key: "ArrowRight", code: "ArrowRight", altKey: true });
+    expect(tabIds()).toEqual([one.id, two.id, three.id]);
+    fireEvent.keyDown(t, { key: "Escape", code: "Escape" });
+    expect(t.parentElement?.hasAttribute("data-dragging")).toBe(false);
+    expect(isPicking(getPanel(KEY))).toBe(true);
+    fireEvent.pointerUp(t, { isPrimary: true, button: 0, clientX: 40, clientY: 10 });
+    // After the drag, Escape is the panel's again.
+    fireEvent.keyDown(t, { key: "Escape", code: "Escape" });
+    expect(isPicking(getPanel(KEY))).toBe(false);
+  });
+
+  /** jsdom lays nothing out: the strip is 400px wide and its tabs sit 100px apart, 80px wide, so dnd-kit finds the tab under the pointer. */
+  const layOutTabs = () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this.getAttribute("role") === "tablist") return DOMRect.fromRect({ x: 0, y: 0, width: 400, height: 28 });
+      if (this.dataset.tabId === undefined || !this.parentElement) return new DOMRect();
+      const i = Array.from(this.parentElement.children).indexOf(this);
+      return DOMRect.fromRect({ x: i * 100, y: 0, width: 80, height: 28 });
+    });
+  };
+  const drag = (t: HTMLElement, x: number) => {
+    fireEvent.pointerDown(t, { isPrimary: true, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(t, { isPrimary: true, clientX: 15, clientY: 10 });
+    fireEvent.pointerMove(t, { isPrimary: true, clientX: x, clientY: 10 });
+  };
+
+  it("a drop onto another tab moves the dragged tab to that tab's index", () => {
+    layOutTabs();
+    render(<SidePanel />);
+    const t = tab("#1");
+    drag(t, 210);
+    fireEvent.pointerUp(t, { isPrimary: true, button: 0, clientX: 210, clientY: 10 });
+    expect(tabIds()).toEqual([two.id, three.id, one.id]);
+  });
+
+  it("tabs opened or closed mid-drag: the drop uses the strip as it is then, and a closed dragged tab moves nothing", () => {
+    layOutTabs();
+    const four = makeTab("pullrequest", "#4", { number: "4" });
+    render(<SidePanel />);
+    const t = tab("#1");
+    drag(t, 110);
+    act(() => {
+      openSurface(KEY, four);
+    });
+    fireEvent.pointerUp(document, { isPrimary: true, button: 0, clientX: 110, clientY: 10 });
+    expect(tabIds()).toEqual([two.id, one.id, three.id, four.id]);
+
+    const d = tab("#4");
+    drag(d, 10);
+    act(() => {
+      closePanelTab(KEY, four.id);
+    });
+    fireEvent.pointerUp(document, { isPrimary: true, button: 0, clientX: 10, clientY: 10 });
+    expect(tabIds()).toEqual([two.id, one.id, three.id]);
+    expect(screen.queryByTestId("panel-tabs")?.querySelector("[data-dragging]")).toBeNull();
+  });
+
+  it("a drag whose panel unmounts (the selection switched) moves nothing on release", () => {
+    layOutTabs();
+    const other = makeTab("files", "Files");
+    act(() => {
+      openSurface("session:b", other);
+    });
+    render(<SidePanel />);
+    const t = tab("#1");
+    drag(t, 210);
+    act(() => {
+      useUiStore.setState({ selection: { kind: "session", id: "b" } });
+    });
+    expect(screen.getByRole("tab", { name: "Files" })).toBeTruthy();
+    fireEvent.pointerUp(document, { isPrimary: true, button: 0, clientX: 210, clientY: 10 });
+    expect(tabIds()).toEqual([one.id, two.id, three.id]);
+  });
+
+  it("describes the keyboard move on each tab, and keeps the wrapper presentational", () => {
+    render(<SidePanel />);
+    const t = tab("#2");
+    const described = document.getElementById(t.getAttribute("aria-describedby") ?? "");
+    expect(described?.textContent).toBe("To move this tab, press Option with Left Arrow or Right Arrow.");
+    const wrapper = t.parentElement;
+    expect(wrapper?.getAttribute("role")).toBe("presentation");
+    expect(wrapper?.hasAttribute("tabindex")).toBe(false);
+    expect(wrapper?.hasAttribute("aria-roledescription")).toBe(false);
+    expect(tab("#3").tabIndex).toBe(0);
+    expect(t.tabIndex).toBe(-1);
   });
 });
 
