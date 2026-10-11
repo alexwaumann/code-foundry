@@ -29,6 +29,7 @@ const RATES: Record<string, { input: number; output: number; cacheRead: number; 
   "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite5m: 5, cacheWrite1h: 8 },
   "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.1, cacheWrite5m: 2.5, cacheWrite1h: 4 },
   "claude-haiku-5-5": { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite5m: 0.125, cacheWrite1h: 0.2 },
+  "claude-opus-4-8": { input: 5, output: 25, cacheRead: 0.5, cacheWrite5m: 6.25, cacheWrite1h: 10 },
 };
 
 function bucketMsg(u: MockUsage): UsageBucketInit {
@@ -81,4 +82,46 @@ export function sampleUsage(): MockUsage[] {
     { model: "claude-opus-5-5", day: utcDay(0), requests: 120, input: 4000, output: 300_000, cacheRead: 104_000_000, cacheWrite5m: 460_000, cacheWrite1h: 3_100_000 },
     { model: "claude-fable-5-1", day: utcDay(0), requests: 122, input: 3100, output: 260_000, cacheRead: 97_000_000, cacheWrite5m: 400_000, cacheWrite1h: 3_300_000 },
   ];
+}
+
+// ---- The Usage page's fixtures -----------------------------------------------------
+// Two weeks of four models on s-3 and s-4 (s-1 keeps sampleUsage, s-2 stays empty for the
+// panel's "No usage yet"), an empty day, an unpriced model, and a retired ledger reaching
+// past 30 days with a priced model without a colour slot ("Other").
+
+/** A bucket of about `millions` million tokens, mostly cache reads (the real mix). */
+function mix(model: string, daysAgo: number, millions: number, requests: number): MockUsage {
+  const total = Math.round(millions * 1e6);
+  const input = Math.round(total * 0.00005);
+  const output = Math.round(total * 0.003);
+  const cacheWrite5m = Math.round(total * 0.005);
+  const cacheWrite1h = Math.round(total * 0.03);
+  return { model, day: utcDay(daysAgo), requests, input, output, cacheRead: total - input - output - cacheWrite5m - cacheWrite1h, cacheWrite5m, cacheWrite1h };
+}
+
+// Millions of tokens per day, 13 days ago to today; 0 is no bucket (9 days ago is empty for every model).
+const OPUS = [12, 58, 71, 40, 0, 95, 132, 118, 160, 210, 188, 141, 126, 88];
+const FABLE = [4, 19, 22, 9, 0, 31, 48, 37, 52, 71, 64, 55, 49, 37];
+const SONNET = [0, 0.2, 0, 0, 0, 0.1, 0.3, 0.2, 0.1, 0.2, 0.1, 0, 0.2, 0.1];
+const HAIKU = [0, 0, 0, 0, 0, 0.1, 0.2, 0, 0.3, 0.1, 0.2, 0.1, 0.1, 0.1];
+
+function daily(model: string, values: readonly number[], perRequest: number): MockUsage[] {
+  return values.flatMap((m, i) => (m > 0 ? [mix(model, values.length - 1 - i, m, Math.max(1, Math.round(m / perRequest)))] : []));
+}
+
+/** s-3: Opus 5.5 every day, plus claude-opus-5 (no rate: "unpriced"). s-4: Fable, Sonnet and Haiku. */
+export function pageUsage(sessionId: string): MockUsage[] {
+  switch (sessionId) {
+    case "s-3":
+      return [...daily("claude-opus-5-5", OPUS, 1), mix("claude-opus-5", 2, 18, 9), mix("claude-opus-5", 1, 10.4, 5)];
+    case "s-4":
+      return [...daily("claude-fable-5-1", FABLE, 0.8), ...daily("claude-sonnet-5-5", SONNET, 0.01), ...daily("claude-haiku-5-5", HAIKU, 0.04)];
+    default:
+      return [];
+  }
+}
+
+/** SessionSnapshot.retired_usage / ListSessionsResponse.retired_usage: removed threads' usage. */
+export function retiredUsage(): UsageBucketInit[] {
+  return usageFields([mix("claude-opus-5-5", 20, 64, 70), mix("claude-fable-5-1", 20, 21, 25), mix("claude-opus-5-5", 33, 90, 80), mix("claude-opus-5-5", 60, 45, 40), mix("claude-opus-4-8", 12, 6, 4)]).usage;
 }

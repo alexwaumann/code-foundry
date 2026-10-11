@@ -68,9 +68,11 @@ test("the sidebar band holds only the empty traffic-light gutter and the app nam
   expect(await title.evaluate((el) => el.getBoundingClientRect().left)).toBe(80 + 12);
   expect(await drag(page, '[data-testid="sidebar-app-name"]')).toBe("drag");
 
-  // The toolbar sits right under the band, 32px tall, its buttons in order from 12px in; it does not drag.
+  // The toolbar sits right under the band, 32px tall, in the sidebar body's 8px left gutter
+  // with no inset of its own (#40: rows, toolbar and status run to the sidebar's edges, 8px
+  // from the window and from the pane), its buttons in order from there; it does not drag.
   const toolbar = await box(page, "sidebar-toolbar");
-  expect([toolbar.top, toolbar.left, toolbar.height]).toEqual([BAND, 0, 32]);
+  expect([toolbar.top, toolbar.left, toolbar.height]).toEqual([BAND, 8, 32]);
   expect(await drag(page, '[data-testid="sidebar-toolbar"]')).toBe("no-drag");
   expect(await drag(page, '[data-testid="sidebar-new-session"]')).toBe("no-drag");
   const buttons = await page
@@ -78,7 +80,7 @@ test("the sidebar band holds only the empty traffic-light gutter and the app nam
     .locator("button")
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
   expect(buttons).toEqual(["sidebar-dashboard", "sidebar-notifications", "sidebar-add-project", "sidebar-new-session"]);
-  expect((await box(page, "sidebar-dashboard")).left).toBe(12);
+  expect((await box(page, "sidebar-dashboard")).left).toBe(8);
   // New terminal is not in the sidebar (palette, cmd+t and the row menu only).
   await expect(page.getByTestId("sidebar-new-terminal")).toHaveCount(0);
   // Pull Requests, Projects and the thread list sit below the toolbar and do not drag.

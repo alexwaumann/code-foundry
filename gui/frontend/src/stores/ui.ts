@@ -109,6 +109,8 @@ interface UiState {
   fontSize: number;
   /** Page zoom in percent (appearance.zoom). */
   zoom: number;
+  /** The Usage page's range control. */
+  usageRange: UsageRange;
 
   select: (sel: Selection, opts?: { focusTerminal?: boolean }) => void;
   setFocus: (f: FocusRegion) => void;
@@ -132,6 +134,16 @@ interface UiState {
   focusContent: () => void;
   setFontSize: (n: number) => void;
   setZoom: (percent: number) => void;
+  setUsageRange: (days: UsageRange) => void;
+}
+
+/** The Usage page's ranges in days (UTC days, today inclusive); 30 by default. */
+export const USAGE_RANGES = [1, 7, 30, 90] as const;
+export type UsageRange = (typeof USAGE_RANGES)[number];
+export const USAGE_RANGE_DEFAULT: UsageRange = 30;
+
+function isUsageRange(n: unknown): n is UsageRange {
+  return USAGE_RANGES.some((r) => r === n);
 }
 
 export function clamp(n: number, lo: number, hi: number): number {
@@ -190,6 +202,7 @@ export const useUiStore = create<UiState>()(
       sidebarWidth: SIDEBAR_DEFAULT,
       fontSize: FONT_DEFAULT,
       zoom: ZOOM_DEFAULT,
+      usageRange: USAGE_RANGE_DEFAULT,
 
       select: (sel, opts) => {
         set((s) => ({
@@ -254,6 +267,9 @@ export const useUiStore = create<UiState>()(
       setZoom: (percent) => {
         set({ zoom: clamp(Math.round(percent), ZOOM_MIN, ZOOM_MAX) });
       },
+      setUsageRange: (usageRange) => {
+        set({ usageRange });
+      },
     }),
     {
       name: "code-foundry.ui",
@@ -268,7 +284,7 @@ export const useUiStore = create<UiState>()(
       // rose to 220) is clamped on load, so it renders and drags from a valid width.
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<UiState>;
-        const merged = { ...current, ...p };
+        const merged = { ...current, ...p, usageRange: isUsageRange(p.usageRange) ? p.usageRange : current.usageRange };
         return typeof p.sidebarWidth === "number" ? { ...merged, sidebarWidth: clamp(Math.round(p.sidebarWidth), SIDEBAR_MIN, SIDEBAR_MAX) } : merged;
       },
       partialize: (s) => ({
@@ -276,6 +292,7 @@ export const useUiStore = create<UiState>()(
         sidebarWidth: s.sidebarWidth,
         fontSize: s.fontSize,
         zoom: s.zoom,
+        usageRange: s.usageRange,
       }),
     },
   ),

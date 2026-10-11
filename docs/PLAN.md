@@ -81,9 +81,10 @@ after it.
 * PR 2 (subagent runs folded into the thread, every transcript a thread used rescanned
   after `/clear`, `Session.agent_runs`, per-bucket `cache_savings_usd`) done: "PR 2" in
   `docs/notes/session-usage.md`.
-* PR 3 (the side panel Usage surface) done: "Panel surface (PR 3)" in
-  `docs/notes/session-usage.md`.
-* PR 4 (the Usage page and its sidebar toggle): to do.
+* PR 3 (the side panel Usage surface, per-kind bucket costs, `view.panel.usage`) done:
+  "Panel surface (PR 3)" in `docs/notes/session-usage.md`.
+* PR 4 (the Usage page and its sidebar toggle, Cache savings from `cache_savings_usd`)
+  done: "Usage page (PR 4)" in `docs/notes/session-usage.md`.
 
 ### Open items
 

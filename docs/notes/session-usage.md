@@ -456,3 +456,138 @@ requestIds, `agent-a804aa7c20e2611b5.jsonl` 1, total 4. Cache savings by hand: 1
 
 A daemon restart is needed after installing: migration 0013 and the new fields come with
 the daemon. An older GUI ignores `agent_runs` and `cache_savings_usd`.
+
+# Usage page (PR 4)
+
+Frontend only; no Go or proto changes. The page over every thread, `view.usage`, as in
+DESIGN "Views" and the `?view=all` mockup.
+
+## What was built
+
+* **Views store** (`stores/views.ts`): `usageOpen` next to `settingsOpen`; the two are
+  mutually exclusive. `showView("usage")` **toggles** (open if closed, `closeUsage()` if
+  open), so the button, the palette and the CLI's `view.usage` all flip it. `closeUsage()`
+  mirrors `closeSettings()` (refocuses the selection's terminal). A selection change and
+  a top-level page (`showView("pullrequests")` etc.) close it like settings.
+  `selectPageOpen` (settings or usage) replaces the bare `settingsOpen` checks: either page
+  hides the side panel, and the panel commands are no-ops under it.
+* **`view.usage` is presented window-locally** (`keys/bindings.ts`), like `view.settings`:
+  the button needs no daemon round trip. The CLI still reaches the window through
+  `UiIntent.ShowView "usage"`, which toggles too.
+* **Sidebar status row**: a `ChartColumn` `CommandButton` (`status-usage`) right of the
+  palette button, `aria-pressed` while the page shows, with the sidebar-accent background
+  the toolbar's Dashboard button uses for its current state.
+* **`components/usage/`**: `UsagePage` (header with "Code Foundry threads only", the range
+  control and ×; hero total, 44px semibold, proportional figures; summary line; chart;
+  by-model table; bucket strip), `UsageChart` (inline SVG), `Segmented`, and
+  `usageData.ts` (the range filter, daily series, Other folding, axis helpers).
+  `useEscapeCloses` moved from `SettingsPage` to `components/window/` and serves both pages.
+* **`lib/usage.ts` is PR 3's, shared**: the page uses its `totalUsage`, `usageByModel`,
+  `bucketTokens`, `fmtTok`, `fmtUsd`, `fmtShare`, `modelSlot`, `modelColorVars` and
+  `SWATCH_BG`, so the panel surface and the page have one colour map and one set of
+  formats. This branch first had its own `formatTokens` / `formatUsd` / `formatShare` /
+  `modelColor` / `sumBuckets` / `byModel`; they were dropped in the merge with main (PR 3
+  landed first). The only change to the shared file: `MODEL_SLOTS` is exported (the chart
+  keys its series by a slot's model id).
+* **ui store**: `usageRange` (1, 7, 30 or 90; default 30), persisted with the sidebar
+  width and zoom. A persisted value outside the set falls back to 30. No version bump: an
+  older state simply lacks the key.
+* **Mock daemon** (`mock/usage.ts`, `pageUsage`, `retiredUsage`): s-3 and s-4 carry two
+  weeks of buckets over four models with an empty day (s-1 keeps PR 3's `sampleUsage`, s-2
+  stays empty for the panel's "No usage yet"); s-3 also has `claude-opus-5`, unpriced; the
+  retired ledger has opus 20, 33 and 60 days ago and `claude-opus-4-8` (priced from
+  `internal/pricing`, no colour slot: "Other") 12 days ago. `view.usage` is in the mock
+  registry.
+* **Test ids** are all `usage-page-*` (`usage-page-total`, `-summary`, `-chart`, `-day`,
+  `-tooltip`, `-legend`, `-models`, `-model-row`, `-unpriced`, `-buckets`, `-range-<n>`,
+  `-mode-<tokens|cost>`, `-close`, `-empty`): the panel surface uses `usage-empty`,
+  `usage-summary`, `usage-models` and `usage-unpriced`.
+
+## Decisions
+
+* **Data**: one `useSessionsStore` subscription (`useShallow`) returns every thread's
+  `usage` array plus `retiredUsage`; the page folds them with `useMemo` keyed on that,
+  the range and today's UTC date. Buckets are kept by `day` against the range's UTC days
+  (today inclusive). Day `"unknown"` buckets never show on the page (they have no slot);
+  the CLI still counts them.
+* **Thread count** is the live threads with a bucket in the range. Removed threads are in
+  the total but not in the count: the retired ledger has no thread ids.
+* **Colours** are the shared slot colours (opus-5-5 blue, fable-5-1 orange, sonnet-5-5
+  aqua, haiku-5-5 yellow) as `--sw-l` / `--sw-d` vars, so swatches and SVG fills
+  (`fill-(--sw-l) dark:fill-(--sw-d)`) follow the theme without a hook. `modelSlot` also
+  matches dated and suffixed snapshots, so the chart stacks `claude-haiku-5-5-20261001`
+  with its family's series; the table still lists the exact id. Every other id is grey:
+  one "Other" series on the chart and legend, but its own row (grey swatch) in the table.
+* **Table**: sorted by cost, then tokens. A model with any unpriced bucket gets the
+  "unpriced" tag; when every bucket is unpriced (`allUnpriced`), cost and share are "—".
+  Share is of the priced total.
+* **Chart**: continuous day slots for the whole range (empty days are empty), y grid on a
+  1/2/2.5/5 step (about four lines), bars at most 28px wide, a 2px gap between stacked
+  segments, 4px radius on the top segment only. Segments too thin to show past the gap
+  are left out of the drawing (the tooltip still lists them), so the rounded end always
+  sits on a visible segment; without that, a sliver of haiku on top of a bar took the
+  rounded corners as a 1px cap. Axis labels: about eight, from the oldest day, always
+  today. The chart measures its width (ResizeObserver) rather than scaling a viewBox, so
+  text stays 11px. The Tokens / Cost toggle is component state (not persisted).
+* **Money and tokens** use the shared `fmtUsd` (four decimals under a cent, "$0.0047",
+  like the CLI) and `fmtTok` (trailing zeros dropped: "85K", "28.4M").
+
+## Cache savings
+
+DESIGN puts "Cache savings" (Σ cache read × (input rate − cache read rate)) at the right
+of the bucket strip. The GUI has no rate table, so the first version of this PR left it
+out. PR 2 then put `UsageBucket.cache_savings_usd` on the wire (`pricing.CacheSavings`,
+0 for unpriced buckets), and after merging it the strip ends with "Cache savings",
+right-aligned (`ml-auto`): `usagePageData` sums `cacheSavingsUsd` over the range's
+buckets, the retired ledger included, formatted with `fmtUsd`. It is the page's own sum,
+not a `UsageTotals` field, so the panel surface's shared totals are unchanged.
+
+## Gotchas
+
+* `workspaces.spec.ts` (chromium) has a pre-existing keyboard race: `Meta+n` then
+  `Meta+1`/`Meta+3` straight after `openApp`, or Enter before the composer has the base
+  ref. On main (89232d3) it failed 3 of 40 runs with `--repeat-each=8`; unrelated to this
+  PR. It also failed once in the full `make gui-e2e` here, while binaries were building.
+* `layout.spec.ts:50` and `sidebar.spec.ts:455` (both browsers) failed on main since #40
+  (sidebar gutter; checked against 4071bef alone, nothing here touches the toolbar). #40
+  moved the toolbar into the sidebar body's 8px left gutter and dropped its own inset
+  ("rows run to the sidebar's edges, 8px from the window and the pane"), but kept the old
+  expectations: toolbar at x 0, Dashboard 12px in, New thread 12px from the toolbar's
+  right edge. Updated here to what #40 intends: toolbar at 8, Dashboard at 8, New thread
+  flush (0).
+* JSX whitespace: prettier reflowed the summary line's `· <b>` into `·<b>`; the line is
+  now built from a list so the separators cannot be lost.
+
+## Verified
+
+`make check` green. Unit tests: `lib/usage.test.ts` (formats, colour slots, sums, model
+sort), `components/usage/usageData.test.ts` (UTC days across month ends, range filter
+including `unknown`, retired ledger, thread count, empty-day slots, Other folding, axis
+step and labels), `UsagePage.test.tsx` (total and summary, unpriced row, bucket strip,
+Other on chart and legend with ids in the table, 30/90/1-day switching and persistence,
+"No usage in this range", Tokens/Cost with the tooltip, × and Escape), `views.test.ts`
+(toggle, exclusivity with settings, top-level pages, `closeUsage`, selection change,
+panel commands no-op). `e2e/usage-page.spec.ts` (WebKit and Chromium): button position
+and `aria-pressed`, toggle, ×, Escape, selection, settings exclusivity, ShowView from the
+CLI path toggling, range filter and reload persistence, Tokens/Cost and the tooltip, plus
+`SHOTS=<dir>` screenshots.
+
+Live screenshots, real Wails window at 1400x900: `make build && make gui-build`, daemon
+in `CODE_FOUNDRY_HOME=/tmp/cf-usage4-home`, a scratch git repo under the worktree's
+`.scratch/` (home-only paths), two haiku threads prompted "reply with the word ok"
+(`code-foundry usage`: 2 requests · 75.8K tokens · $0.0047, Cache savings $0.0050; the page
+shows the same). The GUI started with
+`code-foundry gui` and the same home; the window raised, moved and sized by unix id
+through System Events (it resolved to ours this time; see PR 3's gotcha above); the
+status-row button clicked with a CGEvent mouse click (JXA; AppleScript's `click at` does
+not reach the web view); `screencapture -R` of the window. Theme switched with `settings
+set appearance.theme light`. Afterwards both threads removed (usage moved to the retired
+ledger: `All threads (0 + removed): 2 requests · 75.8K tokens · $0.0047`, savings
+$0.0050), daemon stopped, home and scratch repo deleted. The shots were retaken after
+merging PR 3 (shared `fmtTok`: the axis reads "80K", not "80.0K"; main's sidebar gutter)
+and again after PR 2 (Cache savings in the strip). Before the merges, a second click on
+the button closed the page live.
+
+* `session-usage/page-dark.png`: tokens, dark.
+* `session-usage/page-cost.png`: cost, dark, hovering today's bar.
+* `session-usage/page-light.png`: tokens, light.

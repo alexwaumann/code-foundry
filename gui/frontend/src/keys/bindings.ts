@@ -201,6 +201,8 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   // Window-local: only this window opens, without a round trip (the CLI and palette
   // reach every window through UiIntent.ShowView instead).
   "view.settings": () => showView("settings"),
+  // The Usage page, a toggle (stores/views.ts): window-local like view.settings.
+  "view.usage": () => showView("usage"),
   "view.help": () => {
     toggleHelp();
     return true;

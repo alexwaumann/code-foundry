@@ -112,7 +112,7 @@ export function usageByModel(buckets: readonly UsageBucketView[]): ModelUsage[] 
 export type ModelSlot = 1 | 2 | 3 | 4 | 5;
 
 /** Fixed slot per model family (DESIGN.md: opus blue, fable orange, sonnet aqua, haiku yellow). */
-const MODEL_SLOTS: readonly (readonly [string, ModelSlot])[] = [
+export const MODEL_SLOTS: readonly (readonly [string, ModelSlot])[] = [
   ["claude-opus-5-5", 1],
   ["claude-fable-5-1", 2],
   ["claude-sonnet-5-5", 3],

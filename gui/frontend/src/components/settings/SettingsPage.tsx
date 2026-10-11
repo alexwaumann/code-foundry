@@ -3,12 +3,11 @@ import { FileText, Search, TriangleAlert, X } from "lucide-react";
 import type { SettingFieldView } from "@/api/settings";
 import { Button } from "@/components/ui/button";
 import { PaneHeader } from "@/components/window/PaneHeader";
+import { useEscapeCloses } from "@/components/window/useEscapeCloses";
 import { tildify } from "@/lib/path";
 import { runCommand } from "@/stores/commands";
-import { useConfirmStore } from "@/stores/confirm";
 import { loadSettingsSchema, useSettingsStore } from "@/stores/settings";
-import { useUiStore } from "@/stores/ui";
-import { closeSettings, useViewsStore } from "@/stores/views";
+import { closeSettings } from "@/stores/views";
 import { SettingRow } from "./SettingRow";
 
 function matches(f: SettingFieldView, q: string): boolean {
@@ -18,24 +17,6 @@ function matches(f: SettingFieldView, q: string): boolean {
     .toLowerCase()
     .split(/\s+/)
     .every((w) => hay.includes(w));
-}
-
-/** Escape closes the page, unless a dialog is open or a field is being edited. */
-function useEscapeCloses(): void {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (useUiStore.getState().palette.open || useViewsStore.getState().helpOpen || useConfirmStore.getState().pending) return;
-      const t = e.target;
-      if (t instanceof HTMLElement && (t.matches("input, select, textarea") || t.closest("[data-key-recorder]"))) return;
-      closeSettings();
-    };
-    // Capture phase: runs before Radix closes a dialog on the same Escape.
-    window.addEventListener("keydown", onKey, { capture: true });
-    return () => {
-      window.removeEventListener("keydown", onKey, { capture: true });
-    };
-  }, []);
 }
 
 function Banners() {
@@ -76,7 +57,7 @@ export function SettingsPage() {
   const [query, setQuery] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  useEscapeCloses();
+  useEscapeCloses(closeSettings);
 
   useEffect(() => {
     void loadSettingsSchema();
