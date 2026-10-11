@@ -163,7 +163,7 @@ func (m *Manager) startSlug(id, prompt string) (<-chan namingResult, error) {
 	ch := make(chan namingResult, 1)
 	go func() {
 		defer m.wg.Done()
-		ctx, cancel := context.WithTimeout(m.ctx, m.opts.NamingTimeout)
+		ctx, cancel := context.WithTimeout(withNamingSession(m.ctx, id), m.opts.NamingTimeout)
 		defer cancel()
 		name, err := m.opts.Namer(ctx, prompt)
 		if isRateLimit(err) {
