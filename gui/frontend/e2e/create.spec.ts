@@ -250,6 +250,9 @@ test("repo.github.publish in the palette opens the publish dialog; repo.create o
   const sk = page.locator('[data-nav-key="p:repo-sk"]');
   await sk.hover();
   await sk.getByTestId("project-new-terminal").click();
+  // The shell opens in the Projects page's bottom panel; its sidebar row selects it.
+  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
+  await page.locator('[data-row-key^="t:t-new-"]').click();
   await expect(page.getByTestId("terminal-host")).toBeVisible();
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
