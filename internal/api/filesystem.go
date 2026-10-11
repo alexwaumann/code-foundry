@@ -70,7 +70,9 @@ func (h *Filesystem) ListDirectories(_ context.Context, req *connect.Request[v1.
 	return connect.NewResponse(out), nil
 }
 
-// ListSkills lists project skills of each source checkout, then the user's.
+// ListSkills lists project skills of each source checkout, then the user's. A source
+// whose project or checkout is gone is skipped (the composer may hold a stale one); a
+// malformed one fails the request.
 func (h *Filesystem) ListSkills(_ context.Context, req *connect.Request[v1.ListSkillsRequest]) (*connect.Response[v1.ListSkillsResponse], error) {
 	out := &v1.ListSkillsResponse{}
 	add := func(skills []fsx.Skill, scope v1.SkillScope, repoID string) {
@@ -82,8 +84,13 @@ func (h *Filesystem) ListSkills(_ context.Context, req *connect.Request[v1.ListS
 	}
 	for _, src := range req.Msg.GetSources() {
 		dir, _, err := h.checkout(src.GetRepoId(), src.GetPath())
-		if err != nil {
+		switch code := connect.CodeOf(err); {
+		case err == nil:
+		case code == connect.CodeInvalidArgument: // a malformed request, not a missing checkout
 			return nil, err
+		default: // a removed project or worktree, or one that cannot be resolved: skip it
+			h.log.Warn("skill source skipped", "repo", src.GetRepoId(), "path", src.GetPath(), "err", err)
+			continue
 		}
 		add(fsx.ReadSkills(filepath.Join(dir, ".claude"), true, h.log), v1.SkillScope_SKILL_SCOPE_PROJECT, src.GetRepoId())
 	}

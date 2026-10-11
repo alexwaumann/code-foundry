@@ -206,6 +206,8 @@ export function listSkills(
   completionCalls.push(`skills ${sources.map((s) => s.repoId).join(",") || "-"} ${String(includeUser)}`);
   const out: SkillInit[] = [];
   for (const src of sources) {
+    // Like the daemon: an unknown project is skipped; a malformed source fails.
+    if (src.repoId !== "" && !repos.has(src.repoId)) continue;
     const repo = completionCheckout(repos, src.repoId, src.path);
     const dir = src.path || repo.path;
     for (const s of PROJECT_SKILLS) {

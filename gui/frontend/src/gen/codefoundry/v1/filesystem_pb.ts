@@ -370,8 +370,10 @@ export const FilesystemService: GenService<{
    * checkouts (the composer's "/" completion): .claude/skills/<name>/SKILL.md and
    * .claude/commands/**\/*.md in each source, then ~/.claude/skills and
    * ~/.claude/commands/*.md when include_user. Project skills come in request order,
-   * sorted by name within a source; user skills last. Unreadable entries are skipped.
-   * An unknown repo is NotFound; a path outside the home directory is InvalidArgument.
+   * sorted by name within a source; user skills last. Unreadable entries are skipped,
+   * and so is a source whose project or checkout is gone (logged). A source without a
+   * repo id, or with a path that is relative or outside the home directory, is
+   * InvalidArgument.
    *
    * @generated from rpc codefoundry.v1.FilesystemService.ListSkills
    */

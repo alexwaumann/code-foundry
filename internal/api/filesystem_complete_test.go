@@ -78,6 +78,18 @@ func completionHome(t *testing.T) (root, outside string, c codefoundryv1connect.
 
 func TestFilesystemListSkills(t *testing.T) {
 	root, outside, c := completionHome(t)
+	// A checkout with a skill that cannot be read.
+	locked := filepath.Join(root, "locked")
+	if err := os.MkdirAll(filepath.Join(locked, ".claude", "skills", "hidden"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(locked, ".claude", "skills", "hidden", "SKILL.md"), []byte("---\ndescription: Hidden.\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
 	type item struct {
 		name, desc string
 		scope      v1.SkillScope
@@ -108,7 +120,21 @@ func TestFilesystemListSkills(t *testing.T) {
 			{"commit", "Commit.", U, "", ".claude/skills/commit/SKILL.md"},
 			{"user-cmd", "User command.", U, "", ".claude/commands/user-cmd.md"},
 		}},
-		{name: "unknown repo", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{RepoId: "zz"}}}, code: connect.CodeNotFound},
+		{name: "unknown repo is skipped", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{RepoId: "zz"}}}},
+		{name: "bad sources are skipped, the good one and the user's listed", req: &v1.ListSkillsRequest{
+			Sources: []*v1.SkillSource{
+				{RepoId: "p", Path: filepath.Join(root, "gone")}, // a removed worktree
+				{RepoId: "zz"}, // a removed project
+				{RepoId: "p", Path: filepath.Join(root, "locked")}, // unreadable
+				{RepoId: "p"},
+			},
+			IncludeUser: true,
+		}, want: []item{
+			{"demo", "A demo skill.", P, "p", "proj/.claude/skills/demo/SKILL.md"},
+			{"fix", "Fix the bug.", P, "p", "proj/.claude/commands/fix.md"},
+			{"commit", "Commit.", U, "", ".claude/skills/commit/SKILL.md"},
+			{"user-cmd", "User command.", U, "", ".claude/commands/user-cmd.md"},
+		}},
 		{name: "missing repo id", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{Path: root}}}, code: connect.CodeInvalidArgument},
 		{name: "outside home", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{RepoId: "p", Path: outside}}}, code: connect.CodeInvalidArgument},
 		{name: "relative path", req: &v1.ListSkillsRequest{Sources: []*v1.SkillSource{{RepoId: "p", Path: "proj"}}}, code: connect.CodeInvalidArgument},
