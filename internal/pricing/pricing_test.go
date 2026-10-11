@@ -109,6 +109,33 @@ func TestCostByKind(t *testing.T) {
 	}
 }
 
+func TestCacheSavings(t *testing.T) {
+	tests := []struct {
+		name string
+		b    Bucket
+		want float64
+	}{
+		{name: "opus 5.5", want: 3e6 * (4 - 0.2) / 1e6,
+			b: Bucket{Model: "claude-opus-5-5", Input: 1e6, Output: 2e6, CacheRead: 3e6, CacheWrite1h: 5e6}},
+		{name: "haiku 5.5 long tier", want: 200_000 * (0.5 - 0.05) / 1e6,
+			b: Bucket{Model: "claude-haiku-5-5", Tier: TierLong, CacheRead: 200_000}},
+		{name: "fast opus 5.5", want: 1e6 * (4 - 0.2) * 2 / 1e6,
+			b: Bucket{Model: "claude-opus-5-5", Speed: SpeedFast, CacheRead: 1e6}},
+		{name: "dated haiku id", want: 1e6 * (1 - 0.1) / 1e6,
+			b: Bucket{Model: "claude-haiku-4-5-20251001", CacheRead: 1e6}},
+		{name: "no cache reads", b: Bucket{Model: "claude-fable-5-1", Input: 500}},
+		{name: "unpriced model", b: Bucket{Model: "claude-unknown", CacheRead: 1e6}},
+		{name: "unpriced fast", b: Bucket{Model: "claude-haiku-5-5", Speed: SpeedFast, CacheRead: 1e6}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CacheSavings(tt.b); math.Abs(got-tt.want) > 1e-12 {
+				t.Errorf("CacheSavings = %v; want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestHasLongTier(t *testing.T) {
 	for model, want := range map[string]bool{
 		"claude-haiku-5-5": true, "claude-haiku-5-5-20261001": true,

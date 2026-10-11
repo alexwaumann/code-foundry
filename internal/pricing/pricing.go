@@ -172,3 +172,14 @@ func Cost(b Bucket) (usd float64, ok bool) {
 	c, ok := CostByKind(b)
 	return c.Total(), ok
 }
+
+// CacheSavings is what the bucket's cache reads saved against paying the input rate for
+// the same tokens: CacheRead x (input rate - cache read rate), at the bucket's (model,
+// tier, speed). 0 for an unpriced bucket.
+func CacheSavings(b Bucket) float64 {
+	r, ok := Lookup(b.Model, b.Tier, b.Speed)
+	if !ok {
+		return 0
+	}
+	return float64(b.CacheRead) * (r.Input - r.CacheRead) / 1e6
+}

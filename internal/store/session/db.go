@@ -108,9 +108,20 @@ func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	transcripts, err := loadTranscripts(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	runs, err := loadAgentRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
 	for i := range out {
-		out[i].LinkedPullRequests = links[out[i].ID]
-		out[i].Usage = usage[out[i].ID]
+		id := out[i].ID
+		out[i].LinkedPullRequests = links[id]
+		out[i].Usage = usage[id]
+		out[i].Transcripts = transcripts[id]
+		out[i].AgentRuns = runs[id]
 	}
 	return out, nil
 }

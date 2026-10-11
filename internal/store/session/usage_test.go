@@ -296,7 +296,7 @@ func TestUsageRescanOnReconnect(t *testing.T) {
 	// adds to it.
 	e.writeTranscript(cid, c[3:]...)
 	stale := []UsageBucket{{Model: "claude-opus-5-5", Day: "2026-10-06", Requests: 99, Input: 99}}
-	e.m.setUsage(s.ID, stale)
+	e.m.setUsage(s.ID, usageUpdate{total: stale})
 	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +348,7 @@ func TestForkSkipsParentUsage(t *testing.T) {
 	// The rescan on reconnect skips the copies too.
 	_ = e.terms.Exit(got.TerminalID, 0)
 	e.waitFor(f.ID, "fork disconnected", func(s Session) bool { return s.State == StateDisconnected })
-	e.m.setUsage(f.ID, nil)
+	e.m.setUsage(f.ID, usageUpdate{})
 	if _, err := e.m.Reconnect(e.ctx(), f.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -367,8 +367,8 @@ func TestRemoveRetiresUsage(t *testing.T) {
 		{Model: "claude-haiku-5-5", Day: "2026-10-08", Requests: 1, Output: 1},
 		{Model: "claude-opus-5-5", Day: "2026-10-09", Requests: 1, Input: 1, Output: 1, CacheRead: 1, CacheWrite5m: 1, CacheWrite1h: 1},
 	}
-	e.m.setUsage(a.ID, ua)
-	e.m.setUsage(b.ID, ub)
+	e.m.setUsage(a.ID, usageUpdate{total: ua})
+	e.m.setUsage(b.ID, usageUpdate{total: ub})
 	for len(e.events.C()) > 0 {
 		<-e.events.C()
 	}

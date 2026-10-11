@@ -120,18 +120,28 @@ func (t *tailer) poll() (lines [][]byte, discovered bool) {
 	if fi, err := t.f.Stat(); err == nil && fi.Size() < t.off {
 		t.off, t.lineSplitter = 0, lineSplitter{} // truncated or replaced
 	}
+	lines, err := readAppended(t.f, &t.off, &t.lineSplitter, lines)
+	if err != nil {
+		t.closeFile() // reopen on the next poll
+	}
+	return lines, discovered
+}
+
+// readAppended reads f from *off to its end, advancing *off, and appends the complete
+// lines to lines. err is a read error other than EOF.
+func readAppended(f *os.File, off *int64, sp *lineSplitter, lines [][]byte) ([][]byte, error) {
 	buf := make([]byte, tailReadChunk)
 	for {
-		n, err := t.f.ReadAt(buf, t.off)
+		n, err := f.ReadAt(buf, *off)
 		if n > 0 {
-			t.off += int64(n)
-			lines = t.split(lines, buf[:n])
+			*off += int64(n)
+			lines = sp.split(lines, buf[:n])
+		}
+		if err != nil && !errors.Is(err, io.EOF) {
+			return lines, err
 		}
 		if err != nil || n < len(buf) {
-			if err != nil && !errors.Is(err, io.EOF) {
-				t.closeFile() // reopen on the next poll
-			}
-			return lines, discovered
+			return lines, nil
 		}
 	}
 }

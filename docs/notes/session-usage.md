@@ -91,7 +91,7 @@ session's buckets exactly once, in the transaction that deletes the session.
 
 ## Gotchas
 
-* **`/clear`** moves Claude to a new transcript file. Live, the fold carries on across
+* **`/clear`** (fixed in PR 2, below) moves Claude to a new transcript file. Live, the fold carries on across
   the switch. But a later resume rescans only the current file, so usage from before a
   `/clear` is dropped at the next reconnect or restart. Fixing that needs the list of
   transcript files a thread has used, which is not tracked yet; PR 2's per-file folds
@@ -255,3 +255,204 @@ Accessibility exposed no windows for ours at all, so it could not be resized. Th
 1400x900 shots came from a throwaway build with `gui/main.go`'s default window set to
 1400x900 (reverted, rebuilt), captured by CGWindowID (`CGWindowListCopyWindowInfo` filtered
 by owner pid, then `screencapture -o -l <id>`), which ignores overlapping windows.
+
+# Session usage, PR 2: subagent runs, every transcript, cache savings
+
+PR 2 of 4. A thread's usage is now the sum of its **sources**: every transcript file the
+thread has used (`/clear` moves Claude to a new one) and every subagent run under them.
+Each source has its own `usageFold` (its own streaming-repeat state). Also: the runs on
+the wire for PR 3's panel, and a per-bucket `cache_savings_usd` (scope addition).
+
+## The invariant, restated
+
+Each source's counters are only ever replaced by a complete fold of that source, and the
+thread's total is always the sum of its sources' current values. A runner's folds are
+complete because each file is either read from byte zero live (a new thread, a fork, a
+file after `/clear`, a run opened at its spawn) or rescanned from byte zero on the
+runner's first discovery. Nothing is ever added to a cached value from a partial read;
+a rescan that hits a read error (other than a missing file) publishes nothing
+(`usageOff`), as in PR 1.
+
+## What was built
+
+* `usage_runs.go`: `AgentRun`, the lifecycle parser `parseRunEvents` (byte prefilters,
+  then a small decode), `fileTail` (lazy-open follower sharing `readAppended` with the
+  tailer), and `threadUsage`, which holds the file folds, the run folds, pending spawns,
+  and the dirty sources. `Session.Transcripts` (claude session ids, oldest first) and
+  `Session.AgentRuns` (by start time).
+* Migration `0013_session_usage_sources.sql`: `session_transcripts`,
+  `session_agent_runs`, `session_source_usage` (source `t:<cid>` or `a:<agent id>`, same
+  bucket columns as `session_usage`). It seeds every existing thread's current
+  transcript as its first source, with its `session_usage` rows as that source's fold.
+  `session_usage` stays the thread's total (what PR 1 loads, ships and retires). All
+  three cascade on the session.
+* Runner: `pollTranscript` feeds the thread's lines to the current file's fold and the
+  lifecycle, then `threadUsage.poll` (match pending spawns to meta files, drain open
+  runs), then `publishUsage` (once per poll with a change). `rescan` replaces
+  `backfill`: on the runner's first discovery, when there is anything before (skipped
+  history, earlier transcripts, saved runs), it folds every transcript in
+  `Session.Transcripts` (the current one up to the skipped offset; the tailer reads on),
+  then every `agent-*.jsonl` under them, into a fresh `threadUsage` that becomes the
+  live one. `discoverTranscript` records each new id. `onTick` runs the safety net.
+  Subagent directories of open runs are added to the tailer's fsnotify watcher.
+* `setUsage(id, usageUpdate)` writes the total, the dirty sources and the changed runs in
+  one transaction, and publishes when the total or the runs changed.
+* Proto: `AgentRun` (id, description, agent_type, model, effort, background,
+  `AgentRunStatus` OPEN / CLOSED, spawn_depth, started_at, its own priced usage),
+  `Session.agent_runs = 30`, `UsageBucket.cache_savings_usd = 18` (13 to 17 are PR #43's
+  per-kind costs). `pricing.CacheSavings(b)` = cache read × (input rate − cache read
+  rate), 0 when unpriced; priced per bucket in `internal/api`.
+* Frontend `src/api/session.ts`: `AgentRunView` (status `"open" | "closed"`),
+  `SessionView.agentRuns`, `UsageBucketView.cacheSavingsUsd`; `stores/sessions.ts`
+  compares runs by content (`sameAgentRuns`). The count of runs is
+  `agentRuns.length`: a selector on it returns a number, so it is cheap; no separate
+  count field.
+* `code-foundry usage`: a `Cache savings` line under the bucket totals; with `--thread`,
+  a table of agent runs (status, description, type, model, requests, tokens, cost) and
+  `agent_runs` in `--json`.
+
+## The lifecycle as built (checked against 27 `subagents/` directories here)
+
+* **Start.** An `Agent` (or old `Task`) tool_use, in the thread's transcript or in a
+  run's, is a pending spawn. While any is pending, each poll lists the directories of
+  the pending spawns and opens the run whose meta `toolUseId` matches. The spawn's result
+  carries `agentId`, so a run is also opened (or folded once) from its result if the
+  meta was never matched.
+* **Stop.** The spawn's `tool_result`: `async_launched` keeps it open (background), any
+  other status closes it, including an interrupted call (no `agentId`, `is_error`,
+  string `toolUseResult`: matched by tool use id). A background run closes on its
+  `<task-notification>` (not a second `tool_result` as DESIGN assumed): the
+  `queue-operation` `enqueue` record or the delivered `user` record, whichever comes
+  first. Statuses seen: completed 1604, failed 230, killed 37, stopped 14; all close.
+  Task ids that are not agents (background shells) have no file and are ignored.
+* **Resume.** `SendMessage` to a finished run writes `toolUseResult.resumedAgentId`;
+  the run is opened again from where its fold stopped. Not in DESIGN.
+* **Nested runs are live**, through the same code: lines of run files go through the
+  same lifecycle. 72 metas here are depth 2, 18 are depth 3.
+* **Safety net**: 10 minutes without growth while the thread is at its prompt
+  (`atPromptSince`), six times that for a background run (one runs on while the thread
+  is idle, e.g. a long build). `Options.AgentIdleClose`.
+* Run info: the meta file wins over the spawn's input and the result (so live and
+  rescan agree whichever was met first); they only fill gaps. Claude rewrites a stopped
+  run's meta as `{"agentType":…,"stoppedByUser":true}`: merged, never overwritten with
+  "".
+
+## Decisions and deviations
+
+* **Event order by record time.** A rescan reads the thread's transcript before the run
+  files. A nested background run's notification is enqueued in the *thread's*
+  transcript, while its `async_launched` is in its parent run's file, so the rescan met
+  the close first and the older launch reopened it: 36 and 28 phantom open runs in two
+  real sessions. Each run now keeps the timestamp of the record that last opened or
+  closed it and ignores older events. After the fix both rescan with 0 open runs.
+* **Per-source persistence** (beyond "a small table" for the transcript list). Claude
+  deletes transcripts after `cleanupPeriodDays` (30 by default). With only a list, a
+  rescan after a deletion either shrinks the total or (to keep the invariant) never
+  publishes again. With each source's last complete fold saved, a missing transcript or
+  run keeps its counters and everything else is rescanned. Run usage had to be persisted
+  anyway for `Session.agent_runs` of a disconnected thread.
+* **`/clear` fixed.** The gotcha from PR 1 is gone: every transcript the thread used is
+  rescanned. Threads from before this PR only know their current transcript (the
+  migration's seed); pre-`/clear` files from before the upgrade are not recoverable.
+* **Fork cutoff** applies to every fold and to lifecycle events: a fork's copied
+  history names its parent's runs, whose files live under the parent's id, so without
+  the cutoff they would be pending forever.
+* **Rescan trigger**: the first discovery in a runner, when the tailer skipped history,
+  the thread has other transcripts, or it has saved runs. A new thread or a fork has
+  none and does not rescan.
+* **Background safety net is 1 h**, not 10 min (above).
+
+## Gotchas
+
+* An `attachment`-like record holds the Agent tool's schema (`"name":"Agent"` plus a
+  long description): it passes the spawn prefilter and is decoded once per file, then
+  rejected (`type` is not `assistant`). Harmless.
+* `make gen` needs `gui/frontend/dist` (`make gui-dist-stub`) in a fresh worktree for
+  `go build ./...`.
+* The tailer still resets to byte 0 on truncation; agent tails never do.
+
+## Verified
+
+`make check` green (Go: gofmt, vet, staticcheck, all tests; frontend: typecheck, lint,
+1173 vitest tests). `go test -race ./internal/store/session/` green.
+
+Tests (`usage_runs_test.go`, captured lines in `testdata/runs.jsonl`: a foreground and a
+background spawn, completed, async_launched, both notification records, a SendMessage
+resume, an interrupted Agent result, a run's usage record):
+
+* `TestParseRunEvents`: every captured shape plus fork cutoff, other tools, a shell's
+  notification, a quoted notification, dequeue, bad JSON.
+* `TestRunLifecycle`: spawn waits for its meta then opens; completed closes after a
+  final drain (later bytes not read); async_launched stays open and the notification
+  closes it; SendMessage reopens and the queue-operation closes; interrupted result
+  closes; a depth-2 run spawned from a run's file is followed and closed from that file;
+  a result for an unseen run folds it once; a shell task id is ignored; safety net
+  (foreground at 1×, background at 6×).
+* `TestRunRescan`: a mix of closed, open background, in-flight foreground, nested
+  in-flight, orphan and meta-less runs; then live from the rescan; a nested background
+  run notified in the thread's file; and a second rescan agreeing run by run with the
+  live state.
+* `TestAgentRunsRollUpAndPersist` (Manager): live run open → closed, totals; identical
+  after a restart; a stale cached value replaced by the reconnect's rescan.
+* `TestClearRescansEveryTranscript` (Manager): `/clear` via the pid file, both files in
+  `Transcripts`; restart and reconnect rescans both plus the run, replacing a stale
+  value; after deleting the first file and its run, the saved folds stand in.
+* `TestCacheSavings`, `TestAgentRunsToProto`, `TestRenderRuns`, frontend mapping and
+  `sameAgentRuns` tests.
+
+Real transcripts, the rescan code (`scanLines` + `threadUsage.settle`) against unique
+`requestId`s over the parent and every `agent-*.jsonl` (python):
+
+| session | runs (depth 2+) | ground truth | fold | open after rescan | rescan |
+|---|---|---|---|---|---|
+| `18e2b705…` (reckon) | 84 (45) | 3317 | 3317 | 0 | 1.1 s |
+| `47622fac…` (reckon) | 76 (44) | 1906 | 1906 | 0 | 0.42 s |
+| `c306a732…` | 20 (1) | 1436 | 1436 | 0 | 0.31 s |
+| `3f281f4d…` | 18 (0) | 2376 | 2376 | 0 | 0.44 s |
+| `3ea243ad…` (live orchestrator) | 4 | 576 | 576 | 2 (this PR's run and usage-4's, both running) | 0.13 s |
+
+(`47622fac` has 76 runs for 75 transcripts: one stopped run has only its meta.)
+
+End to end, daemon from this branch in `CODE_FOUNDRY_HOME=/tmp/cf-usage2-home`, scratch
+repo in an uncommitted `.scratch/usage2-repo` inside the worktree (both deleted after):
+
+```
+$ code-foundry session new --worktree <repo> --model haiku --effort medium --name usage2-e2e \
+    --prompt "Use the Agent tool with model haiku to have a subagent reply with the word ok, then say done"
+created thread usage2-e2e (s-939038093df4) in <repo>
+$ code-foundry usage --thread s-939038093df4
+Thread s-939038093df4 (usage2-e2e): 4 requests · 151K tokens · $0.0080
+
+MODEL             REQUESTS  TOKENS  COST     SHARE
+claude-haiku-5-5  4         151K    $0.0080  100%
+TOTAL             4         151K    $0.0080  100%
+
+Input 10 · Output 361 · Cache read 106,212 · Cache write 5m 28,415 · Cache write 1h 16,019
+Cache savings $0.0096
+
+1 agent run (0 open), included above:
+
+STATUS  RUN                         TYPE             MODEL  REQUESTS  TOKENS  COST
+closed  Reply with ok (background)  general-purpose  haiku  1         28.4K   $0.0036
+```
+
+Claude ran the agent in the background: `async_launched`, then two notification records
+(enqueue, delivered); the daemon closed it on the first. On disk: parent 3 unique
+requestIds, `agent-a804aa7c20e2611b5.jsonl` 1, total 4. Cache savings by hand: 106,212 ×
+(0.10 − 0.01) / 1e6 = $0.0096.
+
+* `daemon restart --yes`, then `usage --thread … --json`: `IDENTICAL-after-restart`.
+* `session reconnect` (resume; the runner's rescan): `IDENTICAL-after-rescan`.
+* `/clear` then `reply ok`, typed through `TerminalService.Write` on the Unix socket
+  (`curl --unix-socket …/daemon.sock …/codefoundry.v1.TerminalService/Write`, data
+  base64). Log: `claude switched session id from 68e22def… to 42549202…`. Usage grew:
+  `5 requests · 191.9K tokens · $0.01`, the run still listed.
+* `daemon restart --yes`: `IDENTICAL-after-clear-restart`. Then `session reconnect`
+  (respawn 00:22:34, discovery 00:22:35, a fresh rescan of both files):
+  `IDENTICAL-after-clear-rescan`, still 5 requests (before this PR this rescan dropped
+  to the current file's 1). SQLite: `session_transcripts` 68e22def…|0, 42549202…|1;
+  `session_source_usage` `t:68e22def…` 3, `t:42549202…` 1, `a:a804aa7c20e2611b5` 1;
+  `session_agent_runs` a804aa7c20e2611b5|Reply with ok|open 0.
+
+A daemon restart is needed after installing: migration 0013 and the new fields come with
+the daemon. An older GUI ignores `agent_runs` and `cache_savings_usd`.

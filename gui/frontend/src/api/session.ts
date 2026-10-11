@@ -1,5 +1,15 @@
 import { timestampMs } from "@bufbuild/protobuf/wkt";
-import { PermissionMode, SessionService, SessionState, SessionStatus, type Session, type SessionEvent, type UsageBucket } from "@/gen/codefoundry/v1/session_pb";
+import {
+  AgentRunStatus,
+  PermissionMode,
+  SessionService,
+  SessionState,
+  SessionStatus,
+  type AgentRun,
+  type Session,
+  type SessionEvent,
+  type UsageBucket,
+} from "@/gen/codefoundry/v1/session_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
 
@@ -65,13 +75,41 @@ export interface SessionView {
    */
   linkedPullRequests: LinkedPullRequestView[];
   /**
-   * Token usage of the thread's transcript, one bucket per (model, tier, speed, UTC day),
-   * sorted by day, model, tier, speed. docs/notes/session-usage.md.
+   * Token usage of the thread, one bucket per (model, tier, speed, UTC day), sorted by day,
+   * model, tier, speed: every transcript it used (a /clear starts a new one) plus every
+   * subagent run in agentRuns. docs/notes/session-usage.md.
    */
   usage: UsageBucketView[];
   /** Price of usage in USD at Claude API rates, excluding unpriced buckets. */
   costUsd: number;
   /** Some bucket has no known rate: costUsd is a lower bound; say "unpriced", never $0. */
+  unpriced: boolean;
+  /**
+   * The thread's subagent runs by start time (unknown last); their usage is already in
+   * usage. The run count is agentRuns.length (select that, not the array, for a count).
+   */
+  agentRuns: AgentRunView[];
+}
+
+/** One subagent run of a thread (a Claude Code Agent tool call). */
+export interface AgentRunView {
+  /** Claude's agent id. */
+  id: string;
+  description: string;
+  /** "general-purpose", "Explore", ... */
+  agentType: string;
+  /** As requested, e.g. "haiku"; "" when inherited from the thread. */
+  model: string;
+  effort: string;
+  background: boolean;
+  /** "open": still followed (running, or a background run that has not notified); "closed": its result is in. */
+  status: "open" | "closed";
+  /** 1: spawned by the thread; 2+: by another run. */
+  spawnDepth: number;
+  startedAtMs: number | null;
+  /** The run's own usage, priced like the session's. */
+  usage: UsageBucketView[];
+  costUsd: number;
   unpriced: boolean;
 }
 
@@ -101,6 +139,8 @@ export interface UsageBucketView {
   cacheReadCostUsd: number;
   cacheWrite5mCostUsd: number;
   cacheWrite1hCostUsd: number;
+  /** USD the cache reads saved: cacheRead x (input rate - cache read rate); 0 when unpriced. */
+  cacheSavingsUsd: number;
 }
 
 /** A pull request linked to a thread. */
@@ -183,6 +223,24 @@ export function toSessionView(s: Session): SessionView {
     usage: s.usage.map(toUsageBucketView),
     costUsd: s.costUsd,
     unpriced: s.unpriced,
+    agentRuns: s.agentRuns.map(toAgentRunView),
+  };
+}
+
+export function toAgentRunView(r: AgentRun): AgentRunView {
+  return {
+    id: r.id,
+    description: r.description,
+    agentType: r.agentType,
+    model: r.model,
+    effort: r.effort,
+    background: r.background,
+    status: r.status === AgentRunStatus.OPEN ? "open" : "closed",
+    spawnDepth: r.spawnDepth,
+    startedAtMs: r.startedAt ? timestampMs(r.startedAt) : null,
+    usage: r.usage.map(toUsageBucketView),
+    costUsd: r.costUsd,
+    unpriced: r.unpriced,
   };
 }
 
@@ -205,6 +263,7 @@ export function toUsageBucketView(b: UsageBucket): UsageBucketView {
     cacheReadCostUsd: b.cacheReadCostUsd,
     cacheWrite5mCostUsd: b.cacheWrite5mCostUsd,
     cacheWrite1hCostUsd: b.cacheWrite1hCostUsd,
+    cacheSavingsUsd: b.cacheSavingsUsd,
   };
 }
 

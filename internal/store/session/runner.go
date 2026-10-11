@@ -3,6 +3,8 @@ package session
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -116,12 +118,14 @@ type runner struct {
 	namingSeen bool
 	finished   bool
 
-	// usage folds the followed transcript (usage.go). It is complete from byte zero:
-	// a file the tailer read from its start, or a skipped prefix rescanned on discovery
-	// (backfill). usageOff: that rescan failed, so the fold is partial and must not
+	// usage holds the thread's folds: one per transcript file and one per subagent run
+	// (usage_runs.go). Each is complete from byte zero: a file read from its start, or
+	// history rescanned on the first discovery (rescan). usageSeen: that discovery
+	// happened. usageOff: the rescan failed, so some fold is partial and must not
 	// replace the session's usage; the next discovery (reconnect, restart) rescans.
-	usage    usageFold
-	usageOff bool
+	usage     *threadUsage
+	usageSeen bool
+	usageOff  bool
 
 	// viewers is the terminal's Attach subscriber count (from the observer). While
 	// someone is attached, whatever Claude produces is seen: see acknowledge.
@@ -137,6 +141,7 @@ func newRunner(m *Manager, id, cwd string, l launch) *runner {
 		stopReq:  make(chan struct{}, 1),
 		done:     make(chan struct{}),
 		state:    StateStarting,
+		usage:    newThreadUsage(time.Time{}, m.opts.Now, m.opts.AgentIdleClose),
 	}
 }
 
@@ -154,6 +159,7 @@ func (r *runner) attach(t terminal.Terminal) {
 	})
 	r.tail = newTailer(r.m.opts.Paths, r.cwd)
 	r.tail.follow(r.launch.claudeID(), r.launch.resume != "" && !r.launch.fork)
+	r.usage.watchDir = r.tail.watch
 	now := r.m.opts.Now()
 	r.activity, r.pubActivity, r.savedActivity = now, now, now
 }
@@ -177,6 +183,7 @@ func (r *runner) log() *slogger { return &slogger{r} }
 func (r *runner) run() {
 	defer close(r.done)
 	defer r.tail.close()
+	defer r.usage.closeAll()
 	opts := r.m.opts
 	tick := time.NewTicker(opts.Tick)
 	defer tick.Stop()
@@ -361,6 +368,9 @@ func (r *runner) onTick(now time.Time) {
 	r.pollTranscript()
 	r.checkStatus()
 	r.tryCd()
+	// Safety net for runs whose closing record never comes (tryCd keeps atPromptSince).
+	r.usage.closeIdle(!r.atPromptSince.IsZero())
+	r.publishUsage()
 	if r.activity.After(r.pubActivity) && now.Sub(r.pubActivity) >= r.m.opts.ActivityPublish {
 		persist := now.Sub(r.savedActivity) >= activityPersistGap
 		r.pubActivity = r.activity
@@ -376,16 +386,26 @@ func (r *runner) pollTranscript() {
 	if discovered {
 		cid := r.tail.id
 		r.log().info("transcript discovered", "claude_session_id", cid, "path", r.tail.path)
-		r.m.update(r.id, true, func(rec *record) { rec.s.ClaudeSessionID = cid })
-		if r.tail.skipped > 0 {
-			r.backfill(r.tail.path, r.tail.skipped)
+		r.m.discoverTranscript(r.id, cid)
+		if !r.usageSeen {
+			// The thread's first file in this runner: anything it used before (earlier
+			// transcripts, this one's skipped history, their runs) is folded from byte
+			// zero. A new conversation or a fork has nothing before.
+			r.usageSeen = true
+			if s, ok := r.m.Snapshot().Session(r.id); ok && (r.tail.skipped > 0 || len(s.Transcripts) > 1 || len(s.AgentRuns) > 0) {
+				r.rescan(s, cid, r.tail.path, r.tail.skipped)
+			}
 		}
+		// After /clear the tailer follows a new file, read from its start.
+		r.usage.file(cid, r.tail.path)
 	}
-	// After /clear the tailer follows a new file; the fold carries on across it.
-	counted := r.usage.requests
+	var f *fileUsage
+	if len(lines) > 0 {
+		f = r.usage.file(r.tail.id, r.tail.path)
+	}
 	var links []LinkedPullRequest
 	for _, line := range lines {
-		r.usage.Line(line)
+		r.usage.transcriptLine(f, line)
 		r.det.Transcript(line)
 		if !r.namingSeen {
 			if msg, ok := firstUserText(line); ok {
@@ -401,11 +421,10 @@ func (r *runner) pollTranscript() {
 	if len(links) > 0 {
 		r.m.linkPullRequests(r.id, links)
 	}
-	if r.usage.requests != counted && !r.usageOff {
-		// At most once per batch with a new API response: streaming repeats of a
-		// counted request are not counted again.
-		r.m.setUsage(r.id, r.usage.Buckets())
-	}
+	// Runs after the thread's lines: a run's closing result has been applied, so its
+	// final drain comes now.
+	r.usage.poll()
+	r.publishUsage()
 	if len(lines) > 0 {
 		// The turn-end record trails the last output chunk by ~120 ms and counts as
 		// new work for the detector; a viewer has seen it too.
@@ -414,33 +433,97 @@ func (r *runner) pollTranscript() {
 	}
 }
 
-// backfill reads the part of a resumed transcript the tailer skipped, from byte zero
-// (the history is not news for status, but its links and usage are). Links: the
-// pr-link records are merged in (a thread reconnected after linking pull requests, or
-// one that linked them before this existed); it runs once per discovered file, before
-// any new line, so first-seen order holds. Usage: the prefix is folded into a fresh
-// fold that becomes the live one, so with the lines the tailer reads from there on
-// it is always the whole file; its buckets replace whatever was persisted.
-func (r *runner) backfill(path string, limit int64) {
+// publishUsage replaces the session's usage when a fold changed: at most once per poll
+// with a new API response or a run opening or closing (streaming repeats of a counted
+// request change nothing).
+func (r *runner) publishUsage() {
+	if !r.usage.changed || r.usageOff {
+		return
+	}
+	r.m.setUsage(r.id, r.usage.snapshot())
+}
+
+// rescan folds every source of the thread from byte zero into a fresh threadUsage that
+// becomes the live one: each transcript in s.Transcripts (the current one, cid at
+// path, only up to limit, the history its tailer skipped; it reads on from there),
+// then the runs under them. A transcript or run Claude has since deleted keeps its
+// last saved fold. The result replaces whatever was persisted. The pr-link records of
+// the current file's skipped history are merged in too (a thread reconnected after
+// linking pull requests); first-seen order holds since this runs before any new line.
+func (r *runner) rescan(s Session, cid, path string, limit int64) {
 	start := time.Now()
-	var links []LinkedPullRequest
-	fold := usageFold{notBefore: r.usage.notBefore}
-	err := scanLines(path, limit, func(line []byte) {
-		if l, ok := parsePRLink(line); ok {
-			links = append(links, l)
+	u := newThreadUsage(r.usage.notBefore, r.usage.now, r.usage.idleClose)
+	u.watchDir = r.usage.watchDir
+	var saved map[string][]UsageBucket
+	loadSaved := func() map[string][]UsageBucket {
+		if saved == nil {
+			all, err := loadSourceUsage(context.Background(), r.m.opts.DB, r.id)
+			if err != nil {
+				r.log().warn("load saved usage", "err", err)
+			}
+			saved = all[r.id]
+			if saved == nil {
+				saved = map[string][]UsageBucket{}
+			}
 		}
-		fold.Line(line)
-	})
-	if err != nil {
-		r.log().warn("backfill transcript history", "path", path, "err", err)
+		return saved
+	}
+	var links []LinkedPullRequest
+	var bytesRead int64
+	for _, tc := range s.Transcripts {
+		p, current := path, tc == cid
+		if !current {
+			var ok bool
+			if p, ok = r.m.opts.Paths.transcriptPath(r.cwd, tc); !ok {
+				f := u.file(tc, p)
+				f.fold = seededFold(loadSaved()[transcriptSource(tc)])
+				f.fold.notBefore = u.notBefore
+				u.markDirty(transcriptSource(tc))
+				continue
+			}
+		}
+		f := u.file(tc, p)
+		u.markDirty(transcriptSource(tc))
+		n := int64(0)
+		if current {
+			if n = limit; n <= 0 {
+				continue // nothing skipped: the tailer reads it from the start
+			}
+		}
+		err := scanLines(p, n, func(line []byte) {
+			bytesRead += int64(len(line)) + 1
+			if current {
+				if l, ok := parsePRLink(line); ok {
+					links = append(links, l)
+				}
+			}
+			u.transcriptLine(f, line)
+		})
+		if err != nil && u.err == nil {
+			u.err = fmt.Errorf("rescan %s: %w", p, err)
+		}
+	}
+	if !slices.Contains(s.Transcripts, cid) {
+		u.file(cid, path)
+	}
+	u.settle()
+	for _, run := range s.AgentRuns {
+		u.adopt(run)
+	}
+	for id := range u.runs {
+		u.markDirty(runSource(id))
 	}
 	n := r.m.linkPullRequests(r.id, links)
-	r.usage, r.usageOff = fold, err != nil
-	if !r.usageOff {
-		r.m.setUsage(r.id, r.usage.Buckets())
+	r.usage.closeAll()
+	r.usage, r.usageOff = u, u.err != nil
+	if r.usageOff {
+		r.log().warn("usage rescan incomplete; keeping the saved usage until the next discovery", "err", u.err)
+	} else {
+		r.m.setUsage(r.id, u.snapshot())
 	}
-	r.log().debug("backfilled transcript history", "links", len(links), "new_links", n,
-		"usage_requests", fold.requests, "bytes", limit, "took", time.Since(start).Round(time.Millisecond).String())
+	r.log().debug("rescanned thread usage", "transcripts", len(s.Transcripts), "runs", len(u.runs),
+		"open_runs", len(u.openRuns()), "links", len(links), "new_links", n, "bytes", bytesRead,
+		"took", time.Since(start).Round(time.Millisecond).String())
 }
 
 // checkStatus schedules a debounced publish when the detector's answer changed.

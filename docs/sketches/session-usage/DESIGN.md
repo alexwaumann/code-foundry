@@ -201,8 +201,18 @@ What the parent transcript says:
   file's `toolUseId`.
 * The `tool_result` record for that id carries `toolUseResult` with `agentId`, and a
   `status` of `completed` (foreground: the run is over) or `async_launched`
-  (background: the run is in flight). A background run later produces a second
-  `tool_result` on a new tool use (the notification), also carrying the `agentId`.
+  (background: the run is in flight). An interrupted call's result has no `agentId`
+  (`is_error`, a string `toolUseResult`).
+* *Corrected in PR 2:* a background run's end is not a `tool_result`. Claude writes a
+  `<task-notification>` (`<task-id>` = the agent id, `<status>` completed / failed /
+  killed / stopped) twice: a `queue-operation` `enqueue` record, then a `user` record
+  whose content is that text when it is delivered. A nested run's notification is
+  enqueued in the session transcript too (then `remove`d: it is delivered to the parent
+  run, not the thread).
+* *Added in PR 2:* `SendMessage` to a finished run resumes it (`toolUseResult.
+  resumedAgentId`); it appends to the same `agent-<id>.jsonl` and notifies again.
+  Since 2.1.29x every Agent call runs in the background unless the model asks
+  otherwise, so `async_launched` + notification is the common path.
 
 Lifecycle in the runner:
 
@@ -213,9 +223,10 @@ Lifecycle in the runner:
    retry next poll). Each open file gets a `tailer` and a `usageFold`.
 2. **Follow.** Each poll drains every open agent tailer after the parent. Agent folds
    are summed into the session's buckets with the parent fold on every publish.
-3. **Stop.** Close an agent tailer once the parent has a `tool_result` for its
-   `agentId` with status `completed`, or any later `tool_result` naming that
-   `agentId` (the background notification), after one final drain. The fold's
+3. **Stop.** Close an agent tailer once the spawn's `tool_result` arrives with any
+   status but `async_launched` (completed, or an error), or a `<task-notification>`
+   names its agent id, after one final drain. A `SendMessage` resume opens it again.
+   (PR 2: the notification, not a second `tool_result`; see above.) The fold's
    buckets stay in the sum; only the tailer goes away. Nothing in the agent file
    itself is needed to decide this, so a killed or crashed run is also closed by the
    parent's error `tool_result`.
@@ -224,15 +235,22 @@ Lifecycle in the runner:
    tool_result). Every `agent-*.jsonl` in the directory is folded from byte zero;
    pending ones stay open, the rest are folded once and dropped.
 5. **Safety net.** An agent tailer with no new bytes for 10 minutes while its parent is
-   at the prompt (status idle) is closed. This only matters if Claude Code ever fails to
-   write the closing tool_result.
+   at the prompt (status idle) is closed (PR 2: an hour for a background run, which
+   legitimately works on while the thread is idle). This only matters if Claude Code
+   ever fails to write the closing record.
 
 Nested agents (`spawnDepth` 2+) write into the same `subagents/` directory with their
-own meta pointing at a tool use inside the parent agent's file, not the session's. Rule
-1 only watches the session transcript, so a nested run is picked up by rule 4's
-"fold every file" on the next discovery, and live by extending rule 1 to also scan
-open agent files for `Agent` tool uses. Cheap, and the same code path. First version:
-sessions and depth 1 live, deeper runs on discovery only.
+own meta pointing at a tool use inside the parent agent's file, not the session's.
+PR 2 applies rules 1 to 3 to every followed file, runs included, so nested runs are
+live too (one code path; real sessions here go three deep). Because a rescan reads the
+session transcript before the run files, a nested run's notification (session file) can
+be met before its launch (parent run's file): each run keeps the record time of the
+event that last opened or closed it and ignores older ones.
+
+Every thread also keeps the list of transcripts it has used (`/clear` starts a new
+one); rule 4 rescans all of them and their `subagents/` directories. Each source's last
+complete fold is persisted, so a file Claude's cleanup has deleted keeps its counters.
+Details and the real-transcript checks: "PR 2" in `docs/notes/session-usage.md`.
 
 This is the same state the thread's panel can show as "agent runs" later (description,
 model, status, cost each), which is why the fold is kept per agent id rather than

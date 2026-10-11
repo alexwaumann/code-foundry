@@ -155,11 +155,18 @@ type Session struct {
 	// shrinks. Persisted. Copy on write: a new slice replaces the old one, the backing
 	// array is never written, so snapshots may share it.
 	LinkedPullRequests []LinkedPullRequest
-	// Usage is the token counters of the session's transcript (usage.go), one bucket per
-	// (model, tier, speed, UTC day), sorted by Day, Model, Tier, Speed. Only ever
-	// replaced by a complete fold of the transcript, never added to. Persisted. Copy on
-	// write like LinkedPullRequests.
+	// Usage is the token counters of the thread (usage.go), one bucket per (model,
+	// tier, speed, UTC day), sorted by Day, Model, Tier, Speed: the sum over every
+	// transcript in Transcripts and every run in AgentRuns. Only ever replaced by a
+	// complete fold, never added to. Persisted. Copy on write like LinkedPullRequests.
 	Usage []UsageBucket
+	// Transcripts are the Claude session ids (transcript files) the thread's
+	// conversation has used, oldest first: /clear moves Claude to a new one. The last is
+	// usually ClaudeSessionID. Persisted. Copy on write.
+	Transcripts []string
+	// AgentRuns are the subagent runs under Transcripts (usage_runs.go), by start time.
+	// Persisted. Copy on write.
+	AgentRuns []AgentRun
 }
 
 // Snapshot is every session, sorted by creation time then id. Never mutate it.
