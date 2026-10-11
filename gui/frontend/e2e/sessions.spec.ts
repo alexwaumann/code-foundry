@@ -60,7 +60,7 @@ test("a live session that disconnects swaps to the panel, and Reconnect attaches
   await expect(host).toHaveAttribute("data-terminal-id", "t-claude");
   await expect(host).toHaveAttribute("data-attach-phase", "live");
 
-  await mockPost("session/disconnect?id=s-1&reason=exited&code=0");
+  await mockPost("session/disconnect?id=s-1&reason=exited&code=0&status=idle");
   await expect(page.getByTestId("disconnect-reason")).toHaveText("Claude exited");
   await expect(badge(page, "s-1")).toHaveAttribute("data-session-badge", "disconnected");
 
@@ -69,6 +69,18 @@ test("a live session that disconnects swaps to the panel, and Reconnect attaches
   await page.keyboard.press("Enter");
   await expect(host).toHaveAttribute("data-terminal-id", /^t-s-1-/);
   await expect(host).toHaveAttribute("data-attach-phase", "live");
+});
+
+test("a disconnected thread keeps its status: busy ends interrupted, attention persists", async ({ page }) => {
+  await openApp(page);
+  await mockPost("session/disconnect?id=s-1&reason=crashed&code=1&status=busy");
+  await expect(badge(page, "s-1")).toHaveAttribute("data-session-badge", "error");
+  await expect(badge(page, "s-1")).toHaveAttribute("aria-label", "error");
+  await mockPost("session/disconnect?id=s-2&reason=daemon%20stopped&code=0");
+  await expect(badge(page, "s-2")).toHaveAttribute("data-session-badge", "attention");
+  // Still waiting on the user: counted, and listed under Needs attention.
+  await expect(page.getByTestId("attention-badge")).toHaveText("1");
+  await expect.poll(async () => (await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).slice(0, 2)).toEqual(["h:attention", "s:s-2"]);
 });
 
 test("close shows closing… then the panel with the reason", async ({ page }) => {
