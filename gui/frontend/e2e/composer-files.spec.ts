@@ -195,6 +195,18 @@ test("Also in: files grouped by project, the primary first; tooltips name the pr
   await expect(tip(page)).toHaveText("internal/api/session.go");
 });
 
+test("Enter before the first answer does not send the half-typed reference", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  await page.keyboard.type("look at @READ");
+  await page.keyboard.press("Enter"); // within the debounce: nothing has answered yet
+  await expect(labels(page)).toHaveText(["README.md"]);
+  expect(await newThreads()).toBe(0);
+  await page.keyboard.press("Enter");
+  await expect(value(page)).toHaveAttribute("data-value", "look at [README.md](cf-file://repo-cf/README.md) ");
+  expect(await newThreads()).toBe(0);
+});
+
 test("a daemon older than SearchFiles: @ is plain text, no card", async ({ page }) => {
   await mockPost("missing-rpc?rpc=FilesystemService/SearchFiles");
   await openApp(page);

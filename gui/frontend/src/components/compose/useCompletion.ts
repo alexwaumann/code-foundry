@@ -134,8 +134,9 @@ const CLOSED: CardState = { key: "", memo: null, show: "none", selected: 0 };
  *
  * An asynchronous source may answer an earlier query than the trigger's: while this
  * trigger has been answered before, the card goes on with the latest answer (as if that
- * query were typed); a trigger nothing has answered yet waits with the card closed. A
- * slow answer shows "Searching…".
+ * query were typed); a trigger nothing has answered yet waits with the card closed and
+ * Enter does nothing (it would send the half-typed reference). A slow answer shows
+ * "Searching…".
  */
 export function useCompletion(
   trigger: EditorTrigger | null,
@@ -160,11 +161,13 @@ export function useCompletion(
   }
   const dismissed = live !== null && cur.memo?.at === live.at && cur.memo.dismissed;
   const show: CompletionShow = live && source.searching && !dismissed ? "searching" : cur.show;
+  // Nothing has answered this trigger yet: Enter must not send what is about to be completed.
+  const waiting = live !== null && answered === null && !dismissed;
 
   // The editor calls onKey from its own handlers: it reads the latest render through this.
-  const latest = useRef({ show, cur, items, trigger, live });
+  const latest = useRef({ show, waiting, cur, items, trigger, live });
   useLayoutEffect(() => {
-    latest.current = { show, cur, items, trigger, live };
+    latest.current = { show, waiting, cur, items, trigger, live };
   });
 
   const insert = (index: number) => {
@@ -179,7 +182,8 @@ export function useCompletion(
   };
 
   const onKey = (k: CompletionKey): boolean => {
-    const { show: sh, cur: c, items: rows, live: l } = latest.current;
+    const { show: sh, waiting: w, cur: c, items: rows, live: l } = latest.current;
+    if (sh === "none" && w && k === "enter") return true;
     if (sh === "none" || !l) return false;
     if (k === "escape" || (sh !== "list" && k === "enter")) {
       setState((s) => ({ ...s, memo: dismissCard(l), show: "none" }));
