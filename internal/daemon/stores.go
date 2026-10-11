@@ -158,10 +158,11 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 		return nil, err
 	}
 	claude := cmp.Or(settings.ExpandedPath(cfg.Advanced.ClaudePath), "claude")
+	sessionLog := log.With("store", "session")
 	if s.session, err = session.New(ctx, session.Options{
-		DB: s.db, Terminals: s.terminal, Repos: s.repo, Workspaces: s.workspace, Bus: s.bus, Log: log.With("store", "session"),
+		DB: s.db, Terminals: s.terminal, Repos: s.repo, Workspaces: s.workspace, Bus: s.bus, Log: sessionLog,
 		NewDetector: newDetector, Claude: claude, CloseTimeout: cfg.CloseGrace(),
-		Namer:          settingsNamer(s.settings, session.ClaudeNamer(claude, "/tmp")),
+		Namer:          settingsNamer(s.settings, session.ClaudeNamer(claude, "/tmp", sessionLog)),
 		AttachmentsDir: p.Attachments(), WorktreePath: settingsWorktreePath(s.settings),
 		Env: sessionEnv,
 	}); err != nil {

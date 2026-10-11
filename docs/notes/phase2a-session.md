@@ -116,7 +116,9 @@ graceful path. Escape still goes first so a running turn is interrupted. The Ctr
 repeats every 2 s until exit, and at 10 s the terminal is killed. A user typing `/exit`
 themselves is fine: that is the "exited" path.
 
-**Auto-naming.** On the first real user line in the transcript (`type:"user"`, not
+**Auto-naming.** (The command changed on 2026-10-11: `--strict-mcp-config` is gone,
+replaced by `--safe-mode`, with a minimal fallback; see `naming-managed-settings.md`.)
+On the first real user line in the transcript (`type:"user"`, not
 meta/sidechain, text content that is not a tool result or a `<command-…>` wrapper), the
 store runs
 `claude -p --model haiku --no-session-persistence --tools "" --strict-mcp-config <prompt>`

@@ -125,7 +125,7 @@ func (o Options) withDefaults() (Options, error) {
 		o.NewDetector = NewStubDetector
 	}
 	if o.Namer == nil {
-		o.Namer = ClaudeNamer(o.Claude, "/tmp")
+		o.Namer = ClaudeNamer(o.Claude, "/tmp", o.Log)
 	}
 	if o.RefExists == nil {
 		o.RefExists = gitRefExists
@@ -746,7 +746,7 @@ func (m *Manager) startNaming(id, msg string) {
 	m.mu.Unlock()
 	go func() {
 		defer m.wg.Done()
-		ctx, cancel := context.WithTimeout(m.ctx, m.opts.NamingTimeout)
+		ctx, cancel := context.WithTimeout(withNamingSession(m.ctx, id), m.opts.NamingTimeout)
 		defer cancel()
 		start := time.Now()
 		name, err := m.opts.Namer(ctx, msg)

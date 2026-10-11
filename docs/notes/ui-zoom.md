@@ -29,6 +29,8 @@ the whole window like T3 Code (Electron's `webContents.setZoomLevel`, ±0.5 step
   in layout px. `layoutWidth()` uses the body, and `startZoomSync` re-measures after each
   zoom change so `panelMax` hides the side panel when it stops fitting.
 - A press count mistake: three cmd+= presses reach 150%, not four.
+- **Floating surfaces** (Radix poppers) position in viewport px; their wrapper undoes
+  the zoom and the content zooms back (`zoom-popovers.md`).
 
 ## Traffic lights
 

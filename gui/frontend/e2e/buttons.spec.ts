@@ -62,12 +62,21 @@ test("New Terminal from the palette starts a terminal in the selected thread's w
   await expect(page.locator('[data-row-kind="terminal"][aria-selected="true"]')).toBeVisible();
 });
 
-test("status row buttons open settings, help and the palette", async ({ page }) => {
+test("status row buttons toggle settings, open help and the palette", async ({ page }) => {
   await openApp(page);
   const status = page.getByTestId("sidebar-status");
   await expect(status.getByTestId("daemon-status")).toBeVisible();
 
-  await status.getByTestId("status-settings").click();
+  const settings = status.getByTestId("status-settings");
+  await expect(settings).toHaveAttribute("aria-pressed", "false");
+  await settings.click();
+  await expect(page.getByTestId("settings-page")).toBeVisible();
+  await expect(settings).toHaveAttribute("aria-pressed", "true");
+  // A toggle, like usage: the button closes the page it opened.
+  await settings.click();
+  await expect(page.getByTestId("settings-page")).toHaveCount(0);
+  await expect(settings).toHaveAttribute("aria-pressed", "false");
+  await settings.click();
   await expect(page.getByTestId("settings-page")).toBeVisible();
 
   await status.getByTestId("status-help").click();
