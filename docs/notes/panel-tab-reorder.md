@@ -44,13 +44,26 @@ daemon restart is needed.
   tab's on-screen left, and a layout effect slides it the rest of the way with WAAPI
   (`el.animate`, FLIP). It uses dnd-kit's own `defaultDropAnimation` timing (250ms,
   `ease`). Measured per frame in WebKit and Chromium: 978 → 935px over about 250ms, no
-  jump. jsdom has no `animate`, so the code checks for it.
+  jump. jsdom has no `animate`, so the code checks for it. The running settles are kept
+  per tab, and picking a settling tab up again cancels its settle: a WAAPI animation
+  overrides the inline transform, so the lifted tab would not follow the pointer until
+  the 250ms were up. Other tabs keep settling.
 * **The sensor: `PointerSensor` with `distance: 4`.** A press and release under 4px is
   still a click (activates the tab), and the × and middle click work as before. The
   sensor only takes primary-button pointerdowns, so middle click (`onMouseDown` /
   `onAuxClick`) is untouched. Once a drag starts, dnd-kit swallows the next click in the
   capture phase on `document`, so **dropping a tab does not activate it**. Dragging is
   reordering only. Escape mid-drag cancels.
+* **While a tab is lifted, Escape belongs to the drag.** dnd-kit cancels from a
+  `keydown` listener on the document, so a React handler that stops the key starves
+  it. The panel's Escape while picking did, and the drag went on (and picking ended). The
+  aside now skips Escape while a `[data-dragging]` tab is in it, and the tablist skips
+  every key then, so alt+←/→ no longer move tabs under a lifted one.
+* **A release after the strip unmounted moves nothing.** dnd-kit's sensor keeps its
+  document listeners until the release even when its `DndContext` unmounts. `Panel` is
+  keyed by `panelKey`, so a selection switch mid-drag (a cmd chord with the mouse held)
+  unmounts it, and the release reordered the hidden panel. `onDragEnd` returns when
+  `stripRef` is null.
 * **Auto-scroll is slowed: `acceleration: 4` (default 10), `threshold: { x: 0.2, y: 0 }`.**
   At 10 a dozen tabs went past in about half a second. The lifted tab also lagged the
   scroll by up to 16px per frame, which showed as jitter. At 4 the lag is about 6px
@@ -99,8 +112,16 @@ daemon restart is needed.
   `react >=16.8`, and nothing warned.
 * **jsdom does not drop focus when React moves a node**, so a SidePanel test cannot catch
   lost focus. The e2e alt+arrow test checks `toBeFocused` in both browsers.
-* **`data-dragging`** marks the lifted tab's wrapper. Tests use it. It is also handy in
-  the live window's inspector.
+* **`data-dragging`** marks the lifted tab's wrapper. Tests and the key guards above use
+  it. It is also handy in the live window's inspector.
+* **dnd-kit's click swallower outlives the drop by 50ms** (its document listeners are
+  removed on a timer). A SidePanel test that clicks right after another test's drag sees
+  the click swallowed; the picking test uses `startPanelPicking` instead of clicking the
+  "+".
+* **Every tab re-renders on each pointer move during a drag.** dnd-kit's public context
+  carries the collisions, which change per move, and `SortableContext`/`useSortable`
+  read it. `TabStrip` itself does not re-render then; memoizing `TabButton` would not
+  help.
 * **Live Wails check:** the header is a window-drag region (`--wails-draggable: drag`),
   and each tab wrapper (now the sortable node), its ×, and the "+" wrapper are `no-drag`.
   The e2e checks the lifted tab's computed `no-drag`. What the e2e cannot cover: (1) a
@@ -113,23 +134,29 @@ daemon restart is needed.
 
 ## Tests
 
-* Vitest (whole suite 1440 tests, 75 files; was 1400): `stores/panel.test.ts` 105 (+22:
+* Vitest (whole suite 1444 tests, 75 files; was 1400): `stores/panel.test.ts` 105 (+22:
   16 `moveTab` rows, 3 same-entry rows, no mutation, `movePanelTab` per key + no-op
   identity + persisted across rehydrate, nothing selected),
-  `components/panel/keys.test.ts` 35 (+11 `tabMoveIndex` rows), `SidePanel.test.tsx` 32
-  (+7: alt+→/← move and keep focus and the active tab; clamped ends still handled and not
+  `components/panel/keys.test.ts` 35 (+11 `tabMoveIndex` rows), `SidePanel.test.tsx` 36
+  (+11: alt+→/← move and keep focus and the active tab; clamped ends still handled and not
   offered to the surface; from the ×; plain arrows and alt+shift unaffected; a sub-4px
-  press is still a click; a drag past 4px is not a click; the tab's aria-describedby
-  and the presentational wrapper).
-* Playwright (`e2e/panel.spec.ts`, WebKit and Chromium, +4 tests each, real
+  press is still a click; a drag past 4px is not a click; Escape mid-drag while picking
+  cancels the drag and keeps picking, alt+arrows mid-drag do nothing; with a stubbed
+  layout (jsdom has none): a drop takes the target tab's index, a tab opened mid-drag
+  and the dragged tab closed mid-drag, a release after a selection switch moves nothing;
+  the tab's aria-describedby and the presentational wrapper).
+* Playwright (`e2e/panel.spec.ts`, WebKit and Chromium, +6 tests each, real
   `page.mouse` drags in 12 steps):
   dragging onto a neighbour (lifted, no-drag, neighbour slid, order, not activated, a
   click still activates, persists across reload); dropping on the "+" puts it last,
   dragging to the first tab puts it first, Escape cancels; 12 tabs: holding at the right
   edge auto-scrolls to the end and the tab lands last, the left edge back to 0 and it
   lands first, and alt+→ on the last fully visible tab scrolls the strip to it; alt+←/→
-  (order, focus, clamped end, not activating, plain arrows still move focus).
-  `make gui-e2e`: 444 passed, 20 skipped (was 436 and 16; the SHOTS-gated screenshot tests are among the skipped).
+  (order, focus, clamped end, not activating, plain arrows still move focus); while
+  picking, Escape mid-drag cancels the drag and keeps picking, alt+→ mid-drag moves
+  nothing; no transform or animation is left on any tab after a drop and after a cancel,
+  and a tab picked up again right after its drop has no settle running.
+  `make gui-e2e`: 448 passed, 20 skipped (was 436 and 16; the SHOTS-gated screenshot tests are among the skipped).
 * Screenshots: `SHOTS=<dir> pnpm exec playwright test e2e/panel.spec.ts -g "tab reorder
   screenshots" --project webkit` (skipped without `SHOTS`), mock daemon, 1400x900, dark
   and `-light`, the mouse held down mid-drag, saved under `docs/notes/panel-tab-reorder/`.
