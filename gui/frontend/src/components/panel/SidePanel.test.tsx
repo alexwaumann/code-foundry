@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { create } from "zustand";
 import type { CommandView } from "@/api/command";
 import { useCommandsStore } from "@/stores/commands";
-import { getPanel, isPicking, makeTab, openSurface, startPanelPicking, usePanelStore } from "@/stores/panel";
+import { closePanelTab, getPanel, isPicking, makeTab, openSurface, startPanelPicking, usePanelStore } from "@/stores/panel";
 import { PANEL_MIN, useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { filesSurface } from "@/surfaces/files";
@@ -483,6 +483,28 @@ describe("reordering tabs", () => {
     drag(t, 210);
     fireEvent.pointerUp(t, { isPrimary: true, button: 0, clientX: 210, clientY: 10 });
     expect(tabIds()).toEqual([two.id, three.id, one.id]);
+  });
+
+  it("tabs opened or closed mid-drag: the drop uses the strip as it is then, and a closed dragged tab moves nothing", () => {
+    layOutTabs();
+    const four = makeTab("pullrequest", "#4", { number: "4" });
+    render(<SidePanel />);
+    const t = tab("#1");
+    drag(t, 110);
+    act(() => {
+      openSurface(KEY, four);
+    });
+    fireEvent.pointerUp(document, { isPrimary: true, button: 0, clientX: 110, clientY: 10 });
+    expect(tabIds()).toEqual([two.id, one.id, three.id, four.id]);
+
+    const d = tab("#4");
+    drag(d, 10);
+    act(() => {
+      closePanelTab(KEY, four.id);
+    });
+    fireEvent.pointerUp(document, { isPrimary: true, button: 0, clientX: 10, clientY: 10 });
+    expect(tabIds()).toEqual([two.id, one.id, three.id]);
+    expect(screen.queryByTestId("panel-tabs")?.querySelector("[data-dragging]")).toBeNull();
   });
 
   it("a drag whose panel unmounts (the selection switched) moves nothing on release", () => {
