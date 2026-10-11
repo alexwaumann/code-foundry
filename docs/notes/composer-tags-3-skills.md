@@ -109,6 +109,9 @@ green; exercised against a real scratch daemon with a haiku thread (below).
   for the answer"; the live spec waits for an assistant text line in the transcript.
 * ProseMirror groups edits within 500 ms into one undo step: the e2e waits 600 ms before
   the deletion it undoes (like the image-chip spec).
+* Token labels must not match `[` (`[^[\]\n]*`): with `[^\]\n]*`, an unclosed `[` typed
+  before a tag on the same line was swallowed into the token (lost on send and on tag
+  removal). Found in review; `lib/prompt.test.ts` covers it per kind.
 * `RegExp.matchAll` items must be typed `RegExpExecArray` (`index` is then a number).
 * The React Compiler lint rejects `useCallback`s whose inferred deps differ; the hook uses
   plain functions and a ref synced in a layout effect for the editor's callbacks.
