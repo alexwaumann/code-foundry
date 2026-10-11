@@ -212,7 +212,9 @@ type CreateOptions struct {
 	// Name, if set, is the display name and disables auto-naming.
 	Name string
 	// InitialPrompt is passed to claude as its positional prompt argument (after
-	// "--", so a prompt starting with "-" is not read as a flag).
+	// "--", so a prompt starting with "-" is not read as a flag). File references
+	// "cf-file://<repoId>/<path>" in it become absolute paths in the thread's
+	// worktrees (filerefs.go).
 	InitialPrompt string
 	// PermissionMode selects claude --permission-mode.
 	PermissionMode PermissionMode

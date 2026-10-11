@@ -123,6 +123,12 @@ func (l launch) argv(claude string, a spawnArgs) []string {
 // buildPrompt is the first prompt claude gets: the user's text, then, after a blank
 // line, one "Attached image: <path>" line per attachment. A prompt of only whitespace
 // counts as none.
+//
+// The text may carry file references, "@cf-file://<repoId>/<percent-encoded relative
+// path>" (the composer's file tags), which name a file in a worktree that may not
+// exist yet. buildPrompt leaves them alone; Create rewrites them to absolute paths with
+// rewriteFileRefs once the thread's worktrees exist, before claude is spawned. See
+// filerefs.go for the token format.
 func buildPrompt(text string, attachments []string) string {
 	text = strings.TrimSpace(text)
 	if len(attachments) == 0 {
