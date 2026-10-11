@@ -2,7 +2,8 @@
  * Window-level views that are not selections: the settings and usage pages (each replaces
  * the content area; at most one is open) and the help overlay. Top-level pages that are selections (ui.ts `viewNames`,
  * the Pull Requests page) are routed to `select`. Opened by view.settings / view.help (their chords are
- * presented locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon.
+ * presented locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon. Settings
+ * and usage toggle: showing the one already open closes it.
  */
 import { toast } from "sonner";
 import { create } from "zustand";
@@ -38,7 +39,9 @@ function pageOpen(): boolean {
 export function showView(name: string): boolean {
   switch (name) {
     case "settings":
-      useViewsStore.setState({ settingsOpen: true, usageOpen: false, helpOpen: false });
+      // A toggle like usage: the sidebar's settings button (and view.settings, cmd+,) closes it again.
+      if (useViewsStore.getState().settingsOpen) closeSettings();
+      else useViewsStore.setState({ settingsOpen: true, usageOpen: false, helpOpen: false });
       return true;
     case "usage":
       // A toggle: the sidebar's usage button (and view.usage from anywhere) closes it again.

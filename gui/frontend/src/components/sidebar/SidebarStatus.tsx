@@ -11,6 +11,7 @@ import { useViewsStore } from "@/stores/views";
  */
 export function SidebarStatus() {
   const usageOpen = useViewsStore((s) => s.usageOpen);
+  const settingsOpen = useViewsStore((s) => s.settingsOpen);
   return (
     <div className="flex shrink-0 flex-col gap-0.5 pt-1 pb-1.5 text-[11px] text-muted-foreground" data-testid="sidebar-status">
       <UpdateIndicator />
@@ -28,7 +29,15 @@ export function SidebarStatus() {
             data-testid="status-usage"
           />
           <CommandButton command="view.help" icon={CircleHelp} title="Keyboard Shortcuts and Help" data-testid="status-help" />
-          <CommandButton command="view.settings" icon={Settings} title="Settings" data-testid="status-settings" />
+          {/* A toggle like usage (showView "settings"): pressed while the settings page shows. */}
+          <CommandButton
+            command="view.settings"
+            icon={Settings}
+            title="Settings"
+            pressed={settingsOpen}
+            className={settingsOpen ? "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent" : undefined}
+            data-testid="status-settings"
+          />
         </span>
       </div>
     </div>

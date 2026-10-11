@@ -178,7 +178,17 @@ describe("the usage page", () => {
     expect(useUiStore.getState().terminalFocusSeq).toBe(1);
   });
 
+  it("\"settings\" toggles too: opens, then closes and hands focus back to the terminal", () => {
+    expect(showView("settings")).toBe(true);
+    expect(views()).toEqual({ settingsOpen: true, usageOpen: false, helpOpen: false });
+    expect(useUiStore.getState().terminalFocusSeq).toBe(0);
+    expect(showView("settings")).toBe(true);
+    expect(views().settingsOpen).toBe(false);
+    expect(useUiStore.getState().terminalFocusSeq).toBe(1);
+  });
+
   it.each([
+    ["settings over help", { helpOpen: true }, "settings", { settingsOpen: true, usageOpen: false, helpOpen: false }],
     ["usage over settings", { settingsOpen: true, helpOpen: true }, "usage", { settingsOpen: false, usageOpen: true, helpOpen: false }],
     ["settings over usage", { usageOpen: true }, "settings", { settingsOpen: true, usageOpen: false, helpOpen: false }],
     ["a top-level page closes usage", { usageOpen: true }, "pullrequests", { settingsOpen: false, usageOpen: false, helpOpen: false }],
