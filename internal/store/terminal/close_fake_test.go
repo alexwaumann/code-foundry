@@ -1,21 +1,34 @@
 package terminal_test
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
+	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
 // stubborn is a store whose Kill does nothing: the process never exits.
 type stubborn struct{ *terminaltest.Fake }
 
 func (stubborn) Kill(context.Context, string) error { return nil }
+
+// reaped is a store whose terminal is exited and removed (by the daemon's reaper) just
+// before Kill reaches it.
+type reaped struct{ *terminaltest.Fake }
+
+func (r reaped) Kill(ctx context.Context, id string) error {
+	_ = r.Exit(id, 0)
+	_ = r.Remove(ctx, id)
+	return r.Fake.Kill(ctx, id) // ErrNotFound
+}
 
 // removing is a store whose Kill exits the terminal and removes it straight away, as
 // the daemon's shell reaper does with an exited shell.
@@ -41,7 +54,8 @@ func TestKillAndRemove(t *testing.T) {
 		{name: "running", wantGone: true},
 		{name: "exited", exited: true, wantGone: true},
 		{name: "removed meanwhile", store: func(f *terminaltest.Fake) terminal.Store { return removing{f} }, wantGone: true},
-		{name: "unknown", id: "nope", wantErr: terminal.ErrNotFound},
+		{name: "unknown is gone already", id: "nope"},
+		{name: "reaped just before Kill", store: func(f *terminaltest.Fake) terminal.Store { return reaped{f} }, wantGone: true},
 		{name: "never exits", store: func(f *terminaltest.Fake) terminal.Store { return stubborn{f} },
 			timeout: 50 * time.Millisecond, wantErr: context.DeadlineExceeded},
 	}
@@ -103,5 +117,44 @@ func TestKillAndRemoveWhere(t *testing.T) {
 	}
 	if !slices.Equal(left, ids[1:2]) {
 		t.Errorf("left = %v, want %v", left, ids[1:2])
+	}
+}
+
+func TestCloseShell(t *testing.T) {
+	tests := []struct {
+		name     string
+		labels   map[string]string
+		id       string
+		wantErr  error
+		wantMsg  string
+		wantGone bool
+	}{
+		{name: "a worktree shell", labels: termlabel.Shell("", "r1", "/wt"), wantGone: true},
+		{name: "a thread's shell", labels: termlabel.Shell("s1", "r1", "/wt"), wantGone: true},
+		{name: "a thread's Claude terminal", labels: map[string]string{termlabel.Session: "s1", termlabel.Worktree: "/wt"},
+			wantErr: terminal.ErrNotShell, wantMsg: "use session.close"},
+		{name: "an unlabelled terminal", wantErr: terminal.ErrNotShell},
+		{name: "unknown", labels: termlabel.Shell("", "r1", "/wt"), id: "nope", wantErr: terminal.ErrNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := terminaltest.New(bus.New())
+			term, err := f.Create(t.Context(), terminal.Spec{Argv: []string{"sh"}, Labels: tt.labels})
+			if err != nil {
+				t.Fatal(err)
+			}
+			id := cmp.Or(tt.id, term.ID)
+			err = terminal.CloseShell(t.Context(), f, id)
+			if !errors.Is(err, tt.wantErr) || (tt.wantErr == nil && err != nil) || (err != nil && !strings.Contains(err.Error(), tt.wantMsg)) {
+				t.Fatalf("CloseShell = %v, want %v containing %q", err, tt.wantErr, tt.wantMsg)
+			}
+			got, gerr := f.Get(t.Context(), term.ID)
+			if gone := errors.Is(gerr, terminal.ErrNotFound); gone != tt.wantGone {
+				t.Errorf("terminal gone = %v, want %v", gone, tt.wantGone)
+			}
+			if !tt.wantGone && got.State != terminal.StateRunning {
+				t.Errorf("refused terminal state = %v, want running", got.State)
+			}
+		})
 	}
 }

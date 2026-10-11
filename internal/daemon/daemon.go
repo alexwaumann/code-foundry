@@ -30,6 +30,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/termlabel"
 	"github.com/alexwaumann/code-foundry/internal/version"
 )
 
@@ -124,8 +125,12 @@ func Run(ctx context.Context, opts Options) error {
 		},
 		Emitter:  command.BusEmitter{Bus: events},
 		Terminal: terminalAPI,
-		Repo:     worktreeDirRepo{RepoBackend: repoAPI, repos: st.repo, settings: st.settings},
-		Clone:    repoAPI.CloneRef,
+		IsShellTerminal: func(id string) bool {
+			t, err := st.terminal.Get(context.Background(), id)
+			return err == nil && termlabel.IsShell(t.Labels)
+		},
+		Repo:  worktreeDirRepo{RepoBackend: repoAPI, repos: st.repo, settings: st.settings},
+		Clone: repoAPI.CloneRef,
 		Projects: command.ProjectDeps{
 			Backend: repoAPI,
 			HasOrigin: func(c command.Context) bool {

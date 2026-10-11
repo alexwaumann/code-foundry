@@ -1132,9 +1132,12 @@ export class World {
     if (t.labels[LABEL_KIND] === KIND_SHELL) this.remove(id);
   }
 
-  /** terminal.close / TerminalService.Close: kill, then remove once exited (a session's terminal goes with its session). */
+  /** terminal.close / TerminalService.Close: kill, then remove once exited. Only shells, like the daemon. */
   close(id: string): void {
-    this.term(id);
+    const t = this.term(id);
+    if (t.labels[LABEL_KIND] !== KIND_SHELL) {
+      throw new CommandError("unavailable", `terminal ${id} is not a shell${t.labels[LABEL_SESSION] ? "; use session.close to end the thread" : ""}`);
+    }
     this.kill(id);
     if (this.terms.get(id)?.state === TerminalState.EXITED) this.remove(id);
   }
@@ -1816,7 +1819,8 @@ export class World {
       },
       {
         cmd: { name: "terminal.close", title: "Close Terminal", category: "Terminal", description: "Terminate the terminal's process and remove it once it has exited", keybindings: [], args: [] },
-        when: (ctx) => activeTerm(ctx) !== undefined,
+        // Only shells: with a thread selected the active terminal is its Claude terminal.
+        when: (ctx) => activeTerm(ctx)?.labels[LABEL_KIND] === KIND_SHELL,
         run: (ctx) => {
           const t = activeTerm(ctx);
           if (!t) throw new CommandError("unavailable", "no active terminal");

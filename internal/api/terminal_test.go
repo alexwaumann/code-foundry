@@ -14,6 +14,7 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
+	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
 func newTerminalClient(t *testing.T) (codefoundryv1connect.TerminalServiceClient, *terminaltest.Fake) {
@@ -189,7 +190,15 @@ func TestTerminalServiceCloseKillsThenRemoves(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	c, fake := newTerminalClient(t)
-	term, _ := fake.Create(ctx, terminal.Spec{Argv: []string{"cat"}})
+	term, _ := fake.Create(ctx, terminal.Spec{Argv: []string{"cat"}, Labels: termlabel.Shell("", "r1", "/wt")})
+	claude, _ := fake.Create(ctx, terminal.Spec{Argv: []string{"claude"}, Labels: map[string]string{termlabel.Session: "s1"}})
+	_, err := c.Close(ctx, connect.NewRequest(&v1.CloseTerminalRequest{Id: claude.ID}))
+	if ce := new(connect.Error); !errors.As(err, &ce) || ce.Code() != connect.CodeFailedPrecondition {
+		t.Errorf("Close(Claude terminal) = %v, want FailedPrecondition", err)
+	}
+	if got, _ := fake.Get(ctx, claude.ID); got.State != terminal.StateRunning {
+		t.Errorf("Claude terminal state = %v, want running", got.State)
+	}
 	if _, err := c.Close(ctx, connect.NewRequest(&v1.CloseTerminalRequest{Id: term.ID})); err != nil {
 		t.Fatal(err)
 	}

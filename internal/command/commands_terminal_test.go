@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -39,10 +40,19 @@ func TestTerminalNewOwner(t *testing.T) {
 		{Id: "r2", Path: real, Worktrees: []*v1.Worktree{{RepoId: "r2", Path: real}}},
 	}
 	thread := &v1.Session{RepoId: "r1", WorktreePath: feat}
+	cli := command.Context{} // ActiveView is empty only from the CLI
+	gui := func(c command.Context) command.Context {
+		if c.ActiveView == "" {
+			c.ActiveView = "session"
+		}
+		return c
+	}
+	here := func(p string) map[string]string { return map[string]string{"here": p} }
 	tests := []struct {
 		name       string
 		ctx        command.Context
 		args       map[string]string
+		darwinOnly bool
 		sessionErr error
 		wantErr    error
 		wantMsg    string // substring of the error
@@ -50,38 +60,59 @@ func TestTerminalNewOwner(t *testing.T) {
 		wantLabels map[string]string
 		wantArgv   []string
 	}{
-		{name: "thread in the GUI", ctx: command.Context{ActiveSessionID: "s1", ActiveRepoID: "r1", ActiveWorktreePath: feat},
+		// A thread owns it.
+		{name: "thread in the GUI", ctx: gui(command.Context{ActiveSessionID: "s1", ActiveRepoID: "r1", ActiveWorktreePath: feat}),
 			wantCwd: feat, wantLabels: termlabel.Shell("s1", "r1", feat)},
-		{name: "thread without a worktree in context starts in the thread's worktree", ctx: command.Context{ActiveSessionID: "s1"},
+		{name: "thread without a worktree in context starts in the thread's worktree", ctx: gui(command.Context{ActiveSessionID: "s1"}),
 			wantCwd: feat, wantLabels: termlabel.Shell("s1", "r1", feat)},
-		{name: "thread from the CLI keeps --cwd", ctx: command.Context{ActiveSessionID: "s1"}, args: map[string]string{"cwd": app + "/docs"},
+		{name: "thread from the CLI ignores the working directory", ctx: command.Context{ActiveSessionID: "s1"}, args: here("/cf-test/elsewhere"),
+			wantCwd: feat, wantLabels: termlabel.Shell("s1", "r1", feat)},
+		{name: "thread with --cwd starts there", ctx: command.Context{ActiveSessionID: "s1"}, args: map[string]string{"cwd": app + "/docs"},
 			wantCwd: app + "/docs", wantLabels: termlabel.Shell("s1", "r1", feat)},
 		{name: "thread lookup fails", ctx: command.Context{ActiveSessionID: "s1"},
 			sessionErr: connect.NewError(connect.CodeNotFound, errors.New("no such session")), wantMsg: "no such session"},
+		// Else the context's worktree.
 		{name: "worktree in the GUI", ctx: command.Context{ActiveRepoID: "r1", ActiveWorktreePath: feat, ActiveView: "projects"},
 			wantCwd: feat, wantLabels: termlabel.Shell("", "r1", feat)},
-		{name: "CLI in a main worktree's subdirectory", args: map[string]string{"cwd": app + "/internal"},
-			wantCwd: app + "/internal", wantLabels: termlabel.Shell("", "r1", app)},
-		{name: "CLI in a nested worktree: the deepest wins", args: map[string]string{"cwd": feat + "/pkg"},
-			wantCwd: feat + "/pkg", wantLabels: termlabel.Shell("", "r1", feat)},
-		{name: "CLI at a worktree root", args: map[string]string{"cwd": app},
-			wantCwd: app, wantLabels: termlabel.Shell("", "r1", app)},
-		{name: "CLI through a symlink", args: map[string]string{"cwd": link},
-			wantCwd: link, wantLabels: termlabel.Shell("", "r2", real)},
-		{name: "CLI with argv", args: map[string]string{"cwd": app, "argv": "htop -d 5"},
-			wantCwd: app, wantLabels: termlabel.Shell("", "r1", app), wantArgv: []string{"htop", "-d", "5"}},
-		{name: "a sibling with the same prefix is outside", args: map[string]string{"cwd": "/cf-test/src/apple"},
-			wantErr: command.ErrInvalidArgs, wantMsg: "/cf-test/src/apple is not inside a registered project"},
-		{name: "outside every project", args: map[string]string{"cwd": "/cf-test/elsewhere"},
-			wantErr: command.ErrInvalidArgs, wantMsg: "/cf-test/elsewhere is not inside a registered project"},
-		{name: "stale worktree context falls back to containment", ctx: command.Context{ActiveRepoID: "r9", ActiveWorktreePath: feat},
+		{name: "--context-worktree beats the working directory", ctx: command.Context{ActiveWorktreePath: feat}, args: here(app + "/docs"),
 			wantCwd: feat, wantLabels: termlabel.Shell("", "r1", feat)},
-		{name: "nothing to own it", wantErr: command.ErrUnavailable},
+		{name: "--context-worktree with --cwd: owner from the context, starts in --cwd", ctx: command.Context{ActiveWorktreePath: feat},
+			args: map[string]string{"cwd": app + "/docs"}, wantCwd: app + "/docs", wantLabels: termlabel.Shell("", "r1", feat)},
+		{name: "stale repo in context falls back to the worktree path", ctx: command.Context{ActiveRepoID: "r9", ActiveWorktreePath: feat},
+			wantCwd: feat, wantLabels: termlabel.Shell("", "r1", feat)},
+		{name: "an unregistered context worktree is refused", ctx: command.Context{ActiveWorktreePath: "/cf-test/gone"}, args: here(app),
+			wantErr: command.ErrInvalidArgs, wantMsg: "/cf-test/gone is not inside a registered project"},
+		// Else the worktree containing --cwd, else the CLI's working directory.
+		{name: "CLI in a main worktree's subdirectory", ctx: cli, args: here(app + "/internal"),
+			wantCwd: app + "/internal", wantLabels: termlabel.Shell("", "r1", app)},
+		{name: "CLI in a nested worktree: the deepest wins", ctx: cli, args: here(feat + "/pkg"),
+			wantCwd: feat + "/pkg", wantLabels: termlabel.Shell("", "r1", feat)},
+		{name: "--cwd beats the working directory", ctx: cli, args: map[string]string{"cwd": feat + "/pkg", "here": "/cf-test/elsewhere"},
+			wantCwd: feat + "/pkg", wantLabels: termlabel.Shell("", "r1", feat)},
+		{name: "CLI through a symlink", ctx: cli, args: here(link),
+			wantCwd: link, wantLabels: termlabel.Shell("", "r2", real)},
+		{name: "a missing folder resolves through its nearest existing ancestor", ctx: cli, args: here(link + "/not/yet"),
+			wantCwd: link + "/not/yet", wantLabels: termlabel.Shell("", "r2", real)},
+		{name: "case differences match on macOS", ctx: cli, args: here("/CF-Test/Src/App/x"), darwinOnly: true,
+			wantCwd: "/CF-Test/Src/App/x", wantLabels: termlabel.Shell("", "r1", app)},
+		{name: "CLI with argv", ctx: cli, args: map[string]string{"here": app, "argv": "htop -d 5"},
+			wantCwd: app, wantLabels: termlabel.Shell("", "r1", app), wantArgv: []string{"htop", "-d", "5"}},
+		{name: "a sibling with the same prefix is outside", ctx: cli, args: here("/cf-test/src/apple"),
+			wantErr: command.ErrInvalidArgs, wantMsg: "/cf-test/src/apple is not inside a registered project"},
+		{name: "outside every project", ctx: cli, args: map[string]string{"cwd": "/cf-test/elsewhere"},
+			wantErr: command.ErrInvalidArgs, wantMsg: "/cf-test/elsewhere is not inside a registered project"},
+		{name: "CLI without any path", ctx: cli, wantErr: command.ErrInvalidArgs, wantMsg: "needs a thread, a worktree, or --cwd"},
+		// The GUI offers it only with a thread or a worktree.
+		{name: "dashboard", ctx: command.Context{ActiveView: "dashboard"}, wantErr: command.ErrUnavailable},
+		{name: "pull requests page", ctx: command.Context{ActiveView: "pullrequests"}, wantErr: command.ErrUnavailable},
 		{name: "a repo alone is not enough", ctx: command.Context{ActiveRepoID: "r1", ActiveView: "compose"}, wantErr: command.ErrUnavailable},
-		{name: "bad argv", args: map[string]string{"cwd": app, "argv": `"oops`}, wantErr: command.ErrInvalidArgs},
+		{name: "bad argv", ctx: cli, args: map[string]string{"here": app, "argv": `"oops`}, wantErr: command.ErrInvalidArgs},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.darwinOnly && runtime.GOOS != "darwin" {
+				t.Skip("case-insensitive paths are a macOS default")
+			}
 			term := &commandtest.Terminal{}
 			reg := command.NewRegistry()
 			if err := command.RegisterTerminal(reg, command.TerminalDeps{
@@ -168,11 +199,26 @@ func TestTerminalClose(t *testing.T) {
 		})
 	}
 	reg := command.NewRegistry()
-	if err := command.RegisterTerminal(reg, command.TerminalDeps{Terminal: &commandtest.Terminal{}}); err != nil {
+	shells := map[string]bool{"t-shell": true}
+	if err := command.RegisterTerminal(reg, command.TerminalDeps{
+		Terminal: &commandtest.Terminal{}, IsShell: func(id string) bool { return shells[id] },
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if c, _ := reg.Get("terminal.close"); c.Confirm != "" || c.Title != "Close Terminal" || c.Category != "Terminal" {
+	c, _ := reg.Get("terminal.close")
+	if c.Confirm != "" || c.Title != "Close Terminal" || c.Category != "Terminal" {
 		t.Errorf("terminal.close = %+v, want title Close Terminal, category Terminal, no confirmation", c)
+	}
+	// A thread is selected: its Claude terminal is the active terminal, and not a shell.
+	if c.Available(command.Context{ActiveTerminalID: "t-claude", ActiveSessionID: "s1"}) {
+		t.Error("terminal.close offered on a thread's Claude terminal")
+	}
+	if !c.Available(command.Context{ActiveTerminalID: "t-shell", ActiveSessionID: "s1"}) {
+		t.Error("terminal.close not offered on a shell")
+	}
+	_, err := reg.Invoke(context.Background(), command.Context{ActiveTerminalID: "t-claude"}, "terminal.close", nil)
+	if !errors.Is(err, command.ErrUnavailable) || !strings.Contains(err.Error(), "use session.close") {
+		t.Errorf("terminal.close on a Claude terminal = %v, want unavailable, use session.close", err)
 	}
 }
 

@@ -31,7 +31,7 @@ func TestKillAndRemoveRealProcess(t *testing.T) {
 			}
 		})
 	}
-	if err := KillAndRemove(ctx, m, "t-nope"); !errors.Is(err, ErrNotFound) {
-		t.Errorf("KillAndRemove(unknown) = %v, want ErrNotFound", err)
+	if err := KillAndRemove(ctx, m, "t-nope"); err != nil {
+		t.Errorf("KillAndRemove(unknown) = %v, want nil (gone already)", err)
 	}
 }

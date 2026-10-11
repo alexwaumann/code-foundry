@@ -134,9 +134,10 @@ func (h *Terminal) Remove(ctx context.Context, req *connect.Request[v1.RemoveTer
 	return connect.NewResponse(&v1.RemoveTerminalResponse{}), nil
 }
 
-// Close kills a terminal, waits for it to exit, and removes it.
+// Close kills a shell terminal, waits for it to exit, and removes it. Other terminals
+// (a thread's Claude terminal) are refused with FailedPrecondition.
 func (h *Terminal) Close(ctx context.Context, req *connect.Request[v1.CloseTerminalRequest]) (*connect.Response[v1.CloseTerminalResponse], error) {
-	if err := terminal.KillAndRemove(ctx, h.store, req.Msg.GetId()); err != nil {
+	if err := terminal.CloseShell(ctx, h.store, req.Msg.GetId()); err != nil {
 		return nil, terminalError(err)
 	}
 	return connect.NewResponse(&v1.CloseTerminalResponse{}), nil
@@ -239,7 +240,7 @@ func terminalError(err error) error {
 		code = connect.CodeNotFound
 	case errors.Is(err, terminal.ErrInvalidSpec):
 		code = connect.CodeInvalidArgument
-	case errors.Is(err, terminal.ErrRunning), errors.Is(err, terminal.ErrExited):
+	case errors.Is(err, terminal.ErrRunning), errors.Is(err, terminal.ErrExited), errors.Is(err, terminal.ErrNotShell):
 		code = connect.CodeFailedPrecondition
 	case errors.Is(err, terminal.ErrInputBacklog), errors.Is(err, terminal.ErrSlowSubscriber):
 		code = connect.CodeResourceExhausted

@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"text/tabwriter"
@@ -42,14 +43,21 @@ type TerminalDeps struct {
 	Terminal TerminalBackend
 	Repo     RepoBackend
 	Session  SessionBackend
+	// IsShell reports whether terminal id is a shell terminal.new started
+	// (termlabel.KindShell). It gates terminal.close, which refuses other terminals
+	// anyway. Nil: any terminal (the refusal then comes from Close).
+	IsShell func(id string) bool
 }
 
 func hasTerminal(c Context) bool { return c.ActiveTerminalID != "" }
 
-// canStartShell is terminal.new's availability: a thread, or a worktree to own the shell.
-// The GUI passes the selected thread or worktree; the CLI always sends --cwd (the working
-// directory by default), which stands in for the worktree.
-func canStartShell(c Context) bool { return hasSession(c) || c.ActiveWorktreePath != "" }
+// canStartShell is terminal.new's availability: a thread or a worktree to own the shell
+// (the GUI passes the selected one), or the CLI (ActiveView is empty only there), which
+// sends its working directory as --here and is refused outside every registered project.
+// The dashboard and the Pull Requests page never offer it.
+func canStartShell(c Context) bool {
+	return hasSession(c) || c.ActiveWorktreePath != "" || c.ActiveView == ""
+}
 
 // notInProject is how terminal.new refuses a cwd outside every registered worktree:
 // "<path> is not inside a registered project" (InvalidArgument).
@@ -63,14 +71,16 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 		Command{
 			Name:  "terminal.new",
 			Title: "New Terminal",
-			Description: "Start a shell (or argv) that belongs to the active thread, else to the active worktree; " +
-				"from the CLI, to the registered worktree containing --cwd (default: the working directory). " +
-				"It starts in --cwd, else the thread's or worktree's directory.",
+			Description: "Start a shell (or argv) that belongs to the active thread, else to the active worktree, " +
+				"else to the registered worktree containing --cwd (from the CLI: the working directory). " +
+				"It starts in --cwd, else in the CLI's working directory when that chose the owner, else in the thread's or worktree's directory.",
 			Category:    "Terminal",
 			Keybindings: []string{"cmd+t"},
 			Args: []ArgSpec{
-				{Name: "cwd", Type: Path, Context: ContextWorktree, DefaultToCwd: true, Description: "Working directory (CLI default: the working directory)"},
+				{Name: "cwd", Type: Path, Description: "Working directory; without a thread or worktree context, its registered worktree owns the shell"},
 				{Name: "argv", Type: String, Description: `Command line, split like a shell would (e.g. "claude --model opus")`},
+				{Name: "here", Type: Path, DefaultToCwd: true, Description: "Where the CLI runs: without a thread, worktree or --cwd, " +
+					"the registered worktree containing it owns the shell, which starts there (CLI default: the working directory)"},
 			},
 			When: canStartShell,
 			WhyUnavailable: func(Context) string {
@@ -84,7 +94,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				if len(argv) == 0 {
 					argv = defaultShell()
 				}
-				owner, err := shellOwner(ctx, d, c, a.Path("cwd"))
+				owner, err := shellOwner(ctx, d, c, a.Path("cwd"), a.Path("here"))
 				if err != nil {
 					return Result{}, err
 				}
@@ -124,7 +134,17 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			Description: "Terminate the terminal's process (SIGHUP, then SIGKILL after a grace period) and remove it once it has exited.",
 			Category:    "Terminal",
 			Args:        []ArgSpec{idArg},
-			When:        hasTerminal,
+			// Only shells: a thread's Claude terminal (the active terminal while a thread
+			// is selected) ends with session.close. Close refuses it too.
+			When: func(c Context) bool {
+				return hasTerminal(c) && (d.IsShell == nil || d.IsShell(c.ActiveTerminalID))
+			},
+			WhyUnavailable: func(c Context) string {
+				if hasTerminal(c) {
+					return "terminal " + c.ActiveTerminalID + " is not a shell; use session.close to end a thread"
+				}
+				return ""
+			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("id")
 				if _, err := d.Terminal.Close(ctx, connect.NewRequest(&v1.CloseTerminalRequest{Id: id})); err != nil {
@@ -193,42 +213,46 @@ type owner struct {
 	cwd                     string
 }
 
-// shellOwner decides who owns a shell terminal.new starts with cwd (empty: none given):
-// the active thread; else the active worktree when it is registered; else the deepest
-// registered worktree containing cwd (or the active worktree path). A shell starts in
-// cwd, else in its owner's worktree.
-func shellOwner(ctx context.Context, d TerminalDeps, c Context, cwd string) (owner, error) {
+// shellOwner decides who owns a shell terminal.new starts, in this order: the active
+// thread; the active worktree (ActiveWorktreePath, matched with ActiveRepoID when given,
+// else the registered worktree containing it); the registered worktree containing cwd,
+// else here (the CLI's working directory). The shell starts in cwd, else in here when here
+// chose the owner, else in the thread's worktree or the context's worktree path.
+func shellOwner(ctx context.Context, d TerminalDeps, c Context, cwd, here string) (owner, error) {
 	if c.ActiveSessionID != "" {
 		res, err := d.Session.Get(ctx, connect.NewRequest(&v1.GetSessionRequest{Id: c.ActiveSessionID}))
 		if err != nil {
 			return owner{}, err
 		}
 		s := res.Msg.GetSession()
-		o := owner{session: s.GetId(), repo: s.GetRepoId(), worktree: s.GetWorktreePath(), cwd: cwd}
-		if o.cwd == "" {
-			o.cwd = o.worktree
-		}
-		return o, nil
+		return owner{session: s.GetId(), repo: s.GetRepoId(), worktree: s.GetWorktreePath(), cwd: cmp.Or(cwd, s.GetWorktreePath())}, nil
+	}
+	path, start := c.ActiveWorktreePath, cmp.Or(cwd, c.ActiveWorktreePath)
+	if path == "" {
+		path = cmp.Or(cwd, here)
+		start = path
+	}
+	if path == "" {
+		return owner{}, InvalidArg("cwd", "terminal.new needs a thread, a worktree, or --cwd inside a registered project")
 	}
 	res, err := d.Repo.List(ctx, connect.NewRequest(&v1.ListReposRequest{}))
 	if err != nil {
 		return owner{}, err
 	}
-	path := cmp.Or(cwd, c.ActiveWorktreePath)
 	repoID, wt, ok := ownerWorktree(res.Msg.GetRepos(), c.ActiveRepoID, c.ActiveWorktreePath, realPath(path))
 	if !ok {
 		return owner{}, InvalidArg("cwd", "%s %s", path, notInProject)
 	}
-	return owner{repo: repoID, worktree: wt, cwd: cmp.Or(cwd, wt)}, nil
+	return owner{repo: repoID, worktree: wt, cwd: start}, nil
 }
 
-// ownerWorktree returns worktree wtPath of repo repoID when both are given and it is
-// registered, else the deepest registered worktree containing path.
+// ownerWorktree returns the registered worktree at wtPath (in repo repoID when that is
+// given), else the deepest registered worktree containing path.
 func ownerWorktree(repos []*v1.Repo, repoID, wtPath, path string) (string, string, bool) {
 	var bestRepo, best string
 	for _, r := range repos {
 		for _, w := range r.GetWorktrees() {
-			if repoID != "" && r.GetId() == repoID && w.GetPath() == wtPath {
+			if wtPath != "" && w.GetPath() == wtPath && (repoID == "" || r.GetId() == repoID) {
 				return r.GetId(), w.GetPath(), true
 			}
 			if path != "" && within(path, w.GetPath()) && len(w.GetPath()) > len(best) {
@@ -239,24 +263,39 @@ func ownerWorktree(repos []*v1.Repo, repoID, wtPath, path string) (string, strin
 	return bestRepo, best, best != ""
 }
 
+// foldCase is whether paths compare case-insensitively: macOS volumes (APFS, HFS+) are
+// case-insensitive by default, and EvalSymlinks keeps the case it was given.
+var foldCase = runtime.GOOS == "darwin"
+
 // within reports whether path is root or inside it. Both are absolute and clean.
 func within(path, root string) bool {
 	if root == "" {
 		return false
 	}
+	if foldCase {
+		path, root = strings.ToLower(path), strings.ToLower(root)
+	}
 	return path == root || strings.HasPrefix(path, strings.TrimSuffix(root, "/")+"/")
 }
 
-// realPath resolves symlinks in p (repo paths are stored resolved: /tmp is
-// /private/tmp on macOS), or returns p cleaned when that fails.
+// realPath resolves symlinks in p the way the repo store stores paths (/tmp is
+// /private/tmp on macOS). A path that does not exist (yet) is resolved through its
+// nearest existing ancestor, with the missing rest appended.
 func realPath(p string) string {
 	if p == "" {
 		return ""
 	}
-	if r, err := filepath.EvalSymlinks(p); err == nil {
-		return r
+	p = filepath.Clean(p)
+	var rest []string
+	for dir := p; ; dir = filepath.Dir(dir) {
+		if r, err := filepath.EvalSymlinks(dir); err == nil {
+			return filepath.Join(append([]string{r}, rest...)...)
+		}
+		if parent := filepath.Dir(dir); parent == dir {
+			return p
+		}
+		rest = append([]string{filepath.Base(dir)}, rest...)
 	}
-	return filepath.Clean(p)
 }
 
 // defaultShell is the user's login shell, as a terminal emulator would start it.
