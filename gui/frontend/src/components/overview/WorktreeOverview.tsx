@@ -143,7 +143,7 @@ function PrLine({ pr, prefix, viewer }: { pr: PullRequestView; prefix: string; v
   return (
     <NavRow
       navKey={`${prefix}:${String(pr.number)}`}
-      title={`${pr.url}\nClick or Enter: open in the side panel · ⌘-click or ⌘↵: open on GitHub`}
+      title={pr.url}
       activateOnClick
       onCmdClick={() => void openUrl(pr.url)}
       className="flex h-6 items-center gap-2 px-2 pl-6 text-xs @max-[420px]:pl-2"

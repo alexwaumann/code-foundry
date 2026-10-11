@@ -244,14 +244,18 @@ export function Sidebar() {
   return (
     <aside className="relative flex shrink-0 flex-col bg-sidebar" style={{ width }} data-testid="sidebar">
       <SidebarBand />
-      <SidebarToolbar />
-      <nav className="flex shrink-0 flex-col" aria-label="Pages">
-        <PullRequestsNav />
-        <ProjectsNav />
-      </nav>
-      <SidebarList />
-      <SessionsUnavailable />
-      <SidebarStatus />
+      {/* The content pane floats 8px off the sidebar (App.tsx ContentPane's m-2); the same
+          gutter on the left keeps the rows the same distance from the window edge. */}
+      <div className="flex min-h-0 flex-1 flex-col pl-2" data-testid="sidebar-body">
+        <SidebarToolbar />
+        <nav className="flex shrink-0 flex-col" aria-label="Pages">
+          <PullRequestsNav />
+          <ProjectsNav />
+        </nav>
+        <SidebarList />
+        <SessionsUnavailable />
+        <SidebarStatus />
+      </div>
       <ResizeHandle />
     </aside>
   );

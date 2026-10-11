@@ -49,7 +49,7 @@ function PrRow({ section, pr, viewer }: { section: Section; pr: PullRequestView;
   return (
     <NavRow
       navKey={prKey(section, pr)}
-      title={`${pr.url}\nClick or Enter: open in the side panel · ⌘-click or ⌘↵: open on GitHub`}
+      title={pr.url}
       activateOnClick
       onCmdClick={() => void openUrl(pr.url)}
       className={cn("grid h-full items-center gap-3 px-2 text-sm", columns[section])}>
@@ -249,7 +249,6 @@ export function PullRequestsNav() {
       )}
       data-testid="nav-pullrequests"
       aria-current={active ? "page" : undefined}
-      title="Pull Requests"
       onClick={() => {
         useUiStore.getState().select({ kind: "view", name: "pullrequests" });
       }}

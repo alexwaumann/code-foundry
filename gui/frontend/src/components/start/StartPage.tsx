@@ -37,7 +37,7 @@ function Onboarding() {
       </Header>
       <div className="flex flex-wrap justify-center gap-2" data-testid="welcome-actions">
         <CommandButton command="repo.add" icon={FolderPlus} label="Add a project" variant="default" whenUnavailable="disable" keepFocus={false} />
-        <CommandButton command="ui.palette.open" icon={Command} label="Command palette" title="Command Palette" variant="outline" className="backdrop-blur-sm" keepFocus={false} />
+        <CommandButton command="ui.palette.open" icon={Command} label="Command palette" variant="outline" className="backdrop-blur-sm" keepFocus={false} />
       </div>
     </>
   );
@@ -101,7 +101,7 @@ function Fleet() {
       </Header>
       <div className="flex flex-wrap justify-center gap-2" data-testid="welcome-actions">
         <CommandButton command="session.new" icon={SquarePen} label="New thread" variant="default" whenUnavailable="disable" keepFocus={false} />
-        <CommandButton command="ui.palette.open" icon={Command} label="Command palette" title="Command Palette" variant="outline" className="backdrop-blur-sm" keepFocus={false} />
+        <CommandButton command="ui.palette.open" icon={Command} label="Command palette" variant="outline" className="backdrop-blur-sm" keepFocus={false} />
       </div>
       <ActiveThreads />
       <button

@@ -30,7 +30,6 @@ export function UpdateIndicator() {
       }}
       data-testid="update-indicator"
       data-kind={badge.kind}
-      title="Software update"
     >
       <Icon className="size-3 shrink-0" aria-hidden />
       <span className="min-w-0 truncate" data-testid="update-indicator-label">

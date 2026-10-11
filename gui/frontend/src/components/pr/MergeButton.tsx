@@ -49,7 +49,7 @@ export function MergeButton({ prRef, detail }: { prRef: PrRef; detail: PullReque
           aria-busy={busy || undefined}
           aria-describedby={a.reason ? reasonId : undefined}
           data-reason={a.reason ?? undefined}
-          title={a.reason ?? (busy ? "Merging…" : `Merge into ${pr.baseRef}`)}
+          title={a.reason ?? undefined}
           className={cn(
             "flex h-7 shrink-0 items-center gap-1 rounded-md bg-primary pr-1.5 pl-2 text-[13px] font-medium text-primary-foreground shadow-xs outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/60 @max-[340px]:pl-1.5",
             blocked && "cursor-default hover:bg-primary",

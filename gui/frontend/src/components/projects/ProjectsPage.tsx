@@ -59,7 +59,7 @@ function decode(repoKeys: readonly string[], wsKeys: readonly string[]) {
 function WorktreeRow({ repoId, path }: { repoId: string; path: string }) {
   const isMain = useReposStore((s) => findWorktree(s, repoId, path)?.isMain ?? false);
   return (
-    <NavRow navKey={projectWorktreeKey(repoId, path)} className="group/wt flex h-full items-center gap-2 pr-2 pl-6 text-sm" title={`${path}\nEnter or double-click: show the worktree in the side panel`}>
+    <NavRow navKey={projectWorktreeKey(repoId, path)} className="group/wt flex h-full items-center gap-2 pr-2 pl-6 text-sm" title={path}>
       <span className="flex h-full min-w-0 flex-1 items-center" data-testid="project-worktree" data-path={path}>
         <WorktreeState repoId={repoId} path={path} />
       </span>
@@ -89,7 +89,7 @@ function ProjectBlock({ project }: { project: ProjectModel }) {
   const Icon = noGit ? Folder : FolderGit2;
   return (
     <section className="rounded-md border" data-testid="project" data-repo={repoId} data-git={!noGit}>
-      <NavRow navKey={projectKey(repoId)} className="group/p flex h-9 items-center gap-2 rounded-b-none border-b px-2" title="Enter or double-click: show the project in the side panel">
+      <NavRow navKey={projectKey(repoId)} className="group/p flex h-9 items-center gap-2 rounded-b-none border-b px-2">
         <Icon className={cn("size-4 shrink-0", noGit ? "text-muted-foreground" : "text-sky-400/90")} aria-hidden />
         <span className="truncate font-medium" data-testid="project-name">
           {name}
@@ -127,7 +127,7 @@ function WorkspaceBlock({ id }: { id: string }) {
   const threadName = useSessionsStore((s) => (thread ? s.byId[thread]?.name || thread : ""));
   return (
     <section className="rounded-md border" data-testid="workspace" data-workspace={id}>
-      <NavRow navKey={workspaceKey(id)} className="group/ws flex h-9 items-center gap-2 rounded-b-none border-b px-2" title="Enter or double-click: new thread in this workspace">
+      <NavRow navKey={workspaceKey(id)} className="group/ws flex h-9 items-center gap-2 rounded-b-none border-b px-2">
         <Layers className="size-4 shrink-0 text-violet-400/90" aria-hidden />
         <span className="truncate font-medium" data-testid="workspace-name">
           {name}
@@ -268,7 +268,6 @@ export function ProjectsNav() {
       )}
       data-testid="nav-projects"
       aria-current={active ? "page" : undefined}
-      title="Projects"
       onClick={() => {
         useUiStore.getState().select({ kind: "view", name: "projects" });
       }}

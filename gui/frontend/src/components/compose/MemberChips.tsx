@@ -39,7 +39,6 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
         disabled={disabled}
         aria-pressed={primary}
         aria-label={`${name}${member.noGit ? ", not a git repository" : member.branch ? ` on ${member.branch}` : ""}${primary ? ", primary: the thread runs here" : ""}`}
-        title={primary ? "The thread runs here" : `Run the thread in ${name}`}
         data-compose-stop
         className={cn(
           "flex h-full min-w-0 items-center gap-1.5 rounded-full pr-2.5 pl-2.5 outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60",
