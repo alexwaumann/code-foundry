@@ -5,6 +5,7 @@ import {
   emptyEntry,
   expandPanel,
   getPanel,
+  isPicking,
   keyOf,
   makeTab,
   openSurface,
@@ -13,6 +14,10 @@ import {
   setExpanded,
   setPanelWidth,
   setWidth,
+  startPanelPicking,
+  startPicking,
+  stopPanelPicking,
+  stopPicking,
   tabId,
   toggle,
   togglePanel,
@@ -27,6 +32,11 @@ const pr = makeTab("pullrequest", "#12", { number: "12" });
 
 function entry(open: boolean, tabs: PanelEntry["tabs"], activeTabId: string | null): PanelEntry {
   return { open, tabs, activeTabId };
+}
+
+/** A panel picking (activeTabId null) that came from `pickFrom`. */
+function picking(tabs: PanelEntry["tabs"], pickFrom: string): PanelEntry {
+  return { open: true, tabs, activeTabId: null, pickFrom };
 }
 
 describe("keyOf", () => {
@@ -67,6 +77,8 @@ describe("openTab", () => {
     ["existing tab is activated, not duplicated", entry(true, [files, diff], diff.id), makeTab("files", "Files"), entry(true, [files, diff], files.id)],
     ["reopens a hidden panel with its tabs", entry(false, [files, diff], diff.id), files, entry(true, [files, diff], files.id)],
     ["refreshes the title of an existing tab", entry(true, [pr], pr.id), makeTab("pullrequest", "#12 Fix", { number: "12" }), entry(true, [{ ...pr, title: "#12 Fix" }], pr.id)],
+    ["picking a new surface appends it and ends picking", picking([files], files.id), diff, entry(true, [files, diff], diff.id)],
+    ["picking an open surface activates it and ends picking", picking([files, diff], diff.id), makeTab("files", "Files"), entry(true, [files, diff], files.id)],
   ];
   it.each(cases)("%s", (_name, before, tab, want) => {
     expect(openTab(before, tab)).toEqual(want);
@@ -82,6 +94,10 @@ describe("closeTab", () => {
     ["active first tab activates the right neighbour", entry(true, three, files.id), files.id, entry(true, [diff, pr], diff.id)],
     ["inactive tab keeps the active one", entry(true, three, files.id), pr.id, entry(true, [files, diff], files.id)],
     ["unknown id changes nothing", entry(true, [files], files.id), "nope", entry(true, [files], files.id)],
+    ["picking: another tab keeps picking and pickFrom", picking(three, files.id), pr.id, picking([files, diff], files.id)],
+    ["picking: the pickFrom tab moves pickFrom to its right neighbour", picking(three, diff.id), diff.id, picking([files, pr], pr.id)],
+    ["picking: the last pickFrom tab moves pickFrom to its left neighbour", picking(three, pr.id), pr.id, picking([files, diff], diff.id)],
+    ["picking: the last tab hides the panel and ends picking", picking([files], files.id), files.id, entry(false, [], null)],
   ];
   it.each(cases)("%s", (_name, before, id, want) => {
     expect(closeTab(before, id)).toEqual(want);
@@ -98,9 +114,69 @@ describe("activateTab", () => {
     ["switches the active tab", entry(true, [files, diff], files.id), diff.id, entry(true, [files, diff], diff.id)],
     ["unknown id changes nothing", entry(true, [files], files.id), "nope", entry(true, [files], files.id)],
     ["already active changes nothing", entry(true, [files], files.id), files.id, entry(true, [files], files.id)],
+    ["picking: any tab ends picking", picking([files, diff], files.id), diff.id, entry(true, [files, diff], diff.id)],
+    ["picking: the pickFrom tab ends picking", picking([files, diff], files.id), files.id, entry(true, [files, diff], files.id)],
+    ["picking: unknown id keeps picking", picking([files], files.id), "nope", picking([files], files.id)],
   ];
   it.each(cases)("%s", (_name, before, id, want) => {
     expect(activateTab(before, id)).toEqual(want);
+  });
+});
+
+describe("picking", () => {
+  const two = [files, diff];
+  it.each<[string, PanelEntry, boolean]>([
+    ["no tabs is not picking (the list shows anyway)", { ...emptyEntry, open: true }, false],
+    ["an active tab is not picking", entry(true, two, diff.id), false],
+    ["tabs and no active tab is picking", picking(two, diff.id), true],
+    ["without pickFrom (an old entry) too", entry(true, two, null), true],
+  ])("isPicking: %s", (_name, e, want) => {
+    expect(isPicking(e)).toBe(want);
+  });
+
+  const startCases: [string, PanelEntry, PanelEntry][] = [
+    ["remembers the active tab", entry(true, two, diff.id), picking(two, diff.id)],
+    ["works on a hidden panel (the caller shows it)", entry(false, two, files.id), { ...picking(two, files.id), open: false }],
+    ["keeps width and expanded", { ...entry(true, two, diff.id), width: 500, expanded: true }, { ...picking(two, diff.id), width: 500, expanded: true }],
+  ];
+  it.each(startCases)("startPicking %s", (_name, before, want) => {
+    expect(startPicking(before)).toEqual(want);
+  });
+
+  it.each<[string, PanelEntry]>([
+    ["no tabs", { ...emptyEntry, open: true }],
+    ["already picking", picking(two, diff.id)],
+  ])("startPicking returns the same entry with %s", (_name, e) => {
+    expect(startPicking(e)).toBe(e);
+  });
+
+  const stopCases: [string, PanelEntry, PanelEntry][] = [
+    ["goes back to pickFrom", picking(two, diff.id), entry(true, two, diff.id)],
+    ["a missing pickFrom goes to the first tab", picking(two, "gone"), entry(true, two, files.id)],
+    ["no pickFrom goes to the first tab", entry(true, two, null), entry(true, two, files.id)],
+    ["keeps width and expanded", { ...picking(two, diff.id), width: 500, expanded: true }, { ...entry(true, two, diff.id), width: 500, expanded: true }],
+  ];
+  it.each(stopCases)("stopPicking %s", (_name, before, want) => {
+    expect(stopPicking(before)).toEqual(want);
+  });
+
+  it.each<[string, PanelEntry]>([
+    ["no tabs", { ...emptyEntry, open: true }],
+    ["an active tab", entry(true, two, diff.id)],
+  ])("stopPicking returns the same entry with %s", (_name, e) => {
+    expect(stopPicking(e)).toBe(e);
+  });
+
+  it("round-trips: start then stop is where it began", () => {
+    const e = entry(true, two, diff.id);
+    expect(stopPicking(startPicking(e))).toEqual(e);
+  });
+
+  it("survives hiding and resizing", () => {
+    const p = picking(two, diff.id);
+    expect(toggle(p)).toEqual({ ...p, open: false });
+    expect(setWidth(p, 500)).toEqual({ ...p, width: 500 });
+    expect(setExpanded(p, true)).toEqual({ ...p, expanded: true });
   });
 });
 
@@ -276,6 +352,30 @@ describe("panel store", () => {
     expect(expandPanel("current", true, { focus: true })).toBe(false);
     expect(usePanelStore.getState().byKey).toEqual({});
     expect(useUiStore.getState().panelFocusSeq).toBe(0);
+  });
+
+  it("startPanelPicking shows a hidden panel picking and asks for focus; stopPanelPicking goes back", () => {
+    openSurface("current", files);
+    openSurface("current", diff);
+    togglePanel("current", false);
+    expect(startPanelPicking()).toBe(true);
+    expect(getPanel()).toEqual(picking([files, diff], diff.id));
+    expect(useUiStore.getState().panelFocusSeq).toBe(1);
+    // Already picking: unchanged.
+    expect(startPanelPicking("current", { focus: false })).toBe(true);
+    expect(useUiStore.getState().panelFocusSeq).toBe(1);
+    stopPanelPicking();
+    expect(getPanel()).toEqual(entry(true, [files, diff], diff.id));
+    // Persisted like the rest (a reload keeps the picker).
+    startPanelPicking("current", { focus: false });
+    expect(JSON.parse(localStorage.getItem("code-foundry.panel") ?? "{}")).toMatchObject({ state: { byKey: { "session:a": { activeTabId: null, pickFrom: diff.id } } } });
+  });
+
+  it("startPanelPicking without tabs only shows the panel; with nothing selected it does nothing", () => {
+    expect(startPanelPicking()).toBe(true);
+    expect(getPanel()).toEqual({ ...emptyEntry, open: true });
+    useUiStore.getState().select({ kind: "none" });
+    expect(startPanelPicking()).toBe(false);
   });
 
   it("showing asks for focus unless told not to; hiding never does", () => {

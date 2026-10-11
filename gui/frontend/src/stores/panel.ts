@@ -2,7 +2,9 @@
  * The side panel ("surface panel") to the right of the content pane. Each selection
  * (session, terminal, composer, top-level page) has its own panel: whether it is
  * open, its tabs, the active tab, its width, and whether it is expanded to the full width
- * of the content area. Switching selection shows that
+ * of the content area. A panel with tabs but no active tab is picking: its "+" was
+ * clicked and it shows the surface list until a surface (or a tab) is picked. Switching
+ * selection shows that
  * selection's panel. All of it is persisted (localStorage "code-foundry.panel"), so it
  * survives a reload. Entries are never pruned: a deleted session's panel stays stored.
  * See docs/notes/side-panel.md.
@@ -41,6 +43,13 @@ export interface PanelEntry {
    * entries never expanded look the same. Hiding the panel keeps it.
    */
   expanded?: boolean;
+  /**
+   * While picking (tabs but no active tab, see isPicking): the tab that was active when
+   * picking began, so leaving picking without a pick goes back to it. Absent otherwise:
+   * the reducers drop it rather than store undefined, like `expanded`. Persisted with the
+   * rest, so a reload keeps the picker and where it came from.
+   */
+  pickFrom?: string;
 }
 
 export const emptyEntry: PanelEntry = { open: false, tabs: [], activeTabId: null };
@@ -76,31 +85,73 @@ export function makeTab(kind: SurfaceKind, title: string, params: Readonly<Recor
   return { id: tabId(kind, params), kind, title, params };
 }
 
-/** Opens the panel with the tab active. An existing tab with the same id is reused (its title refreshed). */
+/** The entry without `pickFrom` (the same entry when it has none). */
+function dropPickFrom(e: PanelEntry): PanelEntry {
+  if (e.pickFrom === undefined) return e;
+  const { pickFrom: _old, ...rest } = e;
+  return rest;
+}
+
+/**
+ * Whether the panel is picking: it has tabs but none is active, so its body shows the
+ * surface list and the "+" after its tabs is highlighted (startPicking).
+ */
+export function isPicking(e: PanelEntry): boolean {
+  return e.tabs.length > 0 && e.activeTabId === null;
+}
+
+/**
+ * Opens the panel with the tab active. An existing tab with the same id is reused (its
+ * title refreshed). Ends picking: this is what picking a surface from the list does.
+ */
 export function openTab(e: PanelEntry, tab: Tab): PanelEntry {
   const i = e.tabs.findIndex((t) => t.id === tab.id);
   const tabs = i < 0 ? [...e.tabs, tab] : e.tabs[i]?.title === tab.title ? e.tabs : e.tabs.map((t, j) => (j === i ? { ...t, title: tab.title } : t));
-  return { ...e, open: true, tabs, activeTabId: tab.id };
+  return { ...dropPickFrom(e), open: true, tabs, activeTabId: tab.id };
 }
 
 /**
  * Removes a tab. Closing the active tab activates its right neighbour, else the left one.
- * Closing the last tab hides the panel. An unknown id changes nothing.
+ * Closing the last tab hides the panel (and ends picking). While picking, the panel keeps
+ * picking; closing the tab it would go back to moves `pickFrom` to that tab's right
+ * neighbour, else the left one, like closing an active tab. An unknown id changes nothing.
  */
 export function closeTab(e: PanelEntry, id: string): PanelEntry {
   const i = e.tabs.findIndex((t) => t.id === id);
   if (i < 0) return e;
   const tabs = e.tabs.filter((t) => t.id !== id);
-  if (tabs.length === 0) return { ...e, open: false, tabs, activeTabId: null };
-  if (e.activeTabId !== id) return { ...e, tabs };
+  if (tabs.length === 0) return { ...dropPickFrom(e), open: false, tabs, activeTabId: null };
   const next = tabs[i] ?? tabs[i - 1] ?? null;
+  if (e.pickFrom === id && next) return { ...e, tabs, pickFrom: next.id };
+  if (e.activeTabId !== id) return { ...e, tabs };
   return { ...e, tabs, activeTabId: next?.id ?? null };
 }
 
-/** Makes an existing tab active; an unknown id changes nothing. */
+/** Makes an existing tab active (ending picking); an unknown id changes nothing. */
 export function activateTab(e: PanelEntry, id: string): PanelEntry {
   if (e.activeTabId === id || !e.tabs.some((t) => t.id === id)) return e;
-  return { ...e, activeTabId: id };
+  return { ...dropPickFrom(e), activeTabId: id };
+}
+
+/**
+ * Starts picking (the "+" after the tabs, view.panel.new-tab): no tab is active, so the
+ * body shows the surface list, and `pickFrom` remembers the tab that was. No tab is added
+ * until a surface is picked (openTab). A panel without tabs already shows the list, and
+ * one already picking stays as it is: both come back unchanged.
+ */
+export function startPicking(e: PanelEntry): PanelEntry {
+  if (e.tabs.length === 0 || e.activeTabId === null) return e;
+  return { ...e, activeTabId: null, pickFrom: e.activeTabId };
+}
+
+/**
+ * Leaves picking without a pick (Escape, cmd+w): back to `pickFrom` if that tab is still
+ * there, else the first tab. Not picking (or no tabs) changes nothing.
+ */
+export function stopPicking(e: PanelEntry): PanelEntry {
+  if (!isPicking(e)) return e;
+  const back = e.tabs.find((t) => t.id === e.pickFrom) ?? e.tabs[0];
+  return back ? { ...dropPickFrom(e), activeTabId: back.id } : e;
 }
 
 /** Shows or hides the panel (flips it without `open`). Tabs are kept either way. */
@@ -202,6 +253,22 @@ export function activatePanelTab(target: PanelTarget, id: string): void {
 }
 
 /**
+ * Shows a panel's surface list to open another tab (startPicking), showing the panel if
+ * it is hidden. A panel without tabs shows the list anyway, so it is only shown. Showing
+ * asks the panel to take focus (so Escape and the surface letters work at once) unless
+ * `focus` is false. Returns false when there is no panel (nothing selected). The
+ * view.panel.new-tab command is newPanelTabCommand (stores/views.ts).
+ */
+export function startPanelPicking(target: PanelTarget = "current", opts: { focus?: boolean } = {}): boolean {
+  return update(target, (e) => startPicking(toggle(e, true)), { focus: opts.focus ?? true }) !== null;
+}
+
+/** Leaves picking without a pick: back to the tab that was active (stopPicking). */
+export function stopPanelPicking(target: PanelTarget = "current"): void {
+  update(target, stopPicking);
+}
+
+/**
  * Expands a panel to the full width of the content area, restores its split (`expanded`
  * false), or flips it. Expanding shows a hidden panel. With `focus`, an expanded result
  * asks the panel to take focus. Returns whether the panel is now open and expanded. The
@@ -247,6 +314,14 @@ export function usePanelExpanded(): boolean {
   return usePanelStore((s) => {
     const e = key === null ? undefined : s.byKey[key];
     return (e?.open ?? false) && (e?.expanded ?? false);
+  });
+}
+
+/** Whether a panel is picking (isPicking): it has tabs, none active, and shows the surface list. */
+export function usePanelPicking(key: string): boolean {
+  return usePanelStore((s) => {
+    const e = s.byKey[key];
+    return e !== undefined && isPicking(e);
   });
 }
 
