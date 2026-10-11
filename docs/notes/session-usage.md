@@ -367,13 +367,16 @@ CLI path toggling, range filter and reload persistence, Tokens/Cost and the tool
 Live screenshots, real Wails window at 1400x900: `make build && make gui-build`, daemon
 in `CODE_FOUNDRY_HOME=/tmp/cf-usage4-home`, a scratch git repo under the worktree's
 `.scratch/` (home-only paths), two haiku threads prompted "reply with the word ok"
-(`code-foundry usage`: 2 requests · 77.8K tokens · $0.0047). The GUI started with
-`code-foundry gui` and the same home; the window raised by unix id; the status-row button
-clicked with a CGEvent mouse click (JXA; AppleScript's `click at` does not reach the web
-view); `screencapture -R` of the window. Theme switched with `settings set
-appearance.theme light`. A second click on the button closed the page. Afterwards both
-threads removed (usage moved to the retired ledger: `All threads (0 + removed): 2
-requests · 77.8K tokens · $0.0047`), daemon stopped, home and scratch repo deleted.
+(`code-foundry usage`: 2 requests · 75.8K tokens · $0.0052). The GUI started with
+`code-foundry gui` and the same home; the window raised, moved and sized by unix id
+through System Events (it resolved to ours this time; see PR 3's gotcha above); the
+status-row button clicked with a CGEvent mouse click (JXA; AppleScript's `click at` does
+not reach the web view); `screencapture -R` of the window. Theme switched with `settings
+set appearance.theme light`. Afterwards both threads removed (usage moved to the retired
+ledger: `All threads (0 + removed): 2 requests · 75.8K tokens · $0.0052`), daemon
+stopped, home and scratch repo deleted. The shots were retaken after merging PR 3 (shared
+`fmtTok`: the axis reads "80K", not "80.0K"; main's sidebar gutter). Before the merge, a
+second click on the button closed the page live.
 
 * `session-usage/page-dark.png`: tokens, dark.
 * `session-usage/page-cost.png`: cost, dark, hovering today's bar.
