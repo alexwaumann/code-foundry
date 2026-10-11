@@ -369,6 +369,11 @@ describe("events mapping", () => {
       cacheWrite1h: 11400n,
       costUsd: 0.0026,
       unpriced: false,
+      inputCostUsd: 0.0001,
+      outputCostUsd: 0.0002,
+      cacheReadCostUsd: 0.0003,
+      cacheWrite5mCostUsd: 0,
+      cacheWrite1hCostUsd: 0.002,
     };
     const view = {
       model: "claude-haiku-5-5",
@@ -383,6 +388,11 @@ describe("events mapping", () => {
       cacheWrite1h: 11400,
       costUsd: 0.0026,
       unpriced: false,
+      inputCostUsd: 0.0001,
+      outputCostUsd: 0.0002,
+      cacheReadCostUsd: 0.0003,
+      cacheWrite5mCostUsd: 0,
+      cacheWrite1hCostUsd: 0.002,
     };
     expect(toSessionView(create(SessionSchema, { id: "s0" }))).toMatchObject({ usage: [], costUsd: 0, unpriced: false });
     expect(toSessionView(create(SessionSchema, { id: "s1", usage: [bucket], costUsd: 0.0026, unpriced: true }))).toMatchObject({

@@ -101,7 +101,7 @@ export function SettingsPage() {
         <Button variant="outline" size="xs" className="[--wails-draggable:no-drag]" onClick={() => void runCommand("settings.reveal")} data-testid="reveal-settings">
           <FileText /> Reveal settings file
         </Button>
-        <Button variant="ghost" size="icon-xs" className="[--wails-draggable:no-drag]" aria-label="Close settings" title="Close (Esc)" onClick={closeSettings}>
+        <Button variant="ghost" size="icon-xs" className="[--wails-draggable:no-drag]" aria-label="Close settings" onClick={closeSettings}>
           <X />
         </Button>
       </PaneHeader>

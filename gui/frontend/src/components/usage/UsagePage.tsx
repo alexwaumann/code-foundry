@@ -5,8 +5,7 @@ import type { UsageBucketView } from "@/api/session";
 import { Button } from "@/components/ui/button";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useEscapeCloses } from "@/components/window/useEscapeCloses";
-import { useColorScheme } from "@/lib/theme";
-import { formatShare, formatTokens, formatUsd, modelColor, type ModelUsage, type UsageTotals } from "@/lib/usage";
+import { fmtShare, fmtTok, fmtUsd, type ModelUsage, type UsageTotals } from "@/lib/usage";
 import { useSessionsStore } from "@/stores/sessions";
 import { USAGE_RANGES, useUiStore, type UsageRange } from "@/stores/ui";
 import { closeUsage } from "@/stores/views";
@@ -65,22 +64,22 @@ export function UsagePage() {
             setRange(d);
           }}
           aria-label="Range"
-          data-testid="usage-range"
+          data-testid="usage-page-range"
           className="ml-1"
         />
-        <Button variant="ghost" size="icon-xs" className="[--wails-draggable:no-drag]" aria-label="Close usage" title="Close (Esc)" onClick={closeUsage} data-testid="usage-close">
+        <Button variant="ghost" size="icon-xs" className="[--wails-draggable:no-drag]" aria-label="Close usage" title="Close (Esc)" onClick={closeUsage} data-testid="usage-page-close">
           <X />
         </Button>
       </PaneHeader>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[1040px] px-8 pt-7 pb-10">
-          <div className="text-[44px] leading-none font-semibold tracking-[-0.02em] proportional-nums" data-testid="usage-total">
-            {formatUsd(totals.costUsd)}
+          <div className="text-[44px] leading-none font-semibold tracking-[-0.02em] proportional-nums" data-testid="usage-page-total">
+            {fmtUsd(totals.costUsd)}
           </div>
-          <p className="mt-2 text-[13px] text-muted-foreground" data-testid="usage-summary">
+          <p className="mt-2 text-[13px] text-muted-foreground" data-testid="usage-page-summary">
             {(
               [
-                [formatTokens(totals.tokens), plural(totals.tokens, "token", "tokens")],
+                [fmtTok(totals.tokens), plural(totals.tokens, "token", "tokens")],
                 [totals.requests.toLocaleString("en-US"), plural(totals.requests, "request", "requests")],
                 [String(data.threads), plural(data.threads, "thread", "threads")],
               ] as const
@@ -92,7 +91,7 @@ export function UsagePage() {
             ))}
           </p>
           {empty ? (
-            <p className="mt-10 text-sm text-muted-foreground" data-testid="usage-empty">
+            <p className="mt-10 text-sm text-muted-foreground" data-testid="usage-page-empty">
               No usage in this range
             </p>
           ) : (
@@ -101,7 +100,7 @@ export function UsagePage() {
                 <h2 className="text-[13px] font-semibold">
                   Daily<span className="ml-2 font-normal text-muted-foreground">by model</span>
                 </h2>
-                <Segmented options={MODE_OPTIONS} value={mode} onChange={setMode} aria-label="Chart measure" data-testid="usage-mode" />
+                <Segmented options={MODE_OPTIONS} value={mode} onChange={setMode} aria-label="Chart measure" data-testid="usage-page-mode" />
               </div>
               <UsageChart daily={data.daily} series={data.series} mode={mode} />
               <h2 className="mt-8 mb-2.5 text-[13px] font-semibold">By model</h2>
@@ -116,10 +115,9 @@ export function UsagePage() {
 }
 
 function ModelTable({ models, totalCost }: { models: readonly ModelUsage[]; totalCost: number }) {
-  const scheme = useColorScheme();
-  const th = "px-2 py-1.5 text-[11px] font-medium text-muted-foreground border-b border-border";
+  const th ="px-2 py-1.5 text-[11px] font-medium text-muted-foreground border-b border-border";
   return (
-    <table className="w-full border-collapse text-[13px]" data-testid="usage-models">
+    <table className="w-full border-collapse text-[13px]" data-testid="usage-page-models">
       <thead>
         <tr>
           <th className={`${th} text-left`}>Model</th>
@@ -133,24 +131,24 @@ function ModelTable({ models, totalCost }: { models: readonly ModelUsage[]; tota
         {models.map((m) => {
           // A model with no rate at all: no cost and no share. One with some unpriced
           // buckets (fast mode on a model without it) keeps its priced part and the tag.
-          const noRate = m.unpriced && m.costUsd === 0;
+          const noRate = m.allUnpriced;
           return (
-            <tr key={m.model} data-testid="usage-model-row" data-model={m.model}>
+            <tr key={m.model} data-testid="usage-page-model-row" data-model={m.model}>
               <td className="border-b border-border p-2">
                 <span className="flex items-center">
-                  <Swatch color={modelColor(m.model, scheme)} />
+                  <Swatch model={m.model} />
                   <span className="font-mono">{m.model}</span>
                   {m.unpriced && (
-                    <span className="ml-1.5 rounded border border-border px-1.5 py-px text-[10px] text-muted-foreground" data-testid="usage-unpriced">
+                    <span className="ml-1.5 rounded border border-border px-1.5 py-px text-[10px] text-muted-foreground" data-testid="usage-page-unpriced">
                       unpriced
                     </span>
                   )}
                 </span>
               </td>
               <td className="border-b border-border p-2 text-right text-muted-foreground tabular-nums">{m.requests.toLocaleString("en-US")}</td>
-              <td className="border-b border-border p-2 text-right tabular-nums">{formatTokens(m.tokens)}</td>
-              <td className={`border-b border-border p-2 text-right tabular-nums ${noRate ? "text-muted-foreground" : ""}`}>{noRate ? "—" : formatUsd(m.costUsd)}</td>
-              <td className="border-b border-border p-2 text-right text-muted-foreground tabular-nums">{noRate ? "—" : formatShare(m.costUsd, totalCost)}</td>
+              <td className="border-b border-border p-2 text-right tabular-nums">{fmtTok(m.tokens)}</td>
+              <td className={`border-b border-border p-2 text-right tabular-nums ${noRate ? "text-muted-foreground" : ""}`}>{noRate ? "—" : fmtUsd(m.costUsd)}</td>
+              <td className="border-b border-border p-2 text-right text-muted-foreground tabular-nums">{noRate ? "—" : fmtShare(m.costUsd, totalCost)}</td>
             </tr>
           );
         })}
@@ -169,11 +167,11 @@ function BucketStrip({ totals }: { totals: UsageTotals }) {
     ["Output", totals.output],
   ];
   return (
-    <div className="mt-5 flex flex-wrap gap-8 border-t border-border pt-4" data-testid="usage-buckets">
+    <div className="mt-5 flex flex-wrap gap-8 border-t border-border pt-4" data-testid="usage-page-buckets">
       {items.map(([k, v]) => (
         <div key={k}>
           <div className="text-[11px] text-muted-foreground">{k}</div>
-          <div className="mt-[3px] text-sm font-medium tabular-nums">{formatTokens(v)}</div>
+          <div className="mt-[3px] text-sm font-medium tabular-nums">{fmtTok(v)}</div>
         </div>
       ))}
     </div>

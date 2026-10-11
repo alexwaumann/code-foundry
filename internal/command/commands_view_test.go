@@ -20,6 +20,7 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 		{command: "view.panel.expand", view: command.ViewPanelExpand},
 		{command: "view.panel.workspace", view: command.ViewPanelWorkspace},
 		{command: "view.panel.linked-prs", view: command.ViewPanelLinkedPRs},
+		{command: "view.panel.usage", view: command.ViewPanelUsage},
 		{command: "view.panel.worktree", view: command.ViewPanelWorktree},
 	}
 	for _, tt := range tests {
@@ -79,7 +80,7 @@ func TestViewPanelWorkspaceAvailability(t *testing.T) {
 	}
 }
 
-func TestViewPanelLinkedPRsAvailability(t *testing.T) {
+func TestViewPanelThreadSurfacesAvailability(t *testing.T) {
 	tests := []struct {
 		name string
 		ctx  command.Context
@@ -99,18 +100,21 @@ func TestViewPanelLinkedPRsAvailability(t *testing.T) {
 	if err := command.RegisterView(reg, &commandtest.Emitter{Delivered: 1}); err != nil {
 		t.Fatal(err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := false
-			for _, c := range reg.List(tt.ctx, false) {
-				if c.Name == "view.panel.linked-prs" {
-					got = true
+	// Both are available for any thread (the GUI says when there is nothing to show).
+	for _, name := range []string{"view.panel.linked-prs", "view.panel.usage"} {
+		for _, tt := range tests {
+			t.Run(name+"/"+tt.name, func(t *testing.T) {
+				got := false
+				for _, c := range reg.List(tt.ctx, false) {
+					if c.Name == name {
+						got = true
+					}
 				}
-			}
-			if got != tt.want {
-				t.Errorf("available = %v, want %v", got, tt.want)
-			}
-		})
+				if got != tt.want {
+					t.Errorf("available = %v, want %v", got, tt.want)
+				}
+			})
+		}
 	}
 }
 

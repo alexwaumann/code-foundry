@@ -165,14 +165,14 @@ function SidebarList() {
               data-region="sidebar"
               data-testid="thread-list"
               aria-activedescendant={activeRow ? `row-${activeRow.key}` : undefined}
-              className="group min-h-0 flex-1 overflow-y-auto px-1.5 outline-none"
+              className="group min-h-0 flex-1 overflow-y-auto outline-none"
               onKeyDown={onKeyDown}
               onContextMenu={onContextMenu}
             >
               {rows.length === 0 ? (
                 // No threads (once loaded): the list is simply empty.
                 emptyText !== null && (
-                  <p className="px-3 py-4 text-xs break-words text-muted-foreground" data-testid="thread-list-empty">
+                  <p className="px-2 py-4 text-xs break-words text-muted-foreground" data-testid="thread-list-empty">
                     {emptyText}
                   </p>
                 )
@@ -204,7 +204,7 @@ function SessionsUnavailable() {
   const error = useSessionsStore((s) => s.error);
   if (!unavailable) return null;
   return (
-    <p className="shrink-0 border-t border-sidebar-border px-3 py-1.5 text-[11px] text-muted-foreground" data-testid="sessions-unavailable" title={error ?? ""}>
+    <p className="shrink-0 border-t border-sidebar-border px-2 py-1.5 text-[11px] text-muted-foreground" data-testid="sessions-unavailable" title={error ?? ""}>
       Threads: service unavailable
     </p>
   );
@@ -244,14 +244,19 @@ export function Sidebar() {
   return (
     <aside className="relative flex shrink-0 flex-col bg-sidebar" style={{ width }} data-testid="sidebar">
       <SidebarBand />
-      <SidebarToolbar />
-      <nav className="flex shrink-0 flex-col" aria-label="Pages">
-        <PullRequestsNav />
-        <ProjectsNav />
-      </nav>
-      <SidebarList />
-      <SessionsUnavailable />
-      <SidebarStatus />
+      {/* The content pane floats 8px off the sidebar (App.tsx ContentPane's m-2). Rows run
+          to the sidebar's edges, so the same 8px gutter on the left keeps them as far from
+          the window edge as from the pane. */}
+      <div className="flex min-h-0 flex-1 flex-col pl-2" data-testid="sidebar-body">
+        <SidebarToolbar />
+        <nav className="flex shrink-0 flex-col" aria-label="Pages">
+          <PullRequestsNav />
+          <ProjectsNav />
+        </nav>
+        <SidebarList />
+        <SessionsUnavailable />
+        <SidebarStatus />
+      </div>
       <ResizeHandle />
     </aside>
   );

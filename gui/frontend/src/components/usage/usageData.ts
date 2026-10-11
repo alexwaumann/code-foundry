@@ -4,7 +4,7 @@
  * chart series. docs/notes/session-usage.md "Usage page".
  */
 import type { UsageBucketView } from "@/api/session";
-import { MODEL_SLOTS, byModel, bucketTokens, modelSlot, sumBuckets, type ModelUsage, type UsageTotals } from "@/lib/usage";
+import { MODEL_SLOTS, bucketTokens, modelSlot, totalUsage, usageByModel, type ModelUsage, type UsageTotals } from "@/lib/usage";
 
 const DAY_MS = 86_400_000;
 
@@ -28,9 +28,13 @@ export function seriesLabel(key: string): string {
   return key === OTHER ? "Other" : key;
 }
 
-/** The chart series a model belongs to: its own id with a slot, else OTHER. */
+/**
+ * The chart series a model belongs to: its colour slot's model id (so a dated or suffixed
+ * snapshot stacks with its family), else OTHER.
+ */
 export function seriesOf(model: string): string {
-  return modelSlot(model) < 0 ? OTHER : model;
+  const slot = modelSlot(model);
+  return MODEL_SLOTS.find(([, s]) => s === slot)?.[0] ?? OTHER;
 }
 
 /** A 1, 2, 2.5 or 5 × 10^k grid step giving about four lines up to `max`. */
@@ -101,7 +105,7 @@ export function usagePageData(threads: readonly (readonly UsageBucketView[])[], 
   };
   for (const bs of threads) if (take(bs)) threadCount++;
   take(retired);
-  const series: string[] = MODEL_SLOTS.filter((m) => seen.has(m));
+  const series: string[] = MODEL_SLOTS.map(([m]) => m).filter((m) => seen.has(m));
   if (seen.has(OTHER)) series.push(OTHER);
-  return { totals: sumBuckets(inRange), threads: threadCount, models: byModel(inRange), series, daily };
+  return { totals: totalUsage(inRange), threads: threadCount, models: usageByModel(inRange), series, daily };
 }

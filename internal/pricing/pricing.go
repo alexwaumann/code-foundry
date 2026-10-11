@@ -140,12 +140,35 @@ type Bucket struct {
 	Input, Output, CacheRead, CacheWrite5m, CacheWrite1h int64
 }
 
-// Cost prices one bucket with Lookup. ok is false when the bucket is unpriced.
-func Cost(b Bucket) (usd float64, ok bool) {
+// Costs is a bucket's price split by token kind, in USD.
+type Costs struct {
+	Input, Output, CacheRead, CacheWrite5m, CacheWrite1h float64
+}
+
+// Total is the sum of the kinds.
+func (c Costs) Total() float64 {
+	return c.Input + c.Output + c.CacheRead + c.CacheWrite5m + c.CacheWrite1h
+}
+
+// CostByKind prices one bucket with Lookup, per token kind (the side panel's token table
+// shows a cost per kind). ok is false when the bucket is unpriced.
+func CostByKind(b Bucket) (Costs, bool) {
 	r, ok := Lookup(b.Model, b.Tier, b.Speed)
 	if !ok {
-		return 0, false
+		return Costs{}, false
 	}
-	return (float64(b.Input)*r.Input + float64(b.Output)*r.Output + float64(b.CacheRead)*r.CacheRead +
-		float64(b.CacheWrite5m)*r.CacheWrite5m + float64(b.CacheWrite1h)*r.CacheWrite1h) / 1e6, true
+	return Costs{
+		Input:        float64(b.Input) * r.Input / 1e6,
+		Output:       float64(b.Output) * r.Output / 1e6,
+		CacheRead:    float64(b.CacheRead) * r.CacheRead / 1e6,
+		CacheWrite5m: float64(b.CacheWrite5m) * r.CacheWrite5m / 1e6,
+		CacheWrite1h: float64(b.CacheWrite1h) * r.CacheWrite1h / 1e6,
+	}, true
+}
+
+// Cost prices one bucket with Lookup: CostByKind's total. ok is false when the bucket is
+// unpriced.
+func Cost(b Bucket) (usd float64, ok bool) {
+	c, ok := CostByKind(b)
+	return c.Total(), ok
 }

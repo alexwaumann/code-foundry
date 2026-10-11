@@ -1,6 +1,6 @@
-import { useLayoutEffect, useRef, useState } from "react";
-import { useColorScheme } from "@/lib/theme";
-import { formatTokens, formatUsd, modelColor } from "@/lib/usage";
+import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { fmtTok, fmtUsd, modelColorVars, SWATCH_BG } from "@/lib/usage";
+import { cn } from "@/lib/utils";
 import { dayLabel, labelledDays, niceStep, seriesLabel, type DayUsage } from "./usageData";
 
 export type ChartMode = "tokens" | "cost";
@@ -14,19 +14,22 @@ const BOTTOM = 24;
 const GAP = 2;
 const RADIUS = 4;
 
-/** Grey for OTHER (it has no slot), like any model without one. */
-function seriesColor(key: string, scheme: "dark" | "light"): string {
-  return modelColor(key, scheme);
+/** A series' colour as --sw-l / --sw-d (lib/usage modelColorVars); OTHER has no slot, so it is grey. */
+function seriesStyle(key: string): CSSProperties {
+  return modelColorVars(key) as CSSProperties;
 }
 
+/** SVG fill reading seriesStyle, following the theme. */
+const SERIES_FILL = "fill-(--sw-l) dark:fill-(--sw-d)";
+
 function formatValue(v: number, mode: ChartMode): string {
-  return mode === "cost" ? formatUsd(v) : formatTokens(v);
+  return mode === "cost" ? fmtUsd(v) : fmtTok(v);
 }
 
 /** Axis labels: "300M", "$25", "$7.5", "$0.001". */
 function formatTick(v: number, mode: ChartMode): string {
   if (v === 0) return "0";
-  return mode === "cost" ? `$${v.toLocaleString("en-US", { maximumFractionDigits: 4 })}` : formatTokens(v);
+  return mode === "cost" ? `$${v.toLocaleString("en-US", { maximumFractionDigits: 4 })}` : fmtTok(v);
 }
 
 /** A bar segment with only its top corners rounded (the data end; the base stays square). */
@@ -66,7 +69,6 @@ interface Hover {
  * included, series stacked in slot order from the baseline, a tooltip per day.
  */
 export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]; series: readonly string[]; mode: ChartMode }) {
-  const scheme = useColorScheme();
   const [ref, width] = useWidth();
   const [hover, setHover] = useState<Hover | null>(null);
   const values = (d: DayUsage) => (mode === "cost" ? d.cost : d.tokens);
@@ -83,7 +85,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
   const hovered = hover ? daily[hover.index] : undefined;
 
   return (
-    <div className="relative mt-1" ref={ref} data-testid="usage-chart" data-mode={mode}>
+    <div className="relative mt-1" ref={ref} data-testid="usage-page-chart" data-mode={mode}>
       <svg width={width} height={H} className="block overflow-visible" role="img" aria-label={`Daily ${mode} by model`}>
         <g>
           {grid.map((v) => (
@@ -119,7 +121,8 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
                   <path
                     key={k}
                     d={isTop ? topRoundedRect(x, y0, bw, h, RADIUS) : `M${String(x)},${String(y0)}h${String(bw)}v${String(h)}h${String(-bw)}Z`}
-                    fill={seriesColor(k, scheme)}
+                    className={SERIES_FILL}
+                    style={seriesStyle(k)}
                     data-series={k}
                   />
                 );
@@ -145,7 +148,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
             width={slot}
             height={H - TOP - BOTTOM}
             fill="transparent"
-            data-testid="usage-day"
+            data-testid="usage-page-day"
             data-day={d.day}
             onMouseMove={(e) => {
               const b = ref.current?.getBoundingClientRect();
@@ -161,7 +164,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
         <div
           className="pointer-events-none absolute z-10 min-w-40 rounded-lg border border-border bg-popover px-2.5 py-2 text-[11px] shadow-lg"
           style={{ left: Math.max(0, Math.min(hover.x + 14, width - 220)), top: Math.max(0, hover.y - 10) }}
-          data-testid="usage-tooltip"
+          data-testid="usage-page-tooltip"
         >
           <div className="mb-1 text-muted-foreground">{dayLabel(hovered.day)}</div>
           {series
@@ -169,7 +172,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
             .map((k) => (
               <div key={k} className="flex justify-between gap-4 leading-relaxed">
                 <span className="flex items-center">
-                  <Swatch color={seriesColor(k, scheme)} />
+                  <Swatch model={k} />
                   {seriesLabel(k)}
                 </span>
                 <span className="tabular-nums">{formatValue(values(hovered)[k] ?? 0, mode)}</span>
@@ -181,10 +184,10 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
           </div>
         </div>
       )}
-      <div className="mt-2.5 flex flex-wrap gap-3.5 text-[11px] text-muted-foreground" data-testid="usage-legend">
+      <div className="mt-2.5 flex flex-wrap gap-3.5 text-[11px] text-muted-foreground" data-testid="usage-page-legend">
         {series.map((k) => (
           <span key={k} className="inline-flex items-center" data-series={k}>
-            <Swatch color={seriesColor(k, scheme)} />
+            <Swatch model={k} />
             {seriesLabel(k)}
           </span>
         ))}
@@ -193,6 +196,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
   );
 }
 
-export function Swatch({ color }: { color: string }) {
-  return <span aria-hidden className="mr-2 inline-block size-2 shrink-0 rounded-[2px]" style={{ background: color }} />;
+/** A model's (or series') colour square; grey for a model without a slot. */
+export function Swatch({ model }: { model: string }) {
+  return <span aria-hidden className={cn("mr-2 inline-block size-2 shrink-0 rounded-[2px]", SWATCH_BG)} style={seriesStyle(model)} />;
 }

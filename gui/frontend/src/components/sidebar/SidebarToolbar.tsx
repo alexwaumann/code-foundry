@@ -60,7 +60,7 @@ export function SidebarToolbar() {
     <div
       role="toolbar"
       aria-label="Sidebar"
-      className="flex h-8 shrink-0 items-center gap-1 border-b border-sidebar-border px-3 [--wails-draggable:no-drag]"
+      className="flex h-8 shrink-0 items-center gap-1 border-b border-sidebar-border [--wails-draggable:no-drag]"
       data-testid="sidebar-toolbar"
     >
       <CommandButton

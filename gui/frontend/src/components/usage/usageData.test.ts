@@ -3,7 +3,7 @@ import type { UsageBucketView } from "@/api/session";
 import { OTHER, dayLabel, labelledDays, niceStep, seriesOf, usagePageData, utcDays } from "./usageData";
 
 function bucket(over: Partial<UsageBucketView>): UsageBucketView {
-  return { model: "claude-opus-5-5", tier: "", speed: "", day: "2026-10-10", requests: 1, input: 0, output: 0, cacheRead: 100, cacheWrite5m: 0, cacheWrite1h: 0, costUsd: 1, unpriced: false, ...over };
+  return { model: "claude-opus-5-5", tier: "", speed: "", day: "2026-10-10", requests: 1, input: 0, output: 0, cacheRead: 100, cacheWrite5m: 0, cacheWrite1h: 0, costUsd: 1, unpriced: false, inputCostUsd: 0, outputCostUsd: 0, cacheReadCostUsd: 0, cacheWrite5mCostUsd: 0, cacheWrite1hCostUsd: 0, ...over };
 }
 
 // 2026-10-10T23:30Z: still the 10th in UTC.
@@ -80,6 +80,7 @@ describe("usagePageData", () => {
 describe("seriesOf", () => {
   it.each([
     ["claude-opus-5-5", "claude-opus-5-5"],
+    ["claude-haiku-5-5-20261001", "claude-haiku-5-5"],
     ["claude-opus-5", OTHER],
     ["<synthetic>", OTHER],
   ])("%s → %s", (model, want) => {

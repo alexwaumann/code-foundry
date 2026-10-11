@@ -12,7 +12,7 @@ interface CommandButtonProps {
   icon: LucideIcon;
   /** Visible text. Omit for an icon-only button; the command's title is then its label. */
   label?: string;
-  /** Tooltip; defaults to the command's title. Never a chord: those live in the palette and help. */
+  /** Tooltip of an icon-only button; defaults to the command's title. A button with a label has none. Never a chord: those live in the palette and help. */
   title?: string;
   /** When the command is not available here: hide the button (default) or show it disabled. */
   whenUnavailable?: "hide" | "disable";
@@ -64,7 +64,7 @@ export function CommandButton({
       size={size ?? (label ? "sm" : count !== undefined ? "xs" : "icon-xs")}
       className={className}
       disabled={commandTitle === null}
-      title={name}
+      title={label ? undefined : name}
       aria-label={label ? undefined : count !== undefined ? `${name} (${String(count)})` : name}
       aria-pressed={pressed}
       aria-current={current ? "page" : undefined}

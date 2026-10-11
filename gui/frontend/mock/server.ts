@@ -27,6 +27,9 @@
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
  *   POST /__mock/link-pr?session=s-1&slug=owner/name&number=12[&ago=<ms>]   (Claude linked a pull
  *                                                 request ago ms ago; deduplicated by URL like the daemon)
+ *   POST /__mock/usage?session=s-2&model=claude-opus-5&requests=3&cacheRead=1000[&input=…&output=…
+ *        &cacheWrite5m=…&cacheWrite1h=…&day=YYYY-MM-DD]   (Claude made requests: added to the
+ *                                                 session's (model, day) bucket; s-1 is seeded)
  *   POST /__mock/sessions-service?enabled=false   (simulate a daemon without SessionService)
  *   POST /__mock/missing-rpc?rpc=RepoService/ListRefs&rpc=SessionService/StageAttachment
  *                                                 (simulate a daemon older than those RPCs: 404)
@@ -96,7 +99,7 @@ import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from 
 import { createProject, deleteProject, listPublishOwners, projectCalls, publishProject, resetProjects, visibilityFlag } from "./create";
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
-import { mockRetiredUsage } from "./usage";
+import { retiredUsage, utcDay } from "./usage";
 import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
 
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -306,7 +309,7 @@ function routes(router: ConnectRouter): void {
   });
 
   router.service(SessionService, {
-    list: () => ({ sessions: [...world.sessions.values()].map((s) => world.sessionMsg(s)), retiredUsage: mockRetiredUsage(new Date()) }),
+    list: () => ({ sessions: [...world.sessions.values()].map((s) => world.sessionMsg(s)), retiredUsage: retiredUsage() }),
     get: (req) => guard(() => ({ session: world.sessionMsg(world.session(req.id)) })),
     create: () => {
       throw new ConnectError("use the session.new command in the mock", Code.Unimplemented);
@@ -568,6 +571,26 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         const id = q.get("session") ?? "";
         const added = world.linkPullRequest(id, q.get("slug") ?? "", Number(q.get("number") ?? ""), Number(q.get("ago") ?? "0"));
         json(res, 200, { added, ...sessionSummary(id) });
+      } catch (err) {
+        json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
+    case "POST /__mock/usage":
+      // session=s-2&model=claude-opus-5&requests=3&cacheRead=1000[&input=…&output=…&cacheWrite5m=…&cacheWrite1h=…&day=YYYY-MM-DD]
+      try {
+        const id = q.get("session") ?? "";
+        const n = (k: string) => Number(q.get(k) ?? "0");
+        world.addUsage(id, {
+          model: q.get("model") ?? "",
+          day: q.get("day") ?? utcDay(0),
+          requests: n("requests"),
+          input: n("input"),
+          output: n("output"),
+          cacheRead: n("cacheRead"),
+          cacheWrite5m: n("cacheWrite5m"),
+          cacheWrite1h: n("cacheWrite1h"),
+        });
+        json(res, 200, { ok: true });
       } catch (err) {
         json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
       }

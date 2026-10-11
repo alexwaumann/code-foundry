@@ -111,7 +111,7 @@ function LinkedPrRow({ link, showRepo }: { link: LinkRow; showRepo: boolean }) {
       activateOnClick
       onCmdClick={() => void openUrl(link.url)}
       className="group/link flex h-full flex-col justify-center gap-0.5 px-2"
-      title={`${link.url}\nClick or Enter: open · ⌘-click: open on GitHub`}
+      title={link.url}
     >
       <span className="flex min-w-0 items-center gap-1.5 text-sm" data-testid="linkedpr" data-url={link.url} data-loaded={pr ? "true" : "false"}>
         <span className="shrink-0 font-medium text-muted-foreground tabular-nums" data-testid="linkedpr-number">

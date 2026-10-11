@@ -45,6 +45,12 @@ const ViewPanelWorkspace = "panel.workspace"
 // thread has no linked pull requests says so instead of opening an empty surface.
 const ViewPanelLinkedPRs = "panel.linked-prs"
 
+// ViewPanelUsage is the ShowView name that opens (or reveals) the Usage surface in the
+// side panel of the selected thread: its token usage and cost, per model and per token
+// kind. An action on per-selection GUI state like ViewPanelLinkedPRs; a window whose
+// selection is not a thread ignores it. A thread without usage shows "No usage yet".
+const ViewPanelUsage = "panel.usage"
+
 // ViewPanelWorktree is the ShowView name that opens (or reveals) the Worktree surface in
 // the side panel of the selected thread or terminal: the overview of the worktree it runs
 // in (sync state, GitHub activity, files, log). An action on per-selection GUI state like
@@ -73,7 +79,8 @@ func hasWorktreeThreadContext(c Context) bool {
 // view.projects, which shows the Projects page, view.panel.toggle, which shows or hides
 // the side panel, view.panel.expand, which switches it between split and full width, and
 // view.panel.workspace, which opens the workspace surface in it,
-// view.panel.linked-prs, which opens the thread's linked pull requests in it, and
+// view.panel.linked-prs, which opens the thread's linked pull requests in it,
+// view.panel.usage, which opens the thread's usage in it, and
 // view.panel.worktree, which opens the thread's own worktree in it (all emitted as
 // UiIntent.ShowView). Links open through view.open.url (RegisterGitOps).
 func RegisterView(r *Registry, e Emitter) error {
@@ -168,6 +175,19 @@ func RegisterView(r *Registry, e Emitter) error {
 			When: hasSession,
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return show(ViewPanelLinkedPRs), nil
+			},
+		},
+		Command{
+			Name:  "view.panel.usage",
+			Title: "Show Usage in Side Panel",
+			Description: "Open the Usage surface in the selected thread's side panel: " +
+				"its cost at Claude API rates, tokens and requests, per model and per token kind.",
+			Category: "View",
+			// No default chord, like view.panel.linked-prs (U opens it while the panel has
+			// focus). Available for any thread, even one without usage yet.
+			When: hasSession,
+			Run: func(context.Context, Context, Args) (Result, error) {
+				return show(ViewPanelUsage), nil
 			},
 		},
 		Command{

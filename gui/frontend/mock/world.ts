@@ -15,13 +15,13 @@ import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefound
 import { MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
 import { prDetailCall } from "./prDetail";
 import { GhWorld, ghEvent, viewCommands } from "./github";
-import { mockRetiredUsage, mockUsage, mockUsageTotals } from "./usage";
 import { cloneExists } from "./clone";
 import { HOME, projectFolder } from "./filesystem";
 import { projectCommands } from "./create";
 import { Hub } from "./hub";
 import { MockSettings } from "./settings";
 import { MockUpdater } from "./update";
+import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { claudeIntro, claudeTick, ENTER_ALT, logLine, prompt, RESET, testRunOutput, topFrame } from "./screens";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
@@ -77,6 +77,8 @@ interface MockSession {
   pinned: boolean;
   /** Claude's pr-link records: one per URL, first-seen order (POST /__mock/link-pr). */
   linkedPullRequests: { slug: string; number: number; url: string; linkedAt: Date }[];
+  /** Token usage buckets (mock/usage.ts; POST /__mock/usage). */
+  usage: MockUsage[];
   /** Mock-only: seconds a queued run-in waits once the thread is not busy (the daemon waits for its prompt). */
   moveIn: number;
   /** Mock-only: seconds left before a STARTING/CLOSING session settles. */
@@ -373,10 +375,10 @@ export class World {
     // Sessions in every state. s-1/s-2 own t-claude/t-ghostty (labels.session above).
     this.sessions.clear();
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
-    this.addSession({ id: "s-1", repoId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "opus", effort: "high", terminalId: "t-claude", status: SessionStatus.BUSY, statusReason: "working: Refactor sidebar tree", createdAt: ago(42) });
+    this.addSession({ id: "s-1", repoId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "opus", effort: "high", terminalId: "t-claude", status: SessionStatus.BUSY, statusReason: "working: Refactor sidebar tree", createdAt: ago(42), usage: sampleUsage() });
     this.addSession({ id: "s-2", repoId: "repo-gp", worktreePath: GP, name: "Port renderer", model: "sonnet", effort: "", terminalId: "t-ghostty", status: SessionStatus.NEEDS_ATTENTION, statusReason: "permission: Do you want to proceed?", statusChangedAt: ago(3), createdAt: ago(40) });
-    this.addSession({ id: "s-3", repoId: "repo-cf", worktreePath: `${CFW}/fix-resize`, name: "Fix resize race", model: "opus", effort: "medium", state: SessionState.DISCONNECTED, disconnectReason: "exited", createdAt: ago(300), lastActivityAt: ago(95) });
-    this.addSession({ id: "s-4", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Investigate flaky e2e", model: "haiku", effort: "", state: SessionState.DISCONNECTED, disconnectReason: "crashed", exitCode: 139, createdAt: ago(200), lastActivityAt: ago(17) });
+    this.addSession({ id: "s-3", repoId: "repo-cf", worktreePath: `${CFW}/fix-resize`, name: "Fix resize race", model: "opus", effort: "medium", state: SessionState.DISCONNECTED, disconnectReason: "exited", createdAt: ago(300), lastActivityAt: ago(95), usage: pageUsage("s-3") });
+    this.addSession({ id: "s-4", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Investigate flaky e2e", model: "haiku", effort: "", state: SessionState.DISCONNECTED, disconnectReason: "crashed", exitCode: 139, createdAt: ago(200), lastActivityAt: ago(17), usage: pageUsage("s-4") });
     this.addSession({ id: "s-5", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Write session docs", model: "opus", effort: "low", state: SessionState.STARTING, settleIn: 8, createdAt: ago(0) });
     this.addSession({ id: "s-6", repoId: "repo-dot", worktreePath: `${HOME}/dotfiles`, name: "Tidy zshrc", model: "sonnet", effort: "", state: SessionState.CLOSING, settleIn: 8, createdAt: ago(60) });
     // Republish so connected watchers converge on the reset state.
@@ -672,6 +674,7 @@ export class World {
       pendingWorktreePath: "",
       pinned: false,
       linkedPullRequests: [],
+      usage: [],
       moveIn: 0,
       settleIn: 0,
       nameIn: 0,
@@ -718,18 +721,12 @@ export class World {
       pendingWorktreePath: s.pendingWorktreePath,
       pinned: s.pinned,
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
-      ...this.sessionUsage(s.id),
+      ...usageFields(s.usage),
     };
   }
 
-  /** Session.usage, cost_usd and unpriced (mock/usage.ts). */
-  private sessionUsage(id: string): Pick<SessionInit, "usage" | "costUsd" | "unpriced"> {
-    const usage = mockUsage(id, new Date());
-    return { usage, ...mockUsageTotals(usage) };
-  }
-
   sessionSnapshot(): SessionEventInit {
-    return { event: { case: "snapshot", value: { sessions: [...this.sessions.values()].map((s) => this.sessionMsg(s)), retiredUsage: mockRetiredUsage(new Date()) } } };
+    return { event: { case: "snapshot", value: { sessions: [...this.sessions.values()].map((s) => this.sessionMsg(s)), retiredUsage: retiredUsage() } } };
   }
 
   session(id: string): MockSession {
@@ -781,6 +778,24 @@ export class World {
     s.linkedPullRequests = [...s.linkedPullRequests, { slug, number, url, linkedAt: new Date(Date.now() - agoMs) }];
     this.publishSession(s);
     return true;
+  }
+
+  /**
+   * Claude made requests: adds counters to the session's (model, day) bucket, or a new
+   * bucket, and republishes the session (the daemon's live fold, coarser).
+   */
+  addUsage(id: string, u: MockUsage): void {
+    const s = this.session(id);
+    if (!u.model) throw new CommandError("invalid", "model is required");
+    const counters = [u.requests, u.input, u.output, u.cacheRead, u.cacheWrite5m, u.cacheWrite1h];
+    if (counters.some((n) => !Number.isInteger(n) || n < 0)) throw new CommandError("invalid", "counters must be non-negative integers");
+    const i = s.usage.findIndex((b) => b.model === u.model && b.day === u.day && (b.tier ?? "") === (u.tier ?? "") && (b.speed ?? "") === (u.speed ?? ""));
+    const old = s.usage[i];
+    const merged: MockUsage = old
+      ? { ...old, requests: old.requests + u.requests, input: old.input + u.input, output: old.output + u.output, cacheRead: old.cacheRead + u.cacheRead, cacheWrite5m: old.cacheWrite5m + u.cacheWrite5m, cacheWrite1h: old.cacheWrite1h + u.cacheWrite1h }
+      : u;
+    s.usage = old ? s.usage.map((b, j) => (j === i ? merged : b)) : [...s.usage, merged];
+    this.publishSession(s);
   }
 
   /** The detector's reading changed (reason defaults to a typical one for the status). */
@@ -1963,6 +1978,19 @@ export class World {
         // Like the daemon: a thread is active (with or without linked pull requests).
         when: (ctx) => Boolean(ctx?.activeSessionId),
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.linked-prs" } } }))}`,
+      },
+      {
+        cmd: {
+          name: "view.panel.usage",
+          title: "Show Usage in Side Panel",
+          category: "View",
+          description: "Open the Usage surface in the selected thread's side panel: its cost at Claude API rates, tokens and requests, per model and per token kind.",
+          keybindings: [],
+          args: [],
+        },
+        // Like the daemon: a thread is active (with or without usage).
+        when: (ctx) => Boolean(ctx?.activeSessionId),
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.usage" } } }))}`,
       },
       {
         cmd: { name: "settings.reveal", title: "Reveal Settings File", category: "Settings", description: "Show the settings file in Finder", keybindings: [], args: [] },
