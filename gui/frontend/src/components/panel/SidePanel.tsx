@@ -96,7 +96,7 @@ function TabButton({ panelKey, tab, active, focusable }: { panelKey: string; tab
       className={cn(
         "group relative flex h-7 max-w-48 shrink-0 items-center rounded-md pr-1 text-xs [--wails-draggable:no-drag]",
         isDragging
-          ? "z-10 bg-accent text-accent-foreground opacity-95 shadow-md ring-1 ring-border"
+          ? "z-10 bg-accent text-accent-foreground shadow-md ring-1 ring-border"
           : active
             ? "bg-accent text-accent-foreground dark:bg-accent/50"
             : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",

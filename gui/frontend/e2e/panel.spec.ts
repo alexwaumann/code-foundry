@@ -1016,8 +1016,9 @@ for (const scheme of ["dark", "light"] as const) {
     await tabs.first().click();
     await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-surface", "worktree");
 
-    // Lift Usage and hold it over the worktree tab: that one has slid right to make room.
-    await startTabDrag(page, tabs.nth(1), (await centerX(tabs.first())) - 6);
+    // Lift Usage and hold it just past the first slot: the worktree tab has slid right to make room.
+    const first = await tabs.first().boundingBox();
+    await startTabDrag(page, tabs.nth(1), (first?.x ?? 0) + 22);
     await expect(panel(page).locator("[data-dragging]")).toHaveCount(1);
     await page.waitForTimeout(400); // the neighbour's 200ms slide
     await page.screenshot({ path: `${shots ?? ""}/panel-tab-reorder-drag${suffix}.png` });
