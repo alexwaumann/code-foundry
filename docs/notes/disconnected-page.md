@@ -57,7 +57,7 @@ While a reconnect is pending the pill shows a spinner and "Reconnecting…".
 * `DragBand` is `z-10` across the top 44px. `PanelToggle` lives inside the scrolling
   section (so it paints above the backdrop) and needs `z-20` to stay clickable; the
   section sets no z-index, so it is not a stacking context and the toggle wins.
-  panel.spec's "panel toggle on the disconnected page" click covers it.
+  panel.spec's "worktrees and the Pull Requests page have their own panels and toggles" clicks it.
 * `data-focus-root`, `tabIndex` and the `session-disconnected` test id stay on the
   section (panel.spec asserts that element is focused and contains the toggle).
 * Selectors: the page reads `id in byId` and the name; the pill, cause, model and
