@@ -20,8 +20,8 @@ screenshotted (see Screenshots).
 
 | File | Role |
 |---|---|
-| `stores/bottomPanel.ts` | Per-key state (`byKey`: `open`, `height?`, `activeTerminalId?`), persisted as `code-foundry.bottom`; `pendingFocus` (not persisted). Pure: `bottomKeyOf`, `ownerKeyOf`, `bottomTabIds` (the tab derivation), `activeTabOf`, `bottomTabTitle`, reducers `setOpen`/`setHeight`/`activate`/`openOn`. Hooks: `useCurrentBottomKey`, `useBottomOpen`, `useBottomHeight`, `useBottomTabIds` (`useShallow`), `useBottomActiveId` |
-| `stores/bottomActions.ts` | What touches the daemon or other stores: `paneContext`, `newBottomTerminal` ("+", empty state), `newThreadTerminal` (row menu), `newWorktreeTerminal` (Projects rows), `markTerminalNewFromHere` (cmd+t, palette), `closeBottomTerminal` (`terminal.close --id`), `revealShell` (focusTerminal), `onNewTerminal` (new shell event) |
+| `stores/bottomPanel.ts` | Per-key state (`byKey`: `open`, `height?`, `activeTerminalId?`), persisted as `code-foundry.bottom`; `pendingFocus` (by key) and `pendingFocusId` (by shell), not persisted. `neighbourOf`, `bottomVisible`, `focusedBottomShell`. Pure: `bottomKeyOf`, `ownerKeyOf`, `bottomTabIds` (the tab derivation), `activeTabOf`, `bottomTabTitle`, reducers `setOpen`/`setHeight`/`activate`/`openOn`. Hooks: `useCurrentBottomKey`, `useBottomOpen`, `useBottomHeight`, `useBottomTabIds` (`useShallow`), `useBottomActiveId` |
+| `stores/bottomActions.ts` | What touches the daemon or other stores: `paneContext`, `newBottomTerminal` ("+", empty state), `newThreadTerminal` (row menu), `newWorktreeTerminal` (Projects rows), `markTerminalNewFromHere` (cmd+t, palette), `closeBottomTerminal` (`terminal.close --id`), `revealShell` (focusTerminal), `onNewTerminal` (new shell event), `onRemovedTerminal` (neighbour activation) |
 | `lib/termlabel.ts` | `KIND_LABEL`, `REPO_LABEL`, `KIND_SHELL`, `isShellLabels` (the label contract beyond `lib/tree.ts`'s two) |
 | `stores/ui.ts` | `FocusRegion` `"bottom"`, `bottomFocusSeq` (closePalette bumps it for `returnTo: "bottom"`), `BOTTOM_MIN` 120 / `BOTTOM_DEFAULT` 280 / `BOTTOM_MAX_FRACTION` 0.7, `bottomMax(column)`, `clampBottomHeight` |
 | `stores/views.ts` | `toggleBottomCommand` and `showView("bottom.toggle")` |
@@ -94,16 +94,14 @@ screenshotted (see Screenshots).
   not have, with `kind=shell` and not exited, opens the owner key's panel with it active
   (`openOn`), whether or not that key is selected. The reconnect's List and the Watch
   snapshot do not count (they bring known terminals, or arrive while `loaded` is false).
-  Focus: `pendingFocus = { key, at }` is set by this window's terminal.new runs ("+", the
-  empty state, the row menu, the Projects rows, and cmd+t/palette/buttons through the
-  `terminal.new` presenter). The first new shell for that key within 10s takes it, if the
-  key is the one selected. The timestamp keeps a failed run from stealing focus later.
+  Focus: see "Review fixes" (by id for the window's own runs, by key for the chord and
+  palette).
 * **focusTerminal.** For a known shell, `revealShell` selects the owner (the thread, or the
   Projects page), closes settings or usage, takes the owner's side panel out of full
   width, opens the bottom panel on the shell, and focuses it. An unknown id is remembered
   and revealed when it arrives as a new shell. The old path (select the terminal or its
-  session) still runs for it meanwhile, and for every other terminal. The mock's
-  `terminal.new` emits focusTerminal, but the daemon's does not. Both paths end up the same.
+  session) still runs for it meanwhile, and for every other terminal. Neither the daemon's
+  nor (since the review fixes) the mock's `terminal.new` emits focusTerminal.
 * **Projects page "+".** The page's selection context has no worktree, so `terminal.new`
   is unavailable there. "+" runs it in the active tab's worktree (`paneContext`), so it
   starts a shell beside the active one. With no tabs there is nothing to own one: no "+",
@@ -179,11 +177,12 @@ screenshotted (see Screenshots).
 
 ## Screenshots
 
-WebKit against the mock daemon, 1440x900 at 2x (`bottom-panel-2-gui/`):
-`bottom-panel-2-thread-dark.png`, `bottom-panel-2-thread-light.png` (s-1 with two shells,
-the second active), `bottom-panel-2-projects-dark.png`, `bottom-panel-2-projects-light.png`
-(the Projects page's panel on `t-top`), `bottom-panel-2-empty-dark.png` (a thread's empty
-panel). Copies are in `/Users/alex/.t3/userdata/attachments/`.
+WebKit against the mock daemon, 1440x900 at 2x, in `docs/notes/bottom-panel-2-gui/`:
+`thread-dark.png`, `thread-light.png` (s-1 with two shells, the second active),
+`projects-dark.png`, `projects-light.png` (the Projects page's panel on `t-top`),
+`empty-dark.png` (a thread's empty panel). The copies in `/Users/alex/.t3/userdata/attachments/`
+carry a `bottom-panel-2-` prefix. Taken before the review fixes, which change nothing
+visible apart from "+" being a Tab stop.
 
 Not the real app. The plan was `make gui-build`, then an isolated copy
 (`CODE_FOUNDRY_HOME=/tmp/bp2`) with a scratch repo, a haiku thread and two shells (all set
@@ -193,6 +192,35 @@ one). But the Mac's screen was locked for the whole session
 and `screencapture -l <window id>` returned an empty window. Without Accessibility
 permission, `osascript` cannot raise or read the window, so the window id came from
 `CGWindowListCopyWindowInfo` (a small Swift script). That part works for next time.
+
+## Review fixes
+
+Status: `make check` green (Go packages all ok; 84 vitest files / 1641 tests).
+`make gui-e2e` (full suite, both browsers, nothing else running): 528 tests, 508 passed,
+20 skipped, 0 failed. `e2e/bottom-panel.spec.ts` is 15 tests per browser. The
+`zoom-popovers.spec.ts:74` Chromium failure noted above passed in this run. It also failed
+on the base branch, so it is flaky, not broken by this PR.
+
+| Finding | Change |
+|---|---|
+| Expand from the bottom shell left focus on `<body>` | `expandPanelCommand` counts `"bottom"` as content (expanding hides the column): focus, or the palette's return, goes to the side panel |
+| A foreign shell stole the keyboard | `onNewTerminal`: a shell this window did not start, for the panel that is showing while the keyboard (or the palette's return) is in it, only gets its tab. The tab that was active is pinned (with none remembered, the last tab is active, and the new one is last). Otherwise it still becomes active |
+| The resize handle was outside the region | `data-region="bottom"` and the capture-phase cmd+w handler moved to the wrapper, which holds the handle and the `<aside>`. cmd+j, cmd+w and the palette's return work from the handle |
+| Pending focus by key could focus someone else's shell | The window's own runs ("+", empty state, row menu, Projects rows) use `runCommandForResult` and read the id from the result JSON (`terminalIdFromResult`, api/terminal.ts). A shell that already arrived is activated and focused at once. Otherwise `pendingFocusId` waits for that id (10s). A failed run leaves nothing pending. The key match stays only for the `terminal.new` presenter (chord, palette, CommandButton), still capped at 10s. The mock's `terminal.new` now returns the terminal as result JSON and no longer emits focusTerminal, like the daemon |
+| One unclamped frame after the side panel collapses | `useColumnHeight(ref, hidden)` measures again in its layout effect when `hidden` flips, before paint |
+| A thread's terminal switch (reconnect) pulled focus out of the bottom shell | TerminalPane's focus effect skips a run caused only by `terminalId` while `ui.focus === "bottom"`. Explicit requests (`terminalFocusSeq`, `contentFocusSeq`) still focus it |
+| Close Terminal in the palette hit the Claude terminal | `focusedBottomShell` (stores/bottomPanel.ts): with the keyboard (or the palette's return) in the open bottom panel, its active shell is `activeTerminalId` in `getUiContext()` (`deriveContext`'s new `focusedShell` argument). Session, repo and worktree are unchanged. An explicit selection (`getUiContext(sel)`) is not affected |
+| The bottom panel could squeeze the content pane | `bottomMax` = max(120, min(70% of the column, column − 160 − 8)): the content pane keeps 160px above the gap |
+| Nits | "+" and the empty state's button show exactly when `paneContext(key)` is non-null. One `bottomVisible(key, open, pageOpen, sideExpanded)` rule serves BottomPanel, `visibleBottomKey` (stores/views.ts) and `toggleBottomCommand`. A removed shell that was its panel's active tab hands that to the tab after it, else the one before (`onRemovedTerminal` from the events handler, so closes, reaps and exits all do). "+" is a Tab stop and in the strip's arrow keys. The screenshot names are fixed. CLAUDE.md says the visible terminal and the visible bottom shell are attached |
+
+Tests added: `stores/context.test.ts` (new), and rows in `bottomPanel.test.ts`
+(`neighbourOf`, `bottomVisible`, `focusedBottomShell`, `takePendingFocusId`),
+`bottomActions.test.ts` (by-id focus: arrives after or before the result, another
+thread, failure; foreign shells; `onRemovedTerminal`), `views.test.ts` (expand from the
+bottom panel), and `ui.test.ts` (the 160px rule). e2e: a foreign shell while typing (the
+keys go to the active shell), expanding the side panel from the bottom shell, switching
+between two threads with open panels (two streams, focus), cmd+j from the handle, and
+the Usage page.
 
 ## Not done
 
