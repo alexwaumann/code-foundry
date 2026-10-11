@@ -96,6 +96,7 @@ import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from 
 import { createProject, deleteProject, listPublishOwners, projectCalls, publishProject, resetProjects, visibilityFlag } from "./create";
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
+import { mockRetiredUsage } from "./usage";
 import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
 
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -305,7 +306,7 @@ function routes(router: ConnectRouter): void {
   });
 
   router.service(SessionService, {
-    list: () => ({ sessions: [...world.sessions.values()].map((s) => world.sessionMsg(s)) }),
+    list: () => ({ sessions: [...world.sessions.values()].map((s) => world.sessionMsg(s)), retiredUsage: mockRetiredUsage(new Date()) }),
     get: (req) => guard(() => ({ session: world.sessionMsg(world.session(req.id)) })),
     create: () => {
       throw new ConnectError("use the session.new command in the mock", Code.Unimplemented);

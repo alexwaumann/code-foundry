@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { getPanel, usePanelStore } from "./panel";
 import { useUiStore, type FocusRegion } from "./ui";
-import { expandPanelCommand, showView, togglePanelCommand, useViewsStore } from "./views";
+import { closeUsage, expandPanelCommand, showView, startViewSync, togglePanelCommand, useViewsStore } from "./views";
 
 const closedPalette = { open: false, query: "", commandName: null, page: "commands" as const, returnTo: "content" as FocusRegion };
 
@@ -155,5 +155,63 @@ describe("showView", () => {
     expect(showView("dashboard")).toBe(true);
     expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
     expect(useViewsStore.getState().settingsOpen).toBe(false);
+  });
+});
+
+describe("the usage page", () => {
+  beforeEach(() => {
+    usePanelStore.setState({ byKey: {} });
+    useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
+    useUiStore.setState({ selection: { kind: "session", id: "a" }, terminalFocusSeq: 0, palette: closedPalette });
+  });
+  const views = () => {
+    const { settingsOpen, usageOpen, helpOpen } = useViewsStore.getState();
+    return { settingsOpen, usageOpen, helpOpen };
+  };
+
+  it("\"usage\" toggles: opens, then closes and hands focus back to the terminal", () => {
+    expect(showView("usage")).toBe(true);
+    expect(views()).toEqual({ settingsOpen: false, usageOpen: true, helpOpen: false });
+    expect(useUiStore.getState().terminalFocusSeq).toBe(0);
+    expect(showView("usage")).toBe(true);
+    expect(views().usageOpen).toBe(false);
+    expect(useUiStore.getState().terminalFocusSeq).toBe(1);
+  });
+
+  it.each([
+    ["usage over settings", { settingsOpen: true, helpOpen: true }, "usage", { settingsOpen: false, usageOpen: true, helpOpen: false }],
+    ["settings over usage", { usageOpen: true }, "settings", { settingsOpen: true, usageOpen: false, helpOpen: false }],
+    ["a top-level page closes usage", { usageOpen: true }, "pullrequests", { settingsOpen: false, usageOpen: false, helpOpen: false }],
+  ])("%s", (_name, before, view, want) => {
+    useViewsStore.setState(before);
+    showView(view);
+    expect(views()).toEqual(want);
+  });
+
+  it("closeUsage closes it and refocuses the selection's terminal", () => {
+    useViewsStore.setState({ usageOpen: true });
+    closeUsage();
+    expect(views().usageOpen).toBe(false);
+    expect(useUiStore.getState().terminalFocusSeq).toBe(1);
+  });
+
+  it("a selection change closes it", () => {
+    const stop = startViewSync();
+    try {
+      useViewsStore.setState({ usageOpen: true });
+      useUiStore.getState().select({ kind: "session", id: "a" }); // same selection: stays open
+      expect(views().usageOpen).toBe(true);
+      useUiStore.getState().select({ kind: "session", id: "b" });
+      expect(views().usageOpen).toBe(false);
+    } finally {
+      stop();
+    }
+  });
+
+  it("the panel commands are no-ops while it is up", () => {
+    useViewsStore.setState({ usageOpen: true });
+    expect(togglePanelCommand()).toBe(false);
+    expect(expandPanelCommand()).toBe(false);
+    expect(usePanelStore.getState().byKey).toEqual({});
   });
 });

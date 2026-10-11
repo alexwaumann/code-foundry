@@ -3,18 +3,18 @@ import { CommandButton } from "@/components/command/CommandButton";
 import { cn } from "@/lib/utils";
 import { usePanelExpanded, usePanelOpen } from "@/stores/panel";
 import { PANEL_MIN, panelMax, useUiStore, visibleSidebarWidth } from "@/stores/ui";
-import { useViewsStore } from "@/stores/views";
+import { selectPageOpen, useViewsStore } from "@/stores/views";
 
 /**
  * Whether the current selection's panel is rendered (open, room for it or expanded,
- * settings closed; see SidePanel).
+ * no settings or usage page; see SidePanel).
  */
 function usePanelShown(): boolean {
   const open = usePanelOpen();
   const expanded = usePanelExpanded();
   const room = useUiStore((s) => panelMax(s.windowWidth, visibleSidebarWidth(s)) >= PANEL_MIN);
-  const settingsOpen = useViewsStore((s) => s.settingsOpen);
-  return open && (room || expanded) && !settingsOpen;
+  const pageOpen = useViewsStore(selectPageOpen);
+  return open && (room || expanded) && !pageOpen;
 }
 
 /**

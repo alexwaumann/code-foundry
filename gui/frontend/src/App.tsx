@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
 import { StartPage } from "@/components/start/StartPage";
 import { HelpOverlay } from "@/components/help/HelpOverlay";
 import { SettingsPage } from "@/components/settings/SettingsPage";
+import { UsagePage } from "@/components/usage/UsagePage";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { ProjectsPage } from "@/components/projects/ProjectsPage";
 import { PullRequestsPage } from "@/components/prs/PullRequestsPage";
@@ -26,7 +27,7 @@ import { usePanelExpanded } from "@/stores/panel";
 import { useAttentionCount, useSessionsStore } from "@/stores/sessions";
 import { layoutWidth, startZoomSync } from "@/lib/zoom";
 import { CONTENT_MIN, useUiStore, type FocusRegion } from "@/stores/ui";
-import { startViewSync, useViewsStore } from "@/stores/views";
+import { selectPageOpen, startViewSync, useViewsStore } from "@/stores/views";
 import { startUpdateSync } from "@/stores/update";
 
 function regionOf(el: EventTarget | null): FocusRegion {
@@ -117,8 +118,10 @@ export function App() {
   useEffect(() => startApp(), []);
   const scheme = useColorScheme();
   const settingsOpen = useViewsStore((s) => s.settingsOpen);
-  // Settings hides the panel, so the content pane shows the settings page even then.
-  const panelExpanded = usePanelExpanded() && !settingsOpen;
+  const usageOpen = useViewsStore((s) => s.usageOpen);
+  // Settings and usage hide the panel, so the content pane shows the page even then.
+  const pageOpen = useViewsStore(selectPageOpen);
+  const panelExpanded = usePanelExpanded() && !pageOpen;
   useWindowTitle(useAttentionCount());
 
   return (
@@ -134,7 +137,7 @@ export function App() {
       <div className="absolute inset-x-0 top-0 h-2 [--wails-draggable:drag]" data-testid="window-drag-edge" aria-hidden />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <ContentPane hidden={panelExpanded}>{settingsOpen ? <SettingsPage /> : <Content />}</ContentPane>
+        <ContentPane hidden={panelExpanded}>{settingsOpen ? <SettingsPage /> : usageOpen ? <UsagePage /> : <Content />}</ContentPane>
         <SidePanel />
       </div>
       <CommandPalette />

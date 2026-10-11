@@ -15,6 +15,7 @@ import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefound
 import { MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
 import { prDetailCall } from "./prDetail";
 import { GhWorld, ghEvent, viewCommands } from "./github";
+import { mockRetiredUsage, mockUsage, mockUsageTotals } from "./usage";
 import { cloneExists } from "./clone";
 import { HOME, projectFolder } from "./filesystem";
 import { projectCommands } from "./create";
@@ -717,11 +718,18 @@ export class World {
       pendingWorktreePath: s.pendingWorktreePath,
       pinned: s.pinned,
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
+      ...this.sessionUsage(s.id),
     };
   }
 
+  /** Session.usage, cost_usd and unpriced (mock/usage.ts). */
+  private sessionUsage(id: string): Pick<SessionInit, "usage" | "costUsd" | "unpriced"> {
+    const usage = mockUsage(id, new Date());
+    return { usage, ...mockUsageTotals(usage) };
+  }
+
   sessionSnapshot(): SessionEventInit {
-    return { event: { case: "snapshot", value: { sessions: [...this.sessions.values()].map((s) => this.sessionMsg(s)) } } };
+    return { event: { case: "snapshot", value: { sessions: [...this.sessions.values()].map((s) => this.sessionMsg(s)), retiredUsage: mockRetiredUsage(new Date()) } } };
   }
 
   session(id: string): MockSession {
@@ -1896,6 +1904,11 @@ export class World {
         cmd: { name: "view.settings", title: "Open Settings", category: "View", description: "Open the settings page", keybindings: ["cmd+,"], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "settings" } } }))}`,
+      },
+      {
+        cmd: { name: "view.usage", title: "Usage", category: "View", description: "Show the Usage page: token usage and its cost per day and per model over every thread.", keybindings: [], args: [] },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "usage" } } }))}`,
       },
       {
         cmd: { name: "view.help", title: "Keyboard Shortcuts and Help", category: "View", description: "Show keybindings and how the app works", keybindings: ["cmd+/"], args: [] },
