@@ -1,6 +1,7 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Composer } from "@/components/compose/Composer";
 import { AddProjectDialog } from "@/components/addproject/AddProjectDialog";
+import { BottomPanel } from "@/components/bottom/BottomPanel";
 import { PublishDialog } from "@/components/publish/PublishDialog";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
 import { StartPage } from "@/components/start/StartPage";
@@ -25,19 +26,20 @@ import { startEventSync } from "@/stores/events";
 import { startHealthPolling } from "@/stores/health";
 import { usePanelExpanded } from "@/stores/panel";
 import { useAttentionCount, useSessionsStore } from "@/stores/sessions";
-import { layoutWidth, startZoomSync } from "@/lib/zoom";
+import { layoutWidth, startZoomSync, zoomFactor } from "@/lib/zoom";
 import { CONTENT_MIN, useUiStore, type FocusRegion } from "@/stores/ui";
 import { selectPageOpen, startViewSync, useViewsStore } from "@/stores/views";
 import { startUpdateSync } from "@/stores/update";
 
 function regionOf(el: EventTarget | null): FocusRegion {
   const region = el instanceof Element ? el.closest("[data-region]")?.getAttribute("data-region") : null;
-  return region === "sidebar" || region === "terminal" || region === "palette" || region === "panel" ? region : "content";
+  return region === "sidebar" || region === "terminal" || region === "palette" || region === "panel" || region === "bottom" ? region : "content";
 }
 
 /**
  * Starts the daemon sync and global listeners; returns one stop function. Long-lived
- * connections: one EventService.Watch (all slices) plus the visible terminal's Attach.
+ * connections: one EventService.Watch (all slices) plus an Attach for the content pane's
+ * terminal and one for the bottom panel's active terminal, each only while visible.
  */
 function startApp(): () => void {
   const onFocusIn = (e: FocusEvent) => {
@@ -88,13 +90,12 @@ function Content() {
 }
 
 /**
- * The content pane. Hidden (display: none), not unmounted, while the side panel is
- * expanded over it: the terminal keeps its Attach stream and xterm state, and its fit
- * skips the zero-size host (terminal/xterm.ts). On a focus request (ui contentFocusSeq) it focuses the page's
- * `[data-focus-root]` element (a page's keyboard list or its root section); a terminal
- * answers the same request itself (TerminalPane), and has no focus root.
+ * The content pane: the page or terminal the selection shows. On a focus request (ui
+ * contentFocusSeq) it focuses the page's `[data-focus-root]` element (a page's keyboard
+ * list or its root section); a terminal answers the same request itself (TerminalPane),
+ * and has no focus root.
  */
-function ContentPane({ hidden, children }: { hidden: boolean; children: ReactNode }) {
+function ContentPane({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLElement>(null);
   const focusSeq = useUiStore((s) => s.contentFocusSeq);
   useEffect(() => {
@@ -104,13 +105,57 @@ function ContentPane({ hidden, children }: { hidden: boolean; children: ReactNod
   return (
     <main
       ref={ref}
-      className={cn("m-2 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs", hidden ? "hidden" : "flex")}
-      // The side panel shrinks, then hides, before the content pane gets narrower than this.
-      style={{ minWidth: CONTENT_MIN }}
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs"
       data-testid="content-pane"
     >
       {children}
     </main>
+  );
+}
+
+/**
+ * An element's height in layout px (viewport px divided by the page zoom, lib/zoom.ts),
+ * kept current with a ResizeObserver. 0 while it is hidden.
+ */
+function useColumnHeight(ref: RefObject<HTMLElement | null>): number {
+  const [h, setH] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      setH(el.getBoundingClientRect().height / zoomFactor());
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+    };
+  }, [ref]);
+  return h;
+}
+
+/**
+ * The content column: the content pane and, under it, the selection's bottom terminal
+ * panel (components/bottom), the same width, 8px apart. Hidden (display: none), not
+ * unmounted, while the side panel is expanded over it: the terminal keeps its Attach
+ * stream and xterm state, and its fit skips the zero-size host (terminal/xterm.ts). The
+ * bottom panel unmounts then (its terminal detaches).
+ */
+function ContentColumn({ hidden, children }: { hidden: boolean; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const height = useColumnHeight(ref);
+  return (
+    <div
+      ref={ref}
+      className={cn("m-2 min-h-0 min-w-0 flex-1 flex-col", hidden ? "hidden" : "flex")}
+      // The side panel shrinks, then hides, before the content column gets narrower than this.
+      style={{ minWidth: CONTENT_MIN }}
+      data-testid="content-column"
+    >
+      {children}
+      <BottomPanel columnHeight={height} />
+    </div>
   );
 }
 
@@ -127,7 +172,7 @@ export function App() {
   return (
     // The sheet: one background under the sidebar. The content area is a pane floating
     // on it (rounded, lighter, 8px in from its neighbours and the window's top, right
-    // and bottom edges); the selection's side panel, when open, is a second pane to its
+    // and bottom edges), with the selection's bottom terminal panel under it; the selection's side panel, when open, is a second pane to its
     // right (components/panel, docs/notes/side-panel.md). Nothing spans the title band
     // (components/window/titleBand.ts): the sidebar's top band and the pane headers fill it.
     <div className="relative flex h-full flex-col overflow-hidden bg-sheet text-foreground">
@@ -137,7 +182,9 @@ export function App() {
       <div className="absolute inset-x-0 top-0 h-2 [--wails-draggable:drag]" data-testid="window-drag-edge" aria-hidden />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <ContentPane hidden={panelExpanded}>{settingsOpen ? <SettingsPage /> : usageOpen ? <UsagePage /> : <Content />}</ContentPane>
+        <ContentColumn hidden={panelExpanded}>
+          <ContentPane>{settingsOpen ? <SettingsPage /> : usageOpen ? <UsagePage /> : <Content />}</ContentPane>
+        </ContentColumn>
         <SidePanel />
       </div>
       <CommandPalette />

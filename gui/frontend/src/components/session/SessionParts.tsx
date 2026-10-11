@@ -4,6 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 import { SessionStatusIcon } from "./SessionStatusIcon";
 import { Backdrop } from "@/components/backdrop/Backdrop";
 import { Button } from "@/components/ui/button";
+import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { DragBand } from "@/components/window/DragBand";
 import { tildify } from "@/lib/path";
@@ -213,7 +214,10 @@ export function SessionDisconnected({ id }: { id: string }) {
     <DisconnectedFrame testId="session-disconnected">
       {/* Centred in the 44px band where the other pages have their header (window/PaneHeader);
           above the drag band (z-10), which would otherwise take its clicks. */}
-      <PanelToggle className="absolute top-2.5 right-1.5 z-20" />
+      <span className="absolute top-2.5 right-1.5 z-20 flex items-center">
+        <BottomToggle />
+        <PanelToggle />
+      </span>
       <div className="m-auto flex w-full max-w-[480px] flex-col items-center gap-5 text-center">
         <StatusPill id={id} reconnecting={pending === "reconnect"} />
         <div className="flex flex-col gap-1.5">

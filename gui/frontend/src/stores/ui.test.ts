@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONTENT_MIN, DASHBOARD, PANE_GAPS, PANEL_MIN, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, clampPanelWidth, isDashboard, panelMax, useUiStore, type FocusRegion, type Selection } from "./ui";
+import { BOTTOM_MIN, bottomMax, clampBottomHeight, CONTENT_MIN, DASHBOARD, PANE_GAPS, PANEL_MIN, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, clampPanelWidth, isDashboard, panelMax, useUiStore, type FocusRegion, type Selection } from "./ui";
 
 describe("panelMax", () => {
   const cases: [string, number, number, number][] = [
@@ -85,21 +85,42 @@ describe("ui persistence", () => {
   });
 });
 
+describe("bottomMax and clampBottomHeight", () => {
+  const cases: [string, number, number][] = [
+    ["70% of the column", 1000, 700],
+    ["floored", 784, 548],
+    ["never below the minimum", 100, BOTTOM_MIN],
+    ["an unmeasured column", 0, BOTTOM_MIN],
+  ];
+  it.each(cases)("bottomMax: %s", (_name, column, want) => {
+    expect(bottomMax(column)).toBe(want);
+  });
+  const clamps: [string, number, number, number][] = [
+    ["within bounds, rounded", 300.4, 1000, 300],
+    ["below the minimum", 40, 1000, BOTTOM_MIN],
+    ["above the maximum", 900, 1000, 700],
+  ];
+  it.each(clamps)("clampBottomHeight: %s", (_name, h, column, want) => {
+    expect(clampBottomHeight(h, column)).toBe(want);
+  });
+});
+
 describe("closePalette", () => {
   const seqs = (): Record<string, number> => {
     const s = useUiStore.getState();
-    return { terminal: s.terminalFocusSeq, sidebar: s.sidebarFocusSeq, panel: s.panelFocusSeq, content: s.contentFocusSeq };
+    return { terminal: s.terminalFocusSeq, sidebar: s.sidebarFocusSeq, panel: s.panelFocusSeq, bottom: s.bottomFocusSeq, content: s.contentFocusSeq };
   };
   const cases: [FocusRegion, string][] = [
     ["terminal", "terminal"],
     ["sidebar", "sidebar"],
     ["panel", "panel"],
+    ["bottom", "bottom"],
     ["content", "content"],
   ];
   it.each(cases)("returns focus to %s", (returnTo, bumped) => {
-    useUiStore.setState({ terminalFocusSeq: 0, sidebarFocusSeq: 0, panelFocusSeq: 0, contentFocusSeq: 0, palette: { open: true, query: "", commandName: null, page: "commands", returnTo } });
+    useUiStore.setState({ terminalFocusSeq: 0, sidebarFocusSeq: 0, panelFocusSeq: 0, bottomFocusSeq: 0, contentFocusSeq: 0, palette: { open: true, query: "", commandName: null, page: "commands", returnTo } });
     useUiStore.getState().closePalette();
-    const want = { terminal: 0, sidebar: 0, panel: 0, content: 0, [bumped]: 1 };
+    const want = { terminal: 0, sidebar: 0, panel: 0, bottom: 0, content: 0, [bumped]: 1 };
     expect(seqs()).toEqual(want);
     expect(useUiStore.getState().palette.open).toBe(false);
   });

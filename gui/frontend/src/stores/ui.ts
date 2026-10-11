@@ -29,7 +29,7 @@ export function isDashboard(sel: Selection): boolean {
 }
 
 /** Which region has keyboard focus; the palette returns focus to it on close. */
-export type FocusRegion = "sidebar" | "terminal" | "content" | "palette" | "panel";
+export type FocusRegion = "sidebar" | "terminal" | "content" | "palette" | "panel" | "bottom";
 
 /**
  * What the palette dialog shows: the command list (and arg prompts), the project picker,
@@ -56,6 +56,13 @@ export const CONTENT_MIN = 360;
  * margins on both sides plus the panel's 8px right margin (App.tsx, SidePanel.tsx).
  */
 export const PANE_GAPS = 24;
+/**
+ * Bottom panel height bounds (components/bottom): the upper bound is a share of the
+ * content column's measured height (bottomMax).
+ */
+export const BOTTOM_MIN = 120;
+export const BOTTOM_DEFAULT = 280;
+export const BOTTOM_MAX_FRACTION = 0.7;
 export const FONT_MIN = 9;
 export const FONT_MAX = 28;
 export const FONT_DEFAULT = 13;
@@ -87,6 +94,11 @@ interface UiState {
   sidebarFocusSeq: number;
   /** Incremented to ask the visible side panel to take focus (components/panel/SidePanel.tsx). */
   panelFocusSeq: number;
+  /**
+   * Incremented to ask the visible bottom panel to take focus: its active terminal, else
+   * the panel itself (components/bottom/BottomPanel.tsx).
+   */
+  bottomFocusSeq: number;
   /**
    * Incremented to ask whatever fills the content pane to take focus: the terminal when
    * one shows, else the page's `[data-focus-root]` element (App.tsx).
@@ -159,6 +171,19 @@ export function panelMax(windowWidth: number, sidebarWidth: number): number {
   return Math.floor(Math.min(windowWidth * PANEL_MAX_FRACTION, windowWidth - sidebarWidth - PANE_GAPS - CONTENT_MIN));
 }
 
+/**
+ * Tallest the bottom panel may be: 70% of the content column (main pane, gap and bottom
+ * pane together). Never below BOTTOM_MIN.
+ */
+export function bottomMax(columnHeight: number): number {
+  return Math.max(BOTTOM_MIN, Math.floor(columnHeight * BOTTOM_MAX_FRACTION));
+}
+
+/** A bottom panel height clamped to [BOTTOM_MIN, bottomMax(columnHeight)]. */
+export function clampBottomHeight(h: number, columnHeight: number): number {
+  return clamp(Math.round(h), BOTTOM_MIN, bottomMax(columnHeight));
+}
+
 /** The sidebar's rendered width: 0 when hidden. */
 export function visibleSidebarWidth(s: { sidebarVisible: boolean; sidebarWidth: number }): number {
   return s.sidebarVisible ? s.sidebarWidth : 0;
@@ -192,6 +217,7 @@ export const useUiStore = create<UiState>()(
       terminalFocusSeq: 0,
       sidebarFocusSeq: 0,
       panelFocusSeq: 0,
+      bottomFocusSeq: 0,
       contentFocusSeq: 0,
       windowWidth: typeof window === "undefined" ? 1280 : window.innerWidth,
       cursorKey: null,
@@ -245,6 +271,7 @@ export const useUiStore = create<UiState>()(
             terminalFocusSeq: to === "terminal" ? s.terminalFocusSeq + 1 : s.terminalFocusSeq,
             sidebarFocusSeq: to === "sidebar" ? s.sidebarFocusSeq + 1 : s.sidebarFocusSeq,
             panelFocusSeq: to === "panel" ? s.panelFocusSeq + 1 : s.panelFocusSeq,
+            bottomFocusSeq: to === "bottom" ? s.bottomFocusSeq + 1 : s.bottomFocusSeq,
             contentFocusSeq: to === "content" ? s.contentFocusSeq + 1 : s.contentFocusSeq,
           };
         });

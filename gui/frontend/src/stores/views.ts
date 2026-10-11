@@ -7,6 +7,7 @@
  */
 import { toast } from "sonner";
 import { create } from "zustand";
+import { bottomKeyOf, getBottom, toggleBottom } from "./bottomPanel";
 import { linkedPrsTarget, openLinkedPrsSurface } from "./linkedPrsPanel";
 import { expandPanel, getPanel, startPanelPicking, togglePanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
@@ -79,6 +80,10 @@ export function showView(name: string): boolean {
       // view.panel.worktree: the thread's own worktree in the current thread's panel.
       worktreePanelCommand();
       return true;
+    case "bottom.toggle":
+      // view.bottom.toggle: the current selection's bottom terminal panel.
+      toggleBottomCommand();
+      return true;
     default:
       // Top-level pages (the Pull Requests page) are selections. Closing settings and
       // usage here too covers re-selecting the page that is already selected.
@@ -108,6 +113,33 @@ export function togglePanelCommand(): boolean {
     const returnTo: FocusRegion = open ? "panel" : from === "panel" ? "content" : from;
     useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo } }));
   } else if (!open && from === "panel") {
+    ui.focusContent();
+  }
+  return open;
+}
+
+/**
+ * view.bottom.toggle for the current selection (a thread or the Projects page; other
+ * selections have no bottom panel and it does nothing). A no-op while the settings or
+ * usage page is up, or while the side panel fills the content area: both hide the bottom
+ * panel, so a toggle there would flip state the user cannot see.
+ *
+ * Focus works like view.panel.toggle: showing focuses the panel (its active terminal, else
+ * the panel), hiding it while it has focus hands focus to the content pane, and with the
+ * palette open its return target moves instead.
+ */
+export function toggleBottomCommand(): boolean {
+  const ui = useUiStore.getState();
+  if (bottomKeyOf(ui.selection) === null) return false;
+  const side = getPanel();
+  if (pageOpen() || (side.open && side.expanded)) return getBottom().open;
+  const inPalette = ui.palette.open;
+  const from: FocusRegion = inPalette ? ui.palette.returnTo : ui.focus;
+  const open = toggleBottom("current", undefined, { focus: !inPalette });
+  if (inPalette) {
+    const returnTo: FocusRegion = open ? "bottom" : from === "bottom" ? "content" : from;
+    useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo } }));
+  } else if (!open && from === "bottom") {
     ui.focusContent();
   }
   return open;

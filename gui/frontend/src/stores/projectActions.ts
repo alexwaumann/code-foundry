@@ -6,14 +6,15 @@
 import { startCommandNamed } from "@/keys/bindings";
 import { repoRef } from "@/lib/projects";
 import { openAddProject } from "./addProject";
+import { newWorktreeTerminal } from "./bottomActions";
 import { runCommand } from "./commands";
 import { repoContext, worktreeContext } from "./context";
 import { useReposStore } from "./repos";
 import { useWorkspacesStore } from "./workspaces";
 
-/** terminal.new in the worktree. */
+/** terminal.new in the worktree; the shell opens (focused) in the Projects page's bottom panel. */
 export function newTerminalIn(repoId: string, path: string): Promise<boolean> {
-  return runCommand("terminal.new", {}, worktreeContext(repoId, path));
+  return newWorktreeTerminal(repoId, path);
 }
 
 /** repo.worktree.remove (the daemon asks for confirmation; dirty worktrees are refused without force). */

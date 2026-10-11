@@ -6,6 +6,7 @@ import { listRepos } from "@/api/repo";
 import { listSessions } from "@/api/session";
 import { errorMessage, isAbort, runStream, type StreamStatus } from "@/api/stream";
 import { listTerminals } from "@/api/terminal";
+import { onNewTerminal } from "./bottomActions";
 import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
 import { applyIntent } from "./intents";
@@ -41,7 +42,12 @@ const handlers: Handlers = {
     useWorkspacesStore.setState((s) => ({ ...applyWorkspaceEvent(s, ev), loaded: true }));
   },
   terminal: (ev) => {
+    // A terminal the store did not have (not one the reconnect's List already brought):
+    // a new shell opens its owner's bottom panel (stores/bottomActions.ts).
+    const before = useTerminalsStore.getState();
+    const fresh = ev.kind === "updated" && before.loaded && !(ev.terminal.id in before.byId) ? ev.terminal : null;
     useTerminalsStore.setState((s) => applyTerminalEvent(s, ev));
+    if (fresh) onNewTerminal(fresh);
   },
   session: (ev) => {
     // Session events prove the service exists, even if List failed transiently.

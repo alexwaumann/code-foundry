@@ -1818,14 +1818,15 @@ export class World {
         },
       },
       {
-        cmd: { name: "terminal.close", title: "Close Terminal", category: "Terminal", description: "Terminate the terminal's process and remove it once it has exited", keybindings: [], args: [] },
+        // --id defaults to the active terminal, like the daemon (a context-bound arg, so not required in List).
+        cmd: { name: "terminal.close", title: "Close Terminal", category: "Terminal", description: "Terminate the terminal's process and remove it once it has exited", keybindings: [], args: [{ name: "id", type: ArgType.STRING, required: false, description: "Terminal id (default: the active terminal)" }] },
         // Only shells: with a thread selected the active terminal is its Claude terminal.
         when: (ctx) => activeTerm(ctx)?.labels[LABEL_KIND] === KIND_SHELL,
-        run: (ctx) => {
-          const t = activeTerm(ctx);
-          if (!t) throw new CommandError("unavailable", "no active terminal");
-          this.close(t.id);
-          return "";
+        run: (ctx, args) => {
+          const id = args.id || activeTerm(ctx)?.id;
+          if (!id) throw new CommandError("unavailable", "no active terminal");
+          this.close(id);
+          return `closed terminal ${id}`;
         },
       },
       {

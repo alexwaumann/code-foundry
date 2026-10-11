@@ -576,7 +576,8 @@ test("expand fills the content area, keeps the terminal mounted, and restores th
   expect(wrapper.top).toBe(8);
   expect(vp && vp.height - wrapper.bottom).toBe(8);
   await expect(page.getByTestId("content-pane")).toBeHidden();
-  expect(await page.getByTestId("content-pane").evaluate((el) => getComputedStyle(el).display)).toBe("none");
+  // The content column (content pane and bottom panel) is display: none, not unmounted.
+  expect(await page.getByTestId("content-column").evaluate((el) => getComputedStyle(el).display)).toBe("none");
   // The terminal stays mounted and attached, at its size (a hidden host is not fitted).
   await expect(page.getByTestId("terminal-host")).toHaveCount(1);
   await expect(page.getByTestId("terminal-host")).toBeHidden();

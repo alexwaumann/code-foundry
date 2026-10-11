@@ -1,0 +1,364 @@
+import { useEffect, useRef, type KeyboardEvent, type RefObject } from "react";
+import { Plus, SquareTerminal, X } from "lucide-react";
+import { CommandButton } from "@/components/command/CommandButton";
+import { revealTab } from "@/components/panel/reveal";
+import { TerminalHost, type TerminalHostHandle } from "@/components/terminal/TerminalHost";
+import { Button } from "@/components/ui/button";
+import { chordFromEvent, formatChord } from "@/keys/chord";
+import { tildify } from "@/lib/path";
+import { cn } from "@/lib/utils";
+import { closeBottomTerminal, newBottomTerminal } from "@/stores/bottomActions";
+import {
+  activateBottomTab,
+  bottomKeyOf,
+  getBottom,
+  bottomTabTitle,
+  getBottomActiveId,
+  PROJECTS_KEY,
+  requestBottomFocus,
+  sessionOfKey,
+  toggleBottom,
+  useBottomActiveId,
+  useBottomHeight,
+  useBottomOpen,
+  useBottomTabIds,
+  useCurrentBottomKey,
+} from "@/stores/bottomPanel";
+import { useCommandsStore } from "@/stores/commands";
+import { getPanel, usePanelExpanded } from "@/stores/panel";
+import { useTerminalsStore } from "@/stores/terminals";
+import { bottomMax, useUiStore } from "@/stores/ui";
+import { selectPageOpen, useViewsStore } from "@/stores/views";
+import { BottomResizeHandle } from "./BottomResizeHandle";
+import { bottomKeyAction, tabFocusIndex } from "./keys";
+
+const BODY_ID = "bottom-panel-body";
+
+function tabDomId(id: string): string {
+  return `bottom-tab-${encodeURIComponent(id)}`;
+}
+
+/** The key whose bottom panel is on screen now (BottomPanel's `shown`, read imperatively), or null. */
+function bottomShownKey(): string | null {
+  const key = bottomKeyOf(useUiStore.getState().selection);
+  const side = getPanel();
+  if (key === null || !getBottom(key).open || selectPageOpen(useViewsStore.getState()) || (side.open && side.expanded)) return null;
+  return key;
+}
+
+/** Hides the panel (cmd+w with no tabs) and gives focus to the content pane. */
+function hidePanel(panelKey: string): void {
+  toggleBottom(panelKey, false);
+  useUiStore.getState().focusContent();
+}
+
+/** Clicking a tab shows its terminal and puts the keyboard in it. */
+function openTab(panelKey: string, id: string): void {
+  activateBottomTab(panelKey, id);
+  requestBottomFocus();
+}
+
+/**
+ * One terminal's tab: icon, title (bottomTabTitle), × (on hover, keyboard focus, or when
+ * active). Middle click closes. The tab's tooltip is the full cwd, which the title hides.
+ * `focusable` is the roving tabindex: only the active tab (and its ×) is in the Tab order.
+ */
+function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id: string; active: boolean; focusable: boolean }) {
+  const title = useTerminalsStore((s) => {
+    const t = s.byId[id];
+    return t ? bottomTabTitle(t, panelKey) : id;
+  });
+  const cwd = useTerminalsStore((s) => s.byId[id]?.cwd ?? "");
+  const exited = useTerminalsStore((s) => s.byId[id]?.state === "exited");
+  return (
+    <div
+      role="presentation"
+      data-tab-id={id}
+      data-exited={exited || undefined}
+      className={cn(
+        "group relative flex h-7 max-w-48 shrink-0 items-center rounded-md pr-1 text-xs [--wails-draggable:no-drag]",
+        active ? "bg-accent text-accent-foreground dark:bg-accent/50" : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+      )}
+      onMouseDown={(e) => {
+        if (e.button === 1) e.preventDefault(); // middle click closes, below
+      }}
+      onAuxClick={(e) => {
+        if (e.button === 1) void closeBottomTerminal(id);
+      }}
+    >
+      <button
+        type="button"
+        role="tab"
+        id={tabDomId(id)}
+        aria-selected={active}
+        aria-controls={active ? BODY_ID : undefined}
+        tabIndex={focusable ? 0 : -1}
+        title={tildify(cwd)}
+        className="flex h-full min-w-0 cursor-default items-center gap-1.5 rounded-md pr-1 pl-2 outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        onClick={() => {
+          openTab(panelKey, id);
+        }}
+      >
+        <SquareTerminal className={cn("size-3.5 shrink-0", exited && "opacity-50")} aria-hidden />
+        <span className={cn("truncate", exited && "line-through opacity-60")}>{title}</span>
+      </button>
+      <button
+        type="button"
+        tabIndex={focusable ? 0 : -1}
+        aria-label={`Close ${title}`}
+        title="Close terminal"
+        className={cn(
+          "flex size-4 shrink-0 items-center justify-center rounded-sm outline-none hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring",
+          active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+        )}
+        onClick={() => void closeBottomTerminal(id)}
+      >
+        <X className="size-3" aria-hidden />
+      </button>
+    </div>
+  );
+}
+
+/** Left/Right (and Home/End) move focus between tabs; Enter or Space on a tab activates it. */
+function onTabListKeyDown(e: KeyboardEvent<HTMLElement>): void {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const tabs = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]'));
+  const i = tabs.findIndex((t) => t === document.activeElement || t.parentElement?.contains(document.activeElement));
+  if (i < 0) return;
+  const next = tabFocusIndex(e.key, i, tabs.length);
+  if (next === null) return;
+  e.preventDefault();
+  e.stopPropagation();
+  tabs[next]?.focus();
+}
+
+/** terminal.new's title and first chord as the registry lists them (the user may rebind it). */
+function useNewTerminalCommand(): { title: string; chord: string | null } {
+  const title = useCommandsStore((s) => s.commands.find((c) => c.name === "terminal.new")?.title ?? "New Terminal");
+  const chord = useCommandsStore((s) => s.commands.find((c) => c.name === "terminal.new")?.keybindings[0] ?? null);
+  return { title, chord };
+}
+
+/**
+ * Whether "+" has something to own the new shell: a thread always; the Projects page
+ * through its active tab's worktree (stores/bottomActions.ts paneContext).
+ */
+function useCanStartTerminal(panelKey: string, activeId: string | null): boolean {
+  return sessionOfKey(panelKey) !== null || (panelKey === PROJECTS_KEY && activeId !== null);
+}
+
+/** The "+" after the last tab: terminal.new in this panel's context; the new shell opens here, focused. */
+function NewTerminalButton({ panelKey }: { panelKey: string }) {
+  const { title } = useNewTerminalCommand();
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      className="size-7 text-muted-foreground [--wails-draggable:no-drag] hover:bg-accent/40 hover:text-foreground dark:hover:bg-accent/40"
+      title={title}
+      aria-label={title}
+      tabIndex={-1}
+      data-testid="bottom-new-terminal"
+      // Keeps focus where it is; the new terminal takes it when it shows up.
+      onMouseDown={(e) => {
+        e.preventDefault();
+      }}
+      onClick={() => void newBottomTerminal(panelKey)}
+    >
+      <Plus />
+    </Button>
+  );
+}
+
+function TabStrip({ panelKey, ids, activeId }: { panelKey: string; ids: readonly string[]; activeId: string | null }) {
+  const stripRef = useRef<HTMLDivElement>(null);
+  const canStart = useCanStartTerminal(panelKey, activeId);
+  // A new or activated tab may sit past the strip's scrolled edge: bring it into view.
+  useEffect(() => {
+    if (stripRef.current && activeId !== null) revealTab(stripRef.current, activeId);
+  }, [activeId, ids.length]);
+  return (
+    <div
+      ref={stripRef}
+      role="tablist"
+      aria-label="Terminals"
+      aria-orientation="horizontal"
+      className="relative flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none]"
+      data-testid="bottom-tabs"
+      onKeyDown={onTabListKeyDown}
+    >
+      {ids.map((id) => (
+        <TerminalTab key={id} panelKey={panelKey} id={id} active={id === activeId} focusable={id === activeId} />
+      ))}
+      {canStart && (
+        <span className="flex shrink-0 [--wails-draggable:no-drag]">
+          <NewTerminalButton panelKey={panelKey} />
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * No terminals yet: a button for terminal.new with its chord, like the side panel's
+ * surface list. The Projects page has no worktree to own a shell until it has a tab, so
+ * it points at the page's rows instead.
+ */
+function EmptyState({ panelKey }: { panelKey: string }) {
+  const { title, chord } = useNewTerminalCommand();
+  const canStart = useCanStartTerminal(panelKey, null);
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center p-6" data-testid="bottom-empty">
+      <div className="w-full max-w-64">
+        <h2 className="mb-3 text-center text-sm font-medium">No terminals</h2>
+        {canStart ? (
+          <ul className="flex flex-col gap-0.5">
+            <li>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
+                data-testid="bottom-empty-new"
+                onClick={() => void newBottomTerminal(panelKey)}
+              >
+                <SquareTerminal className="size-4 text-muted-foreground" aria-hidden />
+                <span className="flex-1 truncate">{title}</span>
+                {chord && <kbd className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-sans text-[11px] text-muted-foreground">{formatChord(chord)}</kbd>}
+              </button>
+            </li>
+          </ul>
+        ) : (
+          <p className="text-center text-xs text-muted-foreground">Start one with New terminal on a project or worktree row.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The header: tabs with "+" after them on the left, the close-panel button at the right
+ * end. Not a drag surface (the window drags by the title band only).
+ */
+function BottomHeader({ panelKey, ids, activeId }: { panelKey: string; ids: readonly string[]; activeId: string | null }) {
+  return (
+    <div className="flex h-9 shrink-0 items-center gap-2 border-b border-pane-border pr-1.5 pl-1 [--wails-draggable:no-drag]" data-testid="bottom-header">
+      <TabStrip panelKey={panelKey} ids={ids} activeId={activeId} />
+      <CommandButton command="view.bottom.toggle" icon={X} title="Close bottom panel" className="shrink-0 [--wails-draggable:no-drag]" data-testid="bottom-close" />
+    </div>
+  );
+}
+
+function Panel({
+  panelKey,
+  height,
+  max,
+  asideRef,
+  hostRef,
+}: {
+  panelKey: string;
+  height: number;
+  max: number;
+  asideRef: RefObject<HTMLElement | null>;
+  hostRef: RefObject<TerminalHostHandle | null>;
+}) {
+  const ids = useBottomTabIds(panelKey);
+  const activeId = useBottomActiveId(panelKey);
+
+  // The active terminal changed under the keyboard (a tab closed, a new shell came in):
+  // keep the keyboard in the panel, on the terminal now showing, or on the panel itself.
+  const shownId = useRef(activeId);
+  useEffect(() => {
+    if (shownId.current === activeId) return;
+    shownId.current = activeId;
+    if (useUiStore.getState().focus !== "bottom") return;
+    if (document.activeElement?.closest('[role="tablist"]')) return;
+    if (activeId !== null) hostRef.current?.focus();
+    else asideRef.current?.focus({ preventScroll: true });
+  }, [activeId, asideRef, hostRef]);
+
+  // Capture phase: cmd+w must not reach xterm, which has focus most of the time.
+  const onKeyDownCapture = (e: KeyboardEvent<HTMLElement>) => {
+    const chord = chordFromEvent(e.nativeEvent);
+    if (!chord) return;
+    const action = bottomKeyAction(chord, getBottomActiveId(panelKey));
+    if (!action) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (action.kind === "close") void closeBottomTerminal(action.terminalId);
+    else hidePanel(panelKey);
+  };
+
+  return (
+    // Not clipped, so the resize handle can sit in the 8px gap above it.
+    <div className="relative mt-2 flex shrink-0" style={{ height }} data-testid="bottom-panel-wrapper">
+      <BottomResizeHandle panelKey={panelKey} height={height} max={max} />
+      <aside
+        ref={asideRef}
+        tabIndex={-1}
+        aria-label="Bottom panel"
+        data-region="bottom"
+        data-testid="bottom-panel"
+        data-panel-key={panelKey}
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs outline-none"
+        onKeyDownCapture={onKeyDownCapture}
+      >
+        <BottomHeader panelKey={panelKey} ids={ids} activeId={activeId} />
+        <div
+          id={BODY_ID}
+          role={activeId === null ? undefined : "tabpanel"}
+          aria-labelledby={activeId === null ? undefined : tabDomId(activeId)}
+          className="flex min-h-0 flex-1 flex-col"
+          data-testid="bottom-body"
+        >
+          {/* One host for every tab: switching tabs re-attaches the same xterm. Hidden
+              (and detached) while there is no tab. */}
+          <TerminalHost ref={hostRef} name="bottom" terminalId={activeId} hidden={activeId === null} testId="bottom-terminal-host" />
+          {activeId === null && <EmptyState panelKey={panelKey} />}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+/**
+ * The current selection's bottom terminal panel, under the content pane in the content
+ * column (App.tsx). Unmounted (so its terminal detaches) when the selection has none
+ * (only threads and the Projects page do), when it is closed, while the settings or
+ * usage page is up, and while the side panel fills the content area.
+ *
+ * `columnHeight` is the content column's height in layout px (App.tsx), which bounds
+ * the panel's (bottomMax).
+ *
+ * Focus requests (ui bottomFocusSeq) are handled here, not in the panel: this component
+ * stays mounted, so a request with no panel showing is dropped instead of being acted on
+ * by the next panel that mounts. The request comes after the panel is shown, so it is
+ * mounted (and its terminal host with it) by the time this effect runs.
+ */
+export function BottomPanel({ columnHeight }: { columnHeight: number }) {
+  const panelKey = useCurrentBottomKey();
+  const open = useBottomOpen(panelKey);
+  const pageOpen = useViewsStore(selectPageOpen);
+  const sideExpanded = usePanelExpanded();
+  const stored = useBottomHeight(panelKey ?? "");
+  const focusSeq = useUiStore((s) => s.bottomFocusSeq);
+  const asideRef = useRef<HTMLElement>(null);
+  const hostRef = useRef<TerminalHostHandle>(null);
+  const handled = useRef(focusSeq);
+  const shown = panelKey !== null && open && !pageOpen && !sideExpanded;
+
+  // Only on a new request, and only for a panel on screen.
+  useEffect(() => {
+    if (focusSeq === handled.current) return;
+    handled.current = focusSeq;
+    const key = bottomShownKey();
+    if (key === null) return;
+    if (getBottomActiveId(key) !== null) hostRef.current?.focus();
+    else asideRef.current?.focus({ preventScroll: true });
+  }, [focusSeq]);
+
+  if (!shown) return null;
+  // Bounded by the column there is now; the stored height comes back when the room does.
+  const max = bottomMax(columnHeight);
+  const height = columnHeight > 0 ? Math.min(stored, max) : stored;
+  return <Panel panelKey={panelKey} height={height} max={max} asideRef={asideRef} hostRef={hostRef} />;
+}
