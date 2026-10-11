@@ -150,11 +150,11 @@ message Session {
   // When status or status_reason last changed. Persisted with them; unset if never
   // known (a row from before status persistence).
   google.protobuf.Timestamp status_changed_at = 26;
-  // Token usage of the thread's transcript: one bucket per (model, tier, speed, UTC
-  // day), sorted by day, model, tier, speed. A pure fold over the transcript's
-  // assistant records (each API request counted once); a reconnect or daemon restart
-  // rescans the transcript from the start and replaces it. Persisted. See
-  // docs/notes/session-usage.md.
+  // Token usage of the thread: one bucket per (model, tier, speed, UTC day), sorted by
+  // day, model, tier, speed. A pure fold over the assistant records (each API request
+  // counted once) of every transcript the thread has used (a /clear starts a new one)
+  // and of every subagent run under them (agent_runs); a reconnect rescans them all
+  // from the start and replaces it. Persisted. See docs/notes/session-usage.md.
   repeated UsageBucket usage = 27;
   // The price of usage in USD at first-party Claude API rates, computed when sent
   // (never stored). Excludes unpriced buckets.
@@ -162,6 +162,44 @@ message Session {
   // Some bucket's model (or tier, or speed) has no known rate: cost_usd is a lower
   // bound and the UI says "unpriced" rather than showing $0 for it.
   bool unpriced = 29;
+  // The thread's subagent runs, by start time (unknown last). Their usage is included
+  // in usage. The count of runs is the length. Persisted.
+  repeated AgentRun agent_runs = 30;
+}
+
+// Whether a subagent run is still followed.
+enum AgentRunStatus {
+  AGENT_RUN_STATUS_UNSPECIFIED = 0;
+  // Its result has not reached the thread yet: running, or a background run that has
+  // not notified.
+  AGENT_RUN_STATUS_OPEN = 1;
+  // Its result (completed, failed, interrupted, stopped) reached the thread, or it was
+  // idle past the safety net.
+  AGENT_RUN_STATUS_CLOSED = 2;
+}
+
+// One subagent run of a thread (Session.agent_runs): a Claude Code Agent tool call,
+// with its own transcript.
+message AgentRun {
+  // Claude's agent id.
+  string id = 1;
+  string description = 2;
+  // "general-purpose", "Explore", ...
+  string agent_type = 3;
+  // As requested, e.g. "haiku"; empty when inherited from the thread.
+  string model = 4;
+  string effort = 5;
+  // Launched in the background (run_in_background).
+  bool background = 6;
+  AgentRunStatus status = 7;
+  // 1: spawned by the thread; 2 and up: by another run.
+  int32 spawn_depth = 8;
+  // Time of the run's first record; unset if unknown.
+  google.protobuf.Timestamp started_at = 9;
+  // The run's own usage, sorted like Session.usage, priced the same way.
+  repeated UsageBucket usage = 10;
+  double cost_usd = 11;
+  bool unpriced = 12;
 }
 
 // Token counters for one model on one UTC day (of one session, or of the retired
@@ -192,6 +230,9 @@ message UsageBucket {
   double cache_read_cost_usd = 15;
   double cache_write_5m_cost_usd = 16;
   double cache_write_1h_cost_usd = 17;
+  // What the bucket's cache reads saved in USD: cache_read x (input rate - cache read
+  // rate) at the bucket's (model, tier, speed). 0 when unpriced.
+  double cache_savings_usd = 18;
 }
 
 // A pull request Claude linked to a session (Session.linked_pull_requests).

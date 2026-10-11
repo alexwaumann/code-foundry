@@ -55,6 +55,8 @@ function bucketMsg(u: MockUsage): UsageBucketInit {
     cacheWrite1h: BigInt(u.cacheWrite1h),
     costUsd: c.inputCostUsd + c.outputCostUsd + c.cacheReadCostUsd + c.cacheWrite5mCostUsd + c.cacheWrite1hCostUsd,
     unpriced: !r,
+    // pricing.CacheSavings: cache reads at (input rate - cache read rate).
+    cacheSavingsUsd: cost(u.cacheRead, r ? r.input - r.cacheRead : undefined),
     ...c,
   };
 }

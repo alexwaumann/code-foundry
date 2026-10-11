@@ -44,6 +44,7 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     usage: [],
     costUsd: 0,
     unpriced: false,
+    agentRuns: [],
     ...over,
   };
 }

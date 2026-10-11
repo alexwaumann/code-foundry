@@ -1,33 +1,37 @@
-import { useId, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { dismissCard, groupSkills, nextCard, type CardMemo, type CardShow, type TriggerChar } from "@/lib/completion";
-import type { PromptTag } from "@/lib/prompt";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import type { SkillSourceView } from "@/api/filesystem";
+import {
+  dismissCard,
+  fileItems,
+  fileSourcesKey,
+  groupSkills,
+  nextCard,
+  type CardMemo,
+  type CardShow,
+  type CompletionGroup,
+  type TriggerChar,
+} from "@/lib/completion";
+import { cancelFiles, requestFiles, useFilesEntry } from "@/stores/files";
 import { useSkills } from "@/stores/skills";
 import type { CompletionKey, EditorTrigger, PromptEditorHandle } from "./PromptEditor";
 
-/** One row of the completion card. */
-export interface CompletionItem {
-  key: string;
-  /** Bold: `/deploy`. */
-  label: string;
-  /** Muted, after the label (may be empty). */
-  detail: string;
-  /** What Enter puts into the prompt. */
-  tag: PromptTag;
-}
-
-/** A group of rows under an optional heading: a project (dot + name) or "User". */
-export interface CompletionGroup {
-  key: string;
-  heading: { kind: "project"; repoId: string } | { kind: "user" } | null;
-  items: CompletionItem[];
-}
+export type { CompletionGroup, CompletionItem } from "@/lib/completion";
 
 /** A completion source: the rows for a trigger's query, and whether it has anything at all. */
 export interface CompletionSource {
   char: TriggerChar;
+  /** The listbox's accessible name: "Skills", "Files". */
+  label: string;
   /** False while nothing is loaded, on an outdated daemon, or with nothing to offer: no card. */
   available: boolean;
   groups: CompletionGroup[];
+  /**
+   * The query `groups` answer: the trigger's for a source that answers at once, an earlier
+   * one while an asynchronous source is still looking (null: nothing answered yet).
+   */
+  query: string | null;
+  /** The answer for the trigger's query is taking long: the card says `searchingText`. */
+  searching: boolean;
   /** "No skills match". */
   emptyText: string;
 }
@@ -54,12 +58,49 @@ export function useSkillSource(trigger: EditorTrigger | null, sourcesKey: string
       })),
     }));
   }, [skills, query, members]);
-  return { char: "/", available: skills.length > 0, groups, emptyText: "No skills match" };
+  return { char: "/", label: "Skills", available: skills.length > 0, groups, query, searching: false, emptyText: "No skills match" };
 }
+
+/**
+ * Files after "@" (stores/files.ts): asks for the trigger's query whenever it changes
+ * (debounced there; nothing while the card is only navigated), and offers the latest
+ * answer grouped by project, the primary first, with headings when the draft has more than
+ * one project. On an outdated daemon nothing is offered.
+ */
+export function useFileSource(trigger: EditorTrigger | null, sources: readonly SkillSourceView[], members: readonly string[], primary: string): CompletionSource {
+  const entry = useFilesEntry(fileSourcesKey(sources));
+  const query = trigger?.char === "@" ? trigger.query : null;
+  useEffect(() => {
+    if (query === null) return;
+    requestFiles(sources, query);
+    return () => {
+      cancelFiles(sources);
+    };
+  }, [sources, query]);
+  const answered = entry?.answered ?? null;
+  const results = entry?.results;
+  const groups = useMemo<CompletionGroup[]>(
+    () => (query === null || answered === null || !results ? [] : fileItems(results, answered, members, primary)),
+    [query, answered, results, members, primary],
+  );
+  return {
+    char: "@",
+    label: "Files",
+    available: entry?.outdated !== true,
+    groups,
+    query: query === null ? null : answered,
+    searching: query !== null && answered !== query && entry?.searching === true,
+    emptyText: "No files match",
+  };
+}
+
+/** What the card shows: CardShow, or "searching" while a slow answer is awaited. */
+export type CompletionShow = CardShow | "searching";
 
 /** What the composer renders and wires: the card's model and the editor's hooks into it. */
 export interface Completion {
-  show: CardShow;
+  show: CompletionShow;
+  label: string;
   groups: CompletionGroup[];
   emptyText: string;
   /** Index into the flattened rows. */
@@ -75,7 +116,7 @@ export interface Completion {
 }
 
 interface CardState {
-  /** The inputs the state was derived from (trigger position, query, row count). */
+  /** The inputs the state was derived from (trigger position, answered query, row count). */
   key: string;
   memo: CardMemo | null;
   show: CardShow;
@@ -90,6 +131,13 @@ const CLOSED: CardState = { key: "", memo: null, show: "none", selected: 0 };
  * the no-match keystroke, Escape), the selected row, and inserting a row as a tag.
  * `trigger` and `setTrigger` are held by the caller, which also builds the source from
  * the trigger.
+ *
+ * An asynchronous source may answer an earlier query than the trigger's: while this
+ * trigger has been answered before, the card goes on with the latest answer (as if that
+ * query were typed); a trigger nothing has answered yet waits with the card closed and
+ * Enter does nothing (it would send the half-typed reference) until Escape dismisses the
+ * trigger. A slow answer shows
+ * "Searching…".
  */
 export function useCompletion(
   trigger: EditorTrigger | null,
@@ -100,21 +148,27 @@ export function useCompletion(
   const listId = useId();
   const items = useMemo(() => source.groups.flatMap((g) => g.items), [source.groups]);
   const live = trigger !== null && trigger.char === source.char && source.available ? { at: trigger.from, query: trigger.query } : null;
-  const key = live ? `${String(live.at)}\u0001${live.query}\u0001${String(items.length)}` : "";
 
   const [state, setState] = useState<CardState>(CLOSED);
+  const answered =
+    live && source.query !== null && (source.query === live.query || state.memo?.at === live.at) ? { at: live.at, query: source.query } : null;
+  const key = answered ? `${String(answered.at)}\u0001${answered.query}\u0001${String(items.length)}` : live ? `${String(live.at)}\u0001wait` : "";
   let cur = state;
   if (state.key !== key) {
     // Derived from the trigger and the rows: recomputed during render when they change.
-    const r = nextCard(state.memo, live, items.length);
+    const r = answered ? nextCard(state.memo, answered, items.length) : { show: "none" as const, memo: null };
     cur = { key, memo: r.memo, show: r.show, selected: 0 };
     setState(cur);
   }
+  const dismissed = live !== null && cur.memo?.at === live.at && cur.memo.dismissed;
+  const show: CompletionShow = live && source.searching && !dismissed ? "searching" : cur.show;
+  // Nothing has answered this trigger yet: Enter must not send what is about to be completed.
+  const waiting = live !== null && answered === null && !dismissed;
 
   // The editor calls onKey from its own handlers: it reads the latest render through this.
-  const latest = useRef({ cur, items, trigger, live });
+  const latest = useRef({ show, waiting, cur, items, trigger, live });
   useLayoutEffect(() => {
-    latest.current = { cur, items, trigger, live };
+    latest.current = { show, waiting, cur, items, trigger, live };
   });
 
   const insert = (index: number) => {
@@ -129,13 +183,16 @@ export function useCompletion(
   };
 
   const onKey = (k: CompletionKey): boolean => {
-    const { cur: c, items: rows, live: l } = latest.current;
-    if (c.show === "none" || !l) return false;
-    if (k === "escape" || (c.show === "empty" && k === "enter")) {
+    const { show: sh, waiting: w, cur: c, items: rows, live: l } = latest.current;
+    if (sh === "none" && w && k === "enter") return true;
+    // Escape before the first answer dismisses the trigger too (the card must not open
+    // when the answer lands, and Enter sends again).
+    if (!l || (sh === "none" && !(w && k === "escape"))) return false;
+    if (k === "escape" || (sh !== "list" && k === "enter")) {
       setState((s) => ({ ...s, memo: dismissCard(l), show: "none" }));
       return true;
     }
-    if (c.show === "empty") return false;
+    if (sh !== "list") return false;
     if (k === "up" || k === "down") {
       const n = rows.length;
       setState((s) => ({ ...s, selected: (s.selected + (k === "down" ? 1 : n - 1)) % n }));
@@ -146,11 +203,12 @@ export function useCompletion(
   };
 
   const optionId = (index: number) => `${listId}-${String(index)}`;
-  const open = cur.show === "list";
+  const open = show === "list";
   return {
-    show: cur.show,
+    show,
+    label: source.label,
     groups: source.groups,
-    emptyText: source.emptyText,
+    emptyText: show === "searching" ? "Searching…" : source.emptyText,
     selected: cur.selected,
     listId,
     optionId,

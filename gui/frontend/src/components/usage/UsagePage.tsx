@@ -105,7 +105,7 @@ export function UsagePage() {
               <UsageChart daily={data.daily} series={data.series} mode={mode} />
               <h2 className="mt-8 mb-2.5 text-[13px] font-semibold">By model</h2>
               <ModelTable models={data.models} totalCost={totals.costUsd} />
-              <BucketStrip totals={totals} />
+              <BucketStrip totals={totals} cacheSavingsUsd={data.cacheSavingsUsd} />
             </>
           )}
         </div>
@@ -115,7 +115,7 @@ export function UsagePage() {
 }
 
 function ModelTable({ models, totalCost }: { models: readonly ModelUsage[]; totalCost: number }) {
-  const th ="px-2 py-1.5 text-[11px] font-medium text-muted-foreground border-b border-border";
+  const th = "px-2 py-1.5 text-[11px] font-medium text-muted-foreground border-b border-border";
   return (
     <table className="w-full border-collapse text-[13px]" data-testid="usage-page-models">
       <thead>
@@ -157,8 +157,8 @@ function ModelTable({ models, totalCost }: { models: readonly ModelUsage[]; tota
   );
 }
 
-/** Bucket totals. Cache savings (DESIGN) needs the input and cache-read rates, which the GUI does not have yet. */
-function BucketStrip({ totals }: { totals: UsageTotals }) {
+/** Bucket totals, then Cache savings right-aligned (UsageBucket.cache_savings_usd summed over the range). */
+function BucketStrip({ totals, cacheSavingsUsd }: { totals: UsageTotals; cacheSavingsUsd: number }) {
   const items: [string, number][] = [
     ["Input", totals.input],
     ["Cache read", totals.cacheRead],
@@ -174,6 +174,10 @@ function BucketStrip({ totals }: { totals: UsageTotals }) {
           <div className="mt-[3px] text-sm font-medium tabular-nums">{fmtTok(v)}</div>
         </div>
       ))}
+      <div className="ml-auto text-right" data-testid="usage-page-cache-savings">
+        <div className="text-[11px] text-muted-foreground">Cache savings</div>
+        <div className="mt-[3px] text-sm font-medium tabular-nums">{fmtUsd(cacheSavingsUsd)}</div>
+      </div>
     </div>
   );
 }

@@ -42,6 +42,7 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     usage: [],
     costUsd: 0,
     unpriced: false,
+    agentRuns: [],
     ...over,
   };
 }
@@ -106,6 +107,7 @@ describe("session reducers", () => {
       cacheReadCostUsd: 0,
       cacheWrite5mCostUsd: 0,
       cacheWrite1hCostUsd: 0.001,
+      cacheSavingsUsd: 0,
     });
     const prev = replaceSessions(emptySessions, [session("a", { usage: [bucket(1)] })]);
     expect(applySessionEvent(prev, { kind: "updated", session: session("a", { usage: [bucket(1)] }) })).toBe(prev);
@@ -118,6 +120,26 @@ describe("session reducers", () => {
     expect(applyRetiredUsage(retired, { kind: "retiredUsage", buckets: [bucket(5)] })).toBe(retired);
     expect(applyRetiredUsage(retired, { kind: "retiredUsage", buckets: [bucket(6)] })[0]?.requests).toBe(6);
     expect(applyRetiredUsage(retired, { kind: "removed", id: "a" })).toBe(retired);
+
+    // Agent runs compare by content too, their usage included.
+    const run = (status: "open" | "closed", requests: number) => ({
+      id: "r1",
+      description: "say ok",
+      agentType: "general-purpose",
+      model: "haiku",
+      effort: "",
+      background: false,
+      status,
+      spawnDepth: 1,
+      startedAtMs: 5,
+      usage: [bucket(requests)],
+      costUsd: 0,
+      unpriced: false,
+    });
+    const withRun = replaceSessions(emptySessions, [session("a", { agentRuns: [run("open", 1)] })]);
+    expect(applySessionEvent(withRun, { kind: "updated", session: session("a", { agentRuns: [run("open", 1)] }) })).toBe(withRun);
+    expect(applySessionEvent(withRun, { kind: "updated", session: session("a", { agentRuns: [run("closed", 1)] }) }).byId.a?.agentRuns[0]?.status).toBe("closed");
+    expect(applySessionEvent(withRun, { kind: "updated", session: session("a", { agentRuns: [run("open", 2)] }) })).not.toBe(withRun);
   });
 
   it("attentionIds counts a disconnected session's persisted attention, not an interrupted one", () => {

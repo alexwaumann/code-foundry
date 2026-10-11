@@ -94,7 +94,8 @@ func TestSummarizeUsage(t *testing.T) {
 
 func TestRenderUsage(t *testing.T) {
 	rep := summarizeUsage([]*v1.UsageBucket{
-		{Day: "2026-10-10", Model: "claude-haiku-5-5", Requests: 2, Input: 12, Output: 340, CacheRead: 30_100, CacheWrite_1H: 11_400, CostUsd: 0.0026},
+		{Day: "2026-10-10", Model: "claude-haiku-5-5", Requests: 2, Input: 12, Output: 340, CacheRead: 30_100, CacheWrite_1H: 11_400, CostUsd: 0.0026,
+			CacheSavingsUsd: 30_100 * (0.1 - 0.01) / 1e6},
 		{Day: "2026-10-10", Model: "claude-next", Requests: 1, Input: 5, CostUsd: 0, Unpriced: true},
 	})
 	want := `Thread s-1 (demo): 3 requests · 41.9K tokens · $0.0026 + unpriced
@@ -105,11 +106,37 @@ claude-next       1         5       —        —
 TOTAL             3         41.9K   $0.0026  100%
 
 Input 17 · Output 340 · Cache read 30,100 · Cache write 5m 0 · Cache write 1h 11,400
+Cache savings $0.0027
 `
 	if got := renderUsage("Thread s-1 (demo)", rep); got != want {
 		t.Errorf("renderUsage =\n%s\nwant\n%s", got, want)
 	}
 	if got := renderUsage("All threads (0)", summarizeUsage(nil)); got != "All threads (0): 0 requests · 0 tokens · $0.00\nNo usage yet.\n" {
 		t.Errorf("empty = %q", got)
+	}
+}
+
+func TestRenderRuns(t *testing.T) {
+	runs := usageRuns([]*v1.AgentRun{
+		{Id: "a1", Description: "say ok", AgentType: "general-purpose", Model: "haiku", Status: v1.AgentRunStatus_AGENT_RUN_STATUS_CLOSED,
+			SpawnDepth: 1, CostUsd: 0.0012, Usage: []*v1.UsageBucket{{Model: "claude-haiku-5-5", Requests: 2, Input: 10, Output: 20, CacheRead: 29_970}}},
+		{Id: "a2", Background: true, Status: v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN, SpawnDepth: 2, Unpriced: true,
+			Usage: []*v1.UsageBucket{{Model: "claude-next", Requests: 1, Input: 5, Unpriced: true}}},
+	})
+	if runs[0].Requests != 2 || runs[0].Tokens != 30_000 || runs[0].Status != "closed" || runs[1].Status != "open" || runs[1].SpawnDepth != 2 {
+		t.Errorf("usageRuns = %+v", runs)
+	}
+	want := `
+2 agent runs (1 open), included above:
+
+STATUS  RUN              TYPE             MODEL      REQUESTS  TOKENS  COST
+closed  say ok           general-purpose  haiku      2         30K     $0.0012
+open    a2 (background)  —                inherited  1         5       $0.00 + unpriced
+`
+	if got := renderRuns(runs); got != want {
+		t.Errorf("renderRuns =\n%s\nwant\n%s", got, want)
+	}
+	if renderRuns(nil) != "" {
+		t.Error("no runs should render nothing")
 	}
 }

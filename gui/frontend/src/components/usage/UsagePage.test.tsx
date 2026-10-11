@@ -7,7 +7,7 @@ import { useViewsStore } from "@/stores/views";
 import { UsagePage } from "./UsagePage";
 
 function bucket(over: Partial<UsageBucketView>): UsageBucketView {
-  return { model: "claude-opus-5-5", tier: "", speed: "", day: "2026-10-10", requests: 1, input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0, costUsd: 0, unpriced: false, inputCostUsd: 0, outputCostUsd: 0, cacheReadCostUsd: 0, cacheWrite5mCostUsd: 0, cacheWrite1hCostUsd: 0, ...over };
+  return { model: "claude-opus-5-5", tier: "", speed: "", day: "2026-10-10", requests: 1, input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0, costUsd: 0, unpriced: false, inputCostUsd: 0, outputCostUsd: 0, cacheReadCostUsd: 0, cacheWrite5mCostUsd: 0, cacheWrite1hCostUsd: 0, cacheSavingsUsd: 0, ...over };
 }
 
 function setUsage(threads: Record<string, UsageBucketView[]>, retired: UsageBucketView[] = []): void {
@@ -34,11 +34,11 @@ describe("UsagePage", () => {
   it("shows the total, the summary line, the table with an unpriced row and the bucket strip", () => {
     setUsage(
       {
-        a: [bucket({ requests: 3, input: 1_000, cacheRead: 1_000_000, output: 2_000, costUsd: 4.5 }), bucket({ model: "claude-opus-5", unpriced: true, requests: 2, cacheRead: 28_400_000, day: "2026-10-09" })],
+        a: [bucket({ requests: 3, input: 1_000, cacheRead: 1_000_000, output: 2_000, costUsd: 4.5, cacheSavingsUsd: 6.4 }), bucket({ model: "claude-opus-5", unpriced: true, requests: 2, cacheRead: 28_400_000, day: "2026-10-09" })],
         b: [bucket({ model: "claude-haiku-5-5", requests: 1_200, cacheRead: 3_000, costUsd: 0.5 })],
         idle: [],
       },
-      [bucket({ model: "claude-fable-5-1", requests: 1, cacheWrite1h: 500, costUsd: 5, day: "2026-10-01" })],
+      [bucket({ model: "claude-fable-5-1", requests: 1, cacheWrite1h: 500, costUsd: 5, cacheSavingsUsd: 0.5, day: "2026-10-01" })],
     );
     render(<UsagePage />);
     expect(screen.getByTestId("usage-page-total").textContent).toBe("$10.00");
@@ -50,7 +50,8 @@ describe("UsagePage", () => {
     expect(within(unpriced).getAllByRole("cell").map((c) => c.textContent)).toEqual(["claude-opus-5unpriced", "2", "28.4M", "—", "—"]);
     const opus = screen.getAllByTestId("usage-page-model-row")[1];
     expect(opus && within(opus).getAllByRole("cell").map((c) => c.textContent)).toEqual(["claude-opus-5-5", "3", "1M", "$4.50", "45.0%"]);
-    expect(screen.getByTestId("usage-page-buckets").textContent).toBe("Input1KCache read29.4MCache write · 5m0Cache write · 1h500Output2K");
+    expect(screen.getByTestId("usage-page-buckets").textContent).toBe("Input1KCache read29.4MCache write · 5m0Cache write · 1h500Output2KCache savings$6.90");
+    expect(screen.getByTestId("usage-page-cache-savings").textContent).toBe("Cache savings$6.90");
   });
 
   it("folds models without a slot into Other on the chart and legend, but lists them by id", () => {

@@ -237,6 +237,7 @@ func sessionToProto(s session.Session) *v1.Session {
 		p.LinkedPullRequests = append(p.LinkedPullRequests, lp)
 	}
 	p.Usage, p.CostUsd, p.Unpriced = usageToProto(s.Usage)
+	p.AgentRuns = agentRunsToProto(s.AgentRuns)
 	return p
 }
 

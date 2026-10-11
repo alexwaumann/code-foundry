@@ -6,7 +6,8 @@ import (
 	"fmt"
 )
 
-// Persistence for session_usage and usage_retired (migration 0012).
+// Persistence for session_usage and usage_retired (migration 0012). The per-source
+// tables of 0013 are in usage_runs_db.go.
 
 const usageColumns = `model, tier, speed, day, requests, input, output, cache_read, cache_write_5m, cache_write_1h`
 
@@ -28,6 +29,17 @@ func saveUsage(ctx context.Context, db *sql.DB, sessionID string, buckets []Usag
 		return fmt.Errorf("session: save usage of %s: %w", sessionID, err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := replaceUsageTx(ctx, tx, sessionID, buckets); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("session: save usage of %s: %w", sessionID, err)
+	}
+	return nil
+}
+
+// replaceUsageTx replaces a session's session_usage rows inside tx.
+func replaceUsageTx(ctx context.Context, tx *sql.Tx, sessionID string, buckets []UsageBucket) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM session_usage WHERE session_id = ?`, sessionID); err != nil {
 		return fmt.Errorf("session: save usage of %s: %w", sessionID, err)
 	}
@@ -36,9 +48,6 @@ func saveUsage(ctx context.Context, db *sql.DB, sessionID string, buckets []Usag
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, append([]any{sessionID}, usageArgs(b)...)...); err != nil {
 			return fmt.Errorf("session: save usage of %s: %w", sessionID, err)
 		}
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("session: save usage of %s: %w", sessionID, err)
 	}
 	return nil
 }

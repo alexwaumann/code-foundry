@@ -23,6 +23,11 @@ async function openUsage(page: Page) {
   await expect(page.getByTestId("usage-page-model-row").first()).toBeVisible();
 }
 
+async function cacheSavings(page: Page): Promise<number> {
+  const t = (await page.getByTestId("usage-page-cache-savings").textContent()) ?? "";
+  return Number(t.replace(/^Cache savings/, "").replace(/[$,]/g, ""));
+}
+
 async function total(page: Page): Promise<number> {
   const t = (await page.getByTestId("usage-page-total").textContent()) ?? "";
   return Number(t.replace(/[$,]/g, ""));
@@ -78,6 +83,15 @@ test("range control filters by day and persists; the table lists unpriced and Ot
   const t30 = await total(page);
   expect(t30).toBeGreaterThan(0);
 
+  // The bucket strip ends with Cache savings, right-aligned at the strip's edge.
+  const savings = page.getByTestId("usage-page-cache-savings");
+  await expect(savings).toContainText(/^Cache savings\$[\d,]+\.\d{2}$/);
+  const s30 = await cacheSavings(page);
+  expect(s30).toBeGreaterThan(0);
+  const strip = await page.getByTestId("usage-page-buckets").boundingBox();
+  const cell = await savings.boundingBox();
+  expect(Math.round((strip?.x ?? 0) + (strip?.width ?? 0) - ((cell?.x ?? 0) + (cell?.width ?? 0)))).toBe(0);
+
   const unpriced = page.locator('[data-testid="usage-page-model-row"][data-model="claude-opus-5"]');
   await expect(unpriced.getByTestId("usage-page-unpriced")).toBeVisible();
   await expect(unpriced.locator("td").nth(3)).toHaveText("—");
@@ -89,6 +103,8 @@ test("range control filters by day and persists; the table lists unpriced and Ot
   await page.getByTestId("usage-page-range-90").click();
   await expect(page.getByTestId("usage-page-day")).toHaveCount(90);
   expect(await total(page)).toBeGreaterThan(t30);
+  // The retired opus 33 and 60 days ago saved on cache reads too.
+  expect(await cacheSavings(page)).toBeGreaterThan(s30);
 
   await page.getByTestId("usage-page-range-7").click();
   await expect(page.getByTestId("usage-page-day")).toHaveCount(7);

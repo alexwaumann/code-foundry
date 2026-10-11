@@ -33,6 +33,7 @@ function bucket(model: string, o: Partial<UsageBucketView> = {}): UsageBucketVie
     cacheReadCostUsd: 0,
     cacheWrite5mCostUsd: 0,
     cacheWrite1hCostUsd: 0,
+    cacheSavingsUsd: 0,
     ...o,
   };
 }

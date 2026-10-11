@@ -68,6 +68,8 @@ export interface DayUsage {
 
 export interface UsagePageData {
   totals: UsageTotals;
+  /** USD the cache reads saved over the range (UsageBucket.cache_savings_usd summed; 0 for unpriced buckets). */
+  cacheSavingsUsd: number;
   /** Tracked threads with usage in the range (removed threads are not counted: the ledger has no ids). */
   threads: number;
   models: ModelUsage[];
@@ -107,5 +109,6 @@ export function usagePageData(threads: readonly (readonly UsageBucketView[])[], 
   take(retired);
   const series: string[] = MODEL_SLOTS.map(([m]) => m).filter((m) => seen.has(m));
   if (seen.has(OTHER)) series.push(OTHER);
-  return { totals: totalUsage(inRange), threads: threadCount, models: usageByModel(inRange), series, daily };
+  const cacheSavingsUsd = inRange.reduce((s, b) => s + b.cacheSavingsUsd, 0);
+  return { totals: totalUsage(inRange), cacheSavingsUsd, threads: threadCount, models: usageByModel(inRange), series, daily };
 }

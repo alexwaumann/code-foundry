@@ -3,7 +3,7 @@ import type { UsageBucketView } from "@/api/session";
 import { OTHER, dayLabel, labelledDays, niceStep, seriesOf, usagePageData, utcDays } from "./usageData";
 
 function bucket(over: Partial<UsageBucketView>): UsageBucketView {
-  return { model: "claude-opus-5-5", tier: "", speed: "", day: "2026-10-10", requests: 1, input: 0, output: 0, cacheRead: 100, cacheWrite5m: 0, cacheWrite1h: 0, costUsd: 1, unpriced: false, inputCostUsd: 0, outputCostUsd: 0, cacheReadCostUsd: 0, cacheWrite5mCostUsd: 0, cacheWrite1hCostUsd: 0, ...over };
+  return { model: "claude-opus-5-5", tier: "", speed: "", day: "2026-10-10", requests: 1, input: 0, output: 0, cacheRead: 100, cacheWrite5m: 0, cacheWrite1h: 0, costUsd: 1, unpriced: false, inputCostUsd: 0, outputCostUsd: 0, cacheReadCostUsd: 0, cacheWrite5mCostUsd: 0, cacheWrite1hCostUsd: 0, cacheSavingsUsd: 0, ...over };
 }
 
 // 2026-10-10T23:30Z: still the 10th in UTC.
@@ -38,6 +38,15 @@ describe("usagePageData", () => {
     );
     expect(d.totals.costUsd).toBe(5);
     expect(d.totals.requests).toBe(2);
+  });
+
+  it("sums cache savings over the range's buckets, the retired ledger included", () => {
+    const d = usagePageData(
+      [[bucket({ cacheSavingsUsd: 1.5 }), bucket({ day: "2026-09-01", cacheSavingsUsd: 10 }), bucket({ model: "claude-opus-5", unpriced: true, cacheSavingsUsd: 0 })]],
+      [bucket({ day: "2026-10-05", cacheSavingsUsd: 0.25 })],
+      days,
+    );
+    expect(d.cacheSavingsUsd).toBe(1.75);
   });
 
   it("adds the retired ledger but counts only live threads with usage in the range", () => {

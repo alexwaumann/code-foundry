@@ -28,6 +28,8 @@ type UsageModel struct {
 	CacheWrite1h int64   `json:"cache_write_1h"`
 	Tokens       int64   `json:"tokens"`
 	CostUSD      float64 `json:"cost_usd"`
+	// CacheSavingsUSD is what cache reads saved against the input rate (priced buckets).
+	CacheSavingsUSD float64 `json:"cache_savings_usd"`
 	// Unpriced: some of the row's buckets have no known rate; CostUSD leaves them out
 	// and the text table shows "—".
 	Unpriced bool `json:"unpriced,omitempty"`
@@ -48,7 +50,9 @@ type UsageDay struct {
 	CacheWrite5m int64   `json:"cache_write_5m"`
 	CacheWrite1h int64   `json:"cache_write_1h"`
 	CostUSD      float64 `json:"cost_usd"`
-	Unpriced     bool    `json:"unpriced,omitempty"`
+	// CacheSavingsUSD: the daemon's UsageBucket.cache_savings_usd.
+	CacheSavingsUSD float64 `json:"cache_savings_usd"`
+	Unpriced        bool    `json:"unpriced,omitempty"`
 }
 
 // UsageReport is usage.show's --json result.
@@ -62,6 +66,75 @@ type UsageReport struct {
 	Models  []UsageModel `json:"models"`
 	Total   UsageModel   `json:"total"`
 	Buckets []UsageDay   `json:"buckets"`
+	// AgentRuns are the thread's subagent runs (with --thread); their usage is already
+	// in the totals above.
+	AgentRuns []UsageRun `json:"agent_runs,omitempty"`
+}
+
+// UsageRun is one subagent run of a thread in a usage report.
+type UsageRun struct {
+	ID          string  `json:"id"`
+	Description string  `json:"description"`
+	AgentType   string  `json:"agent_type"`
+	Model       string  `json:"model"`
+	Background  bool    `json:"background,omitempty"`
+	Status      string  `json:"status"` // "open" | "closed"
+	SpawnDepth  int32   `json:"spawn_depth"`
+	Requests    int64   `json:"requests"`
+	Tokens      int64   `json:"tokens"`
+	CostUSD     float64 `json:"cost_usd"`
+	Unpriced    bool    `json:"unpriced,omitempty"`
+}
+
+// usageRuns summarizes a thread's runs.
+func usageRuns(runs []*v1.AgentRun) []UsageRun {
+	out := make([]UsageRun, 0, len(runs))
+	for _, r := range runs {
+		t := summarizeUsage(r.GetUsage()).Total
+		status := "closed"
+		if r.GetStatus() == v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN {
+			status = "open"
+		}
+		out = append(out, UsageRun{ID: r.GetId(), Description: r.GetDescription(), AgentType: r.GetAgentType(), Model: r.GetModel(),
+			Background: r.GetBackground(), Status: status, SpawnDepth: r.GetSpawnDepth(), Requests: t.Requests, Tokens: t.Tokens,
+			CostUSD: r.GetCostUsd(), Unpriced: r.GetUnpriced()})
+	}
+	return out
+}
+
+// renderRuns is the agent runs table under a thread's usage.
+func renderRuns(runs []UsageRun) string {
+	if len(runs) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	open := 0
+	for _, r := range runs {
+		if r.Status == "open" {
+			open++
+		}
+	}
+	noun := "runs"
+	if len(runs) == 1 {
+		noun = "run"
+	}
+	fmt.Fprintf(&sb, "\n%d agent %s (%d open), included above:\n\n", len(runs), noun, open)
+	tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
+	_, _ = fmt.Fprintln(tw, "STATUS\tRUN\tTYPE\tMODEL\tREQUESTS\tTOKENS\tCOST")
+	for _, r := range runs {
+		desc := cmp.Or(r.Description, r.ID)
+		if r.Background {
+			desc += " (background)"
+		}
+		cost := formatUSD(r.CostUSD)
+		if r.Unpriced {
+			cost += " + unpriced"
+		}
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", r.Status, desc, cmp.Or(r.AgentType, "—"), cmp.Or(r.Model, "inherited"),
+			groupInt(r.Requests), formatTokens(r.Tokens), cost)
+	}
+	_ = tw.Flush()
+	return sb.String()
 }
 
 // summarizeUsage adds buckets up per model (rows by cost, then tokens, then name) and
@@ -78,6 +151,7 @@ func summarizeUsage(buckets []*v1.UsageBucket) UsageReport {
 		m.CacheWrite1h += b.GetCacheWrite_1H()
 		m.Tokens += b.GetInput() + b.GetOutput() + b.GetCacheRead() + b.GetCacheWrite_5M() + b.GetCacheWrite_1H()
 		m.CostUSD += b.GetCostUsd()
+		m.CacheSavingsUSD += b.GetCacheSavingsUsd()
 		m.Unpriced = m.Unpriced || b.GetUnpriced()
 	}
 	for _, b := range buckets {
@@ -90,7 +164,8 @@ func summarizeUsage(buckets []*v1.UsageBucket) UsageReport {
 		add(&rep.Total, b)
 		rep.Buckets = append(rep.Buckets, UsageDay{Day: b.GetDay(), Model: b.GetModel(), Tier: b.GetTier(), Speed: b.GetSpeed(),
 			Requests: b.GetRequests(), Input: b.GetInput(), Output: b.GetOutput(), CacheRead: b.GetCacheRead(),
-			CacheWrite5m: b.GetCacheWrite_5M(), CacheWrite1h: b.GetCacheWrite_1H(), CostUSD: b.GetCostUsd(), Unpriced: b.GetUnpriced()})
+			CacheWrite5m: b.GetCacheWrite_5M(), CacheWrite1h: b.GetCacheWrite_1H(), CostUSD: b.GetCostUsd(), CacheSavingsUSD: b.GetCacheSavingsUsd(),
+			Unpriced: b.GetUnpriced()})
 	}
 	for _, m := range byModel {
 		if !m.Unpriced && rep.Total.CostUSD > 0 {
@@ -189,6 +264,7 @@ func renderUsage(heading string, rep UsageReport) string {
 	_ = tw.Flush()
 	fmt.Fprintf(&sb, "\nInput %s · Output %s · Cache read %s · Cache write 5m %s · Cache write 1h %s\n",
 		groupInt(t.Input), groupInt(t.Output), groupInt(t.CacheRead), groupInt(t.CacheWrite5m), groupInt(t.CacheWrite1h))
+	fmt.Fprintf(&sb, "Cache savings %s\n", formatUSD(t.CacheSavingsUSD))
 	return sb.String()
 }
 
@@ -215,11 +291,12 @@ func RegisterUsage(r *Registry, b SessionBackend) error {
 				s := res.Msg.GetSession()
 				rep := summarizeUsage(s.GetUsage())
 				rep.Thread, rep.Threads = s.GetId(), 1
+				rep.AgentRuns = usageRuns(s.GetAgentRuns())
 				heading := "Thread " + s.GetId()
 				if s.GetName() != "" {
 					heading += " (" + s.GetName() + ")"
 				}
-				return Result{Message: strings.TrimRight(renderUsage(heading, rep), "\n"), JSON: rep}, nil
+				return Result{Message: strings.TrimRight(renderUsage(heading, rep)+renderRuns(rep.AgentRuns), "\n"), JSON: rep}, nil
 			}
 			res, err := b.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))
 			if err != nil {

@@ -182,7 +182,7 @@ Services (v1):
   `.claude/commands` of given checkouts, plus the user's) and SearchFiles (fuzzy match over
   a checkout's git-listed or walked files, cached ~5s) feed the composer's `/` and `@`
   completion (`docs/notes/composer-tags-1-daemon.md`; the GUI's tags and `/` card:
-  `docs/notes/composer-tags-3-skills.md`).
+  `docs/notes/composer-tags-3-skills.md`; the `@` card: `docs/notes/composer-tags-4-files.md`).
 * `HealthService` — Ping, Version.
 
 Rules:
@@ -239,11 +239,14 @@ Layers Claude-specific knowledge on top of terminal:
 * **Linked pull requests** come from Claude's own `pr-link` transcript records: every
   distinct URL in first-seen order, persisted in `session_pull_requests`, backfilled from
   the transcript's history when a thread is resumed (`docs/notes/linked-prs.md`).
-* **Token usage** is a pure fold over the transcript's assistant records (each request
-  once), per (model, tier, speed, UTC day), persisted in `session_usage` and only ever
-  replaced by a complete fold (a resume rescans from byte zero); removing a thread adds
-  its buckets to `usage_retired`. Cost is priced at read time by `internal/pricing`
-  (`docs/notes/session-usage.md`).
+* **Token usage** is a pure fold over assistant records (each request once), per
+  (model, tier, speed, UTC day), summed over the thread's sources: every transcript it
+  used (`/clear` starts a new one) and every subagent run under them, followed from the
+  transcripts' own Agent tool records. The total is persisted in `session_usage`, each
+  source in `session_source_usage`, runs in `session_agent_runs`; values are only ever
+  replaced by complete folds (a resume rescans every source from byte zero). Removing a
+  thread adds its buckets to `usage_retired`. Cost is priced at read time by
+  `internal/pricing` (`docs/notes/session-usage.md`).
 * Persists session metadata in SQLite so the sidebar can show resumable sessions after a
   daemon restart. v1 does not keep PTYs alive across daemon restarts.
 

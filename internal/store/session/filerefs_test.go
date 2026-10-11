@@ -35,6 +35,16 @@ func TestRewriteFileRefs(t *testing.T) {
 		{name: "percent-encoded space",
 			prompt: "@cf-file://r-web/docs/my%20notes.md please",
 			want:   "@/Users/me/.code-foundry/worktrees/web/cf-x/docs/my notes.md please"},
+		{name: "the GUI's encoding of #, %, unicode, + and ~ (gui lib/prompt encodeTagPath)",
+			prompt: "@cf-file://r-web/docs/%231%2050%25.md @cf-file://r-web/src/na%C3%AFve/%E6%97%A5%E6%9C%AC.ts @cf-file://r-web/a%2Bb/~x.md",
+			want: "@/Users/me/.code-foundry/worktrees/web/cf-x/docs/#1 50%.md" +
+				" @/Users/me/.code-foundry/worktrees/web/cf-x/src/naïve/日本.ts" +
+				" @/Users/me/.code-foundry/worktrees/web/cf-x/a+b/~x.md"},
+		{name: "the GUI's encoding of !'()*, brackets, a no-break space and a directory",
+			prompt: "@cf-file://r-web/odd%21%27%28%29%2A%5Bx%5D.md @cf-file://r-web/nb%C2%A0sp.md @cf-file://r-web/my%20dir/",
+			want: "@/Users/me/.code-foundry/worktrees/web/cf-x/odd!'()*[x].md" +
+				" @/Users/me/.code-foundry/worktrees/web/cf-x/nb sp.md" +
+				" @/Users/me/.code-foundry/worktrees/web/cf-x/my dir/"},
 		{name: "unknown repo keeps the relative path",
 			prompt:  "@cf-file://r-gone/src/a.ts ok",
 			want:    "@src/a.ts ok",
