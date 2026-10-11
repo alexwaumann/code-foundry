@@ -13,7 +13,6 @@ export function BranchIndicator({ worktree }: { worktree: { branch: string; head
     <div
       role="note"
       aria-label={label}
-      title={label}
       data-testid="composer-checkout-branch"
       className="inline-flex h-6 max-w-64 min-w-0 shrink-0 cursor-default items-center gap-1 rounded-md bg-muted/50 px-1.5 text-xs font-medium whitespace-nowrap text-muted-foreground select-none [&_svg]:size-3 [&_svg]:shrink-0"
     >

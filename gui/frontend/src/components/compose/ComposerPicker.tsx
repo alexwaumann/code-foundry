@@ -79,7 +79,6 @@ export function ComposerPicker({
           disabled={disabled}
           aria-label={`${label}: ${text}`}
           data-compose-stop
-          title={label}
           data-testid={testId}
           className={cn("max-w-64 text-muted-foreground hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground", className)}
           onKeyDown={(e) => {
