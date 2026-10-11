@@ -1,10 +1,10 @@
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it } from "vitest";
-import { ListDirectoriesResponseSchema } from "@/gen/codefoundry/v1/filesystem_pb";
+import { ListDirectoriesResponseSchema, SearchFilesResponseSchema, SkillSchema, SkillScope } from "@/gen/codefoundry/v1/filesystem_pb";
 import { listingMessage } from "@/components/palette/usePathListing";
 import { OUTDATED_DAEMON_MESSAGE } from "./errors";
-import { PathRejectedError, toDirectoryListingView } from "./filesystem";
+import { PathRejectedError, toDirectoryListingView, toFileSearchView, toSkillView } from "./filesystem";
 
 describe("toDirectoryListingView", () => {
   it("maps entries and the completion", () => {
@@ -22,6 +22,39 @@ describe("toDirectoryListingView", () => {
         { path: "/Users/me/src/apple", name: "apple", isGit: false, registered: false },
       ],
       completion: "~/src/app",
+      truncated: true,
+    });
+  });
+});
+
+describe("toSkillView", () => {
+  it.each([
+    [
+      "project scope",
+      { name: "review", description: "Review it.", scope: SkillScope.PROJECT, repoId: "r-1", path: "/w/.claude/skills/review/SKILL.md" },
+      { name: "review", description: "Review it.", scope: "project", repoId: "r-1", path: "/w/.claude/skills/review/SKILL.md" },
+    ],
+    [
+      "user scope, no description",
+      { name: "commit", scope: SkillScope.USER, path: "/h/.claude/commands/commit.md" },
+      { name: "commit", description: "", scope: "user", repoId: "", path: "/h/.claude/commands/commit.md" },
+    ],
+  ] as const)("%s", (_name, init, want) => {
+    expect(toSkillView(create(SkillSchema, init))).toEqual(want);
+  });
+});
+
+describe("toFileSearchView", () => {
+  it("maps matches in order", () => {
+    const res = create(SearchFilesResponseSchema, {
+      matches: [{ path: "src", isDir: true }, { path: "src/index.ts" }],
+      truncated: true,
+    });
+    expect(toFileSearchView(res)).toEqual({
+      matches: [
+        { path: "src", isDir: true },
+        { path: "src/index.ts", isDir: false },
+      ],
       truncated: true,
     });
   });
