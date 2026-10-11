@@ -1,6 +1,52 @@
 import { describe, expect, it } from "vitest";
-import type { SessionStatusView } from "@/api/session";
-import { attentionTier, disconnectCause, disconnectedPill, modelEffortLabel, sessionLocation, statusDetail, statusKind, statusNote, type LocationRepos, type PillKind, type StatusKind } from "./session";
+import type { SessionStateView, SessionStatusView } from "@/api/session";
+import {
+  attentionTier,
+  disconnectCause,
+  disconnectedPill,
+  isThreadGroup,
+  modelEffortLabel,
+  sessionLocation,
+  statusDetail,
+  statusKind,
+  statusNote,
+  threadGroup,
+  type LocationRepos,
+  type PillKind,
+  type StatusKind,
+  type ThreadGroup,
+} from "./session";
+
+describe("threadGroup (the sidebar group of an unpinned thread)", () => {
+  it.each<[SessionStateView, SessionStatusView, string, ThreadGroup]>([
+    ["connected", "attention", "permission: Do you want to proceed?", "prompt"],
+    ["connected", "attention", "question: Which?", "prompt"],
+    ["connected", "attention", "error: overloaded", "prompt"],
+    ["disconnected", "attention", "question: Which?", "prompt"],
+    ["connected", "attention", "finished", "done"],
+    ["disconnected", "attention", "finished", "done"],
+    ["disconnected", "error", "interrupted", "error"],
+    ["disconnected", "error", "daemon restarted", "error"],
+    ["connected", "busy", "working: Say hi", "working"],
+    ["unknown", "busy", "running Bash", "working"],
+    ["starting", "unknown", "", "working"],
+    ["starting", "idle", "", "working"],
+    ["closing", "busy", "working: Say hi", "idle"],
+    ["closing", "idle", "", "idle"],
+    ["disconnected", "busy", "", "idle"],
+    ["disconnected", "idle", "", "idle"],
+    ["connected", "idle", "at prompt", "idle"],
+    ["connected", "unknown", "", "idle"],
+    ["unknown", "unknown", "", "idle"],
+  ])("%s %s %j", (state, status, statusReason, group) => {
+    expect(threadGroup({ state, status, statusReason })).toBe(group);
+    expect(isThreadGroup(group)).toBe(true);
+  });
+  it("isThreadGroup rejects anything else", () => {
+    expect(isThreadGroup("")).toBe(false);
+    expect(isThreadGroup("threads")).toBe(false);
+  });
+});
 
 // Reasons as the daemon reported them: replays of the internal/claudestatus fixtures
 // (Claude Code 2.1.294; CLAUDESTATUS_TRACE=<fixture>, noscreen for "waiting for approval")

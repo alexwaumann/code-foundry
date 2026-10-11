@@ -118,6 +118,28 @@ export function attentionTier(s: Pick<SessionView, "status" | "statusReason">): 
   return statusKind(s) === "done" ? "done" : "prompt";
 }
 
+/**
+ * The sidebar group an unpinned thread sorts in (lib/tree.ts buildRows): "prompt" (waits on
+ * the user, attentionTier), "error" (error / interrupted), "done" (an unseen finished turn),
+ * "working" (busy, or starting up), "idle" (everything else: idle, unknown, closing, plain
+ * disconnected). Attention and error win over the process state, so a thread waiting on the
+ * user never hides in the collapsible Working section; closing wins over busy (the close
+ * interrupts the turn), and a disconnected busy thread (an older daemon's) is idle.
+ */
+export type ThreadGroup = "prompt" | "error" | "done" | "idle" | "working";
+
+export function isThreadGroup(v: string): v is ThreadGroup {
+  return v === "prompt" || v === "error" || v === "done" || v === "idle" || v === "working";
+}
+
+export function threadGroup(s: Pick<SessionView, "state" | "status" | "statusReason">): ThreadGroup {
+  const tier = attentionTier(s);
+  if (tier !== "") return tier;
+  if (s.status === "error") return "error";
+  if (s.state === "closing" || s.state === "disconnected") return "idle";
+  return s.state === "starting" || s.status === "busy" ? "working" : "idle";
+}
+
 /** Why a session is not connected, for the "Not connected" panel. */
 export function disconnectReason(s: Pick<SessionView, "disconnectReason" | "exitCode" | "lastError">): string {
   switch (s.disconnectReason) {

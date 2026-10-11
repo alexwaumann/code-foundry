@@ -25,10 +25,10 @@ export interface ViewAction {
   run: () => void;
 }
 
-/** Selects the Nth thread or terminal in sidebar order. */
+/** Selects the Nth thread or terminal in sidebar order (rows of a collapsed section do not count). */
 function jumpTo(n: number): void {
-  const { sessions, terminals } = getListInputs();
-  const row = leafOrder(sessions, terminals)[n - 1];
+  const { sessions, terminals, options } = getListInputs();
+  const row = leafOrder(sessions, terminals, options)[n - 1];
   if (!row) return;
   const sel = row.kind === "session" ? ({ kind: "session", id: row.sessionId } as const) : ({ kind: "terminal", id: row.terminalId } as const);
   useUiStore.getState().select(sel, { focusTerminal: true });
@@ -36,10 +36,11 @@ function jumpTo(n: number): void {
 
 /** Selects the next session that needs attention after the current one, wrapping. */
 export function jumpToAttention(): boolean {
-  const { sessions, terminals } = getListInputs();
+  const { sessions, terminals, options } = getListInputs();
   const waiting = new Set(attentionIds(useSessionsStore.getState()));
   const sel = useUiStore.getState().selection;
-  const next = nextAfter(sessionOrder(sessions, terminals), sel.kind === "session" ? sel.id : null, (id) => waiting.has(id));
+  // Threads that need attention are never in the collapsible Working section (threadGroup).
+  const next = nextAfter(sessionOrder(sessions, terminals, options),sel.kind === "session" ? sel.id : null, (id) => waiting.has(id));
   if (next === null) return false;
   useUiStore.getState().select({ kind: "session", id: next }, { focusTerminal: true });
   return true;
