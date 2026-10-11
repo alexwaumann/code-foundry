@@ -64,18 +64,24 @@ func ReadSkills(claudeDir string, nested bool, log *slog.Logger) []Skill {
 	}
 
 	cmdDir := filepath.Join(claudeDir, "commands")
+	// WalkDir does not follow a root that is a symlink (a commands directory kept in a
+	// dotfiles checkout): walk its target and report the paths under cmdDir.
+	root := cmdDir
+	if real, err := filepath.EvalSymlinks(cmdDir); err == nil {
+		root = real
+	}
 	walk := func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if !os.IsNotExist(err) {
 				log.Debug("command skipped", "path", p, "err", err)
 			}
-			if d != nil && d.IsDir() && p != cmdDir {
+			if d != nil && d.IsDir() && p != root {
 				return fs.SkipDir
 			}
 			return nil
 		}
 		if d.IsDir() {
-			if p != cmdDir && !nested {
+			if p != root && !nested {
 				return fs.SkipDir
 			}
 			return nil
@@ -92,10 +98,13 @@ func ReadSkills(claudeDir string, nested bool, log *slog.Logger) []Skill {
 			return nil
 		}
 		name := strings.TrimSuffix(d.Name(), filepath.Ext(d.Name()))
+		if rel, err := filepath.Rel(root, p); err == nil {
+			p = filepath.Join(cmdDir, rel)
+		}
 		out = append(out, Skill{Name: name, Description: desc, Path: p})
 		return nil
 	}
-	_ = filepath.WalkDir(cmdDir, walk) // walk never returns an error itself
+	_ = filepath.WalkDir(root, walk) // walk never returns an error itself
 
 	slices.SortFunc(out, func(a, b Skill) int {
 		return cmp.Or(cmp.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)), cmp.Compare(a.Path, b.Path))

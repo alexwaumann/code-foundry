@@ -3,6 +3,7 @@ package fsx
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -113,6 +114,38 @@ func TestReadSkills(t *testing.T) {
 
 	if got := ReadSkills(filepath.Join(dir, "missing"), true, nil); len(got) != 0 {
 		t.Fatalf("missing dir: %v", got)
+	}
+}
+
+// A commands directory that is a symlink (a dotfiles checkout, say) is listed like a
+// skill directory that is one, under the symlink's path.
+func TestReadSkillsSymlinkedCommands(t *testing.T) {
+	dir := realTemp(t)
+	dotfiles := filepath.Join(dir, "dotfiles", "commands")
+	mkdir(t, filepath.Join(dotfiles, "sub"))
+	write(t, filepath.Join(dotfiles, "fix.md"), "Fix it.\n")
+	write(t, filepath.Join(dotfiles, "sub", "deep.md"), "Deep.\n")
+	claude := filepath.Join(dir, "home", ".claude")
+	mkdir(t, claude)
+	symlink(t, dotfiles, filepath.Join(claude, "commands"))
+
+	for _, tt := range []struct {
+		nested bool
+		want   []string
+	}{
+		{false, []string{"fix " + filepath.Join(claude, "commands", "fix.md")}},
+		{true, []string{
+			"deep " + filepath.Join(claude, "commands", "sub", "deep.md"),
+			"fix " + filepath.Join(claude, "commands", "fix.md"),
+		}},
+	} {
+		var got []string
+		for _, s := range ReadSkills(claude, tt.nested, nil) {
+			got = append(got, s.Name+" "+s.Path)
+		}
+		if !slices.Equal(got, tt.want) {
+			t.Errorf("nested=%v: ReadSkills = %q, want %q", tt.nested, got, tt.want)
+		}
 	}
 }
 
