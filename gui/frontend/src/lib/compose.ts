@@ -4,6 +4,7 @@
  * (components/compose) use these; they hold no state.
  */
 import type { PermissionModeView } from "@/api/session";
+import { retainRepoTags } from "./prompt";
 
 export interface Choice {
   value: string;
@@ -73,6 +74,8 @@ export function isWorkspaceKey(key: string): boolean {
 
 /** The draft fields a move to another target rewrites (stores/compose.ts Draft has them all). */
 export interface MovableDraft {
+  /** The prompt with tag tokens (lib/prompt.ts). */
+  text: string;
   worktree: WorktreeChoice;
   base: string | null;
   alsoIn: readonly string[];
@@ -89,18 +92,27 @@ export interface MovableDraft {
  * Also in: the old project is dropped (never demoted to Also in); the new project leaves
  * Also in (a swap); a workspace, or a project without git, has none. The primary stays
  * only while it is still one of the moved draft's Also in projects.
+ *
+ * Tags: project skills and files of a project that is not a member of the moved draft
+ * (the project and its Also in projects, or `workspaceMembers` for a workspace target)
+ * leave the text (lib/prompt retainRepoTags); images and user skills stay.
  */
-export function movedDraft<D extends MovableDraft>(d: D, from: ComposeTarget, to: ComposeTarget, isGitRepo: (id: string) => boolean): D {
+export function movedDraft<D extends MovableDraft>(
+  d: D,
+  from: ComposeTarget,
+  to: ComposeTarget,
+  isGitRepo: (id: string) => boolean,
+  workspaceMembers: readonly string[] = [],
+): D {
   const dropped = new Set<string>();
   if (from.kind === "project") dropped.add(from.repoId);
   if (to.kind === "project") dropped.add(to.repoId);
   const alsoIn = to.kind === "workspace" || !isGitRepo(to.repoId) ? [] : d.alsoIn.filter((id) => !dropped.has(id));
-  // Per-member cleanup goes here: whatever else in the draft names a project (file and
-  // skill tags, once they exist) is checked against the new members (to.repoId +
-  // alsoIn, or the workspace's members) and dropped when its project is not among them.
+  const members = to.kind === "project" ? [to.repoId, ...alsoIn] : workspaceMembers;
   const primary = d.primary !== null && alsoIn.includes(d.primary) ? d.primary : null;
   return {
     ...d,
+    text: retainRepoTags(d.text, members),
     worktree: to.kind === "project" ? { kind: "new" } : { kind: "members" },
     base: null,
     alsoIn,

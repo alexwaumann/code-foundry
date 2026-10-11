@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RepoView } from "@/api/repo";
+import { tagToken } from "@/lib/prompt";
 import {
   addAlsoIn,
   emptyDraft,
@@ -42,6 +43,15 @@ describe("compose drafts", () => {
     expect(getDraft("repo-cf")).toMatchObject({ alsoIn: ["repo-gp"], primary: "repo-gp", base: "origin/dev" });
     removeAlsoIn("repo-cf", "repo-gp");
     expect(getDraft("repo-cf")).toMatchObject({ alsoIn: [], primary: null, base: null });
+  });
+
+  it("removing an Also in project removes its skill and file tags, nothing else", () => {
+    const sk = (repoId: string) => tagToken({ tagKind: "skill", name: "deploy", repoId });
+    const file = tagToken({ tagKind: "file", repoId: "repo-gp", path: "src/a.ts" });
+    addAlsoIn("repo-cf", "repo-gp");
+    updateDraft("repo-cf", { text: `Use ${sk("repo-gp")} and ${sk("repo-cf")} on ${file} then ${sk("")} ` });
+    removeAlsoIn("repo-cf", "repo-gp");
+    expect(getDraft("repo-cf")).toMatchObject({ alsoIn: [], text: `Use and ${sk("repo-cf")} on then ${sk("")}` });
   });
 
   it("a new primary resets the base (its refs differ)", () => {
@@ -116,6 +126,43 @@ describe("switchDraftTarget", () => {
     expect(getDraft("repo-gp")).toMatchObject({ text: "new idea", attachments: [] });
     expect(revoke).toHaveBeenCalledWith("blob:a2");
     expect(useComposeStore.getState().drafts["repo-cf"]).toBeUndefined();
+  });
+
+  it("tags of projects that leave the draft: removed only after the confirm", async () => {
+    const sk = (repoId: string) => tagToken({ tagKind: "skill", name: "deploy", repoId });
+    const text = `${sk("repo-cf")} and ${sk("repo-cf")} with ${sk("repo-gp")} ${sk("")}`;
+    updateDraft("repo-cf", { text });
+    const cancelled = switchDraftTarget(cf, gp);
+    expect(useConfirmStore.getState().pending).toMatchObject({ title: "Switch to gp?", message: "2 references to cf in your text will be removed.", confirmLabel: "Switch" });
+    answerConfirm(false);
+    await expect(cancelled).resolves.toBe(false);
+    expect(getDraft("repo-cf").text).toBe(text);
+    expect(useComposeStore.getState().drafts["repo-gp"]).toBeUndefined();
+    expect(useUiStore.getState().selection).toEqual({ kind: "compose", repoId: "repo-cf" });
+
+    const switched = switchDraftTarget(cf, gp);
+    answerConfirm(true);
+    await expect(switched).resolves.toBe(true);
+    expect(getDraft("repo-gp").text).toBe(`and with ${sk("repo-gp")} ${sk("")}`);
+    expect(useUiStore.getState().selection).toEqual({ kind: "compose", repoId: "repo-gp" });
+  });
+
+  it("to a workspace: Also in tags go too; its members' tags stay", async () => {
+    const sk = (repoId: string) => tagToken({ tagKind: "skill", name: "deploy", repoId });
+    updateDraft("repo-cf", { text: `${sk("repo-sk")} ${sk("repo-cf")} ${sk("repo-gp")}`, alsoIn: ["repo-sk", "repo-gp"] });
+    const p = switchDraftTarget(cf, login);
+    expect(useConfirmStore.getState().pending).toMatchObject({ title: "Switch to login?", message: "2 references to sk and cf in your text will be removed." });
+    answerConfirm(true);
+    await expect(p).resolves.toBe(true);
+    expect(getDraft("ws:w-1").text).toBe(sk("repo-gp"));
+  });
+
+  it("no dropped tags: no tag confirm", async () => {
+    const sk = tagToken({ tagKind: "skill", name: "deploy", repoId: "repo-sk" });
+    updateDraft("repo-cf", { text: `${sk} now`, alsoIn: ["repo-sk"] });
+    await expect(switchDraftTarget(cf, gp)).resolves.toBe(true);
+    expect(useConfirmStore.getState().pending).toBeNull();
+    expect(getDraft("repo-gp").text).toBe(`${sk} now`);
   });
 
   it("an empty draft moves nothing: the target's own draft shows as it is, no confirm", async () => {

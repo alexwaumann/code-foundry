@@ -1,21 +1,35 @@
 import { describe, expect, it } from "vitest";
 import { Schema } from "@tiptap/pm/model";
 import { NodeSelection, TextSelection } from "@tiptap/pm/state";
-import { CHIP_NODE } from "./chipContext";
-import { selectedChipId } from "./chipSelection";
+import { TAG_ATTR_SPEC, TAG_NODE, tagAttrs, tagOf } from "./tagContext";
+import { selectedChipId } from "./tagSelection";
 
 const schema = new Schema({
   nodes: {
     doc: { content: "paragraph+" },
     paragraph: { content: "inline*" },
     text: { group: "inline" },
-    [CHIP_NODE]: { group: "inline", inline: true, atom: true, selectable: true, attrs: { id: { default: "" }, name: { default: "" } } },
+    [TAG_NODE]: {
+      group: "inline",
+      inline: true,
+      atom: true,
+      selectable: true,
+      attrs: TAG_ATTR_SPEC,
+    },
   },
 });
 
-// <p>ab[chip a1]c[chip a2]</p>: a=1, b=2, chip a1 at 3..4, c 4..5, chip a2 at 5..6.
+const image = (id: string, name: string) => schema.node(TAG_NODE, tagAttrs({ tagKind: "image", id, name }));
+
+// <p>ab[chip a1]c[chip a2][skill]</p>: a=1, b=2, chip a1 at 3..4, c 4..5, chip a2 at 5..6, skill 6..7.
 const doc = schema.node("doc", null, [
-  schema.node("paragraph", null, [schema.text("ab"), schema.node(CHIP_NODE, { id: "a1", name: "x.png" }), schema.text("c"), schema.node(CHIP_NODE, { id: "a2", name: "y.png" })]),
+  schema.node("paragraph", null, [
+    schema.text("ab"),
+    image("a1", "x.png"),
+    schema.text("c"),
+    image("a2", "y.png"),
+    schema.node(TAG_NODE, tagAttrs({ tagKind: "skill", name: "deploy", repoId: "r1" })),
+  ]),
 ]);
 
 describe("selectedChipId", () => {
@@ -28,10 +42,21 @@ describe("selectedChipId", () => {
     { name: "range over the chip and text", sel: () => TextSelection.create(doc, 3, 5), want: null },
     { name: "range over text before the chip", sel: () => TextSelection.create(doc, 2, 4), want: null },
     { name: "range over plain text", sel: () => TextSelection.create(doc, 1, 3), want: null },
+    { name: "a skill tag has no preview", sel: () => NodeSelection.create(doc, 6), want: null },
   ];
   for (const c of cases) {
     it(c.name, () => {
       expect(selectedChipId(c.sel())).toBe(c.want);
     });
   }
+});
+
+describe("tag attributes", () => {
+  it.each([
+    { tagKind: "image", id: "a1", name: "x.png" },
+    { tagKind: "skill", name: "deploy", repoId: "" },
+    { tagKind: "file", repoId: "r1", path: "src/" },
+  ] as const)("round-trip a $tagKind tag", (tag) => {
+    expect(tagOf({ ...tagAttrs(tag) })).toEqual(tag);
+  });
 });

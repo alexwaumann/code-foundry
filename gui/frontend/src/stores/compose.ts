@@ -5,9 +5,10 @@
  * files behind the attachments do not survive a reload anyway. Also caches each repo's
  * base refs (RepoService.ListRefs) for the base-ref picker.
  *
- * The draft's text is the prompt with inline image chips as tokens (lib/prompt.ts); the
- * attachments are the images themselves (the thumbnails). A chip refers to an attachment
- * by id; removing a chip from the text keeps the attachment.
+ * The draft's text is the prompt with inline tags as tokens (lib/prompt.ts: image chips,
+ * skills, files); the attachments are the images themselves (the thumbnails). A chip
+ * refers to an attachment by id; removing a chip from the text keeps the attachment.
+ * Skill and file tags of a project go when the project leaves the draft.
  *
  * Sending stages the attachments (SessionService.StageAttachment) and invokes the
  * session.new registry command, like every other user action.
@@ -32,9 +33,9 @@ import {
   type ThreadPlace,
   type WorktreeChoice,
 } from "@/lib/compose";
-import { projectPrompt, removeReferences } from "@/lib/prompt";
+import { projectPrompt, removeReferences, removeRepoTags, repoTagCount, tagsByRepo } from "@/lib/prompt";
 import { invokeConfirmed, refreshCommands } from "./commands";
-import { requestConfirm } from "./confirm";
+import { requestConfirm, type ConfirmRequest } from "./confirm";
 import { getUiContext } from "./context";
 import { useReposStore } from "./repos";
 import { SESSION_COMMANDS } from "./sessionActions";
@@ -54,7 +55,7 @@ export interface DraftAttachment {
 export type DraftPhase = "idle" | "attaching" | "starting";
 
 export interface Draft {
-  /** The prompt, chips as `![name](cf-attachment://<id>)` tokens. */
+  /** The prompt, tags as tokens (`![name](cf-attachment://<id>)`, `[/name](cf-skill://…)`, …). */
   text: string;
   attachments: readonly DraftAttachment[];
   /** null: the settings default (sessions.default_model / default_effort). */
@@ -152,12 +153,16 @@ export function addAlsoIn(key: string, repoId: string): void {
   updateDraft(key, { alsoIn: [...d.alsoIn, repoId], error: null });
 }
 
-/** Drops an "Also in" project; if the thread was to run there, it runs in the project again. */
+/**
+ * Drops an "Also in" project and every tag in the text that refers to it (its skills and
+ * files); if the thread was to run there, it runs in the project again.
+ */
 export function removeAlsoIn(key: string, repoId: string): void {
   const d = getDraft(key);
   if (!d.alsoIn.includes(repoId)) return;
   updateDraft(key, {
     alsoIn: d.alsoIn.filter((id) => id !== repoId),
+    text: removeRepoTags(d.text, repoId),
     ...(d.primary === repoId ? { primary: null, base: null } : {}),
     error: null,
   });
@@ -253,8 +258,10 @@ function targetName(t: ComposeTarget): string {
  * where it runs resets (lib/compose movedDraft). The old key is deleted without
  * revoking the attachments' object URLs: they moved with it.
  *
- * A non-empty draft already at the new target is replaced only after a confirm; on
- * cancel nothing changes. An empty draft moves nothing: the new target's own draft is
+ * Tags of projects the moved draft no longer has (the old project, Also in projects a
+ * workspace or no-git target drops) leave the text; when there are any, a confirm comes
+ * first ("Switch to <name>?"). A non-empty draft already at the new target is replaced
+ * only after a confirm. On either cancel nothing changes. An empty draft moves nothing: the new target's own draft is
  * shown as it is. Resolves false when nothing happened (same target, busy, cancelled).
  */
 export async function switchDraftTarget(from: ComposeTarget, to: ComposeTarget): Promise<boolean> {
@@ -262,12 +269,17 @@ export async function switchDraftTarget(from: ComposeTarget, to: ComposeTarget):
   const toKey = draftKey(to);
   if (fromKey === toKey || getDraft(fromKey).phase !== "idle") return false;
   const waiting = useComposeStore.getState().drafts[toKey];
+  const isGit = (id: string) => useReposStore.getState().byId[id]?.git === true;
   if (isDraftEmpty(getDraft(fromKey))) {
     if (waiting && !isDraftEmpty(waiting)) {
       selectTarget(to);
       return true;
     }
-  } else if (waiting && !isDraftEmpty(waiting)) {
+  } else {
+    const drop = droppedTagsConfirm(getDraft(fromKey).text, movedDraft(getDraft(fromKey), from, to, isGit, workspaceMemberIds(to)).text, to);
+    if (drop && !(await requestConfirm(drop))) return false;
+  }
+  if (!isDraftEmpty(getDraft(fromKey)) && waiting && !isDraftEmpty(waiting)) {
     const yes = await requestConfirm({
       title: `Replace the draft in ${targetName(to)}?`,
       message: "It has unsent text or images.",
@@ -278,8 +290,7 @@ export async function switchDraftTarget(from: ComposeTarget, to: ComposeTarget):
   }
   const cur = getDraft(fromKey);
   if (cur.phase !== "idle") return false;
-  const repos = useReposStore.getState().byId;
-  const moved = movedDraft(cur, from, to, (id) => repos[id]?.git === true);
+  const moved = movedDraft(cur, from, to, isGit, workspaceMemberIds(to));
   useComposeStore.setState((s) => {
     // The replaced draft's images go away with it.
     for (const a of s.drafts[toKey]?.attachments ?? []) URL.revokeObjectURL(a.url);
@@ -288,6 +299,34 @@ export async function switchDraftTarget(from: ComposeTarget, to: ComposeTarget):
   });
   selectTarget(to);
   return true;
+}
+
+/** A workspace target's member repo ids ([] for a project, or a workspace that is gone). */
+function workspaceMemberIds(t: ComposeTarget): string[] {
+  return t.kind === "workspace" ? (useWorkspacesStore.getState().byId[t.workspaceId]?.members.map((m) => m.repoId) ?? []) : [];
+}
+
+/** "a", "a and b", "a, b and c". */
+function listNames(names: readonly string[]): string {
+  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
+}
+
+/**
+ * The question to ask when moving the draft drops tags (skills, files of projects that
+ * leave it), or null when it drops none.
+ */
+function droppedTagsConfirm(before: string, after: string, to: ComposeTarget): ConfirmRequest | null {
+  const kept = tagsByRepo(after);
+  const gone = tagsByRepo(before).filter((id) => !kept.includes(id));
+  if (gone.length === 0) return null;
+  const n = gone.reduce((sum, id) => sum + repoTagCount(before, id), 0);
+  const repos = useReposStore.getState().byId;
+  return {
+    title: `Switch to ${targetName(to)}?`,
+    message: `${String(n)} ${n === 1 ? "reference" : "references"} to ${listNames(gone.map((id) => repos[id]?.name ?? id))} in your text will be removed.`,
+    confirmLabel: "Switch",
+    centered: true,
+  };
 }
 
 /** Shows a target's composer and focuses its prompt (no worktree side effect, unlike composeIn's path). */

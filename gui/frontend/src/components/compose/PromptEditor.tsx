@@ -6,12 +6,25 @@ import { UndoRedo } from "@tiptap/extensions";
 import { EditorContent, useEditor, type JSONContent } from "@tiptap/react";
 import { splitBlock } from "@tiptap/pm/commands";
 import { Fragment, Slice, type Node as PMNode } from "@tiptap/pm/model";
-import { TextSelection } from "@tiptap/pm/state";
+import { TextSelection, type EditorState } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
-import { chipInsertText, chipToken, parseLine, parsePrompt, proseOf, serializePrompt, type PromptPiece } from "@/lib/prompt";
-import { ChipDraftContext, CHIP_NODE } from "./chipContext";
-import { AttachmentChipNode } from "./chipNode";
-import { selectedChipId } from "./chipSelection";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { findTrigger, LEAF_CHAR, type TriggerChar } from "@/lib/completion";
+import { chipInsertText, chipToken, parseLine, parsePrompt, proseOf, serializePrompt, type PromptPiece, type PromptTag } from "@/lib/prompt";
+import { TagDraftContext, TAG_NODE, tagAttrs, tagOf } from "./tagContext";
+import { TagNode } from "./tagNode";
+import { selectedChipId } from "./tagSelection";
+
+/** A completion trigger at the caret: the character, the query, and the document range of both. */
+export interface EditorTrigger {
+  char: TriggerChar;
+  query: string;
+  from: number;
+  to: number;
+}
+
+/** Keys the completion card takes while it is open. */
+export type CompletionKey = "up" | "down" | "enter" | "tab" | "escape";
 
 export interface PromptEditorHandle {
   focus(): void;
@@ -20,6 +33,12 @@ export interface PromptEditorHandle {
    * only when the prompt has prose already or a selection is being replaced).
    */
   insertChips(attachments: readonly { id: string; name: string }[]): void;
+  /**
+   * Replaces a range (a trigger and its query) with a tag and one space after it (or
+   * steps over the space already there): a slash command and a file reference end at
+   * whitespace. One undo step.
+   */
+  insertTag(range: { from: number; to: number }, tag: PromptTag): void;
 }
 
 interface PromptEditorProps {
@@ -38,11 +57,53 @@ interface PromptEditorProps {
   onPasteFiles: (files: File[]) => void;
   /** Space on a selected chip: preview its attachment; false when it has none. */
   onPreviewChip: (id: string, returnFocus: HTMLElement) => boolean;
+  /** The characters that start a completion ([] for none). */
+  triggers: readonly TriggerChar[];
+  /** The trigger at the caret changed (null: none, or the prompt lost focus). */
+  onTrigger: (t: EditorTrigger | null) => void;
+  /** A completion key; true when the open card took it. */
+  onCompletionKey: (key: CompletionKey) => boolean;
+  /** The open card's listbox and active option ids, for aria-controls / aria-activedescendant. */
+  completionAria: { controls: string; active: string } | null;
   handleRef: Ref<PromptEditorHandle>;
 }
 
 function piecesToNodes(pieces: readonly PromptPiece[]): JSONContent[] {
-  return pieces.map((p) => (p.kind === "text" ? { type: "text", text: p.text } : { type: CHIP_NODE, attrs: { id: p.id, name: p.name } }));
+  return pieces.map((p) => (p.kind === "text" ? { type: "text", text: p.text } : { type: TAG_NODE, attrs: { ...tagAttrs(p) } }));
+}
+
+/** The trigger at a collapsed caret, if any. */
+function triggerAt(state: EditorState, chars: readonly TriggerChar[]): EditorTrigger | null {
+  const sel = state.selection;
+  if (!sel.empty || chars.length === 0) return null;
+  const { $from } = sel;
+  // Leaves (tags) are one position and one LEAF_CHAR each, so offsets map to positions.
+  const before = $from.parent.textBetween(0, $from.parentOffset, undefined, LEAF_CHAR);
+  const t = findTrigger(before, chars);
+  return t && { char: t.char, query: t.query, from: $from.start() + t.offset, to: $from.pos };
+}
+
+function sameTrigger(a: EditorTrigger | null, b: EditorTrigger | null): boolean {
+  return a === b || (a !== null && b !== null && a.char === b.char && a.query === b.query && a.from === b.from && a.to === b.to);
+}
+
+/** The completion key an event is (plain keys only), or null. */
+function completionKey(e: KeyboardEvent): CompletionKey | null {
+  if (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return null;
+  switch (e.key) {
+    case "ArrowUp":
+      return "up";
+    case "ArrowDown":
+      return "down";
+    case "Enter":
+      return "enter";
+    case "Tab":
+      return "tab";
+    case "Escape":
+      return "escape";
+    default:
+      return null;
+  }
 }
 
 function toDoc(text: string): JSONContent {
@@ -54,7 +115,7 @@ function inlinePieces(parent: PMNode | Fragment): PromptPiece[] {
   const out: PromptPiece[] = [];
   parent.forEach((n) => {
     if (n.isText) out.push({ kind: "text", text: n.text ?? "" });
-    else if (n.type.name === CHIP_NODE) out.push({ kind: "chip", id: String(n.attrs.id), name: String(n.attrs.name) });
+    else if (n.type.name === TAG_NODE) out.push({ kind: "tag", ...tagOf(n.attrs) });
   });
   return out;
 }
@@ -88,22 +149,50 @@ function textSlice(view: EditorView, text: string): Slice {
 }
 
 /**
- * The prompt input: a TipTap (ProseMirror) editor with paragraphs, text and inline image
- * chips, nothing else (no marks, no Markdown). Enter sends, Shift+Enter starts a new
- * line; Space on a selected chip previews its image; chips are atoms, so Backspace/Delete remove one whole and the arrows step over
- * one in a single press; undo restores a deleted chip. Copy writes the token text; a
- * pasted token becomes a chip again.
+ * The prompt input: a TipTap (ProseMirror) editor with paragraphs, text and inline tags
+ * (image chips, skills, files), nothing else (no marks, no Markdown). Enter sends,
+ * Shift+Enter starts a new line; Space on a selected image chip previews it; tags are
+ * atoms, so Backspace/Delete remove one whole and the arrows step over one in a single
+ * press; undo restores a deleted tag. Copy writes the token text; a pasted token becomes
+ * a tag again. A trigger character (`/`) at the caret is reported to the composer, whose
+ * completion card then takes the arrows, Enter, Tab and Escape while it is open.
  */
-export function PromptEditor({ draftKey, value, disabled, placeholder, onChange, onSubmit, onEscape, onPasteFiles, onPreviewChip, handleRef }: PromptEditorProps) {
+export function PromptEditor({
+  draftKey,
+  value,
+  disabled,
+  placeholder,
+  onChange,
+  onSubmit,
+  onEscape,
+  onPasteFiles,
+  onPreviewChip,
+  triggers,
+  onTrigger,
+  onCompletionKey,
+  completionAria,
+  handleRef,
+}: PromptEditorProps) {
   // What the editor last reported (or was set to): a store value that differs came from
   // outside (a removed attachment, a cleared draft) and replaces the document.
   const shown = useRef(value);
   const focused = useRef(false);
-  const cb = useRef({ onChange, onSubmit, onEscape, onPasteFiles, onPreviewChip });
+  const lastTrigger = useRef<EditorTrigger | null>(null);
+  const cb = useRef({ onChange, onSubmit, onEscape, onPasteFiles, onPreviewChip, onTrigger, onCompletionKey, triggers, disabled });
   useLayoutEffect(() => {
-    cb.current = { onChange, onSubmit, onEscape, onPasteFiles, onPreviewChip };
+    cb.current = { onChange, onSubmit, onEscape, onPasteFiles, onPreviewChip, onTrigger, onCompletionKey, triggers, disabled };
   });
 
+  /** Reports the trigger at the caret when it changed (none without focus or while disabled). */
+  const report = (state: EditorState | null) => {
+    const t = state && !cb.current.disabled ? triggerAt(state, cb.current.triggers) : null;
+    if (sameTrigger(t, lastTrigger.current)) return;
+    lastTrigger.current = t;
+    cb.current.onTrigger(t);
+  };
+
+  const controls = completionAria?.controls;
+  const active = completionAria?.active;
   const attributes = useMemo(
     () => ({
       role: "textbox",
@@ -111,21 +200,27 @@ export function PromptEditor({ draftKey, value, disabled, placeholder, onChange,
       "aria-label": "Prompt",
       "aria-placeholder": placeholder,
       ...(disabled ? { "aria-disabled": "true" } : {}),
+      ...(triggers.length > 0 ? { "aria-autocomplete": "list" } : {}),
+      ...(controls ? { "aria-controls": controls } : {}),
+      ...(active ? { "aria-activedescendant": active } : {}),
       "data-compose-stop": "",
       "data-testid": "composer-input",
       class: "min-h-16 max-h-80 overflow-y-auto px-4 pt-3.5 pb-1 text-sm leading-6 whitespace-pre-wrap break-words outline-none aria-disabled:opacity-70",
     }),
-    [disabled, placeholder],
+    [disabled, placeholder, triggers.length, controls, active],
   );
 
   const editor = useEditor({
-    extensions: [Document, Paragraph, Text, UndoRedo, AttachmentChipNode],
+    extensions: [Document, Paragraph, Text, UndoRedo, TagNode],
     content: toDoc(value),
     editable: !disabled,
     editorProps: {
       attributes,
       handleKeyDown: (view, e) => {
         if (e.isComposing) return false;
+        const ck = completionKey(e);
+        // The open completion card first: Enter inserts there instead of sending.
+        if (ck && cb.current.onCompletionKey(ck)) return true;
         const plain = !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey;
         if (e.key === "Enter") {
           if (e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey) return splitBlock(view.state, (tr) => {
@@ -147,19 +242,19 @@ export function PromptEditor({ draftKey, value, disabled, placeholder, onChange,
         }
         if (!sel.empty || !plain) return false;
         const { $from } = sel;
-        // Step over a chip in one press (ProseMirror would select it first).
+        // Step over a tag in one press (ProseMirror would select it first).
         if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
           const dir = e.key === "ArrowLeft" ? -1 : 1;
           const next = dir < 0 ? $from.nodeBefore : $from.nodeAfter;
-          if (next?.type.name !== CHIP_NODE) return false;
+          if (next?.type.name !== TAG_NODE) return false;
           view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, $from.pos + dir * next.nodeSize)).scrollIntoView());
           return true;
         }
-        // Backspace/Delete next to a chip remove exactly it (the same in WebKit and Chromium).
+        // Backspace/Delete next to a tag remove exactly it (the same in WebKit and Chromium).
         if (e.key === "Backspace" || e.key === "Delete") {
           const back = e.key === "Backspace";
           const next = back ? $from.nodeBefore : $from.nodeAfter;
-          if (next?.type.name !== CHIP_NODE) return false;
+          if (next?.type.name !== TAG_NODE) return false;
           const from = back ? $from.pos - next.nodeSize : $from.pos;
           view.dispatch(view.state.tr.delete(from, from + next.nodeSize).scrollIntoView());
           return true;
@@ -185,17 +280,27 @@ export function PromptEditor({ draftKey, value, disabled, placeholder, onChange,
     },
     onUpdate: ({ editor: ed }) => {
       const text = fragmentText(ed.state.doc.content);
-      if (text === shown.current) return;
-      shown.current = text;
-      cb.current.onChange(text);
+      if (text !== shown.current) {
+        shown.current = text;
+        cb.current.onChange(text);
+      }
+      report(ed.view.hasFocus() ? ed.state : null);
     },
-    onFocus: () => {
+    onSelectionUpdate: ({ editor: ed }) => {
+      report(ed.view.hasFocus() ? ed.state : null);
+    },
+    onFocus: ({ editor: ed }) => {
       focused.current = true;
+      report(ed.state);
+    },
+    onBlur: () => {
+      report(null);
     },
   });
 
   useEffect(() => {
     editor.setEditable(!disabled, false);
+    if (disabled) report(null);
   }, [editor, disabled]);
 
   useLayoutEffect(() => {
@@ -223,26 +328,42 @@ export function PromptEditor({ draftKey, value, disabled, placeholder, onChange,
         // Unknown caret (never focused): the end of the prompt.
         const end = TextSelection.atEnd(state.doc);
         const sel = focused.current ? state.selection : end;
-        const before = sel.$from.parent.textBetween(0, sel.$from.parentOffset, undefined, "￼");
+        const before = sel.$from.parent.textBetween(0, sel.$from.parentOffset, undefined, LEAF_CHAR);
         const insert = chipInsertText(tokens, before, { hasProse: proseOf(shown.current).trim() !== "", replacingSelection: replacing });
         if (insert === null) return;
         editor.chain().insertContentAt({ from: sel.from, to: sel.to }, piecesToNodes(parseLine(insert))).run();
+      },
+      insertTag: (range, tag) => {
+        const { doc } = editor.state;
+        const end = doc.resolve(range.to).end();
+        const spaced = doc.textBetween(range.to, Math.min(range.to + 1, end), undefined, LEAF_CHAR) === " ";
+        const nodes = piecesToNodes(spaced ? [{ kind: "tag", ...tag }] : [{ kind: "tag", ...tag }, { kind: "text", text: " " }]);
+        // The caret ends after the space: the inserted one, or the one already there.
+        editor
+          .chain()
+          .focus()
+          .insertContentAt(range, nodes)
+          .setTextSelection(range.from + 2)
+          .scrollIntoView()
+          .run();
       },
     }),
     [editor],
   );
 
   return (
-    <ChipDraftContext.Provider value={draftKey}>
-      {/* data-value: the prompt as stored (chip tokens included), for tests and debugging. */}
-      <div className="relative" data-testid="composer-prompt" data-value={value}>
-        {value === "" && (
-          <span aria-hidden className="pointer-events-none absolute top-3.5 left-4 text-sm leading-6 text-muted-foreground select-none">
-            {placeholder}
-          </span>
-        )}
-        <EditorContent editor={editor} />
-      </div>
-    </ChipDraftContext.Provider>
+    <TagDraftContext.Provider value={draftKey}>
+      <TooltipProvider>
+        {/* data-value: the prompt as stored (tag tokens included), for tests and debugging. */}
+        <div className="relative" data-testid="composer-prompt" data-value={value}>
+          {value === "" && (
+            <span aria-hidden className="pointer-events-none absolute top-3.5 left-4 text-sm leading-6 text-muted-foreground select-none">
+              {placeholder}
+            </span>
+          )}
+          <EditorContent editor={editor} />
+        </div>
+      </TooltipProvider>
+    </TagDraftContext.Provider>
   );
 }

@@ -4,9 +4,29 @@ import { Plus, X } from "lucide-react";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { tildify } from "@/lib/path";
+import { repoTagCount } from "@/lib/prompt";
 import { cn } from "@/lib/utils";
-import { addAlsoIn, removeAlsoIn, setPrimary } from "@/stores/compose";
+import { addAlsoIn, getDraft, removeAlsoIn, setPrimary } from "@/stores/compose";
+import { requestConfirm } from "@/stores/confirm";
 import { useReposStore } from "@/stores/repos";
+
+/**
+ * Removes an "Also in" project. When tags in the text refer to it (its skills, files),
+ * asks first: they go with it.
+ */
+async function removeWithConfirm(draftKey: string, repoId: string, name: string): Promise<void> {
+  const n = repoTagCount(getDraft(draftKey).text, repoId);
+  if (n > 0) {
+    const yes = await requestConfirm({
+      title: `Remove ${name} from the thread?`,
+      message: `${String(n)} ${n === 1 ? "reference" : "references"} in your text will be removed.`,
+      confirmLabel: "Remove",
+      centered: true,
+    });
+    if (!yes) return;
+  }
+  removeAlsoIn(draftKey, repoId);
+}
 
 /** One project the thread works in, as the chip row shows it. */
 export interface MemberChipModel {
@@ -75,7 +95,7 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
           data-compose-stop
           className="mr-1 flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:hidden"
           onClick={() => {
-            removeAlsoIn(draftKey, member.repoId);
+            void removeWithConfirm(draftKey, member.repoId, name);
           }}
         >
           <X className="size-3" />
