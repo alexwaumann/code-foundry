@@ -45,7 +45,9 @@ func usageLine(req, ts, sid, model string, in, out, read, create int64, cache, s
 		req, ts, sid, model, u)
 }
 
-func h1(n int64) string { return fmt.Sprintf(`{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":%d}`, n) }
+func h1(n int64) string {
+	return fmt.Sprintf(`{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":%d}`, n)
+}
 
 func TestUsageFoldLine(t *testing.T) {
 	c := usageLines(t)

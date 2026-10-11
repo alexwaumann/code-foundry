@@ -136,7 +136,7 @@ func Lookup(model, tier, speed string) (Rate, bool) {
 // Bucket is the part of a usage bucket pricing reads: the rate key and the token
 // counters.
 type Bucket struct {
-	Model, Tier, Speed                                  string
+	Model, Tier, Speed                                   string
 	Input, Output, CacheRead, CacheWrite5m, CacheWrite1h int64
 }
 
