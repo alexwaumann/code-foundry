@@ -161,10 +161,10 @@ func RegisterView(r *Registry, e Emitter) error {
 		Command{
 			Name:        "view.panel.new-tab",
 			Title:       "New Side Panel Tab",
-			Description: "Show the side panel's surface list to open another tab next to the selected session, terminal, worktree, or page.",
+			Description: "Show the surface list in the side panel of the selected session, terminal, worktree, or page, to open another tab there.",
 			Category:    "View",
-			// No default chord, like view.panel.expand (the + after the panel's tabs runs
-			// it, and each surface's letter opens it directly while the panel has focus).
+			// No default chord, like view.panel.expand: the + after the panel's tabs runs
+			// it, and while the panel has focus each surface's letter opens that surface.
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return show(ViewPanelNewTab), nil
 			},
