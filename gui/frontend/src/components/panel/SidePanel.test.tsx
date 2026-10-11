@@ -462,10 +462,9 @@ describe("reordering tabs", () => {
 
   /** jsdom lays nothing out: the strip is 400px wide and its tabs sit 100px apart, 80px wide, so dnd-kit finds the tab under the pointer. */
   const layOutTabs = () => {
-    const real = HTMLElement.prototype.getBoundingClientRect;
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
       if (this.getAttribute("role") === "tablist") return DOMRect.fromRect({ x: 0, y: 0, width: 400, height: 28 });
-      if (this.dataset.tabId === undefined || !this.parentElement) return real.call(this);
+      if (this.dataset.tabId === undefined || !this.parentElement) return new DOMRect();
       const i = Array.from(this.parentElement.children).indexOf(this);
       return DOMRect.fromRect({ x: i * 100, y: 0, width: 80, height: 28 });
     });
