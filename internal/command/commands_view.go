@@ -32,6 +32,12 @@ const ViewPanelToggle = "panel.toggle"
 // action on per-selection GUI state, not a page; expanding a hidden panel shows it.
 const ViewPanelExpand = "panel.expand"
 
+// ViewPanelNewTab is the ShowView name that shows the selection's side panel with its
+// surface list ("Open a surface") so another tab can be opened next to the ones it has.
+// Like ViewPanelToggle it is an action on per-selection GUI state, not a page: it shows a
+// hidden panel, and no tab is added until a surface is picked.
+const ViewPanelNewTab = "panel.new-tab"
+
 // ViewPanelWorkspace is the ShowView name that opens (or reveals) the workspace surface
 // in the side panel of the selected workspace thread: the workspace's members with their
 // git and pull request state. Like ViewPanelToggle it is an action on per-selection GUI
@@ -77,7 +83,8 @@ func hasWorktreeThreadContext(c Context) bool {
 // shows the Usage page,
 // view.pullrequests, which shows the Pull Requests page,
 // view.projects, which shows the Projects page, view.panel.toggle, which shows or hides
-// the side panel, view.panel.expand, which switches it between split and full width, and
+// the side panel, view.panel.expand, which switches it between split and full width,
+// view.panel.new-tab, which shows its surface list to open another tab, and
 // view.panel.workspace, which opens the workspace surface in it,
 // view.panel.linked-prs, which opens the thread's linked pull requests in it,
 // view.panel.usage, which opens the thread's usage in it, and
@@ -149,6 +156,17 @@ func RegisterView(r *Registry, e Emitter) error {
 			// No default chord (the user's choice); bindable in settings.
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return show(ViewPanelExpand), nil
+			},
+		},
+		Command{
+			Name:        "view.panel.new-tab",
+			Title:       "New Side Panel Tab",
+			Description: "Show the side panel's surface list to open another tab next to the selected session, terminal, worktree, or page.",
+			Category:    "View",
+			// No default chord, like view.panel.expand (the + after the panel's tabs runs
+			// it, and each surface's letter opens it directly while the panel has focus).
+			Run: func(context.Context, Context, Args) (Result, error) {
+				return show(ViewPanelNewTab), nil
 			},
 		},
 		Command{
