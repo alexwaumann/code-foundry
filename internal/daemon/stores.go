@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/db"
@@ -47,6 +48,9 @@ type stores struct {
 	gitops *gitops.Manager
 	// terminal owns PTYs; closed first so every child gets hung up before the db goes.
 	terminal *terminal.Manager
+	// stopShells stops the shell reaper (shells.go): exited shells and the shells of a
+	// removed worktree are removed. Stopped before terminal closes.
+	stopShells func()
 	// session layers Claude sessions on terminal and db; shut down before terminal so
 	// live sessions are recorded as disconnected while their processes still run.
 	session *session.Manager
@@ -168,6 +172,17 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 	}); err != nil {
 		return nil, err
 	}
+	// After session: the reaper's sweep asks it which threads exist.
+	if s.stopShells, err = startShellReaper(ctx, shellReaperOptions{
+		Log: log.With("store", "terminal"), Terminals: s.terminal, Bus: s.bus,
+		RepoExists: func(id string) bool { _, ok := s.repo.Snapshot().Repo(id); return ok },
+		SessionExists: func(id string) bool {
+			snap := s.session.Snapshot()
+			return snap == nil || slices.ContainsFunc(snap.Sessions, func(x session.Session) bool { return x.ID == id })
+		},
+	}); err != nil {
+		return nil, err
+	}
 	uo := update.DefaultOptions(version.Version)
 	uo.Bus, uo.Log = s.bus, log.With("store", "update")
 	s.update = update.Start(ctx, uo)
@@ -194,6 +209,9 @@ func (s *stores) close() error {
 	var errs []error
 	if s.update != nil {
 		s.update.Close()
+	}
+	if s.stopShells != nil {
+		s.stopShells()
 	}
 	if s.session != nil {
 		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)

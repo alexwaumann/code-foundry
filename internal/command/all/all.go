@@ -14,9 +14,13 @@ import (
 type Deps struct {
 	Daemon  command.DaemonInfo
 	Emitter command.Emitter
-	// Terminal backs terminal.*. Nil registers the commands against
+	// Terminal backs terminal.* (terminal.new also reads Repo and Session to find a
+	// shell's owner). Nil registers the commands against
 	// UnimplementedTerminalServiceHandler, so they list but fail with Unimplemented.
 	Terminal command.TerminalBackend
+	// IsShellTerminal reports whether a terminal is a shell terminal.new started; it gates
+	// terminal.close. Nil: any terminal.
+	IsShellTerminal func(id string) bool
 	// Repo backs repo.*. Nil works like Terminal.
 	Repo command.RepoBackend
 	// NotGit reports a context in a project without git: it gates repo.worktree.*,
@@ -82,7 +86,7 @@ func Register(r *command.Registry, d Deps) error {
 	return errors.Join(
 		command.RegisterDaemon(r, d.Daemon),
 		command.RegisterUI(r, d.Emitter),
-		command.RegisterTerminal(r, d.Terminal),
+		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Repo: d.Repo, Session: d.Session, IsShell: d.IsShellTerminal}),
 		command.RegisterRepo(r, d.Repo, d.NotGit),
 		command.RegisterRepoAdd(r, d.Repo, d.Clone),
 		command.RegisterProjects(r, d.Projects),

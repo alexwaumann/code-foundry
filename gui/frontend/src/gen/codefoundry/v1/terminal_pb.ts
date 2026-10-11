@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/terminal.proto.
  */
 export const file_codefoundry_v1_terminal: GenFile = /*@__PURE__*/
-  fileDesc("Ch1jb2RlZm91bmRyeS92MS90ZXJtaW5hbC5wcm90bxIOY29kZWZvdW5kcnkudjEi9QIKCFRlcm1pbmFsEgoKAmlkGAEgASgJEgwKBGFyZ3YYAiADKAkSCwoDY3dkGAMgASgJEgwKBGNvbHMYBCABKA0SDAoEcm93cxgFIAEoDRINCgV0aXRsZRgGIAEoCRIsCgVzdGF0ZRgHIAEoDjIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsU3RhdGUSEQoJZXhpdF9jb2RlGAggASgFEi4KCnN0YXJ0ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi0KCWV4aXRlZF9hdBgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEgoKYWx0X3NjcmVlbhgLIAEoCBI0CgZsYWJlbHMYDCADKAsyJC5jb2RlZm91bmRyeS52MS5UZXJtaW5hbC5MYWJlbHNFbnRyeRotCgtMYWJlbHNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIs0BChVDcmVhdGVUZXJtaW5hbFJlcXVlc3QSDAoEYXJndhgBIAMoCRILCgNjd2QYAiABKAkSCwoDZW52GAMgAygJEgwKBGNvbHMYBCABKA0SDAoEcm93cxgFIAEoDRJBCgZsYWJlbHMYBiADKAsyMS5jb2RlZm91bmRyeS52MS5DcmVhdGVUZXJtaW5hbFJlcXVlc3QuTGFiZWxzRW50cnkaLQoLTGFiZWxzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJEChZDcmVhdGVUZXJtaW5hbFJlc3BvbnNlEioKCHRlcm1pbmFsGAEgASgLMhguY29kZWZvdW5kcnkudjEuVGVybWluYWwiFgoUTGlzdFRlcm1pbmFsc1JlcXVlc3QiRAoVTGlzdFRlcm1pbmFsc1Jlc3BvbnNlEisKCXRlcm1pbmFscxgBIAMoCzIYLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsIiAKEkdldFRlcm1pbmFsUmVxdWVzdBIKCgJpZBgBIAEoCSJBChNHZXRUZXJtaW5hbFJlc3BvbnNlEioKCHRlcm1pbmFsGAEgASgLMhguY29kZWZvdW5kcnkudjEuVGVybWluYWwiGwoNQXR0YWNoUmVxdWVzdBIKCgJpZBgBIAEoCSKaAwoLQXR0YWNoRXZlbnQSOAoIc25hcHNob3QYASABKAsyJC5jb2RlZm91bmRyeS52MS5BdHRhY2hFdmVudC5TbmFwc2hvdEgAEjQKBm91dHB1dBgCIAEoCzIiLmNvZGVmb3VuZHJ5LnYxLkF0dGFjaEV2ZW50Lk91dHB1dEgAEjYKB3Jlc2l6ZWQYAyABKAsyIy5jb2RlZm91bmRyeS52MS5BdHRhY2hFdmVudC5SZXNpemVkSAASNAoGZXhpdGVkGAQgASgLMiIuY29kZWZvdW5kcnkudjEuQXR0YWNoRXZlbnQuRXhpdGVkSAAaSAoIU25hcHNob3QSDAoEZGF0YRgBIAEoDBIMCgRjb2xzGAIgASgNEgwKBHJvd3MYAyABKA0SEgoKYWx0X3NjcmVlbhgEIAEoCBoWCgZPdXRwdXQSDAoEZGF0YRgBIAEoDBolCgdSZXNpemVkEgwKBGNvbHMYASABKA0SDAoEcm93cxgCIAEoDRobCgZFeGl0ZWQSEQoJZXhpdF9jb2RlGAEgASgFQgcKBWV2ZW50IjAKFFdyaXRlVGVybWluYWxSZXF1ZXN0EgoKAmlkGAEgASgJEgwKBGRhdGEYAiABKAwiFwoVV3JpdGVUZXJtaW5hbFJlc3BvbnNlIj8KFVJlc2l6ZVRlcm1pbmFsUmVxdWVzdBIKCgJpZBgBIAEoCRIMCgRjb2xzGAIgASgNEgwKBHJvd3MYAyABKA0iGAoWUmVzaXplVGVybWluYWxSZXNwb25zZSIhChNLaWxsVGVybWluYWxSZXF1ZXN0EgoKAmlkGAEgASgJIhYKFEtpbGxUZXJtaW5hbFJlc3BvbnNlIiMKFVJlbW92ZVRlcm1pbmFsUmVxdWVzdBIKCgJpZBgBIAEoCSIYChZSZW1vdmVUZXJtaW5hbFJlc3BvbnNlIhcKFVdhdGNoVGVybWluYWxzUmVxdWVzdCJbCg1UZXJtaW5hbEV2ZW50EisKB3VwZGF0ZWQYASABKAsyGC5jb2RlZm91bmRyeS52MS5UZXJtaW5hbEgAEhQKCnJlbW92ZWRfaWQYAiABKAlIAEIHCgVldmVudCpmCg1UZXJtaW5hbFN0YXRlEh4KGlRFUk1JTkFMX1NUQVRFX1VOU1BFQ0lGSUVEEAASGgoWVEVSTUlOQUxfU1RBVEVfUlVOTklORxABEhkKFVRFUk1JTkFMX1NUQVRFX0VYSVRFRBACMpUGCg9UZXJtaW5hbFNlcnZpY2USWQoGQ3JlYXRlEiUuY29kZWZvdW5kcnkudjEuQ3JlYXRlVGVybWluYWxSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuQ3JlYXRlVGVybWluYWxSZXNwb25zZSIAElUKBExpc3QSJC5jb2RlZm91bmRyeS52MS5MaXN0VGVybWluYWxzUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLkxpc3RUZXJtaW5hbHNSZXNwb25zZSIAElAKA0dldBIiLmNvZGVmb3VuZHJ5LnYxLkdldFRlcm1pbmFsUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLkdldFRlcm1pbmFsUmVzcG9uc2UiABJICgZBdHRhY2gSHS5jb2RlZm91bmRyeS52MS5BdHRhY2hSZXF1ZXN0GhsuY29kZWZvdW5kcnkudjEuQXR0YWNoRXZlbnQiADABElYKBVdyaXRlEiQuY29kZWZvdW5kcnkudjEuV3JpdGVUZXJtaW5hbFJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5Xcml0ZVRlcm1pbmFsUmVzcG9uc2UiABJZCgZSZXNpemUSJS5jb2RlZm91bmRyeS52MS5SZXNpemVUZXJtaW5hbFJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5SZXNpemVUZXJtaW5hbFJlc3BvbnNlIgASUwoES2lsbBIjLmNvZGVmb3VuZHJ5LnYxLktpbGxUZXJtaW5hbFJlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5LaWxsVGVybWluYWxSZXNwb25zZSIAElkKBlJlbW92ZRIlLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVRlcm1pbmFsUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVRlcm1pbmFsUmVzcG9uc2UiABJRCgVXYXRjaBIlLmNvZGVmb3VuZHJ5LnYxLldhdGNoVGVybWluYWxzUmVxdWVzdBodLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsRXZlbnQiADABQsUBChJjb20uY29kZWZvdW5kcnkudjFCDVRlcm1pbmFsUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp]);
+  fileDesc("Ch1jb2RlZm91bmRyeS92MS90ZXJtaW5hbC5wcm90bxIOY29kZWZvdW5kcnkudjEi9QIKCFRlcm1pbmFsEgoKAmlkGAEgASgJEgwKBGFyZ3YYAiADKAkSCwoDY3dkGAMgASgJEgwKBGNvbHMYBCABKA0SDAoEcm93cxgFIAEoDRINCgV0aXRsZRgGIAEoCRIsCgVzdGF0ZRgHIAEoDjIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsU3RhdGUSEQoJZXhpdF9jb2RlGAggASgFEi4KCnN0YXJ0ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi0KCWV4aXRlZF9hdBgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEgoKYWx0X3NjcmVlbhgLIAEoCBI0CgZsYWJlbHMYDCADKAsyJC5jb2RlZm91bmRyeS52MS5UZXJtaW5hbC5MYWJlbHNFbnRyeRotCgtMYWJlbHNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIs0BChVDcmVhdGVUZXJtaW5hbFJlcXVlc3QSDAoEYXJndhgBIAMoCRILCgNjd2QYAiABKAkSCwoDZW52GAMgAygJEgwKBGNvbHMYBCABKA0SDAoEcm93cxgFIAEoDRJBCgZsYWJlbHMYBiADKAsyMS5jb2RlZm91bmRyeS52MS5DcmVhdGVUZXJtaW5hbFJlcXVlc3QuTGFiZWxzRW50cnkaLQoLTGFiZWxzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJEChZDcmVhdGVUZXJtaW5hbFJlc3BvbnNlEioKCHRlcm1pbmFsGAEgASgLMhguY29kZWZvdW5kcnkudjEuVGVybWluYWwiFgoUTGlzdFRlcm1pbmFsc1JlcXVlc3QiRAoVTGlzdFRlcm1pbmFsc1Jlc3BvbnNlEisKCXRlcm1pbmFscxgBIAMoCzIYLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsIiAKEkdldFRlcm1pbmFsUmVxdWVzdBIKCgJpZBgBIAEoCSJBChNHZXRUZXJtaW5hbFJlc3BvbnNlEioKCHRlcm1pbmFsGAEgASgLMhguY29kZWZvdW5kcnkudjEuVGVybWluYWwiGwoNQXR0YWNoUmVxdWVzdBIKCgJpZBgBIAEoCSKaAwoLQXR0YWNoRXZlbnQSOAoIc25hcHNob3QYASABKAsyJC5jb2RlZm91bmRyeS52MS5BdHRhY2hFdmVudC5TbmFwc2hvdEgAEjQKBm91dHB1dBgCIAEoCzIiLmNvZGVmb3VuZHJ5LnYxLkF0dGFjaEV2ZW50Lk91dHB1dEgAEjYKB3Jlc2l6ZWQYAyABKAsyIy5jb2RlZm91bmRyeS52MS5BdHRhY2hFdmVudC5SZXNpemVkSAASNAoGZXhpdGVkGAQgASgLMiIuY29kZWZvdW5kcnkudjEuQXR0YWNoRXZlbnQuRXhpdGVkSAAaSAoIU25hcHNob3QSDAoEZGF0YRgBIAEoDBIMCgRjb2xzGAIgASgNEgwKBHJvd3MYAyABKA0SEgoKYWx0X3NjcmVlbhgEIAEoCBoWCgZPdXRwdXQSDAoEZGF0YRgBIAEoDBolCgdSZXNpemVkEgwKBGNvbHMYASABKA0SDAoEcm93cxgCIAEoDRobCgZFeGl0ZWQSEQoJZXhpdF9jb2RlGAEgASgFQgcKBWV2ZW50IjAKFFdyaXRlVGVybWluYWxSZXF1ZXN0EgoKAmlkGAEgASgJEgwKBGRhdGEYAiABKAwiFwoVV3JpdGVUZXJtaW5hbFJlc3BvbnNlIj8KFVJlc2l6ZVRlcm1pbmFsUmVxdWVzdBIKCgJpZBgBIAEoCRIMCgRjb2xzGAIgASgNEgwKBHJvd3MYAyABKA0iGAoWUmVzaXplVGVybWluYWxSZXNwb25zZSIhChNLaWxsVGVybWluYWxSZXF1ZXN0EgoKAmlkGAEgASgJIhYKFEtpbGxUZXJtaW5hbFJlc3BvbnNlIiMKFVJlbW92ZVRlcm1pbmFsUmVxdWVzdBIKCgJpZBgBIAEoCSIYChZSZW1vdmVUZXJtaW5hbFJlc3BvbnNlIiIKFENsb3NlVGVybWluYWxSZXF1ZXN0EgoKAmlkGAEgASgJIhcKFUNsb3NlVGVybWluYWxSZXNwb25zZSIXChVXYXRjaFRlcm1pbmFsc1JlcXVlc3QiWwoNVGVybWluYWxFdmVudBIrCgd1cGRhdGVkGAEgASgLMhguY29kZWZvdW5kcnkudjEuVGVybWluYWxIABIUCgpyZW1vdmVkX2lkGAIgASgJSABCBwoFZXZlbnQqZgoNVGVybWluYWxTdGF0ZRIeChpURVJNSU5BTF9TVEFURV9VTlNQRUNJRklFRBAAEhoKFlRFUk1JTkFMX1NUQVRFX1JVTk5JTkcQARIZChVURVJNSU5BTF9TVEFURV9FWElURUQQAjLtBgoPVGVybWluYWxTZXJ2aWNlElkKBkNyZWF0ZRIlLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZVRlcm1pbmFsUmVxdWVzdBomLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZVRlcm1pbmFsUmVzcG9uc2UiABJVCgRMaXN0EiQuY29kZWZvdW5kcnkudjEuTGlzdFRlcm1pbmFsc1JlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5MaXN0VGVybWluYWxzUmVzcG9uc2UiABJQCgNHZXQSIi5jb2RlZm91bmRyeS52MS5HZXRUZXJtaW5hbFJlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5HZXRUZXJtaW5hbFJlc3BvbnNlIgASSAoGQXR0YWNoEh0uY29kZWZvdW5kcnkudjEuQXR0YWNoUmVxdWVzdBobLmNvZGVmb3VuZHJ5LnYxLkF0dGFjaEV2ZW50IgAwARJWCgVXcml0ZRIkLmNvZGVmb3VuZHJ5LnYxLldyaXRlVGVybWluYWxSZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuV3JpdGVUZXJtaW5hbFJlc3BvbnNlIgASWQoGUmVzaXplEiUuY29kZWZvdW5kcnkudjEuUmVzaXplVGVybWluYWxSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuUmVzaXplVGVybWluYWxSZXNwb25zZSIAElMKBEtpbGwSIy5jb2RlZm91bmRyeS52MS5LaWxsVGVybWluYWxSZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuS2lsbFRlcm1pbmFsUmVzcG9uc2UiABJZCgZSZW1vdmUSJS5jb2RlZm91bmRyeS52MS5SZW1vdmVUZXJtaW5hbFJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5SZW1vdmVUZXJtaW5hbFJlc3BvbnNlIgASVgoFQ2xvc2USJC5jb2RlZm91bmRyeS52MS5DbG9zZVRlcm1pbmFsUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLkNsb3NlVGVybWluYWxSZXNwb25zZSIAElEKBVdhdGNoEiUuY29kZWZvdW5kcnkudjEuV2F0Y2hUZXJtaW5hbHNSZXF1ZXN0Gh0uY29kZWZvdW5kcnkudjEuVGVybWluYWxFdmVudCIAMAFCxQEKEmNvbS5jb2RlZm91bmRyeS52MUINVGVybWluYWxQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message codefoundry.v1.Terminal
@@ -80,7 +80,19 @@ export type Terminal = Message<"codefoundry.v1.Terminal"> & {
   altScreen: boolean;
 
   /**
-   * Opaque labels set by the creator (e.g. session store). Not interpreted here.
+   * Labels set by the creator. TerminalService does not interpret them; the daemon's
+   * creators follow this contract (internal/termlabel):
+   *   kind      "shell" on a shell started by the terminal.new command. A session's
+   *             Claude terminal has no kind. The daemon removes a "shell" terminal as
+   *             soon as it exits, and kills and removes it when its thread is removed,
+   *             its project is unregistered, or its worktree directory is removed.
+   *   session   the thread (session id) the terminal belongs to: on a session's Claude
+   *             terminal, and on a shell started for a thread.
+   *   repo      the repository id of the worktree a shell belongs to.
+   *   worktree  the worktree path (symlinks resolved) the terminal belongs to: the
+   *             session's worktree on a Claude terminal; on a shell, its owner worktree
+   *             (the thread's worktree when it belongs to a thread).
+   * A terminal created through Create without labels belongs to nothing.
    *
    * @generated from field: map<string, string> labels = 12;
    */
@@ -504,6 +516,36 @@ export const RemoveTerminalResponseSchema: GenMessage<RemoveTerminalResponse> = 
   messageDesc(file_codefoundry_v1_terminal, 16);
 
 /**
+ * @generated from message codefoundry.v1.CloseTerminalRequest
+ */
+export type CloseTerminalRequest = Message<"codefoundry.v1.CloseTerminalRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.CloseTerminalRequest.
+ * Use `create(CloseTerminalRequestSchema)` to create a new message.
+ */
+export const CloseTerminalRequestSchema: GenMessage<CloseTerminalRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_terminal, 17);
+
+/**
+ * @generated from message codefoundry.v1.CloseTerminalResponse
+ */
+export type CloseTerminalResponse = Message<"codefoundry.v1.CloseTerminalResponse"> & {
+};
+
+/**
+ * Describes the message codefoundry.v1.CloseTerminalResponse.
+ * Use `create(CloseTerminalResponseSchema)` to create a new message.
+ */
+export const CloseTerminalResponseSchema: GenMessage<CloseTerminalResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_terminal, 18);
+
+/**
  * @generated from message codefoundry.v1.WatchTerminalsRequest
  */
 export type WatchTerminalsRequest = Message<"codefoundry.v1.WatchTerminalsRequest"> & {
@@ -514,7 +556,7 @@ export type WatchTerminalsRequest = Message<"codefoundry.v1.WatchTerminalsReques
  * Use `create(WatchTerminalsRequestSchema)` to create a new message.
  */
 export const WatchTerminalsRequestSchema: GenMessage<WatchTerminalsRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_terminal, 17);
+  messageDesc(file_codefoundry_v1_terminal, 19);
 
 /**
  * @generated from message codefoundry.v1.TerminalEvent
@@ -547,7 +589,7 @@ export type TerminalEvent = Message<"codefoundry.v1.TerminalEvent"> & {
  * Use `create(TerminalEventSchema)` to create a new message.
  */
 export const TerminalEventSchema: GenMessage<TerminalEvent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_terminal, 18);
+  messageDesc(file_codefoundry_v1_terminal, 20);
 
 /**
  * @generated from enum codefoundry.v1.TerminalState
@@ -663,6 +705,20 @@ export const TerminalService: GenService<{
     methodKind: "unary";
     input: typeof RemoveTerminalRequestSchema;
     output: typeof RemoveTerminalResponseSchema;
+  },
+  /**
+   * Close kills a shell terminal (labels kind=shell) like Kill, waits for it to exit,
+   * and removes it. It returns once the terminal is gone (Watch has sent `updated` with
+   * state EXITED, then `removed_id`). Closing an exited shell just removes it. Any other
+   * terminal (a thread's Claude terminal: use SessionService.Close) is refused with
+   * FailedPrecondition; an unknown id is NotFound.
+   *
+   * @generated from rpc codefoundry.v1.TerminalService.Close
+   */
+  close: {
+    methodKind: "unary";
+    input: typeof CloseTerminalRequestSchema;
+    output: typeof CloseTerminalResponseSchema;
   },
   /**
    * Watch streams lifecycle and metadata changes for all terminals.

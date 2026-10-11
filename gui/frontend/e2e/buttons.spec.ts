@@ -59,7 +59,11 @@ test("New Terminal from the palette starts a terminal in the selected thread's w
   const last = (await invocations()).at(-1);
   expect(last?.name).toBe("terminal.new");
   expect(last?.context?.activeWorktreePath).toBe(FIX_RESIZE);
-  await expect(page.locator('[data-row-kind="terminal"][aria-selected="true"]')).toBeVisible();
+  // The shell belongs to the thread (labels session=s-3): the sidebar hides it like the
+  // thread's other terminals, and its focus intent selects the thread (the bottom panel, PR B,
+  // shows it there).
+  await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator('[data-row-kind="terminal"][aria-selected="true"]')).toHaveCount(0);
 });
 
 test("status row buttons toggle settings, open help and the palette", async ({ page }) => {

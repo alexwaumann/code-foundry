@@ -27,6 +27,29 @@ func TestKeybindingsAreUniqueAndNotReserved(t *testing.T) {
 	}
 }
 
+// The chords the GUI expects on the panel toggles. cmd+j is the bottom panel's, like
+// VS Code's panel; it must stay free of GUI view actions (ReservedChords).
+func TestPanelKeybindings(t *testing.T) {
+	f := newFixture(t)
+	want := map[string]string{
+		"view.panel.toggle":  "cmd+shift+e",
+		"view.bottom.toggle": "cmd+j",
+		"terminal.new":       "cmd+t",
+	}
+	for name, chord := range want {
+		c, ok := f.reg.Get(name)
+		if !ok {
+			t.Fatalf("%s not registered", name)
+		}
+		if !slices.Equal(c.Keybindings, []string{chord}) {
+			t.Errorf("%s keybindings = %v, want [%s]", name, c.Keybindings, chord)
+		}
+		if slices.Contains(command.ReservedChords, chord) {
+			t.Errorf("%s binds reserved chord %s", name, chord)
+		}
+	}
+}
+
 // The chords the GUI (phase 2c) expects on the session commands.
 func TestSessionKeybindings(t *testing.T) {
 	f := newFixture(t)

@@ -57,7 +57,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 	want := []string{
 		"daemon.status", "daemon.version",
 		"ui.palette.open", "ui.notify", "ui.focus.terminal", "ui.focus.repo",
-		"terminal.new", "terminal.kill", "terminal.remove",
+		"terminal.new", "terminal.list", "terminal.close", "terminal.kill", "terminal.remove",
 		"repo.unregister", "repo.worktree.new", "repo.worktree.remove", "repo.refresh", "repo.git.init",
 		"repo.add", "repo.clone", "repo.create", "repo.github.publish", "repo.delete",
 		"session.new", "session.list", "session.focus", "session.close", "session.reconnect",
@@ -68,7 +68,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"settings.get", "settings.set", "settings.reset", "settings.path", "settings.reveal",
 		"view.settings", "view.help",
 		"app.version", "app.update.check", "app.update", "app.relaunch", "app.restart", "daemon.restart",
-		"view.dashboard", "view.usage", "usage.show", "view.pullrequests", "view.projects", "view.panel.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.workspace", "view.panel.linked-prs", "view.panel.usage", "view.panel.worktree",
+		"view.dashboard", "view.usage", "usage.show", "view.pullrequests", "view.projects", "view.panel.toggle", "view.bottom.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.workspace", "view.panel.linked-prs", "view.panel.usage", "view.panel.worktree",
 		"workspace.new", "workspace.list", "workspace.members", "workspace.add-repo", "workspace.remove-repo", "workspace.remove",
 	}
 	for _, n := range want {
@@ -101,7 +101,12 @@ func TestAvailability(t *testing.T) {
 		{"usage.show", command.Context{}, true},
 		{"usage.show", command.Context{ActiveView: "terminal"}, false},
 		{"view.usage", command.Context{ActiveView: "terminal"}, true},
-		{"terminal.new", command.Context{}, true},
+		{"terminal.new", command.Context{}, true}, // the CLI (no view): owner from --cwd
+		{"terminal.new", command.Context{ActiveView: "dashboard"}, false},
+		{"terminal.new", command.Context{ActiveView: "pullrequests"}, false},
+		{"terminal.new", command.Context{ActiveSessionID: "s1"}, true},
+		{"terminal.close", command.Context{}, false},
+		{"terminal.close", command.Context{ActiveTerminalID: "t1"}, true},
 		{"terminal.kill", command.Context{}, false},
 		{"terminal.kill", command.Context{ActiveTerminalID: "t1"}, true},
 		{"terminal.remove", command.Context{ActiveTerminalID: "t1"}, true},
@@ -173,12 +178,7 @@ func TestBuiltinCommands(t *testing.T) {
 		{name: "ui.focus.terminal needs an id", cmd: "ui.focus.terminal", wantErr: command.ErrInvalidArgs},
 		{name: "ui.focus.repo", cmd: "ui.focus.repo", args: map[string]string{"repo": "r1", "worktree": "~/wt"},
 			wantReq: &v1.UiIntent{Intent: &v1.UiIntent_FocusRepo_{FocusRepo: &v1.UiIntent_FocusRepo{RepoId: "r1", WorktreePath: "/Users/me/wt"}}}},
-		{name: "terminal.new defaults", cmd: "terminal.new", wantMsg: "created terminal t1", wantJSON: `"cwd":"/Users/me"`,
-			wantReq: &v1.CreateTerminalRequest{Argv: []string{"/bin/fish", "-l"}, Cwd: "/Users/me"}},
-		{name: "terminal.new in worktree with argv", cmd: "terminal.new", ctx: command.Context{ActiveWorktreePath: "/wt"},
-			args:    map[string]string{"argv": `claude --append-system-prompt "be brief"`},
-			wantReq: &v1.CreateTerminalRequest{Argv: []string{"claude", "--append-system-prompt", "be brief"}, Cwd: "/wt"}},
-		{name: "terminal.new bad argv", cmd: "terminal.new", args: map[string]string{"argv": `"oops`}, wantErr: command.ErrInvalidArgs},
+		// terminal.new's owners and defaults: commands_terminal_test.go.
 		{name: "terminal.new relative cwd", cmd: "terminal.new", args: map[string]string{"cwd": "rel"}, wantErr: command.ErrInvalidArgs},
 		{name: "terminal.kill", cmd: "terminal.kill", args: map[string]string{"id": "t3"}, wantMsg: "killed terminal t3",
 			wantReq: &v1.KillTerminalRequest{Id: "t3"}},

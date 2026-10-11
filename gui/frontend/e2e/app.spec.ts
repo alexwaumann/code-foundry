@@ -50,10 +50,11 @@ test("palette opens with cmd+k and lists only commands available in context", as
   await openApp(page);
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
-  await expect(palette.locator('[data-command="terminal.new"]')).toBeVisible();
-  await expect(palette.locator('[data-command="terminal.kill"]')).toHaveCount(0);
   // session.new is unavailable with nothing selected, but its project picker supplies the repo.
   await expect(palette.locator('[data-command="session.new"]')).toBeVisible();
+  // A terminal belongs to a thread or a worktree: the dashboard offers none.
+  await expect(palette.locator('[data-command="terminal.new"]')).toHaveCount(0);
+  await expect(palette.locator('[data-command="terminal.kill"]')).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(palette).toHaveCount(0);
 
