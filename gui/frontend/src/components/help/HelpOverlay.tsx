@@ -24,6 +24,8 @@ const extraChords: LocalChord[] = [
   { chord: "cmd+w", title: "Side panel: close the active tab (hides an empty panel)" },
   { chord: "escape", title: "Side panel, surface list after +: back to the tab" },
   { chord: "cmd+w", title: "Side panel, surface list after +: back to the tab" },
+  { chord: "alt+arrowleft", title: "Side panel, focused tab: move it left or right" },
+  { chord: "alt+arrowright", title: "Side panel, focused tab: move it left or right" },
   { chord: "cmd+shift+c", title: "Side panel, pull request: copy its link" },
 ];
 
