@@ -48,6 +48,26 @@ export async function mockPost(pathAndQuery: string): Promise<unknown> {
   return res.json();
 }
 
+/**
+ * Stops the mock's clock from changing these threads. The default world's s-1 flips
+ * busy/idle every 4 s and s-5 settles from starting after 8 s, which moves them in and out
+ * of the sidebar's Working section; specs that pin the order hold them (s-1 busy, s-5
+ * starting: both under Working) right after the reset.
+ */
+export async function holdSessions(...ids: string[]): Promise<void> {
+  await mockPost(`session/hold?${ids.map((id) => `id=${id}`).join("&")}`);
+}
+
+/** Holds the default world in DEFAULT_ORDER: s-1 busy and s-5 starting, both held. Call right after resetMock. */
+export async function holdDefaultOrder(): Promise<void> {
+  await holdSessions("s-1", "s-5");
+  // s-1 may have flipped to idle between the reset and the hold.
+  await mockPost("session/status?id=s-1&status=busy");
+}
+
+/** The default world's sidebar order with s-1 and s-5 held: s-2 waits, s-6/s-4/s-3 are idle, s-5 and s-1 work. */
+export const DEFAULT_ORDER = ["s:s-2", "s:s-6", "s:s-4", "s:s-3", "h:working", "s:s-5", "s:s-1", "h:terminals", "t:t-logs", "t:t-top", "t:t-tests", "t:t-tmp"];
+
 /** Long-lived streams the mock has open right now, by RPC (e.g. "EventService/Watch"). */
 export async function openStreams(): Promise<Record<string, number>> {
   const res = await fetch(`${mockUrl}/__mock/streams`);

@@ -433,6 +433,7 @@ function WorkingHeader({ row }: { row: Extract<HeaderRow, { section: "working" }
         <span className="truncate text-[11px] font-medium tracking-wider uppercase" data-testid="working-label">
           {row.label}
         </span>
+        {/* A flex container drops this space visually; it keeps the text and name "Working 2". */}{" "}
         <span className="shrink-0 text-[11px] tabular-nums opacity-70" data-testid="working-count">
           {row.count}
         </span>
