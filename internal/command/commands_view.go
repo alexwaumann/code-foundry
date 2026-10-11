@@ -27,6 +27,11 @@ const ViewUsage = "usage"
 // panel state (gui/frontend/src/stores/panel.ts) and stays on the current selection.
 const ViewPanelToggle = "panel.toggle"
 
+// ViewBottomToggle is the ShowView name that toggles the bottom panel (the terminals
+// under the main content) of whatever the window has selected. Like ViewPanelToggle it
+// is an action on per-selection GUI state, not a page.
+const ViewBottomToggle = "bottom.toggle"
+
 // ViewPanelExpand is the ShowView name that toggles the selection's side panel between
 // its split width and the full width of the content area. Like ViewPanelToggle it is an
 // action on per-selection GUI state, not a page; expanding a hidden panel shows it.
@@ -83,7 +88,7 @@ func hasWorktreeThreadContext(c Context) bool {
 // shows the Usage page,
 // view.pullrequests, which shows the Pull Requests page,
 // view.projects, which shows the Projects page, view.panel.toggle, which shows or hides
-// the side panel, view.panel.expand, which switches it between split and full width,
+// the side panel, view.bottom.toggle, which shows or hides the bottom panel, view.panel.expand, which switches it between split and full width,
 // view.panel.new-tab, which shows its surface list to open another tab, and
 // view.panel.workspace, which opens the workspace surface in it,
 // view.panel.linked-prs, which opens the thread's linked pull requests in it,
@@ -146,6 +151,16 @@ func RegisterView(r *Registry, e Emitter) error {
 			Keybindings: []string{"cmd+shift+e"},
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return show(ViewPanelToggle), nil
+			},
+		},
+		Command{
+			Name:        "view.bottom.toggle",
+			Title:       "Toggle Bottom Panel",
+			Description: "Show or hide the terminals under the selected thread or page.",
+			Category:    "View",
+			Keybindings: []string{"cmd+j"},
+			Run: func(context.Context, Context, Args) (Result, error) {
+				return show(ViewBottomToggle), nil
 			},
 		},
 		Command{
