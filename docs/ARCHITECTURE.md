@@ -123,7 +123,9 @@ Services (v1):
   claude's positional argument, and carries a permission mode (never
   bypassPermissions); see `docs/notes/new-thread-composer.md` and
   `docs/notes/workspaces-2-launch.md`. A session carries lifecycle `state` (starting, connected, closing,
-  disconnected) and detector `status` (busy, idle, needs-attention) with `status_reason`.
+  disconnected) and detector `status` (busy, idle, needs-attention; error when the
+  process ended mid-turn) with `status_reason` and `status_changed_at`, persisted
+  (`docs/notes/thread-status-persistence.md`).
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
   chunks), Write (input bytes), Resize, Detach.
 * `RepoService` — Register (a git repository, or any folder as a project without git;
@@ -225,7 +227,10 @@ Layers Claude-specific knowledge on top of terminal:
   once it is idle at its prompt (`docs/notes/workspaces-2-launch.md`).
 * **Status detection** (busy / idle / needs-attention) derives from observing the output
   stream and the JSONL transcript. It is a pure function over observed events with table
-  tests. It is never inferred from rendering.
+  tests. It is never inferred from rendering. The status is persisted: a disconnected
+  thread keeps the one it ended with (busy becomes error "interrupted"), across daemon
+  restarts, until a reconnect's detector replaces it
+  (`docs/notes/thread-status-persistence.md`).
 * Auto-naming via an independent `claude -p` call producing a slug.
 * **Linked pull requests** come from Claude's own `pr-link` transcript records: every
   distinct URL in first-seen order, persisted in `session_pull_requests`, backfilled from
