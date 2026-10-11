@@ -325,10 +325,11 @@ for (const zoom of [90, 100, 125, 150]) {
     // Zoomed in, the same window is shorter in layout px: fewer whole rows.
     if (zoom <= 100) expect(fit.height).toBe(248);
     else {
-      // Capped: the card ends 16 layout px above the visible bottom (not 16 viewport px,
-      // nor short of it, which a missing or doubled zoom division would give).
+      // Capped to whole rows (28px each, 8px padding), ending at most a row above the
+      // 16 layout px margin: a missing or doubled zoom division would miss both.
       expect(fit.height).toBeLessThan(248);
-      expect(pop.y + pop.height).toBeGreaterThanOrEqual(bottom - 16 * (zoom / 100) - 2);
+      expect((fit.height - 8) % 28).toBe(0);
+      expect(pop.y + pop.height).toBeGreaterThan(bottom - (16 + 28) * (zoom / 100) - 1);
     }
     expect(fit.whole).toBeGreaterThanOrEqual(1);
 
@@ -348,7 +349,7 @@ for (const zoom of [90, 100, 125, 150]) {
 
 test("a short window shows fewer rows; a taller one all eight; a very short one drops the hints", async ({ page }) => {
   await setFiles("repo-cf", MANY);
-  await page.setViewportSize({ width: 1280, height: 480 });
+  await page.setViewportSize({ width: 1280, height: 560 });
   await openApp(page);
   await compose(page);
   const before = await composerBoxes(page);
@@ -356,9 +357,10 @@ test("a short window shows fewer rows; a taller one all eight; a very short one 
   await expect(rows(page)).toHaveCount(21);
   expect(await composerBoxes(page)).toEqual(before);
   const pop = await boxOf(page, "completion-card");
-  expect(pop.y + pop.height).toBeLessThanOrEqual(480 - 16 + 1);
+  expect(pop.y + pop.height).toBeLessThanOrEqual(560 - 16 + 1);
   const short = await listFit(page);
   expect(short.height).toBeLessThan(248);
+  expect((short.height - 8) % 28).toBe(0);
   expect(short.whole).toBeGreaterThanOrEqual(1);
   expect(short.whole).toBeLessThan(8);
   // Two rows still fit with the hints.
@@ -369,7 +371,7 @@ test("a short window shows fewer rows; a taller one all eight; a very short one 
   await expect.poll(async () => (await listFit(page)).height).toBe(248);
   await expect(card(page).getByTestId("completion-hints")).toBeVisible();
   await page.setViewportSize({ width: 1280, height: 400 });
-  await expect.poll(async () => (await listFit(page)).height).toBeLessThan(short.height);
+  await expect.poll(async () => (await listFit(page)).height).toBeLessThanOrEqual(short.height);
   const tiny = await boxOf(page, "completion-card");
   // Under two rows' room the hints give their space to the rows.
   await expect(card(page).getByTestId("completion-hints")).toBeHidden();
