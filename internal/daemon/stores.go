@@ -47,6 +47,9 @@ type stores struct {
 	gitops *gitops.Manager
 	// terminal owns PTYs; closed first so every child gets hung up before the db goes.
 	terminal *terminal.Manager
+	// stopShells stops the shell reaper (shells.go): exited shells and the shells of a
+	// removed worktree are removed. Stopped before terminal closes.
+	stopShells func()
 	// session layers Claude sessions on terminal and db; shut down before terminal so
 	// live sessions are recorded as disconnected while their processes still run.
 	session *session.Manager
@@ -136,6 +139,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 	s.terminal = terminal.New(terminal.Options{
 		Bus: s.bus, Logger: log.With("store", "terminal"), MaxScrollbackLines: uint(cfg.Sessions.ScrollbackLines),
 	})
+	if s.stopShells, err = startShellReaper(ctx, log.With("store", "terminal"), s.terminal, s.bus); err != nil {
+		return nil, err
+	}
 	// Workspaces open before sessions: a session reads a workspace thread's members at
 	// every spawn, and the workspace store asks sessions about live threads (and
 	// pre-trusts worktrees) only through these closures, which run after both exist.
@@ -194,6 +200,9 @@ func (s *stores) close() error {
 	var errs []error
 	if s.update != nil {
 		s.update.Close()
+	}
+	if s.stopShells != nil {
+		s.stopShells()
 	}
 	if s.session != nil {
 		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
