@@ -193,12 +193,12 @@ export function linkedPrsPanelCommand(): boolean {
  * view.panel.usage for the current selection: opens (or activates) the Usage tab in the
  * selected thread's panel and shows the panel, like view.panel.workspace. A thread
  * without usage opens it too (the surface says "No usage yet"). A no-op while the
- * settings page is up and when the selection is no thread.
+ * settings or usage page is up and when the selection is no thread.
  *
  * Focus moves to the panel; with the palette open, its return target moves there instead.
  */
 export function usagePanelCommand(): boolean {
-  if (useViewsStore.getState().settingsOpen) return false;
+  if (pageOpen()) return false;
   const key = openUsageSurface();
   if (key === null) return false;
   const inPalette = useUiStore.getState().palette.open;

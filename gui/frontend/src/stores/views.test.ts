@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { getPanel, usePanelStore } from "./panel";
 import { useUiStore, type FocusRegion } from "./ui";
-import { closeUsage, expandPanelCommand, showView, startViewSync, togglePanelCommand, useViewsStore } from "./views";
+import { closeUsage, expandPanelCommand, showView, startViewSync, togglePanelCommand, usagePanelCommand, useViewsStore } from "./views";
 
 const closedPalette = { open: false, query: "", commandName: null, page: "commands" as const, returnTo: "content" as FocusRegion };
 
@@ -212,6 +212,7 @@ describe("the usage page", () => {
     useViewsStore.setState({ usageOpen: true });
     expect(togglePanelCommand()).toBe(false);
     expect(expandPanelCommand()).toBe(false);
+    expect(usagePanelCommand()).toBe(false);
     expect(usePanelStore.getState().byKey).toEqual({});
   });
 });
