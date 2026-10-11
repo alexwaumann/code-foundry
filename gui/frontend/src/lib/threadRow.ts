@@ -5,6 +5,8 @@
  */
 import type { SessionView } from "@/api/session";
 import type { WorkspaceView } from "@/api/workspace";
+import type { Choice } from "./compose";
+import { modelName } from "./models";
 import { basename, tildify } from "./path";
 import { placeTerminal } from "./tree";
 
@@ -81,10 +83,10 @@ export function threadRowModel(
   };
 }
 
-/** The model as the thread tooltip names it: first letter capitalized ("opus" -> "Opus"); "Default" when unset. */
-export function modelLabel(model: string): string {
+/** The model as the thread tooltip names it: its registry label, else the raw id; "Default" when unset. */
+export function modelLabel(model: string, models: readonly Choice[]): string {
   const m = model.trim();
-  return m ? m.charAt(0).toUpperCase() + m.slice(1) : "Default";
+  return m ? modelName(models, m) : "Default";
 }
 
 /**

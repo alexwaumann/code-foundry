@@ -41,7 +41,8 @@ func TestFieldParse(t *testing.T) {
 		{key: KeyFontSize, in: "13.5", err: `want an integer, got "13.5"`},
 		{key: KeyFetchInterval, in: "0", want: "0"},
 		{key: KeyDefaultModel, in: "opus", want: "opus"},
-		{key: KeyDefaultModel, in: "gpt-5", err: `want one of "fable", "opus", "sonnet", "haiku", got "gpt-5"`},
+		{key: KeyDefaultModel, in: "claude-opus-4-8", want: "claude-opus-4-8"},
+		{key: KeyDefaultModel, in: "gpt-5", err: `want one of "fable", "opus", "claude-opus-4-8", "claude-opus-4-7", "sonnet", "claude-sonnet-5", "claude-sonnet-4-6", "haiku", "claude-haiku-4-5", got "gpt-5"`},
 		{key: KeyTheme, in: "Dark", err: `want one of "system", "dark", "light", got "Dark"`},
 		{key: KeyBackdrop, in: "none", want: "none"},
 		{key: KeyBackdrop, in: "aurora", err: `want one of "forest", "none", got "aurora"`},
@@ -93,11 +94,47 @@ func TestSchemaShape(t *testing.T) {
 		if f.Type == Enum && !slices.Contains(f.Enum, f.Default) {
 			t.Errorf("%s: default %q is not an enum value", f.Key, f.Default)
 		}
+		if len(f.EnumLabels) > 0 && len(f.EnumLabels) != len(f.Enum) {
+			t.Errorf("%s: %d enum labels for %d values", f.Key, len(f.EnumLabels), len(f.Enum))
+		}
 	}
 	d := Defaults()
 	if d.Appearance.FontSize != 13 || !d.Sessions.AutoName || d.Sessions.ScrollbackLines != 10000 || d.Appearance.Theme != "system" || d.Appearance.Backdrop != "forest" ||
 		d.GitHub.PollIntervalSeconds != 60 || d.Repos.FetchIntervalSeconds != 120 || d.Advanced.LogLevel != "info" {
 		t.Errorf("Defaults() = %+v", d)
+	}
+}
+
+func TestEnumLabels(t *testing.T) {
+	tests := []struct {
+		key, value, want string
+	}{
+		{KeyDefaultModel, "opus", "Opus"},
+		{KeyDefaultModel, "claude-opus-4-8", "Opus 4.8"},
+		{KeyDefaultModel, "claude-sonnet-4-6", "Sonnet 4.6"},
+		{KeyDefaultModel, "haiku", "Haiku"},
+		{KeyDefaultModel, "claude-haiku-4-5", "Haiku 4.5"},
+		// Fields without labels show their values as they are.
+		{KeyTheme, "dark", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.key+"="+tt.value, func(t *testing.T) {
+			f := field(t, tt.key)
+			i := slices.Index(f.Enum, tt.value)
+			if i < 0 {
+				t.Fatalf("%q is not an enum value of %s", tt.value, tt.key)
+			}
+			got := ""
+			if len(f.EnumLabels) > 0 {
+				got = f.EnumLabels[i]
+			}
+			if got != tt.want {
+				t.Errorf("label = %q, want %q", got, tt.want)
+			}
+		})
+	}
+	if f := field(t, KeyDefaultModel); f.Default != "opus" {
+		t.Errorf("default model = %q, want opus", f.Default)
 	}
 }
 

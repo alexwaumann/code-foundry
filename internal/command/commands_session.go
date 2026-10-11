@@ -12,6 +12,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/alexwaumann/code-foundry/internal/model"
 )
 
 // SessionBackend is the slice of SessionService the session.* commands need, in
@@ -35,14 +36,17 @@ var (
 	_ SessionBackend = codefoundryv1connect.SessionServiceClient(nil)
 )
 
-// Model aliases and effort levels offered for new sessions. From `claude --help`
-// (Claude Code 2.1.294): --model takes an alias ("fable", "opus", "sonnet"; "haiku"
-// also works) or a full model name; --effort takes low, medium, high, xhigh, max. The
-// SessionService API also accepts full model names.
+// Models and effort levels offered for new sessions. Models come from the registry
+// (internal/model): family aliases ("opus") and pinned ids ("claude-opus-4-8"). From
+// `claude --help` (Claude Code 2.1.294): --effort takes low, medium, high, xhigh, max.
+// The SessionService API also accepts full model names outside the registry.
 var (
-	SessionModels  = []string{"fable", "opus", "sonnet", "haiku"}
+	SessionModels  = model.Values()
 	SessionEfforts = []string{"low", "medium", "high", "xhigh", "max"}
 )
+
+// sessionModelHelp describes the model arg; the enum values list the registry.
+const sessionModelHelp = "Model: a family alias (opus, sonnet, ...) runs Claude Code's default for that family, a claude-* id pins a version"
 
 // SessionPermissions are session.new's permission values, mapped to the claude
 // --permission-mode they select by sessionPermissionModes. Full access
@@ -149,7 +153,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path (with workspace: a member worktree)"},
 				{Name: "workspace", Type: String, Description: "Workspace id or name the thread belongs to; it runs in the member repo or worktree names (default: the first member)"},
 				{Name: "repos", Type: String, Description: "With new-worktree: comma-separated repositories (id, name, or path; repo:base gives that one its own base) for a new workspace, a cf/<name> worktree in each; repo picks the member the thread runs in (default: the first)"},
-				{Name: "model", Type: Enum, Enum: SessionModels, Description: "Model (default: settings sessions.default_model)"},
+				{Name: "model", Type: Enum, Enum: SessionModels, Description: sessionModelHelp + " (default: settings sessions.default_model)"},
 				{Name: "effort", Type: Enum, Enum: SessionEfforts, Description: "Effort level (default: settings sessions.default_effort)"},
 				{Name: "permission", Type: Enum, Enum: SessionPermissions, Default: "auto",
 					Description: "Permissions: supervised (confirm every tool call), accept-edits (file edits allowed), or auto (Claude's auto mode)"},

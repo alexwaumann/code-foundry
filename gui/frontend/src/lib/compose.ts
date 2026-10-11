@@ -11,14 +11,6 @@ export interface Choice {
   label: string;
 }
 
-/** session.new `model` values with the names the composer shows. */
-export const MODEL_CHOICES: readonly Choice[] = [
-  { value: "fable", label: "Fable 5.1" },
-  { value: "opus", label: "Opus 5.5" },
-  { value: "sonnet", label: "Sonnet 5.5" },
-  { value: "haiku", label: "Haiku 5.5" },
-];
-
 export const EFFORT_CHOICES: readonly Choice[] = [
   { value: "low", label: "Low" },
   { value: "medium", label: "Medium" },

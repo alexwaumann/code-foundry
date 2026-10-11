@@ -95,7 +95,8 @@ export function ComposerPicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className={cn("p-0", contentClassName)}
+        // Never taller than the room Radix found on its side (viewport px, so divided by the zoom).
+        className={cn("flex max-h-[calc(var(--radix-popover-content-available-height)/var(--cf-zoom))] flex-col p-0", contentClassName)}
         data-testid={testId ? `${testId}-list` : undefined}
         onOpenAutoFocus={(e) => {
           // cmdk handles keys on its root (or its input): focus that, not the popover.
@@ -103,9 +104,9 @@ export function ComposerPicker({
           (inputRef.current ?? rootRef.current)?.focus();
         }}
       >
-        <Command ref={rootRef} loop defaultValue={value} label={label} className="rounded-lg outline-hidden">
+        <Command ref={rootRef} loop defaultValue={value} label={label} className="min-h-0 rounded-lg outline-hidden">
           {filterPlaceholder && <CommandInput ref={inputRef} placeholder={filterPlaceholder} value={search} onValueChange={setSearch} />}
-          <CommandList className="max-h-72">
+          <CommandList className="max-h-72 min-h-0">
             {status ? (
               <div className="px-3 py-3 text-xs text-muted-foreground" role="status">
                 {status}

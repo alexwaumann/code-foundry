@@ -70,13 +70,17 @@ describe("threadRowModel", () => {
 describe("helpers", () => {
   it.each([
     ["opus", "Opus"],
-    ["haiku", "Haiku"],
-    ["sonnet[1m]", "Sonnet[1m]"],
-    ["claude-opus-5-5", "Claude-opus-5-5"],
+    ["claude-sonnet-4-6", "Sonnet 4.6"],
+    ["sonnet[1m]", "sonnet[1m]"],
+    ["claude-opus-5-5", "claude-opus-5-5"],
     ["", "Default"],
     ["  ", "Default"],
   ])("modelLabel(%j) is %j", (model, want) => {
-    expect(modelLabel(model)).toBe(want);
+    const models = [
+      { value: "opus", label: "Opus" },
+      { value: "claude-sonnet-4-6", label: "Sonnet 4.6" },
+    ];
+    expect(modelLabel(model, models)).toBe(want);
   });
   it("worktreeBranch falls back to the directory name for an unknown worktree", () => {
     expect(worktreeBranch(repos, "web", "/wt/web/gone")).toBe("gone");

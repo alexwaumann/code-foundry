@@ -103,7 +103,10 @@ type SettingField struct {
 	Min int64 `protobuf:"varint,9,opt,name=min,proto3" json:"min,omitempty"`
 	Max int64 `protobuf:"varint,10,opt,name=max,proto3" json:"max,omitempty"`
 	// Free-form hint for the input (e.g. a template or an example).
-	Placeholder   string `protobuf:"bytes,11,opt,name=placeholder,proto3" json:"placeholder,omitempty"`
+	Placeholder string `protobuf:"bytes,11,opt,name=placeholder,proto3" json:"placeholder,omitempty"`
+	// Display names for enum_values, parallel to it; empty when the values are shown as is.
+	// sessions.default_model carries the model registry's labels ("Opus 4.8").
+	EnumLabels    []string `protobuf:"bytes,12,rep,name=enum_labels,json=enumLabels,proto3" json:"enum_labels,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -213,6 +216,13 @@ func (x *SettingField) GetPlaceholder() string {
 		return x.Placeholder
 	}
 	return ""
+}
+
+func (x *SettingField) GetEnumLabels() []string {
+	if x != nil {
+		return x.EnumLabels
+	}
+	return nil
 }
 
 type SettingGroup struct {
@@ -825,7 +835,7 @@ var File_codefoundry_v1_settings_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_settings_proto_rawDesc = "" +
 	"\n" +
-	"\x1dcodefoundry/v1/settings.proto\x12\x0ecodefoundry.v1\"\xd6\x02\n" +
+	"\x1dcodefoundry/v1/settings.proto\x12\x0ecodefoundry.v1\"\xf7\x02\n" +
 	"\fSettingField\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -839,7 +849,9 @@ const file_codefoundry_v1_settings_proto_rawDesc = "" +
 	"\x03min\x18\t \x01(\x03R\x03min\x12\x10\n" +
 	"\x03max\x18\n" +
 	" \x01(\x03R\x03max\x12 \n" +
-	"\vplaceholder\x18\v \x01(\tR\vplaceholder\"V\n" +
+	"\vplaceholder\x18\v \x01(\tR\vplaceholder\x12\x1f\n" +
+	"\venum_labels\x18\f \x03(\tR\n" +
+	"enumLabels\"V\n" +
 	"\fSettingGroup\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +

@@ -33,6 +33,8 @@ async function rect(l: Locator) {
 // 90% is the bottom of the zoom ladder (stores/ui.ts ZOOM_LEVELS).
 for (const zoom of [90, 100, 125, 150]) {
   test(`the composer model picker opens right under its trigger at ${String(zoom)}%`, async ({ page }) => {
+    // Tall enough that the whole model list fits below the trigger at 150%.
+    await page.setViewportSize({ width: 1280, height: 1100 });
     await openApp(page);
     await setZoom(page, zoom);
     await compose(page);

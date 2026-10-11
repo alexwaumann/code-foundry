@@ -4,20 +4,21 @@ import { toast } from "sonner";
 import { cn } from "cn";
 import type { SettingFieldView } from "@/api/settings";
 import { chordFromEvent, formatChord } from "@/keys/chord";
+import { enumOptionLabel } from "@/lib/models";
 import { validateSetting } from "@/settings/validate";
 import { saveSettings, useSettingsStore, useSettingValue } from "@/stores/settings";
 
 const inputClass =
   "h-7 w-full rounded-md border border-input bg-background px-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50 aria-invalid:border-destructive";
 
-/** "" in an enum means "no preference" (e.g. Claude's default model). */
-function enumLabel(v: string): string {
-  return v === "" ? "Default" : v;
+/** An enum value's name: the schema's label (the model registry's "Opus 4.8"), else the value; "" is "no preference". */
+function enumLabel(f: SettingFieldView, v: string): string {
+  return v === "" ? "Default" : enumOptionLabel(f, v);
 }
 
 function displayValue(f: SettingFieldView, v: string): string {
   if (f.type === "keybinding") return v === "none" ? "unbound" : v ? formatChord(v) : "unbound";
-  if (f.type === "enum") return enumLabel(v);
+  if (f.type === "enum") return enumLabel(f, v);
   return v === "" ? "default" : v;
 }
 
@@ -65,7 +66,7 @@ function EnumEditor({ field, value, pending, commit }: EditorProps) {
     >
       {field.enumValues.map((v) => (
         <option key={v} value={v}>
-          {enumLabel(v)}
+          {enumLabel(field, v)}
           {v === field.defaultValue && v !== "" ? " (default)" : ""}
         </option>
       ))}

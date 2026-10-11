@@ -21,7 +21,6 @@ import {
   draftKey as keyOf,
   draftMembers,
   EFFORT_CHOICES,
-  MODEL_CHOICES,
   NEW_BRANCH,
   PERMISSION_CHOICES,
   pickDefault,
@@ -51,7 +50,7 @@ import {
 } from "@/stores/compose";
 import { requestConfirm } from "@/stores/confirm";
 import { useReposStore } from "@/stores/repos";
-import { useSettingValue } from "@/stores/settings";
+import { useModelChoices, useSettingValue } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
 import { DASHBOARD, useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
@@ -63,7 +62,7 @@ const TRIGGERS: readonly TriggerChar[] = ["/", "@"];
 
 /** Model and effort the composer starts with: the settings defaults, else opus / high. */
 function useDefaults(): { model: string; effort: string } {
-  const model = pickDefault(MODEL_CHOICES, useSettingValue("sessions.default_model"), DEFAULT_MODEL);
+  const model = pickDefault(useModelChoices(), useSettingValue("sessions.default_model"), DEFAULT_MODEL);
   const effort = pickDefault(EFFORT_CHOICES, useSettingValue("sessions.default_effort"), DEFAULT_EFFORT);
   return useMemo(() => ({ model, effort }), [model, effort]);
 }
@@ -285,6 +284,8 @@ const NEW_IN_EVERY = "A cf/… branch in every project (a new workspace)";
 function ComposerCard({ target }: { target: ComposeTarget }) {
   const draftKey = keyOf(target);
   const defaults = useDefaults();
+  const modelChoices = useModelChoices();
+  const modelGroups = useMemo(() => [{ options: modelChoices }], [modelChoices]);
   const text = useDraft(draftKey, "text");
   const hasAttachments = useDraft(draftKey, "attachments").length > 0;
   const model = useDraft(draftKey, "model") ?? defaults.model;
@@ -511,9 +512,9 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
           <ComposerPicker
             label="Model"
             icon={Brain}
-            text={choiceLabel(MODEL_CHOICES, model)}
+            text={choiceLabel(modelChoices, model)}
             value={model}
-            groups={[{ options: MODEL_CHOICES }]}
+            groups={modelGroups}
             onChange={(v) => {
               updateDraft(draftKey, { model: v });
             }}

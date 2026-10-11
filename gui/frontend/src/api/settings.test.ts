@@ -30,6 +30,15 @@ describe("settings mapping", () => {
     expect(toSettingFieldView(create(SettingFieldSchema, { key: "keybindings.session.new", type: SettingType.KEYBINDING })).type).toBe("keybinding");
   });
 
+  it.each([
+    ["labels parallel to the values", ["opus", "claude-opus-4-8"], ["Opus", "Opus 4.8"], ["Opus", "Opus 4.8"]],
+    ["no labels", ["dark", "light"], [], []],
+    ["labels that do not line up are dropped", ["a", "b"], ["A"], []],
+  ])("maps enum labels: %s", (_, enumValues, enumLabels, want) => {
+    const f = create(SettingFieldSchema, { key: "k", type: SettingType.ENUM, enumValues, enumLabels });
+    expect(toSettingFieldView(f).enumLabels).toEqual(want);
+  });
+
   it("maps ShowView intents", () => {
     expect(toUiIntentView(create(UiIntentSchema, { intent: { case: "showView", value: { name: "help" } } }))).toEqual({ kind: "showView", name: "help" });
   });

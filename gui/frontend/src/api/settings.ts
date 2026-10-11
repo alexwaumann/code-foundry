@@ -18,6 +18,8 @@ export interface SettingFieldView {
   group: string;
   type: SettingTypeView;
   enumValues: string[];
+  /** Display names parallel to enumValues; empty when the values are shown as they are. */
+  enumLabels: string[];
   defaultValue: string;
   restartRequired: boolean;
   min: number;
@@ -78,6 +80,7 @@ export function toSettingFieldView(f: SettingField): SettingFieldView {
     group: f.group,
     type: typeMap[f.type],
     enumValues: [...f.enumValues],
+    enumLabels: f.enumLabels.length === f.enumValues.length ? [...f.enumLabels] : [],
     defaultValue: f.defaultValue,
     restartRequired: f.restartRequired,
     min: Number(f.min),

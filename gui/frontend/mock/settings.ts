@@ -32,8 +32,32 @@ export const groups: GroupInit[] = [
 ];
 
 const S = SettingType;
+
+/** internal/model's registry, in order: values for --model and their labels. */
+export const MODELS: readonly { value: string; label: string }[] = [
+  { value: "fable", label: "Fable" },
+  { value: "opus", label: "Opus" },
+  { value: "claude-opus-4-8", label: "Opus 4.8" },
+  { value: "claude-opus-4-7", label: "Opus 4.7" },
+  { value: "sonnet", label: "Sonnet" },
+  { value: "claude-sonnet-5", label: "Sonnet 5" },
+  { value: "claude-sonnet-4-6", label: "Sonnet 4.6" },
+  { value: "haiku", label: "Haiku" },
+  { value: "claude-haiku-4-5", label: "Haiku 4.5" },
+];
+export const MODEL_VALUES: string[] = MODELS.map((m) => m.value);
+
 const staticFields: FieldInit[] = [
-  { key: "sessions.default_model", group: "sessions", type: S.ENUM, title: "Default model", description: "Model for new sessions when none is picked. Empty uses Claude's own default.", enumValues: ["", "fable", "opus", "sonnet", "haiku"], defaultValue: "opus" },
+  {
+    key: "sessions.default_model",
+    group: "sessions",
+    type: S.ENUM,
+    title: "Default model",
+    description: 'Model for new threads when none is picked. Fable, Opus, Sonnet and Haiku run Claude Code\'s current default for that family; the versioned entries pin one.',
+    enumValues: MODEL_VALUES,
+    enumLabels: MODELS.map((m) => m.label),
+    defaultValue: "opus",
+  },
   { key: "sessions.default_effort", group: "sessions", type: S.ENUM, title: "Default effort", description: "Effort level for new sessions when none is picked.", enumValues: ["", "low", "medium", "high", "xhigh", "max"], defaultValue: "high" },
   { key: "sessions.auto_name", group: "sessions", type: S.BOOL, title: "Name sessions automatically", description: "Name a new session from its first message with a short claude -p call.", defaultValue: "true" },
   { key: "sessions.close_grace_seconds", group: "sessions", type: S.INT, title: "Close grace (seconds)", description: "How long closing a session waits for Claude to exit.", defaultValue: "10", min: 1n, max: 120n, restartRequired: true },
