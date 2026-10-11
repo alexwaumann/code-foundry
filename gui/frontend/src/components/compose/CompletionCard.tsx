@@ -2,7 +2,24 @@ import { useEffect, type ReactNode } from "react";
 import { projectHue } from "@/lib/compose";
 import { cn } from "@/lib/utils";
 import { useReposStore } from "@/stores/repos";
-import type { Completion, CompletionGroup } from "./useCompletion";
+import type { Completion, CompletionGroup, CompletionItem } from "./useCompletion";
+
+/** A row's muted detail, its emphasized ranges (a path's matched characters) in the foreground. */
+function Detail({ item }: { item: CompletionItem }) {
+  const parts: ReactNode[] = [];
+  let at = 0;
+  for (const [from, to] of item.emphasis ?? []) {
+    if (from > at) parts.push(item.detail.slice(at, from));
+    parts.push(
+      <b key={from} className="font-medium text-foreground" data-testid="completion-hit">
+        {item.detail.slice(from, to)}
+      </b>,
+    );
+    at = to;
+  }
+  parts.push(item.detail.slice(at));
+  return <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{parts}</span>;
+}
 
 function Kbd({ children }: { children: ReactNode }) {
   return <kbd className="inline-block min-w-4 rounded border px-1 text-center font-sans text-[10px] leading-[15px] text-muted-foreground">{children}</kbd>;
@@ -31,10 +48,12 @@ function Heading({ heading }: { heading: NonNullable<CompletionGroup["heading"]>
  * Rows are text only (bold label, muted detail), grouped under project headings (a dot
  * in the project's hue) and "User"; the selected row has the accent background and a ⏎.
  * About eight rows show, the rest scroll. A mousedown keeps the focus in the prompt; a
- * click inserts the row. "No skills match" stands in for the rows when nothing matches.
+ * click inserts the row. "No skills match" stands in for the rows when nothing matches,
+ * "Searching…" while a slow answer is awaited. A file row's name is monospace and its
+ * path has the matched characters emphasized.
  */
-export function CompletionCard({ completion, label }: { completion: Completion; label: string }) {
-  const { show, groups, selected, listId, optionId, emptyText, select, insert } = completion;
+export function CompletionCard({ completion }: { completion: Completion }) {
+  const { show, label, groups, selected, listId, optionId, emptyText, select, insert } = completion;
   const active = show === "list" ? optionId(selected) : "";
   useEffect(() => {
     if (active) document.getElementById(active)?.scrollIntoView({ block: "nearest" });
@@ -49,8 +68,8 @@ export function CompletionCard({ completion, label }: { completion: Completion; 
         e.preventDefault();
       }}
     >
-      {show === "empty" ? (
-        <p className="px-3 py-2.5 text-[13px] text-muted-foreground" role="status" data-testid="completion-empty">
+      {show !== "list" ? (
+        <p className="px-3 py-2.5 text-[13px] text-muted-foreground" role="status" data-testid={show === "searching" ? "completion-searching" : "completion-empty"}>
           {emptyText}
         </p>
       ) : (
@@ -77,8 +96,10 @@ export function CompletionCard({ completion, label }: { completion: Completion; 
                       insert(i);
                     }}
                   >
-                    <span className="shrink-0 font-medium text-foreground">{item.label}</span>
-                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{item.detail}</span>
+                    <span className={cn("shrink-0 font-medium text-foreground", item.mono && "font-mono")} data-testid="completion-label">
+                      {item.label}
+                    </span>
+                    <Detail item={item} />
                     {on && (
                       <span aria-hidden className="shrink-0 text-xs text-muted-foreground">
                         ⏎
@@ -91,7 +112,7 @@ export function CompletionCard({ completion, label }: { completion: Completion; 
           ))}
         </div>
       )}
-      <div className={cn("flex items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground", show === "empty" && "hidden")} data-testid="completion-hints">
+      <div className={cn("flex items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground", show !== "list" && "hidden")} data-testid="completion-hints">
         <span className="flex items-center gap-1">
           <Kbd>↑</Kbd>
           <Kbd>↓</Kbd> move

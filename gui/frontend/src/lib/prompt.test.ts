@@ -175,6 +175,26 @@ describe("skill and file tags", () => {
     expect(projectPrompt(`${DEPLOY} `, () => undefined)).toBe("/deploy ");
   });
 
+  // The daemon ends a reference at whitespace and decodes it with url.PathUnescape
+  // (internal/store/session/filerefs.go); decodeURIComponent agrees with it on these.
+  it.each<[string, string, string]>([
+    ["# and %", "docs/#1 50%.md", "docs/%231%2050%25.md"],
+    ["unicode", "src/naïve/日本.ts", "src/na%C3%AFve/%E6%97%A5%E6%9C%AC.ts"],
+    ["+ and ~", "a+b/~x.md", "a%2Bb/~x.md"],
+    ["a no-break space", "nb\u00a0sp.md", "nb%C2%A0sp.md"],
+    ["!'()* and brackets", "odd!'()*[x].md", "odd%21%27%28%29%2A%5Bx%5D.md"],
+    ["a directory with a space", "my dir/", "my%20dir/"],
+  ])("a file path round-trips through the token and the projection: %s", (_name, path, encoded) => {
+    const tag: PromptTag = { tagKind: "file", repoId: "r1", path };
+    const token = tagToken(tag);
+    expect(token.endsWith(`](cf-file://r1/${encoded})`)).toBe(true);
+    expect(parseLine(token)).toEqual([{ kind: "tag", ...tag }]);
+    const sent = projectPrompt(`${token}x`, () => undefined);
+    expect(sent).toBe(`@cf-file://r1/${encoded} x`);
+    const ref = sent.split(/\s/u)[0] ?? "";
+    expect(decodeURIComponent(ref.slice("@cf-file://r1/".length))).toBe(path);
+  });
+
   it("tagsByRepo and repoTagCount see project skills and files only", () => {
     const text = `${COMMIT} ${API_DEPLOY} ${DEPLOY} ${A} ${FILE}\n${DIR}`;
     expect(tagsByRepo(text)).toEqual(["r2", "r1"]);

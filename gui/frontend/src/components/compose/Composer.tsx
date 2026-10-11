@@ -8,7 +8,8 @@ import { CompletionCard } from "./CompletionCard";
 import { MemberChips, type MemberChipModel } from "./MemberChips";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import { PromptEditor, type EditorTrigger, type PromptEditorHandle } from "./PromptEditor";
-import { useCompletion, useSkillSource } from "./useCompletion";
+import { TagMultiProjectContext } from "./tagContext";
+import { useCompletion, useFileSource, useSkillSource } from "./useCompletion";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { ATTACHMENT_MIME_TYPES } from "@/api/session";
 import { Backdrop } from "@/components/backdrop/Backdrop";
@@ -29,7 +30,7 @@ import {
   type ComposeTarget,
   type WorktreeChoice,
 } from "@/lib/compose";
-import { skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
+import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
 import { tildify } from "@/lib/path";
 import { formatAttachmentSize, isReferenced } from "@/lib/prompt";
 import { cn } from "@/lib/utils";
@@ -57,8 +58,8 @@ import { useWorkspacesStore } from "@/stores/workspaces";
 
 const SEP = "\u0001";
 
-/** What starts a completion in the prompt: "/" for skills. */
-const TRIGGERS: readonly TriggerChar[] = ["/"];
+/** What starts a completion in the prompt: "/" for skills, "@" for files. */
+const TRIGGERS: readonly TriggerChar[] = ["/", "@"];
 
 /** Model and effort the composer starts with: the settings defaults, else opus / high. */
 function useDefaults(): { model: string; effort: string } {
@@ -337,9 +338,23 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   useEffect(() => {
     void loadSkills(sources);
   }, [sources]);
+  // "@" completion: files of the checkouts the thread will see (lib/completion fileSources;
+  // a new worktree's come from the main checkout it starts from).
+  const worktreeKind = worktree.kind;
+  const fileSrcs = useMemo(
+    () =>
+      fileSources({
+        target: target.kind,
+        repoIds,
+        worktree: worktreeKind === "existing" ? { kind: "existing", path: existingPath } : { kind: worktreeKind },
+        wsMembers,
+      }),
+    [target.kind, repoIds, worktreeKind, existingPath, wsMembers],
+  );
   const [trigger, setTrigger] = useState<EditorTrigger | null>(null);
   const skillSource = useSkillSource(trigger, skillSourcesKey(sources), repoIds);
-  const completion = useCompletion(trigger, setTrigger, skillSource, editorRef);
+  const fileSource = useFileSource(trigger, fileSrcs, repoIds, primary);
+  const completion = useCompletion(trigger, setTrigger, trigger?.char === "@" ? fileSource : skillSource, editorRef);
 
   useEffect(() => {
     if (primary && noGitPath === undefined) void loadRefs(primary);
@@ -464,31 +479,33 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
         <div className="col-span-2 col-start-1 row-start-1 flex min-w-0 flex-col">
           <Attachments draftKey={draftKey} disabled={busy} refocus={refocus} />
           <AttachmentPreview draftKey={draftKey} />
-          <PromptEditor
-            handleRef={editorRef}
-            draftKey={draftKey}
-            value={text}
-            disabled={busy}
-            placeholder="Describe what to build…"
-            onChange={(t) => {
-              updateDraft(draftKey, { text: t, error: null });
-            }}
-            onSubmit={send}
-            onEscape={() => {
-              if (!isDraftEmpty(getDraft(draftKey))) return false;
-              // Back to the Projects page (the worktree overview is a panel tab there,
-              // not a page); the dashboard when the composer has no project at all.
-              const back = target.kind === "project" ? target.repoId : primary;
-              useUiStore.getState().select(back ? { kind: "view", name: "projects" } : DASHBOARD);
-              return true;
-            }}
-            onPasteFiles={attach}
-            onPreviewChip={(id, el) => openPreview(draftKey, id, el)}
-            triggers={TRIGGERS}
-            onTrigger={completion.onTrigger}
-            onCompletionKey={completion.onKey}
-            completionAria={completion.aria}
-          />
+          <TagMultiProjectContext.Provider value={repoIds.length > 1}>
+            <PromptEditor
+              handleRef={editorRef}
+              draftKey={draftKey}
+              value={text}
+              disabled={busy}
+              placeholder="Describe what to build…"
+              onChange={(t) => {
+                updateDraft(draftKey, { text: t, error: null });
+              }}
+              onSubmit={send}
+              onEscape={() => {
+                if (!isDraftEmpty(getDraft(draftKey))) return false;
+                // Back to the Projects page (the worktree overview is a panel tab there,
+                // not a page); the dashboard when the composer has no project at all.
+                const back = target.kind === "project" ? target.repoId : primary;
+                useUiStore.getState().select(back ? { kind: "view", name: "projects" } : DASHBOARD);
+                return true;
+              }}
+              onPasteFiles={attach}
+              onPreviewChip={(id, el) => openPreview(draftKey, id, el)}
+              triggers={TRIGGERS}
+              onTrigger={completion.onTrigger}
+              onCompletionKey={completion.onKey}
+              completionAria={completion.aria}
+            />
+          </TagMultiProjectContext.Provider>
         </div>
         <div className="col-start-1 row-start-2 flex min-w-0 flex-wrap items-center gap-0.5 px-2 pb-2">
           <ComposerPicker
@@ -557,7 +574,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
         </div>
         {/* The completion card, between the card and the worktree row (in flow). */}
         <div className="col-span-2 col-start-1 row-start-3 min-w-0 empty:hidden">
-          <CompletionCard completion={completion} label="Skills" />
+          <CompletionCard completion={completion} />
         </div>
         {(error ?? notice) && (
           <div className="col-span-2 col-start-1 row-start-4 flex flex-col gap-1 px-2 pt-2 text-sm">

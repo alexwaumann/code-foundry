@@ -1,0 +1,264 @@
+import { expect, test, type Page } from "@playwright/test";
+import { invocations, mockPost, mockUrl, openApp, resetMock } from "./fixtures";
+
+// `@` file completion against the mock's SearchFiles (mock/filesystem.ts): each test sets
+// the projects' files with POST /__mock/files; the mock ranks like internal/fuzzy (tier,
+// then shorter path) and logs "search <repo> <query>" per request.
+
+const FILES = ["internal/api/session.go", "gui/frontend/src/api/session.ts", "internal/store/session/manager.go", "README.md"];
+
+async function setFiles(repo: string, files: readonly string[]): Promise<void> {
+  await mockPost(`files?repo=${repo}&${files.map((f) => `path=${encodeURIComponent(f)}`).join("&")}`);
+}
+
+test.beforeEach(async () => {
+  await resetMock();
+  await setFiles("repo-cf", FILES);
+});
+
+/** cmd+n, then cmd+<n> in the project picker: the composer for the nth project. */
+async function compose(page: Page, n = 1): Promise<void> {
+  await page.keyboard.press("Meta+n");
+  await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
+  await page.keyboard.press(`Meta+${String(n)}`);
+  await expect(page.getByTestId("palette")).toHaveCount(0);
+  await expect(page.getByTestId("composer-input")).toBeFocused();
+}
+
+/** The prompt as the draft stores it (tags as tokens). */
+const value = (page: Page) => page.getByTestId("composer-prompt");
+const card = (page: Page) => page.getByTestId("completion-card");
+const rows = (page: Page) => card(page).getByTestId("completion-item");
+const labels = (page: Page) => card(page).getByTestId("completion-label");
+const tags = (page: Page) => page.getByTestId("prompt-tag");
+/** The tooltip's visible line (Radix also renders a visually hidden copy for screen readers). */
+const tip = (page: Page) => page.getByTestId("prompt-tag-tooltip").locator("p").first();
+
+async function newThreads(): Promise<number> {
+  return (await invocations()).filter((i) => i.name === "session.new").length;
+}
+
+/** The mock's SearchFiles calls ("search <repo> <query>"). */
+async function searches(): Promise<string[]> {
+  const res = await fetch(`${mockUrl}/__mock/files/calls`);
+  return ((await res.json()) as string[]).filter((c) => c.startsWith("search "));
+}
+
+const SESSION_GO = "[session.go](cf-file://repo-cf/internal/api/session.go)";
+
+test("type @ses: file rows; Enter inserts the base name and a space without sending; send gets @cf-file://", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  await page.keyboard.type("@ses");
+  await expect(card(page)).toBeVisible();
+  // One project: no heading. Daemon order (tier, then shorter path); a directory ends with "/".
+  await expect(card(page).getByTestId("completion-group")).toHaveCount(0);
+  await expect(labels(page)).toHaveText(["session/", "session.go", "session.ts", "manager.go"]);
+  await expect(rows(page).nth(1)).toContainText("internal/api/session.go");
+  await expect(rows(page).nth(1).getByTestId("completion-hit")).toHaveText(["ses"]);
+  await expect(labels(page).nth(1)).toHaveCSS("font-family", /mono|Menlo|Monaco/i);
+  await expect(rows(page).nth(0)).toHaveAttribute("aria-selected", "true");
+  await expect(card(page).getByRole("listbox")).toHaveAttribute("aria-label", "Files");
+  await expect(card(page).getByTestId("completion-hints")).toHaveText(/↑\s*↓\s*move\s*⏎\s*⇥\s*insert\s*esc\s*dismiss/);
+  expect(await searches()).toContain("search repo-cf ses");
+
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(card(page)).toHaveCount(0);
+  await expect(value(page)).toHaveAttribute("data-value", `${SESSION_GO} `);
+  await expect(tags(page)).toHaveText(["session.go"]);
+  await expect(tags(page).nth(0)).toHaveAttribute("data-tag-kind", "file");
+  expect(await newThreads()).toBe(0);
+
+  // One project: the tooltip is the path alone.
+  await tags(page).nth(0).hover();
+  await expect(tip(page)).toHaveText("internal/api/session.go");
+  await page.mouse.move(0, 0);
+
+  await page.keyboard.type("explain it");
+  await page.keyboard.press("Enter");
+  await expect.poll(newThreads).toBe(1);
+  const prompt = (await invocations()).at(-1)?.args.prompt;
+  expect(prompt).toBe("@cf-file://repo-cf/internal/api/session.go explain it");
+  expect(prompt).toContain("@cf-file://repo-cf/internal/api/session.go ");
+});
+
+test("Escape leaves the text; no matches says so; a click inserts a directory; Tab inserts", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  await page.keyboard.type("@ses");
+  await expect(rows(page)).toHaveCount(4);
+  await page.keyboard.press("Escape");
+  await expect(card(page)).toHaveCount(0);
+  await expect(value(page)).toHaveAttribute("data-value", "@ses");
+  await expect(page.getByTestId("composer")).toBeVisible();
+
+  await page.keyboard.type(" @zzz");
+  await expect(card(page).getByTestId("completion-empty")).toHaveText("No files match");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("READ");
+  await expect(labels(page)).toHaveText(["README.md"]);
+  await page.keyboard.press("Tab");
+  await expect(value(page)).toHaveAttribute("data-value", "@ses [README.md](cf-file://repo-cf/README.md) ");
+  await expect(page.getByTestId("composer-input")).toBeFocused();
+
+  await page.keyboard.type("@sess");
+  await rows(page).filter({ has: page.getByTestId("completion-label").getByText("session/", { exact: true }) }).click();
+  await expect(value(page)).toHaveAttribute("data-value", "@ses [README.md](cf-file://repo-cf/README.md) [session/](cf-file://repo-cf/internal/store/session/) ");
+  await expect(tags(page)).toHaveText(["README.md", "session/"]);
+  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await tags(page).nth(1).hover();
+  await expect(tip(page)).toHaveText("internal/store/session/");
+  expect(await newThreads()).toBe(0);
+});
+
+test("navigating the card with arrows searches nothing more; re-opening with the same query is instant", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  await page.keyboard.type("@ses");
+  await expect(rows(page)).toHaveCount(4);
+  await page.waitForTimeout(300); // let the debounce settle
+  const before = await searches();
+  for (const key of ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowUp", "ArrowDown", "ArrowDown"]) await page.keyboard.press(key);
+  await expect(rows(page).nth(0)).toHaveAttribute("aria-selected", "true"); // wrapped
+  await page.waitForTimeout(300);
+  expect(await searches()).toEqual(before);
+
+  // A space ends the trigger; Backspace puts the caret back in it: the cached answer, no request.
+  await page.keyboard.type(" ");
+  await expect(card(page)).toHaveCount(0);
+  await page.keyboard.press("Backspace");
+  await expect(rows(page)).toHaveCount(4);
+  await page.waitForTimeout(300);
+  expect(await searches()).toEqual(before);
+});
+
+test("Also in: files grouped by project, the primary first; tooltips name the project; removing the project removes its file tag after a confirm", async ({ page }) => {
+  await setFiles("repo-cf", ["internal/api/session.go", "README.md"]);
+  await setFiles("repo-sk", ["internal/api/session.go", "sketch.md"]);
+  await openApp(page);
+  await compose(page);
+  await page.getByTestId("composer-also-in").click();
+  await page.getByTestId("composer-also-in-list").getByRole("option").filter({ hasText: "sketches" }).click();
+  await expect(page.getByTestId("composer-member")).toHaveCount(2);
+
+  await page.getByTestId("composer-input").click();
+  await page.keyboard.type("@session.go");
+  await expect(card(page).getByTestId("completion-group")).toHaveText(["code-foundry", "sketches"]);
+  await expect(labels(page)).toHaveText(["session.go", "session.go"]);
+  expect(await searches()).toEqual(expect.arrayContaining(["search repo-cf session.go", "search repo-sk session.go"]));
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  const SK = "[session.go](cf-file://repo-sk/internal/api/session.go)";
+  await expect(value(page)).toHaveAttribute("data-value", `${SK} `);
+  await page.keyboard.type("and @session.go");
+  await expect(rows(page)).toHaveCount(2);
+  await page.keyboard.press("Enter");
+  await expect(value(page)).toHaveAttribute("data-value", `${SK} and ${SESSION_GO} `);
+
+  // More than one project: the tooltip starts with the project's name.
+  await tags(page).nth(0).hover();
+  await expect(tip(page)).toHaveText("sketches/internal/api/session.go");
+  await page.mouse.move(0, 0);
+  await expect(tip(page)).toHaveCount(0);
+  await tags(page).nth(1).hover();
+  await expect(tip(page)).toHaveText("code-foundry/internal/api/session.go");
+  await page.mouse.move(0, 0);
+
+  // Sketches as the primary: its group comes first.
+  await page.getByTestId("composer-member").filter({ hasText: "sketches" }).getByRole("button", { name: /^sketches/ }).click();
+  await expect(page.getByTestId("composer-member").filter({ hasText: "sketches" })).toHaveAttribute("data-primary", "true");
+  await page.getByTestId("composer-input").click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("@session.go");
+  await expect(card(page).getByTestId("completion-group")).toHaveText(["sketches", "code-foundry"]);
+  await page.keyboard.press("Escape");
+  for (let i = 0; i < "@session.go".length; i++) await page.keyboard.press("Backspace");
+  await expect(value(page)).toHaveAttribute("data-value", `${SK} and ${SESSION_GO} `);
+
+  // Cancel keeps both; confirm removes the project and its file tag.
+  const dialog = page.getByTestId("confirm-dialog");
+  await page.getByRole("button", { name: "Remove sketches" }).click();
+  await expect(dialog).toContainText("Remove sketches from the thread?");
+  await expect(dialog).toContainText("1 reference in your text will be removed.");
+  await dialog.getByTestId("confirm-cancel").click();
+  await expect(tags(page)).toHaveCount(2);
+  await page.getByRole("button", { name: "Remove sketches" }).click();
+  await dialog.getByTestId("confirm-ok").click();
+  await expect(page.getByTestId("composer-member")).toHaveCount(0);
+  await expect(tags(page)).toHaveText(["session.go"]);
+  await expect(value(page)).toHaveAttribute("data-value", `and ${SESSION_GO}`);
+  // One project again: no prefix.
+  await tags(page).nth(0).hover();
+  await expect(tip(page)).toHaveText("internal/api/session.go");
+});
+
+test("Enter before the first answer does not send the half-typed reference", async ({ page }) => {
+  await openApp(page);
+  await compose(page);
+  await page.keyboard.type("look at @READ");
+  await page.keyboard.press("Enter"); // within the debounce: nothing has answered yet
+  await expect(labels(page)).toHaveText(["README.md"]);
+  expect(await newThreads()).toBe(0);
+  await page.keyboard.press("Enter");
+  await expect(value(page)).toHaveAttribute("data-value", "look at [README.md](cf-file://repo-cf/README.md) ");
+  expect(await newThreads()).toBe(0);
+});
+
+test("a slow search says Searching… until the rows land; Escape before the first answer keeps the card closed and Enter sends", async ({ page }) => {
+  await mockPost("files/search?delay=900");
+  await openApp(page);
+  await compose(page);
+  await page.keyboard.type("@READ");
+  await expect(card(page).getByTestId("completion-searching")).toHaveText("Searching…");
+  await expect(card(page).getByTestId("completion-hints")).toBeHidden();
+  await expect(labels(page)).toHaveText(["README.md"]);
+  await page.keyboard.press("Enter");
+  await expect(value(page)).toHaveAttribute("data-value", "[README.md](cf-file://repo-cf/README.md) ");
+
+  // A new query nothing has answered (no prefix of it is cached): Escape at once, then the
+  // answer lands.
+  await page.keyboard.type("@manag");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(1300);
+  await expect(card(page)).toHaveCount(0);
+  expect(await searches()).toContain("search repo-cf manag");
+  expect(await newThreads()).toBe(0);
+  await page.keyboard.press("Enter");
+  await expect.poll(newThreads).toBe(1);
+  expect((await invocations()).at(-1)?.args.prompt).toBe("@cf-file://repo-cf/README.md @manag");
+});
+
+test("a failing search: Enter waits for the answer (No files match), the next Enter closes the card, the one after sends", async ({ page }) => {
+  await mockPost("files/search?fail=1&delay=300");
+  await openApp(page);
+  await compose(page);
+  await page.keyboard.type("@READ");
+  await page.keyboard.press("Enter");
+  await expect(card(page).getByTestId("completion-empty")).toHaveText("No files match");
+  expect(await newThreads()).toBe(0);
+  await page.keyboard.press("Enter");
+  await expect(card(page)).toHaveCount(0);
+  expect(await newThreads()).toBe(0);
+  await page.keyboard.press("Enter");
+  await expect.poll(newThreads).toBe(1);
+  expect((await invocations()).at(-1)?.args.prompt).toBe("@READ");
+});
+
+test("a daemon older than SearchFiles: @ is plain text, no card", async ({ page }) => {
+  await mockPost("missing-rpc?rpc=FilesystemService/SearchFiles");
+  await openApp(page);
+  await compose(page);
+  await page.keyboard.type("@ses");
+  await page.waitForTimeout(400);
+  await expect(card(page)).toHaveCount(0);
+  await page.keyboard.type("x");
+  await page.waitForTimeout(200);
+  await expect(card(page)).toHaveCount(0);
+  await expect(value(page)).toHaveAttribute("data-value", "@sesx");
+  await page.keyboard.press("Enter");
+  await expect.poll(newThreads).toBe(1);
+  expect((await invocations()).at(-1)?.args.prompt).toBe("@sesx");
+});
