@@ -70,6 +70,8 @@ type Terminal struct {
 	// Created is returned by Create; its Argv, Cwd and Labels are filled from the
 	// request.
 	Created *v1.Terminal
+	// Terminals is what List returns.
+	Terminals []*v1.Terminal
 }
 
 var _ command.TerminalBackend = (*Terminal)(nil)
@@ -104,6 +106,15 @@ func (t *Terminal) Remove(_ context.Context, r *connect.Request[v1.RemoveTermina
 func (t *Terminal) Close(_ context.Context, r *connect.Request[v1.CloseTerminalRequest]) (*connect.Response[v1.CloseTerminalResponse], error) {
 	t.record(r.Msg)
 	return connect.NewResponse(&v1.CloseTerminalResponse{}), t.Err
+}
+
+// List records the request and returns Terminals.
+func (t *Terminal) List(_ context.Context, r *connect.Request[v1.ListTerminalsRequest]) (*connect.Response[v1.ListTerminalsResponse], error) {
+	t.record(r.Msg)
+	if t.Err != nil {
+		return nil, t.Err
+	}
+	return connect.NewResponse(&v1.ListTerminalsResponse{Terminals: t.Terminals}), nil
 }
 
 // Repo is a fake command.RepoBackend. Err, when set, is returned by every call. List

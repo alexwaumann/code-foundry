@@ -3,9 +3,13 @@ package command
 import (
 	"cmp"
 	"context"
+	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"text/tabwriter"
 
 	"connectrpc.com/connect"
 
@@ -24,6 +28,7 @@ type TerminalBackend interface {
 	Kill(context.Context, *connect.Request[v1.KillTerminalRequest]) (*connect.Response[v1.KillTerminalResponse], error)
 	Remove(context.Context, *connect.Request[v1.RemoveTerminalRequest]) (*connect.Response[v1.RemoveTerminalResponse], error)
 	Close(context.Context, *connect.Request[v1.CloseTerminalRequest]) (*connect.Response[v1.CloseTerminalResponse], error)
+	List(context.Context, *connect.Request[v1.ListTerminalsRequest]) (*connect.Response[v1.ListTerminalsResponse], error)
 }
 
 var (
@@ -50,8 +55,8 @@ func canStartShell(c Context) bool { return hasSession(c) || c.ActiveWorktreePat
 // "<path> is not inside a registered project" (InvalidArgument).
 const notInProject = "is not inside a registered project"
 
-// RegisterTerminal registers terminal.new, terminal.close, terminal.kill, and
-// terminal.remove.
+// RegisterTerminal registers terminal.new, terminal.list, terminal.close, terminal.kill,
+// and terminal.remove.
 func RegisterTerminal(r *Registry, d TerminalDeps) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextTerminal, Description: "Terminal id"}
 	return r.RegisterAll(
@@ -91,6 +96,26 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				}
 				t := res.Msg.GetTerminal()
 				return Result{Message: "created terminal " + t.GetId(), JSON: t}, nil
+			},
+		},
+		Command{
+			Name:        "terminal.list",
+			Title:       "List Terminals",
+			Description: "List every terminal with its state, working directory and labels (who it belongs to).",
+			Category:    "Terminal",
+			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
+				res, err := d.Terminal.List(ctx, connect.NewRequest(&v1.ListTerminalsRequest{}))
+				if err != nil {
+					return Result{}, err
+				}
+				var sb strings.Builder
+				tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
+				_, _ = fmt.Fprintln(tw, "ID\tSTATE\tCWD\tLABELS")
+				for _, t := range res.Msg.GetTerminals() {
+					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", t.GetId(), terminalState(t), t.GetCwd(), formatLabels(t.GetLabels()))
+				}
+				_ = tw.Flush()
+				return Result{Message: strings.TrimRight(sb.String(), "\n"), JSON: res.Msg}, nil
 			},
 		},
 		Command{
@@ -140,6 +165,26 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			},
 		},
 	)
+}
+
+// terminalState is "running", or "exited <code>".
+func terminalState(t *v1.Terminal) string {
+	if t.GetState() == v1.TerminalState_TERMINAL_STATE_EXITED {
+		return fmt.Sprintf("exited %d", t.GetExitCode())
+	}
+	return "running"
+}
+
+// formatLabels is "k=v" pairs sorted by key, or "-".
+func formatLabels(l map[string]string) string {
+	if len(l) == 0 {
+		return "-"
+	}
+	parts := make([]string, 0, len(l))
+	for _, k := range slices.Sorted(maps.Keys(l)) {
+		parts = append(parts, k+"="+l[k])
+	}
+	return strings.Join(parts, " ")
 }
 
 // owner is who a new shell belongs to (its labels) and where it starts.

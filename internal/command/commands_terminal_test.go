@@ -175,3 +175,32 @@ func TestTerminalClose(t *testing.T) {
 		t.Errorf("terminal.close = %+v, want title Close Terminal, category Terminal, no confirmation", c)
 	}
 }
+
+func TestTerminalList(t *testing.T) {
+	term := &commandtest.Terminal{Terminals: []*v1.Terminal{
+		{Id: "t-1", Cwd: "/src/app/sub", State: v1.TerminalState_TERMINAL_STATE_RUNNING, Labels: termlabel.Shell("", "r1", "/src/app")},
+		{Id: "t-2", Cwd: "/tmp", State: v1.TerminalState_TERMINAL_STATE_EXITED, ExitCode: 2},
+	}}
+	reg := command.NewRegistry()
+	if err := command.RegisterTerminal(reg, command.TerminalDeps{Terminal: term}); err != nil {
+		t.Fatal(err)
+	}
+	res, err := reg.Invoke(context.Background(), command.Context{}, "terminal.list", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(res.Message, "\n")
+	want := [][]string{
+		{"ID", "STATE", "CWD", "LABELS"},
+		{"t-1", "running", "/src/app/sub", "kind=shell", "repo=r1", "worktree=/src/app"},
+		{"t-2", "exited", "2", "/tmp", "-"},
+	}
+	if len(lines) != len(want) {
+		t.Fatalf("lines = %q", lines)
+	}
+	for i, w := range want {
+		if got := strings.Fields(lines[i]); !slices.Equal(got, w) {
+			t.Errorf("line %d = %q, want %q", i, got, w)
+		}
+	}
+}
