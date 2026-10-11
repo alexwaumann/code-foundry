@@ -42,6 +42,8 @@ test("type /dep: the card offers /deploy, Enter inserts a tag and a space withou
   await openApp(page);
   await compose(page);
   await expect.poll(completionCalls).toContain("skills repo-cf true");
+  const skillCalls = async () => (await completionCalls()).filter((c) => c.startsWith("skills ")).length;
+  const loaded = await skillCalls();
   await page.keyboard.type("/dep");
   await expect(card(page)).toBeVisible();
   // A single project: no project heading; the card sits between the card and the worktree row.
@@ -68,6 +70,8 @@ test("type /dep: the card offers /deploy, Enter inserts a tag and a space withou
 
   await page.keyboard.type("to staging");
   await expect(value(page)).toHaveAttribute("data-value", `${DEPLOY} to staging`);
+  // Cached per member set: typing, the card and inserting fetch nothing more.
+  expect(await skillCalls()).toBe(loaded);
   await page.keyboard.press("Enter");
   await expect.poll(newThreads).toBe(1);
   const last = (await invocations()).at(-1);

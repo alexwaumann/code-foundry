@@ -45,6 +45,20 @@ describe("skills store", () => {
     expect(entry(R1)?.skills).toEqual([deploy]);
   });
 
+  it("a list that changes while its request is in flight: the late answer lands under the old list only", async () => {
+    const { fn, calls } = deferred();
+    const R2: SkillSourceView[] = [{ repoId: "r1" }, { repoId: "r2" }];
+    const old = loadSkills(R1, fn);
+    const cur = loadSkills(R2, fn);
+    expect(calls.map((c) => c.sources)).toEqual([R1, R2]);
+    calls[1]?.resolve([deploy, commit]);
+    await cur;
+    calls[0]?.resolve([deploy]);
+    await old;
+    expect(entry(R2)?.skills).toEqual([deploy, commit]);
+    expect(entry(R1)?.skills).toEqual([deploy]);
+  });
+
   it("a reload keeps the previous list until it answers, and after it fails", async () => {
     await loadSkills(R1, () => Promise.resolve([deploy]));
     const { fn, calls } = deferred();
