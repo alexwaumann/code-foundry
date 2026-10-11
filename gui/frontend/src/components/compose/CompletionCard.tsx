@@ -43,7 +43,7 @@ export function CompletionCard({ completion, label }: { completion: Completion; 
   let index = 0;
   return (
     <div
-      className="mt-2 overflow-hidden rounded-2xl border border-border bg-card/85 text-sm shadow-sm backdrop-blur-xl"
+      className="mt-2 overflow-hidden rounded-2xl border border-border bg-card/85 text-[13px] shadow-sm backdrop-blur-xl"
       data-testid="completion-card"
       onMouseDown={(e) => {
         e.preventDefault();
@@ -54,7 +54,7 @@ export function CompletionCard({ completion, label }: { completion: Completion; 
           {emptyText}
         </p>
       ) : (
-        <div id={listId} role="listbox" aria-label={label} className="max-h-[17.5rem] overflow-y-auto py-1">
+        <div id={listId} role="listbox" aria-label={label} className="max-h-[15.5rem] overflow-y-auto py-1">
           {groups.map((g) => (
             <div key={g.key} role="group" aria-label={g.heading ? undefined : label}>
               {g.heading && <Heading heading={g.heading} />}
@@ -69,7 +69,7 @@ export function CompletionCard({ completion, label }: { completion: Completion; 
                     aria-selected={on}
                     data-testid="completion-item"
                     data-selected={on || undefined}
-                    className={cn("mx-1 flex h-8 cursor-pointer items-center gap-2 rounded-md px-2", on && "bg-accent")}
+                    className={cn("mx-1 flex h-7 cursor-pointer items-center gap-2 rounded-md px-2", on && "bg-accent")}
                     onMouseMove={() => {
                       select(i);
                     }}
