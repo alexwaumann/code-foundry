@@ -537,6 +537,11 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 
 	r := newRunner(m, id, s.WorktreePath, l)
 	r.awaitFirstPrompt = prompt != ""
+	if s.ParentID != "" {
+		// A fork's transcript starts with a copy of its parent's records, billed to
+		// the parent; they keep their original times (usage.go).
+		r.usage.notBefore = s.CreatedAt
+	}
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode, prompt: prompt}
 	if m.opts.AttachmentsDir != "" {
 		// Every spawn (not only the first prompt's): a resumed or forked conversation

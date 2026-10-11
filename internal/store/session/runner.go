@@ -382,7 +382,6 @@ func (r *runner) pollTranscript() {
 		}
 	}
 	// After /clear the tailer follows a new file; the fold carries on across it.
-	r.usage.session = r.tail.id
 	counted := r.usage.requests
 	var links []LinkedPullRequest
 	for _, line := range lines {
@@ -425,7 +424,7 @@ func (r *runner) pollTranscript() {
 func (r *runner) backfill(path string, limit int64) {
 	start := time.Now()
 	var links []LinkedPullRequest
-	fold := usageFold{session: r.tail.id}
+	fold := usageFold{notBefore: r.usage.notBefore}
 	err := scanLines(path, limit, func(line []byte) {
 		if l, ok := parsePRLink(line); ok {
 			links = append(links, l)

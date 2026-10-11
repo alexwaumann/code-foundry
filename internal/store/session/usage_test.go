@@ -54,10 +54,10 @@ func TestUsageFoldLine(t *testing.T) {
 	const day = "2026-10-09T12:00:00.000Z"
 	opus := UsageBucket{Model: "claude-opus-5-5", Day: "2026-10-06", Requests: 1, Input: 2, Output: 199, CacheRead: 27402, CacheWrite1h: 748}
 	tests := []struct {
-		name    string
-		session string
-		lines   []string
-		want    []UsageBucket
+		name      string
+		notBefore time.Time
+		lines     []string
+		want      []UsageBucket
 	}{
 		{name: "captured user record", lines: c[:1]},
 		{name: "captured streamed response counts once", lines: c[1:3], want: []UsageBucket{opus}},
@@ -115,15 +115,24 @@ func TestUsageFoldLine(t *testing.T) {
 		{name: "unparsable timestamp", lines: []string{
 			usageLine("r1", "yesterday", "", "claude-opus-5", 1, 0, 0, 0, h1(0), ""),
 		}, want: []UsageBucket{{Model: "claude-opus-5", Day: "unknown", Requests: 1, Input: 1}}},
-		{name: "a fork's copied parent records are skipped", session: "child", lines: []string{
-			usageLine("r1", day, "parent", "claude-opus-5", 1, 0, 0, 0, h1(0), ""),
+		// A fork's copy of its parent's history keeps the original times; its sessionId
+		// is the fork's (as Claude Code 2.1.296 writes it), so ids do not tell them apart.
+		{name: "a fork's copied parent records are skipped by time", notBefore: ts(day), lines: []string{
+			usageLine("r1", "2026-10-09T11:59:59.999Z", "child", "claude-opus-5", 1, 0, 0, 0, h1(0), ""),
 			usageLine("r2", day, "child", "claude-opus-5", 2, 0, 0, 0, h1(0), ""),
-			usageLine("r3", day, "", "claude-opus-5", 4, 0, 0, 0, h1(0), ""),
-		}, want: []UsageBucket{{Model: "claude-opus-5", Day: "2026-10-09", Requests: 2, Input: 6}}},
-		{name: "no session filter without a session", lines: []string{
-			usageLine("r1", day, "parent", "claude-opus-5", 1, 0, 0, 0, h1(0), ""),
+			usageLine("r3", "2026-10-09T13:00:00Z", "child", "claude-opus-5", 4, 0, 0, 0, h1(0), ""),
+			usageLine("r4", "yesterday", "child", "claude-opus-5", 8, 0, 0, 0, h1(0), ""),
+		}, want: []UsageBucket{
+			{Model: "claude-opus-5", Day: "2026-10-09", Requests: 2, Input: 6},
+			{Model: "claude-opus-5", Day: "unknown", Requests: 1, Input: 8},
+		}},
+		{name: "no cutoff when not a fork", lines: []string{
+			usageLine("r1", "2020-01-01T00:00:00Z", "parent", "claude-opus-5", 1, 0, 0, 0, h1(0), ""),
 			usageLine("r2", day, "child", "claude-opus-5", 2, 0, 0, 0, h1(0), ""),
-		}, want: []UsageBucket{{Model: "claude-opus-5", Day: "2026-10-09", Requests: 2, Input: 3}}},
+		}, want: []UsageBucket{
+			{Model: "claude-opus-5", Day: "2020-01-01", Requests: 1, Input: 1},
+			{Model: "claude-opus-5", Day: "2026-10-09", Requests: 1, Input: 2},
+		}},
 		{name: "not an assistant record", lines: []string{
 			strings.Replace(usageLine("r1", day, "", "claude-opus-5", 1, 0, 0, 0, h1(0), ""), `"assistant"`, `"user"`, 1),
 		}},
@@ -139,7 +148,7 @@ func TestUsageFoldLine(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := usageFold{session: tt.session}
+			f := usageFold{notBefore: tt.notBefore}
 			for _, l := range tt.lines {
 				f.Line([]byte(l))
 			}
@@ -211,21 +220,6 @@ func TestSumBuckets(t *testing.T) {
 	}
 }
 
-// ownLines rewrites the captured records' sessionId to cid: they then read as the
-// session's own records rather than a fork's copied history.
-func ownLines(lines []string, cid string) []string {
-	out := make([]string, len(lines))
-	for i, l := range lines {
-		out[i] = l
-		if j := strings.Index(l, `"sessionId":"`); j >= 0 {
-			k := j + len(`"sessionId":"`)
-			end := k + strings.IndexByte(l[k:], '"')
-			out[i] = l[:k] + cid + l[end:]
-		}
-	}
-	return out
-}
-
 func totalRequests(bs []UsageBucket) (n int64) {
 	for _, b := range bs {
 		n += b.Requests
@@ -238,7 +232,7 @@ func TestUsageFromLiveTranscript(t *testing.T) {
 	s := e.connected(CreateOptions{Name: "driver"})
 	spec, _ := e.terms.Spec(s.TerminalID)
 	cid := argOf(spec.Argv, "--session-id")
-	c := ownLines(usageLines(t), cid)
+	c := usageLines(t)
 	e.writeTranscript(cid, userLine("hi"))
 	e.writeTranscript(cid, c[1])
 	got := e.waitFor(s.ID, "usage", func(s Session) bool { return totalRequests(s.Usage) == 1 })
@@ -291,7 +285,7 @@ func TestUsageRescanOnReconnect(t *testing.T) {
 	s := e.connected(CreateOptions{Name: "driver"})
 	spec, _ := e.terms.Spec(s.TerminalID)
 	cid := argOf(spec.Argv, "--session-id")
-	c := ownLines(usageLines(t), cid)
+	c := usageLines(t)
 	e.writeTranscript(cid, userLine("hi"), c[1], c[2])
 	e.waitFor(s.ID, "usage", func(s Session) bool { return totalRequests(s.Usage) == 1 })
 	_ = e.terms.Exit(s.TerminalID, 0)
@@ -328,7 +322,7 @@ func TestForkSkipsParentUsage(t *testing.T) {
 	s := e.connected(CreateOptions{Name: "driver"})
 	spec, _ := e.terms.Spec(s.TerminalID)
 	cid := argOf(spec.Argv, "--session-id")
-	c := ownLines(usageLines(t), cid)
+	c := usageLines(t)
 	e.writeTranscript(cid, userLine("hi"), c[1])
 	e.waitFor(s.ID, "usage", func(s Session) bool { return totalRequests(s.Usage) == 1 })
 
@@ -341,13 +335,26 @@ func TestForkSkipsParentUsage(t *testing.T) {
 	if fcid == "" || fcid == cid {
 		t.Fatalf("fork argv = %q", fspec.Argv)
 	}
-	// Claude starts the fork's file with a copy of the parent's records (keeping the
-	// parent's sessionId), then the fork's own.
-	e.writeTranscript(fcid, userLine("hi"), c[1], c[3])
-	e.writeTranscript(fcid, ownLines(c[4:5], fcid)...)
+	// Claude starts the fork's file with a copy of the parent's records (original
+	// times, the fork's sessionId), then the fork's own.
+	own := usageLine("r-own", time.Now().UTC().Add(time.Minute).Format(time.RFC3339Nano), fcid,
+		"claude-haiku-5-5", 2, 4, 25896, 13021, h1(13021), "standard")
+	e.writeTranscript(fcid, userLine("hi"), c[1], c[3], own)
 	got := e.waitFor(f.ID, "fork usage", func(s Session) bool { return len(s.Usage) > 0 })
 	if totalRequests(got.Usage) != 1 || got.Usage[0].Model != "claude-haiku-5-5" {
 		t.Errorf("fork usage = %+v; want only its own haiku request", got.Usage)
+	}
+
+	// The rescan on reconnect skips the copies too.
+	_ = e.terms.Exit(got.TerminalID, 0)
+	e.waitFor(f.ID, "fork disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	e.m.setUsage(f.ID, nil)
+	if _, err := e.m.Reconnect(e.ctx(), f.ID); err != nil {
+		t.Fatal(err)
+	}
+	got = e.waitFor(f.ID, "fork rescan", func(s Session) bool { return len(s.Usage) > 0 })
+	if totalRequests(got.Usage) != 1 || got.Usage[0].Model != "claude-haiku-5-5" {
+		t.Errorf("fork usage after rescan = %+v", got.Usage)
 	}
 }
 

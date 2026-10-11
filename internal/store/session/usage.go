@@ -96,7 +96,6 @@ type usageRecord struct {
 	Type      string `json:"type"`
 	RequestID string `json:"requestId"`
 	Timestamp string `json:"timestamp"`
-	SessionID string `json:"sessionId"`
 	Message   *struct {
 		Model string `json:"model"`
 		Usage *struct {
@@ -117,11 +116,12 @@ type usageRecord struct {
 // fold is per file (the parent transcript now; one per subagent run later), so
 // several can be summed with SumUsage.
 type usageFold struct {
-	// session, when set, is the Claude session id of the transcript being folded.
-	// Records naming another session are skipped: a forked transcript starts with a
-	// copy of its parent's records, which keep the parent's sessionId and were billed
-	// to the parent.
-	session string
+	// notBefore, when set, skips records timestamped before it. A forked thread's
+	// transcript starts with a copy of its parent's records, which were billed to the
+	// parent; the copies keep their original times, while the fork's own requests come
+	// after the fork was created. (Claude rewrites the copies' sessionId to the fork's,
+	// and session_id does not reliably name the requester: docs/notes/session-usage.md.)
+	notBefore time.Time
 
 	buckets  map[usageKey]*UsageBucket
 	lastReq  string // requestId of the previous counted record: streaming repeats are consecutive
@@ -142,7 +142,8 @@ func (f *usageFold) Line(line []byte) {
 	if rec.Message.Model == "<synthetic>" || rec.Message.Model == "" {
 		return
 	}
-	if f.session != "" && rec.SessionID != "" && rec.SessionID != f.session {
+	ts, tsErr := time.Parse(time.RFC3339Nano, rec.Timestamp)
+	if tsErr == nil && ts.Before(f.notBefore) {
 		return // a fork's copy of its parent's history
 	}
 	if rec.RequestID != "" && rec.RequestID == f.lastReq {
@@ -152,7 +153,7 @@ func (f *usageFold) Line(line []byte) {
 	u := rec.Message.Usage
 	b := UsageBucket{Model: rec.Message.Model, Day: UnknownDay, Requests: 1,
 		Input: u.Input, Output: u.Output, CacheRead: u.CacheRead}
-	if ts, err := time.Parse(time.RFC3339Nano, rec.Timestamp); err == nil {
+	if tsErr == nil {
 		b.Day = ts.UTC().Format(time.DateOnly)
 	}
 	if u.Tiers != nil {

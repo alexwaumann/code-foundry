@@ -163,7 +163,11 @@ func renderUsage(heading string, rep UsageReport) string {
 	if t.Unpriced {
 		cost += " + unpriced"
 	}
-	fmt.Fprintf(&sb, "%s: %s requests · %s tokens · %s\n", heading, groupInt(t.Requests), formatTokens(t.Tokens), cost)
+	requests := "requests"
+	if t.Requests == 1 {
+		requests = "request"
+	}
+	fmt.Fprintf(&sb, "%s: %s %s · %s tokens · %s\n", heading, groupInt(t.Requests), requests, formatTokens(t.Tokens), cost)
 	if len(rep.Models) == 0 {
 		sb.WriteString("No usage yet.\n")
 		return sb.String()
