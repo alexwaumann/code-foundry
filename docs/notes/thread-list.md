@@ -127,3 +127,40 @@ on Add project because `repo.add` hides when unavailable.
   (`rowTooltips.ts`), not in `SidebarRow.tsx`.
 * The workspace and Linked PRs badges keep their native `title`, so hovering a badge can
   show the native title as well as the row tooltip.
+
+## Verification
+
+* `make check` green (gofmt, vet, staticcheck, `go test`, typecheck, lint, 1024 vitest
+  tests). New and changed unit tests: `lib/statusLine.test.ts` (every status to line kind,
+  text and tone, times), `lib/session.test.ts` (`statusNote`, `attentionTier`),
+  `lib/tree.test.ts` (headerless order, prompts above finished, `rowCache`),
+  `lib/threadRow.test.ts` (`worktree`, `modelLabel`), `keys/bindings.test.ts`
+  (cmd+shift+a visits prompts before finished turns).
+* `make gui-e2e` green: 378 passed, 4 skipped (the live specs), no flakes this run. New in
+  `sidebar.spec.ts`: the status-kinds scenario (`POST /__mock/status-kinds`: full order,
+  line-2 text and colour per kind, place only on working/idle rows, offline dimming, no row
+  icons, cmd+1 and cmd+shift+a order, count 7), the tooltip (worktree chip, main checkout,
+  no-effort model, no-git project; closes on click; keyboard does not open it; quiet while
+  the row menu is open; 220px, right of the sidebar) and the toolbar sides. Updated:
+  `app.spec`, `sidebar.spec`, `sessions.spec` (offline dimming instead of a muted name, the
+  interrupted text, order without headers), `compose.spec`.
+* `make gui-build` green.
+* **Live** (isolated `CODE_FOUNDRY_HOME=/tmp/cf-threadlist`, GUI from `gui/bin`, daemon
+  started by it, scratch repo `~/tmp/cf-threadlist-repo`, haiku / medium): a pinned busy
+  thread ("Working · cf-threadlist-repo · main", sky, pin glyph), a supervised thread at
+  "Needs input · Do you want to create hello.txt?" (amber), a new-worktree thread at
+  "Finished just now" (emerald), and a closed idle thread (dimmed, plain place); the bell
+  showed 2. Hovering the finished thread showed its tooltip with `cf/update-dial…` and the
+  worktree chip, and "Haiku (medium)". Screenshots:
+  `~/.t3/userdata/attachments/thread-list/app-rows.png`, `app-tooltip.png`. Daemon log had
+  no warnings or errors. Everything removed afterwards (threads, home, repo, the two
+  `~/.claude/projects` directories).
+* Not verified live: the error / interrupted / plan / question lines and the no-git tooltip
+  (mock e2e only), light mode, and the 30 s tick of a "Finished n min ago" line (the clock
+  is the existing shared one).
+
+## Daemon restart
+
+None needed for this step (frontend only). The status lines need the daemon from
+`thread-status-persistence.md` (#34); against an older daemon `statusReason` is still
+sent, `statusChangedAt` is not, so finished rows read just "Finished".
