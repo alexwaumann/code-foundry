@@ -2,15 +2,15 @@
 // @generated from file codefoundry/v1/filesystem.proto (package codefoundry.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file codefoundry/v1/filesystem.proto.
  */
 export const file_codefoundry_v1_filesystem: GenFile = /*@__PURE__*/
-  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIMnkKEUZpbGVzeXN0ZW1TZXJ2aWNlEmQKD0xpc3REaXJlY3RvcmllcxImLmNvZGVmb3VuZHJ5LnYxLkxpc3REaXJlY3Rvcmllc1JlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5MaXN0RGlyZWN0b3JpZXNSZXNwb25zZSIAQscBChJjb20uY29kZWZvdW5kcnkudjFCD0ZpbGVzeXN0ZW1Qcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z");
+  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIIiwKC1NraWxsU291cmNlEg8KB3JlcG9faWQYASABKAkSDAoEcGF0aBgCIAEoCSJXChFMaXN0U2tpbGxzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2tpbGxTb3VyY2USFAoMaW5jbHVkZV91c2VyGAIgASgIInQKBVNraWxsEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoFc2NvcGUYAyABKA4yGi5jb2RlZm91bmRyeS52MS5Ta2lsbFNjb3BlEg8KB3JlcG9faWQYBCABKAkSDAoEcGF0aBgFIAEoCSI7ChJMaXN0U2tpbGxzUmVzcG9uc2USJQoGc2tpbGxzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuU2tpbGwiUQoSU2VhcmNoRmlsZXNSZXF1ZXN0Eg8KB3JlcG9faWQYASABKAkSDAoEcGF0aBgCIAEoCRINCgVxdWVyeRgDIAEoCRINCgVsaW1pdBgEIAEoBSIpCglGaWxlTWF0Y2gSDAoEcGF0aBgBIAEoCRIOCgZpc19kaXIYAiABKAgiVAoTU2VhcmNoRmlsZXNSZXNwb25zZRIqCgdtYXRjaGVzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuRmlsZU1hdGNoEhEKCXRydW5jYXRlZBgCIAEoCCpYCgpTa2lsbFNjb3BlEhsKF1NLSUxMX1NDT1BFX1VOU1BFQ0lGSUVEEAASFAoQU0tJTExfU0NPUEVfVVNFUhABEhcKE1NLSUxMX1NDT1BFX1BST0pFQ1QQAjKqAgoRRmlsZXN5c3RlbVNlcnZpY2USZAoPTGlzdERpcmVjdG9yaWVzEiYuY29kZWZvdW5kcnkudjEuTGlzdERpcmVjdG9yaWVzUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLkxpc3REaXJlY3Rvcmllc1Jlc3BvbnNlIgASVQoKTGlzdFNraWxscxIhLmNvZGVmb3VuZHJ5LnYxLkxpc3RTa2lsbHNSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuTGlzdFNraWxsc1Jlc3BvbnNlIgASWAoLU2VhcmNoRmlsZXMSIi5jb2RlZm91bmRyeS52MS5TZWFyY2hGaWxlc1JlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5TZWFyY2hGaWxlc1Jlc3BvbnNlIgBCxwEKEmNvbS5jb2RlZm91bmRyeS52MUIPRmlsZXN5c3RlbVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
 
 /**
  * @generated from message codefoundry.v1.ListDirectoriesRequest
@@ -107,6 +107,243 @@ export const ListDirectoriesResponseSchema: GenMessage<ListDirectoriesResponse> 
   messageDesc(file_codefoundry_v1_filesystem, 2);
 
 /**
+ * SkillSource is one checkout to read skills from.
+ *
+ * @generated from message codefoundry.v1.SkillSource
+ */
+export type SkillSource = Message<"codefoundry.v1.SkillSource"> & {
+  /**
+   * The registered project.
+   *
+   * @generated from field: string repo_id = 1;
+   */
+  repoId: string;
+
+  /**
+   * Absolute path of the checkout to read (a worktree of the project). Empty: the
+   * project's main worktree.
+   *
+   * @generated from field: string path = 2;
+   */
+  path: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.SkillSource.
+ * Use `create(SkillSourceSchema)` to create a new message.
+ */
+export const SkillSourceSchema: GenMessage<SkillSource> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 3);
+
+/**
+ * @generated from message codefoundry.v1.ListSkillsRequest
+ */
+export type ListSkillsRequest = Message<"codefoundry.v1.ListSkillsRequest"> & {
+  /**
+   * @generated from field: repeated codefoundry.v1.SkillSource sources = 1;
+   */
+  sources: SkillSource[];
+
+  /**
+   * Also list the user's skills and commands under ~/.claude.
+   *
+   * @generated from field: bool include_user = 2;
+   */
+  includeUser: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.ListSkillsRequest.
+ * Use `create(ListSkillsRequestSchema)` to create a new message.
+ */
+export const ListSkillsRequestSchema: GenMessage<ListSkillsRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 4);
+
+/**
+ * @generated from message codefoundry.v1.Skill
+ */
+export type Skill = Message<"codefoundry.v1.Skill"> & {
+  /**
+   * What follows "/": the skill's directory name, or a command file's stem.
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * The SKILL.md frontmatter's description, or a command file's first non-empty line
+   * that is not a heading (frontmatter skipped). May be empty.
+   *
+   * @generated from field: string description = 2;
+   */
+  description: string;
+
+  /**
+   * @generated from field: codefoundry.v1.SkillScope scope = 3;
+   */
+  scope: SkillScope;
+
+  /**
+   * The project, for SKILL_SCOPE_PROJECT.
+   *
+   * @generated from field: string repo_id = 4;
+   */
+  repoId: string;
+
+  /**
+   * Absolute path of the SKILL.md or command .md file.
+   *
+   * @generated from field: string path = 5;
+   */
+  path: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.Skill.
+ * Use `create(SkillSchema)` to create a new message.
+ */
+export const SkillSchema: GenMessage<Skill> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 5);
+
+/**
+ * @generated from message codefoundry.v1.ListSkillsResponse
+ */
+export type ListSkillsResponse = Message<"codefoundry.v1.ListSkillsResponse"> & {
+  /**
+   * @generated from field: repeated codefoundry.v1.Skill skills = 1;
+   */
+  skills: Skill[];
+};
+
+/**
+ * Describes the message codefoundry.v1.ListSkillsResponse.
+ * Use `create(ListSkillsResponseSchema)` to create a new message.
+ */
+export const ListSkillsResponseSchema: GenMessage<ListSkillsResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 6);
+
+/**
+ * @generated from message codefoundry.v1.SearchFilesRequest
+ */
+export type SearchFilesRequest = Message<"codefoundry.v1.SearchFilesRequest"> & {
+  /**
+   * The registered project.
+   *
+   * @generated from field: string repo_id = 1;
+   */
+  repoId: string;
+
+  /**
+   * Absolute path of the checkout to search (a worktree of the project). Empty: the
+   * project's main worktree.
+   *
+   * @generated from field: string path = 2;
+   */
+  path: string;
+
+  /**
+   * Typed text after "@". Matched as a case-insensitive subsequence.
+   *
+   * @generated from field: string query = 3;
+   */
+  query: string;
+
+  /**
+   * Maximum matches. Zero means 50; at most 200.
+   *
+   * @generated from field: int32 limit = 4;
+   */
+  limit: number;
+};
+
+/**
+ * Describes the message codefoundry.v1.SearchFilesRequest.
+ * Use `create(SearchFilesRequestSchema)` to create a new message.
+ */
+export const SearchFilesRequestSchema: GenMessage<SearchFilesRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 7);
+
+/**
+ * @generated from message codefoundry.v1.FileMatch
+ */
+export type FileMatch = Message<"codefoundry.v1.FileMatch"> & {
+  /**
+   * Relative to the checkout, forward slashes, no leading "./", no trailing "/".
+   *
+   * @generated from field: string path = 1;
+   */
+  path: string;
+
+  /**
+   * @generated from field: bool is_dir = 2;
+   */
+  isDir: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.FileMatch.
+ * Use `create(FileMatchSchema)` to create a new message.
+ */
+export const FileMatchSchema: GenMessage<FileMatch> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 8);
+
+/**
+ * @generated from message codefoundry.v1.SearchFilesResponse
+ */
+export type SearchFilesResponse = Message<"codefoundry.v1.SearchFilesResponse"> & {
+  /**
+   * Best match first.
+   *
+   * @generated from field: repeated codefoundry.v1.FileMatch matches = 1;
+   */
+  matches: FileMatch[];
+
+  /**
+   * More entries matched than were returned.
+   *
+   * @generated from field: bool truncated = 2;
+   */
+  truncated: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.SearchFilesResponse.
+ * Use `create(SearchFilesResponseSchema)` to create a new message.
+ */
+export const SearchFilesResponseSchema: GenMessage<SearchFilesResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 9);
+
+/**
+ * @generated from enum codefoundry.v1.SkillScope
+ */
+export enum SkillScope {
+  /**
+   * @generated from enum value: SKILL_SCOPE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * ~/.claude/skills or ~/.claude/commands.
+   *
+   * @generated from enum value: SKILL_SCOPE_USER = 1;
+   */
+  USER = 1,
+
+  /**
+   * <checkout>/.claude/skills or <checkout>/.claude/commands.
+   *
+   * @generated from enum value: SKILL_SCOPE_PROJECT = 2;
+   */
+  PROJECT = 2,
+}
+
+/**
+ * Describes the enum codefoundry.v1.SkillScope.
+ */
+export const SkillScopeSchema: GenEnum<SkillScope> = /*@__PURE__*/
+  enumDesc(file_codefoundry_v1_filesystem, 0);
+
+/**
  * FilesystemService answers questions about the local filesystem that the GUI cannot
  * (the frontend has no filesystem access). Every path it accepts or returns is under
  * the user's home directory.
@@ -127,6 +364,37 @@ export const FilesystemService: GenService<{
     methodKind: "unary";
     input: typeof ListDirectoriesRequestSchema;
     output: typeof ListDirectoriesResponseSchema;
+  },
+  /**
+   * ListSkills lists the skills and slash commands Claude Code would offer in the given
+   * checkouts (the composer's "/" completion): .claude/skills/<name>/SKILL.md and
+   * .claude/commands/**\/*.md in each source, then ~/.claude/skills and
+   * ~/.claude/commands/*.md when include_user. Project skills come in request order,
+   * sorted by name within a source; user skills last. Unreadable entries are skipped.
+   * An unknown repo is NotFound; a path outside the home directory is InvalidArgument.
+   *
+   * @generated from rpc codefoundry.v1.FilesystemService.ListSkills
+   */
+  listSkills: {
+    methodKind: "unary";
+    input: typeof ListSkillsRequestSchema;
+    output: typeof ListSkillsResponseSchema;
+  },
+  /**
+   * SearchFiles fuzzy-matches query against the files and directories of one checkout
+   * (the composer's "@" completion). A git checkout lists tracked plus untracked, not
+   * ignored files (and their parent directories); a project without git is walked,
+   * skipping .git, node_modules and dot-directories, at most 50,000 entries. The
+   * candidate list is cached for a few seconds per checkout. An empty query returns
+   * the shallowest entries. An unknown repo is NotFound; a path outside the home
+   * directory is InvalidArgument.
+   *
+   * @generated from rpc codefoundry.v1.FilesystemService.SearchFiles
+   */
+  searchFiles: {
+    methodKind: "unary";
+    input: typeof SearchFilesRequestSchema;
+    output: typeof SearchFilesResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_codefoundry_v1_filesystem, 0);

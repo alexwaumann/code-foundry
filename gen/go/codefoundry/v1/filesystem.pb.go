@@ -21,6 +21,57 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type SkillScope int32
+
+const (
+	SkillScope_SKILL_SCOPE_UNSPECIFIED SkillScope = 0
+	// ~/.claude/skills or ~/.claude/commands.
+	SkillScope_SKILL_SCOPE_USER SkillScope = 1
+	// <checkout>/.claude/skills or <checkout>/.claude/commands.
+	SkillScope_SKILL_SCOPE_PROJECT SkillScope = 2
+)
+
+// Enum value maps for SkillScope.
+var (
+	SkillScope_name = map[int32]string{
+		0: "SKILL_SCOPE_UNSPECIFIED",
+		1: "SKILL_SCOPE_USER",
+		2: "SKILL_SCOPE_PROJECT",
+	}
+	SkillScope_value = map[string]int32{
+		"SKILL_SCOPE_UNSPECIFIED": 0,
+		"SKILL_SCOPE_USER":        1,
+		"SKILL_SCOPE_PROJECT":     2,
+	}
+)
+
+func (x SkillScope) Enum() *SkillScope {
+	p := new(SkillScope)
+	*p = x
+	return p
+}
+
+func (x SkillScope) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SkillScope) Descriptor() protoreflect.EnumDescriptor {
+	return file_codefoundry_v1_filesystem_proto_enumTypes[0].Descriptor()
+}
+
+func (SkillScope) Type() protoreflect.EnumType {
+	return &file_codefoundry_v1_filesystem_proto_enumTypes[0]
+}
+
+func (x SkillScope) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SkillScope.Descriptor instead.
+func (SkillScope) EnumDescriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{0}
+}
+
 type ListDirectoriesRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// A path prefix as typed: "~", "~/", "~/co", or an absolute path.
@@ -203,6 +254,420 @@ func (x *ListDirectoriesResponse) GetTruncated() bool {
 	return false
 }
 
+// SkillSource is one checkout to read skills from.
+type SkillSource struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The registered project.
+	RepoId string `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	// Absolute path of the checkout to read (a worktree of the project). Empty: the
+	// project's main worktree.
+	Path          string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SkillSource) Reset() {
+	*x = SkillSource{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SkillSource) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SkillSource) ProtoMessage() {}
+
+func (x *SkillSource) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SkillSource.ProtoReflect.Descriptor instead.
+func (*SkillSource) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SkillSource) GetRepoId() string {
+	if x != nil {
+		return x.RepoId
+	}
+	return ""
+}
+
+func (x *SkillSource) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+type ListSkillsRequest struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Sources []*SkillSource         `protobuf:"bytes,1,rep,name=sources,proto3" json:"sources,omitempty"`
+	// Also list the user's skills and commands under ~/.claude.
+	IncludeUser   bool `protobuf:"varint,2,opt,name=include_user,json=includeUser,proto3" json:"include_user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSkillsRequest) Reset() {
+	*x = ListSkillsRequest{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSkillsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSkillsRequest) ProtoMessage() {}
+
+func (x *ListSkillsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSkillsRequest.ProtoReflect.Descriptor instead.
+func (*ListSkillsRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ListSkillsRequest) GetSources() []*SkillSource {
+	if x != nil {
+		return x.Sources
+	}
+	return nil
+}
+
+func (x *ListSkillsRequest) GetIncludeUser() bool {
+	if x != nil {
+		return x.IncludeUser
+	}
+	return false
+}
+
+type Skill struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// What follows "/": the skill's directory name, or a command file's stem.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// The SKILL.md frontmatter's description, or a command file's first non-empty line
+	// that is not a heading (frontmatter skipped). May be empty.
+	Description string     `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Scope       SkillScope `protobuf:"varint,3,opt,name=scope,proto3,enum=codefoundry.v1.SkillScope" json:"scope,omitempty"`
+	// The project, for SKILL_SCOPE_PROJECT.
+	RepoId string `protobuf:"bytes,4,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	// Absolute path of the SKILL.md or command .md file.
+	Path          string `protobuf:"bytes,5,opt,name=path,proto3" json:"path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Skill) Reset() {
+	*x = Skill{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Skill) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Skill) ProtoMessage() {}
+
+func (x *Skill) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Skill.ProtoReflect.Descriptor instead.
+func (*Skill) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *Skill) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Skill) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *Skill) GetScope() SkillScope {
+	if x != nil {
+		return x.Scope
+	}
+	return SkillScope_SKILL_SCOPE_UNSPECIFIED
+}
+
+func (x *Skill) GetRepoId() string {
+	if x != nil {
+		return x.RepoId
+	}
+	return ""
+}
+
+func (x *Skill) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+type ListSkillsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Skills        []*Skill               `protobuf:"bytes,1,rep,name=skills,proto3" json:"skills,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSkillsResponse) Reset() {
+	*x = ListSkillsResponse{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSkillsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSkillsResponse) ProtoMessage() {}
+
+func (x *ListSkillsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSkillsResponse.ProtoReflect.Descriptor instead.
+func (*ListSkillsResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListSkillsResponse) GetSkills() []*Skill {
+	if x != nil {
+		return x.Skills
+	}
+	return nil
+}
+
+type SearchFilesRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The registered project.
+	RepoId string `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	// Absolute path of the checkout to search (a worktree of the project). Empty: the
+	// project's main worktree.
+	Path string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	// Typed text after "@". Matched as a case-insensitive subsequence.
+	Query string `protobuf:"bytes,3,opt,name=query,proto3" json:"query,omitempty"`
+	// Maximum matches. Zero means 50; at most 200.
+	Limit         int32 `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchFilesRequest) Reset() {
+	*x = SearchFilesRequest{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchFilesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchFilesRequest) ProtoMessage() {}
+
+func (x *SearchFilesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchFilesRequest.ProtoReflect.Descriptor instead.
+func (*SearchFilesRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SearchFilesRequest) GetRepoId() string {
+	if x != nil {
+		return x.RepoId
+	}
+	return ""
+}
+
+func (x *SearchFilesRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *SearchFilesRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *SearchFilesRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type FileMatch struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Relative to the checkout, forward slashes, no leading "./", no trailing "/".
+	Path          string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	IsDir         bool   `protobuf:"varint,2,opt,name=is_dir,json=isDir,proto3" json:"is_dir,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FileMatch) Reset() {
+	*x = FileMatch{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FileMatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileMatch) ProtoMessage() {}
+
+func (x *FileMatch) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FileMatch.ProtoReflect.Descriptor instead.
+func (*FileMatch) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *FileMatch) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *FileMatch) GetIsDir() bool {
+	if x != nil {
+		return x.IsDir
+	}
+	return false
+}
+
+type SearchFilesResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Best match first.
+	Matches []*FileMatch `protobuf:"bytes,1,rep,name=matches,proto3" json:"matches,omitempty"`
+	// More entries matched than were returned.
+	Truncated     bool `protobuf:"varint,2,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchFilesResponse) Reset() {
+	*x = SearchFilesResponse{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchFilesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchFilesResponse) ProtoMessage() {}
+
+func (x *SearchFilesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchFilesResponse.ProtoReflect.Descriptor instead.
+func (*SearchFilesResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *SearchFilesResponse) GetMatches() []*FileMatch {
+	if x != nil {
+		return x.Matches
+	}
+	return nil
+}
+
+func (x *SearchFilesResponse) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
 var File_codefoundry_v1_filesystem_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
@@ -222,9 +687,42 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\n" +
 	"completion\x18\x02 \x01(\tR\n" +
 	"completion\x12\x1c\n" +
-	"\ttruncated\x18\x03 \x01(\bR\ttruncated2y\n" +
+	"\ttruncated\x18\x03 \x01(\bR\ttruncated\":\n" +
+	"\vSkillSource\x12\x17\n" +
+	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\"m\n" +
+	"\x11ListSkillsRequest\x125\n" +
+	"\asources\x18\x01 \x03(\v2\x1b.codefoundry.v1.SkillSourceR\asources\x12!\n" +
+	"\finclude_user\x18\x02 \x01(\bR\vincludeUser\"\x9c\x01\n" +
+	"\x05Skill\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x120\n" +
+	"\x05scope\x18\x03 \x01(\x0e2\x1a.codefoundry.v1.SkillScopeR\x05scope\x12\x17\n" +
+	"\arepo_id\x18\x04 \x01(\tR\x06repoId\x12\x12\n" +
+	"\x04path\x18\x05 \x01(\tR\x04path\"C\n" +
+	"\x12ListSkillsResponse\x12-\n" +
+	"\x06skills\x18\x01 \x03(\v2\x15.codefoundry.v1.SkillR\x06skills\"m\n" +
+	"\x12SearchFilesRequest\x12\x17\n" +
+	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x14\n" +
+	"\x05query\x18\x03 \x01(\tR\x05query\x12\x14\n" +
+	"\x05limit\x18\x04 \x01(\x05R\x05limit\"6\n" +
+	"\tFileMatch\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x15\n" +
+	"\x06is_dir\x18\x02 \x01(\bR\x05isDir\"h\n" +
+	"\x13SearchFilesResponse\x123\n" +
+	"\amatches\x18\x01 \x03(\v2\x19.codefoundry.v1.FileMatchR\amatches\x12\x1c\n" +
+	"\ttruncated\x18\x02 \x01(\bR\ttruncated*X\n" +
+	"\n" +
+	"SkillScope\x12\x1b\n" +
+	"\x17SKILL_SCOPE_UNSPECIFIED\x10\x00\x12\x14\n" +
+	"\x10SKILL_SCOPE_USER\x10\x01\x12\x17\n" +
+	"\x13SKILL_SCOPE_PROJECT\x10\x022\xaa\x02\n" +
 	"\x11FilesystemService\x12d\n" +
-	"\x0fListDirectories\x12&.codefoundry.v1.ListDirectoriesRequest\x1a'.codefoundry.v1.ListDirectoriesResponse\"\x00B\xc7\x01\n" +
+	"\x0fListDirectories\x12&.codefoundry.v1.ListDirectoriesRequest\x1a'.codefoundry.v1.ListDirectoriesResponse\"\x00\x12U\n" +
+	"\n" +
+	"ListSkills\x12!.codefoundry.v1.ListSkillsRequest\x1a\".codefoundry.v1.ListSkillsResponse\"\x00\x12X\n" +
+	"\vSearchFiles\x12\".codefoundry.v1.SearchFilesRequest\x1a#.codefoundry.v1.SearchFilesResponse\"\x00B\xc7\x01\n" +
 	"\x12com.codefoundry.v1B\x0fFilesystemProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
@@ -239,21 +737,38 @@ func file_codefoundry_v1_filesystem_proto_rawDescGZIP() []byte {
 	return file_codefoundry_v1_filesystem_proto_rawDescData
 }
 
-var file_codefoundry_v1_filesystem_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_codefoundry_v1_filesystem_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_codefoundry_v1_filesystem_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_codefoundry_v1_filesystem_proto_goTypes = []any{
-	(*ListDirectoriesRequest)(nil),  // 0: codefoundry.v1.ListDirectoriesRequest
-	(*DirectoryEntry)(nil),          // 1: codefoundry.v1.DirectoryEntry
-	(*ListDirectoriesResponse)(nil), // 2: codefoundry.v1.ListDirectoriesResponse
+	(SkillScope)(0),                 // 0: codefoundry.v1.SkillScope
+	(*ListDirectoriesRequest)(nil),  // 1: codefoundry.v1.ListDirectoriesRequest
+	(*DirectoryEntry)(nil),          // 2: codefoundry.v1.DirectoryEntry
+	(*ListDirectoriesResponse)(nil), // 3: codefoundry.v1.ListDirectoriesResponse
+	(*SkillSource)(nil),             // 4: codefoundry.v1.SkillSource
+	(*ListSkillsRequest)(nil),       // 5: codefoundry.v1.ListSkillsRequest
+	(*Skill)(nil),                   // 6: codefoundry.v1.Skill
+	(*ListSkillsResponse)(nil),      // 7: codefoundry.v1.ListSkillsResponse
+	(*SearchFilesRequest)(nil),      // 8: codefoundry.v1.SearchFilesRequest
+	(*FileMatch)(nil),               // 9: codefoundry.v1.FileMatch
+	(*SearchFilesResponse)(nil),     // 10: codefoundry.v1.SearchFilesResponse
 }
 var file_codefoundry_v1_filesystem_proto_depIdxs = []int32{
-	1, // 0: codefoundry.v1.ListDirectoriesResponse.entries:type_name -> codefoundry.v1.DirectoryEntry
-	0, // 1: codefoundry.v1.FilesystemService.ListDirectories:input_type -> codefoundry.v1.ListDirectoriesRequest
-	2, // 2: codefoundry.v1.FilesystemService.ListDirectories:output_type -> codefoundry.v1.ListDirectoriesResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	2,  // 0: codefoundry.v1.ListDirectoriesResponse.entries:type_name -> codefoundry.v1.DirectoryEntry
+	4,  // 1: codefoundry.v1.ListSkillsRequest.sources:type_name -> codefoundry.v1.SkillSource
+	0,  // 2: codefoundry.v1.Skill.scope:type_name -> codefoundry.v1.SkillScope
+	6,  // 3: codefoundry.v1.ListSkillsResponse.skills:type_name -> codefoundry.v1.Skill
+	9,  // 4: codefoundry.v1.SearchFilesResponse.matches:type_name -> codefoundry.v1.FileMatch
+	1,  // 5: codefoundry.v1.FilesystemService.ListDirectories:input_type -> codefoundry.v1.ListDirectoriesRequest
+	5,  // 6: codefoundry.v1.FilesystemService.ListSkills:input_type -> codefoundry.v1.ListSkillsRequest
+	8,  // 7: codefoundry.v1.FilesystemService.SearchFiles:input_type -> codefoundry.v1.SearchFilesRequest
+	3,  // 8: codefoundry.v1.FilesystemService.ListDirectories:output_type -> codefoundry.v1.ListDirectoriesResponse
+	7,  // 9: codefoundry.v1.FilesystemService.ListSkills:output_type -> codefoundry.v1.ListSkillsResponse
+	10, // 10: codefoundry.v1.FilesystemService.SearchFiles:output_type -> codefoundry.v1.SearchFilesResponse
+	8,  // [8:11] is the sub-list for method output_type
+	5,  // [5:8] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_filesystem_proto_init() }
@@ -266,13 +781,14 @@ func file_codefoundry_v1_filesystem_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_filesystem_proto_rawDesc), len(file_codefoundry_v1_filesystem_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   3,
+			NumEnums:      1,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_codefoundry_v1_filesystem_proto_goTypes,
 		DependencyIndexes: file_codefoundry_v1_filesystem_proto_depIdxs,
+		EnumInfos:         file_codefoundry_v1_filesystem_proto_enumTypes,
 		MessageInfos:      file_codefoundry_v1_filesystem_proto_msgTypes,
 	}.Build()
 	File_codefoundry_v1_filesystem_proto = out.File

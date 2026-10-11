@@ -12,6 +12,23 @@ service FilesystemService {
   // directory. Dot-directories are listed only when the last segment starts with ".".
   // A prefix that resolves outside the home directory is InvalidArgument.
   rpc ListDirectories(ListDirectoriesRequest) returns (ListDirectoriesResponse) {}
+
+  // ListSkills lists the skills and slash commands Claude Code would offer in the given
+  // checkouts (the composer's "/" completion): .claude/skills/<name>/SKILL.md and
+  // .claude/commands/**/*.md in each source, then ~/.claude/skills and
+  // ~/.claude/commands/*.md when include_user. Project skills come in request order,
+  // sorted by name within a source; user skills last. Unreadable entries are skipped.
+  // An unknown repo is NotFound; a path outside the home directory is InvalidArgument.
+  rpc ListSkills(ListSkillsRequest) returns (ListSkillsResponse) {}
+
+  // SearchFiles fuzzy-matches query against the files and directories of one checkout
+  // (the composer's "@" completion). A git checkout lists tracked plus untracked, not
+  // ignored files (and their parent directories); a project without git is walked,
+  // skipping .git, node_modules and dot-directories, at most 50,000 entries. The
+  // candidate list is cached for a few seconds per checkout. An empty query returns
+  // the shallowest entries. An unknown repo is NotFound; a path outside the home
+  // directory is InvalidArgument.
+  rpc SearchFiles(SearchFilesRequest) returns (SearchFilesResponse) {}
 }
 
 message ListDirectoriesRequest {
@@ -39,4 +56,69 @@ message ListDirectoriesResponse {
   string completion = 2;
   // More directories matched than were returned.
   bool truncated = 3;
+}
+
+// SkillSource is one checkout to read skills from.
+message SkillSource {
+  // The registered project.
+  string repo_id = 1;
+  // Absolute path of the checkout to read (a worktree of the project). Empty: the
+  // project's main worktree.
+  string path = 2;
+}
+
+message ListSkillsRequest {
+  repeated SkillSource sources = 1;
+  // Also list the user's skills and commands under ~/.claude.
+  bool include_user = 2;
+}
+
+enum SkillScope {
+  SKILL_SCOPE_UNSPECIFIED = 0;
+  // ~/.claude/skills or ~/.claude/commands.
+  SKILL_SCOPE_USER = 1;
+  // <checkout>/.claude/skills or <checkout>/.claude/commands.
+  SKILL_SCOPE_PROJECT = 2;
+}
+
+message Skill {
+  // What follows "/": the skill's directory name, or a command file's stem.
+  string name = 1;
+  // The SKILL.md frontmatter's description, or a command file's first non-empty line
+  // that is not a heading (frontmatter skipped). May be empty.
+  string description = 2;
+  SkillScope scope = 3;
+  // The project, for SKILL_SCOPE_PROJECT.
+  string repo_id = 4;
+  // Absolute path of the SKILL.md or command .md file.
+  string path = 5;
+}
+
+message ListSkillsResponse {
+  repeated Skill skills = 1;
+}
+
+message SearchFilesRequest {
+  // The registered project.
+  string repo_id = 1;
+  // Absolute path of the checkout to search (a worktree of the project). Empty: the
+  // project's main worktree.
+  string path = 2;
+  // Typed text after "@". Matched as a case-insensitive subsequence.
+  string query = 3;
+  // Maximum matches. Zero means 50; at most 200.
+  int32 limit = 4;
+}
+
+message FileMatch {
+  // Relative to the checkout, forward slashes, no leading "./", no trailing "/".
+  string path = 1;
+  bool is_dir = 2;
+}
+
+message SearchFilesResponse {
+  // Best match first.
+  repeated FileMatch matches = 1;
+  // More entries matched than were returned.
+  bool truncated = 2;
 }
