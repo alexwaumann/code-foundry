@@ -89,6 +89,10 @@ test("at 125% a row's context menu opens at the pointer and stays inside the win
     .toBe(true);
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
+  // Off the list, so no thread tooltip is open (or, through Radix's skip delay, opens at once
+  // on the next row) when the next right-click lands.
+  await page.mouse.move(900, 300);
+  await expect(page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])')).toHaveCount(0);
 
   // The lowest thread row inside the list's viewport (rows the virtual list renders below it
   // are "visible" to Playwright but clipped): the menu is taller than the room below, so it moves up.
