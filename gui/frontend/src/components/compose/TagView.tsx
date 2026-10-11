@@ -1,11 +1,11 @@
-import type { ReactNode } from "react";
+import { useContext, type ReactNode } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { tagLabel } from "@/lib/prompt";
 import { useReposStore } from "@/stores/repos";
 import { useSkillDescription } from "@/stores/skills";
 import { AttachmentChip } from "./AttachmentChip";
-import { tagOf } from "./tagContext";
+import { TagMultiProjectContext, tagOf } from "./tagContext";
 import { TAG_ACCENT, tagClass } from "./tagStyle";
 
 /** A project's name for a tag ("" for none, the id when the project is gone). */
@@ -66,8 +66,14 @@ function SkillTag({ name, repoId, selected }: { name: string; repoId: string; se
   );
 }
 
+/**
+ * A file or directory: the tooltip is its path (a directory's ends with "/"), prefixed
+ * with the project's name when the draft has more than one project
+ * (`api/internal/api/session.go`).
+ */
 function FileTag({ repoId, path, selected }: { repoId: string; path: string; selected: boolean }) {
   const project = useProjectName(repoId);
+  const multi = useContext(TagMultiProjectContext);
   const label = tagLabel({ tagKind: "file", repoId, path });
   return (
     <TextTag
@@ -75,8 +81,8 @@ function FileTag({ repoId, path, selected }: { repoId: string; path: string; sel
       label={label}
       selected={selected}
       ariaLabel={`${path.endsWith("/") ? "Folder" : "File"} ${path} in ${project}`}
-      tip={<span className="font-mono">{path}</span>}
-      detail={project}
+      tip={<span className="font-mono">{multi ? `${project}/${path}` : path}</span>}
+      detail=""
       data={{ "data-path": path, "data-repo": repoId }}
     />
   );

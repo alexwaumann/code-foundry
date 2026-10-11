@@ -57,3 +57,6 @@ export function tagOf(attrs: Record<string, unknown>): PromptTag {
 
 /** The draft (draftKey) the tags belong to (image chips look their attachment up by id). */
 export const TagDraftContext = createContext("");
+
+/** The draft has more than one project: a file tag's tooltip names its project. */
+export const TagMultiProjectContext = createContext(false);
