@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SessionStatusView } from "@/api/session";
-import { statusDetail, statusKind, type StatusKind } from "./session";
+import { disconnectCause, disconnectedPill, modelLabel, sessionLocation, statusDetail, statusKind, type LocationRepos, type PillKind, type StatusKind } from "./session";
 
 // Reasons as the daemon reported them: replays of the internal/claudestatus fixtures
 // (Claude Code 2.1.294; CLAUDESTATUS_TRACE=<fixture>, noscreen for "waiting for approval")
@@ -28,5 +28,75 @@ describe("statusKind / statusDetail", () => {
   ])("%s %j", (status, statusReason, kind, detail) => {
     expect(statusKind({ status, statusReason })).toBe(kind);
     expect(statusDetail({ statusReason })).toBe(detail);
+  });
+});
+
+describe("disconnectedPill", () => {
+  it.each<[SessionStatusView, string, PillKind, string]>([
+    ["error", "interrupted", "interrupted", "Interrupted"],
+    ["error", "", "interrupted", "Interrupted"],
+    ["attention", "permission: Do you want to proceed?", "attention", "Was waiting on you"],
+    ["attention", "finished", "attention", "Was waiting on you"],
+    ["idle", "finished", "idle", "Finished"],
+    ["idle", "at prompt", "idle", "At prompt"],
+    ["idle", "", "idle", "At prompt"],
+    ["busy", "working", "none", ""],
+    ["unknown", "", "none", ""],
+  ])("%s %j", (status, statusReason, kind, label) => {
+    expect(disconnectedPill({ status, statusReason })).toEqual({ kind, label });
+  });
+});
+
+describe("disconnectCause", () => {
+  it.each([
+    [{ disconnectReason: "closed", exitCode: 0, lastError: "" }, "closed"],
+    [{ disconnectReason: "crashed", exitCode: 1, lastError: "" }, "crashed (exit code 1)"],
+    [{ disconnectReason: "exited", exitCode: 0, lastError: "" }, "Claude exited"],
+    [{ disconnectReason: "exited", exitCode: 2, lastError: "" }, "Claude exited with code 2"],
+    [{ disconnectReason: "daemon stopped", exitCode: 0, lastError: "" }, "daemon stopped"],
+    [{ disconnectReason: "", exitCode: 0, lastError: "" }, "not running"],
+    [{ disconnectReason: "", exitCode: 0, lastError: "Worktree is missing" }, "stopped: Worktree is missing"],
+  ])("%j", (s, want) => {
+    expect(disconnectCause(s)).toBe(want);
+  });
+});
+
+describe("modelLabel", () => {
+  it.each([
+    ["opus", "high", "Opus 5.5 (high)"],
+    ["haiku", "", "Haiku 5.5"],
+    ["claude-opus-5-5", "max", "claude-opus-5-5 (max)"],
+    ["", "high", ""],
+    ["", "", ""],
+  ])("%j %j", (model, effort, want) => {
+    expect(modelLabel({ model, effort })).toBe(want);
+  });
+});
+
+describe("sessionLocation", () => {
+  const repos: LocationRepos = {
+    order: ["cf", "notes"],
+    byId: {
+      cf: {
+        name: "code-foundry",
+        git: true,
+        worktrees: [
+          { path: "/u/cf", branch: "main", head: "3c3c4651aa", detached: false },
+          { path: "/u/cf.worktrees/fix", branch: "fix/resize", head: "1f2e3d4c55", detached: false },
+          { path: "/u/cf.worktrees/bisect", branch: "", head: "9a8b7c6d44", detached: true },
+        ],
+      },
+      notes: { name: "notes", git: false, worktrees: [{ path: "/u/notes", branch: "", head: "", detached: false }] },
+    },
+  };
+  it.each([
+    ["git, on a branch", "/u/cf.worktrees/fix", { project: "code-foundry", branch: "fix/resize" }],
+    ["git, main worktree", "/u/cf", { project: "code-foundry", branch: "main" }],
+    ["git, detached", "/u/cf.worktrees/bisect", { project: "code-foundry", branch: "9a8b7c6" }],
+    ["git, a subdirectory of a worktree", "/u/cf/gui", { project: "code-foundry", branch: "main" }],
+    ["no git", "/u/notes", { project: "notes", branch: "" }],
+    ["unplaceable", "/tmp/elsewhere/scratch", { project: "scratch", branch: "" }],
+  ])("%s", (_, worktreePath, want) => {
+    expect(sessionLocation({ worktreePath }, repos)).toEqual(want);
   });
 });
