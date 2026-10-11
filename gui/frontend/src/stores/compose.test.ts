@@ -128,6 +128,43 @@ describe("switchDraftTarget", () => {
     expect(useComposeStore.getState().drafts["repo-cf"]).toBeUndefined();
   });
 
+  it("tags of projects that leave the draft: removed only after the confirm", async () => {
+    const sk = (repoId: string) => tagToken({ tagKind: "skill", name: "deploy", repoId });
+    const text = `${sk("repo-cf")} and ${sk("repo-cf")} with ${sk("repo-gp")} ${sk("")}`;
+    updateDraft("repo-cf", { text });
+    const cancelled = switchDraftTarget(cf, gp);
+    expect(useConfirmStore.getState().pending).toMatchObject({ title: "Switch to gp?", message: "2 references to cf in your text will be removed.", confirmLabel: "Switch" });
+    answerConfirm(false);
+    await expect(cancelled).resolves.toBe(false);
+    expect(getDraft("repo-cf").text).toBe(text);
+    expect(useComposeStore.getState().drafts["repo-gp"]).toBeUndefined();
+    expect(useUiStore.getState().selection).toEqual({ kind: "compose", repoId: "repo-cf" });
+
+    const switched = switchDraftTarget(cf, gp);
+    answerConfirm(true);
+    await expect(switched).resolves.toBe(true);
+    expect(getDraft("repo-gp").text).toBe(`and with ${sk("repo-gp")} ${sk("")}`);
+    expect(useUiStore.getState().selection).toEqual({ kind: "compose", repoId: "repo-gp" });
+  });
+
+  it("to a workspace: Also in tags go too; its members' tags stay", async () => {
+    const sk = (repoId: string) => tagToken({ tagKind: "skill", name: "deploy", repoId });
+    updateDraft("repo-cf", { text: `${sk("repo-sk")} ${sk("repo-cf")} ${sk("repo-gp")}`, alsoIn: ["repo-sk", "repo-gp"] });
+    const p = switchDraftTarget(cf, login);
+    expect(useConfirmStore.getState().pending).toMatchObject({ title: "Switch to login?", message: "2 references to sk and cf in your text will be removed." });
+    answerConfirm(true);
+    await expect(p).resolves.toBe(true);
+    expect(getDraft("ws:w-1").text).toBe(sk("repo-gp"));
+  });
+
+  it("no dropped tags: no tag confirm", async () => {
+    const sk = tagToken({ tagKind: "skill", name: "deploy", repoId: "repo-sk" });
+    updateDraft("repo-cf", { text: `${sk} now`, alsoIn: ["repo-sk"] });
+    await expect(switchDraftTarget(cf, gp)).resolves.toBe(true);
+    expect(useConfirmStore.getState().pending).toBeNull();
+    expect(getDraft("repo-gp").text).toBe(`${sk} now`);
+  });
+
   it("an empty draft moves nothing: the target's own draft shows as it is, no confirm", async () => {
     updateDraft("repo-cf", { model: "haiku" });
     updateDraft("repo-gp", { text: "older idea" });

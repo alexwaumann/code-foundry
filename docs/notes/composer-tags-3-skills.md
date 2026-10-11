@@ -2,8 +2,8 @@
 
 Status: done on branch `cf/composer-skill-tags` (PR 3 of 4 for composer skill and file
 tags). GUI only, on top of PR 2's `FilesystemService.ListSkills`
-(`composer-tags-1-daemon.md`). PR 1 (project switch in the heading, `movedDraft`) is a
-separate branch; nothing here touches the heading or `movedDraft`. PR 4 adds the `@` file
+(`composer-tags-1-daemon.md`) and PR #38 (the heading's project switch,
+`composer-tags-2-switch.md`), merged in; the switch now cleans up tags. PR 4 adds the `@` file
 source to the plumbing built here. `make check`, `make gui-e2e` and `make gui-build`
 green; exercised against a real scratch daemon with a haiku thread (below).
 
@@ -36,10 +36,14 @@ green; exercised against a real scratch daemon with a haiku thread (below).
   already adds the space; this covers a user who deletes it.
 * **`proseOf`** strips image chips only: a skill tag counts as prose for the image-chip
   insertion rule.
-* **Helpers for PR 1**: `retainRepoTags(text, repoIds)` keeps only the project-scoped tags
-  whose repo is a member (images and user skills always stay). `movedDraft`'s
-  "per-member cleanup goes here" comment becomes `text: retainRepoTags(d.text, newMembers)`.
-  `tagsByRepo` / `repoTagCount` / `removeRepoTags` for anything that wants to ask first.
+* **The heading's project switch** (PR #38, merged into this branch): `movedDraft` takes the
+  target workspace's member ids and keeps only the tags of the moved draft's members
+  (`retainRepoTags(text, [to, ...alsoIn])`, or the workspace's members); images and user
+  skills always stay. `switchDraftTarget` compares `tagsByRepo` before and after: when tags
+  would go it asks first ("Switch to <target>?", "<n> reference(s) to <project(s)> in your
+  text will be removed.", confirm label "Switch"), before the existing "Replace the draft"
+  confirm; cancel leaves draft and selection as they were. The check is synchronous and
+  awaits only when there is something to ask, so the replace confirm still opens at once.
 * **Also in removal**: `removeAlsoIn` (store) always removes the project's tags.
   `MemberChips`' × asks first when the text refers to it: "Remove <name> from the thread?",
   "<n> reference(s) in your text will be removed.", confirm label "Remove" (centered, like

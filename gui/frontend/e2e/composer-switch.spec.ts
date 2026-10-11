@@ -185,3 +185,43 @@ test("switching onto a project with its own draft asks before replacing it", asy
   await compose(page, 1);
   await expect(prompt(page)).toHaveAttribute("data-value", "");
 });
+
+test("switching away drops the old project's skill tags after a confirm; the rest stays", async ({ page }) => {
+  await openApp(page);
+  await compose(page, 1);
+  await addAlsoIn(page, "sketches");
+  await page.getByTestId("composer-input").click();
+  // code-foundry's /deploy, sketches' /deploy (second in the card), the user's /commit.
+  await page.keyboard.type("/deploy");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/deploy");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/commit");
+  await page.keyboard.press("Enter");
+  const CF = "[/deploy](cf-skill://repo-cf/deploy)";
+  const SK = "[/deploy](cf-skill://repo-sk/deploy)";
+  const USER = "[/commit](cf-skill://~/commit)";
+  await expect(prompt(page)).toHaveAttribute("data-value", `${CF} ${SK} ${USER} `);
+
+  const dialog = page.getByTestId("confirm-dialog");
+  await trigger(page).click();
+  await page.keyboard.type("ghostty");
+  await page.keyboard.press("Enter");
+  await expect(dialog).toContainText("Switch to ghostty-playground?");
+  await expect(dialog).toContainText("1 reference to code-foundry in your text will be removed.");
+  await page.getByTestId("confirm-cancel").click();
+  await expect(heading(page)).toHaveText("What should we build in code-foundry?");
+  await expect(prompt(page)).toHaveAttribute("data-value", `${CF} ${SK} ${USER} `);
+  await expect(chips(page)).toHaveCount(2);
+
+  await trigger(page).click();
+  await page.keyboard.type("ghostty");
+  await page.keyboard.press("Enter");
+  await page.getByTestId("confirm-ok").click();
+  await expect(heading(page)).toHaveText("What should we build in ghostty-playground?");
+  // sketches stays an Also in project, so its tag stays; the user's skill always does.
+  await expect(prompt(page)).toHaveAttribute("data-value", `${SK} ${USER}`);
+  await expect(page.getByTestId("prompt-tag")).toHaveText(["/deploy", "/commit"]);
+  await expect(chips(page)).toHaveCount(2);
+});

@@ -23,6 +23,7 @@ import {
   type PlaceInput,
   type ThreadPlace,
 } from "./compose";
+import { tagToken } from "./prompt";
 
 const MB = 1024 * 1024;
 const opts = { types: ["image/png", "image/jpeg"], maxBytes: 10 * MB };
@@ -268,6 +269,22 @@ describe("movedDraft", () => {
   ])("%s", (_, over, from, to, want) => {
     const got = movedDraft({ ...draft, ...over }, from, to, isGit);
     expect(got).toMatchObject({ ...carried, ...want });
+  });
+
+  const sk = (repoId: string) => tagToken({ tagKind: "skill", name: "deploy", repoId });
+  const fl = (repoId: string) => tagToken({ tagKind: "file", repoId, path: "src/a.ts" });
+  const img = tagToken({ tagKind: "image", id: "a1", name: "x.png" });
+  it.each<[string, Partial<MovableDraft>, ComposeTarget, ComposeTarget, string[], string]>([
+    ["the old project's tags go; images and user skills stay", { text: `Use ${sk("repo-cf")} on ${fl("repo-cf")} with ${img} ${sk("")}` }, proj("repo-cf"), proj("repo-gp"), [], `Use on with ${img} ${sk("")}`],
+    ["the new project's tags stay", { text: `${sk("repo-gp")} and ${sk("repo-cf")} now` }, proj("repo-cf"), proj("repo-gp"), [], `${sk("repo-gp")} and now`],
+    ["a carried Also in project's tags stay", { alsoIn: ["repo-sk"], text: `${sk("repo-sk")} ${fl("repo-cf")}` }, proj("repo-cf"), proj("repo-gp"), [], sk("repo-sk")],
+    ["Also in tags go with Also in (a workspace target)", { alsoIn: ["repo-sk"], text: `${sk("repo-sk")} then ${sk("repo-gp")}` }, proj("repo-cf"), ws("w-1"), ["repo-gp"], `then ${sk("repo-gp")}`],
+    ["Also in tags go for a project without git", { alsoIn: ["repo-sk"], text: `x ${fl("repo-sk")}` }, proj("repo-cf"), proj("repo-wr"), [], "x"],
+    ["workspace → workspace keeps the shared members' tags", { text: `${sk("repo-gp")} ${sk("repo-dot")}` }, ws("w-1"), ws("w-2"), ["repo-gp", "repo-sk"], sk("repo-gp")],
+    ["workspace → project keeps that project's tags", { text: `${sk("repo-gp")} ${sk("repo-dot")}` }, ws("w-1"), proj("repo-dot"), [], sk("repo-dot")],
+    ["no tags: text unchanged", { text: "  plain text  " }, proj("repo-cf"), proj("repo-gp"), [], "  plain text  "],
+  ])("tags: %s", (_, over, from, to, wsMembers, want) => {
+    expect(movedDraft({ ...draft, ...over }, from, to, isGit, wsMembers).text).toBe(want);
   });
 
   it("does not modify the draft it moves", () => {
