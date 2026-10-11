@@ -195,6 +195,26 @@ describe("focus for this window's own shells (by id)", () => {
     expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", args, { ctx: expect.objectContaining({ activeSessionId: "s2", activeView: "session" }) as unknown });
   });
 
+  const uncover: [string, string, boolean, boolean][] = [
+    ["already arrived, for the selected thread: uncovered and focused", "a", true, true],
+    ["arriving later, for the selected thread: uncovered and focused", "t-late", true, true],
+    ["for another thread: nothing uncovered", "t-other", false, false],
+  ];
+  it.each(uncover)("a shell this window started %s", async (_name, id, uncovered, focused) => {
+    useViewsStore.setState({ settingsOpen: true });
+    usePanelStore.setState({ byKey: { "session:s1": { open: true, tabs: [], activeTabId: null, expanded: true } } });
+    commands.runCommandForResult.mockResolvedValue({ message: "", resultJson: JSON.stringify({ id }) });
+    await newThreadTerminal(id === "t-other" ? "s2" : "s1", "/src/api");
+    if (id !== "a") {
+      const t = term(id, shell(id === "t-other" ? "s2" : "s1"));
+      setTerminals([term("a", shell("s1")), t]);
+      onNewTerminal(t);
+    }
+    expect(usePanelStore.getState().byKey["session:s1"]?.expanded === undefined).toBe(uncovered);
+    expect(useViewsStore.getState().settingsOpen).toBe(!uncovered);
+    expect(useUiStore.getState().bottomFocusSeq).toBe(focused ? 1 : 0);
+  });
+
   it("a failed run leaves nothing pending", async () => {
     commands.runCommandForResult.mockResolvedValue(null);
     expect(await newBottomTerminal("session:s1")).toBe(false);

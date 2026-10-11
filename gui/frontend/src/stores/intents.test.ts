@@ -1,13 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionView } from "@/api/session";
 import type { TerminalView } from "@/api/terminal";
 
 const toastInfo = vi.hoisted(() => vi.fn());
-vi.mock("sonner", () => ({ toast: { info: toastInfo, error: vi.fn(), warning: vi.fn() } }));
+const toastError = vi.hoisted(() => vi.fn());
+vi.mock("sonner", () => ({ toast: { info: toastInfo, error: toastError, warning: vi.fn() } }));
 
-const { applyIntent, retryFocusTerminal } = await import("./intents");
-const { getBottom, useBottomStore } = await import("./bottomPanel");
-const { onNewTerminal } = await import("./bottomActions");
+const { applyIntent, clearPendingFocus, retryFocusTerminal } = await import("./intents");
+const { getBottom, PENDING_FOCUS_MS, useBottomStore } = await import("./bottomPanel");
+const { onNewTerminal, revealArrived } = await import("./bottomActions");
 const { usePanelStore } = await import("./panel");
 const { useSessionsStore } = await import("./sessions");
 const { useTerminalsStore } = await import("./terminals");
@@ -33,9 +34,68 @@ beforeEach(() => {
   useSessionsStore.setState({ byId: { s1: thread("s1", "claude") }, order: ["s1"] });
   setTerminals([term("claude", { session: "s1" }), term("sh", shell), term("raw", {})]);
   useUiStore.setState({ selection: { kind: "view", name: "dashboard" }, terminalFocusSeq: 0, bottomFocusSeq: 0 });
-  // Clear a pending terminal left by a previous test.
-  focusTerminal("claude");
-  useUiStore.setState({ selection: { kind: "view", name: "dashboard" }, terminalFocusSeq: 0, bottomFocusSeq: 0 });
+  clearPendingFocus();
+});
+
+describe("a pending focusTerminal", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("expires after PENDING_FOCUS_MS: a toast, and a late shell only gets its tab", () => {
+    vi.useFakeTimers();
+    focusTerminal("late");
+    vi.advanceTimersByTime(PENDING_FOCUS_MS + 1);
+    expect(toastError).toHaveBeenCalledWith("Terminal late not found");
+    const late = term("late", shell);
+    setTerminals([late]);
+    onNewTerminal(late);
+    retryFocusTerminal();
+    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+    expect(useUiStore.getState().bottomFocusSeq).toBe(0);
+  });
+
+  it("a known terminal whose thread never shows up expires without a toast", () => {
+    vi.useFakeTimers();
+    setTerminals([term("c9", { session: "s9" })]);
+    focusTerminal("c9");
+    vi.advanceTimersByTime(PENDING_FOCUS_MS + 1);
+    expect(toastError).not.toHaveBeenCalled();
+    useSessionsStore.setState({ byId: { s9: thread("s9", "c9") }, order: ["s9"] });
+    retryFocusTerminal();
+    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+  });
+
+  const cancels: [string, () => void][] = [
+    ["the user selects something", () => { useUiStore.getState().select({ kind: "view", name: "pullrequests" }); }],
+    ["a focusSession intent", () => { applyIntent({ kind: "focusSession", sessionId: "s1" }); }],
+    ["a showView intent", () => { applyIntent({ kind: "showView", name: "projects" }); }],
+    ["another focusTerminal", () => { focusTerminal("claude"); }],
+  ];
+  it.each(cancels)("is dropped when %s", (_name, act) => {
+    vi.useFakeTimers();
+    focusTerminal("later");
+    act();
+    const selected = useUiStore.getState().selection;
+    const later = term("later", { kind: "shell", session: "s2", repo: "r1", worktree: "/src/app" });
+    setTerminals([later]);
+    onNewTerminal(later);
+    retryFocusTerminal();
+    expect(useUiStore.getState().selection).toEqual(selected);
+    vi.advanceTimersByTime(PENDING_FOCUS_MS + 1);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("the reconnect's List reveals a pending shell once (revealArrived)", () => {
+    focusTerminal("relist");
+    setTerminals([term("relist", shell)]);
+    revealArrived();
+    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s1" });
+    expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "relist" });
+    useUiStore.setState({ selection: { kind: "view", name: "dashboard" } });
+    revealArrived();
+    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
+  });
 });
 
 describe("the focusTerminal intent", () => {

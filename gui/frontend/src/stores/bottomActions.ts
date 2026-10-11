@@ -9,7 +9,6 @@ import type { UiContextView } from "@/api/command";
 import { isNotFound } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
 import { terminalIdFromResult, type TerminalView } from "@/api/terminal";
-import { REPO_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import {
   activate,
   activeTabOf,
@@ -23,6 +22,7 @@ import {
   neighbourOf,
   openOn,
   ownerKeyOf,
+  PENDING_FOCUS_MS,
   PROJECTS_KEY,
   requestBottomFocus,
   sessionOfKey,
@@ -32,7 +32,7 @@ import {
   updateBottom,
 } from "./bottomPanel";
 import { invokeConfirmed, refreshCommands, runCommandForResult, useCommandsStore } from "./commands";
-import { getUiContext, worktreeContext } from "./context";
+import { getUiContext, projectsShellPlace, worktreeContext } from "./context";
 import { expandPanel, getPanel } from "./panel";
 import { useTerminalsStore, type TerminalsData } from "./terminals";
 import { useUiStore } from "./ui";
@@ -50,10 +50,8 @@ export function paneContext(key: string): UiContextView | null {
   if (session !== null) return getUiContext({ kind: "session", id: session });
   if (key !== PROJECTS_KEY) return null;
   const active = getBottomActiveId(key);
-  const t = active === null ? undefined : useTerminalsStore.getState().byId[active];
-  const repo = t?.labels[REPO_LABEL] ?? "";
-  const worktree = t?.labels[WORKTREE_LABEL] ?? "";
-  return repo && worktree ? worktreeContext(repo, worktree) : null;
+  const place = projectsShellPlace(active === null ? undefined : useTerminalsStore.getState().byId[active]);
+  return place ? worktreeContext(place.repoId, place.path) : null;
 }
 
 /**
@@ -70,8 +68,19 @@ async function startShell(ctx: UiContextView, args: Record<string, string> = {})
 }
 
 /**
- * A shell this window started: show it in its owner's panel, active, and focus it if
- * that panel belongs to the selection. One that has not arrived yet is focused on arrival.
+ * Lets the selection's bottom panel show: the Settings and Usage pages close, and its
+ * side panel leaves full width (an expanded side panel hides the content column).
+ */
+function uncoverBottom(key: string): void {
+  useViewsStore.setState({ settingsOpen: false, usageOpen: false });
+  if (getPanel(key).expanded) expandPanel(key, false);
+}
+
+/**
+ * A shell this window started: show it in its owner's panel, active. If that panel
+ * belongs to the selection, uncover it (a member's "New terminal here" in an expanded
+ * side panel, a row menu under Settings) and focus it. One that has not arrived yet is
+ * handled on arrival.
  */
 function focusOwnShell(id: string): void {
   const t = useTerminalsStore.getState().byId[id];
@@ -81,8 +90,15 @@ function focusOwnShell(id: string): void {
   }
   const key = ownerKeyOf(t);
   if (key === null) return;
+  showOwnShell(key, id);
+}
+
+/** focusOwnShell for a shell in the store: open its panel on it; uncover and focus it when it is the selection's. */
+function showOwnShell(key: string, id: string): void {
   updateBottom(key, (e) => openOn(e, id));
-  if (bottomKeyOf(useUiStore.getState().selection) === key) focusBottom();
+  if (bottomKeyOf(useUiStore.getState().selection) !== key) return;
+  uncoverBottom(key);
+  focusBottom();
 }
 
 /**
@@ -145,8 +161,35 @@ function focusBottom(): void {
   else requestBottomFocus();
 }
 
-/** A focusTerminal intent that arrived before its terminal; revealed if it turns out to be a shell. */
-let revealOnArrival: string | null = null;
+/**
+ * A focusTerminal intent that arrived before its terminal: revealed if it turns out to be
+ * a shell within PENDING_FOCUS_MS. stores/intents.ts clears it (a new intent, a selection).
+ */
+let revealOnArrival: { id: string; at: number } | null = null;
+
+/** Forgets a pending reveal (stores/intents.ts clearPendingFocus). */
+export function clearRevealOnArrival(): void {
+  revealOnArrival = null;
+}
+
+/** Whether `id` is the pending reveal and still fresh; the slot is used up either way. */
+function takeReveal(id: string, now = Date.now()): boolean {
+  if (revealOnArrival?.id !== id) return false;
+  const fresh = now - revealOnArrival.at <= PENDING_FOCUS_MS;
+  revealOnArrival = null;
+  return fresh;
+}
+
+/**
+ * The reconnect's List brings terminals without `updated` events (no onNewTerminal): a
+ * pending reveal whose shell is now known is revealed once (events.ts).
+ */
+export function revealArrived(): void {
+  const id = revealOnArrival?.id;
+  if (id === undefined) return;
+  const t = useTerminalsStore.getState().byId[id];
+  if (t && ownerKeyOf(t) !== null && takeReveal(id)) revealShell(id);
+}
 
 /**
  * The focusTerminal intent for a shell: select its owner (the thread, or the Projects
@@ -158,15 +201,14 @@ let revealOnArrival: string | null = null;
 export function revealShell(id: string): boolean {
   const t = useTerminalsStore.getState().byId[id];
   if (!t) {
-    revealOnArrival = id;
+    revealOnArrival = { id, at: Date.now() };
     return false;
   }
   const key = ownerKeyOf(t);
   if (key === null) return false;
   const session = sessionOfKey(key);
   useUiStore.getState().select(session !== null ? { kind: "session", id: session } : { kind: "view", name: "projects" });
-  useViewsStore.setState({ settingsOpen: false, usageOpen: false });
-  if (getPanel(key).expanded) expandPanel(key, false);
+  uncoverBottom(key);
   updateBottom(key, (e) => openOn(e, id));
   focusBottom();
   return true;
@@ -189,15 +231,13 @@ function keyboardRegion(): string {
 export function onNewTerminal(t: TerminalView): void {
   const key = ownerKeyOf(t);
   if (key === null || t.state === "exited") return;
-  if (revealOnArrival === t.id) {
-    revealOnArrival = null;
+  if (takeReveal(t.id)) {
     revealShell(t.id);
     return;
   }
   const mine = takePendingFocusId(t.id) || takePendingFocus(key);
   if (mine) {
-    updateBottom(key, (e) => openOn(e, t.id));
-    if (bottomKeyOf(useUiStore.getState().selection) === key) focusBottom();
+    showOwnShell(key, t.id);
     return;
   }
   if (visibleBottomKey() === key && keyboardRegion() === "bottom") {

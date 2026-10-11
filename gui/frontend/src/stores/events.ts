@@ -6,7 +6,7 @@ import { listRepos } from "@/api/repo";
 import { listSessions } from "@/api/session";
 import { errorMessage, isAbort, runStream, type StreamStatus } from "@/api/stream";
 import { listTerminals } from "@/api/terminal";
-import { onNewTerminal, onRemovedTerminal } from "./bottomActions";
+import { onNewTerminal, onRemovedTerminal, revealArrived } from "./bottomActions";
 import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
 import { applyIntent, retryFocusTerminal } from "./intents";
@@ -106,6 +106,9 @@ export function startEventSync(sessionRetryMs = 10_000): () => void {
       const [repos, terminals] = await Promise.all([listRepos(daemon, signal), listTerminals(daemon, signal), reconcileSessions(signal)]);
       useReposStore.setState({ ...replaceRepos(repos), loaded: true });
       useTerminalsStore.setState((s) => ({ ...replaceTerminals(s, terminals), loaded: true }));
+      // The List brings terminals without updated events: a pending reveal's shell, or a
+      // pending Claude terminal's thread, may be here now.
+      revealArrived();
       retryFocusTerminal();
     },
     onEvent: dispatchEvent,

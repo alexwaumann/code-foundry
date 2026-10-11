@@ -1087,8 +1087,12 @@ export class World {
     this.publishTerm(t);
   }
 
-  /** Ends a terminal. A session whose process dies without a close request disconnects. */
-  kill(id: string, code = 129, notifySession = true): void {
+  /**
+   * Ends a terminal. A session whose process dies without a close request disconnects.
+   * `keep` leaves an exited shell in place (the reaper has not got to it yet; tests use it
+   * to see the exit overlay).
+   */
+  kill(id: string, code = 129, notifySession = true, keep = false): void {
     const t = this.term(id);
     if (t.state !== TerminalState.RUNNING) return;
     const owner = notifySession ? [...this.sessions.values()].find((s) => s.terminalId === id && s.state !== SessionState.CLOSING) : undefined;
@@ -1107,7 +1111,7 @@ export class World {
     t.attach.publish("end");
     this.publishTerm(t);
     // Like the daemon's shell reaper: a shell terminal.new started is removed once it exits.
-    if (t.labels[LABEL_KIND] === KIND_SHELL) this.remove(id);
+    if (t.labels[LABEL_KIND] === KIND_SHELL && !keep) this.remove(id);
   }
 
   /** terminal.close / TerminalService.Close: kill, then remove once exited. Only shells, like the daemon. */

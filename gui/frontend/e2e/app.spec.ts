@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { CF, emit, expectTerminalText, invocations, openApp, openProjects, resetMock, row, terminalText, writes } from "./fixtures";
+import { CF, emit, expectTerminalText, invocations, mockPost, openApp, openProjects, resetMock, row, terminalText, writes } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -45,6 +45,18 @@ test("keystrokes are written to the attached terminal in order", async ({ page }
   await expectTerminalText(page, "command not found: echo", "bottom");
   const sent = (await writes()).filter((w) => w.id === "t-s1-shell").map((w) => w.data).join("");
   expect(sent).toBe("echo hi\r");
+});
+
+test("a shell that exits shows the exit overlay until the reaper removes it", async ({ page }) => {
+  await openApp(page);
+  await row(page, "s:s-1").click();
+  await page.keyboard.press("Meta+j");
+  const host = page.getByTestId("bottom-terminal-host");
+  await expect(host).toHaveAttribute("data-attach-phase", "live");
+  // Exited but not reaped yet (keep=1): the overlay says how, the tab is struck through.
+  await mockPost("terminal/exit?id=t-s1-shell&code=1&keep=1");
+  await expect(page.getByTestId("bottom-panel").getByTestId("exit-overlay")).toContainText("Process exited with code 1");
+  await expect(page.locator('[data-tab-id="t-s1-shell"]')).toHaveAttribute("data-exited", "true");
 });
 
 test("palette opens with cmd+k and lists only commands available in context", async ({ page }) => {

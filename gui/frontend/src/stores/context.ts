@@ -1,7 +1,8 @@
 import { useShallow } from "zustand/react/shallow";
 import type { UiContextView } from "@/api/command";
 import { placeSession, type ListSession, type TreeRepo, type WorktreeRef } from "@/lib/tree";
-import { focusedBottomShell, useBottomStore } from "./bottomPanel";
+import { REPO_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
+import { focusedBottomShell, ownerKeyOf, PROJECTS_KEY, useBottomStore } from "./bottomPanel";
 import { useReposStore, type ReposData } from "./repos";
 import { useSessionsStore, type SessionsData } from "./sessions";
 import { attentionTier } from "@/lib/session";
@@ -31,6 +32,24 @@ export function repoContext(repoId: string): UiContextView {
   return { ...emptyContext, activeRepoId: repoId, activeView: "projects" };
 }
 
+/** A terminal as the command context needs it: its id and owner labels. */
+export interface ContextShell {
+  id: string;
+  labels: Readonly<Record<string, string>>;
+}
+
+/**
+ * The worktree a Projects-page shell belongs to (its repo and worktree labels); null for
+ * any other terminal. Both the Projects page's "+" (bottomActions paneContext) and the
+ * command context with the keyboard in that shell use it.
+ */
+export function projectsShellPlace(t: ContextShell | undefined): WorktreeRef | null {
+  if (!t || ownerKeyOf(t) !== PROJECTS_KEY) return null;
+  const repoId = t.labels[REPO_LABEL] ?? "";
+  const path = t.labels[WORKTREE_LABEL] ?? "";
+  return repoId && path ? { repoId, path } : null;
+}
+
 /**
  * Derives the UiContext the daemon sees from the current selection. A session contributes
  * its place (repo, worktree) and its attached terminal (if any), so terminal.* commands
@@ -38,10 +57,16 @@ export function repoContext(repoId: string): UiContextView {
  * selected (the Projects page, the panel's worktree tab) build their context with
  * worktreeContext / repoContext.
  */
-export function deriveContext(sel: Selection, repos: ReposData, sessions: SessionsData = { byId: {}, order: [] }, focusedShell = ""): UiContextView {
+export function deriveContext(sel: Selection, repos: ReposData, sessions: SessionsData = { byId: {}, order: [] }, focusedShell?: ContextShell): UiContextView {
   const ctx = deriveSelectionContext(sel, repos, sessions);
-  // The keyboard is in a bottom panel shell (focusedBottomShell): terminal commands act on it.
-  return focusedShell ? { ...ctx, activeTerminalId: focusedShell } : ctx;
+  if (!focusedShell) return ctx;
+  // The keyboard is in a bottom panel shell (focusedBottomShell): terminal commands act on
+  // it. On the Projects page, which carries no worktree, the shell's worktree is the
+  // context too, so cmd+t (terminal.new) starts another shell beside it.
+  const place = projectsShellPlace(focusedShell);
+  return place
+    ? { ...ctx, activeTerminalId: focusedShell.id, activeRepoId: place.repoId, activeWorktreePath: place.path }
+    : { ...ctx, activeTerminalId: focusedShell.id };
 }
 
 function deriveSelectionContext(sel: Selection, repos: ReposData, sessions: SessionsData): UiContextView {
@@ -77,13 +102,14 @@ export function contextKey(c: UiContextView): string {
 /**
  * Current context, read imperatively (keybindings, invoke). For the window's own
  * selection (no `sel`), a bottom panel shell with the keyboard (or the palette's return)
- * is the active terminal. An explicit selection gets that selection's context only.
+ * is the active terminal (and, on the Projects page, its worktree the active one). An explicit selection gets that selection's context only.
  */
 export function getUiContext(sel?: Selection): UiContextView {
   const ui = useUiStore.getState();
   const terminals = useTerminalsStore.getState();
   const focused = sel === undefined ? focusedBottomShell(ui, terminals, useBottomStore.getState().byKey) : "";
-  return deriveContext(sel ?? ui.selection, useReposStore.getState(), useSessionsStore.getState(), focused);
+  const shell = focused ? (terminals.byId[focused] ?? { id: focused, labels: {} }) : undefined;
+  return deriveContext(sel ?? ui.selection, useReposStore.getState(), useSessionsStore.getState(), shell);
 }
 
 const SEP = "\u0001";

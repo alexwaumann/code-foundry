@@ -25,6 +25,8 @@
  *        plan, finished, Claude error, busy, idle, interrupted, and a disconnected one still asking
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
+ *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
+ *                                                 shell stays, exited, as if the reaper were late)
  *   POST /__mock/link-pr?session=s-1&slug=owner/name&number=12[&ago=<ms>]   (Claude linked a pull
  *                                                 request ago ms ago; deduplicated by URL like the daemon)
  *   POST /__mock/usage?session=s-2&model=claude-opus-5&requests=3&cacheRead=1000[&input=…&output=…
@@ -521,6 +523,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     return;
   }
   switch (`${req.method ?? ""} ${path}`) {
+    case "POST /__mock/terminal/exit":
+      try {
+        const id = q.get("id") ?? "";
+        world.kill(id, Number(q.get("code") ?? 0), false, q.get("keep") === "1");
+        json(res, 200, { ok: true });
+      } catch (err) {
+        json(res, 404, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
     case "POST /__mock/sessions-service":
       // enabled=false simulates a daemon without Phase 2a: SessionService 404s and the
       // events stream carries no session source. Reset turns it back on.

@@ -79,6 +79,39 @@ test("a workspace member's New terminal here in a thread's side panel: the threa
   await expect(bottom(page).getByRole("tab")).toHaveAttribute("title", "~/.code-foundry/worktrees/alexwaumann/code-foundry/cf-checkout");
 });
 
+test("a member's New terminal here from an expanded side panel collapses it so the shell shows", async ({ page }) => {
+  await mockPost("workspace-mixed?name=checkout");
+  const driver = ((await mockPost("workspace-thread?workspace=checkout&repo=repo-gp&name=driver")) as { id: string }).id;
+  await openApp(page);
+  await row(page, `s:${driver}`).getByTestId("row-workspace").click();
+  const side = page.getByTestId("side-panel");
+  await side.getByTestId("panel-header").getByTestId("panel-expand").click();
+  await expect(side.getByTestId("panel-header").getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("content-pane")).toBeHidden();
+  const cf = page.getByTestId("workspace-surface").locator(`[data-nav-key="m:${WS}::repo-cf"]`);
+  await cf.hover();
+  await cf.getByTestId("member-terminal").click();
+  // The side panel is back to its split width, and the new shell shows, with the keyboard.
+  await expect(side.getByTestId("panel-header").getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByTestId("content-pane")).toBeVisible();
+  await expect(bottom(page).getByRole("tab")).toHaveCount(1);
+  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("bottom");
+});
+
+test("cmd+t from a Projects-page shell starts another in its worktree", async ({ page }) => {
+  await openApp(page);
+  await openProjects(page);
+  await page.keyboard.press("Meta+j");
+  await expect(host(page)).toHaveAttribute("data-terminal-id", "t-top");
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("bottom");
+  await page.keyboard.press("Meta+t");
+  expect((await lastNew())?.context).toMatchObject({ activeTerminalId: "t-top", activeRepoId: "repo-cf", activeWorktreePath: `${CF}.worktrees/feat-sidebar`, activeView: "projects" });
+  await expect(bottom(page).getByRole("tab")).toHaveText(["feat-sidebar", "feat-sidebar 2"]);
+  await expect(bottom(page).getByRole("tab").nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("bottom");
+});
+
 test("a project row's New terminal: the Projects page's bottom panel", async ({ page }) => {
   await openApp(page);
   await openProjects(page);
