@@ -134,6 +134,28 @@ Medium, "New worktree", typed `print the first line of @READ` → the card showe
   show within 5 s). Both specs rerun alone (WebKit + Chromium): 38/38 passed.
 * `make gui-build` green.
 
+## Review fixes
+
+* **Back to a cached query while another is out**: `@s` answered, `@se` sent, Backspace
+  to `@s` sent nothing (fresh cache) but the `se` answer then landed over it, so the card
+  listed `se` rows under `@s` until the next keystroke. Returning the fresh answer now
+  supersedes the request still out (`applied = seq`, `searching` off).
+* **Escape before the first answer** passed through (the card was not up yet), so the
+  answer opened the card anyway and Enter stayed swallowed. It now dismisses the trigger
+  like Escape on an open card. `useCompletion.test.tsx` tables the keys before and after an
+  answer (answer, Escape, failed search, Searching…, outdated) and the `/` keys.
+* **Emphasis offsets**: `toLowerCase` can lengthen a string (`İ`), shifting the marked
+  characters; the path is lowered per character where that happens.
+* Tests: file paths with `#`, `%`, `+`, `~`, unicode, a no-break space, `!'()*` and
+  brackets round-trip through token, projection and the daemon's `url.PathUnescape`
+  (`lib/prompt.test.ts`, `filerefs_test.go`). The mock's SearchFiles takes
+  `POST /__mock/files/search?delay=&fail=`; e2e covers Searching…, Escape before the first
+  answer and a failing search with Enter pending.
+* Left as is: after Escape the dismissed trigger still searches per keystroke (answers
+  unused); a member-set change with the caret in a trigger can briefly show the other
+  set's cached rows (changing members takes the focus out of the prompt, which ends the
+  trigger).
+
 ## Daemon restart
 
 Nothing beyond PR #37's: the installed daemon must already have SearchFiles and the
