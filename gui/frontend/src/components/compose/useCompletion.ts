@@ -135,7 +135,8 @@ const CLOSED: CardState = { key: "", memo: null, show: "none", selected: 0 };
  * An asynchronous source may answer an earlier query than the trigger's: while this
  * trigger has been answered before, the card goes on with the latest answer (as if that
  * query were typed); a trigger nothing has answered yet waits with the card closed and
- * Enter does nothing (it would send the half-typed reference). A slow answer shows
+ * Enter does nothing (it would send the half-typed reference) until Escape dismisses the
+ * trigger. A slow answer shows
  * "Searching…".
  */
 export function useCompletion(
@@ -184,7 +185,9 @@ export function useCompletion(
   const onKey = (k: CompletionKey): boolean => {
     const { show: sh, waiting: w, cur: c, items: rows, live: l } = latest.current;
     if (sh === "none" && w && k === "enter") return true;
-    if (sh === "none" || !l) return false;
+    // Escape before the first answer dismisses the trigger too (the card must not open
+    // when the answer lands, and Enter sends again).
+    if (!l || (sh === "none" && !(w && k === "escape"))) return false;
     if (k === "escape" || (sh !== "list" && k === "enter")) {
       setState((s) => ({ ...s, memo: dismissCard(l), show: "none" }));
       return true;
