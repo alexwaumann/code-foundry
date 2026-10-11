@@ -117,7 +117,16 @@ export function requestFiles(sources: readonly SkillSourceView[], query: string,
   clearTimeout(c.debounce);
   c.debounce = undefined;
   const entry = useFilesStore.getState().byKey[key];
-  if (entry?.answered === query && Date.now() - c.appliedAt < FRESH_MS) return;
+  if (entry?.answered === query && Date.now() - c.appliedAt < FRESH_MS) {
+    // Back to the answered query (Backspace) while another is out: that answer must not
+    // replace this one when it lands.
+    if (c.applied < c.seq) {
+      c.applied = c.seq;
+      clearTimeout(c.slow);
+      if (entry.searching) patch(key, { searching: false });
+    }
+    return;
+  }
   if (c.latest === query && c.applied < c.seq) return; // already on its way
   c.debounce = setTimeout(() => {
     send(key, sources, query, search);

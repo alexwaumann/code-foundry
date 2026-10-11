@@ -169,6 +169,28 @@ describe("files store", () => {
     expect(calls).toHaveLength(3);
   });
 
+  it("back to the fresh answered query while another is out: that answer stays, the one out is dropped", async () => {
+    const { fn, calls } = deferred();
+    requestFiles(R1, "s", fn);
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    calls[0]?.resolve(hit("s.go"));
+    await flush();
+    requestFiles(R1, "se", fn);
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS + SEARCHING_AFTER_MS);
+    expect(entry(R1)?.searching).toBe(true);
+    requestFiles(R1, "s", fn); // Backspace: the cached answer, nothing sent
+    expect(entry(R1)?.searching).toBe(false);
+    calls[1]?.resolve(hit("se.go"));
+    await flush();
+    expect(calls).toHaveLength(2);
+    expect(entry(R1)?.answered).toBe("s");
+    expect(entry(R1)?.results[0]?.matches[0]?.path).toBe("s.go");
+    // Typing on asks again.
+    requestFiles(R1, "se", fn);
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    expect(calls.map((c) => c.req.query)).toEqual(["s", "se", "se"]);
+  });
+
   it("cancelFiles drops a search still waiting out its debounce", async () => {
     const { fn, calls } = deferred();
     requestFiles(R1, "ses", fn);
