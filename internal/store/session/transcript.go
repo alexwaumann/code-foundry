@@ -38,7 +38,7 @@ type tailer struct {
 	path    string
 	f       *os.File
 	off     int64
-	skipped int64 // bytes fromEnd skipped when the file was opened (backfillLinks reads them)
+	skipped int64 // bytes fromEnd skipped when the file was opened (backfill reads them)
 	lineSplitter
 
 	w       *fsnotify.Watcher // nil if fsnotify is unavailable; polling still works
@@ -211,4 +211,45 @@ func pidSessionID(paths ClaudePaths, pid int) string {
 		return ""
 	}
 	return rec.SessionID
+}
+
+// scanLines streams the first limit bytes of the transcript at path (all of it when
+// limit <= 0) and calls fn with each line in file order. Lines are split like the
+// tailer splits them: over-long lines are skipped, never buffered whole. A last line
+// without its newline (yet) is passed too. Reads the history the tailer skipped
+// (backfill) and does full rescans.
+func scanLines(path string, limit int64, fn func(line []byte)) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	var r io.Reader = f
+	if limit > 0 {
+		r = io.LimitReader(f, limit)
+	}
+	var (
+		sp    lineSplitter
+		lines [][]byte
+	)
+	buf := make([]byte, tailReadChunk)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			lines = sp.split(lines[:0], buf[:n])
+			for _, line := range lines {
+				fn(line)
+			}
+		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+	}
+	if !sp.skip && len(sp.partial) > 0 {
+		fn(sp.partial)
+	}
+	return nil
 }

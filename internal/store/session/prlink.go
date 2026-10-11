@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
-	"io"
-	"os"
 	"slices"
 	"time"
 )
@@ -79,48 +76,16 @@ func mergeLinks(cur, add []LinkedPullRequest) (merged, added []LinkedPullRequest
 	return append(slices.Clip(cur), added...), added
 }
 
-// scanPRLinks streams the first limit bytes of the transcript at path (all of it when
-// limit <= 0) and returns its pr-link records in file order. Lines are split like the
-// tailer splits them: over-long lines are skipped, never buffered whole.
+// scanPRLinks reads the first limit bytes of the transcript at path (all of it when
+// limit <= 0) and returns its pr-link records in file order.
 func scanPRLinks(path string, limit int64) ([]LinkedPullRequest, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = f.Close() }()
-	var r io.Reader = f
-	if limit > 0 {
-		r = io.LimitReader(f, limit)
-	}
-	var (
-		sp    lineSplitter
-		out   []LinkedPullRequest
-		lines [][]byte
-	)
-	buf := make([]byte, tailReadChunk)
-	for {
-		n, err := r.Read(buf)
-		if n > 0 {
-			lines = sp.split(lines[:0], buf[:n])
-			for _, line := range lines {
-				if l, ok := parsePRLink(line); ok {
-					out = append(out, l)
-				}
-			}
-		}
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return out, err
-		}
-	}
-	if !sp.skip && len(sp.partial) > 0 { // last line without its newline (yet)
-		if l, ok := parsePRLink(sp.partial); ok {
+	var out []LinkedPullRequest
+	err := scanLines(path, limit, func(line []byte) {
+		if l, ok := parsePRLink(line); ok {
 			out = append(out, l)
 		}
-	}
-	return out, nil
+	})
+	return out, err
 }
 
 // linkPullRequests adds the links whose URL the session does not have yet, persists
