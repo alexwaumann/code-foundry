@@ -79,7 +79,9 @@ after it.
   `cost_usd`/`unpriced`, `code-foundry usage`, `view.usage`) done:
   `docs/notes/session-usage.md`.
 * PR 2 (subagent runs folded into the parent thread), PR 3 (the side panel Usage
-  surface), PR 4 (the Usage page and its sidebar toggle): to do.
+  surface): to do.
+* PR 4 (the Usage page and its sidebar toggle) done: `docs/notes/session-usage.md`
+  "Usage page". Cache savings is left out until the GUI has the rates.
 
 ### Open items
 
