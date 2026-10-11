@@ -27,8 +27,11 @@ test("session rows render with status badges, above the terminals no thread owns
   const keys = await tree.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
   expect(keys.indexOf("s:s-4")).toBeLessThan(keys.indexOf("t:t-top"));
   expect(keys.indexOf("s:s-5")).toBeLessThan(keys.indexOf("t:t-top"));
-  // Disconnected names are muted; starting settles into connected on the mock's timer.
-  await expect(row(page, "s:s-3").getByTestId("session-name")).toHaveClass(/text-muted-foreground/);
+  // Disconnected rows are dimmed as a whole (not just the name); starting settles into connected on the mock's timer.
+  await expect(row(page, "s:s-3").getByTestId("session-body")).toHaveAttribute("data-offline", "true");
+  await expect(row(page, "s:s-3").getByTestId("session-body")).toHaveCSS("opacity", "0.5");
+  await expect(row(page, "s:s-3").getByTestId("session-name")).not.toHaveClass(/text-muted-foreground/);
+  await expect(row(page, "s:s-1").getByTestId("session-body")).not.toHaveAttribute("data-offline");
   await expect(badge(page, "s-5")).toHaveAttribute("data-session-badge", /^(idle|busy)$/, { timeout: 12_000 });
 });
 
@@ -75,12 +78,14 @@ test("a disconnected thread keeps its status: busy ends interrupted, attention p
   await openApp(page);
   await mockPost("session/disconnect?id=s-1&reason=crashed&code=1&status=busy");
   await expect(badge(page, "s-1")).toHaveAttribute("data-session-badge", "error");
-  await expect(badge(page, "s-1")).toHaveAttribute("aria-label", "error");
+  await expect(row(page, "s:s-1").getByTestId("row-status")).toHaveText("Interrupted while working · just now");
   await mockPost("session/disconnect?id=s-2&reason=daemon%20stopped&code=0");
   await expect(badge(page, "s-2")).toHaveAttribute("data-session-badge", "attention");
-  // Still waiting on the user: counted, and listed under Needs attention.
+  // Still waiting on the user: counted, still on top, still saying so (dimmed).
   await expect(page.getByTestId("attention-badge")).toHaveText("1");
-  await expect.poll(async () => (await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).slice(0, 2)).toEqual(["h:attention", "s:s-2"]);
+  await expect.poll(async () => (await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).slice(0, 1)).toEqual(["s:s-2"]);
+  await expect(row(page, "s:s-2").getByTestId("row-status")).toHaveText("Needs input · Do you want to proceed?");
+  await expect(row(page, "s:s-2").getByTestId("session-body")).toHaveAttribute("data-offline", "true");
 });
 
 test("close shows closing… then the panel with the reason", async ({ page }) => {
@@ -103,8 +108,8 @@ test("needs-attention: count badge, window title, and cmd+shift+a", async ({ pag
   await expect(page).toHaveTitle("Code Foundry (2)");
   await expect(badge(page, "s-1")).toHaveAttribute("data-session-badge", "attention");
 
-  // Both sit under Needs attention, newest first: s-2 (40 min old) before s-1 (42 min); wraps around.
-  await expect.poll(async () => (await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).slice(0, 3)).toEqual(["h:attention", "s:s-2", "s:s-1"]);
+  // Both sit on top, newest first: s-2 (40 min old) before s-1 (42 min); wraps around.
+  await expect.poll(async () => (await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).slice(0, 2)).toEqual(["s:s-2", "s:s-1"]);
   await page.keyboard.press("Meta+Shift+a");
   await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Meta+Shift+a"); // from inside the focused terminal
@@ -141,8 +146,9 @@ test("new thread: a worktree's + on the Projects page opens the composer with th
   await expect(created).toBeVisible();
   await expect(created.getByTestId("row-branch")).toHaveText("fix/resize");
   const key = await created.getAttribute("data-row-key");
-  const keys = await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
-  expect(keys.indexOf(key)).toBe(keys.indexOf("h:threads") + 1);
+  const sections = await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => [e.getAttribute("data-row-key"), e.getAttribute("data-section")]));
+  // The newest thread that needs nothing: first in its group, right below the waiting ones.
+  expect(sections.find(([, section]) => section === "threads")?.[0]).toBe(key);
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
 });
 
