@@ -181,6 +181,11 @@ describe("emphasis", () => {
     ["spread over the path", "internal/store/session", "isse", [[0, 1], [9, 10], [15, 17]]],
     ["no match", "README.md", "xyz", []],
     ["a directory (no trailing slash)", "internal/store/session", "sess", [[15, 19]]],
+    ["repeated characters: the run in the base name", "assets/sass.ts", "ss", [[9, 11]]],
+    ["repeated characters spread greedily", "banana/aria.ts", "aa", [[7, 8], [10, 11]]],
+    ["a repeated character not in the base name twice: spread over the path", "a/xa.ts", "aa", [[0, 1], [3, 4]]],
+    ["positions stay the path's when lower case is longer (İ)", "İ/İses.go", "ses", [[3, 6]]],
+    ["non-ASCII query", "docs/Über.md", "über", [[5, 9]]],
   ])("%s", (_name, path, query, want) => {
     expect(emphasis(path, query)).toEqual(want);
   });

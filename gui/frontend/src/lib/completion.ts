@@ -243,15 +243,25 @@ function toRanges(hits: readonly number[]): [number, number][] {
   return out;
 }
 
+/** Lower case with the positions of `s` (a character whose lower case is longer, "İ", stays). */
+function lowerInPlace(s: string): string {
+  const l = s.toLowerCase();
+  if (l.length === s.length) return l;
+  return Array.from(s, (ch) => {
+    const c = ch.toLowerCase();
+    return c.length === ch.length ? c : ch;
+  }).join("");
+}
+
 /**
  * The characters of a path to emphasize for a query (case-insensitive; the daemon ranks,
  * this only marks): the query as a run in the base name, else spread over the base name,
  * else as a run anywhere, else spread over the whole path. [] when it does not match.
  */
 export function emphasis(path: string, query: string): [number, number][] {
-  const q = query.toLowerCase();
+  const q = lowerInPlace(query);
   if (q === "") return [];
-  const p = path.toLowerCase();
+  const p = lowerInPlace(path);
   const base = p.lastIndexOf("/") + 1;
   const run = (i: number): [number, number][] => [[i, i + q.length]];
   const inBase = p.indexOf(q, base);
