@@ -460,6 +460,48 @@ describe("reordering tabs", () => {
     expect(isPicking(getPanel(KEY))).toBe(false);
   });
 
+  /** jsdom lays nothing out: the strip is 400px wide and its tabs sit 100px apart, 80px wide, so dnd-kit finds the tab under the pointer. */
+  const layOutTabs = () => {
+    const real = HTMLElement.prototype.getBoundingClientRect;
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this.getAttribute("role") === "tablist") return DOMRect.fromRect({ x: 0, y: 0, width: 400, height: 28 });
+      if (this.dataset.tabId === undefined || !this.parentElement) return real.call(this);
+      const i = Array.from(this.parentElement.children).indexOf(this);
+      return DOMRect.fromRect({ x: i * 100, y: 0, width: 80, height: 28 });
+    });
+  };
+  const drag = (t: HTMLElement, x: number) => {
+    fireEvent.pointerDown(t, { isPrimary: true, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(t, { isPrimary: true, clientX: 15, clientY: 10 });
+    fireEvent.pointerMove(t, { isPrimary: true, clientX: x, clientY: 10 });
+  };
+
+  it("a drop onto another tab moves the dragged tab to that tab's index", () => {
+    layOutTabs();
+    render(<SidePanel />);
+    const t = tab("#1");
+    drag(t, 210);
+    fireEvent.pointerUp(t, { isPrimary: true, button: 0, clientX: 210, clientY: 10 });
+    expect(tabIds()).toEqual([two.id, three.id, one.id]);
+  });
+
+  it("a drag whose panel unmounts (the selection switched) moves nothing on release", () => {
+    layOutTabs();
+    const other = makeTab("files", "Files");
+    act(() => {
+      openSurface("session:b", other);
+    });
+    render(<SidePanel />);
+    const t = tab("#1");
+    drag(t, 210);
+    act(() => {
+      useUiStore.setState({ selection: { kind: "session", id: "b" } });
+    });
+    expect(screen.getByRole("tab", { name: "Files" })).toBeTruthy();
+    fireEvent.pointerUp(document, { isPrimary: true, button: 0, clientX: 210, clientY: 10 });
+    expect(tabIds()).toEqual([one.id, two.id, three.id]);
+  });
+
   it("describes the keyboard move on each tab, and keeps the wrapper presentational", () => {
     render(<SidePanel />);
     const t = tab("#2");

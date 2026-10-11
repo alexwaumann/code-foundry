@@ -296,6 +296,10 @@ function TabStrip({ panelKey }: { panelKey: string }) {
     settling.current.delete(id);
   };
   const onDragEnd = ({ active, over }: DragEndEvent) => {
+    // dnd-kit's sensor outlives the strip: a release after the panel unmounted (the
+    // selection switched mid-drag) still ends the drag here. Its panel is gone, so it
+    // moves nothing.
+    if (!stripRef.current) return;
     const id = String(active.id);
     drop(id);
     if (!over || active.id === over.id) return;
