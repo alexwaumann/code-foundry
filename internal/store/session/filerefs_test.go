@@ -2,6 +2,7 @@ package session
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -66,6 +67,19 @@ func TestRewriteFileRefs(t *testing.T) {
 		{name: "without the @ too",
 			prompt: "path cf-file://r-api/go.mod",
 			want:   "path /Users/me/.code-foundry/worktrees/api/cf-x/go.mod"},
+		{name: "at the very start, without the @",
+			prompt: "cf-file://r-web/a.md is it",
+			want:   "/Users/me/.code-foundry/worktrees/web/cf-x/a.md is it"},
+		{name: "trailing punctuation is part of the path",
+			prompt: "(see @cf-file://r-web/a.md) then @cf-file://r-web/b.md, ok",
+			want:   "(see @/Users/me/.code-foundry/worktrees/web/cf-x/a.md) then @/Users/me/.code-foundry/worktrees/web/cf-x/b.md, ok"},
+		{name: "unknown repo with a trailing paren drops the scheme only",
+			prompt:  "(ignore @cf-file://r-gone/x.md)",
+			want:    "(ignore @x.md)",
+			dropped: []string{"cf-file://r-gone/x.md)"}},
+		{name: "a newline ends the token",
+			prompt: "@cf-file://r-web/a\nnext",
+			want:   "@/Users/me/.code-foundry/worktrees/web/cf-x/a\nnext"},
 		{name: "adjacent tokens are one token up to whitespace",
 			prompt: "@cf-file://r-web/a@cf-file://r-api/b",
 			want:   "@/Users/me/.code-foundry/worktrees/web/cf-x/a@cf-file://r-api/b"},
@@ -78,6 +92,10 @@ func TestRewriteFileRefs(t *testing.T) {
 			}
 			if !slices.Equal(dropped, tt.dropped) {
 				t.Errorf("dropped = %q, want %q", dropped, tt.dropped)
+			}
+			// Create rejects a NUL before rewriting: the rewrite must never add one.
+			if strings.ContainsRune(got, 0) {
+				t.Errorf("rewriteFileRefs(%q) added a NUL: %q", tt.prompt, got)
 			}
 		})
 	}
