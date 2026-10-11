@@ -1,7 +1,11 @@
 /** Scrolls the strip (only the strip) so the tab is fully visible, with a small margin. */
 export function revealTab(strip: HTMLElement, id: string): void {
   const el = Array.from(strip.querySelectorAll<HTMLElement>("[data-tab-id]")).find((t) => t.dataset.tabId === id);
-  if (!el) return;
+  if (el) revealElement(strip, el);
+}
+
+/** Scrolls the strip (only the strip) so one of its children (a tab, the "+") is fully visible, with a small margin. */
+export function revealElement(strip: HTMLElement, el: HTMLElement): void {
   const pad = 6;
   const left = el.offsetLeft;
   const right = left + el.offsetWidth;
