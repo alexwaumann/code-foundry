@@ -25,6 +25,9 @@
  *        plan, finished, Claude error, busy, idle, interrupted, and a disconnected one still asking
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
+ *   POST /__mock/session/hold?id=s-1&id=s-5   (the clock stops changing them: s-1 stops flipping
+ *        busy/idle, a starting or closing one does not settle; the sidebar order then holds still.
+ *        e2e's resetMock holds s-1 and s-5.) POST /__mock/session/release?id=s-5 undoes it.
  *   POST /__mock/link-pr?session=s-1&slug=owner/name&number=12[&ago=<ms>]   (Claude linked a pull
  *                                                 request ago ms ago; deduplicated by URL like the daemon)
  *   POST /__mock/usage?session=s-2&model=claude-opus-5&requests=3&cacheRead=1000[&input=…&output=…
@@ -474,7 +477,7 @@ function sessionSummary(id: string): Record<string, unknown> {
 
 const statusNames: Record<string, SessionStatus> = { busy: SessionStatus.BUSY, idle: SessionStatus.IDLE, attention: SessionStatus.NEEDS_ATTENTION };
 
-/** Session controls: POST /__mock/session/{attention|status|disconnect|focus}?id=…[&status=…][&reason=…&code=…] */
+/** Session controls: POST /__mock/session/{attention|status|disconnect|hold|release|focus}?id=…[&status=…][&reason=…&code=…] */
 function sessionControl(res: ServerResponse, action: string, q: URLSearchParams): void {
   const id = q.get("id") ?? "";
   try {
@@ -495,6 +498,10 @@ function sessionControl(res: ServerResponse, action: string, q: URLSearchParams)
         world.disconnectSession(id, q.get("reason") ?? "crashed", Number(q.get("code") ?? 1), status);
         break;
       }
+      case "hold":
+      case "release":
+        for (const each of q.getAll("id")) world.holdSession(each, action === "hold");
+        break;
       case "focus":
         json(res, 200, { delivered: world.focusSession(id) });
         return;

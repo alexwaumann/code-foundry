@@ -5,6 +5,7 @@ import {
   placeTerminal,
   SESSION_LABEL,
   WORKTREE_LABEL,
+  type ListOptions,
   type ListSession,
   type PlaceableTerminal,
   type TreeRepo,
@@ -13,7 +14,7 @@ import {
 } from "@/lib/tree";
 import { useReposStore, type ReposData } from "./repos";
 import { useSessionsStore, type SessionsData } from "./sessions";
-import { attentionTier } from "@/lib/session";
+import { isThreadGroup, threadGroup } from "@/lib/session";
 import { useTerminalsStore, type TerminalsData } from "./terminals";
 import { useUiStore, type Selection } from "./ui";
 
@@ -149,16 +150,17 @@ export function decodeSessionKeys(keys: readonly string[]): TreeSession[] {
 }
 
 /**
- * One string per session for the sidebar list: id + attached terminal + pin + attention
- * tier (name, model, busy/idle and the status line's text don't rebuild the list; a
- * question turning into a finished turn does, since it moves). In the store's order.
+ * One string per session for the sidebar list: id + attached terminal + pin + group (name,
+ * model, a different dialog and the status line's text don't rebuild the list; a question
+ * turning into a finished turn, or an idle thread starting work, does, since it moves). In
+ * the store's order.
  */
 export function useSessionListKeys(): string[] {
   return useSessionsStore(
     useShallow((s) =>
       s.order.map((id) => {
         const x = s.byId[id];
-        return [id, x?.terminalId ?? "", x?.pinned ? "1" : "", x ? attentionTier(x) : ""].join(SEP);
+        return [id, x?.terminalId ?? "", x?.pinned ? "1" : "", x ? threadGroup(x) : "idle"].join(SEP);
       }),
     ),
   );
@@ -166,19 +168,20 @@ export function useSessionListKeys(): string[] {
 
 export function decodeSessionListKeys(keys: readonly string[]): ListSession[] {
   return keys.map((k) => {
-    const [id = "", terminalId = "", pinned = "", attention = ""] = k.split(SEP);
-    return { id, terminalId, pinned: pinned === "1", attention: attention === "prompt" || attention === "done" ? attention : "" };
+    const [id = "", terminalId = "", pinned = "", group = ""] = k.split(SEP);
+    return { id, terminalId, pinned: pinned === "1", group: isThreadGroup(group) ? group : "idle" };
   });
 }
 
-/** Sidebar list inputs read imperatively (cmd+1..9, cmd+shift+a). */
-export function getListInputs(): { sessions: ListSession[]; terminals: PlaceableTerminal[] } {
+/** Sidebar list inputs read imperatively (cmd+1..9, cmd+shift+a), with the list's display options. */
+export function getListInputs(): { sessions: ListSession[]; terminals: PlaceableTerminal[]; options: ListOptions } {
   const t = useTerminalsStore.getState();
   const s = useSessionsStore.getState();
   return {
+    options: { workingCollapsed: useUiStore.getState().workingCollapsed },
     sessions: s.order.flatMap((id) => {
       const x = s.byId[id];
-      return x ? [{ id, terminalId: x.terminalId, pinned: x.pinned, attention: attentionTier(x) }] : [];
+      return x ? [{ id, terminalId: x.terminalId, pinned: x.pinned, group: threadGroup(x) }] : [];
     }),
     terminals: t.order.map((id) => {
       const term = t.byId[id];

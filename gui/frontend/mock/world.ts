@@ -86,6 +86,12 @@ interface MockSession {
   /** Mock-only: seconds until an unnamed session gets `pendingName` (background naming). */
   nameIn: number;
   pendingName: string;
+  /**
+   * Mock-only: the clock leaves it alone (no settling, no busy/idle flip, no naming, no
+   * queued move); POST /__mock/session/hold. Specs that pin the sidebar order use it, since
+   * starting and busy threads sit in the Working section.
+   */
+  held: boolean;
 }
 
 interface ArgDef {
@@ -679,6 +685,7 @@ export class World {
       settleIn: 0,
       nameIn: 0,
       pendingName: "",
+      held: false,
       ...o,
       state,
       terminalId,
@@ -799,6 +806,11 @@ export class World {
   }
 
   /** The detector's reading changed (reason defaults to a typical one for the status). */
+  /** Test control: the clock stops (or, held false, resumes) changing this thread (MockSession.held); controls and input always do. */
+  holdSession(id: string, held = true): void {
+    this.session(id).held = held;
+  }
+
   setSessionStatus(id: string, status: SessionStatus, reason?: string): void {
     const s = this.session(id);
     if (s.state === SessionState.DISCONNECTED) throw new CommandError("unavailable", "session is disconnected");
@@ -855,6 +867,7 @@ export class World {
 
   private tickSessions(): void {
     for (const s of this.sessions.values()) {
+      if (s.held) continue;
       // A queued run-in: the daemon types /cd once the thread is idle at its prompt.
       if (s.pendingWorktreePath && s.status !== SessionStatus.BUSY && --s.moveIn <= 0) this.applyMove(s);
       if (s.nameIn > 0 && --s.nameIn === 0 && !s.name) {

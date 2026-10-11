@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { CF, emit, invocations, mockPost, openApp, openProjects, openStreams, resetMock, row } from "./fixtures";
+import { CF, emit, invocations, mockPost, openApp, openProjects, openStreams, releaseSessions, resetMock, row } from "./fixtures";
 
 const FIX_RESIZE = `${CF}.worktrees/fix-resize`;
 
@@ -32,7 +32,10 @@ test("session rows render with status badges, above the terminals no thread owns
   await expect(row(page, "s:s-3").getByTestId("session-body")).toHaveCSS("opacity", "0.5");
   await expect(row(page, "s:s-3").getByTestId("session-name")).not.toHaveClass(/text-muted-foreground/);
   await expect(row(page, "s:s-1").getByTestId("session-body")).not.toHaveAttribute("data-offline");
+  // resetMock holds s-5 starting; released, the mock's clock settles it.
+  await releaseSessions("s-5");
   await expect(badge(page, "s-5")).toHaveAttribute("data-session-badge", /^(idle|busy)$/, { timeout: 12_000 });
+  await expect(row(page, "s:s-5")).toHaveAttribute("data-section", "idle");
 });
 
 test("a disconnected session shows the disconnected page; Reconnect re-attaches", async ({ page }) => {
@@ -178,9 +181,14 @@ test("new thread: a worktree's + on the Projects page opens the composer with th
   await expect(created).toBeVisible();
   await expect(created.getByTestId("row-branch")).toHaveText("fix/resize");
   const key = await created.getAttribute("data-row-key");
-  const sections = await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => [e.getAttribute("data-row-key"), e.getAttribute("data-section")]));
-  // The newest thread that needs nothing: first in its group, right below the waiting ones.
-  expect(sections.find(([, section]) => section === "threads")?.[0]).toBe(key);
+  // Starting, it sits under Working; once idle it is the newest idle thread: first in its
+  // group, right below the waiting ones.
+  const firstIdle = () =>
+    page
+      .getByTestId("thread-list")
+      .locator('[data-row-key][data-section="idle"]')
+      .evaluateAll((els) => els[0]?.getAttribute("data-row-key"));
+  await expect.poll(firstIdle).toBe(key);
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
 });
 

@@ -75,7 +75,8 @@ test("at 125% a row's context menu opens at the pointer and stays inside the win
   await page.setViewportSize({ width: 1280, height: 640 });
   await openApp(page);
   await setZoom(page, 125);
-  const r = await rect(row(page, "s:s-1"));
+  // The top row (the waiting thread): room below for the menu.
+  const r = await rect(row(page, "s:s-2"));
   await page.mouse.click(r.left + 30, r.top + 5, { button: "right" });
   const menu = page.getByTestId("row-menu");
   await expect(menu).toBeVisible();
@@ -88,12 +89,19 @@ test("at 125% a row's context menu opens at the pointer and stays inside the win
     .toBe(true);
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
+  // Off the list, so no thread tooltip is open (or, through Radix's skip delay, opens at once
+  // on the next row) when the next right-click lands.
+  await page.mouse.move(900, 300);
+  await expect(page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])')).toHaveCount(0);
 
-  // The lowest visible thread row: the menu is taller than the room below, so it moves up.
+  // The lowest thread row inside the list's viewport (rows the virtual list renders below it
+  // are "visible" to Playwright but clipped): the menu is taller than the room below, so it moves up.
+  const listBox = await rect(page.getByTestId("thread-list"));
   const rows = page.getByTestId("thread-list").locator('[data-row-key^="s:"]');
   let low = rows.first();
   for (let i = (await rows.count()) - 1; i >= 0; i--) {
-    if (await rows.nth(i).isVisible()) {
+    const b = await rows.nth(i).boundingBox();
+    if (b && b.y >= listBox.top && b.y + b.height <= listBox.bottom) {
       low = rows.nth(i);
       break;
     }

@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { ArrowRightLeft, CircleAlert, Folder, FolderGit2, GitBranch, Layers, OctagonX, Pin, type LucideIcon } from "lucide-react";
+import { ArrowRightLeft, ChevronDown, ChevronRight, CircleAlert, Folder, FolderGit2, GitBranch, Layers, OctagonX, Pin, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
@@ -10,7 +10,7 @@ import { basename, terminalLabel } from "@/lib/path";
 import { sessionBadge } from "@/lib/session";
 import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLine, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
 import { modelLabel, terminalPlace, threadRowModel, type RepoLookup, type WorkspaceLookup } from "@/lib/threadRow";
-import { WORKTREE_LABEL, type Row } from "@/lib/tree";
+import { WORKTREE_LABEL, type HeaderRow, type Row } from "@/lib/tree";
 import { useReposStore } from "@/stores/repos";
 import { renameSession } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
@@ -407,8 +407,45 @@ function HeaderLabel({ label }: { label: string }) {
   return <span className="truncate pt-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">{label}</span>;
 }
 
+/**
+ * The Working section's header (design record: /tmp/working-header/index.html?v=2): the
+ * Terminals header's type, the number of working threads after the label, and a chevron on
+ * the right saying whether the section is open. A button (aria-expanded) inside the row;
+ * the row itself stays role="presentation" like the Terminals header, so the listbox's
+ * cursor never lands on it. Pressing it with the mouse does not take focus from the list.
+ */
+function WorkingHeader({ row }: { row: Extract<HeaderRow, { section: "working" }> }) {
+  const Chevron = row.collapsed ? ChevronRight : ChevronDown;
+  return (
+    <div id={`row-${row.key}`} role="presentation" data-row-kind="header" data-row-key={row.key} data-section={row.section} className="flex h-full items-end select-none">
+      <button
+        type="button"
+        aria-expanded={!row.collapsed}
+        data-testid="working-header"
+        className="flex h-[22px] w-full min-w-0 cursor-default items-center gap-1.5 rounded-md px-2 text-muted-foreground outline-none hover:bg-sidebar-accent/50 focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+        onMouseDown={(e) => {
+          e.preventDefault();
+        }}
+        onClick={() => {
+          useUiStore.getState().toggleWorkingCollapsed();
+        }}
+      >
+        <span className="truncate text-[11px] font-medium tracking-wider uppercase" data-testid="working-label">
+          {row.label}
+        </span>
+        {/* A flex container drops this space visually; it keeps the text and name "Working 2". */}{" "}
+        <span className="shrink-0 text-[11px] tabular-nums opacity-70" data-testid="working-count">
+          {row.count}
+        </span>
+        <Chevron className="ml-auto size-3 shrink-0" aria-hidden />
+      </button>
+    </div>
+  );
+}
+
 export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onActivate }: RowProps) {
   if (row.kind === "header") {
+    if (row.section === "working") return <WorkingHeader row={row} />;
     return (
       <div id={`row-${row.key}`} role="presentation" data-row-kind="header" data-row-key={row.key} className="flex h-full items-end px-2 pb-1 select-none">
         <HeaderLabel label={row.label} />

@@ -19,7 +19,7 @@ import { SidebarRow } from "./SidebarRow";
 import { SidebarStatus } from "./SidebarStatus";
 import { SidebarToolbar } from "./SidebarToolbar";
 
-/** The Terminals header's height; thread and terminal rows are two lines (rowHeight + this). */
+/** The Working and Terminals headers' height; thread and terminal rows are two lines (rowHeight + this). */
 const HEADER_HEIGHT = 26;
 const SECOND_LINE = 15;
 
@@ -31,8 +31,12 @@ const SECOND_LINE = 15;
 function useRows(): Row[] {
   const sessionKeys = useSessionListKeys();
   const termKeys = useTerminalPlacementKeys();
+  const workingCollapsed = useUiStore((s) => s.workingCollapsed);
   const [stable] = useState(rowCache);
-  return useMemo(() => stable(buildRows(decodeSessionListKeys(sessionKeys), decodeTerminalKeys(termKeys))), [stable, sessionKeys, termKeys]);
+  return useMemo(
+    () => stable(buildRows(decodeSessionListKeys(sessionKeys), decodeTerminalKeys(termKeys), { workingCollapsed })),
+    [stable, sessionKeys, termKeys, workingCollapsed],
+  );
 }
 
 /** Index of the next leaf row from i in direction dir (skipping headers); i itself when none. */
