@@ -67,7 +67,8 @@ func (c *Calls) Requests() []proto.Message {
 type Terminal struct {
 	Calls
 	Err error
-	// Created is returned by Create; its Argv and Cwd are filled from the request.
+	// Created is returned by Create; its Argv, Cwd and Labels are filled from the
+	// request.
 	Created *v1.Terminal
 }
 
@@ -83,7 +84,7 @@ func (t *Terminal) Create(_ context.Context, r *connect.Request[v1.CreateTermina
 	if t.Created != nil {
 		term = proto.CloneOf(t.Created)
 	}
-	term.Argv, term.Cwd = r.Msg.GetArgv(), r.Msg.GetCwd()
+	term.Argv, term.Cwd, term.Labels = r.Msg.GetArgv(), r.Msg.GetCwd(), r.Msg.GetLabels()
 	return connect.NewResponse(&v1.CreateTerminalResponse{Terminal: term}), nil
 }
 
@@ -97,6 +98,12 @@ func (t *Terminal) Kill(_ context.Context, r *connect.Request[v1.KillTerminalReq
 func (t *Terminal) Remove(_ context.Context, r *connect.Request[v1.RemoveTerminalRequest]) (*connect.Response[v1.RemoveTerminalResponse], error) {
 	t.record(r.Msg)
 	return connect.NewResponse(&v1.RemoveTerminalResponse{}), t.Err
+}
+
+// Close records the request.
+func (t *Terminal) Close(_ context.Context, r *connect.Request[v1.CloseTerminalRequest]) (*connect.Response[v1.CloseTerminalResponse], error) {
+	t.record(r.Msg)
+	return connect.NewResponse(&v1.CloseTerminalResponse{}), t.Err
 }
 
 // Repo is a fake command.RepoBackend. Err, when set, is returned by every call. List
