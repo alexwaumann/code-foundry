@@ -539,9 +539,15 @@ type UsageBucket struct {
 	// The bucket's price in USD; 0 when unpriced.
 	CostUsd float64 `protobuf:"fixed64,11,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
 	// The bucket's (model, tier, speed) has no known rate.
-	Unpriced      bool `protobuf:"varint,12,opt,name=unpriced,proto3" json:"unpriced,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Unpriced bool `protobuf:"varint,12,opt,name=unpriced,proto3" json:"unpriced,omitempty"`
+	// cost_usd split by token kind (the side panel's token table); all 0 when unpriced.
+	InputCostUsd         float64 `protobuf:"fixed64,13,opt,name=input_cost_usd,json=inputCostUsd,proto3" json:"input_cost_usd,omitempty"`
+	OutputCostUsd        float64 `protobuf:"fixed64,14,opt,name=output_cost_usd,json=outputCostUsd,proto3" json:"output_cost_usd,omitempty"`
+	CacheReadCostUsd     float64 `protobuf:"fixed64,15,opt,name=cache_read_cost_usd,json=cacheReadCostUsd,proto3" json:"cache_read_cost_usd,omitempty"`
+	CacheWrite_5MCostUsd float64 `protobuf:"fixed64,16,opt,name=cache_write_5m_cost_usd,json=cacheWrite5mCostUsd,proto3" json:"cache_write_5m_cost_usd,omitempty"`
+	CacheWrite_1HCostUsd float64 `protobuf:"fixed64,17,opt,name=cache_write_1h_cost_usd,json=cacheWrite1hCostUsd,proto3" json:"cache_write_1h_cost_usd,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *UsageBucket) Reset() {
@@ -656,6 +662,41 @@ func (x *UsageBucket) GetUnpriced() bool {
 		return x.Unpriced
 	}
 	return false
+}
+
+func (x *UsageBucket) GetInputCostUsd() float64 {
+	if x != nil {
+		return x.InputCostUsd
+	}
+	return 0
+}
+
+func (x *UsageBucket) GetOutputCostUsd() float64 {
+	if x != nil {
+		return x.OutputCostUsd
+	}
+	return 0
+}
+
+func (x *UsageBucket) GetCacheReadCostUsd() float64 {
+	if x != nil {
+		return x.CacheReadCostUsd
+	}
+	return 0
+}
+
+func (x *UsageBucket) GetCacheWrite_5MCostUsd() float64 {
+	if x != nil {
+		return x.CacheWrite_5MCostUsd
+	}
+	return 0
+}
+
+func (x *UsageBucket) GetCacheWrite_1HCostUsd() float64 {
+	if x != nil {
+		return x.CacheWrite_1HCostUsd
+	}
+	return 0
 }
 
 // A pull request Claude linked to a session (Session.linked_pull_requests).
@@ -2235,7 +2276,7 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\x11status_changed_at\x18\x1a \x01(\v2\x1a.google.protobuf.TimestampR\x0fstatusChangedAt\x121\n" +
 	"\x05usage\x18\x1b \x03(\v2\x1b.codefoundry.v1.UsageBucketR\x05usage\x12\x19\n" +
 	"\bcost_usd\x18\x1c \x01(\x01R\acostUsd\x12\x1a\n" +
-	"\bunpriced\x18\x1d \x01(\bR\bunpriced\"\xcb\x02\n" +
+	"\bunpriced\x18\x1d \x01(\bR\bunpriced\"\xb4\x04\n" +
 	"\vUsageBucket\x12\x14\n" +
 	"\x05model\x18\x01 \x01(\tR\x05model\x12\x12\n" +
 	"\x04tier\x18\x02 \x01(\tR\x04tier\x12\x14\n" +
@@ -2250,7 +2291,12 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\x0ecache_write_1h\x18\n" +
 	" \x01(\x03R\fcacheWrite1h\x12\x19\n" +
 	"\bcost_usd\x18\v \x01(\x01R\acostUsd\x12\x1a\n" +
-	"\bunpriced\x18\f \x01(\bR\bunpriced\"\x8a\x01\n" +
+	"\bunpriced\x18\f \x01(\bR\bunpriced\x12$\n" +
+	"\x0einput_cost_usd\x18\r \x01(\x01R\finputCostUsd\x12&\n" +
+	"\x0foutput_cost_usd\x18\x0e \x01(\x01R\routputCostUsd\x12-\n" +
+	"\x13cache_read_cost_usd\x18\x0f \x01(\x01R\x10cacheReadCostUsd\x124\n" +
+	"\x17cache_write_5m_cost_usd\x18\x10 \x01(\x01R\x13cacheWrite5mCostUsd\x124\n" +
+	"\x17cache_write_1h_cost_usd\x18\x11 \x01(\x01R\x13cacheWrite1hCostUsd\"\x8a\x01\n" +
 	"\x11LinkedPullRequest\x12\x12\n" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x10\n" +

@@ -95,6 +95,12 @@ export interface UsageBucketView {
   /** USD; 0 when unpriced. */
   costUsd: number;
   unpriced: boolean;
+  /** costUsd split by token kind (flat, so sameUsage compares them by value); 0 when unpriced. */
+  inputCostUsd: number;
+  outputCostUsd: number;
+  cacheReadCostUsd: number;
+  cacheWrite5mCostUsd: number;
+  cacheWrite1hCostUsd: number;
 }
 
 /** A pull request linked to a thread. */
@@ -194,6 +200,11 @@ export function toUsageBucketView(b: UsageBucket): UsageBucketView {
     cacheWrite1h: Number(b.cacheWrite1h),
     costUsd: b.costUsd,
     unpriced: b.unpriced,
+    inputCostUsd: b.inputCostUsd,
+    outputCostUsd: b.outputCostUsd,
+    cacheReadCostUsd: b.cacheReadCostUsd,
+    cacheWrite5mCostUsd: b.cacheWrite5mCostUsd,
+    cacheWrite1hCostUsd: b.cacheWrite1hCostUsd,
   };
 }
 

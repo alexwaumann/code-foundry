@@ -79,6 +79,36 @@ func TestCost(t *testing.T) {
 	}
 }
 
+func TestCostByKind(t *testing.T) {
+	tests := []struct {
+		name string
+		b    Bucket
+		want Costs
+		ok   bool
+	}{
+		{name: "every counter", ok: true, want: Costs{Input: 4, Output: 40, CacheRead: 0.6, CacheWrite5m: 20, CacheWrite1h: 40},
+			b: Bucket{Model: "claude-opus-5-5", Input: 1e6, Output: 2e6, CacheRead: 3e6, CacheWrite5m: 4e6, CacheWrite1h: 5e6}},
+		{name: "small haiku turn", ok: true, want: Costs{Input: 3 * 0.1 / 1e6, Output: 12 * 0.5 / 1e6, CacheRead: 20000 * 0.01 / 1e6, CacheWrite1h: 5000 * 0.2 / 1e6},
+			b: Bucket{Model: "claude-haiku-5-5", Input: 3, Output: 12, CacheRead: 20000, CacheWrite1h: 5000}},
+		{name: "empty bucket", ok: true, b: Bucket{Model: "claude-fable-5-1"}},
+		{name: "unpriced", b: Bucket{Model: "claude-unknown", Input: 100}},
+	}
+	near := func(a, b float64) bool { return math.Abs(a-b) <= 1e-12 }
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := CostByKind(tt.b)
+			if ok != tt.ok || !near(got.Input, tt.want.Input) || !near(got.Output, tt.want.Output) || !near(got.CacheRead, tt.want.CacheRead) ||
+				!near(got.CacheWrite5m, tt.want.CacheWrite5m) || !near(got.CacheWrite1h, tt.want.CacheWrite1h) {
+				t.Errorf("CostByKind = %+v, %v; want %+v, %v", got, ok, tt.want, tt.ok)
+			}
+			total, _ := Cost(tt.b)
+			if !near(got.Total(), total) {
+				t.Errorf("Total = %v; Cost = %v", got.Total(), total)
+			}
+		})
+	}
+}
+
 func TestHasLongTier(t *testing.T) {
 	for model, want := range map[string]bool{
 		"claude-haiku-5-5": true, "claude-haiku-5-5-20261001": true,

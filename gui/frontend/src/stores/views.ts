@@ -9,6 +9,7 @@ import { create } from "zustand";
 import { linkedPrsTarget, openLinkedPrsSurface } from "./linkedPrsPanel";
 import { expandPanel, getPanel, togglePanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
+import { openUsageSurface } from "./usagePanel";
 import { openWorkspaceSurface } from "./workspacePanel";
 import { openWorktreeSurface } from "./worktreePanel";
 
@@ -43,6 +44,10 @@ export function showView(name: string): boolean {
     case "panel.linked-prs":
       // view.panel.linked-prs: the Linked PRs surface in the current thread's panel.
       linkedPrsPanelCommand();
+      return true;
+    case "panel.usage":
+      // view.panel.usage: the Usage surface in the current thread's panel.
+      usagePanelCommand();
       return true;
     case "panel.worktree":
       // view.panel.worktree: the thread's own worktree in the current thread's panel.
@@ -158,6 +163,24 @@ export function linkedPrsPanelCommand(): boolean {
     return false;
   }
   const key = openLinkedPrsSurface();
+  if (key === null) return false;
+  const inPalette = useUiStore.getState().palette.open;
+  togglePanel(key, true, { focus: !inPalette });
+  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
+  return true;
+}
+
+/**
+ * view.panel.usage for the current selection: opens (or activates) the Usage tab in the
+ * selected thread's panel and shows the panel, like view.panel.workspace. A thread
+ * without usage opens it too (the surface says "No usage yet"). A no-op while the
+ * settings page is up and when the selection is no thread.
+ *
+ * Focus moves to the panel; with the palette open, its return target moves there instead.
+ */
+export function usagePanelCommand(): boolean {
+  if (useViewsStore.getState().settingsOpen) return false;
+  const key = openUsageSurface();
   if (key === null) return false;
   const inPalette = useUiStore.getState().palette.open;
   togglePanel(key, true, { focus: !inPalette });

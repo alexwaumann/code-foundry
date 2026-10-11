@@ -170,3 +170,88 @@ Large transcripts, the real fold (`scanLines` + `usageFold`) against grep:
 
 A GUI built from this branch needs a daemon from this branch for the new fields (an older
 daemon simply sends none: empty usage, cost 0). Restart the daemon after installing.
+
+# Panel surface (PR 3)
+
+The side panel's **Usage** surface for one thread, per DESIGN.md's session view and
+`session.png`.
+
+![Usage surface, dark](session-usage/panel-dark.png)
+![Usage surface, light](session-usage/panel-light.png)
+
+## What was built
+
+* `surfaces/usage.ts` + `usageTarget.ts`: kind `usage`, title "Usage", lucide
+  `ChartColumn`, hotkey **U** (free; the others are f, d, p, l, w, t). Enabled for a
+  thread or a thread's terminal (`selectionThread` from `linkedprsTarget.ts`, i.e.
+  `deriveContext`), even one without usage; hidden otherwise. One tab per panel, no
+  params, follows the selection's thread. Listed after Linked PRs.
+* `view.panel.usage` (Go, `commands_view.go`): ShowView `"panel.usage"`, `When:
+  hasSession` like `view.panel.linked-prs`, no chord. `stores/views.ts`
+  `usagePanelCommand` → `stores/usagePanel.ts` `openUsageSurface`. Unlike Linked PRs
+  there is no "nothing yet" toast: a thread without usage opens the surface, which says
+  "No usage yet".
+* `components/usage/UsageSurface.tsx`: hero cost (32px semibold), "<tokens> tokens · <n>
+  requests" (no agent runs yet: PR 2 adds the count), "By model" rows (swatch, mono id,
+  "<tokens> tokens · <n> requests"; cost with share of cost beneath), "Tokens" grid (Input,
+  Output, Cache read, Cache write · 5m, Cache write · 1h; tokens, muted cost). A model with
+  any unpriced bucket gets the "unpriced" tag; one with no priced bucket shows "—" for
+  cost and share. Nothing priced at all: the hero and the kind costs are "—" too.
+* `lib/usage.ts` (shared with PR 4): `TOKEN_KINDS` (labels and cost fields in display
+  order), `totalUsage` and `usageByModel` (folds over `UsageBucketView[]`; per model:
+  most expensive first, then tokens, then id), `modelSlot` / `SLOT_COLORS` /
+  `modelColorVars` / `SWATCH_BG`, `fmtTok`, `fmtUsd`, `fmtShare`, `fmtRequests`.
+* Mock: `mock/usage.ts` seeds s-1 with Opus 5.5 (two days) and Fable 5.1 buckets priced
+  from copies of the `internal/pricing` rows; `POST /__mock/usage?session=…&model=…&…` adds
+  counters to a (model, day) bucket; `view.panel.usage` in the mock registry.
+
+## Decisions and deviations
+
+* **Per-kind cost on the wire.** The Tokens table has a cost per token kind; the wire
+  had one cost per bucket, and PR 1 deliberately kept the rate table out of TypeScript.
+  So `pricing.CostByKind` (with `Cost` now its `Total`) and five `UsageBucket` fields,
+  `input_cost_usd`, `output_cost_usd`, `cache_read_cost_usd`, `cache_write_5m_cost_usd`,
+  `cache_write_1h_cost_usd` (all 0 when unpriced), mapped flat onto `UsageBucketView` so
+  `sameUsage`'s field compare still covers them. PR 4's cache-savings figure can use them
+  too (savings needs the input rate, which `inputCostUsd / input` gives for a priced
+  bucket with input tokens).
+* **Token order** follows DESIGN's Labels (Input, Output, Cache read, Cache write 5m / 1h),
+  not `session.png` (which put Output last).
+* **`fmtTok`** is the mockup's rule, not the CLI's: whole numbers from 100 of a unit
+  (980K, 261M, not 980.4K / 261.2M), one decimal below (two for B), trailing zeros
+  trimmed (1.5M, not the mockup's 1.50M). `fmtUsd` matches the CLI's four decimals under
+  a cent, plus "<$0.0001" for slivers (a haiku "ok" bills 2 input tokens:
+  $0.0000002 would otherwise read "$0.0000").
+* **Swatch colours without a stylesheet entry.** `modelColorVars` puts the slot's light
+  and dark colours on the element as `--sw-l` / `--sw-d`; `SWATCH_BG` is `bg-(--sw-l)
+  dark:bg-(--sw-d)` (SVG: `fill-(--sw-l) dark:fill-(--sw-d)`). One table in
+  `lib/usage.ts`, no `index.css` edit. Snapshot ids (`claude-haiku-5-5-20261001`,
+  `…[1m]`) take their family's slot; anything else is slot 5 (grey).
+* **Narrow selector.** Every session Updated carries a new `usage` array, so the
+  surface keeps the previous array while `sameUsage` says it is unchanged: a status flip
+  does not re-render it.
+
+## Verified
+
+`make check` green (Go incl. `TestCostByKind`, the per-kind assertions in
+`TestUsageToProto`, `view.panel.usage` in `TestViewCommandsEmitShowView` and the shared
+thread-surface availability table; frontend typecheck, lint, 1241 vitest tests incl.
+`lib/usage.test.ts`, `surfaces/usageTarget.test.ts`, `surfaces/usage.test.tsx`).
+`make gui-e2e` green incl. `e2e/usage.spec.ts` (U from the empty panel, the numbers of
+the seeded thread, "No usage yet" then live buckets, unpriced, the palette, ShowView, a
+plain terminal not listing it). `SHOTS=<dir>` saves `usage-panel(-light).png` and
+`usage-empty(-light).png` from the mock.
+
+**Live screenshots** (`session-usage/panel-dark.png`, `panel-light.png`): `make
+gui-build`; daemon `CODE_FOUNDRY_HOME=/tmp/cf-usage3-home bin/code-foundry daemon --dev`;
+a scratch git repo under the worktree (`.scratch/usage3-repo`, deleted afterwards),
+`repo add`, `session new --model haiku --effort medium --prompt "reply with the word ok"`
+(1 request, 38.9K tokens, $0.0029, same as `code-foundry usage --thread`); `code-foundry
+gui` with the same home; `session focus --id <thread>` then `view.panel.usage
+--context-session <thread>`; `settings set appearance.theme dark|light` between shots.
+Window capture gotcha: with another session's "Code Foundry" running, System Events'
+`window 1 of (process whose unix id is N)` resolved to the *other* app (same name), and
+Accessibility exposed no windows for ours at all, so it could not be resized. The
+1400x900 shots came from a throwaway build with `gui/main.go`'s default window set to
+1400x900 (reverted, rebuilt), captured by CGWindowID (`CGWindowListCopyWindowInfo` filtered
+by owner pid, then `screencapture -o -l <id>`), which ignores overlapping windows.
