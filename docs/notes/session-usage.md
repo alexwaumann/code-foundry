@@ -548,10 +548,13 @@ not a `UsageTotals` field, so the panel surface's shared totals are unchanged.
   `Meta+1`/`Meta+3` straight after `openApp`, or Enter before the composer has the base
   ref. On main (89232d3) it failed 3 of 40 runs with `--repeat-each=8`; unrelated to this
   PR. It also failed once in the full `make gui-e2e` here, while binaries were building.
-* `layout.spec.ts:50` and `sidebar.spec.ts:455` (both browsers) fail on main since #40
-  (sidebar gutter): the toolbar now sits 8px in (`toolbar.left` 8, the spec says 0) and
-  New thread 0px from the toolbar's edge (the spec says 12). Checked against 4071bef
-  alone; nothing here touches the toolbar.
+* `layout.spec.ts:50` and `sidebar.spec.ts:455` (both browsers) failed on main since #40
+  (sidebar gutter; checked against 4071bef alone, nothing here touches the toolbar). #40
+  moved the toolbar into the sidebar body's 8px left gutter and dropped its own inset
+  ("rows run to the sidebar's edges, 8px from the window and the pane"), but kept the old
+  expectations: toolbar at x 0, Dashboard 12px in, New thread 12px from the toolbar's
+  right edge. Updated here to what #40 intends: toolbar at 8, Dashboard at 8, New thread
+  flush (0).
 * JSX whitespace: prettier reflowed the summary line's `· <b>` into `·<b>`; the line is
   now built from a list so the separators cannot be lost.
 

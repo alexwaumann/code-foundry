@@ -461,6 +461,7 @@ test("the toolbar: Dashboard and Notifications on the left, Add project then New
   expect(bell.x + bell.width).toBeLessThan((bar?.x ?? 0) + (bar?.width ?? 0) / 2);
   expect(add.x).toBeGreaterThan((bar?.x ?? 0) + (bar?.width ?? 0) / 2);
   expect(add.x).toBeLessThan(add2.x);
-  // New thread is rightmost, 12px in from the edge.
-  expect(Math.round((bar?.x ?? 0) + (bar?.width ?? 0) - (add2.x + add2.width))).toBe(12);
+  // New thread is rightmost, flush with the toolbar's right edge (#40: no inset; the
+  // content pane's 8px margin is the gap beyond it).
+  expect(Math.round((bar?.x ?? 0) + (bar?.width ?? 0) - (add2.x + add2.width))).toBe(0);
 });
