@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/model"
 )
 
 // Type is a field's value type. Values travel as strings; the type drives parsing, the
@@ -46,6 +47,8 @@ type Field struct {
 	Group       string
 	Type        Type
 	Enum        []string
+	// EnumLabels, when set, names each Enum value for display (parallel to Enum).
+	EnumLabels []string
 	// Default is the string-encoded value used when the file does not set the key.
 	Default string
 	// Restart means the daemon reads the value only at start.
@@ -124,8 +127,8 @@ func KeybindingKey(command string) string { return keybindingKeyPrefix + command
 var staticFields = []Field{
 	{
 		Key: KeyDefaultModel, Group: GroupSessions, Type: Enum, Title: "Default model",
-		Description: "Model for new threads when none is picked.",
-		Enum:        command.SessionModels, Default: "opus",
+		Description: "Model for new threads when none is picked. A \"(default)\" model is Claude Code's current default for that family; the others pin a version.",
+		Enum:        command.SessionModels, EnumLabels: model.Labels(), Default: model.Default,
 		bind: func(s *Settings) any { return &s.Sessions.DefaultModel },
 	},
 	{

@@ -41,10 +41,6 @@ import (
 // Efforts are the valid --effort levels.
 var Efforts = []string{"low", "medium", "high", "xhigh", "max"}
 
-// ModelAliases are the --model aliases offered in pickers. Full model names are also
-// accepted by the store.
-var ModelAliases = []string{"fable", "opus", "sonnet", "haiku"}
-
 // modelPattern guards --model values (aliases or full names like
 // "claude-opus-5-5[1m]") so nothing that looks like a flag reaches argv.
 var modelPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._\-\[\]]{0,79}$`)

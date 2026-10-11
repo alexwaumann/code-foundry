@@ -55,6 +55,9 @@ message SettingField {
   int64 max = 10;
   // Free-form hint for the input (e.g. a template or an example).
   string placeholder = 11;
+  // Display names for enum_values, parallel to it; empty when the values are shown as is.
+  // sessions.default_model carries the model registry's labels ("Opus 4.8").
+  repeated string enum_labels = 12;
 }
 
 message SettingGroup {

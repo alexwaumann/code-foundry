@@ -230,7 +230,7 @@ func RegisterPullRequestSessions(r *Registry, d PullRequestSessionDeps) error {
 	// which pr.ask and pr.explain use only when it is a clone of the slug and
 	// pr.fix.findings ignores.
 	worktree := ArgSpec{Name: "worktree", Type: Path, Description: "Worktree to start the session in (default: picked from the registered clones of repo-slug and the pull request's branch)"}
-	model := ArgSpec{Name: "model", Type: Enum, Enum: SessionModels, Description: "Model (default: settings sessions.default_model, else Claude's default)"}
+	model := ArgSpec{Name: "model", Type: Enum, Enum: SessionModels, Description: sessionModelHelp + " (default: settings sessions.default_model, else Claude's default)"}
 	effort := ArgSpec{Name: "effort", Type: Enum, Enum: SessionEfforts, Description: "Effort level (default: settings sessions.default_effort, else Claude's default)"}
 
 	start := func(ctx context.Context, uctx Context, a Args, kind prSessionKind, prompt func(*v1.PullRequestDetail, PRCheckout) string) (Result, error) {

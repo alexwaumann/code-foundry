@@ -13,6 +13,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
+	"github.com/alexwaumann/code-foundry/internal/model"
 )
 
 func newSessionRegistry(t *testing.T) (*command.Registry, *commandtest.Session, *commandtest.Emitter) {
@@ -85,6 +86,10 @@ func TestSessionCommands(t *testing.T) {
 		{name: "workspace refuses new worktree", cmd: "session.new", args: map[string]string{"workspace": "login", "new-worktree": "true"}, wantErr: command.ErrInvalidArgs},
 		{name: "new bad effort", cmd: "session.new", args: map[string]string{"worktree": "/wt", "effort": "huge"}, wantErr: command.ErrInvalidArgs},
 		{name: "new bad model", cmd: "session.new", args: map[string]string{"worktree": "/wt", "model": "gpt"}, wantErr: command.ErrInvalidArgs},
+		{name: "new pinned model", cmd: "session.new", args: map[string]string{"worktree": "/wt", "model": "claude-opus-4-8"},
+			wantMsg:  "created thread s1 in /wt",
+			wantReqs: []proto.Message{&v1.CreateSessionRequest{WorktreePath: "/wt", Model: "claude-opus-4-8", PermissionMode: auto}}, wantIntent: focusIntent("s1")},
+		{name: "new model outside the registry", cmd: "session.new", args: map[string]string{"worktree": "/wt", "model": "claude-opus-5-5"}, wantErr: command.ErrInvalidArgs},
 		{name: "close from context", cmd: "session.close", ctx: command.Context{ActiveSessionID: "s5"},
 			wantMsg: "closed thread s5", wantReqs: []proto.Message{&v1.CloseSessionRequest{Id: "s5"}}},
 		{name: "close explicit id", cmd: "session.close", args: map[string]string{"id": "s6"},
@@ -213,7 +218,7 @@ func TestSessionNewKeybindingAndEnums(t *testing.T) {
 	for _, a := range c.Args {
 		switch a.Name {
 		case "model":
-			if !slices.Equal(a.Enum, []string{"fable", "opus", "sonnet", "haiku"}) {
+			if !slices.Equal(a.Enum, model.Values()) || !strings.Contains(a.Description, "claude-* id pins a version") {
 				t.Errorf("model enum = %v", a.Enum)
 			}
 		case "effort":
