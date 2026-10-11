@@ -55,7 +55,12 @@ interface MockSession {
   effort: string;
   terminalId: string;
   state: SessionState;
+  /** Persisted like the daemon's: a disconnected thread keeps it (busy becomes ERROR "interrupted"). */
   status: SessionStatus;
+  /** The detector's reason ("permission: Do you want to proceed?", "finished", "interrupted", …). */
+  statusReason: string;
+  /** When status or statusReason last changed. */
+  statusChangedAt: Date;
   createdAt: Date;
   lastActivityAt: Date;
   exitCode: number;
@@ -210,6 +215,22 @@ export function promptSlug(prompt: string): string {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** A typical detector reason for a status (captured strings; see src/lib/session.test.ts). */
+function defaultReason(status: SessionStatus): string {
+  switch (status) {
+    case SessionStatus.BUSY:
+      return "working";
+    case SessionStatus.IDLE:
+      return "at prompt";
+    case SessionStatus.NEEDS_ATTENTION:
+      return "permission: Do you want to proceed?";
+    case SessionStatus.ERROR:
+      return "interrupted";
+    default:
+      return "";
+  }
+}
 const HISTORY_CAP = 256 * 1024;
 
 function clean(over: Partial<MockWorktree["status"]> = {}): MockWorktree["status"] {
@@ -351,8 +372,8 @@ export class World {
     // Sessions in every state. s-1/s-2 own t-claude/t-ghostty (labels.session above).
     this.sessions.clear();
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
-    this.addSession({ id: "s-1", repoId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "opus", effort: "high", terminalId: "t-claude", status: SessionStatus.BUSY, createdAt: ago(42) });
-    this.addSession({ id: "s-2", repoId: "repo-gp", worktreePath: GP, name: "Port renderer", model: "sonnet", effort: "", terminalId: "t-ghostty", status: SessionStatus.NEEDS_ATTENTION, createdAt: ago(40) });
+    this.addSession({ id: "s-1", repoId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "opus", effort: "high", terminalId: "t-claude", status: SessionStatus.BUSY, statusReason: "working: Refactor sidebar tree", createdAt: ago(42) });
+    this.addSession({ id: "s-2", repoId: "repo-gp", worktreePath: GP, name: "Port renderer", model: "sonnet", effort: "", terminalId: "t-ghostty", status: SessionStatus.NEEDS_ATTENTION, statusReason: "permission: Do you want to proceed?", statusChangedAt: ago(3), createdAt: ago(40) });
     this.addSession({ id: "s-3", repoId: "repo-cf", worktreePath: `${CFW}/fix-resize`, name: "Fix resize race", model: "opus", effort: "medium", state: SessionState.DISCONNECTED, disconnectReason: "exited", createdAt: ago(300), lastActivityAt: ago(95) });
     this.addSession({ id: "s-4", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Investigate flaky e2e", model: "haiku", effort: "", state: SessionState.DISCONNECTED, disconnectReason: "crashed", exitCode: 139, createdAt: ago(200), lastActivityAt: ago(17) });
     this.addSession({ id: "s-5", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Write session docs", model: "opus", effort: "low", state: SessionState.STARTING, settleIn: 8, createdAt: ago(0) });
@@ -488,6 +509,39 @@ export class World {
     return out;
   }
 
+  /**
+   * Scenario: one thread per status kind the sidebar distinguishes (lib/session statusKind),
+   * with captured reasons and staggered statusChangedAt. POST /__mock/status-kinds, or
+   * MOCK_SCENARIO=status-kinds. Idempotent. Not in the default world, whose rows e2e pins.
+   */
+  addStatusKinds(): string[] {
+    const ago = (min: number) => new Date(Date.now() - min * 60_000);
+    const A = SessionStatus.NEEDS_ATTENTION;
+    const D = SessionState.DISCONNECTED;
+    type Kind = Partial<MockSession> & Pick<MockSession, "id" | "name" | "status" | "statusReason"> & { min: number };
+    const kinds: Kind[] = [
+      { id: "s-k-approval", name: "Run the migration script", status: A, statusReason: "waiting for approval: Bash", min: 2 },
+      { id: "s-k-question", name: "Pick a color palette", status: A, statusReason: "question: Which color do you prefer?", min: 6 },
+      { id: "s-k-plan", name: "Plan the settings page", status: A, statusReason: "plan: Claude has written up a plan and is ready to execute. Would you like to proceed?", min: 1 },
+      { id: "s-k-finished", name: "Summarize the changelog", status: A, statusReason: "finished", min: 12 },
+      { id: "s-k-error", name: "Try the new model", status: A, statusReason: "error: model_not_found", min: 20 },
+      { id: "s-k-busy", name: "Index the docs", status: SessionStatus.BUSY, statusReason: "running Bash", min: 0.5 },
+      { id: "s-k-idle", name: "Review lint rules", status: SessionStatus.IDLE, statusReason: "at prompt", min: 50 },
+      { id: "s-k-interrupted", name: "Migrate the config loader", status: SessionStatus.ERROR, statusReason: "interrupted", min: 35, state: D, disconnectReason: "daemon stopped" },
+      { id: "s-k-asked-before-restart", name: "Choose sidebar density", status: A, statusReason: "question: Which density should the sidebar use?", min: 90, state: D, disconnectReason: "daemon restarted" },
+    ];
+    const out: string[] = [];
+    for (const { min, ...k } of kinds) {
+      out.push(k.id);
+      if (this.sessions.has(k.id)) continue;
+      const s = this.addSession({ repoId: "repo-cf", worktreePath: CF, model: "haiku", effort: "medium", createdAt: ago(min + 5), lastActivityAt: ago(min), statusChangedAt: ago(min), ...k });
+      const t = this.terms.get(s.terminalId);
+      if (t) this.publishTerm(t);
+      this.publishSession(s);
+    }
+    return out;
+  }
+
   /** Test control: a connected thread owned by the workspace, running in `repo`'s member (else the first). */
   addWorkspaceThread(workspace: string, repo: string, name: string, status: SessionStatus = SessionStatus.IDLE): MockSession {
     const ws = this.workspaceRef(workspace);
@@ -599,10 +653,13 @@ export class World {
     if (!terminalId && (state === SessionState.STARTING || state === SessionState.CONNECTED || state === SessionState.CLOSING)) {
       terminalId = this.sessionTerminal(o.id, o.worktreePath, o.model, false).id;
     }
+    const status = o.status ?? SessionStatus.IDLE;
     const s: MockSession = {
       claudeSessionId: `cl-${o.id}`,
       autoNamed: true,
-      status: SessionStatus.IDLE,
+      status,
+      statusReason: o.statusReason ?? defaultReason(status),
+      statusChangedAt: o.statusChangedAt ?? o.lastActivityAt ?? new Date(),
       createdAt: new Date(),
       lastActivityAt: new Date(),
       exitCode: 0,
@@ -647,6 +704,8 @@ export class World {
       terminalId: s.terminalId,
       state: s.state,
       status: s.status,
+      statusReason: s.statusReason,
+      statusChangedAt: timestampFromDate(s.statusChangedAt),
       createdAt: timestampFromDate(s.createdAt),
       lastActivityAt: timestampFromDate(s.lastActivityAt),
       exitCode: s.exitCode,
@@ -675,14 +734,20 @@ export class World {
     this.sessionEvents.publish({ event: { case: "updated", value: this.sessionMsg(s) } });
   }
 
-  /** Session → disconnected. Its terminal is killed (if running) and removed first. */
-  disconnectSession(id: string, reason: string, code: number): void {
+  /**
+   * Session → disconnected. Its terminal is killed (if running) and removed first. Like the
+   * daemon, the status it had is kept, except busy, which becomes ERROR "interrupted".
+   * `status`, when given, is the status it had at that moment (tests use it: s-1 flips
+   * busy/idle on a timer).
+   */
+  disconnectSession(id: string, reason: string, code: number, status?: SessionStatus): void {
     const s = this.session(id);
     const t = s.terminalId ? this.terms.get(s.terminalId) : undefined;
+    if (status !== undefined) this.setStatus(s, status);
+    if (s.status === SessionStatus.BUSY) this.setStatus(s, SessionStatus.ERROR, "interrupted");
     // terminal_id clears in the same update that sets DISCONNECTED (the contract 2a keeps).
     s.terminalId = "";
     s.state = SessionState.DISCONNECTED;
-    s.status = SessionStatus.IDLE;
     s.disconnectReason = reason;
     s.exitCode = code;
     s.settleIn = 0;
@@ -710,12 +775,22 @@ export class World {
     return true;
   }
 
-  setSessionStatus(id: string, status: SessionStatus): void {
+  /** The detector's reading changed (reason defaults to a typical one for the status). */
+  setSessionStatus(id: string, status: SessionStatus, reason?: string): void {
     const s = this.session(id);
     if (s.state === SessionState.DISCONNECTED) throw new CommandError("unavailable", "session is disconnected");
-    s.status = status;
+    if (status === SessionStatus.ERROR) throw new CommandError("invalid", "error is set only by a disconnect while busy");
+    this.setStatus(s, status, reason);
     s.lastActivityAt = new Date();
     this.publishSession(s);
+  }
+
+  /** Sets status and reason, stamping statusChangedAt when either changes (Session.setStatus). */
+  private setStatus(s: MockSession, status: SessionStatus, reason: string = defaultReason(status)): void {
+    if (s.status === status && s.statusReason === reason) return;
+    s.status = status;
+    s.statusReason = reason;
+    s.statusChangedAt = new Date();
   }
 
   /** Emits FocusSession for an existing session. */
@@ -746,6 +821,8 @@ export class World {
     const t = this.sessionTerminal(s.id, s.worktreePath, s.model, true);
     s.terminalId = t.id;
     s.state = SessionState.STARTING;
+    // The fresh detector owns status again: the persisted one is cleared.
+    this.setStatus(s, SessionStatus.UNSPECIFIED);
     s.settleIn = 2;
     s.disconnectReason = "";
     s.exitCode = 0;
@@ -764,7 +841,7 @@ export class World {
       if (s.settleIn > 0 && --s.settleIn === 0) {
         if (s.state === SessionState.STARTING) {
           s.state = SessionState.CONNECTED;
-          s.status = SessionStatus.IDLE;
+          this.setStatus(s, SessionStatus.IDLE);
           this.publishSession(s);
         } else if (s.state === SessionState.CLOSING) {
           this.disconnectSession(s.id, "closed", 0);
@@ -773,7 +850,7 @@ export class World {
       }
       // s-1 alternates busy/idle every 4s; attention sticks until input arrives.
       if (s.id === "s-1" && s.state === SessionState.CONNECTED && s.status !== SessionStatus.NEEDS_ATTENTION && this.seconds % 4 === 0) {
-        s.status = s.status === SessionStatus.BUSY ? SessionStatus.IDLE : SessionStatus.BUSY;
+        this.setStatus(s, s.status === SessionStatus.BUSY ? SessionStatus.IDLE : SessionStatus.BUSY);
         s.lastActivityAt = new Date();
         this.publishSession(s);
       }

@@ -96,11 +96,16 @@ type runner struct {
 	awaitFirstPrompt bool
 	atPromptSince    time.Time
 
-	closing    bool
-	closeStep  int
-	closeTimer *time.Timer
-	closeBy    time.Time
-	killed     bool
+	closing bool
+	// closeStatus/closeReason are the detector's reading when the close began: the
+	// close sequence's Escape interrupts a running turn, so the reading at exit no
+	// longer says it was busy (see finish).
+	closeStatus Status
+	closeReason string
+	closeStep   int
+	closeTimer  *time.Timer
+	closeBy     time.Time
+	killed      bool
 
 	status, pubStatus Status
 	reason, pubReason string
@@ -418,14 +423,19 @@ func (r *runner) checkStatus() {
 	}
 }
 
+// publishStatus publishes and persists the detector's answer. Persisting every change
+// (debounced, a handful per turn) is what lets a session that is waiting on the user
+// still say so after the daemon dies without a clean shutdown.
 func (r *runner) publishStatus() {
 	r.status, r.reason = r.det.Status()
 	if r.status == r.pubStatus && r.reason == r.pubReason {
 		return
 	}
 	r.pubStatus, r.pubReason, r.pubActivity = r.status, r.reason, r.activity
-	r.m.update(r.id, false, func(rec *record) {
-		rec.s.Status, rec.s.StatusReason, rec.s.LastActivityAt = r.status, r.reason, r.activity
+	now := r.m.opts.Now()
+	r.m.update(r.id, true, func(rec *record) {
+		rec.s.setStatus(r.status, r.reason, now)
+		rec.s.LastActivityAt = r.activity
 	})
 }
 
@@ -434,6 +444,7 @@ func (r *runner) beginClose() {
 		return
 	}
 	r.closing = true
+	r.closeStatus, r.closeReason = r.det.Status()
 	r.state = StateClosing
 	r.closeBy = time.Now().Add(r.m.opts.CloseTimeout)
 	r.m.update(r.id, true, func(rec *record) { rec.s.State = StateClosing })
@@ -489,7 +500,11 @@ func (r *runner) onExit(code int) {
 	})
 }
 
-// finish detaches the runner, applying the final state.
+// finish detaches the runner, applying the final state. Every disconnect of a live
+// process goes through here (exit, crash, close, daemon stop): the session keeps the
+// status it had at that moment, read fresh from the detector (the published one may
+// lag by the debounce), or as it was when a close began; disconnectedStatus turns busy
+// into interrupted.
 func (r *runner) finish(fn func(*Session)) {
 	r.finished = true
 	for _, t := range []*time.Timer{r.closeTimer, r.debounce, r.cdTimer} {
@@ -497,6 +512,12 @@ func (r *runner) finish(fn func(*Session)) {
 			t.Stop()
 		}
 	}
+	st, reason := r.det.Status()
+	if r.closing {
+		st, reason = r.closeStatus, r.closeReason
+	}
+	st, reason = disconnectedStatus(st, reason)
+	now := r.m.opts.Now()
 	r.m.detach(r, func(s *Session) {
 		fn(s)
 		// Under m.mu, which RunIn holds while it queues: nothing can be queued after.
@@ -505,7 +526,7 @@ func (r *runner) finish(fn func(*Session)) {
 			s.WorktreePath, s.RepoID = owed.path, owed.repoID
 		}
 		s.PendingWorktreePath = ""
-		s.Status, s.StatusReason = StatusUnknown, ""
+		s.setStatus(st, reason, now)
 		if r.activity.After(s.LastActivityAt) {
 			s.LastActivityAt = r.activity
 		}

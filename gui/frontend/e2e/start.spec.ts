@@ -9,7 +9,7 @@ const start = (page: Page) => page.getByTestId("start-page");
 
 /** A steady fleet: s-1 (which flips busy/idle) and the settling s-5/s-6 disconnected, s-2 waiting. */
 async function steadyFleet(): Promise<void> {
-  for (const id of ["s-1", "s-5", "s-6"]) await mockPost(`session/disconnect?id=${id}&reason=closed&code=0`);
+  for (const id of ["s-1", "s-5", "s-6"]) await mockPost(`session/disconnect?id=${id}&reason=closed&code=0&status=idle`);
 }
 
 test("onboarding: no projects shows the welcome and Add a project", async ({ page }) => {

@@ -14,6 +14,10 @@ const (
 	// StatusNeedsAttention: Claude waits on the user (permission prompt, question,
 	// dialog).
 	StatusNeedsAttention
+	// StatusError: the process ended while Claude was working (reason
+	// ReasonInterrupted). Never reported by a detector; set by the store on a
+	// disconnect (see disconnectedStatus).
+	StatusError
 )
 
 func (s Status) String() string {
@@ -24,6 +28,8 @@ func (s Status) String() string {
 		return "idle"
 	case StatusNeedsAttention:
 		return "needs attention"
+	case StatusError:
+		return "error"
 	default:
 		return "unknown"
 	}

@@ -24,6 +24,8 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     terminalId: `t-${id}`,
     state: "connected",
     status: "idle",
+    statusReason: "",
+    statusChangedAtMs: null,
     createdAtMs: 10,
     lastActivityAtMs: null,
     exitCode: 0,
@@ -82,13 +84,14 @@ describe("session reducers", () => {
     expect(next.byId.a?.linkedPullRequests.map((l) => l.number)).toEqual([5, 6]);
   });
 
-  it("attentionIds ignores disconnected sessions", () => {
+  it("attentionIds counts a disconnected session's persisted attention, not an interrupted one", () => {
     const d = replaceSessions(emptySessions, [
       session("a", { status: "attention" }),
-      session("b", { status: "attention", state: "disconnected", terminalId: "" }),
+      session("b", { status: "attention", statusReason: "question: Which color do you prefer?", state: "disconnected", terminalId: "" }),
       session("c"),
+      session("d", { status: "error", statusReason: "interrupted", state: "disconnected", terminalId: "" }),
     ]);
-    expect(attentionIds(d)).toEqual(["a"]);
+    expect(attentionIds(d)).toEqual(["a", "b"]);
   });
 
   it("start page counts and thread list: waiting first, then running; disconnected never", () => {
@@ -191,7 +194,12 @@ describe("session presentation", () => {
     [{ state: "connected", status: "attention" }, "attention"],
     [{ state: "starting", status: "attention" }, "starting"],
     [{ state: "closing", status: "busy" }, "closing"],
-    [{ state: "disconnected", status: "attention" }, "disconnected"],
+    [{ state: "disconnected", status: "attention" }, "attention"],
+    [{ state: "disconnected", status: "error" }, "error"],
+    [{ state: "disconnected", status: "idle" }, "disconnected"],
+    [{ state: "disconnected", status: "unknown" }, "disconnected"],
+    [{ state: "disconnected", status: "busy" }, "disconnected"],
+    [{ state: "closing", status: "attention" }, "closing"],
     [{ state: "connected", status: "unknown" }, "unknown"],
   ] as const)("badge %#", (s, want) => {
     expect(sessionBadge(s)).toBe(want);

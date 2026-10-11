@@ -17,8 +17,13 @@
  *        mock/create.ts (publishing private to octo-org, or a repository named "taken", fails like gh)
  *   GET  /__mock/projects/calls                   ("create <name>", "publish <id> <o/n> <visibility>", "delete <id>")
  *   POST /__mock/session/attention?id=s-1
- *   POST /__mock/session/status?id=s-1&status=busy|idle|attention
- *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139
+ *   POST /__mock/session/status?id=s-1&status=busy|idle|attention[&reason=question: Which color?]
+ *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139[&status=busy|idle|attention]
+ *        (status: what it was doing at that moment; busy ends as ERROR "interrupted", other
+ *        statuses persist, like the daemon)
+ *   POST /__mock/status-kinds                     (one thread per status kind: approval, question,
+ *        plan, finished, Claude error, busy, idle, interrupted, and a disconnected one still asking
+ *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
  *   POST /__mock/link-pr?session=s-1&slug=owner/name&number=12[&ago=<ms>]   (Claude linked a pull
  *                                                 request ago ms ago; deduplicated by URL like the daemon)
@@ -93,6 +98,13 @@ type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
 const port = Number(process.env.MOCK_PORT ?? 7788);
 const token = process.env.MOCK_TOKEN ?? "dev-mock-token";
 const world = new World();
+
+/** MOCK_SCENARIO=status-kinds: the status-kinds threads (World.addStatusKinds) in the world from the start and after every reset. */
+function seedScenario(): void {
+  if (process.env.MOCK_SCENARIO === "status-kinds") world.addStatusKinds();
+}
+seedScenario();
+
 /** False simulates a pre-Phase-2a daemon (see POST /__mock/sessions-service). */
 let sessionsEnabled = true;
 /** "Service/Method" paths that 404 like a daemon built before they existed. */
@@ -436,6 +448,8 @@ function sessionSummary(id: string): Record<string, unknown> {
     name: s.name,
     state: SessionState[s.state],
     status: SessionStatus[s.status],
+    statusReason: s.statusReason,
+    statusChangedAt: s.statusChangedAt.toISOString(),
     terminalId: s.terminalId,
     repoId: s.repoId,
     worktreePath: s.worktreePath,
@@ -454,17 +468,21 @@ function sessionControl(res: ServerResponse, action: string, q: URLSearchParams)
   try {
     switch (action) {
       case "attention":
-        world.setSessionStatus(id, SessionStatus.NEEDS_ATTENTION);
+        world.setSessionStatus(id, SessionStatus.NEEDS_ATTENTION, q.get("reason") ?? undefined);
         break;
       case "status": {
         const status = statusNames[q.get("status") ?? ""];
         if (status === undefined) throw new CommandError("invalid", "status must be busy, idle or attention");
-        world.setSessionStatus(id, status);
+        world.setSessionStatus(id, status, q.get("reason") ?? undefined);
         break;
       }
-      case "disconnect":
-        world.disconnectSession(id, q.get("reason") ?? "crashed", Number(q.get("code") ?? 1));
+      case "disconnect": {
+        const at = q.get("status");
+        const status = at === null ? undefined : statusNames[at];
+        if (at !== null && status === undefined) throw new CommandError("invalid", "status must be busy, idle or attention");
+        world.disconnectSession(id, q.get("reason") ?? "crashed", Number(q.get("code") ?? 1), status);
         break;
+      }
       case "focus":
         json(res, 200, { delivered: world.focusSession(id) });
         return;
@@ -545,6 +563,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       } catch (err) {
         json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
       }
+      break;
+    case "POST /__mock/status-kinds":
+      json(res, 200, world.addStatusKinds());
       break;
     case "POST /__mock/empty":
       world.empty();
@@ -646,6 +667,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       sessionsEnabled = true;
       missingRpcs.clear();
       world.reset();
+      seedScenario();
       resetClones();
       resetProjects();
       json(res, 200, { ok: true });
