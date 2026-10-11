@@ -245,6 +245,9 @@ func (x *FileIndex) candidates(ctx context.Context, dir string, git bool) (cache
 	if truncated {
 		x.log.Info("file search candidates capped", "dir", dir, "entries", len(files))
 	}
+	// Stamp the entry when the listing is done: one slower than the TTL (a huge repo)
+	// would otherwise be cached already expired and re-run on every keystroke.
+	now = x.now()
 	c = cachedFiles{key: key, files: files, paths: make([]string, len(files)), created: now}
 	for i, f := range files {
 		c.paths[i] = f.Path

@@ -2,10 +2,12 @@ package fsx
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 )
@@ -227,5 +229,73 @@ func TestFileIndexCache(t *testing.T) {
 	now = now.Add(FileCacheTTL)
 	if got := search(); !slices.Equal(got, []string{"new.go"}) {
 		t.Fatalf("after the TTL: %q", got)
+	}
+}
+
+// The TTL counts from the end of the listing, so a listing slower than the TTL is
+// still reused by the next keystroke.
+func TestFileIndexCacheSlowListing(t *testing.T) {
+	dir := gitRepo(t)
+	start := time.Unix(1000, 0)
+	var calls int
+	x := NewFileIndex(nil)
+	x.now = func() time.Time {
+		calls++
+		switch calls {
+		case 1: // the first search starts
+			return start
+		case 2: // its listing ends after the TTL
+			return start.Add(FileCacheTTL + time.Second)
+		default: // the next search, one second later
+			return start.Add(FileCacheTTL + 2*time.Second)
+		}
+	}
+	if _, _, err := x.Search(context.Background(), dir, true, "new.go", 0); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(dir, "new.go"), "package x\n")
+	got, _, err := x.Search(context.Background(), dir, true, "new.go", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("the second search listed again (%q): the first listing was cached already expired", paths(got))
+	}
+}
+
+// Each checkout has its own entry, and concurrent searches over two checkouts (hits
+// and misses) are safe and never serve one checkout's list for the other. Run with
+// -race.
+func TestFileIndexConcurrentCheckouts(t *testing.T) {
+	a, b := gitRepo(t), realTemp(t)
+	write(t, filepath.Join(b, "only-in-b.txt"), "x")
+	x := NewFileIndex(nil)
+	var wg sync.WaitGroup
+	errs := make(chan error, 128)
+	for i := range 64 {
+		wg.Go(func() {
+			dir, git, query, want := a, true, "index", "src/index.ts"
+			if i%2 == 1 {
+				dir, git, query, want = b, false, "only", "only-in-b.txt"
+			}
+			got, _, err := x.Search(context.Background(), dir, git, query, 0)
+			if err != nil {
+				errs <- err
+				return
+			}
+			if g := paths(got); !slices.Equal(g, []string{want}) {
+				errs <- fmt.Errorf("Search(%s, %q) = %q, want [%q]", dir, query, g, want)
+			}
+			if i%2 == 0 { // b's file never shows up in a
+				if other, _, _ := x.Search(context.Background(), dir, git, "only-in-b", 0); len(other) != 0 {
+					errs <- fmt.Errorf("checkout a returned b's file: %q", paths(other))
+				}
+			}
+		})
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Error(err)
 	}
 }
