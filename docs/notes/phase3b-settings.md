@@ -88,7 +88,7 @@ Status: done on this branch.
 
 | Key | Type | Default | Applied |
 |---|---|---|---|
-| `sessions.default_model` | enum `fable, opus, sonnet, haiku` | `opus` (was `""`, Claude's, until the new-thread step) | live: session.new's `model` default |
+| `sessions.default_model` | enum from `internal/model` with labels (`model-registry.md`); was `fable, opus, sonnet, haiku` | `opus` (was `""`, Claude's, until the new-thread step) | live: session.new's `model` default |
 | `sessions.default_effort` | enum `low … max` | `high` (was `""` until the new-thread step) | live: session.new's `effort` default |
 | `sessions.auto_name` | bool | true | live (Namer wrapper) |
 | `sessions.close_grace_seconds` | int 1–120 | 10 | **restart** (session `CloseTimeout`) |
