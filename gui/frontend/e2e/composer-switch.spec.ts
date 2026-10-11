@@ -203,6 +203,8 @@ test("switching away drops the old project's skill tags after a confirm; the res
   const SK = "[/deploy](cf-skill://repo-sk/deploy)";
   const USER = "[/commit](cf-skill://~/commit)";
   await expect(prompt(page)).toHaveAttribute("data-value", `${CF} ${SK} ${USER} `);
+  // The caret at the start of the line: a cancelled switch leaves it there.
+  await page.keyboard.press("Meta+ArrowLeft");
 
   const dialog = page.getByTestId("confirm-dialog");
   await trigger(page).click();
@@ -214,6 +216,9 @@ test("switching away drops the old project's skill tags after a confirm; the res
   await expect(heading(page)).toHaveText("What should we build in code-foundry?");
   await expect(prompt(page)).toHaveAttribute("data-value", `${CF} ${SK} ${USER} `);
   await expect(chips(page)).toHaveCount(2);
+  await expect(page.getByTestId("composer-input")).toBeFocused();
+  await page.keyboard.type("go ");
+  await expect(prompt(page)).toHaveAttribute("data-value", `go ${CF} ${SK} ${USER} `);
 
   await trigger(page).click();
   await page.keyboard.type("ghostty");
@@ -221,7 +226,7 @@ test("switching away drops the old project's skill tags after a confirm; the res
   await page.getByTestId("confirm-ok").click();
   await expect(heading(page)).toHaveText("What should we build in ghostty-playground?");
   // sketches stays an Also in project, so its tag stays; the user's skill always does.
-  await expect(prompt(page)).toHaveAttribute("data-value", `${SK} ${USER}`);
+  await expect(prompt(page)).toHaveAttribute("data-value", `go ${SK} ${USER}`);
   await expect(page.getByTestId("prompt-tag")).toHaveText(["/deploy", "/commit"]);
   await expect(chips(page)).toHaveCount(2);
 });
