@@ -2,12 +2,14 @@ package fsx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -260,6 +262,103 @@ func TestFileIndexCacheSlowListing(t *testing.T) {
 	}
 	if len(got) != 0 {
 		t.Fatalf("the second search listed again (%q): the first listing was cached already expired", paths(got))
+	}
+}
+
+// A cancelled search returns at once while its listing goes on and fills the cache; a
+// later search gets that listing's result without listing again.
+func TestFileIndexListingOutlivesCancelledSearch(t *testing.T) {
+	x := NewFileIndex(nil)
+	var listings atomic.Int32
+	started, release := make(chan struct{}), make(chan struct{})
+	var listCtxErr error // set before the listing returns, read after a search sees it
+	x.list = func(ctx context.Context, _ string, _ bool) ([]FileEntry, error) {
+		listings.Add(1)
+		close(started)
+		<-release
+		listCtxErr = ctx.Err()
+		return []FileEntry{{Path: "a.go"}}, nil
+	}
+	search := func(ctx context.Context) ([]string, error) {
+		got, _, err := x.Search(ctx, "/w", true, "a", 0)
+		return paths(got), err
+	}
+
+	ctx1, cancel1 := context.WithCancel(context.Background())
+	first := make(chan error, 1)
+	go func() {
+		_, err := search(ctx1)
+		first <- err
+	}()
+	<-started
+	cancel1()
+	select {
+	case err := <-first:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("cancelled search: err = %v, want context.Canceled", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the cancelled search waited for the listing")
+	}
+
+	// The second search starts while the listing is (most likely) still running and
+	// waits for it; either way it must not list again.
+	second := make(chan []string, 1)
+	go func() {
+		got, err := search(context.Background())
+		if err != nil {
+			t.Error(err)
+		}
+		second <- got
+	}()
+	close(release)
+	if got := <-second; !slices.Equal(got, []string{"a.go"}) {
+		t.Fatalf("second search = %q, want [a.go]", got)
+	}
+	if listCtxErr != nil {
+		t.Fatalf("the listing's context ended with its first caller: %v", listCtxErr)
+	}
+	if got, err := search(context.Background()); err != nil || !slices.Equal(got, []string{"a.go"}) {
+		t.Fatalf("cached search = %q, %v", got, err)
+	}
+	if n := listings.Load(); n != 1 {
+		t.Fatalf("listed %d times, want 1", n)
+	}
+}
+
+// Concurrent misses for one checkout share a single listing.
+func TestFileIndexConcurrentMissesShareOneListing(t *testing.T) {
+	x := NewFileIndex(nil)
+	var listings atomic.Int32
+	release := make(chan struct{})
+	x.list = func(context.Context, string, bool) ([]FileEntry, error) {
+		listings.Add(1)
+		<-release
+		return []FileEntry{{Path: "a.go"}}, nil
+	}
+	var wg sync.WaitGroup
+	for range 16 {
+		wg.Go(func() {
+			if got, _, err := x.Search(context.Background(), "/w", true, "", 0); err != nil || len(got) != 1 {
+				t.Errorf("Search = %v, %v", got, err)
+			}
+		})
+	}
+	// Let every search reach the wait before the listing ends.
+	for {
+		x.mu.Lock()
+		l := x.inflight["true:/w"]
+		x.mu.Unlock()
+		if l != nil {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	time.Sleep(50 * time.Millisecond)
+	close(release)
+	wg.Wait()
+	if n := listings.Load(); n != 1 {
+		t.Fatalf("listed %d times, want 1", n)
 	}
 }
 

@@ -169,16 +169,26 @@ func WalkFiles(ctx context.Context, dir string, max int) (entries []FileEntry, t
 	return entries, truncated, nil
 }
 
+// listTimeout bounds one listing (git ls-files, then the walk if git fails). A listing
+// runs apart from the request that started it, so it finishes and fills the cache even
+// when that request is cancelled (the composer cancels the previous search on each
+// keystroke).
+const listTimeout = 30 * time.Second
+
 // FileIndex searches checkouts, caching each one's candidate list for TTL so typing
-// does not re-run git on every keystroke. Safe for concurrent use. The zero value is
-// not ready; use NewFileIndex.
+// does not re-run git on every keystroke. Concurrent misses for one checkout share a
+// single listing. Safe for concurrent use. The zero value is not ready; use
+// NewFileIndex.
 type FileIndex struct {
 	ttl time.Duration
 	now func() time.Time
 	log *slog.Logger
+	// list produces a checkout's candidates (listFiles; tests replace it).
+	list func(ctx context.Context, dir string, git bool) ([]FileEntry, error)
 
-	mu      sync.Mutex
-	entries map[string]cachedFiles
+	mu       sync.Mutex
+	entries  map[string]cachedFiles
+	inflight map[string]*listing
 }
 
 type cachedFiles struct {
@@ -188,18 +198,29 @@ type cachedFiles struct {
 	created time.Time
 }
 
+// listing is one in-flight listing of a checkout; c and err are set before done closes.
+type listing struct {
+	done chan struct{}
+	c    cachedFiles
+	err  error
+}
+
 // NewFileIndex returns an index with FileCacheTTL. A nil log discards.
 func NewFileIndex(log *slog.Logger) *FileIndex {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	return &FileIndex{ttl: FileCacheTTL, now: time.Now, log: log, entries: map[string]cachedFiles{}}
+	x := &FileIndex{ttl: FileCacheTTL, now: time.Now, log: log, entries: map[string]cachedFiles{}, inflight: map[string]*listing{}}
+	x.list = x.listFiles
+	return x
 }
 
 // Search fuzzy-matches query against the files and directories of the checkout dir
 // (absolute, symlinks resolved): git's view when git is true, else a bounded walk.
 // When git ls-files fails (say .git is broken) the walk is used. limit is clamped to
-// [1, MaxFileLimit] with zero meaning DefaultFileLimit.
+// [1, MaxFileLimit] with zero meaning DefaultFileLimit. When ctx ends first, Search
+// returns its error at once; the listing goes on (at most listTimeout) and fills the
+// cache for the next search.
 func (x *FileIndex) Search(ctx context.Context, dir string, git bool, query string, limit int) (matches []FileEntry, truncated bool, err error) {
 	if limit <= 0 {
 		limit = DefaultFileLimit
@@ -217,16 +238,71 @@ func (x *FileIndex) Search(ctx context.Context, dir string, git bool, query stri
 	return matches, truncated, nil
 }
 
+// candidates returns dir's cached list, else waits for the listing in flight for it,
+// starting one if there is none.
 func (x *FileIndex) candidates(ctx context.Context, dir string, git bool) (cachedFiles, error) {
 	key := fmt.Sprintf("%t:%s", git, dir)
 	now := x.now()
 	x.mu.Lock()
-	c, ok := x.entries[key]
-	x.mu.Unlock()
-	if ok && now.Sub(c.created) < x.ttl {
+	if c, ok := x.entries[key]; ok && now.Sub(c.created) < x.ttl {
+		x.mu.Unlock()
 		return c, nil
 	}
+	l, ok := x.inflight[key]
+	if !ok {
+		l = &listing{done: make(chan struct{})}
+		x.inflight[key] = l
+		go x.fill(context.WithoutCancel(ctx), key, dir, git, l)
+	}
+	x.mu.Unlock()
+	select {
+	case <-l.done:
+		return l.c, l.err
+	case <-ctx.Done():
+		return cachedFiles{}, ctx.Err()
+	}
+}
 
+// fill lists dir, caches the list under key on success, and finishes l.
+func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, l *listing) {
+	ctx, cancel := context.WithTimeout(ctx, listTimeout)
+	defer cancel()
+	files, err := x.list(ctx, dir, git)
+	var c cachedFiles
+	if err == nil {
+		// Stamp the entry when the listing is done: one slower than the TTL (a huge
+		// repo) would otherwise be cached already expired and re-run on every keystroke.
+		now := x.now()
+		c = cachedFiles{key: key, files: files, paths: make([]string, len(files)), created: now}
+		for i, f := range files {
+			c.paths[i] = f.Path
+		}
+	}
+
+	x.mu.Lock()
+	delete(x.inflight, key)
+	if err == nil {
+		for k, e := range x.entries { // drop expired entries; bound the rest
+			if c.created.Sub(e.created) >= x.ttl {
+				delete(x.entries, k)
+			}
+		}
+		if len(x.entries) >= maxCachedCheckouts {
+			oldest := slices.MinFunc(slices.Collect(maps.Values(x.entries)), func(a, b cachedFiles) int {
+				return a.created.Compare(b.created)
+			})
+			delete(x.entries, oldest.key)
+		}
+		x.entries[key] = c
+	}
+	x.mu.Unlock()
+	l.c, l.err = c, err
+	close(l.done)
+}
+
+// listFiles lists a checkout's candidates: git's view, else (no git, or git failed)
+// the walk.
+func (x *FileIndex) listFiles(ctx context.Context, dir string, git bool) ([]FileEntry, error) {
 	var files []FileEntry
 	var truncated bool
 	var err error
@@ -239,33 +315,11 @@ func (x *FileIndex) candidates(ctx context.Context, dir string, git bool) (cache
 	if !git || err != nil {
 		files, truncated, err = WalkFiles(ctx, dir, MaxWalkEntries)
 		if err != nil {
-			return cachedFiles{}, err
+			return nil, err
 		}
 	}
 	if truncated {
 		x.log.Info("file search candidates capped", "dir", dir, "entries", len(files))
 	}
-	// Stamp the entry when the listing is done: one slower than the TTL (a huge repo)
-	// would otherwise be cached already expired and re-run on every keystroke.
-	now = x.now()
-	c = cachedFiles{key: key, files: files, paths: make([]string, len(files)), created: now}
-	for i, f := range files {
-		c.paths[i] = f.Path
-	}
-
-	x.mu.Lock()
-	defer x.mu.Unlock()
-	for k, e := range x.entries { // drop expired entries; bound the rest
-		if now.Sub(e.created) >= x.ttl {
-			delete(x.entries, k)
-		}
-	}
-	if len(x.entries) >= maxCachedCheckouts {
-		oldest := slices.MinFunc(slices.Collect(maps.Values(x.entries)), func(a, b cachedFiles) int {
-			return a.created.Compare(b.created)
-		})
-		delete(x.entries, oldest.key)
-	}
-	x.entries[key] = c
-	return c, nil
+	return files, nil
 }

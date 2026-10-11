@@ -103,7 +103,13 @@ func (h *Filesystem) SearchFiles(ctx context.Context, req *connect.Request[v1.Se
 		return nil, err
 	}
 	matches, truncated, err := h.files.Search(ctx, dir, git, req.Msg.GetQuery(), int(req.Msg.GetLimit()))
-	if err != nil {
+	switch {
+	case err == nil:
+	case errors.Is(err, context.Canceled): // the client gave up; the listing goes on
+		return nil, connect.NewError(connect.CodeCanceled, err)
+	case errors.Is(err, context.DeadlineExceeded):
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, err)
+	default:
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	out := &v1.SearchFilesResponse{Truncated: truncated, Matches: make([]*v1.FileMatch, len(matches))}
