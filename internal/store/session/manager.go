@@ -258,7 +258,7 @@ func (m *Manager) rebuildLocked() {
 	m.snap.Store(&Snapshot{Sessions: out, RetiredUsage: m.retired})
 }
 
-// update applies fn to a record, rebuilds the snapshot, optionally persists, and
+// update applies fn to a record, optionally persists, rebuilds the snapshot, and
 // publishes Updated. Everything happens under m.mu so the snapshot, the database, and
 // the event order agree (bus.Publish never blocks).
 func (m *Manager) update(id string, persist bool, fn func(*record)) (Session, bool) {
@@ -273,13 +273,16 @@ func (m *Manager) update(id string, persist bool, fn func(*record)) (Session, bo
 	return rec.s, true
 }
 
+// commitLocked persists (when asked) before it swaps in the snapshot: Snapshot is read
+// without m.mu, so saving second would let a reader see a change the database does not
+// have yet, and a crash in that window would lose a status the GUI already showed.
 func (m *Manager) commitLocked(rec *record, persist bool) {
-	m.rebuildLocked()
 	if persist {
 		if err := saveSession(context.Background(), m.opts.DB, rec.s); err != nil {
 			m.log.Error("persist session", "session", rec.s.ID, "err", err)
 		}
 	}
+	m.rebuildLocked()
 	bus.Publish[Event](m.opts.Bus, Updated{Session: rec.s})
 }
 
