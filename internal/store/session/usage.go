@@ -59,8 +59,10 @@ func compareBuckets(a, b UsageBucket) int {
 		cmp.Compare(a.Tier, b.Tier), cmp.Compare(a.Speed, b.Speed))
 }
 
-// sumBuckets merges buckets with the same key, sorted. Nil for none.
-func sumBuckets(lists ...[]UsageBucket) []UsageBucket {
+// SumUsage adds up buckets with the same (Model, Tier, Speed, Day) across lists and
+// returns them sorted by (Day, Model, Tier, Speed): a new slice, nil for none. The
+// inputs are not modified.
+func SumUsage(lists ...[]UsageBucket) []UsageBucket {
 	m := map[usageKey]*UsageBucket{}
 	for _, l := range lists {
 		for _, b := range l {
@@ -113,7 +115,7 @@ type usageRecord struct {
 
 // usageFold accumulates usage records of one transcript. The zero value is ready. A
 // fold is per file (the parent transcript now; one per subagent run later), so
-// several can be summed with sumBuckets.
+// several can be summed with SumUsage.
 type usageFold struct {
 	// session, when set, is the Claude session id of the transcript being folded.
 	// Records naming another session are skipped: a forked transcript starts with a

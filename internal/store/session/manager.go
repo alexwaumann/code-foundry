@@ -676,7 +676,7 @@ func (m *Manager) Remove(ctx context.Context, id string) error {
 	}
 	delete(m.recs, id)
 	if len(rec.s.Usage) > 0 {
-		m.retired = sumBuckets(m.retired, rec.s.Usage)
+		m.retired = SumUsage(m.retired, rec.s.Usage)
 	}
 	m.rebuildLocked()
 	bus.Publish[Event](m.opts.Bus, Removed{ID: id})

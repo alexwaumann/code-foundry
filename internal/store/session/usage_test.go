@@ -194,20 +194,20 @@ func TestSumBuckets(t *testing.T) {
 		{Model: "m", Day: "2026-10-08", Requests: 1},
 		{Model: "m", Tier: "long", Day: "2026-10-09", Requests: 1},
 	}
-	got := sumBuckets(a, b)
+	got := SumUsage(a, b)
 	want := []UsageBucket{
 		{Model: "m", Day: "2026-10-08", Requests: 1},
 		{Model: "m", Day: "2026-10-09", Requests: 3, Input: 11, Output: 22, CacheRead: 33, CacheWrite5m: 44, CacheWrite1h: 55},
 		{Model: "m", Tier: "long", Day: "2026-10-09", Requests: 1},
 	}
 	if !slices.Equal(got, want) {
-		t.Errorf("sumBuckets = %+v", got)
+		t.Errorf("SumUsage = %+v", got)
 	}
 	if a[0].Requests != 1 || b[0].Requests != 2 {
-		t.Error("sumBuckets wrote into its inputs")
+		t.Error("SumUsage wrote into its inputs")
 	}
-	if sumBuckets() != nil {
-		t.Error("sumBuckets() != nil")
+	if SumUsage() != nil {
+		t.Error("SumUsage() != nil")
 	}
 }
 
