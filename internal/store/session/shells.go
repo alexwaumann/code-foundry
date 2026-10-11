@@ -1,0 +1,24 @@
+package session
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/alexwaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/terminal/termlabel"
+)
+
+// removeShells kills and removes every shell terminal.new started for thread id (see
+// termlabel). Closing a thread leaves them running; removing it takes them along.
+func (m *Manager) removeShells(ctx context.Context, id string) error {
+	n, err := terminal.KillAndRemoveWhere(ctx, m.opts.Terminals, func(t terminal.Terminal) bool {
+		return termlabel.IsShell(t.Labels) && t.Labels[termlabel.Session] == id
+	})
+	if err != nil {
+		return fmt.Errorf("session %s: remove its shells: %w", id, err)
+	}
+	if n > 0 {
+		m.log.Info("removed the thread's shells", "session", id, "count", n)
+	}
+	return nil
+}

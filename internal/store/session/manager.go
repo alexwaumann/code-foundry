@@ -17,6 +17,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/terminal/termlabel"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
@@ -583,7 +584,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 		Env:      env,
 		Cols:     m.opts.Cols,
 		Rows:     m.opts.Rows,
-		Labels:   map[string]string{"session": id, "worktree": s.WorktreePath},
+		Labels:   map[string]string{termlabel.Session: id, termlabel.Worktree: s.WorktreePath},
 		Observer: r.observe,
 	})
 	if err != nil {
@@ -669,9 +670,13 @@ func (m *Manager) Close(ctx context.Context, id string) error {
 	}
 }
 
-// Remove closes the session if needed, then forgets it.
+// Remove closes the session if needed, kills and removes the shells that belong to it
+// (terminals labelled termlabel.KindShell with its id), then forgets it.
 func (m *Manager) Remove(ctx context.Context, id string) error {
 	if err := m.Close(ctx, id); err != nil {
+		return err
+	}
+	if err := m.removeShells(ctx, id); err != nil {
 		return err
 	}
 	m.mu.Lock()
