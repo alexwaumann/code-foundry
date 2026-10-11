@@ -1,0 +1,278 @@
+<!doctype html>
+<html class="dark">
+<head>
+<meta charset="utf-8">
+<title>Session usage sketch</title>
+<style>
+:root{
+  --sheet:oklch(0.955 0 0);--pane:#fff;--pane-border:oklch(0 0 0/8%);
+  --fg:oklch(0.145 0 0);--muted:oklch(0.97 0 0);--muted-fg:oklch(0.556 0 0);
+  --border:oklch(0.922 0 0);--card:#fff;--row:oklch(0 0 0/3%);
+  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:oklch(0.65 0 0);
+  --grid:oklch(0 0 0/8%);
+}
+.dark{
+  --sheet:#000;--pane:#060606;--pane-border:oklch(1 0 0/11%);
+  --fg:oklch(0.985 0 0);--muted:oklch(0.269 0 0);--muted-fg:oklch(0.708 0 0);
+  --border:oklch(1 0 0/10%);--card:#060606;--row:oklch(1 0 0/3%);
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:oklch(0.6 0 0);
+  --grid:oklch(1 0 0/8%);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;font-size:13px;color:var(--fg);background:var(--sheet);-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+.num{font-variant-numeric:tabular-nums}
+.app{display:flex;height:100vh}
+.sidebar{width:240px;padding:44px 8px 8px;display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--muted-fg)}
+.sidebar .row{padding:5px 8px;border-radius:6px;display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sidebar .row.sel{background:var(--muted);color:var(--fg)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted-fg);flex:none}
+.dot.busy{background:oklch(0.75 0.15 240)}
+.dot.off{background:transparent;border:1.5px solid var(--muted-fg)}
+.pane{margin:8px;flex:1;min-width:0;border-radius:8px;border:1px solid var(--pane-border);background:var(--pane);position:relative;overflow:hidden;display:flex;flex-direction:column}
+.pane.side{flex:none;width:420px;margin-left:0}
+.pane.term{background:#0a0a0a}
+.hdr{height:40px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;flex:none}
+.hdr .tabs{display:flex;gap:2px;margin-left:-6px}
+.hdr .tab{padding:4px 8px;border-radius:6px;color:var(--muted-fg);font-weight:500}
+.hdr .tab.on{background:var(--muted);color:var(--fg)}
+.hdr .sp{flex:1}
+.hdr .ic{width:16px;height:16px;color:var(--muted-fg)}
+.scroll{flex:1;min-height:0;overflow:auto}
+.content{padding:28px 32px 40px;max-width:1040px;margin:0 auto;width:100%}
+.panel-body{padding:20px 16px 32px}
+.muted{color:var(--muted-fg)}
+.hero{font-size:44px;font-weight:600;letter-spacing:-.02em;line-height:1}
+.hero-sub{margin-top:8px;color:var(--muted-fg);font-size:13px}
+.hero-sub b{color:var(--fg);font-weight:500}
+.tiles{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:28px}
+.tile{background:var(--card);padding:12px 14px}
+.tile .k{color:var(--muted-fg);font-size:11px}
+.tile .v{font-size:17px;font-weight:600;margin-top:4px;letter-spacing:-.01em}
+.tile .d{font-size:11px;color:var(--muted-fg);margin-top:2px}
+h2{margin:32px 0 10px;font-size:13px;font-weight:600}
+h2 .meta{font-weight:400;color:var(--muted-fg);margin-left:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-weight:500;color:var(--muted-fg);font-size:11px;padding:6px 8px;border-bottom:1px solid var(--border)}
+td{padding:8px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:0}
+th.r,td.r{text-align:right}
+td.r{font-variant-numeric:tabular-nums}
+.sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:8px;vertical-align:1px}
+.bar{position:relative;height:4px;border-radius:2px;background:var(--muted);overflow:hidden;margin-top:6px}
+.bar i{position:absolute;inset:0;right:auto;border-radius:2px}
+.mix{display:inline-flex;height:6px;width:72px;border-radius:2px;overflow:hidden;gap:1px;vertical-align:middle}
+.mix i{display:block;height:100%}
+.chart{position:relative;margin-top:4px}
+.chart svg{display:block;width:100%;height:220px;overflow:visible}
+.chart .grid line{stroke:var(--grid);stroke-width:1}
+.chart text{fill:var(--muted-fg);font-size:11px;font-family:inherit}
+.legend{display:flex;gap:14px;font-size:11px;color:var(--muted-fg);margin-top:10px}
+.legend span{display:inline-flex;align-items:center}
+.tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:11px;box-shadow:0 4px 16px rgba(0,0,0,.35);min-width:160px;display:none}
+.tip .t{color:var(--muted-fg);margin-bottom:4px}
+.tip div.l{display:flex;justify-content:space-between;gap:16px;line-height:1.6}
+.tip .tot{border-top:1px solid var(--border);margin-top:4px;padding-top:4px;font-weight:600}
+.note{font-size:11px;color:var(--muted-fg);margin-top:8px}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;padding:2px;gap:2px;font-size:11px;font-weight:500}
+.seg span{padding:2px 8px;border-radius:4px;color:var(--muted-fg);cursor:pointer}
+.seg span.on{background:var(--muted);color:var(--fg)}
+.h2row{display:flex;align-items:center;justify-content:space-between;margin:32px 0 10px}
+.h2row h2{margin:0}
+.strip{display:flex;gap:32px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+.strip>div .k{color:var(--muted-fg);font-size:11px}
+.strip>div .v{font-size:14px;font-weight:500;margin-top:3px;font-variant-numeric:tabular-nums}
+.tag{display:inline-block;font-size:10px;padding:1px 5px;border:1px solid var(--border);border-radius:4px;color:var(--muted-fg);margin-left:6px;vertical-align:1px}
+/* side panel specifics */
+.prow{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.prow:last-child{border-bottom:0}
+.prow .name{flex:1;min-width:0}
+.prow .name small{display:block;color:var(--muted-fg);font-size:11px;margin-top:2px}
+.prow .c{text-align:right;font-variant-numeric:tabular-nums}
+.prow .c small{display:block;color:var(--muted-fg);font-size:11px;margin-top:2px}
+.kv{display:grid;grid-template-columns:1fr auto auto;gap:6px 16px;font-size:12px;margin-top:8px}
+.kv .h{color:var(--muted-fg);font-size:11px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.kv .r{text-align:right;font-variant-numeric:tabular-nums}
+.kv .r.muted{color:var(--muted-fg)}
+.subh{font-size:12px;font-weight:600;margin:26px 0 4px}
+.subh .meta{font-weight:400;color:var(--muted-fg);margin-left:6px}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script>
+const q = new URLSearchParams(location.search);
+const view = q.get('view') || 'all';
+if (q.get('light')) document.documentElement.classList.remove('dark');
+
+const MODELS = [
+  {id:'claude-opus-5-5',  name:'claude-opus-5-5',  c:'var(--s1)'},
+  {id:'claude-fable-5-1', name:'claude-fable-5-1', c:'var(--s2)'},
+  {id:'claude-sonnet-5-5',name:'claude-sonnet-5-5',c:'var(--s3)'},
+  {id:'claude-haiku-5-5', name:'claude-haiku-5-5', c:'var(--s4)'},
+];
+const fmtTok = n => n>=1e9? (n/1e9).toFixed(2)+'B' : n>=1e6? (n/1e6).toFixed(n>=1e8?0:2)+'M' : n>=1e3? (n/1e3).toFixed(n>=1e5?0:1)+'K' : String(n);
+const fmtUsd = n => '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct = (a,b) => b? (a/b*100<0.1?'<0.1%':(a/b*100).toFixed(1)+'%') : '—';
+
+// ---------- sample data: code-foundry threads only ----------
+const DAYS = ['Sep 27','Sep 28','Sep 29','Sep 30','Oct 1','Oct 2','Oct 3','Oct 4','Oct 5','Oct 6','Oct 7','Oct 8','Oct 9','Oct 10'];
+const daily = [ // tokens per model per day (M)
+  [12,4,0,0],[58,19,0.2,0],[71,22,0,0],[40,9,0,0],[0,0,0,0],[95,31,0.1,0.1],[132,48,0.3,0.2],
+  [118,37,0.2,0],[160,52,0.1,0.3],[210,71,0.2,0.1],[188,64,0.1,0.2],[141,55,0,0.1],[126,49,0.2,0.1],[88,37,0.1,0.1],
+].map(r=>r.map(v=>v*1e6));
+const perModel = [
+  {m:0, cost:412.18, tok:1.44e9, input:61.2e3, output:4.1e6, read:1.39e9, w5:8.1e6, w1:41.3e6},
+  {m:1, cost:198.40, tok:0.50e9, input:19.9e3, output:1.3e6, read:0.48e9, w5:2.2e6, w1:14.6e6},
+  {m:2, cost:1.68,   tok:1.12e6, input:2.1e3,  output:61e3,  read:0.92e6, w5:12e3,  w1:131e3},
+  {m:3, cost:0.10,   tok:3.42e6, input:1.8e3,  output:120e3, read:3.1e6,  w5:0,     w1:200e3},
+];
+const totalCost = perModel.reduce((a,b)=>a+b.cost,0);
+const totalTok  = perModel.reduce((a,b)=>a+b.tok,0);
+const threads = [
+  {n:'side panel tabs', mix:[.72,.28,0,0], cost:141.20, tok:362e6, last:'2h ago', st:'busy'},
+  {n:'cf/gh-polling', mix:[.9,.1,0,0], cost:96.44, tok:251e6, last:'yesterday', st:'idle'},
+  {n:'cf/disconnected-page', mix:[.55,.45,0,0], cost:88.02, tok:214e6, last:'Oct 8', st:'off'},
+  {n:'thread list rows', mix:[.8,.2,0,0], cost:71.30, tok:190e6, last:'Oct 7', st:'off'},
+  {n:'update dialog', mix:[.6,.38,.02,0], cost:64.11, tok:168e6, last:'Oct 6', st:'busy'},
+  {n:'add project dialog', mix:[.85,.15,0,0], cost:52.90, tok:140e6, last:'Oct 5', st:'off'},
+  {n:'composer tags', mix:[.3,.7,0,0], cost:44.70, tok:97e6, last:'Oct 4', st:'off'},
+  {n:'bare-binary distribution', mix:[.95,.05,0,0], cost:28.01, tok:75e6, last:'Oct 2', st:'off'},
+];
+
+const sidebar = (sel) => `<div class="sidebar">
+  <div class="row" style="font-weight:600;color:var(--fg)">code-foundry</div>
+  <div class="row ${sel==='side panel tabs'?'sel':''}"><span class="dot busy"></span>side panel tabs</div>
+  <div class="row"><span class="dot"></span>cf/gh-polling</div>
+  <div class="row"><span class="dot off"></span>cf/disconnected-page</div>
+  <div class="row"><span class="dot busy"></span>update dialog</div>
+  <div class="row" style="margin-top:8px;font-weight:600;color:var(--fg)">sketchbook</div>
+  <div class="row"><span class="dot"></span>cf/palette-colors</div>
+  <div style="flex:1"></div>
+  <div class="row ${sel==='usage'?'sel':''}">Usage</div>
+</div>`;
+
+const sw = i => `<span class="sw" style="background:${MODELS[i].c}"></span>`;
+
+// ---------- chart: stacked daily bars by model ----------
+const rate = perModel.map(r=>r.cost/r.tok); // $ per token, per model (mockup)
+const series = mode => mode==='cost' ? daily.map(r=>r.map((v,i)=>v*rate[i])) : daily;
+const fmt = mode => mode==='cost' ? fmtUsd : fmtTok;
+function chart(mode){
+  const W=960,H=220,L=64,R=8,T=8,B=24;
+  const data = series(mode), f = fmt(mode);
+  const tot = data.map(r=>r.reduce((a,b)=>a+b,0));
+  const max = Math.max(...tot), step = mode==='cost'? 25 : 100e6, top = Math.ceil(max/step)*step;
+  const y = v => T + (H-T-B) * (1 - v/top);
+  const n = DAYS.length, slot=(W-L-R)/n, bw=Math.min(28, slot*0.6);
+  let g='';
+  for (let v=0; v<=top; v+=step) g += `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/>
+    <text x="${L-8}" y="${y(v)+4}" text-anchor="end">${v? (mode==='cost'?'$'+v:fmtTok(v)):'0'}</text>`;
+  let bars='';
+  data.forEach((r,d)=>{
+    const x = L + slot*d + (slot-bw)/2; let acc=0;
+    r.forEach((v,i)=>{ if(!v) return;
+      const y0=y(acc+v), h=y(acc)-y0; acc+=v;
+      const last = acc===tot[d];
+      bars += `<rect x="${x}" y="${y0}" width="${bw}" height="${Math.max(h-2,0)}" fill="${MODELS[i].c}" ${last?'rx="3"':''}/>`;
+    });
+    bars += `<rect class="hit" data-d="${d}" x="${L+slot*d}" y="${T}" width="${slot}" height="${H-T-B}" fill="transparent"/>`;
+  });
+  const ax = DAYS.map((d,i)=> (i%3===0||i===n-1)? `<text x="${L+slot*i+slot/2}" y="${H-6}" text-anchor="middle">${d.toUpperCase()}</text>`:'').join('');
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}"><g class="grid">${g}</g>${bars}<g class="ax">${ax}</g></svg><div class="tip" id="tip"></div></div>
+  <div class="legend">${MODELS.map((m,i)=>`<span>${sw(i)}${m.name}</span>`).join('')}</div>`;
+}
+function wireTip(root){
+  const tip=root.querySelector('#tip'); const ch=root.querySelector('.chart');
+  root.querySelectorAll('.hit').forEach(h=>{
+    h.addEventListener('mousemove',e=>{
+      const mode=root.dataset.mode||'tokens', f=fmt(mode);
+      const d=+h.dataset.d, r=series(mode)[d], tot=r.reduce((a,b)=>a+b,0);
+      tip.innerHTML=`<div class="t">${DAYS[d]}</div>`+r.map((v,i)=>v?`<div class="l"><span>${sw(i)}${MODELS[i].name}</span><span class="num">${f(v)}</span></div>`:'').join('')+`<div class="l tot"><span>Total</span><span class="num">${f(tot)}</span></div>`;
+      const b=ch.getBoundingClientRect(); tip.style.display='block';
+      tip.style.left=Math.min(e.clientX-b.left+14, b.width-180)+'px'; tip.style.top=(e.clientY-b.top-10)+'px';
+    });
+    h.addEventListener('mouseleave',()=>tip.style.display='none');
+  });
+}
+
+// ---------- all-threads page ----------
+function allPage(mode){
+  const sum=k=>perModel.reduce((a,b)=>a+b[k],0);
+  return `<div class="pane">
+    <div class="hdr">Usage<span class="sp"></span><span class="muted" style="font-weight:400;font-size:12px">Code Foundry threads only</span><div class="seg" style="margin-left:14px"><span>1 day</span><span>7 days</span><span class="on">30 days</span><span>90 days</span></div><span style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--muted-fg);margin-left:6px;margin-right:-6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span></div>
+    <div class="scroll"><div class="content">
+      <div class="hero">${fmtUsd(totalCost)}</div>
+      <div class="hero-sub"><b>${fmtTok(totalTok)}</b> tokens · <b>2,214</b> requests · <b>8</b> threads</div>
+
+      <div class="h2row"><h2>Daily<span class="meta">by model</span></h2>
+        <div class="seg"><span class="${mode==='tokens'?'on':''}" data-mode="tokens">Tokens</span><span class="${mode==='cost'?'on':''}" data-mode="cost">Cost</span></div></div>
+      ${chart(mode)}
+
+      <h2>By model</h2>
+      <table>
+        <tr><th>Model</th><th class="r">Requests</th><th class="r">Tokens</th><th class="r">Cost</th><th class="r">Share</th></tr>
+        ${perModel.map((r,i)=>`<tr><td>${sw(r.m)}<span class="mono">${MODELS[r.m].name}</span></td><td class="r muted">${[1402,611,118,83][i].toLocaleString()}</td><td class="r">${fmtTok(r.tok)}</td><td class="r">${fmtUsd(r.cost)}</td><td class="r muted">${pct(r.cost,totalCost)}</td></tr>`).join('')}
+        <tr><td><span class="sw" style="background:var(--s5)"></span><span class="mono">claude-opus-5</span><span class="tag">unpriced</span></td><td class="r muted">14</td><td class="r">28.4M</td><td class="r muted">—</td><td class="r muted">—</td></tr>
+      </table>
+
+      <div class="strip">
+        <div><div class="k">Input</div><div class="v">${fmtTok(sum('input'))}</div></div>
+        <div><div class="k">Cache read</div><div class="v">${fmtTok(sum('read'))}</div></div>
+        <div><div class="k">Cache write · 5m</div><div class="v">${fmtTok(sum('w5'))}</div></div>
+        <div><div class="k">Cache write · 1h</div><div class="v">${fmtTok(sum('w1'))}</div></div>
+        <div><div class="k">Output</div><div class="v">${fmtTok(sum('output'))}</div></div>
+        <div style="margin-left:auto;text-align:right"><div class="k">Cache savings</div><div class="v">$6,912.40</div></div>
+      </div>
+    </div></div>
+  </div>`;
+}
+
+// ---------- one session: side panel surface ----------
+function sessionPanel(){
+  const s = {cost:141.20, tok:362e6, req:412, models:[
+    {m:0, cost:101.60, tok:261e6, req:290, input:9.8e3, output:0.72e6, read:252e6, w5:1.1e6, w1:7.4e6},
+    {m:1, cost:39.60,  tok:101e6, req:122, input:3.1e3, output:0.26e6, read:97e6,  w5:0.4e6, w1:3.3e6},
+  ]};
+  const sum = k => s.models.reduce((a,b)=>a+b[k],0);
+  const bc = {input:0.21, read:71.40, w5:4.62, w1:44.90, output:20.07};
+  return `<div class="pane term"><div class="hdr" style="border-bottom:0"><span class="muted" style="font-weight:400">side panel tabs</span><span class="sp"></span></div>
+    <div class="scroll mono" style="padding:16px;color:var(--muted-fg);font-size:12px;line-height:1.5">
+      ● Reading internal/store/session/runner.go<br>● Edit gui/frontend/src/components/panel/SidePanel.tsx<br><br><span style="color:var(--fg)">›</span> _
+    </div></div>
+  <div class="pane side">
+    <div class="hdr"><div class="tabs"><span class="tab">Pull request #37</span><span class="tab on">Usage</span></div><span class="sp"></span></div>
+    <div class="scroll"><div class="panel-body">
+      <div class="hero" style="font-size:32px">${fmtUsd(s.cost)}</div>
+      <div class="hero-sub"><b>${fmtTok(s.tok)}</b> tokens · <b>${s.req}</b> requests · 1 agent run</div>
+
+      <div class="subh">By model</div>
+      ${s.models.map(r=>`<div class="prow">${sw(r.m)}<div class="name"><span class="mono">${MODELS[r.m].name}</span><small>${fmtTok(r.tok)} tokens · ${r.req} requests</small></div>
+        <div class="c">${fmtUsd(r.cost)}<small>${pct(r.cost,s.cost)}</small></div></div>`).join('')}
+
+      <div class="subh">Tokens</div>
+      <div class="kv">
+        <div class="h">Bucket</div><div class="h r">Tokens</div><div class="h r">Cost</div>
+        <div>Input</div><div class="r">${fmtTok(sum('input'))}</div><div class="r muted">${fmtUsd(bc.input)}</div>
+        <div>Cache read</div><div class="r">${fmtTok(sum('read'))}</div><div class="r muted">${fmtUsd(bc.read)}</div>
+        <div>Cache write · 5m</div><div class="r">${fmtTok(sum('w5'))}</div><div class="r muted">${fmtUsd(bc.w5)}</div>
+        <div>Cache write · 1h</div><div class="r">${fmtTok(sum('w1'))}</div><div class="r muted">${fmtUsd(bc.w1)}</div>
+        <div>Output</div><div class="r">${fmtTok(sum('output'))}</div><div class="r muted">${fmtUsd(bc.output)}</div>
+      </div>
+    </div></div>
+  </div>`;
+}
+
+const app=document.getElementById('app');
+let mode = q.get('mode')||'tokens';
+function render(){
+  app.dataset.mode=mode;
+  app.innerHTML = view==='session' ? sidebar('side panel tabs')+sessionPanel() : sidebar('usage')+allPage(mode);
+  wireTip(app);
+  app.querySelectorAll('.seg span').forEach(el=>el.addEventListener('click',()=>{mode=el.dataset.mode;render();}));
+}
+render();
+</script>
+</body>
+</html>
