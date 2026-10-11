@@ -1941,6 +1941,11 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.expand" } } }))}`,
       },
       {
+        cmd: { name: "view.panel.new-tab", title: "New Side Panel Tab", category: "View", description: "Show the surface list in the side panel of the selected session, terminal, worktree, or page, to open another tab there.", keybindings: [], args: [] },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.new-tab" } } }))}`,
+      },
+      {
         cmd: {
           name: "view.panel.workspace",
           title: "Show Workspace in Side Panel",

@@ -8,7 +8,7 @@
 import { toast } from "sonner";
 import { create } from "zustand";
 import { linkedPrsTarget, openLinkedPrsSurface } from "./linkedPrsPanel";
-import { expandPanel, getPanel, togglePanel } from "./panel";
+import { expandPanel, getPanel, startPanelPicking, togglePanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
 import { openUsageSurface } from "./usagePanel";
 import { openWorkspaceSurface } from "./workspacePanel";
@@ -58,6 +58,10 @@ export function showView(name: string): boolean {
     case "panel.expand":
       // view.panel.expand: like panel.toggle, an action on the current selection's panel.
       expandPanelCommand();
+      return true;
+    case "panel.new-tab":
+      // view.panel.new-tab: the surface list in the current selection's panel (its "+").
+      newPanelTabCommand();
       return true;
     case "panel.workspace":
       // view.panel.workspace: the workspace surface in the current workspace thread's panel.
@@ -130,6 +134,24 @@ export function expandPanelCommand(): boolean {
   const expanded = expandPanel("current", getPanel().open ? undefined : true, { focus: fromContent && !inPalette });
   if (inPalette && expanded && fromContent) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
   return expanded;
+}
+
+/**
+ * view.panel.new-tab for the current selection (the "+" after the panel's tabs): shows
+ * its panel if hidden, with the surface list ("Open a surface") instead of the active
+ * tab (stores/panel.ts startPicking). No tab is added until a surface is picked; Escape
+ * goes back. A panel without tabs shows the list anyway, so it is only shown. A no-op
+ * while the settings or usage page is up and with nothing selected.
+ *
+ * Focus moves to the panel, like toggling it on, so Escape and the surface letters work
+ * at once; with the palette open, its return target moves there instead.
+ */
+export function newPanelTabCommand(): boolean {
+  if (pageOpen()) return false;
+  const inPalette = useUiStore.getState().palette.open;
+  if (!startPanelPicking("current", { focus: !inPalette })) return false;
+  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
+  return true;
 }
 
 /**

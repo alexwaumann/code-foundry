@@ -1,8 +1,24 @@
 import { useEffect, useMemo, useRef, type KeyboardEvent, type RefObject } from "react";
-import { X } from "lucide-react";
+import { Plus, X } from "lucide-react";
+import { CommandButton } from "@/components/command/CommandButton";
 import { chordFromEvent } from "@/keys/chord";
 import { cn } from "@/lib/utils";
-import { activatePanelTab, closePanelTab, emptyEntry, getPanel, openSurface, togglePanel, useCurrentPanelKey, usePanelExpanded, usePanelStore, usePanelWidth, type Tab } from "@/stores/panel";
+import {
+  activatePanelTab,
+  closePanelTab,
+  emptyEntry,
+  getPanel,
+  isPicking,
+  openSurface,
+  stopPanelPicking,
+  togglePanel,
+  useCurrentPanelKey,
+  usePanelExpanded,
+  usePanelPicking,
+  usePanelStore,
+  usePanelWidth,
+  type Tab,
+} from "@/stores/panel";
 import { PANEL_MIN, panelMax, useUiStore, visibleSidebarWidth } from "@/stores/ui";
 import { selectPageOpen, useViewsStore } from "@/stores/views";
 import { surfaceOf, surfaces, useAvailability, type SurfaceContext, type SurfaceSpec } from "@/surfaces/registry";
@@ -10,7 +26,7 @@ import { PanelExpand } from "./PanelExpand";
 import { PanelToggle } from "./PanelToggle";
 import { PanelResizeHandle } from "./PanelResizeHandle";
 import { isPanelChord, panelKeyAction } from "./keys";
-import { revealTab } from "./reveal";
+import { revealElement, revealTab } from "./reveal";
 
 const BODY_ID = "side-panel-body";
 
@@ -38,11 +54,25 @@ function hidePanel(panelKey: string): void {
   useUiStore.getState().focusContent();
 }
 
+/**
+ * The surface list unmounts when a tab opens or picking ends. Focus that was in it (a
+ * row reached with Tab) moves to the panel first, so cmd+w and the letters keep working,
+ * as in LinkedPRsSurface's openLink.
+ */
+function keepPanelFocus(from: Element): void {
+  const list = from.closest("[data-surface-list]");
+  if (list?.contains(document.activeElement)) list.closest<HTMLElement>('[data-region="panel"]')?.focus({ preventScroll: true });
+}
+
 function tabDomId(id: string): string {
   return `panel-tab-${encodeURIComponent(id)}`;
 }
 
-function TabButton({ panelKey, tab, active }: { panelKey: string; tab: Tab; active: boolean }) {
+/**
+ * One tab. `focusable` is the roving tabindex: the active tab, or the first one while
+ * picking (no tab is active then), so Tab still reaches the strip.
+ */
+function TabButton({ panelKey, tab, active, focusable }: { panelKey: string; tab: Tab; active: boolean; focusable: boolean }) {
   const Icon = surfaceOf(tab.kind)?.icon;
   return (
     <div
@@ -66,7 +96,7 @@ function TabButton({ panelKey, tab, active }: { panelKey: string; tab: Tab; acti
         id={tabDomId(tab.id)}
         aria-selected={active}
         aria-controls={active ? BODY_ID : undefined}
-        tabIndex={active ? 0 : -1}
+        tabIndex={focusable ? 0 : -1}
         className="flex h-full min-w-0 cursor-default items-center gap-1.5 rounded-md pr-1 pl-2 outline-none focus-visible:ring-1 focus-visible:ring-ring"
         onClick={() => {
           activatePanelTab(panelKey, tab.id);
@@ -77,7 +107,7 @@ function TabButton({ panelKey, tab, active }: { panelKey: string; tab: Tab; acti
       </button>
       <button
         type="button"
-        tabIndex={active ? 0 : -1}
+        tabIndex={focusable ? 0 : -1}
         aria-label={`Close ${tab.title}`}
         title="Close tab"
         className={cn(
@@ -107,14 +137,41 @@ function onTabListKeyDown(e: KeyboardEvent<HTMLElement>): void {
   tabs[next]?.focus();
 }
 
+/**
+ * The "+" after the last tab (view.panel.new-tab): it scrolls with the tabs, like a
+ * browser's. While picking it is highlighted like an active tab (and pressed), since the
+ * body shows the surface list in place of a tab.
+ */
+function NewTabButton({ picking }: { picking: boolean }) {
+  return (
+    <CommandButton
+      command="view.panel.new-tab"
+      icon={Plus}
+      title="New tab"
+      pressed={picking}
+      className={cn(
+        "size-7 [--wails-draggable:no-drag]",
+        picking
+          ? "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground dark:bg-accent/50 dark:hover:bg-accent/50"
+          : "text-muted-foreground hover:bg-accent/40 hover:text-foreground dark:hover:bg-accent/40",
+      )}
+      data-testid="panel-new-tab"
+    />
+  );
+}
+
 function TabStrip({ panelKey }: { panelKey: string }) {
   const tabs = usePanelStore((s) => s.byKey[panelKey]?.tabs ?? emptyEntry.tabs);
   const activeTabId = usePanelStore((s) => s.byKey[panelKey]?.activeTabId ?? null);
+  const picking = usePanelPicking(panelKey);
   const stripRef = useRef<HTMLDivElement>(null);
+  const newTabRef = useRef<HTMLSpanElement>(null);
   // A new or activated tab may sit past the strip's scrolled edge (e.g. a PR row opened
-  // its tenth tab): bring it into view.
+  // its tenth tab): bring it into view. Picking brings the highlighted "+" into view.
   useEffect(() => {
-    if (stripRef.current && activeTabId !== null) revealTab(stripRef.current, activeTabId);
+    if (!stripRef.current) return;
+    if (activeTabId !== null) revealTab(stripRef.current, activeTabId);
+    else if (newTabRef.current) revealElement(stripRef.current, newTabRef.current);
   }, [activeTabId, tabs.length]);
   return (
     <div
@@ -126,9 +183,12 @@ function TabStrip({ panelKey }: { panelKey: string }) {
       data-testid="panel-tabs"
       onKeyDown={onTabListKeyDown}
     >
-      {tabs.map((t) => (
-        <TabButton key={t.id} panelKey={panelKey} tab={t} active={t.id === activeTabId} />
+      {tabs.map((t, i) => (
+        <TabButton key={t.id} panelKey={panelKey} tab={t} active={t.id === activeTabId} focusable={t.id === activeTabId || (picking && i === 0)} />
       ))}
+      <span ref={newTabRef} className="flex shrink-0 [--wails-draggable:no-drag]">
+        <NewTabButton picking={picking} />
+      </span>
     </div>
   );
 }
@@ -146,10 +206,12 @@ function SurfaceRow({ spec, ctx }: { spec: SurfaceSpec; ctx: SurfaceContext }) {
         data-surface={spec.kind}
         data-availability={availability}
         className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm enabled:hover:bg-accent disabled:cursor-default disabled:opacity-45"
-        onClick={() => {
+        onClick={(e) => {
           const now = surfaceContext(ctx.panelKey);
           const tab = spec.openDefault(now);
-          if (tab && spec.available(now) === "enabled") openSurface(ctx.panelKey, tab);
+          if (!tab || spec.available(now) !== "enabled") return;
+          keepPanelFocus(e.currentTarget);
+          openSurface(ctx.panelKey, tab);
         }}
       >
         <spec.icon className="size-4 text-muted-foreground" aria-hidden />
@@ -160,12 +222,15 @@ function SurfaceRow({ spec, ctx }: { spec: SurfaceSpec; ctx: SurfaceContext }) {
   );
 }
 
-/** No tabs yet: the surfaces this selection can open, with their hotkeys (as in T3 Code). */
+/**
+ * No tabs yet, or picking (the "+" was clicked): the surfaces this selection can open,
+ * with their hotkeys (as in T3 Code). Picking one opens it (or activates its open tab).
+ */
 function EmptyState({ panelKey }: { panelKey: string }) {
   const selection = useUiStore((s) => s.selection);
   const ctx = useMemo<SurfaceContext>(() => ({ selection, panelKey }), [selection, panelKey]);
   return (
-    <div className="flex flex-1 flex-col items-center justify-center p-6" data-testid="panel-empty">
+    <div className="flex flex-1 flex-col items-center justify-center p-6" data-surface-list data-testid="panel-empty">
       <div className="w-full max-w-64">
         <h2 className="mb-3 text-center text-sm font-medium">Open a surface</h2>
         <ul className="flex flex-col gap-0.5">
@@ -236,6 +301,7 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
   // for when the split comes back.
   const width = Math.min(usePanelWidth(panelKey), max);
   const hasTabs = usePanelStore((s) => (s.byKey[panelKey]?.tabs.length ?? 0) > 0);
+  const picking = usePanelPicking(panelKey);
 
   // Surfaces keep what their availability reads loaded while this panel shows.
   useEffect(() => {
@@ -251,8 +317,9 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
     if (!chord) return;
     // cmd+w applies in text fields too (it is no editing chord); letters do not.
     if (chord !== "cmd+w" && isEditable(e.target)) return;
-    // The panel's own keys (cmd+w, the surface letters) are never offered to a surface.
-    if (!isPanelChord(chord) && surfaceKey(panelKey, chord)) {
+    // The panel's own keys (cmd+w, the surface letters, Escape while picking) are never
+    // offered to a surface.
+    if (!isPanelChord(chord, isPicking(getPanel(panelKey))) && surfaceKey(panelKey, chord)) {
       e.preventDefault();
       e.stopPropagation();
       return;
@@ -261,8 +328,10 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
     if (!action) return;
     e.preventDefault();
     e.stopPropagation();
+    if (e.target instanceof Element && (action.kind === "stopPicking" || action.kind === "open")) keepPanelFocus(e.target);
     if (action.kind === "close") closeTab(panelKey, action.tabId);
     else if (action.kind === "hide") hidePanel(panelKey);
+    else if (action.kind === "stopPicking") stopPanelPicking(panelKey);
     else openSurface(panelKey, action.tab);
   };
 
@@ -284,6 +353,7 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
         data-region="panel"
         data-testid="side-panel"
         data-panel-key={panelKey}
+        data-picking={picking || undefined}
         className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs outline-none"
         onKeyDown={onKeyDown}
       >
