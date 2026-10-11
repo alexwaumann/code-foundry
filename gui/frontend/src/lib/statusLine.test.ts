@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SessionStateView, SessionStatusView } from "@/api/session";
-import { showsPlace, statusLine, statusText, statusTones, type StatusLineKind } from "./statusLine";
+import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLineKind, type TipStatusTone } from "./statusLine";
 
 const NOW = Date.UTC(2026, 9, 10, 12, 0, 0);
 const MIN = 60_000;
@@ -62,5 +62,33 @@ describe("statusLine / statusText", () => {
   ])("%s: place %s, tone %s", (kind, place, tone) => {
     expect(showsPlace(kind)).toBe(place);
     expect(statusTones[kind]).toBe(tone);
+  });
+});
+
+describe("tipStatusTone", () => {
+  // The tooltip's status row: the full line-2 text, only when the thread needs the user or failed.
+  it.each<[string, SessionStateView, SessionStatusView, string, number | null, TipStatusTone | null, string]>([
+    ["permission dialog", "connected", "attention", "permission: Do you want to create hello.txt and then run the whole test suite?", 1, "amber", "Needs input · Do you want to create hello.txt and then run the whole test suite?"],
+    ["permission without a screen", "connected", "attention", "waiting for approval: Bash", 1, "amber", "Needs input · Bash"],
+    ["question", "connected", "attention", "question: Which color do you prefer?", 1, "amber", "Asked a question"],
+    ["plan", "connected", "attention", "plan: Claude has written up a plan", 1, "amber", "Plan ready for review"],
+    ["trust", "connected", "attention", "trust: Do you trust the files in this folder?", 1, "amber", "Needs input · Do you trust the files in this folder?"],
+    ["bell", "connected", "attention", "bell", 1, "amber", "Needs input"],
+    ["question after a restart", "disconnected", "attention", "question: Which density?", 1, "amber", "Asked a question"],
+    ["Claude error", "connected", "attention", "error: rate_limit", 1, "red", "Error · rate_limit"],
+    ["interrupted", "disconnected", "error", "interrupted", NOW - 60 * MIN, "red", "Interrupted while working · 1 h ago"],
+    ["interrupted, time unknown", "disconnected", "error", "interrupted", null, "red", "Interrupted while working"],
+    ["other error status", "disconnected", "error", "daemon restarted", 1, "red", "Error · daemon restarted"],
+    ["finished", "connected", "attention", "finished", NOW - 3 * MIN, null, "Finished 3 min ago"],
+    ["busy", "connected", "busy", "working: Say hi", null, null, "Working"],
+    ["idle", "connected", "idle", "at prompt", 1, null, ""],
+    ["plain disconnected", "disconnected", "idle", "at prompt", 1, null, ""],
+    ["unknown", "unknown", "unknown", "", null, null, ""],
+    ["starting", "starting", "unknown", "", null, null, "Starting"],
+    ["closing", "closing", "busy", "working: x", null, null, "Closing"],
+  ])("%s", (_name, state, status, statusReason, statusChangedAtMs, tone, text) => {
+    const l = statusLine({ state, status, statusReason, statusChangedAtMs });
+    expect(tipStatusTone(l.kind)).toBe(tone);
+    expect(statusText(l, NOW)).toBe(text);
   });
 });

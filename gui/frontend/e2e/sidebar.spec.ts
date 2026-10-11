@@ -452,6 +452,54 @@ test("hovering a thread row shows its tooltip: name, project, branch with a work
   await expect(page.getByTestId("row-menu")).toHaveCount(0);
 });
 
+test("the tooltip shows the full status, wrapped, under the name for threads that need input or failed; not for finished, working or idle", async ({ page }) => {
+  await mockPost("status-kinds");
+  const long = "Do you want to create hello.txt in the scratch repository and then run the whole test suite?";
+  await mockPost(`session/status?id=s-k-approval&status=attention&reason=${encodeURIComponent(`permission: ${long}`)}`);
+  await openApp(page);
+  const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
+
+  // The permission prompt: line 2 cuts it off, the tooltip has all of it, wrapped, in amber.
+  const approval = row(page, "s:s-k-approval");
+  await expect(approval.getByTestId("row-status")).toHaveText(`Needs input · ${long}`);
+  await approval.hover();
+  await expect(tip).toHaveAttribute("data-session-id", "s-k-approval");
+  const status = tip.getByTestId("tip-status");
+  await expect(status).toHaveText(`Needs input · ${long}`);
+  await expect(status).toHaveAttribute("data-tone", "amber");
+  await expect(status).toHaveClass(/text-amber/);
+  const line2 = await approval.getByTestId("row-place").locator("span.truncate").evaluate((el) => el.scrollWidth > el.clientWidth);
+  expect(line2).toBe(true);
+  // Wrapped over several lines inside the 220px tooltip, between the name and the project.
+  expect(Math.round((await tip.boundingBox())?.width ?? 0)).toBe(220);
+  const [name, st, project] = [await tip.getByTestId("tip-name").boundingBox(), await status.boundingBox(), await tip.getByTestId("tip-project").boundingBox()];
+  expect(st && st.height >= 40).toBe(true);
+  expect(name && st && project && name.y < st.y && st.y + st.height <= project.y).toBe(true);
+
+  // The other prompts, the Claude error and the interrupted thread: same words and colour as line 2.
+  const shown: [string, string, "amber" | "red"][] = [
+    ["s-k-question", "Asked a question", "amber"],
+    ["s-k-plan", "Plan ready for review", "amber"],
+    ["s-k-error", "Error · model_not_found", "red"],
+    ["s-k-interrupted", "Interrupted while working · 35 min ago", "red"],
+  ];
+  for (const [id, text, tone] of shown) {
+    await row(page, `s:${id}`).hover();
+    await expect(tip, id).toHaveAttribute("data-session-id", id);
+    await expect(tip.getByTestId("tip-status"), id).toHaveText(text);
+    await expect(tip.getByTestId("tip-status"), id).toHaveAttribute("data-tone", tone);
+    await expect(tip.getByTestId("tip-status"), id).toHaveClass(tone === "amber" ? /text-amber/ : /text-red/);
+  }
+
+  // Finished, working and idle threads: no status row; the rest of the tooltip is unchanged.
+  for (const id of ["s-k-finished", "s-k-busy", "s-k-idle"]) {
+    await row(page, `s:${id}`).hover();
+    await expect(tip, id).toHaveAttribute("data-session-id", id);
+    await expect(tip.getByTestId("tip-project"), id).toBeVisible();
+    await expect(tip.getByTestId("tip-status"), id).toHaveCount(0);
+  }
+});
+
 test("the toolbar: Dashboard and Notifications on the left, Add project then New thread on the right", async ({ page }) => {
   await openApp(page);
   const bar = await page.getByTestId("sidebar-toolbar").boundingBox();

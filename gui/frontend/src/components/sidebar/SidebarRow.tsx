@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { ArrowRightLeft, Folder, FolderGit2, GitBranch, Layers, Pin, type LucideIcon } from "lucide-react";
+import { ArrowRightLeft, CircleAlert, Folder, FolderGit2, GitBranch, Layers, OctagonX, Pin, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
@@ -8,7 +8,7 @@ import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { basename, terminalLabel } from "@/lib/path";
 import { sessionBadge } from "@/lib/session";
-import { showsPlace, statusLine, statusText, statusTones, type StatusLine, type StatusTone } from "@/lib/statusLine";
+import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLine, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
 import { modelLabel, terminalPlace, threadRowModel, type RepoLookup, type WorkspaceLookup } from "@/lib/threadRow";
 import { WORKTREE_LABEL, type Row } from "@/lib/tree";
 import { useReposStore } from "@/stores/repos";
@@ -316,7 +316,28 @@ function TipIcon({ icon: Icon }: { icon: LucideIcon }) {
   return <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />;
 }
 
-/** The tooltip's body: name, project, branch (git only) and model. Mounted only while open. */
+const tipStatusIcons: Readonly<Record<TipStatusTone, LucideIcon>> = { amber: CircleAlert, red: OctagonX };
+
+/**
+ * The full status text of a thread that needs the user or failed, in the row's line-2 words
+ * and colour, wrapped rather than truncated (line 2 usually cuts it off); nothing for other
+ * statuses (lib/statusLine `tipStatusTone`). A timed line ticks on the shared clock, only
+ * while the tooltip is open (its body is mounted only then).
+ */
+function TipStatus({ id }: { id: string }) {
+  const line = useSessionsStore(useShallow((st) => statusLine(st.byId[id])));
+  const tone = tipStatusTone(line.kind);
+  if (tone === null) return null;
+  const Icon = tipStatusIcons[tone];
+  return (
+    <div className={cn("mb-[3px] flex items-start gap-2 leading-5", toneClasses[tone])} data-testid="tip-status" data-tone={tone}>
+      <Icon className="mt-[3px] size-3.5 shrink-0" aria-hidden />
+      <span className="min-w-0 break-words">{line.at !== null ? <TimedStatusText line={line} /> : statusText(line, 0)}</span>
+    </div>
+  );
+}
+
+/** The tooltip's body: name, status (attention or error only), project, branch (git only) and model. Mounted only while open. */
 function ThreadTipBody({ id }: { id: string }) {
   const name = useSessionsStore((s) => s.byId[id]?.name ?? "");
   const model = useSessionsStore((s) => s.byId[id]?.model ?? "");
@@ -339,6 +360,7 @@ function ThreadTipBody({ id }: { id: string }) {
       <div className="mb-[5px] truncate text-[13px] font-semibold" data-testid="tip-name">
         {name || id}
       </div>
+      <TipStatus id={id} />
       <TipRow icon={<TipIcon icon={m.noGit ? Folder : FolderGit2} />} chip={m.noGit ? "no git" : null} testId="tip-project">
         {m.project}
       </TipRow>
