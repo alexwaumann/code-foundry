@@ -111,6 +111,20 @@ export type UiIntentInit = MessageInitShape<typeof UiIntentSchema>;
 
 type Kind = "claude" | "logs" | "top" | "shell" | "exited";
 
+// The terminal label contract (internal/store/terminal/termlabel, proto Terminal.labels).
+const LABEL_KIND = "kind";
+const LABEL_SESSION = "session";
+const LABEL_REPO = "repo";
+const LABEL_WORKTREE = "worktree";
+const KIND_SHELL = "shell";
+
+/** Labels of a shell terminal.new starts: owned by a worktree, and by a thread when sessionId is set. */
+function shellLabels(sessionId: string, repoId: string, worktree: string): Record<string, string> {
+  const l: Record<string, string> = { [LABEL_KIND]: KIND_SHELL, [LABEL_REPO]: repoId, [LABEL_WORKTREE]: worktree };
+  if (sessionId) l[LABEL_SESSION] = sessionId;
+  return l;
+}
+
 /** "end" closes attached streams (after the process exits). */
 export type AttachItem = AttachEventInit | "end";
 
@@ -368,10 +382,13 @@ export class World {
     const started = new Date(Date.now() - 42 * 60_000);
     this.addTerm({ id: "t-claude", argv: ["claude"], cwd: CF, title: "✳ Refactor sidebar tree", kind: "claude", labels: { worktree: CF, session: "s-1" }, startedAt: started });
     this.addTerm({ id: "t-logs", argv: ["/bin/zsh"], cwd: `${CF}/internal/daemon`, title: "tail -f daemon.log", kind: "logs", labels: {}, startedAt: started });
-    this.addTerm({ id: "t-top", argv: ["top"], cwd: `${CFW}/feat-sidebar`, title: "", kind: "top", labels: {}, startedAt: started });
+    // A shell terminal.new started on the Projects page for feat/sidebar (worktree-owned).
+    this.addTerm({ id: "t-top", argv: ["top"], cwd: `${CFW}/feat-sidebar`, title: "", kind: "top", labels: shellLabels("", "repo-cf", `${CFW}/feat-sidebar`), startedAt: started });
     this.addTerm({ id: "t-tests", argv: ["go", "test", "./..."], cwd: `${CFW}/fix-resize`, title: "", kind: "exited", labels: { worktree: `${CFW}/fix-resize` }, startedAt: started });
     this.addTerm({ id: "t-ghostty", argv: ["claude", "--resume"], cwd: GP, title: "✳ Port renderer", kind: "claude", labels: { worktree: GP, session: "s-2" }, startedAt: started });
     this.addTerm({ id: "t-tmp", argv: ["/bin/zsh"], cwd: "/tmp", title: "", kind: "shell", labels: {}, startedAt: started });
+    // A shell terminal.new started in thread s-1 (thread-owned; the sidebar hides it, as it hides every terminal of a known thread).
+    this.addTerm({ id: "t-s1-shell", argv: ["/bin/zsh", "-l"], cwd: CF, title: "", kind: "shell", labels: shellLabels("s-1", "repo-cf", CF), startedAt: started });
     // Sessions in every state. s-1/s-2 own t-claude/t-ghostty (labels.session above).
     this.sessions.clear();
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
@@ -618,6 +635,7 @@ export class World {
       repo.worktrees = repo.worktrees.filter((w) => w.path !== path);
       this.repoEvents.publish({ event: { case: "worktreeRemoved", value: { repoId: repo.id, path } } });
     }
+    this.closeShells((l) => l[LABEL_WORKTREE] === path);
   }
 
   /** workspace.remove-repo: refused while a live thread runs there or with changes (unless force). */
@@ -1110,6 +1128,46 @@ export class World {
     t.attach.publish({ event: { case: "exited", value: { exitCode: code } } });
     t.attach.publish("end");
     this.publishTerm(t);
+    // Like the daemon's shell reaper: a shell terminal.new started is removed once it exits.
+    if (t.labels[LABEL_KIND] === KIND_SHELL) this.remove(id);
+  }
+
+  /** terminal.close / TerminalService.Close: kill, then remove once exited (a session's terminal goes with its session). */
+  close(id: string): void {
+    this.term(id);
+    this.kill(id);
+    if (this.terms.get(id)?.state === TerminalState.EXITED) this.remove(id);
+  }
+
+  /** Closes every running or exited shell terminal.new started whose labels match (thread or worktree removal). */
+  private closeShells(match: (labels: Record<string, string>) => boolean): void {
+    for (const t of [...this.terms.values()]) {
+      if (t.labels[LABEL_KIND] === KIND_SHELL && match(t.labels) && this.terms.has(t.id)) this.close(t.id);
+    }
+  }
+
+  /**
+   * Who owns a shell terminal.new starts, like the daemon (internal/command/commands_terminal.go):
+   * the active thread, else the active registered worktree, else the deepest registered worktree
+   * containing cwd. Refuses a cwd outside every project.
+   */
+  private shellOwner(ctx: UiContext | undefined, cwd: string): { labels: Record<string, string>; cwd: string } {
+    const s = ctx?.activeSessionId ? this.sessions.get(ctx.activeSessionId) : undefined;
+    if (ctx?.activeSessionId) {
+      if (!s) throw new CommandError("notfound", `session ${ctx.activeSessionId} not found`);
+      return { labels: shellLabels(s.id, s.repoId, s.worktreePath), cwd: cwd || s.worktreePath };
+    }
+    const exact = ctx?.activeRepoId ? this.repos.get(ctx.activeRepoId)?.worktrees.find((w) => w.path === ctx.activeWorktreePath) : undefined;
+    if (exact && ctx) return { labels: shellLabels("", ctx.activeRepoId, exact.path), cwd: cwd || exact.path };
+    const path = cwd || ctx?.activeWorktreePath || "";
+    let best: { repoId: string; path: string } | null = null;
+    for (const repo of this.repos.values()) {
+      for (const w of repo.worktrees) {
+        if ((path === w.path || path.startsWith(`${w.path}/`)) && w.path.length > (best?.path.length ?? 0)) best = { repoId: repo.id, path: w.path };
+      }
+    }
+    if (!best) throw new CommandError("invalid", `${path} is not inside a registered project`);
+    return { labels: shellLabels("", best.repoId, best.path), cwd: cwd || best.path };
   }
 
   remove(id: string): void {
@@ -1547,13 +1605,14 @@ export class World {
     return [
       ...viewCommands((i) => this.emit(i)),
       {
-        cmd: { name: "terminal.new", title: "New Terminal", category: "Terminal", description: "Start a shell in the active worktree", keybindings: ["cmd+t"], args: [{ name: "cwd", type: ArgType.PATH, required: false, description: "Working directory" }] },
-        when: always,
+        cmd: { name: "terminal.new", title: "New Terminal", category: "Terminal", description: "Start a shell that belongs to the active thread, else to the active worktree", keybindings: ["cmd+t"], args: [{ name: "cwd", type: ArgType.PATH, required: false, description: "Working directory" }] },
+        // Like the daemon: a thread, or a worktree to own the shell (never the dashboard or a page).
+        when: (ctx) => Boolean(ctx?.activeSessionId || ctx?.activeWorktreePath),
         run: (ctx, args) => {
-          const cwd = args.cwd || ctx?.activeWorktreePath || HOME;
-          const t = this.create(["/bin/zsh"], cwd, ctx?.activeWorktreePath ? { worktree: ctx.activeWorktreePath } : {}, "shell");
+          const owner = this.shellOwner(ctx, args.cwd ?? "");
+          const t = this.create(["/bin/zsh"], owner.cwd, owner.labels, "shell");
           this.intents.publish({ intent: { case: "focusTerminal", value: { terminalId: t.id } } });
-          return `Started zsh in ${cwd}`;
+          return `Started zsh in ${owner.cwd}`;
         },
       },
       {
@@ -1736,6 +1795,7 @@ export class World {
           const s = activeSession(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
           if (s.state !== SessionState.DISCONNECTED) this.disconnectSession(s.id, "closed", 0);
+          this.closeShells((l) => l[LABEL_SESSION] === s.id);
           this.sessions.delete(s.id);
           this.sessionEvents.publish({ event: { case: "removedId", value: s.id } });
           return `Removed ${s.name || s.id}`;
@@ -1752,6 +1812,16 @@ export class World {
           if (!t) throw new CommandError("unavailable", "no active terminal");
           this.kill(t.id);
           return `Killed ${t.id}`;
+        },
+      },
+      {
+        cmd: { name: "terminal.close", title: "Close Terminal", category: "Terminal", description: "Terminate the terminal's process and remove it once it has exited", keybindings: [], args: [] },
+        when: (ctx) => activeTerm(ctx) !== undefined,
+        run: (ctx) => {
+          const t = activeTerm(ctx);
+          if (!t) throw new CommandError("unavailable", "no active terminal");
+          this.close(t.id);
+          return "";
         },
       },
       {
@@ -1880,8 +1950,7 @@ export class World {
           const w = this.worktreeOf(ctx);
           if (!w) throw new CommandError("unavailable", "no active worktree");
           if (w.wt.status.dirty && args.force !== "true") throw new CommandError("unavailable", "worktree has local changes; use force");
-          w.repo.worktrees = w.repo.worktrees.filter((x) => x !== w.wt);
-          this.repoEvents.publish({ event: { case: "worktreeRemoved", value: { repoId: w.repo.id, path: w.wt.path } } });
+          this.dropWorktree(w.wt.path);
           return `Removed worktree ${w.wt.branch}`;
         },
       },
@@ -1934,6 +2003,11 @@ export class World {
         cmd: { name: "view.panel.toggle", title: "Toggle Side Panel", category: "View", description: "Show or hide the side panel next to the selected session, terminal, worktree, or page.", keybindings: ["cmd+shift+e"], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.toggle" } } }))}`,
+      },
+      {
+        cmd: { name: "view.bottom.toggle", title: "Toggle Bottom Panel", category: "View", description: "Show or hide the terminals under the selected thread or page.", keybindings: ["cmd+j"], args: [] },
+        when: always,
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "bottom.toggle" } } }))}`,
       },
       {
         cmd: { name: "view.panel.expand", title: "Expand Side Panel", category: "View", description: "Toggle the side panel between its split width and the full width of the content area for the selected session, terminal, worktree, or page.", keybindings: [], args: [] },

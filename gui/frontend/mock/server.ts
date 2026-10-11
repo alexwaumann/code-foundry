@@ -190,6 +190,7 @@ function routes(router: ConnectRouter): void {
     resize: (req) => guard(() => (world.resize(req.id, req.cols, req.rows), {})),
     kill: (req) => guard(() => (world.kill(req.id), {})),
     remove: (req) => guard(() => (world.remove(req.id), {})),
+    close: (req) => guard(() => (world.close(req.id), {})),
     watch: (_req, ctx) => tracked("TerminalService/Watch", world.termEvents.subscribe(ctx.signal)),
   });
 
