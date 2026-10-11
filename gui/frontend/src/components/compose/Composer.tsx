@@ -5,6 +5,7 @@ import { AttachmentPreview } from "./AttachmentPreview";
 import { BranchIndicator } from "./BranchIndicator";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { MemberChips, type MemberChipModel } from "./MemberChips";
+import { ProjectSwitcher } from "./ProjectSwitcher";
 import { PromptEditor, type PromptEditorHandle } from "./PromptEditor";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { ATTACHMENT_MIME_TYPES } from "@/api/session";
@@ -404,7 +405,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   }, [refs, defaultRef]);
 
   return (
-    <div onKeyDown={cycleStops}>
+    <div>
       <MemberChips draftKey={draftKey} members={chips} primary={primary} canAdd={target.kind === "project" && noGitPath === undefined} disabled={busy} />
       <div
         // isolate: the surface's backdrop-filter makes it a stacking context, which would
@@ -622,6 +623,7 @@ export function Composer({ repoId, workspaceId }: { repoId: string; workspaceId?
   const workspaceName = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? null) : null));
   const reposLoaded = useReposStore((s) => s.loaded);
   const workspacesLoaded = useWorkspacesStore((s) => s.loaded);
+  const busy = useDraft(keyOf(target), "phase") !== "idle";
   const name = workspaceId ? workspaceName : projectName;
   const loaded = workspaceId ? workspacesLoaded : reposLoaded;
   const gone = workspaceId ? "This workspace no longer exists." : "This project is no longer registered.";
@@ -636,9 +638,10 @@ export function Composer({ repoId, workspaceId }: { repoId: string; workspaceId?
         {name === null ? (
           <p className="m-auto text-sm text-muted-foreground">{loaded ? gone : "Loading…"}</p>
         ) : (
-          <div className="m-auto w-full max-w-2xl" data-testid="composer-body">
+          // The heading's name is the first composer Tab stop, then the member chips, the prompt…
+          <div className="m-auto w-full max-w-2xl" data-testid="composer-body" onKeyDown={cycleStops}>
             <h1 className="mb-6 text-center text-2xl font-semibold tracking-tight" data-testid="composer-heading">
-              What should we build in <span className="text-foreground">{name}</span>?
+              What should we build in <ProjectSwitcher target={target} name={name} disabled={busy} />?
             </h1>
             <ComposerCard target={target} />
           </div>
