@@ -1,10 +1,13 @@
 package session
 
 import (
+	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
+	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
@@ -56,5 +59,43 @@ func TestRemoveTakesTheThreadsShellsCloseDoesNot(t *testing.T) {
 		if gone := errors.Is(err, terminal.ErrNotFound); gone != tt.wantGone {
 			t.Errorf("after remove, %s gone = %v, want %v", tt.name, gone, tt.wantGone)
 		}
+	}
+}
+
+// stubbornShells is a terminal store whose shells ignore Kill.
+type stubbornShells struct{ *terminaltest.Fake }
+
+func (s stubbornShells) Kill(ctx context.Context, id string) error {
+	if t, err := s.Get(ctx, id); err == nil && termlabel.IsShell(t.Labels) {
+		return nil
+	}
+	return s.Fake.Kill(ctx, id)
+}
+
+func TestRemoveFailsWhileAShellWillNotDie(t *testing.T) {
+	e := newEnv(t, func(o *Options) { o.Terminals = stubbornShells{o.Terminals.(*terminaltest.Fake)} })
+	s := e.connected(CreateOptions{})
+	done := make(chan error, 1)
+	go func() { done <- e.m.Close(e.ctx(), s.ID) }()
+	e.waitWritten(s.TerminalID, keyEscape)
+	_ = e.terms.Exit(s.TerminalID, 0)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	shell, err := e.terms.Create(e.ctx(), terminal.Spec{Argv: []string{"zsh"}, Cwd: e.wt, Labels: termlabel.Shell(s.ID, "r1", e.wt)})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if err := e.m.Remove(ctx, s.ID); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Remove = %v, want the deadline", err)
+	}
+	if _, err := e.m.Get(e.ctx(), s.ID); err != nil {
+		t.Errorf("thread after a failed Remove: %v, want it kept", err)
+	}
+	if _, err := e.terms.Get(e.ctx(), shell.ID); err != nil {
+		t.Errorf("shell after a failed Remove: %v, want it still there", err)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/db"
@@ -139,9 +140,6 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 	s.terminal = terminal.New(terminal.Options{
 		Bus: s.bus, Logger: log.With("store", "terminal"), MaxScrollbackLines: uint(cfg.Sessions.ScrollbackLines),
 	})
-	if s.stopShells, err = startShellReaper(ctx, log.With("store", "terminal"), s.terminal, s.bus); err != nil {
-		return nil, err
-	}
 	// Workspaces open before sessions: a session reads a workspace thread's members at
 	// every spawn, and the workspace store asks sessions about live threads (and
 	// pre-trusts worktrees) only through these closures, which run after both exist.
@@ -171,6 +169,17 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 		Namer:          settingsNamer(s.settings, session.ClaudeNamer(claude, "/tmp", sessionLog)),
 		AttachmentsDir: p.Attachments(), WorktreePath: settingsWorktreePath(s.settings),
 		Env: sessionEnv,
+	}); err != nil {
+		return nil, err
+	}
+	// After session: the reaper's sweep asks it which threads exist.
+	if s.stopShells, err = startShellReaper(ctx, shellReaperOptions{
+		Log: log.With("store", "terminal"), Terminals: s.terminal, Bus: s.bus,
+		RepoExists: func(id string) bool { _, ok := s.repo.Snapshot().Repo(id); return ok },
+		SessionExists: func(id string) bool {
+			snap := s.session.Snapshot()
+			return snap == nil || slices.ContainsFunc(snap.Sessions, func(x session.Session) bool { return x.ID == id })
+		},
 	}); err != nil {
 		return nil, err
 	}
