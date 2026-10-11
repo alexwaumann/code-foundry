@@ -182,3 +182,7 @@ and cmd+shift+a, so cmd+N jumps to the Nth thread in the rendered order (a colla
 Working section's threads do not count). The arrow keys, Home and End skip the header
 again (`stepThread`); a right-click on it opens no menu. e2e: `DEFAULT_ORDER` ends at s-1
 (s-2, s-6, s-4, s-3, Working, s-5, s-1); the "no terminal rows" checks allow the header.
+
+Status after the merge, the quiet `terminal.new` and the chord fix: `make check` green (85
+vitest files / 1692 tests); `make gui-e2e` (both browsers) 526 passed, 24 skipped, none
+failed.
