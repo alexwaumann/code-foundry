@@ -42,8 +42,11 @@ scratch daemon (below).
   the store thinks has no git, `.git` is checked at that path.
 * **Cache.** `fsx.FileIndex` caches each checkout's candidate list for 5 s (key: git flag +
   resolved path), at most 32 checkouts, oldest evicted; expired entries are dropped on every
-  miss. Two concurrent misses may both list; that is fine. The 5 s count from the end of the
-  listing, so a listing slower than that is still reused.
+  miss. The 5 s count from the end of the listing, so a listing slower than that is still
+  reused. Concurrent misses for one checkout wait on a single in-flight listing, which runs
+  on `context.WithoutCancel` of the request with a 30 s bound: a search whose request is
+  cancelled (the composer cancels the previous one per keystroke) returns Canceled at once
+  while the listing finishes and fills the cache for the next keystroke.
 * **Ranking.** Tier first: exact base name > base-name prefix > base-name subsequence >
   whole-path subsequence. Within a tier, a bonus per query character landing at a segment
   start or after `/ . - _ space` (4) or right after the previous hit (1), maximised over all
@@ -55,7 +58,10 @@ scratch daemon (below).
   absolute, resolve under home (InvalidArgument; like ListDirectories), exist (NotFound) and
   be a directory (InvalidArgument). Any path under home is accepted, not only the repo's
   known worktrees, so a worktree the repo store has not reconciled yet still works. A
-  negative limit is InvalidArgument; 0 → 50; > 200 → 200.
+  negative limit is InvalidArgument; 0 → 50; > 200 → 200. ListSkills applies the same checks
+  per source but skips (WARN log) a source whose project is unknown or whose checkout is
+  missing or cannot be resolved, so one stale source does not hide the others or the
+  user's skills; a malformed source (no repo id, relative, outside home) still fails it.
 * **File references in the first prompt.** Token: `cf-file://<repoId>/<percent-encoded
   relative path>` (the GUI writes it after `@`), ending at whitespace or the end of the
   prompt. `Manager.Create` rewrites it after the switch that resolves or creates the
