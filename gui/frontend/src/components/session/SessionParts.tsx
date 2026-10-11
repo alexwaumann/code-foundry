@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { DragBand } from "@/components/window/DragBand";
 import { tildify } from "@/lib/path";
-import { badgeLabels, disconnectCause, disconnectedPill, formatAgo, modelLabel, sessionBadge, sessionLocation, type PillKind } from "@/lib/session";
+import { badgeLabels, disconnectCause, disconnectedPill, formatAgo, modelEffortLabel, sessionBadge, sessionLocation, type PillKind } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { useReposStore } from "@/stores/repos";
 import { reconnectSession, removeSession } from "@/stores/sessionActions";
@@ -146,7 +146,7 @@ function MetaLine({ id }: { id: string }) {
   const worktreePath = useSessionsStore((st) => st.byId[id]?.worktreePath ?? "");
   const model = useSessionsStore((st) => {
     const s = st.byId[id];
-    return s ? modelLabel(s) : "";
+    return s ? modelEffortLabel(s) : "";
   });
   const where = useReposStore(useShallow((r) => sessionLocation({ worktreePath }, r)));
   return (

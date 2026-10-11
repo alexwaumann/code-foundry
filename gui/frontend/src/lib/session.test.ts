@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SessionStatusView } from "@/api/session";
-import { attentionTier, disconnectCause, disconnectedPill, modelLabel, sessionLocation, statusDetail, statusKind, statusNote, type LocationRepos, type PillKind, type StatusKind } from "./session";
+import { attentionTier, disconnectCause, disconnectedPill, modelEffortLabel, sessionLocation, statusDetail, statusKind, statusNote, type LocationRepos, type PillKind, type StatusKind } from "./session";
 
 // Reasons as the daemon reported them: replays of the internal/claudestatus fixtures
 // (Claude Code 2.1.294; CLAUDESTATUS_TRACE=<fixture>, noscreen for "waiting for approval")
@@ -61,7 +61,7 @@ describe("disconnectCause", () => {
   });
 });
 
-describe("modelLabel", () => {
+describe("modelEffortLabel", () => {
   it.each([
     ["opus", "high", "Opus 5.5 (high)"],
     ["haiku", "", "Haiku 5.5"],
@@ -69,7 +69,7 @@ describe("modelLabel", () => {
     ["", "high", ""],
     ["", "", ""],
   ])("%j %j", (model, effort, want) => {
-    expect(modelLabel({ model, effort })).toBe(want);
+    expect(modelEffortLabel({ model, effort })).toBe(want);
   });
 });
 

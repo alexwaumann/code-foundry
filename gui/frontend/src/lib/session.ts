@@ -167,7 +167,7 @@ export function disconnectCause(s: Pick<SessionView, "disconnectReason" | "exitC
 }
 
 /** "Opus 5.5 (high)", the composer's model name (the raw id when unknown) and the effort; "" without a model. */
-export function modelLabel(s: Pick<SessionView, "model" | "effort">): string {
+export function modelEffortLabel(s: Pick<SessionView, "model" | "effort">): string {
   if (!s.model) return "";
   const name = choiceLabel(MODEL_CHOICES, s.model);
   return s.effort ? `${name} (${s.effort})` : name;

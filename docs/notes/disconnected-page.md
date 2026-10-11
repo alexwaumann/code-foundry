@@ -49,7 +49,7 @@ While a reconnect is pending the pill shows a spinner and "Reconnecting…".
   (7 chars) when detached (falls back to whichever of branch / head is non-empty).
   No git (`RepoView.git === false`): the project name alone. Unplaceable:
   `basename(worktreePath)`. The span's title is the full worktree path.
-* **Model** (`modelLabel`): the composer's `MODEL_CHOICES` label ("Opus 5.5"), the raw
+* **Model** (`modelEffortLabel`): the composer's `MODEL_CHOICES` label ("Opus 5.5"), the raw
   id when unknown, plus ` (<effort>)` with the raw effort value. Omitted with no model.
 
 ## Gotchas
