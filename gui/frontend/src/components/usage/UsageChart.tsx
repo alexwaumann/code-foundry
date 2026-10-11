@@ -97,7 +97,13 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
         </g>
         {daily.map((d, i) => {
           const x = LEFT + slot * i + (slot - bw) / 2;
-          const drawn = series.filter((k) => (values(d)[k] ?? 0) > 0);
+          // Segments too thin to show past the gap are left out (the tooltip still lists
+          // them), so the rounded end sits on the topmost visible one. A bar made only of
+          // slivers keeps its largest, at least 1px tall.
+          const present = series.filter((k) => (values(d)[k] ?? 0) > 0);
+          const visible = present.filter((k) => y(0) - y(values(d)[k] ?? 0) > GAP + 1);
+          const largest = present.reduce<string | undefined>((m, k) => (m === undefined || (values(d)[k] ?? 0) > (values(d)[m] ?? 0) ? k : m), undefined);
+          const drawn = visible.length > 0 ? visible : largest === undefined ? [] : [largest];
           let acc = 0;
           return (
             <g key={d.day} data-day={d.day}>
@@ -107,7 +113,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
                 const y0 = y(acc + v);
                 const base = y(acc) - (j > 0 ? GAP : 0);
                 acc += v;
-                const h = Math.max(base - y0, Math.min(1, y(0) - y0));
+                const h = Math.max(base - y0, 1);
                 const isTop = j === drawn.length - 1;
                 return (
                   <path
