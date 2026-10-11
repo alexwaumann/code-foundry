@@ -35,14 +35,14 @@ const S = SettingType;
 
 /** internal/model's registry, in order: values for --model and their labels. */
 export const MODELS: readonly { value: string; label: string }[] = [
-  { value: "fable", label: "Fable (default)" },
-  { value: "opus", label: "Opus (default)" },
+  { value: "fable", label: "Fable" },
+  { value: "opus", label: "Opus" },
   { value: "claude-opus-4-8", label: "Opus 4.8" },
   { value: "claude-opus-4-7", label: "Opus 4.7" },
-  { value: "sonnet", label: "Sonnet (default)" },
+  { value: "sonnet", label: "Sonnet" },
   { value: "claude-sonnet-5", label: "Sonnet 5" },
   { value: "claude-sonnet-4-6", label: "Sonnet 4.6" },
-  { value: "haiku", label: "Haiku (default)" },
+  { value: "haiku", label: "Haiku" },
   { value: "claude-haiku-4-5", label: "Haiku 4.5" },
 ];
 export const MODEL_VALUES: string[] = MODELS.map((m) => m.value);
@@ -53,7 +53,7 @@ const staticFields: FieldInit[] = [
     group: "sessions",
     type: S.ENUM,
     title: "Default model",
-    description: 'Model for new threads when none is picked. A "(default)" model is Claude Code\'s current default for that family; the others pin a version.',
+    description: 'Model for new threads when none is picked. Fable, Opus, Sonnet and Haiku run Claude Code\'s current default for that family; the versioned entries pin one.',
     enumValues: MODEL_VALUES,
     enumLabels: MODELS.map((m) => m.label),
     defaultValue: "opus",

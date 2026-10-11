@@ -127,7 +127,7 @@ func KeybindingKey(command string) string { return keybindingKeyPrefix + command
 var staticFields = []Field{
 	{
 		Key: KeyDefaultModel, Group: GroupSessions, Type: Enum, Title: "Default model",
-		Description: "Model for new threads when none is picked. A \"(default)\" model is Claude Code's current default for that family; the others pin a version.",
+		Description: "Model for new threads when none is picked. Fable, Opus, Sonnet and Haiku run Claude Code's current default for that family; the versioned entries pin one.",
 		Enum:        command.SessionModels, EnumLabels: model.Labels(), Default: model.Default,
 		bind: func(s *Settings) any { return &s.Sessions.DefaultModel },
 	},

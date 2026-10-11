@@ -167,14 +167,11 @@ export function disconnectCause(s: Pick<SessionView, "disconnectReason" | "exitC
   return r.startsWith("Claude ") ? r : r.charAt(0).toLowerCase() + r.slice(1);
 }
 
-/**
- * "Opus 4.8 · high": the model's registry label (the raw id when unknown) and the effort;
- * "" without a model. A dot, not parentheses: labels such as "Opus (default)" have their own.
- */
+/** "Opus 4.8 (high)": the model's registry label (the raw id when unknown) and the effort; "" without a model. */
 export function modelEffortLabel(s: Pick<SessionView, "model" | "effort">, models: readonly Choice[]): string {
   if (!s.model) return "";
   const name = modelName(models, s.model);
-  return s.effort ? `${name} · ${s.effort}` : name;
+  return s.effort ? `${name} (${s.effort})` : name;
 }
 
 /** The repos store slice sessionLocation reads. */

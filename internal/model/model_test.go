@@ -10,14 +10,14 @@ func TestLabel(t *testing.T) {
 	tests := []struct {
 		value, want string
 	}{
-		{"fable", "Fable (default)"},
-		{"opus", "Opus (default)"},
+		{"fable", "Fable"},
+		{"opus", "Opus"},
 		{"claude-opus-4-8", "Opus 4.8"},
 		{"claude-opus-4-7", "Opus 4.7"},
-		{"sonnet", "Sonnet (default)"},
+		{"sonnet", "Sonnet"},
 		{"claude-sonnet-5", "Sonnet 5"},
 		{"claude-sonnet-4-6", "Sonnet 4.6"},
-		{"haiku", "Haiku (default)"},
+		{"haiku", "Haiku"},
 		{"claude-haiku-4-5", "Haiku 4.5"},
 		{"claude-opus-5-5[1m]", "claude-opus-5-5[1m]"},
 		{"", ""},

@@ -349,7 +349,7 @@ function ThreadTipBody({ id }: { id: string }) {
       )}
       <TipRow icon={<ClaudeMark className="size-3.5 shrink-0" style={{ color: CLAUDE_ORANGE }} />} testId="tip-model">
         {modelLabel(model, models)}
-        {effort && <span className="text-muted-foreground"> · {effort}</span>}
+        {effort && <span className="text-muted-foreground"> ({effort})</span>}
       </TipRow>
     </>
   );

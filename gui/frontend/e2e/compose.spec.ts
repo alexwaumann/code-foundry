@@ -84,7 +84,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   // A composer has no sidebar row: nothing in the thread list is selected.
   await expect(page.getByTestId("thread-list").locator('[aria-selected="true"]')).toHaveCount(0);
   // Defaults: settings (opus / high), Auto, a new worktree from ListRefs' default ref.
-  await expect(page.getByTestId("composer-model")).toHaveText("Opus (default)");
+  await expect(page.getByTestId("composer-model")).toHaveText("Opus");
   await expect(page.getByTestId("composer-effort")).toHaveText("High");
   await expect(page.getByTestId("composer-permission")).toHaveText("Auto");
   await expect(page.getByTestId("composer-worktree")).toHaveText("New worktree");
@@ -144,14 +144,14 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
   await expect(page.getByTestId("composer-model-list")).toBeVisible();
   // The daemon's model registry, from the settings schema.
   await expect(page.getByTestId("composer-model-list").getByRole("option")).toHaveText([
-    "Fable (default)",
-    "Opus (default)",
+    "Fable",
+    "Opus",
     "Opus 4.8",
     "Opus 4.7",
-    "Sonnet (default)",
+    "Sonnet",
     "Sonnet 5",
     "Sonnet 4.6",
-    "Haiku (default)",
+    "Haiku",
     "Haiku 4.5",
   ]);
   await page.keyboard.press("ArrowDown"); // opus -> claude-opus-4-8

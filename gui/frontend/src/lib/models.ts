@@ -12,10 +12,10 @@ export const MODEL_SETTING_KEY = "sessions.default_model";
 
 /** The family aliases, until the schema arrives. Claude Code resolves each to its default. */
 export const FALLBACK_MODEL_CHOICES: readonly Choice[] = [
-  { value: "fable", label: "Fable (default)" },
-  { value: "opus", label: "Opus (default)" },
-  { value: "sonnet", label: "Sonnet (default)" },
-  { value: "haiku", label: "Haiku (default)" },
+  { value: "fable", label: "Fable" },
+  { value: "opus", label: "Opus" },
+  { value: "sonnet", label: "Sonnet" },
+  { value: "haiku", label: "Haiku" },
 ];
 
 /** An enum value's display name: its label from the schema, else the value itself. */

@@ -16,11 +16,6 @@ function enumLabel(f: SettingFieldView, v: string): string {
   return v === "" ? "Default" : enumOptionLabel(f, v);
 }
 
-/** " (default)" after the field's default option, unless its label already says so ("Opus (default)"). */
-function defaultSuffix(f: SettingFieldView, v: string): string {
-  return v === f.defaultValue && v !== "" && !enumLabel(f, v).endsWith("(default)") ? " (default)" : "";
-}
-
 function displayValue(f: SettingFieldView, v: string): string {
   if (f.type === "keybinding") return v === "none" ? "unbound" : v ? formatChord(v) : "unbound";
   if (f.type === "enum") return enumLabel(f, v);
@@ -72,7 +67,7 @@ function EnumEditor({ field, value, pending, commit }: EditorProps) {
       {field.enumValues.map((v) => (
         <option key={v} value={v}>
           {enumLabel(field, v)}
-          {defaultSuffix(field, v)}
+          {v === field.defaultValue && v !== "" ? " (default)" : ""}
         </option>
       ))}
     </select>

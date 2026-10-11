@@ -18,18 +18,18 @@ type Model struct {
 }
 
 // registry is in display order: per family, the alias first, then pinned versions newest
-// first. The "(default)" entries pass the bare alias, so Claude Code resolves whatever the
-// user's default for that family is (including a managed-settings pin). Edit this list to
+// first. The family entries ("Opus") pass the bare alias, so Claude Code resolves whatever
+// the user's default for that family is (including a managed-settings pin). Edit this list to
 // add or retire models.
 var registry = []Model{
-	{"fable", "Fable (default)"},
-	{"opus", "Opus (default)"},
+	{"fable", "Fable"},
+	{"opus", "Opus"},
 	{"claude-opus-4-8", "Opus 4.8"},
 	{"claude-opus-4-7", "Opus 4.7"},
-	{"sonnet", "Sonnet (default)"},
+	{"sonnet", "Sonnet"},
 	{"claude-sonnet-5", "Sonnet 5"},
 	{"claude-sonnet-4-6", "Sonnet 4.6"},
-	{"haiku", "Haiku (default)"},
+	{"haiku", "Haiku"},
 	{"claude-haiku-4-5", "Haiku 4.5"},
 }
 

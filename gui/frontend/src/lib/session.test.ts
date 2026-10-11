@@ -63,15 +63,15 @@ describe("disconnectCause", () => {
 
 describe("modelEffortLabel", () => {
   const models = [
-    { value: "opus", label: "Opus (default)" },
+    { value: "opus", label: "Opus" },
     { value: "claude-opus-4-8", label: "Opus 4.8" },
-    { value: "haiku", label: "Haiku (default)" },
+    { value: "haiku", label: "Haiku" },
   ];
   it.each([
-    ["opus", "high", "Opus (default) · high"],
-    ["claude-opus-4-8", "max", "Opus 4.8 · max"],
-    ["haiku", "", "Haiku (default)"],
-    ["claude-opus-5-5", "max", "claude-opus-5-5 · max"],
+    ["opus", "high", "Opus (high)"],
+    ["claude-opus-4-8", "max", "Opus 4.8 (max)"],
+    ["haiku", "", "Haiku"],
+    ["claude-opus-5-5", "max", "claude-opus-5-5 (max)"],
     ["", "high", ""],
     ["", "", ""],
   ])("%j %j", (model, effort, want) => {

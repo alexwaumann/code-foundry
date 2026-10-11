@@ -109,10 +109,10 @@ func TestEnumLabels(t *testing.T) {
 	tests := []struct {
 		key, value, want string
 	}{
-		{KeyDefaultModel, "opus", "Opus (default)"},
+		{KeyDefaultModel, "opus", "Opus"},
 		{KeyDefaultModel, "claude-opus-4-8", "Opus 4.8"},
 		{KeyDefaultModel, "claude-sonnet-4-6", "Sonnet 4.6"},
-		{KeyDefaultModel, "haiku", "Haiku (default)"},
+		{KeyDefaultModel, "haiku", "Haiku"},
 		{KeyDefaultModel, "claude-haiku-4-5", "Haiku 4.5"},
 		// Fields without labels show their values as they are.
 		{KeyTheme, "dark", ""},

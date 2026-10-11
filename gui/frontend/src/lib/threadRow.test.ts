@@ -69,7 +69,7 @@ describe("threadRowModel", () => {
 
 describe("helpers", () => {
   it.each([
-    ["opus", "Opus (default)"],
+    ["opus", "Opus"],
     ["claude-sonnet-4-6", "Sonnet 4.6"],
     ["sonnet[1m]", "sonnet[1m]"],
     ["claude-opus-5-5", "claude-opus-5-5"],
@@ -77,7 +77,7 @@ describe("helpers", () => {
     ["  ", "Default"],
   ])("modelLabel(%j) is %j", (model, want) => {
     const models = [
-      { value: "opus", label: "Opus (default)" },
+      { value: "opus", label: "Opus" },
       { value: "claude-sonnet-4-6", label: "Sonnet 4.6" },
     ];
     expect(modelLabel(model, models)).toBe(want);

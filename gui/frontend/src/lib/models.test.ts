@@ -4,7 +4,7 @@ import { enumOptionLabel, FALLBACK_MODEL_CHOICES, MODEL_SETTING_KEY, modelChoice
 const modelField = {
   key: MODEL_SETTING_KEY,
   enumValues: ["fable", "opus", "claude-opus-4-8", "claude-opus-4-7", "sonnet", "claude-sonnet-5", "claude-sonnet-4-6", "haiku", "claude-haiku-4-5"],
-  enumLabels: ["Fable (default)", "Opus (default)", "Opus 4.8", "Opus 4.7", "Sonnet (default)", "Sonnet 5", "Sonnet 4.6", "Haiku (default)", "Haiku 4.5"],
+  enumLabels: ["Fable", "Opus", "Opus 4.8", "Opus 4.7", "Sonnet", "Sonnet 5", "Sonnet 4.6", "Haiku", "Haiku 4.5"],
 };
 
 describe("modelChoicesFromSchema", () => {
@@ -33,7 +33,7 @@ describe("modelChoicesFromSchema", () => {
 describe("modelName", () => {
   const choices = modelChoicesFromSchema([modelField]) ?? [];
   it.each([
-    ["opus", "Opus (default)"],
+    ["opus", "Opus"],
     ["claude-opus-4-8", "Opus 4.8"],
     ["claude-haiku-4-5", "Haiku 4.5"],
     ["claude-opus-5-5[1m]", "claude-opus-5-5[1m]"],
@@ -43,7 +43,7 @@ describe("modelName", () => {
 
   it("the fallback names the family aliases", () => {
     expect(FALLBACK_MODEL_CHOICES.map((c) => c.value)).toEqual(["fable", "opus", "sonnet", "haiku"]);
-    expect(modelName(FALLBACK_MODEL_CHOICES, "sonnet")).toBe("Sonnet (default)");
+    expect(modelName(FALLBACK_MODEL_CHOICES, "sonnet")).toBe("Sonnet");
     expect(modelName(FALLBACK_MODEL_CHOICES, "claude-sonnet-5")).toBe("claude-sonnet-5");
   });
 });

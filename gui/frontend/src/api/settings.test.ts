@@ -31,7 +31,7 @@ describe("settings mapping", () => {
   });
 
   it.each([
-    ["labels parallel to the values", ["opus", "claude-opus-4-8"], ["Opus (default)", "Opus 4.8"], ["Opus (default)", "Opus 4.8"]],
+    ["labels parallel to the values", ["opus", "claude-opus-4-8"], ["Opus", "Opus 4.8"], ["Opus", "Opus 4.8"]],
     ["no labels", ["dark", "light"], [], []],
     ["labels that do not line up are dropped", ["a", "b"], ["A"], []],
   ])("maps enum labels: %s", (_, enumValues, enumLabels, want) => {
