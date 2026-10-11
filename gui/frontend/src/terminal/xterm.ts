@@ -8,6 +8,7 @@ import { chordFromEvent } from "@/keys/chord";
 import { copyText } from "@/lib/clipboard";
 import type { ColorScheme, Disposable, TermSize, TerminalRenderer } from "./renderer";
 import { DEFAULT_TERMINAL_FONT_FAMILY, onBundledFontLoaded } from "./fonts";
+import { KeyboardModes, shiftEnterSequence } from "./keyboard";
 import { terminalTheme } from "./theme";
 
 export type RendererKind = "webgl" | "dom";
@@ -44,6 +45,8 @@ export class XtermRenderer implements TerminalRenderer {
   private readonly resizeListeners = new Set<(s: TermSize) => void>();
   private readonly disposables: IDisposable[] = [];
   private mounted = false;
+  /** Kitty keyboard / modifyOtherKeys state the program asked for (see keyboard.ts). */
+  readonly keyboardModes = new KeyboardModes();
   kind: RendererKind = "dom";
 
   constructor(private readonly opts: XtermRendererOptions) {
@@ -65,10 +68,44 @@ export class XtermRenderer implements TerminalRenderer {
       }),
     );
     this.term.attachCustomKeyEventHandler((e) => this.keyHandler(e));
+    this.trackKeyboardModes();
+  }
+
+  /**
+   * Observes the keyboard-protocol sequences xterm.js does not implement. Every handler
+   * returns false so xterm's own handling (none, for these) still runs.
+   */
+  private trackKeyboardModes(): void {
+    const modes = this.keyboardModes;
+    const csi = (prefix: string, final: string, apply: (params: (number | number[])[]) => void) =>
+      this.term.parser.registerCsiHandler({ prefix, final }, (params) => {
+        apply(params);
+        return false;
+      });
+    this.disposables.push(
+      csi(">", "u", (params) => { modes.kittyPush(params); }),
+      csi("<", "u", (params) => { modes.kittyPop(params); }),
+      csi("=", "u", (params) => { modes.kittySet(params); }),
+      csi(">", "m", (params) => { modes.xtmodkeys(params); }),
+      this.term.parser.registerEscHandler({ final: "c" }, () => {
+        modes.reset(); // RIS
+        return false;
+      }),
+      this.term.buffer.onBufferChange((buf) => {
+        modes.setAlternate(buf.type === "alternate");
+      }),
+    );
   }
 
   /** Returns false for keys xterm must not process. */
   private keyHandler(e: KeyboardEvent): boolean {
+    // xterm sends "\r" for shift+enter. Send the program's shift+enter instead; swallow
+    // the keypress too so xterm cannot add a "\r" from it.
+    if ((e.type === "keydown" || e.type === "keypress") && !e.isComposing && chordFromEvent(e) === "shift+enter") {
+      e.preventDefault();
+      if (e.type === "keydown") this.term.input(shiftEnterSequence(this.keyboardModes));
+      return false;
+    }
     if (e.type !== "keydown") return true;
     const chord = chordFromEvent(e);
     if (!chord) return true;
@@ -156,6 +193,7 @@ export class XtermRenderer implements TerminalRenderer {
   reset(): void {
     this.term.reset();
     this.term.clear();
+    this.keyboardModes.reset();
   }
 
   resize(cols: number, rows: number): void {
