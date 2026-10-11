@@ -946,6 +946,43 @@ test("while picking, Escape mid-drag cancels the drag and leaves picking alone; 
   await expect(panel(page)).not.toHaveAttribute("data-picking");
 });
 
+test("the drop settle leaves no transform or animation behind, and a tab picked up again mid-settle follows the pointer", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await page.getByTestId("panel-toggle").click();
+  await injectTab(page, "files", "Files");
+  await injectTab(page, "diff", "Diff");
+  await injectTab(page, "pullrequest", "#12", { number: "12" });
+  const tabs = panel(page).getByRole("tab");
+  const plus = panel(page).getByTestId("panel-new-tab");
+  const strip = panel(page).getByTestId("panel-tabs");
+  const residue = () =>
+    strip.evaluate((el) =>
+      Array.from(el.querySelectorAll<HTMLElement>("[data-tab-id]"))
+        .filter((w) => w.getAnimations().length > 0 || getComputedStyle(w).transform !== "none")
+        .map((w) => w.dataset.tabId),
+    );
+
+  // A drop, then the same tab picked up again at once: the settle is cancelled, so the lifted tab is where dnd-kit puts it.
+  await startTabDrag(page, tabs.first(), await centerX(plus));
+  await page.mouse.up();
+  await expect(tabs).toHaveText(["Diff", "#12", "Files"]);
+  const files = panel(page).locator('[data-tab-id="files"]');
+  await startTabDrag(page, tabs.last(), await centerX(tabs.first()));
+  await expect(panel(page).locator("[data-dragging]")).toHaveAttribute("data-tab-id", "files");
+  expect(await files.evaluate((el) => el.getAnimations().length)).toBe(0);
+  await page.mouse.up();
+  await expect(tabs).toHaveText(["Files", "Diff", "#12"]);
+  await expect.poll(residue).toEqual([]);
+
+  // A cancel settles the same way.
+  await startTabDrag(page, tabs.first(), await centerX(plus));
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  await expect(tabs).toHaveText(["Files", "Diff", "#12"]);
+  await expect.poll(residue).toEqual([]);
+});
+
 test("dragging a tab to the strip's edge scrolls the strip and lands it at the far end; alt+Right past the edge scrolls too", async ({ page }) => {
   await openApp(page);
   await selectSession(page, "s-1");

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { flushSync } from "react-dom";
-import { closestCenter, DndContext, defaultDropAnimation, PointerSensor, useSensor, useSensors, type Announcements, type DragCancelEvent, type DragEndEvent, type ScreenReaderInstructions, type UniqueIdentifier } from "@dnd-kit/core";
+import { closestCenter, DndContext, defaultDropAnimation, PointerSensor, useSensor, useSensors, type Announcements, type DragCancelEvent, type DragEndEvent, type DragStartEvent, type ScreenReaderInstructions, type UniqueIdentifier } from "@dnd-kit/core";
 import { restrictToHorizontalAxis, restrictToParentElement } from "@dnd-kit/modifiers";
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -261,8 +261,11 @@ function TabStrip({ panelKey }: { panelKey: string }) {
   // The drop: dnd-kit's drop animation belongs to a DragOverlay, and in place the dragged
   // tab would jump from under the pointer to its slot. So the drop records where it is
   // on screen and, once it sits in its slot, slides it the rest of the way (FLIP) with
-  // dnd-kit's default drop animation timing.
+  // dnd-kit's default drop animation timing. A tab picked up again while it settles drops
+  // the animation, which would otherwise override dnd-kit's transform (the lifted tab
+  // would not follow the pointer until it ended).
   const settle = useRef<{ id: string; left: number } | null>(null);
+  const settling = useRef(new Map<string, Animation>());
   const [settleSeq, setSettleSeq] = useState(0);
   const drop = (id: string) => {
     const el = stripRef.current && tabNode(stripRef.current, id);
@@ -277,11 +280,21 @@ function TabStrip({ panelKey }: { panelKey: string }) {
     if (!s || !el || typeof el.animate !== "function") return;
     const dx = s.left - el.getBoundingClientRect().left;
     if (Math.abs(dx) < 1) return;
-    el.animate([{ transform: `translate3d(${String(dx)}px, 0, 0)`, zIndex: 10 }, { transform: "translate3d(0, 0, 0)", zIndex: 10 }], {
+    const anim = el.animate([{ transform: `translate3d(${String(dx)}px, 0, 0)`, zIndex: 10 }, { transform: "translate3d(0, 0, 0)", zIndex: 10 }], {
       duration: defaultDropAnimation.duration,
       easing: defaultDropAnimation.easing,
     });
+    const running = settling.current;
+    running.set(s.id, anim);
+    anim.onfinish = () => {
+      if (running.get(s.id) === anim) running.delete(s.id);
+    };
   }, [settleSeq]);
+  const onDragStart = ({ active }: DragStartEvent) => {
+    const id = String(active.id);
+    settling.current.get(id)?.cancel();
+    settling.current.delete(id);
+  };
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     const id = String(active.id);
     drop(id);
@@ -300,6 +313,7 @@ function TabStrip({ panelKey }: { panelKey: string }) {
       modifiers={[restrictToHorizontalAxis, restrictToParentElement]}
       accessibility={{ announcements, screenReaderInstructions }}
       autoScroll={autoScroll}
+      onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onDragCancel={onDragCancel}
     >
