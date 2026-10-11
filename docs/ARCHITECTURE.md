@@ -181,7 +181,8 @@ Services (v1):
   it too (`docs/notes/add-project-1-paths.md`). ListSkills (`.claude/skills` and
   `.claude/commands` of given checkouts, plus the user's) and SearchFiles (fuzzy match over
   a checkout's git-listed or walked files, cached ~5s) feed the composer's `/` and `@`
-  completion (`docs/notes/composer-tags-1-daemon.md`).
+  completion (`docs/notes/composer-tags-1-daemon.md`; the GUI's tags and `/` card:
+  `docs/notes/composer-tags-3-skills.md`).
 * `HealthService` — Ping, Version.
 
 Rules:
