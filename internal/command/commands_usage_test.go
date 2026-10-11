@@ -51,7 +51,7 @@ func TestUsageShow(t *testing.T) {
 			}
 		})
 	}
-	if _, err := reg.Invoke(context.Background(), command.Context{ActiveView: "terminal"}, "usage.show", nil); err == nil {
+	if _, err := reg.Invoke(context.Background(), command.Context{ActiveView: "session"}, "usage.show", nil); err == nil {
 		t.Error("usage.show ran from the GUI; it is the CLI's (the palette has view.usage)")
 	}
 }

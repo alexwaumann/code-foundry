@@ -1984,7 +1984,7 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "help" } } }))}`,
       },
       {
-        cmd: { name: "view.panel.toggle", title: "Toggle Side Panel", category: "View", description: "Show or hide the side panel next to the selected session, terminal, worktree, or page.", keybindings: ["cmd+shift+e"], args: [] },
+        cmd: { name: "view.panel.toggle", title: "Toggle Side Panel", category: "View", description: "Show or hide the side panel next to the selected thread or page.", keybindings: ["cmd+shift+e"], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.toggle" } } }))}`,
       },
@@ -1994,12 +1994,12 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "bottom.toggle" } } }))}`,
       },
       {
-        cmd: { name: "view.panel.expand", title: "Expand Side Panel", category: "View", description: "Toggle the side panel between its split width and the full width of the content area for the selected session, terminal, worktree, or page.", keybindings: [], args: [] },
+        cmd: { name: "view.panel.expand", title: "Expand Side Panel", category: "View", description: "Toggle the side panel between its split width and the full width of the content area for the selected thread or page.", keybindings: [], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.expand" } } }))}`,
       },
       {
-        cmd: { name: "view.panel.new-tab", title: "New Side Panel Tab", category: "View", description: "Show the surface list in the side panel of the selected session, terminal, worktree, or page, to open another tab there.", keybindings: [], args: [] },
+        cmd: { name: "view.panel.new-tab", title: "New Side Panel Tab", category: "View", description: "Show the surface list in the side panel of the selected thread or page, to open another tab there.", keybindings: [], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.new-tab" } } }))}`,
       },
@@ -2025,8 +2025,8 @@ export class World {
           keybindings: [],
           args: [],
         },
-        // Like the daemon: a thread or terminal is active and it sits in a registered worktree.
-        when: (ctx) => Boolean((ctx?.activeSessionId || ctx?.activeTerminalId) && ctx.activeRepoId && ctx.activeWorktreePath),
+        // Like the daemon: a thread is active and it sits in a registered worktree.
+        when: (ctx) => Boolean(ctx?.activeSessionId && ctx.activeRepoId && ctx.activeWorktreePath),
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.worktree" } } }))}`,
       },
       {
