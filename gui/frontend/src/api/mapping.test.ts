@@ -29,7 +29,7 @@ import { overrideEndpoint } from "./endpoint";
 import { toEventView } from "./events";
 import { toGhEventView, toPullRequestDetailView, toPullRequestView, toReviewerCandidateView } from "./gh";
 import { isRemoteless, toRepoEventView, toRepoView } from "./repo";
-import { toSessionView } from "./session";
+import { toSessionEventView, toSessionView } from "./session";
 import { toAttachEventView, toTerminalEventView, toTerminalView } from "./terminal";
 import { toUiIntentView } from "./ui";
 import { toWorkspaceEventView } from "./workspace";
@@ -353,6 +353,47 @@ describe("events mapping", () => {
       { slug: "o/r", number: 5, url: "https://github.com/o/r/pull/5", linkedAt: 9000 },
       { slug: "o/r", number: 6, url: "https://github.com/o/r/pull/6", linkedAt: null },
     ]);
+  });
+
+  it("maps usage buckets, cost and the retired ledger", () => {
+    const bucket = {
+      model: "claude-haiku-5-5",
+      tier: "long",
+      speed: "",
+      day: "2026-10-10",
+      requests: 3n,
+      input: 12n,
+      output: 340n,
+      cacheRead: 30100n,
+      cacheWrite5m: 0n,
+      cacheWrite1h: 11400n,
+      costUsd: 0.0026,
+      unpriced: false,
+    };
+    const view = {
+      model: "claude-haiku-5-5",
+      tier: "long",
+      speed: "",
+      day: "2026-10-10",
+      requests: 3,
+      input: 12,
+      output: 340,
+      cacheRead: 30100,
+      cacheWrite5m: 0,
+      cacheWrite1h: 11400,
+      costUsd: 0.0026,
+      unpriced: false,
+    };
+    expect(toSessionView(create(SessionSchema, { id: "s0" }))).toMatchObject({ usage: [], costUsd: 0, unpriced: false });
+    expect(toSessionView(create(SessionSchema, { id: "s1", usage: [bucket], costUsd: 0.0026, unpriced: true }))).toMatchObject({
+      usage: [view],
+      costUsd: 0.0026,
+      unpriced: true,
+    });
+    const snap = toSessionEventView(create(SessionEventSchema, { event: { case: "snapshot", value: { sessions: [], retiredUsage: [bucket] } } }));
+    expect(snap).toEqual({ kind: "snapshot", sessions: [], retiredUsage: [view] });
+    const retired = toSessionEventView(create(SessionEventSchema, { event: { case: "retiredUsage", value: { buckets: [bucket] } } }));
+    expect(retired).toEqual({ kind: "retiredUsage", buckets: [view] });
   });
 
   it("empty events map to null", () => {

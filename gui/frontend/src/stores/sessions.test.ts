@@ -7,7 +7,7 @@ import { deriveContext } from "./context";
 import { dispatchEvent } from "./events";
 import { applyIntent } from "./intents";
 import { emptyRepos, replaceRepos, useReposStore } from "./repos";
-import { activeThreadIds, applySessionEvent, attentionIds, connectedCount, emptySessions, replaceSessions, runningCount, sessionOfTerminal, useSessionsStore } from "./sessions";
+import { activeThreadIds, applyRetiredUsage, applySessionEvent, attentionIds, connectedCount, emptySessions, replaceSessions, runningCount, sessionOfTerminal, useSessionsStore } from "./sessions";
 import { emptyTerminals, useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 
@@ -39,6 +39,9 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     pendingWorktreePath: "",
     pinned: false,
     linkedPullRequests: [],
+    usage: [],
+    costUsd: 0,
+    unpriced: false,
     ...over,
   };
 }
@@ -61,7 +64,7 @@ describe("session reducers", () => {
   });
 
   it.each([
-    ["snapshot replaces", { kind: "snapshot" as const, sessions: [session("z")] }, ["z"]],
+    ["snapshot replaces", { kind: "snapshot" as const, sessions: [session("z")], retiredUsage: [] }, ["z"]],
     ["updated appends", { kind: "updated" as const, session: session("c", { createdAtMs: 99 }) }, ["a", "b", "c"]],
     ["removed drops", { kind: "removed" as const, id: "a" }, ["b"]],
     ["unknown removal is a no-op", { kind: "removed" as const, id: "nope" }, ["a", "b"]],
@@ -82,6 +85,34 @@ describe("session reducers", () => {
     const next = applySessionEvent(prev, { kind: "updated", session: session("a", { linkedPullRequests: [pr(5), pr(6)] }) });
     expect(next).not.toBe(prev);
     expect(next.byId.a?.linkedPullRequests.map((l) => l.number)).toEqual([5, 6]);
+  });
+
+  it("usage compares by content; the retired ledger follows snapshots and retiredUsage events", () => {
+    const bucket = (requests: number) => ({
+      model: "claude-haiku-5-5",
+      tier: "",
+      speed: "",
+      day: "2026-10-10",
+      requests,
+      input: 1,
+      output: 2,
+      cacheRead: 3,
+      cacheWrite5m: 0,
+      cacheWrite1h: 4,
+      costUsd: 0.001,
+      unpriced: false,
+    });
+    const prev = replaceSessions(emptySessions, [session("a", { usage: [bucket(1)] })]);
+    expect(applySessionEvent(prev, { kind: "updated", session: session("a", { usage: [bucket(1)] }) })).toBe(prev);
+    const next = applySessionEvent(prev, { kind: "updated", session: session("a", { usage: [bucket(2)] }) });
+    expect(next.byId.a?.usage[0]?.requests).toBe(2);
+    expect(applySessionEvent(prev, { kind: "retiredUsage", buckets: [bucket(1)] })).toBe(prev);
+
+    const retired = [bucket(5)];
+    expect(applyRetiredUsage([], { kind: "snapshot", sessions: [], retiredUsage: retired })).toBe(retired);
+    expect(applyRetiredUsage(retired, { kind: "retiredUsage", buckets: [bucket(5)] })).toBe(retired);
+    expect(applyRetiredUsage(retired, { kind: "retiredUsage", buckets: [bucket(6)] })[0]?.requests).toBe(6);
+    expect(applyRetiredUsage(retired, { kind: "removed", id: "a" })).toBe(retired);
   });
 
   it("attentionIds counts a disconnected session's persisted attention, not an interrupted one", () => {
@@ -165,7 +196,7 @@ describe("event dispatch", () => {
   });
 
   it("routes each source to its slice", () => {
-    dispatchEvent({ source: "session", event: { kind: "snapshot", sessions: [session("s1")] } });
+    dispatchEvent({ source: "session", event: { kind: "snapshot", sessions: [session("s1")], retiredUsage: [] } });
     dispatchEvent({ source: "terminal", event: { kind: "updated", terminal: term("t1") } });
     dispatchEvent({ source: "repo", event: { kind: "snapshot", repos: [] } });
     dispatchEvent({ source: "gh", event: { kind: "viewer" } });

@@ -1,5 +1,5 @@
 import { timestampMs } from "@bufbuild/protobuf/wkt";
-import { PermissionMode, SessionService, SessionState, SessionStatus, type Session, type SessionEvent } from "@/gen/codefoundry/v1/session_pb";
+import { PermissionMode, SessionService, SessionState, SessionStatus, type Session, type SessionEvent, type UsageBucket } from "@/gen/codefoundry/v1/session_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
 
@@ -64,6 +64,37 @@ export interface SessionView {
    * per URL, in first-seen order; never shrinks. docs/notes/linked-prs.md.
    */
   linkedPullRequests: LinkedPullRequestView[];
+  /**
+   * Token usage of the thread's transcript, one bucket per (model, tier, speed, UTC day),
+   * sorted by day, model, tier, speed. docs/notes/session-usage.md.
+   */
+  usage: UsageBucketView[];
+  /** Price of usage in USD at Claude API rates, excluding unpriced buckets. */
+  costUsd: number;
+  /** Some bucket has no known rate: costUsd is a lower bound; say "unpriced", never $0. */
+  unpriced: boolean;
+}
+
+/** Token counters for one model on one UTC day, priced by the daemon. */
+export interface UsageBucketView {
+  /** Canonical model id, e.g. "claude-opus-5-5". */
+  model: string;
+  /** "" or "long" (Haiku 5.5 prompts over 100K tokens). */
+  tier: string;
+  /** "" (standard) or "fast". */
+  speed: string;
+  /** UTC "YYYY-MM-DD"; "unknown" for records without a timestamp. */
+  day: string;
+  requests: number;
+  input: number;
+  /** Includes thinking tokens. */
+  output: number;
+  cacheRead: number;
+  cacheWrite5m: number;
+  cacheWrite1h: number;
+  /** USD; 0 when unpriced. */
+  costUsd: number;
+  unpriced: boolean;
 }
 
 /** A pull request linked to a thread. */
@@ -76,10 +107,16 @@ export interface LinkedPullRequestView {
   linkedAt: number | null;
 }
 
+/**
+ * Session events. retiredUsage is the usage of removed threads summed per (model, tier,
+ * speed, day): usage over every thread is the sessions' usage plus it. A "retiredUsage"
+ * event follows "removed" when the removed thread had usage and carries the whole ledger.
+ */
 export type SessionEventView =
-  | { kind: "snapshot"; sessions: SessionView[] }
+  | { kind: "snapshot"; sessions: SessionView[]; retiredUsage: UsageBucketView[] }
   | { kind: "updated"; session: SessionView }
-  | { kind: "removed"; id: string };
+  | { kind: "removed"; id: string }
+  | { kind: "retiredUsage"; buckets: UsageBucketView[] };
 
 const stateMap: Record<SessionState, SessionStateView> = {
   [SessionState.UNSPECIFIED]: "unknown",
@@ -137,6 +174,26 @@ export function toSessionView(s: Session): SessionView {
       url: l.url,
       linkedAt: l.linkedAt ? timestampMs(l.linkedAt) : null,
     })),
+    usage: s.usage.map(toUsageBucketView),
+    costUsd: s.costUsd,
+    unpriced: s.unpriced,
+  };
+}
+
+export function toUsageBucketView(b: UsageBucket): UsageBucketView {
+  return {
+    model: b.model,
+    tier: b.tier,
+    speed: b.speed,
+    day: b.day,
+    requests: Number(b.requests),
+    input: Number(b.input),
+    output: Number(b.output),
+    cacheRead: Number(b.cacheRead),
+    cacheWrite5m: Number(b.cacheWrite5m),
+    cacheWrite1h: Number(b.cacheWrite1h),
+    costUsd: b.costUsd,
+    unpriced: b.unpriced,
   };
 }
 
@@ -144,11 +201,13 @@ export function toSessionEventView(ev: SessionEvent): SessionEventView | null {
   const e = ev.event;
   switch (e.case) {
     case "snapshot":
-      return { kind: "snapshot", sessions: e.value.sessions.map(toSessionView) };
+      return { kind: "snapshot", sessions: e.value.sessions.map(toSessionView), retiredUsage: e.value.retiredUsage.map(toUsageBucketView) };
     case "updated":
       return { kind: "updated", session: toSessionView(e.value) };
     case "removedId":
       return { kind: "removed", id: e.value };
+    case "retiredUsage":
+      return { kind: "retiredUsage", buckets: e.value.buckets.map(toUsageBucketView) };
     default:
       return null;
   }
