@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SessionStatusView } from "@/api/session";
-import { disconnectCause, disconnectedPill, modelLabel, sessionLocation, statusDetail, statusKind, type LocationRepos, type PillKind, type StatusKind } from "./session";
+import { attentionTier, disconnectCause, disconnectedPill, modelLabel, sessionLocation, statusDetail, statusKind, statusNote, type LocationRepos, type PillKind, type StatusKind } from "./session";
 
 // Reasons as the daemon reported them: replays of the internal/claudestatus fixtures
 // (Claude Code 2.1.294; CLAUDESTATUS_TRACE=<fixture>, noscreen for "waiting for approval")
@@ -98,5 +98,28 @@ describe("sessionLocation", () => {
     ["unplaceable", "/tmp/elsewhere/scratch", { project: "scratch", branch: "" }],
   ])("%s", (_, worktreePath, want) => {
     expect(sessionLocation({ worktreePath }, repos)).toEqual(want);
+  });
+});
+
+describe("statusNote / attentionTier", () => {
+  it.each<[SessionStatusView, string, string, string]>([
+    ["attention", "permission: Do you want to proceed?", "Do you want to proceed?", "prompt"],
+    ["attention", "waiting for approval: Bash", "Bash", "prompt"],
+    ["attention", "question: Which?", "Which?", "prompt"],
+    ["attention", "waiting for input", "", "prompt"],
+    ["attention", "plan: ready", "ready", "prompt"],
+    ["attention", "trust: folder", "folder", "prompt"],
+    ["attention", "bell", "", "prompt"],
+    ["attention", "error: overloaded", "overloaded", "prompt"],
+    ["attention", "something new", "something new", "prompt"],
+    ["attention", "finished", "", "done"],
+    ["error", "interrupted", "", ""],
+    ["error", "daemon restarted", "daemon restarted", ""],
+    ["busy", "working: Say hi", "Say hi", ""],
+    ["idle", "at prompt", "at prompt", ""],
+    ["unknown", "", "", ""],
+  ])("%s %j", (status, statusReason, note, tier) => {
+    expect(statusNote({ statusReason })).toBe(note);
+    expect(attentionTier({ status, statusReason })).toBe(tier);
   });
 });

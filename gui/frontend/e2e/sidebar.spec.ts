@@ -92,16 +92,15 @@ test("Notifications: the count over the bell jumps to the waiting thread; with n
   await expect(page.getByTestId("projects-page")).toBeVisible();
 });
 
-test("the sidebar is a flat thread list: sections on top, workspace badges, no repo or worktree rows", async ({ page }) => {
+test("the sidebar is a flat thread list: waiting threads on top, no thread headers, workspace badges, no repo or worktree rows", async ({ page }) => {
   const driver = await workspaceWithThread();
   await openApp(page);
   await expect(row(page, `s:${driver}`)).toBeVisible();
   await expect(page.getByTestId("sidebar-band")).toContainText("Code Foundry");
-  // Needs attention (s-2) on top, then threads newest first, then terminals no thread owns.
+  // The waiting thread (s-2) on top, then threads newest first, then terminals no thread owns
+  // under the only header.
   await expect.poll(() => rowKeys(page)).toEqual([
-    "# Needs attention",
     "s:s-2",
-    "# Threads",
     `s:${driver}`,
     "s:s-5",
     "s:s-1",
@@ -122,12 +121,14 @@ test("the sidebar is a flat thread list: sections on top, workspace badges, no r
   await expect(d.getByTestId("row-project")).toHaveText("ghostty-playground");
   await expect(d.getByTestId("row-branch")).toHaveText("cf/login");
   await expect(d.getByTestId("row-workspace")).toHaveText("login");
+  // No model on the row any more.
+  await expect(d).not.toContainText("haiku");
   // A project thread: no badge.
   const s1 = row(page, "s:s-1");
   await expect(s1.getByTestId("row-project")).toHaveText("code-foundry");
   await expect(s1.getByTestId("row-branch")).toHaveText("main");
   await expect(s1.getByTestId("row-workspace")).toHaveCount(0);
-  // Terminals keep a terminal glyph and say where they run.
+  // Terminals say where they run.
   await expect(row(page, "t:t-top").getByTestId("row-place")).toHaveText("code-foundry · feat/sidebar");
   await expect(row(page, "t:t-tmp").getByTestId("row-place")).toHaveText("/tmp");
 
@@ -144,7 +145,7 @@ test("the sidebar is a flat thread list: sections on top, workspace badges, no r
   await expect(d).toHaveAttribute("aria-selected", "true");
 });
 
-test("pin from the context menu moves a thread to Pinned; unpin moves it back", async ({ page }) => {
+test("pin from the context menu moves a thread to the top; unpin moves it back", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-3").click({ button: "right" });
   const menu = page.getByTestId("row-menu");
@@ -154,13 +155,15 @@ test("pin from the context menu moves a thread to Pinned; unpin moves it back", 
   const pin = await lastInvocation("session.pin");
   expect(pin?.args).toEqual({ pinned: "true" });
   expect(pin?.context?.activeSessionId).toBe("s-3");
-  await expect.poll(async () => (await rowKeys(page)).slice(0, 3)).toEqual(["# Pinned", "s:s-3", "# Needs attention"]);
+  await expect.poll(async () => (await rowKeys(page)).slice(0, 2)).toEqual(["s:s-3", "s:s-2"]);
+  await expect(row(page, "s:s-3")).toHaveAttribute("data-section", "pinned");
   await expect(row(page, "s:s-3").getByTestId("row-pinned")).toBeVisible();
 
   await row(page, "s:s-3").click({ button: "right" });
   await expect(page.getByTestId("menu-pin")).toHaveText("Unpin");
   await page.getByTestId("menu-pin").click();
-  await expect.poll(async () => (await rowKeys(page)).slice(0, 2)).toEqual(["# Needs attention", "s:s-2"]);
+  await expect.poll(async () => (await rowKeys(page)).slice(0, 2)).toEqual(["s:s-2", "s:s-5"]);
+  await expect.poll(async () => (await rowKeys(page)).at(5)).toBe("s:s-3");
 });
 
 test("Run in… from the context menu moves a workspace thread; the row shows the queued move", async ({ page }) => {
@@ -320,4 +323,144 @@ test("a workspace thread's member worktree never shows under its project in the 
   await openApp(page);
   await expect(list(page).locator(`[data-row-key*="${GP_LOGIN}"]`)).toHaveCount(0);
   await expect(list(page).getByText("cf/login")).toHaveCount(1); // only the driver row's branch
+});
+
+test("status kinds: each thread's second line says its status in words and colour; waiting threads first, prompts above finished", async ({ page }) => {
+  await mockPost("status-kinds");
+  await openApp(page);
+  // Prompts newest first (s-2 is the default world's permission prompt), then the finished
+  // turn, then everything else newest first: busy, interrupted, idle and offline alike.
+  await expect
+    .poll(async () => (await rowKeys(page)).filter((k) => k.startsWith("s:")))
+    .toEqual([
+      "s:s-k-plan",
+      "s:s-k-approval",
+      "s:s-k-question",
+      "s:s-k-error",
+      "s:s-2",
+      "s:s-k-asked-before-restart",
+      "s:s-k-finished",
+      "s:s-5",
+      "s:s-k-busy",
+      "s:s-k-interrupted",
+      "s:s-1",
+      "s:s-k-idle",
+      "s:s-6",
+      "s:s-4",
+      "s:s-3",
+    ]);
+  // The only header left is Terminals.
+  expect((await rowKeys(page)).filter((k) => k.startsWith("#"))).toEqual(["# Terminals"]);
+
+  const want: [string, string, string, RegExp][] = [
+    ["s-k-approval", "input", "Needs input · Bash", /text-amber/],
+    ["s-k-question", "question", "Asked a question", /text-amber/],
+    ["s-k-plan", "plan", "Plan ready for review", /text-amber/],
+    ["s-k-finished", "finished", "Finished 12 min ago", /text-emerald/],
+    ["s-k-error", "error", "Error · model_not_found", /text-red/],
+    ["s-k-busy", "working", "Working", /text-sky/],
+    ["s-k-interrupted", "interrupted", "Interrupted while working · 35 min ago", /text-red/],
+    ["s-k-asked-before-restart", "question", "Asked a question", /text-amber/],
+  ];
+  for (const [id, kind, text, tone] of want) {
+    const r = row(page, `s:${id}`);
+    await expect(r.getByTestId("row-place"), id).toHaveAttribute("data-status-line", kind);
+    await expect(r.getByTestId("row-status"), id).toHaveText(text);
+    await expect(r.getByTestId("row-status"), id).toHaveClass(tone);
+  }
+  // Working and idle rows say where they run; prompts and finished turns do not.
+  await expect(row(page, "s:s-k-busy").getByTestId("row-place")).toHaveText("Working · code-foundry · main");
+  const idle = row(page, "s:s-k-idle");
+  await expect(idle.getByTestId("row-place")).toHaveAttribute("data-status-line", "place");
+  await expect(idle.getByTestId("row-status")).toHaveCount(0);
+  await expect(idle.getByTestId("row-place")).toHaveText("code-foundry · main");
+  await expect(row(page, "s:s-k-question").getByTestId("row-project")).toHaveCount(0);
+  // Offline rows are dimmed, the rest are not; the name is never coloured by status.
+  for (const id of ["s-k-interrupted", "s-k-asked-before-restart"]) await expect(row(page, `s:${id}`).getByTestId("session-body"), id).toHaveAttribute("data-offline", "true");
+  for (const id of ["s-k-approval", "s-k-finished", "s-k-busy", "s-k-idle"]) await expect(row(page, `s:${id}`).getByTestId("session-body"), id).not.toHaveAttribute("data-offline");
+  await expect(row(page, "s:s-k-approval").getByTestId("session-name")).not.toHaveClass(/amber/);
+  // No status icon in thread rows.
+  await expect(list(page).locator('[data-row-kind="session"] [role="img"]')).toHaveCount(0);
+
+  // cmd+1 is the top row; cmd+shift+a visits the waiting threads in this order.
+  await list(page).focus();
+  await page.keyboard.press("Meta+1");
+  await expect(row(page, "s:s-k-plan")).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Meta+Shift+a");
+  await expect(row(page, "s:s-k-approval")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("attention-badge")).toHaveText("7");
+});
+
+test("hovering a thread row shows its tooltip: name, project, branch with a worktree chip, model and effort", async ({ page }) => {
+  await mockPost("threads?repo=repo-wr&count=1&status=idle&prefix=Notes");
+  await openApp(page);
+  // The open one: the previous tooltip may still be fading out.
+  const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
+
+  // s-3 runs in a linked worktree of code-foundry.
+  await row(page, "s:s-3").hover();
+  await expect(tip).toBeVisible();
+  await expect(tip).toHaveAttribute("data-session-id", "s-3");
+  await expect(tip.getByTestId("tip-name")).toHaveText("Fix resize race");
+  await expect(tip.getByTestId("tip-project")).toHaveText("code-foundry");
+  await expect(tip.getByTestId("tip-branch")).toHaveText("fix/resizeworktree");
+  await expect(tip.getByTestId("tip-branch-chip")).toHaveText("worktree");
+  await expect(tip.getByTestId("tip-model")).toHaveText("Opus (medium)");
+  await expect(tip.getByTestId("tip-project-chip")).toHaveCount(0);
+  // To the right of the sidebar, 220px wide.
+  const sidebar = await page.getByTestId("sidebar").boundingBox();
+  const box = await tip.boundingBox();
+  expect(box && sidebar && box.x >= sidebar.x + sidebar.width - 1).toBe(true);
+  expect(Math.round(box?.width ?? 0)).toBe(220);
+
+  // Moving to the next row: s-2 in ghostty-playground's main checkout, no effort.
+  await row(page, "s:s-2").hover();
+  await expect(tip).toHaveAttribute("data-session-id", "s-2");
+  await expect(tip.getByTestId("tip-branch")).toHaveText("main");
+  await expect(tip.getByTestId("tip-branch-chip")).toHaveCount(0);
+  await expect(tip.getByTestId("tip-model")).toHaveText("Sonnet");
+
+  // A project without git: a plain folder, the no git chip, no branch row.
+  const notes = list(page).locator('[data-row-kind="session"]').filter({ hasText: "Notes 1" });
+  await notes.hover();
+  await expect(tip.getByTestId("tip-name")).toHaveText("Notes 1");
+  await expect(tip.getByTestId("tip-project")).toHaveText("writingno git");
+  await expect(tip.getByTestId("tip-project-chip")).toHaveText("no git");
+  await expect(tip.getByTestId("tip-branch")).toHaveCount(0);
+  await expect(tip.getByTestId("tip-model")).toHaveText("Haiku");
+
+  // A click closes it and selects the row; the keyboard never opens one.
+  await notes.click();
+  await expect(tip).toHaveCount(0);
+  await page.mouse.move(900, 600);
+  await list(page).focus();
+  await page.keyboard.press("Home");
+  await page.keyboard.press("ArrowDown");
+  await page.waitForTimeout(700);
+  await expect(tip).toHaveCount(0);
+
+  // A right-click closes it and opens the row menu; other rows stay quiet while the menu is open.
+  await row(page, "s:s-1").hover();
+  await expect(tip).toHaveAttribute("data-session-id", "s-1");
+  await row(page, "s:s-1").click({ button: "right" });
+  await expect(page.getByTestId("row-menu")).toBeVisible();
+  await expect(tip).toHaveCount(0);
+  await row(page, "s:s-4").hover({ force: true });
+  await page.waitForTimeout(700);
+  await expect(tip).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("row-menu")).toHaveCount(0);
+});
+
+test("the toolbar: Dashboard and Notifications on the left, Add project then New thread on the right", async ({ page }) => {
+  await openApp(page);
+  const bar = await page.getByTestId("sidebar-toolbar").boundingBox();
+  const at = async (id: string) => (await page.getByTestId(id).boundingBox()) ?? { x: 0, width: 0 };
+  const [dash, bell, add, add2] = [await at("sidebar-dashboard"), await at("sidebar-notifications"), await at("sidebar-add-project"), await at("sidebar-new-session")];
+  expect(dash.x).toBeLessThan(bell.x);
+  expect(bell.x + bell.width).toBeLessThan((bar?.x ?? 0) + (bar?.width ?? 0) / 2);
+  expect(add.x).toBeGreaterThan((bar?.x ?? 0) + (bar?.width ?? 0) / 2);
+  expect(add.x).toBeLessThan(add2.x);
+  // New thread is rightmost, 12px in from the edge.
+  expect(Math.round((bar?.x ?? 0) + (bar?.width ?? 0) - (add2.x + add2.width))).toBe(12);
 });

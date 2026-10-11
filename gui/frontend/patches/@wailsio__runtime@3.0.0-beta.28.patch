@@ -1,8 +1,29 @@
 diff --git a/dist/drag.js b/dist/drag.js
-index b15d87a08cfc19cbb5f7082cf60299c368127030..c020a9d04afe8806061293e26c71f0cd0dfa927c 100644
+index b15d87a08cfc19cbb5f7082cf60299c368127030..c215b8cc4f86a76196d62565f0113fd84efd7211 100644
 --- a/dist/drag.js
 +++ b/dist/drag.js
-@@ -96,11 +96,17 @@ function suppressEvent(event) {
+@@ -64,14 +64,16 @@ if (hasDOM) {
+     document.addEventListener('DOMContentLoaded', tryInitDragHandlers, { once: true });
+     // As a last resort, poll for environment for a short period
+     let dragEnvPolls = 0;
+-    const dragEnvPoll = window.setInterval(() => {
+-        if (dragInitDone) {
+-            window.clearInterval(dragEnvPoll);
++    // Global timers, and stop once the window is gone: under a test runner the
++    // DOM environment can be torn down before the first tick fires.
++    const dragEnvPoll = setInterval(() => {
++        if (typeof window === "undefined" || dragInitDone) {
++            clearInterval(dragEnvPoll);
+             return;
+         }
+         tryInitDragHandlers();
+         if (++dragEnvPolls > 100) {
+-            window.clearInterval(dragEnvPoll);
++            clearInterval(dragEnvPoll);
+         }
+     }, 50);
+ }
+@@ -96,11 +98,17 @@ function suppressEvent(event) {
  function isDraggableEvent(event) {
      const target = eventTarget(event);
      const style = window.getComputedStyle(target);

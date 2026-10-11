@@ -1,11 +1,13 @@
-import { Bot, Circle, Loader2, Unplug } from "lucide-react";
+import { Bot, Circle, CircleX, Loader2, Unplug } from "lucide-react";
 import { badgeLabels, sessionBadge } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions";
 
 /**
  * Session status badge: busy spinner, idle dot, needs-attention accent with a subtle
- * pulse; starting/closing spin muted; disconnected shows an unplugged icon.
+ * pulse; starting/closing spin muted; disconnected shows an unplugged icon; error (the
+ * process ended mid-turn: interrupted) a red crossed circle. The sidebar's thread rows do
+ * not use it (they say the status in words, lib/statusLine); SessionLink and SessionParts do.
  */
 export function SessionStatusIcon({ id, className }: { id: string; className?: string }) {
   const badge = useSessionsStore((s) => sessionBadge(s.byId[id]));
@@ -25,6 +27,8 @@ export function SessionStatusIcon({ id, className }: { id: string; className?: s
           <span className="relative inline-flex size-2.5 rounded-full bg-amber-400" />
         </span>
       );
+    case "error":
+      return <CircleX className={cn("size-3.5 shrink-0 text-red-400", className)} {...common} />;
     case "idle":
       return <Circle className={cn("size-2.5 shrink-0 fill-emerald-400 text-emerald-400", className)} {...common} />;
     default:

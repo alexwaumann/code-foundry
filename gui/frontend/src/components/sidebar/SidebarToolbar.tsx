@@ -49,9 +49,10 @@ function NotificationsButton() {
 }
 
 /**
- * The row of icon buttons under the sidebar's title band: Dashboard (view.dashboard),
- * Notifications, Add project (repo.add) and New thread (session.new). Not part of the
- * window drag area. See docs/notes/sidebar-toolbar.md.
+ * The row of icon buttons under the sidebar's title band: Dashboard (view.dashboard) and
+ * Notifications on the left; Add project (repo.add) and New thread (session.new) on the
+ * right, New thread rightmost. Not part of the window drag area. See
+ * docs/notes/sidebar-toolbar.md.
  */
 export function SidebarToolbar() {
   const dashboard = useUiStore((s) => isDashboard(s.selection));
@@ -71,6 +72,7 @@ export function SidebarToolbar() {
         data-testid="sidebar-dashboard"
       />
       <NotificationsButton />
+      <div className="flex-1" aria-hidden />
       <CommandButton command="repo.add" icon={FolderPlus} data-testid="sidebar-add-project" />
       <CommandButton command="session.new" icon={SquarePen} whenUnavailable="disable" data-testid="sidebar-new-session" />
     </div>
