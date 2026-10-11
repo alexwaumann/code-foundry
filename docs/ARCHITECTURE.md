@@ -238,6 +238,11 @@ Layers Claude-specific knowledge on top of terminal:
 * **Linked pull requests** come from Claude's own `pr-link` transcript records: every
   distinct URL in first-seen order, persisted in `session_pull_requests`, backfilled from
   the transcript's history when a thread is resumed (`docs/notes/linked-prs.md`).
+* **Token usage** is a pure fold over the transcript's assistant records (each request
+  once), per (model, tier, speed, UTC day), persisted in `session_usage` and only ever
+  replaced by a complete fold (a resume rescans from byte zero); removing a thread adds
+  its buckets to `usage_retired`. Cost is priced at read time by `internal/pricing`
+  (`docs/notes/session-usage.md`).
 * Persists session metadata in SQLite so the sidebar can show resumable sessions after a
   daemon restart. v1 does not keep PTYs alive across daemon restarts.
 
