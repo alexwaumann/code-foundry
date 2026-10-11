@@ -244,7 +244,7 @@ export function PullRequestsNav() {
     <button
       type="button"
       className={cn(
-        "mx-1.5 mt-1.5 flex h-7 items-center gap-2 rounded-md px-2 text-left text-[13px]",
+        "mt-1.5 flex h-7 items-center gap-2 rounded-md px-2 text-left text-[13px]",
         active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/60",
       )}
       data-testid="nav-pullrequests"
