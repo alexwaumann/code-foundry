@@ -78,8 +78,12 @@ after it.
   full rescan on discovery, `Store.Remove` retiring, proto `UsageBucket` with
   `cost_usd`/`unpriced`, `code-foundry usage`, `view.usage`) done:
   `docs/notes/session-usage.md`.
-* PR 2 (subagent runs folded into the parent thread), PR 3 (the side panel Usage
-  surface), PR 4 (the Usage page and its sidebar toggle): to do.
+* PR 2 (subagent runs folded into the thread, every transcript a thread used rescanned
+  after `/clear`, `Session.agent_runs`, per-bucket `cache_savings_usd`) done: "PR 2" in
+  `docs/notes/session-usage.md`.
+* PR 3 (the side panel Usage surface) done: "Panel surface (PR 3)" in
+  `docs/notes/session-usage.md`.
+* PR 4 (the Usage page and its sidebar toggle): to do.
 
 ### Open items
 
