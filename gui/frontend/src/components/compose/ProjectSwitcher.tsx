@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { ProjectRowGroups } from "./ProjectRows";
 import { useProjectRows } from "./useProjectRows";
 import { Command, CommandEmpty, CommandInput, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { draftKey, type ComposeTarget } from "@/lib/compose";
 import { switchDraftTarget } from "@/stores/compose";
 import { useUiStore } from "@/stores/ui";
@@ -56,13 +56,24 @@ export function ProjectSwitcher({ target, name, disabled }: { target: ComposeTar
           title="Change project"
           data-compose-stop
           data-testid="composer-project-trigger"
-          className="cursor-pointer rounded-sm border-b-[1.5px] border-dotted border-foreground/45 pb-px text-foreground outline-none transition-colors hover:border-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:hover:border-foreground/45 data-[state=open]:border-foreground"
+          // The underline is on the inline span: the button's box is the heading's line
+          // height, so a border on it would float below the descenders.
+          className="group cursor-pointer rounded-sm text-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default"
         >
-          {name}
+          {/* The popover centres on the name itself, whatever box the button gets. */}
+          <PopoverAnchor asChild>
+            <span
+              className="border-b-[1.5px] border-dotted border-foreground/45 transition-colors group-hover:border-foreground group-disabled:border-foreground/45 group-data-[state=open]:border-foreground"
+              data-testid="composer-project-name"
+            >
+              {name}
+            </span>
+          </PopoverAnchor>
         </button>
       </PopoverTrigger>
       <PopoverContent
         align="center"
+        sideOffset={8}
         className="w-80 p-0 text-left text-sm font-normal tracking-normal"
         data-testid="composer-project-list"
         onOpenAutoFocus={(e) => {

@@ -70,6 +70,17 @@ Design: the static sketch in `/tmp/cf-composer/index.html` (`?h=a&t=a&pop=proj`)
 
 ## Gotchas
 
+* **The underline goes on the name span, not the button.** In the first version the
+  border was on the `<button>`. A button is inline-block, so its box is the heading's
+  full line height, and the border floated a few px below the descenders and looked
+  faint in the live app. The border is now on an inline span around the name, which
+  sits right under the descenders (`group-hover` / `group-data-[state=open]` brighten
+  it). The popover is anchored to that span (`PopoverAnchor`, now exported from
+  `ui/popover.tsx`) with `align="center"` and `sideOffset={8}`, so it is centred under
+  the name whatever box the button gets. The e2e checks this (centred within 1px, an 8px
+  gap, the border on the span and 0px on the button). Tailwind's preflight gives every
+  element `border-style: solid`, so the button is checked by width, not style.
+
 * `react-refresh/only-export-components` rejects hooks and helpers exported from a
   `.tsx` file, which is why `useProjectRows` has its own `.ts` file.
 * `ProjectRows.tsx` vs. a would-be `projectRows.ts` would collide on the

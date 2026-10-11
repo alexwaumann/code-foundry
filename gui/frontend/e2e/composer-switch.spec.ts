@@ -41,6 +41,17 @@ test("switch the project from the heading: the draft moves, Also in is swapped, 
   await trigger(page).click();
   await expect(list(page)).toBeVisible();
   await expect(page.getByPlaceholder("Switch project…")).toBeFocused();
+  // Centred under the name, just below it; the dotted underline is the name's own border.
+  const name = page.getByTestId("composer-project-name");
+  await expect(name).toHaveCSS("border-bottom-style", "dotted");
+  await expect(trigger(page)).toHaveCSS("border-bottom-width", "0px");
+  await expect
+    .poll(async () => {
+      const [n, l] = await Promise.all([name.boundingBox(), list(page).boundingBox()]);
+      if (!n || !l) return null;
+      return { centre: Math.round(Math.abs(n.x + n.width / 2 - (l.x + l.width / 2))) <= 1, gap: Math.round(l.y - (n.y + n.height)) };
+    })
+    .toEqual({ centre: true, gap: 8 });
   // No workspaces: no group heading; the same rows as cmd+N without the cmd+1..9 hints.
   await expect(list(page).locator("[cmdk-group-heading]")).toHaveCount(0);
   await expect(list(page).locator("[data-project]")).toHaveCount(5);
