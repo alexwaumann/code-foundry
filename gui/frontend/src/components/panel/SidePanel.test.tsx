@@ -285,6 +285,23 @@ describe("the new-tab button and picking", () => {
     expect(screen.getByTestId("probe").textContent).toBe(one.id);
   });
 
+  it.each([
+    ["Escape", (row: HTMLElement) => fireEvent.keyDown(row, { key: "Escape" }), one.id],
+    ["its letter", (row: HTMLElement) => fireEvent.keyDown(row, { key: "f" }), files.id],
+    ["a click", (row: HTMLElement) => fireEvent.click(row), files.id],
+  ])("leaving the list with focus on a row (%s) hands focus to the panel", (_name, leave, active) => {
+    render(<SidePanel />);
+    fireEvent.click(screen.getByRole("tab", { name: "#1" }));
+    enterPicking();
+    const row = screen.getByTestId("panel-empty").querySelector<HTMLButtonElement>('[data-surface="files"]');
+    if (!row) throw new Error("no files row");
+    row.focus();
+    leave(row);
+    expect(getPanel(KEY).activeTabId).toBe(active);
+    expect(screen.queryByTestId("panel-empty")).toBeNull();
+    expect(document.activeElement).toBe(aside());
+  });
+
   it("Escape with a tab active is left alone (surfaces use it)", () => {
     const onKey = vi.fn(() => true);
     const prev = pullRequestSurface.onKey;

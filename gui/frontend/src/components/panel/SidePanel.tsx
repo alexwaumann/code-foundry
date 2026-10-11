@@ -54,6 +54,16 @@ function hidePanel(panelKey: string): void {
   useUiStore.getState().focusContent();
 }
 
+/**
+ * The surface list unmounts when a tab opens or picking ends. Focus that was in it (a
+ * row reached with Tab) moves to the panel first, so cmd+w and the letters keep working,
+ * as in LinkedPRsSurface's openLink.
+ */
+function keepPanelFocus(from: Element): void {
+  const list = from.closest("[data-surface-list]");
+  if (list?.contains(document.activeElement)) list.closest<HTMLElement>('[data-region="panel"]')?.focus({ preventScroll: true });
+}
+
 function tabDomId(id: string): string {
   return `panel-tab-${encodeURIComponent(id)}`;
 }
@@ -196,10 +206,12 @@ function SurfaceRow({ spec, ctx }: { spec: SurfaceSpec; ctx: SurfaceContext }) {
         data-surface={spec.kind}
         data-availability={availability}
         className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm enabled:hover:bg-accent disabled:cursor-default disabled:opacity-45"
-        onClick={() => {
+        onClick={(e) => {
           const now = surfaceContext(ctx.panelKey);
           const tab = spec.openDefault(now);
-          if (tab && spec.available(now) === "enabled") openSurface(ctx.panelKey, tab);
+          if (!tab || spec.available(now) !== "enabled") return;
+          keepPanelFocus(e.currentTarget);
+          openSurface(ctx.panelKey, tab);
         }}
       >
         <spec.icon className="size-4 text-muted-foreground" aria-hidden />
@@ -218,7 +230,7 @@ function EmptyState({ panelKey }: { panelKey: string }) {
   const selection = useUiStore((s) => s.selection);
   const ctx = useMemo<SurfaceContext>(() => ({ selection, panelKey }), [selection, panelKey]);
   return (
-    <div className="flex flex-1 flex-col items-center justify-center p-6" data-testid="panel-empty">
+    <div className="flex flex-1 flex-col items-center justify-center p-6" data-surface-list data-testid="panel-empty">
       <div className="w-full max-w-64">
         <h2 className="mb-3 text-center text-sm font-medium">Open a surface</h2>
         <ul className="flex flex-col gap-0.5">
@@ -316,6 +328,7 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
     if (!action) return;
     e.preventDefault();
     e.stopPropagation();
+    if (e.target instanceof Element && (action.kind === "stopPicking" || action.kind === "open")) keepPanelFocus(e.target);
     if (action.kind === "close") closeTab(panelKey, action.tabId);
     else if (action.kind === "hide") hidePanel(panelKey);
     else if (action.kind === "stopPicking") stopPanelPicking(panelKey);
