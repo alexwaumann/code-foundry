@@ -101,7 +101,13 @@ export function TerminalPane({ terminalId, sessionId }: { terminalId: string; se
   // A request to focus the content pane (e.g. the side panel hid) means the terminal here.
   const contentFocusSeq = useUiStore((s) => s.contentFocusSeq);
 
+  // What the last run of the focus effect saw: a run for a new terminal alone (a thread
+  // switched terminals, e.g. on reconnect) leaves a keyboard that is in the bottom panel there.
+  const seen = useRef({ focusSeq, contentFocusSeq });
   useEffect(() => {
+    const asked = seen.current.focusSeq !== focusSeq || seen.current.contentFocusSeq !== contentFocusSeq;
+    seen.current = { focusSeq, contentFocusSeq };
+    if (!asked && useUiStore.getState().focus === "bottom") return;
     // Hidden under an expanded side panel: the panel is what shows, so it takes the focus
     // meant for the terminal (selection switch, settings closing).
     const panel = getPanel();

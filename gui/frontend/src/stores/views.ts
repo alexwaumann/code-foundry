@@ -7,7 +7,7 @@
  */
 import { toast } from "sonner";
 import { create } from "zustand";
-import { bottomKeyOf, getBottom, toggleBottom } from "./bottomPanel";
+import { bottomKeyOf, bottomVisible, getBottom, toggleBottom } from "./bottomPanel";
 import { linkedPrsTarget, openLinkedPrsSurface } from "./linkedPrsPanel";
 import { expandPanel, getPanel, startPanelPicking, togglePanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
@@ -34,6 +34,18 @@ export function selectPageOpen(s: ViewsState): boolean {
 
 function pageOpen(): boolean {
   return selectPageOpen(useViewsStore.getState());
+}
+
+/** Whether the current selection's side panel is open and expanded over the content column. */
+function sideExpanded(): boolean {
+  const side = getPanel();
+  return side.open && (side.expanded ?? false);
+}
+
+/** The key whose bottom panel is on screen now (bottomVisible, read imperatively), or null. */
+export function visibleBottomKey(): string | null {
+  const key = bottomKeyOf(useUiStore.getState().selection);
+  return key !== null && bottomVisible(key, getBottom(key).open, pageOpen(), sideExpanded()) ? key : null;
 }
 
 /** Shows a named view (UiIntent.ShowView.name). Returns false for an unknown name. */
@@ -130,9 +142,10 @@ export function togglePanelCommand(): boolean {
  */
 export function toggleBottomCommand(): boolean {
   const ui = useUiStore.getState();
-  if (bottomKeyOf(ui.selection) === null) return false;
-  const side = getPanel();
-  if (pageOpen() || (side.open && side.expanded)) return getBottom().open;
+  const key = bottomKeyOf(ui.selection);
+  if (key === null) return false;
+  // Whether it could show if open: otherwise a toggle flips state nobody sees.
+  if (!bottomVisible(key, true, pageOpen(), sideExpanded())) return getBottom().open;
   const inPalette = ui.palette.open;
   const from: FocusRegion = inPalette ? ui.palette.returnTo : ui.focus;
   const open = toggleBottom("current", undefined, { focus: !inPalette });
@@ -162,7 +175,8 @@ export function expandPanelCommand(): boolean {
   const ui = useUiStore.getState();
   const inPalette = ui.palette.open;
   const from: FocusRegion = inPalette ? ui.palette.returnTo : ui.focus;
-  const fromContent = from === "terminal" || from === "content";
+  // Expanding hides the content column, the bottom panel with it.
+  const fromContent = from === "terminal" || from === "content" || from === "bottom";
   const expanded = expandPanel("current", getPanel().open ? undefined : true, { focus: fromContent && !inPalette });
   if (inPalette && expanded && fromContent) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
   return expanded;

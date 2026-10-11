@@ -171,12 +171,18 @@ export function panelMax(windowWidth: number, sidebarWidth: number): number {
   return Math.floor(Math.min(windowWidth * PANEL_MAX_FRACTION, windowWidth - sidebarWidth - PANE_GAPS - CONTENT_MIN));
 }
 
+/** The content pane keeps at least this much height above the bottom panel. */
+export const MAIN_MIN_HEIGHT = 160;
+/** The gap between the content pane and the bottom panel (App.tsx, components/bottom). */
+export const BOTTOM_GAP = 8;
+
 /**
  * Tallest the bottom panel may be: 70% of the content column (main pane, gap and bottom
- * pane together). Never below BOTTOM_MIN.
+ * pane together), and no more than leaves MAIN_MIN_HEIGHT for the content pane above the
+ * gap. Never below BOTTOM_MIN.
  */
 export function bottomMax(columnHeight: number): number {
-  return Math.max(BOTTOM_MIN, Math.floor(columnHeight * BOTTOM_MAX_FRACTION));
+  return Math.max(BOTTOM_MIN, Math.min(Math.floor(columnHeight * BOTTOM_MAX_FRACTION), Math.floor(columnHeight - MAIN_MIN_HEIGHT - BOTTOM_GAP)));
 }
 
 /** A bottom panel height clamped to [BOTTOM_MIN, bottomMax(columnHeight)]. */

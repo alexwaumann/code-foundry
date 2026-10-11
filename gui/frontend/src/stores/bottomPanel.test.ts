@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { TerminalView } from "@/api/terminal";
 import {
   activate,
+  bottomVisible,
+  focusedBottomShell,
+  markPendingFocusId,
+  neighbourOf,
+  takePendingFocusId,
   activeTabOf,
   bottomKeyOf,
   bottomTabIds,
@@ -107,6 +112,48 @@ describe("bottomTabTitle", () => {
   });
 });
 
+describe("neighbourOf", () => {
+  const cases: [string, string[], string, string | null][] = [
+    ["the one after", ["a", "b", "c"], "b", "c"],
+    ["the last: the one before", ["a", "b", "c"], "c", "b"],
+    ["the only one: none", ["a"], "a", null],
+    ["unknown", ["a"], "x", null],
+  ];
+  it.each(cases)("%s", (_name, ids, id, want) => {
+    expect(neighbourOf(ids, id)).toBe(want);
+  });
+});
+
+describe("bottomVisible", () => {
+  const cases: [string, string | null, boolean, boolean, boolean, boolean][] = [
+    ["open, nothing over it", "session:a", true, false, false, true],
+    ["no key", null, true, false, false, false],
+    ["closed", "session:a", false, false, false, false],
+    ["settings or usage up", "session:a", true, true, false, false],
+    ["side panel expanded", "session:a", true, false, true, false],
+  ];
+  it.each(cases)("%s", (_name, key, open, page, side, want) => {
+    expect(bottomVisible(key, open, page, side)).toBe(want);
+  });
+});
+
+describe("focusedBottomShell", () => {
+  const terminals = data([term("claude", { session: "s1" }), term("a", shell("s1")), term("b", shell("s1"))]);
+  const closed = { open: false, returnTo: "content" };
+  const cases: [string, Selection, string, { open: boolean; returnTo: string }, Record<string, BottomEntry>, string][] = [
+    ["keyboard in the panel: its active shell", { kind: "session", id: "s1" }, "bottom", closed, { "session:s1": { open: true, activeTerminalId: "a" } }, "a"],
+    ["no remembered tab: the last", { kind: "session", id: "s1" }, "bottom", closed, { "session:s1": { open: true } }, "b"],
+    ["the palette returns there", { kind: "session", id: "s1" }, "palette", { open: true, returnTo: "bottom" }, { "session:s1": { open: true } }, "b"],
+    ["keyboard in the content pane", { kind: "session", id: "s1" }, "terminal", closed, { "session:s1": { open: true } }, ""],
+    ["panel closed", { kind: "session", id: "s1" }, "bottom", closed, { "session:s1": { open: false } }, ""],
+    ["no tabs", { kind: "session", id: "s2" }, "bottom", closed, { "session:s2": { open: true } }, ""],
+    ["no bottom key", { kind: "view", name: "pullrequests" }, "bottom", closed, {}, ""],
+  ];
+  it.each(cases)("%s", (_name, selection, focus, palette, byKey, want) => {
+    expect(focusedBottomShell({ selection, focus, palette }, terminals, byKey)).toBe(want);
+  });
+});
+
 describe("reducers", () => {
   it("setOpen flips or forces, and keeps identity when unchanged", () => {
     const e: BottomEntry = { open: false, height: 300, activeTerminalId: "a" };
@@ -134,7 +181,7 @@ describe("reducers", () => {
 
 describe("store", () => {
   beforeEach(() => {
-    useBottomStore.setState({ byKey: {}, pendingFocus: null });
+    useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null });
     useUiStore.setState({ selection: { kind: "session", id: "s1" }, bottomFocusSeq: 0 });
   });
 
@@ -169,6 +216,14 @@ describe("store", () => {
     expect(useBottomStore.getState().pendingFocus).toBeNull();
   });
 
+  it("pending focus by id is taken once, for that shell, while recent", () => {
+    markPendingFocusId("t1", 1000);
+    expect(takePendingFocusId("t2", 1001)).toBe(false);
+    expect(takePendingFocusId("t1", 1000 + PENDING_FOCUS_MS + 1)).toBe(false);
+    expect(takePendingFocusId("t1", 1002)).toBe(true);
+    expect(takePendingFocusId("t1", 1003)).toBe(false);
+  });
+
   it("persists byKey (not the pending focus) and rehydrates it", async () => {
     toggleBottom("session:s1", true);
     setBottomHeight("session:s1", 360);
@@ -176,7 +231,7 @@ describe("store", () => {
     const raw = localStorage.getItem("code-foundry.bottom") ?? "{}";
     expect((JSON.parse(raw) as { state: unknown }).state).toEqual({ byKey: { "session:s1": { open: true, height: 360 } } });
     // Clearing the store saves too; put the saved value back before loading it.
-    useBottomStore.setState({ byKey: {}, pendingFocus: null });
+    useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null });
     localStorage.setItem("code-foundry.bottom", raw);
     await useBottomStore.persist.rehydrate();
     expect(getBottom("session:s1")).toEqual({ open: true, height: 360 });

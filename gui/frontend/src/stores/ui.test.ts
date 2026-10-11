@@ -89,7 +89,8 @@ describe("bottomMax and clampBottomHeight", () => {
   const cases: [string, number, number][] = [
     ["70% of the column", 1000, 700],
     ["floored", 784, 548],
-    ["never below the minimum", 100, BOTTOM_MIN],
+    ["a short column keeps 160 for the content pane (plus the 8px gap)", 500, 500 - 160 - 8],
+    ["never below the minimum", 250, BOTTOM_MIN],
     ["an unmeasured column", 0, BOTTOM_MIN],
   ];
   it.each(cases)("bottomMax: %s", (_name, column, want) => {

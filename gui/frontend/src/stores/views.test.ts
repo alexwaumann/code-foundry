@@ -346,3 +346,22 @@ describe("toggleBottomCommand", () => {
     expect(getBottom("session:a").open).toBe(true);
   });
 });
+
+describe("expandPanelCommand from the bottom panel", () => {
+  beforeEach(() => {
+    usePanelStore.setState({ byKey: {} });
+    useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
+    useUiStore.setState({ selection: { kind: "session", id: "a" }, focus: "bottom", panelFocusSeq: 0, palette: closedPalette });
+  });
+
+  it("moves focus to the panel: expanding hides the bottom panel with the content column", () => {
+    expect(expandPanelCommand()).toBe(true);
+    expect(useUiStore.getState().panelFocusSeq).toBe(1);
+  });
+
+  it("from the palette, its return target moves to the panel", () => {
+    useUiStore.setState({ focus: "palette", palette: { ...closedPalette, open: true, returnTo: "bottom" } });
+    expandPanelCommand();
+    expect(useUiStore.getState().palette.returnTo).toBe("panel");
+  });
+});

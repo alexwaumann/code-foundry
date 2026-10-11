@@ -1611,11 +1611,12 @@ export class World {
         cmd: { name: "terminal.new", title: "New Terminal", category: "Terminal", description: "Start a shell that belongs to the active thread, else to the active worktree", keybindings: ["cmd+t"], args: [{ name: "cwd", type: ArgType.PATH, required: false, description: "Working directory" }] },
         // Like the daemon: a thread, or a worktree to own the shell (never the dashboard or a page).
         when: (ctx) => Boolean(ctx?.activeSessionId || ctx?.activeWorktreePath),
+        // Like the daemon: no focus intent; the result's JSON is the new terminal (the GUI
+        // focuses it in the bottom panel by its id).
         run: (ctx, args) => {
           const owner = this.shellOwner(ctx, args.cwd ?? "");
           const t = this.create(["/bin/zsh"], owner.cwd, owner.labels, "shell");
-          this.intents.publish({ intent: { case: "focusTerminal", value: { terminalId: t.id } } });
-          return `Started zsh in ${owner.cwd}`;
+          return Promise.resolve({ message: `created terminal ${t.id}`, resultJson: JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels }) });
         },
       },
       {

@@ -106,6 +106,23 @@ export function activate(e: BottomEntry, id: string): BottomEntry {
   return e.activeTerminalId === id ? e : { ...e, activeTerminalId: id };
 }
 
+/** The tab to activate when `id` (a tab of `ids`) goes: the one after it, else the one before. */
+export function neighbourOf(ids: readonly string[], id: string): string | null {
+  const i = ids.indexOf(id);
+  if (i < 0) return null;
+  return ids[i + 1] ?? ids[i - 1] ?? null;
+}
+
+/**
+ * Whether a key's bottom panel is on screen: there is a key, its panel is open, no
+ * settings or usage page covers the content area, and the side panel is not expanded over
+ * it. The one rule BottomPanel, visibleBottomKey (stores/views.ts) and
+ * toggleBottomCommand share.
+ */
+export function bottomVisible(key: string | null, open: boolean, pageOpen: boolean, sideExpanded: boolean): key is string {
+  return key !== null && open && !pageOpen && !sideExpanded;
+}
+
 /** A new shell for this key: show the panel with it active. */
 export function openOn(e: BottomEntry, id: string): BottomEntry {
   return activate(setOpen(e, true), id);
@@ -117,14 +134,21 @@ export const PENDING_FOCUS_MS = 10_000;
 export interface BottomState {
   byKey: Readonly<Record<string, BottomEntry>>;
   /**
-   * Set when this window starts terminal.new (stores/bottomActions.ts) for a key: the
-   * first new shell for that key within PENDING_FOCUS_MS takes focus. Not persisted.
+   * Set when terminal.new starts from this window's chord, palette or a CommandButton
+   * (keys/bindings.ts), which do not hand back the result: the first new shell for that
+   * key within PENDING_FOCUS_MS takes focus. Not persisted.
    */
   pendingFocus: { key: string; at: number } | null;
+  /**
+   * Set when this window's own terminal.new run ("+", the empty state, a row menu, the
+   * Projects rows; stores/bottomActions.ts) returned a shell that has not arrived yet:
+   * that shell takes focus when it does, within PENDING_FOCUS_MS. Not persisted.
+   */
+  pendingFocusId: { id: string; at: number } | null;
 }
 
 export const useBottomStore = create<BottomState>()(
-  persist((): BottomState => ({ byKey: {}, pendingFocus: null }), {
+  persist((): BottomState => ({ byKey: {}, pendingFocus: null, pendingFocusId: null }), {
     name: "code-foundry.bottom",
     version: 1,
     partialize: (s) => ({ byKey: s.byKey }),
@@ -208,6 +232,37 @@ export function takePendingFocus(key: string, now = Date.now()): boolean {
   if (p?.key !== key || now - p.at > PENDING_FOCUS_MS) return false;
   useBottomStore.setState({ pendingFocus: null });
   return true;
+}
+
+/** Marks that this window's terminal.new run returned shell `id`, which has not arrived yet. */
+export function markPendingFocusId(id: string | null, now = Date.now()): void {
+  useBottomStore.setState({ pendingFocusId: id === null ? null : { id, at: now } });
+}
+
+/** Consumes the pending focus when it is for shell `id` and recent enough. */
+export function takePendingFocusId(id: string, now = Date.now()): boolean {
+  const p = useBottomStore.getState().pendingFocusId;
+  if (p?.id !== id || now - p.at > PENDING_FOCUS_MS) return false;
+  useBottomStore.setState({ pendingFocusId: null });
+  return true;
+}
+
+/**
+ * The shell the keyboard is in (or the palette returns to): the current key's active tab
+ * while focus is in its open bottom panel, else "". The command context's terminal then
+ * (stores/context.ts), so Close Terminal and friends act on it.
+ */
+export function focusedBottomShell(
+  ui: { selection: Selection; focus: string; palette: { open: boolean; returnTo: string } },
+  terminals: TerminalsData,
+  byKey: Readonly<Record<string, BottomEntry>>,
+): string {
+  const region = ui.palette.open ? ui.palette.returnTo : ui.focus;
+  if (region !== "bottom") return "";
+  const key = bottomKeyOf(ui.selection);
+  const entry = key === null ? undefined : byKey[key];
+  if (key === null || !entry?.open) return "";
+  return activeTabOf(entry, bottomTabIds(terminals, key)) ?? "";
 }
 
 /** The current selection's bottom key (a string, so the selector is cheap and stable). */

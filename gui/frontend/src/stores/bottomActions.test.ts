@@ -4,14 +4,14 @@ import type { TerminalView } from "@/api/terminal";
 
 const commands = vi.hoisted(() => ({
   invokeConfirmed: vi.fn(),
-  runCommand: vi.fn(),
+  runCommandForResult: vi.fn(),
   refreshCommands: vi.fn(),
 }));
 vi.mock("./commands", async (importOriginal) => ({ ...(await importOriginal<typeof import("./commands")>()), ...commands }));
 const toastError = vi.hoisted(() => vi.fn());
 vi.mock("sonner", () => ({ toast: { error: toastError } }));
 
-const { closeBottomTerminal, newBottomTerminal, onNewTerminal, paneContext, revealShell } = await import("./bottomActions");
+const { closeBottomTerminal, newBottomTerminal, newThreadTerminal, onNewTerminal, onRemovedTerminal, paneContext, revealShell } = await import("./bottomActions");
 const { getBottom, markPendingFocus, useBottomStore } = await import("./bottomPanel");
 const { usePanelStore } = await import("./panel");
 const { useTerminalsStore } = await import("./terminals");
@@ -31,9 +31,9 @@ const closedPalette = { open: false, query: "", commandName: null, page: "comman
 
 beforeEach(() => {
   vi.clearAllMocks();
-  commands.runCommand.mockResolvedValue(true);
+  commands.runCommandForResult.mockResolvedValue({ message: "created terminal t-new", resultJson: JSON.stringify({ id: "t-new" }) });
   commands.invokeConfirmed.mockResolvedValue({ message: "", resultJson: "" });
-  useBottomStore.setState({ byKey: {}, pendingFocus: null });
+  useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null });
   usePanelStore.setState({ byKey: {} });
   useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
   useUiStore.setState({ selection: { kind: "session", id: "s1" }, focus: "terminal", bottomFocusSeq: 0, palette: closedPalette });
@@ -142,14 +142,101 @@ describe("paneContext and newBottomTerminal", () => {
     expect(paneContext("view:pullrequests")).toBeNull();
   });
 
-  it("newBottomTerminal runs terminal.new there and marks the key for focus", async () => {
-    await newBottomTerminal("session:s1");
-    expect(commands.runCommand).toHaveBeenCalledWith("terminal.new", {}, expect.objectContaining({ activeSessionId: "s1" }));
-    expect(useBottomStore.getState().pendingFocus?.key).toBe("session:s1");
-    commands.runCommand.mockClear();
+  it("newBottomTerminal runs terminal.new there; no context, no run", async () => {
+    expect(await newBottomTerminal("session:s1")).toBe(true);
+    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, { ctx: expect.objectContaining({ activeSessionId: "s1" }) as unknown });
+    commands.runCommandForResult.mockClear();
     setTerminals([]);
     expect(await newBottomTerminal("view:projects")).toBe(false);
-    expect(commands.runCommand).not.toHaveBeenCalled();
+    expect(commands.runCommandForResult).not.toHaveBeenCalled();
+  });
+});
+
+describe("focus for this window's own shells (by id)", () => {
+  it("a shell that arrives after the result takes focus then", async () => {
+    await newBottomTerminal("session:s1");
+    expect(useBottomStore.getState().pendingFocusId?.id).toBe("t-new");
+    expect(useUiStore.getState().bottomFocusSeq).toBe(0);
+    const t = term("t-new", shell("s1"));
+    setTerminals([term("a", shell("s1")), t]);
+    onNewTerminal(t);
+    expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "t-new" });
+    expect(useUiStore.getState().bottomFocusSeq).toBe(1);
+    expect(useBottomStore.getState().pendingFocusId).toBeNull();
+  });
+
+  it("a shell that arrived before the result (while the keyboard was in the panel) is activated and focused by the result", async () => {
+    useBottomStore.setState({ byKey: { "session:s1": { open: true } } });
+    useUiStore.setState({ focus: "bottom" });
+    const t = term("t-new", shell("s1"));
+    setTerminals([term("a", shell("s1")), t]);
+    onNewTerminal(t);
+    expect(getBottom("session:s1").activeTerminalId).toBe("a");
+    await newBottomTerminal("session:s1");
+    expect(getBottom("session:s1").activeTerminalId).toBe("t-new");
+    expect(useUiStore.getState().bottomFocusSeq).toBe(1);
+  });
+
+  it("a shell for a thread that is not selected opens there without focus", async () => {
+    commands.runCommandForResult.mockResolvedValue({ message: "", resultJson: JSON.stringify({ id: "t-b" }) });
+    await newThreadTerminal("s2");
+    const t = term("t-b", shell("s2"));
+    setTerminals([t]);
+    onNewTerminal(t);
+    expect(getBottom("session:s2")).toEqual({ open: true, activeTerminalId: "t-b" });
+    expect(useUiStore.getState().bottomFocusSeq).toBe(0);
+  });
+
+  it("a failed run leaves nothing pending", async () => {
+    commands.runCommandForResult.mockResolvedValue(null);
+    expect(await newBottomTerminal("session:s1")).toBe(false);
+    expect(useBottomStore.getState().pendingFocusId).toBeNull();
+    expect(useBottomStore.getState().pendingFocus).toBeNull();
+  });
+});
+
+describe("a shell this window did not start", () => {
+  it("while the keyboard is in that panel: gets a tab, the active one stays", () => {
+    useBottomStore.setState({ byKey: { "session:s1": { open: true } } });
+    useUiStore.setState({ focus: "bottom" });
+    const t = term("b", shell("s1"));
+    setTerminals([term("a", shell("s1")), t]);
+    onNewTerminal(t);
+    expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "a" });
+    expect(useUiStore.getState().bottomFocusSeq).toBe(0);
+  });
+
+  const activates: [string, () => void][] = [
+    ["the keyboard elsewhere", () => useBottomStore.setState({ byKey: { "session:s1": { open: true } } })],
+    ["the panel hidden", () => useUiStore.setState({ focus: "bottom" })],
+    ["the settings page up", () => {
+      useBottomStore.setState({ byKey: { "session:s1": { open: true } } });
+      useUiStore.setState({ focus: "bottom" });
+      useViewsStore.setState({ settingsOpen: true });
+    }],
+  ];
+  it.each(activates)("with %s: becomes active", (_name, arrange) => {
+    arrange();
+    const t = term("b", shell("s1"));
+    setTerminals([term("a", shell("s1")), t]);
+    onNewTerminal(t);
+    expect(getBottom("session:s1").activeTerminalId).toBe("b");
+    expect(useUiStore.getState().bottomFocusSeq).toBe(0);
+  });
+});
+
+describe("onRemovedTerminal", () => {
+  const before = (ids: string[]) => ({ byId: Object.fromEntries(ids.map((id) => [id, term(id, shell("s1"))])), order: ids });
+  const cases: [string, string | undefined, string, string | undefined][] = [
+    ["the active middle tab: the one after it", "b", "b", "c"],
+    ["the active last tab: the one before it", "c", "c", "b"],
+    ["the active tab by fallback (none remembered): the one before it", undefined, "c", "b"],
+    ["another tab: the active one stays", "a", "b", "a"],
+  ];
+  it.each(cases)("%s", (_name, remembered, removed, want) => {
+    useBottomStore.setState({ byKey: { "session:s1": remembered === undefined ? { open: true } : { open: true, activeTerminalId: remembered } } });
+    onRemovedTerminal(term(removed, shell("s1")), before(["a", "b", "c"]));
+    expect(getBottom("session:s1").activeTerminalId).toBe(want);
   });
 });
 

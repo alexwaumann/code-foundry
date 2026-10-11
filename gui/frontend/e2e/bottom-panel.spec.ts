@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { CF, invocations, mockUrl, openApp, openProjects, openStreams, resetMock, row } from "./fixtures";
+import { CF, invocations, mockUrl, openApp, openProjects, openStreams, resetMock, row, writes } from "./fixtures";
 
 // The bottom terminal panel (docs/notes/bottom-panel-2-gui.md). Mock seeds: t-s1-shell is
 // thread s-1's shell, t-top a shell of the feat/sidebar worktree (the Projects page's).
@@ -351,7 +351,10 @@ test("only the active tab of the visible panel holds an Attach stream", async ({
   await page.getByTestId("bottom-toggle").click();
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
   await expect.poll(attachStreams).toBe(2);
+  // A second shell from elsewhere: the keyboard is in the panel, so it only gets a tab.
   const second = await createShell(threadShell("s-1"), CF);
+  await expect(tabs(page)).toHaveCount(2);
+  await tabs(page).nth(1).click();
   await expect(host(page)).toHaveAttribute("data-terminal-id", second);
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
   await expect.poll(attachStreams).toBe(2);
@@ -375,4 +378,83 @@ test("only the active tab of the visible panel holds an Attach stream", async ({
   await page.keyboard.press("Meta+j");
   await expect(bottom(page)).toHaveCount(0);
   await expect.poll(attachStreams).toBe(1);
+});
+
+test("a shell this window did not start does not take the keyboard from the bottom panel", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await page.getByTestId("bottom-toggle").click();
+  await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
+  await page.keyboard.type("ec");
+  const other = await createShell(threadShell("s-1"), CF);
+  // Its tab shows up, but the tab being typed in stays active and keeps the keys.
+  await expect(bottom(page).locator(`[data-tab-id="${other}"]`)).toHaveCount(1);
+  await expect(host(page)).toHaveAttribute("data-terminal-id", "t-s1-shell");
+  expect(await focusInBottomTerminal(page)).toBe(true);
+  await page.keyboard.type("ho");
+  await expect.poll(async () => (await writes()).filter((w) => w.id === "t-s1-shell").map((w) => w.data).join("")).toBe("echo");
+  expect((await writes()).some((w) => w.id === other)).toBe(false);
+});
+
+test("expanding the side panel from the bottom panel moves the keyboard to the side panel", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await page.getByTestId("bottom-toggle").click();
+  await page.getByTestId("terminal-header").getByTestId("panel-toggle").click();
+  await expect(page.getByTestId("side-panel")).toBeVisible();
+  // Back into the bottom shell, then the side panel's expand button (it keeps focus where it is).
+  await host(page).click();
+  await expect.poll(() => region(page)).toBe("bottom");
+  await page.getByTestId("panel-expand").click();
+  await expect(bottom(page)).toHaveCount(0);
+  await expect.poll(() => region(page)).toBe("panel");
+});
+
+test("switching between two threads with open panels keeps one bottom stream", async ({ page }) => {
+  await openApp(page);
+  const s2shell = await createShell(threadShell("s-2", "/Users/dev/src/ghostty-playground"), "/Users/dev/src/ghostty-playground");
+  await selectSession(page, "s-1");
+  await page.getByTestId("bottom-toggle").click();
+  await expect(host(page)).toHaveAttribute("data-terminal-id", "t-s1-shell");
+  await expect.poll(attachStreams).toBe(2);
+  await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
+  // cmd+1 jumps to the first thread (s-2, waiting on the user): its terminal takes the keyboard.
+  await page.keyboard.press("Meta+1");
+  await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
+  await expect(host(page)).toHaveAttribute("data-terminal-id", s2shell);
+  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
+  await expect.poll(attachStreams).toBe(2);
+  await expect.poll(() => region(page)).toBe("terminal");
+  // And back.
+  await selectSession(page, "s-1");
+  await expect(host(page)).toHaveAttribute("data-terminal-id", "t-s1-shell");
+  await expect.poll(attachStreams).toBe(2);
+});
+
+test("the resize handle is part of the panel: cmd+j from it hides the panel", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await page.getByTestId("bottom-toggle").click();
+  await page.getByTestId("bottom-resize-handle").focus();
+  await expect.poll(() => region(page)).toBe("bottom");
+  await page.keyboard.press("Meta+j");
+  await expect(bottom(page)).toHaveCount(0);
+  await expect.poll(() => region(page)).toBe("terminal");
+});
+
+test("the Usage page hides the panel and brings it back when it closes", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await page.getByTestId("bottom-toggle").click();
+  await expect(bottom(page)).toBeVisible();
+  await page.getByTestId("status-usage").click();
+  await expect(page.getByTestId("usage-page")).toBeVisible();
+  await expect(bottom(page)).toHaveCount(0);
+  // The page replaces the thread's terminal too: no Attach stream at all.
+  await expect.poll(attachStreams).toBe(0);
+  // cmd+j is a no-op meanwhile.
+  await page.keyboard.press("Meta+j");
+  await page.getByTestId("usage-page-close").click();
+  await expect(bottom(page)).toBeVisible();
+  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
 });

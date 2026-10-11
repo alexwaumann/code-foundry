@@ -117,8 +117,11 @@ function ContentPane({ children }: { children: ReactNode }) {
  * An element's height in layout px (viewport px divided by the page zoom, lib/zoom.ts),
  * kept current with a ResizeObserver. 0 while it is hidden.
  */
-function useColumnHeight(ref: RefObject<HTMLElement | null>): number {
+function useColumnHeight(ref: RefObject<HTMLElement | null>, hidden: boolean): number {
   const [h, setH] = useState(0);
+  // Measured again when `hidden` flips, before paint: shown again (the side panel left full
+  // width), the bottom panel must not render one frame at its unclamped height (its
+  // terminal would send the PTY a Resize, then another).
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -131,7 +134,7 @@ function useColumnHeight(ref: RefObject<HTMLElement | null>): number {
     return () => {
       ro.disconnect();
     };
-  }, [ref]);
+  }, [ref, hidden]);
   return h;
 }
 
@@ -144,7 +147,7 @@ function useColumnHeight(ref: RefObject<HTMLElement | null>): number {
  */
 function ContentColumn({ hidden, children }: { hidden: boolean; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const height = useColumnHeight(ref);
+  const height = useColumnHeight(ref, hidden);
   return (
     <div
       ref={ref}

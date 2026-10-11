@@ -7,28 +7,26 @@ import { Button } from "@/components/ui/button";
 import { chordFromEvent, formatChord } from "@/keys/chord";
 import { tildify } from "@/lib/path";
 import { cn } from "@/lib/utils";
-import { closeBottomTerminal, newBottomTerminal } from "@/stores/bottomActions";
+import { closeBottomTerminal, newBottomTerminal, paneContext } from "@/stores/bottomActions";
 import {
   activateBottomTab,
-  bottomKeyOf,
-  getBottom,
+  bottomVisible,
   bottomTabTitle,
   getBottomActiveId,
-  PROJECTS_KEY,
   requestBottomFocus,
-  sessionOfKey,
   toggleBottom,
   useBottomActiveId,
   useBottomHeight,
   useBottomOpen,
+  useBottomStore,
   useBottomTabIds,
   useCurrentBottomKey,
 } from "@/stores/bottomPanel";
 import { useCommandsStore } from "@/stores/commands";
-import { getPanel, usePanelExpanded } from "@/stores/panel";
+import { usePanelExpanded } from "@/stores/panel";
 import { useTerminalsStore } from "@/stores/terminals";
 import { bottomMax, useUiStore } from "@/stores/ui";
-import { selectPageOpen, useViewsStore } from "@/stores/views";
+import { selectPageOpen, useViewsStore, visibleBottomKey } from "@/stores/views";
 import { BottomResizeHandle } from "./BottomResizeHandle";
 import { bottomKeyAction, tabFocusIndex } from "./keys";
 
@@ -36,14 +34,6 @@ const BODY_ID = "bottom-panel-body";
 
 function tabDomId(id: string): string {
   return `bottom-tab-${encodeURIComponent(id)}`;
-}
-
-/** The key whose bottom panel is on screen now (BottomPanel's `shown`, read imperatively), or null. */
-function bottomShownKey(): string | null {
-  const key = bottomKeyOf(useUiStore.getState().selection);
-  const side = getPanel();
-  if (key === null || !getBottom(key).open || selectPageOpen(useViewsStore.getState()) || (side.open && side.expanded)) return null;
-  return key;
 }
 
 /** Hides the panel (cmd+w with no tabs) and gives focus to the content pane. */
@@ -119,10 +109,13 @@ function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id
   );
 }
 
-/** Left/Right (and Home/End) move focus between tabs; Enter or Space on a tab activates it. */
+/**
+ * Left/Right (and Home/End) move focus between the tabs and the "+" after them; Enter or
+ * Space on a tab activates it, on "+" starts a shell.
+ */
 function onTabListKeyDown(e: KeyboardEvent<HTMLElement>): void {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
-  const tabs = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]'));
+  const tabs = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"], [data-strip-stop]'));
   const i = tabs.findIndex((t) => t === document.activeElement || t.parentElement?.contains(document.activeElement));
   if (i < 0) return;
   const next = tabFocusIndex(e.key, i, tabs.length);
@@ -140,11 +133,15 @@ function useNewTerminalCommand(): { title: string; chord: string | null } {
 }
 
 /**
- * Whether "+" has something to own the new shell: a thread always; the Projects page
- * through its active tab's worktree (stores/bottomActions.ts paneContext).
+ * Whether "+" (and the empty state) has something to own a new shell: paneContext, the
+ * context newBottomTerminal runs in, exists (a thread always; the Projects page through
+ * its active tab's worktree). Re-read whenever the terminals or this panel's state change.
  */
-function useCanStartTerminal(panelKey: string, activeId: string | null): boolean {
-  return sessionOfKey(panelKey) !== null || (panelKey === PROJECTS_KEY && activeId !== null);
+function useCanStartTerminal(panelKey: string): boolean {
+  // Re-renders when the remembered tab changes; the selector below re-runs on every
+  // terminals change and every render, reading the rest (paneContext) as it is now.
+  useBottomStore((s) => s.byKey[panelKey]?.activeTerminalId);
+  return useTerminalsStore(() => paneContext(panelKey) !== null);
 }
 
 /** The "+" after the last tab: terminal.new in this panel's context; the new shell opens here, focused. */
@@ -158,8 +155,8 @@ function NewTerminalButton({ panelKey }: { panelKey: string }) {
       className="size-7 text-muted-foreground [--wails-draggable:no-drag] hover:bg-accent/40 hover:text-foreground dark:hover:bg-accent/40"
       title={title}
       aria-label={title}
-      tabIndex={-1}
       data-testid="bottom-new-terminal"
+      data-strip-stop
       // Keeps focus where it is; the new terminal takes it when it shows up.
       onMouseDown={(e) => {
         e.preventDefault();
@@ -173,7 +170,7 @@ function NewTerminalButton({ panelKey }: { panelKey: string }) {
 
 function TabStrip({ panelKey, ids, activeId }: { panelKey: string; ids: readonly string[]; activeId: string | null }) {
   const stripRef = useRef<HTMLDivElement>(null);
-  const canStart = useCanStartTerminal(panelKey, activeId);
+  const canStart = useCanStartTerminal(panelKey);
   // A new or activated tab may sit past the strip's scrolled edge: bring it into view.
   useEffect(() => {
     if (stripRef.current && activeId !== null) revealTab(stripRef.current, activeId);
@@ -207,7 +204,7 @@ function TabStrip({ panelKey, ids, activeId }: { panelKey: string; ids: readonly
  */
 function EmptyState({ panelKey }: { panelKey: string }) {
   const { title, chord } = useNewTerminalCommand();
-  const canStart = useCanStartTerminal(panelKey, null);
+  const canStart = useCanStartTerminal(panelKey);
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-6" data-testid="bottom-empty">
       <div className="w-full max-w-64">
@@ -289,18 +286,18 @@ function Panel({
   };
 
   return (
-    // Not clipped, so the resize handle can sit in the 8px gap above it.
-    <div className="relative mt-2 flex shrink-0" style={{ height }} data-testid="bottom-panel-wrapper">
+    // Not clipped, so the resize handle can sit in the 8px gap above it. The region (and
+    // cmd+w) is the wrapper's, so the handle counts as the panel: cmd+j, cmd+w and the
+    // palette's return work from it as from the terminal.
+    <div className="relative mt-2 flex shrink-0" style={{ height }} data-region="bottom" data-testid="bottom-panel-wrapper" onKeyDownCapture={onKeyDownCapture}>
       <BottomResizeHandle panelKey={panelKey} height={height} max={max} />
       <aside
         ref={asideRef}
         tabIndex={-1}
         aria-label="Bottom panel"
-        data-region="bottom"
         data-testid="bottom-panel"
         data-panel-key={panelKey}
         className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs outline-none"
-        onKeyDownCapture={onKeyDownCapture}
       >
         <BottomHeader panelKey={panelKey} ids={ids} activeId={activeId} />
         <div
@@ -344,19 +341,20 @@ export function BottomPanel({ columnHeight }: { columnHeight: number }) {
   const asideRef = useRef<HTMLElement>(null);
   const hostRef = useRef<TerminalHostHandle>(null);
   const handled = useRef(focusSeq);
-  const shown = panelKey !== null && open && !pageOpen && !sideExpanded;
+  const shown = bottomVisible(panelKey, open, pageOpen, sideExpanded);
 
   // Only on a new request, and only for a panel on screen.
   useEffect(() => {
     if (focusSeq === handled.current) return;
     handled.current = focusSeq;
-    const key = bottomShownKey();
+    const key = visibleBottomKey();
     if (key === null) return;
     if (getBottomActiveId(key) !== null) hostRef.current?.focus();
     else asideRef.current?.focus({ preventScroll: true });
   }, [focusSeq]);
 
   if (!shown) return null;
+  // bottomVisible narrows panelKey to a string here.
   // Bounded by the column there is now; the stored height comes back when the room does.
   const max = bottomMax(columnHeight);
   const height = columnHeight > 0 ? Math.min(stored, max) : stored;
