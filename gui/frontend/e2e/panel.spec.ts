@@ -916,6 +916,36 @@ test("dropping a tab on the + puts it last; dragging back to the first tab puts 
   await expect(tabs).toHaveText(["Files", "Diff", "#12"]);
 });
 
+test("while picking, Escape mid-drag cancels the drag and leaves picking alone; alt+arrows do nothing mid-drag", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await page.getByTestId("panel-toggle").click();
+  await injectTab(page, "files", "Files");
+  await injectTab(page, "diff", "Diff");
+  await injectTab(page, "pullrequest", "#12", { number: "12" });
+  const tabs = panel(page).getByRole("tab");
+  const plus = panel(page).getByTestId("panel-new-tab");
+  await plus.click();
+  await expect(panel(page)).toHaveAttribute("data-picking", "true");
+
+  await startTabDrag(page, tabs.first(), await centerX(plus));
+  const lifted = panel(page).locator("[data-dragging]");
+  await expect(lifted).toHaveCount(1);
+  // The pressed tab has focus in Chromium; WebKit leaves it on the panel. Either way alt+arrows wait for the drop.
+  await page.keyboard.press("Alt+ArrowRight");
+  await expect(tabs).toHaveText(["Files", "Diff", "#12"]);
+  // Escape belongs to the drag: it is cancelled, and the surface list stays.
+  await page.keyboard.press("Escape");
+  await expect(lifted).toHaveCount(0);
+  await expect(panel(page)).toHaveAttribute("data-picking", "true");
+  await page.mouse.up();
+  await expect(tabs).toHaveText(["Files", "Diff", "#12"]);
+  await expect(panel(page)).toHaveAttribute("data-picking", "true");
+  // Once the drag is over, Escape is the panel's again.
+  await page.keyboard.press("Escape");
+  await expect(panel(page)).not.toHaveAttribute("data-picking");
+});
+
 test("dragging a tab to the strip's edge scrolls the strip and lands it at the far end; alt+Right past the edge scrolls too", async ({ page }) => {
   await openApp(page);
   await selectSession(page, "s-1");

@@ -70,6 +70,15 @@ function keepPanelFocus(from: Element): void {
   if (list?.contains(document.activeElement)) list.closest<HTMLElement>('[data-region="panel"]')?.focus({ preventScroll: true });
 }
 
+/**
+ * Whether a tab of the strip under `root` is being dragged. Escape then belongs to the
+ * drag: dnd-kit cancels it from a `keydown` listener on the document, which a React
+ * handler that stops the key (the panel's Escape while picking) would starve.
+ */
+function liftedTab(root: Element): boolean {
+  return root.querySelector("[data-dragging]") !== null;
+}
+
 function tabDomId(id: string): string {
   return `panel-tab-${encodeURIComponent(id)}`;
 }
@@ -152,6 +161,8 @@ function TabButton({ panelKey, tab, active, focusable }: { panelKey: string; tab
  */
 function onTabListKeyDown(e: KeyboardEvent<HTMLElement>, panelKey: string): void {
   const strip = e.currentTarget;
+  // While a tab is lifted, the strip's keys wait for the drop (Escape cancels the drag: see liftedTab).
+  if (liftedTab(strip)) return;
   const tabs = Array.from(strip.querySelectorAll<HTMLElement>('[role="tab"]'));
   const i = tabs.findIndex((t) => t === document.activeElement || t.parentElement?.contains(document.activeElement));
   if (i < 0) return;
@@ -438,6 +449,7 @@ function Panel({ panelKey, max, expanded, asideRef }: { panelKey: string; max: n
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     const chord = chordFromEvent(e.nativeEvent);
     if (!chord) return;
+    if (chord === "escape" && liftedTab(e.currentTarget)) return;
     // cmd+w applies in text fields too (it is no editing chord); letters do not.
     if (chord !== "cmd+w" && isEditable(e.target)) return;
     // The panel's own keys (cmd+w, the surface letters, Escape while picking) are never

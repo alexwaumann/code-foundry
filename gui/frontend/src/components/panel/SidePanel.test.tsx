@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { create } from "zustand";
 import type { CommandView } from "@/api/command";
 import { useCommandsStore } from "@/stores/commands";
-import { getPanel, makeTab, openSurface, usePanelStore } from "@/stores/panel";
+import { getPanel, isPicking, makeTab, openSurface, startPanelPicking, usePanelStore } from "@/stores/panel";
 import { PANEL_MIN, useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { filesSurface } from "@/surfaces/files";
@@ -435,6 +435,29 @@ describe("reordering tabs", () => {
     fireEvent.click(t);
     expect(getPanel(KEY).activeTabId).toBe(three.id);
     expect(t.parentElement?.hasAttribute("data-dragging")).toBe(false);
+  });
+
+  it("mid-drag, Escape cancels the drag even while picking (which keeps picking), and alt+arrows wait for the drop", () => {
+    render(<SidePanel />);
+    // Not a click on the +: the drag test before this one leaves dnd-kit's click swallower on the document for 50ms.
+    act(() => {
+      startPanelPicking(KEY);
+    });
+    expect(isPicking(getPanel(KEY))).toBe(true);
+    const t = tab("#1");
+    t.focus();
+    fireEvent.pointerDown(t, { isPrimary: true, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(t, { isPrimary: true, clientX: 40, clientY: 10 });
+    expect(t.parentElement?.getAttribute("data-dragging")).toBe("true");
+    fireEvent.keyDown(t, { key: "ArrowRight", code: "ArrowRight", altKey: true });
+    expect(tabIds()).toEqual([one.id, two.id, three.id]);
+    fireEvent.keyDown(t, { key: "Escape", code: "Escape" });
+    expect(t.parentElement?.hasAttribute("data-dragging")).toBe(false);
+    expect(isPicking(getPanel(KEY))).toBe(true);
+    fireEvent.pointerUp(t, { isPrimary: true, button: 0, clientX: 40, clientY: 10 });
+    // After the drag, Escape is the panel's again.
+    fireEvent.keyDown(t, { key: "Escape", code: "Escape" });
+    expect(isPicking(getPanel(KEY))).toBe(false);
   });
 
   it("describes the keyboard move on each tab, and keeps the wrapper presentational", () => {
