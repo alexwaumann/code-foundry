@@ -30,3 +30,14 @@ export function panelKeyAction(chord: string, entry: PanelEntry, ctx: SurfaceCon
   const tab = spec.openDefault(ctx);
   return tab ? { kind: "open", tab } : null;
 }
+
+/**
+ * Where alt+Left / alt+Right on the tab at `index` (of `count`) moves it: one slot over,
+ * clamped at the ends (no wrap), so at an end it stays at `index`. null for any other
+ * chord, or an index outside the strip.
+ */
+export function tabMoveIndex(chord: string, index: number, count: number): number | null {
+  const step = chord === "alt+arrowleft" ? -1 : chord === "alt+arrowright" ? 1 : 0;
+  if (step === 0 || index < 0 || index >= count) return null;
+  return Math.max(0, Math.min(count - 1, index + step));
+}
