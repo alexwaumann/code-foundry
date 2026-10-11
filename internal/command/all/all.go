@@ -95,6 +95,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterSettings(r, d.Settings, d.Emitter, d.Reveal),
 		command.RegisterUpdate(r, command.UpdateDeps{Update: d.Update, Session: d.Session, Restart: d.Restart, Daemon: d.Daemon}),
 		command.RegisterView(r, d.Emitter),
+		command.RegisterUsage(r, d.Session),
 		command.RegisterWorkspace(r, d.Workspace),
 	)
 }

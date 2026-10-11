@@ -90,13 +90,17 @@ func (f *argFlag) Set(s string) error {
 func (f *argFlag) IsBoolFlag() bool { return f.spec.GetType() == v1.ArgType_ARG_TYPE_BOOL }
 
 // resolveCommand finds the command named by the longest prefix of words, joined with
-// dots. It returns the command and how many words it consumed.
+// dots. It returns the command and how many words it consumed. When no prefix names a
+// command, a prefix naming a domain with a "show" command runs that: `code-foundry
+// usage` is usage.show (command names have at least two segments).
 func resolveCommand(cmds []*v1.Command, words []string) (*v1.Command, int) {
-	for n := len(words); n > 0; n-- {
-		name := strings.Join(words[:n], ".")
-		for _, c := range cmds {
-			if c.GetName() == name {
-				return c, n
+	for _, suffix := range []string{"", ".show"} {
+		for n := len(words); n > 0; n-- {
+			name := strings.Join(words[:n], ".") + suffix
+			for _, c := range cmds {
+				if c.GetName() == name {
+					return c, n
+				}
 			}
 		}
 	}

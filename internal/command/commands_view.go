@@ -17,6 +17,11 @@ const ViewPullRequests = "pullrequests"
 // repository) with its worktrees, and every workspace with its members.
 const ViewProjects = "projects"
 
+// ViewUsage is the ShowView name of the Usage page: token usage and its cost over every
+// thread the daemon tracks (docs/notes/session-usage.md). The GUI toggles it like the
+// settings page.
+const ViewUsage = "usage"
+
 // ViewPanelToggle is the ShowView name that toggles the side panel of whatever the
 // window has selected. It is an action, not a page: the GUI toggles its per-selection
 // panel state (gui/frontend/src/stores/panel.ts) and stays on the current selection.
@@ -62,7 +67,8 @@ func hasWorktreeThreadContext(c Context) bool {
 	return (hasSession(c) || hasTerminal(c)) && hasWorktree(c)
 }
 
-// RegisterView registers view.dashboard, which shows the dashboard,
+// RegisterView registers view.dashboard, which shows the dashboard, view.usage, which
+// shows the Usage page,
 // view.pullrequests, which shows the Pull Requests page,
 // view.projects, which shows the Projects page, view.panel.toggle, which shows or hides
 // the side panel, view.panel.expand, which switches it between split and full width, and
@@ -86,6 +92,16 @@ func RegisterView(r *Registry, e Emitter) error {
 			// No default chord; bindable in settings.
 			Run: func(context.Context, Context, Args) (Result, error) {
 				return show(ViewDashboard), nil
+			},
+		},
+		Command{
+			Name:        "view.usage",
+			Title:       "Usage",
+			Description: "Show the Usage page: token usage and its cost per day and per model over every thread.",
+			Category:    "View",
+			// No default chord; bindable in settings. The CLI's report is usage.show.
+			Run: func(context.Context, Context, Args) (Result, error) {
+				return show(ViewUsage), nil
 			},
 		},
 		Command{

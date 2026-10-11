@@ -62,7 +62,8 @@ func TestDispatchLocal(t *testing.T) {
 }
 
 func TestResolveCommand(t *testing.T) {
-	cmds := []*v1.Command{{Name: "terminal.new"}, {Name: "repo.worktree.new"}, {Name: "repo.refresh"}}
+	cmds := []*v1.Command{{Name: "terminal.new"}, {Name: "repo.worktree.new"}, {Name: "repo.refresh"},
+		{Name: "usage.show"}, {Name: "usage.reset"}}
 	tests := []struct {
 		words    []string
 		wantName string
@@ -76,6 +77,12 @@ func TestResolveCommand(t *testing.T) {
 		{[]string{"terminal"}, "", 0},
 		{[]string{"bogus", "thing"}, "", 0},
 		{nil, "", 0},
+		// A bare domain word runs its show command; an exact name always wins.
+		{[]string{"usage"}, "usage.show", 1},
+		{[]string{"usage", "show"}, "usage.show", 2},
+		{[]string{"usage", "reset"}, "usage.reset", 2},
+		{[]string{"usage", "extra"}, "usage.show", 1},
+		{[]string{"repo"}, "", 0},
 	}
 	for _, tt := range tests {
 		t.Run(strings.Join(tt.words, " "), func(t *testing.T) {
