@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { CF, emit, invocations, mockPost, openApp, openProjects, openStreams, resetMock, row } from "./fixtures";
+import { CF, emit, invocations, mockPost, openApp, openProjects, openStreams, releaseSessions, resetMock, row } from "./fixtures";
 
 const FIX_RESIZE = `${CF}.worktrees/fix-resize`;
 
@@ -32,7 +32,10 @@ test("session rows render with status badges, above the terminals no thread owns
   await expect(row(page, "s:s-3").getByTestId("session-body")).toHaveCSS("opacity", "0.5");
   await expect(row(page, "s:s-3").getByTestId("session-name")).not.toHaveClass(/text-muted-foreground/);
   await expect(row(page, "s:s-1").getByTestId("session-body")).not.toHaveAttribute("data-offline");
+  // resetMock holds s-5 starting; released, the mock's clock settles it.
+  await releaseSessions("s-5");
   await expect(badge(page, "s-5")).toHaveAttribute("data-session-badge", /^(idle|busy)$/, { timeout: 12_000 });
+  await expect(row(page, "s:s-5")).toHaveAttribute("data-section", "idle");
 });
 
 test("a disconnected session shows the disconnected page; Reconnect re-attaches", async ({ page }) => {

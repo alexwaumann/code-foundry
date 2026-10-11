@@ -7,9 +7,19 @@ export const CF = "/Users/dev/src/code-foundry";
 /** App URL pointed at the e2e mock daemon via the dev-only query override. */
 export const appPath = `/?daemon=${encodeURIComponent(mockUrl)}&token=${MOCK_TOKEN}`;
 
+/**
+ * Resets the mock to its default world and holds it still: the mock's clock flips s-1
+ * busy/idle every 4 s and settles s-5 from starting after 8 s, which would move them in and
+ * out of the sidebar's Working section (and every row below them) under a spec's pointer.
+ * Held, s-1 stays busy and s-5 starting, so the sidebar shows DEFAULT_ORDER. A spec that
+ * needs the clock releases them (`releaseSessions`).
+ */
 export async function resetMock(): Promise<void> {
   const res = await fetch(`${mockUrl}/__mock/reset`, { method: "POST" });
   expect(res.ok).toBe(true);
+  await holdSessions("s-1", "s-5");
+  // s-1 may have flipped to idle between the reset and the hold.
+  await mockPost("session/status?id=s-1&status=busy");
 }
 
 export interface Invocation {
@@ -48,24 +58,17 @@ export async function mockPost(pathAndQuery: string): Promise<unknown> {
   return res.json();
 }
 
-/**
- * Stops the mock's clock from changing these threads. The default world's s-1 flips
- * busy/idle every 4 s and s-5 settles from starting after 8 s, which moves them in and out
- * of the sidebar's Working section; specs that pin the order hold them (s-1 busy, s-5
- * starting: both under Working) right after the reset.
- */
+/** Stops the mock's clock from changing these threads (status, settling); controls and input still do. */
 export async function holdSessions(...ids: string[]): Promise<void> {
   await mockPost(`session/hold?${ids.map((id) => `id=${id}`).join("&")}`);
 }
 
-/** Holds the default world in DEFAULT_ORDER: s-1 busy and s-5 starting, both held. Call right after resetMock. */
-export async function holdDefaultOrder(): Promise<void> {
-  await holdSessions("s-1", "s-5");
-  // s-1 may have flipped to idle between the reset and the hold.
-  await mockPost("session/status?id=s-1&status=busy");
+/** Lets the mock's clock change these threads again (resetMock holds s-1 and s-5). */
+export async function releaseSessions(...ids: string[]): Promise<void> {
+  await mockPost(`session/release?${ids.map((id) => `id=${id}`).join("&")}`);
 }
 
-/** The default world's sidebar order with s-1 and s-5 held: s-2 waits, s-6/s-4/s-3 are idle, s-5 and s-1 work. */
+/** The default world's sidebar order after resetMock: s-2 waits, s-6/s-4/s-3 are idle, s-5 (starting) and s-1 (busy) work. */
 export const DEFAULT_ORDER = ["s:s-2", "s:s-6", "s:s-4", "s:s-3", "h:working", "s:s-5", "s:s-1", "h:terminals", "t:t-logs", "t:t-top", "t:t-tests", "t:t-tmp"];
 
 /** Long-lived streams the mock has open right now, by RPC (e.g. "EventService/Watch"). */

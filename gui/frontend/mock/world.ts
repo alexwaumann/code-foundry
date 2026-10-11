@@ -806,9 +806,9 @@ export class World {
   }
 
   /** The detector's reading changed (reason defaults to a typical one for the status). */
-  /** Test control: the clock stops changing this thread (MockSession.held); controls and input still do. */
-  holdSession(id: string): void {
-    this.session(id).held = true;
+  /** Test control: the clock stops (or, held false, resumes) changing this thread (MockSession.held); controls and input always do. */
+  holdSession(id: string, held = true): void {
+    this.session(id).held = held;
   }
 
   setSessionStatus(id: string, status: SessionStatus, reason?: string): void {

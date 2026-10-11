@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, DEFAULT_ORDER, holdDefaultOrder, holdSessions, invocations, mockPost, mockUrl, openApp, openProjects, resetMock, row } from "./fixtures";
+import { CF, DEFAULT_ORDER, holdSessions, invocations, mockPost, mockUrl, openApp, openProjects, resetMock, row } from "./fixtures";
 
 /** Where the mock (like the daemon) puts a repo's worktree for a cf/<name> branch. */
 const WT = "/Users/dev/.code-foundry/worktrees/alexwaumann";
@@ -93,7 +93,6 @@ test("Notifications: the count over the bell jumps to the waiting thread; with n
 });
 
 test("the sidebar is a flat thread list: waiting threads on top, working ones under Working, workspace badges, no repo or worktree rows", async ({ page }) => {
-  await holdDefaultOrder();
   const driver = await workspaceWithThread();
   await openApp(page);
   await expect(row(page, `s:${driver}`)).toBeVisible();
@@ -148,7 +147,6 @@ test("the sidebar is a flat thread list: waiting threads on top, working ones un
 });
 
 test("pin from the context menu moves a thread to the top; unpin moves it back", async ({ page }) => {
-  await holdDefaultOrder();
   await openApp(page);
   await row(page, "s:s-3").click({ button: "right" });
   const menu = page.getByTestId("row-menu");
@@ -330,7 +328,6 @@ test("a workspace thread's member worktree never shows under its project in the 
 });
 
 test("status kinds: each thread's second line says its status in words and colour; waiting threads first, prompts above errors above finished, working last", async ({ page }) => {
-  await holdDefaultOrder();
   await mockPost("status-kinds");
   await openApp(page);
   // Prompts newest first (s-2 is the default world's permission prompt), then the interrupted
@@ -422,7 +419,6 @@ test("status kinds: each thread's second line says its status in words and colou
 });
 
 test("Working section: a header with the count collapses and expands its rows, persists across a reload, and cmd+N skips hidden rows", async ({ page }) => {
-  await holdDefaultOrder();
   await openApp(page);
   await expect.poll(() => rowKeys(page)).toEqual(DEFAULT_ORDER.map((k) => (k === "h:working" ? "# Working 2" : k === "h:terminals" ? "# Terminals" : k)));
   const header = page.getByTestId("working-header");
@@ -481,7 +477,6 @@ test("Working section: a header with the count collapses and expands its rows, p
 });
 
 test("Working section: the header counts threads as they start and stop working, and goes away with the last one", async ({ page }) => {
-  await holdDefaultOrder();
   await openApp(page);
   await expect(page.getByTestId("working-count")).toHaveText("2");
   // s-6 is idle (closing); a busy thread joins Working, at its place by creation time.

@@ -1,12 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { CF, DEFAULT_ORDER, emit, expectTerminalText, holdDefaultOrder, invocations, openApp, openProjects, resetMock, row, writes } from "./fixtures";
+import { CF, DEFAULT_ORDER, emit, expectTerminalText, invocations, openApp, openProjects, resetMock, row, writes } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
 });
 
 test("sidebar lists threads, then terminals no thread owns; repos and worktrees are on the Projects page", async ({ page }) => {
-  await holdDefaultOrder();
   await openApp(page);
   const list = page.getByTestId("thread-list");
   // The waiting thread, the idle ones, the working ones under Working, then terminals. Sessions
@@ -158,7 +157,6 @@ test("OpenPalette and Notify intents", async ({ page }) => {
 });
 
 test("sidebar is keyboard navigable", async ({ page }) => {
-  await holdDefaultOrder();
   await openApp(page);
   const list = page.getByTestId("thread-list");
   await list.focus();
