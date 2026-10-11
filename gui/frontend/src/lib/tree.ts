@@ -147,6 +147,23 @@ export function buildRows(sessions: readonly ListSession[], terminals: readonly 
   return rows;
 }
 
+/**
+ * A row cache for the virtual list: each call returns `rows` with every row whose key and
+ * section match the previous call's replaced by the previous object, so memoized row
+ * components see the same prop and skip rendering.
+ */
+export function rowCache(): (rows: readonly Row[]) => Row[] {
+  let prev = new Map<string, Row>();
+  return (rows) => {
+    const out = rows.map((r) => {
+      const old = prev.get(r.key);
+      return old?.kind === r.kind && old.section === r.section ? old : r;
+    });
+    prev = new Map(out.map((r) => [r.key, r]));
+    return out;
+  };
+}
+
 /** Thread and terminal rows in sidebar order (cmd+1..9). */
 export function leafOrder(sessions: readonly ListSession[], terminals: readonly PlaceableTerminal[]): LeafRow[] {
   return buildRows(sessions, terminals).filter(isLeaf);

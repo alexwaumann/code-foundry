@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { ProjectsNav } from "@/components/projects/ProjectsPage";
 import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
 import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
-import { buildRows, isLeaf, type LeafRow, type Row } from "@/lib/tree";
+import { buildRows, isLeaf, rowCache, type LeafRow, type Row } from "@/lib/tree";
 import { decodeSessionListKeys, decodeTerminalKeys, useSessionListKeys, useTerminalPlacementKeys } from "@/stores/context";
 import { useEventsStore } from "@/stores/events";
 import { useSessionsStore } from "@/stores/sessions";
@@ -13,18 +14,25 @@ import { useRowHeight } from "@/stores/settings";
 import { RowMenu } from "./RowMenu";
 import { rowSelection, selectionKey } from "./selection";
 import { ResizeHandle } from "./ResizeHandle";
+import { RowTooltipsEnabled } from "./rowTooltips";
 import { SidebarRow } from "./SidebarRow";
 import { SidebarStatus } from "./SidebarStatus";
 import { SidebarToolbar } from "./SidebarToolbar";
 
-/** Section header height; thread and terminal rows are two lines (rowHeight + this). */
+/** The Terminals header's height; thread and terminal rows are two lines (rowHeight + this). */
 const HEADER_HEIGHT = 26;
 const SECOND_LINE = 15;
 
+/**
+ * The list's rows. A rebuild (a thread moved between groups, one came or went) reuses the
+ * previous row object for every row whose key and group are unchanged (rowCache), so the
+ * memoized SidebarRow re-renders only the rows that actually changed.
+ */
 function useRows(): Row[] {
   const sessionKeys = useSessionListKeys();
   const termKeys = useTerminalPlacementKeys();
-  return useMemo(() => buildRows(decodeSessionListKeys(sessionKeys), decodeTerminalKeys(termKeys)), [sessionKeys, termKeys]);
+  const [stable] = useState(rowCache);
+  return useMemo(() => stable(buildRows(decodeSessionListKeys(sessionKeys), decodeTerminalKeys(termKeys))), [stable, sessionKeys, termKeys]);
 }
 
 /** Index of the next leaf row from i in direction dir (skipping headers); i itself when none. */
@@ -58,7 +66,7 @@ function SidebarList() {
     paddingEnd: 8,
   });
 
-  // appearance.density changes the row height, and sections come and go; drop the cached sizes.
+  // appearance.density changes the row height, and the Terminals header moves; drop the cached sizes.
   useEffect(() => {
     virtualizer.measure();
   }, [virtualizer, leafHeight, rows]);
@@ -140,49 +148,53 @@ function SidebarList() {
   const activeRow = rows[cursorIndex];
   const emptyText = unavailable ? "Threads are unavailable on this daemon." : loaded ? null : streamError ? `Cannot list threads: ${streamError}. Retrying…` : "Loading…";
   return (
-    <ContextMenu
-      modal={false}
-      onOpenChange={(open) => {
-        if (!open) setMenuRow(null);
-      }}
-    >
-      <ContextMenuTrigger asChild>
-        <div
-          ref={scrollRef}
-          role="listbox"
-          aria-label="Threads and terminals"
-          tabIndex={0}
-          data-region="sidebar"
-          data-testid="thread-list"
-          aria-activedescendant={activeRow ? `row-${activeRow.key}` : undefined}
-          className="group min-h-0 flex-1 overflow-y-auto px-1.5 outline-none"
-          onKeyDown={onKeyDown}
-          onContextMenu={onContextMenu}
+    <RowTooltipsEnabled value={menuRow === null}>
+      <TooltipProvider delayDuration={500}>
+        <ContextMenu
+          modal={false}
+          onOpenChange={(open) => {
+            if (!open) setMenuRow(null);
+          }}
         >
-          {rows.length === 0 ? (
-            // No threads (once loaded): the list is simply empty.
-            emptyText !== null && (
-              <p className="px-3 py-4 text-xs break-words text-muted-foreground" data-testid="thread-list-empty">
-                {emptyText}
-              </p>
-            )
-          ) : (
-            <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-              {virtualizer.getVirtualItems().map((vi) => {
-                const row = rows[vi.index];
-                if (!row) return null;
-                return (
-                  <div key={row.key} style={{ position: "absolute", top: 0, left: 0, right: 0, height: vi.size, transform: `translateY(${String(vi.start)}px)` }}>
-                    <SidebarRow row={row} selected={row.key === selectedKey} cursor={vi.index === cursorIndex && cursorKey !== null} onActivate={activate} />
-                  </div>
-                );
-              })}
+          <ContextMenuTrigger asChild>
+            <div
+              ref={scrollRef}
+              role="listbox"
+              aria-label="Threads and terminals"
+              tabIndex={0}
+              data-region="sidebar"
+              data-testid="thread-list"
+              aria-activedescendant={activeRow ? `row-${activeRow.key}` : undefined}
+              className="group min-h-0 flex-1 overflow-y-auto px-1.5 outline-none"
+              onKeyDown={onKeyDown}
+              onContextMenu={onContextMenu}
+            >
+              {rows.length === 0 ? (
+                // No threads (once loaded): the list is simply empty.
+                emptyText !== null && (
+                  <p className="px-3 py-4 text-xs break-words text-muted-foreground" data-testid="thread-list-empty">
+                    {emptyText}
+                  </p>
+                )
+              ) : (
+                <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+                  {virtualizer.getVirtualItems().map((vi) => {
+                    const row = rows[vi.index];
+                    if (!row) return null;
+                    return (
+                      <div key={row.key} style={{ position: "absolute", top: 0, left: 0, right: 0, height: vi.size, transform: `translateY(${String(vi.start)}px)` }}>
+                        <SidebarRow row={row} selected={row.key === selectedKey} cursor={vi.index === cursorIndex && cursorKey !== null} onActivate={activate} />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </ContextMenuTrigger>
-      {menuRow && <RowMenu row={menuRow} />}
-    </ContextMenu>
+          </ContextMenuTrigger>
+          {menuRow && <RowMenu row={menuRow} />}
+        </ContextMenu>
+      </TooltipProvider>
+    </RowTooltipsEnabled>
   );
 }
 

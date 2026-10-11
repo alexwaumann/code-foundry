@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRows, leafOrder, nextAfter, ownedTerminalIds, placeTerminal, sessionKey, sessionOrder, terminalKey, type ListSession, type PlaceableTerminal } from "./tree";
+import { buildRows, leafOrder, rowCache, nextAfter, ownedTerminalIds, placeTerminal, sessionKey, sessionOrder, terminalKey, type ListSession, type PlaceableTerminal } from "./tree";
 
 const W = [
   { repoId: "r1", path: "/src/app" },
@@ -73,6 +73,22 @@ describe("buildRows (the flat thread list)", () => {
     const sessions = [thread("s1"), thread("s2", { attention: "done" }), thread("s3", { terminalId: "a" }), thread("s4", { attention: "prompt" })];
     expect(leafOrder(sessions, terms).map((r) => r.key)).toEqual(["s:s4", "s:s2", "s:s3", "s:s1", "t:b", "t:c"]);
     expect(sessionOrder(sessions, terms)).toEqual(["s4", "s2", "s3", "s1"]);
+  });
+});
+
+describe("rowCache", () => {
+  it("keeps row objects whose key and section are unchanged", () => {
+    const stable = rowCache();
+    const first = stable(buildRows([thread("s1"), thread("s2")], [terms[1] as PlaceableTerminal]));
+    const second = stable(buildRows([thread("s1"), thread("s2", { attention: "prompt" }), thread("s3")], [terms[1] as PlaceableTerminal]));
+    const byKey = (rows: ReturnType<typeof buildRows>, key: string) => rows.find((r) => r.key === key);
+    expect(byKey(second, sessionKey("s1"))).toBe(byKey(first, sessionKey("s1")));
+    expect(byKey(second, terminalKey("b"))).toBe(byKey(first, terminalKey("b")));
+    expect(byKey(second, "h:terminals")).toBe(byKey(first, "h:terminals"));
+    // s2 moved into the attention group: a new object with the new section.
+    expect(byKey(second, sessionKey("s2"))).not.toBe(byKey(first, sessionKey("s2")));
+    expect(byKey(second, sessionKey("s2"))).toMatchObject({ section: "attention" });
+    expect(second.map((r) => r.key)).toEqual([sessionKey("s2"), sessionKey("s3"), sessionKey("s1"), "h:terminals", terminalKey("b")]);
   });
 });
 
