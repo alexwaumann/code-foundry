@@ -14,7 +14,8 @@ a restart for the Dashboard button to enable.
 * **A toolbar row sits under the band**, above the Pull Requests / Projects nav
   (components/sidebar/SidebarToolbar.tsx, `sidebar-toolbar`, `role="toolbar"`): 32px tall
   (`h-8`), 12px left padding, a bottom border (`border-sidebar-border`), `no-drag`. Four
-  24px icon buttons, in this order:
+  24px icon buttons, in this order (since thread-list.md: 1 and 2 on the left, a spacer,
+  3 and 4 on the right with New thread rightmost, 12px from the edge):
   1. **Dashboard** (`sidebar-dashboard`): `CommandButton` for `view.dashboard`, lucide
      `LayoutDashboard` (reads as "overview" better than `House` next to a bell). While the
      dashboard shows it gets the nav rows' active style (`bg-sidebar-accent

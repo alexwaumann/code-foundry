@@ -283,10 +283,11 @@ from the pull request (docs/notes/pr-thread-commands.md).
   an Attach subscriber, finished turns count as seen (see
   `docs/notes/phase2-integration.md`).
 * Layout: a draggable title strip under the hidden-inset traffic lights, sidebar (Pull
-  Requests and Projects entries, then a flat thread list: Pinned and Needs attention
-  sections on top, threads newest first with project, branch, status and a workspace
-  badge, then terminals no thread owns; a status row at its foot; see
-  `docs/notes/workspaces-4-sidebar.md`), content (terminal, the Pull Requests page, the
+  Requests and Projects entries, then a flat thread list with no thread headers: pinned
+  threads, then the ones waiting on the user, then the rest newest first, each row saying
+  its status in words on its second line (or project and branch) with a hover tooltip,
+  then terminals no thread owns under a Terminals header; a status row at its foot; see
+  `docs/notes/workspaces-4-sidebar.md` and `docs/notes/thread-list.md`), content (terminal, the Pull Requests page, the
   Projects page with each project's worktrees and each workspace's members, or the
   composer; a worktree's overview is a side panel tab, not a page), command palette
   overlay. Strip and sidebar sit on one background (the sheet);
