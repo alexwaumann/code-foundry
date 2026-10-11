@@ -1,12 +1,15 @@
 /**
  * Settings from the daemon's settings file. Snapshots arrive on the shared events stream
  * (source "settings"), including edits made to the file by hand; the schema is fetched
- * when the settings page opens. Appearance settings are applied here, so they take
+ * on every events-stream (re)connect and again when the settings page opens. It carries
+ * the model registry (modelChoices). Appearance settings are applied here, so they take
  * effect in every window as soon as a snapshot lands.
  */
 import { create } from "zustand";
 import { getSettingsSchema, SettingsValidationError, updateSettings, type SettingsSchemaView, type SettingsSnapshotView } from "@/api/settings";
 import { errorMessage } from "@/api/stream";
+import type { Choice } from "@/lib/compose";
+import { FALLBACK_MODEL_CHOICES, modelChoicesFromSchema } from "@/lib/models";
 import { setThemePreference } from "@/lib/theme";
 import { DEFAULT_TERMINAL_FONT_FAMILY, FONT_FALLBACKS } from "@/terminal/fonts";
 import { refreshCommands } from "./commands";
@@ -32,9 +35,11 @@ interface SettingsState {
   snapshot: SettingsSnapshotView | null;
   schema: SettingsSchemaView | null;
   schemaError: string | null;
+  /** The daemon's model registry from the schema; null until it loads. */
+  modelChoices: readonly Choice[] | null;
 }
 
-export const useSettingsStore = create<SettingsState>()(() => ({ snapshot: null, schema: null, schemaError: null }));
+export const useSettingsStore = create<SettingsState>()(() => ({ snapshot: null, schema: null, schemaError: null, modelChoices: null }));
 
 function changed(prev: SettingsSnapshotView | null, next: SettingsSnapshotView, key: string): boolean {
   return !prev || prev.values[key] !== next.values[key];
@@ -91,9 +96,15 @@ export function useRowHeight(): number {
   return useSettingValue(KEYS.density) === "comfortable" ? ROW_HEIGHTS.comfortable : ROW_HEIGHTS.compact;
 }
 
+/** The models the composer offers and threads are named by: the daemon's registry, else the family aliases. */
+export function useModelChoices(): readonly Choice[] {
+  return useSettingsStore((s) => s.modelChoices) ?? FALLBACK_MODEL_CHOICES;
+}
+
 export async function loadSettingsSchema(): Promise<void> {
   try {
-    useSettingsStore.setState({ schema: await getSettingsSchema(), schemaError: null });
+    const schema = await getSettingsSchema();
+    useSettingsStore.setState((s) => ({ schema, schemaError: null, modelChoices: modelChoicesFromSchema(schema.fields) ?? s.modelChoices }));
   } catch (err) {
     useSettingsStore.setState({ schemaError: errorMessage(err) });
   }

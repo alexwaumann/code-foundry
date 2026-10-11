@@ -14,6 +14,7 @@ import { WORKTREE_LABEL, type Row } from "@/lib/tree";
 import { useReposStore } from "@/stores/repos";
 import { renameSession } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
+import { useModelChoices } from "@/stores/settings";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
@@ -320,6 +321,7 @@ function ThreadTipBody({ id }: { id: string }) {
   const name = useSessionsStore((s) => s.byId[id]?.name ?? "");
   const model = useSessionsStore((s) => s.byId[id]?.model ?? "");
   const effort = useSessionsStore((s) => s.byId[id]?.effort ?? "");
+  const models = useModelChoices();
   const where = useSessionsStore(
     useShallow((st) => {
       const x = st.byId[id];
@@ -346,8 +348,8 @@ function ThreadTipBody({ id }: { id: string }) {
         </TipRow>
       )}
       <TipRow icon={<ClaudeMark className="size-3.5 shrink-0" style={{ color: CLAUDE_ORANGE }} />} testId="tip-model">
-        {modelLabel(model)}
-        {effort && <span className="text-muted-foreground"> ({effort})</span>}
+        {modelLabel(model, models)}
+        {effort && <span className="text-muted-foreground"> · {effort}</span>}
       </TipRow>
     </>
   );

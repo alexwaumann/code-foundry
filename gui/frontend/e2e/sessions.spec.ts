@@ -102,7 +102,7 @@ test("the disconnected page's pill shows what Claude was doing and why it stoppe
   await expect(panel.getByTestId("session-title")).toHaveText("Refactor sidebar tree");
   await expect(panel.getByTestId("last-activity")).toHaveText("just now");
   await expect(panel.getByTestId("session-location")).toHaveText("code-foundry @ main");
-  await expect(panel.getByTestId("session-model")).toHaveText("Opus 5.5 (high)");
+  await expect(panel.getByTestId("session-model")).toHaveText("Opus (default) · high");
 
   // s-2 (sonnet, no effort) was asking for permission when the daemon stopped: attention persists.
   await mockPost("session/disconnect?id=s-2&reason=daemon%20stopped&code=0");
@@ -110,14 +110,14 @@ test("the disconnected page's pill shows what Claude was doing and why it stoppe
   await expect(pill).toHaveAttribute("data-status-kind", "attention");
   await expect(pill).toHaveText("Was waiting on you · daemon stopped");
   await expect(panel.getByTestId("session-location")).toHaveText("ghostty-playground @ main");
-  await expect(panel.getByTestId("session-model")).toHaveText("Sonnet 5.5");
+  await expect(panel.getByTestId("session-model")).toHaveText("Sonnet (default)");
 
   // s-3 is seeded idle at its prompt after Claude exited, opus/medium in the fix/resize worktree.
   await row(page, "s:s-3").click();
   await expect(pill).toHaveAttribute("data-status-kind", "idle");
   await expect(pill).toHaveText("At prompt · Claude exited");
   await expect(panel.getByTestId("session-location")).toHaveText("code-foundry @ fix/resize");
-  await expect(panel.getByTestId("session-model")).toHaveText("Opus 5.5 (medium)");
+  await expect(panel.getByTestId("session-model")).toHaveText("Opus (default) · medium");
 });
 
 test("close shows closing… then the panel with the reason", async ({ page }) => {

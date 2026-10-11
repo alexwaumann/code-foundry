@@ -84,7 +84,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   // A composer has no sidebar row: nothing in the thread list is selected.
   await expect(page.getByTestId("thread-list").locator('[aria-selected="true"]')).toHaveCount(0);
   // Defaults: settings (opus / high), Auto, a new worktree from ListRefs' default ref.
-  await expect(page.getByTestId("composer-model")).toHaveText("Opus 5.5");
+  await expect(page.getByTestId("composer-model")).toHaveText("Opus (default)");
   await expect(page.getByTestId("composer-effort")).toHaveText("High");
   await expect(page.getByTestId("composer-permission")).toHaveText("Auto");
   await expect(page.getByTestId("composer-worktree")).toHaveText("New worktree");
@@ -142,10 +142,22 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
   await expect(page.getByTestId("composer-model")).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("composer-model-list")).toBeVisible();
-  await page.keyboard.press("ArrowDown"); // opus -> sonnet
+  // The daemon's model registry, from the settings schema.
+  await expect(page.getByTestId("composer-model-list").getByRole("option")).toHaveText([
+    "Fable (default)",
+    "Opus (default)",
+    "Opus 4.8",
+    "Opus 4.7",
+    "Sonnet (default)",
+    "Sonnet 5",
+    "Sonnet 4.6",
+    "Haiku (default)",
+    "Haiku 4.5",
+  ]);
+  await page.keyboard.press("ArrowDown"); // opus -> claude-opus-4-8
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("composer-model-list")).toHaveCount(0);
-  await expect(page.getByTestId("composer-model")).toHaveText("Sonnet 5.5");
+  await expect(page.getByTestId("composer-model")).toHaveText("Opus 4.8");
   await expect(page.getByTestId("composer-model")).toBeFocused();
 
   await page.keyboard.press("Tab");
@@ -192,7 +204,7 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
     repo: "repo-cf",
     "new-worktree": "true",
     base: "origin/release/v0.3",
-    model: "sonnet",
+    model: "claude-opus-4-8",
     effort: "xhigh",
     permission: "supervised",
     prompt: "Refactor the sidebar",

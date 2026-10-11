@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { FALLBACK_MODEL_CHOICES } from "./models";
 import {
   checkAttachments,
   checkoutBranch,
@@ -8,7 +9,6 @@ import {
   isWorkspaceKey,
   movedDraft,
   pickDefault,
-  MODEL_CHOICES,
   projectChipBranch,
   projectHue,
   projectInitials,
@@ -190,10 +190,10 @@ describe("helpers", () => {
   });
 
   it("pickDefault uses a known setting, else the fallback", () => {
-    expect(pickDefault(MODEL_CHOICES, "sonnet", "opus")).toBe("sonnet");
-    expect(pickDefault(MODEL_CHOICES, "", "opus")).toBe("opus");
-    expect(pickDefault(MODEL_CHOICES, undefined, "opus")).toBe("opus");
-    expect(pickDefault(MODEL_CHOICES, "gpt", "opus")).toBe("opus");
+    expect(pickDefault(FALLBACK_MODEL_CHOICES, "sonnet", "opus")).toBe("sonnet");
+    expect(pickDefault(FALLBACK_MODEL_CHOICES, "", "opus")).toBe("opus");
+    expect(pickDefault(FALLBACK_MODEL_CHOICES, undefined, "opus")).toBe("opus");
+    expect(pickDefault(FALLBACK_MODEL_CHOICES, "gpt", "opus")).toBe("opus");
   });
 
   it.each([

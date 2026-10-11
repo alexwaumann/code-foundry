@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { useReposStore } from "@/stores/repos";
 import { reconnectSession, removeSession } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
+import { useModelChoices } from "@/stores/settings";
 import { DASHBOARD, useUiStore } from "@/stores/ui";
 
 /** Re-renders every `ms` so relative times stay fresh. */
@@ -144,10 +145,10 @@ function MetaLine({ id }: { id: string }) {
   const now = useNow();
   const lastActivityAtMs = useSessionsStore((st) => st.byId[id]?.lastActivityAtMs ?? null);
   const worktreePath = useSessionsStore((st) => st.byId[id]?.worktreePath ?? "");
-  const model = useSessionsStore((st) => {
-    const s = st.byId[id];
-    return s ? modelEffortLabel(s) : "";
-  });
+  const models = useModelChoices();
+  const modelId = useSessionsStore((st) => st.byId[id]?.model ?? "");
+  const effort = useSessionsStore((st) => st.byId[id]?.effort ?? "");
+  const model = modelEffortLabel({ model: modelId, effort }, models);
   const where = useReposStore(useShallow((r) => sessionLocation({ worktreePath }, r)));
   return (
     <div className="flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-muted-foreground">

@@ -11,7 +11,7 @@ import { applyGitOpsEvent } from "./gitops";
 import { applyIntent } from "./intents";
 import { applyRepoEvent, replaceRepos, useReposStore } from "./repos";
 import { applyRetiredUsage, applySessionEvent, replaceSessions, sessionOfTerminal, useSessionsStore } from "./sessions";
-import { applySettingsSnapshot } from "./settings";
+import { applySettingsSnapshot, loadSettingsSchema } from "./settings";
 import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./terminals";
 import { applyUpdateEvent } from "./update";
 import { useUiStore } from "./ui";
@@ -104,6 +104,8 @@ export function startEventSync(sessionRetryMs = 10_000): () => void {
   const stop = runStream<EventView>({
     open: (signal) => watchEvents(signal),
     onConnect: async (signal) => {
+      // The schema carries the model registry; a restarted daemon may have a new one.
+      void loadSettingsSchema();
       const [repos, terminals] = await Promise.all([listRepos(daemon, signal), listTerminals(daemon, signal), reconcileSessions(signal)]);
       useReposStore.setState({ ...replaceRepos(repos), loaded: true });
       useTerminalsStore.setState((s) => ({ ...replaceTerminals(s, terminals), loaded: true }));

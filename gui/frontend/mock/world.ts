@@ -19,7 +19,7 @@ import { cloneExists } from "./clone";
 import { HOME, projectFolder } from "./filesystem";
 import { projectCommands } from "./create";
 import { Hub } from "./hub";
-import { MockSettings } from "./settings";
+import { MockSettings, MODEL_VALUES } from "./settings";
 import { MockUpdater } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { claudeIntro, claudeTick, ENTER_ALT, logLine, prompt, RESET, testRunOutput, topFrame } from "./screens";
@@ -1422,7 +1422,7 @@ export class World {
     const slugArg = { name: "repo-slug", type: ArgType.STRING, required: true, description: 'GitHub repository, "owner/name"' };
     const numberArg = { name: "number", type: ArgType.INT, required: true, description: "Pull request number" };
     const worktreeArg = { name: "worktree", type: ArgType.PATH, required: false, description: "Worktree to start the session in (default: picked from the registered clones of repo-slug and the pull request's branch)" };
-    const modelArg = { name: "model", type: ArgType.ENUM, required: false, description: "Model (default: settings sessions.default_model, else Claude's default)", enumValues: ["fable", "opus", "sonnet", "haiku"] };
+    const modelArg = { name: "model", type: ArgType.ENUM, required: false, description: "Model (default: settings sessions.default_model, else Claude's default)", enumValues: MODEL_VALUES };
     const effortArg = { name: "effort", type: ArgType.ENUM, required: false, description: "Effort level (default: settings sessions.default_effort, else Claude's default)", enumValues: ["low", "medium", "high", "xhigh", "max"] };
     const start =
       (fix: boolean) =>
@@ -1568,7 +1568,7 @@ export class World {
             { name: "worktree", type: ArgType.PATH, required: false, description: "Worktree path" },
             { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name the thread belongs to" },
             { name: "repos", type: ArgType.STRING, required: false, description: "With new-worktree: repositories for a new workspace (repo[:base], comma-separated)" },
-            { name: "model", type: ArgType.ENUM, required: false, description: "Model", enumValues: ["fable", "opus", "sonnet", "haiku"], defaultValue: "opus" },
+            { name: "model", type: ArgType.ENUM, required: false, description: "Model", enumValues: MODEL_VALUES, defaultValue: "opus" },
             { name: "effort", type: ArgType.ENUM, required: false, description: "Effort", enumValues: ["low", "medium", "high", "xhigh", "max"], defaultValue: "high" },
             { name: "permission", type: ArgType.ENUM, required: false, description: "Permission mode", enumValues: ["supervised", "accept-edits", "auto"] },
             { name: "new-worktree", type: ArgType.BOOL, required: false, description: "Create a worktree for the thread" },

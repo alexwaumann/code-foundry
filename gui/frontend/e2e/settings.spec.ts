@@ -37,6 +37,19 @@ test("cmd+, opens settings rendered from the schema", async ({ page }) => {
   }
   await expect(setting(page, "appearance.font_size").getByRole("spinbutton")).toHaveValue("13");
   await expect(setting(page, "sessions.default_model").getByRole("combobox")).toHaveValue("opus");
+  // The model registry's labels; "Opus (default)" is not suffixed a second time.
+  await expect(setting(page, "sessions.default_model").getByRole("option")).toHaveText([
+    "Fable (default)",
+    "Opus (default)",
+    "Opus 4.8",
+    "Opus 4.7",
+    "Sonnet (default)",
+    "Sonnet 5",
+    "Sonnet 4.6",
+    "Haiku (default)",
+    "Haiku 4.5",
+  ]);
+  await expect(setting(page, "appearance.theme").getByRole("option", { name: "system (default)" })).toHaveCount(1);
   // Restart-required fields say so; live ones do not.
   await expect(setting(page, "sessions.scrollback_lines").getByTestId("restart-hint")).toBeVisible();
   await expect(setting(page, "appearance.theme").getByTestId("restart-hint")).toHaveCount(0);
