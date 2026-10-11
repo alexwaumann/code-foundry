@@ -105,14 +105,17 @@ export function row(page: Page, key: string) {
   return page.locator(`[data-row-key="${key}"]`);
 }
 
-/** Text of the attached terminal's buffer (renderer-agnostic: works for WebGL too). */
-export async function terminalText(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    const w = window as unknown as { __cfTerminal?: { renderer: { getText(): string } } };
-    return w.__cfTerminal?.renderer.getText() ?? "";
-  });
+/**
+ * Text of an attached terminal's buffer (renderer-agnostic: works for WebGL too): the
+ * content pane's ("main", a thread's Claude terminal) or the bottom panel's active shell.
+ */
+export async function terminalText(page: Page, which: "main" | "bottom" = "main"): Promise<string> {
+  return page.evaluate((name) => {
+    const w = window as unknown as { __cfTerminals?: Record<string, { renderer: { getText(): string } } | undefined> };
+    return w.__cfTerminals?.[name]?.renderer.getText() ?? "";
+  }, which);
 }
 
-export async function expectTerminalText(page: Page, text: string | RegExp): Promise<void> {
-  await expect.poll(() => terminalText(page), { timeout: 5000 }).toMatch(text);
+export async function expectTerminalText(page: Page, text: string | RegExp, which: "main" | "bottom" = "main"): Promise<void> {
+  await expect.poll(() => terminalText(page, which), { timeout: 5000 }).toMatch(text);
 }

@@ -174,7 +174,7 @@ test("ShowView intents from the daemon open settings and help", async ({ page })
   expect(await emit({ showView: { name: "settings" } })).toBe(1);
   await expect(page.getByTestId("settings-page")).toBeVisible();
   // Selecting something in the sidebar leaves the page.
-  await row(page, "t:t-logs").click();
+  await row(page, "s:s-1").click();
   await expect(page.getByTestId("settings-page")).toHaveCount(0);
   await emit({ showView: { name: "help" } });
   await expect(page.getByTestId("help-overlay")).toBeVisible();

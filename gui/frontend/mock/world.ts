@@ -22,7 +22,7 @@ import { Hub } from "./hub";
 import { MockSettings, MODEL_VALUES } from "./settings";
 import { MockUpdater } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
-import { claudeIntro, claudeTick, ENTER_ALT, logLine, prompt, RESET, testRunOutput, topFrame } from "./screens";
+import { claudeIntro, claudeTick, ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -109,7 +109,7 @@ interface CmdDef {
 }
 export type UiIntentInit = MessageInitShape<typeof UiIntentSchema>;
 
-type Kind = "claude" | "logs" | "top" | "shell" | "exited";
+type Kind = "claude" | "top" | "shell";
 
 // The terminal label contract (internal/termlabel, proto Terminal.labels).
 const LABEL_KIND = "kind";
@@ -381,13 +381,10 @@ export class World {
     this.gh.reset();
     const started = new Date(Date.now() - 42 * 60_000);
     this.addTerm({ id: "t-claude", argv: ["claude"], cwd: CF, title: "✳ Refactor sidebar tree", kind: "claude", labels: { worktree: CF, session: "s-1" }, startedAt: started });
-    this.addTerm({ id: "t-logs", argv: ["/bin/zsh"], cwd: `${CF}/internal/daemon`, title: "tail -f daemon.log", kind: "logs", labels: {}, startedAt: started });
     // A shell terminal.new started on the Projects page for feat/sidebar (worktree-owned).
     this.addTerm({ id: "t-top", argv: ["top"], cwd: `${CFW}/feat-sidebar`, title: "", kind: "top", labels: shellLabels("", "repo-cf", `${CFW}/feat-sidebar`), startedAt: started });
-    this.addTerm({ id: "t-tests", argv: ["go", "test", "./..."], cwd: `${CFW}/fix-resize`, title: "", kind: "exited", labels: { worktree: `${CFW}/fix-resize` }, startedAt: started });
     this.addTerm({ id: "t-ghostty", argv: ["claude", "--resume"], cwd: GP, title: "✳ Port renderer", kind: "claude", labels: { worktree: GP, session: "s-2" }, startedAt: started });
-    this.addTerm({ id: "t-tmp", argv: ["/bin/zsh"], cwd: "/tmp", title: "", kind: "shell", labels: {}, startedAt: started });
-    // A shell terminal.new started in thread s-1 (thread-owned; the sidebar hides it, as it hides every terminal of a known thread).
+    // A shell terminal.new started in thread s-1 (thread-owned: s-1's bottom panel).
     this.addTerm({ id: "t-s1-shell", argv: ["/bin/zsh", "-l"], cwd: CF, title: "", kind: "shell", labels: shellLabels("s-1", "repo-cf", CF), startedAt: started });
     // Sessions in every state. s-1/s-2 own t-claude/t-ghostty (labels.session above).
     this.sessions.clear();
@@ -922,19 +919,9 @@ export class World {
       case "claude":
         t.history = claudeIntro(o.cwd, t.cols, o.id === "t-claude" ? "refactor the sidebar tree into a virtualized list" : "port the grid renderer to libghostty-vt");
         break;
-      case "logs":
-        t.history = `${prompt(o.cwd)}tail -f ~/Library/Application\\ Support/code-foundry/logs/daemon.log\r\n`;
-        for (let i = 0; i < 12; i++) t.history += logLine(i, new Date(Date.now() - (12 - i) * 1000));
-        break;
       case "top":
         t.history = `${prompt(o.cwd)}top\r\n`;
         t.altScreen = true;
-        break;
-      case "exited":
-        t.history = testRunOutput(o.cwd);
-        t.state = TerminalState.EXITED;
-        t.exitCode = 1;
-        t.exitedAt = new Date(Date.now() - 5 * 60_000);
         break;
       case "shell":
         t.history = `${RESET}Last login: Thu Oct  8 09:12:44 on ttys004\r\n${prompt(o.cwd)}`;
@@ -967,8 +954,6 @@ export class World {
           const base = t.title.replace(/^\S+\s/, "");
           this.setTitle(t, `${t.tick % 12 === 0 ? "✳" : "⠐"} ${base}`);
         }
-      } else if (t.kind === "logs") {
-        this.output(t, logLine(t.tick));
       } else if (t.kind === "top" && t.altScreen) {
         this.output(t, topFrame(t.tick, t.cols, t.rows));
       }
@@ -1054,13 +1039,6 @@ export class World {
         t.attach.publish({ event: { case: "output", value: { data: enc.encode("\x1b[?1049l\x1b[?25h") } } });
         this.output(t, prompt(t.cwd));
         this.publishTerm(t);
-      }
-      return;
-    }
-    if (t.kind === "logs") {
-      if (text.includes("\x03")) {
-        t.kind = "shell";
-        this.output(t, `^C\r\n${prompt(t.cwd)}`);
       }
       return;
     }

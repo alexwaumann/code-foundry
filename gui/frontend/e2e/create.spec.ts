@@ -245,15 +245,13 @@ test("the overview's Publish to GitHub opens the publish dialog for sketches", a
 
 test("repo.github.publish in the palette opens the publish dialog; repo.create opens New", async ({ page }) => {
   await openApp(page);
-  // A terminal in sketches gives the palette the project's context (the Projects page has none).
+  // The composer for sketches (its Projects page row's New thread) gives the palette the
+  // project's context; the Projects page itself has none.
   await openProjects(page);
   const sk = page.locator('[data-nav-key="p:repo-sk"]');
   await sk.hover();
-  await sk.getByTestId("project-new-terminal").click();
-  // The shell opens in the Projects page's bottom panel; its sidebar row selects it.
-  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
-  await page.locator('[data-row-key^="t:t-new-"]').click();
-  await expect(page.getByTestId("terminal-host")).toBeVisible();
+  await sk.getByTestId("project-new-thread").click();
+  await expect(page.getByTestId("composer")).toBeVisible();
   await page.keyboard.press("Meta+k");
   const palette = page.getByTestId("palette");
   await palette.locator('[data-command="repo.github.publish"]').click();

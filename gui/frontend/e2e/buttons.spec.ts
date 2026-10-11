@@ -59,11 +59,10 @@ test("New Terminal from the palette starts a terminal in the selected thread's w
   const last = (await invocations()).at(-1);
   expect(last?.name).toBe("terminal.new");
   expect(last?.context?.activeWorktreePath).toBe(FIX_RESIZE);
-  // The shell belongs to the thread (labels session=s-3): the sidebar hides it like the
-  // thread's other terminals, the thread stays selected, and the shell opens in the
-  // thread's bottom panel.
+  // The shell belongs to the thread (labels session=s-3): the thread stays selected, the
+  // sidebar gains no row, and the shell opens in the thread's bottom panel.
   await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
-  await expect(page.locator('[data-row-kind="terminal"][aria-selected="true"]')).toHaveCount(0);
+  await expect(page.locator('[data-row-kind]:not([data-row-kind="session"])')).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel").getByRole("tab")).toHaveCount(1);
   await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
 });
@@ -103,6 +102,8 @@ test("session pane header: rename, fork and close buttons run the session comman
   await expect(header.getByTestId("terminal-title")).toHaveText("Refactor sidebar tree");
   // 44px, like every pane header (window/PaneHeader; layout.spec.ts).
   expect((await header.boundingBox())?.height).toBe(44);
+  // The thread's commands only: no Kill Terminal for its Claude terminal (session.close ends it).
+  await expect(header.getByRole("button", { name: "Kill Terminal" })).toHaveCount(0);
 
   // Rename is presented inline in the sidebar, as from the palette.
   await header.getByRole("button", { name: "Rename Thread" }).click();
@@ -121,15 +122,6 @@ test("session pane header: rename, fork and close buttons run the session comman
   expect((await invocations()).at(-1)?.context?.activeSessionId).toBe("s-1");
   // Closing: session.close is no longer available, so its button goes away.
   await expect(header.getByRole("button", { name: "Close Thread" })).toHaveCount(0);
-});
-
-test("terminal pane header: kill asks for confirmation", async ({ page }) => {
-  await openApp(page);
-  await row(page, "t:t-logs").click();
-  const header = page.getByTestId("terminal-header");
-  await expect(header.getByRole("button", { name: "Rename Thread" })).toHaveCount(0);
-  await header.getByRole("button", { name: "Kill Terminal" }).click();
-  await expect(page.getByTestId("confirm-dialog")).toBeVisible();
 });
 
 test("empty states and the welcome panel offer buttons", async ({ page }) => {

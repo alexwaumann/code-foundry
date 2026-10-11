@@ -1,17 +1,18 @@
 import { expect, test } from "@playwright/test";
-import { CF, emit, expectTerminalText, invocations, openApp, openProjects, resetMock, row, writes } from "./fixtures";
+import { CF, emit, expectTerminalText, invocations, openApp, openProjects, resetMock, row, terminalText, writes } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
 });
 
-test("sidebar lists threads, then terminals no thread owns; repos and worktrees are on the Projects page", async ({ page }) => {
+test("sidebar lists threads only; repos and worktrees are on the Projects page, shells in bottom panels", async ({ page }) => {
   await openApp(page);
   const list = page.getByTestId("thread-list");
   const keys = await list.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
-  // Sessions own t-claude and t-ghostty, so those terminals have no rows of their own.
-  expect(keys).toEqual(["s:s-2", "s:s-5", "s:s-1", "s:s-6", "s:s-4", "s:s-3", "h:terminals", "t:t-logs", "t:t-top", "t:t-tests", "t:t-tmp"]);
-  await expect(list.locator('[data-row-kind="repo"], [data-row-kind="worktree"]')).toHaveCount(0);
+  // No terminal rows: a thread's Claude terminal shows through its row, shells (t-top,
+  // t-s1-shell) in their owner's bottom panel.
+  expect(keys).toEqual(["s:s-2", "s:s-5", "s:s-1", "s:s-6", "s:s-4", "s:s-3"]);
+  await expect(list.locator('[data-row-kind]:not([data-row-kind="session"])')).toHaveCount(0);
   await openProjects(page);
   await expect(page.getByTestId("project-name")).toHaveText(["code-foundry", "dotfiles", "ghostty-playground", "sketches", "writing"]);
   await expect(page.locator('[data-testid="project"][data-repo="repo-cf"]').getByTestId("worktree-branch")).toHaveText(["main", "feat/sidebar", "fix/resize"]);
@@ -27,22 +28,22 @@ test("selecting a session attaches its terminal and shows the snapshot", async (
   await expectTerminalText(page, "Welcome to Claude Code!");
 
   // Switching aborts the old stream and resets before the new snapshot.
-  await row(page, "t:t-tests").click();
-  await expect(host).toHaveAttribute("data-terminal-id", "t-tests");
-  await expectTerminalText(page, "TestResizeAppliesToPTY");
-  await expect(page.getByTestId("exit-overlay")).toContainText("code 1");
-  const text = await page.evaluate(() => (window as unknown as { __cfTerminal: { renderer: { getText(): string } } }).__cfTerminal.renderer.getText());
-  expect(text).not.toContain("Welcome to Claude Code!");
+  await row(page, "s:s-2").click();
+  await expect(host).toHaveAttribute("data-terminal-id", "t-ghostty");
+  await expectTerminalText(page, "port the grid renderer");
+  expect(await terminalText(page)).not.toContain("refactor the sidebar tree");
 });
 
 test("keystrokes are written to the attached terminal in order", async ({ page }) => {
   await openApp(page);
-  await row(page, "t:t-tmp").click();
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
+  // s-1's shell, in its bottom panel (cmd+j shows it with the keyboard in the shell).
+  await row(page, "s:s-1").click();
+  await page.keyboard.press("Meta+j");
+  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
   await page.keyboard.type("echo hi");
   await page.keyboard.press("Enter");
-  await expectTerminalText(page, "command not found: echo");
-  const sent = (await writes()).filter((w) => w.id === "t-tmp").map((w) => w.data).join("");
+  await expectTerminalText(page, "command not found: echo", "bottom");
+  const sent = (await writes()).filter((w) => w.id === "t-s1-shell").map((w) => w.data).join("");
   expect(sent).toBe("echo hi\r");
 });
 
@@ -71,27 +72,30 @@ test("palette opens with cmd+k and lists only commands available in context", as
 
 test("invoking a command sends the current context", async ({ page }) => {
   await openApp(page);
-  await row(page, "t:t-logs").click();
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
+  // The keyboard in a thread's bottom panel shell: the shell is the active terminal.
+  await row(page, "s:s-1").click();
+  await page.keyboard.press("Meta+j");
+  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("kill term");
   await page.keyboard.press("Enter");
   // terminal.kill requires confirmation; the confirm button has focus.
-  await expect(page.getByTestId("confirm-dialog")).toContainText("Kill terminal t-logs?");
+  await expect(page.getByTestId("confirm-dialog")).toContainText("Kill terminal t-s1-shell?");
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("exit-overlay")).toContainText("code 129");
+  // A shell that exits is removed: its tab goes, the panel shows its empty state.
+  await expect(page.getByTestId("bottom-panel").getByRole("tab")).toHaveCount(0);
   const last = (await invocations()).at(-1);
   expect(last?.name).toBe("terminal.kill");
   expect(last?.context).toEqual({
-    activeTerminalId: "t-logs",
-    activeSessionId: "",
+    activeTerminalId: "t-s1-shell",
+    activeSessionId: "s-1",
     activeRepoId: "repo-cf",
     activeWorktreePath: CF,
-    activeView: "terminal",
+    activeView: "session",
     activeWorkspaceId: "",
   });
 
-  // A session contributes its id, terminal and worktree.
+  // The thread's own terminal: its id, terminal and worktree.
   await row(page, "s:s-1").click();
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-claude");
   await page.keyboard.press("Meta+k");
@@ -140,19 +144,23 @@ test("required args are prompted inline before invoking", async ({ page }) => {
   expect((await invocations()).at(-1)?.args).toEqual({ level: "warning" });
 });
 
-test("FocusTerminal intent switches the selection; a shell shows in its owner's bottom panel", async ({ page }) => {
+test("FocusTerminal intent: a thread's terminal selects the thread; a shell shows in its owner's bottom panel", async ({ page }) => {
   await openApp(page);
-  // A terminal no thread or worktree owns (no labels) is selected in the content pane.
-  await expect.poll(() => emit({ focusTerminal: { terminalId: "t-tmp" } })).toBeGreaterThan(0);
-  await expect(row(page, "t:t-tmp")).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-tmp");
+  // A thread's Claude terminal: the thread, in the content pane.
+  await expect.poll(() => emit({ focusTerminal: { terminalId: "t-claude" } })).toBeGreaterThan(0);
+  await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-claude");
+  await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
   // A worktree's shell: the Projects page, with the shell active in its bottom panel.
   await emit({ focusTerminal: { terminalId: "t-top" } });
   await expect(page.getByTestId("projects-page")).toBeVisible();
   await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-terminal-id", "t-top");
-  await expect
-    .poll(() => page.evaluate(() => (window as unknown as { __cfTerminals?: Record<string, { renderer: { getText(): string } }> }).__cfTerminals?.bottom?.renderer.getText() ?? ""))
-    .toMatch("PID USER");
+  await expectTerminalText(page, "PID USER", "bottom");
+  // A thread's shell: the thread, with the shell in its bottom panel and the keyboard there.
+  await emit({ focusTerminal: { terminalId: "t-s1-shell" } });
+  await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-terminal-id", "t-s1-shell");
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("bottom");
 });
 
 test("OpenPalette and Notify intents", async ({ page }) => {
@@ -169,18 +177,22 @@ test("sidebar is keyboard navigable", async ({ page }) => {
   const list = page.getByTestId("thread-list");
   await list.focus();
   await page.keyboard.press("Home"); // s-2 (needs attention, on top)
-  await page.keyboard.press("ArrowDown"); // s-5 (headers are skipped)
+  await page.keyboard.press("ArrowDown"); // s-5
   await page.keyboard.press("ArrowDown"); // s-1
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-claude");
   await list.focus();
   await page.keyboard.press("End");
-  await expect(list).toHaveAttribute("aria-activedescendant", "row-t:t-tmp");
-  // cmd+N jumps to the Nth thread or terminal in sidebar order: s-2, s-5, s-1, s-6, s-4, s-3, t-logs, t-top, …
-  await page.keyboard.press("Meta+7");
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-logs");
-  await page.keyboard.press("Meta+8");
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-top");
+  await expect(list).toHaveAttribute("aria-activedescendant", "row-s:s-3");
+  // cmd+N jumps to the Nth thread in sidebar order: s-2, s-5, s-1, s-6, s-4, s-3.
+  await page.keyboard.press("Meta+1");
+  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-ghostty");
+  await page.keyboard.press("Meta+5");
+  await expect(row(page, "s:s-4")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("session-disconnected")).toBeVisible();
+  // Past the last thread: nothing changes.
+  await page.keyboard.press("Meta+9");
+  await expect(row(page, "s:s-4")).toHaveAttribute("aria-selected", "true");
 });
 
 test("WebGL context loss falls back to the DOM renderer", async ({ page, browserName }) => {

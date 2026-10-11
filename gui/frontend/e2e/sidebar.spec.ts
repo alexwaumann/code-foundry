@@ -36,7 +36,7 @@ function list(page: Page) {
 async function rowKeys(page: Page): Promise<string[]> {
   return list(page)
     .locator("[data-row-key]")
-    .evaluateAll((els) => els.map((e) => (e.getAttribute("data-row-kind") === "header" ? `# ${e.textContent}` : (e.getAttribute("data-row-key") ?? ""))));
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key") ?? ""));
 }
 
 async function lastInvocation(name: string) {
@@ -97,23 +97,11 @@ test("the sidebar is a flat thread list: waiting threads on top, no thread heade
   await openApp(page);
   await expect(row(page, `s:${driver}`)).toBeVisible();
   await expect(page.getByTestId("sidebar-band")).toContainText("Code Foundry");
-  // The waiting thread (s-2) on top, then threads newest first, then terminals no thread owns
-  // under the only header.
-  await expect.poll(() => rowKeys(page)).toEqual([
-    "s:s-2",
-    `s:${driver}`,
-    "s:s-5",
-    "s:s-1",
-    "s:s-6",
-    "s:s-4",
-    "s:s-3",
-    "# Terminals",
-    "t:t-logs",
-    "t:t-top",
-    "t:t-tests",
-    "t:t-tmp",
-  ]);
-  await expect(list(page).locator('[data-row-kind="repo"], [data-row-kind="worktree"], [data-row-kind="group"]')).toHaveCount(0);
+  // The waiting thread (s-2) on top, then threads newest first. Nothing else: no terminal
+  // rows (shells live in bottom panels) and no header.
+  await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", `s:${driver}`, "s:s-5", "s:s-1", "s:s-6", "s:s-4", "s:s-3"]);
+  await expect(list(page).locator('[data-row-kind]:not([data-row-kind="session"])')).toHaveCount(0);
+  await expect(list(page)).toHaveAttribute("aria-label", "Threads");
 
   // A workspace thread: its cwd's project and branch, and the workspace badge.
   const d = row(page, `s:${driver}`);
@@ -128,11 +116,8 @@ test("the sidebar is a flat thread list: waiting threads on top, no thread heade
   await expect(s1.getByTestId("row-project")).toHaveText("code-foundry");
   await expect(s1.getByTestId("row-branch")).toHaveText("main");
   await expect(s1.getByTestId("row-workspace")).toHaveCount(0);
-  // Terminals say where they run.
-  await expect(row(page, "t:t-top").getByTestId("row-place")).toHaveText("code-foundry · feat/sidebar");
-  await expect(row(page, "t:t-tmp").getByTestId("row-place")).toHaveText("/tmp");
 
-  // Keyboard: ↓ skips headers; Enter selects.
+  // Keyboard: ↓ moves; Enter selects.
   await list(page).focus();
   await page.keyboard.press("Home");
   await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-2");
@@ -349,8 +334,8 @@ test("status kinds: each thread's second line says its status in words and colou
       "s:s-4",
       "s:s-3",
     ]);
-  // The only header left is Terminals.
-  expect((await rowKeys(page)).filter((k) => k.startsWith("#"))).toEqual(["# Terminals"]);
+  // No headers at all.
+  await expect(list(page).locator('[data-row-kind="header"]')).toHaveCount(0);
 
   const want: [string, string, string, RegExp][] = [
     ["s-k-approval", "input", "Needs input · Bash", /text-amber/],

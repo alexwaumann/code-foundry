@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, mockPost, openApp, resetMock, row } from "./fixtures";
+import { emit, mockPost, openApp, openProjects, resetMock, row } from "./fixtures";
 
 /**
  * The Usage side panel surface (docs/notes/session-usage.md, "Panel surface"): a thread's
@@ -94,8 +94,8 @@ test("the palette and the CLI's ShowView open it for a thread; a plain terminal 
   await expectUsageTab(page);
   await expect(surface(page).getByTestId("usage-cost")).toHaveText("$237.82");
 
-  // A plain terminal is no thread: not in the palette, not in the empty panel.
-  await row(page, "t:t-logs").click();
+  // A page is no thread: not in the palette, not in the empty panel.
+  await openProjects(page);
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Show Usage in Side Panel");
   await expect(palette.locator('[data-command="view.panel.usage"]')).toHaveCount(0);

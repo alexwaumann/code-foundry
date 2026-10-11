@@ -69,34 +69,6 @@ export function claudeTick(n: number): string {
   return `\r\x1b[2K${step}${status}`;
 }
 
-const levels = [
-  [`${GREEN}INFO ${RESET}`, "api: request method=/codefoundry.v1.HealthService/Ping status=200 dur=0.4ms"],
-  [`${GREEN}INFO ${RESET}`, "terminal: attach id=t-claude subscribers=1"],
-  [`${CYAN}DEBUG${RESET}`, "bus: publish type=terminal.Updated drops=0"],
-  [`${YELLOW}WARN ${RESET}`, "repo: fsnotify overflow, scheduling full reconcile root=/Users/dev/src"],
-  [`${GREEN}INFO ${RESET}`, "repo: reconcile done repos=3 worktrees=5 dur=38ms"],
-  [`${RED}ERROR${RESET}`, "gh: graphql rate limited, backing off for=30s"],
-] as const;
-
-export function logLine(n: number, now = new Date()): string {
-  const [lvl, msg] = levels[n % levels.length] ?? levels[0];
-  return `${GRAY}${now.toISOString()}${RESET} ${lvl} ${msg}\r\n`;
-}
-
-export function testRunOutput(cwd: string): string {
-  return (
-    prompt(cwd) +
-    "go test ./...\r\n" +
-    `${GREEN}ok${RESET}  \tgithub.com/alexwaumann/code-foundry/internal/bus\t0.212s\r\n` +
-    `${GREEN}ok${RESET}  \tgithub.com/alexwaumann/code-foundry/internal/paths\t0.104s\r\n` +
-    `--- ${RED}FAIL${RESET}: TestResizeAppliesToPTY (0.00s)\r\n` +
-    `    actor_test.go:88: got ${BOLD}80x24${RESET}, want ${BOLD}120x40${RESET}\r\n` +
-    `${RED}FAIL${RESET}\r\n` +
-    `${RED}FAIL${RESET}\tgithub.com/alexwaumann/code-foundry/internal/store/terminal\t0.341s\r\n` +
-    `${RED}FAIL${RESET}\r\n`
-  );
-}
-
 const procs = ["claude", "code-foundry", "node", "WebKit.WebContent", "gopls", "zsh", "git", "Ghostty", "kernel_task", "launchd", "mds_stores", "WindowServer"];
 
 /** A full top-like frame for the alternate screen, drawn with absolute cursor moves. */
