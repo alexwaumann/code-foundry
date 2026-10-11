@@ -332,25 +332,49 @@ func next(t *testing.T, sub *bus.Subscription[Event]) Event {
 	}
 }
 
-func TestTimeoutAndClose(t *testing.T) {
+func TestTimeout(t *testing.T) {
 	fr := &fakeRunner{block: map[string]chan struct{}{"fetch": make(chan struct{})}}
 	w := newWorld(t, Options{Runner: fr, Timeouts: map[Kind]time.Duration{KindFetch: 50 * time.Millisecond}})
 	op := mustOp(t)(w.m.Fetch(context.Background(), FetchOptions{WorktreePath: w.a}))
 	wantFailed(t, op, "timed out after 50ms")
+}
 
-	// The caller giving up does not cancel the op; Close does.
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+// The caller giving up does not cancel the op; Close does. The caller leaves only once
+// the op has started: Fetch resolves the worktree (a real git probe) before it queues,
+// and the op reaches the snapshot only when its lane starts it, so a caller deadline
+// would race both.
+func TestCallerLeavesThenClose(t *testing.T) {
+	fr := &fakeRunner{block: map[string]chan struct{}{"fetch": make(chan struct{})}}
+	w := newWorld(t, Options{Runner: fr})
+	sub := bus.Subscribe[Event](w.bus, 16)
+	defer sub.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	w.m.opts.Timeouts[KindFetch] = time.Hour
-	if _, err := w.m.Fetch(ctx, FetchOptions{WorktreePath: w.a}); !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("err = %v, want the caller's deadline", err)
+	errc := make(chan error, 1)
+	go func() {
+		_, err := w.m.Fetch(ctx, FetchOptions{WorktreePath: w.a})
+		errc <- err
+	}()
+	if ev := next(t, sub); ev.Type != Started || ev.Op.Kind != KindFetch {
+		t.Fatalf("first event = %+v, want fetch started", ev)
 	}
-	if s := w.m.Snapshot(); len(s.Ops) == 0 || s.Ops[0].State != StateRunning {
+	cancel()
+	select {
+	case err := <-errc:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("err = %v, want the caller's cancellation", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Fetch did not return after the caller cancelled")
+	}
+	if s := w.m.Snapshot(); len(s.Ops) != 1 || s.Ops[0].State != StateRunning {
 		t.Fatalf("op should still run after the caller left: %+v", s.Ops)
 	}
+
 	_ = w.m.Close()
-	if s := w.m.Snapshot(); s.Ops[0].State != StateFailed || !strings.Contains(s.Ops[0].Summary, "shutting down") {
-		t.Errorf("after Close: %+v", s.Ops[0])
+	if s := w.m.Snapshot(); len(s.Ops) != 1 || s.Ops[0].State != StateFailed || !strings.Contains(s.Ops[0].Summary, "shutting down") {
+		t.Errorf("after Close: %+v", s.Ops)
 	}
 	if _, err := w.m.Fetch(context.Background(), FetchOptions{WorktreePath: w.a}); !errors.Is(err, ErrClosed) {
 		t.Errorf("Fetch after Close err = %v", err)
