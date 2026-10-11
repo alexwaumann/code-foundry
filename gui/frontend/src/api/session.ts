@@ -4,7 +4,12 @@ import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
 
 export type SessionStateView = "starting" | "connected" | "closing" | "disconnected" | "unknown";
-export type SessionStatusView = "busy" | "idle" | "attention" | "unknown";
+/**
+ * What Claude is doing. Persisted by the daemon: a disconnected session keeps the status it
+ * ended with ("attention" with its reason survives a restart). "error" is set only on a
+ * disconnected session whose process ended mid-turn (statusReason "interrupted").
+ */
+export type SessionStatusView = "busy" | "idle" | "attention" | "error" | "unknown";
 /** claude --permission-mode, as session.new's `permission` arg spells it; "" = Claude's default. */
 export type PermissionModeView = "supervised" | "accept-edits" | "auto" | "";
 
@@ -22,6 +27,14 @@ export interface SessionView {
   terminalId: string;
   state: SessionStateView;
   status: SessionStatusView;
+  /**
+   * The detector's reason for status, e.g. "finished", "at prompt",
+   * "permission: Do you want to proceed?", "waiting for approval: Bash", or "interrupted"
+   * for "error". Classify it with statusKind / statusDetail (lib/session), not by hand.
+   */
+  statusReason: string;
+  /** When status or statusReason last changed, epoch ms; null if never known. */
+  statusChangedAtMs: number | null;
   createdAtMs: number | null;
   lastActivityAtMs: number | null;
   exitCode: number;
@@ -81,6 +94,7 @@ const statusMap: Record<SessionStatus, SessionStatusView> = {
   [SessionStatus.BUSY]: "busy",
   [SessionStatus.IDLE]: "idle",
   [SessionStatus.NEEDS_ATTENTION]: "attention",
+  [SessionStatus.ERROR]: "error",
 };
 
 const permissionMap: Record<PermissionMode, PermissionModeView> = {
@@ -103,6 +117,8 @@ export function toSessionView(s: Session): SessionView {
     terminalId: s.terminalId,
     state: stateMap[s.state],
     status: statusMap[s.status],
+    statusReason: s.statusReason,
+    statusChangedAtMs: s.statusChangedAt ? timestampMs(s.statusChangedAt) : null,
     createdAtMs: s.createdAt ? timestampMs(s.createdAt) : null,
     lastActivityAtMs: s.lastActivityAt ? timestampMs(s.lastActivityAt) : null,
     exitCode: s.exitCode,

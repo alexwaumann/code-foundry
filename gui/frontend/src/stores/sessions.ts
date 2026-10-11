@@ -81,9 +81,13 @@ export const useSessionsStore = create<SessionsState>()(() => ({
   error: null,
 }));
 
-/** The session needs the user: needs-attention and not disconnected. */
+/**
+ * The session needs the user: needs-attention, in any state. The daemon persists status, so
+ * a thread that disconnected (or outlived a daemon restart) while asking a question or
+ * waiting on a permission prompt still counts. "error" (interrupted) does not.
+ */
 export function isAttention(s: Pick<SessionView, "status" | "state">): boolean {
-  return s.status === "attention" && s.state !== "disconnected";
+  return s.status === "attention";
 }
 
 /** Session ids that need the user, in `order`. */

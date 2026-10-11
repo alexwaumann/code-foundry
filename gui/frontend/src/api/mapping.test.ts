@@ -333,6 +333,10 @@ describe("events mapping", () => {
     });
     expect(toSessionView(s)).toMatchObject({ id: "s1", state: "disconnected", status: "attention", lastActivityAtMs: 5000, createdAtMs: null, exitCode: 1, disconnectReason: "crashed" });
     expect(toSessionView(s).workspaceId).toBe("");
+    expect(toSessionView(s)).toMatchObject({ statusReason: "", statusChangedAtMs: null });
+    expect(
+      toSessionView(create(SessionSchema, { id: "s3", status: SessionStatus.ERROR, statusReason: "interrupted", statusChangedAt: timestampFromMs(7000) })),
+    ).toMatchObject({ status: "error", statusReason: "interrupted", statusChangedAtMs: 7000 });
     expect(toSessionView(create(SessionSchema, { id: "s2", repoId: "web", workspaceId: "w-1" }))).toMatchObject({ repoId: "web", workspaceId: "w-1" });
   });
 

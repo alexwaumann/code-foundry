@@ -26,6 +26,8 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     terminalId: `t-${id}`,
     state: "connected",
     status: "idle",
+    statusReason: "",
+    statusChangedAtMs: null,
     createdAtMs: 1,
     lastActivityAtMs: null,
     exitCode: 0,

@@ -1,18 +1,25 @@
 import type { SessionView } from "@/api/session";
 
-/** The one badge a session row shows. Lifecycle wins over activity status. */
-export type SessionBadge = "starting" | "closing" | "disconnected" | "busy" | "idle" | "attention" | "unknown";
+/**
+ * The one badge a session row shows. Lifecycle wins over activity status, except that a
+ * disconnected session shows the status it persisted when that status still matters:
+ * "attention" (it was waiting on the user; it still is, and counts as attention, see
+ * isAttention) or "error" (its process ended mid-turn: interrupted). A disconnected session
+ * that was idle or unknown shows "disconnected".
+ */
+export type SessionBadge = "starting" | "closing" | "disconnected" | "busy" | "idle" | "attention" | "error" | "unknown";
 
 export function sessionBadge(s: Pick<SessionView, "state" | "status"> | undefined): SessionBadge {
   if (!s) return "unknown";
   switch (s.state) {
-    case "disconnected":
     case "starting":
     case "closing":
       return s.state;
+    case "disconnected":
+      return s.status === "attention" || s.status === "error" ? s.status : "disconnected";
     case "connected":
     case "unknown":
-      return s.status === "unknown" ? "unknown" : s.status;
+      return s.status;
   }
 }
 
@@ -23,8 +30,64 @@ export const badgeLabels: Record<SessionBadge, string> = {
   busy: "busy",
   idle: "idle",
   attention: "needs attention",
+  error: "error",
   unknown: "thread",
 };
+
+/**
+ * What a session is waiting on or why it stopped, classified from the daemon's status
+ * reason (internal/claudestatus restingStatus; the store's "interrupted"):
+ * - "done": "finished" (a turn ended with output the user has not seen)
+ * - "permission": "permission: <dialog question>" or "waiting for approval: <Tool>"
+ *   (the latter when no screen read saw the dialog)
+ * - "question": "question: <question>" (AskUserQuestion) or "waiting for input" (an open
+ *   turn with no prompt box and no pending tool: a question or plan seen without a screen)
+ * - "plan": "plan: <dialog text>" (ExitPlanMode approval)
+ * - "error": "error: <code>" (a Claude API error at the prompt), or an "error" status with
+ *   any other reason
+ * - "interrupted": status "error", reason "interrupted" (the process ended mid-turn)
+ * - "trust": "trust: <dialog text>" (folder trust dialog)
+ * - "notification": "notification: <text>" (OSC 9/99/777) or "bell"
+ * - "other": everything else, including every busy / idle / unknown status and the
+ *   untested "blocked: …", "continue: …", "menu: …" dialogs
+ * Only "attention" and "error" statuses are classified; the rest are "other".
+ */
+export type StatusKind = "done" | "permission" | "question" | "plan" | "error" | "interrupted" | "trust" | "notification" | "other";
+
+const reasonKinds: Readonly<Record<string, StatusKind>> = {
+  finished: "done",
+  permission: "permission",
+  "waiting for approval": "permission",
+  question: "question",
+  "waiting for input": "question",
+  plan: "plan",
+  error: "error",
+  trust: "trust",
+  notification: "notification",
+  bell: "notification",
+};
+
+/** "permission: Do you want to proceed?" -> ["permission", "Do you want to proceed?"]; no colon -> [reason, ""]. */
+function splitReason(reason: string): [string, string] {
+  const i = reason.indexOf(": ");
+  return i < 0 ? [reason.trim(), ""] : [reason.slice(0, i).trim(), reason.slice(i + 2).trim()];
+}
+
+export function statusKind(s: Pick<SessionView, "status" | "statusReason">): StatusKind {
+  if (s.status === "error") return s.statusReason === "interrupted" ? "interrupted" : "error";
+  if (s.status !== "attention") return "other";
+  return reasonKinds[splitReason(s.statusReason)[0]] ?? "other";
+}
+
+/**
+ * The human part of the status reason, after its "<kind>: " prefix: the dialog question for
+ * "permission" ("Do you want to proceed?"), the tool name(s) for "waiting for approval"
+ * ("Bash"), the question, plan or notification text, the error code. "" when the reason has
+ * none ("finished", "bell", "waiting for input", "interrupted").
+ */
+export function statusDetail(s: Pick<SessionView, "statusReason">): string {
+  return splitReason(s.statusReason)[1];
+}
 
 /** Why a session is not connected, for the "Not connected" panel. */
 export function disconnectReason(s: Pick<SessionView, "disconnectReason" | "exitCode" | "lastError">): string {
