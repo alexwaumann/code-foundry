@@ -68,6 +68,13 @@ thread's panel or the Projects page's, and neither does the composer.
 
 ## Decisions and gotchas
 
+* **No success toast for a GUI-started shell.** The new tab is the feedback, so every GUI
+  `terminal.new` runs quiet: `startShell` (`stores/bottomActions.ts`: row menus, Projects
+  rows, workspace members, "+", the empty state) passes `quiet: true`, and the chord, the
+  palette and a `CommandButton` invoke through `invokeStarted` (`keys/bindings.ts`), which
+  is quiet for the commands in `quietCommands` (only `terminal.new`). A failure still
+  toasts; `code-foundry terminal new` still prints "created terminal t-…".
+
 * **No owner, no GUI.** `terminal.new` always sets an owner since PR A, so the only
   unowned terminals are raw `TerminalService.Create` calls. They do not show anywhere in
   the GUI.

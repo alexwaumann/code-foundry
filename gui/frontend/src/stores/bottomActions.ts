@@ -57,10 +57,11 @@ export function paneContext(key: string): UiContextView | null {
 /**
  * Runs terminal.new in `ctx` (with `args`) and puts the keyboard in the shell it returns
  * (by id, from the result JSON): at once if the shell already arrived, else when it does
- * (pendingFocusId). Nothing is left pending when the command fails.
+ * (pendingFocusId). Nothing is left pending when the command fails. Quiet: the new tab is
+ * the feedback, so no "created terminal" toast (a failure still toasts).
  */
 async function startShell(ctx: UiContextView, args: Record<string, string> = {}): Promise<boolean> {
-  const res = await runCommandForResult("terminal.new", args, { ctx });
+  const res = await runCommandForResult("terminal.new", args, { ctx, quiet: true });
   if (res === null) return false;
   const id = terminalIdFromResult(res.resultJson);
   if (id !== null) focusOwnShell(id);

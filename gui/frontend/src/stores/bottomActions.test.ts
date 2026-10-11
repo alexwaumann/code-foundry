@@ -144,7 +144,7 @@ describe("paneContext and newBottomTerminal", () => {
 
   it("newBottomTerminal runs terminal.new there; no context, no run", async () => {
     expect(await newBottomTerminal("session:s1")).toBe(true);
-    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, { ctx: expect.objectContaining({ activeSessionId: "s1" }) as unknown });
+    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, { ctx: expect.objectContaining({ activeSessionId: "s1" }) as unknown, quiet: true });
     commands.runCommandForResult.mockClear();
     setTerminals([]);
     expect(await newBottomTerminal("view:projects")).toBe(false);
@@ -192,7 +192,7 @@ describe("focus for this window's own shells (by id)", () => {
     ["a workspace member in the thread's panel: that member's worktree", "/src/api.worktrees/x", { cwd: "/src/api.worktrees/x" }],
   ])("newThreadTerminal from %s runs in the thread's context", async (_name, cwd, args) => {
     await newThreadTerminal("s2", cwd);
-    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", args, { ctx: expect.objectContaining({ activeSessionId: "s2", activeView: "session" }) as unknown });
+    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", args, { ctx: expect.objectContaining({ activeSessionId: "s2", activeView: "session" }) as unknown, quiet: true });
   });
 
   const uncover: [string, string, boolean, boolean][] = [

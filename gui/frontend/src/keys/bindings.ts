@@ -1,7 +1,7 @@
-import type { CommandView } from "@/api/command";
+import type { CommandView, UiContextView } from "@/api/command";
 import { promptedArgs } from "@/palette/args";
 import { nextAfter, sessionOrder } from "@/lib/tree";
-import { refreshCommands, runCommand, useCommandsStore, whenListed } from "@/stores/commands";
+import { refreshCommands, runCommandForResult, useCommandsStore, whenListed } from "@/stores/commands";
 import { contextKey, getListOptions, getListSessions, getUiContext } from "@/stores/context";
 import { openAddProject } from "@/stores/addProject";
 import { openNewThreadPicker } from "@/stores/compose";
@@ -276,11 +276,23 @@ export function presentInPalette(name: string): boolean {
   return paletteSupplied.has(name) && presentCommand(name);
 }
 
+/**
+ * Commands whose success this window shows by itself, so starting one here toasts only a
+ * failure, not the result message: terminal.new's shell opens as a new bottom panel tab.
+ * The CLI still prints the message.
+ */
+const quietCommands: ReadonlySet<string> = new Set(["terminal.new"]);
+
+/** Invokes a command started in this window (a chord, the palette, a CommandButton), toasting the result unless it is quiet. */
+export function invokeStarted(name: string, args: Record<string, string> = {}, ctx: UiContextView = getUiContext()): void {
+  void runCommandForResult(name, args, { ctx, quiet: quietCommands.has(name) });
+}
+
 /** Starts a command from the keyboard or palette: prompts for args it needs, else invokes. */
 export function startCommand(c: CommandView): void {
   if (presentCommand(c.name)) return;
   if (promptedArgs(c).length > 0) useUiStore.getState().openPalette("", c.name);
-  else void runCommand(c.name);
+  else invokeStarted(c.name);
 }
 
 /** startCommand for a command by name, when it is available in the current context. */

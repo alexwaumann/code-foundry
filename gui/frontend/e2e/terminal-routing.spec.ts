@@ -58,6 +58,8 @@ test("cmd+t on a thread starts its shell in the bottom panel, with the keyboard 
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("bottom");
   expect((await lastNew())?.context).toMatchObject({ activeSessionId: "s-2" });
   await noTerminalRows(page);
+  // The new tab is the feedback: no "created terminal" toast.
+  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
 });
 
 test("a workspace member's New terminal here in a thread's side panel: the thread owns it, in the member's worktree", async ({ page }) => {
@@ -123,6 +125,7 @@ test("a project row's New terminal: the Projects page's bottom panel", async ({ 
   await expect(bottom(page).getByRole("tab")).toHaveText(["feat-sidebar", "code-foundry"]);
   await expect(bottom(page).getByRole("tab").nth(1)).toHaveAttribute("aria-selected", "true");
   await noTerminalRows(page);
+  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
 });
 
 /** SHOTS=<dir>: the notes' screenshots (docs/notes/bottom-panel-3-routing/), WebKit, 1440x900 at 2x. */

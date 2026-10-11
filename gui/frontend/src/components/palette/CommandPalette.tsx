@@ -9,10 +9,10 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { ProjectPicker } from "@/components/compose/ProjectPicker";
 import { RunInPicker } from "./RunInPicker";
-import { isStartable, presentCommand, presentInPalette } from "@/keys/bindings";
+import { invokeStarted, isStartable, presentCommand, presentInPalette } from "@/keys/bindings";
 import { formatChord } from "@/keys/chord";
 import { argChoices, groupByCategory, previousArg, promptedArgs, startPrompt, submitArg, UNSET_CHOICE, type ArgPrompt } from "@/palette/args";
-import { refreshCommands, runCommand, useCommandsStore } from "@/stores/commands";
+import { refreshCommands, useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { useUiStore } from "@/stores/ui";
 
@@ -75,7 +75,7 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
 
   const invoke = (c: CommandView, values: Record<string, string>) => {
     close();
-    void runCommand(c.name, values, context);
+    invokeStarted(c.name, values, context);
   };
 
   const enterPrompt = (p: ArgPrompt) => {

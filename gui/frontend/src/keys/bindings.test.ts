@@ -6,8 +6,8 @@ import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
 import { commandBindings, handleKeyDown, isGlobalChord, openRunInPicker } from "./bindings";
 
-const runCommand = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
-vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommand }));
+const runCommandForResult = vi.hoisted(() => vi.fn(() => Promise.resolve(null)));
+vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommandForResult }));
 
 function cmd(over: Partial<CommandView>): CommandView {
   return { name: "c", title: "C", description: "", category: "X", args: [], keybindings: [], available: true, ...over };
@@ -92,7 +92,7 @@ describe("handleKeyDown precedence", () => {
     });
     useSessionsStore.setState({ byId: {}, order: [] });
     useUiStore.setState({ selection: { kind: "none" }, renamingSessionId: null, workingCollapsed: false });
-    runCommand.mockClear();
+    runCommandForResult.mockClear();
   });
 
   afterEach(() => {
@@ -115,7 +115,7 @@ describe("handleKeyDown precedence", () => {
   ])("terminal focus: %s", (_name, init, runs) => {
     const e = press(terminal, init);
     expect(e.defaultPrevented).toBe(runs);
-    expect(runCommand).toHaveBeenCalledTimes(runs ? 1 : 0);
+    expect(runCommandForResult).toHaveBeenCalledTimes(runs ? 1 : 0);
     expect(isGlobalChord(init.metaKey ? `cmd+${init.key}` : `ctrl+${init.key}`)).toBe(runs);
   });
 
@@ -214,18 +214,19 @@ describe("handleKeyDown precedence", () => {
 
   it("text fields consume command chords", () => {
     press(input, { key: "t", code: "KeyT", metaKey: true });
-    expect(runCommand).not.toHaveBeenCalled();
+    expect(runCommandForResult).not.toHaveBeenCalled();
   });
 
   it("command chords run outside the terminal", () => {
     const e = press(outside, { key: "t", code: "KeyT", metaKey: true });
     expect(e.defaultPrevented).toBe(true);
-    expect(runCommand).toHaveBeenCalledWith("terminal.new");
+    // Quiet: the new bottom panel tab is the feedback, not a "created terminal" toast.
+    expect(runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, expect.objectContaining({ quiet: true }));
   });
 
   it("commands with required args open the palette prompt instead of running", () => {
     press(outside, { key: "n", code: "KeyN", metaKey: true, altKey: true });
-    expect(runCommand).not.toHaveBeenCalled();
+    expect(runCommandForResult).not.toHaveBeenCalled();
     expect(useUiStore.getState().palette).toMatchObject({ open: true, commandName: "worktree.create", page: "commands" });
   });
 
@@ -233,7 +234,7 @@ describe("handleKeyDown precedence", () => {
     const e = press(terminal, { key: "n", code: "KeyN", metaKey: true });
     expect(e.defaultPrevented).toBe(true);
     await Promise.resolve();
-    expect(runCommand).not.toHaveBeenCalled();
+    expect(runCommandForResult).not.toHaveBeenCalled();
     expect(useUiStore.getState().palette).toMatchObject({ open: true, page: "projects", commandName: null });
   });
 
