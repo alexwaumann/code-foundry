@@ -1,6 +1,11 @@
+/** The strip's element for a tab (its wrapper, with `data-tab-id`), or null. */
+export function tabNode(strip: HTMLElement, id: string): HTMLElement | null {
+  return Array.from(strip.querySelectorAll<HTMLElement>("[data-tab-id]")).find((t) => t.dataset.tabId === id) ?? null;
+}
+
 /** Scrolls the strip (only the strip) so the tab is fully visible, with a small margin. */
 export function revealTab(strip: HTMLElement, id: string): void {
-  const el = Array.from(strip.querySelectorAll<HTMLElement>("[data-tab-id]")).find((t) => t.dataset.tabId === id);
+  const el = tabNode(strip, id);
   if (el) revealElement(strip, el);
 }
 

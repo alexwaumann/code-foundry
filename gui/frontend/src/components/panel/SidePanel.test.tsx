@@ -340,6 +340,117 @@ describe("the new-tab button and picking", () => {
   });
 });
 
+describe("reordering tabs", () => {
+  const one = makeTab("pullrequest", "#1", { number: "1" });
+  const two = makeTab("pullrequest", "#2", { number: "2" });
+  const three = makeTab("pullrequest", "#3", { number: "3" });
+
+  beforeEach(() => {
+    vi.spyOn(pullRequestSurface, "render").mockImplementation((tab) => <p data-testid="probe">{tab.id}</p>);
+    act(() => {
+      openSurface(KEY, one);
+      openSurface(KEY, two);
+      openSurface(KEY, three);
+    });
+  });
+
+  const tab = (name: string) => screen.getByRole("tab", { name });
+  const titles = () => screen.getAllByRole("tab").map((t) => t.textContent);
+  const tabIds = () => getPanel(KEY).tabs.map((t) => t.id);
+
+  it("alt+Right and alt+Left move the focused tab one slot, keep it focused, and keep the active tab", () => {
+    render(<SidePanel />);
+    tab("#1").focus();
+    fireEvent.keyDown(tab("#1"), { key: "ArrowRight", code: "ArrowRight", altKey: true });
+    expect(tabIds()).toEqual([two.id, one.id, three.id]);
+    expect(titles()).toEqual(["#2", "#1", "#3"]);
+    expect(document.activeElement).toBe(tab("#1"));
+    fireEvent.keyDown(tab("#1"), { key: "ArrowRight", code: "ArrowRight", altKey: true });
+    expect(titles()).toEqual(["#2", "#3", "#1"]);
+    expect(document.activeElement).toBe(tab("#1"));
+    fireEvent.keyDown(tab("#1"), { key: "ArrowLeft", code: "ArrowLeft", altKey: true });
+    expect(titles()).toEqual(["#2", "#1", "#3"]);
+    expect(document.activeElement).toBe(tab("#1"));
+    // Moving is not activating: #3 stays the active tab.
+    expect(getPanel(KEY).activeTabId).toBe(three.id);
+    expect(tab("#3").getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("clamps at the ends (no wrap), and still handles the key there", () => {
+    const onKey = vi.fn(() => true);
+    const prev = pullRequestSurface.onKey;
+    pullRequestSurface.onKey = onKey;
+    try {
+      render(<SidePanel />);
+      tab("#1").focus();
+      const before = usePanelStore.getState();
+      expect(fireEvent.keyDown(tab("#1"), { key: "ArrowLeft", code: "ArrowLeft", altKey: true })).toBe(false);
+      tab("#3").focus();
+      expect(fireEvent.keyDown(tab("#3"), { key: "ArrowRight", code: "ArrowRight", altKey: true })).toBe(false);
+      expect(usePanelStore.getState()).toBe(before);
+      expect(document.activeElement).toBe(tab("#3"));
+      // Handled by the strip: the surface never sees it.
+      expect(onKey).not.toHaveBeenCalled();
+    } finally {
+      pullRequestSurface.onKey = prev;
+    }
+  });
+
+  it("from a tab's ×, moves that tab and keeps focus on the ×", () => {
+    render(<SidePanel />);
+    const close = screen.getByRole("button", { name: "Close #3" });
+    close.focus();
+    fireEvent.keyDown(close, { key: "ArrowLeft", code: "ArrowLeft", altKey: true });
+    expect(titles()).toEqual(["#1", "#3", "#2"]);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close #3" }));
+  });
+
+  it("plain arrows still only move focus, and alt+shift+arrows do nothing", () => {
+    render(<SidePanel />);
+    tab("#2").focus();
+    fireEvent.keyDown(tab("#2"), { key: "ArrowRight", code: "ArrowRight" });
+    expect(document.activeElement).toBe(tab("#3"));
+    fireEvent.keyDown(tab("#3"), { key: "ArrowLeft", code: "ArrowLeft", altKey: true, shiftKey: true });
+    expect(tabIds()).toEqual([one.id, two.id, three.id]);
+  });
+
+  it("a click (pointer down and up without moving 4px) still activates the tab", () => {
+    render(<SidePanel />);
+    const t = tab("#1");
+    fireEvent.pointerDown(t, { isPrimary: true, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(t, { isPrimary: true, clientX: 12, clientY: 11 });
+    fireEvent.pointerUp(t, { isPrimary: true, button: 0, clientX: 12, clientY: 11 });
+    fireEvent.click(t);
+    expect(getPanel(KEY).activeTabId).toBe(one.id);
+    expect(screen.getByTestId("probe").textContent).toBe(one.id);
+  });
+
+  it("a drag past 4px is not a click: the tab is not activated on release", () => {
+    render(<SidePanel />);
+    const t = tab("#1");
+    fireEvent.pointerDown(t, { isPrimary: true, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(t, { isPrimary: true, clientX: 40, clientY: 10 });
+    expect(t.parentElement?.getAttribute("data-dragging")).toBe("true");
+    fireEvent.pointerUp(t, { isPrimary: true, button: 0, clientX: 40, clientY: 10 });
+    fireEvent.click(t);
+    expect(getPanel(KEY).activeTabId).toBe(three.id);
+    expect(t.parentElement?.hasAttribute("data-dragging")).toBe(false);
+  });
+
+  it("describes the keyboard move on each tab, and keeps the wrapper presentational", () => {
+    render(<SidePanel />);
+    const t = tab("#2");
+    const described = document.getElementById(t.getAttribute("aria-describedby") ?? "");
+    expect(described?.textContent).toBe("To move this tab, press Option with Left Arrow or Right Arrow.");
+    const wrapper = t.parentElement;
+    expect(wrapper?.getAttribute("role")).toBe("presentation");
+    expect(wrapper?.hasAttribute("tabindex")).toBe(false);
+    expect(wrapper?.hasAttribute("aria-roledescription")).toBe(false);
+    expect(tab("#3").tabIndex).toBe(0);
+    expect(t.tabIndex).toBe(-1);
+  });
+});
+
 describe("revealTab", () => {
   function strip(scrollLeft: number): HTMLElement {
     const el = document.createElement("div");
