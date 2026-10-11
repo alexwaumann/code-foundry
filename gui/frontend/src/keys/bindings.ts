@@ -336,11 +336,17 @@ export function handleKeyDown(e: KeyboardEvent): void {
   }
   const target = e.target instanceof Element ? e.target : null;
   if (target?.closest("[data-terminal-host]")) {
+    if (useUiStore.getState().palette.open) return;
     const yielded = terminalYields(chord);
-    if (!yielded || useUiStore.getState().palette.open) return;
-    e.preventDefault();
-    e.stopPropagation();
-    startCommand(yielded);
+    if (yielded) {
+      e.preventDefault();
+      e.stopPropagation();
+      startCommand(yielded);
+    } else if (terminalYieldable(chord)) {
+      // Focusing a shell changes the context (a Projects-page shell brings its worktree):
+      // cmd+t right after it must not be lost to the debounced re-list.
+      startWhenListed(e, chord);
+    }
     return;
   }
   if (isEditable(target) || useUiStore.getState().palette.open) return;
@@ -357,20 +363,26 @@ export function handleKeyDown(e: KeyboardEvent): void {
     startCommand(cmd);
     return;
   }
-  // Clicking a worktree and pressing cmd+n at once beats the debounced re-list: when the
-  // list is for an older context, re-list now and look the chord up again.
+  if (/^(cmd|ctrl|alt)\+/.test(chord)) startWhenListed(e, chord);
+}
+
+/**
+ * Clicking a worktree and pressing cmd+n at once beats the debounced re-list: when the
+ * list is for an older context, re-list now and look the chord up again. Nothing happens
+ * when the list is current (the chord is simply unbound).
+ */
+function startWhenListed(e: KeyboardEvent, chord: string): void {
   const ctx = getUiContext();
-  if (/^(cmd|ctrl|alt)\+/.test(chord) && useCommandsStore.getState().contextKey !== contextKey(ctx)) {
-    e.preventDefault();
-    // Another refresh may abort this one (startup, context changes): wait for the list
-    // for ctx from whichever refresh completes, not just this call.
-    void refreshCommands(ctx)
-      .then(() => whenListed(ctx))
-      .then(() => {
-        const late = commandBindings(useCommandsStore.getState().commands).get(chord);
-        if (late && contextKey(getUiContext()) === contextKey(ctx)) startCommand(late);
-      });
-  }
+  if (useCommandsStore.getState().contextKey === contextKey(ctx)) return;
+  e.preventDefault();
+  // Another refresh may abort this one (startup, context changes): wait for the list
+  // for ctx from whichever refresh completes, not just this call.
+  void refreshCommands(ctx)
+    .then(() => whenListed(ctx))
+    .then(() => {
+      const late = commandBindings(useCommandsStore.getState().commands).get(chord);
+      if (late && contextKey(getUiContext()) === contextKey(ctx)) startCommand(late);
+    });
 }
 
 /** Installs the global key handler (capture phase, ahead of xterm). */

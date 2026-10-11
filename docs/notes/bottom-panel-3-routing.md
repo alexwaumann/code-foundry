@@ -159,6 +159,18 @@ The screenshots were retaken after these fixes (the thread's second tab reads
 
 * No real-app screenshots (screen locked).
 
+## cmd+t right after focusing a shell
+
+A Projects-page shell's focus changes the context (it brings the worktree, which makes
+`terminal.new` available), and the command list follows it on a debounced re-list. A
+command chord pressed in a terminal before that re-list landed found nothing bound and was
+dropped: `terminal-routing.spec`'s "cmd+t from a Projects-page shell" failed on Chromium in
+2 of 2 full both-browser runs (never alone, 10/10 repeated, and not in a Chromium-only full
+run). `handleKeyDown` now treats an unbound cmd chord in a terminal like one elsewhere:
+when the list is for an older context it waits for the re-list and runs the chord then
+(`startWhenListed`); with a current list the chord still goes to the terminal. Unit test in
+`keys/bindings.test.ts`.
+
 ## Merged with main's Working section (#57)
 
 The stack took main's collapsible Working section (`sidebar-working-section.md`) on top of
