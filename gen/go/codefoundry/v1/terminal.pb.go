@@ -88,7 +88,7 @@ type Terminal struct {
 	// True while the program is on the alternate screen (DECSET 1049/1047/47).
 	AltScreen bool `protobuf:"varint,11,opt,name=alt_screen,json=altScreen,proto3" json:"alt_screen,omitempty"`
 	// Labels set by the creator. TerminalService does not interpret them; the daemon's
-	// creators follow this contract (internal/store/terminal/termlabel):
+	// creators follow this contract (internal/termlabel):
 	//
 	//	kind      "shell" on a shell started by the terminal.new command. A session's
 	//	          Claude terminal has no kind. The daemon removes a "shell" terminal as

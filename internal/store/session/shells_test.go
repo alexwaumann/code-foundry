@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
-	"github.com/alexwaumann/code-foundry/internal/store/terminal/termlabel"
+	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
 func TestRemoveTakesTheThreadsShellsCloseDoesNot(t *testing.T) {

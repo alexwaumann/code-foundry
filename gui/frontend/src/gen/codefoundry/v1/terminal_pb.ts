@@ -81,7 +81,7 @@ export type Terminal = Message<"codefoundry.v1.Terminal"> & {
 
   /**
    * Labels set by the creator. TerminalService does not interpret them; the daemon's
-   * creators follow this contract (internal/store/terminal/termlabel):
+   * creators follow this contract (internal/termlabel):
    *   kind      "shell" on a shell started by the terminal.new command. A session's
    *             Claude terminal has no kind. The daemon removes a "shell" terminal as
    *             soon as it exits, kills and removes it when its thread is removed

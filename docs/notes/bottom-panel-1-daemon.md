@@ -8,7 +8,7 @@ PR B (GUI panel) and PR C (sidebar Terminals section removal) follow.
 
 ## Label contract
 
-One place: `internal/store/terminal/termlabel` (a cgo-free leaf package, so
+One place: `internal/termlabel` (a cgo-free leaf package, so
 `internal/command` can import it without linking libghostty). Also documented on
 `Terminal.labels` in `proto/codefoundry/v1/terminal.proto`.
 

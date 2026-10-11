@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
-	"github.com/alexwaumann/code-foundry/internal/store/terminal/termlabel"
+	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
 // removeShells kills and removes every shell terminal.new started for thread id (see

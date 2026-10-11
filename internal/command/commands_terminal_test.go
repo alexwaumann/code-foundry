@@ -15,7 +15,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
-	"github.com/alexwaumann/code-foundry/internal/store/terminal/termlabel"
+	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
 func TestTerminalNewOwner(t *testing.T) {

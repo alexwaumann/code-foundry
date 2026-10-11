@@ -15,7 +15,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/alexwaumann/code-foundry/internal/store/terminal/termlabel"
+	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
 // TerminalBackend is the slice of TerminalService the terminal.* commands need. It is

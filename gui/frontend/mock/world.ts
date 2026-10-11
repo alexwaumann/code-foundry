@@ -111,7 +111,7 @@ export type UiIntentInit = MessageInitShape<typeof UiIntentSchema>;
 
 type Kind = "claude" | "logs" | "top" | "shell" | "exited";
 
-// The terminal label contract (internal/store/terminal/termlabel, proto Terminal.labels).
+// The terminal label contract (internal/termlabel, proto Terminal.labels).
 const LABEL_KIND = "kind";
 const LABEL_SESSION = "session";
 const LABEL_REPO = "repo";

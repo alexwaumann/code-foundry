@@ -10,7 +10,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
-	"github.com/alexwaumann/code-foundry/internal/store/terminal/termlabel"
+	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
 // reapTimeout bounds one removal: a shell that ignores SIGHUP gets SIGKILL after the
