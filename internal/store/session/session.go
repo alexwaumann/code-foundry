@@ -155,11 +155,21 @@ type Session struct {
 	// shrinks. Persisted. Copy on write: a new slice replaces the old one, the backing
 	// array is never written, so snapshots may share it.
 	LinkedPullRequests []LinkedPullRequest
+	// Usage is the token counters of the session's transcript (usage.go), one bucket per
+	// (model, tier, speed, UTC day), sorted by Day, Model, Tier, Speed. Only ever
+	// replaced by a complete fold of the transcript, never added to. Persisted. Copy on
+	// write like LinkedPullRequests.
+	Usage []UsageBucket
 }
 
 // Snapshot is every session, sorted by creation time then id. Never mutate it.
 type Snapshot struct {
 	Sessions []Session
+	// RetiredUsage is the usage of removed sessions summed per (model, tier, speed,
+	// day): Store.Remove adds a session's buckets here as it forgets it, so the total
+	// over every thread ever tracked is the sessions' Usage plus RetiredUsage. Sorted
+	// like Session.Usage. Persisted (usage_retired).
+	RetiredUsage []UsageBucket
 }
 
 // Session returns the session with id.
@@ -175,9 +185,10 @@ func (s *Snapshot) Session(id string) (Session, bool) {
 }
 
 // Event is published on the bus as bus.Publish[session.Event]. Subscribe with
-// bus.Subscribe[session.Event] and type-switch. The store publishes only Updated and
-// Removed; *Snapshot also implements Event so a consumer can merge "resync with the
-// current snapshot" into the same stream (the API's Watch does that on drops).
+// bus.Subscribe[session.Event] and type-switch. The store publishes only Updated,
+// Removed and RetiredUsage; *Snapshot also implements Event so a consumer can merge
+// "resync with the current snapshot" into the same stream (the API's Watch does that
+// on drops).
 type Event interface{ isSessionEvent() }
 
 // Updated carries a session's full state after a change.
@@ -186,9 +197,14 @@ type Updated struct{ Session Session }
 // Removed is sent when a session is forgotten.
 type Removed struct{ ID string }
 
-func (Updated) isSessionEvent()   {}
-func (Removed) isSessionEvent()   {}
-func (*Snapshot) isSessionEvent() {}
+// RetiredUsage follows Removed when the removed session had usage. It carries the
+// whole retired ledger (Snapshot.RetiredUsage) after the session's buckets were added.
+type RetiredUsage struct{ Buckets []UsageBucket }
+
+func (Updated) isSessionEvent()      {}
+func (Removed) isSessionEvent()      {}
+func (RetiredUsage) isSessionEvent() {}
+func (*Snapshot) isSessionEvent()    {}
 
 // CreateOptions configures Store.Create.
 type CreateOptions struct {

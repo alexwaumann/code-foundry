@@ -24,12 +24,13 @@ type Fake struct {
 	// Err, when set, is returned by every mutating method.
 	Err error
 
-	mu     sync.Mutex
-	next   int
-	staged int
-	byID   map[string]session.Session
-	snap   *session.Snapshot
-	calls  []string
+	mu      sync.Mutex
+	next    int
+	staged  int
+	byID    map[string]session.Session
+	snap    *session.Snapshot
+	calls   []string
+	retired []session.UsageBucket
 }
 
 var _ session.Store = (*Fake)(nil)
@@ -72,7 +73,7 @@ func (f *Fake) rebuild() {
 		}
 		return strings.Compare(a.ID, b.ID)
 	})
-	f.snap = &session.Snapshot{Sessions: out}
+	f.snap = &session.Snapshot{Sessions: out, RetiredUsage: f.retired}
 }
 
 func (f *Fake) record(call string) error {
@@ -268,22 +269,39 @@ func (f *Fake) RunIn(_ context.Context, id string, t session.RunInTarget) (sessi
 	})
 }
 
-// Remove forgets a session and publishes Removed.
+// Remove forgets a session and publishes Removed. Like the Manager, a session's usage
+// moves to the retired ledger (then RetiredUsage is published too).
 func (f *Fake) Remove(_ context.Context, id string) error {
 	f.mu.Lock()
 	if err := f.record("Remove " + id); err != nil {
 		f.mu.Unlock()
 		return err
 	}
-	if _, err := f.get(id); err != nil {
+	s, err := f.get(id)
+	if err != nil {
 		f.mu.Unlock()
 		return err
 	}
 	delete(f.byID, id)
+	if len(s.Usage) > 0 {
+		f.retired = session.SumUsage(f.retired, s.Usage)
+	}
+	retired := f.retired
 	f.rebuild()
 	f.mu.Unlock()
 	bus.Publish[session.Event](f.bus, session.Removed{ID: id})
+	if len(s.Usage) > 0 {
+		bus.Publish[session.Event](f.bus, session.RetiredUsage{Buckets: retired})
+	}
 	return nil
+}
+
+// SetRetiredUsage replaces the retired usage ledger (Snapshot.RetiredUsage).
+func (f *Fake) SetRetiredUsage(buckets []session.UsageBucket) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.retired = buckets
+	f.rebuild()
 }
 
 // Snapshot returns the current snapshot.

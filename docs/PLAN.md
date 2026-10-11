@@ -69,6 +69,18 @@ completion or the folder picker, clone from GitHub, start a new project, publish
 `repo.add` is the one command for it (`code-foundry repo add <folder>` on the CLI); the
 old "Add Project (local folder)" command is gone: `docs/notes/add-project-remove-register.md`.
 
+### Session usage: four PRs (design 2026-10-10)
+
+Design in `docs/sketches/session-usage/DESIGN.md`. PR 1 first; 2, 3 and 4 in parallel
+after it.
+
+* PR 1 (`internal/pricing`, the transcript usage fold, `session_usage` + `usage_retired`,
+  full rescan on discovery, `Store.Remove` retiring, proto `UsageBucket` with
+  `cost_usd`/`unpriced`, `code-foundry usage`, `view.usage`) done:
+  `docs/notes/session-usage.md`.
+* PR 2 (subagent runs folded into the parent thread), PR 3 (the side panel Usage
+  surface), PR 4 (the Usage page and its sidebar toggle): to do.
+
 ### Open items
 
 Collected from the step notes; none blocks daily use.

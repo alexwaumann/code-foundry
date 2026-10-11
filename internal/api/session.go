@@ -61,9 +61,14 @@ func (h *Session) Fork(ctx context.Context, req *connect.Request[v1.ForkSessionR
 	return connect.NewResponse(&v1.ForkSessionResponse{Session: sessionToProto(s)}), nil
 }
 
-// List returns every session.
+// List returns every session, and the retired usage ledger.
 func (h *Session) List(context.Context, *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error) {
-	return connect.NewResponse(&v1.ListSessionsResponse{Sessions: sessionsToProto(h.store.Snapshot())}), nil
+	snap := h.store.Snapshot()
+	res := &v1.ListSessionsResponse{Sessions: sessionsToProto(snap)}
+	if snap != nil {
+		res.RetiredUsage = retiredToProto(snap.RetiredUsage)
+	}
+	return connect.NewResponse(res), nil
 }
 
 // Get returns one session.
@@ -164,11 +169,17 @@ func (h *Session) Watch(ctx context.Context, _ *connect.Request[v1.WatchSessions
 func sessionEventToProto(ev session.Event) *v1.SessionEvent {
 	switch e := ev.(type) {
 	case *session.Snapshot:
-		return &v1.SessionEvent{Event: &v1.SessionEvent_Snapshot{Snapshot: &v1.SessionSnapshot{Sessions: sessionsToProto(e)}}}
+		snap := &v1.SessionSnapshot{Sessions: sessionsToProto(e)}
+		if e != nil {
+			snap.RetiredUsage = retiredToProto(e.RetiredUsage)
+		}
+		return &v1.SessionEvent{Event: &v1.SessionEvent_Snapshot{Snapshot: snap}}
 	case session.Updated:
 		return &v1.SessionEvent{Event: &v1.SessionEvent_Updated{Updated: sessionToProto(e.Session)}}
 	case session.Removed:
 		return &v1.SessionEvent{Event: &v1.SessionEvent_RemovedId{RemovedId: e.ID}}
+	case session.RetiredUsage:
+		return &v1.SessionEvent{Event: &v1.SessionEvent_RetiredUsage{RetiredUsage: &v1.RetiredUsage{Buckets: retiredToProto(e.Buckets)}}}
 	}
 	return nil
 }
@@ -225,6 +236,7 @@ func sessionToProto(s session.Session) *v1.Session {
 		}
 		p.LinkedPullRequests = append(p.LinkedPullRequests, lp)
 	}
+	p.Usage, p.CostUsd, p.Unpriced = usageToProto(s.Usage)
 	return p
 }
 

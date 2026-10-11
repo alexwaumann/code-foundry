@@ -116,6 +116,13 @@ type runner struct {
 	namingSeen bool
 	finished   bool
 
+	// usage folds the followed transcript (usage.go). It is complete from byte zero:
+	// a file the tailer read from its start, or a skipped prefix rescanned on discovery
+	// (backfill). usageOff: that rescan failed, so the fold is partial and must not
+	// replace the session's usage; the next discovery (reconnect, restart) rescans.
+	usage    usageFold
+	usageOff bool
+
 	// viewers is the terminal's Attach subscriber count (from the observer). While
 	// someone is attached, whatever Claude produces is seen: see acknowledge.
 	viewers int
@@ -371,11 +378,14 @@ func (r *runner) pollTranscript() {
 		r.log().info("transcript discovered", "claude_session_id", cid, "path", r.tail.path)
 		r.m.update(r.id, true, func(rec *record) { rec.s.ClaudeSessionID = cid })
 		if r.tail.skipped > 0 {
-			r.backfillLinks(r.tail.path, r.tail.skipped)
+			r.backfill(r.tail.path, r.tail.skipped)
 		}
 	}
+	// After /clear the tailer follows a new file; the fold carries on across it.
+	counted := r.usage.requests
 	var links []LinkedPullRequest
 	for _, line := range lines {
+		r.usage.Line(line)
 		r.det.Transcript(line)
 		if !r.namingSeen {
 			if msg, ok := firstUserText(line); ok {
@@ -391,6 +401,11 @@ func (r *runner) pollTranscript() {
 	if len(links) > 0 {
 		r.m.linkPullRequests(r.id, links)
 	}
+	if r.usage.requests != counted && !r.usageOff {
+		// At most once per batch with a new API response: streaming repeats of a
+		// counted request are not counted again.
+		r.m.setUsage(r.id, r.usage.Buckets())
+	}
 	if len(lines) > 0 {
 		// The turn-end record trails the last output chunk by ~120 ms and counts as
 		// new work for the detector; a viewer has seen it too.
@@ -399,20 +414,33 @@ func (r *runner) pollTranscript() {
 	}
 }
 
-// backfillLinks reads the pr-link records in the part of a resumed transcript the
-// tailer skipped (the history is not news for status, but its links are: a thread
-// reconnected after linking pull requests, or one that linked them before this
-// existed). It runs once per discovered file, before any new line, so first-seen
-// order holds.
-func (r *runner) backfillLinks(path string, limit int64) {
+// backfill reads the part of a resumed transcript the tailer skipped, from byte zero
+// (the history is not news for status, but its links and usage are). Links: the
+// pr-link records are merged in (a thread reconnected after linking pull requests, or
+// one that linked them before this existed); it runs once per discovered file, before
+// any new line, so first-seen order holds. Usage: the prefix is folded into a fresh
+// fold that becomes the live one, so with the lines the tailer reads from there on
+// it is always the whole file; its buckets replace whatever was persisted.
+func (r *runner) backfill(path string, limit int64) {
 	start := time.Now()
-	links, err := scanPRLinks(path, limit)
+	var links []LinkedPullRequest
+	fold := usageFold{notBefore: r.usage.notBefore}
+	err := scanLines(path, limit, func(line []byte) {
+		if l, ok := parsePRLink(line); ok {
+			links = append(links, l)
+		}
+		fold.Line(line)
+	})
 	if err != nil {
-		r.log().warn("backfill linked pull requests", "path", path, "err", err)
+		r.log().warn("backfill transcript history", "path", path, "err", err)
 	}
 	n := r.m.linkPullRequests(r.id, links)
-	r.log().debug("backfilled linked pull requests", "records", len(links), "new", n,
-		"bytes", limit, "took", time.Since(start).Round(time.Millisecond).String())
+	r.usage, r.usageOff = fold, err != nil
+	if !r.usageOff {
+		r.m.setUsage(r.id, r.usage.Buckets())
+	}
+	r.log().debug("backfilled transcript history", "links", len(links), "new_links", n,
+		"usage_requests", fold.requests, "bytes", limit, "took", time.Since(start).Round(time.Millisecond).String())
 }
 
 // checkStatus schedules a debounced publish when the detector's answer changed.

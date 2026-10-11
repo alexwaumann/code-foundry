@@ -162,6 +162,8 @@ type Manager struct {
 	recs   map[string]*record
 	closed bool
 	snap   atomic.Pointer[Snapshot]
+	// retired is the retired usage ledger (Snapshot.RetiredUsage). Copy on write.
+	retired []UsageBucket
 }
 
 type record struct {
@@ -185,7 +187,11 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	m := &Manager{opts: opts, log: opts.Log, recs: map[string]*record{}}
+	retired, err := loadRetiredUsage(ctx, opts.DB)
+	if err != nil {
+		return nil, err
+	}
+	m := &Manager{opts: opts, log: opts.Log, recs: map[string]*record{}, retired: retired}
 	m.ctx, m.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	for _, s := range rows {
 		if s.State != StateDisconnected {
@@ -244,7 +250,7 @@ func (m *Manager) rebuildLocked() {
 		}
 		return strings.Compare(a.ID, b.ID)
 	})
-	m.snap.Store(&Snapshot{Sessions: out})
+	m.snap.Store(&Snapshot{Sessions: out, RetiredUsage: m.retired})
 }
 
 // update applies fn to a record, rebuilds the snapshot, optionally persists, and
@@ -531,6 +537,11 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 
 	r := newRunner(m, id, s.WorktreePath, l)
 	r.awaitFirstPrompt = prompt != ""
+	if s.ParentID != "" {
+		// A fork's transcript starts with a copy of its parent's records, billed to
+		// the parent; they keep their original times (usage.go).
+		r.usage.notBefore = s.CreatedAt
+	}
 	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode, prompt: prompt}
 	if m.opts.AttachmentsDir != "" {
 		// Every spawn (not only the first prompt's): a resumed or forked conversation
@@ -664,12 +675,19 @@ func (m *Manager) Remove(ctx context.Context, id string) error {
 	if rec.run != nil {
 		return fmt.Errorf("%w: session %s was reconnected while being removed", ErrFailedPrecondition, id)
 	}
-	if err := deleteSession(ctx, m.opts.DB, id); err != nil {
+	// The session's usage moves to the retired ledger in the delete's transaction.
+	if err := retireSession(ctx, m.opts.DB, id, rec.s.Usage); err != nil {
 		return err
 	}
 	delete(m.recs, id)
+	if len(rec.s.Usage) > 0 {
+		m.retired = SumUsage(m.retired, rec.s.Usage)
+	}
 	m.rebuildLocked()
 	bus.Publish[Event](m.opts.Bus, Removed{ID: id})
+	if len(rec.s.Usage) > 0 {
+		bus.Publish[Event](m.opts.Bus, RetiredUsage{Buckets: m.retired})
+	}
 	return nil
 }
 

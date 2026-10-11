@@ -10,7 +10,7 @@ import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
 import { applyIntent } from "./intents";
 import { applyRepoEvent, replaceRepos, useReposStore } from "./repos";
-import { applySessionEvent, replaceSessions, sessionOfTerminal, useSessionsStore } from "./sessions";
+import { applyRetiredUsage, applySessionEvent, replaceSessions, sessionOfTerminal, useSessionsStore } from "./sessions";
 import { applySettingsSnapshot } from "./settings";
 import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./terminals";
 import { applyUpdateEvent } from "./update";
@@ -45,7 +45,7 @@ const handlers: Handlers = {
   },
   session: (ev) => {
     // Session events prove the service exists, even if List failed transiently.
-    useSessionsStore.setState((s) => ({ ...applySessionEvent(s, ev), availability: "available", error: null }));
+    useSessionsStore.setState((s) => ({ ...applySessionEvent(s, ev), retiredUsage: applyRetiredUsage(s.retiredUsage, ev), availability: "available", error: null }));
   },
   gh: applyGhEvent,
   gitops: applyGitOpsEvent,

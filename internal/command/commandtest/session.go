@@ -20,6 +20,8 @@ type Session struct {
 	Current *v1.Session
 	// Others are listed after Current.
 	Others []*v1.Session
+	// RetiredUsage is List's retired usage ledger.
+	RetiredUsage []*v1.UsageBucket
 }
 
 var _ command.SessionBackend = (*Session)(nil)
@@ -73,7 +75,7 @@ func (s *Session) List(_ context.Context, r *connect.Request[v1.ListSessionsRequ
 		out = append(out, s.Current)
 	}
 	out = append(out, s.Others...)
-	return connect.NewResponse(&v1.ListSessionsResponse{Sessions: out}), nil
+	return connect.NewResponse(&v1.ListSessionsResponse{Sessions: out, RetiredUsage: s.RetiredUsage}), nil
 }
 
 // Get returns Current with the requested id.

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { SessionEventView, SessionView } from "@/api/session";
+import type { SessionEventView, SessionView, UsageBucketView } from "@/api/session";
 
 export interface SessionsData {
   byId: Readonly<Record<string, SessionView>>;
@@ -18,13 +18,31 @@ interface SessionsState extends SessionsData {
   loaded: boolean;
   availability: SessionsAvailability;
   error: string | null;
+  /**
+   * Usage of removed threads (the daemon's retired ledger). Usage over every thread is the
+   * sessions' usage plus this. From the snapshot and "retiredUsage" events.
+   */
+  retiredUsage: readonly UsageBucketView[];
 }
 
 export const emptySessions: SessionsData = { byId: {}, order: [] };
 
 /** Structural equality, so unchanged sessions keep their identity and rows don't re-render. */
 export function sameSession(a: SessionView, b: SessionView): boolean {
-  return (Object.keys(a) as (keyof SessionView)[]).every((k) => (k === "linkedPullRequests" ? sameLinks(a[k], b[k]) : a[k] === b[k]));
+  return (Object.keys(a) as (keyof SessionView)[]).every((k) =>
+    k === "linkedPullRequests" ? sameLinks(a[k], b[k]) : k === "usage" ? sameUsage(a[k], b[k]) : a[k] === b[k],
+  );
+}
+
+/** Field-by-field equality of usage buckets (every Updated event carries new arrays). */
+export function sameUsage(a: readonly UsageBucketView[], b: readonly UsageBucketView[]): boolean {
+  return a === b || (a.length === b.length && a.every((x, i) => (Object.keys(x) as (keyof UsageBucketView)[]).every((k) => x[k] === b[i]?.[k])));
+}
+
+/** The retired ledger after a session event: kept by identity unless it changed. */
+export function applyRetiredUsage(prev: readonly UsageBucketView[], ev: SessionEventView): readonly UsageBucketView[] {
+  const next = ev.kind === "snapshot" ? ev.retiredUsage : ev.kind === "retiredUsage" ? ev.buckets : prev;
+  return sameUsage(prev, next) ? prev : next;
 }
 
 /** Links only ever grow, in order, and a URL's entry never changes: compare URLs. */
@@ -71,6 +89,8 @@ export function applySessionEvent(prev: SessionsData, ev: SessionEventView): Ses
       const { [ev.id]: _removed, ...byId } = prev.byId;
       return { byId, order: prev.order.filter((id) => id !== ev.id) };
     }
+    case "retiredUsage":
+      return prev; // no session changed: see applyRetiredUsage
   }
 }
 
@@ -79,6 +99,7 @@ export const useSessionsStore = create<SessionsState>()(() => ({
   loaded: false,
   availability: "unknown",
   error: null,
+  retiredUsage: [],
 }));
 
 /**

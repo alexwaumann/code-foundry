@@ -8,7 +8,8 @@ import (
 )
 
 // Persistence for the sessions table (migrations 0003, 0006, 0008, 0009 and 0011) and
-// session_pull_requests (0010). The terminal id is not persisted: no process survives
+// session_pull_requests (0010); session_usage and usage_retired (0012) are in
+// usage_db.go, which also deletes sessions (retireSession). The terminal id is not persisted: no process survives
 // a daemon restart. Status, its reason and StatusChangedAt are (0011): a disconnected
 // session keeps the status it ended with.
 
@@ -65,13 +66,6 @@ func saveSession(ctx context.Context, db *sql.DB, s Session) error {
 	return nil
 }
 
-func deleteSession(ctx context.Context, db *sql.DB, id string) error {
-	if _, err := db.ExecContext(ctx, `DELETE FROM sessions WHERE id = ?`, id); err != nil {
-		return fmt.Errorf("session: delete %s: %w", id, err)
-	}
-	return nil
-}
-
 func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 	rows, err := db.QueryContext(ctx, `SELECT id, claude_session_id, repo_id, worktree_path, name, auto_named,
 			model, effort, created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
@@ -110,8 +104,13 @@ func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	usage, err := loadUsage(ctx, db)
+	if err != nil {
+		return nil, err
+	}
 	for i := range out {
 		out[i].LinkedPullRequests = links[out[i].ID]
+		out[i].Usage = usage[out[i].ID]
 	}
 	return out, nil
 }

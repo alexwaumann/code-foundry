@@ -150,6 +150,42 @@ message Session {
   // When status or status_reason last changed. Persisted with them; unset if never
   // known (a row from before status persistence).
   google.protobuf.Timestamp status_changed_at = 26;
+  // Token usage of the thread's transcript: one bucket per (model, tier, speed, UTC
+  // day), sorted by day, model, tier, speed. A pure fold over the transcript's
+  // assistant records (each API request counted once); a reconnect or daemon restart
+  // rescans the transcript from the start and replaces it. Persisted. See
+  // docs/notes/session-usage.md.
+  repeated UsageBucket usage = 27;
+  // The price of usage in USD at first-party Claude API rates, computed when sent
+  // (never stored). Excludes unpriced buckets.
+  double cost_usd = 28;
+  // Some bucket's model (or tier, or speed) has no known rate: cost_usd is a lower
+  // bound and the UI says "unpriced" rather than showing $0 for it.
+  bool unpriced = 29;
+}
+
+// Token counters for one model on one UTC day (of one session, or of the retired
+// ledger).
+message UsageBucket {
+  // Canonical model id as Claude wrote it, e.g. "claude-opus-5-5".
+  string model = 1;
+  // "" or "long" (Claude Haiku 5.5 requests whose prompt is over 100K tokens).
+  string tier = 2;
+  // "" (standard) or "fast".
+  string speed = 3;
+  // UTC date "YYYY-MM-DD" of the requests; "unknown" when a record had no timestamp.
+  string day = 4;
+  int64 requests = 5;
+  int64 input = 6;
+  // Includes thinking tokens.
+  int64 output = 7;
+  int64 cache_read = 8;
+  int64 cache_write_5m = 9;
+  int64 cache_write_1h = 10;
+  // The bucket's price in USD; 0 when unpriced.
+  double cost_usd = 11;
+  // The bucket's (model, tier, speed) has no known rate.
+  bool unpriced = 12;
 }
 
 // A pull request Claude linked to a session (Session.linked_pull_requests).
@@ -234,6 +270,8 @@ message ListSessionsRequest {}
 
 message ListSessionsResponse {
   repeated Session sessions = 1;
+  // Usage of removed threads (see SessionSnapshot.retired_usage).
+  repeated UsageBucket retired_usage = 2;
 }
 
 message GetSessionRequest {
@@ -301,9 +339,20 @@ message SessionEvent {
     SessionSnapshot snapshot = 1;
     Session updated = 2;
     string removed_id = 3;
+    // Follows removed_id when the removed thread had usage: the whole retired ledger.
+    RetiredUsage retired_usage = 4;
   }
 }
 
 message SessionSnapshot {
   repeated Session sessions = 1;
+  // Usage of removed threads, summed per (model, tier, speed, day): a thread's buckets
+  // are added here when it is removed. Usage over every thread ever tracked is the
+  // sessions' usage plus this.
+  repeated UsageBucket retired_usage = 2;
+}
+
+// The retired usage ledger after a removal (SessionEvent.retired_usage).
+message RetiredUsage {
+  repeated UsageBucket buckets = 1;
 }
