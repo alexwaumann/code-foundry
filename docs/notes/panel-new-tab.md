@@ -22,8 +22,9 @@ Light: `panel-new-tab/panel-new-tab-strip-light.png`, `panel-new-tab-picking-lig
 | `gui/frontend/src/stores/panel.ts` | `PanelEntry.pickFrom?`, `isPicking`, `startPicking`, `stopPicking`; `openTab`/`activateTab`/`closeTab` handle picking; `startPanelPicking`, `stopPanelPicking`, `usePanelPicking` |
 | `gui/frontend/src/stores/views.ts`, `keys/bindings.ts` | `newPanelTabCommand`, `showView("panel.new-tab")`, the window-local presenter |
 | `gui/frontend/src/components/panel/keys.ts` | `{ kind: "stopPicking" }`; cmd+w and Escape while picking; `isPanelChord(chord, picking)` |
-| `gui/frontend/src/components/panel/SidePanel.tsx` | `NewTabButton` (a `CommandButton`) after the last tab; `data-picking` on the aside; roving tabindex while picking; the reveal effect scrolls the + into view |
+| `gui/frontend/src/components/panel/SidePanel.tsx` | `NewTabButton` (a `CommandButton`) after the last tab; `data-picking` on the aside; roving tabindex while picking; the reveal effect scrolls the + into view; `keepPanelFocus` when the list unmounts |
 | `gui/frontend/src/components/panel/reveal.ts` | `revealElement` (what `revealTab` now calls) |
+| `gui/frontend/src/components/help/HelpOverlay.tsx` | One row for Escape and cmd+w on the surface list ("back to the tab") |
 | `gui/frontend/mock/world.ts` | `view.panel.new-tab` for the e2e mock daemon |
 
 ## Decisions
@@ -65,6 +66,11 @@ Light: `panel-new-tab/panel-new-tab-strip-light.png`, `panel-new-tab-picking-lig
   `CommandButton` takes no ref. The wrapper is `no-drag` too.
 * **Roving tabindex while picking.** With no active tab, no tab had `tabIndex=0`, so Tab
   could not reach the strip. The first tab (and its ×) takes it while picking.
+* **Focus leaves the list before it unmounts.** A row reached with Tab lost focus to
+  `<body>` when picking ended (Escape), a letter opened a surface, or the row was
+  clicked (Chromium focuses clicked buttons; WebKit does not), and then cmd+w and the
+  letters no longer reached the panel. `keepPanelFocus` moves focus to the aside first,
+  as `LinkedPRsSurface`'s `openLink` does. It applies to the empty panel's list too.
 * **Hiding the panel keeps picking.** `toggle` leaves `pickFrom` alone, like `width` and
   `expanded`. Showing the panel again shows the list it was hidden with. Alex did not
   specify this; it is the simpler rule.
@@ -86,12 +92,13 @@ Light: `panel-new-tab/panel-new-tab-strip-light.png`, `panel-new-tab-picking-lig
 
 ## Tests
 
-* Vitest (whole suite 1397 tests, 75 files): `stores/panel.test.ts` 83 (+28: picking
+* Vitest (whole suite 1400 tests, 75 files): `stores/panel.test.ts` 83 (+28: picking
   rows for `openTab`/`closeTab`/`activateTab`, `isPicking`, `startPicking`,
   `stopPicking`, round trip, survives hide/resize, `startPanelPicking`/`stopPanelPicking`
-  incl. persistence), `components/panel/keys.test.ts` 24 (+9), `SidePanel.test.tsx` 22
-  (+10: the + only with tabs, entering picking adds no tab, picking a surface, picking an
-  open one, clicking a tab, Escape and cmd+w, Escape with an active tab reaches the
+  incl. persistence), `components/panel/keys.test.ts` 24 (+9), `SidePanel.test.tsx` 25
+  (+13: the + only with tabs, entering picking adds no tab, picking a surface, picking an
+  open one, clicking a tab, Escape and cmd+w, focus moving to the panel when a focused
+  row's list unmounts (Escape, a letter, a click), Escape with an active tab reaches the
   surface, closing the `pickFrom` tab, closing every tab), `stores/views.test.ts` 29 (+5).
 * Go: `TestViewCommandsEmitShowView` and `TestAllRegistersEveryDomain` cover the new
   command.
