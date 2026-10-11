@@ -6,6 +6,7 @@ import {
   draftKey,
   draftMembers,
   isWorkspaceKey,
+  movedDraft,
   pickDefault,
   MODEL_CHOICES,
   projectChipBranch,
@@ -15,7 +16,9 @@ import {
   sessionNewArgs,
   threadArgs,
   threadPlace,
+  type ComposeTarget,
   type DraftArgsInput,
+  type MovableDraft,
   type PlaceEnv,
   type PlaceInput,
   type ThreadPlace,
@@ -219,5 +222,57 @@ describe("helpers", () => {
       expect(projectHue(n)).toBeGreaterThanOrEqual(0);
       expect(projectHue(n)).toBeLessThan(360);
     }
+  });
+});
+
+describe("movedDraft", () => {
+  const proj = (repoId: string): ComposeTarget => ({ kind: "project", repoId });
+  const ws = (workspaceId: string): ComposeTarget => ({ kind: "workspace", workspaceId });
+  // repo-wr is the project without git.
+  const isGit = (id: string) => id !== "repo-wr";
+  // The fields movedDraft does not name must come through unchanged.
+  const carried = {
+    text: "Add a dark mode toggle",
+    attachments: ["a1"],
+    model: "haiku",
+    effort: "medium",
+    permission: "supervised",
+    phase: "idle",
+    notice: "x.bmp: not a PNG image",
+  };
+  const draft: MovableDraft & typeof carried = {
+    ...carried,
+    worktree: { kind: "existing", path: "/src/cf/wt" },
+    base: "origin/release",
+    alsoIn: [],
+    primary: null,
+    error: "the last send failed",
+  };
+
+  it.each<[string, Partial<MovableDraft>, ComposeTarget, ComposeTarget, Partial<MovableDraft>]>([
+    ["project → project: new worktree; base and error reset", {}, proj("repo-cf"), proj("repo-gp"), { worktree: { kind: "new" }, base: null, error: null, alsoIn: [], primary: null }],
+    ["project → workspace: workspace worktrees; base and error reset", {}, proj("repo-cf"), ws("w-1"), { worktree: { kind: "members" }, base: null, error: null }],
+    ["workspace → project: new worktree", { worktree: { kind: "members" } }, ws("w-1"), proj("repo-cf"), { worktree: { kind: "new" } }],
+    ["workspace (new-worktree mode) → workspace: workspace worktrees", { worktree: { kind: "new" } }, ws("w-1"), ws("w-2"), { worktree: { kind: "members" } }],
+    ["Also in carried to another git project; the old project is not demoted to it", { alsoIn: ["repo-sk"] }, proj("repo-cf"), proj("repo-gp"), { alsoIn: ["repo-sk"] }],
+    ["the new project leaves Also in (a swap)", { alsoIn: ["repo-gp", "repo-sk"] }, proj("repo-cf"), proj("repo-gp"), { alsoIn: ["repo-sk"] }],
+    ["the old project never stays in Also in", { alsoIn: ["repo-cf", "repo-sk"] }, proj("repo-cf"), proj("repo-gp"), { alsoIn: ["repo-sk"] }],
+    ["a workspace target: no Also in", { alsoIn: ["repo-gp"] }, proj("repo-cf"), ws("w-1"), { alsoIn: [] }],
+    ["a project without git: no Also in", { alsoIn: ["repo-gp"] }, proj("repo-cf"), proj("repo-wr"), { alsoIn: [] }],
+    ["primary kept while it is still an Also in project", { alsoIn: ["repo-sk", "repo-dot"], primary: "repo-sk" }, proj("repo-cf"), proj("repo-gp"), { alsoIn: ["repo-sk", "repo-dot"], primary: "repo-sk" }],
+    ["primary on the swapped-in project: null (it is the project now)", { alsoIn: ["repo-gp"], primary: "repo-gp" }, proj("repo-cf"), proj("repo-gp"), { alsoIn: [], primary: null }],
+    ["primary on the old project: null", { alsoIn: ["repo-sk"], primary: "repo-cf" }, proj("repo-cf"), proj("repo-gp"), { alsoIn: ["repo-sk"], primary: null }],
+    ["primary dropped with Also in for a workspace target", { alsoIn: ["repo-sk"], primary: "repo-sk" }, proj("repo-cf"), ws("w-1"), { alsoIn: [], primary: null }],
+    ["a workspace member as primary does not survive a move", { primary: "repo-gp" }, ws("w-1"), ws("w-2"), { primary: null }],
+    ["primary dropped for a project without git", { alsoIn: ["repo-sk"], primary: "repo-sk" }, proj("repo-cf"), proj("repo-wr"), { alsoIn: [], primary: null }],
+  ])("%s", (_, over, from, to, want) => {
+    const got = movedDraft({ ...draft, ...over }, from, to, isGit);
+    expect(got).toMatchObject({ ...carried, ...want });
+  });
+
+  it("does not modify the draft it moves", () => {
+    const d = { ...draft, alsoIn: ["repo-gp"] };
+    movedDraft(d, proj("repo-cf"), proj("repo-gp"), isGit);
+    expect(d).toMatchObject({ alsoIn: ["repo-gp"], base: "origin/release", error: "the last send failed" });
   });
 });

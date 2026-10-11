@@ -71,6 +71,44 @@ export function isWorkspaceKey(key: string): boolean {
   return key.startsWith(WORKSPACE_KEY);
 }
 
+/** The draft fields a move to another target rewrites (stores/compose.ts Draft has them all). */
+export interface MovableDraft {
+  worktree: WorktreeChoice;
+  base: string | null;
+  alsoIn: readonly string[];
+  primary: string | null;
+  error: string | null;
+}
+
+/**
+ * A draft moved to another target (the composer heading's project switch). Carried
+ * over: every field this does not name (text, attachments, model, effort, permission,
+ * notice, phase). Reset: the worktree (a project's "new", a workspace's "members"), the
+ * base (it was one of the old primary's refs) and the error.
+ *
+ * Also in: the old project is dropped (never demoted to Also in); the new project leaves
+ * Also in (a swap); a workspace, or a project without git, has none. The primary stays
+ * only while it is still one of the moved draft's Also in projects.
+ */
+export function movedDraft<D extends MovableDraft>(d: D, from: ComposeTarget, to: ComposeTarget, isGitRepo: (id: string) => boolean): D {
+  const dropped = new Set<string>();
+  if (from.kind === "project") dropped.add(from.repoId);
+  if (to.kind === "project") dropped.add(to.repoId);
+  const alsoIn = to.kind === "workspace" || !isGitRepo(to.repoId) ? [] : d.alsoIn.filter((id) => !dropped.has(id));
+  // Per-member cleanup goes here: whatever else in the draft names a project (file and
+  // skill tags, once they exist) is checked against the new members (to.repoId +
+  // alsoIn, or the workspace's members) and dropped when its project is not among them.
+  const primary = d.primary !== null && alsoIn.includes(d.primary) ? d.primary : null;
+  return {
+    ...d,
+    worktree: to.kind === "project" ? { kind: "new" } : { kind: "members" },
+    base: null,
+    alsoIn,
+    primary,
+    error: null,
+  };
+}
+
 /** The draft fields that decide where a thread starts. */
 export interface PlaceInput {
   target: ComposeTarget;
