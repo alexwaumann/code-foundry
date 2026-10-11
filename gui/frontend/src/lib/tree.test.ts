@@ -30,7 +30,7 @@ const terms: PlaceableTerminal[] = [
   { id: "f", cwd: "/src/lib", worktreeLabel: "", sessionLabel: "s2" }, // owned by label: hidden
 ];
 
-const thread = (id: string, over: Partial<ListSession> = {}): ListSession => ({ id, terminalId: "", pinned: false, attention: false, ...over });
+const thread = (id: string, over: Partial<ListSession> = {}): ListSession => ({ id, terminalId: "", pinned: false, attention: "", ...over });
 
 /** "<kind>:<key>" per row, headers as "# Label". */
 function shape(rows: ReturnType<typeof buildRows>): string[] {
@@ -38,28 +38,29 @@ function shape(rows: ReturnType<typeof buildRows>): string[] {
 }
 
 describe("buildRows (the flat thread list)", () => {
-  it("lists threads newest first with no header when there is only one section, then loose terminals", () => {
+  it("lists threads newest first with no header, then loose terminals under Terminals", () => {
     const sessions = [thread("s1", { terminalId: "a" }), thread("s2"), thread("s3")];
     expect(shape(buildRows(sessions, terms))).toEqual([sessionKey("s3"), sessionKey("s2"), sessionKey("s1"), "# Terminals", terminalKey("b"), terminalKey("c")]);
   });
 
-  it("puts pinned threads, then unpinned ones needing attention, above the rest", () => {
-    const sessions = [thread("s1", { attention: true }), thread("s2", { pinned: true }), thread("s3"), thread("s4", { pinned: true, attention: true }), thread("s5", { attention: true })];
-    expect(shape(buildRows(sessions, []))).toEqual([
-      "# Pinned",
-      sessionKey("s4"),
-      sessionKey("s2"),
-      "# Needs attention",
-      sessionKey("s5"),
-      sessionKey("s1"),
-      "# Threads",
-      sessionKey("s3"),
-    ]);
-    expect(buildRows(sessions, []).find((r) => r.key === sessionKey("s4"))).toMatchObject({ section: "pinned" });
+  it("puts pinned threads, then prompts, then finished turns, above the rest, with no headers", () => {
+    const sessions = [
+      thread("s1", { attention: "prompt" }),
+      thread("s2", { pinned: true }),
+      thread("s3"),
+      thread("s4", { pinned: true, attention: "prompt" }),
+      thread("s5", { attention: "done" }),
+      thread("s6", { attention: "prompt" }),
+      thread("s7"),
+      thread("s8", { pinned: true, attention: "done" }),
+    ];
+    const rows = buildRows(sessions, []);
+    expect(shape(rows)).toEqual([sessionKey("s8"), sessionKey("s4"), sessionKey("s2"), sessionKey("s6"), sessionKey("s1"), sessionKey("s5"), sessionKey("s7"), sessionKey("s3")]);
+    expect(rows.map((r) => r.section)).toEqual(["pinned", "pinned", "pinned", "attention", "attention", "attention", "threads", "threads"]);
   });
 
-  it("drops empty sections and their headers", () => {
-    expect(shape(buildRows([thread("s1", { attention: true })], []))).toEqual(["# Needs attention", sessionKey("s1")]);
+  it("has a header only for terminals", () => {
+    expect(shape(buildRows([thread("s1", { attention: "prompt" })], []))).toEqual([sessionKey("s1")]);
     expect(shape(buildRows([], [terms[1] as PlaceableTerminal]))).toEqual(["# Terminals", terminalKey("b")]);
     expect(buildRows([], [])).toEqual([]);
   });
@@ -68,10 +69,10 @@ describe("buildRows (the flat thread list)", () => {
     expect([...ownedTerminalIds([thread("s1", { terminalId: "a" }), thread("s2")], terms)].sort()).toEqual(["a", "f"]);
   });
 
-  it("orders leaves (cmd+1..9) and threads (cmd+shift+a) as shown, headers skipped", () => {
-    const sessions = [thread("s1"), thread("s2", { attention: true }), thread("s3", { terminalId: "a" })];
-    expect(leafOrder(sessions, terms).map((r) => r.key)).toEqual(["s:s2", "s:s3", "s:s1", "t:b", "t:c"]);
-    expect(sessionOrder(sessions, terms)).toEqual(["s2", "s3", "s1"]);
+  it("orders leaves (cmd+1..9) and threads (cmd+shift+a) as shown, the Terminals header skipped", () => {
+    const sessions = [thread("s1"), thread("s2", { attention: "done" }), thread("s3", { terminalId: "a" }), thread("s4", { attention: "prompt" })];
+    expect(leafOrder(sessions, terms).map((r) => r.key)).toEqual(["s:s4", "s:s2", "s:s3", "s:s1", "t:b", "t:c"]);
+    expect(sessionOrder(sessions, terms)).toEqual(["s4", "s2", "s3", "s1"]);
   });
 });
 

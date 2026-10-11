@@ -89,6 +89,30 @@ export function statusDetail(s: Pick<SessionView, "statusReason">): string {
   return splitReason(s.statusReason)[1];
 }
 
+/**
+ * statusDetail, else the whole reason when it is not just a kind word ("bell", "finished",
+ * "waiting for input") or an error status's own text ("daemon restarted"). "" when there is
+ * nothing more to say than the kind. For the sidebar's "Needs input · …" and "Error · …".
+ */
+export function statusNote(s: Pick<SessionView, "statusReason">): string {
+  const [head, detail] = splitReason(s.statusReason);
+  if (detail) return detail;
+  return head in reasonKinds || head === "interrupted" ? "" : head;
+}
+
+/**
+ * Where a thread sorts in the sidebar's attention block: "prompt" when it waits on the user
+ * (a permission, question, plan, trust or other dialog, a notification, a Claude error),
+ * "done" for a finished turn the user has not seen, "" when it needs nothing (any status but
+ * attention, including error / interrupted). Prompts sort above finished turns.
+ */
+export type AttentionTier = "prompt" | "done" | "";
+
+export function attentionTier(s: Pick<SessionView, "status" | "statusReason">): AttentionTier {
+  if (s.status !== "attention") return "";
+  return statusKind(s) === "done" ? "done" : "prompt";
+}
+
 /** Why a session is not connected, for the "Not connected" panel. */
 export function disconnectReason(s: Pick<SessionView, "disconnectReason" | "exitCode" | "lastError">): string {
   switch (s.disconnectReason) {

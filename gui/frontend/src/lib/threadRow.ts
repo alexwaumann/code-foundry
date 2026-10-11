@@ -11,7 +11,7 @@ import { placeTerminal } from "./tree";
 /** The slices of the repos store these helpers read. */
 export interface RepoLookup {
   /** `git` false: a project without git, whose checkout has no branch (absent counts as git). */
-  byId: Readonly<Record<string, { name: string; git?: boolean; worktrees: readonly { path: string; branch: string; head: string }[] } | undefined>>;
+  byId: Readonly<Record<string, { name: string; git?: boolean; worktrees: readonly { path: string; branch: string; head: string; isMain?: boolean }[] } | undefined>>;
 }
 
 /** What stands in for a branch in text (a terminal's place) for a project without git. */
@@ -37,6 +37,8 @@ export interface ThreadRowModel {
   workspace: string | null;
   /** Project name of the member a queued Run in moves the thread to; null when none is queued. */
   movingTo: string | null;
+  /** The cwd is a linked worktree, not the project's main checkout (false when unknown or without git). */
+  worktree: boolean;
 }
 
 /**
@@ -75,7 +77,14 @@ export function threadRowModel(
     // A workspace the slice does not know (older daemon, or just removed) still badges the row.
     workspace: s.workspaceId ? (ws?.name ?? s.workspaceId) : null,
     movingTo: s.pendingWorktreePath && s.pendingWorktreePath !== s.worktreePath ? memberName(repos, ws, s.pendingWorktreePath) : null,
+    worktree: !isNoGit(repos, s.repoId) && repos.byId[s.repoId]?.worktrees.find((w) => w.path === s.worktreePath)?.isMain === false,
   };
+}
+
+/** The model as the thread tooltip names it: first letter capitalized ("opus" -> "Opus"); "Default" when unset. */
+export function modelLabel(model: string): string {
+  const m = model.trim();
+  return m ? m.charAt(0).toUpperCase() + m.slice(1) : "Default";
 }
 
 /**
