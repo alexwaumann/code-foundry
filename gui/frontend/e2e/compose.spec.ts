@@ -124,8 +124,9 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   // The thread's row names its project and the new worktree's branch; it is the newest thread.
   await expect(created.getByTestId("row-project")).toHaveText("code-foundry");
   await expect(created.getByTestId("row-branch")).toHaveText("cf/add-a-dark-mode");
-  const keys = await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
-  expect(keys.indexOf(key)).toBe(keys.indexOf("h:threads") + 1);
+  const sections = await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => [e.getAttribute("data-row-key"), e.getAttribute("data-section")]));
+  // The newest thread that needs nothing: first in its group, right below the waiting ones.
+  expect(sections.find(([, section]) => section === "threads")?.[0]).toBe(key);
 
   // The draft was cleared: a new composer for the repo starts empty.
   await compose(page);

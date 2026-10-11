@@ -12,7 +12,8 @@ import {
   type WorktreeRef,
 } from "@/lib/tree";
 import { useReposStore, type ReposData } from "./repos";
-import { isAttention, useSessionsStore, type SessionsData } from "./sessions";
+import { useSessionsStore, type SessionsData } from "./sessions";
+import { attentionTier } from "@/lib/session";
 import { useTerminalsStore, type TerminalsData } from "./terminals";
 import { useUiStore, type Selection } from "./ui";
 
@@ -149,14 +150,15 @@ export function decodeSessionKeys(keys: readonly string[]): TreeSession[] {
 
 /**
  * One string per session for the sidebar list: id + attached terminal + pin + attention
- * (name, model and busy/idle changes don't rebuild the list). In the store's order.
+ * tier (name, model, busy/idle and the status line's text don't rebuild the list; a
+ * question turning into a finished turn does, since it moves). In the store's order.
  */
 export function useSessionListKeys(): string[] {
   return useSessionsStore(
     useShallow((s) =>
       s.order.map((id) => {
         const x = s.byId[id];
-        return [id, x?.terminalId ?? "", x?.pinned ? "1" : "", x && isAttention(x) ? "1" : ""].join(SEP);
+        return [id, x?.terminalId ?? "", x?.pinned ? "1" : "", x ? attentionTier(x) : ""].join(SEP);
       }),
     ),
   );
@@ -165,7 +167,7 @@ export function useSessionListKeys(): string[] {
 export function decodeSessionListKeys(keys: readonly string[]): ListSession[] {
   return keys.map((k) => {
     const [id = "", terminalId = "", pinned = "", attention = ""] = k.split(SEP);
-    return { id, terminalId, pinned: pinned === "1", attention: attention === "1" };
+    return { id, terminalId, pinned: pinned === "1", attention: attention === "prompt" || attention === "done" ? attention : "" };
   });
 }
 
@@ -176,7 +178,7 @@ export function getListInputs(): { sessions: ListSession[]; terminals: Placeable
   return {
     sessions: s.order.flatMap((id) => {
       const x = s.byId[id];
-      return x ? [{ id, terminalId: x.terminalId, pinned: x.pinned, attention: isAttention(x) }] : [];
+      return x ? [{ id, terminalId: x.terminalId, pinned: x.pinned, attention: attentionTier(x) }] : [];
     }),
     terminals: t.order.map((id) => {
       const term = t.byId[id];

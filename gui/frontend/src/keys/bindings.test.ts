@@ -144,6 +144,26 @@ describe("handleKeyDown precedence", () => {
     expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "c" });
   });
 
+  it("cmd+shift+a visits prompts before finished turns, as the sidebar lists them", () => {
+    useSessionsStore.setState({
+      byId: {
+        a: session("a", { status: "attention", statusReason: "finished" }),
+        b: session("b", { status: "attention", statusReason: "question: Which?" }),
+        c: session("c", { status: "attention", statusReason: "finished" }),
+        d: session("d", { status: "error", statusReason: "interrupted" }),
+      },
+      order: ["a", "b", "c", "d"],
+    });
+    const jump = () => press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
+    const seen: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      jump();
+      const sel = useUiStore.getState().selection;
+      seen.push(sel.kind === "session" ? sel.id : "");
+    }
+    expect(seen).toEqual(["b", "c", "a", "b"]);
+  });
+
   it("text fields consume command chords", () => {
     press(input, { key: "t", code: "KeyT", metaKey: true });
     expect(runCommand).not.toHaveBeenCalled();

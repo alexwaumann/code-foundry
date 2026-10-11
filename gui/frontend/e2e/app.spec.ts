@@ -10,7 +10,7 @@ test("sidebar lists threads, then terminals no thread owns; repos and worktrees 
   const list = page.getByTestId("thread-list");
   const keys = await list.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
   // Sessions own t-claude and t-ghostty, so those terminals have no rows of their own.
-  expect(keys).toEqual(["h:attention", "s:s-2", "h:threads", "s:s-5", "s:s-1", "s:s-6", "s:s-4", "s:s-3", "h:terminals", "t:t-logs", "t:t-top", "t:t-tests", "t:t-tmp"]);
+  expect(keys).toEqual(["s:s-2", "s:s-5", "s:s-1", "s:s-6", "s:s-4", "s:s-3", "h:terminals", "t:t-logs", "t:t-top", "t:t-tests", "t:t-tmp"]);
   await expect(list.locator('[data-row-kind="repo"], [data-row-kind="worktree"]')).toHaveCount(0);
   await openProjects(page);
   await expect(page.getByTestId("project-name")).toHaveText(["code-foundry", "dotfiles", "ghostty-playground", "sketches", "writing"]);
