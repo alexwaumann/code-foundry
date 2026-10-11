@@ -24,6 +24,7 @@ import {
   draftKey,
   draftMembers,
   isWorkspaceKey,
+  movedDraft,
   threadArgs,
   threadPlace,
   type ComposePermission,
@@ -33,6 +34,7 @@ import {
 } from "@/lib/compose";
 import { projectPrompt, removeReferences } from "@/lib/prompt";
 import { invokeConfirmed, refreshCommands } from "./commands";
+import { requestConfirm } from "./confirm";
 import { getUiContext } from "./context";
 import { useReposStore } from "./repos";
 import { SESSION_COMMANDS } from "./sessionActions";
@@ -238,6 +240,60 @@ export function composeInWorkspace(workspaceId: string): void {
   const ui = useUiStore.getState();
   ui.select({ kind: "compose", repoId: first, workspaceId });
   ui.focusComposer();
+}
+
+/** A target's display name (the project's or the workspace's), else its id. */
+function targetName(t: ComposeTarget): string {
+  return t.kind === "project" ? (useReposStore.getState().byId[t.repoId]?.name ?? t.repoId) : (useWorkspacesStore.getState().byId[t.workspaceId]?.name ?? t.workspaceId);
+}
+
+/**
+ * Moves the draft to another project or workspace (the composer heading's switch) and
+ * shows that composer, prompt focused. The draft keeps its text, images and options;
+ * where it runs resets (lib/compose movedDraft). The old key is deleted without
+ * revoking the attachments' object URLs: they moved with it.
+ *
+ * A non-empty draft already at the new target is replaced only after a confirm; on
+ * cancel nothing changes. An empty draft moves nothing: the new target's own draft is
+ * shown as it is. Resolves false when nothing happened (same target, busy, cancelled).
+ */
+export async function switchDraftTarget(from: ComposeTarget, to: ComposeTarget): Promise<boolean> {
+  const fromKey = draftKey(from);
+  const toKey = draftKey(to);
+  if (fromKey === toKey || getDraft(fromKey).phase !== "idle") return false;
+  const waiting = useComposeStore.getState().drafts[toKey];
+  if (isDraftEmpty(getDraft(fromKey))) {
+    if (waiting && !isDraftEmpty(waiting)) {
+      selectTarget(to);
+      return true;
+    }
+  } else if (waiting && !isDraftEmpty(waiting)) {
+    const yes = await requestConfirm({
+      title: `Replace the draft in ${targetName(to)}?`,
+      message: "It has unsent text or images.",
+      confirmLabel: "Replace",
+      centered: true,
+    });
+    if (!yes) return false;
+  }
+  const cur = getDraft(fromKey);
+  if (cur.phase !== "idle") return false;
+  const repos = useReposStore.getState().byId;
+  const moved = movedDraft(cur, from, to, (id) => repos[id]?.git === true);
+  useComposeStore.setState((s) => {
+    // The replaced draft's images go away with it.
+    for (const a of s.drafts[toKey]?.attachments ?? []) URL.revokeObjectURL(a.url);
+    const { [fromKey]: _moved, ...drafts } = s.drafts;
+    return { drafts: { ...drafts, [toKey]: moved }, preview: null };
+  });
+  selectTarget(to);
+  return true;
+}
+
+/** Shows a target's composer and focuses its prompt (no worktree side effect, unlike composeIn's path). */
+function selectTarget(to: ComposeTarget): void {
+  if (to.kind === "project") composeIn(to.repoId);
+  else composeInWorkspace(to.workspaceId);
 }
 
 /** The composer target a compose selection shows. */
