@@ -140,8 +140,12 @@ had already been recognised in that transcript.
 
 ## Verified
 
-* `make check`: gofmt, vet, staticcheck, `go test -race ./...`, frontend typecheck, lint,
-  vitest (1134).
+* `make check` (after merging main): gofmt, vet, staticcheck, `go test -race ./...`,
+  frontend typecheck, lint, vitest (1166).
+* `make gui-e2e` (after merging main): 401 passed, 4 skipped, 1 failed: Chromium
+  `gitops.spec.ts:17` (the push toast never showed "running" within 5 s). This branch does
+  not touch gitops; it failed the same way in an earlier full run and passes alone (the
+  whole spec, 5/5), so it is a timing flake of the full suite.
 * Vitest: `lib/prompt.test.ts` (tokens, round trip of every kind, labels, malformed tokens,
   projection and spacing, `tagsByRepo`, `repoTagCount`, `removeRepoTags`, `retainRepoTags`,
   every existing case), `lib/completion.test.ts` (trigger table, card rules incl.
@@ -149,7 +153,9 @@ had already been recognised in that transcript.
   (faked ListSkills: keying, shared in-flight, stale-while-reload, outdated),
   `stores/compose.test.ts` (Also in removal drops the project's tags only),
   `components/compose/tagSelection.test.ts` (image only; attrs round trip).
-* `make gui-e2e` (WebKit + Chromium), including `composer-skills.spec.ts`: `/dep` → card
+* e2e (WebKit + Chromium) for this work: `composer-switch.spec.ts` gains "switching away
+  drops the old project's skill tags after a confirm" (cancel keeps text, project and Also
+  in; confirm keeps sketches' and the user's tags), and `composer-skills.spec.ts`: `/dep` → card
   with `/deploy` under the composer card and above the worktree row → Enter inserts the tag
   and a space without sending → send's prompt is `/deploy to staging`; Escape keeps `/dep`
   and stays dismissed; "No skills match" for one keystroke, closed on the next, back on
