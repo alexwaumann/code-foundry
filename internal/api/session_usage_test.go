@@ -45,6 +45,18 @@ func TestUsageToProto(t *testing.T) {
 				if p.GetUnpriced() != (b.Model == unknown.Model) || (p.GetUnpriced() && p.GetCostUsd() != 0) {
 					t.Errorf("bucket %d priced = %v, %v", i, p.GetCostUsd(), p.GetUnpriced())
 				}
+				kinds := p.GetInputCostUsd() + p.GetOutputCostUsd() + p.GetCacheReadCostUsd() + p.GetCacheWrite_5MCostUsd() + p.GetCacheWrite_1HCostUsd()
+				if !near(kinds, p.GetCostUsd()) {
+					t.Errorf("bucket %d per-kind costs sum to %v; cost %v", i, kinds, p.GetCostUsd())
+				}
+			}
+			if tt.name == "priced" {
+				// Opus 5.5 at 1M of each kind: input 4, output 20, cache read 0.2, write 5m 5, write 1h 8.
+				o := out[0]
+				if !near(o.GetInputCostUsd(), 4) || !near(o.GetOutputCostUsd(), 20) || !near(o.GetCacheReadCostUsd(), 0.2) ||
+					!near(o.GetCacheWrite_5MCostUsd(), 5) || !near(o.GetCacheWrite_1HCostUsd(), 8) {
+					t.Errorf("opus per-kind costs = %v", o)
+				}
 			}
 		})
 	}

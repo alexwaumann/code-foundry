@@ -186,6 +186,12 @@ message UsageBucket {
   double cost_usd = 11;
   // The bucket's (model, tier, speed) has no known rate.
   bool unpriced = 12;
+  // cost_usd split by token kind (the side panel's token table); all 0 when unpriced.
+  double input_cost_usd = 13;
+  double output_cost_usd = 14;
+  double cache_read_cost_usd = 15;
+  double cache_write_5m_cost_usd = 16;
+  double cache_write_1h_cost_usd = 17;
 }
 
 // A pull request Claude linked to a session (Session.linked_pull_requests).
