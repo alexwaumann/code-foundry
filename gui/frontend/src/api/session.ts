@@ -101,6 +101,8 @@ export interface UsageBucketView {
   cacheReadCostUsd: number;
   cacheWrite5mCostUsd: number;
   cacheWrite1hCostUsd: number;
+  /** USD the cache reads saved: cacheRead x (input rate - cache read rate); 0 when unpriced. */
+  cacheSavingsUsd: number;
 }
 
 /** A pull request linked to a thread. */
@@ -205,6 +207,7 @@ export function toUsageBucketView(b: UsageBucket): UsageBucketView {
     cacheReadCostUsd: b.cacheReadCostUsd,
     cacheWrite5mCostUsd: b.cacheWrite5mCostUsd,
     cacheWrite1hCostUsd: b.cacheWrite1hCostUsd,
+    cacheSavingsUsd: b.cacheSavingsUsd,
   };
 }
 

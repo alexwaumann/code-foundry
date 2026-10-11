@@ -106,6 +106,7 @@ describe("session reducers", () => {
       cacheReadCostUsd: 0,
       cacheWrite5mCostUsd: 0,
       cacheWrite1hCostUsd: 0.001,
+      cacheSavingsUsd: 0,
     });
     const prev = replaceSessions(emptySessions, [session("a", { usage: [bucket(1)] })]);
     expect(applySessionEvent(prev, { kind: "updated", session: session("a", { usage: [bucket(1)] }) })).toBe(prev);

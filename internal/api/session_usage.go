@@ -11,11 +11,12 @@ import (
 // any bucket has no known rate.
 func usageToProto(buckets []session.UsageBucket) (out []*v1.UsageBucket, cost float64, unpriced bool) {
 	for _, b := range buckets {
-		c, ok := pricing.CostByKind(pricing.Bucket{
+		pb := pricing.Bucket{
 			Model: b.Model, Tier: b.Tier, Speed: b.Speed,
 			Input: b.Input, Output: b.Output, CacheRead: b.CacheRead,
 			CacheWrite5m: b.CacheWrite5m, CacheWrite1h: b.CacheWrite1h,
-		})
+		}
+		c, ok := pricing.CostByKind(pb)
 		usd := c.Total()
 		out = append(out, &v1.UsageBucket{
 			Model: b.Model, Tier: b.Tier, Speed: b.Speed, Day: b.Day,
@@ -24,6 +25,7 @@ func usageToProto(buckets []session.UsageBucket) (out []*v1.UsageBucket, cost fl
 			CostUsd: usd, Unpriced: !ok,
 			InputCostUsd: c.Input, OutputCostUsd: c.Output, CacheReadCostUsd: c.CacheRead,
 			CacheWrite_5MCostUsd: c.CacheWrite5m, CacheWrite_1HCostUsd: c.CacheWrite1h,
+			CacheSavingsUsd: pricing.CacheSavings(pb),
 		})
 		cost += usd
 		unpriced = unpriced || !ok

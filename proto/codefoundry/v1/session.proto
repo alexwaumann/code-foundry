@@ -192,6 +192,9 @@ message UsageBucket {
   double cache_read_cost_usd = 15;
   double cache_write_5m_cost_usd = 16;
   double cache_write_1h_cost_usd = 17;
+  // What the bucket's cache reads saved in USD: cache_read x (input rate - cache read
+  // rate) at the bucket's (model, tier, speed). 0 when unpriced.
+  double cache_savings_usd = 18;
 }
 
 // A pull request Claude linked to a session (Session.linked_pull_requests).

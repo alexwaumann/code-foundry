@@ -546,8 +546,11 @@ type UsageBucket struct {
 	CacheReadCostUsd     float64 `protobuf:"fixed64,15,opt,name=cache_read_cost_usd,json=cacheReadCostUsd,proto3" json:"cache_read_cost_usd,omitempty"`
 	CacheWrite_5MCostUsd float64 `protobuf:"fixed64,16,opt,name=cache_write_5m_cost_usd,json=cacheWrite5mCostUsd,proto3" json:"cache_write_5m_cost_usd,omitempty"`
 	CacheWrite_1HCostUsd float64 `protobuf:"fixed64,17,opt,name=cache_write_1h_cost_usd,json=cacheWrite1hCostUsd,proto3" json:"cache_write_1h_cost_usd,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// What the bucket's cache reads saved in USD: cache_read x (input rate - cache read
+	// rate) at the bucket's (model, tier, speed). 0 when unpriced.
+	CacheSavingsUsd float64 `protobuf:"fixed64,18,opt,name=cache_savings_usd,json=cacheSavingsUsd,proto3" json:"cache_savings_usd,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *UsageBucket) Reset() {
@@ -695,6 +698,13 @@ func (x *UsageBucket) GetCacheWrite_5MCostUsd() float64 {
 func (x *UsageBucket) GetCacheWrite_1HCostUsd() float64 {
 	if x != nil {
 		return x.CacheWrite_1HCostUsd
+	}
+	return 0
+}
+
+func (x *UsageBucket) GetCacheSavingsUsd() float64 {
+	if x != nil {
+		return x.CacheSavingsUsd
 	}
 	return 0
 }
@@ -2276,7 +2286,7 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\x11status_changed_at\x18\x1a \x01(\v2\x1a.google.protobuf.TimestampR\x0fstatusChangedAt\x121\n" +
 	"\x05usage\x18\x1b \x03(\v2\x1b.codefoundry.v1.UsageBucketR\x05usage\x12\x19\n" +
 	"\bcost_usd\x18\x1c \x01(\x01R\acostUsd\x12\x1a\n" +
-	"\bunpriced\x18\x1d \x01(\bR\bunpriced\"\xb4\x04\n" +
+	"\bunpriced\x18\x1d \x01(\bR\bunpriced\"\xe0\x04\n" +
 	"\vUsageBucket\x12\x14\n" +
 	"\x05model\x18\x01 \x01(\tR\x05model\x12\x12\n" +
 	"\x04tier\x18\x02 \x01(\tR\x04tier\x12\x14\n" +
@@ -2296,7 +2306,8 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\x0foutput_cost_usd\x18\x0e \x01(\x01R\routputCostUsd\x12-\n" +
 	"\x13cache_read_cost_usd\x18\x0f \x01(\x01R\x10cacheReadCostUsd\x124\n" +
 	"\x17cache_write_5m_cost_usd\x18\x10 \x01(\x01R\x13cacheWrite5mCostUsd\x124\n" +
-	"\x17cache_write_1h_cost_usd\x18\x11 \x01(\x01R\x13cacheWrite1hCostUsd\"\x8a\x01\n" +
+	"\x17cache_write_1h_cost_usd\x18\x11 \x01(\x01R\x13cacheWrite1hCostUsd\x12*\n" +
+	"\x11cache_savings_usd\x18\x12 \x01(\x01R\x0fcacheSavingsUsd\"\x8a\x01\n" +
 	"\x11LinkedPullRequest\x12\x12\n" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x10\n" +

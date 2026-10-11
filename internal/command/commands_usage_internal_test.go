@@ -94,7 +94,8 @@ func TestSummarizeUsage(t *testing.T) {
 
 func TestRenderUsage(t *testing.T) {
 	rep := summarizeUsage([]*v1.UsageBucket{
-		{Day: "2026-10-10", Model: "claude-haiku-5-5", Requests: 2, Input: 12, Output: 340, CacheRead: 30_100, CacheWrite_1H: 11_400, CostUsd: 0.0026},
+		{Day: "2026-10-10", Model: "claude-haiku-5-5", Requests: 2, Input: 12, Output: 340, CacheRead: 30_100, CacheWrite_1H: 11_400, CostUsd: 0.0026,
+			CacheSavingsUsd: 30_100 * (0.1 - 0.01) / 1e6},
 		{Day: "2026-10-10", Model: "claude-next", Requests: 1, Input: 5, CostUsd: 0, Unpriced: true},
 	})
 	want := `Thread s-1 (demo): 3 requests · 41.9K tokens · $0.0026 + unpriced
@@ -105,6 +106,7 @@ claude-next       1         5       —        —
 TOTAL             3         41.9K   $0.0026  100%
 
 Input 17 · Output 340 · Cache read 30,100 · Cache write 5m 0 · Cache write 1h 11,400
+Cache savings $0.0027
 `
 	if got := renderUsage("Thread s-1 (demo)", rep); got != want {
 		t.Errorf("renderUsage =\n%s\nwant\n%s", got, want)

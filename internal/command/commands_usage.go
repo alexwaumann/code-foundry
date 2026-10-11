@@ -28,6 +28,8 @@ type UsageModel struct {
 	CacheWrite1h int64   `json:"cache_write_1h"`
 	Tokens       int64   `json:"tokens"`
 	CostUSD      float64 `json:"cost_usd"`
+	// CacheSavingsUSD is what cache reads saved against the input rate (priced buckets).
+	CacheSavingsUSD float64 `json:"cache_savings_usd"`
 	// Unpriced: some of the row's buckets have no known rate; CostUSD leaves them out
 	// and the text table shows "—".
 	Unpriced bool `json:"unpriced,omitempty"`
@@ -48,7 +50,9 @@ type UsageDay struct {
 	CacheWrite5m int64   `json:"cache_write_5m"`
 	CacheWrite1h int64   `json:"cache_write_1h"`
 	CostUSD      float64 `json:"cost_usd"`
-	Unpriced     bool    `json:"unpriced,omitempty"`
+	// CacheSavingsUSD: the daemon's UsageBucket.cache_savings_usd.
+	CacheSavingsUSD float64 `json:"cache_savings_usd"`
+	Unpriced        bool    `json:"unpriced,omitempty"`
 }
 
 // UsageReport is usage.show's --json result.
@@ -78,6 +82,7 @@ func summarizeUsage(buckets []*v1.UsageBucket) UsageReport {
 		m.CacheWrite1h += b.GetCacheWrite_1H()
 		m.Tokens += b.GetInput() + b.GetOutput() + b.GetCacheRead() + b.GetCacheWrite_5M() + b.GetCacheWrite_1H()
 		m.CostUSD += b.GetCostUsd()
+		m.CacheSavingsUSD += b.GetCacheSavingsUsd()
 		m.Unpriced = m.Unpriced || b.GetUnpriced()
 	}
 	for _, b := range buckets {
@@ -90,7 +95,8 @@ func summarizeUsage(buckets []*v1.UsageBucket) UsageReport {
 		add(&rep.Total, b)
 		rep.Buckets = append(rep.Buckets, UsageDay{Day: b.GetDay(), Model: b.GetModel(), Tier: b.GetTier(), Speed: b.GetSpeed(),
 			Requests: b.GetRequests(), Input: b.GetInput(), Output: b.GetOutput(), CacheRead: b.GetCacheRead(),
-			CacheWrite5m: b.GetCacheWrite_5M(), CacheWrite1h: b.GetCacheWrite_1H(), CostUSD: b.GetCostUsd(), Unpriced: b.GetUnpriced()})
+			CacheWrite5m: b.GetCacheWrite_5M(), CacheWrite1h: b.GetCacheWrite_1H(), CostUSD: b.GetCostUsd(), CacheSavingsUSD: b.GetCacheSavingsUsd(),
+			Unpriced: b.GetUnpriced()})
 	}
 	for _, m := range byModel {
 		if !m.Unpriced && rep.Total.CostUSD > 0 {
@@ -189,6 +195,7 @@ func renderUsage(heading string, rep UsageReport) string {
 	_ = tw.Flush()
 	fmt.Fprintf(&sb, "\nInput %s · Output %s · Cache read %s · Cache write 5m %s · Cache write 1h %s\n",
 		groupInt(t.Input), groupInt(t.Output), groupInt(t.CacheRead), groupInt(t.CacheWrite5m), groupInt(t.CacheWrite1h))
+	fmt.Fprintf(&sb, "Cache savings %s\n", formatUSD(t.CacheSavingsUSD))
 	return sb.String()
 }
 

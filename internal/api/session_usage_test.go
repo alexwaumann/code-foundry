@@ -49,6 +49,13 @@ func TestUsageToProto(t *testing.T) {
 				if !near(kinds, p.GetCostUsd()) {
 					t.Errorf("bucket %d per-kind costs sum to %v; cost %v", i, kinds, p.GetCostUsd())
 				}
+				wantSavings := 0.0
+				if b.Model == opus.Model {
+					wantSavings = 4 - 0.2 // 1M cache-read tokens at (input - cache read) rate
+				}
+				if !near(p.GetCacheSavingsUsd(), wantSavings) {
+					t.Errorf("bucket %d cache savings = %v; want %v", i, p.GetCacheSavingsUsd(), wantSavings)
+				}
 			}
 			if tt.name == "priced" {
 				// Opus 5.5 at 1M of each kind: input 4, output 20, cache read 0.2, write 5m 5, write 1h 8.
