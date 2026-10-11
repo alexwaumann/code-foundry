@@ -703,3 +703,127 @@ test("view.panel.expand from the palette and the CLI; focus follows the hidden t
   await expect(panel(page).getByTestId("panel-expand")).toHaveAttribute("aria-pressed", "true");
   await expect.poll(() => region(page)).toBe("panel");
 });
+
+test("the + after the last tab shows the surface list without adding a tab; picking, a tab, Escape and cmd+w leave it", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await recordCmdW(page);
+  await page.getByTestId("panel-toggle").click();
+  await injectTab(page, "files", "Files");
+  await injectTab(page, "diff", "Diff");
+  const tabs = panel(page).getByRole("tab");
+  const body = panel(page).getByTestId("panel-body");
+  const empty = panel(page).getByTestId("panel-empty");
+  const plus = panel(page).getByTestId("panel-tabs").getByTestId("panel-new-tab");
+  await expect(tabs).toHaveText(["Files", "Diff"]);
+
+  // Right after the last tab, in the strip, tab height, never dragging the window.
+  await expect(plus).toHaveAttribute("aria-label", "New tab");
+  await expect(plus).toHaveAttribute("aria-pressed", "false");
+  const last = await tabs.last().evaluate((el) => (el.parentElement ?? el).getBoundingClientRect().right);
+  const p = await box(page, "panel-new-tab");
+  expect(p.left - last).toBeGreaterThanOrEqual(0);
+  expect(p.left - last).toBeLessThanOrEqual(8);
+  expect(p.bottom - p.top).toBe(28);
+  expect(await plus.evaluate((el) => getComputedStyle(el).getPropertyValue("--wails-draggable").trim())).toBe("no-drag");
+
+  // Picking: the list shows, no tab is added or selected, the + is pressed, the panel has focus.
+  await plus.click();
+  await expect(panel(page)).toHaveAttribute("data-picking", "true");
+  await expect(empty.getByRole("heading", { name: "Open a surface" })).toBeVisible();
+  await expect(body).toHaveCount(0);
+  await expect(tabs).toHaveText(["Files", "Diff"]);
+  await expect(tabs.and(page.locator('[aria-selected="true"]'))).toHaveCount(0);
+  await expect(plus).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => region(page)).toBe("panel");
+  // The + runs the registry command through its local presenter: no daemon call.
+  expect((await invocations()).map((i) => i.name)).not.toContain("view.panel.new-tab");
+
+  // Escape goes back to the tab that was active.
+  await page.keyboard.press("Escape");
+  await expect(panel(page)).not.toHaveAttribute("data-picking");
+  await expect(body).toHaveAttribute("data-tab-id", "diff");
+  await expect(plus).toHaveAttribute("aria-pressed", "false");
+
+  // Picking a surface adds its tab and activates it.
+  await plus.click();
+  await empty.locator('[data-surface="worktree"]').click();
+  await expect(tabs).toHaveText(["Files", "Diff", "code-foundry"]);
+  await expect(body).toHaveAttribute("data-surface", "worktree");
+  await expect(panel(page)).not.toHaveAttribute("data-picking");
+
+  // Picking it again activates the open tab instead of adding one.
+  await tabs.filter({ hasText: "Files" }).click();
+  await plus.click();
+  await empty.locator('[data-surface="worktree"]').click();
+  await expect(tabs).toHaveText(["Files", "Diff", "code-foundry"]);
+  await expect(body).toHaveAttribute("data-surface", "worktree");
+
+  // Clicking a tab leaves picking.
+  await plus.click();
+  await tabs.filter({ hasText: "Files" }).click();
+  await expect(body).toHaveAttribute("data-tab-id", "files");
+  await expect(panel(page)).not.toHaveAttribute("data-picking");
+
+  // cmd+w goes back too (handled), instead of closing a tab or hiding the panel.
+  await plus.click();
+  await page.keyboard.press("Meta+w");
+  await expect(body).toHaveAttribute("data-tab-id", "files");
+  await expect(tabs).toHaveText(["Files", "Diff", "code-foundry"]);
+  await expect.poll(() => cmdW(page)).toEqual([true]);
+});
+
+test("closing the tab picking came from keeps picking; picking survives a reload", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await page.getByTestId("panel-toggle").click();
+  await injectTab(page, "files", "Files");
+  await injectTab(page, "diff", "Diff");
+  await injectTab(page, "pullrequest", "#12", { number: "12" });
+  const tabs = panel(page).getByRole("tab");
+  await tabs.filter({ hasText: "Diff" }).click();
+  await panel(page).getByTestId("panel-new-tab").click();
+  await panel(page).getByRole("button", { name: "Close Diff" }).click({ force: true });
+  await expect(tabs).toHaveText(["Files", "#12"]);
+  await expect(panel(page)).toHaveAttribute("data-picking", "true");
+
+  await page.reload();
+  await expect(row(page, "s:s-1")).toBeVisible();
+  await row(page, "s:s-1").click();
+  await expect(panel(page)).toHaveAttribute("data-picking", "true");
+  await expect(panel(page).getByTestId("panel-new-tab")).toHaveAttribute("aria-pressed", "true");
+  // Escape goes to the closed tab's right neighbour.
+  await panel(page).focus();
+  await page.keyboard.press("Escape");
+  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "pullrequest?number=12");
+});
+
+test("view.panel.new-tab from the palette and the CLI shows a hidden panel picking", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await page.getByTestId("panel-toggle").click();
+  await injectTab(page, "files", "Files");
+  await page.getByTestId("panel-toggle").click();
+  await expect(panel(page)).toHaveCount(0);
+  await page.getByTestId("terminal-host").click();
+  await expect.poll(() => region(page)).toBe("terminal");
+
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("New Side Panel Tab");
+  await page.getByTestId("palette").locator('[data-command="view.panel.new-tab"]').click();
+  await expect(page.getByTestId("palette")).toHaveCount(0);
+  await expect(panel(page)).toHaveAttribute("data-picking", "true");
+  await expect.poll(() => region(page)).toBe("panel");
+  await page.keyboard.press("Escape");
+  await expect(panel(page).getByTestId("panel-body")).toHaveAttribute("data-tab-id", "files");
+
+  // The CLI: CommandService.Invoke emits ShowView "panel.new-tab" to every window.
+  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
+    body: JSON.stringify({ name: "view.panel.new-tab" }),
+  });
+  expect(res.ok).toBe(true);
+  await expect(panel(page)).toHaveAttribute("data-picking", "true");
+  expect((await invocations()).map((i) => i.name)).toContain("view.panel.new-tab");
+});
