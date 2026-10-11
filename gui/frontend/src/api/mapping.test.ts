@@ -20,7 +20,7 @@ import {
   ReviewerKind,
 } from "@/gen/codefoundry/v1/gh_pb";
 import { RepoEventSchema, RepoSchema } from "@/gen/codefoundry/v1/repo_pb";
-import { SessionEventSchema, SessionSchema, SessionState, SessionStatus } from "@/gen/codefoundry/v1/session_pb";
+import { AgentRunStatus, SessionEventSchema, SessionSchema, SessionState, SessionStatus } from "@/gen/codefoundry/v1/session_pb";
 import { AttachEventSchema, TerminalEventSchema, TerminalSchema, TerminalState } from "@/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "@/gen/codefoundry/v1/ui_pb";
 import { WorkspaceEventSchema } from "@/gen/codefoundry/v1/workspace_pb";
@@ -406,6 +406,53 @@ describe("events mapping", () => {
     expect(snap).toEqual({ kind: "snapshot", sessions: [], retiredUsage: [view] });
     const retired = toSessionEventView(create(SessionEventSchema, { event: { case: "retiredUsage", value: { buckets: [bucket] } } }));
     expect(retired).toEqual({ kind: "retiredUsage", buckets: [view] });
+  });
+
+  it("maps agent runs with their status, start and priced usage", () => {
+    const usage = [{ model: "claude-haiku-5-5", day: "2026-10-11", requests: 2n, input: 3n, output: 4n, cacheRead: 5n, costUsd: 0.0001, cacheSavingsUsd: 0.00002 }];
+    const s = toSessionView(
+      create(SessionSchema, {
+        id: "s1",
+        agentRuns: [
+          { id: "a1", description: "say ok", agentType: "general-purpose", model: "haiku", effort: "medium", status: AgentRunStatus.CLOSED, spawnDepth: 1, startedAt: timestampFromMs(1000), usage, costUsd: 0.0001 },
+          { id: "a2", background: true, status: AgentRunStatus.OPEN, spawnDepth: 2, unpriced: true },
+        ],
+      }),
+    );
+    expect(s.agentRuns).toEqual([
+      {
+        id: "a1",
+        description: "say ok",
+        agentType: "general-purpose",
+        model: "haiku",
+        effort: "medium",
+        background: false,
+        status: "closed",
+        spawnDepth: 1,
+        startedAtMs: 1000,
+        usage: [
+          {
+            model: "claude-haiku-5-5",
+            tier: "",
+            speed: "",
+            day: "2026-10-11",
+            requests: 2,
+            input: 3,
+            output: 4,
+            cacheRead: 5,
+            cacheWrite5m: 0,
+            cacheWrite1h: 0,
+            costUsd: 0.0001,
+            unpriced: false,
+            cacheSavingsUsd: 0.00002,
+          },
+        ],
+        costUsd: 0.0001,
+        unpriced: false,
+      },
+      { id: "a2", description: "", agentType: "", model: "", effort: "", background: true, status: "open", spawnDepth: 2, startedAtMs: null, usage: [], costUsd: 0, unpriced: true },
+    ]);
+    expect(toSessionView(create(SessionSchema, { id: "s0" })).agentRuns).toEqual([]);
   });
 
   it("empty events map to null", () => {

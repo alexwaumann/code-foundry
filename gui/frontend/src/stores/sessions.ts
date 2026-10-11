@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { SessionEventView, SessionView, UsageBucketView } from "@/api/session";
+import type { AgentRunView, SessionEventView, SessionView, UsageBucketView } from "@/api/session";
 
 export interface SessionsData {
   byId: Readonly<Record<string, SessionView>>;
@@ -30,7 +30,25 @@ export const emptySessions: SessionsData = { byId: {}, order: [] };
 /** Structural equality, so unchanged sessions keep their identity and rows don't re-render. */
 export function sameSession(a: SessionView, b: SessionView): boolean {
   return (Object.keys(a) as (keyof SessionView)[]).every((k) =>
-    k === "linkedPullRequests" ? sameLinks(a[k], b[k]) : k === "usage" ? sameUsage(a[k], b[k]) : a[k] === b[k],
+    k === "linkedPullRequests"
+      ? sameLinks(a[k], b[k])
+      : k === "usage"
+        ? sameUsage(a[k], b[k])
+        : k === "agentRuns"
+          ? sameAgentRuns(a[k], b[k])
+          : a[k] === b[k],
+  );
+}
+
+/** Field-by-field equality of agent runs, their usage by sameUsage. */
+export function sameAgentRuns(a: readonly AgentRunView[], b: readonly AgentRunView[]): boolean {
+  return (
+    a === b ||
+    (a.length === b.length &&
+      a.every((x, i) => {
+        const y = b[i];
+        return y !== undefined && (Object.keys(x) as (keyof AgentRunView)[]).every((k) => (k === "usage" ? sameUsage(x.usage, y.usage) : x[k] === y[k]));
+      }))
   );
 }
 

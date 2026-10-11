@@ -110,3 +110,27 @@ func TestSessionUsageOnTheWire(t *testing.T) {
 		t.Errorf("retired event = %v", stream.Msg())
 	}
 }
+
+func TestAgentRunsToProto(t *testing.T) {
+	started := time.Date(2026, 10, 11, 3, 0, 0, 0, time.UTC)
+	runs := []session.AgentRun{
+		{ID: "a1", Description: "say ok", AgentType: "general-purpose", Model: "haiku", Effort: "medium", SpawnDepth: 1,
+			StartedAt: started, Usage: []session.UsageBucket{{Model: "claude-haiku-5-5", Day: "2026-10-11", Requests: 1, Input: 1_000_000}}},
+		{ID: "a2", Background: true, Open: true, SpawnDepth: 2,
+			Usage: []session.UsageBucket{{Model: "claude-next-1", Day: "2026-10-11", Requests: 1, Input: 5}}},
+	}
+	out := agentRunsToProto(runs)
+	if len(out) != 2 {
+		t.Fatalf("agentRunsToProto = %v", out)
+	}
+	a, b := out[0], out[1]
+	if a.GetId() != "a1" || a.GetDescription() != "say ok" || a.GetAgentType() != "general-purpose" || a.GetModel() != "haiku" ||
+		a.GetEffort() != "medium" || a.GetBackground() || a.GetStatus() != v1.AgentRunStatus_AGENT_RUN_STATUS_CLOSED ||
+		a.GetSpawnDepth() != 1 || !a.GetStartedAt().AsTime().Equal(started) || len(a.GetUsage()) != 1 || !near(a.GetCostUsd(), 0.1) || a.GetUnpriced() {
+		t.Errorf("closed run = %v", a)
+	}
+	if b.GetStatus() != v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN || !b.GetBackground() || b.GetSpawnDepth() != 2 ||
+		b.GetStartedAt() != nil || !b.GetUnpriced() || b.GetCostUsd() != 0 {
+		t.Errorf("open run = %v", b)
+	}
+}

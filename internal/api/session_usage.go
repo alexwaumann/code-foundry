@@ -1,6 +1,8 @@
 package api
 
 import (
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/pricing"
 	"github.com/alexwaumann/code-foundry/internal/store/session"
@@ -36,5 +38,25 @@ func usageToProto(buckets []session.UsageBucket) (out []*v1.UsageBucket, cost fl
 // retiredToProto maps the retired ledger.
 func retiredToProto(buckets []session.UsageBucket) []*v1.UsageBucket {
 	out, _, _ := usageToProto(buckets)
+	return out
+}
+
+// agentRunsToProto maps a thread's subagent runs, each priced like the session.
+func agentRunsToProto(runs []session.AgentRun) []*v1.AgentRun {
+	out := make([]*v1.AgentRun, 0, len(runs))
+	for _, r := range runs {
+		p := &v1.AgentRun{
+			Id: r.ID, Description: r.Description, AgentType: r.AgentType, Model: r.Model, Effort: r.Effort,
+			Background: r.Background, Status: v1.AgentRunStatus_AGENT_RUN_STATUS_CLOSED, SpawnDepth: int32(r.SpawnDepth),
+		}
+		if r.Open {
+			p.Status = v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN
+		}
+		if !r.StartedAt.IsZero() {
+			p.StartedAt = timestamppb.New(r.StartedAt)
+		}
+		p.Usage, p.CostUsd, p.Unpriced = usageToProto(r.Usage)
+		out = append(out, p)
+	}
 	return out
 }

@@ -115,3 +115,28 @@ Cache savings $0.0027
 		t.Errorf("empty = %q", got)
 	}
 }
+
+func TestRenderRuns(t *testing.T) {
+	runs := usageRuns([]*v1.AgentRun{
+		{Id: "a1", Description: "say ok", AgentType: "general-purpose", Model: "haiku", Status: v1.AgentRunStatus_AGENT_RUN_STATUS_CLOSED,
+			SpawnDepth: 1, CostUsd: 0.0012, Usage: []*v1.UsageBucket{{Model: "claude-haiku-5-5", Requests: 2, Input: 10, Output: 20, CacheRead: 29_970}}},
+		{Id: "a2", Background: true, Status: v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN, SpawnDepth: 2, Unpriced: true,
+			Usage: []*v1.UsageBucket{{Model: "claude-next", Requests: 1, Input: 5, Unpriced: true}}},
+	})
+	if runs[0].Requests != 2 || runs[0].Tokens != 30_000 || runs[0].Status != "closed" || runs[1].Status != "open" || runs[1].SpawnDepth != 2 {
+		t.Errorf("usageRuns = %+v", runs)
+	}
+	want := `
+2 agent runs (1 open), included above:
+
+STATUS  RUN              TYPE             MODEL      REQUESTS  TOKENS  COST
+closed  say ok           general-purpose  haiku      2         30K     $0.0012
+open    a2 (background)  —                inherited  1         5       $0.00 + unpriced
+`
+	if got := renderRuns(runs); got != want {
+		t.Errorf("renderRuns =\n%s\nwant\n%s", got, want)
+	}
+	if renderRuns(nil) != "" {
+		t.Error("no runs should render nothing")
+	}
+}
