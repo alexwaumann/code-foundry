@@ -84,8 +84,8 @@ export type Terminal = Message<"codefoundry.v1.Terminal"> & {
    * creators follow this contract (internal/termlabel):
    *   kind      "shell" on a shell started by the terminal.new command. A session's
    *             Claude terminal has no kind. The daemon removes a "shell" terminal as
-   *             soon as it exits, kills and removes it when its thread is removed
-   *             (session.remove), and when its worktree is removed.
+   *             soon as it exits, and kills and removes it when its thread is removed,
+   *             its project is unregistered, or its worktree directory is removed.
    *   session   the thread (session id) the terminal belongs to: on a session's Claude
    *             terminal, and on a shell started for a thread.
    *   repo      the repository id of the worktree a shell belongs to.
@@ -707,9 +707,11 @@ export const TerminalService: GenService<{
     output: typeof RemoveTerminalResponseSchema;
   },
   /**
-   * Close kills the terminal like Kill, waits for it to exit, and removes it. It returns
-   * once the terminal is gone (Watch has sent `updated` with state EXITED, then
-   * `removed_id`). Closing an exited terminal just removes it.
+   * Close kills a shell terminal (labels kind=shell) like Kill, waits for it to exit,
+   * and removes it. It returns once the terminal is gone (Watch has sent `updated` with
+   * state EXITED, then `removed_id`). Closing an exited shell just removes it. Any other
+   * terminal (a thread's Claude terminal: use SessionService.Close) is refused with
+   * FailedPrecondition; an unknown id is NotFound.
    *
    * @generated from rpc codefoundry.v1.TerminalService.Close
    */

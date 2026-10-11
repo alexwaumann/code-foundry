@@ -92,8 +92,8 @@ type Terminal struct {
 	//
 	//	kind      "shell" on a shell started by the terminal.new command. A session's
 	//	          Claude terminal has no kind. The daemon removes a "shell" terminal as
-	//	          soon as it exits, kills and removes it when its thread is removed
-	//	          (session.remove), and when its worktree is removed.
+	//	          soon as it exits, and kills and removes it when its thread is removed,
+	//	          its project is unregistered, or its worktree directory is removed.
 	//	session   the thread (session id) the terminal belongs to: on a session's Claude
 	//	          terminal, and on a shell started for a thread.
 	//	repo      the repository id of the worktree a shell belongs to.

@@ -127,7 +127,8 @@ Services (v1):
   process ended mid-turn) with `status_reason` and `status_changed_at`, persisted
   (`docs/notes/thread-status-persistence.md`).
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
-  chunks), Write (input bytes), Resize, Detach.
+  chunks), Write (input bytes), Resize, Detach, Kill, Remove, and Close (kill, wait for
+  the exit, remove; shells only, a thread's Claude terminal is refused).
 * `RepoService` — Register (a git repository, or any folder as a project without git;
   "~" expands, the path must be absolute; the Add Project dialog's Local folder tab calls
   it directly, the CLI through `repo add <folder>`),
@@ -212,6 +213,13 @@ PTY (creack/pty) ──reader goroutine──► tee ──► libghostty-vt (fe
   session store's concern. A plain shell terminal is a first-class use.
 * Resize is driven by the attached GUI terminal; the daemon applies it to the PTY and vt.
   With no attachment, size is the last known size.
+* Labels are opaque to the store; their contract lives in `internal/termlabel`: `kind`
+  (`shell` on a shell `terminal.new` started), `session` (the owning thread; also on a
+  thread's Claude terminal), `repo` and `worktree` (the owning worktree). `terminal.new`
+  gives every shell an owner (thread, else worktree) and refuses a cwd outside every
+  registered project. The shell reaper (`internal/daemon/shells.go`) removes a shell when
+  it exits or when its worktree, project or thread goes away, with a periodic sweep for
+  dropped events (`docs/notes/bottom-panel-1-daemon.md`).
 
 ## 6. Session store
 

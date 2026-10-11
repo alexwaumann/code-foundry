@@ -75,9 +75,11 @@ type TerminalServiceClient interface {
 	Kill(context.Context, *connect.Request[v1.KillTerminalRequest]) (*connect.Response[v1.KillTerminalResponse], error)
 	// Remove forgets an exited terminal.
 	Remove(context.Context, *connect.Request[v1.RemoveTerminalRequest]) (*connect.Response[v1.RemoveTerminalResponse], error)
-	// Close kills the terminal like Kill, waits for it to exit, and removes it. It returns
-	// once the terminal is gone (Watch has sent `updated` with state EXITED, then
-	// `removed_id`). Closing an exited terminal just removes it.
+	// Close kills a shell terminal (labels kind=shell) like Kill, waits for it to exit,
+	// and removes it. It returns once the terminal is gone (Watch has sent `updated` with
+	// state EXITED, then `removed_id`). Closing an exited shell just removes it. Any other
+	// terminal (a thread's Claude terminal: use SessionService.Close) is refused with
+	// FailedPrecondition; an unknown id is NotFound.
 	Close(context.Context, *connect.Request[v1.CloseTerminalRequest]) (*connect.Response[v1.CloseTerminalResponse], error)
 	// Watch streams lifecycle and metadata changes for all terminals.
 	Watch(context.Context, *connect.Request[v1.WatchTerminalsRequest]) (*connect.ServerStreamForClient[v1.TerminalEvent], error)
@@ -241,9 +243,11 @@ type TerminalServiceHandler interface {
 	Kill(context.Context, *connect.Request[v1.KillTerminalRequest]) (*connect.Response[v1.KillTerminalResponse], error)
 	// Remove forgets an exited terminal.
 	Remove(context.Context, *connect.Request[v1.RemoveTerminalRequest]) (*connect.Response[v1.RemoveTerminalResponse], error)
-	// Close kills the terminal like Kill, waits for it to exit, and removes it. It returns
-	// once the terminal is gone (Watch has sent `updated` with state EXITED, then
-	// `removed_id`). Closing an exited terminal just removes it.
+	// Close kills a shell terminal (labels kind=shell) like Kill, waits for it to exit,
+	// and removes it. It returns once the terminal is gone (Watch has sent `updated` with
+	// state EXITED, then `removed_id`). Closing an exited shell just removes it. Any other
+	// terminal (a thread's Claude terminal: use SessionService.Close) is refused with
+	// FailedPrecondition; an unknown id is NotFound.
 	Close(context.Context, *connect.Request[v1.CloseTerminalRequest]) (*connect.Response[v1.CloseTerminalResponse], error)
 	// Watch streams lifecycle and metadata changes for all terminals.
 	Watch(context.Context, *connect.Request[v1.WatchTerminalsRequest], *connect.ServerStream[v1.TerminalEvent]) error
