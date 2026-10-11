@@ -127,7 +127,12 @@ Medium, "New worktree", typed `print the first line of @READ` → the card showe
   × → confirm (cancel keeps, confirm removes the project and its file tag), tooltip without
   prefix after; Enter inside the debounce does not send; SearchFiles missing → no card,
   `@sesx` sent as text. The skills, switch and compose specs pass unchanged.
-* `make gui-e2e` and `make gui-build`: see the PR.
+* `make gui-e2e`: 412 passed, 4 skipped, 2 failed, both WebKit and outside the composer:
+  `buttons.spec.ts:120` failed in `browserContext.close` with ENOENT on its trace file
+  (my concurrent live Playwright run had cleaned the shared `test-results` directory), and
+  `sidebar.spec.ts:224` (the workspace member removal confirm on the Projects page did not
+  show within 5 s). Both specs rerun alone (WebKit + Chromium): 38/38 passed.
+* `make gui-build` green.
 
 ## Daemon restart
 
