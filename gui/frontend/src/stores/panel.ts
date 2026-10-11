@@ -133,6 +133,24 @@ export function activateTab(e: PanelEntry, id: string): PanelEntry {
 }
 
 /**
+ * Moves a tab to `toIndex` in the strip (drag and drop, alt+arrows), with arrayMove
+ * semantics: the tab is taken out, then put back at `toIndex`, clamped to the strip. The
+ * active tab, picking and everything else are kept. An unknown id, or a move to where the
+ * tab already is, returns the same entry.
+ */
+export function moveTab(e: PanelEntry, id: string, toIndex: number): PanelEntry {
+  const from = e.tabs.findIndex((t) => t.id === id);
+  if (from < 0 || Number.isNaN(toIndex)) return e;
+  const to = Math.max(0, Math.min(e.tabs.length - 1, Math.trunc(toIndex)));
+  if (to === from) return e;
+  const tabs = e.tabs.filter((t) => t.id !== id);
+  const tab = e.tabs[from];
+  if (!tab) return e;
+  tabs.splice(to, 0, tab);
+  return { ...e, tabs };
+}
+
+/**
  * Starts picking (the "+" after the tabs, view.panel.new-tab): no tab is active, so the
  * body shows the surface list, and `pickFrom` remembers the tab that was. No tab is added
  * until a surface is picked (openTab). A panel without tabs already shows the list, and
@@ -182,7 +200,7 @@ export interface PanelState {
 
 /**
  * Focus requests for the panel go through the ui store (panelFocusSeq), which the palette
- * also uses. Persisted whole: open state, tabs, active tab, width, expanded and picking
+ * also uses. Persisted whole: open state, tabs (in strip order), active tab, width, expanded and picking
  * survive a reload.
  */
 export const usePanelStore = create<PanelState>()(
@@ -250,6 +268,11 @@ export function closePanelTab(target: PanelTarget, id: string): void {
 
 export function activatePanelTab(target: PanelTarget, id: string): void {
   update(target, (e) => activateTab(e, id));
+}
+
+/** Moves a tab to `toIndex` in its panel's strip (moveTab); the order is persisted with the rest. */
+export function movePanelTab(target: PanelTarget, id: string, toIndex: number): void {
+  update(target, (e) => moveTab(e, id, toIndex));
 }
 
 /**
