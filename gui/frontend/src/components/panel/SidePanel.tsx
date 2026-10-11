@@ -163,7 +163,7 @@ function NewTabButton({ picking }: { picking: boolean }) {
 function TabStrip({ panelKey }: { panelKey: string }) {
   const tabs = usePanelStore((s) => s.byKey[panelKey]?.tabs ?? emptyEntry.tabs);
   const activeTabId = usePanelStore((s) => s.byKey[panelKey]?.activeTabId ?? null);
-  const picking = activeTabId === null && tabs.length > 0;
+  const picking = usePanelPicking(panelKey);
   const stripRef = useRef<HTMLDivElement>(null);
   const newTabRef = useRef<HTMLSpanElement>(null);
   // A new or activated tab may sit past the strip's scrolled edge (e.g. a PR row opened
