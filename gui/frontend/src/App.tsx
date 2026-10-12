@@ -17,9 +17,6 @@ import { Sidebar } from "@/components/sidebar/Sidebar";
 import { TerminalPane } from "@/components/terminal/TerminalPane";
 import { Toaster } from "@/components/ui/sonner";
 import { UpdateDialog } from "@/components/update/UpdateDialog";
-
-/** A rendered thread's pane, loaded on first use (markdown highlighting stays out of the main bundle). */
-const ThreadPane = lazy(() => import("@/components/thread/ThreadPane"));
 import { installKeybindings } from "@/keys/bindings";
 import { syncDocumentScheme, useColorScheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -33,6 +30,9 @@ import { layoutWidth, startZoomSync, zoomFactor } from "@/lib/zoom";
 import { CONTENT_MIN, useUiStore, type FocusRegion } from "@/stores/ui";
 import { selectPageOpen, startViewSync, useViewsStore } from "@/stores/views";
 import { startUpdateSync } from "@/stores/update";
+
+/** A rendered thread's pane, loaded on first use (markdown highlighting stays out of the main bundle). */
+const ThreadPane = lazy(() => import("@/components/thread/ThreadPane"));
 
 function regionOf(el: EventTarget | null): FocusRegion {
   const region = el instanceof Element ? el.closest("[data-region]")?.getAttribute("data-region") : null;
