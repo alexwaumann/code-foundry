@@ -151,6 +151,15 @@ func (h *Thread) SetPermissionMode(ctx context.Context, req *connect.Request[v1.
 	return connect.NewResponse(&v1.SetThreadPermissionModeResponse{Session: sessionToProto(s)}), nil
 }
 
+// SetEffort changes the effort (a restart with --resume, now or after the turn).
+func (h *Thread) SetEffort(ctx context.Context, req *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error) {
+	s, err := h.store.SetEffort(ctx, req.Msg.GetSessionId(), req.Msg.GetEffort())
+	if err != nil {
+		return nil, sessionError(err)
+	}
+	return connect.NewResponse(&v1.SetThreadEffortResponse{Session: sessionToProto(s)}), nil
+}
+
 // ---- mapping ----------------------------------------------------------------------
 
 func threadSeq(ev session.ThreadEvent) uint64 {

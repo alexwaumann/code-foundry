@@ -2039,7 +2039,10 @@ type RespondThreadRequest struct {
 	Decision  ThreadDecision         `protobuf:"varint,3,opt,name=decision,proto3,enum=codefoundry.v1.ThreadDecision" json:"decision,omitempty"`
 	// A question's answers (required to allow one): question -> chosen label(s).
 	Answers map[string]string `protobuf:"bytes,4,rep,name=answers,proto3" json:"answers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// DENY: the reason Claude sees.
+	// DENY: the user's reason. Claude sees it inside Claude Code's own rejection text
+	// ("The user doesn't want to proceed with this tool use. … the user said: <message>");
+	// without one, the plain rejection (a question: "The user declined to answer the
+	// questions.").
 	Message string `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
 	// DENY: also stop the turn.
 	Interrupt     bool `protobuf:"varint,6,opt,name=interrupt,proto3" json:"interrupt,omitempty"`
@@ -2436,6 +2439,104 @@ func (x *SetThreadPermissionModeResponse) GetSession() *Session {
 	return nil
 }
 
+type SetThreadEffortRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	SessionId string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	// low, medium, high, xhigh or max.
+	Effort        string `protobuf:"bytes,2,opt,name=effort,proto3" json:"effort,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetThreadEffortRequest) Reset() {
+	*x = SetThreadEffortRequest{}
+	mi := &file_codefoundry_v1_thread_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetThreadEffortRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetThreadEffortRequest) ProtoMessage() {}
+
+func (x *SetThreadEffortRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetThreadEffortRequest.ProtoReflect.Descriptor instead.
+func (*SetThreadEffortRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *SetThreadEffortRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *SetThreadEffortRequest) GetEffort() string {
+	if x != nil {
+		return x.Effort
+	}
+	return ""
+}
+
+type SetThreadEffortResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// effort_pending is set when the restart waits for the running turn.
+	Session       *Session `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetThreadEffortResponse) Reset() {
+	*x = SetThreadEffortResponse{}
+	mi := &file_codefoundry_v1_thread_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetThreadEffortResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetThreadEffortResponse) ProtoMessage() {}
+
+func (x *SetThreadEffortResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_thread_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetThreadEffortResponse.ProtoReflect.Descriptor instead.
+func (*SetThreadEffortResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_thread_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *SetThreadEffortResponse) GetSession() *Session {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
 var File_codefoundry_v1_thread_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_proto_rawDesc = "" +
@@ -2626,6 +2727,12 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12G\n" +
 	"\x0fpermission_mode\x18\x02 \x01(\x0e2\x1e.codefoundry.v1.PermissionModeR\x0epermissionMode\"T\n" +
 	"\x1fSetThreadPermissionModeResponse\x121\n" +
+	"\asession\x18\x01 \x01(\v2\x17.codefoundry.v1.SessionR\asession\"O\n" +
+	"\x16SetThreadEffortRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x16\n" +
+	"\x06effort\x18\x02 \x01(\tR\x06effort\"L\n" +
+	"\x17SetThreadEffortResponse\x121\n" +
 	"\asession\x18\x01 \x01(\v2\x17.codefoundry.v1.SessionR\asession*\x87\x01\n" +
 	"\x0eToolCallStatus\x12 \n" +
 	"\x1cTOOL_CALL_STATUS_UNSPECIFIED\x10\x00\x12\x1c\n" +
@@ -2642,7 +2749,7 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\x1bTHREAD_DECISION_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15THREAD_DECISION_ALLOW\x10\x01\x12%\n" +
 	"!THREAD_DECISION_ALLOW_FOR_SESSION\x10\x02\x12\x18\n" +
-	"\x14THREAD_DECISION_DENY\x10\x032\xab\x05\n" +
+	"\x14THREAD_DECISION_DENY\x10\x032\x8b\x06\n" +
 	"\rThreadService\x12^\n" +
 	"\tListItems\x12&.codefoundry.v1.ListThreadItemsRequest\x1a'.codefoundry.v1.ListThreadItemsResponse\"\x00\x12L\n" +
 	"\x05Watch\x12\".codefoundry.v1.WatchThreadRequest\x1a\x1b.codefoundry.v1.ThreadEvent\"\x000\x01\x12]\n" +
@@ -2650,7 +2757,8 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\aRespond\x12$.codefoundry.v1.RespondThreadRequest\x1a%.codefoundry.v1.RespondThreadResponse\"\x00\x12^\n" +
 	"\tInterrupt\x12&.codefoundry.v1.InterruptThreadRequest\x1a'.codefoundry.v1.InterruptThreadResponse\"\x00\x12[\n" +
 	"\bSetModel\x12%.codefoundry.v1.SetThreadModelRequest\x1a&.codefoundry.v1.SetThreadModelResponse\"\x00\x12v\n" +
-	"\x11SetPermissionMode\x12..codefoundry.v1.SetThreadPermissionModeRequest\x1a/.codefoundry.v1.SetThreadPermissionModeResponse\"\x00B\xc3\x01\n" +
+	"\x11SetPermissionMode\x12..codefoundry.v1.SetThreadPermissionModeRequest\x1a/.codefoundry.v1.SetThreadPermissionModeResponse\"\x00\x12^\n" +
+	"\tSetEffort\x12&.codefoundry.v1.SetThreadEffortRequest\x1a'.codefoundry.v1.SetThreadEffortResponse\"\x00B\xc3\x01\n" +
 	"\x12com.codefoundry.v1B\vThreadProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
@@ -2666,7 +2774,7 @@ func file_codefoundry_v1_thread_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_thread_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_codefoundry_v1_thread_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_codefoundry_v1_thread_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_codefoundry_v1_thread_proto_goTypes = []any{
 	(ToolCallStatus)(0),                     // 0: codefoundry.v1.ToolCallStatus
 	(ThreadRequestState)(0),                 // 1: codefoundry.v1.ThreadRequestState
@@ -2702,15 +2810,17 @@ var file_codefoundry_v1_thread_proto_goTypes = []any{
 	(*SetThreadModelResponse)(nil),          // 31: codefoundry.v1.SetThreadModelResponse
 	(*SetThreadPermissionModeRequest)(nil),  // 32: codefoundry.v1.SetThreadPermissionModeRequest
 	(*SetThreadPermissionModeResponse)(nil), // 33: codefoundry.v1.SetThreadPermissionModeResponse
-	nil,                                     // 34: codefoundry.v1.ThreadRequestItem.AnswersEntry
-	nil,                                     // 35: codefoundry.v1.RespondThreadRequest.AnswersEntry
-	(*timestamppb.Timestamp)(nil),           // 36: google.protobuf.Timestamp
-	(*Session)(nil),                         // 37: codefoundry.v1.Session
-	(PermissionMode)(0),                     // 38: codefoundry.v1.PermissionMode
+	(*SetThreadEffortRequest)(nil),          // 34: codefoundry.v1.SetThreadEffortRequest
+	(*SetThreadEffortResponse)(nil),         // 35: codefoundry.v1.SetThreadEffortResponse
+	nil,                                     // 36: codefoundry.v1.ThreadRequestItem.AnswersEntry
+	nil,                                     // 37: codefoundry.v1.RespondThreadRequest.AnswersEntry
+	(*timestamppb.Timestamp)(nil),           // 38: google.protobuf.Timestamp
+	(*Session)(nil),                         // 39: codefoundry.v1.Session
+	(PermissionMode)(0),                     // 40: codefoundry.v1.PermissionMode
 }
 var file_codefoundry_v1_thread_proto_depIdxs = []int32{
-	36, // 0: codefoundry.v1.ThreadItem.created_at:type_name -> google.protobuf.Timestamp
-	36, // 1: codefoundry.v1.ThreadItem.updated_at:type_name -> google.protobuf.Timestamp
+	38, // 0: codefoundry.v1.ThreadItem.created_at:type_name -> google.protobuf.Timestamp
+	38, // 1: codefoundry.v1.ThreadItem.updated_at:type_name -> google.protobuf.Timestamp
 	5,  // 2: codefoundry.v1.ThreadItem.user_message:type_name -> codefoundry.v1.UserMessageItem
 	6,  // 3: codefoundry.v1.ThreadItem.assistant_text:type_name -> codefoundry.v1.AssistantTextItem
 	7,  // 4: codefoundry.v1.ThreadItem.thinking:type_name -> codefoundry.v1.ThinkingItem
@@ -2723,7 +2833,7 @@ var file_codefoundry_v1_thread_proto_depIdxs = []int32{
 	13, // 11: codefoundry.v1.ThreadItem.command_output:type_name -> codefoundry.v1.CommandOutputItem
 	0,  // 12: codefoundry.v1.ToolCallItem.status:type_name -> codefoundry.v1.ToolCallStatus
 	1,  // 13: codefoundry.v1.ThreadRequestItem.state:type_name -> codefoundry.v1.ThreadRequestState
-	34, // 14: codefoundry.v1.ThreadRequestItem.answers:type_name -> codefoundry.v1.ThreadRequestItem.AnswersEntry
+	36, // 14: codefoundry.v1.ThreadRequestItem.answers:type_name -> codefoundry.v1.ThreadRequestItem.AnswersEntry
 	4,  // 15: codefoundry.v1.ThreadItemsSnapshot.items:type_name -> codefoundry.v1.ThreadItem
 	14, // 16: codefoundry.v1.ThreadItemsSnapshot.pending:type_name -> codefoundry.v1.ThreadPendingRequest
 	3,  // 17: codefoundry.v1.ThreadItemDelta.field:type_name -> codefoundry.v1.ThreadItemDelta.Field
@@ -2739,30 +2849,33 @@ var file_codefoundry_v1_thread_proto_depIdxs = []int32{
 	15, // 27: codefoundry.v1.ListThreadItemsResponse.snapshot:type_name -> codefoundry.v1.ThreadItemsSnapshot
 	4,  // 28: codefoundry.v1.SendThreadMessageResponse.item:type_name -> codefoundry.v1.ThreadItem
 	2,  // 29: codefoundry.v1.RespondThreadRequest.decision:type_name -> codefoundry.v1.ThreadDecision
-	35, // 30: codefoundry.v1.RespondThreadRequest.answers:type_name -> codefoundry.v1.RespondThreadRequest.AnswersEntry
+	37, // 30: codefoundry.v1.RespondThreadRequest.answers:type_name -> codefoundry.v1.RespondThreadRequest.AnswersEntry
 	4,  // 31: codefoundry.v1.RespondThreadResponse.item:type_name -> codefoundry.v1.ThreadItem
-	37, // 32: codefoundry.v1.SetThreadModelResponse.session:type_name -> codefoundry.v1.Session
-	38, // 33: codefoundry.v1.SetThreadPermissionModeRequest.permission_mode:type_name -> codefoundry.v1.PermissionMode
-	37, // 34: codefoundry.v1.SetThreadPermissionModeResponse.session:type_name -> codefoundry.v1.Session
-	21, // 35: codefoundry.v1.ThreadService.ListItems:input_type -> codefoundry.v1.ListThreadItemsRequest
-	23, // 36: codefoundry.v1.ThreadService.Watch:input_type -> codefoundry.v1.WatchThreadRequest
-	24, // 37: codefoundry.v1.ThreadService.Send:input_type -> codefoundry.v1.SendThreadMessageRequest
-	26, // 38: codefoundry.v1.ThreadService.Respond:input_type -> codefoundry.v1.RespondThreadRequest
-	28, // 39: codefoundry.v1.ThreadService.Interrupt:input_type -> codefoundry.v1.InterruptThreadRequest
-	30, // 40: codefoundry.v1.ThreadService.SetModel:input_type -> codefoundry.v1.SetThreadModelRequest
-	32, // 41: codefoundry.v1.ThreadService.SetPermissionMode:input_type -> codefoundry.v1.SetThreadPermissionModeRequest
-	22, // 42: codefoundry.v1.ThreadService.ListItems:output_type -> codefoundry.v1.ListThreadItemsResponse
-	20, // 43: codefoundry.v1.ThreadService.Watch:output_type -> codefoundry.v1.ThreadEvent
-	25, // 44: codefoundry.v1.ThreadService.Send:output_type -> codefoundry.v1.SendThreadMessageResponse
-	27, // 45: codefoundry.v1.ThreadService.Respond:output_type -> codefoundry.v1.RespondThreadResponse
-	29, // 46: codefoundry.v1.ThreadService.Interrupt:output_type -> codefoundry.v1.InterruptThreadResponse
-	31, // 47: codefoundry.v1.ThreadService.SetModel:output_type -> codefoundry.v1.SetThreadModelResponse
-	33, // 48: codefoundry.v1.ThreadService.SetPermissionMode:output_type -> codefoundry.v1.SetThreadPermissionModeResponse
-	42, // [42:49] is the sub-list for method output_type
-	35, // [35:42] is the sub-list for method input_type
-	35, // [35:35] is the sub-list for extension type_name
-	35, // [35:35] is the sub-list for extension extendee
-	0,  // [0:35] is the sub-list for field type_name
+	39, // 32: codefoundry.v1.SetThreadModelResponse.session:type_name -> codefoundry.v1.Session
+	40, // 33: codefoundry.v1.SetThreadPermissionModeRequest.permission_mode:type_name -> codefoundry.v1.PermissionMode
+	39, // 34: codefoundry.v1.SetThreadPermissionModeResponse.session:type_name -> codefoundry.v1.Session
+	39, // 35: codefoundry.v1.SetThreadEffortResponse.session:type_name -> codefoundry.v1.Session
+	21, // 36: codefoundry.v1.ThreadService.ListItems:input_type -> codefoundry.v1.ListThreadItemsRequest
+	23, // 37: codefoundry.v1.ThreadService.Watch:input_type -> codefoundry.v1.WatchThreadRequest
+	24, // 38: codefoundry.v1.ThreadService.Send:input_type -> codefoundry.v1.SendThreadMessageRequest
+	26, // 39: codefoundry.v1.ThreadService.Respond:input_type -> codefoundry.v1.RespondThreadRequest
+	28, // 40: codefoundry.v1.ThreadService.Interrupt:input_type -> codefoundry.v1.InterruptThreadRequest
+	30, // 41: codefoundry.v1.ThreadService.SetModel:input_type -> codefoundry.v1.SetThreadModelRequest
+	32, // 42: codefoundry.v1.ThreadService.SetPermissionMode:input_type -> codefoundry.v1.SetThreadPermissionModeRequest
+	34, // 43: codefoundry.v1.ThreadService.SetEffort:input_type -> codefoundry.v1.SetThreadEffortRequest
+	22, // 44: codefoundry.v1.ThreadService.ListItems:output_type -> codefoundry.v1.ListThreadItemsResponse
+	20, // 45: codefoundry.v1.ThreadService.Watch:output_type -> codefoundry.v1.ThreadEvent
+	25, // 46: codefoundry.v1.ThreadService.Send:output_type -> codefoundry.v1.SendThreadMessageResponse
+	27, // 47: codefoundry.v1.ThreadService.Respond:output_type -> codefoundry.v1.RespondThreadResponse
+	29, // 48: codefoundry.v1.ThreadService.Interrupt:output_type -> codefoundry.v1.InterruptThreadResponse
+	31, // 49: codefoundry.v1.ThreadService.SetModel:output_type -> codefoundry.v1.SetThreadModelResponse
+	33, // 50: codefoundry.v1.ThreadService.SetPermissionMode:output_type -> codefoundry.v1.SetThreadPermissionModeResponse
+	35, // 51: codefoundry.v1.ThreadService.SetEffort:output_type -> codefoundry.v1.SetThreadEffortResponse
+	44, // [44:52] is the sub-list for method output_type
+	36, // [36:44] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_thread_proto_init() }
@@ -2797,7 +2910,7 @@ func file_codefoundry_v1_thread_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_thread_proto_rawDesc), len(file_codefoundry_v1_thread_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   32,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

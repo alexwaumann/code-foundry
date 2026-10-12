@@ -583,36 +583,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 		r.usage.notBefore = s.CreatedAt
 	}
 	rendered := s.Render == RenderRendered
-	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode, prompt: prompt, rendered: rendered}
-	if rendered {
-		sa.prompt = "" // sent as the first user message instead
-	}
-	if m.opts.AttachmentsDir != "" {
-		// Every spawn (not only the first prompt's): a resumed or forked conversation
-		// may read its images again.
-		sa.addDirs = []string{m.opts.AttachmentsDir}
-	}
-	env := m.opts.Env
-	if s.WorkspaceID != "" {
-		// The current members, every spawn (create, reconnect, fork): a repo added to
-		// the workspace since the row was written is included.
-		var ws *workspace.Snapshot
-		if m.opts.Workspaces != nil {
-			ws = m.opts.Workspaces.Snapshot()
-		}
-		if wl, ok := workspaceLaunch(ws, s.WorkspaceID, s.WorktreePath, isDir); ok {
-			sa.addDirs = append(sa.addDirs, wl.addDirs...)
-			sa.appendSystemPrompt = wl.prompt
-			env = append(slices.Clip(env), wl.env...)
-			if len(wl.missing) > 0 {
-				m.log.Warn("workspace member worktrees missing; not passed to claude", "session", id,
-					"workspace", s.WorkspaceID, "paths", wl.missing)
-			}
-		} else {
-			m.log.Warn("workspace of thread not found; starting without its members", "session", id, "workspace", s.WorkspaceID)
-		}
-	}
-	argv := l.argv(m.opts.Claude, sa)
+	argv, env := m.claudeCommand(s, l, prompt)
 	if rendered {
 		return m.startStream(ctx, rec, r, argv, env)
 	}
@@ -651,6 +622,44 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 		r.run()
 	}()
 	return nil
+}
+
+// claudeCommand is the argv and environment of a claude spawn for s: its model,
+// effort and permission mode, the attachments dir and workspace members as --add-dir,
+// the workspace prompt and env. A rendered thread's prompt is never in argv (it is the
+// first user message).
+func (m *Manager) claudeCommand(s Session, l launch, prompt string) (argv, env []string) {
+	rendered := s.Render == RenderRendered
+	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode, prompt: prompt, rendered: rendered}
+	if rendered {
+		sa.prompt = "" // sent as the first user message instead
+	}
+	if m.opts.AttachmentsDir != "" {
+		// Every spawn (not only the first prompt's): a resumed or forked conversation
+		// may read its images again.
+		sa.addDirs = []string{m.opts.AttachmentsDir}
+	}
+	env = m.opts.Env
+	if s.WorkspaceID != "" {
+		// The current members, every spawn (create, reconnect, fork): a repo added to
+		// the workspace since the row was written is included.
+		var ws *workspace.Snapshot
+		if m.opts.Workspaces != nil {
+			ws = m.opts.Workspaces.Snapshot()
+		}
+		if wl, ok := workspaceLaunch(ws, s.WorkspaceID, s.WorktreePath, isDir); ok {
+			sa.addDirs = append(sa.addDirs, wl.addDirs...)
+			sa.appendSystemPrompt = wl.prompt
+			env = append(slices.Clip(env), wl.env...)
+			if len(wl.missing) > 0 {
+				m.log.Warn("workspace member worktrees missing; not passed to claude", "session", s.ID,
+					"workspace", s.WorkspaceID, "paths", wl.missing)
+			}
+		} else {
+			m.log.Warn("workspace of thread not found; starting without its members", "session", s.ID, "workspace", s.WorkspaceID)
+		}
+	}
+	return l.argv(m.opts.Claude, sa), env
 }
 
 // startStream is spawn's rendered half: claude over stdio, no terminal.

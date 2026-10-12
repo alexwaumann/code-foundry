@@ -38,7 +38,7 @@ func TestThreadCommandsAvailability(t *testing.T) {
 		{"no thread", command.Context{ActiveView: "projects"}, false},
 	}
 	for _, tt := range tests {
-		for _, name := range []string{"thread.send", "thread.respond", "thread.interrupt", "thread.items", "thread.set-model", "thread.set-mode"} {
+		for _, name := range []string{"thread.send", "thread.respond", "thread.interrupt", "thread.items", "thread.set-model", "thread.set-mode", "thread.set-effort"} {
 			c, _ := reg.Get(name)
 			if got := c.Available(tt.ctx); got != tt.want {
 				t.Errorf("%s %s: available = %v", tt.name, name, got)
@@ -117,6 +117,14 @@ func TestThreadCommands(t *testing.T) {
 		{
 			name: "set model", cmd: "thread.set-model", args: map[string]string{"id": "s1", "model": "sonnet"},
 			wantMsg: "thread fix (s1) uses sonnet", wantCalls: []string{"SetModel s1 sonnet"},
+		},
+		{
+			name: "set effort", cmd: "thread.set-effort", args: map[string]string{"id": "s1", "effort": "high"},
+			wantMsg: "thread fix (s1) restarts with effort high", wantCalls: []string{"SetEffort s1 high"},
+		},
+		{
+			name: "bad effort", cmd: "thread.set-effort", args: map[string]string{"id": "s1", "effort": "huge"},
+			wantErr: command.ErrInvalidArgs,
 		},
 	}
 	for _, tt := range tests {

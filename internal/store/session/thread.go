@@ -108,7 +108,7 @@ func (m *Manager) Interrupt(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	return controlErr(r.st.conn.Interrupt(ctx))
+	return controlErr(r.st.connection().Interrupt(ctx))
 }
 
 // SetModel implements Store.
@@ -123,7 +123,7 @@ func (m *Manager) SetModel(ctx context.Context, id, model string) (Session, erro
 	if err != nil {
 		return Session{}, err
 	}
-	if err := controlErr(r.st.conn.SetModel(ctx, model)); err != nil {
+	if err := controlErr(r.st.connection().SetModel(ctx, model)); err != nil {
 		return Session{}, err
 	}
 	s, _ := m.update(id, true, func(rec *record) { rec.s.Model = model })
@@ -150,7 +150,7 @@ func (m *Manager) SetPermissionMode(ctx context.Context, id string, mode Permiss
 	if err != nil {
 		return Session{}, err
 	}
-	if err := controlErr(r.st.conn.SetPermissionMode(ctx, wire)); err != nil {
+	if err := controlErr(r.st.connection().SetPermissionMode(ctx, wire)); err != nil {
 		return Session{}, err
 	}
 	s, _ := m.update(id, true, func(rec *record) { rec.s.PermissionMode = mode })

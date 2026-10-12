@@ -566,3 +566,18 @@ func (f *Fake) SetPermissionMode(_ context.Context, id string, mode session.Perm
 		return nil
 	})
 }
+
+// SetEffort implements session.Store: the row's effort changes at once (no restart to
+// fake).
+func (f *Fake) SetEffort(_ context.Context, id, effort string) (session.Session, error) {
+	return f.mutate(fmt.Sprintf("SetEffort %s %s", id, effort), id, func(s *session.Session) error {
+		if s.Render != session.RenderRendered {
+			return fmt.Errorf("%w: thread %s runs in a terminal", session.ErrFailedPrecondition, id)
+		}
+		if !slices.Contains(session.Efforts, effort) {
+			return fmt.Errorf("%w: effort %q", session.ErrInvalidArgument, effort)
+		}
+		s.Effort = effort
+		return nil
+	})
+}

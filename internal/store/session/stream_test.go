@@ -376,6 +376,11 @@ func TestRenderedDenyAndSubagent(t *testing.T) {
 		if err != nil || it.Request.State != RequestDenied || it.Request.Decision != DecisionDeny {
 			t.Fatalf("deny: %+v %v", it.Request, err)
 		}
+		ans := re.waitSent("the denial", func(m map[string]any) bool { return m["type"] == "control_response" })
+		res := ans["response"].(map[string]any)["response"].(map[string]any)
+		if res["behavior"] != "deny" || res["message"] != rejectWithReason+"The user denied this." {
+			t.Errorf("deny sent %v", res)
+		}
 		items := re.waitItems(s.ID, "turn end", hasTurnEnd)
 		tool, _ := lastKind(items, KindToolCall)
 		if tool.Tool.Status != ToolError || !tool.Tool.IsError {
