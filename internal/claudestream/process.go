@@ -226,4 +226,3 @@ func lookPath(name string, env []string) (string, error) {
 	}
 	return "", fmt.Errorf("claudestream: %q not found in PATH", name)
 }
-
