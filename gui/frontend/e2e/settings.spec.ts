@@ -49,6 +49,10 @@ test("cmd+, opens settings rendered from the schema", async ({ page }) => {
     "Haiku",
     "Haiku 4.5",
   ]);
+  // The naming model is its own live setting, defaulting to Sonnet.
+  await expect(setting(page, "sessions.naming_model").getByRole("combobox")).toHaveValue("sonnet");
+  await expect(setting(page, "sessions.naming_model").getByRole("option", { name: "Sonnet (default)" })).toHaveCount(1);
+  await expect(setting(page, "sessions.naming_model").getByTestId("restart-hint")).toHaveCount(0);
   // Restart-required fields say so; live ones do not.
   await expect(setting(page, "sessions.scrollback_lines").getByTestId("restart-hint")).toBeVisible();
   await expect(setting(page, "appearance.theme").getByTestId("restart-hint")).toHaveCount(0);
