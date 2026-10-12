@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // A fake `claude -p` for the rendered runner's tests. The test binary re-executes
@@ -16,8 +19,13 @@ import (
 // stream (internal/claudestream/testdata): it answers the control requests the daemon
 // sends, and for every user message replays the next turn of the capture (lines up to
 // and including a result), stopping at each can_use_tool until the daemon answers.
-// Everything the daemon writes to stdin is appended to CF_FAKE_CLAUDE_LOG, and argv to
-// CF_FAKE_CLAUDE_ARGV.
+// Everything the daemon writes to stdin is appended to CF_FAKE_CLAUDE_LOG (and to
+// CF_FAKE_CLAUDE_LOG.<pid>, this process's own), and argv to CF_FAKE_CLAUDE_ARGV (and
+// CF_FAKE_CLAUDE_ARGV.<pid>).
+//
+// Knobs for the effort restart's tests: CF_FAKE_CLAUDE_EXIT_DELAY (a duration) keeps
+// the process alive that long after stdin closes; CF_FAKE_CLAUDE_RESUME_EXIT (a code)
+// makes a process started with --resume print to stderr and exit with it at once.
 
 const fakeClaudeEnv = "CF_FAKE_CLAUDE"
 
@@ -69,18 +77,26 @@ func fakeTurns(path string) ([][]string, error) {
 }
 
 func fakeStreamClaude(fixture string) int {
+	pid := strconv.Itoa(os.Getpid())
 	if p := os.Getenv("CF_FAKE_CLAUDE_ARGV"); p != "" {
 		b, _ := json.Marshal(os.Args)
 		_ = os.WriteFile(p, b, 0o600)
+		_ = os.WriteFile(p+"."+pid, b, 0o600)
+	}
+	if code := os.Getenv("CF_FAKE_CLAUDE_RESUME_EXIT"); code != "" && slices.Contains(os.Args, "--resume") {
+		fmt.Fprintln(os.Stderr, "fake claude: cannot resume")
+		n, _ := strconv.Atoi(code)
+		return n
 	}
 	turns, err := fakeTurns(fixture)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "fake claude:", err)
 		return 2
 	}
-	var logf *os.File
+	var logf, ownLog *os.File
 	if p := os.Getenv("CF_FAKE_CLAUDE_LOG"); p != "" {
 		logf, _ = os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+		ownLog, _ = os.OpenFile(p+"."+pid, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	}
 	var outMu sync.Mutex
 	write := func(line string) {
@@ -98,6 +114,7 @@ func fakeStreamClaude(fixture string) int {
 		line := sc.Text()
 		if logf != nil {
 			_, _ = logf.WriteString(line + "\n")
+			_, _ = ownLog.WriteString(line + "\n")
 		}
 		var m struct {
 			Type      string         `json:"type"`
@@ -122,6 +139,15 @@ func fakeStreamClaude(fixture string) int {
 				if m.Request["mode"] == "bogus" {
 					resp = map[string]any{"subtype": "error", "request_id": m.RequestID, "error": "Cannot set permission mode"}
 				}
+			case "interrupt":
+				// Claude withdraws what it asked: the capture carries on (its own
+				// control_cancel_request follows the can_use_tool).
+				mu.Lock()
+				for id, ch := range waiting {
+					close(ch)
+					delete(waiting, id)
+				}
+				mu.Unlock()
 			}
 			b, _ := json.Marshal(map[string]any{"type": "control_response", "response": resp})
 			write(string(b))
@@ -173,5 +199,8 @@ func fakeStreamClaude(fixture string) int {
 	}
 	mu.Unlock()
 	replay.Wait()
+	if d, err := time.ParseDuration(os.Getenv("CF_FAKE_CLAUDE_EXIT_DELAY")); err == nil {
+		time.Sleep(d)
+	}
 	return 0
 }

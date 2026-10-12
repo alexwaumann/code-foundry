@@ -989,8 +989,8 @@ export type RespondThreadRequest = Message<"codefoundry.v1.RespondThreadRequest"
   /**
    * DENY: the user's reason. Claude sees it inside Claude Code's own rejection text
    * ("The user doesn't want to proceed with this tool use. … the user said: <message>");
-   * without one, the plain rejection (a question: "The user declined to answer the
-   * questions.").
+   * without one, the plain rejection ("… STOP what you are doing and wait for the user to
+   * tell you how to proceed."). A question is denied (skipped) the same way.
    *
    * @generated from field: string message = 5;
    */

@@ -280,3 +280,70 @@ test("an effort change while busy waits for the turn; when idle it applies at on
   await expect(page.getByTestId("thread-pane")).toContainText("Set effort to low");
   await expect(composer(page).getByTestId("thread-effort-pending")).toHaveCount(0);
 });
+
+test("answering a request Claude withdrew meanwhile: a plain notice, no error, the prompt stays gone", async ({ page }) => {
+  await openThread(page, "permission");
+  await mockPost("thread/fail-respond?withdrawn=1");
+  await composer(page).getByTestId("thread-permission-allow").click();
+  await expect(page.getByText("Claude no longer needs that answer")).toBeVisible();
+  await expect(page.getByText("Answer Thread Request failed")).toHaveCount(0);
+  await expect(composer(page).getByTestId("thread-permission")).toHaveCount(0);
+  // The timeline's row no longer waits either.
+  await expect(page.getByTestId("thread-pane").getByTestId("thread-waiting")).toHaveCount(0);
+});
+
+test("fields keep their keys: the Other field and the deny reason take digits and Escape; an open reason ignores 1 and 2", async ({ page }) => {
+  await openThread(page, "question");
+  const q = composer(page).getByTestId("thread-question");
+  const other = q.getByLabel("Other answer");
+  await other.click();
+  await page.keyboard.type("12");
+  await expect(other).toHaveValue("12");
+  await expect(q.getByRole("radio").nth(0)).toHaveAttribute("aria-checked", "false");
+  // Escape leaves the field for the prompt; it does not skip.
+  await page.keyboard.press("Escape");
+  await expect(q).toBeFocused();
+  // Enter on a focused action button is the button's own: Skip skips, it does not submit.
+  await q.getByTestId("thread-question-skip").focus();
+  await page.keyboard.press("Enter");
+  await expect.poll(responds).toEqual(["respond s-r1 deny req-push-q"]);
+
+  await openThread(page, "permission");
+  const prompt = composer(page).getByTestId("thread-permission");
+  await editor(page).click();
+  await page.keyboard.press("3");
+  const reason = prompt.getByTestId("thread-deny-reason");
+  await expect(reason).toBeFocused();
+  await page.keyboard.type("2 tests fail");
+  await expect(reason).toHaveValue("2 tests fail");
+  // Back in the empty editor, 1 and 2 do not allow while the reason is open; 3 returns to it.
+  await editor(page).click();
+  await page.keyboard.press("1");
+  await page.keyboard.press("2");
+  await page.keyboard.press("3");
+  await expect(reason).toBeFocused();
+  await expect(reason).toHaveValue("2 tests fail");
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await responds()).slice(1)).toEqual(["respond s-r1 deny req-push message=2 tests fail"]);
+});
+
+test("a question's pages and picks survive the timeline streaming meanwhile", async ({ page }) => {
+  await openThread(page, "question");
+  const q = composer(page).getByTestId("thread-question");
+  await q.getByRole("radio").nth(1).click();
+  await q.getByTestId("thread-question-next").click();
+  await expect(q).toContainText("2 of 2");
+  await q.getByRole("radio").nth(0).click();
+  await mockPost("thread/stream?text=" + encodeURIComponent("Meanwhile, the subagent "));
+  for (const part of ["found ", "two ", "more ", "call sites."]) await mockPost(`thread/delta?text=${encodeURIComponent(part)}`);
+  await expect(page.getByTestId("thread-pane")).toContainText("Meanwhile, the subagent found two more call sites.");
+  await expect(q).toContainText("2 of 2");
+  await expect(q.getByRole("radio").nth(0)).toHaveAttribute("aria-checked", "true");
+  await q.getByTestId("thread-question-back").click();
+  await expect(q.getByRole("radio").nth(1)).toHaveAttribute("aria-checked", "true");
+  await q.getByTestId("thread-question-next").click();
+  await q.getByTestId("thread-question-next").click();
+  await expect.poll(responds).toHaveLength(1);
+  const sent = (await invocations()).find((i) => i.name === "thread.respond");
+  expect(Object.values(JSON.parse(sent?.args.answer ?? "{}") as Record<string, string>)).toEqual(["Push to a new branch", "Yes"]);
+});

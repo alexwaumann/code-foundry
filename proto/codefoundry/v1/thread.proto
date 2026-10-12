@@ -321,8 +321,8 @@ message RespondThreadRequest {
   map<string, string> answers = 4;
   // DENY: the user's reason. Claude sees it inside Claude Code's own rejection text
   // ("The user doesn't want to proceed with this tool use. … the user said: <message>");
-  // without one, the plain rejection (a question: "The user declined to answer the
-  // questions.").
+  // without one, the plain rejection ("… STOP what you are doing and wait for the user to
+  // tell you how to proceed."). A question is denied (skipped) the same way.
   string message = 5;
   // DENY: also stop the turn.
   bool interrupt = 6;

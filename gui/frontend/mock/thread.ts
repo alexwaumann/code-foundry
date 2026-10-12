@@ -8,6 +8,7 @@
  *        (re)creates the rendered thread in that state; returns { id }. parallel: an Edit
  *        and a Bash permission pending at once (oldest first); multi: a multi-select question
  *   POST /__mock/thread/delta?id=s-r1&text=…   appends text to the streaming answer
+ *   POST /__mock/thread/stream?id=s-r1&text=…  starts a new streaming text item
  *   POST /__mock/thread/finish?id=s-r1          ends the streaming turn (turn_end, idle)
  *   GET  /__mock/thread/calls                  thread.* invocations ("send <id> <text> [attachments]", ...)
  *
@@ -31,6 +32,7 @@ import {
   type ThreadItemSchema,
   type ThreadPendingRequestSchema,
 } from "../src/gen/codefoundry/v1/thread_pb";
+import { CommandError } from "./errors";
 import { Hub } from "./hub";
 
 export type ThreadEventInit = MessageInitShape<typeof ThreadEventSchema>;
@@ -215,8 +217,11 @@ export class MockThreads {
   calls: string[] = [];
   /** Bumped by reset(): a scripted reply still sleeping from before stops. */
   private generation = 0;
-  /** POST /__mock/thread/fail-respond: the next thread.respond fails (the prompt must come back). */
-  failRespond = false;
+  /**
+   * POST /__mock/thread/fail-respond: the next thread.respond fails (the prompt must come
+   * back); with ?withdrawn=1 Claude withdrew the request first (NotFound, like the daemon).
+   */
+  failRespond: "" | "error" | "withdrawn" = "";
 
   /** `source` gets what the EventService thread source carries (pending events only). */
   constructor(
@@ -227,7 +232,7 @@ export class MockThreads {
   reset(): void {
     this.logs.clear();
     this.calls = [];
-    this.failRespond = false;
+    this.failRespond = "";
     this.generation++;
   }
 
@@ -322,6 +327,11 @@ export class MockThreads {
     this.source({ event: { case: "pending", value } });
   }
 
+  /** A new streaming text item (e.g. a subagent's reply arriving while a prompt waits); /delta extends it. */
+  stream(id: string, text: string): void {
+    this.append(id, this.item(id, { case: "assistantText", value: { text } }, { streaming: true }));
+  }
+
   /** Text appended to the streaming text item (a delta). */
   delta(id: string, text: string): void {
     const l = this.log(id);
@@ -383,6 +393,16 @@ export class MockThreads {
     }
   }
 
+  /** Claude withdraws a pending request (control_cancel_request): the item says so, the prompt leaves. */
+  private withdraw(id: string, requestId: string): void {
+    const l = this.log(id);
+    const p = l.pending.find((x) => x.requestId === requestId);
+    const req = p && l.items.find((x) => x.id === p.itemId);
+    if (!p || (req?.payload?.case !== "permission" && req?.payload?.case !== "question")) return;
+    this.update(id, { ...req, payload: { case: req.payload.case, value: { ...req.payload.value, state: ThreadRequestState.CANCELLED, message: "withdrawn by Claude" } } } as ItemInit);
+    this.setPending(id, l.pending.filter((x) => x !== p));
+  }
+
   /** The restart with the new effort is done: the timeline says so, the flag clears. */
   private applyEffort(id: string, effort: string): void {
     this.append(id, this.item(id, { case: "commandOutput", value: { text: `Set effort to ${effort}` } }));
@@ -415,7 +435,7 @@ export class MockThreads {
   respond(id: string, requestId: string, decision: "allow" | "allow-session" | "deny", answers: Record<string, string>, message: string): ItemInit {
     const l = this.log(id);
     const p = requestId ? l.pending.find((x) => x.requestId === requestId) : l.pending[0];
-    if (!p) throw new Error(requestId ? `thread ${id} has no pending request ${requestId}` : `thread ${id} has no pending request`);
+    if (!p) throw new CommandError("notfound", requestId ? `no pending request ${requestId} on thread ${id}` : `thread ${id} has no pending request`);
     const req = l.items.find((x) => x.id === p.itemId);
     if (req?.payload?.case !== "permission" && req?.payload?.case !== "question") throw new Error(`request ${p.requestId ?? ""} has no item`);
     const r = req.payload.value;
@@ -829,9 +849,12 @@ export class MockThreads {
           const decision = (a.decision || "allow") as "allow" | "allow-session" | "deny";
           const sid = a.id ?? "";
           this.calls.push(`respond ${sid} ${decision}${a.request ? ` ${a.request}` : ""}${a.answer ? ` answer=${a.answer}` : ""}${a.message ? ` message=${a.message}` : ""}`);
-          if (this.failRespond) {
-            this.failRespond = false;
-            throw new Error("the thread's process has ended");
+          const fail = this.failRespond;
+          this.failRespond = "";
+          if (fail === "error") throw new Error("the thread's process has ended");
+          if (fail === "withdrawn") {
+            this.withdraw(sid, a.request ?? "");
+            throw new CommandError("notfound", `Claude withdrew request ${a.request ?? ""}`);
           }
           let answers: Record<string, string> = {};
           const answer = (a.answer ?? "").trim();

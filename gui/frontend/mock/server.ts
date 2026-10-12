@@ -26,9 +26,10 @@
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
  *   POST /__mock/thread?state=permission|question|streaming|idle   (the rendered thread s-r1:
- *        mock/thread.ts, also parallel|multi); POST /__mock/thread/delta?text=… |
+ *        mock/thread.ts, also parallel|multi); POST /__mock/thread/delta?text=… | /__mock/thread/stream?text=… |
  *        /__mock/thread/finish[?total=1.5&turnCost=1.5&model=claude-sonnet-5] (the turn_end's figures) |
- *        /__mock/thread/fail-respond (the next answer fails); GET /__mock/thread/calls
+ *        /__mock/thread/fail-respond[?withdrawn=1] (the next answer fails; withdrawn: Claude withdrew
+ *        the request first, NotFound); GET /__mock/thread/calls
  *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
  *                                                 shell stays, exited, as if the reaper were late)
  *   POST /__mock/session/hold?id=s-1&id=s-5   (the clock stops changing them: s-1 stops flipping
@@ -653,6 +654,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { id: s.id });
       break;
     }
+    case "POST /__mock/thread/stream":
+      world.threads.stream(q.get("id") ?? "s-r1", q.get("text") ?? "");
+      json(res, 200, { ok: true });
+      break;
     case "POST /__mock/thread/delta":
       world.threads.delta(q.get("id") ?? "s-r1", q.get("text") ?? "");
       json(res, 200, { ok: true });
@@ -667,7 +672,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/thread/fail-respond":
-      world.threads.failRespond = true;
+      world.threads.failRespond = q.get("withdrawn") ? "withdrawn" : "error";
       json(res, 200, { ok: true });
       break;
     case "GET /__mock/thread/calls":

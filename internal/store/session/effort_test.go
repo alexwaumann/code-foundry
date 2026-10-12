@@ -1,10 +1,13 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -138,18 +141,16 @@ func TestRenderedSetEffortRefusals(t *testing.T) {
 
 func TestDenyMessage(t *testing.T) {
 	tests := []struct {
-		kind   ItemKind
 		reason string
 		want   string
 	}{
-		{KindPermission, "", rejectStop},
-		{KindPermission, "  use the staging branch ", rejectWithReason + "use the staging branch"},
-		{KindQuestion, "", "The user declined to answer the questions."},
-		{KindQuestion, "ask me later", "The user declined to answer the questions. They said:\nask me later"},
+		{"", rejectStop},
+		{"   ", rejectStop},
+		{"  use the staging branch ", rejectWithReason + "use the staging branch"},
 	}
 	for _, tt := range tests {
-		if got := denyMessage(tt.kind, tt.reason); got != tt.want {
-			t.Errorf("denyMessage(%s, %q) = %q, want %q", tt.kind, tt.reason, got, tt.want)
+		if got := denyMessage(tt.reason); got != tt.want {
+			t.Errorf("denyMessage(%q) = %q, want %q", tt.reason, got, tt.want)
 		}
 	}
 }
@@ -171,5 +172,359 @@ func TestRenderedFollowsClaudesModeChange(t *testing.T) {
 	r.onModeChange("")
 	if got, _ := re.m.Get(re.ctx(), s.ID); got.PermissionMode != PermissionAcceptEdits {
 		t.Errorf("mode after unknown wire modes %v", got.PermissionMode)
+	}
+}
+
+// spawnLogs is what each fake process got on stdin, by pid, with its argv.
+func (re *renderedEnv) spawnLogs() map[string]struct {
+	argv []string
+	sent []map[string]any
+} {
+	out := map[string]struct {
+		argv []string
+		sent []map[string]any
+	}{}
+	paths, _ := filepath.Glob(re.argv + ".*")
+	for _, p := range paths {
+		pid := strings.TrimPrefix(p, re.argv+".")
+		var e struct {
+			argv []string
+			sent []map[string]any
+		}
+		if b, err := os.ReadFile(p); err == nil {
+			_ = json.Unmarshal(b, &e.argv)
+		}
+		data, _ := os.ReadFile(re.log + "." + pid)
+		for _, l := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+			var m map[string]any
+			if json.Unmarshal([]byte(l), &m) == nil {
+				e.sent = append(e.sent, m)
+			}
+		}
+		out[pid] = e
+	}
+	return out
+}
+
+// userTextOf is a user message's text ("" for other lines).
+func userTextOf(m map[string]any) string {
+	if m["type"] != "user" {
+		return ""
+	}
+	msg, _ := m["message"].(map[string]any)
+	content, _ := msg["content"].([]any)
+	if len(content) == 0 {
+		return ""
+	}
+	b, _ := content[0].(map[string]any)
+	text, _ := b["text"].(string)
+	return text
+}
+
+// deliveries counts, per spawn (resumed or not), the user messages with text.
+func (re *renderedEnv) deliveries(text string) (fresh, resumed int) {
+	for _, e := range re.spawnLogs() {
+		for _, m := range e.sent {
+			if userTextOf(m) != text {
+				continue
+			}
+			if slices.Contains(e.argv, "--resume") {
+				resumed++
+			} else {
+				fresh++
+			}
+		}
+	}
+	return fresh, resumed
+}
+
+// runnerOf is the thread's runner.
+func (re *renderedEnv) runnerOf(id string) *runner {
+	re.m.mu.Lock()
+	defer re.m.mu.Unlock()
+	return re.m.recs[id].run
+}
+
+// waitSwapping waits until a restart is replacing the thread's Conn.
+func (re *renderedEnv) waitSwapping(id string) {
+	re.t.Helper()
+	r := re.runnerOf(id)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if _, err := r.st.connection(); err != nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			re.t.Fatal("the restart never began")
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+}
+
+// sendAsync sends text on its own goroutine; the result arrives on the channel.
+func (re *renderedEnv) sendAsync(ctx context.Context, id, text string) <-chan error {
+	done := make(chan error, 1)
+	go func() {
+		_, err := re.m.Send(ctx, id, Message{Text: text})
+		done <- err
+	}()
+	return done
+}
+
+func waitErr(t *testing.T, what string, ch <-chan error) error {
+	t.Helper()
+	select {
+	case err := <-ch:
+		return err
+	case <-time.After(5 * time.Second):
+		t.Fatalf("%s never returned", what)
+		return nil
+	}
+}
+
+// What happens to calls made while an effort restart is between processes (the old one
+// lingers 400 ms after its stdin closes, so they land in the gap).
+func TestRenderedSetEffortGap(t *testing.T) {
+	tests := []struct {
+		name string
+		env  []string
+		run  func(t *testing.T, re *renderedEnv, s Session)
+	}{
+		{
+			name: "a send is held and reaches the new process once",
+			run: func(t *testing.T, re *renderedEnv, s Session) {
+				done := re.sendAsync(re.ctx(), s.ID, "held")
+				if err := waitErr(t, "the held send", done); err != nil {
+					t.Fatalf("send: %v", err)
+				}
+				re.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && s.Status == StatusIdle })
+				if fresh, resumed := re.deliveries("held"); fresh != 0 || resumed != 1 {
+					t.Errorf("held message delivered %d times to the old process, %d to the new", fresh, resumed)
+				}
+			},
+		},
+		{
+			name: "a send its caller gave up on is dropped",
+			run: func(t *testing.T, re *renderedEnv, s Session) {
+				ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+				defer cancel()
+				if err := waitErr(t, "the send", re.sendAsync(ctx, s.ID, "gave up")); !errors.Is(err, context.DeadlineExceeded) {
+					t.Fatalf("send: %v", err)
+				}
+				re.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && s.State == StateConnected })
+				if fresh, resumed := re.deliveries("gave up"); fresh+resumed != 0 {
+					t.Errorf("a send that failed was delivered (%d, %d)", fresh, resumed)
+				}
+				if slices.ContainsFunc(re.items(s.ID).Items, func(it Item) bool { return it.Text == "gave up" }) {
+					t.Errorf("a send that failed is in the timeline")
+				}
+			},
+		},
+		{
+			name: "interrupt, model and mode wait for the new process; respond finds nothing",
+			run: func(t *testing.T, re *renderedEnv, s Session) {
+				if err := re.m.Interrupt(re.ctx(), s.ID); !errors.Is(err, ErrFailedPrecondition) {
+					t.Errorf("interrupt: %v", err)
+				}
+				if _, err := re.m.SetModel(re.ctx(), s.ID, "sonnet"); !errors.Is(err, ErrFailedPrecondition) {
+					t.Errorf("set model: %v", err)
+				}
+				if _, err := re.m.SetPermissionMode(re.ctx(), s.ID, PermissionAuto); !errors.Is(err, ErrFailedPrecondition) {
+					t.Errorf("set mode: %v", err)
+				}
+				if _, err := re.m.Respond(re.ctx(), s.ID, "req-1", Decision{Allow: true}); !errors.Is(err, ErrNotFound) {
+					t.Errorf("respond: %v", err)
+				}
+				got := re.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && s.State == StateConnected })
+				if got.Model != "haiku" || got.PermissionMode != PermissionSupervised {
+					t.Errorf("refused changes were recorded: %+v", got)
+				}
+				if _, err := re.m.SetPermissionMode(re.ctx(), s.ID, PermissionAuto); err != nil {
+					t.Errorf("set mode after the restart: %v", err)
+				}
+			},
+		},
+		{
+			name: "a close fails the held send",
+			run: func(t *testing.T, re *renderedEnv, s Session) {
+				done := re.sendAsync(re.ctx(), s.ID, "held")
+				time.Sleep(20 * time.Millisecond) // the send is on the runner first
+				if err := re.m.Close(re.ctx(), s.ID); err != nil {
+					t.Fatal(err)
+				}
+				if err := waitErr(t, "the held send", done); !errors.Is(err, ErrFailedPrecondition) {
+					t.Errorf("held send after close: %v", err)
+				}
+				got := re.waitFor(s.ID, "closed", func(s Session) bool { return s.State == StateDisconnected })
+				if got.DisconnectReason != ReasonClosed || got.Effort != "high" || got.EffortPending {
+					t.Errorf("closed %+v", got)
+				}
+				if fresh, resumed := re.deliveries("held"); fresh+resumed != 0 {
+					t.Errorf("delivered after close (%d, %d)", fresh, resumed)
+				}
+			},
+		},
+		{
+			name: "daemon shutdown fails the held send; the next spawn uses the new effort",
+			run: func(t *testing.T, re *renderedEnv, s Session) {
+				done := re.sendAsync(re.ctx(), s.ID, "held")
+				time.Sleep(20 * time.Millisecond)
+				re.restart(re.mutate)
+				if err := waitErr(t, "the held send", done); err == nil {
+					t.Errorf("held send succeeded across a daemon stop")
+				}
+				got, _ := re.m.Get(re.ctx(), s.ID)
+				if got.State != StateDisconnected || got.DisconnectReason != ReasonDaemonStopped || got.Effort != "high" || got.EffortPending {
+					t.Errorf("after the daemon restart %+v", got)
+				}
+				if _, err := re.m.Reconnect(re.ctx(), s.ID); err != nil {
+					t.Fatal(err)
+				}
+				argv := re.waitArgv("the reconnect", func(a []string) bool { return argOf(a, "--resume") != "" && argOf(a, "--effort") == "high" })
+				if argOf(argv, "--model") != "haiku" {
+					t.Errorf("reconnect argv %q", argv)
+				}
+				re.waitFor(s.ID, "reconnected", func(s Session) bool { return s.State == StateConnected && !s.EffortPending })
+			},
+		},
+		{
+			name: "the new process crashes",
+			env:  []string{"CF_FAKE_CLAUDE_RESUME_EXIT=3"},
+			run: func(t *testing.T, re *renderedEnv, s Session) {
+				done := re.sendAsync(re.ctx(), s.ID, "held")
+				if err := waitErr(t, "the held send", done); !errors.Is(err, ErrFailedPrecondition) {
+					t.Errorf("held send: %v", err)
+				}
+				got := re.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+				if got.DisconnectReason != ReasonCrashed || got.ExitCode != 3 || got.Effort != "high" || got.EffortPending ||
+					!strings.Contains(got.LastError, "cannot resume") {
+					t.Errorf("after the crash %+v", got)
+				}
+				items := re.items(s.ID).Items
+				if e, ok := lastKind(items, KindError); !ok || !strings.Contains(e.Text, "before answering the initialize handshake") {
+					t.Errorf("no error item:\n%s", describeItems(items))
+				}
+				if hasEffortNote("high")(items) {
+					t.Errorf("the effort note for a restart that failed")
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			re := newRenderedEnvAt(t, fixturePath("text-table"), append([]string{"CF_FAKE_CLAUDE_EXIT_DELAY=400ms"}, tt.env...)...)
+			s := re.create(CreateOptions{Model: "haiku", Effort: "low", PermissionMode: PermissionSupervised})
+			re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
+			re.writeTranscript(argOf(re.argvOf(), "--session-id"), userLine("earlier"))
+			if _, err := re.m.SetEffort(re.ctx(), s.ID, "high"); err != nil {
+				t.Fatal(err)
+			}
+			re.waitSwapping(s.ID)
+			tt.run(t, re, s)
+		})
+	}
+}
+
+// The respawn's argv is the original launch's but for the conversation (--resume, no
+// --session-id) and the effort, plus what allow for session granted the old process.
+func TestRenderedSetEffortRespawnArgv(t *testing.T) {
+	re := newRenderedEnv(t, "bash")
+	s := re.create(CreateOptions{Model: "haiku", Effort: "low", PermissionMode: PermissionAcceptEdits, InitialPrompt: "run it"})
+	re.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
+	first := re.argvOf()
+	re.writeTranscript(argOf(first, "--session-id"), userLine("run it"))
+	p := re.items(s.ID).Pending
+	if _, err := re.m.Respond(re.ctx(), s.ID, p[0].RequestID, Decision{Allow: true, ForSession: true}); err != nil {
+		t.Fatal(err)
+	}
+	re.waitFor(s.ID, "idle", func(s Session) bool {
+		return s.Status == StatusIdle || s.Status == StatusNeedsAttention && s.StatusReason == "finished"
+	})
+	if _, err := re.m.SetEffort(re.ctx(), s.ID, "max"); err != nil {
+		t.Fatal(err)
+	}
+	argv := re.waitArgv("the restart", func(a []string) bool { return argOf(a, "--effort") == "max" })
+	re.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && s.State == StateConnected })
+
+	// Everything before the conversation flags and after the effort is the same.
+	strip := func(a []string) []string {
+		var out []string
+		for i := 0; i < len(a); i++ {
+			switch a[i] {
+			case "--session-id", "--resume", "--effort":
+				i++
+				continue
+			case "--allowedTools":
+				for i+1 < len(a) && !strings.HasPrefix(a[i+1], "--") {
+					i++
+				}
+				continue
+			}
+			out = append(out, a[i])
+		}
+		return out
+	}
+	if !slices.Equal(strip(first), strip(argv)) {
+		t.Errorf("respawn argv differs beyond the conversation and effort:\n first %q\n again %q", first, argv)
+	}
+	if argOf(argv, "--resume") != argOf(first, "--session-id") || slices.Contains(argv, "--session-id") || slices.Contains(argv, "--") {
+		t.Errorf("respawn argv %q", argv)
+	}
+	i := slices.Index(argv, "--allowedTools")
+	if i < 0 || !slices.Equal(argv[i+1:min(i+3, len(argv))], []string{"Bash(mkdir -p sub)", "Bash(touch sub/a.txt)"}) {
+		t.Errorf("the session's grants are not passed again: %q", argv)
+	}
+}
+
+func TestGrants(t *testing.T) {
+	tests := []struct {
+		name string
+		json []string
+		want grants
+	}{
+		{"nothing", []string{"", "not json", "[]"}, grants{}},
+		{"rules", []string{`[{"type":"addRules","rules":[{"toolName":"Bash","ruleContent":"git push:*"},{"toolName":"WebFetch"}],"behavior":"allow","destination":"session"}]`},
+			grants{allow: []string{"Bash(git push:*)", "WebFetch"}}},
+		{"deduplicated across answers", []string{
+			`[{"type":"addRules","rules":[{"toolName":"Bash","ruleContent":"ls"}],"behavior":"allow"}]`,
+			`[{"type":"addRules","rules":[{"toolName":"Bash","ruleContent":"ls"}],"behavior":"allow"},{"type":"addRules","rules":[{"toolName":"Bash","ruleContent":"rm:*"}],"behavior":"deny"}]`,
+		}, grants{allow: []string{"Bash(ls)"}, deny: []string{"Bash(rm:*)"}}},
+		{"directories; a mode needs nothing", []string{`[{"type":"addDirectories","directories":["/tmp/x"],"destination":"session"},{"type":"setMode","mode":"acceptEdits"}]`},
+			grants{dirs: []string{"/tmp/x"}}},
+		{"ask rules are not kept", []string{`[{"type":"addRules","rules":[{"toolName":"Bash"}],"behavior":"ask"}]`}, grants{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var g grants
+			for _, j := range tt.json {
+				g.add(j)
+			}
+			if !slices.Equal(g.allow, tt.want.allow) || !slices.Equal(g.deny, tt.want.deny) || !slices.Equal(g.dirs, tt.want.dirs) {
+				t.Errorf("grants %+v, want %+v", g, tt.want)
+			}
+		})
+	}
+}
+
+// Answering a request Claude already withdrew (an interrupt withdraws what is pending)
+// is NotFound, which the GUI shows as a quiet notice; the item stays withdrawn.
+func TestRenderedRespondToWithdrawnRequest(t *testing.T) {
+	re := newRenderedEnv(t, "interrupt-pending")
+	s := re.create(CreateOptions{PermissionMode: PermissionSupervised, InitialPrompt: "write"})
+	re.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
+	p := re.items(s.ID).Pending[0]
+	if err := re.m.Interrupt(re.ctx(), s.ID); err != nil {
+		t.Fatal(err)
+	}
+	re.waitItems(s.ID, "the request withdrawn", func(items []Item) bool {
+		return slices.ContainsFunc(items, func(it Item) bool { return it.Request != nil && it.Request.State == RequestCancelled })
+	})
+	if _, err := re.m.Respond(re.ctx(), s.ID, p.RequestID, Decision{Allow: true}); !errors.Is(err, ErrNotFound) {
+		t.Errorf("respond to a withdrawn request: %v", err)
+	}
+	items := re.items(s.ID).Items
+	i := slices.IndexFunc(items, func(it Item) bool { return it.Request != nil })
+	if i < 0 || items[i].Request.State != RequestCancelled || items[i].Request.Message != "withdrawn by Claude" {
+		t.Errorf("request item:\n%s", describeItems(items))
 	}
 }

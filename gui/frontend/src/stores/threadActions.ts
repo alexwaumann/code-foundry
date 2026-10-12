@@ -6,6 +6,8 @@
  * store under `thread:<id>` (its text with the composer's tags as tokens, its images), so
  * switching threads keeps what was typed.
  */
+import { toast } from "sonner";
+import { isNotFound } from "@/api/errors";
 import { stageAttachment } from "@/api/session";
 import { errorMessage } from "@/api/stream";
 import type { ComposePermission } from "@/lib/compose";
@@ -93,16 +95,25 @@ export async function interruptThread(sessionId: string): Promise<boolean> {
  * Answers a pending request (thread.respond): a permission's decision with a deny's
  * reason, or a question's answers (question -> label, lib/threadRequest answersOf; deny
  * skips the questions). The prompt leaves at once and comes back if the answer fails
- * (the failure toasts). Quiet otherwise: the timeline shows the outcome.
+ * (the failure toasts). A request Claude withdrew meanwhile (NotFound: an interrupt, or
+ * its turn ended) stays gone with a plain notice; the timeline row says "withdrawn".
+ * Quiet otherwise: the timeline shows the outcome.
  */
 export async function respondThread(sessionId: string, requestId: string, decision: PermissionDecision, opts: { answers?: Record<string, string>; message?: string } = {}): Promise<boolean> {
   const args: Record<string, string> = { id: sessionId, request: requestId, decision };
   if (opts.answers) args.answer = JSON.stringify(opts.answers);
   if (opts.message?.trim()) args.message = opts.message.trim();
   setAnswering(sessionId, requestId, true);
-  const res = await runCommandForResult(THREAD_COMMANDS.respond, args, { ctx: sessionContext(sessionId), quiet: true });
-  if (res === null) setAnswering(sessionId, requestId, false);
-  return res !== null;
+  const failure = { withdrawn: false };
+  const res = await runCommandForResult(THREAD_COMMANDS.respond, args, {
+    ctx: sessionContext(sessionId),
+    quiet: true,
+    expected: (err) => (failure.withdrawn = isNotFound(err)),
+  });
+  if (res !== null) return true;
+  if (failure.withdrawn) toast("Claude no longer needs that answer", { id: `withdrawn:${requestId}` });
+  else setAnswering(sessionId, requestId, false);
+  return false;
 }
 
 /**

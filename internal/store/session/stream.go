@@ -75,17 +75,36 @@ type streamState struct {
 	restart            restartPhase
 	restartTimer       *time.Timer
 	held               []threadCmd
+	// grants: what allow-for-session answers gave this conversation, passed again to a
+	// restarted process (effort.go).
+	grants grants
+	// swapping (under connMu): a restart is replacing the Conn; Store calls made outside
+	// the goroutine are refused meanwhile (connection).
+	swapping bool
 }
 
-// connection is the current Conn, for Store calls made outside the run goroutine.
-func (st *streamState) connection() *claudestream.Conn {
+// connection is the current Conn, for Store calls made outside the run goroutine. While
+// a restart swaps it (the old process's stdin is closed, the new one has not answered
+// the handshake) there is no Conn to talk to: refused.
+func (st *streamState) connection() (*claudestream.Conn, error) {
 	st.connMu.Lock()
 	defer st.connMu.Unlock()
-	return st.conn
+	if st.swapping {
+		return nil, fmt.Errorf("%w: Claude is restarting for an effort change; try again in a moment", ErrFailedPrecondition)
+	}
+	return st.conn, nil
+}
+
+func (st *streamState) setSwapping(on bool) {
+	st.connMu.Lock()
+	st.swapping = on
+	st.connMu.Unlock()
 }
 
 // threadCmd is a Store call the runner carries out on its goroutine.
 type threadCmd struct {
+	// ctx is the caller's: a send held across a restart is dropped once it is done.
+	ctx       context.Context
 	send      *outgoing
 	effort    *string // SetEffort
 	requestID string
@@ -285,6 +304,9 @@ func (r *runner) onInitialized(err error) {
 	}
 	st.initialized = true
 	st.sd.initialized()
+	if r.closing {
+		return // closed while starting: the close finishes it
+	}
 	if st.restart != restartNone {
 		r.onRestarted()
 		return
@@ -490,7 +512,17 @@ func (r *runner) respond(id string, d Decision) (Item, error) {
 	if err != nil {
 		return Item{}, err
 	}
-	r.answer(req, res)
+	if err := req.Answer(res); errors.Is(err, claudestream.ErrCancelled) {
+		// Withdrawn by Claude before its cancel was handled here: the item says so, not
+		// what the user picked.
+		r.onAskGone(id)
+		return Item{}, fmt.Errorf("%w: Claude withdrew request %s", ErrNotFound, id)
+	} else if err != nil {
+		r.log().debug("answer permission request", "request", id, "err", err)
+	}
+	if d.Allow && d.ForSession {
+		st.grants.add(cur.Request.SuggestionsJSON)
+	}
 	delete(st.pending, id)
 	st.sd.resolved(id)
 	it, _ := r.resolveItem(id, func(q *Request) {
@@ -570,6 +602,7 @@ func (r *runner) beginCloseStream() {
 	st := r.st
 	r.closing = true
 	st.restart = restartNone
+	st.setSwapping(false)
 	r.failHeld("the thread is closing")
 	st.sd.pending = nil // the requests die with the process; do not keep their status
 	r.closeStatus, r.closeReason = st.sd.Status()

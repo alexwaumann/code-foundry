@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -15,7 +16,14 @@ import (
 // the new --effort, between turns: the old process gets its stdin closed (it exits
 // once idle), then the same runner starts the new one and does the handshake again.
 // The thread stays connected throughout; its items, viewers, transcript tailing and
-// usage carry on. A send during the restart waits for the new process (held).
+// usage carry on. A send during the restart waits for the new process (held); Interrupt,
+// SetModel and SetPermissionMode are refused until it is up (connection). What "Allow for
+// session" granted the old process lives in its memory only, so the new one gets it again
+// as flags (grants).
+//
+// Across a daemon restart: the row's Effort is the new level from SetEffort on, and
+// EffortPending is not persisted, so a change that had not restarted Claude yet is applied
+// by the next spawn (Reconnect, fork) rather than lost.
 
 // restartPhase is where a restart is.
 type restartPhase int
@@ -76,6 +84,7 @@ func (r *runner) maybeRestart() {
 		return
 	}
 	st.restart = restartClosing
+	st.setSwapping(true)
 	r.log().info("restarting claude for an effort change", "from", st.effort, "to", st.wantEffort, "pid", st.proc.Pid())
 	conn := st.conn
 	go func() { _ = conn.CloseStdin() }()
@@ -97,6 +106,9 @@ func (r *runner) respawn() {
 	r.closeStep, r.killed = 0, false
 	r.stopStreamTimers()
 	st.conn.Close()
+	// Anything the old process still asked on its way out died with it.
+	clear(st.pending)
+	st.sd.pending = nil
 	closeUnfinished(st.proj.w, "Claude restarted")
 	st.proj.restart()
 	l := r.launch
@@ -107,7 +119,7 @@ func (r *runner) respawn() {
 	}
 	s, _ := r.m.Snapshot().Session(r.id)
 	s.WorktreePath, s.Effort = r.cwd, st.wantEffort
-	argv, env := r.m.claudeCommand(s, l, "")
+	argv, env := r.m.claudeCommand(s, l, "", st.grants)
 	proc, err := claudestream.Start(claudestream.Spec{
 		Argv: argv, Env: env, Dir: r.cwd,
 		Conn: claudestream.Options{Log: r.m.log.With("session", r.id)},
@@ -116,6 +128,7 @@ func (r *runner) respawn() {
 		msg := "Claude did not restart for the effort change: " + err.Error()
 		r.log().warn("restart claude", "err", err)
 		st.restart = restartNone
+		st.setSwapping(false)
 		st.proj.w.add(Item{ID: st.proj.nextID("err"), Kind: KindError, Text: msg})
 		r.failHeld("Claude did not restart")
 		r.finish(func(s *Session) {
@@ -141,6 +154,7 @@ func (r *runner) respawn() {
 func (r *runner) onRestarted() {
 	st := r.st
 	st.restart = restartNone
+	st.setSwapping(false)
 	if st.restartTimer != nil {
 		st.restartTimer.Stop()
 		st.restartTimer = nil
@@ -155,7 +169,13 @@ func (r *runner) onRestarted() {
 	st.held = nil
 	for _, cmd := range held {
 		var rep threadReply
-		rep.item, rep.err = r.sendMessage(cmd.send)
+		if cmd.ctx != nil && cmd.ctx.Err() != nil {
+			// The caller gave up waiting (its Send failed): sending it now would deliver a
+			// message the user was told did not go.
+			rep.err = cmd.ctx.Err()
+		} else {
+			rep.item, rep.err = r.sendMessage(cmd.send)
+		}
 		cmd.reply <- rep
 	}
 	r.checkStatus()
@@ -168,4 +188,58 @@ func (r *runner) failHeld(why string) {
 		cmd.reply <- threadReply{err: fmt.Errorf("%w: %s", ErrFailedPrecondition, why)}
 	}
 	r.st.held = nil
+}
+
+// grants are what "Allow for session" answers gave the running process (the request's
+// permission_suggestions): Claude keeps session rules and directories in memory only, so
+// a restart passes them again (--allowedTools, --disallowedTools, --add-dir). A setMode
+// suggestion needs nothing here: the row follows the mode (onModeChange).
+type grants struct {
+	allow, deny, dirs []string
+}
+
+// suggestion is one permission_suggestions entry (sdk.d.ts PermissionUpdate).
+type suggestion struct {
+	Type  string `json:"type"`
+	Rules []struct {
+		ToolName    string `json:"toolName"`
+		RuleContent string `json:"ruleContent"`
+	} `json:"rules"`
+	Behavior    string   `json:"behavior"`
+	Directories []string `json:"directories"`
+}
+
+// add records the suggestions an allow for session applied.
+func (g *grants) add(suggestionsJSON string) {
+	var list []suggestion
+	if suggestionsJSON == "" || json.Unmarshal([]byte(suggestionsJSON), &list) != nil {
+		return
+	}
+	appendNew := func(to []string, v string) []string {
+		if v == "" || slices.Contains(to, v) {
+			return to
+		}
+		return append(to, v)
+	}
+	for _, s := range list {
+		switch s.Type {
+		case "addRules", "replaceRules":
+			for _, rule := range s.Rules {
+				v := rule.ToolName
+				if rule.RuleContent != "" {
+					v += "(" + rule.RuleContent + ")"
+				}
+				switch s.Behavior {
+				case "allow":
+					g.allow = appendNew(g.allow, v)
+				case "deny":
+					g.deny = appendNew(g.deny, v)
+				}
+			}
+		case "addDirectories":
+			for _, d := range s.Directories {
+				g.dirs = appendNew(g.dirs, d)
+			}
+		}
+	}
 }
