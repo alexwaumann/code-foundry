@@ -32,7 +32,7 @@ test("each project's header says what kind it is", async ({ page }) => {
     await expect(p.getByTestId("project-kind-icon")).toHaveAttribute("title", /\.$/);
     if (meta === null) {
       await expect(p.getByTestId("project-meta")).toHaveCount(0);
-      await expect(p.getByRole("option").first().getByTestId("no-git-badge")).toBeVisible();
+      await expect(p.locator(`[data-nav-key="p:${id}"]`).getByTestId("no-git-badge")).toBeVisible();
     } else {
       await expect(p.getByTestId("project-meta")).toHaveText(meta);
     }
