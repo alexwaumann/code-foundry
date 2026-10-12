@@ -5,7 +5,8 @@ import { useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
-import { commandBindings, handleKeyDown, isGlobalChord, openRunInPicker } from "./bindings";
+import { useThreadStore } from "@/stores/thread";
+import { chordFires, commandBindings, handleKeyDown, isGlobalChord, openRunInPicker } from "./bindings";
 
 const runCommandForResult = vi.hoisted(() => vi.fn(() => Promise.resolve(null)));
 // The re-list a chord on a stale list waits for: a test sets what it lists.
@@ -301,5 +302,55 @@ describe("Run in… presentation (session.run-in)", () => {
     expect(openRunInPicker("")).toBe(false);
     await Promise.resolve();
     expect(useUiStore.getState().palette.open).toBe(false);
+  });
+});
+
+describe("a bare-key command chord (Escape interrupts a rendered thread)", () => {
+  let pane: HTMLElement;
+  let prompt: HTMLElement;
+  let sidebar: HTMLElement;
+
+  beforeEach(() => {
+    document.body.innerHTML =
+      '<nav id="side" tabindex="0"></nav><section id="pane" data-region="content" tabindex="-1"><div id="prompt" data-keys-local tabindex="-1"></div></section>';
+    pane = document.getElementById("pane") as HTMLElement;
+    prompt = document.getElementById("prompt") as HTMLElement;
+    sidebar = document.getElementById("side") as HTMLElement;
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    useUiStore.setState({ palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" }, selection: { kind: "session", id: "s-r" } });
+    useCommandsStore.setState({ commands: [cmd({ name: "thread.interrupt", keybindings: ["escape"] })] });
+    useSessionsStore.setState({ byId: { "s-r": session("s-r", { render: "rendered", status: "busy", terminalId: "" }) }, order: ["s-r"] });
+    useThreadStore.setState({ logs: {}, pending: {} });
+    useCommandsStore.setState({ contextKey: contextKey(getUiContext()) });
+    runCommandForResult.mockClear();
+  });
+
+  afterEach(() => {
+    window.removeEventListener("keydown", handleKeyDown, { capture: true });
+  });
+
+  const escape = { key: "Escape", code: "Escape" };
+
+  it("fires in the content pane while the thread works", () => {
+    expect(press(pane, escape).defaultPrevented).toBe(true);
+    expect(runCommandForResult).toHaveBeenCalledWith("thread.interrupt", {}, expect.objectContaining({ quiet: true }));
+  });
+
+  it.each<[string, () => void, () => HTMLElement]>([
+    ["outside the content pane (lists, dialogs)", () => undefined, () => sidebar],
+    ["inside an element with its own keys (a docked prompt)", () => undefined, () => prompt],
+    ["when the thread is idle", () => { useSessionsStore.setState({ byId: { "s-r": session("s-r", { render: "rendered", status: "idle", terminalId: "" }) } }); }, () => pane],
+    ["while a prompt waits for the user", () => { useThreadStore.setState({ pending: { "s-r": { sessionId: "s-r", seq: 1, pending: [{ requestId: "r", itemId: "i", question: false, toolName: "Bash", summary: "ls" }] } } }); }, () => pane],
+    ["for a terminal thread", () => { useSessionsStore.setState({ byId: { "s-r": session("s-r", { status: "busy" }) } }); }, () => pane],
+  ])("leaves the key alone %s", (_name, setup, target) => {
+    setup();
+    expect(press(target(), escape).defaultPrevented).toBe(false);
+    expect(runCommandForResult).not.toHaveBeenCalled();
+  });
+
+  it("modified chords keep firing anywhere", () => {
+    expect(chordFires("x", "cmd+t", sidebar)).toBe(true);
+    expect(chordFires("x", "escape", sidebar)).toBe(false);
+    expect(chordFires("x", "shift+escape", pane)).toBe(true);
   });
 });

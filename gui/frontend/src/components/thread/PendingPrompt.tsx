@@ -143,10 +143,12 @@ function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
   const sessionMode = suggestedMode(r.suggestionsJson);
   const sessionRule = suggestionCount(r.suggestionsJson) > 0;
   const description = str(input, "description") || r.description;
-  const why = r.decisionReason || (r.blockedPath ? `Outside the working directories: ${relPath(r.blockedPath, cwd)}` : "");
   const hint = modeHint(permissionMode, r.toolName);
+  // Why Claude asks, when it says (and says more than the mode hint).
+  const reason = r.decisionReason || (r.blockedPath ? `Outside the working directories: ${relPath(r.blockedPath, cwd)}` : "");
+  const why = reason === hint ? "" : reason;
   const [denying, setDenying] = useState(false);
-  const [reason, setReason] = useState("");
+  const [denyReason, setDenyReason] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
   const reasonRef = useRef<HTMLInputElement>(null);
   const choices = permissionChoices(sessionRule);
@@ -229,26 +231,26 @@ function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
           className="acts deny"
           onSubmit={(e) => {
             e.preventDefault();
-            answer("deny", reason);
+            answer("deny", denyReason);
           }}
         >
           <input
             ref={reasonRef}
             type="text"
             className="reason-in"
-            value={reason}
+            value={denyReason}
             placeholder="Tell Claude why or what to do instead (optional)"
             aria-label="Reason for denying"
             data-testid="thread-deny-reason"
             onChange={(e) => {
-              setReason(e.target.value);
+              setDenyReason(e.target.value);
             }}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
                 e.preventDefault();
                 e.stopPropagation();
                 setDenying(false);
-                setReason("");
+                setDenyReason("");
                 rootRef.current?.focus();
               }
             }}
@@ -261,7 +263,7 @@ function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
             className="btn outline"
             onClick={() => {
               setDenying(false);
-              setReason("");
+              setDenyReason("");
               rootRef.current?.focus();
             }}
           >

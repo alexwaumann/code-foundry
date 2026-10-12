@@ -56,9 +56,9 @@ for (const scheme of ["dark", "light"] as const) {
       await openThread(page, "permission", scheme);
       const prompt = composer(page).getByTestId("thread-permission");
       await expect(prompt).toContainText("Allow Claude to run this command?");
-      // The mode hint (the thread runs accept-edits) and the CLI's own reason.
+      // The mode hint (the thread runs accept-edits); the CLI's reason says the same, so once.
       await expect(prompt.getByTestId("thread-permission-hint")).toHaveText("Accept edits asks before commands");
-      await expect(prompt.getByTestId("thread-permission-why")).toHaveText("Accept edits asks before commands");
+      await expect(prompt.getByTestId("thread-permission-why")).toHaveCount(0);
       await expect(prompt.locator("kbd")).toHaveText(["1", "2", "3"]);
       await shot(page, `permission-${scheme}`);
 
@@ -135,7 +135,7 @@ test("keyboard: an empty editor's digits answer, a typed message keeps them, Esc
   // The prompt focused: Escape returns to the editor.
   await composer(page).getByTestId("thread-permission").focus();
   await page.keyboard.press("Escape");
-  expect(await editorFocused(page)).toBe(true);
+  await expect.poll(() => editorFocused(page)).toBe(true);
 
   // 3 opens the reason; Escape cancels it and nothing is sent.
   await page.keyboard.press("3");
@@ -150,7 +150,7 @@ test("keyboard: an empty editor's digits answer, a typed message keeps them, Esc
   await page.keyboard.press("2");
   await expect.poll(responds).toEqual(["respond s-r1 allow-session req-push"]);
   await expect(page.getByTestId("composer-prompt")).toHaveAttribute("data-value", "");
-  expect(await editorFocused(page)).toBe(true);
+  await expect.poll(() => editorFocused(page)).toBe(true);
 });
 
 test("a failed answer brings the prompt back", async ({ page }) => {
