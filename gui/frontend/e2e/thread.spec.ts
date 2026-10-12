@@ -297,6 +297,42 @@ test("the prompt is focused again after a send from the Send button", async ({ p
   await expect(page.getByTestId("composer-prompt")).toHaveAttribute("data-value", "next");
 });
 
+test("scrolled up, a Jump to bottom chip floats above the composer; a click scrolls down and re-pins", async ({ page }) => {
+  await openThread(page, "idle");
+  const timeline = page.getByTestId("thread-timeline");
+  const chip = page.getByTestId("thread-jump-bottom");
+  await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+  await expect(chip).toBeHidden();
+
+  const box = await timeline.boundingBox();
+  await page.mouse.move((box?.x ?? 0) + 200, (box?.y ?? 0) + 200);
+  await page.mouse.wheel(0, -600);
+  await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
+  await expect(chip).toBeVisible();
+  await expect(chip).toHaveText("Jump to bottom");
+  // Centred, clear of the composer.
+  await expect
+    .poll(async () => {
+      const c = await chip.boundingBox();
+      const composer = await page.getByTestId("thread-composer").boundingBox();
+      const t = await timeline.boundingBox();
+      return !!c && !!composer && !!t && c.y + c.height <= composer.y && Math.abs(c.x + c.width / 2 - (t.x + t.width / 2)) <= 2;
+    })
+    .toBe(true);
+  await shot(page, "thread-jump-bottom");
+
+  await chip.click();
+  await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+  await expect(chip).toBeHidden();
+  // Pinned again: a new turn keeps the list at the bottom.
+  await page.getByTestId("thread-composer").locator('[contenteditable="true"]').click();
+  await page.keyboard.type("more");
+  await page.keyboard.press("Enter");
+  await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.");
+  await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+  await expect(chip).toBeHidden();
+});
+
 test("Interrupt stops the running turn (thread.interrupt)", async ({ page }) => {
   await openThread(page, "streaming");
   await page.getByTestId("thread-interrupt").click();

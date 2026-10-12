@@ -583,6 +583,60 @@ html[data-thread-width="full"] .cf-thread {
   animation: cf-shimmer 2s linear infinite;
 }
 
+/* ---------- jump to bottom: floats above the composer while the list is scrolled up ---------- */
+.cf-thread .jump-bottom {
+  position: absolute;
+  left: 50%;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--card) 85%, transparent);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 1px 3px oklch(0 0 0 / 8%);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, 6px);
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease,
+    visibility 0s linear 150ms,
+    color 100ms ease;
+}
+.dark .cf-thread .jump-bottom {
+  box-shadow: 0 1px 3px oklch(0 0 0 / 40%);
+}
+.cf-thread .jump-bottom[data-shown] {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease,
+    visibility 0s,
+    color 100ms ease;
+}
+.cf-thread .jump-bottom:hover {
+  color: var(--foreground);
+}
+.cf-thread .jump-bottom:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+}
+.cf-thread .jump-bottom svg {
+  width: 14px;
+  height: 14px;
+}
+
 /* ---------- the floating composer, prompts docked into it ---------- */
 .cf-thread .dock {
   position: absolute;
