@@ -22,7 +22,7 @@ import { Hub } from "./hub";
 import { MockSettings, MODEL_VALUES } from "./settings";
 import { MockUpdater } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
-import { claudeIntro, claudeTick, ENTER_ALT, logLine, prompt, RESET, testRunOutput, topFrame } from "./screens";
+import { claudeIntro, claudeTick, ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -115,7 +115,7 @@ interface CmdDef {
 }
 export type UiIntentInit = MessageInitShape<typeof UiIntentSchema>;
 
-type Kind = "claude" | "logs" | "top" | "shell" | "exited";
+type Kind = "claude" | "top" | "shell";
 
 // The terminal label contract (internal/termlabel, proto Terminal.labels).
 const LABEL_KIND = "kind";
@@ -387,13 +387,10 @@ export class World {
     this.gh.reset();
     const started = new Date(Date.now() - 42 * 60_000);
     this.addTerm({ id: "t-claude", argv: ["claude"], cwd: CF, title: "✳ Refactor sidebar tree", kind: "claude", labels: { worktree: CF, session: "s-1" }, startedAt: started });
-    this.addTerm({ id: "t-logs", argv: ["/bin/zsh"], cwd: `${CF}/internal/daemon`, title: "tail -f daemon.log", kind: "logs", labels: {}, startedAt: started });
     // A shell terminal.new started on the Projects page for feat/sidebar (worktree-owned).
     this.addTerm({ id: "t-top", argv: ["top"], cwd: `${CFW}/feat-sidebar`, title: "", kind: "top", labels: shellLabels("", "repo-cf", `${CFW}/feat-sidebar`), startedAt: started });
-    this.addTerm({ id: "t-tests", argv: ["go", "test", "./..."], cwd: `${CFW}/fix-resize`, title: "", kind: "exited", labels: { worktree: `${CFW}/fix-resize` }, startedAt: started });
     this.addTerm({ id: "t-ghostty", argv: ["claude", "--resume"], cwd: GP, title: "✳ Port renderer", kind: "claude", labels: { worktree: GP, session: "s-2" }, startedAt: started });
-    this.addTerm({ id: "t-tmp", argv: ["/bin/zsh"], cwd: "/tmp", title: "", kind: "shell", labels: {}, startedAt: started });
-    // A shell terminal.new started in thread s-1 (thread-owned; the sidebar hides it, as it hides every terminal of a known thread).
+    // A shell terminal.new started in thread s-1 (thread-owned: s-1's bottom panel).
     this.addTerm({ id: "t-s1-shell", argv: ["/bin/zsh", "-l"], cwd: CF, title: "", kind: "shell", labels: shellLabels("s-1", "repo-cf", CF), startedAt: started });
     // Sessions in every state. s-1/s-2 own t-claude/t-ghostty (labels.session above).
     this.sessions.clear();
@@ -935,19 +932,9 @@ export class World {
       case "claude":
         t.history = claudeIntro(o.cwd, t.cols, o.id === "t-claude" ? "refactor the sidebar tree into a virtualized list" : "port the grid renderer to libghostty-vt");
         break;
-      case "logs":
-        t.history = `${prompt(o.cwd)}tail -f ~/Library/Application\\ Support/code-foundry/logs/daemon.log\r\n`;
-        for (let i = 0; i < 12; i++) t.history += logLine(i, new Date(Date.now() - (12 - i) * 1000));
-        break;
       case "top":
         t.history = `${prompt(o.cwd)}top\r\n`;
         t.altScreen = true;
-        break;
-      case "exited":
-        t.history = testRunOutput(o.cwd);
-        t.state = TerminalState.EXITED;
-        t.exitCode = 1;
-        t.exitedAt = new Date(Date.now() - 5 * 60_000);
         break;
       case "shell":
         t.history = `${RESET}Last login: Thu Oct  8 09:12:44 on ttys004\r\n${prompt(o.cwd)}`;
@@ -980,8 +967,6 @@ export class World {
           const base = t.title.replace(/^\S+\s/, "");
           this.setTitle(t, `${t.tick % 12 === 0 ? "✳" : "⠐"} ${base}`);
         }
-      } else if (t.kind === "logs") {
-        this.output(t, logLine(t.tick));
       } else if (t.kind === "top" && t.altScreen) {
         this.output(t, topFrame(t.tick, t.cols, t.rows));
       }
@@ -1070,13 +1055,6 @@ export class World {
       }
       return;
     }
-    if (t.kind === "logs") {
-      if (text.includes("\x03")) {
-        t.kind = "shell";
-        this.output(t, `^C\r\n${prompt(t.cwd)}`);
-      }
-      return;
-    }
     const owner = [...this.sessions.values()].find((s) => s.terminalId === id);
     if (owner?.status === SessionStatus.NEEDS_ATTENTION) this.setSessionStatus(owner.id, SessionStatus.BUSY);
     if (owner && (t.line + text).replace(/\r$/, "").trim() === "/exit" && text.endsWith("\r")) {
@@ -1122,8 +1100,12 @@ export class World {
     this.publishTerm(t);
   }
 
-  /** Ends a terminal. A session whose process dies without a close request disconnects. */
-  kill(id: string, code = 129, notifySession = true): void {
+  /**
+   * Ends a terminal. A session whose process dies without a close request disconnects.
+   * `keep` leaves an exited shell in place (the reaper has not got to it yet; tests use it
+   * to see the exit overlay).
+   */
+  kill(id: string, code = 129, notifySession = true, keep = false): void {
     const t = this.term(id);
     if (t.state !== TerminalState.RUNNING) return;
     const owner = notifySession ? [...this.sessions.values()].find((s) => s.terminalId === id && s.state !== SessionState.CLOSING) : undefined;
@@ -1142,7 +1124,7 @@ export class World {
     t.attach.publish("end");
     this.publishTerm(t);
     // Like the daemon's shell reaper: a shell terminal.new started is removed once it exits.
-    if (t.labels[LABEL_KIND] === KIND_SHELL) this.remove(id);
+    if (t.labels[LABEL_KIND] === KIND_SHELL && !keep) this.remove(id);
   }
 
   /** terminal.close / TerminalService.Close: kill, then remove once exited. Only shells, like the daemon. */
@@ -2019,7 +2001,7 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "help" } } }))}`,
       },
       {
-        cmd: { name: "view.panel.toggle", title: "Toggle Side Panel", category: "View", description: "Show or hide the side panel next to the selected session, terminal, worktree, or page.", keybindings: ["cmd+shift+e"], args: [] },
+        cmd: { name: "view.panel.toggle", title: "Toggle Side Panel", category: "View", description: "Show or hide the side panel next to the selected thread or page.", keybindings: ["cmd+shift+e"], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.toggle" } } }))}`,
       },
@@ -2029,12 +2011,12 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "bottom.toggle" } } }))}`,
       },
       {
-        cmd: { name: "view.panel.expand", title: "Expand Side Panel", category: "View", description: "Toggle the side panel between its split width and the full width of the content area for the selected session, terminal, worktree, or page.", keybindings: [], args: [] },
+        cmd: { name: "view.panel.expand", title: "Expand Side Panel", category: "View", description: "Toggle the side panel between its split width and the full width of the content area for the selected thread or page.", keybindings: [], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.expand" } } }))}`,
       },
       {
-        cmd: { name: "view.panel.new-tab", title: "New Side Panel Tab", category: "View", description: "Show the surface list in the side panel of the selected session, terminal, worktree, or page, to open another tab there.", keybindings: [], args: [] },
+        cmd: { name: "view.panel.new-tab", title: "New Side Panel Tab", category: "View", description: "Show the surface list in the side panel of the selected thread or page, to open another tab there.", keybindings: [], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.new-tab" } } }))}`,
       },
@@ -2060,8 +2042,8 @@ export class World {
           keybindings: [],
           args: [],
         },
-        // Like the daemon: a thread or terminal is active and it sits in a registered worktree.
-        when: (ctx) => Boolean((ctx?.activeSessionId || ctx?.activeTerminalId) && ctx.activeRepoId && ctx.activeWorktreePath),
+        // Like the daemon: a thread is active and it sits in a registered worktree.
+        when: (ctx) => Boolean(ctx?.activeSessionId && ctx.activeRepoId && ctx.activeWorktreePath),
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.worktree" } } }))}`,
       },
       {

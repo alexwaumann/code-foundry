@@ -6,16 +6,15 @@ import { listRepos } from "@/api/repo";
 import { listSessions } from "@/api/session";
 import { errorMessage, isAbort, runStream, type StreamStatus } from "@/api/stream";
 import { listTerminals } from "@/api/terminal";
-import { onNewTerminal, onRemovedTerminal } from "./bottomActions";
+import { onNewTerminal, onRemovedTerminal, revealArrived } from "./bottomActions";
 import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
-import { applyIntent } from "./intents";
+import { applyIntent, retryFocusTerminal } from "./intents";
 import { applyRepoEvent, replaceRepos, useReposStore } from "./repos";
-import { applyRetiredUsage, applySessionEvent, replaceSessions, sessionOfTerminal, useSessionsStore } from "./sessions";
+import { applyRetiredUsage, applySessionEvent, replaceSessions, useSessionsStore } from "./sessions";
 import { applySettingsSnapshot, loadSettingsSchema } from "./settings";
 import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./terminals";
 import { applyUpdateEvent } from "./update";
-import { useUiStore } from "./ui";
 import { applyWorkspaceEvent, useWorkspacesStore } from "./workspaces";
 import { applyRepoEventToDetails } from "./worktreeDetail";
 
@@ -65,19 +64,8 @@ const handlers: Handlers = {
 
 export function dispatchEvent(ev: EventView): void {
   (handlers[ev.source] as (e: EventView["event"]) => void)(ev.event);
-  if (ev.source === "terminal" || ev.source === "session") promoteTerminalSelection();
-}
-
-/**
- * Terminals of known sessions have no row of their own. If the selection points at one
- * (e.g. a FocusTerminal that raced the session event), show it as its session.
- */
-function promoteTerminalSelection(): void {
-  const ui = useUiStore.getState();
-  if (ui.selection.kind !== "terminal") return;
-  const t = useTerminalsStore.getState().byId[ui.selection.id];
-  const session = t && sessionOfTerminal(useSessionsStore.getState(), t);
-  if (session) ui.select({ kind: "session", id: session.id });
+  // A focusTerminal that raced its terminal or thread selects the thread once both are known.
+  if (ev.source === "terminal" || ev.source === "session") retryFocusTerminal();
 }
 
 /** True when the error means the daemon does not serve the RPC (older daemon). */
@@ -118,7 +106,10 @@ export function startEventSync(sessionRetryMs = 10_000): () => void {
       const [repos, terminals] = await Promise.all([listRepos(daemon, signal), listTerminals(daemon, signal), reconcileSessions(signal)]);
       useReposStore.setState({ ...replaceRepos(repos), loaded: true });
       useTerminalsStore.setState((s) => ({ ...replaceTerminals(s, terminals), loaded: true }));
-      promoteTerminalSelection();
+      // The List brings terminals without updated events: a pending reveal's shell, or a
+      // pending Claude terminal's thread, may be here now.
+      revealArrived();
+      retryFocusTerminal();
     },
     onEvent: dispatchEvent,
     onStatus: (stream, err) => {

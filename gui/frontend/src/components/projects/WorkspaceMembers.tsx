@@ -6,6 +6,7 @@ import { RowList } from "@/components/prs/RowList";
 import { NavRow } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
 import { addableRepos, memberKey, threadAt } from "@/lib/projects";
+import { newThreadTerminal } from "@/stores/bottomActions";
 import { addToWorkspace, newTerminalIn, removeFromWorkspace } from "@/stores/projectActions";
 import { openWorktreeTab } from "@/stores/worktreePanel";
 import { useReposStore } from "@/stores/repos";
@@ -75,7 +76,12 @@ function PanelMemberRow({ workspaceId, member, threadId, onOpen }: RowOptions & 
               <ArrowRightLeft />
             </RowAction>
           )}
-          <RowAction label="New terminal here" testId="member-terminal" onClick={() => void newTerminalIn(member.repoId, member.path)}>
+          {/* In a thread's panel the thread owns the shell (its bottom panel); else the Projects page's. */}
+          <RowAction
+            label="New terminal here"
+            testId="member-terminal"
+            onClick={() => void (threadId ? newThreadTerminal(threadId, member.path) : newTerminalIn(member.repoId, member.path))}
+          >
             <SquareTerminal />
           </RowAction>
           <RowAction label={`Remove ${name} from the workspace`} destructive testId="member-remove" onClick={() => void removeFromWorkspace(workspaceId, member.repoId)}>

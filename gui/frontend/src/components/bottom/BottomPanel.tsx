@@ -11,7 +11,7 @@ import { closeBottomTerminal, newBottomTerminal, paneContext } from "@/stores/bo
 import {
   activateBottomTab,
   bottomVisible,
-  bottomTabTitle,
+  bottomTabTitleOf,
   getBottomActiveId,
   requestBottomFocus,
   toggleBottom,
@@ -49,15 +49,12 @@ function openTab(panelKey: string, id: string): void {
 }
 
 /**
- * One terminal's tab: icon, title (bottomTabTitle), × (on hover, keyboard focus, or when
+ * One terminal's tab: icon, title (bottomTabTitleOf: duplicates numbered), × (on hover, keyboard focus, or when
  * active). Middle click closes. The tab's tooltip is the full cwd, which the title hides.
  * `focusable` is the roving tabindex: only the active tab (and its ×) is in the Tab order.
  */
 function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id: string; active: boolean; focusable: boolean }) {
-  const title = useTerminalsStore((s) => {
-    const t = s.byId[id];
-    return t ? bottomTabTitle(t, panelKey) : id;
-  });
+  const title = useTerminalsStore((s) => bottomTabTitleOf(s, panelKey, id));
   const cwd = useTerminalsStore((s) => s.byId[id]?.cwd ?? "");
   const exited = useTerminalsStore((s) => s.byId[id]?.state === "exited");
   return (

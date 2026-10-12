@@ -2,7 +2,6 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RepoView, WorktreeView } from "@/api/repo";
 import type { SessionView } from "@/api/session";
-import type { TerminalView } from "@/api/terminal";
 
 // The tab body's GitHub section reads branch pull requests; nothing to fetch here.
 const getBranchPullRequests = vi.hoisted(() => vi.fn(() => Promise.resolve({ pullRequests: [], fetchedAtMs: 1, lastError: "" })));
@@ -12,7 +11,6 @@ const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useReposStore } = await import("@/stores/repos");
 const { useSessionsStore } = await import("@/stores/sessions");
-const { useTerminalsStore } = await import("@/stores/terminals");
 const { useUiStore } = await import("@/stores/ui");
 const { showView, useViewsStore, worktreePanelCommand } = await import("@/stores/views");
 const { showWorktreeInPanel, worktreeTabTitle } = await import("@/stores/worktreePanel");
@@ -23,7 +21,6 @@ const status = { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untr
 const wt = (repoId: string, path: string, branch: string, isMain = false): WorktreeView => ({ repoId, path, branch, head: "abc", detached: false, isMain, status });
 const repo = (id: string, extra: WorktreeView[] = []): RepoView => ({ id, path: `/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [wt(id, `/src/${id}`, "main", true), ...extra] });
 const thread = (id: string, o: Partial<SessionView>) => ({ id, repoId: "web", worktreePath: WEB_MAIN, workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", linkedPullRequests: [], ...o }) as SessionView;
-const term = (id: string, cwd: string, labels: Record<string, string> = {}): TerminalView => ({ id, argv: ["/bin/zsh"], cwd, cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, labels });
 
 function select(id: string): void {
   useUiStore.setState({ selection: { kind: "session", id } });
@@ -32,12 +29,16 @@ function select(id: string): void {
 beforeEach(() => {
   useReposStore.setState({ byId: { web: repo("web", [wt("web", WEB_FEAT, "cf/feat")]) }, order: ["web"] });
   useSessionsStore.setState({
-    byId: { "s-main": thread("s-main", {}), "s-feat": thread("s-feat", { worktreePath: WEB_FEAT }), "s-lost": thread("s-lost", { repoId: "", worktreePath: "/elsewhere" }) },
-    order: ["s-main", "s-feat", "s-lost"],
+    byId: {
+      "s-main": thread("s-main", {}),
+      "s-feat": thread("s-feat", { worktreePath: WEB_FEAT }),
+      "s-sub": thread("s-sub", { worktreePath: `${WEB_FEAT}/src` }),
+      "s-lost": thread("s-lost", { repoId: "", worktreePath: "/elsewhere" }),
+    },
+    order: ["s-main", "s-feat", "s-sub", "s-lost"],
   });
-  useTerminalsStore.setState({ byId: { "t-feat": term("t-feat", `${WEB_FEAT}/src`), "t-tmp": term("t-tmp", "/tmp") }, order: ["t-feat", "t-tmp"] });
   const open = { open: true, tabs: [], activeTabId: null };
-  usePanelStore.setState({ byKey: { "session:s-main": open, "session:s-feat": open, "terminal:t-feat": open, "terminal:t-tmp": open, "view:projects": open } });
+  usePanelStore.setState({ byKey: { "session:s-main": open, "session:s-feat": open, "session:s-sub": open, "view:projects": open } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, palette: { ...useUiStore.getState().palette, open: false } });
   select("s-feat");
@@ -72,14 +73,9 @@ describe("Worktree surface availability", () => {
     expect(row()).toBeNull();
   });
 
-  it("is listed for a terminal placed in a worktree, hidden for one elsewhere and on a page", () => {
-    useUiStore.setState({ selection: { kind: "terminal", id: "t-feat" } });
+  it("is hidden on a page", () => {
     render(<SidePanel />);
     expect(row()?.getAttribute("data-availability")).toBe("enabled");
-    act(() => {
-      useUiStore.setState({ selection: { kind: "terminal", id: "t-tmp" } });
-    });
-    expect(row()).toBeNull();
     act(() => {
       useUiStore.setState({ selection: { kind: "view", name: "projects" } });
     });
@@ -96,11 +92,11 @@ describe("Worktree surface availability", () => {
     expect(screen.getByTestId("worktree-surface-title").textContent).toBe("web@cf/feat");
   });
 
-  it("a terminal's tab follows its placement (the worktree, not the cwd inside it)", () => {
-    useUiStore.setState({ selection: { kind: "terminal", id: "t-feat" } });
+  it("a thread's tab follows its placement (the worktree, not the folder inside it)", () => {
+    select("s-sub");
     render(<SidePanel />);
     fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "t" });
-    expect(getPanel("terminal:t-feat").tabs[0]?.params).toEqual({ repo: "web", path: WEB_FEAT });
+    expect(getPanel("session:s-sub").tabs[0]?.params).toEqual({ repo: "web", path: WEB_FEAT });
   });
 });
 

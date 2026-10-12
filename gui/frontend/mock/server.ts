@@ -25,6 +25,8 @@
  *        plan, finished, Claude error, busy, idle, interrupted, and a disconnected one still asking
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
+ *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
+ *                                                 shell stays, exited, as if the reaper were late)
  *   POST /__mock/session/hold?id=s-1&id=s-5   (the clock stops changing them: s-1 stops flipping
  *        busy/idle, a starting or closing one does not settle; the sidebar order then holds still.
  *        e2e's resetMock holds s-1 and s-5.) POST /__mock/session/release?id=s-5 undoes it.
@@ -528,6 +530,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     return;
   }
   switch (`${req.method ?? ""} ${path}`) {
+    case "POST /__mock/terminal/exit":
+      try {
+        const id = q.get("id") ?? "";
+        world.kill(id, Number(q.get("code") ?? 0), false, q.get("keep") === "1");
+        json(res, 200, { ok: true });
+      } catch (err) {
+        json(res, 404, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
     case "POST /__mock/sessions-service":
       // enabled=false simulates a daemon without Phase 2a: SessionService 404s and the
       // events stream carries no session source. Reset turns it back on.

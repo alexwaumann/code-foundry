@@ -1,7 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionView, UsageBucketView } from "@/api/session";
-import type { TerminalView } from "@/api/terminal";
 
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
@@ -10,7 +9,6 @@ const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useReposStore } = await import("@/stores/repos");
 const { useSessionsStore } = await import("@/stores/sessions");
-const { useTerminalsStore } = await import("@/stores/terminals");
 const { useUiStore } = await import("@/stores/ui");
 const { showView, usagePanelCommand, useViewsStore } = await import("@/stores/views");
 
@@ -57,7 +55,6 @@ const pressU = () => fireEvent.keyDown(screen.getByTestId("side-panel"), { key: 
 
 beforeEach(() => {
   useReposStore.setState({ byId: {}, order: [] });
-  useTerminalsStore.setState({ byId: {}, order: [] });
   useSessionsStore.setState({ byId: { "s-1": thread("s-1", [OPUS_A, FABLE, OPUS_B]), "s-0": thread("s-0", []), "s-x": thread("s-x", [OLD]) }, order: ["s-1", "s-0", "s-x"] });
   usePanelStore.setState({ byKey: { "session:s-1": { open: true, tabs: [], activeTabId: null }, "session:s-0": { open: true, tabs: [], activeTabId: null }, "session:s-x": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });
@@ -144,16 +141,6 @@ describe("Usage surface", () => {
     expect(screen.getByTestId("usage-summary").textContent).toBe("101M tokens · 122 requests");
   });
 
-  it("follows a thread's terminal", () => {
-    useTerminalsStore.setState({ byId: { "t-1": { id: "t-1", cwd: "/src/web", labels: { session: "s-1" } } as unknown as TerminalView }, order: ["t-1"] });
-    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "terminal:t-1": { open: true, tabs: [], activeTabId: null } } }));
-    useUiStore.setState({ selection: { kind: "terminal", id: "t-1" } });
-    render(<SidePanel />);
-    pressU();
-    expect(getPanel("terminal:t-1").activeTabId).toBe("usage");
-    expect(screen.getByTestId("usage-surface").getAttribute("data-thread")).toBe("s-1");
-    expect(screen.getByTestId("usage-cost").textContent).toBe("$141.20");
-  });
 });
 
 describe("usagePanelCommand (view.panel.usage)", () => {

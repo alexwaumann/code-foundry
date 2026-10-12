@@ -10,7 +10,6 @@ import { selectionWorktree, worktreeTab } from "@/surfaces/workspaceTarget";
 import { keyOf, openSurface, togglePanel, type PanelTarget } from "./panel";
 import { findWorktree, mainWorktreePath, useReposStore, type ReposData } from "./repos";
 import { useSessionsStore } from "./sessions";
-import { useTerminalsStore } from "./terminals";
 import { useUiStore, type Selection } from "./ui";
 
 /**
@@ -68,12 +67,12 @@ export function showWorktreeInThread(sessionId: string): boolean {
 
 /**
  * Opens (or activates) the selection's own worktree tab in its panel when the selection
- * is a thread or terminal in a registered worktree. Returns that panel's key, or null
+ * is a thread in a registered worktree. Returns that panel's key, or null
  * otherwise. It does not request focus.
  */
 export function openWorktreeSurface(sel: Selection = useUiStore.getState().selection): string | null {
   const key = keyOf(sel);
-  const w = selectionWorktree(sel, { repos: useReposStore.getState(), sessions: useSessionsStore.getState(), terminals: useTerminalsStore.getState() });
+  const w = selectionWorktree(sel, { repos: useReposStore.getState(), sessions: useSessionsStore.getState() });
   if (key === null || w === null) return null;
   return openWorktreeTab(key, w.repoId, w.path) ? key : null;
 }

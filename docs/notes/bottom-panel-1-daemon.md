@@ -155,6 +155,8 @@ the GUI's `showView` returns false for the name, which is harmless.
 
 ## Between PR A and PR B
 
+(Superseded by PR C, `bottom-panel-3-routing.md`: no terminal rows, no `terminal` selection.)
+
 * The sidebar hides every terminal whose `session` label names a known thread
   (`lib/tree.ts`), and the `focusTerminal` intent (`stores/intents.ts`) selects that
   thread. A thread's shell (cmd+t on a thread) therefore has no row of its own and only

@@ -6,7 +6,6 @@ import { branchKey, branchPullRequestsResource } from "@/stores/gh";
 import { copyPullRequestLink } from "@/stores/prPanel";
 import { useReposStore } from "@/stores/repos";
 import { useSessionsStore } from "@/stores/sessions";
-import { useTerminalsStore } from "@/stores/terminals";
 import type { Selection } from "@/stores/ui";
 import { PULL_REQUEST_KIND, prRefOfTab, pullRequestTab, selectionBranch, selectionPullRequest, type PrRef } from "./pullrequestTarget";
 import type { SurfaceSpec } from "./types";
@@ -14,7 +13,7 @@ import type { SurfaceSpec } from "./types";
 const noop = (): void => undefined;
 
 function stores() {
-  return { repos: useReposStore.getState(), sessions: useSessionsStore.getState(), terminals: useTerminalsStore.getState() };
+  return { repos: useReposStore.getState(), sessions: useSessionsStore.getState() };
 }
 
 /** The pull request of the selection's worktree branch, from what is loaded now. */
@@ -24,7 +23,7 @@ function currentPullRequest(sel: Selection): PrRef | null {
 }
 
 /**
- * Pull request: the selection's pull request (a session's, terminal's or worktree's
+ * Pull request: the selection's pull request (a session's or worktree's
  * branch; a repo row's main worktree). Enabled when that branch has one; disabled
  * otherwise, including on the Pull Requests page, whose rows open a pull request
  * explicitly (openSurface with pullRequestTab). Tabs: params { slug, number }, title #N.
@@ -35,7 +34,7 @@ export const pullRequestSurface: SurfaceSpec = {
   icon: GitPullRequest,
   hotkey: "p",
   available: (ctx) => (currentPullRequest(ctx.selection) ? "enabled" : "disabled"),
-  watches: [useReposStore, useSessionsStore, useTerminalsStore, branchPullRequestsResource.store],
+  watches: [useReposStore, useSessionsStore, branchPullRequestsResource.store],
   // Keeps the selection's branch pull requests loaded while its panel shows, so the
   // empty list and the P hotkey know whether there is one. Follows a branch switch.
   warm: (ctx) => {
@@ -50,7 +49,7 @@ export const pullRequestSurface: SurfaceSpec = {
       release = next === null ? noop : branchPullRequestsResource.watch(next);
     };
     sync();
-    const stops = [useReposStore.subscribe(sync), useSessionsStore.subscribe(sync), useTerminalsStore.subscribe(sync)];
+    const stops = [useReposStore.subscribe(sync), useSessionsStore.subscribe(sync)];
     return () => {
       for (const stop of stops) stop();
       release();

@@ -1,5 +1,9 @@
 # Sidebar: stable order and a collapsible Working section
 
+> **Superseded in part (2026-10-11):** the Terminals group (6. below), loose terminal rows
+> and `leafOrder` went away with `bottom-panel-3-routing.md`. The Working section is now the
+> list's last group and its header the only header; cmd+1..9 jump to the Nth thread shown.
+
 Decided 2026-10-11 (Alex). Frontend only. Design record: the static sketch
 `/tmp/working-header/index.html` (`?v=1..3`, PNGs in
 `~/.t3/userdata/attachments/working-header/v1.png` … `v3.png`); the shipped header is `?v=2`.

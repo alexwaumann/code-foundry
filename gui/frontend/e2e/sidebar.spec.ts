@@ -98,23 +98,10 @@ test("the sidebar is a flat thread list: waiting threads on top, working ones un
   await expect(row(page, `s:${driver}`)).toBeVisible();
   await expect(page.getByTestId("sidebar-band")).toContainText("Code Foundry");
   // The waiting thread (s-2) on top, then idle threads newest first (no header), then the
-  // working ones under Working, then terminals no thread owns under Terminals.
-  await expect.poll(() => rowKeys(page)).toEqual([
-    "s:s-2",
-    `s:${driver}`,
-    "s:s-6",
-    "s:s-4",
-    "s:s-3",
-    "# Working 2",
-    "s:s-5",
-    "s:s-1",
-    "# Terminals",
-    "t:t-logs",
-    "t:t-top",
-    "t:t-tests",
-    "t:t-tmp",
-  ]);
-  await expect(list(page).locator('[data-row-kind="repo"], [data-row-kind="worktree"], [data-row-kind="group"]')).toHaveCount(0);
+  // working ones under Working. No terminal rows: shells live in bottom panels.
+  await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", `s:${driver}`, "s:s-6", "s:s-4", "s:s-3", "# Working 2", "s:s-5", "s:s-1"]);
+  await expect(list(page).locator('[data-row-kind]:not([data-row-kind="session"]):not([data-row-kind="header"])')).toHaveCount(0);
+  await expect(list(page)).toHaveAttribute("aria-label", "Threads");
 
   // A workspace thread: its cwd's project and branch, and the workspace badge.
   const d = row(page, `s:${driver}`);
@@ -129,11 +116,8 @@ test("the sidebar is a flat thread list: waiting threads on top, working ones un
   await expect(s1.getByTestId("row-project")).toHaveText("code-foundry");
   await expect(s1.getByTestId("row-branch")).toHaveText("main");
   await expect(s1.getByTestId("row-workspace")).toHaveCount(0);
-  // Terminals say where they run.
-  await expect(row(page, "t:t-top").getByTestId("row-place")).toHaveText("code-foundry · feat/sidebar");
-  await expect(row(page, "t:t-tmp").getByTestId("row-place")).toHaveText("/tmp");
 
-  // Keyboard: ↓ skips headers; Enter selects.
+  // Keyboard: ↓ moves; Enter selects.
   await list(page).focus();
   await page.keyboard.press("Home");
   await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-2");
@@ -352,11 +336,6 @@ test("status kinds: each thread's second line says its status in words and colou
       "s:s-5",
       "s:s-k-busy",
       "s:s-1",
-      "# Terminals",
-      "t:t-logs",
-      "t:t-top",
-      "t:t-tests",
-      "t:t-tmp",
     ]);
   const sections = await list(page)
     .locator('[data-row-kind="session"]')
@@ -420,13 +399,13 @@ test("status kinds: each thread's second line says its status in words and colou
 
 test("Working section: a header with the count collapses and expands its rows, persists across a reload, and cmd+N skips hidden rows", async ({ page }) => {
   await openApp(page);
-  await expect.poll(() => rowKeys(page)).toEqual(DEFAULT_ORDER.map((k) => (k === "h:working" ? "# Working 2" : k === "h:terminals" ? "# Terminals" : k)));
+  await expect.poll(() => rowKeys(page)).toEqual(DEFAULT_ORDER.map((k) => (k === "h:working" ? "# Working 2" : k)));
   const header = page.getByTestId("working-header");
   await expect(header).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByTestId("working-label")).toHaveText("Working");
   await expect(page.getByTestId("working-count")).toHaveText("2");
   await expect(header).toHaveAccessibleName("Working 2");
-  // Not an option of the listbox: the row is presentation, like the Terminals header.
+  // Not an option of the listbox: the row is presentation.
   await expect(row(page, "h:working")).toHaveAttribute("role", "presentation");
   // Same left edge as the rows (the 8px gutter rule): the header button starts where s-3 starts.
   const hb = await header.boundingBox();
@@ -442,17 +421,22 @@ test("Working section: a header with the count collapses and expands its rows, p
   await expect(row(page, "s:s-1")).toHaveCount(0);
   await expect(row(page, "s:s-5")).toHaveCount(0);
   await expect(page.getByTestId("working-count")).toHaveText("2");
-  await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4", "s:s-3", "# Working 2", "# Terminals", "t:t-logs", "t:t-top", "t:t-tests", "t:t-tmp"]);
+  await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4", "s:s-3", "# Working 2"]);
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-claude");
 
-  // cmd+N counts only the rows shown: cmd+5 is now the first terminal.
+  // cmd+N counts only the rows shown: cmd+4 is s-3, the last one, and cmd+5 does nothing.
+  await page.keyboard.press("Meta+4");
+  await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Meta+5");
-  await expect(row(page, "t:t-logs")).toHaveAttribute("aria-selected", "true");
-  // Arrows and End skip the hidden rows too: ↓ from s-3 lands on t-logs.
+  await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
+  // Arrows and End skip the hidden rows too: s-3 is the last row ↓ and End reach.
   await row(page, "s:s-3").click();
   await list(page).focus();
   await page.keyboard.press("ArrowDown");
-  await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-t:t-logs");
+  await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-3");
+  await page.keyboard.press("Home");
+  await page.keyboard.press("End");
+  await expect(list(page)).toHaveAttribute("aria-activedescendant", "row-s:s-3");
 
   // The collapsed state survives a reload.
   await page.reload();
@@ -464,7 +448,7 @@ test("Working section: a header with the count collapses and expands its rows, p
   // Expanding brings the rows back, and cmd+5 is the starting thread again.
   await page.getByTestId("working-header").click();
   await expect(page.getByTestId("working-header")).toHaveAttribute("aria-expanded", "true");
-  await expect.poll(() => rowKeys(page)).toEqual(DEFAULT_ORDER.map((k) => (k === "h:working" ? "# Working 2" : k === "h:terminals" ? "# Terminals" : k)));
+  await expect.poll(() => rowKeys(page)).toEqual(DEFAULT_ORDER.map((k) => (k === "h:working" ? "# Working 2" : k)));
   await page.keyboard.press("Meta+5");
   await expect(row(page, "s:s-5")).toHaveAttribute("aria-selected", "true");
 
@@ -496,7 +480,7 @@ test("Working section: the header counts threads as they start and stop working,
   await expect(row(page, "s:s-1")).toHaveAttribute("data-section", "idle");
   await mockPost("session/disconnect?id=s-5&reason=closed&code=0&status=idle");
   await expect(page.getByTestId("working-header")).toHaveCount(0);
-  expect((await rowKeys(page)).filter((k) => k.startsWith("#"))).toEqual(["# Terminals"]);
+  expect((await rowKeys(page)).filter((k) => k.startsWith("#"))).toEqual([]);
 });
 
 test("hovering a thread row shows its tooltip: name, project, branch with a worktree chip, model and effort", async ({ page }) => {

@@ -56,7 +56,7 @@ func TestViewPanelWorkspaceAvailability(t *testing.T) {
 		want bool
 	}{
 		{name: "workspace thread in the GUI", ctx: command.Context{ActiveSessionID: "s1", ActiveWorkspaceID: "w1", ActiveView: "session"}, want: true},
-		{name: "workspace thread's terminal", ctx: command.Context{ActiveSessionID: "s1", ActiveTerminalID: "t1", ActiveWorkspaceID: "w1", ActiveView: "terminal"}, want: true},
+		{name: "workspace thread with its terminal", ctx: command.Context{ActiveSessionID: "s1", ActiveTerminalID: "t1", ActiveWorkspaceID: "w1", ActiveView: "session"}, want: true},
 		{name: "project thread", ctx: command.Context{ActiveSessionID: "s1", ActiveView: "session"}, want: false},
 		{name: "workspace composer (no thread)", ctx: command.Context{ActiveRepoID: "r1", ActiveWorkspaceID: "w1", ActiveView: "compose"}, want: false},
 		{name: "nothing selected", ctx: command.Context{ActiveView: "dashboard"}, want: false},
@@ -90,8 +90,8 @@ func TestViewPanelThreadSurfacesAvailability(t *testing.T) {
 	}{
 		{name: "project thread in the GUI", ctx: command.Context{ActiveSessionID: "s1", ActiveView: "session"}, want: true},
 		{name: "workspace thread", ctx: command.Context{ActiveSessionID: "s1", ActiveWorkspaceID: "w1", ActiveView: "session"}, want: true},
-		{name: "thread's terminal", ctx: command.Context{ActiveSessionID: "s1", ActiveTerminalID: "t1", ActiveView: "terminal"}, want: true},
-		{name: "plain terminal", ctx: command.Context{ActiveTerminalID: "t1", ActiveView: "terminal"}, want: false},
+		{name: "thread with its terminal", ctx: command.Context{ActiveSessionID: "s1", ActiveTerminalID: "t1", ActiveView: "session"}, want: true},
+		{name: "a terminal alone (CLI)", ctx: command.Context{ActiveTerminalID: "t1"}, want: false},
 		{name: "worktree", ctx: command.Context{ActiveRepoID: "r1", ActiveWorktreePath: "/wt", ActiveView: "worktree"}, want: false},
 		{name: "workspace composer (no thread)", ctx: command.Context{ActiveRepoID: "r1", ActiveWorkspaceID: "w1", ActiveView: "compose"}, want: false},
 		{name: "nothing selected", ctx: command.Context{ActiveView: "dashboard"}, want: false},
@@ -127,8 +127,8 @@ func TestViewPanelWorktreeAvailability(t *testing.T) {
 		want bool
 	}{
 		{name: "thread in a worktree", ctx: command.Context{ActiveSessionID: "s1", ActiveRepoID: "r1", ActiveWorktreePath: "/wt", ActiveView: "session"}, want: true},
-		{name: "thread's terminal", ctx: command.Context{ActiveSessionID: "s1", ActiveTerminalID: "t1", ActiveRepoID: "r1", ActiveWorktreePath: "/wt", ActiveView: "terminal"}, want: true},
-		{name: "plain terminal in a worktree", ctx: command.Context{ActiveTerminalID: "t1", ActiveRepoID: "r1", ActiveWorktreePath: "/wt", ActiveView: "terminal"}, want: true},
+		{name: "thread with its terminal", ctx: command.Context{ActiveSessionID: "s1", ActiveTerminalID: "t1", ActiveRepoID: "r1", ActiveWorktreePath: "/wt", ActiveView: "session"}, want: true},
+		{name: "Projects page bottom shell in a worktree (no thread)", ctx: command.Context{ActiveTerminalID: "t1", ActiveRepoID: "r1", ActiveWorktreePath: "/wt", ActiveView: "projects"}, want: false},
 		{name: "thread outside any worktree", ctx: command.Context{ActiveSessionID: "s1", ActiveView: "session"}, want: false},
 		{name: "thread with a repo but no worktree", ctx: command.Context{ActiveSessionID: "s1", ActiveRepoID: "r1", ActiveView: "session"}, want: false},
 		{name: "worktree page", ctx: command.Context{ActiveRepoID: "r1", ActiveWorktreePath: "/wt", ActiveView: "worktree"}, want: false},

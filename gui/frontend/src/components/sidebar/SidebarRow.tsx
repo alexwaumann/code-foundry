@@ -6,16 +6,14 @@ import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
-import { basename, terminalLabel } from "@/lib/path";
 import { sessionBadge } from "@/lib/session";
 import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLine, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
-import { modelLabel, terminalPlace, threadRowModel, type RepoLookup, type WorkspaceLookup } from "@/lib/threadRow";
-import { WORKTREE_LABEL, type HeaderRow, type Row } from "@/lib/tree";
+import { modelLabel, threadRowModel, type RepoLookup, type WorkspaceLookup } from "@/lib/threadRow";
+import type { HeaderRow, Row } from "@/lib/tree";
 import { useReposStore } from "@/stores/repos";
 import { renameSession } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
 import { useModelChoices } from "@/stores/settings";
-import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { RowTooltipsEnabled } from "./rowTooltips";
@@ -30,68 +28,11 @@ interface RowProps {
   onActivate: (row: Row, how: "click") => void;
 }
 
-/** A small muted chip on a row's first line ("fullscreen", "exited"). */
+/** A small muted chip (the tooltip's "worktree" and "no git"). */
 function Chip({ children, className, ...props }: { children: ReactNode; className?: string; "aria-label"?: string; "data-testid"?: string }) {
   return (
     <span className={cn("shrink-0 rounded-[3px] bg-foreground/8 px-1 text-[10px] leading-4 font-medium text-muted-foreground", className)} {...props}>
       {children}
-    </span>
-  );
-}
-
-/** What a terminal row's first line says about its process: full screen, exited, or nothing while it runs. */
-function TerminalState({ id }: { id: string }) {
-  const state = useTerminalsStore((s) => s.byId[id]?.state ?? "unknown");
-  const exitCode = useTerminalsStore((s) => s.byId[id]?.exitCode ?? 0);
-  const alt = useTerminalsStore((s) => s.byId[id]?.altScreen ?? false);
-  if (state === "exited") {
-    return exitCode === 0 ? (
-      <Chip aria-label="exited" data-testid="terminal-state">
-        exited
-      </Chip>
-    ) : (
-      <Chip className="bg-red-500/15 text-red-600 dark:text-red-300" aria-label={`exited ${String(exitCode)}`} data-testid="terminal-state">
-        exit {exitCode}
-      </Chip>
-    );
-  }
-  if (state === "running" && alt) {
-    return (
-      <Chip aria-label="running (full screen)" data-testid="terminal-state">
-        fullscreen
-      </Chip>
-    );
-  }
-  return null;
-}
-
-/** A terminal no thread owns: its title, the program, its state, and where it runs. */
-function TerminalLabel({ id }: { id: string }) {
-  const label = useTerminalsStore((s) => {
-    const t = s.byId[id];
-    return t ? terminalLabel(t) : id;
-  });
-  const prog = useTerminalsStore((s) => {
-    const t = s.byId[id];
-    return t?.title && t.argv[0] ? basename(t.argv[0]) : "";
-  });
-  const exited = useTerminalsStore((s) => s.byId[id]?.state === "exited");
-  const where = useTerminalsStore(useShallow((s) => ({ cwd: s.byId[id]?.cwd ?? "", worktreeLabel: s.byId[id]?.labels[WORKTREE_LABEL] ?? "" })));
-  const place = useReposStore((s) => terminalPlace(s, where));
-  return (
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-      <span className="flex min-w-0 items-center gap-1.5">
-        <span className={cn("truncate", exited && "text-muted-foreground")} data-testid="terminal-name">
-          {label}
-        </span>
-        {prog && <span className="truncate text-xs text-muted-foreground">{prog}</span>}
-        <span className="ml-auto flex shrink-0 items-center gap-1 pl-1">
-          <TerminalState id={id} />
-        </span>
-      </span>
-      <span className="truncate text-[11px] text-muted-foreground" data-testid="row-place">
-        {place}
-      </span>
     </span>
   );
 }
@@ -403,18 +344,14 @@ function ThreadTooltip({ id, children }: { id: string; children: ReactElement })
   );
 }
 
-function HeaderLabel({ label }: { label: string }) {
-  return <span className="truncate pt-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">{label}</span>;
-}
-
 /**
- * The Working section's header (design record: /tmp/working-header/index.html?v=2): the
- * Terminals header's type, the number of working threads after the label, and a chevron on
- * the right saying whether the section is open. A button (aria-expanded) inside the row;
- * the row itself stays role="presentation" like the Terminals header, so the listbox's
- * cursor never lands on it. Pressing it with the mouse does not take focus from the list.
+ * The Working section's header (design record: /tmp/working-header/index.html?v=2): an
+ * 11px uppercase muted label, the number of working threads after it, and a chevron on the
+ * right saying whether the section is open. A button (aria-expanded) inside the row; the
+ * row itself is role="presentation", so the listbox's cursor never lands on it. Pressing it
+ * with the mouse does not take focus from the list.
  */
-function WorkingHeader({ row }: { row: Extract<HeaderRow, { section: "working" }> }) {
+function WorkingHeader({ row }: { row: HeaderRow }) {
   const Chevron = row.collapsed ? ChevronRight : ChevronDown;
   return (
     <div id={`row-${row.key}`} role="presentation" data-row-kind="header" data-row-key={row.key} data-section={row.section} className="flex h-full items-end select-none">
@@ -444,37 +381,31 @@ function WorkingHeader({ row }: { row: Extract<HeaderRow, { section: "working" }
 }
 
 export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onActivate }: RowProps) {
-  if (row.kind === "header") {
-    if (row.section === "working") return <WorkingHeader row={row} />;
-    return (
-      <div id={`row-${row.key}`} role="presentation" data-row-kind="header" data-row-key={row.key} className="flex h-full items-end px-2 pb-1 select-none">
-        <HeaderLabel label={row.label} />
+  if (row.kind === "header") return <WorkingHeader row={row} />;
+  return (
+    <ThreadTooltip id={row.sessionId}>
+      <div
+        id={`row-${row.key}`}
+        role="option"
+        aria-selected={selected}
+        data-row-kind={row.kind}
+        data-row-key={row.key}
+        data-section={row.section}
+        data-cursor={cursor || undefined}
+        className={cn(
+          "group/row flex h-full cursor-default items-center gap-1.5 rounded-md px-2 text-[13px] select-none",
+          selected ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/90 hover:bg-sidebar-accent/50",
+          cursor && "group-focus:ring-1 group-focus:ring-sidebar-ring group-focus:ring-inset",
+        )}
+        onClick={() => {
+          onActivate(row, "click");
+        }}
+        onDoubleClick={() => {
+          useUiStore.getState().setRenaming(row.sessionId);
+        }}
+      >
+        <SessionLabel id={row.sessionId} />
       </div>
-    );
-  }
-  const el = (
-    <div
-      id={`row-${row.key}`}
-      role="option"
-      aria-selected={selected}
-      data-row-kind={row.kind}
-      data-row-key={row.key}
-      data-section={row.section}
-      data-cursor={cursor || undefined}
-      className={cn(
-        "group/row flex h-full cursor-default items-center gap-1.5 rounded-md px-2 text-[13px] select-none",
-        selected ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/90 hover:bg-sidebar-accent/50",
-        cursor && "group-focus:ring-1 group-focus:ring-sidebar-ring group-focus:ring-inset",
-      )}
-      onClick={() => {
-        onActivate(row, "click");
-      }}
-      onDoubleClick={() => {
-        if (row.kind === "session") useUiStore.getState().setRenaming(row.sessionId);
-      }}
-    >
-      {row.kind === "terminal" ? <TerminalLabel id={row.terminalId} /> : <SessionLabel id={row.sessionId} />}
-    </div>
+    </ThreadTooltip>
   );
-  return row.kind === "session" ? <ThreadTooltip id={row.sessionId}>{el}</ThreadTooltip> : el;
 });

@@ -63,10 +63,10 @@ const ViewPanelLinkedPRs = "panel.linked-prs"
 const ViewPanelUsage = "panel.usage"
 
 // ViewPanelWorktree is the ShowView name that opens (or reveals) the Worktree surface in
-// the side panel of the selected thread or terminal: the overview of the worktree it runs
-// in (sync state, GitHub activity, files, log). An action on per-selection GUI state like
-// ViewPanelWorkspace; a window whose selection is not a thread or terminal in a
-// registered worktree ignores it.
+// the side panel of the selected thread: the overview of the worktree it runs in (sync
+// state, GitHub activity, files, log). An action on per-selection GUI state like
+// ViewPanelWorkspace; a window whose selection is not a thread in a registered worktree
+// ignores it.
 const ViewPanelWorktree = "panel.worktree"
 
 // hasWorkspaceThreadContext is view.panel.workspace's availability: a thread is active
@@ -76,12 +76,13 @@ func hasWorkspaceThreadContext(c Context) bool {
 	return hasSession(c) && c.ActiveWorkspaceID != ""
 }
 
-// hasWorktreeThreadContext is view.panel.worktree's availability: a thread or a terminal
-// is active and it sits in a registered worktree (the GUI passes the placement as
-// ActiveRepoID and ActiveWorktreePath; the CLI with --context-session or
-// --context-terminal plus --context-repo and --context-worktree).
+// hasWorktreeThreadContext is view.panel.worktree's availability: a thread is active and
+// it sits in a registered worktree (the GUI passes the placement as ActiveRepoID and
+// ActiveWorktreePath; the CLI with --context-session plus --context-repo and
+// --context-worktree). A terminal alone does not count: the GUI never selects one (a
+// Projects-page bottom shell brings its worktree, but the page has no thread).
 func hasWorktreeThreadContext(c Context) bool {
-	return (hasSession(c) || hasTerminal(c)) && hasWorktree(c)
+	return hasSession(c) && hasWorktree(c)
 }
 
 // RegisterView registers view.dashboard, which shows the dashboard, view.usage, which
@@ -146,7 +147,7 @@ func RegisterView(r *Registry, e Emitter) error {
 		Command{
 			Name:        "view.panel.toggle",
 			Title:       "Toggle Side Panel",
-			Description: "Show or hide the side panel next to the selected session, terminal, worktree, or page.",
+			Description: "Show or hide the side panel next to the selected thread or page.",
 			Category:    "View",
 			Keybindings: []string{"cmd+shift+e"},
 			Run: func(context.Context, Context, Args) (Result, error) {
@@ -166,7 +167,7 @@ func RegisterView(r *Registry, e Emitter) error {
 		Command{
 			Name:        "view.panel.expand",
 			Title:       "Expand Side Panel",
-			Description: "Toggle the side panel between its split width and the full width of the content area for the selected session, terminal, worktree, or page.",
+			Description: "Toggle the side panel between its split width and the full width of the content area for the selected thread or page.",
 			Category:    "View",
 			// No default chord (the user's choice); bindable in settings.
 			Run: func(context.Context, Context, Args) (Result, error) {
@@ -176,7 +177,7 @@ func RegisterView(r *Registry, e Emitter) error {
 		Command{
 			Name:        "view.panel.new-tab",
 			Title:       "New Side Panel Tab",
-			Description: "Show the surface list in the side panel of the selected session, terminal, worktree, or page, to open another tab there.",
+			Description: "Show the surface list in the side panel of the selected thread or page, to open another tab there.",
 			Category:    "View",
 			// No default chord, like view.panel.expand: the + after the panel's tabs runs
 			// it, and while the panel has focus each surface's letter opens that surface.

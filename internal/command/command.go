@@ -67,7 +67,7 @@ type Context struct {
 	ActiveSessionID    string
 	ActiveRepoID       string
 	ActiveWorktreePath string
-	// ActiveView is a logical view name ("terminal", "repo", ...). Empty from the CLI.
+	// ActiveView is a logical view name ("session", "projects", ...). Empty from the CLI.
 	ActiveView string
 	// ActiveWorkspaceID is the workspace that owns what is active (the active thread's
 	// workspace, or the workspace a composer or page is for). Empty for a project

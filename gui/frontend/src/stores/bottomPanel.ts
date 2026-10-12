@@ -87,6 +87,35 @@ export function bottomTabTitle(t: { title: string; cwd: string; labels: Readonly
   return t.title || basename(t.cwd);
 }
 
+/**
+ * Every tab title of a key's panel (bottomTabTitle), with fallback names told apart: the
+ * first shell named after a folder keeps the name, later ones with the same name get " 2",
+ * " 3", … in the terminals store's order, so they stay put as tabs come and go after
+ * them. A thread's shell with an OSC title shows it as is and takes no number.
+ */
+export function bottomTabTitles(terminals: TerminalsData, key: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const seen = new Map<string, number>();
+  for (const id of bottomTabIds(terminals, key)) {
+    const t = terminals.byId[id];
+    if (!t) continue;
+    if (key !== PROJECTS_KEY && t.title) {
+      out[id] = t.title;
+      continue;
+    }
+    const name = bottomTabTitle(t, key);
+    const n = (seen.get(name) ?? 0) + 1;
+    seen.set(name, n);
+    out[id] = n === 1 ? name : `${name} ${String(n)}`;
+  }
+  return out;
+}
+
+/** One tab's title as bottomTabTitles numbers it; a primitive, for a narrow selector. */
+export function bottomTabTitleOf(terminals: TerminalsData, key: string, id: string): string {
+  return bottomTabTitles(terminals, key)[id] ?? id;
+}
+
 /** Shows (true), hides (false) or flips (undefined) the panel. */
 export function setOpen(e: BottomEntry, open?: boolean): BottomEntry {
   const next = open ?? !e.open;

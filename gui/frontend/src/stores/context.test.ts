@@ -26,8 +26,8 @@ describe("the bottom panel's shell in the command context", () => {
 
   it("deriveContext puts the focused shell in activeTerminalId and keeps the rest", () => {
     const sel = { kind: "session", id: "s1" } as const;
-    const plain = deriveContext(sel, useTerminalsStore.getState(), useReposStore.getState());
-    const focused = deriveContext(sel, useTerminalsStore.getState(), useReposStore.getState(), undefined, "a");
+    const plain = deriveContext(sel, useReposStore.getState());
+    const focused = deriveContext(sel, useReposStore.getState(), undefined, { id: "a", labels: shell });
     expect(focused).toEqual({ ...plain, activeTerminalId: "a" });
     expect(focused.activeSessionId).toBe("s1");
   });
@@ -46,5 +46,36 @@ describe("the bottom panel's shell in the command context", () => {
 
   it("an explicit selection gets that selection's context only", () => {
     expect(getUiContext({ kind: "session", id: "s1" }).activeTerminalId).toBe("");
+  });
+});
+
+describe("a Projects-page shell in the command context", () => {
+  const wtShell = { kind: "shell", repo: "r1", worktree: "/src/app.worktrees/x" };
+  beforeEach(() => {
+    const list = [term("p", wtShell), term("q", { kind: "shell", worktree: "/src/y" })];
+    useTerminalsStore.setState({ byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id), loaded: true });
+    useReposStore.setState({ byId: {}, order: [] });
+    useSessionsStore.setState({ byId: {}, order: [] });
+    useUiStore.setState({ selection: { kind: "view", name: "projects" }, focus: "bottom", palette: closed });
+  });
+
+  const cases: [string, string, Partial<ReturnType<typeof getUiContext>>][] = [
+    ["its repo and worktree become the context (terminal.new starts beside it)", "p", { activeTerminalId: "p", activeRepoId: "r1", activeWorktreePath: "/src/app.worktrees/x", activeView: "projects" }],
+    ["without a repo label: the terminal only", "q", { activeTerminalId: "q", activeRepoId: "", activeWorktreePath: "", activeView: "projects" }],
+  ];
+  it.each(cases)("%s", (_name, active, want) => {
+    useBottomStore.setState({ byKey: { "view:projects": { open: true, activeTerminalId: active } }, pendingFocus: null, pendingFocusId: null });
+    expect(getUiContext()).toMatchObject(want);
+  });
+
+  it("a thread's shell keeps the thread's place", () => {
+    const ctx = deriveContext({ kind: "session", id: "s1" }, useReposStore.getState(), undefined, { id: "a", labels: shell });
+    expect(ctx).toMatchObject({ activeTerminalId: "a", activeSessionId: "s1", activeRepoId: "", activeWorktreePath: "" });
+  });
+
+  it("the keyboard elsewhere on the page: no shell, no worktree", () => {
+    useBottomStore.setState({ byKey: { "view:projects": { open: true, activeTerminalId: "p" } }, pendingFocus: null, pendingFocusId: null });
+    useUiStore.setState({ focus: "content" });
+    expect(getUiContext()).toMatchObject({ activeTerminalId: "", activeWorktreePath: "" });
   });
 });

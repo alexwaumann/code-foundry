@@ -33,11 +33,10 @@ test("register a plain folder, see No git everywhere, then repo git init turns i
 
   try {
     await page.goto("/");
-    // The terminal's sidebar row: "<project> · No git" where a branch would be.
-    const row = page.locator(`[data-row-key="t:${term.id}"]`);
-    await expect(row.getByTestId("row-place")).toHaveText(`${repo.name} · No git`);
-
     await page.getByTestId("nav-projects").click();
+    // The shell belongs to the folder: the Projects page's bottom panel, titled by the folder.
+    await page.keyboard.press("Meta+j");
+    await expect(page.getByTestId("bottom-panel").locator(`[data-tab-id="${term.id}"]`)).toContainText(path.basename(DIR));
     const project = page.locator(`[data-testid="project"][data-repo="${repo.id}"]`);
     await expect(project).toHaveAttribute("data-git", "false");
     await expect(project.getByTestId("no-git-badge")).toBeVisible();
@@ -61,7 +60,6 @@ test("register a plain folder, see No git everywhere, then repo git init turns i
     await expect(page.getByTestId("worktree-surface-title")).toHaveText(`${repo.name}@${branch}`);
     await expect(page.getByTestId("sync-line")).toBeVisible();
     await expect(page.getByTestId("publish-github")).toBeEnabled();
-    await expect(row.getByTestId("row-place")).toHaveText(`${repo.name} · ${branch}`);
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-after-init.png") });
   } finally {
     cli("terminal", "kill", "--id", term.id, "--yes");

@@ -1,8 +1,8 @@
-import type { CommandView } from "@/api/command";
+import type { CommandView, UiContextView } from "@/api/command";
 import { promptedArgs } from "@/palette/args";
-import { leafOrder, nextAfter, sessionOrder } from "@/lib/tree";
-import { refreshCommands, runCommand, useCommandsStore, whenListed } from "@/stores/commands";
-import { contextKey, getListInputs, getUiContext } from "@/stores/context";
+import { nextAfter, sessionOrder } from "@/lib/tree";
+import { refreshCommands, runCommandForResult, useCommandsStore, whenListed } from "@/stores/commands";
+import { contextKey, getListOptions, getListSessions, getUiContext } from "@/stores/context";
 import { openAddProject } from "@/stores/addProject";
 import { openNewThreadPicker } from "@/stores/compose";
 import { openPublishDialog } from "@/stores/publish";
@@ -25,22 +25,18 @@ export interface ViewAction {
   run: () => void;
 }
 
-/** Selects the Nth thread or terminal in sidebar order (rows of a collapsed section do not count). */
+/** Selects the Nth thread in sidebar order (rows of a collapsed section do not count). */
 function jumpTo(n: number): void {
-  const { sessions, terminals, options } = getListInputs();
-  const row = leafOrder(sessions, terminals, options)[n - 1];
-  if (!row) return;
-  const sel = row.kind === "session" ? ({ kind: "session", id: row.sessionId } as const) : ({ kind: "terminal", id: row.terminalId } as const);
-  useUiStore.getState().select(sel, { focusTerminal: true });
+  const id = sessionOrder(getListSessions(), getListOptions())[n - 1];
+  if (id !== undefined) useUiStore.getState().select({ kind: "session", id }, { focusTerminal: true });
 }
 
 /** Selects the next session that needs attention after the current one, wrapping. */
 export function jumpToAttention(): boolean {
-  const { sessions, terminals, options } = getListInputs();
   const waiting = new Set(attentionIds(useSessionsStore.getState()));
   const sel = useUiStore.getState().selection;
   // Threads that need attention are never in the collapsible Working section (threadGroup).
-  const next = nextAfter(sessionOrder(sessions, terminals, options),sel.kind === "session" ? sel.id : null, (id) => waiting.has(id));
+  const next = nextAfter(sessionOrder(getListSessions(), getListOptions()), sel.kind === "session" ? sel.id : null, (id) => waiting.has(id));
   if (next === null) return false;
   useUiStore.getState().select({ kind: "session", id: next }, { focusTerminal: true });
   return true;
@@ -53,8 +49,7 @@ function togglePalette(): void {
 }
 
 function focusContentTerminal(): void {
-  const kind = useUiStore.getState().selection.kind;
-  if (kind === "terminal" || kind === "session") useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
+  if (useUiStore.getState().selection.kind === "session") useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
 }
 
 function toggleSidebar(): void {
@@ -79,7 +74,7 @@ export const viewActions: readonly ViewAction[] = [
   { chord: "cmd+shift+a", title: "Next thread needing attention", run: () => void jumpToAttention() },
   ...Array.from({ length: 9 }, (_, i) => ({
     chord: `cmd+${String(i + 1)}`,
-    title: `Jump to item ${String(i + 1)}`,
+    title: `Jump to thread ${String(i + 1)}`,
     run: () => {
       jumpTo(i + 1);
     },
@@ -281,11 +276,23 @@ export function presentInPalette(name: string): boolean {
   return paletteSupplied.has(name) && presentCommand(name);
 }
 
+/**
+ * Commands whose success this window shows by itself, so starting one here toasts only a
+ * failure, not the result message: terminal.new's shell opens as a new bottom panel tab.
+ * The CLI still prints the message.
+ */
+const quietCommands: ReadonlySet<string> = new Set(["terminal.new"]);
+
+/** Invokes a command started in this window (a chord, the palette, a CommandButton), toasting the result unless it is quiet. */
+export function invokeStarted(name: string, args: Record<string, string> = {}, ctx: UiContextView = getUiContext()): void {
+  void runCommandForResult(name, args, { ctx, quiet: quietCommands.has(name) });
+}
+
 /** Starts a command from the keyboard or palette: prompts for args it needs, else invokes. */
 export function startCommand(c: CommandView): void {
   if (presentCommand(c.name)) return;
   if (promptedArgs(c).length > 0) useUiStore.getState().openPalette("", c.name);
-  else void runCommand(c.name);
+  else invokeStarted(c.name);
 }
 
 /** startCommand for a command by name, when it is available in the current context. */
@@ -329,11 +336,17 @@ export function handleKeyDown(e: KeyboardEvent): void {
   }
   const target = e.target instanceof Element ? e.target : null;
   if (target?.closest("[data-terminal-host]")) {
+    if (useUiStore.getState().palette.open) return;
     const yielded = terminalYields(chord);
-    if (!yielded || useUiStore.getState().palette.open) return;
-    e.preventDefault();
-    e.stopPropagation();
-    startCommand(yielded);
+    if (yielded) {
+      e.preventDefault();
+      e.stopPropagation();
+      startCommand(yielded);
+    } else if (terminalYieldable(chord)) {
+      // Focusing a shell changes the context (a Projects-page shell brings its worktree):
+      // cmd+t right after it must not be lost to the debounced re-list.
+      startWhenListed(e, chord);
+    }
     return;
   }
   if (isEditable(target) || useUiStore.getState().palette.open) return;
@@ -350,20 +363,26 @@ export function handleKeyDown(e: KeyboardEvent): void {
     startCommand(cmd);
     return;
   }
-  // Clicking a worktree and pressing cmd+n at once beats the debounced re-list: when the
-  // list is for an older context, re-list now and look the chord up again.
+  if (/^(cmd|ctrl|alt)\+/.test(chord)) startWhenListed(e, chord);
+}
+
+/**
+ * Clicking a worktree and pressing cmd+n at once beats the debounced re-list: when the
+ * list is for an older context, re-list now and look the chord up again. Nothing happens
+ * when the list is current (the chord is simply unbound).
+ */
+function startWhenListed(e: KeyboardEvent, chord: string): void {
   const ctx = getUiContext();
-  if (/^(cmd|ctrl|alt)\+/.test(chord) && useCommandsStore.getState().contextKey !== contextKey(ctx)) {
-    e.preventDefault();
-    // Another refresh may abort this one (startup, context changes): wait for the list
-    // for ctx from whichever refresh completes, not just this call.
-    void refreshCommands(ctx)
-      .then(() => whenListed(ctx))
-      .then(() => {
-        const late = commandBindings(useCommandsStore.getState().commands).get(chord);
-        if (late && contextKey(getUiContext()) === contextKey(ctx)) startCommand(late);
-      });
-  }
+  if (useCommandsStore.getState().contextKey === contextKey(ctx)) return;
+  e.preventDefault();
+  // Another refresh may abort this one (startup, context changes): wait for the list
+  // for ctx from whichever refresh completes, not just this call.
+  void refreshCommands(ctx)
+    .then(() => whenListed(ctx))
+    .then(() => {
+      const late = commandBindings(useCommandsStore.getState().commands).get(chord);
+      if (late && contextKey(getUiContext()) === contextKey(ctx)) startCommand(late);
+    });
 }
 
 /** Installs the global key handler (capture phase, ahead of xterm). */

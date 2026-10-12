@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { CF, emit, invocations, mockPost, openApp, openProjects, openStreams, releaseSessions, resetMock, row } from "./fixtures";
+import { appPath, CF, emit, invocations, mockPost, openApp, openProjects, openStreams, releaseSessions, resetMock, row } from "./fixtures";
 
 const FIX_RESIZE = `${CF}.worktrees/fix-resize`;
 
@@ -20,13 +20,10 @@ test("session rows render with status badges, above the terminals no thread owns
   await expect(badge(page, "s-4")).toHaveAttribute("data-session-badge", "disconnected");
   await expect(badge(page, "s-5")).toHaveAttribute("data-session-badge", "starting");
   await expect(badge(page, "s-6")).toHaveAttribute("data-session-badge", "closing");
-  // Session-owned terminals have no row of their own.
-  await expect(row(page, "t:t-claude")).toHaveCount(0);
-  await expect(row(page, "t:t-ghostty")).toHaveCount(0);
-  // Threads come before plain terminals.
+  // Only threads have rows (and the Working header): their terminals show through them,
+  // shells in bottom panels.
   const keys = await tree.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
-  expect(keys.indexOf("s:s-4")).toBeLessThan(keys.indexOf("t:t-top"));
-  expect(keys.indexOf("s:s-5")).toBeLessThan(keys.indexOf("t:t-top"));
+  expect(keys.every((k) => k?.startsWith("s:") || k === "h:working")).toBe(true);
   // Disconnected rows are dimmed as a whole (not just the name); starting settles into connected on the mock's timer.
   await expect(row(page, "s:s-3").getByTestId("session-body")).toHaveAttribute("data-offline", "true");
   await expect(row(page, "s:s-3").getByTestId("session-body")).toHaveCSS("opacity", "0.5");
@@ -247,10 +244,10 @@ test("the whole app runs on one events stream plus one Attach", async ({ page })
 
   await openApp(page);
   // Exercise every source: sessions, terminals (switching attaches), intents, repos.
-  await row(page, "s:s-1").click();
+  await row(page, "s:s-2").click();
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
-  await row(page, "t:t-logs").click();
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-logs");
+  await row(page, "s:s-1").click();
+  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-claude");
   await row(page, "s:s-2").click();
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-ghostty");
   await mockPost("session/attention?id=s-1");
@@ -273,12 +270,15 @@ test("the whole app runs on one events stream plus one Attach", async ({ page })
 
 test("a daemon without SessionService degrades to 'service unavailable'", async ({ page }) => {
   await mockPost("sessions-service?enabled=false");
-  await openApp(page);
+  // No rows to wait for (openApp waits for one): the notice is what shows.
+  await page.goto(appPath);
   await expect(page.getByTestId("sessions-unavailable")).toHaveText("Threads: service unavailable");
-  // Repos and terminals still work; session terminals show as plain terminals.
-  await expect(row(page, "t:t-claude")).toBeVisible();
+  // No thread rows; repos still work (the Projects page, and its shells' bottom panel).
   await expect(page.locator('[data-row-kind="session"]')).toHaveCount(0);
-  await row(page, "t:t-claude").click();
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
   await expect(page.getByTestId("daemon-status")).not.toContainText("syncing");
+  await openProjects(page);
+  await expect(page.getByTestId("project-name").first()).toBeVisible();
+  await page.keyboard.press("Meta+j");
+  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-terminal-id", "t-top");
+  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
 });

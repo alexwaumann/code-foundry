@@ -11,14 +11,10 @@ import {
 } from "@/components/ui/context-menu";
 import { beginRename } from "@/keys/bindings";
 import { worktreeBranch } from "@/lib/threadRow";
-import type { LeafRow } from "@/lib/tree";
 import { newThreadTerminal } from "@/stores/bottomActions";
-import { runCommand } from "@/stores/commands";
-import { getUiContext } from "@/stores/context";
 import { useReposStore } from "@/stores/repos";
 import { closeSession, forkSession, pinSession, reconnectSession, removeSession, runSessionIn } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
-import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { showWorktreeInThread } from "@/stores/worktreePanel";
@@ -70,7 +66,8 @@ function RunInMenu({ sessionId, workspaceId }: { sessionId: string; workspaceId:
   );
 }
 
-function ThreadMenu({ id }: { id: string }) {
+/** The context menu of a thread row. Every item is a registry command (or the inline rename that commits one). */
+export function RowMenu({ id }: { id: string }) {
   const pinned = useSessionsStore((s) => s.byId[id]?.pinned ?? false);
   const state = useSessionsStore((s) => s.byId[id]?.state ?? "unknown");
   const workspaceId = useSessionsStore((s) => s.byId[id]?.workspaceId ?? "");
@@ -158,38 +155,4 @@ function ThreadMenu({ id }: { id: string }) {
       </ContextMenuItem>
     </ContextMenuContent>
   );
-}
-
-function TerminalMenu({ id }: { id: string }) {
-  const running = useTerminalsStore((s) => s.byId[id]?.state === "running");
-  const ctx = () => getUiContext({ kind: "terminal", id });
-  return (
-    <ContextMenuContent data-testid="row-menu" data-terminal={id}>
-      {running ? (
-        <ContextMenuItem
-          variant="destructive"
-          onSelect={() => {
-            void runCommand("terminal.kill", {}, ctx());
-          }}
-        >
-          <Power />
-          Kill…
-        </ContextMenuItem>
-      ) : (
-        <ContextMenuItem
-          onSelect={() => {
-            void runCommand("terminal.remove", {}, ctx());
-          }}
-        >
-          <Trash2 />
-          Remove
-        </ContextMenuItem>
-      )}
-    </ContextMenuContent>
-  );
-}
-
-/** The context menu of a sidebar row. Every item is a registry command (or the inline rename that commits one). */
-export function RowMenu({ row }: { row: LeafRow }) {
-  return row.kind === "session" ? <ThreadMenu id={row.sessionId} /> : <TerminalMenu id={row.terminalId} />;
 }

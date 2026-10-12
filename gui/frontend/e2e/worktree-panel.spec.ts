@@ -106,7 +106,7 @@ test("a thread's panel lists Worktree with T; T, the list entry and the palette 
   await expect.poll(() => inPanel(page)).toBe(true);
 });
 
-test("the CLI's ShowView reaches the window; a terminal outside any worktree has no Worktree entry", async ({ page }) => {
+test("the CLI's ShowView reaches the window; a page has no Worktree entry", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-2").click();
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
@@ -115,9 +115,9 @@ test("the CLI's ShowView reaches the window; a terminal outside any worktree has
   await expect(tabs(page)).toHaveText(["ghostty-playground"]);
   await expect(surface(page).getByTestId("worktree-surface-title")).toHaveText("ghostty-playground@main");
 
-  await row(page, "t:t-tmp").click();
+  await page.getByTestId("nav-pullrequests").click();
   await page.keyboard.press("Meta+Shift+e");
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "terminal:t-tmp");
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "view:pullrequests");
   await expect(page.getByTestId("panel-empty").locator('[data-surface="worktree"]')).toHaveCount(0);
   // The ShowView is ignored here: nothing to open.
   await emit({ showView: { name: "panel.worktree" } });

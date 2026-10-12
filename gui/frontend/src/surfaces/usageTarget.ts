@@ -10,10 +10,10 @@ export const USAGE_KIND = "usage";
 export const USAGE_TITLE = "Usage";
 
 /**
- * The selection's thread for the Usage surface: a session, or a thread's terminal, that
- * the sessions store knows (the same resolution as Linked PRs, which is what
- * view.panel.usage's availability sees). A thread without usage still counts: the surface
- * says "No usage yet". Null for a plain terminal, a worktree, a page or a composer.
+ * The selection's thread for the Usage surface, when the sessions store knows it (the same
+ * resolution as Linked PRs, which is what view.panel.usage's availability sees). A thread
+ * without usage still counts: the surface says "No usage yet". Null for a page or a
+ * composer.
  */
 export function selectionUsageThread(sel: Selection, s: SelectionStores): string | null {
   return selectionThread(sel, s);

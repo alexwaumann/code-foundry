@@ -15,7 +15,6 @@ const session = (id: string, worktreePath: string): SessionView => ({ id, worktr
 const stores: SelectionStores = {
   repos: { byId: { r1: repo, r2: local }, order: ["r1", "r2"] },
   sessions: { byId: { s1: session("s1", "/src/cf-fix"), s2: session("s2", "/src/cf"), s3: session("s3", "/gone") }, order: ["s1", "s2", "s3"] },
-  terminals: { byId: {}, order: [] },
 };
 
 const pr = (number: number, state: PullRequestView["state"]): PullRequestView => ({ repoSlug: "alex/cf", number, state }) as PullRequestView;

@@ -134,8 +134,9 @@ export async function runCommandForResult(
 }
 
 /**
- * Re-lists commands whenever the derived UiContext changes (debounced), and when the
- * selected terminal's or session's state changes (availability often depends on it).
+ * Re-lists commands whenever the derived UiContext changes (debounced; the terminals
+ * store decides which bottom panel shell is active), and when the selected thread's
+ * state changes (availability often depends on it).
  */
 export function startCommandSync(debounceMs = 60): () => void {
   let lastKey = "";
@@ -144,12 +145,7 @@ export function startCommandSync(debounceMs = 60): () => void {
   const check = () => {
     const ctx = getUiContext();
     const sel = useUiStore.getState().selection;
-    const state =
-      sel.kind === "terminal"
-        ? (useTerminalsStore.getState().byId[sel.id]?.state ?? "")
-        : sel.kind === "session"
-          ? (useSessionsStore.getState().byId[sel.id]?.state ?? "")
-          : "";
+    const state = sel.kind === "session" ? (useSessionsStore.getState().byId[sel.id]?.state ?? "") : "";
     const key = contextKey(ctx);
     if (key === lastKey && state === lastState) return;
     lastKey = key;

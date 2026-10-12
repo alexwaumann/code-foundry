@@ -7,8 +7,7 @@ import type { SessionView } from "@/api/session";
 import type { WorkspaceView } from "@/api/workspace";
 import type { Choice } from "./compose";
 import { modelName } from "./models";
-import { basename, tildify } from "./path";
-import { placeTerminal } from "./tree";
+import { basename } from "./path";
 
 /** The slices of the repos store these helpers read. */
 export interface RepoLookup {
@@ -16,8 +15,6 @@ export interface RepoLookup {
   byId: Readonly<Record<string, { name: string; git?: boolean; worktrees: readonly { path: string; branch: string; head: string; isMain?: boolean }[] } | undefined>>;
 }
 
-/** What stands in for a branch in text (a terminal's place) for a project without git. */
-export const NO_GIT_LABEL = "No git";
 
 /** Whether repoId is a known project without git. */
 export function isNoGit(repos: RepoLookup, repoId: string): boolean {
@@ -87,16 +84,4 @@ export function threadRowModel(
 export function modelLabel(model: string, models: readonly Choice[]): string {
   const m = model.trim();
   return m ? modelName(models, m) : "Default";
-}
-
-/**
- * Where a terminal sits, for its sidebar row: "project · branch" of the worktree it is
- * placed in (labels.worktree, else the longest cwd prefix), else its cwd with ~.
- */
-export function terminalPlace(repos: RepoLookup & { order: readonly string[] }, t: { cwd: string; worktreeLabel: string }): string {
-  const worktrees = repos.order.flatMap((id) => repos.byId[id]?.worktrees.map((w) => ({ repoId: id, path: w.path })) ?? []);
-  const w = placeTerminal(t, worktrees);
-  if (!w) return tildify(t.cwd);
-  const branch = isNoGit(repos, w.repoId) ? NO_GIT_LABEL : worktreeBranch(repos, w.repoId, w.path);
-  return `${repos.byId[w.repoId]?.name ?? w.repoId} · ${branch}`;
 }

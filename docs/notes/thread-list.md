@@ -1,5 +1,8 @@
 # Thread list rows, tooltip and toolbar sides
 
+> **Superseded (2026-10-11):** the sidebar has no terminal rows any more (no Terminals
+> header, no exit chips); shells live in bottom panels. See `bottom-panel-3-routing.md`.
+
 Decided 2026-10-10 (Alex). Design record: the static sketch `/tmp/thread-list/index.html`,
 `?v=14` for the rows and `?v=23` for the tooltip (PNGs in
 `~/.t3/userdata/attachments/thread-list/v14.png`, `v23.png`). Frontend only; it builds on the
@@ -54,8 +57,8 @@ daemon step in `thread-status-persistence.md` (persisted status, `status_reason`
 
 > **Superseded (2026-10-11):** the order and headers below. Error / interrupted threads now
 > sort right after the prompts, finished turns get their own group, and working threads
-> (busy or starting, unpinned) moved to a collapsible **Working** section at the bottom,
-> above Terminals; the list key carries a `group` instead of the attention tier, and
+> (busy or starting, unpinned) moved to a collapsible **Working** section at the bottom
+> (the Terminals header below it went away with `bottom-panel-3-routing.md`); the list key carries a `group` instead of the attention tier, and
 > `data-section` says `pinned`, `attention`, `done`, `idle` or `working`. See
 > `sidebar-working-section.md`. The prompt/done split and `rowCache` still work as described.
 

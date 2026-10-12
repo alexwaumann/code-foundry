@@ -69,7 +69,7 @@ export async function releaseSessions(...ids: string[]): Promise<void> {
 }
 
 /** The default world's sidebar order after resetMock: s-2 waits, s-6/s-4/s-3 are idle, s-5 (starting) and s-1 (busy) work. */
-export const DEFAULT_ORDER = ["s:s-2", "s:s-6", "s:s-4", "s:s-3", "h:working", "s:s-5", "s:s-1", "h:terminals", "t:t-logs", "t:t-top", "t:t-tests", "t:t-tmp"];
+export const DEFAULT_ORDER = ["s:s-2", "s:s-6", "s:s-4", "s:s-3", "h:working", "s:s-5", "s:s-1"];
 
 /** Long-lived streams the mock has open right now, by RPC (e.g. "EventService/Watch"). */
 export async function openStreams(): Promise<Record<string, number>> {
@@ -128,14 +128,17 @@ export function row(page: Page, key: string) {
   return page.locator(`[data-row-key="${key}"]`);
 }
 
-/** Text of the attached terminal's buffer (renderer-agnostic: works for WebGL too). */
-export async function terminalText(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    const w = window as unknown as { __cfTerminal?: { renderer: { getText(): string } } };
-    return w.__cfTerminal?.renderer.getText() ?? "";
-  });
+/**
+ * Text of an attached terminal's buffer (renderer-agnostic: works for WebGL too): the
+ * content pane's ("main", a thread's Claude terminal) or the bottom panel's active shell.
+ */
+export async function terminalText(page: Page, which: "main" | "bottom" = "main"): Promise<string> {
+  return page.evaluate((name) => {
+    const w = window as unknown as { __cfTerminals?: Record<string, { renderer: { getText(): string } } | undefined> };
+    return w.__cfTerminals?.[name]?.renderer.getText() ?? "";
+  }, which);
 }
 
-export async function expectTerminalText(page: Page, text: string | RegExp): Promise<void> {
-  await expect.poll(() => terminalText(page), { timeout: 5000 }).toMatch(text);
+export async function expectTerminalText(page: Page, text: string | RegExp, which: "main" | "bottom" = "main"): Promise<void> {
+  await expect.poll(() => terminalText(page, which), { timeout: 5000 }).toMatch(text);
 }

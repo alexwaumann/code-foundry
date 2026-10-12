@@ -144,7 +144,7 @@ describe("paneContext and newBottomTerminal", () => {
 
   it("newBottomTerminal runs terminal.new there; no context, no run", async () => {
     expect(await newBottomTerminal("session:s1")).toBe(true);
-    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, { ctx: expect.objectContaining({ activeSessionId: "s1" }) as unknown });
+    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, { ctx: expect.objectContaining({ activeSessionId: "s1" }) as unknown, quiet: true });
     commands.runCommandForResult.mockClear();
     setTerminals([]);
     expect(await newBottomTerminal("view:projects")).toBe(false);
@@ -185,6 +185,34 @@ describe("focus for this window's own shells (by id)", () => {
     onNewTerminal(t);
     expect(getBottom("session:s2")).toEqual({ open: true, activeTerminalId: "t-b" });
     expect(useUiStore.getState().bottomFocusSeq).toBe(0);
+  });
+
+  it.each<[string, string | undefined, Record<string, string>]>([
+    ["the row menu: the thread's worktree", undefined, {}],
+    ["a workspace member in the thread's panel: that member's worktree", "/src/api.worktrees/x", { cwd: "/src/api.worktrees/x" }],
+  ])("newThreadTerminal from %s runs in the thread's context", async (_name, cwd, args) => {
+    await newThreadTerminal("s2", cwd);
+    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", args, { ctx: expect.objectContaining({ activeSessionId: "s2", activeView: "session" }) as unknown, quiet: true });
+  });
+
+  const uncover: [string, string, boolean, boolean][] = [
+    ["already arrived, for the selected thread: uncovered and focused", "a", true, true],
+    ["arriving later, for the selected thread: uncovered and focused", "t-late", true, true],
+    ["for another thread: nothing uncovered", "t-other", false, false],
+  ];
+  it.each(uncover)("a shell this window started %s", async (_name, id, uncovered, focused) => {
+    useViewsStore.setState({ settingsOpen: true });
+    usePanelStore.setState({ byKey: { "session:s1": { open: true, tabs: [], activeTabId: null, expanded: true } } });
+    commands.runCommandForResult.mockResolvedValue({ message: "", resultJson: JSON.stringify({ id }) });
+    await newThreadTerminal(id === "t-other" ? "s2" : "s1", "/src/api");
+    if (id !== "a") {
+      const t = term(id, shell(id === "t-other" ? "s2" : "s1"));
+      setTerminals([term("a", shell("s1")), t]);
+      onNewTerminal(t);
+    }
+    expect(usePanelStore.getState().byKey["session:s1"]?.expanded === undefined).toBe(uncovered);
+    expect(useViewsStore.getState().settingsOpen).toBe(!uncovered);
+    expect(useUiStore.getState().bottomFocusSeq).toBe(focused ? 1 : 0);
   });
 
   it("a failed run leaves nothing pending", async () => {

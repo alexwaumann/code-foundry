@@ -1,22 +1,12 @@
 import { useShallow } from "zustand/react/shallow";
 import type { UiContextView } from "@/api/command";
-import {
-  placeSession,
-  placeTerminal,
-  SESSION_LABEL,
-  WORKTREE_LABEL,
-  type ListOptions,
-  type ListSession,
-  type PlaceableTerminal,
-  type TreeRepo,
-  type TreeSession,
-  type WorktreeRef,
-} from "@/lib/tree";
-import { focusedBottomShell, useBottomStore } from "./bottomPanel";
+import { placeSession, type ListOptions, type ListSession, type TreeRepo, type WorktreeRef } from "@/lib/tree";
+import { REPO_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
+import { focusedBottomShell, ownerKeyOf, PROJECTS_KEY, useBottomStore } from "./bottomPanel";
 import { useReposStore, type ReposData } from "./repos";
 import { useSessionsStore, type SessionsData } from "./sessions";
 import { isThreadGroup, threadGroup } from "@/lib/session";
-import { useTerminalsStore, type TerminalsData } from "./terminals";
+import { useTerminalsStore } from "./terminals";
 import { useUiStore, type Selection } from "./ui";
 
 export const emptyContext: UiContextView = {
@@ -42,43 +32,47 @@ export function repoContext(repoId: string): UiContextView {
   return { ...emptyContext, activeRepoId: repoId, activeView: "projects" };
 }
 
-/**
- * Derives the UiContext the daemon sees from the current selection. A terminal's
- * repo/worktree come from the same placement the sidebar uses. The composer looks only
- * at its repo. A session contributes its attached terminal (if any) so terminal.*
- * commands apply to it. Actions on a worktree that is not selected (the Projects page,
- * the panel's worktree tab) build their context with worktreeContext / repoContext.
- */
-export function deriveContext(
-  sel: Selection,
-  terminals: TerminalsData,
-  repos: ReposData,
-  sessions: SessionsData = { byId: {}, order: [] },
-  focusedShell = "",
-): UiContextView {
-  const ctx = deriveSelectionContext(sel, terminals, repos, sessions);
-  // The keyboard is in a bottom panel shell (focusedBottomShell): terminal commands act on it.
-  return focusedShell ? { ...ctx, activeTerminalId: focusedShell } : ctx;
+/** A terminal as the command context needs it: its id and owner labels. */
+export interface ContextShell {
+  id: string;
+  labels: Readonly<Record<string, string>>;
 }
 
-function deriveSelectionContext(sel: Selection, terminals: TerminalsData, repos: ReposData, sessions: SessionsData): UiContextView {
+/**
+ * The worktree a Projects-page shell belongs to (its repo and worktree labels); null for
+ * any other terminal. Both the Projects page's "+" (bottomActions paneContext) and the
+ * command context with the keyboard in that shell use it.
+ */
+export function projectsShellPlace(t: ContextShell | undefined): WorktreeRef | null {
+  if (!t || ownerKeyOf(t) !== PROJECTS_KEY) return null;
+  const repoId = t.labels[REPO_LABEL] ?? "";
+  const path = t.labels[WORKTREE_LABEL] ?? "";
+  return repoId && path ? { repoId, path } : null;
+}
+
+/**
+ * Derives the UiContext the daemon sees from the current selection. A session contributes
+ * its place (repo, worktree) and its attached terminal (if any), so terminal.* commands
+ * apply to it. The composer looks only at its repo. Actions on a worktree that is not
+ * selected (the Projects page, the panel's worktree tab) build their context with
+ * worktreeContext / repoContext.
+ */
+export function deriveContext(sel: Selection, repos: ReposData, sessions: SessionsData = { byId: {}, order: [] }, focusedShell?: ContextShell): UiContextView {
+  const ctx = deriveSelectionContext(sel, repos, sessions);
+  if (!focusedShell) return ctx;
+  // The keyboard is in a bottom panel shell (focusedBottomShell): terminal commands act on
+  // it. On the Projects page, which carries no worktree, the shell's worktree is the
+  // context too, so cmd+t (terminal.new) starts another shell beside it.
+  const place = projectsShellPlace(focusedShell);
+  return place
+    ? { ...ctx, activeTerminalId: focusedShell.id, activeRepoId: place.repoId, activeWorktreePath: place.path }
+    : { ...ctx, activeTerminalId: focusedShell.id };
+}
+
+function deriveSelectionContext(sel: Selection, repos: ReposData, sessions: SessionsData): UiContextView {
   switch (sel.kind) {
     case "none":
       return emptyContext;
-    case "terminal": {
-      const t = terminals.byId[sel.id];
-      const place = t ? placeTerminal({ cwd: t.cwd, worktreeLabel: t.labels[WORKTREE_LABEL] ?? "" }, allWorktrees(repos)) : null;
-      const sessionId = t?.labels[SESSION_LABEL] ?? "";
-      return {
-        ...emptyContext,
-        activeTerminalId: sel.id,
-        activeSessionId: sessionId,
-        activeWorkspaceId: sessions.byId[sessionId]?.workspaceId ?? "",
-        activeRepoId: place?.repoId ?? "",
-        activeWorktreePath: place?.path ?? "",
-        activeView: "terminal",
-      };
-    }
     case "session": {
       const s = sessions.byId[sel.id];
       const place = s ? placeSession(s, allWorktrees(repos)) : null;
@@ -108,13 +102,14 @@ export function contextKey(c: UiContextView): string {
 /**
  * Current context, read imperatively (keybindings, invoke). For the window's own
  * selection (no `sel`), a bottom panel shell with the keyboard (or the palette's return)
- * is the active terminal. An explicit selection gets that selection's context only.
+ * is the active terminal (and, on the Projects page, its worktree the active one). An explicit selection gets that selection's context only.
  */
 export function getUiContext(sel?: Selection): UiContextView {
   const ui = useUiStore.getState();
   const terminals = useTerminalsStore.getState();
   const focused = sel === undefined ? focusedBottomShell(ui, terminals, useBottomStore.getState().byKey) : "";
-  return deriveContext(sel ?? ui.selection, terminals, useReposStore.getState(), useSessionsStore.getState(), focused);
+  const shell = focused ? (terminals.byId[focused] ?? { id: focused, labels: {} }) : undefined;
+  return deriveContext(sel ?? ui.selection, useReposStore.getState(), useSessionsStore.getState(), shell);
 }
 
 const SEP = "\u0001";
@@ -124,30 +119,6 @@ export function useRepoStructureKeys(): string[] {
   return useReposStore(useShallow((s) => s.order.map((id) => [id, ...(s.byId[id]?.worktrees.map((w) => w.path) ?? [])].join(SEP))));
 }
 
-/** One string per terminal: id + the inputs that decide where (and whether) it sits in the tree. */
-export function useTerminalPlacementKeys(): string[] {
-  return useTerminalsStore(
-    useShallow((s) =>
-      s.order.map((id) => {
-        const t = s.byId[id];
-        return [id, t?.cwd ?? "", t?.labels[WORKTREE_LABEL] ?? "", t?.labels[SESSION_LABEL] ?? ""].join(SEP);
-      }),
-    ),
-  );
-}
-
-/** One string per session: id + worktree + attached terminal (status/name changes don't rebuild). */
-export function useSessionPlacementKeys(): string[] {
-  return useSessionsStore(
-    useShallow((s) =>
-      s.order.map((id) => {
-        const x = s.byId[id];
-        return [id, x?.worktreePath ?? "", x?.terminalId ?? ""].join(SEP);
-      }),
-    ),
-  );
-}
-
 export function decodeRepoKeys(keys: readonly string[]): TreeRepo[] {
   return keys.map((k) => {
     const [id = "", ...worktreePaths] = k.split(SEP);
@@ -155,32 +126,18 @@ export function decodeRepoKeys(keys: readonly string[]): TreeRepo[] {
   });
 }
 
-export function decodeTerminalKeys(keys: readonly string[]): PlaceableTerminal[] {
-  return keys.map((k) => {
-    const [id = "", cwd = "", worktreeLabel = "", sessionLabel = ""] = k.split(SEP);
-    return { id, cwd, worktreeLabel, sessionLabel };
-  });
-}
-
-export function decodeSessionKeys(keys: readonly string[]): TreeSession[] {
-  return keys.map((k) => {
-    const [id = "", worktreePath = "", terminalId = ""] = k.split(SEP);
-    return { id, worktreePath, terminalId };
-  });
-}
-
 /**
- * One string per session for the sidebar list: id + attached terminal + pin + group (name,
- * model, a different dialog and the status line's text don't rebuild the list; a question
- * turning into a finished turn, or an idle thread starting work, does, since it moves). In
- * the store's order.
+ * One string per session for the sidebar list: id + pin + group (name, model, a different
+ * dialog and the status line's text don't rebuild the list; a question turning into a
+ * finished turn, or an idle thread starting work, does, since it moves). In the store's
+ * order.
  */
 export function useSessionListKeys(): string[] {
   return useSessionsStore(
     useShallow((s) =>
       s.order.map((id) => {
         const x = s.byId[id];
-        return [id, x?.terminalId ?? "", x?.pinned ? "1" : "", x ? threadGroup(x) : "idle"].join(SEP);
+        return [id, x?.pinned ? "1" : "", x ? threadGroup(x) : "idle"].join(SEP);
       }),
     ),
   );
@@ -188,24 +145,21 @@ export function useSessionListKeys(): string[] {
 
 export function decodeSessionListKeys(keys: readonly string[]): ListSession[] {
   return keys.map((k) => {
-    const [id = "", terminalId = "", pinned = "", group = ""] = k.split(SEP);
-    return { id, terminalId, pinned: pinned === "1", group: isThreadGroup(group) ? group : "idle" };
+    const [id = "", pinned = "", group = ""] = k.split(SEP);
+    return { id, pinned: pinned === "1", group: isThreadGroup(group) ? group : "idle" };
   });
 }
 
-/** Sidebar list inputs read imperatively (cmd+1..9, cmd+shift+a), with the list's display options. */
-export function getListInputs(): { sessions: ListSession[]; terminals: PlaceableTerminal[]; options: ListOptions } {
-  const t = useTerminalsStore.getState();
+/** The sidebar list's threads read imperatively (cmd+1..9, cmd+shift+a). */
+export function getListSessions(): ListSession[] {
   const s = useSessionsStore.getState();
-  return {
-    options: { workingCollapsed: useUiStore.getState().workingCollapsed },
-    sessions: s.order.flatMap((id) => {
-      const x = s.byId[id];
-      return x ? [{ id, terminalId: x.terminalId, pinned: x.pinned, group: threadGroup(x) }] : [];
-    }),
-    terminals: t.order.map((id) => {
-      const term = t.byId[id];
-      return { id, cwd: term?.cwd ?? "", worktreeLabel: term?.labels[WORKTREE_LABEL] ?? "", sessionLabel: term?.labels[SESSION_LABEL] ?? "" };
-    }),
-  };
+  return s.order.flatMap((id) => {
+    const x = s.byId[id];
+    return x ? [{ id, pinned: x.pinned, group: threadGroup(x) }] : [];
+  });
+}
+
+/** The sidebar list's display options read imperatively, so cmd+1..9 and cmd+shift+a see the rendered list. */
+export function getListOptions(): ListOptions {
+  return { workingCollapsed: useUiStore.getState().workingCollapsed };
 }

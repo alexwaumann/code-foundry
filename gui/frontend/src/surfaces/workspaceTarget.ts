@@ -10,7 +10,6 @@ import { deriveContext } from "@/stores/context";
 import { makeTab, type Tab } from "@/stores/panel";
 import type { ReposData } from "@/stores/repos";
 import type { SessionsData } from "@/stores/sessions";
-import type { TerminalsData } from "@/stores/terminals";
 import type { Selection } from "@/stores/ui";
 
 export const WORKSPACE_KIND = "workspace";
@@ -19,7 +18,6 @@ export const WORKTREE_KIND = "worktree";
 export interface SelectionStores {
   repos: ReposData;
   sessions: SessionsData;
-  terminals: TerminalsData;
 }
 
 /** A workspace thread: the thread and the workspace that owns it. */
@@ -29,14 +27,13 @@ export interface WorkspaceThread {
 }
 
 /**
- * The selection's workspace thread: a session, or a thread's terminal, whose thread is
- * owned by a workspace (deriveContext's activeSessionId + activeWorkspaceId, which is what
- * view.panel.workspace's availability sees). Null for a project thread, a plain terminal,
- * a worktree, a page, or a workspace composer (it has no thread yet).
+ * The selection's workspace thread: a thread owned by a workspace (deriveContext's
+ * activeSessionId + activeWorkspaceId, which is what view.panel.workspace's availability
+ * sees). Null for a project thread, a page, or a workspace composer (it has no thread yet).
  */
 export function selectionWorkspaceThread(sel: Selection, s: SelectionStores): WorkspaceThread | null {
-  if (sel.kind !== "session" && sel.kind !== "terminal") return null;
-  const ctx = deriveContext(sel, s.terminals, s.repos, s.sessions);
+  if (sel.kind !== "session") return null;
+  const ctx = deriveContext(sel, s.repos, s.sessions);
   return ctx.activeSessionId && ctx.activeWorkspaceId ? { sessionId: ctx.activeSessionId, workspaceId: ctx.activeWorkspaceId } : null;
 }
 
@@ -47,14 +44,13 @@ export interface WorktreeTarget {
 }
 
 /**
- * The worktree the selection's thread runs in: a session, or a thread's terminal (or a
- * plain terminal), placed in a registered worktree (deriveContext's activeRepoId +
- * activeWorktreePath). Null for a worktree or repo page (the overview is the content
+ * The worktree the selection's thread runs in, placed in a registered worktree
+ * (deriveContext's activeRepoId + activeWorktreePath). Null for a worktree or repo page (the overview is the content
  * already), a top-level page, a composer, or a thread whose cwd is in no worktree.
  */
 export function selectionWorktree(sel: Selection, s: SelectionStores): WorktreeTarget | null {
-  if (sel.kind !== "session" && sel.kind !== "terminal") return null;
-  const ctx = deriveContext(sel, s.terminals, s.repos, s.sessions);
+  if (sel.kind !== "session") return null;
+  const ctx = deriveContext(sel, s.repos, s.sessions);
   return ctx.activeRepoId && ctx.activeWorktreePath ? { repoId: ctx.activeRepoId, path: ctx.activeWorktreePath } : null;
 }
 

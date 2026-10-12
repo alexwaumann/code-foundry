@@ -5,21 +5,20 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ProjectsNav } from "@/components/projects/ProjectsPage";
 import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
 import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
-import { buildRows, isLeaf, rowCache, type LeafRow, type Row } from "@/lib/tree";
-import { decodeSessionListKeys, decodeTerminalKeys, useSessionListKeys, useTerminalPlacementKeys } from "@/stores/context";
+import { buildRows, isSessionRow, rowCache, sessionKey, type Row, type SessionRow } from "@/lib/tree";
+import { decodeSessionListKeys, useSessionListKeys } from "@/stores/context";
 import { useEventsStore } from "@/stores/events";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
 import { useRowHeight } from "@/stores/settings";
 import { RowMenu } from "./RowMenu";
-import { rowSelection, selectionKey } from "./selection";
 import { ResizeHandle } from "./ResizeHandle";
 import { RowTooltipsEnabled } from "./rowTooltips";
 import { SidebarRow } from "./SidebarRow";
 import { SidebarStatus } from "./SidebarStatus";
 import { SidebarToolbar } from "./SidebarToolbar";
 
-/** The Working and Terminals headers' height; thread and terminal rows are two lines (rowHeight + this). */
+/** The Working header's height; thread rows are two lines (rowHeight + this). */
 const HEADER_HEIGHT = 26;
 const SECOND_LINE = 15;
 
@@ -30,25 +29,21 @@ const SECOND_LINE = 15;
  */
 function useRows(): Row[] {
   const sessionKeys = useSessionListKeys();
-  const termKeys = useTerminalPlacementKeys();
   const workingCollapsed = useUiStore((s) => s.workingCollapsed);
   const [stable] = useState(rowCache);
-  return useMemo(
-    () => stable(buildRows(decodeSessionListKeys(sessionKeys), decodeTerminalKeys(termKeys), { workingCollapsed })),
-    [stable, sessionKeys, termKeys, workingCollapsed],
-  );
+  return useMemo(() => stable(buildRows(decodeSessionListKeys(sessionKeys), { workingCollapsed })), [stable, sessionKeys, workingCollapsed]);
 }
 
-/** Index of the next leaf row from i in direction dir (skipping headers); i itself when none. */
-function stepLeaf(rows: readonly Row[], i: number, dir: 1 | -1): number {
-  for (let j = i + dir; j >= 0 && j < rows.length; j += dir) if (rows[j] && isLeaf(rows[j] as Row)) return j;
+/** Index of the next thread row from i in direction dir (skipping the header); i itself when none. */
+function stepThread(rows: readonly Row[], i: number, dir: 1 | -1): number {
+  for (let j = i + dir; j >= 0 && j < rows.length; j += dir) if (rows[j] && isSessionRow(rows[j] as Row)) return j;
   return i;
 }
 
 function SidebarList() {
   const rows = useRows();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const selectedKey = useUiStore((s) => selectionKey(s.selection));
+  const selectedKey = useUiStore((s) => (s.selection.kind === "session" ? sessionKey(s.selection.id) : null));
   const cursorKey = useUiStore((s) => s.cursorKey);
   const focusSeq = useUiStore((s) => s.sidebarFocusSeq);
   const loaded = useSessionsStore((s) => s.loaded);
@@ -57,7 +52,7 @@ function SidebarList() {
   const rowHeight = useRowHeight();
   const leafHeight = rowHeight + SECOND_LINE;
   // The row the context menu is open for (right-clicked), or null.
-  const [menuRow, setMenuRow] = useState<LeafRow | null>(null);
+  const [menuRow, setMenuRow] = useState<SessionRow | null>(null);
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const virtualizer = useVirtualizer({
@@ -70,14 +65,14 @@ function SidebarList() {
     paddingEnd: 8,
   });
 
-  // appearance.density changes the row height, and the Terminals header moves; drop the cached sizes.
+  // appearance.density changes the row height, and the Working header moves; drop the cached sizes.
   useEffect(() => {
     virtualizer.measure();
   }, [virtualizer, leafHeight, rows]);
 
   const cursorIndex = useMemo(() => {
     const key = cursorKey ?? selectedKey;
-    return key ? rows.findIndex((r) => r.key === key && isLeaf(r)) : -1;
+    return key ? rows.findIndex((r) => r.key === key && isSessionRow(r)) : -1;
   }, [rows, cursorKey, selectedKey]);
 
   useEffect(() => {
@@ -85,21 +80,20 @@ function SidebarList() {
   }, [focusSeq]);
 
   const activate = useCallback((row: Row) => {
-    const sel = rowSelection(row);
-    if (!sel) return;
+    if (!isSessionRow(row)) return;
     const ui = useUiStore.getState();
     ui.setCursor(row.key);
-    ui.select(sel, { focusTerminal: true });
+    ui.select({ kind: "session", id: row.sessionId }, { focusTerminal: true });
   }, []);
 
   const moveCursor = (i: number) => {
     const row = rows[i];
-    if (!row || !isLeaf(row)) return;
+    if (!row || !isSessionRow(row)) return;
     useUiStore.getState().setCursor(row.key);
     virtualizer.scrollToIndex(i, { align: "auto" });
   };
-  const firstLeaf = () => stepLeaf(rows, -1, 1);
-  const lastLeaf = () => stepLeaf(rows, rows.length, -1);
+  const firstThread = () => stepThread(rows, -1, 1);
+  const lastThread = () => stepThread(rows, rows.length, -1);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey || e.altKey || e.target !== e.currentTarget) return;
@@ -107,16 +101,16 @@ function SidebarList() {
     const ui = useUiStore.getState();
     switch (e.key) {
       case "ArrowDown":
-        moveCursor(cursorIndex < 0 ? firstLeaf() : stepLeaf(rows, cursorIndex, 1));
+        moveCursor(cursorIndex < 0 ? firstThread() : stepThread(rows, cursorIndex, 1));
         break;
       case "ArrowUp":
-        moveCursor(cursorIndex < 0 ? lastLeaf() : stepLeaf(rows, cursorIndex, -1));
+        moveCursor(cursorIndex < 0 ? lastThread() : stepThread(rows, cursorIndex, -1));
         break;
       case "Home":
-        moveCursor(firstLeaf());
+        moveCursor(firstThread());
         break;
       case "End":
-        moveCursor(lastLeaf());
+        moveCursor(lastThread());
         break;
       case "Enter":
       case " ":
@@ -128,7 +122,7 @@ function SidebarList() {
         ui.setRenaming(row.sessionId);
         break;
       case "Escape":
-        if (ui.selection.kind === "terminal" || ui.selection.kind === "session") useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
+        if (ui.selection.kind === "session") useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
         break;
       default:
         return;
@@ -136,11 +130,11 @@ function SidebarList() {
     e.preventDefault();
   };
 
-  // Right-click on a thread or terminal row opens its menu; anywhere else, none.
+  // Right-click on a thread row opens its menu; anywhere else, none.
   const onContextMenu = (e: React.MouseEvent) => {
     const key = (e.target as Element).closest("[data-row-key]")?.getAttribute("data-row-key");
     const row = rows.find((r) => r.key === key);
-    if (!row || !isLeaf(row)) {
+    if (!row || !isSessionRow(row)) {
       e.preventDefault();
       setMenuRow(null);
       return;
@@ -164,7 +158,7 @@ function SidebarList() {
             <div
               ref={scrollRef}
               role="listbox"
-              aria-label="Threads and terminals"
+              aria-label="Threads"
               tabIndex={0}
               data-region="sidebar"
               data-testid="thread-list"
@@ -195,7 +189,7 @@ function SidebarList() {
               )}
             </div>
           </ContextMenuTrigger>
-          {menuRow && <RowMenu row={menuRow} />}
+          {menuRow && <RowMenu id={menuRow.sessionId} />}
         </ContextMenu>
       </TooltipProvider>
     </RowTooltipsEnabled>

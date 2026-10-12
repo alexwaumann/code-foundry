@@ -294,8 +294,8 @@ from the pull request (docs/notes/pr-thread-commands.md).
   components subscribe to the narrowest selector. Lists are virtualized. No global
   re-render on daemon events.
 * Connection budget: the GUI holds exactly one `EventService.Watch` stream plus at most
-  two `TerminalService.Attach` streams: the content pane's terminal and the bottom panel's
-  active tab, each only while it is visible. Everything else is unary, except a
+  two `TerminalService.Attach` streams: the content pane's (a thread's Claude terminal)
+  and the bottom panel's active shell, each only while it is visible. Everything else is unary, except a
   `RepoService.Clone` stream while the Add Project dialog clones a repository. This keeps
   the browser's six HTTP/1.1 connections per origin mostly free.
 * Only visible terminals are attached. Switching sessions (or bottom panel tabs) detaches
@@ -304,16 +304,24 @@ from the pull request (docs/notes/pr-thread-commands.md).
   an Attach subscriber, finished turns count as seen (see
   `docs/notes/phase2-integration.md`).
 * Layout: a draggable title strip under the hidden-inset traffic lights, sidebar (Pull
-  Requests and Projects entries, then a flat thread list with no thread headers: pinned
-  threads, then the ones waiting on the user, then the rest newest first, each row saying
-  its status in words on its second line (or project and branch) with a hover tooltip,
-  then terminals no thread owns under a Terminals header; a status row at its foot; see
-  `docs/notes/workspaces-4-sidebar.md` and `docs/notes/thread-list.md`), content (terminal, the Pull Requests page, the
-  Projects page with each project's worktrees and each workspace's members, or the
-  composer; a worktree's overview is a side panel tab, not a page), command palette
-  overlay. Under the content pane, a thread and the Projects page each have a bottom
-  terminal panel (cmd+j, `view.bottom.toggle`): tabs for the shells it owns, derived from
-  the terminal list by the owner labels (`docs/notes/bottom-panel-2-gui.md`). Strip and sidebar sit on one background (the sheet);
+  Requests and Projects entries, then a flat list of threads and nothing else: pinned
+  threads, then the ones waiting on the user (prompts, then errors), finished turns and
+  idle ones, newest first within each group and with no headers, then the working ones
+  under a collapsible Working header that counts them; each row says its status in words
+  on its second line (or project and branch) with a hover tooltip; a status row at its
+  foot; see `docs/notes/workspaces-4-sidebar.md`, `docs/notes/thread-list.md` and
+  `docs/notes/sidebar-working-section.md`), content (a thread's Claude terminal, the Pull Requests
+  page, the Projects page with each project's worktrees and each workspace's members, or
+  the composer; a worktree's overview is a side panel tab, not a page; a shell is never
+  selected), command palette overlay. Under the content pane, a thread and the Projects
+  page each have a bottom terminal panel (cmd+j, `view.bottom.toggle`), the only place
+  shells show: tabs for the shells it owns, derived from the terminal list by the owner
+  labels (`session` for a thread's, none for the Projects page's worktree shells). Every
+  way to start one lands there: cmd+t and the palette's New Terminal, a thread row's New
+  terminal here, the Projects page's rows, a workspace member (in a thread's side panel
+  the thread owns it), the panel's own "+", and `terminal new` on the CLI; the
+  focusTerminal intent reveals a shell there and selects the thread for its Claude
+  terminal (`docs/notes/bottom-panel-2-gui.md`, `docs/notes/bottom-panel-3-routing.md`). Strip and sidebar sit on one background (the sheet);
   the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Each
   selection can open a side panel right of the content: a second pane with tabs whose
   bodies come from the surface registry (`src/surfaces`, `docs/notes/side-panel.md`):

@@ -2,12 +2,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
 import type { SessionView } from "@/api/session";
 import { useCommandsStore } from "@/stores/commands";
+import { contextKey, getUiContext } from "@/stores/context";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
 import { commandBindings, handleKeyDown, isGlobalChord, openRunInPicker } from "./bindings";
 
-const runCommand = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
-vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommand }));
+const runCommandForResult = vi.hoisted(() => vi.fn(() => Promise.resolve(null)));
+// The re-list a chord on a stale list waits for: a test sets what it lists.
+const relist = vi.hoisted(() => ({ run: (): void => undefined }));
+vi.mock("@/stores/commands", async (orig) => ({
+  ...(await orig<typeof import("@/stores/commands")>()),
+  runCommandForResult,
+  refreshCommands: vi.fn(() => {
+    relist.run();
+    return Promise.resolve();
+  }),
+  whenListed: vi.fn(() => Promise.resolve()),
+}));
 
 function cmd(over: Partial<CommandView>): CommandView {
   return { name: "c", title: "C", description: "", category: "X", args: [], keybindings: [], available: true, ...over };
@@ -92,7 +103,10 @@ describe("handleKeyDown precedence", () => {
     });
     useSessionsStore.setState({ byId: {}, order: [] });
     useUiStore.setState({ selection: { kind: "none" }, renamingSessionId: null, workingCollapsed: false });
-    runCommand.mockClear();
+    // The list is for the current context.
+    useCommandsStore.setState({ contextKey: contextKey(getUiContext()) });
+    relist.run = () => undefined;
+    runCommandForResult.mockClear();
   });
 
   afterEach(() => {
@@ -115,8 +129,21 @@ describe("handleKeyDown precedence", () => {
   ])("terminal focus: %s", (_name, init, runs) => {
     const e = press(terminal, init);
     expect(e.defaultPrevented).toBe(runs);
-    expect(runCommand).toHaveBeenCalledTimes(runs ? 1 : 0);
+    expect(runCommandForResult).toHaveBeenCalledTimes(runs ? 1 : 0);
     expect(isGlobalChord(init.metaKey ? `cmd+${init.key}` : `ctrl+${init.key}`)).toBe(runs);
+  });
+
+  it("terminal focus: a cmd chord on a list for an older context waits for the re-list (cmd+t right after focusing a shell)", async () => {
+    const commands = useCommandsStore.getState().commands;
+    useCommandsStore.setState({ commands: commands.map((c) => (c.name === "terminal.new" ? { ...c, available: false } : c)), contextKey: "older" });
+    relist.run = () => {
+      useCommandsStore.setState({ commands, contextKey: contextKey(getUiContext()) });
+    };
+    const e = press(terminal, { key: "t", code: "KeyT", metaKey: true });
+    expect(e.defaultPrevented).toBe(true);
+    await vi.waitFor(() => {
+      expect(runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, expect.objectContaining({ quiet: true }));
+    });
   });
 
   it("session.rename's chord starts the inline rename instead of the palette", () => {
@@ -214,18 +241,19 @@ describe("handleKeyDown precedence", () => {
 
   it("text fields consume command chords", () => {
     press(input, { key: "t", code: "KeyT", metaKey: true });
-    expect(runCommand).not.toHaveBeenCalled();
+    expect(runCommandForResult).not.toHaveBeenCalled();
   });
 
   it("command chords run outside the terminal", () => {
     const e = press(outside, { key: "t", code: "KeyT", metaKey: true });
     expect(e.defaultPrevented).toBe(true);
-    expect(runCommand).toHaveBeenCalledWith("terminal.new");
+    // Quiet: the new bottom panel tab is the feedback, not a "created terminal" toast.
+    expect(runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, expect.objectContaining({ quiet: true }));
   });
 
   it("commands with required args open the palette prompt instead of running", () => {
     press(outside, { key: "n", code: "KeyN", metaKey: true, altKey: true });
-    expect(runCommand).not.toHaveBeenCalled();
+    expect(runCommandForResult).not.toHaveBeenCalled();
     expect(useUiStore.getState().palette).toMatchObject({ open: true, commandName: "worktree.create", page: "commands" });
   });
 
@@ -233,7 +261,7 @@ describe("handleKeyDown precedence", () => {
     const e = press(terminal, { key: "n", code: "KeyN", metaKey: true });
     expect(e.defaultPrevented).toBe(true);
     await Promise.resolve();
-    expect(runCommand).not.toHaveBeenCalled();
+    expect(runCommandForResult).not.toHaveBeenCalled();
     expect(useUiStore.getState().palette).toMatchObject({ open: true, page: "projects", commandName: null });
   });
 

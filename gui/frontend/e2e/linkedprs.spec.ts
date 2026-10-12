@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { emit, invocations, mockPost, openApp, openProjects, resetMock, row } from "./fixtures";
 
 /**
  * The Linked PRs surface (docs/notes/linked-prs.md, GUI chunk): a thread's pull requests
@@ -195,8 +195,8 @@ test("the palette lists it for any thread; without links it only says so", async
   await expect(page.getByText("No linked PRs yet")).toBeVisible();
   await expect(panel(page)).toHaveCount(0);
 
-  // A plain terminal is no thread: not listed.
-  await row(page, "t:t-logs").click();
+  // A page is no thread: not listed.
+  await openProjects(page);
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Show Linked PRs");
   await expect(palette.locator('[data-command="view.panel.linked-prs"]')).toHaveCount(0);

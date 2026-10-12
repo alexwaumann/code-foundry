@@ -98,7 +98,7 @@ test.describe("Pull Requests page", () => {
     expect((await invocations()).some((i) => i.name === "view.pullrequests")).toBe(true);
 
     // An intent from the CLI (UiService.Emit) does the same.
-    await row(page, "t:t-tmp").click();
+    await row(page, "s:s-1").click();
     await expect(page.getByTestId("prs-page")).toHaveCount(0);
     expect(await emit({ showView: { name: "pullrequests" } })).toBeGreaterThan(0);
     await expect(page.getByTestId("prs-page")).toBeVisible();

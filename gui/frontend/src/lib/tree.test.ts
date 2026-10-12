@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRows, leafOrder, rowCache, nextAfter, ownedTerminalIds, placeTerminal, sessionKey, sessionOrder, terminalKey, type ListSession, type PlaceableTerminal, type Row } from "./tree";
+import { buildRows, rowCache, nextAfter, placeSession, sessionKey, sessionOrder, type ListSession, type Row } from "./tree";
 
 const W = [
   { repoId: "r1", path: "/src/app" },
@@ -7,46 +7,35 @@ const W = [
   { repoId: "r2", path: "/src/lib" },
 ];
 
-describe("placeTerminal", () => {
+describe("placeSession", () => {
   it.each([
-    ["label wins over cwd", { cwd: "/src/lib", worktreeLabel: "/src/app.worktrees/feat" }, W[1]],
-    ["label with trailing slash", { cwd: "/tmp", worktreeLabel: "/src/app/" }, W[0]],
-    ["unknown label falls back to cwd", { cwd: "/src/lib/x", worktreeLabel: "/gone" }, W[2]],
-    ["exact cwd", { cwd: "/src/app", worktreeLabel: "" }, W[0]],
-    ["nested cwd", { cwd: "/src/app/internal/daemon", worktreeLabel: "" }, W[0]],
-    ["longest prefix wins", { cwd: "/src/app.worktrees/feat/gui", worktreeLabel: "" }, W[1]],
-    ["sibling with shared prefix is not a match", { cwd: "/src/application", worktreeLabel: "" }, null],
-    ["outside every worktree", { cwd: "/tmp", worktreeLabel: "" }, null],
-    ["empty cwd", { cwd: "", worktreeLabel: "" }, null],
-  ])("%s", (_name, t, want) => {
-    expect(placeTerminal(t, W)).toEqual(want);
+    ["exact", "/src/app", W[0]],
+    ["exact with trailing slash", "/src/app/", W[0]],
+    ["nested", "/src/app/internal/daemon", W[0]],
+    ["longest prefix wins", "/src/app.worktrees/feat/gui", W[1]],
+    ["sibling with shared prefix is not a match", "/src/application", null],
+    ["outside every worktree", "/tmp", null],
+    ["empty", "", null],
+  ])("%s", (_name, worktreePath, want) => {
+    expect(placeSession({ worktreePath }, W)).toEqual(want);
   });
 });
 
-const terms: PlaceableTerminal[] = [
-  { id: "a", cwd: "/src/app", worktreeLabel: "" },
-  { id: "b", cwd: "/tmp", worktreeLabel: "" },
-  { id: "c", cwd: "/x", worktreeLabel: "/src/app.worktrees/feat", sessionLabel: "s9" }, // unknown session: shown
-  { id: "f", cwd: "/src/lib", worktreeLabel: "", sessionLabel: "s2" }, // owned by label: hidden
-];
-const loose = terms[1] as PlaceableTerminal;
+const thread = (id: string, over: Partial<ListSession> = {}): ListSession => ({ id, pinned: false, group: "idle", ...over });
 
-const thread = (id: string, over: Partial<ListSession> = {}): ListSession => ({ id, terminalId: "", pinned: false, group: "idle", ...over });
-
-/** The row key per row, headers as "# Label" (the Working header with its count and state). */
+/** The row key per row, the Working header as "# Working <count>" (and its state). */
 function shape(rows: readonly Row[]): string[] {
-  return rows.map((r) => (r.kind !== "header" ? r.key : r.section === "working" ? `# ${r.label} ${String(r.count)}${r.collapsed ? " (collapsed)" : ""}` : `# ${r.label}`));
+  return rows.map((r) => (r.kind === "session" ? r.key : `# ${r.label} ${String(r.count)}${r.collapsed ? " (collapsed)" : ""}`));
 }
 
 const s = (...ids: string[]) => ids.map(sessionKey);
 
 describe("buildRows (the flat thread list)", () => {
-  it("lists idle threads newest first with no header, then loose terminals under Terminals", () => {
-    const sessions = [thread("s1", { terminalId: "a" }), thread("s2"), thread("s3")];
-    expect(shape(buildRows(sessions, terms))).toEqual([...s("s3", "s2", "s1"), "# Terminals", terminalKey("b"), terminalKey("c")]);
+  it("lists idle threads newest first with no header", () => {
+    expect(shape(buildRows([thread("s1"), thread("s2"), thread("s3")]))).toEqual(s("s3", "s2", "s1"));
   });
 
-  // Creation order s1..s10; every group newest first.
+  // Creation order s1..s12; every group newest first.
   const all = [
     thread("s1", { group: "prompt" }),
     thread("s2", { pinned: true, group: "working" }), // pinned working: at the top, not under Working
@@ -62,63 +51,31 @@ describe("buildRows (the flat thread list)", () => {
     thread("s12", { group: "idle" }),
   ];
 
-  it("orders pinned, prompts then errors, finished, idle, then Working, then Terminals", () => {
-    const rows = buildRows(all, [loose]);
-    expect(shape(rows)).toEqual([
-      ...s("s11", "s8", "s2"),
-      ...s("s7", "s1", "s10", "s4"),
-      ...s("s6"),
-      ...s("s12", "s3"),
-      "# Working 2",
-      ...s("s9", "s5"),
-      "# Terminals",
-      terminalKey("b"),
-    ]);
-    expect(rows.map((r) => r.section)).toEqual([
-      "pinned",
-      "pinned",
-      "pinned",
-      "attention",
-      "attention",
-      "attention",
-      "attention",
-      "done",
-      "idle",
-      "idle",
-      "working",
-      "working",
-      "working",
-      "terminals",
-      "terminals",
-    ]);
+  it("orders pinned, prompts then errors, finished, idle, then Working", () => {
+    const rows = buildRows(all);
+    expect(shape(rows)).toEqual([...s("s11", "s8", "s2"), ...s("s7", "s1", "s10", "s4"), ...s("s6"), ...s("s12", "s3"), "# Working 2", ...s("s9", "s5")]);
+    expect(rows.map((r) => r.section)).toEqual(["pinned", "pinned", "pinned", "attention", "attention", "attention", "attention", "done", "idle", "idle", "working", "working", "working"]);
   });
 
   it("collapsed: the Working header stays with its count, its rows are gone", () => {
-    const rows = buildRows(all, [loose], { workingCollapsed: true });
-    expect(shape(rows)).toEqual([...s("s11", "s8", "s2", "s7", "s1", "s10", "s4", "s6", "s12", "s3"), "# Working 2 (collapsed)", "# Terminals", terminalKey("b")]);
+    const rows = buildRows(all, { workingCollapsed: true });
+    expect(shape(rows)).toEqual([...s("s11", "s8", "s2", "s7", "s1", "s10", "s4", "s6", "s12", "s3"), "# Working 2 (collapsed)"]);
     // A pinned working thread is never hidden.
     expect(rows.some((r) => r.key === sessionKey("s2"))).toBe(true);
   });
 
   it("has the Working header only when a thread is working, collapsed or not", () => {
     for (const workingCollapsed of [false, true]) {
-      expect(shape(buildRows([thread("s1", { group: "prompt" }), thread("s2", { pinned: true, group: "working" })], [], { workingCollapsed }))).toEqual(s("s2", "s1"));
+      expect(shape(buildRows([thread("s1", { group: "prompt" }), thread("s2", { pinned: true, group: "working" })], { workingCollapsed }))).toEqual(s("s2", "s1"));
     }
-    expect(shape(buildRows([thread("s1", { group: "working" })], []))).toEqual(["# Working 1", sessionKey("s1")]);
-    expect(shape(buildRows([], [loose]))).toEqual(["# Terminals", terminalKey("b")]);
-    expect(buildRows([], [])).toEqual([]);
+    expect(shape(buildRows([thread("s1", { group: "working" })]))).toEqual(["# Working 1", sessionKey("s1")]);
+    expect(buildRows([])).toEqual([]);
   });
 
-  it("ownedTerminalIds uses both terminal_id and labels.session", () => {
-    expect([...ownedTerminalIds([thread("s1", { terminalId: "a" }), thread("s2")], terms)].sort()).toEqual(["a", "f"]);
-  });
-
-  it("orders leaves (cmd+1..9) and threads (cmd+shift+a) as shown, headers skipped, collapsed rows absent", () => {
-    const sessions = [thread("s1"), thread("s2", { group: "done" }), thread("s3", { terminalId: "a", group: "working" }), thread("s4", { group: "prompt" }), thread("s5", { group: "error" })];
-    expect(leafOrder(sessions, terms).map((r) => r.key)).toEqual(["s:s4", "s:s5", "s:s2", "s:s1", "s:s3", "t:b", "t:c"]);
-    expect(sessionOrder(sessions, terms)).toEqual(["s4", "s5", "s2", "s1", "s3"]);
-    expect(leafOrder(sessions, terms, { workingCollapsed: true }).map((r) => r.key)).toEqual(["s:s4", "s:s5", "s:s2", "s:s1", "t:b", "t:c"]);
-    expect(sessionOrder(sessions, terms, { workingCollapsed: true })).toEqual(["s4", "s5", "s2", "s1"]);
+  it("orders threads (cmd+1..9, cmd+shift+a) as shown, the header skipped, collapsed rows absent", () => {
+    const sessions = [thread("s1"), thread("s2", { group: "done" }), thread("s3", { group: "working" }), thread("s4", { group: "prompt" }), thread("s5", { group: "error" })];
+    expect(sessionOrder(sessions)).toEqual(["s4", "s5", "s2", "s1", "s3"]);
+    expect(sessionOrder(sessions, { workingCollapsed: true })).toEqual(["s4", "s5", "s2", "s1"]);
   });
 });
 
@@ -127,37 +84,34 @@ describe("rowCache", () => {
 
   it("keeps row objects whose key and section are unchanged", () => {
     const stable = rowCache();
-    const first = stable(buildRows([thread("s1"), thread("s2")], [loose]));
-    const second = stable(buildRows([thread("s1"), thread("s2", { group: "prompt" }), thread("s3")], [loose]));
+    const first = stable(buildRows([thread("s1"), thread("s2")]));
+    const second = stable(buildRows([thread("s1"), thread("s2", { group: "prompt" }), thread("s3")]));
     expect(byKey(second, sessionKey("s1"))).toBe(byKey(first, sessionKey("s1")));
-    expect(byKey(second, terminalKey("b"))).toBe(byKey(first, terminalKey("b")));
-    expect(byKey(second, "h:terminals")).toBe(byKey(first, "h:terminals"));
     // s2 moved into the attention group: a new object with the new section.
     expect(byKey(second, sessionKey("s2"))).not.toBe(byKey(first, sessionKey("s2")));
     expect(byKey(second, sessionKey("s2"))).toMatchObject({ section: "attention" });
-    expect(second.map((r) => r.key)).toEqual([...s("s2", "s3", "s1"), "h:terminals", terminalKey("b")]);
+    expect(second.map((r) => r.key)).toEqual(s("s2", "s3", "s1"));
   });
 
   it("re-creates the Working header when its count or state changes, and only the rows that moved", () => {
     const stable = rowCache();
-    const first = stable(buildRows([thread("s1", { group: "working" }), thread("s2"), thread("s3", { group: "working" })], [loose]));
-    // s2 starts working: the header's count changes and s2 moves; s1, s3 and the terminal rows stay.
-    const second = stable(buildRows([thread("s1", { group: "working" }), thread("s2", { group: "working" }), thread("s3", { group: "working" })], [loose]));
+    const first = stable(buildRows([thread("s1", { group: "working" }), thread("s2"), thread("s3", { group: "working" })]));
+    // s2 starts working: the header's count changes and s2 moves; s1 and s3 stay.
+    const second = stable(buildRows([thread("s1", { group: "working" }), thread("s2", { group: "working" }), thread("s3", { group: "working" })]));
     expect(byKey(second, "h:working")).not.toBe(byKey(first, "h:working"));
     expect(byKey(second, "h:working")).toMatchObject({ count: 3, collapsed: false });
     expect(byKey(second, sessionKey("s2"))).not.toBe(byKey(first, sessionKey("s2")));
-    for (const key of [sessionKey("s1"), sessionKey("s3"), "h:terminals", terminalKey("b")]) expect(byKey(second, key), key).toBe(byKey(first, key));
+    for (const key of [sessionKey("s1"), sessionKey("s3")]) expect(byKey(second, key), key).toBe(byKey(first, key));
     // Nothing changed: every object is reused.
-    const same = stable(buildRows([thread("s1", { group: "working" }), thread("s2", { group: "working" }), thread("s3", { group: "working" })], [loose]));
+    const same = stable(buildRows([thread("s1", { group: "working" }), thread("s2", { group: "working" }), thread("s3", { group: "working" })]));
     same.forEach((r, i) => {
       expect(r).toBe(second[i]);
     });
-    // Collapsing: a new header object; the rows above and the terminals are reused.
-    const collapsed = stable(buildRows([thread("s1", { group: "working" }), thread("s2", { group: "working" }), thread("s3", { group: "working" }), thread("s4")], [loose], { workingCollapsed: true }));
+    // Collapsing: a new header object; the row above is new (s4), nothing else is shown.
+    const collapsed = stable(buildRows([thread("s1", { group: "working" }), thread("s2", { group: "working" }), thread("s3", { group: "working" }), thread("s4")], { workingCollapsed: true }));
     expect(byKey(collapsed, "h:working")).toMatchObject({ count: 3, collapsed: true });
     expect(byKey(collapsed, "h:working")).not.toBe(byKey(same, "h:working"));
-    expect(byKey(collapsed, terminalKey("b"))).toBe(byKey(same, terminalKey("b")));
-    expect(shape(collapsed)).toEqual([sessionKey("s4"), "# Working 3 (collapsed)", "# Terminals", terminalKey("b")]);
+    expect(shape(collapsed)).toEqual([sessionKey("s4"), "# Working 3 (collapsed)"]);
   });
 });
 

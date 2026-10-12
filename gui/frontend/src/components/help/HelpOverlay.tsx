@@ -80,6 +80,10 @@ function HelpBody() {
               branch across several projects) with its members.
             </p>
             <p>
+              <span className="font-medium text-foreground">Terminals</span> (⌘T) are shells in the bottom panel (⌘J) under a thread or the
+              Projects page: a thread's start in its worktree, the Projects page's in the row's worktree.
+            </p>
+            <p>
               <span className="font-medium text-foreground">The palette</span> (⌘K) lists every action available for what you are looking
               at. The same commands are keyboard shortcuts and <code className="font-mono text-xs">code-foundry</code> CLI verbs.
             </p>

@@ -9,12 +9,10 @@ import { toneBadge } from "@/components/pr/tones";
 import { useNow } from "@/lib/clock";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
-import { SESSION_LABEL } from "@/lib/tree";
 import { cn } from "@/lib/utils";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { copyPullRequestLink, openPullRequestInPanel } from "@/stores/prPanel";
 import { useSessionsStore } from "@/stores/sessions";
-import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { linkedCount, newestFirst, spansRepos, urlHost } from "@/surfaces/linkedprsTarget";
 
@@ -32,14 +30,11 @@ export interface LinkRow {
 }
 
 /**
- * The thread this panel belongs to: the selected session, or the thread of the selected
- * terminal; "" otherwise. (A panel always shows the current selection's panel, so the
- * selection is the panel's owner.)
+ * The thread this panel belongs to: the selected session; "" otherwise. (A panel always
+ * shows the current selection's panel, so the selection is the panel's owner.)
  */
 function useThreadId(): string {
-  const sel = useUiStore((s) => s.selection);
-  const termThread = useTerminalsStore((s) => (sel.kind === "terminal" ? (s.byId[sel.id]?.labels[SESSION_LABEL] ?? "") : ""));
-  return sel.kind === "session" ? sel.id : termThread;
+  return useUiStore((s) => (s.selection.kind === "session" ? s.selection.id : ""));
 }
 
 /** The thread's links, newest first. Re-renders only when the list changes. */

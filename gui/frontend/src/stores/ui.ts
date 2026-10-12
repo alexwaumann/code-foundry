@@ -1,10 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-/** What the content area shows. Derived into the UiContext sent with List/Invoke. */
+/**
+ * What the content area shows. Derived into the UiContext sent with List/Invoke. A shell
+ * is never selected: it shows in its owner's bottom panel (a thread's, or the Projects
+ * page's; stores/bottomPanel.ts).
+ */
 export type Selection =
   | { kind: "none" }
-  | { kind: "terminal"; id: string }
   | { kind: "session"; id: string }
   /**
    * The new-thread composer (picked in the project picker): for a project, or with
@@ -208,7 +211,6 @@ export function sameSelection(a: Selection, b: Selection): boolean {
   switch (a.kind) {
     case "none":
       return true;
-    case "terminal":
     case "session":
       return a.id === (b as typeof a).id;
     case "compose":
@@ -244,7 +246,7 @@ export const useUiStore = create<UiState>()(
         set((s) => ({
           selection: sameSelection(s.selection, sel) ? s.selection : sel,
           terminalFocusSeq:
-            opts?.focusTerminal && (sel.kind === "terminal" || sel.kind === "session") ? s.terminalFocusSeq + 1 : s.terminalFocusSeq,
+            opts?.focusTerminal && sel.kind === "session" ? s.terminalFocusSeq + 1 : s.terminalFocusSeq,
         }));
       },
       setRenaming: (renamingSessionId) => {
