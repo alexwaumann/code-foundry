@@ -79,6 +79,19 @@ re-download if missing).
    needs-attention while a `can_use_tool` is pending; idle after `result`; error when the
    process exits mid-turn. Same `Status`/`StatusReason` fields as today.
 
+## 3b. UI decisions (Alex, 2026-10-11, from the sketch in `/tmp/cf-thread-sketch`, copied to `docs/sketches/rendered-thread/` by PR 2)
+
+* **Variant A**: dense T3-like work-log rows, user messages as right-aligned bubbles,
+  floating composer card; a pending permission or question docks into the top of the
+  composer card so it never scrolls away. The timeline keeps an amber "waiting for you"
+  row (C's emphasis) at the point of the pending request.
+* **Turn fold** (from B): a finished turn's work rows (thinking, tool rows, subagents)
+  collapse under its footer by default so only the final assistant message stays
+  visible; the **latest turn stays open**; click the footer/summary to expand.
+* **One Interrupt button**: only the composer's. None inside the permission prompt.
+* **Bundled JetBrains Mono** for code, diffs and shell output in the thread.
+* No divider item (modes never switch).
+
 ## 4. Build order
 
 * **PR 1 (daemon)** branch `t3code/rendered-threads-1-daemon`: `internal/claudestream`
