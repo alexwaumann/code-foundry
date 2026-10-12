@@ -949,11 +949,12 @@ export class World {
     return Number(this.settings.values()["sessions.cache_ttl_seconds"] || 3600);
   }
 
-  /** POST /__mock/thread/cache: the thread's last result `agoSeconds` ago (optionally with `tokens`). */
-  ageThreadCache(id: string, agoSeconds: number, tokens?: number): void {
+  /** POST /__mock/thread/cache: the thread's last result `agoSeconds` ago (optionally with `tokens`, answered by `model`). */
+  ageThreadCache(id: string, agoSeconds: number, tokens?: number, model?: string): void {
     const s = this.session(id);
     s.lastResultAt = new Date(Date.now() - agoSeconds * 1000);
     if (tokens !== undefined) s.contextTokens = tokens;
+    if (model !== undefined) s.contextModel = model;
     this.publishSession(s);
   }
 

@@ -4,7 +4,7 @@
  * turn, when that turn ended, and from those and the sessions.cache_ttl_seconds setting the
  * cache expiry and the re-read cost, computed when sent like the daemon's.
  *
- *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N]
+ *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N&model=M]
  *        moves the thread's last result <seconds> into the past (ago > the TTL: expired)
  */
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
