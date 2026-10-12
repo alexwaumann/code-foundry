@@ -1,8 +1,9 @@
 # Rendered threads — handoff
 
-Status: **design agreed with Alex on 2026-10-11**, building. Read `ARCHITECTURE.md` and
-`PLAN.md` first, then `new-thread-composer.md`, `composer-tags-*.md` (the composer this
-reuses) and `thread-status-persistence.md`.
+Status: **design agreed with Alex on 2026-10-11**, building. PR 1 (daemon):
+`docs/notes/rendered-threads-1-daemon.md`. Read `ARCHITECTURE.md` and `PLAN.md` first,
+then `new-thread-composer.md`, `composer-tags-*.md` (the composer this reuses) and
+`thread-status-persistence.md`.
 
 ## 1. Problem
 
@@ -55,6 +56,59 @@ re-download if missing).
 * Sending a `user` message while a turn runs is accepted; the CLI applies its own
   steer/queue behaviour (same as typing while busy in the TUI).
 * Close: `interrupt` if busy, close stdin, wait, SIGTERM, then SIGKILL after the timeout.
+
+Probed while building PR 1 (same day, same version; scripts in `/tmp/cf-stream-probe`,
+captures in `internal/claudestream/testdata`):
+
+* `system/init` does **not** follow `initialize`: it arrives at the start of each turn,
+  the first one only after the first user message. The `initialize` reply carries
+  `pid`, `claude_code_version`, `current_permission_mode` and `session_state`, so the
+  daemon treats a successful handshake as "connected".
+* `command_lifecycle` frames (`command_uuid` = the `uuid` we sent; state queued,
+  started, completed, cancelled) track every user message.
+* `--permission-mode manual` reports itself as `default` (the wire name), and
+  `set_permission_mode` echoes `{"mode":"default"}` for both `manual` and `default`.
+  An unknown mode is an error listing `acceptEdits, auto, bypassPermissions, default,
+  dontAsk, plan`. A change emits `system/status` with `permissionMode`. Without
+  `--permission-mode` the user's `defaultMode` setting applies (Alex's is `auto`: no
+  prompts at all), so live tests that need a prompt pass `manual`.
+* Read-only Bash (`echo`, `ls`, `wc -l`) runs without a prompt even in `manual`.
+* `set_model` replies with an empty payload and emits a replayed
+  `<local-command-stdout>Set model to …</local-command-stdout>` user frame; an unknown
+  model is an error (`Model 'x' not found`).
+* `set_cwd` replies `{"status":"ok","cwd","changed","transcript_relocated"}`, or
+  `{"status":"needs_trust","directory"}` for a folder not trusted in `~/.claude.json`
+  (pre-trust it first), or `{"status":"rejected","reason":"not_found","message"}`.
+* The complete `assistant` frame of a streamed block arrives **before** that block's
+  `content_block_stop`; an interrupted one carries `"aborted": true`. Haiku's thinking
+  streams no text (`thinking_display: "updates"`, empty `thinking_delta`s, progress in
+  `system/thinking_tokens`).
+* `interrupt` replies `{"still_queued":[]}`. A pending `can_use_tool` is withdrawn
+  with `{"type":"control_cancel_request","request_id":R}` and its tool gets a
+  rejected `tool_result`; the turn's result is `error_during_execution`, `is_error`
+  true, `terminal_reason` `aborted_streaming` (or `aborted_tools`), followed by a
+  `[Request interrupted by user]` user frame. After such a turn, closing stdin exits
+  the process with code 1.
+* Subagent output is not streamed: whole `assistant`/`user` frames with
+  `parent_tool_use_id` = the Agent `tool_use`; its `can_use_tool` carries `agent_id`;
+  `system/task_started|task_progress|task_updated|task_notification` frame the run.
+  Unless told otherwise haiku launches the Agent tool in the background ("Async agent
+  launched"): the turn's result comes while the run continues and a later turn picks up
+  its notification.
+* `user` frames with `tool_result` blocks carry `tool_use_result` (the tool's
+  structured output: Write `{type: create|update, filePath, content, structuredPatch,
+  originalFile}`, AskUserQuestion `{questions, answers}`) and `tool_result_meta`.
+* `/compact` sent as a user message: `status compacting`, `status null` with
+  `compact_result`, a new `init`, `compact_boundary {trigger, pre_tokens, post_tokens}`,
+  the summary as a `user` frame with string content and `isSynthetic`, a replayed
+  `<local-command-stdout>Compacted </local-command-stdout>` (`isReplay`), and a
+  `result` with `local_command: "compact"`.
+* `/clear`: `{"type":"conversation_reset","new_conversation_id",…}` and a new `init`.
+  Claude's `sessions/<pid>.json` is written and updated in `-p` mode too, so the
+  `/clear` tracking by pid works with the `exec.Cmd` pid.
+* `result.total_cost_usd` is cumulative over the process; `queued_turn_count > 0`
+  means more queued turns follow.
+* `--resume` over stream-json replays no history: the first frames are the new turn's.
 
 ## 3. Decisions (Alex, 2026-10-11)
 

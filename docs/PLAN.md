@@ -101,6 +101,18 @@ and one for the Projects page, keyed like the side panel.
 * PR C (the sidebar's Terminals section and the `terminal` selection kind removed; every
   entry point lands in a bottom panel) done: `docs/notes/bottom-panel-3-routing.md`.
 
+### Rendered threads: four PRs (design 2026-10-11)
+
+Opt-in render mode: Claude Code runs headless (`claude -p` over stream-json) and the app
+draws the conversation. Design record: `docs/notes/rendered-threads-handoff.md`.
+
+* PR 1 (`internal/claudestream`, the stdio runner beside the PTY runner,
+  `Session.render` and `thread_items`, `ThreadService`, the `thread` event source,
+  `sessions.render`, `session.new --render`, the `thread.*` CLI verbs) done:
+  `docs/notes/rendered-threads-1-daemon.md`.
+* Sketch, then PR 2 (GUI timeline), PR 3 (prompts, questions, live model/mode), PR 4
+  (composer toggle, setting, specs, screenshots): not started.
+
 ### Open items
 
 Collected from the step notes; none blocks daily use.
