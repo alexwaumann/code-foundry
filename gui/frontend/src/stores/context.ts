@@ -16,6 +16,7 @@ export const emptyContext: UiContextView = {
   activeWorktreePath: "",
   activeView: "dashboard",
   activeWorkspaceId: "",
+  activeSessionRendered: false,
 };
 
 function allWorktrees(repos: ReposData): WorktreeRef[] {
@@ -84,6 +85,7 @@ function deriveSelectionContext(sel: Selection, repos: ReposData, sessions: Sess
         activeWorktreePath: place?.path ?? s?.worktreePath ?? "",
         activeView: "session",
         activeWorkspaceId: s?.workspaceId ?? "",
+        activeSessionRendered: s?.render === "rendered",
       };
     }
     // The composer has no worktree yet (it may make one): only the repo, which is
@@ -96,7 +98,7 @@ function deriveSelectionContext(sel: Selection, repos: ReposData, sessions: Sess
 }
 
 export function contextKey(c: UiContextView): string {
-  return [c.activeView, c.activeTerminalId, c.activeSessionId, c.activeRepoId, c.activeWorktreePath, c.activeWorkspaceId].join("\u0000");
+  return [c.activeView, c.activeTerminalId, c.activeSessionId, c.activeRepoId, c.activeWorktreePath, c.activeWorkspaceId, c.activeSessionRendered ? "r" : ""].join("\u0000");
 }
 
 /**

@@ -1,0 +1,821 @@
+/*
+ * The rendered thread (docs/sketches/rendered-thread, variant A). Ported from the sketch's
+ * style.css / variants.css onto the app's tokens (index.css): status tones are the
+ * Tailwind colours the sidebar uses, syntax colours the terminal palette
+ * (src/terminal/theme.ts), mono text the bundled JetBrains Mono.
+ */
+.cf-thread {
+  /* Light: the -700 shades, so 11-12px status text clears 4.5:1 on the pane (the -600s
+     the sidebar's icons use are about 3:1 for amber and 3.8:1 for emerald). */
+  --t-sky: oklch(0.5 0.134 242.749);
+  --t-amber: oklch(0.555 0.163 48.998);
+  --t-emerald: oklch(0.508 0.118 165.612);
+  --t-red: oklch(0.577 0.245 27.325);
+  --t-emerald-500: oklch(0.696 0.17 162.48);
+  --t-red-500: oklch(0.637 0.237 25.331);
+  --t-amber-500: oklch(0.769 0.188 70.08);
+  --t-bubble: oklch(0 0 0 / 4.5%);
+  --t-hover: oklch(0 0 0 / 4%);
+  /* Terminal palette, light (theme.ts). */
+  --syn-fg: #24292f;
+  --syn-kw: #cf222e;
+  --syn-fn: #8250df;
+  --syn-type: #0969da;
+  --syn-str: #116329;
+  --syn-com: #6e7781;
+  --syn-num: #1b7c83;
+  --sh-cmd: #0969da;
+  --sh-flag: #1b7c83;
+  --sh-str: #116329;
+  --t-mono: "JetBrainsMono Nerd Font Mono", "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+}
+.dark .cf-thread {
+  --t-sky: oklch(0.746 0.16 232.661);
+  --t-amber: oklch(0.879 0.169 91.605);
+  --t-emerald: oklch(0.765 0.177 163.223);
+  --t-red: oklch(0.704 0.191 22.216);
+  --t-bubble: oklch(1 0 0 / 7%);
+  --t-hover: oklch(1 0 0 / 5%);
+  --syn-fg: #d8dadf;
+  --syn-kw: #c678dd;
+  --syn-fn: #61afef;
+  --syn-type: #e5c07b;
+  --syn-str: #98c379;
+  --syn-com: #5c6370;
+  --syn-num: #56b6c2;
+  --sh-cmd: #61afef;
+  --sh-flag: #56b6c2;
+  --sh-str: #98c379;
+}
+
+.cf-thread .mono {
+  font-family: var(--t-mono);
+}
+.cf-thread .t-sky {
+  color: var(--t-sky);
+}
+.cf-thread .t-amber {
+  color: var(--t-amber);
+}
+.cf-thread .t-emerald {
+  color: var(--t-emerald);
+}
+.cf-thread .t-red {
+  color: var(--t-red);
+}
+
+/* ---------- column ---------- */
+.cf-thread .col {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 784px;
+  padding: 0 40px;
+}
+.cf-thread .selectable {
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
+}
+
+/* ---------- markdown in the thread: the PR surface's .cf-markdown, mono and syntax from the terminal ---------- */
+.cf-thread .cf-markdown code,
+.cf-thread .cf-markdown pre {
+  font-family: var(--t-mono);
+}
+.cf-thread .cf-markdown pre {
+  line-height: 1.5;
+  tab-size: 4;
+  color: var(--syn-fg);
+}
+.dark .cf-thread .cf-markdown :where(pre, :not(pre) > code) {
+  background: oklch(1 0 0 / 5%);
+}
+.cf-thread .cf-markdown th {
+  font-weight: 600;
+  text-align: left;
+}
+/* .cf-markdown breaks anywhere (long paths in prose); in a table cell that would shrink a
+   column to a letter's width, so cells break between words only. */
+.cf-thread .cf-markdown :where(th, td) {
+  overflow-wrap: break-word;
+}
+.cf-thread .cf-markdown :where(th, td) code {
+  white-space: nowrap;
+}
+.cf-thread .cf-markdown img {
+  max-height: 320px;
+}
+/* The streaming caret, after the last thing written. */
+@keyframes cf-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.cf-thread .cf-streaming > :last-child:not(pre, ul, ol, table)::after,
+.cf-thread .cf-streaming > pre:last-child > code::after,
+.cf-thread .cf-streaming > :is(ul, ol):last-child > li:last-child::after,
+.cf-thread .cf-streaming:empty::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  vertical-align: -2px;
+  margin-left: 1px;
+  background: var(--foreground);
+  opacity: 0.7;
+  border-radius: 1px;
+  animation: cf-caret-blink 1s steps(1) infinite;
+}
+
+/* hljs classes (lib/highlight.ts) in the terminal palette. */
+.cf-thread .hljs-keyword,
+.cf-thread .hljs-selector-tag,
+.cf-thread .hljs-doctag {
+  color: var(--syn-kw);
+}
+.cf-thread .hljs-title,
+.cf-thread .hljs-section,
+.cf-thread .hljs-built_in,
+.cf-thread .hljs-name {
+  color: var(--syn-fn);
+}
+.cf-thread .hljs-type,
+.cf-thread .hljs-title.class_,
+.cf-thread .hljs-selector-class,
+.cf-thread .hljs-tag {
+  color: var(--syn-type);
+}
+.cf-thread .hljs-string,
+.cf-thread .hljs-regexp,
+.cf-thread .hljs-addition,
+.cf-thread .hljs-selector-attr {
+  color: var(--syn-str);
+}
+.cf-thread .hljs-comment,
+.cf-thread .hljs-quote,
+.cf-thread .hljs-meta {
+  color: var(--syn-com);
+}
+.cf-thread .hljs-number,
+.cf-thread .hljs-literal,
+.cf-thread .hljs-symbol,
+.cf-thread .hljs-bullet {
+  color: var(--syn-num);
+}
+.cf-thread .hljs-deletion {
+  color: var(--t-red);
+}
+.cf-thread .sh-cmd {
+  color: var(--sh-cmd);
+}
+.cf-thread .sh-flag {
+  color: var(--sh-flag);
+}
+.cf-thread .sh-str {
+  color: var(--sh-str);
+}
+
+/* ---------- work-log rows ---------- */
+.cf-thread .row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--muted-foreground);
+  border-radius: 6px;
+  padding: 1px 2px;
+  position: relative;
+  width: 100%;
+  text-align: left;
+}
+.cf-thread button.row:hover {
+  background: var(--t-hover);
+}
+.cf-thread button.row:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--ring) 60%, transparent);
+  outline-offset: -2px;
+}
+.cf-thread .row .ico {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.cf-thread .row .ico svg {
+  width: 14px;
+  height: 14px;
+}
+.cf-thread .row .lbl {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cf-thread .row .lbl b {
+  font-weight: 500;
+  color: color-mix(in oklab, var(--foreground) 82%, transparent);
+}
+.cf-thread .row .lbl .mono {
+  font-size: 12px;
+}
+.cf-thread .row .lbl .cmd {
+  color: color-mix(in oklab, var(--foreground) 82%, transparent);
+}
+.cf-thread .row .meta {
+  flex: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.cf-thread .row .chev {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  opacity: 0.55;
+  transition: transform 0.12s;
+}
+.cf-thread .row[aria-expanded="true"] .chev {
+  transform: rotate(90deg);
+}
+.cf-thread .row .nochev {
+  width: 14px;
+  flex: none;
+}
+.cf-thread .add {
+  color: var(--t-emerald);
+}
+.cf-thread .del {
+  color: var(--t-red);
+}
+.cf-thread .chip {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid;
+}
+.cf-thread .chip.fail {
+  border-color: color-mix(in oklab, var(--t-red) 30%, transparent);
+  background: color-mix(in oklab, var(--t-red-500) 10%, transparent);
+  color: var(--t-red);
+}
+.cf-thread .chip.ok {
+  border-color: color-mix(in oklab, var(--t-emerald) 30%, transparent);
+  background: color-mix(in oklab, var(--t-emerald-500) 10%, transparent);
+  color: var(--t-emerald);
+}
+.cf-thread .chip.muted,
+.cf-thread .chip.tool {
+  border-color: var(--border);
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+.cf-thread .chip.tool {
+  font-family: var(--t-mono);
+  font-weight: 400;
+}
+.dark .cf-thread :is(.chip.tool, .chip.muted) {
+  background: oklch(1 0 0 / 5%);
+}
+.cf-thread .q-hdr {
+  display: inline-flex;
+  height: 18px;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  margin-right: 2px;
+}
+.dark .cf-thread .q-hdr {
+  background: oklch(1 0 0 / 7%);
+}
+.cf-thread .detail {
+  margin: 2px 0 6px 30px;
+}
+.cf-thread .members {
+  margin-left: 28px;
+}
+.cf-thread .children {
+  margin: 0 0 4px 12px;
+  padding-left: 16px;
+  border-left: 1px solid color-mix(in oklab, var(--foreground) 14%, transparent);
+}
+.cf-thread .matches {
+  font-family: var(--t-mono);
+  font-size: 12px;
+  line-height: 19px;
+  color: var(--muted-foreground);
+  padding: 2px 0 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cf-thread .subresult {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+  padding: 4px 2px 6px 30px;
+}
+.cf-thread .subresult code {
+  font-family: var(--t-mono);
+  font-size: 11px;
+}
+
+/* bash block */
+.cf-thread .term {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: var(--t-mono);
+  font-size: 12px;
+  line-height: 18px;
+  background: oklch(0 0 0 / 1.5%);
+}
+.dark .cf-thread .term {
+  background: oklch(1 0 0 / 2.5%);
+}
+.cf-thread .term .cmd {
+  padding: 8px 12px;
+  color: var(--syn-fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cf-thread .term .pr {
+  color: var(--muted-foreground);
+  user-select: none;
+}
+.cf-thread .term .out {
+  border-top: 1px solid var(--border);
+  padding: 8px 12px;
+  color: var(--muted-foreground);
+  white-space: pre;
+  overflow: auto;
+  max-height: 220px;
+}
+.cf-thread .term .out.fail {
+  color: var(--t-red);
+}
+
+/* diff */
+.cf-thread .diff {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: var(--t-mono);
+  font-size: 12px;
+  line-height: 19px;
+}
+.cf-thread .diff .dh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--muted);
+}
+.dark .cf-thread .diff .dh {
+  background: oklch(1 0 0 / 4%);
+}
+.cf-thread .diff .dh .path {
+  color: color-mix(in oklab, var(--foreground) 85%, transparent);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cf-thread .diff .dh .dir {
+  color: var(--muted-foreground);
+}
+.cf-thread .diff .hunk {
+  color: var(--muted-foreground);
+  background: color-mix(in oklab, var(--t-sky) 7%, transparent);
+  padding: 0 10px;
+}
+.cf-thread .diff .l {
+  display: grid;
+  grid-template-columns: 38px 38px 18px 1fr;
+  white-space: pre-wrap;
+  word-break: break-word;
+  tab-size: 4;
+  color: var(--syn-fg);
+}
+.cf-thread .diff .l .o,
+.cf-thread .diff .l .n {
+  text-align: right;
+  padding-right: 8px;
+  color: var(--muted-foreground);
+  opacity: 0.6;
+  user-select: none;
+}
+.cf-thread .diff .l .g {
+  color: var(--muted-foreground);
+  user-select: none;
+  text-align: center;
+}
+.cf-thread .diff .l.la {
+  background: color-mix(in oklab, var(--t-emerald-500) 11%, transparent);
+}
+.cf-thread .diff .l.la .g {
+  color: var(--t-emerald);
+}
+.cf-thread .diff .l.la :is(.o, .n) {
+  background: color-mix(in oklab, var(--t-emerald-500) 9%, transparent);
+}
+.cf-thread .diff .l.lr {
+  background: color-mix(in oklab, var(--t-red-500) 11%, transparent);
+}
+.cf-thread .diff .l.lr .g {
+  color: var(--t-red);
+}
+.cf-thread .diff .l.lr :is(.o, .n) {
+  background: color-mix(in oklab, var(--t-red-500) 9%, transparent);
+}
+.cf-thread .diff .l ins {
+  text-decoration: none;
+  background: color-mix(in oklab, var(--t-emerald-500) 26%, transparent);
+  border-radius: 2px;
+}
+.cf-thread .diff .l del {
+  text-decoration: none;
+  background: color-mix(in oklab, var(--t-red-500) 26%, transparent);
+  border-radius: 2px;
+}
+.cf-thread .diff .more {
+  padding: 2px 10px;
+  color: var(--muted-foreground);
+  font-family: inherit;
+}
+
+/* ---------- user messages, turns ---------- */
+.cf-thread .u {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  margin: 6px 0 18px;
+}
+.cf-thread .u .bubble {
+  max-width: 80%;
+  background: var(--t-bubble);
+  border-radius: 16px;
+  padding: 9px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cf-thread .when {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.cf-thread .a-md {
+  margin: 6px 0 8px 4px;
+}
+.cf-thread .a-md.final {
+  margin-top: 14px;
+}
+.cf-thread .tfoot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  margin: 14px 0 24px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.cf-thread .tfoot .sep {
+  opacity: 0.5;
+}
+.cf-thread .tfoot .fold {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 6px;
+  padding: 0 4px;
+  margin-left: -4px;
+  height: 24px;
+}
+.cf-thread .tfoot .fold:hover {
+  background: var(--t-hover);
+  color: var(--foreground);
+}
+.cf-thread .tfoot .fold svg {
+  width: 13px;
+  height: 13px;
+  transition: transform 0.12s;
+}
+.cf-thread .tfoot .fold[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+.cf-thread .tfoot .tb {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cf-thread .tfoot .tb:hover {
+  background: var(--t-hover);
+  color: var(--foreground);
+}
+.cf-thread .tfoot .tb svg {
+  width: 13px;
+  height: 13px;
+}
+@keyframes cf-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+.cf-thread .working {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  height: 24px;
+  padding-left: 4px;
+  margin: 10px 0 24px;
+}
+.cf-thread .working svg {
+  width: 14px;
+  height: 14px;
+  color: var(--t-sky);
+}
+.cf-thread .working .shimmer {
+  background: linear-gradient(90deg, var(--muted-foreground) 0%, var(--foreground) 50%, var(--muted-foreground) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: cf-shimmer 2s linear infinite;
+}
+
+/* ---------- the floating composer, prompts docked into it ---------- */
+.cf-thread .dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 32px 40px 16px;
+  background: linear-gradient(to top, var(--pane) 55%, transparent);
+  pointer-events: none;
+}
+.cf-thread .dock > * {
+  pointer-events: auto;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.cf-thread .ccard {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--card) 85%, transparent);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 1px 2px oklch(0 0 0 / 5%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.dark .cf-thread .ccard {
+  box-shadow: 0 1px 2px oklch(0 0 0 / 40%);
+}
+.cf-thread .ccard.docked {
+  background: var(--card);
+}
+.cf-thread .ccard[data-dragging] {
+  border-color: oklch(0.746 0.16 232.661 / 70%);
+}
+.cf-thread .pend {
+  grid-column: 1 / 3;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.cf-thread .pend-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.cf-thread .pend-h > svg {
+  width: 15px;
+  height: 15px;
+  color: var(--t-amber);
+  flex: none;
+}
+.cf-thread .pend-h .why {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cf-thread .pend .cmdbox {
+  margin: 10px 0 6px;
+  font-family: var(--t-mono);
+  font-size: 12px;
+  line-height: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--syn-fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: oklch(0 0 0 / 2%);
+  max-height: 160px;
+  overflow: auto;
+}
+.dark .cf-thread .pend .cmdbox {
+  background: oklch(1 0 0 / 3%);
+}
+.cf-thread .pend .desc {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin-bottom: 10px;
+  line-height: 1.45;
+}
+.cf-thread .pend .desc code {
+  font-family: var(--t-mono);
+  font-size: 11px;
+  color: color-mix(in oklab, var(--foreground) 80%, transparent);
+}
+.cf-thread .acts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cf-thread .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.cf-thread .btn svg {
+  width: 13px;
+  height: 13px;
+}
+.cf-thread .btn.primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.cf-thread .btn.primary:hover {
+  background: color-mix(in oklab, var(--primary) 90%, transparent);
+}
+.cf-thread .btn.outline {
+  border: 1px solid var(--border);
+  background: var(--sheet);
+  box-shadow: 0 1px 2px oklch(0 0 0 / 5%);
+}
+.dark .cf-thread .btn.outline {
+  border-color: var(--input);
+  background: oklch(1 0 0 / 4.5%);
+}
+.cf-thread .btn.outline:hover {
+  background: var(--accent);
+}
+.cf-thread .btn kbd {
+  font-family: inherit;
+  font-size: 10px;
+  line-height: 14px;
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  opacity: 0.45;
+  text-align: center;
+}
+.cf-thread .q-text {
+  font-size: 13px;
+  margin: 10px 0 8px;
+  line-height: 1.45;
+}
+.cf-thread .opts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.cf-thread .opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: left;
+}
+.cf-thread .opt .on {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in oklab, var(--foreground) 30%, transparent);
+  flex: none;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cf-thread .opt.sel {
+  border-color: color-mix(in oklab, var(--t-sky) 55%, var(--border));
+  background: color-mix(in oklab, var(--t-sky) 7%, transparent);
+}
+.cf-thread .opt.sel .on {
+  border-color: var(--t-sky);
+}
+.cf-thread .opt.sel .on::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--t-sky);
+}
+.cf-thread .opt b {
+  font-weight: 500;
+}
+.cf-thread .opt small {
+  display: block;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin-top: 1px;
+}
+.cf-thread .opt .kn {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+.cf-thread .pager {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.cf-thread .pager i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--foreground) 20%, transparent);
+  display: block;
+}
+.cf-thread .pager i.on {
+  background: var(--foreground);
+}
+.cf-thread .intr {
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  padding: 0 12px 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--sheet);
+}
+.dark .cf-thread .intr {
+  border-color: var(--input);
+  background: oklch(1 0 0 / 4.5%);
+}
+.cf-thread .intr:hover {
+  background: var(--accent);
+}
+.cf-thread .intr i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: currentColor;
+  display: block;
+}

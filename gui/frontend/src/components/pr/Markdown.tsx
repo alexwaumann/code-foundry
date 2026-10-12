@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema, type Options as SanitizeSchema } from "rehype-sanitize";
@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import { resolveLink } from "./model";
 
-const components: Components = {
+const baseComponents: Components = {
   a: ({ href, children, title }) => {
     const url = resolveLink(href);
     // A link whose target was stripped (javascript:, an anchor) is plain text: no href,
@@ -48,18 +48,74 @@ const markdownSchema: SanitizeSchema = {
 };
 
 const remarkPlugins = [remarkGfm];
-const rehypePlugins = [rehypeRaw, [rehypeSanitize, markdownSchema]] as NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
+type RehypePlugins = NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
+const rehypePlugins = [rehypeRaw, [rehypeSanitize, markdownSchema]] as RehypePlugins;
+interface HastLike {
+  type: string;
+  value?: string;
+  children?: HastLike[];
+}
+
+/** Turns raw HTML nodes into text (sanitize would drop them, and their words with them). */
+function rehypeRawAsText() {
+  const walk = (n: HastLike) => {
+    for (const c of n.children ?? []) {
+      if (c.type === "raw") c.type = "text";
+      else walk(c);
+    }
+  };
+  return walk;
+}
+
+/** Without raw HTML: any HTML in the source shows as text. Still sanitized. */
+const rehypePluginsNoHtml = [rehypeRawAsText, [rehypeSanitize, markdownSchema]] as RehypePlugins;
+
+/** Optional renderers a surface adds (the rendered thread: highlighted code, attachment images). */
+export interface MarkdownExtras {
+  /** A fenced code block: its info string's language ("" without one) and its code (no trailing newline). */
+  code?: (lang: string, code: string) => ReactNode;
+  /** An image whose src is not https (https images always load); null renders nothing. */
+  image?: (src: string, alt: string) => ReactNode;
+  /**
+   * false: HTML in the source is text, not markup (Claude's answers: "Result<T, E>" must
+   * not vanish as an unknown tag). Default true (GitHub bodies use HTML).
+   */
+  html?: boolean;
+}
+
+function withExtras(extras: MarkdownExtras): Components {
+  const { code, image } = extras;
+  return {
+    ...baseComponents,
+    ...(code && {
+      pre: ({ node, children }) => {
+        // The hast <pre>'s <code>: its language class and its text.
+        const el = node?.children.find((c) => c.type === "element" && c.tagName === "code");
+        if (el?.type !== "element") return <pre>{children}</pre>;
+        const classes = Array.isArray(el.properties.className) ? el.properties.className.map(String) : [];
+        const lang = classes.find((c) => c.startsWith("language-"))?.slice("language-".length) ?? "";
+        const text = el.children.map((c) => (c.type === "text" ? c.value : "")).join("");
+        return <>{code(lang, text.replace(/\n$/, ""))}</>;
+      },
+    }),
+    ...(image && {
+      img: ({ src, alt }) => (typeof src !== "string" ? null : /^https:\/\//.test(src) ? <img src={src} alt={alt ?? ""} loading="lazy" referrerPolicy="no-referrer" /> : image(src, alt ?? "")),
+    }),
+  };
+}
 
 /**
  * GitHub-flavoured markdown (tables, task lists, strikethrough, autolinks) with the raw
  * HTML GitHub bodies use, sanitized by markdownSchema; react-markdown's URL transform also
  * strips unsafe schemes, so a body cannot inject markup or script. Links open through
- * openUrl (view.open.url).
+ * openUrl (view.open.url). `extras` adds renderers and can turn raw HTML off (pass a
+ * stable object).
  */
-export const Markdown = memo(function Markdown({ children, className }: { children: string; className?: string }) {
+export const Markdown = memo(function Markdown({ children, className, extras }: { children: string; className?: string; extras?: MarkdownExtras }) {
+  const components = useMemo(() => (extras ? withExtras(extras) : baseComponents), [extras]);
   return (
     <div className={cn("cf-markdown", className)}>
-      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
+      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={extras?.html === false ? rehypePluginsNoHtml : rehypePlugins} components={components}>
         {children}
       </ReactMarkdown>
     </div>

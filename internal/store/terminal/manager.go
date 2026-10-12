@@ -357,20 +357,40 @@ func watchBus(ctx context.Context, b *bus.Bus) <-chan Event {
 		defer close(out)
 		defer updated.Close()
 		defer removed.Close()
+		send := func(ev Event) bool {
+			select {
+			case out <- ev:
+				return true
+			case <-ctx.Done():
+				return false
+			}
+		}
 		for {
-			var ev Event
 			select {
 			case <-ctx.Done():
 				return
 			case u := <-updated.C():
-				ev.Updated = &u.Terminal
+				if !send(Event{Updated: &u.Terminal}) {
+					return
+				}
 			case r := <-removed.C():
-				ev.RemovedID = r.ID
-			}
-			select {
-			case out <- ev:
-			case <-ctx.Done():
-				return
+				// Both subscriptions can be ready at once and select picks at
+				// random; forward the updates that were published before the
+				// removal first so watchers never see a removal before an
+				// earlier update of the same terminal.
+				for drained := false; !drained; {
+					select {
+					case u := <-updated.C():
+						if !send(Event{Updated: &u.Terminal}) {
+							return
+						}
+					default:
+						drained = true
+					}
+				}
+				if !send(Event{RemovedID: r.ID}) {
+					return
+				}
 			}
 		}
 	}()

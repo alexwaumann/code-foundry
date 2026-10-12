@@ -162,6 +162,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				{Name: "name", Type: String, Description: "Thread name (default: generated from the first message)"},
 				{Name: "prompt", Type: String, Description: "First prompt, passed to Claude as it starts"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image paths from StageAttachment, appended to the prompt"},
+				{Name: "composer-prompt", Type: String, Description: "A rendered thread: the GUI composer's text of prompt with its tag tokens, kept on the first message for display (the GUI sets it)"},
 				{Name: "render", Type: Enum, Enum: SessionRenders,
 					Description: "terminal (Claude Code in a terminal) or rendered (headless; the app draws the conversation). Default: settings sessions.render"},
 			},
@@ -174,7 +175,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				req := &v1.CreateSessionRequest{
 					RepoId: a.String("repo"), WorktreePath: a.Path("worktree"), Model: a.String("model"),
 					Effort: a.String("effort"), Name: a.String("name"), InitialPrompt: a.String("prompt"),
-					PermissionMode: sessionPermissionModes[a.String("permission")], Attachments: splitList(a.String("attachments")),
+					ComposerPrompt: a.String("composer-prompt"), PermissionMode: sessionPermissionModes[a.String("permission")], Attachments: splitList(a.String("attachments")),
 					WorkspaceId: ws, Render: sessionRenderModes[a.String("render")],
 				}
 				switch {

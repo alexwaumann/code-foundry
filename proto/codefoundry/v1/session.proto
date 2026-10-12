@@ -42,6 +42,10 @@ service SessionService {
   // Claude reads them with its Read tool. Only image types are accepted, with size
   // limits; unused staged files are reaped by the daemon.
   rpc StageAttachment(StageAttachmentRequest) returns (StageAttachmentResponse) {}
+  // ReadAttachment returns a staged attachment's bytes (a rendered thread's user
+  // message shows its images). Only files directly in the attachments directory;
+  // NOT_FOUND once the file was reaped.
+  rpc ReadAttachment(ReadAttachmentRequest) returns (ReadAttachmentResponse) {}
 }
 
 // PermissionMode maps to claude --permission-mode. Full access (bypassPermissions) is
@@ -288,6 +292,9 @@ message CreateSessionRequest {
   NewWorkspace new_workspace = 11;
   // Terminal or rendered; UNSPECIFIED uses the sessions.render setting.
   SessionRender render = 12;
+  // A rendered thread: the composer's text of initial_prompt, kept on the first user
+  // message for display (ThreadItem UserMessageItem.composer_text). Ignored otherwise.
+  string composer_prompt = 13;
 }
 
 message NewWorktree {
@@ -316,6 +323,17 @@ message StageAttachmentRequest {
 
 message StageAttachmentResponse {
   string path = 1;
+}
+
+message ReadAttachmentRequest {
+  // A path StageAttachment returned.
+  string path = 1;
+}
+
+message ReadAttachmentResponse {
+  bytes data = 1;
+  // Sniffed from the content: image/png, image/jpeg, image/gif or image/webp.
+  string mime_type = 2;
 }
 
 message CreateSessionResponse {

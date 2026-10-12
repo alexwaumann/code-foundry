@@ -72,11 +72,13 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				idArg,
 				{Name: "text", Type: String, Required: true, Positional: true, Description: "The message"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image paths from StageAttachment"},
+				{Name: "composer-text", Type: String, Description: "The GUI composer's text with its tag tokens, kept on the message for display (the GUI sets it)"},
 			},
 			When: hasRenderedThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{
 					SessionId: a.String("id"), Text: a.String("text"), Attachments: splitList(a.String("attachments")),
+					ComposerText: a.String("composer-text"),
 				}))
 				if err != nil {
 					return Result{}, err

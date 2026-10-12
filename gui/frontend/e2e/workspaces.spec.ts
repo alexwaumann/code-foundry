@@ -227,6 +227,8 @@ test("with workspaces around, a single-project thread sends exactly what it did 
   await page.keyboard.press("Meta+n");
   await page.keyboard.press("Meta+3"); // projects keep cmd+1..9: ghostty-playground
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in ghostty-playground?");
+  // The base is the project's default ref once its refs load (flaked on Chromium when Enter came first).
+  await expect(page.getByTestId("composer-base")).toHaveText("From origin/main");
   await page.keyboard.type("Port the renderer");
   await page.keyboard.press("Enter");
   expect(await lastNewThread()).toEqual({

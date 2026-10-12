@@ -96,7 +96,7 @@ func (h *Thread) Watch(ctx context.Context, req *connect.Request[v1.WatchThreadR
 // Send sends a user message.
 func (h *Thread) Send(ctx context.Context, req *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error) {
 	m := req.Msg
-	it, err := h.store.Send(ctx, m.GetSessionId(), session.Message{Text: m.GetText(), Attachments: m.GetAttachments()})
+	it, err := h.store.Send(ctx, m.GetSessionId(), session.Message{Text: m.GetText(), Attachments: m.GetAttachments(), ComposerText: m.GetComposerText()})
 	if err != nil {
 		return nil, sessionError(err)
 	}
@@ -231,7 +231,7 @@ func itemToProto(it session.Item) *v1.ThreadItem {
 	}
 	switch it.Kind {
 	case session.KindUserMessage:
-		p.Payload = &v1.ThreadItem_UserMessage{UserMessage: &v1.UserMessageItem{Text: it.Text, Attachments: it.Attachments}}
+		p.Payload = &v1.ThreadItem_UserMessage{UserMessage: &v1.UserMessageItem{Text: it.Text, Attachments: it.Attachments, ComposerText: it.ComposerText}}
 	case session.KindAssistantText:
 		p.Payload = &v1.ThreadItem_AssistantText{AssistantText: &v1.AssistantTextItem{Text: it.Text}}
 	case session.KindThinking:

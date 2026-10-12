@@ -36,7 +36,7 @@ func (h *Session) Create(ctx context.Context, req *connect.Request[v1.CreateSess
 	m := req.Msg
 	o := session.CreateOptions{
 		RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
-		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(), PermissionMode: session.PermissionMode(m.GetPermissionMode()),
+		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(), ComposerPrompt: m.GetComposerPrompt(), PermissionMode: session.PermissionMode(m.GetPermissionMode()),
 		Attachments: m.GetAttachments(), WorkspaceID: m.GetWorkspaceId(), Render: session.Render(m.GetRender()),
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
@@ -282,4 +282,13 @@ func (h *Session) StageAttachment(ctx context.Context, req *connect.Request[v1.S
 		return nil, sessionError(err)
 	}
 	return connect.NewResponse(&v1.StageAttachmentResponse{Path: path}), nil
+}
+
+// ReadAttachment returns a staged attachment's bytes.
+func (h *Session) ReadAttachment(ctx context.Context, req *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error) {
+	data, mimeType, err := h.store.ReadAttachment(ctx, req.Msg.GetPath())
+	if err != nil {
+		return nil, sessionError(err)
+	}
+	return connect.NewResponse(&v1.ReadAttachmentResponse{Data: data, MimeType: mimeType}), nil
 }

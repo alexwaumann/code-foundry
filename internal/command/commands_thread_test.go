@@ -59,6 +59,11 @@ func TestThreadCommands(t *testing.T) {
 		wantCalls []string
 	}{
 		{
+			name: "send with the composer's text", cmd: "thread.send",
+			args:    map[string]string{"id": "s1", "text": "/tdd go", "composer-text": "[/tdd](cf-skill://~/tdd) go"},
+			wantMsg: "sent to thread s1", wantCalls: []string{"Send s1 /tdd go composer=[/tdd](cf-skill://~/tdd) go"},
+		},
+		{
 			name: "send", cmd: "thread.send", args: map[string]string{"id": "s1", "text": "go on", "attachments": "/a.png"},
 			wantMsg: "sent to thread s1", wantCalls: []string{"Send s1 go on attachments=/a.png"},
 		},

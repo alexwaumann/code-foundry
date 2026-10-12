@@ -109,10 +109,13 @@ type Item struct {
 	Text string
 	// Attachments: user_message's staged image paths.
 	Attachments []string
-	Tool        *ToolCall
-	Request     *Request // permission_request and question
-	Turn        *TurnEnd
-	Compaction  *Compaction
+	// ComposerText: user_message's composer text with its tag tokens, when the GUI
+	// sent it (Message.ComposerText); stored for display only.
+	ComposerText string
+	Tool         *ToolCall
+	Request      *Request // permission_request and question
+	Turn         *TurnEnd
+	Compaction   *Compaction
 }
 
 // ToolCall is a tool_call item's payload.
@@ -217,6 +220,9 @@ type Message struct {
 	// Attachments are StageAttachment paths: a path line in the prompt and a base64
 	// image block each.
 	Attachments []string
+	// ComposerText is the GUI composer's text with its tags as tokens, kept on the
+	// user_message item for display only (never sent to Claude).
+	ComposerText string
 }
 
 // Decision answers a pending request (Store.Respond).

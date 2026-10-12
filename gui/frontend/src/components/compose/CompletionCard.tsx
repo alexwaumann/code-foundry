@@ -72,9 +72,12 @@ function scrollerOf(el: HTMLElement): HTMLElement | null {
  * own cap, the list to whole rows (no row cut by the hints). Rects are viewport px;
  * max-heights and offsetHeight are layout px, so the distance is divided by the page zoom.
  */
-function fit(el: HTMLElement, scroller: HTMLElement | null): void {
-  const top = el.getBoundingClientRect().top;
-  const bottom = Math.min(window.innerHeight, scroller ? scroller.getBoundingClientRect().bottom : Infinity);
+function fit(el: HTMLElement, scroller: HTMLElement | null, above: boolean): void {
+  const r = el.getBoundingClientRect();
+  // Above its anchor (the rendered thread's composer at the pane's bottom), the room runs
+  // from the top of the visible area down to the card's bottom.
+  const top = above ? Math.max(0, scroller ? scroller.getBoundingClientRect().top : 0) : r.top;
+  const bottom = above ? r.bottom : Math.min(window.innerHeight, scroller ? scroller.getBoundingClientRect().bottom : Infinity);
   const space = Math.max(Math.floor((bottom - top) / zoomFactor()) - BOTTOM_MARGIN, MIN_HEIGHT);
   el.toggleAttribute("data-short", space < HINTS_MIN_HEIGHT);
   el.style.maxHeight = `${String(space)}px`;
@@ -92,14 +95,14 @@ function fit(el: HTMLElement, scroller: HTMLElement | null): void {
  * go), or any ancestor up to the scroller changes size (a growing prompt moves the
  * centered composer, and the card with it).
  */
-function useFitBelow(ref: RefObject<HTMLDivElement | null>, open: boolean): void {
+function useFitBelow(ref: RefObject<HTMLDivElement | null>, open: boolean, above: boolean): void {
   const zoom = useUiStore((s) => s.zoom);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!open || !el) return;
     const scroller = scrollerOf(el);
     const refit = () => {
-      fit(el, scroller);
+      fit(el, scroller, above);
     };
     refit();
     const observer = new ResizeObserver(refit);
@@ -115,7 +118,7 @@ function useFitBelow(ref: RefObject<HTMLDivElement | null>, open: boolean): void
       window.removeEventListener("resize", refit);
       scroller?.removeEventListener("scroll", refit);
     };
-  }, [ref, open, zoom]);
+  }, [ref, open, zoom, above]);
 }
 
 /**
@@ -131,12 +134,12 @@ function useFitBelow(ref: RefObject<HTMLDivElement | null>, open: boolean): void
  * a slow answer is awaited. A file row's name is monospace and its path has the matched
  * characters emphasized.
  */
-export function CompletionCard({ completion }: { completion: Completion }) {
+export function CompletionCard({ completion, above = false }: { completion: Completion; /** Hang over the anchor instead of under it. */ above?: boolean }) {
   const { show, label, groups, selected, listId, optionId, emptyText, select, insert } = completion;
   const cardRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const active = show === "list" ? optionId(selected) : "";
-  useFitBelow(cardRef, show !== "none");
+  useFitBelow(cardRef, show !== "none", above);
   // Brings the selected row into view by scrolling the list only (scrollIntoView could
   // scroll the composer's section too). Rects are viewport px, scrollTop layout px; whole
   // px up, since the list's height is fractional under zoom and clientHeight is rounded.
@@ -155,7 +158,10 @@ export function CompletionCard({ completion }: { completion: Completion }) {
   return (
     <div
       ref={cardRef}
-      className="group/completion absolute inset-x-0 top-full z-10 mt-2 flex flex-col overflow-hidden rounded-2xl border border-border bg-card/85 text-[13px] shadow-sm backdrop-blur-xl"
+      className={cn(
+        "group/completion absolute inset-x-0 z-10 flex flex-col overflow-hidden rounded-2xl border border-border bg-card/85 text-[13px] shadow-sm backdrop-blur-xl",
+        above ? "bottom-full mb-2" : "top-full mt-2",
+      )}
       data-testid="completion-card"
       onMouseDown={(e) => {
         e.preventDefault();

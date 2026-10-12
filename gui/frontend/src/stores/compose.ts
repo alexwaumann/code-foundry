@@ -33,6 +33,7 @@ import {
   type ThreadPlace,
   type WorktreeChoice,
 } from "@/lib/compose";
+import { sentComposerText } from "@/lib/userMessage";
 import { projectPrompt, removeReferences, removeRepoTags, repoTagCount, tagsByRepo } from "@/lib/prompt";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { requestConfirm, type ConfirmRequest } from "./confirm";
@@ -407,10 +408,17 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
       const a = staged.get(id);
       return a?.stagedPath ? { name: a.file.name, ref: a.stagedPath } : undefined;
     });
+    const sent = cur.attachments.filter((a) => a.stagedPath !== null);
     const args = threadArgs(
       place,
-      { text, model: cur.model ?? defaults.model, effort: cur.effort ?? defaults.effort, permission: cur.permission },
-      cur.attachments.flatMap((a) => (a.stagedPath ? [a.stagedPath] : [])),
+      {
+        text,
+        composerText: sentComposerText(cur.text, (id) => sent.findIndex((a) => a.id === id)),
+        model: cur.model ?? defaults.model,
+        effort: cur.effort ?? defaults.effort,
+        permission: cur.permission,
+      },
+      sent.map((a) => a.stagedPath ?? ""),
     );
     const sel: Selection = target.kind === "project" ? { kind: "compose", repoId: target.repoId } : { kind: "compose", repoId: place.repoId, workspaceId: target.workspaceId };
     const res = await invokeConfirmed(SESSION_COMMANDS.create, args, getUiContext(sel));

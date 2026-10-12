@@ -63,13 +63,20 @@ message ThreadItem {
   }
 }
 
-// What the user sent, as typed in the composer: file tags stay "@cf-file://<repo>/<path>"
-// tokens (not the paths Claude got).
+// What the user sent: text as sent (file tags stay "@cf-file://<repo>/<path>" tokens,
+// not the paths Claude got) and, when it came from the GUI's composer, the composer's
+// own text, from which the GUI draws the message's tags.
 message UserMessageItem {
   string text = 1;
   // Staged image paths (StageAttachment); Claude got each as an image block and a
   // path line.
   repeated string attachments = 2;
+  // The composer's text with its tags as Markdown-link tokens (gui lib/prompt.ts):
+  // "[/name](cf-skill://<repo id or ~>/<name>)", "[base](cf-file://<repo id>/<path>)",
+  // and "![name](cf-attachment://<n>)" where n is the image's index in attachments
+  // (not a number: the chip had lost its image). Empty for a message without tags or sent
+  // without the composer (the CLI): text is then shown as is. Stored, never interpreted.
+  string composer_text = 3;
 }
 
 // One text block of Claude's reply (markdown).
@@ -274,6 +281,8 @@ message SendThreadMessageRequest {
   string text = 2;
   // StageAttachment paths.
   repeated string attachments = 3;
+  // The composer's text (UserMessageItem.composer_text), kept on the item for display.
+  string composer_text = 4;
 }
 
 message SendThreadMessageResponse {

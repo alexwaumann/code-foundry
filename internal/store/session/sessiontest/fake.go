@@ -179,6 +179,9 @@ func (f *Fake) Create(_ context.Context, o session.CreateOptions) (session.Sessi
 	if o.InitialPrompt != "" {
 		call += " prompt=" + o.InitialPrompt
 	}
+	if o.ComposerPrompt != "" {
+		call += " composer=" + o.ComposerPrompt
+	}
 	if len(o.Attachments) > 0 {
 		call += " attachments=" + strings.Join(o.Attachments, ",")
 	}
@@ -195,6 +198,14 @@ func (f *Fake) StageAttachment(_ context.Context, name, mimeType string, data []
 	}
 	f.staged++
 	return fmt.Sprintf("/attachments/%d-%s", f.staged, name), nil
+}
+
+// ReadAttachment records "ReadAttachment <path>" and returns "data:<path>" as image/png.
+func (f *Fake) ReadAttachment(_ context.Context, path string) ([]byte, string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, "ReadAttachment "+path)
+	return []byte("data:" + path), "image/png", nil
 }
 
 // Fork adds a STARTING session with ParentID set.
@@ -429,13 +440,17 @@ func (f *Fake) appendItem(id string, it session.Item) (session.Item, session.Thr
 	return it, session.ItemAppended{SessionID: id, Seq: snap.Seq, Item: it}
 }
 
-// Send records "Send <id> <text>" (" attachments=<a,b>" when set) and appends a
+// Send records "Send <id> <text>" (" attachments=<a,b>" and " composer=<text>" when
+// set) and appends a
 // user_message item. The session must be rendered and not disconnected.
 func (f *Fake) Send(_ context.Context, id string, msg session.Message) (session.Item, error) {
 	f.mu.Lock()
 	call := "Send " + id + " " + msg.Text
 	if len(msg.Attachments) > 0 {
 		call += " attachments=" + strings.Join(msg.Attachments, ",")
+	}
+	if msg.ComposerText != "" {
+		call += " composer=" + msg.ComposerText
 	}
 	if err := f.record(call); err != nil {
 		f.mu.Unlock()
@@ -450,7 +465,7 @@ func (f *Fake) Send(_ context.Context, id string, msg session.Message) (session.
 		return session.Item{}, err
 	}
 	f.next++
-	it, ev := f.appendItem(id, session.Item{ID: fmt.Sprintf("u-%d", f.next), Kind: session.KindUserMessage, Text: msg.Text, Attachments: msg.Attachments})
+	it, ev := f.appendItem(id, session.Item{ID: fmt.Sprintf("u-%d", f.next), Kind: session.KindUserMessage, Text: msg.Text, Attachments: msg.Attachments, ComposerText: msg.ComposerText})
 	f.mu.Unlock()
 	bus.Publish(f.bus, ev)
 	return it, nil

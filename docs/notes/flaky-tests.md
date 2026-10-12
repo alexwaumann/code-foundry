@@ -35,6 +35,14 @@ unit test loads the real runtime (34 of 80 files did, mostly via `src/api/endpoi
 the generated bindings). Removing the mock makes those 34 fail, so the mock covers the
 whole graph.
 
+## `panel.spec.ts` drag-resize on WebKit (seen once, 2026-10-11)
+
+The rendered threads PR 2 builder saw a drag-resize test fail once on WebKit. Not caused by
+that branch (it touches no panel code) and not reproduced: the full suite, and the six
+drag tests 15 times each, passed on WebKit. Likely load: the drags are real mouse moves in
+4 steps and the assertions poll the panel's width. If it shows up again, run with
+`E2E_MOCK_PORT`/`E2E_VITE_PORT` set so another worktree's e2e is not sharing the ports.
+
 ## Gotchas
 
 - Agent worktrees don't have libghostty-vt built; `make check` there needs

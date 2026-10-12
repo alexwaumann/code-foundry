@@ -38,6 +38,7 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     workspaceId: "",
     pendingWorktreePath: "",
     pinned: false,
+    render: "terminal",
     linkedPullRequests: [],
     usage: [],
     costUsd: 0,
@@ -173,6 +174,14 @@ describe("session reducers", () => {
     expect(sessionOfTerminal(d, term("tx"))?.id).toBe("b");
     expect(sessionOfTerminal(d, term("q", { session: "unknown" }))).toBeUndefined();
   });
+
+  it("sessionOfTerminal never picks a rendered thread (no terminal) for an empty id", () => {
+    const d = replaceSessions(emptySessions, [session("r", { terminalId: "", render: "rendered" })]);
+    expect(sessionOfTerminal(d, term(""))).toBeUndefined();
+    expect(sessionOfTerminal(d, term("t1"))).toBeUndefined();
+    // Labelled terminals still resolve (a rendered thread's shell carries labels.session).
+    expect(sessionOfTerminal(d, term("t2", { session: "r" }))?.id).toBe("r");
+  });
 });
 
 describe("deriveContext for a session", () => {
@@ -197,7 +206,15 @@ describe("deriveContext for a session", () => {
       activeWorktreePath: "/src/app",
       activeView: "session",
       activeWorkspaceId: "",
+      activeSessionRendered: false,
     });
+  });
+  it("a rendered thread says so and has no terminal (the thread.* commands' availability)", () => {
+    const sessions = replaceSessions(emptySessions, [session("s1", { terminalId: "", render: "rendered" })]);
+    const ctx = deriveContext({ kind: "session", id: "s1" }, repos, sessions);
+    expect(ctx.activeSessionRendered).toBe(true);
+    expect(ctx.activeTerminalId).toBe("");
+    expect(deriveContext({ kind: "compose", repoId: "r1" }, repos, sessions).activeSessionRendered).toBe(false);
   });
   it("a workspace thread carries its workspace (session.run-in's availability)", () => {
     const sessions = replaceSessions(emptySessions, [session("s1", { terminalId: "t9", workspaceId: "w-1" })]);

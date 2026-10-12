@@ -8,7 +8,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { EventSource, type EventSchema } from "../src/gen/codefoundry/v1/events_pb";
 import type { RepoEventSchema, RepoSchema, WorktreeSchema } from "../src/gen/codefoundry/v1/repo_pb";
-import { PermissionMode, SessionState, SessionStatus, type SessionEventSchema, type SessionSchema } from "../src/gen/codefoundry/v1/session_pb";
+import { PermissionMode, SessionRender, SessionState, SessionStatus, type SessionEventSchema, type SessionSchema } from "../src/gen/codefoundry/v1/session_pb";
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefoundry/v1/workspace_pb";
@@ -23,6 +23,7 @@ import { MockSettings, MODEL_VALUES } from "./settings";
 import { MockUpdater } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { claudeIntro, claudeTick, ENTER_ALT, prompt, RESET, topFrame } from "./screens";
+import { MockThreads, type ThreadState } from "./thread";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -75,6 +76,8 @@ interface MockSession {
   pendingWorktreePath: string;
   /** session.pin. */
   pinned: boolean;
+  /** TERMINAL or RENDERED (mock/thread.ts): a rendered thread has no terminal. */
+  render: SessionRender;
   /** Claude's pr-link records: one per URL, first-seen order (POST /__mock/link-pr). */
   linkedPullRequests: { slug: string; number: number; url: string; linkedAt: Date }[];
   /** Token usage buckets (mock/usage.ts; POST /__mock/usage). */
@@ -334,6 +337,30 @@ export class World {
   readonly sessionEvents = new Hub<SessionEventInit>((v) => this.events.publish({ source: EventSource.SESSION, event: { event: { case: "session", value: v } } }));
   readonly intents = new Hub<UiIntentInit>((v) => this.events.publish({ source: EventSource.UI, event: { event: { case: "ui", value: v } } }));
   readonly gitopsEvents = new Hub<GitOpsEventInit>((v) => this.events.publish({ source: EventSource.GITOPS, event: { event: { case: "gitops", value: v } } }));
+  /** Rendered threads (mock/thread.ts); the EventService thread source carries their pending requests. */
+  readonly threads = new MockThreads(
+    {
+      worktreeOf: (id) => this.session(id).worktreePath,
+      isConnected: (id) => this.session(id).state === SessionState.CONNECTED,
+      setStatus: (id, status, reason) => {
+        const s = this.session(id);
+        this.setStatus(s, status, reason);
+        s.lastActivityAt = new Date();
+        this.publishSession(s);
+      },
+      setModel: (id, model) => {
+        const s = this.session(id);
+        s.model = model;
+        this.publishSession(s);
+      },
+      setPermission: (id, permission) => {
+        const s = this.session(id);
+        s.permissionMode = permissionModes[permission] ?? s.permissionMode;
+        this.publishSession(s);
+      },
+    },
+    (ev) => this.events.publish({ source: EventSource.THREAD, event: { event: { case: "thread", value: ev } } }),
+  );
   /** git.*, pr.*, worktree.open.editor, worktree.reveal, view.open.url (mock/gitops.ts). */
   readonly gitops = new MockGitOps((e) => this.gitopsEvents.publish(e));
   readonly settings = new MockSettings(
@@ -376,6 +403,7 @@ export class World {
     this.workspaces.clear();
     this.invocations = [];
     this.attachments.clear();
+    this.threads.reset();
     this.worktreeDelayMs = 700;
     this.generation++;
     this.gitops.reset();
@@ -674,7 +702,7 @@ export class World {
   private addSession(o: Partial<MockSession> & Pick<MockSession, "id" | "repoId" | "worktreePath" | "name" | "model" | "effort">): MockSession {
     const state = o.state ?? SessionState.CONNECTED;
     let terminalId = o.terminalId ?? "";
-    if (!terminalId && (state === SessionState.STARTING || state === SessionState.CONNECTED || state === SessionState.CLOSING)) {
+    if (!terminalId && o.render !== SessionRender.RENDERED && (state === SessionState.STARTING || state === SessionState.CONNECTED || state === SessionState.CLOSING)) {
       terminalId = this.sessionTerminal(o.id, o.worktreePath, o.model, false).id;
     }
     const status = o.status ?? SessionStatus.IDLE;
@@ -694,6 +722,7 @@ export class World {
       workspaceId: "",
       pendingWorktreePath: "",
       pinned: false,
+      render: SessionRender.TERMINAL,
       linkedPullRequests: [],
       usage: [],
       moveIn: 0,
@@ -742,6 +771,7 @@ export class World {
       workspaceId: s.workspaceId,
       pendingWorktreePath: s.pendingWorktreePath,
       pinned: s.pinned,
+      render: s.render,
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
       ...usageFields(s.usage),
     };
@@ -843,6 +873,31 @@ export class World {
     s.statusChangedAt = new Date();
   }
 
+  /**
+   * The sketch's rendered thread (mock/thread.ts) in a state: "Fix stale PR badge" in
+   * code-foundry, connected, accept-edits. Replaces it when it exists.
+   */
+  addRenderedThread(state: ThreadState, id = "s-r1"): MockSession {
+    if (this.sessions.has(id)) {
+      this.sessions.delete(id);
+      this.sessionEvents.publish({ event: { case: "removedId", value: id } });
+    }
+    const s = this.addSession({
+      id,
+      repoId: "repo-cf",
+      worktreePath: CF,
+      name: "Fix stale PR badge",
+      model: "opus",
+      effort: "high",
+      render: SessionRender.RENDERED,
+      permissionMode: PermissionMode.ACCEPT_EDITS,
+      createdAt: new Date(Date.now() - 10 * 60_000),
+    });
+    this.threads.load(id, state);
+    this.publishSession(s);
+    return s;
+  }
+
   /** Emits FocusSession for an existing session. */
   focusSession(id: string): number {
     this.session(id);
@@ -868,8 +923,8 @@ export class World {
   }
 
   private reconnect(s: MockSession): void {
-    const t = this.sessionTerminal(s.id, s.worktreePath, s.model, true);
-    s.terminalId = t.id;
+    // A rendered thread runs without a terminal.
+    if (s.render !== SessionRender.RENDERED) s.terminalId = this.sessionTerminal(s.id, s.worktreePath, s.model, true).id;
     s.state = SessionState.STARTING;
     // The fresh detector owns status again: the persisted one is cleared.
     this.setStatus(s, SessionStatus.UNSPECIFIED);
@@ -1602,6 +1657,7 @@ export class World {
     const always = () => true;
     return [
       ...viewCommands((i) => this.emit(i)),
+      ...this.threads.commands(),
       {
         cmd: { name: "terminal.new", title: "New Terminal", category: "Terminal", description: "Start a shell that belongs to the active thread, else to the active worktree", keybindings: ["cmd+t"], args: [{ name: "cwd", type: ArgType.PATH, required: false, description: "Working directory" }] },
         // Like the daemon: a thread, or a worktree to own the shell (never the dashboard or a page).

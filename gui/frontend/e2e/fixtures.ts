@@ -24,7 +24,7 @@ export async function resetMock(): Promise<void> {
 
 export interface Invocation {
   name: string;
-  context: { activeTerminalId: string; activeSessionId: string; activeRepoId: string; activeWorktreePath: string; activeView: string; activeWorkspaceId?: string } | null;
+  context: { activeTerminalId: string; activeSessionId: string; activeRepoId: string; activeWorktreePath: string; activeView: string; activeWorkspaceId?: string; activeSessionRendered?: boolean } | null;
   args: Record<string, string>;
   confirmed?: boolean;
 }

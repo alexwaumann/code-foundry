@@ -14,6 +14,7 @@ import { applyRepoEvent, replaceRepos, useReposStore } from "./repos";
 import { applyRetiredUsage, applySessionEvent, replaceSessions, useSessionsStore } from "./sessions";
 import { applySettingsSnapshot, loadSettingsSchema } from "./settings";
 import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./terminals";
+import { applyThreadSourceEvent, pruneThreadLogs } from "./thread";
 import { applyUpdateEvent } from "./update";
 import { applyWorkspaceEvent, useWorkspacesStore } from "./workspaces";
 import { applyRepoEventToDetails } from "./worktreeDetail";
@@ -54,7 +55,11 @@ const handlers: Handlers = {
   session: (ev) => {
     // Session events prove the service exists, even if List failed transiently.
     useSessionsStore.setState((s) => ({ ...applySessionEvent(s, ev), retiredUsage: applyRetiredUsage(s.retiredUsage, ev), availability: "available", error: null }));
+    // A removed rendered thread's items go with it.
+    if (ev.kind === "removed" || ev.kind === "snapshot") pruneThreadLogs((id) => id in useSessionsStore.getState().byId);
   },
+  // Pending requests of every rendered thread; the visible one's items come from its Watch.
+  thread: applyThreadSourceEvent,
   gh: applyGhEvent,
   gitops: applyGitOpsEvent,
   ui: applyIntent,

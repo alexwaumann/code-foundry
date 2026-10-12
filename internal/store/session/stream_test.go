@@ -27,11 +27,17 @@ type renderedEnv struct {
 
 func newRenderedEnv(t *testing.T, fixture string) *renderedEnv {
 	t.Helper()
+	return newRenderedEnvAt(t, fixturePath(fixture))
+}
+
+// newRenderedEnvAt is newRenderedEnv replaying the capture at path (absolute).
+func newRenderedEnvAt(t *testing.T, path string) *renderedEnv {
+	t.Helper()
 	dir := t.TempDir()
 	re := &renderedEnv{log: filepath.Join(dir, "stdin.log"), argv: filepath.Join(dir, "argv.json")}
 	re.mutate = func(o *Options) {
 		o.Claude = os.Args[0]
-		o.Env = []string{fakeClaudeEnv + "=" + fixturePath(fixture), "CF_FAKE_CLAUDE_LOG=" + re.log, "CF_FAKE_CLAUDE_ARGV=" + re.argv}
+		o.Env = []string{fakeClaudeEnv + "=" + path, "CF_FAKE_CLAUDE_LOG=" + re.log, "CF_FAKE_CLAUDE_ARGV=" + re.argv}
 		o.DefaultRender = func() Render { return RenderRendered }
 		o.DisablePreTrust = true
 	}
@@ -138,7 +144,7 @@ func hasTurnEnd(items []Item) bool { _, ok := lastKind(items, KindTurnEnd); retu
 func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 	re := newRenderedEnv(t, "write-allow")
 	s := re.create(CreateOptions{Model: "haiku", Effort: "low", PermissionMode: PermissionSupervised,
-		InitialPrompt: "  create @cf-file://r1/hello.txt please  "})
+		InitialPrompt: "  create @cf-file://r1/hello.txt please  ", ComposerPrompt: "create [hello.txt](cf-file://r1/hello.txt) please"})
 	if s.Render != RenderRendered || s.TerminalID != "" {
 		t.Fatalf("created %+v", s)
 	}
@@ -179,7 +185,8 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 		t.Fatalf("pending %+v", snap.Pending)
 	}
 	first := snap.Items[0]
-	if first.Kind != KindUserMessage || first.Text != "create @cf-file://r1/hello.txt please" || first.ID != user["uuid"] {
+	if first.Kind != KindUserMessage || first.Text != "create @cf-file://r1/hello.txt please" || first.ID != user["uuid"] ||
+		first.ComposerText != "create [hello.txt](cf-file://r1/hello.txt) please" {
 		t.Errorf("first item %+v (sent uuid %v)", first, user["uuid"])
 	}
 	tool, _ := lastKind(snap.Items, KindToolCall)
@@ -234,7 +241,7 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 	}
 	for i := range after {
 		a, b := after[i], items[i]
-		if a.ID != b.ID || a.Ordinal != b.Ordinal || a.Text != b.Text || a.Streaming || fmt.Sprint(a.Tool) != fmt.Sprint(b.Tool) || fmt.Sprint(a.Request) != fmt.Sprint(b.Request) {
+		if a.ID != b.ID || a.Ordinal != b.Ordinal || a.Text != b.Text || a.ComposerText != b.ComposerText || a.Streaming || fmt.Sprint(a.Tool) != fmt.Sprint(b.Tool) || fmt.Sprint(a.Request) != fmt.Sprint(b.Request) {
 			t.Errorf("item %d changed across restart:\n%+v\n%+v", i, a, b)
 		}
 	}
@@ -253,11 +260,11 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 	re.waitFor(s.ID, "reconnected", func(s Session) bool {
 		return s.State == StateConnected && s.Render == RenderRendered && s.TerminalID == ""
 	})
-	sentIt, err := re.m.Send(re.ctx(), s.ID, Message{Text: "again"})
+	sentIt, err := re.m.Send(re.ctx(), s.ID, Message{Text: "/tdd again", ComposerText: "[/tdd](cf-skill://~/tdd) again"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sentIt.Ordinal != int64(len(want)+1) || sentIt.Text != "again" {
+	if sentIt.Ordinal != int64(len(want)+1) || sentIt.Text != "/tdd again" || sentIt.ComposerText != "[/tdd](cf-skill://~/tdd) again" {
 		t.Errorf("appended %+v", sentIt)
 	}
 	if err := re.m.Close(re.ctx(), s.ID); err != nil {
@@ -662,5 +669,55 @@ func TestProjectToolOutputCap(t *testing.T) {
 	}
 	if it.Tool.ResultJSON != "" {
 		t.Errorf("structured result over the cap was kept (%d bytes)", len(it.Tool.ResultJSON))
+	}
+}
+
+// TestRenderedPermissionFollowsItsToolCall: the CLI writes a tool_use's assistant
+// frame and then its can_use_tool request on the same stdout, so the permission item
+// must come right after its tool call. (The request used to reach the runner on a
+// goroutine of its own, racing the ordered events: run with -race -count=20.)
+func TestRenderedPermissionFollowsItsToolCall(t *testing.T) {
+	const rounds = 10
+	var lines []string
+	for i := range rounds {
+		for range 20 { // events queued ahead of the pair widen any race
+			lines = append(lines, `{"type":"rate_limit_event","rate_limit_info":{"status":"allowed"}}`)
+		}
+		lines = append(lines,
+			fmt.Sprintf(`{"type":"assistant","message":{"id":"msg_%d","role":"assistant","content":[{"type":"tool_use","id":"toolu_%d","name":"Bash","input":{"command":"echo %d"}}]},"parent_tool_use_id":null}`, i, i, i),
+			fmt.Sprintf(`{"type":"control_request","request_id":"r-%d","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"echo %d"},"tool_use_id":"toolu_%d"}}`, i, i, i),
+			fmt.Sprintf(`{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_%d","content":"%d"}]},"parent_tool_use_id":null}`, i, i))
+	}
+	lines = append(lines, `{"type":"result","subtype":"success","is_error":false,"num_turns":1,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}`)
+	path := filepath.Join(t.TempDir(), "pairs.jsonl")
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	re := newRenderedEnvAt(t, path)
+	s := re.create(CreateOptions{InitialPrompt: "run them"})
+	for i := range rounds {
+		reqID := fmt.Sprintf("r-%d", i)
+		toolID := fmt.Sprintf("toolu_%d", i)
+		at := func(items []Item, id string) int {
+			return slices.IndexFunc(items, func(it Item) bool { return it.ID == id })
+		}
+		items := re.waitItems(s.ID, "request "+reqID, func(items []Item) bool {
+			return at(items, "perm-"+reqID) >= 0 && at(items, toolID) >= 0
+		})
+		if at(items, "perm-"+reqID) != at(items, toolID)+1 {
+			t.Fatalf("round %d: the request does not follow its tool call:\n%s", i, describeItems(items))
+		}
+		if _, err := re.m.Respond(re.ctx(), s.ID, reqID, Decision{Allow: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items := re.waitItems(s.ID, "turn end", hasTurnEnd)
+	want := []string{"user_message"}
+	for range rounds {
+		want = append(want, "tool_call", "permission_request")
+	}
+	want = append(want, "turn_end")
+	if !slices.Equal(kinds(items), want) {
+		t.Errorf("kinds %v, want %v\n%s", kinds(items), want, describeItems(items))
 	}
 }
