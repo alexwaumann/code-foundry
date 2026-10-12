@@ -57,6 +57,17 @@ enum PermissionMode {
   PERMISSION_MODE_AUTO = 3;
 }
 
+// SessionRender is how a thread runs and is shown, fixed for the thread's life (fork
+// and reconnect keep it).
+enum SessionRender {
+  // CreateSessionRequest only: the sessions.render setting decides.
+  SESSION_RENDER_UNSPECIFIED = 0;
+  // Claude Code in a terminal (PTY) the GUI attaches to (terminal_id).
+  SESSION_RENDER_TERMINAL = 1;
+  // claude -p over stream-json; the conversation is ThreadService items, no terminal.
+  SESSION_RENDER_RENDERED = 2;
+}
+
 // SessionState is the lifecycle of the Claude process behind a session.
 enum SessionState {
   SESSION_STATE_UNSPECIFIED = 0;
@@ -165,6 +176,9 @@ message Session {
   // The thread's subagent runs, by start time (unknown last). Their usage is included
   // in usage. The count of runs is the length. Persisted.
   repeated AgentRun agent_runs = 30;
+  // TERMINAL or RENDERED (never UNSPECIFIED). A rendered thread has no terminal_id;
+  // its conversation is ThreadService.ListItems / Watch. Persisted.
+  SessionRender render = 31;
 }
 
 // Whether a subagent run is still followed.
@@ -251,7 +265,9 @@ message CreateSessionRequest {
   string effort = 4;
   // Optional explicit name; disables auto-naming.
   string name = 5;
-  // Optional first prompt, passed to claude as its positional prompt argument.
+  // Optional first prompt, passed to claude as its positional prompt argument (a
+  // rendered thread: sent as its first user message, with the attachments as image
+  // blocks).
   string initial_prompt = 6;
   PermissionMode permission_mode = 7;
   // When set, Create makes a new worktree for the session before claude starts and
@@ -270,6 +286,8 @@ message CreateSessionRequest {
   // member repo_id names (default: the first). worktree_path is ignored. Not with
   // new_worktree or workspace_id.
   NewWorkspace new_workspace = 11;
+  // Terminal or rendered; UNSPECIFIED uses the sessions.render setting.
+  SessionRender render = 12;
 }
 
 message NewWorktree {
