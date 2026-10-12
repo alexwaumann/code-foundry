@@ -196,7 +196,9 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
   await page.keyboard.press("ArrowDown"); // terminal -> rendered
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("composer-render")).toHaveText("Rendered");
+  // At once: reopened while it still fades out, the list takes the keyboard all the same.
   await page.keyboard.press("Enter");
+  await expect(page.getByTestId("composer-render-list").locator("[cmdk-root]")).toBeFocused();
   await page.keyboard.press("ArrowUp"); // back to terminal: the thread below starts as one
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("composer-render")).toHaveText("Terminal");

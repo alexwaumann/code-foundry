@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -62,6 +62,18 @@ export function ComposerPicker({
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const hasOptions = groups.some((g) => g.options.length > 0);
+  // Reopened while its close animation runs, the popover keeps its content and Radix does
+  // not autofocus it again: the keyboard stayed on the trigger and the arrows did nothing.
+  useEffect(() => {
+    if (!open) return;
+    const id = requestAnimationFrame(() => {
+      const target = inputRef.current ?? rootRef.current;
+      if (target && !target.contains(document.activeElement)) target.focus();
+    });
+    return () => {
+      cancelAnimationFrame(id);
+    };
+  }, [open]);
   return (
     <Popover
       open={open}
@@ -98,6 +110,13 @@ export function ComposerPicker({
         // Never taller than the room Radix found on its side (viewport px, so divided by the zoom).
         className={cn("flex max-h-[calc(var(--radix-popover-content-available-height)/var(--cf-zoom))] flex-col p-0", contentClassName)}
         data-testid={testId ? `${testId}-list` : undefined}
+        onCloseAutoFocus={(e) => {
+          // Back to the trigger unless something else took the keyboard (a click outside).
+          // Radix's own return lands on the body after a reopen during the close animation.
+          e.preventDefault();
+          const el = document.activeElement;
+          if (!el || el === document.body || rootRef.current?.contains(el)) triggerRef.current?.focus();
+        }}
         onOpenAutoFocus={(e) => {
           // cmdk handles keys on its root (or its input): focus that, not the popover.
           e.preventDefault();

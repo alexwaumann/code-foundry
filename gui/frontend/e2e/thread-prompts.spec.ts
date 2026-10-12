@@ -200,19 +200,17 @@ test("a subagent's request names the agent that asked", async ({ page }) => {
   // Its Agent call's subagent type and description, not a bare "subagent".
   const chip = prompt.getByTestId("thread-asking-agent");
   await expect(chip).toHaveText("general-purpose · Write the changelog entry");
-  // A tooltip only when a narrow pane cuts the label short.
-  await chip.hover();
-  expect((await chip.getAttribute("title")) ?? "").toBe("");
-  await chip.evaluate((el) => {
-    el.style.maxWidth = "60px";
-  });
-  await page.mouse.move(0, 0);
+  // A tooltip only when the label is cut short (the prompt's header is narrow here).
+  expect(await chip.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
   await chip.hover();
   await expect(chip).toHaveAttribute("title", "general-purpose · Write the changelog entry");
-  await chip.evaluate((el) => {
-    el.style.maxWidth = "";
-  });
   await shot(page, "subagent-dark");
+  await page.mouse.move(0, 0);
+  await chip.evaluate((el) => {
+    el.style.flex = "none";
+  });
+  await chip.hover();
+  expect((await chip.getAttribute("title")) ?? "").toBe("");
   await prompt.getByTestId("thread-permission-allow").click();
   await expect(composer(page).getByTestId("thread-permission")).toHaveCount(0);
   await expect.poll(responds).toEqual(["respond s-r1 allow req-sub"]);
