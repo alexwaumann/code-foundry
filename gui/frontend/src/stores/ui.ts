@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { UiContextView } from "@/api/command";
 
 /**
  * What the content area shows. Derived into the UiContext sent with List/Invoke. A shell
@@ -111,7 +112,11 @@ interface UiState {
   windowWidth: number;
   /** Row key the sidebar keyboard cursor is on. */
   cursorKey: string | null;
-  palette: { open: boolean; query: string; commandName: string | null; page: PalettePage; returnTo: FocusRegion; sessionId?: string };
+  /**
+   * `context`: the command context the palette lists and invokes in, instead of the
+   * selection's (a Projects page row's action on its own project).
+   */
+  palette: { open: boolean; query: string; commandName: string | null; page: PalettePage; returnTo: FocusRegion; sessionId?: string; context?: UiContextView };
   /** Incremented to ask the composer to take focus. */
   composerFocusSeq: number;
   /** Session whose sidebar row is in inline-rename mode. */
@@ -137,7 +142,7 @@ interface UiState {
   setFocus: (f: FocusRegion) => void;
   focusSidebar: () => void;
   setCursor: (key: string | null) => void;
-  openPalette: (query?: string, commandName?: string | null) => void;
+  openPalette: (query?: string, commandName?: string | null, context?: UiContextView) => void;
   /** Opens the palette on the project picker (session.new's presenter). */
   openProjectPicker: (returnTo?: FocusRegion) => void;
   /** Opens the palette on the "Run in…" member picker for a thread (session.run-in's presenter). */
@@ -281,8 +286,8 @@ export const useUiStore = create<UiState>()(
       setCursor: (cursorKey) => {
         set({ cursorKey });
       },
-      openPalette: (query = "", commandName = null) => {
-        set((s) => ({ palette: { open: true, query, commandName, page: "commands", returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
+      openPalette: (query = "", commandName = null, context) => {
+        set((s) => ({ palette: { open: true, query, commandName, page: "commands", returnTo: s.palette.open ? s.palette.returnTo : s.focus, ...(context ? { context } : {}) } }));
       },
       openProjectPicker: (returnTo) => {
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "projects", returnTo: returnTo ?? (s.palette.open ? s.palette.returnTo : s.focus) } }));
