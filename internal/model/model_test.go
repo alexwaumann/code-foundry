@@ -18,7 +18,6 @@ func TestLabel(t *testing.T) {
 		{"claude-sonnet-5", "Sonnet 5"},
 		{"claude-sonnet-4-6", "Sonnet 4.6"},
 		{"haiku", "Haiku"},
-		{"claude-haiku-4-5", "Haiku 4.5"},
 		{"claude-opus-5-5[1m]", "claude-opus-5-5[1m]"},
 		{"", ""},
 	}
@@ -35,7 +34,7 @@ func TestLabel(t *testing.T) {
 }
 
 func TestRegistry(t *testing.T) {
-	want := []string{"fable", "opus", "claude-opus-4-8", "claude-opus-4-7", "sonnet", "claude-sonnet-5", "claude-sonnet-4-6", "haiku", "claude-haiku-4-5"}
+	want := []string{"fable", "opus", "claude-opus-4-8", "claude-opus-4-7", "sonnet", "claude-sonnet-5", "claude-sonnet-4-6", "haiku"}
 	if got := Values(); !slices.Equal(got, want) {
 		t.Fatalf("Values() = %v, want %v", got, want)
 	}
