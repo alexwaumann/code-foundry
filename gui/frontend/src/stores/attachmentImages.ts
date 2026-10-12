@@ -2,7 +2,8 @@
  * Object URLs for staged attachments a rendered thread's user messages show
  * (SessionService.ReadAttachment). One fetch per path for the window's life; a path the
  * daemon no longer has (reaped after 7 days) resolves to null and the chip shows it as
- * missing.
+ * missing. A failed fetch (the daemon down or restarting) is not remembered: the next
+ * chip that mounts asks again.
  */
 import { useEffect, useState } from "react";
 import { readAttachment } from "@/api/session";
@@ -17,8 +18,11 @@ export function loadAttachmentUrl(path: string): Promise<string | null> {
   if (hit) return hit.wait;
   const entry: Entry = { url: null, done: false, wait: Promise.resolve(null) };
   entry.wait = readAttachment(path)
-    .then(({ data, mimeType }) => URL.createObjectURL(new Blob([new Uint8Array(data)], { type: mimeType })))
-    .catch(() => null)
+    .then((res) => (res ? URL.createObjectURL(new Blob([new Uint8Array(res.data)], { type: res.mimeType })) : null))
+    .catch(() => {
+      if (cache.get(path) === entry) cache.delete(path);
+      return null;
+    })
     .then((url) => {
       entry.url = url;
       entry.done = true;

@@ -354,7 +354,7 @@ function routes(router: ConnectRouter): void {
   router.service(ThreadService, {
     listItems: (req) => guard(() => ({ snapshot: world.threads.snapshotValue(req.sessionId) })),
     watch: (req, ctx) => tracked("ThreadService/Watch", guard(() => world.threads.watch(req.sessionId, ctx.signal))),
-    send: (req) => guard(() => ({ item: world.threads.send(req.sessionId, req.text, req.attachments) })),
+    send: (req) => guard(() => ({ item: world.threads.send(req.sessionId, req.text, req.attachments, req.composerText) })),
     interrupt: (req) => guard(() => (world.threads.finish(req.sessionId, { interrupted: true }), {})),
   });
 

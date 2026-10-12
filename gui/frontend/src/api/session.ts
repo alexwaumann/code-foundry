@@ -1,4 +1,5 @@
 import { timestampMs } from "@bufbuild/protobuf/wkt";
+import { Code, ConnectError } from "@connectrpc/connect";
 import {
   AgentRunStatus,
   PermissionMode,
@@ -306,13 +307,20 @@ export const ATTACHMENT_MIME_TYPES: readonly string[] = ["image/png", "image/jpe
 export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
 /**
- * A staged attachment's bytes (a rendered thread's user message shows its images). Rejects
- * with NotFound once the daemon reaped it.
+ * A staged attachment's bytes (a rendered thread's user message shows its images); null
+ * once the daemon reaped it. Rejects when the daemon could not be asked.
  */
-export async function readAttachment(path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<{ data: Uint8Array; mimeType: string }> {
+export async function readAttachment(path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<{ data: Uint8Array; mimeType: string } | null> {
   const c = await conn.client(SessionService);
-  const res = await c.readAttachment({ path }, { signal });
-  return { data: res.data, mimeType: res.mimeType };
+  try {
+    const res = await c.readAttachment({ path }, { signal });
+    return { data: res.data, mimeType: res.mimeType };
+  } catch (err) {
+    // Gone for good (reaped, or not a staged image): null. Anything else (the daemon is
+    // down or restarting, an older daemon) is worth another try later.
+    if (err instanceof ConnectError && (err.code === Code.NotFound || err.code === Code.InvalidArgument)) return null;
+    throw err;
+  }
 }
 
 /**

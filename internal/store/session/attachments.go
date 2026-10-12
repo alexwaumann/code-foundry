@@ -107,6 +107,9 @@ func (m *Manager) ReadAttachment(_ context.Context, path string) ([]byte, string
 	if err != nil {
 		return nil, "", fmt.Errorf("%w: attachment %q", ErrNotFound, path)
 	}
+	if fi, err := os.Stat(paths[0]); err != nil || fi.Size() > MaxAttachmentBytes {
+		return nil, "", fmt.Errorf("%w: attachment %q", ErrNotFound, path)
+	}
 	data, err := os.ReadFile(paths[0])
 	if err != nil {
 		return nil, "", fmt.Errorf("%w: attachment %q", ErrNotFound, path)
