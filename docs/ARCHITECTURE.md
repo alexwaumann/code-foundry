@@ -324,6 +324,15 @@ from the pull request (docs/notes/pr-thread-commands.md).
   shell, each only while it is visible. Everything else is unary, except a
   `RepoService.Clone` stream while the Add Project dialog clones a repository. This keeps
   the browser's six HTTP/1.1 connections per origin mostly free.
+* A rendered thread's content pane is `components/thread` (lazy-loaded): a virtualized
+  work-log timeline built from the items' structure (`lib/threadTimeline.ts`; text deltas
+  re-render only their row), turns that fold under their footer once finished (the latest
+  stays open), inline diffs, lowlight-highlighted markdown in the terminal palette, and the
+  follow-up composer with a pending permission or question docked into it. Its items live
+  in `stores/thread.ts`, fed only by that thread's `ThreadService.Watch` (snapshot, then
+  seq-ordered events, batched per frame); the EventService `thread` source only carries
+  pending requests. Sending and interrupting are the `thread.*` commands
+  (`docs/notes/rendered-threads-2-gui.md`).
 * Only visible terminals are attached. Switching sessions (or bottom panel tabs) detaches
   the old stream and attaches the new one. Background sessions cost nothing in the frontend. Attaching is
   also how the daemon knows a session is being looked at: while a session's terminal has
@@ -336,7 +345,7 @@ from the pull request (docs/notes/pr-thread-commands.md).
   under a collapsible Working header that counts them; each row says its status in words
   on its second line (or project and branch) with a hover tooltip; a status row at its
   foot; see `docs/notes/workspaces-4-sidebar.md`, `docs/notes/thread-list.md` and
-  `docs/notes/sidebar-working-section.md`), content (a thread's Claude terminal, the Pull Requests
+  `docs/notes/sidebar-working-section.md`), content (a thread's Claude terminal or its rendered conversation, the Pull Requests
   page, the Projects page with each project's worktrees and each workspace's members, or
   the composer; a worktree's overview is a side panel tab, not a page; a shell is never
   selected), command palette overlay. Under the content pane, a thread and the Projects

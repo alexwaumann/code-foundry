@@ -106,6 +106,7 @@ test("invoking a command sends the current context", async ({ page }) => {
     activeWorktreePath: CF,
     activeView: "session",
     activeWorkspaceId: "",
+    activeSessionRendered: false,
   });
 
   // The thread's own terminal: its id, terminal and worktree.
@@ -122,6 +123,7 @@ test("invoking a command sends the current context", async ({ page }) => {
     activeWorktreePath: CF,
     activeView: "session",
     activeWorkspaceId: "",
+    activeSessionRendered: false,
   });
 });
 

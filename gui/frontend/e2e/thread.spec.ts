@@ -218,7 +218,7 @@ test("a follow-up goes through thread.send with the composer's tags projected; t
   await expect.poll(calls).toContain("send s-r1 Ship it with /review");
   const send = (await invocations()).find((i) => i.name === "thread.send");
   expect(send?.args).toMatchObject({ id: "s-r1", text: "Ship it with /review" });
-  expect((send?.context as { activeSessionRendered?: boolean } | null)?.activeSessionRendered).toBe(true);
+  expect(send?.context?.activeSessionRendered).toBe(true);
   await expect(page.getByTestId("thread-user").last()).toContainText("Ship it with");
   await expect(page.getByTestId("thread-user").last().locator('[data-tag-kind="skill"]')).toHaveText("/review");
   await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.");

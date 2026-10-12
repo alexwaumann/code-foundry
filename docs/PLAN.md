@@ -110,8 +110,12 @@ draws the conversation. Design record: `docs/notes/rendered-threads-handoff.md`.
   `Session.render` and `thread_items`, `ThreadService`, the `thread` event source,
   `sessions.render`, `session.new --render`, the `thread.*` CLI verbs) done:
   `docs/notes/rendered-threads-1-daemon.md`.
-* Sketch, then PR 2 (GUI timeline), PR 3 (prompts, questions, live model/mode), PR 4
-  (composer toggle, setting, specs, screenshots): not started.
+* Sketch (variant A, `docs/sketches/rendered-thread`) done. PR 2 (GUI timeline: items
+  store and Watch, virtualized work log, turn fold, diffs, highlighted markdown, docked
+  prompts in a pending state, follow-up composer with send / interrupt / model /
+  permission, mock daemon and e2e) done: `docs/notes/rendered-threads-2-gui.md`.
+* PR 3 (answering prompts and questions, keyboard 1/2/3, effort restart), PR 4 (composer
+  toggle, setting, specs, screenshots): not started.
 
 ### Open items
 
