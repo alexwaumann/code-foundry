@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 )
@@ -299,8 +300,25 @@ func (e ItemDelta) Thread() string { return e.SessionID }
 func (e PendingChanged) Thread() string { return e.SessionID }
 
 // maxResultJSON bounds ToolCall.ResultJSON (a Read's structured result holds the
-// whole file).
-const maxResultJSON = 256 << 10
+// whole file). maxToolOutput bounds ToolCall.Output the same way: every update of
+// the item travels whole over the bus and to each watcher, and a Read of a big file
+// or a long Bash output can run to megabytes; the tail is replaced by a marker.
+const (
+	maxResultJSON = 256 << 10
+	maxToolOutput = 512 << 10
+)
+
+// capOutput cuts s to maxToolOutput bytes (on a rune boundary) with a marker.
+func capOutput(s string) string {
+	if len(s) <= maxToolOutput {
+		return s
+	}
+	cut := maxToolOutput
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + fmt.Sprintf("\n… [output truncated: %d more bytes]", len(s)-cut)
+}
 
 // threadLog is one rendered thread's items in memory. Mutations happen on the
 // thread's runner goroutine (or while it has none); readers take mu.

@@ -421,6 +421,9 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 	if err := m.spawn(ctx, id, launch{newID: cid}, prompt); err != nil {
 		m.mu.Lock()
 		delete(m.recs, id)
+		m.tmu.Lock()
+		delete(m.threads, id) // a rendered thread's log, loaded by spawnStream
+		m.tmu.Unlock()
 		m.mu.Unlock()
 		return Session{}, err
 	}

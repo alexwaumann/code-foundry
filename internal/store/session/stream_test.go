@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/claudestream"
@@ -638,5 +639,28 @@ func TestRenderedStartCrash(t *testing.T) {
 	}
 	if _, err := re.m.Reconnect(re.ctx(), s.ID); err != nil {
 		t.Fatalf("reconnect after a crash: %v", err)
+	}
+}
+
+// TestProjectToolOutputCap: a tool result longer than maxToolOutput keeps its head
+// and a marker (the structured result is dropped over maxResultJSON already).
+func TestProjectToolOutputCap(t *testing.T) {
+	log := newThreadLog("s", bus.New(), time.Now, nil)
+	p := newProjector(itemWriter{log: log, save: func(Item) {}})
+	p.event(claudestream.Parse([]byte(`{"type":"assistant","message":{"id":"m1","role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"big"}}]},"parent_tool_use_id":null}`)))
+	big := strings.Repeat("é", maxToolOutput/2+100) // multi-byte: the cut must land on a rune boundary
+	line, _ := json.Marshal(map[string]any{
+		"type": "user", "parent_tool_use_id": nil,
+		"message":         map[string]any{"role": "user", "content": []map[string]any{{"type": "tool_result", "tool_use_id": "t1", "content": big}}},
+		"tool_use_result": map[string]any{"file": map[string]any{"content": big}},
+	})
+	p.event(claudestream.Parse(line))
+	it, _ := log.get("t1")
+	if it.Tool.Status != ToolDone || len(it.Tool.Output) > maxToolOutput+80 || !utf8.ValidString(it.Tool.Output) ||
+		!strings.HasSuffix(it.Tool.Output, fmt.Sprintf("[output truncated: %d more bytes]", len(big)-maxToolOutput)) {
+		t.Errorf("output len %d, tail %q", len(it.Tool.Output), it.Tool.Output[max(0, len(it.Tool.Output)-60):])
+	}
+	if it.Tool.ResultJSON != "" {
+		t.Errorf("structured result over the cap was kept (%d bytes)", len(it.Tool.ResultJSON))
 	}
 }
