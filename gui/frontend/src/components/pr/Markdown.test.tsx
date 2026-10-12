@@ -62,3 +62,21 @@ describe("Markdown", () => {
     expect(c.querySelector("table td")?.textContent).toBe("1");
   });
 });
+
+describe("Markdown extras", () => {
+  it("hands fenced blocks to the code renderer and local images to the image renderer", () => {
+    const code = vi.fn((lang: string, text: string) => <pre data-lang={lang}>{text}</pre>);
+    const image = vi.fn((src: string, alt: string) => <span data-src={src}>{alt}</span>);
+    const extras = { code, image };
+    const c = render(
+      <Markdown extras={extras}>{"```go\nfunc f() {}\n```\n\n```\nplain\n```\n\n![shot](/att/a.png) ![web](https://x.test/b.png)"}</Markdown>,
+    ).container;
+    expect(code.mock.calls).toEqual([
+      ["go", "func f() {}"],
+      ["", "plain"],
+    ]);
+    expect(c.querySelector('pre[data-lang="go"]')?.textContent).toBe("func f() {}");
+    expect(image.mock.calls).toEqual([["/att/a.png", "shot"]]);
+    expect(c.querySelector("img")?.getAttribute("src")).toBe("https://x.test/b.png");
+  });
+});

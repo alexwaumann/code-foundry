@@ -203,7 +203,8 @@ async function removeWithConfirm(key: string, a: DraftAttachment, refocus: () =>
   refocus();
 }
 
-function Attachments({ draftKey, disabled, refocus }: { draftKey: string; disabled: boolean; refocus: () => void }) {
+/** A draft's image thumbnails (preview on click, × to remove); also the rendered thread's follow-up composer's. */
+export function Attachments({ draftKey, disabled, refocus }: { draftKey: string; disabled: boolean; refocus: () => void }) {
   const attachments = useDraft(draftKey, "attachments");
   if (attachments.length === 0) return null;
   return (

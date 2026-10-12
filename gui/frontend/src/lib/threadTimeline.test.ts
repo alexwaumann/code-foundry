@@ -121,7 +121,9 @@ describe("buildTurns / buildRows", () => {
     ];
     const turns = buildTurns(items);
     expect(turns.map((t) => t.key)).toEqual(["u1", "u2"]);
-    expect(shape(buildRows(turns, open))).toEqual(["user:u1", "note:error", "final:a1", "final:a2", "footer(folded 5)", "user:u2", "tool:Bash", "final:b1", "footer"]);
+    const rows = buildRows(turns, open);
+    expect(shape(rows)).toEqual(["user:u1", "note:error", "final:a1", "final:a2", "footer(folded 5)", "user:u2", "tool:Bash", "final:b1", "footer"]);
+    expect(rows.flatMap((r) => (r.type === "footer" ? [r.finals] : []))).toEqual([["a1", "a2"], ["b1"]]);
     // The user's choice wins both ways.
     const fold = (k: string) => (k === "u1" ? false : k === "u2" ? true : undefined);
     expect(shape(buildRows(turns, { fold, working: false }))).toEqual([

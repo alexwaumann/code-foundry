@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { grammarFor, grammarForPath, highlightLines, shellTokens, treeLines } from "./highlight";
+import { grammarFor, grammarForPath, highlightLines, markTokens, shellTokens, treeLines } from "./highlight";
 
 describe("grammarFor / grammarForPath", () => {
   it.each([
@@ -62,5 +62,17 @@ describe("shellTokens", () => {
     ]);
     expect(show("FOO=1 make build")).toEqual(["FOO=1 ", "sh-cmd:make", " build"]);
     expect(shellTokens("").length).toBe(0);
+  });
+});
+
+describe("markTokens", () => {
+  it("cuts tokens at the span's edges", () => {
+    const toks = [
+      { text: "HeadOid", cls: "a" },
+      { text: " string", cls: "b" },
+    ];
+    expect(markTokens(toks, [4, 10]).map((t) => `${t.marked ? "[" : ""}${t.text}${t.marked ? "]" : ""}`)).toEqual(["Head", "[Oid]", "[ st]", "ring"]);
+    expect(markTokens(toks, undefined).every((t) => !t.marked)).toBe(true);
+    expect(markTokens(toks, [3, 3]).map((t) => t.text)).toEqual(["HeadOid", " string"]);
   });
 });

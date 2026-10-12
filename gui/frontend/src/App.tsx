@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Composer } from "@/components/compose/Composer";
 import { AddProjectDialog } from "@/components/addproject/AddProjectDialog";
 import { BottomPanel } from "@/components/bottom/BottomPanel";
@@ -17,6 +17,9 @@ import { Sidebar } from "@/components/sidebar/Sidebar";
 import { TerminalPane } from "@/components/terminal/TerminalPane";
 import { Toaster } from "@/components/ui/sonner";
 import { UpdateDialog } from "@/components/update/UpdateDialog";
+
+/** A rendered thread's pane, loaded on first use (markdown highlighting stays out of the main bundle). */
+const ThreadPane = lazy(() => import("@/components/thread/ThreadPane"));
 import { installKeybindings } from "@/keys/bindings";
 import { syncDocumentScheme, useColorScheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -72,17 +75,26 @@ function startApp(): () => void {
 
 /**
  * Exactly one thing fills the content area. A session shows its live terminal when it
- * has one, otherwise the "Not connected" panel; "compose" is the new-thread composer.
+ * has one, otherwise the "Not connected" panel; a rendered thread shows its conversation
+ * (components/thread), connected or not; "compose" is the new-thread composer.
  * TerminalPane stays mounted across thread switches (same element position), so its
  * renderer is reused. Shells never show here: they live in the bottom panel.
  */
 function Content() {
   const sel = useUiStore((s) => s.selection);
   const sessionTerminal = useSessionsStore((s) => (sel.kind === "session" ? s.byId[sel.id]?.terminalId || null : null));
+  const rendered = useSessionsStore((s) => sel.kind === "session" && s.byId[sel.id]?.render === "rendered");
   if (sel.kind === "view" && sel.name === "dashboard") return <StartPage />;
   if (sel.kind === "view" && sel.name === "pullrequests") return <PullRequestsPage />;
   if (sel.kind === "view" && sel.name === "projects") return <ProjectsPage />;
   if (sel.kind === "compose") return <Composer key={sel.workspaceId ? `ws:${sel.workspaceId}` : sel.repoId} repoId={sel.repoId} workspaceId={sel.workspaceId} />;
+  if (sel.kind === "session" && rendered) {
+    return (
+      <Suspense fallback={null}>
+        <ThreadPane sessionId={sel.id} />
+      </Suspense>
+    );
+  }
   if (sel.kind === "session") {
     return sessionTerminal ? <TerminalPane terminalId={sessionTerminal} sessionId={sel.id} /> : <SessionDisconnected id={sel.id} />;
   }

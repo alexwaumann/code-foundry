@@ -258,3 +258,14 @@ export function toolSummary(t: ToolCallView, opts: { tense: Tense; durationMs?: 
   if (t.isError && !s.chip && done) s.chip = { tone: "fail", text: "error" };
   return s;
 }
+
+/** What a subagent reported back: the result's text blocks, else the tool output. */
+export function agentReport(t: Pick<ToolCallView, "resultJson" | "output">): string {
+  const content = parseObject(t.resultJson).content;
+  if (Array.isArray(content)) {
+    const text = (content as Json[]).map((c) => str(c, "text")).join("\n\n").trim();
+    if (text) return text;
+  }
+  return t.output.replace(/^\[Subagent hand-back\][^\n]*\n+/, "").trim();
+}
+

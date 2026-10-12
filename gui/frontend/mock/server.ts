@@ -25,6 +25,8 @@
  *        plan, finished, Claude error, busy, idle, interrupted, and a disconnected one still asking
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
+ *   POST /__mock/thread?state=permission|question|streaming|idle   (the rendered thread s-r1:
+ *        mock/thread.ts); POST /__mock/thread/delta?text=… | /__mock/thread/finish; GET /__mock/thread/calls
  *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
  *                                                 shell stays, exited, as if the reaper were late)
  *   POST /__mock/session/hold?id=s-1&id=s-5   (the clock stops changing them: s-1 stops flipping
@@ -96,6 +98,7 @@ import { HealthService } from "../src/gen/codefoundry/v1/health_pb";
 import { RepoService } from "../src/gen/codefoundry/v1/repo_pb";
 import { SessionService, SessionState, SessionStatus } from "../src/gen/codefoundry/v1/session_pb";
 import { TerminalService, TerminalState, type AttachEventSchema } from "../src/gen/codefoundry/v1/terminal_pb";
+import { ThreadService } from "../src/gen/codefoundry/v1/thread_pb";
 import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
@@ -106,6 +109,7 @@ import { createProject, deleteProject, listPublishOwners, projectCalls, publishP
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
 import { retiredUsage, utcDay } from "./usage";
+import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreads, type ThreadState } from "./thread";
 import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
 
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -337,7 +341,21 @@ function routes(router: ConnectRouter): void {
       throw new ConnectError("use the session.remove command in the mock", Code.Unimplemented);
     },
     stageAttachment: (req) => guard(() => ({ path: world.stageAttachment(req.name, req.mimeType, req.data.length) })),
+    // The scripted rendered thread's image (mock/thread.ts); staged uploads have no bytes in the mock.
+    readAttachment: (req) => {
+      if (req.path === MOCK_ATTACHMENT || world.attachments.has(req.path)) return { data: new Uint8Array(MOCK_ATTACHMENT_PNG), mimeType: "image/png" };
+      throw new ConnectError(`attachment ${req.path} not found`, Code.NotFound);
+    },
     watch: (_req, ctx) => tracked("SessionService/Watch", world.sessionEvents.subscribe(ctx.signal, [world.sessionSnapshot()])),
+  });
+
+  // Rendered threads (mock/thread.ts). The GUI goes through the thread.* commands for
+  // Send / Interrupt / SetModel / SetPermissionMode; these serve the RPCs themselves.
+  router.service(ThreadService, {
+    listItems: (req) => guard(() => ({ snapshot: world.threads.snapshotValue(req.sessionId) })),
+    watch: (req, ctx) => tracked("ThreadService/Watch", guard(() => world.threads.watch(req.sessionId, ctx.signal))),
+    send: (req) => guard(() => ({ item: world.threads.send(req.sessionId, req.text, req.attachments) })),
+    interrupt: (req) => guard(() => (world.threads.finish(req.sessionId, { interrupted: true }), {})),
   });
 
   router.service(UpdateService, {
@@ -355,7 +373,7 @@ function routes(router: ConnectRouter): void {
       const want = new Set(
         req.sources.length > 0
           ? req.sources
-          : [EventSource.REPO, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.SESSION, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI],
+          : [EventSource.REPO, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.SESSION, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI],
       );
       if (!sessionsEnabled) want.delete(EventSource.SESSION);
       const initial: { source: EventSource; event: EventInit }[] = [
@@ -363,6 +381,7 @@ function routes(router: ConnectRouter): void {
         { source: EventSource.WORKSPACE, event: { event: { case: "workspace", value: world.workspaceSnapshot() } } },
         ...[...world.terms.values()].map((t) => ({ source: EventSource.TERMINAL, event: { event: { case: "terminal" as const, value: { event: { case: "updated" as const, value: world.terminalMsg(t) } } } } })),
         { source: EventSource.SESSION, event: { event: { case: "session", value: world.sessionSnapshot() } } },
+        { source: EventSource.THREAD, event: { event: { case: "thread", value: world.threads.pendingSnapshot() } } },
         ghEvent(world.gh.polledEvent()),
         { source: EventSource.GITOPS, event: { event: { case: "gitops", value: world.gitops.snapshot() } } },
         { source: EventSource.SETTINGS, event: { event: { case: "settings", value: { event: { case: "snapshot", value: world.settings.snapshot() } } } } },
@@ -614,6 +633,28 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       } catch (err) {
         json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
       }
+      break;
+    case "POST /__mock/thread": {
+      // state=permission|question|streaming|idle[&id=s-r1]: the sketch's rendered thread.
+      const state = (q.get("state") ?? "permission") as ThreadState;
+      if (!["permission", "question", "streaming", "idle"].includes(state)) {
+        json(res, 400, { error: "state must be permission, question, streaming or idle" });
+        break;
+      }
+      const s = world.addRenderedThread(state, q.get("id") ?? "s-r1");
+      json(res, 200, { id: s.id });
+      break;
+    }
+    case "POST /__mock/thread/delta":
+      world.threads.delta(q.get("id") ?? "s-r1", q.get("text") ?? "");
+      json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/thread/finish":
+      world.threads.finish(q.get("id") ?? "s-r1", { rest: q.get("rest") ?? MockThreads.answerRest });
+      json(res, 200, { ok: true });
+      break;
+    case "GET /__mock/thread/calls":
+      json(res, 200, world.threads.calls);
       break;
     case "POST /__mock/status-kinds":
       json(res, 200, world.addStatusKinds());

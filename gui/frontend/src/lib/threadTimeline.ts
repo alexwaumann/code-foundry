@@ -59,6 +59,8 @@ export type TimelineRow =
       folded: boolean;
       /** Work rows the fold hides (0 when open). */
       hidden: number;
+      /** The turn's final text items (what its copy button copies). */
+      finals: string[];
     }
   | { type: "working"; key: string; /** The turn's user message, for the elapsed time; "" when none. */ since: string };
 
@@ -239,7 +241,8 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
     const folded = t.end !== "" && (opts.fold(t.key) ?? defaultFolded(t, latest));
     for (const u of t.user) rows.push({ type: "user", key: u, id: u });
     for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n);
-    if (t.end) rows.push({ type: "footer", key: `f:${t.end}`, id: t.end, turn: t.key, folded, hidden: folded ? hiddenCount(t.body) : 0 });
+    const finals = t.body.flatMap((n) => (n.type === "text" && n.final ? [n.id] : []));
+    if (t.end) rows.push({ type: "footer", key: `f:${t.end}`, id: t.end, turn: t.key, folded, hidden: folded ? hiddenCount(t.body) : 0, finals });
   });
   const last = turns[turns.length - 1];
   if (opts.working && (!last || last.end === "")) rows.push({ type: "working", key: "working", since: last?.user[last.user.length - 1] ?? "" });

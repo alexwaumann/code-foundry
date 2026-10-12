@@ -22,7 +22,7 @@ function LinkedPrsButton({ sessionId }: { sessionId: string }) {
  * The pane's own commands, run against the current selection (this thread) exactly as the
  * palette runs them. Each hides when the daemon does not list it as available.
  */
-function HeaderActions({ sessionId }: { sessionId: string }) {
+export function HeaderActions({ sessionId }: { sessionId: string }) {
   return (
     <span className="-mr-1.5 flex items-center [--wails-draggable:no-drag]" data-testid="pane-actions">
       <CommandButton command="session.rename" icon={Pencil} />
