@@ -78,34 +78,29 @@ func next(t *testing.T, c *Conn) Event {
 func TestConnRequestCorrelation(t *testing.T) {
 	f := newFakeCLI(t, Options{})
 	ctx := context.Background()
-	type res struct {
-		err error
-	}
-	got := make(chan res, 2)
+	// One channel per request: the answers come out of order, so which caller wakes
+	// first is up to the scheduler.
+	initErr, modeErr := make(chan error, 1), make(chan error, 1)
 	go func() {
 		r, err := f.conn.Initialize(ctx)
 		if err == nil && (r.PID != 42 || r.CurrentPermissionMode != "default") {
 			err = errors.New("bad initialize response")
 		}
-		got <- res{err: err}
+		initErr <- err
 	}()
 	init := f.read()
 	if init["type"] != "control_request" || init["request"].(map[string]any)["subtype"] != "initialize" {
 		t.Fatalf("first line %v", init)
 	}
 	go func() {
-		err := f.conn.SetPermissionMode(ctx, "bogus")
-		got <- res{err: err}
+		modeErr <- f.conn.SetPermissionMode(ctx, "bogus")
 	}()
 	mode := f.read()
 	// Answer out of order: the second request first.
 	f.emit(`{"type":"control_response","response":{"subtype":"error","request_id":"` + mode["request_id"].(string) + `","error":"Cannot set permission mode"}}`)
 	f.emit(`{"type":"stream_event","event":{"type":"message_stop"}}`)
 	f.emit(`{"type":"control_response","response":{"subtype":"success","request_id":"` + init["request_id"].(string) + `","response":{"pid":42,"current_permission_mode":"default"}}}`)
-	var errs []error
-	for range 2 {
-		errs = append(errs, (<-got).err)
-	}
+	errs := []error{<-modeErr, <-initErr}
 	var ce *ControlError
 	if !errors.As(errs[0], &ce) || ce.Subtype != "set_permission_mode" || !strings.Contains(ce.Error(), "Cannot set") {
 		t.Errorf("set mode err = %v", errs[0])

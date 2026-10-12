@@ -43,6 +43,14 @@ drag tests 15 times each, passed on WebKit. Likely load: the drags are real mous
 4 steps and the assertions poll the panel's width. If it shows up again, run with
 `E2E_MOCK_PORT`/`E2E_VITE_PORT` set so another worktree's e2e is not sharing the ports.
 
+## `TestConnRequestCorrelation` (internal/claudestream) — 1 failure, fixed
+
+Seen in `make check` on the rendered threads PR 4 branch (2026-10-12): "set mode err =
+<nil>". The test answers two control requests out of order and read both callers' results
+from one channel, assuming the set_permission_mode caller would send first; under load the
+initialize caller woke first. Each request now has its own channel (50 `-race` repeats
+green). Not a Conn bug.
+
 ## Gotchas
 
 - Agent worktrees don't have libghostty-vt built; `make check` there needs
