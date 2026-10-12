@@ -351,8 +351,10 @@ export class MockThreads {
       {
         case: "userMessage",
         value: {
-          text: `The PR badge in the sidebar stays green after a force-push, see [Image: pr-badge-stale.png; ref=${MOCK_ATTACHMENT}] Look at @cf-file://repo-cf/internal/store/pr/poller.go and fix it with /tdd . Keep the fingerprint check-count based.`,
+          text: `The PR badge in the sidebar stays green after a force-push, see [Image: pr-badge-stale.png; ref=${MOCK_ATTACHMENT}] Look at @cf-file://repo-cf/internal/store/pr/poller.go and fix it with /tdd . Keep the fingerprint check-count based in /tmp.`,
           attachments: [MOCK_ATTACHMENT],
+          composerText:
+            "The PR badge in the sidebar stays green after a force-push, see ![pr-badge-stale.png](cf-attachment://0) Look at [poller.go](cf-file://repo-cf/internal/store/pr/poller.go) and fix it with [/tdd](cf-skill://~/tdd). Keep the fingerprint check-count based in /tmp.",
         },
       },
       { at: ago(9) },
@@ -484,9 +486,9 @@ export class MockThreads {
   }
 
   /** thread.send: the user message, then a short streamed reply and the turn's end. */
-  send(id: string, text: string, attachments: string[]): ItemInit {
+  send(id: string, text: string, attachments: string[], composerText = ""): ItemInit {
     if (!this.world.isConnected(id)) throw new Error(`thread ${id} is not connected; reconnect it first`);
-    const msg = this.append(id, this.item(id, { case: "userMessage", value: { text, attachments } }));
+    const msg = this.append(id, this.item(id, { case: "userMessage", value: { text, attachments, composerText } }));
     this.world.setStatus(id, SessionStatus.BUSY, "working");
     const gen = this.generation;
     void (async () => {
@@ -518,12 +520,12 @@ export class MockThreads {
     const id = { name: "id", type: ArgType.STRING, required: true, description: "Thread id" };
     return [
       {
-        cmd: { name: "thread.send", title: "Send to Thread", category: "Thread", description: "Send a message to a rendered thread", keybindings: [], args: [id, { name: "text", type: ArgType.STRING, required: true, description: "The message" }, { name: "attachments", type: ArgType.STRING, required: false, description: "Comma-separated image paths" }] },
+        cmd: { name: "thread.send", title: "Send to Thread", category: "Thread", description: "Send a message to a rendered thread", keybindings: [], args: [id, { name: "text", type: ArgType.STRING, required: true, description: "The message" }, { name: "attachments", type: ArgType.STRING, required: false, description: "Comma-separated image paths" }, { name: "composer-text", type: ArgType.STRING, required: false, description: "The composer's text with its tag tokens" }] },
         when,
         run: (_ctx, a) => {
           const atts = (a.attachments ?? "").split(",").filter(Boolean);
           this.calls.push(`send ${a.id ?? ""} ${a.text ?? ""}${atts.length > 0 ? ` [${atts.join(",")}]` : ""}`);
-          this.send(a.id ?? "", a.text ?? "", atts);
+          this.send(a.id ?? "", a.text ?? "", atts, a["composer-text"] ?? "");
           return `sent to thread ${a.id ?? ""}`;
         },
       },

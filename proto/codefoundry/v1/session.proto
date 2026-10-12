@@ -292,6 +292,9 @@ message CreateSessionRequest {
   NewWorkspace new_workspace = 11;
   // Terminal or rendered; UNSPECIFIED uses the sessions.render setting.
   SessionRender render = 12;
+  // A rendered thread: the composer's text of initial_prompt, kept on the first user
+  // message for display (ThreadItem UserMessageItem.composer_text). Ignored otherwise.
+  string composer_prompt = 13;
 }
 
 message NewWorktree {

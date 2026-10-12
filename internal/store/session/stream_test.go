@@ -138,7 +138,7 @@ func hasTurnEnd(items []Item) bool { _, ok := lastKind(items, KindTurnEnd); retu
 func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 	re := newRenderedEnv(t, "write-allow")
 	s := re.create(CreateOptions{Model: "haiku", Effort: "low", PermissionMode: PermissionSupervised,
-		InitialPrompt: "  create @cf-file://r1/hello.txt please  "})
+		InitialPrompt: "  create @cf-file://r1/hello.txt please  ", ComposerPrompt: "create [hello.txt](cf-file://r1/hello.txt) please"})
 	if s.Render != RenderRendered || s.TerminalID != "" {
 		t.Fatalf("created %+v", s)
 	}
@@ -179,7 +179,8 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 		t.Fatalf("pending %+v", snap.Pending)
 	}
 	first := snap.Items[0]
-	if first.Kind != KindUserMessage || first.Text != "create @cf-file://r1/hello.txt please" || first.ID != user["uuid"] {
+	if first.Kind != KindUserMessage || first.Text != "create @cf-file://r1/hello.txt please" || first.ID != user["uuid"] ||
+		first.ComposerText != "create [hello.txt](cf-file://r1/hello.txt) please" {
 		t.Errorf("first item %+v (sent uuid %v)", first, user["uuid"])
 	}
 	tool, _ := lastKind(snap.Items, KindToolCall)
@@ -234,7 +235,7 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 	}
 	for i := range after {
 		a, b := after[i], items[i]
-		if a.ID != b.ID || a.Ordinal != b.Ordinal || a.Text != b.Text || a.Streaming || fmt.Sprint(a.Tool) != fmt.Sprint(b.Tool) || fmt.Sprint(a.Request) != fmt.Sprint(b.Request) {
+		if a.ID != b.ID || a.Ordinal != b.Ordinal || a.Text != b.Text || a.ComposerText != b.ComposerText || a.Streaming || fmt.Sprint(a.Tool) != fmt.Sprint(b.Tool) || fmt.Sprint(a.Request) != fmt.Sprint(b.Request) {
 			t.Errorf("item %d changed across restart:\n%+v\n%+v", i, a, b)
 		}
 	}
@@ -253,11 +254,11 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 	re.waitFor(s.ID, "reconnected", func(s Session) bool {
 		return s.State == StateConnected && s.Render == RenderRendered && s.TerminalID == ""
 	})
-	sentIt, err := re.m.Send(re.ctx(), s.ID, Message{Text: "again"})
+	sentIt, err := re.m.Send(re.ctx(), s.ID, Message{Text: "/tdd again", ComposerText: "[/tdd](cf-skill://~/tdd) again"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sentIt.Ordinal != int64(len(want)+1) || sentIt.Text != "again" {
+	if sentIt.Ordinal != int64(len(want)+1) || sentIt.Text != "/tdd again" || sentIt.ComposerText != "[/tdd](cf-skill://~/tdd) again" {
 		t.Errorf("appended %+v", sentIt)
 	}
 	if err := re.m.Close(re.ctx(), s.ID); err != nil {

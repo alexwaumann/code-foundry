@@ -58,12 +58,14 @@ for (const scheme of ["dark", "light"] as const) {
   test.describe(scheme, () => {
     test("the timeline: user tags, folded earlier turn, work rows, diff, subagent, markdown", async ({ page }) => {
       await openThread(page, "permission", scheme);
-      // The first message's tags, read back from the sent text.
+      // The first message's tags, drawn from the composer text the item carries: a lone
+      // "/tmp" in the prose stays text.
       const bubble = await reveal(page, page.getByTestId("thread-user"));
       await expect(bubble.locator('[data-tag-kind="image"]')).toContainText("pr-badge-stale.png");
       await expect(bubble.locator('[data-tag-kind="image"] img')).toBeVisible();
       await expect(bubble.locator('[data-tag-kind="file"]')).toHaveText("poller.go");
       await expect(bubble.locator('[data-tag-kind="skill"]')).toHaveText("/tdd");
+      await expect(bubble).toContainText("with /tdd. Keep the fingerprint check-count based in /tmp.");
 
       // Turn 1 is finished and not the latest: folded to its answer and footer.
       const first = footers(page).first();
@@ -218,6 +220,7 @@ test("a follow-up goes through thread.send with the composer's tags projected; t
   await expect.poll(calls).toContain("send s-r1 Ship it with /review");
   const send = (await invocations()).find((i) => i.name === "thread.send");
   expect(send?.args).toMatchObject({ id: "s-r1", text: "Ship it with /review" });
+  expect(send?.args["composer-text"]).toMatch(/^Ship it with \[\/review\]\(cf-skill:\/\/[\w.~-]+\/review\)$/);
   expect(send?.context?.activeSessionRendered).toBe(true);
   await expect(page.getByTestId("thread-user").last()).toContainText("Ship it with");
   await expect(page.getByTestId("thread-user").last().locator('[data-tag-kind="skill"]')).toHaveText("/review");

@@ -414,7 +414,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 	rec := &record{s: s, namingTried: namingTried}
 	if render == RenderRendered && prompt != "" {
 		// The prompt goes in as the first user message; the item keeps it as typed.
-		rec.first = &outgoing{text: strings.TrimSpace(o.InitialPrompt), attachments: attachments, prompt: prompt}
+		rec.first = &outgoing{text: strings.TrimSpace(o.InitialPrompt), composer: strings.TrimSpace(o.ComposerPrompt), attachments: attachments, prompt: prompt}
 	}
 	m.recs[id] = rec
 	m.mu.Unlock()

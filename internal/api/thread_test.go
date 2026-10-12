@@ -35,7 +35,8 @@ func TestThreadWatchSendRespond(t *testing.T) {
 	fake.Put(session.Session{ID: "s1", State: session.StateConnected, Render: session.RenderRendered})
 	fake.Put(session.Session{ID: "t1", State: session.StateConnected, Render: session.RenderTerminal, TerminalID: "term"})
 	fake.PutItems("s1",
-		session.Item{ID: "u1", Kind: session.KindUserMessage, Text: "hi @cf-file://r1/a.go", Attachments: []string{"/att/1.png"}},
+		session.Item{ID: "u1", Kind: session.KindUserMessage, Text: "hi @cf-file://r1/a.go", Attachments: []string{"/att/1.png"},
+			ComposerText: "hi [a.go](cf-file://r1/a.go)"},
 		session.Item{ID: "m/0", Kind: session.KindAssistantText, Text: "| a |", Streaming: true},
 		session.Item{ID: "perm-r1", Kind: session.KindPermission, Request: &session.Request{RequestID: "r1", ToolName: "Write", Description: "a.go", State: session.RequestPending}},
 	)
@@ -66,7 +67,8 @@ func TestThreadWatchSendRespond(t *testing.T) {
 		t.Fatalf("snapshot %v", snap)
 	}
 	u := snap.GetItems()[0]
-	if u.GetUserMessage().GetText() != "hi @cf-file://r1/a.go" || u.GetUserMessage().GetAttachments()[0] != "/att/1.png" || u.GetOrdinal() != 1 {
+	if u.GetUserMessage().GetText() != "hi @cf-file://r1/a.go" || u.GetUserMessage().GetAttachments()[0] != "/att/1.png" || u.GetOrdinal() != 1 ||
+		u.GetUserMessage().GetComposerText() != "hi [a.go](cf-file://r1/a.go)" {
 		t.Errorf("user item %v", u)
 	}
 	if !snap.GetItems()[1].GetStreaming() || snap.GetItems()[1].GetAssistantText().GetText() != "| a |" {
@@ -79,11 +81,12 @@ func TestThreadWatchSendRespond(t *testing.T) {
 		t.Errorf("watchers = %d", fake.Watchers("s1"))
 	}
 
-	res, err := c.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{SessionId: "s1", Text: "more", Attachments: []string{"/att/2.png"}}))
+	res, err := c.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{SessionId: "s1", Text: "more", Attachments: []string{"/att/2.png"},
+		ComposerText: "![a.png](cf-attachment://0) more"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Msg.GetItem().GetUserMessage().GetText() != "more" {
+	if um := res.Msg.GetItem().GetUserMessage(); um.GetText() != "more" || um.GetComposerText() != "![a.png](cf-attachment://0) more" {
 		t.Errorf("sent item %v", res.Msg.GetItem())
 	}
 	if ev := next().GetAppended(); ev.GetItem().GetId() != res.Msg.GetItem().GetId() || ev.GetSeq() != 4 {

@@ -1,13 +1,12 @@
 /**
- * A rendered thread's user message as text and tags. The daemon stores what the composer
- * sent: its tokens already projected for Claude (lib/prompt.ts projectPrompt), so a skill
- * is "/name", a file "@cf-file://<repo>/<encoded path>" and an image chip
- * "[Image: <name>; ref=<staged path>]". This reads them back into the composer's tags so
- * the bubble shows the same chips (purple skill, blue file, green image). Skills are
- * recognised by shape: a "/name" word (one segment, starting with a letter) at the start
- * or after whitespace, followed by whitespace or the end. Pure.
+ * A rendered thread's user message as text and tags. When the composer sent it, the item
+ * carries the composer's own text (UserMessageItem.composer_text): its tags are the
+ * composer's tokens (lib/prompt.ts), with each image chip's id replaced by the image's
+ * index in the message's attachments (sentComposerText). The bubble draws chips from
+ * those tokens only; a message without composer text (sent from the CLI) is plain text.
+ * Nothing is guessed from the projected text Claude got. Pure.
  */
-import { FILE_SCHEME } from "./prompt";
+import { parsePrompt, type PromptPiece, type PromptTag, tagToken } from "./prompt";
 
 export type MessagePiece =
   | { kind: "text"; text: string }
@@ -16,43 +15,56 @@ export type MessagePiece =
   /** path "" when the chip lost its attachment before sending. */
   | { kind: "image"; name: string; path: string };
 
-const IMAGE = String.raw`\[Image: ([^;\]\n]*)(?:; ref=([^\]\n]+))?\]`;
-const FILE = String.raw`@${FILE_SCHEME.replace(/[/]/g, "\\/")}([A-Za-z0-9_.~-]+)\/(\S+)`;
-const SKILL = String.raw`(?<=^|\s)\/([A-Za-z][\w-]*(?::[\w-]+)?)(?=\s|$)`;
-const PIECES = new RegExp(`${IMAGE}|${FILE}|${SKILL}`, "g");
+/**
+ * The composer text to store with a sent message: the draft's text with each image
+ * chip's draft id replaced by its image's index in the sent attachments ("x" when the
+ * chip's image is not among them), so the bubble can find the staged path again.
+ */
+export function sentComposerText(text: string, indexOf: (id: string) => number | undefined): string {
+  return parsePrompt(text)
+    .map((line) =>
+      line
+        .map((p) => {
+          if (p.kind === "text") return p.text;
+          if (p.tagKind !== "image") return tagToken(p);
+          const i = indexOf(p.id);
+          return tagToken({ ...p, id: i === undefined || i < 0 ? "x" : String(i) });
+        })
+        .join(""),
+    )
+    .join("\n");
+}
 
-function decodePath(s: string): string | null {
-  try {
-    return decodeURIComponent(s);
-  } catch {
-    return null;
+function tagPiece(tag: PromptTag, attachments: readonly string[]): MessagePiece {
+  switch (tag.tagKind) {
+    case "skill":
+      return { kind: "skill", name: tag.name };
+    case "file":
+      return { kind: "file", repoId: tag.repoId, path: tag.path };
+    case "image": {
+      const i = /^\d+$/.test(tag.id) ? Number(tag.id) : -1;
+      return { kind: "image", name: tag.name.trim() || "image", path: attachments[i] ?? "" };
+    }
   }
 }
 
-/** The message as text runs and tags, in order. */
-export function parseUserMessage(text: string): MessagePiece[] {
+/** The message as text runs and tags, in order: tags from composerText's tokens only; text alone when there is none. */
+export function parseUserMessage(text: string, composerText: string, attachments: readonly string[]): MessagePiece[] {
+  if (!composerText) return text ? [{ kind: "text", text }] : [];
   const out: MessagePiece[] = [];
-  let last = 0;
   const pushText = (t: string) => {
     if (!t) return;
     const prev = out[out.length - 1];
     if (prev?.kind === "text") prev.text += t;
     else out.push({ kind: "text", text: t });
   };
-  for (const m of text.matchAll(PIECES)) {
-    pushText(text.slice(last, m.index));
-    last = m.index + m[0].length;
-    if (m[1] !== undefined) {
-      out.push({ kind: "image", name: m[1].trim() || "image", path: (m[2] ?? "").trim() });
-    } else if (m[3] !== undefined) {
-      const path = decodePath(m[4] ?? "");
-      if (path) out.push({ kind: "file", repoId: m[3], path });
-      else pushText(m[0]);
-    } else {
-      out.push({ kind: "skill", name: m[5] ?? "" });
+  parsePrompt(composerText).forEach((line: PromptPiece[], i) => {
+    if (i > 0) pushText("\n");
+    for (const p of line) {
+      if (p.kind === "text") pushText(p.text);
+      else out.push(tagPiece(p, attachments));
     }
-  }
-  pushText(text.slice(last));
+  });
   return out;
 }
 

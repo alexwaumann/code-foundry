@@ -70,7 +70,7 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	if len(dropped) > 0 {
 		m.log.Warn("file references outside the thread's projects; passing their relative paths", "session", id, "refs", dropped)
 	}
-	return r.call(ctx, threadCmd{send: &outgoing{text: strings.TrimSpace(msg.Text), attachments: attachments, prompt: prompt}})
+	return r.call(ctx, threadCmd{send: &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt}})
 }
 
 // fileRefRoots resolves a file reference's repository to its worktree for thread s:

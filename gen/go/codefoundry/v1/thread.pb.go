@@ -503,14 +503,21 @@ func (*ThreadItem_Compaction) isThreadItem_Payload() {}
 
 func (*ThreadItem_CommandOutput) isThreadItem_Payload() {}
 
-// What the user sent, as typed in the composer: file tags stay "@cf-file://<repo>/<path>"
-// tokens (not the paths Claude got).
+// What the user sent: text as sent (file tags stay "@cf-file://<repo>/<path>" tokens,
+// not the paths Claude got) and, when it came from the GUI's composer, the composer's
+// own text, from which the GUI draws the message's tags.
 type UserMessageItem struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Text  string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
 	// Staged image paths (StageAttachment); Claude got each as an image block and a
 	// path line.
-	Attachments   []string `protobuf:"bytes,2,rep,name=attachments,proto3" json:"attachments,omitempty"`
+	Attachments []string `protobuf:"bytes,2,rep,name=attachments,proto3" json:"attachments,omitempty"`
+	// The composer's text with its tags as Markdown-link tokens (gui lib/prompt.ts):
+	// "[/name](cf-skill://<repo id or ~>/<name>)", "[base](cf-file://<repo id>/<path>)",
+	// and "![name](cf-attachment://<n>)" where n is the image's index in attachments
+	// (not a number: the chip had lost its image). Empty for a message sent without the
+	// composer (the CLI): text is then shown as is. Stored, never interpreted.
+	ComposerText  string `protobuf:"bytes,3,opt,name=composer_text,json=composerText,proto3" json:"composer_text,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -557,6 +564,13 @@ func (x *UserMessageItem) GetAttachments() []string {
 		return x.Attachments
 	}
 	return nil
+}
+
+func (x *UserMessageItem) GetComposerText() string {
+	if x != nil {
+		return x.ComposerText
+	}
+	return ""
 }
 
 // One text block of Claude's reply (markdown).
@@ -1908,7 +1922,9 @@ type SendThreadMessageRequest struct {
 	// As typed; "@cf-file://<repo id>/<path>" tags become absolute paths for Claude.
 	Text string `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
 	// StageAttachment paths.
-	Attachments   []string `protobuf:"bytes,3,rep,name=attachments,proto3" json:"attachments,omitempty"`
+	Attachments []string `protobuf:"bytes,3,rep,name=attachments,proto3" json:"attachments,omitempty"`
+	// The composer's text (UserMessageItem.composer_text), kept on the item for display.
+	ComposerText  string `protobuf:"bytes,4,opt,name=composer_text,json=composerText,proto3" json:"composer_text,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1962,6 +1978,13 @@ func (x *SendThreadMessageRequest) GetAttachments() []string {
 		return x.Attachments
 	}
 	return nil
+}
+
+func (x *SendThreadMessageRequest) GetComposerText() string {
+	if x != nil {
+		return x.ComposerText
+	}
+	return ""
 }
 
 type SendThreadMessageResponse struct {
@@ -2443,10 +2466,11 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"compaction\x18\x12 \x01(\v2\x1e.codefoundry.v1.CompactionItemH\x00R\n" +
 	"compaction\x12J\n" +
 	"\x0ecommand_output\x18\x13 \x01(\v2!.codefoundry.v1.CommandOutputItemH\x00R\rcommandOutputB\t\n" +
-	"\apayload\"G\n" +
+	"\apayload\"l\n" +
 	"\x0fUserMessageItem\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12 \n" +
-	"\vattachments\x18\x02 \x03(\tR\vattachments\"'\n" +
+	"\vattachments\x18\x02 \x03(\tR\vattachments\x12#\n" +
+	"\rcomposer_text\x18\x03 \x01(\tR\fcomposerText\"'\n" +
 	"\x11AssistantTextItem\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\"\"\n" +
 	"\fThinkingItem\x12\x12\n" +
@@ -2564,12 +2588,13 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\bsnapshot\x18\x01 \x01(\v2#.codefoundry.v1.ThreadItemsSnapshotR\bsnapshot\"3\n" +
 	"\x12WatchThreadRequest\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\x01 \x01(\tR\tsessionId\"o\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\"\x94\x01\n" +
 	"\x18SendThreadMessageRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\x12 \n" +
-	"\vattachments\x18\x03 \x03(\tR\vattachments\"K\n" +
+	"\vattachments\x18\x03 \x03(\tR\vattachments\x12#\n" +
+	"\rcomposer_text\x18\x04 \x01(\tR\fcomposerText\"K\n" +
 	"\x19SendThreadMessageResponse\x12.\n" +
 	"\x04item\x18\x01 \x01(\v2\x1a.codefoundry.v1.ThreadItemR\x04item\"\xd1\x02\n" +
 	"\x14RespondThreadRequest\x12\x1d\n" +

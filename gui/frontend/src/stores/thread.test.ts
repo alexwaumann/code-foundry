@@ -105,7 +105,7 @@ describe("sameItem", () => {
     const q = (answers: Record<string, string>): ThreadItemView => ({ id: "q", ordinal: 1, parentToolUseId: "", createdAtMs: 1, updatedAtMs: 1, streaming: false, kind: "question", request: { ...req, answers } });
     expect(sameItem(q({ Q: "A" }), q({ Q: "A" }))).toBe(true);
     expect(sameItem(q({ Q: "A" }), q({ Q: "B" }))).toBe(false);
-    const u = (atts: string[]): ThreadItemView => ({ id: "u", ordinal: 1, parentToolUseId: "", createdAtMs: 1, updatedAtMs: 1, streaming: false, kind: "user", text: "hi", attachments: atts });
+    const u = (atts: string[]): ThreadItemView => ({ id: "u", ordinal: 1, parentToolUseId: "", createdAtMs: 1, updatedAtMs: 1, streaming: false, kind: "user", text: "hi", attachments: atts, composerText: "" });
     expect(sameItem(u(["/a.png"]), u(["/a.png"]))).toBe(true);
     expect(sameItem(u(["/a.png"]), u([]))).toBe(false);
   });

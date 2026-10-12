@@ -109,7 +109,7 @@ func TestSessionCreateNewThreadFields(t *testing.T) {
 	fake, c := newSessionServer(t)
 	ctx := context.Background()
 	res, err := c.Create(ctx, connect.NewRequest(&v1.CreateSessionRequest{
-		RepoId: "r1", InitialPrompt: "fix it", PermissionMode: v1.PermissionMode_PERMISSION_MODE_ACCEPT_EDITS,
+		RepoId: "r1", InitialPrompt: "fix it", ComposerPrompt: "fix [it](cf-file://r1/it)", PermissionMode: v1.PermissionMode_PERMISSION_MODE_ACCEPT_EDITS,
 		NewWorktree: &v1.NewWorktree{BaseRef: "origin/dev"}, Attachments: []string{"/a/1.png", "/a/2.png"},
 	}))
 	if err != nil {
@@ -120,7 +120,7 @@ func TestSessionCreateNewThreadFields(t *testing.T) {
 		s.GetBaseRef() != "origin/dev" || s.GetWorktreePath() != "/worktrees/cf-1" {
 		t.Fatalf("Create = %v", s)
 	}
-	want := "Create r1    perm=2 new-worktree=origin/dev prompt=fix it attachments=/a/1.png,/a/2.png"
+	want := "Create r1    perm=2 new-worktree=origin/dev prompt=fix it composer=fix [it](cf-file://r1/it) attachments=/a/1.png,/a/2.png"
 	if calls := fake.Calls(); len(calls) != 1 || calls[0] != want {
 		t.Errorf("calls = %q, want %q", calls, want)
 	}

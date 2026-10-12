@@ -271,6 +271,10 @@ type CreateOptions struct {
 	// "cf-file://<repoId>/<path>" in it become absolute paths in the thread's
 	// worktrees (filerefs.go).
 	InitialPrompt string
+	// ComposerPrompt is the GUI composer's text of InitialPrompt (its tags as tokens).
+	// A rendered thread keeps it on the first user message for display; otherwise
+	// ignored.
+	ComposerPrompt string
 	// PermissionMode selects claude --permission-mode.
 	PermissionMode PermissionMode
 	// NewWorktree, when set, makes Create branch a new worktree for the session before

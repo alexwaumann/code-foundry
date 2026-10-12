@@ -3,8 +3,8 @@
  * (ThreadService) mapped to view models. Generated types stay in this file. Sync rules
  * (docs/notes/rendered-threads-1-daemon.md): ThreadService.Watch sends a snapshot first,
  * then appended / updated items, text deltas and pending-request changes, each with the
- * thread's seq; the EventService `thread` source carries the same events for every
- * rendered thread, with only the pending requests as its snapshot.
+ * thread's seq. The EventService `thread` source carries only pending requests (a
+ * pending_snapshot, then a pending event per change), for badges without a Watch.
  */
 import { timestampMs } from "@bufbuild/protobuf/wkt";
 import {
@@ -97,7 +97,8 @@ export interface ToolCallView {
 /** One entry of a rendered thread's conversation; the kind says which payload it has. */
 export type ThreadItemView = ItemBase &
   (
-    | { kind: "user"; text: string; attachments: readonly string[] }
+    /** composerText: the composer's text with its tag tokens ("" when sent without the composer); see lib/userMessage. */
+    | { kind: "user"; text: string; attachments: readonly string[]; composerText: string }
     | { kind: "text"; text: string }
     | { kind: "thinking"; text: string }
     | ({ kind: "tool" } & ToolCallView)
@@ -185,7 +186,7 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
   const p = it.payload;
   switch (p.case) {
     case "userMessage":
-      return { ...base, kind: "user", text: p.value.text, attachments: [...p.value.attachments] };
+      return { ...base, kind: "user", text: p.value.text, attachments: [...p.value.attachments], composerText: p.value.composerText };
     case "assistantText":
       return { ...base, kind: "text", text: p.value.text };
     case "thinking":

@@ -433,7 +433,7 @@ const UserRow = memo(function UserRow({ id }: { id: string }) {
   const { sessionId } = useThreadCtx();
   const it = useThreadItem(sessionId, id);
   if (it?.kind !== "user") return null;
-  return <UserBubble text={it.text} attachments={it.attachments} createdAtMs={it.createdAtMs} />;
+  return <UserBubble text={it.text} composerText={it.composerText} attachments={it.attachments} createdAtMs={it.createdAtMs} />;
 });
 
 /** Claude's cumulative cost estimate before this turn_end (0 when none, or another process's). */

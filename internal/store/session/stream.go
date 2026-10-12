@@ -33,6 +33,7 @@ const (
 // outgoing is a user message on its way to Claude.
 type outgoing struct {
 	text        string   // as typed: the item's text
+	composer    string   // the composer's text: the item's ComposerText
 	attachments []string // staged paths
 	prompt      string   // the text Claude gets (file refs rewritten, attachment lines)
 }
@@ -351,7 +352,7 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 	if err := st.conn.Send(ctx, claudestream.UserMessage{UUID: id, Blocks: blocks}); err != nil {
 		return Item{}, fmt.Errorf("%w: send to claude: %v", ErrFailedPrecondition, err)
 	}
-	it := st.proj.w.add(Item{ID: id, Kind: KindUserMessage, Text: o.text, Attachments: o.attachments})
+	it := st.proj.w.add(Item{ID: id, Kind: KindUserMessage, Text: o.text, Attachments: o.attachments, ComposerText: o.composer})
 	st.sd.sent()
 	r.activity = r.m.opts.Now()
 	r.checkStatus()

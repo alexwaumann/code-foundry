@@ -10,6 +10,7 @@ import { stageAttachment } from "@/api/session";
 import { errorMessage } from "@/api/stream";
 import type { ComposePermission } from "@/lib/compose";
 import { projectPrompt } from "@/lib/prompt";
+import { sentComposerText } from "@/lib/userMessage";
 import { invokeConfirmed, refreshCommands, runCommand } from "./commands";
 import { clearDraft, getDraft, isDraftEmpty, updateDraft } from "./compose";
 import { sessionContext } from "./sessionActions";
@@ -31,7 +32,8 @@ export function threadDraftKey(sessionId: string): string {
  * Sends the thread's draft: stages its images, projects the prompt exactly like the
  * new-thread composer (image chips become `[Image: <name>; ref=<path>]`, skills `/name`,
  * files `@cf-file://…`, which the daemon resolves and stores as sent), then thread.send
- * with the staged paths. On success the draft is cleared; on failure it stays with the
+ * with the staged paths and the composer's text (lib/userMessage sentComposerText) that
+ * the message's bubble draws its tags from. On success the draft is cleared; on failure it stays with the
  * error. Allowed while Claude works: it queues the message or folds it in.
  */
 export async function sendThreadDraft(sessionId: string): Promise<boolean> {
@@ -53,9 +55,13 @@ export async function sendThreadDraft(sessionId: string): Promise<boolean> {
       const a = staged.get(id);
       return a?.stagedPath ? { name: a.file.name, ref: a.stagedPath } : undefined;
     }).trim();
-    const attachments = cur.attachments.flatMap((a) => (a.stagedPath ? [a.stagedPath] : []));
+    const sent = cur.attachments.filter((a) => a.stagedPath !== null);
+    const attachments = sent.map((a) => a.stagedPath ?? "");
     const args: Record<string, string> = { id: sessionId, text };
     if (attachments.length > 0) args.attachments = attachments.join(",");
+    // The composer's own text, so the message's bubble draws the same tags.
+    const composer = sentComposerText(cur.text, (id) => sent.findIndex((a) => a.id === id)).trim();
+    if (composer) args["composer-text"] = composer;
     const res = await invokeConfirmed(THREAD_COMMANDS.send, args, sessionContext(sessionId));
     if (!res) {
       updateDraft(key, { phase: "idle" });

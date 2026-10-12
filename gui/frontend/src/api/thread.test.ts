@@ -8,7 +8,7 @@ describe("toThreadItemView", () => {
   it("maps every payload kind", () => {
     const base = { id: "i", ordinal: 7n, parentToolUseId: "p", createdAt: timestampFromMs(1000), updatedAt: timestampFromMs(2000), streaming: true };
     const v = (payload: object) => toThreadItemView(create(ThreadItemSchema, { ...base, payload } as never));
-    expect(v({ case: "userMessage", value: { text: "hi", attachments: ["/a.png"] } })).toEqual({
+    expect(v({ case: "userMessage", value: { text: "hi", attachments: ["/a.png"], composerText: "![a.png](cf-attachment://0) hi" } })).toEqual({
       id: "i",
       ordinal: 7,
       parentToolUseId: "p",
@@ -18,6 +18,7 @@ describe("toThreadItemView", () => {
       kind: "user",
       text: "hi",
       attachments: ["/a.png"],
+      composerText: "![a.png](cf-attachment://0) hi",
     });
     expect(v({ case: "toolCall", value: { toolUseId: "t", name: "Bash", inputJson: "{}", status: ToolCallStatus.ERROR, output: "x", isError: true, resultJson: "" } })).toMatchObject({
       kind: "tool",

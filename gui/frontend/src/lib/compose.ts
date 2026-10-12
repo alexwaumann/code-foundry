@@ -259,7 +259,10 @@ export function checkAttachments<F extends FileLike>(
 
 /** The prompt and Claude options of a draft, as session.new takes them. */
 export interface PromptArgsInput {
+  /** The prompt as Claude gets it (lib/prompt.ts projectPrompt). */
   text: string;
+  /** The composer's text with its tag tokens (lib/userMessage sentComposerText): composer-prompt, for a rendered thread's first message. */
+  composerText?: string;
   model: string;
   effort: string;
   permission: string;
@@ -307,6 +310,9 @@ export function threadArgs(place: ThreadPlace, d: PromptArgsInput, attachments: 
   if (d.permission) args.permission = d.permission;
   const prompt = d.text.trim();
   if (prompt) args.prompt = prompt;
+  // A rendered thread keeps the composer's text on its first message to draw the tags.
+  const composer = d.composerText?.trim() ?? "";
+  if (prompt && composer) args["composer-prompt"] = composer;
   if (attachments.length > 0) args.attachments = attachments.join(",");
   return args;
 }

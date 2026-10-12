@@ -130,12 +130,22 @@ function timeOf(ms: number | null): string {
 }
 
 /**
- * A user message: a right-aligned bubble with the composer's tags read back from the sent
- * text (lib/userMessage), attachments the text does not refer to as thumbnails above it,
- * and the time under it.
+ * A user message: a right-aligned bubble with the composer's tags (from the composer text
+ * the item carries, lib/userMessage), attachments the text does not refer to as
+ * thumbnails above it, and the time under it.
  */
-export const UserBubble = memo(function UserBubble({ text, attachments, createdAtMs }: { text: string; attachments: readonly string[]; createdAtMs: number | null }) {
-  const pieces = useMemo(() => parseUserMessage(text), [text]);
+export const UserBubble = memo(function UserBubble({
+  text,
+  composerText,
+  attachments,
+  createdAtMs,
+}: {
+  text: string;
+  composerText: string;
+  attachments: readonly string[];
+  createdAtMs: number | null;
+}) {
+  const pieces = useMemo(() => parseUserMessage(text, composerText, attachments), [text, composerText, attachments]);
   const inline = useMemo(() => inlineImagePaths(pieces), [pieces]);
   const extra = attachments.filter((p) => !inline.has(p));
   return (
@@ -147,7 +157,7 @@ export const UserBubble = memo(function UserBubble({ text, attachments, createdA
           ))}
         </ul>
       )}
-      {text && (
+      {pieces.length > 0 && (
         <div className="bubble selectable">
           {pieces.map((p, i) => {
             switch (p.kind) {

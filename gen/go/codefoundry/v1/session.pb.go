@@ -1078,9 +1078,12 @@ type CreateSessionRequest struct {
 	// new_worktree or workspace_id.
 	NewWorkspace *NewWorkspace `protobuf:"bytes,11,opt,name=new_workspace,json=newWorkspace,proto3" json:"new_workspace,omitempty"`
 	// Terminal or rendered; UNSPECIFIED uses the sessions.render setting.
-	Render        SessionRender `protobuf:"varint,12,opt,name=render,proto3,enum=codefoundry.v1.SessionRender" json:"render,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Render SessionRender `protobuf:"varint,12,opt,name=render,proto3,enum=codefoundry.v1.SessionRender" json:"render,omitempty"`
+	// A rendered thread: the composer's text of initial_prompt, kept on the first user
+	// message for display (ThreadItem UserMessageItem.composer_text). Ignored otherwise.
+	ComposerPrompt string `protobuf:"bytes,13,opt,name=composer_prompt,json=composerPrompt,proto3" json:"composer_prompt,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreateSessionRequest) Reset() {
@@ -1195,6 +1198,13 @@ func (x *CreateSessionRequest) GetRender() SessionRender {
 		return x.Render
 	}
 	return SessionRender_SESSION_RENDER_UNSPECIFIED
+}
+
+func (x *CreateSessionRequest) GetComposerPrompt() string {
+	if x != nil {
+		return x.ComposerPrompt
+	}
+	return ""
 }
 
 type NewWorktree struct {
@@ -2713,7 +2723,7 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x10\n" +
 	"\x03url\x18\x03 \x01(\tR\x03url\x127\n" +
-	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\x85\x04\n" +
+	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\xae\x04\n" +
 	"\x14CreateSessionRequest\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12#\n" +
 	"\rworktree_path\x18\x02 \x01(\tR\fworktreePath\x12\x14\n" +
@@ -2727,7 +2737,8 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\fworkspace_id\x18\n" +
 	" \x01(\tR\vworkspaceId\x12A\n" +
 	"\rnew_workspace\x18\v \x01(\v2\x1c.codefoundry.v1.NewWorkspaceR\fnewWorkspace\x125\n" +
-	"\x06render\x18\f \x01(\x0e2\x1d.codefoundry.v1.SessionRenderR\x06render\"(\n" +
+	"\x06render\x18\f \x01(\x0e2\x1d.codefoundry.v1.SessionRenderR\x06render\x12'\n" +
+	"\x0fcomposer_prompt\x18\r \x01(\tR\x0ecomposerPrompt\"(\n" +
 	"\vNewWorktree\x12\x19\n" +
 	"\bbase_ref\x18\x01 \x01(\tR\abaseRef\"S\n" +
 	"\fNewWorkspace\x12\x14\n" +

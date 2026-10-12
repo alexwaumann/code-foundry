@@ -13,6 +13,7 @@ import (
 type itemData struct {
 	Text        string      `json:"text,omitempty"`
 	Attachments []string    `json:"attachments,omitempty"`
+	Composer    string      `json:"composer,omitempty"`
 	Tool        *ToolCall   `json:"tool,omitempty"`
 	Request     *Request    `json:"request,omitempty"`
 	Turn        *TurnEnd    `json:"turn,omitempty"`
@@ -21,7 +22,7 @@ type itemData struct {
 
 // saveItem inserts or rewrites one item. Streaming items are never saved.
 func saveItem(ctx context.Context, db *sql.DB, sessionID string, it Item) error {
-	data, err := json.Marshal(itemData{Text: it.Text, Attachments: it.Attachments, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction})
+	data, err := json.Marshal(itemData{Text: it.Text, Attachments: it.Attachments, Composer: it.ComposerText, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction})
 	if err != nil {
 		return fmt.Errorf("session: encode item %s: %w", it.ID, err)
 	}
@@ -59,6 +60,7 @@ func loadItems(ctx context.Context, db *sql.DB, sessionID string) ([]Item, error
 			return nil, fmt.Errorf("session: load item %s of %s: %w", it.ID, sessionID, err)
 		}
 		it.Kind, it.CreatedAt, it.UpdatedAt = ItemKind(kind), fromMillis(created), fromMillis(updated)
+		it.ComposerText = d.Composer
 		it.Text, it.Attachments, it.Tool, it.Request, it.Turn, it.Compaction = d.Text, d.Attachments, d.Tool, d.Request, d.Turn, d.Compaction
 		out = append(out, it)
 	}

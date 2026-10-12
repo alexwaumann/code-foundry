@@ -1,44 +1,55 @@
 import { describe, expect, it } from "vitest";
-import { encodeTagPath, projectPrompt, tagToken } from "./prompt";
-import { inlineImagePaths, parseUserMessage } from "./userMessage";
+import { tagToken } from "./prompt";
+import { inlineImagePaths, parseUserMessage, sentComposerText } from "./userMessage";
+
+const image = (id: string, name: string) => tagToken({ tagKind: "image", id, name });
+const file = (repoId: string, path: string) => tagToken({ tagKind: "file", repoId, path });
+const skill = (name: string, repoId = "") => tagToken({ tagKind: "skill", name, repoId });
+
+describe("sentComposerText", () => {
+  it("replaces image chip ids with their attachment index, keeps other tags", () => {
+    const draft = `see ${image("a7", "b.png")} and ${image("a3", "a.png")} in ${file("r1", "src/x.go")} with ${skill("tdd")}\n${image("gone", "c.png")}`;
+    const order = ["a3", "a7"];
+    const out = sentComposerText(draft, (id) => (order.includes(id) ? order.indexOf(id) : undefined));
+    expect(out).toBe(`see ${image("1", "b.png")} and ${image("0", "a.png")} in ${file("r1", "src/x.go")} with ${skill("tdd")}\n${image("x", "c.png")}`);
+  });
+});
 
 describe("parseUserMessage", () => {
-  it("reads back what the composer projected: images, files, skills", () => {
-    const draft = `The badge is stale, see ${tagToken({ tagKind: "image", id: "a1", name: "pr-badge-stale.png" })} Look at ${tagToken({ tagKind: "file", repoId: "repo-cf", path: "internal/store/pr/poller.go" })} and fix it with ${tagToken({ tagKind: "skill", name: "tdd", repoId: "" })}. Keep it.`;
-    const sent = projectPrompt(draft, (id) => (id === "a1" ? { name: "pr-badge-stale.png", ref: "/att/0a.png" } : undefined));
-    expect(parseUserMessage(sent)).toEqual([
+  it("draws tags from the composer's tokens", () => {
+    const composer = `The badge is stale, see ${image("0", "pr-badge-stale.png")} Look at ${file("repo-cf", "internal/store/pr/poller.go")} and fix it with ${skill("tdd")}. Keep it.`;
+    expect(parseUserMessage("(projected)", composer, ["/att/0a.png"])).toEqual([
       { kind: "text", text: "The badge is stale, see " },
       { kind: "image", name: "pr-badge-stale.png", path: "/att/0a.png" },
       { kind: "text", text: " Look at " },
       { kind: "file", repoId: "repo-cf", path: "internal/store/pr/poller.go" },
       { kind: "text", text: " and fix it with " },
       { kind: "skill", name: "tdd" },
-      { kind: "text", text: " . Keep it." },
+      { kind: "text", text: ". Keep it." },
     ]);
   });
 
-  it("decodes file paths and keeps directories", () => {
+  it("decodes file paths, keeps directories and lines", () => {
     const path = "docs/a b#%.md";
-    expect(parseUserMessage(`@cf-file://r1/${encodeTagPath(path)} and @cf-file://r1/src/`)).toEqual([
+    expect(parseUserMessage("", `${file("r1", path)} and\n${file("r1", "src/")}`, [])).toEqual([
       { kind: "file", repoId: "r1", path },
-      { kind: "text", text: " and " },
+      { kind: "text", text: " and\n" },
       { kind: "file", repoId: "r1", path: "src/" },
     ]);
-    expect(parseUserMessage("@cf-file://r1/%E0%A4%A")).toEqual([{ kind: "text", text: "@cf-file://r1/%E0%A4%A" }]);
   });
 
-  it.each([
-    ["/review now", [{ kind: "skill", name: "review" }, { kind: "text", text: " now" }]],
-    ["use /plugin:deploy", [{ kind: "text", text: "use " }, { kind: "skill", name: "plugin:deploy" }]],
-    ["see /tmp/x and a/b and /1abc", [{ kind: "text", text: "see /tmp/x and a/b and /1abc" }]],
-    ["x/review", [{ kind: "text", text: "x/review" }]],
-  ])("skills by shape: %j", (text, want) => {
-    expect(parseUserMessage(text)).toEqual(want);
+  it("never guesses tags from the projected text", () => {
+    expect(parseUserMessage("ls /tmp then /review @cf-file://r1/a.go [Image: a.png; ref=/att/a.png]", "", ["/att/a.png"])).toEqual([
+      { kind: "text", text: "ls /tmp then /review @cf-file://r1/a.go [Image: a.png; ref=/att/a.png]" },
+    ]);
+    expect(parseUserMessage("ls /tmp", "ls /tmp", [])).toEqual([{ kind: "text", text: "ls /tmp" }]);
+    expect(parseUserMessage("", "", [])).toEqual([]);
   });
 
   it("an image chip whose attachment was gone has no path", () => {
-    const pieces = parseUserMessage("[Image: shot.png] and [Image: b.png; ref=/att/b.png]");
+    const pieces = parseUserMessage("", `${image("x", "shot.png")} and ${image("1", "b.png")} ${image("5", "c.png")}`, ["/att/a.png", "/att/b.png"]);
     expect(pieces[0]).toEqual({ kind: "image", name: "shot.png", path: "" });
+    expect(pieces[4]).toEqual({ kind: "image", name: "c.png", path: "" });
     expect([...inlineImagePaths(pieces)]).toEqual(["/att/b.png"]);
   });
 });

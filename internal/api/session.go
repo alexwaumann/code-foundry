@@ -36,7 +36,7 @@ func (h *Session) Create(ctx context.Context, req *connect.Request[v1.CreateSess
 	m := req.Msg
 	o := session.CreateOptions{
 		RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
-		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(), PermissionMode: session.PermissionMode(m.GetPermissionMode()),
+		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(), ComposerPrompt: m.GetComposerPrompt(), PermissionMode: session.PermissionMode(m.GetPermissionMode()),
 		Attachments: m.GetAttachments(), WorkspaceID: m.GetWorkspaceId(), Render: session.Render(m.GetRender()),
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
