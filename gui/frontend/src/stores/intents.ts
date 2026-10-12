@@ -1,5 +1,6 @@
 import { toast } from "sonner";
 import type { UiIntentView } from "@/api/ui";
+import { revealShell } from "./bottomActions";
 import { sessionOfTerminal, useSessionsStore } from "./sessions";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
@@ -11,6 +12,9 @@ export function applyIntent(intent: UiIntentView): void {
   const ui = useUiStore.getState();
   switch (intent.kind) {
     case "focusTerminal": {
+      // A shell shows in its owner's bottom panel (a thread's, or the Projects page's).
+      // An unknown terminal is revealed there too once it arrives, if it is a shell.
+      if (revealShell(intent.terminalId)) break;
       // A session's terminal is shown through its session row.
       const t = useTerminalsStore.getState().byId[intent.terminalId];
       const session = sessionOfTerminal(useSessionsStore.getState(), t ?? { id: intent.terminalId, labels: {} });

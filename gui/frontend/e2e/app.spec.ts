@@ -140,12 +140,19 @@ test("required args are prompted inline before invoking", async ({ page }) => {
   expect((await invocations()).at(-1)?.args).toEqual({ level: "warning" });
 });
 
-test("FocusTerminal intent switches the selection", async ({ page }) => {
+test("FocusTerminal intent switches the selection; a shell shows in its owner's bottom panel", async ({ page }) => {
   await openApp(page);
-  await expect.poll(() => emit({ focusTerminal: { terminalId: "t-top" } })).toBeGreaterThan(0);
-  await expect(row(page, "t:t-top")).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-top");
-  await expectTerminalText(page, "PID USER");
+  // A terminal no thread or worktree owns (no labels) is selected in the content pane.
+  await expect.poll(() => emit({ focusTerminal: { terminalId: "t-tmp" } })).toBeGreaterThan(0);
+  await expect(row(page, "t:t-tmp")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-tmp");
+  // A worktree's shell: the Projects page, with the shell active in its bottom panel.
+  await emit({ focusTerminal: { terminalId: "t-top" } });
+  await expect(page.getByTestId("projects-page")).toBeVisible();
+  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-terminal-id", "t-top");
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __cfTerminals?: Record<string, { renderer: { getText(): string } }> }).__cfTerminals?.bottom?.renderer.getText() ?? ""))
+    .toMatch("PID USER");
 });
 
 test("OpenPalette and Notify intents", async ({ page }) => {

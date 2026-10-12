@@ -12,6 +12,7 @@ import {
   type TreeSession,
   type WorktreeRef,
 } from "@/lib/tree";
+import { focusedBottomShell, useBottomStore } from "./bottomPanel";
 import { useReposStore, type ReposData } from "./repos";
 import { useSessionsStore, type SessionsData } from "./sessions";
 import { isThreadGroup, threadGroup } from "@/lib/session";
@@ -48,7 +49,19 @@ export function repoContext(repoId: string): UiContextView {
  * commands apply to it. Actions on a worktree that is not selected (the Projects page,
  * the panel's worktree tab) build their context with worktreeContext / repoContext.
  */
-export function deriveContext(sel: Selection, terminals: TerminalsData, repos: ReposData, sessions: SessionsData = { byId: {}, order: [] }): UiContextView {
+export function deriveContext(
+  sel: Selection,
+  terminals: TerminalsData,
+  repos: ReposData,
+  sessions: SessionsData = { byId: {}, order: [] },
+  focusedShell = "",
+): UiContextView {
+  const ctx = deriveSelectionContext(sel, terminals, repos, sessions);
+  // The keyboard is in a bottom panel shell (focusedBottomShell): terminal commands act on it.
+  return focusedShell ? { ...ctx, activeTerminalId: focusedShell } : ctx;
+}
+
+function deriveSelectionContext(sel: Selection, terminals: TerminalsData, repos: ReposData, sessions: SessionsData): UiContextView {
   switch (sel.kind) {
     case "none":
       return emptyContext;
@@ -92,9 +105,16 @@ export function contextKey(c: UiContextView): string {
   return [c.activeView, c.activeTerminalId, c.activeSessionId, c.activeRepoId, c.activeWorktreePath, c.activeWorkspaceId].join("\u0000");
 }
 
-/** Current context, read imperatively (keybindings, invoke). */
-export function getUiContext(sel: Selection = useUiStore.getState().selection): UiContextView {
-  return deriveContext(sel, useTerminalsStore.getState(), useReposStore.getState(), useSessionsStore.getState());
+/**
+ * Current context, read imperatively (keybindings, invoke). For the window's own
+ * selection (no `sel`), a bottom panel shell with the keyboard (or the palette's return)
+ * is the active terminal. An explicit selection gets that selection's context only.
+ */
+export function getUiContext(sel?: Selection): UiContextView {
+  const ui = useUiStore.getState();
+  const terminals = useTerminalsStore.getState();
+  const focused = sel === undefined ? focusedBottomShell(ui, terminals, useBottomStore.getState().byKey) : "";
+  return deriveContext(sel ?? ui.selection, terminals, useReposStore.getState(), useSessionsStore.getState(), focused);
 }
 
 const SEP = "\u0001";

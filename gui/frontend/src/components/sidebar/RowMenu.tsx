@@ -12,10 +12,11 @@ import {
 import { beginRename } from "@/keys/bindings";
 import { worktreeBranch } from "@/lib/threadRow";
 import type { LeafRow } from "@/lib/tree";
+import { newThreadTerminal } from "@/stores/bottomActions";
 import { runCommand } from "@/stores/commands";
 import { getUiContext } from "@/stores/context";
 import { useReposStore } from "@/stores/repos";
-import { closeSession, forkSession, pinSession, reconnectSession, removeSession, runSessionIn, sessionContext } from "@/stores/sessionActions";
+import { closeSession, forkSession, pinSession, reconnectSession, removeSession, runSessionIn } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
@@ -103,7 +104,7 @@ function ThreadMenu({ id }: { id: string }) {
       <ContextMenuSeparator />
       <ContextMenuItem
         onSelect={() => {
-          void runCommand("terminal.new", {}, sessionContext(id));
+          void newThreadTerminal(id);
         }}
       >
         <SquareTerminal />

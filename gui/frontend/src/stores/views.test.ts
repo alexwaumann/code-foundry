@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { getBottom, useBottomStore } from "./bottomPanel";
 import { getPanel, makeTab, usePanelStore } from "./panel";
 import { useUiStore, type FocusRegion } from "./ui";
-import { closeUsage, expandPanelCommand, newPanelTabCommand, showView, startViewSync, togglePanelCommand, usagePanelCommand, useViewsStore } from "./views";
+import { closeUsage, expandPanelCommand, newPanelTabCommand, showView, startViewSync, toggleBottomCommand, togglePanelCommand, usagePanelCommand, useViewsStore } from "./views";
 
 const closedPalette = { open: false, query: "", commandName: null, page: "commands" as const, returnTo: "content" as FocusRegion };
 
@@ -269,5 +270,98 @@ describe("the usage page", () => {
     expect(expandPanelCommand()).toBe(false);
     expect(usagePanelCommand()).toBe(false);
     expect(usePanelStore.getState().byKey).toEqual({});
+  });
+});
+
+describe("toggleBottomCommand", () => {
+  beforeEach(() => {
+    useBottomStore.setState({ byKey: {}, pendingFocus: null });
+    usePanelStore.setState({ byKey: {} });
+    useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
+    useUiStore.setState({
+      selection: { kind: "session", id: "a" },
+      focus: "terminal",
+      bottomFocusSeq: 0,
+      contentFocusSeq: 0,
+      palette: closedPalette,
+    });
+  });
+
+  it("showing focuses the panel; hiding it from the panel focuses the content pane", () => {
+    expect(toggleBottomCommand()).toBe(true);
+    expect(getBottom("session:a").open).toBe(true);
+    expect(useUiStore.getState().bottomFocusSeq).toBe(1);
+    useUiStore.setState({ focus: "bottom" });
+    expect(toggleBottomCommand()).toBe(false);
+    expect(useUiStore.getState().contentFocusSeq).toBe(1);
+  });
+
+  it("hiding it from elsewhere leaves focus alone", () => {
+    toggleBottomCommand();
+    useUiStore.setState({ focus: "sidebar" });
+    toggleBottomCommand();
+    expect(useUiStore.getState().contentFocusSeq).toBe(0);
+  });
+
+  const noops: [string, () => void][] = [
+    ["a selection without a bottom panel (the dashboard)", () => useUiStore.setState({ selection: { kind: "view", name: "dashboard" } })],
+    ["the Pull Requests page", () => useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } })],
+    ["a loose terminal", () => useUiStore.setState({ selection: { kind: "terminal", id: "t" } })],
+    ["the settings page", () => { useViewsStore.setState({ settingsOpen: true }); }],
+    ["the usage page", () => { useViewsStore.setState({ usageOpen: true }); }],
+    ["the side panel expanded", () => usePanelStore.setState({ byKey: { "session:a": { open: true, tabs: [], activeTabId: null, expanded: true } } })],
+  ];
+  it.each(noops)("is a no-op with %s", (_name, arrange) => {
+    arrange();
+    expect(toggleBottomCommand()).toBe(false);
+    expect(useBottomStore.getState().byKey).toEqual({});
+    expect(useUiStore.getState().bottomFocusSeq).toBe(0);
+  });
+
+  it("works on the Projects page's own panel", () => {
+    useUiStore.setState({ selection: { kind: "view", name: "projects" } });
+    expect(toggleBottomCommand()).toBe(true);
+    expect(getBottom("view:projects").open).toBe(true);
+    expect(getBottom("session:a").open).toBe(false);
+  });
+
+  describe("from the palette", () => {
+    const cases: [string, boolean, FocusRegion, FocusRegion][] = [
+      ["showing returns focus to the bottom panel", false, "terminal", "bottom"],
+      ["hiding the panel the palette came from returns to the content pane", true, "bottom", "content"],
+      ["hiding keeps another return target", true, "panel", "panel"],
+    ];
+    it.each(cases)("%s", (_name, wasOpen, returnTo, want) => {
+      if (wasOpen) useBottomStore.setState({ byKey: { "session:a": { open: true } } });
+      useUiStore.setState({ focus: "palette", palette: { ...closedPalette, open: true, returnTo } });
+      expect(toggleBottomCommand()).toBe(!wasOpen);
+      expect(useUiStore.getState().palette.returnTo).toBe(want);
+      // The palette has focus: nothing moves until it closes.
+      expect(useUiStore.getState().bottomFocusSeq).toBe(0);
+    });
+  });
+
+  it("is what ShowView bottom.toggle does", () => {
+    expect(showView("bottom.toggle")).toBe(true);
+    expect(getBottom("session:a").open).toBe(true);
+  });
+});
+
+describe("expandPanelCommand from the bottom panel", () => {
+  beforeEach(() => {
+    usePanelStore.setState({ byKey: {} });
+    useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
+    useUiStore.setState({ selection: { kind: "session", id: "a" }, focus: "bottom", panelFocusSeq: 0, palette: closedPalette });
+  });
+
+  it("moves focus to the panel: expanding hides the bottom panel with the content column", () => {
+    expect(expandPanelCommand()).toBe(true);
+    expect(useUiStore.getState().panelFocusSeq).toBe(1);
+  });
+
+  it("from the palette, its return target moves to the panel", () => {
+    useUiStore.setState({ focus: "palette", palette: { ...closedPalette, open: true, returnTo: "bottom" } });
+    expandPanelCommand();
+    expect(useUiStore.getState().palette.returnTo).toBe("panel");
   });
 });

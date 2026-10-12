@@ -7,6 +7,7 @@
  */
 import { toast } from "sonner";
 import { create } from "zustand";
+import { bottomKeyOf, bottomVisible, getBottom, toggleBottom } from "./bottomPanel";
 import { linkedPrsTarget, openLinkedPrsSurface } from "./linkedPrsPanel";
 import { expandPanel, getPanel, startPanelPicking, togglePanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
@@ -33,6 +34,18 @@ export function selectPageOpen(s: ViewsState): boolean {
 
 function pageOpen(): boolean {
   return selectPageOpen(useViewsStore.getState());
+}
+
+/** Whether the current selection's side panel is open and expanded over the content column. */
+function sideExpanded(): boolean {
+  const side = getPanel();
+  return side.open && (side.expanded ?? false);
+}
+
+/** The key whose bottom panel is on screen now (bottomVisible, read imperatively), or null. */
+export function visibleBottomKey(): string | null {
+  const key = bottomKeyOf(useUiStore.getState().selection);
+  return key !== null && bottomVisible(key, getBottom(key).open, pageOpen(), sideExpanded()) ? key : null;
 }
 
 /** Shows a named view (UiIntent.ShowView.name). Returns false for an unknown name. */
@@ -79,6 +92,10 @@ export function showView(name: string): boolean {
       // view.panel.worktree: the thread's own worktree in the current thread's panel.
       worktreePanelCommand();
       return true;
+    case "bottom.toggle":
+      // view.bottom.toggle: the current selection's bottom terminal panel.
+      toggleBottomCommand();
+      return true;
     default:
       // Top-level pages (the Pull Requests page) are selections. Closing settings and
       // usage here too covers re-selecting the page that is already selected.
@@ -114,6 +131,34 @@ export function togglePanelCommand(): boolean {
 }
 
 /**
+ * view.bottom.toggle for the current selection (a thread or the Projects page; other
+ * selections have no bottom panel and it does nothing). A no-op while the settings or
+ * usage page is up, or while the side panel fills the content area: both hide the bottom
+ * panel, so a toggle there would flip state the user cannot see.
+ *
+ * Focus works like view.panel.toggle: showing focuses the panel (its active terminal, else
+ * the panel), hiding it while it has focus hands focus to the content pane, and with the
+ * palette open its return target moves instead.
+ */
+export function toggleBottomCommand(): boolean {
+  const ui = useUiStore.getState();
+  const key = bottomKeyOf(ui.selection);
+  if (key === null) return false;
+  // Whether it could show if open: otherwise a toggle flips state nobody sees.
+  if (!bottomVisible(key, true, pageOpen(), sideExpanded())) return getBottom().open;
+  const inPalette = ui.palette.open;
+  const from: FocusRegion = inPalette ? ui.palette.returnTo : ui.focus;
+  const open = toggleBottom("current", undefined, { focus: !inPalette });
+  if (inPalette) {
+    const returnTo: FocusRegion = open ? "bottom" : from === "bottom" ? "content" : from;
+    useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo } }));
+  } else if (!open && from === "bottom") {
+    ui.focusContent();
+  }
+  return open;
+}
+
+/**
  * view.panel.expand for the current selection: flips its panel between the split and the
  * full width of the content area. A hidden panel is shown expanded. A no-op while the
  * settings or usage page is up (it hides the panel) and with nothing selected.
@@ -130,7 +175,8 @@ export function expandPanelCommand(): boolean {
   const ui = useUiStore.getState();
   const inPalette = ui.palette.open;
   const from: FocusRegion = inPalette ? ui.palette.returnTo : ui.focus;
-  const fromContent = from === "terminal" || from === "content";
+  // Expanding hides the content column, the bottom panel with it.
+  const fromContent = from === "terminal" || from === "content" || from === "bottom";
   const expanded = expandPanel("current", getPanel().open ? undefined : true, { focus: fromContent && !inPalette });
   if (inPalette && expanded && fromContent) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
   return expanded;

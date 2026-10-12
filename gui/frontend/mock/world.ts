@@ -1624,11 +1624,12 @@ export class World {
         cmd: { name: "terminal.new", title: "New Terminal", category: "Terminal", description: "Start a shell that belongs to the active thread, else to the active worktree", keybindings: ["cmd+t"], args: [{ name: "cwd", type: ArgType.PATH, required: false, description: "Working directory" }] },
         // Like the daemon: a thread, or a worktree to own the shell (never the dashboard or a page).
         when: (ctx) => Boolean(ctx?.activeSessionId || ctx?.activeWorktreePath),
+        // Like the daemon: no focus intent; the result's JSON is the new terminal (the GUI
+        // focuses it in the bottom panel by its id).
         run: (ctx, args) => {
           const owner = this.shellOwner(ctx, args.cwd ?? "");
           const t = this.create(["/bin/zsh"], owner.cwd, owner.labels, "shell");
-          this.intents.publish({ intent: { case: "focusTerminal", value: { terminalId: t.id } } });
-          return `Started zsh in ${owner.cwd}`;
+          return Promise.resolve({ message: `created terminal ${t.id}`, resultJson: JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels }) });
         },
       },
       {
@@ -1831,14 +1832,15 @@ export class World {
         },
       },
       {
-        cmd: { name: "terminal.close", title: "Close Terminal", category: "Terminal", description: "Terminate the terminal's process and remove it once it has exited", keybindings: [], args: [] },
+        // --id defaults to the active terminal, like the daemon (a context-bound arg, so not required in List).
+        cmd: { name: "terminal.close", title: "Close Terminal", category: "Terminal", description: "Terminate the terminal's process and remove it once it has exited", keybindings: [], args: [{ name: "id", type: ArgType.STRING, required: false, description: "Terminal id (default: the active terminal)" }] },
         // Only shells: with a thread selected the active terminal is its Claude terminal.
         when: (ctx) => activeTerm(ctx)?.labels[LABEL_KIND] === KIND_SHELL,
-        run: (ctx) => {
-          const t = activeTerm(ctx);
-          if (!t) throw new CommandError("unavailable", "no active terminal");
-          this.close(t.id);
-          return "";
+        run: (ctx, args) => {
+          const id = args.id || activeTerm(ctx)?.id;
+          if (!id) throw new CommandError("unavailable", "no active terminal");
+          this.close(id);
+          return `closed terminal ${id}`;
         },
       },
       {

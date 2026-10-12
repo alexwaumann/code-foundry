@@ -111,3 +111,17 @@ export async function resizeTerminal(id: string, cols: number, rows: number, con
   const c = await conn.client(TerminalService);
   await c.resize({ id, cols, rows });
 }
+
+/**
+ * The terminal id in a command result's JSON (terminal.new returns the created Terminal,
+ * protojson), or null when there is none.
+ */
+export function terminalIdFromResult(resultJson: string): string | null {
+  if (!resultJson) return null;
+  try {
+    const v = JSON.parse(resultJson) as { id?: unknown };
+    return typeof v.id === "string" && v.id ? v.id : null;
+  } catch {
+    return null;
+  }
+}

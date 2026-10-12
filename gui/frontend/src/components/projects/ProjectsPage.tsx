@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Folder, FolderGit2, FolderPlus, Layers, PanelRight, Sparkles, SquareTerminal, Trash2, Unlink } from "lucide-react";
+import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { PanelToggle } from "@/components/panel/PanelToggle";
 import { SectionTitle } from "@/components/prs/PrBits";
 import { RowList } from "@/components/prs/RowList";
@@ -215,7 +216,10 @@ export function ProjectsPage() {
             Add project
           </Button>
         </span>
-        <PanelToggle className="-mr-2" />
+        <span className="-mr-2 flex items-center">
+          <BottomToggle />
+          <PanelToggle />
+        </span>
       </PaneHeader>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         <NavProvider value={nav.ctx}>

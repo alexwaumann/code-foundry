@@ -10,7 +10,8 @@ import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
-import { expandPanelCommand, linkedPrsPanelCommand, newPanelTabCommand, showView, toggleHelp, togglePanelCommand, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
+import { markTerminalNewFromHere } from "@/stores/bottomActions";
+import { expandPanelCommand, linkedPrsPanelCommand, newPanelTabCommand, showView, toggleBottomCommand, toggleHelp, togglePanelCommand, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -237,6 +238,17 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   "view.panel.worktree": () => {
     worktreePanelCommand();
     return true;
+  },
+  // And for the bottom terminal panel: this window's panel for its selection.
+  "view.bottom.toggle": () => {
+    toggleBottomCommand();
+    return true;
+  },
+  // Not a presentation: terminal.new still runs as usual (false). Started here (cmd+t,
+  // the palette, a button), the shell it starts takes focus in the bottom panel.
+  "terminal.new": () => {
+    markTerminalNewFromHere();
+    return false;
   },
   // Like cmd+k: opens this window's palette without a round trip. Deferred so that
   // picking it inside the palette (which closes after a presenter runs) reopens it.

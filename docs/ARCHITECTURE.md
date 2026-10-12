@@ -293,12 +293,13 @@ from the pull request (docs/notes/pr-thread-commands.md).
 * State discipline: sliced Zustand stores, one per daemon service. Streams update slices;
   components subscribe to the narrowest selector. Lists are virtualized. No global
   re-render on daemon events.
-* Connection budget: the GUI holds exactly one `EventService.Watch` stream plus one
-  `TerminalService.Attach` (the visible terminal). Everything else is unary, except a
+* Connection budget: the GUI holds exactly one `EventService.Watch` stream plus at most
+  two `TerminalService.Attach` streams: the content pane's terminal and the bottom panel's
+  active tab, each only while it is visible. Everything else is unary, except a
   `RepoService.Clone` stream while the Add Project dialog clones a repository. This keeps
   the browser's six HTTP/1.1 connections per origin mostly free.
-* Only the visible terminal is attached. Switching sessions detaches the old stream and
-  attaches the new one. Background sessions cost nothing in the frontend. Attaching is
+* Only visible terminals are attached. Switching sessions (or bottom panel tabs) detaches
+  the old stream and attaches the new one. Background sessions cost nothing in the frontend. Attaching is
   also how the daemon knows a session is being looked at: while a session's terminal has
   an Attach subscriber, finished turns count as seen (see
   `docs/notes/phase2-integration.md`).
@@ -310,7 +311,9 @@ from the pull request (docs/notes/pr-thread-commands.md).
   `docs/notes/workspaces-4-sidebar.md` and `docs/notes/thread-list.md`), content (terminal, the Pull Requests page, the
   Projects page with each project's worktrees and each workspace's members, or the
   composer; a worktree's overview is a side panel tab, not a page), command palette
-  overlay. Strip and sidebar sit on one background (the sheet);
+  overlay. Under the content pane, a thread and the Projects page each have a bottom
+  terminal panel (cmd+j, `view.bottom.toggle`): tabs for the shells it owns, derived from
+  the terminal list by the owner labels (`docs/notes/bottom-panel-2-gui.md`). Strip and sidebar sit on one background (the sheet);
   the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Each
   selection can open a side panel right of the content: a second pane with tabs whose
   bodies come from the surface registry (`src/surfaces`, `docs/notes/side-panel.md`):

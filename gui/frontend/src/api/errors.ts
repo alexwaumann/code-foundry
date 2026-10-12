@@ -30,3 +30,8 @@ export function isOutdatedDaemon(err: unknown): boolean {
 export function orOutdatedDaemon(err: unknown): unknown {
   return isOutdatedDaemon(err) && !(err instanceof OutdatedDaemonError) ? new OutdatedDaemonError(err) : err;
 }
+
+/** True for a Connect NotFound (e.g. closing a terminal the daemon already removed). */
+export function isNotFound(err: unknown): boolean {
+  return err instanceof ConnectError && err.code === Code.NotFound;
+}
