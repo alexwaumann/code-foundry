@@ -177,3 +177,16 @@ export function modeHint(permissionMode: string, toolName: string): string {
       return "";
   }
 }
+
+/**
+ * Who asked, for a request a subagent raised: its Agent (Task) call's subagent_type and
+ * description ("code-reviewer · Review the fingerprint change"), either alone when the
+ * other is missing, "subagent" when the call is not known (not loaded, or input not
+ * parsed yet).
+ */
+export function askingAgentLabel(agentInputJson: string): string {
+  const input = parseObject(agentInputJson);
+  const kind = str(input, "subagent_type").trim();
+  const what = str(input, "description").trim();
+  return [kind, what].filter(Boolean).join(" · ") || "subagent";
+}

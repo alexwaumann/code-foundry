@@ -72,8 +72,8 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
   "base64",
 );
 
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi"];
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent"];
 
 const ANSWER_HEAD = `## Fixed: stale badge after a force-push
 
@@ -496,7 +496,8 @@ export class MockThreads {
     };
     const tool = (name: string, input: object, value: { output?: string; isError?: boolean; resultJson?: string; status?: ToolCallStatus }, over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
       const toolUseId = `toolu_${name.toLowerCase()}_${String(l.nextOrdinal)}`;
-      return it({ case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: ToolCallStatus.DONE, ...value } }, over);
+      // A tool call's item id is its tool_use id, like the daemon's.
+      return it({ case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: ToolCallStatus.DONE, ...value } }, { id: toolUseId, ...over });
     };
     const cwd = this.world.worktreeOf(id);
     const p = (rel: string) => `${cwd}/${rel}`;
@@ -666,6 +667,37 @@ export class MockThreads {
       ];
       l.seq = l.items.length;
       this.world.setStatus(id, SessionStatus.NEEDS_ATTENTION, "permission: Edit poller.go");
+      this.source({ event: { case: "pending", value: { sessionId: id, seq: BigInt(l.seq), pending: l.pending } } });
+      return;
+    }
+    if (state === "subagent") {
+      // A subagent's Write waits for permission: the request carries its agent_id, its
+      // tool call sits under the Agent call (parent_tool_use_id).
+      text("All 412 tests pass. A helper writes the changelog entry before I push.", { at: ago(3) });
+      const agent = tool("Agent", { description: "Write the changelog entry", subagent_type: "general-purpose", prompt: "Add a CHANGELOG.md entry for the force-push fix." }, { status: ToolCallStatus.RUNNING, output: "" }, { at: ago(2, 59) });
+      const agentUse = agent.payload?.case === "toolCall" ? (agent.payload.value.toolUseId ?? "") : "";
+      const write = tool("Write", { file_path: p("CHANGELOG.md"), content: "## Unreleased\n\n- The PR badge refreshes after a force-push.\n" }, { status: ToolCallStatus.RUNNING }, { at: ago(2, 58), parentToolUseId: agentUse });
+      const writeCall = write.payload?.case === "toolCall" ? write.payload.value : undefined;
+      const perm = it(
+        {
+          case: "permission",
+          value: {
+            requestId: "req-sub",
+            toolName: "Write",
+            displayName: "Write",
+            toolUseId: writeCall?.toolUseId ?? "",
+            agentId: "a69def54e0124efca",
+            inputJson: writeCall?.inputJson ?? "",
+            description: "CHANGELOG.md",
+            suggestionsJson: JSON.stringify([{ type: "setMode", mode: "acceptEdits", destination: "session" }]),
+            state: ThreadRequestState.PENDING,
+          },
+        },
+        { at: ago(2, 57) },
+      );
+      l.pending = [{ requestId: "req-sub", itemId: perm.id, question: false, toolName: "Write", summary: "Write CHANGELOG.md" }];
+      l.seq = l.items.length;
+      this.world.setStatus(id, SessionStatus.NEEDS_ATTENTION, "permission: Write CHANGELOG.md");
       this.source({ event: { case: "pending", value: { sessionId: id, seq: BigInt(l.seq), pending: l.pending } } });
       return;
     }
