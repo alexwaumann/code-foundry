@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/alexwaumann/code-foundry/internal/model"
 )
 
 // fakeClaude writes an executable shell script standing in for claude into a temp
@@ -60,8 +62,8 @@ func fakeCalls(t *testing.T, dir string) [][]string {
 }
 
 func TestClaudeNamer(t *testing.T) {
-	hardened := append(slices.Clone(namingArgs), "--", "<prompt>")
-	minimal := append(slices.Clone(minimalNamingArgs), "--", "<prompt>")
+	hardened := append(namingArgs("opus", false), "--", "<prompt>")
+	minimal := append(namingArgs("opus", true), "--", "<prompt>")
 	tests := []struct {
 		name string
 		body string
@@ -110,7 +112,7 @@ echo "API Error: 429 rate limited"; exit 1`,
 			bin, dir := fakeClaude(t, tt.body)
 			var logs bytes.Buffer
 			namer := ClaudeNamer(bin, t.TempDir(), slog.New(slog.NewTextHandler(&logs, nil)))
-			ctx := withNamingSession(context.Background(), "s123")
+			ctx := WithNamingModel(withNamingSession(context.Background(), "s123"), "opus")
 			for i := range 2 {
 				name, err := namer(ctx, "-fix the login bug")
 				if tt.wantErr == nil {
@@ -173,8 +175,63 @@ func TestIsFlagRefused(t *testing.T) {
 	}
 }
 
-func TestNamingCommand(t *testing.T) {
-	if got, want := namingCommand(namingArgs), `-p --model haiku --no-session-persistence --safe-mode --tools "" -- <prompt>`; got != want {
-		t.Errorf("namingCommand = %q, want %q", got, want)
+func TestNamingArgs(t *testing.T) {
+	tests := []struct {
+		name    string
+		model   string
+		minimal bool
+		want    string
+	}{
+		{"hardened", "opus", false, `-p --model opus --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>`},
+		{"minimal", "opus", true, `-p --model opus --effort low --no-session-persistence -- <prompt>`},
+		{"default model, hardened", model.NamingDefault, false, `-p --model sonnet --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>`},
+		{"default model, minimal", model.NamingDefault, true, `-p --model sonnet --effort low --no-session-persistence -- <prompt>`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := namingCommand(namingArgs(tt.model, tt.minimal)); got != tt.want {
+				t.Errorf("namingCommand = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNamingModel(t *testing.T) {
+	tests := []struct {
+		name string
+		ctx  context.Context
+		want string
+	}{
+		{"unset", context.Background(), "sonnet"},
+		{"empty", WithNamingModel(context.Background(), ""), "sonnet"},
+		{"unknown", WithNamingModel(context.Background(), "gpt-5"), "sonnet"},
+		{"set", WithNamingModel(context.Background(), "haiku"), "haiku"},
+		{"pinned", WithNamingModel(context.Background(), "claude-opus-4-8"), "claude-opus-4-8"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := NamingModel(tt.ctx); got != tt.want {
+				t.Errorf("NamingModel = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestClaudeNamerModel checks the model reaches the command per call: no
+// WithNamingModel names with the default, and a later call can pick another model.
+func TestClaudeNamerModel(t *testing.T) {
+	bin, dir := fakeClaude(t, `echo fix-login-bug`)
+	namer := ClaudeNamer(bin, t.TempDir(), slog.New(slog.DiscardHandler))
+	for _, ctx := range []context.Context{context.Background(), WithNamingModel(context.Background(), "haiku")} {
+		if _, err := namer(ctx, "-fix the login bug"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want := [][]string{
+		append(namingArgs("sonnet", false), "--", "<prompt>"),
+		append(namingArgs("haiku", false), "--", "<prompt>"),
+	}
+	if got := fakeCalls(t, dir); !slices.EqualFunc(got, want, slices.Equal) {
+		t.Errorf("calls =\n%q\nwant\n%q", got, want)
 	}
 }

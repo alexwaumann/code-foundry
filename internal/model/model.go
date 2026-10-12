@@ -35,6 +35,11 @@ var registry = []Model{
 // Default is the model for new threads when the settings do not pick one.
 const Default = "opus"
 
+// NamingDefault is the model of the claude -p call that names a new session when the
+// settings (sessions.naming_model) do not pick one. Sonnet until Haiku 5.5 is
+// available everywhere the app runs.
+const NamingDefault = "sonnet"
+
 // All returns the registry in display order.
 func All() []Model { return slices.Clone(registry) }
 

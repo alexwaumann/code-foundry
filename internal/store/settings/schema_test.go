@@ -43,6 +43,8 @@ func TestFieldParse(t *testing.T) {
 		{key: KeyDefaultModel, in: "opus", want: "opus"},
 		{key: KeyDefaultModel, in: "claude-opus-4-8", want: "claude-opus-4-8"},
 		{key: KeyDefaultModel, in: "gpt-5", err: `want one of "fable", "opus", "claude-opus-4-8", "claude-opus-4-7", "sonnet", "claude-sonnet-5", "claude-sonnet-4-6", "haiku", got "gpt-5"`},
+		{key: KeyNamingModel, in: "haiku", want: "haiku"},
+		{key: KeyNamingModel, in: "claude-opus-4-8", want: "claude-opus-4-8"},
 		{key: KeyTheme, in: "Dark", err: `want one of "system", "dark", "light", got "Dark"`},
 		{key: KeyBackdrop, in: "none", want: "none"},
 		{key: KeyBackdrop, in: "aurora", err: `want one of "forest", "none", got "aurora"`},
@@ -113,6 +115,8 @@ func TestEnumLabels(t *testing.T) {
 		{KeyDefaultModel, "claude-opus-4-8", "Opus 4.8"},
 		{KeyDefaultModel, "claude-sonnet-4-6", "Sonnet 4.6"},
 		{KeyDefaultModel, "haiku", "Haiku"},
+		{KeyNamingModel, "sonnet", "Sonnet"},
+		{KeyNamingModel, "haiku", "Haiku"},
 		// Fields without labels show their values as they are.
 		{KeyTheme, "dark", ""},
 	}
@@ -134,6 +138,26 @@ func TestEnumLabels(t *testing.T) {
 	}
 	if f := field(t, KeyDefaultModel); f.Default != "opus" {
 		t.Errorf("default model = %q, want opus", f.Default)
+	}
+}
+
+func TestNamingModelField(t *testing.T) {
+	f := field(t, KeyNamingModel)
+	if f.Default != "sonnet" || Defaults().Sessions.NamingModel != "sonnet" {
+		t.Errorf("default = %q, Defaults() = %q; want sonnet", f.Default, Defaults().Sessions.NamingModel)
+	}
+	if f.Group != GroupSessions || f.Restart || !slices.Equal(f.Enum, field(t, KeyDefaultModel).Enum) ||
+		!slices.Equal(f.EnumLabels, field(t, KeyDefaultModel).EnumLabels) {
+		t.Errorf("field = %+v, want a live Sessions enum over the model registry", f)
+	}
+	// Directly after "Name sessions automatically".
+	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyAutoName }); staticFields[i+1].Key != KeyNamingModel {
+		t.Errorf("field after %s = %s", KeyAutoName, staticFields[i+1].Key)
+	}
+	for _, in := range []string{"", "gpt-5", "Sonnet"} {
+		if _, err := f.parse(in); err == nil || !strings.HasPrefix(err.Error(), "want one of ") {
+			t.Errorf("parse(%q) err = %v, want an enum error", in, err)
+		}
 	}
 }
 
