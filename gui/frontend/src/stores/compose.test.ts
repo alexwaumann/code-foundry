@@ -81,11 +81,11 @@ describe("switchDraftTarget", () => {
   });
 
   it("moves the draft (images kept, not revoked), deletes the old key, shows the new composer focused", async () => {
-    updateDraft("repo-cf", { text: "hi", attachments: [image("a1")], model: "haiku", alsoIn: ["repo-gp", "repo-sk"], base: "origin/dev" });
+    updateDraft("repo-cf", { text: "hi", attachments: [image("a1")], model: "haiku", render: "rendered", alsoIn: ["repo-gp", "repo-sk"], base: "origin/dev" });
     const seq = useUiStore.getState().composerFocusSeq;
     await expect(switchDraftTarget(cf, gp)).resolves.toBe(true);
     expect(useComposeStore.getState().drafts["repo-cf"]).toBeUndefined();
-    expect(getDraft("repo-gp")).toMatchObject({ text: "hi", model: "haiku", alsoIn: ["repo-sk"], base: null, worktree: { kind: "new" } });
+    expect(getDraft("repo-gp")).toMatchObject({ text: "hi", model: "haiku", render: "rendered", alsoIn: ["repo-sk"], base: null, worktree: { kind: "new" } });
     expect(getDraft("repo-gp").attachments.map((a) => a.url)).toEqual(["blob:a1"]);
     expect(revoke).not.toHaveBeenCalled();
     expect(useUiStore.getState().selection).toEqual({ kind: "compose", repoId: "repo-gp" });

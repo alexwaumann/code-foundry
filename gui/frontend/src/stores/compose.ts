@@ -29,6 +29,7 @@ import {
   threadArgs,
   threadPlace,
   type ComposePermission,
+  type ComposeRender,
   type ComposeTarget,
   type ThreadPlace,
   type WorktreeChoice,
@@ -63,6 +64,11 @@ export interface Draft {
   model: string | null;
   effort: string | null;
   permission: ComposePermission;
+  /**
+   * Terminal or rendered. null: the settings default (sessions.render), so a draft nobody
+   * picked a view for follows the setting until it is sent.
+   */
+  render: ComposeRender | null;
   worktree: WorktreeChoice;
   /** null: the primary repo's default base ref (ListRefs.default_ref). */
   base: string | null;
@@ -109,6 +115,7 @@ export const emptyDraft: Draft = {
   model: null,
   effort: null,
   permission: DEFAULT_PERMISSION,
+  render: null,
   worktree: { kind: "new" },
   base: null,
   alsoIn: [],
@@ -387,7 +394,7 @@ export function noGitCheckout(r: Pick<RepoView, "git" | "path" | "worktrees"> | 
  * draft is cleared and the new thread selected (the daemon's FocusSession intent usually
  * got there first). On failure the draft stays, with the error.
  */
-export async function sendDraft(target: ComposeTarget, defaults: { model: string; effort: string }): Promise<boolean> {
+export async function sendDraft(target: ComposeTarget, defaults: { model: string; effort: string; render: ComposeRender }): Promise<boolean> {
   const key = draftKey(target);
   const d = getDraft(key);
   if (d.phase !== "idle" || isDraftEmpty(d)) return false;
@@ -417,6 +424,7 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
         model: cur.model ?? defaults.model,
         effort: cur.effort ?? defaults.effort,
         permission: cur.permission,
+        render: cur.render ?? defaults.render,
       },
       sent.map((a) => a.stagedPath ?? ""),
     );

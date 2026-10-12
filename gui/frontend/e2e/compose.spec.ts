@@ -119,6 +119,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
     model: "opus",
     effort: "high",
     permission: "auto",
+    render: "terminal",
     prompt: "Add a dark mode toggle\nin settings",
   });
   // The thread's row names its project and the new worktree's branch; it is the newest thread.
@@ -189,6 +190,8 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
   await expect(page.getByTestId("composer-permission")).toBeFocused();
 
   await page.keyboard.press("Tab");
+  await expect(page.getByTestId("composer-render")).toBeFocused();
+  await page.keyboard.press("Tab");
   await expect(page.getByTestId("composer-attach")).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("composer-worktree")).toBeFocused();
@@ -211,6 +214,7 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
     model: "claude-opus-4-8",
     effort: "xhigh",
     permission: "supervised",
+    render: "terminal",
     prompt: "Refactor the sidebar",
   });
   await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
@@ -244,7 +248,7 @@ test("a failed start keeps the draft editable and shows why", async ({ page }) =
   await input.press("Enter");
   await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
   const last = (await invocations()).at(-1);
-  expect(last?.args).toEqual({ repo: "repo-cf", worktree: CF, model: "opus", effort: "high", permission: "auto", prompt: "Please work" });
+  expect(last?.args).toEqual({ repo: "repo-cf", worktree: CF, model: "opus", effort: "high", permission: "auto", render: "terminal", prompt: "Please work" });
   expect(await sessionCount()).toBe(before + 1);
 });
 
