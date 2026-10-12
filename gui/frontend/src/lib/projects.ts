@@ -4,7 +4,8 @@
  * listed under the workspace only, never under their project (one change stays in one
  * place). Pure; inputs are the repos and workspaces slices' shapes.
  */
-import type { RepoView, WorktreeView } from "@/api/repo";
+import { isRemoteless, type RepoView, type WorktreeView } from "@/api/repo";
+import type { SessionView } from "@/api/session";
 import type { WorkspaceView } from "@/api/workspace";
 import { tildify } from "./path";
 
@@ -194,4 +195,35 @@ export function filterProjects(model: ProjectsModel, query: string, search: Proj
       return hit(w?.name) || hit(w?.branch);
     }),
   };
+}
+
+/**
+ * The setup step a project header offers, by kind: Publish to GitHub for a git
+ * repository without any remote (isRemoteless), Initialize git for a folder without git,
+ * nothing for a GitHub repository or one whose remote is elsewhere.
+ */
+export type ProjectNextStep = "publish" | "init" | null;
+
+export function projectNextStep(r: Pick<RepoView, "git" | "remotes" | "worktrees">): ProjectNextStep {
+  if (!r.git) return "init";
+  return isRemoteless(r) ? "publish" : null;
+}
+
+/** A project's git status counts as stale (amber) in its header's freshness after this. */
+export const PROJECT_STALE_MS = 10 * 60_000;
+
+/** A thread that is not disconnected (starting, connected, closing): what the rows count as live. */
+export function isLiveThread(s: Pick<SessionView, "state">): boolean {
+  return s.state !== "disconnected";
+}
+
+/** How many live threads run in exactly this worktree (a row's thread count). */
+export function liveThreadCount(sessions: { order: readonly string[]; byId: Readonly<Record<string, Pick<SessionView, "state" | "worktreePath"> | undefined>> }, path: string): number {
+  if (!path) return 0;
+  let n = 0;
+  for (const id of sessions.order) {
+    const s = sessions.byId[id];
+    if (s?.worktreePath === path && isLiveThread(s)) n++;
+  }
+  return n;
 }

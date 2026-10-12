@@ -4,16 +4,19 @@ import {
   collapsedProjectSummary,
   collapsedWorkspaceSummary,
   filterProjects,
+  liveThreadCount,
   memberKey,
   pageItems,
   projectKey,
   projectKind,
+  projectNextStep,
   projectsModel,
   projectWorktreeKey,
   repoRef,
   threadAt,
   workspaceKey,
   type ProjectKind,
+  type ProjectNextStep,
   type ProjectsModel,
   type ProjectsRepos,
   type ProjectsSearch,
@@ -200,5 +203,40 @@ describe("threadAt (the workspace surface's member markers)", () => {
     ["no thread (the Projects page)", undefined, API, null],
   ])("%s", (_name, thread, member, want) => {
     expect(threadAt(thread, member)).toBe(want);
+  });
+});
+
+describe("projectNextStep (the header's Publish / Initialize git gate)", () => {
+  const wt = [{ repoId: "r", path: "/p", branch: "main", head: "", detached: false, isMain: true, status: { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null } }];
+  it.each<[string, { git: boolean; remotes: string[]; worktrees: typeof wt }, ProjectNextStep]>([
+    ["git, no remote: publish", { git: true, remotes: [], worktrees: wt }, "publish"],
+    ["git, not reconciled yet (no worktrees): nothing", { git: true, remotes: [], worktrees: [] }, null],
+    ["GitHub remote: nothing", { git: true, remotes: ["origin"], worktrees: wt }, null],
+    ["a remote elsewhere: nothing", { git: true, remotes: ["upstream"], worktrees: wt }, null],
+    ["no git: initialize", { git: false, remotes: [], worktrees: wt }, "init"],
+  ])("%s", (_name, repo, want) => {
+    expect(projectNextStep(repo)).toBe(want);
+  });
+});
+
+describe("liveThreadCount", () => {
+  const sessions = {
+    order: ["a", "b", "c", "d", "e", "f"],
+    byId: {
+      a: { state: "connected" as const, worktreePath: "/src/web" },
+      b: { state: "starting" as const, worktreePath: "/src/web" },
+      c: { state: "disconnected" as const, worktreePath: "/src/web" },
+      d: { state: "closing" as const, worktreePath: "/wt/web/feat" },
+      e: { state: "connected" as const, worktreePath: "/src/web/sub" },
+      f: { state: "unknown" as const, worktreePath: "/wt/web/feat" },
+    },
+  };
+  it.each<[string, number]>([
+    ["/src/web", 2],
+    ["/wt/web/feat", 2],
+    ["/src/api", 0],
+    ["", 0],
+  ])("%s: %i", (path, want) => {
+    expect(liveThreadCount(sessions, path)).toBe(want);
   });
 });

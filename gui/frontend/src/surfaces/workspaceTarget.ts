@@ -6,6 +6,7 @@
  * lib/projects.ts threadAt. Pure: callers feed it the stores' current state.
  */
 import type { SessionView } from "@/api/session";
+import { isLiveThread } from "@/lib/projects";
 import { deriveContext } from "@/stores/context";
 import { makeTab, type Tab } from "@/stores/panel";
 import type { ReposData } from "@/stores/repos";
@@ -95,7 +96,7 @@ export function liveWorkspaceThread(sessions: SessionsData, workspaceId: string)
   let best: SessionView | null = null;
   for (const id of sessions.order) {
     const s = sessions.byId[id];
-    if (s?.workspaceId !== workspaceId || s.state === "disconnected") continue;
+    if (s?.workspaceId !== workspaceId || !isLiveThread(s)) continue;
     const at = s.lastActivityAtMs ?? s.createdAtMs ?? 0;
     const bestAt = best ? (best.lastActivityAtMs ?? best.createdAtMs ?? 0) : -1;
     if (at > bestAt) best = s;
