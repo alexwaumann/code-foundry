@@ -54,6 +54,18 @@ describe("compose drafts", () => {
     expect(getDraft("repo-cf")).toMatchObject({ alsoIn: [], text: `Use and ${sk("repo-cf")} on then ${sk("")}` });
   });
 
+  it("a view pick belongs to its draft: other drafts, Also in and a new primary leave it", () => {
+    expect(getDraft("repo-cf").render).toBeNull(); // null: the sessions.render setting
+    updateDraft("repo-cf", { render: "rendered" });
+    expect(getDraft("repo-gp").render).toBeNull();
+    expect(getDraft("ws:w-1").render).toBeNull();
+    addAlsoIn("repo-cf", "repo-gp");
+    setPrimary("repo-cf", "repo-gp");
+    removeAlsoIn("repo-cf", "repo-gp");
+    expect(getDraft("repo-cf").render).toBe("rendered");
+    expect(getDraft("repo-gp").render).toBeNull();
+  });
+
   it("a new primary resets the base (its refs differ)", () => {
     updateDraft("ws:w-1", { base: "origin/feat" });
     setPrimary("ws:w-1", "repo-gp");

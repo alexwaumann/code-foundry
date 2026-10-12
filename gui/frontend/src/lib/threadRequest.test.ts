@@ -117,7 +117,11 @@ describe("askingAgentLabel", () => {
     [JSON.stringify({ description: "  ", subagent_type: "" }), "subagent"],
     ['{"description": "partial', "subagent"],
     ["", "subagent"],
+    [JSON.stringify({ subagent_type: "general-purpose", description: "Check\n  the   logs" }), "general-purpose · Check the logs"],
+    [JSON.stringify({ subagent_type: "general-purpose", description: "word ".repeat(40) }), `general-purpose · ${"word ".repeat(16)}w…`],
   ])("%s → %s", (json, want) => {
-    expect(askingAgentLabel(json)).toBe(want);
+    const got = askingAgentLabel(json);
+    expect(got).toBe(want);
+    expect(got.length).toBeLessThanOrEqual(100);
   });
 });

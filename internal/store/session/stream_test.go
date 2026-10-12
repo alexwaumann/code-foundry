@@ -730,3 +730,31 @@ func TestRenderedPermissionFollowsItsToolCall(t *testing.T) {
 		t.Errorf("kinds %v, want %v\n%s", kinds(items), want, describeItems(items))
 	}
 }
+
+// TestRenderedConnectsBusyWithItsFirstPrompt: the update that says connected already
+// says busy and the first message is an item by then, so the GUI never sees a connected
+// thread with nothing to show between "Starting Claude…" and "Working".
+func TestRenderedConnectsBusyWithItsFirstPrompt(t *testing.T) {
+	re := newRenderedEnv(t, "text-table")
+	s := re.create(CreateOptions{InitialPrompt: "a table please"})
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case ev := <-re.events.C():
+			u, ok := ev.(Updated)
+			if !ok || u.Session.ID != s.ID || u.Session.State != StateConnected {
+				continue
+			}
+			if u.Session.Status != StatusBusy {
+				t.Fatalf("first connected update: status %v %q", u.Session.Status, u.Session.StatusReason)
+			}
+			items, err := re.m.Items(re.ctx(), s.ID)
+			if err != nil || len(items.Items) == 0 || items.Items[0].Kind != KindUserMessage {
+				t.Fatalf("items when connected: %+v %v", items, err)
+			}
+			return
+		case <-deadline:
+			t.Fatal("never connected")
+		}
+	}
+}

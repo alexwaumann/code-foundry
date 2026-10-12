@@ -135,19 +135,26 @@ function PromptDiff({ r }: { r: ThreadRequestView }) {
   );
 }
 
-/** A pending permission prompt: what Claude wants to do and why it asks; Allow / Allow for session / Deny (with an optional reason). */
 /** Which subagent asked: its Agent call's type and description ("subagent" until that call is known). */
 function AskingAgent({ toolUseId }: { toolUseId: string }) {
   const { sessionId } = useThreadCtx();
   const label = askingAgentLabel(useAgentInputOf(sessionId, toolUseId));
-  // The title is for a label cut short by a narrow pane.
   return (
-    <span className="chip muted agent" title={label} data-testid="thread-asking-agent">
+    <span
+      className="chip muted agent"
+      data-testid="thread-asking-agent"
+      onMouseEnter={(e) => {
+        // A tooltip only for a label a narrow pane cut short.
+        const el = e.currentTarget;
+        el.title = el.scrollWidth > el.clientWidth ? label : "";
+      }}
+    >
       {label}
     </span>
   );
 }
 
+/** A pending permission prompt: what Claude wants to do and why it asks; Allow / Allow for session / Deny (with an optional reason). */
 function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
   const { sessionId, cwd } = useThreadCtx();
   const permissionMode = useSessionsStore((s) => s.byId[sessionId]?.permissionMode ?? "");

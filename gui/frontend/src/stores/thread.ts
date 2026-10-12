@@ -323,7 +323,6 @@ export function useTimelineKeys(sessionId: string): string[] {
   );
 }
 
-/** Whether the visible thread's snapshot arrived. */
 /**
  * The input JSON of the Agent call a subagent's tool call (by tool_use id) runs under;
  * "" for the thread's own calls and calls not seen. A tool call's item id is its
@@ -338,6 +337,7 @@ export function useAgentInputOf(sessionId: string, toolUseId: string): string {
   });
 }
 
+/** Whether the visible thread's snapshot arrived. */
 export function useThreadLoaded(sessionId: string): boolean {
   return useThreadStore((s) => sessionId in s.logs);
 }

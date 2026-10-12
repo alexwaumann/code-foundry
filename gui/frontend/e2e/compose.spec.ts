@@ -191,6 +191,16 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
 
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("composer-render")).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("composer-render-list").getByRole("option")).toHaveText([/^Terminal/, /^Rendered/]);
+  await page.keyboard.press("ArrowDown"); // terminal -> rendered
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("composer-render")).toHaveText("Rendered");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("ArrowUp"); // back to terminal: the thread below starts as one
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("composer-render")).toHaveText("Terminal");
+  await expect(page.getByTestId("composer-render")).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("composer-attach")).toBeFocused();
   await page.keyboard.press("Tab");

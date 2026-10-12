@@ -180,13 +180,17 @@ export function modeHint(permissionMode: string, toolName: string): string {
 
 /**
  * Who asked, for a request a subagent raised: its Agent (Task) call's subagent_type and
- * description ("code-reviewer · Review the fingerprint change"), either alone when the
- * other is missing, "subagent" when the call is not known (not loaded, or input not
- * parsed yet).
+ * description ("code-reviewer · Review the fingerprint change") on one line, either alone
+ * when the other is missing, "subagent" when the call is not known (not loaded, or input
+ * not parsed yet), cut at 100 characters.
  */
 export function askingAgentLabel(agentInputJson: string): string {
   const input = parseObject(agentInputJson);
-  const kind = str(input, "subagent_type").trim();
-  const what = str(input, "description").trim();
-  return [kind, what].filter(Boolean).join(" · ") || "subagent";
+  const oneLine = (key: string) => str(input, key).replace(/\s+/g, " ").trim();
+  const label = [oneLine("subagent_type"), oneLine("description")].filter(Boolean).join(" · ") || "subagent";
+  // The chip ellipsizes in a narrow pane and its tooltip has the rest; a description is
+  // meant to be a few words, so a runaway one is cut here.
+  return label.length > AGENT_LABEL_MAX ? `${label.slice(0, AGENT_LABEL_MAX - 1).trimEnd()}…` : label;
 }
+
+const AGENT_LABEL_MAX = 100;
