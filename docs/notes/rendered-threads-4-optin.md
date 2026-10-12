@@ -138,3 +138,72 @@ run another model; `<synthetic>` error messages are skipped); empty for a turn w
 Needed: `turn_cost_usd` / `model` and `session.new`'s help are daemon changes. An older
 daemon still works with this GUI (its footers show no cost or model; the composer's `render` arg exists
 since PR 1).
+
+## Review (2026-10-12)
+
+Independent review of the PR 4 diff (`origin/t3code/rendered-threads-3-interaction...`).
+
+Fixed:
+
+* **Cost per turn could be wrong by the whole conversation.** Probed (2.1.296, haiku, a
+  trusted scratch worktree): Claude restores totals from the resumed transcript's last
+  `cost-state` record (written on a clean exit), including on `--fork-session`, and a
+  killed process writes none. The output-token heuristic therefore gave a fork's first
+  turn the parent's whole cost (the fork's log is empty, so no previous totals) and, after
+  a killed process, judged the stale restore "fresh" and gave the turn the conversation's
+  cost. Now the daemon reads that record at spawn (`restoredTotals`) and measures the first
+  turn from it; a result that does not fit, an unreadable transcript, an interrupt with no
+  total or a total going down within a process give an unset (unknown) cost, never a
+  negative or a guess. `TestTurnCosts` (live totals: fresh process, two turns in a row,
+  resume restoring, resume after a kill, fork, resume with a fresh total, zero output
+  tokens, no modelUsage, inconsistent restores, unreadable transcript, interrupts, a drop),
+  `TestTurnCostsBounded` (2000 random sequences: a known cost is in [0, total]),
+  `TestRestoredTotals` (captured `cost-state` line; the last one wins; a user line that
+  mentions it is skipped). Live, scratch daemon on `~/cf-rt4r-scratch` with haiku:
+  turns $0.0021, $0.0019; effort restart $0.0006 ($0.0046 so far); claude killed, reconnect,
+  $0.0003 ($0.0043 so far: Claude restored the older record; the old code said $0.0043);
+  fork, $0.0003 ($0.0043 so far: the parent's restored; the old code said $0.0043).
+* **Footer fallback.** A turn end without `turn_cost_usd` used to show the subtraction of
+  running totals (wrong across any restart) and the thread's current model. Now it shows
+  neither; `turnCostLabel` ("$1.12", "<$0.01", "" for 0/negative/NaN/null) is in
+  `lib/threadTimeline.ts` with tests, `prevEnd` and `usePreviousCost` are gone.
+* **Model label.** `canonicalModelName` takes any `claude-<family>-<major>[-<minor>]` id
+  and the family's label from the registry (a future family needs no regex edit).
+* **"No messages yet." flashed on every new rendered thread.** The Connected update went
+  out before the first prompt was sent and the busy status followed a debounce later, so
+  the GUI saw a connected thread neither starting nor working for ~100 ms. The first
+  prompt now goes out first and the Connected update carries the busy status
+  (`TestRenderedConnectsBusyWithItsFirstPrompt`, fails on the old order).
+* **cmd+t's shell lost the keyboard (the WebKit e2e flake).** Not a test race: xterm
+  focuses its textarea on every keyup except shift/ctrl/alt's, and a late keyup of `t` or
+  cmd landed on the thread's terminal after the shell took focus. `terminal/xterm.ts`
+  returns false for the keyup of an app chord or of cmd; the e2e no longer waits for the
+  thread's terminal first (100 + 40 WebKit, 40 Chromium repeats green; 1 in 6 to 30 failed
+  before). See `flaky-tests.md`. `TestConnRequestCorrelation`: confirmed a test-only race
+  (one channel for two callers); 50 `-race` repeats green.
+* **Composer pickers lost arrows after a quick reopen.** Reopened with Enter during the
+  close animation, Radix kept the content and did not autofocus it: the keyboard stayed on
+  the trigger and arrows did nothing; Escape then dropped focus on the body. The picker now
+  focuses its list on open when it does not have it and returns focus to the trigger on
+  close unless something else took it. Found by the new keyboard e2e for the View picker.
+* **Subagent chip**: always had a `title` repeating the visible label (tooltip rule); now
+  only when the chip is cut short. The label is one line (whitespace collapsed) and capped
+  at 100 characters.
+* Tests added: a view pick stays with its draft (other drafts, Also in, a new primary);
+  View picker by keyboard in the Tab-order e2e. Two orphaned doc comments moved back.
+
+Checked, no change: the picker follows `sessions.render` until picked and the pick moves
+with the draft; `session.new` always gets `render`; pr.* Creates leave Render unset (whole
+request compared in `TestPullRequestSessionCommands`) and the daemon reads the setting per
+call (`TestSettingsRender`, `TestDefaultRender`; live: a CLI thread without `--render`
+came up rendered with the setting at rendered); fork keeps the parent's view
+(`TestRenderedControls`); the terminal spawn is untouched (`TestLaunchArgv` unchanged since
+before the feature); a subagent's parent arriving after the prompt re-renders the chip (a
+store selector); "Starting Claude…", empty fork, crash-before-handshake and closed states
+(e2e); the header's "rendered" is plain text and the sidebar is unchanged.
+
+Not fixed: the first ArrowUp/ArrowDown pressed on a picker's trigger while it opens still
+only opens it (by design of the trigger's key handler).
+
+Screenshots (mock, WebKit): `/tmp/cf-rt4-shots/review-composer-view-{dark,light}.png`,
+`/tmp/cf-rt4-shots/review-settings-thread-view-{dark,light}.png`.
