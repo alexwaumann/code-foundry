@@ -78,7 +78,6 @@ func TestConnRequestCorrelation(t *testing.T) {
 	f := newFakeCLI(t, Options{})
 	ctx := context.Background()
 	type res struct {
-		raw json.RawMessage
 		err error
 	}
 	got := make(chan res, 2)

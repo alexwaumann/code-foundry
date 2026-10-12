@@ -50,11 +50,6 @@ func (w itemWriter) change(id string, fn func(*Item)) (Item, bool) {
 
 func (w itemWriter) delta(id string, f DeltaField, text string) { w.log.delta(id, f, text) }
 
-type blockKey struct {
-	msg   string
-	index int
-}
-
 // projector turns stream events into items. One per runner; not safe for concurrent
 // use.
 type projector struct {

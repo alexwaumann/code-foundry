@@ -58,7 +58,6 @@ type streamState struct {
 	initialized bool
 	outputEnded bool
 	exited      bool
-	killStep    int
 	drainTimer  *time.Timer
 }
 
