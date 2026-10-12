@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ArrowUp, Brain, Gauge, Loader2, Paperclip, RotateCcw, ShieldCheck } from "lucide-react";
 import { ATTACHMENT_MIME_TYPES } from "@/api/session";
@@ -26,6 +26,10 @@ import { useWorkspacesStore } from "@/stores/workspaces";
 import { PendingPrompts, type PromptKeys } from "./PendingPrompt";
 
 const TRIGGERS: readonly TriggerChar[] = ["/", "@"];
+
+function hasFocusWithin(el: HTMLElement | null): boolean {
+  return !!el && el.contains(document.activeElement);
+}
 const EFFORT_GROUPS = [{ options: EFFORT_CHOICES.map((c) => ({ value: c.value, label: c.label })) }];
 const SEP = "\u0001";
 
@@ -143,6 +147,26 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
     };
   }, [focusSeq, contentFocusSeq, sessionId]);
 
+  // The editor turns read-only while a send is in flight. Chromium drops its focus then;
+  // WebKit keeps the element focused but no longer edits in it, and the editor's focus()
+  // is a no-op on a focused view. So: note whether the composer had focus as the send
+  // began (a layout effect, ahead of the editor's own effect that makes it read-only), and
+  // once the draft is idle again blur and refocus the prompt, unless the user has moved on
+  // to something else meanwhile.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const focusedAtSend = useRef(false);
+  useLayoutEffect(() => {
+    if (sending) focusedAtSend.current ||= hasFocusWithin(rootRef.current);
+  }, [sending]);
+  useEffect(() => {
+    if (sending || !focusedAtSend.current) return;
+    focusedAtSend.current = false;
+    const active = document.activeElement;
+    if (active && active !== document.body && !hasFocusWithin(rootRef.current)) return;
+    if (active instanceof HTMLElement && active !== document.body) active.blur();
+    editorRef.current?.focus();
+  }, [sending]);
+
   if (state === "disconnected") return <Reconnect sessionId={sessionId} />;
 
   const send = () => {
@@ -157,7 +181,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
   const docked = pending.length > 0;
 
   return (
-    <div className="relative">
+    <div className="relative" ref={rootRef}>
       <div
         className={cn("ccard", docked && "docked")}
         data-testid="thread-composer"
@@ -306,6 +330,10 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
             data-testid="thread-send"
             data-phase={phase}
             className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground outline-none transition-all hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-40"
+            // A click leaves the caret in the prompt, so it is focused again after the send.
+            onMouseDown={(e) => {
+              e.preventDefault();
+            }}
             onClick={send}
           >
             {sending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <ArrowUp className="size-4" aria-hidden />}

@@ -65,10 +65,24 @@
 }
 
 /* ---------- column ---------- */
+/* appearance.thread_width (stores/settings.ts sets html[data-thread-width]): the
+   conversation column and the composer. Comfortable is the default. */
+.cf-thread {
+  --thread-col: 1040px;
+  --thread-dock: 960px;
+}
+html[data-thread-width="compact"] .cf-thread {
+  --thread-col: 784px;
+  --thread-dock: 720px;
+}
+html[data-thread-width="full"] .cf-thread {
+  --thread-col: none;
+  --thread-dock: none;
+}
 .cf-thread .col {
   margin: 0 auto;
   width: 100%;
-  max-width: 784px;
+  max-width: var(--thread-col);
   padding: 0 40px;
 }
 .cf-thread .selectable {
@@ -94,6 +108,42 @@
   font-weight: 600;
   text-align: left;
 }
+/* Tables (Code.tsx wraps each in .cf-table): a rounded frame that scrolls sideways when
+   the table is wider than the column, inner rules and a muted header. Stronger than the
+   PR surface's 1px var(--border) grid, which reads as floating text in dark mode. */
+.cf-thread {
+  --t-table-line: color-mix(in oklab, var(--foreground) 14%, transparent);
+  --t-table-head: color-mix(in oklab, var(--foreground) 5%, transparent);
+}
+.cf-thread .cf-markdown .cf-table {
+  margin: 0.75em 0;
+  overflow-x: auto;
+  border: 1px solid var(--t-table-line);
+  border-radius: 8px;
+}
+.cf-thread .cf-markdown .cf-table table {
+  display: table;
+  width: 100%;
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.cf-thread .cf-markdown .cf-table :where(th, td) {
+  border: 0;
+  border-right: 1px solid var(--t-table-line);
+  border-bottom: 1px solid var(--t-table-line);
+  padding: 0.35em 0.75em;
+  vertical-align: top;
+}
+.cf-thread .cf-markdown .cf-table :where(th, td):last-child {
+  border-right: 0;
+}
+.cf-thread .cf-markdown .cf-table table > :last-child > tr:last-child > * {
+  border-bottom: 0;
+}
+.cf-thread .cf-markdown .cf-table th {
+  background: var(--t-table-head);
+}
 /* .cf-markdown breaks anywhere (long paths in prose); in a table cell that would shrink a
    column to a letter's width, so cells break between words only. */
 .cf-thread .cf-markdown :where(th, td) {
@@ -111,7 +161,7 @@
     opacity: 0;
   }
 }
-.cf-thread .cf-streaming > :last-child:not(pre, ul, ol, table)::after,
+.cf-thread .cf-streaming > :last-child:not(pre, ul, ol, table, .cf-table)::after,
 .cf-thread .cf-streaming > pre:last-child > code::after,
 .cf-thread .cf-streaming > :is(ul, ol):last-child > li:last-child::after,
 .cf-thread .cf-streaming:empty::after {
@@ -569,6 +619,60 @@
   animation: cf-shimmer 2s linear infinite;
 }
 
+/* ---------- jump to bottom: floats above the composer while the list is scrolled up ---------- */
+.cf-thread .jump-bottom {
+  position: absolute;
+  left: 50%;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--card) 85%, transparent);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 1px 3px oklch(0 0 0 / 8%);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, 6px);
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease,
+    visibility 0s linear 150ms,
+    color 100ms ease;
+}
+.dark .cf-thread .jump-bottom {
+  box-shadow: 0 1px 3px oklch(0 0 0 / 40%);
+}
+.cf-thread .jump-bottom[data-shown] {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease,
+    visibility 0s,
+    color 100ms ease;
+}
+.cf-thread .jump-bottom:hover {
+  color: var(--foreground);
+}
+.cf-thread .jump-bottom:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+}
+.cf-thread .jump-bottom svg {
+  width: 14px;
+  height: 14px;
+}
+
 /* ---------- the floating composer, prompts docked into it ---------- */
 .cf-thread .dock {
   position: absolute;
@@ -581,7 +685,7 @@
 }
 .cf-thread .dock > * {
   pointer-events: auto;
-  max-width: 720px;
+  max-width: var(--thread-dock);
   margin: 0 auto;
 }
 .cf-thread .ccard {

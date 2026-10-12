@@ -121,6 +121,11 @@ for (const scheme of ["dark", "light"] as const) {
       // The final answer's markdown: GFM table, highlighted Go in the bundled mono.
       const answer = await reveal(page, pane(page).locator('[data-testid="thread-text"][data-final]'));
       await expect(answer.locator("table tr")).toHaveCount(4);
+      // Framed (rounded, header filled) and as wide as the answer.
+      const frame = answer.locator(".cf-table");
+      expect(await frame.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe("8px");
+      expect(await frame.locator("th").first().evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
+      expect(await frame.locator("table").evaluate((el) => Math.abs(el.getBoundingClientRect().width - (el.closest(".cf-markdown")?.getBoundingClientRect().width ?? 0)))).toBeLessThan(3);
       await expect(answer.locator('pre[data-lang="go"] .hljs-keyword').first()).toHaveText("func");
       expect(await answer.locator("pre code").evaluate((el) => getComputedStyle(el).fontFamily)).toContain("JetBrainsMono Nerd Font Mono");
       await shot(page, `thread-timeline-${scheme}`);
@@ -277,6 +282,60 @@ test("a follow-up goes through thread.send with the composer's tags projected; t
   await expect(footers(page).nth(0)).toHaveAttribute("data-folded", "true");
   await expect(footers(page).nth(1)).toHaveAttribute("data-folded", "true");
   await expect(footers(page).nth(2)).not.toHaveAttribute("data-folded", "true");
+  // The prompt has focus again after the send (it is read-only while the send is in flight).
+  await expect(editor).toBeFocused();
+  await page.keyboard.type("x");
+  await expect(page.getByTestId("composer-prompt")).toHaveAttribute("data-value", "x");
+});
+
+test("the prompt is focused again after a send from the Send button", async ({ page }) => {
+  await openThread(page, "idle");
+  const editor = page.getByTestId("thread-composer").locator('[contenteditable="true"]');
+  await editor.click();
+  await page.keyboard.type("And the tests");
+  await page.getByTestId("thread-send").click();
+  await expect.poll(calls).toContain("send s-r1 And the tests");
+  await expect(page.getByTestId("composer-prompt")).toHaveAttribute("data-value", "");
+  await expect(editor).toBeFocused();
+  // Typing goes straight into the prompt.
+  await page.keyboard.type("next");
+  await expect(page.getByTestId("composer-prompt")).toHaveAttribute("data-value", "next");
+});
+
+test("scrolled up, a Jump to bottom chip floats above the composer; a click scrolls down and re-pins", async ({ page }) => {
+  await openThread(page, "idle");
+  const timeline = page.getByTestId("thread-timeline");
+  const chip = page.getByTestId("thread-jump-bottom");
+  await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+  await expect(chip).toBeHidden();
+
+  const box = await timeline.boundingBox();
+  await page.mouse.move((box?.x ?? 0) + 200, (box?.y ?? 0) + 200);
+  await page.mouse.wheel(0, -600);
+  await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
+  await expect(chip).toBeVisible();
+  await expect(chip).toHaveText("Jump to bottom");
+  // Centred, clear of the composer.
+  await expect
+    .poll(async () => {
+      const c = await chip.boundingBox();
+      const composer = await page.getByTestId("thread-composer").boundingBox();
+      const t = await timeline.boundingBox();
+      return !!c && !!composer && !!t && c.y + c.height <= composer.y && Math.abs(c.x + c.width / 2 - (t.x + t.width / 2)) <= 2;
+    })
+    .toBe(true);
+  await shot(page, "thread-jump-bottom");
+
+  await chip.click();
+  await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+  await expect(chip).toBeHidden();
+  // Pinned again: a new turn keeps the list at the bottom.
+  await page.getByTestId("thread-composer").locator('[contenteditable="true"]').click();
+  await page.keyboard.type("more");
+  await page.keyboard.press("Enter");
+  await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.");
+  await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+  await expect(chip).toBeHidden();
 });
 
 test("Interrupt stops the running turn (thread.interrupt)", async ({ page }) => {

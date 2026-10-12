@@ -21,6 +21,7 @@ export const KEYS = {
   fontSize: "appearance.font_size",
   zoom: "appearance.zoom",
   density: "appearance.density",
+  threadWidth: "appearance.thread_width",
   backdrop: "appearance.backdrop",
   scrollback: "sessions.scrollback_lines",
 } as const;
@@ -29,6 +30,14 @@ const KEYBINDING_PREFIX = "keybindings.";
 
 
 export const ROW_HEIGHTS = { compact: 26, comfortable: 30 } as const;
+
+const THREAD_WIDTHS = ["compact", "comfortable", "full"] as const;
+export type ThreadWidth = (typeof THREAD_WIDTHS)[number];
+
+/** appearance.thread_width as a known value; anything else is the default (comfortable). */
+export function threadWidthOf(v: string | undefined): ThreadWidth {
+  return THREAD_WIDTHS.find((w) => w === v) ?? "comfortable";
+}
 
 interface SettingsState {
   /** Null until the first snapshot (or forever against a daemon without settings). */
@@ -67,6 +76,8 @@ export function applySettingsSnapshot(next: SettingsSnapshotView): void {
     if (Number.isFinite(n) && n > 0) useUiStore.getState().setZoom(n);
   }
   document.documentElement.dataset.density = next.values[KEYS.density] === "comfortable" ? "comfortable" : "compact";
+  // thread.css sizes a rendered thread's column and composer from html[data-thread-width].
+  document.documentElement.dataset.threadWidth = threadWidthOf(next.values[KEYS.threadWidth]);
   // CommandService.List reports keybinding overrides; the daemon applied them before
   // publishing, so re-list now.
   if (prev && keybindingsChanged(prev, next)) void refreshCommands();
