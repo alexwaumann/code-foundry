@@ -137,17 +137,23 @@ function ToolLabel({ t, tense, cwd }: { t: ToolCallView; tense: Tense; cwd: stri
   );
 }
 
-/** A tool call: its row, and when open its detail (a subagent: its nested rows and report). */
+/** File edits: while one waits for permission its diff shows, so the user sees what they allow. */
+const EDIT_TOOLS: ReadonlySet<string> = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
+
+/**
+ * A tool call: its row, and when open its detail (a subagent: its nested rows and report).
+ * Open by default: a running subagent, and a file edit waiting for permission.
+ */
 const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type: "tool" }> }) {
   const { sessionId, cwd } = useThreadCtx();
   const item = useThreadItem(sessionId, node.id);
   const perm = useThreadItem(sessionId, node.permissionId);
   const t = item?.kind === "tool" ? item : null;
   const agent = node.name === "Agent" || node.name === "Task";
-  const [open, toggle] = useToggle(node.key, agent && t?.status === "running");
-  if (!t) return null;
   const request = perm?.kind === "permission" ? perm.request : null;
   const waiting = request?.state === "pending";
+  const [open, toggle] = useToggle(node.key, (agent && t?.status === "running") || (waiting && EDIT_TOOLS.has(node.name)));
+  if (!t) return null;
   const tense: Tense = waiting ? "pending" : t.status === "running" ? "running" : "done";
   const s = toolSummary(t, { tense, durationMs: durationOf(t), cwd });
   const denied = request?.state === "denied";
@@ -175,13 +181,13 @@ const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type
         icon={toolIcon(t.name)}
         label={<ToolLabel t={t} tense={tense} cwd={cwd} />}
         meta={meta}
-        expanded={waiting ? undefined : open}
+        expanded={waiting && !EDIT_TOOLS.has(t.name) ? undefined : open}
         onToggle={toggle}
         testId="thread-tool"
         data={{ "data-waiting": waiting ? "true" : undefined }}
       />
       {open &&
-        !waiting &&
+        (!waiting || EDIT_TOOLS.has(t.name)) &&
         (agent ? (
           <div className="children">
             {node.children.map((c) => (
