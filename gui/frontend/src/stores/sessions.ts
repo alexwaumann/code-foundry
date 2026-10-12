@@ -180,6 +180,8 @@ export function useAttentionCount(): number {
 export function sessionOfTerminal(data: SessionsData, terminal: { id: string; labels: Readonly<Record<string, string>> }): SessionView | undefined {
   const labelled = terminal.labels.session;
   if (labelled && data.byId[labelled]) return data.byId[labelled];
+  // A rendered thread has no terminal (terminalId ""): never match it by an empty id.
+  if (!terminal.id) return undefined;
   for (const id of data.order) {
     const s = data.byId[id];
     if (s?.terminalId === terminal.id) return s;

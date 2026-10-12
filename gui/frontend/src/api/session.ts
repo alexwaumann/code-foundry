@@ -2,6 +2,7 @@ import { timestampMs } from "@bufbuild/protobuf/wkt";
 import {
   AgentRunStatus,
   PermissionMode,
+  SessionRender,
   SessionService,
   SessionState,
   SessionStatus,
@@ -22,6 +23,11 @@ export type SessionStateView = "starting" | "connected" | "closing" | "disconnec
 export type SessionStatusView = "busy" | "idle" | "attention" | "error" | "unknown";
 /** claude --permission-mode, as session.new's `permission` arg spells it; "" = Claude's default. */
 export type PermissionModeView = "supervised" | "accept-edits" | "auto" | "";
+/**
+ * How the thread runs, fixed for its life: "terminal" (Claude Code in a PTY, terminalId)
+ * or "rendered" (claude -p; the conversation is ThreadService items, no terminal).
+ */
+export type SessionRenderView = "terminal" | "rendered";
 
 /** View model for a Claude session. Generated types stay inside src/api. */
 export interface SessionView {
@@ -69,6 +75,8 @@ export interface SessionView {
   pendingWorktreePath: string;
   /** The user pinned the thread (session.pin): it sits in the sidebar's Pinned section. */
   pinned: boolean;
+  /** Terminal or rendered (docs/notes/rendered-threads-2-gui.md); an older daemon's are terminal. */
+  render: SessionRenderView;
   /**
    * Pull requests Claude linked to the conversation (its pr-link transcript records), one
    * per URL, in first-seen order; never shrinks. docs/notes/linked-prs.md.
@@ -214,6 +222,7 @@ export function toSessionView(s: Session): SessionView {
     workspaceId: s.workspaceId,
     pendingWorktreePath: s.pendingWorktreePath,
     pinned: s.pinned,
+    render: s.render === SessionRender.RENDERED ? "rendered" : "terminal",
     linkedPullRequests: s.linkedPullRequests.map((l) => ({
       slug: l.slug,
       number: l.number,
@@ -295,6 +304,16 @@ export async function listSessions(conn: DaemonConnection = daemon, signal?: Abo
  */
 export const ATTACHMENT_MIME_TYPES: readonly string[] = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+
+/**
+ * A staged attachment's bytes (a rendered thread's user message shows its images). Rejects
+ * with NotFound once the daemon reaped it.
+ */
+export async function readAttachment(path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<{ data: Uint8Array; mimeType: string }> {
+  const c = await conn.client(SessionService);
+  const res = await c.readAttachment({ path }, { signal });
+  return { data: res.data, mimeType: res.mimeType };
+}
 
 /**
  * Uploads an image for a new thread's first prompt; returns the daemon-side path. A

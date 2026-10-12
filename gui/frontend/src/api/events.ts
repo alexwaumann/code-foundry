@@ -6,6 +6,7 @@ import { toRepoEventView, type RepoEventView } from "./repo";
 import { toSessionEventView, type SessionEventView } from "./session";
 import { toSettingsSnapshotView, type SettingsSnapshotView } from "./settings";
 import { toTerminalEventView, type TerminalEventView } from "./terminal";
+import { toThreadEventView, type ThreadEventView } from "./thread";
 import { toUiIntentView, type UiIntentView } from "./ui";
 import { toUpdateEventView, type UpdateEventView } from "./update";
 import { toWorkspaceEventView, type WorkspaceEventView } from "./workspace";
@@ -21,6 +22,7 @@ export type EventView =
   | { source: "workspace"; event: WorkspaceEventView }
   | { source: "terminal"; event: TerminalEventView }
   | { source: "session"; event: SessionEventView }
+  | { source: "thread"; event: ThreadEventView }
   | { source: "gh"; event: GhEventView }
   | { source: "gitops"; event: GitOpsEventView }
   | { source: "ui"; event: UiIntentView }
@@ -45,6 +47,10 @@ export function toEventView(ev: Event): EventView | null {
     case "session": {
       const v = toSessionEventView(e.value);
       return v && { source: "session", event: v };
+    }
+    case "thread": {
+      const v = toThreadEventView(e.value);
+      return v && { source: "thread", event: v };
     }
     case "gh": {
       const v = toGhEventView(e.value);
