@@ -646,6 +646,7 @@ func (r *runner) finish(fn func(*Session)) {
 			s.WorktreePath, s.RepoID = owed.path, owed.repoID
 		}
 		s.PendingWorktreePath = ""
+		s.EffortPending = false // the next spawn uses the row's effort
 		s.setStatus(st, reason, now)
 		if r.activity.After(s.LastActivityAt) {
 			s.LastActivityAt = r.activity

@@ -31,13 +31,14 @@ func newRenderedEnv(t *testing.T, fixture string) *renderedEnv {
 }
 
 // newRenderedEnvAt is newRenderedEnv replaying the capture at path (absolute).
-func newRenderedEnvAt(t *testing.T, path string) *renderedEnv {
+// env adds variables to the fake's environment (its knobs, fakeclaude_test.go).
+func newRenderedEnvAt(t *testing.T, path string, env ...string) *renderedEnv {
 	t.Helper()
 	dir := t.TempDir()
 	re := &renderedEnv{log: filepath.Join(dir, "stdin.log"), argv: filepath.Join(dir, "argv.json")}
 	re.mutate = func(o *Options) {
 		o.Claude = os.Args[0]
-		o.Env = []string{fakeClaudeEnv + "=" + path, "CF_FAKE_CLAUDE_LOG=" + re.log, "CF_FAKE_CLAUDE_ARGV=" + re.argv}
+		o.Env = append([]string{fakeClaudeEnv + "=" + path, "CF_FAKE_CLAUDE_LOG=" + re.log, "CF_FAKE_CLAUDE_ARGV=" + re.argv}, env...)
 		o.DefaultRender = func() Render { return RenderRendered }
 		o.DisablePreTrust = true
 	}
@@ -381,6 +382,11 @@ func TestRenderedDenyAndSubagent(t *testing.T) {
 		it, err := re.m.Respond(re.ctx(), s.ID, p[0].RequestID, Decision{Message: "The user denied this."})
 		if err != nil || it.Request.State != RequestDenied || it.Request.Decision != DecisionDeny {
 			t.Fatalf("deny: %+v %v", it.Request, err)
+		}
+		ans := re.waitSent("the denial", func(m map[string]any) bool { return m["type"] == "control_response" })
+		res := ans["response"].(map[string]any)["response"].(map[string]any)
+		if res["behavior"] != "deny" || res["message"] != rejectWithReason+"The user denied this." {
+			t.Errorf("deny sent %v", res)
 		}
 		items := re.waitItems(s.ID, "turn end", hasTurnEnd)
 		tool, _ := lastKind(items, KindToolCall)

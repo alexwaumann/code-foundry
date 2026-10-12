@@ -20,12 +20,13 @@ import { reconnectSession } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
 import { useModelChoices } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
-import { interruptThread, sendThreadDraft, setThreadModel, setThreadPermission, threadDraftKey } from "@/stores/threadActions";
+import { interruptThread, sendThreadDraft, setThreadEffort, setThreadModel, setThreadPermission, threadDraftKey } from "@/stores/threadActions";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
-import { PendingPrompt } from "./PendingPrompt";
+import { PendingPrompts, type PromptKeys } from "./PendingPrompt";
 
 const TRIGGERS: readonly TriggerChar[] = ["/", "@"];
+const EFFORT_GROUPS = [{ options: EFFORT_CHOICES.map((c) => ({ value: c.value, label: c.label })) }];
 const SEP = "\u0001";
 
 /** The thread's projects for "/" and "@": its workspace's members, else its project at its worktree. */
@@ -87,11 +88,14 @@ function Reconnect({ sessionId }: { sessionId: string }) {
  * The follow-up composer floating over the bottom of the thread (variant A): the
  * new-thread composer's prompt editor with its "/" skills and "@" files, image
  * attachments, the model / effort / permission pickers, attach, Interrupt while Claude
- * works (the only Interrupt), and send. A pending permission or question docks into the
- * top of the card (the card turns opaque). The draft is the compose store's
+ * works (the only Interrupt), and send. Pending permissions and questions dock into the
+ * top of the card, oldest first (the card turns opaque); while the editor is empty its
+ * digits (and a question's Enter) answer the oldest. Escape in an empty editor interrupts
+ * a running turn when nothing is pending (Claude Code's key; thread.interrupt). An effort
+ * change restarts Claude, after the turn when one runs. The draft is the compose store's
  * `thread:<id>`.
  */
-export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string; pending: ThreadPendingView | null; busy: boolean }) {
+export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string; pending: readonly ThreadPendingView[]; busy: boolean }) {
   const draftKey = threadDraftKey(sessionId);
   const text = useDraft(draftKey, "text");
   const hasAttachments = useDraft(draftKey, "attachments").length > 0;
@@ -102,6 +106,8 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
   const model = useSessionsStore((s) => s.byId[sessionId]?.model ?? "");
   const effort = useSessionsStore((s) => s.byId[sessionId]?.effort ?? "");
   const permission = useSessionsStore((s) => s.byId[sessionId]?.permissionMode ?? "");
+  const effortPending = useSessionsStore((s) => s.byId[sessionId]?.effortPending ?? false);
+  const promptKeys = useRef<PromptKeys | null>(null);
   const modelChoices = useModelChoices();
   const modelGroups = useMemo(() => [{ options: modelChoices }], [modelChoices]);
   const sources = useThreadSources(sessionId);
@@ -147,11 +153,13 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
     editorRef.current?.insertChips(added.map((a) => ({ id: a.id, name: a.file.name })));
   };
   const refocus = () => editorRef.current?.focus();
+  const editorEmpty = text.trim() === "" && !hasAttachments;
+  const docked = pending.length > 0;
 
   return (
     <div className="relative">
       <div
-        className={cn("ccard", pending && "docked")}
+        className={cn("ccard", docked && "docked")}
         data-testid="thread-composer"
         data-dragging={dragging || undefined}
         onDragOver={(e) => {
@@ -171,8 +179,19 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
           attach(files);
         }}
       >
-        {pending && <PendingPrompt pending={pending} />}
-        <div className="col-span-2 flex min-w-0 flex-col">
+        {docked && <PendingPrompts pending={pending} keysRef={promptKeys} refocus={refocus} />}
+        <div
+          className="col-span-2 flex min-w-0 flex-col"
+          onKeyDownCapture={(e) => {
+            // The oldest prompt takes an empty editor's digits and Enter (ahead of the editor).
+            const take = promptKeys.current;
+            if (!take || e.nativeEvent.isComposing || !(e.target instanceof HTMLElement) || !e.target.isContentEditable) return;
+            if (take({ key: e.key, plain: !e.metaKey && !e.ctrlKey && !e.altKey, from: "editor", editorEmpty })) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
+        >
           <Attachments draftKey={draftKey} disabled={sending} refocus={refocus} />
           <AttachmentPreview draftKey={draftKey} />
           <TagMultiProjectContext.Provider value={sources.repoIds.length > 1}>
@@ -186,7 +205,12 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
                 updateDraft(draftKey, { text: t, error: null });
               }}
               onSubmit={send}
-              onEscape={() => false}
+              onEscape={() => {
+                // Claude Code's interrupt key, with nothing to lose: no text, no prompt waiting.
+                if (!busy || !live || docked || !editorEmpty) return false;
+                void interruptThread(sessionId);
+                return true;
+              }}
               onPasteFiles={attach}
               onPreviewChip={(id, el) => openPreview(draftKey, id, el)}
               triggers={TRIGGERS}
@@ -210,16 +234,18 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
             contentClassName="w-44"
             data-testid="thread-model"
           />
-          {/* Display only: Claude has no live effort switch; changing it restarts the process (rendered threads PR 3). */}
+          {/* Claude has no live effort switch: the daemon restarts it with --resume, after the turn when one runs. */}
           <ComposerPicker
             label="Effort"
             icon={Gauge}
             text={effort ? choiceLabel(EFFORT_CHOICES, effort) : "Default"}
             value={effort}
-            groups={[]}
-            status="Changing the effort of a running thread is not available yet."
-            onChange={() => undefined}
-            contentClassName="w-56"
+            groups={EFFORT_GROUPS}
+            onChange={(v) => {
+              if (v !== effort) void setThreadEffort(sessionId, v);
+            }}
+            disabled={!live}
+            contentClassName="w-44"
             data-testid="thread-effort"
           />
           <ComposerPicker
@@ -285,6 +311,11 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
             {sending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <ArrowUp className="size-4" aria-hidden />}
           </button>
         </div>
+        {effortPending && live && (
+          <p className="col-span-2 px-4 pb-2 text-xs text-muted-foreground" role="status" data-testid="thread-effort-pending">
+            {busy ? `Effort changes to ${choiceLabel(EFFORT_CHOICES, effort)} after this turn` : `Restarting Claude with ${choiceLabel(EFFORT_CHOICES, effort)} effort…`}
+          </p>
+        )}
         {(error ?? notice) && (
           <div className="col-span-2 flex flex-col gap-1 px-4 pb-2 text-sm">
             {error && (

@@ -33,7 +33,7 @@ func (m *Manager) liveStream(id string) (*runner, Session, error) {
 
 // call runs cmd on the runner's goroutine.
 func (r *runner) call(ctx context.Context, cmd threadCmd) (Item, error) {
-	cmd.reply = make(chan threadReply, 1)
+	cmd.ctx, cmd.reply = ctx, make(chan threadReply, 1)
 	select {
 	case r.st.cmds <- cmd:
 	case <-r.done:
@@ -108,7 +108,11 @@ func (m *Manager) Interrupt(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	return controlErr(r.st.conn.Interrupt(ctx))
+	conn, err := r.st.connection()
+	if err != nil {
+		return err
+	}
+	return controlErr(conn.Interrupt(ctx))
 }
 
 // SetModel implements Store.
@@ -123,7 +127,11 @@ func (m *Manager) SetModel(ctx context.Context, id, model string) (Session, erro
 	if err != nil {
 		return Session{}, err
 	}
-	if err := controlErr(r.st.conn.SetModel(ctx, model)); err != nil {
+	conn, err := r.st.connection()
+	if err != nil {
+		return Session{}, err
+	}
+	if err := controlErr(conn.SetModel(ctx, model)); err != nil {
 		return Session{}, err
 	}
 	s, _ := m.update(id, true, func(rec *record) { rec.s.Model = model })
@@ -150,7 +158,11 @@ func (m *Manager) SetPermissionMode(ctx context.Context, id string, mode Permiss
 	if err != nil {
 		return Session{}, err
 	}
-	if err := controlErr(r.st.conn.SetPermissionMode(ctx, wire)); err != nil {
+	conn, err := r.st.connection()
+	if err != nil {
+		return Session{}, err
+	}
+	if err := controlErr(conn.SetPermissionMode(ctx, wire)); err != nil {
 		return Session{}, err
 	}
 	s, _ := m.update(id, true, func(rec *record) { rec.s.PermissionMode = mode })

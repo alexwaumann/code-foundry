@@ -3,7 +3,7 @@ import { HeaderActions } from "@/components/terminal/TerminalPane";
 import { SessionIndicator, SessionTitle } from "@/components/session/SessionParts";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useSessionsStore } from "@/stores/sessions";
-import { startThreadWatch, useThreadLoaded, useThreadPending, useThreadStore } from "@/stores/thread";
+import { startThreadWatch, useOpenRequests, useThreadLoaded, useThreadPending, useThreadStore } from "@/stores/thread";
 import { ThreadContext } from "./context";
 import { Timeline } from "./Timeline";
 import { ThreadComposer } from "./ThreadComposer";
@@ -43,17 +43,19 @@ export default function ThreadPane({ sessionId }: { sessionId: string }) {
   const pendingList = useThreadPending(sessionId);
   const loaded = useThreadLoaded(sessionId);
   const watchError = useThreadStore((s) => (s.watch?.sessionId === sessionId && s.watch.status === "retrying" ? s.watch.error : null));
-  const pending = pendingList[0] ?? null;
+  // The prompts to dock: pending requests minus the ones just answered (their answer is on its way).
+  const open = useOpenRequests(sessionId);
+  const waiting = pendingList.length > 0;
   const live = state === "connected" || state === "starting";
   // Claude is on a turn: busy, or waiting on the user mid-turn.
-  const busy = live && (status === "busy" || pending !== null);
-  const working = live && (status === "busy" || state === "starting") && pending === null;
+  const busy = live && (status === "busy" || waiting);
+  const working = live && (status === "busy" || state === "starting") && open.length === 0;
   const dockRef = useRef<HTMLDivElement>(null);
   const dockHeight = useHeight(dockRef);
   const ctx = useMemo(() => ({ sessionId, cwd }), [sessionId, cwd]);
   return (
     <ThreadContext.Provider value={ctx}>
-      <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Thread" data-session-id={sessionId} data-testid="thread-pane" data-region="content">
+      <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col outline-none" tabIndex={-1} aria-label="Thread" data-session-id={sessionId} data-testid="thread-pane" data-region="content">
         <PaneHeader className="gap-3 px-3 text-xs" data-testid="terminal-header">
           <SessionTitle id={sessionId} />
           <span className="ml-auto flex shrink-0 items-center gap-2 text-muted-foreground tabular-nums">
@@ -65,7 +67,7 @@ export default function ThreadPane({ sessionId }: { sessionId: string }) {
           {!loaded && <p className="absolute inset-x-0 top-10 text-center text-sm text-muted-foreground">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
           <Timeline key={sessionId} sessionId={sessionId} working={working} bottomInset={dockHeight} />
           <div className="dock" ref={dockRef}>
-            <ThreadComposer key={sessionId} sessionId={sessionId} pending={pending} busy={busy} />
+            <ThreadComposer key={sessionId} sessionId={sessionId} pending={open} busy={busy} />
           </div>
         </div>
       </section>

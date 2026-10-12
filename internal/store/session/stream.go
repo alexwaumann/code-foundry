@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sync"
 	"syscall"
 	"time"
 
@@ -39,13 +40,18 @@ type outgoing struct {
 }
 
 // streamState is the stdio runner's part of runner. Every field is touched only by
-// the run goroutine, except the channels and proc/conn (set before run starts).
+// the run goroutine, except the channels and proc/conn: set before run starts, and
+// replaced by a restart (effort.go) under connMu, which Store calls running outside the
+// goroutine read them under (connection).
 type streamState struct {
-	proc *claudestream.Process
-	conn *claudestream.Conn
-	sd   *streamStatus
-	log  *threadLog
-	proj *projector
+	connMu sync.Mutex
+	proc   *claudestream.Process
+	conn   *claudestream.Conn
+	// events is the current conn's event channel; nil once it ended.
+	events <-chan claudestream.Event
+	sd     *streamStatus
+	log    *threadLog
+	proj   *projector
 
 	first *outgoing // sent once initialize succeeds
 
@@ -61,19 +67,55 @@ type streamState struct {
 	outputEnded bool
 	exited      bool
 	drainTimer  *time.Timer
+
+	// effort is the running process's --effort, wantEffort the one asked for
+	// (Store.SetEffort); a restart (effort.go) makes them equal. held are sends that
+	// came during a restart, answered once the new process is up.
+	effort, wantEffort string
+	restart            restartPhase
+	restartTimer       *time.Timer
+	held               []threadCmd
+	// grants: what allow-for-session answers gave this conversation, passed again to a
+	// restarted process (effort.go).
+	grants grants
+	// swapping (under connMu): a restart is replacing the Conn; Store calls made outside
+	// the goroutine are refused meanwhile (connection).
+	swapping bool
+}
+
+// connection is the current Conn, for Store calls made outside the run goroutine. While
+// a restart swaps it (the old process's stdin is closed, the new one has not answered
+// the handshake) there is no Conn to talk to: refused.
+func (st *streamState) connection() (*claudestream.Conn, error) {
+	st.connMu.Lock()
+	defer st.connMu.Unlock()
+	if st.swapping {
+		return nil, fmt.Errorf("%w: Claude is restarting for an effort change; try again in a moment", ErrFailedPrecondition)
+	}
+	return st.conn, nil
+}
+
+func (st *streamState) setSwapping(on bool) {
+	st.connMu.Lock()
+	st.swapping = on
+	st.connMu.Unlock()
 }
 
 // threadCmd is a Store call the runner carries out on its goroutine.
 type threadCmd struct {
+	// ctx is the caller's: a send held across a restart is dropped once it is done.
+	ctx       context.Context
 	send      *outgoing
+	effort    *string // SetEffort
 	requestID string
 	decision  Decision
 	reply     chan threadReply
 }
 
 type threadReply struct {
-	item Item
-	err  error
+	item    Item
+	session Session // SetEffort's
+	err     error
 }
 
 // viewersChanged tells the runner the thread's viewer count changed. Non-blocking;
@@ -110,6 +152,7 @@ func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv,
 		cmds:     make(chan threadCmd),
 		viewSig:  make(chan struct{}, 1),
 		pending:  map[string]*claudestream.PermissionRequest{},
+		effort:   s.Effort, wantEffort: s.Effort,
 	}
 	st.proj = newProjector(itemWriter{log: log, save: func(it Item) { m.saveItem(s.ID, it) }})
 	r.st = st
@@ -123,6 +166,7 @@ func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv,
 		return fmt.Errorf("session %s: spawn claude: %w", s.ID, err)
 	}
 	st.proc, st.conn = proc, proc.Conn()
+	st.events = st.conn.Events()
 	r.det = st.sd
 	r.awaitFirstPrompt = false
 	r.tail = newTailer(m.opts.Paths, r.cwd)
@@ -169,20 +213,14 @@ func (r *runner) runStream() {
 	defer tick.Stop()
 	startup := time.NewTimer(opts.StartTimeout)
 	defer startup.Stop()
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), opts.StartTimeout)
-		defer cancel()
-		_, err := st.conn.Initialize(ctx)
-		st.initDone <- err
-	}()
-	events := st.conn.Events()
+	r.initialize()
 	for !r.finished {
 		select {
 		case err := <-st.initDone:
 			r.onInitialized(err)
-		case ev, ok := <-events:
+		case ev, ok := <-st.events:
 			if !ok {
-				events, st.outputEnded = nil, true
+				st.events, st.outputEnded = nil, true
 				r.maybeExited()
 				continue
 			}
@@ -207,9 +245,15 @@ func (r *runner) runStream() {
 			r.log().debug("transcript watcher", "err", err)
 		case now := <-tick.C:
 			r.onTick(now)
+			r.maybeRestart()
 		case <-startup.C:
-			if !st.initialized && !r.closing {
+			if !st.initialized && !r.closing && st.restart == restartNone {
 				r.failStart(errors.New("no answer to the initialize handshake"))
+			}
+		case <-timerC(st.restartTimer):
+			st.restartTimer = nil
+			if !st.initialized && !r.closing {
+				r.failStart(errors.New("no answer to the initialize handshake after a restart"))
 			}
 		case <-r.closeReq:
 			r.beginCloseStream()
@@ -224,6 +268,19 @@ func (r *runner) runStream() {
 			r.stopStream()
 		}
 	}
+}
+
+// initialize runs the handshake with the current process; the answer arrives on
+// initDone.
+func (r *runner) initialize() {
+	st := r.st
+	conn, timeout := st.conn, r.m.opts.StartTimeout
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		_, err := conn.Initialize(ctx)
+		st.initDone <- err
+	}()
 }
 
 // procDone is the process's exit channel until the exit was seen.
@@ -247,6 +304,13 @@ func (r *runner) onInitialized(err error) {
 	}
 	st.initialized = true
 	st.sd.initialized()
+	if r.closing {
+		return // closed while starting: the close finishes it
+	}
+	if st.restart != restartNone {
+		r.onRestarted()
+		return
+	}
 	r.state = StateConnected
 	r.m.update(r.id, true, func(rec *record) {
 		if rec.s.State == StateStarting {
@@ -286,6 +350,8 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 		r.onAsk(e)
 	case *claudestream.ControlCancel:
 		r.onAskGone(e.RequestID)
+	case *claudestream.Status:
+		r.onModeChange(e.PermissionMode)
 	case *claudestream.Result:
 		r.acknowledgeIfViewed()
 	case *claudestream.ConversationReset:
@@ -293,6 +359,31 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 	}
 	r.checkStatus()
 	r.tryCd()
+	r.maybeRestart()
+}
+
+// wireModes maps the permission modes Claude reports to the row's.
+var wireModes = map[string]PermissionMode{
+	claudestream.ModeDefault:     PermissionSupervised,
+	claudestream.ModeAcceptEdits: PermissionAcceptEdits,
+	claudestream.ModeAuto:        PermissionAuto,
+}
+
+// onModeChange follows a mode change Claude reports (system/status permissionMode):
+// SetPermissionMode's own, or one Claude made itself, e.g. "allow for session" applying
+// a setMode suggestion (an Edit's switches to accept edits). The row records it, so the
+// picker shows it and later spawns keep it. Modes the app does not offer are ignored.
+func (r *runner) onModeChange(wire string) {
+	mode, ok := wireModes[wire]
+	if !ok {
+		return
+	}
+	r.m.update(r.id, true, func(rec *record) {
+		if rec.s.PermissionMode != mode {
+			r.log().info("claude switched the permission mode", "mode", wire)
+			rec.s.PermissionMode = mode
+		}
+	})
 }
 
 // sendMessage records the user item and writes the message.
@@ -369,6 +460,7 @@ func (r *runner) onAskGone(id string) {
 	st.sd.resolved(id)
 	r.resolveItem(id, func(q *Request) { q.State, q.Message = RequestCancelled, "withdrawn by Claude" })
 	r.checkStatus()
+	r.maybeRestart()
 }
 
 // resolveItem updates the request item of request id.
@@ -388,12 +480,19 @@ func (r *runner) resolveItem(id string, fn func(*Request)) (Item, bool) {
 func (r *runner) onThreadCmd(cmd threadCmd) {
 	var rep threadReply
 	switch {
+	case cmd.send != nil && r.st.restart != restartNone:
+		// Sent once the restarted process is up (onRestarted).
+		r.st.held = append(r.st.held, cmd)
+		return
 	case cmd.send != nil:
 		rep.item, rep.err = r.sendMessage(cmd.send)
+	case cmd.effort != nil:
+		rep.session = r.setEffort(*cmd.effort)
 	default:
 		rep.item, rep.err = r.respond(cmd.requestID, cmd.decision)
 	}
 	cmd.reply <- rep
+	r.maybeRestart()
 }
 
 func (r *runner) respond(id string, d Decision) (Item, error) {
@@ -413,7 +512,17 @@ func (r *runner) respond(id string, d Decision) (Item, error) {
 	if err != nil {
 		return Item{}, err
 	}
-	r.answer(req, res)
+	if err := req.Answer(res); errors.Is(err, claudestream.ErrCancelled) {
+		// Withdrawn by Claude before its cancel was handled here: the item says so, not
+		// what the user picked.
+		r.onAskGone(id)
+		return Item{}, fmt.Errorf("%w: Claude withdrew request %s", ErrNotFound, id)
+	} else if err != nil {
+		r.log().debug("answer permission request", "request", id, "err", err)
+	}
+	if d.Allow && d.ForSession {
+		st.grants.add(cur.Request.SuggestionsJSON)
+	}
 	delete(st.pending, id)
 	st.sd.resolved(id)
 	it, _ := r.resolveItem(id, func(q *Request) {
@@ -492,6 +601,9 @@ func (r *runner) beginCloseStream() {
 	}
 	st := r.st
 	r.closing = true
+	st.restart = restartNone
+	st.setSwapping(false)
+	r.failHeld("the thread is closing")
 	st.sd.pending = nil // the requests die with the process; do not keep their status
 	r.closeStatus, r.closeReason = st.sd.Status()
 	for id, req := range st.pending {
@@ -546,6 +658,7 @@ func (r *runner) stopStream() {
 		_ = st.proc.Signal(syscall.SIGKILL)
 	}
 	st.sd.pending = nil
+	r.failHeld("the daemon stopped")
 	closeUnfinished(st.proj.w, "the daemon stopped")
 	r.stopStreamTimers()
 	st.conn.Close()
@@ -558,9 +671,12 @@ func (r *runner) stopStream() {
 }
 
 func (r *runner) stopStreamTimers() {
-	if t := r.st.drainTimer; t != nil {
-		t.Stop()
+	for _, t := range []*time.Timer{r.st.drainTimer, r.st.restartTimer} {
+		if t != nil {
+			t.Stop()
+		}
 	}
+	r.st.drainTimer, r.st.restartTimer = nil, nil
 }
 
 // maybeExited finishes once the process has exited and its output is read.
@@ -569,6 +685,11 @@ func (r *runner) maybeExited() {
 	if !st.exited || !st.outputEnded || r.finished {
 		return
 	}
+	if st.restart == restartClosing && !r.closing {
+		r.respawn()
+		return
+	}
+	r.failHeld("Claude exited")
 	code := st.proc.ExitCode()
 	reason := ReasonExited
 	switch {

@@ -7,6 +7,7 @@ import { openAddProject } from "@/stores/addProject";
 import { openNewThreadPicker } from "@/stores/compose";
 import { openPublishDialog } from "@/stores/publish";
 import { attentionIds, useSessionsStore } from "@/stores/sessions";
+import { useThreadStore } from "@/stores/thread";
 import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
@@ -281,7 +282,39 @@ export function presentInPalette(name: string): boolean {
  * failure, not the result message: terminal.new's shell opens as a new bottom panel tab.
  * The CLI still prints the message.
  */
-const quietCommands: ReadonlySet<string> = new Set(["terminal.new"]);
+const quietCommands: ReadonlySet<string> = new Set(["terminal.new", "thread.interrupt"]);
+
+/** The active thread is rendered, connected, on a turn and not waiting on the user: Escape interrupts it. */
+function activeThreadInterruptible(): boolean {
+  const id = getUiContext().activeSessionId;
+  const s = id ? useSessionsStore.getState().byId[id] : undefined;
+  if (s?.render !== "rendered" || s.state !== "connected" || s.status !== "busy") return false;
+  const t = useThreadStore.getState();
+  return (t.logs[id]?.pending ?? t.pending[id]?.pending ?? []).length === 0;
+}
+
+/**
+ * When a command's chord may start it from the keyboard; absent means always. A chord that
+ * does not apply is left alone (it reaches whatever else handles it).
+ */
+const chordGuards: Readonly<Record<string, () => boolean>> = {
+  // Escape (Claude Code's interrupt key) only stops a turn that runs, and not while a
+  // prompt waits for an answer.
+  "thread.interrupt": activeThreadInterruptible,
+};
+
+/**
+ * Whether a command's chord fires for this key event: its guard passes, and a key without
+ * cmd, ctrl or alt (Escape) only fires inside the content pane and outside elements that
+ * handle their own keys ([data-keys-local], the docked prompts), so it never steals keys
+ * from lists, dialogs or popovers.
+ */
+export function chordFires(name: string, chord: string, target: Element | null): boolean {
+  const guard = chordGuards[name];
+  if (guard && !guard()) return false;
+  if (/^(cmd|ctrl|alt)\+/.test(chord)) return true;
+  return Boolean(target?.closest('[data-region="content"]')) && !target?.closest("[data-keys-local]");
+}
 
 /** Invokes a command started in this window (a chord, the palette, a CommandButton), toasting the result unless it is quiet. */
 export function invokeStarted(name: string, args: Record<string, string> = {}, ctx: UiContextView = getUiContext()): void {
@@ -357,7 +390,7 @@ export function handleKeyDown(e: KeyboardEvent): void {
     return;
   }
   const cmd = commandBindings(useCommandsStore.getState().commands).get(chord);
-  if (cmd) {
+  if (cmd && chordFires(cmd.name, chord, target)) {
     e.preventDefault();
     e.stopPropagation();
     startCommand(cmd);

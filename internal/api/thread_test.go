@@ -125,6 +125,13 @@ func TestThreadWatchSendRespond(t *testing.T) {
 	if _, err := c.SetPermissionMode(ctx, connect.NewRequest(&v1.SetThreadPermissionModeRequest{SessionId: "s1", PermissionMode: v1.PermissionMode_PERMISSION_MODE_ACCEPT_EDITS})); err != nil {
 		t.Fatal(err)
 	}
+	es, err := c.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{SessionId: "s1", Effort: "max"}))
+	if err != nil || es.Msg.GetSession().GetEffort() != "max" {
+		t.Fatalf("set effort %v %v", es, err)
+	}
+	if _, err := c.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{SessionId: "s1", Effort: "huge"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("bad effort: %v", err)
+	}
 	if _, err := c.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{SessionId: "t1", Text: "x"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Errorf("send to a terminal thread: %v", err)
 	}

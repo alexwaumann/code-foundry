@@ -133,8 +133,14 @@ Services (v1):
   snapshot, then appended/updated items, text deltas and pending-request changes, all
   seq-ordered; an open Watch marks the thread's turns seen like an attached terminal),
   Send (also while busy), Respond (a permission request or AskUserQuestion: allow,
-  allow for session, deny, answers), Interrupt, SetModel, SetPermissionMode. Refuses
-  terminal threads (`docs/notes/rendered-threads-1-daemon.md`).
+  allow for session, deny with a reason, answers), Interrupt, SetModel,
+  SetPermissionMode, SetEffort (Claude has no live effort switch: the runner restarts
+  the process with `--resume` and the new `--effort`, at once when idle, else when the
+  running turn ends, `Session.effort_pending` meanwhile; the thread stays connected; the
+  new process gets the session's allow-for-session grants again as `--allowedTools` /
+  `--add-dir`).
+  Refuses terminal threads (`docs/notes/rendered-threads-1-daemon.md`,
+  `docs/notes/rendered-threads-3-interaction.md`).
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
   chunks), Write (input bytes), Resize, Detach, Kill, Remove, and Close (kill, wait for
   the exit, remove; shells only, a thread's Claude terminal is refused).
@@ -331,8 +337,10 @@ from the pull request (docs/notes/pr-thread-commands.md).
   follow-up composer with a pending permission or question docked into it. Its items live
   in `stores/thread.ts`, fed only by that thread's `ThreadService.Watch` (snapshot, then
   seq-ordered events, batched per frame); the EventService `thread` source only carries
-  pending requests. Sending and interrupting are the `thread.*` commands
-  (`docs/notes/rendered-threads-2-gui.md`).
+  pending requests. Sending, interrupting (also Escape, `thread.interrupt`'s keybinding),
+  answering (`thread.respond`; every pending request docks, oldest first, answerable by
+  click or 1/2/3) and the model / mode / effort pickers are the `thread.*` commands
+  (`docs/notes/rendered-threads-2-gui.md`, `docs/notes/rendered-threads-3-interaction.md`).
 * Only visible terminals are attached. Switching sessions (or bottom panel tabs) detaches
   the old stream and attaches the new one. Background sessions cost nothing in the frontend. Attaching is
   also how the daemon knows a session is being looked at: while a session's terminal has

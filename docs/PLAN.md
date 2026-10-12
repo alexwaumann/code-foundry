@@ -114,8 +114,11 @@ draws the conversation. Design record: `docs/notes/rendered-threads-handoff.md`.
   store and Watch, virtualized work log, turn fold, diffs, highlighted markdown, docked
   prompts in a pending state, follow-up composer with send / interrupt / model /
   permission, mock daemon and e2e) done: `docs/notes/rendered-threads-2-gui.md`.
-* PR 3 (answering prompts and questions, keyboard 1/2/3, effort restart), PR 4 (composer
-  toggle, setting, specs, screenshots): not started.
+* PR 3 (answering permissions with deny reasons, AskUserQuestion single/multi/Other,
+  stacked parallel prompts, keyboard 1/2/3, Escape interrupts, effort restart with
+  `--resume`, `ThreadService.SetEffort` / `thread.set-effort`) done:
+  `docs/notes/rendered-threads-3-interaction.md`.
+* PR 4 (composer toggle, setting UI, polish): not started.
 
 ### Open items
 

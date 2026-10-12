@@ -393,7 +393,11 @@ type Session struct {
 	AgentRuns []*AgentRun `protobuf:"bytes,30,rep,name=agent_runs,json=agentRuns,proto3" json:"agent_runs,omitempty"`
 	// TERMINAL or RENDERED (never UNSPECIFIED). A rendered thread has no terminal_id;
 	// its conversation is ThreadService.ListItems / Watch. Persisted.
-	Render        SessionRender `protobuf:"varint,31,opt,name=render,proto3,enum=codefoundry.v1.SessionRender" json:"render,omitempty"`
+	Render SessionRender `protobuf:"varint,31,opt,name=render,proto3,enum=codefoundry.v1.SessionRender" json:"render,omitempty"`
+	// A rendered thread's effort change (ThreadService.SetEffort) not applied yet: effort is
+	// the new level, and Claude restarts with it (--resume) once the running turn ends.
+	// Not persisted.
+	EffortPending bool `protobuf:"varint,32,opt,name=effort_pending,json=effortPending,proto3" json:"effort_pending,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -643,6 +647,13 @@ func (x *Session) GetRender() SessionRender {
 		return x.Render
 	}
 	return SessionRender_SESSION_RENDER_UNSPECIFIED
+}
+
+func (x *Session) GetEffortPending() bool {
+	if x != nil {
+		return x.EffortPending
+	}
+	return false
 }
 
 // One subagent run of a thread (Session.agent_runs): a Claude Code Agent tool call,
@@ -2639,7 +2650,7 @@ var File_codefoundry_v1_session_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccodefoundry/v1/session.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x91\n" +
+	"\x1ccodefoundry/v1/session.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb8\n" +
 	"\n" +
 	"\aSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
@@ -2678,7 +2689,8 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\bunpriced\x18\x1d \x01(\bR\bunpriced\x127\n" +
 	"\n" +
 	"agent_runs\x18\x1e \x03(\v2\x18.codefoundry.v1.AgentRunR\tagentRuns\x125\n" +
-	"\x06render\x18\x1f \x01(\x0e2\x1d.codefoundry.v1.SessionRenderR\x06render\"\xa7\x03\n" +
+	"\x06render\x18\x1f \x01(\x0e2\x1d.codefoundry.v1.SessionRenderR\x06render\x12%\n" +
+	"\x0eeffort_pending\x18  \x01(\bR\reffortPending\"\xa7\x03\n" +
 	"\bAgentRun\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1d\n" +

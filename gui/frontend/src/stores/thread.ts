@@ -38,9 +38,14 @@ export interface ThreadState {
   folds: Readonly<Record<string, Readonly<Record<string, boolean>>>>;
   /** Rows the user expanded (true) or collapsed (false), by thread and row key; absent: the row's default. */
   expanded: Readonly<Record<string, Readonly<Record<string, boolean>>>>;
+  /**
+   * Requests the user answered whose answer is on its way, by thread and request id: their
+   * prompt leaves at once (threadActions respondThread) and comes back if the answer fails.
+   */
+  answering: Readonly<Record<string, Readonly<Record<string, true>>>>;
 }
 
-export const useThreadStore = create<ThreadState>()(() => ({ logs: {}, pending: {}, watch: null, folds: {}, expanded: {} }));
+export const useThreadStore = create<ThreadState>()(() => ({ logs: {}, pending: {}, watch: null, folds: {}, expanded: {}, answering: {} }));
 
 function sameArray<T>(a: readonly T[], b: readonly T[], eq: (x: T, y: T) => boolean = Object.is): boolean {
   return a === b || (a.length === b.length && a.every((x, i) => eq(x, b[i] as T)));
@@ -326,6 +331,26 @@ export function useThreadLoaded(sessionId: string): boolean {
 /** The thread's pending requests: the Watch's when it has the thread, else the EventService's. */
 export function useThreadPending(sessionId: string): readonly ThreadPendingView[] {
   return useThreadStore((s) => s.logs[sessionId]?.pending ?? s.pending[sessionId]?.pending ?? NO_PENDING);
+}
+
+/** The thread's pending requests without the ones being answered (their prompts left already). */
+export function useOpenRequests(sessionId: string): readonly ThreadPendingView[] {
+  return useThreadStore(
+    useShallow((s) => {
+      const all = s.logs[sessionId]?.pending ?? s.pending[sessionId]?.pending ?? NO_PENDING;
+      const answering = s.answering[sessionId];
+      return answering ? all.filter((p) => !answering[p.requestId]) : all;
+    }),
+  );
+}
+
+/** Marks a request answered (its prompt leaves) or, when its answer failed, open again. */
+export function setAnswering(sessionId: string, requestId: string, on: boolean): void {
+  useThreadStore.setState((s) => {
+    const cur: Record<string, true> = Object.fromEntries(Object.entries(s.answering[sessionId] ?? {}).filter(([k]) => k !== requestId));
+    if (on) cur[requestId] = true;
+    return { answering: { ...s.answering, [sessionId]: cur } };
+  });
 }
 
 /** What the timeline knows about an item. */

@@ -4,14 +4,21 @@
  * states the sketch shows, plus ThreadService.Watch / Send / Interrupt and the EventService
  * `thread` source (pending requests only, like the daemon since PR 1's review).
  *
- *   POST /__mock/thread?state=permission|question|streaming|idle[&id=s-r1]
- *        (re)creates the rendered thread in that state; returns { id }
+ *   POST /__mock/thread?state=permission|question|streaming|idle|parallel|multi[&id=s-r1]
+ *        (re)creates the rendered thread in that state; returns { id }. parallel: an Edit
+ *        and a Bash permission pending at once (oldest first); multi: a multi-select question
  *   POST /__mock/thread/delta?id=s-r1&text=…   appends text to the streaming answer
+ *   POST /__mock/thread/stream?id=s-r1&text=…  starts a new streaming text item
  *   POST /__mock/thread/finish?id=s-r1          ends the streaming turn (turn_end, idle)
  *   GET  /__mock/thread/calls                  thread.* invocations ("send <id> <text> [attachments]", ...)
  *
  * thread.send appends the user message, streams a short reply over ~1 s and ends the turn;
  * thread.interrupt ends a running turn as interrupted and withdraws pending requests.
+ * thread.respond (and ThreadService.Respond) resolves a request like the daemon: once
+ * nothing is pending, an allowed tool runs and Claude carries on, a denied one makes Claude
+ * reply to the reason, answers are echoed; then the turn ends. thread.set-effort applies at
+ * once when idle ("Set effort to …" after ~300 ms), else when the turn ends
+ * (Session.effort_pending meanwhile).
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
@@ -25,6 +32,7 @@ import {
   type ThreadItemSchema,
   type ThreadPendingRequestSchema,
 } from "../src/gen/codefoundry/v1/thread_pb";
+import { CommandError } from "./errors";
 import { Hub } from "./hub";
 
 export type ThreadEventInit = MessageInitShape<typeof ThreadEventSchema>;
@@ -39,6 +47,8 @@ export interface ThreadWorld {
   setStatus(id: string, status: SessionStatus, reason: string): void;
   setModel(id: string, model: string): void;
   setPermission(id: string, permission: string): void;
+  setEffort(id: string, effort: string, pending: boolean): void;
+  statusOf(id: string): SessionStatus;
 }
 
 interface Log {
@@ -48,6 +58,8 @@ interface Log {
   nextOrdinal: number;
   /** Open Watch streams: a finished turn is seen at once while one is open. */
   watchers: number;
+  /** thread.set-effort while on a turn: applied when it ends. */
+  pendingEffort: string;
 }
 
 /** A staged image the scripted first message refers to (a 48×32 PNG). */
@@ -57,7 +69,8 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
   "base64",
 );
 
-export type ThreadState = "permission" | "question" | "streaming" | "idle";
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi"];
 
 const ANSWER_HEAD = `## Fixed: stale badge after a force-push
 
@@ -160,7 +173,24 @@ const QUESTIONS = {
   ],
 };
 
+const MULTI = {
+  questions: [
+    {
+      question: "Which checks should I run before pushing?",
+      header: "Checks",
+      multiSelect: true,
+      options: [
+        { label: "go test ./...", description: "The whole suite (about 40 s)" },
+        { label: "go vet ./...", description: "" },
+        { label: "staticcheck", description: "Lint, as CI does" },
+      ],
+    },
+  ],
+};
+
 const PUSH = "git push --force-with-lease origin cf/pr-badge-stale";
+const POLLER_OLD = "\tif fp == prev {\n\t\treturn\n\t}";
+const POLLER_NEW = "\tif fp == prev && !force {\n\t\treturn\n\t}";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -174,6 +204,11 @@ export class MockThreads {
   calls: string[] = [];
   /** Bumped by reset(): a scripted reply still sleeping from before stops. */
   private generation = 0;
+  /**
+   * POST /__mock/thread/fail-respond: the next thread.respond fails (the prompt must come
+   * back); with ?withdrawn=1 Claude withdrew the request first (NotFound, like the daemon).
+   */
+  failRespond: "" | "error" | "withdrawn" = "";
 
   /** `source` gets what the EventService thread source carries (pending events only). */
   constructor(
@@ -184,6 +219,7 @@ export class MockThreads {
   reset(): void {
     this.logs.clear();
     this.calls = [];
+    this.failRespond = "";
     this.generation++;
   }
 
@@ -194,7 +230,7 @@ export class MockThreads {
   private log(id: string): Log {
     let l = this.logs.get(id);
     if (!l) {
-      l = { seq: 0, items: [], pending: [], nextOrdinal: 1, watchers: 0 };
+      l = { seq: 0, items: [], pending: [], nextOrdinal: 1, watchers: 0, pendingEffort: "" };
       this.logs.set(id, l);
     }
     return l;
@@ -278,6 +314,11 @@ export class MockThreads {
     this.source({ event: { case: "pending", value } });
   }
 
+  /** A new streaming text item (e.g. a subagent's reply arriving while a prompt waits); /delta extends it. */
+  stream(id: string, text: string): void {
+    this.append(id, this.item(id, { case: "assistantText", value: { text } }, { streaming: true }));
+  }
+
   /** Text appended to the streaming text item (a delta). */
   delta(id: string, text: string): void {
     const l = this.log(id);
@@ -324,10 +365,134 @@ export class MockThreads {
       }),
     );
     this.world.setStatus(id, l.watchers > 0 ? SessionStatus.IDLE : SessionStatus.NEEDS_ATTENTION, l.watchers > 0 ? "at prompt" : "finished");
+    if (l.pendingEffort) {
+      const effort = l.pendingEffort;
+      l.pendingEffort = "";
+      this.applyEffort(id, effort);
+    }
+  }
+
+  /** Claude withdraws a pending request (control_cancel_request): the item says so, the prompt leaves. */
+  private withdraw(id: string, requestId: string): void {
+    const l = this.log(id);
+    const p = l.pending.find((x) => x.requestId === requestId);
+    const req = p && l.items.find((x) => x.id === p.itemId);
+    if (!p || (req?.payload?.case !== "permission" && req?.payload?.case !== "question")) return;
+    this.update(id, { ...req, payload: { case: req.payload.case, value: { ...req.payload.value, state: ThreadRequestState.CANCELLED, message: "withdrawn by Claude" } } } as ItemInit);
+    this.setPending(id, l.pending.filter((x) => x !== p));
+  }
+
+  /** The restart with the new effort is done: the timeline says so, the flag clears. */
+  private applyEffort(id: string, effort: string): void {
+    this.append(id, this.item(id, { case: "commandOutput", value: { text: `Set effort to ${effort}` } }));
+    this.world.setEffort(id, effort, false);
+  }
+
+  /** thread.set-effort: at once when idle (after a short "restart"), else when the turn ends. */
+  setEffort(id: string, effort: string): boolean {
+    if (!this.world.isConnected(id)) throw new Error(`thread ${id} is not connected; reconnect it first`);
+    const l = this.log(id);
+    const status = this.world.statusOf(id);
+    const onTurn = status === SessionStatus.BUSY || l.pending.length > 0;
+    this.world.setEffort(id, effort, true);
+    if (onTurn) {
+      l.pendingEffort = effort;
+      return true;
+    }
+    const gen = this.generation;
+    setTimeout(() => {
+      if (gen === this.generation) this.applyEffort(id, effort);
+    }, 300);
+    return false;
+  }
+
+  /**
+   * ThreadService.Respond / thread.respond: resolves the request (the oldest pending one when
+   * requestId is empty). Once nothing is pending, the turn carries on: an allowed tool
+   * finishes, Claude streams a short reply to what was decided, and the turn ends.
+   */
+  respond(id: string, requestId: string, decision: "allow" | "allow-session" | "deny", answers: Record<string, string>, message: string): ItemInit {
+    const l = this.log(id);
+    const p = requestId ? l.pending.find((x) => x.requestId === requestId) : l.pending[0];
+    if (!p) throw new CommandError("notfound", requestId ? `no pending request ${requestId} on thread ${id}` : `thread ${id} has no pending request`);
+    const req = l.items.find((x) => x.id === p.itemId);
+    if (req?.payload?.case !== "permission" && req?.payload?.case !== "question") throw new Error(`request ${p.requestId ?? ""} has no item`);
+    const r = req.payload.value;
+    const isQuestion = req.payload.case === "question";
+    const deny = decision === "deny";
+    if (isQuestion && !deny) {
+      const qs = (JSON.parse(r.inputJson ?? "{}") as { questions?: { question: string }[] }).questions ?? [];
+      const missing = qs.find((q) => !(answers[q.question] ?? "").trim());
+      if (missing) throw new Error(`no answer for question "${missing.question}"`);
+    }
+    const resolved = {
+      ...req,
+      updatedAt: timestampFromDate(new Date()),
+      payload: {
+        case: req.payload.case,
+        value: {
+          ...r,
+          state: deny ? ThreadRequestState.DENIED : ThreadRequestState.ALLOWED,
+          decision: deny ? "deny" : decision === "allow-session" ? "allow_session" : "allow",
+          message: deny ? message : "",
+          answers: isQuestion && !deny ? answers : {},
+        },
+      },
+    } as ItemInit;
+    this.update(id, resolved);
+    const tool = l.items.find((x) => x.payload?.case === "toolCall" && x.payload.value.toolUseId === r.toolUseId);
+    if (tool?.payload?.case === "toolCall") {
+      const output = deny
+        ? message || "The user doesn't want to proceed with this tool use."
+        : isQuestion
+          ? Object.entries(answers)
+              .map(([q, a]) => `"${q}"="${a}"`)
+              .join(", ")
+          : r.toolName === "Bash"
+            ? "To github.com:alexwaumann/code-foundry.git\n + 9f3c2e1...b71d0aa cf/pr-badge-stale -> cf/pr-badge-stale (forced update)"
+            : "The file has been updated.";
+      this.update(id, { ...tool, updatedAt: timestampFromDate(new Date()), payload: { case: "toolCall", value: { ...tool.payload.value, status: deny ? ToolCallStatus.ERROR : ToolCallStatus.DONE, isError: deny, output } } } as ItemInit);
+    }
+    const rest = l.pending.filter((x) => x.requestId !== p.requestId);
+    this.setPending(id, rest);
+    const next = rest[0];
+    if (next) {
+      this.world.setStatus(id, SessionStatus.NEEDS_ATTENTION, `${next.question ? "question" : "permission"}: ${next.summary ?? ""}`);
+      return resolved;
+    }
+    this.world.setStatus(id, SessionStatus.BUSY, "working");
+    const reply = isQuestion
+      ? deny
+        ? "No problem, I'll leave those for later."
+        : `Thanks: ${Object.values(answers).join("; ")}.`
+      : deny
+        ? message
+          ? `Understood, I won't run that. You said: ${message}`
+          : "Understood, I stopped there. Tell me how you'd like to proceed."
+        : r.toolName === "Bash"
+          ? "Pushed. PR #63 now has the fix."
+          : `Done: ${r.toolName ?? "the tool"} ran.`;
+    const gen = this.generation;
+    void (async () => {
+      await sleep(200);
+      if (gen !== this.generation) return;
+      this.append(id, this.item(id, { case: "assistantText", value: { text: "" } }, { streaming: true }));
+      for (const part of reply.match(/.{1,12}/gs) ?? []) {
+        await sleep(40);
+        if (gen !== this.generation) return;
+        this.delta(id, part);
+      }
+      await sleep(80);
+      if (gen !== this.generation || !this.log(id).items.some((x) => x.streaming)) return;
+      this.finish(id);
+    })();
+    return resolved;
   }
 
   /** (Re)builds the scripted conversation in `state` (the sketch's three states, or idle: both turns done). */
   load(id: string, state: ThreadState): void {
+    // A scripted reply still running for the previous conversation stops.
+    this.generation++;
     this.logs.delete(id);
     const l = this.log(id);
     const ago = (min: number, sec = 0) => new Date(Date.now() - min * 60_000 + sec * 1000);
@@ -448,6 +613,67 @@ export class MockThreads {
       this.world.setStatus(id, SessionStatus.IDLE, "at prompt");
       return;
     }
+    if (state === "multi") {
+      text("All 412 tests pass. One thing before I push.", { at: ago(3) });
+      const q = tool("AskUserQuestion", MULTI, { status: ToolCallStatus.RUNNING }, { at: ago(2, 58) });
+      const qCall = q.payload?.case === "toolCall" ? q.payload.value : undefined;
+      const item = it({ case: "question", value: { requestId: "req-checks", toolName: "AskUserQuestion", toolUseId: qCall?.toolUseId ?? "", inputJson: JSON.stringify(MULTI), state: ThreadRequestState.PENDING } }, { at: ago(2, 57) });
+      const summary = MULTI.questions[0]?.question ?? "";
+      l.pending = [{ requestId: "req-checks", itemId: item.id, question: true, toolName: "AskUserQuestion", summary }];
+      l.seq = l.items.length;
+      this.world.setStatus(id, SessionStatus.NEEDS_ATTENTION, `question: ${summary}`);
+      this.source({ event: { case: "pending", value: { sessionId: id, seq: BigInt(l.seq), pending: l.pending } } });
+      return;
+    }
+    if (state === "parallel") {
+      // Two requests at once (a subagent and the main thread can ask in parallel): an Edit
+      // first, then the push.
+      text("All 412 tests pass. Tightening the poller's early return, then pushing.", { at: ago(3) });
+      const edit = tool("Edit", { file_path: p("internal/store/pr/poller.go"), old_string: POLLER_OLD, new_string: POLLER_NEW }, { status: ToolCallStatus.RUNNING }, { at: ago(2, 59) });
+      const editCall = edit.payload?.case === "toolCall" ? edit.payload.value : undefined;
+      const editPerm = it(
+        {
+          case: "permission",
+          value: {
+            requestId: "req-edit",
+            toolName: "Edit",
+            displayName: "Edit",
+            toolUseId: editCall?.toolUseId ?? "",
+            inputJson: editCall?.inputJson ?? "",
+            description: "poller.go",
+            suggestionsJson: JSON.stringify([{ type: "setMode", mode: "acceptEdits", destination: "session" }]),
+            state: ThreadRequestState.PENDING,
+          },
+        },
+        { at: ago(2, 58) },
+      );
+      const push = tool("Bash", { command: PUSH, description: "Force-push the rebased branch so PR #63 picks up the fix." }, { status: ToolCallStatus.RUNNING }, { at: ago(2, 57) });
+      const pushCall = push.payload?.case === "toolCall" ? push.payload.value : undefined;
+      const pushPerm = it(
+        {
+          case: "permission",
+          value: {
+            requestId: "req-push",
+            toolName: "Bash",
+            displayName: "Bash",
+            toolUseId: pushCall?.toolUseId ?? "",
+            inputJson: pushCall?.inputJson ?? "",
+            description: "Force-push the rebased branch so PR #63 picks up the fix.",
+            suggestionsJson: JSON.stringify([{ type: "addRules", rules: [{ toolName: "Bash", ruleContent: "git push:*" }], behavior: "allow", destination: "session" }]),
+            state: ThreadRequestState.PENDING,
+          },
+        },
+        { at: ago(2, 56) },
+      );
+      l.pending = [
+        { requestId: "req-edit", itemId: editPerm.id, question: false, toolName: "Edit", summary: "Edit poller.go" },
+        { requestId: "req-push", itemId: pushPerm.id, question: false, toolName: "Bash", summary: `Bash ${PUSH}` },
+      ];
+      l.seq = l.items.length;
+      this.world.setStatus(id, SessionStatus.NEEDS_ATTENTION, "permission: Edit poller.go");
+      this.source({ event: { case: "pending", value: { sessionId: id, seq: BigInt(l.seq), pending: l.pending } } });
+      return;
+    }
     if (state === "question") {
       text("All 412 tests pass. Two things to settle before I push.", { at: ago(3) });
       const q = tool("AskUserQuestion", QUESTIONS, { status: ToolCallStatus.RUNNING }, { at: ago(2, 58) });
@@ -517,8 +743,10 @@ export class MockThreads {
     run: (ctx: UiContext | undefined, args: Record<string, string>) => string;
   }[] {
     const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeSessionId && (ctx.activeSessionRendered || ctx.activeView === ""));
-    const id = { name: "id", type: ArgType.STRING, required: true, description: "Thread id" };
-    return [
+    // Like the daemon's: an arg with a context default is listed as not required (the GUI
+    // does not prompt for it) and filled from the context when omitted.
+    const id = { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" };
+    const list: ReturnType<MockThreads["commands"]> = [
       {
         cmd: { name: "thread.send", title: "Send to Thread", category: "Thread", description: "Send a message to a rendered thread", keybindings: [], args: [id, { name: "text", type: ArgType.STRING, required: true, description: "The message" }, { name: "attachments", type: ArgType.STRING, required: false, description: "Comma-separated image paths" }, { name: "composer-text", type: ArgType.STRING, required: false, description: "The composer's text with its tag tokens" }] },
         when,
@@ -530,7 +758,7 @@ export class MockThreads {
         },
       },
       {
-        cmd: { name: "thread.interrupt", title: "Interrupt Thread", category: "Thread", description: "Stop a rendered thread's running turn", keybindings: [], args: [id] },
+        cmd: { name: "thread.interrupt", title: "Interrupt Thread", category: "Thread", description: "Stop a rendered thread's running turn", keybindings: ["escape"], args: [id] },
         when,
         run: (_ctx, a) => {
           this.calls.push(`interrupt ${a.id ?? ""}`);
@@ -540,11 +768,52 @@ export class MockThreads {
         },
       },
       {
-        cmd: { name: "thread.respond", title: "Answer Thread Request", category: "Thread", description: "Answer a pending permission request or question", keybindings: [], args: [id, { name: "decision", type: ArgType.ENUM, required: false, description: "allow, allow-session or deny", enumValues: ["allow", "allow-session", "deny"] }] },
+        cmd: {
+          name: "thread.respond",
+          title: "Answer Thread Request",
+          category: "Thread",
+          description: "Answer a pending permission request or question",
+          keybindings: [],
+          args: [
+            id,
+            { name: "decision", type: ArgType.ENUM, required: false, description: "allow, allow-session or deny", enumValues: ["allow", "allow-session", "deny"] },
+            { name: "request", type: ArgType.STRING, required: false, description: "Request id" },
+            { name: "answer", type: ArgType.STRING, required: false, description: "A question's answer" },
+            { name: "message", type: ArgType.STRING, required: false, description: "With deny: the reason" },
+          ],
+        },
         when,
         run: (_ctx, a) => {
-          this.calls.push(`respond ${a.id ?? ""} ${a.decision ?? "allow"}`);
-          return "answered";
+          const decision = (a.decision || "allow") as "allow" | "allow-session" | "deny";
+          const sid = a.id ?? "";
+          this.calls.push(`respond ${sid} ${decision}${a.request ? ` ${a.request}` : ""}${a.answer ? ` answer=${a.answer}` : ""}${a.message ? ` message=${a.message}` : ""}`);
+          const fail = this.failRespond;
+          this.failRespond = "";
+          if (fail === "error") throw new Error("the thread's process has ended");
+          if (fail === "withdrawn") {
+            this.withdraw(sid, a.request ?? "");
+            throw new CommandError("notfound", `Claude withdrew request ${a.request ?? ""}`);
+          }
+          let answers: Record<string, string> = {};
+          const answer = (a.answer ?? "").trim();
+          if (answer.startsWith("{")) answers = JSON.parse(answer) as Record<string, string>;
+          else if (answer) {
+            const l = this.log(sid);
+            const p = a.request ? l.pending.find((x) => x.requestId === a.request) : l.pending[0];
+            if (p?.summary) answers = { [p.summary]: answer };
+          }
+          const it = this.respond(sid, a.request ?? "", decision, answers, a.message ?? "");
+          const r = it.payload?.case === "permission" || it.payload?.case === "question" ? it.payload.value : undefined;
+          return `${r?.toolName ?? ""}: ${decision === "deny" ? "denied" : "allowed"}`;
+        },
+      },
+      {
+        cmd: { name: "thread.set-effort", title: "Set Thread Effort", category: "Thread", description: "Change a rendered thread's effort level", keybindings: [], args: [id, { name: "effort", type: ArgType.ENUM, required: true, description: "Effort", enumValues: ["low", "medium", "high", "xhigh", "max"] }] },
+        when,
+        run: (_ctx, a) => {
+          this.calls.push(`set-effort ${a.id ?? ""} ${a.effort ?? ""}`);
+          const later = this.setEffort(a.id ?? "", a.effort ?? "");
+          return later ? `thread switches to effort ${a.effort ?? ""} after this turn` : `thread restarts with effort ${a.effort ?? ""}`;
         },
       },
       {
@@ -566,6 +835,7 @@ export class MockThreads {
         },
       },
     ];
+    return list.map((c) => ({ ...c, run: (ctx, a) => c.run(ctx, { ...a, id: a.id || ctx?.activeSessionId || "" }) }));
   }
 
   /** Text for the streaming answer's remainder (finish). */

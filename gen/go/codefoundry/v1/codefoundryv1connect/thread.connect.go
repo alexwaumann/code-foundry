@@ -48,6 +48,8 @@ const (
 	// ThreadServiceSetPermissionModeProcedure is the fully-qualified name of the ThreadService's
 	// SetPermissionMode RPC.
 	ThreadServiceSetPermissionModeProcedure = "/codefoundry.v1.ThreadService/SetPermissionMode"
+	// ThreadServiceSetEffortProcedure is the fully-qualified name of the ThreadService's SetEffort RPC.
+	ThreadServiceSetEffortProcedure = "/codefoundry.v1.ThreadService/SetEffort"
 )
 
 // ThreadServiceClient is a client for the codefoundry.v1.ThreadService service.
@@ -73,6 +75,11 @@ type ThreadServiceClient interface {
 	// SetPermissionMode switches a connected thread's permission mode: SUPERVISED,
 	// ACCEPT_EDITS or AUTO (UNSPECIFIED, Claude's default, cannot be selected live).
 	SetPermissionMode(context.Context, *connect.Request[v1.SetThreadPermissionModeRequest]) (*connect.Response[v1.SetThreadPermissionModeResponse], error)
+	// SetEffort changes a connected thread's effort level. Claude has no live effort
+	// switch, so the daemon restarts the process with --resume and the new --effort: at
+	// once when the thread is idle, else once the running turn ends (Session.effort_pending
+	// says so meanwhile). The row records the effort for later spawns either way.
+	SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error)
 }
 
 // NewThreadServiceClient constructs a client for the codefoundry.v1.ThreadService service. By
@@ -128,6 +135,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("SetPermissionMode")),
 			connect.WithClientOptions(opts...),
 		),
+		setEffort: connect.NewClient[v1.SetThreadEffortRequest, v1.SetThreadEffortResponse](
+			httpClient,
+			baseURL+ThreadServiceSetEffortProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("SetEffort")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -140,6 +153,7 @@ type threadServiceClient struct {
 	interrupt         *connect.Client[v1.InterruptThreadRequest, v1.InterruptThreadResponse]
 	setModel          *connect.Client[v1.SetThreadModelRequest, v1.SetThreadModelResponse]
 	setPermissionMode *connect.Client[v1.SetThreadPermissionModeRequest, v1.SetThreadPermissionModeResponse]
+	setEffort         *connect.Client[v1.SetThreadEffortRequest, v1.SetThreadEffortResponse]
 }
 
 // ListItems calls codefoundry.v1.ThreadService.ListItems.
@@ -177,6 +191,11 @@ func (c *threadServiceClient) SetPermissionMode(ctx context.Context, req *connec
 	return c.setPermissionMode.CallUnary(ctx, req)
 }
 
+// SetEffort calls codefoundry.v1.ThreadService.SetEffort.
+func (c *threadServiceClient) SetEffort(ctx context.Context, req *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error) {
+	return c.setEffort.CallUnary(ctx, req)
+}
+
 // ThreadServiceHandler is an implementation of the codefoundry.v1.ThreadService service.
 type ThreadServiceHandler interface {
 	// ListItems returns a thread's items (the streaming one included) and its pending
@@ -200,6 +219,11 @@ type ThreadServiceHandler interface {
 	// SetPermissionMode switches a connected thread's permission mode: SUPERVISED,
 	// ACCEPT_EDITS or AUTO (UNSPECIFIED, Claude's default, cannot be selected live).
 	SetPermissionMode(context.Context, *connect.Request[v1.SetThreadPermissionModeRequest]) (*connect.Response[v1.SetThreadPermissionModeResponse], error)
+	// SetEffort changes a connected thread's effort level. Claude has no live effort
+	// switch, so the daemon restarts the process with --resume and the new --effort: at
+	// once when the thread is idle, else once the running turn ends (Session.effort_pending
+	// says so meanwhile). The row records the effort for later spawns either way.
+	SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error)
 }
 
 // NewThreadServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -251,6 +275,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("SetPermissionMode")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceSetEffortHandler := connect.NewUnaryHandler(
+		ThreadServiceSetEffortProcedure,
+		svc.SetEffort,
+		connect.WithSchema(threadServiceMethods.ByName("SetEffort")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.ThreadService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ThreadServiceListItemsProcedure:
@@ -267,6 +297,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceSetModelHandler.ServeHTTP(w, r)
 		case ThreadServiceSetPermissionModeProcedure:
 			threadServiceSetPermissionModeHandler.ServeHTTP(w, r)
+		case ThreadServiceSetEffortProcedure:
+			threadServiceSetEffortHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -302,4 +334,8 @@ func (UnimplementedThreadServiceHandler) SetModel(context.Context, *connect.Requ
 
 func (UnimplementedThreadServiceHandler) SetPermissionMode(context.Context, *connect.Request[v1.SetThreadPermissionModeRequest]) (*connect.Response[v1.SetThreadPermissionModeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SetPermissionMode is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SetEffort is not implemented"))
 }

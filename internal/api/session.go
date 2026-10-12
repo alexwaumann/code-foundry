@@ -220,6 +220,7 @@ func sessionToProto(s session.Session) *v1.Session {
 		PendingWorktreePath: s.PendingWorktreePath,
 		Pinned:              s.Pinned,
 		Render:              v1.SessionRender(s.Render),
+		EffortPending:       s.EffortPending,
 	}
 	if !s.CreatedAt.IsZero() {
 		p.CreatedAt = timestamppb.New(s.CreatedAt)

@@ -23,6 +23,7 @@ import { MockSettings, MODEL_VALUES } from "./settings";
 import { MockUpdater } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { claudeIntro, claudeTick, ENTER_ALT, prompt, RESET, topFrame } from "./screens";
+import { CommandError } from "./errors";
 import { MockThreads, type ThreadState } from "./thread";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
@@ -78,6 +79,8 @@ interface MockSession {
   pinned: boolean;
   /** TERMINAL or RENDERED (mock/thread.ts): a rendered thread has no terminal. */
   render: SessionRender;
+  /** A rendered thread's effort change waiting for the turn to end (thread.set-effort). */
+  effortPending: boolean;
   /** Claude's pr-link records: one per URL, first-seen order (POST /__mock/link-pr). */
   linkedPullRequests: { slug: string; number: number; url: string; linkedAt: Date }[];
   /** Token usage buckets (mock/usage.ts; POST /__mock/usage). */
@@ -211,14 +214,8 @@ export class ConfirmNeeded extends Error {
   }
 }
 
-export class CommandError extends Error {
-  constructor(
-    readonly kind: "unavailable" | "invalid" | "notfound",
-    message: string,
-  ) {
-    super(message);
-  }
-}
+// In its own module so mock/thread.ts can throw it without importing the world.
+export { CommandError };
 
 // Repo paths under the fake home (mock/filesystem.ts lists the same tree).
 const CF = `${HOME}/src/code-foundry`;
@@ -358,6 +355,13 @@ export class World {
         s.permissionMode = permissionModes[permission] ?? s.permissionMode;
         this.publishSession(s);
       },
+      setEffort: (id, effort, pending) => {
+        const s = this.session(id);
+        s.effort = effort;
+        s.effortPending = pending;
+        this.publishSession(s);
+      },
+      statusOf: (id) => this.session(id).status,
     },
     (ev) => this.events.publish({ source: EventSource.THREAD, event: { event: { case: "thread", value: ev } } }),
   );
@@ -723,6 +727,7 @@ export class World {
       pendingWorktreePath: "",
       pinned: false,
       render: SessionRender.TERMINAL,
+      effortPending: false,
       linkedPullRequests: [],
       usage: [],
       moveIn: 0,
@@ -772,6 +777,7 @@ export class World {
       pendingWorktreePath: s.pendingWorktreePath,
       pinned: s.pinned,
       render: s.render,
+      effortPending: s.effortPending,
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
       ...usageFields(s.usage),
     };

@@ -27,6 +27,7 @@ type ThreadBackend interface {
 	Interrupt(context.Context, *connect.Request[v1.InterruptThreadRequest]) (*connect.Response[v1.InterruptThreadResponse], error)
 	SetModel(context.Context, *connect.Request[v1.SetThreadModelRequest]) (*connect.Response[v1.SetThreadModelResponse], error)
 	SetPermissionMode(context.Context, *connect.Request[v1.SetThreadPermissionModeRequest]) (*connect.Response[v1.SetThreadPermissionModeResponse], error)
+	SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error)
 }
 
 var (
@@ -59,7 +60,7 @@ func hasRenderedThread(c Context) bool {
 }
 
 // RegisterThread registers thread.send, thread.respond, thread.interrupt,
-// thread.items, thread.set-model and thread.set-mode.
+// thread.items, thread.set-model, thread.set-mode and thread.set-effort.
 func RegisterThread(r *Registry, b ThreadBackend) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextSession, Description: "Thread id"}
 	return r.RegisterAll(
@@ -145,6 +146,9 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			Title:       "Interrupt Thread",
 			Description: "Stop a rendered thread's running turn. Pending requests are withdrawn.",
 			Category:    "Thread",
+			// Claude Code's own interrupt key. The GUI starts it from the keyboard only while
+			// the thread is on a turn and the key is not someone else's (keys/bindings.ts).
+			Keybindings: []string{"escape"},
 			Args:        []ArgSpec{idArg},
 			When:        hasRenderedThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -211,6 +215,30 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				}
 				s := res.Msg.GetSession()
 				return Result{Message: "thread " + sessionLabel(s) + " runs " + a.String("permission"), JSON: s}, nil
+			},
+		},
+		Command{
+			Name:  "thread.set-effort",
+			Title: "Set Thread Effort",
+			Description: "Change a connected rendered thread's effort level. Claude restarts with it (resuming the " +
+				"conversation) at once when idle, else when the running turn ends.",
+			Category: "Thread",
+			Args: []ArgSpec{
+				idArg,
+				{Name: "effort", Type: Enum, Enum: SessionEfforts, Required: true, Positional: true, Description: "low, medium, high, xhigh, or max"},
+			},
+			When: hasRenderedThread,
+			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+				res, err := b.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{SessionId: a.String("id"), Effort: a.String("effort")}))
+				if err != nil {
+					return Result{}, err
+				}
+				s := res.Msg.GetSession()
+				msg := "thread " + sessionLabel(s) + " restarts with effort " + s.GetEffort()
+				if s.GetEffortPending() && onTurn(s) {
+					msg = "thread " + sessionLabel(s) + " switches to effort " + s.GetEffort() + " after this turn"
+				}
+				return Result{Message: msg, JSON: s}, nil
 			},
 		},
 	)
@@ -377,4 +405,18 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 		sb.WriteString("(no items yet)\n")
 	}
 	return strings.TrimRight(sb.String(), "\n")
+}
+
+// onTurn: the thread is on a turn (working, or waiting on a permission or a question
+// mid-turn), so an effort change waits for its end. "finished" or a turn's error waits
+// for nobody: the restart is immediate.
+func onTurn(s *v1.Session) bool {
+	switch s.GetStatus() {
+	case v1.SessionStatus_SESSION_STATUS_BUSY:
+		return true
+	case v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION:
+		r := s.GetStatusReason()
+		return strings.HasPrefix(r, "permission") || strings.HasPrefix(r, "question")
+	}
+	return false
 }

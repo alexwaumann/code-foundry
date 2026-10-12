@@ -31,6 +31,11 @@ service ThreadService {
   // SetPermissionMode switches a connected thread's permission mode: SUPERVISED,
   // ACCEPT_EDITS or AUTO (UNSPECIFIED, Claude's default, cannot be selected live).
   rpc SetPermissionMode(SetThreadPermissionModeRequest) returns (SetThreadPermissionModeResponse) {}
+  // SetEffort changes a connected thread's effort level. Claude has no live effort
+  // switch, so the daemon restarts the process with --resume and the new --effort: at
+  // once when the thread is idle, else once the running turn ends (Session.effort_pending
+  // says so meanwhile). The row records the effort for later spawns either way.
+  rpc SetEffort(SetThreadEffortRequest) returns (SetThreadEffortResponse) {}
 }
 
 // One entry of a rendered thread's conversation. The payload's case is the kind.
@@ -304,7 +309,10 @@ message RespondThreadRequest {
   ThreadDecision decision = 3;
   // A question's answers (required to allow one): question -> chosen label(s).
   map<string, string> answers = 4;
-  // DENY: the reason Claude sees.
+  // DENY: the user's reason. Claude sees it inside Claude Code's own rejection text
+  // ("The user doesn't want to proceed with this tool use. … the user said: <message>");
+  // without one, the plain rejection ("… STOP what you are doing and wait for the user to
+  // tell you how to proceed."). A question is denied (skipped) the same way.
   string message = 5;
   // DENY: also stop the turn.
   bool interrupt = 6;
@@ -336,5 +344,16 @@ message SetThreadPermissionModeRequest {
 }
 
 message SetThreadPermissionModeResponse {
+  Session session = 1;
+}
+
+message SetThreadEffortRequest {
+  string session_id = 1;
+  // low, medium, high, xhigh or max.
+  string effort = 2;
+}
+
+message SetThreadEffortResponse {
+  // effort_pending is set when the restart waits for the running turn.
   Session session = 1;
 }

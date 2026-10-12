@@ -343,7 +343,7 @@ func questionsOf(inputJSON string) []question {
 // an answer for each of its questions when allowed.
 func permissionResult(r *Request, kind ItemKind, d Decision) (claudestream.PermissionResult, error) {
 	if !d.Allow {
-		return claudestream.PermissionResult{Message: d.Message, Interrupt: d.Interrupt}, nil
+		return claudestream.PermissionResult{Message: denyMessage(d.Message), Interrupt: d.Interrupt}, nil
 	}
 	res := claudestream.PermissionResult{Allow: true}
 	if d.ForSession && r.SuggestionsJSON != "" {
@@ -372,6 +372,26 @@ func permissionResult(r *Request, kind ItemKind, d Decision) (claudestream.Permi
 	}
 	res.UpdatedInput = up
 	return res, nil
+}
+
+// What Claude reads when the user denies a request: Claude Code's own rejection
+// texts (2.1.296 binary), so a denial from the app reads to Claude like one in its TUI.
+// The CLI passes a deny's message through as the tool result verbatim. A skipped
+// question is the same rejection: the TUI's Esc on AskUserQuestion rejects the tool use
+// (its "User declined to answer questions" is only how the TUI draws that rejection).
+const (
+	rejectText       = "The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file)."
+	rejectStop       = rejectText + " STOP what you are doing and wait for the user to tell you how to proceed."
+	rejectWithReason = rejectText + " To tell you how to proceed, the user said:\n"
+)
+
+// denyMessage is the tool result Claude gets for a deny (a permission or a skipped
+// question) with the user's reason, possibly empty.
+func denyMessage(reason string) string {
+	if reason = strings.TrimSpace(reason); reason != "" {
+		return rejectWithReason + reason
+	}
+	return rejectStop
 }
 
 func nonEmpty(a, b string) string {

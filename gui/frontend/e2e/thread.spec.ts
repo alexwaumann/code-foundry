@@ -159,10 +159,7 @@ for (const scheme of ["dark", "light"] as const) {
       expect(promptBox && editorBox && promptBox.y + promptBox.height <= editorBox.y + 1).toBe(true);
       await shot(page, `thread-permission-${scheme}`);
 
-      // Answering is PR 3: the buttons say so and nothing is sent.
-      await prompt.getByTestId("thread-permission-allow").click();
-      await expect(page.getByText("Answering from the app is coming next")).toBeVisible();
-      expect((await calls()).filter((c) => c.startsWith("respond"))).toEqual([]);
+      // Answering: e2e/thread-prompts.spec.ts.
     });
 
     test("streaming: a caret while the answer grows, then the footer when the turn ends", async ({ page }) => {
@@ -231,7 +228,8 @@ test("a pending question docks with its pager", async ({ page }) => {
   const q = page.getByTestId("thread-composer").getByTestId("thread-question");
   await expect(q).toContainText("Claude has 2 questions");
   await expect(q).toContainText("1 of 2");
-  await expect(q.getByRole("radio")).toHaveCount(3);
+  // Three options and Other.
+  await expect(q.getByRole("radio")).toHaveCount(4);
   await q.getByRole("radio").nth(1).click();
   await expect(q.getByRole("radio").nth(1)).toHaveAttribute("aria-checked", "true");
   await q.getByTestId("thread-question-next").click();

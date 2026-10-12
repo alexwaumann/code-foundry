@@ -199,6 +199,9 @@ type Session struct {
 	// Render is RenderTerminal or RenderRendered, fixed at Create. Persisted. A
 	// rendered thread has no TerminalID; its conversation is Store.Items.
 	Render Render
+	// EffortPending: a rendered thread's effort change (Store.SetEffort) waits for the
+	// running turn to end; Effort is already the new level. Not persisted.
+	EffortPending bool
 }
 
 // Snapshot is every session, sorted by creation time then id. Never mutate it.
@@ -360,4 +363,8 @@ type Store interface {
 	// SetPermissionMode switches the permission mode of a connected thread (supervised,
 	// accept edits or auto; Claude's default cannot be restored live) and records it.
 	SetPermissionMode(ctx context.Context, id string, mode PermissionMode) (Session, error)
+	// SetEffort changes a connected thread's effort and records it. Claude has no live
+	// effort switch: the process restarts with --resume and the new --effort, at once
+	// when idle, else after the running turn (EffortPending meanwhile).
+	SetEffort(ctx context.Context, id, effort string) (Session, error)
 }

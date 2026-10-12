@@ -79,6 +79,11 @@ export interface SessionView {
   /** Terminal or rendered (docs/notes/rendered-threads-2-gui.md); an older daemon's are terminal. */
   render: SessionRenderView;
   /**
+   * A rendered thread's effort change (thread.set-effort) not applied yet: `effort` is the
+   * new level; Claude restarts with it once the running turn ends.
+   */
+  effortPending: boolean;
+  /**
    * Pull requests Claude linked to the conversation (its pr-link transcript records), one
    * per URL, in first-seen order; never shrinks. docs/notes/linked-prs.md.
    */
@@ -224,6 +229,7 @@ export function toSessionView(s: Session): SessionView {
     pendingWorktreePath: s.pendingWorktreePath,
     pinned: s.pinned,
     render: s.render === SessionRender.RENDERED ? "rendered" : "terminal",
+    effortPending: s.effortPending,
     linkedPullRequests: s.linkedPullRequests.map((l) => ({
       slug: l.slug,
       number: l.number,
