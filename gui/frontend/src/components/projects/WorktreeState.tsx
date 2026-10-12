@@ -1,13 +1,15 @@
-import { ArrowDown, ArrowUp, CircleDot, Folder, GitBranch } from "lucide-react";
+import { ArrowDown, ArrowUp, CircleDot, Folder, GitBranch, MessageSquare } from "lucide-react";
 import { ChecksBadge, PrStateIcon } from "@/components/prs/PrBits";
 import { NoGitBadge } from "./NoGitBadge";
 import { tildify } from "@/lib/path";
+import { liveThreadCount } from "@/lib/projects";
 import { worktreeBranch } from "@/lib/threadRow";
 import { cn } from "@/lib/utils";
 import { branchKey, branchPullRequestsResource } from "@/stores/gh";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import { findWorktree, useReposStore } from "@/stores/repos";
 import { useResource } from "@/stores/resource";
+import { useSessionsStore } from "@/stores/sessions";
 
 /**
  * The viewer's pull request on the worktree's branch (GhService.GetBranchPullRequests,
@@ -38,12 +40,26 @@ function BranchPullRequest({ repoId, branch }: { repoId: string; branch: string 
   );
 }
 
+/** How many live threads run in the worktree (hidden at 0); subscribes to the count only. */
+function LiveThreads({ path }: { path: string }) {
+  const n = useSessionsStore((s) => liveThreadCount(s, path));
+  if (n === 0) return null;
+  return (
+    <span className="flex items-center gap-0.5" title={`${String(n)} live ${n === 1 ? "thread" : "threads"}`} data-testid="worktree-threads">
+      <MessageSquare className="size-3" aria-hidden />
+      {n}
+    </span>
+  );
+}
+
 /**
- * One worktree's git state on a line: branch, path, changed files, ahead/behind its
- * upstream, and its pull request. Shared by the Projects page's project worktrees and the
- * workspace member list.
+ * One worktree's git state on a line: branch, then at the right its live threads,
+ * changed files, ahead/behind its upstream, and its pull request. Shared by the Projects
+ * page's project worktrees and the workspace member list. The path is the row's tooltip;
+ * `showPath` also prints it after the branch. A folder without git shows its path always
+ * (it has no branch to name it).
  */
-export function WorktreeState({ repoId, path, showPath = true }: { repoId: string; path: string; showPath?: boolean }) {
+export function WorktreeState({ repoId, path, showPath = false }: { repoId: string; path: string; showPath?: boolean }) {
   const branch = useReposStore((s) => worktreeBranch(s, repoId, path));
   const realBranch = useReposStore((s) => findWorktree(s, repoId, path)?.branch ?? "");
   const isMain = useReposStore((s) => findWorktree(s, repoId, path)?.isMain ?? false);
@@ -62,12 +78,13 @@ export function WorktreeState({ repoId, path, showPath = true }: { repoId: strin
       <span className="flex min-w-0 flex-1 items-center gap-2">
         <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
         <NoGitBadge />
-        {showPath && (
-          <span className="min-w-0 truncate text-xs text-muted-foreground" title={path}>
-            {tildify(path)}
-          </span>
-        )}
-        {missing && <span className="ml-auto shrink-0 pl-1 text-[11px] text-amber-300">missing</span>}
+        <span className="min-w-0 truncate text-xs text-muted-foreground" data-testid="worktree-path">
+          {tildify(path)}
+        </span>
+        <span className="ml-auto flex shrink-0 items-center gap-2 pl-1 text-[11px] text-muted-foreground tabular-nums">
+          {missing && <span className="text-amber-300">missing</span>}
+          <LiveThreads path={path} />
+        </span>
       </span>
     );
   }
@@ -78,12 +95,13 @@ export function WorktreeState({ repoId, path, showPath = true }: { repoId: strin
         {branch}
       </span>
       {showPath && (
-        <span className="min-w-0 truncate text-xs text-muted-foreground" title={path}>
+        <span className="min-w-0 truncate text-xs text-muted-foreground" data-testid="worktree-path">
           {tildify(path)}
         </span>
       )}
       <span className="ml-auto flex shrink-0 items-center gap-2 pl-1 text-[11px] text-muted-foreground tabular-nums">
         {missing && <span className="text-amber-300">missing</span>}
+        <LiveThreads path={path} />
         {dirty && (
           <span className="flex items-center gap-0.5 text-amber-400" title={`${String(changes)} changed`} data-testid="worktree-dirty">
             <CircleDot className="size-3" aria-label="dirty" />
@@ -109,18 +127,37 @@ export function WorktreeState({ repoId, path, showPath = true }: { repoId: strin
 }
 
 /** A small icon button for a row action (mouse; the keyboard reaches the same commands through the palette). */
-export function RowAction({ label, onClick, children, destructive, testId }: { label: string; onClick: () => void; children: React.ReactNode; destructive?: boolean; testId?: string }) {
+export function RowAction({
+  label,
+  onClick,
+  children,
+  destructive,
+  disabled,
+  testId,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  destructive?: boolean;
+  disabled?: boolean;
+  testId?: string;
+}) {
   return (
     <button
       type="button"
       tabIndex={-1}
       aria-label={label}
       title={label}
+      disabled={disabled}
       data-testid={testId}
       className={cn(
-        "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground [&_svg]:size-3.5",
+        "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:hover:bg-transparent [&_svg]:size-3.5",
         destructive && "hover:text-destructive",
       )}
+      onDoubleClick={(e) => {
+        // Quick repeated clicks must not open the row's panel tab.
+        e.stopPropagation();
+      }}
       onClick={(e) => {
         e.stopPropagation();
         onClick();

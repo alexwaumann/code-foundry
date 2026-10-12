@@ -13,6 +13,7 @@ import { useReposStore } from "@/stores/repos";
 import { runSessionIn } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
 import { useWorkspacesStore } from "@/stores/workspaces";
+import { OverflowMenu } from "./OverflowMenu";
 import { RowAction, WorktreeState } from "./WorktreeState";
 
 export const MEMBER_ROW_HEIGHT = 32;
@@ -107,13 +108,19 @@ function MemberRow({ workspaceId, member }: { workspaceId: string; member: Membe
         </span>
         <WorktreeState repoId={member.repoId} path={member.path} />
       </span>
-      <span className="flex shrink-0 items-center opacity-0 group-hover/member:opacity-100 group-aria-selected/member:opacity-100">
-        <RowAction label="New terminal here" onClick={() => void newTerminalIn(member.repoId, member.path)}>
+      {/* Always shown, muted at rest; a fixed width so every member's state column ends at the same x. */}
+      <span
+        className="flex w-12 shrink-0 items-center justify-end opacity-55 transition-opacity group-hover/member:opacity-100 group-focus-within/member:opacity-100 group-aria-selected/member:opacity-100 has-[[data-state=open]]:opacity-100"
+        data-testid="member-actions"
+      >
+        <RowAction label="New terminal here" testId="member-terminal" onClick={() => void newTerminalIn(member.repoId, member.path)}>
           <SquareTerminal />
         </RowAction>
-        <RowAction label={`Remove ${name} from the workspace`} destructive testId="member-remove" onClick={() => void removeFromWorkspace(workspaceId, member.repoId)}>
-          <X />
-        </RowAction>
+        <OverflowMenu
+          label="More member actions"
+          testId="member-more"
+          items={[{ label: "Remove from workspace", icon: X, destructive: true, testId: "member-remove", onSelect: () => void removeFromWorkspace(workspaceId, member.repoId) }]}
+        />
       </span>
     </NavRow>
   );
