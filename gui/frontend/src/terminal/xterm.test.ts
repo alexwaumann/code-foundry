@@ -69,3 +69,14 @@ describe("XtermRenderer keyboard modes", () => {
     r.dispose();
   });
 });
+
+describe("XtermRenderer keyup", () => {
+  it("an app chord's keyup and cmd's are not xterm's (they would take the keyboard back); other keyups are", () => {
+    const r = new XtermRenderer({ fontSize: 12, colorScheme: "dark", isGlobalChord: (c) => c === "cmd+t" });
+    expect(press(r, { key: "t", code: "KeyT", metaKey: true }, "keyup").handled).toBe(false);
+    expect(press(r, { key: "t", code: "KeyT" }, "keyup").handled).toBe(true);
+    expect(press(r, { key: "Meta", code: "MetaLeft" }, "keyup").handled).toBe(false);
+    expect(press(r, { key: "k", code: "KeyK", metaKey: true }, "keyup").handled).toBe(true);
+    r.dispose();
+  });
+});

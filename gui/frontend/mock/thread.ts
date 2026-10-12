@@ -49,7 +49,12 @@ export interface ThreadWorld {
   setPermission(id: string, permission: string): void;
   setEffort(id: string, effort: string, pending: boolean): void;
   statusOf(id: string): SessionStatus;
+  /** The thread's model as picked ("opus", "claude-sonnet-5"). */
+  modelOf(id: string): string;
 }
+
+/** What Claude reports as the model of a reply for a picked one (a family alias resolves to its current model). */
+const CANONICAL: Readonly<Record<string, string>> = { fable: "claude-fable-5-1", opus: "claude-opus-4-8", sonnet: "claude-sonnet-5", haiku: "claude-haiku-5-5" };
 
 interface Log {
   seq: number;
@@ -69,8 +74,16 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
   "base64",
 );
 
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi"];
+/**
+ * The scripted conversation's states. closed: idle's conversation, the thread
+ * disconnected (closed); crashed: Claude exited before answering the handshake (an error
+ * item, nothing else; mock/world.ts disconnects the thread).
+ */
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "closed" | "crashed";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "closed", "crashed"];
+
+/** The stderr line of the "crashed" state's claude (Session.last_error). */
+export const CRASH_STDERR = "error: unknown option '--bogus'";
 
 const ANSWER_HEAD = `## Fixed: stale badge after a force-push
 
@@ -330,7 +343,12 @@ export class MockThreads {
   }
 
   /** Ends the turn: the streaming text completes, a turn_end follows, the thread is finished (seen when watched). */
-  finish(id: string, opts: { rest?: string; interrupted?: boolean } = {}): void {
+  /**
+   * Ends the running turn like the daemon: the turn_end carries Claude's running total
+   * (the previous one + 0.04, or `total`), the turn's own cost (0.04, or `turnCost`: a
+   * restart can make it differ from the totals' difference) and the model that replied.
+   */
+  finish(id: string, opts: { rest?: string; interrupted?: boolean; total?: number; turnCost?: number; model?: string } = {}): void {
     const l = this.log(id);
     const it = [...l.items].reverse().find((x) => x.streaming);
     if (it) {
@@ -354,14 +372,17 @@ export class MockThreads {
     const lastUser = [...l.items].reverse().find((x) => x.payload?.case === "userMessage");
     const started = lastUser?.createdAt ? Number(lastUser.createdAt.seconds) * 1000 : Date.now();
     const prevCost = [...l.items].reverse().find((x) => x.payload?.case === "turnEnd");
-    const cost = (prevCost?.payload?.case === "turnEnd" ? (prevCost.payload.value.costUsd ?? 0) : 0) + 0.04;
+    const cost = opts.total ?? (prevCost?.payload?.case === "turnEnd" ? (prevCost.payload.value.costUsd ?? 0) : 0) + 0.04;
+    const turnCostUsd = opts.turnCost ?? 0.04;
+    const picked = this.world.modelOf(id);
+    const model = opts.model ?? CANONICAL[picked] ?? picked;
     this.append(
       id,
       this.item(id, {
         case: "turnEnd",
         value: opts.interrupted
-          ? { subtype: "error_during_execution", isError: true, interrupted: true, terminalReason: "aborted_streaming", durationMs: BigInt(Date.now() - started), costUsd: cost }
-          : { subtype: "success", durationMs: BigInt(Date.now() - started), numTurns: 3, costUsd: cost, stopReason: "end_turn" },
+          ? { subtype: "error_during_execution", isError: true, interrupted: true, terminalReason: "aborted_streaming", durationMs: BigInt(Date.now() - started), costUsd: cost, turnCostUsd, model }
+          : { subtype: "success", durationMs: BigInt(Date.now() - started), numTurns: 3, costUsd: cost, turnCostUsd, model, stopReason: "end_turn" },
       }),
     );
     this.world.setStatus(id, l.watchers > 0 ? SessionStatus.IDLE : SessionStatus.NEEDS_ATTENTION, l.watchers > 0 ? "at prompt" : "finished");
@@ -490,7 +511,7 @@ export class MockThreads {
   }
 
   /** (Re)builds the scripted conversation in `state` (the sketch's three states, or idle: both turns done). */
-  load(id: string, state: ThreadState): void {
+  load(id: string, loaded: ThreadState): void {
     // A scripted reply still running for the previous conversation stops.
     this.generation++;
     this.logs.delete(id);
@@ -501,9 +522,17 @@ export class MockThreads {
       l.items.push(x);
       return x;
     };
+    if (loaded === "crashed") {
+      // The daemon's item for a claude that exited before the initialize handshake.
+      it({ case: "error", value: { text: `Claude exited (code 1) before answering the initialize handshake: ${CRASH_STDERR}` } }, { at: ago(0, -2) });
+      l.seq = l.items.length;
+      return;
+    }
+    const state = loaded === "closed" ? "idle" : loaded;
     const tool = (name: string, input: object, value: { output?: string; isError?: boolean; resultJson?: string; status?: ToolCallStatus }, over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
       const toolUseId = `toolu_${name.toLowerCase()}_${String(l.nextOrdinal)}`;
-      return it({ case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: ToolCallStatus.DONE, ...value } }, over);
+      // A tool call's item id is its tool_use id, like the daemon's.
+      return it({ case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: ToolCallStatus.DONE, ...value } }, { id: toolUseId, ...over });
     };
     const cwd = this.world.worktreeOf(id);
     const p = (rel: string) => `${cwd}/${rel}`;
@@ -608,7 +637,10 @@ export class MockThreads {
     tool("Bash", { command: "go test ./..." }, { output: "ok  \tgithub.com/alexwaumann/code-foundry/...\t(412 tests)", resultJson: JSON.stringify({ stdout: "ok  \t…/internal/store/pr\t0.41s\nok  \t…/internal/api\t3.2s\n(412 tests passed)", stderr: "" }) }, { at: ago(3, 12), until: ago(3, 50) });
     if (state === "idle") {
       text("All 412 tests pass and the branch is pushed: PR #63 picked up the fix.", { at: ago(2) });
-      it({ case: "turnEnd", value: { subtype: "success", durationMs: 62_000n, numTurns: 4, costUsd: 1.31, stopReason: "end_turn" } }, { at: ago(1, 58) });
+      // Turn 1 has no turn_cost_usd or model (an older daemon, or a cost the daemon could not
+      // tell); turn 2 ran in a new process that started its totals afresh (the difference of
+      // the totals would say $0.38).
+      it({ case: "turnEnd", value: { subtype: "success", durationMs: 62_000n, numTurns: 4, costUsd: 1.5, turnCostUsd: 1.5, model: "claude-sonnet-5", stopReason: "end_turn" } }, { at: ago(1, 58) });
       l.seq = l.items.length;
       this.world.setStatus(id, SessionStatus.IDLE, "at prompt");
       return;
@@ -671,6 +703,37 @@ export class MockThreads {
       ];
       l.seq = l.items.length;
       this.world.setStatus(id, SessionStatus.NEEDS_ATTENTION, "permission: Edit poller.go");
+      this.source({ event: { case: "pending", value: { sessionId: id, seq: BigInt(l.seq), pending: l.pending } } });
+      return;
+    }
+    if (state === "subagent") {
+      // A subagent's Write waits for permission: the request carries its agent_id, its
+      // tool call sits under the Agent call (parent_tool_use_id).
+      text("All 412 tests pass. A helper writes the changelog entry before I push.", { at: ago(3) });
+      const agent = tool("Agent", { description: "Write the changelog entry", subagent_type: "general-purpose", prompt: "Add a CHANGELOG.md entry for the force-push fix." }, { status: ToolCallStatus.RUNNING, output: "" }, { at: ago(2, 59) });
+      const agentUse = agent.payload?.case === "toolCall" ? (agent.payload.value.toolUseId ?? "") : "";
+      const write = tool("Write", { file_path: p("CHANGELOG.md"), content: "## Unreleased\n\n- The PR badge refreshes after a force-push.\n" }, { status: ToolCallStatus.RUNNING }, { at: ago(2, 58), parentToolUseId: agentUse });
+      const writeCall = write.payload?.case === "toolCall" ? write.payload.value : undefined;
+      const perm = it(
+        {
+          case: "permission",
+          value: {
+            requestId: "req-sub",
+            toolName: "Write",
+            displayName: "Write",
+            toolUseId: writeCall?.toolUseId ?? "",
+            agentId: "a69def54e0124efca",
+            inputJson: writeCall?.inputJson ?? "",
+            description: "CHANGELOG.md",
+            suggestionsJson: JSON.stringify([{ type: "setMode", mode: "acceptEdits", destination: "session" }]),
+            state: ThreadRequestState.PENDING,
+          },
+        },
+        { at: ago(2, 57) },
+      );
+      l.pending = [{ requestId: "req-sub", itemId: perm.id, question: false, toolName: "Write", summary: "Write CHANGELOG.md" }];
+      l.seq = l.items.length;
+      this.world.setStatus(id, SessionStatus.NEEDS_ATTENTION, "permission: Write CHANGELOG.md");
       this.source({ event: { case: "pending", value: { sessionId: id, seq: BigInt(l.seq), pending: l.pending } } });
       return;
     }

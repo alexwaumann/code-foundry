@@ -12,7 +12,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-type State = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi";
+type State = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent";
 
 async function openThread(page: Page, state: State, scheme: "dark" | "light" = "dark"): Promise<void> {
   await page.emulateMedia({ colorScheme: scheme });
@@ -191,6 +191,29 @@ test("parallel requests stack oldest first; each is answerable; an Edit shows it
   await expect.poll(responds).toEqual(["respond s-r1 allow req-push", "respond s-r1 allow req-edit"]);
   await expect(composer(page).getByTestId("thread-prompts")).toHaveCount(0);
   await expect(lastText(page)).toContainText("Done: Edit ran.");
+});
+
+test("a subagent's request names the agent that asked", async ({ page }) => {
+  await openThread(page, "subagent");
+  const prompt = composer(page).getByTestId("thread-permission");
+  await expect(prompt).toContainText("CHANGELOG.md");
+  // Its Agent call's subagent type and description, not a bare "subagent".
+  const chip = prompt.getByTestId("thread-asking-agent");
+  await expect(chip).toHaveText("general-purpose · Write the changelog entry");
+  // A tooltip only when the label is cut short (the prompt's header is narrow here).
+  expect(await chip.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  await chip.hover();
+  await expect(chip).toHaveAttribute("title", "general-purpose · Write the changelog entry");
+  await shot(page, "subagent-dark");
+  await page.mouse.move(0, 0);
+  await chip.evaluate((el) => {
+    el.style.flex = "none";
+  });
+  await chip.hover();
+  expect((await chip.getAttribute("title")) ?? "").toBe("");
+  await prompt.getByTestId("thread-permission-allow").click();
+  await expect(composer(page).getByTestId("thread-permission")).toHaveCount(0);
+  await expect.poll(responds).toEqual(["respond s-r1 allow req-sub"]);
 });
 
 test("question keyboard: digits pick, Enter moves on and submits, Escape skips", async ({ page }) => {

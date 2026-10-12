@@ -623,6 +623,16 @@
 .cf-thread .pend .chip {
   flex: none;
 }
+/* Which subagent asked: its description can be long, so it gives way first. */
+.cf-thread .pend .chip.agent {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 16px;
+}
 .cf-thread .pend .desc .reason {
   display: block;
   margin-top: 2px;

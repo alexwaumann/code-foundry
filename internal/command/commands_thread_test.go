@@ -106,9 +106,12 @@ func TestThreadCommands(t *testing.T) {
 				{ID: "p", Kind: session.KindPermission, Request: &session.Request{RequestID: "r9", ToolName: "Bash", Description: "ls", State: session.RequestPending}},
 				{ID: "a", Kind: session.KindAssistantText, Text: "done"},
 				{ID: "e", Kind: session.KindTurnEnd, Turn: &session.TurnEnd{Subtype: "success", DurationMS: 2500, CostUSD: 0.0123, OutputTokens: 9, InputTokens: 1}},
+				{ID: "u2", Kind: session.KindUserMessage, Text: "again"},
+				{ID: "e2", Kind: session.KindTurnEnd, Turn: &session.TurnEnd{Subtype: "success", DurationMS: 1000, CostUSD: 0.0153, TurnCostUSD: new(0.003), Model: "claude-haiku-5-5"}},
 			},
 			wantMsg: "#1 you: write it\n    [image /a.png]\n#2 tool Write [done] {\"file_path\":\"/x\"}\n    → File created …\n    #3 claude: from the agent\n" +
-				"#4 permission Bash ls: pending (request r9)\n#5 claude: done\n#6 turn end: success, 2.5s, 1 in / 9 out tokens, $0.0123 so far",
+				"#4 permission Bash ls: pending (request r9)\n#5 claude: done\n#6 turn end: success, 2.5s, 1 in / 9 out tokens, $0.0123 so far\n" +
+				"#7 you: again\n#8 turn end: success, 1.0s, 0 in / 0 out tokens, $0.0030, $0.0153 so far, claude-haiku-5-5",
 		},
 		{
 			name: "set mode", cmd: "thread.set-mode", args: map[string]string{"id": "s1", "permission": "accept-edits"},

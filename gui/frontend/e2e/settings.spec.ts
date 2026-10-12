@@ -52,6 +52,15 @@ test("cmd+, opens settings rendered from the schema", async ({ page }) => {
   await expect(setting(page, "sessions.naming_model").getByRole("combobox")).toHaveValue("sonnet");
   await expect(setting(page, "sessions.naming_model").getByRole("option", { name: "Sonnet (default)" })).toHaveCount(1);
   await expect(setting(page, "sessions.naming_model").getByTestId("restart-hint")).toHaveCount(0);
+  // The view new threads start in: live, right after the naming model.
+  const view = setting(page, "sessions.render");
+  await expect(view).toContainText("Thread view");
+  await expect(view).toContainText("A thread keeps its view for life.");
+  await expect(view.getByRole("combobox")).toHaveValue("terminal");
+  await expect(view.getByRole("option")).toHaveText(["Terminal (default)", "Rendered"]);
+  await expect(view.getByTestId("restart-hint")).toHaveCount(0);
+  const keys = await page.locator("[data-setting]").evaluateAll((els) => els.map((e) => e.getAttribute("data-setting")));
+  expect(keys[keys.indexOf("sessions.naming_model") + 1]).toBe("sessions.render");
   // Restart-required fields say so; live ones do not.
   await expect(setting(page, "sessions.scrollback_lines").getByTestId("restart-hint")).toBeVisible();
   await expect(setting(page, "appearance.theme").getByTestId("restart-hint")).toHaveCount(0);

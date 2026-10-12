@@ -176,12 +176,21 @@ type TurnEnd struct {
 	DurationMS     int64
 	NumTurns       int
 	// CostUSD is Claude's estimate for the process so far (cumulative across turns).
-	CostUSD          float64
-	InputTokens      int64
-	OutputTokens     int64
-	CacheReadTokens  int64
-	CacheWriteTokens int64
-	Errors           []string
+	CostUSD float64
+	// TurnCostUSD is this turn's share of it (turnCosts); nil when the daemon could
+	// not tell, and on items recorded before it existed.
+	TurnCostUSD *float64 `json:",omitempty"`
+	// Model is the model of the turn's own replies as Claude names it
+	// ("claude-haiku-5-5"); "" when the turn had none.
+	Model string `json:",omitempty"`
+	// ProcessOutputTokens is the process's output tokens so far (modelUsage), kept to
+	// tell whether a resumed process carried the previous one's totals over.
+	ProcessOutputTokens int64 `json:",omitempty"`
+	InputTokens         int64
+	OutputTokens        int64
+	CacheReadTokens     int64
+	CacheWriteTokens    int64
+	Errors              []string
 }
 
 // Compaction is a compaction item's payload.

@@ -488,6 +488,9 @@ func TestDefaultRender(t *testing.T) {
 		{func() Render { return RenderTerminal }, RenderDefault, RenderTerminal},
 		{func() Render { return RenderTerminal }, RenderRendered, RenderRendered},
 		{func() Render { return RenderRendered }, RenderTerminal, RenderTerminal},
+		// A Create that does not pick (pr.ask / pr.explain / pr.fix.findings, the CLI
+		// without --render) follows the setting.
+		{func() Render { return RenderRendered }, RenderDefault, RenderRendered},
 	} {
 		e := newEnv(t, func(o *Options) {
 			o.DefaultRender = tt.def
@@ -551,7 +554,7 @@ func TestProjectFixtures(t *testing.T) {
 			}
 			log := newThreadLog("s", bus.New(), time.Now, nil)
 			saved := map[string]Item{}
-			p := newProjector(itemWriter{log: log, save: func(it Item) { saved[it.ID] = it }})
+			p := newProjector(itemWriter{log: log, save: func(it Item) { saved[it.ID] = it }}, runningTotals{known: true})
 			var sp claudestream.Splitter
 			for _, line := range sp.Split(nil, data) {
 				p.event(claudestream.Parse(line))
@@ -659,7 +662,7 @@ func TestRenderedStartCrash(t *testing.T) {
 // and a marker (the structured result is dropped over maxResultJSON already).
 func TestProjectToolOutputCap(t *testing.T) {
 	log := newThreadLog("s", bus.New(), time.Now, nil)
-	p := newProjector(itemWriter{log: log, save: func(Item) {}})
+	p := newProjector(itemWriter{log: log, save: func(Item) {}}, runningTotals{known: true})
 	p.event(claudestream.Parse([]byte(`{"type":"assistant","message":{"id":"m1","role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"big"}}]},"parent_tool_use_id":null}`)))
 	big := strings.Repeat("é", maxToolOutput/2+100) // multi-byte: the cut must land on a rune boundary
 	line, _ := json.Marshal(map[string]any{
@@ -725,5 +728,33 @@ func TestRenderedPermissionFollowsItsToolCall(t *testing.T) {
 	want = append(want, "turn_end")
 	if !slices.Equal(kinds(items), want) {
 		t.Errorf("kinds %v, want %v\n%s", kinds(items), want, describeItems(items))
+	}
+}
+
+// TestRenderedConnectsBusyWithItsFirstPrompt: the update that says connected already
+// says busy and the first message is an item by then, so the GUI never sees a connected
+// thread with nothing to show between "Starting Claude…" and "Working".
+func TestRenderedConnectsBusyWithItsFirstPrompt(t *testing.T) {
+	re := newRenderedEnv(t, "text-table")
+	s := re.create(CreateOptions{InitialPrompt: "a table please"})
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case ev := <-re.events.C():
+			u, ok := ev.(Updated)
+			if !ok || u.Session.ID != s.ID || u.Session.State != StateConnected {
+				continue
+			}
+			if u.Session.Status != StatusBusy {
+				t.Fatalf("first connected update: status %v %q", u.Session.Status, u.Session.StatusReason)
+			}
+			items, err := re.m.Items(re.ctx(), s.ID)
+			if err != nil || len(items.Items) == 0 || items.Items[0].Kind != KindUserMessage {
+				t.Fatalf("items when connected: %+v %v", items, err)
+			}
+			return
+		case <-deadline:
+			t.Fatal("never connected")
+		}
 	}
 }

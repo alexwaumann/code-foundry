@@ -11,7 +11,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-type State = "permission" | "question" | "streaming" | "idle";
+type State = "permission" | "question" | "streaming" | "idle" | "closed" | "crashed";
 
 async function openThread(page: Page, state: State, scheme: "dark" | "light" = "dark"): Promise<void> {
   await page.emulateMedia({ colorScheme: scheme });
@@ -72,7 +72,6 @@ for (const scheme of ["dark", "light"] as const) {
       await expect(first).toHaveAttribute("data-folded", "true");
       await expect(first).toContainText("Worked for 4m 08s");
       await expect(first).toContainText("12 steps");
-      await expect(first).toContainText("$1.12");
       await expect(pane(page).getByTestId("thread-group")).toHaveCount(0);
       await expect(pane(page).locator('[data-testid="thread-text"][data-final]').first()).toContainText("Fixed: stale badge after a force-push");
       // The latest turn is open.
@@ -195,7 +194,8 @@ for (const scheme of ["dark", "light"] as const) {
       });
       await mockPost("thread/finish");
       const footer = footers(page).last();
-      await expect(footer).toContainText(/Worked for .*·12 steps·\$0\.04·Opus/);
+      // The turn's own cost and the model that replied, from the daemon's turn_end.
+      await expect(footer).toContainText(/Worked for .*·12 steps·\$0\.04·Opus 4\.8/);
       await expect(footer).not.toHaveAttribute("data-folded", "true");
       await expect(timeline).toHaveAttribute("data-at-bottom", "true");
       await expect
@@ -220,6 +220,19 @@ for (const scheme of ["dark", "light"] as const) {
     });
   });
 }
+
+test("footers: the daemon's turn cost and model; a turn without them shows neither", async ({ page }) => {
+  await openThread(page, "idle");
+  // Turn 2 ran in a new process whose total passed the old one's: the difference of the
+  // totals would say $0.38; the daemon's turn cost says $1.50, and Sonnet 5 answered.
+  await expect(footers(page).last()).toContainText(/·\$1\.50·Sonnet 5$/);
+  // Turn 1 has neither (an older daemon, or a cost the daemon could not tell): no guess
+  // from the running total, no model from the thread's current one.
+  const first = await reveal(page, footers(page));
+  await expect(first).toContainText(/steps$/);
+  await expect(first).not.toContainText("$");
+  await expect(first).not.toContainText("Opus");
+});
 
 test("a pending question docks with its pager", async ({ page }) => {
   await openThread(page, "question");
@@ -290,4 +303,69 @@ test("the thread.* commands are offered for a rendered thread", async ({ page })
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Interrupt Thread");
   await expect(page.getByRole("option", { name: /Interrupt Thread/ })).toBeVisible();
+  for (const title of ["Send to Thread", "Answer Thread Request", "Set Thread Effort"]) {
+    await page.getByTestId("palette").getByRole("combobox").fill(title);
+    await expect(page.getByRole("option", { name: new RegExp(title) })).toBeVisible();
+  }
+  await page.keyboard.press("Escape");
+  // A terminal thread has none of them.
+  await row(page, "s:s-2").click();
+  await expect(page.getByTestId("terminal-host")).toBeVisible();
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("Thread");
+  await expect(page.getByRole("option", { name: /New Thread/ })).toBeVisible();
+  for (const title of ["Interrupt Thread", "Send to Thread", "Answer Thread Request", "Set Thread Model"]) {
+    await expect(page.getByRole("option", { name: new RegExp(title) })).toHaveCount(0);
+  }
+});
+
+test("a claude that died before the handshake: its error in the timeline, Reconnect, then Starting Claude…", async ({ page }) => {
+  await openThread(page, "crashed");
+  await expect(pane(page).getByTestId("thread-error")).toHaveText("Claude exited (code 1) before answering the initialize handshake: error: unknown option '--bogus'");
+  const bar = page.getByTestId("thread-disconnected");
+  await expect(bar).toContainText("Not connected · crashed (exit code 1)");
+  await expect(page.getByTestId("thread-composer")).toHaveCount(0);
+  await shot(page, "crashed");
+  await bar.getByRole("button", { name: "Reconnect" }).click();
+  // Until Claude answers the handshake the timeline says so (no elapsed time: no turn yet).
+  const starting = page.getByTestId("thread-working");
+  await expect(starting).toHaveText("Starting Claude…");
+  await expect(starting).toHaveAttribute("data-starting", "true");
+  await shot(page, "starting");
+  await expect(page.getByTestId("thread-composer")).toBeVisible();
+  await expect(starting).toHaveCount(0, { timeout: 5000 });
+  await expect(pane(page).getByTestId("thread-error")).toBeVisible();
+});
+
+test("a closed thread keeps its conversation above the Reconnect bar", async ({ page }) => {
+  await openThread(page, "closed");
+  await expect(page.getByTestId("thread-disconnected")).toContainText("Not connected · closed. Reconnect to continue the conversation.");
+  await expect(footers(page).last()).toContainText("Sonnet 5");
+  await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("All 412 tests pass and the branch is pushed");
+  await expect(page.getByTestId("thread-working")).toHaveCount(0);
+  await expect(page.getByTestId("thread-empty")).toHaveCount(0);
+});
+
+test("a fork of a rendered thread is rendered and starts empty, naming its parent", async ({ page }) => {
+  await openThread(page, "idle");
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("Fork Thread");
+  await page.keyboard.press("Enter");
+  const fork = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  await expect(fork).not.toHaveAttribute("data-row-key", "s:s-r1");
+  await expect(page.getByTestId("thread-pane")).toBeVisible();
+  await expect(page.getByTestId("session-render")).toHaveText("rendered");
+  await expect(page.getByTestId("thread-working")).toHaveText("Starting Claude…");
+  await expect(page.getByTestId("thread-empty")).toHaveText("Forked from Fix stale PR badge. Claude has the conversation so far; send a follow-up to continue.", { timeout: 5000 });
+  await shot(page, "fork-empty");
+});
+
+test("the follow-up placeholder says a message while Claude works is picked up mid-turn; one Interrupt", async ({ page }) => {
+  await openThread(page, "streaming");
+  const editor = page.getByTestId("thread-composer").locator('[contenteditable="true"]');
+  await expect(editor).toHaveAttribute("aria-placeholder", "Send a follow-up… Claude picks it up mid-turn");
+  await expect(pane(page).getByRole("button", { name: /Interrupt/ })).toHaveCount(1);
+  await mockPost("thread/finish");
+  await expect(editor).toHaveAttribute("aria-placeholder", "Send a follow-up…");
+  await expect(pane(page).getByRole("button", { name: /Interrupt/ })).toHaveCount(0);
 });

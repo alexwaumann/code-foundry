@@ -343,12 +343,34 @@ type Result struct {
 	TerminalReason string    `json:"terminal_reason,omitempty"`
 	TotalCostUSD   float64   `json:"total_cost_usd"`
 	Usage          *APIUsage `json:"usage,omitempty"`
-	Errors         []string  `json:"errors,omitempty"`
-	APIErrorStatus *int      `json:"api_error_status,omitempty"`
+	// ModelUsage is cumulative over the process like TotalCostUSD (subagents included),
+	// by the model's canonical id; a --resume that Claude restores the totals for
+	// carries the previous process's over.
+	ModelUsage     map[string]ModelUsage `json:"modelUsage,omitempty"`
+	Errors         []string              `json:"errors,omitempty"`
+	APIErrorStatus *int                  `json:"api_error_status,omitempty"`
 	// QueuedTurnCount > 0 means more queued user turns follow without input.
 	QueuedTurnCount int    `json:"queued_turn_count,omitempty"`
 	LocalCommand    string `json:"local_command,omitempty"`
 	UserMessageUUID string `json:"user_message_uuid,omitempty"`
+}
+
+// ModelUsage is one model's running totals in a result's modelUsage.
+type ModelUsage struct {
+	InputTokens              int64   `json:"inputTokens"`
+	OutputTokens             int64   `json:"outputTokens"`
+	CacheReadInputTokens     int64   `json:"cacheReadInputTokens"`
+	CacheCreationInputTokens int64   `json:"cacheCreationInputTokens"`
+	CostUSD                  float64 `json:"costUSD"`
+}
+
+// OutputTokens is the process's output tokens so far over every model (modelUsage).
+func (r *Result) OutputTokens() int64 {
+	var n int64
+	for _, u := range r.ModelUsage {
+		n += u.OutputTokens
+	}
+	return n
 }
 
 // Interrupted reports whether the turn was cut short by an interrupt

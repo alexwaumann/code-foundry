@@ -118,7 +118,11 @@ draws the conversation. Design record: `docs/notes/rendered-threads-handoff.md`.
   stacked parallel prompts, keyboard 1/2/3, Escape interrupts, effort restart with
   `--resume`, `ThreadService.SetEffort` / `thread.set-effort`) done:
   `docs/notes/rendered-threads-3-interaction.md`.
-* PR 4 (composer toggle, setting UI, polish): not started.
+* PR 4 (the composer's View picker from `sessions.render`, the header's "rendered", per-turn
+  cost and model on `turn_end`, the asking subagent named on its prompts, starting / empty
+  fork / crashed states, docs) done: `docs/notes/rendered-threads-4-optin.md`. All four
+  rendered-thread PRs are done; follow-ups: `docs/notes/rendered-threads-followups.md`
+  (branch `t3code/rendered-threads-followups-doc`).
 
 ### Open items
 

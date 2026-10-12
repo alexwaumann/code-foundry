@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { answerOf, answersOf, modeHint, NO_PICK, pickOption, permissionChoices, promptKey, questionsOf, suggestedMode, suggestedRules, suggestionCount, type Question, type QuestionPick } from "./threadRequest";
+import { answerOf, askingAgentLabel, answersOf, modeHint, NO_PICK, pickOption, permissionChoices, promptKey, questionsOf, suggestedMode, suggestedRules, suggestionCount, type Question, type QuestionPick } from "./threadRequest";
 
 const single: Question = {
   question: "How should I push?",
@@ -106,5 +106,22 @@ describe("promptKey", () => {
     ["letters are nothing", ask, { key: "a", ...prompt }, null],
   ])("%s", (_name, shape, k, want) => {
     expect(promptKey(shape, k)).toEqual(want);
+  });
+});
+
+describe("askingAgentLabel", () => {
+  it.each([
+    [JSON.stringify({ description: "Review the fingerprint change", subagent_type: "code-reviewer", prompt: "…" }), "code-reviewer · Review the fingerprint change"],
+    [JSON.stringify({ description: "Create sub.txt" }), "Create sub.txt"],
+    [JSON.stringify({ subagent_type: "Explore" }), "Explore"],
+    [JSON.stringify({ description: "  ", subagent_type: "" }), "subagent"],
+    ['{"description": "partial', "subagent"],
+    ["", "subagent"],
+    [JSON.stringify({ subagent_type: "general-purpose", description: "Check\n  the   logs" }), "general-purpose · Check the logs"],
+    [JSON.stringify({ subagent_type: "general-purpose", description: "word ".repeat(40) }), `general-purpose · ${"word ".repeat(16)}w…`],
+  ])("%s → %s", (json, want) => {
+    const got = askingAgentLabel(json);
+    expect(got).toBe(want);
+    expect(got.length).toBeLessThanOrEqual(100);
   });
 });

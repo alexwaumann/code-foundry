@@ -145,7 +145,8 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 			Name:  "session.new",
 			Title: "New Thread",
 			Description: "Start Claude Code in a worktree (default: the active worktree, else the active repository's main worktree), or in a new worktree. " +
-				"With workspace the thread belongs to that workspace and runs in one of its member worktrees; with new-worktree and repos it gets a new workspace.",
+				"With workspace the thread belongs to that workspace and runs in one of its member worktrees; with new-worktree and repos it gets a new workspace. " +
+				"render picks how the thread runs for its whole life: terminal (Claude Code's own interface) or rendered (the app draws the conversation); without it, settings sessions.render.",
 			Category:    "Thread",
 			Keybindings: []string{"cmd+n"},
 			Args: []ArgSpec{

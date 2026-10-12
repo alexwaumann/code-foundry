@@ -172,7 +172,7 @@ test("new thread: a worktree's + on the Projects page opens the composer with th
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
   const last = (await invocations()).at(-1);
-  expect(last?.args).toEqual({ repo: "repo-cf", worktree: FIX_RESIZE, model: "opus", effort: "high", permission: "auto", prompt: "Fix the resize race" });
+  expect(last?.args).toEqual({ repo: "repo-cf", worktree: FIX_RESIZE, model: "opus", effort: "high", permission: "auto", render: "terminal", prompt: "Fix the resize race" });
   // The thread is the newest row, in that worktree, selected and attached.
   const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
   await expect(created).toBeVisible();

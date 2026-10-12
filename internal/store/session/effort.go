@@ -116,6 +116,8 @@ func (r *runner) respawn() {
 			l = launch{resume: id}
 		}
 	}
+	// The old process has exited: its cost-state record is in the transcript.
+	st.proj.restart(restoredTotals(r.m.opts.Paths, r.cwd, l))
 	s, _ := r.m.Snapshot().Session(r.id)
 	s.WorktreePath, s.Effort = r.cwd, st.wantEffort
 	argv, env := r.m.claudeCommand(s, l, "", st.grants)

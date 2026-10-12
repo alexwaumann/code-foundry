@@ -24,7 +24,7 @@ import { MockUpdater } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { claudeIntro, claudeTick, ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
-import { MockThreads, type ThreadState } from "./thread";
+import { CRASH_STDERR, MockThreads, type ThreadState } from "./thread";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -68,6 +68,10 @@ interface MockSession {
   lastActivityAt: Date;
   exitCode: number;
   disconnectReason: string;
+  /** Why the last start or run failed (stderr's last line); "" when nothing did. */
+  lastError: string;
+  /** session.fork: the session this one was forked from. */
+  parentId: string;
   permissionMode: PermissionMode;
   baseRef: string;
   createdWorktree: boolean;
@@ -81,6 +85,8 @@ interface MockSession {
   render: SessionRender;
   /** A rendered thread's effort change waiting for the turn to end (thread.set-effort). */
   effortPending: boolean;
+  /** Mock-only: a new rendered thread's first message, sent once it connects (the daemon sends it after the handshake). */
+  firstMessage: { text: string; attachments: string[]; composerText: string } | null;
   /** Claude's pr-link records: one per URL, first-seen order (POST /__mock/link-pr). */
   linkedPullRequests: { slug: string; number: number; url: string; linkedAt: Date }[];
   /** Token usage buckets (mock/usage.ts; POST /__mock/usage). */
@@ -338,6 +344,7 @@ export class World {
   readonly threads = new MockThreads(
     {
       worktreeOf: (id) => this.session(id).worktreePath,
+      modelOf: (id) => this.session(id).model,
       isConnected: (id) => this.session(id).state === SessionState.CONNECTED,
       setStatus: (id, status, reason) => {
         const s = this.session(id);
@@ -720,6 +727,8 @@ export class World {
       lastActivityAt: new Date(),
       exitCode: 0,
       disconnectReason: "",
+      lastError: "",
+      parentId: "",
       permissionMode: PermissionMode.AUTO,
       baseRef: "",
       createdWorktree: false,
@@ -728,6 +737,7 @@ export class World {
       pinned: false,
       render: SessionRender.TERMINAL,
       effortPending: false,
+      firstMessage: null,
       linkedPullRequests: [],
       usage: [],
       moveIn: 0,
@@ -770,6 +780,8 @@ export class World {
       lastActivityAt: timestampFromDate(s.lastActivityAt),
       exitCode: s.exitCode,
       disconnectReason: s.disconnectReason,
+      lastError: s.lastError,
+      parentId: s.parentId,
       permissionMode: s.permissionMode,
       baseRef: s.baseRef,
       createdWorktree: s.createdWorktree,
@@ -900,6 +912,12 @@ export class World {
       createdAt: new Date(Date.now() - 10 * 60_000),
     });
     this.threads.load(id, state);
+    if (state === "closed") this.disconnectSession(id, "closed", 0);
+    if (state === "crashed") {
+      // Before the handshake: no turn ran, so no status to keep.
+      s.lastError = CRASH_STDERR;
+      this.disconnectSession(id, "crashed", 1, SessionStatus.UNSPECIFIED);
+    }
     this.publishSession(s);
     return s;
   }
@@ -937,6 +955,7 @@ export class World {
     s.settleIn = 2;
     s.disconnectReason = "";
     s.exitCode = 0;
+    s.lastError = "";
     s.lastActivityAt = new Date();
     this.publishSession(s);
   }
@@ -955,6 +974,10 @@ export class World {
           s.state = SessionState.CONNECTED;
           this.setStatus(s, SessionStatus.IDLE);
           this.publishSession(s);
+          // A new rendered thread: its first message goes out once Claude answered the handshake.
+          const first = s.firstMessage;
+          s.firstMessage = null;
+          if (first && s.render === SessionRender.RENDERED) this.threads.send(s.id, first.text, first.attachments, first.composerText);
         } else if (s.state === SessionState.CLOSING) {
           this.disconnectSession(s.id, "closed", 0);
         }
@@ -1246,6 +1269,7 @@ export class World {
     if (args.workspace || args.repos) return this.newWorkspaceSession(args);
     const repo = this.repos.get(args.repo || ctx?.activeRepoId || "") ?? this.worktreeOf(ctx)?.repo;
     if (!repo) throw new CommandError("invalid", "a worktree or repository is required");
+    const view = this.viewOf(args);
     const prompt = args.prompt ?? "";
     const permission = args.permission ?? "";
     if (permission && !(permission in permissionModes)) throw new CommandError("invalid", `permission must be supervised, accept-edits or auto`);
@@ -1286,9 +1310,24 @@ export class World {
       permissionMode: permissionModes[permission] ?? PermissionMode.UNSPECIFIED,
       baseRef,
       createdWorktree: created,
+      ...view,
     });
     this.focusSession(s.id);
     return { message: `created session ${s.id} in ${path}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path }) };
+  }
+
+  /**
+   * session.new's view: its `render` arg, else the sessions.render setting (the daemon's
+   * Create without a mode). A rendered thread gets its prompt as the first message once it
+   * connects.
+   */
+  private viewOf(args: Record<string, string>): Pick<MockSession, "render" | "firstMessage"> {
+    const v = args.render || this.settings.values()["sessions.render"] || "terminal";
+    if (v !== "terminal" && v !== "rendered") throw new CommandError("invalid", "render must be terminal or rendered");
+    if (v === "terminal") return { render: SessionRender.TERMINAL, firstMessage: null };
+    const text = (args.prompt ?? "").trim();
+    const attachments = (args.attachments ?? "").split(",").filter(Boolean);
+    return { render: SessionRender.RENDERED, firstMessage: text || attachments.length > 0 ? { text, attachments, composerText: args["composer-prompt"] ?? "" } : null };
   }
 
   /**
@@ -1302,6 +1341,7 @@ export class World {
     const permission = args.permission ?? "";
     if (args.workspace && created) throw new CommandError("invalid", "a workspace thread runs in an existing member; for a new workspace use new-worktree with repos");
     if (args.repos && !created) throw new CommandError("invalid", "repos only applies with new-worktree");
+    const view = this.viewOf(args);
     for (const p of (args.attachments ?? "").split(",").filter(Boolean)) {
       if (!this.attachments.has(p)) throw new CommandError("invalid", `attachment ${p} was not staged`);
     }
@@ -1345,6 +1385,7 @@ export class World {
       baseRef,
       createdWorktree: created,
       workspaceId: ws.id,
+      ...view,
     });
     this.focusSession(s.id);
     return { message: `created thread ${s.id} in ${member.worktreePath} (workspace ${ws.id})`, resultJson: JSON.stringify({ id: s.id, worktreePath: member.worktreePath, workspaceId: ws.id }) };
@@ -1604,7 +1645,8 @@ export class World {
           }
         }
         const defaults = this.sessionDefaults();
-        const s = this.createSession(target.repoId, target.path, args.model ?? defaults.model, args.effort ?? defaults.effort);
+        // No render arg: the thread gets the sessions.render setting's view, like the daemon's.
+        const s = this.createSession(target.repoId, target.path, args.model ?? defaults.model, args.effort ?? defaults.effort, { render: this.viewOf({}).render });
         this.focusSession(s.id);
         // Like the daemon: the result JSON is the created Session (protojson).
         return {
@@ -1681,7 +1723,7 @@ export class World {
           name: "session.new",
           title: "New Thread",
           category: "Session",
-          description: "Start Claude Code in a worktree (or a new one), with a first prompt",
+          description: "Start Claude Code in a worktree (or a new one), with a first prompt; render picks terminal or rendered for the thread's life (default: settings sessions.render)",
           keybindings: ["cmd+n"],
           args: [
             { name: "repo", type: ArgType.STRING, required: false, description: "Repository id" },
@@ -1696,6 +1738,8 @@ export class World {
             { name: "name", type: ArgType.STRING, required: false, description: "Thread name" },
             { name: "prompt", type: ArgType.STRING, required: false, description: "First prompt" },
             { name: "attachments", type: ArgType.STRING, required: false, description: "Staged attachment paths, comma-separated" },
+            { name: "composer-prompt", type: ArgType.STRING, required: false, description: "A rendered thread: the composer's text of prompt with its tag tokens" },
+            { name: "render", type: ArgType.ENUM, required: false, description: "terminal or rendered (default: settings sessions.render)", enumValues: ["terminal", "rendered"] },
           ],
         },
         when: (ctx) => this.worktreeOf(ctx) !== null || Boolean(ctx?.activeRepoId && this.repos.has(ctx.activeRepoId)),
@@ -1719,7 +1763,8 @@ export class World {
         run: (ctx) => {
           const s = activeSession(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
-          const f = this.createSession(s.repoId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode });
+          // A fork keeps its parent's view (the daemon's rule: a thread's view never changes).
+          const f = this.createSession(s.repoId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, render: s.render, parentId: s.id });
           this.focusSession(f.id);
           return `Forked ${s.name || s.id}`;
         },

@@ -154,7 +154,7 @@ func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv,
 		pending:  map[string]*claudestream.PermissionRequest{},
 		effort:   s.Effort, wantEffort: s.Effort,
 	}
-	st.proj = newProjector(itemWriter{log: log, save: func(it Item) { m.saveItem(s.ID, it) }})
+	st.proj = newProjector(itemWriter{log: log, save: func(it Item) { m.saveItem(s.ID, it) }}, restoredTotals(m.opts.Paths, r.cwd, r.launch))
 	r.st = st
 	// A run the daemon lost (crash) may have left items open.
 	closeUnfinished(st.proj.w, "the thread's process ended")
@@ -312,20 +312,33 @@ func (r *runner) onInitialized(err error) {
 		return
 	}
 	r.state = StateConnected
+	// The first prompt goes out before the row says connected, and the row says busy in
+	// the same update: otherwise the GUI sees a connected thread that is neither
+	// starting nor working for a debounce (its timeline flashed "No messages yet.").
+	sentFirst := false
+	if f := st.first; f != nil {
+		st.first = nil
+		if _, err := r.sendMessage(f); err != nil {
+			r.log().warn("send first prompt", "err", err)
+		} else {
+			sentFirst = true
+		}
+	}
+	now := r.m.opts.Now()
 	r.m.update(r.id, true, func(rec *record) {
 		if rec.s.State == StateStarting {
 			rec.s.State = StateConnected
 		}
 		rec.s.LastActivityAt = r.activity
+		if sentFirst {
+			rec.s.setStatus(r.status, r.reason, now)
+		}
 	})
 	r.pubActivity = r.activity
-	r.log().info("session connected", "why", "initialized", "pid", st.proc.Pid())
-	if f := st.first; f != nil {
-		st.first = nil
-		if _, err := r.sendMessage(f); err != nil {
-			r.log().warn("send first prompt", "err", err)
-		}
+	if sentFirst {
+		r.pubStatus, r.pubReason = r.status, r.reason
 	}
+	r.log().info("session connected", "why", "initialized", "pid", st.proc.Pid())
 	r.checkStatus()
 }
 

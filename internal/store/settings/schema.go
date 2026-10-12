@@ -153,7 +153,7 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeyRender, Group: GroupSessions, Type: Enum, Title: "Thread view",
-		Description: "How new threads run when the composer does not pick: terminal (Claude Code's own interface in a terminal) or rendered (Claude Code runs headless and the app draws the conversation). A thread keeps its view for life.",
+		Description: "View for new threads: the composer starts with it, and threads started elsewhere (pull request actions, the CLI without --render) get it. Terminal is Claude Code's own interface; Rendered runs Claude Code headless and the app draws the conversation. A thread keeps its view for life.",
 		Enum:        []string{RenderTerminal, RenderRendered}, EnumLabels: []string{"Terminal", "Rendered"}, Default: RenderTerminal,
 		bind: func(s *Settings) any { return &s.Sessions.Render },
 	},

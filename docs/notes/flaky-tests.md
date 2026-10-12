@@ -43,6 +43,29 @@ drag tests 15 times each, passed on WebKit. Likely load: the drags are real mous
 4 steps and the assertions poll the panel's width. If it shows up again, run with
 `E2E_MOCK_PORT`/`E2E_VITE_PORT` set so another worktree's e2e is not sharing the ports.
 
+## `TestConnRequestCorrelation` (internal/claudestream) — 1 failure, fixed
+
+Seen in `make check` on the rendered threads PR 4 branch (2026-10-12): "set mode err =
+<nil>". The test answers two control requests out of order and read both callers' results
+from one channel, assuming the set_permission_mode caller would send first; under load the
+initialize caller woke first. Each request now has its own channel (50 `-race` repeats
+green). Not a Conn bug: the Conn hands each answer to its own request's waiter; only which
+waiter's goroutine runs first was left to the scheduler (review: confirmed, 50 more `-race`
+repeats green).
+
+## `terminal-routing.spec.ts` "cmd+t on a thread …" on WebKit — app bug, fixed
+
+Seen in the PR 4 full e2e run and once in 5 repeats (2026-10-12): the focus ended in the
+content terminal, not the new bottom shell. PR 4 first made the test wait for the thread's
+terminal to be live before cmd+t; the review found that hid a real race and reverted the
+wait. A focus log (focusin stacks) showed xterm's own `_keyUp` refocusing the thread's
+terminal after the shell had the keyboard: xterm focuses its textarea on every keyup
+except shift/ctrl/alt's (cmd is not on its list), and under load WebKit delivered the
+keyup of `t` / of cmd after the shell focused. A person who holds cmd+t a little longer
+than the shell takes to open can hit the same. `terminal/xterm.ts` now answers a keyup of
+an app chord, or of cmd, with false so xterm skips the refocus. Without the wait: 1 failure
+in 6 to 1 in 30 repeats before, 100 + 40 WebKit and 40 Chromium repeats green after.
+
 ## Gotchas
 
 - Agent worktrees don't have libghostty-vt built; `make check` there needs

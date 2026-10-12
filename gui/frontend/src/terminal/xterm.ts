@@ -108,6 +108,15 @@ export class XtermRenderer implements TerminalRenderer {
       if (e.type === "keydown") this.term.input(shiftEnterSequence(this.keyboardModes));
       return false;
     }
+    if (e.type === "keyup") {
+      // xterm focuses its terminal on every keyup but shift/ctrl/alt's. The keyup of an
+      // app chord that moved the keyboard elsewhere (cmd+t opens a shell in the bottom
+      // panel and focuses it), or of its cmd, can arrive after the move and would take
+      // the keyboard back.
+      if (e.key === "Meta") return false;
+      const chord = chordFromEvent(e);
+      return !(chord && this.opts.isGlobalChord(chord));
+    }
     if (e.type !== "keydown") return true;
     const chord = chordFromEvent(e);
     if (!chord) return true;

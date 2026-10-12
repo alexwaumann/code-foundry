@@ -53,6 +53,9 @@ test("a thread row's New terminal here: the thread owns the shell, in its bottom
 test("cmd+t on a thread starts its shell in the bottom panel, with the keyboard in it", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-2").click();
+  // At once, not after the thread's terminal is live: the keyup of cmd+t can reach the
+  // thread's xterm after the shell took the keyboard, and xterm refocuses itself on a
+  // keyup unless told it is an app chord (terminal/xterm.ts; flaky-tests.md).
   await page.keyboard.press("Meta+t");
   await expect(bottom(page).getByRole("tab")).toHaveCount(1);
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"))).toBe("bottom");

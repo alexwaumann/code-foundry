@@ -271,7 +271,11 @@ Layers Claude-specific knowledge on top of terminal:
   comes from the stream (busy from send to result, needs-attention while a request is
   pending, finished until seen), not a screen. Transcript tailing (naming, usage, PR
   links, `/clear`) is shared with terminal threads
-  (`docs/notes/rendered-threads-1-daemon.md`).
+  (`docs/notes/rendered-threads-1-daemon.md`). Each turn end carries the turn's own cost
+  (Claude reports running totals per process; a process's first turn is measured from
+  what Claude restores on `--resume`, the resumed transcript's last `cost-state` record,
+  read at spawn; unset when the totals do not fit) and the model that replied
+  (`docs/notes/rendered-threads-4-optin.md`).
 * Auto-naming via an independent `claude -p` call producing a slug.
 * **Linked pull requests** come from Claude's own `pr-link` transcript records: every
   distinct URL in first-seen order, persisted in `session_pull_requests`, backfilled from
@@ -304,11 +308,17 @@ type Command struct {
 `Context` is what the caller is looking at: active session, active repo/worktree, active
 view, the workspace that owns the active thread or composer (so `session.run-in` is
 offered for workspace threads only), and whether the active thread is rendered (so the
-`thread.*` commands, send/respond/interrupt/items/set-model/set-mode, are offered for
-rendered threads only). The GUI sends its context with `List` and `Invoke`;
+`thread.*` commands, send/respond/interrupt/items/set-model/set-mode/set-effort, are
+offered for rendered threads only). The GUI sends its context with `List` and `Invoke`;
 the CLI passes an explicit context from flags or none. The palette, keybindings, and CLI subcommands are three front
 doors to this one registry. Adding a feature means registering commands, not editing a
 switch.
+
+Two thread views, fixed for a thread's life: **terminal** (Claude Code's own interface in
+a PTY, attached as a terminal) and **rendered** (`claude -p` over stream-json, drawn by the
+GUI from thread items). `session.new --render terminal|rendered` picks one; a Create
+without it (the CLI, `pr.ask` / `pr.explain` / `pr.fix.findings`) gets the
+`sessions.render` setting (default terminal); fork and reconnect keep the thread's.
 
 Pull request commands: the detail panel's actions (`pr.merge`, `pr.revert`,
 `pr.review.request`, `pr.refresh`; docs/notes/gh-pr-detail.md) and the session starters `pr.ask`,
@@ -330,6 +340,10 @@ from the pull request (docs/notes/pr-thread-commands.md).
   shell, each only while it is visible. Everything else is unary, except a
   `RepoService.Clone` stream while the Add Project dialog clones a repository. This keeps
   the browser's six HTTP/1.1 connections per origin mostly free.
+* The new-thread composer's View picker (Terminal | Rendered) starts at the
+  `sessions.render` setting and follows it until the user picks; the choice goes out as
+  `session.new --render`. A rendered thread's header says "rendered"; the sidebar row is
+  the same for both views.
 * A rendered thread's content pane is `components/thread` (lazy-loaded): a virtualized
   work-log timeline built from the items' structure (`lib/threadTimeline.ts`; text deltas
   re-render only their row), turns that fold under their footer once finished (the latest

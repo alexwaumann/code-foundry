@@ -6,6 +6,7 @@ import { shellTokens } from "@/lib/highlight";
 import {
   answerOf,
   answersOf,
+  askingAgentLabel,
   modeHint,
   NO_PICK,
   permissionChoices,
@@ -23,7 +24,7 @@ import {
 } from "@/lib/threadRequest";
 import { parseObject, relPath, str, toolHunks, type Json } from "@/lib/toolSummary";
 import { useSessionsStore } from "@/stores/sessions";
-import { useThreadItem } from "@/stores/thread";
+import { useAgentInputOf, useThreadItem } from "@/stores/thread";
 import { respondThread } from "@/stores/threadActions";
 import { TokenSpans } from "./Code";
 import { useThreadCtx } from "./context";
@@ -134,6 +135,25 @@ function PromptDiff({ r }: { r: ThreadRequestView }) {
   );
 }
 
+/** Which subagent asked: its Agent call's type and description ("subagent" until that call is known). */
+function AskingAgent({ toolUseId }: { toolUseId: string }) {
+  const { sessionId } = useThreadCtx();
+  const label = askingAgentLabel(useAgentInputOf(sessionId, toolUseId));
+  return (
+    <span
+      className="chip muted agent"
+      data-testid="thread-asking-agent"
+      onMouseEnter={(e) => {
+        // A tooltip only for a label a narrow pane cut short.
+        const el = e.currentTarget;
+        el.title = el.scrollWidth > el.clientWidth ? label : "";
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
 /** A pending permission prompt: what Claude wants to do and why it asks; Allow / Allow for session / Deny (with an optional reason). */
 function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
   const { sessionId, cwd } = useThreadCtx();
@@ -206,7 +226,7 @@ function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
         <ShieldAlert aria-hidden />
         <span>{permissionTitle(r, input, cwd)}</span>
         <span className="chip tool">{r.displayName || r.toolName}</span>
-        {r.agentId && <span className="chip">subagent</span>}
+        {r.agentId && <AskingAgent toolUseId={r.toolUseId} />}
         {hint && (
           <span className="why" data-testid="thread-permission-hint">
             {hint}
@@ -377,7 +397,7 @@ function QuestionPrompt({ r, keysRef, refocus }: PromptProps) {
       <div className="pend-h">
         <MessageCircleQuestionMark aria-hidden />
         <span>{questions.length === 1 ? "Claude has a question" : `Claude has ${String(questions.length)} questions`}</span>
-        {r.agentId && <span className="chip">subagent</span>}
+        {r.agentId && <AskingAgent toolUseId={r.toolUseId} />}
         {questions.length > 1 && (
           <span className="pager" aria-label={`Question ${String(page + 1)} of ${String(questions.length)}`}>
             {questions.map((_, i) => (

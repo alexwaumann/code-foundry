@@ -98,6 +98,7 @@ test("pick a workspace: member chips, the primary is changeable, the thread is t
     model: "opus",
     effort: "high",
     permission: "auto",
+    render: "terminal",
     prompt: "Wire the login form to the new API",
   });
   const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
@@ -134,6 +135,7 @@ test("a workspace in new-worktree mode makes a new workspace with the same proje
     model: "opus",
     effort: "high",
     permission: "auto",
+    render: "terminal",
     prompt: "Rename the session cookie",
   });
   await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
@@ -202,6 +204,7 @@ test("pick a project, add Also in: a new workspace with a cf/<slug> worktree in 
     model: "opus",
     effort: "high",
     permission: "auto",
+    render: "terminal",
     prompt: "Add a dark mode toggle",
   });
   const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
@@ -238,6 +241,7 @@ test("with workspaces around, a single-project thread sends exactly what it did 
     model: "opus",
     effort: "high",
     permission: "auto",
+    render: "terminal",
     prompt: "Port the renderer",
   });
   const created = page.locator('[data-row-kind="session"][aria-selected="true"]');

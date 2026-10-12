@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { ArrowUp, Brain, Folder, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, Paperclip, ShieldCheck, X } from "lucide-react";
+import { ArrowUp, Brain, Folder, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, MessageSquareText, Paperclip, ShieldCheck, SquareTerminal, X } from "lucide-react";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { BranchIndicator } from "./BranchIndicator";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
@@ -18,6 +18,7 @@ import {
   choiceLabel,
   DEFAULT_EFFORT,
   DEFAULT_MODEL,
+  DEFAULT_RENDER,
   draftKey as keyOf,
   draftMembers,
   EFFORT_CHOICES,
@@ -25,7 +26,9 @@ import {
   PERMISSION_CHOICES,
   pickDefault,
   projectChipBranch,
+  RENDER_CHOICES,
   type ComposePermission,
+  type ComposeRender,
   type ComposeTarget,
   type WorktreeChoice,
 } from "@/lib/compose";
@@ -60,11 +63,14 @@ const SEP = "\u0001";
 /** What starts a completion in the prompt: "/" for skills, "@" for files. */
 const TRIGGERS: readonly TriggerChar[] = ["/", "@"];
 
-/** Model and effort the composer starts with: the settings defaults, else opus / high. */
-function useDefaults(): { model: string; effort: string } {
+const RENDER_GROUPS = [{ options: RENDER_CHOICES.map((c) => ({ value: c.value, label: c.label, detail: c.hint })) }];
+
+/** Model, effort and view the composer starts with: the settings defaults, else opus / high / terminal. */
+function useDefaults(): { model: string; effort: string; render: ComposeRender } {
   const model = pickDefault(useModelChoices(), useSettingValue("sessions.default_model"), DEFAULT_MODEL);
   const effort = pickDefault(EFFORT_CHOICES, useSettingValue("sessions.default_effort"), DEFAULT_EFFORT);
-  return useMemo(() => ({ model, effort }), [model, effort]);
+  const render = pickDefault(RENDER_CHOICES, useSettingValue("sessions.render"), DEFAULT_RENDER) as ComposeRender;
+  return useMemo(() => ({ model, effort, render }), [model, effort, render]);
 }
 
 interface WorktreeOption {
@@ -271,8 +277,8 @@ const NEW_IN_EVERY = "A cf/… branch in every project (a new workspace)";
 
 /**
  * The member chips (MemberChips) above the card. The card: attachments, the prompt, the
- * model/effort/permission pickers, attach and send; below it the worktree picker and,
- * beside it, the base-ref picker for new worktrees or the chosen worktree's branch
+ * model/effort/permission/view pickers, attach and send; below it the worktree picker
+ * and, beside it, the base-ref picker for new worktrees or the chosen worktree's branch
  * (read-only, not a Tab stop) otherwise. Grid placement keeps the send button inside the
  * card while Tab goes textarea → pickers (worktree and base included) → send; the chips
  * come before the prompt.
@@ -292,6 +298,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   const model = useDraft(draftKey, "model") ?? defaults.model;
   const effort = useDraft(draftKey, "effort") ?? defaults.effort;
   const permission = useDraft(draftKey, "permission");
+  const render = useDraft(draftKey, "render") ?? defaults.render;
   const choice = useDraft(draftKey, "worktree");
   const baseChoice = useDraft(draftKey, "base");
   const phase = useDraft(draftKey, "phase");
@@ -548,6 +555,19 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
             disabled={busy}
             contentClassName="w-60"
             data-testid="composer-permission"
+          />
+          <ComposerPicker
+            label="View"
+            icon={render === "rendered" ? MessageSquareText : SquareTerminal}
+            text={choiceLabel(RENDER_CHOICES, render)}
+            value={render}
+            groups={RENDER_GROUPS}
+            onChange={(v) => {
+              updateDraft(draftKey, { render: v as ComposeRender });
+            }}
+            disabled={busy}
+            contentClassName="w-60"
+            data-testid="composer-render"
           />
           <button
             type="button"
