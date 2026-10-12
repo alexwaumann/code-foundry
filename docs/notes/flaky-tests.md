@@ -51,6 +51,15 @@ from one channel, assuming the set_permission_mode caller would send first; unde
 initialize caller woke first. Each request now has its own channel (50 `-race` repeats
 green). Not a Conn bug.
 
+## `terminal-routing.spec.ts` "cmd+t on a thread …" on WebKit — 2 failures, fixed
+
+Seen in the PR 4 full e2e run and once in 5 repeats (2026-10-12): the focus ended in the
+content terminal, not the new bottom shell. The test pressed cmd+t right after selecting the
+thread; the thread's Claude terminal attaches and takes focus a moment later, and under load
+that landed after the shell's. The test now waits for the content terminal to be live first
+(30 repeats green). A person pressing cmd+t within milliseconds of selecting a thread could
+see the same; not worth guarding.
+
 ## Gotchas
 
 - Agent worktrees don't have libghostty-vt built; `make check` there needs
