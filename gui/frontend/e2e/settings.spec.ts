@@ -110,6 +110,22 @@ test("changing a bool and an enum saves to the file and applies live", async ({ 
   await expect(setting(page, "sessions.scrollback_lines").getByTestId("restart-pending")).toBeVisible();
 });
 
+test("appearance.thread_width sets data-thread-width on <html>, live", async ({ page }) => {
+  await openSettings(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-thread-width", "comfortable");
+  const width = setting(page, "appearance.thread_width").getByRole("combobox");
+  await expect(width).toHaveValue("comfortable");
+  await width.selectOption("full");
+  await expect.poll(async () => (await mockSettings()).raw["appearance.thread_width"]).toBe("full");
+  await expect(html).toHaveAttribute("data-thread-width", "full");
+  await width.selectOption("compact");
+  await expect(html).toHaveAttribute("data-thread-width", "compact");
+  // A hand edit back to the default.
+  await mockPost("settings/external?appearance.thread_width=");
+  await expect(html).toHaveAttribute("data-thread-width", "comfortable");
+});
+
 test("a keybinding override rejects a reserved chord and applies a valid one", async ({ page }) => {
   await openSettings(page);
   const recorder = setting(page, "keybindings.session.new").getByRole("button", { name: /shortcut/ });

@@ -65,10 +65,24 @@
 }
 
 /* ---------- column ---------- */
+/* appearance.thread_width (stores/settings.ts sets html[data-thread-width]): the
+   conversation column and the composer. Comfortable is the default. */
+.cf-thread {
+  --thread-col: 1040px;
+  --thread-dock: 960px;
+}
+html[data-thread-width="compact"] .cf-thread {
+  --thread-col: 784px;
+  --thread-dock: 720px;
+}
+html[data-thread-width="full"] .cf-thread {
+  --thread-col: none;
+  --thread-dock: none;
+}
 .cf-thread .col {
   margin: 0 auto;
   width: 100%;
-  max-width: 784px;
+  max-width: var(--thread-col);
   padding: 0 40px;
 }
 .cf-thread .selectable {
@@ -581,7 +595,7 @@
 }
 .cf-thread .dock > * {
   pointer-events: auto;
-  max-width: 720px;
+  max-width: var(--thread-dock);
   margin: 0 auto;
 }
 .cf-thread .ccard {

@@ -110,6 +110,7 @@ const (
 	KeyFontSize          = "appearance.font_size"
 	KeyZoom              = "appearance.zoom"
 	KeyDensity           = "appearance.density"
+	KeyThreadWidth       = "appearance.thread_width"
 	KeyBackdrop          = "appearance.backdrop"
 	KeyClaudePath        = "advanced.claude_path"
 	KeyGhPath            = "advanced.gh_path"
@@ -230,6 +231,12 @@ var staticFields = []Field{
 		Description: "Row height and spacing in the sidebar and lists.",
 		Enum:        []string{"compact", "comfortable"}, Default: "compact",
 		bind: func(s *Settings) any { return &s.Appearance.Density },
+	},
+	{
+		Key: KeyThreadWidth, Group: GroupAppearance, Type: Enum, Title: "Thread width",
+		Description: "Column width of a rendered thread's conversation and composer.",
+		Enum:        []string{"compact", "comfortable", "full"}, Default: "comfortable",
+		bind: func(s *Settings) any { return &s.Appearance.ThreadWidth },
 	},
 	{
 		Key: KeyBackdrop, Group: GroupAppearance, Type: Enum, Title: "Backdrop",

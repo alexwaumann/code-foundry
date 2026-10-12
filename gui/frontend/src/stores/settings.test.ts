@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SettingsSnapshotView } from "@/api/settings";
 import { effectiveScheme } from "@/lib/theme";
 import { answerConfirm, useConfirmStore } from "./confirm";
-import { applySettingsSnapshot, terminalFontFamily, useSettingsStore, zoomUi } from "./settings";
+import { applySettingsSnapshot, terminalFontFamily, threadWidthOf, useSettingsStore, zoomUi } from "./settings";
 import { useUiStore } from "./ui";
 import { showView, useViewsStore } from "./views";
 
@@ -33,6 +33,18 @@ describe("applySettingsSnapshot", () => {
     applySettingsSnapshot(snap({ "appearance.theme": "dark", "appearance.font_size": "16", "appearance.density": "compact" }, 2));
     expect(effectiveScheme()).toBe("dark");
     expect(document.documentElement.dataset.density).toBe("compact");
+  });
+
+  it.each([
+    ["compact", "compact"],
+    ["comfortable", "comfortable"],
+    ["full", "full"],
+    [undefined, "comfortable"],
+    ["wide", "comfortable"],
+  ])("thread_width %s sets data-thread-width=%s", (value, want) => {
+    applySettingsSnapshot(snap(value === undefined ? {} : { "appearance.thread_width": value }));
+    expect(document.documentElement.dataset.threadWidth).toBe(want);
+    expect(threadWidthOf(value)).toBe(want);
   });
 
   it("moves the font size only when the setting changes", () => {

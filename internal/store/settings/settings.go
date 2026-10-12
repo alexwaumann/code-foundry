@@ -72,12 +72,13 @@ type GitOps struct {
 
 // Appearance is consumed by the GUI.
 type Appearance struct {
-	Theme      string // system, dark, light
-	FontFamily string
-	FontSize   int
-	Zoom       int    // percent; scales the whole GUI
-	Density    string // compact, comfortable
-	Backdrop   string // forest, none
+	Theme       string // system, dark, light
+	FontFamily  string
+	FontSize    int
+	Zoom        int    // percent; scales the whole GUI
+	Density     string // compact, comfortable
+	ThreadWidth string // compact, comfortable, full
+	Backdrop    string // forest, none
 }
 
 // Advanced holds executable overrides and logging.
