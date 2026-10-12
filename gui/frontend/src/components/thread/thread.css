@@ -92,6 +92,14 @@
   font-weight: 600;
   text-align: left;
 }
+/* .cf-markdown breaks anywhere (long paths in prose); in a table cell that would shrink a
+   column to a letter's width, so cells break between words only. */
+.cf-thread .cf-markdown :where(th, td) {
+  overflow-wrap: break-word;
+}
+.cf-thread .cf-markdown :where(th, td) code {
+  white-space: nowrap;
+}
 .cf-thread .cf-markdown img {
   max-height: 320px;
 }
