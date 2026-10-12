@@ -554,7 +554,7 @@ func TestProjectFixtures(t *testing.T) {
 			}
 			log := newThreadLog("s", bus.New(), time.Now, nil)
 			saved := map[string]Item{}
-			p := newProjector(itemWriter{log: log, save: func(it Item) { saved[it.ID] = it }})
+			p := newProjector(itemWriter{log: log, save: func(it Item) { saved[it.ID] = it }}, runningTotals{known: true})
 			var sp claudestream.Splitter
 			for _, line := range sp.Split(nil, data) {
 				p.event(claudestream.Parse(line))
@@ -662,7 +662,7 @@ func TestRenderedStartCrash(t *testing.T) {
 // and a marker (the structured result is dropped over maxResultJSON already).
 func TestProjectToolOutputCap(t *testing.T) {
 	log := newThreadLog("s", bus.New(), time.Now, nil)
-	p := newProjector(itemWriter{log: log, save: func(Item) {}})
+	p := newProjector(itemWriter{log: log, save: func(Item) {}}, runningTotals{known: true})
 	p.event(claudestream.Parse([]byte(`{"type":"assistant","message":{"id":"m1","role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"big"}}]},"parent_tool_use_id":null}`)))
 	big := strings.Repeat("é", maxToolOutput/2+100) // multi-byte: the cut must land on a rune boundary
 	line, _ := json.Marshal(map[string]any{

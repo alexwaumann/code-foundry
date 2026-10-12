@@ -110,13 +110,14 @@ func (r *runner) respawn() {
 	clear(st.pending)
 	st.sd.pending = nil
 	closeUnfinished(st.proj.w, "Claude restarted")
-	st.proj.restart()
 	l := r.launch
 	if id := r.tail.id; id != "" {
 		if _, ok := r.m.opts.Paths.transcriptPath(r.cwd, id); ok {
 			l = launch{resume: id}
 		}
 	}
+	// The old process has exited: its cost-state record is in the transcript.
+	st.proj.restart(restoredTotals(r.m.opts.Paths, r.cwd, l))
 	s, _ := r.m.Snapshot().Session(r.id)
 	s.WorktreePath, s.Effort = r.cwd, st.wantEffort
 	argv, env := r.m.claudeCommand(s, l, "", st.grants)

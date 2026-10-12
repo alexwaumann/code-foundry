@@ -154,7 +154,7 @@ func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv,
 		pending:  map[string]*claudestream.PermissionRequest{},
 		effort:   s.Effort, wantEffort: s.Effort,
 	}
-	st.proj = newProjector(itemWriter{log: log, save: func(it Item) { m.saveItem(s.ID, it) }})
+	st.proj = newProjector(itemWriter{log: log, save: func(it Item) { m.saveItem(s.ID, it) }}, restoredTotals(m.opts.Paths, r.cwd, r.launch))
 	r.st = st
 	// A run the daemon lost (crash) may have left items open.
 	closeUnfinished(st.proj.w, "the thread's process ended")

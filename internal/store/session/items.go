@@ -177,8 +177,8 @@ type TurnEnd struct {
 	NumTurns       int
 	// CostUSD is Claude's estimate for the process so far (cumulative across turns).
 	CostUSD float64
-	// TurnCostUSD is this turn's share of it (turnCosts); nil when not known (items
-	// recorded before it existed).
+	// TurnCostUSD is this turn's share of it (turnCosts); nil when the daemon could
+	// not tell, and on items recorded before it existed.
 	TurnCostUSD *float64 `json:",omitempty"`
 	// Model is the model of the turn's own replies as Claude names it
 	// ("claude-haiku-5-5"); "" when the turn had none.

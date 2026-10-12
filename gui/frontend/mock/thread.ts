@@ -637,8 +637,9 @@ export class MockThreads {
     tool("Bash", { command: "go test ./..." }, { output: "ok  \tgithub.com/alexwaumann/code-foundry/...\t(412 tests)", resultJson: JSON.stringify({ stdout: "ok  \t…/internal/store/pr\t0.41s\nok  \t…/internal/api\t3.2s\n(412 tests passed)", stderr: "" }) }, { at: ago(3, 12), until: ago(3, 50) });
     if (state === "idle") {
       text("All 412 tests pass and the branch is pushed: PR #63 picked up the fix.", { at: ago(2) });
-      // Turn 1 predates turn_cost_usd and model (an older daemon); turn 2 ran in a new
-      // process that started its totals afresh (the difference of the totals would say $0.38).
+      // Turn 1 has no turn_cost_usd or model (an older daemon, or a cost the daemon could not
+      // tell); turn 2 ran in a new process that started its totals afresh (the difference of
+      // the totals would say $0.38).
       it({ case: "turnEnd", value: { subtype: "success", durationMs: 62_000n, numTurns: 4, costUsd: 1.5, turnCostUsd: 1.5, model: "claude-sonnet-5", stopReason: "end_turn" } }, { at: ago(1, 58) });
       l.seq = l.items.length;
       this.world.setStatus(id, SessionStatus.IDLE, "at prompt");

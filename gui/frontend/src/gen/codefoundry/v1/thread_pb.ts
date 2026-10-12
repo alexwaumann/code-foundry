@@ -462,9 +462,10 @@ export type TurnEndItem = Message<"codefoundry.v1.TurnEndItem"> & {
 
   /**
    * This turn's cost: the difference of Claude's running total from the previous
-   * turn's, measured within one process (the daemon knows when Claude restarted and
-   * whether the new process carried the totals over). Unset on turns recorded before
-   * the daemon computed it.
+   * result of the same process, or for a process's first turn from the totals Claude
+   * restored on --resume (the daemon reads them from the transcript). Unset when the
+   * daemon could not tell (an interrupt that reported no total, totals that do not fit
+   * what Claude should have restored) and on turns recorded before it computed it.
    *
    * @generated from field: optional double turn_cost_usd = 14;
    */

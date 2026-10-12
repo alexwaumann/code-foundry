@@ -72,7 +72,6 @@ for (const scheme of ["dark", "light"] as const) {
       await expect(first).toHaveAttribute("data-folded", "true");
       await expect(first).toContainText("Worked for 4m 08s");
       await expect(first).toContainText("12 steps");
-      await expect(first).toContainText("$1.12");
       await expect(pane(page).getByTestId("thread-group")).toHaveCount(0);
       await expect(pane(page).locator('[data-testid="thread-text"][data-final]').first()).toContainText("Fixed: stale badge after a force-push");
       // The latest turn is open.
@@ -222,14 +221,17 @@ for (const scheme of ["dark", "light"] as const) {
   });
 }
 
-test("footers: the daemon's turn cost and model win; turns without them fall back", async ({ page }) => {
+test("footers: the daemon's turn cost and model; a turn without them shows neither", async ({ page }) => {
   await openThread(page, "idle");
   // Turn 2 ran in a new process whose total passed the old one's: the difference of the
   // totals would say $0.38; the daemon's turn cost says $1.50, and Sonnet 5 answered.
   await expect(footers(page).last()).toContainText(/·\$1\.50·Sonnet 5$/);
-  // Turn 1 predates the fields: its cost is the running total (the first turn) and the
-  // model the thread's.
-  await expect(await reveal(page, footers(page))).toContainText(/\$1\.12·Opus$/);
+  // Turn 1 has neither (an older daemon, or a cost the daemon could not tell): no guess
+  // from the running total, no model from the thread's current one.
+  const first = await reveal(page, footers(page));
+  await expect(first).toContainText(/steps$/);
+  await expect(first).not.toContainText("$");
+  await expect(first).not.toContainText("Opus");
 });
 
 test("a pending question docks with its pager", async ({ page }) => {

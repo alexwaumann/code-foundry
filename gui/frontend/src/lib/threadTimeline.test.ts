@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRows, buildTurns, decodeTimelineKey, groupLabel, timelineKey, type TimelineItem, type TimelineRow } from "./threadTimeline";
+import { buildRows, buildTurns, decodeTimelineKey, groupLabel, timelineKey, turnCostLabel, type TimelineItem, type TimelineRow } from "./threadTimeline";
 
 let n = 0;
 function item(kind: TimelineItem["kind"], over: Partial<TimelineItem> = {}): TimelineItem {
@@ -124,10 +124,10 @@ describe("buildTurns / buildRows", () => {
     const rows = buildRows(turns, open);
     expect(shape(rows)).toEqual(["user:u1", "note:error", "final:a1", "final:a2", "footer(folded 5)", "user:u2", "tool:Bash", "final:b1", "footer"]);
     expect(rows.flatMap((r) => (r.type === "footer" ? [r.finals] : []))).toEqual([["a1", "a2"], ["b1"]]);
-    // Every finished turn's footer counts its steps (open or folded) and knows the turn_end before it.
-    expect(rows.flatMap((r) => (r.type === "footer" ? [[r.id, r.steps, r.prevEnd, r.folded]] : []))).toEqual([
-      ["e1", 5, "", true],
-      ["e2", 1, "e1", false],
+    // Every finished turn's footer counts its steps (open or folded).
+    expect(rows.flatMap((r) => (r.type === "footer" ? [[r.id, r.steps, r.folded]] : []))).toEqual([
+      ["e1", 5, true],
+      ["e2", 1, false],
     ]);
     // The user's choice wins both ways.
     const fold = (k: string) => (k === "u1" ? false : k === "u2" ? true : undefined);
@@ -174,5 +174,21 @@ describe("timelineKey", () => {
   it("round-trips", () => {
     const it = tool("Bash", { parentToolUseId: "p", requestState: "pending", streaming: true });
     expect(decodeTimelineKey(timelineKey(it))).toEqual(it);
+  });
+});
+
+describe("turnCostLabel", () => {
+  it.each([
+    [1.5, "$1.50"],
+    [0.0123, "$0.01"],
+    [0.005, "$0.01"],
+    [0.0049, "<$0.01"],
+    [0.00001, "<$0.01"],
+    [0, ""],
+    [-0.2, ""],
+    [Number.NaN, ""],
+    [null, ""],
+  ])("%s → %s", (usd, want) => {
+    expect(turnCostLabel(usd)).toBe(want);
   });
 });

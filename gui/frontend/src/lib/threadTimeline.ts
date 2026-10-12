@@ -60,8 +60,6 @@ export type TimelineRow =
       folded: boolean;
       /** The turn's work rows (what the fold hides; a group or Agent row counts as one). */
       steps: number;
-      /** The previous turn's turn_end ("" for the first): its cumulative cost is subtracted. */
-      prevEnd: string;
       /** The turn's final text items (what its copy button copies). */
       finals: string[];
     }
@@ -239,7 +237,6 @@ export function defaultFolded(turn: TimelineTurn, latest: boolean): boolean {
 /** The rows to lay out, top to bottom. */
 export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions): TimelineRow[] {
   const rows: TimelineRow[] = [];
-  let prevEnd = "";
   turns.forEach((t, i) => {
     const latest = i === turns.length - 1;
     const folded = t.end !== "" && (opts.fold(t.key) ?? defaultFolded(t, latest));
@@ -247,8 +244,7 @@ export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions)
     for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n);
     const finals = t.body.flatMap((n) => (n.type === "text" && n.final ? [n.id] : []));
     if (t.end) {
-      rows.push({ type: "footer", key: `f:${t.end}`, id: t.end, turn: t.key, folded, steps: stepCount(t.body), prevEnd, finals });
-      prevEnd = t.end;
+      rows.push({ type: "footer", key: `f:${t.end}`, id: t.end, turn: t.key, folded, steps: stepCount(t.body), finals });
     }
   });
   const last = turns[turns.length - 1];
@@ -289,4 +285,10 @@ export function decodeTimelineKey(k: string): TimelineItem {
     requestState: requestState as RequestStateView | "",
     streaming: streaming === "1",
   };
+}
+
+/** A turn's cost in its footer: "$1.12", "<$0.01" under a cent, "" when nothing or not known (null). */
+export function turnCostLabel(usd: number | null): string {
+  if (usd === null || !(usd > 0)) return "";
+  return usd >= 0.005 ? `$${usd.toFixed(2)}` : "<$0.01";
 }

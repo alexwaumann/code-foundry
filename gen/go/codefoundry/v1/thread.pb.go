@@ -949,9 +949,10 @@ type TurnEndItem struct {
 	CacheWriteTokens int64    `protobuf:"varint,12,opt,name=cache_write_tokens,json=cacheWriteTokens,proto3" json:"cache_write_tokens,omitempty"`
 	Errors           []string `protobuf:"bytes,13,rep,name=errors,proto3" json:"errors,omitempty"`
 	// This turn's cost: the difference of Claude's running total from the previous
-	// turn's, measured within one process (the daemon knows when Claude restarted and
-	// whether the new process carried the totals over). Unset on turns recorded before
-	// the daemon computed it.
+	// result of the same process, or for a process's first turn from the totals Claude
+	// restored on --resume (the daemon reads them from the transcript). Unset when the
+	// daemon could not tell (an interrupt that reported no total, totals that do not fit
+	// what Claude should have restored) and on turns recorded before it computed it.
 	TurnCostUsd *float64 `protobuf:"fixed64,14,opt,name=turn_cost_usd,json=turnCostUsd,proto3,oneof" json:"turn_cost_usd,omitempty"`
 	// The model of the turn's own replies as Claude names it ("claude-haiku-5-5"); empty
 	// when the turn had none (a local command, an interrupt before any reply) or was

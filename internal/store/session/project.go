@@ -72,23 +72,26 @@ type openBlock struct {
 	kind  ItemKind
 }
 
-// newProjector projects onto w's log. Its last turn end, if any, is the previous
-// process's (a Reconnect, a daemon restart): the first turn's cost is measured from it.
-func newProjector(w itemWriter) *projector {
+// newProjector projects onto w's log the events of a process that starts from base
+// (restoredTotals). The log's last turn end, if any, is the previous process's (a
+// Reconnect, a daemon restart).
+func newProjector(w itemWriter, base runningTotals) *projector {
 	p := &projector{w: w, open: map[string][]openBlock{}}
 	items := w.log.snapshot().Items
 	for i := len(items) - 1; i >= 0; i-- {
 		if items[i].Kind == KindTurnEnd {
-			p.costs.resume(items[i].Turn)
+			p.costs.seed(items[i].Turn)
 			break
 		}
 	}
+	p.costs.start(base)
 	return p
 }
 
-// restart: the next events come from a new process (an effort change's restart).
-func (p *projector) restart() {
-	p.costs.restart()
+// restart: the next events come from a new process (an effort change's restart) that
+// starts from base.
+func (p *projector) restart(base runningTotals) {
+	p.costs.start(base)
 	p.model = ""
 }
 
@@ -125,8 +128,8 @@ func (p *projector) event(ev claudestream.Event) {
 		if e.Usage != nil {
 			turnOut = e.Usage.OutputTokens
 		}
-		cost := p.costs.turn(e.TotalCostUSD, e.OutputTokens(), turnOut)
-		t.TurnCostUSD, t.Model, t.ProcessOutputTokens = &cost, p.model, e.OutputTokens()
+		t.TurnCostUSD = p.costs.turn(e.TotalCostUSD, e.OutputTokens(), turnOut)
+		t.Model, t.ProcessOutputTokens = p.model, e.OutputTokens()
 		p.model = ""
 		p.w.add(Item{ID: "turn-" + nonEmpty(e.UUID, p.nextID("t")), Kind: KindTurnEnd, Turn: t})
 	}

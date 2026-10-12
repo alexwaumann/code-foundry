@@ -73,7 +73,7 @@ export interface TurnEndView {
   numTurns: number;
   /** Claude's cumulative estimate for the process, not this turn's. */
   costUsd: number;
-  /** This turn's cost as the daemon measured it (it knows Claude's restarts); null from an older daemon. */
+  /** This turn's cost as the daemon measured it (it knows Claude's restarts); null when it could not tell, or from an older daemon. */
   turnCostUsd: number | null;
   /** The model of the turn's own replies as Claude names it ("claude-haiku-5-5"); "" when unknown. */
   model: string;
