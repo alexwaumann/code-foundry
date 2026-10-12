@@ -1,9 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, openProjects, resetMock } from "./fixtures";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { CF, invocations, mockPost, openApp, openProjects, resetMock } from "./fixtures";
 
 /**
  * The Projects page's project kinds, collapsible projects and workspaces, and the header
- * filter (docs/notes/projects-polish-1.md). The mock's projects: code-foundry and
+ * filter (docs/notes/projects-polish-1.md); always-visible actions, overflow menus, thread
+ * counts, freshness and refresh, and the Publish / Initialize git gates
+ * (docs/notes/projects-polish-2.md). The mock's projects: code-foundry and
  * ghostty-playground (GitHub), dotfiles (a remote that is not GitHub), sketches (git, no
  * remote) and writing (no git).
  */
@@ -126,4 +128,210 @@ test("the filter: / focuses it, it hides what does not match, shows collapsed ma
   await expect(page.getByTestId("project")).toHaveCount(5);
   await expect(cf).toHaveAttribute("data-collapsed", "true");
   await expect(page.getByTestId("projects-counts")).toHaveText("5 projects · 1 workspace");
+});
+
+const wtRow = (page: Page, repoId: string, path: string) => page.locator(`[data-nav-key="pw:${repoId}::${path}"]`);
+const FEAT = `${CF}.worktrees/feat-sidebar`;
+const FIX = `${CF}.worktrees/fix-resize`;
+const opacity = (testId: string, within: Locator) => within.getByTestId(testId).evaluate((el) => getComputedStyle(el).opacity);
+async function lastInvocation(name: string) {
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === name).length).toBeGreaterThan(0);
+  return (await invocations()).filter((i) => i.name === name).at(-1);
+}
+/** Escape closes the open menu (and waits out its closing animation). */
+async function closeMenu(page: Page, testId: string): Promise<void> {
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId(`${testId}-menu`)).toHaveCount(0);
+}
+async function menuItems(page: Page, testId: string): Promise<string[]> {
+  const menu = page.getByTestId(`${testId}-menu`);
+  await expect(menu).toBeVisible();
+  return menu.getByRole("menuitem").allInnerTexts();
+}
+
+test("row actions show without hover, muted at rest, in a fixed-width column; rows show no path", async ({ page }) => {
+  await openApp(page);
+  await openProjects(page);
+  await page.mouse.move(0, 0);
+  const main = wtRow(page, "repo-cf", CF);
+  const feat = wtRow(page, "repo-cf", FEAT);
+  for (const id of ["worktree-new-thread", "worktree-new-terminal", "worktree-more"]) await expect(main.getByTestId(id)).toBeVisible();
+  await expect.poll(() => opacity("worktree-actions", feat)).toBe("0.55");
+  await expect.poll(() => opacity("project-actions", project(page, "repo-cf"))).toBe("0.7");
+  // Hover brings a row's actions (and its card's header actions) to full opacity.
+  await feat.hover();
+  await expect.poll(() => opacity("worktree-actions", feat)).toBe("1");
+  await expect.poll(() => opacity("project-actions", project(page, "repo-cf"))).toBe("1");
+  // Every row's action column is as wide (the main row's too), so the state columns end at one x.
+  const widths = await Promise.all([main, feat, wtRow(page, "repo-cf", FIX)].map(async (r) => (await r.getByTestId("worktree-actions").boundingBox())?.width));
+  expect(new Set(widths).size).toBe(1);
+  // Members too: always shown.
+  await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
+  await expect(page.getByTestId("workspace-member").first()).toBeVisible();
+  await page.mouse.move(0, 0);
+  await expect(page.getByTestId("member-actions").first().getByTestId("member-terminal")).toBeVisible();
+  await expect.poll(() => page.getByTestId("member-actions").first().evaluate((el) => getComputedStyle(el).opacity)).toBe("0.55");
+
+  // No path on git rows (the row's tooltip keeps it); the folder without git keeps it.
+  await expect(project(page, "repo-cf").getByTestId("worktree-path")).toHaveCount(0);
+  await expect(main).toHaveAttribute("title", CF);
+  await expect(project(page, "repo-wr").getByTestId("worktree-path")).toHaveText("~/Documents/writing");
+});
+
+test("each worktree counts its live threads", async ({ page }) => {
+  await openApp(page);
+  await openProjects(page);
+  // s-1 (busy) in the main worktree; s-5 (starting) and s-4 (disconnected) on feat/sidebar; s-3 (disconnected) on fix/resize.
+  await expect(wtRow(page, "repo-cf", CF).getByTestId("worktree-threads")).toHaveText("1");
+  await expect(wtRow(page, "repo-cf", CF).getByTestId("worktree-threads")).toHaveAttribute("title", "1 live thread");
+  await expect(wtRow(page, "repo-cf", FEAT).getByTestId("worktree-threads")).toHaveText("1");
+  await expect(wtRow(page, "repo-cf", FIX).getByTestId("worktree-threads")).toHaveCount(0);
+  await mockPost("threads?repo=repo-cf&count=2&status=idle");
+  await expect(wtRow(page, "repo-cf", CF).getByTestId("worktree-threads")).toHaveText("3");
+  await expect(wtRow(page, "repo-cf", CF).getByTestId("worktree-threads")).toHaveAttribute("title", "3 live threads");
+  // A workspace member with a live thread counts it too.
+  await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
+  const gp = page.locator('[data-testid="workspace-member"][data-repo="repo-gp"]');
+  await expect(gp).toBeVisible();
+  await expect(gp.getByTestId("worktree-threads")).toHaveCount(0);
+  await mockPost("workspace-thread?workspace=login&repo=repo-gp&name=driver&status=busy");
+  await expect(gp.getByTestId("worktree-threads")).toHaveText("1");
+});
+
+test("overflow menus per row kind; the menu keeps the list's cursor and gives it the keyboard back", async ({ page }) => {
+  await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
+  await openApp(page);
+  await openProjects(page);
+
+  const want: [string, string[]][] = [
+    ["repo-cf", ["New worktree…", "Remove project"]],
+    ["repo-dot", ["New worktree…", "Remove project"]],
+    ["repo-sk", ["New worktree…", "Publish to GitHub…", "Remove project"]],
+    ["repo-wr", ["Initialize git", "Remove project"]],
+  ];
+  for (const [id, items] of want) {
+    await project(page, id).getByTestId("project-more").click();
+    expect(await menuItems(page, "project-more")).toEqual(items);
+    await closeMenu(page, "project-more");
+  }
+
+  await wtRow(page, "repo-cf", CF).getByTestId("worktree-more").click();
+  expect(await menuItems(page, "worktree-more")).toEqual(["Show in side panel"]);
+  await closeMenu(page, "worktree-more");
+  await wtRow(page, "repo-cf", FIX).getByTestId("worktree-more").click();
+  expect(await menuItems(page, "worktree-more")).toEqual(["Show in side panel", "Remove worktree…"]);
+  await expect(page.getByTestId("worktree-remove")).toHaveAttribute("data-variant", "destructive");
+  await closeMenu(page, "worktree-more");
+
+  const ws = page.getByTestId("workspace").first();
+  await ws.getByTestId("workspace-more").click();
+  expect(await menuItems(page, "workspace-more")).toEqual(["Remove workspace"]);
+  await closeMenu(page, "workspace-more");
+  await ws.getByTestId("member-more").first().click();
+  expect(await menuItems(page, "member-more")).toEqual(["Remove from workspace"]);
+  await closeMenu(page, "member-more");
+
+  // Arrow keys in a menu move in the menu, not the list's cursor; closing it gives the list the keyboard.
+  const list = page.getByTestId("projects-list");
+  await wtRow(page, "repo-cf", FIX).click();
+  const cursor = await list.getAttribute("aria-activedescendant");
+  await wtRow(page, "repo-cf", FIX).getByTestId("worktree-more").click();
+  await expect(page.getByTestId("worktree-more-menu")).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await closeMenu(page, "worktree-more");
+  await expect(list).toHaveAttribute("aria-activedescendant", cursor ?? "");
+  await expect(list).toBeFocused();
+
+  // Show in side panel opens the worktree's tab; the list keeps the keyboard.
+  await wtRow(page, "repo-cf", FIX).getByTestId("worktree-more").click();
+  await page.getByTestId("worktree-show-panel").click();
+  await expect(page.getByTestId("worktree-surface-title")).toHaveText("code-foundry@fix/resize");
+  await expect(list).toBeFocused();
+});
+
+test("Publish to GitHub only on the remoteless project, Initialize git only on the one without git", async ({ page }) => {
+  await openApp(page);
+  await openProjects(page);
+  for (const [id, publish, init] of [
+    ["repo-cf", 0, 0],
+    ["repo-gp", 0, 0],
+    ["repo-dot", 0, 0],
+    ["repo-sk", 1, 0],
+    ["repo-wr", 0, 1],
+  ] as const) {
+    await expect(project(page, id).getByTestId("project-publish")).toHaveCount(publish);
+    await expect(project(page, id).getByTestId("project-init-git")).toHaveCount(init);
+  }
+  // Publish opens the publish dialog for that project.
+  await project(page, "repo-sk").getByTestId("project-publish").click();
+  await expect(page.getByTestId("publish-dialog")).toHaveAttribute("data-repo", "repo-sk");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("publish-dialog")).toHaveCount(0);
+  // The menu item too.
+  await project(page, "repo-sk").getByTestId("project-more").click();
+  await page.getByTestId("project-menu-publish").click();
+  await expect(page.getByTestId("publish-dialog")).toHaveAttribute("data-repo", "repo-sk");
+  // Closing the menu did not take the keyboard from the dialog.
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-testid=publish-dialog]") !== null)).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("publish-dialog")).toHaveCount(0);
+
+  // Initialize git runs repo.git.init on that project; it then is a git project without a remote.
+  await project(page, "repo-wr").getByTestId("project-init-git").click();
+  const init = await lastInvocation("repo.git.init");
+  expect(init?.args).toEqual({ repo: "repo-wr" });
+  expect(init?.context).toMatchObject({ activeRepoId: "repo-wr", activeView: "projects" });
+  await expect(project(page, "repo-wr")).toHaveAttribute("data-kind", "git");
+  await expect(project(page, "repo-wr").getByTestId("project-init-git")).toHaveCount(0);
+  await expect(project(page, "repo-wr").getByTestId("project-publish")).toHaveCount(1);
+});
+
+test("freshness shows on git projects; Refresh fetches (with a remote) then refreshes, spinning meanwhile", async ({ page }) => {
+  await openApp(page);
+  await openProjects(page);
+  await expect(project(page, "repo-cf").getByTestId("project-freshness")).toHaveText(/^updated \d+s ago$/);
+  await expect(project(page, "repo-sk").getByTestId("project-freshness")).toBeVisible();
+  await expect(project(page, "repo-wr").getByTestId("project-freshness")).toHaveCount(0);
+  await expect(project(page, "repo-wr").getByTestId("project-refresh")).toHaveCount(0);
+
+  const refresh = project(page, "repo-cf").getByTestId("project-refresh");
+  await refresh.click();
+  await expect(refresh).toBeDisabled();
+  await expect(refresh.locator("svg")).toHaveClass(/animate-spin/);
+  await expect(refresh).toBeEnabled();
+  const fetch = await lastInvocation("git.fetch");
+  expect(fetch?.args).toEqual({ worktree: CF });
+  expect(fetch?.context).toMatchObject({ activeRepoId: "repo-cf", activeWorktreePath: CF });
+  expect((await lastInvocation("repo.refresh"))?.args).toEqual({ repo: "repo-cf" });
+  const names = (await invocations()).map((i) => i.name).filter((n) => n === "git.fetch" || n === "repo.refresh");
+  expect(names).toEqual(["git.fetch", "repo.refresh"]);
+  await expect(page.getByText("fetched 2 updated refs")).toBeVisible();
+
+  // Without a remote there is nothing to fetch: only repo.refresh.
+  await project(page, "repo-sk").getByTestId("project-refresh").click();
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "repo.refresh").length).toBe(2);
+  expect((await invocations()).filter((i) => i.name === "git.fetch")).toHaveLength(1);
+
+  // A failed fetch shows the gitops failure toast; the refresh still runs.
+  await mockPost("gitops?fail=git.fetch");
+  await project(page, "repo-dot").getByTestId("project-refresh").click();
+  await expect(page.getByText(/Fetch .* failed/)).toBeVisible();
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "repo.refresh").length).toBe(3);
+});
+
+test("New worktree… asks for the branch in the palette, in that project", async ({ page }) => {
+  await openApp(page);
+  await openProjects(page);
+  await project(page, "repo-sk").getByTestId("project-more").click();
+  await page.getByTestId("project-new-worktree").click();
+  const palette = page.getByTestId("palette");
+  await expect(palette).toHaveAttribute("data-mode", "args");
+  await page.keyboard.type("exp/x");
+  await page.keyboard.press("Enter");
+  await expect(palette).toHaveCount(0);
+  const inv = await lastInvocation("repo.worktree.new");
+  expect(inv?.args).toEqual({ branch: "exp/x" });
+  expect(inv?.context).toMatchObject({ activeRepoId: "repo-sk", activeView: "projects" });
+  await expect(project(page, "repo-sk").getByTestId("worktree-branch")).toHaveText(["main", "exp/x"]);
 });
