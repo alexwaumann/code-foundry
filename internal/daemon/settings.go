@@ -25,7 +25,7 @@ import (
 //   - keybinding overrides and session model/effort defaults -> command registry
 //     overrides (CommandService.List reports the effective values);
 //   - log level -> the log file handler's LevelVar;
-//   - auto-naming -> a Namer that checks the current value per session;
+//   - auto-naming and the naming model -> a Namer that reads both per session;
 //   - worktree directory -> repo.worktree.new's default path, and the path of the
 //     worktree a new thread creates (session.Options.WorktreePath).
 //   - editor command -> gitops' Editor func (stores.go), read on every open.
@@ -78,13 +78,16 @@ func logLevel(s string) slog.Level {
 // store logs it and leaves the session unnamed.
 var errAutoNameOff = errors.New("auto-naming is turned off in settings (sessions.auto_name)")
 
-// settingsNamer wraps next so sessions.auto_name applies without a restart.
+// settingsNamer wraps next so sessions.auto_name and sessions.naming_model apply
+// without a restart: each call reads them and hands the model to next with
+// session.WithNamingModel.
 func settingsNamer(st *settings.Store, next session.Namer) session.Namer {
 	return func(ctx context.Context, msg string) (string, error) {
-		if !st.Settings().Sessions.AutoName {
+		s := st.Settings().Sessions
+		if !s.AutoName {
 			return "", errAutoNameOff
 		}
-		return next(ctx, msg)
+		return next(session.WithNamingModel(ctx, s.NamingModel), msg)
 	}
 }
 

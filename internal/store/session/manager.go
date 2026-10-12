@@ -50,7 +50,8 @@ type Options struct {
 	// NewStubDetector (always Unknown) until internal/claudestatus is wired.
 	NewDetector DetectorFactory
 	// Namer names sessions from their first user message. Default ClaudeNamer in
-	// /tmp.
+	// /tmp, which names with model.NamingDefault unless the ctx carries
+	// WithNamingModel (the daemon's settingsNamer sets it per call).
 	Namer Namer
 	// AttachmentsDir is where StageAttachment writes images. Empty disables
 	// attachments. New creates it and removes files older than

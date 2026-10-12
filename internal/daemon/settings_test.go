@@ -12,6 +12,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/session"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 )
 
@@ -142,14 +143,29 @@ func TestApplySettings(t *testing.T) {
 func TestSettingsNamer(t *testing.T) {
 	st := openSettings(t)
 	calls := 0
-	namer := settingsNamer(st, func(context.Context, string) (string, error) { calls++; return "a-name", nil })
+	var models []string
+	namer := settingsNamer(st, func(ctx context.Context, _ string) (string, error) {
+		calls++
+		models = append(models, session.NamingModel(ctx))
+		return "a-name", nil
+	})
 	if name, err := namer(context.Background(), "hi"); err != nil || name != "a-name" {
 		t.Fatalf("namer = %q, %v", name, err)
+	}
+	// The naming model is read per call: no restart, no new namer.
+	if _, err := st.Update(context.Background(), map[string]string{settings.KeyNamingModel: "haiku"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := namer(context.Background(), "hi"); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"sonnet", "haiku"}; !slices.Equal(models, want) {
+		t.Errorf("naming models = %q, want %q", models, want)
 	}
 	if _, err := st.Update(context.Background(), map[string]string{settings.KeyAutoName: "false"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := namer(context.Background(), "hi"); !errors.Is(err, errAutoNameOff) || calls != 1 {
+	if _, err := namer(context.Background(), "hi"); !errors.Is(err, errAutoNameOff) || calls != 2 {
 		t.Fatalf("namer with auto-naming off: err = %v, calls = %d", err, calls)
 	}
 }
