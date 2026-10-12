@@ -41,6 +41,7 @@ type Sessions struct {
 	DefaultModel      string // default "opus"
 	DefaultEffort     string // default "high"
 	AutoName          bool
+	NamingModel       string // default "sonnet"; the effort is always low
 	CloseGraceSeconds int
 	ScrollbackLines   int
 }

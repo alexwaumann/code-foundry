@@ -87,17 +87,18 @@ func TestUpdate(t *testing.T) {
 	s.OnChange(func(snap *Snapshot) { hooked = append(hooked, snap.Revision) })
 
 	snap, err := s.Update(context.Background(), map[string]string{
-		KeyFontSize: "16", KeyDefaultModel: "opus", KeybindingKey("repo.refresh"): "cmd+alt+r",
+		KeyFontSize: "16", KeyDefaultModel: "opus", KeyNamingModel: "haiku", KeybindingKey("repo.refresh"): "cmd+alt+r",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if snap.Settings.Appearance.FontSize != 16 || snap.Settings.Sessions.DefaultModel != "opus" ||
+		snap.Settings.Sessions.NamingModel != "haiku" ||
 		snap.Settings.Keybindings["repo.refresh"] != "cmd+alt+r" {
 		t.Fatalf("settings = %+v", snap.Settings)
 	}
 	data, _ := os.ReadFile(path)
-	for _, want := range []string{"font_size = 16\n", "default_model = \"opus\"\n", `"repo.refresh" = "cmd+alt+r"`} {
+	for _, want := range []string{"font_size = 16\n", "default_model = \"opus\"\n", "naming_model = \"haiku\"\n", `"repo.refresh" = "cmd+alt+r"`} {
 		if !strings.Contains(string(data), want) {
 			t.Errorf("file lacks %q:\n%s", want, data)
 		}

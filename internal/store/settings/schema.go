@@ -96,6 +96,7 @@ const (
 	KeyDefaultModel      = "sessions.default_model"
 	KeyDefaultEffort     = "sessions.default_effort"
 	KeyAutoName          = "sessions.auto_name"
+	KeyNamingModel       = "sessions.naming_model"
 	KeyCloseGrace        = "sessions.close_grace_seconds"
 	KeyScrollback        = "sessions.scrollback_lines"
 	KeyGhPollInterval    = "github.poll_interval_seconds"
@@ -142,6 +143,12 @@ var staticFields = []Field{
 		Description: "Name a new session from its first message with a short claude -p call.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Sessions.AutoName },
+	},
+	{
+		Key: KeyNamingModel, Group: GroupSessions, Type: Enum, Title: "Naming model",
+		Description: "Model for the claude -p call that names a new session. Always runs at low effort.",
+		Enum:        command.SessionModels, EnumLabels: model.Labels(), Default: model.NamingDefault,
+		bind: func(s *Settings) any { return &s.Sessions.NamingModel },
 	},
 	{
 		Key: KeyCloseGrace, Group: GroupSessions, Type: Int, Title: "Close grace (seconds)",
