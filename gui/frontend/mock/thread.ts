@@ -11,6 +11,7 @@
  *   POST /__mock/thread/stream?id=s-r1&text=…  starts a new streaming text item
  *   POST /__mock/thread/finish?id=s-r1          ends the streaming turn (turn_end, idle)
  *   GET  /__mock/thread/calls                  thread.* invocations ("send <id> <text> [attachments]", ...)
+ *   POST /__mock/thread/cache?id=s-r1&ago=<s>  the last result <s> seconds ago (mock/context.ts)
  *
  * thread.send appends the user message, streams a short reply over ~1 s and ends the turn;
  * thread.interrupt ends a running turn as interrupted and withdraws pending requests.
@@ -51,6 +52,8 @@ export interface ThreadWorld {
   statusOf(id: string): SessionStatus;
   /** The thread's model as picked ("opus", "claude-sonnet-5"). */
   modelOf(id: string): string;
+  /** A turn ended: the thread's context totals move to now (mock/context.ts). */
+  recordResult(id: string, model: string): void;
 }
 
 /** What Claude reports as the model of a reply for a picked one (a family alias resolves to its current model). */
@@ -385,6 +388,7 @@ export class MockThreads {
           : { subtype: "success", durationMs: BigInt(Date.now() - started), numTurns: 3, costUsd: cost, turnCostUsd, model, stopReason: "end_turn" },
       }),
     );
+    this.world.recordResult(id, model);
     this.world.setStatus(id, l.watchers > 0 ? SessionStatus.IDLE : SessionStatus.NEEDS_ATTENTION, l.watchers > 0 ? "at prompt" : "finished");
     if (l.pendingEffort) {
       const effort = l.pendingEffort;

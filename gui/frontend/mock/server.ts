@@ -25,6 +25,7 @@
  *        plan, finished, Claude error, busy, idle, interrupted, and a disconnected one still asking
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
+ *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N]   (a rendered thread's last result that long ago; mock/context.ts)
  *   POST /__mock/thread?state=permission|question|streaming|idle   (the rendered thread s-r1:
  *        mock/thread.ts, also parallel|multi); POST /__mock/thread/delta?text=… | /__mock/thread/stream?text=… |
  *        /__mock/thread/finish[?total=1.5&turnCost=1.5&model=claude-sonnet-5] (the turn_end's figures) |
@@ -654,6 +655,14 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { id: s.id });
       break;
     }
+    case "POST /__mock/thread/cache":
+      try {
+        world.ageThreadCache(q.get("id") ?? "s-r1", Number(q.get("ago") ?? "3660"), q.has("tokens") ? Number(q.get("tokens")) : undefined);
+        json(res, 200, { ok: true });
+      } catch (err) {
+        json(res, 404, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
     case "POST /__mock/thread/stream":
       world.threads.stream(q.get("id") ?? "s-r1", q.get("text") ?? "");
       json(res, 200, { ok: true });

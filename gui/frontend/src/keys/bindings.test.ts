@@ -59,6 +59,9 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     costUsd: 0,
     unpriced: false,
     agentRuns: [],
+    contextTokens: 0,
+    cacheExpiresAtMs: null,
+    contextRereadUsd: 0,
     ...over,
   };
 }

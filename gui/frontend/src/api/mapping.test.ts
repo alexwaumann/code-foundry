@@ -408,6 +408,15 @@ describe("events mapping", () => {
     expect(retired).toEqual({ kind: "retiredUsage", buckets: [view] });
   });
 
+  it("maps a rendered thread's context totals and cache expiry", () => {
+    expect(toSessionView(create(SessionSchema, { id: "s0" }))).toMatchObject({ contextTokens: 0, cacheExpiresAtMs: null, contextRereadUsd: 0 });
+    expect(toSessionView(create(SessionSchema, { id: "s1", contextTokens: 25_700n, cacheExpiresAt: timestampFromMs(3_600_000), contextRereadUsd: 0.0514 }))).toMatchObject({
+      contextTokens: 25_700,
+      cacheExpiresAtMs: 3_600_000,
+      contextRereadUsd: 0.0514,
+    });
+  });
+
   it("maps agent runs with their status, start and priced usage", () => {
     const usage = [{ model: "claude-haiku-5-5", day: "2026-10-11", requests: 2n, input: 3n, output: 4n, cacheRead: 5n, costUsd: 0.0001, cacheSavingsUsd: 0.00002 }];
     const s = toSessionView(
