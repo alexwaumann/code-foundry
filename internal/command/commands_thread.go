@@ -235,8 +235,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				}
 				s := res.Msg.GetSession()
 				msg := "thread " + sessionLabel(s) + " restarts with effort " + s.GetEffort()
-				onTurn := s.GetStatus() == v1.SessionStatus_SESSION_STATUS_BUSY || s.GetStatus() == v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION
-				if s.GetEffortPending() && onTurn {
+				if s.GetEffortPending() && onTurn(s) {
 					msg = "thread " + sessionLabel(s) + " switches to effort " + s.GetEffort() + " after this turn"
 				}
 				return Result{Message: msg, JSON: s}, nil
@@ -406,4 +405,18 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 		sb.WriteString("(no items yet)\n")
 	}
 	return strings.TrimRight(sb.String(), "\n")
+}
+
+// onTurn: the thread is on a turn (working, or waiting on a permission or a question
+// mid-turn), so an effort change waits for its end. "finished" or a turn's error waits
+// for nobody: the restart is immediate.
+func onTurn(s *v1.Session) bool {
+	switch s.GetStatus() {
+	case v1.SessionStatus_SESSION_STATUS_BUSY:
+		return true
+	case v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION:
+		r := s.GetStatusReason()
+		return strings.HasPrefix(r, "permission") || strings.HasPrefix(r, "question")
+	}
+	return false
 }
