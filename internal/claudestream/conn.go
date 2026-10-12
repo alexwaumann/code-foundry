@@ -16,9 +16,11 @@ var (
 	// ErrClosed: the CLI's stdout ended (the process exited or is exiting), so no
 	// response will come.
 	ErrClosed = errors.New("claudestream: connection closed")
-	// ErrCancelled is the cause of a PermissionHandler's context when the CLI withdrew
-	// the request (control_cancel_request, after an interrupt).
+	// ErrCancelled: PermissionRequest.Answer after the CLI withdrew the request
+	// (control_cancel_request, after an interrupt).
 	ErrCancelled = errors.New("claudestream: request withdrawn by claude")
+	// ErrAnswered: PermissionRequest.Answer called twice.
+	ErrAnswered = errors.New("claudestream: request already answered")
 )
 
 // ControlError is a control_response with subtype "error".
@@ -31,17 +33,8 @@ func (e *ControlError) Error() string {
 	return fmt.Sprintf("claude refused %s: %s", e.Subtype, e.Message)
 }
 
-// PermissionHandler decides an inbound can_use_tool request. It runs in its own
-// goroutine and may block as long as it needs (a person is deciding): the request
-// stays pending until it returns. ctx is cancelled when the CLI withdraws the request
-// (cause ErrCancelled) or its stdout ends (cause ErrClosed); the handler's result is
-// then not sent. A returned error is sent as a deny carrying the error text.
-type PermissionHandler func(ctx context.Context, req *PermissionRequest) (PermissionResult, error)
-
 // Options configures a Conn.
 type Options struct {
-	// OnPermission decides can_use_tool requests. Nil denies every request.
-	OnPermission PermissionHandler
 	// MaxLine bounds one stdout line; 0 means DefaultMaxLine.
 	MaxLine int
 	// Log receives protocol warnings (undecodable lines, unsupported requests).
@@ -50,8 +43,11 @@ type Options struct {
 }
 
 // Conn speaks the control protocol over a CLI's stdin and stdout. All methods are
-// safe for concurrent use. Lines other than control traffic are delivered in order on
-// Events, which is closed after the last one once stdout ends.
+// safe for concurrent use. Every line other than a response to our own request is
+// delivered in order on Events, inbound can_use_tool requests included (as
+// *PermissionRequest, answered with its Answer method), so a request is seen after the
+// assistant frame carrying its tool_use. Events is closed after the last line once
+// stdout ends.
 type Conn struct {
 	w    io.WriteCloser
 	opts Options
@@ -60,12 +56,12 @@ type Conn struct {
 	wmu     sync.Mutex
 	wclosed bool
 
-	mu       sync.Mutex
-	next     int
-	waiting  map[string]chan controlReply
-	handlers map[string]context.CancelCauseFunc
-	q        []Event
-	ended    bool
+	mu      sync.Mutex
+	next    int
+	waiting map[string]chan controlReply
+	inbound map[string]struct{} // can_use_tool requests not yet answered or withdrawn
+	q       []Event
+	ended   bool
 
 	sig    chan struct{}
 	events chan Event
@@ -86,12 +82,12 @@ type controlReply struct {
 func NewConn(r io.Reader, w io.WriteCloser, opts Options) *Conn {
 	c := &Conn{
 		w: w, opts: opts, log: opts.Log,
-		waiting:  map[string]chan controlReply{},
-		handlers: map[string]context.CancelCauseFunc{},
-		sig:      make(chan struct{}, 1),
-		events:   make(chan Event),
-		done:     make(chan struct{}),
-		stop:     make(chan struct{}),
+		waiting: map[string]chan controlReply{},
+		inbound: map[string]struct{}{},
+		sig:     make(chan struct{}, 1),
+		events:  make(chan Event),
+		done:    make(chan struct{}),
+		stop:    make(chan struct{}),
 	}
 	if c.log == nil {
 		c.log = slog.Default()
@@ -101,9 +97,10 @@ func NewConn(r io.Reader, w io.WriteCloser, opts Options) *Conn {
 	return c
 }
 
-// Events delivers every inbound line that is not a response to our own request or a
-// can_use_tool request, in order. It is closed once stdout has ended and every event
-// was delivered (or after Close).
+// Events delivers every inbound line that is not a response to our own request, in
+// order: a can_use_tool request is a *PermissionRequest (answer it with Answer), its
+// withdrawal a *ControlCancel. It is closed once stdout has ended and every event was
+// delivered (or after Close).
 func (c *Conn) Events() <-chan Event { return c.events }
 
 // Done is closed when stdout ends.
@@ -124,14 +121,10 @@ func (c *Conn) read(r io.Reader) {
 	c.rerr, c.ended = err, true
 	waiting := c.waiting
 	c.waiting = map[string]chan controlReply{}
-	handlers := c.handlers
-	c.handlers = map[string]context.CancelCauseFunc{}
+	c.inbound = map[string]struct{}{} // the process is gone: nothing can be answered
 	c.mu.Unlock()
 	for _, ch := range waiting {
 		close(ch)
-	}
-	for _, cancel := range handlers {
-		cancel(ErrClosed)
 	}
 	close(c.done)
 	c.wake()
@@ -197,13 +190,11 @@ func (c *Conn) dispatch(ev Event) {
 	case *controlRequestLine:
 		c.onRequest(e)
 	case *ControlCancel:
+		// Withdrawn before the event reaches the consumer, so a later Answer sends
+		// nothing (ErrCancelled).
 		c.mu.Lock()
-		cancel, ok := c.handlers[e.RequestID]
-		delete(c.handlers, e.RequestID)
+		delete(c.inbound, e.RequestID)
 		c.mu.Unlock()
-		if ok {
-			cancel(ErrCancelled)
-		}
 		c.push(ev)
 	case *Unknown:
 		if e.Err != nil {
@@ -232,39 +223,41 @@ func (c *Conn) onRequest(e *controlRequestLine) {
 		go func() { _ = c.reply(e.RequestID, nil, "bad can_use_tool request: "+err.Error()) }()
 		return
 	}
-	req.RequestID, req.Raw = e.RequestID, e.Raw
-	ctx, cancel := context.WithCancelCause(context.Background())
+	req.RequestID, req.Raw, req.conn = e.RequestID, e.Raw, c
 	c.mu.Lock()
-	if c.ended {
-		c.mu.Unlock()
-		cancel(ErrClosed)
-		return
-	}
-	c.handlers[e.RequestID] = cancel
+	c.inbound[e.RequestID] = struct{}{}
 	c.mu.Unlock()
+	// Delivered in order with the other lines: the CLI writes the assistant frame
+	// carrying the tool_use before asking about it.
+	c.push(req)
+}
+
+// answer sends the result of inbound request req unless it was withdrawn, already
+// answered, or stdout ended. The write goes out on its own goroutine: the caller may
+// be a loop that must keep reading events while the CLI drains stdin.
+func (c *Conn) answer(req *PermissionRequest, res PermissionResult) error {
+	c.mu.Lock()
+	_, live := c.inbound[req.RequestID]
+	delete(c.inbound, req.RequestID)
+	answered := req.answered
+	req.answered = true
+	ended := c.ended
+	c.mu.Unlock()
+	switch {
+	case answered:
+		return ErrAnswered
+	case live:
+	case ended:
+		return ErrClosed
+	default:
+		return ErrCancelled
+	}
 	go func() {
-		defer cancel(nil)
-		var res PermissionResult
-		var err error
-		if c.opts.OnPermission == nil {
-			res = PermissionResult{Message: "No one can answer permission prompts here."}
-		} else {
-			res, err = c.opts.OnPermission(ctx, req)
-		}
-		c.mu.Lock()
-		_, live := c.handlers[e.RequestID]
-		delete(c.handlers, e.RequestID)
-		c.mu.Unlock()
-		if !live || ctx.Err() != nil {
-			return // withdrawn or the process is gone
-		}
-		if err != nil {
-			res = PermissionResult{Message: err.Error()}
-		}
-		if werr := c.reply(e.RequestID, res.wire(req.Input), ""); werr != nil {
-			c.log.Warn("claudestream: answer permission request", "request_id", e.RequestID, "err", werr)
+		if err := c.reply(req.RequestID, res.wire(req.Input), ""); err != nil {
+			c.log.Warn("claudestream: answer permission request", "request_id", req.RequestID, "err", err)
 		}
 	}()
+	return nil
 }
 
 // reply writes a control_response: success with payload, or error with msg.
@@ -376,7 +369,7 @@ func (c *Conn) Initialize(ctx context.Context) (*InitializeResponse, error) {
 }
 
 // Interrupt stops the running turn (a no-op when idle). Pending can_use_tool
-// requests are withdrawn by the CLI (their handlers' contexts are cancelled).
+// requests are withdrawn by the CLI (a *ControlCancel each on Events).
 func (c *Conn) Interrupt(ctx context.Context) error {
 	_, err := c.Request(ctx, ControlRequest{"subtype": SubtypeInterrupt})
 	return err

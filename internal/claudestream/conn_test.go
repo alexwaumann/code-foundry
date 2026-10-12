@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -158,8 +159,8 @@ func TestConnSendAndCloseStdin(t *testing.T) {
 	}
 }
 
-// TestConnReplay feeds each captured session through a Conn and checks what the
-// permission handler saw and answered.
+// TestConnReplay feeds each captured session through a Conn and checks the
+// permission requests delivered on Events and the answers written.
 func TestConnReplay(t *testing.T) {
 	tests := []struct {
 		name string
@@ -226,14 +227,17 @@ func TestConnReplay(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var mu sync.Mutex
 			var reqs []*PermissionRequest
-			f := newFakeCLI(t, Options{OnPermission: func(_ context.Context, r *PermissionRequest) (PermissionResult, error) {
-				mu.Lock()
-				reqs = append(reqs, r)
-				mu.Unlock()
-				return tt.decide(r), nil
-			}})
+			f := newFakeCLI(t, Options{})
 			go func() {
-				for range f.conn.Events() {
+				for ev := range f.conn.Events() {
+					if r, ok := ev.(*PermissionRequest); ok {
+						mu.Lock()
+						reqs = append(reqs, r)
+						mu.Unlock()
+						if err := r.Answer(tt.decide(r)); err != nil {
+							t.Errorf("answer: %v", err)
+						}
+					}
 				}
 			}()
 			lines := fixture(t, tt.name)
@@ -254,33 +258,63 @@ func TestConnReplay(t *testing.T) {
 	}
 }
 
-func TestConnPermissionCancelled(t *testing.T) {
-	started := make(chan struct{})
-	cause := make(chan error, 1)
-	f := newFakeCLI(t, Options{OnPermission: func(ctx context.Context, _ *PermissionRequest) (PermissionResult, error) {
-		close(started)
-		<-ctx.Done()
-		cause <- context.Cause(ctx)
-		return PermissionResult{Allow: true}, nil
-	}})
+// TestConnPermissionOrder: a can_use_tool request is delivered after the lines the
+// CLI wrote before it (the assistant frame carrying its tool_use), every time.
+func TestConnPermissionOrder(t *testing.T) {
+	f := newFakeCLI(t, Options{})
+	const n = 200
 	go func() {
-		for range f.conn.Events() {
+		for i := range n {
+			f.emit(fmt.Sprintf(`{"type":"assistant","message":{"id":"m%d","role":"assistant","content":[{"type":"tool_use","id":"t%d","name":"Bash","input":{}}]},"parent_tool_use_id":null}`, i, i))
+			f.emit(fmt.Sprintf(`{"type":"control_request","request_id":"p%d","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{},"tool_use_id":"t%d"}}`, i, i))
 		}
 	}()
+	for i := range n {
+		a, ok := next(t, f.conn).(*Assistant)
+		if !ok || a.Message.Content[0].ID != fmt.Sprintf("t%d", i) {
+			t.Fatalf("pair %d: expected the assistant frame first, got %T", i, a)
+		}
+		r, ok := next(t, f.conn).(*PermissionRequest)
+		if !ok || r.RequestID != fmt.Sprintf("p%d", i) || r.ToolUseID != fmt.Sprintf("t%d", i) || !strings.Contains(string(r.RawJSON()), "can_use_tool") {
+			t.Fatalf("pair %d: expected its request, got %+v", i, r)
+		}
+	}
+}
+
+func TestConnPermissionCancelled(t *testing.T) {
+	f := newFakeCLI(t, Options{})
+	evs := make(chan Event, 1024)
+	go func() {
+		for ev := range f.conn.Events() {
+			evs <- ev
+		}
+		close(evs)
+	}()
+	var req *PermissionRequest
 	var cancelSeen bool
 	for _, l := range fixture(t, "interrupt-pending") {
-		s := string(l)
-		if strings.Contains(s, `"type":"control_cancel_request"`) {
-			<-started
+		f.emit(string(l))
+	}
+	for ev := range evs {
+		switch e := ev.(type) {
+		case *PermissionRequest:
+			req = e
+		case *ControlCancel:
+			if req == nil || e.RequestID != req.RequestID {
+				t.Fatalf("cancel %q before its request %+v", e.RequestID, req)
+			}
 			cancelSeen = true
 		}
-		f.emit(s)
+		if cancelSeen {
+			break
+		}
 	}
 	if !cancelSeen {
 		t.Fatal("fixture has no cancel")
 	}
-	if err := <-cause; !errors.Is(err, ErrCancelled) {
-		t.Errorf("cause = %v", err)
+	// Withdrawn: answering sends nothing.
+	if err := req.Answer(PermissionResult{Allow: true}); !errors.Is(err, ErrCancelled) {
+		t.Errorf("answer after withdrawal: %v", err)
 	}
 	// Nothing was answered: the next thing on stdin is EOF once the conn closes stdin.
 	_ = f.conn.CloseStdin()
@@ -290,16 +324,17 @@ func TestConnPermissionCancelled(t *testing.T) {
 }
 
 func TestConnPermissionOnExit(t *testing.T) {
-	cause := make(chan error, 1)
-	f := newFakeCLI(t, Options{OnPermission: func(ctx context.Context, _ *PermissionRequest) (PermissionResult, error) {
-		<-ctx.Done()
-		cause <- context.Cause(ctx)
-		return PermissionResult{}, nil
-	}})
+	f := newFakeCLI(t, Options{})
 	f.emit(`{"type":"control_request","request_id":"p1","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"ls"},"tool_use_id":"t1"}}`)
+	req, ok := next(t, f.conn).(*PermissionRequest)
+	if !ok {
+		t.Fatal("no request")
+	}
 	_ = f.out.Close()
-	if err := <-cause; !errors.Is(err, ErrClosed) {
-		t.Errorf("cause = %v", err)
+	for range f.conn.Events() {
+	}
+	if err := req.Answer(PermissionResult{Allow: true}); !errors.Is(err, ErrClosed) {
+		t.Errorf("answer after exit: %v", err)
 	}
 }
 
@@ -311,11 +346,21 @@ func TestConnUnsupportedRequest(t *testing.T) {
 	if resp["subtype"] != "error" || resp["request_id"] != "d1" {
 		t.Errorf("answer %v", m)
 	}
-	// No handler: can_use_tool is denied.
+	// can_use_tool is the consumer's: answered once, a second answer refused.
 	f.emit(`{"type":"control_request","request_id":"p1","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{},"tool_use_id":"t1"}}`)
+	req, ok := next(t, f.conn).(*PermissionRequest)
+	if !ok {
+		t.Fatal("no request")
+	}
+	if err := req.Answer(PermissionResult{Message: "no"}); err != nil {
+		t.Fatal(err)
+	}
 	inner := f.read()["response"].(map[string]any)["response"].(map[string]any)
-	if inner["behavior"] != "deny" {
+	if inner["behavior"] != "deny" || inner["message"] != "no" {
 		t.Errorf("answer %v", inner)
+	}
+	if err := req.Answer(PermissionResult{Allow: true}); !errors.Is(err, ErrAnswered) {
+		t.Errorf("second answer: %v", err)
 	}
 }
 
@@ -334,16 +379,11 @@ func TestRealClaudeStream(t *testing.T) {
 			env = append(env, k) // bare key: removed
 		}
 	}
-	asked := make(chan string, 4)
 	p, err := Start(Spec{
 		Argv: []string{"claude", "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
 			"--include-partial-messages", "--permission-prompt-tool", "stdio", "--model", "haiku", "--effort", "low",
 			"--permission-mode", "manual"},
 		Env: env, Dir: dir,
-		Conn: Options{OnPermission: func(_ context.Context, r *PermissionRequest) (PermissionResult, error) {
-			asked <- r.ToolName
-			return PermissionResult{Allow: true}, nil
-		}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -362,14 +402,21 @@ func TestRealClaudeStream(t *testing.T) {
 		t.Fatal(err)
 	}
 	var result *Result
+	var asked []string
 	for result == nil {
 		select {
 		case ev, ok := <-c.Events():
 			if !ok {
 				t.Fatalf("stream ended (stderr %s)", p.Stderr())
 			}
-			if r, ok := ev.(*Result); ok {
-				result = r
+			switch e := ev.(type) {
+			case *Result:
+				result = e
+			case *PermissionRequest:
+				asked = append(asked, e.ToolName)
+				if err := e.Answer(PermissionResult{Allow: true}); err != nil {
+					t.Fatal(err)
+				}
 			}
 		case <-ctx.Done():
 			t.Fatal(ctx.Err())
@@ -378,8 +425,8 @@ func TestRealClaudeStream(t *testing.T) {
 	if result.IsError {
 		t.Errorf("result %+v", result)
 	}
-	if got := <-asked; got != "Write" {
-		t.Errorf("asked about %s", got)
+	if len(asked) == 0 || asked[0] != "Write" {
+		t.Errorf("asked about %v", asked)
 	}
 	if b, err := os.ReadFile(filepath.Join(dir, "hello.txt")); err != nil || strings.TrimSpace(string(b)) != "hi" {
 		t.Errorf("hello.txt = %q, %v", b, err)

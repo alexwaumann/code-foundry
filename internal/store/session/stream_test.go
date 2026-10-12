@@ -27,11 +27,17 @@ type renderedEnv struct {
 
 func newRenderedEnv(t *testing.T, fixture string) *renderedEnv {
 	t.Helper()
+	return newRenderedEnvAt(t, fixturePath(fixture))
+}
+
+// newRenderedEnvAt is newRenderedEnv replaying the capture at path (absolute).
+func newRenderedEnvAt(t *testing.T, path string) *renderedEnv {
+	t.Helper()
 	dir := t.TempDir()
 	re := &renderedEnv{log: filepath.Join(dir, "stdin.log"), argv: filepath.Join(dir, "argv.json")}
 	re.mutate = func(o *Options) {
 		o.Claude = os.Args[0]
-		o.Env = []string{fakeClaudeEnv + "=" + fixturePath(fixture), "CF_FAKE_CLAUDE_LOG=" + re.log, "CF_FAKE_CLAUDE_ARGV=" + re.argv}
+		o.Env = []string{fakeClaudeEnv + "=" + path, "CF_FAKE_CLAUDE_LOG=" + re.log, "CF_FAKE_CLAUDE_ARGV=" + re.argv}
 		o.DefaultRender = func() Render { return RenderRendered }
 		o.DisablePreTrust = true
 	}
@@ -668,5 +674,55 @@ func TestProjectToolOutputCap(t *testing.T) {
 	}
 	if it.Tool.ResultJSON != "" {
 		t.Errorf("structured result over the cap was kept (%d bytes)", len(it.Tool.ResultJSON))
+	}
+}
+
+// TestRenderedPermissionFollowsItsToolCall: the CLI writes a tool_use's assistant
+// frame and then its can_use_tool request on the same stdout, so the permission item
+// must come right after its tool call. (The request used to reach the runner on a
+// goroutine of its own, racing the ordered events: run with -race -count=20.)
+func TestRenderedPermissionFollowsItsToolCall(t *testing.T) {
+	const rounds = 10
+	var lines []string
+	for i := range rounds {
+		for range 20 { // events queued ahead of the pair widen any race
+			lines = append(lines, `{"type":"rate_limit_event","rate_limit_info":{"status":"allowed"}}`)
+		}
+		lines = append(lines,
+			fmt.Sprintf(`{"type":"assistant","message":{"id":"msg_%d","role":"assistant","content":[{"type":"tool_use","id":"toolu_%d","name":"Bash","input":{"command":"echo %d"}}]},"parent_tool_use_id":null}`, i, i, i),
+			fmt.Sprintf(`{"type":"control_request","request_id":"r-%d","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"echo %d"},"tool_use_id":"toolu_%d"}}`, i, i, i),
+			fmt.Sprintf(`{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_%d","content":"%d"}]},"parent_tool_use_id":null}`, i, i))
+	}
+	lines = append(lines, `{"type":"result","subtype":"success","is_error":false,"num_turns":1,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}`)
+	path := filepath.Join(t.TempDir(), "pairs.jsonl")
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	re := newRenderedEnvAt(t, path)
+	s := re.create(CreateOptions{InitialPrompt: "run them"})
+	for i := range rounds {
+		reqID := fmt.Sprintf("r-%d", i)
+		toolID := fmt.Sprintf("toolu_%d", i)
+		at := func(items []Item, id string) int {
+			return slices.IndexFunc(items, func(it Item) bool { return it.ID == id })
+		}
+		items := re.waitItems(s.ID, "request "+reqID, func(items []Item) bool {
+			return at(items, "perm-"+reqID) >= 0 && at(items, toolID) >= 0
+		})
+		if at(items, "perm-"+reqID) != at(items, toolID)+1 {
+			t.Fatalf("round %d: the request does not follow its tool call:\n%s", i, describeItems(items))
+		}
+		if _, err := re.m.Respond(re.ctx(), s.ID, reqID, Decision{Allow: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items := re.waitItems(s.ID, "turn end", hasTurnEnd)
+	want := []string{"user_message"}
+	for range rounds {
+		want = append(want, "tool_call", "permission_request")
+	}
+	want = append(want, "turn_end")
+	if !slices.Equal(kinds(items), want) {
+		t.Errorf("kinds %v, want %v\n%s", kinds(items), want, describeItems(items))
 	}
 }

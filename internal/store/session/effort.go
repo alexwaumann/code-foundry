@@ -109,7 +109,7 @@ func (r *runner) respawn() {
 	argv, env := r.m.claudeCommand(s, l, "")
 	proc, err := claudestream.Start(claudestream.Spec{
 		Argv: argv, Env: env, Dir: r.cwd,
-		Conn: claudestream.Options{OnPermission: r.onPermission, Log: r.m.log.With("session", r.id)},
+		Conn: claudestream.Options{Log: r.m.log.With("session", r.id)},
 	})
 	if err != nil {
 		msg := "Claude did not restart for the effort change: " + err.Error()

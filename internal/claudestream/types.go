@@ -12,6 +12,7 @@ package claudestream
 
 import (
 	"encoding/json"
+	"errors"
 )
 
 // ---- outbound -------------------------------------------------------------------
@@ -107,10 +108,10 @@ func (r PermissionResult) wire(input json.RawMessage) map[string]any {
 // ---- inbound --------------------------------------------------------------------
 
 // Event is one parsed stdout line other than a control_response to our own request
-// (the Conn resolves those) and an inbound can_use_tool (routed to the
-// PermissionHandler). Concrete types: *Init, *Status, *PermissionDenied,
+// (the Conn resolves those). Concrete types: *Init, *Status, *PermissionDenied,
 // *CompactBoundary, *ThinkingTokens, *ConversationReset, *Assistant, *User, *StreamEvent, *Result,
-// *RateLimit, *CommandLifecycle, *Task, *ControlCancel, *Unknown.
+// *RateLimit, *CommandLifecycle, *Task, *PermissionRequest (an inbound can_use_tool,
+// from a Conn only), *ControlCancel, *Unknown.
 type Event interface{ RawJSON() json.RawMessage }
 
 // base carries the raw line and the fields every frame may have.
@@ -387,8 +388,8 @@ type Task struct {
 }
 
 // ControlCancel is a control_cancel_request: the CLI withdrew one of its own requests
-// (a pending can_use_tool after an interrupt). The Conn cancels the handler's context;
-// the event is also delivered for logging.
+// (a pending can_use_tool after an interrupt). The Conn forgets the request before
+// delivering this, so answering it afterwards sends nothing (ErrCancelled).
 type ControlCancel struct {
 	base
 	RequestID string `json:"request_id"`
@@ -439,9 +440,12 @@ type SetCwdResponse struct {
 	Message             string `json:"message"`
 }
 
-// PermissionRequest is an inbound can_use_tool control request. AskUserQuestion
-// arrives the same way (ToolName "AskUserQuestion"); answer it with Allow and
-// UpdatedInput {"questions": Input.questions, "answers": {question: label}}.
+// PermissionRequest is an inbound can_use_tool control request, delivered on
+// Conn.Events in stdout order. It stays pending until Answer is called (a person may
+// take as long as they like), the CLI withdraws it (a *ControlCancel with its
+// RequestID follows on Events) or stdout ends. AskUserQuestion arrives the same way
+// (ToolName "AskUserQuestion"); answer it with Allow and UpdatedInput
+// {"questions": Input.questions, "answers": {question: label}}.
 type PermissionRequest struct {
 	RequestID      string          `json:"-"`
 	ToolName       string          `json:"tool_name"`
@@ -459,6 +463,22 @@ type PermissionRequest struct {
 	RequiresUserInteraction bool `json:"requires_user_interaction,omitempty"`
 	// Raw is the whole control_request line.
 	Raw json.RawMessage `json:"-"`
+
+	conn     *Conn
+	answered bool // guarded by conn.mu
+}
+
+// RawJSON returns the control_request line as received.
+func (r *PermissionRequest) RawJSON() json.RawMessage { return r.Raw }
+
+// Answer sends res to the CLI. It does not wait for the write. It fails, sending
+// nothing, with ErrCancelled once the CLI withdrew the request, ErrClosed once
+// stdout ended, and ErrAnswered on a second call.
+func (r *PermissionRequest) Answer(res PermissionResult) error {
+	if r.conn == nil {
+		return errors.New("claudestream: request did not come from a Conn")
+	}
+	return r.conn.answer(r, res)
 }
 
 // IsQuestion reports whether this is an AskUserQuestion request.
