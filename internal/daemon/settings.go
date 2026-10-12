@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
@@ -28,6 +29,8 @@ import (
 //   - auto-naming and the naming model -> a Namer that reads both per session;
 //   - sessions.render -> session.Options.DefaultRender, read by every Create without
 //     an explicit mode;
+//   - sessions.cache_ttl_seconds -> session.Manager.SetCacheTTL on every change
+//     (applyCacheTTL), which republishes the threads whose cache expiry moved;
 //   - worktree directory -> repo.worktree.new's default path, and the path of the
 //     worktree a new thread creates (session.Options.WorktreePath).
 //   - editor command -> gitops' Editor func (stores.go), read on every open.
@@ -145,4 +148,13 @@ func settingsRender(st *settings.Store) func() session.Render {
 		}
 		return session.RenderTerminal
 	}
+}
+
+// cacheTTLSetter is the session store's live cache TTL (*session.Manager).
+type cacheTTLSetter interface{ SetCacheTTL(time.Duration) }
+
+// applyCacheTTL keeps the session store's prompt cache lifetime equal to
+// sessions.cache_ttl_seconds, now and on every settings change.
+func applyCacheTTL(st *settings.Store, sessions cacheTTLSetter) {
+	st.OnChange(func(snap *settings.Snapshot) { sessions.SetCacheTTL(snap.Settings.CacheTTL()) })
 }

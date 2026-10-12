@@ -104,7 +104,11 @@ type Options struct {
 	// sessions.render setting). Nil, or a result other than RenderRendered, means
 	// RenderTerminal.
 	DefaultRender func() Render
-	Now           func() time.Time
+	// CacheTTL is the prompt cache lifetime a rendered thread's CacheExpiresAt counts
+	// from its last result (the sessions.cache_ttl_seconds setting; SetCacheTTL changes
+	// it live). Default DefaultCacheTTL.
+	CacheTTL time.Duration
+	Now      func() time.Time
 }
 
 func (o Options) withDefaults() (Options, error) {
@@ -155,6 +159,7 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.AgentIdleClose, defaultAgentIdleClose)
 	def(&o.AttachmentMaxAge, AttachmentMaxAge)
 	def(&o.AttachmentReapInterval, AttachmentReapInterval)
+	def(&o.CacheTTL, DefaultCacheTTL)
 	if o.Now == nil {
 		o.Now = time.Now
 	}
@@ -177,6 +182,8 @@ type Manager struct {
 	snap    atomic.Pointer[Snapshot]
 	// retired is the retired usage ledger (Snapshot.RetiredUsage). Copy on write.
 	retired []UsageBucket
+	// cacheTTL is the prompt cache lifetime (SetCacheTTL); guarded by mu.
+	cacheTTL time.Duration
 
 	// threads are the rendered threads' item logs loaded so far (items.go).
 	tmu     sync.Mutex
@@ -211,7 +218,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		return nil, err
 	}
 	m := &Manager{opts: opts, log: opts.Log, recs: map[string]*record{}, retired: retired,
-		viewers: map[string]int{}, threads: map[string]*threadLog{}}
+		viewers: map[string]int{}, threads: map[string]*threadLog{}, cacheTTL: opts.CacheTTL}
 	m.ctx, m.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	for _, s := range rows {
 		if s.State != StateDisconnected {
@@ -222,6 +229,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 				return nil, err
 			}
 		}
+		s.CacheExpiresAt = cacheExpiry(s.LastResultAt, opts.CacheTTL)
 		m.recs[s.ID] = &record{s: s, namingTried: s.Name != ""}
 	}
 	m.mu.Lock()

@@ -3,6 +3,7 @@ package pricing
 import (
 	"math"
 	"testing"
+	"time"
 )
 
 func TestLookup(t *testing.T) {
@@ -144,5 +145,34 @@ func TestHasLongTier(t *testing.T) {
 		if got := HasLongTier(model); got != want {
 			t.Errorf("HasLongTier(%q) = %v; want %v", model, got, want)
 		}
+	}
+}
+
+func TestRereadCost(t *testing.T) {
+	tests := []struct {
+		name   string
+		model  string
+		tokens int64
+		ttl    time.Duration
+		want   float64
+		ok     bool
+	}{
+		{name: "1 h write rate for an hour's TTL", model: "claude-opus-4-8", tokens: 1_000_000, ttl: time.Hour, want: 10, ok: true},
+		{name: "a dated snapshot", model: "claude-haiku-4-5-20251001", tokens: 25_700, ttl: time.Hour, want: 25_700 * 2 / 1e6, ok: true},
+		{name: "just over 5 min is still the 1 h rate", model: "claude-sonnet-4-6", tokens: 1_000_000, ttl: 5*time.Minute + time.Second, want: 6, ok: true},
+		{name: "5 min write rate at 5 min", model: "claude-sonnet-4-6", tokens: 1_000_000, ttl: 5 * time.Minute, want: 3.75, ok: true},
+		{name: "5 min write rate below", model: "claude-opus-5-5", tokens: 2_000_000, ttl: time.Minute, want: 10, ok: true},
+		{name: "zero tokens", model: "claude-opus-5-5", ttl: time.Hour, want: 0, ok: true},
+		{name: "an alias is not a rate", model: "opus", tokens: 1000, ttl: time.Hour},
+		{name: "unknown model", model: "claude-next-1", tokens: 1000, ttl: time.Hour},
+		{name: "no model", tokens: 1000, ttl: time.Hour},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := RereadCost(tt.model, tt.tokens, tt.ttl)
+			if ok != tt.ok || math.Abs(got-tt.want) > 1e-9 {
+				t.Errorf("RereadCost(%q, %d, %v) = %v, %v; want %v, %v", tt.model, tt.tokens, tt.ttl, got, ok, tt.want, tt.ok)
+			}
+		})
 	}
 }

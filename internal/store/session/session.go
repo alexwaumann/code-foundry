@@ -202,6 +202,20 @@ type Session struct {
 	// EffortPending: a rendered thread's effort change (Store.SetEffort) waits for the
 	// running turn to end; Effort is already the new level. Not persisted.
 	EffortPending bool
+	// ContextTokens is a rendered thread's context size after its last turn: the last
+	// top-level API response's input + cache read + cache write + output tokens
+	// (context.go). 0 before the first result and after /clear. Persisted.
+	ContextTokens int64
+	// ContextModel is the model that answered the turn ContextTokens comes from, as
+	// Claude names it ("claude-haiku-4-5-20251001"); "" when unknown. Persisted.
+	ContextModel string
+	// LastResultAt is when the turn ContextTokens comes from ended: the conversation's
+	// last API request, which refreshed its prompt cache. Zero with ContextTokens.
+	// Persisted.
+	LastResultAt time.Time
+	// CacheExpiresAt is LastResultAt plus the store's cache TTL (Manager.SetCacheTTL);
+	// zero when LastResultAt is. Derived, not persisted.
+	CacheExpiresAt time.Time
 }
 
 // Snapshot is every session, sorted by creation time then id. Never mutate it.
