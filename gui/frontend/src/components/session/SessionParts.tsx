@@ -36,6 +36,7 @@ export function SessionTitle({ id }: { id: string }) {
   const model = useSessionsStore((s) => [s.byId[id]?.model, s.byId[id]?.effort].filter(Boolean).join(" · "));
   const path = useSessionsStore((s) => s.byId[id]?.worktreePath ?? "");
   const badge = useSessionsStore((s) => sessionBadge(s.byId[id]));
+  const rendered = useSessionsStore((s) => s.byId[id]?.render === "rendered");
   return (
     <>
       <SessionStatusIcon id={id} />
@@ -46,6 +47,12 @@ export function SessionTitle({ id }: { id: string }) {
         {badgeLabels[badge]}
       </span>
       {model && <span className="shrink-0 text-muted-foreground">{model}</span>}
+      {/* A terminal thread says nothing: the terminal is the default and shows itself. */}
+      {rendered && (
+        <span className="shrink-0 text-muted-foreground" data-testid="session-render">
+          rendered
+        </span>
+      )}
       <span className="truncate text-muted-foreground">{tildify(path)}</span>
     </>
   );
