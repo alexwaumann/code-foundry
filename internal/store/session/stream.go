@@ -185,6 +185,10 @@ func (r *runner) onPermission(ctx context.Context, req *claudestream.PermissionR
 		case <-r.done:
 		}
 		return claudestream.PermissionResult{}, context.Cause(ctx)
+	case <-r.done:
+		// The runner finished without answering (daemon stop while stdout was held
+		// open by a grandchild): nothing will come.
+		return claudestream.PermissionResult{}, ErrClosed
 	}
 }
 
@@ -270,7 +274,10 @@ func procDone(st *streamState) <-chan struct{} {
 func (r *runner) onInitialized(err error) {
 	st := r.st
 	if err != nil {
-		if !r.closing && !st.exited {
+		if !r.closing && !st.exited && !errors.Is(err, claudestream.ErrClosed) {
+			// Still running but not answering (the startup timer says the same).
+			// ErrClosed means its stdout ended: the process is gone or going, and
+			// maybeExited records how (crashed, with its last stderr line).
 			r.failStart(err)
 		}
 		return
@@ -567,6 +574,9 @@ func (r *runner) stopStream() {
 	closeUnfinished(st.proj.w, "the daemon stopped")
 	r.stopStreamTimers()
 	st.conn.Close()
+	// End the reader even if a grandchild kept stdout open: it cancels the pending
+	// permission handlers, which otherwise wait for an answer that never comes.
+	st.proc.CloseOutput()
 	r.log().info("session disconnected", "reason", ReasonDaemonStopped)
 	r.finish(func(s *Session) {
 		s.State, s.DisconnectReason, s.TerminalID = StateDisconnected, ReasonDaemonStopped, ""
@@ -597,10 +607,13 @@ func (r *runner) maybeExited() {
 	if !r.closing {
 		midTurn := st.sd.busy || st.sd.compacting || len(st.pending) > 0
 		lastErr = st.proc.LastStderrLine()
-		if midTurn || code != 0 {
+		if midTurn || code != 0 || !st.initialized {
 			msg := fmt.Sprintf("Claude exited (code %d)", code)
-			if midTurn {
+			switch {
+			case midTurn:
 				msg = fmt.Sprintf("Claude exited mid-turn (code %d)", code)
+			case !st.initialized:
+				msg = fmt.Sprintf("Claude exited (code %d) before answering the initialize handshake", code)
 			}
 			if lastErr != "" {
 				msg += ": " + lastErr
@@ -615,7 +628,7 @@ func (r *runner) maybeExited() {
 	r.log().info("session disconnected", "reason", reason, "exit_code", code)
 	r.finish(func(s *Session) {
 		s.State, s.DisconnectReason, s.ExitCode, s.TerminalID = StateDisconnected, reason, code, ""
-		if lastErr != "" && code != 0 {
+		if lastErr != "" && (code != 0 || !st.initialized) {
 			s.LastError = lastErr
 		}
 	})

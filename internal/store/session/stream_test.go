@@ -619,3 +619,24 @@ func TestRenderedFirstPromptWithImage(t *testing.T) {
 		t.Errorf("user item %+v", items[0])
 	}
 }
+
+// TestRenderedStartCrash: a claude that dies before answering the initialize
+// handshake (here the fake, whose fixture is missing: exit 2 with a stderr line) ends
+// the thread crashed, with the stderr line as LastError and an error item, not
+// "closed" (the close path is for a process that is alive and silent).
+func TestRenderedStartCrash(t *testing.T) {
+	re := newRenderedEnv(t, "no-such-fixture")
+	s := re.create(CreateOptions{InitialPrompt: "hi"})
+	got := re.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	if got.DisconnectReason != ReasonCrashed || got.ExitCode != 2 || !strings.Contains(got.LastError, "fake claude") {
+		t.Errorf("after crash %+v", got)
+	}
+	items := re.items(s.ID).Items
+	errItem, ok := lastKind(items, KindError)
+	if !ok || !strings.Contains(errItem.Text, "before answering the initialize handshake") || !strings.Contains(errItem.Text, "fake claude") {
+		t.Errorf("items:\n%s", describeItems(items))
+	}
+	if _, err := re.m.Reconnect(re.ctx(), s.ID); err != nil {
+		t.Fatalf("reconnect after a crash: %v", err)
+	}
+}
