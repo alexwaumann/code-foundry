@@ -343,3 +343,13 @@ test("a fork of a rendered thread is rendered and starts empty, naming its paren
   await expect(page.getByTestId("thread-empty")).toHaveText("Forked from Fix stale PR badge. Claude has the conversation so far; send a follow-up to continue.", { timeout: 5000 });
   await shot(page, "fork-empty");
 });
+
+test("the follow-up placeholder says a message while Claude works is picked up mid-turn; one Interrupt", async ({ page }) => {
+  await openThread(page, "streaming");
+  const editor = page.getByTestId("thread-composer").locator('[contenteditable="true"]');
+  await expect(editor).toHaveAttribute("aria-placeholder", "Send a follow-up… Claude picks it up mid-turn");
+  await expect(pane(page).getByRole("button", { name: /Interrupt/ })).toHaveCount(1);
+  await mockPost("thread/finish");
+  await expect(editor).toHaveAttribute("aria-placeholder", "Send a follow-up…");
+  await expect(pane(page).getByRole("button", { name: /Interrupt/ })).toHaveCount(0);
+});
