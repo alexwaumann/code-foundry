@@ -1736,6 +1736,7 @@ type ThreadEvent_Snapshot struct {
 }
 
 type ThreadEvent_Appended struct {
+	// Watch only: items and their streaming deltas.
 	Appended *ThreadItemChange `protobuf:"bytes,2,opt,name=appended,proto3,oneof"`
 }
 
@@ -1748,6 +1749,7 @@ type ThreadEvent_Delta struct {
 }
 
 type ThreadEvent_Pending struct {
+	// Watch and EventService: the thread's pending requests changed.
 	Pending *ThreadPending `protobuf:"bytes,5,opt,name=pending,proto3,oneof"`
 }
 

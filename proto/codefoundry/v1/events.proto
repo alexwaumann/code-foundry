@@ -45,10 +45,10 @@ enum EventSource {
   // Workspaces (branch sets). Sent right after repo, before terminal: members name
   // repositories, and sessions name workspaces.
   EVENT_SOURCE_WORKSPACE = 11;
-  // Rendered threads' items: appended / updated / delta and pending requests, for
-  // every rendered thread. Its snapshot (right after session) is only the pending
-  // requests (ThreadPendingSnapshot); a thread's items come from
-  // ThreadService.ListItems or Watch.
+  // Rendered threads' pending requests (permission prompts and questions), for
+  // every rendered thread: a ThreadPendingSnapshot (right after session), then a
+  // ThreadEvent.pending per change. A thread's items come only from
+  // ThreadService.ListItems or Watch; this source never carries them.
   EVENT_SOURCE_THREAD = 12;
 }
 
@@ -65,7 +65,7 @@ message Event {
     UpdateEvent update = 10;
     // Workspaces: a snapshot, then updated / removed_id.
     WorkspaceEvent workspace = 11;
-    // Rendered threads: pending_snapshot, then appended / updated / delta / pending.
+    // Rendered threads: pending_snapshot, then pending (never items or deltas).
     ThreadEvent thread = 12;
   }
 }

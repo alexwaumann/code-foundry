@@ -245,9 +245,11 @@ message ThreadEvent {
   oneof event {
     // ThreadService.Watch's first event (and a resync after drops).
     ThreadItemsSnapshot snapshot = 1;
+    // Watch only: items and their streaming deltas.
     ThreadItemChange appended = 2;
     ThreadItemChange updated = 3;
     ThreadItemDelta delta = 4;
+    // Watch and EventService: the thread's pending requests changed.
     ThreadPending pending = 5;
     // EventService only: the snapshot of the thread source.
     ThreadPendingSnapshot pending_snapshot = 6;

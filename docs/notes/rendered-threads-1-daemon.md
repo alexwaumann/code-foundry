@@ -120,9 +120,10 @@ while building this). No GUI work: the GUI PR maps the new proto in `src/api`.
   id) / `delta` (append `text` to `assistant_text.text`/`thinking.text` for
   `FIELD_TEXT`, to `tool_call.input_json` for `FIELD_INPUT`) / `pending`. Drop events
   with `seq <= snapshot.seq`; a second `snapshot` means the stream resynced after
-  drops. The EventService `thread` source carries the same events for every rendered
-  thread (snapshot: `pending_snapshot`, the pending requests of live rendered threads)
-  for badges without a Watch.
+  drops. The EventService `thread` source carries **only pending requests**: a
+  `pending_snapshot` (the live rendered threads' pending requests) and a `pending`
+  event per change, for badges without a Watch. It never carries items or deltas
+  (review, below): build item state from `Watch` alone.
 * A permission item and its tool call share `tool_use_id`. AskUserQuestion shows up
   twice: a `tool_call` named AskUserQuestion and a `question` item (render the
   question, hide or fold the call). `Respond(request_id, ALLOW | ALLOW_FOR_SESSION |
@@ -130,6 +131,13 @@ while building this). No GUI work: the GUI PR maps the new proto in `src/api`.
   joined with ", " (what Claude's own UI sends).
 * `turn_end.cost_usd` is Claude's cumulative estimate for the process, not per turn;
   the thread's usage stays `Session.usage` from the transcript fold.
+* `tool_call.output` is cut at 512 KiB with a trailing `… [output truncated: N more
+  bytes]` line; `result_json` is empty over 256 KiB. An `error` item's text is
+  "Claude exited mid-turn (code N): <last stderr line>", "Claude exited (code N)
+  before answering the initialize handshake: …" or "claude did not start: …".
+* A fork of a rendered thread starts with **no items**: the history is in Claude's
+  transcript (`--resume --fork-session`), not copied into `thread_items`. Show an
+  empty timeline with the parent's name, or ask for copying in a later PR.
 * Thinking items usually have empty text (haiku streams none): render a "thinking"
   row, not an empty bubble.
 * Status reasons for rendered threads: "starting", "working", "compacting",
@@ -197,6 +205,10 @@ while building this). No GUI work: the GUI PR maps the new proto in `src/api`.
 * **Pending requests do not survive their process**, so they are cancelled whenever it
   ends (close, exit, daemon stop, and on load after a crash); the EventService thread
   snapshot only asks live rendered threads.
+* **Daemon stop kills the claude child** (SIGTERM to its process group, SIGKILL 2 s
+  later) and records "daemon stopped": it talks to the daemon over pipes and cannot
+  outlive it, the same as a terminal thread's PTY (ARCHITECTURE §11: processes do not
+  survive a restart). Reconnect resumes the transcript.
 * **`SetPermissionMode` refuses `PermissionDefault`**: "no flag" means the user's
   `defaultMode` setting, which the control protocol cannot select (`default` on the wire
   is supervised).
@@ -218,4 +230,57 @@ while building this). No GUI work: the GUI PR maps the new proto in `src/api`.
   MCP elicitation.
 * No per-thread queue UI: Send while busy goes straight to Claude (decision 6).
 * A thread's items are not pruned; `thread_items` grows with the conversation (rows
-  are small; tool results over 256 KiB keep only their text).
+  are small; tool output is cut at 512 KiB, structured results over 256 KiB dropped).
+  Loaded logs stay in memory (`Manager.threads`) until the thread is removed.
+
+## Review (Fable 5.1, 2026-10-11)
+
+Independent review of the branch; each fix is its own commit, with a test.
+
+Fixed:
+
+* A claude that died before answering `initialize` (bad flag, not logged in, a
+  missing binary's wrapper) ended `disconnected (closed)` with no exit code of note:
+  `onInitialized` began a close on `ErrClosed`. Now `maybeExited` records it:
+  `crashed`, the last stderr line as `LastError`, an error item even on exit 0
+  (`TestRenderedStartCrash`).
+* `stopStream` (daemon shutdown) never closed the stdout read end, so a grandchild
+  holding the pipe kept the reader goroutine and its permission handlers alive; and a
+  permission handler waited on its answer even after the runner was gone. Both end now.
+* The Conn answered unsupported control requests from the reader goroutine: a write
+  that waits for the CLI to drain stdin would stop stdout being drained (both pipes
+  wedged). Replies go out on their own goroutine.
+* `tool_call.output` was unbounded (every update travels whole over the bus, each
+  Watch and the EventService); cut at 512 KiB with a marker (`TestProjectToolOutputCap`).
+* The EventService `thread` source forwarded every thread's items and deltas to every
+  client (a second copy of the visible thread's Watch for everyone), while its resync
+  after dropped events restored pending requests only, so items built from it would
+  diverge silently. It now carries pending requests only; proto comments updated.
+* `compacting` was cleared only by a `status: null` carrying `compact_result`; the
+  status type is `compacting | requesting | null`, so any null now ends it.
+* Create's spawn failure left the thread's log in `Manager.threads`.
+
+Checked and left as is:
+
+* `Conn.Send`/`Request` writes to stdin block without a deadline (the ctx is for the
+  reply). A wedged claude that stops reading stdin with 64 KiB queued would hold the
+  runner goroutine until the daemon's shutdown deadline. A write deadline would need a
+  pipe we own and a "connection broken" state after a partial write; not worth it until
+  seen in practice.
+* A stdout line over 64 MiB is skipped whole; if it was a tool_result its tool call
+  stays "running" until the process ends (background agents legitimately stay running
+  across turns, so the turn end cannot close them).
+* `saveItem` runs on the runner goroutine, one autocommit upsert per completed block or
+  update: a handful per turn, fine for SQLite in WAL mode.
+* `StartTimeout` (15 s) bounds the handshake; a big `--resume` answers `initialize`
+  before loading its transcript in the runs seen, so it has not bitten.
+* Lock order, seq/snapshot semantics of Watch, request-id correlation (the CLI's ids
+  are UUIDs, ours `cf-N`), rehydration, interrupt with a pending request, close with
+  pending requests, Send while busy: reviewed, no change.
+
+Live (haiku, low, scratch daemon in `/tmp/cf-rv-home`, repo `~/cf-rv-scratch`):
+Write permission → allow → file written → finished; `kill -9` of claude mid-turn →
+`disconnected (crashed)`, `error (interrupted)`, the streaming text item closed, error
+item "Claude exited mid-turn (code -1)"; reconnect → answer in five words; SIGTERM
+to the daemon → the child gone in 200 ms, "daemon stopped"; restart → items identical;
+reconnect → close → `disconnected (closed)`.

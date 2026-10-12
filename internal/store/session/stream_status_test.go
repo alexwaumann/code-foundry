@@ -42,6 +42,8 @@ func TestStreamStatus(t *testing.T) {
 		{"all answered", []step{init, sent, ask("p1", perm), resolved("p1")}, StatusBusy, "working", false, false},
 		{"compacting", []step{init, ev(&claudestream.Status{Status: str("compacting")})}, StatusBusy, "compacting", false, false},
 		{"compacted", []step{init, ev(&claudestream.Status{Status: str("compacting")}), ev(&claudestream.Status{CompactResult: "success"})}, StatusIdle, "at prompt", true, false},
+		{"compaction failed", []step{init, ev(&claudestream.Status{Status: str("compacting")}), ev(&claudestream.Status{CompactResult: "failed", CompactError: "x"})}, StatusIdle, "at prompt", true, false},
+		{"status null ends compacting, not busy", []step{init, sent, ev(&claudestream.Status{Status: str("compacting")}), ev(&claudestream.Status{})}, StatusBusy, "working", false, false},
 		{"lifecycle started", []step{init, ev(&claudestream.CommandLifecycle{State: "started"})}, StatusBusy, "working", false, false},
 	}
 	for _, tt := range tests {

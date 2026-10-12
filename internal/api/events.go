@@ -380,10 +380,14 @@ func (s sessionSource) snapshot(context.Context) []*v1.Event {
 
 // ---- thread --------------------------------------------------------------------
 
-// threadSource carries every rendered thread's item events (api/thread.go's mapping).
-// Its snapshot is only the pending requests of the live rendered threads: items are
-// per thread and come from ThreadService.ListItems or Watch. A disconnected thread
-// has none pending (they are cancelled when its process ends).
+// threadSource carries the pending requests (permission prompts and questions) of
+// every rendered thread: the snapshot lists the live threads' pending requests, then
+// each change is a ThreadEvent.pending. Items are per thread and come only from
+// ThreadService.ListItems or Watch (the visible thread's stream, as a terminal's
+// Attach): forwarding every thread's text deltas to every client would cost more than
+// it shows, and this source's resync after dropped events restores pending requests
+// only, so nothing else may be built from it. A disconnected thread has nothing
+// pending (its requests are cancelled when its process ends).
 type threadSource struct {
 	store session.Store
 	bus   *bus.Bus
@@ -392,6 +396,9 @@ type threadSource struct {
 func (threadSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_THREAD }
 
 func threadWrap(ev session.ThreadEvent) *v1.Event {
+	if _, ok := ev.(session.PendingChanged); !ok {
+		return nil
+	}
 	if m := threadEventToProto(ev); m != nil {
 		return &v1.Event{Event: &v1.Event_Thread{Thread: m}}
 	}

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/claudestream"
@@ -617,5 +618,49 @@ func TestRenderedFirstPromptWithImage(t *testing.T) {
 	items := re.waitItems(s.ID, "turn end", hasTurnEnd)
 	if items[0].Text != "What color?" || !slices.Equal(items[0].Attachments, []string{path}) {
 		t.Errorf("user item %+v", items[0])
+	}
+}
+
+// TestRenderedStartCrash: a claude that dies before answering the initialize
+// handshake (here the fake, whose fixture is missing: exit 2 with a stderr line) ends
+// the thread crashed, with the stderr line as LastError and an error item, not
+// "closed" (the close path is for a process that is alive and silent).
+func TestRenderedStartCrash(t *testing.T) {
+	re := newRenderedEnv(t, "no-such-fixture")
+	s := re.create(CreateOptions{InitialPrompt: "hi"})
+	got := re.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
+	if got.DisconnectReason != ReasonCrashed || got.ExitCode != 2 || !strings.Contains(got.LastError, "fake claude") {
+		t.Errorf("after crash %+v", got)
+	}
+	items := re.items(s.ID).Items
+	errItem, ok := lastKind(items, KindError)
+	if !ok || !strings.Contains(errItem.Text, "before answering the initialize handshake") || !strings.Contains(errItem.Text, "fake claude") {
+		t.Errorf("items:\n%s", describeItems(items))
+	}
+	if _, err := re.m.Reconnect(re.ctx(), s.ID); err != nil {
+		t.Fatalf("reconnect after a crash: %v", err)
+	}
+}
+
+// TestProjectToolOutputCap: a tool result longer than maxToolOutput keeps its head
+// and a marker (the structured result is dropped over maxResultJSON already).
+func TestProjectToolOutputCap(t *testing.T) {
+	log := newThreadLog("s", bus.New(), time.Now, nil)
+	p := newProjector(itemWriter{log: log, save: func(Item) {}})
+	p.event(claudestream.Parse([]byte(`{"type":"assistant","message":{"id":"m1","role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"big"}}]},"parent_tool_use_id":null}`)))
+	big := strings.Repeat("é", maxToolOutput/2+100) // multi-byte: the cut must land on a rune boundary
+	line, _ := json.Marshal(map[string]any{
+		"type": "user", "parent_tool_use_id": nil,
+		"message":         map[string]any{"role": "user", "content": []map[string]any{{"type": "tool_result", "tool_use_id": "t1", "content": big}}},
+		"tool_use_result": map[string]any{"file": map[string]any{"content": big}},
+	})
+	p.event(claudestream.Parse(line))
+	it, _ := log.get("t1")
+	if it.Tool.Status != ToolDone || len(it.Tool.Output) > maxToolOutput+80 || !utf8.ValidString(it.Tool.Output) ||
+		!strings.HasSuffix(it.Tool.Output, fmt.Sprintf("[output truncated: %d more bytes]", len(big)-maxToolOutput)) {
+		t.Errorf("output len %d, tail %q", len(it.Tool.Output), it.Tool.Output[max(0, len(it.Tool.Output)-60):])
+	}
+	if it.Tool.ResultJSON != "" {
+		t.Errorf("structured result over the cap was kept (%d bytes)", len(it.Tool.ResultJSON))
 	}
 }

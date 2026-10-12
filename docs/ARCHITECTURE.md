@@ -169,8 +169,8 @@ Services (v1):
   CLI).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
   intents (sources repo, workspace, terminal, session, thread, gh, gitops, settings,
-  update, ui; the thread source's snapshot is only the pending requests;
-  filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
+  update, ui; the thread source carries rendered threads' pending requests only, a
+  snapshot then changes, never items; filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream; the per-service Watch RPCs remain for the CLI and tests.
 * `SettingsService` — GetSchema, Get, Update, Watch over `$CONFIG/settings.toml` (TOML,

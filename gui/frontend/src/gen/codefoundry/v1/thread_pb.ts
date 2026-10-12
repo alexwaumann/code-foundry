@@ -776,6 +776,8 @@ export type ThreadEvent = Message<"codefoundry.v1.ThreadEvent"> & {
     case: "snapshot";
   } | {
     /**
+     * Watch only: items and their streaming deltas.
+     *
      * @generated from field: codefoundry.v1.ThreadItemChange appended = 2;
      */
     value: ThreadItemChange;
@@ -794,6 +796,8 @@ export type ThreadEvent = Message<"codefoundry.v1.ThreadEvent"> & {
     case: "delta";
   } | {
     /**
+     * Watch and EventService: the thread's pending requests changed.
+     *
      * @generated from field: codefoundry.v1.ThreadPending pending = 5;
      */
     value: ThreadPending;

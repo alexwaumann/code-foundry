@@ -264,7 +264,7 @@ func (p *projector) user(e *claudestream.User) {
 				return
 			}
 			it.Streaming = false
-			it.Tool.Output, it.Tool.IsError, it.Tool.ResultJSON = b.ResultText(), b.IsError, res
+			it.Tool.Output, it.Tool.IsError, it.Tool.ResultJSON = capOutput(b.ResultText()), b.IsError, res
 			it.Tool.Status = ToolDone
 			if b.IsError {
 				it.Tool.Status = ToolError
