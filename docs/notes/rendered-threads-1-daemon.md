@@ -17,10 +17,12 @@ while building this). No GUI work: the GUI PR maps the new proto in `src/api`.
   `Request` (request_id correlation; an error response is a `*ControlError`),
   `Interrupt`, `SetModel`, `SetPermissionMode`, `SetCwd`, `CloseStdin`, and `Events()`
   for everything else, fed by an unbounded queue so the reader never waits on the
-  consumer. Inbound `can_use_tool` (AskUserQuestion included) goes to the owner's
-  `PermissionHandler`, one goroutine per request, blocking as long as a person takes;
-  its context is cancelled by `control_cancel_request` (cause `ErrCancelled`) or the
-  end of stdout (`ErrClosed`), and then nothing is sent. Other inbound control requests
+  consumer. Inbound `can_use_tool` (AskUserQuestion included) is a `*PermissionRequest`
+  on the same ordered `Events()`, pending as long as a person takes until its
+  `Answer(result)`; after `control_cancel_request` (also on `Events()`, after the
+  request) `Answer` sends nothing and returns `ErrCancelled`, after the end of stdout
+  `ErrClosed`, a second time `ErrAnswered`. The reply is written on its own goroutine.
+  (See "Ordering" below.) Other inbound control requests
   get an error response. `Process` (`Start(Spec)`) runs the CLI in its own process
   group with its own `os.Pipe`s (so `Wait` is not held by a grandchild keeping a pipe
   open), keeps a 16 KiB stderr tail for `LastError`, and signals the group.
@@ -216,6 +218,19 @@ while building this). No GUI work: the GUI PR maps the new proto in `src/api`.
   record under `mu`, releases it, then takes `tmu` (Remove holds `mu` while dropping a
   log). `thread()` reads the record, not the snapshot: Create's spawn needs the log
   before the first publish.
+* **Ordering: permission requests travel with the other lines.** The CLI writes a
+  tool's `assistant` frame (and its stream events) before the `can_use_tool` asking
+  about it, on the same stdout. The Conn first ran a `PermissionHandler` callback on a
+  goroutine per request while every other line went through the ordered `Events()`
+  queue, so the runner appended the `permission_request` item and the `tool_call`
+  item from two goroutines and their ordinals raced (CI: `[user_message
+  permission_request tool_call …]`). Now the request is an event in stdout order and
+  the runner's loop appends it, registers it as pending, and answers it from
+  `Respond`, a close, or a request arriving while closing; withdrawal is the
+  `*ControlCancel` event in the same loop. No callback, no per-request goroutine (the
+  answer's write still goes out off the caller's goroutine).
+  `TestRenderedPermissionFollowsItsToolCall` (ten tool_use + can_use_tool pairs back
+  to back, failed every run before) and `TestConnPermissionOrder` guard it.
 * The test fake is the test binary itself (`TestMain` + `CF_FAKE_CLAUDE`), so no
   script or Node is needed; fixture paths must be absolute (the fake's cwd is the
   thread's worktree).

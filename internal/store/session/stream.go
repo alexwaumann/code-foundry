@@ -50,22 +50,17 @@ type streamState struct {
 	first *outgoing // sent once initialize succeeds
 
 	initDone chan error
-	asks     chan *permAsk
-	gone     chan string
 	cmds     chan threadCmd
 	viewSig  chan struct{}
 
-	pending     map[string]*permAsk
+	// pending holds the can_use_tool requests waiting for the user, by request id.
+	// They arrive on the Conn's ordered events, so a request's item lands right after
+	// the tool call it asks about.
+	pending     map[string]*claudestream.PermissionRequest
 	initialized bool
 	outputEnded bool
 	exited      bool
 	drainTimer  *time.Timer
-}
-
-// permAsk is a can_use_tool request waiting for the user.
-type permAsk struct {
-	req    *claudestream.PermissionRequest
-	answer chan claudestream.PermissionResult
 }
 
 // threadCmd is a Store call the runner carries out on its goroutine.
@@ -112,11 +107,9 @@ func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv,
 	st := &streamState{
 		sd: &streamStatus{}, log: log, first: first,
 		initDone: make(chan error, 1),
-		asks:     make(chan *permAsk),
-		gone:     make(chan string),
 		cmds:     make(chan threadCmd),
 		viewSig:  make(chan struct{}, 1),
-		pending:  map[string]*permAsk{},
+		pending:  map[string]*claudestream.PermissionRequest{},
 	}
 	st.proj = newProjector(itemWriter{log: log, save: func(it Item) { m.saveItem(s.ID, it) }})
 	r.st = st
@@ -124,7 +117,7 @@ func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv,
 	closeUnfinished(st.proj.w, "the thread's process ended")
 	proc, err := claudestream.Start(claudestream.Spec{
 		Argv: argv, Env: env, Dir: s.WorktreePath,
-		Conn: claudestream.Options{OnPermission: r.onPermission, Log: m.log.With("session", s.ID)},
+		Conn: claudestream.Options{Log: m.log.With("session", s.ID)},
 	})
 	if err != nil {
 		return fmt.Errorf("session %s: spawn claude: %w", s.ID, err)
@@ -166,33 +159,6 @@ func closeUnfinished(w itemWriter, why string) {
 	}
 }
 
-// onPermission is the Conn's PermissionHandler: it hands the request to the run loop
-// and waits for the user's decision, or until Claude withdraws the request or exits.
-func (r *runner) onPermission(ctx context.Context, req *claudestream.PermissionRequest) (claudestream.PermissionResult, error) {
-	ask := &permAsk{req: req, answer: make(chan claudestream.PermissionResult, 1)}
-	select {
-	case r.st.asks <- ask:
-	case <-ctx.Done():
-		return claudestream.PermissionResult{}, context.Cause(ctx)
-	case <-r.done:
-		return claudestream.PermissionResult{}, ErrClosed
-	}
-	select {
-	case res := <-ask.answer:
-		return res, nil
-	case <-ctx.Done():
-		select {
-		case r.st.gone <- req.RequestID:
-		case <-r.done:
-		}
-		return claudestream.PermissionResult{}, context.Cause(ctx)
-	case <-r.done:
-		// The runner finished without answering (daemon stop while stdout was held
-		// open by a grandchild): nothing will come.
-		return claudestream.PermissionResult{}, ErrClosed
-	}
-}
-
 func (r *runner) runStream() {
 	defer close(r.done)
 	defer r.tail.close()
@@ -231,10 +197,6 @@ func (r *runner) runStream() {
 			st.drainTimer = nil
 			r.log().warn("claude exited but its output is still open; closing it")
 			st.proc.CloseOutput()
-		case ask := <-st.asks:
-			r.onAsk(ask)
-		case id := <-st.gone:
-			r.onAskGone(id)
 		case cmd := <-st.cmds:
 			r.onThreadCmd(cmd)
 		case <-st.viewSig:
@@ -320,6 +282,10 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 	r.st.proj.event(ev)
 	r.st.sd.event(ev)
 	switch e := ev.(type) {
+	case *claudestream.PermissionRequest:
+		r.onAsk(e)
+	case *claudestream.ControlCancel:
+		r.onAskGone(e.RequestID)
 	case *claudestream.Result:
 		r.acknowledgeIfViewed()
 	case *claudestream.ConversationReset:
@@ -373,17 +339,25 @@ func imageBlock(path string) (claudestream.ContentBlock, error) {
 	return claudestream.ImageBlock(mt, base64.StdEncoding.EncodeToString(data)), nil
 }
 
-func (r *runner) onAsk(ask *permAsk) {
+func (r *runner) onAsk(req *claudestream.PermissionRequest) {
 	st := r.st
 	if r.closing {
-		ask.answer <- claudestream.PermissionResult{Message: "The thread is closing.", Interrupt: true}
+		r.answer(req, claudestream.PermissionResult{Message: "The thread is closing.", Interrupt: true})
 		return
 	}
-	it := st.proj.w.add(requestItem(ask.req))
-	st.pending[ask.req.RequestID] = ask
-	st.sd.ask(ask.req.RequestID, it)
-	r.log().info("claude asks", "tool", ask.req.ToolName, "request", ask.req.RequestID)
+	it := st.proj.w.add(requestItem(req))
+	st.pending[req.RequestID] = req
+	st.sd.ask(req.RequestID, it)
+	r.log().info("claude asks", "tool", req.ToolName, "request", req.RequestID)
 	r.checkStatus()
+}
+
+// answer sends a decision to Claude. A failure means Claude no longer waits for it
+// (withdrawn, or its output ended): the item is resolved anyway, as before.
+func (r *runner) answer(req *claudestream.PermissionRequest, res claudestream.PermissionResult) {
+	if err := req.Answer(res); err != nil {
+		r.log().debug("answer permission request", "request", req.RequestID, "err", err)
+	}
 }
 
 func (r *runner) onAskGone(id string) {
@@ -424,12 +398,12 @@ func (r *runner) onThreadCmd(cmd threadCmd) {
 
 func (r *runner) respond(id string, d Decision) (Item, error) {
 	st := r.st
-	ask, ok := st.pending[id]
+	req, ok := st.pending[id]
 	if !ok {
 		return Item{}, fmt.Errorf("%w: no pending request %s on thread %s", ErrNotFound, id, r.id)
 	}
 	cur, _ := st.log.get("perm-" + id)
-	if ask.req.IsQuestion() {
+	if req.IsQuestion() {
 		cur, _ = st.log.get("q-" + id)
 	}
 	if cur.Request == nil {
@@ -439,7 +413,7 @@ func (r *runner) respond(id string, d Decision) (Item, error) {
 	if err != nil {
 		return Item{}, err
 	}
-	ask.answer <- res
+	r.answer(req, res)
 	delete(st.pending, id)
 	st.sd.resolved(id)
 	it, _ := r.resolveItem(id, func(q *Request) {
@@ -520,8 +494,8 @@ func (r *runner) beginCloseStream() {
 	r.closing = true
 	st.sd.pending = nil // the requests die with the process; do not keep their status
 	r.closeStatus, r.closeReason = st.sd.Status()
-	for id, ask := range st.pending {
-		ask.answer <- claudestream.PermissionResult{Message: "The thread was closed.", Interrupt: true}
+	for id, req := range st.pending {
+		r.answer(req, claudestream.PermissionResult{Message: "The thread was closed.", Interrupt: true})
 		delete(st.pending, id)
 		r.resolveItem(id, func(q *Request) { q.State, q.Message = RequestCancelled, "the thread was closed" })
 	}
@@ -575,8 +549,7 @@ func (r *runner) stopStream() {
 	closeUnfinished(st.proj.w, "the daemon stopped")
 	r.stopStreamTimers()
 	st.conn.Close()
-	// End the reader even if a grandchild kept stdout open: it cancels the pending
-	// permission handlers, which otherwise wait for an answer that never comes.
+	// End the reader even if a grandchild kept stdout open.
 	st.proc.CloseOutput()
 	r.log().info("session disconnected", "reason", ReasonDaemonStopped)
 	r.finish(func(s *Session) {
