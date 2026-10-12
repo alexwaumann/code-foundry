@@ -21,7 +21,6 @@ Haiku 4.5. Pinned versions could not be picked either.
   | `claude-sonnet-5` | Sonnet 5 |
   | `claude-sonnet-4-6` | Sonnet 4.6 |
   | `haiku` | Haiku |
-  | `claude-haiku-4-5` | Haiku 4.5 |
 
   The family entries (Fable, Opus, Sonnet, Haiku) pass the bare alias. Claude Code then
   resolves it to the user's default for that family, including a managed-settings pin.
@@ -105,3 +104,15 @@ falls back to `opus`, like any bad value.
   the native menu.
 * Other worktrees' GUI windows can open on top of yours. Raise your PID right before each
   `screencapture`.
+
+## Follow-up 2026-10-11: Haiku pin removed
+
+The `claude-haiku-4-5` / "Haiku 4.5" entry is gone. The `haiku` alias stays, and so do
+the Opus and Sonnet pins. On the work laptop the pinned Haiku id showed up with an odd
+name and may not be a valid pick there. The bare `haiku` alias always resolves to Claude
+Code's current default for the family, so it is always valid. The registry now has
+eight entries ("nine options" above is as of the original change). `internal/pricing`
+keeps `claude-haiku-4-5`, since transcripts still contain it. Threads already started
+with `--model claude-haiku-4-5` keep working (the session store checks only
+`modelPattern`); their meta line now shows the raw id, like any id the registry does not
+know.
