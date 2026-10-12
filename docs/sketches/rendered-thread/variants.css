@@ -1,0 +1,78 @@
+/* ---------- shared bits used by more than one variant ---------- */
+.u{display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin:6px 0 18px}
+.u .bubble{max-width:80%;background:var(--bubble);border-radius:16px;padding:9px 14px}
+.members{margin-left:28px}
+.pend.inline{border:1px solid color-mix(in oklab,var(--amber-500) 40%,var(--border));border-radius:12px;background:var(--card);margin:6px 0 4px;box-shadow:0 1px 2px oklch(0 0 0/5%)}
+.dark .pend.inline{box-shadow:none}
+.floatdock{position:absolute;left:0;right:0;bottom:0;padding:28px 32px 16px;background:linear-gradient(to top,var(--pane) 62%,color-mix(in oklab,var(--pane) 0%,transparent))}
+
+/* ---------- A: dense work log, floating composer ---------- */
+[data-variant=a] .col{max-width:784px;padding:28px 40px 250px}
+[data-variant=a] .a{margin:0 0 24px}
+[data-variant=a] .a>.md{margin:6px 0 8px 4px}
+[data-variant=a] .a>.md.answer{margin-top:14px}
+[data-variant=a] .tfoot{margin-top:14px;padding-top:6px;border-top:1px solid var(--border)}
+[data-variant=a] .dock{position:absolute;left:0;right:0;bottom:0;padding:32px 40px 16px;background:linear-gradient(to top,var(--pane) 55%,transparent)}
+[data-variant=a] .dock .composer{max-width:720px;margin:0 auto}
+[data-variant=a] .working{margin-top:10px}
+[data-variant=a][data-state=question] .dock{padding-top:24px}
+
+/* ---------- B: chat, work log folded under each turn, docked composer ---------- */
+[data-variant=b] .col{max-width:920px;padding:28px 48px 28px}
+[data-variant=b] .u .bubble{font-size:14px;max-width:72%}
+[data-variant=b] .umsg{font-size:14px}
+[data-variant=b] .a{margin:0 0 30px}
+[data-variant=b] .who{display:flex;align-items:center;gap:8px;height:24px;font-size:13px}
+[data-variant=b] .who .av{width:24px;height:24px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center}
+[data-variant=b] .who .av svg{width:13px;height:13px}
+[data-variant=b] .who b{font-weight:600}
+[data-variant=b] .who .muted{font-size:12px}
+[data-variant=b] .abody{margin-left:32px}
+[data-variant=b] .log{margin:4px 0 12px}
+[data-variant=b] .loghead{display:flex;align-items:center;gap:8px;height:26px;font-size:13px;color:color-mix(in oklab,var(--fg) 85%,transparent)}
+[data-variant=b] .loghead .chev{width:14px;height:14px;color:var(--muted-fg)}
+[data-variant=b] .loghead svg.spin{width:14px;height:14px}
+[data-variant=b] .loghead .muted{font-size:12px}
+[data-variant=b] .logbody{margin-left:6px;padding:2px 0 2px 14px;border-left:1px solid color-mix(in oklab,var(--fg) 14%,transparent)}
+[data-variant=b] .logbody>.md{margin:4px 0 6px 4px;color:var(--muted-fg)}
+[data-variant=b] .logbody>.md code{color:color-mix(in oklab,var(--fg) 80%,transparent)}
+[data-variant=b] .answer{font-size:14px;line-height:1.6}
+[data-variant=b] .answer pre{font-size:12.5px}
+[data-variant=b] .tfoot{margin-top:10px}
+[data-variant=b] .dock{flex:none;border-top:1px solid var(--pane-border);padding:14px 48px 16px}
+[data-variant=b] .dock .composer{max-width:824px;margin:0 auto}
+[data-variant=b] .dock .ccard{backdrop-filter:none;background:var(--card)}
+
+/* ---------- C: rail (PrTimeline language), prompts on the rail, floating composer ---------- */
+[data-variant=c] .col{max-width:840px;padding:28px 40px 210px}
+[data-variant=c] .rail{position:relative}
+[data-variant=c] .rail::before{content:"";position:absolute;left:12px;top:12px;bottom:12px;width:1px;background:color-mix(in oklab,var(--fg) 18%,transparent)}
+[data-variant=c] .e{position:relative;display:flex;gap:10px;margin:0 0 1px}
+[data-variant=c] .e .node{position:relative;z-index:1;width:24px;height:24px;flex:none;border-radius:50%;background:var(--pane);display:flex;align-items:center;justify-content:center;color:var(--muted-fg)}
+[data-variant=c] .e .node svg{width:14px;height:14px}
+[data-variant=c] .e .eb{flex:1;min-width:0}
+[data-variant=c] .e.tool .node{display:none}
+[data-variant=c] .e.tool .eb{margin-left:34px}
+[data-variant=c] .e.tool>.eb>.row:first-child,
+[data-variant=c] .e.tool>.eb>[data-shot]>.row:first-child{position:static}
+[data-variant=c] .e.tool>.eb>.row:first-child>.ico,
+[data-variant=c] .e.tool>.eb>[data-shot]>.row:first-child>.ico{position:absolute;left:1px;top:1px;background:var(--pane);border-radius:50%;z-index:1}
+[data-variant=c] .e.tool .detail{margin-left:0}
+[data-variant=c] .e.tool .members{margin-left:0}
+[data-variant=c] .e.text,.e.user,.e.end,.e.pending{margin:8px 0}
+[data-variant=c] .e.text .eb{padding-top:2px}
+[data-variant=c] .e.text .md.answer{padding-top:0}
+[data-variant=c] .e.text .md.answer>h2:first-child{margin-top:1px}
+[data-variant=c] .e.user{margin-top:16px}
+[data-variant=c] .e.user .node{background:var(--muted);color:var(--fg)}
+[data-variant=c] .dark .e.user .node{background:oklch(1 0 0/9%)}
+[data-variant=c] .uhead{display:flex;align-items:baseline;gap:8px;height:22px;line-height:22px}
+[data-variant=c] .uhead b{font-weight:600}
+[data-variant=c] .e.user .umsg{background:var(--bubble);border-radius:10px;padding:8px 12px;margin-top:4px}
+[data-variant=c] .e.end .eb{padding-top:0}
+[data-variant=c] .e.end .tfoot{height:24px}
+[data-variant=c] .e.pending .node .attn{width:9px;height:9px}
+[data-variant=c] .e.pending .pend.inline{margin-top:0}
+[data-variant=c] .dock{position:absolute;left:0;right:0;bottom:0;padding:32px 40px 16px;background:linear-gradient(to top,var(--pane) 55%,transparent)}
+[data-variant=c] .dock .composer{max-width:760px;margin:0 auto}
+[data-variant=b] .working{margin-top:8px;padding-left:0}
