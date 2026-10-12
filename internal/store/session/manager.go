@@ -583,7 +583,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 		r.usage.notBefore = s.CreatedAt
 	}
 	rendered := s.Render == RenderRendered
-	argv, env := m.claudeCommand(s, l, prompt)
+	argv, env := m.claudeCommand(s, l, prompt, grants{})
 	if rendered {
 		return m.startStream(ctx, rec, r, argv, env)
 	}
@@ -627,10 +627,12 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 // claudeCommand is the argv and environment of a claude spawn for s: its model,
 // effort and permission mode, the attachments dir and workspace members as --add-dir,
 // the workspace prompt and env. A rendered thread's prompt is never in argv (it is the
-// first user message).
-func (m *Manager) claudeCommand(s Session, l launch, prompt string) (argv, env []string) {
+// first user message). g is what the conversation's allow-for-session answers granted
+// (an effort restart's; a fresh spawn starts without).
+func (m *Manager) claudeCommand(s Session, l launch, prompt string, g grants) (argv, env []string) {
 	rendered := s.Render == RenderRendered
-	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode, prompt: prompt, rendered: rendered}
+	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode, prompt: prompt, rendered: rendered,
+		allowedTools: g.allow, disallowedTools: g.deny}
 	if rendered {
 		sa.prompt = "" // sent as the first user message instead
 	}
@@ -659,6 +661,7 @@ func (m *Manager) claudeCommand(s Session, l launch, prompt string) (argv, env [
 			m.log.Warn("workspace of thread not found; starting without its members", "session", s.ID, "workspace", s.WorkspaceID)
 		}
 	}
+	sa.addDirs = append(sa.addDirs, g.dirs...)
 	return l.argv(m.opts.Claude, sa), env
 }
 

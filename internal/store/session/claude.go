@@ -91,6 +91,9 @@ type spawnArgs struct {
 	// rendered: claude -p over stream-json (a rendered thread); the prompt is never
 	// part of argv.
 	rendered bool
+	// allowedTools / disallowedTools are permission rules ("Bash(git push:*)") passed
+	// as --allowedTools / --disallowedTools (an effort restart's session grants).
+	allowedTools, disallowedTools []string
 }
 
 // streamArgs are a rendered thread's protocol flags (docs/notes/rendered-threads-handoff.md
@@ -129,6 +132,13 @@ func (l launch) argv(claude string, a spawnArgs) []string {
 	}
 	for _, d := range a.addDirs {
 		argv = append(argv, "--add-dir", d)
+	}
+	// One flag, the rules after it (the CLI's variadic form; a rule never starts with "-").
+	if len(a.allowedTools) > 0 {
+		argv = append(append(argv, "--allowedTools"), a.allowedTools...)
+	}
+	if len(a.disallowedTools) > 0 {
+		argv = append(append(argv, "--disallowedTools"), a.disallowedTools...)
 	}
 	if a.appendSystemPrompt != "" {
 		argv = append(argv, "--append-system-prompt", a.appendSystemPrompt)

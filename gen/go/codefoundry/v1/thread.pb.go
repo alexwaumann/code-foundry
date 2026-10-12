@@ -2041,8 +2041,8 @@ type RespondThreadRequest struct {
 	Answers map[string]string `protobuf:"bytes,4,rep,name=answers,proto3" json:"answers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// DENY: the user's reason. Claude sees it inside Claude Code's own rejection text
 	// ("The user doesn't want to proceed with this tool use. … the user said: <message>");
-	// without one, the plain rejection (a question: "The user declined to answer the
-	// questions.").
+	// without one, the plain rejection ("… STOP what you are doing and wait for the user to
+	// tell you how to proceed."). A question is denied (skipped) the same way.
 	Message string `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
 	// DENY: also stop the turn.
 	Interrupt     bool `protobuf:"varint,6,opt,name=interrupt,proto3" json:"interrupt,omitempty"`

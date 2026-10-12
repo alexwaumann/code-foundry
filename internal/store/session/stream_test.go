@@ -31,13 +31,14 @@ func newRenderedEnv(t *testing.T, fixture string) *renderedEnv {
 }
 
 // newRenderedEnvAt is newRenderedEnv replaying the capture at path (absolute).
-func newRenderedEnvAt(t *testing.T, path string) *renderedEnv {
+// env adds variables to the fake's environment (its knobs, fakeclaude_test.go).
+func newRenderedEnvAt(t *testing.T, path string, env ...string) *renderedEnv {
 	t.Helper()
 	dir := t.TempDir()
 	re := &renderedEnv{log: filepath.Join(dir, "stdin.log"), argv: filepath.Join(dir, "argv.json")}
 	re.mutate = func(o *Options) {
 		o.Claude = os.Args[0]
-		o.Env = []string{fakeClaudeEnv + "=" + path, "CF_FAKE_CLAUDE_LOG=" + re.log, "CF_FAKE_CLAUDE_ARGV=" + re.argv}
+		o.Env = append([]string{fakeClaudeEnv + "=" + path, "CF_FAKE_CLAUDE_LOG=" + re.log, "CF_FAKE_CLAUDE_ARGV=" + re.argv}, env...)
 		o.DefaultRender = func() Render { return RenderRendered }
 		o.DisablePreTrust = true
 	}
