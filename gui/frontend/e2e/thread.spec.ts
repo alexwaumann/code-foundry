@@ -121,6 +121,11 @@ for (const scheme of ["dark", "light"] as const) {
       // The final answer's markdown: GFM table, highlighted Go in the bundled mono.
       const answer = await reveal(page, pane(page).locator('[data-testid="thread-text"][data-final]'));
       await expect(answer.locator("table tr")).toHaveCount(4);
+      // Framed (rounded, header filled) and as wide as the answer.
+      const frame = answer.locator(".cf-table");
+      expect(await frame.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe("8px");
+      expect(await frame.locator("th").first().evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
+      expect(await frame.locator("table").evaluate((el) => Math.abs(el.getBoundingClientRect().width - (el.closest(".cf-markdown")?.getBoundingClientRect().width ?? 0)))).toBeLessThan(3);
       await expect(answer.locator('pre[data-lang="go"] .hljs-keyword').first()).toHaveText("func");
       expect(await answer.locator("pre code").evaluate((el) => getComputedStyle(el).fontFamily)).toContain("JetBrainsMono Nerd Font Mono");
       await shot(page, `thread-timeline-${scheme}`);

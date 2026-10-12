@@ -108,6 +108,42 @@ html[data-thread-width="full"] .cf-thread {
   font-weight: 600;
   text-align: left;
 }
+/* Tables (Code.tsx wraps each in .cf-table): a rounded frame that scrolls sideways when
+   the table is wider than the column, inner rules and a muted header. Stronger than the
+   PR surface's 1px var(--border) grid, which reads as floating text in dark mode. */
+.cf-thread {
+  --t-table-line: color-mix(in oklab, var(--foreground) 14%, transparent);
+  --t-table-head: color-mix(in oklab, var(--foreground) 5%, transparent);
+}
+.cf-thread .cf-markdown .cf-table {
+  margin: 0.75em 0;
+  overflow-x: auto;
+  border: 1px solid var(--t-table-line);
+  border-radius: 8px;
+}
+.cf-thread .cf-markdown .cf-table table {
+  display: table;
+  width: 100%;
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.cf-thread .cf-markdown .cf-table :where(th, td) {
+  border: 0;
+  border-right: 1px solid var(--t-table-line);
+  border-bottom: 1px solid var(--t-table-line);
+  padding: 0.35em 0.75em;
+  vertical-align: top;
+}
+.cf-thread .cf-markdown .cf-table :where(th, td):last-child {
+  border-right: 0;
+}
+.cf-thread .cf-markdown .cf-table table > :last-child > tr:last-child > * {
+  border-bottom: 0;
+}
+.cf-thread .cf-markdown .cf-table th {
+  background: var(--t-table-head);
+}
 /* .cf-markdown breaks anywhere (long paths in prose); in a table cell that would shrink a
    column to a letter's width, so cells break between words only. */
 .cf-thread .cf-markdown :where(th, td) {
@@ -125,7 +161,7 @@ html[data-thread-width="full"] .cf-thread {
     opacity: 0;
   }
 }
-.cf-thread .cf-streaming > :last-child:not(pre, ul, ol, table)::after,
+.cf-thread .cf-streaming > :last-child:not(pre, ul, ol, table, .cf-table)::after,
 .cf-thread .cf-streaming > pre:last-child > code::after,
 .cf-thread .cf-streaming > :is(ul, ol):last-child > li:last-child::after,
 .cf-thread .cf-streaming:empty::after {

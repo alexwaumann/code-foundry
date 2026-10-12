@@ -76,6 +76,8 @@ export interface MarkdownExtras {
   code?: (lang: string, code: string) => ReactNode;
   /** An image whose src is not https (https images always load); null renders nothing. */
   image?: (src: string, alt: string) => ReactNode;
+  /** A table, given its rows (thead, tbody) to put in a <table>: lets a surface wrap it. */
+  table?: (rows: ReactNode) => ReactNode;
   /**
    * false: HTML in the source is text, not markup (Claude's answers: "Result<T, E>" must
    * not vanish as an unknown tag). Default true (GitHub bodies use HTML).
@@ -84,7 +86,7 @@ export interface MarkdownExtras {
 }
 
 function withExtras(extras: MarkdownExtras): Components {
-  const { code, image } = extras;
+  const { code, image, table } = extras;
   return {
     ...baseComponents,
     ...(code && {
@@ -101,6 +103,7 @@ function withExtras(extras: MarkdownExtras): Components {
     ...(image && {
       img: ({ src, alt }) => (typeof src !== "string" ? null : /^https:\/\//.test(src) ? <img src={src} alt={alt ?? ""} loading="lazy" referrerPolicy="no-referrer" /> : image(src, alt ?? "")),
     }),
+    ...(table && { table: ({ children }) => <>{table(children)}</> }),
   };
 }
 

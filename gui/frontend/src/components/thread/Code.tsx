@@ -59,6 +59,12 @@ const threadExtras: MarkdownExtras = {
   html: false,
   code: (lang, code) => <CodeBlock lang={lang} code={code} />,
   image: (src, alt) => <LocalImage src={src} alt={alt} />,
+  // The frame (rounded, scrolling sideways when too wide) is the wrapper's: thread.css.
+  table: (rows) => (
+    <div className="cf-table">
+      <table>{rows}</table>
+    </div>
+  ),
 };
 
 /** Markdown as the thread shows it: the PR surface's renderer with highlighted code and attachment images. */

@@ -40,4 +40,11 @@ describe("ThreadMarkdown", () => {
     expect(c.querySelector('img[src^="http:"]')).toBeNull();
     expect(readAttachment).toHaveBeenCalledWith("/att/b.png");
   });
+
+  it("wraps tables in the frame that scrolls them sideways", () => {
+    const c = md("| a | b |\n|---|---|\n| 1 | `x` |");
+    const table = c.querySelector(".cf-markdown > .cf-table > table");
+    expect(table?.querySelectorAll("th")).toHaveLength(2);
+    expect(table?.querySelector("td code")?.textContent).toBe("x");
+  });
 });
