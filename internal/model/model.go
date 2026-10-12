@@ -30,7 +30,6 @@ var registry = []Model{
 	{"claude-sonnet-5", "Sonnet 5"},
 	{"claude-sonnet-4-6", "Sonnet 4.6"},
 	{"haiku", "Haiku"},
-	{"claude-haiku-4-5", "Haiku 4.5"},
 }
 
 // Default is the model for new threads when the settings do not pick one.

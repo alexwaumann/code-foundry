@@ -42,7 +42,7 @@ func TestFieldParse(t *testing.T) {
 		{key: KeyFetchInterval, in: "0", want: "0"},
 		{key: KeyDefaultModel, in: "opus", want: "opus"},
 		{key: KeyDefaultModel, in: "claude-opus-4-8", want: "claude-opus-4-8"},
-		{key: KeyDefaultModel, in: "gpt-5", err: `want one of "fable", "opus", "claude-opus-4-8", "claude-opus-4-7", "sonnet", "claude-sonnet-5", "claude-sonnet-4-6", "haiku", "claude-haiku-4-5", got "gpt-5"`},
+		{key: KeyDefaultModel, in: "gpt-5", err: `want one of "fable", "opus", "claude-opus-4-8", "claude-opus-4-7", "sonnet", "claude-sonnet-5", "claude-sonnet-4-6", "haiku", got "gpt-5"`},
 		{key: KeyTheme, in: "Dark", err: `want one of "system", "dark", "light", got "Dark"`},
 		{key: KeyBackdrop, in: "none", want: "none"},
 		{key: KeyBackdrop, in: "aurora", err: `want one of "forest", "none", got "aurora"`},
@@ -113,7 +113,6 @@ func TestEnumLabels(t *testing.T) {
 		{KeyDefaultModel, "claude-opus-4-8", "Opus 4.8"},
 		{KeyDefaultModel, "claude-sonnet-4-6", "Sonnet 4.6"},
 		{KeyDefaultModel, "haiku", "Haiku"},
-		{KeyDefaultModel, "claude-haiku-4-5", "Haiku 4.5"},
 		// Fields without labels show their values as they are.
 		{KeyTheme, "dark", ""},
 	}

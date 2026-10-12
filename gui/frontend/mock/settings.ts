@@ -43,7 +43,6 @@ export const MODELS: readonly { value: string; label: string }[] = [
   { value: "claude-sonnet-5", label: "Sonnet 5" },
   { value: "claude-sonnet-4-6", label: "Sonnet 4.6" },
   { value: "haiku", label: "Haiku" },
-  { value: "claude-haiku-4-5", label: "Haiku 4.5" },
 ];
 export const MODEL_VALUES: string[] = MODELS.map((m) => m.value);
 

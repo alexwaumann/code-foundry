@@ -47,7 +47,6 @@ test("cmd+, opens settings rendered from the schema", async ({ page }) => {
     "Sonnet 5",
     "Sonnet 4.6",
     "Haiku",
-    "Haiku 4.5",
   ]);
   // Restart-required fields say so; live ones do not.
   await expect(setting(page, "sessions.scrollback_lines").getByTestId("restart-hint")).toBeVisible();
