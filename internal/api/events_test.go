@@ -174,6 +174,19 @@ func describe(ev *v1.Event) string {
 			return "update.status " + st.GetState().String()
 		}
 		return "update.other"
+	case *v1.Event_Thread:
+		switch th := e.Thread.GetEvent().(type) {
+		case *v1.ThreadEvent_PendingSnapshot:
+			return fmt.Sprintf("thread.pending_snapshot(%d)", len(th.PendingSnapshot.GetThreads()))
+		case *v1.ThreadEvent_Appended:
+			return "thread.appended " + th.Appended.GetSessionId() + " " + th.Appended.GetItem().GetId()
+		case *v1.ThreadEvent_Updated:
+			return "thread.updated " + th.Updated.GetSessionId() + " " + th.Updated.GetItem().GetId()
+		case *v1.ThreadEvent_Pending:
+			return fmt.Sprintf("thread.pending %s %d", th.Pending.GetSessionId(), len(th.Pending.GetPending()))
+		default:
+			return "thread.other"
+		}
 	case *v1.Event_Ui:
 		if p := e.Ui.GetOpenPalette(); p != nil {
 			return "ui.palette " + p.GetQuery()
@@ -191,6 +204,8 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	t1, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"zsh"}})
 	t2, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"claude"}, Labels: map[string]string{"session": "s1"}})
 	f.sess.Put(session.Session{ID: "s1", TerminalID: t2.ID, State: session.StateConnected, Status: session.StatusIdle})
+	f.sess.Put(session.Session{ID: "s2", State: session.StateConnected, Render: session.RenderRendered, CreatedAt: time.Unix(1, 0)})
+	f.sess.PutItems("s2", session.Item{ID: "perm-r1", Kind: session.KindPermission, Request: &session.Request{RequestID: "r1", ToolName: "Write", State: session.RequestPending}})
 	f.gh.SetRepo(gh.RepoState{Slug: "o/b"})
 	f.gh.SetRepo(gh.RepoState{Slug: "o/a"})
 	f.gitops.Put(gitops.Op{ID: "op-0", Kind: gitops.KindFetch, State: gitops.StateRunning})
@@ -202,7 +217,8 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 		"workspace.snapshot(1)",
 		"terminal.updated " + t1.ID,
 		"terminal.updated " + t2.ID,
-		"session.snapshot(1)",
+		"session.snapshot(2)",
+		"thread.pending_snapshot(1)",
 		"gh.viewer",
 		"gh.polled ",
 		"gh.dashboard",
@@ -244,6 +260,14 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	f.sess.Put(session.Session{ID: "s1", TerminalID: t2.ID, State: session.StateConnected, Status: session.StatusNeedsAttention})
 	if got := describe(s.next()); got != "session.updated s1 SESSION_STATUS_NEEDS_ATTENTION" {
 		t.Fatalf("got %q, want session update", got)
+	}
+	if _, err := f.sess.Respond(ctx, "s2", "r1", session.Decision{Allow: true}); err != nil {
+		t.Fatal(err)
+	}
+	// Only the pending list travels on the event stream; the item update stays on
+	// the thread's Watch.
+	if got := describe(s.next()); got != "thread.pending s2 0" {
+		t.Fatalf("got %q, want thread.pending s2 0", got)
 	}
 	f.gh.SetViewer(gh.ViewerState{Authenticated: true})
 	if got := describe(s.next()); got != "gh.viewer" {

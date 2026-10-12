@@ -42,9 +42,16 @@ type Sessions struct {
 	DefaultEffort     string // default "high"
 	AutoName          bool
 	NamingModel       string // default "sonnet"; the effort is always low
+	Render            string // RenderTerminal (default) or RenderRendered: new threads' view
 	CloseGraceSeconds int
 	ScrollbackLines   int
 }
+
+// Values of sessions.render.
+const (
+	RenderTerminal = "terminal"
+	RenderRendered = "rendered"
+)
 
 // GitHub configures the gh poller.
 type GitHub struct {

@@ -34,6 +34,8 @@ type Deps struct {
 	Projects command.ProjectDeps
 	// Session backs session.*. Nil works like Terminal.
 	Session command.SessionBackend
+	// Thread backs thread.* (rendered threads). Nil works like Terminal.
+	Thread command.ThreadBackend
 	// GitOps backs git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url.
 	// A nil Backend works like Terminal.
 	GitOps command.GitOpsDeps
@@ -68,6 +70,9 @@ func Register(r *command.Registry, d Deps) error {
 	if d.Session == nil {
 		d.Session = codefoundryv1connect.UnimplementedSessionServiceHandler{}
 	}
+	if d.Thread == nil {
+		d.Thread = codefoundryv1connect.UnimplementedThreadServiceHandler{}
+	}
 	if d.Settings == nil {
 		d.Settings = codefoundryv1connect.UnimplementedSettingsServiceHandler{}
 	}
@@ -91,6 +96,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterRepoAdd(r, d.Repo, d.Clone),
 		command.RegisterProjects(r, d.Projects),
 		command.RegisterSession(r, d.Session, d.Emitter),
+		command.RegisterThread(r, d.Thread),
 		command.RegisterGitOps(r, d.GitOps),
 		command.RegisterPullRequest(r, d.Gh),
 		command.RegisterPullRequestSessions(r, command.PullRequestSessionDeps{

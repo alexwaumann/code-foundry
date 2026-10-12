@@ -88,11 +88,27 @@ type spawnArgs struct {
 	// appendSystemPrompt is passed as --append-system-prompt when set.
 	appendSystemPrompt string
 	prompt             string
+	// rendered: claude -p over stream-json (a rendered thread); the prompt is never
+	// part of argv.
+	rendered bool
+}
+
+// streamArgs are a rendered thread's protocol flags (docs/notes/rendered-threads-handoff.md
+// §2): no positional prompt, the first prompt is the first stdin message;
+// --permission-prompt-tool stdio routes permission prompts to us as can_use_tool
+// control requests (--permission-prompts host does not). The transcript is still
+// written (no --no-session-persistence): naming, usage, PR links and /clear read it.
+var streamArgs = []string{
+	"-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
+	"--include-partial-messages", "--permission-prompt-tool", "stdio",
 }
 
 // argv builds the claude command line. A non-empty prompt goes last, after "--".
 func (l launch) argv(claude string, a spawnArgs) []string {
 	argv := []string{claude}
+	if a.rendered {
+		argv = append(argv, streamArgs...)
+	}
 	if l.resume != "" {
 		argv = append(argv, "--resume", l.resume)
 		if l.fork {
@@ -117,7 +133,7 @@ func (l launch) argv(claude string, a spawnArgs) []string {
 	if a.appendSystemPrompt != "" {
 		argv = append(argv, "--append-system-prompt", a.appendSystemPrompt)
 	}
-	if a.prompt != "" {
+	if a.prompt != "" && !a.rendered {
 		argv = append(argv, "--", a.prompt)
 	}
 	return argv

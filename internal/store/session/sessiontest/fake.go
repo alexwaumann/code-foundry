@@ -31,6 +31,9 @@ type Fake struct {
 	snap    *session.Snapshot
 	calls   []string
 	retired []session.UsageBucket
+	items   map[string]*session.ItemsSnapshot
+	// Watchers counts WatchItems calls whose ctx has not ended, by session.
+	watchers map[string]int
 }
 
 var _ session.Store = (*Fake)(nil)
@@ -40,7 +43,8 @@ func New(b *bus.Bus) *Fake {
 	if b == nil {
 		b = bus.New()
 	}
-	return &Fake{bus: b, Now: time.Now, byID: map[string]session.Session{}, snap: &session.Snapshot{}}
+	return &Fake{bus: b, Now: time.Now, byID: map[string]session.Session{}, snap: &session.Snapshot{},
+		items: map[string]*session.ItemsSnapshot{}, watchers: map[string]int{}}
 }
 
 // Bus returns the bus the fake publishes on.
@@ -119,7 +123,10 @@ func (f *Fake) add(call string, s session.Session) (session.Session, error) {
 	}
 	f.next++
 	s.ID = fmt.Sprintf("s-%d", f.next)
-	s.TerminalID = fmt.Sprintf("t-%d", f.next)
+	if s.Render != session.RenderRendered {
+		s.Render = session.RenderTerminal
+		s.TerminalID = fmt.Sprintf("t-%d", f.next)
+	}
 	s.State = session.StateStarting
 	s.CreatedAt = f.Now()
 	s.LastActivityAt = s.CreatedAt
@@ -136,12 +143,16 @@ func (f *Fake) add(call string, s session.Session) (session.Session, error) {
 // workspace "w-new" and runs in /worktrees/<repo>, repo being RepoID or the first repo.
 // The call reads "Create <repo> <path> <model> <effort>", then " perm=<n>",
 // " new-worktree=<base>", " workspace=<id>", " new-workspace=<a,b>", " prompt=<text>"
-// and " attachments=<a,b>" when set.
+// " attachments=<a,b>" and " render=<mode>" when set. A rendered session (Render
+// RenderRendered) gets no terminal; anything else is a terminal session.
 func (f *Fake) Create(_ context.Context, o session.CreateOptions) (session.Session, error) {
 	call := fmt.Sprintf("Create %s %s %s %s", o.RepoID, o.WorktreePath, o.Model, o.Effort)
 	s := session.Session{
 		RepoID: o.RepoID, WorktreePath: o.WorktreePath, Model: o.Model, Effort: o.Effort, Name: o.Name,
-		PermissionMode: o.PermissionMode,
+		PermissionMode: o.PermissionMode, Render: o.Render,
+	}
+	if o.Render != session.RenderDefault {
+		call += " render=" + o.Render.String()
 	}
 	if o.PermissionMode != session.PermissionDefault {
 		call += fmt.Sprintf(" perm=%d", o.PermissionMode)
@@ -197,6 +208,7 @@ func (f *Fake) Fork(_ context.Context, id, name string) (session.Session, error)
 	return f.add("Fork "+id, session.Session{
 		RepoID: parent.RepoID, WorktreePath: parent.WorktreePath, Model: parent.Model, Effort: parent.Effort,
 		Name: name, ParentID: id, PermissionMode: parent.PermissionMode, WorkspaceID: parent.WorkspaceID,
+		Render: parent.Render,
 	})
 }
 
@@ -244,6 +256,9 @@ func (f *Fake) Reconnect(_ context.Context, id string) (session.Session, error) 
 			return fmt.Errorf("%w: session %s is %s", session.ErrFailedPrecondition, id, s.State)
 		}
 		s.State, s.DisconnectReason, s.TerminalID = session.StateStarting, "", "t-re-"+id
+		if s.Render == session.RenderRendered {
+			s.TerminalID = ""
+		}
 		return nil
 	})
 }
@@ -309,4 +324,230 @@ func (f *Fake) Snapshot() *session.Snapshot {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.snap
+}
+
+// PutItems replaces a session's thread items (and pending requests, derived from the
+// request items) and publishes ItemAppended for each.
+func (f *Fake) PutItems(id string, items ...session.Item) {
+	f.mu.Lock()
+	snap := &session.ItemsSnapshot{SessionID: id}
+	f.items[id] = snap
+	var evs []session.ThreadEvent
+	for i, it := range items {
+		if it.Ordinal == 0 {
+			it.Ordinal = int64(i + 1)
+		}
+		snap.Seq++
+		snap.Items = append(snap.Items, it)
+		evs = append(evs, session.ItemAppended{SessionID: id, Seq: snap.Seq, Item: it})
+	}
+	snap.Pending = pending(snap.Items)
+	f.mu.Unlock()
+	for _, ev := range evs {
+		bus.Publish(f.bus, ev)
+	}
+}
+
+func pending(items []session.Item) []session.PendingRequest {
+	var out []session.PendingRequest
+	for _, it := range items {
+		if it.Request != nil && it.Request.State == session.RequestPending {
+			out = append(out, session.PendingRequest{RequestID: it.Request.RequestID, ItemID: it.ID, Kind: it.Kind, ToolName: it.Request.ToolName})
+		}
+	}
+	return out
+}
+
+// rendered returns session id when it is a rendered thread. The lock is held.
+func (f *Fake) rendered(id string) (session.Session, error) {
+	s, err := f.get(id)
+	if err != nil {
+		return s, err
+	}
+	if s.Render != session.RenderRendered {
+		return s, fmt.Errorf("%w: thread %s runs in a terminal", session.ErrFailedPrecondition, id)
+	}
+	return s, nil
+}
+
+func (f *Fake) itemsLocked(id string) session.ItemsSnapshot {
+	snap, ok := f.items[id]
+	if !ok {
+		return session.ItemsSnapshot{SessionID: id}
+	}
+	out := *snap
+	out.Items = slices.Clone(snap.Items)
+	out.Pending = slices.Clone(snap.Pending)
+	return out
+}
+
+// Items returns what PutItems, Send and Respond left.
+func (f *Fake) Items(_ context.Context, id string) (session.ItemsSnapshot, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, err := f.rendered(id); err != nil {
+		return session.ItemsSnapshot{}, err
+	}
+	return f.itemsLocked(id), nil
+}
+
+// WatchItems is Items, counting a watcher (Watchers) until ctx ends.
+func (f *Fake) WatchItems(ctx context.Context, id string) (session.ItemsSnapshot, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, err := f.rendered(id); err != nil {
+		return session.ItemsSnapshot{}, err
+	}
+	f.watchers[id]++
+	context.AfterFunc(ctx, func() {
+		f.mu.Lock()
+		f.watchers[id]--
+		f.mu.Unlock()
+	})
+	return f.itemsLocked(id), nil
+}
+
+// Watchers returns the number of live WatchItems calls for id.
+func (f *Fake) Watchers(id string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.watchers[id]
+}
+
+// appendItem adds it to id's items and publishes ItemAppended. The lock is held; the
+// event is returned for publishing after unlock.
+func (f *Fake) appendItem(id string, it session.Item) (session.Item, session.ThreadEvent) {
+	snap, ok := f.items[id]
+	if !ok {
+		snap = &session.ItemsSnapshot{SessionID: id}
+		f.items[id] = snap
+	}
+	it.Ordinal = int64(len(snap.Items) + 1)
+	it.CreatedAt, it.UpdatedAt = f.Now(), f.Now()
+	snap.Seq++
+	snap.Items = append(snap.Items, it)
+	return it, session.ItemAppended{SessionID: id, Seq: snap.Seq, Item: it}
+}
+
+// Send records "Send <id> <text>" (" attachments=<a,b>" when set) and appends a
+// user_message item. The session must be rendered and not disconnected.
+func (f *Fake) Send(_ context.Context, id string, msg session.Message) (session.Item, error) {
+	f.mu.Lock()
+	call := "Send " + id + " " + msg.Text
+	if len(msg.Attachments) > 0 {
+		call += " attachments=" + strings.Join(msg.Attachments, ",")
+	}
+	if err := f.record(call); err != nil {
+		f.mu.Unlock()
+		return session.Item{}, err
+	}
+	s, err := f.rendered(id)
+	if err == nil && s.State == session.StateDisconnected {
+		err = fmt.Errorf("%w: thread %s is disconnected", session.ErrFailedPrecondition, id)
+	}
+	if err != nil {
+		f.mu.Unlock()
+		return session.Item{}, err
+	}
+	f.next++
+	it, ev := f.appendItem(id, session.Item{ID: fmt.Sprintf("u-%d", f.next), Kind: session.KindUserMessage, Text: msg.Text, Attachments: msg.Attachments})
+	f.mu.Unlock()
+	bus.Publish(f.bus, ev)
+	return it, nil
+}
+
+// Respond records "Respond <id> <request> allow|allow-session|deny" and resolves the
+// pending request item (ErrNotFound when there is none).
+func (f *Fake) Respond(_ context.Context, id, requestID string, d session.Decision) (session.Item, error) {
+	verb := "deny"
+	if d.Allow {
+		verb = "allow"
+		if d.ForSession {
+			verb = "allow-session"
+		}
+	}
+	f.mu.Lock()
+	if err := f.record("Respond " + id + " " + requestID + " " + verb); err != nil {
+		f.mu.Unlock()
+		return session.Item{}, err
+	}
+	if _, err := f.rendered(id); err != nil {
+		f.mu.Unlock()
+		return session.Item{}, err
+	}
+	snap := f.items[id]
+	i := -1
+	if snap != nil {
+		i = slices.IndexFunc(snap.Items, func(it session.Item) bool {
+			return it.Request != nil && it.Request.RequestID == requestID && it.Request.State == session.RequestPending
+		})
+	}
+	if i < 0 {
+		f.mu.Unlock()
+		return session.Item{}, fmt.Errorf("%w: no pending request %s", session.ErrNotFound, requestID)
+	}
+	it := snap.Items[i]
+	r := *it.Request
+	switch {
+	case !d.Allow:
+		r.State, r.Decision, r.Message = session.RequestDenied, session.DecisionDeny, d.Message
+	case d.ForSession:
+		r.State, r.Decision = session.RequestAllowed, session.DecisionAllowForSession
+	default:
+		r.State, r.Decision = session.RequestAllowed, session.DecisionAllow
+	}
+	if d.Allow && it.Kind == session.KindQuestion {
+		r.Answers = d.Answers
+	}
+	it.Request = &r
+	snap.Items[i] = it
+	snap.Seq++
+	snap.Pending = pending(snap.Items)
+	evs := []session.ThreadEvent{
+		session.ItemUpdated{SessionID: id, Seq: snap.Seq, Item: it},
+		session.PendingChanged{SessionID: id, Seq: snap.Seq + 1, Pending: snap.Pending},
+	}
+	snap.Seq++
+	f.mu.Unlock()
+	for _, ev := range evs {
+		bus.Publish(f.bus, ev)
+	}
+	return it, nil
+}
+
+// Interrupt records "Interrupt <id>".
+func (f *Fake) Interrupt(_ context.Context, id string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.record("Interrupt " + id); err != nil {
+		return err
+	}
+	_, err := f.rendered(id)
+	return err
+}
+
+// SetModel records "SetModel <id> <model>" and sets Model.
+func (f *Fake) SetModel(_ context.Context, id, model string) (session.Session, error) {
+	return f.mutate("SetModel "+id+" "+model, id, func(s *session.Session) error {
+		if s.Render != session.RenderRendered {
+			return fmt.Errorf("%w: thread %s runs in a terminal", session.ErrFailedPrecondition, id)
+		}
+		s.Model = model
+		return nil
+	})
+}
+
+// SetPermissionMode records "SetPermissionMode <id> <n>" and sets PermissionMode;
+// PermissionDefault is refused like the Manager does.
+func (f *Fake) SetPermissionMode(_ context.Context, id string, mode session.PermissionMode) (session.Session, error) {
+	return f.mutate(fmt.Sprintf("SetPermissionMode %s %d", id, mode), id, func(s *session.Session) error {
+		if s.Render != session.RenderRendered {
+			return fmt.Errorf("%w: thread %s runs in a terminal", session.ErrFailedPrecondition, id)
+		}
+		if mode < session.PermissionSupervised || mode > session.PermissionAuto {
+			return fmt.Errorf("%w: permission mode %d", session.ErrInvalidArgument, mode)
+		}
+		s.PermissionMode = mode
+		return nil
+	})
 }

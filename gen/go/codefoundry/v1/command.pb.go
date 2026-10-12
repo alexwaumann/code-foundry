@@ -92,8 +92,11 @@ type UiContext struct {
 	// Workspace that owns what is active: the active thread's workspace, or the workspace
 	// a composer or page is for. Empty for project threads and from the CLI.
 	ActiveWorkspaceId string `protobuf:"bytes,6,opt,name=active_workspace_id,json=activeWorkspaceId,proto3" json:"active_workspace_id,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// The active thread is a rendered thread (Session.render RENDERED): the thread.*
+	// commands are offered. False from the CLI.
+	ActiveSessionRendered bool `protobuf:"varint,7,opt,name=active_session_rendered,json=activeSessionRendered,proto3" json:"active_session_rendered,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *UiContext) Reset() {
@@ -166,6 +169,13 @@ func (x *UiContext) GetActiveWorkspaceId() string {
 		return x.ActiveWorkspaceId
 	}
 	return ""
+}
+
+func (x *UiContext) GetActiveSessionRendered() bool {
+	if x != nil {
+		return x.ActiveSessionRendered
+	}
+	return false
 }
 
 type ArgSpec struct {
@@ -665,7 +675,7 @@ var File_codefoundry_v1_command_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccodefoundry/v1/command.proto\x12\x0ecodefoundry.v1\"\x8e\x02\n" +
+	"\x1ccodefoundry/v1/command.proto\x12\x0ecodefoundry.v1\"\xc6\x02\n" +
 	"\tUiContext\x12,\n" +
 	"\x12active_terminal_id\x18\x01 \x01(\tR\x10activeTerminalId\x12*\n" +
 	"\x11active_session_id\x18\x02 \x01(\tR\x0factiveSessionId\x12$\n" +
@@ -673,7 +683,8 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\x14active_worktree_path\x18\x04 \x01(\tR\x12activeWorktreePath\x12\x1f\n" +
 	"\vactive_view\x18\x05 \x01(\tR\n" +
 	"activeView\x12.\n" +
-	"\x13active_workspace_id\x18\x06 \x01(\tR\x11activeWorkspaceId\"\x94\x02\n" +
+	"\x13active_workspace_id\x18\x06 \x01(\tR\x11activeWorkspaceId\x126\n" +
+	"\x17active_session_rendered\x18\a \x01(\bR\x15activeSessionRendered\"\x94\x02\n" +
 	"\aArgSpec\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12+\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x17.codefoundry.v1.ArgTypeR\x04type\x12\x1a\n" +

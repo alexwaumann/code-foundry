@@ -37,7 +37,7 @@ func (h *Session) Create(ctx context.Context, req *connect.Request[v1.CreateSess
 	o := session.CreateOptions{
 		RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
 		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(), PermissionMode: session.PermissionMode(m.GetPermissionMode()),
-		Attachments: m.GetAttachments(), WorkspaceID: m.GetWorkspaceId(),
+		Attachments: m.GetAttachments(), WorkspaceID: m.GetWorkspaceId(), Render: session.Render(m.GetRender()),
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
 		o.NewWorktree = &session.NewWorktree{BaseRef: nw.GetBaseRef()}
@@ -219,6 +219,7 @@ func sessionToProto(s session.Session) *v1.Session {
 		WorkspaceId:         s.WorkspaceID,
 		PendingWorktreePath: s.PendingWorktreePath,
 		Pinned:              s.Pinned,
+		Render:              v1.SessionRender(s.Render),
 	}
 	if !s.CreatedAt.IsZero() {
 		p.CreatedAt = timestamppb.New(s.CreatedAt)

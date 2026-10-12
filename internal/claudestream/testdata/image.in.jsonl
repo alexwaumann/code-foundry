@@ -1,0 +1,2 @@
+{"type":"control_request","request_id":"init-1","request":{"subtype":"initialize"}}
+{"type":"user","uuid":"202ce69c-0ab7-489c-8d99-88e7a9d0525b","message":{"role":"user","content":[{"type":"text","text":"What color is this image? Answer in one word."},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"<stripped>"}}]},"parent_tool_use_id":null}

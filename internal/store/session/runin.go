@@ -150,6 +150,10 @@ func (r *runner) tryCd() {
 		})
 		return
 	}
+	if r.st != nil {
+		r.streamCd(req)
+		return
+	}
 	r.log().info("typing /cd", "path", req.path)
 	r.write("/cd " + req.path)
 	r.cdSending = req

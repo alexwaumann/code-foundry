@@ -122,10 +122,19 @@ Services (v1):
   (`workspace_id`) or in a new workspace (`new_workspace`), passes the first prompt as
   claude's positional argument, and carries a permission mode (never
   bypassPermissions); see `docs/notes/new-thread-composer.md` and
-  `docs/notes/workspaces-2-launch.md`. A session carries lifecycle `state` (starting, connected, closing,
+  `docs/notes/workspaces-2-launch.md`. A session has a `render` mode fixed for its life:
+  TERMINAL (Claude in a PTY) or RENDERED (claude -p over stream-json, no terminal; the
+  conversation is ThreadService items); Create without one uses the `sessions.render`
+  setting. A session carries lifecycle `state` (starting, connected, closing,
   disconnected) and detector `status` (busy, idle, needs-attention; error when the
   process ended mid-turn) with `status_reason` and `status_changed_at`, persisted
   (`docs/notes/thread-status-persistence.md`).
+* `ThreadService` — rendered threads: ListItems, Watch (server stream: an items
+  snapshot, then appended/updated items, text deltas and pending-request changes, all
+  seq-ordered; an open Watch marks the thread's turns seen like an attached terminal),
+  Send (also while busy), Respond (a permission request or AskUserQuestion: allow,
+  allow for session, deny, answers), Interrupt, SetModel, SetPermissionMode. Refuses
+  terminal threads (`docs/notes/rendered-threads-1-daemon.md`).
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
   chunks), Write (input bytes), Resize, Detach, Kill, Remove, and Close (kill, wait for
   the exit, remove; shells only, a thread's Claude terminal is refused).
@@ -159,8 +168,9 @@ Services (v1):
 * `UiService` — WatchIntents (server stream: focus session, open palette, …); Emit (from
   CLI).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
-  intents (sources repo, workspace, terminal, session, gh, gitops, settings, update, ui;
-  filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
+  intents (sources repo, workspace, terminal, session, thread, gh, gitops, settings,
+  update, ui; the thread source carries rendered threads' pending requests only, a
+  snapshot then changes, never items; filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream; the per-service Watch RPCs remain for the CLI and tests.
 * `SettingsService` — GetSchema, Get, Update, Watch over `$CONFIG/settings.toml` (TOML,
@@ -226,7 +236,9 @@ PTY (creack/pty) ──reader goroutine──► tee ──► libghostty-vt (fe
 Layers Claude-specific knowledge on top of terminal:
 
 * Spawns `claude` in a worktree with the chosen model/effort/permission-mode flags and
-  the first prompt as a positional argument, records the Claude
+  the first prompt as a positional argument (a rendered thread: `claude -p` over
+  stream-json through `internal/claudestream`, the first prompt as the first user
+  message with image blocks; see below), records the Claude
   session id (from `~/.claude/projects/<slug>/*.jsonl`) so dead sessions can be resumed
   with `claude --resume`.
 * A thread has one owner: its workspace when `workspace_id` is set, else its project
@@ -243,6 +255,17 @@ Layers Claude-specific knowledge on top of terminal:
   thread keeps the one it ended with (busy becomes error "interrupted"), across daemon
   restarts, until a reconnect's detector replaces it
   (`docs/notes/thread-status-persistence.md`).
+* **Rendered threads** run on the same runner type with a stdio loop instead of the
+  PTY loop (`stream.go`): `internal/claudestream` speaks the control protocol
+  (initialize handshake, `can_use_tool` routed to the store, interrupt, set_model,
+  set_permission_mode, set_cwd for RunIn). The stream is projected into `thread_items`
+  (user message, assistant text, thinking, tool call, permission request, question,
+  turn end, error, compaction, command output): streaming items stay in memory and are
+  written when complete, so a restart rehydrates them and a reconnect appends. Status
+  comes from the stream (busy from send to result, needs-attention while a request is
+  pending, finished until seen), not a screen. Transcript tailing (naming, usage, PR
+  links, `/clear`) is shared with terminal threads
+  (`docs/notes/rendered-threads-1-daemon.md`).
 * Auto-naming via an independent `claude -p` call producing a slug.
 * **Linked pull requests** come from Claude's own `pr-link` transcript records: every
   distinct URL in first-seen order, persisted in `session_pull_requests`, backfilled from
@@ -273,8 +296,10 @@ type Command struct {
 ```
 
 `Context` is what the caller is looking at: active session, active repo/worktree, active
-view, and the workspace that owns the active thread or composer (so `session.run-in` is
-offered for workspace threads only). The GUI sends its context with `List` and `Invoke`;
+view, the workspace that owns the active thread or composer (so `session.run-in` is
+offered for workspace threads only), and whether the active thread is rendered (so the
+`thread.*` commands, send/respond/interrupt/items/set-model/set-mode, are offered for
+rendered threads only). The GUI sends its context with `List` and `Invoke`;
 the CLI passes an explicit context from flags or none. The palette, keybindings, and CLI subcommands are three front
 doors to this one registry. Adding a feature means registering commands, not editing a
 switch.
@@ -294,8 +319,9 @@ from the pull request (docs/notes/pr-thread-commands.md).
   components subscribe to the narrowest selector. Lists are virtualized. No global
   re-render on daemon events.
 * Connection budget: the GUI holds exactly one `EventService.Watch` stream plus at most
-  two `TerminalService.Attach` streams: the content pane's (a thread's Claude terminal)
-  and the bottom panel's active shell, each only while it is visible. Everything else is unary, except a
+  two `TerminalService.Attach` streams: the content pane's (a thread's Claude terminal,
+  or for a rendered thread its `ThreadService.Watch`) and the bottom panel's active
+  shell, each only while it is visible. Everything else is unary, except a
   `RepoService.Clone` stream while the Add Project dialog clones a repository. This keeps
   the browser's six HTTP/1.1 connections per origin mostly free.
 * Only visible terminals are attached. Switching sessions (or bottom panel tabs) detaches

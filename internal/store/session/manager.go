@@ -100,7 +100,11 @@ type Options struct {
 	// grown for this long while its thread sits at the prompt stops being followed
 	// (six times longer for a background run). Default 10m.
 	AgentIdleClose time.Duration
-	Now            func() time.Time
+	// DefaultRender is the render mode of a thread Create makes without one (the
+	// sessions.render setting). Nil, or a result other than RenderRendered, means
+	// RenderTerminal.
+	DefaultRender func() Render
+	Now           func() time.Time
 }
 
 func (o Options) withDefaults() (Options, error) {
@@ -168,15 +172,23 @@ type Manager struct {
 	mu     sync.Mutex
 	recs   map[string]*record
 	closed bool
-	snap   atomic.Pointer[Snapshot]
+	// viewers counts each rendered thread's item watchers (WatchItems).
+	viewers map[string]int
+	snap    atomic.Pointer[Snapshot]
 	// retired is the retired usage ledger (Snapshot.RetiredUsage). Copy on write.
 	retired []UsageBucket
+
+	// threads are the rendered threads' item logs loaded so far (items.go).
+	tmu     sync.Mutex
+	threads map[string]*threadLog
 }
 
 type record struct {
 	s           Session
-	run         *runner // non-nil while a terminal belongs to the session
+	run         *runner // non-nil while a terminal (or a rendered thread's process) belongs to the session
 	namingTried bool    // one naming call per session (per daemon run)
+	// first is a rendered thread's first prompt, handed to its runner by spawn.
+	first *outgoing
 }
 
 var _ Store = (*Manager)(nil)
@@ -198,7 +210,8 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	m := &Manager{opts: opts, log: opts.Log, recs: map[string]*record{}, retired: retired}
+	m := &Manager{opts: opts, log: opts.Log, recs: map[string]*record{}, retired: retired,
+		viewers: map[string]int{}, threads: map[string]*threadLog{}}
 	m.ctx, m.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	for _, s := range rows {
 		if s.State != StateDisconnected {
@@ -306,6 +319,14 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 	if !o.PermissionMode.valid() {
 		return Session{}, fmt.Errorf("%w: permission mode %d", ErrInvalidArgument, o.PermissionMode)
 	}
+	if !o.Render.valid() {
+		return Session{}, fmt.Errorf("%w: render mode %d", ErrInvalidArgument, o.Render)
+	}
+	render := o.Render
+	if render == RenderDefault && m.opts.DefaultRender != nil {
+		render = m.opts.DefaultRender()
+	}
+	render = renderOrTerminal(render)
 	name, err := cleanName(o.Name, true)
 	if err != nil {
 		return Session{}, err
@@ -328,6 +349,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 	}
 	s := Session{
 		ID: id, Name: name, Model: o.Model, Effort: o.Effort, PermissionMode: o.PermissionMode, State: StateStarting,
+		Render: render,
 	}
 	namingTried := name != ""
 	var late <-chan namingResult
@@ -389,11 +411,19 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 		m.mu.Unlock()
 		return Session{}, ErrClosed
 	}
-	m.recs[id] = &record{s: s, namingTried: namingTried}
+	rec := &record{s: s, namingTried: namingTried}
+	if render == RenderRendered && prompt != "" {
+		// The prompt goes in as the first user message; the item keeps it as typed.
+		rec.first = &outgoing{text: strings.TrimSpace(o.InitialPrompt), attachments: attachments, prompt: prompt}
+	}
+	m.recs[id] = rec
 	m.mu.Unlock()
 	if err := m.spawn(ctx, id, launch{newID: cid}, prompt); err != nil {
 		m.mu.Lock()
 		delete(m.recs, id)
+		m.tmu.Lock()
+		delete(m.threads, id) // a rendered thread's log, loaded by spawnStream
+		m.tmu.Unlock()
 		m.mu.Unlock()
 		return Session{}, err
 	}
@@ -448,7 +478,7 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Session, error) {
 		ID: newID, RepoID: parent.RepoID, WorktreePath: parent.WorktreePath, WorkspaceID: parent.WorkspaceID,
 		Name: name, AutoNamed: autoNamed,
 		Model: parent.Model, Effort: parent.Effort, PermissionMode: parent.PermissionMode,
-		State: StateStarting, CreatedAt: now, LastActivityAt: now, ParentID: parent.ID,
+		State: StateStarting, CreatedAt: now, LastActivityAt: now, ParentID: parent.ID, Render: parent.Render,
 	}
 	m.mu.Lock()
 	// The fork's transcript starts with the copied history, so its first user
@@ -552,7 +582,11 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 		// the parent; they keep their original times (usage.go).
 		r.usage.notBefore = s.CreatedAt
 	}
-	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode, prompt: prompt}
+	rendered := s.Render == RenderRendered
+	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode, prompt: prompt, rendered: rendered}
+	if rendered {
+		sa.prompt = "" // sent as the first user message instead
+	}
 	if m.opts.AttachmentsDir != "" {
 		// Every spawn (not only the first prompt's): a resumed or forked conversation
 		// may read its images again.
@@ -579,6 +613,9 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 		}
 	}
 	argv := l.argv(m.opts.Claude, sa)
+	if rendered {
+		return m.startStream(ctx, rec, r, argv, env)
+	}
 	term, err := m.opts.Terminals.Create(ctx, terminal.Spec{
 		Argv:     argv,
 		Cwd:      s.WorktreePath,
@@ -609,6 +646,34 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 		logArgv = append(slices.Clone(argv[:len(argv)-1]), fmt.Sprintf("<prompt: %d bytes>", len(prompt)))
 	}
 	m.log.Info("session spawned", "session", id, "terminal", term.ID, "pid", term.Pid, "argv", logArgv, "cwd", s.WorktreePath)
+	go func() {
+		defer m.wg.Done()
+		r.run()
+	}()
+	return nil
+}
+
+// startStream is spawn's rendered half: claude over stdio, no terminal.
+func (m *Manager) startStream(ctx context.Context, rec *record, r *runner, argv, env []string) error {
+	m.mu.Lock()
+	first := rec.first
+	rec.first = nil
+	m.mu.Unlock()
+	if err := m.spawnStream(ctx, rec, r, argv, env, first); err != nil {
+		return err
+	}
+	now := m.opts.Now()
+	m.mu.Lock()
+	rec.run = r
+	rec.s.TerminalID = ""
+	rec.s.State = StateStarting
+	rec.s.setStatus(StatusUnknown, "", now)
+	rec.s.DisconnectReason, rec.s.ExitCode = "", 0
+	rec.s.LastActivityAt = now
+	m.commitLocked(rec, true)
+	m.wg.Add(1)
+	m.mu.Unlock()
+	m.log.Info("session spawned", "session", rec.s.ID, "render", "rendered", "pid", r.st.proc.Pid(), "argv", argv, "cwd", rec.s.WorktreePath)
 	go func() {
 		defer m.wg.Done()
 		r.run()
@@ -694,6 +759,9 @@ func (m *Manager) Remove(ctx context.Context, id string) error {
 		return err
 	}
 	delete(m.recs, id)
+	m.tmu.Lock()
+	delete(m.threads, id)
+	m.tmu.Unlock()
 	if len(rec.s.Usage) > 0 {
 		m.retired = SumUsage(m.retired, rec.s.Usage)
 	}

@@ -2133,6 +2133,7 @@ export class World {
             activeWorktreePath: ctx.activeWorktreePath,
             activeView: ctx.activeView,
             activeWorkspaceId: ctx.activeWorkspaceId,
+            activeSessionRendered: ctx.activeSessionRendered,
           }
         : null,
       args,

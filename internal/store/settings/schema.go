@@ -97,6 +97,7 @@ const (
 	KeyDefaultEffort     = "sessions.default_effort"
 	KeyAutoName          = "sessions.auto_name"
 	KeyNamingModel       = "sessions.naming_model"
+	KeyRender            = "sessions.render"
 	KeyCloseGrace        = "sessions.close_grace_seconds"
 	KeyScrollback        = "sessions.scrollback_lines"
 	KeyGhPollInterval    = "github.poll_interval_seconds"
@@ -149,6 +150,12 @@ var staticFields = []Field{
 		Description: "Model for the claude -p call that names a new session. Always runs at low effort.",
 		Enum:        command.SessionModels, EnumLabels: model.Labels(), Default: model.NamingDefault,
 		bind: func(s *Settings) any { return &s.Sessions.NamingModel },
+	},
+	{
+		Key: KeyRender, Group: GroupSessions, Type: Enum, Title: "Thread view",
+		Description: "How new threads run when the composer does not pick: terminal (Claude Code's own interface in a terminal) or rendered (Claude Code runs headless and the app draws the conversation). A thread keeps its view for life.",
+		Enum:        []string{RenderTerminal, RenderRendered}, EnumLabels: []string{"Terminal", "Rendered"}, Default: RenderTerminal,
+		bind: func(s *Settings) any { return &s.Sessions.Render },
 	},
 	{
 		Key: KeyCloseGrace, Group: GroupSessions, Type: Int, Title: "Close grace (seconds)",

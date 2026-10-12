@@ -242,3 +242,19 @@ func TestKeybindingFields(t *testing.T) {
 		t.Errorf("fields = %+v", fs)
 	}
 }
+
+func TestRenderField(t *testing.T) {
+	f := field(t, KeyRender)
+	if f.Default != RenderTerminal || Defaults().Sessions.Render != RenderTerminal || f.Group != GroupSessions || f.Restart ||
+		!slices.Equal(f.Enum, []string{"terminal", "rendered"}) || len(f.EnumLabels) != 2 {
+		t.Errorf("field = %+v, Defaults() = %q", f, Defaults().Sessions.Render)
+	}
+	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyNamingModel }); staticFields[i+1].Key != KeyRender {
+		t.Errorf("field after %s = %s", KeyNamingModel, staticFields[i+1].Key)
+	}
+	for _, in := range []string{"", "Rendered", "tui"} {
+		if _, err := f.parse(in); err == nil {
+			t.Errorf("parse(%q) accepted", in)
+		}
+	}
+}

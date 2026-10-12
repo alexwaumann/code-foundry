@@ -168,7 +168,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 		NewDetector: newDetector, Claude: claude, CloseTimeout: cfg.CloseGrace(),
 		Namer:          settingsNamer(s.settings, session.ClaudeNamer(claude, "/tmp", sessionLog)),
 		AttachmentsDir: p.Attachments(), WorktreePath: settingsWorktreePath(s.settings),
-		Env: sessionEnv,
+		Env: sessionEnv, DefaultRender: settingsRender(s.settings),
 	}); err != nil {
 		return nil, err
 	}

@@ -74,7 +74,7 @@ type eventSource interface {
 }
 
 // sources lists the stream's sources in the order their snapshots are sent (see
-// events.proto: repo, workspace, terminal, session, gh, gitops, settings, update),
+// events.proto: repo, workspace, terminal, session, thread, gh, gitops, settings, update),
 // followed by UI intents.
 func (h *Events) sources() []eventSource {
 	d := h.deps
@@ -89,7 +89,7 @@ func (h *Events) sources() []eventSource {
 		out = append(out, &terminalSource{store: d.Terminal, bus: d.Bus, known: map[string]bool{}})
 	}
 	if d.Session != nil {
-		out = append(out, sessionSource{store: d.Session, bus: d.Bus})
+		out = append(out, sessionSource{store: d.Session, bus: d.Bus}, threadSource{store: d.Session, bus: d.Bus})
 	}
 	if d.Gh != nil {
 		out = append(out, ghSource{store: d.Gh, bus: d.Bus})
@@ -376,6 +376,54 @@ func (s sessionSource) subscribe(ctx context.Context) <-chan *v1.Event {
 
 func (s sessionSource) snapshot(context.Context) []*v1.Event {
 	return []*v1.Event{sessionWrap(s.store.Snapshot())}
+}
+
+// ---- thread --------------------------------------------------------------------
+
+// threadSource carries the pending requests (permission prompts and questions) of
+// every rendered thread: the snapshot lists the live threads' pending requests, then
+// each change is a ThreadEvent.pending. Items are per thread and come only from
+// ThreadService.ListItems or Watch (the visible thread's stream, as a terminal's
+// Attach): forwarding every thread's text deltas to every client would cost more than
+// it shows, and this source's resync after dropped events restores pending requests
+// only, so nothing else may be built from it. A disconnected thread has nothing
+// pending (its requests are cancelled when its process ends).
+type threadSource struct {
+	store session.Store
+	bus   *bus.Bus
+}
+
+func (threadSource) kind() v1.EventSource { return v1.EventSource_EVENT_SOURCE_THREAD }
+
+func threadWrap(ev session.ThreadEvent) *v1.Event {
+	if _, ok := ev.(session.PendingChanged); !ok {
+		return nil
+	}
+	if m := threadEventToProto(ev); m != nil {
+		return &v1.Event{Event: &v1.Event_Thread{Thread: m}}
+	}
+	return nil
+}
+
+func (s threadSource) subscribe(ctx context.Context) <-chan *v1.Event {
+	return fanIn(ctx, newTap(s.bus, threadWatchBuffer, threadWrap))
+}
+
+func (s threadSource) snapshot(ctx context.Context) []*v1.Event {
+	snap := &v1.ThreadPendingSnapshot{}
+	if ss := s.store.Snapshot(); ss != nil {
+		for _, x := range ss.Sessions {
+			if x.Render != session.RenderRendered || x.State == session.StateDisconnected {
+				continue
+			}
+			items, err := s.store.Items(ctx, x.ID)
+			if err != nil || len(items.Pending) == 0 {
+				continue
+			}
+			snap.Threads = append(snap.Threads, pendingToProto(x.ID, items.Seq, items.Pending))
+		}
+	}
+	return []*v1.Event{{Event: &v1.Event_Thread{Thread: &v1.ThreadEvent{Event: &v1.ThreadEvent_PendingSnapshot{PendingSnapshot: snap}}}}}
 }
 
 // ---- gh ------------------------------------------------------------------------

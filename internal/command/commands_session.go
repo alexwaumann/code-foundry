@@ -162,6 +162,8 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				{Name: "name", Type: String, Description: "Thread name (default: generated from the first message)"},
 				{Name: "prompt", Type: String, Description: "First prompt, passed to Claude as it starts"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image paths from StageAttachment, appended to the prompt"},
+				{Name: "render", Type: Enum, Enum: SessionRenders,
+					Description: "terminal (Claude Code in a terminal) or rendered (headless; the app draws the conversation). Default: settings sessions.render"},
 			},
 			When: canStartThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -173,7 +175,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 					RepoId: a.String("repo"), WorktreePath: a.Path("worktree"), Model: a.String("model"),
 					Effort: a.String("effort"), Name: a.String("name"), InitialPrompt: a.String("prompt"),
 					PermissionMode: sessionPermissionModes[a.String("permission")], Attachments: splitList(a.String("attachments")),
-					WorkspaceId: ws,
+					WorkspaceId: ws, Render: sessionRenderModes[a.String("render")],
 				}
 				switch {
 				case len(repos) > 0 && !a.Bool("new-worktree"):

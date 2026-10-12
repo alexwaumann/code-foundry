@@ -1,0 +1,331 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "codefoundry/v1/session.proto";
+import "google/protobuf/timestamp.proto";
+
+// ThreadService drives rendered threads (Session.render RENDERED): Claude Code runs
+// headlessly (claude -p over stream-json) and the conversation is recorded by the
+// daemon as items the GUI draws. Every RPC refuses a terminal thread with
+// FAILED_PRECONDITION. See docs/notes/rendered-threads-1-daemon.md.
+service ThreadService {
+  // ListItems returns a thread's items (the streaming one included) and its pending
+  // requests. Works while disconnected (items persist).
+  rpc ListItems(ListThreadItemsRequest) returns (ListThreadItemsResponse) {}
+  // Watch streams one thread: a snapshot first, then appended/updated items, text
+  // deltas and pending-request changes. While a Watch is open the thread counts as
+  // looked at: a finished turn is seen at once (like an attached terminal). Apply only
+  // events whose seq is greater than the snapshot's.
+  rpc Watch(WatchThreadRequest) returns (stream ThreadEvent) {}
+  // Send sends a user message to a connected thread. Allowed while a turn runs:
+  // Claude queues it or folds it in.
+  rpc Send(SendThreadMessageRequest) returns (SendThreadMessageResponse) {}
+  // Respond answers a pending permission request or question.
+  rpc Respond(RespondThreadRequest) returns (RespondThreadResponse) {}
+  // Interrupt stops the running turn; pending requests are withdrawn.
+  rpc Interrupt(InterruptThreadRequest) returns (InterruptThreadResponse) {}
+  // SetModel switches a connected thread's model (from its next request) and records
+  // it for later spawns.
+  rpc SetModel(SetThreadModelRequest) returns (SetThreadModelResponse) {}
+  // SetPermissionMode switches a connected thread's permission mode: SUPERVISED,
+  // ACCEPT_EDITS or AUTO (UNSPECIFIED, Claude's default, cannot be selected live).
+  rpc SetPermissionMode(SetThreadPermissionModeRequest) returns (SetThreadPermissionModeResponse) {}
+}
+
+// One entry of a rendered thread's conversation. The payload's case is the kind.
+message ThreadItem {
+  // Stable for the item's life (the user message's uuid, "<message id>/<index>" for
+  // text and thinking, the tool_use id, "perm-"/"q-" + the request id, ...).
+  string id = 1;
+  // Order in the thread: assigned when the item first appears, only grows, not dense.
+  int64 ordinal = 2;
+  // The Agent tool_use a subagent's item belongs to; empty for the thread's own.
+  string parent_tool_use_id = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+  // Still arriving: text and tool input grow through deltas until an update with
+  // streaming false.
+  bool streaming = 6;
+  oneof payload {
+    UserMessageItem user_message = 10;
+    AssistantTextItem assistant_text = 11;
+    ThinkingItem thinking = 12;
+    ToolCallItem tool_call = 13;
+    // A permission prompt (can_use_tool), or a call denied without one.
+    ThreadRequestItem permission = 14;
+    // An AskUserQuestion prompt.
+    ThreadRequestItem question = 15;
+    TurnEndItem turn_end = 16;
+    ErrorItem error = 17;
+    CompactionItem compaction = 18;
+    CommandOutputItem command_output = 19;
+  }
+}
+
+// What the user sent, as typed in the composer: file tags stay "@cf-file://<repo>/<path>"
+// tokens (not the paths Claude got).
+message UserMessageItem {
+  string text = 1;
+  // Staged image paths (StageAttachment); Claude got each as an image block and a
+  // path line.
+  repeated string attachments = 2;
+}
+
+// One text block of Claude's reply (markdown).
+message AssistantTextItem {
+  string text = 1;
+}
+
+// One thinking block. Text is usually empty: Claude streams only its progress.
+message ThinkingItem {
+  string text = 1;
+}
+
+enum ToolCallStatus {
+  TOOL_CALL_STATUS_UNSPECIFIED = 0;
+  TOOL_CALL_STATUS_RUNNING = 1;
+  TOOL_CALL_STATUS_DONE = 2;
+  // The tool failed, was denied, or the process ended before it finished.
+  TOOL_CALL_STATUS_ERROR = 3;
+}
+
+message ToolCallItem {
+  string tool_use_id = 1;
+  // "Bash", "Read", "Write", "Edit", "Agent", "AskUserQuestion", "mcp__...", ...
+  string name = 2;
+  // The tool's input as JSON; partial JSON while streaming.
+  string input_json = 3;
+  ToolCallStatus status = 4;
+  // The tool_result's text.
+  string output = 5;
+  bool is_error = 6;
+  // The tool's structured result when Claude sent one (Write/Edit: filePath,
+  // structuredPatch, originalFile; ...); empty when absent or over 256 KiB.
+  string result_json = 7;
+}
+
+enum ThreadRequestState {
+  THREAD_REQUEST_STATE_UNSPECIFIED = 0;
+  THREAD_REQUEST_STATE_PENDING = 1;
+  // Allowed; a question: answered.
+  THREAD_REQUEST_STATE_ALLOWED = 2;
+  THREAD_REQUEST_STATE_DENIED = 3;
+  // Withdrawn by Claude (an interrupt) or the process ended first.
+  THREAD_REQUEST_STATE_CANCELLED = 4;
+}
+
+// A can_use_tool request (permission or AskUserQuestion) and its resolution.
+message ThreadRequestItem {
+  // Answer with ThreadService.Respond(request_id). Empty for an auto-denied call.
+  string request_id = 1;
+  string tool_name = 2;
+  string display_name = 3;
+  string title = 4;
+  // What the call touches, e.g. a file name.
+  string description = 5;
+  // The tool_call item this request is about.
+  string tool_use_id = 6;
+  // Set when a subagent asked.
+  string agent_id = 7;
+  string blocked_path = 8;
+  string decision_reason = 9;
+  // The tool's input JSON. A question's: {"questions": [{question, header, options:
+  // [{label, description}], multiSelect}]}.
+  string input_json = 10;
+  // Claude's permission_suggestions (JSON); "allow for session" applies them. Empty
+  // when there are none.
+  string suggestions_json = 11;
+  ThreadRequestState state = 12;
+  // "allow", "allow_session", "deny" or "auto_denied" once resolved.
+  string decision = 13;
+  // The deny message, or why it was cancelled or auto-denied.
+  string message = 14;
+  // A question's answers: question -> chosen label(s), several joined with ", ".
+  map<string, string> answers = 15;
+}
+
+// The end of a turn (Claude's result).
+message TurnEndItem {
+  // "success", "error_during_execution", "error_max_turns", ...
+  string subtype = 1;
+  bool is_error = 2;
+  // Stopped by an interrupt.
+  bool interrupted = 3;
+  string stop_reason = 4;
+  string terminal_reason = 5;
+  int64 duration_ms = 6;
+  int32 num_turns = 7;
+  // Claude's cost estimate for the process so far (cumulative over its turns).
+  double cost_usd = 8;
+  int64 input_tokens = 9;
+  int64 output_tokens = 10;
+  int64 cache_read_tokens = 11;
+  int64 cache_write_tokens = 12;
+  repeated string errors = 13;
+}
+
+// Something that went wrong outside a turn's result (the process failed to start or
+// exited mid-turn).
+message ErrorItem {
+  string text = 1;
+}
+
+// A compaction (/compact or automatic).
+message CompactionItem {
+  // "manual" or "auto".
+  string trigger = 1;
+  int64 pre_tokens = 2;
+  int64 post_tokens = 3;
+  // The summary Claude continues from, once it arrived.
+  string summary = 4;
+}
+
+// A local slash command's output (/cost, /compact's "Compacted", ...).
+message CommandOutputItem {
+  string text = 1;
+}
+
+// A request waiting on the user.
+message ThreadPendingRequest {
+  string request_id = 1;
+  // The permission or question item.
+  string item_id = 2;
+  bool question = 3;
+  string tool_name = 4;
+  // One line: "Write hello.txt", or the question.
+  string summary = 5;
+}
+
+message ThreadItemsSnapshot {
+  string session_id = 1;
+  // The thread's event sequence number included in the snapshot.
+  uint64 seq = 2;
+  repeated ThreadItem items = 3;
+  repeated ThreadPendingRequest pending = 4;
+}
+
+// Text appended to a streaming item.
+message ThreadItemDelta {
+  string session_id = 1;
+  uint64 seq = 2;
+  string item_id = 3;
+  int64 ordinal = 4;
+  enum Field {
+    FIELD_UNSPECIFIED = 0;
+    // assistant_text.text or thinking.text.
+    FIELD_TEXT = 1;
+    // tool_call.input_json (partial JSON).
+    FIELD_INPUT = 2;
+  }
+  Field field = 5;
+  string text = 6;
+}
+
+message ThreadItemChange {
+  string session_id = 1;
+  uint64 seq = 2;
+  ThreadItem item = 3;
+}
+
+// A thread's pending requests changed (the whole list).
+message ThreadPending {
+  string session_id = 1;
+  uint64 seq = 2;
+  repeated ThreadPendingRequest pending = 3;
+}
+
+// The pending requests of every rendered thread that has any: EventService's
+// snapshot for the thread source. Replace what you have.
+message ThreadPendingSnapshot {
+  repeated ThreadPending threads = 1;
+}
+
+message ThreadEvent {
+  oneof event {
+    // ThreadService.Watch's first event (and a resync after drops).
+    ThreadItemsSnapshot snapshot = 1;
+    // Watch only: items and their streaming deltas.
+    ThreadItemChange appended = 2;
+    ThreadItemChange updated = 3;
+    ThreadItemDelta delta = 4;
+    // Watch and EventService: the thread's pending requests changed.
+    ThreadPending pending = 5;
+    // EventService only: the snapshot of the thread source.
+    ThreadPendingSnapshot pending_snapshot = 6;
+  }
+}
+
+message ListThreadItemsRequest {
+  string session_id = 1;
+}
+
+message ListThreadItemsResponse {
+  ThreadItemsSnapshot snapshot = 1;
+}
+
+message WatchThreadRequest {
+  string session_id = 1;
+}
+
+message SendThreadMessageRequest {
+  string session_id = 1;
+  // As typed; "@cf-file://<repo id>/<path>" tags become absolute paths for Claude.
+  string text = 2;
+  // StageAttachment paths.
+  repeated string attachments = 3;
+}
+
+message SendThreadMessageResponse {
+  // The user_message item.
+  ThreadItem item = 1;
+}
+
+enum ThreadDecision {
+  THREAD_DECISION_UNSPECIFIED = 0;
+  THREAD_DECISION_ALLOW = 1;
+  // Allow and apply Claude's permission suggestions for the rest of the session.
+  THREAD_DECISION_ALLOW_FOR_SESSION = 2;
+  THREAD_DECISION_DENY = 3;
+}
+
+message RespondThreadRequest {
+  string session_id = 1;
+  string request_id = 2;
+  ThreadDecision decision = 3;
+  // A question's answers (required to allow one): question -> chosen label(s).
+  map<string, string> answers = 4;
+  // DENY: the reason Claude sees.
+  string message = 5;
+  // DENY: also stop the turn.
+  bool interrupt = 6;
+}
+
+message RespondThreadResponse {
+  // The resolved permission or question item.
+  ThreadItem item = 1;
+}
+
+message InterruptThreadRequest {
+  string session_id = 1;
+}
+
+message InterruptThreadResponse {}
+
+message SetThreadModelRequest {
+  string session_id = 1;
+  string model = 2;
+}
+
+message SetThreadModelResponse {
+  Session session = 1;
+}
+
+message SetThreadPermissionModeRequest {
+  string session_id = 1;
+  PermissionMode permission_mode = 2;
+}
+
+message SetThreadPermissionModeResponse {
+  Session session = 1;
+}

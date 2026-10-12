@@ -26,6 +26,8 @@ import (
 //     overrides (CommandService.List reports the effective values);
 //   - log level -> the log file handler's LevelVar;
 //   - auto-naming and the naming model -> a Namer that reads both per session;
+//   - sessions.render -> session.Options.DefaultRender, read by every Create without
+//     an explicit mode;
 //   - worktree directory -> repo.worktree.new's default path, and the path of the
 //     worktree a new thread creates (session.Options.WorktreePath).
 //   - editor command -> gitops' Editor func (stores.go), read on every open.
@@ -133,4 +135,14 @@ func worktreePath(dir, repoName, branch string) string {
 		return ""
 	}
 	return filepath.Join(base, strings.ReplaceAll(branch, "/", "-"))
+}
+
+// settingsRender applies sessions.render to new threads that do not pick a mode.
+func settingsRender(st *settings.Store) func() session.Render {
+	return func() session.Render {
+		if st.Settings().Sessions.Render == settings.RenderRendered {
+			return session.RenderRendered
+		}
+		return session.RenderTerminal
+	}
 }

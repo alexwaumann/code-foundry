@@ -8,6 +8,7 @@ import "codefoundry/v1/repo.proto";
 import "codefoundry/v1/session.proto";
 import "codefoundry/v1/settings.proto";
 import "codefoundry/v1/terminal.proto";
+import "codefoundry/v1/thread.proto";
 import "codefoundry/v1/ui.proto";
 import "codefoundry/v1/update.proto";
 import "codefoundry/v1/workspace.proto";
@@ -18,8 +19,8 @@ import "codefoundry/v1/workspace.proto";
 // Watch RPCs remain for the CLI and tests.
 service EventService {
   // Watch streams all events. Each store's snapshot event is sent first, in the order
-  // repo, workspace, terminal, session, gh, gitops, settings, update, so a client can
-  // replace its state wholesale on connect.
+  // repo, workspace, terminal, session, thread, gh, gitops, settings, update, so a
+  // client can replace its state wholesale on connect.
   rpc Watch(WatchEventsRequest) returns (stream Event) {}
 }
 
@@ -44,6 +45,11 @@ enum EventSource {
   // Workspaces (branch sets). Sent right after repo, before terminal: members name
   // repositories, and sessions name workspaces.
   EVENT_SOURCE_WORKSPACE = 11;
+  // Rendered threads' pending requests (permission prompts and questions), for
+  // every rendered thread: a ThreadPendingSnapshot (right after session), then a
+  // ThreadEvent.pending per change. A thread's items come only from
+  // ThreadService.ListItems or Watch; this source never carries them.
+  EVENT_SOURCE_THREAD = 12;
 }
 
 message Event {
@@ -59,5 +65,7 @@ message Event {
     UpdateEvent update = 10;
     // Workspaces: a snapshot, then updated / removed_id.
     WorkspaceEvent workspace = 11;
+    // Rendered threads: pending_snapshot, then pending (never items or deltas).
+    ThreadEvent thread = 12;
   }
 }
