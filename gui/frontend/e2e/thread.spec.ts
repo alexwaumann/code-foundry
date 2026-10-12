@@ -195,7 +195,8 @@ for (const scheme of ["dark", "light"] as const) {
       });
       await mockPost("thread/finish");
       const footer = footers(page).last();
-      await expect(footer).toContainText(/Worked for .*·12 steps·\$0\.04·Opus/);
+      // The turn's own cost and the model that replied, from the daemon's turn_end.
+      await expect(footer).toContainText(/Worked for .*·12 steps·\$0\.04·Opus 4\.8/);
       await expect(footer).not.toHaveAttribute("data-folded", "true");
       await expect(timeline).toHaveAttribute("data-at-bottom", "true");
       await expect
@@ -220,6 +221,16 @@ for (const scheme of ["dark", "light"] as const) {
     });
   });
 }
+
+test("footers: the daemon's turn cost and model win; turns without them fall back", async ({ page }) => {
+  await openThread(page, "idle");
+  // Turn 2 ran in a new process whose total passed the old one's: the difference of the
+  // totals would say $0.38; the daemon's turn cost says $1.50, and Sonnet 5 answered.
+  await expect(footers(page).last()).toContainText(/·\$1\.50·Sonnet 5$/);
+  // Turn 1 predates the fields: its cost is the running total (the first turn) and the
+  // model the thread's.
+  await expect(await reveal(page, footers(page))).toContainText(/\$1\.12·Opus$/);
+});
 
 test("a pending question docks with its pager", async ({ page }) => {
   await openThread(page, "question");

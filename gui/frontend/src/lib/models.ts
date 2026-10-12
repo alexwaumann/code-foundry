@@ -36,3 +36,20 @@ export function modelChoicesFromSchema(fields: readonly Pick<SettingFieldView, "
 export function modelName(choices: readonly Choice[], model: string): string {
   return choices.find((c) => c.value === model)?.label ?? model;
 }
+
+const CANONICAL = /^claude-(fable|opus|sonnet|haiku)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?(?:\[[^\]]*\])?$/;
+
+/**
+ * The name of a model as Claude reports it (a turn's replies: "claude-haiku-5-5",
+ * "claude-opus-4-8[1m]"): the registry's label for that id, else the family and version
+ * read from it ("Haiku 5.5"), else the id itself.
+ */
+export function canonicalModelName(choices: readonly Choice[], id: string): string {
+  const known = choices.find((c) => c.value === id);
+  if (known) return known.label;
+  const m = CANONICAL.exec(id);
+  if (!m) return id;
+  const [, family = "", major = "", minor] = m;
+  const label = choices.find((c) => c.value === family)?.label ?? family.charAt(0).toUpperCase() + family.slice(1);
+  return `${label} ${major}${minor ? `.${minor}` : ""}`;
+}

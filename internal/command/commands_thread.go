@@ -379,8 +379,15 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 			}
 		case it.GetTurnEnd() != nil:
 			t := it.GetTurnEnd()
-			body = fmt.Sprintf("turn end: %s, %.1fs, %d in / %d out tokens, $%.4f so far", t.GetSubtype(),
-				float64(t.GetDurationMs())/1000, t.GetInputTokens()+t.GetCacheReadTokens()+t.GetCacheWriteTokens(), t.GetOutputTokens(), t.GetCostUsd())
+			body = fmt.Sprintf("turn end: %s, %.1fs, %d in / %d out tokens", t.GetSubtype(),
+				float64(t.GetDurationMs())/1000, t.GetInputTokens()+t.GetCacheReadTokens()+t.GetCacheWriteTokens(), t.GetOutputTokens())
+			if t.TurnCostUsd != nil {
+				body += fmt.Sprintf(", $%.4f", t.GetTurnCostUsd())
+			}
+			body += fmt.Sprintf(", $%.4f so far", t.GetCostUsd())
+			if t.GetModel() != "" {
+				body += ", " + t.GetModel()
+			}
 			if t.GetInterrupted() {
 				body += " (interrupted)"
 			}

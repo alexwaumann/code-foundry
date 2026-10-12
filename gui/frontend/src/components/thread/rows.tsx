@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import type { ThreadItemView, ToolCallView } from "@/api/thread";
 import { copyText } from "@/lib/clipboard";
-import { modelName } from "@/lib/models";
+import { canonicalModelName, modelName } from "@/lib/models";
 import { questionsOf } from "@/lib/threadRequest";
 import { groupLabel, type TimelineRow, type WorkNode } from "@/lib/threadTimeline";
 import { formatDuration, parseObject, splitPath, str, toolSummary, type Tense } from "@/lib/toolSummary";
@@ -467,15 +467,17 @@ const FooterRow = memo(function FooterRow({ row }: { row: Extract<TimelineRow, {
   const model = useSessionsStore((s) => s.byId[sessionId]?.model ?? "");
   const models = useModelChoices();
   if (it?.kind !== "turnEnd") return null;
-  // cost_usd is cumulative over the process: this turn's is the difference, unless the
-  // process restarted in between (the total went down).
-  const cost = it.costUsd >= prev ? it.costUsd - prev : it.costUsd;
+  // The daemon's own measure; an older daemon's turns: cost_usd is cumulative over the
+  // process, so the difference, unless the process restarted in between (the total went down).
+  const cost = it.turnCostUsd ?? (it.costUsd >= prev ? it.costUsd - prev : it.costUsd);
   const took = formatDuration(it.durationMs);
   const what = it.interrupted ? "Interrupted" : it.isError ? `Failed (${it.subtype.replace(/_/g, " ")})` : "Worked";
   const parts = [took ? `${what}${it.interrupted || it.isError ? " after" : " for"} ${took}` : what];
   if (row.steps > 0) parts.push(`${String(row.steps)} ${row.steps === 1 ? "step" : "steps"}`);
   if (money(cost)) parts.push(money(cost));
-  if (model) parts.push(modelName(models, model));
+  // The model that answered this turn; else (an older daemon, a turn without a reply) the thread's.
+  if (it.model) parts.push(canonicalModelName(models, it.model));
+  else if (model) parts.push(modelName(models, model));
   const copy = () => {
     const finals = new Set(row.finals);
     const text = getThreadItems(sessionId)

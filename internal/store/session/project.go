@@ -61,6 +61,9 @@ type projector struct {
 	// compaction is the compaction item waiting for its summary.
 	compaction string
 	n          int // for generated ids
+	// model is the model of the running turn's own replies (its assistant frames).
+	model string
+	costs turnCosts
 }
 
 type openBlock struct {
@@ -69,8 +72,24 @@ type openBlock struct {
 	kind  ItemKind
 }
 
+// newProjector projects onto w's log. Its last turn end, if any, is the previous
+// process's (a Reconnect, a daemon restart): the first turn's cost is measured from it.
 func newProjector(w itemWriter) *projector {
-	return &projector{w: w, open: map[string][]openBlock{}}
+	p := &projector{w: w, open: map[string][]openBlock{}}
+	items := w.log.snapshot().Items
+	for i := len(items) - 1; i >= 0; i-- {
+		if items[i].Kind == KindTurnEnd {
+			p.costs.resume(items[i].Turn)
+			break
+		}
+	}
+	return p
+}
+
+// restart: the next events come from a new process (an effort change's restart).
+func (p *projector) restart() {
+	p.costs.restart()
+	p.model = ""
 }
 
 func (p *projector) nextID(prefix string) string {
@@ -101,7 +120,15 @@ func (p *projector) event(ev claudestream.Event) {
 		}})
 	case *claudestream.Result:
 		p.closeOpen()
-		p.w.add(Item{ID: "turn-" + nonEmpty(e.UUID, p.nextID("t")), Kind: KindTurnEnd, Turn: turnEnd(e)})
+		t := turnEnd(e)
+		var turnOut int64
+		if e.Usage != nil {
+			turnOut = e.Usage.OutputTokens
+		}
+		cost := p.costs.turn(e.TotalCostUSD, e.OutputTokens(), turnOut)
+		t.TurnCostUSD, t.Model, t.ProcessOutputTokens = &cost, p.model, e.OutputTokens()
+		p.model = ""
+		p.w.add(Item{ID: "turn-" + nonEmpty(e.UUID, p.nextID("t")), Kind: KindTurnEnd, Turn: t})
 	}
 }
 
@@ -211,6 +238,11 @@ func blockKind(t string) ItemKind {
 }
 
 func (p *projector) assistant(e *claudestream.Assistant) {
+	// A turn's model is its own replies' (a subagent may run another); synthetic API
+	// error messages name none.
+	if e.ParentToolUseID == "" && e.Message.Model != "" && e.Message.Model != "<synthetic>" {
+		p.model = e.Message.Model
+	}
 	for _, b := range e.Message.Content {
 		kind := blockKind(b.Type)
 		if kind == "" {

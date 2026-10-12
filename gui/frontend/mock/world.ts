@@ -347,6 +347,7 @@ export class World {
   readonly threads = new MockThreads(
     {
       worktreeOf: (id) => this.session(id).worktreePath,
+      modelOf: (id) => this.session(id).model,
       isConnected: (id) => this.session(id).state === SessionState.CONNECTED,
       setStatus: (id, status, reason) => {
         const s = this.session(id);

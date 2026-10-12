@@ -47,7 +47,12 @@ export interface ThreadWorld {
   setPermission(id: string, permission: string): void;
   setEffort(id: string, effort: string, pending: boolean): void;
   statusOf(id: string): SessionStatus;
+  /** The thread's model as picked ("opus", "claude-sonnet-5"). */
+  modelOf(id: string): string;
 }
+
+/** What Claude reports as the model of a reply for a picked one (a family alias resolves to its current model). */
+const CANONICAL: Readonly<Record<string, string>> = { fable: "claude-fable-5-1", opus: "claude-opus-4-8", sonnet: "claude-sonnet-5", haiku: "claude-haiku-5-5" };
 
 interface Log {
   seq: number;
@@ -320,7 +325,12 @@ export class MockThreads {
   }
 
   /** Ends the turn: the streaming text completes, a turn_end follows, the thread is finished (seen when watched). */
-  finish(id: string, opts: { rest?: string; interrupted?: boolean } = {}): void {
+  /**
+   * Ends the running turn like the daemon: the turn_end carries Claude's running total
+   * (the previous one + 0.04, or `total`), the turn's own cost (0.04, or `turnCost`: a
+   * restart can make it differ from the totals' difference) and the model that replied.
+   */
+  finish(id: string, opts: { rest?: string; interrupted?: boolean; total?: number; turnCost?: number; model?: string } = {}): void {
     const l = this.log(id);
     const it = [...l.items].reverse().find((x) => x.streaming);
     if (it) {
@@ -344,14 +354,17 @@ export class MockThreads {
     const lastUser = [...l.items].reverse().find((x) => x.payload?.case === "userMessage");
     const started = lastUser?.createdAt ? Number(lastUser.createdAt.seconds) * 1000 : Date.now();
     const prevCost = [...l.items].reverse().find((x) => x.payload?.case === "turnEnd");
-    const cost = (prevCost?.payload?.case === "turnEnd" ? (prevCost.payload.value.costUsd ?? 0) : 0) + 0.04;
+    const cost = opts.total ?? (prevCost?.payload?.case === "turnEnd" ? (prevCost.payload.value.costUsd ?? 0) : 0) + 0.04;
+    const turnCostUsd = opts.turnCost ?? 0.04;
+    const picked = this.world.modelOf(id);
+    const model = opts.model ?? CANONICAL[picked] ?? picked;
     this.append(
       id,
       this.item(id, {
         case: "turnEnd",
         value: opts.interrupted
-          ? { subtype: "error_during_execution", isError: true, interrupted: true, terminalReason: "aborted_streaming", durationMs: BigInt(Date.now() - started), costUsd: cost }
-          : { subtype: "success", durationMs: BigInt(Date.now() - started), numTurns: 3, costUsd: cost, stopReason: "end_turn" },
+          ? { subtype: "error_during_execution", isError: true, interrupted: true, terminalReason: "aborted_streaming", durationMs: BigInt(Date.now() - started), costUsd: cost, turnCostUsd, model }
+          : { subtype: "success", durationMs: BigInt(Date.now() - started), numTurns: 3, costUsd: cost, turnCostUsd, model, stopReason: "end_turn" },
       }),
     );
     this.world.setStatus(id, l.watchers > 0 ? SessionStatus.IDLE : SessionStatus.NEEDS_ATTENTION, l.watchers > 0 ? "at prompt" : "finished");
@@ -588,7 +601,9 @@ export class MockThreads {
     tool("Bash", { command: "go test ./..." }, { output: "ok  \tgithub.com/alexwaumann/code-foundry/...\t(412 tests)", resultJson: JSON.stringify({ stdout: "ok  \t…/internal/store/pr\t0.41s\nok  \t…/internal/api\t3.2s\n(412 tests passed)", stderr: "" }) }, { at: ago(3, 12), until: ago(3, 50) });
     if (state === "idle") {
       text("All 412 tests pass and the branch is pushed: PR #63 picked up the fix.", { at: ago(2) });
-      it({ case: "turnEnd", value: { subtype: "success", durationMs: 62_000n, numTurns: 4, costUsd: 1.31, stopReason: "end_turn" } }, { at: ago(1, 58) });
+      // Turn 1 predates turn_cost_usd and model (an older daemon); turn 2 ran in a new
+      // process that started its totals afresh (the difference of the totals would say $0.38).
+      it({ case: "turnEnd", value: { subtype: "success", durationMs: 62_000n, numTurns: 4, costUsd: 1.5, turnCostUsd: 1.5, model: "claude-sonnet-5", stopReason: "end_turn" } }, { at: ago(1, 58) });
       l.seq = l.items.length;
       this.world.setStatus(id, SessionStatus.IDLE, "at prompt");
       return;

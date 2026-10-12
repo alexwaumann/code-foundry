@@ -73,6 +73,10 @@ export interface TurnEndView {
   numTurns: number;
   /** Claude's cumulative estimate for the process, not this turn's. */
   costUsd: number;
+  /** This turn's cost as the daemon measured it (it knows Claude's restarts); null from an older daemon. */
+  turnCostUsd: number | null;
+  /** The model of the turn's own replies as Claude names it ("claude-haiku-5-5"); "" when unknown. */
+  model: string;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
@@ -220,6 +224,8 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
         durationMs: Number(t.durationMs),
         numTurns: t.numTurns,
         costUsd: t.costUsd,
+        turnCostUsd: t.turnCostUsd ?? null,
+        model: t.model,
         inputTokens: Number(t.inputTokens),
         outputTokens: Number(t.outputTokens),
         cacheReadTokens: Number(t.cacheReadTokens),

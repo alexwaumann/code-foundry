@@ -272,7 +272,7 @@ func itemToProto(it session.Item) *v1.ThreadItem {
 				Subtype: t.Subtype, IsError: t.IsError, Interrupted: t.Interrupted, StopReason: t.StopReason,
 				TerminalReason: t.TerminalReason, DurationMs: t.DurationMS, NumTurns: int32(t.NumTurns), CostUsd: t.CostUSD,
 				InputTokens: t.InputTokens, OutputTokens: t.OutputTokens, CacheReadTokens: t.CacheReadTokens,
-				CacheWriteTokens: t.CacheWriteTokens, Errors: t.Errors,
+				CacheWriteTokens: t.CacheWriteTokens, Errors: t.Errors, TurnCostUsd: t.TurnCostUSD, Model: t.Model,
 			}}
 		}
 	case session.KindError:

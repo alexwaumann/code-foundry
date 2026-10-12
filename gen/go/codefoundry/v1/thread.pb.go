@@ -940,15 +940,25 @@ type TurnEndItem struct {
 	TerminalReason string `protobuf:"bytes,5,opt,name=terminal_reason,json=terminalReason,proto3" json:"terminal_reason,omitempty"`
 	DurationMs     int64  `protobuf:"varint,6,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
 	NumTurns       int32  `protobuf:"varint,7,opt,name=num_turns,json=numTurns,proto3" json:"num_turns,omitempty"`
-	// Claude's cost estimate for the process so far (cumulative over its turns).
+	// Claude's cost estimate for the process so far (cumulative over its turns). The
+	// turn's own is turn_cost_usd.
 	CostUsd          float64  `protobuf:"fixed64,8,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
 	InputTokens      int64    `protobuf:"varint,9,opt,name=input_tokens,json=inputTokens,proto3" json:"input_tokens,omitempty"`
 	OutputTokens     int64    `protobuf:"varint,10,opt,name=output_tokens,json=outputTokens,proto3" json:"output_tokens,omitempty"`
 	CacheReadTokens  int64    `protobuf:"varint,11,opt,name=cache_read_tokens,json=cacheReadTokens,proto3" json:"cache_read_tokens,omitempty"`
 	CacheWriteTokens int64    `protobuf:"varint,12,opt,name=cache_write_tokens,json=cacheWriteTokens,proto3" json:"cache_write_tokens,omitempty"`
 	Errors           []string `protobuf:"bytes,13,rep,name=errors,proto3" json:"errors,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// This turn's cost: the difference of Claude's running total from the previous
+	// turn's, measured within one process (the daemon knows when Claude restarted and
+	// whether the new process carried the totals over). Unset on turns recorded before
+	// the daemon computed it.
+	TurnCostUsd *float64 `protobuf:"fixed64,14,opt,name=turn_cost_usd,json=turnCostUsd,proto3,oneof" json:"turn_cost_usd,omitempty"`
+	// The model of the turn's own replies as Claude names it ("claude-haiku-5-5"); empty
+	// when the turn had none (a local command, an interrupt before any reply) or was
+	// recorded before the daemon kept it.
+	Model         string `protobuf:"bytes,15,opt,name=model,proto3" json:"model,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TurnEndItem) Reset() {
@@ -1070,6 +1080,20 @@ func (x *TurnEndItem) GetErrors() []string {
 		return x.Errors
 	}
 	return nil
+}
+
+func (x *TurnEndItem) GetTurnCostUsd() float64 {
+	if x != nil && x.TurnCostUsd != nil {
+		return *x.TurnCostUsd
+	}
+	return 0
+}
+
+func (x *TurnEndItem) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
 }
 
 // Something that went wrong outside a turn's result (the process failed to start or
@@ -2607,7 +2631,7 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\aanswers\x18\x0f \x03(\v2..codefoundry.v1.ThreadRequestItem.AnswersEntryR\aanswers\x1a:\n" +
 	"\fAnswersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc1\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x92\x04\n" +
 	"\vTurnEndItem\x12\x18\n" +
 	"\asubtype\x18\x01 \x01(\tR\asubtype\x12\x19\n" +
 	"\bis_error\x18\x02 \x01(\bR\aisError\x12 \n" +
@@ -2624,7 +2648,10 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	" \x01(\x03R\foutputTokens\x12*\n" +
 	"\x11cache_read_tokens\x18\v \x01(\x03R\x0fcacheReadTokens\x12,\n" +
 	"\x12cache_write_tokens\x18\f \x01(\x03R\x10cacheWriteTokens\x12\x16\n" +
-	"\x06errors\x18\r \x03(\tR\x06errors\"\x1f\n" +
+	"\x06errors\x18\r \x03(\tR\x06errors\x12'\n" +
+	"\rturn_cost_usd\x18\x0e \x01(\x01H\x00R\vturnCostUsd\x88\x01\x01\x12\x14\n" +
+	"\x05model\x18\x0f \x01(\tR\x05modelB\x10\n" +
+	"\x0e_turn_cost_usd\"\x1f\n" +
 	"\tErrorItem\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\"\x84\x01\n" +
 	"\x0eCompactionItem\x12\x18\n" +
@@ -2896,6 +2923,7 @@ func file_codefoundry_v1_thread_proto_init() {
 		(*ThreadItem_Compaction)(nil),
 		(*ThreadItem_CommandOutput)(nil),
 	}
+	file_codefoundry_v1_thread_proto_msgTypes[6].OneofWrappers = []any{}
 	file_codefoundry_v1_thread_proto_msgTypes[16].OneofWrappers = []any{
 		(*ThreadEvent_Snapshot)(nil),
 		(*ThreadEvent_Appended)(nil),

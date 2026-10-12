@@ -26,7 +26,8 @@
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
  *   POST /__mock/thread?state=permission|question|streaming|idle   (the rendered thread s-r1:
- *        mock/thread.ts, also parallel|multi); POST /__mock/thread/delta?text=… | /__mock/thread/finish |
+ *        mock/thread.ts, also parallel|multi); POST /__mock/thread/delta?text=… |
+ *        /__mock/thread/finish[?total=1.5&turnCost=1.5&model=claude-sonnet-5] (the turn_end's figures) |
  *        /__mock/thread/fail-respond (the next answer fails); GET /__mock/thread/calls
  *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
  *                                                 shell stays, exited, as if the reaper were late)
@@ -657,7 +658,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/thread/finish":
-      world.threads.finish(q.get("id") ?? "s-r1", { rest: q.get("rest") ?? MockThreads.answerRest });
+      world.threads.finish(q.get("id") ?? "s-r1", {
+        rest: q.get("rest") ?? MockThreads.answerRest,
+        total: q.has("total") ? Number(q.get("total")) : undefined,
+        turnCost: q.has("turnCost") ? Number(q.get("turnCost")) : undefined,
+        model: q.get("model") ?? undefined,
+      });
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/thread/fail-respond":

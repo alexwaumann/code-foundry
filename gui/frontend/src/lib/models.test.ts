@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { enumOptionLabel, FALLBACK_MODEL_CHOICES, MODEL_SETTING_KEY, modelChoicesFromSchema, modelName } from "./models";
+import { canonicalModelName, enumOptionLabel, FALLBACK_MODEL_CHOICES, MODEL_SETTING_KEY, modelChoicesFromSchema, modelName } from "./models";
 
 const modelField = {
   key: MODEL_SETTING_KEY,
@@ -57,5 +57,25 @@ describe("enumOptionLabel", () => {
   });
   it("falls back to the value without labels", () => {
     expect(enumOptionLabel({ enumValues: ["dark"], enumLabels: [] }, "dark")).toBe("dark");
+  });
+});
+
+describe("canonicalModelName", () => {
+  const choices = [
+    { value: "opus", label: "Opus" },
+    { value: "claude-opus-4-8", label: "Opus 4.8" },
+    { value: "haiku", label: "Haiku" },
+  ];
+  it.each([
+    ["claude-opus-4-8", "Opus 4.8"],
+    ["claude-haiku-5-5", "Haiku 5.5"],
+    ["claude-sonnet-5", "Sonnet 5"],
+    ["claude-opus-4-8[1m]", "Opus 4.8"],
+    ["claude-sonnet-4-6-20260101", "Sonnet 4.6"],
+    ["claude-fable-5-1", "Fable 5.1"],
+    ["gpt-5", "gpt-5"],
+    ["", ""],
+  ])("%s → %s", (id, want) => {
+    expect(canonicalModelName(choices, id)).toBe(want);
   });
 });

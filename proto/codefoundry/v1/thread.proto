@@ -168,13 +168,23 @@ message TurnEndItem {
   string terminal_reason = 5;
   int64 duration_ms = 6;
   int32 num_turns = 7;
-  // Claude's cost estimate for the process so far (cumulative over its turns).
+  // Claude's cost estimate for the process so far (cumulative over its turns). The
+  // turn's own is turn_cost_usd.
   double cost_usd = 8;
   int64 input_tokens = 9;
   int64 output_tokens = 10;
   int64 cache_read_tokens = 11;
   int64 cache_write_tokens = 12;
   repeated string errors = 13;
+  // This turn's cost: the difference of Claude's running total from the previous
+  // turn's, measured within one process (the daemon knows when Claude restarted and
+  // whether the new process carried the totals over). Unset on turns recorded before
+  // the daemon computed it.
+  optional double turn_cost_usd = 14;
+  // The model of the turn's own replies as Claude names it ("claude-haiku-5-5"); empty
+  // when the turn had none (a local command, an interrupt before any reply) or was
+  // recorded before the daemon kept it.
+  string model = 15;
 }
 
 // Something that went wrong outside a turn's result (the process failed to start or

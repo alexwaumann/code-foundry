@@ -168,7 +168,13 @@ func TestItemToProto(t *testing.T) {
 		{"turn end", session.Item{Kind: session.KindTurnEnd, Turn: &session.TurnEnd{Subtype: "success", CostUSD: 0.5, NumTurns: 2, Interrupted: true, Errors: []string{"e"}}},
 			func(p *v1.ThreadItem) bool {
 				te := p.GetTurnEnd()
-				return te.GetCostUsd() == 0.5 && te.GetNumTurns() == 2 && te.GetInterrupted() && te.GetErrors()[0] == "e"
+				return te.GetCostUsd() == 0.5 && te.GetNumTurns() == 2 && te.GetInterrupted() && te.GetErrors()[0] == "e" &&
+					te.TurnCostUsd == nil && te.GetModel() == ""
+			}},
+		{"turn end with its own cost and model", session.Item{Kind: session.KindTurnEnd, Turn: &session.TurnEnd{CostUSD: 0.5, TurnCostUSD: new(0.2), Model: "claude-haiku-5-5"}},
+			func(p *v1.ThreadItem) bool {
+				te := p.GetTurnEnd()
+				return te.TurnCostUsd != nil && te.GetTurnCostUsd() == 0.2 && te.GetModel() == "claude-haiku-5-5"
 			}},
 		{"compaction", session.Item{Kind: session.KindCompaction, Text: "summary", Compaction: &session.Compaction{Trigger: "auto", PreTokens: 9}},
 			func(p *v1.ThreadItem) bool {

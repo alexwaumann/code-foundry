@@ -98,6 +98,7 @@ func (r *runner) respawn() {
 	r.stopStreamTimers()
 	st.conn.Close()
 	closeUnfinished(st.proj.w, "Claude restarted")
+	st.proj.restart()
 	l := r.launch
 	if id := r.tail.id; id != "" {
 		if _, ok := r.m.opts.Paths.transcriptPath(r.cwd, id); ok {
