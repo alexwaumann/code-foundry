@@ -91,6 +91,35 @@ func (p PermissionMode) Flag() string {
 
 func (p PermissionMode) valid() bool { return p >= PermissionDefault && p <= PermissionAuto }
 
+// Render is how a thread runs and is shown. Values mirror codefoundry.v1.SessionRender.
+// A thread's render mode is fixed for its life: Reconnect and Fork keep it.
+type Render int
+
+// Render modes.
+const (
+	// RenderDefault is only meaningful in CreateOptions: the store's default
+	// (Options.DefaultRender, the sessions.render setting). A session never has it.
+	RenderDefault Render = iota
+	// RenderTerminal: claude runs interactively in a PTY the GUI attaches to.
+	RenderTerminal
+	// RenderRendered: claude -p over stream-json; the conversation is recorded as
+	// thread items (Store.Items) and drawn by the GUI. No terminal.
+	RenderRendered
+)
+
+func (r Render) String() string {
+	switch r {
+	case RenderTerminal:
+		return "terminal"
+	case RenderRendered:
+		return "rendered"
+	default:
+		return "default"
+	}
+}
+
+func (r Render) valid() bool { return r >= RenderDefault && r <= RenderRendered }
+
 // Disconnect reasons recorded in Session.DisconnectReason.
 const (
 	ReasonClosed         = "closed"           // closed through Close/Remove
@@ -167,6 +196,9 @@ type Session struct {
 	// AgentRuns are the subagent runs under Transcripts (usage_runs.go), by start time.
 	// Persisted. Copy on write.
 	AgentRuns []AgentRun
+	// Render is RenderTerminal or RenderRendered, fixed at Create. Persisted. A
+	// rendered thread has no TerminalID; its conversation is Store.Items.
+	Render Render
 }
 
 // Snapshot is every session, sorted by creation time then id. Never mutate it.
@@ -248,8 +280,11 @@ type CreateOptions struct {
 	NewWorktree *NewWorktree
 	// Attachments are paths returned by StageAttachment. Each becomes an
 	// "Attached image: <path>" line after the prompt; Claude reads them with its Read
-	// tool. Paths outside the attachments directory are rejected.
+	// tool. Paths outside the attachments directory are rejected. A rendered thread
+	// also gets each as a base64 image block.
 	Attachments []string
+	// Render picks terminal or rendered; RenderDefault uses Options.DefaultRender.
+	Render Render
 }
 
 // RunInTarget names the member a workspace thread should run in: its repository id or
@@ -294,4 +329,28 @@ type Store interface {
 	StageAttachment(ctx context.Context, name, mimeType string, data []byte) (string, error)
 	// Snapshot returns the current immutable snapshot.
 	Snapshot() *Snapshot
+
+	// Rendered threads (thread.go). Every method refuses a terminal thread with
+	// ErrFailedPrecondition.
+
+	// Items returns a rendered thread's conversation: every item, the one streaming
+	// included, and the pending permission requests and questions.
+	Items(ctx context.Context, id string) (ItemsSnapshot, error)
+	// WatchItems is Items for a viewer: until ctx ends the thread counts as looked at,
+	// so a finished turn is seen at once (like an attached terminal). Subscribe to
+	// ThreadEvent on the bus first; events with Seq <= the snapshot's are in it.
+	WatchItems(ctx context.Context, id string) (ItemsSnapshot, error)
+	// Send sends a user message to a connected rendered thread (also while a turn
+	// runs: Claude queues or folds it in).
+	Send(ctx context.Context, id string, msg Message) (Item, error)
+	// Respond answers a pending permission request or question.
+	Respond(ctx context.Context, id, requestID string, d Decision) (Item, error)
+	// Interrupt stops the running turn.
+	Interrupt(ctx context.Context, id string) error
+	// SetModel switches the model of a connected thread and records it for later
+	// spawns.
+	SetModel(ctx context.Context, id, model string) (Session, error)
+	// SetPermissionMode switches the permission mode of a connected thread (supervised,
+	// accept edits or auto; Claude's default cannot be restored live) and records it.
+	SetPermissionMode(ctx context.Context, id string, mode PermissionMode) (Session, error)
 }

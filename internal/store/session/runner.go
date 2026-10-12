@@ -127,9 +127,14 @@ type runner struct {
 	usageSeen bool
 	usageOff  bool
 
-	// viewers is the terminal's Attach subscriber count (from the observer). While
-	// someone is attached, whatever Claude produces is seen: see acknowledge.
+	// viewers is the terminal's Attach subscriber count (from the observer), or for a
+	// rendered thread the number of item watchers (Store.WatchItems). While someone is
+	// attached, whatever Claude produces is seen: see acknowledge.
 	viewers int
+
+	// st is set for a rendered thread (stream.go): the runner drives claude over
+	// stdio instead of a terminal, and term stays zero.
+	st *streamState
 }
 
 func newRunner(m *Manager, id, cwd string, l launch) *runner {
@@ -181,6 +186,10 @@ func (r *runner) stop() {
 func (r *runner) log() *slogger { return &slogger{r} }
 
 func (r *runner) run() {
+	if r.st != nil {
+		r.runStream()
+		return
+	}
 	defer close(r.done)
 	defer r.tail.close()
 	defer r.usage.closeAll()
@@ -357,11 +366,11 @@ func (r *runner) connect(why string) {
 
 func (r *runner) onTick(now time.Time) {
 	r.det.Tick(now)
-	if r.state == StateStarting {
+	if r.state == StateStarting && r.st == nil {
 		r.checkStartup(true)
 	}
 	// Follow /clear: Claude moves to a new session id and transcript file.
-	if id := pidSessionID(r.m.opts.Paths, r.term.Pid); id != "" && id != r.tail.id {
+	if id := pidSessionID(r.m.opts.Paths, r.pid()); id != "" && id != r.tail.id {
 		r.log().info("claude switched session id", "from", r.tail.id, "to", id)
 		r.tail.follow(id, false)
 	}
@@ -648,6 +657,9 @@ func (r *runner) finish(fn func(*Session)) {
 type slogger struct{ r *runner }
 
 func (l *slogger) args(kv []any) []any {
+	if l.r.st != nil {
+		return append([]any{"session", l.r.id, "render", "rendered"}, kv...)
+	}
 	return append([]any{"session", l.r.id, "terminal", l.r.term.ID}, kv...)
 }
 func (l *slogger) debug(msg string, kv ...any) { l.r.m.log.Debug(msg, l.args(kv)...) }
