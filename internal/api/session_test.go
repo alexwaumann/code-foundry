@@ -191,6 +191,20 @@ func TestSessionStageAttachment(t *testing.T) {
 	}
 }
 
+func TestSessionReadAttachment(t *testing.T) {
+	fake, c := newSessionServer(t)
+	res, err := c.ReadAttachment(context.Background(), connect.NewRequest(&v1.ReadAttachmentRequest{Path: "/attachments/1-shot.png"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(res.Msg.GetData()) != "data:/attachments/1-shot.png" || res.Msg.GetMimeType() != "image/png" {
+		t.Errorf("= %q %q", res.Msg.GetData(), res.Msg.GetMimeType())
+	}
+	if calls := fake.Calls(); len(calls) != 1 || calls[0] != "ReadAttachment /attachments/1-shot.png" {
+		t.Errorf("calls = %q", calls)
+	}
+}
+
 func TestSessionWatchSendsSnapshotThenEvents(t *testing.T) {
 	fake, c := newSessionServer(t)
 	fake.Put(session.Session{ID: "s-a", Name: "a", CreatedAt: time.Unix(1, 0)})

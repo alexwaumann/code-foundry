@@ -327,6 +327,9 @@ type Store interface {
 	// path. mimeType must be one of AttachmentTypes; data at most MaxAttachmentBytes.
 	// name is the user's file name, used only in logs.
 	StageAttachment(ctx context.Context, name, mimeType string, data []byte) (string, error)
+	// ReadAttachment returns a staged attachment's content and MIME type (a rendered
+	// thread's user message shows its images). ErrNotFound once reaped.
+	ReadAttachment(ctx context.Context, path string) ([]byte, string, error)
 	// Snapshot returns the current immutable snapshot.
 	Snapshot() *Snapshot
 

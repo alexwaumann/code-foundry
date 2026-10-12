@@ -295,3 +295,49 @@ func TestReapAttachmentsOnTick(t *testing.T) {
 		})
 	}
 }
+
+func TestReadAttachment(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "attachments")
+	e := newEnv(t, func(o *Options) { o.AttachmentsDir = dir })
+	p, err := e.m.StageAttachment(e.ctx(), "a.jpg", "image/jpeg", jpegData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(t.TempDir(), "x.png")
+	if err := os.WriteFile(outside, pngData, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	text := filepath.Join(dir, "notes.txt")
+	if err := os.WriteFile(text, []byte("hello"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, path string
+		want       error
+	}{
+		{"staged", p, nil},
+		{"unclean path", dir + "/./" + filepath.Base(p), nil},
+		{"outside the dir", outside, ErrNotFound},
+		{"escape", dir + "/../" + filepath.Base(outside), ErrNotFound},
+		{"relative", filepath.Base(p), ErrNotFound},
+		{"missing", filepath.Join(dir, "gone.png"), ErrNotFound},
+		{"not an image", text, ErrInvalidArgument},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data, mimeType, err := e.m.ReadAttachment(e.ctx(), tc.path)
+			if tc.want != nil {
+				if !errors.Is(err, tc.want) {
+					t.Fatalf("err = %v, want %v", err, tc.want)
+				}
+				return
+			}
+			if err != nil || mimeType != "image/jpeg" || !bytes.Equal(data, jpegData) {
+				t.Fatalf("= %d bytes, %q, %v", len(data), mimeType, err)
+			}
+		})
+	}
+	off := newEnv(t)
+	if _, _, err := off.m.ReadAttachment(off.ctx(), p); !errors.Is(err, ErrNotFound) {
+		t.Errorf("without an attachments dir: %v", err)
+	}
+}

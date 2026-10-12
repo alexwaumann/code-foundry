@@ -197,6 +197,14 @@ func (f *Fake) StageAttachment(_ context.Context, name, mimeType string, data []
 	return fmt.Sprintf("/attachments/%d-%s", f.staged, name), nil
 }
 
+// ReadAttachment records "ReadAttachment <path>" and returns "data:<path>" as image/png.
+func (f *Fake) ReadAttachment(_ context.Context, path string) ([]byte, string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, "ReadAttachment "+path)
+	return []byte("data:" + path), "image/png", nil
+}
+
 // Fork adds a STARTING session with ParentID set.
 func (f *Fake) Fork(_ context.Context, id, name string) (session.Session, error) {
 	f.mu.Lock()

@@ -283,3 +283,12 @@ func (h *Session) StageAttachment(ctx context.Context, req *connect.Request[v1.S
 	}
 	return connect.NewResponse(&v1.StageAttachmentResponse{Path: path}), nil
 }
+
+// ReadAttachment returns a staged attachment's bytes.
+func (h *Session) ReadAttachment(ctx context.Context, req *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error) {
+	data, mimeType, err := h.store.ReadAttachment(ctx, req.Msg.GetPath())
+	if err != nil {
+		return nil, sessionError(err)
+	}
+	return connect.NewResponse(&v1.ReadAttachmentResponse{Data: data, MimeType: mimeType}), nil
+}

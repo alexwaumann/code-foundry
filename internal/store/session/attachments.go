@@ -99,6 +99,25 @@ func (m *Manager) StageAttachment(_ context.Context, name, mimeType string, data
 	return path, nil
 }
 
+// ReadAttachment returns a staged attachment's content and its sniffed MIME type. The
+// path must be a regular file directly in Options.AttachmentsDir (what StageAttachment
+// returned); a reaped or unknown one is ErrNotFound.
+func (m *Manager) ReadAttachment(_ context.Context, path string) ([]byte, string, error) {
+	paths, err := checkAttachments(m.opts.AttachmentsDir, []string{path})
+	if err != nil {
+		return nil, "", fmt.Errorf("%w: attachment %q", ErrNotFound, path)
+	}
+	data, err := os.ReadFile(paths[0])
+	if err != nil {
+		return nil, "", fmt.Errorf("%w: attachment %q", ErrNotFound, path)
+	}
+	mimeType := http.DetectContentType(data)
+	if AttachmentTypes[mimeType] == "" {
+		return nil, "", fmt.Errorf("%w: attachment %q is %s, not an image", ErrInvalidArgument, path, mimeType)
+	}
+	return data, mimeType, nil
+}
+
 // checkAttachments verifies that every path is a staged attachment: a regular file
 // directly inside dir (after Clean). It returns the cleaned paths.
 func checkAttachments(dir string, paths []string) ([]string, error) {

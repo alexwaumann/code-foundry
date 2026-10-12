@@ -59,6 +59,9 @@ const (
 	// SessionServiceStageAttachmentProcedure is the fully-qualified name of the SessionService's
 	// StageAttachment RPC.
 	SessionServiceStageAttachmentProcedure = "/codefoundry.v1.SessionService/StageAttachment"
+	// SessionServiceReadAttachmentProcedure is the fully-qualified name of the SessionService's
+	// ReadAttachment RPC.
+	SessionServiceReadAttachmentProcedure = "/codefoundry.v1.SessionService/ReadAttachment"
 )
 
 // SessionServiceClient is a client for the codefoundry.v1.SessionService service.
@@ -97,6 +100,10 @@ type SessionServiceClient interface {
 	// Claude reads them with its Read tool. Only image types are accepted, with size
 	// limits; unused staged files are reaped by the daemon.
 	StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error)
+	// ReadAttachment returns a staged attachment's bytes (a rendered thread's user
+	// message shows its images). Only files directly in the attachments directory;
+	// NOT_FOUND once the file was reaped.
+	ReadAttachment(context.Context, *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error)
 }
 
 // NewSessionServiceClient constructs a client for the codefoundry.v1.SessionService service. By
@@ -182,6 +189,12 @@ func NewSessionServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(sessionServiceMethods.ByName("StageAttachment")),
 			connect.WithClientOptions(opts...),
 		),
+		readAttachment: connect.NewClient[v1.ReadAttachmentRequest, v1.ReadAttachmentResponse](
+			httpClient,
+			baseURL+SessionServiceReadAttachmentProcedure,
+			connect.WithSchema(sessionServiceMethods.ByName("ReadAttachment")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -199,6 +212,7 @@ type sessionServiceClient struct {
 	pin             *connect.Client[v1.PinSessionRequest, v1.PinSessionResponse]
 	watch           *connect.Client[v1.WatchSessionsRequest, v1.SessionEvent]
 	stageAttachment *connect.Client[v1.StageAttachmentRequest, v1.StageAttachmentResponse]
+	readAttachment  *connect.Client[v1.ReadAttachmentRequest, v1.ReadAttachmentResponse]
 }
 
 // Create calls codefoundry.v1.SessionService.Create.
@@ -261,6 +275,11 @@ func (c *sessionServiceClient) StageAttachment(ctx context.Context, req *connect
 	return c.stageAttachment.CallUnary(ctx, req)
 }
 
+// ReadAttachment calls codefoundry.v1.SessionService.ReadAttachment.
+func (c *sessionServiceClient) ReadAttachment(ctx context.Context, req *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error) {
+	return c.readAttachment.CallUnary(ctx, req)
+}
+
 // SessionServiceHandler is an implementation of the codefoundry.v1.SessionService service.
 type SessionServiceHandler interface {
 	// Create spawns claude in a worktree and returns the session in STARTING state.
@@ -297,6 +316,10 @@ type SessionServiceHandler interface {
 	// Claude reads them with its Read tool. Only image types are accepted, with size
 	// limits; unused staged files are reaped by the daemon.
 	StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error)
+	// ReadAttachment returns a staged attachment's bytes (a rendered thread's user
+	// message shows its images). Only files directly in the attachments directory;
+	// NOT_FOUND once the file was reaped.
+	ReadAttachment(context.Context, *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error)
 }
 
 // NewSessionServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -378,6 +401,12 @@ func NewSessionServiceHandler(svc SessionServiceHandler, opts ...connect.Handler
 		connect.WithSchema(sessionServiceMethods.ByName("StageAttachment")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sessionServiceReadAttachmentHandler := connect.NewUnaryHandler(
+		SessionServiceReadAttachmentProcedure,
+		svc.ReadAttachment,
+		connect.WithSchema(sessionServiceMethods.ByName("ReadAttachment")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.SessionService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SessionServiceCreateProcedure:
@@ -404,6 +433,8 @@ func NewSessionServiceHandler(svc SessionServiceHandler, opts ...connect.Handler
 			sessionServiceWatchHandler.ServeHTTP(w, r)
 		case SessionServiceStageAttachmentProcedure:
 			sessionServiceStageAttachmentHandler.ServeHTTP(w, r)
+		case SessionServiceReadAttachmentProcedure:
+			sessionServiceReadAttachmentHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -459,4 +490,8 @@ func (UnimplementedSessionServiceHandler) Watch(context.Context, *connect.Reques
 
 func (UnimplementedSessionServiceHandler) StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SessionService.StageAttachment is not implemented"))
+}
+
+func (UnimplementedSessionServiceHandler) ReadAttachment(context.Context, *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SessionService.ReadAttachment is not implemented"))
 }
