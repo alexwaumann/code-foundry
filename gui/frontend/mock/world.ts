@@ -1728,7 +1728,7 @@ export class World {
           name: "session.new",
           title: "New Thread",
           category: "Session",
-          description: "Start Claude Code in a worktree (or a new one), with a first prompt",
+          description: "Start Claude Code in a worktree (or a new one), with a first prompt; render picks terminal or rendered for the thread's life (default: settings sessions.render)",
           keybindings: ["cmd+n"],
           args: [
             { name: "repo", type: ArgType.STRING, required: false, description: "Repository id" },

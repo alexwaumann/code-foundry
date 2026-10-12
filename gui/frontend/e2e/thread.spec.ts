@@ -301,6 +301,20 @@ test("the thread.* commands are offered for a rendered thread", async ({ page })
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Interrupt Thread");
   await expect(page.getByRole("option", { name: /Interrupt Thread/ })).toBeVisible();
+  for (const title of ["Send to Thread", "Answer Thread Request", "Set Thread Effort"]) {
+    await page.getByTestId("palette").getByRole("combobox").fill(title);
+    await expect(page.getByRole("option", { name: new RegExp(title) })).toBeVisible();
+  }
+  await page.keyboard.press("Escape");
+  // A terminal thread has none of them.
+  await row(page, "s:s-2").click();
+  await expect(page.getByTestId("terminal-host")).toBeVisible();
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("Thread");
+  await expect(page.getByRole("option", { name: /New Thread/ })).toBeVisible();
+  for (const title of ["Interrupt Thread", "Send to Thread", "Answer Thread Request", "Set Thread Model"]) {
+    await expect(page.getByRole("option", { name: new RegExp(title) })).toHaveCount(0);
+  }
 });
 
 test("a claude that died before the handshake: its error in the timeline, Reconnect, then Starting Claude…", async ({ page }) => {
