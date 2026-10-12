@@ -3,7 +3,7 @@ import { HeaderActions } from "@/components/terminal/TerminalPane";
 import { SessionIndicator, SessionTitle } from "@/components/session/SessionParts";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useSessionsStore } from "@/stores/sessions";
-import { startThreadWatch, useOpenRequests, useThreadLoaded, useThreadPending, useThreadStore } from "@/stores/thread";
+import { startThreadWatch, useOpenRequests, useThreadEmpty, useThreadLoaded, useThreadPending, useThreadStore } from "@/stores/thread";
 import { ThreadContext } from "./context";
 import { Timeline } from "./Timeline";
 import { ThreadComposer } from "./ThreadComposer";
@@ -42,6 +42,11 @@ export default function ThreadPane({ sessionId }: { sessionId: string }) {
   const status = useSessionsStore((s) => s.byId[sessionId]?.status ?? "unknown");
   const pendingList = useThreadPending(sessionId);
   const loaded = useThreadLoaded(sessionId);
+  const empty = useThreadEmpty(sessionId);
+  const parentName = useSessionsStore((s) => {
+    const parent = s.byId[sessionId]?.parentId;
+    return parent ? s.byId[parent]?.name || parent : "";
+  });
   const watchError = useThreadStore((s) => (s.watch?.sessionId === sessionId && s.watch.status === "retrying" ? s.watch.error : null));
   // The prompts to dock: pending requests minus the ones just answered (their answer is on its way).
   const open = useOpenRequests(sessionId);
@@ -65,6 +70,12 @@ export default function ThreadPane({ sessionId }: { sessionId: string }) {
         <div className="relative flex min-h-0 flex-1 flex-col">
           <SessionIndicator id={sessionId} />
           {!loaded && <p className="absolute inset-x-0 top-10 text-center text-sm text-muted-foreground">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
+          {/* Connected with nothing to show: a fork's history is Claude's, not ours (its items start empty). */}
+          {empty && state === "connected" && !working && (
+            <p className="absolute inset-x-0 top-10 px-10 text-center text-sm text-muted-foreground" data-testid="thread-empty">
+              {parentName ? `Forked from ${parentName}. Claude has the conversation so far; send a follow-up to continue.` : "No messages yet."}
+            </p>
+          )}
           <Timeline key={sessionId} sessionId={sessionId} working={working} bottomInset={dockHeight} />
           <div className="dock" ref={dockRef}>
             <ThreadComposer key={sessionId} sessionId={sessionId} pending={open} busy={busy} />

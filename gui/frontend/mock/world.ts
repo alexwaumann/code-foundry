@@ -23,7 +23,7 @@ import { MockSettings, MODEL_VALUES } from "./settings";
 import { MockUpdater } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { claudeIntro, claudeTick, ENTER_ALT, prompt, RESET, topFrame } from "./screens";
-import { MockThreads, type ThreadState } from "./thread";
+import { CRASH_STDERR, MockThreads, type ThreadState } from "./thread";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -69,6 +69,8 @@ interface MockSession {
   disconnectReason: string;
   /** Why the last start or run failed (stderr's last line); "" when nothing did. */
   lastError: string;
+  /** session.fork: the session this one was forked from. */
+  parentId: string;
   permissionMode: PermissionMode;
   baseRef: string;
   createdWorktree: boolean;
@@ -731,6 +733,7 @@ export class World {
       exitCode: 0,
       disconnectReason: "",
       lastError: "",
+      parentId: "",
       permissionMode: PermissionMode.AUTO,
       baseRef: "",
       createdWorktree: false,
@@ -783,6 +786,7 @@ export class World {
       exitCode: s.exitCode,
       disconnectReason: s.disconnectReason,
       lastError: s.lastError,
+      parentId: s.parentId,
       permissionMode: s.permissionMode,
       baseRef: s.baseRef,
       createdWorktree: s.createdWorktree,
@@ -913,6 +917,12 @@ export class World {
       createdAt: new Date(Date.now() - 10 * 60_000),
     });
     this.threads.load(id, state);
+    if (state === "closed") this.disconnectSession(id, "closed", 0);
+    if (state === "crashed") {
+      // Before the handshake: no turn ran, so no status to keep.
+      s.lastError = CRASH_STDERR;
+      this.disconnectSession(id, "crashed", 1, SessionStatus.UNSPECIFIED);
+    }
     this.publishSession(s);
     return s;
   }
@@ -950,6 +960,7 @@ export class World {
     s.settleIn = 2;
     s.disconnectReason = "";
     s.exitCode = 0;
+    s.lastError = "";
     s.lastActivityAt = new Date();
     this.publishSession(s);
   }
@@ -1758,7 +1769,7 @@ export class World {
           const s = activeSession(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
           // A fork keeps its parent's view (the daemon's rule: a thread's view never changes).
-          const f = this.createSession(s.repoId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, render: s.render });
+          const f = this.createSession(s.repoId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, render: s.render, parentId: s.id });
           this.focusSession(f.id);
           return `Forked ${s.name || s.id}`;
         },

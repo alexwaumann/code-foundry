@@ -514,10 +514,11 @@ const FooterRow = memo(function FooterRow({ row }: { row: Extract<TimelineRow, {
   );
 });
 
-/** "Working 3m 52s" while the turn runs (since its user message). */
+/** "Working 3m 52s" while the turn runs (since its user message); "Starting Claude…" until Claude is up. */
 function WorkingRow({ since }: { since: string }) {
   const { sessionId } = useThreadCtx();
   const start = useThreadStore((s) => s.logs[sessionId]?.byId[since]?.createdAtMs ?? null);
+  const starting = useSessionsStore((s) => s.byId[sessionId]?.state === "starting");
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => {
@@ -529,10 +530,10 @@ function WorkingRow({ since }: { since: string }) {
   }, []);
   const took = start !== null ? formatDuration(Math.max(0, now - start)) : "";
   return (
-    <div className="working" data-testid="thread-working">
+    <div className="working" data-testid="thread-working" data-starting={starting || undefined}>
       <LoaderCircle className="animate-spin" aria-hidden />
-      <span className="shimmer">Working</span>
-      {took && <span className="tabular-nums">{took.replace(/\.\ds$/, "s")}</span>}
+      <span className="shimmer">{starting ? "Starting Claude…" : "Working"}</span>
+      {!starting && took && <span className="tabular-nums">{took.replace(/\.\ds$/, "s")}</span>}
     </div>
   );
 }

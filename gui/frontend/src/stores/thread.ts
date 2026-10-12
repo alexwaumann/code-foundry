@@ -342,6 +342,11 @@ export function useThreadLoaded(sessionId: string): boolean {
   return useThreadStore((s) => sessionId in s.logs);
 }
 
+/** The thread's log arrived and has no items (a fork, a thread started without a prompt, one still starting). */
+export function useThreadEmpty(sessionId: string): boolean {
+  return useThreadStore((s) => s.logs[sessionId]?.order.length === 0);
+}
+
 /** The thread's pending requests: the Watch's when it has the thread, else the EventService's. */
 export function useThreadPending(sessionId: string): readonly ThreadPendingView[] {
   return useThreadStore((s) => s.logs[sessionId]?.pending ?? s.pending[sessionId]?.pending ?? NO_PENDING);

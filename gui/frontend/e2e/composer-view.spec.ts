@@ -62,6 +62,8 @@ test("Enter starts the thread in the picked view: rendered opens the thread pane
 
   await expect(page.getByTestId("thread-pane")).toBeVisible();
   await expect(page.getByTestId("composer")).toHaveCount(0);
+  // No items until Claude is up: the timeline says it is starting.
+  await expect(page.getByTestId("thread-working")).toHaveText("Starting Claude…");
   expect(await lastNew()).toMatchObject({ repo: "repo-cf", prompt: "Summarize the README", render: "rendered" });
   // The header says how the thread runs; the first message goes out once Claude is up.
   await expect(page.getByTestId("session-render")).toHaveText("rendered");

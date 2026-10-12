@@ -11,7 +11,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-type State = "permission" | "question" | "streaming" | "idle";
+type State = "permission" | "question" | "streaming" | "idle" | "closed" | "crashed";
 
 async function openThread(page: Page, state: State, scheme: "dark" | "light" = "dark"): Promise<void> {
   await page.emulateMedia({ colorScheme: scheme });
@@ -301,4 +301,45 @@ test("the thread.* commands are offered for a rendered thread", async ({ page })
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Interrupt Thread");
   await expect(page.getByRole("option", { name: /Interrupt Thread/ })).toBeVisible();
+});
+
+test("a claude that died before the handshake: its error in the timeline, Reconnect, then Starting Claude…", async ({ page }) => {
+  await openThread(page, "crashed");
+  await expect(pane(page).getByTestId("thread-error")).toHaveText("Claude exited (code 1) before answering the initialize handshake: error: unknown option '--bogus'");
+  const bar = page.getByTestId("thread-disconnected");
+  await expect(bar).toContainText("Not connected · crashed (exit code 1)");
+  await expect(page.getByTestId("thread-composer")).toHaveCount(0);
+  await shot(page, "crashed");
+  await bar.getByRole("button", { name: "Reconnect" }).click();
+  // Until Claude answers the handshake the timeline says so (no elapsed time: no turn yet).
+  const starting = page.getByTestId("thread-working");
+  await expect(starting).toHaveText("Starting Claude…");
+  await expect(starting).toHaveAttribute("data-starting", "true");
+  await shot(page, "starting");
+  await expect(page.getByTestId("thread-composer")).toBeVisible();
+  await expect(starting).toHaveCount(0, { timeout: 5000 });
+  await expect(pane(page).getByTestId("thread-error")).toBeVisible();
+});
+
+test("a closed thread keeps its conversation above the Reconnect bar", async ({ page }) => {
+  await openThread(page, "closed");
+  await expect(page.getByTestId("thread-disconnected")).toContainText("Not connected · closed. Reconnect to continue the conversation.");
+  await expect(footers(page).last()).toContainText("Sonnet 5");
+  await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("All 412 tests pass and the branch is pushed");
+  await expect(page.getByTestId("thread-working")).toHaveCount(0);
+  await expect(page.getByTestId("thread-empty")).toHaveCount(0);
+});
+
+test("a fork of a rendered thread is rendered and starts empty, naming its parent", async ({ page }) => {
+  await openThread(page, "idle");
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("Fork Thread");
+  await page.keyboard.press("Enter");
+  const fork = page.locator('[data-row-kind="session"][aria-selected="true"]');
+  await expect(fork).not.toHaveAttribute("data-row-key", "s:s-r1");
+  await expect(page.getByTestId("thread-pane")).toBeVisible();
+  await expect(page.getByTestId("session-render")).toHaveText("rendered");
+  await expect(page.getByTestId("thread-working")).toHaveText("Starting Claude…");
+  await expect(page.getByTestId("thread-empty")).toHaveText("Forked from Fix stale PR badge. Claude has the conversation so far; send a follow-up to continue.", { timeout: 5000 });
+  await shot(page, "fork-empty");
 });

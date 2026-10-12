@@ -72,8 +72,16 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
   "base64",
 );
 
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent"];
+/**
+ * The scripted conversation's states. closed: idle's conversation, the thread
+ * disconnected (closed); crashed: Claude exited before answering the handshake (an error
+ * item, nothing else; mock/world.ts disconnects the thread).
+ */
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "closed" | "crashed";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "closed", "crashed"];
+
+/** The stderr line of the "crashed" state's claude (Session.last_error). */
+export const CRASH_STDERR = "error: unknown option '--bogus'";
 
 const ANSWER_HEAD = `## Fixed: stale badge after a force-push
 
@@ -483,7 +491,7 @@ export class MockThreads {
   }
 
   /** (Re)builds the scripted conversation in `state` (the sketch's three states, or idle: both turns done). */
-  load(id: string, state: ThreadState): void {
+  load(id: string, loaded: ThreadState): void {
     // A scripted reply still running for the previous conversation stops.
     this.generation++;
     this.logs.delete(id);
@@ -494,6 +502,13 @@ export class MockThreads {
       l.items.push(x);
       return x;
     };
+    if (loaded === "crashed") {
+      // The daemon's item for a claude that exited before the initialize handshake.
+      it({ case: "error", value: { text: `Claude exited (code 1) before answering the initialize handshake: ${CRASH_STDERR}` } }, { at: ago(0, -2) });
+      l.seq = l.items.length;
+      return;
+    }
+    const state = loaded === "closed" ? "idle" : loaded;
     const tool = (name: string, input: object, value: { output?: string; isError?: boolean; resultJson?: string; status?: ToolCallStatus }, over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
       const toolUseId = `toolu_${name.toLowerCase()}_${String(l.nextOrdinal)}`;
       // A tool call's item id is its tool_use id, like the daemon's.
