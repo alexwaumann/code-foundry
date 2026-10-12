@@ -113,6 +113,7 @@ func Run(ctx context.Context, opts Options) error {
 	repoAPI := api.NewRepo(st.repo, events).WithGitHub(st.gh, st.cloner).WithProjects(st.projects, st.gh)
 	terminalAPI := api.NewTerminal(st.terminal)
 	sessionAPI := api.NewSession(st.session, events)
+	threadAPI := api.NewThread(st.session, events)
 	gitopsAPI := api.NewGitOps(st.gitops, events, ctx.Done())
 	ghAPI := api.NewGh(st.gh, events, ctx.Done())
 	settingsAPI := api.NewSettings(st.settings)
@@ -147,6 +148,7 @@ func Run(ctx context.Context, opts Options) error {
 			return ok && !r.Git
 		},
 		Session: sessionAPI,
+		Thread:  threadAPI,
 		GitOps: command.GitOpsDeps{
 			Backend:    gitopsAPI,
 			GitHubSlug: func(c command.Context) string { return st.gitops.GitHubSlug(c.ActiveRepoID, c.ActiveWorktreePath) },
@@ -170,6 +172,7 @@ func Run(ctx context.Context, opts Options) error {
 		api.NewUI(events).Route(),
 		terminalAPI.Route(),
 		sessionAPI.Route(),
+		threadAPI.Route(),
 		repoAPI.Route(),
 		ghAPI.Route(),
 		gitopsAPI.Route(),
