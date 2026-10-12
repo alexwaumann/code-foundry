@@ -206,10 +206,26 @@ export function applyWatchBatch(sessionId: string, events: readonly ThreadEventV
 export const WATCH_BATCH_MS = 16;
 
 /**
+ * Logs kept for threads no longer watched, most recent first: switching back shows them at
+ * once (the Watch's snapshot then replaces them). Older ones are dropped, so memory stays
+ * bounded however many threads are opened (a log holds every item, tool output included).
+ */
+export const KEPT_LOGS = 4;
+let recentlyWatched: string[] = [];
+
+function keepRecent(sessionId: string): void {
+  recentlyWatched = [sessionId, ...recentlyWatched.filter((id) => id !== sessionId)];
+  const drop = new Set(recentlyWatched.slice(KEPT_LOGS));
+  recentlyWatched = recentlyWatched.slice(0, KEPT_LOGS);
+  if (drop.size > 0) pruneThreadLogs((id) => !drop.has(id));
+}
+
+/**
  * Opens the Watch for a thread (the visible rendered thread; one at a time) and keeps it
  * open, reconnecting with backoff, until the returned function is called.
  */
 export function startThreadWatch(sessionId: string): () => void {
+  keepRecent(sessionId);
   let queue: ThreadEventView[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
   const flush = () => {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadEventView, ThreadItemView, ThreadPendingView } from "@/api/thread";
-import { applyPendingEvent, applyThreadEvent, applyThreadEvents, sameItem, startThreadWatch, useThreadStore, WATCH_BATCH_MS, type ThreadLog } from "./thread";
+import { applyPendingEvent, applyThreadEvent, applyThreadEvents, KEPT_LOGS, sameItem, startThreadWatch, useThreadStore, WATCH_BATCH_MS, type ThreadLog } from "./thread";
 
 const watched = vi.hoisted(() => ({ events: [] as unknown[], opened: 0 }));
 vi.mock("@/api/thread", async (orig) => ({
@@ -192,5 +192,22 @@ describe("startThreadWatch", () => {
     unsub();
     expect(useThreadStore.getState().watch).toBeNull();
     expect(watched.opened).toBe(1);
+  });
+
+  it("keeps the logs of the last KEPT_LOGS watched threads only", async () => {
+    const ids = Array.from({ length: KEPT_LOGS + 2 }, (_, i) => `t${String(i)}`);
+    for (const id of ids) {
+      watched.events = [{ ...snapshot(1, [text("a", 1)]), sessionId: id }];
+      const stop = startThreadWatch(id);
+      await vi.advanceTimersByTimeAsync(WATCH_BATCH_MS);
+      stop();
+    }
+    expect(Object.keys(useThreadStore.getState().logs).sort()).toEqual(ids.slice(-KEPT_LOGS).sort());
+    // Watching an old one again moves it to the front.
+    const stop = startThreadWatch(ids[ids.length - KEPT_LOGS] ?? "");
+    stop();
+    watched.events = [];
+    startThreadWatch("new")();
+    expect(Object.keys(useThreadStore.getState().logs)).toContain(ids[ids.length - KEPT_LOGS]);
   });
 });
