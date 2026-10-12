@@ -59,13 +59,13 @@ re-download if missing).
 ## 3. Decisions (Alex, 2026-10-11)
 
 1. Pure Go driver in the daemon (`internal/claudestream`), no Node.
-2. Opt-in: setting `sessions.render` = `terminal` (default) | `rendered`, plus a per-thread
-   toggle in the composer. The mode is a field on the session row. An existing thread
-   changes mode only through Reconnect (disconnected threads).
+2. Opt-in: setting `sessions.render` = `terminal` (default) | `rendered` is the composer's
+   default for **new threads only**, with a per-thread toggle in the composer. The mode is
+   a field on the session row, fixed for the thread's life: **a thread is never switched**
+   between modes (Alex, 2026-10-11). Reconnect and fork keep the row's mode.
 3. **History lives in our own SQLite `thread_items` table**, appended from the stream
    (the transcript is a parent-uuid tree with sidechain/meta records, huge lines, and the
-   projected prompt instead of the composer's tags; not a render source). A thread
-   switched from terminal to rendered starts its items at the switch with a divider item.
+   projected prompt instead of the composer's tags; not a render source).
 4. Images are sent as real base64 image blocks plus the staged path line (today's
    terminal threads only pass paths).
 5. Tool rendering: T3-style compact grouped rows that expand, inline diffs for Edit/Write
@@ -95,8 +95,8 @@ re-download if missing).
   tags / attachments / pickers, mock daemon.
 * **PR 3 (interaction)**: permission prompts (allow, allow for session, deny, interrupt),
   AskUserQuestion panel, live model and mode switching, effort restart.
-* **PR 4 (opt-in + polish)**: composer toggle + setting, Reconnect in either mode,
-  Playwright specs, screenshots, docs.
+* **PR 4 (opt-in + polish)**: composer toggle + setting, Playwright specs, screenshots,
+  docs.
 
 ## 5. T3 Code reference (MIT, checkout `/tmp/t3code-ref/t3code`)
 
