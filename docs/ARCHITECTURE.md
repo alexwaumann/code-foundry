@@ -136,7 +136,9 @@ Services (v1):
   allow for session, deny with a reason, answers), Interrupt, SetModel,
   SetPermissionMode, SetEffort (Claude has no live effort switch: the runner restarts
   the process with `--resume` and the new `--effort`, at once when idle, else when the
-  running turn ends, `Session.effort_pending` meanwhile; the thread stays connected).
+  running turn ends, `Session.effort_pending` meanwhile; the thread stays connected; the
+  new process gets the session's allow-for-session grants again as `--allowedTools` /
+  `--add-dir`).
   Refuses terminal threads (`docs/notes/rendered-threads-1-daemon.md`,
   `docs/notes/rendered-threads-3-interaction.md`).
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
