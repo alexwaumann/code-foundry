@@ -584,3 +584,38 @@ func firstLine(s string) string {
 	s, _, _ = strings.Cut(s, "\n")
 	return s
 }
+
+func TestRenderedFirstPromptWithImage(t *testing.T) {
+	dir := t.TempDir()
+	re := &renderedEnv{log: filepath.Join(dir, "stdin.log"), argv: filepath.Join(dir, "argv.json")}
+	re.mutate = func(o *Options) {
+		o.Claude = os.Args[0]
+		o.Env = []string{fakeClaudeEnv + "=" + fixturePath("image"), "CF_FAKE_CLAUDE_LOG=" + re.log, "CF_FAKE_CLAUDE_ARGV=" + re.argv}
+		o.DisablePreTrust = true
+		o.AttachmentsDir = filepath.Join(dir, "attachments")
+	}
+	re.env = newEnv(t, re.mutate)
+	// A 1x1 PNG.
+	png := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\xcf\xc0\x00\x00\x03\x01\x01\x00\xc9\xfe\x92\xef\x00\x00\x00\x00IEND\xaeB`\x82")
+	path, err := re.m.StageAttachment(re.ctx(), "red.png", "image/png", png)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := re.create(CreateOptions{Render: RenderRendered, InitialPrompt: "What color?", Attachments: []string{path}})
+	user := re.waitSent("the prompt", func(m map[string]any) bool { return m["type"] == "user" })
+	content := user["message"].(map[string]any)["content"].([]any)
+	if len(content) != 2 {
+		t.Fatalf("content %v", content)
+	}
+	if text := content[0].(map[string]any)["text"]; text != "What color?\n\nAttached image: "+path {
+		t.Errorf("text block %q", text)
+	}
+	src := content[1].(map[string]any)["source"].(map[string]any)
+	if content[1].(map[string]any)["type"] != "image" || src["media_type"] != "image/png" || src["type"] != "base64" || src["data"] == "" {
+		t.Errorf("image block %v", content[1])
+	}
+	items := re.waitItems(s.ID, "turn end", hasTurnEnd)
+	if items[0].Text != "What color?" || !slices.Equal(items[0].Attachments, []string{path}) {
+		t.Errorf("user item %+v", items[0])
+	}
+}

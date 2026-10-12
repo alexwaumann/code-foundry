@@ -567,6 +567,7 @@ func (r *runner) stopStream() {
 	closeUnfinished(st.proj.w, "the daemon stopped")
 	r.stopStreamTimers()
 	st.conn.Close()
+	r.log().info("session disconnected", "reason", ReasonDaemonStopped)
 	r.finish(func(s *Session) {
 		s.State, s.DisconnectReason, s.TerminalID = StateDisconnected, ReasonDaemonStopped, ""
 	})
