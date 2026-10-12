@@ -40,6 +40,8 @@ numbered 1/2/3, one Interrupt, the composer's). Earlier PRs: `rendered-threads-1
   stop (§3b); Claude stops on its own after the plain rejection and carries on after a reason.
 * **Skip (AskUserQuestion)** is a deny: Claude Code's TUI renders its own Esc on the
   question as "User declined to answer questions". Live, haiku carried on without asking again.
+  (Review: the question text above was not the binary's; a skip now sends the plain
+  rejection. See "Review" below.)
 * **Claude's own mode switches are recorded** (`stream.go onModeChange`): `system/status`
   with `permissionMode` updates the row's mode. Seen live: "Allow for session" on a Write
   applies Claude's `setMode acceptEdits` suggestion, and the picker now says Accept edits.
@@ -166,3 +168,127 @@ change fails with a toast.
   the PR 2 subtraction caveat still applies.
 * A prompt from a subagent shows a "subagent" chip only; which Agent asked is not linked.
 * No queue UI for sends during a busy turn (decision 6), unchanged.
+
+## Review (independent, 2026-10-12)
+
+Read the diff against main, the handoff, PR 1/2 notes and the 2.1.296 binary's strings;
+fixed what follows (commits `a31136c`, `1cc5ce3`, the set-effort message, this note).
+
+### Fixed
+
+* **The question deny text was not Claude Code's.** "The user declined to answer the
+  questions." is not in the 2.1.296 binary. "User declined to answer questions" is only
+  the TUI's *rendering* of a rejected AskUserQuestion (its rejected-message component);
+  the TUI's Esc rejects the tool use like any other, so Claude reads the generic
+  rejection. `denyMessage(reason)` now uses the same two texts for permissions and
+  questions (`rejectStop`, or `rejectWithReason` + the reason; both verified verbatim in
+  the binary). Consequence: a skipped question makes Claude STOP and wait, as in the TUI
+  (the builder saw haiku carry on with the invented text). The other binary string,
+  "The user did not answer the questions.", is the tool result of an *allow* with no
+  answers, not of a skip.
+* **Allow-for-session grants were lost by an effort restart.** Claude keeps session
+  rules and directories in process memory; `--resume` does not bring them back, so after
+  an effort change the same command prompted again. The runner now records the
+  suggestions of every allow-for-session answer (`grants`: `addRules`/`replaceRules`
+  allow → `--allowedTools`, deny → `--disallowedTools`, `addDirectories` → `--add-dir`;
+  `setMode` needs nothing, the row follows the mode) and the respawn passes them. One
+  `--allowedTools` followed by the rules (the CLI's variadic form). Checked with the real
+  CLI: `claude -p --permission-mode manual --allowedTools "Bash(mkdir -p sub)" "Bash(touch
+  sub/a.txt)"` ran both commands without a denial (without the flag: 1 denial), so a
+  rule with spaces in its parentheses parses. Live through the daemon: allow for session
+  on `mkdir -p rvw/a`, set-effort medium, respawn argv `… --permission-mode acceptEdits
+  --add-dir …/rvw --allowedTools Bash(mkdir -p rvw/a)`, the repeat ran without a prompt
+  (that suggestion's rule was `localSettings`, which Claude also writes to disk, so the
+  live repeat alone does not prove the flag; the CLI check above does).
+* **Interrupt / SetModel / SetPermissionMode during the restart gap** went to the old
+  Conn (stdin closed: an opaque write error) or to the new one before its handshake (a
+  model or mode change could be lost). `streamState.connection()` now refuses them with
+  FailedPrecondition "Claude is restarting for an effort change; try again in a moment"
+  while `swapping` (set under `connMu` from the restart's start to the handshake, cleared
+  on close/failure). Respond in the gap finds nothing (NotFound), as before.
+* **A held send whose caller gave up** (its ctx done: the RPC timed out or the client
+  went away) was still delivered after the restart, so a GUI retry would duplicate it.
+  `threadCmd.ctx` is now carried and checked when the held sends go out.
+* **Answering a request Claude withdrew.** If the respond won the race with the cancel
+  event, the item was marked allowed/denied though Claude had withdrawn it. `respond` now
+  checks `req.Answer`'s `ErrCancelled`: the item becomes "withdrawn by Claude" and the
+  call is NotFound. GUI: `respondThread` treats NotFound as expected (`runCommandForResult`
+  `expected`): no error toast, a plain "Claude no longer needs that answer" notice (one
+  per request id), and the prompt stays gone instead of coming back.
+* **`onInitialized` after a close** (the handshake answered while closing) set
+  `r.state = StateConnected`; it now returns early.
+* **The respawn** dropped stale `st.pending` / `sd.pending` from the old process.
+* **Keyboard.** While the deny reason is open, 1/2 from the empty editor (or the prompt)
+  no longer allow; 3 returns to the field; Escape on the prompt cancels the reason.
+  Enter/Space on a focused action button (Back, Skip, Cancel, Show the change) is the
+  button's own: before, Enter on a focused Skip submitted the question (or did nothing,
+  its click prevented). Prompts are `role="group"` with an aria-label.
+* **`thread.set-effort`'s message** said "after this turn" for a finished-but-unseen
+  thread (needs attention "finished"), which restarts at once. `onTurn` (table test):
+  busy, or needs attention for a permission or question.
+* Mock: `CommandError` moved to `mock/errors.ts` (thread.ts throws it without an import
+  cycle); a missing request is NotFound like the daemon's; `fail-respond?withdrawn=1`;
+  `POST /__mock/thread/stream?text=` starts a streaming text item (re-renders while a
+  prompt is open).
+
+### Checked, no change
+
+* **Restart races** (table test `TestRenderedSetEffortGap`, the fake lingering 400 ms
+  after stdin closes so every call lands in the gap): a held send reaches the new process
+  exactly once and never the old one (per-pid stdin logs, `CF_FAKE_CLAUDE_LOG.<pid>`);
+  a send given up on is not delivered nor in the timeline; interrupt/model/mode refused,
+  respond NotFound, nothing recorded; close fails the held send, row closed with the new
+  effort; daemon shutdown fails the held send, the reopened daemon shows daemon-stopped
+  with `effort` new and `effort_pending` false, Reconnect spawns `--resume … --effort
+  high`; the new process crashing (`CF_FAKE_CLAUDE_RESUME_EXIT=3`) fails the held send,
+  disconnects "crashed" with exit 3, its stderr as `LastError`, an error item "…before
+  answering the initialize handshake", no "Set effort" note.
+* **Persistence across a daemon restart** is deterministic: `Effort` is written at
+  SetEffort, `EffortPending` is never persisted and `finish` clears it, so a change that
+  had not restarted Claude yet is applied by the next spawn (Reconnect or fork; Fork
+  builds a fresh row from the parent's `Effort`). Documented in `effort.go`.
+* **Respawn argv** (`TestRenderedSetEffortRespawnArgv`): identical to the first spawn's
+  except `--session-id` → `--resume <same id>`, `--effort`, and the grants; no `--`, no
+  positional prompt. Model and mode come from the row, which follows SetModel /
+  SetPermissionMode / Claude's own mode switches.
+* **Transcript and `/clear` tracking** follow the new process: `r.pid()` reads
+  `st.proc` (replaced on the run goroutine), the tailer keeps the resumed id (and
+  `pidSessionID` would follow a changed one).
+* **Mode tracking**: `system/status` frames carry `permissionMode` only on a change (none
+  in the fixtures' status frames), so a "Claude's default" row is not rewritten by routine
+  frames. SetPermissionMode still refuses anything but supervised/accept-edits/auto.
+* **Answers format**: question text → label, multi-select labels in option order then
+  Other's trimmed text, joined ", " (sdk-tools.d.ts `answers: {[question]: string}`);
+  the daemon only checks each question has a non-blank answer and passes the map as
+  `updatedInput.answers`. Empty submit is disabled (and Enter is a no-op) until each page
+  has an answer; Other alone with blank text is no answer.
+* **Keyboard routing**: the global handler skips editable targets and the palette, and a
+  bare-key chord only fires inside `[data-region="content"]` outside `[data-keys-local]`
+  (popovers are portaled out of the pane), so Escape is never handled twice; the editor's
+  capture handler only takes keys whose target is the contenteditable while it is empty.
+  Terminal threads: the guard is false (not rendered) and xterm's own branch never yields
+  a bare Escape, so nothing changed for them; the sidebar/bell e2e still passes.
+* **Paging state** lives in `QuestionPrompt` keyed by request id; e2e streams a reply into
+  the timeline while page 2 is open and checks the page and both picks survive.
+
+### Not fixed
+
+* A failed answer brings the prompt back with fresh state (a question's picks are lost);
+  rare, and the remount is the simple way to show the restored prompt.
+* `answering` keeps answered request ids for the window's life (a few strings per answer;
+  ids are unique UUIDs, so nothing reappears hidden).
+* The ErrCancelled branch of `respond` (the respond handled before the cancel event) is
+  not reachable deterministically with the fake; the outward behaviour (NotFound, item
+  withdrawn) is tested through an interrupt (`TestRenderedRespondToWithdrawnRequest`; the
+  fake now withdraws on `interrupt` like Claude).
+* A background Agent that keeps running holds an effort change off until it ends
+  (documented by the builder); no timeout.
+
+### Verification
+
+`make check` green (Go `-race`, vitest 1824 + the new `threadActions.test.ts`), `make
+gui-e2e` green, `e2e/thread-prompts.spec.ts` 2 repeats on both engines with three new
+tests (withdrawn answer, fields keep their keys + Enter on Skip + open reason ignores
+1/2, paging across streaming). Screenshots (mock, WebKit) in `/tmp/cf-rt3-shots/review-*`
+(`permission`, `deny-reason`, `question`, `question-multi`, dark and light, each with a
+`-card` crop). Daemon restart needed (respond, restart and command changes).
