@@ -286,8 +286,8 @@ fixed what follows (commits `a31136c`, `1cc5ce3`, the set-effort message, this n
 
 ### Verification
 
-`make check` green (Go `-race`, vitest 1824 + the new `threadActions.test.ts`), `make
-gui-e2e` green, `e2e/thread-prompts.spec.ts` 2 repeats on both engines with three new
+`make check` green (Go `-race`, vitest 1824 including the new `threadActions.test.ts`), `make
+gui-e2e` green (582 passed, 24 skipped), `e2e/thread-prompts.spec.ts` 2 repeats on both engines with three new
 tests (withdrawn answer, fields keep their keys + Enter on Skip + open reason ignores
 1/2, paging across streaming). Screenshots (mock, WebKit) in `/tmp/cf-rt3-shots/review-*`
 (`permission`, `deny-reason`, `question`, `question-multi`, dark and light, each with a
