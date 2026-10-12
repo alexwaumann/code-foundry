@@ -37,12 +37,12 @@ export function modelName(choices: readonly Choice[], model: string): string {
   return choices.find((c) => c.value === model)?.label ?? model;
 }
 
-const CANONICAL = /^claude-(fable|opus|sonnet|haiku)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?(?:\[[^\]]*\])?$/;
+const CANONICAL = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?(?:\[[^\]]*\])?$/;
 
 /**
  * The name of a model as Claude reports it (a turn's replies: "claude-haiku-5-5",
- * "claude-opus-4-8[1m]"): the registry's label for that id, else the family and version
- * read from it ("Haiku 5.5"), else the id itself.
+ * "claude-opus-4-8[1m]"): the registry's label for that id, else the registry's label for
+ * its family alias with the version read from the id ("Haiku" + "5.5"), else the id itself.
  */
 export function canonicalModelName(choices: readonly Choice[], id: string): string {
   const known = choices.find((c) => c.value === id);

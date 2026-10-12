@@ -73,6 +73,9 @@ describe("canonicalModelName", () => {
     ["claude-opus-4-8[1m]", "Opus 4.8"],
     ["claude-sonnet-4-6-20260101", "Sonnet 4.6"],
     ["claude-fable-5-1", "Fable 5.1"],
+    ["claude-haiku-5-5-20261001[1m]", "Haiku 5.5"],
+    ["claude-quill-6", "Quill 6"],
+    ["claude-3-5-sonnet-20241022", "claude-3-5-sonnet-20241022"],
     ["gpt-5", "gpt-5"],
     ["", ""],
   ])("%s → %s", (id, want) => {

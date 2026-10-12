@@ -31,10 +31,11 @@ thread's view is fixed for life, no plan mode).
   and its terminal shows itself). Sidebar rows and the Projects page are unchanged.
 * **Per-turn cost and model on `turn_end`** (daemon). `TurnEndItem.turn_cost_usd` (optional,
   14) and `model` (15). See "Cost per turn" below. The footer uses them ("… · $0.02 · Haiku
-  5.5"); a turn without them (recorded by an older daemon) falls back to the old subtraction
-  and the thread's current model. `lib/models.ts canonicalModelName` turns Claude's id into a
-  name (registry label if pinned there, else "Haiku 5.5" read from `claude-haiku-5-5`, `[1m]`
-  and date suffixes dropped). `thread items` prints "$X, $Y so far, <model>".
+  5.5", "<$0.01" under a cent); a turn without them (the daemon could not tell, no reply, an
+  older daemon) shows neither (review: no fallback to the subtraction or the thread's
+  current model). `lib/models.ts canonicalModelName` turns Claude's id into a name
+  (registry label if pinned there, else the registry's family label with the version read
+  from the id, "Haiku 5.5" from `claude-haiku-5-5`; `[1m]` and date suffixes dropped). `thread items` prints "$X, $Y so far, <model>".
 * **Which subagent asked.** A permission or question with `agent_id` shows a chip
   "general-purpose · Write the changelog entry" (the Agent call's `subagent_type` and
   `description`) instead of "subagent": the request's tool call (item id = tool_use id) →
@@ -64,25 +65,33 @@ thread's view is fixed for life, no plan mode).
 ## Cost per turn
 
 Claude's `result` has only running totals for its process: `total_cost_usd` and
-`modelUsage` (per model, subagents included); `usage` is the turn's own (top level only).
-`turnCosts` (`internal/store/session/turncost.go`) gives each turn the difference from the
-previous result of the same process. Across a restart (effort change: `projector.restart`;
-Reconnect or daemon restart: a new projector seeded from the log's last turn end) it depends
-on Claude:
+`modelUsage` (per model, subagents and the title call included); `usage` is the turn's own
+(top level only). `turnCosts` (`internal/store/session/turncost.go`) gives each turn the
+difference from the previous result of the same process. A process's first result is
+measured from what the process started with (review rewrite, probed 2.1.296 on haiku):
 
-* Probed (2.1.296, haiku): `--resume` of the conversation Claude last ran in that folder
-  **restores** the totals and keeps adding (0.00272 → 0.00306 with `outputTokens` 85 → 90),
-  which is the "seen growing across an effort restart" of PR 3. Otherwise (a fork, another
-  conversation ran there since) they start from zero.
-* So the first result after a restart is "restored" when its process output tokens are at
-  least the previous process's plus this turn's own (`ProcessOutputTokens`, stored on the
-  turn end, not in the proto); otherwise fresh. Only a first turn whose subagents wrote more
-  than the whole previous process could be misread. Without `modelUsage`, the total decides.
-* A result with no total (an interrupt can report 0) costs 0 and moves nothing: its spend
-  shows in the next turn's. A total going down within a process restarts the count.
+* A process writes a `cost-state` record (`totalCostUSD`, `modelUsage`, ...) to its
+  transcript when it exits cleanly; a killed one writes none.
+* `--resume` (an effort restart, a Reconnect, a daemon restart) restores the totals of the
+  resumed transcript's **last** `cost-state` and keeps adding: after a kill that is an
+  older record than the thread's last turn end. `--resume --fork-session` restores the
+  **parent's** too (a fork's first turn is not cheap).
+* So at spawn the daemon reads that record (`restoredTotals`: zero for a new conversation
+  or a transcript without one; not known when the transcript cannot be read) and measures
+  the first turn from it. When the result does not fit (total or process output tokens
+  below the record's; the record says zero yet the totals continue the previous process's;
+  nothing could be read), the turn's cost is unknown (unset), never a guess.
+* A result with no total (an interrupt can report 0) is unknown and moves nothing: its
+  spend shows in the next turn's. A total going down within a process is unknown and the
+  next turn is measured from it. A known cost is always between 0 and the result's total.
 
-Live (scratch daemon): first turn $0.0016; effort restart then a turn $0.0020 ($0.0036 so
-far, restored); close + reconnect then a turn $0.0006 ($0.0042 so far, restored).
+The builder's first version guessed restored vs fresh from output tokens against the
+previous process's. Probed: a fork got its parent's whole cost as its first turn's, and a
+resume after a killed process the whole conversation's.
+
+Live (scratch daemon, builder): first turn $0.0016; effort restart then a turn $0.0020
+($0.0036 so far, restored); close + reconnect then a turn $0.0006 ($0.0042 so far,
+restored).
 
 The turn's model is the last top-level `assistant` frame's `message.model` (a subagent may
 run another model; `<synthetic>` error messages are skipped); empty for a turn with no reply.
@@ -91,6 +100,8 @@ run another model; `<synthetic>` error messages are skipped); empty for a turn w
 
 * `TestConnRequestCorrelation` (PR 1) flaked in `make check`: it read two out-of-order
   answers from one channel; now one channel per request (`flaky-tests.md`).
+* The WebKit cmd+t e2e flake was an app bug (xterm refocusing itself on a late keyup), fixed
+  in review, not by waiting in the test (`flaky-tests.md`).
 * Running the live daemon from a `nohup … &` in a tool call: it was SIGTERMed a minute later
   (the shell's process group); run it as a background task instead. The CLI then auto-starts a
   non-`--dev` daemon on the same home, which looks like the old one is still there.
@@ -110,7 +121,7 @@ run another model; `<synthetic>` error messages are skipped); empty for a turn w
 * `make gui-e2e` green on WebKit and Chromium, including `e2e/composer-view.spec.ts` (setting
   default followed until picked; explicit pick wins both ways; the created thread's view, the
   header badge, "Starting Claude…"), settings row, footers (`$1.50 · Sonnet 5` where the
-  subtraction would say $0.38; an older turn falls back), the subagent chip, crashed /
+  subtraction would say $0.38; a turn without the fields shows neither, since review), the subagent chip, crashed /
   closed / fork states, placeholder, palette.
 * Live: scratch daemon from this worktree (`CODE_FOUNDRY_HOME=/tmp/cf-rt4-home … daemon
   --dev`), repo `~/cf-rt4-scratch`, Vite + Playwright WebKit. `sessions.render` set to
@@ -125,5 +136,5 @@ run another model; `<synthetic>` error messages are skipped); empty for a turn w
 ## Daemon restart
 
 Needed: `turn_cost_usd` / `model` and `session.new`'s help are daemon changes. An older
-daemon still works with this GUI (the footer falls back; the composer's `render` arg exists
+daemon still works with this GUI (its footers show no cost or model; the composer's `render` arg exists
 since PR 1).

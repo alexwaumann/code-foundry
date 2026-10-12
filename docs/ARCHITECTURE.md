@@ -272,8 +272,9 @@ Layers Claude-specific knowledge on top of terminal:
   pending, finished until seen), not a screen. Transcript tailing (naming, usage, PR
   links, `/clear`) is shared with terminal threads
   (`docs/notes/rendered-threads-1-daemon.md`). Each turn end carries the turn's own cost
-  (Claude reports running totals; the projector measures them per process and tells a
-  `--resume` that restored the totals from a fresh start) and the model that replied
+  (Claude reports running totals per process; a process's first turn is measured from
+  what Claude restores on `--resume`, the resumed transcript's last `cost-state` record,
+  read at spawn; unset when the totals do not fit) and the model that replied
   (`docs/notes/rendered-threads-4-optin.md`).
 * Auto-naming via an independent `claude -p` call producing a slug.
 * **Linked pull requests** come from Claude's own `pr-link` transcript records: every
