@@ -194,6 +194,8 @@ test("parallel requests stack oldest first; each is answerable; an Edit shows it
 });
 
 test("a subagent's request names the agent that asked", async ({ page }) => {
+  // The compact thread width keeps the prompt's header narrow enough to cut the label short.
+  await mockPost("settings/external?appearance.thread_width=compact");
   await openThread(page, "subagent");
   const prompt = composer(page).getByTestId("thread-permission");
   await expect(prompt).toContainText("CHANGELOG.md");
