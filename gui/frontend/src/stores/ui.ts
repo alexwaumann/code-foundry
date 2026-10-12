@@ -128,6 +128,10 @@ interface UiState {
   usageRange: UsageRange;
   /** The sidebar's Working section is collapsed (its threads hidden; the header counts them). */
   workingCollapsed: boolean;
+  /** Projects page: repo ids whose worktree rows are hidden (the header counts them). */
+  collapsedProjects: string[];
+  /** Projects page: workspace ids whose member rows are hidden. */
+  collapsedWorkspaces: string[];
 
   select: (sel: Selection, opts?: { focusTerminal?: boolean }) => void;
   setFocus: (f: FocusRegion) => void;
@@ -153,6 +157,20 @@ interface UiState {
   setZoom: (percent: number) => void;
   setUsageRange: (days: UsageRange) => void;
   toggleWorkingCollapsed: () => void;
+  /** Collapses (true) or expands a project on the Projects page; false when it already was. */
+  setProjectCollapsed: (repoId: string, collapsed: boolean) => boolean;
+  /** Collapses (true) or expands a workspace on the Projects page; false when it already was. */
+  setWorkspaceCollapsed: (workspaceId: string, collapsed: boolean) => boolean;
+}
+
+/** `ids` with `id` in (collapsed) or out; the same array when nothing changes. */
+function withMember(ids: string[], id: string, member: boolean): string[] {
+  if (ids.includes(id) === member) return ids;
+  return member ? [...ids, id] : ids.filter((x) => x !== id);
+}
+
+function isStringArray(v: unknown): v is string[] {
+  return Array.isArray(v) && v.every((x) => typeof x === "string");
 }
 
 /** The Usage page's ranges in days (UTC days, today inclusive); 30 by default. */
@@ -222,7 +240,7 @@ export function sameSelection(a: Selection, b: Selection): boolean {
 
 export const useUiStore = create<UiState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       selection: DASHBOARD,
       focus: "content",
       terminalFocusSeq: 0,
@@ -241,6 +259,8 @@ export const useUiStore = create<UiState>()(
       zoom: ZOOM_DEFAULT,
       usageRange: USAGE_RANGE_DEFAULT,
       workingCollapsed: false,
+      collapsedProjects: [],
+      collapsedWorkspaces: [],
 
       select: (sel, opts) => {
         set((s) => ({
@@ -312,6 +332,20 @@ export const useUiStore = create<UiState>()(
       toggleWorkingCollapsed: () => {
         set((s) => ({ workingCollapsed: !s.workingCollapsed }));
       },
+      setProjectCollapsed: (repoId, collapsed) => {
+        const prev = get().collapsedProjects;
+        const next = withMember(prev, repoId, collapsed);
+        if (next === prev) return false;
+        set({ collapsedProjects: next });
+        return true;
+      },
+      setWorkspaceCollapsed: (workspaceId, collapsed) => {
+        const prev = get().collapsedWorkspaces;
+        const next = withMember(prev, workspaceId, collapsed);
+        if (next === prev) return false;
+        set({ collapsedWorkspaces: next });
+        return true;
+      },
     }),
     {
       name: "code-foundry.ui",
@@ -331,6 +365,8 @@ export const useUiStore = create<UiState>()(
           ...p,
           usageRange: isUsageRange(p.usageRange) ? p.usageRange : current.usageRange,
           workingCollapsed: typeof p.workingCollapsed === "boolean" ? p.workingCollapsed : current.workingCollapsed,
+          collapsedProjects: isStringArray(p.collapsedProjects) ? p.collapsedProjects : current.collapsedProjects,
+          collapsedWorkspaces: isStringArray(p.collapsedWorkspaces) ? p.collapsedWorkspaces : current.collapsedWorkspaces,
         };
         return typeof p.sidebarWidth === "number" ? { ...merged, sidebarWidth: clamp(Math.round(p.sidebarWidth), SIDEBAR_MIN, SIDEBAR_MAX) } : merged;
       },
@@ -341,6 +377,8 @@ export const useUiStore = create<UiState>()(
         zoom: s.zoom,
         usageRange: s.usageRange,
         workingCollapsed: s.workingCollapsed,
+        collapsedProjects: s.collapsedProjects,
+        collapsedWorkspaces: s.collapsedWorkspaces,
       }),
     },
   ),
