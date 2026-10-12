@@ -19,7 +19,8 @@ from live probes against Claude Code 2.1.296 with haiku; "verified" means probed
 
 ## 0. Polish batch (Alex, 2026-10-12, from testing rendered mode)
 
-One PR, branch `t3code/rendered-threads-followups-fixes`, before §2–§4.
+One PR, branch `t3code/rendered-threads-followups-fixes`, before §2–§4. The first four
+items are built: `rendered-threads-followups-fixes.md`.
 
 * **Composer loses focus after send.** PromptEditor (ProseMirror) is made non-editable
   while the draft is `attaching`/`starting`; ProseMirror drops focus then and nothing
