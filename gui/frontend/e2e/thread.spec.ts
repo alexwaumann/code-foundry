@@ -277,6 +277,24 @@ test("a follow-up goes through thread.send with the composer's tags projected; t
   await expect(footers(page).nth(0)).toHaveAttribute("data-folded", "true");
   await expect(footers(page).nth(1)).toHaveAttribute("data-folded", "true");
   await expect(footers(page).nth(2)).not.toHaveAttribute("data-folded", "true");
+  // The prompt has focus again after the send (it is read-only while the send is in flight).
+  await expect(editor).toBeFocused();
+  await page.keyboard.type("x");
+  await expect(page.getByTestId("composer-prompt")).toHaveAttribute("data-value", "x");
+});
+
+test("the prompt is focused again after a send from the Send button", async ({ page }) => {
+  await openThread(page, "idle");
+  const editor = page.getByTestId("thread-composer").locator('[contenteditable="true"]');
+  await editor.click();
+  await page.keyboard.type("And the tests");
+  await page.getByTestId("thread-send").click();
+  await expect.poll(calls).toContain("send s-r1 And the tests");
+  await expect(page.getByTestId("composer-prompt")).toHaveAttribute("data-value", "");
+  await expect(editor).toBeFocused();
+  // Typing goes straight into the prompt.
+  await page.keyboard.type("next");
+  await expect(page.getByTestId("composer-prompt")).toHaveAttribute("data-value", "next");
 });
 
 test("Interrupt stops the running turn (thread.interrupt)", async ({ page }) => {
