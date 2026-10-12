@@ -3,8 +3,8 @@ import { enumOptionLabel, FALLBACK_MODEL_CHOICES, MODEL_SETTING_KEY, modelChoice
 
 const modelField = {
   key: MODEL_SETTING_KEY,
-  enumValues: ["fable", "opus", "claude-opus-4-8", "claude-opus-4-7", "sonnet", "claude-sonnet-5", "claude-sonnet-4-6", "haiku", "claude-haiku-4-5"],
-  enumLabels: ["Fable", "Opus", "Opus 4.8", "Opus 4.7", "Sonnet", "Sonnet 5", "Sonnet 4.6", "Haiku", "Haiku 4.5"],
+  enumValues: ["fable", "opus", "claude-opus-4-8", "claude-opus-4-7", "sonnet", "claude-sonnet-5", "claude-sonnet-4-6", "haiku"],
+  enumLabels: ["Fable", "Opus", "Opus 4.8", "Opus 4.7", "Sonnet", "Sonnet 5", "Sonnet 4.6", "Haiku"],
 };
 
 describe("modelChoicesFromSchema", () => {
@@ -35,7 +35,7 @@ describe("modelName", () => {
   it.each([
     ["opus", "Opus"],
     ["claude-opus-4-8", "Opus 4.8"],
-    ["claude-haiku-4-5", "Haiku 4.5"],
+    ["haiku", "Haiku"],
     ["claude-opus-5-5[1m]", "claude-opus-5-5[1m]"],
   ])("%j is %j", (model, want) => {
     expect(modelName(choices, model)).toBe(want);
