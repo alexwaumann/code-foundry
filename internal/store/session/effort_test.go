@@ -37,6 +37,12 @@ func (re *renderedEnv) waitArgv(what string, cond func([]string) bool) []string 
 	}
 }
 
+// turnOver reports a thread whose turn has ended: idle when something watched it,
+// or "finished" (needs attention) when nothing did. Which one depends on timing.
+func turnOver(s Session) bool {
+	return s.Status == StatusIdle || s.Status == StatusNeedsAttention && s.StatusReason == "finished"
+}
+
 func hasEffortNote(effort string) func([]Item) bool {
 	return func(items []Item) bool {
 		return slices.ContainsFunc(items, func(it Item) bool { return it.Kind == KindCommandOutput && it.Text == "Set effort to "+effort })
@@ -78,7 +84,7 @@ func TestRenderedSetEffortIdleRestarts(t *testing.T) {
 	if note < 0 || msg < note {
 		t.Errorf("the note should come before the held message:\n%s", describeItems(items))
 	}
-	got = re.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && s.Status == StatusIdle })
+	got = re.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && turnOver(s) })
 	if got.State != StateConnected || got.Effort != "high" {
 		t.Errorf("after the restart %+v", got)
 	}
@@ -297,7 +303,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 				if err := waitErr(t, "the held send", done); err != nil {
 					t.Fatalf("send: %v", err)
 				}
-				re.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && s.Status == StatusIdle })
+				re.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && turnOver(s) })
 				if fresh, resumed := re.deliveries("held"); fresh != 0 || resumed != 1 {
 					t.Errorf("held message delivered %d times to the old process, %d to the new", fresh, resumed)
 				}
@@ -437,9 +443,7 @@ func TestRenderedSetEffortRespawnArgv(t *testing.T) {
 	if _, err := re.m.Respond(re.ctx(), s.ID, p[0].RequestID, Decision{Allow: true, ForSession: true}); err != nil {
 		t.Fatal(err)
 	}
-	re.waitFor(s.ID, "idle", func(s Session) bool {
-		return s.Status == StatusIdle || s.Status == StatusNeedsAttention && s.StatusReason == "finished"
-	})
+	re.waitFor(s.ID, "idle", turnOver)
 	if _, err := re.m.SetEffort(re.ctx(), s.ID, "max"); err != nil {
 		t.Fatal(err)
 	}
