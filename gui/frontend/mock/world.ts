@@ -2048,11 +2048,41 @@ export class World {
         },
       },
       {
-        cmd: { name: "repo.refresh", title: "Refresh Git Status", category: "Repository", description: "Reconcile git status now", keybindings: ["cmd+alt+r"], args: [] },
+        cmd: {
+          name: "repo.refresh", title: "Refresh Git Status", category: "Repository", description: "Reconcile git status now", keybindings: ["cmd+alt+r"],
+          args: [{ name: "repo", type: ArgType.STRING, required: false, description: "Repository id (default: all)" }],
+        },
         when: always,
-        run: () => {
-          for (const r of this.repos.values()) this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(r) } });
-          return "Git status refreshed";
+        run: (_ctx, args) => {
+          for (const r of this.repos.values()) if (!args.repo || args.repo === r.id) this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(r) } });
+          return args.repo ? `refreshed ${args.repo}` : "Git status refreshed";
+        },
+      },
+      {
+        // As internal/command/commands_repo.go: repo (context), branch (prompted), base, fetch.
+        cmd: {
+          name: "repo.worktree.new",
+          title: "New Worktree",
+          category: "Project",
+          description: "Create a worktree for a branch, creating the branch from base when it does not exist.",
+          keybindings: [],
+          args: [
+            { name: "repo", type: ArgType.STRING, required: false, description: "Repository id (default: the active repository)" },
+            { name: "branch", type: ArgType.STRING, required: true, description: "Branch to check out" },
+            { name: "base", type: ArgType.STRING, required: false, description: "Ref to branch from (default: the default branch)" },
+            { name: "fetch", type: ArgType.BOOL, required: false, description: "Fetch the remote base branch first", defaultValue: "true" },
+          ],
+        },
+        when: (ctx) => this.repos.get(ctx?.activeRepoId ?? "")?.git !== false && Boolean(ctx?.activeRepoId && this.repos.has(ctx.activeRepoId)),
+        run: (ctx, args) => {
+          const repo = this.repos.get(args.repo || ctx?.activeRepoId || "");
+          if (!repo) throw new CommandError("unavailable", "no active repository");
+          requireGit(repo, "a new worktree");
+          const branch = args.branch ?? "";
+          const w: MockWorktree = { path: `${HOME}/.code-foundry/worktrees/${repo.githubSlug || `_local/${repo.name}`}/${branch.replace(/\//g, "-")}`, branch, head: "c0ffee00", isMain: false, status: clean({ upstream: "", baseRef: "" }) };
+          repo.worktrees.push(w);
+          this.repoEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(repo.id, w) } });
+          return `created worktree ${w.path} on ${branch}`;
         },
       },
       {

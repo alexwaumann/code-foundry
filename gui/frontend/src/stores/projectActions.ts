@@ -7,9 +7,11 @@ import { startCommandNamed } from "@/keys/bindings";
 import { repoRef } from "@/lib/projects";
 import { openAddProject } from "./addProject";
 import { newWorktreeTerminal } from "./bottomActions";
-import { runCommand } from "./commands";
+import { runCommand, runCommandForResult } from "./commands";
 import { repoContext, worktreeContext } from "./context";
-import { useReposStore } from "./repos";
+import { openPublishDialog } from "./publish";
+import { mainWorktreePath, useReposStore } from "./repos";
+import { useUiStore } from "./ui";
 import { useWorkspacesStore } from "./workspaces";
 
 /** terminal.new in the worktree; the shell opens (focused) in the Projects page's bottom panel. */
@@ -25,6 +27,35 @@ export function removeWorktree(repoId: string, path: string): Promise<boolean> {
 /** repo.unregister (confirmed). */
 export function unregisterProject(repoId: string): Promise<boolean> {
   return runCommand("repo.unregister", {}, repoContext(repoId));
+}
+
+/** repo.worktree.new on the project: the palette asks for the branch (base and fetch keep their defaults). */
+export function newWorktreeIn(repoId: string): void {
+  useUiStore.getState().openPalette("", "repo.worktree.new", repoContext(repoId));
+}
+
+/** repo.github.publish's presenter for the project: the publish dialog (owner, name, visibility). */
+export function publishProject(repoId: string): void {
+  openPublishDialog(repoId);
+}
+
+/** repo.git.init: a folder without git becomes a repository with an empty first commit. */
+export function initGitIn(repoId: string): Promise<boolean> {
+  return runCommand("repo.git.init", { repo: repoId }, repoContext(repoId));
+}
+
+/**
+ * A project header's Refresh: git.fetch in its main worktree when it has a remote (the
+ * gitops toasts report it, a failure included), then repo.refresh for the project, quietly
+ * (its result is the header's freshness). A refresh failure is toasted.
+ */
+export async function refreshProject(repoId: string): Promise<void> {
+  const repos = useReposStore.getState();
+  const main = mainWorktreePath(repos, repoId);
+  if (main && (repos.byId[repoId]?.remotes.length ?? 0) > 0) {
+    await runCommandForResult("git.fetch", { worktree: main }, { ctx: worktreeContext(repoId, main), quiet: true });
+  }
+  await runCommandForResult("repo.refresh", { repo: repoId }, { ctx: repoContext(repoId), quiet: true });
 }
 
 /**
