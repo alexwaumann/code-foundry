@@ -1065,12 +1065,19 @@ func (g *Git) status(ctx context.Context, repoID, path string) {
 	changed := next.Branch != prev.Branch || next.Head != prev.Head || next.Detached != prev.Detached ||
 		!next.Status.equalIgnoringTime(prev.Status)
 	if !changed {
-		// Nothing but RefreshedAt moved. The snapshot is rebuilt only for the first
-		// refresh (unset RefreshedAt means "status not known yet"); later ones leave
-		// the snapshot's RefreshedAt at the last refresh that changed something (or
-		// that some other commit picked up). No API client reads it without an event.
+		// Nothing but RefreshedAt moved. The snapshot is rebuilt for the first refresh
+		// (unset RefreshedAt means "status not known yet") and, with an event, once
+		// the published RefreshedAt is older than republishAfter (the Projects page's
+		// freshness reads it); other refreshes leave the snapshot alone.
 		if prev.Status.RefreshedAt.IsZero() {
 			g.commit(nil)
+		} else if g.publishedBefore(repoID, path, now.Add(-republishAfter)) {
+			g.commit(func(s *Snapshot) []Event {
+				if w, ok := s.Worktree(repoID, path); ok {
+					return []Event{WorktreeUpdated{Worktree: w}}
+				}
+				return nil
+			})
 		}
 		return
 	}
@@ -1080,6 +1087,18 @@ func (g *Git) status(ctx context.Context, repoID, path string) {
 		}
 		return nil
 	})
+}
+
+// republishAfter is how stale a worktree's published RefreshedAt may get while its
+// status does not change: an unchanged refresh past it republishes the worktree, so
+// "updated N ago" stays within about a poll interval of the last check.
+const republishAfter = time.Minute
+
+// publishedBefore reports whether the snapshot's RefreshedAt for the worktree is
+// before t (false when the worktree is not in the snapshot).
+func (g *Git) publishedBefore(repoID, path string, t time.Time) bool {
+	w, ok := g.snap.Load().Worktree(repoID, path)
+	return ok && w.Status.RefreshedAt.Before(t)
 }
 
 // --- loops -----------------------------------------------------------------------
