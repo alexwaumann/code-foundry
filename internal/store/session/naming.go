@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/model"
 )
 
 // Namer turns a session's first user message into a short kebab-case name.
@@ -20,7 +22,14 @@ type Namer func(ctx context.Context, firstMessage string) (string, error)
 // maxNamingInput bounds how much of the first message goes into the naming prompt.
 const maxNamingInput = 2000
 
-// namingArgs is the hardened naming command, before "--" and the prompt:
+// namingEffort is the effort of every naming call. A 3-5 word slug needs no thinking,
+// and low keeps the call fast and cheap whatever the model; it is not a setting.
+const namingEffort = "low"
+
+// namingArgs is the naming command for model m, before "--" and the prompt. Both
+// variants pass --model and --effort low. The hardened one (minimal false) is:
+//
+//	-p --model <model> --effort low --no-session-persistence --safe-mode --tools ""
 //
 //   - -p runs once and prints the answer; --no-session-persistence keeps the call out
 //     of Claude's transcript directories (and so out of the usage fold).
@@ -36,16 +45,26 @@ const maxNamingInput = 2000
 //     without --safe-mode, --tools "" still leaves MCP tools (claude.ai connectors)
 //     available, so it is not enough on its own. No managed setting refuses it.
 //
-// --tools is variadic, so the prompt must follow "--" or Claude reads it as a tool
-// name ("Input must be provided ..."); --strict-mcp-config used to end the list.
-var namingArgs = []string{"-p", "--model", "haiku", "--no-session-persistence", "--safe-mode", "--tools", ""}
-
-// minimalNamingArgs is the fallback when Claude refuses a flag of namingArgs (an
-// organization's managed settings, or a Claude too old for --safe-mode). It runs in
-// /tmp without persistence, and -p mode cannot ask for permission, so a tool call
-// that needs approval is denied; read-only tools and the user's MCP servers are
-// available, which is the accepted cost of naming at all on such machines.
-var minimalNamingArgs = []string{"-p", "--model", "haiku", "--no-session-persistence"}
+// --tools is variadic, so it comes last and the prompt must follow "--" or Claude
+// reads it as a tool name ("Input must be provided ..."); --strict-mcp-config used to
+// end the list.
+//
+// The minimal variant (minimal true) is the fallback when Claude refuses a flag of the
+// hardened one (an organization's managed settings, or a Claude too old for
+// --safe-mode):
+//
+//	-p --model <model> --effort low --no-session-persistence
+//
+// It runs in /tmp without persistence, and -p mode cannot ask for permission, so a
+// tool call that needs approval is denied; read-only tools and the user's MCP servers
+// are available, which is the accepted cost of naming at all on such machines.
+func namingArgs(m string, minimal bool) []string {
+	args := []string{"-p", "--model", m, "--effort", namingEffort, "--no-session-persistence"}
+	if !minimal {
+		args = append(args, "--safe-mode", "--tools", "")
+	}
+	return args
+}
 
 // maxNamingErrDetail bounds the claude output kept in a naming error. Large enough
 // for Claude's longest policy refusal, which names the flags and the setting.
@@ -65,15 +84,36 @@ func namingSession(ctx context.Context) string {
 	return id
 }
 
+// namingModelKey carries the naming model into the namer.
+type namingModelKey struct{}
+
+// WithNamingModel returns ctx asking ClaudeNamer to name with model m (a model
+// registry value). The daemon sets it per call from sessions.naming_model, so the setting
+// applies without a restart.
+func WithNamingModel(ctx context.Context, m string) context.Context {
+	return context.WithValue(ctx, namingModelKey{}, m)
+}
+
+// NamingModel returns the model ClaudeNamer uses for a call with ctx: the
+// WithNamingModel value when the model registry lists it, else model.NamingDefault.
+func NamingModel(ctx context.Context) string {
+	if m, _ := ctx.Value(namingModelKey{}).(string); model.Known(m) {
+		return m
+	}
+	return model.NamingDefault
+}
+
 // ClaudeNamer names sessions with an independent, non-interactive claude call:
 //
-//	claude -p --model haiku --no-session-persistence --safe-mode --tools "" -- <prompt>
+//	claude -p --model <model> --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>
 //
 // run in cwd (/tmp) so it never touches a project; see namingArgs for why each flag
-// is there. When Claude refuses one of those flags (isFlagRefused: an
-// organization's managed settings, or an unknown option) the call is retried once as
+// is there. The model is NamingModel(ctx), read per call (model.NamingDefault unless
+// the caller set one with WithNamingModel); the effort is always low. When Claude
+// refuses one of the hardened flags (isFlagRefused: an organization's managed
+// settings, or an unknown option) the call is retried once as
 //
-//	claude -p --model haiku --no-session-persistence -- <prompt>
+//	claude -p --model <model> --effort low --no-session-persistence -- <prompt>
 //
 // and every later call in this daemon run goes straight to that command. Each
 // finished call is logged at info with its arguments (the prompt elided), the
@@ -90,17 +130,15 @@ func ClaudeNamer(claude, cwd string, log *slog.Logger) Namer {
 		prompt := "Give a 3-5 word kebab-case slug (lowercase words joined by hyphens) that names " +
 			"the coding task in the request below. Reply with only the slug.\n\nRequest:\n" + msg
 		session := namingSession(ctx)
-		args := namingArgs
-		if minimal.Load() {
-			args = minimalNamingArgs
-		}
+		m := NamingModel(ctx)
+		args := namingArgs(m, minimal.Load())
 		out, err := runNaming(ctx, log, session, claude, cwd, args, prompt)
 		if err != nil && !minimal.Load() && isFlagRefused(err) {
 			log.Warn("claude refused a naming flag; retrying with the minimal command for this daemon run",
 				"session", session, "args", namingCommand(args), "err", err)
 			minimal.Store(true)
 			first := err
-			if out, err = runNaming(ctx, log, session, claude, cwd, minimalNamingArgs, prompt); err != nil {
+			if out, err = runNaming(ctx, log, session, claude, cwd, namingArgs(m, true), prompt); err != nil {
 				err = fmt.Errorf("%w (after the hardened command failed: %v)", err, first)
 			}
 		}
