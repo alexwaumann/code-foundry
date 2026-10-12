@@ -220,14 +220,16 @@ func (c *Conn) onRequest(e *controlRequestLine) {
 		Subtype string `json:"subtype"`
 	}
 	_ = json.Unmarshal(e.Request, &head)
+	// Replies go out on their own goroutine: onRequest runs on the reader, and a
+	// write that waits for the CLI to drain stdin must not stop stdout being read.
 	if head.Subtype != SubtypeCanUseTool {
 		c.log.Info("claudestream: unsupported control request from claude", "subtype", head.Subtype)
-		_ = c.reply(e.RequestID, nil, "unsupported control request: "+head.Subtype)
+		go func() { _ = c.reply(e.RequestID, nil, "unsupported control request: "+head.Subtype) }()
 		return
 	}
 	req := &PermissionRequest{}
 	if err := json.Unmarshal(e.Request, req); err != nil {
-		_ = c.reply(e.RequestID, nil, "bad can_use_tool request: "+err.Error())
+		go func() { _ = c.reply(e.RequestID, nil, "bad can_use_tool request: "+err.Error()) }()
 		return
 	}
 	req.RequestID, req.Raw = e.RequestID, e.Raw
