@@ -487,6 +487,9 @@ func TestDefaultRender(t *testing.T) {
 		{func() Render { return RenderTerminal }, RenderDefault, RenderTerminal},
 		{func() Render { return RenderTerminal }, RenderRendered, RenderRendered},
 		{func() Render { return RenderRendered }, RenderTerminal, RenderTerminal},
+		// A Create that does not pick (pr.ask / pr.explain / pr.fix.findings, the CLI
+		// without --render) follows the setting.
+		{func() Render { return RenderRendered }, RenderDefault, RenderRendered},
 	} {
 		e := newEnv(t, func(o *Options) {
 			o.DefaultRender = tt.def
