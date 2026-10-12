@@ -4,8 +4,9 @@
  * listed under the workspace only, never under their project (one change stays in one
  * place). Pure; inputs are the repos and workspaces slices' shapes.
  */
-import type { WorktreeView } from "@/api/repo";
+import type { RepoView, WorktreeView } from "@/api/repo";
 import type { WorkspaceView } from "@/api/workspace";
+import { tildify } from "./path";
 
 export interface ProjectsRepos {
   /** `git` false: a project without git (never a workspace member); absent counts as git. */
@@ -102,16 +103,95 @@ export type PageItem =
   | { key: string; kind: "workspace"; workspaceId: string }
   | { key: string; kind: "member"; workspaceId: string; repoId: string; path: string };
 
-/** Every navigable row of the page in display order: projects and their worktrees, then workspaces and their members. */
-export function pageItems(model: ProjectsModel, workspaces: ProjectsWorkspaces): PageItem[] {
+/** Projects and workspaces whose rows are hidden (the UI store's persisted sets; empty while filtering). */
+export interface Collapsed {
+  projects: ReadonlySet<string>;
+  workspaces: ReadonlySet<string>;
+}
+
+export const NONE_COLLAPSED: Collapsed = { projects: new Set(), workspaces: new Set() };
+
+/**
+ * Every navigable row of the page in display order: projects and their worktrees, then
+ * workspaces and their members. A collapsed project or workspace keeps its header row only.
+ */
+export function pageItems(model: ProjectsModel, workspaces: ProjectsWorkspaces, collapsed: Collapsed = NONE_COLLAPSED): PageItem[] {
   const out: PageItem[] = [];
   for (const p of model.projects) {
     out.push({ key: projectKey(p.repoId), kind: "project", repoId: p.repoId });
+    if (collapsed.projects.has(p.repoId)) continue;
     for (const path of p.worktrees) out.push({ key: projectWorktreeKey(p.repoId, path), kind: "worktree", repoId: p.repoId, path });
   }
   for (const id of model.workspaces) {
     out.push({ key: workspaceKey(id), kind: "workspace", workspaceId: id });
+    if (collapsed.workspaces.has(id)) continue;
     for (const m of workspaces.byId[id]?.members ?? []) out.push({ key: memberKey(id, m.repoId), kind: "member", workspaceId: id, repoId: m.repoId, path: m.worktreePath });
   }
   return out;
+}
+
+/** What a collapsed project header says about its hidden rows: "3 worktrees · 1 in a workspace". */
+export function collapsedProjectSummary(p: Pick<ProjectModel, "worktrees" | "inWorkspaces">): string {
+  const total = p.worktrees.length + p.inWorkspaces;
+  const head = `${String(total)} ${total === 1 ? "worktree" : "worktrees"}`;
+  if (p.inWorkspaces === 0) return head;
+  return `${head} · ${String(p.inWorkspaces)} ${p.inWorkspaces === 1 ? "in a workspace" : "in workspaces"}`;
+}
+
+/** What a collapsed workspace header says about its hidden rows: "2 members". */
+export function collapsedWorkspaceSummary(members: number): string {
+  return `${String(members)} ${members === 1 ? "member" : "members"}`;
+}
+
+/**
+ * What kind of project a repository is, as the Projects page's header shows it: a GitHub
+ * repository (pull requests and checks), a git repository without a GitHub remote (local
+ * only, or a remote elsewhere), or a plain folder without git.
+ */
+export type ProjectKind = "github" | "git" | "nogit";
+
+export interface ProjectKindInfo {
+  kind: ProjectKind;
+  /** Muted text after the name: the GitHub slug, "local only · no remote", "origin · not GitHub", or "" (no git: the badge says it). */
+  meta: string;
+  /** The kind icon's tooltip, one sentence. */
+  title: string;
+}
+
+export function projectKind(r: Pick<RepoView, "githubSlug" | "remotes"> & { git?: boolean }): ProjectKindInfo {
+  if (r.git === false) return { kind: "nogit", meta: "", title: "Not a git repository: threads and terminals run in the folder itself." };
+  if (r.githubSlug) return { kind: "github", meta: r.githubSlug, title: "A GitHub repository: its branches show their pull requests and checks." };
+  const remote = r.remotes[0];
+  if (remote === undefined) return { kind: "git", meta: "local only · no remote", title: "A local git repository with no remote: nothing to fetch, push or open pull requests against." };
+  return { kind: "git", meta: `${remote} · not GitHub`, title: `A git repository whose remote (${remote}) is not on GitHub: no pull requests or checks.` };
+}
+
+/** What the page's filter matches against, per project and per workspace (only built while filtering). */
+export interface ProjectsSearch {
+  repos: Readonly<Record<string, { name: string; githubSlug: string; branches: Readonly<Record<string, string>> } | undefined>>;
+  workspaces: Readonly<Record<string, { name: string; branch: string } | undefined>>;
+}
+
+/**
+ * The model narrowed to what the filter matches, case-insensitive substring: a project by
+ * its name or GitHub slug (then all its rows show), else by any of its worktrees' branch or
+ * tildified path (then only those rows show); a workspace by its name or branch. An empty
+ * query keeps everything.
+ */
+export function filterProjects(model: ProjectsModel, query: string, search: ProjectsSearch): ProjectsModel {
+  const q = query.trim().toLowerCase();
+  if (!q) return model;
+  const hit = (s: string | undefined) => s !== undefined && s.toLowerCase().includes(q);
+  return {
+    projects: model.projects.flatMap((p) => {
+      const r = search.repos[p.repoId];
+      if (hit(r?.name) || hit(r?.githubSlug)) return [p];
+      const worktrees = p.worktrees.filter((path) => hit(r?.branches[path]) || hit(tildify(path)));
+      return worktrees.length > 0 ? [{ ...p, worktrees, inWorkspaces: 0 }] : [];
+    }),
+    workspaces: model.workspaces.filter((id) => {
+      const w = search.workspaces[id];
+      return hit(w?.name) || hit(w?.branch);
+    }),
+  };
 }
