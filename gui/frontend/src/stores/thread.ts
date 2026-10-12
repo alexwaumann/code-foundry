@@ -166,12 +166,38 @@ export function applyThreadSourceEvent(ev: ThreadEventView): void {
   });
 }
 
+/**
+ * A batch of events applied to a log (applyThreadEvent's rules). Text deltas, the bulk of
+ * a stream, copy the item map once per batch rather than once per delta.
+ */
+export function applyThreadEvents(log: ThreadLog | undefined, events: readonly ThreadEventView[]): ThreadLog | undefined {
+  /** The log this batch made (its byId is ours to write) or null. */
+  let own: { seq: number; byId: Record<string, ThreadItemView>; order: readonly string[]; pending: readonly ThreadPendingView[] } | null = null;
+  for (const ev of events) {
+    if (ev.kind === "delta" && log && ev.seq > log.seq) {
+      const it = log.byId[ev.itemId];
+      const grown =
+        it?.kind === "tool" && ev.field === "input"
+          ? { ...it, inputJson: it.inputJson + ev.text }
+          : (it?.kind === "text" || it?.kind === "thinking") && ev.field === "text"
+            ? { ...it, text: it.text + ev.text }
+            : null;
+      if (own !== log) own = { ...log, byId: { ...log.byId } };
+      if (grown) own.byId[grown.id] = grown;
+      own.seq = ev.seq;
+      log = own;
+      continue;
+    }
+    log = applyThreadEvent(log, ev);
+  }
+  return log;
+}
+
 /** Applies a batch of Watch events to one thread's log in a single store update. */
 export function applyWatchBatch(sessionId: string, events: readonly ThreadEventView[]): void {
   if (events.length === 0) return;
   useThreadStore.setState((s) => {
-    let log = s.logs[sessionId];
-    for (const ev of events) log = applyThreadEvent(log, ev);
+    const log = applyThreadEvents(s.logs[sessionId], events);
     return log === s.logs[sessionId] || !log ? s : { logs: { ...s.logs, [sessionId]: log } };
   });
 }
@@ -250,6 +276,18 @@ export function useThreadItem(sessionId: string, id: string): ThreadItemView | u
   return useThreadStore((s) => s.logs[sessionId]?.byId[id]);
 }
 
+/** Items keep their identity while unchanged, so each one's key is built once. */
+const keyCache = new WeakMap<ThreadItemView, string>();
+
+function keyOf(it: ThreadItemView): string {
+  let k = keyCache.get(it);
+  if (k === undefined) {
+    k = timelineKey(structOf(it));
+    keyCache.set(it, k);
+  }
+  return k;
+}
+
 /** The timeline's structural keys (lib/threadTimeline timelineKey): shallow-stable across text deltas. */
 export function useTimelineKeys(sessionId: string): string[] {
   return useThreadStore(
@@ -258,7 +296,7 @@ export function useTimelineKeys(sessionId: string): string[] {
       if (!log) return [];
       return log.order.flatMap((id) => {
         const it = log.byId[id];
-        return it ? [timelineKey(structOf(it))] : [];
+        return it ? [keyOf(it)] : [];
       });
     }),
   );

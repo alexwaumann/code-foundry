@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadEventView, ThreadItemView, ThreadPendingView } from "@/api/thread";
-import { applyPendingEvent, applyThreadEvent, sameItem, startThreadWatch, useThreadStore, WATCH_BATCH_MS, type ThreadLog } from "./thread";
+import { applyPendingEvent, applyThreadEvent, applyThreadEvents, sameItem, startThreadWatch, useThreadStore, WATCH_BATCH_MS, type ThreadLog } from "./thread";
 
 const watched = vi.hoisted(() => ({ events: [] as unknown[], opened: 0 }));
 vi.mock("@/api/thread", async (orig) => ({
@@ -28,6 +28,41 @@ const snapshot = (seq: number, items: ThreadItemView[], pending: ThreadPendingVi
 function apply(log: ThreadLog | undefined, ...evs: ThreadEventView[]): ThreadLog | undefined {
   return evs.reduce(applyThreadEvent, log);
 }
+
+describe("applyThreadEvents (a batch)", () => {
+  const d = (seq: number, itemId: string, t: string): ThreadEventView => ({ kind: "delta", sessionId: "s", seq, itemId, ordinal: 1, field: "text", text: t });
+
+  it("matches one-by-one application, a resync snapshot mid-batch included, without touching its input", () => {
+    const start = apply(undefined, snapshot(1, [text("a", 1, "x"), text("b", 2, "y")]));
+    const frozen = JSON.stringify(start);
+    const events: ThreadEventView[] = [
+      d(2, "a", "1"),
+      d(3, "a", "2"),
+      { kind: "appended", sessionId: "s", seq: 4, item: text("c", 3) },
+      d(5, "c", "z"),
+      // The daemon restarted: a new snapshot with a lower seq, then events above it; the
+      // stale delta is dropped and nothing is duplicated.
+      snapshot(2, [text("a", 1, "x12"), text("b", 2, "y"), text("c", 3, "z")]),
+      d(2, "c", "stale"),
+      d(3, "c", "!"),
+      d(4, "b", "?"),
+    ];
+    const batched = applyThreadEvents(start, events);
+    expect(batched).toEqual(apply(start, ...events));
+    expect(batched?.order).toEqual(["a", "b", "c"]);
+    expect(batched?.byId.c).toMatchObject({ text: "z!" });
+    expect(JSON.stringify(start)).toBe(frozen);
+  });
+
+  it("deltas copy the item map once and keep other items by identity", () => {
+    const start = apply(undefined, snapshot(1, [text("a", 1), text("b", 2)]));
+    const next = applyThreadEvents(start, [d(2, "a", "h"), d(3, "a", "i")]);
+    expect(next?.byId.a).toMatchObject({ text: "hi" });
+    expect(next?.byId.b).toBe(start?.byId.b);
+    expect(start?.byId.a).toMatchObject({ text: "" });
+    expect(next?.seq).toBe(3);
+  });
+});
 
 describe("applyThreadEvent", () => {
   it("drops everything before the first snapshot", () => {
