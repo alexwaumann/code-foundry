@@ -31,6 +31,8 @@ const namingEffort = "low"
 //
 //	-p --model <model> --effort low --no-session-persistence --safe-mode --tools ""
 //
+// The flags:
+//
 //   - -p runs once and prints the answer; --no-session-persistence keeps the call out
 //     of Claude's transcript directories (and so out of the usage fold).
 //   - --safe-mode starts without the user's customizations: CLAUDE.md, skills, plugins,
