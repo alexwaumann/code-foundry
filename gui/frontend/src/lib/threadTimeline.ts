@@ -9,8 +9,9 @@
  * - a subagent's items (parent_tool_use_id) nest under its Agent tool row;
  * - AskUserQuestion's tool call is hidden (the question item stands for it), and a
  *   permission request annotates its tool call (pending: "waiting for you");
- * - a finished turn other than the latest folds its work under the footer: only the user
- *   message, the final assistant text (the trailing text of the turn) and the footer show.
+ * - every finished turn ends with a footer (duration, steps, its cost, model) that folds it;
+ *   a finished turn other than the latest folds by default: only the user message, the
+ *   final assistant text (the trailing text of the turn), notes and the footer show.
  */
 import type { RequestStateView, ThreadItemKind, ToolStatusView } from "@/api/thread";
 
@@ -57,8 +58,10 @@ export type TimelineRow =
       /** The turn the footer folds (TimelineTurn.key). */
       turn: string;
       folded: boolean;
-      /** Work rows the fold hides (0 when open). */
-      hidden: number;
+      /** The turn's work rows (what the fold hides; a group or Agent row counts as one). */
+      steps: number;
+      /** The previous turn's turn_end ("" for the first): its cumulative cost is subtracted. */
+      prevEnd: string;
       /** The turn's final text items (what its copy button copies). */
       finals: string[];
     }
@@ -214,8 +217,8 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
   return turns;
 }
 
-/** Number of rows a node takes when shown (a group or Agent row counts as one). */
-function hiddenCount(body: readonly WorkNode[]): number {
+/** A turn's work rows: what folding it hides (a group or Agent row counts as one). */
+function stepCount(body: readonly WorkNode[]): number {
   return body.filter(foldsAway).length;
 }
 
@@ -236,13 +239,17 @@ export function defaultFolded(turn: TimelineTurn, latest: boolean): boolean {
 /** The rows to lay out, top to bottom. */
 export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions): TimelineRow[] {
   const rows: TimelineRow[] = [];
+  let prevEnd = "";
   turns.forEach((t, i) => {
     const latest = i === turns.length - 1;
     const folded = t.end !== "" && (opts.fold(t.key) ?? defaultFolded(t, latest));
     for (const u of t.user) rows.push({ type: "user", key: u, id: u });
     for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n);
     const finals = t.body.flatMap((n) => (n.type === "text" && n.final ? [n.id] : []));
-    if (t.end) rows.push({ type: "footer", key: `f:${t.end}`, id: t.end, turn: t.key, folded, hidden: folded ? hiddenCount(t.body) : 0, finals });
+    if (t.end) {
+      rows.push({ type: "footer", key: `f:${t.end}`, id: t.end, turn: t.key, folded, steps: stepCount(t.body), prevEnd, finals });
+      prevEnd = t.end;
+    }
   });
   const last = turns[turns.length - 1];
   if (opts.working && (!last || last.end === "")) rows.push({ type: "working", key: "working", since: last?.user[last.user.length - 1] ?? "" });

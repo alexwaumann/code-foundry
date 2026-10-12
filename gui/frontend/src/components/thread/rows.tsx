@@ -436,34 +436,28 @@ const UserRow = memo(function UserRow({ id }: { id: string }) {
   return <UserBubble text={it.text} composerText={it.composerText} attachments={it.attachments} createdAtMs={it.createdAtMs} />;
 });
 
-/** Claude's cumulative cost estimate before this turn_end (0 when none, or another process's). */
-function usePreviousCost(endId: string): number {
+/** Claude's cumulative cost estimate at the previous turn_end (0 for the first turn). */
+function usePreviousCost(prevEnd: string): number {
   const { sessionId } = useThreadCtx();
   return useThreadStore((s) => {
-    const log = s.logs[sessionId];
-    if (!log) return 0;
-    const i = log.order.indexOf(endId);
-    for (let j = i - 1; j >= 0; j--) {
-      const it = log.byId[log.order[j] ?? ""];
-      if (it?.kind === "turnEnd") return it.costUsd;
-    }
-    return 0;
+    const it = prevEnd ? s.logs[sessionId]?.byId[prevEnd] : undefined;
+    return it?.kind === "turnEnd" ? it.costUsd : 0;
   });
 }
 
 function money(usd: number): string {
-  return usd >= 0.995 ? `$${usd.toFixed(2)}` : usd >= 0.01 ? `$${usd.toFixed(2)}` : usd > 0 ? "<$0.01" : "";
+  return usd >= 0.005 ? `$${usd.toFixed(2)}` : usd > 0 ? "<$0.01" : "";
 }
 
 /**
- * A turn's footer: "Worked for 4m 08s · $1.12 · Opus" on a hairline. It folds the turn: a
- * click hides (or shows again) the turn's work, so the answer stays. The copy button copies
- * the final answer.
+ * A finished turn's footer: "Worked for 4m 08s · 12 steps · $1.12 · Opus" on a hairline,
+ * the latest turn's too. It folds the turn: a click hides (or shows again) the turn's work,
+ * so the answer stays. The copy button copies the final answer.
  */
 const FooterRow = memo(function FooterRow({ row }: { row: Extract<TimelineRow, { type: "footer" }> }) {
   const { sessionId } = useThreadCtx();
   const it = useThreadItem(sessionId, row.id);
-  const prev = usePreviousCost(row.id);
+  const prev = usePreviousCost(row.prevEnd);
   const model = useSessionsStore((s) => s.byId[sessionId]?.model ?? "");
   const models = useModelChoices();
   if (it?.kind !== "turnEnd") return null;
@@ -473,7 +467,7 @@ const FooterRow = memo(function FooterRow({ row }: { row: Extract<TimelineRow, {
   const took = formatDuration(it.durationMs);
   const what = it.interrupted ? "Interrupted" : it.isError ? `Failed (${it.subtype.replace(/_/g, " ")})` : "Worked";
   const parts = [took ? `${what}${it.interrupted || it.isError ? " after" : " for"} ${took}` : what];
-  if (row.folded && row.hidden > 0) parts.push(`${String(row.hidden)} ${row.hidden === 1 ? "step" : "steps"}`);
+  if (row.steps > 0) parts.push(`${String(row.steps)} ${row.steps === 1 ? "step" : "steps"}`);
   if (money(cost)) parts.push(money(cost));
   if (model) parts.push(modelName(models, model));
   const copy = () => {

@@ -186,6 +186,41 @@ for (const scheme of ["dark", "light"] as const) {
       await expect(footers(page)).toHaveCount(1);
       await expect(pane(page).locator('[data-testid="thread-text"][data-final]').last()).toContainText("I have not pushed.");
     });
+
+    test("the latest finished turn keeps its footer in view; only the user's scroll unpins the list", async ({ page }) => {
+      await openThread(page, "streaming", scheme);
+      const timeline = page.getByTestId("thread-timeline");
+      await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+      // A scroll nobody asked for (the virtualizer keeping rows in place while it measures
+      // the ones above) leaves the list pinned.
+      await timeline.evaluate((el) => {
+        el.scrollTop -= 160;
+      });
+      await mockPost("thread/finish");
+      const footer = footers(page).last();
+      await expect(footer).toContainText(/Worked for .*·12 steps·\$0\.04·Opus/);
+      await expect(footer).not.toHaveAttribute("data-folded", "true");
+      await expect(timeline).toHaveAttribute("data-at-bottom", "true");
+      await expect
+        .poll(async () => {
+          const box = await footer.boundingBox();
+          const composer = await page.getByTestId("thread-composer").boundingBox();
+          return box && composer && box.y + box.height <= composer.y;
+        })
+        .toBe(true);
+
+      // The user's wheel unpins: new content no longer moves the list.
+      const box2 = await timeline.boundingBox();
+      await page.mouse.move((box2?.x ?? 0) + 200, (box2?.y ?? 0) + 200);
+      await page.mouse.wheel(0, -400);
+      await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
+      const top = await timeline.evaluate((el) => el.scrollTop);
+      await page.getByTestId("thread-composer").locator('[contenteditable="true"]').click();
+      await page.keyboard.type("more");
+      await page.keyboard.press("Enter");
+      await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.");
+      expect(await timeline.evaluate((el) => el.scrollTop)).toBe(top);
+    });
   });
 }
 

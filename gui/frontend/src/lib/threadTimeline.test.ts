@@ -27,7 +27,7 @@ function shape(rows: readonly TimelineRow[]): string[] {
       case "text":
         return r.final ? `final:${r.id}` : `text:${r.id}`;
       case "footer":
-        return `footer${r.folded ? `(folded ${String(r.hidden)})` : ""}`;
+        return `footer${r.folded ? `(folded ${String(r.steps)})` : ""}`;
       case "working":
         return `working(${r.since})`;
       case "note":
@@ -124,6 +124,11 @@ describe("buildTurns / buildRows", () => {
     const rows = buildRows(turns, open);
     expect(shape(rows)).toEqual(["user:u1", "note:error", "final:a1", "final:a2", "footer(folded 5)", "user:u2", "tool:Bash", "final:b1", "footer"]);
     expect(rows.flatMap((r) => (r.type === "footer" ? [r.finals] : []))).toEqual([["a1", "a2"], ["b1"]]);
+    // Every finished turn's footer counts its steps (open or folded) and knows the turn_end before it.
+    expect(rows.flatMap((r) => (r.type === "footer" ? [[r.id, r.steps, r.prevEnd, r.folded]] : []))).toEqual([
+      ["e1", 5, "", true],
+      ["e2", 1, "e1", false],
+    ]);
     // The user's choice wins both ways.
     const fold = (k: string) => (k === "u1" ? false : k === "u2" ? true : undefined);
     expect(shape(buildRows(turns, { fold, working: false }))).toEqual([
