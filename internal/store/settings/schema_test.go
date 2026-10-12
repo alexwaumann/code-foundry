@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func field(t *testing.T, key string) Field {
@@ -243,6 +244,28 @@ func TestKeybindingFields(t *testing.T) {
 	}
 	if fs[1].Default != "cmd+n" || fs[1].Type != Keybinding || fs[1].Title != "Session: New Session" || fs[0].Default != "" {
 		t.Errorf("fields = %+v", fs)
+	}
+}
+
+func TestCacheTTLField(t *testing.T) {
+	f := field(t, KeyCacheTTL)
+	if f.Default != "3600" || f.Type != Int || f.Group != GroupSessions || f.Restart || f.Min != 60 || f.Max != 86400 {
+		t.Errorf("field = %+v", f)
+	}
+	if got := Defaults(); got.Sessions.CacheTTLSeconds != 3600 || got.CacheTTL() != time.Hour {
+		t.Errorf("Defaults() cache TTL = %d (%v)", got.Sessions.CacheTTLSeconds, got.CacheTTL())
+	}
+	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyRender }); staticFields[i+1].Key != KeyCacheTTL {
+		t.Errorf("field after %s = %s", KeyRender, staticFields[i+1].Key)
+	}
+	tests := []struct {
+		in string
+		ok bool
+	}{{"60", true}, {"300", true}, {"86400", true}, {"59", false}, {"86401", false}, {"", false}, {"1h", false}}
+	for _, tt := range tests {
+		if _, err := f.parse(tt.in); (err == nil) != tt.ok {
+			t.Errorf("parse(%q) err = %v, want ok %v", tt.in, err, tt.ok)
+		}
 	}
 }
 
