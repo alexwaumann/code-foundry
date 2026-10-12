@@ -82,7 +82,9 @@ func (d *streamStatus) event(ev claudestream.Event) {
 			case "compacting":
 				d.compacting = true
 			}
-		} else if e.CompactResult != "" {
+		} else {
+			// status null ends the announced phase (a compaction's carries
+			// compact_result success|failed); busy itself ends with the result.
 			d.compacting = false
 		}
 	case *claudestream.CommandLifecycle:
