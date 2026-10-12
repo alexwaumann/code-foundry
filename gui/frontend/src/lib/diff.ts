@@ -1,7 +1,8 @@
 /**
  * Unified diffs for a rendered thread's Edit and Write rows (docs/notes/rendered-threads-2-gui.md):
  * from the tool result's structuredPatch when Claude sent one (real line numbers), else from
- * the Edit's old_string / new_string (a line diff, numbered from 1), and a Write that
+ * the Edit's old_string / new_string (a line diff without line numbers: where in the file
+ * is unknown, e.g. while the Edit waits for permission), and a Write that
  * created a file as all additions. A removed line directly followed by an added one gets
  * the changed span of each marked (common prefix and suffix left out) for the word-level
  * highlight. Pure functions.
@@ -23,6 +24,8 @@ export interface DiffHunk {
   newStart: number;
   newLines: number;
   lines: DiffLine[];
+  /** Where in the file is unknown: no line numbers, a bare "@@" header. */
+  unnumbered?: boolean;
 }
 
 /** One hunk of Claude's structuredPatch (the `diff` package's format). */
@@ -136,10 +139,14 @@ function hunkOf(lines: DiffLine[], oldStart: number, newStart: number): DiffHunk
   };
 }
 
-/** An Edit's old_string → new_string as hunks, numbered from `startLine` (1 when the file position is unknown). */
+/**
+ * An Edit's old_string → new_string as hunks, numbered from `startLine`; without one the
+ * position in the file is unknown and the hunks carry no line numbers.
+ */
 export function editHunks(oldStr: string, newStr: string, opts: { context?: number; startLine?: number } = {}): DiffHunk[] {
-  const start = opts.startLine ?? 1;
-  return toHunks(diffLines(splitLines(oldStr), splitLines(newStr)), start, start, opts.context ?? 3);
+  const hunks = toHunks(diffLines(splitLines(oldStr), splitLines(newStr)), opts.startLine ?? 1, opts.startLine ?? 1, opts.context ?? 3);
+  if (opts.startLine !== undefined) return hunks;
+  return hunks.map((h) => ({ ...h, unnumbered: true, lines: h.lines.map((l) => ({ ...l, oldNo: null, newNo: null })) }));
 }
 
 /** Claude's structuredPatch as hunks. */
@@ -226,7 +233,8 @@ export function diffStats(hunks: readonly DiffHunk[]): { added: number; removed:
   return { added, removed };
 }
 
-/** "@@ -18,9 +18,14 @@" */
+/** "@@ -18,9 +18,14 @@" ("@@" when unnumbered) */
 export function hunkHeader(h: DiffHunk): string {
+  if (h.unnumbered) return "@@";
   return `@@ -${String(h.oldStart)},${String(h.oldLines)} +${String(h.newStart)},${String(h.newLines)} @@`;
 }

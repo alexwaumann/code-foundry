@@ -134,7 +134,9 @@ export function toolHunks(t: Pick<ToolCallView, "name" | "inputJson" | "resultJs
       return edits.flatMap((e) => editHunks(str(e, "old_string"), str(e, "new_string")));
     }
     case "Write":
-      // An update without a patch (nothing changed, or no result yet) shows the content as added.
+      // An update that changed nothing has an empty patch: no diff. Otherwise (a new file,
+      // or no result yet) the content shows as added.
+      if (str(result, "type") === "update") return [];
       return addedHunks(str(input, "content"));
     default:
       return [];
@@ -191,6 +193,8 @@ export function toolSummary(t: ToolCallView, opts: { tense: Tense; durationMs?: 
       const stats = diffStats(toolHunks(t));
       s.added = stats.added;
       s.removed = stats.removed;
+      // The diff shows one occurrence; say it applied to every one.
+      if (input.replace_all === true) s.meta = "every occurrence";
       break;
     }
     case "Grep": {

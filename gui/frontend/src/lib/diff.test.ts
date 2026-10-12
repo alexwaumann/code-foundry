@@ -17,11 +17,31 @@ describe("diffLines", () => {
   });
 });
 
+describe("line edge cases", () => {
+  it("CRLF lines compare with their CR; a missing final newline is not a change", () => {
+    expect(ops("a\r\nb\r\n", "a\r\nc\r\n")).toEqual([" a\r", "-b\r", "+c\r"]);
+    expect(ops("a\r\n", "a\n")).toEqual(["-a\r", "+a"]);
+    expect(ops("a\nb", "a\nb\n")).toEqual([" a", " b"]);
+    expect(splitLines("\n")).toEqual([""]);
+  });
+  it("a huge edit is everything removed, then everything added", () => {
+    const a = Array.from({ length: 2100 }, (_, i) => `a${String(i)}`);
+    const b = Array.from({ length: 2100 }, (_, i) => `b${String(i)}`);
+    const d = diffLines(a, b);
+    expect(d.slice(0, 1).concat(d.slice(2100, 2101)).map((o) => o.kind)).toEqual(["del", "add"]);
+  });
+  it("editHunks without a start line has no line numbers and a bare header", () => {
+    const [h] = editHunks("a\nb", "a\nc");
+    expect(h && hunkHeader(h)).toBe("@@");
+    expect(h?.lines.every((l) => l.oldNo === null && l.newNo === null)).toBe(true);
+  });
+});
+
 describe("editHunks", () => {
   it("numbers lines and keeps context around the change", () => {
     const old = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"].join("\n");
     const neu = old.replace("5", "five");
-    const [h, ...rest] = editHunks(old, neu, { context: 2 });
+    const [h, ...rest] = editHunks(old, neu, { context: 2, startLine: 1 });
     expect(rest).toEqual([]);
     expect(h && hunkHeader(h)).toBe("@@ -3,5 +3,5 @@");
     expect(h?.lines.map((l) => [l.kind, l.text, l.oldNo, l.newNo])).toEqual([
@@ -36,8 +56,8 @@ describe("editHunks", () => {
 
   it("splits far-apart changes into hunks and merges close ones", () => {
     const old = Array.from({ length: 20 }, (_, i) => String(i + 1)).join("\n");
-    expect(editHunks(old, old.replace(/^1$/m, "x").replace(/^20$/m, "y"), { context: 2 }).map(hunkHeader)).toEqual(["@@ -1,3 +1,3 @@", "@@ -18,3 +18,3 @@"]);
-    expect(editHunks(old, old.replace(/^5$/m, "x").replace(/^9$/m, "y"), { context: 2 }).map(hunkHeader)).toEqual(["@@ -3,9 +3,9 @@"]);
+    expect(editHunks(old, old.replace(/^1$/m, "x").replace(/^20$/m, "y"), { context: 2, startLine: 1 }).map(hunkHeader)).toEqual(["@@ -1,3 +1,3 @@", "@@ -18,3 +18,3 @@"]);
+    expect(editHunks(old, old.replace(/^5$/m, "x").replace(/^9$/m, "y"), { context: 2, startLine: 1 }).map(hunkHeader)).toEqual(["@@ -3,9 +3,9 @@"]);
     expect(editHunks("same", "same")).toEqual([]);
   });
 

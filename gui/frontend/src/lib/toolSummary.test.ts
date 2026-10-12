@@ -79,7 +79,22 @@ describe("toolHunks", () => {
   it("prefers the result's structuredPatch", () => {
     const t = call("Edit", { old_string: "x", new_string: "y" }, { resultJson: JSON.stringify({ structuredPatch: [{ oldStart: 40, oldLines: 1, newStart: 40, newLines: 1, lines: ["-x", "+y"] }] }) });
     expect(toolHunks(t)[0]?.oldStart).toBe(40);
-    expect(toolHunks({ ...t, resultJson: "" })[0]?.oldStart).toBe(1);
+    // Without it (no result yet: waiting for permission) the position is unknown: no line numbers.
+    const [h] = toolHunks({ ...t, resultJson: "" });
+    expect(h?.unnumbered).toBe(true);
+    expect(h?.lines.map((l) => [l.oldNo, l.newNo])).toEqual([
+      [null, null],
+      [null, null],
+    ]);
+  });
+  it("Write: a new file is all added; an update that changed nothing has no diff", () => {
+    const w = call("Write", { file_path: "/w/a", content: "x\ny" });
+    expect(toolHunks(w)[0]?.lines.map((l) => l.kind)).toEqual(["add", "add"]);
+    expect(toolHunks({ ...w, resultJson: JSON.stringify({ type: "update", structuredPatch: [] }) })).toEqual([]);
+  });
+  it("an Edit with an empty old_string adds its text; replace_all says every occurrence", () => {
+    expect(toolHunks(call("Edit", { old_string: "", new_string: "a\nb" }))[0]?.lines.map((l) => l.kind)).toEqual(["add", "add"]);
+    expect(sum(call("Edit", { file_path: "/w/repo/a.go", old_string: "x", new_string: "y", replace_all: true }))).toMatchObject({ added: 1, removed: 1, meta: "every occurrence" });
   });
   it("MultiEdit concatenates its edits' hunks", () => {
     expect(toolHunks(call("MultiEdit", { edits: [{ old_string: "a", new_string: "b" }, { old_string: "c", new_string: "d" }] }))).toHaveLength(2);
