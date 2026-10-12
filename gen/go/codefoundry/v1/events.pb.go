@@ -39,10 +39,10 @@ const (
 	// Workspaces (branch sets). Sent right after repo, before terminal: members name
 	// repositories, and sessions name workspaces.
 	EventSource_EVENT_SOURCE_WORKSPACE EventSource = 11
-	// Rendered threads' items: appended / updated / delta and pending requests, for
-	// every rendered thread. Its snapshot (right after session) is only the pending
-	// requests (ThreadPendingSnapshot); a thread's items come from
-	// ThreadService.ListItems or Watch.
+	// Rendered threads' pending requests (permission prompts and questions), for
+	// every rendered thread: a ThreadPendingSnapshot (right after session), then a
+	// ThreadEvent.pending per change. A thread's items come only from
+	// ThreadService.ListItems or Watch; this source never carries them.
 	EventSource_EVENT_SOURCE_THREAD EventSource = 12
 )
 
@@ -337,7 +337,7 @@ type Event_Workspace struct {
 }
 
 type Event_Thread struct {
-	// Rendered threads: pending_snapshot, then appended / updated / delta / pending.
+	// Rendered threads: pending_snapshot, then pending (never items or deltas).
 	Thread *ThreadEvent `protobuf:"bytes,12,opt,name=thread,proto3,oneof"`
 }
 

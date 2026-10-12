@@ -264,10 +264,10 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	if _, err := f.sess.Respond(ctx, "s2", "r1", session.Decision{Allow: true}); err != nil {
 		t.Fatal(err)
 	}
-	for _, w := range []string{"thread.updated s2 perm-r1", "thread.pending s2 0"} {
-		if got := describe(s.next()); got != w {
-			t.Fatalf("got %q, want %q", got, w)
-		}
+	// Only the pending list travels on the event stream; the item update stays on
+	// the thread's Watch.
+	if got := describe(s.next()); got != "thread.pending s2 0" {
+		t.Fatalf("got %q, want thread.pending s2 0", got)
 	}
 	f.gh.SetViewer(gh.ViewerState{Authenticated: true})
 	if got := describe(s.next()); got != "gh.viewer" {

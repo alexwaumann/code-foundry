@@ -118,7 +118,7 @@ export type Event = Message<"codefoundry.v1.Event"> & {
     case: "workspace";
   } | {
     /**
-     * Rendered threads: pending_snapshot, then appended / updated / delta / pending.
+     * Rendered threads: pending_snapshot, then pending (never items or deltas).
      *
      * @generated from field: codefoundry.v1.ThreadEvent thread = 12;
      */
@@ -197,10 +197,10 @@ export enum EventSource {
   WORKSPACE = 11,
 
   /**
-   * Rendered threads' items: appended / updated / delta and pending requests, for
-   * every rendered thread. Its snapshot (right after session) is only the pending
-   * requests (ThreadPendingSnapshot); a thread's items come from
-   * ThreadService.ListItems or Watch.
+   * Rendered threads' pending requests (permission prompts and questions), for
+   * every rendered thread: a ThreadPendingSnapshot (right after session), then a
+   * ThreadEvent.pending per change. A thread's items come only from
+   * ThreadService.ListItems or Watch; this source never carries them.
    *
    * @generated from enum value: EVENT_SOURCE_THREAD = 12;
    */
