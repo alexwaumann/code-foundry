@@ -45,9 +45,9 @@ with Alex's decisions (`docs/sketches/rendered-thread/DESIGN.md`, copied from
 * **Turns.** A user message starts a turn (consecutive ones share it); a turn_end closes
   it. A finished turn folds unless it is the latest; the user's choice per turn wins. Folded:
   the user message, the turn's final text (the trailing text items, thinking between them
-  allowed), notes (errors, compactions, command output) and the footer, which says how many
-  steps are hidden. The footer ("Worked for 4m 08s · 12 steps · $1.12 · Opus") is the
-  toggle. Cost is the difference from the previous turn_end's cumulative cost (or the value
+  allowed), notes (errors, compactions, command output) and the footer. Every finished
+  turn has the footer, the latest one too ("Worked for 4m 08s · 12 steps · $1.12 · Opus",
+  steps = the turn's work rows, a group or Agent counting as one); it is the toggle. Cost is the difference from the previous turn_end's cumulative cost (or the value
   itself when the process restarted).
 * **Rows.** Consecutive Read/Grep/Glob/LS fold into a group ("Read 3 files, searched code 2
   times"), absorbing thinking between them; a read waiting on a permission is never grouped.
@@ -59,13 +59,11 @@ with Alex's decisions (`docs/sketches/rendered-thread/DESIGN.md`, copied from
 * **Tense** follows the call: "Run" while it waits for permission, "Running", "Ran".
   Bash's chip is "ok" or "exit N" (parsed from Claude's "Exit code N"), with the call's
   duration (updated_at − created_at).
-* **User messages** are stored as sent (the composer's tokens projected for Claude), so the
-  bubble reads them back: `[Image: name; ref=path]` → green image chip with the thumbnail
-  (via `ReadAttachment`), `@cf-file://repo/path` → blue file chip, `/name` → purple skill
-  chip. Skills are recognised by shape (a one-segment `/word` at a word start, followed by
-  whitespace or the end), so a lone `/tmp` would become a chip; a proto field for the
-  composer's own tokens would remove the guess if it ever matters. Attachments the text
-  does not mention show as thumbnails above the bubble.
+* **User messages** carry the composer's own text (`UserMessageItem.composer_text`, added
+  in the review below): the bubble draws chips from its tokens only (green image chip with
+  the thumbnail via `ReadAttachment`, blue file chip, purple skill chip); a message without
+  it (no tags, or sent from the CLI) is plain text. Attachments the text does not mention
+  show as thumbnails above the bubble.
 * **Sending goes through the registry** (`thread.send`, `thread.interrupt`,
   `thread.set-model`, `thread.set-mode`, with `id` and the thread's context), like the
   new-thread composer's `session.new`. The prompt is projected exactly like the new-thread
@@ -86,8 +84,9 @@ with Alex's decisions (`docs/sketches/rendered-thread/DESIGN.md`, copied from
 * **Disconnected rendered threads** keep their timeline (items persist and Watch works
   while disconnected); the composer becomes a "Not connected · <cause>" bar with Reconnect.
 * **Sticking to the bottom.** The timeline follows new content while the user is at the
-  bottom; a scroll event is the user's only when it lands above where the list last
-  scrolled itself (content growing after a programmatic scroll would otherwise unpin it).
+  bottom; only the user unpins it (a scroll away from the bottom within 400 ms of a wheel,
+  touch or scroll key, or during a scrollbar drag). Any other scroll away (the
+  virtualizer adjusting for rows measured above) is followed back (review, below).
 * **Status plumbing.** Rendered threads' reasons ("permission: Bash git push …",
   "question: …", "finished", "working") go through the existing `statusKind` /
   `statusLine` unchanged: the sidebar says "Needs input · Bash git push …", "Asked a
@@ -139,3 +138,118 @@ with Alex's decisions (`docs/sketches/rendered-thread/DESIGN.md`, copied from
 Needed: the GUI calls `SessionService.ReadAttachment` (new here) for user message images,
 and everything else needs PR 1's ThreadService. An older daemon shows the thread without
 image thumbnails (dashed chips).
+
+## Review (Fable 5.1, 2026-10-11)
+
+Independent review of the branch after merging main (PR 1 as #62). Each fix is its own
+commit with tests.
+
+Fixed:
+
+* **Skill chips were guessed from the projected text** (a lone `/tmp` became a purple
+  chip, a skill followed by "." showed " ."). `UserMessageItem.composer_text` (stored in
+  `thread_items.data` as `composer`, no migration) carries the composer's tokens; images
+  point at their attachment index (`![name](cf-attachment://0)`, "x" when the chip lost its
+  image). It arrives through `SendThreadMessageRequest.composer_text` (`thread.send
+  --composer-text`) and, for a Create's first message, `CreateSessionRequest.
+  composer_prompt` (`session.new --composer-prompt`). The GUI sends it only when it
+  differs from the text (i.e. has tags); `lib/userMessage.ts` draws chips from it alone,
+  and a message without it is plain text. Older items (none outside test homes) lose
+  their chips.
+* **The latest finished turn's footer was missing live** (`live-dark.png`). The daemon had
+  emitted the turn_end (item 8 of the live thread); the row was there but under the
+  composer: a scroll the virtualizer made while measuring rows above (scrollTop moved up
+  by the size delta) counted as the user's and unpinned the list. Now only a scroll
+  within 400 ms of wheel/touch/scroll keys, or during a scrollbar drag, unpins; any other
+  scroll away from the bottom is followed back. The e2e reproduces it with a scripted
+  `scrollTop -= 160` (failed before). Every finished turn's footer shows the step count
+  (not only when folded); the cost delta reads the previous turn_end id carried on the
+  footer row (was an O(n) `indexOf` per store update per footer).
+* **A thread's markdown ate text in angle brackets**: with rehype-raw, "returns
+  Result<T, E> and <Option> values" parsed `<Option>` as a tag and sanitize dropped it.
+  The thread now shows HTML as text, like Claude Code's UI (raw nodes become text, then
+  sanitize as before); PR bodies keep GitHub HTML. Links still go through `openUrl`.
+* **Diffs**: an Edit without a structuredPatch (always the case while it waits for
+  permission) showed made-up line numbers from 1; it now has none and a bare `@@`. A Write
+  update with an empty patch (nothing changed) no longer shows the whole file as added.
+  `replace_all` says "every occurrence" (the diff shows one). Tests for CRLF, a missing
+  final newline, an empty old_string, the size cap.
+* **A file edit waiting for permission** could not be expanded and the docked prompt
+  shows only the path: its diff now shows, open by default.
+* **Streaming cost**: a frame of N deltas copied the item map N times; now once per
+  batch (`applyThreadEvents`, tested equal to one-by-one application across a resync
+  snapshot). Timeline keys are cached per item object (items keep identity).
+* **Memory**: every rendered thread ever opened kept all its items; only the last four
+  watched threads' logs are kept.
+* **Attachment thumbnails**: any fetch error was cached as "missing" for the window's
+  life (a daemon restart lost every thumbnail). `readAttachment` returns null only for
+  NotFound/InvalidArgument; other errors are retried on the next mount. `ReadAttachment`
+  refuses files over the staging limit.
+* **Light theme**: status text (waiting for you, ok/exit chips, +N, sky) used the -600
+  tones, about 3:1 for amber; now -700 (≥ 4.5:1).
+* Stale comment in `api/thread.ts` (the EventService thread source carries pending
+  requests only); the lazy `ThreadPane` sat between imports in `App.tsx`; the mock's
+  Send RPC and `thread.send` keep `composer_text`.
+
+Checked, no change:
+
+* Selectors are narrow (rows read their own item; the timeline reads structural keys with
+  `useShallow`; the composer reads draft fields one by one). No whole-slice subscriptions.
+* Watch lifecycle: one Watch for the visible rendered thread (`ThreadPane`'s effect keyed
+  by session id; e2e counts streams), torn down on switch/unmount; `runStream` reconnects
+  with backoff, the new snapshot replaces the log (seq dedupe after it), no duplicates
+  (tested with a daemon-restart snapshot whose seq is lower).
+* Rows are measured by TanStack's ResizeObserver, so growing text re-lays the list.
+* Grouping: a subagent's items arriving before their Agent call show at top level and
+  move under it when it arrives; nested Agents recurse.
+* Draft key `thread:<id>` never collides with project (repo id) or workspace (`ws:`)
+  keys and no code iterates drafts by prefix; thread drafts are not removed with their
+  thread (a few bytes, object URLs of unsent images).
+* `ReadAttachment`: only regular files directly in the attachments dir (Lstat), behind
+  the daemon's token like every RPC.
+* `activeSessionRendered` in the context key; `sessionOfTerminal` / `focusTerminal` with
+  an empty terminal id; sidebar statuses ("Needs input · Bash …", "Asked a question").
+* Bundle: `ThreadPane` chunk 215 kB (69 kB gzip), lowlight entirely in it; the main
+  bundle has no highlight.js.
+* `panel.spec.ts` drag-resize on WebKit: see Verification below.
+
+Not fixed (and why):
+
+* The footer's cost subtracts the previous turn_end's cumulative cost. After a Reconnect
+  (a new process, its total restarting from 0) the first turn's cost is right only while
+  its total is below the old process's; above it, it is understated. The items show no
+  process boundary; a per-turn cost computed by the daemon (it knows the process) would
+  fix it. PR 3/4.
+* The footer's model is the thread's current model, not the turn's (turn_end has no
+  model; Claude's result has `modelUsage`). Same follow-up.
+* A streaming answer re-parses its whole markdown every frame (fine for answers of a few
+  tens of kB; T3's `markdown-incremental.ts` is the reference if it shows up).
+* Grep detail compiles Claude's pattern as a JS RegExp over at most 100 lines; a
+  pathological pattern could stall a frame. Not seen.
+
+What PR 3 must know:
+
+* Wire `PendingPrompt.tsx` (NOT WIRED YET markers). A waiting Edit/Write row now shows its
+  diff in the timeline; the prompt itself still shows only the path.
+* Thread composers send `composer-text` / `composer-prompt` only when they differ from the
+  text; anything new that sends a user message (an "edit and resend", a queue) must do the
+  same through `lib/userMessage.ts sentComposerText`.
+* Interrupt has no keybinding yet (Claude's TUI uses Esc); the 1/2/3 hints in the prompt
+  are labels only.
+* `money()` prints "<$0.01" for tiny turns; the cost per turn is a GUI subtraction (above).
+
+Review verification:
+
+* `make check` green. `make gui-e2e` (WebKit + Chromium, 576 tests): green apart from one
+  Chromium failure in `workspaces.spec.ts` ("a single-project thread sends exactly what it
+  did before": Enter before the project's refs loaded, so no `base`), unrelated to this
+  branch; the test now waits for "From origin/main" (10 repeats green). The new thread
+  e2e ("the latest finished turn keeps its footer in view; only the user's scroll unpins
+  the list") failed before the Timeline fix and passed 32 repeats after.
+* `panel.spec.ts` drag-resize (the builder's WebKit failure): not caused by this branch
+  and not reproduced (full suite twice, the six drag tests 15 times each on WebKit);
+  recorded in `flaky-tests.md`.
+* Screenshots (mock, WebKit @2x): `/tmp/cf-rt2-shots/review-permission-{dark,light}.png`
+  and `review-full-{dark,light}.png` (turn 1 unfolded, Bash / Edit / Agent rows open).
+* Daemon restart needed: `composer_text` / `composer_prompt` are new fields (an older
+  daemon drops them: bubbles then show plain text), and the `ReadAttachment` size cap.
