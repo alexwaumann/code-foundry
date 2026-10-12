@@ -43,6 +43,14 @@ items are built: `rendered-threads-followups-fixes.md`.
   grants (Reconnect spawns with empty grants, the effort restart keeps them), how the
   break was judged. Side finding: turn 2 of a fresh conversation rewrote ~9k tokens
   (read 15371 / write 9061 after turn 1 wrote 9939) in one probe, not in the other.
+  Follow-up probes the same day: a 7.7 min idle gap still hit (read 25761 / write 41);
+  Alex's exact case (a two-repo workspace thread, daemon killed and restarted,
+  reconnected seconds later) also hit (write 41), with argv identical but `--resume`
+  and env differing only in CODE_FOUNDRY_ENDPOINT/TOKEN. This machine has no Bedrock
+  config and its live daemon never spawned a rendered thread, so the report is from the
+  work laptop over Bedrock: the remaining variable. Next occurrence: read the first
+  turn's cacheWriteTokens with `thread.items --json` and diff the two "session spawned"
+  log lines (argv is logged).
 
 ## 1. Document attachments (PDF, text) — deferred (Alex, 2026-10-12: not yet)
 
