@@ -47,7 +47,6 @@ test("cmd+, opens settings rendered from the schema", async ({ page }) => {
     "Sonnet 5",
     "Sonnet 4.6",
     "Haiku",
-    "Haiku 4.5",
   ]);
   // The naming model is its own live setting, defaulting to Sonnet.
   await expect(setting(page, "sessions.naming_model").getByRole("combobox")).toHaveValue("sonnet");

@@ -157,7 +157,6 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
     "Sonnet 5",
     "Sonnet 4.6",
     "Haiku",
-    "Haiku 4.5",
   ]);
   await page.keyboard.press("ArrowDown"); // opus -> claude-opus-4-8
   await page.keyboard.press("Enter");
