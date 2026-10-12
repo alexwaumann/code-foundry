@@ -142,7 +142,9 @@ function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
   const rules = suggestedRules(r.suggestionsJson);
   const sessionMode = suggestedMode(r.suggestionsJson);
   const sessionRule = suggestionCount(r.suggestionsJson) > 0;
-  const description = str(input, "description") || r.description;
+  // The CLI's description is often just the file name the box above already shows.
+  const rawDescription = str(input, "description") || r.description;
+  const description = path && (rawDescription === relPath(path, cwd) || path.endsWith(`/${rawDescription}`)) ? "" : rawDescription;
   const hint = modeHint(permissionMode, r.toolName);
   // Why Claude asks, when it says (and says more than the mode hint).
   const reason = r.decisionReason || (r.blockedPath ? `Outside the working directories: ${relPath(r.blockedPath, cwd)}` : "");
@@ -381,7 +383,7 @@ function QuestionPrompt({ r, keysRef, refocus }: PromptProps) {
               <span className="on" />
               <span>
                 <b>{o.label}</b>
-                {o.description && <small>{o.description}</small>}
+                {o.description && o.description !== o.label && <small>{o.description}</small>}
               </span>
               <span className="kn">{i + 1}</span>
             </button>

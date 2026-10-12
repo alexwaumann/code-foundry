@@ -328,6 +328,8 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 		r.onAsk(e)
 	case *claudestream.ControlCancel:
 		r.onAskGone(e.RequestID)
+	case *claudestream.Status:
+		r.onModeChange(e.PermissionMode)
 	case *claudestream.Result:
 		r.acknowledgeIfViewed()
 	case *claudestream.ConversationReset:
@@ -336,6 +338,30 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 	r.checkStatus()
 	r.tryCd()
 	r.maybeRestart()
+}
+
+// wireModes maps the permission modes Claude reports to the row's.
+var wireModes = map[string]PermissionMode{
+	claudestream.ModeDefault:     PermissionSupervised,
+	claudestream.ModeAcceptEdits: PermissionAcceptEdits,
+	claudestream.ModeAuto:        PermissionAuto,
+}
+
+// onModeChange follows a mode change Claude reports (system/status permissionMode):
+// SetPermissionMode's own, or one Claude made itself, e.g. "allow for session" applying
+// a setMode suggestion (an Edit's switches to accept edits). The row records it, so the
+// picker shows it and later spawns keep it. Modes the app does not offer are ignored.
+func (r *runner) onModeChange(wire string) {
+	mode, ok := wireModes[wire]
+	if !ok {
+		return
+	}
+	r.m.update(r.id, true, func(rec *record) {
+		if rec.s.PermissionMode != mode {
+			r.log().info("claude switched the permission mode", "mode", wire)
+			rec.s.PermissionMode = mode
+		}
+	})
 }
 
 // sendMessage records the user item and writes the message.

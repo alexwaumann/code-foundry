@@ -153,3 +153,23 @@ func TestDenyMessage(t *testing.T) {
 		}
 	}
 }
+
+// A mode change Claude reports (allow for session applying a setMode suggestion) is
+// recorded on the row; modes the app does not offer are ignored.
+func TestRenderedFollowsClaudesModeChange(t *testing.T) {
+	re := newRenderedEnv(t, "text-table")
+	s := re.create(CreateOptions{PermissionMode: PermissionSupervised})
+	re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
+	re.m.mu.Lock()
+	r := re.m.recs[s.ID].run
+	re.m.mu.Unlock()
+	r.onModeChange("acceptEdits")
+	if got, _ := re.m.Get(re.ctx(), s.ID); got.PermissionMode != PermissionAcceptEdits {
+		t.Fatalf("mode %v", got.PermissionMode)
+	}
+	r.onModeChange("plan")
+	r.onModeChange("")
+	if got, _ := re.m.Get(re.ctx(), s.ID); got.PermissionMode != PermissionAcceptEdits {
+		t.Errorf("mode after unknown wire modes %v", got.PermissionMode)
+	}
+}
