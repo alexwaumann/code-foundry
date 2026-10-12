@@ -59,9 +59,10 @@ export async function sendThreadDraft(sessionId: string): Promise<boolean> {
     const attachments = sent.map((a) => a.stagedPath ?? "");
     const args: Record<string, string> = { id: sessionId, text };
     if (attachments.length > 0) args.attachments = attachments.join(",");
-    // The composer's own text, so the message's bubble draws the same tags.
+    // The composer's own text, so the message's bubble draws the same tags (only when it
+    // has any: without tags it is the text itself).
     const composer = sentComposerText(cur.text, (id) => sent.findIndex((a) => a.id === id)).trim();
-    if (composer) args["composer-text"] = composer;
+    if (composer && composer !== text) args["composer-text"] = composer;
     const res = await invokeConfirmed(THREAD_COMMANDS.send, args, sessionContext(sessionId));
     if (!res) {
       updateDraft(key, { phase: "idle" });

@@ -310,9 +310,10 @@ export function threadArgs(place: ThreadPlace, d: PromptArgsInput, attachments: 
   if (d.permission) args.permission = d.permission;
   const prompt = d.text.trim();
   if (prompt) args.prompt = prompt;
-  // A rendered thread keeps the composer's text on its first message to draw the tags.
+  // A rendered thread keeps the composer's text on its first message to draw the tags
+  // (only when it has any: without tags it is the prompt itself).
   const composer = d.composerText?.trim() ?? "";
-  if (prompt && composer) args["composer-prompt"] = composer;
+  if (prompt && composer && composer !== prompt) args["composer-prompt"] = composer;
   if (attachments.length > 0) args.attachments = attachments.join(",");
   return args;
 }

@@ -515,8 +515,8 @@ type UserMessageItem struct {
 	// The composer's text with its tags as Markdown-link tokens (gui lib/prompt.ts):
 	// "[/name](cf-skill://<repo id or ~>/<name>)", "[base](cf-file://<repo id>/<path>)",
 	// and "![name](cf-attachment://<n>)" where n is the image's index in attachments
-	// (not a number: the chip had lost its image). Empty for a message sent without the
-	// composer (the CLI): text is then shown as is. Stored, never interpreted.
+	// (not a number: the chip had lost its image). Empty for a message without tags or sent
+	// without the composer (the CLI): text is then shown as is. Stored, never interpreted.
 	ComposerText  string `protobuf:"bytes,3,opt,name=composer_text,json=composerText,proto3" json:"composer_text,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

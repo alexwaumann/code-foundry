@@ -164,8 +164,8 @@ export type UserMessageItem = Message<"codefoundry.v1.UserMessageItem"> & {
    * The composer's text with its tags as Markdown-link tokens (gui lib/prompt.ts):
    * "[/name](cf-skill://<repo id or ~>/<name>)", "[base](cf-file://<repo id>/<path>)",
    * and "![name](cf-attachment://<n>)" where n is the image's index in attachments
-   * (not a number: the chip had lost its image). Empty for a message sent without the
-   * composer (the CLI): text is then shown as is. Stored, never interpreted.
+   * (not a number: the chip had lost its image). Empty for a message without tags or sent
+   * without the composer (the CLI): text is then shown as is. Stored, never interpreted.
    *
    * @generated from field: string composer_text = 3;
    */

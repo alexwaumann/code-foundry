@@ -157,6 +157,7 @@ describe("workspaces", () => {
     const place: ThreadPlace = { kind: "workspace", workspaceId: "w-1", repoId: "api", worktreePath: "/wt" };
     expect(threadArgs(place, { ...prompt, text: "/tdd go", composerText: " [/tdd](cf-skill://~/tdd) go " }, [])).toMatchObject({ prompt: "/tdd go", "composer-prompt": "[/tdd](cf-skill://~/tdd) go" });
     expect(threadArgs(place, { ...prompt, text: " ", composerText: "x" }, [])).not.toHaveProperty("composer-prompt");
+    expect(threadArgs(place, { ...prompt, text: "no tags", composerText: "no tags" }, [])).not.toHaveProperty("composer-prompt");
   });
 });
 
