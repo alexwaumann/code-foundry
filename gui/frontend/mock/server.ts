@@ -26,7 +26,8 @@
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
  *   POST /__mock/thread?state=permission|question|streaming|idle   (the rendered thread s-r1:
- *        mock/thread.ts); POST /__mock/thread/delta?text=… | /__mock/thread/finish; GET /__mock/thread/calls
+ *        mock/thread.ts, also parallel|multi); POST /__mock/thread/delta?text=… | /__mock/thread/finish |
+ *        /__mock/thread/fail-respond (the next answer fails); GET /__mock/thread/calls
  *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
  *                                                 shell stays, exited, as if the reaper were late)
  *   POST /__mock/session/hold?id=s-1&id=s-5   (the clock stops changing them: s-1 stops flipping
@@ -98,7 +99,7 @@ import { HealthService } from "../src/gen/codefoundry/v1/health_pb";
 import { RepoService } from "../src/gen/codefoundry/v1/repo_pb";
 import { SessionService, SessionState, SessionStatus } from "../src/gen/codefoundry/v1/session_pb";
 import { TerminalService, TerminalState, type AttachEventSchema } from "../src/gen/codefoundry/v1/terminal_pb";
-import { ThreadService } from "../src/gen/codefoundry/v1/thread_pb";
+import { ThreadDecision, ThreadService } from "../src/gen/codefoundry/v1/thread_pb";
 import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
@@ -109,7 +110,7 @@ import { createProject, deleteProject, listPublishOwners, projectCalls, publishP
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
 import { retiredUsage, utcDay } from "./usage";
-import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreads, type ThreadState } from "./thread";
+import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreads, THREAD_STATES, type ThreadState } from "./thread";
 import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
 
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -350,12 +351,18 @@ function routes(router: ConnectRouter): void {
   });
 
   // Rendered threads (mock/thread.ts). The GUI goes through the thread.* commands for
-  // Send / Interrupt / SetModel / SetPermissionMode; these serve the RPCs themselves.
+  // Send / Interrupt / Respond / SetModel / SetPermissionMode / SetEffort; these serve the RPCs themselves.
   router.service(ThreadService, {
     listItems: (req) => guard(() => ({ snapshot: world.threads.snapshotValue(req.sessionId) })),
     watch: (req, ctx) => tracked("ThreadService/Watch", guard(() => world.threads.watch(req.sessionId, ctx.signal))),
     send: (req) => guard(() => ({ item: world.threads.send(req.sessionId, req.text, req.attachments, req.composerText) })),
     interrupt: (req) => guard(() => (world.threads.finish(req.sessionId, { interrupted: true }), {})),
+    respond: (req) =>
+      guard(() => {
+        const decision = req.decision === ThreadDecision.DENY ? "deny" : req.decision === ThreadDecision.ALLOW_FOR_SESSION ? "allow-session" : "allow";
+        return { item: world.threads.respond(req.sessionId, req.requestId, decision, req.answers, req.message) };
+      }),
+    setEffort: (req) => guard(() => (world.threads.setEffort(req.sessionId, req.effort), { session: world.sessionMsg(world.session(req.sessionId)) })),
   });
 
   router.service(UpdateService, {
@@ -637,8 +644,8 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/thread": {
       // state=permission|question|streaming|idle[&id=s-r1]: the sketch's rendered thread.
       const state = (q.get("state") ?? "permission") as ThreadState;
-      if (!["permission", "question", "streaming", "idle"].includes(state)) {
-        json(res, 400, { error: "state must be permission, question, streaming or idle" });
+      if (!THREAD_STATES.includes(state)) {
+        json(res, 400, { error: `state must be one of ${THREAD_STATES.join(", ")}` });
         break;
       }
       const s = world.addRenderedThread(state, q.get("id") ?? "s-r1");
@@ -651,6 +658,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/thread/finish":
       world.threads.finish(q.get("id") ?? "s-r1", { rest: q.get("rest") ?? MockThreads.answerRest });
+      json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/thread/fail-respond":
+      world.threads.failRespond = true;
       json(res, 200, { ok: true });
       break;
     case "GET /__mock/thread/calls":

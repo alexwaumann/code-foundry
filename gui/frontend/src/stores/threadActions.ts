@@ -2,18 +2,20 @@
  * A rendered thread's follow-up composer and controls (docs/notes/rendered-threads-2-gui.md).
  * Every action is a thread.* registry command invoked with the thread's context, like
  * the new-thread composer's session.new: thread.send (ThreadService.Send),
- * thread.interrupt, thread.set-model and thread.set-mode. The draft lives in the compose
+ * thread.interrupt, thread.respond, thread.set-model, thread.set-mode and thread.set-effort. The draft lives in the compose
  * store under `thread:<id>` (its text with the composer's tags as tokens, its images), so
  * switching threads keeps what was typed.
  */
 import { stageAttachment } from "@/api/session";
 import { errorMessage } from "@/api/stream";
 import type { ComposePermission } from "@/lib/compose";
+import type { PermissionDecision } from "@/lib/threadRequest";
 import { projectPrompt } from "@/lib/prompt";
 import { sentComposerText } from "@/lib/userMessage";
-import { invokeConfirmed, refreshCommands, runCommand } from "./commands";
+import { invokeConfirmed, refreshCommands, runCommand, runCommandForResult } from "./commands";
 import { clearDraft, getDraft, isDraftEmpty, updateDraft } from "./compose";
 import { sessionContext } from "./sessionActions";
+import { setAnswering } from "./thread";
 
 export const THREAD_COMMANDS = {
   send: "thread.send",
@@ -21,6 +23,7 @@ export const THREAD_COMMANDS = {
   setModel: "thread.set-model",
   setMode: "thread.set-mode",
   respond: "thread.respond",
+  setEffort: "thread.set-effort",
 } as const;
 
 /** The compose store key of a rendered thread's follow-up draft. */
@@ -78,9 +81,36 @@ export async function sendThreadDraft(sessionId: string): Promise<boolean> {
   }
 }
 
-/** Stops the running turn (thread.interrupt); pending requests are withdrawn. */
-export function interruptThread(sessionId: string): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.interrupt, { id: sessionId }, sessionContext(sessionId));
+/**
+ * Stops the running turn (thread.interrupt); pending requests are withdrawn. Quiet: the
+ * timeline's footer says "Interrupted"; a failure still toasts.
+ */
+export async function interruptThread(sessionId: string): Promise<boolean> {
+  return (await runCommandForResult(THREAD_COMMANDS.interrupt, { id: sessionId }, { ctx: sessionContext(sessionId), quiet: true })) !== null;
+}
+
+/**
+ * Answers a pending request (thread.respond): a permission's decision with a deny's
+ * reason, or a question's answers (question -> label, lib/threadRequest answersOf; deny
+ * skips the questions). The prompt leaves at once and comes back if the answer fails
+ * (the failure toasts). Quiet otherwise: the timeline shows the outcome.
+ */
+export async function respondThread(sessionId: string, requestId: string, decision: PermissionDecision, opts: { answers?: Record<string, string>; message?: string } = {}): Promise<boolean> {
+  const args: Record<string, string> = { id: sessionId, request: requestId, decision };
+  if (opts.answers) args.answer = JSON.stringify(opts.answers);
+  if (opts.message?.trim()) args.message = opts.message.trim();
+  setAnswering(sessionId, requestId, true);
+  const res = await runCommandForResult(THREAD_COMMANDS.respond, args, { ctx: sessionContext(sessionId), quiet: true });
+  if (res === null) setAnswering(sessionId, requestId, false);
+  return res !== null;
+}
+
+/**
+ * Changes the effort (thread.set-effort): Claude restarts with it, at once when idle, else
+ * after the running turn (Session.effortPending says so meanwhile).
+ */
+export async function setThreadEffort(sessionId: string, effort: string): Promise<boolean> {
+  return (await runCommandForResult(THREAD_COMMANDS.setEffort, { id: sessionId, effort }, { ctx: sessionContext(sessionId), quiet: true })) !== null;
 }
 
 /** Switches the model from the next request (thread.set-model). */

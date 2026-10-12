@@ -604,10 +604,110 @@
 .cf-thread .ccard[data-dragging] {
   border-color: oklch(0.746 0.16 232.661 / 70%);
 }
-.cf-thread .pend {
+.cf-thread .pend-stack {
   grid-column: 1 / 3;
+  /* Several prompts at once (subagents ask in parallel): scroll rather than cover the pane. */
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+  border-radius: 16px 16px 0 0;
+}
+.cf-thread .pend {
   padding: 12px 14px;
   border-bottom: 1px solid var(--border);
+  outline: none;
+}
+.cf-thread .pend:focus-visible,
+.cf-thread .pend:focus {
+  box-shadow: inset 2px 0 0 var(--t-amber);
+}
+.cf-thread .pend .chip {
+  flex: none;
+}
+.cf-thread .pend .desc .reason {
+  display: block;
+  margin-top: 2px;
+  color: var(--t-amber);
+}
+.cf-thread .pdiff {
+  margin: 0 0 8px;
+}
+.cf-thread .pdiff-t {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  border-radius: 4px;
+}
+.cf-thread .pdiff-t:hover {
+  color: var(--foreground);
+}
+.cf-thread .pdiff-t svg {
+  width: 13px;
+  height: 13px;
+}
+.cf-thread .pdiff-t .n {
+  font-family: var(--t-mono);
+  font-size: 11px;
+  margin-left: 2px;
+}
+.cf-thread .pdiff-t .n.add {
+  color: var(--t-emerald);
+}
+.cf-thread .pdiff-t .n.del {
+  color: var(--t-red);
+}
+.cf-thread .pdiff-body {
+  margin-top: 6px;
+  max-height: 260px;
+  overflow: auto;
+  border-radius: 8px;
+}
+.cf-thread .acts.deny .reason-in {
+  flex: 1 1 220px;
+  min-width: 0;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  padding: 0 8px;
+  font-size: 12px;
+  outline: none;
+}
+.cf-thread .acts.deny .reason-in:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+}
+.cf-thread .btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.cf-thread .btn:focus-visible,
+.cf-thread .opt:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+}
+.cf-thread .q-multi {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.cf-thread .opts.multi .opt .on {
+  border-radius: 4px;
+}
+.cf-thread .opts.multi .opt.sel .on {
+  background: var(--t-sky);
+}
+.cf-thread .opts.multi .opt.sel .on::after {
+  width: 9px;
+  height: 5px;
+  border-radius: 0;
+  background: none;
+  border: solid var(--card);
+  border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg);
+}
+.cf-thread .opt[role] {
+  cursor: pointer;
 }
 .cf-thread .pend-h {
   display: flex;

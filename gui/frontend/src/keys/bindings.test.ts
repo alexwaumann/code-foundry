@@ -52,6 +52,7 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     pendingWorktreePath: "",
     pinned: false,
     render: "terminal",
+    effortPending: false,
     linkedPullRequests: [],
     usage: [],
     costUsd: 0,
