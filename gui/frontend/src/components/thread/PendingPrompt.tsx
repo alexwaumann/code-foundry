@@ -74,6 +74,8 @@ function usePromptKeys(shape: PromptShape, act: (a: PromptKeyAction) => void, ke
   }, [keysRef]);
   return (e: ReactKeyboardEvent<HTMLElement>) => {
     if (e.defaultPrevented || (e.target instanceof HTMLInputElement && e.target.type === "text")) return;
+    // A focused action button (Back, Skip, Cancel, Show the change) keeps its own Enter and Space.
+    if ((e.key === "Enter" || e.key === " ") && e.target instanceof HTMLButtonElement && e.target.closest(".acts, .pdiff")) return;
     const a = promptKey(latest.current.shape, { key: e.key, plain: plainKey(e), from: "prompt", editorEmpty: false });
     if (!a) return;
     e.preventDefault();
@@ -168,9 +170,20 @@ function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
     setDenying(true);
     requestAnimationFrame(() => reasonRef.current?.focus());
   };
+  const cancelDeny = () => {
+    setDenying(false);
+    setDenyReason("");
+    rootRef.current?.focus();
+  };
   const onKeyDown = usePromptKeys(
     { kind: "permission", sessionRule },
     (a) => {
+      if (denying) {
+        // The reason is open: only Deny's number (back to the field) and Escape (cancel) apply.
+        if (a.kind === "decide" && a.decision === "deny") reasonRef.current?.focus();
+        else if (a.kind === "editor") cancelDeny();
+        return;
+      }
       if (a.kind === "decide") decide(a.decision);
       else if (a.kind === "editor") refocus();
     },
@@ -178,7 +191,17 @@ function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
   );
 
   return (
-    <div className="pend perm" ref={rootRef} tabIndex={-1} data-keys-local="" data-testid="thread-permission" data-request-id={r.requestId} onKeyDown={onKeyDown}>
+    <div
+      className="pend perm"
+      ref={rootRef}
+      tabIndex={-1}
+      role="group"
+      aria-label={`Permission request: ${r.displayName || r.toolName}`}
+      data-keys-local=""
+      data-testid="thread-permission"
+      data-request-id={r.requestId}
+      onKeyDown={onKeyDown}
+    >
       <div className="pend-h">
         <ShieldAlert aria-hidden />
         <span>{permissionTitle(r, input, cwd)}</span>
@@ -251,9 +274,7 @@ function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
               if (e.key === "Escape") {
                 e.preventDefault();
                 e.stopPropagation();
-                setDenying(false);
-                setDenyReason("");
-                rootRef.current?.focus();
+                cancelDeny();
               }
             }}
           />
@@ -263,11 +284,7 @@ function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
           <button
             type="button"
             className="btn outline"
-            onClick={() => {
-              setDenying(false);
-              setDenyReason("");
-              rootRef.current?.focus();
-            }}
+            onClick={cancelDeny}
           >
             Cancel <Kbd k="esc" />
           </button>
@@ -346,7 +363,17 @@ function QuestionPrompt({ r, keysRef, refocus }: PromptProps) {
   if (!q) return null;
   const role = q.multiSelect ? "checkbox" : "radio";
   return (
-    <div className="pend ask" ref={rootRef} tabIndex={-1} data-keys-local="" data-testid="thread-question" data-request-id={r.requestId} onKeyDown={onKeyDown}>
+    <div
+      className="pend ask"
+      ref={rootRef}
+      tabIndex={-1}
+      role="group"
+      aria-label={questions.length === 1 ? "Claude's question" : "Claude's questions"}
+      data-keys-local=""
+      data-testid="thread-question"
+      data-request-id={r.requestId}
+      onKeyDown={onKeyDown}
+    >
       <div className="pend-h">
         <MessageCircleQuestionMark aria-hidden />
         <span>{questions.length === 1 ? "Claude has a question" : `Claude has ${String(questions.length)} questions`}</span>

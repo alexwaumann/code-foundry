@@ -23,6 +23,7 @@ import { MockSettings, MODEL_VALUES } from "./settings";
 import { MockUpdater } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { claudeIntro, claudeTick, ENTER_ALT, prompt, RESET, topFrame } from "./screens";
+import { CommandError } from "./errors";
 import { MockThreads, type ThreadState } from "./thread";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
@@ -213,14 +214,8 @@ export class ConfirmNeeded extends Error {
   }
 }
 
-export class CommandError extends Error {
-  constructor(
-    readonly kind: "unavailable" | "invalid" | "notfound",
-    message: string,
-  ) {
-    super(message);
-  }
-}
+// In its own module so mock/thread.ts can throw it without importing the world.
+export { CommandError };
 
 // Repo paths under the fake home (mock/filesystem.ts lists the same tree).
 const CF = `${HOME}/src/code-foundry`;
