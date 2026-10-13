@@ -55,6 +55,9 @@ const (
 	// ThreadServiceMcpReconnectProcedure is the fully-qualified name of the ThreadService's
 	// McpReconnect RPC.
 	ThreadServiceMcpReconnectProcedure = "/codefoundry.v1.ThreadService/McpReconnect"
+	// ThreadServiceSlashCommandsProcedure is the fully-qualified name of the ThreadService's
+	// SlashCommands RPC.
+	ThreadServiceSlashCommandsProcedure = "/codefoundry.v1.ThreadService/SlashCommands"
 )
 
 // ThreadServiceClient is a client for the codefoundry.v1.ThreadService service.
@@ -97,6 +100,14 @@ type ThreadServiceClient interface {
 	// A server that still fails is not an RPC error: the response's error says why and the
 	// status shows it. An unknown server is NOT_FOUND.
 	McpReconnect(context.Context, *connect.Request[v1.McpReconnectRequest]) (*connect.Response[v1.McpReconnectResponse], error)
+	// SlashCommands returns the slash commands a running thread offers (the composer's
+	// "/" completion): what Claude reported in its initialize reply, replaced by each
+	// list it pushes when skills change, minus the commands the daemon denies (replaced by
+	// the app's own controls, terminal-only, or retired; never a skill or a user, project
+	// or plugin command). In Claude's order: its skills, then its built-ins, then plugin
+	// skills. Empty when the thread is not running. Watch carries every change (the
+	// `commands` event). See docs/notes/slash-commands-1-daemon.md.
+	SlashCommands(context.Context, *connect.Request[v1.SlashCommandsRequest]) (*connect.Response[v1.SlashCommandsResponse], error)
 }
 
 // NewThreadServiceClient constructs a client for the codefoundry.v1.ThreadService service. By
@@ -170,6 +181,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("McpReconnect")),
 			connect.WithClientOptions(opts...),
 		),
+		slashCommands: connect.NewClient[v1.SlashCommandsRequest, v1.SlashCommandsResponse](
+			httpClient,
+			baseURL+ThreadServiceSlashCommandsProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("SlashCommands")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -185,6 +202,7 @@ type threadServiceClient struct {
 	setEffort         *connect.Client[v1.SetThreadEffortRequest, v1.SetThreadEffortResponse]
 	mcpStatus         *connect.Client[v1.McpStatusRequest, v1.McpStatusResponse]
 	mcpReconnect      *connect.Client[v1.McpReconnectRequest, v1.McpReconnectResponse]
+	slashCommands     *connect.Client[v1.SlashCommandsRequest, v1.SlashCommandsResponse]
 }
 
 // ListItems calls codefoundry.v1.ThreadService.ListItems.
@@ -237,6 +255,11 @@ func (c *threadServiceClient) McpReconnect(ctx context.Context, req *connect.Req
 	return c.mcpReconnect.CallUnary(ctx, req)
 }
 
+// SlashCommands calls codefoundry.v1.ThreadService.SlashCommands.
+func (c *threadServiceClient) SlashCommands(ctx context.Context, req *connect.Request[v1.SlashCommandsRequest]) (*connect.Response[v1.SlashCommandsResponse], error) {
+	return c.slashCommands.CallUnary(ctx, req)
+}
+
 // ThreadServiceHandler is an implementation of the codefoundry.v1.ThreadService service.
 type ThreadServiceHandler interface {
 	// ListItems returns a thread's items (the streaming one included) and its pending
@@ -277,6 +300,14 @@ type ThreadServiceHandler interface {
 	// A server that still fails is not an RPC error: the response's error says why and the
 	// status shows it. An unknown server is NOT_FOUND.
 	McpReconnect(context.Context, *connect.Request[v1.McpReconnectRequest]) (*connect.Response[v1.McpReconnectResponse], error)
+	// SlashCommands returns the slash commands a running thread offers (the composer's
+	// "/" completion): what Claude reported in its initialize reply, replaced by each
+	// list it pushes when skills change, minus the commands the daemon denies (replaced by
+	// the app's own controls, terminal-only, or retired; never a skill or a user, project
+	// or plugin command). In Claude's order: its skills, then its built-ins, then plugin
+	// skills. Empty when the thread is not running. Watch carries every change (the
+	// `commands` event). See docs/notes/slash-commands-1-daemon.md.
+	SlashCommands(context.Context, *connect.Request[v1.SlashCommandsRequest]) (*connect.Response[v1.SlashCommandsResponse], error)
 }
 
 // NewThreadServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -346,6 +377,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("McpReconnect")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceSlashCommandsHandler := connect.NewUnaryHandler(
+		ThreadServiceSlashCommandsProcedure,
+		svc.SlashCommands,
+		connect.WithSchema(threadServiceMethods.ByName("SlashCommands")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.ThreadService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ThreadServiceListItemsProcedure:
@@ -368,6 +405,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceMcpStatusHandler.ServeHTTP(w, r)
 		case ThreadServiceMcpReconnectProcedure:
 			threadServiceMcpReconnectHandler.ServeHTTP(w, r)
+		case ThreadServiceSlashCommandsProcedure:
+			threadServiceSlashCommandsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -415,4 +454,8 @@ func (UnimplementedThreadServiceHandler) McpStatus(context.Context, *connect.Req
 
 func (UnimplementedThreadServiceHandler) McpReconnect(context.Context, *connect.Request[v1.McpReconnectRequest]) (*connect.Response[v1.McpReconnectResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.McpReconnect is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) SlashCommands(context.Context, *connect.Request[v1.SlashCommandsRequest]) (*connect.Response[v1.SlashCommandsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SlashCommands is not implemented"))
 }

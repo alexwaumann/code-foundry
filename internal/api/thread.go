@@ -174,6 +174,8 @@ func threadSeq(ev session.ThreadEvent) uint64 {
 		return e.Seq
 	case session.McpChanged:
 		return e.Seq
+	case session.SlashCommandsChanged:
+		return e.Seq
 	}
 	return 0
 }
@@ -197,6 +199,8 @@ func threadEventToProto(ev session.ThreadEvent) *v1.ThreadEvent {
 		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Pending{Pending: pendingToProto(e.SessionID, e.Seq, e.Pending)}}
 	case session.McpChanged:
 		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Mcp{Mcp: &v1.ThreadMcpChange{SessionId: e.SessionID, Seq: e.Seq, Status: mcpStatusToProto(e.Status)}}}
+	case session.SlashCommandsChanged:
+		return &v1.ThreadEvent{Event: &v1.ThreadEvent_Commands{Commands: &v1.ThreadSlashCommandsChange{SessionId: e.SessionID, Seq: e.Seq, Commands: slashCommandsToProto(e.Commands)}}}
 	}
 	return nil
 }
@@ -208,6 +212,7 @@ func itemsSnapshotToProto(s session.ItemsSnapshot) *v1.ThreadItemsSnapshot {
 	}
 	out.Pending = pendingToProto(s.SessionID, s.Seq, s.Pending).GetPending()
 	out.Mcp = mcpStatusToProto(s.Mcp)
+	out.Commands = slashCommandsToProto(s.Commands)
 	return out
 }
 

@@ -47,6 +47,14 @@ service ThreadService {
   // A server that still fails is not an RPC error: the response's error says why and the
   // status shows it. An unknown server is NOT_FOUND.
   rpc McpReconnect(McpReconnectRequest) returns (McpReconnectResponse) {}
+  // SlashCommands returns the slash commands a running thread offers (the composer's
+  // "/" completion): what Claude reported in its initialize reply, replaced by each
+  // list it pushes when skills change, minus the commands the daemon denies (replaced by
+  // the app's own controls, terminal-only, or retired; never a skill or a user, project
+  // or plugin command). In Claude's order: its skills, then its built-ins, then plugin
+  // skills. Empty when the thread is not running. Watch carries every change (the
+  // `commands` event). See docs/notes/slash-commands-1-daemon.md.
+  rpc SlashCommands(SlashCommandsRequest) returns (SlashCommandsResponse) {}
 }
 
 // One entry of a rendered thread's conversation. The payload's case is the kind.
@@ -249,6 +257,9 @@ message ThreadItemsSnapshot {
   // The thread's MCP servers as last checked; unset when not checked since its process
   // started, or when it is not running.
   ThreadMcpStatus mcp = 5;
+  // The slash commands the running thread offers (ThreadService.SlashCommands); empty
+  // when it is not running.
+  repeated SlashCommand commands = 6;
 }
 
 // Text appended to a streaming item.
@@ -302,6 +313,9 @@ message ThreadEvent {
     // Watch only: the thread's MCP servers were checked again, or dropped (status unset:
     // the process ended).
     ThreadMcpChange mcp = 7;
+    // Watch only: the thread's slash commands changed (Claude's list changed, or the
+    // process ended: empty).
+    ThreadSlashCommandsChange commands = 8;
   }
 }
 
@@ -495,4 +509,37 @@ message McpReconnectResponse {
   // Claude's answer when the attempt failed (the server still fails); empty when it
   // went through.
   string error = 2;
+}
+
+// One slash command a thread offers: "/" + name runs it.
+message SlashCommand {
+  // What follows "/" ("compact", "anthropic-skills:deep-research").
+  string name = 1;
+  // Claude's one-line description; a project skill's ends in " (project)". May be long
+  // (a skill's whole description).
+  string description = 2;
+  // Shown after the name ("[interval] [prompt]", "<file>"); empty for none.
+  string argument_hint = 3;
+  // Other names that run the same command ("/cost" runs usage).
+  repeated string aliases = 4;
+  // Claude Code's own command (bundled skills included); false for a user, project or
+  // plugin skill or command.
+  bool builtin = 5;
+}
+
+// A thread's slash commands changed (ThreadService.Watch).
+message ThreadSlashCommandsChange {
+  string session_id = 1;
+  uint64 seq = 2;
+  // The whole new list; empty when the process ended.
+  repeated SlashCommand commands = 3;
+}
+
+message SlashCommandsRequest {
+  string session_id = 1;
+}
+
+message SlashCommandsResponse {
+  // Empty when the thread is not running.
+  repeated SlashCommand commands = 1;
 }
