@@ -3,6 +3,13 @@
 > **Superseded (2026-10-11):** the sidebar has no terminal rows any more (no Terminals
 > header, no exit chips); shells live in bottom panels. See `bottom-panel-3-routing.md`.
 
+> **Superseded (2026-10-13):** the list is three stacked panels: the main list (pinned →
+> attention → done → idle) scrolls on its own, and under it the **Working** footer
+> (expanded by default, up to 40% of the sidebar body) and the **Archived** footer
+> (archived threads only, single-line rows with the archive age, most recently archived
+> first, collapsed by default, up to 30%). Keys walk one order across all three. See
+> `archive-threads-2-sidebar.md`.
+
 Decided 2026-10-10 (Alex). Design record: the static sketch `/tmp/thread-list/index.html`,
 `?v=14` for the rows and `?v=23` for the tooltip (PNGs in
 `~/.t3/userdata/attachments/thread-list/v14.png`, `v23.png`). Frontend only; it builds on the

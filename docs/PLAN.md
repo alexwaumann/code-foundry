@@ -153,8 +153,10 @@ table; Send refuses the commands the app replaces (`/clear`, `/model`, ...).
 Manual, reversible archive: closes Claude, removes the thread's shells, unpins, stamps
 `archived_at`; reconnect, pin and send unarchive. PR 1 (proto, store, migration 0017,
 `session.archive` with confirmation only mid-turn via `Command.ConfirmIf`, API and view
-mapping) done: `docs/notes/archive-threads-1-daemon.md`. PR 2: the sidebar's archived
-section and row menu.
+mapping) done: `docs/notes/archive-threads-1-daemon.md`. PR 2 (the sidebar as stacked
+panels: the main list scrolling above the Working and Archived footers; single-line
+archived rows with their age; Archive / Unarchive in the row menu and thread header; an
+archived thread's side and bottom panels reset) done: `docs/notes/archive-threads-2-sidebar.md`.
 
 ### Release channels: stable and tip (design 2026-10-11, revised 2026-10-12)
 
