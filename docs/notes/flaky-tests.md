@@ -75,6 +75,19 @@ than the shell takes to open can hit the same. `terminal/xterm.ts` now answers a
 an app chord, or of cmd, with false so xterm skips the refocus. Without the wait: 1 failure
 in 6 to 1 in 30 repeats before, 100 + 40 WebKit and 40 Chromium repeats green after.
 
+## `TestPollCacheRestart` (internal/store/gh) and `TestRenderedSetEffortGap` (internal/store/session) on CI — timing, open
+
+Seen 2026-10-13 on the MCP panel PR's first CI run (#71, `go test -race` on the macOS
+runner): the poller test's restart snapshot differed from the expected one, and the
+effort-gap test saw its held message delivered 0 times to either process after the
+restart was "applied". `TestPollCacheRestart` also failed once on main's previous commit
+(58e2d9e) next to a green run of the same sha. Neither test touches code that PR changed.
+Locally both pass 5 `-race` repeats, and the effort-gap test passed 20 `-race -cpu 2`
+repeats with the MCP status polling in place, so the MCP change is not the cause. The
+re-run of the failed job was green. Both look like the slow runner stretching a wait past
+a test's deadline; not yet reproduced locally, so no fix. If either recurs, capture the
+full log of the failing run before re-running it.
+
 ## Gotchas
 
 - Agent worktrees don't have libghostty-vt built; `make check` there needs
