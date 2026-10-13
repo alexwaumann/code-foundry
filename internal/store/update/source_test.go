@@ -65,7 +65,7 @@ func TestDirSource(t *testing.T) {
 		{"tip: no files", "", "", update.ChannelTip, "", true},
 		{"stable reads latest", "v0.3.0\n", "v0.3.1-tip.2\n", update.ChannelStable, "v0.3.0", false},
 		{"tip reads latest-tip", "v0.3.0\n", "v0.3.1-tip.2\n", update.ChannelTip, "v0.3.1-tip.2", false},
-		{"tip without latest-tip has no release", "v0.3.0\n", "", update.ChannelTip, "", true},
+		{"tip without latest-tip falls back to latest", "v0.3.0\n", "", update.ChannelTip, "v0.3.0", false},
 		{"stable without latest has no release", "", "v0.3.1-tip.2\n", update.ChannelStable, "", true},
 		{"tip without latest", "", "v0.3.1-tip.2\n", update.ChannelTip, "v0.3.1-tip.2", false},
 		{"tip: a stable promoted after the last tip wins", "v0.3.1\n", "v0.3.1-tip.2\n", update.ChannelTip, "v0.3.1", false},

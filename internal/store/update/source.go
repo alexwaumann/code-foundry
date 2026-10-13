@@ -144,9 +144,10 @@ func (s GhSource) NotesURL(tag string) string {
 
 // DirSource reads a local release directory (see version.EnvReleaseDir): the latest
 // stable tag is the content of <Dir>/latest, the latest tip tag that of
-// <Dir>/latest-tip (scripts/release.sh --local writes both). Like GhSource, tip is the
-// higher of the two, so a stable promoted after the last tip wins; a directory without
-// latest-tip has no tip release.
+// <Dir>/latest-tip (scripts/release.sh --local writes both). Like GhSource (and
+// install.sh --channel tip), tip is the higher semver of the two, so a stable promoted
+// after the last tip wins; a missing file is skipped, and only a directory with
+// neither has no tip release.
 type DirSource struct {
 	Dir string
 }
@@ -156,16 +157,19 @@ func (s DirSource) Latest(_ context.Context, ch Channel) (string, error) {
 	if ch != ChannelTip {
 		return s.read("latest")
 	}
-	tip, err := s.read("latest-tip")
-	if err != nil {
-		return "", err
-	}
-	stable, err := s.read("latest")
-	if errors.Is(err, ErrNoRelease) {
+	tip, tipErr := s.read("latest-tip")
+	stable, stableErr := s.read("latest")
+	switch {
+	case tipErr != nil && !errors.Is(tipErr, ErrNoRelease):
+		return "", tipErr
+	case stableErr != nil && !errors.Is(stableErr, ErrNoRelease):
+		return "", stableErr
+	case tipErr != nil && stableErr != nil:
+		return "", fmt.Errorf("%w in %s (no latest-tip or latest)", ErrNoRelease, s.Dir)
+	case tipErr != nil:
+		return stable, nil
+	case stableErr != nil:
 		return tip, nil
-	}
-	if err != nil {
-		return "", err
 	}
 	if Newer(stable, tip) {
 		return stable, nil
