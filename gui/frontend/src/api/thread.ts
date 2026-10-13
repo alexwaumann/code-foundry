@@ -18,6 +18,7 @@ import {
   type ThreadRequestItem,
 } from "@/gen/codefoundry/v1/thread_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { toMcpStatusView, type McpStatusView } from "./mcp";
 
 export type ToolStatusView = "running" | "done" | "error" | "unknown";
 export type RequestStateView = "pending" | "allowed" | "denied" | "cancelled" | "unknown";
@@ -135,10 +136,12 @@ export interface ThreadPendingListView {
 }
 
 export type ThreadEventView =
-  | { kind: "snapshot"; sessionId: string; seq: number; items: ThreadItemView[]; pending: ThreadPendingView[] }
+  | { kind: "snapshot"; sessionId: string; seq: number; items: ThreadItemView[]; pending: ThreadPendingView[]; mcp: McpStatusView | null }
   | { kind: "appended" | "updated"; sessionId: string; seq: number; item: ThreadItemView }
   | { kind: "delta"; sessionId: string; seq: number; itemId: string; ordinal: number; field: "text" | "input"; text: string }
   | ({ kind: "pending" } & ThreadPendingListView)
+  /** Watch only: the thread's MCP servers were checked again, or dropped (null: its process ended). */
+  | { kind: "mcp"; sessionId: string; seq: number; status: McpStatusView | null }
   /** EventService only: the pending requests of every rendered thread that has any. */
   | { kind: "pendingSnapshot"; threads: ThreadPendingListView[] };
 
@@ -259,7 +262,14 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
   const e = ev.event;
   switch (e.case) {
     case "snapshot":
-      return { kind: "snapshot", sessionId: e.value.sessionId, seq: Number(e.value.seq), items: items(e.value.items), pending: e.value.pending.map(toPendingView) };
+      return {
+        kind: "snapshot",
+        sessionId: e.value.sessionId,
+        seq: Number(e.value.seq),
+        items: items(e.value.items),
+        pending: e.value.pending.map(toPendingView),
+        mcp: toMcpStatusView(e.value.mcp),
+      };
     case "appended":
     case "updated": {
       const item = e.value.item ? toThreadItemView(e.value.item) : null;
@@ -271,6 +281,8 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
     }
     case "pending":
       return { kind: "pending", sessionId: e.value.sessionId, seq: Number(e.value.seq), pending: e.value.pending.map(toPendingView) };
+    case "mcp":
+      return { kind: "mcp", sessionId: e.value.sessionId, seq: Number(e.value.seq), status: toMcpStatusView(e.value.status) };
     case "pendingSnapshot":
       return {
         kind: "pendingSnapshot",

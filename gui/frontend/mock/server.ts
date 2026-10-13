@@ -113,6 +113,7 @@ import { createProject, deleteProject, listPublishOwners, projectCalls, publishP
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
 import { retiredUsage, utcDay } from "./usage";
+import { reconnectMcp, refreshMcp } from "./mcp";
 import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreads, THREAD_STATES, type ThreadState } from "./thread";
 import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
 
@@ -366,6 +367,15 @@ function routes(router: ConnectRouter): void {
         return { item: world.threads.respond(req.sessionId, req.requestId, decision, req.answers, req.message) };
       }),
     setEffort: (req) => guard(() => (world.threads.setEffort(req.sessionId, req.effort), { session: world.sessionMsg(world.session(req.sessionId)) })),
+    // MCP (mock/mcp.ts): the GUI reads McpStatus once for a thread never checked; refresh and reconnect go through thread.mcp / thread.mcp-reconnect.
+    mcpStatus: (req) => guard(() => ({ status: req.refresh ? refreshMcp(world.threads, req.sessionId) : world.threads.mcpOf(req.sessionId) })),
+    mcpReconnect: async (req) => {
+      try {
+        return await reconnectMcp(world.threads, req.sessionId, req.serverName);
+      } catch (err) {
+        throw rpcError(err);
+      }
+    },
   });
 
   router.service(UpdateService, {

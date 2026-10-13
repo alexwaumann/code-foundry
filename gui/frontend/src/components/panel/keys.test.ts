@@ -90,6 +90,7 @@ describe("surface registry", () => {
       ["pullrequest", "p"],
       ["linkedprs", "l"],
       ["usage", "u"],
+      ["mcp", "m"],
       ["workspace", "w"],
       ["worktree", "t"],
     ]);
@@ -98,9 +99,10 @@ describe("surface registry", () => {
     expect(surfaceByHotkey("W")?.kind).toBe("workspace");
     expect(surfaceByHotkey("l")?.kind).toBe("linkedprs");
     expect(surfaceByHotkey("U")?.kind).toBe("usage");
+    expect(surfaceByHotkey("m")?.kind).toBe("mcp");
     expect(surfaceByHotkey("T")?.kind).toBe("worktree");
-    // s-1 is unknown here: no pull request, no linked pull requests, no workspace thread,
-    // no worktree to place it in.
-    expect(surfaces.map((s) => s.available(ctx))).toEqual(["disabled", "disabled", "disabled", "hidden", "hidden", "hidden", "hidden"]);
+    // s-1 is unknown here: no pull request, no linked pull requests, not a rendered thread,
+    // no workspace thread, no worktree to place it in.
+    expect(surfaces.map((s) => s.available(ctx))).toEqual(["disabled", "disabled", "disabled", "hidden", "hidden", "hidden", "hidden", "hidden"]);
   });
 });

@@ -15,7 +15,7 @@ const base = { parentToolUseId: "", createdAtMs: 1, updatedAtMs: 1, streaming: f
 
 function show(items: ThreadItemView[]) {
   const byId = Object.fromEntries(items.map((it) => [it.id, it]));
-  useThreadStore.setState({ logs: { s: { seq: 1, byId, order: items.map((it) => it.id), pending: [] } } });
+  useThreadStore.setState({ logs: { s: { seq: 1, byId, order: items.map((it) => it.id), pending: [], mcp: null } } });
   const rows = buildRows(buildTurns(items.map((it) => decodeTimelineKey(timelineKey(structOf(it))))), { fold: () => undefined, working: false });
   return render(
     <ThreadContext.Provider value={{ sessionId: "s", cwd: "/w" }}>
