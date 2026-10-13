@@ -1,5 +1,5 @@
 /**
- * The rendered thread's timeline as rows (docs/notes/rendered-threads-2-gui.md): pure
+ * The thread's timeline as rows (docs/notes/rendered-threads-2-gui.md): pure
  * functions over a structural view of the items (no text), so text deltas never rebuild
  * it. The design is the sketch's variant A (docs/sketches/rendered-thread):
  *

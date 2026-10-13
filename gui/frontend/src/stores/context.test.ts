@@ -35,7 +35,7 @@ describe("the bottom panel's shell in the command context", () => {
   const cases: [string, () => void, string][] = [
     ["keyboard in the bottom panel: its active shell", () => undefined, "a"],
     ["the palette opened from there: still that shell", () => useUiStore.setState({ focus: "palette", palette: { ...closed, open: true, returnTo: "bottom" } }), "a"],
-    ["keyboard in the content pane: nothing from the bottom panel", () => useUiStore.setState({ focus: "terminal" }), ""],
+    ["keyboard in the content pane: nothing from the bottom panel", () => useUiStore.setState({ focus: "content" }), ""],
     ["the panel closed", () => useBottomStore.setState({ byKey: { "session:s1": { open: false, activeTerminalId: "a" } } }), ""],
   ];
   it.each(cases)("getUiContext: %s", (_name, arrange, want) => {

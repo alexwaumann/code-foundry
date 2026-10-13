@@ -122,7 +122,18 @@ draws the conversation. Design record: `docs/notes/rendered-threads-handoff.md`.
   cost and model on `turn_end`, the asking subagent named on its prompts, starting / empty
   fork / crashed states, docs) done: `docs/notes/rendered-threads-4-optin.md`. All four
   rendered-thread PRs are done; follow-ups: `docs/notes/rendered-threads-followups.md`
-  (branch `t3code/rendered-threads-followups-doc`).
+  (branch `t3code/rendered-threads-followups-doc`). The opt-in itself is history: see
+  "Rendered-only threads" below.
+
+### Rendered-only threads (2026-10-12)
+
+The terminal thread mode is removed: every thread is `claude -p` over stream-json. Gone:
+the PTY runner, `internal/claudestatus` (the screen detector), `Session.render` /
+`terminal_id`, `session.new --render`, the `sessions.render` setting, the composer's View
+picker, the terminal content pane and its disconnected page. Decision record and what
+changed: `docs/notes/rendered-only.md` (daemon detail `rendered-only-daemon.md`, GUI
+detail `rendered-only-gui.md`). Follow-ups Alex owns: plan mode, the Bedrock cache break
+on reconnect, importing claude-foundry threads (not planned).
 
 ### Release channels: stable and tip (design 2026-10-11, revised 2026-10-12)
 
@@ -145,7 +156,6 @@ Collected from the step notes; none blocks daily use.
   * Copy says "thread"; identifiers (`session.*`, `SessionService`, settings keys) still say session. Full rename is a separate pass.
   * The GUI does not show `Session.status_reason` (the CLI does). A badge tooltip or the session header could.
   * "Viewed" means "has an Attach subscriber": a minimized or occluded window keeps acknowledging finished turns. Detaching on `visibilitychange` would fix it.
-  * Status detection is untested against real output for subagent permission prompts, auto-compaction, usage-limit menus, login "Press Enter" screens and MCP auth prompts (`phase2b-status.md`, Known blind spots).
   * Memory gate measured the daemon only; the GUI (WKWebView) was not measured.
 * **Git operations**
   * `git.push --force-with-lease` runs without a confirm prompt. `Command.Confirm` applies to every invocation, so confirming only the forced form needs an arg-conditional confirm.

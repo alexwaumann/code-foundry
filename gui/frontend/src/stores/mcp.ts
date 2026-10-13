@@ -1,5 +1,5 @@
 /**
- * A rendered thread's MCP servers for the MCP surface (docs/notes/mcp-panel.md). The status
+ * A thread's MCP servers for the MCP surface (docs/notes/mcp-panel.md). The status
  * itself lives in the thread store's log (fed by the thread's ThreadService.Watch, which
  * is open whenever the thread is selected); this store holds what the GUI is doing to it:
  * reconnects and refreshes in flight. Both are registry commands (thread.mcp-reconnect,

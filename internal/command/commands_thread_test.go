@@ -21,7 +21,7 @@ func newThreadRegistry(t *testing.T) (*command.Registry, *sessiontest.Fake) {
 	if err := command.RegisterThread(reg, api.NewThread(fake, b)); err != nil {
 		t.Fatal(err)
 	}
-	fake.Put(session.Session{ID: "s1", Name: "fix", State: session.StateConnected, Render: session.RenderRendered})
+	fake.Put(session.Session{ID: "s1", Name: "fix", State: session.StateConnected})
 	return reg, fake
 }
 
@@ -33,8 +33,7 @@ func TestThreadCommandsAvailability(t *testing.T) {
 		want bool
 	}{
 		{"cli", command.Context{ActiveSessionID: "s1"}, true},
-		{"gui rendered thread", command.Context{ActiveSessionID: "s1", ActiveView: "session", ActiveSessionRendered: true}, true},
-		{"gui terminal thread", command.Context{ActiveSessionID: "s1", ActiveView: "session"}, false},
+		{"gui thread", command.Context{ActiveSessionID: "s1", ActiveView: "session"}, true},
 		{"no thread", command.Context{ActiveView: "projects"}, false},
 	}
 	for _, tt := range tests {

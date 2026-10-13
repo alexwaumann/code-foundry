@@ -28,20 +28,9 @@ export const PERMISSION_CHOICES: readonly (Choice & { value: ComposePermission; 
   { value: "auto", label: "Auto", hint: "Claude's classifier decides" },
 ];
 
-/** How a thread runs, fixed for its life: Claude Code in a terminal, or headless with the app drawing the conversation. */
-export type ComposeRender = "terminal" | "rendered";
-
-/** session.new `render` values (the composer's View picker). */
-export const RENDER_CHOICES: readonly (Choice & { value: ComposeRender; hint: string })[] = [
-  { value: "terminal", label: "Terminal", hint: "Claude Code's own interface" },
-  { value: "rendered", label: "Rendered", hint: "The app draws the conversation" },
-];
-
 export const DEFAULT_MODEL = "opus";
 export const DEFAULT_EFFORT = "high";
 export const DEFAULT_PERMISSION: ComposePermission = "auto";
-/** The view without a sessions.render setting (the daemon's default too). */
-export const DEFAULT_RENDER: ComposeRender = "terminal";
 
 export function choiceLabel(choices: readonly Choice[], value: string): string {
   return choices.find((c) => c.value === value)?.label ?? value;
@@ -272,13 +261,11 @@ export function checkAttachments<F extends FileLike>(
 export interface PromptArgsInput {
   /** The prompt as Claude gets it (lib/prompt.ts projectPrompt). */
   text: string;
-  /** The composer's text with its tag tokens (lib/userMessage sentComposerText): composer-prompt, for a rendered thread's first message. */
+  /** The composer's text with its tag tokens (lib/userMessage sentComposerText): composer-prompt, for the thread's first message. */
   composerText?: string;
   model: string;
   effort: string;
   permission: string;
-  /** terminal or rendered; "" or absent: the daemon's sessions.render setting. */
-  render?: string;
 }
 
 export interface DraftArgsInput extends PromptArgsInput {
@@ -321,10 +308,9 @@ export function threadArgs(place: ThreadPlace, d: PromptArgsInput, attachments: 
   if (d.model) args.model = d.model;
   if (d.effort) args.effort = d.effort;
   if (d.permission) args.permission = d.permission;
-  if (d.render) args.render = d.render;
   const prompt = d.text.trim();
   if (prompt) args.prompt = prompt;
-  // A rendered thread keeps the composer's text on its first message to draw the tags
+  // The thread keeps the composer's text on its first message to draw the tags
   // (only when it has any: without tags it is the prompt itself).
   const composer = d.composerText?.trim() ?? "";
   if (prompt && composer && composer !== prompt) args["composer-prompt"] = composer;

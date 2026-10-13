@@ -50,8 +50,6 @@ export interface UiContextView {
   activeView: string;
   /** The workspace that owns the active thread (or the composer's workspace); "" otherwise. */
   activeWorkspaceId: string;
-  /** The active thread is a rendered thread: the daemon offers the thread.* commands. */
-  activeSessionRendered: boolean;
 }
 
 export interface InvokeResultView {

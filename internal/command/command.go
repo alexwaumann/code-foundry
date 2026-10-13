@@ -73,9 +73,6 @@ type Context struct {
 	// workspace, or the workspace a composer or page is for). Empty for a project
 	// thread and, unless --context-workspace is given, from the CLI.
 	ActiveWorkspaceID string
-	// ActiveSessionRendered: the active thread is a rendered thread (the thread.*
-	// commands). False from the CLI.
-	ActiveSessionRendered bool
 }
 
 // ContextField names a Context field an argument can default from.

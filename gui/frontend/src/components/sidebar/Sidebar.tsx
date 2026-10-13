@@ -83,7 +83,7 @@ function SidebarList() {
     if (!isSessionRow(row)) return;
     const ui = useUiStore.getState();
     ui.setCursor(row.key);
-    ui.select({ kind: "session", id: row.sessionId }, { focusTerminal: true });
+    ui.select({ kind: "session", id: row.sessionId }, { focusPrompt: true });
   }, []);
 
   const moveCursor = (i: number) => {
@@ -122,7 +122,7 @@ function SidebarList() {
         ui.setRenaming(row.sessionId);
         break;
       case "Escape":
-        if (ui.selection.kind === "session") useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
+        if (ui.selection.kind === "session") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
         break;
       default:
         return;

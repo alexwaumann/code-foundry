@@ -1,5 +1,5 @@
 /**
- * Object URLs for staged attachments a rendered thread's user messages show
+ * Object URLs for staged attachments a thread's user messages show
  * (SessionService.ReadAttachment). One fetch per path for the window's life; a path the
  * daemon no longer has (reaped after 7 days) resolves to null and the chip shows it as
  * missing. A failed fetch (the daemon down or restarting) is not remembered: the next

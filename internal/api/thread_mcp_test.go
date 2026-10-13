@@ -57,15 +57,14 @@ func TestMcpStatusToProto(t *testing.T) {
 
 func TestThreadMcp(t *testing.T) {
 	fake, c := newThreadServer(t)
-	fake.Put(session.Session{ID: "s1", State: session.StateConnected, Render: session.RenderRendered})
-	fake.Put(session.Session{ID: "t1", State: session.StateConnected, Render: session.RenderTerminal, TerminalID: "term"})
+	fake.Put(session.Session{ID: "s1", State: session.StateConnected})
 	fake.PutItems("s1", session.Item{ID: "u1", Kind: session.KindUserMessage, Text: "hi"})
 	fake.PutMcp("s1", mcpSample(time.Now()))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if _, err := c.McpStatus(ctx, connect.NewRequest(&v1.McpStatusRequest{SessionId: "t1"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Errorf("terminal thread: %v", err)
+	if _, err := c.McpStatus(ctx, connect.NewRequest(&v1.McpStatusRequest{SessionId: "nope"})); connect.CodeOf(err) != connect.CodeNotFound {
+		t.Errorf("unknown thread: %v", err)
 	}
 	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThreadRequest{SessionId: "s1"}))
 	if err != nil {

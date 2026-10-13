@@ -16,7 +16,6 @@ export const emptyContext: UiContextView = {
   activeWorktreePath: "",
   activeView: "dashboard",
   activeWorkspaceId: "",
-  activeSessionRendered: false,
 };
 
 function allWorktrees(repos: ReposData): WorktreeRef[] {
@@ -53,8 +52,9 @@ export function projectsShellPlace(t: ContextShell | undefined): WorktreeRef | n
 
 /**
  * Derives the UiContext the daemon sees from the current selection. A session contributes
- * its place (repo, worktree) and its attached terminal (if any), so terminal.* commands
- * apply to it. The composer looks only at its repo. Actions on a worktree that is not
+ * its place (repo, worktree) and its workspace; a thread has no terminal of its own, so
+ * activeTerminalId comes only from a focused bottom panel shell (focusedShell). The
+ * composer looks only at its repo. Actions on a worktree that is not
  * selected (the Projects page, the panel's worktree tab) build their context with
  * worktreeContext / repoContext.
  */
@@ -80,12 +80,10 @@ function deriveSelectionContext(sel: Selection, repos: ReposData, sessions: Sess
       return {
         ...emptyContext,
         activeSessionId: sel.id,
-        activeTerminalId: s?.terminalId ?? "",
         activeRepoId: place?.repoId ?? s?.repoId ?? "",
         activeWorktreePath: place?.path ?? s?.worktreePath ?? "",
         activeView: "session",
         activeWorkspaceId: s?.workspaceId ?? "",
-        activeSessionRendered: s?.render === "rendered",
       };
     }
     // The composer has no worktree yet (it may make one): only the repo, which is
@@ -98,7 +96,7 @@ function deriveSelectionContext(sel: Selection, repos: ReposData, sessions: Sess
 }
 
 export function contextKey(c: UiContextView): string {
-  return [c.activeView, c.activeTerminalId, c.activeSessionId, c.activeRepoId, c.activeWorktreePath, c.activeWorkspaceId, c.activeSessionRendered ? "r" : ""].join("\u0000");
+  return [c.activeView, c.activeTerminalId, c.activeSessionId, c.activeRepoId, c.activeWorktreePath, c.activeWorkspaceId].join("\u0000");
 }
 
 /**

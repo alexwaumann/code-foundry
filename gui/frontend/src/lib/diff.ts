@@ -1,5 +1,5 @@
 /**
- * Unified diffs for a rendered thread's Edit and Write rows (docs/notes/rendered-threads-2-gui.md):
+ * Unified diffs for a thread's Edit and Write rows (docs/notes/rendered-threads-2-gui.md):
  * from the tool result's structuredPatch when Claude sent one (real line numbers), else from
  * the Edit's old_string / new_string (a line diff without line numbers: where in the file
  * is unknown, e.g. while the Edit waits for permission), and a Write that

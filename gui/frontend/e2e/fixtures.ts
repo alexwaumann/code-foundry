@@ -24,7 +24,7 @@ export async function resetMock(): Promise<void> {
 
 export interface Invocation {
   name: string;
-  context: { activeTerminalId: string; activeSessionId: string; activeRepoId: string; activeWorktreePath: string; activeView: string; activeWorkspaceId?: string; activeSessionRendered?: boolean } | null;
+  context: { activeTerminalId: string; activeSessionId: string; activeRepoId: string; activeWorktreePath: string; activeView: string; activeWorkspaceId?: string } | null;
   args: Record<string, string>;
   confirmed?: boolean;
 }
@@ -129,16 +129,21 @@ export function row(page: Page, key: string) {
 }
 
 /**
- * Text of an attached terminal's buffer (renderer-agnostic: works for WebGL too): the
- * content pane's ("main", a thread's Claude terminal) or the bottom panel's active shell.
+ * Text of the bottom panel's active shell (renderer-agnostic: works for WebGL too). Its
+ * host is the only terminal host (threads have none), exposed as window.__cfTerminal.
  */
-export async function terminalText(page: Page, which: "main" | "bottom" = "main"): Promise<string> {
-  return page.evaluate((name) => {
-    const w = window as unknown as { __cfTerminals?: Record<string, { renderer: { getText(): string } } | undefined> };
-    return w.__cfTerminals?.[name]?.renderer.getText() ?? "";
-  }, which);
+export async function terminalText(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const w = window as unknown as { __cfTerminal?: { renderer: { getText(): string } } };
+    return w.__cfTerminal?.renderer.getText() ?? "";
+  });
 }
 
-export async function expectTerminalText(page: Page, text: string | RegExp, which: "main" | "bottom" = "main"): Promise<void> {
-  await expect.poll(() => terminalText(page, which), { timeout: 5000 }).toMatch(text);
+export async function expectTerminalText(page: Page, text: string | RegExp): Promise<void> {
+  await expect.poll(() => terminalText(page), { timeout: 5000 }).toMatch(text);
+}
+
+/** The selected thread's prompt: its composer's editor, where a selected thread puts the keyboard. */
+export function threadPrompt(page: Page) {
+  return page.getByTestId("thread-composer").getByTestId("composer-input");
 }

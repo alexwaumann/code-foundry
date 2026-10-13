@@ -36,7 +36,7 @@ beforeEach(() => {
   useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null });
   usePanelStore.setState({ byKey: {} });
   useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
-  useUiStore.setState({ selection: { kind: "session", id: "s1" }, focus: "terminal", bottomFocusSeq: 0, palette: closedPalette });
+  useUiStore.setState({ selection: { kind: "session", id: "s1" }, focus: "content", bottomFocusSeq: 0, palette: closedPalette });
   setTerminals([term("claude", { session: "s1" }), term("a", shell("s1")), term("w", shell("", "/src/app.worktrees/x"))]);
 });
 
@@ -54,7 +54,7 @@ describe("onNewTerminal", () => {
   });
 
   const ignored: [string, TerminalView][] = [
-    ["a Claude terminal", term("c2", { session: "s1" })],
+    ["a thread-labelled terminal that is no shell", term("c2", { session: "s1" })],
     ["an unlabelled terminal", term("loose", {})],
     ["an exited shell", term("gone", shell("s1"), { state: "exited" })],
   ];
@@ -85,7 +85,7 @@ describe("onNewTerminal", () => {
 
   it("with the palette open, its return target moves to the panel instead", () => {
     markPendingFocus("session:s1");
-    useUiStore.setState({ palette: { ...closedPalette, open: true, returnTo: "terminal" } });
+    useUiStore.setState({ palette: { ...closedPalette, open: true, returnTo: "content" } });
     onNewTerminal(term("b", shell("s1")));
     expect(useUiStore.getState().palette.returnTo).toBe("bottom");
     expect(useUiStore.getState().bottomFocusSeq).toBe(0);

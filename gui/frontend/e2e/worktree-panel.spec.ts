@@ -78,7 +78,7 @@ test("a project without git: its tab says so and offers Initialize Git; the thre
 test("a thread's panel lists Worktree with T; T, the list entry and the palette command open the thread's own worktree", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
+  await expect(page.getByTestId("thread-pane")).toBeVisible();
   await page.keyboard.press("Meta+Shift+e");
   await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
   const entry = page.getByTestId("panel-empty").locator('[data-surface="worktree"]');
@@ -91,7 +91,7 @@ test("a thread's panel lists Worktree with T; T, the list entry and the palette 
   await expect(surface(page)).toHaveAttribute("data-path", CF);
   await expect(surface(page).getByTestId("worktree-surface-title")).toHaveText("code-foundry@main");
   // The content pane still shows the thread.
-  await expect(page.getByTestId("terminal-header")).toContainText("Refactor sidebar tree");
+  await expect(page.getByTestId("thread-header")).toContainText("Refactor sidebar tree");
 
   // The palette lists the command for a thread; its presenter runs locally (no round
   // trip, like view.panel.workspace): the tab comes back and the panel takes focus.
@@ -109,7 +109,7 @@ test("a thread's panel lists Worktree with T; T, the list entry and the palette 
 test("the CLI's ShowView reaches the window; a page has no Worktree entry", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-2").click();
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
+  await expect(page.getByTestId("thread-pane")).toBeVisible();
   expect(await emit({ showView: { name: "panel.worktree" } })).toBe(1);
   await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-2");
   await expect(tabs(page)).toHaveText(["ghostty-playground"]);

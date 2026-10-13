@@ -24,14 +24,10 @@ import (
 // and Claude Code 2.1.295:
 //
 //	--permission-mode <mode>  acceptEdits, auto, bypassPermissions, manual, dontAsk, plan
-//	[prompt]                  positional first prompt; interactive mode submits it once
-//	                          the UI is up (also after the trust dialog is answered)
 //	--add-dir <dir>           also allow tool access to dir; without it, Read of a staged
 //	                          attachment outside the worktree asks for permission even
 //	                          in auto mode ("Allow this read outside the working
 //	                          directories?")
-//	--                        ends options: `claude -- "-hello"` sends "-hello", while
-//	                          `claude "-hello"` fails with "unknown option"
 //	--append-system-prompt <prompt>
 //	                          appended to the default system prompt; recorded on the
 //	                          conversation's first request and reused verbatim on every
@@ -87,16 +83,12 @@ type spawnArgs struct {
 	addDirs       []string
 	// appendSystemPrompt is passed as --append-system-prompt when set.
 	appendSystemPrompt string
-	prompt             string
-	// rendered: claude -p over stream-json (a rendered thread); the prompt is never
-	// part of argv.
-	rendered bool
 	// allowedTools / disallowedTools are permission rules ("Bash(git push:*)") passed
 	// as --allowedTools / --disallowedTools (an effort restart's session grants).
 	allowedTools, disallowedTools []string
 }
 
-// streamArgs are a rendered thread's protocol flags (docs/notes/rendered-threads-handoff.md
+// streamArgs are the protocol flags of every thread's claude (docs/notes/rendered-threads-handoff.md
 // §2): no positional prompt, the first prompt is the first stdin message;
 // --permission-prompt-tool stdio routes permission prompts to us as can_use_tool
 // control requests (--permission-prompts host does not). The transcript is still
@@ -106,12 +98,10 @@ var streamArgs = []string{
 	"--include-partial-messages", "--permission-prompt-tool", "stdio",
 }
 
-// argv builds the claude command line. A non-empty prompt goes last, after "--".
+// argv builds the claude command line. The prompt is never part of it: it is the
+// first user message on stdin.
 func (l launch) argv(claude string, a spawnArgs) []string {
-	argv := []string{claude}
-	if a.rendered {
-		argv = append(argv, streamArgs...)
-	}
+	argv := append([]string{claude}, streamArgs...)
 	if l.resume != "" {
 		argv = append(argv, "--resume", l.resume)
 		if l.fork {
@@ -142,9 +132,6 @@ func (l launch) argv(claude string, a spawnArgs) []string {
 	}
 	if a.appendSystemPrompt != "" {
 		argv = append(argv, "--append-system-prompt", a.appendSystemPrompt)
-	}
-	if a.prompt != "" && !a.rendered {
-		argv = append(argv, "--", a.prompt)
 	}
 	return argv
 }

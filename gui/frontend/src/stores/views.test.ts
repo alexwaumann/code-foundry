@@ -12,10 +12,10 @@ describe("togglePanelCommand", () => {
     useViewsStore.setState({ settingsOpen: false, helpOpen: false });
     useUiStore.setState({
       selection: { kind: "session", id: "a" },
-      focus: "terminal",
+      focus: "content",
       panelFocusSeq: 0,
       contentFocusSeq: 0,
-      terminalFocusSeq: 0,
+      promptFocusSeq: 0,
       sidebarFocusSeq: 0,
       palette: closedPalette,
     });
@@ -46,7 +46,7 @@ describe("togglePanelCommand", () => {
 
   describe("from the palette", () => {
     const cases: [string, boolean, FocusRegion, FocusRegion][] = [
-      ["showing returns focus to the panel", false, "terminal", "panel"],
+      ["showing returns focus to the panel", false, "content", "panel"],
       ["hiding the panel the palette came from returns to the content pane", true, "panel", "content"],
       ["hiding keeps another return target", true, "sidebar", "sidebar"],
     ];
@@ -71,10 +71,10 @@ describe("expandPanelCommand", () => {
     useViewsStore.setState({ settingsOpen: false, helpOpen: false });
     useUiStore.setState({
       selection: { kind: "session", id: "a" },
-      focus: "terminal",
+      focus: "content",
       panelFocusSeq: 0,
       contentFocusSeq: 0,
-      terminalFocusSeq: 0,
+      promptFocusSeq: 0,
       sidebarFocusSeq: 0,
       palette: closedPalette,
     });
@@ -82,7 +82,7 @@ describe("expandPanelCommand", () => {
 
   const seqs = () => {
     const ui = useUiStore.getState();
-    return [ui.panelFocusSeq, ui.contentFocusSeq, ui.terminalFocusSeq, ui.sidebarFocusSeq];
+    return [ui.panelFocusSeq, ui.contentFocusSeq, ui.promptFocusSeq, ui.sidebarFocusSeq];
   };
 
   it("shows a hidden panel expanded, then flips it back to the split", () => {
@@ -103,7 +103,6 @@ describe("expandPanelCommand", () => {
   });
 
   const focusCases: [string, FocusRegion, boolean, number[]][] = [
-    ["from the terminal (hidden by expanding) moves focus to the panel", "terminal", false, [1, 0, 0, 0]],
     ["from a page's content moves focus to the panel", "content", false, [1, 0, 0, 0]],
     ["from the sidebar leaves focus there", "sidebar", false, [0, 0, 0, 0]],
     ["from the panel leaves focus there", "panel", true, [0, 0, 0, 0]],
@@ -134,7 +133,7 @@ describe("expandPanelCommand", () => {
   });
 
   it("from the palette moves its return target to the panel instead of focusing", () => {
-    useUiStore.setState({ focus: "palette", palette: { ...closedPalette, open: true, returnTo: "terminal" } });
+    useUiStore.setState({ focus: "palette", palette: { ...closedPalette, open: true, returnTo: "content" } });
     expect(expandPanelCommand()).toBe(true);
     expect(useUiStore.getState().palette.returnTo).toBe("panel");
     expect(seqs()).toEqual([0, 0, 0, 0]);
@@ -155,7 +154,7 @@ describe("newPanelTabCommand", () => {
   beforeEach(() => {
     usePanelStore.setState({ byKey: {} });
     useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
-    useUiStore.setState({ selection: { kind: "session", id: "a" }, focus: "terminal", panelFocusSeq: 0, palette: closedPalette });
+    useUiStore.setState({ selection: { kind: "session", id: "a" }, focus: "content", panelFocusSeq: 0, palette: closedPalette });
   });
 
   it("starts picking in a hidden panel with tabs, shows it, and focuses it", () => {
@@ -181,7 +180,7 @@ describe("newPanelTabCommand", () => {
   });
 
   it("from the palette moves its return target to the panel instead of focusing", () => {
-    useUiStore.setState({ focus: "palette", palette: { ...closedPalette, open: true, returnTo: "terminal" } });
+    useUiStore.setState({ focus: "palette", palette: { ...closedPalette, open: true, returnTo: "content" } });
     expect(newPanelTabCommand()).toBe(true);
     expect(useUiStore.getState().palette.returnTo).toBe("panel");
     expect(useUiStore.getState().panelFocusSeq).toBe(0);
@@ -208,7 +207,7 @@ describe("the usage page", () => {
   beforeEach(() => {
     usePanelStore.setState({ byKey: {} });
     useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
-    useUiStore.setState({ selection: { kind: "session", id: "a" }, terminalFocusSeq: 0, palette: closedPalette });
+    useUiStore.setState({ selection: { kind: "session", id: "a" }, promptFocusSeq: 0, palette: closedPalette });
   });
   const views = () => {
     const { settingsOpen, usageOpen, helpOpen } = useViewsStore.getState();
@@ -218,19 +217,19 @@ describe("the usage page", () => {
   it("\"usage\" toggles: opens, then closes and hands focus back to the terminal", () => {
     expect(showView("usage")).toBe(true);
     expect(views()).toEqual({ settingsOpen: false, usageOpen: true, helpOpen: false });
-    expect(useUiStore.getState().terminalFocusSeq).toBe(0);
+    expect(useUiStore.getState().promptFocusSeq).toBe(0);
     expect(showView("usage")).toBe(true);
     expect(views().usageOpen).toBe(false);
-    expect(useUiStore.getState().terminalFocusSeq).toBe(1);
+    expect(useUiStore.getState().promptFocusSeq).toBe(1);
   });
 
   it("\"settings\" toggles too: opens, then closes and hands focus back to the terminal", () => {
     expect(showView("settings")).toBe(true);
     expect(views()).toEqual({ settingsOpen: true, usageOpen: false, helpOpen: false });
-    expect(useUiStore.getState().terminalFocusSeq).toBe(0);
+    expect(useUiStore.getState().promptFocusSeq).toBe(0);
     expect(showView("settings")).toBe(true);
     expect(views().settingsOpen).toBe(false);
-    expect(useUiStore.getState().terminalFocusSeq).toBe(1);
+    expect(useUiStore.getState().promptFocusSeq).toBe(1);
   });
 
   it.each([
@@ -248,7 +247,7 @@ describe("the usage page", () => {
     useViewsStore.setState({ usageOpen: true });
     closeUsage();
     expect(views().usageOpen).toBe(false);
-    expect(useUiStore.getState().terminalFocusSeq).toBe(1);
+    expect(useUiStore.getState().promptFocusSeq).toBe(1);
   });
 
   it("a selection change closes it", () => {
@@ -280,7 +279,7 @@ describe("toggleBottomCommand", () => {
     useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
     useUiStore.setState({
       selection: { kind: "session", id: "a" },
-      focus: "terminal",
+      focus: "content",
       bottomFocusSeq: 0,
       contentFocusSeq: 0,
       palette: closedPalette,
@@ -326,7 +325,7 @@ describe("toggleBottomCommand", () => {
 
   describe("from the palette", () => {
     const cases: [string, boolean, FocusRegion, FocusRegion][] = [
-      ["showing returns focus to the bottom panel", false, "terminal", "bottom"],
+      ["showing returns focus to the bottom panel", false, "content", "bottom"],
       ["hiding the panel the palette came from returns to the content pane", true, "bottom", "content"],
       ["hiding keeps another return target", true, "panel", "panel"],
     ];

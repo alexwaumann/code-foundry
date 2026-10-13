@@ -27,8 +27,6 @@ import (
 //     overrides (CommandService.List reports the effective values);
 //   - log level -> the log file handler's LevelVar;
 //   - auto-naming and the naming model -> a Namer that reads both per session;
-//   - sessions.render -> session.Options.DefaultRender, read by every Create without
-//     an explicit mode;
 //   - sessions.cache_ttl_seconds -> session.Manager.SetCacheTTL on every change
 //     (applyCacheTTL), which republishes the threads whose cache expiry moved;
 //   - worktree directory -> repo.worktree.new's default path, and the path of the
@@ -155,16 +153,6 @@ func settingsManagedRoots(st *settings.Store) func(string) []string {
 			return []string{base}
 		}
 		return nil
-	}
-}
-
-// settingsRender applies sessions.render to new threads that do not pick a mode.
-func settingsRender(st *settings.Store) func() session.Render {
-	return func() session.Render {
-		if st.Settings().Sessions.Render == settings.RenderRendered {
-			return session.RenderRendered
-		}
-		return session.RenderTerminal
 	}
 }
 

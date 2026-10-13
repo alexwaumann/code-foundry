@@ -90,7 +90,7 @@ export function showView(name: string): boolean {
       usagePanelCommand();
       return true;
     case "panel.mcp":
-      // view.panel.mcp: the MCP surface in the current rendered thread's panel.
+      // view.panel.mcp: the MCP surface in the current thread's panel.
       mcpPanelCommand();
       return true;
     case "panel.worktree":
@@ -116,7 +116,7 @@ export function showView(name: string): boolean {
  * hides the panel, so a toggle there would flip state the user cannot see.
  *
  * Focus: toggling on focuses the panel. Hiding the panel while it has focus hands focus
- * to the content pane (its terminal, or the page's focus root). With the palette open
+ * to the content pane (a thread's prompt, or the page's focus root). With the palette open
  * (the command was picked there), focus is the palette's, so the palette's return target
  * is what moves: to the panel when it opens, off it when it hides.
  */
@@ -181,7 +181,7 @@ export function expandPanelCommand(): boolean {
   const inPalette = ui.palette.open;
   const from: FocusRegion = inPalette ? ui.palette.returnTo : ui.focus;
   // Expanding hides the content column, the bottom panel with it.
-  const fromContent = from === "terminal" || from === "content" || from === "bottom";
+  const fromContent = from === "content" || from === "bottom";
   const expanded = expandPanel("current", getPanel().open ? undefined : true, { focus: fromContent && !inPalette });
   if (inPalette && expanded && fromContent) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
   return expanded;
@@ -226,7 +226,7 @@ export function workspacePanelCommand(): boolean {
 
 /**
  * view.panel.worktree for the current selection: opens (or activates) the worktree tab of
- * the selected thread's (or terminal's) own worktree in its panel and shows the panel,
+ * the selected thread's own worktree in its panel and shows the panel,
  * like view.panel.workspace. A no-op while the settings or usage page is up and when the selection
  * is not in a registered worktree (a page, a composer, a thread whose cwd is elsewhere).
  *
@@ -285,8 +285,8 @@ export function usagePanelCommand(): boolean {
 
 /**
  * view.panel.mcp for the current selection: opens (or activates) the MCP tab in the
- * selected rendered thread's panel and shows the panel, like view.panel.usage. A no-op
- * while the settings or usage page is up and when the selection is no rendered thread.
+ * selected thread's panel and shows the panel, like view.panel.usage. A no-op
+ * while the settings or usage page is up and when no thread is selected.
  *
  * Focus moves to the panel; with the palette open, its return target moves there instead.
  */
@@ -300,16 +300,21 @@ export function mcpPanelCommand(): boolean {
   return true;
 }
 
+/** Asks the selected thread's prompt for the keyboard; nothing when no thread is selected. */
+function requestPromptFocus(): void {
+  if (useUiStore.getState().selection.kind === "session") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
+}
+
 export function closeSettings(): void {
   useViewsStore.setState({ settingsOpen: false });
-  // Back to what was selected; its terminal takes focus again.
-  useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
+  // Back to what was selected; a thread's prompt takes focus again.
+  requestPromptFocus();
 }
 
 export function closeUsage(): void {
   useViewsStore.setState({ usageOpen: false });
-  // Like closeSettings: back to the selection, whose terminal takes focus again.
-  useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
+  // Like closeSettings: back to the selection, whose prompt takes focus again.
+  requestPromptFocus();
 }
 
 export function toggleHelp(): void {

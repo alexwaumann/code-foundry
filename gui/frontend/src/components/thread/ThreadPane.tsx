@@ -1,10 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { HeaderActions } from "@/components/terminal/TerminalPane";
+import { Backdrop } from "@/components/backdrop/Backdrop";
 import { SessionIndicator, SessionTitle } from "@/components/session/SessionParts";
+import { DragBand } from "@/components/window/DragBand";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useSessionsStore } from "@/stores/sessions";
 import { startThreadWatch, useOpenRequests, useThreadEmpty, useThreadLoaded, useThreadPending, useThreadStore } from "@/stores/thread";
 import { ThreadContext } from "./context";
+import { HeaderActions } from "./HeaderActions";
 import { Timeline } from "./Timeline";
 import { ThreadComposer } from "./ThreadComposer";
 import "./thread.css";
@@ -29,13 +31,35 @@ function useHeight(ref: React.RefObject<HTMLElement | null>): number {
 }
 
 /**
- * A rendered thread in the content pane (docs/notes/rendered-threads-2-gui.md, design
- * docs/sketches/rendered-thread variant A): the terminal pane's header (title, status,
- * the pane's commands), the conversation as a dense work log, and the follow-up composer
- * floating over its bottom. While shown it holds the thread's ThreadService.Watch (the
- * slot a terminal's Attach takes; it also marks finished turns seen).
+ * What the content pane shows for a thread id the sessions store does not have: a removed
+ * thread (a stale selection), or one the first List has not brought yet.
  */
-export default function ThreadPane({ sessionId }: { sessionId: string }) {
+function ThreadMissing() {
+  const loaded = useSessionsStore((st) => st.loaded || st.availability !== "unknown");
+  return (
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+      <Backdrop />
+      <section className="relative flex min-h-0 min-w-0 flex-1 flex-col p-10 outline-none" tabIndex={-1} data-focus-root data-region="content" aria-label="Thread" data-testid="session-missing">
+        <p className="m-auto text-sm text-muted-foreground">{loaded ? "This thread no longer exists." : "Loading thread…"}</p>
+      </section>
+      <DragBand />
+    </div>
+  );
+}
+
+/**
+ * A thread in the content pane (docs/notes/rendered-threads-2-gui.md, design
+ * docs/sketches/rendered-thread variant A): a header (title, status, the pane's
+ * commands), the conversation as a dense work log, and the follow-up composer floating
+ * over its bottom (a disconnected thread's is its Reconnect card). While shown it holds
+ * the thread's ThreadService.Watch (which also marks finished turns seen).
+ */
+export function ThreadPane({ sessionId }: { sessionId: string }) {
+  const exists = useSessionsStore((s) => sessionId in s.byId);
+  return exists ? <ThreadView sessionId={sessionId} /> : <ThreadMissing />;
+}
+
+function ThreadView({ sessionId }: { sessionId: string }) {
   useEffect(() => startThreadWatch(sessionId), [sessionId]);
   const cwd = useSessionsStore((s) => s.byId[sessionId]?.worktreePath ?? "");
   const state = useSessionsStore((s) => s.byId[sessionId]?.state ?? "unknown");
@@ -61,7 +85,7 @@ export default function ThreadPane({ sessionId }: { sessionId: string }) {
   return (
     <ThreadContext.Provider value={ctx}>
       <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col outline-none" tabIndex={-1} aria-label="Thread" data-session-id={sessionId} data-testid="thread-pane" data-region="content">
-        <PaneHeader className="gap-3 px-3 text-xs" data-testid="terminal-header">
+        <PaneHeader className="gap-3 px-3 text-xs" data-testid="thread-header">
           <SessionTitle id={sessionId} />
           <span className="ml-auto flex shrink-0 items-center gap-2 text-muted-foreground tabular-nums">
             <HeaderActions sessionId={sessionId} />

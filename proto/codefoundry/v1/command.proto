@@ -23,9 +23,9 @@ message UiContext {
   // Workspace that owns what is active: the active thread's workspace, or the workspace
   // a composer or page is for. Empty for project threads and from the CLI.
   string active_workspace_id = 6;
-  // The active thread is a rendered thread (Session.render RENDERED): the thread.*
-  // commands are offered. False from the CLI.
-  bool active_session_rendered = 7;
+  // 7 was active_session_rendered until 2026-10-12 (every thread is rendered now).
+  reserved 7;
+  reserved "active_session_rendered";
 }
 
 enum ArgType {

@@ -3,7 +3,6 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import {
   AgentRunStatus,
   PermissionMode,
-  SessionRender,
   SessionService,
   SessionState,
   SessionStatus,
@@ -24,11 +23,6 @@ export type SessionStateView = "starting" | "connected" | "closing" | "disconnec
 export type SessionStatusView = "busy" | "idle" | "attention" | "error" | "unknown";
 /** claude --permission-mode, as session.new's `permission` arg spells it; "" = Claude's default. */
 export type PermissionModeView = "supervised" | "accept-edits" | "auto" | "";
-/**
- * How the thread runs, fixed for its life: "terminal" (Claude Code in a PTY, terminalId)
- * or "rendered" (claude -p; the conversation is ThreadService items, no terminal).
- */
-export type SessionRenderView = "terminal" | "rendered";
 
 /** View model for a Claude session. Generated types stay inside src/api. */
 export interface SessionView {
@@ -40,14 +34,11 @@ export interface SessionView {
   autoNamed: boolean;
   model: string;
   effort: string;
-  /** Attached terminal; "" when disconnected. */
-  terminalId: string;
   state: SessionStateView;
   status: SessionStatusView;
   /**
-   * The detector's reason for status, e.g. "finished", "at prompt",
-   * "permission: Do you want to proceed?", "waiting for approval: Bash", or "interrupted"
-   * for "error". Classify it with statusKind / statusDetail (lib/session), not by hand.
+   * The reason for status, e.g. "finished", "at prompt", "permission: Bash git push",
+   * "question: Which one?", or "interrupted" for "error". Classify it with statusKind / statusDetail (lib/session), not by hand.
    */
   statusReason: string;
   /** When status or statusReason last changed, epoch ms; null if never known. */
@@ -76,10 +67,8 @@ export interface SessionView {
   pendingWorktreePath: string;
   /** The user pinned the thread (session.pin): it sits in the sidebar's Pinned section. */
   pinned: boolean;
-  /** Terminal or rendered (docs/notes/rendered-threads-2-gui.md); an older daemon's are terminal. */
-  render: SessionRenderView;
   /**
-   * A rendered thread's effort change (thread.set-effort) not applied yet: `effort` is the
+   * An effort change (thread.set-effort) not applied yet: `effort` is the
    * new level; Claude restarts with it once the running turn ends.
    */
   effortPending: boolean;
@@ -104,15 +93,14 @@ export interface SessionView {
    */
   agentRuns: AgentRunView[];
   /**
-   * A rendered thread's context size after its last turn (the last API response's input +
-   * cache read + cache write + output tokens); 0 for a terminal thread and before the first
-   * result. docs/notes/rendered-threads-cold-cache.md.
+   * The thread's context size after its last turn (the last API response's input + cache
+   * read + cache write + output tokens); 0 before the first result.
+   * docs/notes/rendered-threads-cold-cache.md.
    */
   contextTokens: number;
   /**
    * When the conversation's prompt cache expires (its last result plus the
-   * sessions.cache_ttl_seconds setting), epoch ms; null for a terminal thread and before
-   * the first result. Past it, the next message re-reads contextTokens.
+   * sessions.cache_ttl_seconds setting), epoch ms; null before the first result. Past it, the next message re-reads contextTokens.
    */
   cacheExpiresAtMs: number | null;
   /** What re-reading contextTokens costs once the cache expired, USD; 0 when unpriced. */
@@ -225,7 +213,6 @@ export function toSessionView(s: Session): SessionView {
     autoNamed: s.autoNamed,
     model: s.model,
     effort: s.effort,
-    terminalId: s.terminalId,
     state: stateMap[s.state],
     status: statusMap[s.status],
     statusReason: s.statusReason,
@@ -242,7 +229,6 @@ export function toSessionView(s: Session): SessionView {
     workspaceId: s.workspaceId,
     pendingWorktreePath: s.pendingWorktreePath,
     pinned: s.pinned,
-    render: s.render === SessionRender.RENDERED ? "rendered" : "terminal",
     effortPending: s.effortPending,
     linkedPullRequests: s.linkedPullRequests.map((l) => ({
       slug: l.slug,
@@ -330,7 +316,7 @@ export const ATTACHMENT_MIME_TYPES: readonly string[] = ["image/png", "image/jpe
 export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
 /**
- * A staged attachment's bytes (a rendered thread's user message shows its images); null
+ * A staged attachment's bytes (a user message shows its images); null
  * once the daemon reaped it. Rejects when the daemon could not be asked.
  */
 export async function readAttachment(path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<{ data: Uint8Array; mimeType: string } | null> {

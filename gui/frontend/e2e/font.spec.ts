@@ -33,8 +33,10 @@ test("the bundled Nerd Font is served, loaded before the terminal opens, and is 
   }, FAMILY);
   expect(lineBox).toBeCloseTo(1.32, 2);
 
+  // s-1's shell in its bottom panel (the only terminal host).
   await row(page, "s:s-1").click();
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
+  await page.keyboard.press("Meta+j");
+  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
   const fontFamily = await page.evaluate(() => {
     const w = window as unknown as { __cfTerminal: { renderer: { term: { options: { fontFamily?: string } } } } };
     return w.__cfTerminal.renderer.term.options.fontFamily ?? "";

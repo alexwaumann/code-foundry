@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { CircleX, Loader2, RefreshCw } from "lucide-react";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { attachTerminal, resizeTerminal, writeTerminal } from "@/api/terminal";
@@ -6,7 +6,7 @@ import { isGlobalChord } from "@/keys/bindings";
 import { useColorScheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { useScrollbackLines, useTerminalFontFamily } from "@/stores/settings";
-import { useUiStore, type FocusRegion } from "@/stores/ui";
+import { useUiStore } from "@/stores/ui";
 import { AttachController, type AttachState } from "@/terminal/attach";
 import { XtermRenderer, type RendererKind } from "@/terminal/xterm";
 
@@ -17,15 +17,14 @@ interface DevHook {
 
 declare global {
   interface Window {
-    /** Dev/test hook: the main (content pane) host's renderer (only in dev builds). */
+    /**
+     * Dev/test hook: the mounted host's renderer and controller (only in dev builds). The
+     * bottom panel's is the only host, so this is its active shell; e2e reads its buffer
+     * (e2e/fixtures.ts terminalText) and loses its WebGL context.
+     */
     __cfTerminal?: DevHook;
-    /** Dev/test hook: every mounted host by name ("main", "bottom"; only in dev builds). */
-    __cfTerminals?: Record<string, DevHook>;
   }
 }
-
-/** Which host: the content pane's or the bottom panel's. Names the dev hook. */
-export type TerminalHostName = "main" | "bottom";
 
 export interface TerminalHostHandle {
   focus: () => void;
@@ -82,37 +81,16 @@ function Overlay({ state }: { state: AttachState }) {
 }
 
 /**
- * One xterm attached to at most one terminal: the content pane's (TerminalPane) and the
- * bottom panel's (components/bottom) each have one. The renderer lives as long as the
- * host; switching `terminalId` aborts the old Attach stream and resets the renderer before
- * the new snapshot, and a null id detaches (no stream). Resizes refit through a
+ * One xterm attached to at most one terminal: the bottom panel's active shell
+ * (components/bottom; threads have no terminal). The renderer lives as long as the host;
+ * switching `terminalId` aborts the old Attach stream and resets the renderer before the
+ * new snapshot, and a null id detaches (no stream). Resizes refit through a
  * ResizeObserver, and the fit skips a hidden (zero-size) host (terminal/xterm.ts).
  *
- * Focus is the parent's call (`ref.focus()`), so each parent decides when its terminal
- * takes focus. `region` is the host's data-region; without it the host's focus counts
- * for the nearest region around it (the bottom panel's "bottom").
+ * Focus is the parent's call (`ref.focus()`). The host's focus counts for the region
+ * around it (the bottom panel's "bottom").
  */
-export function TerminalHost({
-  ref,
-  name,
-  terminalId,
-  region,
-  hidden = false,
-  testId,
-  onSize,
-  onRenderer,
-  children,
-}: {
-  ref?: Ref<TerminalHostHandle>;
-  name: TerminalHostName;
-  terminalId: string | null;
-  region?: FocusRegion;
-  hidden?: boolean;
-  testId: string;
-  onSize?: (size: { cols: number; rows: number }) => void;
-  onRenderer?: (kind: RendererKind) => void;
-  children?: ReactNode;
-}) {
+export function TerminalHost({ ref, terminalId, hidden = false, testId }: { ref?: Ref<TerminalHostHandle>; terminalId: string | null; hidden?: boolean; testId: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const ctlRef = useRef<DevHook | null>(null);
   const [state, setState] = useState<AttachState>({ terminalId: null, phase: "idle", exitCode: null, error: null });
@@ -125,11 +103,6 @@ export function TerminalHost({
   const fontSize = useUiStore((s) => Math.round((s.fontSize * s.zoom) / 100));
   const fontFamily = useTerminalFontFamily();
   const scrollback = useScrollbackLines();
-  // The callbacks may change identity every render; the renderer's listeners read the latest.
-  const callbacks = useRef({ onSize, onRenderer });
-  useLayoutEffect(() => {
-    callbacks.current = { onSize, onRenderer };
-  });
 
   // Set when a renderer is disposed while it has focus: the next one takes it. Only
   // StrictMode's effect replay (dev) creates a second renderer in one host's life, right
@@ -147,10 +120,7 @@ export function TerminalHost({
       fontSize: Math.round((ui.fontSize * ui.zoom) / 100),
       colorScheme: scheme,
       isGlobalChord,
-      onRendererChange: (kind) => {
-        setRendererKind(kind);
-        callbacks.current.onRenderer?.(kind);
-      },
+      onRendererChange: setRendererKind,
     });
     renderer.mount(host);
     const controller = new AttachController(
@@ -163,16 +133,9 @@ export function TerminalHost({
       },
       setState,
     );
-    const sizeSub = renderer.term.onResize((s) => {
-      callbacks.current.onSize?.({ cols: s.cols, rows: s.rows });
-    });
-    callbacks.current.onSize?.(renderer.size);
     const hook = { renderer, controller };
     ctlRef.current = hook;
-    if (import.meta.env.DEV) {
-      window.__cfTerminals = { ...window.__cfTerminals, [name]: hook };
-      if (name === "main") window.__cfTerminal = hook;
-    }
+    if (import.meta.env.DEV) window.__cfTerminal = hook;
 
     let raf = 0;
     const ro = new ResizeObserver(() => {
@@ -192,17 +155,10 @@ export function TerminalHost({
       stopSimulation();
       ro.disconnect();
       cancelAnimationFrame(raf);
-      sizeSub.dispose();
       controller.dispose();
       renderer.dispose();
       ctlRef.current = null;
-      if (import.meta.env.DEV) {
-        if (window.__cfTerminals?.[name] === hook) {
-          const { [name]: _gone, ...rest } = window.__cfTerminals;
-          window.__cfTerminals = rest;
-        }
-        if (window.__cfTerminal === hook) delete window.__cfTerminal;
-      }
+      if (import.meta.env.DEV && window.__cfTerminal === hook) delete window.__cfTerminal;
     };
     // The renderer is created once; scheme/font changes are applied by the effects below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -238,14 +194,12 @@ export function TerminalHost({
         className="h-full w-full"
         style={{ zoom: 100 / zoom }}
         data-terminal-host
-        data-region={region}
         data-testid={testId}
         data-renderer={rendererKind ?? undefined}
         data-attach-phase={state.phase}
         data-terminal-id={state.terminalId ?? undefined}
       />
       <Overlay state={state} />
-      {children}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 /*
- * The rendered thread (docs/sketches/rendered-thread, variant A). Ported from the sketch's
+ * A thread (docs/sketches/rendered-thread, variant A). Ported from the sketch's
  * style.css / variants.css onto the app's tokens (index.css): status tones are the
  * Tailwind colours the sidebar uses, syntax colours the terminal palette
  * (src/terminal/theme.ts), mono text the bundled JetBrains Mono.

@@ -10,14 +10,12 @@ export const MCP_KIND = "mcp";
 export const MCP_TITLE = "MCP";
 
 /**
- * The selection's thread when it is a rendered thread the sessions store knows (a
- * terminal thread's Claude reports no MCP status to the daemon). Null otherwise, a page or
- * a composer included. A disconnected rendered thread counts: the surface says it has no
- * servers to show until it reconnects.
+ * The selection's thread when the sessions store knows it (selectionThread). Null
+ * otherwise, a page or a composer included. A disconnected thread counts: the surface
+ * says it has no servers to show until it reconnects.
  */
 export function selectionMcpThread(sel: Selection, s: SelectionStores): string | null {
-  const id = selectionThread(sel, s);
-  return id !== null && s.sessions.byId[id]?.render === "rendered" ? id : null;
+  return selectionThread(sel, s);
 }
 
 /** The surface's one tab per panel: no params (it follows the selection's thread). */

@@ -34,7 +34,7 @@ type Deps struct {
 	Projects command.ProjectDeps
 	// Session backs session.*. Nil works like Terminal.
 	Session command.SessionBackend
-	// Thread backs thread.* (rendered threads). Nil works like Terminal.
+	// Thread backs thread.*. Nil works like Terminal.
 	Thread command.ThreadBackend
 	// GitOps backs git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url.
 	// A nil Backend works like Terminal.

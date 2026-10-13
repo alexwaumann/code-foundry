@@ -82,32 +82,27 @@ func TestStageAttachment(t *testing.T) {
 		t.Errorf("text staged: %v", err)
 	}
 
-	// Create appends the staged paths to the prompt.
+	// Create appends the staged paths to the first message's text.
 	s := e.create(CreateOptions{InitialPrompt: "look", Attachments: []string{p, dir + "/./" + filepath.Base(p2)}})
-	spec, _ := e.terms.Spec(s.TerminalID)
 	want := "look\n\nAttached image: " + p + "\nAttached image: " + p2
-	if got := spec.Argv[len(spec.Argv)-1]; got != want {
-		t.Errorf("prompt = %q, want %q", got, want)
-	}
+	e.waitSent("the prompt", func(m map[string]any) bool { return userTextOf(m) == want })
 	// Claude may read the staged files without a permission prompt, in every spawn.
-	if argOf(spec.Argv, "--add-dir") != dir {
-		t.Errorf("argv = %q, want --add-dir %s", spec.Argv, dir)
+	if argv := e.spec(s.ID).Argv; argOf(argv, "--add-dir") != dir {
+		t.Errorf("argv = %q, want --add-dir %s", argv, dir)
 	}
-	_ = e.terms.Exit(s.TerminalID, 0)
+	e.exit(s.ID, 0)
 	e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
-	r, err := e.m.Reconnect(e.ctx(), s.ID)
-	if err != nil {
+	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
-	spec, _ = e.terms.Spec(r.TerminalID)
-	if argOf(spec.Argv, "--add-dir") != dir || slices.Contains(spec.Argv, "--") {
-		t.Errorf("reconnect argv = %q", spec.Argv)
+	if argv := e.spec(s.ID).Argv; argOf(argv, "--add-dir") != dir {
+		t.Errorf("reconnect argv = %q", argv)
 	}
 
 	off := newEnv(t)
 	plain := off.create(CreateOptions{})
-	if spec, _ := off.terms.Spec(plain.TerminalID); slices.Contains(spec.Argv, "--add-dir") {
-		t.Errorf("argv without an attachments dir = %q", spec.Argv)
+	if argv := off.spec(plain.ID).Argv; slices.Contains(argv, "--add-dir") {
+		t.Errorf("argv without an attachments dir = %q", argv)
 	}
 	if _, err := off.m.StageAttachment(off.ctx(), "a.png", "image/png", pngData); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("staging without a dir: %v", err)

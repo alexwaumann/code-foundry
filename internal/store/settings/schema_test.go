@@ -255,8 +255,8 @@ func TestCacheTTLField(t *testing.T) {
 	if got := Defaults(); got.Sessions.CacheTTLSeconds != 3600 || got.CacheTTL() != time.Hour {
 		t.Errorf("Defaults() cache TTL = %d (%v)", got.Sessions.CacheTTLSeconds, got.CacheTTL())
 	}
-	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyRender }); staticFields[i+1].Key != KeyCacheTTL {
-		t.Errorf("field after %s = %s", KeyRender, staticFields[i+1].Key)
+	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyNamingModel }); staticFields[i+1].Key != KeyCacheTTL {
+		t.Errorf("field after %s = %s", KeyNamingModel, staticFields[i+1].Key)
 	}
 	tests := []struct {
 		in string
@@ -265,22 +265,6 @@ func TestCacheTTLField(t *testing.T) {
 	for _, tt := range tests {
 		if _, err := f.parse(tt.in); (err == nil) != tt.ok {
 			t.Errorf("parse(%q) err = %v, want ok %v", tt.in, err, tt.ok)
-		}
-	}
-}
-
-func TestRenderField(t *testing.T) {
-	f := field(t, KeyRender)
-	if f.Default != RenderTerminal || Defaults().Sessions.Render != RenderTerminal || f.Group != GroupSessions || f.Restart ||
-		!slices.Equal(f.Enum, []string{"terminal", "rendered"}) || len(f.EnumLabels) != 2 {
-		t.Errorf("field = %+v, Defaults() = %q", f, Defaults().Sessions.Render)
-	}
-	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyNamingModel }); staticFields[i+1].Key != KeyRender {
-		t.Errorf("field after %s = %s", KeyNamingModel, staticFields[i+1].Key)
-	}
-	for _, in := range []string{"", "Rendered", "tui"} {
-		if _, err := f.parse(in); err == nil {
-			t.Errorf("parse(%q) accepted", in)
 		}
 	}
 }

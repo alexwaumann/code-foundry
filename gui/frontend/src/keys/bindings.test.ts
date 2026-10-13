@@ -35,7 +35,6 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     autoNamed: false,
     model: "",
     effort: "",
-    terminalId: `t-${id}`,
     state: "connected",
     status: "idle",
     statusReason: "",
@@ -52,7 +51,6 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     workspaceId: "",
     pendingWorktreePath: "",
     pinned: false,
-    render: "terminal",
     effortPending: false,
     linkedPullRequests: [],
     usage: [],
@@ -137,6 +135,44 @@ describe("handleKeyDown precedence", () => {
     expect(e.defaultPrevented).toBe(runs);
     expect(runCommandForResult).toHaveBeenCalledTimes(runs ? 1 : 0);
     expect(isGlobalChord(init.metaKey ? `cmd+${init.key}` : `ctrl+${init.key}`)).toBe(runs);
+  });
+
+  it.each<[string, KeyboardEventInit & { key: string }, boolean]>([
+    ["a cmd chord bound to a command runs from the thread prompt", { key: "t", code: "KeyT", metaKey: true }, true],
+    ["an editing chord stays with the prompt", { key: "c", code: "KeyC", metaKey: true }, false],
+    ["a plain key stays with the prompt", { key: "t", code: "KeyT" }, false],
+  ])("thread prompt focus ([data-chord-yield]): %s", (_name, init, runs) => {
+    document.body.insertAdjacentHTML("beforeend", '<div data-chord-yield><div id="pr" contenteditable="true"></div></div>');
+    const prompt = document.getElementById("pr") as HTMLElement;
+    const e = press(prompt, init);
+    expect(e.defaultPrevented).toBe(runs);
+    expect(runCommandForResult).toHaveBeenCalledTimes(runs ? 1 : 0);
+    // A text field outside a prompt keeps every chord.
+    runCommandForResult.mockClear();
+    expect(press(input, init).defaultPrevented).toBe(false);
+    expect(runCommandForResult).not.toHaveBeenCalled();
+  });
+
+  it("thread prompt focus: an unbound cmd chord on a list for an older context stays with the prompt (cmd+backspace)", () => {
+    document.body.insertAdjacentHTML("beforeend", '<div data-chord-yield><div id="pr" contenteditable="true"></div></div>');
+    useCommandsStore.setState({ contextKey: "older" });
+    const e = press(document.getElementById("pr") as HTMLElement, { key: "Backspace", code: "Backspace", metaKey: true });
+    expect(e.defaultPrevented).toBe(false);
+    expect(runCommandForResult).not.toHaveBeenCalled();
+  });
+
+  it("thread prompt focus: a declared cmd chord on a list for an older context waits for the re-list (cmd+t right after selecting a thread)", async () => {
+    document.body.insertAdjacentHTML("beforeend", '<div data-chord-yield><div id="pr" contenteditable="true"></div></div>');
+    const commands = useCommandsStore.getState().commands;
+    useCommandsStore.setState({ commands: commands.map((c) => (c.name === "terminal.new" ? { ...c, available: false } : c)), contextKey: "older" });
+    relist.run = () => {
+      useCommandsStore.setState({ commands, contextKey: contextKey(getUiContext()) });
+    };
+    const e = press(document.getElementById("pr") as HTMLElement, { key: "t", code: "KeyT", metaKey: true });
+    expect(e.defaultPrevented).toBe(true);
+    await vi.waitFor(() => {
+      expect(runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, expect.objectContaining({ quiet: true }));
+    });
   });
 
   it("terminal focus: a cmd chord on a list for an older context waits for the re-list (cmd+t right after focusing a shell)", async () => {
@@ -308,7 +344,7 @@ describe("Run in… presentation (session.run-in)", () => {
   });
 });
 
-describe("a bare-key command chord (Escape interrupts a rendered thread)", () => {
+describe("a bare-key command chord (Escape interrupts a thread)", () => {
   let pane: HTMLElement;
   let prompt: HTMLElement;
   let sidebar: HTMLElement;
@@ -322,7 +358,7 @@ describe("a bare-key command chord (Escape interrupts a rendered thread)", () =>
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     useUiStore.setState({ palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" }, selection: { kind: "session", id: "s-r" } });
     useCommandsStore.setState({ commands: [cmd({ name: "thread.interrupt", keybindings: ["escape"] })] });
-    useSessionsStore.setState({ byId: { "s-r": session("s-r", { render: "rendered", status: "busy", terminalId: "" }) }, order: ["s-r"] });
+    useSessionsStore.setState({ byId: { "s-r": session("s-r", { status: "busy" }) }, order: ["s-r"] });
     useThreadStore.setState({ logs: {}, pending: {} });
     useCommandsStore.setState({ contextKey: contextKey(getUiContext()) });
     runCommandForResult.mockClear();
@@ -342,13 +378,18 @@ describe("a bare-key command chord (Escape interrupts a rendered thread)", () =>
   it.each<[string, () => void, () => HTMLElement]>([
     ["outside the content pane (lists, dialogs)", () => undefined, () => sidebar],
     ["inside an element with its own keys (a docked prompt)", () => undefined, () => prompt],
-    ["when the thread is idle", () => { useSessionsStore.setState({ byId: { "s-r": session("s-r", { render: "rendered", status: "idle", terminalId: "" }) } }); }, () => pane],
+    ["when the thread is idle", () => { useSessionsStore.setState({ byId: { "s-r": session("s-r", { status: "idle" }) } }); }, () => pane],
     ["while a prompt waits for the user", () => { useThreadStore.setState({ pending: { "s-r": { sessionId: "s-r", seq: 1, pending: [{ requestId: "r", itemId: "i", question: false, toolName: "Bash", summary: "ls" }] } } }); }, () => pane],
-    ["for a terminal thread", () => { useSessionsStore.setState({ byId: { "s-r": session("s-r", { status: "busy" }) } }); }, () => pane],
   ])("leaves the key alone %s", (_name, setup, target) => {
     setup();
     expect(press(target(), escape).defaultPrevented).toBe(false);
     expect(runCommandForResult).not.toHaveBeenCalled();
+  });
+
+  it("fires from a composer button (not the prompt's text) while the thread works", () => {
+    pane.insertAdjacentHTML("beforeend", '<div data-chord-yield><button id="picker" type="button"></button></div>');
+    expect(press(document.getElementById("picker") as HTMLElement, escape).defaultPrevented).toBe(true);
+    expect(runCommandForResult).toHaveBeenCalledWith("thread.interrupt", {}, expect.objectContaining({ quiet: true }));
   });
 
   it("modified chords keep firing anywhere", () => {

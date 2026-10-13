@@ -2,13 +2,12 @@ package session
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/claudestream"
 )
 
-// streamStatus is a rendered thread's StatusDetector: the status follows the stream,
-// never a screen (decision 8 of the rendered threads handoff).
+// streamStatus is a thread's status: it follows the stream, never a screen (decision 8
+// of the rendered threads handoff).
 //
 //   - Unknown "starting" until the initialize handshake succeeds.
 //   - Busy "working" from a send (or a turn Claude starts itself: a background task's
@@ -20,8 +19,8 @@ import (
 //     watching the items), "error: <code>" when the turn failed, then Idle "at
 //     prompt". An interrupted turn is seen: the user stopped it.
 //
-// The runner feeds it; all methods run on the runner goroutine. The reasons match
-// internal/claudestatus's so the GUI classifies both the same way.
+// The runner feeds it; all methods run on the runner goroutine. The GUI classifies the
+// reasons by prefix ("permission:", "question:", "finished", "error:"): keep them.
 type streamStatus struct {
 	started    bool
 	busy       bool
@@ -33,13 +32,7 @@ type streamStatus struct {
 
 type pendingReason struct{ id, reason string }
 
-var _ StatusDetector = (*streamStatus)(nil)
-
-func (*streamStatus) Output([]byte)     {}
-func (*streamStatus) Transcript([]byte) {}
-func (*streamStatus) Tick(time.Time)    {}
-
-// Status implements StatusDetector.
+// Status returns the current status and its reason.
 func (d *streamStatus) Status() (Status, string) {
 	switch {
 	case !d.started:

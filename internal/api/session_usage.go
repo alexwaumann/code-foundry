@@ -61,7 +61,7 @@ func agentRunsToProto(runs []session.AgentRun) []*v1.AgentRun {
 	return out
 }
 
-// contextRereadUSD prices re-reading a rendered thread's context once its cache expired
+// contextRereadUSD prices re-reading a thread's context once its cache expired
 // (pricing.RereadCost): at the rate of the model that answered its last turn, else of
 // the row's model when that is a full id; the TTL is the one its expiry was computed
 // with. 0 when nothing is recorded or the model is unpriced.

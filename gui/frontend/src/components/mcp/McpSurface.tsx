@@ -236,23 +236,23 @@ function Message({ testId, children }: { testId: string; children: string }) {
 
 /**
  * The side panel's MCP surface (docs/sketches/mcp-panel variant B, docs/notes/mcp-panel.md):
- * the selected rendered thread's MCP servers as Claude last reported them, one card each
+ * the selected thread's MCP servers as Claude last reported them, one card each
  * (name, version, status pill; scope · transport · tools; the error or the login hint;
  * Reconnect and the tools disclosure), under a header with the connected count, when the
  * servers were checked, and a refresh button.
  */
 export function McpSurface() {
   const threadId = useThreadId();
-  const rendered = useSessionsStore((s) => threadId !== "" && s.byId[threadId]?.render === "rendered");
+  const known = useSessionsStore((s) => threadId !== "" && threadId in s.byId);
   const connected = useSessionsStore((s) => s.byId[threadId]?.state === "connected");
   const status = useMcpStatus(threadId);
   const names = useMcpServerNames(threadId);
   const missing = status === null;
   useEffect(() => {
-    if (rendered && connected && missing) ensureMcpStatus(threadId);
-  }, [threadId, rendered, connected, missing]);
+    if (known && connected && missing) ensureMcpStatus(threadId);
+  }, [threadId, known, connected, missing]);
 
-  if (!rendered) return <Message testId="mcp-missing">Select a rendered thread to see its MCP servers.</Message>;
+  if (!known) return <Message testId="mcp-missing">Select a thread to see its MCP servers.</Message>;
   return (
     // @container: tightens the padding when the panel is narrow (down to 280px).
     <TooltipProvider delayDuration={300}>

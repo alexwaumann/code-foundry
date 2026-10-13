@@ -64,7 +64,7 @@ type ThreadServiceClient interface {
 	ListItems(context.Context, *connect.Request[v1.ListThreadItemsRequest]) (*connect.Response[v1.ListThreadItemsResponse], error)
 	// Watch streams one thread: a snapshot first, then appended/updated items, text
 	// deltas and pending-request changes. While a Watch is open the thread counts as
-	// looked at: a finished turn is seen at once (like an attached terminal). Apply only
+	// looked at: a finished turn is seen at once. Apply only
 	// events whose seq is greater than the snapshot's.
 	Watch(context.Context, *connect.Request[v1.WatchThreadRequest]) (*connect.ServerStreamForClient[v1.ThreadEvent], error)
 	// Send sends a user message to a connected thread. Allowed while a turn runs:
@@ -93,7 +93,7 @@ type ThreadServiceClient interface {
 	// unset). See docs/notes/mcp-panel.md.
 	McpStatus(context.Context, *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error)
 	// McpReconnect reconnects one MCP server of a connected thread (also how a login made
-	// out of band, /mcp in a terminal thread, is picked up), then checks the servers again.
+	// out of band, `claude /mcp` in a shell, is picked up), then checks the servers again.
 	// A server that still fails is not an RPC error: the response's error says why and the
 	// status shows it. An unknown server is NOT_FOUND.
 	McpReconnect(context.Context, *connect.Request[v1.McpReconnectRequest]) (*connect.Response[v1.McpReconnectResponse], error)
@@ -244,7 +244,7 @@ type ThreadServiceHandler interface {
 	ListItems(context.Context, *connect.Request[v1.ListThreadItemsRequest]) (*connect.Response[v1.ListThreadItemsResponse], error)
 	// Watch streams one thread: a snapshot first, then appended/updated items, text
 	// deltas and pending-request changes. While a Watch is open the thread counts as
-	// looked at: a finished turn is seen at once (like an attached terminal). Apply only
+	// looked at: a finished turn is seen at once. Apply only
 	// events whose seq is greater than the snapshot's.
 	Watch(context.Context, *connect.Request[v1.WatchThreadRequest], *connect.ServerStream[v1.ThreadEvent]) error
 	// Send sends a user message to a connected thread. Allowed while a turn runs:
@@ -273,7 +273,7 @@ type ThreadServiceHandler interface {
 	// unset). See docs/notes/mcp-panel.md.
 	McpStatus(context.Context, *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error)
 	// McpReconnect reconnects one MCP server of a connected thread (also how a login made
-	// out of band, /mcp in a terminal thread, is picked up), then checks the servers again.
+	// out of band, `claude /mcp` in a shell, is picked up), then checks the servers again.
 	// A server that still fails is not an RPC error: the response's error says why and the
 	// status shows it. An unknown server is NOT_FOUND.
 	McpReconnect(context.Context, *connect.Request[v1.McpReconnectRequest]) (*connect.Response[v1.McpReconnectResponse], error)

@@ -6,7 +6,7 @@ import { useUiStore } from "@/stores/ui";
 
 /**
  * A thread row on an overview page: status, name, and a muted detail on the right.
- * Clicking selects the thread and focuses its terminal. Defaults to the status icon and
+ * Clicking selects the thread and focuses its prompt. Defaults to the status icon and
  * badge label; `icon` and `detail` replace them.
  */
 export function SessionLink({ id, icon, detail }: { id: string; icon?: ReactNode; detail?: string }) {
@@ -18,7 +18,7 @@ export function SessionLink({ id, icon, detail }: { id: string; icon?: ReactNode
       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
       data-session-link={id}
       onClick={() => {
-        useUiStore.getState().select({ kind: "session", id }, { focusTerminal: true });
+        useUiStore.getState().select({ kind: "session", id }, { focusPrompt: true });
       }}
     >
       <span className="flex size-4 shrink-0 items-center justify-center">{icon ?? <SessionStatusIcon id={id} />}</span>

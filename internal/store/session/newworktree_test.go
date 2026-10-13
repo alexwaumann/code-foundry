@@ -131,8 +131,8 @@ func TestCreateNewWorktree(t *testing.T) {
 				s.Name != tt.wantName || s.AutoNamed != (tt.wantName != "" && tt.o.Name == "") {
 				t.Errorf("session = %+v", s)
 			}
-			spec, _ := e.terms.Spec(s.TerminalID)
-			if spec.Cwd != wantPath {
+			spec := e.spec(s.ID)
+			if !samePath(spec.Cwd, wantPath) {
 				t.Errorf("spawned in %q", spec.Cwd)
 			}
 			e.mu.Lock()

@@ -17,13 +17,13 @@ func hasWorkspaceThread(c Context) bool {
 }
 
 // sessionRunIn is session.run-in: move a workspace thread to another member worktree
-// ("Run in…"). The daemon types `/cd <path>` once the thread is idle at its prompt.
+// ("Run in…"). The daemon moves a live thread (set_cwd) once it is idle at its prompt.
 func sessionRunIn(b SessionBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:  "session.run-in",
 		Title: "Run Thread In…",
 		Description: "Move a workspace thread to another member worktree of its workspace. " +
-			"A running thread gets /cd typed once it is idle at its prompt; a disconnected one moves at once.",
+			"A running thread moves once it is idle at its prompt; a disconnected one moves at once.",
 		Category: "Thread",
 		Args: []ArgSpec{
 			idArg,
@@ -44,7 +44,7 @@ func sessionRunIn(b SessionBackend, idArg ArgSpec) Command {
 			s := res.Msg.GetSession()
 			msg := "thread " + sessionLabel(s) + " runs in " + s.GetWorktreePath()
 			if p := s.GetPendingWorktreePath(); p != "" {
-				msg = "thread " + sessionLabel(s) + " moves to " + p + " once it is idle (/cd)"
+				msg = "thread " + sessionLabel(s) + " moves to " + p + " once it is idle"
 			}
 			return Result{Message: msg, JSON: s}, nil
 		},

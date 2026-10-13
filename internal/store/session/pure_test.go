@@ -10,78 +10,6 @@ import (
 	"time"
 )
 
-// Screens captured from Claude Code 2.1.294 through terminal.Store.ScreenText (120x40).
-const (
-	trustScreenNo = `
-────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- Accessing workspace:
-
- /private/tmp/cf2a-trust1
-
- Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source
- project, or work from your team). If not, take a moment to review what's in this folder first.
-
- Claude Code'll be able to read, edit, and execute files here.
-
- Security guide
-
- ❯ No, exit
-   Yes, I trust this folder
-
- Enter to confirm · Esc to cancel`
-	trustScreenYes = `
-────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- Accessing workspace:
-
- /private/tmp/cf2a-trust1
-
- Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source
- project, or work from your team). If not, take a moment to review what's in this folder first.
-
- Claude Code'll be able to read, edit, and execute files here.
-
- Security guide
-
-   No, exit
- ❯ Yes, I trust this folder
-
- Enter to confirm · Esc to cancel`
-	promptScreen = ` ▐▛███▛█   Claude Code v2.1.294
-▝▜██████▀  Opus 5.5 with low effort · Claude Max
- ▝▝   ▝▝   /private/tmp/cf2a-trust2
-                                                                                                       ○ low · /effort
-────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-❯ Try "how do I log an error?"
-────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  /private/tmp/cf2a-trust2
-  Opus 5.5 (low) · 0 tokens
-  -- INSERT -- ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents`
-	// A conversation that merely quotes the option text is not the dialog.
-	quotedScreen = `❯ what does "Yes, I trust this folder" do?
-⏺ It accepts the dialog.`
-)
-
-func TestParseTrustDialog(t *testing.T) {
-	tests := []struct {
-		name   string
-		screen string
-		want   trustDialog
-	}{
-		{"default selection is No", trustScreenNo, trustDialog{Visible: true}},
-		{"Yes selected after Down", trustScreenYes, trustDialog{Visible: true, YesSelected: true}},
-		{"Claude prompt", promptScreen, trustDialog{}},
-		{"empty", "", trustDialog{}},
-		{"quoted in conversation", quotedScreen, trustDialog{}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := parseTrustDialog(tt.screen); got != tt.want {
-				t.Errorf("parseTrustDialog = %+v, want %+v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestSetTrusted(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -193,6 +121,8 @@ func TestProjectSlug(t *testing.T) {
 }
 
 func TestLaunchArgv(t *testing.T) {
+	// Every spawn speaks stream-json; the prompt is never part of argv.
+	argv := func(rest ...string) []string { return append(append([]string{"claude"}, streamArgs...), rest...) }
 	tests := []struct {
 		name string
 		l    launch
@@ -201,33 +131,33 @@ func TestLaunchArgv(t *testing.T) {
 		id   string
 	}{
 		{"new", launch{newID: "N"}, spawnArgs{model: "opus", effort: "high", perm: PermissionDefault},
-			[]string{"claude", "--session-id", "N", "--model", "opus", "--effort", "high"}, "N"},
-		{"new defaults", launch{newID: "N"}, spawnArgs{}, []string{"claude", "--session-id", "N"}, "N"},
-		{"resume", launch{resume: "R"}, spawnArgs{model: "opus", effort: "", perm: PermissionDefault}, []string{"claude", "--resume", "R", "--model", "opus"}, "R"},
+			argv("--session-id", "N", "--model", "opus", "--effort", "high"), "N"},
+		{"new defaults", launch{newID: "N"}, spawnArgs{}, argv("--session-id", "N"), "N"},
+		{"resume", launch{resume: "R"}, spawnArgs{model: "opus", effort: "", perm: PermissionDefault}, argv("--resume", "R", "--model", "opus"), "R"},
 		{"resume ignores newID", launch{resume: "R", newID: "N"}, spawnArgs{model: "", effort: "low", perm: PermissionDefault},
-			[]string{"claude", "--resume", "R", "--effort", "low"}, "R"},
+			argv("--resume", "R", "--effort", "low"), "R"},
 		{"fork", launch{resume: "R", fork: true, newID: "N"}, spawnArgs{model: "sonnet", effort: "max", perm: PermissionDefault},
-			[]string{"claude", "--resume", "R", "--fork-session", "--session-id", "N", "--model", "sonnet", "--effort", "max"}, "N"},
+			argv("--resume", "R", "--fork-session", "--session-id", "N", "--model", "sonnet", "--effort", "max"), "N"},
 		{"supervised", launch{newID: "N"}, spawnArgs{perm: PermissionSupervised},
-			[]string{"claude", "--session-id", "N", "--permission-mode", "manual"}, "N"},
+			argv("--session-id", "N", "--permission-mode", "manual"), "N"},
 		{"accept edits", launch{newID: "N"}, spawnArgs{perm: PermissionAcceptEdits},
-			[]string{"claude", "--session-id", "N", "--permission-mode", "acceptEdits"}, "N"},
-		{"auto with prompt", launch{newID: "N"}, spawnArgs{model: "opus", effort: "high", perm: PermissionAuto, prompt: "fix it"},
-			[]string{"claude", "--session-id", "N", "--model", "opus", "--effort", "high", "--permission-mode", "auto", "--", "fix it"}, "N"},
-		{"prompt that looks like a flag", launch{newID: "N"}, spawnArgs{perm: PermissionDefault, prompt: "--help me\nplease"},
-			[]string{"claude", "--session-id", "N", "--", "--help me\nplease"}, "N"},
+			argv("--session-id", "N", "--permission-mode", "acceptEdits"), "N"},
+		{"auto", launch{newID: "N"}, spawnArgs{model: "opus", effort: "high", perm: PermissionAuto},
+			argv("--session-id", "N", "--model", "opus", "--effort", "high", "--permission-mode", "auto"), "N"},
 		{"resume keeps the mode", launch{resume: "R"}, spawnArgs{perm: PermissionAuto},
-			[]string{"claude", "--resume", "R", "--permission-mode", "auto"}, "R"},
-		{"add dirs before the prompt", launch{newID: "N"}, spawnArgs{perm: PermissionAuto, prompt: "x", addDirs: []string{"/att"}},
-			[]string{"claude", "--session-id", "N", "--permission-mode", "auto", "--add-dir", "/att", "--", "x"}, "N"},
-		{"workspace: add dirs and the prompt line before the prompt", launch{newID: "N"},
-			spawnArgs{perm: PermissionAuto, prompt: "x", addDirs: []string{"/att", "/wt/api"}, appendSystemPrompt: "line"},
-			[]string{"claude", "--session-id", "N", "--permission-mode", "auto", "--add-dir", "/att", "--add-dir", "/wt/api",
-				"--append-system-prompt", "line", "--", "x"}, "N"},
-		{"workspace on resume, no prompt", launch{resume: "R"}, spawnArgs{addDirs: []string{"/wt/api"}, appendSystemPrompt: "line"},
-			[]string{"claude", "--resume", "R", "--add-dir", "/wt/api", "--append-system-prompt", "line"}, "R"},
+			argv("--resume", "R", "--permission-mode", "auto"), "R"},
+		{"add dirs", launch{newID: "N"}, spawnArgs{perm: PermissionAuto, addDirs: []string{"/att"}},
+			argv("--session-id", "N", "--permission-mode", "auto", "--add-dir", "/att"), "N"},
+		{"workspace: add dirs and the prompt line", launch{newID: "N"},
+			spawnArgs{perm: PermissionAuto, addDirs: []string{"/att", "/wt/api"}, appendSystemPrompt: "line"},
+			argv("--session-id", "N", "--permission-mode", "auto", "--add-dir", "/att", "--add-dir", "/wt/api",
+				"--append-system-prompt", "line"), "N"},
+		{"workspace on resume", launch{resume: "R"}, spawnArgs{addDirs: []string{"/wt/api"}, appendSystemPrompt: "line"},
+			argv("--resume", "R", "--add-dir", "/wt/api", "--append-system-prompt", "line"), "R"},
+		{"session grants", launch{resume: "R"}, spawnArgs{allowedTools: []string{"Bash(git push:*)", "Read"}, disallowedTools: []string{"Write"}},
+			argv("--resume", "R", "--allowedTools", "Bash(git push:*)", "Read", "--disallowedTools", "Write"), "R"},
 		{"unknown mode passes nothing", launch{newID: "N"}, spawnArgs{perm: PermissionMode(9)},
-			[]string{"claude", "--session-id", "N"}, "N"},
+			argv("--session-id", "N"), "N"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

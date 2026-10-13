@@ -11,7 +11,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/claudestream"
 )
 
-// Effort changes of a rendered thread. Claude has no live effort switch (no
+// Effort changes of a thread. Claude has no live effort switch (no
 // set_effort control request), so the runner restarts the process with --resume and
 // the new --effort, between turns: the old process gets its stdin closed (it exits
 // once idle), then the same runner starts the new one and does the handshake again.
@@ -59,8 +59,8 @@ func (m *Manager) SetEffort(ctx context.Context, id, effort string) (Session, er
 	}
 }
 
-// restarting: a restart is under way (rendered threads only).
-func (r *runner) restarting() bool { return r.st != nil && r.st.restart != restartNone }
+// restarting: a restart is under way.
+func (r *runner) restarting() bool { return r.st.restart != restartNone }
 
 // setEffort records the wanted effort on the row; maybeRestart applies it.
 func (r *runner) setEffort(effort string) Session {
@@ -80,7 +80,7 @@ func (r *runner) setEffort(effort string) Session {
 func (r *runner) maybeRestart() {
 	st := r.st
 	if st.wantEffort == st.effort || st.restart != restartNone || r.closing || r.finished || !st.initialized ||
-		st.first != nil || r.cdTimer != nil || !st.sd.AtPrompt() || len(st.log.unfinished()) > 0 {
+		st.first != nil || !st.sd.AtPrompt() || len(st.log.unfinished()) > 0 {
 		return
 	}
 	st.restart = restartClosing
@@ -88,7 +88,7 @@ func (r *runner) maybeRestart() {
 	r.log().info("restarting claude for an effort change", "from", st.effort, "to", st.wantEffort, "pid", st.proc.Pid())
 	conn := st.conn
 	go func() { _ = conn.CloseStdin() }()
-	// Not gone after CloseTimeout: SIGTERM, then SIGKILL (closeNextStream).
+	// Not gone after CloseTimeout: SIGTERM, then SIGKILL (closeNext).
 	r.closeStep = 1
 	r.closeTimer = time.NewTimer(r.m.opts.CloseTimeout)
 }
@@ -120,7 +120,7 @@ func (r *runner) respawn() {
 	st.proj.restart(restoredTotals(r.m.opts.Paths, r.cwd, l))
 	s, _ := r.m.Snapshot().Session(r.id)
 	s.WorktreePath, s.Effort = r.cwd, st.wantEffort
-	argv, env := r.m.claudeCommand(s, l, "", st.grants)
+	argv, env := r.m.claudeCommand(s, l, st.grants)
 	proc, err := claudestream.Start(claudestream.Spec{
 		Argv: argv, Env: env, Dir: r.cwd,
 		Conn: claudestream.Options{Log: r.m.log.With("session", r.id)},
@@ -133,7 +133,7 @@ func (r *runner) respawn() {
 		st.proj.w.add(Item{ID: st.proj.nextID("err"), Kind: KindError, Text: msg})
 		r.failHeld("Claude did not restart")
 		r.finish(func(s *Session) {
-			s.State, s.DisconnectReason, s.TerminalID, s.LastError = StateDisconnected, ReasonSpawnFailed, "", msg
+			s.State, s.DisconnectReason, s.LastError = StateDisconnected, ReasonSpawnFailed, msg
 		})
 		return
 	}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { ArrowUp, Brain, Folder, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, MessageSquareText, Paperclip, ShieldCheck, SquareTerminal, X } from "lucide-react";
+import { ArrowUp, Brain, Folder, FolderGit2, Gauge, GitBranch, GitBranchPlus, GitCommitHorizontal, Layers, Loader2, Paperclip, ShieldCheck, X } from "lucide-react";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { BranchIndicator } from "./BranchIndicator";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
@@ -18,7 +18,6 @@ import {
   choiceLabel,
   DEFAULT_EFFORT,
   DEFAULT_MODEL,
-  DEFAULT_RENDER,
   draftKey as keyOf,
   draftMembers,
   EFFORT_CHOICES,
@@ -26,9 +25,7 @@ import {
   PERMISSION_CHOICES,
   pickDefault,
   projectChipBranch,
-  RENDER_CHOICES,
   type ComposePermission,
-  type ComposeRender,
   type ComposeTarget,
   type WorktreeChoice,
 } from "@/lib/compose";
@@ -63,14 +60,11 @@ const SEP = "\u0001";
 /** What starts a completion in the prompt: "/" for skills, "@" for files. */
 const TRIGGERS: readonly TriggerChar[] = ["/", "@"];
 
-const RENDER_GROUPS = [{ options: RENDER_CHOICES.map((c) => ({ value: c.value, label: c.label, detail: c.hint })) }];
-
-/** Model, effort and view the composer starts with: the settings defaults, else opus / high / terminal. */
-function useDefaults(): { model: string; effort: string; render: ComposeRender } {
+/** Model and effort the composer starts with: the settings defaults, else opus / high. */
+function useDefaults(): { model: string; effort: string } {
   const model = pickDefault(useModelChoices(), useSettingValue("sessions.default_model"), DEFAULT_MODEL);
   const effort = pickDefault(EFFORT_CHOICES, useSettingValue("sessions.default_effort"), DEFAULT_EFFORT);
-  const render = pickDefault(RENDER_CHOICES, useSettingValue("sessions.render"), DEFAULT_RENDER) as ComposeRender;
-  return useMemo(() => ({ model, effort, render }), [model, effort, render]);
+  return useMemo(() => ({ model, effort }), [model, effort]);
 }
 
 interface WorktreeOption {
@@ -209,7 +203,7 @@ async function removeWithConfirm(key: string, a: DraftAttachment, refocus: () =>
   refocus();
 }
 
-/** A draft's image thumbnails (preview on click, × to remove); also the rendered thread's follow-up composer's. */
+/** A draft's image thumbnails (preview on click, × to remove); also a thread's follow-up composer's. */
 export function Attachments({ draftKey, disabled, refocus }: { draftKey: string; disabled: boolean; refocus: () => void }) {
   const attachments = useDraft(draftKey, "attachments");
   if (attachments.length === 0) return null;
@@ -298,7 +292,6 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   const model = useDraft(draftKey, "model") ?? defaults.model;
   const effort = useDraft(draftKey, "effort") ?? defaults.effort;
   const permission = useDraft(draftKey, "permission");
-  const render = useDraft(draftKey, "render") ?? defaults.render;
   const choice = useDraft(draftKey, "worktree");
   const baseChoice = useDraft(draftKey, "base");
   const phase = useDraft(draftKey, "phase");
@@ -555,19 +548,6 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
             disabled={busy}
             contentClassName="w-60"
             data-testid="composer-permission"
-          />
-          <ComposerPicker
-            label="View"
-            icon={render === "rendered" ? MessageSquareText : SquareTerminal}
-            text={choiceLabel(RENDER_CHOICES, render)}
-            value={render}
-            groups={RENDER_GROUPS}
-            onChange={(v) => {
-              updateDraft(draftKey, { render: v as ComposeRender });
-            }}
-            disabled={busy}
-            contentClassName="w-60"
-            data-testid="composer-render"
           />
           <button
             type="button"

@@ -25,8 +25,8 @@
  *        plan, finished, Claude error, busy, idle, interrupted, and a disconnected one still asking
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
- *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N&model=M]   (a rendered thread's last result that long ago; mock/context.ts)
- *   POST /__mock/thread?state=permission|question|streaming|idle   (the rendered thread s-r1:
+ *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N&model=M]   (a thread's last result that long ago; mock/context.ts)
+ *   POST /__mock/thread?state=permission|question|streaming|idle   (the scripted thread s-r1:
  *        mock/thread.ts, also parallel|multi); POST /__mock/thread/delta?text=… | /__mock/thread/stream?text=… |
  *        /__mock/thread/finish[?total=1.5&turnCost=1.5&model=claude-sonnet-5] (the turn_end's figures) |
  *        /__mock/thread/fail-respond[?withdrawn=1] (the next answer fails; withdrawn: Claude withdrew
@@ -349,7 +349,7 @@ function routes(router: ConnectRouter): void {
       throw new ConnectError("use the session.remove command in the mock", Code.Unimplemented);
     },
     stageAttachment: (req) => guard(() => ({ path: world.stageAttachment(req.name, req.mimeType, req.data.length) })),
-    // The scripted rendered thread's image (mock/thread.ts); staged uploads have no bytes in the mock.
+    // The scripted thread's image (mock/thread.ts); staged uploads have no bytes in the mock.
     readAttachment: (req) => {
       if (req.path === MOCK_ATTACHMENT || world.attachments.has(req.path)) return { data: new Uint8Array(MOCK_ATTACHMENT_PNG), mimeType: "image/png" };
       throw new ConnectError(`attachment ${req.path} not found`, Code.NotFound);
@@ -357,7 +357,7 @@ function routes(router: ConnectRouter): void {
     watch: (_req, ctx) => tracked("SessionService/Watch", world.sessionEvents.subscribe(ctx.signal, [world.sessionSnapshot()])),
   });
 
-  // Rendered threads (mock/thread.ts). The GUI goes through the thread.* commands for
+  // Threads (mock/thread.ts). The GUI goes through the thread.* commands for
   // Send / Interrupt / Respond / SetModel / SetPermissionMode / SetEffort; these serve the RPCs themselves.
   router.service(ThreadService, {
     listItems: (req) => guard(() => ({ snapshot: world.threads.snapshotValue(req.sessionId) })),
@@ -510,7 +510,6 @@ function sessionSummary(id: string): Record<string, unknown> {
     status: SessionStatus[s.status],
     statusReason: s.statusReason,
     statusChangedAt: s.statusChangedAt.toISOString(),
-    terminalId: s.terminalId,
     repoId: s.repoId,
     worktreePath: s.worktreePath,
     workspaceId: s.workspaceId,
@@ -575,7 +574,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/terminal/exit":
       try {
         const id = q.get("id") ?? "";
-        world.kill(id, Number(q.get("code") ?? 0), false, q.get("keep") === "1");
+        world.kill(id, Number(q.get("code") ?? 0), q.get("keep") === "1");
         json(res, 200, { ok: true });
       } catch (err) {
         json(res, 404, { error: err instanceof Error ? err.message : String(err) });
@@ -666,13 +665,13 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       }
       break;
     case "POST /__mock/thread": {
-      // state=permission|question|streaming|idle[&id=s-r1]: the sketch's rendered thread.
+      // state=permission|question|streaming|idle[&id=s-r1]: the sketch's scripted thread.
       const state = (q.get("state") ?? "permission") as ThreadState;
       if (!THREAD_STATES.includes(state)) {
         json(res, 400, { error: `state must be one of ${THREAD_STATES.join(", ")}` });
         break;
       }
-      const s = world.addRenderedThread(state, q.get("id") ?? "s-r1");
+      const s = world.addScriptedThread(state, q.get("id") ?? "s-r1");
       json(res, 200, { id: s.id });
       break;
     }

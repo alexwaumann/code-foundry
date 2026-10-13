@@ -76,7 +76,7 @@ export function applySettingsSnapshot(next: SettingsSnapshotView): void {
     if (Number.isFinite(n) && n > 0) useUiStore.getState().setZoom(n);
   }
   document.documentElement.dataset.density = next.values[KEYS.density] === "comfortable" ? "comfortable" : "compact";
-  // thread.css sizes a rendered thread's column and composer from html[data-thread-width].
+  // thread.css sizes a thread's column and composer from html[data-thread-width].
   document.documentElement.dataset.threadWidth = threadWidthOf(next.values[KEYS.threadWidth]);
   // CommandService.List reports keybinding overrides; the daemon applied them before
   // publishing, so re-list now.

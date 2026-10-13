@@ -46,7 +46,7 @@ function surfaceContext(panelKey: string): SurfaceContext {
 
 /**
  * Closing the panel's last tab hides it. If it had focus, hand focus to the content
- * pane (its terminal, or the page's focus root), so keys keep working.
+ * pane (a thread's prompt, or the page's focus root), so keys keep working.
  */
 function closeTab(panelKey: string, id: string): void {
   const hadFocus = useUiStore.getState().focus === "panel";

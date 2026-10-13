@@ -16,7 +16,7 @@ export const MCP_STATUS_LABEL: Readonly<Record<McpServerStatusView, string>> = {
 };
 
 /** The line under a needs-login card: Claude cannot log in headlessly. */
-export const MCP_LOGIN_HINT = "Needs login · run /mcp in a terminal thread, then reconnect";
+export const MCP_LOGIN_HINT = "Needs login · run claude in a shell and use /mcp, then reconnect";
 
 /** Reconnect is offered for every server but a connecting or disabled one. */
 export function canReconnect(status: McpServerStatusView): boolean {

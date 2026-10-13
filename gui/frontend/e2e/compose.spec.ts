@@ -46,8 +46,9 @@ async function pasteImage(page: Page, name: string): Promise<void> {
   );
 }
 
-function terminalFocused(page: Page): Promise<boolean> {
-  return page.evaluate(() => document.activeElement?.closest("[data-terminal-host]") != null);
+/** The keyboard is in the selected thread's prompt (its composer). */
+function promptFocused(page: Page): Promise<boolean> {
+  return page.evaluate(() => document.activeElement?.closest('[data-testid="thread-composer"]') != null);
 }
 
 test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktree", async ({ page }) => {
@@ -98,14 +99,16 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   await expect(page.getByTestId("composer-send")).toHaveText("Creating worktree…");
   await expect(page.getByTestId("composer-input")).toBeDisabled();
 
-  // The daemon's focus intent replaces the composer with the thread; its terminal has focus.
+  // The daemon's focus intent replaces the composer with the thread; its prompt has focus.
   const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
   await expect(created).toBeVisible();
   const key = (await created.getAttribute("data-row-key")) ?? "";
   expect(key).toMatch(/^s:s-new-\d+$/);
   await expect(page.getByTestId("composer")).toHaveCount(0);
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
-  await expect.poll(() => terminalFocused(page)).toBe(true);
+  await expect(page.getByTestId("thread-pane")).toBeVisible();
+  // No items until Claude is up: the timeline says it is starting.
+  await expect(page.getByTestId("thread-working")).toHaveText("Starting Claude…");
+  await expect.poll(() => promptFocused(page)).toBe(true);
   // Unnamed at first: the id stands in until the daemon names it.
   await expect(created.getByTestId("session-name")).toHaveText(key.slice(2));
   await expect(created.getByTestId("session-name")).toHaveText("add-a-dark-mode", { timeout: 5000 });
@@ -119,9 +122,10 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
     model: "opus",
     effort: "high",
     permission: "auto",
-    render: "terminal",
     prompt: "Add a dark mode toggle\nin settings",
   });
+  // The prompt goes out as the thread's first message once Claude is up.
+  await expect(page.getByTestId("thread-user").first()).toContainText("Add a dark mode toggle", { timeout: 8000 });
   // The thread's row names its project and the new worktree's branch; it is the newest thread.
   await expect(created.getByTestId("row-project")).toHaveText("code-foundry");
   await expect(created.getByTestId("row-branch")).toHaveText("cf/add-a-dark-mode");
@@ -189,20 +193,11 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
   await expect(page.getByTestId("composer-permission")).toHaveText("Supervised");
   await expect(page.getByTestId("composer-permission")).toBeFocused();
 
-  await page.keyboard.press("Tab");
-  await expect(page.getByTestId("composer-render")).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("composer-render-list").getByRole("option")).toHaveText([/^Terminal/, /^Rendered/]);
-  await page.keyboard.press("ArrowDown"); // terminal -> rendered
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("composer-render")).toHaveText("Rendered");
   // At once: reopened while it still fades out, the list takes the keyboard all the same.
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("composer-render-list").locator("[cmdk-root]")).toBeFocused();
-  await page.keyboard.press("ArrowUp"); // back to terminal: the thread below starts as one
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("composer-render")).toHaveText("Terminal");
-  await expect(page.getByTestId("composer-render")).toBeFocused();
+  await expect(page.getByTestId("composer-permission-list").locator("[cmdk-root]")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("composer-permission")).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("composer-attach")).toBeFocused();
   await page.keyboard.press("Tab");
@@ -226,7 +221,6 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
     model: "claude-opus-4-8",
     effort: "xhigh",
     permission: "supervised",
-    render: "terminal",
     prompt: "Refactor the sidebar",
   });
   await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
@@ -260,7 +254,7 @@ test("a failed start keeps the draft editable and shows why", async ({ page }) =
   await input.press("Enter");
   await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
   const last = (await invocations()).at(-1);
-  expect(last?.args).toEqual({ repo: "repo-cf", worktree: CF, model: "opus", effort: "high", permission: "auto", render: "terminal", prompt: "Please work" });
+  expect(last?.args).toEqual({ repo: "repo-cf", worktree: CF, model: "opus", effort: "high", permission: "auto", prompt: "Please work" });
   expect(await sessionCount()).toBe(before + 1);
 });
 

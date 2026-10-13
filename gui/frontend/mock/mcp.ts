@@ -1,7 +1,7 @@
 /**
- * A rendered thread's MCP servers in the mock daemon (docs/notes/mcp-panel.md): the
- * sketch's six servers (docs/sketches/mcp-panel), covering every status, seeded on the
- * scripted rendered thread (mock/thread.ts load). ThreadService.McpStatus / McpReconnect
+ * A thread's MCP servers in the mock daemon (docs/notes/mcp-panel.md): the sketch's six
+ * servers (docs/sketches/mcp-panel), covering every status, seeded on the scripted thread
+ * (mock/thread.ts load) and the live default-world threads (seed). ThreadService.McpStatus / McpReconnect
  * and the thread.mcp, thread.mcp-reconnect and view.panel.mcp commands.
  *
  * Reconnect answers after MCP_RECONNECT_MS: a failed server connects (with tools), a
@@ -120,7 +120,7 @@ export async function reconnectMcp(threads: McpThreads, id: string, server: stri
         tools: [tool("browser_navigate", "Navigate to a URL", "o"), tool("browser_click", "Click an element on the page", ""), tool("browser_snapshot", "Capture the page's accessibility tree", "r")],
       };
     }
-    if (s.status === McpServerStatus.NEEDS_AUTH) error = `${server} needs a login: run /mcp in a terminal thread`;
+    if (s.status === McpServerStatus.NEEDS_AUTH) error = `${server} needs a login: run claude in a shell and use /mcp`;
     return s;
   });
   const status: McpStatusInit = { checkedAt: timestampFromDate(new Date()), trigger: McpCheckTrigger.RECONNECT, server, servers: next };
@@ -134,9 +134,9 @@ type Command = {
   run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut>;
 };
 
-/** thread.mcp, thread.mcp-reconnect and view.panel.mcp, like the daemon's (rendered threads only). */
+/** thread.mcp, thread.mcp-reconnect and view.panel.mcp, like the daemon's (any active thread). */
 export function mcpCommands(threads: McpThreads, emit: (i: UiIntentInit) => number): Command[] {
-  const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeSessionId && (ctx.activeSessionRendered || ctx.activeView === ""));
+  const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeSessionId);
   const id = { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" };
   const sid = (ctx: UiContext | undefined, a: Record<string, string>) => a.id || ctx?.activeSessionId || "";
   return [
@@ -145,7 +145,7 @@ export function mcpCommands(threads: McpThreads, emit: (i: UiIntentInit) => numb
         name: "thread.mcp",
         title: "Show Thread MCP Servers",
         category: "Thread",
-        description: "Print a rendered thread's MCP servers as Claude last reported them.",
+        description: "Print a thread's MCP servers as Claude last reported them.",
         keybindings: [],
         args: [id, { name: "refresh", type: ArgType.BOOL, required: false, description: "Ask Claude now" }, { name: "full", type: ArgType.BOOL, required: false, description: "List each server's tools" }],
       },
@@ -165,7 +165,7 @@ export function mcpCommands(threads: McpThreads, emit: (i: UiIntentInit) => numb
         name: "thread.mcp-reconnect",
         title: "Reconnect Thread MCP Server",
         category: "Thread",
-        description: "Reconnect one of a connected rendered thread's MCP servers, then check them again.",
+        description: "Reconnect one of a connected thread's MCP servers, then check them again.",
         keybindings: [],
         args: [id, { name: "server", type: ArgType.STRING, required: true, description: "The server's name" }],
       },
@@ -185,7 +185,7 @@ export function mcpCommands(threads: McpThreads, emit: (i: UiIntentInit) => numb
         name: "view.panel.mcp",
         title: "Show MCP Servers",
         category: "View",
-        description: "Open the MCP surface in the selected rendered thread's side panel: its MCP servers with status, errors and tools, and Reconnect.",
+        description: "Open the MCP surface in the selected thread's side panel: its MCP servers with status, errors and tools, and Reconnect.",
         keybindings: [],
         args: [],
       },

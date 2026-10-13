@@ -166,20 +166,20 @@ func TestContextRereadUSD(t *testing.T) {
 func TestSessionContextOnTheWire(t *testing.T) {
 	fake, c := newSessionServer(t)
 	at := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
-	fake.Put(session.Session{ID: "s-a", CreatedAt: time.Unix(1, 0), Render: session.RenderRendered, ContextTokens: 25_700,
+	fake.Put(session.Session{ID: "s-a", CreatedAt: time.Unix(1, 0), ContextTokens: 25_700,
 		ContextModel: "claude-haiku-4-5-20251001", LastResultAt: at, CacheExpiresAt: at.Add(time.Hour)})
-	fake.Put(session.Session{ID: "s-b", CreatedAt: time.Unix(2, 0), Render: session.RenderTerminal})
+	fake.Put(session.Session{ID: "s-b", CreatedAt: time.Unix(2, 0)}) // no result yet
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	list, err := c.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, term := list.Msg.GetSessions()[0], list.Msg.GetSessions()[1]
+	r, fresh := list.Msg.GetSessions()[0], list.Msg.GetSessions()[1]
 	if r.GetContextTokens() != 25_700 || !r.GetCacheExpiresAt().AsTime().Equal(at.Add(time.Hour)) || !near(r.GetContextRereadUsd(), 25_700*2/1e6) {
-		t.Errorf("rendered = tokens %d, expires %v, reread %v", r.GetContextTokens(), r.GetCacheExpiresAt(), r.GetContextRereadUsd())
+		t.Errorf("with a result = tokens %d, expires %v, reread %v", r.GetContextTokens(), r.GetCacheExpiresAt(), r.GetContextRereadUsd())
 	}
-	if term.GetContextTokens() != 0 || term.GetCacheExpiresAt() != nil || term.GetContextRereadUsd() != 0 {
-		t.Errorf("terminal = %v", term)
+	if fresh.GetContextTokens() != 0 || fresh.GetCacheExpiresAt() != nil || fresh.GetContextRereadUsd() != 0 {
+		t.Errorf("without a result = %v", fresh)
 	}
 }

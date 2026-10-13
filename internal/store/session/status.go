@@ -2,6 +2,39 @@ package session
 
 import "time"
 
+// Status is what Claude is doing. Values mirror codefoundry.v1.SessionStatus, so a
+// conversion is a cast.
+type Status int
+
+// Statuses.
+const (
+	StatusUnknown Status = iota
+	StatusBusy
+	StatusIdle
+	// StatusNeedsAttention: Claude waits on the user (permission prompt, question,
+	// dialog).
+	StatusNeedsAttention
+	// StatusError: the process ended while Claude was working (reason
+	// ReasonInterrupted). Never reported by streamStatus; set by the store on a
+	// disconnect (see disconnectedStatus).
+	StatusError
+)
+
+func (s Status) String() string {
+	switch s {
+	case StatusBusy:
+		return "busy"
+	case StatusIdle:
+		return "idle"
+	case StatusNeedsAttention:
+		return "needs attention"
+	case StatusError:
+		return "error"
+	default:
+		return "unknown"
+	}
+}
+
 // setStatus sets the status and reason, stamping StatusChangedAt with now when either
 // changes. It reports whether anything changed.
 func (s *Session) setStatus(st Status, reason string, now time.Time) bool {

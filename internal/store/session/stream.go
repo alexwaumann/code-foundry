@@ -14,11 +14,11 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/claudestream"
 )
 
-// The stdio runner: a rendered thread's claude runs as `claude -p` over stream-json
-// (claudestream) instead of in a PTY. It is the same runner type as a terminal
-// thread's, so lifecycle, status persistence, transcript tailing (naming, usage, PR
-// links, /clear), RunIn and close share their code; runStream replaces the terminal
-// loop. See docs/notes/rendered-threads-1-daemon.md.
+// The stdio runner: a thread's claude runs as `claude -p` over stream-json
+// (claudestream). The control protocol carries the conversation, permission requests,
+// interrupts and mode switches; the transcript is still tailed for naming, usage, PR
+// links and /clear (runner.go). See docs/notes/rendered-threads-1-daemon.md and
+// docs/notes/rendered-only-daemon.md.
 
 // Stream timing.
 const (
@@ -39,7 +39,7 @@ type outgoing struct {
 	prompt      string   // the text Claude gets (file refs rewritten, attachment lines)
 }
 
-// streamState is the stdio runner's part of runner. Every field is touched only by
+// streamState is the runner's process half. Every field is touched only by
 // the run goroutine, except the channels and proc/conn: set before run starts, and
 // replaced by a restart (effort.go) under connMu, which Store calls running outside the
 // goroutine read them under (connection).
@@ -120,12 +120,8 @@ type threadReply struct {
 	err     error
 }
 
-// viewersChanged tells the runner the thread's viewer count changed. Non-blocking;
-// a terminal runner learns about viewers from its terminal's Attach count instead.
+// viewersChanged tells the runner the thread's viewer count changed. Non-blocking.
 func (r *runner) viewersChanged() {
-	if r.st == nil {
-		return
-	}
 	select {
 	case r.st.viewSig <- struct{}{}:
 	default:
@@ -133,15 +129,9 @@ func (r *runner) viewersChanged() {
 }
 
 // pid is the claude process id (Claude's sessions/<pid>.json follows /clear).
-func (r *runner) pid() int {
-	if r.st != nil {
-		return r.st.proc.Pid()
-	}
-	return r.term.Pid
-}
+func (r *runner) pid() int { return r.st.proc.Pid() }
 
-// spawnStream starts a rendered thread's claude and its runner. argv is the stream
-// argv (launch.argv with spawnArgs.rendered).
+// spawnStream starts a thread's claude and prepares its runner (spawn starts run).
 func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv, env []string, first *outgoing) error {
 	s := rec.s
 	log, err := m.thread(ctx, s.ID)
@@ -169,8 +159,6 @@ func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv,
 	}
 	st.proc, st.conn = proc, proc.Conn()
 	st.events = st.conn.Events()
-	r.det = st.sd
-	r.awaitFirstPrompt = false
 	r.tail = newTailer(m.opts.Paths, r.cwd)
 	r.tail.follow(r.launch.claudeID(), r.launch.resume != "" && !r.launch.fork)
 	r.usage.watchDir = r.tail.watch
@@ -205,7 +193,7 @@ func closeUnfinished(w itemWriter, why string) {
 	}
 }
 
-func (r *runner) runStream() {
+func (r *runner) run() {
 	defer close(r.done)
 	defer r.tail.close()
 	defer r.usage.closeAll()
@@ -258,16 +246,16 @@ func (r *runner) runStream() {
 				r.failStart(errors.New("no answer to the initialize handshake after a restart"))
 			}
 		case <-r.closeReq:
-			r.beginCloseStream()
+			r.beginClose()
 		case req := <-r.cdReq:
 			r.onCdRequest(req)
 		case <-timerC(r.closeTimer):
-			r.closeNextStream()
+			r.closeNext()
 		case <-timerC(r.debounce):
 			r.debounce = nil
 			r.publishStatus()
 		case <-r.stopReq:
-			r.stopStream()
+			r.shutdown()
 		}
 	}
 }
@@ -350,10 +338,10 @@ func (r *runner) failStart(err error) {
 	if line := r.st.proc.LastStderrLine(); line != "" {
 		msg += ": " + line
 	}
-	r.log().warn("rendered thread failed to start", "err", err)
+	r.log().warn("thread failed to start", "err", err)
 	r.st.proj.w.add(Item{ID: r.st.proj.nextID("err"), Kind: KindError, Text: msg})
 	r.m.update(r.id, true, func(rec *record) { rec.s.LastError = msg })
-	r.beginCloseStream()
+	r.beginClose()
 }
 
 func (r *runner) onStreamEvent(ev claudestream.Event) {
@@ -576,9 +564,8 @@ func (r *runner) onViewers() {
 	}
 }
 
-// streamCd moves the conversation to req's member with set_cwd (RunIn), the
-// rendered counterpart of typing /cd. The member is pre-trusted first: set_cwd
-// refuses an untrusted folder ("needs_trust").
+// streamCd moves the conversation to req's member with set_cwd (RunIn). The member is
+// pre-trusted first: set_cwd refuses an untrusted folder ("needs_trust").
 func (r *runner) streamCd(req cdRequest) {
 	fail := func(msg string) {
 		r.log().warn("run in failed", "path", req.path, "err", msg)
@@ -616,9 +603,9 @@ func (r *runner) streamCd(req cdRequest) {
 	r.log().info("thread moved to another workspace member", "path", req.path, "transcript_relocated", res.TranscriptRelocated)
 }
 
-// beginCloseStream: deny what is pending, interrupt a running turn, close stdin; then
-// SIGTERM after CloseTimeout and SIGKILL streamKillGrace later (closeNextStream).
-func (r *runner) beginCloseStream() {
+// beginClose: deny what is pending, interrupt a running turn, close stdin; then
+// SIGTERM after CloseTimeout and SIGKILL streamKillGrace later (closeNext).
+func (r *runner) beginClose() {
 	if r.closing {
 		return
 	}
@@ -652,7 +639,7 @@ func (r *runner) beginCloseStream() {
 	r.closeTimer = time.NewTimer(r.m.opts.CloseTimeout)
 }
 
-func (r *runner) closeNextStream() {
+func (r *runner) closeNext() {
 	r.closeTimer = nil
 	switch r.closeStep {
 	case 1:
@@ -669,9 +656,9 @@ func (r *runner) closeNextStream() {
 	}
 }
 
-// stopStream is daemon shutdown: the process cannot outlive the daemon (it talks to
+// shutdown is daemon shutdown: the process cannot outlive the daemon (it talks to
 // it over pipes), so it is terminated, and the thread disconnects "daemon stopped".
-func (r *runner) stopStream() {
+func (r *runner) shutdown() {
 	st := r.st
 	_ = st.conn.CloseStdin()
 	_ = st.proc.Signal(syscall.SIGTERM)
@@ -690,7 +677,7 @@ func (r *runner) stopStream() {
 	st.proc.CloseOutput()
 	r.log().info("session disconnected", "reason", ReasonDaemonStopped)
 	r.finish(func(s *Session) {
-		s.State, s.DisconnectReason, s.TerminalID = StateDisconnected, ReasonDaemonStopped, ""
+		s.State, s.DisconnectReason = StateDisconnected, ReasonDaemonStopped
 	})
 }
 
@@ -747,7 +734,7 @@ func (r *runner) maybeExited() {
 	st.conn.Close()
 	r.log().info("session disconnected", "reason", reason, "exit_code", code)
 	r.finish(func(s *Session) {
-		s.State, s.DisconnectReason, s.ExitCode, s.TerminalID = StateDisconnected, reason, code, ""
+		s.State, s.DisconnectReason, s.ExitCode = StateDisconnected, reason, code
 		if lastErr != "" && (code != 0 || !st.initialized) {
 			s.LastError = lastErr
 		}

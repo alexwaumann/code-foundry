@@ -159,14 +159,6 @@ describe("workspaces", () => {
     expect(threadArgs(place, { ...prompt, text: " ", composerText: "x" }, [])).not.toHaveProperty("composer-prompt");
     expect(threadArgs(place, { ...prompt, text: "no tags", composerText: "no tags" }, [])).not.toHaveProperty("composer-prompt");
   });
-
-  it("threadArgs passes the view when there is one (else the daemon's setting applies)", () => {
-    const place: ThreadPlace = { kind: "project", repoId: "r", worktree: { kind: "new" }, base: "" };
-    expect(threadArgs(place, { ...prompt, render: "rendered" }, [])).toMatchObject({ render: "rendered" });
-    expect(threadArgs(place, { ...prompt, render: "terminal" }, [])).toMatchObject({ render: "terminal" });
-    expect(threadArgs(place, { ...prompt, render: "" }, [])).not.toHaveProperty("render");
-    expect(threadArgs(place, prompt, [])).not.toHaveProperty("render");
-  });
 });
 
 describe("checkoutBranch", () => {

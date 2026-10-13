@@ -175,8 +175,7 @@ func TestLinkedPullRequestsFromLiveTranscript(t *testing.T) {
 	lines := fixtureLines(t)
 	e := newEnv(t)
 	s := e.connected(CreateOptions{Name: "driver"})
-	spec, _ := e.terms.Spec(s.TerminalID)
-	cid := argOf(spec.Argv, "--session-id")
+	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	e.writeTranscript(cid, userLine("open a pr"))
 	e.writeTranscript(cid, lines[:12]...) // through the second #7 record
 	got := e.waitFor(s.ID, "links", func(s Session) bool { return len(s.LinkedPullRequests) == 3 })
@@ -190,19 +189,12 @@ func TestLinkedPullRequestsFromLiveTranscript(t *testing.T) {
 		<-e.events.C()
 	}
 	e.writeTranscript(cid, lines[10], lines[11], lines[10])
-	e.waitFor(s.ID, "repeats fed", func(Session) bool {
-		e.det.mu.Lock()
-		defer e.det.mu.Unlock()
-		return len(e.det.transcript) >= 1+12+3
-	})
-	e.writeTranscript(cid, userLine("sentinel")) // a later poll: the repeats' batch is done
-	e.waitFor(s.ID, "sentinel fed", func(Session) bool {
-		e.det.mu.Lock()
-		defer e.det.mu.Unlock()
-		return slices.Contains(e.det.transcript, userLine("sentinel"))
-	})
+	// A barrier: once the sentinel's usage shows, the repeats have been read.
+	e.writeTranscript(cid, usageLine("r-sentinel", "2026-10-10T00:00:00Z", cid, "claude-haiku-5-5", 1, 1, 1, 0, h1(0), "standard"))
+	e.waitFor(s.ID, "sentinel read", func(s Session) bool { return totalRequests(s.Usage) == 1 })
 	for len(e.events.C()) > 0 {
-		if u, ok := (<-e.events.C()).(Updated); ok && u.Session.ID == s.ID {
+		// The sentinel's own update is the only one.
+		if u, ok := (<-e.events.C()).(Updated); ok && u.Session.ID == s.ID && totalRequests(u.Session.Usage) != 1 {
 			t.Errorf("repeat published an update: %+v", u.Session.LinkedPullRequests)
 		}
 	}
@@ -232,33 +224,24 @@ func TestLinkedPullRequestsBackfillOnReconnect(t *testing.T) {
 	lines := fixtureLines(t)
 	e := newEnv(t)
 	s := e.connected(CreateOptions{Name: "driver"})
-	spec, _ := e.terms.Spec(s.TerminalID)
-	cid := argOf(spec.Argv, "--session-id")
+	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	e.writeTranscript(cid, userLine("hi"))
 	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
-	_ = e.terms.Exit(s.TerminalID, 0)
+	e.exit(s.ID, 0)
 	e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
 
 	// History the daemon never saw: written while disconnected, or before pr-link
 	// records were read at all.
 	e.writeTranscript(cid, lines[:22]...) // through the flip back to #11
-	r, err := e.m.Reconnect(e.ctx(), s.ID)
-	if err != nil {
+	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
-	if spec2, _ := e.terms.Spec(r.TerminalID); argOf(spec2.Argv, "--resume") != cid {
-		t.Fatalf("reconnect argv = %q", spec2.Argv)
+	if argv := e.spec(s.ID).Argv; argOf(argv, "--resume") != cid {
+		t.Fatalf("reconnect argv = %q", argv)
 	}
 	got := e.waitFor(s.ID, "backfill", func(s Session) bool { return len(s.LinkedPullRequests) == 7 })
 	if !slices.Equal(linkNumbers(got), []int{5, 6, 7, 9, 10, 11, 12}) {
 		t.Errorf("backfilled = %v", linkNumbers(got))
-	}
-	// The history stays out of status detection.
-	e.det.mu.Lock()
-	fed := len(e.det.transcript)
-	e.det.mu.Unlock()
-	if fed != 1 {
-		t.Errorf("detector fed %d lines; want only the first conversation's 1", fed)
 	}
 
 	// New records after the resume append after the backfilled ones.

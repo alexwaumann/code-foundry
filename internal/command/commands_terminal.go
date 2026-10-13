@@ -45,7 +45,8 @@ type TerminalDeps struct {
 	Session  SessionBackend
 	// IsShell reports whether terminal id is a shell terminal.new started
 	// (termlabel.KindShell). It gates terminal.close, which refuses other terminals
-	// anyway. Nil: any terminal (the refusal then comes from Close).
+	// (unlabelled ones TerminalService.Create made) anyway. Nil: any terminal (the
+	// refusal then comes from Close).
 	IsShell func(id string) bool
 }
 
@@ -134,14 +135,14 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			Description: "Terminate the terminal's process (SIGHUP, then SIGKILL after a grace period) and remove it once it has exited.",
 			Category:    "Terminal",
 			Args:        []ArgSpec{idArg},
-			// Only shells: a thread's Claude terminal (the active terminal while a thread
-			// is selected) ends with session.close. Close refuses it too.
+			// Only shells: an unlabelled terminal (TerminalService.Create) is ended with
+			// terminal.kill and terminal.remove. Close refuses it too.
 			When: func(c Context) bool {
 				return hasTerminal(c) && (d.IsShell == nil || d.IsShell(c.ActiveTerminalID))
 			},
 			WhyUnavailable: func(c Context) string {
 				if hasTerminal(c) {
-					return "terminal " + c.ActiveTerminalID + " is not a shell; use session.close to end a thread"
+					return "terminal " + c.ActiveTerminalID + " is not a shell; use terminal.kill"
 				}
 				return ""
 			},

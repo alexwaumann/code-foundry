@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -9,8 +10,10 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -18,37 +21,11 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/db"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
-	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
 )
 
-// fakeDetector reports whatever status the test sets and records what it was fed.
-type fakeDetector struct {
-	mu         sync.Mutex
-	status     Status
-	reason     string
-	outputs    int
-	transcript []string
-}
-
-func (d *fakeDetector) Output([]byte) { d.mu.Lock(); d.outputs++; d.mu.Unlock() }
-func (d *fakeDetector) Transcript(l []byte) {
-	d.mu.Lock()
-	d.transcript = append(d.transcript, string(l))
-	d.mu.Unlock()
-}
-func (d *fakeDetector) Tick(time.Time) {}
-func (d *fakeDetector) Status() (Status, string) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.status, d.reason
-}
-func (d *fakeDetector) set(s Status, reason string) {
-	d.mu.Lock()
-	d.status, d.reason = s, reason
-	d.mu.Unlock()
-}
-
+// env is a Manager whose claude is the fake (fakeclaude_test.go) replaying a captured
+// stream, with a fake repo store (r1 at wt) and a fake terminal store for the shells.
 type env struct {
 	t      *testing.T
 	m      *Manager
@@ -59,19 +36,51 @@ type env struct {
 	dbPath string
 	bus    *bus.Bus
 	events *bus.Subscription[Event]
-	det    *fakeDetector
+
+	// log and argv are the fake's stdin log and latest argv; spawns is the directory of
+	// its per-process records (fakeclaude_test.go).
+	log, argv, spawns string
+	// mutate points claude at the fake; open applies it before its own mutators.
+	mutate func(*Options)
 
 	mu    sync.Mutex
 	named []string
 	namer func(string) (string, error)
 }
 
+// newEnv is newFixtureEnv with the text-table capture: every message gets one turn
+// that ends in a result.
 func newEnv(t *testing.T, mutate ...func(*Options)) *env {
 	t.Helper()
+	return newFixtureEnvAt(t, fixturePath("text-table"), nil, mutate...)
+}
+
+// newFixtureEnv is an env whose fake replays the capture fixture (claudestream/testdata).
+func newFixtureEnv(t *testing.T, fixture string, mutate ...func(*Options)) *env {
+	t.Helper()
+	return newFixtureEnvAt(t, fixturePath(fixture), nil, mutate...)
+}
+
+// newFixtureEnvAt replays the capture at path (absolute); vars are added to the fake's
+// environment (its knobs, fakeclaude_test.go).
+func newFixtureEnvAt(t *testing.T, path string, vars []string, mutate ...func(*Options)) *env {
+	t.Helper()
 	dir := t.TempDir()
-	e := &env{t: t, bus: bus.New(), det: &fakeDetector{}}
+	e := &env{t: t, bus: bus.New(), log: filepath.Join(dir, "stdin.log"), argv: filepath.Join(dir, "argv.json"),
+		spawns: filepath.Join(dir, "spawns")}
+	if err := os.MkdirAll(e.spawns, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	e.mutate = func(o *Options) {
+		o.Claude = os.Args[0]
+		o.Env = append([]string{fakeClaudeEnv + "=" + path, "CF_FAKE_CLAUDE_LOG=" + e.log, "CF_FAKE_CLAUDE_ARGV=" + e.argv,
+			"CF_FAKE_CLAUDE_SPAWN=" + e.spawns}, vars...)
+		o.DisablePreTrust = true
+	}
 	e.terms = terminaltest.New(nil)
 	e.repos = repotest.New(nil)
+	// claude starts in the worktrees Create makes: they must exist.
+	e.repos.WorktreeRoot, e.repos.MakeDirs = filepath.Join(dir, "worktrees"), true
 	e.wt = filepath.Join(dir, "repo")
 	if err := os.MkdirAll(e.wt, 0o755); err != nil {
 		t.Fatal(err)
@@ -95,7 +104,6 @@ func (e *env) open(mutate ...func(*Options)) {
 	opts := Options{
 		DB: d, Terminals: e.terms, Repos: e.repos, Bus: e.bus, Paths: e.paths,
 		Log:            slog.New(slog.NewTextHandler(io.Discard, nil)),
-		NewDetector:    func(ScreenTextFn) StatusDetector { return e.det },
 		Tick:           20 * time.Millisecond,
 		StatusDebounce: 10 * time.Millisecond,
 		StartTimeout:   5 * time.Second,
@@ -108,6 +116,7 @@ func (e *env) open(mutate ...func(*Options)) {
 			return fn(msg)
 		},
 	}
+	e.mutate(&opts)
 	for _, f := range mutate {
 		f(&opts)
 	}
@@ -124,6 +133,18 @@ func (e *env) open(mutate ...func(*Options)) {
 		}
 		_ = d.Close()
 	})
+}
+
+// restart shuts the Manager down (live threads disconnect "daemon stopped") and opens
+// a new one on the same database.
+func (e *env) restart(mutate ...func(*Options)) {
+	e.t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := e.m.Shutdown(ctx); err != nil {
+		e.t.Fatal(err)
+	}
+	e.open(mutate...)
 }
 
 func (e *env) ctx() context.Context {
@@ -148,17 +169,6 @@ func (e *env) waitFor(id, what string, cond func(Session) bool) Session {
 	}
 }
 
-func (e *env) waitWritten(termID, want string) {
-	e.t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for !strings.Contains(string(e.terms.Written(termID)), want) {
-		if time.Now().After(deadline) {
-			e.t.Fatalf("terminal %s never got %q; written %q", termID, want, e.terms.Written(termID))
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-}
-
 func (e *env) create(o CreateOptions) Session {
 	e.t.Helper()
 	if o.WorktreePath == "" && o.RepoID == "" {
@@ -171,13 +181,128 @@ func (e *env) create(o CreateOptions) Session {
 	return s
 }
 
+// connected creates a thread and waits until Claude answered the handshake and the
+// status says so (the first reading is published after a debounce when no prompt was
+// sent), so no update from the start is still on its way.
 func (e *env) connected(o CreateOptions) Session {
 	e.t.Helper()
 	s := e.create(o)
-	if err := e.terms.SetAltScreen(s.TerminalID, true); err != nil {
+	return e.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected && s.Status != StatusUnknown })
+}
+
+// pid is the process id of the thread's running claude.
+func (e *env) pid(id string) int {
+	e.t.Helper()
+	e.m.mu.Lock()
+	defer e.m.mu.Unlock()
+	rec, ok := e.m.recs[id]
+	if !ok || rec.run == nil {
+		e.t.Fatalf("thread %s has no process", id)
+	}
+	return rec.run.pid()
+}
+
+// spec is what the thread's running claude recorded about itself: argv, cwd, env.
+func (e *env) spec(id string) fakeSpawn {
+	e.t.Helper()
+	path := filepath.Join(e.spawns, strconv.Itoa(e.pid(id))+".json")
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if b, err := os.ReadFile(path); err == nil {
+			var sp fakeSpawn
+			if err := json.Unmarshal(b, &sp); err != nil {
+				e.t.Fatal(err)
+			}
+			return sp
+		}
+		if time.Now().After(deadline) {
+			e.t.Fatalf("claude of %s never recorded its spawn", id)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// exit ends the thread's claude on its own: code 0 (/exit), 1 (a crash), or -1 (killed
+// by a signal).
+func (e *env) exit(id string, code int) {
+	e.t.Helper()
+	sig := syscall.SIGKILL
+	switch code {
+	case 0:
+		sig = syscall.SIGUSR1
+	case 1:
+		sig = syscall.SIGUSR2
+	}
+	if err := syscall.Kill(e.pid(id), sig); err != nil {
 		e.t.Fatal(err)
 	}
-	return e.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
+}
+
+// sent returns what the daemon wrote to the fake's stdin, decoded.
+func (e *env) sent() []map[string]any {
+	data, _ := os.ReadFile(e.log)
+	var out []map[string]any
+	for _, l := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		var m map[string]any
+		if json.Unmarshal([]byte(l), &m) == nil {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// waitSent waits for a stdin line satisfying cond.
+func (e *env) waitSent(what string, cond func(map[string]any) bool) map[string]any {
+	e.t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		for _, m := range e.sent() {
+			if cond(m) {
+				return m
+			}
+		}
+		if time.Now().After(deadline) {
+			e.t.Fatalf("never sent %s; sent %v", what, e.sent())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// sentSetCwd reports whether a set_cwd to path was sent.
+func (e *env) sentSetCwd(path string) bool {
+	return slices.ContainsFunc(e.sent(), isSetCwd(path))
+}
+
+func isSetCwd(path string) func(map[string]any) bool {
+	return func(m map[string]any) bool {
+		r, _ := m["request"].(map[string]any)
+		return r["subtype"] == "set_cwd" && r["path"] == path
+	}
+}
+
+func (e *env) items(id string) ItemsSnapshot {
+	e.t.Helper()
+	snap, err := e.m.Items(e.ctx(), id)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	return snap
+}
+
+// waitItems waits until the thread's items satisfy cond.
+func (e *env) waitItems(id, what string, cond func([]Item) bool) []Item {
+	e.t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		items := e.items(id).Items
+		if cond(items) {
+			return items
+		}
+		if time.Now().After(deadline) {
+			e.t.Fatalf("timed out waiting for %s; items:\n%s", what, describeItems(items))
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 }
 
 // writeTranscript appends lines to a Claude transcript for the worktree.
@@ -204,46 +329,40 @@ func argOf(argv []string, flag string) string {
 	return ""
 }
 
+// sentinelLink is a pr-link record of a URL no fixture has. Once a session links it,
+// every transcript line written before it has been read: a barrier for tests that
+// assert something was not published.
+const sentinelLink = `{"type":"pr-link","sessionId":"x","prNumber":999,"prUrl":"https://github.com/o/sentinel/pull/999","prRepository":"o/sentinel","timestamp":"2026-10-10T00:00:00Z"}`
+
+func linkedSentinel(s Session) bool {
+	return slices.ContainsFunc(s.LinkedPullRequests, func(l LinkedPullRequest) bool { return l.Number == 999 })
+}
+
 func userLine(text string) string {
 	return fmt.Sprintf(`{"type":"user","message":{"role":"user","content":%q}}`, text)
 }
 
-func TestCreateSpawnsClaudeAndConnectsOnAltScreen(t *testing.T) {
-	e := newEnv(t)
+func TestCreateSpawnsClaude(t *testing.T) {
+	e := newEnv(t, func(o *Options) { o.DisablePreTrust = false })
 	s := e.create(CreateOptions{WorktreePath: e.wt, Model: "opus", Effort: "high"})
-	if s.State != StateStarting || s.RepoID != "r1" || s.WorktreePath != e.wt || s.TerminalID == "" {
+	if s.State != StateStarting || s.RepoID != "r1" || s.WorktreePath != e.wt {
 		t.Fatalf("created = %+v", s)
 	}
-	spec, _ := e.terms.Spec(s.TerminalID)
-	if spec.Argv[0] != "claude" || argOf(spec.Argv, "--model") != "opus" || argOf(spec.Argv, "--effort") != "high" {
+	spec := e.spec(s.ID)
+	if spec.Argv[0] != os.Args[0] || argOf(spec.Argv, "--model") != "opus" || argOf(spec.Argv, "--effort") != "high" {
 		t.Errorf("argv = %q", spec.Argv)
 	}
 	if len(argOf(spec.Argv, "--session-id")) != 36 {
 		t.Errorf("argv has no --session-id uuid: %q", spec.Argv)
 	}
-	if spec.Cwd != e.wt || spec.Labels["session"] != s.ID || spec.Labels["worktree"] != e.wt {
-		t.Errorf("spec cwd=%q labels=%v", spec.Cwd, spec.Labels)
-	}
-	if spec.Env != nil {
-		t.Errorf("spec env = %q, want none (the daemon env is scrubbed)", spec.Env)
+	if !samePath(spec.Cwd, e.wt) {
+		t.Errorf("cwd = %q, want %q", spec.Cwd, e.wt)
 	}
 	cfg, err := os.ReadFile(e.paths.Config)
 	if err != nil || !strings.Contains(string(cfg), realPath(e.wt)) || !strings.Contains(string(cfg), "hasTrustDialogAccepted") {
 		t.Errorf("worktree not pre-trusted: %s (%v)", cfg, err)
 	}
-	_ = e.terms.SetAltScreen(s.TerminalID, true)
 	e.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
-}
-
-func TestConnectsOnTitleOrTimeout(t *testing.T) {
-	e := newEnv(t)
-	s := e.create(CreateOptions{})
-	_ = e.terms.SetTitle(s.TerminalID, "✳ Claude Code")
-	e.waitFor(s.ID, "connected via title", func(s Session) bool { return s.State == StateConnected })
-
-	e2 := newEnv(t, func(o *Options) { o.StartTimeout = 50 * time.Millisecond })
-	s2 := e2.create(CreateOptions{})
-	e2.waitFor(s2.ID, "connected via timeout", func(s Session) bool { return s.State == StateConnected })
 }
 
 func TestCreateResolvesWorktree(t *testing.T) {
@@ -274,95 +393,65 @@ func TestCreateResolvesWorktree(t *testing.T) {
 			}
 		})
 	}
-	e.terms.CreateErr = errors.New("boom")
-	if _, err := e.m.Create(e.ctx(), CreateOptions{RepoID: "r1"}); err == nil {
+	missing := filepath.Join(t.TempDir(), "no-such-claude")
+	bad := newEnv(t, func(o *Options) { o.Claude = missing })
+	if _, err := bad.m.Create(bad.ctx(), CreateOptions{RepoID: "r1"}); err == nil {
 		t.Fatal("spawn failure not reported")
 	}
-	if n := len(e.m.Snapshot().Sessions); n != 1 {
+	if n := len(bad.m.Snapshot().Sessions); n != 0 {
 		t.Errorf("failed create left a row: %d sessions", n)
 	}
-}
-
-func TestTrustDialogFallbackAnswersWithDownThenEnter(t *testing.T) {
-	e := newEnv(t, func(o *Options) { o.DisablePreTrust = true })
-	s := e.create(CreateOptions{})
-	id := s.TerminalID
-	_ = e.terms.SetScreen(id, trustScreenNo)
-	_ = e.terms.Emit(id, []byte("dialog"))
-	e.waitWritten(id, keyDown)
-	if strings.Contains(string(e.terms.Written(id)), keyEnter) {
-		t.Fatal("pressed Enter while No was selected")
-	}
-	// Alt screen while the dialog is still showing must not connect.
-	_ = e.terms.SetTitle(id, "x")
-	time.Sleep(50 * time.Millisecond)
-	if got, _ := e.m.Get(e.ctx(), s.ID); got.State != StateStarting {
-		t.Fatalf("connected while the trust dialog was visible: %v", got.State)
-	}
-	_ = e.terms.SetScreen(id, trustScreenYes)
-	_ = e.terms.Emit(id, []byte("rerender"))
-	e.waitWritten(id, keyDown+keyEnter)
-	_ = e.terms.SetScreen(id, promptScreen)
-	_ = e.terms.SetAltScreen(id, true)
-	e.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
 }
 
 func TestExitWithoutCloseDisconnects(t *testing.T) {
 	for _, tt := range []struct {
 		code   int
 		reason string
-	}{{0, ReasonExited}, {1, ReasonCrashed}, {129, ReasonCrashed}} {
-		t.Run(tt.reason, func(t *testing.T) {
+	}{{0, ReasonExited}, {1, ReasonCrashed}, {-1, ReasonCrashed}} {
+		t.Run(fmt.Sprint(tt.code), func(t *testing.T) {
 			e := newEnv(t)
 			s := e.connected(CreateOptions{})
-			_ = e.terms.Exit(s.TerminalID, tt.code)
+			e.exit(s.ID, tt.code)
 			got := e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
-			if got.DisconnectReason != tt.reason || got.ExitCode != tt.code || got.TerminalID != "" {
+			if got.DisconnectReason != tt.reason || got.ExitCode != tt.code {
 				t.Errorf("session = %+v", got)
 			}
-			if _, err := e.terms.Get(e.ctx(), s.TerminalID); !errors.Is(err, terminal.ErrNotFound) {
-				t.Errorf("terminal not removed: %v", err)
+			if tt.code == 1 && !strings.Contains(got.LastError, "fake claude: exit 1") {
+				t.Errorf("last error %q, want the stderr line", got.LastError)
 			}
 		})
 	}
 }
 
+// Close closes Claude's stdin and waits for it to exit; a thread that is gone is a
+// no-op.
 func TestCloseIsGraceful(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{})
-	done := make(chan error, 1)
-	go func() { done <- e.m.Close(e.ctx(), s.ID) }()
-	e.waitFor(s.ID, "closing", func(s Session) bool { return s.State == StateClosing })
-	e.waitWritten(s.TerminalID, keyEscape+keyCtrlC+keyCtrlC)
-	select {
-	case err := <-done:
-		t.Fatalf("Close returned before exit: %v", err)
-	default:
-	}
-	_ = e.terms.Exit(s.TerminalID, 0)
-	if err := <-done; err != nil {
+	if err := e.m.Close(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := e.m.Get(e.ctx(), s.ID)
-	if got.State != StateDisconnected || got.DisconnectReason != ReasonClosed {
+	if got.State != StateDisconnected || got.DisconnectReason != ReasonClosed || got.ExitCode != 0 {
 		t.Errorf("after close = %+v", got)
 	}
-	// Closing a disconnected session is a no-op.
 	if err := e.m.Close(e.ctx(), s.ID); err != nil {
 		t.Errorf("second close: %v", err)
 	}
 }
 
-func TestCloseKillsAfterTimeout(t *testing.T) {
-	e := newEnv(t, func(o *Options) { o.CloseTimeout = 100 * time.Millisecond })
+// A claude that outlives its closed stdin is terminated after CloseTimeout.
+func TestCloseTerminatesAfterTimeout(t *testing.T) {
+	e := newFixtureEnvAt(t, fixturePath("text-table"), []string{"CF_FAKE_CLAUDE_EXIT_DELAY=1m"},
+		func(o *Options) { o.CloseTimeout = 100 * time.Millisecond })
 	s := e.connected(CreateOptions{})
 	start := time.Now()
 	if err := e.m.Close(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := e.m.Get(e.ctx(), s.ID)
-	if got.DisconnectReason != ReasonClosed || got.ExitCode != 129 {
-		t.Errorf("after kill = %+v", got)
+	if got.DisconnectReason != ReasonClosed || got.ExitCode != -1 {
+		t.Errorf("after terminate = %+v", got)
 	}
 	if el := time.Since(start); el > 2*time.Second {
 		t.Errorf("close took %v", el)
@@ -372,8 +461,7 @@ func TestCloseKillsAfterTimeout(t *testing.T) {
 func TestTranscriptDiscoveryAndAutoNaming(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{})
-	spec, _ := e.terms.Spec(s.TerminalID)
-	cid := argOf(spec.Argv, "--session-id")
+	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	if s.ClaudeSessionID != "" {
 		t.Fatalf("claude session id known before the transcript: %q", s.ClaudeSessionID)
 	}
@@ -390,12 +478,6 @@ func TestTranscriptDiscoveryAndAutoNaming(t *testing.T) {
 	if len(calls) != 1 || calls[0] != "pong please" {
 		t.Errorf("namer calls = %q, want one for the first message", calls)
 	}
-	e.det.mu.Lock()
-	n := len(e.det.transcript)
-	e.det.mu.Unlock()
-	if n != 3 {
-		t.Errorf("detector got %d transcript lines, want 3", n)
-	}
 	renamed, err := e.m.Rename(e.ctx(), s.ID, "  my name ")
 	if err != nil || renamed.Name != "my name" || renamed.AutoNamed {
 		t.Errorf("rename = %+v, %v", renamed, err)
@@ -408,8 +490,7 @@ func TestTranscriptDiscoveryAndAutoNaming(t *testing.T) {
 func TestExplicitNameOrRenameSkipsAutoNaming(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{Name: "chosen"})
-	spec, _ := e.terms.Spec(s.TerminalID)
-	e.writeTranscript(argOf(spec.Argv, "--session-id"), userLine("hello there"))
+	e.writeTranscript(argOf(e.spec(s.ID).Argv, "--session-id"), userLine("hello there"))
 	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID != "" })
 	time.Sleep(50 * time.Millisecond)
 	e.mu.Lock()
@@ -422,32 +503,14 @@ func TestExplicitNameOrRenameSkipsAutoNaming(t *testing.T) {
 func TestFollowsClearViaPidFile(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{})
-	term, _ := e.terms.Get(e.ctx(), s.TerminalID)
+	pid := e.pid(s.ID)
 	_ = os.MkdirAll(filepath.Join(e.paths.Dir, "sessions"), 0o755)
-	if err := os.WriteFile(e.paths.pidFile(term.Pid), []byte(fmt.Sprintf(`{"pid":%d,"sessionId":"rotated-id"}`, term.Pid)), 0o644); err != nil {
+	if err := os.WriteFile(e.paths.pidFile(pid), []byte(fmt.Sprintf(`{"pid":%d,"sessionId":"rotated-id"}`, pid)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(60 * time.Millisecond)
 	e.writeTranscript("rotated-id", `{"type":"mode"}`)
 	e.waitFor(s.ID, "rotated id", func(s Session) bool { return s.ClaudeSessionID == "rotated-id" })
-}
-
-func TestStatusFromDetectorIsPublished(t *testing.T) {
-	e := newEnv(t)
-	s := e.connected(CreateOptions{})
-	e.det.set(StatusBusy, "esc to interrupt visible")
-	_ = e.terms.Emit(s.TerminalID, []byte("working"))
-	got := e.waitFor(s.ID, "busy", func(s Session) bool { return s.Status == StatusBusy })
-	if got.StatusReason != "esc to interrupt visible" {
-		t.Errorf("reason = %q", got.StatusReason)
-	}
-	e.det.set(StatusNeedsAttention, "permission prompt")
-	e.waitFor(s.ID, "needs attention via tick", func(s Session) bool { return s.Status == StatusNeedsAttention })
-	_ = e.terms.Exit(s.TerminalID, 0)
-	// Kept once disconnected (status_test.go covers the rules).
-	e.waitFor(s.ID, "status kept", func(s Session) bool {
-		return s.State == StateDisconnected && s.Status == StatusNeedsAttention && s.StatusReason == "permission prompt"
-	})
 }
 
 func TestReconnectResumesOrStartsFresh(t *testing.T) {
@@ -456,39 +519,37 @@ func TestReconnectResumesOrStartsFresh(t *testing.T) {
 	if _, err := e.m.Reconnect(e.ctx(), s.ID); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("reconnect while connected: %v", err)
 	}
-	spec, _ := e.terms.Spec(s.TerminalID)
-	cid := argOf(spec.Argv, "--session-id")
+	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	e.writeTranscript(cid, userLine("hi"))
 	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
-	_ = e.terms.Exit(s.TerminalID, 0)
+	e.exit(s.ID, 0)
 	e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
 
 	r, err := e.m.Reconnect(e.ctx(), s.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	spec2, _ := e.terms.Spec(r.TerminalID)
-	if r.TerminalID == s.TerminalID || argOf(spec2.Argv, "--resume") != cid || argOf(spec2.Argv, "--model") != "opus" ||
-		argOf(spec2.Argv, "--effort") != "low" || slices.Contains(spec2.Argv, "--session-id") {
-		t.Errorf("reconnect argv = %q (terminal %s)", spec2.Argv, r.TerminalID)
+	argv := e.spec(s.ID).Argv
+	if argOf(argv, "--resume") != cid || argOf(argv, "--model") != "opus" ||
+		argOf(argv, "--effort") != "low" || slices.Contains(argv, "--session-id") {
+		t.Errorf("reconnect argv = %q", argv)
 	}
 	if r.State != StateStarting || r.LastError != "" || r.DisconnectReason != "" {
 		t.Errorf("reconnected = %+v", r)
 	}
-	_ = e.terms.SetAltScreen(r.TerminalID, true)
 	e.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
 
 	// A session that never got a message has nothing to resume.
 	s2 := e.connected(CreateOptions{})
-	_ = e.terms.Exit(s2.TerminalID, 0)
+	e.exit(s2.ID, 0)
 	e.waitFor(s2.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
 	r2, err := e.m.Reconnect(e.ctx(), s2.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	spec3, _ := e.terms.Spec(r2.TerminalID)
-	if slices.Contains(spec3.Argv, "--resume") || argOf(spec3.Argv, "--session-id") == "" || !strings.Contains(r2.LastError, "started a new conversation") {
-		t.Errorf("fresh reconnect argv=%q last_error=%q", spec3.Argv, r2.LastError)
+	argv = e.spec(s2.ID).Argv
+	if slices.Contains(argv, "--resume") || argOf(argv, "--session-id") == "" || !strings.Contains(r2.LastError, "started a new conversation") {
+		t.Errorf("fresh reconnect argv=%q last_error=%q", argv, r2.LastError)
 	}
 	if _, err := e.m.Reconnect(e.ctx(), "s-nope"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("unknown id: %v", err)
@@ -501,32 +562,31 @@ func TestFork(t *testing.T) {
 	if _, err := e.m.Fork(e.ctx(), s.ID, ""); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("fork without transcript: %v", err)
 	}
-	spec, _ := e.terms.Spec(s.TerminalID)
-	cid := argOf(spec.Argv, "--session-id")
+	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	e.writeTranscript(cid, userLine("hi"))
 	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
 	f, err := e.m.Fork(e.ctx(), s.ID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	fspec, _ := e.terms.Spec(f.TerminalID)
-	if argOf(fspec.Argv, "--resume") != cid || !slices.Contains(fspec.Argv, "--fork-session") ||
-		argOf(fspec.Argv, "--session-id") == cid || argOf(fspec.Argv, "--model") != "sonnet" {
-		t.Errorf("fork argv = %q", fspec.Argv)
+	fargv := e.spec(f.ID).Argv
+	if argOf(fargv, "--resume") != cid || !slices.Contains(fargv, "--fork-session") ||
+		argOf(fargv, "--session-id") == cid || argOf(fargv, "--model") != "sonnet" {
+		t.Errorf("fork argv = %q", fargv)
 	}
 	if f.ParentID != s.ID || f.Name != "base-fork" || f.ID == s.ID || f.WorktreePath != s.WorktreePath {
 		t.Errorf("fork = %+v", f)
+	}
+	e.waitFor(f.ID, "fork connected", func(s Session) bool { return s.State == StateConnected })
+	if _, err := e.m.Items(e.ctx(), f.ID); err != nil {
+		t.Errorf("fork items: %v", err)
 	}
 }
 
 func TestRemoveClosesThenForgets(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{})
-	done := make(chan error, 1)
-	go func() { done <- e.m.Remove(e.ctx(), s.ID) }()
-	e.waitWritten(s.TerminalID, keyEscape+keyCtrlC)
-	_ = e.terms.Exit(s.TerminalID, 0)
-	if err := <-done; err != nil {
+	if err := e.m.Remove(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := e.m.Get(e.ctx(), s.ID); !errors.Is(err, ErrNotFound) {
@@ -552,24 +612,18 @@ func TestRemoveClosesThenForgets(t *testing.T) {
 func TestSessionsSurviveRestartAsDisconnected(t *testing.T) {
 	e := newEnv(t)
 	live := e.connected(CreateOptions{Name: "live"})
-	spec, _ := e.terms.Spec(live.TerminalID)
-	cid := argOf(spec.Argv, "--session-id")
+	cid := argOf(e.spec(live.ID).Argv, "--session-id")
 	e.writeTranscript(cid, userLine("hi"))
 	e.waitFor(live.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
 
 	// Clean shutdown: "daemon stopped".
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := e.m.Shutdown(ctx); err != nil {
-		t.Fatal(err)
-	}
-	e.open()
+	e.restart()
 	got, err := e.m.Get(e.ctx(), live.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got.State != StateDisconnected || got.DisconnectReason != ReasonDaemonStopped || got.ClaudeSessionID != cid ||
-		got.Name != "live" || got.TerminalID != "" || got.WorktreePath != e.wt {
+		got.Name != "live" || got.WorktreePath != e.wt {
 		t.Errorf("after restart = %+v", got)
 	}
 	// A row left live by a crash is repaired on load.
@@ -577,71 +631,47 @@ func TestSessionsSurviveRestartAsDisconnected(t *testing.T) {
 	if err := saveSession(context.Background(), e.m.opts.DB, got); err != nil {
 		t.Fatal(err)
 	}
-	e.open()
+	e.restart()
 	if got, _ := e.m.Get(e.ctx(), live.ID); got.State != StateDisconnected || got.DisconnectReason != ReasonDaemonRestarts {
 		t.Errorf("after crash restart = %+v", got)
 	}
-	r, err := e.m.Reconnect(e.ctx(), live.ID)
-	if err != nil {
+	if _, err := e.m.Reconnect(e.ctx(), live.ID); err != nil {
 		t.Fatal(err)
 	}
-	spec2, _ := e.terms.Spec(r.TerminalID)
-	if argOf(spec2.Argv, "--resume") != cid {
-		t.Errorf("reconnect after restart argv = %q", spec2.Argv)
-	}
-}
-
-func TestInitialPromptIsPositional(t *testing.T) {
-	e := newEnv(t)
-	s := e.connected(CreateOptions{InitialPrompt: "  -do the thing\n", PermissionMode: PermissionAuto})
-	spec, _ := e.terms.Spec(s.TerminalID)
-	n := len(spec.Argv)
-	if n < 2 || spec.Argv[n-2] != "--" || spec.Argv[n-1] != "-do the thing" || argOf(spec.Argv, "--permission-mode") != "auto" {
-		t.Fatalf("argv = %q", spec.Argv)
-	}
-	// Nothing is typed into the terminal: Claude submits the argument itself.
-	_ = e.terms.SetScreen(s.TerminalID, promptScreen)
-	time.Sleep(200 * time.Millisecond)
-	if w := e.terms.Written(s.TerminalID); len(w) != 0 {
-		t.Fatalf("typed %q", w)
-	}
-	if s.PermissionMode != PermissionAuto {
-		t.Errorf("session = %+v", s)
+	if argv := e.spec(live.ID).Argv; argOf(argv, "--resume") != cid {
+		t.Errorf("reconnect after restart argv = %q", argv)
 	}
 }
 
 func TestPermissionModeIsKeptForReconnectAndFork(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{PermissionMode: PermissionAcceptEdits, InitialPrompt: "hi"})
-	spec, _ := e.terms.Spec(s.TerminalID)
-	cid := argOf(spec.Argv, "--session-id")
+	argv := e.spec(s.ID).Argv
+	if argOf(argv, "--permission-mode") != "acceptEdits" {
+		t.Errorf("create argv = %q", argv)
+	}
+	cid := argOf(argv, "--session-id")
 	e.writeTranscript(cid, userLine("hi"))
 	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := e.m.Shutdown(ctx); err != nil {
-		t.Fatal(err)
-	}
-	e.open()
+	e.restart()
 	got, _ := e.m.Get(e.ctx(), s.ID)
 	if got.PermissionMode != PermissionAcceptEdits {
 		t.Fatalf("after restart = %+v", got)
 	}
-	r, err := e.m.Reconnect(e.ctx(), s.ID)
-	if err != nil {
+	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
-	spec, _ = e.terms.Spec(r.TerminalID)
-	if argOf(spec.Argv, "--resume") != cid || argOf(spec.Argv, "--permission-mode") != "acceptEdits" || slices.Contains(spec.Argv, "--") {
-		t.Errorf("reconnect argv = %q", spec.Argv)
+	argv = e.spec(s.ID).Argv
+	if argOf(argv, "--resume") != cid || argOf(argv, "--permission-mode") != "acceptEdits" || slices.Contains(argv, "hi") {
+		t.Errorf("reconnect argv = %q", argv)
 	}
 	f, err := e.m.Fork(e.ctx(), s.ID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	spec, _ = e.terms.Spec(f.TerminalID)
-	if f.PermissionMode != PermissionAcceptEdits || argOf(spec.Argv, "--permission-mode") != "acceptEdits" || slices.Contains(spec.Argv, "--") {
-		t.Errorf("fork = %+v argv = %q", f, spec.Argv)
+	argv = e.spec(f.ID).Argv
+	if f.PermissionMode != PermissionAcceptEdits || argOf(argv, "--permission-mode") != "acceptEdits" || slices.Contains(argv, "hi") {
+		t.Errorf("fork = %+v argv = %q", f, argv)
 	}
 }
 

@@ -18,8 +18,8 @@ const { useThreadStore } = await import("@/stores/thread");
 const { useUiStore } = await import("@/stores/ui");
 const { mcpPanelCommand, showView, useViewsStore } = await import("@/stores/views");
 
-const thread = (id: string, render: "terminal" | "rendered", state = "connected") =>
-  ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", terminalId: "", render, state, status: "idle", linkedPullRequests: [], usage: [] }) as unknown as SessionView;
+const thread = (id: string, state = "connected") =>
+  ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state, status: "idle", linkedPullRequests: [], usage: [] }) as unknown as SessionView;
 
 function server(name: string, o: Partial<McpServerView> = {}): McpServerView {
   return { name, status: "connected", serverName: "", version: "", error: "", scope: "user", source: "user", transport: "stdio", tools: [], ...o };
@@ -55,8 +55,8 @@ const row = () => screen.queryByTestId("panel-empty")?.querySelector('[data-surf
 
 beforeEach(() => {
   useReposStore.setState({ byId: {}, order: [] });
-  useSessionsStore.setState({ byId: { "s-r": thread("s-r", "rendered"), "s-t": thread("s-t", "terminal"), "s-off": thread("s-off", "rendered", "disconnected") }, order: ["s-r", "s-t", "s-off"] });
-  usePanelStore.setState({ byKey: { "session:s-r": { open: true, tabs: [], activeTabId: null }, "session:s-t": { open: true, tabs: [], activeTabId: null }, "session:s-off": { open: true, tabs: [], activeTabId: null } } });
+  useSessionsStore.setState({ byId: { "s-r": thread("s-r"), "s-off": thread("s-off", "disconnected") }, order: ["s-r", "s-off"] });
+  usePanelStore.setState({ byKey: { "session:s-r": { open: true, tabs: [], activeTabId: null }, "session:s-off": { open: true, tabs: [], activeTabId: null }, "view:projects": { open: true, tabs: [], activeTabId: null } } });
   useViewsStore.setState({ settingsOpen: false });
   useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, selection: { kind: "session", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
   useThreadStore.setState({ logs: {} });
@@ -70,12 +70,12 @@ afterEach(() => {
 });
 
 describe("MCP surface", () => {
-  it("is listed with M for a rendered thread and hidden for a terminal thread", () => {
+  it("is listed with M for a thread and hidden for a page", () => {
     render(<SidePanel />);
     expect(row()?.getAttribute("data-availability")).toBe("enabled");
     expect(row()?.textContent).toContain("MCP");
     act(() => {
-      useUiStore.setState({ selection: { kind: "session", id: "s-t" } });
+      useUiStore.setState({ selection: { kind: "view", name: "projects" } });
     });
     expect(row()).toBeNull();
     expect(mcpPanelCommand()).toBe(false);
@@ -97,7 +97,7 @@ describe("MCP surface", () => {
     expect(within(card("github"), "mcp-meta")?.textContent).toBe("user·stdio·2 tools");
     expect(within(card("github"), "mcp-version")?.textContent).toBe("v1.12.0");
     expect(within(card("playwright"), "mcp-error")?.textContent).toBe("spawn npx ENOENT");
-    expect(within(card("linear"), "mcp-login-hint")?.textContent).toBe("Needs login · run /mcp in a terminal thread, then reconnect");
+    expect(within(card("linear"), "mcp-login-hint")?.textContent).toBe("Needs login · run claude in a shell and use /mcp, then reconnect");
     // Reconnect everywhere but connecting and disabled; amber on the ones that need you.
     expect(cards().map((c) => within(c, "mcp-reconnect") !== null)).toEqual([true, true, true, false, false]);
     expect(within(card("playwright"), "mcp-reconnect")?.className).toContain("border-amber-500/40");

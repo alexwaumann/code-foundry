@@ -230,8 +230,7 @@ func totalRequests(bs []UsageBucket) (n int64) {
 func TestUsageFromLiveTranscript(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{Name: "driver"})
-	spec, _ := e.terms.Spec(s.TerminalID)
-	cid := argOf(spec.Argv, "--session-id")
+	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	c := usageLines(t)
 	e.writeTranscript(cid, userLine("hi"))
 	e.writeTranscript(cid, c[1])
@@ -245,14 +244,11 @@ func TestUsageFromLiveTranscript(t *testing.T) {
 		<-e.events.C()
 	}
 	e.writeTranscript(cid, c[2])
-	e.writeTranscript(cid, userLine("sentinel"))
-	e.waitFor(s.ID, "sentinel fed", func(Session) bool {
-		e.det.mu.Lock()
-		defer e.det.mu.Unlock()
-		return slices.Contains(e.det.transcript, userLine("sentinel"))
-	})
+	e.writeTranscript(cid, sentinelLink)
+	e.waitFor(s.ID, "sentinel read", linkedSentinel)
 	for len(e.events.C()) > 0 {
-		if u, ok := (<-e.events.C()).(Updated); ok && u.Session.ID == s.ID {
+		// The sentinel's own update is the only one.
+		if u, ok := (<-e.events.C()).(Updated); ok && u.Session.ID == s.ID && !linkedSentinel(u.Session) {
 			t.Errorf("repeat published an update: %+v", u.Session.Usage)
 		}
 	}
@@ -283,12 +279,11 @@ func TestUsageFromLiveTranscript(t *testing.T) {
 func TestUsageRescanOnReconnect(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{Name: "driver"})
-	spec, _ := e.terms.Spec(s.TerminalID)
-	cid := argOf(spec.Argv, "--session-id")
+	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	c := usageLines(t)
 	e.writeTranscript(cid, userLine("hi"), c[1], c[2])
 	e.waitFor(s.ID, "usage", func(s Session) bool { return totalRequests(s.Usage) == 1 })
-	_ = e.terms.Exit(s.TerminalID, 0)
+	e.exit(s.ID, 0)
 	e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
 
 	// History the daemon never saw, and a cached value that is wrong (as after a crash
@@ -320,8 +315,7 @@ func TestUsageRescanOnReconnect(t *testing.T) {
 func TestForkSkipsParentUsage(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{Name: "driver"})
-	spec, _ := e.terms.Spec(s.TerminalID)
-	cid := argOf(spec.Argv, "--session-id")
+	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	c := usageLines(t)
 	e.writeTranscript(cid, userLine("hi"), c[1])
 	e.waitFor(s.ID, "usage", func(s Session) bool { return totalRequests(s.Usage) == 1 })
@@ -330,10 +324,10 @@ func TestForkSkipsParentUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fspec, _ := e.terms.Spec(f.TerminalID)
-	fcid := argOf(fspec.Argv, "--session-id")
+	fargv := e.spec(f.ID).Argv
+	fcid := argOf(fargv, "--session-id")
 	if fcid == "" || fcid == cid {
-		t.Fatalf("fork argv = %q", fspec.Argv)
+		t.Fatalf("fork argv = %q", fargv)
 	}
 	// Claude starts the fork's file with a copy of the parent's records (original
 	// times, the fork's sessionId), then the fork's own.
@@ -346,7 +340,7 @@ func TestForkSkipsParentUsage(t *testing.T) {
 	}
 
 	// The rescan on reconnect skips the copies too.
-	_ = e.terms.Exit(got.TerminalID, 0)
+	e.exit(f.ID, 0)
 	e.waitFor(f.ID, "fork disconnected", func(s Session) bool { return s.State == StateDisconnected })
 	e.m.setUsage(f.ID, usageUpdate{})
 	if _, err := e.m.Reconnect(e.ctx(), f.ID); err != nil {

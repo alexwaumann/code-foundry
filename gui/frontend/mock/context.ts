@@ -1,5 +1,5 @@
 /**
- * Context totals of rendered threads in the mock daemon
+ * Context totals of threads in the mock daemon
  * (docs/notes/rendered-threads-cold-cache.md): a thread's context size after its last
  * turn, when that turn ended, and from those and the sessions.cache_ttl_seconds setting the
  * cache expiry and the re-read cost, computed when sent like the daemon's.

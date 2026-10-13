@@ -13,9 +13,9 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
-// Rendered threads (docs/notes/rendered-threads-1-daemon.md): the thread.* commands
-// drive a thread whose Claude runs headless and whose conversation the daemon records
-// as items.
+// Threads (docs/notes/rendered-threads-1-daemon.md): the thread.* commands drive a
+// thread's Claude, which runs headless, and read the conversation the daemon records as
+// items.
 
 // ThreadBackend is the slice of ThreadService the thread.* commands need, in generated
 // Connect signatures. The API handler, any ThreadServiceHandler, and a
@@ -37,14 +37,6 @@ var (
 	_ ThreadBackend = codefoundryv1connect.ThreadServiceClient(nil)
 )
 
-// SessionRenders are session.new's render values.
-var SessionRenders = []string{"terminal", "rendered"}
-
-var sessionRenderModes = map[string]v1.SessionRender{
-	"terminal": v1.SessionRender_SESSION_RENDER_TERMINAL,
-	"rendered": v1.SessionRender_SESSION_RENDER_RENDERED,
-}
-
 // ThreadDecisions are thread.respond's decision values.
 var ThreadDecisions = []string{"allow", "allow-session", "deny"}
 
@@ -52,13 +44,6 @@ var threadDecisions = map[string]v1.ThreadDecision{
 	"allow":         v1.ThreadDecision_THREAD_DECISION_ALLOW,
 	"allow-session": v1.ThreadDecision_THREAD_DECISION_ALLOW_FOR_SESSION,
 	"deny":          v1.ThreadDecision_THREAD_DECISION_DENY,
-}
-
-// hasRenderedThread is the thread.* availability: a thread is active and, in the GUI,
-// it is a rendered thread. A CLI caller (no active view) names the thread with --id,
-// which When cannot look up, so the daemon refuses a terminal thread instead.
-func hasRenderedThread(c Context) bool {
-	return hasSession(c) && (c.ActiveSessionRendered || c.ActiveView == "")
 }
 
 // RegisterThread registers thread.send, thread.respond, thread.interrupt,
@@ -69,7 +54,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		Command{
 			Name:        "thread.send",
 			Title:       "Send to Thread",
-			Description: "Send a message to a rendered thread, also while it works (Claude queues it or folds it in).",
+			Description: "Send a message to a thread, also while it works (Claude queues it or folds it in).",
 			Category:    "Thread",
 			Args: []ArgSpec{
 				idArg,
@@ -77,7 +62,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				{Name: "attachments", Type: String, Description: "Comma-separated image paths from StageAttachment"},
 				{Name: "composer-text", Type: String, Description: "The GUI composer's text with its tag tokens, kept on the message for display (the GUI sets it)"},
 			},
-			When: hasRenderedThread,
+			When: hasSession,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{
 					SessionId: a.String("id"), Text: a.String("text"), Attachments: splitList(a.String("attachments")),
@@ -92,7 +77,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		Command{
 			Name:  "thread.respond",
 			Title: "Answer Thread Request",
-			Description: "Answer a rendered thread's pending permission request or question (default: the oldest pending one). " +
+			Description: "Answer a thread's pending permission request or question (default: the oldest pending one). " +
 				"A question takes answer: the chosen option's label, or a JSON object of question to label.",
 			Category: "Thread",
 			Args: []ArgSpec{
@@ -104,7 +89,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				{Name: "message", Type: String, Description: "With deny: the reason Claude sees"},
 				{Name: "interrupt", Type: Bool, Description: "With deny: also stop the turn"},
 			},
-			When: hasRenderedThread,
+			When: hasSession,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("id")
 				items, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{SessionId: id}))
@@ -146,13 +131,13 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		Command{
 			Name:        "thread.interrupt",
 			Title:       "Interrupt Thread",
-			Description: "Stop a rendered thread's running turn. Pending requests are withdrawn.",
+			Description: "Stop a thread's running turn. Pending requests are withdrawn.",
 			Category:    "Thread",
 			// Claude Code's own interrupt key. The GUI starts it from the keyboard only while
 			// the thread is on a turn and the key is not someone else's (keys/bindings.ts).
 			Keybindings: []string{"escape"},
 			Args:        []ArgSpec{idArg},
-			When:        hasRenderedThread,
+			When:        hasSession,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				if _, err := b.Interrupt(ctx, connect.NewRequest(&v1.InterruptThreadRequest{SessionId: a.String("id")})); err != nil {
 					return Result{}, err
@@ -163,13 +148,13 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		Command{
 			Name:        "thread.items",
 			Title:       "Show Thread Conversation",
-			Description: "Print a rendered thread's conversation as a readable log.",
+			Description: "Print a thread's conversation as a readable log.",
 			Category:    "Thread",
 			Args: []ArgSpec{
 				idArg,
 				{Name: "full", Type: Bool, Description: "Print whole texts, tool inputs and outputs instead of one line each"},
 			},
-			When: hasRenderedThread,
+			When: hasSession,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{SessionId: a.String("id")}))
 				if err != nil {
@@ -182,13 +167,13 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		Command{
 			Name:        "thread.set-model",
 			Title:       "Set Thread Model",
-			Description: "Switch a connected rendered thread's model from its next request.",
+			Description: "Switch a connected thread's model from its next request.",
 			Category:    "Thread",
 			Args: []ArgSpec{
 				idArg,
 				{Name: "model", Type: Enum, Enum: SessionModels, Required: true, Positional: true, Description: sessionModelHelp},
 			},
-			When: hasRenderedThread,
+			When: hasSession,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.SetModel(ctx, connect.NewRequest(&v1.SetThreadModelRequest{SessionId: a.String("id"), Model: a.String("model")}))
 				if err != nil {
@@ -201,13 +186,13 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		Command{
 			Name:        "thread.set-mode",
 			Title:       "Set Thread Permissions",
-			Description: "Switch a connected rendered thread's permission mode: supervised (confirm every tool call), accept-edits, or auto.",
+			Description: "Switch a connected thread's permission mode: supervised (confirm every tool call), accept-edits, or auto.",
 			Category:    "Thread",
 			Args: []ArgSpec{
 				idArg,
 				{Name: "permission", Type: Enum, Enum: SessionPermissions, Required: true, Positional: true, Description: "supervised, accept-edits, or auto"},
 			},
-			When: hasRenderedThread,
+			When: hasSession,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.SetPermissionMode(ctx, connect.NewRequest(&v1.SetThreadPermissionModeRequest{
 					SessionId: a.String("id"), PermissionMode: sessionPermissionModes[a.String("permission")],
@@ -222,14 +207,14 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		Command{
 			Name:  "thread.set-effort",
 			Title: "Set Thread Effort",
-			Description: "Change a connected rendered thread's effort level. Claude restarts with it (resuming the " +
+			Description: "Change a connected thread's effort level. Claude restarts with it (resuming the " +
 				"conversation) at once when idle, else when the running turn ends.",
 			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,
 				{Name: "effort", Type: Enum, Enum: SessionEfforts, Required: true, Positional: true, Description: "low, medium, high, xhigh, or max"},
 			},
-			When: hasRenderedThread,
+			When: hasSession,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{SessionId: a.String("id"), Effort: a.String("effort")}))
 				if err != nil {

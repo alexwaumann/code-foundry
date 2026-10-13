@@ -9,7 +9,7 @@ import { listTerminals } from "@/api/terminal";
 import { onNewTerminal, onRemovedTerminal, revealArrived } from "./bottomActions";
 import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
-import { applyIntent, retryFocusTerminal } from "./intents";
+import { applyIntent } from "./intents";
 import { applyRepoEvent, replaceRepos, useReposStore } from "./repos";
 import { applyRetiredUsage, applySessionEvent, replaceSessions, useSessionsStore } from "./sessions";
 import { applySettingsSnapshot, loadSettingsSchema } from "./settings";
@@ -55,10 +55,10 @@ const handlers: Handlers = {
   session: (ev) => {
     // Session events prove the service exists, even if List failed transiently.
     useSessionsStore.setState((s) => ({ ...applySessionEvent(s, ev), retiredUsage: applyRetiredUsage(s.retiredUsage, ev), availability: "available", error: null }));
-    // A removed rendered thread's items go with it.
+    // A removed thread's items go with it.
     if (ev.kind === "removed" || ev.kind === "snapshot") pruneThreadLogs((id) => id in useSessionsStore.getState().byId);
   },
-  // Pending requests of every rendered thread; the visible one's items come from its Watch.
+  // Pending requests of every thread; the visible one's items come from its Watch.
   thread: applyThreadSourceEvent,
   gh: applyGhEvent,
   gitops: applyGitOpsEvent,
@@ -69,8 +69,6 @@ const handlers: Handlers = {
 
 export function dispatchEvent(ev: EventView): void {
   (handlers[ev.source] as (e: EventView["event"]) => void)(ev.event);
-  // A focusTerminal that raced its terminal or thread selects the thread once both are known.
-  if (ev.source === "terminal" || ev.source === "session") retryFocusTerminal();
 }
 
 /** True when the error means the daemon does not serve the RPC (older daemon). */
@@ -111,10 +109,8 @@ export function startEventSync(sessionRetryMs = 10_000): () => void {
       const [repos, terminals] = await Promise.all([listRepos(daemon, signal), listTerminals(daemon, signal), reconcileSessions(signal)]);
       useReposStore.setState({ ...replaceRepos(repos), loaded: true });
       useTerminalsStore.setState((s) => ({ ...replaceTerminals(s, terminals), loaded: true }));
-      // The List brings terminals without updated events: a pending reveal's shell, or a
-      // pending Claude terminal's thread, may be here now.
+      // The List brings terminals without updated events: a pending reveal's shell may be here now.
       revealArrived();
-      retryFocusTerminal();
     },
     onEvent: dispatchEvent,
     onStatus: (stream, err) => {

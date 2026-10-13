@@ -12,7 +12,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/claudestream"
 )
 
-// A rendered thread's MCP servers (docs/notes/mcp-panel.md). Claude pushes nothing when
+// A thread's MCP servers (docs/notes/mcp-panel.md). Claude pushes nothing when
 // a server's status changes, so the runner asks (mcp_status) after every system/init,
 // i.e. at the start of each turn, again every few seconds while a server is still
 // connecting, and after the user's own reconnects. The answer is cached on the thread's

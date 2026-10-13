@@ -18,7 +18,7 @@ import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 /**
  * GUI-local view actions. They change only what the window shows (palette, sidebar,
  * zoom, which row is selected), never daemon state, so they are not registry commands.
- * Every chord here is "global": it wins even when the terminal has focus.
+ * Every chord here is "global": it wins even when a bottom panel shell has focus.
  */
 export interface ViewAction {
   chord: string;
@@ -29,7 +29,7 @@ export interface ViewAction {
 /** Selects the Nth thread in sidebar order (rows of a collapsed section do not count). */
 function jumpTo(n: number): void {
   const id = sessionOrder(getListSessions(), getListOptions())[n - 1];
-  if (id !== undefined) useUiStore.getState().select({ kind: "session", id }, { focusTerminal: true });
+  if (id !== undefined) useUiStore.getState().select({ kind: "session", id }, { focusPrompt: true });
 }
 
 /** Selects the next session that needs attention after the current one, wrapping. */
@@ -39,7 +39,7 @@ export function jumpToAttention(): boolean {
   // Threads that need attention are never in the collapsible Working section (threadGroup).
   const next = nextAfter(sessionOrder(getListSessions(), getListOptions()), sel.kind === "session" ? sel.id : null, (id) => waiting.has(id));
   if (next === null) return false;
-  useUiStore.getState().select({ kind: "session", id: next }, { focusTerminal: true });
+  useUiStore.getState().select({ kind: "session", id: next }, { focusPrompt: true });
   return true;
 }
 
@@ -49,15 +49,16 @@ function togglePalette(): void {
   else ui.openPalette();
 }
 
-function focusContentTerminal(): void {
-  if (useUiStore.getState().selection.kind === "session") useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
+/** A selected thread's prompt takes the keyboard (ThreadComposer). */
+function focusThreadPrompt(): void {
+  if (useUiStore.getState().selection.kind === "session") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
 }
 
 function toggleSidebar(): void {
   const ui = useUiStore.getState();
   if (ui.sidebarVisible) {
     ui.toggleSidebar();
-    focusContentTerminal();
+    focusThreadPrompt();
   } else {
     ui.focusSidebar();
   }
@@ -125,13 +126,18 @@ export function commandBindings(commands: readonly CommandView[]): Map<string, C
 }
 
 /**
- * The command a focused terminal yields this chord to (see terminalYieldable). Sessions
- * are terminals, so without this session.close/rename/reconnect would never fire from
- * the main view.
+ * The command a focused terminal (a bottom panel shell) or thread prompt
+ * ([data-chord-yield]) yields this chord to (see terminalYieldable), so
+ * session.close/rename, cmd+j and cmd+t still fire while typing to Claude or a shell.
  */
 function terminalYields(chord: string): CommandView | undefined {
   if (!terminalYieldable(chord)) return undefined;
   return commandBindings(useCommandsStore.getState().commands).get(chord);
+}
+
+/** Some listed command declares the chord, whether or not it is available in this context. */
+function declaredChord(chord: string): boolean {
+  return useCommandsStore.getState().commands.some((c) => c.keybindings.some((k) => normalizeChord(k) === chord));
 }
 
 /** True when the chord must reach the app even while xterm has focus. */
@@ -284,11 +290,11 @@ export function presentInPalette(name: string): boolean {
  */
 const quietCommands: ReadonlySet<string> = new Set(["terminal.new", "thread.interrupt"]);
 
-/** The active thread is rendered, connected, on a turn and not waiting on the user: Escape interrupts it. */
+/** The active thread is connected, on a turn and not waiting on the user: Escape interrupts it. */
 function activeThreadInterruptible(): boolean {
   const id = getUiContext().activeSessionId;
   const s = id ? useSessionsStore.getState().byId[id] : undefined;
-  if (s?.render !== "rendered" || s.state !== "connected" || s.status !== "busy") return false;
+  if (s?.state !== "connected" || s.status !== "busy") return false;
   const t = useThreadStore.getState();
   return (t.logs[id]?.pending ?? t.pending[id]?.pending ?? []).length === 0;
 }
@@ -338,15 +344,17 @@ export function startCommandNamed(name: string): boolean {
 function isEditable(el: Element | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
   if (el.closest("[data-terminal-host]")) return false; // xterm's hidden textarea
-  return el.isContentEditable || el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
+  // isContentEditable, spelled out for DOMs without it (jsdom).
+  const editableText = el.isContentEditable || el.closest('[contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]') !== null;
+  return editableText || el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
 }
 
 /**
  * Key precedence:
  *  1. Global view actions (cmd+k, cmd+shift+p, cmd+b, cmd+shift+a, cmd+1..9, zoom) always win
  *     (cmd+1..9 belong to the project picker while it is open).
- *  2. A focused terminal consumes everything else, except cmd chords bound to commands
- *     (see terminalYields).
+ *  2. A focused terminal or a thread prompt's text ([data-chord-yield]) consumes everything
+ *     else, except cmd chords bound to commands (see terminalYields).
  *  3. A focused text field (palette input, rename field) consumes everything else.
  *  4. F2 renames the selected session (the cursor row inside the tree); command
  *     keybindings from CommandService.List for the current context.
@@ -368,16 +376,21 @@ export function handleKeyDown(e: KeyboardEvent): void {
     return;
   }
   const target = e.target instanceof Element ? e.target : null;
-  if (target?.closest("[data-terminal-host]")) {
+  const shell = Boolean(target?.closest("[data-terminal-host]"));
+  // Only the prompt's text yields: a composer button or picker keeps the usual keys
+  // (Escape interrupts, F2 renames).
+  if (shell || (isEditable(target) && target?.closest("[data-chord-yield]"))) {
     if (useUiStore.getState().palette.open) return;
     const yielded = terminalYields(chord);
     if (yielded) {
       e.preventDefault();
       e.stopPropagation();
       startCommand(yielded);
-    } else if (terminalYieldable(chord)) {
-      // Focusing a shell changes the context (a Projects-page shell brings its worktree):
-      // cmd+t right after it must not be lost to the debounced re-list.
+    } else if (terminalYieldable(chord) && (shell || declaredChord(chord))) {
+      // Focusing a shell or selecting a thread changes the context (a Projects-page shell
+      // brings its worktree): cmd+t or cmd+shift+w right after it must not be lost to the
+      // debounced re-list. In a prompt only for a chord some command declares: the
+      // others edit (cmd+arrows, cmd+backspace) and must not be held.
       startWhenListed(e, chord);
     }
     return;

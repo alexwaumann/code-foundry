@@ -64,14 +64,14 @@ function preparingToast(ref: PrRef): () => void {
 }
 
 /**
- * The "Started session …" toast's Open action: selects the new session (with terminal
+ * The "Started session …" toast's Open action: selects the new session (with prompt
  * focus, as FocusSession does) unless it is selected already. The daemon's FocusSession
  * normally gets there first; this covers a stream that missed it.
  */
 export function openStartedSession(id: string): void {
   const ui = useUiStore.getState();
   if (ui.selection.kind === "session" && ui.selection.id === id) return;
-  ui.select({ kind: "session", id }, { focusTerminal: true });
+  ui.select({ kind: "session", id }, { focusPrompt: true });
 }
 
 /**

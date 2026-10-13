@@ -209,16 +209,16 @@ func TestTerminalClose(t *testing.T) {
 	if c.Confirm != "" || c.Title != "Close Terminal" || c.Category != "Terminal" {
 		t.Errorf("terminal.close = %+v, want title Close Terminal, category Terminal, no confirmation", c)
 	}
-	// A thread is selected: its Claude terminal is the active terminal, and not a shell.
-	if c.Available(command.Context{ActiveTerminalID: "t-claude", ActiveSessionID: "s1"}) {
-		t.Error("terminal.close offered on a thread's Claude terminal")
+	// A terminal that is not a shell (TerminalService.Create without labels).
+	if c.Available(command.Context{ActiveTerminalID: "t-other", ActiveSessionID: "s1"}) {
+		t.Error("terminal.close offered on a terminal that is not a shell")
 	}
 	if !c.Available(command.Context{ActiveTerminalID: "t-shell", ActiveSessionID: "s1"}) {
 		t.Error("terminal.close not offered on a shell")
 	}
-	_, err := reg.Invoke(context.Background(), command.Context{ActiveTerminalID: "t-claude"}, "terminal.close", nil)
-	if !errors.Is(err, command.ErrUnavailable) || !strings.Contains(err.Error(), "use session.close") {
-		t.Errorf("terminal.close on a Claude terminal = %v, want unavailable, use session.close", err)
+	_, err := reg.Invoke(context.Background(), command.Context{ActiveTerminalID: "t-other"}, "terminal.close", nil)
+	if !errors.Is(err, command.ErrUnavailable) || !strings.Contains(err.Error(), "use terminal.kill") {
+		t.Errorf("terminal.close on a terminal that is not a shell = %v, want unavailable, use terminal.kill", err)
 	}
 }
 

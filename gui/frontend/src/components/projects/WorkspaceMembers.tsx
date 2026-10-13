@@ -62,7 +62,7 @@ function PanelMemberRow({ workspaceId, member, threadId, onOpen }: RowOptions & 
         {at && (
           <span
             className={cn("shrink-0 rounded-sm px-1 text-[10px] leading-4 font-medium", at === "current" ? "bg-emerald-400/15 text-emerald-300" : "bg-amber-400/15 text-amber-300")}
-            title={at === "current" ? "The thread runs in this worktree" : "The thread moves here once it is idle at its prompt (/cd)"}
+            title={at === "current" ? "The thread runs in this worktree" : "The thread moves here once it is idle at its prompt"}
             data-testid="member-at"
           >
             {at === "current" ? "here" : "queued"}

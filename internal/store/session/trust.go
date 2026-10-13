@@ -8,7 +8,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -24,8 +23,9 @@ import (
 // Claude rewrites the file often from every running instance. It bundles
 // proper-lockfile, whose convention is a "<file>.lock" directory considered stale
 // after 10s; trustWorktree takes the same lock, re-reads, edits only the one entry,
-// and replaces the file atomically. If anything goes wrong, the runner's dialog
-// fallback (parseTrustDialog) still accepts the dialog.
+// and replaces the file atomically. claude -p skips the dialog itself, but set_cwd
+// (RunIn) refuses a folder that is not trusted ("needs_trust"), so spawn and RunIn
+// pre-trust.
 
 const (
 	trustLockStale = 10 * time.Second
@@ -157,52 +157,9 @@ func lockFile(path string) (func(), error) {
 	}
 }
 
-// trustDialog is what parseTrustDialog found on a screen.
-type trustDialog struct {
-	Visible bool
-	// YesSelected: the "Yes, I trust this folder" option has the ❯ cursor. Claude
-	// selects "No, exit" by default, so the answer is Down, then Enter.
-	YesSelected bool
-}
-
-// trustYes is the accepting option's label in Claude Code 2.1.294's trust dialog:
-//
-//	Quick safety check: Is this a project you created or one you trust? ...
-//	❯ No, exit
-//	  Yes, I trust this folder
-//	Enter to confirm · Esc to cancel
-const trustYes = "Yes, I trust this folder"
-
-// parseTrustDialog finds Claude's folder-trust dialog on a plain-text screen. It
-// must be the rendered screen (terminal.Store.ScreenText): Ink positions words with
-// cursor moves, so the raw byte stream never contains the phrase.
-func parseTrustDialog(screen string) trustDialog {
-	if !strings.Contains(screen, trustYes) {
-		return trustDialog{}
-	}
-	if !strings.Contains(screen, "trust") || !(strings.Contains(screen, "Quick safety check") ||
-		strings.Contains(screen, "Enter to confirm") || strings.Contains(screen, "No, exit")) {
-		return trustDialog{}
-	}
-	d := trustDialog{Visible: true}
-	for _, line := range strings.Split(screen, "\n") {
-		if strings.Contains(line, trustYes) {
-			before, _, _ := strings.Cut(line, trustYes)
-			d.YesSelected = strings.ContainsAny(before, "❯›>")
-		}
-	}
-	return d
-}
-
-// Keys sent to answer the dialog.
-const (
-	keyDown  = "\x1b[B"
-	keyEnter = "\r"
-)
-
 // PreTrust marks dir as trusted in Claude's config, as spawn does for a session's
-// worktree, so a session started (or moved with /cd) there later gets no trust
-// dialog. The workspace store calls it for member worktrees. It is a no-op with
+// worktree, so a session can later be started in (or moved with RunIn to) dir. The
+// workspace store calls it for member worktrees. It is a no-op with
 // Options.DisablePreTrust.
 func (m *Manager) PreTrust(dir string) error {
 	if m.opts.DisablePreTrust {

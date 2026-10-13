@@ -70,7 +70,7 @@ function rehypeRawAsText() {
 /** Without raw HTML: any HTML in the source shows as text. Still sanitized. */
 const rehypePluginsNoHtml = [rehypeRawAsText, [rehypeSanitize, markdownSchema]] as RehypePlugins;
 
-/** Optional renderers a surface adds (the rendered thread: highlighted code, attachment images). */
+/** Optional renderers a surface adds (a thread: highlighted code, attachment images). */
 export interface MarkdownExtras {
   /** A fenced code block: its info string's language ("" without one) and its code (no trailing newline). */
   code?: (lang: string, code: string) => ReactNode;

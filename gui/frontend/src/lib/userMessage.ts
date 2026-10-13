@@ -1,5 +1,5 @@
 /**
- * A rendered thread's user message as text and tags. When the composer sent it, the item
+ * A thread's user message as text and tags. When the composer sent it, the item
  * carries the composer's own text (UserMessageItem.composer_text): its tags are the
  * composer's tokens (lib/prompt.ts), with each image chip's id replaced by the image's
  * index in the message's attachments (sentComposerText). The bubble draws chips from

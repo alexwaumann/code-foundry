@@ -1,6 +1,6 @@
 /**
- * Rendered threads (Session.render RENDERED): the conversation the daemon records as items
- * (ThreadService) mapped to view models. Generated types stay in this file. Sync rules
+ * Threads: the conversation the daemon records as items (ThreadService) mapped to view
+ * models. Generated types stay in this file. Sync rules
  * (docs/notes/rendered-threads-1-daemon.md): ThreadService.Watch sends a snapshot first,
  * then appended / updated items, text deltas and pending-request changes, each with the
  * thread's seq. The EventService `thread` source carries only pending requests (a
@@ -99,7 +99,7 @@ export interface ToolCallView {
   resultJson: string;
 }
 
-/** One entry of a rendered thread's conversation; the kind says which payload it has. */
+/** One entry of a thread's conversation; the kind says which payload it has. */
 export type ThreadItemView = ItemBase &
   (
     /** composerText: the composer's text with its tag tokens ("" when sent without the composer); see lib/userMessage. */
@@ -142,7 +142,7 @@ export type ThreadEventView =
   | ({ kind: "pending" } & ThreadPendingListView)
   /** Watch only: the thread's MCP servers were checked again, or dropped (null: its process ended). */
   | { kind: "mcp"; sessionId: string; seq: number; status: McpStatusView | null }
-  /** EventService only: the pending requests of every rendered thread that has any. */
+  /** EventService only: the pending requests of every thread that has any. */
   | { kind: "pendingSnapshot"; threads: ThreadPendingListView[] };
 
 const toolStatus: Record<ToolCallStatus, ToolStatusView> = {

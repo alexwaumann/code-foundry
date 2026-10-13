@@ -19,7 +19,7 @@ function setUsage(threads: Record<string, UsageBucketView[]>, retired: UsageBuck
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-10T15:00:00Z"));
-  useUiStore.setState({ usageRange: 30, terminalFocusSeq: 0 });
+  useUiStore.setState({ usageRange: 30, promptFocusSeq: 0 });
   useViewsStore.setState({ settingsOpen: false, usageOpen: true, helpOpen: false });
 });
 

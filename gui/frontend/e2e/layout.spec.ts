@@ -100,8 +100,8 @@ test("the panes start 8px from the top and their 44px headers drag the window, w
   await openApp(page);
   const viewport = page.viewportSize();
   await row(page, "s:s-1").click();
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
-  await page.getByTestId("terminal-header").getByTestId("panel-toggle").click();
+  await expect(page.getByTestId("thread-pane")).toBeVisible();
+  await page.getByTestId("thread-header").getByTestId("panel-toggle").click();
   await expect(page.getByTestId("side-panel")).toBeVisible();
 
   for (const visible of [true, false]) {
@@ -114,15 +114,15 @@ test("the panes start 8px from the top and their 44px headers drag the window, w
     expect(pane.left).toBe(visible ? (await box(page, "sidebar")).right + 8 : 8);
     expect(viewport && viewport.height - pane.bottom).toBe(8);
 
-    const header = await box(page, "terminal-header");
+    const header = await box(page, "thread-header");
     expect(header.top).toBe(pane.top + 1);
     expect(header.height).toBe(HEADER);
     expect(header.bottom - 1).toBe(BAND);
-    expect(await drag(page, '[data-testid="terminal-header"]')).toBe("drag");
-    expect(await drag(page, '[data-testid="terminal-title"]')).toBe("drag");
+    expect(await drag(page, '[data-testid="thread-header"]')).toBe("drag");
+    expect(await drag(page, '[data-testid="thread-title"]')).toBe("drag");
     expect(await drag(page, '[data-testid="pane-actions"]')).toBe("no-drag");
-    // The terminal itself never drags.
-    expect(await drag(page, '[data-testid="terminal-host"]')).toBe("");
+    // The conversation itself never drags.
+    expect(await drag(page, '[data-testid="thread-timeline"]')).toBe("");
 
     // The side panel: same top, same header, ending on the band.
     const wrapper = await box(page, "side-panel-wrapper");
@@ -142,7 +142,7 @@ test("the panes start 8px from the top and their 44px headers drag the window, w
 
     // Hidden sidebar: the pane runs under the traffic lights, so the header content
     // starts past the gutter.
-    const title = await box(page, "terminal-title");
+    const title = await box(page, "thread-title");
     if (!visible) expect(title.left).toBeGreaterThanOrEqual(80 + 8);
   }
   await expect(page.getByTestId("hints")).toHaveCount(0);
@@ -169,12 +169,10 @@ test("every page header is 44px, ends on the band and drags; its controls do not
   await check('[data-testid="settings-page"] > header', ['input[type="search"]', '[data-testid="reveal-settings"]', 'button[aria-label="Close settings"]']);
   await page.getByRole("button", { name: "Close settings" }).click();
 
-  // A disconnected thread has no header: its panel toggle sits centred where one would be.
+  // A disconnected thread keeps the thread header.
   await row(page, "s:s-3").click();
-  await expect(page.getByTestId("session-disconnected")).toBeVisible();
-  const toggle = await box(page, "panel-toggle");
-  expect((toggle.top + toggle.bottom) / 2).toBe((9 + BAND + 1) / 2);
-  expect(await drag(page, '[data-testid="panel-toggle"]')).toBe("no-drag");
+  await expect(page.getByTestId("thread-disconnected")).toBeVisible();
+  await check('[data-testid="thread-header"]', ['[data-testid="pane-actions"]', '[data-testid="panel-toggle"]']);
 });
 
 test("headerless panes (start page, composer) drag the window from the same 44px band", async ({ page }) => {
@@ -208,7 +206,7 @@ test("the daemon status and update indicator sit at the bottom of the sidebar", 
 });
 
 for (const scheme of ["dark", "light"] as const) {
-  test(`${scheme}: sidebar sits on the sheet and the terminal matches its pane`, async ({ page }) => {
+  test(`${scheme}: sidebar sits on the sheet and the bottom panel's terminal matches its pane`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
     await openApp(page);
     await expect(page.locator("html")).toHaveClass(scheme === "dark" ? /dark/ : /^(?!.*dark)/);
@@ -218,9 +216,12 @@ for (const scheme of ["dark", "light"] as const) {
     expect(pane).not.toBe(sheet);
     expect(await page.getByTestId("sidebar").evaluate((el) => getComputedStyle(el).borderRightWidth)).toBe("0px");
 
+    // s-1's shell in its bottom panel: the xterm theme background (src/terminal/theme.ts)
+    // must be the pane colour.
     await row(page, "s:s-1").click();
-    await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
-    // The xterm theme background (src/terminal/theme.ts) must be the pane colour.
+    await page.keyboard.press("Meta+j");
+    await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
+    expect(await bg(page, '[data-testid="bottom-panel"]')).toBe(pane);
     const xtermBg = () =>
       page.evaluate(() => {
         const w = window as unknown as { __cfTerminal?: { renderer: { term: { options: { theme?: { background?: string } } } } } };
@@ -232,6 +233,6 @@ for (const scheme of ["dark", "light"] as const) {
         return c;
       });
     await expect.poll(xtermBg).toBe(pane);
-    expect(await bg(page, '[data-testid="terminal-host"] >> xpath=..')).toBe(pane);
+    expect(await bg(page, '[data-testid="bottom-terminal-host"] >> xpath=..')).toBe(pane);
   });
 }

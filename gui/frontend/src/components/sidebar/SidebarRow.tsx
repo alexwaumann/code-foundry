@@ -177,7 +177,7 @@ function ThreadLine({ id }: { id: string }) {
   return (
     <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground" data-testid="row-place" data-status-line={line.kind} data-session-badge={badge}>
       {movingTo !== null ? (
-        <span className="flex min-w-0 items-center gap-1 text-amber-300" data-testid="row-moving" title={`Runs in ${movingTo} once it is idle at its prompt (/cd)`}>
+        <span className="flex min-w-0 items-center gap-1 text-amber-300" data-testid="row-moving" title={`Runs in ${movingTo} once it is idle at its prompt`}>
           <ArrowRightLeft className="size-3 shrink-0" aria-hidden />
           <span className="truncate">moving to {movingTo}…</span>
         </span>

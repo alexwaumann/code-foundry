@@ -3,16 +3,11 @@ import type { SessionStateView, SessionStatusView } from "@/api/session";
 import {
   attentionTier,
   disconnectCause,
-  disconnectedPill,
   isThreadGroup,
-  modelEffortLabel,
-  sessionLocation,
   statusDetail,
   statusKind,
   statusNote,
   threadGroup,
-  type LocationRepos,
-  type PillKind,
   type StatusKind,
   type ThreadGroup,
 } from "./session";
@@ -48,9 +43,9 @@ describe("threadGroup (the sidebar group of an unpinned thread)", () => {
   });
 });
 
-// Reasons as the daemon reported them: replays of the internal/claudestatus fixtures
-// (Claude Code 2.1.294; CLAUDESTATUS_TRACE=<fixture>, noscreen for "waiting for approval")
-// and the session store's "interrupted".
+// Reasons as the daemon reported them: the stream's (permission, question, finished,
+// error), the store's "interrupted", and the removed screen detector's (Claude Code
+// 2.1.294 fixtures), which rows persisted before rendered-only threads still carry.
 describe("statusKind / statusDetail", () => {
   it.each<[SessionStatusView, string, StatusKind, string]>([
     ["attention", "finished", "done", ""],
@@ -77,22 +72,6 @@ describe("statusKind / statusDetail", () => {
   });
 });
 
-describe("disconnectedPill", () => {
-  it.each<[SessionStatusView, string, PillKind, string]>([
-    ["error", "interrupted", "interrupted", "Interrupted"],
-    ["error", "", "interrupted", "Interrupted"],
-    ["attention", "permission: Do you want to proceed?", "attention", "Was waiting on you"],
-    ["attention", "finished", "attention", "Was waiting on you"],
-    ["idle", "finished", "idle", "Finished"],
-    ["idle", "at prompt", "idle", "At prompt"],
-    ["idle", "", "idle", "At prompt"],
-    ["busy", "working", "none", ""],
-    ["unknown", "", "none", ""],
-  ])("%s %j", (status, statusReason, kind, label) => {
-    expect(disconnectedPill({ status, statusReason })).toEqual({ kind, label });
-  });
-});
-
 describe("disconnectCause", () => {
   it.each([
     [{ disconnectReason: "closed", exitCode: 0, lastError: "" }, "closed"],
@@ -104,52 +83,6 @@ describe("disconnectCause", () => {
     [{ disconnectReason: "", exitCode: 0, lastError: "Worktree is missing" }, "stopped: Worktree is missing"],
   ])("%j", (s, want) => {
     expect(disconnectCause(s)).toBe(want);
-  });
-});
-
-describe("modelEffortLabel", () => {
-  const models = [
-    { value: "opus", label: "Opus" },
-    { value: "claude-opus-4-8", label: "Opus 4.8" },
-    { value: "haiku", label: "Haiku" },
-  ];
-  it.each([
-    ["opus", "high", "Opus (high)"],
-    ["claude-opus-4-8", "max", "Opus 4.8 (max)"],
-    ["haiku", "", "Haiku"],
-    ["claude-opus-5-5", "max", "claude-opus-5-5 (max)"],
-    ["", "high", ""],
-    ["", "", ""],
-  ])("%j %j", (model, effort, want) => {
-    expect(modelEffortLabel({ model, effort }, models)).toBe(want);
-  });
-});
-
-describe("sessionLocation", () => {
-  const repos: LocationRepos = {
-    order: ["cf", "notes"],
-    byId: {
-      cf: {
-        name: "code-foundry",
-        git: true,
-        worktrees: [
-          { path: "/u/cf", branch: "main", head: "3c3c4651aa", detached: false },
-          { path: "/u/cf.worktrees/fix", branch: "fix/resize", head: "1f2e3d4c55", detached: false },
-          { path: "/u/cf.worktrees/bisect", branch: "", head: "9a8b7c6d44", detached: true },
-        ],
-      },
-      notes: { name: "notes", git: false, worktrees: [{ path: "/u/notes", branch: "", head: "", detached: false }] },
-    },
-  };
-  it.each([
-    ["git, on a branch", "/u/cf.worktrees/fix", { project: "code-foundry", branch: "fix/resize" }],
-    ["git, main worktree", "/u/cf", { project: "code-foundry", branch: "main" }],
-    ["git, detached", "/u/cf.worktrees/bisect", { project: "code-foundry", branch: "9a8b7c6" }],
-    ["git, a subdirectory of a worktree", "/u/cf/gui", { project: "code-foundry", branch: "main" }],
-    ["no git", "/u/notes", { project: "notes", branch: "" }],
-    ["unplaceable", "/tmp/elsewhere/scratch", { project: "scratch", branch: "" }],
-  ])("%s", (_, worktreePath, want) => {
-    expect(sessionLocation({ worktreePath }, repos)).toEqual(want);
   });
 });
 

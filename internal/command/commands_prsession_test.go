@@ -83,7 +83,6 @@ func TestPullRequestSessionCommands(t *testing.T) {
 		setup   func(*prSessionFixture)
 		wantReq []proto.Message // gh, repo and gitops requests, in call order
 		// wantSession checks the CreateSessionRequest (prompt by prefix and contents).
-		// None sets Render: a PR thread's view is the sessions.render setting's.
 		wantSession  *v1.CreateSessionRequest
 		wantPrompt   string
 		wantInPrompt []string

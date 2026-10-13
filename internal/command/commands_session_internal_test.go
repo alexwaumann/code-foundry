@@ -17,7 +17,7 @@ func TestListContext(t *testing.T) {
 		s    *v1.Session
 		want string
 	}{
-		{name: "a terminal thread", s: &v1.Session{}, want: "-"},
+		{name: "no result yet", s: &v1.Session{}, want: "-"},
 		{name: "no expiry", s: &v1.Session{ContextTokens: 25_700}, want: "-"},
 		{name: "warm", s: &v1.Session{ContextTokens: 25_700, CacheExpiresAt: at(41*time.Minute + 30*time.Second)}, want: "25.7K · cache expires in 42 min"},
 		{name: "under a minute rounds up", s: &v1.Session{ContextTokens: 812, CacheExpiresAt: at(time.Second)}, want: "812 · cache expires in 1 min"},

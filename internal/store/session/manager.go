@@ -18,7 +18,6 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
-	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
 // RepoSource is the part of the repo store sessions need: resolving worktrees and
@@ -30,7 +29,9 @@ type RepoSource interface {
 
 // Options configures a Manager. DB and Terminals are required.
 type Options struct {
-	DB        *sql.DB
+	DB *sql.DB
+	// Terminals holds the shells terminal.new started for threads; Remove kills a
+	// thread's (shells.go). Claude itself never runs in a terminal.
 	Terminals terminal.Store
 	// Repos resolves repo ids and worktree paths. Nil accepts any existing directory
 	// as a worktree (tests); the daemon always sets it.
@@ -46,9 +47,6 @@ type Options struct {
 	// Paths locates Claude's config dir and global config. Default
 	// DefaultClaudePaths().
 	Paths ClaudePaths
-	// NewDetector builds each connected terminal's status detector. Default
-	// NewStubDetector (always Unknown) until internal/claudestatus is wired.
-	NewDetector DetectorFactory
 	// Namer names sessions from their first user message. Default ClaudeNamer in
 	// /tmp, which names with model.NamingDefault unless the ctx carries
 	// WithNamingModel (the daemon's settingsNamer sets it per call).
@@ -76,15 +74,13 @@ type Options struct {
 	// the CLI inside a session reaches it without the Unix socket.
 	Env []string
 	// DisablePreTrust skips writing folder trust into Claude's config before spawning
-	// (the on-screen dialog is still answered). For tests.
+	// and before a RunIn move (set_cwd refuses an untrusted folder). For tests.
 	DisablePreTrust bool
-	// Cols and Rows are the initial terminal size. Default 120x40.
-	Cols, Rows uint16
 
 	NamingTimeout  time.Duration // default 20s
-	StartTimeout   time.Duration // STARTING -> CONNECTED without a UI signal; default 15s
-	CloseTimeout   time.Duration // graceful close before Kill; default 10s
-	Tick           time.Duration // detector tick and transcript poll; default 1s
+	StartTimeout   time.Duration // bound on the initialize handshake (STARTING -> CONNECTED); default 15s
+	CloseTimeout   time.Duration // graceful close (stdin closed) before SIGTERM; default 10s
+	Tick           time.Duration // transcript poll and housekeeping; default 1s
 	StatusDebounce time.Duration // default 100ms
 	// SlugTimeout bounds how long Create waits for the namer before naming a new
 	// worktree's branch after the session id. Default 6s.
@@ -100,11 +96,7 @@ type Options struct {
 	// grown for this long while its thread sits at the prompt stops being followed
 	// (six times longer for a background run). Default 10m.
 	AgentIdleClose time.Duration
-	// DefaultRender is the render mode of a thread Create makes without one (the
-	// sessions.render setting). Nil, or a result other than RenderRendered, means
-	// RenderTerminal.
-	DefaultRender func() Render
-	// CacheTTL is the prompt cache lifetime a rendered thread's CacheExpiresAt counts
+	// CacheTTL is the prompt cache lifetime a thread's CacheExpiresAt counts
 	// from its last result (the sessions.cache_ttl_seconds setting; SetCacheTTL changes
 	// it live). Default DefaultCacheTTL.
 	CacheTTL time.Duration
@@ -131,17 +123,11 @@ func (o Options) withDefaults() (Options, error) {
 		}
 		o.Paths = p
 	}
-	if o.NewDetector == nil {
-		o.NewDetector = NewStubDetector
-	}
 	if o.Namer == nil {
 		o.Namer = ClaudeNamer(o.Claude, "/tmp", o.Log)
 	}
 	if o.RefExists == nil {
 		o.RefExists = gitRefExists
-	}
-	if o.Cols == 0 || o.Rows == 0 {
-		o.Cols, o.Rows = 120, 40
 	}
 	def := func(d *time.Duration, v time.Duration) {
 		if *d <= 0 {
@@ -166,7 +152,7 @@ func (o Options) withDefaults() (Options, error) {
 	return o, nil
 }
 
-// Manager is the Store backed by SQLite and the terminal store.
+// Manager is the Store backed by SQLite.
 type Manager struct {
 	opts   Options
 	log    *slog.Logger
@@ -177,7 +163,7 @@ type Manager struct {
 	mu     sync.Mutex
 	recs   map[string]*record
 	closed bool
-	// viewers counts each rendered thread's item watchers (WatchItems).
+	// viewers counts each thread's item watchers (WatchItems).
 	viewers map[string]int
 	snap    atomic.Pointer[Snapshot]
 	// retired is the retired usage ledger (Snapshot.RetiredUsage). Copy on write.
@@ -185,16 +171,16 @@ type Manager struct {
 	// cacheTTL is the prompt cache lifetime (SetCacheTTL); guarded by mu.
 	cacheTTL time.Duration
 
-	// threads are the rendered threads' item logs loaded so far (items.go).
+	// threads are the threads' item logs loaded so far (items.go).
 	tmu     sync.Mutex
 	threads map[string]*threadLog
 }
 
 type record struct {
 	s           Session
-	run         *runner // non-nil while a terminal (or a rendered thread's process) belongs to the session
+	run         *runner // non-nil while a claude process belongs to the session
 	namingTried bool    // one naming call per session (per daemon run)
-	// first is a rendered thread's first prompt, handed to its runner by spawn.
+	// first is the thread's first prompt, handed to its runner by spawn.
 	first *outgoing
 }
 
@@ -327,14 +313,6 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 	if !o.PermissionMode.valid() {
 		return Session{}, fmt.Errorf("%w: permission mode %d", ErrInvalidArgument, o.PermissionMode)
 	}
-	if !o.Render.valid() {
-		return Session{}, fmt.Errorf("%w: render mode %d", ErrInvalidArgument, o.Render)
-	}
-	render := o.Render
-	if render == RenderDefault && m.opts.DefaultRender != nil {
-		render = m.opts.DefaultRender()
-	}
-	render = renderOrTerminal(render)
 	name, err := cleanName(o.Name, true)
 	if err != nil {
 		return Session{}, err
@@ -357,7 +335,6 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 	}
 	s := Session{
 		ID: id, Name: name, Model: o.Model, Effort: o.Effort, PermissionMode: o.PermissionMode, State: StateStarting,
-		Render: render,
 	}
 	namingTried := name != ""
 	var late <-chan namingResult
@@ -420,17 +397,17 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 		return Session{}, ErrClosed
 	}
 	rec := &record{s: s, namingTried: namingTried}
-	if render == RenderRendered && prompt != "" {
+	if prompt != "" {
 		// The prompt goes in as the first user message; the item keeps it as typed.
 		rec.first = &outgoing{text: strings.TrimSpace(o.InitialPrompt), composer: strings.TrimSpace(o.ComposerPrompt), attachments: attachments, prompt: prompt}
 	}
 	m.recs[id] = rec
 	m.mu.Unlock()
-	if err := m.spawn(ctx, id, launch{newID: cid}, prompt); err != nil {
+	if err := m.spawn(ctx, id, launch{newID: cid}); err != nil {
 		m.mu.Lock()
 		delete(m.recs, id)
 		m.tmu.Lock()
-		delete(m.threads, id) // a rendered thread's log, loaded by spawnStream
+		delete(m.threads, id) // the thread's log, loaded by spawnStream
 		m.tmu.Unlock()
 		m.mu.Unlock()
 		return Session{}, err
@@ -486,16 +463,19 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Session, error) {
 		ID: newID, RepoID: parent.RepoID, WorktreePath: parent.WorktreePath, WorkspaceID: parent.WorkspaceID,
 		Name: name, AutoNamed: autoNamed,
 		Model: parent.Model, Effort: parent.Effort, PermissionMode: parent.PermissionMode,
-		State: StateStarting, CreatedAt: now, LastActivityAt: now, ParentID: parent.ID, Render: parent.Render,
+		State: StateStarting, CreatedAt: now, LastActivityAt: now, ParentID: parent.ID,
 	}
 	m.mu.Lock()
 	// The fork's transcript starts with the copied history, so its first user
 	// message is the parent's: never auto-name a fork from it.
 	m.recs[newID] = &record{s: s, namingTried: true}
 	m.mu.Unlock()
-	if err := m.spawn(ctx, newID, launch{resume: parent.ClaudeSessionID, fork: true, newID: cid}, ""); err != nil {
+	if err := m.spawn(ctx, newID, launch{resume: parent.ClaudeSessionID, fork: true, newID: cid}); err != nil {
 		m.mu.Lock()
 		delete(m.recs, newID)
+		m.tmu.Lock()
+		delete(m.threads, newID)
+		m.tmu.Unlock()
 		m.mu.Unlock()
 		return Session{}, err
 	}
@@ -558,14 +538,15 @@ func (m *Manager) Reconnect(ctx context.Context, id string) (Session, error) {
 			r.namingTried = r.s.Name != ""
 		}
 	})
-	if err := m.spawn(ctx, id, l, ""); err != nil {
+	if err := m.spawn(ctx, id, l); err != nil {
 		return revert(err)
 	}
 	return m.Get(ctx, id)
 }
 
-// spawn starts claude for record id and its runner.
-func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string) error {
+// spawn starts claude for record id (claude -p over stream-json, stream.go) and its
+// runner. The record's first prompt, if any, is sent once the handshake succeeds.
+func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	m.mu.Lock()
 	rec, err := m.record(id)
 	if err != nil {
@@ -573,58 +554,40 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 		return err
 	}
 	s := rec.s
+	first := rec.first
+	rec.first = nil
 	m.mu.Unlock()
 
 	if !m.opts.DisablePreTrust {
 		if changed, err := trustWorktree(m.opts.Paths.Config, s.WorktreePath); err != nil {
-			m.log.Warn("pre-trust worktree failed; will answer the dialog instead", "session", id, "path", s.WorktreePath, "err", err)
+			m.log.Warn("pre-trust worktree failed", "session", id, "path", s.WorktreePath, "err", err)
 		} else if changed {
 			m.log.Info("pre-trusted worktree in claude config", "session", id, "path", realPath(s.WorktreePath))
 		}
 	}
 
 	r := newRunner(m, id, s.WorktreePath, l)
-	r.awaitFirstPrompt = prompt != ""
 	if s.ParentID != "" {
 		// A fork's transcript starts with a copy of its parent's records, billed to
 		// the parent; they keep their original times (usage.go).
 		r.usage.notBefore = s.CreatedAt
 	}
-	rendered := s.Render == RenderRendered
-	argv, env := m.claudeCommand(s, l, prompt, grants{})
-	if rendered {
-		return m.startStream(ctx, rec, r, argv, env)
+	argv, env := m.claudeCommand(s, l, grants{})
+	if err := m.spawnStream(ctx, rec, r, argv, env, first); err != nil {
+		return err
 	}
-	term, err := m.opts.Terminals.Create(ctx, terminal.Spec{
-		Argv:     argv,
-		Cwd:      s.WorktreePath,
-		Env:      env,
-		Cols:     m.opts.Cols,
-		Rows:     m.opts.Rows,
-		Labels:   map[string]string{termlabel.Session: id, termlabel.Worktree: s.WorktreePath},
-		Observer: r.observe,
-	})
-	if err != nil {
-		return fmt.Errorf("session %s: spawn claude: %w", id, err)
-	}
-	r.attach(term)
 	now := m.opts.Now()
 	m.mu.Lock()
 	rec.run = r
-	rec.s.TerminalID = term.ID
 	rec.s.State = StateStarting
-	// The fresh detector owns status from here: the persisted one is cleared.
+	// The fresh process owns status from here: the persisted one is cleared.
 	rec.s.setStatus(StatusUnknown, "", now)
 	rec.s.DisconnectReason, rec.s.ExitCode = "", 0
 	rec.s.LastActivityAt = now
 	m.commitLocked(rec, true)
 	m.wg.Add(1)
 	m.mu.Unlock()
-	logArgv := argv
-	if prompt != "" { // the prompt is the user's text: log its size, not its content
-		logArgv = append(slices.Clone(argv[:len(argv)-1]), fmt.Sprintf("<prompt: %d bytes>", len(prompt)))
-	}
-	m.log.Info("session spawned", "session", id, "terminal", term.ID, "pid", term.Pid, "argv", logArgv, "cwd", s.WorktreePath)
+	m.log.Info("session spawned", "session", id, "pid", r.st.proc.Pid(), "argv", argv, "cwd", s.WorktreePath)
 	go func() {
 		defer m.wg.Done()
 		r.run()
@@ -634,16 +597,12 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch, prompt string)
 
 // claudeCommand is the argv and environment of a claude spawn for s: its model,
 // effort and permission mode, the attachments dir and workspace members as --add-dir,
-// the workspace prompt and env. A rendered thread's prompt is never in argv (it is the
-// first user message). g is what the conversation's allow-for-session answers granted
-// (an effort restart's; a fresh spawn starts without).
-func (m *Manager) claudeCommand(s Session, l launch, prompt string, g grants) (argv, env []string) {
-	rendered := s.Render == RenderRendered
-	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode, prompt: prompt, rendered: rendered,
+// the workspace prompt and env. The prompt is never in argv (it is the first user
+// message). g is what the conversation's allow-for-session answers granted (an effort
+// restart's; a fresh spawn starts without).
+func (m *Manager) claudeCommand(s Session, l launch, g grants) (argv, env []string) {
+	sa := spawnArgs{model: s.Model, effort: s.Effort, perm: s.PermissionMode,
 		allowedTools: g.allow, disallowedTools: g.deny}
-	if rendered {
-		sa.prompt = "" // sent as the first user message instead
-	}
 	if m.opts.AttachmentsDir != "" {
 		// Every spawn (not only the first prompt's): a resumed or forked conversation
 		// may read its images again.
@@ -671,34 +630,6 @@ func (m *Manager) claudeCommand(s Session, l launch, prompt string, g grants) (a
 	}
 	sa.addDirs = append(sa.addDirs, g.dirs...)
 	return l.argv(m.opts.Claude, sa), env
-}
-
-// startStream is spawn's rendered half: claude over stdio, no terminal.
-func (m *Manager) startStream(ctx context.Context, rec *record, r *runner, argv, env []string) error {
-	m.mu.Lock()
-	first := rec.first
-	rec.first = nil
-	m.mu.Unlock()
-	if err := m.spawnStream(ctx, rec, r, argv, env, first); err != nil {
-		return err
-	}
-	now := m.opts.Now()
-	m.mu.Lock()
-	rec.run = r
-	rec.s.TerminalID = ""
-	rec.s.State = StateStarting
-	rec.s.setStatus(StatusUnknown, "", now)
-	rec.s.DisconnectReason, rec.s.ExitCode = "", 0
-	rec.s.LastActivityAt = now
-	m.commitLocked(rec, true)
-	m.wg.Add(1)
-	m.mu.Unlock()
-	m.log.Info("session spawned", "session", rec.s.ID, "render", "rendered", "pid", r.st.proc.Pid(), "argv", argv, "cwd", rec.s.WorktreePath)
-	go func() {
-		defer m.wg.Done()
-		r.run()
-	}()
-	return nil
 }
 
 // Rename sets a user-chosen name and disables auto-naming.
@@ -793,9 +724,9 @@ func (m *Manager) Remove(ctx context.Context, id string) error {
 	return nil
 }
 
-// Shutdown detaches every runner and records live sessions as DISCONNECTED
-// ("daemon stopped"). It does not end the processes: the terminal store, closed after
-// this, hangs them up. The Manager is unusable afterwards.
+// Shutdown stops every runner, which terminates its claude process (it talks to the
+// daemon over pipes and cannot outlive it), and records live sessions as DISCONNECTED
+// ("daemon stopped"). The Manager is unusable afterwards.
 func (m *Manager) Shutdown(ctx context.Context) error {
 	m.mu.Lock()
 	m.closed = true

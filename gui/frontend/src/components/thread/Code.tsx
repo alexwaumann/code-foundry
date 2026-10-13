@@ -40,7 +40,7 @@ export const CodeBlock = memo(function CodeBlock({ lang, code }: { lang: string;
 });
 
 /**
- * An image in a rendered thread's markdown with a local path: a staged attachment loads
+ * An image in a thread's markdown with a local path: a staged attachment loads
  * through ReadAttachment; anything else (a file in the worktree) shows as a chip with its path.
  */
 function LocalImage({ src, alt }: { src: string; alt: string }) {

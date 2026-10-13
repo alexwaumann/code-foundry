@@ -10,7 +10,7 @@ const status = { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untr
 const wt = (path: string, branch: string, isMain = false): WorktreeView => ({ repoId: "r1", path, branch, head: "abc", detached: false, isMain, status });
 const repo: RepoView = { id: "r1", path: "/src/cf", name: "cf", defaultBranch: "main", githubSlug: "Alex/CF", remotes: ["origin"], git: true, worktrees: [wt("/src/cf", "main", true), wt("/src/cf-fix", "fix/resize"), wt("/src/cf-nopr", "feat/nopr")] };
 const local: RepoView = { id: "r2", path: "/src/local", name: "local", defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [{ ...wt("/src/local", "main", true), repoId: "r2" }] };
-const session = (id: string, worktreePath: string): SessionView => ({ id, worktreePath, repoId: "r1", terminalId: "" }) as SessionView;
+const session = (id: string, worktreePath: string): SessionView => ({ id, worktreePath, repoId: "r1" }) as SessionView;
 
 const stores: SelectionStores = {
   repos: { byId: { r1: repo, r2: local }, order: ["r1", "r2"] },
