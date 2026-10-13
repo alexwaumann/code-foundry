@@ -1,4 +1,5 @@
 import { formatUptime } from "@/lib/format";
+import { displayVersion } from "@/lib/update";
 import { cn } from "@/lib/utils";
 import { useEventsStore } from "@/stores/events";
 import { useHealthStore } from "@/stores/health";
@@ -21,7 +22,8 @@ function useDegradedStreams(): string {
 export function DaemonStatus() {
   const status = useHealthStore((s) => s.status);
   const pid = useHealthStore((s) => s.health?.pid);
-  const version = useHealthStore((s) => s.health?.version);
+  const rawVersion = useHealthStore((s) => s.health?.version);
+  const version = rawVersion && displayVersion(rawVersion);
   const uptime = useHealthStore((s) => s.health?.uptimeSeconds);
   const error = useHealthStore((s) => s.error);
   const degraded = useDegradedStreams();

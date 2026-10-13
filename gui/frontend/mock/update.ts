@@ -20,6 +20,7 @@ interface MockStatus {
   enabled: boolean;
   disabledReason: string;
   releaseRepo: string;
+  channel: string;
   checking: boolean;
   lastCheckedAt: Date | null;
   lastCheckError: string;
@@ -96,6 +97,7 @@ export class MockUpdater {
       enabled: true,
       disabledReason: "",
       releaseRepo: REPO,
+      channel: "stable",
       checking: false,
       lastCheckedAt: null,
       lastCheckError: "",

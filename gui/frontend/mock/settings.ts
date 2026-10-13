@@ -28,6 +28,7 @@ export const groups: GroupInit[] = [
   { id: "gitops", title: "Git operations", description: "How worktrees are handed to other apps." },
   { id: "appearance", title: "Appearance", description: "Theme, terminal font, density, and backdrop. Applied live in every window." },
   { id: "keybindings", title: "Keybindings", description: 'Override a command\'s chord, or "none" to unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) cannot be bound.' },
+  { id: "update", title: "Updates", description: "Which releases the app checks for and offers to install." },
   { id: "advanced", title: "Advanced", description: "Executables and logging." },
 ];
 
@@ -84,6 +85,7 @@ const staticFields: FieldInit[] = [
   { key: "appearance.density", group: "appearance", type: S.ENUM, title: "Density", description: "Row height and spacing in the sidebar and lists.", enumValues: ["compact", "comfortable"], defaultValue: "compact" },
   { key: "appearance.thread_width", group: "appearance", type: S.ENUM, title: "Thread width", description: "Column width of a thread's conversation and composer.", enumValues: ["compact", "comfortable", "full"], defaultValue: "comfortable" },
   { key: "appearance.backdrop", group: "appearance", type: S.ENUM, title: "Backdrop", description: "Faint artwork behind the start page and the new-thread composer.", enumValues: ["forest", "none"], defaultValue: "forest" },
+  { key: "update.channel", group: "update", type: S.ENUM, title: "Channel", description: "Stable is a build promoted on purpose; tip is the newest build of main, published on every push.", enumValues: ["stable", "tip"], enumLabels: ["Stable", "Tip"], defaultValue: "stable" },
   { key: "advanced.claude_path", group: "advanced", type: S.PATH, title: "claude executable", description: "Absolute path to claude. Empty finds it on PATH.", defaultValue: "", placeholder: "claude (from PATH)", restartRequired: true },
   { key: "advanced.gh_path", group: "advanced", type: S.PATH, title: "gh executable", description: "Absolute path to gh. Empty finds it on PATH.", defaultValue: "", placeholder: "gh (from PATH)", restartRequired: true },
   { key: "advanced.log_level", group: "advanced", type: S.ENUM, title: "Log level", description: "Minimum level written to the daemon's log file.", enumValues: ["debug", "info", "warn", "error"], defaultValue: "info" },

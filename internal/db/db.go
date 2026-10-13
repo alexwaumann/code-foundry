@@ -134,7 +134,10 @@ func migrationVersion(name string) (int, error) {
 
 // Migrate applies every migration in fsys whose version is not yet recorded in
 // schema_migrations. Each migration runs in its own transaction with its bookkeeping
-// row, so a failure leaves the database at the previous version.
+// row, so a failure leaves the database at the previous version. A database that
+// records versions above the highest in fsys was migrated by a newer build and is
+// refused with ErrNewerSchema (e.g. an older tarball reinstalled by hand after the tip
+// channel ran a new migration).
 func Migrate(ctx context.Context, db *sql.DB, fsys fs.FS) error {
 	migrations, err := LoadMigrations(fsys)
 	if err != nil {
@@ -151,6 +154,9 @@ func Migrate(ctx context.Context, db *sql.DB, fsys fs.FS) error {
 	if err != nil {
 		return err
 	}
+	if err := checkUnknown(applied, migrations); err != nil {
+		return err
+	}
 	for _, m := range migrations {
 		if applied[m.Version] {
 			continue
@@ -160,6 +166,41 @@ func Migrate(ctx context.Context, db *sql.DB, fsys fs.FS) error {
 		}
 	}
 	return nil
+}
+
+// ErrNewerSchema means the database was migrated by a newer build: schema_migrations
+// records versions above the highest one this build embeds. Opening it anyway would
+// fail later at query time if one of them dropped or reshaped something.
+var ErrNewerSchema = errors.New("database was last opened by a newer Code Foundry")
+
+// checkUnknown refuses a database whose schema_migrations records versions above the
+// highest embedded one (a newer build's migrations), naming them. Unknown versions
+// below the maximum are left alone: they cannot come from a newer build.
+func checkUnknown(applied map[int]bool, migrations []Migration) error {
+	highest := 0
+	if n := len(migrations); n > 0 {
+		highest = migrations[n-1].Version
+	}
+	var unknown []int
+	for v := range applied {
+		if v > highest {
+			unknown = append(unknown, v)
+		}
+	}
+	if len(unknown) == 0 {
+		return nil
+	}
+	sort.Ints(unknown)
+	vs := make([]string, len(unknown))
+	for i, v := range unknown {
+		vs[i] = strconv.Itoa(v)
+	}
+	noun := "migrations"
+	if len(unknown) == 1 {
+		noun = "migration"
+	}
+	return fmt.Errorf("db: %w (%s %s unknown to this build, which knows up to %d); reinstall the newer build",
+		ErrNewerSchema, noun, strings.Join(vs, ", "), highest)
 }
 
 func appliedVersions(ctx context.Context, db *sql.DB) (map[int]bool, error) {

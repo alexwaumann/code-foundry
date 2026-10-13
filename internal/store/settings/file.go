@@ -26,6 +26,21 @@ import (
 // rendered file documents every field and shows its default) and no trailing-comma or
 // quoting traps. BurntSushi/toml was already in the module graph (via Wails).
 
+// Read returns the settings in the file at path without opening a store: no watcher,
+// and a missing file is not created. A missing or unparsable file yields the defaults,
+// and rejected values fall back to theirs. For CLI verbs that run without the daemon.
+func Read(path string) Settings {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Defaults()
+	}
+	raw, err := decode(data)
+	if err != nil {
+		return Defaults()
+	}
+	return resolve(raw, nil).settings
+}
+
 // decode parses a settings file into raw string-encoded values keyed by settings key.
 // Values are stringified leniently (14 and "14" both work for an int); type errors are
 // found by Field.parse. Under [keybindings], unquoted dotted keys (session.new = ...)

@@ -15,6 +15,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/session"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
+	"github.com/alexwaumann/code-foundry/internal/store/update"
 )
 
 func TestWorktreePath(t *testing.T) {
@@ -214,6 +215,36 @@ func TestApplyCacheTTL(t *testing.T) {
 			}
 			if !slices.Equal(rec.got, tt.want) {
 				t.Errorf("SetCacheTTL calls = %v, want %v", rec.got, tt.want)
+			}
+		})
+	}
+}
+
+type channelRecorder struct{ got []update.Channel }
+
+func (r *channelRecorder) SetChannel(ch update.Channel) { r.got = append(r.got, ch) }
+
+func TestApplyUpdateChannel(t *testing.T) {
+	tests := []struct {
+		name   string
+		update string
+		want   []update.Channel
+	}{
+		{name: "stable at once by default", want: []update.Channel{update.ChannelStable}},
+		{name: "switching to tip applies live", update: "tip", want: []update.Channel{update.ChannelStable, update.ChannelTip}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := openSettings(t)
+			rec := &channelRecorder{}
+			applyUpdateChannel(st, rec)
+			if tt.update != "" {
+				if _, err := st.Update(context.Background(), map[string]string{settings.KeyUpdateChannel: tt.update}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if !slices.Equal(rec.got, tt.want) {
+				t.Errorf("SetChannel calls = %v, want %v", rec.got, tt.want)
 			}
 		})
 	}

@@ -3,6 +3,9 @@ import { UpdateState, type UpdateEvent, type UpdateStatus } from "@/gen/codefoun
 
 export type UpdateStateView = "idle" | "available" | "downloading" | "installed" | "restartRequired" | "failed";
 
+/** The release channel the updater follows (the update.channel setting). */
+export type UpdateChannel = "stable" | "tip";
+
 /** codefoundry.v1.UpdateStatus as the GUI sees it. */
 export interface UpdateStatusView {
   state: UpdateStateView;
@@ -11,9 +14,12 @@ export interface UpdateStatusView {
   enabled: boolean;
   disabledReason: string;
   releaseRepo: string;
+  /** The channel checks follow; "stable" from a daemon that predates channels. */
+  channel: UpdateChannel;
   checking: boolean;
   lastCheckedAt: Date | null;
   lastCheckError: string;
+  /** The channel's latest release; may be older than currentVersion on stable after a switch from tip. */
   latestVersion: string;
   /** The version available / installing / installed / failed. */
   targetVersion: string;
@@ -41,6 +47,7 @@ export function toUpdateStatusView(s: UpdateStatus): UpdateStatusView {
     enabled: s.enabled,
     disabledReason: s.disabledReason,
     releaseRepo: s.releaseRepo,
+    channel: s.channel === "tip" ? "tip" : "stable",
     checking: s.checking,
     lastCheckedAt: s.lastCheckedAt ? timestampDate(s.lastCheckedAt) : null,
     lastCheckError: s.lastCheckError,

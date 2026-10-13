@@ -16,6 +16,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/session"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
+	"github.com/alexwaumann/code-foundry/internal/store/update"
 )
 
 // Settings consumers. Values the stores read only at start (intervals, scrollback,
@@ -34,6 +35,8 @@ import (
 //   - editor command -> gitops' Editor func (stores.go), read on every open.
 //   - github.poll_interval_seconds and github.dashboards_enabled -> the gh store's
 //     Config func (stores.go), read before every poll.
+//   - update.channel -> update.Store.SetChannel on every change (applyUpdateChannel),
+//     which re-checks at once when the channel changed.
 
 // applySettings tells the settings store which commands exist (enabling keybinding
 // fields and validation) and keeps the registry and log level in sync with it. The
@@ -163,4 +166,13 @@ type cacheTTLSetter interface{ SetCacheTTL(time.Duration) }
 // sessions.cache_ttl_seconds, now and on every settings change.
 func applyCacheTTL(st *settings.Store, sessions cacheTTLSetter) {
 	st.OnChange(func(snap *settings.Snapshot) { sessions.SetCacheTTL(snap.Settings.CacheTTL()) })
+}
+
+// updateChannelSetter is the updater's live channel (*update.Store).
+type updateChannelSetter interface{ SetChannel(update.Channel) }
+
+// applyUpdateChannel keeps the updater on update.channel, now and on every settings
+// change; SetChannel re-checks in the background when the channel changed.
+func applyUpdateChannel(st *settings.Store, u updateChannelSetter) {
+	st.OnChange(func(snap *settings.Snapshot) { u.SetChannel(update.ParseChannel(snap.Settings.Update.Channel)) })
 }

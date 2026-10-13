@@ -3,8 +3,6 @@ package update_test
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -365,19 +363,5 @@ func TestDefaultOptions(t *testing.T) {
 				t.Fatalf("%+v", o)
 			}
 		})
-	}
-}
-
-func TestDirSource(t *testing.T) {
-	dir := t.TempDir()
-	s := update.DirSource{Dir: dir}
-	if _, err := s.Latest(context.Background()); !errors.Is(err, update.ErrNoRelease) {
-		t.Fatalf("missing latest: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "latest"), []byte("v0.3.0\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if tag, err := s.Latest(context.Background()); err != nil || tag != "v0.3.0" {
-		t.Fatalf("Latest = %q, %v", tag, err)
 	}
 }

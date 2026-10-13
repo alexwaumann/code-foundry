@@ -9,6 +9,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/alexwaumann/code-foundry/internal/store/update"
 )
 
 // UpdateBackend is the slice of UpdateService the app.* commands need, in generated
@@ -42,9 +43,11 @@ type AppVersion struct {
 	Version     string `json:"version"`
 	Commit      string `json:"commit,omitempty"`
 	ReleaseRepo string `json:"release_repo,omitempty"`
-	Update      string `json:"update"`
-	Latest      string `json:"latest,omitempty"`
-	Target      string `json:"target,omitempty"`
+	// Channel is the release channel the updater follows: "stable" or "tip".
+	Channel string `json:"channel,omitempty"`
+	Update  string `json:"update"`
+	Latest  string `json:"latest,omitempty"`
+	Target  string `json:"target,omitempty"`
 }
 
 // DaemonRestart is daemon.restart's JSON result.
@@ -107,7 +110,29 @@ func UpdateSummary(st *v1.UpdateStatus) string {
 	if st.GetLastCheckedAt() == nil {
 		return "not checked yet"
 	}
+	if note := olderStable(st); note != "" {
+		return "up to date; " + note
+	}
 	return "up to date"
+}
+
+// olderStable explains an up-to-date status on the stable channel whose latest stable
+// release is older than the running build (after a switch from tip): "stable v0.14.41
+// is older than this build; the next stable release will move you". "" otherwise.
+func olderStable(st *v1.UpdateStatus) string {
+	latest := st.GetLatestVersion()
+	if st.GetChannel() != string(update.ChannelStable) || !update.Newer(st.GetCurrentVersion(), latest) {
+		return ""
+	}
+	return "stable " + latest + " is older than this build; the next stable release will move you"
+}
+
+// channelSuffix is " (tip channel)" for an enabled updater, "" otherwise.
+func channelSuffix(st *v1.UpdateStatus) string {
+	if !st.GetEnabled() || st.GetChannel() == "" {
+		return ""
+	}
+	return " (" + st.GetChannel() + " channel)"
 }
 
 // LiveSessions counts sessions with a running process (everything but disconnected):
@@ -179,9 +204,9 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 				}
 				summary := UpdateSummary(st)
 				return Result{
-					Message: msg + "; " + summary,
+					Message: msg + "; " + summary + channelSuffix(st),
 					JSON: AppVersion{
-						Version: v.Version, Commit: v.Commit, ReleaseRepo: st.GetReleaseRepo(),
+						Version: v.Version, Commit: v.Commit, ReleaseRepo: st.GetReleaseRepo(), Channel: st.GetChannel(),
 						Update: summary, Latest: st.GetLatestVersion(), Target: st.GetTargetVersion(),
 					},
 				}, nil
@@ -201,7 +226,11 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 				msg := UpdateSummary(st)
 				if st.GetState() == v1.UpdateState_UPDATE_STATE_IDLE {
 					msg = "Code Foundry " + st.GetCurrentVersion() + " is up to date"
+					if note := olderStable(st); note != "" {
+						msg += "; " + note
+					}
 				}
+				msg += channelSuffix(st)
 				return Result{Message: msg, JSON: st}, nil
 			},
 		},

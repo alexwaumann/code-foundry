@@ -105,6 +105,9 @@ func Run(ctx context.Context, opts Options) error {
 
 	st, err := openStores(ctx, log, p, sessionEnv(port, token))
 	if err != nil {
+		// In the log file too: an auto-started daemon's stderr goes nowhere a user
+		// looks (db.ErrNewerSchema, say, after reinstalling an older build).
+		log.Error("daemon cannot start", "err", err)
 		return err
 	}
 	defer func() { _ = st.close() }() // after the servers have shut down

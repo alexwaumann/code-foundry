@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -114,6 +115,59 @@ func TestMigrateFailureRollsBack(t *testing.T) {
 	defer func() { _ = db.Close() }()
 	if got := values(t, db); strings.Join(got, ",") != "fixed" {
 		t.Fatalf("values = %v; the failed migration's insert should have rolled back", got)
+	}
+}
+
+// TestMigrateRefusesNewerSchema: a database migrated by a newer build (versions above
+// the highest embedded one) is refused, naming the versions; unknown versions below the
+// maximum are not a newer build's and are left alone.
+func TestMigrateRefusesNewerSchema(t *testing.T) {
+	fsys := fstest.MapFS{
+		"0001_a.sql": {Data: []byte(`CREATE TABLE t (v TEXT);`)},
+		"0003_c.sql": {Data: []byte(`INSERT INTO t (v) VALUES ('third');`)},
+	}
+	tests := []struct {
+		name    string
+		extra   []int // schema_migrations rows a newer build left behind
+		wantErr string
+	}{
+		{"none", nil, ""},
+		{"gap below the maximum", []int{2}, ""},
+		{"one newer", []int{4}, "db: database was last opened by a newer Code Foundry (migration 4 unknown to this build, which knows up to 3); reinstall the newer build"},
+		{"several newer, sorted", []int{8, 2, 7}, "db: database was last opened by a newer Code Foundry (migrations 7, 8 unknown to this build, which knows up to 3); reinstall the newer build"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			path := filepath.Join(t.TempDir(), "db.sqlite")
+			db, err := OpenWith(ctx, path, fsys)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, v := range tt.extra {
+				if _, err := db.ExecContext(ctx, `INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, 'newer.sql', 1)`, v); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := db.Close(); err != nil {
+				t.Fatal(err)
+			}
+			db, err = OpenWith(ctx, path, fsys)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("reopen: %v", err)
+				}
+				_ = db.Close()
+				return
+			}
+			if err == nil {
+				_ = db.Close()
+				t.Fatal("reopen succeeded; want a refusal")
+			}
+			if !errors.Is(err, ErrNewerSchema) || err.Error() != tt.wantErr {
+				t.Fatalf("err = %q, want %q", err, tt.wantErr)
+			}
+		})
 	}
 }
 
