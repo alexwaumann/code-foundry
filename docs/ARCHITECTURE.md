@@ -126,7 +126,8 @@ Services (v1):
   unarchive; `docs/notes/archive-threads-1-daemon.md`), Watch (server stream), StageAttachment (images the first prompt refers to). Create can
   make the worktree first (`new_worktree`), start a thread in a workspace member
   (`workspace_id`) or in a new workspace (`new_workspace`), or without a project in the
-  home directory (`no_project`; `docs/notes/no-project-1-daemon.md`), sends the first prompt as
+  home directory (`no_project`; `docs/notes/no-project-1-daemon.md`; the GUI's "No
+  project" picker row and composer: `docs/notes/no-project-2-gui.md`), sends the first prompt as
   the thread's first user message, and carries a permission mode (never
   bypassPermissions); see `docs/notes/new-thread-composer.md` and
   `docs/notes/workspaces-2-launch.md`. Every thread runs headless (`claude -p` over
