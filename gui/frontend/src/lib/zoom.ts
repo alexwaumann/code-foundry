@@ -5,8 +5,8 @@
  * standardized zoom model), so every px and rem value grows with it. Two things do not:
  * viewport units (100vh is still the whole window, so zoomed it overflows; the app root
  * uses a 100% height chain and the few vh offsets divide by --cf-zoom, index.css), and
- * canvas backing stores (the terminal pane undoes the zoom on its host and scales the
- * font instead, components/terminal/TerminalPane.tsx). The native traffic lights are
+ * canvas backing stores (a terminal host undoes the zoom on itself and scales the
+ * font instead, components/terminal/TerminalHost.tsx). The native traffic lights are
  * outside the page: the Wails host re-centres them on the zoomed band (api/app.ts
  * setHostZoom, gui/trafficlights_darwin.go). Radix floating surfaces position themselves in
  * viewport px: their wrapper undoes the zoom and their content zooms back (index.css,

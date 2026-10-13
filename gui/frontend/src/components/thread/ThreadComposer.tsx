@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Ref } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ArrowUp, Brain, Gauge, Loader2, Paperclip, RotateCcw, ShieldCheck } from "lucide-react";
 import { ATTACHMENT_MIME_TYPES } from "@/api/session";
@@ -57,8 +57,12 @@ function useThreadSources(sessionId: string) {
   }, [repoId, worktreePath, memberKeys]);
 }
 
-/** A disconnected thread's composer: what happened, and Reconnect. */
-function Reconnect({ sessionId }: { sessionId: string }) {
+/**
+ * A disconnected thread's composer: what happened, and Reconnect. The button takes the
+ * focus requests the prompt would (`ref`); once the thread reconnects the prompt takes
+ * the keyboard.
+ */
+function Reconnect({ sessionId, ref }: { sessionId: string; ref: Ref<HTMLButtonElement> }) {
   const cause = useSessionsStore((s) => {
     const x = s.byId[sessionId];
     return x ? disconnectCause(x) : "";
@@ -71,13 +75,16 @@ function Reconnect({ sessionId }: { sessionId: string }) {
       </p>
       <div className="pr-2">
         <button
+          ref={ref}
           type="button"
           className="btn primary"
           disabled={busy}
+          data-testid="reconnect"
           onClick={() => {
             setBusy(true);
-            void reconnectSession(sessionId).finally(() => {
+            void reconnectSession(sessionId).then((ok) => {
               setBusy(false);
+              if (ok) useUiStore.setState((u) => ({ promptFocusSeq: u.promptFocusSeq + 1 }));
             });
           }}
         >
@@ -117,6 +124,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
   const modelGroups = useMemo(() => [{ options: modelChoices }], [modelChoices]);
   const sources = useThreadSources(sessionId);
   const editorRef = useRef<PromptEditorHandle>(null);
+  const reconnectRef = useRef<HTMLButtonElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [trigger, setTrigger] = useState<EditorTrigger | null>(null);
@@ -132,8 +140,8 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
   }, [sources.skills]);
 
   // Focus requests for the content pane (a thread selected, the side panel hid) land in
-  // the prompt, as they would in a terminal.
-  const focusSeq = useUiStore((s) => s.terminalFocusSeq);
+  // the prompt (a disconnected thread's: its Reconnect button).
+  const focusSeq = useUiStore((s) => s.promptFocusSeq);
   const contentFocusSeq = useUiStore((s) => s.contentFocusSeq);
   const seen = useRef({ focusSeq, contentFocusSeq });
   useEffect(() => {
@@ -142,7 +150,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
     if (!asked && useUiStore.getState().focus === "bottom") return;
     const panel = getPanel();
     if (panel.open && panel.expanded) return;
-    const raf = requestAnimationFrame(() => editorRef.current?.focus());
+    const raf = requestAnimationFrame(() => (editorRef.current ?? reconnectRef.current)?.focus());
     return () => {
       cancelAnimationFrame(raf);
     };
@@ -168,7 +176,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
     editorRef.current?.focus();
   }, [sending]);
 
-  if (state === "disconnected") return <Reconnect sessionId={sessionId} />;
+  if (state === "disconnected") return <Reconnect sessionId={sessionId} ref={reconnectRef} />;
 
   const send = () => {
     if (canSend) void sendThreadDraft(sessionId);

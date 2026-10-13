@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Composer } from "@/components/compose/Composer";
 import { AddProjectDialog } from "@/components/addproject/AddProjectDialog";
 import { BottomPanel } from "@/components/bottom/BottomPanel";
@@ -11,10 +11,9 @@ import { UsagePage } from "@/components/usage/UsagePage";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { ProjectsPage } from "@/components/projects/ProjectsPage";
 import { PullRequestsPage } from "@/components/prs/PullRequestsPage";
-import { SessionDisconnected } from "@/components/session/SessionParts";
 import { SidePanel } from "@/components/panel/SidePanel";
 import { Sidebar } from "@/components/sidebar/Sidebar";
-import { TerminalPane } from "@/components/terminal/TerminalPane";
+import { ThreadPane } from "@/components/thread/ThreadPane";
 import { Toaster } from "@/components/ui/sonner";
 import { UpdateDialog } from "@/components/update/UpdateDialog";
 import { installKeybindings } from "@/keys/bindings";
@@ -25,24 +24,22 @@ import { startCommandSync } from "@/stores/commands";
 import { startEventSync } from "@/stores/events";
 import { startHealthPolling } from "@/stores/health";
 import { usePanelExpanded } from "@/stores/panel";
-import { useAttentionCount, useSessionsStore } from "@/stores/sessions";
+import { useAttentionCount } from "@/stores/sessions";
 import { layoutWidth, startZoomSync, zoomFactor } from "@/lib/zoom";
 import { CONTENT_MIN, useUiStore, type FocusRegion } from "@/stores/ui";
 import { selectPageOpen, startViewSync, useViewsStore } from "@/stores/views";
 import { startUpdateSync } from "@/stores/update";
 
-/** A rendered thread's pane, loaded on first use (markdown highlighting stays out of the main bundle). */
-const ThreadPane = lazy(() => import("@/components/thread/ThreadPane"));
-
 function regionOf(el: EventTarget | null): FocusRegion {
   const region = el instanceof Element ? el.closest("[data-region]")?.getAttribute("data-region") : null;
-  return region === "sidebar" || region === "terminal" || region === "palette" || region === "panel" || region === "bottom" ? region : "content";
+  return region === "sidebar" || region === "palette" || region === "panel" || region === "bottom" ? region : "content";
 }
 
 /**
  * Starts the daemon sync and global listeners; returns one stop function. Long-lived
- * connections: one EventService.Watch (all slices) plus an Attach for the content pane's
- * terminal and one for the bottom panel's active terminal, each only while visible.
+ * connections: one EventService.Watch (all slices) plus the selected thread's
+ * ThreadService.Watch (components/thread) and an Attach for the bottom panel's active
+ * shell, each only while visible.
  */
 function startApp(): () => void {
   const onFocusIn = (e: FocusEvent) => {
@@ -74,38 +71,25 @@ function startApp(): () => void {
 }
 
 /**
- * Exactly one thing fills the content area. A session shows its live terminal when it
- * has one, otherwise the "Not connected" panel; a rendered thread shows its conversation
- * (components/thread), connected or not; "compose" is the new-thread composer.
- * TerminalPane stays mounted across thread switches (same element position), so its
- * renderer is reused. Shells never show here: they live in the bottom panel.
+ * Exactly one thing fills the content area. A session shows its conversation
+ * (components/thread), connected or not; "compose" is the new-thread composer. Shells
+ * never show here: they live in the bottom panel.
  */
 function Content() {
   const sel = useUiStore((s) => s.selection);
-  const sessionTerminal = useSessionsStore((s) => (sel.kind === "session" ? s.byId[sel.id]?.terminalId || null : null));
-  const rendered = useSessionsStore((s) => sel.kind === "session" && s.byId[sel.id]?.render === "rendered");
   if (sel.kind === "view" && sel.name === "dashboard") return <StartPage />;
   if (sel.kind === "view" && sel.name === "pullrequests") return <PullRequestsPage />;
   if (sel.kind === "view" && sel.name === "projects") return <ProjectsPage />;
   if (sel.kind === "compose") return <Composer key={sel.workspaceId ? `ws:${sel.workspaceId}` : sel.repoId} repoId={sel.repoId} workspaceId={sel.workspaceId} />;
-  if (sel.kind === "session" && rendered) {
-    return (
-      <Suspense fallback={null}>
-        <ThreadPane sessionId={sel.id} />
-      </Suspense>
-    );
-  }
-  if (sel.kind === "session") {
-    return sessionTerminal ? <TerminalPane terminalId={sessionTerminal} sessionId={sel.id} /> : <SessionDisconnected id={sel.id} />;
-  }
+  if (sel.kind === "session") return <ThreadPane sessionId={sel.id} />;
   return <StartPage />;
 }
 
 /**
- * The content pane: the page or terminal the selection shows. On a focus request (ui
+ * The content pane: the page or thread the selection shows. On a focus request (ui
  * contentFocusSeq) it focuses the page's `[data-focus-root]` element (a page's keyboard
- * list or its root section); a terminal answers the same request itself (TerminalPane),
- * and has no focus root.
+ * list or its root section); a thread answers the same request itself (its prompt,
+ * ThreadComposer), and has no focus root.
  */
 function ContentPane({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLElement>(null);
@@ -153,9 +137,8 @@ function useColumnHeight(ref: RefObject<HTMLElement | null>, hidden: boolean): n
 /**
  * The content column: the content pane and, under it, the selection's bottom terminal
  * panel (components/bottom), the same width, 8px apart. Hidden (display: none), not
- * unmounted, while the side panel is expanded over it: the terminal keeps its Attach
- * stream and xterm state, and its fit skips the zero-size host (terminal/xterm.ts). The
- * bottom panel unmounts then (its terminal detaches).
+ * unmounted, while the side panel is expanded over it: the thread keeps its Watch and
+ * scroll position. The bottom panel unmounts then (its terminal detaches).
  */
 function ContentColumn({ hidden, children }: { hidden: boolean; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -192,8 +175,8 @@ export function App() {
     // (components/window/titleBand.ts): the sidebar's top band and the pane headers fill it.
     <div className="relative flex h-full flex-col overflow-hidden bg-sheet text-foreground">
       {/* The sheet above the panes drags the window too (as the sidebar band and the pane
-          headers do), so a page without a header (dashboard, composer, a disconnected
-          thread) still has a drag surface when the sidebar is hidden. */}
+          headers do), so a page without a header (dashboard, composer) still has a drag
+          surface when the sidebar is hidden. */}
       <div className="absolute inset-x-0 top-0 h-2 [--wails-draggable:drag]" data-testid="window-drag-edge" aria-hidden />
       <div className="flex min-h-0 flex-1">
         <Sidebar />

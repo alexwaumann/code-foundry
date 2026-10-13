@@ -306,7 +306,7 @@ function Panel({
         >
           {/* One host for every tab: switching tabs re-attaches the same xterm. Hidden
               (and detached) while there is no tab. */}
-          <TerminalHost ref={hostRef} name="bottom" terminalId={activeId} hidden={activeId === null} testId="bottom-terminal-host" />
+          <TerminalHost ref={hostRef} terminalId={activeId} hidden={activeId === null} testId="bottom-terminal-host" />
           {activeId === null && <EmptyState panelKey={panelKey} />}
         </div>
       </aside>
