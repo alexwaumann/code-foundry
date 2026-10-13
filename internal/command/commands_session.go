@@ -251,7 +251,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				for _, s := range res.Msg.GetSessions() {
 					// The status and its reason persist once disconnected (a thread that
 					// was asking a question still is); the state cell says why it is.
-					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), s.GetName(), listState(s),
+					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), cmp.Or(s.GetName(), "-"), listState(s),
 						listStatus(s), cmp.Or(s.GetStatusReason(), "-"), cmp.Or(s.GetWorkspaceId(), "-"), linkedPRs(s),
 						listContext(s, now), s.GetWorktreePath())
 				}

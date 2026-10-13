@@ -166,6 +166,12 @@ func TestSessionCommands(t *testing.T) {
 			current: &v1.Session{Id: "s4", Name: "p", State: v1.SessionState_SESSION_STATE_CONNECTED, LinkedPullRequests: []*v1.LinkedPullRequest{
 				{Slug: "o/api", Number: 5, Url: "https://github.com/o/api/pull/5"}, {Slug: "o/web", Number: 2, Url: "https://github.com/o/web/pull/2"}}},
 			wantIn: []string{"s4", "p", "connected", "unspecified", "-", "-", "api#5,web#2"}},
+		{name: "list shows a natural name as typed", cmd: "session.list",
+			current: &v1.Session{Id: "s7", Name: "Fix the login redirect", State: v1.SessionState_SESSION_STATE_CONNECTED},
+			wantIn:  []string{"s7", "Fix", "the", "login", "redirect", "connected"}},
+		{name: "list shows a dash for an unnamed thread", cmd: "session.list",
+			current: &v1.Session{Id: "s8", State: v1.SessionState_SESSION_STATE_CONNECTED},
+			wantIn:  []string{"s8", "-", "connected"}},
 		{name: "list shows an expired cache", cmd: "session.list",
 			current: &v1.Session{Id: "s6", Name: "r", State: v1.SessionState_SESSION_STATE_CONNECTED, ContextTokens: 25_700,
 				CacheExpiresAt: timestamppb.New(time.Unix(1, 0)), WorktreePath: "/wt/r"},
