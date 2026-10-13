@@ -40,7 +40,7 @@ cd gui && wails3 dev   # GUI with hot reload (needs a running daemon or auto-sta
 - TypeScript strict, React 19, Tailwind v4, shadcn/ui, Zustand, cmdk, @xterm/xterm.
 - Generated protobuf types are used only in `src/api/`. Map to view models there.
 - Narrow selectors. Virtualize lists. No component subscribes to a whole slice.
-- Only the visible terminal and the visible bottom shell are attached to a `TerminalService.Attach` stream.
+- Only the visible thread holds a `ThreadService.Watch` stream and only the visible bottom shell a `TerminalService.Attach` stream.
 
 ## Verification
 
