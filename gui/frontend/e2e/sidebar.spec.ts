@@ -381,11 +381,11 @@ test("status kinds: each thread's second line says its status in words and colou
     await expect(r.getByTestId("row-status"), id).toHaveClass(tone);
   }
   // Working and idle rows say where they run; prompts and finished turns do not.
-  await expect(row(page, "s:s-k-busy").getByTestId("row-place")).toHaveText("Working · code-foundry · main");
+  await expect(row(page, "s:s-k-busy").getByTestId("row-place")).toHaveText("Working · code-foundry @ main");
   const idle = row(page, "s:s-k-idle");
   await expect(idle.getByTestId("row-place")).toHaveAttribute("data-status-line", "place");
   await expect(idle.getByTestId("row-status")).toHaveCount(0);
-  await expect(idle.getByTestId("row-place")).toHaveText("code-foundry · main");
+  await expect(idle.getByTestId("row-place")).toHaveText("code-foundry @ main");
   await expect(row(page, "s:s-k-question").getByTestId("row-project")).toHaveCount(0);
   // Offline rows are dimmed, the rest are not; the name is never coloured by status.
   for (const id of ["s-k-interrupted", "s-k-asked-before-restart"]) await expect(row(page, `s:${id}`).getByTestId("session-body"), id).toHaveAttribute("data-offline", "true");
