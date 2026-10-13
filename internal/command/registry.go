@@ -134,7 +134,8 @@ func (r *Registry) Get(name string) (Command, bool) {
 // it. Errors wrap ErrUnknownCommand, ErrInvalidArgs (*ArgError), or ErrUnavailable;
 // anything else comes from Run. Checks run in this order: name, arg syntax,
 // availability (with explicit context-bound args overlaid), required args,
-// confirmation (*ConfirmError unless Confirmed(true) for a command with Confirm). Run
+// confirmation (*ConfirmError unless Confirmed(true) for a command with Confirm whose
+// ConfirmIf, if any, says this call needs it). Run
 // sees the overlaid context.
 func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw map[string]string, opts ...InvokeOption) (Result, error) {
 	var o invokeOptions
@@ -160,7 +161,7 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 	if err := checkRequired(c.Args, args); err != nil {
 		return Result{}, fmt.Errorf("%s: %w", name, err)
 	}
-	if c.Confirm != "" && !o.confirmed {
+	if c.Confirm != "" && !o.confirmed && (c.ConfirmIf == nil || c.ConfirmIf(ctx, eff, args)) {
 		msg := renderConfirm(c.Confirm, c.Args, args)
 		if c.DynamicConfirm != nil {
 			if m := c.DynamicConfirm(ctx, eff, args); m != "" {

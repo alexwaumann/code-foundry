@@ -2,9 +2,11 @@ package commandtest
 
 import (
 	"context"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
@@ -134,6 +136,29 @@ func (s *Session) Pin(_ context.Context, r *connect.Request[v1.PinSessionRequest
 	}
 	cur.Id, cur.Pinned = r.Msg.GetId(), r.Msg.GetPinned()
 	return connect.NewResponse(&v1.PinSessionResponse{Session: cur}), nil
+}
+
+// Archive returns Current (default: a CONNECTED session) with the requested id:
+// archiving disconnects and unpins it and sets archived_at (kept when already set);
+// unarchiving clears archived_at.
+func (s *Session) Archive(_ context.Context, r *connect.Request[v1.ArchiveSessionRequest]) (*connect.Response[v1.ArchiveSessionResponse], error) {
+	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	cur := &v1.Session{State: v1.SessionState_SESSION_STATE_CONNECTED}
+	if s.Current != nil {
+		cur = proto.CloneOf(s.Current)
+	}
+	cur.Id = r.Msg.GetId()
+	if !r.Msg.GetArchived() {
+		cur.ArchivedAt = nil
+	} else {
+		cur.State, cur.Pinned = v1.SessionState_SESSION_STATE_DISCONNECTED, false
+		if cur.ArchivedAt == nil {
+			cur.ArchivedAt = timestamppb.New(time.UnixMilli(1))
+		}
+	}
+	return connect.NewResponse(&v1.ArchiveSessionResponse{Session: cur}), nil
 }
 
 // RunIn returns Current (default: a CONNECTED session in workspace "w-1") with the

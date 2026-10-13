@@ -154,3 +154,55 @@ func TestOverrides(t *testing.T) {
 		t.Errorf("terminal.new after reset = %v", c.Keybindings)
 	}
 }
+
+// ConfirmIf decides per call whether Confirm applies; DynamicConfirm returning "" keeps
+// the static message (it never means "no confirmation": pr.merge, app.restart and
+// repo.worktree.cleanup fall back on it).
+func TestInvokeConfirmIf(t *testing.T) {
+	tests := []struct {
+		name      string
+		confirmIf func(context.Context, Context, Args) bool
+		dynamic   string
+		opts      []InvokeOption
+		wantMsg   string // confirm message; "" means it ran
+	}{
+		{name: "ConfirmIf false runs unconfirmed", confirmIf: func(context.Context, Context, Args) bool { return false }},
+		{name: "ConfirmIf true asks with the dynamic message", confirmIf: func(_ context.Context, _ Context, a Args) bool { return a.Bool("hot") },
+			dynamic: "Hot, sure?", wantMsg: "Hot, sure?"},
+		{name: "ConfirmIf true, confirmed runs", confirmIf: func(context.Context, Context, Args) bool { return true },
+			opts: []InvokeOption{Confirmed(true)}},
+		{name: "no ConfirmIf and an empty dynamic message keeps the static one", wantMsg: "Archive s1?"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ran := false
+			r := NewRegistry()
+			if err := r.Register(Command{
+				Name: "session.archive", Title: "Archive", Category: "Thread",
+				Args:      []ArgSpec{{Name: "id", Type: String}, {Name: "hot", Type: Bool}},
+				Confirm:   "Archive {id}?",
+				ConfirmIf: tt.confirmIf,
+				DynamicConfirm: func(context.Context, Context, Args) string {
+					return tt.dynamic
+				},
+				Run: func(context.Context, Context, Args) (Result, error) {
+					ran = true
+					return Result{}, nil
+				},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			_, err := r.Invoke(context.Background(), Context{}, "session.archive", map[string]string{"id": "s1", "hot": "true"}, tt.opts...)
+			if tt.wantMsg == "" {
+				if err != nil || !ran {
+					t.Fatalf("err = %v, ran = %v; want it to run", err, ran)
+				}
+				return
+			}
+			var ce *ConfirmError
+			if !errors.As(err, &ce) || ce.Message != tt.wantMsg || ran {
+				t.Fatalf("err = %v, ran = %v; want confirm %q", err, ran, tt.wantMsg)
+			}
+		})
+	}
+}

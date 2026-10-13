@@ -53,6 +53,12 @@ type Command struct {
 	// rendered Confirm message at invoke time (e.g. "Close 3 sessions and restart the
 	// daemon?"). It sees the effective context and validated args.
 	DynamicConfirm func(ctx context.Context, uctx Context, args Args) string
+	// ConfirmIf, when set with Confirm, decides at invoke time whether this call needs
+	// the confirmation at all: false runs the command without one (e.g. session.archive
+	// asks only while Claude is working or waiting on the user). nil means always.
+	// Listing still reports the command as requiring confirmation, so clients offer
+	// their confirm flag. It sees the effective context and validated args.
+	ConfirmIf func(ctx context.Context, uctx Context, args Args) bool
 }
 
 // Available reports whether c is available in uctx.
