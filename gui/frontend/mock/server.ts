@@ -25,6 +25,8 @@
  *        plan, finished, Claude error, busy, idle, interrupted, and a disconnected one still asking
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
+ *   POST /__mock/session/archive?id=s-1[&archived=false]   (session.archive as the CLI's --yes does it:
+ *                                                 closes, removes its shells, unpins, stamps; false unarchives)
  *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N&model=M]   (a thread's last result that long ago; mock/context.ts)
  *   POST /__mock/thread?state=permission|question|streaming|idle   (the scripted thread s-r1:
  *        mock/thread.ts, also parallel|multi); POST /__mock/thread/delta?text=… | /__mock/thread/stream?text=… |
@@ -518,13 +520,14 @@ function sessionSummary(id: string): Record<string, unknown> {
     workspaceId: s.workspaceId,
     pendingWorktreePath: s.pendingWorktreePath,
     pinned: s.pinned,
+    archivedAt: s.archivedAt?.toISOString() ?? null,
     linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url })),
   };
 }
 
 const statusNames: Record<string, SessionStatus> = { busy: SessionStatus.BUSY, idle: SessionStatus.IDLE, attention: SessionStatus.NEEDS_ATTENTION };
 
-/** Session controls: POST /__mock/session/{attention|status|disconnect|hold|release|focus}?id=…[&status=…][&reason=…&code=…] */
+/** Session controls: POST /__mock/session/{attention|status|disconnect|hold|release|focus|archive}?id=…[&status=…][&reason=…&code=…] */
 function sessionControl(res: ServerResponse, action: string, q: URLSearchParams): void {
   const id = q.get("id") ?? "";
   try {
@@ -552,6 +555,9 @@ function sessionControl(res: ServerResponse, action: string, q: URLSearchParams)
       case "focus":
         json(res, 200, { delivered: world.focusSession(id) });
         return;
+      case "archive":
+        world.archiveSession(id, q.get("archived") !== "false");
+        break;
       default:
         json(res, 404, { error: "unknown session action" });
         return;

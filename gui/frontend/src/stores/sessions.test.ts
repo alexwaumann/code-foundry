@@ -153,7 +153,9 @@ describe("session reducers", () => {
       session("b", { status: "attention", statusReason: "question: Which color do you prefer?", state: "disconnected" }),
       session("c"),
       session("d", { status: "error", statusReason: "interrupted", state: "disconnected" }),
+      session("e", { status: "attention", statusReason: "finished", state: "disconnected", archivedAtMs: 7 }),
     ]);
+    // e waits (a finished turn) but is archived: not counted.
     expect(attentionIds(d)).toEqual(["a", "b"]);
   });
 

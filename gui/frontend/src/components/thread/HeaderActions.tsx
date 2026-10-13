@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { GitPullRequest, Layers, Power } from "lucide-react";
+import { Archive, ArchiveRestore, GitPullRequest, Layers, Power } from "lucide-react";
 import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { CommandButton } from "@/components/command/CommandButton";
 import { PanelToggle } from "@/components/panel/PanelToggle";
@@ -84,6 +84,16 @@ function WorkspaceChip({ sessionId }: { sessionId: string }) {
 }
 
 /**
+ * session.archive for this thread: Archive, or Unarchive (its own icon and tooltip) while
+ * it is archived. Run without args, the command toggles; the daemon asks for confirmation
+ * only while Claude is mid-turn.
+ */
+function ArchiveButton({ sessionId }: { sessionId: string }) {
+  const archived = useSessionsStore((s) => (s.byId[sessionId]?.archivedAtMs ?? null) !== null);
+  return <CommandButton command="session.archive" icon={archived ? ArchiveRestore : Archive} title={archived ? "Unarchive Thread" : "Archive Thread"} />;
+}
+
+/**
  * The thread header's right side: the workspace, the linked pull requests, then the
  * thread's and window's commands, run against the current selection (this thread) exactly
  * as the palette runs them. Each command button hides when the daemon does not list it as
@@ -95,6 +105,7 @@ export function HeaderActions({ sessionId }: { sessionId: string }) {
       <WorkspaceChip sessionId={sessionId} />
       <LinkedPrs sessionId={sessionId} />
       <CommandButton command="session.close" icon={Power} />
+      <ArchiveButton sessionId={sessionId} />
       <BottomToggle />
       <PanelToggle />
     </span>
