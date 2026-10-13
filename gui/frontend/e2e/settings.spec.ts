@@ -36,21 +36,21 @@ test("cmd+, opens settings rendered from the schema", async ({ page }) => {
     await expect(settings.getByRole("heading", { name: title, exact: true })).toBeVisible();
   }
   await expect(setting(page, "appearance.font_size").getByRole("spinbutton")).toHaveValue("13");
-  await expect(setting(page, "sessions.default_model").getByRole("combobox")).toHaveValue("opus");
+  await expect(setting(page, "sessions.default_model").getByRole("combobox")).toHaveValue("claude-opus-4-8[1m]");
   // The model registry's labels; the setting's own default is marked.
   await expect(setting(page, "sessions.default_model").getByRole("option")).toHaveText([
-    "Fable",
-    "Opus (default)",
-    "Opus 4.8",
+    "Opus 5.5",
+    "Opus 4.8 (default)",
     "Opus 4.7",
-    "Sonnet",
+    "Sonnet 5.5",
     "Sonnet 5",
     "Sonnet 4.6",
-    "Haiku",
+    "Haiku 5.5",
+    "Haiku 4.5",
   ]);
-  // The naming model is its own live setting, defaulting to Sonnet.
-  await expect(setting(page, "sessions.naming_model").getByRole("combobox")).toHaveValue("sonnet");
-  await expect(setting(page, "sessions.naming_model").getByRole("option", { name: "Sonnet (default)" })).toHaveCount(1);
+  // The naming model is its own live setting, defaulting to Sonnet 5.
+  await expect(setting(page, "sessions.naming_model").getByRole("combobox")).toHaveValue("claude-sonnet-5[1m]");
+  await expect(setting(page, "sessions.naming_model").getByRole("option", { name: "Sonnet 5 (default)" })).toHaveCount(1);
   await expect(setting(page, "sessions.naming_model").getByTestId("restart-hint")).toHaveCount(0);
   // Every thread is rendered: no view setting (the schema has none).
   await expect(setting(page, "sessions.render")).toHaveCount(0);

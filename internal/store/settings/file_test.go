@@ -46,7 +46,7 @@ func TestDecode(t *testing.T) {
 func TestRenderRoundTrip(t *testing.T) {
 	accepted := map[string]string{
 		KeyAutoName:                   "false",
-		KeyNamingModel:                "haiku",
+		KeyNamingModel:                "claude-4.5-haiku[1m]",
 		KeyFontSize:                   "15",
 		KeyFontFamily:                 `Weird "Font" \ Name`,
 		KeyWorktreeDir:                "~/wt/{repo}",
@@ -56,8 +56,8 @@ func TestRenderRoundTrip(t *testing.T) {
 	out := render(accepted)
 	text := string(out)
 	for _, want := range []string{
-		"[sessions]\n", "auto_name = false\n", "naming_model = \"haiku\"\n", "font_size = 15\n", `font_family = "Weird \"Font\" \\ Name"` + "\n",
-		"# default_model = \"opus\"\n", "# default_effort = \"high\"\n", "# scrollback_lines = 10000\n", `"session.new" = "cmd+shift+n"` + "\n",
+		"[sessions]\n", "auto_name = false\n", "naming_model = \"claude-4.5-haiku[1m]\"\n", "font_size = 15\n", `font_family = "Weird \"Font\" \\ Name"` + "\n",
+		"# default_model = \"claude-opus-4-8[1m]\"\n", "# default_effort = \"high\"\n", "# scrollback_lines = 10000\n", `"session.new" = "cmd+shift+n"` + "\n",
 		"Applies after a daemon restart.",
 	} {
 		if !strings.Contains(text, want) {

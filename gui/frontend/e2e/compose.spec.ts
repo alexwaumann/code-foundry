@@ -85,7 +85,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   // A composer has no sidebar row: nothing in the thread list is selected.
   await expect(page.getByTestId("thread-list").locator('[aria-selected="true"]')).toHaveCount(0);
   // Defaults: settings (opus / high), Auto, a new worktree from ListRefs' default ref.
-  await expect(page.getByTestId("composer-model")).toHaveText("Opus");
+  await expect(page.getByTestId("composer-model")).toHaveText("Opus 4.8");
   await expect(page.getByTestId("composer-effort")).toHaveText("High");
   await expect(page.getByTestId("composer-permission")).toHaveText("Auto");
   await expect(page.getByTestId("composer-worktree")).toHaveText("New worktree");
@@ -119,7 +119,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
     repo: "repo-cf",
     "new-worktree": "true",
     base: "origin/main",
-    model: "opus",
+    model: "claude-opus-4-8[1m]",
     effort: "high",
     permission: "auto",
     prompt: "Add a dark mode toggle\nin settings",
@@ -154,19 +154,19 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
   await expect(page.getByTestId("composer-model-list")).toBeVisible();
   // The daemon's model registry, from the settings schema.
   await expect(page.getByTestId("composer-model-list").getByRole("option")).toHaveText([
-    "Fable",
-    "Opus",
+    "Opus 5.5",
     "Opus 4.8",
     "Opus 4.7",
-    "Sonnet",
+    "Sonnet 5.5",
     "Sonnet 5",
     "Sonnet 4.6",
-    "Haiku",
+    "Haiku 5.5",
+    "Haiku 4.5",
   ]);
-  await page.keyboard.press("ArrowDown"); // opus -> claude-opus-4-8
+  await page.keyboard.press("ArrowDown"); // Opus 4.8 -> Opus 4.7
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("composer-model-list")).toHaveCount(0);
-  await expect(page.getByTestId("composer-model")).toHaveText("Opus 4.8");
+  await expect(page.getByTestId("composer-model")).toHaveText("Opus 4.7");
   await expect(page.getByTestId("composer-model")).toBeFocused();
 
   await page.keyboard.press("Tab");
@@ -218,7 +218,7 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
     repo: "repo-cf",
     "new-worktree": "true",
     base: "origin/release/v0.3",
-    model: "claude-opus-4-8",
+    model: "claude-opus-4-7[1m]",
     effort: "xhigh",
     permission: "supervised",
     prompt: "Refactor the sidebar",
@@ -254,7 +254,7 @@ test("a failed start keeps the draft editable and shows why", async ({ page }) =
   await input.press("Enter");
   await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
   const last = (await invocations()).at(-1);
-  expect(last?.args).toEqual({ repo: "repo-cf", worktree: CF, model: "opus", effort: "high", permission: "auto", prompt: "Please work" });
+  expect(last?.args).toEqual({ repo: "repo-cf", worktree: CF, model: "claude-opus-4-8[1m]", effort: "high", permission: "auto", prompt: "Please work" });
   expect(await sessionCount()).toBe(before + 1);
 });
 

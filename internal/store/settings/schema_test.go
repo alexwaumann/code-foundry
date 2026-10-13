@@ -41,11 +41,14 @@ func TestFieldParse(t *testing.T) {
 		{key: KeyFontSize, in: "8", err: "want 9 to 28, got 8"},
 		{key: KeyFontSize, in: "13.5", err: `want an integer, got "13.5"`},
 		{key: KeyFetchInterval, in: "0", want: "0"},
-		{key: KeyDefaultModel, in: "opus", want: "opus"},
-		{key: KeyDefaultModel, in: "claude-opus-4-8", want: "claude-opus-4-8"},
-		{key: KeyDefaultModel, in: "gpt-5", err: `want one of "fable", "opus", "claude-opus-4-8", "claude-opus-4-7", "sonnet", "claude-sonnet-5", "claude-sonnet-4-6", "haiku", got "gpt-5"`},
-		{key: KeyNamingModel, in: "haiku", want: "haiku"},
-		{key: KeyNamingModel, in: "claude-opus-4-8", want: "claude-opus-4-8"},
+		{key: KeyDefaultModel, in: "claude-opus-4-8[1m]", want: "claude-opus-4-8[1m]"},
+		{key: KeyDefaultModel, in: "claude-opus-5-5[1m]", want: "claude-opus-5-5[1m]"},
+		{key: KeyDefaultModel, in: "gpt-5", err: `want one of "claude-opus-5-5[1m]", "claude-opus-4-8[1m]", "claude-opus-4-7[1m]", "claude-sonnet-5-5[1m]", "claude-sonnet-5[1m]", "claude-sonnet-4-6[1m]", "claude-haiku-5-5[1m]", "claude-4.5-haiku[1m]", got "gpt-5"`},
+		// Retired aliases and unsuffixed ids are rejected.
+		{key: KeyDefaultModel, in: "opus", err: `want one of "claude-opus-5-5[1m]", "claude-opus-4-8[1m]", "claude-opus-4-7[1m]", "claude-sonnet-5-5[1m]", "claude-sonnet-5[1m]", "claude-sonnet-4-6[1m]", "claude-haiku-5-5[1m]", "claude-4.5-haiku[1m]", got "opus"`},
+		{key: KeyDefaultModel, in: "claude-opus-4-8", err: `want one of "claude-opus-5-5[1m]", "claude-opus-4-8[1m]", "claude-opus-4-7[1m]", "claude-sonnet-5-5[1m]", "claude-sonnet-5[1m]", "claude-sonnet-4-6[1m]", "claude-haiku-5-5[1m]", "claude-4.5-haiku[1m]", got "claude-opus-4-8"`},
+		{key: KeyNamingModel, in: "claude-4.5-haiku[1m]", want: "claude-4.5-haiku[1m]"},
+		{key: KeyNamingModel, in: "claude-opus-4-8[1m]", want: "claude-opus-4-8[1m]"},
 		{key: KeyTheme, in: "Dark", err: `want one of "system", "dark", "light", got "Dark"`},
 		{key: KeyBackdrop, in: "none", want: "none"},
 		{key: KeyBackdrop, in: "aurora", err: `want one of "forest", "none", got "aurora"`},
@@ -115,12 +118,12 @@ func TestEnumLabels(t *testing.T) {
 	tests := []struct {
 		key, value, want string
 	}{
-		{KeyDefaultModel, "opus", "Opus"},
-		{KeyDefaultModel, "claude-opus-4-8", "Opus 4.8"},
-		{KeyDefaultModel, "claude-sonnet-4-6", "Sonnet 4.6"},
-		{KeyDefaultModel, "haiku", "Haiku"},
-		{KeyNamingModel, "sonnet", "Sonnet"},
-		{KeyNamingModel, "haiku", "Haiku"},
+		{KeyDefaultModel, "claude-opus-5-5[1m]", "Opus 5.5"},
+		{KeyDefaultModel, "claude-opus-4-8[1m]", "Opus 4.8"},
+		{KeyDefaultModel, "claude-sonnet-4-6[1m]", "Sonnet 4.6"},
+		{KeyDefaultModel, "claude-4.5-haiku[1m]", "Haiku 4.5"},
+		{KeyNamingModel, "claude-sonnet-5[1m]", "Sonnet 5"},
+		{KeyNamingModel, "claude-haiku-5-5[1m]", "Haiku 5.5"},
 		// Fields without labels show their values as they are.
 		{KeyTheme, "dark", ""},
 	}
@@ -140,15 +143,15 @@ func TestEnumLabels(t *testing.T) {
 			}
 		})
 	}
-	if f := field(t, KeyDefaultModel); f.Default != "opus" {
-		t.Errorf("default model = %q, want opus", f.Default)
+	if f := field(t, KeyDefaultModel); f.Default != "claude-opus-4-8[1m]" {
+		t.Errorf("default model = %q, want Opus 4.8", f.Default)
 	}
 }
 
 func TestNamingModelField(t *testing.T) {
 	f := field(t, KeyNamingModel)
-	if f.Default != "sonnet" || Defaults().Sessions.NamingModel != "sonnet" {
-		t.Errorf("default = %q, Defaults() = %q; want sonnet", f.Default, Defaults().Sessions.NamingModel)
+	if f.Default != "claude-sonnet-5[1m]" || Defaults().Sessions.NamingModel != "claude-sonnet-5[1m]" {
+		t.Errorf("default = %q, Defaults() = %q; want Sonnet 5", f.Default, Defaults().Sessions.NamingModel)
 	}
 	if f.Group != GroupSessions || f.Restart || !slices.Equal(f.Enum, field(t, KeyDefaultModel).Enum) ||
 		!slices.Equal(f.EnumLabels, field(t, KeyDefaultModel).EnumLabels) {
@@ -158,7 +161,7 @@ func TestNamingModelField(t *testing.T) {
 	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyAutoName }); staticFields[i+1].Key != KeyNamingModel {
 		t.Errorf("field after %s = %s", KeyAutoName, staticFields[i+1].Key)
 	}
-	for _, in := range []string{"", "gpt-5", "Sonnet"} {
+	for _, in := range []string{"", "gpt-5", "Sonnet", "sonnet"} {
 		if _, err := f.parse(in); err == nil || !strings.HasPrefix(err.Error(), "want one of ") {
 			t.Errorf("parse(%q) err = %v, want an enum error", in, err)
 		}

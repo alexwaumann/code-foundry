@@ -34,7 +34,7 @@ test("switch the project from the heading: the draft moves, Also in is swapped, 
   await expect(trigger(page)).toHaveAttribute("aria-haspopup", "dialog");
   await page.keyboard.type("Port the login form");
   await page.getByTestId("composer-model").click();
-  await page.getByTestId("composer-model-list").getByRole("option", { name: "Haiku", exact: true }).click();
+  await page.getByTestId("composer-model-list").getByRole("option", { name: "Haiku 4.5", exact: true }).click();
   await addAlsoIn(page, "ghostty-playground");
   await expect(chips(page)).toHaveCount(2);
 
@@ -70,7 +70,7 @@ test("switch the project from the heading: the draft moves, Also in is swapped, 
   await expect(heading(page)).toHaveText("What should we build in ghostty-playground?");
   await expect(page.getByTestId("composer-input")).toBeFocused();
   await expect(prompt(page)).toHaveAttribute("data-value", "Port the login form");
-  await expect(page.getByTestId("composer-model")).toHaveText("Haiku");
+  await expect(page.getByTestId("composer-model")).toHaveText("Haiku 4.5");
   // ghostty-playground was swapped out of Also in; code-foundry is not demoted to it.
   await expect(chips(page)).toHaveCount(0);
   await expect(page.getByTestId("composer-also-in")).toHaveText("Also in…");
@@ -79,7 +79,7 @@ test("switch the project from the heading: the draft moves, Also in is swapped, 
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
   const args = (await invocations()).at(-1)?.args ?? {};
-  expect(args).toMatchObject({ repo: "repo-gp", "new-worktree": "true", model: "haiku", prompt: "Port the login form" });
+  expect(args).toMatchObject({ repo: "repo-gp", "new-worktree": "true", model: "claude-4.5-haiku[1m]", prompt: "Port the login form" });
   expect(args.repos).toBeUndefined();
   await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
 

@@ -35,8 +35,8 @@ func TestCLISettings(t *testing.T) {
 	}{
 		{"get one", []string{"settings", "get", "appearance.font_size"}, nil, "13\n", ""},
 		{"get all", []string{"settings", "get"}, nil, `sessions.auto_name = "true"`, ""},
-		{"naming model default", []string{"settings", "get", "sessions.naming_model"}, nil, "sonnet\n", ""},
-		{"set naming model", []string{"settings", "set", "sessions.naming_model", "haiku"}, nil, `sessions.naming_model = "haiku"`, ""},
+		{"naming model default", []string{"settings", "get", "sessions.naming_model"}, nil, "claude-sonnet-5[1m]\n", ""},
+		{"set naming model", []string{"settings", "set", "sessions.naming_model", "claude-4.5-haiku[1m]"}, nil, `sessions.naming_model = "claude-4.5-haiku[1m]"`, ""},
 		{"invalid naming model", []string{"settings", "set", "sessions.naming_model", "gpt-5"}, errAny, "", ""},
 		{"set positional", []string{"settings", "set", "appearance.font_size", "15"}, nil, `appearance.font_size = "15"`, ""},
 		{"get after set", []string{"settings.get", "appearance.font_size"}, nil, "15\n", ""},

@@ -10,35 +10,40 @@ import "slices"
 
 // Model is one choice.
 type Model struct {
-	// Value is passed to `claude --model`: a family alias ("opus") or a pinned id
-	// ("claude-opus-4-8").
+	// Value is passed to `claude --model`: a pinned id with the 1M context suffix
+	// ("claude-opus-4-8[1m]").
 	Value string
 	// Label is what the app shows.
 	Label string
 }
 
-// registry is in display order: per family, the alias first, then pinned versions newest
-// first. The family entries ("Opus") pass the bare alias, so Claude Code resolves whatever
-// the user's default for that family is (including a managed-settings pin). Edit this list to
-// add or retire models.
+// registry is in display order: per family, newest first. Every entry asks for the 1M
+// context window; on models where 1M is already the default the suffix is accepted and
+// changes nothing. There are no family aliases: an alias resolves to whatever the
+// account's default is, which may not be the 1M variant.
+//
+// The 5.5 entries are listed before managed settings offer them, so they show up
+// without an app update; until then picking one fails at session start.
+// claude-4.5-haiku[1m] is the id the work Bedrock setup accepts; claude-haiku-4-5 is
+// refused there. Edit this list to add or retire models.
 var registry = []Model{
-	{"fable", "Fable"},
-	{"opus", "Opus"},
-	{"claude-opus-4-8", "Opus 4.8"},
-	{"claude-opus-4-7", "Opus 4.7"},
-	{"sonnet", "Sonnet"},
-	{"claude-sonnet-5", "Sonnet 5"},
-	{"claude-sonnet-4-6", "Sonnet 4.6"},
-	{"haiku", "Haiku"},
+	{"claude-opus-5-5[1m]", "Opus 5.5"},
+	{"claude-opus-4-8[1m]", "Opus 4.8"},
+	{"claude-opus-4-7[1m]", "Opus 4.7"},
+	{"claude-sonnet-5-5[1m]", "Sonnet 5.5"},
+	{"claude-sonnet-5[1m]", "Sonnet 5"},
+	{"claude-sonnet-4-6[1m]", "Sonnet 4.6"},
+	{"claude-haiku-5-5[1m]", "Haiku 5.5"},
+	{"claude-4.5-haiku[1m]", "Haiku 4.5"},
 }
 
 // Default is the model for new threads when the settings do not pick one.
-const Default = "opus"
+const Default = "claude-opus-4-8[1m]"
 
 // NamingDefault is the model of the claude -p call that names a new session when the
 // settings (sessions.naming_model) do not pick one. Sonnet until Haiku 5.5 is
 // available everywhere the app runs.
-const NamingDefault = "sonnet"
+const NamingDefault = "claude-sonnet-5[1m]"
 
 // All returns the registry in display order.
 func All() []Model { return slices.Clone(registry) }

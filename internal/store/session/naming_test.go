@@ -62,8 +62,8 @@ func fakeCalls(t *testing.T, dir string) [][]string {
 }
 
 func TestClaudeNamer(t *testing.T) {
-	hardened := append(namingArgs("opus", false), "--", "<prompt>")
-	minimal := append(namingArgs("opus", true), "--", "<prompt>")
+	hardened := append(namingArgs("claude-opus-4-8[1m]", false), "--", "<prompt>")
+	minimal := append(namingArgs("claude-opus-4-8[1m]", true), "--", "<prompt>")
 	tests := []struct {
 		name string
 		body string
@@ -118,7 +118,7 @@ echo "API Error: 429 rate limited"; exit 1`,
 			bin, dir := fakeClaude(t, tt.body)
 			var logs bytes.Buffer
 			namer := ClaudeNamer(bin, t.TempDir(), slog.New(slog.NewTextHandler(&logs, nil)))
-			ctx := WithNamingModel(withNamingSession(context.Background(), "s123"), "opus")
+			ctx := WithNamingModel(withNamingSession(context.Background(), "s123"), "claude-opus-4-8[1m]")
 			for i := range 2 {
 				name, err := namer(ctx, "-fix the login bug")
 				if tt.wantErr == nil {
@@ -188,10 +188,10 @@ func TestNamingArgs(t *testing.T) {
 		minimal bool
 		want    string
 	}{
-		{"hardened", "opus", false, `-p --model opus --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>`},
-		{"minimal", "opus", true, `-p --model opus --effort low --no-session-persistence -- <prompt>`},
-		{"default model, hardened", model.NamingDefault, false, `-p --model sonnet --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>`},
-		{"default model, minimal", model.NamingDefault, true, `-p --model sonnet --effort low --no-session-persistence -- <prompt>`},
+		{"hardened", "claude-opus-4-8[1m]", false, `-p --model claude-opus-4-8[1m] --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>`},
+		{"minimal", "claude-opus-4-8[1m]", true, `-p --model claude-opus-4-8[1m] --effort low --no-session-persistence -- <prompt>`},
+		{"default model, hardened", model.NamingDefault, false, `-p --model claude-sonnet-5[1m] --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>`},
+		{"default model, minimal", model.NamingDefault, true, `-p --model claude-sonnet-5[1m] --effort low --no-session-persistence -- <prompt>`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -208,11 +208,12 @@ func TestNamingModel(t *testing.T) {
 		ctx  context.Context
 		want string
 	}{
-		{"unset", context.Background(), "sonnet"},
-		{"empty", WithNamingModel(context.Background(), ""), "sonnet"},
-		{"unknown", WithNamingModel(context.Background(), "gpt-5"), "sonnet"},
-		{"set", WithNamingModel(context.Background(), "haiku"), "haiku"},
-		{"pinned", WithNamingModel(context.Background(), "claude-opus-4-8"), "claude-opus-4-8"},
+		{"unset", context.Background(), "claude-sonnet-5[1m]"},
+		{"empty", WithNamingModel(context.Background(), ""), "claude-sonnet-5[1m]"},
+		{"unknown", WithNamingModel(context.Background(), "gpt-5"), "claude-sonnet-5[1m]"},
+		{"retired alias", WithNamingModel(context.Background(), "haiku"), "claude-sonnet-5[1m]"},
+		{"set", WithNamingModel(context.Background(), "claude-4.5-haiku[1m]"), "claude-4.5-haiku[1m]"},
+		{"newest", WithNamingModel(context.Background(), "claude-haiku-5-5[1m]"), "claude-haiku-5-5[1m]"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -228,14 +229,14 @@ func TestNamingModel(t *testing.T) {
 func TestClaudeNamerModel(t *testing.T) {
 	bin, dir := fakeClaude(t, `echo fix-login-bug`)
 	namer := ClaudeNamer(bin, t.TempDir(), slog.New(slog.DiscardHandler))
-	for _, ctx := range []context.Context{context.Background(), WithNamingModel(context.Background(), "haiku")} {
+	for _, ctx := range []context.Context{context.Background(), WithNamingModel(context.Background(), "claude-4.5-haiku[1m]")} {
 		if _, err := namer(ctx, "-fix the login bug"); err != nil {
 			t.Fatal(err)
 		}
 	}
 	want := [][]string{
-		append(namingArgs("sonnet", false), "--", "<prompt>"),
-		append(namingArgs("haiku", false), "--", "<prompt>"),
+		append(namingArgs("claude-sonnet-5[1m]", false), "--", "<prompt>"),
+		append(namingArgs("claude-4.5-haiku[1m]", false), "--", "<prompt>"),
 	}
 	if got := fakeCalls(t, dir); !slices.EqualFunc(got, want, slices.Equal) {
 		t.Errorf("calls =\n%q\nwant\n%q", got, want)

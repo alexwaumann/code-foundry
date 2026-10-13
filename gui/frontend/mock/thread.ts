@@ -72,7 +72,7 @@ export interface ThreadWorld {
   setPermission(id: string, permission: string): void;
   setEffort(id: string, effort: string, pending: boolean): void;
   statusOf(id: string): SessionStatus;
-  /** The thread's model as picked ("opus", "claude-sonnet-5"). */
+  /** The thread's model as picked ("claude-opus-4-8[1m]"). */
   modelOf(id: string): string;
   /** A turn ended: the thread's context totals move to now (mock/context.ts). */
   recordResult(id: string, model: string): void;

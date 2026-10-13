@@ -262,7 +262,7 @@ type CreateOptions struct {
 	// in every repository, the slug as for NewWorktree) and run the thread in the
 	// member RepoID names, else the first. Exclusive with NewWorktree and WorkspaceID.
 	NewWorkspace *NewWorkspace
-	// Model is a claude --model value (alias like "opus" or a full model name).
+	// Model is a claude --model value (registry id like "claude-opus-4-8[1m]", or any full model name).
 	Model string
 	// Effort is a claude --effort level: low, medium, high, xhigh, max.
 	Effort string

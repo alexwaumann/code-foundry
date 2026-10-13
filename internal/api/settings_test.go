@@ -51,7 +51,7 @@ func TestSettingsService(t *testing.T) {
 	if kb := byKey["keybindings.session.new"]; kb.GetType() != v1.SettingType_SETTING_TYPE_KEYBINDING || kb.GetDefaultValue() != "cmd+n" {
 		t.Errorf("keybinding field = %v", kb)
 	}
-	if m := byKey["sessions.default_model"]; len(m.GetEnumLabels()) != len(m.GetEnumValues()) || m.GetEnumValues()[2] != "claude-opus-4-8" || m.GetEnumLabels()[2] != "Opus 4.8" {
+	if m := byKey["sessions.default_model"]; len(m.GetEnumLabels()) != len(m.GetEnumValues()) || m.GetEnumValues()[1] != "claude-opus-4-8[1m]" || m.GetEnumLabels()[1] != "Opus 4.8" {
 		t.Errorf("default_model labels = %v for %v", m.GetEnumLabels(), m.GetEnumValues())
 	}
 	if th := byKey["appearance.theme"]; len(th.GetEnumLabels()) != 0 {

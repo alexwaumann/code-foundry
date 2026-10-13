@@ -39,10 +39,10 @@ type Settings struct {
 
 // Sessions are defaults for new Claude Code sessions.
 type Sessions struct {
-	DefaultModel      string // default "opus"
+	DefaultModel      string // default model.Default
 	DefaultEffort     string // default "high"
 	AutoName          bool
-	NamingModel       string // default "sonnet"; the effort is always low
+	NamingModel       string // default model.NamingDefault; the effort is always low
 	CacheTTLSeconds   int    // the API's prompt cache lifetime; default 3600
 	CloseGraceSeconds int
 	ScrollbackLines   int
