@@ -82,6 +82,8 @@ interface MockSession {
   pendingWorktreePath: string;
   /** session.pin. */
   pinned: boolean;
+  /** session.archive: when it was archived; null when not. Reconnect and pin(true) clear it, like the daemon. */
+  archivedAt: Date | null;
   /** An effort change waiting for the turn to end (thread.set-effort). */
   effortPending: boolean;
   /** Mock-only: a new thread's first message, sent once it connects (the daemon sends it after the handshake). */
@@ -129,6 +131,8 @@ interface CmdDef {
   args: ArgDef[];
   /** Destructive: Invoke needs confirmed=true; renders the prompt from the context and args. */
   confirm?: (ctx: UiContext | undefined, args: Record<string, string>) => string;
+  /** Like the daemon's Command.ConfirmIf: when set, confirmation is asked only when it returns true. */
+  confirmIf?: (ctx: UiContext | undefined, args: Record<string, string>) => boolean;
 }
 export type UiIntentInit = MessageInitShape<typeof UiIntentSchema>;
 
@@ -146,6 +150,23 @@ function shellLabels(sessionId: string, repoId: string, worktree: string): Recor
   const l: Record<string, string> = { [LABEL_KIND]: KIND_SHELL, [LABEL_REPO]: repoId, [LABEL_WORKTREE]: worktree };
   if (sessionId) l[LABEL_SESSION] = sessionId;
   return l;
+}
+
+/** session.archive archives (rather than unarchives): its `archived` arg, else the opposite of now. */
+function archiving(s: { archivedAt: Date | null }, args: Record<string, string>): boolean {
+  return args.archived === undefined || args.archived === "" ? s.archivedAt === null : args.archived === "true";
+}
+
+/**
+ * Why archiving would end a turn (the daemon's archiveInterrupts): starting, or connected
+ * and busy, or waiting on a permission request or question; "" when it would not.
+ */
+function archiveInterrupts(s: { state: SessionState; status: SessionStatus; statusReason: string }): string {
+  if (s.state === SessionState.STARTING) return "Claude is still working";
+  if (s.state !== SessionState.CONNECTED) return "";
+  if (s.status === SessionStatus.BUSY) return "Claude is still working";
+  if (s.status === SessionStatus.NEEDS_ATTENTION && /^(permission|question):/.test(s.statusReason)) return "Claude is waiting on your answer";
+  return "";
 }
 
 /** "end" closes attached streams (after the process exits). */
@@ -537,6 +558,8 @@ export class World {
     this.addSession({ id: "s-4", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Investigate flaky e2e", model: "claude-4.5-haiku[1m]", effort: "", state: SessionState.DISCONNECTED, disconnectReason: "crashed", exitCode: 139, createdAt: ago(200), lastActivityAt: ago(17), usage: pageUsage("s-4") });
     this.addSession({ id: "s-5", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Write session docs", model: "claude-opus-4-8[1m]", effort: "low", state: SessionState.STARTING, settleIn: 8, createdAt: ago(0) });
     this.addSession({ id: "s-6", repoId: "repo-dot", worktreePath: `${HOME}/dotfiles`, name: "Tidy zshrc", model: "claude-sonnet-5[1m]", effort: "", state: SessionState.CLOSING, settleIn: 8, createdAt: ago(60) });
+    // Archived 90 min ago (the sidebar's Archived section, collapsed by default).
+    this.addSession({ id: "s-7", repoId: "repo-cf", worktreePath: CF, name: "Spike a canvas sidebar", model: "claude-sonnet-5[1m]", effort: "", state: SessionState.DISCONNECTED, disconnectReason: "closed", status: SessionStatus.NEEDS_ATTENTION, statusReason: "finished", statusChangedAt: ago(95), createdAt: ago(600), lastActivityAt: ago(95), archivedAt: ago(90) });
     for (const [id, h] of Object.entries(SEEDS)) if (h) this.threads.seed(id, h);
     // Republish so connected watchers converge on the reset state.
     for (const t of this.terms.values()) this.termEvents.publish({ event: { case: "updated", value: this.terminalMsg(t) } });
@@ -866,6 +889,7 @@ export class World {
       workspaceId: "",
       pendingWorktreePath: "",
       pinned: false,
+      archivedAt: null,
       effortPending: false,
       firstMessage: null,
       linkedPullRequests: [],
@@ -912,6 +936,7 @@ export class World {
       workspaceId: s.workspaceId,
       pendingWorktreePath: s.pendingWorktreePath,
       pinned: s.pinned,
+      ...(s.archivedAt ? { archivedAt: timestampFromDate(s.archivedAt) } : {}),
       effortPending: s.effortPending,
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
       ...usageFields(s.usage),
@@ -1096,9 +1121,32 @@ export class World {
     return s;
   }
 
+  /**
+   * session.archive without its confirmation (POST /__mock/session/archive does what the CLI
+   * with --yes does). Archiving closes Claude (busy becomes ERROR "interrupted"), removes the
+   * thread's shells, unpins it and stamps archivedAt (the first stamp is kept); unarchiving
+   * only clears the stamp. Returns the command's message.
+   */
+  archiveSession(id: string, archived: boolean): string {
+    const s = this.session(id);
+    const label = s.name ? `${s.name} (${s.id})` : s.id;
+    if (!archived) {
+      s.archivedAt = null;
+      this.publishSession(s);
+      return `unarchived thread ${label}`;
+    }
+    if (s.state !== SessionState.DISCONNECTED) this.disconnectSession(s.id, "closed", 0);
+    this.closeShells((l) => l[LABEL_SESSION] === s.id);
+    s.pinned = false;
+    s.archivedAt ??= new Date();
+    this.publishSession(s);
+    return `archived thread ${label}`;
+  }
+
   /** session.reconnect: claude --resume in a new process; STARTING until the handshake (~2 s). */
   private reconnect(s: MockSession): void {
     s.state = SessionState.STARTING;
+    s.archivedAt = null;
     // The fresh detector owns status again: the persisted one is cleared.
     this.setStatus(s, SessionStatus.UNSPECIFIED);
     s.settleIn = 2;
@@ -1932,6 +1980,7 @@ export class World {
           const s = activeSession(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
           s.pinned = args.pinned === undefined || args.pinned === "" ? !s.pinned : args.pinned === "true";
+          if (s.pinned) s.archivedAt = null;
           this.publishSession(s);
           return `${s.pinned ? "pinned" : "unpinned"} thread ${s.name ? `${s.name} (${s.id})` : s.id}`;
         },
@@ -1993,6 +2042,31 @@ export class World {
         run: (_ctx, args) => {
           this.removeWorkspace(args.workspace ?? "", args.force === "true");
           return `removed workspace ${args.workspace ?? ""}`;
+        },
+      },
+      {
+        cmd: {
+          name: "session.archive",
+          title: "Archive or Unarchive Thread",
+          category: "Thread",
+          description: "Archive a thread: Claude is closed, its terminals are removed and it is unpinned and listed apart. Unarchive puts it back in the thread list, still disconnected. Without archived, toggles.",
+          keybindings: [],
+          args: [{ name: "archived", type: ArgType.BOOL, required: false, description: "Archive (true) or unarchive (false); default: the opposite of now" }],
+          // Like the daemon: only archiving a thread that is mid-turn asks.
+          confirmIf: (ctx, args) => {
+            const s = activeSession(ctx);
+            return s !== undefined && archiving(s, args) && archiveInterrupts(s) !== "";
+          },
+          confirm: (ctx) => {
+            const s = activeSession(ctx);
+            return `Archive thread ${s?.name || (s?.id ?? "")}? ${s ? archiveInterrupts(s) : ""}; archiving ends the turn.`;
+          },
+        },
+        when: (ctx) => activeSession(ctx) !== undefined,
+        run: (ctx, args) => {
+          const s = activeSession(ctx);
+          if (!s) throw new CommandError("unavailable", "no active session");
+          return this.archiveSession(s.id, archiving(s, args));
         },
       },
       {
@@ -2386,9 +2460,9 @@ export class World {
     }));
   }
 
-  listCommands(ctx: UiContext | undefined, includeUnavailable: boolean): (Omit<CmdDef, "confirm"> & { available: boolean; requiresConfirmation: boolean })[] {
+  listCommands(ctx: UiContext | undefined, includeUnavailable: boolean): (Omit<CmdDef, "confirm" | "confirmIf"> & { available: boolean; requiresConfirmation: boolean })[] {
     return this.effectiveRegistry()
-      .map(({ cmd: { confirm, ...cmd }, when }) => ({ ...cmd, available: when(ctx), requiresConfirmation: confirm !== undefined }))
+      .map(({ cmd: { confirm, confirmIf: _if, ...cmd }, when }) => ({ ...cmd, available: when(ctx), requiresConfirmation: confirm !== undefined }))
       .filter((c) => includeUnavailable || c.available);
   }
 
@@ -2417,7 +2491,7 @@ export class World {
     for (const a of entry.cmd.args) {
       if (a.required && !args[a.name]) throw new CommandError("invalid", `missing required arg ${a.name}`);
     }
-    if (entry.cmd.confirm && !confirmed) throw new ConfirmNeeded(name, entry.cmd.title, entry.cmd.confirm(ctx, args));
+    if (entry.cmd.confirm && !confirmed && (entry.cmd.confirmIf?.(ctx, args) ?? true)) throw new ConfirmNeeded(name, entry.cmd.title, entry.cmd.confirm(ctx, args));
     return entry.run(ctx, args);
   }
 }
