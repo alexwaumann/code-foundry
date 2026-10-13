@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isStartable, startCommandNamed } from "@/keys/bindings";
@@ -9,13 +9,22 @@ type ButtonProps = ComponentProps<typeof Button>;
 interface CommandButtonProps {
   /** Registry command name, e.g. "session.new". */
   command: string;
-  icon: LucideIcon;
+  /** The button's icon; omit it when `children` draws the whole content. */
+  icon?: LucideIcon;
   /** Visible text. Omit for an icon-only button; the command's title is then its label. */
   label?: string;
   /** Tooltip of an icon-only button; defaults to the command's title. A button with a label has none. Never a chord: those live in the palette and help. */
   title?: string;
-  /** When the command is not available here: hide the button (default) or show it disabled. */
-  whenUnavailable?: "hide" | "disable";
+  /**
+   * Content drawn instead of the icon and label (a thread's name, its project and branch).
+   * Visible, so the button has no title; its text is its accessible name.
+   */
+  children?: ReactNode;
+  /**
+   * When the command is not available here: hide the button (default), show it disabled,
+   * or show `children` as plain, non-interactive text (a span with `className`).
+   */
+  whenUnavailable?: "hide" | "disable" | "plain";
   /**
    * Keep keyboard focus where it is (default): the button is skipped by Tab and a click
    * does not move focus, so the sidebar tree and the terminal keep theirs.
@@ -43,6 +52,7 @@ export function CommandButton({
   command,
   icon: Icon,
   label,
+  children,
   title,
   whenUnavailable = "hide",
   keepFocus = true,
@@ -56,16 +66,24 @@ export function CommandButton({
 }: CommandButtonProps) {
   const commandTitle = useCommandsStore((s) => s.commands.find((c) => c.name === command && isStartable(c))?.title ?? null);
   if (commandTitle === null && whenUnavailable === "hide") return null;
+  if (commandTitle === null && whenUnavailable === "plain")
+    return (
+      <span className={className} data-command-plain={command} data-testid={testId}>
+        {children}
+      </span>
+    );
   const name = title ?? commandTitle ?? label ?? command;
+  // Visible text (a label or custom content) names the button itself: no title.
+  const visible = Boolean(label) || children !== undefined;
   return (
     <Button
       type="button"
       variant={variant}
-      size={size ?? (label ? "sm" : count !== undefined ? "xs" : "icon-xs")}
+      size={size ?? (visible ? "sm" : count !== undefined ? "xs" : "icon-xs")}
       className={className}
       disabled={commandTitle === null}
-      title={label ? undefined : name}
-      aria-label={label ? undefined : count !== undefined ? `${name} (${String(count)})` : name}
+      title={visible ? undefined : name}
+      aria-label={visible ? undefined : count !== undefined ? `${name} (${String(count)})` : name}
       aria-pressed={pressed}
       aria-current={current ? "page" : undefined}
       tabIndex={keepFocus ? -1 : undefined}
@@ -82,13 +100,14 @@ export function CommandButton({
         startCommandNamed(command);
       }}
     >
-      <Icon aria-hidden className={label ? undefined : "size-3.5"} />
+      {Icon && <Icon aria-hidden className={label ? undefined : "size-3.5"} />}
       {count !== undefined && (
         <span className="text-[11px] font-medium tabular-nums" aria-hidden data-count>
           {count}
         </span>
       )}
       {label}
+      {children}
     </Button>
   );
 }

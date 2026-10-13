@@ -120,7 +120,8 @@ test("the palette, the thread header and the CLI open it on a workspace thread; 
   await page.keyboard.press("Meta+w");
   await expect(panel(page)).toHaveCount(0);
 
-  // The header button (the same command).
+  // The header's workspace chip (the same command), named by the workspace.
+  await expect(page.getByTestId("pane-workspace")).toHaveText("checkout");
   await page.getByTestId("pane-workspace").click();
   await expectWorkspaceTab(page, driver);
   await page.keyboard.press("Meta+w");

@@ -1,8 +1,9 @@
-import { CircleCheck, CircleDashed, CircleDot, CircleX, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from "lucide-react";
+import { CircleCheck, CircleDashed, CircleDot, CircleX } from "lucide-react";
 import type { CheckRollupView, PrStateView, ReviewView } from "@/api/gh";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { checksSummary, freshness, reviewLabel, shortAge, updatedAgo } from "./format";
+import { prStateLook, type PrStateTone } from "./prState";
 
 const toneClass = {
   success: "text-emerald-400",
@@ -33,11 +34,18 @@ export function ReviewBadge({ review }: { review: ReviewView }) {
   return <span className={cn("truncate text-xs", reviewClass[review ?? "none"])}>{reviewLabel(review)}</span>;
 }
 
+/** The PR lists' state colours (the dark-first 400s). */
+const stateIconClass: Record<PrStateTone, string> = {
+  emerald: "text-emerald-400",
+  violet: "text-violet-400",
+  red: "text-red-400",
+  muted: "text-muted-foreground",
+};
+
 export function PrStateIcon({ state, draft }: { state: PrStateView; draft: boolean }) {
-  if (state === "merged") return <GitMerge className="size-3.5 shrink-0 text-violet-400" aria-label="merged" />;
-  if (state === "closed") return <GitPullRequestClosed className="size-3.5 shrink-0 text-red-400" aria-label="closed" />;
-  if (draft) return <GitPullRequestDraft className="size-3.5 shrink-0 text-muted-foreground" aria-label="draft" />;
-  return <GitPullRequest className="size-3.5 shrink-0 text-emerald-400" aria-label="open" />;
+  const look = prStateLook(state, draft);
+  const Icon = look.icon;
+  return <Icon className={cn("size-3.5 shrink-0", stateIconClass[look.tone])} aria-label={look.label} />;
 }
 
 /** Relative age that refreshes every 30s. */

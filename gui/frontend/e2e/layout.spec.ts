@@ -119,7 +119,9 @@ test("the panes start 8px from the top and their 44px headers drag the window, w
     expect(header.height).toBe(HEADER);
     expect(header.bottom - 1).toBe(BAND);
     expect(await drag(page, '[data-testid="thread-header"]')).toBe("drag");
-    expect(await drag(page, '[data-testid="thread-title"]')).toBe("drag");
+    // The name and the location are buttons (rename, worktree surface): they do not drag.
+    expect(await drag(page, '[data-testid="thread-title"]')).toBe("no-drag");
+    expect(await drag(page, '[data-testid="thread-location"]')).toBe("no-drag");
     expect(await drag(page, '[data-testid="pane-actions"]')).toBe("no-drag");
     // The conversation itself never drags.
     expect(await drag(page, '[data-testid="thread-timeline"]')).toBe("");
@@ -143,7 +145,8 @@ test("the panes start 8px from the top and their 44px headers drag the window, w
     // Hidden sidebar: the pane runs under the traffic lights, so the header content
     // starts past the gutter.
     const title = await box(page, "thread-title");
-    if (!visible) expect(title.left).toBeGreaterThanOrEqual(80 + 8);
+    // (The name's button pulls its 6px hover padding into the header's own; its text starts past the gutter.)
+    if (!visible) expect(title.left + 6).toBeGreaterThanOrEqual(80 + 8);
   }
   await expect(page.getByTestId("hints")).toHaveCount(0);
 });

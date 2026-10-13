@@ -62,6 +62,7 @@ test("hidden without links; a link brings the sidebar badge, the header button a
   await row(page, "s:s-1").click();
   await expect(page.getByTestId("pane-actions")).toBeVisible();
   await expect(page.getByTestId("pane-linked-prs")).toHaveCount(0);
+  await expect(page.getByTestId("pane-linked-pr")).toHaveCount(0);
   await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveCount(0);
   await page.keyboard.press("Meta+Shift+e");
   await expect(empty(page)).toBeVisible();
@@ -73,8 +74,10 @@ test("hidden without links; a link brings the sidebar badge, the header button a
 
   await link("s-1", 142);
   await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveText("1 PR");
-  await expect(page.getByTestId("pane-linked-prs")).toHaveAttribute("aria-label", "Show Linked PRs in Side Panel (1)");
-  await expect(page.getByTestId("pane-linked-prs")).toContainText("1");
+  // One link: the header shows that PR, its state icon and number in the state's colour.
+  await expect(page.getByTestId("pane-linked-pr")).toHaveText("#142");
+  await expect(page.getByTestId("pane-linked-pr")).toHaveAttribute("data-state", "open");
+  await expect(page.getByTestId("pane-linked-prs")).toHaveCount(0);
   const entry = empty(page).locator('[data-surface="linkedprs"]');
   await expect(entry).toHaveAttribute("data-availability", "enabled");
   await expect(entry).toContainText("Linked PRs");
@@ -82,7 +85,10 @@ test("hidden without links; a link brings the sidebar badge, the header button a
 
   await link("s-1", 147);
   await expect(row(page, "s:s-1").getByTestId("row-linked-prs")).toHaveText("2 PRs");
-  await expect(page.getByTestId("pane-linked-prs")).toContainText("2");
+  // Two or more: a muted count (view.panel.linked-prs).
+  await expect(page.getByTestId("pane-linked-prs")).toHaveAttribute("aria-label", "Show Linked PRs in Side Panel (2)");
+  await expect(page.getByTestId("pane-linked-prs")).toHaveText("2");
+  await expect(page.getByTestId("pane-linked-pr")).toHaveCount(0);
   // Other threads have none.
   await expect(row(page, "s:s-2").getByTestId("row-linked-prs")).toHaveCount(0);
 });
@@ -165,6 +171,24 @@ test("the sidebar badge opens the surface for its thread and selects it", async 
   await expect(numbers(page)).toHaveText(["#147", "#12"]);
   // Two repositories: each row names its own.
   await expect(list(page).getByTestId("linkedpr-repo")).toHaveText(["· alexwaumann/code-foundry", "· alexwaumann/ghostty-playground"]);
+});
+
+test("one link: the header shows that PR in its state's colour and opens it as a panel tab", async ({ page }) => {
+  await link("s-1", 138);
+  await openApp(page);
+  await row(page, "s:s-1").click();
+  const pr = page.getByTestId("pane-linked-pr");
+  await expect(pr).toHaveText("#138");
+  // Merged, from the PR's cached detail.
+  await expect(pr).toHaveAttribute("data-state", "merged");
+  await expect(pr.locator('svg[aria-label="merged"]')).toBeVisible();
+  // No tooltip: the number is visible.
+  await expect(pr).not.toHaveAttribute("title", /.*/);
+  await pr.click();
+  await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-1");
+  await expect(tabs(page)).toHaveText(["#138"]);
+  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "pullrequest");
+  await expect(page.getByTestId("pr-surface")).toContainText("pace requests through one worker");
 });
 
 test("hover actions: open on GitHub and copy the link", async ({ page }) => {

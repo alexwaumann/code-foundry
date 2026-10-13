@@ -95,7 +95,7 @@ test("status row buttons toggle settings, open help and the palette", async ({ p
   expect((await invocations()).some((i) => i.name === "ui.palette.open")).toBe(false);
 });
 
-test("session pane header: rename, fork and close buttons run the session commands", async ({ page }) => {
+test("session pane header: the name renames, the location opens the worktree, close runs session.close; fork is palette-only", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   const header = page.getByTestId("thread-header");
@@ -104,13 +104,26 @@ test("session pane header: rename, fork and close buttons run the session comman
   expect((await header.boundingBox())?.height).toBe(44);
   // The thread's commands only: no Kill Terminal (a thread has no terminal; session.close ends it).
   await expect(header.getByRole("button", { name: "Kill Terminal" })).toHaveCount(0);
+  // No rename (the name is the button) or fork buttons.
+  await expect(header.getByRole("button", { name: "Rename Thread" })).toHaveCount(0);
+  await expect(header.getByRole("button", { name: "Fork Thread" })).toHaveCount(0);
 
-  // Rename is presented inline in the sidebar, as from the palette.
-  await header.getByRole("button", { name: "Rename Thread" }).click();
+  // A click on the name: rename, presented inline in the sidebar, as from the palette.
+  await header.getByTestId("thread-title").click();
   await expect(page.getByTestId("rename-input")).toBeFocused();
   await page.keyboard.press("Escape");
 
-  await header.getByRole("button", { name: "Fork Thread" }).click();
+  // A click on project @ branch: the Worktree surface in the side panel (view.panel.worktree).
+  await expect(header.getByTestId("thread-location")).toHaveText("code-foundry@main");
+  await header.getByTestId("thread-location").click();
+  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "worktree");
+  await page.keyboard.press("Meta+w");
+  await expect(page.getByTestId("side-panel")).toHaveCount(0);
+
+  // Fork stays in the palette.
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("Fork Thread");
+  await page.getByTestId("palette").locator('[data-command="session.fork"]').click();
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.fork");
   expect((await invocations()).at(-1)?.context?.activeSessionId).toBe("s-1");
   const fork = page.locator('[data-row-kind="session"][aria-selected="true"]');

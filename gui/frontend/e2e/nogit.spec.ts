@@ -104,6 +104,12 @@ test("the composer in a project without git offers only its current checkout; th
   await expect(row.getByTestId("row-project")).toHaveText("writing");
   await expect(row.getByTestId("no-git-badge")).toBeVisible();
   await expect(row.getByTestId("row-branch")).toHaveCount(0);
+  // The header: the folder, the project and No git; no "@", branch or worktree chip.
+  const where = page.getByTestId("thread-location");
+  await expect(where).toHaveText("writingNo git");
+  await expect(where.getByTestId("no-git-badge")).toBeVisible();
+  await expect(where.getByTestId("thread-branch")).toHaveCount(0);
+  await expect(where.getByTestId("thread-worktree-chip")).toHaveCount(0);
 });
 
 test("a git repository without a remote: Publish to GitHub is there", async ({ page }) => {
