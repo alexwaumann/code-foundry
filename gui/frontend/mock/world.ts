@@ -271,6 +271,12 @@ function clean(over: Partial<MockWorktree["status"]> = {}): MockWorktree["status
   return { upstream: "origin/main", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, baseRef: "origin/main", baseAhead: 0, baseBehind: 0, ...over };
 }
 
+/** The daemon's repo.MergedCleanReason == "": not main, on a branch, nothing uncommitted, every commit in baseRef. */
+function mergedClean(w: MockWorktree): boolean {
+  const st = w.status;
+  return !w.isMain && !w.detached && w.branch !== "" && !st.dirty && st.staged + st.modified + st.untracked === 0 && Boolean(st.baseRef) && (st.baseAhead ?? 0) === 0;
+}
+
 function initialRepos(): MockRepo[] {
   return [
     {
@@ -485,6 +491,41 @@ export class World {
     const r = this.repoRef(ref);
     if (r.git === false) throw new CommandError("unavailable", `${r.name} is not a git repository; workspaces need git in every project`);
     return r;
+  }
+
+  /** A worktree on `branch` whose work is in origin/<default> and that has no changes (cleanable unless something holds it). */
+  addMergedWorktree(repoRef: string, branch: string): MockWorktree {
+    return this.addWorktree(this.repoRef(repoRef), branch, `origin/${this.repoRef(repoRef).defaultBranch || "main"}`);
+  }
+
+  /** Why the daemon's cleanupHold keeps a worktree: a live thread, a running terminal, a workspace; "" for nothing. */
+  private cleanupHold(path: string): string {
+    const thread = this.threadsIn([path])[0];
+    if (thread) return `live thread ${thread.name || thread.id} runs in it`;
+    for (const t of this.terms.values()) {
+      if (t.state === TerminalState.RUNNING && (t.labels[LABEL_WORKTREE] === path || t.cwd === path || t.cwd.startsWith(`${path}/`))) return "a terminal is open in it";
+    }
+    for (const ws of this.workspaces.values()) if (ws.members.some((m) => m.worktreePath === path)) return `member of workspace ${ws.name}`;
+    return "";
+  }
+
+  /** RepoService.CleanupWorktrees: what repo.worktree.cleanup removes (dry: only says so) and what it keeps, with why. */
+  cleanupWorktrees(repoRef: string, path: string, dry: boolean): { removed: MockWorktree[]; skipped: { w: MockWorktree; reason: string }[] } {
+    const repo = this.repoRef(repoRef);
+    requireGit(repo, "a cleanup");
+    const candidates = path ? repo.worktrees.filter((w) => w.path === path) : repo.worktrees.filter((w) => !w.isMain);
+    if (path && candidates.length === 0) throw new CommandError("notfound", `worktree ${path} in repo ${repo.name}`);
+    const out: { removed: MockWorktree[]; skipped: { w: MockWorktree; reason: string }[] } = { removed: [], skipped: [] };
+    for (const w of candidates) {
+      const reason = !mergedClean(w) ? (w.isMain ? "main worktree" : w.status.dirty ? "uncommitted changes" : !w.status.baseRef ? "no remote default branch to compare with" : `${String(w.status.baseAhead ?? 0)} commits not in ${w.status.baseRef}`) : this.cleanupHold(w.path);
+      if (reason) {
+        out.skipped.push({ w, reason });
+        continue;
+      }
+      if (!dry) this.dropWorktree(w.path);
+      out.removed.push(w);
+    }
+    return out;
   }
 
   /** A new worktree on `branch` in `repo` (published), where the daemon would put it. */
@@ -1463,7 +1504,7 @@ export class World {
   // ---- Repo API -----------------------------------------------------------------
 
   worktreeMsg(repoId: string, w: MockWorktree): WorktreeInit {
-    return { repoId, path: w.path, branch: w.branch, head: w.head, detached: w.detached ?? false, isMain: w.isMain, status: { ...w.status, refreshedAt: timestampFromDate(new Date()) } };
+    return { repoId, path: w.path, branch: w.branch, head: w.head, detached: w.detached ?? false, isMain: w.isMain, mergedClean: mergedClean(w), status: { ...w.status, refreshedAt: timestampFromDate(new Date()) } };
   }
 
   repoMsg(r: MockRepo): RepoInit {
@@ -2126,6 +2167,36 @@ export class World {
           if (w.wt.status.dirty && args.force !== "true") throw new CommandError("unavailable", "worktree has local changes; use force");
           this.dropWorktree(w.wt.path);
           return `Removed worktree ${w.wt.branch}`;
+        },
+      },
+      {
+        // As internal/command/commands_repo_cleanup.go (the fetch is not modelled).
+        cmd: {
+          name: "repo.worktree.cleanup",
+          title: "Clean Up Merged Worktrees",
+          category: "Project",
+          description: "Fetch, then remove the project's worktrees (or one) whose work is already in origin/<default>. Branches are kept.",
+          keybindings: [],
+          args: [
+            { name: "repo", type: ArgType.STRING, required: true, description: "Repository name or id" },
+            { name: "path", type: ArgType.PATH, required: false, description: "One worktree (default: every merged one)" },
+          ],
+          confirm: (ctx, args) => {
+            const ref = args.repo || ctx?.activeRepoId || "";
+            const rm = this.cleanupWorktrees(ref, args.path ?? "", true).removed;
+            if (rm.length === 0) return `Fetch ${ref} and remove its worktrees whose work is already in the default branch? Branches are kept.`;
+            if (args.path) return `Remove the worktree of ${rm[0]?.branch ?? ""} (${args.path})? Its work is in origin/main; the branch is kept. It is checked again after a fetch.`;
+            return `Remove ${String(rm.length)} ${rm.length === 1 ? "worktree" : "worktrees"} whose work is in origin/main: ${rm.map((w) => w.branch).join(", ")}? Branches are kept; each is checked again after a fetch.`;
+          },
+        },
+        when: (ctx) => Boolean(ctx?.activeRepoId && this.repos.get(ctx.activeRepoId)?.git !== false),
+        run: (ctx, args) => {
+          const res = this.cleanupWorktrees(args.repo || ctx?.activeRepoId || "", args.path ?? "", false);
+          const parts: string[] = [];
+          const n = (k: number) => `${String(k)} ${k === 1 ? "worktree" : "worktrees"}`;
+          if (res.removed.length > 0) parts.push(`Removed ${n(res.removed.length)}: ${res.removed.map((w) => w.branch).join(", ")}`);
+          if (res.skipped.length > 0) parts.push(`${res.removed.length === 0 ? "Nothing removed; kept" : "kept"} ${n(res.skipped.length)}: ${res.skipped.map((s) => `${s.w.branch} (${s.reason})`).join(", ")}`);
+          return parts.join("; ") || "No worktrees to clean up";
         },
       },
       {

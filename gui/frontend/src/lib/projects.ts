@@ -6,6 +6,7 @@
  */
 import { isRemoteless, type RepoView, type WorktreeView } from "@/api/repo";
 import type { SessionView } from "@/api/session";
+import type { TerminalView } from "@/api/terminal";
 import type { WorkspaceView } from "@/api/workspace";
 import { tildify } from "./path";
 
@@ -226,4 +227,61 @@ export function liveThreadCount(sessions: { order: readonly string[]; byId: Read
     if (s?.worktreePath === path && isLiveThread(s)) n++;
   }
   return n;
+}
+
+/** p is root or inside it (snapshot paths: cleaned, symlinks resolved). */
+function inside(p: string, root: string): boolean {
+  if (!p || !root) return false;
+  return p === root || p.startsWith(root.endsWith("/") ? root : `${root}/`);
+}
+
+export interface CleanupSessions {
+  order: readonly string[];
+  byId: Readonly<Record<string, Pick<SessionView, "state" | "worktreePath"> | undefined>>;
+}
+
+export interface CleanupTerminals {
+  order: readonly string[];
+  byId: Readonly<Record<string, Pick<TerminalView, "state" | "cwd" | "labels"> | undefined>>;
+}
+
+/** A live thread runs in the worktree (its cwd is the worktree or inside it). */
+export function threadHolds(sessions: CleanupSessions, path: string): boolean {
+  return sessions.order.some((id) => {
+    const s = sessions.byId[id];
+    return s !== undefined && isLiveThread(s) && inside(s.worktreePath, path);
+  });
+}
+
+/** A terminal that has not exited belongs to the worktree (its worktree label) or runs inside it. */
+export function terminalHolds(terminals: CleanupTerminals, path: string): boolean {
+  return terminals.order.some((id) => {
+    const t = terminals.byId[id];
+    return t !== undefined && t.state !== "exited" && (t.labels.worktree === path || inside(t.cwd, path));
+  });
+}
+
+/** The worktree is (inside) a workspace member. */
+export function memberHolds(workspaces: ProjectsWorkspaces, path: string): boolean {
+  return workspaces.order.some((id) => workspaces.byId[id]?.members.some((m) => inside(path, m.worktreePath)) ?? false);
+}
+
+/**
+ * Whether repo.worktree.cleanup would remove the worktree now: the daemon's git verdict
+ * (mergedClean) and nothing holds it, as the daemon's cleanupHold checks (a live thread,
+ * a terminal that has not exited, a workspace). The daemon checks again after a fetch.
+ */
+export function isCleanable(
+  wt: Pick<WorktreeView, "path" | "mergedClean"> | undefined,
+  sessions: CleanupSessions,
+  terminals: CleanupTerminals,
+  workspaces: ProjectsWorkspaces,
+): boolean {
+  if (!wt?.mergedClean) return false;
+  return !threadHolds(sessions, wt.path) && !terminalHolds(terminals, wt.path) && !memberHolds(workspaces, wt.path);
+}
+
+/** The "in main" tag's tooltip. */
+export function cleanableTitle(baseRef: string | undefined): string {
+  return `Clean: no changes, every commit is in ${baseRef || "origin/<default>"}, no live thread or terminal`;
 }

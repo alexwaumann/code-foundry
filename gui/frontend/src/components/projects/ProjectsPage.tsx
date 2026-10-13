@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
+  Broom,
   ChevronDown,
   ChevronRight,
   CloudUpload,
@@ -50,6 +51,8 @@ import { cn } from "@/lib/utils";
 import { composeIn, composeInWorkspace } from "@/stores/compose";
 import {
   addProject,
+  cleanupMergedWorktrees,
+  cleanupWorktree,
   initGitIn,
   newTerminalIn,
   newWorktreeIn,
@@ -66,6 +69,7 @@ import { showWorkspaceInThread } from "@/stores/workspacePanel";
 import { showWorktreeInPanel } from "@/stores/worktreePanel";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { liveWorkspaceThread } from "@/surfaces/workspaceTarget";
+import { useCleanable, useCleanableCount } from "./useCleanable";
 import { NoGitBadge } from "./NoGitBadge";
 import { OverflowMenu, type OverflowItem } from "./OverflowMenu";
 import { WorkspaceMembers } from "./WorkspaceMembers";
@@ -177,8 +181,14 @@ const KIND_ICON: Record<ProjectKind, { Icon: React.ComponentType<{ className?: s
 
 const UNKNOWN_REPO = { githubSlug: "", remotes: [] };
 
-function WorktreeRow({ repoId, path }: { repoId: string; path: string }) {
+/**
+ * One worktree of a project. `cleanupSlot`: some row of the project can be cleaned up,
+ * so every row keeps a fourth action slot (the broom, or empty) and the columns stay
+ * aligned; projects with nothing to clean up keep three.
+ */
+function WorktreeRow({ repoId, path, cleanupSlot }: { repoId: string; path: string; cleanupSlot: boolean }) {
   const isMain = useReposStore((s) => findWorktree(s, repoId, path)?.isMain ?? false);
+  const cleanable = useCleanable(repoId, path);
   const show: OverflowItem = { label: "Show in side panel", icon: PanelRight, testId: "worktree-show-panel", onSelect: () => { showWorktreeInPanel(repoId, path); } };
   const items: OverflowItem[] = isMain
     ? [show]
@@ -190,7 +200,7 @@ function WorktreeRow({ repoId, path }: { repoId: string; path: string }) {
       </span>
       {/* Always shown, muted at rest; a fixed width so every row's state column ends at the same x. */}
       <span
-        className="flex w-18 shrink-0 items-center justify-end opacity-55 transition-opacity group-hover/wt:opacity-100 group-focus-within/wt:opacity-100 group-aria-selected/wt:opacity-100 has-[[data-state=open]]:opacity-100"
+        className={cn("flex shrink-0 items-center justify-end opacity-55", cleanupSlot ? "w-24" : "w-18", " transition-opacity group-hover/wt:opacity-100 group-focus-within/wt:opacity-100 group-aria-selected/wt:opacity-100 has-[[data-state=open]]:opacity-100")}
         data-testid="worktree-actions"
       >
         <RowAction label="New thread here" testId="worktree-new-thread" onClick={() => { composeIn(repoId, path); }}>
@@ -199,6 +209,13 @@ function WorktreeRow({ repoId, path }: { repoId: string; path: string }) {
         <RowAction label="New terminal here" testId="worktree-new-terminal" onClick={() => void newTerminalIn(repoId, path)}>
           <SquareTerminal />
         </RowAction>
+        {cleanable ? (
+          <RowAction label="Clean up: remove this worktree" testId="worktree-cleanup" className="text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300" onClick={() => void cleanupWorktree(repoId, path)}>
+            <Broom />
+          </RowAction>
+        ) : (
+          cleanupSlot && <span className="size-6 shrink-0" aria-hidden />
+        )}
         <OverflowMenu label="More actions" testId="worktree-more" items={items} />
       </span>
     </NavRow>
@@ -236,10 +253,17 @@ function RefreshAction({ repoId }: { repoId: string }) {
   );
 }
 
-/** A project header's overflow: New worktree… (git), its setup step, then Remove project. */
-function projectMenu(repoId: string, kind: ProjectKind, step: ProjectNextStep): OverflowItem[] {
+/**
+ * A project header's overflow: New worktree… (git), Clean up merged worktrees (git with a
+ * remote: merged means in origin/<default>; disabled at 0), its setup step, then Remove
+ * project.
+ */
+function projectMenu(repoId: string, kind: ProjectKind, step: ProjectNextStep, cleanup: number | null): OverflowItem[] {
   const items: OverflowItem[] = [];
   if (kind !== "nogit") items.push({ label: "New worktree…", icon: GitBranchPlus, testId: "project-new-worktree", onSelect: () => { newWorktreeIn(repoId); } });
+  if (cleanup !== null) {
+    items.push({ label: "Clean up merged worktrees", icon: Broom, testId: "project-cleanup", badge: cleanup, disabled: cleanup === 0, onSelect: () => void cleanupMergedWorktrees(repoId) });
+  }
   if (step === "publish") items.push({ label: "Publish to GitHub…", icon: CloudUpload, testId: "project-menu-publish", onSelect: () => { publishProject(repoId); } });
   if (step === "init") items.push({ label: "Initialize git", icon: GitBranchPlus, testId: "project-menu-init-git", onSelect: () => void initGitIn(repoId) });
   if (items.length > 0) items.push("separator");
@@ -256,6 +280,8 @@ function ProjectBlock({ project, collapsed, filtering }: { project: ProjectModel
     const r = s.byId[repoId];
     return r ? projectNextStep(r) : null;
   });
+  const hasRemote = useReposStore((s) => (s.byId[repoId]?.remotes.length ?? 0) > 0);
+  const cleanable = useCleanableCount(repoId);
   const { Icon, className: iconClass } = KIND_ICON[kind.kind];
   return (
     <section className="group/card rounded-md border" data-testid="project" data-repo={repoId} data-git={kind.kind !== "nogit"} data-kind={kind.kind} data-collapsed={collapsed}>
@@ -310,13 +336,13 @@ function ProjectBlock({ project, collapsed, filtering }: { project: ProjectModel
             <RowAction label="New terminal" testId="project-new-terminal" onClick={() => void newTerminalIn(repoId, main)}>
               <SquareTerminal />
             </RowAction>
-            <OverflowMenu label="More project actions" testId="project-more" items={projectMenu(repoId, kind.kind, step)} />
+            <OverflowMenu label="More project actions" testId="project-more" items={projectMenu(repoId, kind.kind, step, kind.kind !== "nogit" && hasRemote ? cleanable : null)} />
           </span>
         </span>
       </NavRow>
       {!collapsed && (
         <div className="p-0.5">
-          <RowList rows={project.worktrees} rowKey={(p) => projectWorktreeKey(repoId, p)} rowHeight={ROW_H} render={(p) => <WorktreeRow repoId={repoId} path={p} />} />
+          <RowList rows={project.worktrees} rowKey={(p) => projectWorktreeKey(repoId, p)} rowHeight={ROW_H} render={(p) => <WorktreeRow repoId={repoId} path={p} cleanupSlot={cleanable > 0} />} />
           {project.inWorkspaces > 0 && (
             <p className="px-6 py-1 text-xs text-muted-foreground" data-testid="project-in-workspaces">
               {project.inWorkspaces} {project.inWorkspaces === 1 ? "worktree is" : "worktrees are"} in workspaces (below)

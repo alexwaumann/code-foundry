@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   addableRepos,
+  cleanableTitle,
   collapsedProjectSummary,
   collapsedWorkspaceSummary,
   filterProjects,
+  isCleanable,
   liveThreadCount,
   memberKey,
   pageItems,
@@ -238,5 +240,43 @@ describe("liveThreadCount", () => {
     ["", 0],
   ])("%s: %i", (path, want) => {
     expect(liveThreadCount(sessions, path)).toBe(want);
+  });
+});
+
+describe("isCleanable", () => {
+  const WT = "/wt/cf-a";
+  const none = { order: [], byId: {} };
+  type Sessions = Parameters<typeof isCleanable>[1];
+  type Terminals = Parameters<typeof isCleanable>[2];
+  const thread = (state: "connected" | "starting" | "closing" | "disconnected", worktreePath: string): Sessions => ({ order: ["s"], byId: { s: { state, worktreePath } } });
+  const term = (state: "running" | "exited", cwd: string, worktree?: string): Terminals => ({
+    order: ["t"],
+    byId: { t: { state, cwd, labels: worktree ? { kind: "shell", worktree } : {} } },
+  });
+  const member = (path: string): ProjectsWorkspaces => ({ order: ["w"], byId: { w: { id: "w", members: [{ repoId: "r", worktreePath: path }] } } });
+  const merged = { path: WT, mergedClean: true };
+  const cases: { name: string; wt: Parameters<typeof isCleanable>[0]; sessions?: Sessions; terminals?: Terminals; workspaces?: ProjectsWorkspaces; want: boolean }[] = [
+    { name: "merged, nothing holds it", wt: merged, want: true },
+    { name: "not merged clean", wt: { path: WT, mergedClean: false }, want: false },
+    { name: "an older daemon (no flag)", wt: { path: WT }, want: false },
+    { name: "unknown worktree", wt: undefined, want: false },
+    { name: "a live thread in it", wt: merged, sessions: thread("connected", WT), want: false },
+    { name: "a starting thread in a subdirectory", wt: merged, sessions: thread("starting", `${WT}/sub`), want: false },
+    { name: "a disconnected thread does not hold", wt: merged, sessions: thread("disconnected", WT), want: true },
+    { name: "a thread in a sibling with a common prefix", wt: merged, sessions: thread("connected", `${WT}-b`), want: true },
+    { name: "a running shell it owns", wt: merged, terminals: term("running", "/elsewhere", WT), want: false },
+    { name: "a running terminal inside it", wt: merged, terminals: term("running", `${WT}/src`), want: false },
+    { name: "an exited shell does not hold", wt: merged, terminals: term("exited", WT, WT), want: true },
+    { name: "a workspace member", wt: merged, workspaces: member(WT), want: false },
+    { name: "another workspace's member", wt: merged, workspaces: member("/wt/other"), want: true },
+  ];
+  for (const c of cases) {
+    it(c.name, () => {
+      expect(isCleanable(c.wt, c.sessions ?? none, c.terminals ?? none, c.workspaces ?? none)).toBe(c.want);
+    });
+  }
+  it("names the base in its tooltip", () => {
+    expect(cleanableTitle("origin/main")).toBe("Clean: no changes, every commit is in origin/main, no live thread or terminal");
+    expect(cleanableTitle("")).toContain("origin/<default>");
   });
 });
