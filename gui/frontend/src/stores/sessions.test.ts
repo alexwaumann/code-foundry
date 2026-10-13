@@ -3,7 +3,7 @@ import type { SessionView } from "@/api/session";
 import type { TerminalView } from "@/api/terminal";
 import { disconnectReason, formatAgo, sessionBadge } from "@/lib/session";
 import { windowTitle } from "@/lib/title";
-import { deriveContext } from "./context";
+import { deriveContext, emptyContext } from "./context";
 import { dispatchEvent } from "./events";
 import { applyIntent } from "./intents";
 import { emptyRepos, replaceRepos, useReposStore } from "./repos";
@@ -203,6 +203,17 @@ describe("deriveContext for a session", () => {
     const sessions = replaceSessions(emptySessions, [session("s1", { workspaceId: "w-1" })]);
     expect(deriveContext({ kind: "session", id: "s1" }, repos, sessions).activeWorkspaceId).toBe("w-1");
     expect(deriveContext({ kind: "compose", repoId: "r1", workspaceId: "w-2" }, repos, sessions).activeWorkspaceId).toBe("w-2");
+  });
+  it("a thread without a project: no repo or worktree (home is none), so project commands and plain session.new are not offered", () => {
+    const sessions = replaceSessions(emptySessions, [session("s1", { repoId: "", workspaceId: "", worktreePath: "/Users/dev" })]);
+    expect(deriveContext({ kind: "session", id: "s1" }, repos, sessions)).toMatchObject({ activeSessionId: "s1", activeRepoId: "", activeWorktreePath: "", activeView: "session" });
+  });
+  it("an older thread without a repo id inside a project keeps its place", () => {
+    const sessions = replaceSessions(emptySessions, [session("s1", { repoId: "", workspaceId: "", worktreePath: "/src/app/docs" })]);
+    expect(deriveContext({ kind: "session", id: "s1" }, repos, sessions)).toMatchObject({ activeRepoId: "r1", activeWorktreePath: "/src/app" });
+  });
+  it("a composer without a project: the compose view alone", () => {
+    expect(deriveContext({ kind: "compose", repoId: "", noProject: true }, repos)).toEqual({ ...emptyContext, activeView: "compose" });
   });
   it("an unknown session keeps the id", () => {
     const sessions = replaceSessions(emptySessions, [session("s1", { state: "disconnected" })]);
