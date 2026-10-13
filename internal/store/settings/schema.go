@@ -97,7 +97,6 @@ const (
 	KeyDefaultEffort     = "sessions.default_effort"
 	KeyAutoName          = "sessions.auto_name"
 	KeyNamingModel       = "sessions.naming_model"
-	KeyRender            = "sessions.render"
 	KeyCacheTTL          = "sessions.cache_ttl_seconds"
 	KeyCloseGrace        = "sessions.close_grace_seconds"
 	KeyScrollback        = "sessions.scrollback_lines"
@@ -155,20 +154,14 @@ var staticFields = []Field{
 		bind: func(s *Settings) any { return &s.Sessions.NamingModel },
 	},
 	{
-		Key: KeyRender, Group: GroupSessions, Type: Enum, Title: "Thread view",
-		Description: "View for new threads: the composer starts with it, and threads started elsewhere (pull request actions, the CLI without --render) get it. Terminal is Claude Code's own interface; Rendered runs Claude Code headless and the app draws the conversation. A thread keeps its view for life.",
-		Enum:        []string{RenderTerminal, RenderRendered}, EnumLabels: []string{"Terminal", "Rendered"}, Default: RenderTerminal,
-		bind: func(s *Settings) any { return &s.Sessions.Render },
-	},
-	{
 		Key: KeyCacheTTL, Group: GroupSessions, Type: Int, Title: "Prompt cache lifetime (seconds)",
-		Description: "How long the Claude API in use keeps a conversation's prompt cache after its last request: 1 hour on Bedrock and the Anthropic API today (5 minutes only applies to subagents, which live inside a turn). A rendered thread idle longer than this says its next message re-reads the whole context.",
+		Description: "How long the Claude API in use keeps a conversation's prompt cache after its last request: 1 hour on Bedrock and the Anthropic API today (5 minutes only applies to subagents, which live inside a turn). A thread idle longer than this says its next message re-reads the whole context.",
 		Default:     strconv.Itoa(defaultCacheTTL), Min: 60, Max: 86400,
 		bind: func(s *Settings) any { return &s.Sessions.CacheTTLSeconds },
 	},
 	{
 		Key: KeyCloseGrace, Group: GroupSessions, Type: Int, Title: "Close grace (seconds)",
-		Description: "How long closing a session waits for Claude to exit after /exit before killing it.",
+		Description: "How long closing a session waits for Claude to exit after its input is closed before terminating it.",
 		Default:     strconv.Itoa(defaultCloseGrace), Min: 1, Max: 120, Restart: true,
 		bind: func(s *Settings) any { return &s.Sessions.CloseGraceSeconds },
 	},

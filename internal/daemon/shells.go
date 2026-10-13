@@ -41,7 +41,7 @@ type shellReaperOptions struct {
 }
 
 // shellReaper removes the shells terminal.new starts (termlabel.KindShell) once nothing
-// shows them. Other terminals (a session's Claude terminal) are never touched.
+// shows them. Other terminals (unlabelled ones) are never touched.
 //
 //   - A shell is removed as soon as it exits.
 //   - Its worktree is removed (repo.WorktreeRemoved, from repo.worktree.remove, a
