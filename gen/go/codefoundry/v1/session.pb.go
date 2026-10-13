@@ -255,10 +255,13 @@ func (AgentRunStatus) EnumDescriptor() ([]byte, []int) {
 	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{3}
 }
 
-// Ownership: a thread belongs to exactly one owner. When workspace_id is set the owner
-// is that workspace; otherwise it is the project (repository) repo_id. repo_id and
-// worktree_path are facts about the thread's cwd (for a workspace thread, the member
-// worktree it runs in) and never decide the owner.
+// Ownership: a thread has at most one owner. When workspace_id is set the owner is that
+// workspace; otherwise, when repo_id is set, it is the project (repository) repo_id;
+// otherwise the thread has no project (CreateSessionRequest.no_project) and runs in the
+// daemon's home directory. repo_id and worktree_path are facts about the thread's cwd
+// (for a workspace thread, the member worktree it runs in) and never decide the owner
+// beyond that order. Rows from before projects were required may also have an empty
+// repo_id with a worktree_path inside a project; clients may place those by the path.
 type Session struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Our stable id (survives reconnects).
@@ -266,9 +269,11 @@ type Session struct {
 	// Claude's own session id, once discovered from the transcript directory. Needed for
 	// resume; empty until known.
 	ClaudeSessionId string `protobuf:"bytes,2,opt,name=claude_session_id,json=claudeSessionId,proto3" json:"claude_session_id,omitempty"`
-	// Repository of the cwd. The owner when workspace_id is empty.
+	// Repository of the cwd. The owner when workspace_id is empty. Empty, with an empty
+	// workspace_id, for a thread without a project.
 	RepoId string `protobuf:"bytes,3,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
-	// The cwd: the worktree claude runs in.
+	// The cwd: the worktree claude runs in (the home directory for a thread without a
+	// project).
 	WorktreePath string `protobuf:"bytes,4,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
 	// Display name: a short natural title ("Fix the login redirect"). Auto-generated
 	// unless the user named or renamed it.
@@ -300,9 +305,9 @@ type Session struct {
 	BaseRef string `protobuf:"bytes,20,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
 	// Create made the worktree for this session (new_worktree or new_workspace was set).
 	CreatedWorktree bool `protobuf:"varint,21,opt,name=created_worktree,json=createdWorktree,proto3" json:"created_worktree,omitempty"`
-	// Owner workspace (see the ownership rule above); empty for a project thread. Every
-	// spawn of a workspace thread gets --add-dir for the workspace's other member
-	// worktrees, read from the workspace store at launch.
+	// Owner workspace (see the ownership rule above); empty for a project thread and for a
+	// thread without a project. Every spawn of a workspace thread gets --add-dir for the
+	// workspace's other member worktrees, read from the workspace store at launch.
 	WorkspaceId string `protobuf:"bytes,22,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
 	// Member worktree a queued RunIn will move the thread to once it is idle; empty when
 	// nothing is queued. Not persisted: a thread that disconnects first moves its row
@@ -1159,8 +1164,13 @@ type CreateSessionRequest struct {
 	// The composer's text of initial_prompt, kept on the first user message for display
 	// (ThreadItem UserMessageItem.composer_text).
 	ComposerPrompt string `protobuf:"bytes,13,opt,name=composer_prompt,json=composerPrompt,proto3" json:"composer_prompt,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// When set, the thread has no project: it runs in the daemon's home directory with an
+	// empty repo_id and workspace_id (see the ownership rule on Session). Exclusive with
+	// repo_id, worktree_path, new_worktree, workspace_id and new_workspace
+	// (InvalidArgument). RunIn refuses such a thread; Fork and Reconnect keep its cwd.
+	NoProject     bool `protobuf:"varint,14,opt,name=no_project,json=noProject,proto3" json:"no_project,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateSessionRequest) Reset() {
@@ -1275,6 +1285,13 @@ func (x *CreateSessionRequest) GetComposerPrompt() string {
 		return x.ComposerPrompt
 	}
 	return ""
+}
+
+func (x *CreateSessionRequest) GetNoProject() bool {
+	if x != nil {
+		return x.NoProject
+	}
+	return false
 }
 
 type NewWorktree struct {
@@ -2901,7 +2918,7 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x10\n" +
 	"\x03url\x18\x03 \x01(\tR\x03url\x127\n" +
-	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\x85\x04\n" +
+	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\xa4\x04\n" +
 	"\x14CreateSessionRequest\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12#\n" +
 	"\rworktree_path\x18\x02 \x01(\tR\fworktreePath\x12\x14\n" +
@@ -2915,7 +2932,9 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\fworkspace_id\x18\n" +
 	" \x01(\tR\vworkspaceId\x12A\n" +
 	"\rnew_workspace\x18\v \x01(\v2\x1c.codefoundry.v1.NewWorkspaceR\fnewWorkspace\x12'\n" +
-	"\x0fcomposer_prompt\x18\r \x01(\tR\x0ecomposerPromptJ\x04\b\f\x10\rR\x06render\"(\n" +
+	"\x0fcomposer_prompt\x18\r \x01(\tR\x0ecomposerPrompt\x12\x1d\n" +
+	"\n" +
+	"no_project\x18\x0e \x01(\bR\tnoProjectJ\x04\b\f\x10\rR\x06render\"(\n" +
 	"\vNewWorktree\x12\x19\n" +
 	"\bbase_ref\x18\x01 \x01(\tR\abaseRef\"S\n" +
 	"\fNewWorkspace\x12\x14\n" +

@@ -6,7 +6,9 @@
 //
 // Only shells carry labels: a shell started by terminal.new has Kind = KindShell, Repo
 // and Worktree for the worktree it belongs to, and Session when it belongs to a thread
-// (Repo and Worktree are then the thread's). Claude itself never runs in a terminal.
+// (Repo and Worktree are then the thread's: for a thread without a project, Repo is
+// empty and Worktree is its cwd, the home directory). Claude itself never runs in a
+// terminal.
 //
 // A terminal without labels (TerminalService.Create called directly) belongs to nothing.
 package termlabel

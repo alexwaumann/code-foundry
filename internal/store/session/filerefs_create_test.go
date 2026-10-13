@@ -23,6 +23,11 @@ func TestCreateRewritesFileRefs(t *testing.T) {
 			want: func(s Session, _ *wsEnv) string {
 				return "read @" + s.WorktreePath + "/README.md and @docs/a b.md and @x.go"
 			}},
+		{name: "no project: nothing resolves",
+			o: CreateOptions{NoProject: true},
+			want: func(Session, *wsEnv) string {
+				return "read @README.md and @docs/a b.md and @x.go"
+			}},
 		{name: "new worktree: the created worktree",
 			o: CreateOptions{RepoID: "r1", NewWorktree: &NewWorktree{}},
 			want: func(s Session, _ *wsEnv) string {

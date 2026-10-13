@@ -135,6 +135,9 @@ func TestAvailability(t *testing.T) {
 		{"worktree.reveal", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, true},
 		{"worktree.open.editor", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, true},
 		{"session.new", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, true},
+		// The composer may target no project at all (session.new --no-project).
+		{"session.new", command.Context{ActiveView: "compose"}, true},
+		{"session.new", command.Context{ActiveView: "prs"}, false},
 		{"terminal.new", command.Context{ActiveRepoID: "plain", ActiveWorktreePath: "/plain"}, true},
 	}
 	for _, tt := range tests {

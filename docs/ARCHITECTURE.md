@@ -125,7 +125,8 @@ Services (v1):
   remove the thread's shells, unpin, stamp `archived_at`; reconnect, pin and send
   unarchive; `docs/notes/archive-threads-1-daemon.md`), Watch (server stream), StageAttachment (images the first prompt refers to). Create can
   make the worktree first (`new_worktree`), start a thread in a workspace member
-  (`workspace_id`) or in a new workspace (`new_workspace`), sends the first prompt as
+  (`workspace_id`) or in a new workspace (`new_workspace`), or without a project in the
+  home directory (`no_project`; `docs/notes/no-project-1-daemon.md`), sends the first prompt as
   the thread's first user message, and carries a permission mode (never
   bypassPermissions); see `docs/notes/new-thread-composer.md` and
   `docs/notes/workspaces-2-launch.md`. Every thread runs headless (`claude -p` over
@@ -264,8 +265,10 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   prompt as the first user message (with image blocks; see below). It records the Claude
   session id (from `~/.claude/projects/<slug>/*.jsonl`) so dead sessions can be resumed
   with `claude --resume`.
-* A thread has one owner: its workspace when `workspace_id` is set, else its project
-  (`repo_id`). `repo_id`/`worktree_path` are the cwd. Every spawn of a workspace thread
+* A thread has at most one owner: its workspace when `workspace_id` is set, else its
+  project when `repo_id` is set, else none: a thread without a project runs in the home
+  directory (`Options.Home`), pre-trusted like any cwd, and RunIn refuses it
+  (`docs/notes/no-project-1-daemon.md`). `repo_id`/`worktree_path` are the cwd. Every spawn of a workspace thread
   (create, reconnect, fork) reads the workspace's current members from the workspace
   store and adds `--add-dir` for each other member,
   `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`, and one static

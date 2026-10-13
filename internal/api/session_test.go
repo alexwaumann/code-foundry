@@ -166,6 +166,20 @@ func TestSessionCreateWorkspaceFields(t *testing.T) {
 	}
 }
 
+func TestSessionCreateNoProject(t *testing.T) {
+	fake, c := newSessionServer(t)
+	res, err := c.Create(context.Background(), connect.NewRequest(&v1.CreateSessionRequest{NoProject: true, Model: "haiku"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := res.Msg.GetSession(); s.GetRepoId() != "" || s.GetWorkspaceId() != "" || s.GetWorktreePath() != "/home" {
+		t.Errorf("Create without a project = %v", s)
+	}
+	if want := []string{"Create   haiku  no-project"}; !slices.Equal(fake.Calls(), want) {
+		t.Errorf("calls = %q, want %q", fake.Calls(), want)
+	}
+}
+
 func TestSessionRunIn(t *testing.T) {
 	fake, c := newSessionServer(t)
 	ctx := context.Background()
