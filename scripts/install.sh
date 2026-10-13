@@ -4,7 +4,7 @@
 #   gh release download --repo alexwaumann/code-foundry --pattern install.sh -O - | bash
 #
 # Downloads code-foundry-darwin-arm64.tar.gz and checksums.txt from the latest GitHub
-# release (or --version) with the authenticated gh CLI, verifies the checksum, and
+# release of a channel (or --version) with the authenticated gh CLI, verifies the checksum, and
 # installs the app directory ~/.code-foundry/app: code-foundry (daemon + CLI),
 # "Code Foundry" (the GUI) and VERSION. Plain executables, not an .app bundle: managed Macs
 # often block unsigned bundles. An existing install is replaced by unpacking next to it
@@ -19,7 +19,13 @@
 # Uninstall: rm -rf ~/.code-foundry/app ~/.local/bin/code-foundry
 #
 # Options:
-#   --version vX.Y.Z   install that release instead of the latest
+#   --channel stable|tip
+#                      which release is the latest (default stable): stable is GitHub's
+#                      latest full release; tip is the highest version among all
+#                      published releases, prereleases (vX.Y.Z-tip.N) included, so a
+#                      stable promoted after the last tip wins
+#   --version vX.Y.Z   install that release (any tag, e.g. v0.15.0-tip.3) instead of the
+#                      channel's latest
 #   --yes              never prompt
 #   --force            reinstall even if that version is already installed
 #   --skip-path        do not touch ~/.zshrc
@@ -33,7 +39,9 @@
 # Environment:
 #   CODE_FOUNDRY_RELEASE_REPO  owner/name to download from (default below)
 #   CODE_FOUNDRY_RELEASE_DIR   local release source instead of GitHub: DIR/latest holds
-#                              the latest tag, DIR/<tag>/ holds that release's assets
+#                              the latest stable tag, DIR/latest-tip the latest tip tag
+#                              (the tip channel takes the higher of the two),
+#                              DIR/<tag>/ holds that release's assets
 #   CODE_FOUNDRY_GH            gh executable (default: gh on PATH, then Homebrew)
 #   CODE_FOUNDRY_HOME          the daemon's config home (default ~/.code-foundry)
 #   CODE_FOUNDRY_APP_DIR, CODE_FOUNDRY_BIN_DIR   defaults for --app-dir / --bin-dir
@@ -51,6 +59,7 @@ RELEASE_DIR="${CODE_FOUNDRY_RELEASE_DIR:-}"
 APP_DIR="${CODE_FOUNDRY_APP_DIR:-${CODE_FOUNDRY_HOME:-$HOME/.code-foundry}/app}"
 BIN_DIR="${CODE_FOUNDRY_BIN_DIR:-$HOME/.local/bin}"
 TAG=""
+CHANNEL=stable
 YES=0
 FORCE=0
 SKIP_PATH=0
@@ -67,7 +76,7 @@ usage() {
 	if [ -f "$0" ]; then
 		sed -n '2,/^set -euo/p' "$0" | sed -e '$d' -e 's/^# \{0,1\}//'
 	else
-		echo "usage: install.sh [--version vX.Y.Z] [--yes] [--force] [--skip-path] [--skip-link] [--app-dir DIR] [--bin-dir DIR]"
+		echo "usage: install.sh [--channel stable|tip] [--version vX.Y.Z] [--yes] [--force] [--skip-path] [--skip-link] [--app-dir DIR] [--bin-dir DIR]"
 	fi
 }
 
@@ -80,6 +89,15 @@ while [ $# -gt 0 ]; do
 		;;
 	--version=*)
 		TAG="${1#--version=}"
+		shift
+		;;
+	--channel)
+		[ $# -ge 2 ] || die "--channel needs stable or tip"
+		CHANNEL="$2"
+		shift 2
+		;;
+	--channel=*)
+		CHANNEL="${1#--channel=}"
 		shift
 		;;
 	--yes | -y)
@@ -115,6 +133,10 @@ while [ $# -gt 0 ]; do
 	*) die "unknown option: $1 (see --help)" ;;
 	esac
 done
+case "$CHANNEL" in
+stable | tip) ;;
+*) die "unknown channel: '$CHANNEL' (want stable or tip)" ;;
+esac
 
 # Interactive: a terminal to talk to, and not --yes. Prompts read /dev/tty so this works
 # when the script itself arrives on stdin (`... -O - | bash`).
@@ -135,8 +157,42 @@ confirm() {
 	esac
 }
 
+TAG_RE='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+
+# is_tag TAG: a semver release tag, prereleases (v0.15.0-tip.3) included.
 is_tag() {
-	printf '%s' "$1" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+	printf '%s' "$1" | grep -Eq "$TAG_RE"
+}
+
+# highest_tag: the highest semver tag among the lines on stdin (others are skipped), or
+# nothing. Semver precedence: a prerelease sorts below its release (v0.15.0-tip.3 <
+# v0.15.0), numeric identifiers compare as numbers (tip.10 > tip.9), build metadata is
+# ignored.
+highest_tag() {
+	{ grep -E "$TAG_RE" || true; } | awk '
+	function cmpid(x, y,   xn, yn) {
+		xn = (x ~ /^[0-9]+$/); yn = (y ~ /^[0-9]+$/)
+		if (xn && yn) return (x + 0 < y + 0) ? -1 : (x + 0 > y + 0)
+		if (xn) return -1
+		if (yn) return 1
+		return (x < y) ? -1 : (x > y)
+	}
+	function cmp(a, b,   i, n, m, ap, bp, A, B, r) {
+		sub(/^v/, "", a); sub(/\+.*/, "", a)
+		sub(/^v/, "", b); sub(/\+.*/, "", b)
+		ap = ""; i = index(a, "-"); if (i) { ap = substr(a, i + 1); a = substr(a, 1, i - 1) }
+		bp = ""; i = index(b, "-"); if (i) { bp = substr(b, i + 1); b = substr(b, 1, i - 1) }
+		split(a, A, "."); split(b, B, ".")
+		for (i = 1; i <= 3; i++) if (A[i] + 0 != B[i] + 0) return (A[i] + 0 < B[i] + 0) ? -1 : 1
+		if (ap == bp) return 0
+		if (ap == "") return 1
+		if (bp == "") return -1
+		n = split(ap, A, "."); m = split(bp, B, ".")
+		for (i = 1; i <= n && i <= m; i++) if ((r = cmpid(A[i], B[i])) != 0) return r
+		return (n < m) ? -1 : (n > m)
+	}
+	best == "" || cmp($0, best) > 0 { best = $0 }
+	END { if (best != "") print best }'
 }
 
 # installed_version DIR -> the version an app directory was installed as: its VERSION
@@ -173,7 +229,7 @@ if [ -z "$RELEASE_DIR" ]; then
 	export GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1
 fi
 
-if [ -z "$TAG" ]; then
+if [ -z "$TAG" ] && [ "$CHANNEL" = stable ]; then
 	if [ -n "$RELEASE_DIR" ]; then
 		[ -f "$RELEASE_DIR/latest" ] || die "no release published in $RELEASE_DIR (missing $RELEASE_DIR/latest)"
 		TAG="$(tr -d '[:space:]' <"$RELEASE_DIR/latest")"
@@ -181,8 +237,30 @@ if [ -z "$TAG" ]; then
 		TAG="$("$GH" api "repos/$REPO/releases/latest" --jq .tag_name 2>/dev/null)" ||
 			die "no published release found in $REPO (or gh cannot see the repository)"
 	fi
+elif [ -z "$TAG" ]; then
+	# Tip: the highest version of all, which is a stable when one was promoted after the
+	# last tip. A malformed pointer is an error, not something to skip.
+	if [ -n "$RELEASE_DIR" ]; then
+		[ -f "$RELEASE_DIR/latest-tip" ] || [ -f "$RELEASE_DIR/latest" ] ||
+			die "no release published in $RELEASE_DIR (missing $RELEASE_DIR/latest-tip and $RELEASE_DIR/latest)"
+		tags=""
+		for f in latest-tip latest; do
+			[ -f "$RELEASE_DIR/$f" ] || continue
+			t="$(tr -d '[:space:]' <"$RELEASE_DIR/$f")"
+			is_tag "$t" || die "not a release version: '$t' in $RELEASE_DIR/$f"
+			tags="$tags$t
+"
+		done
+		TAG="$(printf '%s' "$tags" | highest_tag)"
+	else
+		tags="$("$GH" api --paginate "repos/$REPO/releases?per_page=100" --jq '.[] | select(.draft | not) | .tag_name' 2>/dev/null)" ||
+			die "cannot list the releases of $REPO (or gh cannot see the repository)"
+		TAG="$(printf '%s\n' "$tags" | highest_tag)"
+		[ -n "$TAG" ] || die "no published release found in $REPO"
+	fi
+	say "tip channel: $TAG"
 fi
-is_tag "$TAG" || die "not a release version: '$TAG' (want vMAJOR.MINOR.PATCH)"
+is_tag "$TAG" || die "not a release version: '$TAG' (want vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-tip.N)"
 
 # ---- already installed? ---------------------------------------------------------------
 

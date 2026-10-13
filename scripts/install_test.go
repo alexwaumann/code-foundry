@@ -391,3 +391,172 @@ func TestInstallRefusesWithoutGh(t *testing.T) {
 		t.Fatalf("err = %v\n%s", err, out)
 	}
 }
+
+// pointer writes a release dir pointer file (latest or latest-tip) holding tag.
+func pointer(t *testing.T, relDir, file, tag string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(relDir, file), []byte(tag+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The tip channel takes the higher of latest-tip and latest in a local release dir, so
+// a stable promoted after the last tip wins; the default channel reads latest only.
+func TestInstallTipChannelReleaseDir(t *testing.T) {
+	tests := []struct {
+		name          string
+		stable, tip   string // pointer contents; "" leaves the file out
+		args          []string
+		want, wantOut string
+	}{
+		{"stable is the default", "v0.14.41", "v0.15.0-tip.2", nil, "v0.14.41", ""},
+		{"explicit stable", "v0.14.41", "v0.15.0-tip.2", []string{"--channel", "stable"}, "v0.14.41", ""},
+		{"tip ahead of stable", "v0.14.41", "v0.15.0-tip.2", []string{"--channel", "tip"}, "v0.15.0-tip.2", "tip channel: v0.15.0-tip.2"},
+		{"promotion after the last tip", "v0.15.0", "v0.15.0-tip.3", []string{"--channel=tip"}, "v0.15.0", "tip channel: v0.15.0"},
+		{"numeric tip order", "v0.15.0-tip.2", "v0.15.0-tip.10", []string{"--channel", "tip"}, "v0.15.0-tip.10", ""},
+		{"no tip yet", "v0.14.41", "", []string{"--channel", "tip"}, "v0.14.41", ""},
+		{"only a tip", "", "v0.1.0-tip.1", []string{"--channel", "tip"}, "v0.1.0-tip.1", ""},
+		{"--version takes a tip tag", "v0.15.0", "v0.15.0-tip.3", []string{"--version", "v0.15.0-tip.2"}, "v0.15.0-tip.2", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newInstallEnv(t)
+			for _, tag := range []string{"v0.1.0-tip.1", "v0.14.41", "v0.15.0-tip.2", "v0.15.0-tip.3", "v0.15.0-tip.10", "v0.15.0"} {
+				fakeRelease(t, e.rel, tag, tag)
+			}
+			_ = os.Remove(filepath.Join(e.rel, "latest"))
+			if tt.stable != "" {
+				pointer(t, e.rel, "latest", tt.stable)
+			}
+			if tt.tip != "" {
+				pointer(t, e.rel, "latest-tip", tt.tip)
+			}
+			out, err := e.run(t, append([]string{"--skip-path"}, tt.args...)...)
+			if err != nil {
+				t.Fatalf("%v\n%s", err, out)
+			}
+			if v := e.installedVersion(t); v != tt.want {
+				t.Fatalf("installed %s, want %s\n%s", v, tt.want, out)
+			}
+			if !strings.Contains(out, tt.wantOut) {
+				t.Fatalf("output lacks %q:\n%s", tt.wantOut, out)
+			}
+		})
+	}
+}
+
+func TestInstallTipChannelErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		prepare func(t *testing.T, e installEnv)
+		args    []string
+		want    string
+	}{
+		{
+			name:    "malformed latest-tip",
+			prepare: func(t *testing.T, e installEnv) { pointer(t, e.rel, "latest-tip", "tip") },
+			args:    []string{"--channel", "tip"},
+			want:    "not a release version: 'tip'",
+		},
+		{
+			name:    "nothing published",
+			prepare: func(t *testing.T, e installEnv) { _ = os.Remove(filepath.Join(e.rel, "latest")) },
+			args:    []string{"--channel", "tip"},
+			want:    "no release published",
+		},
+		{
+			name:    "unknown channel",
+			prepare: func(*testing.T, installEnv) {},
+			args:    []string{"--channel", "beta"},
+			want:    "unknown channel",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newInstallEnv(t)
+			fakeRelease(t, e.rel, "v0.1.0", "v0.1.0")
+			tt.prepare(t, e)
+			out, err := e.run(t, tt.args...)
+			if err == nil || !strings.Contains(out, tt.want) {
+				t.Fatalf("err = %v, want output containing %q:\n%s", err, tt.want, out)
+			}
+		})
+	}
+}
+
+// fakeGh writes an authenticated gh that serves releases from $FAKE_REL: `api
+// …/releases/latest` prints $FAKE_STABLE, `api …/releases` prints $FAKE_TAGS one per
+// line (what the --jq filter would print), and `release download <tag> … --dir D`
+// copies $FAKE_REL/<tag>/*. Each api call's arguments are appended to the returned log.
+func fakeGh(t *testing.T, dir string) (gh, log string) {
+	t.Helper()
+	gh = filepath.Join(dir, "gh")
+	log = filepath.Join(dir, "gh.log")
+	script := `#!/bin/sh
+case "$1" in
+auth) exit 0 ;;
+api)
+	echo "$*" >>"` + log + `"
+	case "$*" in
+	*releases/latest*) echo "$FAKE_STABLE" ;;
+	*) printf '%s\n' $FAKE_TAGS ;;
+	esac
+	;;
+release)
+	tag="$3"
+	while [ $# -gt 0 ]; do
+		[ "$1" = --dir ] && out="$2"
+		shift
+	done
+	cp "$FAKE_REL/$tag/"* "$out/"
+	;;
+*) exit 1 ;;
+esac
+`
+	if err := os.WriteFile(gh, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return gh, log
+}
+
+// Against GitHub, tip lists every non-draft release and takes the highest semver.
+func TestInstallTipChannelGitHub(t *testing.T) {
+	tests := []struct {
+		name, channel, tags, want string
+	}{
+		{"stable uses releases/latest", "stable", "v0.15.0-tip.2 v0.14.41", "v0.14.41"},
+		{"tip ahead", "tip", "v0.15.0-tip.9 v0.15.0-tip.10 v0.14.42-tip.1 v0.14.41", "v0.15.0-tip.10"},
+		{"promoted stable wins", "tip", "v0.15.0 v0.15.0-tip.3 v0.15.0-tip.2 v0.14.41", "v0.15.0"},
+		{"prerelease ordering", "tip", "v1.0.0-alpha v1.0.0-1 v0.14.41", "v1.0.0-alpha"},
+		{"other tags are skipped", "tip", "nightly v0.14.41 v0.15.0-tip.2", "v0.15.0-tip.2"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newInstallEnv(t)
+			for _, tag := range strings.Fields(tt.tags) {
+				if tag != "nightly" {
+					fakeRelease(t, e.rel, tag, tag)
+				}
+			}
+			gh, log := fakeGh(t, e.home)
+			e.env = []string{
+				"CODE_FOUNDRY_RELEASE_DIR=", // the GitHub path
+				"CODE_FOUNDRY_GH=" + gh,
+				"FAKE_REL=" + e.rel,
+				"FAKE_STABLE=v0.14.41",
+				"FAKE_TAGS=" + tt.tags,
+			}
+			out, err := e.run(t, "--skip-path", "--channel", tt.channel)
+			if err != nil {
+				t.Fatalf("%v\n%s", err, out)
+			}
+			if v := e.installedVersion(t); v != tt.want {
+				t.Fatalf("installed %s, want %s\n%s", v, tt.want, out)
+			}
+			calls, _ := os.ReadFile(log)
+			if tt.channel == "tip" && (!strings.Contains(string(calls), "--paginate") || !strings.Contains(string(calls), "select(.draft | not)")) {
+				t.Fatalf("tip did not list non-draft releases with pagination: %s", calls)
+			}
+		})
+	}
+}
