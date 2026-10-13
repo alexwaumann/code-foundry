@@ -153,6 +153,14 @@ describe("handleKeyDown precedence", () => {
     expect(runCommandForResult).not.toHaveBeenCalled();
   });
 
+  it("thread prompt focus: an unbound cmd chord on a list for an older context stays with the prompt (cmd+backspace)", () => {
+    document.body.insertAdjacentHTML("beforeend", '<div data-chord-yield><div id="pr" contenteditable="true"></div></div>');
+    useCommandsStore.setState({ contextKey: "older" });
+    const e = press(document.getElementById("pr") as HTMLElement, { key: "Backspace", code: "Backspace", metaKey: true });
+    expect(e.defaultPrevented).toBe(false);
+    expect(runCommandForResult).not.toHaveBeenCalled();
+  });
+
   it("terminal focus: a cmd chord on a list for an older context waits for the re-list (cmd+t right after focusing a shell)", async () => {
     const commands = useCommandsStore.getState().commands;
     useCommandsStore.setState({ commands: commands.map((c) => (c.name === "terminal.new" ? { ...c, available: false } : c)), contextKey: "older" });
@@ -362,6 +370,12 @@ describe("a bare-key command chord (Escape interrupts a thread)", () => {
     setup();
     expect(press(target(), escape).defaultPrevented).toBe(false);
     expect(runCommandForResult).not.toHaveBeenCalled();
+  });
+
+  it("fires from a composer button (not the prompt's text) while the thread works", () => {
+    pane.insertAdjacentHTML("beforeend", '<div data-chord-yield><button id="picker" type="button"></button></div>');
+    expect(press(document.getElementById("picker") as HTMLElement, escape).defaultPrevented).toBe(true);
+    expect(runCommandForResult).toHaveBeenCalledWith("thread.interrupt", {}, expect.objectContaining({ quiet: true }));
   });
 
   it("modified chords keep firing anywhere", () => {

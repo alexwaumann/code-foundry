@@ -339,15 +339,17 @@ export function startCommandNamed(name: string): boolean {
 function isEditable(el: Element | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
   if (el.closest("[data-terminal-host]")) return false; // xterm's hidden textarea
-  return el.isContentEditable || el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
+  // isContentEditable, spelled out for DOMs without it (jsdom).
+  const editableText = el.isContentEditable || el.closest('[contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]') !== null;
+  return editableText || el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
 }
 
 /**
  * Key precedence:
  *  1. Global view actions (cmd+k, cmd+shift+p, cmd+b, cmd+shift+a, cmd+1..9, zoom) always win
  *     (cmd+1..9 belong to the project picker while it is open).
- *  2. A focused terminal or thread prompt ([data-chord-yield]) consumes everything else,
- *     except cmd chords bound to commands (see terminalYields).
+ *  2. A focused terminal or a thread prompt's text ([data-chord-yield]) consumes everything
+ *     else, except cmd chords bound to commands (see terminalYields).
  *  3. A focused text field (palette input, rename field) consumes everything else.
  *  4. F2 renames the selected session (the cursor row inside the tree); command
  *     keybindings from CommandService.List for the current context.
@@ -369,16 +371,20 @@ export function handleKeyDown(e: KeyboardEvent): void {
     return;
   }
   const target = e.target instanceof Element ? e.target : null;
-  if (target?.closest("[data-terminal-host], [data-chord-yield]")) {
+  const shell = Boolean(target?.closest("[data-terminal-host]"));
+  // Only the prompt's text yields: a composer button or picker keeps the usual keys
+  // (Escape interrupts, F2 renames).
+  if (shell || (isEditable(target) && target?.closest("[data-chord-yield]"))) {
     if (useUiStore.getState().palette.open) return;
     const yielded = terminalYields(chord);
     if (yielded) {
       e.preventDefault();
       e.stopPropagation();
       startCommand(yielded);
-    } else if (terminalYieldable(chord)) {
+    } else if (shell && terminalYieldable(chord)) {
       // Focusing a shell changes the context (a Projects-page shell brings its worktree):
-      // cmd+t right after it must not be lost to the debounced re-list.
+      // cmd+t right after it must not be lost to the debounced re-list. Not in a prompt:
+      // its unbound cmd chords edit (cmd+arrows, cmd+backspace) and must not be held.
       startWhenListed(e, chord);
     }
     return;
