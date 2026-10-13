@@ -18,6 +18,13 @@ describe("DaemonStatus", () => {
     expect(screen.queryByText(/syncing/)).toBeNull();
   });
 
+  it("renders a tip build as vX.Y.Z (tip N)", () => {
+    useHealthStore.setState({ status: "ok", health: { pid: 1, version: "v0.15.0-tip.3", uptimeSeconds: 1 }, error: null });
+    useEventsStore.setState({ stream: "open" });
+    render(<DaemonStatus />);
+    expect(screen.getByTestId("version").textContent).toBe("v0.15.0 (tip 3)");
+  });
+
   it("says so while the events stream is not open", () => {
     useHealthStore.setState({ status: "ok", health: { pid: 1, version: "dev", uptimeSeconds: 1 }, error: null });
     useEventsStore.setState({ stream: "retrying" });

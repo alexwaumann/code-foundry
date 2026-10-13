@@ -35,6 +35,19 @@ export function compareVersions(a: string, b: string): number | null {
   return Math.sign(x.pre.length - y.pre.length);
 }
 
+const TIP = /^(v?\d+\.\d+\.\d+)-tip\.(\d+)$/;
+
+/**
+ * A version as the GUI shows it. Tip builds are tagged `vX.Y.Z-tip.N` (strict semver: a
+ * prerelease of the next stable, N = tip releases since the last stable) and read
+ * `vX.Y.Z (tip N)`; stable tags and anything else ("dev") are shown as they are. The
+ * CLI, tags and release names keep the raw tag.
+ */
+export function displayVersion(v: string): string {
+  const m = TIP.exec(v);
+  return m ? `${m[1] ?? ""} (tip ${m[2] ?? ""})` : v;
+}
+
 /** The window and the daemon run different versions (see versionMismatch). */
 export interface Mismatch {
   /** The window's version. */
@@ -89,7 +102,7 @@ export interface UpdateBadge {
  */
 export function updateBadge(status: UpdateStatusView | null, guiVersion: string | null): UpdateBadge | null {
   if (!status) return null;
-  const target = status.targetVersion;
+  const target = displayVersion(status.targetVersion);
   switch (status.state) {
     case "available":
       return { kind: "available", label: `${target} available`, cta: "Install" };
@@ -102,7 +115,7 @@ export function updateBadge(status: UpdateStatusView | null, guiVersion: string 
       return { kind: "installed", label: `${target} installed`, cta: "Restart to apply" };
     case "idle": {
       const m = versionMismatch(status, guiVersion);
-      return m ? { kind: "installed", label: `${m.version} installed`, cta: "Restart to apply" } : null;
+      return m ? { kind: "installed", label: `${displayVersion(m.version)} installed`, cta: "Restart to apply" } : null;
     }
   }
 }
@@ -159,6 +172,15 @@ function laterFor(t: ThreadActivity): string {
   return t.busy > 0 ? "Wait, I’ll restart later" : "Later";
 }
 
+/**
+ * On the stable channel, the latest stable release is older than the running build: a
+ * switch from tip, which never offers a downgrade. The next stable release above this
+ * build is offered as a normal update.
+ */
+export function olderStable(status: UpdateStatusView): boolean {
+  return status.channel === "stable" && compareVersions(status.latestVersion, status.currentVersion) === -1;
+}
+
 function sentence(s: string): string {
   if (!s) return "";
   const t = `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
@@ -170,24 +192,26 @@ function sentence(s: string): string {
  * window's own version, the live/busy thread counts, and whether Restart Now already ran.
  */
 export function updateView(status: UpdateStatusView, guiVersion: string | null, t: ThreadActivity, restarting = false): UpdateView {
-  const target = status.targetVersion;
-  const current = status.currentVersion;
-  const base = { version: target, later: "Later", close: false, showBusy: false, mismatch: null };
+  // Copy shows versions through displayVersion; `version` and `mismatch` keep the tags.
+  const target = displayVersion(status.targetVersion);
+  const current = displayVersion(status.currentVersion);
+  const base = { version: status.targetVersion, later: "Later", close: false, showBusy: false, mismatch: null };
   if (restarting) {
     return { ...base, variant: "restarting", title: "Restarting…", body: "Code Foundry will reopen in a moment.", later: null };
   }
   if (!status.enabled) {
-    return { ...base, variant: "disabled", version: current, title: "Updates are off for this build", body: sentence(status.disabledReason), later: null, close: true };
+    return { ...base, variant: "disabled", version: status.currentVersion, title: "Updates are off for this build", body: sentence(status.disabledReason), later: null, close: true };
   }
   const m = versionMismatch(status, guiVersion);
   if (m) {
-    const where =
-      compareVersions(m.app, m.daemon) === 1 ? `The app is on ${m.app} but the daemon is still on ${m.daemon}` : `The daemon is on ${m.daemon} but the app is still on ${m.app}`;
+    const app = displayVersion(m.app);
+    const daemon = displayVersion(m.daemon);
+    const where = compareVersions(m.app, m.daemon) === 1 ? `The app is on ${app} but the daemon is still on ${daemon}` : `The daemon is on ${daemon} but the app is still on ${app}`;
     return {
       ...base,
       variant: "partlyApplied",
       version: m.version,
-      title: `Code Foundry ${m.version} is partly applied`,
+      title: `Code Foundry ${displayVersion(m.version)} is partly applied`,
       body: `${where}; some things won’t work until you restart.${t.busy > 0 ? ` ${cutOff(t.busy)}` : ""}`,
       later: laterFor(t),
       showBusy: t.busy > 0,
@@ -199,9 +223,9 @@ export function updateView(status: UpdateStatusView, guiVersion: string | null, 
       return {
         ...base,
         variant: "upToDate",
-        version: current,
+        version: status.currentVersion,
         title: status.checking ? "Checking for updates…" : "You’re up to date",
-        body: `Code Foundry ${current} is the latest version.`,
+        body: olderStable(status) ? sentence(`stable ${displayVersion(status.latestVersion)} is older than this build; the next stable release will move you`) : `Code Foundry ${current} is the latest version.`,
         later: null,
         close: true,
       };

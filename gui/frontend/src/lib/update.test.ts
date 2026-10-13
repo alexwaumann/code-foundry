@@ -1,6 +1,36 @@
 import { describe, expect, it } from "vitest";
 import type { UpdateStateView, UpdateStatusView } from "@/api/update";
-import { busyHeading, compareVersions, failureHeadline, updateBadge, updateView, versionMismatch, type ThreadActivity, type UpdateVariant } from "./update";
+import { busyHeading, compareVersions, displayVersion, failureHeadline, olderStable, updateBadge, updateView, versionMismatch, type ThreadActivity, type UpdateVariant } from "./update";
+
+describe("displayVersion", () => {
+  it.each([
+    ["v0.15.0-tip.3", "v0.15.0 (tip 3)"],
+    ["v0.14.42-tip.1", "v0.14.42 (tip 1)"],
+    ["v1.0.0-tip.12", "v1.0.0 (tip 12)"],
+    ["0.15.0-tip.3", "0.15.0 (tip 3)"],
+    ["v0.15.0", "v0.15.0"],
+    ["v1.0.0-rc.1", "v1.0.0-rc.1"],
+    ["v0.15.0-tip", "v0.15.0-tip"],
+    ["v0.15.0-tip.3.1", "v0.15.0-tip.3.1"],
+    ["dev", "dev"],
+    ["", ""],
+  ])("%s", (v, want) => {
+    expect(displayVersion(v)).toBe(want);
+  });
+});
+
+describe("olderStable", () => {
+  it.each<[string, Partial<UpdateStatusView>, boolean]>([
+    ["tip build on stable, stable behind", { channel: "stable", currentVersion: "v0.15.0-tip.2", latestVersion: "v0.14.41" }, true],
+    ["tip build on stable, promotion landed", { channel: "stable", currentVersion: "v0.15.0-tip.2", latestVersion: "v0.15.0" }, false],
+    ["stable build up to date", { channel: "stable", currentVersion: "v0.14.41", latestVersion: "v0.14.41" }, false],
+    ["tip channel never says so", { channel: "tip", currentVersion: "v0.15.0-tip.2", latestVersion: "v0.14.41" }, false],
+    ["not checked since the switch", { channel: "stable", currentVersion: "v0.15.0-tip.2", latestVersion: "" }, false],
+    ["dev build", { channel: "stable", currentVersion: "dev", latestVersion: "v0.14.41" }, false],
+  ])("%s", (_name, over, want) => {
+    expect(olderStable(status("idle", over))).toBe(want);
+  });
+});
 
 function status(state: UpdateStateView, over: Partial<UpdateStatusView> = {}): UpdateStatusView {
   return {
@@ -9,6 +39,7 @@ function status(state: UpdateStateView, over: Partial<UpdateStatusView> = {}): U
     enabled: true,
     disabledReason: "",
     releaseRepo: "o/n",
+    channel: "stable",
     checking: false,
     lastCheckedAt: null,
     lastCheckError: "",
@@ -67,6 +98,10 @@ describe("updateBadge", () => {
     ["partly applied: daemon restarted first", status("idle", { currentVersion: "v0.2.0" }), "v0.1.0", "v0.2.0 installed", "Restart to apply"],
     ["dev GUI against a release daemon", status("idle", { currentVersion: "v0.2.0" }), "dev", null, null],
     ["dev daemon, disabled", status("idle", { currentVersion: "dev", enabled: false }), "dev", null, null],
+    ["tip available", status("available", { targetVersion: "v0.15.0-tip.3", channel: "tip" }), null, "v0.15.0 (tip 3) available", "Install"],
+    ["tip installing", status("downloading", { targetVersion: "v0.15.0-tip.3", channel: "tip" }), null, "Installing v0.15.0 (tip 3)…", ""],
+    ["tip installed", status("installed", { targetVersion: "v0.15.0-tip.3", channel: "tip" }), null, "v0.15.0 (tip 3) installed", "Restart to apply"],
+    ["tip partly applied", status("idle", { currentVersion: "v0.15.0-tip.2" }), "v0.15.0-tip.3", "v0.15.0 (tip 3) installed", "Restart to apply"],
   ])("%s", (_name, st, gui, label, cta) => {
     const b = updateBadge(st, gui);
     expect(b?.label ?? null).toBe(label);
@@ -154,6 +189,71 @@ describe("updateView", () => {
     ["installing", status("downloading"), "v0.1.0", none, false, "installing", "Installing v0.2.0…", "You can close this and keep working.", "Hide", false, false],
     ["up to date", status("idle"), "v0.1.0", { live: 2, busy: 1 }, false, "upToDate", "You’re up to date", "Code Foundry v0.1.0 is the latest version.", null, true, false],
     ["checking", status("idle", { checking: true }), null, none, false, "upToDate", "Checking for updates…", "Code Foundry v0.1.0 is the latest version.", null, true, false],
+    [
+      "up to date on tip",
+      status("idle", { channel: "tip", currentVersion: "v0.15.0-tip.3", latestVersion: "v0.15.0-tip.3" }),
+      null,
+      none,
+      false,
+      "upToDate",
+      "You’re up to date",
+      "Code Foundry v0.15.0 (tip 3) is the latest version.",
+      null,
+      true,
+      false,
+    ],
+    [
+      "tip to stable, tip ahead: older stable",
+      status("idle", { channel: "stable", currentVersion: "v0.15.0-tip.2", latestVersion: "v0.14.41" }),
+      null,
+      none,
+      false,
+      "upToDate",
+      "You’re up to date",
+      "Stable v0.14.41 is older than this build; the next stable release will move you.",
+      null,
+      true,
+      false,
+    ],
+    [
+      "tip to stable, tip behind: the promotion is offered",
+      status("available", { channel: "stable", currentVersion: "v0.15.0-tip.2", latestVersion: "v0.15.0", targetVersion: "v0.15.0" }),
+      null,
+      none,
+      false,
+      "available",
+      "Code Foundry v0.15.0 is available",
+      "You’re on v0.15.0 (tip 2). Installing happens in the background; you’ll be asked to restart when it’s done.",
+      "Later",
+      false,
+      false,
+    ],
+    [
+      "stable to tip, tip ahead",
+      status("available", { channel: "tip", currentVersion: "v0.14.41", latestVersion: "v0.15.0-tip.3", targetVersion: "v0.15.0-tip.3" }),
+      null,
+      none,
+      false,
+      "available",
+      "Code Foundry v0.15.0 (tip 3) is available",
+      "You’re on v0.14.41. Installing happens in the background; you’ll be asked to restart when it’s done.",
+      "Later",
+      false,
+      false,
+    ],
+    [
+      "tip partly applied",
+      status("installed", { channel: "tip", currentVersion: "v0.15.0-tip.2", targetVersion: "v0.15.0-tip.3" }),
+      "v0.15.0-tip.3",
+      none,
+      false,
+      "partlyApplied",
+      "Code Foundry v0.15.0 (tip 3) is partly applied",
+      "The app is on v0.15.0 (tip 3) but the daemon is still on v0.15.0 (tip 2); some things won’t work until you restart.",
+      "Later",
+      false,
+      false,
+    ],
     [
       "partly applied: GUI newer, idle, busy threads",
       status("idle"),

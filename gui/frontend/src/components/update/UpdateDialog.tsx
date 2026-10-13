@@ -6,7 +6,7 @@ import type { UpdateStatusView } from "@/api/update";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { formatAgo } from "@/lib/session";
-import { busyHeading, failureHeadline, updateView, type UpdateVariant, type UpdateView } from "@/lib/update";
+import { busyHeading, displayVersion, failureHeadline, updateView, type UpdateVariant, type UpdateView } from "@/lib/update";
 import { cn } from "@/lib/utils";
 import { closeUpdateDialog, runUpdateAction, useBusyThreadNames, useLiveSessionCount, useUpdateStore, type UpdateAction } from "@/stores/update";
 
@@ -27,13 +27,18 @@ const primaries: Partial<Record<UpdateVariant, Primary>> = {
   readyBusy: restart,
   readyOpen: restart,
   partlyApplied: restart,
-  available: { action: "install", label: (v) => `Install ${v.version}`, icon: Download },
+  available: { action: "install", label: (v) => `Install ${displayVersion(v.version)}`, icon: Download },
   failed: { action: "install", label: () => "Try Again" },
   upToDate: { action: "check", label: () => "Check Again", outline: true },
 };
 
 function checked(st: UpdateStatusView): string {
   return st.lastCheckedAt ? `Checked ${formatAgo(st.lastCheckedAt.getTime())}` : "Not checked yet";
+}
+
+/** "Running v0.15.0 (tip 3) · tip channel". */
+function running(st: UpdateStatusView): string {
+  return `Running ${displayVersion(st.currentVersion)} · ${st.channel} channel`;
 }
 
 function NotesLink({ url }: { url: string }) {
@@ -56,30 +61,41 @@ function RepoLink({ repo }: { repo: string }) {
 
 /** The 11px line at the foot of the dialog, per variant. */
 const metas: Partial<Record<UpdateVariant, (st: UpdateStatusView, v: UpdateView) => ReactNode[]>> = {
-  readyIdle: (st) => [`Running ${st.currentVersion}`, <NotesLink key="n" url={st.notesUrl} />],
-  readyBusy: (st) => [`Running ${st.currentVersion}`, <NotesLink key="n" url={st.notesUrl} />],
-  readyOpen: (st) => [`Running ${st.currentVersion}`, <NotesLink key="n" url={st.notesUrl} />],
+  readyIdle: (st) => [running(st), <NotesLink key="n" url={st.notesUrl} />],
+  readyBusy: (st) => [running(st), <NotesLink key="n" url={st.notesUrl} />],
+  readyOpen: (st) => [running(st), <NotesLink key="n" url={st.notesUrl} />],
   available: (st) => [checked(st), <NotesLink key="n" url={st.notesUrl} />],
   upToDate: (st) => [checked(st), <RepoLink key="r" repo={st.releaseRepo} />],
-  partlyApplied: (_st, v) => (v.mismatch ? [`App ${v.mismatch.app}`, `Daemon ${v.mismatch.daemon}`] : []),
+  partlyApplied: (_st, v) => (v.mismatch ? [`App ${displayVersion(v.mismatch.app)}`, `Daemon ${displayVersion(v.mismatch.daemon)}`] : []),
   restarting: () => ["Stopping daemon"],
 };
 
-function Meta({ items }: { items: ReactNode[] }) {
+/** A line above the meta line where the line itself has no room for the running version and channel. */
+const leads: Partial<Record<UpdateVariant, (st: UpdateStatusView) => string>> = {
+  available: running,
+  upToDate: running,
+};
+
+function Meta({ items, lead }: { items: ReactNode[]; lead: string }) {
   const shown = items.filter((x) => x !== null && x !== "");
-  if (shown.length === 0) return null;
+  if (shown.length === 0 && !lead) return null;
   return (
-    <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-muted-foreground" data-testid="update-meta">
-      {shown.map((x, i) => (
-        <span key={i} className="contents">
-          {i > 0 && (
-            <span className="opacity-50" aria-hidden>
-              |
+    <div className="mt-4 grid gap-1 text-[11px] text-muted-foreground" data-testid="update-meta">
+      {lead && <div data-testid="update-meta-lead">{lead}</div>}
+      {shown.length > 0 && (
+        <div className="flex items-center justify-center gap-2">
+          {shown.map((x, i) => (
+            <span key={i} className="contents">
+              {i > 0 && (
+                <span className="opacity-50" aria-hidden>
+                  |
+                </span>
+              )}
+              {typeof x === "string" ? <span>{x}</span> : x}
             </span>
-          )}
-          {typeof x === "string" ? <span>{x}</span> : x}
-        </span>
-      ))}
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -188,7 +204,7 @@ function Body({ st, v }: { st: UpdateStatusView; v: UpdateView }) {
           {v.later && <LaterLink label={v.later} />}
         </div>
       )}
-      <Meta items={meta} />
+      <Meta items={meta} lead={leads[v.variant]?.(st) ?? ""} />
     </>
   );
 }
