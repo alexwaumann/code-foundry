@@ -161,22 +161,26 @@ export function groupSkills(skills: readonly SkillView[], query: string, members
 // ---- a running thread's slash commands ---------------------------------------------------
 
 /**
- * How well a slash command matches what was typed after "/": skillScore on its name and
- * description, or through an alias (4 an alias, 3 a prefix of one), whichever is better:
- * "/cost" finds usage.
+ * How well a slash command matches what was typed after "/" (case-insensitive): 6 the
+ * name, 5 a prefix of it or an alias ("/cost" finds usage), 4 inside the name or a prefix
+ * of an alias, 3 a subsequence of the name, 2 a prefix of a description word, 0 no match.
+ * An empty query matches everything (1). 4 and up are name matches (STRONG_MATCH).
  */
 export function commandScore(c: Pick<SlashCommandView, "name" | "description" | "aliases">, query: string): number {
-  const own = skillScore(c, query);
   const q = query.toLowerCase();
-  if (q === "" || own >= 4) return own;
-  let alias = 0;
-  for (const a of c.aliases) {
-    const l = a.toLowerCase();
-    if (l === q) return 4;
-    if (l.startsWith(q)) alias = 3;
-  }
-  return Math.max(own, alias);
+  if (q === "") return 1;
+  const name = c.name.toLowerCase();
+  if (name === q) return 6;
+  const aliases = c.aliases.map((a) => a.toLowerCase());
+  if (name.startsWith(q) || aliases.includes(q)) return 5;
+  if (name.includes(q) || aliases.some((a) => a.startsWith(q))) return 4;
+  if (isSubsequence(name, q)) return 3;
+  const words = c.description.toLowerCase().split(/[^\p{L}\p{N}]+/u);
+  return words.some((w) => w.startsWith(q)) ? 2 : 0;
 }
+
+/** commandScore of a match by name or alias (not a scattered subsequence, not the description). */
+export const STRONG_MATCH = 4;
 
 /** A command's description on one line (descriptions can be whole paragraphs; the row truncates the rest). */
 export function firstLine(text: string): string {
@@ -196,7 +200,9 @@ const BUILTIN = "\u0001claude";
  * (builtin, bundled skills included) go under "Claude Code", last, and insert "/name" as
  * plain text (they take free-form arguments). Anything else (a plugin's skill, a skill
  * the scan did not see) goes under "Skills" and inserts plain text too: there is no
- * scope to name in a tag. Within a group: best score first, then Claude's order. A row
+ * scope to name in a tag. When anything matches by name or alias, weaker matches
+ * (subsequence, description) are left out. Within a group: best score first, then
+ * Claude's order. A row
  * shows the argument hint and the description's first line; aliases only match.
  */
 export function commandItems(commands: readonly SlashCommandView[], skills: readonly SkillView[], query: string, members: readonly string[]): CompletionGroup[] {
@@ -206,9 +212,13 @@ export function commandItems(commands: readonly SlashCommandView[], skills: read
     for (const m of members) if (skills.some((s) => s.scope === "project" && s.repoId === m && s.name === name)) return m;
     return skills.some((s) => s.scope === "user" && s.name === name) ? USER : null;
   };
+  const scores = commands.map((c) => commandScore(c, query));
+  // Claude's list is long and its descriptions are paragraphs: once anything matches by
+  // name or alias, scattered and description matches would only bury it.
+  const floor = scores.some((x) => x >= STRONG_MATCH) ? STRONG_MATCH : 1;
   commands.forEach((c, i) => {
-    const score = commandScore(c, query);
-    if (score === 0) return;
+    const score = scores[i] ?? 0;
+    if (score < floor) return;
     const scope = c.builtin ? null : scopeOf(c.name);
     const group = c.builtin ? BUILTIN : (scope ?? OTHER);
     const item: CompletionItem = {

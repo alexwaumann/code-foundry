@@ -61,8 +61,9 @@ for (const scheme of ["dark", "light"] as const) {
 test("/co matches code-review and compact; /cost finds usage through its alias", async ({ page }) => {
   await openThread(page);
   await page.keyboard.type("/co");
-  // Name prefixes in Claude's order, then usage through its alias "cost", then description words.
-  await expect(labels(page)).toContainText(["/commit", "/code-review", "/compact", "/context", "/usage", "/simplify"]);
+  // Name prefixes in Claude's order, then usage through its alias "cost"; with name matches
+  // around, description matches (simplify's "code") are left out.
+  await expect(labels(page)).toHaveText(["/commit", "/code-review", "/compact", "/context", "/usage"]);
   await expect(headings(page)).toHaveText(["User", "Claude Code"]);
   await page.keyboard.type("st");
   await expect(labels(page)).toHaveText(["/usage"]);

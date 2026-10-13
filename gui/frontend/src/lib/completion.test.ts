@@ -137,11 +137,12 @@ describe("commandScore", () => {
   const usage = cmd("usage", true, { description: "Show session cost and plan usage", aliases: ["cost", "stats"] });
   it.each<[string, string, number]>([
     ["empty query", "", 1],
-    ["the name", "usage", 5],
-    ["a prefix of the name", "us", 4],
-    ["an alias", "cost", 4],
-    ["an alias, any case", "COST", 4],
-    ["a prefix of an alias", "sta", 3],
+    ["the name", "usage", 6],
+    ["a prefix of the name", "us", 5],
+    ["an alias", "cost", 5],
+    ["an alias, any case", "COST", 5],
+    ["inside the name", "sag", 4],
+    ["a prefix of an alias", "sta", 4],
     ["a subsequence of the name", "uge", 3],
     ["a description word", "plan", 2],
     ["nothing", "zz", 0],
@@ -150,7 +151,7 @@ describe("commandScore", () => {
   });
 
   it("the name beats an alias of the same text", () => {
-    expect(commandScore(cmd("cost", true, { aliases: ["cost"] }), "cost")).toBe(5);
+    expect(commandScore(cmd("cost", true, { aliases: ["cost"] }), "cost")).toBe(6);
   });
 });
 
@@ -170,6 +171,7 @@ describe("commandItems", () => {
   // Claude's order: project skills, then built-ins and bundled skills, then plugin skills.
   const commands = [
     cmd("deploy", false, { description: "Ship it (project)" }),
+    cmd("security-review", true),
     cmd("lint", false, { description: "Lint the API (project)" }),
     cmd("commit", false, { description: "Write a commit message" }),
     cmd("compact", true, { description: "Free up context\nby summarizing", argumentHint: "<instructions>" }),
@@ -192,7 +194,7 @@ describe("commandItems", () => {
         [null, ["/deploy", "/lint"]],
         ["user", ["/commit"]],
         ["Skills", ["/pdf", "/anthropic-skills:deep-research"]],
-        ["Claude Code", ["/compact", "/context", "/code-review", "/usage"]],
+        ["Claude Code", ["/security-review", "/compact", "/context", "/code-review", "/usage"]],
       ],
     ],
     [
@@ -204,11 +206,11 @@ describe("commandItems", () => {
         ["r1", ["/deploy"]],
         ["user", ["/commit"]],
         ["Skills", ["/pdf", "/anthropic-skills:deep-research"]],
-        ["Claude Code", ["/compact", "/context", "/code-review", "/usage"]],
+        ["Claude Code", ["/security-review", "/compact", "/context", "/code-review", "/usage"]],
       ],
     ],
     [
-      "/co: name prefixes before an alias prefix, Claude's order among equals",
+      "/co: name prefixes before an alias prefix, Claude's order among equals; no weak matches",
       "co",
       ["r1"],
       [
@@ -217,6 +219,9 @@ describe("commandItems", () => {
       ],
     ],
     ["an alias finds its command", "cost", ["r1"], [["Claude Code", ["/usage"]]]],
+    ["inside a name: /rev finds security-review and code-review, in Claude's order", "rev", ["r1"], [["Claude Code", ["/security-review", "/code-review"]]]],
+    ["only weak matches: they show", "cmt", ["r1"], [["user", ["/commit"]], ["Claude Code", ["/compact"]]]],
+    ["a description word alone shows", "summarizing", ["r1"], [["Claude Code", ["/compact"]]]],
     ["a plugin alias: a name prefix first, then the alias prefix", "anthropic-skills:", ["r1"], [["Skills", ["/anthropic-skills:deep-research", "/pdf"]]]],
     ["no match", "zzz", ["r1"], []],
   ])("%s", (_name, query, members, want) => {
