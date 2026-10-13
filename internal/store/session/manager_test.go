@@ -33,6 +33,7 @@ type env struct {
 	repos  *repotest.Fake
 	paths  ClaudePaths
 	wt     string
+	home   string // Options.Home: the cwd of a thread without a project
 	dbPath string
 	bus    *bus.Bus
 	events *bus.Subscription[Event]
@@ -86,6 +87,10 @@ func newFixtureEnvAt(t *testing.T, path string, vars []string, mutate ...func(*O
 		t.Fatal(err)
 	}
 	e.repos.Put(repo.Repo{ID: "r1", Path: e.wt, Name: "repo", Git: true, Worktrees: []repo.Worktree{{RepoID: "r1", Path: e.wt, IsMain: true}}})
+	e.home = filepath.Join(dir, "home")
+	if err := os.MkdirAll(e.home, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	e.paths = ClaudePaths{Dir: filepath.Join(dir, "claude"), Config: filepath.Join(dir, "claude.json")}
 	e.dbPath = filepath.Join(dir, "cf.db")
 	e.namer = func(msg string) (string, error) { return "named-" + strings.Fields(msg)[0], nil }
@@ -102,7 +107,7 @@ func (e *env) open(mutate ...func(*Options)) {
 		e.t.Fatal(err)
 	}
 	opts := Options{
-		DB: d, Terminals: e.terms, Repos: e.repos, Bus: e.bus, Paths: e.paths,
+		DB: d, Terminals: e.terms, Repos: e.repos, Bus: e.bus, Paths: e.paths, Home: e.home,
 		Log:            slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Tick:           20 * time.Millisecond,
 		StatusDebounce: 10 * time.Millisecond,
@@ -171,7 +176,7 @@ func (e *env) waitFor(id, what string, cond func(Session) bool) Session {
 
 func (e *env) create(o CreateOptions) Session {
 	e.t.Helper()
-	if o.WorktreePath == "" && o.RepoID == "" {
+	if o.WorktreePath == "" && o.RepoID == "" && !o.NoProject {
 		o.WorktreePath = e.wt
 	}
 	s, err := e.m.Create(e.ctx(), o)

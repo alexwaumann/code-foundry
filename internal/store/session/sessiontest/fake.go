@@ -138,8 +138,9 @@ func (f *Fake) add(call string, s session.Session) (session.Session, error) {
 // NewWorktree the session's worktree is /worktrees/cf-<N> (CreatedWorktree, BaseRef as
 // requested). WorkspaceID is copied as is. With NewWorkspace the session belongs to
 // workspace "w-new" and runs in /worktrees/<repo>, repo being RepoID or the first repo.
-// The call reads "Create <repo> <path> <model> <effort>", then " perm=<n>",
-// " new-worktree=<base>", " workspace=<id>", " new-workspace=<a,b>", " prompt=<text>"
+// With NoProject it runs in /home. The call reads "Create <repo> <path> <model>
+// <effort>", then " perm=<n>", " new-worktree=<base>", " workspace=<id>",
+// " new-workspace=<a,b>", " no-project", " prompt=<text>"
 // " composer=<text>" and " attachments=<a,b>" when set.
 func (f *Fake) Create(_ context.Context, o session.CreateOptions) (session.Session, error) {
 	call := fmt.Sprintf("Create %s %s %s %s", o.RepoID, o.WorktreePath, o.Model, o.Effort)
@@ -168,6 +169,10 @@ func (f *Fake) Create(_ context.Context, o session.CreateOptions) (session.Sessi
 			s.RepoID = nw.Repos[0]
 		}
 		s.WorkspaceID, s.WorktreePath, s.CreatedWorktree, s.BaseRef = "w-new", "/worktrees/"+s.RepoID, true, nw.BaseRef
+	}
+	if o.NoProject {
+		call += " no-project"
+		s.WorktreePath = "/home"
 	}
 	if o.InitialPrompt != "" {
 		call += " prompt=" + o.InitialPrompt

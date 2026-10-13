@@ -108,8 +108,10 @@ const ReasonInterrupted = "interrupted"
 // Session is an immutable snapshot of one session. Field meanings follow
 // codefoundry.v1.Session.
 //
-// Owner: WorkspaceID when set, else the project RepoID. RepoID and WorktreePath are
-// the cwd (for a workspace thread, the member worktree it runs in), never the owner.
+// Owner: WorkspaceID when set, else the project RepoID when set, else none (a thread
+// without a project, CreateOptions.NoProject, running in Options.Home). RepoID and
+// WorktreePath are the cwd (for a workspace thread, the member worktree it runs in),
+// never the owner beyond that order.
 type Session struct {
 	ID              string
 	ClaudeSessionID string // set once the transcript file is discovered
@@ -265,6 +267,10 @@ type CreateOptions struct {
 	// in every repository, the slug as for NewWorktree) and run the thread in the
 	// member RepoID names, else the first. Exclusive with NewWorktree and WorkspaceID.
 	NewWorkspace *NewWorkspace
+	// NoProject, when set, starts a thread without a project: it runs in Options.Home
+	// with an empty RepoID and WorkspaceID. Exclusive with RepoID, WorktreePath,
+	// NewWorktree, WorkspaceID and NewWorkspace.
+	NoProject bool
 	// Model is a claude --model value (registry id like "claude-opus-4-8[1m]", or any full model name).
 	Model string
 	// Effort is a claude --effort level: low, medium, high, xhigh, max.

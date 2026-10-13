@@ -73,6 +73,9 @@ type Options struct {
 	// (Create, Reconnect, Fork). The daemon passes its loopback endpoint and token so
 	// the CLI inside a session reaches it without the Unix socket.
 	Env []string
+	// Home is the cwd of a thread without a project (CreateOptions.NoProject). Default:
+	// os.UserHomeDir().
+	Home string
 	// DisablePreTrust skips writing folder trust into Claude's config before spawning
 	// and before a RunIn move (set_cwd refuses an untrusted folder). For tests.
 	DisablePreTrust bool
@@ -125,6 +128,13 @@ func (o Options) withDefaults() (Options, error) {
 	}
 	if o.Namer == nil {
 		o.Namer = ClaudeNamer(o.Claude, "/tmp", o.Log)
+	}
+	if o.Home == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return o, fmt.Errorf("session: home directory: %w", err)
+		}
+		o.Home = home
 	}
 	if o.RefExists == nil {
 		o.RefExists = gitRefExists
@@ -305,7 +315,8 @@ func (m *Manager) record(id string) (*record, error) {
 
 // Create spawns claude in a worktree. The session is returned STARTING. With
 // NewWorktree it first creates the worktree (synchronously: on failure nothing is
-// persisted); see newWorktree.
+// persisted); see newWorktree. With NoProject it runs in Options.Home and has no
+// owner.
 func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) {
 	if err := validateModelEffort(o.Model, o.Effort); err != nil {
 		return Session{}, err
@@ -342,7 +353,14 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 	if (o.NewWorkspace != nil && (o.NewWorktree != nil || o.WorkspaceID != "")) || (o.NewWorktree != nil && o.WorkspaceID != "") {
 		return Session{}, fmt.Errorf("%w: new workspace, new worktree and workspace are exclusive", ErrInvalidArgument)
 	}
+	if o.NoProject && (o.RepoID != "" || o.WorktreePath != "" || o.NewWorktree != nil || o.WorkspaceID != "" || o.NewWorkspace != nil) {
+		return Session{}, fmt.Errorf("%w: no project excludes a repo, worktree, new worktree, workspace and new workspace", ErrInvalidArgument)
+	}
 	switch {
+	case o.NoProject:
+		// No owner: RepoID and WorkspaceID stay empty and claude starts in the home
+		// directory, trusted like any cwd (spawn).
+		s.WorktreePath = m.opts.Home
 	case o.NewWorkspace != nil:
 		cw, err := m.newWorkspace(ctx, id, name, o)
 		if err != nil {
@@ -383,7 +401,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 		if i := slices.IndexFunc(members, func(mem workspace.Member) bool { return mem.RepoID == repoID }); i >= 0 {
 			return members[i].WorktreePath, true
 		}
-		return s.WorktreePath, repoID == s.RepoID
+		return s.WorktreePath, s.RepoID != "" && repoID == s.RepoID
 	})
 	if len(dropped) > 0 {
 		m.log.Warn("file references outside the thread's projects; passing their relative paths",
@@ -815,7 +833,7 @@ func (m *Manager) resolveWorktree(repoID, path string) (string, string, error) {
 		path = filepath.Clean(path)
 	}
 	if repoID == "" && path == "" {
-		return "", "", fmt.Errorf("%w: a repo or a worktree path is required", ErrInvalidArgument)
+		return "", "", fmt.Errorf("%w: a repo, a worktree path, a workspace or no project is required", ErrInvalidArgument)
 	}
 	if m.opts.Repos == nil {
 		if fi, err := os.Stat(path); err != nil || !fi.IsDir() {
