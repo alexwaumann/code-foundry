@@ -5,7 +5,8 @@ import { CF, invocations, mockPost, openApp, openProjects, resetMock } from "./f
  * The Projects page's project kinds, collapsible projects and workspaces, and the header
  * filter (docs/notes/projects-polish-1.md); always-visible actions, overflow menus, thread
  * counts, freshness and refresh, and the Publish / Initialize git gates
- * (docs/notes/projects-polish-2.md). The mock's projects: code-foundry and
+ * (docs/notes/projects-polish-2.md); the "in main" tag, the broom and Clean up merged
+ * worktrees (docs/notes/projects-polish-3.md). The mock's projects: code-foundry and
  * ghostty-playground (GitHub), dotfiles (a remote that is not GitHub), sketches (git, no
  * remote) and writing (no git).
  */
@@ -146,7 +147,8 @@ async function closeMenu(page: Page, testId: string): Promise<void> {
 async function menuItems(page: Page, testId: string): Promise<string[]> {
   const menu = page.getByTestId(`${testId}-menu`);
   await expect(menu).toBeVisible();
-  return menu.getByRole("menuitem").allInnerTexts();
+  // A count badge reads "Clean up merged worktrees 1".
+  return (await menu.getByRole("menuitem").allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim());
 }
 
 test("row actions show without hover, muted at rest, in a fixed-width column; rows show no path", async ({ page }) => {
@@ -204,8 +206,8 @@ test("overflow menus per row kind; the menu keeps the list's cursor and gives it
   await openProjects(page);
 
   const want: [string, string[]][] = [
-    ["repo-cf", ["New worktree…", "Remove project"]],
-    ["repo-dot", ["New worktree…", "Remove project"]],
+    ["repo-cf", ["New worktree…", "Clean up merged worktrees 0", "Remove project"]],
+    ["repo-dot", ["New worktree…", "Clean up merged worktrees 0", "Remove project"]],
     ["repo-sk", ["New worktree…", "Publish to GitHub…", "Remove project"]],
     ["repo-wr", ["Initialize git", "Remove project"]],
   ];
@@ -336,4 +338,83 @@ test("New worktree… asks for the branch in the palette, in that project", asyn
   expect(inv?.args).toEqual({ branch: "exp/x" });
   expect(inv?.context).toMatchObject({ activeRepoId: "repo-sk", activeView: "projects" });
   await expect(project(page, "repo-sk").getByTestId("worktree-branch")).toHaveText(["main", "exp/x"]);
+});
+
+const MERGED = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-usage-polish";
+
+test("a merged, clean worktree shows 'in main' and a broom that removes it after a confirm naming the branch", async ({ page }) => {
+  expect(await mockPost("worktree/merged?repo=repo-cf&branch=cf/usage-polish")).toEqual({ path: MERGED });
+  await openApp(page);
+  await openProjects(page);
+  const row = wtRow(page, "repo-cf", MERGED);
+  // The tag and the broom are on the fixture only.
+  await expect(row.getByTestId("worktree-cleanable")).toHaveText("in main");
+  await expect(row.getByTestId("worktree-cleanable")).toHaveAttribute("title", "Clean: no changes, every commit is in origin/main, no live thread or terminal");
+  await expect(page.getByTestId("worktree-cleanable")).toHaveCount(1);
+  await expect(page.getByTestId("worktree-cleanup")).toHaveCount(1);
+  await expect(row.getByTestId("worktree-cleanup")).toHaveAttribute("title", "Clean up: remove this worktree");
+  // Every row of the project keeps a fourth slot so the state columns still end at one x;
+  // a project with nothing to clean up keeps three.
+  const widths = await Promise.all([CF, FEAT, FIX, MERGED].map(async (p) => (await wtRow(page, "repo-cf", p).getByTestId("worktree-actions").boundingBox())?.width));
+  expect(new Set(widths).size).toBe(1);
+  const gpWidth = (await wtRow(page, "repo-gp", "/Users/dev/src/ghostty-playground").getByTestId("worktree-actions").boundingBox())?.width;
+  expect(gpWidth).toBeLessThan(widths[0] ?? 0);
+
+  await row.getByTestId("worktree-cleanup").click();
+  const dialog = page.getByTestId("confirm-dialog");
+  await expect(dialog).toContainText("Remove the worktree of cf/usage-polish");
+  await expect(dialog).toContainText("the branch is kept");
+  await dialog.getByTestId("confirm-ok").click();
+  await expect(row).toHaveCount(0);
+  await expect(page.getByText("Removed 1 worktree: cf/usage-polish")).toBeVisible();
+  const inv = await lastInvocation("repo.worktree.cleanup");
+  expect(inv?.args).toEqual({ repo: "repo-cf", path: MERGED });
+  expect(inv?.context).toMatchObject({ activeRepoId: "repo-cf", activeWorktreePath: MERGED });
+  await expect(page.getByTestId("worktree-cleanup")).toHaveCount(0);
+});
+
+test("the project menu counts merged worktrees, cleans them all up, and is disabled at zero", async ({ page }) => {
+  await mockPost("worktree/merged?repo=repo-cf&branch=cf/usage-polish");
+  await mockPost("worktree/merged?repo=repo-cf&branch=cf/old-docs");
+  await openApp(page);
+  await openProjects(page);
+  await expect(page.getByTestId("worktree-cleanable")).toHaveCount(2);
+
+  // Only git projects with a remote offer it; zero is disabled.
+  await project(page, "repo-dot").getByTestId("project-more").click();
+  await expect(page.getByTestId("project-cleanup-count")).toHaveText("0");
+  await expect(page.getByTestId("project-cleanup")).toHaveAttribute("data-disabled", "");
+  await closeMenu(page, "project-more");
+  await project(page, "repo-sk").getByTestId("project-more").click();
+  expect(await menuItems(page, "project-more")).toEqual(["New worktree…", "Publish to GitHub…", "Remove project"]);
+  await closeMenu(page, "project-more");
+
+  await project(page, "repo-cf").getByTestId("project-more").click();
+  expect(await menuItems(page, "project-more")).toEqual(["New worktree…", "Clean up merged worktrees 2", "Remove project"]);
+  await expect(page.getByTestId("project-cleanup")).not.toHaveAttribute("data-disabled");
+  await page.getByTestId("project-cleanup").click();
+  const dialog = page.getByTestId("confirm-dialog");
+  await expect(dialog).toContainText("Remove 2 worktrees whose work is in origin/main: cf/usage-polish, cf/old-docs?");
+  await dialog.getByTestId("confirm-ok").click();
+  await expect(page.getByTestId("worktree-cleanable")).toHaveCount(0);
+  await expect(page.getByText(/^Removed 2 worktrees: cf\/usage-polish, cf\/old-docs; kept 2 worktrees/)).toBeVisible();
+  expect((await lastInvocation("repo.worktree.cleanup"))?.args).toEqual({ repo: "repo-cf" });
+  await expect(project(page, "repo-cf").getByTestId("worktree-branch")).toHaveText(["main", "feat/sidebar", "fix/resize"]);
+
+  await project(page, "repo-cf").getByTestId("project-more").click();
+  await expect(page.getByTestId("project-cleanup-count")).toHaveText("0");
+  await expect(page.getByTestId("project-cleanup")).toHaveAttribute("data-disabled", "");
+});
+
+test("a terminal open in a merged worktree keeps it: no tag, no broom, not counted", async ({ page }) => {
+  await mockPost("worktree/merged?repo=repo-cf&branch=cf/usage-polish");
+  await openApp(page);
+  await openProjects(page);
+  const row = wtRow(page, "repo-cf", MERGED);
+  await expect(row.getByTestId("worktree-cleanable")).toBeVisible();
+  await row.getByTestId("worktree-new-terminal").click();
+  await expect(row.getByTestId("worktree-cleanable")).toHaveCount(0);
+  await expect(row.getByTestId("worktree-cleanup")).toHaveCount(0);
+  await project(page, "repo-cf").getByTestId("project-more").click();
+  await expect(page.getByTestId("project-cleanup-count")).toHaveText("0");
 });
