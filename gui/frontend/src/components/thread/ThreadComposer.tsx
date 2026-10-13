@@ -9,7 +9,7 @@ import { Attachments } from "@/components/compose/Composer";
 import { ComposerPicker } from "@/components/compose/ComposerPicker";
 import { PromptEditor, type EditorTrigger, type PromptEditorHandle } from "@/components/compose/PromptEditor";
 import { TagMultiProjectContext } from "@/components/compose/tagContext";
-import { useCompletion, useFileSource, useSkillSource } from "@/components/compose/useCompletion";
+import { useCommandSource, useCompletion, useFileSource, useSkillSource } from "@/components/compose/useCompletion";
 import { choiceLabel, EFFORT_CHOICES, PERMISSION_CHOICES, type ComposePermission } from "@/lib/compose";
 import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
 import { disconnectCause } from "@/lib/session";
@@ -20,6 +20,7 @@ import { reconnectSession } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
 import { useModelChoices } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
+import { useSlashCommands } from "@/stores/thread";
 import { interruptThread, sendThreadDraft, setThreadEffort, setThreadModel, setThreadPermission, threadDraftKey } from "@/stores/threadActions";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
@@ -110,7 +111,8 @@ function Reconnect({ sessionId, ref }: { sessionId: string; ref: Ref<HTMLButtonE
 
 /**
  * The follow-up composer floating over the bottom of the thread (variant A): the
- * new-thread composer's prompt editor with its "/" skills and "@" files, image
+ * new-thread composer's prompt editor with its "/" skills (the running process's slash
+ * commands when it has reported them) and "@" files, image
  * attachments, the model / effort / permission pickers, attach, Interrupt while Claude
  * works (the only Interrupt), and send. Pending permissions and questions dock into the
  * top of the card, oldest first (the card turns opaque); while the editor is empty its
@@ -140,9 +142,14 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [trigger, setTrigger] = useState<EditorTrigger | null>(null);
+  // "/": the running process's own list (what "/name" runs); the disk scan while there is
+  // none (not running yet, or a daemon that predates the list).
+  const commands = useSlashCommands(sessionId);
   const skillSource = useSkillSource(trigger, skillSourcesKey(sources.skills), sources.repoIds);
+  const commandSource = useCommandSource(trigger, commands, skillSourcesKey(sources.skills), sources.repoIds);
+  const slashSource = commands.length > 0 ? commandSource : skillSource;
   const fileSource = useFileSource(trigger, sources.files, sources.repoIds, sources.repoIds[0] ?? "");
-  const completion = useCompletion(trigger, setTrigger, trigger?.char === "@" ? fileSource : skillSource, editorRef);
+  const completion = useCompletion(trigger, setTrigger, trigger?.char === "@" ? fileSource : slashSource, editorRef);
   const live = state === "connected";
   const sending = phase !== "idle";
   const canSend = live && !sending && (text.trim() !== "" || hasAttachments);

@@ -13,6 +13,8 @@
  *   POST /__mock/thread/finish?id=s-r1          ends the streaming turn (turn_end, idle)
  *   GET  /__mock/thread/calls                  thread.* invocations ("send <id> <text> [attachments]", ...)
  *   POST /__mock/thread/cache?id=s-r1&ago=<s>  the last result <s> seconds ago (mock/context.ts)
+ *   POST /__mock/thread/commands?id=s-r1&set=none|more|default   replaces the slash commands
+ *        (mock/slashCommands.ts) and publishes the Watch's `commands` event
  *
  * thread.send appends the user message, streams a short reply over ~1 s and ends the turn;
  * thread.interrupt ends a running turn as interrupted and withdraws pending requests.
@@ -37,6 +39,7 @@ import {
 import { CommandError } from "./errors";
 import { Hub } from "./hub";
 import { mcpFixture, type McpStatusInit } from "./mcp";
+import { refuseSlashCommand, slashCommandsFixture, type SlashCommandInit } from "./slashCommands";
 
 export type ThreadEventInit = MessageInitShape<typeof ThreadEventSchema>;
 type ItemInit = MessageInitShape<typeof ThreadItemSchema>;
@@ -235,6 +238,8 @@ export class MockThreads {
   private logs = new Map<string, Log>();
   /** MCP status per thread (mock/mcp.ts); absent: none (not running). */
   private mcp = new Map<string, McpStatusInit>();
+  /** Slash commands per running thread (mock/slashCommands.ts); absent: none. */
+  private slash = new Map<string, SlashCommandInit[]>();
   /** Every thread event, for the Watch streams. */
   private readonly hub = new Hub<{ sessionId: string; event: ThreadEventInit }>();
   /** thread.* calls, for GET /__mock/thread/calls. */
@@ -256,6 +261,7 @@ export class MockThreads {
   reset(): void {
     this.logs.clear();
     this.mcp.clear();
+    this.slash.clear();
     this.calls = [];
     this.failRespond = "";
     this.generation++;
@@ -279,10 +285,26 @@ export class MockThreads {
   }
 
   /** ListItems' snapshot. */
-  snapshotValue(id: string): { sessionId: string; seq: bigint; items: ItemInit[]; pending: PendingInit[]; mcp?: McpStatusInit } {
+  snapshotValue(id: string): { sessionId: string; seq: bigint; items: ItemInit[]; pending: PendingInit[]; mcp?: McpStatusInit; commands: SlashCommandInit[] } {
     this.world.worktreeOf(id);
     const l = this.log(id);
-    return { sessionId: id, seq: BigInt(l.seq), items: l.items, pending: l.pending, mcp: this.mcp.get(id) };
+    return { sessionId: id, seq: BigInt(l.seq), items: l.items, pending: l.pending, mcp: this.mcp.get(id), commands: this.slash.get(id) ?? [] };
+  }
+
+  /** ThreadService.SlashCommands: the running thread's list ([] when none). Throws for an unknown thread. */
+  slashCommandsOf(id: string): SlashCommandInit[] {
+    this.world.worktreeOf(id);
+    return this.slash.get(id) ?? [];
+  }
+
+  /** Replaces the thread's slash commands and publishes the Watch's `commands` event (the whole list; [] the process ended). */
+  setSlashCommands(id: string, commands: SlashCommandInit[]): void {
+    this.world.worktreeOf(id);
+    if (commands.length > 0) this.slash.set(id, commands);
+    else this.slash.delete(id);
+    const l = this.log(id);
+    l.seq++;
+    this.publish(id, { event: { case: "commands", value: { sessionId: id, seq: BigInt(l.seq), commands } } });
   }
 
   /** The thread's MCP status (mock/mcp.ts); undefined when it has none. Throws for an unknown thread. */
@@ -557,8 +579,13 @@ export class MockThreads {
     this.generation++;
     this.logs.delete(id);
     // A running thread was checked at the start of its last turn; a closed or crashed one has none.
-    if (loaded === "closed" || loaded === "crashed") this.mcp.delete(id);
-    else this.mcp.set(id, mcpFixture());
+    if (loaded === "closed" || loaded === "crashed") {
+      this.mcp.delete(id);
+      this.slash.delete(id);
+    } else {
+      this.mcp.set(id, mcpFixture());
+      this.slash.set(id, slashCommandsFixture());
+    }
     const l = this.log(id);
     const ago = (min: number, sec = 0) => new Date(Date.now() - min * 60_000 + sec * 1000);
     const it = (payload: ItemInit["payload"], over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
@@ -825,8 +852,13 @@ export class MockThreads {
    */
   seed(id: string, h: SeedHistory): void {
     this.logs.delete(id);
-    if (h.end === "working" || h.end === "permission") this.mcp.set(id, mcpFixture());
-    else this.mcp.delete(id);
+    if (h.end === "working" || h.end === "permission") {
+      this.mcp.set(id, mcpFixture());
+      this.slash.set(id, slashCommandsFixture());
+    } else {
+      this.mcp.delete(id);
+      this.slash.delete(id);
+    }
     const l = this.log(id);
     const at = (sec: number) => new Date(Date.now() - h.minutesAgo * 60_000 + sec * 1000);
     const push = (payload: ItemInit["payload"], over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
@@ -930,6 +962,8 @@ export class MockThreads {
         when,
         run: (_ctx, a) => {
           const atts = (a.attachments ?? "").split(",").filter(Boolean);
+          // Like the daemon's Manager.Send: nothing reaches Claude and nothing is recorded.
+          refuseSlashCommand(a.text ?? "");
           this.calls.push(`send ${a.id ?? ""} ${a.text ?? ""}${atts.length > 0 ? ` [${atts.join(",")}]` : ""}`);
           this.send(a.id ?? "", a.text ?? "", atts, a["composer-text"] ?? "");
           return `sent to thread ${a.id ?? ""}`;

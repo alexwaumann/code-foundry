@@ -1,6 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { SkillSourceView } from "@/api/filesystem";
+import type { SlashCommandView } from "@/api/slashCommands";
 import {
+  commandItems,
   dismissCard,
   fileItems,
   fileSourcesKey,
@@ -59,6 +61,20 @@ export function useSkillSource(trigger: EditorTrigger | null, sourcesKey: string
     }));
   }, [skills, query, members]);
   return { char: "/", label: "Skills", available: skills.length > 0, groups, query, searching: false, emptyText: "No skills match" };
+}
+
+/**
+ * A running thread's slash commands after "/" (stores/thread.ts useSlashCommands, what
+ * "/name" will run), grouped by lib/completion commandItems: the skills the disk scan
+ * (`sourcesKey`, loaded by the composer) knows keep their project and "User" groups and
+ * their tags, other skills go under "Skills", Claude Code's own under "Claude Code" as
+ * plain text. The composer uses it while the list is not empty, useSkillSource otherwise.
+ */
+export function useCommandSource(trigger: EditorTrigger | null, commands: readonly SlashCommandView[], sourcesKey: string, members: readonly string[]): CompletionSource {
+  const skills = useSkills(sourcesKey);
+  const query = trigger?.char === "/" ? trigger.query : null;
+  const groups = useMemo<CompletionGroup[]>(() => (query === null ? [] : commandItems(commands, skills, query, members)), [commands, skills, query, members]);
+  return { char: "/", label: "Slash commands", available: commands.length > 0, groups, query, searching: false, emptyText: "No commands match" };
 }
 
 /**
@@ -175,7 +191,9 @@ export function useCompletion(
     const { items: rows, trigger: t } = latest.current;
     const item = rows[index];
     if (!item || !t) return;
-    editorRef.current?.insertTag({ from: t.from, to: t.to }, item.tag);
+    const range = { from: t.from, to: t.to };
+    if (typeof item.tag === "string") editorRef.current?.insertText(range, item.tag);
+    else editorRef.current?.insertTag(range, item.tag);
   };
 
   const select = (index: number) => {

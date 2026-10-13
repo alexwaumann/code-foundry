@@ -45,7 +45,7 @@ const STATUS: McpStatusView = {
 };
 
 function setMcp(id: string, mcp: McpStatusView | null): void {
-  useThreadStore.setState((s) => ({ logs: { ...s.logs, [id]: { seq: 1, byId: {}, order: [], pending: [], mcp } } }));
+  useThreadStore.setState((s) => ({ logs: { ...s.logs, [id]: { seq: 1, byId: {}, order: [], pending: [], mcp, commands: [] } } }));
 }
 
 const cards = () => screen.getAllByTestId("mcp-card");

@@ -366,6 +366,9 @@ from the pull request (docs/notes/pr-thread-commands.md).
   answering (`thread.respond`; every pending request docks, oldest first, answerable by
   click or 1/2/3) and the model / mode / effort pickers are the `thread.*` commands
   (`docs/notes/rendered-threads-2-gui.md`, `docs/notes/rendered-threads-3-interaction.md`).
+  The follow-up composer's `/` card offers the running process's slash commands from the
+  thread's log (Claude Code's own in a last "Claude Code" group, inserted as plain text),
+  and the ListSkills scan while there are none (`docs/notes/slash-commands-2-gui.md`).
 * Only the visible thread is watched and only the visible shell is attached. Switching
   sessions (or bottom panel tabs) ends the old stream and opens the new one. Background
   sessions cost nothing in the frontend. Watching is also how the daemon knows a thread

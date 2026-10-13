@@ -16,6 +16,7 @@ import { useShallow } from "zustand/react/shallow";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { runStream, type StreamStatus } from "@/api/stream";
 import type { McpStatusView } from "@/api/mcp";
+import { shareCommands, type SlashCommandView } from "@/api/slashCommands";
 import { watchThread, type ThreadEventView, type ThreadItemView, type ThreadPendingListView, type ThreadPendingView } from "@/api/thread";
 import { shareMcp } from "@/lib/mcp";
 import { timelineKey } from "@/lib/threadTimeline";
@@ -30,6 +31,11 @@ export interface ThreadLog {
   pending: readonly ThreadPendingView[];
   /** The thread's MCP servers as last checked (docs/notes/mcp-panel.md); null: none. */
   mcp: McpStatusView | null;
+  /**
+   * The slash commands its running process offers (docs/notes/slash-commands-1-daemon.md),
+   * in Claude's order; empty when it is not running (or the daemon predates the list).
+   */
+  commands: readonly SlashCommandView[];
 }
 
 export interface ThreadState {
@@ -88,8 +94,17 @@ function byOrdinal(byId: Readonly<Record<string, ThreadItemView>>): string[] {
     .map((it) => it.id);
 }
 
+const NO_COMMANDS: readonly SlashCommandView[] = [];
+
 /** A snapshot over the previous log, keeping unchanged items (and arrays) by identity. */
-function replaceLog(prev: ThreadLog | undefined, seq: number, items: readonly ThreadItemView[], pending: readonly ThreadPendingView[], mcp: McpStatusView | null): ThreadLog {
+function replaceLog(
+  prev: ThreadLog | undefined,
+  seq: number,
+  items: readonly ThreadItemView[],
+  pending: readonly ThreadPendingView[],
+  mcp: McpStatusView | null,
+  commands: readonly SlashCommandView[],
+): ThreadLog {
   const byId: Record<string, ThreadItemView> = {};
   for (const it of items) {
     const old = prev?.byId[it.id];
@@ -102,6 +117,7 @@ function replaceLog(prev: ThreadLog | undefined, seq: number, items: readonly Th
     order: prev && sameArray(prev.order, order) ? prev.order : order,
     pending: prev && samePending(prev.pending, pending) ? prev.pending : pending,
     mcp: shareMcp(prev?.mcp ?? null, mcp),
+    commands: shareCommands(prev?.commands ?? NO_COMMANDS, commands),
   };
 }
 
@@ -121,7 +137,7 @@ function putItem(log: ThreadLog, it: ThreadItemView, seq: number): ThreadLog {
  */
 export function applyThreadEvent(log: ThreadLog | undefined, ev: ThreadEventView): ThreadLog | undefined {
   if (ev.kind === "pendingSnapshot") return log;
-  if (ev.kind === "snapshot") return replaceLog(log, ev.seq, ev.items, ev.pending, ev.mcp);
+  if (ev.kind === "snapshot") return replaceLog(log, ev.seq, ev.items, ev.pending, ev.mcp, ev.commands);
   if (!log || ev.seq <= log.seq) return log;
   switch (ev.kind) {
     case "appended":
@@ -140,6 +156,8 @@ export function applyThreadEvent(log: ThreadLog | undefined, ev: ThreadEventView
       return { ...log, seq: ev.seq, pending: samePending(log.pending, ev.pending) ? log.pending : ev.pending };
     case "mcp":
       return { ...log, seq: ev.seq, mcp: shareMcp(log.mcp, ev.status) };
+    case "commands":
+      return { ...log, seq: ev.seq, commands: shareCommands(log.commands, ev.commands) };
   }
 }
 
@@ -184,7 +202,7 @@ export function applyThreadSourceEvent(ev: ThreadEventView): void {
  */
 export function applyThreadEvents(log: ThreadLog | undefined, events: readonly ThreadEventView[]): ThreadLog | undefined {
   /** The log this batch made (its byId is ours to write) or null. */
-  let own: { seq: number; byId: Record<string, ThreadItemView>; order: readonly string[]; pending: readonly ThreadPendingView[]; mcp: McpStatusView | null } | null = null;
+  let own: (ThreadLog & { byId: Record<string, ThreadItemView> }) | null = null;
   for (const ev of events) {
     if (ev.kind === "delta" && log && ev.seq > log.seq) {
       const it = log.byId[ev.itemId];
@@ -352,6 +370,15 @@ export function useThreadLoaded(sessionId: string): boolean {
 /** The thread's log arrived and has no items (a thread started without a prompt, one still starting). */
 export function useThreadEmpty(sessionId: string): boolean {
   return useThreadStore((s) => s.logs[sessionId]?.order.length === 0);
+}
+
+/**
+ * The slash commands the thread's running process offers (narrow: the same list keeps its
+ * identity); empty before its Watch's snapshot, when it is not running, or from a daemon
+ * that predates the list.
+ */
+export function useSlashCommands(sessionId: string): readonly SlashCommandView[] {
+  return useThreadStore((s) => s.logs[sessionId]?.commands ?? NO_COMMANDS);
 }
 
 /** The thread's pending requests: the Watch's when it has the thread, else the EventService's. */

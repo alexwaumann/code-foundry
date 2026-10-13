@@ -146,7 +146,7 @@ table; Send refuses the commands the app replaces (`/clear`, `/model`, ...).
   `ThreadService.SlashCommands`, `thread.commands`, the deny table and send guard) done:
   `docs/notes/slash-commands-1-daemon.md`.
 * PR 2 (GUI: the "/" card reads the thread's list, ListSkills for threads not running;
-  the refusal shown under the composer): next.
+  the refusal shown under the composer) done: `docs/notes/slash-commands-2-gui.md`.
 
 ### Release channels: stable and tip (design 2026-10-11, revised 2026-10-12)
 
