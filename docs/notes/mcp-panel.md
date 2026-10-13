@@ -164,3 +164,17 @@ in `mcp-panel/` (`mcp-{dark,light}.png`, `-panel.png` crops); the live ones are 
   * Not verified live: the GUI against the live daemon (Alex takes the live screenshots);
     a failed server through the daemon (the daemon passes no `--mcp-config`; covered by
     the captured fixture and the fake).
+
+## Follow-up: long names (2026-10-13)
+
+A long version tag or tool name made the panel scroll sideways: both were `shrink-0`
+in their flex rows, so they pushed the status pill (or the hint icons) past the card.
+The server name itself already truncated. Now the card's title row and each tool row
+share one pattern: the name and its secondary text sit in a `min-w-0 flex-1` group, the
+name is `shrink-0 max-w-full truncate` (so it wins and only truncates once it alone fills
+the row) and the secondary text (version, description) is `min-w-0 truncate` and gives
+way first; the pill and the hint icons stay `shrink-0` outside the group. Full names
+and versions are in `title`. The e2e "long names truncate" test stretches the names in
+the DOM and asserts the panel body has no horizontal overflow and every pill sits inside
+its card; `SHOTS_LONG=1` with `SHOTS` takes the screenshots with the stretched names
+(`mcp-long-{dark,light}-panel.png`, mock data).

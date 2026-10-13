@@ -167,7 +167,48 @@ test("listed for every thread; hidden for a page: not in the panel's list, not i
   await expect(page.getByTestId("panel-body")).toHaveCount(0);
 });
 
-/** SHOTS=<dir>: the notes' screenshots, WebKit, 1440x900, dark and light. */
+/** Stretches the names in the DOM: long names, versions and tool names truncate, never scroll the panel sideways. */
+async function stretchNames(page: Page): Promise<void> {
+  await card(page, "github").getByTestId("mcp-tools-toggle").click();
+  await expect(card(page, "github").getByTestId("mcp-tool")).toHaveCount(5);
+  await page.evaluate(() => {
+    const set = (sel: string, text: string) => {
+      const el = document.querySelector<HTMLElement>(sel);
+      if (!el) throw new Error(`missing ${sel}`);
+      el.textContent = text;
+    };
+    set('[data-server="t3-code"] [data-testid="mcp-version"]', "v1.2.3-a-prerelease-tag-that-goes-on-and-on-and-on");
+    set('[data-server="github"] [data-testid="mcp-name"]', "my-extremely-long-mcp-server-name-that-keeps-going-and-going-forever");
+    set('[data-server="github"] [data-testid="mcp-tool"] [title]', "mcp__some_extremely_long_tool_name_that_never_ends_at_all_ok");
+    set('[data-server="linear"] [data-testid="mcp-name"]', "another_very_long_server_name_with_underscores_everywhere_and_more");
+    set('[data-server="playwright"] [data-testid="mcp-error"]', "Error: connect ECONNREFUSED https://example.com/a/very/long/path/that/has/no/spaces/in/it/at/all");
+  });
+}
+
+test("long names truncate: the status pill stays in the card and the panel never scrolls sideways", async ({ page }) => {
+  await openThread(page);
+  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
+  await expectMcpTab(page);
+  await stretchNames(page);
+  const body = page.getByTestId("panel-body");
+  expect(await body.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+  // Each card's row keeps its pill inside the card; the name wins over the version.
+  for (const name of ["t3-code", "github", "linear", "playwright"]) {
+    const c = card(page, name);
+    const overhang = await c.evaluate((e) => {
+      const pill = e.querySelector('[data-testid="mcp-pill"]');
+      if (!pill) throw new Error("no pill");
+      return pill.getBoundingClientRect().right - e.getBoundingClientRect().right;
+    });
+    expect(overhang).toBeLessThanOrEqual(0);
+  }
+  const t3 = card(page, "t3-code");
+  expect(await t3.getByTestId("mcp-name").evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  expect(await t3.getByTestId("mcp-version").evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true);
+  expect(await card(page, "github").getByTestId("mcp-name").evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true);
+});
+
+/** SHOTS=<dir>: the notes' screenshots, WebKit, 1440x900, dark and light; SHOTS_LONG=1 stretches the names first. */
 for (const scheme of ["dark", "light"] as const) {
   test(`screenshots (${scheme})`, async ({ page }, info) => {
     const shots = process.env.SHOTS;
@@ -177,7 +218,8 @@ for (const scheme of ["dark", "light"] as const) {
     await openThread(page);
     expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
     await expectMcpTab(page);
-    await card(page, "github").getByTestId("mcp-tools-toggle").click();
+    if (process.env.SHOTS_LONG) await stretchNames(page);
+    else await card(page, "github").getByTestId("mcp-tools-toggle").click();
     await page.mouse.move(0, 0);
     await page.screenshot({ path: `${String(shots)}/mcp-${scheme}.png` });
     await panel(page).screenshot({ path: `${String(shots)}/mcp-${scheme}-panel.png` });
