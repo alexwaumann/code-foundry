@@ -135,7 +135,7 @@ func (h *Terminal) Remove(ctx context.Context, req *connect.Request[v1.RemoveTer
 }
 
 // Close kills a shell terminal, waits for it to exit, and removes it. Other terminals
-// (a thread's Claude terminal) are refused with FailedPrecondition.
+// (unlabelled ones Create made) are refused with FailedPrecondition.
 func (h *Terminal) Close(ctx context.Context, req *connect.Request[v1.CloseTerminalRequest]) (*connect.Response[v1.CloseTerminalResponse], error) {
 	if err := terminal.CloseShell(ctx, h.store, req.Msg.GetId()); err != nil {
 		return nil, terminalError(err)

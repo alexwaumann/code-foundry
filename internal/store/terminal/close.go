@@ -14,25 +14,20 @@ import (
 // exit, in case the Watch subscription dropped the event (the bus never blocks).
 const closePoll = 250 * time.Millisecond
 
-// ErrNotShell is returned by CloseShell for a terminal terminal.new did not start (a
-// thread's Claude terminal, or one created without labels).
+// ErrNotShell is returned by CloseShell for a terminal terminal.new did not start (one
+// TerminalService.Create made without labels).
 var ErrNotShell = errors.New("not a shell terminal")
 
 // CloseShell is KillAndRemove for a shell terminal.new started (termlabel.KindShell). It
-// refuses any other terminal with ErrNotShell: a thread's Claude terminal ends with
-// session.close, which lets Claude exit gracefully. It fails with ErrNotFound when id
-// does not exist.
+// refuses any other terminal with ErrNotShell (terminal.kill and terminal.remove end
+// those). It fails with ErrNotFound when id does not exist.
 func CloseShell(ctx context.Context, s Store, id string) error {
 	t, err := s.Get(ctx, id)
 	if err != nil {
 		return fmt.Errorf("close terminal %s: %w", id, err)
 	}
 	if !termlabel.IsShell(t.Labels) {
-		hint := ""
-		if t.Labels[termlabel.Session] != "" {
-			hint = "; use session.close to end the thread"
-		}
-		return fmt.Errorf("close terminal %s: %w%s", id, ErrNotShell, hint)
+		return fmt.Errorf("close terminal %s: %w", id, ErrNotShell)
 	}
 	return KillAndRemove(ctx, s, id)
 }

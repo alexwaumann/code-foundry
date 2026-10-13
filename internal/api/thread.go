@@ -14,11 +14,11 @@ import (
 )
 
 // threadWatchBuffer is the per-stream backlog of thread events. Text deltas of every
-// rendered thread pass through each subscription, so it is larger than watchBuffer.
+// thread pass through each subscription, so it is larger than watchBuffer.
 const threadWatchBuffer = 2048
 
 // Thread implements codefoundryv1connect.ThreadServiceHandler over the session store's
-// rendered-thread methods.
+// thread methods.
 type Thread struct {
 	store session.Store
 	bus   *bus.Bus

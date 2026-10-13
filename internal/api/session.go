@@ -37,7 +37,7 @@ func (h *Session) Create(ctx context.Context, req *connect.Request[v1.CreateSess
 	o := session.CreateOptions{
 		RepoID: m.GetRepoId(), WorktreePath: m.GetWorktreePath(), Model: m.GetModel(), Effort: m.GetEffort(),
 		Name: m.GetName(), InitialPrompt: m.GetInitialPrompt(), ComposerPrompt: m.GetComposerPrompt(), PermissionMode: session.PermissionMode(m.GetPermissionMode()),
-		Attachments: m.GetAttachments(), WorkspaceID: m.GetWorkspaceId(), Render: session.Render(m.GetRender()),
+		Attachments: m.GetAttachments(), WorkspaceID: m.GetWorkspaceId(),
 	}
 	if nw := m.GetNewWorktree(); nw != nil {
 		o.NewWorktree = &session.NewWorktree{BaseRef: nw.GetBaseRef()}
@@ -205,7 +205,6 @@ func sessionToProto(s session.Session) *v1.Session {
 		AutoNamed:           s.AutoNamed,
 		Model:               s.Model,
 		Effort:              s.Effort,
-		TerminalId:          s.TerminalID,
 		State:               v1.SessionState(s.State),
 		Status:              v1.SessionStatus(s.Status),
 		StatusReason:        s.StatusReason,
@@ -219,7 +218,6 @@ func sessionToProto(s session.Session) *v1.Session {
 		WorkspaceId:         s.WorkspaceID,
 		PendingWorktreePath: s.PendingWorktreePath,
 		Pinned:              s.Pinned,
-		Render:              v1.SessionRender(s.Render),
 		EffortPending:       s.EffortPending,
 	}
 	if !s.CreatedAt.IsZero() {
@@ -267,14 +265,6 @@ func sessionError(err error) error {
 		code = connect.CodeCanceled
 	case errors.Is(err, context.DeadlineExceeded):
 		code = connect.CodeDeadlineExceeded
-	default:
-		// Spawn failures surface the terminal store's error (bad argv, cwd).
-		if te := terminalError(err); te != nil {
-			var tce *connect.Error
-			if errors.As(te, &tce) && tce.Code() != connect.CodeInternal {
-				return te
-			}
-		}
 	}
 	return connect.NewError(code, err)
 }

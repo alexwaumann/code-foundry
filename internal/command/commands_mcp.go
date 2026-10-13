@@ -13,7 +13,7 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
-// A rendered thread's MCP servers (docs/notes/mcp-panel.md): thread.mcp prints them,
+// A thread's MCP servers (docs/notes/mcp-panel.md): thread.mcp prints them,
 // thread.mcp-reconnect reconnects one, view.panel.mcp opens the GUI's MCP surface.
 
 // McpBackend is the slice of ThreadService the MCP commands need, in generated Connect
@@ -30,9 +30,9 @@ var (
 )
 
 // ViewPanelMcp is the ShowView name that opens (or reveals) the MCP surface in the side
-// panel of the selected rendered thread: its MCP servers with status, tools and
-// Reconnect. An action on per-selection GUI state like ViewPanelUsage; a window whose
-// selection is not a rendered thread ignores it.
+// panel of the selected thread: its MCP servers with status, tools and Reconnect. An
+// action on per-selection GUI state like ViewPanelUsage; a window whose selection is
+// not a thread ignores it.
 const ViewPanelMcp = "panel.mcp"
 
 // RegisterMcp registers thread.mcp, thread.mcp-reconnect and view.panel.mcp.
@@ -42,7 +42,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 		Command{
 			Name:  "thread.mcp",
 			Title: "Show Thread MCP Servers",
-			Description: "Print a rendered thread's MCP servers as Claude last reported them (checked at the start of every turn): " +
+			Description: "Print a thread's MCP servers as Claude last reported them (checked at the start of every turn): " +
 				"status, scope, transport, version and tool count; --full adds each server's tools.",
 			Category: "Thread",
 			Args: []ArgSpec{
@@ -50,7 +50,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 				{Name: "refresh", Type: Bool, Description: "Ask Claude now instead of showing the last check"},
 				{Name: "full", Type: Bool, Description: "List each server's tools with their hints"},
 			},
-			When: hasRenderedThread,
+			When: hasSession,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.McpStatus(ctx, connect.NewRequest(&v1.McpStatusRequest{SessionId: a.String("id"), Refresh: a.Bool("refresh")}))
 				if err != nil {
@@ -63,14 +63,14 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 		Command{
 			Name:  "thread.mcp-reconnect",
 			Title: "Reconnect Thread MCP Server",
-			Description: "Reconnect one of a connected rendered thread's MCP servers, then check them again. " +
+			Description: "Reconnect one of a connected thread's MCP servers, then check them again. " +
 				"After logging in to a server with /mcp in a terminal thread, this picks the login up.",
 			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,
 				{Name: "server", Type: String, Required: true, Description: "The server's name as thread.mcp prints it"},
 			},
-			When: hasRenderedThread,
+			When: hasSession,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				name := a.String("server")
 				res, err := b.McpReconnect(ctx, connect.NewRequest(&v1.McpReconnectRequest{SessionId: a.String("id"), ServerName: name}))
@@ -93,12 +93,12 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 		Command{
 			Name:  "view.panel.mcp",
 			Title: "Show MCP Servers",
-			Description: "Open the MCP surface in the selected rendered thread's side panel: " +
+			Description: "Open the MCP surface in the selected thread's side panel: " +
 				"its MCP servers with status, errors and tools, and Reconnect.",
 			Category: "View",
 			// No default chord, like view.panel.usage (M opens it while the panel has
-			// focus). Rendered threads only: a terminal thread's Claude reports nothing.
-			When: hasRenderedThread,
+			// focus).
+			When: hasSession,
 			Run: func(context.Context, Context, Args) (Result, error) {
 				n := e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: ViewPanelMcp}}})
 				return Result{JSON: EmitResult{Delivered: n}}, nil

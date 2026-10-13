@@ -381,7 +381,7 @@ func (s sessionSource) snapshot(context.Context) []*v1.Event {
 // ---- thread --------------------------------------------------------------------
 
 // threadSource carries the pending requests (permission prompts and questions) of
-// every rendered thread: the snapshot lists the live threads' pending requests, then
+// every thread: the snapshot lists the live threads' pending requests, then
 // each change is a ThreadEvent.pending. Items are per thread and come only from
 // ThreadService.ListItems or Watch (the visible thread's stream, as a terminal's
 // Attach): forwarding every thread's text deltas to every client would cost more than
@@ -413,7 +413,7 @@ func (s threadSource) snapshot(ctx context.Context) []*v1.Event {
 	snap := &v1.ThreadPendingSnapshot{}
 	if ss := s.store.Snapshot(); ss != nil {
 		for _, x := range ss.Sessions {
-			if x.Render != session.RenderRendered || x.State == session.StateDisconnected {
+			if x.State == session.StateDisconnected {
 				continue
 			}
 			items, err := s.store.Items(ctx, x.ID)

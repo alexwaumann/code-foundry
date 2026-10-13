@@ -10,7 +10,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/session"
 )
 
-// A rendered thread's MCP servers (docs/notes/mcp-panel.md).
+// A thread's MCP servers (docs/notes/mcp-panel.md).
 
 // McpStatus returns the thread's MCP servers as last checked, or checks now.
 func (h *Thread) McpStatus(ctx context.Context, req *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error) {

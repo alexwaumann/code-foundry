@@ -132,7 +132,7 @@ func listStatus(s *v1.Session) string {
 	return st
 }
 
-// listContext is session.list's CONTEXT cell for a rendered thread with a result: its
+// listContext is session.list's CONTEXT cell for a thread with a result: its
 // context size and whether the prompt cache is still warm at now ("25.7K · cache
 // expires in 42 min", "25.7K · cache expired"); "-" otherwise.
 func listContext(s *v1.Session, now time.Time) string {
@@ -175,8 +175,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 			Name:  "session.new",
 			Title: "New Thread",
 			Description: "Start Claude Code in a worktree (default: the active worktree, else the active repository's main worktree), or in a new worktree. " +
-				"With workspace the thread belongs to that workspace and runs in one of its member worktrees; with new-worktree and repos it gets a new workspace. " +
-				"render picks how the thread runs for its whole life: terminal (Claude Code's own interface) or rendered (the app draws the conversation); without it, settings sessions.render.",
+				"With workspace the thread belongs to that workspace and runs in one of its member worktrees; with new-worktree and repos it gets a new workspace.",
 			Category:    "Thread",
 			Keybindings: []string{"cmd+n"},
 			Args: []ArgSpec{
@@ -191,11 +190,9 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				{Name: "new-worktree", Type: Bool, Description: "Create a new worktree for the thread (branch cf/<name from the prompt>)"},
 				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: origin/<default branch>); needs new-worktree"},
 				{Name: "name", Type: String, Description: "Thread name (default: generated from the first message)"},
-				{Name: "prompt", Type: String, Description: "First prompt, passed to Claude as it starts"},
+				{Name: "prompt", Type: String, Description: "First prompt, sent as the thread's first message once Claude is up"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image paths from StageAttachment, appended to the prompt"},
-				{Name: "composer-prompt", Type: String, Description: "A rendered thread: the GUI composer's text of prompt with its tag tokens, kept on the first message for display (the GUI sets it)"},
-				{Name: "render", Type: Enum, Enum: SessionRenders,
-					Description: "terminal (Claude Code in a terminal) or rendered (headless; the app draws the conversation). Default: settings sessions.render"},
+				{Name: "composer-prompt", Type: String, Description: "The GUI composer's text of prompt with its tag tokens, kept on the first message for display (the GUI sets it)"},
 			},
 			When: canStartThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -207,7 +204,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 					RepoId: a.String("repo"), WorktreePath: a.Path("worktree"), Model: a.String("model"),
 					Effort: a.String("effort"), Name: a.String("name"), InitialPrompt: a.String("prompt"),
 					ComposerPrompt: a.String("composer-prompt"), PermissionMode: sessionPermissionModes[a.String("permission")], Attachments: splitList(a.String("attachments")),
-					WorkspaceId: ws, Render: sessionRenderModes[a.String("render")],
+					WorkspaceId: ws,
 				}
 				switch {
 				case len(repos) > 0 && !a.Bool("new-worktree"):
