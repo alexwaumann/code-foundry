@@ -35,7 +35,6 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     autoNamed: false,
     model: "",
     effort: "",
-    terminalId: `t-${id}`,
     state: "connected",
     status: "idle",
     statusReason: "",
@@ -52,7 +51,6 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     workspaceId: "",
     pendingWorktreePath: "",
     pinned: false,
-    render: "terminal",
     effortPending: false,
     linkedPullRequests: [],
     usage: [],
@@ -308,7 +306,7 @@ describe("Run in… presentation (session.run-in)", () => {
   });
 });
 
-describe("a bare-key command chord (Escape interrupts a rendered thread)", () => {
+describe("a bare-key command chord (Escape interrupts a thread)", () => {
   let pane: HTMLElement;
   let prompt: HTMLElement;
   let sidebar: HTMLElement;
@@ -322,7 +320,7 @@ describe("a bare-key command chord (Escape interrupts a rendered thread)", () =>
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     useUiStore.setState({ palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" }, selection: { kind: "session", id: "s-r" } });
     useCommandsStore.setState({ commands: [cmd({ name: "thread.interrupt", keybindings: ["escape"] })] });
-    useSessionsStore.setState({ byId: { "s-r": session("s-r", { render: "rendered", status: "busy", terminalId: "" }) }, order: ["s-r"] });
+    useSessionsStore.setState({ byId: { "s-r": session("s-r", { status: "busy" }) }, order: ["s-r"] });
     useThreadStore.setState({ logs: {}, pending: {} });
     useCommandsStore.setState({ contextKey: contextKey(getUiContext()) });
     runCommandForResult.mockClear();
@@ -342,9 +340,8 @@ describe("a bare-key command chord (Escape interrupts a rendered thread)", () =>
   it.each<[string, () => void, () => HTMLElement]>([
     ["outside the content pane (lists, dialogs)", () => undefined, () => sidebar],
     ["inside an element with its own keys (a docked prompt)", () => undefined, () => prompt],
-    ["when the thread is idle", () => { useSessionsStore.setState({ byId: { "s-r": session("s-r", { render: "rendered", status: "idle", terminalId: "" }) } }); }, () => pane],
+    ["when the thread is idle", () => { useSessionsStore.setState({ byId: { "s-r": session("s-r", { status: "idle" }) } }); }, () => pane],
     ["while a prompt waits for the user", () => { useThreadStore.setState({ pending: { "s-r": { sessionId: "s-r", seq: 1, pending: [{ requestId: "r", itemId: "i", question: false, toolName: "Bash", summary: "ls" }] } } }); }, () => pane],
-    ["for a terminal thread", () => { useSessionsStore.setState({ byId: { "s-r": session("s-r", { status: "busy" }) } }); }, () => pane],
   ])("leaves the key alone %s", (_name, setup, target) => {
     setup();
     expect(press(target(), escape).defaultPrevented).toBe(false);

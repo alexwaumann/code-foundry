@@ -165,7 +165,7 @@ describe("usagePanelCommand (view.panel.usage)", () => {
   });
 
   it("from the palette, sends the palette's focus back to the panel", () => {
-    useUiStore.setState((s) => ({ palette: { ...s.palette, open: true, returnTo: "terminal" } }));
+    useUiStore.setState((s) => ({ palette: { ...s.palette, open: true, returnTo: "content" } }));
     expect(usagePanelCommand()).toBe(true);
     expect(useUiStore.getState().palette.returnTo).toBe("panel");
   });

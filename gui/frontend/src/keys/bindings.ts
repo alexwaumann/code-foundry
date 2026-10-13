@@ -18,7 +18,7 @@ import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 /**
  * GUI-local view actions. They change only what the window shows (palette, sidebar,
  * zoom, which row is selected), never daemon state, so they are not registry commands.
- * Every chord here is "global": it wins even when the terminal has focus.
+ * Every chord here is "global": it wins even when a bottom panel shell has focus.
  */
 export interface ViewAction {
   chord: string;
@@ -29,7 +29,7 @@ export interface ViewAction {
 /** Selects the Nth thread in sidebar order (rows of a collapsed section do not count). */
 function jumpTo(n: number): void {
   const id = sessionOrder(getListSessions(), getListOptions())[n - 1];
-  if (id !== undefined) useUiStore.getState().select({ kind: "session", id }, { focusTerminal: true });
+  if (id !== undefined) useUiStore.getState().select({ kind: "session", id }, { focusPrompt: true });
 }
 
 /** Selects the next session that needs attention after the current one, wrapping. */
@@ -39,7 +39,7 @@ export function jumpToAttention(): boolean {
   // Threads that need attention are never in the collapsible Working section (threadGroup).
   const next = nextAfter(sessionOrder(getListSessions(), getListOptions()), sel.kind === "session" ? sel.id : null, (id) => waiting.has(id));
   if (next === null) return false;
-  useUiStore.getState().select({ kind: "session", id: next }, { focusTerminal: true });
+  useUiStore.getState().select({ kind: "session", id: next }, { focusPrompt: true });
   return true;
 }
 
@@ -49,15 +49,16 @@ function togglePalette(): void {
   else ui.openPalette();
 }
 
-function focusContentTerminal(): void {
-  if (useUiStore.getState().selection.kind === "session") useUiStore.setState((s) => ({ terminalFocusSeq: s.terminalFocusSeq + 1 }));
+/** A selected thread's prompt takes the keyboard (ThreadComposer). */
+function focusThreadPrompt(): void {
+  if (useUiStore.getState().selection.kind === "session") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
 }
 
 function toggleSidebar(): void {
   const ui = useUiStore.getState();
   if (ui.sidebarVisible) {
     ui.toggleSidebar();
-    focusContentTerminal();
+    focusThreadPrompt();
   } else {
     ui.focusSidebar();
   }
@@ -125,9 +126,8 @@ export function commandBindings(commands: readonly CommandView[]): Map<string, C
 }
 
 /**
- * The command a focused terminal yields this chord to (see terminalYieldable). Sessions
- * are terminals, so without this session.close/rename/reconnect would never fire from
- * the main view.
+ * The command a focused terminal (a bottom panel shell) yields this chord to (see
+ * terminalYieldable), so session.close/rename/reconnect still fire from a thread's shell.
  */
 function terminalYields(chord: string): CommandView | undefined {
   if (!terminalYieldable(chord)) return undefined;
@@ -284,11 +284,11 @@ export function presentInPalette(name: string): boolean {
  */
 const quietCommands: ReadonlySet<string> = new Set(["terminal.new", "thread.interrupt"]);
 
-/** The active thread is rendered, connected, on a turn and not waiting on the user: Escape interrupts it. */
+/** The active thread is connected, on a turn and not waiting on the user: Escape interrupts it. */
 function activeThreadInterruptible(): boolean {
   const id = getUiContext().activeSessionId;
   const s = id ? useSessionsStore.getState().byId[id] : undefined;
-  if (s?.render !== "rendered" || s.state !== "connected" || s.status !== "busy") return false;
+  if (s?.state !== "connected" || s.status !== "busy") return false;
   const t = useThreadStore.getState();
   return (t.logs[id]?.pending ?? t.pending[id]?.pending ?? []).length === 0;
 }

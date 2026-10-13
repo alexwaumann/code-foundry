@@ -20,7 +20,7 @@ const { useUiStore } = await import("@/stores/ui");
 const { linkedPrsPanelCommand, showView, useViewsStore } = await import("@/stores/views");
 
 const link = (slug: string, number: number): LinkedPullRequestView => ({ slug, number, url: `https://github.com/${slug}/pull/${String(number)}`, linkedAt: Date.now() - number * 60_000 });
-const thread = (id: string, links: LinkedPullRequestView[]) => ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", terminalId: "", state: "connected", linkedPullRequests: links }) as SessionView;
+const thread = (id: string, links: LinkedPullRequestView[]) => ({ id, name: `thread ${id}`, repoId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state: "connected", linkedPullRequests: links }) as SessionView;
 const pr = (slug: string, number: number, o: Partial<PullRequestView>): PullRequestDetailView =>
   ({
     pullRequest: { repoSlug: slug, number, title: `title ${String(number)}`, state: "open", draft: false, headRef: `branch-${String(number)}`, checks: { state: "success", total: 1, passed: 1, failed: 0, pending: 0, skipped: 0 }, ...o },
@@ -159,7 +159,7 @@ describe("linkedPrsPanelCommand (view.panel.linked-prs)", () => {
   });
 
   it("from the palette, sends the palette's focus back to the panel", () => {
-    useUiStore.setState((s) => ({ palette: { ...s.palette, open: true, returnTo: "terminal" } }));
+    useUiStore.setState((s) => ({ palette: { ...s.palette, open: true, returnTo: "content" } }));
     expect(linkedPrsPanelCommand()).toBe(true);
     expect(useUiStore.getState().palette.returnTo).toBe("panel");
   });

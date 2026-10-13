@@ -144,19 +144,18 @@ describe("bottomMax and clampBottomHeight", () => {
 describe("closePalette", () => {
   const seqs = (): Record<string, number> => {
     const s = useUiStore.getState();
-    return { terminal: s.terminalFocusSeq, sidebar: s.sidebarFocusSeq, panel: s.panelFocusSeq, bottom: s.bottomFocusSeq, content: s.contentFocusSeq };
+    return { prompt: s.promptFocusSeq, sidebar: s.sidebarFocusSeq, panel: s.panelFocusSeq, bottom: s.bottomFocusSeq, content: s.contentFocusSeq };
   };
   const cases: [FocusRegion, string][] = [
-    ["terminal", "terminal"],
     ["sidebar", "sidebar"],
     ["panel", "panel"],
     ["bottom", "bottom"],
     ["content", "content"],
   ];
   it.each(cases)("returns focus to %s", (returnTo, bumped) => {
-    useUiStore.setState({ terminalFocusSeq: 0, sidebarFocusSeq: 0, panelFocusSeq: 0, bottomFocusSeq: 0, contentFocusSeq: 0, palette: { open: true, query: "", commandName: null, page: "commands", returnTo } });
+    useUiStore.setState({ promptFocusSeq: 0, sidebarFocusSeq: 0, panelFocusSeq: 0, bottomFocusSeq: 0, contentFocusSeq: 0, palette: { open: true, query: "", commandName: null, page: "commands", returnTo } });
     useUiStore.getState().closePalette();
-    const want = { terminal: 0, sidebar: 0, panel: 0, bottom: 0, content: 0, [bumped]: 1 };
+    const want = { prompt: 0, sidebar: 0, panel: 0, bottom: 0, content: 0, [bumped]: 1 };
     expect(seqs()).toEqual(want);
     expect(useUiStore.getState().palette.open).toBe(false);
   });

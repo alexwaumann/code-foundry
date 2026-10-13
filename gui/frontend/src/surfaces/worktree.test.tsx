@@ -125,7 +125,7 @@ describe("worktreePanelCommand (view.panel.worktree)", () => {
 
   it("is reached through ShowView panel.worktree and, from the palette, returns focus to the panel", () => {
     usePanelStore.setState({ byKey: {} });
-    useUiStore.setState((s) => ({ palette: { ...s.palette, open: true, returnTo: "terminal" } }));
+    useUiStore.setState((s) => ({ palette: { ...s.palette, open: true, returnTo: "content" } }));
     expect(showView("panel.worktree")).toBe(true);
     expect(getPanel("session:s-feat").open).toBe(true);
     expect(useUiStore.getState().palette.returnTo).toBe("panel");

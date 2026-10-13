@@ -33,7 +33,7 @@ export function isDashboard(sel: Selection): boolean {
 }
 
 /** Which region has keyboard focus; the palette returns focus to it on close. */
-export type FocusRegion = "sidebar" | "terminal" | "content" | "palette" | "panel" | "bottom";
+export type FocusRegion = "sidebar" | "content" | "palette" | "panel" | "bottom";
 
 /**
  * What the palette dialog shows: the command list (and arg prompts), the project picker,
@@ -92,8 +92,12 @@ export function nextZoom(zoom: number, direction: 1 | -1): number {
 interface UiState {
   selection: Selection;
   focus: FocusRegion;
-  /** Incremented to ask the terminal pane to take focus. */
-  terminalFocusSeq: number;
+  /**
+   * Incremented to ask the selected thread's prompt to take focus (its composer,
+   * components/thread/ThreadComposer.tsx): a thread picked from the sidebar, a palette
+   * jump, a focusSession intent.
+   */
+  promptFocusSeq: number;
   /** Incremented to ask the sidebar list to take focus. */
   sidebarFocusSeq: number;
   /** Incremented to ask the visible side panel to take focus (components/panel/SidePanel.tsx). */
@@ -104,8 +108,8 @@ interface UiState {
    */
   bottomFocusSeq: number;
   /**
-   * Incremented to ask whatever fills the content pane to take focus: the terminal when
-   * one shows, else the page's `[data-focus-root]` element (App.tsx).
+   * Incremented to ask whatever fills the content pane to take focus: a thread's prompt
+   * (ThreadComposer), else the page's `[data-focus-root]` element (App.tsx).
    */
   contentFocusSeq: number;
   /** window.innerWidth, kept current by startApp; bounds the side panel (panelMax). */
@@ -125,7 +129,7 @@ interface UiState {
   // Persisted settings.
   sidebarVisible: boolean;
   sidebarWidth: number;
-  /** Terminal font size in px before zoom (appearance.font_size). */
+  /** Terminal font size in px before zoom (appearance.font_size); the bottom panel's shells. */
   fontSize: number;
   /** Page zoom in percent (appearance.zoom). */
   zoom: number;
@@ -138,7 +142,8 @@ interface UiState {
   /** Projects page: workspace ids whose member rows are hidden. */
   collapsedWorkspaces: string[];
 
-  select: (sel: Selection, opts?: { focusTerminal?: boolean }) => void;
+  /** Selects; `focusPrompt` also asks a thread's prompt to take focus (promptFocusSeq). */
+  select: (sel: Selection, opts?: { focusPrompt?: boolean }) => void;
   setFocus: (f: FocusRegion) => void;
   focusSidebar: () => void;
   setCursor: (key: string | null) => void;
@@ -248,7 +253,7 @@ export const useUiStore = create<UiState>()(
     (set, get) => ({
       selection: DASHBOARD,
       focus: "content",
-      terminalFocusSeq: 0,
+      promptFocusSeq: 0,
       sidebarFocusSeq: 0,
       panelFocusSeq: 0,
       bottomFocusSeq: 0,
@@ -270,8 +275,7 @@ export const useUiStore = create<UiState>()(
       select: (sel, opts) => {
         set((s) => ({
           selection: sameSelection(s.selection, sel) ? s.selection : sel,
-          terminalFocusSeq:
-            opts?.focusTerminal && sel.kind === "session" ? s.terminalFocusSeq + 1 : s.terminalFocusSeq,
+          promptFocusSeq: opts?.focusPrompt && sel.kind === "session" ? s.promptFocusSeq + 1 : s.promptFocusSeq,
         }));
       },
       setRenaming: (renamingSessionId) => {
@@ -305,7 +309,6 @@ export const useUiStore = create<UiState>()(
           const to = s.palette.returnTo;
           return {
             palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" },
-            terminalFocusSeq: to === "terminal" ? s.terminalFocusSeq + 1 : s.terminalFocusSeq,
             sidebarFocusSeq: to === "sidebar" ? s.sidebarFocusSeq + 1 : s.sidebarFocusSeq,
             panelFocusSeq: to === "panel" ? s.panelFocusSeq + 1 : s.panelFocusSeq,
             bottomFocusSeq: to === "bottom" ? s.bottomFocusSeq + 1 : s.bottomFocusSeq,

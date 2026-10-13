@@ -130,13 +130,13 @@ describe("startPrSession", () => {
   });
 
   it("the toast's Open selects the new session when no FocusSession moved the selection", async () => {
-    useUiStore.setState({ selection: { kind: "view", name: "pullrequests" }, terminalFocusSeq: 0 });
+    useUiStore.setState({ selection: { kind: "view", name: "pullrequests" }, promptFocusSeq: 0 });
     invokeCommand.mockResolvedValueOnce(started("s-9"));
     await startPrSession("explain", REF);
     const opts = toast.success.mock.calls[0]?.[1] as { action: { onClick: () => void } };
     opts.action.onClick();
     expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s-9" });
-    expect(useUiStore.getState().terminalFocusSeq).toBe(1);
+    expect(useUiStore.getState().promptFocusSeq).toBe(1);
   });
 });
 
@@ -147,9 +147,9 @@ describe("openStartedSession", () => {
     // FocusSession got there first: nothing changes (no second terminal focus).
     ["the new session", { kind: "session", id: "s-9" }, 0],
   ] as const)("from %s", (_, selection, focusSeq) => {
-    useUiStore.setState({ selection, terminalFocusSeq: 0 });
+    useUiStore.setState({ selection, promptFocusSeq: 0 });
     openStartedSession("s-9");
     expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s-9" });
-    expect(useUiStore.getState().terminalFocusSeq).toBe(focusSeq);
+    expect(useUiStore.getState().promptFocusSeq).toBe(focusSeq);
   });
 });
