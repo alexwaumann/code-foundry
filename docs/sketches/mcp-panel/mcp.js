@@ -115,9 +115,10 @@ function variantB() {
     const cls = s.status === 'failed' ? 'bad' : s.status === 'needs-auth' ? 'needs' : s.status === 'disabled' ? 'off' : '';
     const meta = [s.scope, s.transport, s.status === 'connected' ? `${s.toolCount} tools` : s.status === 'disabled' && s.toolCount ? `${s.toolCount} tools when enabled` : ''].filter(Boolean).join('<span class="sep"> · </span>');
     const detail = s.error ? `<div class="err"><span class="mono">${s.error}</span></div>` : s.note ? `<div class="note">${s.note}</div>` : '';
-    const acts = s.status === 'disabled'
-      ? `<span class="btn">${ic('power')}Enable</span>`
-      : `<span class="btn ${s.status === 'needs-auth' || s.status === 'failed' ? 'warn' : 'quiet'}">${ic('refresh-cw')}Reconnect</span><span class="btn quiet">${ic('circle-minus')}Disable</span>`;
+    // Decision (Alex, 2026-10-12): Reconnect is the only action; no Disable/Enable. A
+    // disabled server (Claude's config) just shows as disabled; a pending one has nothing.
+    const acts = s.status === 'disabled' || s.status === 'pending' ? ''
+      : `<span class="btn ${s.status === 'needs-auth' || s.status === 'failed' ? 'warn' : 'quiet'}">${ic('refresh-cw')}Reconnect</span>`;
     const tools = s.tools.length ? `<span class="btn quiet tools-btn">${ic(open ? 'chevron-down' : 'chevron-right')}${s.toolCount} tools</span>` : '';
     return `<div class="card ${cls}">
       <div class="top">${s.status === 'pending' ? ic('loader-circle', 'spin', 12) : `<span class="dot ${DOT[s.status]}"></span>`}<span class="name">${s.name}</span>${s.version ? `<span class="ver">v${s.version}</span>` : ''}<span class="pill ${DOT[s.status]}">${LABEL[s.status]}</span></div>

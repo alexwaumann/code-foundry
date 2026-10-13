@@ -26,3 +26,10 @@ was last checked (each `system/init`, i.e. the start of a turn) and a refresh bu
   Attention rows carry a single amber action button (Reconnect / Retry) inline; connected
   rows show the tool count with hover actions; disabled rows a muted Enable. Two-line
   rows (name, then scope · transport · version or the error).
+
+## Decisions (Alex, 2026-10-12)
+
+**Variant B.** Reconnect is the only action: no Disable/Enable buttons (a server disabled
+in Claude's config shows as disabled, nothing to do here; the header's refresh button
+re-asks `mcp_status`). Keep the tool annotation icons, each with a tooltip naming the
+hint (read-only, destructive, open-world, writes). `shots/b-*.png` are the final state.
