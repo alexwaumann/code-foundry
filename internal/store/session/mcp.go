@@ -204,28 +204,33 @@ func (t *threadLog) mcpStatus() *McpStatus {
 	return t.mcp.status
 }
 
-// MCP polling while a server connects: Claude starts servers in the background, so the
-// first turn's check often finds one pending.
+// MCP polling while the answer is unsettled (mcpUnsettled): Claude starts servers in the
+// background, so the first turn's check often finds one pending.
 const (
 	mcpPendingPolls    = 5
 	mcpPendingInterval = 3 * time.Second
 )
 
-// checkMcp asks Claude for its MCP servers off the runner goroutine (system/init) and,
-// while one is still connecting, asks again a few times.
-func (r *runner) checkMcp() {
+// checkMcp asks Claude for its MCP servers off the runner goroutine (system/init, whose
+// mcp_servers fill in what the answer lacks) and, while the answer looks unsettled, asks
+// again a few times: a server still connecting, a server init listed missing, or no
+// servers at all on the process's first check (claude.ai connectors arrive a moment
+// after the first turn starts; mcp_status then answered none in a live run).
+func (r *runner) checkMcp(init []claudestream.McpServerInit) {
 	conn, log, m, id := r.st.conn, r.st.log, r.m, r.id
+	first := !r.st.mcpChecked
+	r.st.mcpChecked = true
 	go func() {
 		trigger := McpTriggerTurn
 		for poll := 0; ; poll++ {
-			s, err := m.fetchMcp(context.Background(), conn, log, trigger, "")
+			s, err := m.fetchMcp(context.Background(), conn, log, trigger, "", init)
 			if err != nil {
 				if !errors.Is(err, claudestream.ErrClosed) {
 					m.log.Warn("check MCP servers", "session", id, "err", err)
 				}
 				return
 			}
-			if s == nil || !s.anyPending() || poll >= mcpPendingPolls {
+			if !mcpUnsettled(s, init, first) || poll >= mcpPendingPolls {
 				return
 			}
 			select {
@@ -238,9 +243,32 @@ func (r *runner) checkMcp() {
 	}()
 }
 
+// mcpUnsettled reports whether a turn's check should be repeated soon.
+func mcpUnsettled(s *McpStatus, init []claudestream.McpServerInit, first bool) bool {
+	if s.anyPending() || (first && len(s.Servers) == 0) {
+		return true
+	}
+	return slices.ContainsFunc(init, func(in claudestream.McpServerInit) bool {
+		sv, ok := s.server(in.Name)
+		return !ok || sv.Transport == ""
+	})
+}
+
+// fillFromInit adds the servers system/init listed that mcp_status did not report, with
+// init's status and source (no transport, tools or version: init does not say).
+func fillFromInit(servers []McpServer, init []claudestream.McpServerInit) []McpServer {
+	for _, in := range init {
+		if !slices.ContainsFunc(servers, func(sv McpServer) bool { return sv.Name == in.Name }) {
+			servers = append(servers, McpServer{Name: in.Name, Status: in.Status, Source: in.Source, Scope: in.Source})
+		}
+	}
+	return servers
+}
+
 // fetchMcp asks Claude (mcp_status, bounded by streamControlTimeout) and caches the
-// answer. It returns the answer, also when a later check's answer was cached first.
-func (m *Manager) fetchMcp(ctx context.Context, conn *claudestream.Conn, log *threadLog, trigger McpTrigger, server string) (*McpStatus, error) {
+// answer, completed by fill (system/init's list). It returns the answer, also when a
+// later check's answer was cached first.
+func (m *Manager) fetchMcp(ctx context.Context, conn *claudestream.Conn, log *threadLog, trigger McpTrigger, server string, fill []claudestream.McpServerInit) (*McpStatus, error) {
 	ticket := log.mcpTicket()
 	ctx, cancel := context.WithTimeout(ctx, streamControlTimeout)
 	defer cancel()
@@ -248,7 +276,7 @@ func (m *Manager) fetchMcp(ctx context.Context, conn *claudestream.Conn, log *th
 	if err != nil {
 		return nil, err
 	}
-	s := &McpStatus{CheckedAt: m.opts.Now(), Trigger: trigger, Server: server, Servers: mcpFromWire(wire)}
+	s := &McpStatus{CheckedAt: m.opts.Now(), Trigger: trigger, Server: server, Servers: fillFromInit(mcpFromWire(wire), fill)}
 	log.setMcp(ticket, s)
 	return s, nil
 }
@@ -275,7 +303,7 @@ func (m *Manager) McpStatus(ctx context.Context, id string, refresh bool) (*McpS
 	if err != nil {
 		return nil, err
 	}
-	s, err := m.fetchMcp(ctx, conn, log, McpTriggerRefresh, "")
+	s, err := m.fetchMcp(ctx, conn, log, McpTriggerRefresh, "", nil)
 	return s, controlErr(err)
 }
 
@@ -314,7 +342,7 @@ func (m *Manager) McpReconnect(ctx context.Context, id, server string) (McpRecon
 		return res, controlErr(err)
 	}
 	m.log.Info("MCP server reconnected", "session", id, "server", server, "err", res.Error)
-	if res.Status, err = m.fetchMcp(ctx, conn, log, McpTriggerReconnect, server); err != nil {
+	if res.Status, err = m.fetchMcp(ctx, conn, log, McpTriggerReconnect, server, nil); err != nil {
 		return res, controlErr(err)
 	}
 	return res, nil

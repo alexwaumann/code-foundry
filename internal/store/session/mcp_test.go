@@ -285,3 +285,34 @@ func TestRenderedMcpReconnect(t *testing.T) {
 		t.Errorf("terminal reconnect: %v", err)
 	}
 }
+
+func TestMcpUnsettledAndFill(t *testing.T) {
+	init := []claudestream.McpServerInit{{Name: "docs", Status: "pending", Source: "claudeai"}, {Name: "gmail", Status: "needs-auth", Source: "claudeai"}}
+	settled := &McpStatus{Servers: []McpServer{{Name: "docs", Status: McpConnected, Transport: "claudeai-proxy"}, {Name: "gmail", Status: McpNeedsAuth, Transport: "claudeai-proxy"}}}
+	tests := []struct {
+		name  string
+		s     *McpStatus
+		init  []claudestream.McpServerInit
+		first bool
+		want  bool
+	}{
+		{name: "settled", s: settled, init: init, want: false},
+		{name: "a server pending", s: &McpStatus{Servers: []McpServer{{Name: "x", Status: McpPending, Transport: "stdio"}}}, want: true},
+		{name: "none on the first check", s: &McpStatus{}, first: true, want: true},
+		{name: "none later", s: &McpStatus{}, want: false},
+		{name: "init lists one the answer lacks", s: &McpStatus{Servers: settled.Servers[:1]}, init: init, want: true},
+		{name: "filled from init only", s: &McpStatus{Servers: fillFromInit(nil, init[1:])}, init: init[1:], want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := mcpUnsettled(tt.s, tt.init, tt.first); got != tt.want {
+				t.Errorf("unsettled = %v", got)
+			}
+		})
+	}
+	got := fillFromInit([]McpServer{{Name: "docs", Status: McpConnected, Transport: "claudeai-proxy"}}, init)
+	want := []McpServer{{Name: "docs", Status: McpConnected, Transport: "claudeai-proxy"}, {Name: "gmail", Status: McpNeedsAuth, Source: "claudeai", Scope: "claudeai"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("fill = %+v", got)
+	}
+}

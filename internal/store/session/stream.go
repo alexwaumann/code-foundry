@@ -81,6 +81,8 @@ type streamState struct {
 	// swapping (under connMu): a restart is replacing the Conn; Store calls made outside
 	// the goroutine are refused meanwhile (connection).
 	swapping bool
+	// mcpChecked: the MCP servers were checked since spawn (mcp.go checkMcp).
+	mcpChecked bool
 }
 
 // connection is the current Conn, for Store calls made outside the run goroutine. While
@@ -367,7 +369,7 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 		r.onModeChange(e.PermissionMode)
 	case *claudestream.Init:
 		if !r.closing {
-			r.checkMcp() // a turn starts: Claude pushes no MCP status changes (mcp.go)
+			r.checkMcp(e.McpServers) // a turn starts: Claude pushes no MCP status changes (mcp.go)
 		}
 	case *claudestream.Result:
 		r.acknowledgeIfViewed()
