@@ -19,6 +19,7 @@ import {
 } from "@/gen/codefoundry/v1/thread_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { toMcpStatusView, type McpStatusView } from "./mcp";
+import { toSlashCommandViews, type SlashCommandView } from "./slashCommands";
 
 export type ToolStatusView = "running" | "done" | "error" | "unknown";
 export type RequestStateView = "pending" | "allowed" | "denied" | "cancelled" | "unknown";
@@ -138,12 +139,14 @@ export interface ThreadPendingListView {
 }
 
 export type ThreadEventView =
-  | { kind: "snapshot"; sessionId: string; seq: number; items: ThreadItemView[]; pending: ThreadPendingView[]; mcp: McpStatusView | null }
+  | { kind: "snapshot"; sessionId: string; seq: number; items: ThreadItemView[]; pending: ThreadPendingView[]; mcp: McpStatusView | null; commands: SlashCommandView[] }
   | { kind: "appended" | "updated"; sessionId: string; seq: number; item: ThreadItemView }
   | { kind: "delta"; sessionId: string; seq: number; itemId: string; ordinal: number; field: "text" | "input"; text: string }
   | ({ kind: "pending" } & ThreadPendingListView)
   /** Watch only: the thread's MCP servers were checked again, or dropped (null: its process ended). */
   | { kind: "mcp"; sessionId: string; seq: number; status: McpStatusView | null }
+  /** Watch only: the thread's slash commands changed (the whole new list; empty: its process ended). */
+  | { kind: "commands"; sessionId: string; seq: number; commands: SlashCommandView[] }
   /** EventService only: the pending requests of every thread that has any. */
   | { kind: "pendingSnapshot"; threads: ThreadPendingListView[] };
 
@@ -273,6 +276,7 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
         items: items(e.value.items),
         pending: e.value.pending.map(toPendingView),
         mcp: toMcpStatusView(e.value.mcp),
+        commands: toSlashCommandViews(e.value.commands),
       };
     case "appended":
     case "updated": {
@@ -287,6 +291,8 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
       return { kind: "pending", sessionId: e.value.sessionId, seq: Number(e.value.seq), pending: e.value.pending.map(toPendingView) };
     case "mcp":
       return { kind: "mcp", sessionId: e.value.sessionId, seq: Number(e.value.seq), status: toMcpStatusView(e.value.status) };
+    case "commands":
+      return { kind: "commands", sessionId: e.value.sessionId, seq: Number(e.value.seq), commands: toSlashCommandViews(e.value.commands) };
     case "pendingSnapshot":
       return {
         kind: "pendingSnapshot",

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { McpStatusView } from "@/api/mcp";
+import type { SlashCommandView } from "@/api/slashCommands";
 import type { ThreadEventView, ThreadItemView, ThreadPendingView } from "@/api/thread";
 import { applyPendingEvent, applyThreadEvent, applyThreadEvents, KEPT_LOGS, sameItem, startThreadWatch, useThreadStore, WATCH_BATCH_MS, type ThreadLog } from "./thread";
 
@@ -24,7 +25,7 @@ function tool(id: string, ordinal: number, input = ""): ThreadItemView {
   return { id, ordinal, parentToolUseId: "", createdAtMs: 1, updatedAtMs: 1, streaming: true, kind: "tool", toolUseId: id, name: "Bash", inputJson: input, status: "running", output: "", isError: false, resultJson: "" };
 }
 const pend = (requestId: string): ThreadPendingView => ({ requestId, itemId: `perm-${requestId}`, question: false, toolName: "Bash", summary: "Bash ls" });
-const snapshot = (seq: number, items: ThreadItemView[], pending: ThreadPendingView[] = []): ThreadEventView => ({ kind: "snapshot", sessionId: "s", seq, items, pending, mcp: null });
+const snapshot = (seq: number, items: ThreadItemView[], pending: ThreadPendingView[] = []): ThreadEventView => ({ kind: "snapshot", sessionId: "s", seq, items, pending, mcp: null, commands: [] });
 
 function apply(log: ThreadLog | undefined, ...evs: ThreadEventView[]): ThreadLog | undefined {
   return evs.reduce(applyThreadEvent, log);
@@ -165,6 +166,44 @@ describe("the MCP status on the log", () => {
     expect(apply(next, mcp(3, null))?.mcp).toBeNull();
     // A resync snapshot without one clears it.
     expect(apply(next, snapshot(5, [text("a", 1)]))?.mcp).toBeNull();
+  });
+});
+
+describe("slash commands", () => {
+  const cmd = (name: string, builtin = true): SlashCommandView => ({ name, description: `${name} it`, argumentHint: "", aliases: [], builtin });
+  const commands = (seq: number, list: SlashCommandView[]): ThreadEventView => ({ kind: "commands", sessionId: "s", seq, commands: list });
+
+  it("come with the snapshot, follow commands events above its seq, keep an unchanged list, and drop to empty", () => {
+    const start = apply(undefined, { ...snapshot(3, [text("a", 1)]), commands: [cmd("compact"), cmd("deploy", false)] } as ThreadEventView);
+    expect(start?.commands.map((c) => c.name)).toEqual(["compact", "deploy"]);
+    const items = start?.byId;
+
+    // An event the snapshot already includes is dropped.
+    expect(apply(start, commands(3, []))).toBe(start);
+    expect(apply(start, commands(2, [cmd("x")]))).toBe(start);
+
+    const next = apply(start, commands(4, [cmd("deploy", false), cmd("compact"), cmd("usage")]));
+    expect(next?.seq).toBe(4);
+    expect(next?.byId).toBe(items);
+    expect(next?.commands.map((c) => c.name)).toEqual(["deploy", "compact", "usage"]);
+
+    // The same list again (an effort restart's) keeps its identity.
+    const same = apply(next, commands(5, [cmd("deploy", false), cmd("compact"), cmd("usage")]));
+    expect(same?.commands).toBe(next?.commands);
+    // So does a resync snapshot with it.
+    expect(apply(same, { ...snapshot(6, [text("a", 1)]), commands: [cmd("deploy", false), cmd("compact"), cmd("usage")] } as ThreadEventView)?.commands).toBe(next?.commands);
+
+    // The process ended.
+    expect(apply(next, commands(6, []))?.commands).toEqual([]);
+    // A snapshot without any (not running, or an older daemon) clears them.
+    expect(apply(next, snapshot(7, [text("a", 1)]))?.commands).toEqual([]);
+  });
+
+  it("are batched like any other event", () => {
+    const start = apply(undefined, snapshot(1, []));
+    const out = applyThreadEvents(start, [commands(2, [cmd("compact")]), { kind: "delta", sessionId: "s", seq: 3, itemId: "x", ordinal: 1, field: "text", text: "y" }]);
+    expect(out?.seq).toBe(3);
+    expect(out?.commands.map((c) => c.name)).toEqual(["compact"]);
   });
 });
 
