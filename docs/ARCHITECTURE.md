@@ -144,7 +144,11 @@ Services (v1):
   new process gets the session's allow-for-session grants again as `--allowedTools` /
   `--add-dir`), McpStatus and McpReconnect (the thread's MCP servers as Claude last
   reported them, checked at the start of every turn and cached in memory; Watch carries
-  each check; `docs/notes/mcp-panel.md`). See `docs/notes/rendered-threads-1-daemon.md`
+  each check; `docs/notes/mcp-panel.md`), SlashCommands (the commands Claude reports in its
+  initialize reply and `commands_changed` pushes, minus a daemon-side deny table, cached
+  in memory; the items snapshot and Watch carry them; Send refuses a message starting with
+  a command the app replaces, such as `/clear`; `docs/notes/slash-commands-1-daemon.md`).
+  See `docs/notes/rendered-threads-1-daemon.md`
   and `docs/notes/rendered-threads-3-interaction.md`.
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
   chunks), Write (input bytes), Resize, Detach, Kill, Remove, and Close (kill, wait for
@@ -324,7 +328,7 @@ type Command struct {
 `Context` is what the caller is looking at: active session, active repo/worktree, active
 view, and the workspace that owns the active thread or composer (so `session.run-in` is
 offered for workspace threads only; the `thread.*` commands,
-send/respond/interrupt/items/set-model/set-mode/set-effort/mcp/mcp-reconnect, are
+send/respond/interrupt/items/set-model/set-mode/set-effort/mcp/mcp-reconnect/commands, are
 offered whenever a thread is active). The GUI sends its context with `List` and `Invoke`;
 the CLI passes an explicit context from flags or none. The palette, keybindings, and CLI subcommands are three front
 doors to this one registry. Adding a feature means registering commands, not editing a
