@@ -2,12 +2,22 @@
 # Publishes a GitHub release: the manual fallback for .github/workflows/release.yml,
 # which runs this same script.
 #
-#   scripts/release.sh [--dry-run] [--local DIR] [vX.Y.Z]
+#   scripts/release.sh [--dry-run] [--local DIR] [--channel stable|tip] [vX.Y.Z[-tip.N]]
 #
-# Without a version, the next one comes from conventional commits since the last tag
-# (scripts/next-version.sh); with nothing new it exits 0 without releasing, unless HEAD
-# is already tagged with a version whose GitHub release is missing (a re-run after a
-# failure), which it finishes.
+# Two channels (docs/notes/release-channels-handoff.md); the GitHub prerelease flag is
+# the channel:
+#   stable  (default) a full release vX.Y.Z, notes generated since the previous stable.
+#           Promotion: `make promote` dispatches the workflow with channel=stable.
+#   tip     a prerelease vX.Y.Z-tip.N (scripts/next-version.sh --tip): X.Y.Z is the
+#           stable this commit would become if promoted now, N the first-parent commits
+#           since the last stable. Every push to main publishes one. Nothing new since
+#           the stable, or HEAD already tagged stable: nothing to publish.
+#
+# Without a version, the next one comes from conventional commits since the last stable
+# tag (scripts/next-version.sh); with nothing new it exits 0 without releasing, unless
+# (stable) HEAD is already tagged with a version whose GitHub release is missing (a
+# re-run after a failure), which it finishes. A tip re-run computes the same tag for the
+# same HEAD and finishes it the same way.
 #
 # Steps: clean tree, gh authenticated, `make package VERSION=<v> RELEASE_REPO=<slug>`,
 # annotated tag <v> on HEAD, push the tag, `gh release create <v> --generate-notes` with
@@ -15,8 +25,10 @@
 # Every step is idempotent.
 #
 #   --dry-run    run the read-only checks, print the commands that change things
-#   --local DIR  publish into a local release directory (DIR/<v>/ + DIR/latest, the
-#                CODE_FOUNDRY_RELEASE_DIR layout) instead of GitHub: no tag, no push
+#   --local DIR  publish into a local release directory (DIR/<v>/ + DIR/latest, or
+#                DIR/latest-tip on the tip channel: the CODE_FOUNDRY_RELEASE_DIR layout)
+#                instead of GitHub: no tag, no push
+#   --channel C  stable (default) or tip
 #
 # The repository slug comes from CODE_FOUNDRY_RELEASE_REPO, else `git remote get-url
 # origin`.
@@ -28,10 +40,20 @@ cd "$ROOT"
 DRY_RUN=0
 LOCAL_DIR=""
 VERSION=""
+CHANNEL=stable
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--dry-run)
 		DRY_RUN=1
+		shift
+		;;
+	--channel)
+		[ $# -ge 2 ] || { echo "release: --channel needs stable or tip" >&2; exit 2; }
+		CHANNEL="$2"
+		shift 2
+		;;
+	--channel=*)
+		CHANNEL="${1#--channel=}"
 		shift
 		;;
 	--local)
@@ -53,6 +75,13 @@ while [ $# -gt 0 ]; do
 		;;
 	esac
 done
+case "$CHANNEL" in
+stable | tip) ;;
+*)
+	echo "release: unknown channel '$CHANNEL' (want stable or tip)" >&2
+	exit 2
+	;;
+esac
 
 say() { printf '==> %s\n' "$*"; }
 die() {
@@ -109,10 +138,23 @@ fi
 
 release_exists() { gh release view "$1" --repo "$SLUG" >/dev/null 2>&1; }
 
-if [ -z "$VERSION" ]; then
+STABLE_TAG='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+# The stable tag on HEAD, if any.
+head_tag="$(git tag --points-at HEAD --list 'v*' | grep -E "$STABLE_TAG" | head -n 1 || true)"
+
+if [ -z "$VERSION" ] && [ "$CHANNEL" = tip ]; then
+	if [ -n "$head_tag" ]; then
+		say "HEAD is the stable release $head_tag; no tip to publish"
+		exit 0
+	fi
+	VERSION="$(scripts/next-version.sh --tip)"
+	if [ -z "$VERSION" ]; then
+		say "no commits since the last stable tag; no tip to publish"
+		exit 0
+	fi
+elif [ -z "$VERSION" ]; then
 	VERSION="$(scripts/next-version.sh)"
 	if [ -z "$VERSION" ]; then
-		head_tag="$(git tag --points-at HEAD --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
 		if [ -n "$head_tag" ] && [ -z "$LOCAL_DIR" ] && ! release_exists "$head_tag"; then
 			say "HEAD is tagged $head_tag but its release is missing; finishing it"
 			VERSION="$head_tag"
@@ -124,7 +166,27 @@ if [ -z "$VERSION" ]; then
 fi
 printf '%s' "$VERSION" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$' ||
 	die "not a release version: $VERSION"
+# The workflow prunes tips by their -tip. tags, so the channel and the tag must agree.
+if [ "$CHANNEL" = tip ]; then
+	printf '%s' "$VERSION" | grep -Eq -- '-tip\.(0|[1-9][0-9]*)$' ||
+		die "a tip release needs a vX.Y.Z-tip.N version, not $VERSION"
+else
+	case "$VERSION" in
+	*-tip.*) die "$VERSION is a tip version; publish it with --channel tip" ;;
+	esac
+fi
+say "channel: $CHANNEL"
 say "version: $VERSION"
+
+# Tips are prereleases (GitHub's releases/latest skips them). Stable notes start at the
+# previous stable; GitHub's default start is the newest release, which would be a tip.
+CREATE_FLAGS=(--generate-notes)
+if [ "$CHANNEL" = tip ]; then
+	CREATE_FLAGS+=(--prerelease)
+else
+	prev_stable="$(git tag --merged HEAD --list 'v*' --sort=-v:refname | grep -E "$STABLE_TAG" | grep -vxF "$VERSION" | head -n 1 || true)"
+	[ -z "$prev_stable" ] || CREATE_FLAGS+=(--notes-start-tag "$prev_stable")
+fi
 
 # ---- build -------------------------------------------------------------------------------
 
@@ -133,10 +195,12 @@ run make package VERSION="$VERSION" RELEASE_REPO="$SLUG"
 if [ -n "$LOCAL_DIR" ]; then
 	run mkdir -p "$LOCAL_DIR/$VERSION"
 	run cp "${ASSETS[@]}" "$LOCAL_DIR/$VERSION/"
+	pointer="$LOCAL_DIR/latest"
+	[ "$CHANNEL" = stable ] || pointer="$LOCAL_DIR/latest-tip"
 	if [ "$DRY_RUN" = 1 ]; then
-		echo "+ echo $VERSION > $LOCAL_DIR/latest"
+		echo "+ echo $VERSION > $pointer"
 	else
-		echo "$VERSION" >"$LOCAL_DIR/latest"
+		echo "$VERSION" >"$pointer"
 	fi
 	say "published $VERSION to $LOCAL_DIR$([ "$DRY_RUN" = 0 ] || echo ' (dry run: nothing was changed)')"
 	exit 0
@@ -159,7 +223,7 @@ if release_exists "$VERSION"; then
 	say "release $VERSION exists; replacing its assets"
 	run gh release upload "$VERSION" "${ASSETS[@]}" --clobber --repo "$SLUG"
 else
-	run gh release create "$VERSION" "${ASSETS[@]}" --repo "$SLUG" --verify-tag --generate-notes --title "Code Foundry $VERSION"
+	run gh release create "$VERSION" "${ASSETS[@]}" --repo "$SLUG" --verify-tag "${CREATE_FLAGS[@]}" --title "Code Foundry $VERSION"
 fi
 if [ "$DRY_RUN" = 1 ]; then
 	say "dry run: nothing was changed"
