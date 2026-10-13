@@ -14,6 +14,7 @@ export const SESSION_COMMANDS = {
   close: "session.close",
   fork: "session.fork",
   pin: "session.pin",
+  archive: "session.archive",
   runIn: "session.run-in",
 } as const;
 
@@ -51,6 +52,16 @@ export function forkSession(id: string): Promise<boolean> {
 /** session.pin with an explicit value (the menu knows the current pin). */
 export function pinSession(id: string, pinned: boolean): Promise<boolean> {
   return runCommand(SESSION_COMMANDS.pin, { pinned: String(pinned) }, sessionContext(id));
+}
+
+/**
+ * session.archive with an explicit value. Archiving closes Claude, removes the thread's
+ * shells and unpins it; the daemon asks for confirmation (runCommand opens the dialog) only
+ * while Claude is working or waiting on an answer. Unarchiving never asks and leaves the
+ * thread disconnected.
+ */
+export function archiveSession(id: string, archived: boolean): Promise<boolean> {
+  return runCommand(SESSION_COMMANDS.archive, { archived: String(archived) }, sessionContext(id));
 }
 
 /** session.run-in ("Run in…"): moves a workspace thread to the member in repoId. */
