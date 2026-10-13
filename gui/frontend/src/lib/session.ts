@@ -36,7 +36,9 @@ export const badgeLabels: Record<SessionBadge, string> = {
 
 /**
  * What a session is waiting on or why it stopped, classified from the daemon's status
- * reason (internal/claudestatus restingStatus; the store's "interrupted"):
+ * reason (the daemon's stream_status.go; the store's "interrupted"). "waiting for …",
+ * "plan", "trust", "notification" and "bell" came from the screen detector of terminal
+ * threads (removed 2026-10-12) and only survive on rows that disconnected before then:
  * - "done": "finished" (a turn ended with output the user has not seen)
  * - "permission": "permission: <dialog question>" or "waiting for approval: <Tool>"
  *   (the latter when no screen read saw the dialog)

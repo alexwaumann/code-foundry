@@ -43,9 +43,9 @@ describe("threadGroup (the sidebar group of an unpinned thread)", () => {
   });
 });
 
-// Reasons as the daemon reported them: replays of the internal/claudestatus fixtures
-// (Claude Code 2.1.294; CLAUDESTATUS_TRACE=<fixture>, noscreen for "waiting for approval")
-// and the session store's "interrupted".
+// Reasons as the daemon reported them: the stream's (permission, question, finished,
+// error), the store's "interrupted", and the removed screen detector's (Claude Code
+// 2.1.294 fixtures), which rows persisted before rendered-only threads still carry.
 describe("statusKind / statusDetail", () => {
   it.each<[SessionStatusView, string, StatusKind, string]>([
     ["attention", "finished", "done", ""],

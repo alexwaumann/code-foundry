@@ -85,8 +85,8 @@ type SessionServiceClient interface {
 	Remove(context.Context, *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error)
 	// RunIn moves a workspace thread's cwd to another member worktree of its workspace.
 	// A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
-	// target until then) and the row's
-	// worktree_path and repo_id change when it is sent. A disconnected thread's row
+	// target until then) and the row's worktree_path and repo_id change when Claude
+	// accepts it. A disconnected thread's row
 	// changes at once; the next reconnect resumes there. Refused for a project thread or
 	// a target that is not a member.
 	RunIn(context.Context, *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error)
@@ -301,8 +301,8 @@ type SessionServiceHandler interface {
 	Remove(context.Context, *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error)
 	// RunIn moves a workspace thread's cwd to another member worktree of its workspace.
 	// A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
-	// target until then) and the row's
-	// worktree_path and repo_id change when it is sent. A disconnected thread's row
+	// target until then) and the row's worktree_path and repo_id change when Claude
+	// accepts it. A disconnected thread's row
 	// changes at once; the next reconnect resumes there. Refused for a project thread or
 	// a target that is not a member.
 	RunIn(context.Context, *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error)

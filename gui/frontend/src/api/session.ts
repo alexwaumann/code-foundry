@@ -37,9 +37,8 @@ export interface SessionView {
   state: SessionStateView;
   status: SessionStatusView;
   /**
-   * The detector's reason for status, e.g. "finished", "at prompt",
-   * "permission: Do you want to proceed?", "waiting for approval: Bash", or "interrupted"
-   * for "error". Classify it with statusKind / statusDetail (lib/session), not by hand.
+   * The reason for status, e.g. "finished", "at prompt", "permission: Bash git push",
+   * "question: Which one?", or "interrupted" for "error". Classify it with statusKind / statusDetail (lib/session), not by hand.
    */
   statusReason: string;
   /** When status or statusReason last changed, epoch ms; null if never known. */

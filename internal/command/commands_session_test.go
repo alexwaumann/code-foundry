@@ -116,7 +116,7 @@ func TestSessionCommands(t *testing.T) {
 		{name: "remove", cmd: "session.remove", args: map[string]string{"id": "s5"},
 			wantMsg: "removed thread s5", wantReqs: []proto.Message{&v1.RemoveSessionRequest{Id: "s5"}}},
 		{name: "run in queues a move", cmd: "session.run-in", ctx: command.Context{ActiveSessionID: "s5"}, args: map[string]string{"repo": "api"},
-			wantMsg:  "thread s5 moves to /worktrees/api once it is idle (/cd)",
+			wantMsg:  "thread s5 moves to /worktrees/api once it is idle",
 			wantReqs: []proto.Message{&v1.RunInSessionRequest{Id: "s5", RepoId: "api"}}},
 		{name: "run in a disconnected thread moves it", cmd: "session.run-in", args: map[string]string{"id": "s5", "worktree": "/wt/api"},
 			current: &v1.Session{State: v1.SessionState_SESSION_STATE_DISCONNECTED, WorkspaceId: "w-1", Name: "drv"},

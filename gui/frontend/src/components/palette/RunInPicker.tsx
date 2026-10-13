@@ -36,7 +36,7 @@ function MemberItem({ repoId, path, current, queued, onPick }: { repoId: string;
 
 /**
  * The palette's "Run in…" page: the members of the thread's workspace; picking one
- * invokes session.run-in for the thread (the daemon types /cd once it is idle).
+ * invokes session.run-in for the thread (the daemon moves a live thread once it is idle).
  */
 export function RunInPicker({ sessionId, close }: { sessionId: string; close: () => void }) {
   const name = useSessionsStore((s) => s.byId[sessionId]?.name || sessionId);

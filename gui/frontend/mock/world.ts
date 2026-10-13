@@ -1886,7 +1886,7 @@ export class World {
           if (!args.repo && !args.worktree) throw new CommandError("invalid", "name the member: a repository or a worktree path");
           const out = this.runIn(s, args.repo ?? "", args.worktree ?? "");
           const label = out.name ? `${out.name} (${out.id})` : out.id;
-          return out.pendingWorktreePath ? `thread ${label} moves to ${out.pendingWorktreePath} once it is idle (/cd)` : `thread ${label} runs in ${out.worktreePath}`;
+          return out.pendingWorktreePath ? `thread ${label} moves to ${out.pendingWorktreePath} once it is idle` : `thread ${label} runs in ${out.worktreePath}`;
         },
       },
       {
