@@ -100,8 +100,12 @@ Three things were needed to keep what the terminal did:
 
 ## Gotchas
 
-* `[data-chord-yield]` also covers the docked prompts' buttons; they are not editable, so
-  nothing changes for them.
+* `[data-chord-yield]` sits on the composer's root, but only an editable target yields
+  (review fix): a focused picker, attach or docked-prompt button keeps the usual keys
+  (Escape interrupts, F2 renames). An unbound cmd chord in the prompt waits for a stale
+  command list only when some command declares it, so cmd+arrows and cmd+backspace are
+  never held. A disconnect or reconnect flip does not take the keyboard from the side
+  panel or the palette either.
 * A fresh composer's prompt focus is deferred one frame; e2e waits with `toBeFocused()`
   before pressing chords.
 * The production bundle grew by the thread chunk (lowlight) now that `ThreadPane` is eager;
