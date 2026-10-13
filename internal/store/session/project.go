@@ -64,6 +64,15 @@ type projector struct {
 	// model is the model of the running turn's own replies (its assistant frames).
 	model string
 	costs turnCosts
+	// ctx is the running turn's context size so far: the last top-level response's
+	// usage (usageTokens), or a compaction's post-compaction size; 0 when none yet.
+	ctx int64
+	// last is the context of the last result (context.go); tokens 0 when the turn
+	// reported none (a local command).
+	last struct {
+		tokens int64
+		model  string
+	}
 }
 
 type openBlock struct {
@@ -116,6 +125,9 @@ func (p *projector) event(ev claudestream.Event) {
 			Trigger: e.Metadata.Trigger, PreTokens: e.Metadata.PreTokens, PostTokens: e.Metadata.PostTokens,
 		}})
 		p.compaction = it.ID
+		if e.Metadata.PostTokens > 0 {
+			p.ctx = e.Metadata.PostTokens
+		}
 	case *claudestream.PermissionDenied:
 		p.w.add(Item{ID: "denied-" + nonEmpty(e.ToolUseID, p.nextID("d")), Kind: KindPermission, Request: &Request{
 			ToolName: e.ToolName, ToolUseID: e.ToolUseID, AgentID: e.AgentID, DecisionReason: e.DecisionReason,
@@ -130,7 +142,8 @@ func (p *projector) event(ev claudestream.Event) {
 		}
 		t.TurnCostUSD = p.costs.turn(e.TotalCostUSD, e.OutputTokens(), turnOut)
 		t.Model, t.ProcessOutputTokens = p.model, e.OutputTokens()
-		p.model = ""
+		p.last.tokens, p.last.model = turnContext(p.ctx, e.Usage), p.model
+		p.model, p.ctx = "", 0
 		p.w.add(Item{ID: "turn-" + nonEmpty(e.UUID, p.nextID("t")), Kind: KindTurnEnd, Turn: t})
 	}
 }
@@ -141,7 +154,11 @@ func (p *projector) stream(e *claudestream.StreamEvent) {
 	case "message_start":
 		if se.Message != nil {
 			p.msg = se.Message.ID
+			p.noteUsage(se.Message.Usage)
 		}
+	case "message_delta":
+		// The response's final usage (message_start's has the output so far).
+		p.noteUsage(se.Usage)
 	case "content_block_start":
 		msg := nonEmpty(e.APIMessageID, p.msg)
 		cb := se.ContentBlock
@@ -186,6 +203,13 @@ func (p *projector) stream(e *claudestream.StreamEvent) {
 			p.finish(p.open[msg][i].id, nil)
 			p.drop(msg, i)
 		}
+	}
+}
+
+// noteUsage records a top-level response's usage as the running turn's context size.
+func (p *projector) noteUsage(u *claudestream.APIUsage) {
+	if n := usageTokens(u); n > 0 {
+		p.ctx = n
 	}
 }
 
@@ -245,6 +269,9 @@ func (p *projector) assistant(e *claudestream.Assistant) {
 	// error messages name none.
 	if e.ParentToolUseID == "" && e.Message.Model != "" && e.Message.Model != "<synthetic>" {
 		p.model = e.Message.Model
+		// Without partial messages this frame is the only usage of the response; with
+		// them its message_delta follows with the final output count.
+		p.noteUsage(e.Message.Usage)
 	}
 	for _, b := range e.Message.Content {
 		kind := blockKind(b.Type)

@@ -103,6 +103,20 @@ export interface SessionView {
    * usage. The run count is agentRuns.length (select that, not the array, for a count).
    */
   agentRuns: AgentRunView[];
+  /**
+   * A rendered thread's context size after its last turn (the last API response's input +
+   * cache read + cache write + output tokens); 0 for a terminal thread and before the first
+   * result. docs/notes/rendered-threads-cold-cache.md.
+   */
+  contextTokens: number;
+  /**
+   * When the conversation's prompt cache expires (its last result plus the
+   * sessions.cache_ttl_seconds setting), epoch ms; null for a terminal thread and before
+   * the first result. Past it, the next message re-reads contextTokens.
+   */
+  cacheExpiresAtMs: number | null;
+  /** What re-reading contextTokens costs once the cache expired, USD; 0 when unpriced. */
+  contextRereadUsd: number;
 }
 
 /** One subagent run of a thread (a Claude Code Agent tool call). */
@@ -240,6 +254,9 @@ export function toSessionView(s: Session): SessionView {
     costUsd: s.costUsd,
     unpriced: s.unpriced,
     agentRuns: s.agentRuns.map(toAgentRunView),
+    contextTokens: Number(s.contextTokens),
+    cacheExpiresAtMs: s.cacheExpiresAt ? timestampMs(s.cacheExpiresAt) : null,
+    contextRereadUsd: s.contextRereadUsd,
   };
 }
 

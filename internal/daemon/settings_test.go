@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
@@ -181,5 +182,36 @@ func TestSettingsRender(t *testing.T) {
 	}
 	if got := def(); got != session.RenderRendered {
 		t.Errorf("after update = %v (read per call, no restart)", got)
+	}
+}
+
+type ttlRecorder struct{ got []time.Duration }
+
+func (r *ttlRecorder) SetCacheTTL(d time.Duration) { r.got = append(r.got, d) }
+
+func TestApplyCacheTTL(t *testing.T) {
+	tests := []struct {
+		name   string
+		update string
+		want   []time.Duration
+	}{
+		{name: "the default at once", want: []time.Duration{time.Hour}},
+		{name: "a change applies live", update: "60", want: []time.Duration{time.Hour, time.Minute}},
+		{name: "5 minutes", update: "300", want: []time.Duration{time.Hour, 5 * time.Minute}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := openSettings(t)
+			rec := &ttlRecorder{}
+			applyCacheTTL(st, rec)
+			if tt.update != "" {
+				if _, err := st.Update(context.Background(), map[string]string{settings.KeyCacheTTL: tt.update}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if !slices.Equal(rec.got, tt.want) {
+				t.Errorf("SetCacheTTL calls = %v, want %v", rec.got, tt.want)
+			}
+		})
 	}
 }

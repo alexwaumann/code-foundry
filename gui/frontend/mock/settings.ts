@@ -79,6 +79,7 @@ const staticFields: FieldInit[] = [
     enumLabels: ["Terminal", "Rendered"],
     defaultValue: "terminal",
   },
+  { key: "sessions.cache_ttl_seconds", group: "sessions", type: S.INT, title: "Prompt cache lifetime (seconds)", description: "How long the Claude API in use keeps a conversation's prompt cache after its last request.", defaultValue: "3600", min: 60n, max: 86400n },
   { key: "sessions.close_grace_seconds", group: "sessions", type: S.INT, title: "Close grace (seconds)", description: "How long closing a session waits for Claude to exit.", defaultValue: "10", min: 1n, max: 120n, restartRequired: true },
   { key: "sessions.scrollback_lines", group: "sessions", type: S.INT, title: "Scrollback lines", description: "Lines of history each terminal keeps.", defaultValue: "10000", min: 1000n, max: 100000n, restartRequired: true },
   { key: "github.poll_interval_seconds", group: "github", type: S.INT, title: "Poll interval (seconds)", description: "How often one request checks your pull requests, watched branches, and tracked default branches for changes.", defaultValue: "60", min: 15n, max: 3600n },

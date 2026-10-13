@@ -367,8 +367,12 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 		r.onModeChange(e.PermissionMode)
 	case *claudestream.Result:
 		r.acknowledgeIfViewed()
+		if last := r.st.proj.last; last.tokens > 0 {
+			r.m.recordContext(r.id, last.tokens, last.model)
+		}
 	case *claudestream.ConversationReset:
 		r.log().info("claude reset the conversation (/clear)", "to", e.NewConversationID)
+		r.m.recordContext(r.id, 0, "")
 	}
 	r.checkStatus()
 	r.tryCd()

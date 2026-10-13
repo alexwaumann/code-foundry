@@ -240,6 +240,10 @@ func sessionToProto(s session.Session) *v1.Session {
 	}
 	p.Usage, p.CostUsd, p.Unpriced = usageToProto(s.Usage)
 	p.AgentRuns = agentRunsToProto(s.AgentRuns)
+	p.ContextTokens, p.ContextRereadUsd = s.ContextTokens, contextRereadUSD(s)
+	if !s.CacheExpiresAt.IsZero() {
+		p.CacheExpiresAt = timestamppb.New(s.CacheExpiresAt)
+	}
 	return p
 }
 

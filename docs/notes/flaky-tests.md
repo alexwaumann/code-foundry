@@ -43,6 +43,15 @@ drag tests 15 times each, passed on WebKit. Likely load: the drags are real mous
 4 steps and the assertions poll the panel's width. If it shows up again, run with
 `E2E_MOCK_PORT`/`E2E_VITE_PORT` set so another worktree's e2e is not sharing the ports.
 
+## `sidebar.spec.ts:210` Projects page on WebKit (seen once, 2026-10-12)
+
+In a full `make gui-e2e` on the cold-cache branch: the click on a workspace member's
+remove button timed out because the toasts of the previous steps ("added dotfiles to
+workspace login", "removed code-foundry from workspace login") sat over it and Sonner's
+section intercepted the pointer for the whole 20 s. Passed 5/5 alone and on Chromium in
+the same run. Not investigated further; a fix would wait for or dismiss the toasts before
+clicking.
+
 ## `TestConnRequestCorrelation` (internal/claudestream) — 1 failure, fixed
 
 Seen in `make check` on the rendered threads PR 4 branch (2026-10-12): "set mode err =

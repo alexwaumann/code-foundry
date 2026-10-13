@@ -107,7 +107,14 @@ memory files, skills). **No persistent meter** in the thread: Alex notes they st
 reading those. Only an amber one-liner near the auto-compact threshold (~80 %), and the
 `compact_boundary` frame already marks compaction in the timeline.
 
-## 4. Cold-cache signal (Alex: yes, with the token count)
+## 4. Cold-cache signal (Alex: yes, with the token count) — done
+
+**Done** (2026-10-12): `rendered-threads-cold-cache.md`. The TTL is the setting
+`sessions.cache_ttl_seconds` (default 3600); the note shows the cost; the context is the
+last top-level response's tokens, not the result's (a result sums the turn's calls).
+Context totals only; the breakdown panel (§3) and the amber near-compaction line are
+later PRs.
+
 
 Cache refreshes on every hit, so `expires_at = last result time + TTL`. The daemon knows
 both (TTL = 1 h on Bedrock; 5 min does not matter here because subagents live inside a
@@ -140,6 +147,6 @@ Confirm by eye on the first turn: `cache_creation_input_tokens` large,
 
 0. Polish batch (§0).
 1. ~~Document attachments~~ (deferred).
-2. Cold-cache signal + context totals (daemon fields + composer note; one PR).
+2. ~~Cold-cache signal + context totals~~ (done: `rendered-threads-cold-cache.md`).
 3. Context breakdown panel tab.
 4. MCP panel tab.

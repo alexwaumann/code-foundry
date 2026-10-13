@@ -134,3 +134,52 @@ func TestAgentRunsToProto(t *testing.T) {
 		t.Errorf("open run = %v", b)
 	}
 }
+
+func TestContextRereadUSD(t *testing.T) {
+	at := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
+	hour := func(s session.Session) session.Session {
+		s.LastResultAt, s.CacheExpiresAt = at, at.Add(time.Hour)
+		return s
+	}
+	tests := []struct {
+		name string
+		s    session.Session
+		want float64
+	}{
+		{name: "the answering model's 1 h write rate", s: hour(session.Session{ContextTokens: 1_000_000, ContextModel: "claude-opus-4-8", Model: "opus"}), want: 10},
+		{name: "a 5 min TTL bills the 5 min rate", want: 6.25, s: session.Session{ContextTokens: 1_000_000, ContextModel: "claude-opus-4-8",
+			LastResultAt: at, CacheExpiresAt: at.Add(5 * time.Minute)}},
+		{name: "the row's model when it is a full id", s: hour(session.Session{ContextTokens: 1_000_000, Model: "claude-sonnet-4-6"}), want: 6},
+		{name: "an alias alone is unpriced", s: hour(session.Session{ContextTokens: 1_000_000, Model: "haiku"})},
+		{name: "an unknown model", s: hour(session.Session{ContextTokens: 1_000_000, ContextModel: "claude-next-1"})},
+		{name: "no result yet", s: session.Session{ContextTokens: 0, ContextModel: "claude-opus-4-8"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := contextRereadUSD(tt.s); !near(got, tt.want) {
+				t.Errorf("contextRereadUSD = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSessionContextOnTheWire(t *testing.T) {
+	fake, c := newSessionServer(t)
+	at := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
+	fake.Put(session.Session{ID: "s-a", CreatedAt: time.Unix(1, 0), Render: session.RenderRendered, ContextTokens: 25_700,
+		ContextModel: "claude-haiku-4-5-20251001", LastResultAt: at, CacheExpiresAt: at.Add(time.Hour)})
+	fake.Put(session.Session{ID: "s-b", CreatedAt: time.Unix(2, 0), Render: session.RenderTerminal})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	list, err := c.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, term := list.Msg.GetSessions()[0], list.Msg.GetSessions()[1]
+	if r.GetContextTokens() != 25_700 || !r.GetCacheExpiresAt().AsTime().Equal(at.Add(time.Hour)) || !near(r.GetContextRereadUsd(), 25_700*2/1e6) {
+		t.Errorf("rendered = tokens %d, expires %v, reread %v", r.GetContextTokens(), r.GetCacheExpiresAt(), r.GetContextRereadUsd())
+	}
+	if term.GetContextTokens() != 0 || term.GetCacheExpiresAt() != nil || term.GetContextRereadUsd() != 0 {
+		t.Errorf("terminal = %v", term)
+	}
+}

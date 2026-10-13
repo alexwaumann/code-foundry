@@ -6,9 +6,11 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
@@ -157,7 +159,7 @@ func TestSessionCommands(t *testing.T) {
 		{name: "list shows the workspace", cmd: "session.list",
 			current: &v1.Session{Id: "s3", Name: "w", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_IDLE,
 				StatusReason: "idle", WorkspaceId: "w-1", WorktreePath: "/wt/api"},
-			wantIn: []string{"s3", "w", "connected", "idle", "idle", "w-1", "-", "/wt/api"}},
+			wantIn: []string{"s3", "w", "connected", "idle", "idle", "w-1", "-", "-", "/wt/api"}},
 		{name: "list shows linked pull requests", cmd: "session.list",
 			current: &v1.Session{Id: "s4", Name: "p", State: v1.SessionState_SESSION_STATE_CONNECTED, LinkedPullRequests: []*v1.LinkedPullRequest{
 				{Slug: "o/api", Number: 5, Url: "https://github.com/o/api/pull/5"}, {Slug: "o/api", Number: 7, Url: "https://github.com/o/api/pull/7"}}},
@@ -166,6 +168,10 @@ func TestSessionCommands(t *testing.T) {
 			current: &v1.Session{Id: "s4", Name: "p", State: v1.SessionState_SESSION_STATE_CONNECTED, LinkedPullRequests: []*v1.LinkedPullRequest{
 				{Slug: "o/api", Number: 5, Url: "https://github.com/o/api/pull/5"}, {Slug: "o/web", Number: 2, Url: "https://github.com/o/web/pull/2"}}},
 			wantIn: []string{"s4", "p", "connected", "unspecified", "-", "-", "api#5,web#2"}},
+		{name: "list shows an expired cache", cmd: "session.list",
+			current: &v1.Session{Id: "s6", Name: "r", State: v1.SessionState_SESSION_STATE_CONNECTED, ContextTokens: 25_700,
+				CacheExpiresAt: timestamppb.New(time.Unix(1, 0)), WorktreePath: "/wt/r"},
+			wantIn: []string{"s6", "r", "connected", "unspecified", "-", "-", "-", "25.7K", "·", "cache", "expired", "/wt/r"}},
 		{name: "backend error passes through", cmd: "session.close", args: map[string]string{"id": "s5"},
 			backendErr: connect.NewError(connect.CodeNotFound, errors.New("nope")), wantCode: connect.CodeNotFound},
 	}

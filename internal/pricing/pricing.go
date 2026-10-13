@@ -10,7 +10,10 @@
 // counters to a Bucket. Cost is computed at read time and never stored.
 package pricing
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 // Rate is USD per million tokens.
 type Rate struct {
@@ -182,4 +185,24 @@ func CacheSavings(b Bucket) float64 {
 		return 0
 	}
 	return float64(b.CacheRead) * (r.Input - r.CacheRead) / 1e6
+}
+
+// shortCacheTTL is the short prompt-cache lifetime; a longer TTL is billed at the 1 h
+// write rate.
+const shortCacheTTL = 5 * time.Minute
+
+// RereadCost is what sending tokens of context again costs once its prompt cache
+// expired: every token is written to the cache again, at model's 1 h cache-write rate
+// when ttl is over 5 minutes (what Claude Code writes on the main thread), else the
+// 5 min rate. ok is false for a model without a known rate.
+func RereadCost(model string, tokens int64, ttl time.Duration) (usd float64, ok bool) {
+	r, ok := Lookup(model, "", "")
+	if !ok {
+		return 0, false
+	}
+	rate := r.CacheWrite1h
+	if ttl <= shortCacheTTL {
+		rate = r.CacheWrite5m
+	}
+	return float64(tokens) * rate / 1e6, true
 }

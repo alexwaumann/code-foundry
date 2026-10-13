@@ -43,6 +43,7 @@ type Sessions struct {
 	AutoName          bool
 	NamingModel       string // default "sonnet"; the effort is always low
 	Render            string // RenderTerminal (default) or RenderRendered: new threads' view
+	CacheTTLSeconds   int    // the API's prompt cache lifetime; default 3600
 	CloseGraceSeconds int
 	ScrollbackLines   int
 }
@@ -96,6 +97,11 @@ func Defaults() Settings {
 // CloseGrace is Sessions.CloseGraceSeconds as a duration.
 func (s Settings) CloseGrace() time.Duration {
 	return time.Duration(s.Sessions.CloseGraceSeconds) * time.Second
+}
+
+// CacheTTL is Sessions.CacheTTLSeconds as a duration.
+func (s Settings) CacheTTL() time.Duration {
+	return time.Duration(s.Sessions.CacheTTLSeconds) * time.Second
 }
 
 // GhPollInterval is GitHub.PollIntervalSeconds as a duration.

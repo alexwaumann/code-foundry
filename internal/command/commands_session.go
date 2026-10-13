@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -131,6 +132,35 @@ func listStatus(s *v1.Session) string {
 	return st
 }
 
+// listContext is session.list's CONTEXT cell for a rendered thread with a result: its
+// context size and whether the prompt cache is still warm at now ("25.7K · cache
+// expires in 42 min", "25.7K · cache expired"); "-" otherwise.
+func listContext(s *v1.Session, now time.Time) string {
+	if s.GetContextTokens() <= 0 || s.GetCacheExpiresAt() == nil {
+		return "-"
+	}
+	n := formatTokens(s.GetContextTokens())
+	left := s.GetCacheExpiresAt().AsTime().Sub(now)
+	if left <= 0 {
+		return n + " · cache expired"
+	}
+	return n + " · cache expires in " + minutesLeft(left)
+}
+
+// minutesLeft is a positive duration in whole minutes, rounded up: "1 min", "42 min",
+// "1 h", "2 h 5 min".
+func minutesLeft(d time.Duration) string {
+	m := int64((d + time.Minute - 1) / time.Minute)
+	switch {
+	case m < 60:
+		return fmt.Sprintf("%d min", m)
+	case m%60 == 0:
+		return fmt.Sprintf("%d h", m/60)
+	default:
+		return fmt.Sprintf("%d h %d min", m/60, m%60)
+	}
+}
+
 // RegisterSession registers session.new, session.list, session.focus, session.close,
 // session.reconnect, session.rename, session.fork, session.remove, session.run-in, and
 // session.pin. The user-facing word is "thread" (titles, descriptions, messages);
@@ -219,12 +249,14 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				}
 				var sb strings.Builder
 				tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
-				_, _ = fmt.Fprintln(tw, "ID\tNAME\tSTATE\tSTATUS\tREASON\tWORKSPACE\tPRS\tWORKTREE")
+				_, _ = fmt.Fprintln(tw, "ID\tNAME\tSTATE\tSTATUS\tREASON\tWORKSPACE\tPRS\tCONTEXT\tWORKTREE")
+				now := time.Now()
 				for _, s := range res.Msg.GetSessions() {
 					// The status and its reason persist once disconnected (a thread that
 					// was asking a question still is); the state cell says why it is.
-					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), s.GetName(), listState(s),
-						listStatus(s), cmp.Or(s.GetStatusReason(), "-"), cmp.Or(s.GetWorkspaceId(), "-"), linkedPRs(s), s.GetWorktreePath())
+					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), s.GetName(), listState(s),
+						listStatus(s), cmp.Or(s.GetStatusReason(), "-"), cmp.Or(s.GetWorkspaceId(), "-"), linkedPRs(s),
+						listContext(s, now), s.GetWorktreePath())
 				}
 				_ = tw.Flush()
 				return Result{Message: strings.TrimRight(sb.String(), "\n"), JSON: res.Msg}, nil

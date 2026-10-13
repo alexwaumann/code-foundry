@@ -275,7 +275,11 @@ Layers Claude-specific knowledge on top of terminal:
   (Claude reports running totals per process; a process's first turn is measured from
   what Claude restores on `--resume`, the resumed transcript's last `cost-state` record,
   read at spawn; unset when the totals do not fit) and the model that replied
-  (`docs/notes/rendered-threads-4-optin.md`).
+  (`docs/notes/rendered-threads-4-optin.md`). Each result also records the thread's
+  context size (the last top-level response's tokens) and when, persisted; the cache
+  expiry is that plus the `sessions.cache_ttl_seconds` setting, and the composer says
+  when the next message re-reads a cold context
+  (`docs/notes/rendered-threads-cold-cache.md`).
 * Auto-naming via an independent `claude -p` call producing a slug.
 * **Linked pull requests** come from Claude's own `pr-link` transcript records: every
   distinct URL in first-seen order, persisted in `session_pull_requests`, backfilled from

@@ -25,6 +25,7 @@ import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } fro
 import { claudeIntro, claudeTick, ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
 import { CRASH_STDERR, MockThreads, type ThreadState } from "./thread";
+import { contextFields, recordResult, type MockContext } from "./context";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
@@ -91,6 +92,10 @@ interface MockSession {
   linkedPullRequests: { slug: string; number: number; url: string; linkedAt: Date }[];
   /** Token usage buckets (mock/usage.ts; POST /__mock/usage). */
   usage: MockUsage[];
+  /** A rendered thread's context totals (mock/context.ts). */
+  contextTokens: MockContext["contextTokens"];
+  contextModel: MockContext["contextModel"];
+  lastResultAt: MockContext["lastResultAt"];
   /** Mock-only: seconds a queued run-in waits once the thread is not busy (the daemon waits for its prompt). */
   moveIn: number;
   /** Mock-only: seconds left before a STARTING/CLOSING session settles. */
@@ -369,6 +374,11 @@ export class World {
         this.publishSession(s);
       },
       statusOf: (id) => this.session(id).status,
+      recordResult: (id, model) => {
+        const s = this.session(id);
+        recordResult(s, model);
+        this.publishSession(s);
+      },
     },
     (ev) => this.events.publish({ source: EventSource.THREAD, event: { event: { case: "thread", value: ev } } }),
   );
@@ -376,7 +386,11 @@ export class World {
   readonly gitops = new MockGitOps((e) => this.gitopsEvents.publish(e));
   readonly settings = new MockSettings(
     () => this.registry().map((e) => e.cmd),
-    (snap) => this.events.publish({ source: EventSource.SETTINGS, event: { event: { case: "settings", value: { event: { case: "snapshot", value: snap } } } } }),
+    (snap) => {
+      this.events.publish({ source: EventSource.SETTINGS, event: { event: { case: "settings", value: { event: { case: "snapshot", value: snap } } } } });
+      // Like the daemon: a new cache TTL moves every expiry, so those threads are republished.
+      for (const s of this.sessions.values()) if (s.lastResultAt) this.publishSession(s);
+    },
   );
   /** UpdateService (Phase 3d): publishes into the events hub as the update source. */
   readonly update = new MockUpdater(
@@ -740,6 +754,9 @@ export class World {
       firstMessage: null,
       linkedPullRequests: [],
       usage: [],
+      contextTokens: 0,
+      contextModel: "",
+      lastResultAt: null,
       moveIn: 0,
       settleIn: 0,
       nameIn: 0,
@@ -792,6 +809,7 @@ export class World {
       effortPending: s.effortPending,
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
       ...usageFields(s.usage),
+      ...contextFields(s, this.cacheTTLSeconds()),
     };
   }
 
@@ -910,6 +928,10 @@ export class World {
       render: SessionRender.RENDERED,
       permissionMode: PermissionMode.ACCEPT_EDITS,
       createdAt: new Date(Date.now() - 10 * 60_000),
+      // The earlier turn's result, two minutes ago: the cache is warm.
+      contextTokens: 25_700,
+      contextModel: "claude-opus-4-8",
+      lastResultAt: new Date(Date.now() - 2 * 60_000),
     });
     this.threads.load(id, state);
     if (state === "closed") this.disconnectSession(id, "closed", 0);
@@ -920,6 +942,20 @@ export class World {
     }
     this.publishSession(s);
     return s;
+  }
+
+  /** sessions.cache_ttl_seconds (the daemon's default when unset). */
+  private cacheTTLSeconds(): number {
+    return Number(this.settings.values()["sessions.cache_ttl_seconds"] || 3600);
+  }
+
+  /** POST /__mock/thread/cache: the thread's last result `agoSeconds` ago (optionally with `tokens`, answered by `model`). */
+  ageThreadCache(id: string, agoSeconds: number, tokens?: number, model?: string): void {
+    const s = this.session(id);
+    s.lastResultAt = new Date(Date.now() - agoSeconds * 1000);
+    if (tokens !== undefined) s.contextTokens = tokens;
+    if (model !== undefined) s.contextModel = model;
+    this.publishSession(s);
   }
 
   /** Emits FocusSession for an existing session. */
