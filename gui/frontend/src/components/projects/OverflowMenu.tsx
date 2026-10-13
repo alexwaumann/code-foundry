@@ -11,12 +11,15 @@ export type OverflowItem =
  * The "More" (…) action of a Projects page row or header: a dropdown of the row's less
  * frequent and destructive actions. The trigger is a row action (mouse; the palette
  * reaches the same commands by keyboard). Keys inside the menu stay in it (the list's
- * arrow keys must not move its cursor meanwhile), and closing it gives the keyboard back
- * to the page's list unless an item moved the focus somewhere else (a dialog, the
- * palette).
+ * arrow keys must not move its cursor meanwhile). Closing it gives the keyboard back to
+ * the page's list, and only then runs the picked item: a menu still animating out takes
+ * the focus back when the pointer leaves its items, which would pull it out of a dialog
+ * or the palette the item opened (and their focus scopes select the input on return, so
+ * the next keystroke replaced what was typed).
  */
 export function OverflowMenu({ label, items, testId }: { label: string; items: readonly OverflowItem[]; testId: string }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const picked = useRef<(() => void) | null>(null);
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
@@ -55,15 +58,26 @@ export function OverflowMenu({ label, items, testId }: { label: string; items: r
         onCloseAutoFocus={(e) => {
           e.preventDefault();
           const active = document.activeElement;
-          if (active && active !== document.body && active !== triggerRef.current) return;
-          triggerRef.current?.closest<HTMLElement>("[data-focus-root]")?.focus({ preventScroll: true });
+          if (!active || active === document.body || active === triggerRef.current) {
+            triggerRef.current?.closest<HTMLElement>("[data-focus-root]")?.focus({ preventScroll: true });
+          }
+          const run = picked.current;
+          picked.current = null;
+          run?.();
         }}
       >
         {items.map((it, i) =>
           it === "separator" ? (
             <DropdownMenuSeparator key={`sep-${String(i)}`} />
           ) : (
-            <DropdownMenuItem key={it.testId} variant={it.destructive ? "destructive" : "default"} data-testid={it.testId} onSelect={it.onSelect}>
+            <DropdownMenuItem
+              key={it.testId}
+              variant={it.destructive ? "destructive" : "default"}
+              data-testid={it.testId}
+              onSelect={() => {
+                picked.current = it.onSelect;
+              }}
+            >
               <it.icon className={it.destructive ? "text-destructive" : undefined} />
               {it.label}
             </DropdownMenuItem>

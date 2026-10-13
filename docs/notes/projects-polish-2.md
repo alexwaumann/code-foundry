@@ -49,8 +49,12 @@ PR 2 of three for the Projects page (sketch variant A, `/tmp/cf-projects-sketch`
   at most one event per worktree per minute.
 - Menu keys are stopped at the menu content: React portals bubble synthetic events to the
   row and the list, whose arrow keys would otherwise move the list's cursor (and clicks
-  would set it). On close the focus goes back to the page's list unless an item moved it
-  elsewhere (the publish dialog, the palette, a confirm dialog).
+  would set it). On close the focus goes back to the page's list.
+- **A picked item runs only after the menu has closed** (from `onCloseAutoFocus`). Run
+  from `onSelect`, the palette opened under the pointer while the menu was still animating
+  out; Radix's `onItemLeave` then focused the closing menu, the palette's focus scope pulled
+  the focus back with `select: true`, and the next keystroke replaced what had been typed
+  (WebKit, about one run in three: "exp/x" became "x").
 - Radix keeps a closing menu in the DOM for its exit animation: e2e waits for
   `*-more-menu` to be gone before opening the next one (strict-mode duplicates otherwise).
 - `RowAction` stops double-clicks, so quick clicks on an action no longer open the row's

@@ -327,6 +327,8 @@ test("New worktree… asks for the branch in the palette, in that project", asyn
   await page.getByTestId("project-new-worktree").click();
   const palette = page.getByTestId("palette");
   await expect(palette).toHaveAttribute("data-mode", "args");
+  // The closing menu leaves the keyboard with the palette.
+  await expect(palette.locator("input")).toBeFocused();
   await page.keyboard.type("exp/x");
   await page.keyboard.press("Enter");
   await expect(palette).toHaveCount(0);

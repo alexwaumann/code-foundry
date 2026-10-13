@@ -242,8 +242,10 @@ test("the Projects page lists projects with their own worktrees and workspaces w
 
   // Remove one (workspace.remove-repo, confirmed).
   const member = ws.locator('[data-nav-key="m:w-000000000001::repo-cf"]');
+  // By keyboard: the add-repo toast sits over the menu's bottom-right corner.
   await member.getByTestId("member-more").click();
-  await page.getByTestId("member-remove").click();
+  await page.getByTestId("member-remove").focus();
+  await page.keyboard.press("Enter");
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toContainText("Remove project code-foundry from its workspace?");
   await dialog.getByTestId("confirm-ok").click();
@@ -257,7 +259,8 @@ test("the Projects page lists projects with their own worktrees and workspaces w
   // A member with a live thread is refused, and stays.
   const gp = ws.locator('[data-nav-key="m:w-000000000001::repo-gp"]');
   await gp.getByTestId("member-more").click();
-  await page.getByTestId("member-remove").click();
+  await page.getByTestId("member-remove").focus();
+  await page.keyboard.press("Enter");
   await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
   await expect(page.getByText(/running in .*ghostty-playground\/cf-login; close it first/)).toBeVisible();
   await expect(ws.getByTestId("member-name")).toHaveText(["ghostty-playground", "dotfiles"]);
