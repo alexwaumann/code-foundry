@@ -7,7 +7,7 @@ import type { SessionView } from "@/api/session";
 import type { WorkspaceView } from "@/api/workspace";
 import type { Choice } from "./compose";
 import { modelName } from "./models";
-import { basename } from "./path";
+import { basename, isWithin } from "./path";
 
 /** The slices of the repos store these helpers read. */
 export interface RepoLookup {
@@ -21,13 +21,30 @@ export function isNoGit(repos: RepoLookup, repoId: string): boolean {
   return repos.byId[repoId]?.git === false;
 }
 
+/** What a thread without a project shows where a project name would be (with the House icon). */
+export const NO_PROJECT = "No project";
+
+/**
+ * A thread without a project (docs/notes/no-project-1-daemon.md): no workspace, no repo
+ * id, and a cwd (the daemon's home directory) inside no known project's worktree. Older
+ * rows with an empty repo id whose path is inside a project are placed by their path
+ * instead, so they are not this.
+ */
+export function isNoProject(s: Pick<SessionView, "repoId" | "workspaceId" | "worktreePath">, repos: RepoLookup): boolean {
+  if (s.repoId || s.workspaceId) return false;
+  for (const r of Object.values(repos.byId)) if (r?.worktrees.some((w) => isWithin(s.worktreePath, w.path))) return false;
+  return true;
+}
+
 export interface WorkspaceLookup {
   byId: Readonly<Record<string, Pick<WorkspaceView, "name" | "members"> | undefined>>;
 }
 
 export interface ThreadRowModel {
-  /** The cwd's project name (the repo id when unknown). */
+  /** The cwd's project name (the repo id when unknown); NO_PROJECT for a thread without one. */
   project: string;
+  /** A thread without a project (isNoProject): no branch, no worktree, the House icon. */
+  noProject: boolean;
   /** The branch checked out in the cwd: branch, else the short head, else the directory name; "" without git. */
   branch: string;
   /** The cwd's project is not a git repository: show the No git badge instead of a branch. */
@@ -50,9 +67,15 @@ export function worktreeBranch(repos: RepoLookup, repoId: string, path: string):
   return w?.branch || (w?.head ? w.head.slice(0, 7) : basename(path));
 }
 
-/** The project a worktree path belongs to, by name: a repo whose worktrees include it, else the directory name. */
+/**
+ * The project a worktree path belongs to, by name: a repo whose worktrees include it,
+ * else one with a worktree containing it (an older thread row with no repo id), else the
+ * directory name.
+ */
 export function projectOfPath(repos: RepoLookup, path: string): string {
-  for (const r of Object.values(repos.byId)) if (r?.worktrees.some((w) => w.path === path)) return r.name;
+  const all = Object.values(repos.byId);
+  for (const r of all) if (r?.worktrees.some((w) => w.path === path)) return r.name;
+  for (const r of all) if (r?.worktrees.some((w) => isWithin(path, w.path))) return r.name;
   return basename(path);
 }
 
@@ -68,8 +91,10 @@ export function threadRowModel(
   repos: RepoLookup,
   workspaces: WorkspaceLookup,
 ): ThreadRowModel {
+  if (isNoProject(s, repos)) return { project: NO_PROJECT, noProject: true, branch: "", noGit: false, workspace: null, movingTo: null, worktree: false };
   const ws = s.workspaceId ? workspaces.byId[s.workspaceId] : undefined;
   return {
+    noProject: false,
     project: repos.byId[s.repoId]?.name ?? (s.repoId || projectOfPath(repos, s.worktreePath)),
     branch: worktreeBranch(repos, s.repoId, s.worktreePath),
     noGit: isNoGit(repos, s.repoId),

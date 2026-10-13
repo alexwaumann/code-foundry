@@ -1433,6 +1433,7 @@ export class World {
    * fails the way a git error would, before any session exists.
    */
   private async newSession(ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> {
+    if (args["no-project"] === "true") return this.newHomeSession(ctx, args);
     if (args.workspace || args.repos) return this.newWorkspaceSession(args);
     const repo = this.repos.get(args.repo || ctx?.activeRepoId || "") ?? this.worktreeOf(ctx)?.repo;
     if (!repo) throw new CommandError("invalid", "a worktree or repository is required");
@@ -1481,6 +1482,34 @@ export class World {
     });
     this.focusSession(s.id);
     return { message: `created session ${s.id} in ${path}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path }) };
+  }
+
+  /**
+   * session.new --no-project like the daemon: a thread with no repo or workspace in the
+   * home directory. Refuses any arg that places it, a repo or worktree from the caller's
+   * context included.
+   */
+  private async newHomeSession(ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> {
+    for (const name of ["repo", "worktree", "workspace", "repos", "new-worktree", "base"]) {
+      if (args[name]) throw new CommandError("invalid", `no-project starts a thread without a project; it does not take ${name}`);
+    }
+    if (ctx?.activeRepoId) throw new CommandError("invalid", "no-project starts a thread without a project; it does not take repo");
+    if (ctx?.activeWorktreePath) throw new CommandError("invalid", "no-project starts a thread without a project; it does not take worktree");
+    const prompt = args.prompt ?? "";
+    const permission = args.permission ?? "";
+    const gen = this.generation;
+    await sleep(150);
+    if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while session.new ran");
+    const s = this.createSession("", HOME, args.model || "opus", args.effort ?? "", {
+      name: args.name ?? "",
+      autoNamed: !args.name,
+      nameIn: args.name ? 0 : 2,
+      pendingName: promptTitle(prompt) || `thread-${String(this.nextId)}`,
+      permissionMode: permissionModes[permission] ?? PermissionMode.UNSPECIFIED,
+      firstMessage: firstMessageOf(args),
+    });
+    this.focusSession(s.id);
+    return { message: `created thread ${s.id} in ${HOME} (no project)`, resultJson: JSON.stringify({ id: s.id, worktreePath: HOME }) };
   }
 
   /**
@@ -1887,6 +1916,7 @@ export class World {
             { name: "effort", type: ArgType.ENUM, required: false, description: "Effort", enumValues: ["low", "medium", "high", "xhigh", "max"], defaultValue: "high" },
             { name: "permission", type: ArgType.ENUM, required: false, description: "Permission mode", enumValues: ["supervised", "accept-edits", "auto"] },
             { name: "new-worktree", type: ArgType.BOOL, required: false, description: "Create a worktree for the thread" },
+            { name: "no-project", type: ArgType.BOOL, required: false, description: "Start the thread without a project, in the home directory" },
             { name: "base", type: ArgType.STRING, required: false, description: "Base ref for the new worktree" },
             { name: "name", type: ArgType.STRING, required: false, description: "Thread name" },
             { name: "prompt", type: ArgType.STRING, required: false, description: "First prompt" },
@@ -1894,7 +1924,8 @@ export class World {
             { name: "composer-prompt", type: ArgType.STRING, required: false, description: "The composer's text of prompt with its tag tokens" },
           ],
         },
-        when: (ctx) => this.worktreeOf(ctx) !== null || Boolean(ctx?.activeRepoId && this.repos.has(ctx.activeRepoId)),
+        // Like the daemon: also in the composer, whose no-project target has no repo.
+        when: (ctx) => this.worktreeOf(ctx) !== null || Boolean(ctx?.activeRepoId && this.repos.has(ctx.activeRepoId)) || ctx?.activeView === "compose",
         run: (ctx, args) => this.newSession(ctx, args),
       },
       {

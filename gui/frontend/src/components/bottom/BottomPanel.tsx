@@ -2,6 +2,7 @@ import { useEffect, useRef, type KeyboardEvent, type RefObject } from "react";
 import { Plus, SquareTerminal, X } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { revealTab } from "@/components/panel/reveal";
+import { useNoProjectThread } from "@/components/session/useNoProject";
 import { TerminalHost, type TerminalHostHandle } from "@/components/terminal/TerminalHost";
 import { Button } from "@/components/ui/button";
 import { chordFromEvent, formatChord } from "@/keys/chord";
@@ -14,6 +15,7 @@ import {
   bottomTabTitleOf,
   getBottomActiveId,
   requestBottomFocus,
+  sessionOfKey,
   toggleBottom,
   useBottomActiveId,
   useBottomHeight,
@@ -54,7 +56,8 @@ function openTab(panelKey: string, id: string): void {
  * `focusable` is the roving tabindex: only the active tab (and its ×) is in the Tab order.
  */
 function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id: string; active: boolean; focusable: boolean }) {
-  const title = useTerminalsStore((s) => bottomTabTitleOf(s, panelKey, id));
+  const noProject = useNoProjectThread(sessionOfKey(panelKey));
+  const title = useTerminalsStore((s) => bottomTabTitleOf(s, panelKey, id, noProject));
   const cwd = useTerminalsStore((s) => s.byId[id]?.cwd ?? "");
   const exited = useTerminalsStore((s) => s.byId[id]?.state === "exited");
   return (

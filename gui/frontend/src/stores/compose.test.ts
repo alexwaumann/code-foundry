@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RepoView } from "@/api/repo";
+import { HOME_KEY } from "@/lib/compose";
 import { tagToken } from "@/lib/prompt";
 import {
   addAlsoIn,
+  composeNoProject,
+  composeSelection,
+  composeTarget,
   emptyDraft,
   emptyWorkspaceDraft,
   getDraft,
@@ -61,6 +65,18 @@ describe("compose drafts", () => {
     updateDraft("ws:w-1", { base: "origin/feat" });
     setPrimary("ws:w-1", "repo-gp"); // same primary: the base stays
     expect(getDraft("ws:w-1").base).toBe("origin/feat");
+  });
+});
+
+describe("the no-project composer", () => {
+  it("its selection has no repo and maps to the home target and back", () => {
+    composeNoProject();
+    const sel = useUiStore.getState().selection;
+    expect(sel).toEqual({ kind: "compose", repoId: "", noProject: true });
+    if (sel.kind !== "compose") throw new Error("not a composer");
+    expect(composeTarget(sel)).toEqual({ kind: "home" });
+    expect(composeSelection({ kind: "home" }, { kind: "home" })).toEqual(sel);
+    expect(composeTarget({ kind: "compose", repoId: "repo-cf" })).toEqual({ kind: "project", repoId: "repo-cf" });
   });
 });
 
@@ -155,6 +171,29 @@ describe("switchDraftTarget", () => {
     answerConfirm(true);
     await expect(p).resolves.toBe(true);
     expect(getDraft("ws:w-1").text).toBe(sk("repo-gp"));
+  });
+
+  it("to no project: the home draft, selected without a repo; and back to a project", async () => {
+    updateDraft("repo-cf", { text: "hi", alsoIn: ["repo-gp"], model: "haiku" });
+    await expect(switchDraftTarget(cf, { kind: "home" })).resolves.toBe(true);
+    expect(useComposeStore.getState().drafts["repo-cf"]).toBeUndefined();
+    expect(getDraft(HOME_KEY)).toMatchObject({ text: "hi", alsoIn: [], model: "haiku" });
+    expect(useUiStore.getState().selection).toEqual({ kind: "compose", repoId: "", noProject: true });
+    await expect(switchDraftTarget({ kind: "home" }, gp)).resolves.toBe(true);
+    expect(useComposeStore.getState().drafts[HOME_KEY]).toBeUndefined();
+    expect(getDraft("repo-gp")).toMatchObject({ text: "hi", worktree: { kind: "new" } });
+  });
+
+  it("to no project with project tags: removed only after the confirm, which names No project", async () => {
+    const sk = tagToken({ tagKind: "skill", name: "deploy", repoId: "repo-cf" });
+    updateDraft("repo-cf", { text: `${sk} now` });
+    const moving = switchDraftTarget(cf, { kind: "home" });
+    await vi.waitFor(() => {
+      expect(useConfirmStore.getState().pending?.title).toBe("Switch to No project?");
+    });
+    answerConfirm(true);
+    await expect(moving).resolves.toBe(true);
+    expect(getDraft(HOME_KEY).text).toBe("now");
   });
 
   it("no dropped tags: no tag confirm", async () => {

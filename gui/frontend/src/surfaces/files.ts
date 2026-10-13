@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { FileText } from "lucide-react";
 import { makeTab } from "@/stores/panel";
+import { NO_PROJECT_WATCHES, noProjectNow } from "./noProject";
 import { SurfacePlaceholder } from "./Placeholder";
 import type { SurfaceSpec } from "./types";
 
@@ -10,7 +11,9 @@ export const filesSurface: SurfaceSpec = {
   title: "Files",
   icon: FileText,
   hotkey: "f",
-  available: () => "disabled",
+  // Hidden for a thread (or composer) without a project: there are no files or diff to show.
+  available: (ctx) => (noProjectNow(ctx.selection) ? "hidden" : "disabled"),
+  watches: NO_PROJECT_WATCHES,
   render: () => createElement(SurfacePlaceholder, { icon: FileText, title: "Files" }),
   openDefault: () => makeTab("files", "Files"),
 };

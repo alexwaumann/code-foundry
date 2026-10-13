@@ -14,6 +14,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 import { basename } from "@/lib/path";
+import { NO_PROJECT } from "@/lib/threadRow";
 import { isShellLabels, SESSION_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { keyOf } from "./panel";
 import { useTerminalsStore, type TerminalsData } from "./terminals";
@@ -77,15 +78,17 @@ export function activeTabOf(entry: BottomEntry, ids: readonly string[]): string 
 
 /**
  * A tab's title. On a thread: the terminal's title (OSC) when it has one, else the last
- * segment of its cwd. On the Projects page, where shells of many worktrees share a strip:
- * the worktree's folder name.
+ * segment of its cwd; a thread without a project (`noProject`) names a shell in its home
+ * directory (its worktree label) "No project", not after the user's home folder. On the
+ * Projects page, where shells of many worktrees share a strip: the worktree's folder name.
  */
-export function bottomTabTitle(t: { title: string; cwd: string; labels: Readonly<Record<string, string>> }, key: string): string {
+export function bottomTabTitle(t: { title: string; cwd: string; labels: Readonly<Record<string, string>> }, key: string, noProject = false): string {
   if (key === PROJECTS_KEY) {
     const wt = t.labels[WORKTREE_LABEL] ?? "";
     return basename(wt || t.cwd);
   }
-  return t.title || basename(t.cwd);
+  if (t.title) return t.title;
+  return noProject && t.cwd === (t.labels[WORKTREE_LABEL] ?? "") ? NO_PROJECT : basename(t.cwd);
 }
 
 /**
@@ -94,7 +97,7 @@ export function bottomTabTitle(t: { title: string; cwd: string; labels: Readonly
  * " 3", … in the terminals store's order, so they stay put as tabs come and go after
  * them. A thread's shell with an OSC title shows it as is and takes no number.
  */
-export function bottomTabTitles(terminals: TerminalsData, key: string): Record<string, string> {
+export function bottomTabTitles(terminals: TerminalsData, key: string, noProject = false): Record<string, string> {
   const out: Record<string, string> = {};
   const seen = new Map<string, number>();
   for (const id of bottomTabIds(terminals, key)) {
@@ -104,7 +107,7 @@ export function bottomTabTitles(terminals: TerminalsData, key: string): Record<s
       out[id] = t.title;
       continue;
     }
-    const name = bottomTabTitle(t, key);
+    const name = bottomTabTitle(t, key, noProject);
     const n = (seen.get(name) ?? 0) + 1;
     seen.set(name, n);
     out[id] = n === 1 ? name : `${name} ${String(n)}`;
@@ -113,8 +116,8 @@ export function bottomTabTitles(terminals: TerminalsData, key: string): Record<s
 }
 
 /** One tab's title as bottomTabTitles numbers it; a primitive, for a narrow selector. */
-export function bottomTabTitleOf(terminals: TerminalsData, key: string, id: string): string {
-  return bottomTabTitles(terminals, key)[id] ?? id;
+export function bottomTabTitleOf(terminals: TerminalsData, key: string, id: string, noProject = false): string {
+  return bottomTabTitles(terminals, key, noProject)[id] ?? id;
 }
 
 /** Shows (true), hides (false) or flips (undefined) the panel. */

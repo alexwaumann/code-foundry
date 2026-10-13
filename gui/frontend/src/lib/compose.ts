@@ -50,14 +50,28 @@ export type WorktreeChoice = { kind: "new" } | { kind: "existing"; path: string 
 /** A project's worktree choice (a workspace's "members" never applies to a project). */
 export type ProjectWorktree = Exclude<WorktreeChoice, { kind: "members" }>;
 
-/** What a composer starts a thread in: a project, or a workspace and its members. */
-export type ComposeTarget = { kind: "project"; repoId: string } | { kind: "workspace"; workspaceId: string };
+/**
+ * What a composer starts a thread in: a project, a workspace and its members, or no
+ * project at all (`home`: the thread runs in the daemon's home directory, session.new
+ * --no-project; docs/notes/no-project-2-gui.md).
+ */
+export type ComposeTarget = { kind: "project"; repoId: string } | { kind: "workspace"; workspaceId: string } | { kind: "home" };
 
 const WORKSPACE_KEY = "ws:";
 
-/** The compose store's key for a target's draft: the repo id, or "ws:<workspace id>". */
+/** The draft key (and picker row value) of the no-project target. */
+export const HOME_KEY = "home:";
+
+/** The compose store's key for a target's draft: the repo id, "ws:<workspace id>", or HOME_KEY. */
 export function draftKey(t: ComposeTarget): string {
-  return t.kind === "project" ? t.repoId : WORKSPACE_KEY + t.workspaceId;
+  switch (t.kind) {
+    case "project":
+      return t.repoId;
+    case "workspace":
+      return WORKSPACE_KEY + t.workspaceId;
+    case "home":
+      return HOME_KEY;
+  }
 }
 
 export function isWorkspaceKey(key: string): boolean {
@@ -82,12 +96,13 @@ export interface MovableDraft {
  * base (it was one of the old primary's refs) and the error.
  *
  * Also in: the old project is dropped (never demoted to Also in); the new project leaves
- * Also in (a swap); a workspace, or a project without git, has none. The primary stays
- * only while it is still one of the moved draft's Also in projects.
+ * Also in (a swap); a workspace, a project without git, or no project has none. The
+ * primary stays only while it is still one of the moved draft's Also in projects.
  *
  * Tags: project skills and files of a project that is not a member of the moved draft
- * (the project and its Also in projects, or `workspaceMembers` for a workspace target)
- * leave the text (lib/prompt retainRepoTags); images and user skills stay.
+ * (the project and its Also in projects, `workspaceMembers` for a workspace target,
+ * none without a project) leave the text (lib/prompt retainRepoTags); images and user
+ * skills stay.
  */
 export function movedDraft<D extends MovableDraft>(
   d: D,
@@ -99,13 +114,13 @@ export function movedDraft<D extends MovableDraft>(
   const dropped = new Set<string>();
   if (from.kind === "project") dropped.add(from.repoId);
   if (to.kind === "project") dropped.add(to.repoId);
-  const alsoIn = to.kind === "workspace" || !isGitRepo(to.repoId) ? [] : d.alsoIn.filter((id) => !dropped.has(id));
-  const members = to.kind === "project" ? [to.repoId, ...alsoIn] : workspaceMembers;
+  const alsoIn = to.kind !== "project" || !isGitRepo(to.repoId) ? [] : d.alsoIn.filter((id) => !dropped.has(id));
+  const members = to.kind === "project" ? [to.repoId, ...alsoIn] : to.kind === "workspace" ? workspaceMembers : [];
   const primary = d.primary !== null && alsoIn.includes(d.primary) ? d.primary : null;
   return {
     ...d,
     text: retainRepoTags(d.text, members),
-    worktree: to.kind === "project" ? { kind: "new" } : { kind: "members" },
+    worktree: to.kind === "workspace" ? { kind: "members" } : { kind: "new" },
     base: null,
     alsoIn,
     primary,
@@ -133,8 +148,8 @@ export interface WorkspaceMembersInput {
 /**
  * The repositories a draft's thread works in, in member order, and the one it runs in
  * (its cwd). A project: itself, then its registered "Also in" projects. A workspace: its
- * members (none when it is gone). A primary that is not among them falls back to the
- * first.
+ * members (none when it is gone). No project: none (primary ""). A primary that is not
+ * among them falls back to the first.
  */
 export function draftMembers(
   d: Pick<PlaceInput, "target" | "alsoIn" | "primary">,
@@ -145,8 +160,10 @@ export function draftMembers(
   if (d.target.kind === "project") {
     repoIds = [d.target.repoId];
     for (const id of d.alsoIn) if (isRepo(id) && !repoIds.includes(id)) repoIds.push(id);
-  } else {
+  } else if (d.target.kind === "workspace") {
     repoIds = workspace ? workspace.members.map((m) => m.repoId) : [];
+  } else {
+    repoIds = [];
   }
   const primary = d.primary !== null && repoIds.includes(d.primary) ? d.primary : (repoIds[0] ?? "");
   return { repoIds, primary };
@@ -156,13 +173,16 @@ export function draftMembers(
  * Where session.new starts the thread: in a project (a new or existing worktree, exactly
  * as before workspaces), in a workspace's member worktree (the thread belongs to the
  * workspace), or in a new workspace with a cf/<slug> worktree in every member (a
- * project with "Also in" projects, or a workspace in new-worktree mode).
+ * project with "Also in" projects, or a workspace in new-worktree mode), or without a
+ * project in the home directory.
  */
 export type ThreadPlace =
   | { kind: "project"; repoId: string; worktree: ProjectWorktree; base: string }
   | { kind: "workspace"; workspaceId: string; repoId: string; worktreePath: string }
   /** `base` applies to the primary member only ("" : every member's default). */
-  | { kind: "new-workspace"; repoIds: readonly string[]; repoId: string; base: string };
+  | { kind: "new-workspace"; repoIds: readonly string[]; repoId: string; base: string }
+  /** session.new --no-project: no repo, worktree or workspace. */
+  | { kind: "home" };
 
 export interface PlaceEnv {
   /** The target workspace; undefined when it is gone. */
@@ -180,6 +200,7 @@ export interface PlaceEnv {
 
 /** Where a draft's thread starts, or null when its workspace is gone or has no members. */
 export function threadPlace(d: PlaceInput, env: PlaceEnv): ThreadPlace | null {
+  if (d.target.kind === "home") return { kind: "home" };
   const checkout = d.target.kind === "project" ? env.noGitCheckout?.(d.target.repoId) : undefined;
   if (d.target.kind === "project" && checkout !== undefined) {
     return { kind: "project", repoId: d.target.repoId, worktree: { kind: "existing", path: checkout }, base: "" };
@@ -284,11 +305,14 @@ export function sessionNewArgs(repoId: string, d: DraftArgsInput, attachments: r
  * defaults. A project: `worktree` is the path for an existing worktree, `new-worktree` +
  * `base` otherwise. A workspace: `workspace` and the member (`repo` + its `worktree`).
  * A new workspace: `new-worktree` + `repos`, the primary's own base as `<repo>:<base>`,
- * `repo` the member the thread runs in.
+ * `repo` the member the thread runs in. No project: `no-project` alone (the daemon
+ * refuses it beside any of the others).
  */
 export function threadArgs(place: ThreadPlace, d: PromptArgsInput, attachments: readonly string[]): Record<string, string> {
-  const args: Record<string, string> = { repo: place.repoId };
+  const args: Record<string, string> = place.kind === "home" ? { "no-project": "true" } : { repo: place.repoId };
   switch (place.kind) {
+    case "home":
+      break;
     case "project":
       if (place.worktree.kind === "existing") args.worktree = place.worktree.path;
       else {

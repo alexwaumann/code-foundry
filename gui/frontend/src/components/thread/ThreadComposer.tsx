@@ -9,6 +9,7 @@ import { Attachments } from "@/components/compose/Composer";
 import { ComposerPicker } from "@/components/compose/ComposerPicker";
 import { PromptEditor, type EditorTrigger, type PromptEditorHandle } from "@/components/compose/PromptEditor";
 import { TagMultiProjectContext } from "@/components/compose/tagContext";
+import { useNoProjectThread } from "@/components/session/useNoProject";
 import { useCommandSource, useCompletion, useFileSource, useSkillSource } from "@/components/compose/useCompletion";
 import { choiceLabel, EFFORT_CHOICES, PERMISSION_CHOICES, type ComposePermission } from "@/lib/compose";
 import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
@@ -29,6 +30,8 @@ import { RetryNote } from "./RetryNote";
 import { PendingPrompts, type PromptKeys } from "./PendingPrompt";
 
 const TRIGGERS: readonly TriggerChar[] = ["/", "@"];
+/** A thread without a project: "/" only ("@" would search its cwd, the home directory, which is never indexed). */
+const HOME_TRIGGERS: readonly TriggerChar[] = ["/"];
 
 /**
  * The last ui promptFocusSeq a thread composer acted on. Module-level: selecting a thread
@@ -49,13 +52,18 @@ function hasFocusWithin(el: HTMLElement | null): boolean {
 const EFFORT_GROUPS = [{ options: EFFORT_CHOICES.map((c) => ({ value: c.value, label: c.label })) }];
 const SEP = "\u0001";
 
-/** The thread's projects for "/" and "@": its workspace's members, else its project at its worktree. */
+/**
+ * The thread's projects for "/" and "@": its workspace's members, else its project at its
+ * worktree; none without a project (only the user's skills, and no "@").
+ */
 function useThreadSources(sessionId: string) {
+  const noProject = useNoProjectThread(sessionId);
   const repoId = useSessionsStore((s) => s.byId[sessionId]?.repoId ?? "");
   const worktreePath = useSessionsStore((s) => s.byId[sessionId]?.worktreePath ?? "");
   const workspaceId = useSessionsStore((s) => s.byId[sessionId]?.workspaceId ?? "");
   const memberKeys = useWorkspacesStore(useShallow((s) => (workspaceId ? (s.byId[workspaceId]?.members ?? []).map((m) => m.repoId + SEP + m.worktreePath) : [])));
   return useMemo(() => {
+    if (noProject) return { noProject, repoIds: [], skills: [], files: [] };
     const wsMembers = memberKeys.map((k) => {
       const [r = "", p = ""] = k.split(SEP);
       return { repoId: r, worktreePath: p };
@@ -65,11 +73,12 @@ function useThreadSources(sessionId: string) {
     const repoIds = workspace ? [repoId, ...wsMembers.map((m) => m.repoId).filter((r) => r !== repoId)] : [repoId];
     const input = { target: workspace ? ("workspace" as const) : ("project" as const), repoIds, wsMembers };
     return {
+      noProject,
       repoIds,
       skills: skillSources({ ...input, worktree: { kind: "existing", path: worktreePath } }),
       files: fileSources({ ...input, worktree: workspace ? { kind: "members" } : { kind: "existing", path: worktreePath } }),
     };
-  }, [repoId, worktreePath, memberKeys]);
+  }, [noProject, repoId, worktreePath, memberKeys]);
 }
 
 /**
@@ -322,7 +331,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
               }}
               onPasteFiles={attach}
               onPreviewChip={(id, el) => openPreview(draftKey, id, el)}
-              triggers={TRIGGERS}
+              triggers={sources.noProject ? HOME_TRIGGERS : TRIGGERS}
               onTrigger={completion.onTrigger}
               onCompletionKey={completion.onKey}
               completionAria={completion.aria}

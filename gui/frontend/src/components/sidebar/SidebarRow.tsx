@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { ArrowRightLeft, ChevronDown, ChevronRight, CircleAlert, Folder, FolderGit2, GitBranch, Layers, OctagonX, Pin, type LucideIcon } from "lucide-react";
+import { ArrowRightLeft, ChevronDown, ChevronRight, CircleAlert, Folder, FolderGit2, GitBranch, House, Layers, OctagonX, Pin, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
@@ -137,8 +137,9 @@ function useThreadPlace(id: string) {
   const project = useReposStore((st) => threadRowModel(s, st, NO_WORKSPACES).project);
   const branch = useReposStore((st) => threadRowModel(s, st, NO_WORKSPACES).branch);
   const noGit = useReposStore((st) => threadRowModel(s, st, NO_WORKSPACES).noGit);
+  const noProject = useReposStore((st) => threadRowModel(s, st, NO_WORKSPACES).noProject);
   const movingTo = useReposStore((st) => threadRowModel(s, st, { byId: ws ? { [s.workspaceId]: ws } : {} }).movingTo);
-  return { project, branch, noGit, movingTo };
+  return { project, branch, noGit, noProject, movingTo };
 }
 
 /** Tailwind colours for the status text: the sketch's sky / amber / emerald / red 400s, darker in light mode. */
@@ -158,13 +159,14 @@ function TimedStatusText({ line }: { line: StatusLine }) {
 
 /**
  * The thread's second line (lib/statusLine): what it is doing or waiting on, coloured, and
- * "project @ branch" where the status leaves room for it (working, idle, offline). A queued
- * "Run in…" move replaces it until the thread's worktree changes.
+ * "project @ branch" where the status leaves room for it (working, idle, offline); "No
+ * project" alone for a thread without one. A queued "Run in…" move replaces it until the
+ * thread's worktree changes.
  */
 function ThreadLine({ id }: { id: string }) {
   const line = useSessionsStore(useShallow((st) => statusLine(st.byId[id])));
   const badge = useSessionsStore((st) => sessionBadge(st.byId[id]));
-  const { project, branch, noGit, movingTo } = useThreadPlace(id);
+  const { project, branch, noGit, noProject, movingTo } = useThreadPlace(id);
   const status = line.kind !== "place";
   return (
     <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground" data-testid="row-place" data-status-line={line.kind} data-session-badge={badge}>
@@ -183,11 +185,17 @@ function ThreadLine({ id }: { id: string }) {
           {showsPlace(line.kind) && (
             <>
               {status && <span aria-hidden> · </span>}
-              <span data-testid="row-project">{project}</span>{" "}
-              {noGit ? (
-                <NoGitBadge className="align-[1px]" />
+              <span data-testid="row-project" data-no-project={noProject || undefined}>
+                {project}
+              </span>
+              {noProject ? null : noGit ? (
+                <>
+                  {" "}
+                  <NoGitBadge className="align-[1px]" />
+                </>
               ) : (
                 <>
+                  {" "}
                   <span className="opacity-60">@</span>{" "}
                   <span className="font-mono" data-testid="row-branch">
                     {branch}
@@ -272,7 +280,11 @@ function TipStatus({ id }: { id: string }) {
   );
 }
 
-/** The tooltip's body: name, status (attention or error only), project, branch (git only) and model. Mounted only while open. */
+/**
+ * The tooltip's body: name, status (attention or error only), project ("No project" with
+ * the House icon for a thread without one), branch (git only) and model. Mounted only
+ * while open.
+ */
 function ThreadTipBody({ id }: { id: string }) {
   const name = useSessionsStore((s) => s.byId[id]?.name ?? "");
   const model = useSessionsStore((s) => s.byId[id]?.model ?? "");
@@ -281,13 +293,13 @@ function ThreadTipBody({ id }: { id: string }) {
   const where = useSessionsStore(
     useShallow((st) => {
       const x = st.byId[id];
-      return { repoId: x?.repoId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: "", pendingWorktreePath: "" };
+      return { repoId: x?.repoId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
     }),
   );
   const m = useReposStore(
     useShallow((st) => {
       const r = threadRowModel(where, st, NO_WORKSPACES);
-      return { project: r.project, branch: r.branch, noGit: r.noGit, worktree: r.worktree };
+      return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject, worktree: r.worktree };
     }),
   );
   return (
@@ -296,10 +308,10 @@ function ThreadTipBody({ id }: { id: string }) {
         {name || id}
       </div>
       <TipStatus id={id} />
-      <TipRow icon={<TipIcon icon={m.noGit ? Folder : FolderGit2} />} chip={m.noGit ? "no git" : null} testId="tip-project">
+      <TipRow icon={<TipIcon icon={m.noProject ? House : m.noGit ? Folder : FolderGit2} />} chip={m.noGit ? "no git" : null} testId="tip-project">
         {m.project}
       </TipRow>
-      {!m.noGit && (
+      {!m.noGit && !m.noProject && (
         <TipRow icon={<TipIcon icon={GitBranch} />} chip={m.worktree ? "worktree" : null} testId="tip-branch">
           <span className="font-mono">{m.branch}</span>
         </TipRow>
