@@ -51,6 +51,7 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     workspaceId: "",
     pendingWorktreePath: "",
     pinned: false,
+    archivedAtMs: null,
     effortPending: false,
     linkedPullRequests: [],
     usage: [],

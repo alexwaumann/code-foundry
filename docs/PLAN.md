@@ -148,6 +148,14 @@ table; Send refuses the commands the app replaces (`/clear`, `/model`, ...).
 * PR 2 (GUI: the "/" card reads the thread's list, ListSkills for threads not running;
   the refusal shown under the composer) done: `docs/notes/slash-commands-2-gui.md`.
 
+### Archived threads: two PRs (2026-10-13)
+
+Manual, reversible archive: closes Claude, removes the thread's shells, unpins, stamps
+`archived_at`; reconnect, pin and send unarchive. PR 1 (proto, store, migration 0017,
+`session.archive` with confirmation only mid-turn via `Command.ConfirmIf`, API and view
+mapping) done: `docs/notes/archive-threads-1-daemon.md`. PR 2: the sidebar's archived
+section and row menu.
+
 ### Release channels: stable and tip (design 2026-10-11, revised 2026-10-12)
 
 Two channels, one install: every push to main publishes a `vX.Y.Z-tip.N` prerelease

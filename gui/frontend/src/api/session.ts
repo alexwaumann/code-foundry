@@ -68,6 +68,12 @@ export interface SessionView {
   /** The user pinned the thread (session.pin): it sits in the sidebar's Pinned section. */
   pinned: boolean;
   /**
+   * When the user archived the thread (session.archive), epoch ms; null when it is not
+   * archived. An archived thread is disconnected, unpinned and has no shells; reconnecting,
+   * pinning or sending unarchives it. docs/notes/archive-threads-1-daemon.md.
+   */
+  archivedAtMs: number | null;
+  /**
    * An effort change (thread.set-effort) not applied yet: `effort` is the
    * new level; Claude restarts with it once the running turn ends.
    */
@@ -247,6 +253,7 @@ export function toSessionView(s: Session): SessionView {
     workspaceId: s.workspaceId,
     pendingWorktreePath: s.pendingWorktreePath,
     pinned: s.pinned,
+    archivedAtMs: s.archivedAt ? timestampMs(s.archivedAt) : null,
     effortPending: s.effortPending,
     linkedPullRequests: s.linkedPullRequests.map((l) => ({
       slug: l.slug,

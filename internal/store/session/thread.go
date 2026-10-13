@@ -46,7 +46,7 @@ func (r *runner) call(ctx context.Context, cmd threadCmd) (Item, error) {
 	}
 }
 
-// Send implements Store.
+// Send implements Store. A sent message unarchives the thread.
 func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error) {
 	r, s, err := m.liveStream(id)
 	if err != nil {
@@ -72,7 +72,12 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	if len(dropped) > 0 {
 		m.log.Warn("file references outside the thread's projects; passing their relative paths", "session", id, "refs", dropped)
 	}
-	return r.call(ctx, threadCmd{send: &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt}})
+	it, err := r.call(ctx, threadCmd{send: &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt}})
+	if err == nil {
+		// A new turn brings an archived thread back to the main list.
+		m.unarchive(id)
+	}
+	return it, err
 }
 
 // fileRefRoots resolves a file reference's repository to its worktree for thread s:

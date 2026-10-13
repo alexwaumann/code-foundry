@@ -121,7 +121,9 @@ start; the Wails host reads them and injects them into the page before load.
 Services (v1):
 
 * `SessionService` — Create, Fork, List, Get, Rename, Close, Reconnect, Remove, RunIn,
-  Pin (the user's pin, persisted; `docs/notes/workspaces-4-sidebar.md`), Watch (server stream), StageAttachment (images the first prompt refers to). Create can
+  Pin (the user's pin, persisted; `docs/notes/workspaces-4-sidebar.md`), Archive (close,
+  remove the thread's shells, unpin, stamp `archived_at`; reconnect, pin and send
+  unarchive; `docs/notes/archive-threads-1-daemon.md`), Watch (server stream), StageAttachment (images the first prompt refers to). Create can
   make the worktree first (`new_worktree`), start a thread in a workspace member
   (`workspace_id`) or in a new workspace (`new_workspace`), sends the first prompt as
   the thread's first user message, and carries a permission mode (never

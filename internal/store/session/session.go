@@ -150,6 +150,9 @@ type Session struct {
 	PendingWorktreePath string
 	// Pinned is the user's pin (Store.Pin). Persisted.
 	Pinned bool
+	// ArchivedAt is when the user archived the thread (Store.Archive); zero when it is
+	// not archived. Reconnect, Pin(true) and Send clear it. Persisted.
+	ArchivedAt time.Time
 	// LinkedPullRequests are the pull requests Claude linked to the conversation
 	// (pr-link transcript records; prlink.go), one per URL, in first-seen order. Never
 	// shrinks. Persisted. Copy on write: a new slice replaces the old one, the backing
@@ -323,8 +326,12 @@ type Store interface {
 	// thread is idle at its prompt (the row's cwd changes when Claude accepts), or the
 	// row's cwd at once for a disconnected thread.
 	RunIn(ctx context.Context, id string, target RunInTarget) (Session, error)
-	// Pin sets or clears the user's pin, in any state.
+	// Pin sets or clears the user's pin, in any state. Pinning unarchives.
 	Pin(ctx context.Context, id string, pinned bool) (Session, error)
+	// Archive archives a thread (archived true): it closes it like Close, kills and
+	// removes its shells, unpins it and sets ArchivedAt (kept when already set). With
+	// archived false it only clears ArchivedAt; the thread stays disconnected.
+	Archive(ctx context.Context, id string, archived bool) (Session, error)
 	// StageAttachment stores an image for a first prompt and returns its absolute
 	// path. mimeType must be one of AttachmentTypes; data at most MaxAttachmentBytes.
 	// name is the user's file name, used only in logs.

@@ -98,6 +98,15 @@ func (h *Session) Pin(ctx context.Context, req *connect.Request[v1.PinSessionReq
 	return connect.NewResponse(&v1.PinSessionResponse{Session: sessionToProto(s)}), nil
 }
 
+// Archive archives (closing it and its shells, unpinning) or unarchives a thread.
+func (h *Session) Archive(ctx context.Context, req *connect.Request[v1.ArchiveSessionRequest]) (*connect.Response[v1.ArchiveSessionResponse], error) {
+	s, err := h.store.Archive(ctx, req.Msg.GetId(), req.Msg.GetArchived())
+	if err != nil {
+		return nil, sessionError(err)
+	}
+	return connect.NewResponse(&v1.ArchiveSessionResponse{Session: sessionToProto(s)}), nil
+}
+
 // Close ends the process gracefully; it returns once the session is DISCONNECTED.
 func (h *Session) Close(ctx context.Context, req *connect.Request[v1.CloseSessionRequest]) (*connect.Response[v1.CloseSessionResponse], error) {
 	if err := h.store.Close(ctx, req.Msg.GetId()); err != nil {
@@ -228,6 +237,9 @@ func sessionToProto(s session.Session) *v1.Session {
 	}
 	if !s.StatusChangedAt.IsZero() {
 		p.StatusChangedAt = timestamppb.New(s.StatusChangedAt)
+	}
+	if !s.ArchivedAt.IsZero() {
+		p.ArchivedAt = timestamppb.New(s.ArchivedAt)
 	}
 	for _, l := range s.LinkedPullRequests {
 		lp := &v1.LinkedPullRequest{Slug: l.Slug, Number: int32(l.Number), Url: l.URL}
