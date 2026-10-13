@@ -188,20 +188,6 @@ func TestSettingsNamer(t *testing.T) {
 	}
 }
 
-func TestSettingsRender(t *testing.T) {
-	st := openSettings(t)
-	def := settingsRender(st)
-	if got := def(); got != session.RenderTerminal {
-		t.Errorf("default = %v", got)
-	}
-	if _, err := st.Update(context.Background(), map[string]string{settings.KeyRender: settings.RenderRendered}); err != nil {
-		t.Fatal(err)
-	}
-	if got := def(); got != session.RenderRendered {
-		t.Errorf("after update = %v (read per call, no restart)", got)
-	}
-}
-
 type ttlRecorder struct{ got []time.Duration }
 
 func (r *ttlRecorder) SetCacheTTL(d time.Duration) { r.got = append(r.got, d) }

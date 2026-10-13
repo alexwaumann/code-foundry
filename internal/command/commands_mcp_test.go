@@ -28,8 +28,7 @@ func newMcpRegistry(t *testing.T) (*command.Registry, *sessiontest.Fake, *comman
 	if err := command.RegisterMcp(reg, api.NewThread(fake, b), emit); err != nil {
 		t.Fatal(err)
 	}
-	fake.Put(session.Session{ID: "s1", Name: "fix", State: session.StateConnected, Render: session.RenderRendered})
-	fake.Put(session.Session{ID: "t1", Name: "term", State: session.StateConnected, Render: session.RenderTerminal, TerminalID: "x"})
+	fake.Put(session.Session{ID: "s1", Name: "fix", State: session.StateConnected})
 	fake.PutMcp("s1", &session.McpStatus{CheckedAt: time.Now().Add(-12 * time.Second), Trigger: session.McpTriggerTurn, Servers: []session.McpServer{
 		{Name: "github", Status: session.McpConnected, Version: "1.12.0", Scope: "user", Transport: "stdio",
 			Tools: []session.McpTool{{Name: "get_pull_request", Description: "Get details of a pull request", ReadOnly: true}, {Name: "merge_pull_request", Destructive: true, OpenWorld: true}}},
@@ -47,8 +46,7 @@ func TestMcpCommandsAvailability(t *testing.T) {
 		want bool
 	}{
 		{"cli", command.Context{ActiveSessionID: "s1"}, true},
-		{"gui rendered thread", command.Context{ActiveSessionID: "s1", ActiveView: "session", ActiveSessionRendered: true}, true},
-		{"gui terminal thread", command.Context{ActiveSessionID: "t1", ActiveView: "session"}, false},
+		{"gui thread", command.Context{ActiveSessionID: "s1", ActiveView: "session"}, true},
 		{"no thread", command.Context{ActiveView: "projects"}, false},
 	}
 	for _, tt := range tests {
@@ -77,7 +75,7 @@ func TestMcpCommands(t *testing.T) {
 			wantMsg: []string{
 				"MCP servers: 1 of 3 connected (checked 12s ago, at the start of the last turn)",
 				"SERVER", "github      connected", "1.12.0", "linear      needs login", "playwright  failed",
-				"error: spawn npx ENOENT", "needs login: run /mcp in a terminal thread, then thread mcp-reconnect --server 'linear'",
+				"error: spawn npx ENOENT", "needs login: run claude in a shell and log in with /mcp, then thread mcp-reconnect --server 'linear'",
 			},
 			notMsg:    []string{"get_pull_request"},
 			wantCalls: []string{"McpStatus s1"},
@@ -100,8 +98,8 @@ func TestMcpCommands(t *testing.T) {
 			wantErr: connect.CodeNotFound, wantCalls: []string{"McpReconnect s1 nope"},
 		},
 		{
-			name: "terminal thread", cmd: "thread.mcp", args: map[string]string{"id": "t1"},
-			wantErr: connect.CodeFailedPrecondition, wantCalls: []string{"McpStatus t1"},
+			name: "unknown thread", cmd: "thread.mcp", args: map[string]string{"id": "nope"},
+			wantErr: connect.CodeNotFound, wantCalls: []string{"McpStatus nope"},
 		},
 	}
 	for _, tt := range tests {
@@ -138,7 +136,7 @@ func TestMcpCommands(t *testing.T) {
 
 func TestViewPanelMcpEmits(t *testing.T) {
 	reg, _, emit := newMcpRegistry(t)
-	uctx := command.Context{ActiveSessionID: "s1", ActiveView: "session", ActiveSessionRendered: true}
+	uctx := command.Context{ActiveSessionID: "s1", ActiveView: "session"}
 	res, err := reg.Invoke(context.Background(), uctx, "view.panel.mcp", nil)
 	if err != nil {
 		t.Fatal(err)

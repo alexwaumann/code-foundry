@@ -21,7 +21,8 @@ var discard = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 func TestShellReaper(t *testing.T) {
 	gone := "/cf-test/src/app/.worktrees/feat" // does not exist: a real removal
-	claude := map[string]string{termlabel.Session: "s1", termlabel.Worktree: gone}
+	// Owner labels without the shell kind: not terminal.new's, so never reaped.
+	owned := map[string]string{termlabel.Session: "s1", termlabel.Worktree: gone}
 	worktreeRemoved := func(path string) func(dir string) any {
 		return func(dir string) any {
 			if path == "%dir" {
@@ -46,7 +47,7 @@ func TestShellReaper(t *testing.T) {
 		{name: "a shell that exits is removed", labels: termlabel.Shell("", "r1", "%dir"), exit: true, wantGone: true},
 		{name: "a thread's shell that exits is removed", labels: termlabel.Shell("s1", "r1", "%dir"), exit: true, wantGone: true},
 		{name: "a shell that exited before the start is swept", labels: termlabel.Shell("", "r1", "%dir"), exitedBefore: true, wantGone: true},
-		{name: "a Claude terminal that exits stays", labels: claude, exit: true},
+		{name: "an owned non-shell terminal that exits stays", labels: owned, exit: true},
 		{name: "an unlabelled terminal that exits stays", exit: true},
 		{name: "removing its worktree kills and removes a shell", labels: termlabel.Shell("", "r1", gone),
 			event: worktreeRemoved(gone), wantGone: true},
@@ -55,14 +56,14 @@ func TestShellReaper(t *testing.T) {
 		{name: "a removal event while the directory exists (failed refresh) leaves the shell", labels: termlabel.Shell("", "r1", "%dir"),
 			event: worktreeRemoved("%dir")},
 		{name: "removing another worktree leaves a shell", labels: termlabel.Shell("", "r1", "%dir"), event: worktreeRemoved(gone)},
-		{name: "removing its worktree leaves a Claude terminal", labels: claude, event: worktreeRemoved(gone)},
+		{name: "removing its worktree leaves an owned non-shell terminal", labels: owned, event: worktreeRemoved(gone)},
 		{name: "unregistering its project kills and removes a shell", labels: termlabel.Shell("s1", "r1", "%dir"),
 			event: event(repo.RepoRemoved{ID: "r1"}), wantGone: true},
 		{name: "unregistering another project leaves a shell", labels: termlabel.Shell("", "r1", "%dir"), event: event(repo.RepoRemoved{ID: "r2"})},
 		{name: "removing its thread kills and removes a shell", labels: termlabel.Shell("s1", "r1", "%dir"),
 			event: event(session.Removed{ID: "s1"}), wantGone: true},
 		{name: "removing another thread leaves a shell", labels: termlabel.Shell("s1", "r1", "%dir"), event: event(session.Removed{ID: "s2"})},
-		{name: "removing its thread leaves its Claude terminal", labels: claude, event: event(session.Removed{ID: "s1"})},
+		{name: "removing its thread leaves an owned non-shell terminal", labels: owned, event: event(session.Removed{ID: "s1"})},
 		{name: "the sweep removes a shell whose worktree is gone (missed event)", labels: termlabel.Shell("", "r1", gone), wantGone: true},
 		{name: "the sweep removes a shell of an unregistered project", labels: termlabel.Shell("", "r9", "%dir"), wantGone: true},
 		{name: "the sweep removes a shell of a removed thread", labels: termlabel.Shell("s9", "r1", "%dir"), wantGone: true},

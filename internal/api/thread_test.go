@@ -32,8 +32,8 @@ func newThreadServer(t *testing.T) (*sessiontest.Fake, codefoundryv1connect.Thre
 
 func TestThreadWatchSendRespond(t *testing.T) {
 	fake, c := newThreadServer(t)
-	fake.Put(session.Session{ID: "s1", State: session.StateConnected, Render: session.RenderRendered})
-	fake.Put(session.Session{ID: "t1", State: session.StateConnected, Render: session.RenderTerminal, TerminalID: "term"})
+	fake.Put(session.Session{ID: "s1", State: session.StateConnected})
+	fake.Put(session.Session{ID: "d1", State: session.StateDisconnected})
 	fake.PutItems("s1",
 		session.Item{ID: "u1", Kind: session.KindUserMessage, Text: "hi @cf-file://r1/a.go", Attachments: []string{"/att/1.png"},
 			ComposerText: "hi [a.go](cf-file://r1/a.go)"},
@@ -43,9 +43,6 @@ func TestThreadWatchSendRespond(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if _, err := c.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{SessionId: "t1"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Errorf("items of a terminal thread: %v", err)
-	}
 	if _, err := c.ListItems(ctx, connect.NewRequest(&v1.ListThreadItemsRequest{SessionId: "nope"})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("items of an unknown thread: %v", err)
 	}
@@ -116,7 +113,7 @@ func TestThreadWatchSendRespond(t *testing.T) {
 		t.Fatal(err)
 	}
 	ms, err := c.SetModel(ctx, connect.NewRequest(&v1.SetThreadModelRequest{SessionId: "s1", Model: "sonnet"}))
-	if err != nil || ms.Msg.GetSession().GetModel() != "sonnet" || ms.Msg.GetSession().GetRender() != v1.SessionRender_SESSION_RENDER_RENDERED {
+	if err != nil || ms.Msg.GetSession().GetModel() != "sonnet" {
 		t.Fatalf("set model %v %v", ms, err)
 	}
 	if _, err := c.SetPermissionMode(ctx, connect.NewRequest(&v1.SetThreadPermissionModeRequest{SessionId: "s1"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
@@ -132,8 +129,8 @@ func TestThreadWatchSendRespond(t *testing.T) {
 	if _, err := c.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{SessionId: "s1", Effort: "huge"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Errorf("bad effort: %v", err)
 	}
-	if _, err := c.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{SessionId: "t1", Text: "x"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Errorf("send to a terminal thread: %v", err)
+	if _, err := c.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{SessionId: "d1", Text: "x"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Errorf("send to a disconnected thread: %v", err)
 	}
 
 	// Closing the stream releases the viewer.

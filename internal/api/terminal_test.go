@@ -191,13 +191,13 @@ func TestTerminalServiceCloseKillsThenRemoves(t *testing.T) {
 	defer cancel()
 	c, fake := newTerminalClient(t)
 	term, _ := fake.Create(ctx, terminal.Spec{Argv: []string{"cat"}, Labels: termlabel.Shell("", "r1", "/wt")})
-	claude, _ := fake.Create(ctx, terminal.Spec{Argv: []string{"claude"}, Labels: map[string]string{termlabel.Session: "s1"}})
-	_, err := c.Close(ctx, connect.NewRequest(&v1.CloseTerminalRequest{Id: claude.ID}))
+	other, _ := fake.Create(ctx, terminal.Spec{Argv: []string{"cat"}, Labels: map[string]string{termlabel.Session: "s1"}})
+	_, err := c.Close(ctx, connect.NewRequest(&v1.CloseTerminalRequest{Id: other.ID}))
 	if ce := new(connect.Error); !errors.As(err, &ce) || ce.Code() != connect.CodeFailedPrecondition {
-		t.Errorf("Close(Claude terminal) = %v, want FailedPrecondition", err)
+		t.Errorf("Close(non-shell terminal) = %v, want FailedPrecondition", err)
 	}
-	if got, _ := fake.Get(ctx, claude.ID); got.State != terminal.StateRunning {
-		t.Errorf("Claude terminal state = %v, want running", got.State)
+	if got, _ := fake.Get(ctx, other.ID); got.State != terminal.StateRunning {
+		t.Errorf("non-shell terminal state = %v, want running", got.State)
 	}
 	if _, err := c.Close(ctx, connect.NewRequest(&v1.CloseTerminalRequest{Id: term.ID})); err != nil {
 		t.Fatal(err)

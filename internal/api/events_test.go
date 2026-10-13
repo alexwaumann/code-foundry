@@ -202,9 +202,9 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	defer cancel()
 	_, _ = f.repo.Register(ctx, "/code/a")
 	t1, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"zsh"}})
-	t2, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"claude"}, Labels: map[string]string{"session": "s1"}})
-	f.sess.Put(session.Session{ID: "s1", TerminalID: t2.ID, State: session.StateConnected, Status: session.StatusIdle})
-	f.sess.Put(session.Session{ID: "s2", State: session.StateConnected, Render: session.RenderRendered, CreatedAt: time.Unix(1, 0)})
+	t2, _ := f.term.Create(ctx, terminal.Spec{Argv: []string{"zsh"}, Labels: map[string]string{"kind": "shell", "session": "s1"}})
+	f.sess.Put(session.Session{ID: "s1", State: session.StateConnected, Status: session.StatusIdle})
+	f.sess.Put(session.Session{ID: "s2", State: session.StateConnected, CreatedAt: time.Unix(1, 0)})
 	f.sess.PutItems("s2", session.Item{ID: "perm-r1", Kind: session.KindPermission, Request: &session.Request{RequestID: "r1", ToolName: "Write", State: session.RequestPending}})
 	f.gh.SetRepo(gh.RepoState{Slug: "o/b"})
 	f.gh.SetRepo(gh.RepoState{Slug: "o/a"})
@@ -257,7 +257,7 @@ func TestEventsSnapshotOrderThenLive(t *testing.T) {
 	if got := describe(s.next()); got != "terminal.removed "+t1.ID {
 		t.Fatalf("got %q, want terminal removal", got)
 	}
-	f.sess.Put(session.Session{ID: "s1", TerminalID: t2.ID, State: session.StateConnected, Status: session.StatusNeedsAttention})
+	f.sess.Put(session.Session{ID: "s1", State: session.StateConnected, Status: session.StatusNeedsAttention})
 	if got := describe(s.next()); got != "session.updated s1 SESSION_STATUS_NEEDS_ATTENTION" {
 		t.Fatalf("got %q, want session update", got)
 	}

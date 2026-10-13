@@ -64,7 +64,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 			Name:  "thread.mcp-reconnect",
 			Title: "Reconnect Thread MCP Server",
 			Description: "Reconnect one of a connected thread's MCP servers, then check them again. " +
-				"After logging in to a server with /mcp in a terminal thread, this picks the login up.",
+				"After logging in to a server with /mcp in an interactive claude (a shell in the bottom panel), this picks the login up.",
 			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,
@@ -200,7 +200,7 @@ func FormatMcpStatus(st *v1.ThreadMcpStatus, full bool, now time.Time) string {
 			lines = append(lines, "  error: "+e)
 		}
 		if s.GetStatus() == v1.McpServerStatus_MCP_SERVER_STATUS_NEEDS_AUTH {
-			lines = append(lines, "  needs login: run /mcp in a terminal thread, then thread mcp-reconnect --server '"+s.GetName()+"'")
+			lines = append(lines, "  needs login: run claude in a shell and log in with /mcp, then thread mcp-reconnect --server '"+s.GetName()+"'")
 		}
 		if full && len(s.GetTools()) > 0 {
 			var tb strings.Builder

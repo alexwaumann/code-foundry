@@ -78,6 +78,19 @@ func TestOpenReportsBadValues(t *testing.T) {
 	}
 }
 
+// A setting the app no longer has (sessions.render, removed with terminal threads) is
+// an issue, not an error: the file still loads.
+func TestOpenReportsRemovedSettings(t *testing.T) {
+	s, _, _ := openTest(t, "[sessions]\nrender = \"terminal\"\ndefault_effort = \"low\"\n")
+	snap := s.Snapshot()
+	if snap.Settings.Sessions.DefaultEffort != "low" {
+		t.Errorf("settings = %+v", snap.Settings.Sessions)
+	}
+	if want := []Issue{{"sessions.render", "unknown setting"}}; !slices.Equal(snap.Issues, want) {
+		t.Errorf("issues = %v, want %v", snap.Issues, want)
+	}
+}
+
 func TestUpdate(t *testing.T) {
 	s, b, path := openTest(t, "")
 	s.SetCommands(testCmds)
