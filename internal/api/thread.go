@@ -290,6 +290,8 @@ func itemToProto(it session.Item) *v1.ThreadItem {
 		p.Payload = &v1.ThreadItem_Compaction{Compaction: c}
 	case session.KindCommandOutput:
 		p.Payload = &v1.ThreadItem_CommandOutput{CommandOutput: &v1.CommandOutputItem{Text: it.Text}}
+	case session.KindNote:
+		p.Payload = &v1.ThreadItem_Note{Note: &v1.NoteItem{Text: it.Text}}
 	}
 	return p
 }

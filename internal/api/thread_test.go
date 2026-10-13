@@ -180,6 +180,7 @@ func TestItemToProto(t *testing.T) {
 		{"thinking", session.Item{Kind: session.KindThinking, Text: "hm"}, func(p *v1.ThreadItem) bool { return p.GetThinking().GetText() == "hm" }},
 		{"error", session.Item{Kind: session.KindError, Text: "boom"}, func(p *v1.ThreadItem) bool { return p.GetError().GetText() == "boom" }},
 		{"command output", session.Item{Kind: session.KindCommandOutput, Text: "Compacted"}, func(p *v1.ThreadItem) bool { return p.GetCommandOutput().GetText() == "Compacted" }},
+		{"note", session.Item{Kind: session.KindNote, Text: "Forked from base"}, func(p *v1.ThreadItem) bool { return p.GetNote().GetText() == "Forked from base" }},
 		{"subagent", session.Item{Kind: session.KindAssistantText, Text: "x", ParentToolUseID: "agent"}, func(p *v1.ThreadItem) bool { return p.GetParentToolUseId() == "agent" }},
 		{"unknown kind", session.Item{Kind: "future"}, func(p *v1.ThreadItem) bool { return p.GetPayload() == nil }},
 	}

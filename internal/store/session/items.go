@@ -53,6 +53,10 @@ const (
 	// KindCommandOutput is a local slash command's output (/cost, /compact's
 	// "Compacted", ...).
 	KindCommandOutput ItemKind = "command_output"
+	// KindNote is a line the daemon adds to the conversation, not Claude: Text says
+	// what happened. A fork's log starts with its parent's items and a note "Forked
+	// from <parent>" where they end (fork.go).
+	KindNote ItemKind = "note"
 )
 
 // ToolStatus is a tool call's progress.
@@ -105,7 +109,7 @@ type Item struct {
 	// Streaming: the item is still arriving (text deltas) and not yet persisted.
 	Streaming bool
 	// Text: user_message (as typed), assistant_text, thinking, error, compaction (the
-	// summary), command_output.
+	// summary), command_output, note.
 	Text string
 	// Attachments: user_message's staged image paths.
 	Attachments []string
