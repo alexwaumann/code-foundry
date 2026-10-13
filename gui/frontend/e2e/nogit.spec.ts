@@ -29,8 +29,11 @@ test("a project without git: No git on the Projects page, its overview, then Ini
   await openProjects(page);
   const project = page.locator('[data-testid="project"][data-repo="repo-wr"]');
   await expect(project).toHaveAttribute("data-git", "false");
-  // The badge stands where the branch would; no branch, status or pull request.
-  await expect(project.getByTestId("no-git-badge")).toBeVisible();
+  await expect(project).toHaveAttribute("data-kind", "nogit");
+  // The header says it after the name; on the row the badge stands where the branch
+  // would. No branch, status or pull request.
+  await expect(project.locator('[data-nav-key="p:repo-wr"]').getByTestId("no-git-badge")).toBeVisible();
+  await expect(project.getByTestId("project-worktree").getByTestId("no-git-badge")).toBeVisible();
   await expect(project.getByTestId("worktree-branch")).toHaveCount(0);
   await expect(project.getByTestId("worktree-dirty")).toHaveCount(0);
 
@@ -60,6 +63,8 @@ test("a project without git: No git on the Projects page, its overview, then Ini
 
   await openProjects(page);
   await expect(project).toHaveAttribute("data-git", "true");
+  await expect(project).toHaveAttribute("data-kind", "git");
+  await expect(project.getByTestId("project-meta")).toHaveText("local only · no remote");
   await expect(project.getByTestId("no-git-badge")).toHaveCount(0);
   await expect(project.getByTestId("worktree-branch")).toHaveText("main");
 });

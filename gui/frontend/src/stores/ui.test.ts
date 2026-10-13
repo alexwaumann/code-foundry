@@ -98,6 +98,26 @@ describe("ui persistence", () => {
     useUiStore.getState().toggleWorkingCollapsed();
     expect(useUiStore.getState().workingCollapsed).toBe(false);
   });
+
+  it("saves and loads the Projects page's collapsed projects and workspaces; none by default and for a bad value", () => {
+    expect(useUiStore.getInitialState().collapsedProjects).toEqual([]);
+    expect(useUiStore.getInitialState().collapsedWorkspaces).toEqual([]);
+    const opts = useUiStore.persist.getOptions();
+    const current = useUiStore.getState();
+    useUiStore.setState({ collapsedProjects: [], collapsedWorkspaces: [] });
+    const ui = () => useUiStore.getState();
+    expect(ui().setProjectCollapsed("repo-cf", true)).toBe(true);
+    expect(ui().setProjectCollapsed("repo-cf", true)).toBe(false);
+    expect(ui().setWorkspaceCollapsed("w-1", true)).toBe(true);
+    expect(ui().setWorkspaceCollapsed("w-2", false)).toBe(false);
+    expect(opts.partialize?.(ui())).toMatchObject({ collapsedProjects: ["repo-cf"], collapsedWorkspaces: ["w-1"] });
+    expect(opts.merge?.({ collapsedProjects: ["a"], collapsedWorkspaces: ["b"] }, current)).toMatchObject({ collapsedProjects: ["a"], collapsedWorkspaces: ["b"] });
+    expect(opts.merge?.({}, { ...current, collapsedProjects: [] }).collapsedProjects).toEqual([]);
+    expect(opts.merge?.({ collapsedProjects: "a", collapsedWorkspaces: [1] }, { ...current, collapsedProjects: [], collapsedWorkspaces: [] })).toMatchObject({ collapsedProjects: [], collapsedWorkspaces: [] });
+    expect(ui().setProjectCollapsed("repo-cf", false)).toBe(true);
+    expect(ui().collapsedProjects).toEqual([]);
+    useUiStore.setState({ collapsedWorkspaces: [] });
+  });
 });
 
 describe("bottomMax and clampBottomHeight", () => {
