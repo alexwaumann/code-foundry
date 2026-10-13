@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import type { SessionView } from "@/api/session";
 import type { TerminalView } from "@/api/terminal";
 import { useBottomStore } from "./bottomPanel";
-import { deriveContext, getUiContext } from "./context";
+import { decodeSessionListKeys, deriveContext, encodeSessionListKey, getListOptions, getListSessions, getUiContext } from "./context";
 import { useReposStore } from "./repos";
 import { useSessionsStore } from "./sessions";
 import { useTerminalsStore } from "./terminals";
@@ -77,5 +78,28 @@ describe("a Projects-page shell in the command context", () => {
     useBottomStore.setState({ byKey: { "view:projects": { open: true, activeTerminalId: "p" } }, pendingFocus: null, pendingFocusId: null });
     useUiStore.setState({ focus: "content" });
     expect(getUiContext()).toMatchObject({ activeTerminalId: "", activeWorktreePath: "" });
+  });
+});
+
+describe("the sidebar list's keys", () => {
+  const session = (o: Partial<SessionView>) => ({ id: "s1", state: "connected", status: "idle", statusReason: "", pinned: false, archivedAtMs: null, ...o }) as SessionView;
+
+  it.each<[string, Partial<SessionView>, { pinned: boolean; group: string; archivedAtMs: number | null }]>([
+    ["idle", {}, { pinned: false, group: "idle", archivedAtMs: null }],
+    ["pinned and busy", { pinned: true, status: "busy" }, { pinned: true, group: "working", archivedAtMs: null }],
+    ["archived", { state: "disconnected", archivedAtMs: 1760352000123 }, { pinned: false, group: "idle", archivedAtMs: 1760352000123 }],
+  ])("round-trips %s", (_name, o, want) => {
+    expect(decodeSessionListKeys([encodeSessionListKey("s1", session(o))])).toEqual([{ id: "s1", ...want }]);
+  });
+
+  it("an unknown session decodes as an idle, unarchived thread", () => {
+    expect(decodeSessionListKeys([encodeSessionListKey("s9", undefined)])).toEqual([{ id: "s9", pinned: false, group: "idle", archivedAtMs: null }]);
+  });
+
+  it("getListSessions and getListOptions read the stores (archive time, both collapsed states)", () => {
+    useSessionsStore.setState({ byId: { s1: session({ archivedAtMs: 5 }) }, order: ["s1"] });
+    useUiStore.setState({ workingCollapsed: true, archivedCollapsed: false });
+    expect(getListSessions()).toEqual([{ id: "s1", pinned: false, group: "idle", archivedAtMs: 5 }]);
+    expect(getListOptions()).toEqual({ workingCollapsed: true, archivedCollapsed: false });
   });
 });

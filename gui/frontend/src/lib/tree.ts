@@ -1,7 +1,8 @@
 /**
  * Sidebar list: a flat list of threads (sessions), pinned ones first, then the ones waiting
- * on the user, then finished turns, then idle ones, then the working ones under a
- * collapsible Working header, as rows for a virtual list. No repo, worktree or terminal
+ * on the user, then finished turns, then idle ones (the main list); then the working ones
+ * under a collapsible Working header and the archived ones under a collapsible Archived
+ * header (the two footers, buildSections), as rows for virtual lists. No repo, worktree or terminal
  * rows: worktrees live on the Projects page, and shells in their owner's bottom panel
  * (stores/bottomPanel.ts). Pure functions over the minimal inputs that affect structure, so
  * the sidebar only rebuilds when membership, order, pin or group changes (not on name or
@@ -26,27 +27,38 @@ export interface ListSession {
   pinned: boolean;
   /** Where it sorts when unpinned (lib/session.ts threadGroup). */
   group: ThreadGroup;
+  /** When the user archived it (epoch ms), null when not archived: it then sorts under Archived, whatever its pin and group. */
+  archivedAtMs: number | null;
 }
 
 /**
- * The group a thread row sorts in. Only "working" has a header; the other groups follow
- * each other without one (data-section on the row says which a thread is in).
- * "attention" holds prompts and then error / interrupted threads; "done" unseen finished
- * turns; "idle" everything else that is not working.
+ * The group a thread row sorts in. Only "working" and "archived" have a header (they are
+ * the footers); the other groups follow each other without one (data-section on the row
+ * says which a thread is in). "attention" holds prompts and then error / interrupted
+ * threads; "done" unseen finished turns; "idle" everything else that is not working;
+ * "archived" every archived thread, whatever its status or pin.
  */
-export type Section = "pinned" | "attention" | "done" | "idle" | "working";
+export type Section = "pinned" | "attention" | "done" | "idle" | "working" | "archived";
 
-/** How the list is shown (the UI store's sidebar prefs). */
+/** The sections with a header: the sidebar's two footers. */
+export type FooterSection = "working" | "archived";
+
+/**
+ * How the list is shown (the UI store's sidebar prefs). Absent means expanded; the UI
+ * store's defaults are Working expanded, Archived collapsed.
+ */
 export interface ListOptions {
   /** The Working section is collapsed: its header stays, its rows are not in the list. */
   workingCollapsed?: boolean;
+  /** The Archived section is collapsed: its header stays, its rows are not in the list. */
+  archivedCollapsed?: boolean;
 }
 
-/** The Working section's header: a toggle, with the number of threads under it (shown or not). */
+/** A footer's header (Working, Archived): a toggle, with the number of threads under it (shown or not). */
 export type HeaderRow = {
   key: string;
   kind: "header";
-  section: "working";
+  section: FooterSection;
   label: string;
   count: number;
   collapsed: boolean;
@@ -101,31 +113,52 @@ export function placeSession(s: { worktreePath: string }, worktrees: readonly Wo
 }
 
 /**
- * The sidebar rows. Threads newest first (`sessions` comes in creation order, the sessions
- * store's order) within each group, so a thread moves only when it changes group: pinned
- * ones (whatever their status); then unpinned ones waiting on the user (prompts, then error
- * and interrupted threads); finished turns; idle ones (idle, unknown, closing, offline);
- * all without headers. Then the working ones (busy or starting) under a Working header that
- * counts them (only when there are any; with `workingCollapsed` the header alone).
+ * The sidebar's three panels: the main list (scrolls on its own) and the two footers pinned
+ * below it, each footer its header row followed by its rows (none when collapsed); a
+ * footer without threads is empty (no header).
  */
-export function buildRows(sessions: readonly ListSession[], opts: ListOptions = {}): Row[] {
+export interface Sections {
+  main: Row[];
+  working: Row[];
+  archived: Row[];
+}
+
+/**
+ * The sidebar rows by panel. Threads newest first (`sessions` comes in creation order, the
+ * sessions store's order) within each group, so a thread moves only when it changes group.
+ * Main: pinned ones (whatever their status); then unpinned ones waiting on the user
+ * (prompts, then error and interrupted threads); finished turns; idle ones (idle, unknown,
+ * closing, offline); all without headers. Working: the working ones (busy or starting)
+ * under a Working header that counts them. Archived: every archived thread (pinned or not,
+ * whatever its group; it appears nowhere else) under an Archived header, most recently
+ * archived first. A footer has its header only when it has threads; collapsed, the header
+ * alone.
+ */
+export function buildSections(sessions: readonly ListSession[], opts: ListOptions = {}): Sections {
   const newest = [...sessions].reverse();
-  const unpinned = (...groups: ThreadGroup[]) => groups.flatMap((g) => newest.filter((s) => !s.pinned && s.group === g));
-  const rows: Row[] = [];
-  const push = (section: Section, list: readonly ListSession[]) => {
-    for (const s of list) rows.push({ key: sessionKey(s.id), kind: "session", section, sessionId: s.id });
+  const live = newest.filter((s) => s.archivedAtMs === null);
+  const unpinned = (...groups: ThreadGroup[]) => groups.flatMap((g) => live.filter((s) => !s.pinned && s.group === g));
+  const rowsOf = (section: Section, list: readonly ListSession[]): Row[] => list.map((s) => ({ key: sessionKey(s.id), kind: "session", section, sessionId: s.id }));
+  const footer = (section: FooterSection, label: string, list: readonly ListSession[], collapsed: boolean): Row[] =>
+    list.length === 0 ? [] : [{ key: headerKey(section), kind: "header", section, label, count: list.length, collapsed }, ...(collapsed ? [] : rowsOf(section, list))];
+  // Stable sort: equal archive times keep newest-created first.
+  const archived = newest.filter((s) => s.archivedAtMs !== null).sort((a, b) => (b.archivedAtMs ?? 0) - (a.archivedAtMs ?? 0));
+  return {
+    main: [
+      ...rowsOf("pinned", live.filter((s) => s.pinned)),
+      ...rowsOf("attention", unpinned("prompt", "error")),
+      ...rowsOf("done", unpinned("done")),
+      ...rowsOf("idle", unpinned("idle")),
+    ],
+    working: footer("working", "Working", unpinned("working"), opts.workingCollapsed === true),
+    archived: footer("archived", "Archived", archived, opts.archivedCollapsed === true),
   };
-  push("pinned", newest.filter((s) => s.pinned));
-  push("attention", unpinned("prompt", "error"));
-  push("done", unpinned("done"));
-  push("idle", unpinned("idle"));
-  const working = unpinned("working");
-  if (working.length > 0) {
-    const collapsed = opts.workingCollapsed === true;
-    rows.push({ key: headerKey("working"), kind: "header", section: "working", label: "Working", count: working.length, collapsed });
-    if (!collapsed) push("working", working);
-  }
-  return rows;
+}
+
+/** The sidebar rows in one order: the main list, then Working, then Archived (buildSections). */
+export function buildRows(sessions: readonly ListSession[], opts: ListOptions = {}): Row[] {
+  const { main, working, archived } = buildSections(sessions, opts);
+  return [...main, ...working, ...archived];
 }
 
 /** Same row content: every field equal (rows are flat objects of strings, numbers and booleans). */

@@ -99,6 +99,23 @@ describe("ui persistence", () => {
     expect(useUiStore.getState().workingCollapsed).toBe(false);
   });
 
+  it("saves and loads the Archived section's collapsed state; collapsed by default and for a bad value", () => {
+    expect(useUiStore.getInitialState().archivedCollapsed).toBe(true);
+    const opts = useUiStore.persist.getOptions();
+    const current = useUiStore.getState();
+    useUiStore.setState({ archivedCollapsed: true });
+    useUiStore.getState().toggleArchivedCollapsed();
+    expect(useUiStore.getState().archivedCollapsed).toBe(false);
+    expect(opts.partialize?.(useUiStore.getState())).toMatchObject({ archivedCollapsed: false });
+    expect(opts.merge?.({ archivedCollapsed: false }, current).archivedCollapsed).toBe(false);
+    expect(opts.merge?.({}, { ...current, archivedCollapsed: true }).archivedCollapsed).toBe(true);
+    expect(opts.merge?.({ archivedCollapsed: 0 }, { ...current, archivedCollapsed: true }).archivedCollapsed).toBe(true);
+    // Independent of Working.
+    expect(opts.merge?.({ workingCollapsed: true }, { ...current, archivedCollapsed: true })).toMatchObject({ workingCollapsed: true, archivedCollapsed: true });
+    useUiStore.getState().toggleArchivedCollapsed();
+    expect(useUiStore.getState().archivedCollapsed).toBe(true);
+  });
+
   it("saves and loads the Projects page's collapsed projects and workspaces; none by default and for a bad value", () => {
     expect(useUiStore.getInitialState().collapsedProjects).toEqual([]);
     expect(useUiStore.getInitialState().collapsedWorkspaces).toEqual([]);

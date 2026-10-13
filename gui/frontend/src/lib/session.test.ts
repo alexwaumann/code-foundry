@@ -4,6 +4,7 @@ import {
   attentionTier,
   disconnectCause,
   isThreadGroup,
+  shortAge,
   statusDetail,
   statusKind,
   statusNote,
@@ -106,5 +107,24 @@ describe("statusNote / attentionTier", () => {
   ])("%s %j", (status, statusReason, note, tier) => {
     expect(statusNote({ statusReason })).toBe(note);
     expect(attentionTier({ status, statusReason })).toBe(tier);
+  });
+});
+
+describe("shortAge (an archived row's age)", () => {
+  const now = Date.UTC(2026, 9, 13, 12, 0, 0);
+  const MIN = 60_000;
+  it.each<[string, number, string]>([
+    ["just archived", 0, "0m"],
+    ["59 s", 59_000, "0m"],
+    ["1 min", MIN, "1m"],
+    ["59 min 59 s", 60 * MIN - 1000, "59m"],
+    ["1 h", 60 * MIN, "1h"],
+    ["23 h 59 min", 24 * 60 * MIN - MIN, "23h"],
+    ["1 d", 24 * 60 * MIN, "1d"],
+    ["9 d 23 h", 10 * 24 * 60 * MIN - 60 * MIN, "9d"],
+    ["400 d", 400 * 24 * 60 * MIN, "400d"],
+    ["in the future (clock skew)", -5 * MIN, "0m"],
+  ])("%s", (_name, age, want) => {
+    expect(shortAge(now - age, now)).toBe(want);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRows, rowCache, nextAfter, placeSession, sessionKey, sessionOrder, type ListSession, type Row } from "./tree";
+import { buildRows, buildSections, rowCache, nextAfter, placeSession, sessionKey, sessionOrder, type ListSession, type Row } from "./tree";
 
 const W = [
   { repoId: "r1", path: "/src/app" },
@@ -21,9 +21,9 @@ describe("placeSession", () => {
   });
 });
 
-const thread = (id: string, over: Partial<ListSession> = {}): ListSession => ({ id, pinned: false, group: "idle", ...over });
+const thread = (id: string, over: Partial<ListSession> = {}): ListSession => ({ id, pinned: false, group: "idle", archivedAtMs: null, ...over });
 
-/** The row key per row, the Working header as "# Working <count>" (and its state). */
+/** The row key per row, a header as "# <label> <count>" (and its state). */
 function shape(rows: readonly Row[]): string[] {
   return rows.map((r) => (r.kind === "session" ? r.key : `# ${r.label} ${String(r.count)}${r.collapsed ? " (collapsed)" : ""}`));
 }
@@ -79,6 +79,47 @@ describe("buildRows (the flat thread list)", () => {
   });
 });
 
+describe("buildSections (main list, Working and Archived footers)", () => {
+  const sessions = [
+    thread("s1", { group: "prompt" }),
+    thread("s2", { group: "working" }),
+    thread("s3", { archivedAtMs: 3000 }),
+    thread("s4", { pinned: true, group: "working", archivedAtMs: 1000 }), // defensively: pinned and archived is archived
+    thread("s5"),
+    thread("s6", { group: "prompt", archivedAtMs: 2000 }), // waiting on the user, archived: under Archived only
+    thread("s7", { group: "working" }),
+    thread("s8", { archivedAtMs: 3000 }), // same archive time as s3: newer created first
+  ];
+
+  it("splits the threads into the main list and the two footers, archived threads only under Archived, most recently archived first", () => {
+    const { main, working, archived } = buildSections(sessions);
+    expect(shape(main)).toEqual(s("s1", "s5"));
+    expect(shape(working)).toEqual(["# Working 2", ...s("s7", "s2")]);
+    expect(shape(archived)).toEqual(["# Archived 4", ...s("s8", "s3", "s6", "s4")]);
+    expect(archived.map((r) => r.section)).toEqual(["archived", "archived", "archived", "archived", "archived"]);
+    expect(shape(buildRows(sessions))).toEqual([...shape(main), ...shape(working), ...shape(archived)]);
+  });
+
+  it("collapsed: each footer keeps its header and count, its rows are gone", () => {
+    const { working, archived } = buildSections(sessions, { workingCollapsed: true, archivedCollapsed: true });
+    expect(shape(working)).toEqual(["# Working 2 (collapsed)"]);
+    expect(shape(archived)).toEqual(["# Archived 4 (collapsed)"]);
+    expect(shape(buildSections(sessions, { archivedCollapsed: true }).working)).toEqual(["# Working 2", ...s("s7", "s2")]);
+  });
+
+  it("has a footer only when it has threads", () => {
+    expect(buildSections([thread("s1"), thread("s2", { group: "working" })]).archived).toEqual([]);
+    expect(buildSections([thread("s1", { archivedAtMs: 5 })])).toEqual({ main: [], working: [], archived: [expect.objectContaining({ key: "h:archived", count: 1 }), expect.objectContaining({ key: sessionKey("s1") })] });
+    expect(buildSections([])).toEqual({ main: [], working: [], archived: [] });
+  });
+
+  it("orders threads (cmd+1..9, cmd+shift+a, arrows) across main, Working and Archived; collapsed rows absent", () => {
+    expect(sessionOrder(sessions)).toEqual(["s1", "s5", "s7", "s2", "s8", "s3", "s6", "s4"]);
+    expect(sessionOrder(sessions, { archivedCollapsed: true })).toEqual(["s1", "s5", "s7", "s2"]);
+    expect(sessionOrder(sessions, { workingCollapsed: true })).toEqual(["s1", "s5", "s8", "s3", "s6", "s4"]);
+  });
+});
+
 describe("rowCache", () => {
   const byKey = (rows: readonly Row[], key: string) => rows.find((r) => r.key === key);
 
@@ -112,6 +153,17 @@ describe("rowCache", () => {
     expect(byKey(collapsed, "h:working")).toMatchObject({ count: 3, collapsed: true });
     expect(byKey(collapsed, "h:working")).not.toBe(byKey(same, "h:working"));
     expect(shape(collapsed)).toEqual([sessionKey("s4"), "# Working 3 (collapsed)"]);
+  });
+
+  it("archiving a thread moves only that row (a new object in the archived section)", () => {
+    const stable = rowCache();
+    const first = stable(buildRows([thread("s1"), thread("s2"), thread("s3", { archivedAtMs: 1 })]));
+    const second = stable(buildRows([thread("s1"), thread("s2", { archivedAtMs: 2 }), thread("s3", { archivedAtMs: 1 })]));
+    expect(shape(second)).toEqual([sessionKey("s1"), "# Archived 2", ...s("s2", "s3")]);
+    expect(byKey(second, sessionKey("s1"))).toBe(byKey(first, sessionKey("s1")));
+    expect(byKey(second, sessionKey("s3"))).toBe(byKey(first, sessionKey("s3")));
+    expect(byKey(second, sessionKey("s2"))).toMatchObject({ section: "archived" });
+    expect(byKey(second, "h:archived")).not.toBe(byKey(first, "h:archived"));
   });
 });
 

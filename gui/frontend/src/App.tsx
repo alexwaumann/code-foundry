@@ -28,6 +28,7 @@ import { useAttentionCount } from "@/stores/sessions";
 import { layoutWidth, startZoomSync, zoomFactor } from "@/lib/zoom";
 import { CONTENT_MIN, useUiStore, type FocusRegion } from "@/stores/ui";
 import { selectPageOpen, startViewSync, useViewsStore } from "@/stores/views";
+import { startArchiveCleanup } from "@/stores/archiveCleanup";
 import { startUpdateSync } from "@/stores/update";
 
 function regionOf(el: EventTarget | null): FocusRegion {
@@ -61,6 +62,7 @@ function startApp(): () => void {
     startCommandSync(),
     installKeybindings(),
     startViewSync(),
+    startArchiveCleanup(),
     startUpdateSync(),
   ];
   return () => {

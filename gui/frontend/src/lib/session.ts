@@ -173,3 +173,16 @@ export function formatAgo(ms: number | null, now: number = Date.now()): string {
   if (h < 24) return `${String(h)} h ago`;
   return `${String(Math.round(h / 24))} d ago`;
 }
+
+/**
+ * A compact age for the sidebar's archived rows: whole minutes under an hour ("0m" under a
+ * minute, "59m"), whole hours under a day ("23h"), else whole days ("3d"). Rounded down; a
+ * time in the future reads "0m".
+ */
+export function shortAge(ms: number, now: number = Date.now()): string {
+  const m = Math.floor(Math.max(0, now - ms) / 60_000);
+  if (m < 60) return `${String(m)}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${String(h)}h`;
+  return `${String(Math.floor(h / 24))}d`;
+}
