@@ -381,4 +381,12 @@ type Store interface {
 	// effort switch: the process restarts with --resume and the new --effort, at once
 	// when idle, else after the running turn (EffortPending meanwhile).
 	SetEffort(ctx context.Context, id, effort string) (Session, error)
+	// McpStatus returns a rendered thread's MCP servers as last checked (mcp.go).
+	// refresh asks Claude again first (a connected thread only). Without it, a connected
+	// thread not checked yet is asked once; one that is not running has none (nil).
+	McpStatus(ctx context.Context, id string, refresh bool) (*McpStatus, error)
+	// McpReconnect reconnects one of a connected thread's MCP servers (by name), then
+	// checks the servers again. Claude refusing the attempt (the server still fails) is
+	// the result's Error, not an error; an unknown server is ErrNotFound.
+	McpReconnect(ctx context.Context, id, server string) (McpReconnectResult, error)
 }

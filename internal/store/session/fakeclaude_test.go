@@ -23,6 +23,11 @@ import (
 // CF_FAKE_CLAUDE_LOG.<pid>, this process's own), and argv to CF_FAKE_CLAUDE_ARGV (and
 // CF_FAKE_CLAUDE_ARGV.<pid>).
 //
+// MCP: CF_FAKE_CLAUDE_MCP names a capture like claudestream/testdata/mcp.jsonl; mcp_status
+// answers with its first mcp_status reply, and mcp_reconnect of a server takes that
+// server's entry from the last reply when it changed there, else answers with the
+// server's error (or "Server not found"). Without it mcp_status answers no servers.
+//
 // Knobs for the effort restart's tests: CF_FAKE_CLAUDE_EXIT_DELAY (a duration) keeps
 // the process alive that long after stdin closes; CF_FAKE_CLAUDE_RESUME_EXIT (a code)
 // makes a process started with --resume print to stderr and exit with it at once.
@@ -98,6 +103,11 @@ func fakeStreamClaude(fixture string) int {
 		logf, _ = os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 		ownLog, _ = os.OpenFile(p+"."+pid, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	}
+	mcp, err := newFakeMcp(os.Getenv("CF_FAKE_CLAUDE_MCP"))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "fake claude:", err)
+		return 2
+	}
 	var outMu sync.Mutex
 	write := func(line string) {
 		outMu.Lock()
@@ -135,6 +145,13 @@ func fakeStreamClaude(fixture string) int {
 				resp["response"] = map[string]any{"pid": os.Getpid(), "current_permission_mode": "default"}
 			case "set_cwd":
 				resp["response"] = map[string]any{"status": "ok", "cwd": m.Request["path"], "changed": true}
+			case "mcp_status":
+				resp["response"] = map[string]any{"mcpServers": mcp.servers()}
+			case "mcp_reconnect":
+				name, _ := m.Request["serverName"].(string)
+				if msg := mcp.reconnect(name); msg != "" {
+					resp = map[string]any{"subtype": "error", "request_id": m.RequestID, "error": msg}
+				}
 			case "set_permission_mode":
 				if m.Request["mode"] == "bogus" {
 					resp = map[string]any{"subtype": "error", "request_id": m.RequestID, "error": "Cannot set permission mode"}
@@ -203,4 +220,67 @@ func fakeStreamClaude(fixture string) int {
 		time.Sleep(d)
 	}
 	return 0
+}
+
+// fakeMcp is the fake's MCP servers (CF_FAKE_CLAUDE_MCP).
+type fakeMcp struct {
+	mu     sync.Mutex
+	now    []map[string]any
+	latest map[string]map[string]any
+}
+
+func newFakeMcp(path string) (*fakeMcp, error) {
+	f := &fakeMcp{latest: map[string]map[string]any{}}
+	if path == "" {
+		return f, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var replies [][]map[string]any
+	for _, l := range strings.Split(string(data), "\n") {
+		var m struct {
+			Response struct {
+				Response struct {
+					McpServers []map[string]any `json:"mcpServers"`
+				} `json:"response"`
+			} `json:"response"`
+		}
+		if json.Unmarshal([]byte(l), &m) == nil && m.Response.Response.McpServers != nil {
+			replies = append(replies, m.Response.Response.McpServers)
+		}
+	}
+	if len(replies) == 0 {
+		return nil, fmt.Errorf("%s has no mcp_status reply", path)
+	}
+	f.now = replies[0]
+	for _, s := range replies[len(replies)-1] {
+		f.latest[s["name"].(string)] = s
+	}
+	return f, nil
+}
+
+func (f *fakeMcp) servers() []map[string]any {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.now)
+}
+
+// reconnect returns the error Claude would answer, "" for success.
+func (f *fakeMcp) reconnect(name string) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	i := slices.IndexFunc(f.now, func(s map[string]any) bool { return s["name"] == name })
+	if i < 0 {
+		return "Server not found: " + name
+	}
+	if to, ok := f.latest[name]; ok && to["status"] != f.now[i]["status"] {
+		f.now[i] = to
+		return ""
+	}
+	if msg, _ := f.now[i]["error"].(string); msg != "" {
+		return msg
+	}
+	return ""
 }
