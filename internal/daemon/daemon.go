@@ -30,6 +30,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 	"github.com/alexwaumann/code-foundry/internal/version"
 )
@@ -110,7 +111,10 @@ func Run(ctx context.Context, opts Options) error {
 
 	started := time.Now()
 	events := st.bus
-	repoAPI := api.NewRepo(st.repo, events).WithGitHub(st.gh, st.cloner).WithProjects(st.projects, st.gh)
+	repoAPI := api.NewRepo(st.repo, events).WithGitHub(st.gh, st.cloner).WithProjects(st.projects, st.gh).
+		WithCleanupHold(func(w repo.Worktree) string {
+			return cleanupHold(w.Path, liveThreads(st.session.Snapshot()), st.terminal.List(context.Background()), st.workspace.Snapshot())
+		})
 	terminalAPI := api.NewTerminal(st.terminal)
 	sessionAPI := api.NewSession(st.session, events)
 	threadAPI := api.NewThread(st.session, events)

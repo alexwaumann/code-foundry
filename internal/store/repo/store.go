@@ -43,6 +43,11 @@ type Options struct {
 	// WorktreeRoot is where CreateWorktree puts worktrees without an explicit path:
 	// <WorktreeRoot>/<owner>/<repo>/<branch>. Required, absolute.
 	WorktreeRoot string
+	// ManagedRoots lists more directories the app makes worktrees in for the repository
+	// named repoName (the repos.worktree_dir setting); WorktreeRoot always counts. Only a
+	// worktree inside one of them is Worktree.Managed, so only those can be cleaned up.
+	// Nil: WorktreeRoot only.
+	ManagedRoots func(repoName string) []string
 	// AllowedRoot is the directory every registered project must resolve inside
 	// (symlinks followed). Empty means the user's home directory; tests set a temp dir.
 	AllowedRoot string
@@ -116,6 +121,8 @@ type Git struct {
 	runner Runner
 	now    func() time.Time
 	wtRoot string
+	// managed is Options.ManagedRoots.
+	managed func(repoName string) []string
 	// root is Options.AllowedRoot with symlinks resolved.
 	root string
 
@@ -159,6 +166,7 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		db:      opts.DB,
 		bus:     opts.Bus,
 		wtRoot:  opts.WorktreeRoot,
+		managed: opts.ManagedRoots,
 		log:     cmp.Or(opts.Log, slog.Default()).With("store", "repo"),
 		runner:  opts.Runner,
 		now:     opts.Now,
@@ -294,8 +302,11 @@ func (g *Git) buildLocked() *Snapshot {
 			DefaultBranch: m.DefaultBranch, GitHubSlug: m.GitHubSlug, Remotes: m.Remotes, Git: m.Git, Error: m.Error,
 			Worktrees: make([]Worktree, 0, len(st.wts)),
 		}
+		roots := g.managedRoots(m.Name)
 		for _, slot := range st.wts {
-			r.Worktrees = append(r.Worktrees, *slot.cur.Load())
+			w := *slot.cur.Load()
+			w.Managed = InsideRoot(w.Path, roots...)
+			r.Worktrees = append(r.Worktrees, w)
 		}
 		slices.SortFunc(r.Worktrees, func(a, b Worktree) int {
 			if a.IsMain != b.IsMain {

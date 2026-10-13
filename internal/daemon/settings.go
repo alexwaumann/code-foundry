@@ -130,14 +130,32 @@ func (w worktreeDirRepo) CreateWorktree(ctx context.Context, req *connect.Reques
 // worktreePath is dir (~ and {repo} expanded) joined with the branch's directory name,
 // or "" when dir is unset or the branch is empty.
 func worktreePath(dir, repoName, branch string) string {
-	if dir == "" || branch == "" {
-		return ""
-	}
-	base := settings.ExpandedPath(strings.ReplaceAll(dir, "{repo}", repoName))
-	if base == "" {
+	base := worktreeBase(dir, repoName)
+	if base == "" || branch == "" {
 		return ""
 	}
 	return filepath.Join(base, strings.ReplaceAll(branch, "/", "-"))
+}
+
+// worktreeBase is dir with ~ and {repo} expanded: where repos.worktree_dir puts the
+// worktrees of repoName. "" when dir is unset.
+func worktreeBase(dir, repoName string) string {
+	if dir == "" {
+		return ""
+	}
+	return settings.ExpandedPath(strings.ReplaceAll(dir, "{repo}", repoName))
+}
+
+// settingsManagedRoots is repo.Options.ManagedRoots: besides the worktrees directory,
+// the repos.worktree_dir setting's directory for the repository (read live), so the
+// worktrees the app made there count as its own for cleanup.
+func settingsManagedRoots(st *settings.Store) func(string) []string {
+	return func(repoName string) []string {
+		if base := worktreeBase(st.Settings().Repos.WorktreeDir, repoName); base != "" {
+			return []string{base}
+		}
+		return nil
+	}
 }
 
 // settingsRender applies sessions.render to new threads that do not pick a mode.

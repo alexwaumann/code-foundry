@@ -24,6 +24,20 @@ export function removeWorktree(repoId: string, path: string): Promise<boolean> {
   return runCommand("repo.worktree.remove", {}, worktreeContext(repoId, path));
 }
 
+/**
+ * repo.worktree.cleanup for one worktree (confirmed; the daemon fetches, checks again and
+ * removes it without touching its branch). The fetch reports through the gitops toasts,
+ * the result ("Removed 1 worktree: …" or why it was kept) as a toast.
+ */
+export function cleanupWorktree(repoId: string, path: string): Promise<boolean> {
+  return runCommand("repo.worktree.cleanup", { repo: repoId, path }, worktreeContext(repoId, path));
+}
+
+/** repo.worktree.cleanup for every merged, clean, unheld worktree of the project (confirmed; the prompt lists the branches). */
+export function cleanupMergedWorktrees(repoId: string): Promise<boolean> {
+  return runCommand("repo.worktree.cleanup", { repo: repoId }, repoContext(repoId));
+}
+
 /** repo.unregister (confirmed). */
 export function unregisterProject(repoId: string): Promise<boolean> {
   return runCommand("repo.unregister", {}, repoContext(repoId));

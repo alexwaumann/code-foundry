@@ -33,6 +33,9 @@ type Repo struct {
 	// (repo_create.go); nil answers Unimplemented.
 	projects project.Service
 	owners   gh.Owners
+	// cleanupHold backs CleanupWorktrees' non-git check (repo_cleanup.go); nil holds
+	// nothing.
+	cleanupHold func(repo.Worktree) string
 }
 
 var _ codefoundryv1connect.RepoServiceHandler = (*Repo)(nil)
@@ -256,6 +259,6 @@ func worktreeToProto(w repo.Worktree) *v1.Worktree {
 	}
 	return &v1.Worktree{
 		RepoId: w.RepoID, Path: w.Path, Branch: w.Branch, Head: w.Head,
-		IsMain: w.IsMain, Detached: w.Detached, Status: st,
+		IsMain: w.IsMain, Detached: w.Detached, Status: st, MergedClean: w.MergedClean(),
 	}
 }

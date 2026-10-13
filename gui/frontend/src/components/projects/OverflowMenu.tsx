@@ -4,7 +4,16 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 
 /** One item of a row's overflow menu; "separator" draws a line. */
 export type OverflowItem =
-  | { label: string; icon: React.ComponentType<{ className?: string }>; onSelect: () => void; destructive?: boolean; testId: string }
+  | {
+      label: string;
+      icon: React.ComponentType<{ className?: string }>;
+      onSelect: () => void;
+      destructive?: boolean;
+      testId: string;
+      /** Shown at the item's right, e.g. how many things it acts on. */
+      badge?: number;
+      disabled?: boolean;
+    }
   | "separator";
 
 /**
@@ -74,12 +83,18 @@ export function OverflowMenu({ label, items, testId }: { label: string; items: r
               key={it.testId}
               variant={it.destructive ? "destructive" : "default"}
               data-testid={it.testId}
+              disabled={it.disabled}
               onSelect={() => {
                 picked.current = it.onSelect;
               }}
             >
               <it.icon className={it.destructive ? "text-destructive" : undefined} />
               {it.label}
+              {it.badge !== undefined && (
+                <span className="ml-auto pl-4 text-xs text-muted-foreground tabular-nums" data-testid={`${it.testId}-count`}>
+                  {it.badge}
+                </span>
+              )}
             </DropdownMenuItem>
           ),
         )}

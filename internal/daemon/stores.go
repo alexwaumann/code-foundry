@@ -90,6 +90,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 	}
 	if s.repo, err = repo.Start(ctx, repo.Options{
 		DB: s.db, Bus: s.bus, Log: log, WorktreeRoot: p.Worktrees(), AllowedRoot: s.home, FetchInterval: cfg.FetchInterval(),
+		ManagedRoots: settingsManagedRoots(s.settings),
 	}); err != nil {
 		return nil, err
 	}

@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, CircleDot, Folder, GitBranch, MessageSquare } from "lucide-react";
 import { ChecksBadge, PrStateIcon } from "@/components/prs/PrBits";
+import { CleanableTag } from "./Cleanup";
 import { NoGitBadge } from "./NoGitBadge";
 import { tildify } from "@/lib/path";
 import { liveThreadCount } from "@/lib/projects";
@@ -54,7 +55,8 @@ function LiveThreads({ path }: { path: string }) {
 
 /**
  * One worktree's git state on a line: branch, then at the right its live threads,
- * changed files, ahead/behind its upstream, and its pull request. Shared by the Projects
+ * changed files, ahead/behind its upstream, "in main" when the cleanup would remove it,
+ * and its pull request. Shared by the Projects
  * page's project worktrees and the workspace member list. The path is the row's tooltip;
  * `showPath` also prints it after the branch. A folder without git shows its path always
  * (it has no branch to name it).
@@ -120,6 +122,7 @@ export function WorktreeState({ repoId, path, showPath = false }: { repoId: stri
             {behind}
           </span>
         )}
+        <CleanableTag repoId={repoId} path={path} />
         {realBranch && <BranchPullRequest repoId={repoId} branch={realBranch} />}
       </span>
     </span>
@@ -134,6 +137,7 @@ export function RowAction({
   destructive,
   disabled,
   testId,
+  className,
 }: {
   label: string;
   onClick: () => void;
@@ -141,6 +145,7 @@ export function RowAction({
   destructive?: boolean;
   disabled?: boolean;
   testId?: string;
+  className?: string;
 }) {
   return (
     <button
@@ -153,6 +158,7 @@ export function RowAction({
       className={cn(
         "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:hover:bg-transparent [&_svg]:size-3.5",
         destructive && "hover:text-destructive",
+        className,
       )}
       onDoubleClick={(e) => {
         // Quick repeated clicks must not open the row's panel tab.

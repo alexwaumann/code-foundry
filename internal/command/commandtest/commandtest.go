@@ -126,6 +126,9 @@ type Repo struct {
 	Repos             []*v1.Repo
 	CreateWorktreeErr error
 	OnCreateWorktree  func(*v1.CreateWorktreeRequest)
+	// OnCleanup answers CleanupWorktrees (dry runs included); nil answers an empty
+	// response for the requested repo.
+	OnCleanup func(*v1.CleanupWorktreesRequest) (*v1.CleanupWorktreesResponse, error)
 }
 
 var _ command.RepoBackend = (*Repo)(nil)
@@ -163,6 +166,22 @@ func (f *Repo) CreateWorktree(_ context.Context, r *connect.Request[v1.CreateWor
 func (f *Repo) RemoveWorktree(_ context.Context, r *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error) {
 	f.record(r.Msg)
 	return connect.NewResponse(&v1.RemoveWorktreeResponse{}), f.Err
+}
+
+// CleanupWorktrees records the request and answers with OnCleanup.
+func (f *Repo) CleanupWorktrees(_ context.Context, r *connect.Request[v1.CleanupWorktreesRequest]) (*connect.Response[v1.CleanupWorktreesResponse], error) {
+	f.record(r.Msg)
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	if f.OnCleanup == nil {
+		return connect.NewResponse(&v1.CleanupWorktreesResponse{RepoId: r.Msg.GetRepo()}), nil
+	}
+	res, err := f.OnCleanup(r.Msg)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(res), nil
 }
 
 // List records the request and returns copies of Repos.

@@ -35,6 +35,13 @@ export interface WorktreeView {
   detached: boolean;
   isMain: boolean;
   status: GitStatusView;
+  /**
+   * The git half of "safe to clean up" (the daemon's repo.MergedCleanReason): not main,
+   * on a branch, nothing uncommitted, every commit in status.baseRef. Live threads,
+   * terminals and workspaces are checked against their own slices (lib/projects.ts
+   * isCleanable). Absent counts as false.
+   */
+  mergedClean?: boolean;
 }
 
 export interface RepoView {
@@ -105,7 +112,7 @@ export function toGitStatusView(s: GitStatus | undefined): GitStatusView {
 }
 
 export function toWorktreeView(w: Worktree): WorktreeView {
-  return { repoId: w.repoId, path: w.path, branch: w.branch, head: w.head, detached: w.detached, isMain: w.isMain, status: toGitStatusView(w.status) };
+  return { repoId: w.repoId, path: w.path, branch: w.branch, head: w.head, detached: w.detached, isMain: w.isMain, status: toGitStatusView(w.status), mergedClean: w.mergedClean };
 }
 
 export function toRepoView(r: Repo): RepoView {

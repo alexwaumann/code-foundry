@@ -47,6 +47,9 @@ const (
 	// RepoServiceRemoveWorktreeProcedure is the fully-qualified name of the RepoService's
 	// RemoveWorktree RPC.
 	RepoServiceRemoveWorktreeProcedure = "/codefoundry.v1.RepoService/RemoveWorktree"
+	// RepoServiceCleanupWorktreesProcedure is the fully-qualified name of the RepoService's
+	// CleanupWorktrees RPC.
+	RepoServiceCleanupWorktreesProcedure = "/codefoundry.v1.RepoService/CleanupWorktrees"
 	// RepoServiceRefreshProcedure is the fully-qualified name of the RepoService's Refresh RPC.
 	RepoServiceRefreshProcedure = "/codefoundry.v1.RepoService/Refresh"
 	// RepoServiceWatchProcedure is the fully-qualified name of the RepoService's Watch RPC.
@@ -93,6 +96,13 @@ type RepoServiceClient interface {
 	CreateWorktree(context.Context, *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error)
 	// RemoveWorktree removes a worktree (and optionally its branch).
 	RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error)
+	// CleanupWorktrees removes worktrees whose work is already in the default branch:
+	// merged_clean (which includes "created by Code Foundry"), and no live thread, running
+	// terminal or workspace holds them. It
+	// refreshes the repository's status first (a caller wanting fresh remote refs fetches
+	// before), re-evaluates, and removes with `git worktree remove` (never --force).
+	// Branches are never deleted. dry_run only evaluates the current snapshot.
+	CleanupWorktrees(context.Context, *connect.Request[v1.CleanupWorktreesRequest]) (*connect.Response[v1.CleanupWorktreesResponse], error)
 	// Refresh forces a status reconcile for a repo (or all repos when id is empty).
 	Refresh(context.Context, *connect.Request[v1.RefreshRepoRequest]) (*connect.Response[v1.RefreshRepoResponse], error)
 	// Watch streams repository and worktree changes.
@@ -195,6 +205,12 @@ func NewRepoServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(repoServiceMethods.ByName("RemoveWorktree")),
 			connect.WithClientOptions(opts...),
 		),
+		cleanupWorktrees: connect.NewClient[v1.CleanupWorktreesRequest, v1.CleanupWorktreesResponse](
+			httpClient,
+			baseURL+RepoServiceCleanupWorktreesProcedure,
+			connect.WithSchema(repoServiceMethods.ByName("CleanupWorktrees")),
+			connect.WithClientOptions(opts...),
+		),
 		refresh: connect.NewClient[v1.RefreshRepoRequest, v1.RefreshRepoResponse](
 			httpClient,
 			baseURL+RepoServiceRefreshProcedure,
@@ -278,6 +294,7 @@ type repoServiceClient struct {
 	get               *connect.Client[v1.GetRepoRequest, v1.GetRepoResponse]
 	createWorktree    *connect.Client[v1.CreateWorktreeRequest, v1.CreateWorktreeResponse]
 	removeWorktree    *connect.Client[v1.RemoveWorktreeRequest, v1.RemoveWorktreeResponse]
+	cleanupWorktrees  *connect.Client[v1.CleanupWorktreesRequest, v1.CleanupWorktreesResponse]
 	refresh           *connect.Client[v1.RefreshRepoRequest, v1.RefreshRepoResponse]
 	watch             *connect.Client[v1.WatchReposRequest, v1.RepoEvent]
 	getWorktreeDetail *connect.Client[v1.GetWorktreeDetailRequest, v1.GetWorktreeDetailResponse]
@@ -320,6 +337,11 @@ func (c *repoServiceClient) CreateWorktree(ctx context.Context, req *connect.Req
 // RemoveWorktree calls codefoundry.v1.RepoService.RemoveWorktree.
 func (c *repoServiceClient) RemoveWorktree(ctx context.Context, req *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error) {
 	return c.removeWorktree.CallUnary(ctx, req)
+}
+
+// CleanupWorktrees calls codefoundry.v1.RepoService.CleanupWorktrees.
+func (c *repoServiceClient) CleanupWorktrees(ctx context.Context, req *connect.Request[v1.CleanupWorktreesRequest]) (*connect.Response[v1.CleanupWorktreesResponse], error) {
+	return c.cleanupWorktrees.CallUnary(ctx, req)
 }
 
 // Refresh calls codefoundry.v1.RepoService.Refresh.
@@ -398,6 +420,13 @@ type RepoServiceHandler interface {
 	CreateWorktree(context.Context, *connect.Request[v1.CreateWorktreeRequest]) (*connect.Response[v1.CreateWorktreeResponse], error)
 	// RemoveWorktree removes a worktree (and optionally its branch).
 	RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error)
+	// CleanupWorktrees removes worktrees whose work is already in the default branch:
+	// merged_clean (which includes "created by Code Foundry"), and no live thread, running
+	// terminal or workspace holds them. It
+	// refreshes the repository's status first (a caller wanting fresh remote refs fetches
+	// before), re-evaluates, and removes with `git worktree remove` (never --force).
+	// Branches are never deleted. dry_run only evaluates the current snapshot.
+	CleanupWorktrees(context.Context, *connect.Request[v1.CleanupWorktreesRequest]) (*connect.Response[v1.CleanupWorktreesResponse], error)
 	// Refresh forces a status reconcile for a repo (or all repos when id is empty).
 	Refresh(context.Context, *connect.Request[v1.RefreshRepoRequest]) (*connect.Response[v1.RefreshRepoResponse], error)
 	// Watch streams repository and worktree changes.
@@ -496,6 +525,12 @@ func NewRepoServiceHandler(svc RepoServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(repoServiceMethods.ByName("RemoveWorktree")),
 		connect.WithHandlerOptions(opts...),
 	)
+	repoServiceCleanupWorktreesHandler := connect.NewUnaryHandler(
+		RepoServiceCleanupWorktreesProcedure,
+		svc.CleanupWorktrees,
+		connect.WithSchema(repoServiceMethods.ByName("CleanupWorktrees")),
+		connect.WithHandlerOptions(opts...),
+	)
 	repoServiceRefreshHandler := connect.NewUnaryHandler(
 		RepoServiceRefreshProcedure,
 		svc.Refresh,
@@ -582,6 +617,8 @@ func NewRepoServiceHandler(svc RepoServiceHandler, opts ...connect.HandlerOption
 			repoServiceCreateWorktreeHandler.ServeHTTP(w, r)
 		case RepoServiceRemoveWorktreeProcedure:
 			repoServiceRemoveWorktreeHandler.ServeHTTP(w, r)
+		case RepoServiceCleanupWorktreesProcedure:
+			repoServiceCleanupWorktreesHandler.ServeHTTP(w, r)
 		case RepoServiceRefreshProcedure:
 			repoServiceRefreshHandler.ServeHTTP(w, r)
 		case RepoServiceWatchProcedure:
@@ -637,6 +674,10 @@ func (UnimplementedRepoServiceHandler) CreateWorktree(context.Context, *connect.
 
 func (UnimplementedRepoServiceHandler) RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.RemoveWorktree is not implemented"))
+}
+
+func (UnimplementedRepoServiceHandler) CleanupWorktrees(context.Context, *connect.Request[v1.CleanupWorktreesRequest]) (*connect.Response[v1.CleanupWorktreesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.RepoService.CleanupWorktrees is not implemented"))
 }
 
 func (UnimplementedRepoServiceHandler) Refresh(context.Context, *connect.Request[v1.RefreshRepoRequest]) (*connect.Response[v1.RefreshRepoResponse], error) {
