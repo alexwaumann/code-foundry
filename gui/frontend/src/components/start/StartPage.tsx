@@ -5,8 +5,10 @@ import { Backdrop } from "@/components/backdrop/Backdrop";
 import { CommandButton } from "@/components/command/CommandButton";
 import { DragBand } from "@/components/window/DragBand";
 import { SessionLink } from "@/components/session/SessionLink";
+import { useNoProjectThread } from "@/components/session/useNoProject";
 import { startCommandNamed } from "@/keys/bindings";
 import { greeting } from "@/lib/greeting";
+import { NO_PROJECT } from "@/lib/threadRow";
 import { placeSession } from "@/lib/tree";
 import { cn } from "@/lib/utils";
 import { decodeRepoKeys, useRepoStructureKeys } from "@/stores/context";
@@ -43,15 +45,17 @@ function Onboarding() {
   );
 }
 
-/** The registered project a session's worktree belongs to, by name; null when it cannot be placed. */
+/** The registered project a session's worktree belongs to, by name; "No project" for a thread without one; null when it cannot be placed. */
 function useSessionProject(id: string): string | null {
+  const noProject = useNoProjectThread(id);
   const worktreePath = useSessionsStore((s) => s.byId[id]?.worktreePath ?? "");
   const repoKeys = useRepoStructureKeys();
   const repoId = useMemo(() => {
     const worktrees = decodeRepoKeys(repoKeys).flatMap((r) => r.worktreePaths.map((path) => ({ repoId: r.id, path })));
     return placeSession({ worktreePath }, worktrees)?.repoId ?? null;
   }, [repoKeys, worktreePath]);
-  return useReposStore((s) => (repoId ? (s.byId[repoId]?.name ?? null) : null));
+  const name = useReposStore((s) => (repoId ? (s.byId[repoId]?.name ?? null) : null));
+  return noProject ? NO_PROJECT : name;
 }
 
 function ThreadRow({ id }: { id: string }) {

@@ -1,4 +1,4 @@
-import { Folder, FolderGit2, Loader2 } from "lucide-react";
+import { Folder, FolderGit2, House, Loader2 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CommandButton } from "@/components/command/CommandButton";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
@@ -31,7 +31,8 @@ function ThreadName({ id }: { id: string }) {
 
 /**
  * Where the thread runs: project @ branch (mono), and a "worktree" chip off the main
- * checkout; a project without git shows a plain folder and the No git badge instead. The
+ * checkout; a project without git shows a plain folder and the No git badge instead; a
+ * thread without a project the House icon and "No project", nothing else. The
  * same threadRowModel the sidebar row reads, so the two never disagree. A click opens the
  * Worktree surface in the side panel (view.panel.worktree); where that is not available it
  * is plain text.
@@ -40,16 +41,16 @@ function ThreadLocation({ id }: { id: string }) {
   const where = useSessionsStore(
     useShallow((st) => {
       const x = st.byId[id];
-      return { repoId: x?.repoId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: "", pendingWorktreePath: "" };
+      return { repoId: x?.repoId ?? "", worktreePath: x?.worktreePath ?? "", workspaceId: x?.workspaceId ?? "", pendingWorktreePath: "" };
     }),
   );
   const m = useReposStore(
     useShallow((st) => {
       const r = threadRowModel(where, st, NO_WORKSPACES);
-      return { project: r.project, branch: r.branch, noGit: r.noGit, worktree: r.worktree };
+      return { project: r.project, branch: r.branch, noGit: r.noGit, noProject: r.noProject, worktree: r.worktree };
     }),
   );
-  const Icon = m.noGit ? Folder : FolderGit2;
+  const Icon = m.noProject ? House : m.noGit ? Folder : FolderGit2;
   return (
     <CommandButton
       command="view.panel.worktree"
@@ -59,10 +60,10 @@ function ThreadLocation({ id }: { id: string }) {
       data-testid="thread-location"
     >
       <Icon className="size-3.5 shrink-0" aria-hidden />
-      <span className="truncate" data-testid="thread-project">
+      <span className="truncate" data-testid="thread-project" data-no-project={m.noProject || undefined}>
         {m.project}
       </span>
-      {m.noGit ? (
+      {m.noProject ? null : m.noGit ? (
         <NoGitBadge />
       ) : (
         <>

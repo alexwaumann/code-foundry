@@ -91,6 +91,17 @@ describe("SessionTitle", () => {
     expect(title().textContent).toBe("Fix the stale PR badge");
   });
 
+  it("no project: the House icon and No project, no branch or chip, plain text without view.panel.worktree", () => {
+    useCommandsStore.setState({ commands: [cmd("session.rename")] });
+    useSessionsStore.setState({ byId: { "s-1": thread({ repoId: "", worktreePath: "/Users/dev" }) } });
+    render(<SessionTitle id="s-1" />);
+    expect(location().tagName).toBe("SPAN");
+    expect(location().textContent).toBe("No project");
+    expect(location().querySelector("svg.lucide-house")).not.toBeNull();
+    expect(screen.queryByTestId("thread-branch")).toBeNull();
+    expect(screen.queryByTestId("thread-worktree-chip")).toBeNull();
+  });
+
   it("an unnamed thread shows its id", () => {
     useSessionsStore.setState({ byId: { "s-1": thread({ name: "" }) } });
     render(<SessionTitle id="s-1" />);

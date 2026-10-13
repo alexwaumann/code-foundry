@@ -9,6 +9,7 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
 } from "@/components/ui/context-menu";
+import { useNoProjectThread } from "@/components/session/useNoProject";
 import { beginRename } from "@/keys/bindings";
 import { worktreeBranch } from "@/lib/threadRow";
 import { newThreadTerminal } from "@/stores/bottomActions";
@@ -66,8 +67,12 @@ function RunInMenu({ sessionId, workspaceId }: { sessionId: string; workspaceId:
   );
 }
 
-/** The context menu of a thread row. Every item is a registry command (or the inline rename that commits one). */
+/**
+ * The context menu of a thread row. Every item is a registry command (or the inline rename
+ * that commits one). A thread without a project has no worktree to show.
+ */
 export function RowMenu({ id }: { id: string }) {
+  const noProject = useNoProjectThread(id);
   const pinned = useSessionsStore((s) => s.byId[id]?.pinned ?? false);
   const archived = useSessionsStore((s) => (s.byId[id]?.archivedAtMs ?? null) !== null);
   const state = useSessionsStore((s) => s.byId[id]?.state ?? "unknown");
@@ -117,14 +122,16 @@ export function RowMenu({ id }: { id: string }) {
         <SquareTerminal />
         New terminal here
       </ContextMenuItem>
-      <ContextMenuItem
-        onSelect={() => {
-          showWorktreeInThread(id);
-        }}
-      >
-        <FolderGit2 />
-        Show worktree
-      </ContextMenuItem>
+      {!noProject && (
+        <ContextMenuItem
+          onSelect={() => {
+            showWorktreeInThread(id);
+          }}
+        >
+          <FolderGit2 />
+          Show worktree
+        </ContextMenuItem>
+      )}
       <ContextMenuSeparator />
       <ContextMenuItem
         onSelect={() => {

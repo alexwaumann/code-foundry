@@ -38,6 +38,8 @@ describe("SidebarRow line 2", () => {
     ["starting", { state: "starting" as const }, "Starting · code-foundry @ main"],
     ["no git: the project and the No git badge, no @", { repoId: "notes", worktreePath: "/src/notes" }, "writing No git"],
     ["a question: no place", { status: "attention" as const, statusReason: "question: Which one?" }, "Asked a question"],
+    ["no project: No project alone, no branch", { repoId: "", worktreePath: "/Users/dev" }, "No project"],
+    ["no project, working", { repoId: "", worktreePath: "/Users/dev", status: "busy" as const }, "Working · No project"],
   ])("%s", (_name, o, text) => {
     expect(renderRow(o).textContent).toBe(text);
   });
