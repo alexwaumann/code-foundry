@@ -35,6 +35,12 @@ const TRIGGERS: readonly TriggerChar[] = ["/", "@"];
  */
 let handledPromptSeq = 0;
 
+/** The keyboard is in a region a thread's disconnect or reconnect must not take it from. */
+function keyboardElsewhere(): boolean {
+  const ui = useUiStore.getState();
+  return ui.palette.open || ui.focus === "bottom" || ui.focus === "panel" || ui.focus === "palette";
+}
+
 function hasFocusWithin(el: HTMLElement | null): boolean {
   return !!el && el.contains(document.activeElement);
 }
@@ -148,9 +154,10 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
   // Focus requests land in the prompt (a disconnected thread's: its Reconnect button): a
   // thread selected to be typed in (ui promptFocusSeq), the content pane asked for (the side
   // panel hid, ui contentFocusSeq). So does the thread disconnecting or reconnecting while
-  // shown, unless the keyboard is in the bottom panel. A composer that mounts with no
-  // request (Show worktree, a revealed shell) leaves the keyboard where that put it. Under
-  // an expanded side panel the panel takes the requested focus.
+  // shown, unless the keyboard is elsewhere (keyboardElsewhere: a key typed in the bottom
+  // panel, the side panel or the palette must not land on the Reconnect button). A composer
+  // that mounts with no request (Show worktree, a revealed shell) leaves the keyboard where
+  // that put it. Under an expanded side panel the panel takes the requested focus.
   const disconnected = state === "disconnected";
   const focusSeq = useUiStore((s) => s.promptFocusSeq);
   const contentFocusSeq = useUiStore((s) => s.contentFocusSeq);
@@ -175,7 +182,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
     const asked = handledPromptSeq !== focusSeq || seenContent.current !== contentFocusSeq;
     const flipped = wasDisconnected.current !== disconnected;
     wasDisconnected.current = disconnected;
-    if (!asked && (!flipped || useUiStore.getState().focus === "bottom")) return;
+    if (!asked && (!flipped || keyboardElsewhere())) return;
     const key = `${String(focusSeq)}:${String(contentFocusSeq)}:${String(disconnected)}`;
     if (request.current?.key !== key) request.current = { key, before: document.activeElement };
     const { before } = request.current;
