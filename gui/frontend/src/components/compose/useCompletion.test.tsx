@@ -42,10 +42,11 @@ const skills = (n: number, query: string): CompletionSource => ({
 
 function setup(trigger: EditorTrigger, source: CompletionSource) {
   const insertTag = vi.fn();
+  const insertText = vi.fn();
   const out: { current: Completion | null } = { current: null };
   let trig = trigger;
   function Harness({ src, at }: { src: CompletionSource; at: EditorTrigger }) {
-    const editorRef = useRef({ insertTag } as unknown as PromptEditorHandle) as RefObject<PromptEditorHandle | null>;
+    const editorRef = useRef({ insertTag, insertText } as unknown as PromptEditorHandle) as RefObject<PromptEditorHandle | null>;
     out.current = useCompletion(at, () => undefined, src, editorRef);
     return null;
   }
@@ -57,6 +58,7 @@ function setup(trigger: EditorTrigger, source: CompletionSource) {
   return {
     c,
     insertTag,
+    insertText,
     update: (src: CompletionSource, next: EditorTrigger = trig) => {
       trig = next;
       view.rerender(<Harness src={src} at={trig} />);
@@ -142,5 +144,23 @@ describe("useCompletion with skills (unchanged by the file source)", () => {
     expect(t.c().show).toBe(show);
     if (inserted === null) expect(t.insertTag).not.toHaveBeenCalled();
     else expect(t.insertTag).toHaveBeenCalledWith({ from: 0, to: 3 }, { tagKind: "skill", repoId: "r1", name: `s${String(inserted)}` });
+  });
+});
+
+describe("useCompletion with a running thread's slash commands", () => {
+  it("a built-in row inserts its plain text, a skill row its tag", () => {
+    const groups: CompletionGroup[] = [
+      { key: "~", heading: { kind: "user" }, items: [{ key: "commit", label: "/commit", detail: "", tag: { tagKind: "skill", repoId: "", name: "commit" } }] },
+      { key: "claude", heading: { kind: "label", text: "Claude Code" }, items: [{ key: "compact", label: "/compact", hint: "<instructions>", detail: "", tag: "/compact" }] },
+    ];
+    const src: CompletionSource = { ...skills(0, "co"), label: "Slash commands", groups, emptyText: "No commands match" };
+    const t = setup({ char: "/", query: "co", from: 4, to: 7 }, src);
+    expect(t.key("down")).toBe(true);
+    expect(t.key("enter")).toBe(true);
+    expect(t.insertText).toHaveBeenCalledWith({ from: 4, to: 7 }, "/compact");
+    expect(t.insertTag).not.toHaveBeenCalled();
+    expect(t.key("up")).toBe(true);
+    expect(t.key("tab")).toBe(true);
+    expect(t.insertTag).toHaveBeenCalledWith({ from: 4, to: 7 }, { tagKind: "skill", repoId: "", name: "commit" });
   });
 });

@@ -40,7 +40,7 @@ function ProjectHeading({ repoId }: { repoId: string }) {
 function Heading({ heading }: { heading: NonNullable<CompletionGroup["heading"]> }) {
   return (
     <div role="presentation" className="flex items-center gap-1.5 px-3 pt-2 pb-0.5 text-[11px] text-muted-foreground" data-testid="completion-group">
-      {heading.kind === "project" ? <ProjectHeading repoId={heading.repoId} /> : <span>User</span>}
+      {heading.kind === "project" ? <ProjectHeading repoId={heading.repoId} /> : <span>{heading.kind === "user" ? "User" : heading.text}</span>}
     </div>
   );
 }
@@ -127,8 +127,9 @@ function useFitBelow(ref: RefObject<HTMLDivElement | null>, open: boolean, above
  * parent must be positioned and as wide as the composer card. Same surface as the card,
  * full width; its height is capped to the space left below it in the window (fewer rows
  * when short, the hints footer dropped when very short), about eight rows at most, the
- * rest scroll. Rows are text only (bold label, muted detail), grouped under project
- * headings (a dot in the project's hue) and "User"; the selected row has the accent
+ * rest scroll. Rows are text only (bold label, a command's argument hint dimmer, muted
+ * detail), grouped under project headings (a dot in the project's hue), "User", and a
+ * running thread's "Skills" and "Claude Code"; the selected row has the accent
  * background and a ⏎. A mousedown keeps the focus in the prompt; a click inserts the
  * row. "No skills match" stands in for the rows when nothing matches, "Searching…" while
  * a slow answer is awaited. A file row's name is monospace and its path has the matched
@@ -198,6 +199,11 @@ export function CompletionCard({ completion, above = false }: { completion: Comp
                     <span className={cn("shrink-0 font-medium text-foreground", item.mono && "font-mono")} data-testid="completion-label">
                       {item.label}
                     </span>
+                    {item.hint && (
+                      <span className="max-w-[40%] shrink-0 truncate text-xs text-muted-foreground/70" data-testid="completion-hint">
+                        {item.hint}
+                      </span>
+                    )}
                     <Detail item={item} />
                     {on && (
                       <span aria-hidden className="shrink-0 text-xs text-muted-foreground">

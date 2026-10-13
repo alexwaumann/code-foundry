@@ -1,11 +1,12 @@
 /**
- * The composer's inline completion: `/` offers skills (stores/skills.ts), `@` files
- * (stores/files.ts). Pure pieces only: where a trigger is, when the card shows, how skills
+ * The composer's inline completion: `/` offers skills (stores/skills.ts), or a running
+ * thread's slash commands (stores/thread.ts useSlashCommands), `@` files (stores/files.ts). Pure pieces only: where a trigger is, when the card shows, how skills
  * are matched, ranked and grouped, and how file matches become rows. The editor reports
  * triggers (components/compose/PromptEditor.tsx); components/compose/useCompletion.ts
  * runs the card.
  */
 import type { FileMatchView, SkillSourceView, SkillView } from "@/api/filesystem";
+import type { SlashCommandView } from "@/api/slashCommands";
 import type { WorktreeChoice } from "./compose";
 import type { PromptTag } from "./prompt";
 
@@ -27,18 +28,20 @@ export interface CompletionItem {
   label: string;
   /** The label in monospace (file names). */
   mono?: boolean;
+  /** Muted, right after the label: a command's argument hint ("[interval] [prompt]"). */
+  hint?: string;
   /** Muted, after the label (may be empty). */
   detail: string;
   /** Ranges of `detail` to emphasize ([from, to)): a file path's matched characters. */
   emphasis?: readonly (readonly [number, number])[];
-  /** What Enter puts into the prompt. */
-  tag: PromptTag;
+  /** What Enter puts into the prompt: a tag, or plain text (a built-in command's "/compact"). */
+  tag: PromptTag | string;
 }
 
-/** A group of rows under an optional heading: a project (dot + name) or "User". */
+/** A group of rows under an optional heading: a project (dot + name), "User", or a plain label ("Claude Code"). */
 export interface CompletionGroup {
   key: string;
-  heading: { kind: "project"; repoId: string } | { kind: "user" } | null;
+  heading: { kind: "project"; repoId: string } | { kind: "user" } | { kind: "label"; text: string } | null;
   items: CompletionItem[];
 }
 
@@ -152,6 +155,83 @@ export function groupSkills(skills: readonly SkillView[], query: string, members
     if (hits.length === 0) return [];
     hits.sort((a, b) => b.score - a.score || a.i - b.i);
     return [{ repoId, skills: hits.map((h) => h.s) }];
+  });
+}
+
+// ---- a running thread's slash commands ---------------------------------------------------
+
+/**
+ * How well a slash command matches what was typed after "/": skillScore on its name and
+ * description, or through an alias (4 an alias, 3 a prefix of one), whichever is better:
+ * "/cost" finds usage.
+ */
+export function commandScore(c: Pick<SlashCommandView, "name" | "description" | "aliases">, query: string): number {
+  const own = skillScore(c, query);
+  const q = query.toLowerCase();
+  if (q === "" || own >= 4) return own;
+  let alias = 0;
+  for (const a of c.aliases) {
+    const l = a.toLowerCase();
+    if (l === q) return 4;
+    if (l.startsWith(q)) alias = 3;
+  }
+  return Math.max(own, alias);
+}
+
+/** A command's description on one line (descriptions can be whole paragraphs; the row truncates the rest). */
+export function firstLine(text: string): string {
+  return text.split(/\r?\n/, 1)[0]?.trim() ?? "";
+}
+
+/** The group keys after the projects': the user's skills, other skills, Claude Code's own. */
+const USER = "";
+const OTHER = "\u0001skills";
+const BUILTIN = "\u0001claude";
+
+/**
+ * The card's rows for a running thread's slash commands (Claude's list, which is what
+ * "/name" runs). A command the disk scan (ListSkills: `skills`) knows by name keeps its
+ * scope and today's tag: a project's under that project (member order; headings only
+ * when the draft has more than one project), the user's under "User". Claude Code's own
+ * (builtin, bundled skills included) go under "Claude Code", last, and insert "/name" as
+ * plain text (they take free-form arguments). Anything else (a plugin's skill, a skill
+ * the scan did not see) goes under "Skills" and inserts plain text too: there is no
+ * scope to name in a tag. Within a group: best score first, then Claude's order. A row
+ * shows the argument hint and the description's first line; aliases only match.
+ */
+export function commandItems(commands: readonly SlashCommandView[], skills: readonly SkillView[], query: string, members: readonly string[]): CompletionGroup[] {
+  const order = [...members, USER, OTHER, BUILTIN];
+  const buckets = new Map<string, { item: CompletionItem; score: number; i: number }[]>(order.map((k) => [k, []]));
+  const scopeOf = (name: string): string | null => {
+    for (const m of members) if (skills.some((s) => s.scope === "project" && s.repoId === m && s.name === name)) return m;
+    return skills.some((s) => s.scope === "user" && s.name === name) ? USER : null;
+  };
+  commands.forEach((c, i) => {
+    const score = commandScore(c, query);
+    if (score === 0) return;
+    const scope = c.builtin ? null : scopeOf(c.name);
+    const group = c.builtin ? BUILTIN : (scope ?? OTHER);
+    const item: CompletionItem = {
+      key: c.name,
+      label: `/${c.name}`,
+      hint: c.argumentHint,
+      detail: firstLine(c.description),
+      tag: scope === null ? `/${c.name}` : { tagKind: "skill", name: c.name, repoId: scope },
+    };
+    buckets.get(group)?.push({ item, score, i });
+  });
+  const multi = members.length > 1;
+  const heading = (key: string): CompletionGroup["heading"] => {
+    if (key === USER) return { kind: "user" };
+    if (key === OTHER) return { kind: "label", text: "Skills" };
+    if (key === BUILTIN) return { kind: "label", text: "Claude Code" };
+    return multi ? { kind: "project", repoId: key } : null;
+  };
+  return order.flatMap((key) => {
+    const hits = buckets.get(key) ?? [];
+    if (hits.length === 0) return [];
+    hits.sort((a, b) => b.score - a.score || a.i - b.i);
+    return [{ key: key === USER ? "~" : key, heading: heading(key), items: hits.map((h) => h.item) }];
   });
 }
 

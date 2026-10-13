@@ -39,6 +39,8 @@ export interface PromptEditorHandle {
    * whitespace. One undo step.
    */
   insertTag(range: { from: number; to: number }, tag: PromptTag): void;
+  /** insertTag for plain text (a built-in slash command: "/compact"): the text and one space, one undo step. */
+  insertText(range: { from: number; to: number }, text: string): void;
 }
 
 interface PromptEditorProps {
@@ -353,6 +355,18 @@ export function PromptEditor({
           .focus()
           .insertContentAt(range, nodes)
           .setTextSelection(range.from + 2)
+          .scrollIntoView()
+          .run();
+      },
+      insertText: (range, text) => {
+        const { doc } = editor.state;
+        const end = doc.resolve(range.to).end();
+        const spaced = doc.textBetween(range.to, Math.min(range.to + 1, end), undefined, LEAF_CHAR) === " ";
+        editor
+          .chain()
+          .focus()
+          .insertContentAt(range, { type: "text", text: spaced ? text : `${text} ` })
+          .setTextSelection(range.from + text.length + 1)
           .scrollIntoView()
           .run();
       },

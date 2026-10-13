@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { SkillView } from "@/api/filesystem";
+import type { SlashCommandView } from "@/api/slashCommands";
 import {
+  commandItems,
+  commandScore,
   dismissCard,
   emphasis,
   fileItems,
   fileSources,
   findTrigger,
+  firstLine,
   groupSkills,
   LEAF_CHAR,
   nextCard,
@@ -124,6 +128,117 @@ describe("groupSkills", () => {
 
   it("keeps the first of a duplicate", () => {
     expect(groupSkills(skills, "deploy", ["r1"])[0]?.skills[0]?.description).toBe("Build and push a release");
+  });
+});
+
+const cmd = (name: string, builtin: boolean, over: Partial<SlashCommandView> = {}): SlashCommandView => ({ name, description: "", argumentHint: "", aliases: [], builtin, ...over });
+
+describe("commandScore", () => {
+  const usage = cmd("usage", true, { description: "Show session cost and plan usage", aliases: ["cost", "stats"] });
+  it.each<[string, string, number]>([
+    ["empty query", "", 1],
+    ["the name", "usage", 5],
+    ["a prefix of the name", "us", 4],
+    ["an alias", "cost", 4],
+    ["an alias, any case", "COST", 4],
+    ["a prefix of an alias", "sta", 3],
+    ["a subsequence of the name", "uge", 3],
+    ["a description word", "plan", 2],
+    ["nothing", "zz", 0],
+  ])("%s", (_name, query, want) => {
+    expect(commandScore(usage, query)).toBe(want);
+  });
+
+  it("the name beats an alias of the same text", () => {
+    expect(commandScore(cmd("cost", true, { aliases: ["cost"] }), "cost")).toBe(5);
+  });
+});
+
+describe("firstLine", () => {
+  it.each([
+    ["one line", "one line"],
+    ["first\nsecond", "first"],
+    ["first\r\nsecond", "first"],
+    ["  padded  \nx", "padded"],
+    ["", ""],
+  ])("%j", (text, want) => {
+    expect(firstLine(text)).toBe(want);
+  });
+});
+
+describe("commandItems", () => {
+  // Claude's order: project skills, then built-ins and bundled skills, then plugin skills.
+  const commands = [
+    cmd("deploy", false, { description: "Ship it (project)" }),
+    cmd("lint", false, { description: "Lint the API (project)" }),
+    cmd("commit", false, { description: "Write a commit message" }),
+    cmd("compact", true, { description: "Free up context\nby summarizing", argumentHint: "<instructions>" }),
+    cmd("context", true),
+    cmd("code-review", true, { aliases: ["review"], argumentHint: "[low|high]" }),
+    cmd("usage", true, { aliases: ["cost", "stats"] }),
+    cmd("pdf", false, { aliases: ["anthropic-skills:pdf"], description: "Read and write PDF files" }),
+    cmd("anthropic-skills:deep-research", false),
+  ];
+  const skills = [skill("deploy", "r1"), skill("lint", "r2"), skill("lint", "r1"), skill("commit", "")];
+  const shape = (groups: ReturnType<typeof commandItems>) =>
+    groups.map((g) => [g.heading?.kind === "label" ? g.heading.text : g.heading?.kind === "project" ? g.heading.repoId : (g.heading?.kind ?? null), g.items.map((i) => i.label)]);
+
+  it.each<[string, string, string[], (string | null | string[])[][]]>([
+    [
+      "all: one project (no heading), User, Skills, Claude Code last",
+      "",
+      ["r1"],
+      [
+        [null, ["/deploy", "/lint"]],
+        ["user", ["/commit"]],
+        ["Skills", ["/pdf", "/anthropic-skills:deep-research"]],
+        ["Claude Code", ["/compact", "/context", "/code-review", "/usage"]],
+      ],
+    ],
+    [
+      "several projects: headings, the first member that has it",
+      "",
+      ["r2", "r1"],
+      [
+        ["r2", ["/lint"]],
+        ["r1", ["/deploy"]],
+        ["user", ["/commit"]],
+        ["Skills", ["/pdf", "/anthropic-skills:deep-research"]],
+        ["Claude Code", ["/compact", "/context", "/code-review", "/usage"]],
+      ],
+    ],
+    [
+      "/co: name prefixes before an alias prefix, Claude's order among equals",
+      "co",
+      ["r1"],
+      [
+        ["user", ["/commit"]],
+        ["Claude Code", ["/compact", "/context", "/code-review", "/usage"]],
+      ],
+    ],
+    ["an alias finds its command", "cost", ["r1"], [["Claude Code", ["/usage"]]]],
+    ["a plugin alias: a name prefix first, then the alias prefix", "anthropic-skills:", ["r1"], [["Skills", ["/anthropic-skills:deep-research", "/pdf"]]]],
+    ["no match", "zzz", ["r1"], []],
+  ])("%s", (_name, query, members, want) => {
+    expect(shape(commandItems(commands, skills, query, members))).toEqual(want);
+  });
+
+  it("a skill the scan has not loaded (yet) goes under Skills", () => {
+    expect(shape(commandItems(commands.slice(0, 1), [], "", ["r1"]))).toEqual([["Skills", ["/deploy"]]]);
+  });
+
+  it("rows: the hint, the description's first line; scanned skills insert tags, the rest plain text", () => {
+    const rows = commandItems(commands, skills, "", ["r1"]).flatMap((g) => g.items);
+    const by = (label: string) => rows.find((r) => r.label === label);
+    expect(by("/compact")).toEqual({ key: "compact", label: "/compact", hint: "<instructions>", detail: "Free up context", tag: "/compact" });
+    expect(by("/deploy")?.tag).toEqual({ tagKind: "skill", name: "deploy", repoId: "r1" });
+    expect(by("/commit")?.tag).toEqual({ tagKind: "skill", name: "commit", repoId: "" });
+    expect(by("/pdf")?.tag).toBe("/pdf");
+    expect(by("/code-review")?.hint).toBe("[low|high]");
+  });
+
+  it("a built-in is Claude Code's even when a skill of that name is on disk", () => {
+    expect(shape(commandItems([cmd("init", true)], [skill("init", "r1")], "", ["r1"]))).toEqual([["Claude Code", ["/init"]]]);
   });
 });
 
