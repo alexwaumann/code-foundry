@@ -35,6 +35,12 @@ service SessionService {
   // Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
   // the GUI's thread list. Persisted; any state.
   rpc Pin(PinSessionRequest) returns (PinSessionResponse) {}
+  // Archive archives or unarchives a thread. Archiving ends Claude gracefully like
+  // Close (the thread is DISCONNECTED), kills and removes the thread's shells, unpins
+  // it and records archived_at (kept when it is already archived). Unarchiving only
+  // clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
+  // Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
+  rpc Archive(ArchiveSessionRequest) returns (ArchiveSessionResponse) {}
   // Watch streams session changes. The first event is a snapshot.
   rpc Watch(WatchSessionsRequest) returns (stream SessionEvent) {}
   // StageAttachment stores an image the first prompt refers to and returns its path.
@@ -199,6 +205,10 @@ message Session {
   // connection error); unset once any other frame follows or the process ends. Not
   // persisted. See docs/notes/api-retry-note.md.
   ApiRetry retry = 36;
+  // When the user archived the thread (SessionService.Archive); unset when it is not
+  // archived. An archived thread is disconnected, unpinned and has no shells; the GUI
+  // lists it apart. Reconnect, Pin (pinned) and Send clear it. Persisted.
+  google.protobuf.Timestamp archived_at = 37;
 }
 
 // ApiRetry is a thread's pending API retry: Claude's system/api_retry frame.
@@ -441,6 +451,16 @@ message PinSessionRequest {
 }
 
 message PinSessionResponse {
+  Session session = 1;
+}
+
+message ArchiveSessionRequest {
+  string id = 1;
+  // Archive (true) or unarchive (false).
+  bool archived = 2;
+}
+
+message ArchiveSessionResponse {
   Session session = 1;
 }
 

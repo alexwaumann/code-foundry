@@ -233,10 +233,33 @@ func (f *Fake) Rename(_ context.Context, id, name string) (session.Session, erro
 	})
 }
 
-// Pin records "Pin <id> <pinned>" and sets Pinned.
+// Pin records "Pin <id> <pinned>" and sets Pinned. Pinning unarchives.
 func (f *Fake) Pin(_ context.Context, id string, pinned bool) (session.Session, error) {
 	return f.mutate(fmt.Sprintf("Pin %s %t", id, pinned), id, func(s *session.Session) error {
 		s.Pinned = pinned
+		if pinned {
+			s.ArchivedAt = time.Time{}
+		}
+		return nil
+	})
+}
+
+// Archive records "Archive <id> <archived>". Archiving disconnects a live session
+// (reason "closed"), unpins it and sets ArchivedAt to Now unless already set;
+// unarchiving clears ArchivedAt only. No shells are involved.
+func (f *Fake) Archive(_ context.Context, id string, archived bool) (session.Session, error) {
+	return f.mutate(fmt.Sprintf("Archive %s %t", id, archived), id, func(s *session.Session) error {
+		if !archived {
+			s.ArchivedAt = time.Time{}
+			return nil
+		}
+		if s.State != session.StateDisconnected {
+			s.State, s.DisconnectReason = session.StateDisconnected, session.ReasonClosed
+		}
+		s.Pinned = false
+		if s.ArchivedAt.IsZero() {
+			s.ArchivedAt = f.Now()
+		}
 		return nil
 	})
 }
@@ -252,13 +275,13 @@ func (f *Fake) Close(_ context.Context, id string) error {
 	return err
 }
 
-// Reconnect requires DISCONNECTED and moves the session to STARTING.
+// Reconnect requires DISCONNECTED and moves the session to STARTING, unarchived.
 func (f *Fake) Reconnect(_ context.Context, id string) (session.Session, error) {
 	return f.mutate("Reconnect "+id, id, func(s *session.Session) error {
 		if s.State != session.StateDisconnected {
 			return fmt.Errorf("%w: session %s is %s", session.ErrFailedPrecondition, id, s.State)
 		}
-		s.State, s.DisconnectReason = session.StateStarting, ""
+		s.State, s.DisconnectReason, s.ArchivedAt = session.StateStarting, "", time.Time{}
 		return nil
 	})
 }
@@ -419,7 +442,7 @@ func (f *Fake) appendItem(id string, it session.Item) (session.Item, session.Thr
 
 // Send records "Send <id> <text>" (" attachments=<a,b>" and " composer=<text>" when
 // set) and appends a
-// user_message item. The session must not be disconnected.
+// user_message item. The session must not be disconnected. Sending unarchives.
 func (f *Fake) Send(_ context.Context, id string, msg session.Message) (session.Item, error) {
 	f.mu.Lock()
 	call := "Send " + id + " " + msg.Text
@@ -443,8 +466,17 @@ func (f *Fake) Send(_ context.Context, id string, msg session.Message) (session.
 	}
 	f.next++
 	it, ev := f.appendItem(id, session.Item{ID: fmt.Sprintf("u-%d", f.next), Kind: session.KindUserMessage, Text: msg.Text, Attachments: msg.Attachments, ComposerText: msg.ComposerText})
+	unarchived := !s.ArchivedAt.IsZero()
+	if unarchived {
+		s.ArchivedAt = time.Time{}
+		f.byID[id] = s
+		f.rebuild()
+	}
 	f.mu.Unlock()
 	bus.Publish(f.bus, ev)
+	if unarchived {
+		bus.Publish[session.Event](f.bus, session.Updated{Session: s})
+	}
 	return it, nil
 }
 

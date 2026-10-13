@@ -70,6 +70,17 @@ func TestSessionUnaryAndErrorCodes(t *testing.T) {
 	if _, err := c.Pin(ctx, connect.NewRequest(&v1.PinSessionRequest{Id: "nope", Pinned: true})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("Pin unknown: %v", err)
 	}
+	archived, err := c.Archive(ctx, connect.NewRequest(&v1.ArchiveSessionRequest{Id: "s-1", Archived: true}))
+	if a := archived.Msg.GetSession(); err != nil || a.GetArchivedAt() == nil || a.GetPinned() {
+		t.Fatalf("Archive = %v, %v; want archived_at set, unpinned", archived, err)
+	}
+	unarchived, err := c.Archive(ctx, connect.NewRequest(&v1.ArchiveSessionRequest{Id: "s-1"}))
+	if err != nil || unarchived.Msg.GetSession().GetArchivedAt() != nil {
+		t.Fatalf("Unarchive = %v, %v; want archived_at unset", unarchived, err)
+	}
+	if _, err := c.Archive(ctx, connect.NewRequest(&v1.ArchiveSessionRequest{Id: "nope", Archived: true})); connect.CodeOf(err) != connect.CodeNotFound {
+		t.Errorf("Archive unknown: %v", err)
+	}
 	list, err := c.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))
 	if err != nil || len(list.Msg.GetSessions()) != 1 {
 		t.Fatalf("List = %v, %v", list, err)

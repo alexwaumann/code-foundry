@@ -54,6 +54,8 @@ const (
 	SessionServiceRunInProcedure = "/codefoundry.v1.SessionService/RunIn"
 	// SessionServicePinProcedure is the fully-qualified name of the SessionService's Pin RPC.
 	SessionServicePinProcedure = "/codefoundry.v1.SessionService/Pin"
+	// SessionServiceArchiveProcedure is the fully-qualified name of the SessionService's Archive RPC.
+	SessionServiceArchiveProcedure = "/codefoundry.v1.SessionService/Archive"
 	// SessionServiceWatchProcedure is the fully-qualified name of the SessionService's Watch RPC.
 	SessionServiceWatchProcedure = "/codefoundry.v1.SessionService/Watch"
 	// SessionServiceStageAttachmentProcedure is the fully-qualified name of the SessionService's
@@ -93,6 +95,12 @@ type SessionServiceClient interface {
 	// Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
 	// the GUI's thread list. Persisted; any state.
 	Pin(context.Context, *connect.Request[v1.PinSessionRequest]) (*connect.Response[v1.PinSessionResponse], error)
+	// Archive archives or unarchives a thread. Archiving ends Claude gracefully like
+	// Close (the thread is DISCONNECTED), kills and removes the thread's shells, unpins
+	// it and records archived_at (kept when it is already archived). Unarchiving only
+	// clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
+	// Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
+	Archive(context.Context, *connect.Request[v1.ArchiveSessionRequest]) (*connect.Response[v1.ArchiveSessionResponse], error)
 	// Watch streams session changes. The first event is a snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchSessionsRequest]) (*connect.ServerStreamForClient[v1.SessionEvent], error)
 	// StageAttachment stores an image the first prompt refers to and returns its path.
@@ -177,6 +185,12 @@ func NewSessionServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(sessionServiceMethods.ByName("Pin")),
 			connect.WithClientOptions(opts...),
 		),
+		archive: connect.NewClient[v1.ArchiveSessionRequest, v1.ArchiveSessionResponse](
+			httpClient,
+			baseURL+SessionServiceArchiveProcedure,
+			connect.WithSchema(sessionServiceMethods.ByName("Archive")),
+			connect.WithClientOptions(opts...),
+		),
 		watch: connect.NewClient[v1.WatchSessionsRequest, v1.SessionEvent](
 			httpClient,
 			baseURL+SessionServiceWatchProcedure,
@@ -210,6 +224,7 @@ type sessionServiceClient struct {
 	remove          *connect.Client[v1.RemoveSessionRequest, v1.RemoveSessionResponse]
 	runIn           *connect.Client[v1.RunInSessionRequest, v1.RunInSessionResponse]
 	pin             *connect.Client[v1.PinSessionRequest, v1.PinSessionResponse]
+	archive         *connect.Client[v1.ArchiveSessionRequest, v1.ArchiveSessionResponse]
 	watch           *connect.Client[v1.WatchSessionsRequest, v1.SessionEvent]
 	stageAttachment *connect.Client[v1.StageAttachmentRequest, v1.StageAttachmentResponse]
 	readAttachment  *connect.Client[v1.ReadAttachmentRequest, v1.ReadAttachmentResponse]
@@ -265,6 +280,11 @@ func (c *sessionServiceClient) Pin(ctx context.Context, req *connect.Request[v1.
 	return c.pin.CallUnary(ctx, req)
 }
 
+// Archive calls codefoundry.v1.SessionService.Archive.
+func (c *sessionServiceClient) Archive(ctx context.Context, req *connect.Request[v1.ArchiveSessionRequest]) (*connect.Response[v1.ArchiveSessionResponse], error) {
+	return c.archive.CallUnary(ctx, req)
+}
+
 // Watch calls codefoundry.v1.SessionService.Watch.
 func (c *sessionServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchSessionsRequest]) (*connect.ServerStreamForClient[v1.SessionEvent], error) {
 	return c.watch.CallServerStream(ctx, req)
@@ -309,6 +329,12 @@ type SessionServiceHandler interface {
 	// Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
 	// the GUI's thread list. Persisted; any state.
 	Pin(context.Context, *connect.Request[v1.PinSessionRequest]) (*connect.Response[v1.PinSessionResponse], error)
+	// Archive archives or unarchives a thread. Archiving ends Claude gracefully like
+	// Close (the thread is DISCONNECTED), kills and removes the thread's shells, unpins
+	// it and records archived_at (kept when it is already archived). Unarchiving only
+	// clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
+	// Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
+	Archive(context.Context, *connect.Request[v1.ArchiveSessionRequest]) (*connect.Response[v1.ArchiveSessionResponse], error)
 	// Watch streams session changes. The first event is a snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchSessionsRequest], *connect.ServerStream[v1.SessionEvent]) error
 	// StageAttachment stores an image the first prompt refers to and returns its path.
@@ -389,6 +415,12 @@ func NewSessionServiceHandler(svc SessionServiceHandler, opts ...connect.Handler
 		connect.WithSchema(sessionServiceMethods.ByName("Pin")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sessionServiceArchiveHandler := connect.NewUnaryHandler(
+		SessionServiceArchiveProcedure,
+		svc.Archive,
+		connect.WithSchema(sessionServiceMethods.ByName("Archive")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sessionServiceWatchHandler := connect.NewServerStreamHandler(
 		SessionServiceWatchProcedure,
 		svc.Watch,
@@ -429,6 +461,8 @@ func NewSessionServiceHandler(svc SessionServiceHandler, opts ...connect.Handler
 			sessionServiceRunInHandler.ServeHTTP(w, r)
 		case SessionServicePinProcedure:
 			sessionServicePinHandler.ServeHTTP(w, r)
+		case SessionServiceArchiveProcedure:
+			sessionServiceArchiveHandler.ServeHTTP(w, r)
 		case SessionServiceWatchProcedure:
 			sessionServiceWatchHandler.ServeHTTP(w, r)
 		case SessionServiceStageAttachmentProcedure:
@@ -482,6 +516,10 @@ func (UnimplementedSessionServiceHandler) RunIn(context.Context, *connect.Reques
 
 func (UnimplementedSessionServiceHandler) Pin(context.Context, *connect.Request[v1.PinSessionRequest]) (*connect.Response[v1.PinSessionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SessionService.Pin is not implemented"))
+}
+
+func (UnimplementedSessionServiceHandler) Archive(context.Context, *connect.Request[v1.ArchiveSessionRequest]) (*connect.Response[v1.ArchiveSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SessionService.Archive is not implemented"))
 }
 
 func (UnimplementedSessionServiceHandler) Watch(context.Context, *connect.Request[v1.WatchSessionsRequest], *connect.ServerStream[v1.SessionEvent]) error {

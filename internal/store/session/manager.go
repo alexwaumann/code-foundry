@@ -494,7 +494,7 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Session, error) {
 
 // Reconnect resumes a DISCONNECTED session. Without a resumable conversation (no
 // Claude session id yet, or its transcript is gone) it starts a new conversation in
-// the same worktree and says so in LastError.
+// the same worktree and says so in LastError. It unarchives the thread.
 func (m *Manager) Reconnect(ctx context.Context, id string) (Session, error) {
 	m.mu.Lock()
 	rec, err := m.record(id)
@@ -543,6 +543,8 @@ func (m *Manager) Reconnect(ctx context.Context, id string) (Session, error) {
 	}
 	m.update(id, false, func(r *record) {
 		r.s.LastError = lastErr
+		// Reconnecting unarchives (persisted by spawn's commit, or by revert).
+		m.unarchiveLocked(r)
 		if l.resume == "" {
 			r.s.ClaudeSessionID = ""
 			r.namingTried = r.s.Name != ""
@@ -659,7 +661,8 @@ func (m *Manager) Rename(_ context.Context, id, name string) (Session, error) {
 	return rec.s, nil
 }
 
-// Pin sets or clears the user's pin. It works in any state and is persisted.
+// Pin sets or clears the user's pin. It works in any state and is persisted. Pinning an
+// archived thread unarchives it.
 func (m *Manager) Pin(_ context.Context, id string, pinned bool) (Session, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -667,7 +670,8 @@ func (m *Manager) Pin(_ context.Context, id string, pinned bool) (Session, error
 	if err != nil {
 		return Session{}, err
 	}
-	if rec.s.Pinned == pinned {
+	unarchived := pinned && m.unarchiveLocked(rec)
+	if rec.s.Pinned == pinned && !unarchived {
 		return rec.s, nil
 	}
 	rec.s.Pinned = pinned

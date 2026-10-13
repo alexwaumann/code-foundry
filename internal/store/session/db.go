@@ -8,7 +8,7 @@ import (
 )
 
 // Persistence for the sessions table (migrations 0003, 0006, 0008, 0009, 0011, 0014,
-// 0015 and 0016) and session_pull_requests (0010); session_usage and usage_retired
+// 0015, 0016 and 0017) and session_pull_requests (0010); session_usage and usage_retired
 // (0012) are in usage_db.go, which also deletes sessions (retireSession). No process
 // survives a daemon restart. Status, its reason and StatusChangedAt are (0011): a disconnected
 // session keeps the status it ended with.
@@ -33,8 +33,8 @@ func saveSession(ctx context.Context, db *sql.DB, s Session) error {
 			created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
 			permission_mode, base_ref, created_worktree, workspace_id, pinned,
 			status, status_reason, status_changed_at,
-			context_tokens, context_model, last_result_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			context_tokens, context_model, last_result_at, archived_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET
 			claude_session_id = excluded.claude_session_id,
 			repo_id = excluded.repo_id,
@@ -59,12 +59,13 @@ func saveSession(ctx context.Context, db *sql.DB, s Session) error {
 			status_changed_at = excluded.status_changed_at,
 			context_tokens = excluded.context_tokens,
 			context_model = excluded.context_model,
-			last_result_at = excluded.last_result_at`,
+			last_result_at = excluded.last_result_at,
+			archived_at = excluded.archived_at`,
 		s.ID, s.ClaudeSessionID, s.RepoID, s.WorktreePath, s.Name, s.AutoNamed, s.Model, s.Effort,
 		millis(s.CreatedAt), millis(s.LastActivityAt), s.ParentID, int(s.State), s.DisconnectReason, s.ExitCode, s.LastError,
 		int(s.PermissionMode), s.BaseRef, s.CreatedWorktree, s.WorkspaceID, s.Pinned,
 		int(s.Status), s.StatusReason, millis(s.StatusChangedAt),
-		s.ContextTokens, s.ContextModel, millis(s.LastResultAt))
+		s.ContextTokens, s.ContextModel, millis(s.LastResultAt), millis(s.ArchivedAt))
 	if err != nil {
 		return fmt.Errorf("session: save %s: %w", s.ID, err)
 	}
@@ -76,7 +77,7 @@ func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 			model, effort, created_at, last_activity_at, parent_id, state, disconnect_reason, exit_code, last_error,
 			permission_mode, base_ref, created_worktree, workspace_id, pinned,
 			status, status_reason, status_changed_at,
-			context_tokens, context_model, last_result_at
+			context_tokens, context_model, last_result_at, archived_at
 		FROM sessions ORDER BY created_at, id`)
 	if err != nil {
 		return nil, fmt.Errorf("session: load: %w", err)
@@ -85,13 +86,13 @@ func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 	var out []Session
 	for rows.Next() {
 		var s Session
-		var created, active, statusAt, lastResult int64
+		var created, active, statusAt, lastResult, archived int64
 		var state, perm, status int
 		if err := rows.Scan(&s.ID, &s.ClaudeSessionID, &s.RepoID, &s.WorktreePath, &s.Name, &s.AutoNamed,
 			&s.Model, &s.Effort, &created, &active, &s.ParentID, &state, &s.DisconnectReason, &s.ExitCode, &s.LastError,
 			&perm, &s.BaseRef, &s.CreatedWorktree, &s.WorkspaceID, &s.Pinned,
 			&status, &s.StatusReason, &statusAt,
-			&s.ContextTokens, &s.ContextModel, &lastResult); err != nil {
+			&s.ContextTokens, &s.ContextModel, &lastResult, &archived); err != nil {
 			return nil, fmt.Errorf("session: load: %w", err)
 		}
 		s.CreatedAt, s.LastActivityAt, s.State = fromMillis(created), fromMillis(active), State(state)
@@ -103,6 +104,7 @@ func loadSessions(ctx context.Context, db *sql.DB) ([]Session, error) {
 		}
 		s.StatusChangedAt = fromMillis(statusAt)
 		s.LastResultAt = fromMillis(lastResult)
+		s.ArchivedAt = fromMillis(archived)
 		out = append(out, s)
 	}
 	if err := rows.Err(); err != nil {
