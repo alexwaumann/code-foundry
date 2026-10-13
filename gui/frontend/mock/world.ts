@@ -271,10 +271,18 @@ function clean(over: Partial<MockWorktree["status"]> = {}): MockWorktree["status
   return { upstream: "origin/main", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, baseRef: "origin/main", baseAhead: 0, baseBehind: 0, ...over };
 }
 
-/** The daemon's repo.MergedCleanReason == "": not main, on a branch, nothing uncommitted, every commit in baseRef. */
+/** Where the mock daemon makes worktrees (the daemon's repo store WorktreeRoot). */
+const WORKTREE_ROOT = `${HOME}/.code-foundry/worktrees`;
+
+/** Made by the app: strictly inside its worktrees directory (the daemon's Worktree.Managed). */
+function managed(w: MockWorktree): boolean {
+  return w.path.startsWith(`${WORKTREE_ROOT}/`);
+}
+
+/** The daemon's repo.MergedCleanReason == "": not main, made by the app, on a branch, nothing uncommitted, every commit in baseRef. */
 function mergedClean(w: MockWorktree): boolean {
   const st = w.status;
-  return !w.isMain && !w.detached && w.branch !== "" && !st.dirty && st.staged + st.modified + st.untracked === 0 && Boolean(st.baseRef) && (st.baseAhead ?? 0) === 0;
+  return !w.isMain && managed(w) && !w.detached && w.branch !== "" && !st.dirty && st.staged + st.modified + st.untracked === 0 && Boolean(st.baseRef) && (st.baseAhead ?? 0) === 0;
 }
 
 function initialRepos(): MockRepo[] {
@@ -493,9 +501,19 @@ export class World {
     return r;
   }
 
-  /** A worktree on `branch` whose work is in origin/<default> and that has no changes (cleanable unless something holds it). */
-  addMergedWorktree(repoRef: string, branch: string): MockWorktree {
-    return this.addWorktree(this.repoRef(repoRef), branch, `origin/${this.repoRef(repoRef).defaultBranch || "main"}`);
+  /**
+   * A worktree on `branch` whose work is in origin/<default> and that has no changes
+   * (cleanable unless something holds it). `path`: put it there instead, e.g. outside the
+   * app's worktrees directory, as another tool would (then it is never cleanable).
+   */
+  addMergedWorktree(repoRef: string, branch: string, path = ""): MockWorktree {
+    const repo = this.repoRef(repoRef);
+    const w = this.addWorktree(repo, branch, `origin/${repo.defaultBranch || "main"}`);
+    if (path) {
+      w.path = path;
+      this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(repo) } });
+    }
+    return w;
   }
 
   /** Why the daemon's cleanupHold keeps a worktree: a live thread, a running terminal, a workspace; "" for nothing. */
@@ -517,7 +535,7 @@ export class World {
     if (path && candidates.length === 0) throw new CommandError("notfound", `worktree ${path} in repo ${repo.name}`);
     const out: { removed: MockWorktree[]; skipped: { w: MockWorktree; reason: string }[] } = { removed: [], skipped: [] };
     for (const w of candidates) {
-      const reason = !mergedClean(w) ? (w.isMain ? "main worktree" : w.status.dirty ? "uncommitted changes" : !w.status.baseRef ? "no remote default branch to compare with" : `${String(w.status.baseAhead ?? 0)} commits not in ${w.status.baseRef}`) : this.cleanupHold(w.path);
+      const reason = !mergedClean(w) ? (w.isMain ? "main worktree" : !managed(w) ? "not a Code Foundry worktree" : w.status.dirty ? "uncommitted changes" : !w.status.baseRef ? "no remote default branch to compare with" : `${String(w.status.baseAhead ?? 0)} commits not in ${w.status.baseRef}`) : this.cleanupHold(w.path);
       if (reason) {
         out.skipped.push({ w, reason });
         continue;
@@ -2184,9 +2202,9 @@ export class World {
           confirm: (ctx, args) => {
             const ref = args.repo || ctx?.activeRepoId || "";
             const rm = this.cleanupWorktrees(ref, args.path ?? "", true).removed;
-            if (rm.length === 0) return `Fetch ${ref} and remove its worktrees whose work is already in the default branch? Branches are kept.`;
-            if (args.path) return `Remove the worktree of ${rm[0]?.branch ?? ""} (${args.path})? Its work is in origin/main; the branch is kept. It is checked again after a fetch.`;
-            return `Remove ${String(rm.length)} ${rm.length === 1 ? "worktree" : "worktrees"} whose work is in origin/main: ${rm.map((w) => w.branch).join(", ")}? Branches are kept; each is checked again after a fetch.`;
+            if (rm.length === 0) return `Fetch ${ref} and remove the worktrees created by Code Foundry (under its worktrees directory) whose work is already in the default branch? Branches are kept.`;
+            if (args.path) return `Remove the worktree of ${rm[0]?.branch ?? ""} (${args.path})? Code Foundry created it (under its worktrees directory) and its work is in origin/main; the branch is kept. It is checked again after a fetch.`;
+            return `Remove ${String(rm.length)} ${rm.length === 1 ? "worktree" : "worktrees"} created by Code Foundry (under its worktrees directory) whose work is in origin/main: ${rm.map((w) => w.branch).join(", ")}? Branches are kept; each is checked again after a fetch.`;
           },
         },
         when: (ctx) => Boolean(ctx?.activeRepoId && this.repos.get(ctx.activeRepoId)?.git !== false),

@@ -46,8 +46,9 @@
  *                                                 (simulate a daemon older than those RPCs: 404)
  *   POST /__mock/session-new?delay=700            (how long session.new takes to make a worktree)
  *   POST /__mock/worktree/checkout?path=…&branch=…   (the worktree switches branch; no branch detaches HEAD)
- *   POST /__mock/worktree/merged?repo=repo-cf&branch=cf/usage-polish   (a clean worktree whose work is
- *                                                 in origin/main: merged_clean, so repo.worktree.cleanup removes it)
+ *   POST /__mock/worktree/merged?repo=repo-cf&branch=cf/usage-polish[&path=…]   (a clean worktree whose
+ *                                                 work is in origin/main: merged_clean, so repo.worktree.cleanup removes
+ *                                                 it; a path outside ~/.code-foundry/worktrees is never merged_clean)
  *   POST /__mock/workspace?name=login&repos=repo-cf,repo-gp[&branch=cf/login]
  *                                                 (a workspace: a cf/<name> worktree in each repo)
  *   GET  /__mock/workspaces                       (id, name, branch, members)
@@ -594,7 +595,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     }
     case "POST /__mock/worktree/merged":
       try {
-        const w = world.addMergedWorktree(q.get("repo") ?? "", q.get("branch") ?? "");
+        const w = world.addMergedWorktree(q.get("repo") ?? "", q.get("branch") ?? "", q.get("path") ?? "");
         json(res, 200, { path: w.path });
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });

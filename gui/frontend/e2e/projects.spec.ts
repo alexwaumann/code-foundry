@@ -341,6 +341,8 @@ test("New worktree… asks for the branch in the palette, in that project", asyn
 });
 
 const MERGED = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-usage-polish";
+/** A worktree another tool made, outside the app's worktrees directory. */
+const T3 = "/Users/dev/.t3/worktrees/code-foundry/t3code-elsewhere";
 
 test("a merged, clean worktree shows 'in main' and a broom that removes it after a confirm naming the branch", async ({ page }) => {
   expect(await mockPost("worktree/merged?repo=repo-cf&branch=cf/usage-polish")).toEqual({ path: MERGED });
@@ -363,6 +365,7 @@ test("a merged, clean worktree shows 'in main' and a broom that removes it after
   await row.getByTestId("worktree-cleanup").click();
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toContainText("Remove the worktree of cf/usage-polish");
+  await expect(dialog).toContainText("Code Foundry created it (under its worktrees directory)");
   await expect(dialog).toContainText("the branch is kept");
   await dialog.getByTestId("confirm-ok").click();
   await expect(row).toHaveCount(0);
@@ -376,8 +379,13 @@ test("a merged, clean worktree shows 'in main' and a broom that removes it after
 test("the project menu counts merged worktrees, cleans them all up, and is disabled at zero", async ({ page }) => {
   await mockPost("worktree/merged?repo=repo-cf&branch=cf/usage-polish");
   await mockPost("worktree/merged?repo=repo-cf&branch=cf/old-docs");
+  // Merged and clean too, but made by another tool outside the app's worktrees directory: never cleanable.
+  await mockPost(`worktree/merged?repo=repo-cf&branch=t3code/elsewhere&path=${encodeURIComponent(T3)}`);
   await openApp(page);
   await openProjects(page);
+  await expect(wtRow(page, "repo-cf", T3)).toBeVisible();
+  await expect(wtRow(page, "repo-cf", T3).getByTestId("worktree-cleanable")).toHaveCount(0);
+  await expect(wtRow(page, "repo-cf", T3).getByTestId("worktree-cleanup")).toHaveCount(0);
   await expect(page.getByTestId("worktree-cleanable")).toHaveCount(2);
 
   // Only git projects with a remote offer it; zero is disabled.
@@ -394,12 +402,12 @@ test("the project menu counts merged worktrees, cleans them all up, and is disab
   await expect(page.getByTestId("project-cleanup")).not.toHaveAttribute("data-disabled");
   await page.getByTestId("project-cleanup").click();
   const dialog = page.getByTestId("confirm-dialog");
-  await expect(dialog).toContainText("Remove 2 worktrees whose work is in origin/main: cf/usage-polish, cf/old-docs?");
+  await expect(dialog).toContainText("Remove 2 worktrees created by Code Foundry (under its worktrees directory) whose work is in origin/main: cf/usage-polish, cf/old-docs?");
   await dialog.getByTestId("confirm-ok").click();
   await expect(page.getByTestId("worktree-cleanable")).toHaveCount(0);
-  await expect(page.getByText(/^Removed 2 worktrees: cf\/usage-polish, cf\/old-docs; kept 2 worktrees/)).toBeVisible();
+  await expect(page.getByText(/^Removed 2 worktrees: cf\/usage-polish, cf\/old-docs; kept 3 worktrees: .*t3code\/elsewhere \(not a Code Foundry worktree\)/)).toBeVisible();
   expect((await lastInvocation("repo.worktree.cleanup"))?.args).toEqual({ repo: "repo-cf" });
-  await expect(project(page, "repo-cf").getByTestId("worktree-branch")).toHaveText(["main", "feat/sidebar", "fix/resize"]);
+  await expect(project(page, "repo-cf").getByTestId("worktree-branch")).toHaveText(["main", "feat/sidebar", "fix/resize", "t3code/elsewhere"]);
 
   await project(page, "repo-cf").getByTestId("project-more").click();
   await expect(page.getByTestId("project-cleanup-count")).toHaveText("0");
