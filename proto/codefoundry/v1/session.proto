@@ -94,19 +94,24 @@ enum SessionStatus {
   SESSION_STATUS_ERROR = 4;
 }
 
-// Ownership: a thread belongs to exactly one owner. When workspace_id is set the owner
-// is that workspace; otherwise it is the project (repository) repo_id. repo_id and
-// worktree_path are facts about the thread's cwd (for a workspace thread, the member
-// worktree it runs in) and never decide the owner.
+// Ownership: a thread has at most one owner. When workspace_id is set the owner is that
+// workspace; otherwise, when repo_id is set, it is the project (repository) repo_id;
+// otherwise the thread has no project (CreateSessionRequest.no_project) and runs in the
+// daemon's home directory. repo_id and worktree_path are facts about the thread's cwd
+// (for a workspace thread, the member worktree it runs in) and never decide the owner
+// beyond that order. Rows from before projects were required may also have an empty
+// repo_id with a worktree_path inside a project; clients may place those by the path.
 message Session {
   // Our stable id (survives reconnects).
   string id = 1;
   // Claude's own session id, once discovered from the transcript directory. Needed for
   // resume; empty until known.
   string claude_session_id = 2;
-  // Repository of the cwd. The owner when workspace_id is empty.
+  // Repository of the cwd. The owner when workspace_id is empty. Empty, with an empty
+  // workspace_id, for a thread without a project.
   string repo_id = 3;
-  // The cwd: the worktree claude runs in.
+  // The cwd: the worktree claude runs in (the home directory for a thread without a
+  // project).
   string worktree_path = 4;
   // Display name: a short natural title ("Fix the login redirect"). Auto-generated
   // unless the user named or renamed it.
@@ -141,9 +146,9 @@ message Session {
   string base_ref = 20;
   // Create made the worktree for this session (new_worktree or new_workspace was set).
   bool created_worktree = 21;
-  // Owner workspace (see the ownership rule above); empty for a project thread. Every
-  // spawn of a workspace thread gets --add-dir for the workspace's other member
-  // worktrees, read from the workspace store at launch.
+  // Owner workspace (see the ownership rule above); empty for a project thread and for a
+  // thread without a project. Every spawn of a workspace thread gets --add-dir for the
+  // workspace's other member worktrees, read from the workspace store at launch.
   string workspace_id = 22;
   // Member worktree a queued RunIn will move the thread to once it is idle; empty when
   // nothing is queued. Not persisted: a thread that disconnects first moves its row
@@ -334,6 +339,11 @@ message CreateSessionRequest {
   // The composer's text of initial_prompt, kept on the first user message for display
   // (ThreadItem UserMessageItem.composer_text).
   string composer_prompt = 13;
+  // When set, the thread has no project: it runs in the daemon's home directory with an
+  // empty repo_id and workspace_id (see the ownership rule on Session). Exclusive with
+  // repo_id, worktree_path, new_worktree, workspace_id and new_workspace
+  // (InvalidArgument). RunIn refuses such a thread; Fork and Reconnect keep its cwd.
+  bool no_project = 14;
 }
 
 message NewWorktree {
