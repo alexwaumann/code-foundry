@@ -373,8 +373,8 @@ from the pull request (docs/notes/pr-thread-commands.md).
   way to start one lands there: cmd+t and the palette's New Terminal, a thread row's New
   terminal here, the Projects page's rows, a workspace member (in a thread's side panel
   the thread owns it), the panel's own "+", and `terminal new` on the CLI; the
-  focusTerminal intent reveals a shell there and selects the thread for its Claude
-  terminal (`docs/notes/bottom-panel-2-gui.md`, `docs/notes/bottom-panel-3-routing.md`). Strip and sidebar sit on one background (the sheet);
+  focusTerminal intent reveals a shell there (threads have no terminal of their own)
+  (`docs/notes/bottom-panel-2-gui.md`, `docs/notes/bottom-panel-3-routing.md`). Strip and sidebar sit on one background (the sheet);
   the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Each
   selection can open a side panel right of the content: a second pane with tabs whose
   bodies come from the surface registry (`src/surfaces`, `docs/notes/side-panel.md`):
