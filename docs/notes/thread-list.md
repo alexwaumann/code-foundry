@@ -17,6 +17,8 @@ daemon step in `thread-status-persistence.md` (persisted status, `status_reason`
   Same two-line geometry as before (`rowHeight + 15`), 8px left padding, 2px between the
   lines. The name is never coloured by status (the amber name is gone); an unnamed thread
   still shows its id muted.
+  > **Superseded (2026-10-13):** the place reads "project @ branch" (muted "@"), not
+  > "project · branch"; see `thread-header.md`.
 * **Line 2** comes from `statusLine(session)` (`src/lib/statusLine.ts`, table-tested), which
   classifies on `sessionBadge` then `statusKind`; `statusText(line, now)` words it:
 
