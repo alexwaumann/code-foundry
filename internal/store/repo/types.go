@@ -53,6 +53,11 @@ type Worktree struct {
 	IsMain   bool
 	Detached bool
 	Status   Status
+	// Managed: the worktree is inside a directory the app creates worktrees in
+	// (Options.WorktreeRoot or Options.ManagedRoots), so the app made it. Only managed
+	// worktrees can be cleaned up; others (made by hand or by other tools) never are.
+	// Set when the snapshot is built.
+	Managed bool
 }
 
 // Status is the git status of a worktree.

@@ -262,7 +262,9 @@ type Worktree struct {
 	Status *GitStatus             `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`
 	// HEAD is detached (branch is empty).
 	Detached bool `protobuf:"varint,7,opt,name=detached,proto3" json:"detached,omitempty"`
-	// The git half of "safe to clean up": not the main worktree, on a branch, no staged,
+	// The git half of "safe to clean up": not the main worktree, created by Code Foundry
+	// (its path is under the app's worktrees directory or repos.worktree_dir; worktrees
+	// made by hand or by other tools never qualify), on a branch, no staged,
 	// modified, untracked or conflicted entries, no status error, and status.base_ref is
 	// set with base_ahead 0 (every commit on HEAD is in origin/<default>). Whether a live
 	// thread, a running terminal or a workspace holds it is not part of this flag (the

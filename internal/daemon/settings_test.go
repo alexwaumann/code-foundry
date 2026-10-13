@@ -36,6 +36,23 @@ func TestWorktreePath(t *testing.T) {
 	}
 }
 
+// worktreeBase is the cleanup's managed root from repos.worktree_dir.
+func TestWorktreeBase(t *testing.T) {
+	home, _ := os.UserHomeDir()
+	tests := []struct{ dir, repo, want string }{
+		{"", "cf", ""},
+		{"/wt", "cf", "/wt"},
+		{"/wt/{repo}", "cf", "/wt/cf"},
+		{"~/worktrees/{repo}", "cf", filepath.Join(home, "worktrees/cf")},
+		{"relative/{repo}", "cf", ""},
+	}
+	for _, tt := range tests {
+		if got := worktreeBase(tt.dir, tt.repo); got != tt.want {
+			t.Errorf("worktreeBase(%q, %q) = %q, want %q", tt.dir, tt.repo, got, tt.want)
+		}
+	}
+}
+
 // repos.worktree_dir applies live to the worktrees new threads create.
 func TestSettingsWorktreePath(t *testing.T) {
 	st := openSettings(t)

@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 // MergedCleanReason is the git half of the worktree cleanup rule: "" when w can be
 // removed without losing work, else why not. Removable means not the main worktree,
-// on a branch, a status that has been read without error, no staged, modified,
+// created by Code Foundry (Managed: under its worktrees directory), on a branch, a status that has been read without error, no staged, modified,
 // untracked or conflicted entries, and every commit on HEAD in the remote-tracking
 // default branch (Status.BaseRef set, BaseAhead 0). Pure.
 //
@@ -20,6 +21,8 @@ func MergedCleanReason(w Worktree) string {
 	switch {
 	case w.IsMain:
 		return "main worktree"
+	case !w.Managed:
+		return NotManagedReason
 	case w.Detached || w.Branch == "":
 		return "detached HEAD"
 	case st.Error != "":
@@ -38,6 +41,51 @@ func MergedCleanReason(w Worktree) string {
 		return strconv.Itoa(st.BaseAhead) + " " + n + " not in " + st.BaseRef
 	}
 	return ""
+}
+
+// NotManagedReason is why a worktree outside the app's worktree directories is kept.
+const NotManagedReason = "not a Code Foundry worktree"
+
+// InsideRoot reports whether path is strictly inside one of roots (never a root
+// itself). Paths compare cleaned; a root is also tried with symlinks resolved, since
+// snapshot paths are resolved (/tmp is /private/tmp). A path that only shares a prefix
+// string ("/x/worktrees2" for "/x/worktrees") is not inside. Empty roots are skipped,
+// so no roots means nothing is inside. Pure apart from resolving the roots.
+func InsideRoot(path string, roots ...string) bool {
+	if path == "" {
+		return false
+	}
+	path = filepath.Clean(path)
+	for _, root := range roots {
+		if root == "" {
+			continue
+		}
+		root = filepath.Clean(root)
+		for _, r := range []string{root, resolved(root)} {
+			rel, err := filepath.Rel(r, path)
+			if err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// resolved is p with symlinks resolved, or p when that fails (it does not exist yet).
+func resolved(p string) string {
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		return r
+	}
+	return p
+}
+
+// managedRoots is where the app makes worktrees for the repository named name.
+func (g *Git) managedRoots(name string) []string {
+	roots := []string{g.wtRoot}
+	if g.managed != nil {
+		roots = append(roots, g.managed(name)...)
+	}
+	return roots
 }
 
 // MergedClean reports MergedCleanReason(w) == "".

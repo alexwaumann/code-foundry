@@ -27,11 +27,11 @@ type RepoCleanupDeps struct {
 
 // cleanupConfirm is the prompt when nothing is cleanable before the fetch (or the dry
 // run failed; Run then reports why).
-const cleanupConfirm = "Fetch {repo} and remove its worktrees whose work is already in the default branch? Branches are kept."
+const cleanupConfirm = "Fetch {repo} and remove the worktrees created by Code Foundry (under its worktrees directory) whose work is already in the default branch? Branches are kept."
 
 // RegisterRepoCleanup registers repo.worktree.cleanup: reclaim the disk space of
 // worktrees whose work is already in origin/<default>. A worktree goes only when it is
-// not the main one, on a branch, without staged, modified, untracked or conflicted
+// not the main one, created by Code Foundry (under its worktrees directory), on a branch, without staged, modified, untracked or conflicted
 // files, every commit on it is in origin/<default>, and no live thread, running
 // terminal or workspace holds it. It fetches first and the daemon checks again after
 // the fetch; removal is `git worktree remove` without --force, and branches are never
@@ -59,7 +59,8 @@ func RegisterRepoCleanup(r *Registry, d RepoCleanupDeps) error {
 		Name:  "repo.worktree.cleanup",
 		Title: "Clean Up Merged Worktrees",
 		Description: "Fetch, then remove the project's worktrees (or one) whose work is already in origin/<default>: " +
-			"no uncommitted changes, every commit merged, no live thread, terminal or workspace. Branches are kept.",
+			"created by Code Foundry (under its worktrees directory), no uncommitted changes, every commit merged, " +
+			"no live thread, terminal or workspace. Branches are kept.",
 		Category: "Project",
 		Args: []ArgSpec{
 			{Name: "repo", Type: String, Required: true, Context: ContextRepo, Positional: true, Description: "Repository name or id"},
@@ -141,14 +142,14 @@ func cleanupPrompt(res *v1.CleanupWorktreesResponse, path string) string {
 	}
 	if path != "" {
 		w := rm[0]
-		return fmt.Sprintf("Remove the worktree of %s (%s)? Its work is in %s; the branch is kept. It is checked again after a fetch.",
+		return fmt.Sprintf("Remove the worktree of %s (%s)? Code Foundry created it (under its worktrees directory) and its work is in %s; the branch is kept. It is checked again after a fetch.",
 			worktreeLabel(w), w.GetPath(), cmpBase(w))
 	}
 	names := make([]string, len(rm))
 	for i, w := range rm {
 		names[i] = worktreeLabel(w)
 	}
-	return fmt.Sprintf("Remove %s whose work is in %s: %s? Branches are kept; each is checked again after a fetch.",
+	return fmt.Sprintf("Remove %s created by Code Foundry (under its worktrees directory) whose work is in %s: %s? Branches are kept; each is checked again after a fetch.",
 		plural(len(rm), "worktree"), cmpBase(rm[0]), strings.Join(names, ", "))
 }
 

@@ -97,7 +97,8 @@ type RepoServiceClient interface {
 	// RemoveWorktree removes a worktree (and optionally its branch).
 	RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error)
 	// CleanupWorktrees removes worktrees whose work is already in the default branch:
-	// merged_clean, and no live thread, running terminal or workspace holds them. It
+	// merged_clean (which includes "created by Code Foundry"), and no live thread, running
+	// terminal or workspace holds them. It
 	// refreshes the repository's status first (a caller wanting fresh remote refs fetches
 	// before), re-evaluates, and removes with `git worktree remove` (never --force).
 	// Branches are never deleted. dry_run only evaluates the current snapshot.
@@ -420,7 +421,8 @@ type RepoServiceHandler interface {
 	// RemoveWorktree removes a worktree (and optionally its branch).
 	RemoveWorktree(context.Context, *connect.Request[v1.RemoveWorktreeRequest]) (*connect.Response[v1.RemoveWorktreeResponse], error)
 	// CleanupWorktrees removes worktrees whose work is already in the default branch:
-	// merged_clean, and no live thread, running terminal or workspace holds them. It
+	// merged_clean (which includes "created by Code Foundry"), and no live thread, running
+	// terminal or workspace holds them. It
 	// refreshes the repository's status first (a caller wanting fresh remote refs fetches
 	// before), re-evaluates, and removes with `git worktree remove` (never --force).
 	// Branches are never deleted. dry_run only evaluates the current snapshot.

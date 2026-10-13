@@ -21,7 +21,8 @@ service RepoService {
   // RemoveWorktree removes a worktree (and optionally its branch).
   rpc RemoveWorktree(RemoveWorktreeRequest) returns (RemoveWorktreeResponse) {}
   // CleanupWorktrees removes worktrees whose work is already in the default branch:
-  // merged_clean, and no live thread, running terminal or workspace holds them. It
+  // merged_clean (which includes "created by Code Foundry"), and no live thread, running
+  // terminal or workspace holds them. It
   // refreshes the repository's status first (a caller wanting fresh remote refs fetches
   // before), re-evaluates, and removes with `git worktree remove` (never --force).
   // Branches are never deleted. dry_run only evaluates the current snapshot.
@@ -115,7 +116,9 @@ message Worktree {
   GitStatus status = 6;
   // HEAD is detached (branch is empty).
   bool detached = 7;
-  // The git half of "safe to clean up": not the main worktree, on a branch, no staged,
+  // The git half of "safe to clean up": not the main worktree, created by Code Foundry
+  // (its path is under the app's worktrees directory or repos.worktree_dir; worktrees
+  // made by hand or by other tools never qualify), on a branch, no staged,
   // modified, untracked or conflicted entries, no status error, and status.base_ref is
   // set with base_ahead 0 (every commit on HEAD is in origin/<default>). Whether a live
   // thread, a running terminal or a workspace holds it is not part of this flag (the

@@ -162,17 +162,17 @@ func TestRepoCleanupConfirmListsBranches(t *testing.T) {
 		{
 			name: "every merged worktree", args: map[string]string{"repo": "proj"},
 			dry:  &v1.CleanupWorktreesResponse{RepoId: "r1", Removed: []*v1.Worktree{a, b}},
-			want: "Remove 2 worktrees whose work is in origin/main: cf/a, cf/b? Branches are kept; each is checked again after a fetch.",
+			want: "Remove 2 worktrees created by Code Foundry (under its worktrees directory) whose work is in origin/main: cf/a, cf/b? Branches are kept; each is checked again after a fetch.",
 		},
 		{
 			name: "one path", args: map[string]string{"repo": "proj", "path": "/wt/a"},
 			dry:  &v1.CleanupWorktreesResponse{RepoId: "r1", Removed: []*v1.Worktree{a}},
-			want: "Remove the worktree of cf/a (/wt/a)? Its work is in origin/main; the branch is kept. It is checked again after a fetch.",
+			want: "Remove the worktree of cf/a (/wt/a)? Code Foundry created it (under its worktrees directory) and its work is in origin/main; the branch is kept. It is checked again after a fetch.",
 		},
 		{
 			name: "nothing merged yet", args: map[string]string{"repo": "proj"},
 			dry:  &v1.CleanupWorktreesResponse{RepoId: "r1"},
-			want: "Fetch proj and remove its worktrees whose work is already in the default branch? Branches are kept.",
+			want: "Fetch proj and remove the worktrees created by Code Foundry (under its worktrees directory) whose work is already in the default branch? Branches are kept.",
 		},
 	}
 	for _, tt := range tests {
