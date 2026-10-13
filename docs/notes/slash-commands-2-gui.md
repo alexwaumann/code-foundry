@@ -1,7 +1,7 @@
 # Slash commands in the composer, PR 2 of 2: the GUI
 
 Status: built on branch `t3code/composer-slash-command-shortlist-gui`, on top of PR 1
-(`slash-commands-1-daemon.md`, PR #79). `make check`, `make gui-e2e` and `make gui-build`
+(`slash-commands-1-daemon.md`, PR #79, merged; this branch is rebased onto main). `make check`, `make gui-e2e` and `make gui-build`
 green; exercised against a daemon built from this branch with an isolated home and a haiku
 thread that did no work (below).
 
@@ -97,14 +97,18 @@ thread that did no work (below).
 
 ## Verification
 
-* `make check` green (vitest 103 files, 2024 tests). New: `api/slashCommands.test.ts`
+* `make check` green (vitest 103 files, 2031 tests after the rebase). New: `api/slashCommands.test.ts`
   (snapshot, event, empty on process end and on an older daemon; `shareCommands` table),
   `stores/thread.test.ts` (snapshot, seq rule, identity on an unchanged list and a resync,
   drop to empty, batching), `lib/completion.test.ts` (`commandScore` table incl. aliases,
   `firstLine`, `commandItems` table: one and several projects, `/co`, alias, plugin
   prefix, no match, unscanned skill, rows and tags, a built-in shadowing a scanned skill),
   `useCompletion.test.tsx` (a string row calls `insertText`, a tag row `insertTag`).
-* `make gui-e2e`: see the PR. `e2e/thread-slash-commands.spec.ts` (WebKit + Chromium):
+* `make gui-e2e`: before the rebase onto main, 652 passed, 28 skipped, 0 failed. After it
+  (with #81): 648 passed, 6 failed (`usage-page.spec.ts:36`, `worktree-panel.spec.ts:109`
+  in both browsers, `sessions.spec.ts:216` and `settings.spec.ts:193` in Chromium: intent
+  delivered to 2 clients instead of 1, or one stream more than expected); those four specs
+  alone: 58/58 passed. Nothing here touches intents or streams. `e2e/thread-slash-commands.spec.ts` (WebKit + Chromium):
   the card's groups `User`, `Skills`, `Claude Code` with `/deploy` first, the compact hint,
   a paragraph description cut to its first line (dark and light); `/co` → commit,
   code-review, compact, context, usage, …; `/cost` → only `/usage`, aliases not shown;
