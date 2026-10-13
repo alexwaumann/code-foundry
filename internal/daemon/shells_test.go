@@ -68,6 +68,12 @@ func TestShellReaper(t *testing.T) {
 		{name: "the sweep removes a shell of an unregistered project", labels: termlabel.Shell("", "r9", "%dir"), wantGone: true},
 		{name: "the sweep removes a shell of a removed thread", labels: termlabel.Shell("s9", "r1", "%dir"), wantGone: true},
 		{name: "the sweep leaves a live shell", labels: termlabel.Shell("s1", "r1", "%dir")},
+		// A thread without a project: no repo label, its worktree label is the home dir.
+		{name: "the sweep leaves a no-project thread's shell", labels: termlabel.Shell("s1", "", "%dir")},
+		{name: "unregistering a project leaves a no-project thread's shell", labels: termlabel.Shell("s1", "", "%dir"),
+			event: event(repo.RepoRemoved{ID: "r1"})},
+		{name: "removing a no-project thread kills and removes its shell", labels: termlabel.Shell("s1", "", "%dir"),
+			event: event(session.Removed{ID: "s1"}), wantGone: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -1,6 +1,7 @@
 package command_test
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"maps"
@@ -54,6 +55,7 @@ func TestTerminalNewOwner(t *testing.T) {
 		args       map[string]string
 		darwinOnly bool
 		sessionErr error
+		session    *v1.Session // the thread Get returns; default thread
 		wantErr    error
 		wantMsg    string // substring of the error
 		wantCwd    string
@@ -69,6 +71,8 @@ func TestTerminalNewOwner(t *testing.T) {
 			wantCwd: feat, wantLabels: termlabel.Shell("s1", "r1", feat)},
 		{name: "thread with --cwd starts there", ctx: command.Context{ActiveSessionID: "s1"}, args: map[string]string{"cwd": app + "/docs"},
 			wantCwd: app + "/docs", wantLabels: termlabel.Shell("s1", "r1", feat)},
+		{name: "thread without a project starts in its home and has no repo", ctx: gui(command.Context{ActiveSessionID: "s1", ActiveWorktreePath: "/cf-test/home"}),
+			session: &v1.Session{WorktreePath: "/cf-test/home"}, wantCwd: "/cf-test/home", wantLabels: termlabel.Shell("s1", "", "/cf-test/home")},
 		{name: "thread lookup fails", ctx: command.Context{ActiveSessionID: "s1"},
 			sessionErr: connect.NewError(connect.CodeNotFound, errors.New("no such session")), wantMsg: "no such session"},
 		// Else the context's worktree.
@@ -118,7 +122,7 @@ func TestTerminalNewOwner(t *testing.T) {
 			if err := command.RegisterTerminal(reg, command.TerminalDeps{
 				Terminal: term,
 				Repo:     &commandtest.Repo{Repos: repos},
-				Session:  &commandtest.Session{Current: thread, Err: tt.sessionErr},
+				Session:  &commandtest.Session{Current: cmp.Or(tt.session, thread), Err: tt.sessionErr},
 			}); err != nil {
 				t.Fatal(err)
 			}
