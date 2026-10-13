@@ -40,6 +40,8 @@ func Parse(line []byte) Event {
 			ev = &CompactBoundary{}
 		case "thinking_tokens":
 			ev = &ThinkingTokens{}
+		case "commands_changed":
+			ev = &CommandsChanged{}
 		case "task_started", "task_progress", "task_updated", "task_notification":
 			ev = &Task{}
 		}

@@ -63,7 +63,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"session.new", "session.list", "session.focus", "session.close", "session.reconnect",
 		"session.rename", "session.fork", "session.remove", "session.run-in", "session.pin",
 		"thread.send", "thread.respond", "thread.interrupt", "thread.items", "thread.set-model", "thread.set-mode", "thread.set-effort",
-		"thread.mcp", "thread.mcp-reconnect", "view.panel.mcp",
+		"thread.mcp", "thread.mcp-reconnect", "view.panel.mcp", "thread.commands",
 		"git.fetch", "git.pull", "git.push", "pr.create", "pr.open",
 		"pr.revert", "pr.merge", "pr.review.request", "pr.refresh", "pr.ask", "pr.explain", "pr.fix.findings",
 		"worktree.open.editor", "worktree.reveal", "view.open.url",

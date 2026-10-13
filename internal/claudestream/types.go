@@ -109,9 +109,10 @@ func (r PermissionResult) wire(input json.RawMessage) map[string]any {
 
 // Event is one parsed stdout line other than a control_response to our own request
 // (the Conn resolves those). Concrete types: *Init, *Status, *PermissionDenied,
-// *CompactBoundary, *ThinkingTokens, *ConversationReset, *Assistant, *User, *StreamEvent, *Result,
-// *RateLimit, *CommandLifecycle, *Task, *PermissionRequest (an inbound can_use_tool,
-// from a Conn only), *ControlCancel, *Unknown.
+// *CompactBoundary, *ThinkingTokens, *CommandsChanged, *ConversationReset, *Assistant,
+// *User, *StreamEvent, *Result, *RateLimit, *CommandLifecycle, *Task,
+// *PermissionRequest (an inbound can_use_tool, from a Conn only), *ControlCancel,
+// *Unknown.
 type Event interface{ RawJSON() json.RawMessage }
 
 // base carries the raw line and the fields every frame may have.
@@ -449,10 +450,8 @@ type InitializeResponse struct {
 	ClaudeCodeVersion     string `json:"claude_code_version"`
 	CurrentPermissionMode string `json:"current_permission_mode"`
 	SessionState          string `json:"session_state"`
-	Commands              []struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-	} `json:"commands"`
+	// Commands are the slash commands Claude offers, in its order (commands.go).
+	Commands []SlashCommand `json:"commands"`
 }
 
 // SetCwdResponse is set_cwd's success payload. Status is "ok", "needs_trust" (the

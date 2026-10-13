@@ -30,6 +30,8 @@ type ThreadBackend interface {
 	SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error)
 	// McpBackend backs thread.mcp and thread.mcp-reconnect (commands_mcp.go).
 	McpBackend
+	// SlashBackend backs thread.commands (commands_slash.go).
+	SlashBackend
 }
 
 var (

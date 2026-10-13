@@ -141,7 +141,7 @@ func (r *runner) respawn() {
 	st.proc, st.conn = proc, proc.Conn()
 	st.connMu.Unlock()
 	st.events = st.conn.Events()
-	st.initialized, st.outputEnded, st.exited = false, false, false
+	st.initialized, st.outputEnded, st.exited, st.commandsPushed = false, false, false, false
 	st.effort = s.Effort
 	st.restart = restartStarting
 	st.restartTimer = time.NewTimer(r.m.opts.StartTimeout)

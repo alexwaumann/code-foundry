@@ -55,7 +55,7 @@ type streamState struct {
 
 	first *outgoing // sent once initialize succeeds
 
-	initDone chan error
+	initDone chan initResult
 	cmds     chan threadCmd
 	viewSig  chan struct{}
 
@@ -83,6 +83,8 @@ type streamState struct {
 	swapping bool
 	// mcpChecked: the MCP servers were checked since spawn (mcp.go checkMcp).
 	mcpChecked bool
+	// commandsPushed: this process pushed its slash commands (slashcommands.go).
+	commandsPushed bool
 }
 
 // connection is the current Conn, for Store calls made outside the run goroutine. While
@@ -140,7 +142,7 @@ func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv,
 	}
 	st := &streamState{
 		sd: &streamStatus{}, log: log, first: first,
-		initDone: make(chan error, 1),
+		initDone: make(chan initResult, 1),
 		cmds:     make(chan threadCmd),
 		viewSig:  make(chan struct{}, 1),
 		pending:  map[string]*claudestream.PermissionRequest{},
@@ -206,8 +208,8 @@ func (r *runner) run() {
 	r.initialize()
 	for !r.finished {
 		select {
-		case err := <-st.initDone:
-			r.onInitialized(err)
+		case res := <-st.initDone:
+			r.onInitialized(res)
 		case ev, ok := <-st.events:
 			if !ok {
 				st.events, st.outputEnded = nil, true
@@ -260,6 +262,12 @@ func (r *runner) run() {
 	}
 }
 
+// initResult is the handshake's answer.
+type initResult struct {
+	resp *claudestream.InitializeResponse
+	err  error
+}
+
 // initialize runs the handshake with the current process; the answer arrives on
 // initDone.
 func (r *runner) initialize() {
@@ -268,8 +276,8 @@ func (r *runner) initialize() {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
-		_, err := conn.Initialize(ctx)
-		st.initDone <- err
+		resp, err := conn.Initialize(ctx)
+		st.initDone <- initResult{resp, err}
 	}()
 }
 
@@ -281,9 +289,9 @@ func procDone(st *streamState) <-chan struct{} {
 	return st.proc.Done()
 }
 
-func (r *runner) onInitialized(err error) {
+func (r *runner) onInitialized(res initResult) {
 	st := r.st
-	if err != nil {
+	if err := res.err; err != nil {
 		if !r.closing && !st.exited && !errors.Is(err, claudestream.ErrClosed) {
 			// Still running but not answering (the startup timer says the same).
 			// ErrClosed means its stdout ended: the process is gone or going, and
@@ -297,6 +305,7 @@ func (r *runner) onInitialized(err error) {
 	if r.closing {
 		return // closed while starting: the close finishes it
 	}
+	r.onSlashCommands(res.resp.Commands, false)
 	if st.restart != restartNone {
 		r.onRestarted()
 		return
@@ -364,6 +373,8 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 		if last := r.st.proj.last; last.tokens > 0 {
 			r.m.recordContext(r.id, last.tokens, last.model)
 		}
+	case *claudestream.CommandsChanged:
+		r.onSlashCommands(e.Commands, true)
 	case *claudestream.ConversationReset:
 		r.log().info("claude reset the conversation (/clear)", "to", e.NewConversationID)
 		r.m.recordContext(r.id, 0, "")

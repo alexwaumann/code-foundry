@@ -136,6 +136,18 @@ changed: `docs/notes/rendered-only.md` (daemon detail `rendered-only-daemon.md`,
 detail `rendered-only-gui.md`). Follow-ups Alex owns: plan mode, the Bedrock cache break
 on reconnect, importing claude-foundry threads (not planned).
 
+### Slash commands in the composer: two PRs (2026-10-13)
+
+The composer's "/" card offers, for a running thread, the commands Claude itself reports
+(initialize's `commands`, kept current by `commands_changed`) minus a daemon-side deny
+table; Send refuses the commands the app replaces (`/clear`, `/model`, ...).
+
+* PR 1 (daemon: claudestream decode, per-thread cache, snapshot + Watch event,
+  `ThreadService.SlashCommands`, `thread.commands`, the deny table and send guard) done:
+  `docs/notes/slash-commands-1-daemon.md`.
+* PR 2 (GUI: the "/" card reads the thread's list, ListSkills for threads not running;
+  the refusal shown under the composer): next.
+
 ### Release channels: stable and tip (design 2026-10-11, revised 2026-10-12)
 
 Two channels, one install: every push to main publishes a `vX.Y.Z-tip.N` prerelease

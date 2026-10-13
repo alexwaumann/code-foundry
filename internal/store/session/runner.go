@@ -307,6 +307,7 @@ func (r *runner) publishStatus() {
 // into interrupted.
 func (r *runner) finish(fn func(*Session)) {
 	r.finished = true
+	r.st.log.setSlashCommands(nil) // only a running thread has them
 	for _, t := range []*time.Timer{r.closeTimer, r.debounce} {
 		if t != nil {
 			t.Stop()
