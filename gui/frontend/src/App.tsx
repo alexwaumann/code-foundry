@@ -82,7 +82,8 @@ function Content() {
   if (sel.kind === "view" && sel.name === "dashboard") return <StartPage />;
   if (sel.kind === "view" && sel.name === "pullrequests") return <PullRequestsPage />;
   if (sel.kind === "view" && sel.name === "projects") return <ProjectsPage />;
-  if (sel.kind === "compose") return <Composer key={sel.workspaceId ? `ws:${sel.workspaceId}` : sel.repoId} repoId={sel.repoId} workspaceId={sel.workspaceId} />;
+  if (sel.kind === "compose")
+    return <Composer key={sel.workspaceId ? `ws:${sel.workspaceId}` : sel.noProject ? "home:" : sel.repoId} repoId={sel.repoId} workspaceId={sel.workspaceId} noProject={sel.noProject} />;
   if (sel.kind === "session") return <ThreadPane sessionId={sel.id} />;
   return <StartPage />;
 }

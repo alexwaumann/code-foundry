@@ -1,6 +1,6 @@
 /**
- * New-thread drafts, one per project and one per workspace (keyed by draftKey in
- * lib/compose.ts: the repo id, or "ws:<workspace id>"), so switching the selection away
+ * New-thread drafts, one per project, one per workspace and one without a project (keyed
+ * by draftKey in lib/compose.ts: the repo id, "ws:<workspace id>", or "home:"), so switching the selection away
  * and back keeps what was typed and attached. Kept in memory only (not persisted): the
  * files behind the attachments do not survive a reload anyway. Also caches each repo's
  * base refs (RepoService.ListRefs) for the base-ref picker.
@@ -33,6 +33,7 @@ import {
   type ThreadPlace,
   type WorktreeChoice,
 } from "@/lib/compose";
+import { NO_PROJECT } from "@/lib/threadRow";
 import { sentComposerText } from "@/lib/userMessage";
 import { projectPrompt, removeReferences, removeRepoTags, repoTagCount, tagsByRepo } from "@/lib/prompt";
 import { invokeConfirmed, refreshCommands } from "./commands";
@@ -248,9 +249,26 @@ export function composeInWorkspace(workspaceId: string): void {
   ui.focusComposer();
 }
 
-/** A target's display name (the project's or the workspace's), else its id. */
+/**
+ * Shows the composer for a thread without a project and focuses it. Its selection has
+ * no repo, so the command context is the compose view alone (session.new --no-project).
+ */
+export function composeNoProject(): void {
+  const ui = useUiStore.getState();
+  ui.select({ kind: "compose", repoId: "", noProject: true });
+  ui.focusComposer();
+}
+
+/** A target's display name (the project's or the workspace's, else its id; "No project"). */
 function targetName(t: ComposeTarget): string {
-  return t.kind === "project" ? (useReposStore.getState().byId[t.repoId]?.name ?? t.repoId) : (useWorkspacesStore.getState().byId[t.workspaceId]?.name ?? t.workspaceId);
+  switch (t.kind) {
+    case "project":
+      return useReposStore.getState().byId[t.repoId]?.name ?? t.repoId;
+    case "workspace":
+      return useWorkspacesStore.getState().byId[t.workspaceId]?.name ?? t.workspaceId;
+    case "home":
+      return NO_PROJECT;
+  }
 }
 
 /**
@@ -333,12 +351,26 @@ function droppedTagsConfirm(before: string, after: string, to: ComposeTarget): C
 /** Shows a target's composer and focuses its prompt (no worktree side effect, unlike composeIn's path). */
 function selectTarget(to: ComposeTarget): void {
   if (to.kind === "project") composeIn(to.repoId);
-  else composeInWorkspace(to.workspaceId);
+  else if (to.kind === "workspace") composeInWorkspace(to.workspaceId);
+  else composeNoProject();
 }
 
 /** The composer target a compose selection shows. */
 export function composeTarget(sel: Extract<Selection, { kind: "compose" }>): ComposeTarget {
-  return sel.workspaceId ? { kind: "workspace", workspaceId: sel.workspaceId } : { kind: "project", repoId: sel.repoId };
+  if (sel.workspaceId) return { kind: "workspace", workspaceId: sel.workspaceId };
+  return sel.noProject ? { kind: "home" } : { kind: "project", repoId: sel.repoId };
+}
+
+/** The compose selection that shows a target (sendDraft's command context): a workspace's with the member the thread runs in. */
+export function composeSelection(target: ComposeTarget, place: ThreadPlace): Selection {
+  switch (target.kind) {
+    case "project":
+      return { kind: "compose", repoId: target.repoId };
+    case "workspace":
+      return { kind: "compose", repoId: place.kind === "home" ? "" : place.repoId, workspaceId: target.workspaceId };
+    case "home":
+      return { kind: "compose", repoId: "", noProject: true };
+  }
 }
 
 /** Loads the repo's base refs (once per composer mount; the previous list shows meanwhile). */
@@ -420,8 +452,7 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
       },
       sent.map((a) => a.stagedPath ?? ""),
     );
-    const sel: Selection = target.kind === "project" ? { kind: "compose", repoId: target.repoId } : { kind: "compose", repoId: place.repoId, workspaceId: target.workspaceId };
-    const res = await invokeConfirmed(SESSION_COMMANDS.create, args, getUiContext(sel));
+    const res = await invokeConfirmed(SESSION_COMMANDS.create, args, getUiContext(composeSelection(target, place)));
     if (!res) {
       updateDraft(key, { phase: "idle" });
       return false;

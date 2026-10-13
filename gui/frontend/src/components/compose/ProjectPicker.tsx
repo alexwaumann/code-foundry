@@ -4,7 +4,7 @@ import { ProjectRowGroups } from "./ProjectRows";
 import { useProjectRows } from "./useProjectRows";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { draftKey } from "@/lib/compose";
-import { composeIn, composeInWorkspace } from "@/stores/compose";
+import { composeIn, composeInWorkspace, composeNoProject } from "@/stores/compose";
 import { addProject } from "@/stores/projectActions";
 import { getUiContext } from "@/stores/context";
 import { useReposStore } from "@/stores/repos";
@@ -33,9 +33,10 @@ const hints = [
 
 /**
  * The palette's project picker: session.new's presentation in the GUI. Workspaces are
- * listed above projects (ProjectRows); picking either opens the new-thread composer for
- * it. The active thread's workspace, else the project in the current context, is
- * highlighted first; cmd+1..9 pick projects by position.
+ * listed above projects (ProjectRows), "No project" last; picking any opens the
+ * new-thread composer for it. The active thread's workspace, else the project in the
+ * current context, is highlighted first; cmd+1..9 pick projects by position. With no
+ * projects yet, "Add a project…" comes first and "No project" still starts a thread.
  */
 export function ProjectPicker({ close }: { close: () => void }) {
   const { workspaces, projects: order, loaded } = useProjectRows();
@@ -56,6 +57,10 @@ export function ProjectPicker({ close }: { close: () => void }) {
   const pickWorkspace = (id: string) => {
     leave();
     composeInWorkspace(id);
+  };
+  const pickNoProject = () => {
+    leave();
+    composeNoProject();
   };
 
   return (
@@ -85,7 +90,7 @@ export function ProjectPicker({ close }: { close: () => void }) {
         aria-label={workspaces.length > 0 ? "Search workspaces and projects" : "Search projects"}
       />
       <CommandList>
-        <CommandEmpty>{!loaded ? "Loading projects…" : order.length === 0 ? "No projects yet." : "No matching projects."}</CommandEmpty>
+        <CommandEmpty>{!loaded ? "Loading projects…" : "No matching projects."}</CommandEmpty>
         {loaded && order.length === 0 && (
           // The empty state's way forward: the Add Project dialog (repo.add).
           <CommandGroup heading="No projects yet">
@@ -104,7 +109,15 @@ export function ProjectPicker({ close }: { close: () => void }) {
             </CommandItem>
           </CommandGroup>
         )}
-        <ProjectRowGroups workspaces={workspaces} projects={order} soloHeading="New thread in…" shortcuts onPickProject={pick} onPickWorkspace={pickWorkspace} />
+        <ProjectRowGroups
+          workspaces={workspaces}
+          projects={order}
+          soloHeading="New thread in…"
+          shortcuts
+          onPickProject={pick}
+          onPickWorkspace={pickWorkspace}
+          onPickNoProject={loaded ? pickNoProject : undefined}
+        />
       </CommandList>
       <div className="flex items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground" data-testid="picker-hints">
         {hints.map(([key, label]) => (

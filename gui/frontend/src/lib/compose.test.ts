@@ -7,6 +7,7 @@ import {
   DEFAULT_MODEL,
   draftKey,
   draftMembers,
+  HOME_KEY,
   isWorkspaceKey,
   movedDraft,
   pickDefault,
@@ -90,6 +91,12 @@ describe("workspaces", () => {
     expect(isWorkspaceKey("web")).toBe(false);
   });
 
+  it("no project has its own draft key, no member and no primary", () => {
+    expect(draftKey({ kind: "home" })).toBe(HOME_KEY);
+    expect(isWorkspaceKey(HOME_KEY)).toBe(false);
+    expect(draftMembers({ target: { kind: "home" }, alsoIn: ["web"], primary: "web" }, login, (id) => repos.has(id))).toEqual({ repoIds: [], primary: "" });
+  });
+
   it.each<[string, PlaceInput, string[], string]>([
     ["a project alone", project, ["web"], "web"],
     ["a project with Also in, unknown and duplicate ones dropped", { ...project, alsoIn: ["api", "gone", "web", "api"] }, ["web", "api"], "web"],
@@ -159,6 +166,21 @@ describe("workspaces", () => {
     expect(threadArgs(place, { ...prompt, text: "/tdd go", composerText: " [/tdd](cf-skill://~/tdd) go " }, [])).toMatchObject({ prompt: "/tdd go", "composer-prompt": "[/tdd](cf-skill://~/tdd) go" });
     expect(threadArgs(place, { ...prompt, text: " ", composerText: "x" }, [])).not.toHaveProperty("composer-prompt");
     expect(threadArgs(place, { ...prompt, text: "no tags", composerText: "no tags" }, [])).not.toHaveProperty("composer-prompt");
+  });
+
+  it("no project: the thread starts at home, whatever the draft says; session.new gets no-project alone", () => {
+    const d: PlaceInput = { target: { kind: "home" }, worktree: { kind: "existing", path: "/src/web-fix" }, base: "origin/dev", alsoIn: ["api"], primary: "api" };
+    const place = threadPlace(d, env);
+    expect(place).toEqual({ kind: "home" });
+    expect(threadArgs({ kind: "home" }, { ...prompt, composerText: "[/tdd](cf-skill://~/tdd) Fix login" }, ["/tmp/a.png"])).toEqual({
+      "no-project": "true",
+      model: "haiku",
+      effort: "medium",
+      permission: "auto",
+      prompt: "Fix login",
+      "composer-prompt": "[/tdd](cf-skill://~/tdd) Fix login",
+      attachments: "/tmp/a.png",
+    });
   });
 });
 
@@ -275,6 +297,10 @@ describe("movedDraft", () => {
     ["primary dropped with Also in for a workspace target", { alsoIn: ["repo-sk"], primary: "repo-sk" }, proj("repo-cf"), ws("w-1"), { alsoIn: [], primary: null }],
     ["a workspace member as primary does not survive a move", { primary: "repo-gp" }, ws("w-1"), ws("w-2"), { primary: null }],
     ["primary dropped for a project without git", { alsoIn: ["repo-sk"], primary: "repo-sk" }, proj("repo-cf"), proj("repo-wr"), { alsoIn: [], primary: null }],
+    ["project → no project: no Also in, primary or base", { alsoIn: ["repo-sk"], primary: "repo-sk" }, proj("repo-cf"), { kind: "home" }, { alsoIn: [], primary: null, base: null, worktree: { kind: "new" }, error: null }],
+    ["workspace → no project", { worktree: { kind: "members" } }, ws("w-1"), { kind: "home" }, { alsoIn: [], worktree: { kind: "new" } }],
+    ["no project → project: a new worktree", { worktree: { kind: "new" }, base: null }, { kind: "home" }, proj("repo-cf"), { worktree: { kind: "new" }, alsoIn: [] }],
+    ["no project → workspace: workspace worktrees", { worktree: { kind: "new" } }, { kind: "home" }, ws("w-1"), { worktree: { kind: "members" } }],
   ])("%s", (_, over, from, to, want) => {
     const got = movedDraft({ ...draft, ...over }, from, to, isGit);
     expect(got).toMatchObject({ ...carried, ...want });
@@ -292,6 +318,7 @@ describe("movedDraft", () => {
     ["workspace → workspace keeps the shared members' tags", { text: `${sk("repo-gp")} ${sk("repo-dot")}` }, ws("w-1"), ws("w-2"), ["repo-gp", "repo-sk"], sk("repo-gp")],
     ["workspace → project keeps that project's tags", { text: `${sk("repo-gp")} ${sk("repo-dot")}` }, ws("w-1"), proj("repo-dot"), [], sk("repo-dot")],
     ["no tags: text unchanged", { text: "  plain text  " }, proj("repo-cf"), proj("repo-gp"), [], "  plain text  "],
+    ["to no project: every project tag goes; images and user skills stay", { alsoIn: ["repo-sk"], text: `${sk("repo-cf")} ${fl("repo-sk")} ${img} ${sk("")}` }, proj("repo-cf"), { kind: "home" }, [], `${img} ${sk("")}`],
   ])("tags: %s", (_, over, from, to, wsMembers, want) => {
     expect(movedDraft({ ...draft, ...over }, from, to, isGit, wsMembers).text).toBe(want);
   });

@@ -12,9 +12,10 @@ export type Selection =
   | { kind: "session"; id: string }
   /**
    * The new-thread composer (picked in the project picker): for a project, or with
-   * workspaceId for a workspace, repoId then being a member's (for the command context).
+   * workspaceId for a workspace, repoId then being a member's (for the command context),
+   * or with noProject for a thread without a project (repoId "").
    */
-  | { kind: "compose"; repoId: string; workspaceId?: string }
+  | { kind: "compose"; repoId: string; workspaceId?: string; noProject?: boolean }
   /** A top-level page that is not a sidebar row (see components/prs). */
   | { kind: "view"; name: string };
 
@@ -245,7 +246,7 @@ export function sameSelection(a: Selection, b: Selection): boolean {
     case "session":
       return a.id === (b as typeof a).id;
     case "compose":
-      return a.repoId === (b as typeof a).repoId && a.workspaceId === (b as typeof a).workspaceId;
+      return a.repoId === (b as typeof a).repoId && a.workspaceId === (b as typeof a).workspaceId && Boolean(a.noProject) === Boolean((b as typeof a).noProject);
     case "view":
       return a.name === (b as typeof a).name;
   }

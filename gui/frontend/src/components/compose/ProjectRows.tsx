@@ -1,16 +1,18 @@
 import { useShallow } from "zustand/react/shallow";
-import { Check, Layers } from "lucide-react";
-import { CommandGroup, CommandItem, CommandShortcut } from "@/components/ui/command";
+import { Check, House, Layers } from "lucide-react";
+import { CommandGroup, CommandItem, CommandSeparator, CommandShortcut } from "@/components/ui/command";
 import { formatChord } from "@/keys/chord";
-import { draftKey, projectHue, projectInitials, repoSource } from "@/lib/compose";
+import { draftKey, HOME_KEY, projectHue, projectInitials, repoSource } from "@/lib/compose";
 import { tildify } from "@/lib/path";
+import { NO_PROJECT } from "@/lib/threadRow";
 import { useReposStore } from "@/stores/repos";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
 /**
  * The rows the project pickers list (cmd+N's ProjectPicker and the composer heading's
  * ProjectSwitcher): workspaces above projects, each with its badge and a muted detail
- * line. One place for the markup and the order; the pickers add their own chrome.
+ * line, then "No project" last. One place for the markup and the order; the pickers add
+ * their own chrome.
  */
 
 /** Two-letter badge with a hue hashed from the project name. */
@@ -23,6 +25,15 @@ export function ProjectBadge({ name, className }: { name: string; className?: st
       style={{ backgroundColor: `oklch(0.55 0.13 ${String(hue)})` }}
     >
       {projectInitials(name)}
+    </span>
+  );
+}
+
+/** The House badge that stands for "No project" where a project shows its two letters. */
+export function NoProjectBadge({ className }: { className?: string }) {
+  return (
+    <span aria-hidden className={`flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground ${className ?? ""}`}>
+      <House className="size-3.5" />
     </span>
   );
 }
@@ -99,8 +110,27 @@ function WorkspaceRow({ id, current, onPick }: { id: string; current: boolean; o
 }
 
 /**
+ * A thread without a project: it runs in the home directory (`~`). Never a cmd+number
+ * shortcut, so Enter right after cmd+N still picks the first project. Its cmdk value is
+ * the home target's draftKey.
+ */
+function NoProjectRow({ current, onPick }: { current: boolean; onPick: () => void }) {
+  return (
+    <CommandItem value={HOME_KEY} keywords={[NO_PROJECT, "home", "~"]} onSelect={onPick} data-testid="picker-no-project" data-current={current || undefined} className="gap-3 py-2">
+      <NoProjectBadge />
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate font-medium">{NO_PROJECT}</span>
+        <span className="truncate text-xs text-muted-foreground">~</span>
+      </span>
+      {current && <CurrentMark />}
+    </CommandItem>
+  );
+}
+
+/**
  * The "Workspaces" group (when there are any) above the projects. The projects' heading
- * is "Projects" next to workspaces, else `soloHeading` (none when omitted).
+ * is "Projects" next to workspaces, else `soloHeading` (none when omitted). With
+ * `onPickNoProject`, a "No project" row after them all, below a separator.
  */
 export function ProjectRowGroups({
   workspaces,
@@ -110,6 +140,7 @@ export function ProjectRowGroups({
   current,
   onPickProject,
   onPickWorkspace,
+  onPickNoProject,
 }: {
   workspaces: readonly string[];
   projects: readonly string[];
@@ -120,6 +151,7 @@ export function ProjectRowGroups({
   current?: string;
   onPickProject: (id: string) => void;
   onPickWorkspace: (id: string) => void;
+  onPickNoProject?: () => void;
 }) {
   return (
     <>
@@ -136,6 +168,14 @@ export function ProjectRowGroups({
             <ProjectRow key={id} id={id} index={shortcuts ? i : undefined} current={current === id} onPick={onPickProject} />
           ))}
         </CommandGroup>
+      )}
+      {onPickNoProject && (
+        <>
+          {workspaces.length + projects.length > 0 && <CommandSeparator />}
+          <CommandGroup>
+            <NoProjectRow current={current === HOME_KEY} onPick={onPickNoProject} />
+          </CommandGroup>
+        </>
       )}
     </>
   );

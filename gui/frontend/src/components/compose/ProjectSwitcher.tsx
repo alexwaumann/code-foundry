@@ -11,8 +11,8 @@ import { useUiStore } from "@/stores/ui";
  * The composer heading's project or workspace name, as a button that switches the
  * composer to another one and moves the draft along (stores/compose switchDraftTarget).
  * A dotted underline only; a composer Tab stop before the member chips. The popover
- * lists the same rows as cmd+N's picker (ProjectRows) without the cmd+1..9 hints, the
- * current target checked and highlighted first.
+ * lists the same rows as cmd+N's picker (ProjectRows; "No project" last) without the
+ * cmd+1..9 hints, the current target checked and highlighted first.
  *
  * Esc closes it and focus returns to the name; after a pick the prompt has focus (the
  * new composer's, or this one's when nothing moved: the same target, or a cancelled
@@ -99,6 +99,13 @@ export function ProjectSwitcher({ target, name, disabled }: { target: ComposeTar
               onPickWorkspace={(workspaceId) => {
                 pick({ kind: "workspace", workspaceId });
               }}
+              onPickNoProject={
+                loaded
+                  ? () => {
+                      pick({ kind: "home" });
+                    }
+                  : undefined
+              }
             />
           </CommandList>
         </Command>

@@ -31,6 +31,7 @@ import {
 } from "@/lib/compose";
 import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
 import { tildify } from "@/lib/path";
+import { NO_PROJECT } from "@/lib/threadRow";
 import { formatAttachmentSize, isReferenced } from "@/lib/prompt";
 import { cn } from "@/lib/utils";
 import {
@@ -59,6 +60,8 @@ const SEP = "\u0001";
 
 /** What starts a completion in the prompt: "/" for skills, "@" for files. */
 const TRIGGERS: readonly TriggerChar[] = ["/", "@"];
+/** Without a project only "/": "@" would search the home directory, which is never indexed. */
+const HOME_TRIGGERS: readonly TriggerChar[] = ["/"];
 
 /** Model and effort the composer starts with: the settings defaults, else opus / high. */
 function useDefaults(): { model: string; effort: string } {
@@ -315,6 +318,9 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   const [dragging, setDragging] = useState(false);
 
   const busy = phase !== "idle";
+  // No project: no worktree, base, branch or member chips; "/" completes, "@" does not.
+  const home = target.kind === "home";
+  const sourceTarget = target.kind === "workspace" ? "workspace" : "project";
   const multi = target.kind === "project" && repoIds.length > 1;
   const worktree: WorktreeChoice =
     target.kind === "workspace"
@@ -326,7 +332,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
         : multi
           ? { kind: "new" }
           : resolveWorktree(choice, worktrees);
-  const newWorktrees = worktree.kind !== "new" ? 0 : target.kind === "workspace" || multi ? repoIds.length : 1;
+  const newWorktrees = home || worktree.kind !== "new" ? 0 : target.kind === "workspace" || multi ? repoIds.length : 1;
   const base = baseChoice ?? defaultRef;
   const canSend = !busy && (text.trim() !== "" || hasAttachments);
 
@@ -334,8 +340,8 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   // the user's, reloaded on mount and whenever those change.
   const existingPath = worktree.kind === "existing" ? worktree.path : "";
   const sources = useMemo(
-    () => skillSources({ target: target.kind, repoIds, worktree: existingPath ? { kind: "existing", path: existingPath } : { kind: "new" }, wsMembers }),
-    [target.kind, repoIds, existingPath, wsMembers],
+    () => skillSources({ target: sourceTarget, repoIds, worktree: existingPath ? { kind: "existing", path: existingPath } : { kind: "new" }, wsMembers }),
+    [sourceTarget, repoIds, existingPath, wsMembers],
   );
   useEffect(() => {
     void loadSkills(sources);
@@ -346,12 +352,12 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   const fileSrcs = useMemo(
     () =>
       fileSources({
-        target: target.kind,
+        target: sourceTarget,
         repoIds,
         worktree: worktreeKind === "existing" ? { kind: "existing", path: existingPath } : { kind: worktreeKind },
         wsMembers,
       }),
-    [target.kind, repoIds, worktreeKind, existingPath, wsMembers],
+    [sourceTarget, repoIds, worktreeKind, existingPath, wsMembers],
   );
   const [trigger, setTrigger] = useState<EditorTrigger | null>(null);
   const skillSource = useSkillSource(trigger, skillSourcesKey(sources), repoIds);
@@ -444,7 +450,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
 
   return (
     <div>
-      <MemberChips draftKey={draftKey} members={chips} primary={primary} canAdd={target.kind === "project" && noGitPath === undefined} disabled={busy} />
+      {!home && <MemberChips draftKey={draftKey} members={chips} primary={primary} canAdd={target.kind === "project" && noGitPath === undefined} disabled={busy} />}
       <div
         // isolate: the surface's backdrop-filter makes it a stacking context, which would
         // paint over the in-flow prompt and toolbar; -z-10 inside this context keeps it under them.
@@ -502,7 +508,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
               }}
               onPasteFiles={attach}
               onPreviewChip={(id, el) => openPreview(draftKey, id, el)}
-              triggers={TRIGGERS}
+              triggers={home ? HOME_TRIGGERS : TRIGGERS}
               onTrigger={completion.onTrigger}
               onCompletionKey={completion.onKey}
               completionAria={completion.aria}
@@ -590,45 +596,50 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
         )}
         {/* relative: the completion card hangs under this row, out of flow (CompletionCard). */}
         <div className="relative col-span-2 col-start-1 row-start-4 flex flex-wrap items-center gap-0.5 px-1 pt-2" data-testid="composer-worktree-row">
-          <ComposerPicker
-            label="Worktree"
-            icon={worktreeIcon}
-            text={worktreeText}
-            value={worktree.kind === "existing" ? worktree.path : worktree.kind}
-            groups={worktreeGroups}
-            onChange={(v) => {
-              updateDraft(draftKey, { worktree: v === "new" || v === "members" ? { kind: v } : { kind: "existing", path: v } });
-            }}
-            disabled={busy}
-            contentClassName="w-80"
-            data-testid="composer-worktree"
-          />
-          {noGitPath !== undefined ? <NoGitBadge className="mx-1 h-6 rounded-md px-1.5 text-xs" /> : chosen && <BranchIndicator worktree={chosen} />}
-          {worktree.kind === "members" && primaryCheckout && <BranchIndicator worktree={primaryCheckout} />}
-          {worktree.kind === "new" && (
-            <ComposerPicker
-              label="Base"
-              icon={GitCommitHorizontal}
-              text={base ? `From ${base}` : "From the default branch"}
-              value={base}
-              groups={refGroups}
-              onChange={(v) => {
-                updateDraft(draftKey, { base: v });
-              }}
-              filterPlaceholder="Filter refs…"
-              status={
-                refsStatus === "loading"
-                  ? "Loading refs…"
-                  : refsStatus === "error"
-                    ? refsOutdated
-                      ? refsError
-                      : `Cannot list refs: ${refsError ?? "unknown error"}. The default branch is used.`
-                    : null
-              }
-              disabled={busy}
-              contentClassName="w-72"
-              data-testid="composer-base"
-            />
+          {/* No project: no worktree, branch or base to pick. */}
+          {!home && (
+            <>
+              <ComposerPicker
+                label="Worktree"
+                icon={worktreeIcon}
+                text={worktreeText}
+                value={worktree.kind === "existing" ? worktree.path : worktree.kind}
+                groups={worktreeGroups}
+                onChange={(v) => {
+                  updateDraft(draftKey, { worktree: v === "new" || v === "members" ? { kind: v } : { kind: "existing", path: v } });
+                }}
+                disabled={busy}
+                contentClassName="w-80"
+                data-testid="composer-worktree"
+              />
+              {noGitPath !== undefined ? <NoGitBadge className="mx-1 h-6 rounded-md px-1.5 text-xs" /> : chosen && <BranchIndicator worktree={chosen} />}
+              {worktree.kind === "members" && primaryCheckout && <BranchIndicator worktree={primaryCheckout} />}
+              {worktree.kind === "new" && (
+                <ComposerPicker
+                  label="Base"
+                  icon={GitCommitHorizontal}
+                  text={base ? `From ${base}` : "From the default branch"}
+                  value={base}
+                  groups={refGroups}
+                  onChange={(v) => {
+                    updateDraft(draftKey, { base: v });
+                  }}
+                  filterPlaceholder="Filter refs…"
+                  status={
+                    refsStatus === "loading"
+                      ? "Loading refs…"
+                      : refsStatus === "error"
+                        ? refsOutdated
+                          ? refsError
+                          : `Cannot list refs: ${refsError ?? "unknown error"}. The default branch is used.`
+                        : null
+                  }
+                  disabled={busy}
+                  contentClassName="w-72"
+                  data-testid="composer-base"
+                />
+              )}
+            </>
           )}
           <CompletionCard completion={completion} />
         </div>
@@ -662,15 +673,21 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   );
 }
 
-/** The new-thread composer for a project, or a workspace with workspaceId (Selection kind "compose"). */
-export function Composer({ repoId, workspaceId }: { repoId: string; workspaceId?: string }) {
-  const target = useMemo<ComposeTarget>(() => (workspaceId ? { kind: "workspace", workspaceId } : { kind: "project", repoId }), [repoId, workspaceId]);
+/**
+ * The new-thread composer for a project, a workspace with workspaceId, or no project with
+ * noProject (Selection kind "compose").
+ */
+export function Composer({ repoId, workspaceId, noProject = false }: { repoId: string; workspaceId?: string; noProject?: boolean }) {
+  const target = useMemo<ComposeTarget>(
+    () => (workspaceId ? { kind: "workspace", workspaceId } : noProject ? { kind: "home" } : { kind: "project", repoId }),
+    [repoId, workspaceId, noProject],
+  );
   const projectName = useReposStore((s) => s.byId[repoId]?.name ?? null);
   const workspaceName = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? null) : null));
   const reposLoaded = useReposStore((s) => s.loaded);
   const workspacesLoaded = useWorkspacesStore((s) => s.loaded);
   const busy = useDraft(keyOf(target), "phase") !== "idle";
-  const name = workspaceId ? workspaceName : projectName;
+  const name = workspaceId ? workspaceName : noProject ? NO_PROJECT : projectName;
   const loaded = workspaceId ? workspacesLoaded : reposLoaded;
   const gone = workspaceId ? "This workspace no longer exists." : "This project is no longer registered.";
   return (
@@ -687,7 +704,8 @@ export function Composer({ repoId, workspaceId }: { repoId: string; workspaceId?
           // The heading's name is the first composer Tab stop, then the member chips, the prompt…
           <div className="m-auto w-full max-w-2xl" data-testid="composer-body" onKeyDown={cycleStops}>
             <h1 className="mb-6 text-center text-2xl font-semibold tracking-tight" data-testid="composer-heading">
-              What should we build in <ProjectSwitcher target={target} name={name} disabled={busy} />?
+              {/* "build with No project" reads as "with no project"; "in" would not. */}
+              What should we build {noProject ? "with" : "in"} <ProjectSwitcher target={target} name={name} disabled={busy} />?
             </h1>
             <ComposerCard target={target} />
           </div>
