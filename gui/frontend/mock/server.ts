@@ -686,6 +686,20 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, 404, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
+    case "POST /__mock/thread/retry":
+      // id=s-r1&in=20&attempt=3&max=10&status=429&error=rate_limit, or clear=1.
+      try {
+        world.setThreadRetry(
+          q.get("id") ?? "s-r1",
+          q.has("clear")
+            ? null
+            : { inSeconds: Number(q.get("in") ?? "20"), attempt: Number(q.get("attempt") ?? "3"), maxRetries: Number(q.get("max") ?? "10"), errorStatus: Number(q.get("status") ?? "429"), error: q.get("error") ?? "rate_limit" },
+        );
+        json(res, 200, { ok: true });
+      } catch (err) {
+        json(res, 404, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
     case "POST /__mock/thread/stream":
       world.threads.stream(q.get("id") ?? "s-r1", q.get("text") ?? "");
       json(res, 200, { ok: true });

@@ -195,6 +195,23 @@ message Session {
   // TTL is over 5 minutes, else the 5 min rate), first-party Claude API prices,
   // computed when sent. 0 when the model has no known rate.
   double context_reread_usd = 35;
+  // Set while Claude waits to retry a failed API request (a 429, a 529, a 5xx, a
+  // connection error); unset once any other frame follows or the process ends. Not
+  // persisted. See docs/notes/api-retry-note.md.
+  ApiRetry retry = 36;
+}
+
+// ApiRetry is a thread's pending API retry: Claude's system/api_retry frame.
+message ApiRetry {
+  // Counts from 1 to max_retries.
+  int32 attempt = 1;
+  int32 max_retries = 2;
+  // When the retry is due.
+  google.protobuf.Timestamp retry_at = 3;
+  // The HTTP status of the failed request; 0 for a connection error with no response.
+  int32 error_status = 4;
+  // Claude's category: "rate_limit", "overloaded", "server_error", ...
+  string error = 5;
 }
 
 // Whether a subagent run is still followed.

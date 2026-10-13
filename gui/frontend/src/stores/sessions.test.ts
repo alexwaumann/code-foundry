@@ -46,6 +46,7 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     contextTokens: 0,
     cacheExpiresAtMs: null,
     contextRereadUsd: 0,
+    retry: null,
     ...over,
   };
 }

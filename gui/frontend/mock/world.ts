@@ -94,6 +94,8 @@ interface MockSession {
   contextTokens: MockContext["contextTokens"];
   contextModel: MockContext["contextModel"];
   lastResultAt: MockContext["lastResultAt"];
+  /** A pending API retry (Session.retry; POST /__mock/thread/retry); null for none. */
+  retry: { attempt: number; maxRetries: number; retryAt: Date; errorStatus: number; error: string } | null;
   /** Mock-only: seconds a queued run-in waits once the thread is not busy (the daemon waits for its prompt). */
   moveIn: number;
   /** Mock-only: seconds left before a STARTING/CLOSING session settles. */
@@ -871,6 +873,7 @@ export class World {
       contextTokens: 0,
       contextModel: "",
       lastResultAt: null,
+      retry: null,
       moveIn: 0,
       settleIn: 0,
       nameIn: 0,
@@ -913,6 +916,7 @@ export class World {
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
       ...usageFields(s.usage),
       ...contextFields(s, this.cacheTTLSeconds()),
+      ...(s.retry ? { retry: { attempt: s.retry.attempt, maxRetries: s.retry.maxRetries, retryAt: timestampFromDate(s.retry.retryAt), errorStatus: s.retry.errorStatus, error: s.retry.error } } : {}),
     };
   }
 
@@ -1027,6 +1031,7 @@ export class World {
       contextTokens: 25_700,
       contextModel: "claude-opus-4-8",
       lastResultAt: new Date(Date.now() - 2 * 60_000),
+      retry: null,
     });
     this.threads.load(id, state);
     if (state === "closed") this.disconnectSession(id, "closed", 0);
@@ -1050,6 +1055,22 @@ export class World {
     s.lastResultAt = new Date(Date.now() - agoSeconds * 1000);
     if (tokens !== undefined) s.contextTokens = tokens;
     if (model !== undefined) s.contextModel = model;
+    this.publishSession(s);
+  }
+
+  /**
+   * POST /__mock/thread/retry: Claude retries a failed API request in `inSeconds`
+   * (attempt/max, the HTTP status and Claude's error category), or with `clear` the
+   * retry went through. The thread says busy meanwhile, as the daemon's would.
+   */
+  setThreadRetry(id: string, r: { inSeconds: number; attempt: number; maxRetries: number; errorStatus: number; error: string } | null): void {
+    const s = this.session(id);
+    if (r) {
+      s.retry = { attempt: r.attempt, maxRetries: r.maxRetries, retryAt: new Date(Date.now() + r.inSeconds * 1000), errorStatus: r.errorStatus, error: r.error };
+      this.setStatus(s, SessionStatus.BUSY);
+    } else {
+      s.retry = null;
+    }
     this.publishSession(s);
   }
 

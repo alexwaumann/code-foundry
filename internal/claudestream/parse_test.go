@@ -337,3 +337,43 @@ func TestPermissionResultWire(t *testing.T) {
 		})
 	}
 }
+
+// The api_retry line is not in a capture (a 429 is hard to force); its shape is Claude
+// Code 2.1.296's SDKAPIRetryMessage schema, read from the binary.
+func TestParseAPIRetry(t *testing.T) {
+	tests := []struct {
+		name string
+		line string
+		want APIRetry
+	}{
+		{
+			name: "rate limited",
+			line: `{"type":"system","subtype":"api_retry","attempt":3,"max_retries":10,"retry_delay_ms":20000,"error_status":429,"error":"rate_limit","uuid":"u1","session_id":"s1"}`,
+			want: APIRetry{Attempt: 3, MaxRetries: 10, RetryDelayMs: 20000, ErrorStatus: intp(429), Error: "rate_limit"},
+		},
+		{
+			name: "connection error without a response",
+			line: `{"type":"system","subtype":"api_retry","attempt":1,"max_retries":10,"retry_delay_ms":500,"error_status":null,"error":"connection","no_response":{"waited_ms":30000,"retry_wait_ms":500},"uuid":"u2","session_id":"s1"}`,
+			want: APIRetry{Attempt: 1, MaxRetries: 10, RetryDelayMs: 500, Error: "connection"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ev, ok := Parse([]byte(tt.line)).(*APIRetry)
+			if !ok {
+				t.Fatalf("parsed %T, want *APIRetry", Parse([]byte(tt.line)))
+			}
+			if ev.Attempt != tt.want.Attempt || ev.MaxRetries != tt.want.MaxRetries || ev.RetryDelayMs != tt.want.RetryDelayMs || ev.Error != tt.want.Error {
+				t.Errorf("got %+v, want %+v", ev, tt.want)
+			}
+			if (ev.ErrorStatus == nil) != (tt.want.ErrorStatus == nil) || (ev.ErrorStatus != nil && *ev.ErrorStatus != *tt.want.ErrorStatus) {
+				t.Errorf("error_status = %v, want %v", ev.ErrorStatus, tt.want.ErrorStatus)
+			}
+			if tt.name == "connection error without a response" && (ev.NoResponse == nil || ev.NoResponse.WaitedMs != 30000) {
+				t.Errorf("no_response = %+v", ev.NoResponse)
+			}
+		})
+	}
+}
+
+func intp(v int) *int { return &v }

@@ -110,7 +110,7 @@ func (r PermissionResult) wire(input json.RawMessage) map[string]any {
 // Event is one parsed stdout line other than a control_response to our own request
 // (the Conn resolves those). Concrete types: *Init, *Status, *PermissionDenied,
 // *CompactBoundary, *ThinkingTokens, *CommandsChanged, *ConversationReset, *Assistant,
-// *User, *StreamEvent, *Result, *RateLimit, *CommandLifecycle, *Task,
+// *User, *StreamEvent, *Result, *RateLimit, *APIRetry, *CommandLifecycle, *Task,
 // *PermissionRequest (an inbound can_use_tool, from a Conn only), *ControlCancel,
 // *Unknown.
 type Event interface{ RawJSON() json.RawMessage }
@@ -149,6 +149,27 @@ type Status struct {
 	PermissionMode string  `json:"permissionMode,omitempty"`
 	CompactResult  string  `json:"compact_result,omitempty"`
 	CompactError   string  `json:"compact_error,omitempty"`
+}
+
+// APIRetry is system/api_retry: an API request failed with a retryable error (a 429,
+// a 529, a 5xx, a connection error) and Claude retries it after retry_delay_ms. One
+// frame per attempt; nothing announces the retry's success. The next frame of any other
+// kind means it went through (Claude's own REPL clears its banner the same way). Shape
+// from Claude Code 2.1.296's SDKAPIRetryMessage.
+type APIRetry struct {
+	base
+	Attempt      int `json:"attempt"`
+	MaxRetries   int `json:"max_retries"`
+	RetryDelayMs int `json:"retry_delay_ms"`
+	// ErrorStatus is the HTTP status; nil for connection errors with no response.
+	ErrorStatus *int `json:"error_status"`
+	// Error is Claude's category: "rate_limit", "overloaded", "server_error", ...
+	Error string `json:"error"`
+	// NoResponse is set when no response headers arrived within the first-byte window.
+	NoResponse *struct {
+		WaitedMs    int `json:"waited_ms"`
+		RetryWaitMs int `json:"retry_wait_ms"`
+	} `json:"no_response,omitempty"`
 }
 
 // PermissionDenied is system/permission_denied: a tool call was denied without a
