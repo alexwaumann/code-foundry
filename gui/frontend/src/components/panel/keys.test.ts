@@ -101,7 +101,7 @@ describe("surface registry", () => {
     expect(surfaceByHotkey("U")?.kind).toBe("usage");
     expect(surfaceByHotkey("m")?.kind).toBe("mcp");
     expect(surfaceByHotkey("T")?.kind).toBe("worktree");
-    // s-1 is unknown here: no pull request, no linked pull requests, not a rendered thread,
+    // s-1 is unknown here: no pull request, no linked pull requests, not a known thread,
     // no workspace thread, no worktree to place it in.
     expect(surfaces.map((s) => s.available(ctx))).toEqual(["disabled", "disabled", "disabled", "hidden", "hidden", "hidden", "hidden", "hidden"]);
   });

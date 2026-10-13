@@ -5,7 +5,6 @@ const EXPIRES = Date.UTC(2026, 9, 12, 10, 0, 0);
 
 function input(o: Partial<ColdCacheInput> = {}): ColdCacheInput {
   return {
-    render: "rendered",
     state: "connected",
     status: "idle",
     contextTokens: 25_700,
@@ -22,12 +21,11 @@ const NOTE = "Cache expired · the next message re-reads 25.7K tokens (~$0.08)";
 
 describe("coldCacheNote", () => {
   it.each<[string, Partial<ColdCacheInput>, string | null]>([
-    ["an idle rendered thread past its expiry", {}, NOTE],
+    ["an idle thread past its expiry", {}, NOTE],
     ["exactly at the expiry", { nowMs: EXPIRES }, NOTE],
     ["a finished turn not seen yet is idle enough", { status: "attention" }, NOTE],
     ["unknown status while connected", { status: "unknown" }, NOTE],
     ["before the expiry", { nowMs: EXPIRES - 1 }, null],
-    ["a terminal thread", { render: "terminal" }, null],
     ["disconnected (the Reconnect card shows instead)", { state: "disconnected" }, null],
     ["starting", { state: "starting" }, null],
     ["closing", { state: "closing" }, null],

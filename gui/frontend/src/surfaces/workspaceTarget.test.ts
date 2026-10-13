@@ -17,7 +17,7 @@ const WEB = "/wt/web/cf-demo";
 const API = "/wt/api/cf-demo";
 
 function session(id: string, o: Partial<SessionView> = {}): SessionView {
-  return { id, repoId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", terminalId: "", createdAtMs: 1, lastActivityAtMs: null, ...o } as SessionView;
+  return { id, repoId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", createdAtMs: 1, lastActivityAtMs: null, ...o } as SessionView;
 }
 
 const repos: ReposData = {
@@ -33,7 +33,7 @@ function sessions(...list: SessionView[]): SessionsData {
 }
 
 describe("selectionWorkspaceThread (the surface's availability)", () => {
-  const s = { repos, sessions: sessions(session("s-ws", { workspaceId: "w1", terminalId: "t-ws" }), session("s-proj")) };
+  const s = { repos, sessions: sessions(session("s-ws", { workspaceId: "w1" }), session("s-proj")) };
   it.each<[string, Selection, { sessionId: string; workspaceId: string } | null]>([
     ["a workspace thread", { kind: "session", id: "s-ws" }, { sessionId: "s-ws", workspaceId: "w1" }],
     ["a project thread", { kind: "session", id: "s-proj" }, null],

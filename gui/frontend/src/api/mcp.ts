@@ -1,5 +1,5 @@
 /**
- * A rendered thread's MCP servers (docs/notes/mcp-panel.md) mapped to view models.
+ * A thread's MCP servers (docs/notes/mcp-panel.md) mapped to view models.
  * Generated types stay in src/api. The daemon checks the servers at the start of every
  * turn (and after a reconnect); ThreadService.Watch carries each check (the snapshot's
  * `mcp`, then `mcp` events), so the panel reads them from the thread store.

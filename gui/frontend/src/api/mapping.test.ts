@@ -324,7 +324,6 @@ describe("events mapping", () => {
       worktreePath: "/w",
       name: "fix tests",
       model: "opus",
-      terminalId: "t1",
       state: SessionState.DISCONNECTED,
       status: SessionStatus.NEEDS_ATTENTION,
       lastActivityAt: timestampFromMs(5000),
@@ -408,7 +407,7 @@ describe("events mapping", () => {
     expect(retired).toEqual({ kind: "retiredUsage", buckets: [view] });
   });
 
-  it("maps a rendered thread's context totals and cache expiry", () => {
+  it("maps a thread's context totals and cache expiry", () => {
     expect(toSessionView(create(SessionSchema, { id: "s0" }))).toMatchObject({ contextTokens: 0, cacheExpiresAtMs: null, contextRereadUsd: 0 });
     expect(toSessionView(create(SessionSchema, { id: "s1", contextTokens: 25_700n, cacheExpiresAt: timestampFromMs(3_600_000), contextRereadUsd: 0.0514 }))).toMatchObject({
       contextTokens: 25_700,

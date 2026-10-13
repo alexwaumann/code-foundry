@@ -12,10 +12,10 @@ function thread(sel: Selection): string | null {
 }
 
 /**
- * MCP: the selected rendered thread's MCP servers as Claude last reported them (checked at
+ * MCP: the selected thread's MCP servers as Claude last reported them (checked at
  * the start of every turn), one card each with status, error or login hint, tools with
  * their hints, and Reconnect (docs/sketches/mcp-panel variant B, docs/notes/mcp-panel.md).
- * Enabled for a rendered thread, hidden otherwise. One tab per panel, no params: the body
+ * Enabled for a thread, hidden otherwise. One tab per panel, no params: the body
  * follows the selection's thread, like Usage. Opened by M in the panel and by
  * view.panel.mcp (stores/mcpPanel.ts).
  */

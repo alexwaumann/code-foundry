@@ -58,7 +58,7 @@ describe("ownerKeyOf", () => {
   const cases: [string, Record<string, string>, string | null][] = [
     ["a thread's shell", shell("s1"), "session:s1"],
     ["a worktree's shell", shell(""), "view:projects"],
-    ["a thread's Claude terminal (session, no kind)", { session: "s1", worktree: "/src/app" }, null],
+    ["a thread-labelled terminal that is no shell (session, no kind)", { session: "s1", worktree: "/src/app" }, null],
     ["an unlabelled terminal", {}, null],
     ["another kind", { kind: "job", session: "s1" }, null],
   ];
@@ -78,7 +78,7 @@ describe("bottomTabIds", () => {
     term("w2", shell("", "/src/app.worktrees/x")),
   ]);
   const cases: [string, string, string[]][] = [
-    ["a thread: its shells in store order, not its Claude terminal", "session:s1", ["a", "c"]],
+    ["a thread: its shells in store order, not a non-shell terminal", "session:s1", ["a", "c"]],
     ["another thread", "session:s2", ["b"]],
     ["a thread without shells", "session:s3", []],
     ["the Projects page: every shell no thread owns", "view:projects", ["w1", "w2"]],

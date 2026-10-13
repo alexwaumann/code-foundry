@@ -171,20 +171,3 @@ export function activeThreadIds(data: SessionsData): string[] {
 export function useAttentionCount(): number {
   return useSessionsStore((s) => attentionIds(s).length);
 }
-
-/**
- * The session a terminal belongs to, if that session is known (labels.session, else the
- * session's attached terminal). The focusTerminal intent selects it for its Claude
- * terminal.
- */
-export function sessionOfTerminal(data: SessionsData, terminal: { id: string; labels: Readonly<Record<string, string>> }): SessionView | undefined {
-  const labelled = terminal.labels.session;
-  if (labelled && data.byId[labelled]) return data.byId[labelled];
-  // A rendered thread has no terminal (terminalId ""): never match it by an empty id.
-  if (!terminal.id) return undefined;
-  for (const id of data.order) {
-    const s = data.byId[id];
-    if (s?.terminalId === terminal.id) return s;
-  }
-  return undefined;
-}

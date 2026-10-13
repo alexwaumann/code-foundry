@@ -7,7 +7,7 @@ import { deriveContext } from "./context";
 import { dispatchEvent } from "./events";
 import { applyIntent } from "./intents";
 import { emptyRepos, replaceRepos, useReposStore } from "./repos";
-import { activeThreadIds, applyRetiredUsage, applySessionEvent, attentionIds, connectedCount, emptySessions, replaceSessions, runningCount, sessionOfTerminal, useSessionsStore } from "./sessions";
+import { activeThreadIds, applyRetiredUsage, applySessionEvent, attentionIds, connectedCount, emptySessions, replaceSessions, runningCount, useSessionsStore } from "./sessions";
 import { emptyTerminals, useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 
@@ -21,7 +21,6 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     autoNamed: true,
     model: "opus",
     effort: "high",
-    terminalId: `t-${id}`,
     state: "connected",
     status: "idle",
     statusReason: "",
@@ -38,7 +37,6 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     workspaceId: "",
     pendingWorktreePath: "",
     pinned: false,
-    render: "terminal",
     effortPending: false,
     linkedPullRequests: [],
     usage: [],
@@ -150,9 +148,9 @@ describe("session reducers", () => {
   it("attentionIds counts a disconnected session's persisted attention, not an interrupted one", () => {
     const d = replaceSessions(emptySessions, [
       session("a", { status: "attention" }),
-      session("b", { status: "attention", statusReason: "question: Which color do you prefer?", state: "disconnected", terminalId: "" }),
+      session("b", { status: "attention", statusReason: "question: Which color do you prefer?", state: "disconnected" }),
       session("c"),
-      session("d", { status: "error", statusReason: "interrupted", state: "disconnected", terminalId: "" }),
+      session("d", { status: "error", statusReason: "interrupted", state: "disconnected" }),
     ]);
     expect(attentionIds(d)).toEqual(["a", "b"]);
   });
@@ -162,7 +160,7 @@ describe("session reducers", () => {
       session("busy1", { status: "busy", createdAtMs: 1 }),
       session("idle", { createdAtMs: 2 }),
       session("wait1", { status: "attention", createdAtMs: 3 }),
-      session("gone", { status: "busy", state: "disconnected", terminalId: "", createdAtMs: 4 }),
+      session("gone", { status: "busy", state: "disconnected", createdAtMs: 4 }),
       session("start", { status: "busy", state: "starting", createdAtMs: 5 }),
       session("wait2", { status: "attention", state: "closing", createdAtMs: 6 }),
     ]);
@@ -170,21 +168,6 @@ describe("session reducers", () => {
     expect(runningCount(d)).toBe(2);
     expect(activeThreadIds(d)).toEqual(["wait1", "wait2", "busy1", "start"]);
     expect(activeThreadIds(emptySessions)).toEqual([]);
-  });
-
-  it("sessionOfTerminal matches labels.session, then terminal_id", () => {
-    const d = replaceSessions(emptySessions, [session("a"), session("b", { terminalId: "tx" })]);
-    expect(sessionOfTerminal(d, term("q", { session: "a" }))?.id).toBe("a");
-    expect(sessionOfTerminal(d, term("tx"))?.id).toBe("b");
-    expect(sessionOfTerminal(d, term("q", { session: "unknown" }))).toBeUndefined();
-  });
-
-  it("sessionOfTerminal never picks a rendered thread (no terminal) for an empty id", () => {
-    const d = replaceSessions(emptySessions, [session("r", { terminalId: "", render: "rendered" })]);
-    expect(sessionOfTerminal(d, term(""))).toBeUndefined();
-    expect(sessionOfTerminal(d, term("t1"))).toBeUndefined();
-    // Labelled terminals still resolve (a rendered thread's shell carries labels.session).
-    expect(sessionOfTerminal(d, term("t2", { session: "r" }))?.id).toBe("r");
   });
 });
 
@@ -201,33 +184,24 @@ describe("deriveContext for a session", () => {
       worktrees: [{ repoId: "r1", path: "/src/app", branch: "main", head: "", detached: false, isMain: true, status: { upstream: "", ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, dirty: false, refreshedAtMs: null } }],
     },
   ]);
-  it("carries session, its terminal, and its worktree", () => {
-    const sessions = replaceSessions(emptySessions, [session("s1", { terminalId: "t9" })]);
+  it("carries the session and its worktree; no terminal (a thread has none)", () => {
+    const sessions = replaceSessions(emptySessions, [session("s1")]);
     expect(deriveContext({ kind: "session", id: "s1" }, repos, sessions)).toEqual({
       activeSessionId: "s1",
-      activeTerminalId: "t9",
+      activeTerminalId: "",
       activeRepoId: "r1",
       activeWorktreePath: "/src/app",
       activeView: "session",
       activeWorkspaceId: "",
-      activeSessionRendered: false,
     });
   });
-  it("a rendered thread says so and has no terminal (the thread.* commands' availability)", () => {
-    const sessions = replaceSessions(emptySessions, [session("s1", { terminalId: "", render: "rendered" })]);
-    const ctx = deriveContext({ kind: "session", id: "s1" }, repos, sessions);
-    expect(ctx.activeSessionRendered).toBe(true);
-    expect(ctx.activeTerminalId).toBe("");
-    expect(deriveContext({ kind: "compose", repoId: "r1" }, repos, sessions).activeSessionRendered).toBe(false);
-  });
   it("a workspace thread carries its workspace (session.run-in's availability)", () => {
-    const sessions = replaceSessions(emptySessions, [session("s1", { terminalId: "t9", workspaceId: "w-1" })]);
+    const sessions = replaceSessions(emptySessions, [session("s1", { workspaceId: "w-1" })]);
     expect(deriveContext({ kind: "session", id: "s1" }, repos, sessions).activeWorkspaceId).toBe("w-1");
     expect(deriveContext({ kind: "compose", repoId: "r1", workspaceId: "w-2" }, repos, sessions).activeWorkspaceId).toBe("w-2");
   });
-  it("disconnected: no terminal; unknown session keeps the id", () => {
-    const sessions = replaceSessions(emptySessions, [session("s1", { terminalId: "", state: "disconnected" })]);
-    expect(deriveContext({ kind: "session", id: "s1" }, repos, sessions).activeTerminalId).toBe("");
+  it("an unknown session keeps the id", () => {
+    const sessions = replaceSessions(emptySessions, [session("s1", { state: "disconnected" })]);
     expect(deriveContext({ kind: "session", id: "gone" }, emptyRepos, sessions)).toMatchObject({ activeSessionId: "gone", activeView: "session" });
   });
 });
@@ -251,16 +225,12 @@ describe("event dispatch", () => {
     expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s1" });
   });
 
-  it("a FocusTerminal that races its terminal and thread selects the thread once both are known", () => {
+  it("a FocusTerminal that races its shell reveals the shell once it arrives", () => {
+    useSessionsStore.setState({ ...replaceSessions(emptySessions, [session("s1")]), availability: "available" });
+    useTerminalsStore.setState({ ...emptyTerminals, loaded: true });
     applyIntent({ kind: "focusTerminal", terminalId: "t1" });
     expect(useUiStore.getState().selection).toEqual({ kind: "none" });
-    dispatchEvent({ source: "terminal", event: { kind: "updated", terminal: term("t1", { session: "s1" }) } });
-    expect(useUiStore.getState().selection).toEqual({ kind: "none" });
-    dispatchEvent({ source: "session", event: { kind: "updated", session: session("s1", { terminalId: "t1" }) } });
-    expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s1" });
-    // A later FocusTerminal on a session's terminal selects the session directly.
-    useUiStore.setState({ selection: { kind: "none" } });
-    applyIntent({ kind: "focusTerminal", terminalId: "t1" });
+    dispatchEvent({ source: "terminal", event: { kind: "updated", terminal: term("t1", { session: "s1", kind: "shell" }) } });
     expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s1" });
   });
 });

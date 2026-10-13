@@ -51,7 +51,8 @@ type LabelledTerminal = { labels: Readonly<Record<string, string>> };
 /**
  * The key whose bottom panel shows a terminal: its thread's for a shell a thread owns,
  * the Projects page's for a shell a worktree owns, null for anything that is no shell
- * (a thread's Claude terminal, an unlabelled terminal).
+ * (an unlabelled terminal from a raw TerminalService.Create, or one labelled without
+ * kind=shell).
  */
 export function ownerKeyOf(t: LabelledTerminal): string | null {
   if (!isShellLabels(t.labels)) return null;

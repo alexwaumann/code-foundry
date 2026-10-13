@@ -13,7 +13,6 @@ import { threadDraftKey } from "@/stores/threadActions";
  */
 export function ColdCacheNote({ sessionId, pending }: { sessionId: string; pending: number }) {
   const phase = useDraft(threadDraftKey(sessionId), "phase");
-  const render = useSessionsStore((s) => s.byId[sessionId]?.render ?? "terminal");
   const state = useSessionsStore((s) => s.byId[sessionId]?.state ?? "unknown");
   const status = useSessionsStore((s) => s.byId[sessionId]?.status ?? "unknown");
   const contextTokens = useSessionsStore((s) => s.byId[sessionId]?.contextTokens ?? 0);
@@ -28,7 +27,7 @@ export function ColdCacheNote({ sessionId, pending }: { sessionId: string; pendi
       window.clearInterval(id);
     };
   }, []);
-  const note = coldCacheNote({ render, state, status, contextTokens, cacheExpiresAtMs, contextRereadUsd, pending, phase, nowMs });
+  const note = coldCacheNote({ state, status, contextTokens, cacheExpiresAtMs, contextRereadUsd, pending, phase, nowMs });
   if (!note) return null;
   return (
     <p className="col-span-2 px-4 pt-2.5 text-xs text-muted-foreground" role="status" data-testid="thread-cold-cache">
