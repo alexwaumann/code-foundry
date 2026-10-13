@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
@@ -86,6 +87,19 @@ func TestAppUpdateCommands(t *testing.T) {
 		{"relaunch without a window", "app.relaunch", nil, 0, "no app window is connected; open it with `code-foundry gui`"},
 		{"version disabled", "app.version", &v1.UpdateStatus{State: v1.UpdateState_UPDATE_STATE_IDLE, DisabledReason: "dev build"}, 0, "Code Foundry v0.1.0; updates disabled (dev build)"},
 		{"version installed", "app.version", &v1.UpdateStatus{State: v1.UpdateState_UPDATE_STATE_RESTART_REQUIRED, Enabled: true, TargetVersion: "v0.2.0"}, 0, "Code Foundry v0.1.0; v0.2.0 installed and the app relaunched; restart Code Foundry to apply"},
+		{"check up to date on tip", "app.update.check", &v1.UpdateStatus{State: v1.UpdateState_UPDATE_STATE_IDLE, Enabled: true, CurrentVersion: "v0.2.0-tip.1", LatestVersion: "v0.2.0-tip.1", Channel: "tip"}, 0, "Code Foundry v0.2.0-tip.1 is up to date (tip channel)"},
+		{"check finds a tip", "app.update.check", &v1.UpdateStatus{State: v1.UpdateState_UPDATE_STATE_AVAILABLE, Enabled: true, TargetVersion: "v0.2.0-tip.1", Channel: "tip"}, 0, "v0.2.0-tip.1 available (tip channel)"},
+		{
+			"check on stable, older than this tip build", "app.update.check",
+			&v1.UpdateStatus{State: v1.UpdateState_UPDATE_STATE_IDLE, Enabled: true, CurrentVersion: "v0.15.0-tip.2", LatestVersion: "v0.14.41", Channel: "stable"}, 0,
+			"Code Foundry v0.15.0-tip.2 is up to date; stable v0.14.41 is older than this build; the next stable release will move you (stable channel)",
+		},
+		{
+			"version on stable, older than this tip build", "app.version",
+			&v1.UpdateStatus{State: v1.UpdateState_UPDATE_STATE_IDLE, Enabled: true, CurrentVersion: "v0.15.0-tip.2", LatestVersion: "v0.14.41", Channel: "stable", LastCheckedAt: timestamppb.Now()}, 0,
+			"Code Foundry v0.1.0; up to date; stable v0.14.41 is older than this build; the next stable release will move you (stable channel)",
+		},
+		{"version disabled hides the channel", "app.version", &v1.UpdateStatus{State: v1.UpdateState_UPDATE_STATE_IDLE, DisabledReason: "dev build", Channel: "tip"}, 0, "Code Foundry v0.1.0; updates disabled (dev build)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -70,7 +70,7 @@ func TestUpdateServiceFlow(t *testing.T) {
 		}
 		return w.Msg()
 	}
-	if st := next().GetStatus(); st.GetState() != v1.UpdateState_UPDATE_STATE_IDLE || !st.GetEnabled() || st.GetCurrentVersion() != "v0.1.0" || st.GetReleaseRepo() != "o/n" {
+	if st := next().GetStatus(); st.GetState() != v1.UpdateState_UPDATE_STATE_IDLE || !st.GetEnabled() || st.GetCurrentVersion() != "v0.1.0" || st.GetReleaseRepo() != "o/n" || st.GetChannel() != "stable" {
 		t.Fatalf("snapshot %v", st)
 	}
 

@@ -74,7 +74,8 @@ message UpdateStatus {
   google.protobuf.Timestamp last_checked_at = 7;
   // The last check's error, cleared by a successful check.
   string last_check_error = 8;
-  // Latest release tag seen by the last successful check.
+  // Latest release tag of the channel seen by the last successful check ("" until the
+  // first check after a channel change).
   string latest_version = 9;
   // The version AVAILABLE / DOWNLOADING / INSTALLED / RESTART_REQUIRED / FAILED refer to.
   string target_version = 10;
@@ -84,6 +85,11 @@ message UpdateStatus {
   string progress = 12;
   // FAILED: why, usually the installer's last output lines.
   string failure_reason = 13;
+  // Release channel the updater follows (the update.channel setting): "stable" (the
+  // newest full release) or "tip" (the highest release, prereleases included). Never
+  // offers a downgrade: on stable, latest_version may be older than current_version
+  // after a switch from tip, and the next stable release above it is offered.
+  string channel = 14;
 }
 
 // RelaunchRequested asks connected GUIs to relaunch themselves.

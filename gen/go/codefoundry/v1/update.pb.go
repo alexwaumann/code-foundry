@@ -108,7 +108,8 @@ type UpdateStatus struct {
 	LastCheckedAt *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=last_checked_at,json=lastCheckedAt,proto3" json:"last_checked_at,omitempty"`
 	// The last check's error, cleared by a successful check.
 	LastCheckError string `protobuf:"bytes,8,opt,name=last_check_error,json=lastCheckError,proto3" json:"last_check_error,omitempty"`
-	// Latest release tag seen by the last successful check.
+	// Latest release tag of the channel seen by the last successful check ("" until the
+	// first check after a channel change).
 	LatestVersion string `protobuf:"bytes,9,opt,name=latest_version,json=latestVersion,proto3" json:"latest_version,omitempty"`
 	// The version AVAILABLE / DOWNLOADING / INSTALLED / RESTART_REQUIRED / FAILED refer to.
 	TargetVersion string `protobuf:"bytes,10,opt,name=target_version,json=targetVersion,proto3" json:"target_version,omitempty"`
@@ -118,6 +119,11 @@ type UpdateStatus struct {
 	Progress string `protobuf:"bytes,12,opt,name=progress,proto3" json:"progress,omitempty"`
 	// FAILED: why, usually the installer's last output lines.
 	FailureReason string `protobuf:"bytes,13,opt,name=failure_reason,json=failureReason,proto3" json:"failure_reason,omitempty"`
+	// Release channel the updater follows (the update.channel setting): "stable" (the
+	// newest full release) or "tip" (the highest release, prereleases included). Never
+	// offers a downgrade: on stable, latest_version may be older than current_version
+	// after a switch from tip, and the next stable release above it is offered.
+	Channel       string `protobuf:"bytes,14,opt,name=channel,proto3" json:"channel,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -239,6 +245,13 @@ func (x *UpdateStatus) GetProgress() string {
 func (x *UpdateStatus) GetFailureReason() string {
 	if x != nil {
 		return x.FailureReason
+	}
+	return ""
+}
+
+func (x *UpdateStatus) GetChannel() string {
+	if x != nil {
+		return x.Channel
 	}
 	return ""
 }
@@ -860,7 +873,7 @@ var File_codefoundry_v1_update_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_update_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/update.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x88\x04\n" +
+	"\x1bcodefoundry/v1/update.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa2\x04\n" +
 	"\fUpdateStatus\x121\n" +
 	"\x05state\x18\x01 \x01(\x0e2\x1b.codefoundry.v1.UpdateStateR\x05state\x12'\n" +
 	"\x0fcurrent_version\x18\x02 \x01(\tR\x0ecurrentVersion\x12\x18\n" +
@@ -875,7 +888,8 @@ const file_codefoundry_v1_update_proto_rawDesc = "" +
 	" \x01(\tR\rtargetVersion\x12\x1b\n" +
 	"\tnotes_url\x18\v \x01(\tR\bnotesUrl\x12\x1a\n" +
 	"\bprogress\x18\f \x01(\tR\bprogress\x12%\n" +
-	"\x0efailure_reason\x18\r \x01(\tR\rfailureReason\"\x13\n" +
+	"\x0efailure_reason\x18\r \x01(\tR\rfailureReason\x12\x18\n" +
+	"\achannel\x18\x0e \x01(\tR\achannel\"\x13\n" +
 	"\x11RelaunchRequested\"\x12\n" +
 	"\x10RestartRequested\"\xf3\x01\n" +
 	"\vUpdateEvent\x126\n" +

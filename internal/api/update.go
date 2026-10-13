@@ -139,6 +139,7 @@ func updateStatusToProto(s update.Status) *v1.UpdateStatus {
 		Enabled:        s.Enabled,
 		DisabledReason: s.DisabledReason,
 		ReleaseRepo:    s.Repo,
+		Channel:        string(s.Channel),
 		Checking:       s.Checking,
 		LastCheckError: s.LastCheckError,
 		LatestVersion:  s.Latest,
