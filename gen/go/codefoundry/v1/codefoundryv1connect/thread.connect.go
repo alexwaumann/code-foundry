@@ -50,6 +50,11 @@ const (
 	ThreadServiceSetPermissionModeProcedure = "/codefoundry.v1.ThreadService/SetPermissionMode"
 	// ThreadServiceSetEffortProcedure is the fully-qualified name of the ThreadService's SetEffort RPC.
 	ThreadServiceSetEffortProcedure = "/codefoundry.v1.ThreadService/SetEffort"
+	// ThreadServiceMcpStatusProcedure is the fully-qualified name of the ThreadService's McpStatus RPC.
+	ThreadServiceMcpStatusProcedure = "/codefoundry.v1.ThreadService/McpStatus"
+	// ThreadServiceMcpReconnectProcedure is the fully-qualified name of the ThreadService's
+	// McpReconnect RPC.
+	ThreadServiceMcpReconnectProcedure = "/codefoundry.v1.ThreadService/McpReconnect"
 )
 
 // ThreadServiceClient is a client for the codefoundry.v1.ThreadService service.
@@ -80,6 +85,18 @@ type ThreadServiceClient interface {
 	// once when the thread is idle, else once the running turn ends (Session.effort_pending
 	// says so meanwhile). The row records the effort for later spawns either way.
 	SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error)
+	// McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
+	// (mcp_status) at the start of every turn, again every few seconds while a server is
+	// still connecting, and after McpReconnect; Watch carries each new answer (the `mcp`
+	// event). refresh asks Claude now (a connected thread only). Without it a connected
+	// thread not checked yet is asked once; a thread that is not running has none (status
+	// unset). See docs/notes/mcp-panel.md.
+	McpStatus(context.Context, *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error)
+	// McpReconnect reconnects one MCP server of a connected thread (also how a login made
+	// out of band, /mcp in a terminal thread, is picked up), then checks the servers again.
+	// A server that still fails is not an RPC error: the response's error says why and the
+	// status shows it. An unknown server is NOT_FOUND.
+	McpReconnect(context.Context, *connect.Request[v1.McpReconnectRequest]) (*connect.Response[v1.McpReconnectResponse], error)
 }
 
 // NewThreadServiceClient constructs a client for the codefoundry.v1.ThreadService service. By
@@ -141,6 +158,18 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("SetEffort")),
 			connect.WithClientOptions(opts...),
 		),
+		mcpStatus: connect.NewClient[v1.McpStatusRequest, v1.McpStatusResponse](
+			httpClient,
+			baseURL+ThreadServiceMcpStatusProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("McpStatus")),
+			connect.WithClientOptions(opts...),
+		),
+		mcpReconnect: connect.NewClient[v1.McpReconnectRequest, v1.McpReconnectResponse](
+			httpClient,
+			baseURL+ThreadServiceMcpReconnectProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("McpReconnect")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -154,6 +183,8 @@ type threadServiceClient struct {
 	setModel          *connect.Client[v1.SetThreadModelRequest, v1.SetThreadModelResponse]
 	setPermissionMode *connect.Client[v1.SetThreadPermissionModeRequest, v1.SetThreadPermissionModeResponse]
 	setEffort         *connect.Client[v1.SetThreadEffortRequest, v1.SetThreadEffortResponse]
+	mcpStatus         *connect.Client[v1.McpStatusRequest, v1.McpStatusResponse]
+	mcpReconnect      *connect.Client[v1.McpReconnectRequest, v1.McpReconnectResponse]
 }
 
 // ListItems calls codefoundry.v1.ThreadService.ListItems.
@@ -196,6 +227,16 @@ func (c *threadServiceClient) SetEffort(ctx context.Context, req *connect.Reques
 	return c.setEffort.CallUnary(ctx, req)
 }
 
+// McpStatus calls codefoundry.v1.ThreadService.McpStatus.
+func (c *threadServiceClient) McpStatus(ctx context.Context, req *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error) {
+	return c.mcpStatus.CallUnary(ctx, req)
+}
+
+// McpReconnect calls codefoundry.v1.ThreadService.McpReconnect.
+func (c *threadServiceClient) McpReconnect(ctx context.Context, req *connect.Request[v1.McpReconnectRequest]) (*connect.Response[v1.McpReconnectResponse], error) {
+	return c.mcpReconnect.CallUnary(ctx, req)
+}
+
 // ThreadServiceHandler is an implementation of the codefoundry.v1.ThreadService service.
 type ThreadServiceHandler interface {
 	// ListItems returns a thread's items (the streaming one included) and its pending
@@ -224,6 +265,18 @@ type ThreadServiceHandler interface {
 	// once when the thread is idle, else once the running turn ends (Session.effort_pending
 	// says so meanwhile). The row records the effort for later spawns either way.
 	SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error)
+	// McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
+	// (mcp_status) at the start of every turn, again every few seconds while a server is
+	// still connecting, and after McpReconnect; Watch carries each new answer (the `mcp`
+	// event). refresh asks Claude now (a connected thread only). Without it a connected
+	// thread not checked yet is asked once; a thread that is not running has none (status
+	// unset). See docs/notes/mcp-panel.md.
+	McpStatus(context.Context, *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error)
+	// McpReconnect reconnects one MCP server of a connected thread (also how a login made
+	// out of band, /mcp in a terminal thread, is picked up), then checks the servers again.
+	// A server that still fails is not an RPC error: the response's error says why and the
+	// status shows it. An unknown server is NOT_FOUND.
+	McpReconnect(context.Context, *connect.Request[v1.McpReconnectRequest]) (*connect.Response[v1.McpReconnectResponse], error)
 }
 
 // NewThreadServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -281,6 +334,18 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("SetEffort")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceMcpStatusHandler := connect.NewUnaryHandler(
+		ThreadServiceMcpStatusProcedure,
+		svc.McpStatus,
+		connect.WithSchema(threadServiceMethods.ByName("McpStatus")),
+		connect.WithHandlerOptions(opts...),
+	)
+	threadServiceMcpReconnectHandler := connect.NewUnaryHandler(
+		ThreadServiceMcpReconnectProcedure,
+		svc.McpReconnect,
+		connect.WithSchema(threadServiceMethods.ByName("McpReconnect")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.ThreadService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ThreadServiceListItemsProcedure:
@@ -299,6 +364,10 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceSetPermissionModeHandler.ServeHTTP(w, r)
 		case ThreadServiceSetEffortProcedure:
 			threadServiceSetEffortHandler.ServeHTTP(w, r)
+		case ThreadServiceMcpStatusProcedure:
+			threadServiceMcpStatusHandler.ServeHTTP(w, r)
+		case ThreadServiceMcpReconnectProcedure:
+			threadServiceMcpReconnectHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -338,4 +407,12 @@ func (UnimplementedThreadServiceHandler) SetPermissionMode(context.Context, *con
 
 func (UnimplementedThreadServiceHandler) SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.SetEffort is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) McpStatus(context.Context, *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.McpStatus is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) McpReconnect(context.Context, *connect.Request[v1.McpReconnectRequest]) (*connect.Response[v1.McpReconnectResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.McpReconnect is not implemented"))
 }

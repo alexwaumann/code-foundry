@@ -36,6 +36,18 @@ service ThreadService {
   // once when the thread is idle, else once the running turn ends (Session.effort_pending
   // says so meanwhile). The row records the effort for later spawns either way.
   rpc SetEffort(SetThreadEffortRequest) returns (SetThreadEffortResponse) {}
+  // McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
+  // (mcp_status) at the start of every turn, again every few seconds while a server is
+  // still connecting, and after McpReconnect; Watch carries each new answer (the `mcp`
+  // event). refresh asks Claude now (a connected thread only). Without it a connected
+  // thread not checked yet is asked once; a thread that is not running has none (status
+  // unset). See docs/notes/mcp-panel.md.
+  rpc McpStatus(McpStatusRequest) returns (McpStatusResponse) {}
+  // McpReconnect reconnects one MCP server of a connected thread (also how a login made
+  // out of band, /mcp in a terminal thread, is picked up), then checks the servers again.
+  // A server that still fails is not an RPC error: the response's error says why and the
+  // status shows it. An unknown server is NOT_FOUND.
+  rpc McpReconnect(McpReconnectRequest) returns (McpReconnectResponse) {}
 }
 
 // One entry of a rendered thread's conversation. The payload's case is the kind.
@@ -226,6 +238,9 @@ message ThreadItemsSnapshot {
   uint64 seq = 2;
   repeated ThreadItem items = 3;
   repeated ThreadPendingRequest pending = 4;
+  // The thread's MCP servers as last checked; unset when not checked since its process
+  // started, or when it is not running.
+  ThreadMcpStatus mcp = 5;
 }
 
 // Text appended to a streaming item.
@@ -276,7 +291,87 @@ message ThreadEvent {
     ThreadPending pending = 5;
     // EventService only: the snapshot of the thread source.
     ThreadPendingSnapshot pending_snapshot = 6;
+    // Watch only: the thread's MCP servers were checked again, or dropped (status unset:
+    // the process ended).
+    ThreadMcpChange mcp = 7;
   }
+}
+
+// An MCP server's status as Claude reports it.
+enum McpServerStatus {
+  // A status this daemon does not know (a newer Claude's).
+  MCP_SERVER_STATUS_UNSPECIFIED = 0;
+  MCP_SERVER_STATUS_CONNECTED = 1;
+  // It could not start or connect; McpServer.error says why.
+  MCP_SERVER_STATUS_FAILED = 2;
+  // It needs a login (OAuth). Claude cannot log in headlessly: /mcp in a terminal
+  // thread, then McpReconnect.
+  MCP_SERVER_STATUS_NEEDS_AUTH = 3;
+  // Still connecting.
+  MCP_SERVER_STATUS_PENDING = 4;
+  // Disabled in Claude's configuration: not passed to Claude.
+  MCP_SERVER_STATUS_DISABLED = 5;
+}
+
+// What made the daemon check a thread's MCP servers.
+enum McpCheckTrigger {
+  MCP_CHECK_TRIGGER_UNSPECIFIED = 0;
+  // system/init: the start of a turn.
+  MCP_CHECK_TRIGGER_TURN_START = 1;
+  // McpStatus asked for it (refresh, or the first read), or a follow-up while a server
+  // was still connecting.
+  MCP_CHECK_TRIGGER_REFRESH = 2;
+  // After McpReconnect of ThreadMcpStatus.server.
+  MCP_CHECK_TRIGGER_RECONNECT = 3;
+}
+
+// One tool of a connected MCP server. The hints are the ones the server set to true
+// (MCP tool annotations); an unset read_only means the tool may write.
+message McpTool {
+  string name = 1;
+  // Empty when Claude sends none (claude.ai connectors).
+  string description = 2;
+  bool read_only = 3;
+  bool destructive = 4;
+  // It reaches outside the server (the open web, other services).
+  bool open_world = 5;
+}
+
+message McpServer {
+  // The config key, untrusted text ("github", "claude.ai Gmail").
+  string name = 1;
+  McpServerStatus status = 2;
+  // What a connected server says about itself.
+  string server_name = 3;
+  string version = 4;
+  // Why it failed.
+  string error = 5;
+  // The configuration scope: user, project, local, dynamic, claudeai, managed, ...
+  string scope = 6;
+  // Where the definition came from: the scope names, plus plugin and sdk.
+  string source = 7;
+  // stdio, sse, http, sdk or claudeai-proxy.
+  string transport = 8;
+  // A connected server's tools, in Claude's order.
+  repeated McpTool tools = 9;
+}
+
+// A thread's MCP servers at one check.
+message ThreadMcpStatus {
+  google.protobuf.Timestamp checked_at = 1;
+  McpCheckTrigger trigger = 2;
+  // The server reconnected (MCP_CHECK_TRIGGER_RECONNECT).
+  string server = 3;
+  // In Claude's order.
+  repeated McpServer servers = 4;
+}
+
+// A thread's MCP status changed (ThreadService.Watch).
+message ThreadMcpChange {
+  string session_id = 1;
+  uint64 seq = 2;
+  // Unset: the thread has none any more (its process ended).
+  ThreadMcpStatus status = 3;
 }
 
 message ListThreadItemsRequest {
@@ -367,4 +462,29 @@ message SetThreadEffortRequest {
 message SetThreadEffortResponse {
   // effort_pending is set when the restart waits for the running turn.
   Session session = 1;
+}
+
+message McpStatusRequest {
+  string session_id = 1;
+  // Ask Claude now instead of returning the last check.
+  bool refresh = 2;
+}
+
+message McpStatusResponse {
+  // Unset when the thread is not running.
+  ThreadMcpStatus status = 1;
+}
+
+message McpReconnectRequest {
+  string session_id = 1;
+  // The server's name as McpServer.name has it.
+  string server_name = 2;
+}
+
+message McpReconnectResponse {
+  // The servers checked after the attempt.
+  ThreadMcpStatus status = 1;
+  // Claude's answer when the attempt failed (the server still fails); empty when it
+  // went through.
+  string error = 2;
 }
