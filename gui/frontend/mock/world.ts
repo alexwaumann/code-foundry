@@ -531,12 +531,12 @@ export class World {
     // Threads in every state, each with a short history (SEEDS).
     this.sessions.clear();
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
-    this.addSession({ id: "s-1", repoId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "opus", effort: "high", status: SessionStatus.BUSY, statusReason: "working: Refactor sidebar tree", createdAt: ago(42), usage: sampleUsage() });
-    this.addSession({ id: "s-2", repoId: "repo-gp", worktreePath: GP, name: "Port renderer", model: "sonnet", effort: "", status: SessionStatus.NEEDS_ATTENTION, statusReason: `permission: Bash ${SEEDS["s-2"]?.reply ?? ""}`, statusChangedAt: ago(3), createdAt: ago(40) });
-    this.addSession({ id: "s-3", repoId: "repo-cf", worktreePath: `${CFW}/fix-resize`, name: "Fix resize race", model: "opus", effort: "medium", state: SessionState.DISCONNECTED, disconnectReason: "exited", createdAt: ago(300), lastActivityAt: ago(95), usage: pageUsage("s-3") });
-    this.addSession({ id: "s-4", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Investigate flaky e2e", model: "haiku", effort: "", state: SessionState.DISCONNECTED, disconnectReason: "crashed", exitCode: 139, createdAt: ago(200), lastActivityAt: ago(17), usage: pageUsage("s-4") });
-    this.addSession({ id: "s-5", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Write session docs", model: "opus", effort: "low", state: SessionState.STARTING, settleIn: 8, createdAt: ago(0) });
-    this.addSession({ id: "s-6", repoId: "repo-dot", worktreePath: `${HOME}/dotfiles`, name: "Tidy zshrc", model: "sonnet", effort: "", state: SessionState.CLOSING, settleIn: 8, createdAt: ago(60) });
+    this.addSession({ id: "s-1", repoId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "claude-opus-4-8[1m]", effort: "high", status: SessionStatus.BUSY, statusReason: "working: Refactor sidebar tree", createdAt: ago(42), usage: sampleUsage() });
+    this.addSession({ id: "s-2", repoId: "repo-gp", worktreePath: GP, name: "Port renderer", model: "claude-sonnet-5[1m]", effort: "", status: SessionStatus.NEEDS_ATTENTION, statusReason: `permission: Bash ${SEEDS["s-2"]?.reply ?? ""}`, statusChangedAt: ago(3), createdAt: ago(40) });
+    this.addSession({ id: "s-3", repoId: "repo-cf", worktreePath: `${CFW}/fix-resize`, name: "Fix resize race", model: "claude-opus-4-8[1m]", effort: "medium", state: SessionState.DISCONNECTED, disconnectReason: "exited", createdAt: ago(300), lastActivityAt: ago(95), usage: pageUsage("s-3") });
+    this.addSession({ id: "s-4", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Investigate flaky e2e", model: "claude-4.5-haiku[1m]", effort: "", state: SessionState.DISCONNECTED, disconnectReason: "crashed", exitCode: 139, createdAt: ago(200), lastActivityAt: ago(17), usage: pageUsage("s-4") });
+    this.addSession({ id: "s-5", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Write session docs", model: "claude-opus-4-8[1m]", effort: "low", state: SessionState.STARTING, settleIn: 8, createdAt: ago(0) });
+    this.addSession({ id: "s-6", repoId: "repo-dot", worktreePath: `${HOME}/dotfiles`, name: "Tidy zshrc", model: "claude-sonnet-5[1m]", effort: "", state: SessionState.CLOSING, settleIn: 8, createdAt: ago(60) });
     for (const [id, h] of Object.entries(SEEDS)) if (h) this.threads.seed(id, h);
     // Republish so connected watchers converge on the reset state.
     for (const t of this.terms.values()) this.termEvents.publish({ event: { case: "updated", value: this.terminalMsg(t) } });
@@ -705,7 +705,7 @@ export class World {
     const path = r.worktrees.find((w) => w.isMain)?.path ?? r.path;
     const out: MockSession[] = [];
     for (let i = 1; i <= count; i++) {
-      const s = this.addSession({ id: `s-t-${String(this.nextId++)}`, repoId: r.id, worktreePath: path, name: `${prefix} ${String(i)}`, model: "haiku", effort: "", status, createdAt: new Date() });
+      const s = this.addSession({ id: `s-t-${String(this.nextId++)}`, repoId: r.id, worktreePath: path, name: `${prefix} ${String(i)}`, model: "claude-4.5-haiku[1m]", effort: "", status, createdAt: new Date() });
       this.publishSession(s);
       out.push(s);
     }
@@ -737,7 +737,7 @@ export class World {
     for (const { min, ...k } of kinds) {
       out.push(k.id);
       if (this.sessions.has(k.id)) continue;
-      const s = this.addSession({ repoId: "repo-cf", worktreePath: CF, model: "haiku", effort: "medium", createdAt: ago(min + 5), lastActivityAt: ago(min), statusChangedAt: ago(min), ...k });
+      const s = this.addSession({ repoId: "repo-cf", worktreePath: CF, model: "claude-4.5-haiku[1m]", effort: "medium", createdAt: ago(min + 5), lastActivityAt: ago(min), statusChangedAt: ago(min), ...k });
       this.publishSession(s);
     }
     return out;
@@ -748,7 +748,7 @@ export class World {
     const ws = this.workspaceRef(workspace);
     const member = repo ? ws.members.find((m) => m.repoId === this.repoRef(repo).id) : ws.members[0];
     if (!member) throw new CommandError("unavailable", `repo ${repo} is not a member of workspace ${ws.name}`);
-    const s = this.addSession({ id: `s-ws-${String(this.nextId++)}`, repoId: member.repoId, worktreePath: member.worktreePath, name, model: "haiku", effort: "", workspaceId: ws.id, status, createdAt: new Date() });
+    const s = this.addSession({ id: `s-ws-${String(this.nextId++)}`, repoId: member.repoId, worktreePath: member.worktreePath, name, model: "claude-4.5-haiku[1m]", effort: "", workspaceId: ws.id, status, createdAt: new Date() });
     this.publishSession(s);
     return s;
   }
@@ -1023,7 +1023,7 @@ export class World {
       repoId: "repo-cf",
       worktreePath: CF,
       name: "Fix stale PR badge",
-      model: "opus",
+      model: "claude-opus-4-8[1m]",
       effort: "high",
       permissionMode: PermissionMode.ACCEPT_EDITS,
       createdAt: new Date(Date.now() - 10 * 60_000),
@@ -1419,7 +1419,7 @@ export class World {
       await settle(150);
       if (prompt.includes("FAIL")) throw new CommandError("unavailable", "start claude: exec: \"claude\": executable file not found in $PATH");
     }
-    const model = args.model || "opus";
+    const model = args.model || "claude-opus-4-8[1m]";
     const s = this.createSession(repo.id, path, model, args.effort ?? "", {
       name: args.name ?? "",
       autoNamed: !args.name,
@@ -1481,7 +1481,7 @@ export class World {
     if (!member) throw new CommandError("unavailable", `repo ${repoId} is not a member of workspace ${ws.name}`);
     const repo = this.repoRef(member.repoId);
     if (created && !baseRef) baseRef = repo.remotes.length > 0 ? `origin/${repo.defaultBranch}` : repo.defaultBranch;
-    const s = this.createSession(member.repoId, member.worktreePath, args.model || "opus", args.effort ?? "", {
+    const s = this.createSession(member.repoId, member.worktreePath, args.model || "claude-opus-4-8[1m]", args.effort ?? "", {
       name: args.name ?? "",
       autoNamed: !args.name,
       nameIn: args.name ? 0 : 2,
@@ -1835,7 +1835,7 @@ export class World {
             { name: "worktree", type: ArgType.PATH, required: false, description: "Worktree path" },
             { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name the thread belongs to" },
             { name: "repos", type: ArgType.STRING, required: false, description: "With new-worktree: repositories for a new workspace (repo[:base], comma-separated)" },
-            { name: "model", type: ArgType.ENUM, required: false, description: "Model", enumValues: MODEL_VALUES, defaultValue: "opus" },
+            { name: "model", type: ArgType.ENUM, required: false, description: "Model", enumValues: MODEL_VALUES, defaultValue: "claude-opus-4-8[1m]" },
             { name: "effort", type: ArgType.ENUM, required: false, description: "Effort", enumValues: ["low", "medium", "high", "xhigh", "max"], defaultValue: "high" },
             { name: "permission", type: ArgType.ENUM, required: false, description: "Permission mode", enumValues: ["supervised", "accept-edits", "auto"] },
             { name: "new-worktree", type: ArgType.BOOL, required: false, description: "Create a worktree for the thread" },

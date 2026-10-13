@@ -1,5 +1,8 @@
 # Model registry
 
+> The alias entries below were replaced by 1M pinned ids on 2026-10-13; see
+> `model-registry-1m.md`.
+
 Decided 2026-10-11 (Alex). Before this change the composer had its own list of four
 models, with labels hardcoded as "Opus 5.5 / Sonnet 5.5 / Haiku 5.5 / Fable 5.1". The
 settings enum was `command.SessionModels` (the same four aliases). Those labels were wrong

@@ -52,9 +52,9 @@ func TestSessionCommands(t *testing.T) {
 		wantIn     []string // fields expected in the message, in order on one line
 	}{
 		{name: "new from worktree context", cmd: "session.new", ctx: command.Context{ActiveWorktreePath: "/wt"},
-			args:     map[string]string{"model": "opus", "effort": "high"},
+			args:     map[string]string{"model": "claude-opus-4-8[1m]", "effort": "high"},
 			wantMsg:  "created thread s1 in /wt",
-			wantReqs: []proto.Message{&v1.CreateSessionRequest{WorktreePath: "/wt", Model: "opus", Effort: "high", PermissionMode: auto}}, wantIntent: focusIntent("s1")},
+			wantReqs: []proto.Message{&v1.CreateSessionRequest{WorktreePath: "/wt", Model: "claude-opus-4-8[1m]", Effort: "high", PermissionMode: auto}}, wantIntent: focusIntent("s1")},
 		{name: "new with explicit worktree and prompt", cmd: "session.new",
 			args:     map[string]string{"worktree": "~/src/app", "name": "fix-it", "prompt": "hello"},
 			wantMsg:  "created thread fix-it (s1) in /Users/me/src/app",
@@ -94,9 +94,9 @@ func TestSessionCommands(t *testing.T) {
 		{name: "workspace refuses new worktree", cmd: "session.new", args: map[string]string{"workspace": "login", "new-worktree": "true"}, wantErr: command.ErrInvalidArgs},
 		{name: "new bad effort", cmd: "session.new", args: map[string]string{"worktree": "/wt", "effort": "huge"}, wantErr: command.ErrInvalidArgs},
 		{name: "new bad model", cmd: "session.new", args: map[string]string{"worktree": "/wt", "model": "gpt"}, wantErr: command.ErrInvalidArgs},
-		{name: "new pinned model", cmd: "session.new", args: map[string]string{"worktree": "/wt", "model": "claude-opus-4-8"},
+		{name: "new pinned model", cmd: "session.new", args: map[string]string{"worktree": "/wt", "model": "claude-opus-4-8[1m]"},
 			wantMsg:  "created thread s1 in /wt",
-			wantReqs: []proto.Message{&v1.CreateSessionRequest{WorktreePath: "/wt", Model: "claude-opus-4-8", PermissionMode: auto}}, wantIntent: focusIntent("s1")},
+			wantReqs: []proto.Message{&v1.CreateSessionRequest{WorktreePath: "/wt", Model: "claude-opus-4-8[1m]", PermissionMode: auto}}, wantIntent: focusIntent("s1")},
 		{name: "new model outside the registry", cmd: "session.new", args: map[string]string{"worktree": "/wt", "model": "claude-opus-5-5"}, wantErr: command.ErrInvalidArgs},
 		{name: "close from context", cmd: "session.close", ctx: command.Context{ActiveSessionID: "s5"},
 			wantMsg: "closed thread s5", wantReqs: []proto.Message{&v1.CloseSessionRequest{Id: "s5"}}},
@@ -236,7 +236,7 @@ func TestSessionNewKeybindingAndEnums(t *testing.T) {
 	for _, a := range c.Args {
 		switch a.Name {
 		case "model":
-			if !slices.Equal(a.Enum, model.Values()) || !strings.Contains(a.Description, "claude-* id pins a version") {
+			if !slices.Equal(a.Enum, model.Values()) || !strings.Contains(a.Description, "1M context suffix") {
 				t.Errorf("model enum = %v", a.Enum)
 			}
 		case "effort":

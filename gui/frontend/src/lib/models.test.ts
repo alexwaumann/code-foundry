@@ -3,8 +3,17 @@ import { canonicalModelName, enumOptionLabel, FALLBACK_MODEL_CHOICES, MODEL_SETT
 
 const modelField = {
   key: MODEL_SETTING_KEY,
-  enumValues: ["fable", "opus", "claude-opus-4-8", "claude-opus-4-7", "sonnet", "claude-sonnet-5", "claude-sonnet-4-6", "haiku"],
-  enumLabels: ["Fable", "Opus", "Opus 4.8", "Opus 4.7", "Sonnet", "Sonnet 5", "Sonnet 4.6", "Haiku"],
+  enumValues: [
+    "claude-opus-5-5[1m]",
+    "claude-opus-4-8[1m]",
+    "claude-opus-4-7[1m]",
+    "claude-sonnet-5-5[1m]",
+    "claude-sonnet-5[1m]",
+    "claude-sonnet-4-6[1m]",
+    "claude-haiku-5-5[1m]",
+    "claude-4.5-haiku[1m]",
+  ],
+  enumLabels: ["Opus 5.5", "Opus 4.8", "Opus 4.7", "Sonnet 5.5", "Sonnet 5", "Sonnet 4.6", "Haiku 5.5", "Haiku 4.5"],
 };
 
 describe("modelChoicesFromSchema", () => {
@@ -33,24 +42,24 @@ describe("modelChoicesFromSchema", () => {
 describe("modelName", () => {
   const choices = modelChoicesFromSchema([modelField]) ?? [];
   it.each([
-    ["opus", "Opus"],
-    ["claude-opus-4-8", "Opus 4.8"],
-    ["haiku", "Haiku"],
-    ["claude-opus-5-5[1m]", "claude-opus-5-5[1m]"],
+    ["claude-opus-4-8[1m]", "Opus 4.8"],
+    ["claude-4.5-haiku[1m]", "Haiku 4.5"],
+    // A thread started before the 1M registry keeps its value.
+    ["opus", "opus"],
+    ["claude-opus-4-8", "claude-opus-4-8"],
   ])("%j is %j", (model, want) => {
     expect(modelName(choices, model)).toBe(want);
   });
 
-  it("the fallback names the family aliases", () => {
-    expect(FALLBACK_MODEL_CHOICES.map((c) => c.value)).toEqual(["fable", "opus", "sonnet", "haiku"]);
-    expect(modelName(FALLBACK_MODEL_CHOICES, "sonnet")).toBe("Sonnet");
-    expect(modelName(FALLBACK_MODEL_CHOICES, "claude-sonnet-5")).toBe("claude-sonnet-5");
+  it("the fallback is the default model alone", () => {
+    expect(FALLBACK_MODEL_CHOICES).toEqual([{ value: "claude-opus-4-8[1m]", label: "Opus 4.8" }]);
+    expect(modelName(FALLBACK_MODEL_CHOICES, "claude-sonnet-5[1m]")).toBe("claude-sonnet-5[1m]");
   });
 });
 
 describe("enumOptionLabel", () => {
   it.each([
-    ["claude-opus-4-7", "Opus 4.7"],
+    ["claude-opus-4-7[1m]", "Opus 4.7"],
     ["unknown", "unknown"],
   ])("%j is %j", (v, want) => {
     expect(enumOptionLabel(modelField, v)).toBe(want);

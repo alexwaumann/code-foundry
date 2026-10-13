@@ -38,7 +38,7 @@ var (
 )
 
 // Models and effort levels offered for new sessions. Models come from the registry
-// (internal/model): family aliases ("opus") and pinned ids ("claude-opus-4-8"). From
+// (internal/model): pinned ids with the 1M suffix ("claude-opus-4-8[1m]"). From
 // `claude --help` (Claude Code 2.1.294): --effort takes low, medium, high, xhigh, max.
 // The SessionService API also accepts full model names outside the registry.
 var (
@@ -47,7 +47,7 @@ var (
 )
 
 // sessionModelHelp describes the model arg; the enum values list the registry.
-const sessionModelHelp = "Model: a family alias (opus, sonnet, ...) runs Claude Code's default for that family, a claude-* id pins a version"
+const sessionModelHelp = "Model: a claude-* id with the 1M context suffix; quote it in the shell ('claude-opus-4-8[1m]')"
 
 // SessionPermissions are session.new's permission values, mapped to the claude
 // --permission-mode they select by sessionPermissionModes. Full access

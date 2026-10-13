@@ -28,7 +28,7 @@ export const PERMISSION_CHOICES: readonly (Choice & { value: ComposePermission; 
   { value: "auto", label: "Auto", hint: "Claude's classifier decides" },
 ];
 
-export const DEFAULT_MODEL = "opus";
+export const DEFAULT_MODEL = "claude-opus-4-8[1m]";
 export const DEFAULT_EFFORT = "high";
 export const DEFAULT_PERMISSION: ComposePermission = "auto";
 

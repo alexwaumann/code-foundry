@@ -118,8 +118,8 @@ func TestThreadCommands(t *testing.T) {
 			wantMsg: "thread fix (s1) runs accept-edits", wantCalls: []string{"SetPermissionMode s1 2"},
 		},
 		{
-			name: "set model", cmd: "thread.set-model", args: map[string]string{"id": "s1", "model": "sonnet"},
-			wantMsg: "thread fix (s1) uses sonnet", wantCalls: []string{"SetModel s1 sonnet"},
+			name: "set model", cmd: "thread.set-model", args: map[string]string{"id": "s1", "model": "claude-sonnet-5[1m]"},
+			wantMsg: "thread fix (s1) uses Sonnet 5", wantCalls: []string{"SetModel s1 claude-sonnet-5[1m]"},
 		},
 		{
 			name: "set effort", cmd: "thread.set-effort", args: map[string]string{"id": "s1", "effort": "high"},

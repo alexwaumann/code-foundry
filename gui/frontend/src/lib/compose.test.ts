@@ -4,6 +4,7 @@ import {
   checkAttachments,
   checkoutBranch,
   createdSessionId,
+  DEFAULT_MODEL,
   draftKey,
   draftMembers,
   isWorkspaceKey,
@@ -197,10 +198,11 @@ describe("helpers", () => {
   });
 
   it("pickDefault uses a known setting, else the fallback", () => {
-    expect(pickDefault(FALLBACK_MODEL_CHOICES, "sonnet", "opus")).toBe("sonnet");
-    expect(pickDefault(FALLBACK_MODEL_CHOICES, "", "opus")).toBe("opus");
-    expect(pickDefault(FALLBACK_MODEL_CHOICES, undefined, "opus")).toBe("opus");
-    expect(pickDefault(FALLBACK_MODEL_CHOICES, "gpt", "opus")).toBe("opus");
+    const choices = [...FALLBACK_MODEL_CHOICES, { value: "claude-sonnet-5[1m]", label: "Sonnet 5" }];
+    expect(pickDefault(choices, "claude-sonnet-5[1m]", DEFAULT_MODEL)).toBe("claude-sonnet-5[1m]");
+    expect(pickDefault(choices, "", DEFAULT_MODEL)).toBe(DEFAULT_MODEL);
+    expect(pickDefault(choices, undefined, DEFAULT_MODEL)).toBe(DEFAULT_MODEL);
+    expect(pickDefault(choices, "opus", DEFAULT_MODEL)).toBe(DEFAULT_MODEL);
   });
 
   it.each([

@@ -11,6 +11,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/alexwaumann/code-foundry/internal/model"
 )
 
 // Threads (docs/notes/rendered-threads-1-daemon.md): the thread.* commands drive a
@@ -182,7 +183,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 					return Result{}, err
 				}
 				s := res.Msg.GetSession()
-				return Result{Message: "thread " + sessionLabel(s) + " uses " + s.GetModel(), JSON: s}, nil
+				return Result{Message: "thread " + sessionLabel(s) + " uses " + model.Label(s.GetModel()), JSON: s}, nil
 			},
 		},
 		Command{

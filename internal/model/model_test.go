@@ -10,15 +10,17 @@ func TestLabel(t *testing.T) {
 	tests := []struct {
 		value, want string
 	}{
-		{"fable", "Fable"},
-		{"opus", "Opus"},
-		{"claude-opus-4-8", "Opus 4.8"},
-		{"claude-opus-4-7", "Opus 4.7"},
-		{"sonnet", "Sonnet"},
-		{"claude-sonnet-5", "Sonnet 5"},
-		{"claude-sonnet-4-6", "Sonnet 4.6"},
-		{"haiku", "Haiku"},
-		{"claude-opus-5-5[1m]", "claude-opus-5-5[1m]"},
+		{"claude-opus-5-5[1m]", "Opus 5.5"},
+		{"claude-opus-4-8[1m]", "Opus 4.8"},
+		{"claude-opus-4-7[1m]", "Opus 4.7"},
+		{"claude-sonnet-5-5[1m]", "Sonnet 5.5"},
+		{"claude-sonnet-5[1m]", "Sonnet 5"},
+		{"claude-sonnet-4-6[1m]", "Sonnet 4.6"},
+		{"claude-haiku-5-5[1m]", "Haiku 5.5"},
+		{"claude-4.5-haiku[1m]", "Haiku 4.5"},
+		// Retired aliases and unsuffixed ids are not listed.
+		{"opus", "opus"},
+		{"claude-opus-4-8", "claude-opus-4-8"},
 		{"", ""},
 	}
 	for _, tt := range tests {
@@ -34,15 +36,21 @@ func TestLabel(t *testing.T) {
 }
 
 func TestRegistry(t *testing.T) {
-	want := []string{"fable", "opus", "claude-opus-4-8", "claude-opus-4-7", "sonnet", "claude-sonnet-5", "claude-sonnet-4-6", "haiku"}
+	want := []string{
+		"claude-opus-5-5[1m]", "claude-opus-4-8[1m]", "claude-opus-4-7[1m]",
+		"claude-sonnet-5-5[1m]", "claude-sonnet-5[1m]", "claude-sonnet-4-6[1m]",
+		"claude-haiku-5-5[1m]", "claude-4.5-haiku[1m]",
+	}
 	if got := Values(); !slices.Equal(got, want) {
 		t.Fatalf("Values() = %v, want %v", got, want)
 	}
 	if len(Labels()) != len(Values()) || len(All()) != len(Values()) {
 		t.Fatalf("Labels/All not parallel to Values")
 	}
-	if !Known(Default) {
-		t.Errorf("Default %q is not in the registry", Default)
+	for _, v := range []string{Default, NamingDefault} {
+		if !Known(v) {
+			t.Errorf("default %q is not in the registry", v)
+		}
 	}
 	seen := map[string]bool{}
 	for _, m := range All() {

@@ -1,22 +1,17 @@
 /**
  * Model choices and names. The list comes from the daemon's model registry
  * (internal/model) through the settings schema: sessions.default_model's enum values and
- * labels. Nothing here names a model version; FALLBACK_MODEL_CHOICES only covers the
- * moment before the schema has loaded (or a daemon without settings).
+ * labels. FALLBACK_MODEL_CHOICES only covers the moment before the schema has loaded (or a
+ * daemon without settings).
  */
 import type { SettingFieldView } from "@/api/settings";
-import type { Choice } from "./compose";
+import { DEFAULT_MODEL, type Choice } from "./compose";
 
 /** The settings field whose enum is the model registry. */
 export const MODEL_SETTING_KEY = "sessions.default_model";
 
-/** The family aliases, until the schema arrives. Claude Code resolves each to its default. */
-export const FALLBACK_MODEL_CHOICES: readonly Choice[] = [
-  { value: "fable", label: "Fable" },
-  { value: "opus", label: "Opus" },
-  { value: "sonnet", label: "Sonnet" },
-  { value: "haiku", label: "Haiku" },
-];
+/** The registry's default model alone, until the schema arrives. */
+export const FALLBACK_MODEL_CHOICES: readonly Choice[] = [{ value: DEFAULT_MODEL, label: "Opus 4.8" }];
 
 /** An enum value's display name: its label from the schema, else the value itself. */
 export function enumOptionLabel(f: Pick<SettingFieldView, "enumValues" | "enumLabels">, value: string): string {

@@ -124,19 +124,19 @@ func TestApplySettings(t *testing.T) {
 	applySettings(st, reg, level, false)
 
 	if _, err := st.Update(context.Background(), map[string]string{
-		settings.KeyDefaultModel: "opus", settings.KeyDefaultEffort: "high", settings.KeyLogLevel: "warn",
+		settings.KeyDefaultModel: "claude-opus-4-8[1m]", settings.KeyDefaultEffort: "high", settings.KeyLogLevel: "warn",
 		settings.KeybindingKey("terminal.new"): "none", settings.KeybindingKey("session.new"): "cmd+t",
 	}); err != nil {
 		t.Fatal(err)
 	}
 	c, _ := reg.Get("session.new")
-	if c.Args[0].Default != "opus" || c.Args[1].Default != "high" || !slices.Equal(c.Keybindings, []string{"cmd+t"}) {
+	if c.Args[0].Default != "claude-opus-4-8[1m]" || c.Args[1].Default != "high" || !slices.Equal(c.Keybindings, []string{"cmd+t"}) {
 		t.Errorf("session.new = defaults %q/%q keybindings %v", c.Args[0].Default, c.Args[1].Default, c.Keybindings)
 	}
 	// The pull request session commands start sessions too, with the same defaults.
 	for _, name := range []string{"pr.ask", "pr.explain", "pr.fix.findings"} {
 		c, _ := reg.Get(name)
-		if m, e := argDefault(c, "model"), argDefault(c, "effort"); m != "opus" || e != "high" {
+		if m, e := argDefault(c, "model"), argDefault(c, "effort"); m != "claude-opus-4-8[1m]" || e != "high" {
 			t.Errorf("%s defaults = %q/%q, want opus/high", name, m, e)
 		}
 	}
@@ -151,10 +151,10 @@ func TestApplySettings(t *testing.T) {
 	if _, err := st.Update(context.Background(), map[string]string{settings.KeyDefaultModel: "", settings.KeyDefaultEffort: ""}); err != nil {
 		t.Fatal(err)
 	}
-	if c, _ := reg.Get("session.new"); c.Args[0].Default != "opus" || c.Args[1].Default != "high" {
+	if c, _ := reg.Get("session.new"); c.Args[0].Default != "claude-opus-4-8[1m]" || c.Args[1].Default != "high" {
 		t.Errorf("defaults after reset = %q/%q", c.Args[0].Default, c.Args[1].Default)
 	}
-	if c, _ := reg.Get("pr.fix.findings"); argDefault(c, "model") != "opus" || argDefault(c, "effort") != "high" {
+	if c, _ := reg.Get("pr.fix.findings"); argDefault(c, "model") != "claude-opus-4-8[1m]" || argDefault(c, "effort") != "high" {
 		t.Errorf("pr.fix.findings defaults after reset = %q/%q", argDefault(c, "model"), argDefault(c, "effort"))
 	}
 }
@@ -172,13 +172,13 @@ func TestSettingsNamer(t *testing.T) {
 		t.Fatalf("namer = %q, %v", name, err)
 	}
 	// The naming model is read per call: no restart, no new namer.
-	if _, err := st.Update(context.Background(), map[string]string{settings.KeyNamingModel: "haiku"}); err != nil {
+	if _, err := st.Update(context.Background(), map[string]string{settings.KeyNamingModel: "claude-4.5-haiku[1m]"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := namer(context.Background(), "hi"); err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"sonnet", "haiku"}; !slices.Equal(models, want) {
+	if want := []string{"claude-sonnet-5[1m]", "claude-4.5-haiku[1m]"}; !slices.Equal(models, want) {
 		t.Errorf("naming models = %q, want %q", models, want)
 	}
 	if _, err := st.Update(context.Background(), map[string]string{settings.KeyAutoName: "false"}); err != nil {

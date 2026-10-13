@@ -17,7 +17,7 @@ import (
 // File format: TOML, one table per group, keys without the group prefix:
 //
 //	[sessions]
-//	default_model = "opus"
+//	default_model = "claude-opus-4-8[1m]"
 //
 //	[keybindings]
 //	"session.new" = "cmd+shift+n"

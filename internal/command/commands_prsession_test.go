@@ -92,9 +92,9 @@ func TestPullRequestSessionCommands(t *testing.T) {
 		wantErrMsg   string
 	}{
 		{name: "explain in the main worktree with model and effort, not refreshed", cmd: "pr.explain",
-			args:        map[string]string{"repo-slug": "o/r", "number": "7", "model": "haiku", "effort": "medium"},
+			args:        map[string]string{"repo-slug": "o/r", "number": "7", "model": "claude-4.5-haiku[1m]", "effort": "medium"},
 			wantReq:     []proto.Message{detail(false), list},
-			wantSession: &v1.CreateSessionRequest{RepoId: "r1", WorktreePath: "/src/r", Model: "haiku", Effort: "medium"},
+			wantSession: &v1.CreateSessionRequest{RepoId: "r1", WorktreePath: "/src/r", Model: "claude-4.5-haiku[1m]", Effort: "medium"},
 			wantPrompt:  "Explain this pull request.\n\nThe pull request is #7, titled `Fix it`",
 			wantMsg:     "Started session s1 for PR #7"},
 		{name: "ask in the active worktree of the clone, not refreshed", cmd: "pr.ask",
