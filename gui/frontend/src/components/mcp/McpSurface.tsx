@@ -110,13 +110,18 @@ function HintIcon({ hint }: { hint: ToolHint }) {
 function ToolRow({ tool }: { tool: McpToolView }) {
   return (
     <li className="flex h-6 min-w-0 items-center gap-2 pl-1 text-xs" data-testid="mcp-tool" data-tool={tool.name}>
-      <span className="shrink-0 font-mono text-[11.5px]">{tool.name}</span>
-      {tool.description && (
-        <span className="min-w-0 truncate text-muted-foreground" title={tool.description}>
-          {tool.description}
+      {/* The description gives way first; a name wider than the row truncates on its own. */}
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="max-w-full shrink-0 truncate font-mono text-[11.5px]" title={tool.name}>
+          {tool.name}
         </span>
-      )}
-      <span className="ml-auto flex shrink-0 items-center gap-1 text-muted-foreground">
+        {tool.description && (
+          <span className="min-w-0 truncate text-muted-foreground" title={tool.description}>
+            {tool.description}
+          </span>
+        )}
+      </span>
+      <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
         {toolHints(tool).map((h) => (
           <HintIcon key={h} hint={h} />
         ))}
@@ -149,15 +154,18 @@ function ServerCard({ threadId, name }: { threadId: string; name: string }) {
     >
       <div className="flex min-w-0 items-center gap-2 text-[13px]">
         {shown === "pending" ? <LoaderCircle className="size-3 shrink-0 animate-spin text-muted-foreground" aria-hidden /> : <span className={cn("size-2 shrink-0 rounded-full", DOT[shown])} aria-hidden />}
-        <span className="min-w-0 truncate font-semibold" data-testid="mcp-name">
-          {server.name}
-        </span>
-        {server.version && (
-          <span className="shrink-0 font-mono text-[11.5px] text-muted-foreground" data-testid="mcp-version">
-            v{server.version}
+        {/* The pill always shows: the version gives way first, then the name truncates. */}
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="max-w-full shrink-0 truncate font-semibold" title={server.name} data-testid="mcp-name">
+            {server.name}
           </span>
-        )}
-        <span className={cn("ml-auto shrink-0 rounded-full px-1.5 text-[10.5px] leading-4 font-medium whitespace-nowrap", PILL[shown])} data-testid="mcp-pill">
+          {server.version && (
+            <span className="min-w-0 truncate font-mono text-[11.5px] text-muted-foreground" title={`v${server.version}`} data-testid="mcp-version">
+              v{server.version}
+            </span>
+          )}
+        </span>
+        <span className={cn("shrink-0 rounded-full px-1.5 text-[10.5px] leading-4 font-medium whitespace-nowrap", PILL[shown])} data-testid="mcp-pill">
           {MCP_STATUS_LABEL[shown]}
         </span>
       </div>
