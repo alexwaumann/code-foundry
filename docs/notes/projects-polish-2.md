@@ -46,7 +46,9 @@ PR 2 of three for the Projects page (sketch variant A, `/tmp/cf-projects-sketch`
   polled every 30 s (and Refresh would not move it). An unchanged status now republishes the
   worktree (snapshot + `WorktreeUpdated`) once the published time is a minute old
   (`republishAfter` in `internal/store/repo/store.go`, test in `republish_test.go`). Cost:
-  at most one event per worktree per minute.
+  at most one event per worktree per minute. With the 30 s poll the published time is
+  60-90 s old at worst, so a healthy header reads "updated 1m ago" (a loaded machine can
+  stretch it to "2m"); stale (amber) means no status refresh for 10 minutes.
 - Menu keys are stopped at the menu content: React portals bubble synthetic events to the
   row and the list, whose arrow keys would otherwise move the list's cursor (and clicks
   would set it). On close the focus goes back to the page's list.
@@ -67,3 +69,5 @@ e2e: `gui/frontend/e2e/projects.spec.ts` (actions without hover and their opacit
 action column widths, no path on rows, thread counts incl. a workspace member, menus per
 row kind, menu keeps the list cursor and focus, Publish/Init gates, freshness, Refresh's
 fetch-then-refresh order and failure toast, New worktree via the palette).
+
+Screenshots (real app, isolated `CODE_FOUNDRY_HOME`): `docs/notes/projects-polish-2/`.
