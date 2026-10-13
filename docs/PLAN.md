@@ -132,7 +132,7 @@ a full `vX.Y.Z`; an `update.channel` setting picks which the updater follows, do
 are never offered, the GUI shows tips as `vX.Y.Z (tip N)`, and the migrator refuses a
 database from a newer build. Design record: `docs/notes/release-channels-handoff.md`.
 
-* PR 1 (workflow, release/install scripts, `make promote`, tip pruning): not started.
+* PR 1 (workflow, release/install scripts, `make promote`, tip pruning): done: see docs/notes/release-channels-1-pipeline.md.
 * PR 2 (`update.channel`, channel-aware source, migration guard, dialog label): not started.
 
 ### Open items
@@ -164,7 +164,7 @@ Collected from the step notes; none blocks daily use.
 * **Settings**
   * Saving from the app rewrites `settings.toml`, which drops user comments and unknown keys.
 * **Packaging and updates**
-  * Releases are live (every push to main). The `install.sh` one-liner has not been run from a fresh machine.
+  * Releases are live: a tip prerelease per push to main, stables by `make promote`. The `install.sh` one-liner has not been run from a fresh machine.
   * Homebrew tap deferred (needs a separate repo).
   * A real Finder double-click launch is unverified (`env -i … open` stood in for it). macOS arm64 only.
 * **Integration pass**

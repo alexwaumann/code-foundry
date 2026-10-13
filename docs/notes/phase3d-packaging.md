@@ -70,6 +70,18 @@ package.sh refuses to finish when:
 
 ## Releases
 
+### Channels (since 2026-10-12)
+
+Releases come in two channels; GitHub's prerelease flag is the channel. Every push to
+main publishes a **tip** prerelease `vX.Y.Z-tip.N` (`X.Y.Z` the stable this commit would
+become, `N` the first-parent commits since the last stable); the workflow keeps the
+newest five. A **stable** `vX.Y.Z` is published on purpose with `make promote`
+(`workflow_dispatch`, `channel=stable`); `make release` is the local stable fallback.
+`release.sh --channel`, `next-version.sh --tip` and `install.sh --channel` implement it.
+Design: [release-channels-handoff.md](release-channels-handoff.md); pipeline notes:
+[release-channels-1-pipeline.md](release-channels-1-pipeline.md). Where the sections
+below say "every push to main releases", read "publishes a tip".
+
 ### Automatic (GitHub Actions, on since 2026-10-09)
 
 `.github/workflows/release.yml` uses the same setup as `ci.yml`: checkout with full
