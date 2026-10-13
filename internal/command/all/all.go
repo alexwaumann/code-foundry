@@ -99,6 +99,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterSession(r, d.Session, d.Emitter),
 		command.RegisterThread(r, d.Thread),
 		command.RegisterMcp(r, d.Thread, d.Emitter),
+		command.RegisterSlash(r, d.Thread),
 		command.RegisterGitOps(r, d.GitOps),
 		command.RegisterPullRequest(r, d.Gh),
 		command.RegisterPullRequestSessions(r, command.PullRequestSessionDeps{
