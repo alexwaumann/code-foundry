@@ -20,6 +20,12 @@ service RepoService {
   rpc CreateWorktree(CreateWorktreeRequest) returns (CreateWorktreeResponse) {}
   // RemoveWorktree removes a worktree (and optionally its branch).
   rpc RemoveWorktree(RemoveWorktreeRequest) returns (RemoveWorktreeResponse) {}
+  // CleanupWorktrees removes worktrees whose work is already in the default branch:
+  // merged_clean, and no live thread, running terminal or workspace holds them. It
+  // refreshes the repository's status first (a caller wanting fresh remote refs fetches
+  // before), re-evaluates, and removes with `git worktree remove` (never --force).
+  // Branches are never deleted. dry_run only evaluates the current snapshot.
+  rpc CleanupWorktrees(CleanupWorktreesRequest) returns (CleanupWorktreesResponse) {}
   // Refresh forces a status reconcile for a repo (or all repos when id is empty).
   rpc Refresh(RefreshRepoRequest) returns (RefreshRepoResponse) {}
   // Watch streams repository and worktree changes.
@@ -109,6 +115,12 @@ message Worktree {
   GitStatus status = 6;
   // HEAD is detached (branch is empty).
   bool detached = 7;
+  // The git half of "safe to clean up": not the main worktree, on a branch, no staged,
+  // modified, untracked or conflicted entries, no status error, and status.base_ref is
+  // set with base_ahead 0 (every commit on HEAD is in origin/<default>). Whether a live
+  // thread, a running terminal or a workspace holds it is not part of this flag (the
+  // repo store does not know them); CleanupWorktrees checks those too.
+  bool merged_clean = 8;
 }
 
 message GitStatus {
@@ -186,6 +198,31 @@ message RemoveWorktreeRequest {
 }
 
 message RemoveWorktreeResponse {}
+
+message CleanupWorktreesRequest {
+  // Repository id or name (a name only when exactly one registered repository has it).
+  string repo = 1;
+  // One worktree to clean up; empty means every worktree of the repository.
+  string path = 2;
+  // Evaluate the current snapshot only: nothing is refreshed or removed, and removed
+  // lists what would be.
+  bool dry_run = 3;
+}
+
+message CleanupWorktreesResponse {
+  string repo_id = 1;
+  // Removed worktrees (their state just before removal), in the repository's order.
+  repeated Worktree removed = 2;
+  // Worktrees kept, with why. Without a path the main worktree is not listed.
+  repeated SkippedWorktree skipped = 3;
+}
+
+message SkippedWorktree {
+  Worktree worktree = 1;
+  // Why it was kept, e.g. "uncommitted changes", "2 commits not in origin/main",
+  // "a live thread runs in it"; or the removal's error.
+  string reason = 2;
+}
 
 message ListRefsRequest {
   string repo_id = 1;
