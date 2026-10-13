@@ -136,6 +136,8 @@ type Init struct {
 	Tools             []string `json:"tools"`
 	ClaudeCodeVersion string   `json:"claude_code_version"`
 	Capabilities      []string `json:"capabilities"`
+	// McpServers are the MCP servers with their status at the turn's start (mcp.go).
+	McpServers []McpServerInit `json:"mcp_servers"`
 }
 
 // Status is system/status: status "requesting", "compacting" or null; a mode change
@@ -437,6 +439,8 @@ const (
 	SubtypeSetPermissionMode = "set_permission_mode"
 	SubtypeSetCwd            = "set_cwd"
 	SubtypeCanUseTool        = "can_use_tool"
+	SubtypeMcpStatus         = "mcp_status"
+	SubtypeMcpReconnect      = "mcp_reconnect"
 )
 
 // InitializeResponse is the part of initialize's success payload we read.
