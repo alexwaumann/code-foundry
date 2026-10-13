@@ -141,8 +141,8 @@ const (
 	McpServerStatus_MCP_SERVER_STATUS_CONNECTED   McpServerStatus = 1
 	// It could not start or connect; McpServer.error says why.
 	McpServerStatus_MCP_SERVER_STATUS_FAILED McpServerStatus = 2
-	// It needs a login (OAuth). Claude cannot log in headlessly: /mcp in a terminal
-	// thread, then McpReconnect.
+	// It needs a login (OAuth). Claude cannot log in headlessly: run `claude` in a
+	// shell and use /mcp, then McpReconnect.
 	McpServerStatus_MCP_SERVER_STATUS_NEEDS_AUTH McpServerStatus = 3
 	// Still connecting.
 	McpServerStatus_MCP_SERVER_STATUS_PENDING McpServerStatus = 4

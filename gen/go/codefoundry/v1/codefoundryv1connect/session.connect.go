@@ -76,16 +76,16 @@ type SessionServiceClient interface {
 	Get(context.Context, *connect.Request[v1.GetSessionRequest]) (*connect.Response[v1.GetSessionResponse], error)
 	// Rename sets a user-chosen name and disables auto-naming for the session.
 	Rename(context.Context, *connect.Request[v1.RenameSessionRequest]) (*connect.Response[v1.RenameSessionResponse], error)
-	// Close ends the Claude process gracefully (/exit, bounded wait, then kill). The
-	// session remains, DISCONNECTED, until Remove.
+	// Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
+	// then kill). The session remains, DISCONNECTED, until Remove.
 	Close(context.Context, *connect.Request[v1.CloseSessionRequest]) (*connect.Response[v1.CloseSessionResponse], error)
-	// Reconnect resumes a DISCONNECTED session in a new terminal.
+	// Reconnect resumes a DISCONNECTED session in a new claude process.
 	Reconnect(context.Context, *connect.Request[v1.ReconnectSessionRequest]) (*connect.Response[v1.ReconnectSessionResponse], error)
 	// Remove forgets a session. Closes it first if connected.
 	Remove(context.Context, *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error)
 	// RunIn moves a workspace thread's cwd to another member worktree of its workspace.
-	// A live thread gets `/cd <path>` typed once it is idle at its prompt
-	// (pending_worktree_path shows the queued target until then) and the row's
+	// A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
+	// target until then) and the row's
 	// worktree_path and repo_id change when it is sent. A disconnected thread's row
 	// changes at once; the next reconnect resumes there. Refused for a project thread or
 	// a target that is not a member.
@@ -100,8 +100,8 @@ type SessionServiceClient interface {
 	// Claude reads them with its Read tool. Only image types are accepted, with size
 	// limits; unused staged files are reaped by the daemon.
 	StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error)
-	// ReadAttachment returns a staged attachment's bytes (a rendered thread's user
-	// message shows its images). Only files directly in the attachments directory;
+	// ReadAttachment returns a staged attachment's bytes (a user message shows its
+	// images). Only files directly in the attachments directory;
 	// NOT_FOUND once the file was reaped.
 	ReadAttachment(context.Context, *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error)
 }
@@ -292,16 +292,16 @@ type SessionServiceHandler interface {
 	Get(context.Context, *connect.Request[v1.GetSessionRequest]) (*connect.Response[v1.GetSessionResponse], error)
 	// Rename sets a user-chosen name and disables auto-naming for the session.
 	Rename(context.Context, *connect.Request[v1.RenameSessionRequest]) (*connect.Response[v1.RenameSessionResponse], error)
-	// Close ends the Claude process gracefully (/exit, bounded wait, then kill). The
-	// session remains, DISCONNECTED, until Remove.
+	// Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
+	// then kill). The session remains, DISCONNECTED, until Remove.
 	Close(context.Context, *connect.Request[v1.CloseSessionRequest]) (*connect.Response[v1.CloseSessionResponse], error)
-	// Reconnect resumes a DISCONNECTED session in a new terminal.
+	// Reconnect resumes a DISCONNECTED session in a new claude process.
 	Reconnect(context.Context, *connect.Request[v1.ReconnectSessionRequest]) (*connect.Response[v1.ReconnectSessionResponse], error)
 	// Remove forgets a session. Closes it first if connected.
 	Remove(context.Context, *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error)
 	// RunIn moves a workspace thread's cwd to another member worktree of its workspace.
-	// A live thread gets `/cd <path>` typed once it is idle at its prompt
-	// (pending_worktree_path shows the queued target until then) and the row's
+	// A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
+	// target until then) and the row's
 	// worktree_path and repo_id change when it is sent. A disconnected thread's row
 	// changes at once; the next reconnect resumes there. Refused for a project thread or
 	// a target that is not a member.
@@ -316,8 +316,8 @@ type SessionServiceHandler interface {
 	// Claude reads them with its Read tool. Only image types are accepted, with size
 	// limits; unused staged files are reaped by the daemon.
 	StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error)
-	// ReadAttachment returns a staged attachment's bytes (a rendered thread's user
-	// message shows its images). Only files directly in the attachments directory;
+	// ReadAttachment returns a staged attachment's bytes (a user message shows its
+	// images). Only files directly in the attachments directory;
 	// NOT_FOUND once the file was reaped.
 	ReadAttachment(context.Context, *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error)
 }

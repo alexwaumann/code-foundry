@@ -1576,8 +1576,8 @@ export enum McpServerStatus {
   FAILED = 2,
 
   /**
-   * It needs a login (OAuth). Claude cannot log in headlessly: /mcp in a terminal
-   * thread, then McpReconnect.
+   * It needs a login (OAuth). Claude cannot log in headlessly: run `claude` in a
+   * shell and use /mcp, then McpReconnect.
    *
    * @generated from enum value: MCP_SERVER_STATUS_NEEDS_AUTH = 3;
    */
@@ -1678,10 +1678,9 @@ export const ThreadDecisionSchema: GenEnum<ThreadDecision> = /*@__PURE__*/
   enumDesc(file_codefoundry_v1_thread, 4);
 
 /**
- * ThreadService drives rendered threads (Session.render RENDERED): Claude Code runs
- * headlessly (claude -p over stream-json) and the conversation is recorded by the
- * daemon as items the GUI draws. Every RPC refuses a terminal thread with
- * FAILED_PRECONDITION. See docs/notes/rendered-threads-1-daemon.md.
+ * ThreadService drives threads: Claude Code runs headlessly (claude -p over
+ * stream-json) and the conversation is recorded by the daemon as items the GUI draws.
+ * See docs/notes/rendered-threads-1-daemon.md and docs/notes/rendered-only.md.
  *
  * @generated from service codefoundry.v1.ThreadService
  */
@@ -1700,7 +1699,7 @@ export const ThreadService: GenService<{
   /**
    * Watch streams one thread: a snapshot first, then appended/updated items, text
    * deltas and pending-request changes. While a Watch is open the thread counts as
-   * looked at: a finished turn is seen at once (like an attached terminal). Apply only
+   * looked at: a finished turn is seen at once. Apply only
    * events whose seq is greater than the snapshot's.
    *
    * @generated from rpc codefoundry.v1.ThreadService.Watch
@@ -1793,7 +1792,7 @@ export const ThreadService: GenService<{
   },
   /**
    * McpReconnect reconnects one MCP server of a connected thread (also how a login made
-   * out of band, /mcp in a terminal thread, is picked up), then checks the servers again.
+   * out of band, `claude /mcp` in a shell, is picked up), then checks the servers again.
    * A server that still fails is not an RPC error: the response's error says why and the
    * status shows it. An unknown server is NOT_FOUND.
    *

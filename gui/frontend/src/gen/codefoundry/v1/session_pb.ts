@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/session.proto.
  */
 export const file_codefoundry_v1_session: GenFile = /*@__PURE__*/
-  fileDesc("Chxjb2RlZm91bmRyeS92MS9zZXNzaW9uLnByb3RvEg5jb2RlZm91bmRyeS52MSKtCAoHU2Vzc2lvbhIKCgJpZBgBIAEoCRIZChFjbGF1ZGVfc2Vzc2lvbl9pZBgCIAEoCRIPCgdyZXBvX2lkGAMgASgJEhUKDXdvcmt0cmVlX3BhdGgYBCABKAkSDAoEbmFtZRgFIAEoCRISCgphdXRvX25hbWVkGAYgASgIEg0KBW1vZGVsGAcgASgJEg4KBmVmZm9ydBgIIAEoCRITCgt0ZXJtaW5hbF9pZBgJIAEoCRIrCgVzdGF0ZRgKIAEoDjIcLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb25TdGF0ZRItCgZzdGF0dXMYCyABKA4yHS5jb2RlZm91bmRyeS52MS5TZXNzaW9uU3RhdHVzEi4KCmNyZWF0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjQKEGxhc3RfYWN0aXZpdHlfYXQYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhEKCWV4aXRfY29kZRgOIAEoBRIZChFkaXNjb25uZWN0X3JlYXNvbhgPIAEoCRISCgpsYXN0X2Vycm9yGBAgASgJEhEKCXBhcmVudF9pZBgRIAEoCRIVCg1zdGF0dXNfcmVhc29uGBIgASgJEjcKD3Blcm1pc3Npb25fbW9kZRgTIAEoDjIeLmNvZGVmb3VuZHJ5LnYxLlBlcm1pc3Npb25Nb2RlEhAKCGJhc2VfcmVmGBQgASgJEhgKEGNyZWF0ZWRfd29ya3RyZWUYFSABKAgSFAoMd29ya3NwYWNlX2lkGBYgASgJEh0KFXBlbmRpbmdfd29ya3RyZWVfcGF0aBgXIAEoCRIOCgZwaW5uZWQYGCABKAgSPwoUbGlua2VkX3B1bGxfcmVxdWVzdHMYGSADKAsyIS5jb2RlZm91bmRyeS52MS5MaW5rZWRQdWxsUmVxdWVzdBI1ChFzdGF0dXNfY2hhbmdlZF9hdBgaIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASKgoFdXNhZ2UYGyADKAsyGy5jb2RlZm91bmRyeS52MS5Vc2FnZUJ1Y2tldBIQCghjb3N0X3VzZBgcIAEoARIQCgh1bnByaWNlZBgdIAEoCBIsCgphZ2VudF9ydW5zGB4gAygLMhguY29kZWZvdW5kcnkudjEuQWdlbnRSdW4SLQoGcmVuZGVyGB8gASgOMh0uY29kZWZvdW5kcnkudjEuU2Vzc2lvblJlbmRlchIWCg5lZmZvcnRfcGVuZGluZxggIAEoCBIWCg5jb250ZXh0X3Rva2VucxghIAEoAxI0ChBjYWNoZV9leHBpcmVzX2F0GCIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIaChJjb250ZXh0X3JlcmVhZF91c2QYIyABKAEitwIKCEFnZW50UnVuEgoKAmlkGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJEhIKCmFnZW50X3R5cGUYAyABKAkSDQoFbW9kZWwYBCABKAkSDgoGZWZmb3J0GAUgASgJEhIKCmJhY2tncm91bmQYBiABKAgSLgoGc3RhdHVzGAcgASgOMh4uY29kZWZvdW5kcnkudjEuQWdlbnRSdW5TdGF0dXMSEwoLc3Bhd25fZGVwdGgYCCABKAUSLgoKc3RhcnRlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASKgoFdXNhZ2UYCiADKAsyGy5jb2RlZm91bmRyeS52MS5Vc2FnZUJ1Y2tldBIQCghjb3N0X3VzZBgLIAEoARIQCgh1bnByaWNlZBgMIAEoCCKKAwoLVXNhZ2VCdWNrZXQSDQoFbW9kZWwYASABKAkSDAoEdGllchgCIAEoCRINCgVzcGVlZBgDIAEoCRILCgNkYXkYBCABKAkSEAoIcmVxdWVzdHMYBSABKAMSDQoFaW5wdXQYBiABKAMSDgoGb3V0cHV0GAcgASgDEhIKCmNhY2hlX3JlYWQYCCABKAMSFgoOY2FjaGVfd3JpdGVfNW0YCSABKAMSFgoOY2FjaGVfd3JpdGVfMWgYCiABKAMSEAoIY29zdF91c2QYCyABKAESEAoIdW5wcmljZWQYDCABKAgSFgoOaW5wdXRfY29zdF91c2QYDSABKAESFwoPb3V0cHV0X2Nvc3RfdXNkGA4gASgBEhsKE2NhY2hlX3JlYWRfY29zdF91c2QYDyABKAESHwoXY2FjaGVfd3JpdGVfNW1fY29zdF91c2QYECABKAESHwoXY2FjaGVfd3JpdGVfMWhfY29zdF91c2QYESABKAESGQoRY2FjaGVfc2F2aW5nc191c2QYEiABKAEibQoRTGlua2VkUHVsbFJlcXVlc3QSDAoEc2x1ZxgBIAEoCRIOCgZudW1iZXIYAiABKAUSCwoDdXJsGAMgASgJEi0KCWxpbmtlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAilwMKFENyZWF0ZVNlc3Npb25SZXF1ZXN0Eg8KB3JlcG9faWQYASABKAkSFQoNd29ya3RyZWVfcGF0aBgCIAEoCRINCgVtb2RlbBgDIAEoCRIOCgZlZmZvcnQYBCABKAkSDAoEbmFtZRgFIAEoCRIWCg5pbml0aWFsX3Byb21wdBgGIAEoCRI3Cg9wZXJtaXNzaW9uX21vZGUYByABKA4yHi5jb2RlZm91bmRyeS52MS5QZXJtaXNzaW9uTW9kZRIxCgxuZXdfd29ya3RyZWUYCCABKAsyGy5jb2RlZm91bmRyeS52MS5OZXdXb3JrdHJlZRITCgthdHRhY2htZW50cxgJIAMoCRIUCgx3b3Jrc3BhY2VfaWQYCiABKAkSMwoNbmV3X3dvcmtzcGFjZRgLIAEoCzIcLmNvZGVmb3VuZHJ5LnYxLk5ld1dvcmtzcGFjZRItCgZyZW5kZXIYDCABKA4yHS5jb2RlZm91bmRyeS52MS5TZXNzaW9uUmVuZGVyEhcKD2NvbXBvc2VyX3Byb21wdBgNIAEoCSIfCgtOZXdXb3JrdHJlZRIQCghiYXNlX3JlZhgBIAEoCSI9CgxOZXdXb3Jrc3BhY2USDQoFcmVwb3MYASADKAkSEAoIYmFzZV9yZWYYAiABKAkSDAoEbmFtZRgDIAEoCSJHChZTdGFnZUF0dGFjaG1lbnRSZXF1ZXN0EgwKBG5hbWUYASABKAkSEQoJbWltZV90eXBlGAIgASgJEgwKBGRhdGEYAyABKAwiJwoXU3RhZ2VBdHRhY2htZW50UmVzcG9uc2USDAoEcGF0aBgBIAEoCSIlChVSZWFkQXR0YWNobWVudFJlcXVlc3QSDAoEcGF0aBgBIAEoCSI5ChZSZWFkQXR0YWNobWVudFJlc3BvbnNlEgwKBGRhdGEYASABKAwSEQoJbWltZV90eXBlGAIgASgJIkEKFUNyZWF0ZVNlc3Npb25SZXNwb25zZRIoCgdzZXNzaW9uGAEgASgLMhcuY29kZWZvdW5kcnkudjEuU2Vzc2lvbiIuChJGb3JrU2Vzc2lvblJlcXVlc3QSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCSI/ChNGb3JrU2Vzc2lvblJlc3BvbnNlEigKB3Nlc3Npb24YASABKAsyFy5jb2RlZm91bmRyeS52MS5TZXNzaW9uIhUKE0xpc3RTZXNzaW9uc1JlcXVlc3QidQoUTGlzdFNlc3Npb25zUmVzcG9uc2USKQoIc2Vzc2lvbnMYASADKAsyFy5jb2RlZm91bmRyeS52MS5TZXNzaW9uEjIKDXJldGlyZWRfdXNhZ2UYAiADKAsyGy5jb2RlZm91bmRyeS52MS5Vc2FnZUJ1Y2tldCIfChFHZXRTZXNzaW9uUmVxdWVzdBIKCgJpZBgBIAEoCSI+ChJHZXRTZXNzaW9uUmVzcG9uc2USKAoHc2Vzc2lvbhgBIAEoCzIXLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb24iMAoUUmVuYW1lU2Vzc2lvblJlcXVlc3QSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCSJBChVSZW5hbWVTZXNzaW9uUmVzcG9uc2USKAoHc2Vzc2lvbhgBIAEoCzIXLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb24iIQoTQ2xvc2VTZXNzaW9uUmVxdWVzdBIKCgJpZBgBIAEoCSIWChRDbG9zZVNlc3Npb25SZXNwb25zZSIlChdSZWNvbm5lY3RTZXNzaW9uUmVxdWVzdBIKCgJpZBgBIAEoCSJEChhSZWNvbm5lY3RTZXNzaW9uUmVzcG9uc2USKAoHc2Vzc2lvbhgBIAEoCzIXLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb24iIgoUUmVtb3ZlU2Vzc2lvblJlcXVlc3QSCgoCaWQYASABKAkiFwoVUmVtb3ZlU2Vzc2lvblJlc3BvbnNlIkkKE1J1bkluU2Vzc2lvblJlcXVlc3QSCgoCaWQYASABKAkSDwoHcmVwb19pZBgCIAEoCRIVCg13b3JrdHJlZV9wYXRoGAMgASgJIkAKFFJ1bkluU2Vzc2lvblJlc3BvbnNlEigKB3Nlc3Npb24YASABKAsyFy5jb2RlZm91bmRyeS52MS5TZXNzaW9uIi8KEVBpblNlc3Npb25SZXF1ZXN0EgoKAmlkGAEgASgJEg4KBnBpbm5lZBgCIAEoCCI+ChJQaW5TZXNzaW9uUmVzcG9uc2USKAoHc2Vzc2lvbhgBIAEoCzIXLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb24iFgoUV2F0Y2hTZXNzaW9uc1JlcXVlc3QixQEKDFNlc3Npb25FdmVudBIzCghzbmFwc2hvdBgBIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb25TbmFwc2hvdEgAEioKB3VwZGF0ZWQYAiABKAsyFy5jb2RlZm91bmRyeS52MS5TZXNzaW9uSAASFAoKcmVtb3ZlZF9pZBgDIAEoCUgAEjUKDXJldGlyZWRfdXNhZ2UYBCABKAsyHC5jb2RlZm91bmRyeS52MS5SZXRpcmVkVXNhZ2VIAEIHCgVldmVudCJwCg9TZXNzaW9uU25hcHNob3QSKQoIc2Vzc2lvbnMYASADKAsyFy5jb2RlZm91bmRyeS52MS5TZXNzaW9uEjIKDXJldGlyZWRfdXNhZ2UYAiADKAsyGy5jb2RlZm91bmRyeS52MS5Vc2FnZUJ1Y2tldCI8CgxSZXRpcmVkVXNhZ2USLAoHYnVja2V0cxgBIAMoCzIbLmNvZGVmb3VuZHJ5LnYxLlVzYWdlQnVja2V0Ko0BCg5QZXJtaXNzaW9uTW9kZRIfChtQRVJNSVNTSU9OX01PREVfVU5TUEVDSUZJRUQQABIeChpQRVJNSVNTSU9OX01PREVfU1VQRVJWSVNFRBABEiAKHFBFUk1JU1NJT05fTU9ERV9BQ0NFUFRfRURJVFMQAhIYChRQRVJNSVNTSU9OX01PREVfQVVUTxADKmkKDVNlc3Npb25SZW5kZXISHgoaU0VTU0lPTl9SRU5ERVJfVU5TUEVDSUZJRUQQABIbChdTRVNTSU9OX1JFTkRFUl9URVJNSU5BTBABEhsKF1NFU1NJT05fUkVOREVSX1JFTkRFUkVEEAIqoQEKDFNlc3Npb25TdGF0ZRIdChlTRVNTSU9OX1NUQVRFX1VOU1BFQ0lGSUVEEAASGgoWU0VTU0lPTl9TVEFURV9TVEFSVElORxABEhsKF1NFU1NJT05fU1RBVEVfQ09OTkVDVEVEEAISGQoVU0VTU0lPTl9TVEFURV9DTE9TSU5HEAMSHgoaU0VTU0lPTl9TVEFURV9ESVNDT05ORUNURUQQBCqfAQoNU2Vzc2lvblN0YXR1cxIeChpTRVNTSU9OX1NUQVRVU19VTlNQRUNJRklFRBAAEhcKE1NFU1NJT05fU1RBVFVTX0JVU1kQARIXChNTRVNTSU9OX1NUQVRVU19JRExFEAISIgoeU0VTU0lPTl9TVEFUVVNfTkVFRFNfQVRURU5USU9OEAMSGAoUU0VTU0lPTl9TVEFUVVNfRVJST1IQBCpqCg5BZ2VudFJ1blN0YXR1cxIgChxBR0VOVF9SVU5fU1RBVFVTX1VOU1BFQ0lGSUVEEAASGQoVQUdFTlRfUlVOX1NUQVRVU19PUEVOEAESGwoXQUdFTlRfUlVOX1NUQVRVU19DTE9TRUQQAjKLCQoOU2Vzc2lvblNlcnZpY2USVwoGQ3JlYXRlEiQuY29kZWZvdW5kcnkudjEuQ3JlYXRlU2Vzc2lvblJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5DcmVhdGVTZXNzaW9uUmVzcG9uc2UiABJRCgRGb3JrEiIuY29kZWZvdW5kcnkudjEuRm9ya1Nlc3Npb25SZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuRm9ya1Nlc3Npb25SZXNwb25zZSIAElMKBExpc3QSIy5jb2RlZm91bmRyeS52MS5MaXN0U2Vzc2lvbnNSZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuTGlzdFNlc3Npb25zUmVzcG9uc2UiABJOCgNHZXQSIS5jb2RlZm91bmRyeS52MS5HZXRTZXNzaW9uUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLkdldFNlc3Npb25SZXNwb25zZSIAElcKBlJlbmFtZRIkLmNvZGVmb3VuZHJ5LnYxLlJlbmFtZVNlc3Npb25SZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuUmVuYW1lU2Vzc2lvblJlc3BvbnNlIgASVAoFQ2xvc2USIy5jb2RlZm91bmRyeS52MS5DbG9zZVNlc3Npb25SZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuQ2xvc2VTZXNzaW9uUmVzcG9uc2UiABJgCglSZWNvbm5lY3QSJy5jb2RlZm91bmRyeS52MS5SZWNvbm5lY3RTZXNzaW9uUmVxdWVzdBooLmNvZGVmb3VuZHJ5LnYxLlJlY29ubmVjdFNlc3Npb25SZXNwb25zZSIAElcKBlJlbW92ZRIkLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVNlc3Npb25SZXF1ZXN0GiUuY29kZWZvdW5kcnkudjEuUmVtb3ZlU2Vzc2lvblJlc3BvbnNlIgASVAoFUnVuSW4SIy5jb2RlZm91bmRyeS52MS5SdW5JblNlc3Npb25SZXF1ZXN0GiQuY29kZWZvdW5kcnkudjEuUnVuSW5TZXNzaW9uUmVzcG9uc2UiABJOCgNQaW4SIS5jb2RlZm91bmRyeS52MS5QaW5TZXNzaW9uUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLlBpblNlc3Npb25SZXNwb25zZSIAEk8KBVdhdGNoEiQuY29kZWZvdW5kcnkudjEuV2F0Y2hTZXNzaW9uc1JlcXVlc3QaHC5jb2RlZm91bmRyeS52MS5TZXNzaW9uRXZlbnQiADABEmQKD1N0YWdlQXR0YWNobWVudBImLmNvZGVmb3VuZHJ5LnYxLlN0YWdlQXR0YWNobWVudFJlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5TdGFnZUF0dGFjaG1lbnRSZXNwb25zZSIAEmEKDlJlYWRBdHRhY2htZW50EiUuY29kZWZvdW5kcnkudjEuUmVhZEF0dGFjaG1lbnRSZXF1ZXN0GiYuY29kZWZvdW5kcnkudjEuUmVhZEF0dGFjaG1lbnRSZXNwb25zZSIAQsQBChJjb20uY29kZWZvdW5kcnkudjFCDFNlc3Npb25Qcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp]);
+  fileDesc("Chxjb2RlZm91bmRyeS92MS9zZXNzaW9uLnByb3RvEg5jb2RlZm91bmRyeS52MSKKCAoHU2Vzc2lvbhIKCgJpZBgBIAEoCRIZChFjbGF1ZGVfc2Vzc2lvbl9pZBgCIAEoCRIPCgdyZXBvX2lkGAMgASgJEhUKDXdvcmt0cmVlX3BhdGgYBCABKAkSDAoEbmFtZRgFIAEoCRISCgphdXRvX25hbWVkGAYgASgIEg0KBW1vZGVsGAcgASgJEg4KBmVmZm9ydBgIIAEoCRIrCgVzdGF0ZRgKIAEoDjIcLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb25TdGF0ZRItCgZzdGF0dXMYCyABKA4yHS5jb2RlZm91bmRyeS52MS5TZXNzaW9uU3RhdHVzEi4KCmNyZWF0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjQKEGxhc3RfYWN0aXZpdHlfYXQYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhEKCWV4aXRfY29kZRgOIAEoBRIZChFkaXNjb25uZWN0X3JlYXNvbhgPIAEoCRISCgpsYXN0X2Vycm9yGBAgASgJEhEKCXBhcmVudF9pZBgRIAEoCRIVCg1zdGF0dXNfcmVhc29uGBIgASgJEjcKD3Blcm1pc3Npb25fbW9kZRgTIAEoDjIeLmNvZGVmb3VuZHJ5LnYxLlBlcm1pc3Npb25Nb2RlEhAKCGJhc2VfcmVmGBQgASgJEhgKEGNyZWF0ZWRfd29ya3RyZWUYFSABKAgSFAoMd29ya3NwYWNlX2lkGBYgASgJEh0KFXBlbmRpbmdfd29ya3RyZWVfcGF0aBgXIAEoCRIOCgZwaW5uZWQYGCABKAgSPwoUbGlua2VkX3B1bGxfcmVxdWVzdHMYGSADKAsyIS5jb2RlZm91bmRyeS52MS5MaW5rZWRQdWxsUmVxdWVzdBI1ChFzdGF0dXNfY2hhbmdlZF9hdBgaIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASKgoFdXNhZ2UYGyADKAsyGy5jb2RlZm91bmRyeS52MS5Vc2FnZUJ1Y2tldBIQCghjb3N0X3VzZBgcIAEoARIQCgh1bnByaWNlZBgdIAEoCBIsCgphZ2VudF9ydW5zGB4gAygLMhguY29kZWZvdW5kcnkudjEuQWdlbnRSdW4SFgoOZWZmb3J0X3BlbmRpbmcYICABKAgSFgoOY29udGV4dF90b2tlbnMYISABKAMSNAoQY2FjaGVfZXhwaXJlc19hdBgiIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGgoSY29udGV4dF9yZXJlYWRfdXNkGCMgASgBSgQICRAKSgQIHxAgUgt0ZXJtaW5hbF9pZFIGcmVuZGVyIrcCCghBZ2VudFJ1bhIKCgJpZBgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRISCgphZ2VudF90eXBlGAMgASgJEg0KBW1vZGVsGAQgASgJEg4KBmVmZm9ydBgFIAEoCRISCgpiYWNrZ3JvdW5kGAYgASgIEi4KBnN0YXR1cxgHIAEoDjIeLmNvZGVmb3VuZHJ5LnYxLkFnZW50UnVuU3RhdHVzEhMKC3NwYXduX2RlcHRoGAggASgFEi4KCnN0YXJ0ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEioKBXVzYWdlGAogAygLMhsuY29kZWZvdW5kcnkudjEuVXNhZ2VCdWNrZXQSEAoIY29zdF91c2QYCyABKAESEAoIdW5wcmljZWQYDCABKAgiigMKC1VzYWdlQnVja2V0Eg0KBW1vZGVsGAEgASgJEgwKBHRpZXIYAiABKAkSDQoFc3BlZWQYAyABKAkSCwoDZGF5GAQgASgJEhAKCHJlcXVlc3RzGAUgASgDEg0KBWlucHV0GAYgASgDEg4KBm91dHB1dBgHIAEoAxISCgpjYWNoZV9yZWFkGAggASgDEhYKDmNhY2hlX3dyaXRlXzVtGAkgASgDEhYKDmNhY2hlX3dyaXRlXzFoGAogASgDEhAKCGNvc3RfdXNkGAsgASgBEhAKCHVucHJpY2VkGAwgASgIEhYKDmlucHV0X2Nvc3RfdXNkGA0gASgBEhcKD291dHB1dF9jb3N0X3VzZBgOIAEoARIbChNjYWNoZV9yZWFkX2Nvc3RfdXNkGA8gASgBEh8KF2NhY2hlX3dyaXRlXzVtX2Nvc3RfdXNkGBAgASgBEh8KF2NhY2hlX3dyaXRlXzFoX2Nvc3RfdXNkGBEgASgBEhkKEWNhY2hlX3NhdmluZ3NfdXNkGBIgASgBIm0KEUxpbmtlZFB1bGxSZXF1ZXN0EgwKBHNsdWcYASABKAkSDgoGbnVtYmVyGAIgASgFEgsKA3VybBgDIAEoCRItCglsaW5rZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIvYCChRDcmVhdGVTZXNzaW9uUmVxdWVzdBIPCgdyZXBvX2lkGAEgASgJEhUKDXdvcmt0cmVlX3BhdGgYAiABKAkSDQoFbW9kZWwYAyABKAkSDgoGZWZmb3J0GAQgASgJEgwKBG5hbWUYBSABKAkSFgoOaW5pdGlhbF9wcm9tcHQYBiABKAkSNwoPcGVybWlzc2lvbl9tb2RlGAcgASgOMh4uY29kZWZvdW5kcnkudjEuUGVybWlzc2lvbk1vZGUSMQoMbmV3X3dvcmt0cmVlGAggASgLMhsuY29kZWZvdW5kcnkudjEuTmV3V29ya3RyZWUSEwoLYXR0YWNobWVudHMYCSADKAkSFAoMd29ya3NwYWNlX2lkGAogASgJEjMKDW5ld193b3Jrc3BhY2UYCyABKAsyHC5jb2RlZm91bmRyeS52MS5OZXdXb3Jrc3BhY2USFwoPY29tcG9zZXJfcHJvbXB0GA0gASgJSgQIDBANUgZyZW5kZXIiHwoLTmV3V29ya3RyZWUSEAoIYmFzZV9yZWYYASABKAkiPQoMTmV3V29ya3NwYWNlEg0KBXJlcG9zGAEgAygJEhAKCGJhc2VfcmVmGAIgASgJEgwKBG5hbWUYAyABKAkiRwoWU3RhZ2VBdHRhY2htZW50UmVxdWVzdBIMCgRuYW1lGAEgASgJEhEKCW1pbWVfdHlwZRgCIAEoCRIMCgRkYXRhGAMgASgMIicKF1N0YWdlQXR0YWNobWVudFJlc3BvbnNlEgwKBHBhdGgYASABKAkiJQoVUmVhZEF0dGFjaG1lbnRSZXF1ZXN0EgwKBHBhdGgYASABKAkiOQoWUmVhZEF0dGFjaG1lbnRSZXNwb25zZRIMCgRkYXRhGAEgASgMEhEKCW1pbWVfdHlwZRgCIAEoCSJBChVDcmVhdGVTZXNzaW9uUmVzcG9uc2USKAoHc2Vzc2lvbhgBIAEoCzIXLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb24iLgoSRm9ya1Nlc3Npb25SZXF1ZXN0EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkiPwoTRm9ya1Nlc3Npb25SZXNwb25zZRIoCgdzZXNzaW9uGAEgASgLMhcuY29kZWZvdW5kcnkudjEuU2Vzc2lvbiIVChNMaXN0U2Vzc2lvbnNSZXF1ZXN0InUKFExpc3RTZXNzaW9uc1Jlc3BvbnNlEikKCHNlc3Npb25zGAEgAygLMhcuY29kZWZvdW5kcnkudjEuU2Vzc2lvbhIyCg1yZXRpcmVkX3VzYWdlGAIgAygLMhsuY29kZWZvdW5kcnkudjEuVXNhZ2VCdWNrZXQiHwoRR2V0U2Vzc2lvblJlcXVlc3QSCgoCaWQYASABKAkiPgoSR2V0U2Vzc2lvblJlc3BvbnNlEigKB3Nlc3Npb24YASABKAsyFy5jb2RlZm91bmRyeS52MS5TZXNzaW9uIjAKFFJlbmFtZVNlc3Npb25SZXF1ZXN0EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkiQQoVUmVuYW1lU2Vzc2lvblJlc3BvbnNlEigKB3Nlc3Npb24YASABKAsyFy5jb2RlZm91bmRyeS52MS5TZXNzaW9uIiEKE0Nsb3NlU2Vzc2lvblJlcXVlc3QSCgoCaWQYASABKAkiFgoUQ2xvc2VTZXNzaW9uUmVzcG9uc2UiJQoXUmVjb25uZWN0U2Vzc2lvblJlcXVlc3QSCgoCaWQYASABKAkiRAoYUmVjb25uZWN0U2Vzc2lvblJlc3BvbnNlEigKB3Nlc3Npb24YASABKAsyFy5jb2RlZm91bmRyeS52MS5TZXNzaW9uIiIKFFJlbW92ZVNlc3Npb25SZXF1ZXN0EgoKAmlkGAEgASgJIhcKFVJlbW92ZVNlc3Npb25SZXNwb25zZSJJChNSdW5JblNlc3Npb25SZXF1ZXN0EgoKAmlkGAEgASgJEg8KB3JlcG9faWQYAiABKAkSFQoNd29ya3RyZWVfcGF0aBgDIAEoCSJAChRSdW5JblNlc3Npb25SZXNwb25zZRIoCgdzZXNzaW9uGAEgASgLMhcuY29kZWZvdW5kcnkudjEuU2Vzc2lvbiIvChFQaW5TZXNzaW9uUmVxdWVzdBIKCgJpZBgBIAEoCRIOCgZwaW5uZWQYAiABKAgiPgoSUGluU2Vzc2lvblJlc3BvbnNlEigKB3Nlc3Npb24YASABKAsyFy5jb2RlZm91bmRyeS52MS5TZXNzaW9uIhYKFFdhdGNoU2Vzc2lvbnNSZXF1ZXN0IsUBCgxTZXNzaW9uRXZlbnQSMwoIc25hcHNob3QYASABKAsyHy5jb2RlZm91bmRyeS52MS5TZXNzaW9uU25hcHNob3RIABIqCgd1cGRhdGVkGAIgASgLMhcuY29kZWZvdW5kcnkudjEuU2Vzc2lvbkgAEhQKCnJlbW92ZWRfaWQYAyABKAlIABI1Cg1yZXRpcmVkX3VzYWdlGAQgASgLMhwuY29kZWZvdW5kcnkudjEuUmV0aXJlZFVzYWdlSABCBwoFZXZlbnQicAoPU2Vzc2lvblNuYXBzaG90EikKCHNlc3Npb25zGAEgAygLMhcuY29kZWZvdW5kcnkudjEuU2Vzc2lvbhIyCg1yZXRpcmVkX3VzYWdlGAIgAygLMhsuY29kZWZvdW5kcnkudjEuVXNhZ2VCdWNrZXQiPAoMUmV0aXJlZFVzYWdlEiwKB2J1Y2tldHMYASADKAsyGy5jb2RlZm91bmRyeS52MS5Vc2FnZUJ1Y2tldCqNAQoOUGVybWlzc2lvbk1vZGUSHwobUEVSTUlTU0lPTl9NT0RFX1VOU1BFQ0lGSUVEEAASHgoaUEVSTUlTU0lPTl9NT0RFX1NVUEVSVklTRUQQARIgChxQRVJNSVNTSU9OX01PREVfQUNDRVBUX0VESVRTEAISGAoUUEVSTUlTU0lPTl9NT0RFX0FVVE8QAyqhAQoMU2Vzc2lvblN0YXRlEh0KGVNFU1NJT05fU1RBVEVfVU5TUEVDSUZJRUQQABIaChZTRVNTSU9OX1NUQVRFX1NUQVJUSU5HEAESGwoXU0VTU0lPTl9TVEFURV9DT05ORUNURUQQAhIZChVTRVNTSU9OX1NUQVRFX0NMT1NJTkcQAxIeChpTRVNTSU9OX1NUQVRFX0RJU0NPTk5FQ1RFRBAEKp8BCg1TZXNzaW9uU3RhdHVzEh4KGlNFU1NJT05fU1RBVFVTX1VOU1BFQ0lGSUVEEAASFwoTU0VTU0lPTl9TVEFUVVNfQlVTWRABEhcKE1NFU1NJT05fU1RBVFVTX0lETEUQAhIiCh5TRVNTSU9OX1NUQVRVU19ORUVEU19BVFRFTlRJT04QAxIYChRTRVNTSU9OX1NUQVRVU19FUlJPUhAEKmoKDkFnZW50UnVuU3RhdHVzEiAKHEFHRU5UX1JVTl9TVEFUVVNfVU5TUEVDSUZJRUQQABIZChVBR0VOVF9SVU5fU1RBVFVTX09QRU4QARIbChdBR0VOVF9SVU5fU1RBVFVTX0NMT1NFRBACMosJCg5TZXNzaW9uU2VydmljZRJXCgZDcmVhdGUSJC5jb2RlZm91bmRyeS52MS5DcmVhdGVTZXNzaW9uUmVxdWVzdBolLmNvZGVmb3VuZHJ5LnYxLkNyZWF0ZVNlc3Npb25SZXNwb25zZSIAElEKBEZvcmsSIi5jb2RlZm91bmRyeS52MS5Gb3JrU2Vzc2lvblJlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5Gb3JrU2Vzc2lvblJlc3BvbnNlIgASUwoETGlzdBIjLmNvZGVmb3VuZHJ5LnYxLkxpc3RTZXNzaW9uc1JlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5MaXN0U2Vzc2lvbnNSZXNwb25zZSIAEk4KA0dldBIhLmNvZGVmb3VuZHJ5LnYxLkdldFNlc3Npb25SZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuR2V0U2Vzc2lvblJlc3BvbnNlIgASVwoGUmVuYW1lEiQuY29kZWZvdW5kcnkudjEuUmVuYW1lU2Vzc2lvblJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5SZW5hbWVTZXNzaW9uUmVzcG9uc2UiABJUCgVDbG9zZRIjLmNvZGVmb3VuZHJ5LnYxLkNsb3NlU2Vzc2lvblJlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5DbG9zZVNlc3Npb25SZXNwb25zZSIAEmAKCVJlY29ubmVjdBInLmNvZGVmb3VuZHJ5LnYxLlJlY29ubmVjdFNlc3Npb25SZXF1ZXN0GiguY29kZWZvdW5kcnkudjEuUmVjb25uZWN0U2Vzc2lvblJlc3BvbnNlIgASVwoGUmVtb3ZlEiQuY29kZWZvdW5kcnkudjEuUmVtb3ZlU2Vzc2lvblJlcXVlc3QaJS5jb2RlZm91bmRyeS52MS5SZW1vdmVTZXNzaW9uUmVzcG9uc2UiABJUCgVSdW5JbhIjLmNvZGVmb3VuZHJ5LnYxLlJ1bkluU2Vzc2lvblJlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5SdW5JblNlc3Npb25SZXNwb25zZSIAEk4KA1BpbhIhLmNvZGVmb3VuZHJ5LnYxLlBpblNlc3Npb25SZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuUGluU2Vzc2lvblJlc3BvbnNlIgASTwoFV2F0Y2gSJC5jb2RlZm91bmRyeS52MS5XYXRjaFNlc3Npb25zUmVxdWVzdBocLmNvZGVmb3VuZHJ5LnYxLlNlc3Npb25FdmVudCIAMAESZAoPU3RhZ2VBdHRhY2htZW50EiYuY29kZWZvdW5kcnkudjEuU3RhZ2VBdHRhY2htZW50UmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLlN0YWdlQXR0YWNobWVudFJlc3BvbnNlIgASYQoOUmVhZEF0dGFjaG1lbnQSJS5jb2RlZm91bmRyeS52MS5SZWFkQXR0YWNobWVudFJlcXVlc3QaJi5jb2RlZm91bmRyeS52MS5SZWFkQXR0YWNobWVudFJlc3BvbnNlIgBCxAEKEmNvbS5jb2RlZm91bmRyeS52MUIMU2Vzc2lvblByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
 
 /**
  * Ownership: a thread belongs to exactly one owner. When workspace_id is set the owner
@@ -75,13 +75,6 @@ export type Session = Message<"codefoundry.v1.Session"> & {
    * @generated from field: string effort = 8;
    */
   effort: string;
-
-  /**
-   * Terminal currently attached to this session; empty when DISCONNECTED.
-   *
-   * @generated from field: string terminal_id = 9;
-   */
-  terminalId: string;
 
   /**
    * @generated from field: codefoundry.v1.SessionState state = 10;
@@ -243,15 +236,7 @@ export type Session = Message<"codefoundry.v1.Session"> & {
   agentRuns: AgentRun[];
 
   /**
-   * TERMINAL or RENDERED (never UNSPECIFIED). A rendered thread has no terminal_id;
-   * its conversation is ThreadService.ListItems / Watch. Persisted.
-   *
-   * @generated from field: codefoundry.v1.SessionRender render = 31;
-   */
-  render: SessionRender;
-
-  /**
-   * A rendered thread's effort change (ThreadService.SetEffort) not applied yet: effort is
+   * An effort change (ThreadService.SetEffort) not applied yet: effort is
    * the new level, and Claude restarts with it (--resume) once the running turn ends.
    * Not persisted.
    *
@@ -260,11 +245,11 @@ export type Session = Message<"codefoundry.v1.Session"> & {
   effortPending: boolean;
 
   /**
-   * A rendered thread's context size after its last turn: the last top-level API
+   * The thread's context size after its last turn: the last top-level API
    * response's input + cache read + cache write + output tokens (Claude Code's own
    * definition, what get_context_usage reports as totalTokens). Re-sent on the next
-   * message: read from cache while it is warm, written again once it expired. 0 for a
-   * terminal thread and before the first result. Persisted. See
+   * message: read from cache while it is warm, written again once it expired. 0 before
+   * the first result. Persisted. See
    * docs/notes/rendered-threads-cold-cache.md.
    *
    * @generated from field: int64 context_tokens = 33;
@@ -272,10 +257,10 @@ export type Session = Message<"codefoundry.v1.Session"> & {
   contextTokens: bigint;
 
   /**
-   * When the prompt cache of a rendered thread's conversation expires: its last result
+   * When the prompt cache of the thread's conversation expires: its last result
    * plus the sessions.cache_ttl_seconds setting (the cache refreshes on every hit, so
-   * the last request is what counts). Recomputed when the setting changes. Unset for a
-   * terminal thread and before the first result.
+   * the last request is what counts). Recomputed when the setting changes. Unset
+   * before the first result.
    *
    * @generated from field: google.protobuf.Timestamp cache_expires_at = 34;
    */
@@ -582,9 +567,8 @@ export type CreateSessionRequest = Message<"codefoundry.v1.CreateSessionRequest"
   name: string;
 
   /**
-   * Optional first prompt, passed to claude as its positional prompt argument (a
-   * rendered thread: sent as its first user message, with the attachments as image
-   * blocks).
+   * Optional first prompt, sent as the thread's first user message once Claude has
+   * started (attachments as image blocks).
    *
    * @generated from field: string initial_prompt = 6;
    */
@@ -632,15 +616,8 @@ export type CreateSessionRequest = Message<"codefoundry.v1.CreateSessionRequest"
   newWorkspace?: NewWorkspace | undefined;
 
   /**
-   * Terminal or rendered; UNSPECIFIED uses the sessions.render setting.
-   *
-   * @generated from field: codefoundry.v1.SessionRender render = 12;
-   */
-  render: SessionRender;
-
-  /**
-   * A rendered thread: the composer's text of initial_prompt, kept on the first user
-   * message for display (ThreadItem UserMessageItem.composer_text). Ignored otherwise.
+   * The composer's text of initial_prompt, kept on the first user message for display
+   * (ThreadItem UserMessageItem.composer_text).
    *
    * @generated from field: string composer_prompt = 13;
    */
@@ -1289,41 +1266,6 @@ export const PermissionModeSchema: GenEnum<PermissionMode> = /*@__PURE__*/
   enumDesc(file_codefoundry_v1_session, 0);
 
 /**
- * SessionRender is how a thread runs and is shown, fixed for the thread's life (fork
- * and reconnect keep it).
- *
- * @generated from enum codefoundry.v1.SessionRender
- */
-export enum SessionRender {
-  /**
-   * CreateSessionRequest only: the sessions.render setting decides.
-   *
-   * @generated from enum value: SESSION_RENDER_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
-
-  /**
-   * Claude Code in a terminal (PTY) the GUI attaches to (terminal_id).
-   *
-   * @generated from enum value: SESSION_RENDER_TERMINAL = 1;
-   */
-  TERMINAL = 1,
-
-  /**
-   * claude -p over stream-json; the conversation is ThreadService items, no terminal.
-   *
-   * @generated from enum value: SESSION_RENDER_RENDERED = 2;
-   */
-  RENDERED = 2,
-}
-
-/**
- * Describes the enum codefoundry.v1.SessionRender.
- */
-export const SessionRenderSchema: GenEnum<SessionRender> = /*@__PURE__*/
-  enumDesc(file_codefoundry_v1_session, 1);
-
-/**
  * SessionState is the lifecycle of the Claude process behind a session.
  *
  * @generated from enum codefoundry.v1.SessionState
@@ -1335,14 +1277,14 @@ export enum SessionState {
   UNSPECIFIED = 0,
 
   /**
-   * Process spawned, Claude's UI not yet confirmed (trust dialog may be in progress).
+   * Process spawned, the stream-json initialize handshake not yet done.
    *
    * @generated from enum value: SESSION_STATE_STARTING = 1;
    */
   STARTING = 1,
 
   /**
-   * Claude is running and the session owns a terminal.
+   * Claude is running.
    *
    * @generated from enum value: SESSION_STATE_CONNECTED = 2;
    */
@@ -1367,7 +1309,7 @@ export enum SessionState {
  * Describes the enum codefoundry.v1.SessionState.
  */
 export const SessionStateSchema: GenEnum<SessionState> = /*@__PURE__*/
-  enumDesc(file_codefoundry_v1_session, 2);
+  enumDesc(file_codefoundry_v1_session, 1);
 
 /**
  * SessionStatus is what Claude is doing, derived by observing output and the transcript.
@@ -1412,7 +1354,7 @@ export enum SessionStatus {
  * Describes the enum codefoundry.v1.SessionStatus.
  */
 export const SessionStatusSchema: GenEnum<SessionStatus> = /*@__PURE__*/
-  enumDesc(file_codefoundry_v1_session, 3);
+  enumDesc(file_codefoundry_v1_session, 2);
 
 /**
  * Whether a subagent run is still followed.
@@ -1446,12 +1388,12 @@ export enum AgentRunStatus {
  * Describes the enum codefoundry.v1.AgentRunStatus.
  */
 export const AgentRunStatusSchema: GenEnum<AgentRunStatus> = /*@__PURE__*/
-  enumDesc(file_codefoundry_v1_session, 4);
+  enumDesc(file_codefoundry_v1_session, 3);
 
 /**
- * SessionService manages Claude Code sessions. A session is the primary unit of the app.
- * It is layered on TerminalService: a connected session owns exactly one terminal; a
- * disconnected session owns none and can be reconnected (claude --resume).
+ * SessionService manages Claude Code sessions (threads). A session is the primary unit of
+ * the app. A connected session owns one claude process (claude -p over stream-json);
+ * a disconnected session owns none and can be reconnected (claude --resume).
  *
  * @generated from service codefoundry.v1.SessionService
  */
@@ -1507,8 +1449,8 @@ export const SessionService: GenService<{
     output: typeof RenameSessionResponseSchema;
   },
   /**
-   * Close ends the Claude process gracefully (/exit, bounded wait, then kill). The
-   * session remains, DISCONNECTED, until Remove.
+   * Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
+   * then kill). The session remains, DISCONNECTED, until Remove.
    *
    * @generated from rpc codefoundry.v1.SessionService.Close
    */
@@ -1518,7 +1460,7 @@ export const SessionService: GenService<{
     output: typeof CloseSessionResponseSchema;
   },
   /**
-   * Reconnect resumes a DISCONNECTED session in a new terminal.
+   * Reconnect resumes a DISCONNECTED session in a new claude process.
    *
    * @generated from rpc codefoundry.v1.SessionService.Reconnect
    */
@@ -1539,8 +1481,8 @@ export const SessionService: GenService<{
   },
   /**
    * RunIn moves a workspace thread's cwd to another member worktree of its workspace.
-   * A live thread gets `/cd <path>` typed once it is idle at its prompt
-   * (pending_worktree_path shows the queued target until then) and the row's
+   * A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
+   * target until then) and the row's
    * worktree_path and repo_id change when it is sent. A disconnected thread's row
    * changes at once; the next reconnect resumes there. Refused for a project thread or
    * a target that is not a member.
@@ -1587,8 +1529,8 @@ export const SessionService: GenService<{
     output: typeof StageAttachmentResponseSchema;
   },
   /**
-   * ReadAttachment returns a staged attachment's bytes (a rendered thread's user
-   * message shows its images). Only files directly in the attachments directory;
+   * ReadAttachment returns a staged attachment's bytes (a user message shows its
+   * images). Only files directly in the attachments directory;
    * NOT_FOUND once the file was reaped.
    *
    * @generated from rpc codefoundry.v1.SessionService.ReadAttachment
