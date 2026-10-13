@@ -111,7 +111,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   await expect.poll(() => promptFocused(page)).toBe(true);
   // Unnamed at first: the id stands in until the daemon names it.
   await expect(created.getByTestId("session-name")).toHaveText(key.slice(2));
-  await expect(created.getByTestId("session-name")).toHaveText("add-a-dark-mode", { timeout: 5000 });
+  await expect(created.getByTestId("session-name")).toHaveText("Add a dark mode", { timeout: 5000 });
 
   const last = (await invocations()).at(-1);
   expect(last?.name).toBe("session.new");
