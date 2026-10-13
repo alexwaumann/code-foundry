@@ -15,8 +15,9 @@ thread that did no work (below).
   `commands` event whose seq is above the log's (the generic seq rule), shared by value so
   an effort restart's identical list re-renders nothing. `useSlashCommands(sessionId)`
   (narrow; a stable empty list otherwise).
-* **`lib/completion.ts`**: `commandScore` (skillScore, or 4 for an alias, 3 for an alias
-  prefix: `/cost` finds usage), `firstLine`, `commandItems` (the grouping below).
+* **`lib/completion.ts`**: `commandScore` (6 the name, 5 a name prefix or an alias:
+  `/cost` finds usage, 4 inside the name or an alias prefix, 3 a subsequence, 2 a
+  description word), `firstLine`, `commandItems` (the grouping and the match floor below).
   `CompletionItem` gains `hint` (the argument hint) and `tag` may be a string (plain text);
   `CompletionGroup.heading` gains `{kind: "label", text}`.
 * **Composer**: `useCommandSource` (`components/compose/useCompletion.ts`; listbox label
@@ -68,11 +69,23 @@ thread that did no work (below).
   calls `ThreadService.SlashCommands` (it stays for the CLI and other clients; the mock
   serves it). A daemon older than PR 1 sends no field 6: the list is empty and the card
   falls back to ListSkills, as before.
+* **Match floor** (found in the live run, my call): with Claude's real list (43 rows, 13
+  plugin skills with paragraph descriptions in "Skills" ahead of "Claude Code"), `/co`
+  first showed eight plugin skills matched only by a scattered subsequence or a
+  description word, and compact/code-review/context were below the fold. So once any row
+  matches by name or alias (score 4+: exact, prefix, substring, alias), weaker matches
+  are left out; with none, everything that matches shows. `/co` is now computer-use, then
+  Claude Code's code-review, compact, context, update-config, usage. The disk-scan card's
+  `skillScore` is unchanged.
 * **Fallback is all or nothing.** While the list is not empty the card shows only it (what
   `/name` will actually run); the scan's skills that Claude does not list (it would not
   run them) are not mixed in.
 
 ## Gotchas
+
+* With an empty query, the live list's order puts the project skill first, then 13
+  plugin skills under "Skills", so "Claude Code" starts below the fold (~8 rows show).
+  That is the agreed group order; worth a look if it feels wrong in use.
 
 * The full suite's mock port 7799 can be taken by another worktree's run: `E2E_MOCK_PORT`
   / `E2E_VITE_PORT` move it.
@@ -102,3 +115,22 @@ thread that did no work (below).
   back to the scan (`User` only, listbox "Skills"), `set=more` → back, `/gamma` under
   Skills. `thread.spec.ts`'s `/revi` → `/review` tag still passes against the list.
 * `make gui-build` green.
+* **Live** (2026-10-13): `make gui-build`; `CODE_FOUNDRY_HOME=/tmp/cf-slash2-home
+  ./bin/code-foundry daemon --dev`; `repo add ~/.cf-probe/slash` (project skill
+  `alpha-probe`); `session new --repo … --worktree ~/.cf-probe/slash --model haiku --effort
+  medium --permission supervised --name slash-gui` (no prompt, no turn); `thread commands`
+  → 43. The built app with that home (`CODE_FOUNDRY_BIN=$PWD/bin/code-foundry "gui/bin/Code
+  Foundry"`), `session focus`, keys typed with System Events into the process picked by
+  its unix id, the window captured by its bounds. "/" showed `/alpha-probe` (no heading,
+  one project), "Skills" (the plugin skills), "Claude Code"; `/co` as above;
+  `/clear please` + Enter showed "Start a new thread instead of clearing this one." under
+  the pickers with the text kept, and `thread items` stayed "(no items yet)". Daemon log:
+  no WARN or ERROR. Thread closed, daemon stopped, the home removed.
+* Screenshots (live app): `slash-commands-2-gui/card-dark.png` ("/"),
+  `card-co-dark.png`, `card-co-light.png` (`/co`), `refused-light.png`.
+
+## Daemon restart
+
+Needed: the GUI reads the list from the Watch snapshot and `commands` events, which only a
+daemon with PR #79 sends. An older daemon sends none and the card keeps today's disk scan;
+nothing breaks. The refusal is PR #79's too.
