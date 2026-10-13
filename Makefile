@@ -37,7 +37,7 @@ FRONTEND := gui/frontend
 PNPM     := pnpm --dir $(FRONTEND)
 
 .PHONY: all gen build check go-check frontend-check frontend-deps gui-dist-stub \
-        dev gui-build gui-dev gui-e2e gui-mock ghostty-vt package release clean
+        dev gui-build gui-dev gui-e2e gui-mock ghostty-vt package release promote clean
 
 all: build
 
@@ -106,10 +106,17 @@ gui-dev: build
 package: ghostty-vt frontend-deps
 	VERSION=$(VERSION) RELEASE_REPO=$(RELEASE_REPO) WAILS3=$(WAILS3) MAKE=$(MAKE) ./scripts/package.sh
 
-## release: manual fallback for .github/workflows/release.yml. Next version from
-## conventional commits unless VERSION=vX.Y.Z is given; DRY_RUN=1 prints the commands.
+## release: manual fallback for .github/workflows/release.yml, stable channel. Next version
+## from conventional commits unless VERSION=vX.Y.Z is given; DRY_RUN=1 prints the commands.
 release:
 	./scripts/release.sh $(if $(DRY_RUN),--dry-run) $(filter-out dev,$(VERSION))
+
+## promote: publish the head of main as a stable release through the release workflow
+## (channel=stable); VERSION=vX.Y.Z overrides the computed version. Prints the run URL.
+promote:
+	gh workflow run release.yml --ref main -f channel=stable $(if $(filter-out dev,$(VERSION)),-f version=$(VERSION))
+	@sleep 5
+	@gh run list --workflow release.yml --event workflow_dispatch --limit 1 --json url --jq '.[0].url'
 
 ## ghostty-vt: build libghostty-vt from the pinned ghostty commit with zig 0.16.0 (both
 ## downloaded into third_party/, gitignored). No-op once the pkg-config file exists.
