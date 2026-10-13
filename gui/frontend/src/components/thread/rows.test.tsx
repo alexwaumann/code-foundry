@@ -69,3 +69,41 @@ describe("a tool waiting for permission", () => {
     expect(c.querySelector('[data-testid="thread-bash"]')).toBeNull();
   });
 });
+
+describe("a system note", () => {
+  it("is one centered separator line after the copied history, outside any turn's fold", () => {
+    const c = show([
+      { ...base, id: "u", ordinal: 1, kind: "user", text: "hi", attachments: [], composerText: "" },
+      { ...base, id: "t", ordinal: 2, kind: "tool", toolUseId: "t", name: "Bash", inputJson: '{"command":"ls"}', status: "done", output: "", isError: false, resultJson: "" },
+      { ...base, id: "a", ordinal: 3, kind: "text", text: "hello" },
+      {
+        ...base,
+        id: "e",
+        ordinal: 4,
+        kind: "turnEnd",
+        subtype: "success",
+        isError: false,
+        interrupted: false,
+        stopReason: "",
+        terminalReason: "",
+        durationMs: 1000,
+        numTurns: 1,
+        costUsd: 0,
+        turnCostUsd: null,
+        model: "",
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        errors: [],
+      },
+      { ...base, id: "note-fork-p", ordinal: 5, kind: "note", text: "Forked from fix-badge" },
+    ]);
+    const note = c.querySelector('[data-testid="thread-note"]');
+    expect(note?.getAttribute("role")).toBe("separator");
+    expect(note?.textContent).toBe("Forked from fix-badge");
+    // The note is the last row; the copied turn above it folded under its footer.
+    expect(c.lastElementChild).toBe(note);
+    expect(c.querySelector('[data-testid="thread-footer"]')?.getAttribute("data-folded")).toBe("true");
+  });
+});

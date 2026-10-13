@@ -139,7 +139,9 @@ while building this). No GUI work: the GUI PR maps the new proto in `src/api`.
   before answering the initialize handshake: …" or "claude did not start: …".
 * A fork of a rendered thread starts with **no items**: the history is in Claude's
   transcript (`--resume --fork-session`), not copied into `thread_items`. Show an
-  empty timeline with the parent's name, or ask for copying in a later PR.
+  empty timeline with the parent's name, or ask for copying in a later PR. (Superseded:
+  a fork now starts with a copy of its parent's items and a note,
+  `docs/notes/fork-copies-history.md`.)
 * Thinking items usually have empty text (haiku streams none): render a "thinking"
   row, not an empty bubble.
 * Status reasons for rendered threads: "starting", "working", "compacting",

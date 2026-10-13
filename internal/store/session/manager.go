@@ -419,7 +419,8 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 }
 
 // Fork starts a new session that continues id's conversation under a new Claude
-// session id (claude --resume <id> --fork-session --session-id <new>).
+// session id (claude --resume <id> --fork-session --session-id <new>). Its items start
+// as a copy of id's, ended by a "Forked from <name>" note (fork.go).
 func (m *Manager) Fork(ctx context.Context, id, name string) (Session, error) {
 	name, err := cleanName(name, true)
 	if err != nil {
@@ -470,15 +471,24 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Session, error) {
 	// message is the parent's: never auto-name a fork from it.
 	m.recs[newID] = &record{s: s, namingTried: true}
 	m.mu.Unlock()
-	if err := m.spawn(ctx, newID, launch{resume: parent.ClaudeSessionID, fork: true, newID: cid}); err != nil {
+	drop := func() {
 		m.mu.Lock()
 		delete(m.recs, newID)
 		m.tmu.Lock()
 		delete(m.threads, newID)
 		m.tmu.Unlock()
 		m.mu.Unlock()
+	}
+	items, err := m.forkLog(ctx, parent, newID)
+	if err != nil {
+		drop()
 		return Session{}, err
 	}
+	if err := m.spawn(ctx, newID, launch{resume: parent.ClaudeSessionID, fork: true, newID: cid}); err != nil {
+		drop()
+		return Session{}, err
+	}
+	m.persistForkLog(ctx, newID, items)
 	return m.Get(ctx, newID)
 }
 

@@ -20,8 +20,31 @@ type itemData struct {
 	Compaction  *Compaction `json:"compaction,omitempty"`
 }
 
+// execer is a *sql.DB or a *sql.Tx.
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+// saveItems saves items in one transaction (a fork's copied history: all or none).
+func saveItems(ctx context.Context, db *sql.DB, sessionID string, items []Item) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("session: save items of %s: %w", sessionID, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, it := range items {
+		if err := saveItem(ctx, tx, sessionID, it); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("session: save items of %s: %w", sessionID, err)
+	}
+	return nil
+}
+
 // saveItem inserts or rewrites one item. Streaming items are never saved.
-func saveItem(ctx context.Context, db *sql.DB, sessionID string, it Item) error {
+func saveItem(ctx context.Context, db execer, sessionID string, it Item) error {
 	data, err := json.Marshal(itemData{Text: it.Text, Attachments: it.Attachments, Composer: it.ComposerText, Tool: it.Tool, Request: it.Request, Turn: it.Turn, Compaction: it.Compaction})
 	if err != nil {
 		return fmt.Errorf("session: encode item %s: %w", it.ID, err)

@@ -28,6 +28,7 @@ describe("toThreadItemView", () => {
     expect(v({ case: "question", value: { requestId: "r", state: ThreadRequestState.PENDING, answers: { Q: "A" } } })).toMatchObject({ kind: "question", request: { requestId: "r", state: "pending", answers: { Q: "A" } } });
     expect(v({ case: "turnEnd", value: { subtype: "success", durationMs: 1234n, costUsd: 0.5, inputTokens: 3n, errors: ["e"] } })).toMatchObject({ kind: "turnEnd", durationMs: 1234, costUsd: 0.5, inputTokens: 3, errors: ["e"] });
     expect(v({ case: "compaction", value: { trigger: "manual", preTokens: 10n, postTokens: 2n } })).toMatchObject({ kind: "compaction", preTokens: 10, postTokens: 2 });
+    expect(v({ case: "note", value: { text: "Forked from base" } })).toMatchObject({ kind: "note", text: "Forked from base" });
     expect(v({ case: undefined })).toBeNull();
   });
 });

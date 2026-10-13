@@ -415,6 +415,22 @@ const NoteRow = memo(function NoteRow({ id }: { id: string }) {
   return null;
 });
 
+/**
+ * A system note (the daemon's, not Claude's): one quiet centered line between hairlines,
+ * the sketch's divider (docs/sketches/rendered-thread). A fork's "Forked from …" marks
+ * where the history it copied from its parent ends.
+ */
+const SystemNoteRow = memo(function SystemNoteRow({ id }: { id: string }) {
+  const { sessionId } = useThreadCtx();
+  const it = useThreadItem(sessionId, id);
+  if (it?.kind !== "note") return null;
+  return (
+    <div className="sysnote" role="separator" aria-label={it.text} data-testid="thread-note">
+      <span className="selectable">{it.text}</span>
+    </div>
+  );
+});
+
 /** A row of a turn's work log, top level or nested under a subagent. */
 export function WorkNodeView({ node, nested }: { node: WorkNode; nested?: boolean }) {
   switch (node.type) {
@@ -432,6 +448,8 @@ export function WorkNodeView({ node, nested }: { node: WorkNode; nested?: boolea
       return <PermissionRow id={node.id} />;
     case "note":
       return <NoteRow id={node.id} />;
+    case "system":
+      return <SystemNoteRow id={node.id} />;
   }
 }
 

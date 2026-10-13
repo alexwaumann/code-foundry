@@ -387,6 +387,8 @@ func FormatThreadItems(snap *v1.ThreadItemsSnapshot, full bool) string {
 			}
 		case it.GetCommandOutput() != nil:
 			body = "output: " + line(it.GetCommandOutput().GetText())
+		case it.GetNote() != nil:
+			body = "note: " + line(it.GetNote().GetText())
 		default:
 			body = "(unknown item " + it.GetId() + ")"
 		}

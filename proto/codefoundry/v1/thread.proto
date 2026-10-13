@@ -76,6 +76,8 @@ message ThreadItem {
     ErrorItem error = 17;
     CompactionItem compaction = 18;
     CommandOutputItem command_output = 19;
+    // A line the daemon adds, not Claude (a fork's "Forked from <parent>").
+    NoteItem note = 20;
   }
 }
 
@@ -217,6 +219,13 @@ message CompactionItem {
 
 // A local slash command's output (/cost, /compact's "Compacted", ...).
 message CommandOutputItem {
+  string text = 1;
+}
+
+// A system line in the conversation: something the daemon records about the thread
+// rather than anything Claude said or did. A fork's items start with a copy of its
+// parent's, ended by the note "Forked from <parent's name at fork time>".
+message NoteItem {
   string text = 1;
 }
 

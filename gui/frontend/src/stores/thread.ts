@@ -349,7 +349,7 @@ export function useThreadLoaded(sessionId: string): boolean {
   return useThreadStore((s) => sessionId in s.logs);
 }
 
-/** The thread's log arrived and has no items (a fork, a thread started without a prompt, one still starting). */
+/** The thread's log arrived and has no items (a thread started without a prompt, one still starting). */
 export function useThreadEmpty(sessionId: string): boolean {
   return useThreadStore((s) => s.logs[sessionId]?.order.length === 0);
 }

@@ -1840,6 +1840,7 @@ export class World {
           const s = activeSession(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
           const f = this.createSession(s.repoId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, parentId: s.id });
+          this.threads.fork(s.id, f.id, s.name || s.id);
           this.focusSession(f.id);
           return `Forked ${s.name || s.id}`;
         },

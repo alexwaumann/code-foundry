@@ -279,6 +279,9 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   `thread_items` (user message, assistant text, thinking, tool call, permission request,
   question, turn end, error, compaction, command output): streaming items stay in memory
   and are written when complete, so a restart rehydrates them and a reconnect appends.
+  A `note` item is the daemon's own line, not the stream's: a fork's items start as a
+  copy of its parent's (never live: pending requests cancelled, running tools ended),
+  then the note "Forked from <parent>" (`fork.go`, `docs/notes/fork-copies-history.md`).
   Transcript tailing (naming, usage, PR links, `/clear`) reads Claude's own JSONL beside
   the stream (`docs/notes/rendered-threads-1-daemon.md`). Each turn end carries the turn's own cost
   (Claude reports running totals per process; a process's first turn is measured from
