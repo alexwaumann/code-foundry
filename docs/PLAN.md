@@ -14,6 +14,7 @@ Phases 0–3 are done and merged on `main`. Each step's note is in `docs/notes/`
 * **Phase 3** done: Pull Requests page and worktree overview, settings/help/confirm, git operations, packaging and updater (`phase3a`–`phase3d`, `phase3-integration.md`).
 * **New thread composer** done (2026-10-09): project picker + in-pane composer, positional prompt, permission mode, `cf/<slug>` worktrees, image attachments, opus/high defaults, "thread" copy (`new-thread-composer.md`).
 * **Side panel + PR surface** done: per-selection side panel with a surface registry, the Pull request surface (summary, timeline, reviewers, refresh, revert), and its menu starting `pr.ask` / `pr.explain` / `pr.fix.findings` sessions (`side-panel.md`, `gh-pr-detail.md`, `pr-thread-commands.md`).
+* **Natural thread names** done (2026-10-13): the namer asks for a 3–6 word sentence-case title, cleaned to one line; `cf/<slug>` branches slugify it; forks are "<parent> (fork)"; old slug names stay (`natural-thread-names.md`).
 
 ### Multi-repo workspaces: the five steps are built
 

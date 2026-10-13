@@ -12,17 +12,20 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	"github.com/alexwaumann/code-foundry/internal/model"
 )
 
-// Namer turns a session's first user message into a short kebab-case name.
+// Namer turns a session's first user message into a short natural title, such as
+// "Fix the login redirect". The title is the session's name; a new worktree's branch
+// is cf/<slugify(title)>.
 type Namer func(ctx context.Context, firstMessage string) (string, error)
 
 // maxNamingInput bounds how much of the first message goes into the naming prompt.
 const maxNamingInput = 2000
 
-// namingEffort is the effort of every naming call. A 3-5 word slug needs no thinking,
+// namingEffort is the effort of every naming call. A 3-6 word title needs no thinking,
 // and low keeps the call fast and cheap whatever the model; it is not a setting.
 const namingEffort = "low"
 
@@ -105,6 +108,12 @@ func NamingModel(ctx context.Context) string {
 	return model.NamingDefault
 }
 
+// namingPrompt asks for a title; the request (the first message) follows it.
+const namingPrompt = "Write a short title of 3 to 6 words that names the coding task in the request below. " +
+	"Use sentence case (capitalize only the first word and proper nouns), no trailing period, " +
+	"no quotes and no markdown. Examples: Fix the login redirect; Add release channel switcher. " +
+	"Reply with only the title.\n\nRequest:\n"
+
 // ClaudeNamer names sessions with an independent, non-interactive claude call:
 //
 //	claude -p --model <model> --effort low --no-session-persistence --safe-mode --tools "" -- <prompt>
@@ -129,8 +138,7 @@ func ClaudeNamer(claude, cwd string, log *slog.Logger) Namer {
 		if len(msg) > maxNamingInput {
 			msg = msg[:maxNamingInput]
 		}
-		prompt := "Give a 3-5 word kebab-case slug (lowercase words joined by hyphens) that names " +
-			"the coding task in the request below. Reply with only the slug.\n\nRequest:\n" + msg
+		prompt := namingPrompt + msg
 		session := namingSession(ctx)
 		m := NamingModel(ctx)
 		args := namingArgs(m, minimal.Load())
@@ -147,11 +155,11 @@ func ClaudeNamer(claude, cwd string, log *slog.Logger) Namer {
 		if err != nil {
 			return "", err
 		}
-		slug := slugify(out)
-		if slug == "" {
+		title := cleanTitle(out)
+		if title == "" {
 			return "", fmt.Errorf("claude -p: no usable name in %q", out)
 		}
-		return slug, nil
+		return title, nil
 	}
 }
 
@@ -240,8 +248,8 @@ func isRateLimit(err error) bool {
 
 var slugJunk = regexp.MustCompile(`[^a-z0-9]+`)
 
-// slugify reduces model output to a kebab-case slug of at most 5 words and 60
-// characters, using the first non-empty line.
+// slugify reduces a name or title to a kebab-case slug of at most 6 words (the
+// namer's longest title) and 60 characters, using the first non-empty line.
 func slugify(s string) string {
 	for _, line := range strings.Split(s, "\n") {
 		line = strings.TrimSpace(line)
@@ -249,8 +257,8 @@ func slugify(s string) string {
 			continue
 		}
 		words := strings.FieldsFunc(slugJunk.ReplaceAllString(strings.ToLower(line), " "), func(r rune) bool { return r == ' ' })
-		if len(words) > 5 {
-			words = words[:5]
+		if len(words) > 6 {
+			words = words[:6]
 		}
 		out := strings.Join(words, "-")
 		for len(out) > 60 {
@@ -262,6 +270,65 @@ func slugify(s string) string {
 			out = out[:i]
 		}
 		return out
+	}
+	return ""
+}
+
+// maxTitleRunes caps an auto-generated title. Six words fit easily; a longer answer is
+// cut at the last word boundary before the cap.
+const maxTitleRunes = 60
+
+// titleMarkup matches markdown a model may wrap a title in, at the start of a line: a
+// heading, a list or quote marker, or a "Title:" label.
+var titleMarkup = regexp.MustCompile(`(?i)^(#{1,6}\s+|[-*+>]\s+|\d+[.)]\s+|(title|name)\s*:\s*)`)
+
+// titleQuotes are trimmed from both ends of a title.
+const titleQuotes = "\"`“”‘’«»*_"
+
+// cleanTitle reduces model output to a one-line title: the first line with any text,
+// without surrounding quotes, backticks, emphasis, markdown markers or a "Title:"
+// label, whitespace collapsed, no trailing period, at most maxTitleRunes. A bare
+// kebab-case answer ("fix-login-bug", the old slug habit) becomes words with the
+// first one capitalized ("Fix login bug"). "" when no line has any text.
+func cleanTitle(s string) string {
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.Map(func(r rune) rune {
+			if unicode.IsControl(r) || unicode.IsSpace(r) {
+				return ' '
+			}
+			return r
+		}, line)
+		for prev := ""; prev != line; {
+			prev = line
+			line = strings.TrimSpace(line)
+			line = titleMarkup.ReplaceAllString(line, "")
+			line = strings.Trim(line, titleQuotes)
+			if len(line) >= 2 && line[0] == '\'' && line[len(line)-1] == '\'' {
+				line = line[1 : len(line)-1]
+			}
+			line = strings.TrimRight(line, ".")
+		}
+		words := strings.Fields(line)
+		if len(words) == 0 {
+			continue
+		}
+		if len(words) == 1 && strings.Contains(words[0], "-") && words[0] == strings.ToLower(words[0]) {
+			if parts := strings.FieldsFunc(words[0], func(r rune) bool { return r == '-' }); len(parts) > 1 {
+				words = parts
+				r := []rune(words[0])
+				r[0] = unicode.ToUpper(r[0])
+				words[0] = string(r)
+			}
+		}
+		title := strings.Join(words, " ")
+		if r := []rune(title); len(r) > maxTitleRunes {
+			title = string(r[:maxTitleRunes])
+			if i := strings.LastIndexByte(title, ' '); i > 0 {
+				title = title[:i]
+			}
+			title = strings.TrimRight(title, " .,;:-")
+		}
+		return title
 	}
 	return ""
 }

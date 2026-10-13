@@ -457,7 +457,7 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Session, error) {
 	}
 	autoNamed := false
 	if name == "" && parent.Name != "" {
-		name, autoNamed = parent.Name+"-fork", parent.AutoNamed
+		name, autoNamed = forkName(parent.Name), parent.AutoNamed
 	}
 	now := m.opts.Now()
 	s := Session{
@@ -865,4 +865,9 @@ func cleanName(name string, optional bool) (string, error) {
 		return "", fmt.Errorf("%w: name must be one line of at most 200 bytes", ErrInvalidArgument)
 	}
 	return name, nil
+}
+
+// forkName is the default name of a fork of a thread named parent: "<parent> (fork)".
+func forkName(parent string) string {
+	return parent + " (fork)"
 }

@@ -241,7 +241,14 @@ const permissionModes: Record<string, PermissionMode> = {
   auto: PermissionMode.AUTO,
 };
 
-/** "Add a dark mode toggle!" -> "add-a-dark-mode" (what the daemon's haiku naming stands in for). */
+/** "Add a dark mode toggle!" -> "Add a dark mode" (what the daemon's title naming stands in for). */
+export function promptTitle(prompt: string): string {
+  const words = prompt.replace(/[^A-Za-z0-9']+/g, " ").trim().split(" ").filter(Boolean).slice(0, 4);
+  const title = words.join(" ");
+  return title.charAt(0).toUpperCase() + title.slice(1);
+}
+
+/** "Add a dark mode" -> "add-a-dark-mode": the daemon's slugify, for cf/<slug> branches. */
 export function promptSlug(prompt: string): string {
   return prompt.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean).slice(0, 4).join("-");
 }
@@ -1397,7 +1404,7 @@ export class World {
       autoNamed: !args.name,
       // Named in the background a moment after it starts (1–2 ticks), like the daemon.
       nameIn: args.name ? 0 : 2,
-      pendingName: slug || `thread-${String(this.nextId)}`,
+      pendingName: promptTitle(prompt) || `thread-${String(this.nextId)}`,
       permissionMode: permissionModes[permission] ?? PermissionMode.UNSPECIFIED,
       baseRef,
       createdWorktree: created,
@@ -1457,7 +1464,7 @@ export class World {
       name: args.name ?? "",
       autoNamed: !args.name,
       nameIn: args.name ? 0 : 2,
-      pendingName: slug || `thread-${String(this.nextId)}`,
+      pendingName: promptTitle(prompt) || `thread-${String(this.nextId)}`,
       permissionMode: permissionModes[permission] ?? PermissionMode.UNSPECIFIED,
       baseRef,
       createdWorktree: created,

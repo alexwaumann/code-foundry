@@ -558,7 +558,7 @@ func TestReconnectResumesOrStartsFresh(t *testing.T) {
 
 func TestFork(t *testing.T) {
 	e := newEnv(t)
-	s := e.connected(CreateOptions{Model: "sonnet", Name: "base"})
+	s := e.connected(CreateOptions{Model: "sonnet", Name: "Base work"})
 	if _, err := e.m.Fork(e.ctx(), s.ID, ""); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("fork without transcript: %v", err)
 	}
@@ -574,7 +574,7 @@ func TestFork(t *testing.T) {
 		argOf(fargv, "--session-id") == cid || argOf(fargv, "--model") != "sonnet" {
 		t.Errorf("fork argv = %q", fargv)
 	}
-	if f.ParentID != s.ID || f.Name != "base-fork" || f.ID == s.ID || f.WorktreePath != s.WorktreePath {
+	if f.ParentID != s.ID || f.Name != "Base work (fork)" || f.AutoNamed || f.ID == s.ID || f.WorktreePath != s.WorktreePath {
 		t.Errorf("fork = %+v", f)
 	}
 	e.waitFor(f.ID, "fork connected", func(s Session) bool { return s.State == StateConnected })

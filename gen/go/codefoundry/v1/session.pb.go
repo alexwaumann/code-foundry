@@ -270,7 +270,8 @@ type Session struct {
 	RepoId string `protobuf:"bytes,3,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
 	// The cwd: the worktree claude runs in.
 	WorktreePath string `protobuf:"bytes,4,opt,name=worktree_path,json=worktreePath,proto3" json:"worktree_path,omitempty"`
-	// Display name. Auto-generated unless the user renamed it.
+	// Display name: a short natural title ("Fix the login redirect"). Auto-generated
+	// unless the user named or renamed it.
 	Name      string `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
 	AutoNamed bool   `protobuf:"varint,6,opt,name=auto_named,json=autoNamed,proto3" json:"auto_named,omitempty"`
 	// Model and effort as passed to claude (e.g. "opus", "high"). Empty means claude's default.
@@ -1037,8 +1038,8 @@ type CreateSessionRequest struct {
 	InitialPrompt  string         `protobuf:"bytes,6,opt,name=initial_prompt,json=initialPrompt,proto3" json:"initial_prompt,omitempty"`
 	PermissionMode PermissionMode `protobuf:"varint,7,opt,name=permission_mode,json=permissionMode,proto3,enum=codefoundry.v1.PermissionMode" json:"permission_mode,omitempty"`
 	// When set, Create makes a new worktree for the session before claude starts and
-	// worktree_path is ignored. The branch is cf/<slug>, the slug named from
-	// initial_prompt (bounded wait), else cf/<session id>.
+	// worktree_path is ignored. The branch is cf/<slug>, the slug of the explicit name,
+	// else of the title named from initial_prompt (bounded wait), else cf/<session id>.
 	NewWorktree *NewWorktree `protobuf:"bytes,8,opt,name=new_worktree,json=newWorktree,proto3" json:"new_worktree,omitempty"`
 	// Paths returned by StageAttachment, appended to initial_prompt.
 	Attachments []string `protobuf:"bytes,9,rep,name=attachments,proto3" json:"attachments,omitempty"`

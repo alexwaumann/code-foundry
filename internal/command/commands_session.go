@@ -182,12 +182,12 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				{Name: "repo", Type: String, Context: ContextRepo, Description: "Repository id (with workspace or repos: the member the thread runs in, by id or name)"},
 				{Name: "worktree", Type: Path, Context: ContextWorktree, Description: "Worktree path (with workspace: a member worktree)"},
 				{Name: "workspace", Type: String, Description: "Workspace id or name the thread belongs to; it runs in the member repo or worktree names (default: the first member)"},
-				{Name: "repos", Type: String, Description: "With new-worktree: comma-separated repositories (id, name, or path; repo:base gives that one its own base) for a new workspace, a cf/<name> worktree in each; repo picks the member the thread runs in (default: the first)"},
+				{Name: "repos", Type: String, Description: "With new-worktree: comma-separated repositories (id, name, or path; repo:base gives that one its own base) for a new workspace, a cf/<slug of the thread name> worktree in each; repo picks the member the thread runs in (default: the first)"},
 				{Name: "model", Type: Enum, Enum: SessionModels, Description: sessionModelHelp + " (default: settings sessions.default_model)"},
 				{Name: "effort", Type: Enum, Enum: SessionEfforts, Description: "Effort level (default: settings sessions.default_effort)"},
 				{Name: "permission", Type: Enum, Enum: SessionPermissions, Default: "auto",
 					Description: "Permissions: supervised (confirm every tool call), accept-edits (file edits allowed), or auto (Claude's auto mode)"},
-				{Name: "new-worktree", Type: Bool, Description: "Create a new worktree for the thread (branch cf/<name from the prompt>)"},
+				{Name: "new-worktree", Type: Bool, Description: "Create a new worktree for the thread (branch cf/<slug of the thread name>, named from the prompt)"},
 				{Name: "base", Type: String, Description: "Ref the new worktree branches from (default: origin/<default branch>); needs new-worktree"},
 				{Name: "name", Type: String, Description: "Thread name (default: generated from the first message)"},
 				{Name: "prompt", Type: String, Description: "First prompt, sent as the thread's first message once Claude is up"},
@@ -251,7 +251,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				for _, s := range res.Msg.GetSessions() {
 					// The status and its reason persist once disconnected (a thread that
 					// was asking a question still is); the state cell says why it is.
-					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), s.GetName(), listState(s),
+					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), cmp.Or(s.GetName(), "-"), listState(s),
 						listStatus(s), cmp.Or(s.GetStatusReason(), "-"), cmp.Or(s.GetWorkspaceId(), "-"), linkedPRs(s),
 						listContext(s, now), s.GetWorktreePath())
 				}

@@ -102,7 +102,8 @@ message Session {
   string repo_id = 3;
   // The cwd: the worktree claude runs in.
   string worktree_path = 4;
-  // Display name. Auto-generated unless the user renamed it.
+  // Display name: a short natural title ("Fix the login redirect"). Auto-generated
+  // unless the user named or renamed it.
   string name = 5;
   bool auto_named = 6;
   // Model and effort as passed to claude (e.g. "opus", "high"). Empty means claude's default.
@@ -285,8 +286,8 @@ message CreateSessionRequest {
   string initial_prompt = 6;
   PermissionMode permission_mode = 7;
   // When set, Create makes a new worktree for the session before claude starts and
-  // worktree_path is ignored. The branch is cf/<slug>, the slug named from
-  // initial_prompt (bounded wait), else cf/<session id>.
+  // worktree_path is ignored. The branch is cf/<slug>, the slug of the explicit name,
+  // else of the title named from initial_prompt (bounded wait), else cf/<session id>.
   NewWorktree new_worktree = 8;
   // Paths returned by StageAttachment, appended to initial_prompt.
   repeated string attachments = 9;

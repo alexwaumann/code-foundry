@@ -196,7 +196,8 @@ func TestSlugify(t *testing.T) {
 		"  Fix Login Bug \n":                 "fix-login-bug",
 		"`add-dark-mode-toggle`":             "add-dark-mode-toggle",
 		"\n\nRefactor the API client layer!": "refactor-the-api-client-layer",
-		"one two three four five six seven":  "one-two-three-four-five",
+		"one two three four five six seven":  "one-two-three-four-five-six",
+		"Add README usage section for tests": "add-readme-usage-section-for-tests",
 		"":                                   "",
 		"!!!":                                "",
 	}
@@ -204,6 +205,50 @@ func TestSlugify(t *testing.T) {
 		if got := slugify(in); got != want {
 			t.Errorf("slugify(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestCleanTitle(t *testing.T) {
+	long := "Refactor the session manager so that every naming call goes through one helper"
+	tests := []struct {
+		name, in, want string
+	}{
+		{"plain title", "Fix the login redirect", "Fix the login redirect"},
+		{"trailing newline and spaces", "  Add release channel switcher \n", "Add release channel switcher"},
+		{"first non-empty line", "\n\n  \nFix the login redirect\nBecause it loops", "Fix the login redirect"},
+		{"double quotes", `"Fix the login redirect"`, "Fix the login redirect"},
+		{"curly quotes", "“Fix the login redirect”", "Fix the login redirect"},
+		{"single quotes", "'Fix the login redirect'", "Fix the login redirect"},
+		{"apostrophe kept", "Fix the user's session", "Fix the user's session"},
+		{"backticks", "`Fix the login redirect`", "Fix the login redirect"},
+		{"bold", "**Fix the login redirect**", "Fix the login redirect"},
+		{"heading", "## Fix the login redirect", "Fix the login redirect"},
+		{"list item", "- Fix the login redirect", "Fix the login redirect"},
+		{"numbered item", "1. Fix the login redirect", "Fix the login redirect"},
+		{"title label", "Title: Fix the login redirect", "Fix the login redirect"},
+		{"label and quotes", `Title: "Fix the login redirect."`, "Fix the login redirect"},
+		{"trailing period", "Fix the login redirect.", "Fix the login redirect"},
+		{"collapsed whitespace", "Fix   the\tlogin  redirect", "Fix the login redirect"},
+		{"carriage return", "Fix the login redirect\r\n", "Fix the login redirect"},
+		{"kebab slug becomes words", "fix-login-redirect", "Fix login redirect"},
+		{"hyphenated word kept", "Add dark-mode toggle", "Add dark-mode toggle"},
+		{"single word", "Refactor", "Refactor"},
+		{"non-ascii", "Añadir modo oscuro", "Añadir modo oscuro"},
+		{"long cut at a word", long, "Refactor the session manager so that every naming call goes"},
+		{"long single word cut", strings.Repeat("a", 80), strings.Repeat("a", 60)},
+		{"empty", "", ""},
+		{"only quotes and markup", "\"\"\n**\n  ", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cleanTitle(tt.in)
+			if got != tt.want {
+				t.Errorf("cleanTitle(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+			if len([]rune(got)) > maxTitleRunes {
+				t.Errorf("cleanTitle(%q) is %d runes", tt.in, len([]rune(got)))
+			}
+		})
 	}
 }
 

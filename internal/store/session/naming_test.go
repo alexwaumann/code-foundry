@@ -74,13 +74,13 @@ func TestClaudeNamer(t *testing.T) {
 	}{
 		{
 			name:  "success",
-			body:  `echo "Fix Login Bug"`,
+			body:  "printf '\\n**Fix the login bug**\\n'",
 			calls: [][]string{hardened, hardened},
 		},
 		{
 			name: "enterprise MCP config refusal, then success",
 			body: `if [ $refused = 1 ]; then echo "You cannot use --strict-mcp-config when an enterprise MCP config is present" >&2; exit 1; fi
-echo fix-login-bug`,
+echo "Fix the login bug"`,
 			// The second Namer call goes straight to the minimal command.
 			calls: [][]string{hardened, minimal, minimal},
 			warn:  true,
@@ -88,9 +88,15 @@ echo fix-login-bug`,
 		{
 			name: "unknown option, then success",
 			body: `if [ $refused = 1 ]; then echo "error: unknown option '--safe-mode'" >&2; exit 1; fi
-echo fix-login-bug`,
+echo '"Fix the login bug."'`,
 			calls: [][]string{hardened, minimal, minimal},
 			warn:  true,
+		},
+		{
+			name:    "no title in the answer",
+			body:    `echo '""'; echo '  '`,
+			calls:   [][]string{hardened, hardened},
+			wantErr: []string{"no usable name"},
 		},
 		{
 			name:    "hard failure",
@@ -116,7 +122,7 @@ echo "API Error: 429 rate limited"; exit 1`,
 			for i := range 2 {
 				name, err := namer(ctx, "-fix the login bug")
 				if tt.wantErr == nil {
-					if err != nil || name != "fix-login-bug" {
+					if err != nil || name != "Fix the login bug" {
 						t.Fatalf("call %d = %q, %v", i, name, err)
 					}
 					continue
