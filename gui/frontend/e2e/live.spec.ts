@@ -8,7 +8,8 @@
  * under ~/.claude/projects/, and closes its sessions at the end.
  *
  * Env: LIVE_DAEMON=1, CODE_FOUNDRY_HOME (required); LIVE_BIN, LIVE_WORKTREE,
- * LIVE_APP_URL, LIVE_SHOTS (screenshot dir; unset = no screenshots).
+ * LIVE_APP_URL, LIVE_MODEL (default opus), LIVE_SHOTS (screenshot dir; unset = no
+ * screenshots).
  */
 import { execFileSync } from "node:child_process";
 import path from "node:path";
@@ -21,6 +22,8 @@ const ROOT = path.resolve(process.cwd(), "../..");
 const BIN = process.env.LIVE_BIN ?? path.join(ROOT, "bin/code-foundry");
 const WORKTREE = process.env.LIVE_WORKTREE ?? ROOT;
 const SHOTS = process.env.LIVE_SHOTS ?? "";
+// Model for the watched turn (LIVE_MODEL, default opus; haiku keeps a test run cheap).
+const MODEL = process.env.LIVE_MODEL ?? "opus";
 
 interface LiveSession {
   id: string;
@@ -85,7 +88,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
   const created: string[] = [];
   try {
     // (a) A session created from the CLI shows up in the sidebar, idle.
-    const s1 = JSON.parse(cli("session", "new", "--worktree", WORKTREE, "--model", "opus", "--json")) as LiveSession;
+    const s1 = JSON.parse(cli("session", "new", "--worktree", WORKTREE, "--model", MODEL, "--json")) as LiveSession;
     created.push(s1.id);
     await test.step("a: CLI-created session is listed idle", async () => {
       await openApp(page);
