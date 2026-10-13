@@ -53,7 +53,8 @@ export type Session = Message<"codefoundry.v1.Session"> & {
   worktreePath: string;
 
   /**
-   * Display name. Auto-generated unless the user renamed it.
+   * Display name: a short natural title ("Fix the login redirect"). Auto-generated
+   * unless the user named or renamed it.
    *
    * @generated from field: string name = 5;
    */
@@ -581,8 +582,8 @@ export type CreateSessionRequest = Message<"codefoundry.v1.CreateSessionRequest"
 
   /**
    * When set, Create makes a new worktree for the session before claude starts and
-   * worktree_path is ignored. The branch is cf/<slug>, the slug named from
-   * initial_prompt (bounded wait), else cf/<session id>.
+   * worktree_path is ignored. The branch is cf/<slug>, the slug of the explicit name,
+   * else of the title named from initial_prompt (bounded wait), else cf/<session id>.
    *
    * @generated from field: codefoundry.v1.NewWorktree new_worktree = 8;
    */
