@@ -1,5 +1,5 @@
 /**
- * Syntax highlighting for a rendered thread's code (fenced blocks, diffs, shell commands):
+ * Syntax highlighting for a thread's code (fenced blocks, diffs, shell commands):
  * lowlight (highlight.js grammars, the `common` set) run synchronously, so a streaming
  * block re-highlights as it grows without a flash. Output is plain tokens with hljs class
  * names; the colours are the terminal palette (components/thread/thread.css), so code

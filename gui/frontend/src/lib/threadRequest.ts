@@ -1,5 +1,5 @@
 /**
- * What a rendered thread's pending request carries, read from its JSON: Claude's
+ * What a thread's pending request carries, read from its JSON: Claude's
  * permission suggestions ("Allow for session adds Bash(git push:*)") and an
  * AskUserQuestion's questions. Pure.
  */

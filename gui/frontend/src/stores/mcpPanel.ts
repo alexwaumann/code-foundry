@@ -10,7 +10,7 @@ import { useUiStore, type Selection } from "./ui";
 
 /**
  * Opens (or activates) the MCP tab in the selection's panel when the selection is a
- * rendered thread. Returns that panel's key, or null otherwise. It does not request focus.
+ * thread. Returns that panel's key, or null otherwise. It does not request focus.
  */
 export function openMcpSurface(sel: Selection = useUiStore.getState().selection): string | null {
   const key = keyOf(sel);

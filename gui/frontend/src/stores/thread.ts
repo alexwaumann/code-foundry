@@ -1,6 +1,6 @@
 /**
- * Rendered threads' items (docs/notes/rendered-threads-2-gui.md). Only the visible rendered
- * thread holds a ThreadService.Watch (it takes the content pane's Attach slot in the
+ * Threads' items (docs/notes/rendered-threads-2-gui.md). Only the visible
+ * thread holds a ThreadService.Watch (the content pane's slot in the
  * connection budget, ARCHITECTURE §8, and it is what marks its turns seen). The Watch
  * sends a snapshot, then events with the thread's seq: an event whose seq is not above the
  * log's is dropped, and a later snapshot (a resync after drops, or a reconnect) replaces
@@ -8,8 +8,8 @@
  * re-renders for its own item. Events are applied in batches, at most one store update per
  * frame, so a fast stream of text deltas costs one render per frame.
  *
- * The EventService `thread` source feeds `pending` for every rendered thread (its snapshot
- * is the pending requests of live rendered threads); its item events are left to the Watch.
+ * The EventService `thread` source feeds `pending` for every thread (its snapshot
+ * is the pending requests of live threads); its item events are left to the Watch.
  */
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
@@ -233,7 +233,7 @@ function keepRecent(sessionId: string): void {
 }
 
 /**
- * Opens the Watch for a thread (the visible rendered thread; one at a time) and keeps it
+ * Opens the Watch for a thread (the visible thread; one at a time) and keeps it
  * open, reconnecting with backoff, until the returned function is called.
  */
 export function startThreadWatch(sessionId: string): () => void {

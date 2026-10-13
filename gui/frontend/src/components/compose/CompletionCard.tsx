@@ -74,7 +74,7 @@ function scrollerOf(el: HTMLElement): HTMLElement | null {
  */
 function fit(el: HTMLElement, scroller: HTMLElement | null, above: boolean): void {
   const r = el.getBoundingClientRect();
-  // Above its anchor (the rendered thread's composer at the pane's bottom), the room runs
+  // Above its anchor (a thread's composer at the pane's bottom), the room runs
   // from the top of the visible area down to the card's bottom.
   const top = above ? Math.max(0, scroller ? scroller.getBoundingClientRect().top : 0) : r.top;
   const bottom = above ? r.bottom : Math.min(window.innerHeight, scroller ? scroller.getBoundingClientRect().bottom : Infinity);

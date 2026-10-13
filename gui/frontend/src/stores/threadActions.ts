@@ -1,5 +1,5 @@
 /**
- * A rendered thread's follow-up composer and controls (docs/notes/rendered-threads-2-gui.md).
+ * A thread's follow-up composer and controls (docs/notes/rendered-threads-2-gui.md).
  * Every action is a thread.* registry command invoked with the thread's context, like
  * the new-thread composer's session.new: thread.send (ThreadService.Send),
  * thread.interrupt, thread.respond, thread.set-model, thread.set-mode and thread.set-effort. The draft lives in the compose
@@ -28,7 +28,7 @@ export const THREAD_COMMANDS = {
   setEffort: "thread.set-effort",
 } as const;
 
-/** The compose store key of a rendered thread's follow-up draft. */
+/** The compose store key of a thread's follow-up draft. */
 export function threadDraftKey(sessionId: string): string {
   return `thread:${sessionId}`;
 }

@@ -1,5 +1,5 @@
 /**
- * What a rendered thread's tool row says (docs/sketches/rendered-thread, variant A): a verb
+ * What a thread's tool row says (docs/sketches/rendered-thread, variant A): a verb
  * and a target ("Read fingerprint.go internal/store/pr", "Ran go test ./…"), meta on the
  * right ("84 lines", "+6 −1", "5 matches") and a chip for a command's outcome ("ok",
  * "exit 1"). Tense follows the call: "Run" while it waits for permission, "Running" while it
