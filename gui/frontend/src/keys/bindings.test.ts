@@ -161,6 +161,20 @@ describe("handleKeyDown precedence", () => {
     expect(runCommandForResult).not.toHaveBeenCalled();
   });
 
+  it("thread prompt focus: a declared cmd chord on a list for an older context waits for the re-list (cmd+t right after selecting a thread)", async () => {
+    document.body.insertAdjacentHTML("beforeend", '<div data-chord-yield><div id="pr" contenteditable="true"></div></div>');
+    const commands = useCommandsStore.getState().commands;
+    useCommandsStore.setState({ commands: commands.map((c) => (c.name === "terminal.new" ? { ...c, available: false } : c)), contextKey: "older" });
+    relist.run = () => {
+      useCommandsStore.setState({ commands, contextKey: contextKey(getUiContext()) });
+    };
+    const e = press(document.getElementById("pr") as HTMLElement, { key: "t", code: "KeyT", metaKey: true });
+    expect(e.defaultPrevented).toBe(true);
+    await vi.waitFor(() => {
+      expect(runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, expect.objectContaining({ quiet: true }));
+    });
+  });
+
   it("terminal focus: a cmd chord on a list for an older context waits for the re-list (cmd+t right after focusing a shell)", async () => {
     const commands = useCommandsStore.getState().commands;
     useCommandsStore.setState({ commands: commands.map((c) => (c.name === "terminal.new" ? { ...c, available: false } : c)), contextKey: "older" });

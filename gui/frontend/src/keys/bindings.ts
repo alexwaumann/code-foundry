@@ -135,6 +135,11 @@ function terminalYields(chord: string): CommandView | undefined {
   return commandBindings(useCommandsStore.getState().commands).get(chord);
 }
 
+/** Some listed command declares the chord, whether or not it is available in this context. */
+function declaredChord(chord: string): boolean {
+  return useCommandsStore.getState().commands.some((c) => c.keybindings.some((k) => normalizeChord(k) === chord));
+}
+
 /** True when the chord must reach the app even while xterm has focus. */
 export function isGlobalChord(chord: string): boolean {
   return viewActionMap.has(chord) || terminalYields(chord) !== undefined;
@@ -381,10 +386,11 @@ export function handleKeyDown(e: KeyboardEvent): void {
       e.preventDefault();
       e.stopPropagation();
       startCommand(yielded);
-    } else if (shell && terminalYieldable(chord)) {
-      // Focusing a shell changes the context (a Projects-page shell brings its worktree):
-      // cmd+t right after it must not be lost to the debounced re-list. Not in a prompt:
-      // its unbound cmd chords edit (cmd+arrows, cmd+backspace) and must not be held.
+    } else if (terminalYieldable(chord) && (shell || declaredChord(chord))) {
+      // Focusing a shell or selecting a thread changes the context (a Projects-page shell
+      // brings its worktree): cmd+t or cmd+shift+w right after it must not be lost to the
+      // debounced re-list. In a prompt only for a chord some command declares: the
+      // others edit (cmd+arrows, cmd+backspace) and must not be held.
       startWhenListed(e, chord);
     }
     return;
