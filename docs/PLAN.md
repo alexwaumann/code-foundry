@@ -124,6 +124,17 @@ draws the conversation. Design record: `docs/notes/rendered-threads-handoff.md`.
   rendered-thread PRs are done; follow-ups: `docs/notes/rendered-threads-followups.md`
   (branch `t3code/rendered-threads-followups-doc`).
 
+### Release channels: stable and tip (design 2026-10-11, revised 2026-10-12)
+
+Two channels, one install: every push to main publishes a `vX.Y.Z-tip.N` prerelease
+(`X.Y.Z` the next stable, `N` the tip releases since the last stable), `make promote` tags
+a full `vX.Y.Z`; an `update.channel` setting picks which the updater follows, downgrades
+are never offered, the GUI shows tips as `vX.Y.Z (tip N)`, and the migrator refuses a
+database from a newer build. Design record: `docs/notes/release-channels-handoff.md`.
+
+* PR 1 (workflow, release/install scripts, `make promote`, tip pruning): done: see docs/notes/release-channels-1-pipeline.md.
+* PR 2 (`update.channel`, channel-aware source, migration guard, dialog label): not started.
+
 ### Open items
 
 Collected from the step notes; none blocks daily use.
@@ -153,7 +164,7 @@ Collected from the step notes; none blocks daily use.
 * **Settings**
   * Saving from the app rewrites `settings.toml`, which drops user comments and unknown keys.
 * **Packaging and updates**
-  * The release workflow is disabled. No real release has been published, so `gh release download`, the `install.sh` one-liner and the workflow are untested end to end.
+  * Releases are live: a tip prerelease per push to main, stables by `make promote`. The `install.sh` one-liner has not been run from a fresh machine.
   * Homebrew tap deferred (needs a separate repo).
   * A real Finder double-click launch is unverified (`env -i … open` stood in for it). macOS arm64 only.
 * **Integration pass**

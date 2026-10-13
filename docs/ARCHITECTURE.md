@@ -48,7 +48,9 @@ links to it) and `VERSION` (the release tag the updater reads). `code-foundry gu
 the GUI next to it. `code-foundry daemon` runs the daemon in the foreground. Every client
 auto-starts the daemon if the socket is absent. Packaging and updates:
 `docs/notes/bare-binary-distribution.md` (layout and launch) on top of
-`docs/notes/phase3d-packaging.md` (releases and the update flow).
+`docs/notes/phase3d-packaging.md` (releases and the update flow). Releases come in two
+channels: a `vX.Y.Z-tip.N` prerelease per push to main, and stables promoted with `make
+promote` (`docs/notes/release-channels-handoff.md`).
 
 ## 2. The one rule
 

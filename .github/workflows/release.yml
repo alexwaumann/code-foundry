@@ -1,27 +1,42 @@
 name: release
 
-# Builds and publishes a GitHub release: version from conventional commits since the last
-# v* tag (scripts/next-version.sh), assets from `make package`, tag + `gh release create`
-# by scripts/release.sh (idempotent, so a failed run can simply be re-run).
+# Builds and publishes a GitHub release on one of two channels
+# (docs/notes/release-channels-handoff.md): version from conventional commits since the
+# last stable vX.Y.Z tag (scripts/next-version.sh), assets from `make package`, tag +
+# `gh release create` by scripts/release.sh (idempotent, so a failed run can simply be
+# re-run).
 #
-# Automatic releases are ON: every push to main releases (docs/notes/phase3d-packaging.md,
-# "Enabling automatic releases"). The repository variable RELEASE_ENABLED gates both the
-# push trigger and manual runs; set it to anything but "true" to pause releases.
+#   push to main       tip: a prerelease vX.Y.Z-tip.N (X.Y.Z the stable this commit would
+#                      become, N the first-parent commits since the last stable), then the
+#                      tip releases beyond the newest five are deleted with their tags.
+#                      HEAD already tagged stable: nothing to publish.
+#   workflow_dispatch  channel=stable (default; `make promote`) tags the head of main
+#                      vX.Y.Z as a full release. channel=tip publishes a tip by hand.
+#
+# Automatic releases are ON (docs/notes/phase3d-packaging.md, "Enabling automatic
+# releases"). The repository variable RELEASE_ENABLED gates both the push trigger and
+# manual runs; set it to anything but "true" to pause releases.
 on:
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
+      channel:
+        description: "stable: a full release (promotion). tip: a vX.Y.Z-tip.N prerelease."
+        type: choice
+        options: [stable, tip]
+        default: stable
       version:
-        description: "Release version (vX.Y.Z). Empty: next version from conventional commits."
+        description: "Release version (vX.Y.Z, or vX.Y.Z-tip.N on tip). Empty: next version from conventional commits."
         required: false
         default: ""
 
 permissions:
-  contents: write # tag push and gh release create with GITHUB_TOKEN
+  contents: write # tag push, gh release create and delete with GITHUB_TOKEN
 
 # Two merges in quick succession must not compute the same version; queue, never cancel
-# a release half-way.
+# a release half-way. GitHub keeps one pending run per group: a newer queued run cancels
+# an older pending one (a skipped tip number, or a pending promotion to re-dispatch).
 concurrency:
   group: release
   cancel-in-progress: false
@@ -81,11 +96,30 @@ jobs:
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
+          # Pushes publish tips; dispatches default to stable.
+          CHANNEL: ${{ github.event_name == 'push' && 'tip' || inputs.channel }}
           VERSION: ${{ inputs.version }}
           CODE_FOUNDRY_RELEASE_REPO: ${{ github.repository }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Empty VERSION: next-version.sh decides, and exits without releasing when
-          # nothing changed since the last tag.
-          scripts/release.sh ${VERSION:+"$VERSION"}
+          # nothing changed since the last stable tag.
+          scripts/release.sh --channel "$CHANNEL" ${VERSION:+"$VERSION"}
+
+      # Keep the five newest tip releases; older ones go with their tags. Stables and
+      # other prereleases are never touched.
+      - name: Prune tip releases
+        if: github.event_name == 'push' || inputs.channel == 'tip'
+        shell: bash # -eo pipefail: a failed listing fails the step
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh release list --repo "$REPO" --exclude-drafts --limit 200 \
+            --json tagName,isPrerelease,createdAt \
+            --jq '[.[] | select(.isPrerelease and (.tagName | test("-tip\\.[0-9]+$")))] | sort_by(.createdAt) | reverse | .[5:] | .[].tagName' |
+            while read -r tag; do
+              echo "deleting tip release $tag"
+              gh release delete "$tag" --repo "$REPO" --cleanup-tag --yes
+            done
