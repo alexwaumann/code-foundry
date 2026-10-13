@@ -116,4 +116,4 @@ failed fetch removes nothing, prompts), `lib/projects.test.ts` (`isCleanable`), 
 worktrees directory, broom removes it after a confirm naming the
 branch, menu count and disabled at 0, a terminal holds it, aligned columns).
 
-Screenshots (real app, isolated `CODE_FOUNDRY_HOME`): `docs/notes/projects-polish-3/`.
+Screenshots (real app, isolated `CODE_FOUNDRY_HOME`, after narrowing the rule): `docs/notes/projects-polish-3/`. This repository's T3 Code worktrees show no tag; the scratch `demo` project's `cf/usage-polish` (made through `repo.worktree.new`, under the isolated worktrees directory, itself behind the `/tmp` symlink) is tagged, and `cf/elsewhere` (merged and clean, outside it) is not.
