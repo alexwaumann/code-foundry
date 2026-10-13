@@ -30,7 +30,8 @@
  *        mock/thread.ts, also parallel|multi); POST /__mock/thread/delta?text=… | /__mock/thread/stream?text=… |
  *        /__mock/thread/finish[?total=1.5&turnCost=1.5&model=claude-sonnet-5] (the turn_end's figures) |
  *        /__mock/thread/fail-respond[?withdrawn=1] (the next answer fails; withdrawn: Claude withdrew
- *        the request first, NotFound); GET /__mock/thread/calls
+ *        the request first, NotFound); GET /__mock/thread/calls;
+ *        /__mock/thread/commands?set=none|more|default (the slash commands: mock/slashCommands.ts)
  *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
  *                                                 shell stays, exited, as if the reaper were late)
  *   POST /__mock/session/hold?id=s-1&id=s-5   (the clock stops changing them: s-1 stops flipping
@@ -117,6 +118,7 @@ import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
 import { retiredUsage, utcDay } from "./usage";
 import { reconnectMcp, refreshMcp } from "./mcp";
+import { refuseSlashCommand, slashCommandsFor } from "./slashCommands";
 import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreads, THREAD_STATES, type ThreadState } from "./thread";
 import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
 
@@ -362,7 +364,8 @@ function routes(router: ConnectRouter): void {
   router.service(ThreadService, {
     listItems: (req) => guard(() => ({ snapshot: world.threads.snapshotValue(req.sessionId) })),
     watch: (req, ctx) => tracked("ThreadService/Watch", guard(() => world.threads.watch(req.sessionId, ctx.signal))),
-    send: (req) => guard(() => ({ item: world.threads.send(req.sessionId, req.text, req.attachments, req.composerText) })),
+    send: (req) => guard(() => (refuseSlashCommand(req.text), { item: world.threads.send(req.sessionId, req.text, req.attachments, req.composerText) })),
+    slashCommands: (req) => guard(() => ({ commands: world.threads.slashCommandsOf(req.sessionId) })),
     interrupt: (req) => guard(() => (world.threads.finish(req.sessionId, { interrupted: true }), {})),
     respond: (req) =>
       guard(() => {
@@ -699,6 +702,14 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         model: q.get("model") ?? undefined,
       });
       json(res, 200, { ok: true });
+      break;
+    case "POST /__mock/thread/commands":
+      try {
+        world.threads.setSlashCommands(q.get("id") ?? "s-r1", slashCommandsFor(q.get("set") ?? "default"));
+        json(res, 200, { ok: true });
+      } catch (err) {
+        json(res, 404, { error: err instanceof Error ? err.message : String(err) });
+      }
       break;
     case "POST /__mock/thread/fail-respond":
       world.threads.failRespond = q.get("withdrawn") ? "withdrawn" : "error";
