@@ -1,0 +1,26 @@
+<!doctype html>
+<html class="dark">
+<head>
+<meta charset="utf-8">
+<title>Thread header sketch</title>
+<!-- Thread header redesign (docs/notes/thread-header.md). Layout A was chosen: ?h=a&s=wt|main|ws|merged|nogit. B (pill) and C (right-aligned place) were rejected. -->
+<link rel="stylesheet" href="../rendered-thread/style.css">
+<link rel="stylesheet" href="../rendered-thread/variants.css">
+<link rel="stylesheet" href="header.css">
+<script src="../rendered-thread/icons.js"></script>
+<script>
+// extra lucide glyphs
+Object.assign(window.ICONS, {
+  "layers": '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>',
+  "git-merge": '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/>',
+  "git-pull-request-closed": '<circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="m21 3-6 6"/><path d="m21 9-6-6"/><path d="M18 11.5V15"/><circle cx="18" cy="18" r="3"/>',
+  "folder": '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+});
+</script>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script src="../rendered-thread/thread.js"></script>
+<script src="header.js"></script>
+</body>
+</html>

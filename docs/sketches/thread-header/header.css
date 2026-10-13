@@ -1,0 +1,26 @@
+/* thread header sketch (variants via ?h=) */
+.phdr{gap:10px}
+.phdr .title{font-size:13px}
+.phdr .place{display:flex;align-items:center;gap:6px;min-width:0;color:var(--muted-fg);white-space:nowrap;overflow:hidden;height:26px;padding:0 6px;border-radius:6px}
+.phdr .place:hover{background:var(--hover);color:var(--fg)}
+.phdr .place svg{width:13px;height:13px}
+.phdr .place .mono{font-size:11.5px}
+.phdr .place .at{opacity:.6}
+.chip{display:inline-flex;align-items:center;height:16px;padding:0 5px;border-radius:4px;border:1px solid var(--border);font-size:10px;line-height:1;color:var(--muted-fg);white-space:nowrap}
+.chip.ws{gap:4px}
+.chip.ws svg{width:10px;height:10px}
+.phdr .sep{color:var(--muted-fg);opacity:.5}
+.phdr .acts .tb.pr{width:auto;padding:0 6px;gap:4px;font-size:11.5px}
+.phdr .acts .tb.pr .n{font-variant-numeric:tabular-nums}
+.phdr .acts .tb.ws{width:auto;padding:0 7px;gap:5px;font-size:11.5px}
+.t-violet{color:var(--violet)}
+/* B: pill-like place */
+.hb .place{border:1px solid var(--border);height:24px;padding:0 8px}
+.hb .place:hover{background:var(--hover)}
+/* C: place right-aligned before actions */
+.hc .place{margin-left:auto}
+.hc .acts{margin-left:0}
+/* D: name editable look (hover underline) */
+.phdr .title.edit{padding:0 6px;height:26px;display:flex;align-items:center;border-radius:6px;margin-left:-6px}
+.phdr .title.edit:hover{background:var(--hover)}
+/* label beneath icon buttons? no. */
