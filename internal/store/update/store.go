@@ -1,6 +1,9 @@
 // Package update is the in-app updater: it checks the latest GitHub release of the
-// build's release repository (30s after daemon start, then every 24h, or on request)
-// and installs it on request by running the installer embedded in the binary.
+// build's release repository on the configured channel (30s after daemon start, then
+// every 24h, on request, and at once when the channel changes) and installs it on
+// request by running the installer embedded in the binary. Newer is the only install
+// rule on both channels: switching from tip to stable never offers a downgrade, it
+// waits for the next stable release above the running build.
 //
 // State machine (Status.State):
 //
@@ -71,10 +74,13 @@ type Status struct {
 	Enabled        bool
 	DisabledReason string
 	Repo           string
+	// Channel is the release channel checks follow.
+	Channel        Channel
 	Checking       bool
 	LastCheckedAt  time.Time
 	LastCheckError string
-	// Latest is the latest tag seen by the last successful check.
+	// Latest is the latest tag seen by the last successful check on Channel ("" until
+	// the first check after a channel change).
 	Latest string
 	// Target is the version Available/Downloading/Installed/RestartRequired/Failed
 	// refer to.
@@ -115,6 +121,9 @@ type Service interface {
 	// RequestRestart tells connected GUIs the daemon is about to restart and returns
 	// how many listeners received it.
 	RequestRestart() int
+	// SetChannel switches the release channel and, when it changed, re-checks at once
+	// in the background. It does not block.
+	SetChannel(ch Channel)
 }
 
 // Defaults.
@@ -131,6 +140,9 @@ type Options struct {
 	Current string
 	// Repo is the release repository, for display.
 	Repo string
+	// Channel is the release channel to follow at start; SetChannel changes it.
+	// Default ChannelStable.
+	Channel Channel
 	// DisabledReason, when set, disables checking and installing.
 	DisabledReason string
 	// Source and Installer are required unless disabled.
@@ -190,6 +202,9 @@ type Store struct {
 	mu     sync.Mutex
 	status Status
 
+	// recheck asks the loop for an immediate check (a channel change); buffered 1.
+	recheck chan struct{}
+
 	stop context.CancelFunc
 	wg   sync.WaitGroup
 }
@@ -217,17 +232,21 @@ func Start(ctx context.Context, opts Options) *Store {
 	if opts.DisabledReason == "" && (opts.Source == nil || opts.Installer == nil) {
 		opts.DisabledReason = "no release source configured"
 	}
+	if opts.Channel == "" {
+		opts.Channel = ChannelStable
+	}
 	ctx, stop := context.WithCancel(ctx)
-	s := &Store{opts: opts, log: opts.Log, ctx: ctx, stop: stop}
+	s := &Store{opts: opts, log: opts.Log, ctx: ctx, stop: stop, recheck: make(chan struct{}, 1)}
 	s.status = Status{
 		State:          Idle,
 		Current:        opts.Current,
 		Enabled:        opts.DisabledReason == "",
 		DisabledReason: opts.DisabledReason,
 		Repo:           opts.Repo,
+		Channel:        opts.Channel,
 	}
 	if !s.status.Enabled {
-		s.log.Info("update checks disabled", "reason", opts.DisabledReason, "version", opts.Current)
+		s.log.Info("update checks disabled", "reason", opts.DisabledReason, "version", opts.Current, "channel", opts.Channel)
 		return s
 	}
 	// An update installed while this daemon was down cannot be newer than us (we start
@@ -261,11 +280,35 @@ func (s *Store) loop() {
 		case <-s.ctx.Done():
 			return
 		case <-t.C:
+		case <-s.recheck:
 		}
 		if _, err := s.Check(s.ctx); err != nil && s.ctx.Err() == nil {
 			s.log.Warn("update check failed", "err", err)
 		}
-		t.Reset(s.opts.Interval)
+		t.Reset(s.opts.Interval) // Go 1.23+ timers: Reset discards a pending fire
+	}
+}
+
+// SetChannel implements Service. The previous channel's latest tag is cleared; the
+// state (an offered update, say) stays until the re-check replaces it.
+func (s *Store) SetChannel(ch Channel) {
+	s.mu.Lock()
+	if s.status.Channel == ch {
+		s.mu.Unlock()
+		return
+	}
+	s.log.Info("update channel changed", "from", s.status.Channel, "to", ch)
+	s.status.Channel = ch
+	s.status.Latest = ""
+	s.publishLocked()
+	enabled := s.status.Enabled
+	s.mu.Unlock()
+	if !enabled {
+		return
+	}
+	select {
+	case s.recheck <- struct{}{}:
+	default: // a re-check is already queued; it reads the channel when it runs
 	}
 }
 
@@ -277,9 +320,10 @@ func (s *Store) Check(ctx context.Context) (Status, error) {
 	}
 	s.checkMu.Lock()
 	defer s.checkMu.Unlock()
-	s.set(func(st *Status) { st.Checking = true })
+	var ch Channel
+	s.set(func(st *Status) { st.Checking, ch = true, st.Channel })
 
-	tag, err := s.opts.Source.Latest(ctx)
+	tag, err := s.opts.Source.Latest(ctx, ch)
 	noRelease := errors.Is(err, ErrNoRelease)
 	if noRelease {
 		err, tag = nil, ""
@@ -293,10 +337,17 @@ func (s *Store) Check(ctx context.Context) (Status, error) {
 	s.mu.Lock()
 	st := &s.status
 	st.Checking = false
-	st.LastCheckedAt = now
-	if err != nil {
+	stale := st.Channel != ch
+	switch {
+	case stale:
+		// The channel changed while checking: drop the old channel's answer; the
+		// re-check SetChannel queued follows.
+		err = nil
+	case err != nil:
+		st.LastCheckedAt = now
 		st.LastCheckError = err.Error()
-	} else {
+	default:
+		st.LastCheckedAt = now
 		st.LastCheckError = ""
 		st.Latest = tag
 		s.applyLatest(tag)
@@ -304,10 +355,10 @@ func (s *Store) Check(ctx context.Context) (Status, error) {
 	s.publishLocked()
 	out = s.status
 	s.mu.Unlock()
-	if err != nil {
+	if err != nil || stale {
 		return out, err
 	}
-	s.log.Info("update check", "current", s.opts.Current, "latest", tag, "state", out.State.String())
+	s.log.Info("update check", "channel", ch, "current", s.opts.Current, "latest", tag, "state", out.State.String())
 	return out, nil
 }
 

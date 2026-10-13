@@ -2,6 +2,8 @@ package settings
 
 import (
 	"maps"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -92,5 +94,34 @@ func TestTomlString(t *testing.T) {
 		if got := tomlString(tt.in); got != tt.want {
 			t.Errorf("tomlString(%q) = %s, want %s", tt.in, got, tt.want)
 		}
+	}
+}
+
+func TestRead(t *testing.T) {
+	tests := []struct {
+		name string
+		file string // "" = no file
+		want string // update.channel
+	}{
+		{"missing file: defaults", "", ChannelStable},
+		{"set", "[update]\nchannel = \"tip\"\n", ChannelTip},
+		{"rejected value: default", "[update]\nchannel = \"nightly\"\n", ChannelStable},
+		{"syntax error: defaults", "[update\n", ChannelStable},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), FileName)
+			if tt.file != "" {
+				if err := os.WriteFile(path, []byte(tt.file), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if got := Read(path).Update.Channel; got != tt.want {
+				t.Errorf("channel = %q, want %q", got, tt.want)
+			}
+			if _, err := os.Stat(path); tt.file == "" && err == nil {
+				t.Error("Read created the file")
+			}
+		})
 	}
 }

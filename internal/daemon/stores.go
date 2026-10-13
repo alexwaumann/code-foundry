@@ -187,7 +187,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 	}
 	uo := update.DefaultOptions(version.Version)
 	uo.Bus, uo.Log = s.bus, log.With("store", "update")
+	uo.Channel = update.ParseChannel(cfg.Update.Channel)
 	s.update = update.Start(ctx, uo)
+	applyUpdateChannel(s.settings, s.update)
 	return s, nil
 }
 

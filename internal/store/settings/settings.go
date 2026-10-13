@@ -33,6 +33,7 @@ type Settings struct {
 	// Keybindings are the valid overrides: command name -> canonical chord or
 	// KeybindingNone.
 	Keybindings map[string]string
+	Update      Update
 	Advanced    Advanced
 }
 
@@ -81,6 +82,17 @@ type Appearance struct {
 	ThreadWidth string // compact, comfortable, full
 	Backdrop    string // forest, none
 }
+
+// Update configures the updater.
+type Update struct {
+	Channel string // ChannelStable (default) or ChannelTip
+}
+
+// Values of update.channel: which releases the updater follows.
+const (
+	ChannelStable = "stable"
+	ChannelTip    = "tip"
+)
 
 // Advanced holds executable overrides and logging.
 type Advanced struct {

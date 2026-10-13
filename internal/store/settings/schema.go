@@ -77,6 +77,7 @@ const (
 	GroupGitOps      = "gitops"
 	GroupAppearance  = "appearance"
 	GroupKeybindings = "keybindings"
+	GroupUpdate      = "update"
 	GroupAdvanced    = "advanced"
 )
 
@@ -88,6 +89,7 @@ var Groups = []Group{
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
 	{GroupAppearance, "Appearance", "Theme, terminal font, density, and backdrop. Applied live in every window."},
 	{GroupKeybindings, "Keybindings", `Override a command's chord, or "none" to unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) cannot be bound.`},
+	{GroupUpdate, "Updates", "Which releases the app checks for and offers to install."},
 	{GroupAdvanced, "Advanced", "Executables and logging."},
 }
 
@@ -113,6 +115,7 @@ const (
 	KeyDensity           = "appearance.density"
 	KeyThreadWidth       = "appearance.thread_width"
 	KeyBackdrop          = "appearance.backdrop"
+	KeyUpdateChannel     = "update.channel"
 	KeyClaudePath        = "advanced.claude_path"
 	KeyGhPath            = "advanced.gh_path"
 	KeyLogLevel          = "advanced.log_level"
@@ -251,6 +254,12 @@ var staticFields = []Field{
 		Description: "Faint artwork behind the start page and the new-thread composer.",
 		Enum:        []string{"forest", "none"}, Default: "forest",
 		bind: func(s *Settings) any { return &s.Appearance.Backdrop },
+	},
+	{
+		Key: KeyUpdateChannel, Group: GroupUpdate, Type: Enum, Title: "Channel",
+		Description: "Stable is a build promoted on purpose; tip is the newest build of main, published on every push. Switching never installs an older version: going from tip to stable keeps your build until the next stable release passes it.",
+		Enum:        []string{ChannelStable, ChannelTip}, EnumLabels: []string{"Stable", "Tip"}, Default: ChannelStable,
+		bind: func(s *Settings) any { return &s.Update.Channel },
 	},
 	{
 		Key: KeyClaudePath, Group: GroupAdvanced, Type: Path, Title: "claude executable",

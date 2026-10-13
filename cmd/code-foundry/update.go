@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"connectrpc.com/connect"
@@ -13,9 +14,27 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/client"
 	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
 	"github.com/alexwaumann/code-foundry/internal/version"
 )
+
+// updateChannel is the release channel `code-foundry update` follows: the --channel
+// flag, else the update.channel setting read from the settings file (the daemon need not
+// run).
+func updateChannel(flag string) (update.Channel, error) {
+	if flag != "" {
+		if flag != string(update.ChannelStable) && flag != string(update.ChannelTip) {
+			return "", fmt.Errorf("--channel: want stable or tip, got %q", flag)
+		}
+		return update.Channel(flag), nil
+	}
+	p, err := paths.Resolve()
+	if err != nil {
+		return "", err
+	}
+	return update.ParseChannel(settings.Read(filepath.Join(p.Home(), settings.FileName)).Update.Channel), nil
+}
 
 // runUpdate is `code-foundry update` (also `code-foundry --update`): checks the latest
 // release and runs the embedded installer attached to this terminal, so it can prompt.
@@ -26,8 +45,13 @@ func runUpdate(ctx context.Context, cl *cli, args []string) error {
 	tag := fs.String("version", "", "install this release (vX.Y.Z) instead of the latest")
 	force := fs.Bool("force", false, "reinstall even if already up to date")
 	yes := fs.Bool("yes", false, "do not prompt")
+	channelFlag := fs.String("channel", "", "release channel to follow: stable or tip (default: the update.channel setting)")
 	if err := cl.parseFlags(fs, args); err != nil {
 		return quietHelp(err)
+	}
+	channel, err := updateChannel(*channelFlag)
+	if err != nil {
+		return err
 	}
 
 	repo, dir := version.Repo(), version.ReleaseDir()
@@ -55,9 +79,9 @@ func runUpdate(ctx context.Context, cl *cli, args []string) error {
 		installed = "(not installed)"
 	}
 	if *tag == "" {
-		latest, err := src.Latest(ctx)
+		latest, err := src.Latest(ctx, channel)
 		if errors.Is(err, update.ErrNoRelease) {
-			fmt.Fprintf(cl.stdout, "No release has been published yet (%v).\n", err)
+			fmt.Fprintf(cl.stdout, "No %s release has been published yet (%v).\n", channel, err)
 			return nil
 		}
 		if err != nil {
@@ -69,7 +93,7 @@ func runUpdate(ctx context.Context, cl *cli, args []string) error {
 		return fmt.Errorf("not a release version: %q", *tag)
 	}
 	if !*force && update.IsSemver(installed) && !update.Newer(*tag, installed) {
-		fmt.Fprintf(cl.stdout, "Code Foundry %s is up to date (latest release %s).\n", installed, *tag)
+		fmt.Fprintf(cl.stdout, "Code Foundry %s is up to date (latest %s release %s).\n", installed, channel, *tag)
 		return nil
 	}
 	fmt.Fprintf(cl.stdout, "Updating Code Foundry %s -> %s\n", installed, *tag)
