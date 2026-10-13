@@ -11,7 +11,9 @@
  *   permission request annotates its tool call (pending: "waiting for you");
  * - every finished turn ends with a footer (duration, steps, its cost, model) that folds it;
  *   a finished turn other than the latest folds by default: only the user message, the
- *   final assistant text (the trailing text of the turn), notes and the footer show.
+ *   final assistant text (the trailing text of the turn), notes and the footer show;
+ * - a system note (the daemon's, e.g. a fork's "Forked from …" where the copied history
+ *   ends) stands alone between turns: it closes the turn before it and never folds.
  */
 import type { RequestStateView, ThreadItemKind, ToolStatusView } from "@/api/thread";
 
@@ -44,7 +46,9 @@ export type WorkNode =
   | { type: "text"; key: string; id: string; final: boolean }
   | { type: "question"; key: string; id: string }
   | { type: "permission"; key: string; id: string }
-  | { type: "note"; key: string; id: string; kind: "error" | "compaction" | "commandOutput" };
+  | { type: "note"; key: string; id: string; kind: "error" | "compaction" | "commandOutput" }
+  /** A system note on its own line between turns (an item of kind "note"). */
+  | { type: "system"; key: string; id: string };
 
 /** One row of the timeline (what the virtualizer lays out). */
 export type TimelineRow =
@@ -144,6 +148,9 @@ export function workNodes(list: readonly TimelineItem[], children: ReadonlyMap<s
       case "commandOutput":
         out.push({ type: "note", key: it.id, id: it.id, kind: it.kind });
         break;
+      case "note":
+        out.push({ type: "system", key: it.id, id: it.id });
+        break;
       case "user":
       case "turnEnd":
         break;
@@ -162,9 +169,9 @@ function markFinal(body: WorkNode[]): void {
   }
 }
 
-/** Notes (errors, compactions, command output) stay visible in a folded turn. */
+/** Notes (errors, compactions, command output, system notes) stay visible in a folded turn. */
 function foldsAway(n: WorkNode): boolean {
-  return !(n.type === "text" && n.final) && n.type !== "note";
+  return !(n.type === "text" && n.final) && n.type !== "note" && n.type !== "system";
 }
 
 /** The thread's items (top level, in order) as turns. */
@@ -201,6 +208,12 @@ export function buildTurns(items: readonly TimelineItem[]): TimelineTurn[] {
         cur = { key: it.id, user: [], items: [], end: "" };
       }
       cur.user.push(it.id);
+      continue;
+    }
+    if (it.kind === "note") {
+      // A system note is a turn of its own: what came before it is done with.
+      close();
+      turns.push({ key: it.id, user: [], body: workNodes([it], children, permissions), end: "" });
       continue;
     }
     cur ??= { key: it.id, user: [], items: [], end: "" };

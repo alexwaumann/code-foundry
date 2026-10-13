@@ -164,6 +164,24 @@ describe("buildTurns / buildRows", () => {
     ]);
   });
 
+  it("a system note stands alone between turns: the copied history folds above it, the fork's turns follow", () => {
+    const items = [user("u1"), tool("Bash"), text("a"), end("e1"), item("note", { id: "n" }), user("u2"), text("b")];
+    const turns = buildTurns(items);
+    expect(turns.map((t) => [t.key, t.end])).toEqual([
+      ["u1", "e1"],
+      ["n", ""],
+      ["u2", ""],
+    ]);
+    expect(shape(buildRows(turns, { fold: () => undefined, working: true }))).toEqual(["user:u1", "final:a", "footer(folded 1)", "system:n", "user:u2", "final:b", "working(u2)"]);
+  });
+
+  it("a system note ends a turn that was cut short; a fork with nothing else shows the note, then working while it starts", () => {
+    const cut = [user("u1"), tool("Bash"), item("note", { id: "n" })];
+    expect(buildTurns(cut).map((t) => t.key)).toEqual(["u1", "n"]);
+    expect(shape(buildRows(buildTurns(cut), open))).toEqual(["user:u1", "tool:Bash", "system:n"]);
+    expect(shape(buildRows(buildTurns([item("note", { id: "n" })]), { fold: () => undefined, working: true }))).toEqual(["system:n", "working()"]);
+  });
+
   it("an empty thread has no rows, and a starting one only the working row", () => {
     expect(buildRows(buildTurns([]), open)).toEqual([]);
     expect(shape(buildRows(buildTurns([]), { fold: () => undefined, working: true }))).toEqual(["working()"]);

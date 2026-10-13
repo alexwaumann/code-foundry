@@ -23,6 +23,8 @@ function estimate(r: TimelineRow | undefined): number {
       return 58;
     case "working":
       return 58;
+    case "system":
+      return 46;
     default:
       return 26;
   }

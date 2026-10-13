@@ -417,17 +417,24 @@ test("a closed thread keeps its conversation above the Reconnect bar", async ({ 
   await expect(page.getByTestId("thread-empty")).toHaveCount(0);
 });
 
-test("a fork starts empty, naming its parent", async ({ page }) => {
+test("a fork shows its parent's conversation, ended by a Forked from note", async ({ page }) => {
   await openThread(page, "idle");
+  const parentFooters = await footers(page).count();
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Fork Thread");
   await page.keyboard.press("Enter");
   const fork = page.locator('[data-row-kind="session"][aria-selected="true"]');
   await expect(fork).not.toHaveAttribute("data-row-key", "s:s-r1");
   await expect(page.getByTestId("thread-pane")).toBeVisible();
+  const note = pane(page).getByTestId("thread-note");
+  await expect(note).toHaveText("Forked from Fix stale PR badge");
   await expect(page.getByTestId("thread-working")).toHaveText("Starting Claude…");
-  await expect(page.getByTestId("thread-empty")).toHaveText("Forked from Fix stale PR badge. Claude has the conversation so far; send a follow-up to continue.", { timeout: 5000 });
-  await shot(page, "fork-empty");
+  // The copied turns are all there (folded: the note is the latest row), and nothing waits.
+  await expect(footers(page)).toHaveCount(parentFooters);
+  await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("All 412 tests pass and the branch is pushed");
+  await expect(page.getByTestId("thread-working")).toHaveCount(0, { timeout: 5000 });
+  await expect(page.getByTestId("thread-empty")).toHaveCount(0);
+  await shot(page, "fork-note");
 });
 
 test("the follow-up placeholder says a message while Claude works is picked up mid-turn; one Interrupt", async ({ page }) => {

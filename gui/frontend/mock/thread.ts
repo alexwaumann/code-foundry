@@ -859,6 +859,35 @@ export class MockThreads {
     if (l.pending.length > 0) this.source({ event: { case: "pending", value: { sessionId: id, seq: BigInt(l.seq), pending: l.pending } } });
   }
 
+  /**
+   * session.fork, like the daemon (internal/store/session/fork.go): the fork's log starts
+   * as a copy of the parent's items, renumbered, never live (streaming text dropped, a
+   * running tool an error, a pending request cancelled), then the note "Forked from
+   * <parent>" where the copy ends.
+   */
+  fork(parentId: string, id: string, parentName: string): void {
+    this.logs.delete(id);
+    const why = "the thread was forked before it finished";
+    const l = this.log(id);
+    for (const src of this.logs.get(parentId)?.items ?? []) {
+      if (src.streaming) continue;
+      const it = structuredClone(src);
+      it.ordinal = BigInt(l.nextOrdinal++ * 10);
+      const p = it.payload;
+      if (p?.case === "toolCall" && p.value.status === ToolCallStatus.RUNNING) {
+        p.value.status = ToolCallStatus.ERROR;
+        p.value.output ||= `Interrupted: ${why}.`;
+      }
+      if ((p?.case === "permission" || p?.case === "question") && p.value.state === ThreadRequestState.PENDING) {
+        p.value.state = ThreadRequestState.CANCELLED;
+        p.value.message = why;
+      }
+      l.items.push(it);
+    }
+    l.items.push(this.item(id, { case: "note", value: { text: `Forked from ${parentName}` } }, { id: `note-fork-${parentId}` }));
+    l.seq = l.items.length;
+  }
+
   /** thread.send: the user message, then a short streamed reply and the turn's end. */
   send(id: string, text: string, attachments: string[], composerText = ""): ItemInit {
     if (!this.world.isConnected(id)) throw new Error(`thread ${id} is not connected; reconnect it first`);
