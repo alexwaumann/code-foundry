@@ -1,6 +1,6 @@
 /**
- * In-memory fake daemon state: repos, worktrees, terminals with scripted output, the
- * command registry, and intent fan-out. Deterministic initial state; reset() restores it.
+ * In-memory fake daemon state: repos, worktrees, threads (mock/thread.ts), shells with
+ * scripted output, the command registry, and intent fan-out. Deterministic initial state; reset() restores it.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
@@ -8,7 +8,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { EventSource, type EventSchema } from "../src/gen/codefoundry/v1/events_pb";
 import type { RepoEventSchema, RepoSchema, WorktreeSchema } from "../src/gen/codefoundry/v1/repo_pb";
-import { PermissionMode, SessionRender, SessionState, SessionStatus, type SessionEventSchema, type SessionSchema } from "../src/gen/codefoundry/v1/session_pb";
+import { PermissionMode, SessionState, SessionStatus, type SessionEventSchema, type SessionSchema } from "../src/gen/codefoundry/v1/session_pb";
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefoundry/v1/workspace_pb";
@@ -22,10 +22,10 @@ import { Hub } from "./hub";
 import { MockSettings, MODEL_VALUES } from "./settings";
 import { MockUpdater } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
-import { claudeIntro, claudeTick, ENTER_ALT, prompt, RESET, topFrame } from "./screens";
+import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
 import { mcpCommands } from "./mcp";
-import { CRASH_STDERR, MockThreads, type ThreadState } from "./thread";
+import { CRASH_STDERR, MockThreads, type SeedHistory, type ThreadState } from "./thread";
 import { contextFields, recordResult, type MockContext } from "./context";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
@@ -58,7 +58,6 @@ interface MockSession {
   autoNamed: boolean;
   model: string;
   effort: string;
-  terminalId: string;
   state: SessionState;
   /** Persisted like the daemon's: a disconnected thread keeps it (busy becomes ERROR "interrupted"). */
   status: SessionStatus;
@@ -83,17 +82,15 @@ interface MockSession {
   pendingWorktreePath: string;
   /** session.pin. */
   pinned: boolean;
-  /** TERMINAL or RENDERED (mock/thread.ts): a rendered thread has no terminal. */
-  render: SessionRender;
-  /** A rendered thread's effort change waiting for the turn to end (thread.set-effort). */
+  /** An effort change waiting for the turn to end (thread.set-effort). */
   effortPending: boolean;
-  /** Mock-only: a new rendered thread's first message, sent once it connects (the daemon sends it after the handshake). */
+  /** Mock-only: a new thread's first message, sent once it connects (the daemon sends it after the handshake). */
   firstMessage: { text: string; attachments: string[]; composerText: string } | null;
   /** Claude's pr-link records: one per URL, first-seen order (POST /__mock/link-pr). */
   linkedPullRequests: { slug: string; number: number; url: string; linkedAt: Date }[];
   /** Token usage buckets (mock/usage.ts; POST /__mock/usage). */
   usage: MockUsage[];
-  /** A rendered thread's context totals (mock/context.ts). */
+  /** The thread's context totals (mock/context.ts). */
   contextTokens: MockContext["contextTokens"];
   contextModel: MockContext["contextModel"];
   lastResultAt: MockContext["lastResultAt"];
@@ -133,7 +130,7 @@ interface CmdDef {
 }
 export type UiIntentInit = MessageInitShape<typeof UiIntentSchema>;
 
-type Kind = "claude" | "top" | "shell";
+type Kind = "top" | "shell";
 
 // The terminal label contract (internal/termlabel, proto Terminal.labels).
 const LABEL_KIND = "kind";
@@ -346,6 +343,70 @@ function initialRepos(): MockRepo[] {
   ];
 }
 
+/**
+ * session.new's first message: its prompt (and attachments), sent once the thread has
+ * connected, with the composer's text for display. null without either.
+ */
+function firstMessageOf(args: Record<string, string>): MockSession["firstMessage"] {
+  const text = (args.prompt ?? "").trim();
+  const attachments = (args.attachments ?? "").split(",").filter(Boolean);
+  return text || attachments.length > 0 ? { text, attachments, composerText: args["composer-prompt"] ?? "" } : null;
+}
+
+/**
+ * The default world's thread histories (MockThreads.seed), so every thread's timeline has
+ * something to show: s-1 is mid-reply, s-2 waits on a Bash permission (its status reason
+ * names it), s-3 finished before it exited, s-4 crashed mid-turn, s-6 finished before its
+ * close. s-5 is still starting: nothing yet.
+ */
+const SEEDS: Readonly<Record<string, SeedHistory | undefined>> = {
+  "s-1": {
+    prompt: "Refactor the sidebar tree into a virtualized list.",
+    intro: "I'll start by reading the current sidebar and the tree builder.",
+    command: "rg -n useVirtualizer gui/frontend/src",
+    output: "gui/frontend/src/components/sidebar/Sidebar.tsx:12:import { useVirtualizer } from \"@tanstack/react-virtual\";",
+    reply: "The tree now flattens into rows; only the visible rows render. Moving the row builder into `lib/tree.ts`",
+    minutesAgo: 6,
+    end: "working",
+  },
+  "s-2": {
+    prompt: "Port the grid renderer to libghostty-vt.",
+    intro: "The bindings are in place; building the playground to check the renderer links.",
+    command: "zig version",
+    output: "0.15.1",
+    reply: "zig build -Doptimize=ReleaseFast",
+    minutesAgo: 4,
+    end: "permission",
+  },
+  "s-3": {
+    prompt: "Fix the resize race in the terminal actor.",
+    intro: "Reproducing it with the race detector first.",
+    command: "go test -race ./internal/store/terminal/",
+    output: "ok  \tgithub.com/alexwaumann/code-foundry/internal/store/terminal\t1.412s",
+    reply: "Fixed: the actor applies a resize only after the pending writes drain. The race test passes.",
+    minutesAgo: 100,
+    end: "done",
+  },
+  "s-4": {
+    prompt: "Investigate the flaky e2e run on CI.",
+    intro: "Looking at the last failed run's logs.",
+    command: "gh run view --log-failed",
+    output: "e2e/app.spec.ts:120 › connection budget: timed out",
+    reply: "",
+    minutesAgo: 18,
+    end: "cut",
+  },
+  "s-6": {
+    prompt: "Tidy my zshrc: drop the unused plugins.",
+    intro: "Checking which plugins are loaded.",
+    command: "grep -n plugins ~/.zshrc",
+    output: "12:plugins=(git z fzf docker kubectl)",
+    reply: "Removed docker and kubectl from the plugin list; nothing else references them.",
+    minutesAgo: 61,
+    end: "done",
+  },
+};
+
 export class World {
   readonly startedAt = Date.now();
   terms = new Map<string, MockTerm>();
@@ -360,7 +421,7 @@ export class World {
   readonly sessionEvents = new Hub<SessionEventInit>((v) => this.events.publish({ source: EventSource.SESSION, event: { event: { case: "session", value: v } } }));
   readonly intents = new Hub<UiIntentInit>((v) => this.events.publish({ source: EventSource.UI, event: { event: { case: "ui", value: v } } }));
   readonly gitopsEvents = new Hub<GitOpsEventInit>((v) => this.events.publish({ source: EventSource.GITOPS, event: { event: { case: "gitops", value: v } } }));
-  /** Rendered threads (mock/thread.ts); the EventService thread source carries their pending requests. */
+  /** Threads' conversations (mock/thread.ts); the EventService thread source carries their pending requests. */
   readonly threads = new MockThreads(
     {
       worktreeOf: (id) => this.session(id).worktreePath,
@@ -454,21 +515,20 @@ export class World {
     for (const r of initialRepos()) this.repos.set(r.id, r);
     this.gh.reset();
     const started = new Date(Date.now() - 42 * 60_000);
-    this.addTerm({ id: "t-claude", argv: ["claude"], cwd: CF, title: "✳ Refactor sidebar tree", kind: "claude", labels: { worktree: CF, session: "s-1" }, startedAt: started });
     // A shell terminal.new started on the Projects page for feat/sidebar (worktree-owned).
     this.addTerm({ id: "t-top", argv: ["top"], cwd: `${CFW}/feat-sidebar`, title: "", kind: "top", labels: shellLabels("", "repo-cf", `${CFW}/feat-sidebar`), startedAt: started });
-    this.addTerm({ id: "t-ghostty", argv: ["claude", "--resume"], cwd: GP, title: "✳ Port renderer", kind: "claude", labels: { worktree: GP, session: "s-2" }, startedAt: started });
     // A shell terminal.new started in thread s-1 (thread-owned: s-1's bottom panel).
     this.addTerm({ id: "t-s1-shell", argv: ["/bin/zsh", "-l"], cwd: CF, title: "", kind: "shell", labels: shellLabels("s-1", "repo-cf", CF), startedAt: started });
-    // Sessions in every state. s-1/s-2 own t-claude/t-ghostty (labels.session above).
+    // Threads in every state, each with a short history (SEEDS).
     this.sessions.clear();
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
-    this.addSession({ id: "s-1", repoId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "opus", effort: "high", terminalId: "t-claude", status: SessionStatus.BUSY, statusReason: "working: Refactor sidebar tree", createdAt: ago(42), usage: sampleUsage() });
-    this.addSession({ id: "s-2", repoId: "repo-gp", worktreePath: GP, name: "Port renderer", model: "sonnet", effort: "", terminalId: "t-ghostty", status: SessionStatus.NEEDS_ATTENTION, statusReason: "permission: Do you want to proceed?", statusChangedAt: ago(3), createdAt: ago(40) });
+    this.addSession({ id: "s-1", repoId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "opus", effort: "high", status: SessionStatus.BUSY, statusReason: "working: Refactor sidebar tree", createdAt: ago(42), usage: sampleUsage() });
+    this.addSession({ id: "s-2", repoId: "repo-gp", worktreePath: GP, name: "Port renderer", model: "sonnet", effort: "", status: SessionStatus.NEEDS_ATTENTION, statusReason: `permission: Bash ${SEEDS["s-2"]?.reply ?? ""}`, statusChangedAt: ago(3), createdAt: ago(40) });
     this.addSession({ id: "s-3", repoId: "repo-cf", worktreePath: `${CFW}/fix-resize`, name: "Fix resize race", model: "opus", effort: "medium", state: SessionState.DISCONNECTED, disconnectReason: "exited", createdAt: ago(300), lastActivityAt: ago(95), usage: pageUsage("s-3") });
     this.addSession({ id: "s-4", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Investigate flaky e2e", model: "haiku", effort: "", state: SessionState.DISCONNECTED, disconnectReason: "crashed", exitCode: 139, createdAt: ago(200), lastActivityAt: ago(17), usage: pageUsage("s-4") });
     this.addSession({ id: "s-5", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Write session docs", model: "opus", effort: "low", state: SessionState.STARTING, settleIn: 8, createdAt: ago(0) });
     this.addSession({ id: "s-6", repoId: "repo-dot", worktreePath: `${HOME}/dotfiles`, name: "Tidy zshrc", model: "sonnet", effort: "", state: SessionState.CLOSING, settleIn: 8, createdAt: ago(60) });
+    for (const [id, h] of Object.entries(SEEDS)) if (h) this.threads.seed(id, h);
     // Republish so connected watchers converge on the reset state.
     for (const t of this.terms.values()) this.termEvents.publish({ event: { case: "updated", value: this.terminalMsg(t) } });
     for (const r of this.repos.values()) this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(r) } });
@@ -637,8 +697,6 @@ export class World {
     const out: MockSession[] = [];
     for (let i = 1; i <= count; i++) {
       const s = this.addSession({ id: `s-t-${String(this.nextId++)}`, repoId: r.id, worktreePath: path, name: `${prefix} ${String(i)}`, model: "haiku", effort: "", status, createdAt: new Date() });
-      const t = this.terms.get(s.terminalId);
-      if (t) this.publishTerm(t);
       this.publishSession(s);
       out.push(s);
     }
@@ -671,8 +729,6 @@ export class World {
       out.push(k.id);
       if (this.sessions.has(k.id)) continue;
       const s = this.addSession({ repoId: "repo-cf", worktreePath: CF, model: "haiku", effort: "medium", createdAt: ago(min + 5), lastActivityAt: ago(min), statusChangedAt: ago(min), ...k });
-      const t = this.terms.get(s.terminalId);
-      if (t) this.publishTerm(t);
       this.publishSession(s);
     }
     return out;
@@ -684,8 +740,6 @@ export class World {
     const member = repo ? ws.members.find((m) => m.repoId === this.repoRef(repo).id) : ws.members[0];
     if (!member) throw new CommandError("unavailable", `repo ${repo} is not a member of workspace ${ws.name}`);
     const s = this.addSession({ id: `s-ws-${String(this.nextId++)}`, repoId: member.repoId, worktreePath: member.worktreePath, name, model: "haiku", effort: "", workspaceId: ws.id, status, createdAt: new Date() });
-    const t = this.terms.get(s.terminalId);
-    if (t) this.publishTerm(t);
     this.publishSession(s);
     return s;
   }
@@ -723,8 +777,6 @@ export class World {
     if (member) {
       s.worktreePath = member.worktreePath;
       s.repoId = member.repoId;
-      const t = this.terms.get(s.terminalId);
-      if (t) this.output(t, `\r\n\x1b[2m⎿  Moved to ${path}\x1b[0m\r\n`);
     }
     this.publishSession(s);
   }
@@ -786,10 +838,6 @@ export class World {
 
   private addSession(o: Partial<MockSession> & Pick<MockSession, "id" | "repoId" | "worktreePath" | "name" | "model" | "effort">): MockSession {
     const state = o.state ?? SessionState.CONNECTED;
-    let terminalId = o.terminalId ?? "";
-    if (!terminalId && o.render !== SessionRender.RENDERED && (state === SessionState.STARTING || state === SessionState.CONNECTED || state === SessionState.CLOSING)) {
-      terminalId = this.sessionTerminal(o.id, o.worktreePath, o.model, false).id;
-    }
     const status = o.status ?? SessionStatus.IDLE;
     const s: MockSession = {
       claudeSessionId: `cl-${o.id}`,
@@ -809,7 +857,6 @@ export class World {
       workspaceId: "",
       pendingWorktreePath: "",
       pinned: false,
-      render: SessionRender.TERMINAL,
       effortPending: false,
       firstMessage: null,
       linkedPullRequests: [],
@@ -824,18 +871,9 @@ export class World {
       held: false,
       ...o,
       state,
-      terminalId,
     };
     this.sessions.set(s.id, s);
     return s;
-  }
-
-  private sessionTerminal(sessionId: string, cwd: string, model: string, publish: boolean): MockTerm {
-    const id = `t-${sessionId}-${String(this.nextId++)}`;
-    const t = this.addTerm({ id, argv: ["claude", "--model", model || "opus"], cwd, title: "✳ Claude Code", kind: "claude", labels: { worktree: cwd, session: sessionId } });
-    t.history = claudeIntro(cwd, t.cols, "continue where we left off");
-    if (publish) this.publishTerm(t);
-    return t;
   }
 
   sessionMsg(s: MockSession): SessionInit {
@@ -848,7 +886,6 @@ export class World {
       autoNamed: s.autoNamed,
       model: s.model,
       effort: s.effort,
-      terminalId: s.terminalId,
       state: s.state,
       status: s.status,
       statusReason: s.statusReason,
@@ -865,7 +902,6 @@ export class World {
       workspaceId: s.workspaceId,
       pendingWorktreePath: s.pendingWorktreePath,
       pinned: s.pinned,
-      render: s.render,
       effortPending: s.effortPending,
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
       ...usageFields(s.usage),
@@ -888,28 +924,21 @@ export class World {
   }
 
   /**
-   * Session → disconnected. Its terminal is killed (if running) and removed first. Like the
-   * daemon, the status it had is kept, except busy, which becomes ERROR "interrupted".
+   * Session → disconnected (its claude process is gone). Like the daemon, the status it had
+   * is kept, except busy, which becomes ERROR "interrupted".
    * `status`, when given, is the status it had at that moment (tests use it: s-1 flips
    * busy/idle on a timer).
    */
   disconnectSession(id: string, reason: string, code: number, status?: SessionStatus): void {
     const s = this.session(id);
-    const t = s.terminalId ? this.terms.get(s.terminalId) : undefined;
     if (status !== undefined) this.setStatus(s, status);
     if (s.status === SessionStatus.BUSY) this.setStatus(s, SessionStatus.ERROR, "interrupted");
-    // terminal_id clears in the same update that sets DISCONNECTED (the contract 2a keeps).
-    s.terminalId = "";
     s.state = SessionState.DISCONNECTED;
     s.disconnectReason = reason;
     s.exitCode = code;
     s.settleIn = 0;
     s.lastActivityAt = new Date();
     this.publishSession(s);
-    if (t) {
-      this.kill(t.id, code, false);
-      this.remove(t.id);
-    }
   }
 
   /**
@@ -970,10 +999,10 @@ export class World {
   }
 
   /**
-   * The sketch's rendered thread (mock/thread.ts) in a state: "Fix stale PR badge" in
+   * The sketch's scripted thread (mock/thread.ts) in a state: "Fix stale PR badge" in
    * code-foundry, connected, accept-edits. Replaces it when it exists.
    */
-  addRenderedThread(state: ThreadState, id = "s-r1"): MockSession {
+  addScriptedThread(state: ThreadState, id = "s-r1"): MockSession {
     if (this.sessions.has(id)) {
       this.sessions.delete(id);
       this.sessionEvents.publish({ event: { case: "removedId", value: id } });
@@ -985,7 +1014,6 @@ export class World {
       name: "Fix stale PR badge",
       model: "opus",
       effort: "high",
-      render: SessionRender.RENDERED,
       permissionMode: PermissionMode.ACCEPT_EDITS,
       createdAt: new Date(Date.now() - 10 * 60_000),
       // The earlier turn's result, two minutes ago: the cache is warm.
@@ -1036,15 +1064,12 @@ export class World {
   private createSession(repoId: string, path: string, model: string, effort: string, extra: Partial<MockSession> = {}): MockSession {
     const id = `s-new-${String(this.nextId++)}`;
     const s = this.addSession({ id, repoId, worktreePath: path, name: "", model, effort, state: SessionState.STARTING, settleIn: 2, nameIn: 1, pendingName: `thread-${id}`, createdAt: new Date(), ...extra });
-    const t = this.terms.get(s.terminalId);
-    if (t) this.publishTerm(t);
     this.publishSession(s);
     return s;
   }
 
+  /** session.reconnect: claude --resume in a new process; STARTING until the handshake (~2 s). */
   private reconnect(s: MockSession): void {
-    // A rendered thread runs without a terminal.
-    if (s.render !== SessionRender.RENDERED) s.terminalId = this.sessionTerminal(s.id, s.worktreePath, s.model, true).id;
     s.state = SessionState.STARTING;
     // The fresh detector owns status again: the persisted one is cleared.
     this.setStatus(s, SessionStatus.UNSPECIFIED);
@@ -1059,7 +1084,7 @@ export class World {
   private tickSessions(): void {
     for (const s of this.sessions.values()) {
       if (s.held) continue;
-      // A queued run-in: the daemon types /cd once the thread is idle at its prompt.
+      // A queued run-in: the daemon sends set_cwd once the thread is idle.
       if (s.pendingWorktreePath && s.status !== SessionStatus.BUSY && --s.moveIn <= 0) this.applyMove(s);
       if (s.nameIn > 0 && --s.nameIn === 0 && !s.name) {
         s.name = s.pendingName;
@@ -1070,10 +1095,10 @@ export class World {
           s.state = SessionState.CONNECTED;
           this.setStatus(s, SessionStatus.IDLE);
           this.publishSession(s);
-          // A new rendered thread: its first message goes out once Claude answered the handshake.
+          // A new thread: its first message goes out once Claude answered the handshake.
           const first = s.firstMessage;
           s.firstMessage = null;
-          if (first && s.render === SessionRender.RENDERED) this.threads.send(s.id, first.text, first.attachments, first.composerText);
+          if (first) this.threads.send(s.id, first.text, first.attachments, first.composerText);
         } else if (s.state === SessionState.CLOSING) {
           this.disconnectSession(s.id, "closed", 0);
         }
@@ -1109,9 +1134,6 @@ export class World {
       attach: new Hub<AttachItem>(),
     };
     switch (o.kind) {
-      case "claude":
-        t.history = claudeIntro(o.cwd, t.cols, o.id === "t-claude" ? "refactor the sidebar tree into a virtualized list" : "port the grid renderer to libghostty-vt");
-        break;
       case "top":
         t.history = `${prompt(o.cwd)}top\r\n`;
         t.altScreen = true;
@@ -1141,13 +1163,7 @@ export class World {
     for (const t of this.terms.values()) {
       if (t.state !== TerminalState.RUNNING) continue;
       t.tick++;
-      if (t.kind === "claude") {
-        this.output(t, claudeTick(t.tick));
-        if (t.tick % 6 === 0) {
-          const base = t.title.replace(/^\S+\s/, "");
-          this.setTitle(t, `${t.tick % 12 === 0 ? "✳" : "⠐"} ${base}`);
-        }
-      } else if (t.kind === "top" && t.altScreen) {
+      if (t.kind === "top" && t.altScreen) {
         this.output(t, topFrame(t.tick, t.cols, t.rows));
       }
     }
@@ -1170,11 +1186,6 @@ export class World {
       }
     }
     t.attach.publish({ event: { case: "output", value: { data: enc.encode(s) } } });
-  }
-
-  private setTitle(t: MockTerm, title: string): void {
-    t.title = title;
-    this.publishTerm(t);
   }
 
   private publishTerm(t: MockTerm): void {
@@ -1214,8 +1225,7 @@ export class World {
 
   create(argv: string[], cwd: string, labels: Record<string, string>, kind: Kind): MockTerm {
     const id = `t-new-${String(this.nextId++)}`;
-    const t = this.addTerm({ id, argv, cwd, title: kind === "claude" ? "✳ New session" : "", kind, labels });
-    if (kind === "claude") t.history = claudeIntro(cwd, t.cols, "hello");
+    const t = this.addTerm({ id, argv, cwd, title: "", kind, labels });
     this.publishTerm(t);
     return t;
   }
@@ -1235,12 +1245,6 @@ export class World {
       }
       return;
     }
-    const owner = [...this.sessions.values()].find((s) => s.terminalId === id);
-    if (owner?.status === SessionStatus.NEEDS_ATTENTION) this.setSessionStatus(owner.id, SessionStatus.BUSY);
-    if (owner && (t.line + text).replace(/\r$/, "").trim() === "/exit" && text.endsWith("\r")) {
-      this.disconnectSession(owner.id, "exited", 0);
-      return;
-    }
     // Shell-ish line discipline: echo, backspace, enter, ^C. Escape sequences ignored.
     // eslint-disable-next-line no-control-regex
     const plain = text.replace(/\x1b\[20[01]~/g, "").replace(/\x1b(\[[0-9;?]*[ -/]*[@-~]|O.)/g, "");
@@ -1250,8 +1254,7 @@ export class World {
         const cmd = t.line.trim();
         t.line = "";
         out += "\r\n";
-        if (t.kind === "claude") out += cmd ? `\x1b[32m⏺${RESET} (mock) You said: ${cmd}\r\n\r\n` : "";
-        else out += cmd ? `zsh: command not found: ${cmd.split(" ")[0] ?? ""}\r\n${prompt(t.cwd)}` : prompt(t.cwd);
+        out += cmd ? `zsh: command not found: ${cmd.split(" ")[0] ?? ""}\r\n${prompt(t.cwd)}` : prompt(t.cwd);
       } else if (ch === "\x7f") {
         if (t.line.length > 0) {
           t.line = t.line.slice(0, -1);
@@ -1259,7 +1262,7 @@ export class World {
         }
       } else if (ch === "\x03") {
         t.line = "";
-        out += `^C\r\n${t.kind === "claude" ? "" : prompt(t.cwd)}`;
+        out += `^C\r\n${prompt(t.cwd)}`;
       } else if (ch >= " ") {
         t.line += ch;
         out += ch;
@@ -1281,18 +1284,12 @@ export class World {
   }
 
   /**
-   * Ends a terminal. A session whose process dies without a close request disconnects.
-   * `keep` leaves an exited shell in place (the reaper has not got to it yet; tests use it
-   * to see the exit overlay).
+   * Ends a terminal. `keep` leaves an exited shell in place (the reaper has not got to it
+   * yet; tests use it to see the exit overlay).
    */
-  kill(id: string, code = 129, notifySession = true, keep = false): void {
+  kill(id: string, code = 129, keep = false): void {
     const t = this.term(id);
     if (t.state !== TerminalState.RUNNING) return;
-    const owner = notifySession ? [...this.sessions.values()].find((s) => s.terminalId === id && s.state !== SessionState.CLOSING) : undefined;
-    if (owner) {
-      this.disconnectSession(owner.id, code === 0 ? "exited" : "crashed", code);
-      return;
-    }
     if (t.altScreen) {
       t.altScreen = false;
       t.attach.publish({ event: { case: "output", value: { data: enc.encode("\x1b[?1049l\x1b[?25h") } } });
@@ -1310,9 +1307,7 @@ export class World {
   /** terminal.close / TerminalService.Close: kill, then remove once exited. Only shells, like the daemon. */
   close(id: string): void {
     const t = this.term(id);
-    if (t.labels[LABEL_KIND] !== KIND_SHELL) {
-      throw new CommandError("unavailable", `terminal ${id} is not a shell${t.labels[LABEL_SESSION] ? "; use session.close to end the thread" : ""}`);
-    }
+    if (t.labels[LABEL_KIND] !== KIND_SHELL) throw new CommandError("unavailable", `terminal ${id} is not a shell`);
     this.kill(id);
     if (this.terms.get(id)?.state === TerminalState.EXITED) this.remove(id);
   }
@@ -1365,7 +1360,7 @@ export class World {
     if (args.workspace || args.repos) return this.newWorkspaceSession(args);
     const repo = this.repos.get(args.repo || ctx?.activeRepoId || "") ?? this.worktreeOf(ctx)?.repo;
     if (!repo) throw new CommandError("invalid", "a worktree or repository is required");
-    const view = this.viewOf(args);
+    const first = firstMessageOf(args);
     const prompt = args.prompt ?? "";
     const permission = args.permission ?? "";
     if (permission && !(permission in permissionModes)) throw new CommandError("invalid", `permission must be supervised, accept-edits or auto`);
@@ -1406,24 +1401,10 @@ export class World {
       permissionMode: permissionModes[permission] ?? PermissionMode.UNSPECIFIED,
       baseRef,
       createdWorktree: created,
-      ...view,
+      firstMessage: first,
     });
     this.focusSession(s.id);
     return { message: `created session ${s.id} in ${path}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path }) };
-  }
-
-  /**
-   * session.new's view: its `render` arg, else the sessions.render setting (the daemon's
-   * Create without a mode). A rendered thread gets its prompt as the first message once it
-   * connects.
-   */
-  private viewOf(args: Record<string, string>): Pick<MockSession, "render" | "firstMessage"> {
-    const v = args.render || this.settings.values()["sessions.render"] || "terminal";
-    if (v !== "terminal" && v !== "rendered") throw new CommandError("invalid", "render must be terminal or rendered");
-    if (v === "terminal") return { render: SessionRender.TERMINAL, firstMessage: null };
-    const text = (args.prompt ?? "").trim();
-    const attachments = (args.attachments ?? "").split(",").filter(Boolean);
-    return { render: SessionRender.RENDERED, firstMessage: text || attachments.length > 0 ? { text, attachments, composerText: args["composer-prompt"] ?? "" } : null };
   }
 
   /**
@@ -1437,7 +1418,7 @@ export class World {
     const permission = args.permission ?? "";
     if (args.workspace && created) throw new CommandError("invalid", "a workspace thread runs in an existing member; for a new workspace use new-worktree with repos");
     if (args.repos && !created) throw new CommandError("invalid", "repos only applies with new-worktree");
-    const view = this.viewOf(args);
+    const first = firstMessageOf(args);
     for (const p of (args.attachments ?? "").split(",").filter(Boolean)) {
       if (!this.attachments.has(p)) throw new CommandError("invalid", `attachment ${p} was not staged`);
     }
@@ -1481,7 +1462,7 @@ export class World {
       baseRef,
       createdWorktree: created,
       workspaceId: ws.id,
-      ...view,
+      firstMessage: first,
     });
     this.focusSession(s.id);
     return { message: `created thread ${s.id} in ${member.worktreePath} (workspace ${ws.id})`, resultJson: JSON.stringify({ id: s.id, worktreePath: member.worktreePath, workspaceId: ws.id }) };
@@ -1741,8 +1722,7 @@ export class World {
           }
         }
         const defaults = this.sessionDefaults();
-        // No render arg: the thread gets the sessions.render setting's view, like the daemon's.
-        const s = this.createSession(target.repoId, target.path, args.model ?? defaults.model, args.effort ?? defaults.effort, { render: this.viewOf({}).render });
+        const s = this.createSession(target.repoId, target.path, args.model ?? defaults.model, args.effort ?? defaults.effort);
         this.focusSession(s.id);
         // Like the daemon: the result JSON is the created Session (protojson).
         return {
@@ -1820,7 +1800,7 @@ export class World {
           name: "session.new",
           title: "New Thread",
           category: "Session",
-          description: "Start Claude Code in a worktree (or a new one), with a first prompt; render picks terminal or rendered for the thread's life (default: settings sessions.render)",
+          description: "Start Claude Code in a worktree (or a new one), with a first prompt",
           keybindings: ["cmd+n"],
           args: [
             { name: "repo", type: ArgType.STRING, required: false, description: "Repository id" },
@@ -1835,8 +1815,7 @@ export class World {
             { name: "name", type: ArgType.STRING, required: false, description: "Thread name" },
             { name: "prompt", type: ArgType.STRING, required: false, description: "First prompt" },
             { name: "attachments", type: ArgType.STRING, required: false, description: "Staged attachment paths, comma-separated" },
-            { name: "composer-prompt", type: ArgType.STRING, required: false, description: "A rendered thread: the composer's text of prompt with its tag tokens" },
-            { name: "render", type: ArgType.ENUM, required: false, description: "terminal or rendered (default: settings sessions.render)", enumValues: ["terminal", "rendered"] },
+            { name: "composer-prompt", type: ArgType.STRING, required: false, description: "The composer's text of prompt with its tag tokens" },
           ],
         },
         when: (ctx) => this.worktreeOf(ctx) !== null || Boolean(ctx?.activeRepoId && this.repos.has(ctx.activeRepoId)),
@@ -1860,14 +1839,13 @@ export class World {
         run: (ctx) => {
           const s = activeSession(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
-          // A fork keeps its parent's view (the daemon's rule: a thread's view never changes).
-          const f = this.createSession(s.repoId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, render: s.render, parentId: s.id });
+          const f = this.createSession(s.repoId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, parentId: s.id });
           this.focusSession(f.id);
           return `Forked ${s.name || s.id}`;
         },
       },
       {
-        cmd: { name: "session.reconnect", title: "Reconnect Thread", category: "Session", description: "Resume the session in a new terminal (claude --resume)", keybindings: ["cmd+shift+r"], args: [] },
+        cmd: { name: "session.reconnect", title: "Reconnect Thread", category: "Session", description: "Resume the session in a new claude process (claude --resume)", keybindings: ["cmd+shift+r"], args: [] },
         when: (ctx) => activeSession(ctx)?.state === SessionState.DISCONNECTED,
         run: (ctx) => {
           const s = activeSession(ctx);
@@ -2020,7 +1998,7 @@ export class World {
       {
         // --id defaults to the active terminal, like the daemon (a context-bound arg, so not required in List).
         cmd: { name: "terminal.close", title: "Close Terminal", category: "Terminal", description: "Terminate the terminal's process and remove it once it has exited", keybindings: [], args: [{ name: "id", type: ArgType.STRING, required: false, description: "Terminal id (default: the active terminal)" }] },
-        // Only shells: with a thread selected the active terminal is its Claude terminal.
+        // Only shells, like the daemon.
         when: (ctx) => activeTerm(ctx)?.labels[LABEL_KIND] === KIND_SHELL,
         run: (ctx, args) => {
           const id = args.id || activeTerm(ctx)?.id;
@@ -2397,7 +2375,6 @@ export class World {
             activeWorktreePath: ctx.activeWorktreePath,
             activeView: ctx.activeView,
             activeWorkspaceId: ctx.activeWorkspaceId,
-            activeSessionRendered: ctx.activeSessionRendered,
           }
         : null,
       args,

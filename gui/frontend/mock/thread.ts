@@ -1,11 +1,12 @@
 /**
- * Rendered threads in the mock daemon (docs/notes/rendered-threads-2-gui.md): one scripted
+ * Threads in the mock daemon (docs/notes/rendered-threads-2-gui.md): one scripted
  * conversation, the sketch's "Fix stale PR badge" (docs/sketches/rendered-thread), in the
- * states the sketch shows, plus ThreadService.Watch / Send / Interrupt and the EventService
- * `thread` source (pending requests only, like the daemon since PR 1's review).
+ * states the sketch shows, a short history for each default-world thread (seed), plus
+ * ThreadService.Watch / Send / Interrupt and the EventService `thread` source (pending
+ * requests only, like the daemon since PR 1's review).
  *
  *   POST /__mock/thread?state=permission|question|streaming|idle|parallel|multi[&id=s-r1]
- *        (re)creates the rendered thread in that state; returns { id }. parallel: an Edit
+ *        (re)creates the scripted thread in that state; returns { id }. parallel: an Edit
  *        and a Bash permission pending at once (oldest first); multi: a multi-select question
  *   POST /__mock/thread/delta?id=s-r1&text=…   appends text to the streaming answer
  *   POST /__mock/thread/stream?id=s-r1&text=…  starts a new streaming text item
@@ -40,6 +41,23 @@ import { mcpFixture, type McpStatusInit } from "./mcp";
 export type ThreadEventInit = MessageInitShape<typeof ThreadEventSchema>;
 type ItemInit = MessageInitShape<typeof ThreadItemSchema>;
 type PendingInit = MessageInitShape<typeof ThreadPendingRequestSchema>;
+
+/**
+ * A default-world thread's history (MockThreads.seed): the prompt, Claude's first words
+ * and one Bash call, then by `end`: a finished turn ("done"), a reply still streaming
+ * ("working"), the next Bash call waiting for permission ("permission"), or nothing more
+ * ("cut": the process ended mid-turn).
+ */
+export interface SeedHistory {
+  prompt: string;
+  intro: string;
+  command: string;
+  output: string;
+  /** "done": the closing reply; "working": the streaming start of it; "permission": the command that waits. */
+  reply: string;
+  minutesAgo: number;
+  end: "done" | "working" | "permission" | "cut";
+}
 
 /** The world the threads live in (mock/world.ts implements it). */
 export interface ThreadWorld {
@@ -800,6 +818,47 @@ export class MockThreads {
     this.source({ event: { case: "pending", value: { sessionId: id, seq: BigInt(l.seq), pending: l.pending } } });
   }
 
+  /**
+   * A default-world thread's short history (mock/world.ts reset), so its timeline is not
+   * empty. Leaves the session's status alone (the world's seed sets it); a "permission"
+   * end publishes its pending request on the EventService thread source.
+   */
+  seed(id: string, h: SeedHistory): void {
+    this.logs.delete(id);
+    if (h.end === "working" || h.end === "permission") this.mcp.set(id, mcpFixture());
+    else this.mcp.delete(id);
+    const l = this.log(id);
+    const at = (sec: number) => new Date(Date.now() - h.minutesAgo * 60_000 + sec * 1000);
+    const push = (payload: ItemInit["payload"], over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
+      const x = this.item(id, payload, over);
+      l.items.push(x);
+      return x;
+    };
+    const bash = (command: string, value: { output?: string; status?: ToolCallStatus }, sec: number) => {
+      const toolUseId = `toolu_bash_${id}_${String(l.nextOrdinal)}`;
+      return push({ case: "toolCall", value: { toolUseId, name: "Bash", inputJson: JSON.stringify({ command }), status: ToolCallStatus.DONE, ...value } }, { id: toolUseId, at: at(sec), until: at(sec + 1) });
+    };
+    push({ case: "userMessage", value: { text: h.prompt, attachments: [] } }, { at: at(0) });
+    push({ case: "assistantText", value: { text: h.intro } }, { at: at(5) });
+    bash(h.command, { output: h.output }, 8);
+    if (h.end === "done") {
+      push({ case: "assistantText", value: { text: h.reply } }, { at: at(20) });
+      push({ case: "turnEnd", value: { subtype: "success", durationMs: 21_000n, numTurns: 3, costUsd: 0.21, turnCostUsd: 0.21, stopReason: "end_turn" } }, { at: at(21) });
+    } else if (h.end === "working") {
+      push({ case: "assistantText", value: { text: h.reply } }, { at: at(20), streaming: true });
+    } else if (h.end === "permission") {
+      const call = bash(h.reply, { status: ToolCallStatus.RUNNING }, 20);
+      const use = call.payload?.case === "toolCall" ? call.payload.value : undefined;
+      const perm = push(
+        { case: "permission", value: { requestId: `req-${id}`, toolName: "Bash", displayName: "Bash", toolUseId: use?.toolUseId ?? "", inputJson: use?.inputJson ?? "", description: h.reply, state: ThreadRequestState.PENDING } },
+        { at: at(21) },
+      );
+      l.pending = [{ requestId: `req-${id}`, itemId: perm.id, question: false, toolName: "Bash", summary: `Bash ${h.reply}` }];
+    }
+    l.seq = l.items.length;
+    if (l.pending.length > 0) this.source({ event: { case: "pending", value: { sessionId: id, seq: BigInt(l.seq), pending: l.pending } } });
+  }
+
   /** thread.send: the user message, then a short streamed reply and the turn's end. */
   send(id: string, text: string, attachments: string[], composerText = ""): ItemInit {
     if (!this.world.isConnected(id)) throw new Error(`thread ${id} is not connected; reconnect it first`);
@@ -831,13 +890,14 @@ export class MockThreads {
     when: (ctx: UiContext | undefined) => boolean;
     run: (ctx: UiContext | undefined, args: Record<string, string>) => string;
   }[] {
-    const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeSessionId && (ctx.activeSessionRendered || ctx.activeView === ""));
+    // Every thread (the CLI's context has no view; the GUI's has "session").
+    const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeSessionId);
     // Like the daemon's: an arg with a context default is listed as not required (the GUI
     // does not prompt for it) and filled from the context when omitted.
     const id = { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" };
     const list: ReturnType<MockThreads["commands"]> = [
       {
-        cmd: { name: "thread.send", title: "Send to Thread", category: "Thread", description: "Send a message to a rendered thread", keybindings: [], args: [id, { name: "text", type: ArgType.STRING, required: true, description: "The message" }, { name: "attachments", type: ArgType.STRING, required: false, description: "Comma-separated image paths" }, { name: "composer-text", type: ArgType.STRING, required: false, description: "The composer's text with its tag tokens" }] },
+        cmd: { name: "thread.send", title: "Send to Thread", category: "Thread", description: "Send a message to a thread", keybindings: [], args: [id, { name: "text", type: ArgType.STRING, required: true, description: "The message" }, { name: "attachments", type: ArgType.STRING, required: false, description: "Comma-separated image paths" }, { name: "composer-text", type: ArgType.STRING, required: false, description: "The composer's text with its tag tokens" }] },
         when,
         run: (_ctx, a) => {
           const atts = (a.attachments ?? "").split(",").filter(Boolean);
@@ -847,7 +907,7 @@ export class MockThreads {
         },
       },
       {
-        cmd: { name: "thread.interrupt", title: "Interrupt Thread", category: "Thread", description: "Stop a rendered thread's running turn", keybindings: ["escape"], args: [id] },
+        cmd: { name: "thread.interrupt", title: "Interrupt Thread", category: "Thread", description: "Stop a thread's running turn", keybindings: ["escape"], args: [id] },
         when,
         run: (_ctx, a) => {
           this.calls.push(`interrupt ${a.id ?? ""}`);
@@ -897,7 +957,7 @@ export class MockThreads {
         },
       },
       {
-        cmd: { name: "thread.set-effort", title: "Set Thread Effort", category: "Thread", description: "Change a rendered thread's effort level", keybindings: [], args: [id, { name: "effort", type: ArgType.ENUM, required: true, description: "Effort", enumValues: ["low", "medium", "high", "xhigh", "max"] }] },
+        cmd: { name: "thread.set-effort", title: "Set Thread Effort", category: "Thread", description: "Change a thread's effort level", keybindings: [], args: [id, { name: "effort", type: ArgType.ENUM, required: true, description: "Effort", enumValues: ["low", "medium", "high", "xhigh", "max"] }] },
         when,
         run: (_ctx, a) => {
           this.calls.push(`set-effort ${a.id ?? ""} ${a.effort ?? ""}`);
@@ -906,7 +966,7 @@ export class MockThreads {
         },
       },
       {
-        cmd: { name: "thread.set-model", title: "Set Thread Model", category: "Thread", description: "Switch a rendered thread's model", keybindings: [], args: [id, { name: "model", type: ArgType.STRING, required: true, description: "Model" }] },
+        cmd: { name: "thread.set-model", title: "Set Thread Model", category: "Thread", description: "Switch a thread's model", keybindings: [], args: [id, { name: "model", type: ArgType.STRING, required: true, description: "Model" }] },
         when,
         run: (_ctx, a) => {
           this.calls.push(`set-model ${a.id ?? ""} ${a.model ?? ""}`);
@@ -915,7 +975,7 @@ export class MockThreads {
         },
       },
       {
-        cmd: { name: "thread.set-mode", title: "Set Thread Permissions", category: "Thread", description: "Switch a rendered thread's permission mode", keybindings: [], args: [id, { name: "permission", type: ArgType.ENUM, required: true, description: "supervised, accept-edits or auto", enumValues: ["supervised", "accept-edits", "auto"] }] },
+        cmd: { name: "thread.set-mode", title: "Set Thread Permissions", category: "Thread", description: "Switch a thread's permission mode", keybindings: [], args: [id, { name: "permission", type: ArgType.ENUM, required: true, description: "supervised, accept-edits or auto", enumValues: ["supervised", "accept-edits", "auto"] }] },
         when,
         run: (_ctx, a) => {
           this.calls.push(`set-mode ${a.id ?? ""} ${a.permission ?? ""}`);

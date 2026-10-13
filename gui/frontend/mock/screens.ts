@@ -1,4 +1,4 @@
-/** ANSI content generators for the mock terminals. */
+/** ANSI content generators for the mock shells (prompt, top). */
 
 export const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
@@ -8,65 +8,11 @@ const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
 const BLUE = "\x1b[34m";
 const MAGENTA = "\x1b[35m";
-const CYAN = "\x1b[36m";
 const GRAY = "\x1b[90m";
-const ORANGE = "\x1b[38;5;209m";
 
 export function prompt(cwd: string): string {
   const short = cwd.replace(/^\/Users\/[^/]+/, "~");
   return `${BOLD}${BLUE}${short}${RESET} ${GRAY}on${RESET} ${MAGENTA} main${RESET}\r\n${GREEN}❯${RESET} `;
-}
-
-function box(lines: string[], width: number): string {
-  const inner = Math.max(20, Math.min(width - 4, 64));
-  const top = `${ORANGE}╭${"─".repeat(inner + 2)}╮${RESET}`;
-  const bottom = `${ORANGE}╰${"─".repeat(inner + 2)}╯${RESET}`;
-  const body = lines.map((l) => {
-    // eslint-disable-next-line no-control-regex
-    const visible = l.replace(/\x1b\[[0-9;]*m/g, "");
-    return `${ORANGE}│${RESET} ${l}${" ".repeat(Math.max(0, inner - Array.from(visible).length))} ${ORANGE}│${RESET}`;
-  });
-  return [top, ...body, bottom].join("\r\n");
-}
-
-export function claudeIntro(cwd: string, cols: number, task: string): string {
-  return (
-    box(
-      [
-        `${ORANGE}✻${RESET} ${BOLD}Welcome to Claude Code!${RESET}`,
-        "",
-        `  ${GRAY}/help for help, /status for your current setup${RESET}`,
-        "",
-        `  ${GRAY}cwd: ${cwd}${RESET}`,
-      ],
-      cols,
-    ) +
-    "\r\n\r\n" +
-    `${GRAY}>${RESET} ${task}\r\n\r\n` +
-    `${BOLD}⏺${RESET} I'll start by reading the current implementation.\r\n\r\n` +
-    `${GREEN}⏺${RESET} ${BOLD}Read${RESET}(gui/frontend/src/components/sidebar/Sidebar.tsx)\r\n` +
-    `  ${GRAY}⎿${RESET}  Read ${BOLD}182${RESET} lines\r\n\r\n` +
-    `${GREEN}⏺${RESET} ${BOLD}Update${RESET}(gui/frontend/src/lib/tree.ts)\r\n` +
-    `  ${GRAY}⎿${RESET}  Updated gui/frontend/src/lib/tree.ts with ${GREEN}24 additions${RESET} and ${RED}3 removals${RESET}\r\n\r\n`
-  );
-}
-
-const claudeSteps = [
-  `${GREEN}⏺${RESET} ${BOLD}Bash${RESET}(go test ./internal/store/...)\r\n  ${GRAY}⎿${RESET}  ${GREEN}ok${RESET}  github.com/alexwaumann/code-foundry/internal/store/terminal  0.412s\r\n\r\n`,
-  `${GREEN}⏺${RESET} ${BOLD}Search${RESET}(pattern: "useVirtualizer", path: "gui/frontend/src")\r\n  ${GRAY}⎿${RESET}  Found ${BOLD}2${RESET} files\r\n\r\n`,
-  `${BOLD}⏺${RESET} The tree now flattens into rows; only ${CYAN}visible${RESET} rows render.\r\n\r\n`,
-  `${GREEN}⏺${RESET} ${BOLD}Update${RESET}(gui/frontend/src/components/sidebar/SidebarRow.tsx)\r\n  ${GRAY}⎿${RESET}  Updated with ${GREEN}9 additions${RESET} and ${RED}14 removals${RESET}\r\n\r\n`,
-  `${YELLOW}⏺${RESET} ${BOLD}Bash${RESET}(pnpm run lint)\r\n  ${GRAY}⎿${RESET}  ${YELLOW}warning${RESET}  'rows' is assigned but never used\r\n\r\n`,
-];
-
-const spinner = ["✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳"];
-
-/** One tick of a Claude-like session: rewrite the status line, sometimes append a step. */
-export function claudeTick(n: number): string {
-  const status = `\r\x1b[2K${ORANGE}${spinner[n % spinner.length] ?? "✻"}${RESET} ${ORANGE}Working…${RESET} ${GRAY}(${String(n)}s · esc to interrupt)${RESET}`;
-  if (n % 3 !== 0) return status;
-  const step = claudeSteps[Math.floor(n / 3) % claudeSteps.length] ?? "";
-  return `\r\x1b[2K${step}${status}`;
 }
 
 const procs = ["claude", "code-foundry", "node", "WebKit.WebContent", "gopls", "zsh", "git", "Ghostty", "kernel_task", "launchd", "mds_stores", "WindowServer"];
