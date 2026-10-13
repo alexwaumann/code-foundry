@@ -54,18 +54,6 @@ describe("compose drafts", () => {
     expect(getDraft("repo-cf")).toMatchObject({ alsoIn: [], text: `Use and ${sk("repo-cf")} on then ${sk("")}` });
   });
 
-  it("a view pick belongs to its draft: other drafts, Also in and a new primary leave it", () => {
-    expect(getDraft("repo-cf").render).toBeNull(); // null: the sessions.render setting
-    updateDraft("repo-cf", { render: "rendered" });
-    expect(getDraft("repo-gp").render).toBeNull();
-    expect(getDraft("ws:w-1").render).toBeNull();
-    addAlsoIn("repo-cf", "repo-gp");
-    setPrimary("repo-cf", "repo-gp");
-    removeAlsoIn("repo-cf", "repo-gp");
-    expect(getDraft("repo-cf").render).toBe("rendered");
-    expect(getDraft("repo-gp").render).toBeNull();
-  });
-
   it("a new primary resets the base (its refs differ)", () => {
     updateDraft("ws:w-1", { base: "origin/feat" });
     setPrimary("ws:w-1", "repo-gp");
@@ -93,11 +81,11 @@ describe("switchDraftTarget", () => {
   });
 
   it("moves the draft (images kept, not revoked), deletes the old key, shows the new composer focused", async () => {
-    updateDraft("repo-cf", { text: "hi", attachments: [image("a1")], model: "haiku", render: "rendered", alsoIn: ["repo-gp", "repo-sk"], base: "origin/dev" });
+    updateDraft("repo-cf", { text: "hi", attachments: [image("a1")], model: "haiku", alsoIn: ["repo-gp", "repo-sk"], base: "origin/dev" });
     const seq = useUiStore.getState().composerFocusSeq;
     await expect(switchDraftTarget(cf, gp)).resolves.toBe(true);
     expect(useComposeStore.getState().drafts["repo-cf"]).toBeUndefined();
-    expect(getDraft("repo-gp")).toMatchObject({ text: "hi", model: "haiku", render: "rendered", alsoIn: ["repo-sk"], base: null, worktree: { kind: "new" } });
+    expect(getDraft("repo-gp")).toMatchObject({ text: "hi", model: "haiku", alsoIn: ["repo-sk"], base: null, worktree: { kind: "new" } });
     expect(getDraft("repo-gp").attachments.map((a) => a.url)).toEqual(["blob:a1"]);
     expect(revoke).not.toHaveBeenCalled();
     expect(useUiStore.getState().selection).toEqual({ kind: "compose", repoId: "repo-gp" });
