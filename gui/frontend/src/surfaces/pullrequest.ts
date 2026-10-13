@@ -8,6 +8,7 @@ import { useReposStore } from "@/stores/repos";
 import { useSessionsStore } from "@/stores/sessions";
 import type { Selection } from "@/stores/ui";
 import { PULL_REQUEST_KIND, prRefOfTab, pullRequestTab, selectionBranch, selectionPullRequest, type PrRef } from "./pullrequestTarget";
+import { noProjectNow } from "./noProject";
 import type { SurfaceSpec } from "./types";
 
 const noop = (): void => undefined;
@@ -26,14 +27,16 @@ function currentPullRequest(sel: Selection): PrRef | null {
  * Pull request: the selection's pull request (a session's or worktree's
  * branch; a repo row's main worktree). Enabled when that branch has one; disabled
  * otherwise, including on the Pull Requests page, whose rows open a pull request
- * explicitly (openSurface with pullRequestTab). Tabs: params { slug, number }, title #N.
+ * explicitly (openSurface with pullRequestTab). Hidden for a thread without a project,
+ * which has no branch (a pull request it linked opens from Linked PRs). Tabs: params
+ * { slug, number }, title #N.
  */
 export const pullRequestSurface: SurfaceSpec = {
   kind: PULL_REQUEST_KIND,
   title: "Pull request",
   icon: GitPullRequest,
   hotkey: "p",
-  available: (ctx) => (currentPullRequest(ctx.selection) ? "enabled" : "disabled"),
+  available: (ctx) => (noProjectNow(ctx.selection) ? "hidden" : currentPullRequest(ctx.selection) ? "enabled" : "disabled"),
   watches: [useReposStore, useSessionsStore, branchPullRequestsResource.store],
   // Keeps the selection's branch pull requests loaded while its panel shows, so the
   // empty list and the P hotkey know whether there is one. Follows a branch switch.

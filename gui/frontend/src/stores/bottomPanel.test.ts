@@ -111,6 +111,13 @@ describe("bottomTabTitle", () => {
   it.each(cases)("%s", (_name, extra, key, want) => {
     expect(bottomTabTitle(term("t", shell("s1"), extra), key)).toBe(want);
   });
+  it.each([
+    ["a shell in the thread's home: No project", { cwd: "/Users/dev", labels: { kind: "shell", session: "s1", repo: "", worktree: "/Users/dev" } }, "No project"],
+    ["one elsewhere: its folder", { cwd: "/Users/dev/notes", labels: { kind: "shell", session: "s1", repo: "", worktree: "/Users/dev" } }, "notes"],
+    ["its own title wins", { title: "htop", cwd: "/Users/dev", labels: { kind: "shell", session: "s1", repo: "", worktree: "/Users/dev" } }, "htop"],
+  ] as [string, Partial<TerminalView>, string][])("a thread without a project: %s", (_name, extra, want) => {
+    expect(bottomTabTitle(term("t", {}, extra), "session:s1", true)).toBe(want);
+  });
 });
 
 describe("bottomTabTitles (duplicates numbered)", () => {
