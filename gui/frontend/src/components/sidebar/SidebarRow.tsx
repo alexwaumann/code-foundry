@@ -7,7 +7,7 @@ import { Chip } from "@/components/session/Chip";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
-import { sessionBadge } from "@/lib/session";
+import { sessionBadge, shortAge } from "@/lib/session";
 import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLine, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
 import { modelLabel, threadRowModel, type RepoLookup, type WorkspaceLookup } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
@@ -339,33 +339,36 @@ function ThreadTooltip({ id, children }: { id: string; children: ReactElement })
 }
 
 /**
- * The Working section's header (design record: /tmp/working-header/index.html?v=2): an
- * 11px uppercase muted label, the number of working threads after it, and a chevron on the
- * right saying whether the section is open. A button (aria-expanded) inside the row; the
- * row itself is role="presentation", so the listbox's cursor never lands on it. Pressing it
- * with the mouse does not take focus from the list.
+ * A footer's header, Working or Archived (design record: /tmp/working-header/index.html?v=2):
+ * an 11px uppercase muted label, the number of threads in the section after it, and a
+ * chevron on the right saying whether the section is open. A button (aria-expanded) inside
+ * the row; the row itself is role="presentation", so the listbox's cursor never lands on
+ * it. Pressing it with the mouse does not take focus from the list. Test ids
+ * `<section>-header`, `-label`, `-count`.
  */
-function WorkingHeader({ row }: { row: HeaderRow }) {
+function SectionHeader({ row }: { row: HeaderRow }) {
   const Chevron = row.collapsed ? ChevronRight : ChevronDown;
   return (
     <div id={`row-${row.key}`} role="presentation" data-row-kind="header" data-row-key={row.key} data-section={row.section} className="flex h-full items-end select-none">
       <button
         type="button"
         aria-expanded={!row.collapsed}
-        data-testid="working-header"
+        data-testid={`${row.section}-header`}
         className="flex h-[22px] w-full min-w-0 cursor-default items-center gap-1.5 rounded-md px-2 text-muted-foreground outline-none hover:bg-sidebar-accent/50 focus-visible:ring-1 focus-visible:ring-sidebar-ring"
         onMouseDown={(e) => {
           e.preventDefault();
         }}
         onClick={() => {
-          useUiStore.getState().toggleWorkingCollapsed();
+          const ui = useUiStore.getState();
+          if (row.section === "archived") ui.toggleArchivedCollapsed();
+          else ui.toggleWorkingCollapsed();
         }}
       >
-        <span className="truncate text-[11px] font-medium tracking-wider uppercase" data-testid="working-label">
+        <span className="truncate text-[11px] font-medium tracking-wider uppercase" data-testid={`${row.section}-label`}>
           {row.label}
         </span>
         {/* A flex container drops this space visually; it keeps the text and name "Working 2". */}{" "}
-        <span className="shrink-0 text-[11px] tabular-nums opacity-70" data-testid="working-count">
+        <span className="shrink-0 text-[11px] tabular-nums opacity-70" data-testid={`${row.section}-count`}>
           {row.count}
         </span>
         <Chevron className="ml-auto size-3 shrink-0" aria-hidden />
@@ -374,8 +377,44 @@ function WorkingHeader({ row }: { row: HeaderRow }) {
   );
 }
 
+/** How long ago the thread was archived ("5m", "3h", "2d"), on the shared 30 s clock. */
+function ArchivedAge({ id }: { id: string }) {
+  const at = useSessionsStore((s) => s.byId[id]?.archivedAtMs ?? null);
+  const now = useNow(30_000);
+  if (at === null) return null;
+  return (
+    <span className="ml-auto shrink-0 pl-1 text-[11px] text-muted-foreground tabular-nums" data-testid="row-archived-age">
+      {shortAge(at, now)}
+    </span>
+  );
+}
+
+/**
+ * An archived thread's single line: the name (the id, muted, while unnamed) and, on the
+ * right, how long ago it was archived. No status line, badges or pin (an archived thread is
+ * disconnected and unpinned), and not dimmed: the whole section is archived threads.
+ */
+function ArchivedLabel({ id }: { id: string }) {
+  const name = useSessionsStore((s) => s.byId[id]?.name ?? "");
+  const renaming = useUiStore((s) => s.renamingSessionId === id);
+  return (
+    <span className="flex min-w-0 flex-1 items-center gap-1.5" data-testid="session-body" data-archived>
+      {renaming ? (
+        <RenameField id={id} name={name} />
+      ) : (
+        <>
+          <span className={cn("truncate", !name && "text-muted-foreground")} data-testid="session-name">
+            {name || id}
+          </span>
+          <ArchivedAge id={id} />
+        </>
+      )}
+    </span>
+  );
+}
+
 export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onActivate }: RowProps) {
-  if (row.kind === "header") return <WorkingHeader row={row} />;
+  if (row.kind === "header") return <SectionHeader row={row} />;
   return (
     <ThreadTooltip id={row.sessionId}>
       <div
@@ -398,7 +437,7 @@ export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onAc
           useUiStore.getState().setRenaming(row.sessionId);
         }}
       >
-        <SessionLabel id={row.sessionId} />
+        {row.section === "archived" ? <ArchivedLabel id={row.sessionId} /> : <SessionLabel id={row.sessionId} />}
       </div>
     </ThreadTooltip>
   );

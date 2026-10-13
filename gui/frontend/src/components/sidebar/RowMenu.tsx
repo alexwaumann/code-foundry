@@ -1,5 +1,5 @@
 import { useShallow } from "zustand/react/shallow";
-import { ArrowRightLeft, FolderGit2, GitFork, Pencil, Pin, PinOff, Plug, Power, SquareTerminal, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowRightLeft, FolderGit2, GitFork, Pencil, Pin, PinOff, Plug, Power, SquareTerminal, Trash2 } from "lucide-react";
 import {
   ContextMenuContent,
   ContextMenuItem,
@@ -13,7 +13,7 @@ import { beginRename } from "@/keys/bindings";
 import { worktreeBranch } from "@/lib/threadRow";
 import { newThreadTerminal } from "@/stores/bottomActions";
 import { useReposStore } from "@/stores/repos";
-import { closeSession, forkSession, pinSession, reconnectSession, removeSession, runSessionIn } from "@/stores/sessionActions";
+import { archiveSession, closeSession, forkSession, pinSession, reconnectSession, removeSession, runSessionIn } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
@@ -69,6 +69,7 @@ function RunInMenu({ sessionId, workspaceId }: { sessionId: string; workspaceId:
 /** The context menu of a thread row. Every item is a registry command (or the inline rename that commits one). */
 export function RowMenu({ id }: { id: string }) {
   const pinned = useSessionsStore((s) => s.byId[id]?.pinned ?? false);
+  const archived = useSessionsStore((s) => (s.byId[id]?.archivedAtMs ?? null) !== null);
   const state = useSessionsStore((s) => s.byId[id]?.state ?? "unknown");
   const workspaceId = useSessionsStore((s) => s.byId[id]?.workspaceId ?? "");
   return (
@@ -96,6 +97,15 @@ export function RowMenu({ id }: { id: string }) {
       >
         {pinned ? <PinOff /> : <Pin />}
         {pinned ? "Unpin" : "Pin"}
+      </ContextMenuItem>
+      <ContextMenuItem
+        data-testid="menu-archive"
+        onSelect={() => {
+          void archiveSession(id, !archived);
+        }}
+      >
+        {archived ? <ArchiveRestore /> : <Archive />}
+        {archived ? "Unarchive" : "Archive"}
       </ContextMenuItem>
       {workspaceId && <RunInMenu sessionId={id} workspaceId={workspaceId} />}
       <ContextMenuSeparator />

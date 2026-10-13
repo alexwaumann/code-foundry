@@ -48,3 +48,42 @@ describe("SidebarRow line 2", () => {
     expect(screen.getByTestId("row-branch").className).toContain("font-mono");
   });
 });
+
+describe("SidebarRow archived", () => {
+  function renderArchived(o: Partial<SessionView>): HTMLElement {
+    useSessionsStore.setState({ byId: { "s-1": thread({ state: "disconnected", status: "attention", statusReason: "finished", ...o }) }, order: ["s-1"] });
+    render(
+      <TooltipProvider>
+        <SidebarRow row={{ key: "s:s-1", kind: "session", section: "archived", sessionId: "s-1" }} selected={false} cursor={false} onActivate={() => undefined} />
+      </TooltipProvider>,
+    );
+    return screen.getByRole("option");
+  }
+
+  it("one line: the name and the age of the archive, no status line, not dimmed", () => {
+    const row = renderArchived({ name: "Old work", archivedAtMs: Date.now() - 3 * 3_600_000 - 60_000 });
+    expect(row.textContent).toBe("Old work3h");
+    expect(screen.queryByTestId("row-place")).toBeNull();
+    expect(screen.getByTestId("row-archived-age").className).toContain("tabular-nums");
+    expect(screen.getByTestId("session-body").getAttribute("data-offline")).toBeNull();
+  });
+
+  it("an unnamed thread shows its id, muted", () => {
+    renderArchived({ name: "", archivedAtMs: Date.now() });
+    expect(screen.getByTestId("session-name").textContent).toBe("s-1");
+    expect(screen.getByTestId("session-name").className).toContain("text-muted-foreground");
+    expect(screen.getByTestId("row-archived-age").textContent).toBe("0m");
+  });
+});
+
+describe("SidebarRow footer headers", () => {
+  it.each([
+    ["working", "Working", 2],
+    ["archived", "Archived", 5],
+  ] as const)("%s: label and count, a toggle button", (section, label, count) => {
+    render(<SidebarRow row={{ key: `h:${section}`, kind: "header", section, label, count, collapsed: section === "archived" }} selected={false} cursor={false} onActivate={() => undefined} />);
+    const button = screen.getByTestId(`${section}-header`);
+    expect(button.textContent).toBe(`${label} ${String(count)}`);
+    expect(button.getAttribute("aria-expanded")).toBe(section === "archived" ? "false" : "true");
+  });
+});
