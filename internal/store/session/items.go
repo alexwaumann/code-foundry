@@ -226,6 +226,9 @@ type ItemsSnapshot struct {
 	// Mcp is the thread's MCP servers as last checked (mcp.go); nil when not checked
 	// since the process started, or when it is not running.
 	Mcp *McpStatus
+	// Commands are the slash commands the running thread offers (slashcommands.go);
+	// nil when it is not running or has not answered the handshake.
+	Commands []SlashCommand
 }
 
 // Message is a user turn for Store.Send.
@@ -355,6 +358,8 @@ type threadLog struct {
 	byID    map[string]int
 	nextOrd int64
 	mcp     mcpState
+	// commands: the running process's slash commands (slashcommands.go).
+	commands []SlashCommand
 }
 
 func newThreadLog(id string, b *bus.Bus, now func() time.Time, items []Item) *threadLog {
@@ -372,7 +377,7 @@ func newThreadLog(id string, b *bus.Bus, now func() time.Time, items []Item) *th
 func (t *threadLog) snapshot() ItemsSnapshot {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return ItemsSnapshot{SessionID: t.id, Seq: t.seq, Items: slices.Clone(t.items), Pending: pendingOf(t.items), Mcp: t.mcp.status}
+	return ItemsSnapshot{SessionID: t.id, Seq: t.seq, Items: slices.Clone(t.items), Pending: pendingOf(t.items), Mcp: t.mcp.status, Commands: t.commands}
 }
 
 // get returns the item with id.

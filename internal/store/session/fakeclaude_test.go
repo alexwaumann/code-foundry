@@ -34,6 +34,10 @@ import (
 // server's entry from the last reply when it changed there, else answers with the
 // server's error (or "Server not found"). Without it mcp_status answers no servers.
 //
+// Slash commands: CF_FAKE_CLAUDE_COMMANDS names a capture like
+// claudestream/testdata/commands.jsonl; initialize answers with its initialize reply's
+// commands (fakeInitCommands). Without it initialize lists none.
+//
 // Knobs for the effort restart's tests: CF_FAKE_CLAUDE_EXIT_DELAY (a duration) keeps
 // the process alive that long after stdin closes; CF_FAKE_CLAUDE_RESUME_EXIT (a code)
 // makes a process started with --resume print to stderr and exit with it at once.
@@ -140,6 +144,11 @@ func fakeStreamClaude(fixture string) int {
 		fmt.Fprintln(os.Stderr, "fake claude:", err)
 		return 2
 	}
+	commands, err := fakeInitCommands(os.Getenv("CF_FAKE_CLAUDE_COMMANDS"))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "fake claude:", err)
+		return 2
+	}
 	var outMu sync.Mutex
 	write := func(line string) {
 		outMu.Lock()
@@ -174,7 +183,7 @@ func fakeStreamClaude(fixture string) int {
 			resp := map[string]any{"subtype": "success", "request_id": m.RequestID}
 			switch m.Request["subtype"] {
 			case "initialize":
-				resp["response"] = map[string]any{"pid": os.Getpid(), "current_permission_mode": "default"}
+				resp["response"] = map[string]any{"pid": os.Getpid(), "current_permission_mode": "default", "commands": commands}
 			case "set_cwd":
 				resp["response"] = map[string]any{"status": "ok", "cwd": m.Request["path"], "changed": true}
 			case "mcp_status":

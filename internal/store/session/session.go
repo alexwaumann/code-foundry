@@ -352,4 +352,8 @@ type Store interface {
 	// checks the servers again. Claude refusing the attempt (the server still fails) is
 	// the result's Error, not an error; an unknown server is ErrNotFound.
 	McpReconnect(ctx context.Context, id, server string) (McpReconnectResult, error)
+	// SlashCommands returns the slash commands a running thread offers: Claude's list
+	// minus the deny table, kept current as Claude pushes changes (slashcommands.go).
+	// nil when it is not running.
+	SlashCommands(ctx context.Context, id string) ([]SlashCommand, error)
 }
