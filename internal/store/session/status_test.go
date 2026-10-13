@@ -2,6 +2,8 @@ package session
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -47,63 +49,81 @@ func TestSetStatusStampsOnlyChanges(t *testing.T) {
 	}
 }
 
+// hangFixture is a capture whose turn never ends: a thread sent a message stays busy.
+func hangFixture(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "hang.jsonl")
+	if err := os.WriteFile(path, []byte(`{"type":"rate_limit_event","rate_limit_info":{"status":"allowed"}}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// statusSetup starts a thread and waits until it shows a status.
+type statusSetup struct {
+	fixture string // a capture name, or "" for hangFixture
+	prompt  string
+	st      Status
+	reason  string
+}
+
+var (
+	busySetup       = statusSetup{prompt: "go", st: StatusBusy, reason: "working"}
+	questionSetup   = statusSetup{fixture: "ask", prompt: "ask me", st: StatusNeedsAttention, reason: "question: Which color do you prefer?"}
+	permissionSetup = statusSetup{fixture: "write-allow", prompt: "write", st: StatusNeedsAttention, reason: "permission: Write hello.txt"}
+	idleSetup       = statusSetup{fixture: "text-table", st: StatusIdle, reason: "at prompt"}
+	finishedSetup   = statusSetup{fixture: "text-table", prompt: "a table", st: StatusNeedsAttention, reason: "finished"}
+)
+
+func (ss statusSetup) start(t *testing.T) (*env, Session) {
+	t.Helper()
+	path := hangFixture(t)
+	if ss.fixture != "" {
+		path = fixturePath(ss.fixture)
+	}
+	e := newFixtureEnvAt(t, path, nil)
+	s := e.create(CreateOptions{InitialPrompt: ss.prompt})
+	s = e.waitFor(s.ID, "status published", func(s Session) bool {
+		return s.State == StateConnected && s.Status == ss.st && s.StatusReason == ss.reason
+	})
+	return e, s
+}
+
 // TestStatusSurvivesDisconnect covers every way a live process ends: the session keeps
-// the status it had (busy becomes interrupted), persisted.
+// the status it had, persisted. A turn that was running is interrupted, and so is one
+// waiting on a request: the request dies with the process.
 func TestStatusSurvivesDisconnect(t *testing.T) {
 	type end func(e *env, s Session)
 	exit := func(code int) end {
-		return func(e *env, s Session) {
-			_ = e.terms.Exit(s.TerminalID, code)
-		}
+		return func(e *env, s Session) { e.exit(s.ID, code) }
 	}
 	closeIt := func(e *env, s Session) {
-		done := make(chan error, 1)
-		go func() { done <- e.m.Close(context.Background(), s.ID) }()
-		e.waitWritten(s.TerminalID, keyEscape)
-		// The close sequence's Escape interrupts the turn: by the time the process
-		// exits the detector says idle. The status when the close began wins.
-		e.det.set(StatusIdle, "at prompt")
-		_ = e.terms.Exit(s.TerminalID, 0)
-		if err := <-done; err != nil {
+		if err := e.m.Close(context.Background(), s.ID); err != nil {
 			e.t.Fatal(err)
 		}
 	}
-	shutdown := func(e *env, s Session) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := e.m.Shutdown(ctx); err != nil {
-			e.t.Fatal(err)
-		}
-		e.open()
-	}
+	shutdown := func(e *env, _ Session) { e.restart() }
 	tests := []struct {
 		name       string
-		st         Status
-		reason     string
+		setup      statusSetup
 		end        end
 		wantDisc   string
 		want       Status
 		wantReason string
 	}{
-		{"exit while busy", StatusBusy, "working", exit(0), ReasonExited, StatusError, ReasonInterrupted},
-		{"crash while busy", StatusBusy, "running Bash", exit(1), ReasonCrashed, StatusError, ReasonInterrupted},
-		{"crash at a question", StatusNeedsAttention, "question: Which color do you prefer?", exit(1), ReasonCrashed,
-			StatusNeedsAttention, "question: Which color do you prefer?"},
-		{"exit idle", StatusIdle, "at prompt", exit(0), ReasonExited, StatusIdle, "at prompt"},
-		{"closed while busy", StatusBusy, "working", closeIt, ReasonClosed, StatusError, ReasonInterrupted},
-		{"closed at a permission prompt", StatusNeedsAttention, "permission: Do you want to proceed?", closeIt, ReasonClosed,
-			StatusNeedsAttention, "permission: Do you want to proceed?"},
-		{"daemon stopped while busy", StatusBusy, "working", shutdown, ReasonDaemonStopped, StatusError, ReasonInterrupted},
-		{"daemon stopped at a permission prompt", StatusNeedsAttention, "permission: Do you want to proceed?", shutdown, ReasonDaemonStopped,
-			StatusNeedsAttention, "permission: Do you want to proceed?"},
+		{"exit while busy", busySetup, exit(0), ReasonExited, StatusError, ReasonInterrupted},
+		{"crash while busy", busySetup, exit(1), ReasonCrashed, StatusError, ReasonInterrupted},
+		{"crash at a question", questionSetup, exit(1), ReasonCrashed, StatusError, ReasonInterrupted},
+		{"exit idle", idleSetup, exit(0), ReasonExited, StatusIdle, "at prompt"},
+		{"exit after an unseen turn", finishedSetup, exit(0), ReasonExited, StatusNeedsAttention, "finished"},
+		{"closed while busy", busySetup, closeIt, ReasonClosed, StatusError, ReasonInterrupted},
+		{"closed at a permission prompt", permissionSetup, closeIt, ReasonClosed, StatusError, ReasonInterrupted},
+		{"daemon stopped while busy", busySetup, shutdown, ReasonDaemonStopped, StatusError, ReasonInterrupted},
+		{"daemon stopped after an unseen turn", finishedSetup, shutdown, ReasonDaemonStopped, StatusNeedsAttention, "finished"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := newEnv(t)
-			s := e.connected(CreateOptions{})
-			e.det.set(tt.st, tt.reason)
-			_ = e.terms.Emit(s.TerminalID, []byte("x"))
-			e.waitFor(s.ID, "status published", func(s Session) bool { return s.Status == tt.st && s.StatusReason == tt.reason })
+			e, s := tt.setup.start(t)
 			before := time.Now()
 			tt.end(e, s)
 			got := e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
@@ -111,7 +131,7 @@ func TestStatusSurvivesDisconnect(t *testing.T) {
 				t.Errorf("after %s: disconnect %q, status %v %q; want %q, %v %q", tt.name, got.DisconnectReason,
 					got.Status, got.StatusReason, tt.wantDisc, tt.want, tt.wantReason)
 			}
-			if tt.want != tt.st && got.StatusChangedAt.Before(before.Truncate(time.Millisecond)) {
+			if tt.want != tt.setup.st && got.StatusChangedAt.Before(before.Truncate(time.Millisecond)) {
 				t.Errorf("StatusChangedAt %v not restamped (end began %v)", got.StatusChangedAt, before)
 			}
 			// Persisted: the row reads back the same.
@@ -131,23 +151,18 @@ func TestStatusSurvivesDisconnect(t *testing.T) {
 func TestStatusAfterDaemonCrash(t *testing.T) {
 	tests := []struct {
 		name       string
-		st         Status
-		reason     string
+		setup      statusSetup
 		want       Status
 		wantReason string
 	}{
-		{"busy", StatusBusy, "working", StatusError, ReasonInterrupted},
-		{"question", StatusNeedsAttention, "question: Which color do you prefer?", StatusNeedsAttention, "question: Which color do you prefer?"},
+		{"busy", busySetup, StatusError, ReasonInterrupted},
+		{"question", questionSetup, StatusNeedsAttention, "question: Which color do you prefer?"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := newEnv(t)
-			s := e.connected(CreateOptions{})
-			e.det.set(tt.st, tt.reason)
-			_ = e.terms.Emit(s.TerminalID, []byte("x"))
-			e.waitFor(s.ID, "status published", func(s Session) bool { return s.Status == tt.st })
+			e, s := tt.setup.start(t)
 			rows, err := loadSessions(context.Background(), e.m.opts.DB)
-			if err != nil || len(rows) != 1 || rows[0].Status != tt.st || rows[0].StatusReason != tt.reason || rows[0].StatusChangedAt.IsZero() {
+			if err != nil || len(rows) != 1 || rows[0].Status != tt.setup.st || rows[0].StatusReason != tt.setup.reason || rows[0].StatusChangedAt.IsZero() {
 				t.Fatalf("published status not persisted: %+v, %v", rows, err)
 			}
 			// What a crash leaves behind: the live row as last persisted.
@@ -169,17 +184,12 @@ func TestStatusAfterDaemonCrash(t *testing.T) {
 	}
 }
 
-// TestReconnectHandsStatusToTheDetector: the persisted status is cleared on reconnect;
-// the new detector's first reading replaces it.
-func TestReconnectHandsStatusToTheDetector(t *testing.T) {
-	e := newEnv(t)
-	s := e.connected(CreateOptions{})
-	e.det.set(StatusNeedsAttention, "question: Which color do you prefer?")
-	_ = e.terms.Emit(s.TerminalID, []byte("x"))
-	e.waitFor(s.ID, "question", func(s Session) bool { return s.Status == StatusNeedsAttention })
-	_ = e.terms.Exit(s.TerminalID, 1)
+// TestReconnectResetsTheStatus: the persisted status is cleared on reconnect; the new
+// process's stream replaces it.
+func TestReconnectResetsTheStatus(t *testing.T) {
+	e, s := questionSetup.start(t)
+	e.exit(s.ID, 1)
 	e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
-	e.det.set(StatusUnknown, "")
 	r, err := e.m.Reconnect(e.ctx(), s.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -187,7 +197,5 @@ func TestReconnectHandsStatusToTheDetector(t *testing.T) {
 	if r.Status != StatusUnknown || r.StatusReason != "" {
 		t.Errorf("reconnected status = %v %q, want unknown", r.Status, r.StatusReason)
 	}
-	e.det.set(StatusIdle, "at prompt")
-	_ = e.terms.SetAltScreen(r.TerminalID, true)
-	e.waitFor(s.ID, "detector reading", func(s Session) bool { return s.Status == StatusIdle && s.StatusReason == "at prompt" })
+	e.waitFor(s.ID, "the stream's reading", func(s Session) bool { return s.Status == StatusIdle && s.StatusReason == "at prompt" })
 }

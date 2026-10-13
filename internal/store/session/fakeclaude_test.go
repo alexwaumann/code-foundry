@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -21,7 +23,11 @@ import (
 // and including a result), stopping at each can_use_tool until the daemon answers.
 // Everything the daemon writes to stdin is appended to CF_FAKE_CLAUDE_LOG (and to
 // CF_FAKE_CLAUDE_LOG.<pid>, this process's own), and argv to CF_FAKE_CLAUDE_ARGV (and
-// CF_FAKE_CLAUDE_ARGV.<pid>).
+// CF_FAKE_CLAUDE_ARGV.<pid>). CF_FAKE_CLAUDE_SPAWN names a directory where each process
+// writes <pid>.json: its argv, working directory and environment (fakeSpawn).
+//
+// Signals end the process the way Claude ends on its own: SIGUSR1 exits 0 (/exit),
+// SIGUSR2 exits 1 (a crash), each after a stderr line.
 //
 // MCP: CF_FAKE_CLAUDE_MCP names a capture like claudestream/testdata/mcp.jsonl; mcp_status
 // answers with its first mcp_status reply, and mcp_reconnect of a server takes that
@@ -81,12 +87,38 @@ func fakeTurns(path string) ([][]string, error) {
 	return turns, nil
 }
 
+// fakeSpawn is what a fake claude process recorded about itself (CF_FAKE_CLAUDE_SPAWN).
+type fakeSpawn struct {
+	Argv []string `json:"argv"`
+	Cwd  string   `json:"cwd"`
+	Env  []string `json:"env"`
+}
+
 func fakeStreamClaude(fixture string) int {
 	pid := strconv.Itoa(os.Getpid())
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGUSR1, syscall.SIGUSR2)
+	go func() {
+		code := 0
+		if <-sigs == syscall.SIGUSR2 {
+			code = 1
+		}
+		fmt.Fprintf(os.Stderr, "fake claude: exit %d\n", code)
+		os.Exit(code)
+	}()
 	if p := os.Getenv("CF_FAKE_CLAUDE_ARGV"); p != "" {
 		b, _ := json.Marshal(os.Args)
 		_ = os.WriteFile(p, b, 0o600)
 		_ = os.WriteFile(p+"."+pid, b, 0o600)
+	}
+	if dir := os.Getenv("CF_FAKE_CLAUDE_SPAWN"); dir != "" {
+		cwd, _ := os.Getwd()
+		b, _ := json.Marshal(fakeSpawn{Argv: os.Args, Cwd: cwd, Env: os.Environ()})
+		// Written whole, then renamed: a reader never sees a partial record.
+		tmp := filepath.Join(dir, pid+".tmp")
+		if os.WriteFile(tmp, b, 0o600) == nil {
+			_ = os.Rename(tmp, filepath.Join(dir, pid+".json"))
+		}
 	}
 	if code := os.Getenv("CF_FAKE_CLAUDE_RESUME_EXIT"); code != "" && slices.Contains(os.Args, "--resume") {
 		fmt.Fprintln(os.Stderr, "fake claude: cannot resume")

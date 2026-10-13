@@ -126,7 +126,7 @@ func mcpFixture() string {
 	return p
 }
 
-func (re *renderedEnv) waitMcp(id, what string, cond func(*McpStatus) bool) *McpStatus {
+func (re *env) waitMcp(id, what string, cond func(*McpStatus) bool) *McpStatus {
 	re.t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for {
@@ -153,10 +153,10 @@ func serverOf(t *testing.T, s *McpStatus, name string) McpServer {
 // system/init makes the runner ask mcp_status; the answer is cached on the thread
 // (ItemsSnapshot.Mcp) and published as McpChanged in the thread's seq order.
 func TestRenderedMcpOnInit(t *testing.T) {
-	re := newRenderedEnvAt(t, fixturePath("text-table"), "CF_FAKE_CLAUDE_MCP="+mcpFixture())
+	re := newFixtureEnvAt(t, fixturePath("text-table"), []string{"CF_FAKE_CLAUDE_MCP=" + mcpFixture()})
 	sub := bus.Subscribe[ThreadEvent](re.bus, 1024)
 	defer sub.Close()
-	s := re.create(CreateOptions{Render: RenderRendered, InitialPrompt: "a table please"})
+	s := re.create(CreateOptions{InitialPrompt: "a table please"})
 	re.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
 	got := re.waitMcp(s.ID, "after init", func(m *McpStatus) bool { return m != nil })
 	if got.Trigger != McpTriggerTurn || got.CheckedAt.IsZero() || len(got.Servers) != 5 || got.Connected() != 1 {
@@ -221,8 +221,8 @@ func TestRenderedMcpOnInit(t *testing.T) {
 }
 
 func TestRenderedMcpReconnect(t *testing.T) {
-	re := newRenderedEnvAt(t, fixturePath("text-table"), "CF_FAKE_CLAUDE_MCP="+mcpFixture())
-	s := re.create(CreateOptions{Render: RenderRendered})
+	re := newFixtureEnvAt(t, fixturePath("text-table"), []string{"CF_FAKE_CLAUDE_MCP=" + mcpFixture()})
+	s := re.create(CreateOptions{})
 	re.waitFor(s.ID, "idle", func(s Session) bool { return s.State == StateConnected && s.Status == StatusIdle })
 
 	// No turn yet: the first read asks.
@@ -276,13 +276,12 @@ func TestRenderedMcpReconnect(t *testing.T) {
 		})
 	}
 
-	// A terminal thread has no MCP surface.
-	term := re.create(CreateOptions{Render: RenderTerminal})
-	if _, err := re.m.McpStatus(re.ctx(), term.ID, false); !errors.Is(err, ErrFailedPrecondition) {
-		t.Errorf("terminal status: %v", err)
+	// An unknown thread has no MCP surface.
+	if _, err := re.m.McpStatus(re.ctx(), "s-nope", false); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown thread status: %v", err)
 	}
-	if _, err := re.m.McpReconnect(re.ctx(), term.ID, "x"); !errors.Is(err, ErrFailedPrecondition) {
-		t.Errorf("terminal reconnect: %v", err)
+	if _, err := re.m.McpReconnect(re.ctx(), "s-nope", "x"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown thread reconnect: %v", err)
 	}
 }
 

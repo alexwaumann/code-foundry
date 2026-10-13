@@ -7,6 +7,7 @@ package workspacetest
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -27,6 +28,9 @@ type Fake struct {
 	Repos func() *repo.Snapshot
 	// WorktreeRoot is where member worktrees "are": <root>/<repo>/<branch, / -> ->.
 	WorktreeRoot string
+	// MakeDirs makes Create create the member worktrees' directories, for callers that
+	// start processes in them.
+	MakeDirs bool
 	// Err, when set, is returned by every mutating method.
 	Err error
 	// Now is the clock for CreatedAt.
@@ -127,6 +131,11 @@ func (f *Fake) Create(_ context.Context, o workspace.CreateOptions) (workspace.W
 	}
 	for _, m := range o.Members {
 		w.Members = append(w.Members, workspace.Member{RepoID: m.Repo, WorktreePath: f.path(m.Repo, w.Branch)})
+		if f.MakeDirs {
+			if err := os.MkdirAll(w.Members[len(w.Members)-1].WorktreePath, 0o755); err != nil {
+				return workspace.Workspace{}, err
+			}
+		}
 	}
 	f.putLocked(w)
 	return w, nil

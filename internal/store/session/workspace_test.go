@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
-	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace/workspacetest"
 )
@@ -63,10 +62,16 @@ type wsEnv struct {
 
 func newWSEnv(t *testing.T, mutate ...func(*Options)) *wsEnv {
 	t.Helper()
+	return newWSFixtureEnv(t, "text-table", mutate...)
+}
+
+// newWSFixtureEnv is newWSEnv whose fake replays the capture fixture.
+func newWSFixtureEnv(t *testing.T, fixture string, mutate ...func(*Options)) *wsEnv {
+	t.Helper()
 	ws := workspacetest.New(nil)
-	ws.WorktreeRoot = t.TempDir()
+	ws.WorktreeRoot, ws.MakeDirs = t.TempDir(), true
 	we := &wsEnv{ws: ws, withSource: func(o *Options) { o.Workspaces = ws }}
-	we.env = newEnv(t, append([]func(*Options){we.withSource}, mutate...)...)
+	we.env = newFixtureEnv(t, fixture, append([]func(*Options){we.withSource}, mutate...)...)
 	we.wt2 = filepath.Join(t.TempDir(), "api")
 	if err := os.MkdirAll(we.wt2, 0o755); err != nil {
 		t.Fatal(err)
@@ -108,7 +113,7 @@ func TestCreateInWorkspace(t *testing.T) {
 			if s.WorkspaceID != "w-login" || s.RepoID != tt.wantRepo || s.WorktreePath != tt.wantPath() {
 				t.Errorf("session = %+v", s)
 			}
-			if spec, _ := e.terms.Spec(s.TerminalID); spec.Cwd != tt.wantPath() {
+			if spec := e.spec(s.ID); !samePath(spec.Cwd, tt.wantPath()) {
 				t.Errorf("cwd = %s, want %s", spec.Cwd, tt.wantPath())
 			}
 		})
@@ -128,8 +133,7 @@ func TestWorkspaceThreadNeedsTheWorkspaceStore(t *testing.T) {
 func TestWorkspaceOwnerSurvivesRestartAndFork(t *testing.T) {
 	e := newWSEnv(t)
 	s := e.connected(CreateOptions{WorkspaceID: "login", RepoID: "r2", Name: "driver"})
-	spec, _ := e.terms.Spec(s.TerminalID)
-	cid := argOf(spec.Argv, "--session-id")
+	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	e.writeTranscriptIn(e.wt2, cid, userLine("hi"))
 	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
 
@@ -307,31 +311,25 @@ func addDirs(argv []string) []string {
 func TestWorkspaceThreadSpawn(t *testing.T) {
 	att := filepath.Join(t.TempDir(), "attachments")
 	base := []string{"CODE_FOUNDRY_ENDPOINT=http://127.0.0.1:1", "CODE_FOUNDRY_TOKEN=t"}
-	e := newWSEnv(t, func(o *Options) { o.AttachmentsDir, o.Env = att, base })
+	e := newWSEnv(t, func(o *Options) { o.AttachmentsDir, o.Env = att, append(o.Env, base...) })
 	line := "This thread belongs to workspace login. Run `code-foundry workspace members` for the current worktrees."
 	wantEnv := append(slices.Clone(base), "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1")
 	check := func(what string, s Session, wantDirs ...string) {
 		t.Helper()
-		spec, ok := e.terms.Spec(s.TerminalID)
-		if !ok {
-			t.Fatalf("%s: no terminal", what)
-		}
+		spec := e.spec(s.ID)
 		if got := addDirs(spec.Argv); !slices.Equal(got, append([]string{att}, wantDirs...)) {
 			t.Errorf("%s: --add-dir = %q, want %q", what, got, append([]string{att}, wantDirs...))
 		}
 		if got := argOf(spec.Argv, "--append-system-prompt"); got != line {
 			t.Errorf("%s: --append-system-prompt = %q", what, got)
 		}
-		if !slices.Equal(spec.Env, wantEnv) {
-			t.Errorf("%s: env = %q, want %q", what, spec.Env, wantEnv)
+		if !hasAll(spec.Env, wantEnv) {
+			t.Errorf("%s: env = %q, want %q in it", what, spec.Env, wantEnv)
 		}
 	}
 	s := e.connected(CreateOptions{WorkspaceID: "login", InitialPrompt: "hi"})
 	check("create", s, e.wt2)
-	if spec, _ := e.terms.Spec(s.TerminalID); spec.Argv[len(spec.Argv)-2] != "--" {
-		t.Errorf("the prompt is not last: %q", spec.Argv)
-	}
-	cid := argOf(mustSpec(t, e.env, s).Argv, "--session-id")
+	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	e.writeTranscript(cid, userLine("hi"))
 	e.waitFor(s.ID, "discovered", func(s Session) bool { return s.ClaudeSessionID == cid })
 
@@ -345,7 +343,7 @@ func TestWorkspaceThreadSpawn(t *testing.T) {
 	w.Members = append(slices.Clone(w.Members), workspace.Member{RepoID: "r3", WorktreePath: lib},
 		workspace.Member{RepoID: "r4", WorktreePath: filepath.Join(lib, "gone")})
 	e.ws.Put(w)
-	_ = e.terms.Exit(s.TerminalID, 0)
+	e.exit(s.ID, 0)
 	e.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
 	r, err := e.m.Reconnect(e.ctx(), s.ID)
 	if err != nil {
@@ -360,18 +358,14 @@ func TestWorkspaceThreadSpawn(t *testing.T) {
 
 	// A project thread gets none of it.
 	p := e.connected(CreateOptions{})
-	spec, _ := e.terms.Spec(p.TerminalID)
+	spec := e.spec(p.ID)
 	if got := addDirs(spec.Argv); !slices.Equal(got, []string{att}) || argOf(spec.Argv, "--append-system-prompt") != "" ||
-		!slices.Equal(spec.Env, base) {
+		!hasAll(spec.Env, base) || slices.Contains(spec.Env, "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1") {
 		t.Errorf("project thread argv = %q env = %q", spec.Argv, spec.Env)
 	}
 }
 
-func mustSpec(t *testing.T, e *env, s Session) terminal.Spec {
-	t.Helper()
-	spec, ok := e.terms.Spec(s.TerminalID)
-	if !ok {
-		t.Fatalf("no terminal for %s", s.ID)
-	}
-	return spec
+// hasAll reports whether every entry of want is in got.
+func hasAll(got, want []string) bool {
+	return !slices.ContainsFunc(want, func(s string) bool { return !slices.Contains(got, s) })
 }

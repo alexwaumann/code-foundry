@@ -17,90 +17,6 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/claudestream"
 )
 
-// renderedEnv is an env whose claude is the fake (fakeclaude_test.go) replaying
-// fixture, defaulting new threads to rendered.
-type renderedEnv struct {
-	*env
-	log, argv string
-	mutate    func(*Options)
-}
-
-func newRenderedEnv(t *testing.T, fixture string) *renderedEnv {
-	t.Helper()
-	return newRenderedEnvAt(t, fixturePath(fixture))
-}
-
-// newRenderedEnvAt is newRenderedEnv replaying the capture at path (absolute).
-// env adds variables to the fake's environment (its knobs, fakeclaude_test.go).
-func newRenderedEnvAt(t *testing.T, path string, env ...string) *renderedEnv {
-	t.Helper()
-	dir := t.TempDir()
-	re := &renderedEnv{log: filepath.Join(dir, "stdin.log"), argv: filepath.Join(dir, "argv.json")}
-	re.mutate = func(o *Options) {
-		o.Claude = os.Args[0]
-		o.Env = append([]string{fakeClaudeEnv + "=" + path, "CF_FAKE_CLAUDE_LOG=" + re.log, "CF_FAKE_CLAUDE_ARGV=" + re.argv}, env...)
-		o.DefaultRender = func() Render { return RenderRendered }
-		o.DisablePreTrust = true
-	}
-	re.env = newEnv(t, re.mutate)
-	return re
-}
-
-// sent returns what the daemon wrote to the fake's stdin, decoded.
-func (re *renderedEnv) sent() []map[string]any {
-	data, _ := os.ReadFile(re.log)
-	var out []map[string]any
-	for _, l := range strings.Split(strings.TrimSpace(string(data)), "\n") {
-		var m map[string]any
-		if json.Unmarshal([]byte(l), &m) == nil {
-			out = append(out, m)
-		}
-	}
-	return out
-}
-
-// waitSent waits for a stdin line satisfying cond.
-func (re *renderedEnv) waitSent(what string, cond func(map[string]any) bool) map[string]any {
-	re.t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		for _, m := range re.sent() {
-			if cond(m) {
-				return m
-			}
-		}
-		if time.Now().After(deadline) {
-			re.t.Fatalf("never sent %s; sent %v", what, re.sent())
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-}
-
-func (re *renderedEnv) items(id string) ItemsSnapshot {
-	re.t.Helper()
-	snap, err := re.m.Items(re.ctx(), id)
-	if err != nil {
-		re.t.Fatal(err)
-	}
-	return snap
-}
-
-// waitItems waits until the thread's items satisfy cond.
-func (re *renderedEnv) waitItems(id, what string, cond func([]Item) bool) []Item {
-	re.t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		items := re.items(id).Items
-		if cond(items) {
-			return items
-		}
-		if time.Now().After(deadline) {
-			re.t.Fatalf("timed out waiting for %s; items:\n%s", what, describeItems(items))
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-}
-
 func describeItems(items []Item) string {
 	var sb strings.Builder
 	for _, it := range items {
@@ -143,12 +59,9 @@ func lastKind(items []Item, k ItemKind) (Item, bool) {
 func hasTurnEnd(items []Item) bool { _, ok := lastKind(items, KindTurnEnd); return ok }
 
 func TestRenderedWritePermissionEndToEnd(t *testing.T) {
-	re := newRenderedEnv(t, "write-allow")
+	re := newFixtureEnv(t, "write-allow")
 	s := re.create(CreateOptions{Model: "haiku", Effort: "low", PermissionMode: PermissionSupervised,
 		InitialPrompt: "  create @cf-file://r1/hello.txt please  ", ComposerPrompt: "create [hello.txt](cf-file://r1/hello.txt) please"})
-	if s.Render != RenderRendered || s.TerminalID != "" {
-		t.Fatalf("created %+v", s)
-	}
 	var argv []string
 	re.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
 	if b, err := os.ReadFile(re.argv); err == nil {
@@ -235,7 +148,7 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 	re.waitFor(s.ID, "finished", func(s Session) bool { return s.Status == StatusNeedsAttention && s.StatusReason == "finished" })
 
 	// The items survive a daemon restart; the thread is disconnected, its status kept.
-	re.restart(re.mutate)
+	re.restart()
 	after := re.items(s.ID).Items
 	if !slices.Equal(kinds(after), want) {
 		t.Fatalf("rehydrated %v\n%s", kinds(after), describeItems(after))
@@ -247,20 +160,18 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 		}
 	}
 	got, _ = re.m.Get(re.ctx(), s.ID)
-	if got.State != StateDisconnected || got.Render != RenderRendered || got.StatusReason != "finished" {
+	if got.State != StateDisconnected || got.StatusReason != "finished" {
 		t.Errorf("after restart %+v", got)
 	}
 	if _, err := re.m.Send(re.ctx(), s.ID, Message{Text: "more"}); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("send while disconnected: %v", err)
 	}
 
-	// Reconnect keeps the mode and appends after the old items.
+	// Reconnect appends after the old items.
 	if _, err := re.m.Reconnect(re.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
-	re.waitFor(s.ID, "reconnected", func(s Session) bool {
-		return s.State == StateConnected && s.Render == RenderRendered && s.TerminalID == ""
-	})
+	re.waitFor(s.ID, "reconnected", func(s Session) bool { return s.State == StateConnected })
 	sentIt, err := re.m.Send(re.ctx(), s.ID, Message{Text: "/tdd again", ComposerText: "[/tdd](cf-skill://~/tdd) again"})
 	if err != nil {
 		t.Fatal(err)
@@ -277,20 +188,8 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 	}
 }
 
-func (e *env) restartWith(mutate ...func(*Options)) {
-	e.t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := e.m.Shutdown(ctx); err != nil {
-		e.t.Fatal(err)
-	}
-	e.open(mutate...)
-}
-
-func (re *renderedEnv) restart(mutate func(*Options)) { re.restartWith(mutate) }
-
 func TestRenderedWatchItemsAcknowledges(t *testing.T) {
-	re := newRenderedEnv(t, "text-table")
+	re := newFixtureEnv(t, "text-table")
 	sub := bus.Subscribe[ThreadEvent](re.bus, 4096)
 	defer sub.Close()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -346,7 +245,7 @@ func TestRenderedWatchItemsAcknowledges(t *testing.T) {
 }
 
 func TestRenderedQuestion(t *testing.T) {
-	re := newRenderedEnv(t, "ask")
+	re := newFixtureEnv(t, "ask")
 	s := re.create(CreateOptions{InitialPrompt: "ask me"})
 	re.waitFor(s.ID, "question", func(s Session) bool {
 		return s.Status == StatusNeedsAttention && s.StatusReason == "question: Which color do you prefer?"
@@ -375,7 +274,7 @@ func TestRenderedQuestion(t *testing.T) {
 
 func TestRenderedDenyAndSubagent(t *testing.T) {
 	t.Run("deny", func(t *testing.T) {
-		re := newRenderedEnv(t, "write-deny")
+		re := newFixtureEnv(t, "write-deny")
 		s := re.create(CreateOptions{InitialPrompt: "write"})
 		re.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
 		p := re.items(s.ID).Pending
@@ -395,7 +294,7 @@ func TestRenderedDenyAndSubagent(t *testing.T) {
 		}
 	})
 	t.Run("subagent", func(t *testing.T) {
-		re := newRenderedEnv(t, "task")
+		re := newFixtureEnv(t, "task")
 		s := re.create(CreateOptions{InitialPrompt: "agent"})
 		re.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
 		p := re.items(s.ID).Pending
@@ -425,8 +324,8 @@ func TestRenderedDenyAndSubagent(t *testing.T) {
 }
 
 func TestRenderedControls(t *testing.T) {
-	re := newRenderedEnv(t, "text-table")
-	s := re.create(CreateOptions{Render: RenderRendered})
+	re := newFixtureEnv(t, "text-table")
+	s := re.create(CreateOptions{})
 	re.waitFor(s.ID, "connected", func(s Session) bool { return s.State == StateConnected })
 	// No prompt: idle at the prompt once initialized.
 	re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
@@ -456,60 +355,13 @@ func TestRenderedControls(t *testing.T) {
 		t.Errorf("empty send: %v", err)
 	}
 
-	// A terminal thread refuses the rendered calls.
-	term := re.create(CreateOptions{Render: RenderTerminal})
-	if term.Render != RenderTerminal || term.TerminalID == "" {
-		t.Fatalf("terminal thread %+v", term)
-	}
-	if _, err := re.m.Items(re.ctx(), term.ID); !errors.Is(err, ErrFailedPrecondition) {
-		t.Errorf("items of a terminal thread: %v", err)
-	}
-	if _, err := re.m.Send(re.ctx(), term.ID, Message{Text: "x"}); !errors.Is(err, ErrFailedPrecondition) {
-		t.Errorf("send to a terminal thread: %v", err)
-	}
-	// Fork keeps the mode.
-	re.writeTranscript("c-fork", userLine("hi"))
-	re.m.mu.Lock()
-	re.m.recs[s.ID].s.ClaudeSessionID = "c-fork"
-	re.m.mu.Unlock()
-	f, err := re.m.Fork(re.ctx(), s.ID, "")
-	if err != nil || f.Render != RenderRendered {
-		t.Fatalf("fork %+v %v", f, err)
-	}
-}
-
-func TestDefaultRender(t *testing.T) {
-	for _, tt := range []struct {
-		def  func() Render
-		opt  Render
-		want Render
-	}{
-		{nil, RenderDefault, RenderTerminal},
-		{func() Render { return RenderTerminal }, RenderDefault, RenderTerminal},
-		{func() Render { return RenderTerminal }, RenderRendered, RenderRendered},
-		{func() Render { return RenderRendered }, RenderTerminal, RenderTerminal},
-		// A Create that does not pick (pr.ask / pr.explain / pr.fix.findings, the CLI
-		// without --render) follows the setting.
-		{func() Render { return RenderRendered }, RenderDefault, RenderRendered},
-	} {
-		e := newEnv(t, func(o *Options) {
-			o.DefaultRender = tt.def
-			o.Claude = os.Args[0]
-			o.Env = []string{fakeClaudeEnv + "=" + fixturePath("text-table")}
-		})
-		s := e.create(CreateOptions{Render: tt.opt})
-		if s.Render != tt.want {
-			t.Errorf("default %v, asked %v: got %v", tt.def != nil, tt.opt, s.Render)
-		}
-	}
-	e := newEnv(t)
-	if _, err := e.m.Create(e.ctx(), CreateOptions{WorktreePath: e.wt, Render: Render(9)}); !errors.Is(err, ErrInvalidArgument) {
-		t.Errorf("bad render: %v", err)
+	if _, err := re.m.Items(re.ctx(), "s-nope"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("items of an unknown thread: %v", err)
 	}
 }
 
 func TestRenderedRunInUsesSetCwd(t *testing.T) {
-	re := newRenderedEnv(t, "text-table")
+	re := newFixtureEnv(t, "text-table")
 	s := re.create(CreateOptions{})
 	re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
 	other := filepath.Join(t.TempDir(), "other")
@@ -604,21 +456,14 @@ func firstLine(s string) string {
 
 func TestRenderedFirstPromptWithImage(t *testing.T) {
 	dir := t.TempDir()
-	re := &renderedEnv{log: filepath.Join(dir, "stdin.log"), argv: filepath.Join(dir, "argv.json")}
-	re.mutate = func(o *Options) {
-		o.Claude = os.Args[0]
-		o.Env = []string{fakeClaudeEnv + "=" + fixturePath("image"), "CF_FAKE_CLAUDE_LOG=" + re.log, "CF_FAKE_CLAUDE_ARGV=" + re.argv}
-		o.DisablePreTrust = true
-		o.AttachmentsDir = filepath.Join(dir, "attachments")
-	}
-	re.env = newEnv(t, re.mutate)
+	re := newFixtureEnv(t, "image", func(o *Options) { o.AttachmentsDir = filepath.Join(dir, "attachments") })
 	// A 1x1 PNG.
 	png := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\xcf\xc0\x00\x00\x03\x01\x01\x00\xc9\xfe\x92\xef\x00\x00\x00\x00IEND\xaeB`\x82")
 	path, err := re.m.StageAttachment(re.ctx(), "red.png", "image/png", png)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := re.create(CreateOptions{Render: RenderRendered, InitialPrompt: "What color?", Attachments: []string{path}})
+	s := re.create(CreateOptions{InitialPrompt: "What color?", Attachments: []string{path}})
 	user := re.waitSent("the prompt", func(m map[string]any) bool { return m["type"] == "user" })
 	content := user["message"].(map[string]any)["content"].([]any)
 	if len(content) != 2 {
@@ -642,7 +487,7 @@ func TestRenderedFirstPromptWithImage(t *testing.T) {
 // the thread crashed, with the stderr line as LastError and an error item, not
 // "closed" (the close path is for a process that is alive and silent).
 func TestRenderedStartCrash(t *testing.T) {
-	re := newRenderedEnv(t, "no-such-fixture")
+	re := newFixtureEnv(t, "no-such-fixture")
 	s := re.create(CreateOptions{InitialPrompt: "hi"})
 	got := re.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
 	if got.DisconnectReason != ReasonCrashed || got.ExitCode != 2 || !strings.Contains(got.LastError, "fake claude") {
@@ -702,7 +547,7 @@ func TestRenderedPermissionFollowsItsToolCall(t *testing.T) {
 	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	re := newRenderedEnvAt(t, path)
+	re := newFixtureEnvAt(t, path, nil)
 	s := re.create(CreateOptions{InitialPrompt: "run them"})
 	for i := range rounds {
 		reqID := fmt.Sprintf("r-%d", i)
@@ -735,7 +580,7 @@ func TestRenderedPermissionFollowsItsToolCall(t *testing.T) {
 // says busy and the first message is an item by then, so the GUI never sees a connected
 // thread with nothing to show between "Starting Claude…" and "Working".
 func TestRenderedConnectsBusyWithItsFirstPrompt(t *testing.T) {
-	re := newRenderedEnv(t, "text-table")
+	re := newFixtureEnv(t, "text-table")
 	s := re.create(CreateOptions{InitialPrompt: "a table please"})
 	deadline := time.After(5 * time.Second)
 	for {

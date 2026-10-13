@@ -54,13 +54,8 @@ func TestCreateRewritesFileRefs(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			spec, ok := e.terms.Spec(s.TerminalID)
-			if !ok {
-				t.Fatal("no terminal")
-			}
-			if got, want := spec.Argv[len(spec.Argv)-1], tt.want(s, e); got != want {
-				t.Errorf("prompt argument\n got %q\nwant %q", got, want)
-			}
+			want := tt.want(s, e)
+			e.waitSent("the prompt", func(m map[string]any) bool { return userTextOf(m) == want })
 			e.mu.Lock()
 			named := slices.Clone(e.named)
 			e.mu.Unlock()

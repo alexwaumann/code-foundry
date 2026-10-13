@@ -1,7 +1,6 @@
 package session
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -467,21 +466,11 @@ func (e *env) writeAgent(cid, agent string, meta string, lines ...string) {
 	appendLines(e.t, filepath.Join(sub, "agent-"+agent+".jsonl"), lines...)
 }
 
-func (e *env) restart() {
-	e.t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := e.m.Shutdown(ctx); err != nil {
-		e.t.Fatal(err)
-	}
-	e.open()
-}
-
 func (e *env) reconnect(id string) {
 	e.t.Helper()
 	s, _ := e.m.Get(e.ctx(), id)
 	if s.State != StateDisconnected {
-		_ = e.terms.Exit(s.TerminalID, 0)
+		e.exit(id, 0)
 		e.waitFor(id, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
 	}
 	if _, err := e.m.Reconnect(e.ctx(), id); err != nil {
@@ -497,8 +486,7 @@ func TestAgentRunsRollUpAndPersist(t *testing.T) {
 	c := runLines(t)
 	e := newEnv(t)
 	s := e.connected(CreateOptions{Name: "driver"})
-	spec, _ := e.terms.Spec(s.TerminalID)
-	cid := argOf(spec.Argv, "--session-id")
+	cid := argOf(e.spec(s.ID).Argv, "--session-id")
 	now := time.Now()
 	e.writeTranscript(cid, userLine("hi"), usageLine("r-1", now.UTC().Format(time.RFC3339Nano), cid, "claude-haiku-5-5", 1, 1, 1, 0, h1(0), "standard"),
 		spawnFg(c, "T1"))
@@ -534,8 +522,7 @@ func TestClearRescansEveryTranscript(t *testing.T) {
 	c := runLines(t)
 	e := newEnv(t)
 	s := e.connected(CreateOptions{Name: "driver"})
-	spec, _ := e.terms.Spec(s.TerminalID)
-	first := argOf(spec.Argv, "--session-id")
+	first := argOf(e.spec(s.ID).Argv, "--session-id")
 	now := time.Now()
 	req := func(id string, at time.Time) string {
 		return usageLine(id, at.UTC().Format(time.RFC3339Nano), "x", "claude-haiku-5-5", 1, 1, 1, 0, h1(0), "standard")
@@ -545,9 +532,9 @@ func TestClearRescansEveryTranscript(t *testing.T) {
 	e.waitFor(s.ID, "first file", func(s Session) bool { return totalRequests(s.Usage) == 2 })
 
 	// /clear: Claude moves to a new id and file.
-	term, _ := e.terms.Get(e.ctx(), s.TerminalID)
+	pid := e.pid(s.ID)
 	_ = os.MkdirAll(filepath.Join(e.paths.Dir, "sessions"), 0o755)
-	if err := os.WriteFile(e.paths.pidFile(term.Pid), []byte(fmt.Sprintf(`{"pid":%d,"sessionId":"cleared-id"}`, term.Pid)), 0o644); err != nil {
+	if err := os.WriteFile(e.paths.pidFile(pid), []byte(fmt.Sprintf(`{"pid":%d,"sessionId":"cleared-id"}`, pid)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(60 * time.Millisecond)

@@ -109,8 +109,8 @@ func TestProjectContext(t *testing.T) {
 func TestRenderedContextTotals(t *testing.T) {
 	now := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
 	clock := func(o *Options) { o.Now = func() time.Time { return now } }
-	re := newRenderedEnv(t, "text-table")
-	re.restart(func(o *Options) { re.mutate(o); clock(o) })
+	re := newFixtureEnv(t, "text-table")
+	re.restart(clock)
 	s := re.create(CreateOptions{InitialPrompt: "a table please"})
 	got := re.waitFor(s.ID, "context totals", func(s Session) bool { return s.ContextTokens > 0 })
 	if got.ContextTokens != 22061 || got.ContextModel != "claude-haiku-5-5" || !got.LastResultAt.Equal(now) ||
@@ -138,7 +138,7 @@ func TestRenderedContextTotals(t *testing.T) {
 	}
 
 	// Persisted: a restart with another TTL loads the totals and computes from it.
-	re.restart(func(o *Options) { re.mutate(o); clock(o); o.CacheTTL = 5 * time.Minute })
+	re.restart(func(o *Options) { clock(o); o.CacheTTL = 5 * time.Minute })
 	got, err := re.m.Get(re.ctx(), s.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -155,13 +155,13 @@ func TestRenderedContextTotals(t *testing.T) {
 	}
 }
 
-// A terminal thread never has totals.
-func TestTerminalThreadHasNoContextTotals(t *testing.T) {
+// A thread before its first result has no totals.
+func TestNoContextTotalsBeforeAResult(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{RepoID: "r1", Name: "t"})
 	e.m.SetCacheTTL(time.Minute)
 	got, _ := e.m.Get(e.ctx(), s.ID)
 	if got.ContextTokens != 0 || !got.LastResultAt.IsZero() || !got.CacheExpiresAt.IsZero() {
-		t.Errorf("terminal thread: %+v", got)
+		t.Errorf("before a result: %+v", got)
 	}
 }

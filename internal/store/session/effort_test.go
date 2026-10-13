@@ -13,7 +13,7 @@ import (
 )
 
 // argvOf is the fake claude's latest argv (each spawn overwrites it).
-func (re *renderedEnv) argvOf() []string {
+func (re *env) argvOf() []string {
 	var argv []string
 	if b, err := os.ReadFile(re.argv); err == nil {
 		_ = json.Unmarshal(b, &argv)
@@ -22,7 +22,7 @@ func (re *renderedEnv) argvOf() []string {
 }
 
 // waitArgv waits until the latest spawn's argv satisfies cond.
-func (re *renderedEnv) waitArgv(what string, cond func([]string) bool) []string {
+func (re *env) waitArgv(what string, cond func([]string) bool) []string {
 	re.t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for {
@@ -52,7 +52,7 @@ func hasEffortNote(effort string) func([]Item) bool {
 // An idle thread restarts at once: the new process resumes the conversation with the
 // new effort and keeps the rest of the launch; a send during the restart waits for it.
 func TestRenderedSetEffortIdleRestarts(t *testing.T) {
-	re := newRenderedEnv(t, "text-table")
+	re := newFixtureEnv(t, "text-table")
 	s := re.create(CreateOptions{Model: "haiku", Effort: "low", PermissionMode: PermissionSupervised})
 	re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
 	first := re.argvOf()
@@ -99,7 +99,7 @@ func TestRenderedSetEffortIdleRestarts(t *testing.T) {
 
 // A busy thread keeps its process until the turn ends; then it restarts.
 func TestRenderedSetEffortWaitsForTheTurn(t *testing.T) {
-	re := newRenderedEnv(t, "write-allow")
+	re := newFixtureEnv(t, "write-allow")
 	s := re.create(CreateOptions{Effort: "low", PermissionMode: PermissionSupervised, InitialPrompt: "write"})
 	re.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
 	got, err := re.m.SetEffort(re.ctx(), s.ID, "max")
@@ -127,15 +127,14 @@ func TestRenderedSetEffortWaitsForTheTurn(t *testing.T) {
 }
 
 func TestRenderedSetEffortRefusals(t *testing.T) {
-	re := newRenderedEnv(t, "text-table")
+	re := newFixtureEnv(t, "text-table")
 	s := re.create(CreateOptions{})
 	re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
 	if _, err := re.m.SetEffort(re.ctx(), s.ID, "huge"); !errors.Is(err, ErrInvalidArgument) {
 		t.Errorf("bad effort: %v", err)
 	}
-	term := re.create(CreateOptions{Render: RenderTerminal})
-	if _, err := re.m.SetEffort(re.ctx(), term.ID, "high"); !errors.Is(err, ErrFailedPrecondition) {
-		t.Errorf("terminal thread: %v", err)
+	if _, err := re.m.SetEffort(re.ctx(), "s-nope", "high"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown thread: %v", err)
 	}
 	if err := re.m.Close(re.ctx(), s.ID); err != nil {
 		t.Fatal(err)
@@ -164,7 +163,7 @@ func TestDenyMessage(t *testing.T) {
 // A mode change Claude reports (allow for session applying a setMode suggestion) is
 // recorded on the row; modes the app does not offer are ignored.
 func TestRenderedFollowsClaudesModeChange(t *testing.T) {
-	re := newRenderedEnv(t, "text-table")
+	re := newFixtureEnv(t, "text-table")
 	s := re.create(CreateOptions{PermissionMode: PermissionSupervised})
 	re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
 	re.m.mu.Lock()
@@ -182,7 +181,7 @@ func TestRenderedFollowsClaudesModeChange(t *testing.T) {
 }
 
 // spawnLogs is what each fake process got on stdin, by pid, with its argv.
-func (re *renderedEnv) spawnLogs() map[string]struct {
+func (re *env) spawnLogs() map[string]struct {
 	argv []string
 	sent []map[string]any
 } {
@@ -228,7 +227,7 @@ func userTextOf(m map[string]any) string {
 }
 
 // deliveries counts, per spawn (resumed or not), the user messages with text.
-func (re *renderedEnv) deliveries(text string) (fresh, resumed int) {
+func (re *env) deliveries(text string) (fresh, resumed int) {
 	for _, e := range re.spawnLogs() {
 		for _, m := range e.sent {
 			if userTextOf(m) != text {
@@ -246,7 +245,7 @@ func (re *renderedEnv) deliveries(text string) (fresh, resumed int) {
 
 // waitDeliveries polls deliveries(text) until ok holds or a deadline passes, then
 // returns the last counts (the caller reports them).
-func (re *renderedEnv) waitDeliveries(text string, ok func(fresh, resumed int) bool) (fresh, resumed int) {
+func (re *env) waitDeliveries(text string, ok func(fresh, resumed int) bool) (fresh, resumed int) {
 	re.t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for {
@@ -259,14 +258,14 @@ func (re *renderedEnv) waitDeliveries(text string, ok func(fresh, resumed int) b
 }
 
 // runnerOf is the thread's runner.
-func (re *renderedEnv) runnerOf(id string) *runner {
+func (re *env) runnerOf(id string) *runner {
 	re.m.mu.Lock()
 	defer re.m.mu.Unlock()
 	return re.m.recs[id].run
 }
 
 // waitSwapping waits until a restart is replacing the thread's Conn.
-func (re *renderedEnv) waitSwapping(id string) {
+func (re *env) waitSwapping(id string) {
 	re.t.Helper()
 	r := re.runnerOf(id)
 	deadline := time.Now().Add(5 * time.Second)
@@ -282,7 +281,7 @@ func (re *renderedEnv) waitSwapping(id string) {
 }
 
 // sendAsync sends text on its own goroutine; the result arrives on the channel.
-func (re *renderedEnv) sendAsync(ctx context.Context, id, text string) <-chan error {
+func (re *env) sendAsync(ctx context.Context, id, text string) <-chan error {
 	done := make(chan error, 1)
 	go func() {
 		_, err := re.m.Send(ctx, id, Message{Text: text})
@@ -308,11 +307,11 @@ func TestRenderedSetEffortGap(t *testing.T) {
 	tests := []struct {
 		name string
 		env  []string
-		run  func(t *testing.T, re *renderedEnv, s Session)
+		run  func(t *testing.T, re *env, s Session)
 	}{
 		{
 			name: "a send is held and reaches the new process once",
-			run: func(t *testing.T, re *renderedEnv, s Session) {
+			run: func(t *testing.T, re *env, s Session) {
 				done := re.sendAsync(re.ctx(), s.ID, "held")
 				if err := waitErr(t, "the held send", done); err != nil {
 					t.Fatalf("send: %v", err)
@@ -328,7 +327,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 		},
 		{
 			name: "a send its caller gave up on is dropped",
-			run: func(t *testing.T, re *renderedEnv, s Session) {
+			run: func(t *testing.T, re *env, s Session) {
 				ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 				defer cancel()
 				if err := waitErr(t, "the send", re.sendAsync(ctx, s.ID, "gave up")); !errors.Is(err, context.DeadlineExceeded) {
@@ -345,7 +344,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 		},
 		{
 			name: "interrupt, model and mode wait for the new process; respond finds nothing",
-			run: func(t *testing.T, re *renderedEnv, s Session) {
+			run: func(t *testing.T, re *env, s Session) {
 				if err := re.m.Interrupt(re.ctx(), s.ID); !errors.Is(err, ErrFailedPrecondition) {
 					t.Errorf("interrupt: %v", err)
 				}
@@ -369,7 +368,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 		},
 		{
 			name: "a close fails the held send",
-			run: func(t *testing.T, re *renderedEnv, s Session) {
+			run: func(t *testing.T, re *env, s Session) {
 				done := re.sendAsync(re.ctx(), s.ID, "held")
 				time.Sleep(20 * time.Millisecond) // the send is on the runner first
 				if err := re.m.Close(re.ctx(), s.ID); err != nil {
@@ -389,10 +388,10 @@ func TestRenderedSetEffortGap(t *testing.T) {
 		},
 		{
 			name: "daemon shutdown fails the held send; the next spawn uses the new effort",
-			run: func(t *testing.T, re *renderedEnv, s Session) {
+			run: func(t *testing.T, re *env, s Session) {
 				done := re.sendAsync(re.ctx(), s.ID, "held")
 				time.Sleep(20 * time.Millisecond)
-				re.restart(re.mutate)
+				re.restart()
 				if err := waitErr(t, "the held send", done); err == nil {
 					t.Errorf("held send succeeded across a daemon stop")
 				}
@@ -413,7 +412,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 		{
 			name: "the new process crashes",
 			env:  []string{"CF_FAKE_CLAUDE_RESUME_EXIT=3"},
-			run: func(t *testing.T, re *renderedEnv, s Session) {
+			run: func(t *testing.T, re *env, s Session) {
 				done := re.sendAsync(re.ctx(), s.ID, "held")
 				if err := waitErr(t, "the held send", done); !errors.Is(err, ErrFailedPrecondition) {
 					t.Errorf("held send: %v", err)
@@ -435,7 +434,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			re := newRenderedEnvAt(t, fixturePath("text-table"), append([]string{"CF_FAKE_CLAUDE_EXIT_DELAY=400ms"}, tt.env...)...)
+			re := newFixtureEnvAt(t, fixturePath("text-table"), append([]string{"CF_FAKE_CLAUDE_EXIT_DELAY=400ms"}, tt.env...))
 			s := re.create(CreateOptions{Model: "haiku", Effort: "low", PermissionMode: PermissionSupervised})
 			re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
 			re.writeTranscript(argOf(re.argvOf(), "--session-id"), userLine("earlier"))
@@ -451,7 +450,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 // The respawn's argv is the original launch's but for the conversation (--resume, no
 // --session-id) and the effort, plus what allow for session granted the old process.
 func TestRenderedSetEffortRespawnArgv(t *testing.T) {
-	re := newRenderedEnv(t, "bash")
+	re := newFixtureEnv(t, "bash")
 	s := re.create(CreateOptions{Model: "haiku", Effort: "low", PermissionMode: PermissionAcceptEdits, InitialPrompt: "run it"})
 	re.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
 	first := re.argvOf()
@@ -530,7 +529,7 @@ func TestGrants(t *testing.T) {
 // Answering a request Claude already withdrew (an interrupt withdraws what is pending)
 // is NotFound, which the GUI shows as a quiet notice; the item stays withdrawn.
 func TestRenderedRespondToWithdrawnRequest(t *testing.T) {
-	re := newRenderedEnv(t, "interrupt-pending")
+	re := newFixtureEnv(t, "interrupt-pending")
 	s := re.create(CreateOptions{PermissionMode: PermissionSupervised, InitialPrompt: "write"})
 	re.waitFor(s.ID, "permission", func(s Session) bool { return s.Status == StatusNeedsAttention })
 	p := re.items(s.ID).Pending[0]

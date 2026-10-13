@@ -6,6 +6,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -40,6 +41,9 @@ type Fake struct {
 	// Remotes are given to repos created by Register (cloned). Nil, the default,
 	// registers local-only repos; Put sets any remotes directly.
 	Remotes []string
+	// MakeDirs makes CreateWorktree create the worktree's directory, for callers that
+	// start processes in it.
+	MakeDirs bool
 	// NotGit makes Register create projects without git (Git false, one main worktree
 	// with no branch), like the real store for a plain directory.
 	NotGit bool
@@ -216,7 +220,13 @@ func (f *Fake) CreateWorktree(_ context.Context, o repo.CreateWorktreeOptions) (
 	}
 	w := repo.Worktree{RepoID: r.ID, Path: path, Branch: o.Branch}
 	r.Worktrees = append(slices.Clone(r.Worktrees), w)
+	makeDirs := f.MakeDirs
 	f.mu.Unlock()
+	if makeDirs {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			return repo.Worktree{}, err
+		}
+	}
 	f.Put(r)
 	return w, nil
 }

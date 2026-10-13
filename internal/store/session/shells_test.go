@@ -30,7 +30,7 @@ func TestRemoveTakesTheThreadsShellsCloseDoesNot(t *testing.T) {
 		{"the thread's shell", termlabel.Shell(s.ID, "r1", e.wt), true},
 		{"another thread's shell", termlabel.Shell("other", "r1", e.wt), false},
 		{"the worktree's shell", termlabel.Shell("", "r1", e.wt), false},
-		{"not a shell, same session label", map[string]string{termlabel.Session: s.ID}, false},
+		{"not terminal.new's, same session label", map[string]string{termlabel.Session: s.ID}, false},
 	}
 	ids := make([]string, len(terms))
 	for i, tt := range terms {
@@ -38,11 +38,7 @@ func TestRemoveTakesTheThreadsShellsCloseDoesNot(t *testing.T) {
 	}
 
 	// Closing the thread leaves every shell running.
-	done := make(chan error, 1)
-	go func() { done <- e.m.Close(e.ctx(), s.ID) }()
-	e.waitWritten(s.TerminalID, keyEscape)
-	_ = e.terms.Exit(s.TerminalID, 0)
-	if err := <-done; err != nil {
+	if err := e.m.Close(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
 	for i, tt := range terms {
@@ -75,11 +71,7 @@ func (s stubbornShells) Kill(ctx context.Context, id string) error {
 func TestRemoveFailsWhileAShellWillNotDie(t *testing.T) {
 	e := newEnv(t, func(o *Options) { o.Terminals = stubbornShells{o.Terminals.(*terminaltest.Fake)} })
 	s := e.connected(CreateOptions{})
-	done := make(chan error, 1)
-	go func() { done <- e.m.Close(e.ctx(), s.ID) }()
-	e.waitWritten(s.TerminalID, keyEscape)
-	_ = e.terms.Exit(s.TerminalID, 0)
-	if err := <-done; err != nil {
+	if err := e.m.Close(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
 	shell, err := e.terms.Create(e.ctx(), terminal.Spec{Argv: []string{"zsh"}, Cwd: e.wt, Labels: termlabel.Shell(s.ID, "r1", e.wt)})
