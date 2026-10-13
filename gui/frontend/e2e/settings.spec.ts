@@ -52,15 +52,8 @@ test("cmd+, opens settings rendered from the schema", async ({ page }) => {
   await expect(setting(page, "sessions.naming_model").getByRole("combobox")).toHaveValue("sonnet");
   await expect(setting(page, "sessions.naming_model").getByRole("option", { name: "Sonnet (default)" })).toHaveCount(1);
   await expect(setting(page, "sessions.naming_model").getByTestId("restart-hint")).toHaveCount(0);
-  // The view new threads start in: live, right after the naming model.
-  const view = setting(page, "sessions.render");
-  await expect(view).toContainText("Thread view");
-  await expect(view).toContainText("A thread keeps its view for life.");
-  await expect(view.getByRole("combobox")).toHaveValue("terminal");
-  await expect(view.getByRole("option")).toHaveText(["Terminal (default)", "Rendered"]);
-  await expect(view.getByTestId("restart-hint")).toHaveCount(0);
-  const keys = await page.locator("[data-setting]").evaluateAll((els) => els.map((e) => e.getAttribute("data-setting")));
-  expect(keys[keys.indexOf("sessions.naming_model") + 1]).toBe("sessions.render");
+  // Every thread is rendered: no view setting (the schema has none).
+  await expect(setting(page, "sessions.render")).toHaveCount(0);
   // Restart-required fields say so; live ones do not.
   await expect(setting(page, "sessions.scrollback_lines").getByTestId("restart-hint")).toBeVisible();
   await expect(setting(page, "appearance.theme").getByTestId("restart-hint")).toHaveCount(0);
@@ -211,8 +204,12 @@ test("ShowView intents from the daemon open settings and help", async ({ page })
 test("destructive commands ask first; cancel keeps, confirm runs", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-3").click();
-  const remove = page.getByTestId("remove-session");
-  await remove.click();
+  // The thread row's menu: Remove… (session.remove).
+  const remove = async () => {
+    await row(page, "s:s-3").click({ button: "right" });
+    await page.getByTestId("row-menu").getByText("Remove…").click();
+  };
+  await remove();
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toContainText("Remove session s-3?");
   await dialog.getByTestId("confirm-cancel").click();
@@ -221,7 +218,7 @@ test("destructive commands ask first; cancel keeps, confirm runs", async ({ page
   let calls = (await invocations()).filter((i) => i.name === "session.remove");
   expect(calls.map((c) => (c as { confirmed?: boolean }).confirmed)).toEqual([false]);
 
-  await remove.click();
+  await remove();
   await expect(dialog).toBeVisible();
   await dialog.getByTestId("confirm-ok").click();
   await expect(row(page, "s:s-3")).toHaveCount(0);

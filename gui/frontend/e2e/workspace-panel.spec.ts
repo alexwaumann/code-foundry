@@ -158,7 +158,7 @@ test("a member opens as a worktree tab showing that worktree's overview", async 
   await expect(wt.getByTestId("section-github")).toContainText("#151");
   await expect(wt.getByTestId("section-files")).toBeVisible();
   // The content pane still shows the thread.
-  await expect(page.getByTestId("terminal-header")).toContainText("driver");
+  await expect(page.getByTestId("thread-header")).toContainText("driver");
 
   // Enter on a member row opens its tab too; back on the workspace tab the list is there.
   await tabs.filter({ hasText: "checkout" }).click();

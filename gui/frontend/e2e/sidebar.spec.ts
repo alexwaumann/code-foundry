@@ -421,14 +421,14 @@ test("Working section: a header with the count collapses and expands its rows, p
 
   // s-1 is selected and shown; collapsing hides its row but not the thread in the main pane.
   await row(page, "s:s-1").click();
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-claude");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-1");
   await header.click();
   await expect(header).toHaveAttribute("aria-expanded", "false");
   await expect(row(page, "s:s-1")).toHaveCount(0);
   await expect(row(page, "s:s-5")).toHaveCount(0);
   await expect(page.getByTestId("working-count")).toHaveText("2");
   await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4", "s:s-3", "# Working 2"]);
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", "t-claude");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-1");
 
   // cmd+N counts only the rows shown: cmd+4 is s-3, the last one, and cmd+5 does nothing.
   await page.keyboard.press("Meta+4");

@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 /**
- * Answering a rendered thread (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
+ * Answering a thread (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
  * the docked permission and question prompts over the mock's scripted thread
  * (mock/thread.ts), their keyboard, the Escape interrupt and effort changes. Set SHOTS=<dir>
  * to save screenshots of the panels in both schemes.
@@ -111,7 +111,7 @@ for (const scheme of ["dark", "light"] as const) {
 test("Allow answers at once; the sidebar and the bell stop asking", async ({ page }) => {
   await openThread(page, "permission");
   await expect(row(page, "s:s-r1")).toContainText("Needs input · Bash git push");
-  // s-2 (a terminal thread) and the rendered thread need the user.
+  // s-2 (its seeded Bash permission) and this thread need the user.
   await expect(page.getByTestId("attention-badge")).toHaveText("2");
   await composer(page).getByTestId("thread-permission-allow").click();
   await expect(composer(page).getByTestId("thread-permission")).toHaveCount(0);

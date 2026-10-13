@@ -3,7 +3,7 @@ import { emit, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 /**
  * The MCP side panel surface (docs/notes/mcp-panel.md, docs/sketches/mcp-panel variant B)
- * over the mock's rendered thread s-r1, seeded with the sketch's six servers (mock/mcp.ts):
+ * over the mock's scripted thread s-r1, seeded with the sketch's six servers (mock/mcp.ts):
  * t3-code and github connected, linear needing a login, playwright failed, filesystem
  * connecting, sentry disabled. Set SHOTS=<dir> to save screenshots (WebKit, dark and light).
  */
@@ -59,7 +59,7 @@ test("the palette opens it: one card per server in every state, the header count
   await expect(surface(page).getByTestId("mcp-pill")).toHaveText(["Connected", "Connected", "Needs login", "Failed", "Connecting…", "Disabled"]);
   await expect(card(page, "t3-code").getByTestId("mcp-version")).toHaveText("v0.4.2");
   await expect(card(page, "t3-code").getByTestId("mcp-meta")).toHaveText("project·http·5 tools");
-  await expect(card(page, "linear").getByTestId("mcp-login-hint")).toHaveText("Needs login · run /mcp in a terminal thread, then reconnect");
+  await expect(card(page, "linear").getByTestId("mcp-login-hint")).toHaveText("Needs login · run claude in a shell and use /mcp, then reconnect");
   await expect(card(page, "playwright").getByTestId("mcp-error")).toHaveText("spawn npx ENOENT");
   // Reconnect on all but the connecting and the disabled server; tools only where connected.
   for (const [name, reconnect, tools] of [
@@ -144,12 +144,17 @@ test("Reconnect on the failed card: Connecting… with a spinner, then Connected
   expect(await threadCalls()).toContain("mcp s-r1 refresh");
 });
 
-test("hidden for a terminal thread: not in the panel's list, not in the palette", async ({ page }) => {
+test("listed for every thread; hidden for a page: not in the panel's list, not in the palette", async ({ page }) => {
   await openThread(page);
+  // A seeded thread lists it too.
   await row(page, "s:s-1").click();
   await page.keyboard.press("Meta+Shift+e");
+  await expect(page.getByTestId("panel-empty").locator('[data-surface="mcp"]')).toBeVisible();
+  // The Projects page does not.
+  await page.getByTestId("nav-projects").click();
+  await expect(page.getByTestId("projects-page")).toBeVisible();
+  await page.keyboard.press("Meta+Shift+e");
   await expect(page.getByTestId("panel-empty")).toBeVisible();
-  await expect(page.getByTestId("panel-empty").locator('[data-surface="usage"]')).toBeVisible();
   await expect(page.getByTestId("panel-empty").locator('[data-surface="mcp"]')).toHaveCount(0);
   await page.keyboard.press("m");
   await expect(page.getByTestId("panel-empty")).toBeVisible();

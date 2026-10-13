@@ -44,7 +44,7 @@ test("sidebar new-thread button opens the project picker, then the composer", as
   const created = page.locator('[data-row-kind="session"][aria-selected="true"]');
   await expect(created).toBeVisible();
   expect(await created.getAttribute("data-row-key")).toMatch(/^s:s-new-/);
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
+  await expect(page.getByTestId("thread-pane")).toBeVisible();
 });
 
 // The sidebar band has no New terminal button (docs/notes/sidebar-title-band.md); the
@@ -98,11 +98,11 @@ test("status row buttons toggle settings, open help and the palette", async ({ p
 test("session pane header: rename, fork and close buttons run the session commands", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
-  const header = page.getByTestId("terminal-header");
-  await expect(header.getByTestId("terminal-title")).toHaveText("Refactor sidebar tree");
+  const header = page.getByTestId("thread-header");
+  await expect(header.getByTestId("thread-title")).toHaveText("Refactor sidebar tree");
   // 44px, like every pane header (window/PaneHeader; layout.spec.ts).
   expect((await header.boundingBox())?.height).toBe(44);
-  // The thread's commands only: no Kill Terminal for its Claude terminal (session.close ends it).
+  // The thread's commands only: no Kill Terminal (a thread has no terminal; session.close ends it).
   await expect(header.getByRole("button", { name: "Kill Terminal" })).toHaveCount(0);
 
   // Rename is presented inline in the sidebar, as from the palette.

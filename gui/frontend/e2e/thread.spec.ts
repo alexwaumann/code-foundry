@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { invocations, mockPost, mockUrl, openApp, openStreams, resetMock, row } from "./fixtures";
 
 /**
- * The rendered thread (components/thread, docs/notes/rendered-threads-2-gui.md) over the
+ * A thread (components/thread, docs/notes/rendered-threads-2-gui.md) over the
  * mock's scripted "Fix stale PR badge" (mock/thread.ts), in both schemes. Set SHOTS=<dir>
  * to save screenshots.
  */
@@ -272,7 +272,7 @@ test("a follow-up goes through thread.send with the composer's tags projected; t
   const send = (await invocations()).find((i) => i.name === "thread.send");
   expect(send?.args).toMatchObject({ id: "s-r1", text: "Ship it with /review" });
   expect(send?.args["composer-text"]).toMatch(/^Ship it with \[\/review\]\(cf-skill:\/\/[\w.~-]+\/review\)$/);
-  expect(send?.context?.activeSessionRendered).toBe(true);
+  expect(send?.context).toMatchObject({ activeSessionId: "s-r1", activeView: "session" });
   await expect(page.getByTestId("thread-user").last()).toContainText("Ship it with");
   await expect(page.getByTestId("thread-user").last().locator('[data-tag-kind="skill"]')).toHaveText("/review");
   await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.");
@@ -346,18 +346,23 @@ test("Interrupt stops the running turn (thread.interrupt)", async ({ page }) => 
   await expect(page.getByTestId("thread-interrupt")).toHaveCount(0);
 });
 
-test("only the visible rendered thread holds a Watch; it takes the content pane's Attach slot", async ({ page }) => {
+test("only the visible thread holds a Watch; a page holds none", async ({ page }) => {
   await openThread(page, "idle");
   await expect.poll(async () => (await openStreams())["ThreadService/Watch"] ?? 0).toBe(1);
   expect((await openStreams())["TerminalService/Attach"] ?? 0).toBe(0);
-  await row(page, "s:s-2").click();
+  await page.getByTestId("nav-projects").click();
+  await expect(page.getByTestId("projects-page")).toBeVisible();
   await expect.poll(async () => (await openStreams())["ThreadService/Watch"] ?? 0).toBe(0);
-  await expect.poll(async () => (await openStreams())["TerminalService/Attach"] ?? 0).toBe(1);
   await row(page, "s:s-r1").click();
   await expect.poll(async () => (await openStreams())["ThreadService/Watch"] ?? 0).toBe(1);
+  // Another thread: its Watch replaces this one.
+  await row(page, "s:s-2").click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-2");
+  await expect.poll(async () => (await openStreams())["ThreadService/Watch"] ?? 0).toBe(1);
+  expect((await openStreams())["TerminalService/Attach"] ?? 0).toBe(0);
 });
 
-test("the thread.* commands are offered for a rendered thread", async ({ page }) => {
+test("the thread.* commands are offered for a thread, not for a page", async ({ page }) => {
   await openThread(page, "idle");
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Interrupt Thread");
@@ -367,9 +372,16 @@ test("the thread.* commands are offered for a rendered thread", async ({ page })
     await expect(page.getByRole("option", { name: new RegExp(title) })).toBeVisible();
   }
   await page.keyboard.press("Escape");
-  // A terminal thread has none of them.
-  await row(page, "s:s-2").click();
-  await expect(page.getByTestId("terminal-host")).toBeVisible();
+  // Every thread has them: the seeded s-3 too, disconnected.
+  await row(page, "s:s-3").click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-3");
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("Send to Thread");
+  await expect(page.getByRole("option", { name: /Send to Thread/ })).toBeVisible();
+  await page.keyboard.press("Escape");
+  // A page has none of them.
+  await page.getByTestId("nav-projects").click();
+  await expect(page.getByTestId("projects-page")).toBeVisible();
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Thread");
   await expect(page.getByRole("option", { name: /New Thread/ })).toBeVisible();
@@ -405,7 +417,7 @@ test("a closed thread keeps its conversation above the Reconnect bar", async ({ 
   await expect(page.getByTestId("thread-empty")).toHaveCount(0);
 });
 
-test("a fork of a rendered thread is rendered and starts empty, naming its parent", async ({ page }) => {
+test("a fork starts empty, naming its parent", async ({ page }) => {
   await openThread(page, "idle");
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Fork Thread");
@@ -413,7 +425,6 @@ test("a fork of a rendered thread is rendered and starts empty, naming its paren
   const fork = page.locator('[data-row-kind="session"][aria-selected="true"]');
   await expect(fork).not.toHaveAttribute("data-row-key", "s:s-r1");
   await expect(page.getByTestId("thread-pane")).toBeVisible();
-  await expect(page.getByTestId("session-render")).toHaveText("rendered");
   await expect(page.getByTestId("thread-working")).toHaveText("Starting Claude…");
   await expect(page.getByTestId("thread-empty")).toHaveText("Forked from Fix stale PR badge. Claude has the conversation so far; send a follow-up to continue.", { timeout: 5000 });
   await shot(page, "fork-empty");

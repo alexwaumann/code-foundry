@@ -13,7 +13,7 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { expectTerminalText, row } from "./fixtures";
+import { row, threadPrompt } from "./fixtures";
 
 const LIVE = process.env.LIVE_DAEMON === "1";
 const HOME = process.env.CODE_FOUNDRY_HOME ?? "";
@@ -24,7 +24,6 @@ const SHOTS = process.env.LIVE_SHOTS ?? "";
 
 interface LiveSession {
   id: string;
-  terminalId?: string;
   state?: string;
   status?: string;
   statusReason?: string;
@@ -69,6 +68,11 @@ async function badgeLog(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as { __badgeLog: string[] }).__badgeLog);
 }
 
+/** The selected thread's pane. */
+function pane(page: Page) {
+  return page.getByTestId("thread-pane");
+}
+
 async function openApp(page: Page): Promise<void> {
   await page.goto("/");
   await expect(page.getByTestId("thread-list")).toBeVisible({ timeout: 15_000 });
@@ -89,25 +93,25 @@ test("sessions end to end against the real daemon", async ({ page }) => {
       await expect(badge(page, s1.id)).toHaveAttribute("data-session-badge", "idle", { timeout: 30_000 });
     });
 
-    // (b) Selecting it attaches and shows Claude's prompt UI.
-    await test.step("b: selecting attaches Claude's UI", async () => {
+    // (b) Selecting it shows the (empty) conversation with the prompt focused.
+    await test.step("b: selecting shows the thread, its prompt focused", async () => {
       await row(page, `s:${s1.id}`).click();
-      const host = page.getByTestId("terminal-host");
-      await expect(host).toHaveAttribute("data-attach-phase", "live");
-      await expectTerminalText(page, /❯/);
-      await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", sessionInfo(s1.id)?.terminalId ?? "?");
+      await expect(pane(page)).toHaveAttribute("data-session-id", s1.id);
+      await expect(pane(page).getByTestId("thread-empty")).toHaveText("No messages yet.");
+      await expect(threadPrompt(page)).toBeFocused();
       await shot(page, "attached.png");
     });
 
     // (c) A turn while viewed: busy, then idle (never "needs attention"), CLI agrees.
     await test.step("c: a viewed turn ends idle", async () => {
       await recordBadge(page, s1.id);
-      await page.keyboard.type("reply with the single word pong", { delay: 15 });
-      await page.waitForTimeout(700); // stay clear of Claude's paste detection
-      await page.keyboard.press("Enter");
+      await page.keyboard.type("reply with the single word pong");
+      await page.keyboard.press("Enter"); // thread.send
+      await expect(pane(page).getByTestId("thread-user").last()).toContainText("reply with the single word pong");
       await expect(badge(page, s1.id)).toHaveAttribute("data-session-badge", "busy", { timeout: 20_000 });
       await expect(badge(page, s1.id)).toHaveAttribute("data-session-badge", "idle", { timeout: 90_000 });
-      await expectTerminalText(page, /⏺\s*pong/i);
+      await expect(pane(page).getByTestId("thread-text").last()).toContainText(/pong/i);
+      await expect(pane(page).getByTestId("thread-footer").last()).toBeVisible();
       await page.waitForTimeout(1500); // let a late "finished" show, if the rule were broken
       const log = await badgeLog(page);
       expect(log).toContain("busy");
@@ -136,34 +140,33 @@ test("sessions end to end against the real daemon", async ({ page }) => {
       await expect(badge(page, s2.id)).toHaveAttribute("data-session-badge", "attention");
       await expect(page).toHaveTitle("Code Foundry (1)");
       await row(page, `s:${s2.id}`).click();
-      await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
+      await expect(pane(page).getByTestId("thread-user").first()).toContainText("reply with the single word ping");
       await expect(badge(page, s2.id)).toHaveAttribute("data-session-badge", "idle");
       await expect.poll(() => sessionInfo(s2.id)?.status).toBe("SESSION_STATUS_IDLE");
       await expect(page).toHaveTitle("Code Foundry");
     });
 
-    // (d) Closing from the CLI flips the pane to "Not connected"; Reconnect resumes.
+    // (d) Closing from the CLI swaps the composer for the Reconnect card; Reconnect resumes
+    // with the conversation kept.
     await test.step("d: CLI close shows Not connected; Reconnect resumes", async () => {
       await row(page, `s:${s1.id}`).click();
-      await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-attach-phase", "live");
+      await expect(pane(page)).toHaveAttribute("data-session-id", s1.id);
       cli("session", "close", "--id", s1.id);
-      const panel = page.getByTestId("session-disconnected");
-      await expect(panel).toBeVisible();
-      await expect(panel.getByTestId("disconnect-reason")).toHaveText("closed");
+      const card = page.getByTestId("thread-disconnected");
+      await expect(card).toContainText("Not connected · closed.", { timeout: 20_000 });
       await expect(badge(page, s1.id)).toHaveAttribute("data-session-badge", "disconnected");
       await shot(page, "not-connected.png");
-      await panel.getByTestId("reconnect").click();
-      const host = page.getByTestId("terminal-host");
-      await expect(host).toHaveAttribute("data-attach-phase", "live", { timeout: 20_000 });
-      await expectTerminalText(page, /reply with the single word pong/);
-      await expectTerminalText(page, /⏺\s*pong/i);
+      await card.getByTestId("reconnect").click();
+      await expect(page.getByTestId("thread-composer")).toBeVisible({ timeout: 20_000 });
+      await expect(pane(page).getByTestId("thread-user").first()).toContainText("reply with the single word pong");
+      await expect(pane(page).getByTestId("thread-text").last()).toContainText(/pong/i);
       await expect(badge(page, s1.id)).toHaveAttribute("data-session-badge", "idle", { timeout: 30_000 });
     });
 
-    // (e) cmd+n (from the focused terminal) opens session.new's prompts: model, effort.
+    // (e) cmd+n (from the focused prompt) opens session.new's prompts: model, effort.
     await test.step("e: cmd+n prompts model then effort", async () => {
       const before = listSessions().length;
-      await page.getByTestId("terminal-host").click();
+      await threadPrompt(page).click();
       await page.keyboard.press("Meta+n");
       const palette = page.getByTestId("palette");
       await expect(palette).toHaveAttribute("data-mode", "args");
@@ -184,7 +187,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
       await expect(row(page, `s:${created[1] ?? ""}`)).toHaveAttribute("aria-selected", "true");
       expect(cli("session", "focus", "--id", s1.id)).toMatch(/delivered=[1-9]/);
       await expect(row(page, `s:${s1.id}`)).toHaveAttribute("aria-selected", "true");
-      await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-terminal-id", sessionInfo(s1.id)?.terminalId ?? "?");
+      await expect(pane(page)).toHaveAttribute("data-session-id", s1.id);
     });
   } finally {
     for (const id of created) {
