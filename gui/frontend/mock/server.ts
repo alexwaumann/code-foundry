@@ -62,7 +62,8 @@
  *   POST /__mock/workspace-mixed?name=checkout    (a workspace over code-foundry, ghostty-playground
  *                                                 and dotfiles: an open PR with failing CI, 2 ahead, dirty)
  *   session.run-in queues a move (pendingWorktreePath) that lands ~2s after the thread is not busy.
- *   session.new takes workspace (a member thread) or new-worktree + repos (a new workspace).
+ *   session.new takes workspace (a member thread) or new-worktree + repos (a new workspace),
+ *   or no-project (a thread in the home directory with no repo or workspace).
  *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size)
  *   FilesystemService.ListSkills / SearchFiles: mock/filesystem.ts (project skills review and
  *        deploy in every project, user skill commit; DEFAULT_FILES in every project)
