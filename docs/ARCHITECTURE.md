@@ -25,9 +25,9 @@ Three processes, one protocol.
                                                                       └──────────────────┘
 ```
 
-* **Daemon** (`code-foundry daemon`) owns PTYs, terminal emulation (libghostty-vt),
-  Claude session lifecycle and status detection, git and GitHub workers, SQLite, and the
-  command registry. It never renders. It outlives the window: closing or crashing the GUI
+* **Daemon** (`code-foundry daemon`) owns PTYs and terminal emulation (libghostty-vt) for
+  shells, the Claude session lifecycle (claude -p over stream-json) and its status, git
+  and GitHub workers, SQLite, and the command registry. It never renders. It outlives the window: closing or crashing the GUI
   does not kill sessions.
 * **GUI** is a Wails v3 shell hosting a React frontend. The frontend talks to the daemon
   *directly* with Connect-Web over a loopback HTTP listener. The Go host process in Wails is
@@ -74,7 +74,8 @@ internal/
   command/                 command registry: name, arg schema, when-predicate, handler
   store/
     terminal/              PTY + libghostty-vt actor per terminal; output tee; snapshots
-    session/               Claude sessions layered on terminal: spawn, naming, status, resume
+    session/               Claude threads: claude -p over stream-json, items, naming, status, resume
+    claudestream/          the stream-json / control protocol client (pure Go)
     repo/                  registered repos, worktrees, git status, filesystem watcher
     gh/                    GitHub GraphQL/REST polling over HTTP (token via gh), PR/CI cache
     gitops/                git/gh operations per worktree (fetch, pull, push, PR); editor, Finder, browser
@@ -119,19 +120,19 @@ Services (v1):
 * `SessionService` — Create, Fork, List, Get, Rename, Close, Reconnect, Remove, RunIn,
   Pin (the user's pin, persisted; `docs/notes/workspaces-4-sidebar.md`), Watch (server stream), StageAttachment (images the first prompt refers to). Create can
   make the worktree first (`new_worktree`), start a thread in a workspace member
-  (`workspace_id`) or in a new workspace (`new_workspace`), passes the first prompt as
-  claude's positional argument, and carries a permission mode (never
+  (`workspace_id`) or in a new workspace (`new_workspace`), sends the first prompt as
+  the thread's first user message, and carries a permission mode (never
   bypassPermissions); see `docs/notes/new-thread-composer.md` and
-  `docs/notes/workspaces-2-launch.md`. A session has a `render` mode fixed for its life:
-  TERMINAL (Claude in a PTY) or RENDERED (claude -p over stream-json, no terminal; the
-  conversation is ThreadService items); Create without one uses the `sessions.render`
-  setting. A session carries lifecycle `state` (starting, connected, closing,
-  disconnected) and detector `status` (busy, idle, needs-attention; error when the
-  process ended mid-turn) with `status_reason` and `status_changed_at`, persisted
-  (`docs/notes/thread-status-persistence.md`).
-* `ThreadService` — rendered threads: ListItems, Watch (server stream: an items
+  `docs/notes/workspaces-2-launch.md`. Every thread runs headless (`claude -p` over
+  stream-json, no terminal; the conversation is ThreadService items). The terminal
+  thread mode (Claude's own interface in a PTY) was removed on 2026-10-12
+  (`docs/notes/rendered-only.md`). A session carries lifecycle `state` (starting,
+  connected, closing, disconnected) and `status` (busy, idle, needs-attention; error
+  when the process ended mid-turn) with `status_reason` and `status_changed_at`,
+  persisted (`docs/notes/thread-status-persistence.md`).
+* `ThreadService` — the conversation: ListItems, Watch (server stream: an items
   snapshot, then appended/updated items, text deltas and pending-request changes, all
-  seq-ordered; an open Watch marks the thread's turns seen like an attached terminal),
+  seq-ordered; an open Watch marks the thread's turns seen),
   Send (also while busy), Respond (a permission request or AskUserQuestion: allow,
   allow for session, deny with a reason, answers), Interrupt, SetModel,
   SetPermissionMode, SetEffort (Claude has no live effort switch: the runner restarts
@@ -140,12 +141,11 @@ Services (v1):
   new process gets the session's allow-for-session grants again as `--allowedTools` /
   `--add-dir`), McpStatus and McpReconnect (the thread's MCP servers as Claude last
   reported them, checked at the start of every turn and cached in memory; Watch carries
-  each check; `docs/notes/mcp-panel.md`).
-  Refuses terminal threads (`docs/notes/rendered-threads-1-daemon.md`,
-  `docs/notes/rendered-threads-3-interaction.md`).
+  each check; `docs/notes/mcp-panel.md`). See `docs/notes/rendered-threads-1-daemon.md`
+  and `docs/notes/rendered-threads-3-interaction.md`.
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
   chunks), Write (input bytes), Resize, Detach, Kill, Remove, and Close (kill, wait for
-  the exit, remove; shells only, a thread's Claude terminal is refused).
+  the exit, remove; shells only).
 * `RepoService` — Register (a git repository, or any folder as a project without git;
   "~" expands, the path must be absolute; the Add Project dialog's Local folder tab calls
   it directly, the CLI through `repo add <folder>`),
@@ -180,7 +180,7 @@ Services (v1):
   CLI).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
   intents (sources repo, workspace, terminal, session, thread, gh, gitops, settings,
-  update, ui; the thread source carries rendered threads' pending requests only, a
+  update, ui; the thread source carries threads' pending requests only, a
   snapshot then changes, never items; filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream; the per-service Watch RPCs remain for the CLI and tests.
@@ -230,13 +230,14 @@ PTY (creack/pty) ──reader goroutine──► tee ──► libghostty-vt (fe
   is a byte sequence xterm.js can consume after a reset. If the binding cannot serialize
   scrollback, fall back to replaying the ring buffer for primary-screen history.
 * Slow subscribers are dropped, not blocked. The PTY reader never stalls on a client.
-* The terminal store is program-agnostic. It spawns argv/env/cwd. "This is Claude" is the
-  session store's concern. A plain shell terminal is a first-class use.
+* The terminal store is program-agnostic. It spawns argv/env/cwd. Shells are its only
+  production use since threads run headless; its Observer and ScreenText hooks remain
+  for a future program that wants them.
 * Resize is driven by the attached GUI terminal; the daemon applies it to the PTY and vt.
   With no attachment, size is the last known size.
 * Labels are opaque to the store; their contract lives in `internal/termlabel`: `kind`
-  (`shell` on a shell `terminal.new` started), `session` (the owning thread; also on a
-  thread's Claude terminal), `repo` and `worktree` (the owning worktree). `terminal.new`
+  (`shell` on a shell `terminal.new` started), `session` (the owning thread), `repo` and
+  `worktree` (the owning worktree). `terminal.new`
   gives every shell an owner (thread, else worktree) and refuses a cwd outside every
   registered project. The shell reaper (`internal/daemon/shells.go`) removes a shell when
   it exits or when its worktree, project or thread goes away, with a periodic sweep for
@@ -244,12 +245,11 @@ PTY (creack/pty) ──reader goroutine──► tee ──► libghostty-vt (fe
 
 ## 6. Session store
 
-Layers Claude-specific knowledge on top of terminal:
+Owns the Claude processes. It uses the terminal store only to reap a thread's shells.
 
-* Spawns `claude` in a worktree with the chosen model/effort/permission-mode flags and
-  the first prompt as a positional argument (a rendered thread: `claude -p` over
-  stream-json through `internal/claudestream`, the first prompt as the first user
-  message with image blocks; see below), records the Claude
+* Spawns `claude -p` over stream-json in a worktree with the chosen
+  model/effort/permission-mode flags through `internal/claudestream` and sends the first
+  prompt as the first user message (with image blocks; see below). It records the Claude
   session id (from `~/.claude/projects/<slug>/*.jsonl`) so dead sessions can be resumed
   with `claude --resume`.
 * A thread has one owner: its workspace when `workspace_id` is set, else its project
@@ -258,25 +258,23 @@ Layers Claude-specific knowledge on top of terminal:
   store and adds `--add-dir` for each other member,
   `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`, and one static
   `--append-system-prompt` line pointing at `code-foundry workspace members`.
-  `SessionService.RunIn` moves a workspace thread to another member by typing `/cd`
-  once it is idle at its prompt (`docs/notes/workspaces-2-launch.md`).
-* **Status detection** (busy / idle / needs-attention) derives from observing the output
-  stream and the JSONL transcript. It is a pure function over observed events with table
-  tests. It is never inferred from rendering. The status is persisted: a disconnected
-  thread keeps the one it ended with (busy becomes error "interrupted"), across daemon
-  restarts, until a reconnect's detector replaces it
-  (`docs/notes/thread-status-persistence.md`).
-* **Rendered threads** run on the same runner type with a stdio loop instead of the
-  PTY loop (`stream.go`): `internal/claudestream` speaks the control protocol
-  (initialize handshake, `can_use_tool` routed to the store, interrupt, set_model,
-  set_permission_mode, set_cwd for RunIn). The stream is projected into `thread_items`
-  (user message, assistant text, thinking, tool call, permission request, question,
-  turn end, error, compaction, command output): streaming items stay in memory and are
-  written when complete, so a restart rehydrates them and a reconnect appends. Status
-  comes from the stream (busy from send to result, needs-attention while a request is
-  pending, finished until seen), not a screen. Transcript tailing (naming, usage, PR
-  links, `/clear`) is shared with terminal threads
-  (`docs/notes/rendered-threads-1-daemon.md`). Each turn end carries the turn's own cost
+  `SessionService.RunIn` moves a workspace thread to another member with the control
+  protocol's `set_cwd` once it is idle (`docs/notes/workspaces-2-launch.md`, superseded
+  on the typing detail by `docs/notes/rendered-only.md`).
+* **Status** (busy / idle / needs-attention) comes from the stream, never from a screen:
+  busy from send to `result`, needs-attention while a `can_use_tool` or question is
+  pending, finished until seen, error when the process exits mid-turn. The status is
+  persisted: a disconnected thread keeps the one it ended with (busy becomes error
+  "interrupted"), across daemon restarts, until a reconnect replaces it
+  (`docs/notes/thread-status-persistence.md`; its screen detector is gone).
+* **The runner** (`runner.go`, `stream.go`): `internal/claudestream` speaks the control
+  protocol (initialize handshake, `can_use_tool` routed to the store, interrupt,
+  set_model, set_permission_mode, set_cwd for RunIn). The stream is projected into
+  `thread_items` (user message, assistant text, thinking, tool call, permission request,
+  question, turn end, error, compaction, command output): streaming items stay in memory
+  and are written when complete, so a restart rehydrates them and a reconnect appends.
+  Transcript tailing (naming, usage, PR links, `/clear`) reads Claude's own JSONL beside
+  the stream (`docs/notes/rendered-threads-1-daemon.md`). Each turn end carries the turn's own cost
   (Claude reports running totals per process; a process's first turn is measured from
   what Claude restores on `--resume`, the resumed transcript's last `cost-state` record,
   read at spawn; unset when the totals do not fit) and the model that replied
@@ -298,7 +296,7 @@ Layers Claude-specific knowledge on top of terminal:
   thread adds its buckets to `usage_retired`. Cost is priced at read time by
   `internal/pricing` (`docs/notes/session-usage.md`).
 * Persists session metadata in SQLite so the sidebar can show resumable sessions after a
-  daemon restart. v1 does not keep PTYs alive across daemon restarts.
+  daemon restart. v1 does not keep Claude processes alive across daemon restarts.
 
 ## 7. Command registry
 
@@ -315,19 +313,13 @@ type Command struct {
 ```
 
 `Context` is what the caller is looking at: active session, active repo/worktree, active
-view, the workspace that owns the active thread or composer (so `session.run-in` is
-offered for workspace threads only), and whether the active thread is rendered (so the
-`thread.*` commands, send/respond/interrupt/items/set-model/set-mode/set-effort/mcp/mcp-reconnect, are
-offered for rendered threads only). The GUI sends its context with `List` and `Invoke`;
+view, and the workspace that owns the active thread or composer (so `session.run-in` is
+offered for workspace threads only; the `thread.*` commands,
+send/respond/interrupt/items/set-model/set-mode/set-effort/mcp/mcp-reconnect, are
+offered whenever a thread is active). The GUI sends its context with `List` and `Invoke`;
 the CLI passes an explicit context from flags or none. The palette, keybindings, and CLI subcommands are three front
 doors to this one registry. Adding a feature means registering commands, not editing a
 switch.
-
-Two thread views, fixed for a thread's life: **terminal** (Claude Code's own interface in
-a PTY, attached as a terminal) and **rendered** (`claude -p` over stream-json, drawn by the
-GUI from thread items). `session.new --render terminal|rendered` picks one; a Create
-without it (the CLI, `pr.ask` / `pr.explain` / `pr.fix.findings`) gets the
-`sessions.render` setting (default terminal); fork and reconnect keep the thread's.
 
 Pull request commands: the detail panel's actions (`pr.merge`, `pr.revert`,
 `pr.review.request`, `pr.refresh`; docs/notes/gh-pr-detail.md) and the session starters `pr.ask`,
@@ -344,16 +336,11 @@ from the pull request (docs/notes/pr-thread-commands.md).
   components subscribe to the narrowest selector. Lists are virtualized. No global
   re-render on daemon events.
 * Connection budget: the GUI holds exactly one `EventService.Watch` stream plus at most
-  two `TerminalService.Attach` streams: the content pane's (a thread's Claude terminal,
-  or for a rendered thread its `ThreadService.Watch`) and the bottom panel's active
-  shell, each only while it is visible. Everything else is unary, except a
+  two long-lived streams: the content pane's `ThreadService.Watch` and the bottom
+  panel's active shell `TerminalService.Attach`, each only while it is visible. Everything else is unary, except a
   `RepoService.Clone` stream while the Add Project dialog clones a repository. This keeps
   the browser's six HTTP/1.1 connections per origin mostly free.
-* The new-thread composer's View picker (Terminal | Rendered) starts at the
-  `sessions.render` setting and follows it until the user picks; the choice goes out as
-  `session.new --render`. A rendered thread's header says "rendered"; the sidebar row is
-  the same for both views.
-* A rendered thread's content pane is `components/thread` (lazy-loaded): a virtualized
+* A thread's content pane is `components/thread`: a virtualized
   work-log timeline built from the items' structure (`lib/threadTimeline.ts`; text deltas
   re-render only their row), turns that fold under their footer once finished (the latest
   stays open), inline diffs, lowlight-highlighted markdown in the terminal palette, and the
@@ -364,11 +351,11 @@ from the pull request (docs/notes/pr-thread-commands.md).
   answering (`thread.respond`; every pending request docks, oldest first, answerable by
   click or 1/2/3) and the model / mode / effort pickers are the `thread.*` commands
   (`docs/notes/rendered-threads-2-gui.md`, `docs/notes/rendered-threads-3-interaction.md`).
-* Only visible terminals are attached. Switching sessions (or bottom panel tabs) detaches
-  the old stream and attaches the new one. Background sessions cost nothing in the frontend. Attaching is
-  also how the daemon knows a session is being looked at: while a session's terminal has
-  an Attach subscriber, finished turns count as seen (see
-  `docs/notes/phase2-integration.md`).
+* Only the visible thread is watched and only the visible shell is attached. Switching
+  sessions (or bottom panel tabs) ends the old stream and opens the new one. Background
+  sessions cost nothing in the frontend. Watching is also how the daemon knows a thread
+  is being looked at: while a thread has a Watch subscriber, finished turns count as
+  seen (`docs/notes/phase2-integration.md` describes the same rule for the old Attach).
 * Layout: a draggable title strip under the hidden-inset traffic lights, sidebar (Pull
   Requests and Projects entries, then a flat list of threads and nothing else: pinned
   threads, then the ones waiting on the user (prompts, then errors), finished turns and
@@ -376,7 +363,7 @@ from the pull request (docs/notes/pr-thread-commands.md).
   under a collapsible Working header that counts them; each row says its status in words
   on its second line (or project and branch) with a hover tooltip; a status row at its
   foot; see `docs/notes/workspaces-4-sidebar.md`, `docs/notes/thread-list.md` and
-  `docs/notes/sidebar-working-section.md`), content (a thread's Claude terminal or its rendered conversation, the Pull Requests
+  `docs/notes/sidebar-working-section.md`), content (a thread's conversation, the Pull Requests
   page, the Projects page with each project's worktrees and each workspace's members, or
   the composer; a worktree's overview is a side panel tab, not a page; a shell is never
   selected), command palette overlay. Under the content pane, a thread and the Projects
@@ -401,7 +388,7 @@ from the pull request (docs/notes/pr-thread-commands.md).
   `docs/notes/worktree-panel-tab.md`, `docs/notes/workspaces-5-panel.md`) and Linked PRs (the
   thread's linked pull requests, newest first, each opening as a PR tab; opened by L,
   `view.panel.linked-prs`, the thread header and the sidebar's PR badge;
-  `docs/notes/linked-prs.md`) and MCP (a rendered thread's MCP servers, one card each
+  `docs/notes/linked-prs.md`) and MCP (the thread's MCP servers, one card each
   with status, error, tools and Reconnect; opened by M and `view.panel.mcp`;
   `docs/notes/mcp-panel.md`). Every
   palette command is reachable without the mouse, and common ones also have buttons that
@@ -428,7 +415,7 @@ from the pull request (docs/notes/pr-thread-commands.md).
 
 * Features add files, not edits. Registries over switch statements. Messages owned by the
   emitter.
-* Pure functions with table tests for anything with branches: status detection, layout,
+* Pure functions with table tests for anything with branches: stream status, layout,
   command availability, snapshot serialization.
 * Every store has an interface in its own package and a fake in `<store>/<store>test`.
 * Go 1.26 (required by the libghostty-vt bindings). `context.Context` first, errors wrapped with `%w`, no panics outside `main`.
