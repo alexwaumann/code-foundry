@@ -1875,7 +1875,10 @@ export const ThreadService: GenService<{
   },
   /**
    * Send sends a user message to a connected thread. Allowed while a turn runs:
-   * Claude queues it or folds it in.
+   * Claude queues it or folds it in. A message whose first non-blank line starts with a
+   * slash command the app replaces (/model, /effort, /fast, /mcp, /rename, /clear, and
+   * the aliases /reset, /new, /name) is INVALID_ARGUMENT, nothing sent or recorded; the
+   * error's message is a sentence pointing at the app's control, shown as it is.
    *
    * @generated from rpc codefoundry.v1.ThreadService.Send
    */

@@ -71,7 +71,10 @@ type ThreadServiceClient interface {
 	// events whose seq is greater than the snapshot's.
 	Watch(context.Context, *connect.Request[v1.WatchThreadRequest]) (*connect.ServerStreamForClient[v1.ThreadEvent], error)
 	// Send sends a user message to a connected thread. Allowed while a turn runs:
-	// Claude queues it or folds it in.
+	// Claude queues it or folds it in. A message whose first non-blank line starts with a
+	// slash command the app replaces (/model, /effort, /fast, /mcp, /rename, /clear, and
+	// the aliases /reset, /new, /name) is INVALID_ARGUMENT, nothing sent or recorded; the
+	// error's message is a sentence pointing at the app's control, shown as it is.
 	Send(context.Context, *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error)
 	// Respond answers a pending permission request or question.
 	Respond(context.Context, *connect.Request[v1.RespondThreadRequest]) (*connect.Response[v1.RespondThreadResponse], error)
@@ -271,7 +274,10 @@ type ThreadServiceHandler interface {
 	// events whose seq is greater than the snapshot's.
 	Watch(context.Context, *connect.Request[v1.WatchThreadRequest], *connect.ServerStream[v1.ThreadEvent]) error
 	// Send sends a user message to a connected thread. Allowed while a turn runs:
-	// Claude queues it or folds it in.
+	// Claude queues it or folds it in. A message whose first non-blank line starts with a
+	// slash command the app replaces (/model, /effort, /fast, /mcp, /rename, /clear, and
+	// the aliases /reset, /new, /name) is INVALID_ARGUMENT, nothing sent or recorded; the
+	// error's message is a sentence pointing at the app's control, shown as it is.
 	Send(context.Context, *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error)
 	// Respond answers a pending permission request or question.
 	Respond(context.Context, *connect.Request[v1.RespondThreadRequest]) (*connect.Response[v1.RespondThreadResponse], error)

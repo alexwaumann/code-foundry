@@ -74,34 +74,98 @@ func names(cs []SlashCommand) []string {
 func TestDeniedSlashCommand(t *testing.T) {
 	tests := []struct {
 		name, description string
-		want              SlashDenial
-		denied            bool
+		reason            SlashDenyReason // "" when offered
 	}{
-		{"model", "Set the AI model for Claude Code", SlashDenial{SlashReplaced, "the composer's model picker"}, true},
-		{"effort", "Set effort level", SlashDenial{SlashReplaced, "the composer's effort picker"}, true},
-		{"clear", "Start a new session", SlashDenial{SlashReplaced, "a new thread"}, true},
-		{"mcp", "Manage MCP servers", SlashDenial{SlashReplaced, "the MCP panel"}, true},
-		{"rename", "Rename the current conversation", SlashDenial{SlashReplaced, "Rename Thread"}, true},
-		{"fast", "Toggle fast mode", SlashDenial{SlashReplaced, "the composer's model picker"}, true},
-		{"heapdump", "Dump the JS heap", SlashDenial{Reason: SlashTerminalOnly}, true},
-		{"__remote-workflow", "Run the workflow script", SlashDenial{Reason: SlashTerminalOnly}, true},
-		{"reload-skills", "Pick up skills added or changed on disk", SlashDenial{Reason: SlashTerminalOnly}, true},
-		{"agents", "(removed) Ask Claude to create/manage subagents", SlashDenial{Reason: SlashRetired}, true},
-		{"extra-usage", "Renamed to /usage-credits", SlashDenial{Reason: SlashRetired}, true},
-		{"someday", "(removed) gone", SlashDenial{Reason: SlashRetired}, true},
-		{"was", "Renamed to /is", SlashDenial{Reason: SlashRetired}, true},
-		{"compact", "Free up context by summarizing the conversation so far", SlashDenial{}, false},
-		{"context", "Show current context usage", SlashDenial{}, false},
-		{"usage", "Show session cost", SlashDenial{}, false},
-		{"design", "Grant or revoke Claude agent access to your Design projects", SlashDenial{}, false},
-		{"note", "A description mentioning (removed) later", SlashDenial{}, false},
-		{"", "", SlashDenial{}, false},
+		{"model", "Set the AI model for Claude Code", SlashReplaced},
+		{"effort", "Set effort level", SlashReplaced},
+		{"clear", "Start a new session", SlashReplaced},
+		{"mcp", "Manage MCP servers", SlashReplaced},
+		{"rename", "Rename the current conversation", SlashReplaced},
+		{"fast", "Toggle fast mode", SlashReplaced},
+		{"heapdump", "Dump the JS heap", SlashTerminalOnly},
+		{"__remote-workflow", "Run the workflow script", SlashTerminalOnly},
+		{"reload-skills", "Pick up skills added or changed on disk", SlashTerminalOnly},
+		{"agents", "(removed) Ask Claude to create/manage subagents", SlashRetired},
+		{"extra-usage", "Renamed to /usage-credits", SlashRetired},
+		{"someday", "(removed) gone", SlashRetired},
+		{"was", "Renamed to /is", SlashRetired},
+		{"compact", "Free up context by summarizing the conversation so far", ""},
+		{"context", "Show current context usage", ""},
+		{"usage", "Show session cost", ""},
+		{"design", "Grant or revoke Claude agent access to your Design projects", ""},
+		{"note", "A description mentioning (removed) later", ""},
+		{"", "", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, denied := DeniedSlashCommand(tt.name, tt.description)
-			if got != tt.want || denied != tt.denied {
-				t.Errorf("DeniedSlashCommand(%q, %q) = %+v, %v; want %+v, %v", tt.name, tt.description, got, denied, tt.want, tt.denied)
+			if got.Reason != tt.reason || denied != (tt.reason != "") {
+				t.Errorf("DeniedSlashCommand(%q, %q) = %+v, %v; want %q", tt.name, tt.description, got, denied, tt.reason)
+			}
+			// Only the replaced group is refused at send time, so only it has a refusal.
+			if (got.Refusal != "") != (tt.reason == SlashReplaced) {
+				t.Errorf("refusal %q for a %q denial", got.Refusal, got.Reason)
+			}
+		})
+	}
+}
+
+func TestRefusedSlashCommand(t *testing.T) {
+	offered := func(names ...string) func(string) bool {
+		return func(n string) bool { return slices.Contains(names, n) }
+	}
+	tests := []struct {
+		name     string
+		text     string
+		offers   func(string) bool
+		replaces string // "" when it goes through
+		message  string
+	}{
+		{"clear", "/clear", nil, "clear", "Start a new thread instead of clearing this one."},
+		{"model with an argument", "/model opus", nil, "model", "Change the model with the composer's model selector (or `thread.set-model`), not /model."},
+		{"effort", "/effort high", nil, "effort", "Change the effort with the composer's effort selector (or `thread.set-effort`), not /effort."},
+		{"fast", "/fast on", nil, "fast", "Pick the model with the composer's model selector (or `thread.set-model`), not /fast."},
+		{"mcp", "/mcp reconnect github", nil, "mcp", "Manage MCP servers in the MCP panel (or `thread.mcp`), not /mcp."},
+		{"rename", "/rename my thread", nil, "rename", "Rename the thread with Rename Thread (or `session.rename`), not /rename."},
+		{"leading whitespace", "  \t/clear", nil, "clear", ""},
+		{"leading blank lines", "\n\n  /clear\n", nil, "clear", ""},
+		{"tab after the name", "/model\topus", nil, "model", ""},
+		{"crlf", "/clear\r\nthen this", nil, "clear", ""},
+		{"multi-line, command first", "/clear\nand start over", nil, "clear", ""},
+		{"multi-line, command later", "please summarise\n/clear", nil, "", ""},
+		{"a longer name is not the command", "/clearly", nil, "", ""},
+		{"a skill sharing the prefix", "/model-review the diff", nil, "", ""},
+		{"case-sensitive", "/Clear", nil, "", ""},
+		{"not first on the line", "run /clear", nil, "", ""},
+		{"a bare slash", "/", nil, "", ""},
+		{"a path", "/Users/alex/notes.txt is the file", nil, "", ""},
+		{"terminal-only commands go through", "/color red", nil, "", ""},
+		{"retired commands go through", "/agents", nil, "", ""},
+		{"kept commands go through", "/compact keep the plan", nil, "", ""},
+		{"an alias of clear", "/reset", nil, "clear", "Start a new thread instead of clearing this one."},
+		{"another alias of clear", "/new", offered("compact"), "clear", ""},
+		{"an alias of rename", "/name better", nil, "rename", ""},
+		{"an alias the thread offers as a command", "/new idea", offered("new"), "", ""},
+		{"a name the thread offers is still refused", "/clear", offered("clear"), "clear", ""},
+		{"empty", "", nil, "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := refusedSlashCommand(tt.text, tt.offers)
+			if tt.replaces == "" {
+				if got != nil {
+					t.Fatalf("refused %q: %+v", tt.text, got)
+				}
+				return
+			}
+			if got == nil || got.Replaces != tt.replaces {
+				t.Fatalf("refusedSlashCommand(%q) = %+v, want %s", tt.text, got, tt.replaces)
+			}
+			if tt.message != "" && got.Error() != tt.message {
+				t.Errorf("message %q", got.Error())
+			}
+			if !errors.Is(got, ErrInvalidArgument) {
+				t.Error("not an invalid argument")
 			}
 		})
 	}
@@ -313,6 +377,18 @@ func TestRenderedSlashCommands(t *testing.T) {
 	}
 	if cs, err := re.m.SlashCommands(re.ctx(), s.ID); err != nil || len(cs) != 42 {
 		t.Errorf("SlashCommands = %d, %v", len(cs), err)
+	}
+
+	// A command the app replaces is refused: nothing reaches Claude, no item.
+	sentBefore, itemsBefore := len(re.sent()), len(re.items(s.ID).Items)
+	_, err := re.m.Send(re.ctx(), s.ID, Message{Text: "/clear"})
+	var ref *SlashRefusal
+	if !errors.As(err, &ref) || !errors.Is(err, ErrInvalidArgument) || err.Error() != "Start a new thread instead of clearing this one." {
+		t.Errorf("send /clear: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if len(re.sent()) != sentBefore || len(re.items(s.ID).Items) != itemsBefore {
+		t.Errorf("a refused send wrote %d lines, %d items", len(re.sent())-sentBefore, len(re.items(s.ID).Items)-itemsBefore)
 	}
 
 	// A turn in which Claude discovers skills.

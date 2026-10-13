@@ -52,6 +52,11 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	if err != nil {
 		return Item{}, err
 	}
+	// "/clear" and the like: the app has its own control (slashdeny.go).
+	if ref := refusedSlashCommand(msg.Text, r.st.log.offersSlashCommand); ref != nil {
+		m.log.Info("refused a slash command the app replaces", "session", id, "command", ref.Command)
+		return Item{}, ref
+	}
 	attachments, err := checkAttachments(m.opts.AttachmentsDir, msg.Attachments)
 	if err != nil {
 		return Item{}, err

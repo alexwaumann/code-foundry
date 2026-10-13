@@ -94,6 +94,13 @@ func (t *threadLog) setSlashCommands(cs []SlashCommand) {
 	bus.Publish[ThreadEvent](t.bus, SlashCommandsChanged{SessionID: t.id, Seq: t.seq, Commands: cs})
 }
 
+// offersSlashCommand reports whether the running thread offers a command called name.
+func (t *threadLog) offersSlashCommand(name string) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return slices.ContainsFunc(t.commands, func(c SlashCommand) bool { return c.Name == name })
+}
+
 func (t *threadLog) slashCommands() []SlashCommand {
 	t.mu.Lock()
 	defer t.mu.Unlock()

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"testing"
@@ -95,5 +96,15 @@ func TestThreadSlashCommands(t *testing.T) {
 	none, err := c.SlashCommands(ctx, connect.NewRequest(&v1.SlashCommandsRequest{SessionId: "s1"}))
 	if err != nil || len(none.Msg.GetCommands()) != 0 {
 		t.Errorf("not running %v %v", none, err)
+	}
+}
+
+// A refused slash command reaches the client as InvalidArgument whose message is the
+// refusal alone (the GUI shows it under the composer).
+func TestSlashRefusalError(t *testing.T) {
+	err := sessionError(&session.SlashRefusal{Command: "clear", Replaces: "clear", Message: "Start a new thread instead of clearing this one."})
+	var ce *connect.Error
+	if !errors.As(err, &ce) || ce.Code() != connect.CodeInvalidArgument || ce.Message() != "Start a new thread instead of clearing this one." {
+		t.Errorf("mapped to %v", err)
 	}
 }
