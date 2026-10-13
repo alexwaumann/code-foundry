@@ -158,6 +158,19 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
   const wasDisconnected = useRef(disconnected);
   // Where the keyboard was when this request came in (kept across StrictMode's effect replay).
   const request = useRef<{ key: string; before: Element | null } | null>(null);
+  // Settled a frame after mount: the editor (recreated by StrictMode's replay in dev) is
+  // the one that stays, so a focus request can be served at once.
+  const settled = useRef(false);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      settled.current = true;
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      settled.current = false;
+    };
+  }, []);
+  const rootOrCard = (el: Element | null): boolean => el !== null && (rootRef.current?.contains(el) === true || el === reconnectRef.current);
   useEffect(() => {
     const asked = handledPromptSeq !== focusSeq || seenContent.current !== contentFocusSeq;
     const flipped = wasDisconnected.current !== disconnected;
@@ -166,19 +179,34 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
     const key = `${String(focusSeq)}:${String(contentFocusSeq)}:${String(disconnected)}`;
     if (request.current?.key !== key) request.current = { key, before: document.activeElement };
     const { before } = request.current;
-    const raf = requestAnimationFrame(() => {
-      handledPromptSeq = focusSeq;
-      seenContent.current = contentFocusSeq;
+    // At once when the composer has settled (a key pressed right after must reach the
+    // prompt, not the palette input closing over it), else on the next frame (a composer
+    // just mounted, or a prompt or card that just replaced the other: its editor may still
+    // be replaced).
+    const attempt = (): boolean => {
       const panel = getPanel();
       if (panel.open && panel.expanded) {
         if (asked) useUiStore.setState((u) => ({ panelFocusSeq: u.panelFocusSeq + 1 }));
-        return;
+        return true;
       }
       // Something took the keyboard meanwhile (the side panel, the inline rename a
       // double-click on the sidebar row starts): leave it there.
       const now = document.activeElement;
-      if (now !== before && now !== null && now !== document.body) return;
+      if (now !== before && now !== null && now !== document.body && !rootOrCard(now)) return true;
       (editorRef.current ?? reconnectRef.current)?.focus();
+      return rootOrCard(document.activeElement);
+    };
+    const done = () => {
+      handledPromptSeq = focusSeq;
+      seenContent.current = contentFocusSeq;
+    };
+    if (settled.current && !flipped && attempt()) {
+      done();
+      return;
+    }
+    const raf = requestAnimationFrame(() => {
+      done();
+      attempt();
     });
     return () => {
       cancelAnimationFrame(raf);
