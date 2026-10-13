@@ -244,6 +244,20 @@ func (re *renderedEnv) deliveries(text string) (fresh, resumed int) {
 	return fresh, resumed
 }
 
+// waitDeliveries polls deliveries(text) until ok holds or a deadline passes, then
+// returns the last counts (the caller reports them).
+func (re *renderedEnv) waitDeliveries(text string, ok func(fresh, resumed int) bool) (fresh, resumed int) {
+	re.t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		fresh, resumed = re.deliveries(text)
+		if ok(fresh, resumed) || time.Now().After(deadline) {
+			return fresh, resumed
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 // runnerOf is the thread's runner.
 func (re *renderedEnv) runnerOf(id string) *runner {
 	re.m.mu.Lock()
@@ -304,7 +318,10 @@ func TestRenderedSetEffortGap(t *testing.T) {
 					t.Fatalf("send: %v", err)
 				}
 				re.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && turnOver(s) })
-				if fresh, resumed := re.deliveries("held"); fresh != 0 || resumed != 1 {
+				// The session can publish the applied state a moment before the held
+				// message is written to the new process's stdin: wait for the delivery.
+				fresh, resumed := re.waitDeliveries("held", func(fresh, resumed int) bool { return fresh == 0 && resumed == 1 })
+				if fresh != 0 || resumed != 1 {
 					t.Errorf("held message delivered %d times to the old process, %d to the new", fresh, resumed)
 				}
 			},
