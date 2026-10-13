@@ -24,6 +24,7 @@ import { interruptThread, sendThreadDraft, setThreadEffort, setThreadModel, setT
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { ColdCacheNote } from "./ColdCacheNote";
+import { RetryNote } from "./RetryNote";
 import { PendingPrompts, type PromptKeys } from "./PendingPrompt";
 
 const TRIGGERS: readonly TriggerChar[] = ["/", "@"];
@@ -279,6 +280,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
         }}
       >
         {docked && <PendingPrompts pending={pending} keysRef={promptKeys} refocus={refocus} />}
+        <RetryNote sessionId={sessionId} />
         <ColdCacheNote sessionId={sessionId} pending={pending.length} />
         <div
           className="col-span-2 flex min-w-0 flex-col"

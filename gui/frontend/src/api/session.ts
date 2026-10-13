@@ -105,6 +105,24 @@ export interface SessionView {
   cacheExpiresAtMs: number | null;
   /** What re-reading contextTokens costs once the cache expired, USD; 0 when unpriced. */
   contextRereadUsd: number;
+  /**
+   * Claude waits to retry a failed API request (a 429, a 529, a 5xx, a connection
+   * error); null otherwise. docs/notes/api-retry-note.md.
+   */
+  retry: ApiRetryView | null;
+}
+
+/** A thread's pending API retry (Claude's system/api_retry frame). */
+export interface ApiRetryView {
+  /** Counts from 1 to maxRetries. */
+  attempt: number;
+  maxRetries: number;
+  /** When the retry is due, epoch ms. */
+  retryAtMs: number;
+  /** The HTTP status of the failed request; 0 for a connection error with no response. */
+  errorStatus: number;
+  /** Claude's category: "rate_limit", "overloaded", "server_error", ... */
+  error: string;
 }
 
 /** One subagent run of a thread (a Claude Code Agent tool call). */
@@ -243,6 +261,9 @@ export function toSessionView(s: Session): SessionView {
     contextTokens: Number(s.contextTokens),
     cacheExpiresAtMs: s.cacheExpiresAt ? timestampMs(s.cacheExpiresAt) : null,
     contextRereadUsd: s.contextRereadUsd,
+    retry: s.retry
+      ? { attempt: s.retry.attempt, maxRetries: s.retry.maxRetries, retryAtMs: s.retry.retryAt ? timestampMs(s.retry.retryAt) : 0, errorStatus: s.retry.errorStatus, error: s.retry.error }
+      : null,
   };
 }
 

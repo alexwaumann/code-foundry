@@ -36,6 +36,8 @@ func Parse(line []byte) Event {
 			ev = &Status{}
 		case "permission_denied":
 			ev = &PermissionDenied{}
+		case "api_retry":
+			ev = &APIRetry{}
 		case "compact_boundary":
 			ev = &CompactBoundary{}
 		case "thinking_tokens":

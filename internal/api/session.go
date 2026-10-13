@@ -242,6 +242,9 @@ func sessionToProto(s session.Session) *v1.Session {
 	if !s.CacheExpiresAt.IsZero() {
 		p.CacheExpiresAt = timestamppb.New(s.CacheExpiresAt)
 	}
+	if r := s.Retry; r != nil {
+		p.Retry = &v1.ApiRetry{Attempt: int32(r.Attempt), MaxRetries: int32(r.MaxRetries), RetryAt: timestamppb.New(r.RetryAt), ErrorStatus: int32(r.Status), Error: r.Error}
+	}
 	return p
 }
 

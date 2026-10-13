@@ -378,10 +378,39 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 	case *claudestream.ConversationReset:
 		r.log().info("claude reset the conversation (/clear)", "to", e.NewConversationID)
 		r.m.recordContext(r.id, 0, "")
+	case *claudestream.APIRetry:
+		r.onAPIRetry(e)
 	}
+	r.clearRetry(ev)
 	r.checkStatus()
 	r.tryCd()
 	r.maybeRestart()
+}
+
+// onAPIRetry records that Claude waits to retry a failed API request (Session.Retry),
+// so the thread says why it is quiet. Published, not persisted; cleared by clearRetry.
+func (r *runner) onAPIRetry(e *claudestream.APIRetry) {
+	status := 0
+	if e.ErrorStatus != nil {
+		status = *e.ErrorStatus
+	}
+	retry := &APIRetry{Attempt: e.Attempt, MaxRetries: e.MaxRetries, Status: status, Error: e.Error, RetryAt: r.activity.Add(time.Duration(e.RetryDelayMs) * time.Millisecond)}
+	r.log().info("claude retries an API request", "attempt", e.Attempt, "max_retries", e.MaxRetries, "retry_in_ms", e.RetryDelayMs, "status", status, "error", e.Error)
+	r.m.update(r.id, false, func(rec *record) { rec.s.Retry = retry })
+}
+
+// clearRetry drops Session.Retry on the first frame after an api_retry that is not
+// another one: nothing announces a retry's success, so the next frame of any other kind
+// is the signal (Claude's own REPL clears its banner the same way). Unknown frames
+// count too: they are Claude's, so the request went through.
+func (r *runner) clearRetry(ev claudestream.Event) {
+	if _, retry := ev.(*claudestream.APIRetry); retry {
+		return
+	}
+	if s, ok := r.m.Snapshot().Session(r.id); !ok || s.Retry == nil {
+		return
+	}
+	r.m.update(r.id, false, func(rec *record) { rec.s.Retry = nil })
 }
 
 // wireModes maps the permission modes Claude reports to the row's.

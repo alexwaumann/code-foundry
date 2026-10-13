@@ -407,6 +407,17 @@ describe("events mapping", () => {
     expect(retired).toEqual({ kind: "retiredUsage", buckets: [view] });
   });
 
+  it("maps a thread's pending API retry", () => {
+    expect(toSessionView(create(SessionSchema, { id: "s0" })).retry).toBeNull();
+    expect(toSessionView(create(SessionSchema, { id: "s1", retry: { attempt: 3, maxRetries: 10, retryAt: timestampFromMs(20_000), errorStatus: 429, error: "rate_limit" } })).retry).toEqual({
+      attempt: 3,
+      maxRetries: 10,
+      retryAtMs: 20_000,
+      errorStatus: 429,
+      error: "rate_limit",
+    });
+  });
+
   it("maps a thread's context totals and cache expiry", () => {
     expect(toSessionView(create(SessionSchema, { id: "s0" }))).toMatchObject({ contextTokens: 0, cacheExpiresAtMs: null, contextRereadUsd: 0 });
     expect(toSessionView(create(SessionSchema, { id: "s1", contextTokens: 25_700n, cacheExpiresAt: timestampFromMs(3_600_000), contextRereadUsd: 0.0514 }))).toMatchObject({

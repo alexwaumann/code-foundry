@@ -184,6 +184,23 @@ type Session struct {
 	// CacheExpiresAt is LastResultAt plus the store's cache TTL (Manager.SetCacheTTL);
 	// zero when LastResultAt is. Derived, not persisted.
 	CacheExpiresAt time.Time
+	// Retry is set while Claude waits to retry a failed API request (system/api_retry:
+	// a 429, a 529, a 5xx, a connection error) and nil once any other frame follows or
+	// the process ends. Not persisted. See docs/notes/api-retry-note.md.
+	Retry *APIRetry
+}
+
+// APIRetry is one api_retry frame of a thread's stream (stream.go): Claude retries a
+// failed API request at RetryAt. A value in Session.Retry: never mutated once set.
+type APIRetry struct {
+	// Attempt counts from 1 to MaxRetries.
+	Attempt, MaxRetries int
+	// RetryAt is when the retry is due (the frame's time plus retry_delay_ms).
+	RetryAt time.Time
+	// Status is the HTTP status of the failed request; 0 for a connection error.
+	Status int
+	// Error is Claude's category: "rate_limit", "overloaded", "server_error", ...
+	Error string
 }
 
 // Snapshot is every session, sorted by creation time then id. Never mutate it.

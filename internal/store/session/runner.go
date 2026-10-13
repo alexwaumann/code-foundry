@@ -328,6 +328,7 @@ func (r *runner) finish(fn func(*Session)) {
 		}
 		s.PendingWorktreePath = ""
 		s.EffortPending = false // the next spawn uses the row's effort
+		s.Retry = nil           // the process is gone, so is the request it retried
 		s.setStatus(st, reason, now)
 		if r.activity.After(s.LastActivityAt) {
 			s.LastActivityAt = r.activity
