@@ -128,12 +128,13 @@ in `mcp-panel/` (`mcp-{dark,light}.png`, `-panel.png` crops); the live ones are 
   meta, hints, reconnect/attention, `shareMcp`), `surfaces/mcpTarget.test.ts`,
   `surfaces/mcp.test.tsx` (SidePanel: listing, every card, tools and hints, reconnect
   spinner → connected, refusal toast, refresh, first ask, stopped thread), thread store.
-* `make gui-e2e` green: E2E_RESULT. `e2e/mcp-panel.spec.ts`: palette → tab with six
+* `make gui-e2e` green: 632 passed, 28 skipped (the live specs and SHOTS-only screenshots), no failures or flakes (17.6 min). `e2e/mcp-panel.spec.ts`: palette → tab with six
   cards in their states, pills, meta, error, login hint, which cards get Reconnect and
   tools; M and the ShowView open it; tools expand, hint tooltips by hover; Reconnect on
   the failed card → Connecting… with a spinner → Connected with its tools, "3 of 6
   connected", "after reconnecting playwright"; a needs-login refusal toasts; refresh;
   hidden for a terminal thread (panel list, M, palette, ShowView).
+* `make gui-build` green.
 * **Fixture** `internal/claudestream/testdata/mcp.jsonl`, captured 2026-10-12 from Claude
   Code 2.1.296 (haiku, medium, `/Users/alex/.cf-probe/repo`, plus `--mcp-config` with a
   stdio server whose command does not exist; `--strict-mcp-config` not used): system/init
