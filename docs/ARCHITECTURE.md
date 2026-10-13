@@ -289,7 +289,9 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   expiry is that plus the `sessions.cache_ttl_seconds` setting, and the composer says
   when the next message re-reads a cold context
   (`docs/notes/rendered-threads-cold-cache.md`).
-* Auto-naming via an independent `claude -p` call producing a slug.
+* Auto-naming via an independent `claude -p` call producing a short natural title
+  ("Fix the login redirect"); a new worktree's branch is `cf/` + the title's slug
+  (`docs/notes/natural-thread-names.md`).
 * **Linked pull requests** come from Claude's own `pr-link` transcript records: every
   distinct URL in first-seen order, persisted in `session_pull_requests`, backfilled from
   the transcript's history when a thread is resumed (`docs/notes/linked-prs.md`).
