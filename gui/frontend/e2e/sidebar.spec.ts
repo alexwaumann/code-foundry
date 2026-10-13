@@ -110,7 +110,7 @@ test("the sidebar is a flat thread list: waiting threads on top, working ones un
   await expect(d.getByTestId("row-branch")).toHaveText("cf/login");
   await expect(d.getByTestId("row-workspace")).toHaveText("login");
   // No model on the row any more.
-  await expect(d).not.toContainText("haiku");
+  await expect(d).not.toContainText("Haiku");
   // A project thread: no badge.
   const s1 = row(page, "s:s-1");
   await expect(s1.getByTestId("row-project")).toHaveText("code-foundry");
@@ -503,7 +503,7 @@ test("hovering a thread row shows its tooltip: name, project, branch with a work
   await expect(tip.getByTestId("tip-project")).toHaveText("code-foundry");
   await expect(tip.getByTestId("tip-branch")).toHaveText("fix/resizeworktree");
   await expect(tip.getByTestId("tip-branch-chip")).toHaveText("worktree");
-  await expect(tip.getByTestId("tip-model")).toHaveText("Opus (medium)");
+  await expect(tip.getByTestId("tip-model")).toHaveText("Opus 4.8 (medium)");
   await expect(tip.getByTestId("tip-project-chip")).toHaveCount(0);
   // To the right of the sidebar, 220px wide.
   const sidebar = await page.getByTestId("sidebar").boundingBox();
@@ -516,7 +516,7 @@ test("hovering a thread row shows its tooltip: name, project, branch with a work
   await expect(tip).toHaveAttribute("data-session-id", "s-2");
   await expect(tip.getByTestId("tip-branch")).toHaveText("main");
   await expect(tip.getByTestId("tip-branch-chip")).toHaveCount(0);
-  await expect(tip.getByTestId("tip-model")).toHaveText("Sonnet");
+  await expect(tip.getByTestId("tip-model")).toHaveText("Sonnet 5");
 
   // A project without git: a plain folder, the no git chip, no branch row.
   const notes = list(page).locator('[data-row-kind="session"]').filter({ hasText: "Notes 1" });
@@ -525,7 +525,7 @@ test("hovering a thread row shows its tooltip: name, project, branch with a work
   await expect(tip.getByTestId("tip-project")).toHaveText("writingno git");
   await expect(tip.getByTestId("tip-project-chip")).toHaveText("no git");
   await expect(tip.getByTestId("tip-branch")).toHaveCount(0);
-  await expect(tip.getByTestId("tip-model")).toHaveText("Haiku");
+  await expect(tip.getByTestId("tip-model")).toHaveText("Haiku 4.5");
 
   // A click closes it and selects the row; the keyboard never opens one.
   await notes.click();
