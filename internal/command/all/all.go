@@ -94,6 +94,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Repo: d.Repo, Session: d.Session, IsShell: d.IsShellTerminal}),
 		command.RegisterRepo(r, d.Repo, d.NotGit),
 		command.RegisterRepoAdd(r, d.Repo, d.Clone),
+		command.RegisterRepoCleanup(r, command.RepoCleanupDeps{Repo: d.Repo, GitOps: d.GitOps.Backend, NotGit: d.NotGit}),
 		command.RegisterProjects(r, d.Projects),
 		command.RegisterSession(r, d.Session, d.Emitter),
 		command.RegisterThread(r, d.Thread),
