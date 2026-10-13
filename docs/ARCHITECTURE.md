@@ -82,10 +82,11 @@ internal/
     gitops/                git/gh operations per worktree (fetch, pull, push, PR); editor, Finder, browser
     clone/                 gh repo clone into the projects dir with streamed output, then register
     project/               new projects in the projects dir (git init, register); gh repo create to publish
-    update/                release checks via gh, installs with the embedded installer
+    update/                release checks via gh (stable or tip channel), installs with the embedded installer
     workspace/             branch sets: one branch as a worktree in several repos
                            (docs/notes/workspaces-1-store.md)
-  db/                      SQLite (modernc.org/sqlite, WAL) + migrations
+  db/                      SQLite (modernc.org/sqlite, WAL) + migrations; refuses a database
+                           migrated by a newer build (db.ErrNewerSchema)
   client/                  Go client for the daemon API, used by CLI and the Wails host
   paths/                   XDG-ish paths: config dir, socket, token, db, logs, worktrees, projects
   fsx/                     the home-directory boundary and directory completion
@@ -189,12 +190,15 @@ Services (v1):
 * `SettingsService` — GetSchema, Get, Update, Watch over `$CONFIG/settings.toml` (TOML,
   hand-editable, reloaded on change). See `docs/notes/phase3b-settings.md`.
 * `UpdateService` — Get, Check, Install, Relaunch, RequestRestart, Watch. The 24h release
-  check, install progress, and relaunch and restart requests. Nothing restarts
+  check on the `update.channel` setting's channel (stable: the newest full release; tip:
+  the highest release, prereleases included; re-checked at once when the setting
+  changes; `Newer` is the only install rule, so no switch offers a downgrade), install
+  progress, and relaunch and restart requests. Nothing restarts
   automatically. `app.restart` (the GUI's "Restart Now"; confirmed, warning about busy
   threads) publishes `restart_requested`, then the daemon exits like `daemon.restart`;
   GUI hosts relaunch once their Watch stream ends and the new window auto-starts the
   installed daemon. `app.relaunch` and `daemon.restart` do the halves separately. See
-  `docs/notes/update-restart.md`.
+  `docs/notes/update-restart.md` and `docs/notes/release-channels.md`.
 * `WorkspaceService` — List, Create, AddRepo, RemoveRepo, Remove, Members (by id, name,
   or a path inside a member worktree), Watch. See `docs/notes/workspaces-1-store.md`.
   The GUI gets workspaces from EventService's `workspace` source (a `workspaces` slice),

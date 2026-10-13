@@ -133,7 +133,7 @@ are never offered, the GUI shows tips as `vX.Y.Z (tip N)`, and the migrator refu
 database from a newer build. Design record: `docs/notes/release-channels-handoff.md`.
 
 * PR 1 (workflow, release/install scripts, `make promote`, tip pruning): done: see docs/notes/release-channels-1-pipeline.md.
-* PR 2 (`update.channel`, channel-aware source, migration guard, dialog label): not started.
+* PR 2 (`update.channel`, channel-aware source, migration guard, dialog label): done: see docs/notes/release-channels.md.
 
 ### Open items
 

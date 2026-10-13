@@ -15,7 +15,8 @@ const (
 	EnvReleaseRepo = "CODE_FOUNDRY_RELEASE_REPO"
 	// EnvReleaseDir points the updater and the installer at a local directory laid out
 	// like the release repository instead of GitHub: a "latest" file holding the latest
-	// tag, and one directory per tag holding that release's assets. For testing.
+	// stable tag, a "latest-tip" file holding the latest tip tag, and one directory per
+	// tag holding that release's assets. For testing.
 	EnvReleaseDir = "CODE_FOUNDRY_RELEASE_DIR"
 )
 
