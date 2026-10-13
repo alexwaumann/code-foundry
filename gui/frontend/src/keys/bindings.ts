@@ -126,8 +126,9 @@ export function commandBindings(commands: readonly CommandView[]): Map<string, C
 }
 
 /**
- * The command a focused terminal (a bottom panel shell) yields this chord to (see
- * terminalYieldable), so session.close/rename/reconnect still fire from a thread's shell.
+ * The command a focused terminal (a bottom panel shell) or thread prompt
+ * ([data-chord-yield]) yields this chord to (see terminalYieldable), so
+ * session.close/rename, cmd+j and cmd+t still fire while typing to Claude or a shell.
  */
 function terminalYields(chord: string): CommandView | undefined {
   if (!terminalYieldable(chord)) return undefined;
@@ -345,8 +346,8 @@ function isEditable(el: Element | null): boolean {
  * Key precedence:
  *  1. Global view actions (cmd+k, cmd+shift+p, cmd+b, cmd+shift+a, cmd+1..9, zoom) always win
  *     (cmd+1..9 belong to the project picker while it is open).
- *  2. A focused terminal consumes everything else, except cmd chords bound to commands
- *     (see terminalYields).
+ *  2. A focused terminal or thread prompt ([data-chord-yield]) consumes everything else,
+ *     except cmd chords bound to commands (see terminalYields).
  *  3. A focused text field (palette input, rename field) consumes everything else.
  *  4. F2 renames the selected session (the cursor row inside the tree); command
  *     keybindings from CommandService.List for the current context.
@@ -368,7 +369,7 @@ export function handleKeyDown(e: KeyboardEvent): void {
     return;
   }
   const target = e.target instanceof Element ? e.target : null;
-  if (target?.closest("[data-terminal-host]")) {
+  if (target?.closest("[data-terminal-host], [data-chord-yield]")) {
     if (useUiStore.getState().palette.open) return;
     const yielded = terminalYields(chord);
     if (yielded) {

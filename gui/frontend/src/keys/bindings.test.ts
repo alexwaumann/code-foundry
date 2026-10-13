@@ -137,6 +137,22 @@ describe("handleKeyDown precedence", () => {
     expect(isGlobalChord(init.metaKey ? `cmd+${init.key}` : `ctrl+${init.key}`)).toBe(runs);
   });
 
+  it.each<[string, KeyboardEventInit & { key: string }, boolean]>([
+    ["a cmd chord bound to a command runs from the thread prompt", { key: "t", code: "KeyT", metaKey: true }, true],
+    ["an editing chord stays with the prompt", { key: "c", code: "KeyC", metaKey: true }, false],
+    ["a plain key stays with the prompt", { key: "t", code: "KeyT" }, false],
+  ])("thread prompt focus ([data-chord-yield]): %s", (_name, init, runs) => {
+    document.body.insertAdjacentHTML("beforeend", '<div data-chord-yield><div id="pr" contenteditable="true"></div></div>');
+    const prompt = document.getElementById("pr") as HTMLElement;
+    const e = press(prompt, init);
+    expect(e.defaultPrevented).toBe(runs);
+    expect(runCommandForResult).toHaveBeenCalledTimes(runs ? 1 : 0);
+    // A text field outside a prompt keeps every chord.
+    runCommandForResult.mockClear();
+    expect(press(input, init).defaultPrevented).toBe(false);
+    expect(runCommandForResult).not.toHaveBeenCalled();
+  });
+
   it("terminal focus: a cmd chord on a list for an older context waits for the re-list (cmd+t right after focusing a shell)", async () => {
     const commands = useCommandsStore.getState().commands;
     useCommandsStore.setState({ commands: commands.map((c) => (c.name === "terminal.new" ? { ...c, available: false } : c)), contextKey: "older" });
