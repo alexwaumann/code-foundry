@@ -11,10 +11,10 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
-// Store methods for rendered threads (Send, Respond, Interrupt, SetModel,
+// Store methods for live threads (Send, Respond, Interrupt, SetModel,
 // SetPermissionMode). Items and WatchItems are in items.go.
 
-// liveStream returns a rendered thread's runner, or why there is none.
+// liveStream returns a thread's runner, or why there is none.
 func (m *Manager) liveStream(id string) (*runner, Session, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -22,10 +22,7 @@ func (m *Manager) liveStream(id string) (*runner, Session, error) {
 	if err != nil {
 		return nil, Session{}, err
 	}
-	if rec.s.Render != RenderRendered {
-		return nil, rec.s, fmt.Errorf("%w: thread %s runs in a terminal", ErrFailedPrecondition, id)
-	}
-	if rec.run == nil || rec.run.st == nil || rec.s.State == StateClosing {
+	if rec.run == nil || rec.s.State == StateClosing {
 		return nil, rec.s, fmt.Errorf("%w: thread %s is %s; reconnect it first", ErrFailedPrecondition, id, rec.s.State)
 	}
 	return rec.run, rec.s, nil

@@ -1,14 +1,15 @@
-// Package session is the Claude session store. A session is Claude Code running in a
-// worktree, layered on the terminal store: a connected session owns exactly one
-// terminal, a disconnected one owns none and can be reconnected with
-// `claude --resume`.
+// Package session is the Claude session store. A session (a thread) is Claude Code
+// running in a worktree as `claude -p` over stream-json (internal/claudestream): a
+// connected session owns one claude process, a disconnected one owns none and can be
+// reconnected with `claude --resume`. Its conversation is recorded as thread items
+// (Store.Items).
 //
 // The Manager persists sessions in SQLite (they survive daemon restarts as
 // DISCONNECTED), publishes an immutable Snapshot behind an atomic pointer, and emits
 // Updated/Removed events on the bus. Each connected session has one runner goroutine
-// that consumes the terminal's Observer feed, tails the Claude transcript, drives the
-// StatusDetector, accepts the folder-trust dialog if it appears, and runs the graceful
-// close sequence. See docs/notes/phase2a-session.md.
+// that drives the process over stdio, projects the stream into items, derives the
+// status from it, tails the Claude transcript, and runs the graceful close. See
+// docs/notes/rendered-threads-1-daemon.md and docs/notes/rendered-only-daemon.md.
 package session
 
 import (
@@ -33,9 +34,9 @@ type State int
 // States.
 const (
 	StateUnspecified State = iota
-	// StateStarting: process spawned, Claude's UI not yet confirmed.
+	// StateStarting: process spawned, the initialize handshake not answered yet.
 	StateStarting
-	// StateConnected: Claude is running and the session owns a terminal.
+	// StateConnected: Claude is running and answered the handshake.
 	StateConnected
 	// StateClosing: close requested, waiting for the process to exit.
 	StateClosing
@@ -91,35 +92,6 @@ func (p PermissionMode) Flag() string {
 
 func (p PermissionMode) valid() bool { return p >= PermissionDefault && p <= PermissionAuto }
 
-// Render is how a thread runs and is shown. Values mirror codefoundry.v1.SessionRender.
-// A thread's render mode is fixed for its life: Reconnect and Fork keep it.
-type Render int
-
-// Render modes.
-const (
-	// RenderDefault is only meaningful in CreateOptions: the store's default
-	// (Options.DefaultRender, the sessions.render setting). A session never has it.
-	RenderDefault Render = iota
-	// RenderTerminal: claude runs interactively in a PTY the GUI attaches to.
-	RenderTerminal
-	// RenderRendered: claude -p over stream-json; the conversation is recorded as
-	// thread items (Store.Items) and drawn by the GUI. No terminal.
-	RenderRendered
-)
-
-func (r Render) String() string {
-	switch r {
-	case RenderTerminal:
-		return "terminal"
-	case RenderRendered:
-		return "rendered"
-	default:
-		return "default"
-	}
-}
-
-func (r Render) valid() bool { return r >= RenderDefault && r <= RenderRendered }
-
 // Disconnect reasons recorded in Session.DisconnectReason.
 const (
 	ReasonClosed         = "closed"           // closed through Close/Remove
@@ -127,7 +99,7 @@ const (
 	ReasonCrashed        = "crashed"          // process exited non-zero without a close request
 	ReasonDaemonStopped  = "daemon stopped"   // daemon shut down while connected
 	ReasonDaemonRestarts = "daemon restarted" // row was live when the daemon last died
-	ReasonSpawnFailed    = "spawn failed"     // the terminal could not be created
+	ReasonSpawnFailed    = "spawn failed"     // claude could not be started (an effort restart's)
 )
 
 // ReasonInterrupted is the StatusReason of StatusError: the process ended mid-turn.
@@ -147,12 +119,11 @@ type Session struct {
 	AutoNamed       bool
 	Model           string
 	Effort          string
-	TerminalID      string // empty when disconnected
 	State           State
-	// Status and StatusReason are the detector's reading while connected. Persisted:
-	// once disconnected they keep what they were when the process ended (busy becomes
-	// StatusError ReasonInterrupted; see disconnectedStatus), across daemon restarts,
-	// until a reconnect's detector replaces them.
+	// Status and StatusReason follow the stream while connected (stream_status.go).
+	// Persisted: once disconnected they keep what they were when the process ended
+	// (busy becomes StatusError ReasonInterrupted; see disconnectedStatus), across
+	// daemon restarts, until a reconnect replaces them.
 	Status       Status
 	StatusReason string
 	// StatusChangedAt is when Status or StatusReason last changed. Persisted; zero if
@@ -196,13 +167,10 @@ type Session struct {
 	// AgentRuns are the subagent runs under Transcripts (usage_runs.go), by start time.
 	// Persisted. Copy on write.
 	AgentRuns []AgentRun
-	// Render is RenderTerminal or RenderRendered, fixed at Create. Persisted. A
-	// rendered thread has no TerminalID; its conversation is Store.Items.
-	Render Render
-	// EffortPending: a rendered thread's effort change (Store.SetEffort) waits for the
+	// EffortPending: an effort change (Store.SetEffort) waits for the
 	// running turn to end; Effort is already the new level. Not persisted.
 	EffortPending bool
-	// ContextTokens is a rendered thread's context size after its last turn: the last
+	// ContextTokens is the thread's context size after its last turn: the last
 	// top-level API response's input + cache read + cache write + output tokens
 	// (context.go). 0 before the first result and after /clear. Persisted.
 	ContextTokens int64
@@ -283,14 +251,12 @@ type CreateOptions struct {
 	Effort string
 	// Name, if set, is the display name and disables auto-naming.
 	Name string
-	// InitialPrompt is passed to claude as its positional prompt argument (after
-	// "--", so a prompt starting with "-" is not read as a flag). File references
-	// "cf-file://<repoId>/<path>" in it become absolute paths in the thread's
-	// worktrees (filerefs.go).
+	// InitialPrompt is sent as the thread's first user message once Claude answers the
+	// handshake. File references "cf-file://<repoId>/<path>" in it become absolute
+	// paths in the thread's worktrees (filerefs.go); the item keeps it as typed.
 	InitialPrompt string
-	// ComposerPrompt is the GUI composer's text of InitialPrompt (its tags as tokens).
-	// A rendered thread keeps it on the first user message for display; otherwise
-	// ignored.
+	// ComposerPrompt is the GUI composer's text of InitialPrompt (its tags as tokens),
+	// kept on the first user message for display.
 	ComposerPrompt string
 	// PermissionMode selects claude --permission-mode.
 	PermissionMode PermissionMode
@@ -301,11 +267,9 @@ type CreateOptions struct {
 	NewWorktree *NewWorktree
 	// Attachments are paths returned by StageAttachment. Each becomes an
 	// "Attached image: <path>" line after the prompt; Claude reads them with its Read
-	// tool. Paths outside the attachments directory are rejected. A rendered thread
-	// also gets each as a base64 image block.
+	// tool, and each is also sent as a base64 image block. Paths outside the
+	// attachments directory are rejected.
 	Attachments []string
-	// Render picks terminal or rendered; RenderDefault uses Options.DefaultRender.
-	Render Render
 }
 
 // RunInTarget names the member a workspace thread should run in: its repository id or
@@ -334,13 +298,13 @@ type Store interface {
 	// Close ends the Claude process gracefully and waits until the session is
 	// DISCONNECTED (bounded by the store's close timeout plus the kill grace).
 	Close(ctx context.Context, id string) error
-	// Reconnect resumes a DISCONNECTED session in a new terminal.
+	// Reconnect resumes a DISCONNECTED session in a new claude process.
 	Reconnect(ctx context.Context, id string) (Session, error)
 	// Remove closes the session if needed and forgets it.
 	Remove(ctx context.Context, id string) error
-	// RunIn moves a workspace thread to another member worktree: `/cd <path>` typed
-	// once the live thread is idle at its prompt (the row's cwd changes when it is
-	// sent), or the row's cwd at once for a disconnected thread.
+	// RunIn moves a workspace thread to another member worktree: set_cwd once the live
+	// thread is idle at its prompt (the row's cwd changes when Claude accepts), or the
+	// row's cwd at once for a disconnected thread.
 	RunIn(ctx context.Context, id string, target RunInTarget) (Session, error)
 	// Pin sets or clears the user's pin, in any state.
 	Pin(ctx context.Context, id string, pinned bool) (Session, error)
@@ -348,23 +312,22 @@ type Store interface {
 	// path. mimeType must be one of AttachmentTypes; data at most MaxAttachmentBytes.
 	// name is the user's file name, used only in logs.
 	StageAttachment(ctx context.Context, name, mimeType string, data []byte) (string, error)
-	// ReadAttachment returns a staged attachment's content and MIME type (a rendered
-	// thread's user message shows its images). ErrNotFound once reaped.
+	// ReadAttachment returns a staged attachment's content and MIME type (a thread's
+	// user message shows its images). ErrNotFound once reaped.
 	ReadAttachment(ctx context.Context, path string) ([]byte, string, error)
 	// Snapshot returns the current immutable snapshot.
 	Snapshot() *Snapshot
 
-	// Rendered threads (thread.go). Every method refuses a terminal thread with
-	// ErrFailedPrecondition.
+	// Thread conversations (thread.go, items.go).
 
-	// Items returns a rendered thread's conversation: every item, the one streaming
+	// Items returns a thread's conversation: every item, the one streaming
 	// included, and the pending permission requests and questions.
 	Items(ctx context.Context, id string) (ItemsSnapshot, error)
 	// WatchItems is Items for a viewer: until ctx ends the thread counts as looked at,
-	// so a finished turn is seen at once (like an attached terminal). Subscribe to
+	// so a finished turn is seen at once. Subscribe to
 	// ThreadEvent on the bus first; events with Seq <= the snapshot's are in it.
 	WatchItems(ctx context.Context, id string) (ItemsSnapshot, error)
-	// Send sends a user message to a connected rendered thread (also while a turn
+	// Send sends a user message to a connected thread (also while a turn
 	// runs: Claude queues or folds it in).
 	Send(ctx context.Context, id string, msg Message) (Item, error)
 	// Respond answers a pending permission request or question.
@@ -381,7 +344,7 @@ type Store interface {
 	// effort switch: the process restarts with --resume and the new --effort, at once
 	// when idle, else after the running turn (EffortPending meanwhile).
 	SetEffort(ctx context.Context, id, effort string) (Session, error)
-	// McpStatus returns a rendered thread's MCP servers as last checked (mcp.go).
+	// McpStatus returns a thread's MCP servers as last checked (mcp.go).
 	// refresh asks Claude again first (a connected thread only). Without it, a connected
 	// thread not checked yet is asked once; one that is not running has none (nil).
 	McpStatus(ctx context.Context, id string, refresh bool) (*McpStatus, error)

@@ -12,7 +12,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 )
 
-// Thread items: a rendered thread's conversation (docs/notes/rendered-threads-1-daemon.md).
+// Thread items: a thread's conversation (docs/notes/rendered-threads-1-daemon.md).
 //
 // The stdio runner (stream.go) projects the CLI's stream into items (project.go). Each
 // item gets the next ordinal when it first appears; text that is still streaming lives
@@ -89,7 +89,7 @@ const (
 	DecisionAutoDenied = "auto_denied"
 )
 
-// Item is one entry of a rendered thread's conversation. Kind says which of the
+// Item is one entry of a thread's conversation. Kind says which of the
 // payload fields are set. Items are values: never mutate one read from a snapshot.
 type Item struct {
 	// ID is stable for the item's life: the user message's uuid, "<message id>/<block
@@ -211,7 +211,7 @@ type PendingRequest struct {
 	Summary string
 }
 
-// ItemsSnapshot is a rendered thread's items at one point.
+// ItemsSnapshot is a thread's items at one point.
 type ItemsSnapshot struct {
 	SessionID string
 	// Seq is the thread's event sequence number the snapshot includes: apply only
@@ -253,7 +253,7 @@ type Decision struct {
 }
 
 // ThreadEvent is published on the bus as bus.Publish[session.ThreadEvent] for every
-// change to a rendered thread's items. Seq increases per thread.
+// change to a thread's items. Seq increases per thread.
 type ThreadEvent interface {
 	isThreadEvent()
 	// Thread is the session id.
@@ -338,7 +338,7 @@ func capOutput(s string) string {
 	return s[:cut] + fmt.Sprintf("\n… [output truncated: %d more bytes]", len(s)-cut)
 }
 
-// threadLog is one rendered thread's items in memory. Mutations happen on the
+// threadLog is one thread's items in memory. Mutations happen on the
 // thread's runner goroutine (or while it has none); readers take mu.
 type threadLog struct {
 	id  string
@@ -535,7 +535,7 @@ func cloneItem(it Item) Item {
 	return it
 }
 
-// thread returns the rendered thread's item log, loading it from the database the
+// thread returns the thread's item log, loading it from the database the
 // first time.
 func (m *Manager) thread(ctx context.Context, id string) (*threadLog, error) {
 	// m.mu before (never inside) m.tmu: Remove takes them the other way round. The
@@ -546,11 +546,8 @@ func (m *Manager) thread(ctx context.Context, id string) (*threadLog, error) {
 		m.mu.Unlock()
 		return nil, err
 	}
-	render, idle := rec.s.Render, rec.run == nil
+	idle := rec.run == nil
 	m.mu.Unlock()
-	if render != RenderRendered {
-		return nil, fmt.Errorf("%w: thread %s runs in a terminal; it has no rendered items", ErrFailedPrecondition, id)
-	}
 	m.tmu.Lock()
 	defer m.tmu.Unlock()
 	if t, ok := m.threads[id]; ok {

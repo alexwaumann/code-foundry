@@ -2,106 +2,42 @@ package session
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
-	"sync"
 	"time"
-
-	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 )
 
-// Close sequence. Escape interrupts a running turn (and leaves vim INSERT mode).
-// Then Ctrl-C twice: the first clears pending input and arms "Press Ctrl-C again to
-// exit", the second exits Claude gracefully (code 0). This is Claude's own exit path
-// and works in every input mode. Typing "/exit" does not: with editorMode "vim", Escape
-// leaves Claude in NORMAL mode, where "/exit" becomes vim motions and the following
-// Enter submits whatever is left as a prompt (observed; see the 2a notes). The pair is
-// repeated until the process exits or CloseTimeout passes; then the terminal is killed.
-const (
-	keyEscape = "\x1b"
-	keyCtrlC  = "\x03"
+// activityPersistGap is the minimum interval between saves of last_activity_at alone.
+const activityPersistGap = 30 * time.Second
 
-	closeAfterEscape = 300 * time.Millisecond
-	closeCtrlCGap    = 150 * time.Millisecond
-	closeRepeat      = 2 * time.Second
-)
-
-// Startup timing. The first prompt is not typed: it is claude's positional argument
-// (launch.argv), which Claude submits itself once its UI is up.
-const (
-	trustKeyGap        = 300 * time.Millisecond // between dialog keystrokes
-	maxTrustKeys       = 12
-	screenCheckGap     = 100 * time.Millisecond // ScreenText at most this often while STARTING
-	activityPersistGap = 30 * time.Second
-	screenTextTimeout  = 2 * time.Second
-)
-
-// mailbox is an unbounded FIFO of observer events. push never blocks, so the terminal
-// actor never waits on a session.
-type mailbox struct {
-	mu  sync.Mutex
-	q   []terminal.ObserveEvent
-	sig chan struct{}
-}
-
-func (b *mailbox) push(ev terminal.ObserveEvent) {
-	b.mu.Lock()
-	b.q = append(b.q, ev)
-	b.mu.Unlock()
-	select {
-	case b.sig <- struct{}{}:
-	default:
-	}
-}
-
-func (b *mailbox) drain() []terminal.ObserveEvent {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	q := b.q
-	b.q = nil
-	return q
-}
-
-// runner owns one connected terminal of a session. All fields below are touched only
-// by run (the goroutine), except mb (observer side), closeReq, cdReq, stopReq and done.
+// runner owns one connected session: its claude process over stdio (stream.go), the
+// transcript tailer, status publishing, RunIn and close. All fields below are touched
+// only by run (the goroutine), except closeReq, cdReq, stopReq and done, and st's
+// documented exceptions.
 type runner struct {
 	m      *Manager
 	id     string
 	cwd    string
 	launch launch
-	mb     mailbox
 
 	closeReq chan struct{}
 	cdReq    chan cdRequest // RunIn; capacity 1, latest wins
 	stopReq  chan struct{}
 	done     chan struct{}
 
-	// ---- run goroutine only (term/det/tail are set by attach before run starts) ----
-	term  terminal.Terminal
-	det   StatusDetector
+	// ---- run goroutine only (st and tail are set by spawnStream before run starts) ----
+	st    *streamState
 	tail  *tailer
 	state State
 
-	trustKeys    int
-	lastTrustKey time.Time
-	lastScreen   time.Time
-
-	// pendingCd is a RunIn move waiting for the prompt; cdSending one typed and
-	// waiting for cdTimer to press Enter (runin.go).
-	pendingCd *cdRequest
-	cdSending cdRequest
-	cdTimer   *time.Timer
-	// awaitFirstPrompt: spawned with a positional prompt that has not shown up in the
-	// transcript (nor made Claude busy) yet. atPromptSince: when AtPrompt last became
-	// true; zero while it is false.
-	awaitFirstPrompt bool
-	atPromptSince    time.Time
+	// pendingCd is a RunIn move waiting for the prompt (runin.go). atPromptSince: when
+	// Claude was last seen arriving at its prompt; zero while it is not there.
+	pendingCd     *cdRequest
+	atPromptSince time.Time
 
 	closing bool
-	// closeStatus/closeReason are the detector's reading when the close began: the
-	// close sequence's Escape interrupts a running turn, so the reading at exit no
-	// longer says it was busy (see finish).
+	// closeStatus/closeReason are the status when the close began: the close interrupts
+	// a running turn, so the reading at exit no longer says it was busy (see finish).
 	closeStatus Status
 	closeReason string
 	closeStep   int
@@ -127,20 +63,14 @@ type runner struct {
 	usageSeen bool
 	usageOff  bool
 
-	// viewers is the terminal's Attach subscriber count (from the observer), or for a
-	// rendered thread the number of item watchers (Store.WatchItems). While someone is
-	// attached, whatever Claude produces is seen: see acknowledge.
+	// viewers is the number of item watchers (Store.WatchItems). While someone watches,
+	// whatever Claude produces is seen: see acknowledge.
 	viewers int
-
-	// st is set for a rendered thread (stream.go): the runner drives claude over
-	// stdio instead of a terminal, and term stays zero.
-	st *streamState
 }
 
 func newRunner(m *Manager, id, cwd string, l launch) *runner {
 	return &runner{
 		m: m, id: id, cwd: cwd, launch: l,
-		mb:       mailbox{sig: make(chan struct{}, 1)},
 		closeReq: make(chan struct{}, 1),
 		cdReq:    make(chan cdRequest, 1),
 		stopReq:  make(chan struct{}, 1),
@@ -148,25 +78,6 @@ func newRunner(m *Manager, id, cwd string, l launch) *runner {
 		state:    StateStarting,
 		usage:    newThreadUsage(time.Time{}, m.opts.Now, m.opts.AgentIdleClose),
 	}
-}
-
-// observe is the terminal Observer. It runs on the terminal actor and must not block.
-func (r *runner) observe(_ string, ev terminal.ObserveEvent) { r.mb.push(ev) }
-
-// attach binds the runner to its terminal. Called once, before run.
-func (r *runner) attach(t terminal.Terminal) {
-	r.term = t
-	terms := r.m.opts.Terminals
-	r.det = r.m.opts.NewDetector(func() (string, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), screenTextTimeout)
-		defer cancel()
-		return terms.ScreenText(ctx, t.ID)
-	})
-	r.tail = newTailer(r.m.opts.Paths, r.cwd)
-	r.tail.follow(r.launch.claudeID(), r.launch.resume != "" && !r.launch.fork)
-	r.usage.watchDir = r.tail.watch
-	now := r.m.opts.Now()
-	r.activity, r.pubActivity, r.savedActivity = now, now, now
 }
 
 func (r *runner) requestClose() {
@@ -185,63 +96,6 @@ func (r *runner) stop() {
 
 func (r *runner) log() *slogger { return &slogger{r} }
 
-func (r *runner) run() {
-	if r.st != nil {
-		r.runStream()
-		return
-	}
-	defer close(r.done)
-	defer r.tail.close()
-	defer r.usage.closeAll()
-	opts := r.m.opts
-	tick := time.NewTicker(opts.Tick)
-	defer tick.Stop()
-	startup := time.NewTimer(opts.StartTimeout)
-	defer startup.Stop()
-
-	for !r.finished {
-		select {
-		case <-r.mb.sig:
-			for _, ev := range r.mb.drain() {
-				r.onEvent(ev)
-				if r.finished {
-					return
-				}
-			}
-			if r.state == StateStarting {
-				r.checkStartup(false)
-			}
-			r.checkStatus()
-			r.tryCd()
-		case <-r.tail.events():
-			r.pollTranscript()
-		case err := <-r.tail.errors():
-			r.log().debug("transcript watcher", "err", err)
-		case now := <-tick.C:
-			r.onTick(now)
-		case <-startup.C:
-			if r.state == StateStarting {
-				r.connect("startup timeout")
-			}
-		case <-r.closeReq:
-			r.beginClose()
-		case req := <-r.cdReq:
-			r.onCdRequest(req)
-		case <-timerC(r.cdTimer):
-			r.sendCd()
-		case <-timerC(r.closeTimer):
-			r.closeNext()
-		case <-timerC(r.debounce):
-			r.debounce = nil
-			r.publishStatus()
-		case <-r.stopReq:
-			r.finish(func(s *Session) {
-				s.State, s.DisconnectReason, s.TerminalID = StateDisconnected, ReasonDaemonStopped, ""
-			})
-		}
-	}
-}
-
 // timerC returns t's channel, or nil (blocks forever) for a nil timer.
 func timerC(t *time.Timer) <-chan time.Time {
 	if t == nil {
@@ -250,54 +104,12 @@ func timerC(t *time.Timer) <-chan time.Time {
 	return t.C
 }
 
-func (r *runner) write(s string) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	if err := r.m.opts.Terminals.Write(ctx, r.term.ID, []byte(s)); err != nil && !errors.Is(err, terminal.ErrExited) {
-		r.log().warn("write to session terminal", "err", err)
-	}
-}
-
-func (r *runner) onEvent(ev terminal.ObserveEvent) {
-	switch {
-	case ev.Output != nil:
-		r.activity = r.m.opts.Now()
-		r.det.Output(ev.Output)
-		r.acknowledgeIfViewed()
-	case ev.Attached != nil:
-		prev := r.viewers
-		r.viewers = *ev.Attached
-		if r.viewers > prev {
-			r.acknowledge()
-		}
-	case ev.Input != nil:
-		if in, ok := r.det.(interface{ Input([]byte) }); ok {
-			in.Input(ev.Input)
-		}
-	case ev.AltScreen != nil:
-		if *ev.AltScreen && r.state == StateStarting && !r.trustVisible() {
-			r.connect("alt screen")
-		}
-	case ev.Title != nil:
-		if *ev.Title != "" && r.state == StateStarting && !r.trustVisible() {
-			r.connect("title set")
-		}
-	case ev.Exited != nil:
-		r.onExit(ev.Exited.Code)
-	}
-}
-
-// acknowledge tells the detector that the user has seen everything Claude produced so
-// far, which clears "finished" attention (a detector may implement Acknowledge(), as
-// internal/claudestatus does). The rule: acknowledge when a viewer attaches to the
-// session's terminal, and after every Output chunk and transcript line fed to the
-// detector while at least one viewer is attached. Dialog attention is unaffected: it
-// lasts until the dialog is gone from the screen.
-func (r *runner) acknowledge() {
-	if a, ok := r.det.(interface{ Acknowledge() }); ok {
-		a.Acknowledge()
-	}
-}
+// acknowledge tells the status that the user has seen everything Claude produced so
+// far, which clears "finished" attention. The rule: acknowledge when a viewer starts
+// watching the thread's items, on every result while at least one viewer watches, and
+// when the user answers a request. Pending requests are unaffected: they last until
+// answered or withdrawn.
+func (r *runner) acknowledge() { r.st.sd.Acknowledge() }
 
 func (r *runner) acknowledgeIfViewed() {
 	if r.viewers > 0 {
@@ -305,70 +117,7 @@ func (r *runner) acknowledgeIfViewed() {
 	}
 }
 
-// trustVisible reports whether the trust dialog is on screen right now.
-func (r *runner) trustVisible() bool {
-	screen, err := r.screen()
-	return err == nil && parseTrustDialog(screen).Visible
-}
-
-func (r *runner) screen() (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), screenTextTimeout)
-	defer cancel()
-	return r.m.opts.Terminals.ScreenText(ctx, r.term.ID)
-}
-
-// checkStartup answers the trust dialog if it is on screen (fallback for when the
-// pre-written trust did not take). Claude preselects "No, exit": send Down until
-// "Yes, I trust this folder" is selected, then Enter.
-func (r *runner) checkStartup(force bool) {
-	now := time.Now()
-	if !force && now.Sub(r.lastScreen) < screenCheckGap {
-		return
-	}
-	r.lastScreen = now
-	screen, err := r.screen()
-	if err != nil {
-		return
-	}
-	d := parseTrustDialog(screen)
-	if !d.Visible || now.Sub(r.lastTrustKey) < trustKeyGap {
-		return
-	}
-	if r.trustKeys >= maxTrustKeys {
-		if r.trustKeys == maxTrustKeys {
-			r.trustKeys++
-			r.m.update(r.id, true, func(rec *record) { rec.s.LastError = "could not accept Claude's folder trust dialog" })
-		}
-		return
-	}
-	r.trustKeys++
-	r.lastTrustKey = now
-	if d.YesSelected {
-		r.log().info("accepting folder trust dialog")
-		r.write(keyEnter)
-	} else {
-		r.write(keyDown)
-	}
-}
-
-// connect moves STARTING -> CONNECTED.
-func (r *runner) connect(why string) {
-	r.state = StateConnected
-	r.m.update(r.id, true, func(rec *record) {
-		if rec.s.State == StateStarting {
-			rec.s.State = StateConnected
-		}
-		rec.s.LastActivityAt = r.activity
-	})
-	r.pubActivity = r.activity
-	r.log().info("session connected", "why", why, "after", time.Since(r.term.StartedAt).Round(time.Millisecond).String())
-}
-
 func (r *runner) onTick(now time.Time) {
-	r.det.Tick(now)
-	if r.state == StateStarting && r.st == nil {
-		r.checkStartup(true)
-	}
 	// Follow /clear: Claude moves to a new session id and transcript file.
 	if id := pidSessionID(r.m.opts.Paths, r.pid()); id != "" && id != r.tail.id {
 		r.log().info("claude switched session id", "from", r.tail.id, "to", id)
@@ -415,11 +164,9 @@ func (r *runner) pollTranscript() {
 	var links []LinkedPullRequest
 	for _, line := range lines {
 		r.usage.transcriptLine(f, line)
-		r.det.Transcript(line)
 		if !r.namingSeen {
 			if msg, ok := firstUserText(line); ok {
 				r.namingSeen = true
-				r.awaitFirstPrompt = false
 				r.m.startNaming(r.id, msg)
 			}
 		}
@@ -434,12 +181,6 @@ func (r *runner) pollTranscript() {
 	// final drain comes now.
 	r.usage.poll()
 	r.publishUsage()
-	if len(lines) > 0 {
-		// The turn-end record trails the last output chunk by ~120 ms and counts as
-		// new work for the detector; a viewer has seen it too.
-		r.acknowledgeIfViewed()
-		r.checkStatus()
-	}
 }
 
 // publishUsage replaces the session's usage when a fold changed: at most once per poll
@@ -535,19 +276,19 @@ func (r *runner) rescan(s Session, cid, path string, limit int64) {
 		"took", time.Since(start).Round(time.Millisecond).String())
 }
 
-// checkStatus schedules a debounced publish when the detector's answer changed.
+// checkStatus schedules a debounced publish when the status changed.
 func (r *runner) checkStatus() {
-	r.status, r.reason = r.det.Status()
+	r.status, r.reason = r.st.sd.Status()
 	if (r.status != r.pubStatus || r.reason != r.pubReason) && r.debounce == nil {
 		r.debounce = time.NewTimer(r.m.opts.StatusDebounce)
 	}
 }
 
-// publishStatus publishes and persists the detector's answer. Persisting every change
+// publishStatus publishes and persists the status. Persisting every change
 // (debounced, a handful per turn) is what lets a session that is waiting on the user
 // still say so after the daemon dies without a clean shutdown.
 func (r *runner) publishStatus() {
-	r.status, r.reason = r.det.Status()
+	r.status, r.reason = r.st.sd.Status()
 	if r.status == r.pubStatus && r.reason == r.pubReason {
 		return
 	}
@@ -559,80 +300,19 @@ func (r *runner) publishStatus() {
 	})
 }
 
-func (r *runner) beginClose() {
-	if r.closing {
-		return
-	}
-	r.closing = true
-	r.closeStatus, r.closeReason = r.det.Status()
-	r.state = StateClosing
-	r.closeBy = time.Now().Add(r.m.opts.CloseTimeout)
-	r.m.update(r.id, true, func(rec *record) { rec.s.State = StateClosing })
-	r.log().info("closing session")
-	r.write(keyEscape)
-	r.closeStep = 1
-	r.closeTimer = time.NewTimer(closeAfterEscape)
-}
-
-func (r *runner) closeNext() {
-	r.closeTimer = nil
-	if time.Now().After(r.closeBy) {
-		if !r.killed {
-			r.killed = true
-			r.log().warn("claude did not exit gracefully; killing", "timeout", r.m.opts.CloseTimeout.String())
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-			if err := r.m.opts.Terminals.Kill(ctx, r.term.ID); err != nil {
-				r.log().warn("kill session terminal", "err", err)
-			}
-			cancel()
-		}
-		return
-	}
-	switch r.closeStep {
-	case 1:
-		r.write(keyCtrlC)
-		r.closeStep = 2
-		r.closeTimer = time.NewTimer(closeCtrlCGap)
-	case 2:
-		r.write(keyCtrlC)
-		r.closeStep = 1
-		r.closeTimer = time.NewTimer(min(closeRepeat, time.Until(r.closeBy)+time.Millisecond))
-	}
-}
-
-// onExit records how the process ended and removes its terminal.
-func (r *runner) onExit(code int) {
-	reason := ReasonExited
-	switch {
-	case r.closing:
-		reason = ReasonClosed
-	case code != 0:
-		reason = ReasonCrashed
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	if err := r.m.opts.Terminals.Remove(ctx, r.term.ID); err != nil && !errors.Is(err, terminal.ErrNotFound) {
-		r.log().warn("remove exited session terminal", "err", err)
-	}
-	cancel()
-	r.log().info("session disconnected", "reason", reason, "exit_code", code)
-	r.finish(func(s *Session) {
-		s.State, s.DisconnectReason, s.ExitCode, s.TerminalID = StateDisconnected, reason, code, ""
-	})
-}
-
 // finish detaches the runner, applying the final state. Every disconnect of a live
 // process goes through here (exit, crash, close, daemon stop): the session keeps the
-// status it had at that moment, read fresh from the detector (the published one may
-// lag by the debounce), or as it was when a close began; disconnectedStatus turns busy
+// status it had at that moment, read fresh (the published one may lag by the
+// debounce), or as it was when a close began; disconnectedStatus turns busy
 // into interrupted.
 func (r *runner) finish(fn func(*Session)) {
 	r.finished = true
-	for _, t := range []*time.Timer{r.closeTimer, r.debounce, r.cdTimer} {
+	for _, t := range []*time.Timer{r.closeTimer, r.debounce} {
 		if t != nil {
 			t.Stop()
 		}
 	}
-	st, reason := r.det.Status()
+	st, reason := r.st.sd.Status()
 	if r.closing {
 		st, reason = r.closeStatus, r.closeReason
 	}
@@ -654,15 +334,10 @@ func (r *runner) finish(fn func(*Session)) {
 	})
 }
 
-// slogger prefixes runner logs with the session and terminal ids.
+// slogger prefixes runner logs with the session id.
 type slogger struct{ r *runner }
 
-func (l *slogger) args(kv []any) []any {
-	if l.r.st != nil {
-		return append([]any{"session", l.r.id, "render", "rendered"}, kv...)
-	}
-	return append([]any{"session", l.r.id, "terminal", l.r.term.ID}, kv...)
-}
+func (l *slogger) args(kv []any) []any         { return append([]any{"session", l.r.id}, kv...) }
 func (l *slogger) debug(msg string, kv ...any) { l.r.m.log.Debug(msg, l.args(kv)...) }
 func (l *slogger) info(msg string, kv ...any)  { l.r.m.log.Info(msg, l.args(kv)...) }
 func (l *slogger) warn(msg string, kv ...any)  { l.r.m.log.Warn(msg, l.args(kv)...) }

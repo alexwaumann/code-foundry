@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 )
 
-// turnCosts gives each turn of a rendered thread its own cost. Claude's result carries
+// turnCosts gives each turn of a thread its own cost. Claude's result carries
 // only running totals (total_cost_usd and modelUsage) for the process, so a turn's cost
 // is the difference from the previous result of the same process. A process's first
 // result is measured from what the process started with: zero for a new conversation;

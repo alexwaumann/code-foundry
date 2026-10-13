@@ -124,10 +124,6 @@ func (f *Fake) add(call string, s session.Session) (session.Session, error) {
 	}
 	f.next++
 	s.ID = fmt.Sprintf("s-%d", f.next)
-	if s.Render != session.RenderRendered {
-		s.Render = session.RenderTerminal
-		s.TerminalID = fmt.Sprintf("t-%d", f.next)
-	}
 	s.State = session.StateStarting
 	s.CreatedAt = f.Now()
 	s.LastActivityAt = s.CreatedAt
@@ -138,22 +134,18 @@ func (f *Fake) add(call string, s session.Session) (session.Session, error) {
 	return s, nil
 }
 
-// Create records the call and adds a STARTING session ("s-N", terminal "t-N"). With
+// Create records the call and adds a STARTING session ("s-N"). With
 // NewWorktree the session's worktree is /worktrees/cf-<N> (CreatedWorktree, BaseRef as
 // requested). WorkspaceID is copied as is. With NewWorkspace the session belongs to
 // workspace "w-new" and runs in /worktrees/<repo>, repo being RepoID or the first repo.
 // The call reads "Create <repo> <path> <model> <effort>", then " perm=<n>",
 // " new-worktree=<base>", " workspace=<id>", " new-workspace=<a,b>", " prompt=<text>"
-// " attachments=<a,b>" and " render=<mode>" when set. A rendered session (Render
-// RenderRendered) gets no terminal; anything else is a terminal session.
+// " composer=<text>" and " attachments=<a,b>" when set.
 func (f *Fake) Create(_ context.Context, o session.CreateOptions) (session.Session, error) {
 	call := fmt.Sprintf("Create %s %s %s %s", o.RepoID, o.WorktreePath, o.Model, o.Effort)
 	s := session.Session{
 		RepoID: o.RepoID, WorktreePath: o.WorktreePath, Model: o.Model, Effort: o.Effort, Name: o.Name,
-		PermissionMode: o.PermissionMode, Render: o.Render,
-	}
-	if o.Render != session.RenderDefault {
-		call += " render=" + o.Render.String()
+		PermissionMode: o.PermissionMode,
 	}
 	if o.PermissionMode != session.PermissionDefault {
 		call += fmt.Sprintf(" perm=%d", o.PermissionMode)
@@ -220,7 +212,6 @@ func (f *Fake) Fork(_ context.Context, id, name string) (session.Session, error)
 	return f.add("Fork "+id, session.Session{
 		RepoID: parent.RepoID, WorktreePath: parent.WorktreePath, Model: parent.Model, Effort: parent.Effort,
 		Name: name, ParentID: id, PermissionMode: parent.PermissionMode, WorkspaceID: parent.WorkspaceID,
-		Render: parent.Render,
 	})
 }
 
@@ -254,7 +245,7 @@ func (f *Fake) Pin(_ context.Context, id string, pinned bool) (session.Session, 
 func (f *Fake) Close(_ context.Context, id string) error {
 	_, err := f.mutate("Close "+id, id, func(s *session.Session) error {
 		if s.State != session.StateDisconnected {
-			s.State, s.DisconnectReason, s.TerminalID = session.StateDisconnected, session.ReasonClosed, ""
+			s.State, s.DisconnectReason = session.StateDisconnected, session.ReasonClosed
 		}
 		return nil
 	})
@@ -267,10 +258,7 @@ func (f *Fake) Reconnect(_ context.Context, id string) (session.Session, error) 
 		if s.State != session.StateDisconnected {
 			return fmt.Errorf("%w: session %s is %s", session.ErrFailedPrecondition, id, s.State)
 		}
-		s.State, s.DisconnectReason, s.TerminalID = session.StateStarting, "", "t-re-"+id
-		if s.Render == session.RenderRendered {
-			s.TerminalID = ""
-		}
+		s.State, s.DisconnectReason = session.StateStarting, ""
 		return nil
 	})
 }
@@ -370,18 +358,6 @@ func pending(items []session.Item) []session.PendingRequest {
 	return out
 }
 
-// rendered returns session id when it is a rendered thread. The lock is held.
-func (f *Fake) rendered(id string) (session.Session, error) {
-	s, err := f.get(id)
-	if err != nil {
-		return s, err
-	}
-	if s.Render != session.RenderRendered {
-		return s, fmt.Errorf("%w: thread %s runs in a terminal", session.ErrFailedPrecondition, id)
-	}
-	return s, nil
-}
-
 func (f *Fake) itemsLocked(id string) session.ItemsSnapshot {
 	snap, ok := f.items[id]
 	if !ok {
@@ -397,7 +373,7 @@ func (f *Fake) itemsLocked(id string) session.ItemsSnapshot {
 func (f *Fake) Items(_ context.Context, id string) (session.ItemsSnapshot, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if _, err := f.rendered(id); err != nil {
+	if _, err := f.get(id); err != nil {
 		return session.ItemsSnapshot{}, err
 	}
 	return f.itemsLocked(id), nil
@@ -407,7 +383,7 @@ func (f *Fake) Items(_ context.Context, id string) (session.ItemsSnapshot, error
 func (f *Fake) WatchItems(ctx context.Context, id string) (session.ItemsSnapshot, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if _, err := f.rendered(id); err != nil {
+	if _, err := f.get(id); err != nil {
 		return session.ItemsSnapshot{}, err
 	}
 	f.watchers[id]++
@@ -443,7 +419,7 @@ func (f *Fake) appendItem(id string, it session.Item) (session.Item, session.Thr
 
 // Send records "Send <id> <text>" (" attachments=<a,b>" and " composer=<text>" when
 // set) and appends a
-// user_message item. The session must be rendered and not disconnected.
+// user_message item. The session must not be disconnected.
 func (f *Fake) Send(_ context.Context, id string, msg session.Message) (session.Item, error) {
 	f.mu.Lock()
 	call := "Send " + id + " " + msg.Text
@@ -457,7 +433,7 @@ func (f *Fake) Send(_ context.Context, id string, msg session.Message) (session.
 		f.mu.Unlock()
 		return session.Item{}, err
 	}
-	s, err := f.rendered(id)
+	s, err := f.get(id)
 	if err == nil && s.State == session.StateDisconnected {
 		err = fmt.Errorf("%w: thread %s is disconnected", session.ErrFailedPrecondition, id)
 	}
@@ -487,7 +463,7 @@ func (f *Fake) Respond(_ context.Context, id, requestID string, d session.Decisi
 		f.mu.Unlock()
 		return session.Item{}, err
 	}
-	if _, err := f.rendered(id); err != nil {
+	if _, err := f.get(id); err != nil {
 		f.mu.Unlock()
 		return session.Item{}, err
 	}
@@ -538,16 +514,13 @@ func (f *Fake) Interrupt(_ context.Context, id string) error {
 	if err := f.record("Interrupt " + id); err != nil {
 		return err
 	}
-	_, err := f.rendered(id)
+	_, err := f.get(id)
 	return err
 }
 
 // SetModel records "SetModel <id> <model>" and sets Model.
 func (f *Fake) SetModel(_ context.Context, id, model string) (session.Session, error) {
 	return f.mutate("SetModel "+id+" "+model, id, func(s *session.Session) error {
-		if s.Render != session.RenderRendered {
-			return fmt.Errorf("%w: thread %s runs in a terminal", session.ErrFailedPrecondition, id)
-		}
 		s.Model = model
 		return nil
 	})
@@ -557,9 +530,6 @@ func (f *Fake) SetModel(_ context.Context, id, model string) (session.Session, e
 // PermissionDefault is refused like the Manager does.
 func (f *Fake) SetPermissionMode(_ context.Context, id string, mode session.PermissionMode) (session.Session, error) {
 	return f.mutate(fmt.Sprintf("SetPermissionMode %s %d", id, mode), id, func(s *session.Session) error {
-		if s.Render != session.RenderRendered {
-			return fmt.Errorf("%w: thread %s runs in a terminal", session.ErrFailedPrecondition, id)
-		}
 		if mode < session.PermissionSupervised || mode > session.PermissionAuto {
 			return fmt.Errorf("%w: permission mode %d", session.ErrInvalidArgument, mode)
 		}
@@ -572,9 +542,6 @@ func (f *Fake) SetPermissionMode(_ context.Context, id string, mode session.Perm
 // fake).
 func (f *Fake) SetEffort(_ context.Context, id, effort string) (session.Session, error) {
 	return f.mutate(fmt.Sprintf("SetEffort %s %s", id, effort), id, func(s *session.Session) error {
-		if s.Render != session.RenderRendered {
-			return fmt.Errorf("%w: thread %s runs in a terminal", session.ErrFailedPrecondition, id)
-		}
 		if !slices.Contains(session.Efforts, effort) {
 			return fmt.Errorf("%w: effort %q", session.ErrInvalidArgument, effort)
 		}
@@ -610,7 +577,7 @@ func (f *Fake) McpStatus(_ context.Context, id string, refresh bool) (*session.M
 		f.mu.Unlock()
 		return nil, err
 	}
-	if _, err := f.rendered(id); err != nil {
+	if _, err := f.get(id); err != nil {
 		f.mu.Unlock()
 		return nil, err
 	}
@@ -644,7 +611,7 @@ func (f *Fake) McpReconnect(_ context.Context, id, server string) (session.McpRe
 		f.mu.Unlock()
 		return session.McpReconnectResult{}, err
 	}
-	if _, err := f.rendered(id); err != nil {
+	if _, err := f.get(id); err != nil {
 		f.mu.Unlock()
 		return session.McpReconnectResult{}, err
 	}
