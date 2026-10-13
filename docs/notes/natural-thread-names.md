@@ -28,9 +28,9 @@ Thread names read like titles ("Fix the login redirect") instead of kebab-case s
   `cf/<session id>` exactly as for a failed namer; the session still gets the title.
   A title that arrives after `SlugTimeout` names only the session (the branch is
   already `cf/<id>`), as before.
-* **`slugify` is unchanged** (5 words, 60 characters). Six-word titles therefore lose
-  their last word in the branch: "Add README usage section for tests" is
-  `cf/add-readme-usage-section-for`.
+* **`slugify` keeps 6 words** (was 5), so a six-word title keeps its whole branch:
+  "Add README usage section for tests" is `cf/add-readme-usage-section-for-tests`.
+  The 60-character cap stays and still trims long words at a hyphen.
 * **Workspace names stay slugs.** A new workspace's default name is still the branch
   without `cf/`; only the thread gets the title.
 * **Forks are `<parent> (fork)`** via `forkName`, keeping the parent's `AutoNamed`.
@@ -67,4 +67,6 @@ forked s-1c5f10dfbfa4 into Add README usage section for tests (fork) (s-f21945da
 ```
 
 The naming call (sonnet, effort low, the default naming model) took 2.3 s; the branch
-was `cf/add-readme-usage-section-for`.
+was `cf/add-readme-usage-section-for`, which is what led to the 6-word cap above (that
+title now slugifies to `cf/add-readme-usage-section-for-tests`, covered by
+`TestSlugify` and `TestCreateNewWorktree`).

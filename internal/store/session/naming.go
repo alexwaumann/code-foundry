@@ -248,8 +248,8 @@ func isRateLimit(err error) bool {
 
 var slugJunk = regexp.MustCompile(`[^a-z0-9]+`)
 
-// slugify reduces a name or title to a kebab-case slug of at most 5 words and 60
-// characters, using the first non-empty line.
+// slugify reduces a name or title to a kebab-case slug of at most 6 words (the
+// namer's longest title) and 60 characters, using the first non-empty line.
 func slugify(s string) string {
 	for _, line := range strings.Split(s, "\n") {
 		line = strings.TrimSpace(line)
@@ -257,8 +257,8 @@ func slugify(s string) string {
 			continue
 		}
 		words := strings.FieldsFunc(slugJunk.ReplaceAllString(strings.ToLower(line), " "), func(r rune) bool { return r == ' ' })
-		if len(words) > 5 {
-			words = words[:5]
+		if len(words) > 6 {
+			words = words[:6]
 		}
 		out := strings.Join(words, "-")
 		for len(out) > 60 {

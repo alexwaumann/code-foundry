@@ -196,7 +196,8 @@ func TestSlugify(t *testing.T) {
 		"  Fix Login Bug \n":                 "fix-login-bug",
 		"`add-dark-mode-toggle`":             "add-dark-mode-toggle",
 		"\n\nRefactor the API client layer!": "refactor-the-api-client-layer",
-		"one two three four five six seven":  "one-two-three-four-five",
+		"one two three four five six seven":  "one-two-three-four-five-six",
+		"Add README usage section for tests": "add-readme-usage-section-for-tests",
 		"":                                   "",
 		"!!!":                                "",
 	}
