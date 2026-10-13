@@ -242,8 +242,10 @@ test("the Projects page lists projects with their own worktrees and workspaces w
 
   // Remove one (workspace.remove-repo, confirmed).
   const member = ws.locator('[data-nav-key="m:w-000000000001::repo-cf"]');
-  await member.hover();
-  await member.getByTestId("member-remove").click();
+  // By keyboard: the add-repo toast sits over the menu's bottom-right corner.
+  await member.getByTestId("member-more").click();
+  await page.getByTestId("member-remove").focus();
+  await page.keyboard.press("Enter");
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toContainText("Remove project code-foundry from its workspace?");
   await dialog.getByTestId("confirm-ok").click();
@@ -256,8 +258,9 @@ test("the Projects page lists projects with their own worktrees and workspaces w
 
   // A member with a live thread is refused, and stays.
   const gp = ws.locator('[data-nav-key="m:w-000000000001::repo-gp"]');
-  await gp.hover();
-  await gp.getByTestId("member-remove").click();
+  await gp.getByTestId("member-more").click();
+  await page.getByTestId("member-remove").focus();
+  await page.keyboard.press("Enter");
   await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
   await expect(page.getByText(/running in .*ghostty-playground\/cf-login; close it first/)).toBeVisible();
   await expect(ws.getByTestId("member-name")).toHaveText(["ghostty-playground", "dotfiles"]);
@@ -276,7 +279,8 @@ test("the Projects page removes a workspace and offers project actions", async (
   await openApp(page);
   await openProjects(page);
   const ws = page.locator('[data-testid="workspace"]').filter({ hasText: "spare" });
-  await ws.getByTestId("workspace-remove").click();
+  await ws.getByTestId("workspace-more").click();
+  await page.getByTestId("workspace-remove").click();
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toContainText("Remove workspace spare?");
   await dialog.getByTestId("confirm-ok").click();
@@ -291,17 +295,19 @@ test("the Projects page removes a workspace and offers project actions", async (
   // Remove a worktree (repo.worktree.remove with that worktree's context, confirmed).
   await openProjects(page);
   const fix = page.locator(`[data-nav-key="pw:repo-cf::${CF}.worktrees/fix-resize"]`);
-  await fix.hover();
-  await fix.getByTestId("worktree-remove").click();
+  await fix.getByTestId("worktree-more").click();
+  await page.getByTestId("worktree-remove").click();
   await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
   await expect(fix).toHaveCount(0);
   const rm = (await invocations()).filter((i) => i.name === "repo.worktree.remove").at(-1);
   expect(rm?.context).toMatchObject({ activeRepoId: "repo-cf", activeWorktreePath: `${CF}.worktrees/fix-resize`, activeView: "projects" });
   // The main worktree has no remove action.
   const main = page.locator(`[data-nav-key="pw:repo-cf::${CF}"]`);
-  await main.hover();
-  await expect(main.getByTestId("worktree-remove")).toHaveCount(0);
   await expect(main.getByTestId("worktree-new-terminal")).toBeVisible();
+  await main.getByTestId("worktree-more").click();
+  await expect(page.getByTestId("worktree-more-menu")).toBeVisible();
+  await expect(page.getByTestId("worktree-remove")).toHaveCount(0);
+  await page.keyboard.press("Escape");
 });
 
 test("a workspace thread's member worktree never shows under its project in the sidebar", async ({ page }) => {

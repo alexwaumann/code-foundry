@@ -1,10 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { ChevronDown, ChevronRight, Folder, FolderGit2, FolderPlus, Layers, PanelRight, Search, SquarePen, SquareTerminal, Trash2, Unlink } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  CloudUpload,
+  Folder,
+  FolderGit2,
+  FolderPlus,
+  GitBranchPlus,
+  Layers,
+  PanelRight,
+  RefreshCw,
+  Search,
+  SquarePen,
+  SquareTerminal,
+  Trash2,
+  Unlink,
+} from "lucide-react";
 import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { GithubMark } from "@/components/icons/GithubMark";
 import { PanelToggle } from "@/components/panel/PanelToggle";
-import { SectionTitle } from "@/components/prs/PrBits";
+import { Freshness, SectionTitle } from "@/components/prs/PrBits";
 import { RowList } from "@/components/prs/RowList";
 import { Button } from "@/components/ui/button";
 import { PaneHeader } from "@/components/window/PaneHeader";
@@ -16,20 +32,33 @@ import {
   filterProjects,
   NONE_COLLAPSED,
   pageItems,
+  PROJECT_STALE_MS,
   projectKey,
   projectKind,
+  projectNextStep,
   projectsModel,
   projectWorktreeKey,
   workspaceKey,
   type Collapsed,
   type ProjectKind,
   type ProjectModel,
+  type ProjectNextStep,
   type ProjectsSearch,
   type ProjectsWorkspaces,
 } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { composeIn, composeInWorkspace } from "@/stores/compose";
-import { addProject, newTerminalIn, removeWorkspace, removeWorktree, unregisterProject } from "@/stores/projectActions";
+import {
+  addProject,
+  initGitIn,
+  newTerminalIn,
+  newWorktreeIn,
+  publishProject,
+  refreshProject,
+  removeWorkspace,
+  removeWorktree,
+  unregisterProject,
+} from "@/stores/projectActions";
 import { findWorktree, mainWorktreePath, useReposStore } from "@/stores/repos";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
@@ -38,6 +67,7 @@ import { showWorktreeInPanel } from "@/stores/worktreePanel";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { liveWorkspaceThread } from "@/surfaces/workspaceTarget";
 import { NoGitBadge } from "./NoGitBadge";
+import { OverflowMenu, type OverflowItem } from "./OverflowMenu";
 import { WorkspaceMembers } from "./WorkspaceMembers";
 import { RowAction, WorktreeState } from "./WorktreeState";
 
@@ -149,26 +179,72 @@ const UNKNOWN_REPO = { githubSlug: "", remotes: [] };
 
 function WorktreeRow({ repoId, path }: { repoId: string; path: string }) {
   const isMain = useReposStore((s) => findWorktree(s, repoId, path)?.isMain ?? false);
+  const show: OverflowItem = { label: "Show in side panel", icon: PanelRight, testId: "worktree-show-panel", onSelect: () => { showWorktreeInPanel(repoId, path); } };
+  const items: OverflowItem[] = isMain
+    ? [show]
+    : [show, "separator", { label: "Remove worktree…", icon: Trash2, destructive: true, testId: "worktree-remove", onSelect: () => void removeWorktree(repoId, path) }];
   return (
     <NavRow navKey={projectWorktreeKey(repoId, path)} className="group/wt flex h-full items-center gap-2 pr-2 pl-6 text-sm" title={path}>
       <span className="flex h-full min-w-0 flex-1 items-center" data-testid="project-worktree" data-path={path}>
         <WorktreeState repoId={repoId} path={path} />
       </span>
-      <span className="flex shrink-0 items-center opacity-0 group-hover/wt:opacity-100 group-aria-selected/wt:opacity-100">
+      {/* Always shown, muted at rest; a fixed width so every row's state column ends at the same x. */}
+      <span
+        className="flex w-18 shrink-0 items-center justify-end opacity-55 transition-opacity group-hover/wt:opacity-100 group-focus-within/wt:opacity-100 group-aria-selected/wt:opacity-100 has-[[data-state=open]]:opacity-100"
+        data-testid="worktree-actions"
+      >
         <RowAction label="New thread here" testId="worktree-new-thread" onClick={() => { composeIn(repoId, path); }}>
           <SquarePen />
         </RowAction>
         <RowAction label="New terminal here" testId="worktree-new-terminal" onClick={() => void newTerminalIn(repoId, path)}>
           <SquareTerminal />
         </RowAction>
-        {!isMain && (
-          <RowAction label="Remove worktree" destructive testId="worktree-remove" onClick={() => void removeWorktree(repoId, path)}>
-            <Trash2 />
-          </RowAction>
-        )}
+        <OverflowMenu label="More actions" testId="worktree-more" items={items} />
       </span>
     </NavRow>
   );
+}
+
+/** The main worktree's last git status refresh ("updated 2m ago", amber when stale, red after an error). */
+function ProjectFreshness({ repoId, main }: { repoId: string; main: string }) {
+  const at = useReposStore((s) => findWorktree(s, repoId, main)?.status.refreshedAtMs ?? null);
+  const error = useReposStore((s) => findWorktree(s, repoId, main)?.status.error ?? "");
+  return (
+    <span className="mr-1 shrink-0">
+      <Freshness fetchedAtMs={at} lastError={error} staleAfterMs={PROJECT_STALE_MS} testId="project-freshness" />
+    </span>
+  );
+}
+
+/** Fetch (with a remote) and refresh the project's git status; the icon spins meanwhile. */
+function RefreshAction({ repoId }: { repoId: string }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <RowAction
+      label={busy ? "Refreshing…" : "Fetch and refresh"}
+      testId="project-refresh"
+      disabled={busy}
+      onClick={() => {
+        setBusy(true);
+        void refreshProject(repoId).finally(() => {
+          setBusy(false);
+        });
+      }}
+    >
+      <RefreshCw className={cn(busy && "animate-spin")} data-busy={busy || undefined} />
+    </RowAction>
+  );
+}
+
+/** A project header's overflow: New worktree… (git), its setup step, then Remove project. */
+function projectMenu(repoId: string, kind: ProjectKind, step: ProjectNextStep): OverflowItem[] {
+  const items: OverflowItem[] = [];
+  if (kind !== "nogit") items.push({ label: "New worktree…", icon: GitBranchPlus, testId: "project-new-worktree", onSelect: () => { newWorktreeIn(repoId); } });
+  if (step === "publish") items.push({ label: "Publish to GitHub…", icon: CloudUpload, testId: "project-menu-publish", onSelect: () => { publishProject(repoId); } });
+  if (step === "init") items.push({ label: "Initialize git", icon: GitBranchPlus, testId: "project-menu-init-git", onSelect: () => void initGitIn(repoId) });
+  if (items.length > 0) items.push("separator");
+  items.push({ label: "Remove project", icon: Unlink, destructive: true, testId: "project-unregister", onSelect: () => void unregisterProject(repoId) });
+  return items;
 }
 
 function ProjectBlock({ project, collapsed, filtering }: { project: ProjectModel; collapsed: boolean; filtering: boolean }) {
@@ -176,9 +252,13 @@ function ProjectBlock({ project, collapsed, filtering }: { project: ProjectModel
   const name = useReposStore((s) => s.byId[repoId]?.name ?? repoId);
   const main = useReposStore((s) => s.byId[repoId]?.worktrees.find((w) => w.isMain)?.path ?? s.byId[repoId]?.path ?? "");
   const kind = useReposStore(useShallow((s) => projectKind(s.byId[repoId] ?? UNKNOWN_REPO)));
+  const step = useReposStore((s) => {
+    const r = s.byId[repoId];
+    return r ? projectNextStep(r) : null;
+  });
   const { Icon, className: iconClass } = KIND_ICON[kind.kind];
   return (
-    <section className="rounded-md border" data-testid="project" data-repo={repoId} data-git={kind.kind !== "nogit"} data-kind={kind.kind} data-collapsed={collapsed}>
+    <section className="group/card rounded-md border" data-testid="project" data-repo={repoId} data-git={kind.kind !== "nogit"} data-kind={kind.kind} data-collapsed={collapsed}>
       <NavRow navKey={projectKey(repoId)} className={cn("group/p flex h-9 items-center gap-2 px-2", !collapsed && "rounded-b-none border-b")}>
         <CollapseToggle
           collapsed={collapsed}
@@ -208,15 +288,30 @@ function ProjectBlock({ project, collapsed, filtering }: { project: ProjectModel
           </span>
         )}
         <span className="ml-auto flex shrink-0 items-center">
-          <RowAction label="New thread" testId="project-new-thread" onClick={() => { composeIn(repoId); }}>
-            <SquarePen />
-          </RowAction>
-          <RowAction label="New terminal" testId="project-new-terminal" onClick={() => void newTerminalIn(repoId, main)}>
-            <SquareTerminal />
-          </RowAction>
-          <RowAction label="Remove project (stop tracking it)" destructive testId="project-unregister" onClick={() => void unregisterProject(repoId)}>
-            <Unlink />
-          </RowAction>
+          {kind.kind !== "nogit" && <ProjectFreshness repoId={repoId} main={main} />}
+          <span
+            className="flex items-center opacity-70 transition-opacity group-hover/card:opacity-100 group-focus-within/p:opacity-100 group-aria-selected/p:opacity-100 has-[[data-state=open]]:opacity-100"
+            data-testid="project-actions"
+          >
+            {kind.kind !== "nogit" && <RefreshAction repoId={repoId} />}
+            {step === "publish" && (
+              <RowAction label="Publish to GitHub" testId="project-publish" onClick={() => { publishProject(repoId); }}>
+                <CloudUpload />
+              </RowAction>
+            )}
+            {step === "init" && (
+              <RowAction label="Initialize git" testId="project-init-git" onClick={() => void initGitIn(repoId)}>
+                <GitBranchPlus />
+              </RowAction>
+            )}
+            <RowAction label="New thread" testId="project-new-thread" onClick={() => { composeIn(repoId); }}>
+              <SquarePen />
+            </RowAction>
+            <RowAction label="New terminal" testId="project-new-terminal" onClick={() => void newTerminalIn(repoId, main)}>
+              <SquareTerminal />
+            </RowAction>
+            <OverflowMenu label="More project actions" testId="project-more" items={projectMenu(repoId, kind.kind, step)} />
+          </span>
         </span>
       </NavRow>
       {!collapsed && (
@@ -241,7 +336,7 @@ function WorkspaceBlock({ id, collapsed, filtering }: { id: string; collapsed: b
   const thread = useSessionsStore((s) => liveWorkspaceThread(s, id));
   const threadName = useSessionsStore((s) => (thread ? s.byId[thread]?.name || thread : ""));
   return (
-    <section className="rounded-md border" data-testid="workspace" data-workspace={id} data-collapsed={collapsed}>
+    <section className="group/card rounded-md border" data-testid="workspace" data-workspace={id} data-collapsed={collapsed}>
       <NavRow navKey={workspaceKey(id)} className={cn("group/ws flex h-9 items-center gap-2 px-2", !collapsed && "rounded-b-none border-b")}>
         <CollapseToggle
           collapsed={collapsed}
@@ -264,7 +359,10 @@ function WorkspaceBlock({ id, collapsed, filtering }: { id: string; collapsed: b
             {collapsedWorkspaceSummary(members)}
           </span>
         )}
-        <span className="ml-auto flex shrink-0 items-center">
+        <span
+          className="ml-auto flex shrink-0 items-center opacity-70 transition-opacity group-hover/card:opacity-100 group-focus-within/ws:opacity-100 group-aria-selected/ws:opacity-100 has-[[data-state=open]]:opacity-100"
+          data-testid="workspace-actions"
+        >
           {thread && (
             <RowAction label={`Show in ${threadName}'s side panel`} testId="workspace-show-panel" onClick={() => { showWorkspaceInThread(thread); }}>
               <PanelRight />
@@ -273,9 +371,11 @@ function WorkspaceBlock({ id, collapsed, filtering }: { id: string; collapsed: b
           <RowAction label="New thread in this workspace" testId="workspace-new-thread" onClick={() => { composeInWorkspace(id); }}>
             <SquarePen />
           </RowAction>
-          <RowAction label="Remove workspace" destructive testId="workspace-remove" onClick={() => void removeWorkspace(id)}>
-            <Trash2 />
-          </RowAction>
+          <OverflowMenu
+            label="More workspace actions"
+            testId="workspace-more"
+            items={[{ label: "Remove workspace", icon: Trash2, destructive: true, testId: "workspace-remove", onSelect: () => void removeWorkspace(id) }]}
+          />
         </span>
       </NavRow>
       {!collapsed && (

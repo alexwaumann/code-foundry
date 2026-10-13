@@ -45,13 +45,15 @@ function initialSelection(p: ArgPrompt): string {
 interface BodyProps {
   initialQuery: string;
   initialCommand: string | null;
+  /** The context to list and invoke in; default: the selection's when the palette opens. */
+  initialContext?: UiContextView;
   close: () => void;
 }
 
 /** Palette contents for one opening. Remounted on every open (fresh state). */
-function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
+function PaletteBody({ initialQuery, initialCommand, initialContext, close }: BodyProps) {
   // Snapshot the context when the palette opens: that's what the user was looking at.
-  const [context] = useState<UiContextView>(getUiContext);
+  const [context] = useState<UiContextView>(() => initialContext ?? getUiContext());
   const commands = useCommandsStore((s) => s.commands);
   const loading = useCommandsStore((s) => s.loading);
   const error = useCommandsStore((s) => s.error);
@@ -105,7 +107,8 @@ function PaletteBody({ initialQuery, initialCommand, close }: BodyProps) {
 
   // A keybinding (or the sidebar "+") can open the palette straight into a command's arg
   // prompts. Adjusts state during render once it's listed.
-  if (pendingCommand) {
+  // With a given context, wait for that context's list (the current one may not have it).
+  if (pendingCommand && (!initialContext || fresh)) {
     const c = available.find((x) => x.name === pendingCommand);
     if (c) {
       setPendingCommand(null);
@@ -317,6 +320,7 @@ export function CommandPalette() {
   const commandName = useUiStore((s) => s.palette.commandName);
   const page = useUiStore((s) => s.palette.page);
   const runInSession = useUiStore((s) => s.palette.sessionId ?? "");
+  const context = useUiStore((s) => s.palette.context);
   const close = useUiStore((s) => s.closePalette);
   const title = page === "projects" ? "New thread" : page === "runin" ? "Run thread in" : "Command palette";
   const description =
@@ -342,7 +346,7 @@ export function CommandPalette() {
         ) : page === "runin" ? (
           <RunInPicker sessionId={runInSession} close={close} />
         ) : (
-          <PaletteBody key={`${query}\u0000${commandName ?? ""}`} initialQuery={query} initialCommand={commandName} close={close} />
+          <PaletteBody key={`${query}\u0000${commandName ?? ""}`} initialQuery={query} initialCommand={commandName} initialContext={context} close={close} />
         )}
       </DialogContent>
     </Dialog>
