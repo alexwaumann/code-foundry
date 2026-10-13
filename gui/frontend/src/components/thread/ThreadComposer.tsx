@@ -28,6 +28,13 @@ import { PendingPrompts, type PromptKeys } from "./PendingPrompt";
 
 const TRIGGERS: readonly TriggerChar[] = ["/", "@"];
 
+/**
+ * The last ui promptFocusSeq a thread composer acted on. Module-level: selecting a thread
+ * to type in bumps it before that thread's composer mounts, so a fresh composer still
+ * sees the request as new.
+ */
+let handledPromptSeq = 0;
+
 function hasFocusWithin(el: HTMLElement | null): boolean {
   return !!el && el.contains(document.activeElement);
 }
@@ -59,8 +66,8 @@ function useThreadSources(sessionId: string) {
 
 /**
  * A disconnected thread's composer: what happened, and Reconnect. The button takes the
- * focus requests the prompt would (`ref`); once the thread reconnects the prompt takes
- * the keyboard.
+ * focus requests the prompt would (`ref`), and the keyboard when the thread disconnects
+ * while shown; once it reconnects the prompt takes it back (ThreadComposer).
  */
 function Reconnect({ sessionId, ref }: { sessionId: string; ref: Ref<HTMLButtonElement> }) {
   const cause = useSessionsStore((s) => {
@@ -82,9 +89,8 @@ function Reconnect({ sessionId, ref }: { sessionId: string; ref: Ref<HTMLButtonE
           data-testid="reconnect"
           onClick={() => {
             setBusy(true);
-            void reconnectSession(sessionId).then((ok) => {
+            void reconnectSession(sessionId).finally(() => {
               setBusy(false);
-              if (ok) useUiStore.setState((u) => ({ promptFocusSeq: u.promptFocusSeq + 1 }));
             });
           }}
         >
@@ -139,22 +145,45 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
     void loadSkills(sources.skills);
   }, [sources.skills]);
 
-  // Focus requests for the content pane (a thread selected, the side panel hid) land in
-  // the prompt (a disconnected thread's: its Reconnect button).
+  // Focus requests land in the prompt (a disconnected thread's: its Reconnect button): a
+  // thread selected to be typed in (ui promptFocusSeq), the content pane asked for (the side
+  // panel hid, ui contentFocusSeq). So does the thread disconnecting or reconnecting while
+  // shown, unless the keyboard is in the bottom panel. A composer that mounts with no
+  // request (Show worktree, a revealed shell) leaves the keyboard where that put it. Under
+  // an expanded side panel the panel takes the requested focus.
+  const disconnected = state === "disconnected";
   const focusSeq = useUiStore((s) => s.promptFocusSeq);
   const contentFocusSeq = useUiStore((s) => s.contentFocusSeq);
-  const seen = useRef({ focusSeq, contentFocusSeq });
+  const seenContent = useRef(contentFocusSeq);
+  const wasDisconnected = useRef(disconnected);
+  // Where the keyboard was when this request came in (kept across StrictMode's effect replay).
+  const request = useRef<{ key: string; before: Element | null } | null>(null);
   useEffect(() => {
-    const asked = seen.current.focusSeq !== focusSeq || seen.current.contentFocusSeq !== contentFocusSeq;
-    seen.current = { focusSeq, contentFocusSeq };
-    if (!asked && useUiStore.getState().focus === "bottom") return;
-    const panel = getPanel();
-    if (panel.open && panel.expanded) return;
-    const raf = requestAnimationFrame(() => (editorRef.current ?? reconnectRef.current)?.focus());
+    const asked = handledPromptSeq !== focusSeq || seenContent.current !== contentFocusSeq;
+    const flipped = wasDisconnected.current !== disconnected;
+    wasDisconnected.current = disconnected;
+    if (!asked && (!flipped || useUiStore.getState().focus === "bottom")) return;
+    const key = `${String(focusSeq)}:${String(contentFocusSeq)}:${String(disconnected)}`;
+    if (request.current?.key !== key) request.current = { key, before: document.activeElement };
+    const { before } = request.current;
+    const raf = requestAnimationFrame(() => {
+      handledPromptSeq = focusSeq;
+      seenContent.current = contentFocusSeq;
+      const panel = getPanel();
+      if (panel.open && panel.expanded) {
+        if (asked) useUiStore.setState((u) => ({ panelFocusSeq: u.panelFocusSeq + 1 }));
+        return;
+      }
+      // Something took the keyboard meanwhile (the side panel, the inline rename a
+      // double-click on the sidebar row starts): leave it there.
+      const now = document.activeElement;
+      if (now !== before && now !== null && now !== document.body) return;
+      (editorRef.current ?? reconnectRef.current)?.focus();
+    });
     return () => {
       cancelAnimationFrame(raf);
     };
-  }, [focusSeq, contentFocusSeq, sessionId]);
+  }, [focusSeq, contentFocusSeq, sessionId, disconnected]);
 
   // The editor turns read-only while a send is in flight. Chromium drops its focus then;
   // WebKit keeps the element focused but no longer edits in it, and the editor's focus()
@@ -190,7 +219,9 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
   const docked = pending.length > 0;
 
   return (
-    <div className="relative" ref={rootRef}>
+    // data-chord-yield: cmd chords bound to commands (cmd+j, cmd+shift+w, cmd+r) reach
+    // the app from the prompt, as they did from a thread's terminal (keys/bindings.ts).
+    <div className="relative" ref={rootRef} data-chord-yield="">
       <div
         className={cn("ccard", docked && "docked")}
         data-testid="thread-composer"

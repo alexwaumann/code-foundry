@@ -300,16 +300,21 @@ export function mcpPanelCommand(): boolean {
   return true;
 }
 
+/** Asks the selected thread's prompt for the keyboard; nothing when no thread is selected. */
+function requestPromptFocus(): void {
+  if (useUiStore.getState().selection.kind === "session") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
+}
+
 export function closeSettings(): void {
   useViewsStore.setState({ settingsOpen: false });
   // Back to what was selected; a thread's prompt takes focus again.
-  useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
+  requestPromptFocus();
 }
 
 export function closeUsage(): void {
   useViewsStore.setState({ usageOpen: false });
   // Like closeSettings: back to the selection, whose prompt takes focus again.
-  useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
+  requestPromptFocus();
 }
 
 export function toggleHelp(): void {

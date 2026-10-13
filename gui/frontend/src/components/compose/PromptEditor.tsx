@@ -318,8 +318,17 @@ export function PromptEditor({
   useImperativeHandle(
     handleRef,
     () => ({
+      // Synchronous: TipTap's focus command focuses again a frame later, which takes the
+      // keyboard back from whatever got it meanwhile (cmd+k right after a thread is
+      // selected would lose the palette to its prompt).
       focus: () => {
-        editor.commands.focus();
+        if (editor.isDestroyed) return;
+        try {
+          editor.view.focus();
+          editor.commands.scrollIntoView();
+        } catch {
+          editor.commands.focus();
+        }
       },
       insertChips: (attachments) => {
         const { state } = editor;
