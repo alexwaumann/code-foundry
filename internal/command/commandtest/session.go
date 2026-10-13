@@ -36,7 +36,7 @@ func (s *Session) do(m proto.Message) error {
 // Create echoes the request as a STARTING session "s1". With new_worktree the session
 // is in /worktrees/s1 with created_worktree and base_ref set. workspace_id is echoed;
 // with new_workspace the session belongs to "w-new" and runs in /worktrees/<repo>
-// (repo_id, else the first repo).
+// (repo_id, else the first repo). With no_project it runs in /home.
 func (s *Session) Create(_ context.Context, r *connect.Request[v1.CreateSessionRequest]) (*connect.Response[v1.CreateSessionResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
@@ -55,6 +55,9 @@ func (s *Session) Create(_ context.Context, r *connect.Request[v1.CreateSessionR
 			out.RepoId = nw.GetRepos()[0]
 		}
 		out.WorkspaceId, out.WorktreePath, out.CreatedWorktree, out.BaseRef = "w-new", "/worktrees/"+out.RepoId, true, nw.GetBaseRef()
+	}
+	if m.GetNoProject() {
+		out.WorktreePath = "/home"
 	}
 	return connect.NewResponse(&v1.CreateSessionResponse{Session: out}), nil
 }

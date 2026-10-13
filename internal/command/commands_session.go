@@ -77,10 +77,23 @@ func hasSession(c Context) bool { return c.ActiveSessionID != "" }
 func hasRepoOrWorktree(c Context) bool { return c.ActiveRepoID != "" || c.ActiveWorktreePath != "" }
 
 // canStartThread is session.new's availability: a GUI caller needs an active
-// repository or worktree. A CLI caller (no active view) names everything with flags,
-// and --workspace or --repos alone are enough, which When cannot see, so Run
-// validates instead.
-func canStartThread(c Context) bool { return hasRepoOrWorktree(c) || c.ActiveView == "" }
+// repository or worktree, or the composer (whose target may be no project at all). A
+// CLI caller (no active view) names everything with flags, and --workspace, --repos or
+// --no-project alone are enough, which When cannot see, so Run validates instead.
+func canStartThread(c Context) bool {
+	return hasRepoOrWorktree(c) || c.ActiveView == "" || c.ActiveView == "compose"
+}
+
+// noProjectAlone refuses session.new's no-project with any arg that places the thread
+// in a project or workspace.
+func noProjectAlone(a Args) error {
+	for _, name := range []string{"repo", "worktree", "workspace", "repos", "new-worktree", "base"} {
+		if a.String(name) != "" || a.Bool(name) {
+			return InvalidArg(name, "no-project starts a thread without a project; it does not take %s", name)
+		}
+	}
+	return nil
+}
 
 // sessionLabel is "name (id)" or just the id.
 func sessionLabel(s *v1.Session) string {
@@ -176,7 +189,8 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 			Name:  "session.new",
 			Title: "New Thread",
 			Description: "Start Claude Code in a worktree (default: the active worktree, else the active repository's main worktree), or in a new worktree. " +
-				"With workspace the thread belongs to that workspace and runs in one of its member worktrees; with new-worktree and repos it gets a new workspace.",
+				"With workspace the thread belongs to that workspace and runs in one of its member worktrees; with new-worktree and repos it gets a new workspace. " +
+				"With no-project it belongs to no project and runs in your home directory.",
 			Category:    "Thread",
 			Keybindings: []string{"cmd+n"},
 			Args: []ArgSpec{
@@ -194,18 +208,23 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				{Name: "prompt", Type: String, Description: "First prompt, sent as the thread's first message once Claude is up"},
 				{Name: "attachments", Type: String, Description: "Comma-separated image paths from StageAttachment, appended to the prompt"},
 				{Name: "composer-prompt", Type: String, Description: "The GUI composer's text of prompt with its tag tokens, kept on the first message for display (the GUI sets it)"},
+				{Name: "no-project", Type: Bool, Description: "Start the thread without a project, in your home directory (not with repo, worktree, workspace, repos, new-worktree or base)"},
 			},
 			When: canStartThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				ws, repos := a.String("workspace"), splitList(a.String("repos"))
-				if a.String("repo") == "" && a.Path("worktree") == "" && ws == "" && len(repos) == 0 {
-					return Result{}, InvalidArg("worktree", "a worktree, repository, or workspace is required")
+				if a.Bool("no-project") {
+					if err := noProjectAlone(a); err != nil {
+						return Result{}, err
+					}
+				} else if a.String("repo") == "" && a.Path("worktree") == "" && ws == "" && len(repos) == 0 {
+					return Result{}, InvalidArg("worktree", "a worktree, repository, or workspace is required (or no-project)")
 				}
 				req := &v1.CreateSessionRequest{
 					RepoId: a.String("repo"), WorktreePath: a.Path("worktree"), Model: a.String("model"),
 					Effort: a.String("effort"), Name: a.String("name"), InitialPrompt: a.String("prompt"),
 					ComposerPrompt: a.String("composer-prompt"), PermissionMode: sessionPermissionModes[a.String("permission")], Attachments: splitList(a.String("attachments")),
-					WorkspaceId: ws,
+					WorkspaceId: ws, NoProject: a.Bool("no-project"),
 				}
 				switch {
 				case len(repos) > 0 && !a.Bool("new-worktree"):
@@ -228,6 +247,9 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				msg := "created thread " + sessionLabel(s) + " in " + s.GetWorktreePath()
 				if s.GetWorkspaceId() != "" {
 					msg += " (workspace " + s.GetWorkspaceId() + ")"
+				}
+				if req.GetNoProject() {
+					msg += " (no project)"
 				}
 				if s.GetCreatedWorktree() {
 					msg += " (new worktree from " + s.GetBaseRef() + ")"

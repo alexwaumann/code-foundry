@@ -92,6 +92,22 @@ func TestSessionCommands(t *testing.T) {
 				NewWorkspace: &v1.NewWorkspace{Repos: []string{"web", "api"}, BaseRef: "origin/dev"}}}},
 		{name: "repos needs new worktree", cmd: "session.new", args: map[string]string{"repos": "web,api"}, wantErr: command.ErrInvalidArgs},
 		{name: "workspace refuses new worktree", cmd: "session.new", args: map[string]string{"workspace": "login", "new-worktree": "true"}, wantErr: command.ErrInvalidArgs},
+		{name: "new without a project", cmd: "session.new", args: map[string]string{"no-project": "true", "model": "claude-4.5-haiku[1m]", "prompt": "hi"},
+			wantMsg:  "created thread s1 in /home (no project)",
+			wantReqs: []proto.Message{&v1.CreateSessionRequest{NoProject: true, Model: "claude-4.5-haiku[1m]", InitialPrompt: "hi", PermissionMode: auto}}, wantIntent: focusIntent("s1")},
+		{name: "new without a project from the composer", cmd: "session.new", ctx: command.Context{ActiveView: "compose"},
+			args:     map[string]string{"no-project": "true"},
+			wantReqs: []proto.Message{&v1.CreateSessionRequest{NoProject: true, PermissionMode: auto}}},
+		{name: "new from the composer still needs a target", cmd: "session.new", ctx: command.Context{ActiveView: "compose"}, wantErr: command.ErrInvalidArgs},
+		{name: "no project refuses repo", cmd: "session.new", args: map[string]string{"no-project": "true", "repo": "r1"}, wantErr: command.ErrInvalidArgs},
+		{name: "no project refuses a repo from context", cmd: "session.new", ctx: command.Context{ActiveRepoID: "r1"},
+			args: map[string]string{"no-project": "true"}, wantErr: command.ErrInvalidArgs},
+		{name: "no project refuses worktree", cmd: "session.new", args: map[string]string{"no-project": "true", "worktree": "/wt"}, wantErr: command.ErrInvalidArgs},
+		{name: "no project refuses workspace", cmd: "session.new", args: map[string]string{"no-project": "true", "workspace": "login"}, wantErr: command.ErrInvalidArgs},
+		{name: "no project refuses repos", cmd: "session.new", args: map[string]string{"no-project": "true", "new-worktree": "true", "repos": "web,api"}, wantErr: command.ErrInvalidArgs},
+		{name: "no project refuses new worktree", cmd: "session.new", args: map[string]string{"no-project": "true", "new-worktree": "true"}, wantErr: command.ErrInvalidArgs},
+		{name: "no project refuses base", cmd: "session.new", args: map[string]string{"no-project": "true", "base": "main"}, wantErr: command.ErrInvalidArgs},
+		{name: "no project false still needs a target", cmd: "session.new", args: map[string]string{"no-project": "false"}, wantErr: command.ErrInvalidArgs},
 		{name: "new bad effort", cmd: "session.new", args: map[string]string{"worktree": "/wt", "effort": "huge"}, wantErr: command.ErrInvalidArgs},
 		{name: "new bad model", cmd: "session.new", args: map[string]string{"worktree": "/wt", "model": "gpt"}, wantErr: command.ErrInvalidArgs},
 		{name: "new pinned model", cmd: "session.new", args: map[string]string{"worktree": "/wt", "model": "claude-opus-4-8[1m]"},
@@ -228,7 +244,7 @@ func TestSessionNewKeybindingAndEnums(t *testing.T) {
 	for _, a := range c.Args {
 		names = append(names, a.Name)
 	}
-	for _, want := range []string{"repo", "worktree", "model", "effort", "permission", "new-worktree", "base", "name", "prompt", "attachments"} {
+	for _, want := range []string{"repo", "worktree", "model", "effort", "permission", "new-worktree", "base", "name", "prompt", "attachments", "no-project"} {
 		if !slices.Contains(names, want) {
 			t.Errorf("session.new has no %q arg (args %v)", want, names)
 		}
