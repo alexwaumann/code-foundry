@@ -68,15 +68,18 @@ func TestCreateNewWorktree(t *testing.T) {
 		wantCalls  int
 		wantBase   string
 	}{
-		{name: "slug in time names branch and session", o: CreateOptions{RepoID: "r1", InitialPrompt: "fix the login bug"},
-			namer: func(int, string) (string, error) { return "fix-login-bug", nil }, wantBranch: "cf/fix-login-bug",
-			wantName: "fix-login-bug", wantCalls: 1, wantBase: "origin/main"},
+		{name: "title in time names the session, its slug the branch", o: CreateOptions{RepoID: "r1", InitialPrompt: "fix the login bug"},
+			namer: func(int, string) (string, error) { return "Fix the login bug", nil }, wantBranch: "cf/fix-the-login-bug",
+			wantName: "Fix the login bug", wantCalls: 1, wantBase: "origin/main"},
+		{name: "a title with nothing to slugify names the session, the branch is the id", o: CreateOptions{RepoID: "r1", InitialPrompt: "x"},
+			namer: func(int, string) (string, error) { return "Добавить тёмную тему", nil }, wantBranch: "<id>",
+			wantName: "Добавить тёмную тему", wantCalls: 1, wantBase: "origin/main"},
 		{name: "explicit base ref", o: CreateOptions{RepoID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{BaseRef: "origin/dev"}},
-			namer: func(int, string) (string, error) { return "do-x", nil }, wantBranch: "cf/do-x", wantName: "do-x", wantCalls: 1,
+			namer: func(int, string) (string, error) { return "Do x", nil }, wantBranch: "cf/do-x", wantName: "Do x", wantCalls: 1,
 			wantBase: "origin/dev"},
 		{name: "taken branch gets a suffix", o: CreateOptions{RepoID: "r1", InitialPrompt: "x"},
 			taken: []string{"refs/heads/cf/do-x", "refs/remotes/origin/cf/do-x-2"},
-			namer: func(int, string) (string, error) { return "do-x", nil }, wantBranch: "cf/do-x-3", wantName: "do-x", wantCalls: 1,
+			namer: func(int, string) (string, error) { return "Do x", nil }, wantBranch: "cf/do-x-3", wantName: "Do x", wantCalls: 1,
 			wantBase: "origin/main"},
 		{name: "namer error uses the id", o: CreateOptions{RepoID: "r1", InitialPrompt: "x"},
 			namer: func(int, string) (string, error) { return "", errors.New("exit status 1") }, wantBranch: "<id>", wantCalls: 1,
@@ -86,8 +89,8 @@ func TestCreateNewWorktree(t *testing.T) {
 				if n == 1 {
 					return "", errors.New("claude -p: exit status 1: API Error: 429 rate limit")
 				}
-				return "after-retry", nil
-			}, wantBranch: "cf/after-retry", wantName: "after-retry", wantCalls: 2, wantBase: "origin/main"},
+				return "After retry", nil
+			}, wantBranch: "cf/after-retry", wantName: "After retry", wantCalls: 2, wantBase: "origin/main"},
 		{name: "second rate limit gives up", o: CreateOptions{RepoID: "r1", InitialPrompt: "x"},
 			namer: func(int, string) (string, error) { return "", errors.New("Rate limit reached") }, wantBranch: "<id>",
 			wantCalls: 2, wantBase: "origin/main"},
@@ -95,7 +98,7 @@ func TestCreateNewWorktree(t *testing.T) {
 			wantBranch: "cf/my-big-feature", wantName: "My Big Feature!", wantCalls: 0, wantBase: "origin/main"},
 		{name: "no prompt uses the id", o: CreateOptions{RepoID: "r1"}, wantBranch: "<id>", wantCalls: 0, wantBase: "origin/main"},
 		{name: "repo from a worktree path", o: CreateOptions{WorktreePath: "<wt>", InitialPrompt: "x"},
-			namer: func(int, string) (string, error) { return "from-path", nil }, wantBranch: "cf/from-path", wantName: "from-path",
+			namer: func(int, string) (string, error) { return "From path", nil }, wantBranch: "cf/from-path", wantName: "From path",
 			wantCalls: 1, wantBase: "origin/main"},
 	}
 	for _, tt := range tests {
@@ -169,7 +172,7 @@ func TestCreateNewWorktreeUsesWorktreePathOption(t *testing.T) {
 			return dir + "/" + r.Name + "/" + strings.ReplaceAll(branch, "/", "-")
 		}
 	})
-	e.namer = func(string) (string, error) { return "do-x", nil }
+	e.namer = func(string) (string, error) { return "Do x", nil }
 	s, err := e.m.Create(e.ctx(), CreateOptions{RepoID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{}})
 	if err != nil {
 		t.Fatal(err)
@@ -185,7 +188,7 @@ func TestCreateNewWorktreeSlugTimeoutNamesLater(t *testing.T) {
 	release := make(chan struct{})
 	e.namer = func(string) (string, error) {
 		<-release
-		return "slow-name", nil
+		return "Slow name", nil
 	}
 	start := time.Now()
 	s, err := e.m.Create(e.ctx(), CreateOptions{RepoID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{}})
@@ -202,12 +205,12 @@ func TestCreateNewWorktreeSlugTimeoutNamesLater(t *testing.T) {
 		t.Fatalf("session = %+v", s)
 	}
 	close(release)
-	got := e.waitFor(s.ID, "named", func(s Session) bool { return s.Name == "slow-name" })
+	got := e.waitFor(s.ID, "named", func(s Session) bool { return s.Name == "Slow name" })
 	if !got.AutoNamed {
 		t.Errorf("session = %+v", got)
 	}
 	rows, _ := loadSessions(context.Background(), e.m.opts.DB)
-	if len(rows) != 1 || rows[0].Name != "slow-name" || !rows[0].CreatedWorktree || rows[0].BaseRef != "origin/main" {
+	if len(rows) != 1 || rows[0].Name != "Slow name" || !rows[0].CreatedWorktree || rows[0].BaseRef != "origin/main" {
 		t.Errorf("rows = %+v", rows)
 	}
 }
@@ -217,7 +220,7 @@ func TestCreateNewWorktreeSlugTimeoutKeepsRename(t *testing.T) {
 	release := make(chan struct{})
 	e.namer = func(string) (string, error) {
 		<-release
-		return "slow-name", nil
+		return "Slow name", nil
 	}
 	s, err := e.m.Create(e.ctx(), CreateOptions{RepoID: "r1", InitialPrompt: "x", NewWorktree: &NewWorktree{}})
 	if err != nil {

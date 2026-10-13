@@ -180,29 +180,29 @@ func TestCreateNewWorkspace(t *testing.T) {
 		wantBase   string // session base ref; default: the request's
 		wantErr    error
 	}{
-		{name: "slug names branch, workspace and thread; first repo is the cwd",
+		{name: "title names the thread, its slug the branch and workspace; first repo is the cwd",
 			o:        CreateOptions{InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "api"}}},
-			wantCall: "Create named-fix r1,r2", wantBranch: "cf/named-fix", wantRepo: "r1", wantName: "named-fix"},
+			wantCall: "Create named-fix r1,r2", wantBranch: "cf/named-fix", wantRepo: "r1", wantName: "Named fix"},
 		{name: "repo picks the cwd member, by name too",
 			o:        CreateOptions{RepoID: "api", InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"repo", "api"}}},
-			wantCall: "Create named-fix r1,r2", wantBranch: "cf/named-fix", wantRepo: "r2", wantName: "named-fix"},
+			wantCall: "Create named-fix r1,r2", wantBranch: "cf/named-fix", wantRepo: "r2", wantName: "Named fix"},
 		{name: "repo picks the cwd member",
 			o:        CreateOptions{RepoID: "r2", InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "r2"}, BaseRef: "origin/dev"}},
-			wantCall: "Create named-fix r1,r2", wantBranch: "cf/named-fix", wantRepo: "r2", wantName: "named-fix"},
+			wantCall: "Create named-fix r1,r2", wantBranch: "cf/named-fix", wantRepo: "r2", wantName: "Named fix"},
 		{name: "a member's own base; the cwd member's base is the thread's",
 			o:        CreateOptions{RepoID: "r2", InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "api: origin/feat"}, BaseRef: "origin/dev"}},
-			wantCall: "Create named-fix r1,r2:origin/feat", wantBranch: "cf/named-fix", wantRepo: "r2", wantName: "named-fix", wantBase: "origin/feat"},
+			wantCall: "Create named-fix r1,r2:origin/feat", wantBranch: "cf/named-fix", wantRepo: "r2", wantName: "Named fix", wantBase: "origin/feat"},
 		{name: "a member's own base; another member is the cwd",
 			o:        CreateOptions{InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "r2:origin/feat"}}},
-			wantCall: "Create named-fix r1,r2:origin/feat", wantBranch: "cf/named-fix", wantRepo: "r1", wantName: "named-fix"},
+			wantCall: "Create named-fix r1,r2:origin/feat", wantBranch: "cf/named-fix", wantRepo: "r1", wantName: "Named fix"},
 		{name: "a bad member base", o: CreateOptions{NewWorkspace: &NewWorkspace{Repos: []string{"r1:-x"}}}, wantErr: ErrInvalidArgument},
 		{name: "a branch taken in any member gets a suffix",
 			o:     CreateOptions{InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "r2"}}},
 			taken: []string{"refs/remotes/origin/cf/named-fix"}, wantCall: "Create named-fix-2 r1,r2", wantBranch: "cf/named-fix-2",
-			wantRepo: "r1", wantName: "named-fix"},
+			wantRepo: "r1", wantName: "Named fix"},
 		{name: "a taken workspace name gets a suffix",
 			o:        CreateOptions{InitialPrompt: "fix login", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "r2"}}},
-			existing: "named-fix", wantCall: "Create named-fix-2 r1,r2", wantBranch: "cf/named-fix-2", wantRepo: "r1", wantName: "named-fix"},
+			existing: "named-fix", wantCall: "Create named-fix-2 r1,r2", wantBranch: "cf/named-fix-2", wantRepo: "r1", wantName: "Named fix"},
 		{name: "explicit thread name, explicit workspace name",
 			o:        CreateOptions{Name: "Driver One", NewWorkspace: &NewWorkspace{Repos: []string{"r1", "r2"}, Name: "Login work"}},
 			wantCall: "Create Login work r1,r2", wantBranch: "cf/driver-one", wantRepo: "r1", wantName: "Driver One"},
@@ -219,7 +219,7 @@ func TestCreateNewWorkspace(t *testing.T) {
 			e := newWSEnv(t, func(o *Options) {
 				o.RefExists = func(_ context.Context, _, ref string) bool { return slices.Contains(tt.taken, ref) }
 			})
-			e.namer = func(string) (string, error) { return "named-fix", nil }
+			e.namer = func(string) (string, error) { return "Named fix", nil }
 			e.repos.Put(repo.Repo{ID: "r3", Path: "/src/notes", Name: "notes", Worktrees: []repo.Worktree{{RepoID: "r3", Path: "/src/notes", IsMain: true}}})
 			if tt.existing != "" {
 				e.ws.Put(workspace.Workspace{ID: "w-old", Name: tt.existing, Branch: "cf/other"})

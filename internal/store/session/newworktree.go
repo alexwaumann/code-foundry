@@ -19,10 +19,11 @@ import (
 // Create makes the worktree synchronously so a failure reaches the caller before
 // anything is persisted (the GUI composer keeps its draft). The branch is
 // cf/<slug>: the slug is the session's explicit name slugified, else the namer's
-// answer for the first prompt, else the session id. Only the branch waits for the
-// namer, bounded by Options.SlugTimeout. The namer is called once per session: a slug
-// that arrives in time is also the session's name; one that arrives later is applied
-// as the name then (the row keeps its placeholder until it does).
+// title for the first prompt slugified, else (no title, or one with nothing to
+// slugify) the session id. Only the branch waits for the namer, bounded by
+// Options.SlugTimeout. The namer is called once per session: a title that arrives in
+// time names the branch and the session; one that arrives later only names the
+// session then (the branch stays cf/<id>; the row keeps its placeholder until then).
 
 // branchPrefix namespaces branches the app creates.
 const branchPrefix = "cf/"
@@ -39,7 +40,7 @@ type namingResult struct {
 // createdWorktree is what newWorktree made.
 type createdWorktree struct {
 	repoID, path, baseRef string
-	// name is the namer's slug when it arrived within SlugTimeout.
+	// name is the namer's title when it arrived within SlugTimeout.
 	name string
 	// namerCalled: the namer was started for this session (in time or not).
 	namerCalled bool
@@ -101,10 +102,10 @@ func (m *Manager) newWorktree(ctx context.Context, id, name string, o CreateOpti
 
 // slugWait is the outcome of waitSlug.
 type slugWait struct {
-	// slug for the branch: the explicit name slugified, else the namer's answer, else
-	// "" (the caller falls back to the session id).
+	// slug for the branch: the explicit name slugified, else the namer's title
+	// slugified, else "" (the caller falls back to the session id).
 	slug string
-	// name is the namer's slug when it arrived within SlugTimeout.
+	// name is the namer's title when it arrived within SlugTimeout.
 	name string
 	// namerCalled: the namer was started for this session (in time or not).
 	namerCalled bool
@@ -113,8 +114,8 @@ type slugWait struct {
 }
 
 // waitSlug picks the slug a new worktree's (or workspace's) branch is named after:
-// name slugified when set, else the namer's answer for the first prompt, waiting at
-// most Options.SlugTimeout.
+// name slugified when set, else the namer's title for the first prompt slugified,
+// waiting at most Options.SlugTimeout.
 func (m *Manager) waitSlug(ctx context.Context, id, name, prompt string) (slugWait, error) {
 	sw := slugWait{slug: slugify(name)}
 	if name != "" || strings.TrimSpace(prompt) == "" {
@@ -134,7 +135,7 @@ func (m *Manager) waitSlug(ctx context.Context, id, name, prompt string) (slugWa
 		if res.err != nil {
 			m.log.Warn("naming new worktree branch failed; using the session id", "session", id, "err", res.err)
 		} else {
-			sw.slug, sw.name = res.name, res.name
+			sw.slug, sw.name = slugify(res.name), res.name
 			m.log.Info("session auto-named", "session", id, "name", res.name,
 				"took", time.Since(start).Round(time.Millisecond).String())
 		}
