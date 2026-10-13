@@ -11,6 +11,7 @@ import { bottomKeyOf, bottomVisible, getBottom, toggleBottom } from "./bottomPan
 import { linkedPrsTarget, openLinkedPrsSurface } from "./linkedPrsPanel";
 import { expandPanel, getPanel, startPanelPicking, togglePanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
+import { openMcpSurface } from "./mcpPanel";
 import { openUsageSurface } from "./usagePanel";
 import { openWorkspaceSurface } from "./workspacePanel";
 import { openWorktreeSurface } from "./worktreePanel";
@@ -87,6 +88,10 @@ export function showView(name: string): boolean {
     case "panel.usage":
       // view.panel.usage: the Usage surface in the current thread's panel.
       usagePanelCommand();
+      return true;
+    case "panel.mcp":
+      // view.panel.mcp: the MCP surface in the current rendered thread's panel.
+      mcpPanelCommand();
       return true;
     case "panel.worktree":
       // view.panel.worktree: the thread's own worktree in the current thread's panel.
@@ -271,6 +276,23 @@ export function linkedPrsPanelCommand(): boolean {
 export function usagePanelCommand(): boolean {
   if (pageOpen()) return false;
   const key = openUsageSurface();
+  if (key === null) return false;
+  const inPalette = useUiStore.getState().palette.open;
+  togglePanel(key, true, { focus: !inPalette });
+  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
+  return true;
+}
+
+/**
+ * view.panel.mcp for the current selection: opens (or activates) the MCP tab in the
+ * selected rendered thread's panel and shows the panel, like view.panel.usage. A no-op
+ * while the settings or usage page is up and when the selection is no rendered thread.
+ *
+ * Focus moves to the panel; with the palette open, its return target moves there instead.
+ */
+export function mcpPanelCommand(): boolean {
+  if (pageOpen()) return false;
+  const key = openMcpSurface();
   if (key === null) return false;
   const inPalette = useUiStore.getState().palette.open;
   togglePanel(key, true, { focus: !inPalette });

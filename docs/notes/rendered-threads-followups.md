@@ -66,7 +66,15 @@ Office formats are not API documents; conversion is a separate feature. Terminal
 keep today's path-only behaviour. Small: send path + accepted types + an item renderer
 for the document chip. Could ride in PR 2 or PR 4 if cheap.
 
-## 2. MCP panel
+## 2. MCP panel — done
+
+**Done** (2026-10-12): `mcp-panel.md` (design: `docs/sketches/mcp-panel/`, variant B).
+Reconnect is the only action (no enable/disable, so no `McpToggle`); the status is cached
+on the thread's log in memory and rides `ThreadService.Watch`, not the thread snapshot.
+Verified live: the first turn's `mcp_status` can answer `[]` or "pending" while
+`system/init` already lists the servers; `mcp_reconnect` of a failing server is a control
+error carrying its error; tools of claude.ai connectors have no description and only the
+true annotations.
 
 The `initialize` reply has **no MCP data**. State lives in:
 
@@ -149,4 +157,4 @@ Confirm by eye on the first turn: `cache_creation_input_tokens` large,
 1. ~~Document attachments~~ (deferred).
 2. ~~Cold-cache signal + context totals~~ (done: `rendered-threads-cold-cache.md`).
 3. Context breakdown panel tab.
-4. MCP panel tab.
+4. ~~MCP panel tab~~ (done: `mcp-panel.md`).

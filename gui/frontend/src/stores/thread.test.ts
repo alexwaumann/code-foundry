@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { McpStatusView } from "@/api/mcp";
 import type { ThreadEventView, ThreadItemView, ThreadPendingView } from "@/api/thread";
 import { applyPendingEvent, applyThreadEvent, applyThreadEvents, KEPT_LOGS, sameItem, startThreadWatch, useThreadStore, WATCH_BATCH_MS, type ThreadLog } from "./thread";
 
@@ -23,7 +24,7 @@ function tool(id: string, ordinal: number, input = ""): ThreadItemView {
   return { id, ordinal, parentToolUseId: "", createdAtMs: 1, updatedAtMs: 1, streaming: true, kind: "tool", toolUseId: id, name: "Bash", inputJson: input, status: "running", output: "", isError: false, resultJson: "" };
 }
 const pend = (requestId: string): ThreadPendingView => ({ requestId, itemId: `perm-${requestId}`, question: false, toolName: "Bash", summary: "Bash ls" });
-const snapshot = (seq: number, items: ThreadItemView[], pending: ThreadPendingView[] = []): ThreadEventView => ({ kind: "snapshot", sessionId: "s", seq, items, pending });
+const snapshot = (seq: number, items: ThreadItemView[], pending: ThreadPendingView[] = []): ThreadEventView => ({ kind: "snapshot", sessionId: "s", seq, items, pending, mcp: null });
 
 function apply(log: ThreadLog | undefined, ...evs: ThreadEventView[]): ThreadLog | undefined {
   return evs.reduce(applyThreadEvent, log);
@@ -131,6 +132,39 @@ describe("applyThreadEvent", () => {
     expect(log?.pending).toHaveLength(1);
     log = apply(log, { kind: "pending", sessionId: "s", seq: 3, pending: [] });
     expect(log?.pending).toEqual([]);
+  });
+});
+
+describe("the MCP status on the log", () => {
+  const status = (checkedAtMs: number, st: "connected" | "failed" = "connected"): McpStatusView => ({
+    checkedAtMs,
+    trigger: "turn",
+    server: "",
+    servers: [
+      { name: "a", status: "connected", serverName: "", version: "1", error: "", scope: "user", source: "user", transport: "stdio", tools: [] },
+      { name: "b", status: st, serverName: "", version: "", error: st === "failed" ? "boom" : "", scope: "user", source: "user", transport: "http", tools: [] },
+    ],
+  });
+  const mcp = (seq: number, s: McpStatusView | null): ThreadEventView => ({ kind: "mcp", sessionId: "s", seq, status: s });
+
+  it("comes with the snapshot, follows mcp events by seq, keeps unchanged servers, and drops to null", () => {
+    const start = apply(undefined, { ...snapshot(1, [text("a", 1)]), mcp: status(10, "failed") } as ThreadEventView);
+    expect(start?.mcp?.servers.map((s) => s.status)).toEqual(["connected", "failed"]);
+    const items = start?.byId;
+
+    const next = apply(start, mcp(2, status(20)));
+    expect(next?.seq).toBe(2);
+    expect(next?.byId).toBe(items);
+    expect(next?.mcp?.checkedAtMs).toBe(20);
+    expect(next?.mcp?.servers[0]).toBe(start?.mcp?.servers[0]);
+    expect(next?.mcp?.servers[1]?.status).toBe("connected");
+
+    // An event the log has (seq) is dropped.
+    expect(apply(next, mcp(2, null))).toBe(next);
+    // The process ended.
+    expect(apply(next, mcp(3, null))?.mcp).toBeNull();
+    // A resync snapshot without one clears it.
+    expect(apply(next, snapshot(5, [text("a", 1)]))?.mcp).toBeNull();
   });
 });
 

@@ -24,6 +24,7 @@ import { MockUpdater } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { claudeIntro, claudeTick, ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
+import { mcpCommands } from "./mcp";
 import { CRASH_STDERR, MockThreads, type ThreadState } from "./thread";
 import { contextFields, recordResult, type MockContext } from "./context";
 
@@ -1742,6 +1743,7 @@ export class World {
     return [
       ...viewCommands((i) => this.emit(i)),
       ...this.threads.commands(),
+      ...mcpCommands(this.threads, (i) => this.emit(i)),
       {
         cmd: { name: "terminal.new", title: "New Terminal", category: "Terminal", description: "Start a shell that belongs to the active thread, else to the active worktree", keybindings: ["cmd+t"], args: [{ name: "cwd", type: ArgType.PATH, required: false, description: "Working directory" }] },
         // Like the daemon: a thread, or a worktree to own the shell (never the dashboard or a page).

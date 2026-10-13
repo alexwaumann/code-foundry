@@ -138,7 +138,9 @@ Services (v1):
   the process with `--resume` and the new `--effort`, at once when idle, else when the
   running turn ends, `Session.effort_pending` meanwhile; the thread stays connected; the
   new process gets the session's allow-for-session grants again as `--allowedTools` /
-  `--add-dir`).
+  `--add-dir`), McpStatus and McpReconnect (the thread's MCP servers as Claude last
+  reported them, checked at the start of every turn and cached in memory; Watch carries
+  each check; `docs/notes/mcp-panel.md`).
   Refuses terminal threads (`docs/notes/rendered-threads-1-daemon.md`,
   `docs/notes/rendered-threads-3-interaction.md`).
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
@@ -312,7 +314,7 @@ type Command struct {
 `Context` is what the caller is looking at: active session, active repo/worktree, active
 view, the workspace that owns the active thread or composer (so `session.run-in` is
 offered for workspace threads only), and whether the active thread is rendered (so the
-`thread.*` commands, send/respond/interrupt/items/set-model/set-mode/set-effort, are
+`thread.*` commands, send/respond/interrupt/items/set-model/set-mode/set-effort/mcp/mcp-reconnect, are
 offered for rendered threads only). The GUI sends its context with `List` and `Invoke`;
 the CLI passes an explicit context from flags or none. The palette, keybindings, and CLI subcommands are three front
 doors to this one registry. Adding a feature means registering commands, not editing a
@@ -396,7 +398,9 @@ from the pull request (docs/notes/pr-thread-commands.md).
   `docs/notes/worktree-panel-tab.md`, `docs/notes/workspaces-5-panel.md`) and Linked PRs (the
   thread's linked pull requests, newest first, each opening as a PR tab; opened by L,
   `view.panel.linked-prs`, the thread header and the sidebar's PR badge;
-  `docs/notes/linked-prs.md`). Every
+  `docs/notes/linked-prs.md`) and MCP (a rendered thread's MCP servers, one card each
+  with status, error, tools and Reconnect; opened by M and `view.panel.mcp`;
+  `docs/notes/mcp-panel.md`). Every
   palette command is reachable without the mouse, and common ones also have buttons that
   invoke the same registry command. Chords are listed only in the palette and the
   Keyboard Shortcuts overlay (`docs/notes/phase3-ui-buttons.md`).

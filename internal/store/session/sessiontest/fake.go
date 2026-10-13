@@ -34,6 +34,7 @@ type Fake struct {
 	items   map[string]*session.ItemsSnapshot
 	// Watchers counts WatchItems calls whose ctx has not ended, by session.
 	watchers map[string]int
+	mcpErrs  map[string]string
 }
 
 var _ session.Store = (*Fake)(nil)
@@ -580,4 +581,88 @@ func (f *Fake) SetEffort(_ context.Context, id, effort string) (session.Session,
 		s.Effort = effort
 		return nil
 	})
+}
+
+// PutMcp sets a thread's MCP status (nil: none) and publishes McpChanged.
+func (f *Fake) PutMcp(id string, s *session.McpStatus) {
+	f.mu.Lock()
+	snap, ok := f.items[id]
+	if !ok {
+		snap = &session.ItemsSnapshot{SessionID: id}
+		f.items[id] = snap
+	}
+	snap.Seq++
+	snap.Mcp = s
+	ev := session.McpChanged{SessionID: id, Seq: snap.Seq, Status: s}
+	f.mu.Unlock()
+	bus.Publish[session.ThreadEvent](f.bus, ev)
+}
+
+// McpStatus records "McpStatus <id>" (" refresh" when asked) and returns what PutMcp
+// left; a refresh stamps CheckedAt with Now and the refresh trigger.
+func (f *Fake) McpStatus(_ context.Context, id string, refresh bool) (*session.McpStatus, error) {
+	call := "McpStatus " + id
+	if refresh {
+		call += " refresh"
+	}
+	f.mu.Lock()
+	if err := f.record(call); err != nil {
+		f.mu.Unlock()
+		return nil, err
+	}
+	if _, err := f.rendered(id); err != nil {
+		f.mu.Unlock()
+		return nil, err
+	}
+	cur := f.itemsLocked(id).Mcp
+	f.mu.Unlock()
+	if !refresh || cur == nil {
+		return cur, nil
+	}
+	next := *cur
+	next.CheckedAt, next.Trigger, next.Server = f.Now(), session.McpTriggerRefresh, ""
+	f.PutMcp(id, &next)
+	return &next, nil
+}
+
+// SetMcpReconnectError makes McpReconnect of server report msg (the server stays as it
+// is), like Claude refusing a server that still fails.
+func (f *Fake) SetMcpReconnectError(server, msg string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.mcpErrs == nil {
+		f.mcpErrs = map[string]string{}
+	}
+	f.mcpErrs[server] = msg
+}
+
+// McpReconnect records "McpReconnect <id> <server>" and marks the server connected (its
+// error cleared) unless SetMcpReconnectError named it. An unknown server is ErrNotFound.
+func (f *Fake) McpReconnect(_ context.Context, id, server string) (session.McpReconnectResult, error) {
+	f.mu.Lock()
+	if err := f.record("McpReconnect " + id + " " + server); err != nil {
+		f.mu.Unlock()
+		return session.McpReconnectResult{}, err
+	}
+	if _, err := f.rendered(id); err != nil {
+		f.mu.Unlock()
+		return session.McpReconnectResult{}, err
+	}
+	cur := f.itemsLocked(id).Mcp
+	msg := f.mcpErrs[server]
+	f.mu.Unlock()
+	if cur == nil || !slices.ContainsFunc(cur.Servers, func(s session.McpServer) bool { return s.Name == server }) {
+		return session.McpReconnectResult{}, fmt.Errorf("%w: thread %s has no MCP server %q", session.ErrNotFound, id, server)
+	}
+	next := session.McpStatus{CheckedAt: f.Now(), Trigger: session.McpTriggerReconnect, Server: server, Servers: slices.Clone(cur.Servers)}
+	if msg == "" {
+		for i, s := range next.Servers {
+			if s.Name == server {
+				s.Status, s.Error = session.McpConnected, ""
+				next.Servers[i] = s
+			}
+		}
+	}
+	f.PutMcp(id, &next)
+	return session.McpReconnectResult{Status: &next, Error: msg}, nil
 }

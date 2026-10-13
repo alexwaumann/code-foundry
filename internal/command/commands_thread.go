@@ -28,6 +28,8 @@ type ThreadBackend interface {
 	SetModel(context.Context, *connect.Request[v1.SetThreadModelRequest]) (*connect.Response[v1.SetThreadModelResponse], error)
 	SetPermissionMode(context.Context, *connect.Request[v1.SetThreadPermissionModeRequest]) (*connect.Response[v1.SetThreadPermissionModeResponse], error)
 	SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error)
+	// McpBackend backs thread.mcp and thread.mcp-reconnect (commands_mcp.go).
+	McpBackend
 }
 
 var (

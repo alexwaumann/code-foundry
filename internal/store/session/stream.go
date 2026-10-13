@@ -81,6 +81,8 @@ type streamState struct {
 	// swapping (under connMu): a restart is replacing the Conn; Store calls made outside
 	// the goroutine are refused meanwhile (connection).
 	swapping bool
+	// mcpChecked: the MCP servers were checked since spawn (mcp.go checkMcp).
+	mcpChecked bool
 }
 
 // connection is the current Conn, for Store calls made outside the run goroutine. While
@@ -365,6 +367,10 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 		r.onAskGone(e.RequestID)
 	case *claudestream.Status:
 		r.onModeChange(e.PermissionMode)
+	case *claudestream.Init:
+		if !r.closing {
+			r.checkMcp(e.McpServers) // a turn starts: Claude pushes no MCP status changes (mcp.go)
+		}
 	case *claudestream.Result:
 		r.acknowledgeIfViewed()
 		if last := r.st.proj.last; last.tokens > 0 {
@@ -677,6 +683,7 @@ func (r *runner) stopStream() {
 	st.sd.pending = nil
 	r.failHeld("the daemon stopped")
 	closeUnfinished(st.proj.w, "the daemon stopped")
+	st.log.clearMcp()
 	r.stopStreamTimers()
 	st.conn.Close()
 	// End the reader even if a grandchild kept stdout open.
@@ -735,6 +742,7 @@ func (r *runner) maybeExited() {
 	}
 	st.sd.pending = nil
 	closeUnfinished(st.proj.w, "the thread's process ended")
+	st.log.clearMcp()
 	r.stopStreamTimers()
 	st.conn.Close()
 	r.log().info("session disconnected", "reason", reason, "exit_code", code)

@@ -15,7 +15,9 @@ import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { runStream, type StreamStatus } from "@/api/stream";
+import type { McpStatusView } from "@/api/mcp";
 import { watchThread, type ThreadEventView, type ThreadItemView, type ThreadPendingListView, type ThreadPendingView } from "@/api/thread";
+import { shareMcp } from "@/lib/mcp";
 import { timelineKey } from "@/lib/threadTimeline";
 
 /** One thread's conversation as the Watch delivered it. */
@@ -26,6 +28,8 @@ export interface ThreadLog {
   /** Item ids by ordinal. */
   order: readonly string[];
   pending: readonly ThreadPendingView[];
+  /** The thread's MCP servers as last checked (docs/notes/mcp-panel.md); null: none. */
+  mcp: McpStatusView | null;
 }
 
 export interface ThreadState {
@@ -85,7 +89,7 @@ function byOrdinal(byId: Readonly<Record<string, ThreadItemView>>): string[] {
 }
 
 /** A snapshot over the previous log, keeping unchanged items (and arrays) by identity. */
-function replaceLog(prev: ThreadLog | undefined, seq: number, items: readonly ThreadItemView[], pending: readonly ThreadPendingView[]): ThreadLog {
+function replaceLog(prev: ThreadLog | undefined, seq: number, items: readonly ThreadItemView[], pending: readonly ThreadPendingView[], mcp: McpStatusView | null): ThreadLog {
   const byId: Record<string, ThreadItemView> = {};
   for (const it of items) {
     const old = prev?.byId[it.id];
@@ -97,6 +101,7 @@ function replaceLog(prev: ThreadLog | undefined, seq: number, items: readonly Th
     byId,
     order: prev && sameArray(prev.order, order) ? prev.order : order,
     pending: prev && samePending(prev.pending, pending) ? prev.pending : pending,
+    mcp: shareMcp(prev?.mcp ?? null, mcp),
   };
 }
 
@@ -116,7 +121,7 @@ function putItem(log: ThreadLog, it: ThreadItemView, seq: number): ThreadLog {
  */
 export function applyThreadEvent(log: ThreadLog | undefined, ev: ThreadEventView): ThreadLog | undefined {
   if (ev.kind === "pendingSnapshot") return log;
-  if (ev.kind === "snapshot") return replaceLog(log, ev.seq, ev.items, ev.pending);
+  if (ev.kind === "snapshot") return replaceLog(log, ev.seq, ev.items, ev.pending, ev.mcp);
   if (!log || ev.seq <= log.seq) return log;
   switch (ev.kind) {
     case "appended":
@@ -133,6 +138,8 @@ export function applyThreadEvent(log: ThreadLog | undefined, ev: ThreadEventView
     }
     case "pending":
       return { ...log, seq: ev.seq, pending: samePending(log.pending, ev.pending) ? log.pending : ev.pending };
+    case "mcp":
+      return { ...log, seq: ev.seq, mcp: shareMcp(log.mcp, ev.status) };
   }
 }
 
@@ -177,7 +184,7 @@ export function applyThreadSourceEvent(ev: ThreadEventView): void {
  */
 export function applyThreadEvents(log: ThreadLog | undefined, events: readonly ThreadEventView[]): ThreadLog | undefined {
   /** The log this batch made (its byId is ours to write) or null. */
-  let own: { seq: number; byId: Record<string, ThreadItemView>; order: readonly string[]; pending: readonly ThreadPendingView[] } | null = null;
+  let own: { seq: number; byId: Record<string, ThreadItemView>; order: readonly string[]; pending: readonly ThreadPendingView[]; mcp: McpStatusView | null } | null = null;
   for (const ev of events) {
     if (ev.kind === "delta" && log && ev.seq > log.seq) {
       const it = log.byId[ev.itemId];

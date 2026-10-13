@@ -35,6 +35,7 @@ import {
 } from "../src/gen/codefoundry/v1/thread_pb";
 import { CommandError } from "./errors";
 import { Hub } from "./hub";
+import { mcpFixture, type McpStatusInit } from "./mcp";
 
 export type ThreadEventInit = MessageInitShape<typeof ThreadEventSchema>;
 type ItemInit = MessageInitShape<typeof ThreadItemSchema>;
@@ -214,6 +215,8 @@ function sleep(ms: number): Promise<void> {
 
 export class MockThreads {
   private logs = new Map<string, Log>();
+  /** MCP status per thread (mock/mcp.ts); absent: none (not running). */
+  private mcp = new Map<string, McpStatusInit>();
   /** Every thread event, for the Watch streams. */
   private readonly hub = new Hub<{ sessionId: string; event: ThreadEventInit }>();
   /** thread.* calls, for GET /__mock/thread/calls. */
@@ -234,6 +237,7 @@ export class MockThreads {
 
   reset(): void {
     this.logs.clear();
+    this.mcp.clear();
     this.calls = [];
     this.failRespond = "";
     this.generation++;
@@ -257,10 +261,25 @@ export class MockThreads {
   }
 
   /** ListItems' snapshot. */
-  snapshotValue(id: string): { sessionId: string; seq: bigint; items: ItemInit[]; pending: PendingInit[] } {
+  snapshotValue(id: string): { sessionId: string; seq: bigint; items: ItemInit[]; pending: PendingInit[]; mcp?: McpStatusInit } {
     this.world.worktreeOf(id);
     const l = this.log(id);
-    return { sessionId: id, seq: BigInt(l.seq), items: l.items, pending: l.pending };
+    return { sessionId: id, seq: BigInt(l.seq), items: l.items, pending: l.pending, mcp: this.mcp.get(id) };
+  }
+
+  /** The thread's MCP status (mock/mcp.ts); undefined when it has none. Throws for an unknown thread. */
+  mcpOf(id: string): McpStatusInit | undefined {
+    this.world.worktreeOf(id);
+    return this.mcp.get(id);
+  }
+
+  /** Replaces the thread's MCP status and publishes the Watch's `mcp` event. */
+  setMcp(id: string, status: McpStatusInit | undefined): void {
+    if (status) this.mcp.set(id, status);
+    else this.mcp.delete(id);
+    const l = this.log(id);
+    l.seq++;
+    this.publish(id, { event: { case: "mcp", value: { sessionId: id, seq: BigInt(l.seq), status } } });
   }
 
   /** The Watch's first event. */
@@ -519,6 +538,9 @@ export class MockThreads {
     // A scripted reply still running for the previous conversation stops.
     this.generation++;
     this.logs.delete(id);
+    // A running thread was checked at the start of its last turn; a closed or crashed one has none.
+    if (loaded === "closed" || loaded === "crashed") this.mcp.delete(id);
+    else this.mcp.set(id, mcpFixture());
     const l = this.log(id);
     const ago = (min: number, sec = 0) => new Date(Date.now() - min * 60_000 + sec * 1000);
     const it = (payload: ItemInit["payload"], over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
