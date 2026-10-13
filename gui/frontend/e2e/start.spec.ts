@@ -44,10 +44,10 @@ test("with projects: greeting, counts, actions, and no New terminal", async ({ p
   await expect(actions.getByRole("button")).toHaveText(["New thread", "Command palette"]);
   await expect(start(page).getByRole("button", { name: "New terminal" })).toHaveCount(0);
 
-  // Nothing waiting: the count is muted.
+  // Nothing waiting: zero counts are dropped from the line.
   await mockPost("session/status?id=s-2&status=idle");
-  await expect(page.getByTestId("start-counts")).toHaveText("3 connected · 2 running · 0 waiting on you");
-  await expect(page.getByTestId("start-waiting")).not.toHaveClass(/amber/);
+  await expect(page.getByTestId("start-counts")).toHaveText("3 connected · 2 running");
+  await expect(page.getByTestId("start-waiting")).toHaveCount(0);
 
   await start(page).getByRole("button", { name: "Keyboard Shortcuts" }).click();
   await expect(page.getByTestId("help-overlay")).toBeVisible();
@@ -78,7 +78,7 @@ test("thread list hides when nothing is running or waiting", async ({ page }) =>
   await steadyFleet();
   await mockPost("session/status?id=s-2&status=idle");
   await openApp(page);
-  await expect(page.getByTestId("start-counts")).toHaveText("1 connected · 0 running · 0 waiting on you");
+  await expect(page.getByTestId("start-counts")).toHaveText("1 connected");
   await expect(page.getByTestId("start-threads")).toHaveCount(0);
 });
 
