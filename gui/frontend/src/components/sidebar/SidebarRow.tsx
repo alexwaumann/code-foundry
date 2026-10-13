@@ -3,6 +3,7 @@ import { ArrowRightLeft, ChevronDown, ChevronRight, CircleAlert, Folder, FolderG
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
+import { Chip } from "@/components/session/Chip";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
@@ -26,15 +27,6 @@ interface RowProps {
   selected: boolean;
   cursor: boolean;
   onActivate: (row: Row, how: "click") => void;
-}
-
-/** A small muted chip (the tooltip's "worktree" and "no git"). */
-function Chip({ children, className, ...props }: { children: ReactNode; className?: string; "aria-label"?: string; "data-testid"?: string }) {
-  return (
-    <span className={cn("shrink-0 rounded-[3px] bg-foreground/8 px-1 text-[10px] leading-4 font-medium text-muted-foreground", className)} {...props}>
-      {children}
-    </span>
-  );
 }
 
 /** Inline name editor; Enter or blur commits via session.rename, Escape cancels. */
@@ -166,7 +158,7 @@ function TimedStatusText({ line }: { line: StatusLine }) {
 
 /**
  * The thread's second line (lib/statusLine): what it is doing or waiting on, coloured, and
- * "project · branch" where the status leaves room for it (working, idle, offline). A queued
+ * "project @ branch" where the status leaves room for it (working, idle, offline). A queued
  * "Run in…" move replaces it until the thread's worktree changes.
  */
 function ThreadLine({ id }: { id: string }) {
@@ -191,14 +183,16 @@ function ThreadLine({ id }: { id: string }) {
           {showsPlace(line.kind) && (
             <>
               {status && <span aria-hidden> · </span>}
-              <span data-testid="row-project">{project}</span>
-              <span aria-hidden> · </span>
+              <span data-testid="row-project">{project}</span>{" "}
               {noGit ? (
                 <NoGitBadge className="align-[1px]" />
               ) : (
-                <span className="font-mono" data-testid="row-branch">
-                  {branch}
-                </span>
+                <>
+                  <span className="opacity-60">@</span>{" "}
+                  <span className="font-mono" data-testid="row-branch">
+                    {branch}
+                  </span>
+                </>
               )}
             </>
           )}

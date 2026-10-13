@@ -1,13 +1,13 @@
 /**
  * The second line of a sidebar thread row (docs/notes/thread-list.md): what the thread is
- * doing or waiting on, in words and a colour, and whether "project · branch" follows.
+ * doing or waiting on, in words and a colour, and whether "project @ branch" follows.
  * Pure, over the session view; the row renders it (components/sidebar/SidebarRow.tsx).
  */
 import type { SessionView } from "@/api/session";
 import { formatAgo, sessionBadge, statusKind, statusNote } from "./session";
 
 /**
- * - "place": just "project · branch" (idle, unknown, plain disconnected)
+ * - "place": just "project @ branch" (idle, unknown, plain disconnected)
  * - "starting" / "closing": the lifecycle word, then the place (muted)
  * - "working": "Working" (sky), then the place
  * - "input": "Needs input · <tool, dialog or reason>" (amber): permission, trust, notification, other dialogs
@@ -41,7 +41,7 @@ export const statusTones: Readonly<Record<StatusLineKind, StatusTone>> = {
   interrupted: "red",
 };
 
-/** Whether "project · branch" follows the status text (or stands alone, for "place"). */
+/** Whether "project @ branch" follows the status text (or stands alone, for "place"). */
 export function showsPlace(kind: StatusLineKind): boolean {
   return kind === "place" || kind === "starting" || kind === "closing" || kind === "working";
 }

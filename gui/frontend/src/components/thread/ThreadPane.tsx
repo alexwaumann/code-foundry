@@ -49,8 +49,8 @@ function ThreadMissing() {
 
 /**
  * A thread in the content pane (docs/notes/rendered-threads-2-gui.md, design
- * docs/sketches/rendered-thread variant A): a header (title, status, the pane's
- * commands), the conversation as a dense work log, and the follow-up composer floating
+ * docs/sketches/rendered-thread variant A): a header (name, project @ branch, workspace,
+ * linked PRs and the pane's commands; docs/notes/thread-header.md), the conversation as a dense work log, and the follow-up composer floating
  * over its bottom (a disconnected thread's is its Reconnect card). While shown it holds
  * the thread's ThreadService.Watch (which also marks finished turns seen).
  */
@@ -81,9 +81,9 @@ function ThreadView({ sessionId }: { sessionId: string }) {
   return (
     <ThreadContext.Provider value={ctx}>
       <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col outline-none" tabIndex={-1} aria-label="Thread" data-session-id={sessionId} data-testid="thread-pane" data-region="content">
-        <PaneHeader className="gap-3 px-3 text-xs" data-testid="thread-header">
+        <PaneHeader className="gap-2 px-3 text-xs" data-testid="thread-header">
           <SessionTitle id={sessionId} />
-          <span className="ml-auto flex shrink-0 items-center gap-2 text-muted-foreground tabular-nums">
+          <span className="ml-auto flex shrink-0 items-center gap-2 pl-2 text-muted-foreground tabular-nums">
             <HeaderActions sessionId={sessionId} />
           </span>
         </PaneHeader>
