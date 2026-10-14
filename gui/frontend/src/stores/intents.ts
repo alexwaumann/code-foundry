@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { playAlertSound } from "@/api/app";
 import type { UiIntentView } from "@/api/ui";
 import { clearRevealOnArrival, revealShell } from "./bottomActions";
 import { PENDING_FOCUS_MS } from "./bottomPanel";
@@ -79,6 +80,10 @@ export function applyIntent(intent: UiIntentView): void {
     case "showView":
       clearPendingFocus();
       showView(intent.name);
+      break;
+    case "playAlertSound":
+      // notifications.test: a preview, whatever the focus, cooldown and sound toggle.
+      void playAlertSound(intent.volume);
       break;
   }
 }

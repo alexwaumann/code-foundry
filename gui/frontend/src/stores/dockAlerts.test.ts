@@ -15,7 +15,7 @@ import {
 import { applySessionEvent, attentionIds, emptySessions, replaceSessions, useSessionsStore } from "./sessions";
 import { useSettingsStore } from "./settings";
 
-const on: AlertSettings = { dockBadge: true, bounce: true, sound: false, cooldownMs: 60_000 };
+const on: AlertSettings = { dockBadge: true, bounce: true, sound: false, soundVolume: 50, cooldownMs: 60_000 };
 
 /** Runs evaluations in order from the initial state; returns each step's effects and the final state. */
 function run(steps: (Partial<DockAlertsInput> & { attention: readonly string[] })[]): { effects: DockEffect[][]; state: DockAlertsState } {
@@ -31,7 +31,7 @@ function run(steps: (Partial<DockAlertsInput> & { attention: readonly string[] }
 
 const alerts = (effects: DockEffect[][]) => effects.map((e) => e.filter((x) => x.kind === "alert").length);
 const badges = (effects: DockEffect[][]) => effects.map((e) => e.find((x) => x.kind === "badge")?.count ?? null);
-const bounce: DockEffect = { kind: "alert", bounce: true, sound: false };
+const bounce: DockEffect = { kind: "alert", bounce: true, sound: false, volume: 0 };
 
 describe("stepDockAlerts", () => {
   it("the first evaluation takes the baseline: a badge, no alert", () => {
@@ -99,11 +99,31 @@ describe("stepDockAlerts", () => {
     expect(alerts(effects)).toEqual([0, 1, 1, 1]);
   });
 
-  it("an alert carries both parts; sound alone still alerts", () => {
-    const both = { ...on, sound: true };
-    expect(run([{ attention: [], settings: both }, { attention: ["a"], settings: both }]).effects[1]).toContainEqual({ kind: "alert", bounce: true, sound: true });
-    const sound = { ...on, bounce: false, sound: true };
-    expect(run([{ attention: [], settings: sound }, { attention: ["a"], settings: sound }]).effects[1]).toContainEqual({ kind: "alert", bounce: false, sound: true });
+  it("an alert carries both parts with the sound's volume", () => {
+    const both = { ...on, sound: true, soundVolume: 15 };
+    expect(run([{ attention: [], settings: both }, { attention: ["a"], settings: both }]).effects[1]).toContainEqual({ kind: "alert", bounce: true, sound: true, volume: 15 });
+  });
+
+  it("sound alone (bounce off) still alerts and consumes the cooldown", () => {
+    const sound = { ...on, bounce: false, sound: true, soundVolume: 80 };
+    const { effects, state } = run([
+      { attention: [], settings: sound },
+      { attention: ["a"], nowMs: 1000, settings: sound },
+      { attention: ["a", "b"], nowMs: 2000, settings: sound }, // inside the cooldown: dropped
+    ]);
+    expect(effects[1]).toContainEqual({ kind: "alert", bounce: false, sound: true, volume: 80 });
+    expect(alerts(effects)).toEqual([0, 1, 0]);
+    expect(state.lastAlertAtMs).toBe(1000);
+  });
+
+  it("a sound at volume 0 counts as off", () => {
+    const silent = { ...on, sound: true, soundVolume: 0 };
+    expect(run([{ attention: [], settings: silent }, { attention: ["a"], settings: silent }]).effects[1]).toContainEqual({ kind: "alert", bounce: true, sound: false, volume: 0 });
+    // Bounce off too: nothing fires and the cooldown is not consumed.
+    const quiet = { ...silent, bounce: false };
+    const { effects, state } = run([{ attention: [], settings: quiet }, { attention: ["a"], nowMs: 1000, settings: quiet }]);
+    expect(alerts(effects)).toEqual([0, 0]);
+    expect(state.lastAlertAtMs).toBeNull();
   });
 
   it("bounce and sound off: nothing fires and the cooldown is not consumed", () => {
@@ -181,15 +201,19 @@ describe("alertSettings", () => {
   const snap = (values: Record<string, string>): SettingsSnapshotView => ({ values, path: "", revision: 1, loadError: "", issues: [], restartPending: [] });
   it.each<[Record<string, string>, AlertSettings]>([
     [
-      { "notifications.dock_badge": "true", "notifications.bounce": "true", "notifications.sound": "false", "notifications.cooldown_seconds": "60" },
-      { dockBadge: true, bounce: true, sound: false, cooldownMs: 60_000 },
+      { "notifications.dock_badge": "true", "notifications.bounce": "true", "notifications.sound": "false", "notifications.sound_volume": "50", "notifications.cooldown_seconds": "60" },
+      { dockBadge: true, bounce: true, sound: false, soundVolume: 50, cooldownMs: 60_000 },
     ],
     [
-      { "notifications.dock_badge": "false", "notifications.bounce": "false", "notifications.sound": "true", "notifications.cooldown_seconds": "0" },
-      { dockBadge: false, bounce: false, sound: true, cooldownMs: 0 },
+      { "notifications.dock_badge": "false", "notifications.bounce": "false", "notifications.sound": "true", "notifications.sound_volume": "0", "notifications.cooldown_seconds": "0" },
+      { dockBadge: false, bounce: false, sound: true, soundVolume: 0, cooldownMs: 0 },
     ],
     // An older daemon without the keys: the schema's defaults.
-    [{}, { dockBadge: true, bounce: true, sound: false, cooldownMs: 60_000 }],
+    [{}, { dockBadge: true, bounce: true, sound: false, soundVolume: 50, cooldownMs: 60_000 }],
+    // Out of range or not a number (a hand-edited file): clamped, else the default.
+    [{ "notifications.sound_volume": "250" }, { dockBadge: true, bounce: true, sound: false, soundVolume: 100, cooldownMs: 60_000 }],
+    [{ "notifications.sound_volume": "-3" }, { dockBadge: true, bounce: true, sound: false, soundVolume: 0, cooldownMs: 60_000 }],
+    [{ "notifications.sound_volume": "loud" }, { dockBadge: true, bounce: true, sound: false, soundVolume: 50, cooldownMs: 60_000 }],
   ])("%j", (values, want) => {
     expect(alertSettings(snap(values))).toEqual(want);
   });
@@ -215,7 +239,7 @@ describe("startDockAlerts", () => {
     const deps: DockAlertsDeps = {
       setBadge: (n) => calls.push(`badge ${String(n)}`),
       bounce: () => calls.push("bounce"),
-      playSound: () => calls.push("sound"),
+      playSound: (v) => calls.push(`sound ${String(v)}`),
       focused: () => focused,
       now: () => now,
     };
@@ -253,6 +277,13 @@ describe("startDockAlerts", () => {
     settings({ "notifications.sound": "true" });
     useSessionsStore.setState((s) => ({ ...replaceSessions(s, [thread("a", { status: "busy" })]), epoch: s.epoch + 1 }));
     useSessionsStore.setState((s) => applySessionEvent(s, { kind: "updated", session: thread("a", { status: "attention", statusReason: "finished" }) }));
-    expect(calls).toEqual(["badge 0", "badge 1", "bounce", "sound"]);
+    expect(calls).toEqual(["badge 0", "badge 1", "bounce", "sound 50"]);
+  });
+
+  it("plays the sound alone at the volume setting with the bounce off", () => {
+    settings({ "notifications.sound": "true", "notifications.bounce": "false", "notifications.sound_volume": "15" });
+    useSessionsStore.setState((s) => ({ ...replaceSessions(s, [thread("a", { status: "busy" })]), epoch: s.epoch + 1 }));
+    useSessionsStore.setState((s) => applySessionEvent(s, { kind: "updated", session: thread("a", { status: "attention", statusReason: "finished" }) }));
+    expect(calls).toEqual(["badge 0", "badge 1", "sound 15"]);
   });
 });

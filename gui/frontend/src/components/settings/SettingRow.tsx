@@ -7,6 +7,8 @@ import { chordFromEvent, formatChord } from "@/keys/chord";
 import { enumOptionLabel } from "@/lib/models";
 import { validateSetting } from "@/settings/validate";
 import { saveSettings, useSettingsStore, useSettingValue } from "@/stores/settings";
+import type { EditorProps, SettingEditor } from "./editor";
+import { keyEditors } from "./keyEditors";
 
 const inputClass =
   "h-7 w-full rounded-md border border-input bg-background px-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50 aria-invalid:border-destructive";
@@ -22,14 +24,6 @@ function displayValue(f: SettingFieldView, v: string): string {
   return v === "" ? "default" : v;
 }
 
-interface EditorProps {
-  field: SettingFieldView;
-  value: string;
-  pending: boolean;
-  invalid: boolean;
-  commit: (raw: string) => void;
-  setError: (e: string | null) => void;
-}
 
 function BoolEditor({ field, value, pending, commit }: EditorProps) {
   const on = value === "true";
@@ -149,7 +143,7 @@ function KeybindingEditor({ field, value, pending, invalid, commit, setError }: 
   );
 }
 
-const editors: Record<SettingFieldView["type"], (p: EditorProps) => React.JSX.Element> = {
+const editors: Record<SettingFieldView["type"], SettingEditor> = {
   bool: BoolEditor,
   enum: EnumEditor,
   int: TextEditor,
@@ -187,7 +181,7 @@ export function SettingRow({ field }: { field: SettingFieldView }) {
     });
   };
 
-  const Editor = editors[field.type];
+  const Editor = keyEditors[field.key] ?? editors[field.type];
   const modified = value !== field.defaultValue && !(field.type === "keybinding" && value === "" && field.defaultValue === "");
   const message = error ?? (fileIssue ? `In the file: ${fileIssue}` : null);
   return (

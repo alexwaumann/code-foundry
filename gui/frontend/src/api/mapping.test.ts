@@ -152,6 +152,7 @@ describe("ui intent mapping", () => {
       { kind: "notify", level: "error", title: "x", body: "y" },
     ],
     [{ case: "notify" as const, value: { title: "x" } }, { kind: "notify", level: "info", title: "x", body: "" }],
+    [{ case: "playAlertSound" as const, value: { volume: 15 } }, { kind: "playAlertSound", volume: 15 }],
   ])("maps %#", (intent, want) => {
     expect(toUiIntentView(create(UiIntentSchema, { intent }))).toEqual(want);
   });

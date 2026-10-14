@@ -3,7 +3,7 @@
 
 /**
  * AppService is bound to the frontend: the GUI's own version, relaunching itself, the
- * native folder picker (pickdir.go), and the Dock badge and bounce (notify.go).
+ * native folder picker (pickdir.go), and the Dock badge, bounce and alert sound (notify.go).
  * Updates are installed by the daemon; the host only quits and reopens the window.
  * @module
  */
@@ -40,6 +40,16 @@ export function Info(): $CancellablePromise<$models.AppInfo> {
  */
 export function PickDirectory(startDir: string): $CancellablePromise<string> {
     return $Call.ByID(4292351642, startDir);
+}
+
+/**
+ * PlaySound plays the alert sound at volume percent of the Mac's output volume (clamped
+ * to 0–100; 0 plays nothing). Returns at once; a sound still playing restarts. The
+ * frontend calls it for an alert with notifications.sound on (stores/dockAlerts.ts) and
+ * for notifications.test, the settings page's Play button (stores/intents.ts).
+ */
+export function PlaySound(volume: number): $CancellablePromise<void> {
+    return $Call.ByID(2060944779, volume);
 }
 
 /**

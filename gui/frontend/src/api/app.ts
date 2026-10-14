@@ -1,5 +1,5 @@
 import { Browser, Events } from "@wailsio/runtime";
-import { Bounce, Info, PickDirectory, Relaunch, SetBadge, SetZoom } from "../../bindings/github.com/alexwaumann/code-foundry/gui/appservice";
+import { Bounce, Info, PickDirectory, PlaySound, Relaunch, SetBadge, SetZoom } from "../../bindings/github.com/alexwaumann/code-foundry/gui/appservice";
 
 /** The Wails host (window shell). */
 export interface AppInfoView {
@@ -80,6 +80,20 @@ export async function bounceDock(): Promise<void> {
     await Bounce();
   } catch (err: unknown) {
     console.warn("dock bounce", err);
+  }
+}
+
+/**
+ * Plays the alert sound at volume percent of the Mac's output volume (0 plays nothing).
+ * Host-side (NSSound, gui/notify_darwin.go): the webview's audio is subject to WebKit's
+ * autoplay policy. No-op without a host.
+ */
+export async function playAlertSound(volume: number): Promise<void> {
+  if (!(await appInfo())) return;
+  try {
+    await PlaySound(Math.round(volume));
+  } catch (err: unknown) {
+    console.warn("alert sound", err);
   }
 }
 

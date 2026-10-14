@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/ui.proto.
  */
 export const file_codefoundry_v1_ui: GenFile = /*@__PURE__*/
-  fileDesc("Chdjb2RlZm91bmRyeS92MS91aS5wcm90bxIOY29kZWZvdW5kcnkudjEiFQoTV2F0Y2hJbnRlbnRzUmVxdWVzdCLiBQoIVWlJbnRlbnQSQAoOZm9jdXNfdGVybWluYWwYASABKAsyJi5jb2RlZm91bmRyeS52MS5VaUludGVudC5Gb2N1c1Rlcm1pbmFsSAASOAoKZm9jdXNfcmVwbxgCIAEoCzIiLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzUmVwb0gAEjwKDG9wZW5fcGFsZXR0ZRgDIAEoCzIkLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk9wZW5QYWxldHRlSAASMQoGbm90aWZ5GAQgASgLMh8uY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuTm90aWZ5SAASPgoNZm9jdXNfc2Vzc2lvbhgFIAEoCzIlLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzU2Vzc2lvbkgAEjYKCXNob3dfdmlldxgGIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LlNob3dWaWV3SAAaGAoIU2hvd1ZpZXcSDAoEbmFtZRgBIAEoCRoiCgxGb2N1c1Nlc3Npb24SEgoKc2Vzc2lvbl9pZBgBIAEoCRokCg1Gb2N1c1Rlcm1pbmFsEhMKC3Rlcm1pbmFsX2lkGAEgASgJGjMKCUZvY3VzUmVwbxIPCgdyZXBvX2lkGAEgASgJEhUKDXdvcmt0cmVlX3BhdGgYAiABKAkaHAoLT3BlblBhbGV0dGUSDQoFcXVlcnkYASABKAkarwEKBk5vdGlmeRI0CgVsZXZlbBgBIAEoDjIlLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk5vdGlmeS5MZXZlbBINCgV0aXRsZRgCIAEoCRIMCgRib2R5GAMgASgJIlIKBUxldmVsEhUKEUxFVkVMX1VOU1BFQ0lGSUVEEAASDgoKTEVWRUxfSU5GTxABEhEKDUxFVkVMX1dBUk5JTkcQAhIPCgtMRVZFTF9FUlJPUhADQggKBmludGVudCI9ChFFbWl0SW50ZW50UmVxdWVzdBIoCgZpbnRlbnQYASABKAsyGC5jb2RlZm91bmRyeS52MS5VaUludGVudCInChJFbWl0SW50ZW50UmVzcG9uc2USEQoJZGVsaXZlcmVkGAEgASgNMq8BCglVaVNlcnZpY2USUQoMV2F0Y2hJbnRlbnRzEiMuY29kZWZvdW5kcnkudjEuV2F0Y2hJbnRlbnRzUmVxdWVzdBoYLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50IgAwARJPCgRFbWl0EiEuY29kZWZvdW5kcnkudjEuRW1pdEludGVudFJlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5FbWl0SW50ZW50UmVzcG9uc2UiAEK/AQoSY29tLmNvZGVmb3VuZHJ5LnYxQgdVaVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
+  fileDesc("Chdjb2RlZm91bmRyeS92MS91aS5wcm90bxIOY29kZWZvdW5kcnkudjEiFQoTV2F0Y2hJbnRlbnRzUmVxdWVzdCLJBgoIVWlJbnRlbnQSQAoOZm9jdXNfdGVybWluYWwYASABKAsyJi5jb2RlZm91bmRyeS52MS5VaUludGVudC5Gb2N1c1Rlcm1pbmFsSAASOAoKZm9jdXNfcmVwbxgCIAEoCzIiLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzUmVwb0gAEjwKDG9wZW5fcGFsZXR0ZRgDIAEoCzIkLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50Lk9wZW5QYWxldHRlSAASMQoGbm90aWZ5GAQgASgLMh8uY29kZWZvdW5kcnkudjEuVWlJbnRlbnQuTm90aWZ5SAASPgoNZm9jdXNfc2Vzc2lvbhgFIAEoCzIlLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LkZvY3VzU2Vzc2lvbkgAEjYKCXNob3dfdmlldxgGIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LlNob3dWaWV3SAASQwoQcGxheV9hbGVydF9zb3VuZBgHIAEoCzInLmNvZGVmb3VuZHJ5LnYxLlVpSW50ZW50LlBsYXlBbGVydFNvdW5kSAAaIAoOUGxheUFsZXJ0U291bmQSDgoGdm9sdW1lGAEgASgFGhgKCFNob3dWaWV3EgwKBG5hbWUYASABKAkaIgoMRm9jdXNTZXNzaW9uEhIKCnNlc3Npb25faWQYASABKAkaJAoNRm9jdXNUZXJtaW5hbBITCgt0ZXJtaW5hbF9pZBgBIAEoCRozCglGb2N1c1JlcG8SDwoHcmVwb19pZBgBIAEoCRIVCg13b3JrdHJlZV9wYXRoGAIgASgJGhwKC09wZW5QYWxldHRlEg0KBXF1ZXJ5GAEgASgJGq8BCgZOb3RpZnkSNAoFbGV2ZWwYASABKA4yJS5jb2RlZm91bmRyeS52MS5VaUludGVudC5Ob3RpZnkuTGV2ZWwSDQoFdGl0bGUYAiABKAkSDAoEYm9keRgDIAEoCSJSCgVMZXZlbBIVChFMRVZFTF9VTlNQRUNJRklFRBAAEg4KCkxFVkVMX0lORk8QARIRCg1MRVZFTF9XQVJOSU5HEAISDwoLTEVWRUxfRVJST1IQA0IICgZpbnRlbnQiPQoRRW1pdEludGVudFJlcXVlc3QSKAoGaW50ZW50GAEgASgLMhguY29kZWZvdW5kcnkudjEuVWlJbnRlbnQiJwoSRW1pdEludGVudFJlc3BvbnNlEhEKCWRlbGl2ZXJlZBgBIAEoDTKvAQoJVWlTZXJ2aWNlElEKDFdhdGNoSW50ZW50cxIjLmNvZGVmb3VuZHJ5LnYxLldhdGNoSW50ZW50c1JlcXVlc3QaGC5jb2RlZm91bmRyeS52MS5VaUludGVudCIAMAESTwoERW1pdBIhLmNvZGVmb3VuZHJ5LnYxLkVtaXRJbnRlbnRSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuRW1pdEludGVudFJlc3BvbnNlIgBCvwEKEmNvbS5jb2RlZm91bmRyeS52MUIHVWlQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z");
 
 /**
  * @generated from message codefoundry.v1.WatchIntentsRequest
@@ -68,6 +68,12 @@ export type UiIntent = Message<"codefoundry.v1.UiIntent"> & {
      */
     value: UiIntent_ShowView;
     case: "showView";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.UiIntent.PlayAlertSound play_alert_sound = 7;
+     */
+    value: UiIntent_PlayAlertSound;
+    case: "playAlertSound";
   } | { case: undefined; value?: undefined };
 };
 
@@ -77,6 +83,28 @@ export type UiIntent = Message<"codefoundry.v1.UiIntent"> & {
  */
 export const UiIntentSchema: GenMessage<UiIntent> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_ui, 1);
+
+/**
+ * PlayAlertSound plays the attention alert sound once (notifications.test, a preview:
+ * regardless of focus, the alert cooldown and the notifications.sound toggle).
+ *
+ * @generated from message codefoundry.v1.UiIntent.PlayAlertSound
+ */
+export type UiIntent_PlayAlertSound = Message<"codefoundry.v1.UiIntent.PlayAlertSound"> & {
+  /**
+   * Percent of the Mac's output volume, 0-100; 0 plays nothing.
+   *
+   * @generated from field: int32 volume = 1;
+   */
+  volume: number;
+};
+
+/**
+ * Describes the message codefoundry.v1.UiIntent.PlayAlertSound.
+ * Use `create(UiIntent_PlayAlertSoundSchema)` to create a new message.
+ */
+export const UiIntent_PlayAlertSoundSchema: GenMessage<UiIntent_PlayAlertSound> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_ui, 1, 0);
 
 /**
  * ShowView opens a named GUI view: "help", "settings", "pullrequests".
@@ -96,7 +124,7 @@ export type UiIntent_ShowView = Message<"codefoundry.v1.UiIntent.ShowView"> & {
  * Use `create(UiIntent_ShowViewSchema)` to create a new message.
  */
 export const UiIntent_ShowViewSchema: GenMessage<UiIntent_ShowView> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 0);
+  messageDesc(file_codefoundry_v1_ui, 1, 1);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.FocusSession
@@ -113,7 +141,7 @@ export type UiIntent_FocusSession = Message<"codefoundry.v1.UiIntent.FocusSessio
  * Use `create(UiIntent_FocusSessionSchema)` to create a new message.
  */
 export const UiIntent_FocusSessionSchema: GenMessage<UiIntent_FocusSession> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 1);
+  messageDesc(file_codefoundry_v1_ui, 1, 2);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.FocusTerminal
@@ -130,7 +158,7 @@ export type UiIntent_FocusTerminal = Message<"codefoundry.v1.UiIntent.FocusTermi
  * Use `create(UiIntent_FocusTerminalSchema)` to create a new message.
  */
 export const UiIntent_FocusTerminalSchema: GenMessage<UiIntent_FocusTerminal> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 2);
+  messageDesc(file_codefoundry_v1_ui, 1, 3);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.FocusRepo
@@ -152,7 +180,7 @@ export type UiIntent_FocusRepo = Message<"codefoundry.v1.UiIntent.FocusRepo"> & 
  * Use `create(UiIntent_FocusRepoSchema)` to create a new message.
  */
 export const UiIntent_FocusRepoSchema: GenMessage<UiIntent_FocusRepo> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 3);
+  messageDesc(file_codefoundry_v1_ui, 1, 4);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.OpenPalette
@@ -171,7 +199,7 @@ export type UiIntent_OpenPalette = Message<"codefoundry.v1.UiIntent.OpenPalette"
  * Use `create(UiIntent_OpenPaletteSchema)` to create a new message.
  */
 export const UiIntent_OpenPaletteSchema: GenMessage<UiIntent_OpenPalette> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 4);
+  messageDesc(file_codefoundry_v1_ui, 1, 5);
 
 /**
  * @generated from message codefoundry.v1.UiIntent.Notify
@@ -198,7 +226,7 @@ export type UiIntent_Notify = Message<"codefoundry.v1.UiIntent.Notify"> & {
  * Use `create(UiIntent_NotifySchema)` to create a new message.
  */
 export const UiIntent_NotifySchema: GenMessage<UiIntent_Notify> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_ui, 1, 5);
+  messageDesc(file_codefoundry_v1_ui, 1, 6);
 
 /**
  * @generated from enum codefoundry.v1.UiIntent.Notify.Level
@@ -229,7 +257,7 @@ export enum UiIntent_Notify_Level {
  * Describes the enum codefoundry.v1.UiIntent.Notify.Level.
  */
 export const UiIntent_Notify_LevelSchema: GenEnum<UiIntent_Notify_Level> = /*@__PURE__*/
-  enumDesc(file_codefoundry_v1_ui, 1, 5, 0);
+  enumDesc(file_codefoundry_v1_ui, 1, 6, 0);
 
 /**
  * @generated from message codefoundry.v1.EmitIntentRequest

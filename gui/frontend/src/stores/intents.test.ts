@@ -5,6 +5,8 @@ import type { TerminalView } from "@/api/terminal";
 const toastInfo = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 vi.mock("sonner", () => ({ toast: { info: toastInfo, error: toastError, warning: vi.fn() } }));
+const playAlertSound = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock("@/api/app", () => ({ playAlertSound }));
 
 const { applyIntent, clearPendingFocus } = await import("./intents");
 const { getBottom, PENDING_FOCUS_MS, useBottomStore } = await import("./bottomPanel");
@@ -124,5 +126,13 @@ describe("the focusTerminal intent", () => {
     expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "later" });
     expect(useUiStore.getState().bottomFocusSeq).toBe(1);
     expect(useUiStore.getState().promptFocusSeq).toBe(0);
+  });
+});
+
+describe("a playAlertSound intent (notifications.test)", () => {
+  it("plays the sound at the intent's volume, without moving the window", () => {
+    applyIntent({ kind: "playAlertSound", volume: 15 });
+    expect(playAlertSound).toHaveBeenCalledExactlyOnceWith(15);
+    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "dashboard" });
   });
 });

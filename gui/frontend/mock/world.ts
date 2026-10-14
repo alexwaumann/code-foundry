@@ -2482,6 +2482,23 @@ export class World {
         when: always,
         run: () => this.settings.snapshot().path ?? "",
       },
+      {
+        cmd: {
+          name: "notifications.test",
+          title: "Notifications: Play Alert Sound",
+          category: "Settings",
+          description: "Play the alert sound at the current volume.",
+          keybindings: [],
+          args: [{ name: "volume", type: ArgType.INT, required: false, description: "Volume in percent of the Mac's output volume, 0–100 (default: the notifications.sound_volume setting)" }],
+        },
+        when: always,
+        // Like the daemon: the explicit volume, else the setting. The browser has no host to play it.
+        run: (_ctx, args) => {
+          const volume = Number(args.volume ?? this.settings.values()["notifications.sound_volume"] ?? 50);
+          const n = this.emit({ intent: { case: "playAlertSound", value: { volume } } });
+          return `alert sound at ${String(volume)}%: delivered=${String(n)}`;
+        },
+      },
       ...this.update.commands(),
     ];
   }

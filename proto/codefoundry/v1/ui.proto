@@ -20,6 +20,14 @@ message UiIntent {
     Notify notify = 4;
     FocusSession focus_session = 5;
     ShowView show_view = 6;
+    PlayAlertSound play_alert_sound = 7;
+  }
+
+  // PlayAlertSound plays the attention alert sound once (notifications.test, a preview:
+  // regardless of focus, the alert cooldown and the notifications.sound toggle).
+  message PlayAlertSound {
+    // Percent of the Mac's output volume, 0-100; 0 plays nothing.
+    int32 volume = 1;
   }
 
   // ShowView opens a named GUI view: "help", "settings", "pullrequests".

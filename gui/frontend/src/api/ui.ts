@@ -8,7 +8,8 @@ export type UiIntentView =
   | { kind: "focusRepo"; repoId: string; worktreePath: string }
   | { kind: "openPalette"; query: string }
   | { kind: "notify"; level: NotifyLevel; title: string; body: string }
-  | { kind: "showView"; name: string };
+  | { kind: "showView"; name: string }
+  | { kind: "playAlertSound"; volume: number };
 
 const levelMap: Record<UiIntent_Notify_Level, NotifyLevel> = {
   [UiIntent_Notify_Level.UNSPECIFIED]: "info",
@@ -32,6 +33,8 @@ export function toUiIntentView(i: UiIntent): UiIntentView | null {
       return { kind: "notify", level: levelMap[e.value.level], title: e.value.title, body: e.value.body };
     case "showView":
       return { kind: "showView", name: e.value.name };
+    case "playAlertSound":
+      return { kind: "playAlertSound", volume: e.value.volume };
     default:
       return null;
   }

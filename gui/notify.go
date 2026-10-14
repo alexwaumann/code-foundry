@@ -1,9 +1,23 @@
 package main
 
 import (
+	_ "embed"
 	"strconv"
 	"sync"
 )
+
+// alertWAV is the alert sound: "Soft mallet", a wooden double tap, 48 kHz mono 16-bit,
+// 0.6 s (docs/sketches/alert-sound has how it was made). Played host-side with NSSound
+// (notify_darwin.go), which needs no bundle; the webview's audio is subject to WebKit's
+// autoplay policy.
+//
+//go:embed build/alert.wav
+var alertWAV []byte
+
+// clampVolume clamps an alert volume in percent to 0–100 (0 is silent).
+func clampVolume(percent int) int {
+	return min(max(percent, 0), 100)
+}
 
 // badgeLabel is the Dock badge text for an attention count: "" (no badge) for 0 or less,
 // "99+" above 99.
