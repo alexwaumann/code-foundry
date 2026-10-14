@@ -24,7 +24,7 @@ type AppInfo struct {
 }
 
 // AppService is bound to the frontend: the GUI's own version, relaunching itself, the
-// native folder picker (pickdir.go), and the Dock badge and bounce (notify.go).
+// native folder picker (pickdir.go), and the Dock badge, bounce and alert sound (notify.go).
 // Updates are installed by the daemon; the host only quits and reopens the window.
 type AppService struct {
 	log *slog.Logger
@@ -53,6 +53,19 @@ func (s *AppService) SetBadge(count int) {
 func (s *AppService) Bounce() {
 	s.log.Info("dock bounce")
 	bounceDock()
+}
+
+// PlaySound plays the alert sound at volume percent of the Mac's output volume (clamped
+// to 0–100; 0 plays nothing). Returns at once; a sound still playing restarts. The
+// frontend calls it for an alert with notifications.sound on (stores/dockAlerts.ts) and
+// for notifications.test, the settings page's Play button (stores/intents.ts).
+func (s *AppService) PlaySound(volume int) {
+	v := clampVolume(volume)
+	if v == 0 {
+		return
+	}
+	s.log.Info("alert sound", "volume", v)
+	playAlertSound(float64(v) / 100)
 }
 
 // dockLaunched applies a badge set before the app finished launching. Called from the

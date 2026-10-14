@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"os"
 	"slices"
 	"testing"
 )
@@ -47,5 +49,31 @@ func TestDockBadge(t *testing.T) {
 				t.Errorf("applied %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestClampVolume(t *testing.T) {
+	tests := []struct{ in, want int }{
+		{-5, 0}, {0, 0}, {1, 1}, {50, 50}, {100, 100}, {101, 100}, {1000, 100},
+	}
+	for _, tt := range tests {
+		if got := clampVolume(tt.in); got != tt.want {
+			t.Errorf("clampVolume(%d) = %d, want %d", tt.in, got, tt.want)
+		}
+	}
+}
+
+// The embedded alert sound is a PCM WAV NSSound can read (the RIFF/WAVE header), and the
+// shipped copy of the design record's soft.wav.
+func TestAlertWAV(t *testing.T) {
+	if len(alertWAV) < 44 || string(alertWAV[0:4]) != "RIFF" || string(alertWAV[8:12]) != "WAVE" {
+		t.Fatalf("alert.wav is not a WAV file (%d bytes)", len(alertWAV))
+	}
+	design, err := os.ReadFile("../docs/sketches/alert-sound/soft.wav")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(alertWAV, design) {
+		t.Error("gui/build/alert.wav differs from docs/sketches/alert-sound/soft.wav")
 	}
 }
