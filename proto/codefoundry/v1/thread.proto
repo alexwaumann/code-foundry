@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package codefoundry.v1;
 
+import "codefoundry/v1/heartbeat.proto";
 import "codefoundry/v1/session.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -319,6 +320,9 @@ message ThreadEvent {
     // Watch only: the thread's slash commands changed (Claude's list changed, or the
     // process ended: empty).
     ThreadSlashCommandsChange commands = 8;
+    // Watch only: nothing else was sent for a while (see StreamHeartbeat). It does not
+    // advance seq.
+    StreamHeartbeat heartbeat = 9;
   }
 }
 

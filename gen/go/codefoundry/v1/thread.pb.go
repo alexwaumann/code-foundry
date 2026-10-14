@@ -1877,6 +1877,7 @@ type ThreadEvent struct {
 	//	*ThreadEvent_PendingSnapshot
 	//	*ThreadEvent_Mcp
 	//	*ThreadEvent_Commands
+	//	*ThreadEvent_Heartbeat
 	Event         isThreadEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1991,6 +1992,15 @@ func (x *ThreadEvent) GetCommands() *ThreadSlashCommandsChange {
 	return nil
 }
 
+func (x *ThreadEvent) GetHeartbeat() *StreamHeartbeat {
+	if x != nil {
+		if x, ok := x.Event.(*ThreadEvent_Heartbeat); ok {
+			return x.Heartbeat
+		}
+	}
+	return nil
+}
+
 type isThreadEvent_Event interface {
 	isThreadEvent_Event()
 }
@@ -2035,6 +2045,12 @@ type ThreadEvent_Commands struct {
 	Commands *ThreadSlashCommandsChange `protobuf:"bytes,8,opt,name=commands,proto3,oneof"`
 }
 
+type ThreadEvent_Heartbeat struct {
+	// Watch only: nothing else was sent for a while (see StreamHeartbeat). It does not
+	// advance seq.
+	Heartbeat *StreamHeartbeat `protobuf:"bytes,9,opt,name=heartbeat,proto3,oneof"`
+}
+
 func (*ThreadEvent_Snapshot) isThreadEvent_Event() {}
 
 func (*ThreadEvent_Appended) isThreadEvent_Event() {}
@@ -2050,6 +2066,8 @@ func (*ThreadEvent_PendingSnapshot) isThreadEvent_Event() {}
 func (*ThreadEvent_Mcp) isThreadEvent_Event() {}
 
 func (*ThreadEvent_Commands) isThreadEvent_Event() {}
+
+func (*ThreadEvent_Heartbeat) isThreadEvent_Event() {}
 
 // One tool of a connected MCP server. The hints are the ones the server set to true
 // (MCP tool annotations); an unset read_only means the tool may write.
@@ -3577,7 +3595,7 @@ var File_codefoundry_v1_thread_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/thread.proto\x12\x0ecodefoundry.v1\x1a\x1ccodefoundry/v1/session.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbe\a\n" +
+	"\x1bcodefoundry/v1/thread.proto\x12\x0ecodefoundry.v1\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1ccodefoundry/v1/session.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbe\a\n" +
 	"\n" +
 	"ThreadItem\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
@@ -3717,7 +3735,7 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\x03seq\x18\x02 \x01(\x04R\x03seq\x12>\n" +
 	"\apending\x18\x03 \x03(\v2$.codefoundry.v1.ThreadPendingRequestR\apending\"P\n" +
 	"\x15ThreadPendingSnapshot\x127\n" +
-	"\athreads\x18\x01 \x03(\v2\x1d.codefoundry.v1.ThreadPendingR\athreads\"\x9d\x04\n" +
+	"\athreads\x18\x01 \x03(\v2\x1d.codefoundry.v1.ThreadPendingR\athreads\"\xde\x04\n" +
 	"\vThreadEvent\x12A\n" +
 	"\bsnapshot\x18\x01 \x01(\v2#.codefoundry.v1.ThreadItemsSnapshotH\x00R\bsnapshot\x12>\n" +
 	"\bappended\x18\x02 \x01(\v2 .codefoundry.v1.ThreadItemChangeH\x00R\bappended\x12<\n" +
@@ -3726,7 +3744,8 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"\apending\x18\x05 \x01(\v2\x1d.codefoundry.v1.ThreadPendingH\x00R\apending\x12R\n" +
 	"\x10pending_snapshot\x18\x06 \x01(\v2%.codefoundry.v1.ThreadPendingSnapshotH\x00R\x0fpendingSnapshot\x123\n" +
 	"\x03mcp\x18\a \x01(\v2\x1f.codefoundry.v1.ThreadMcpChangeH\x00R\x03mcp\x12G\n" +
-	"\bcommands\x18\b \x01(\v2).codefoundry.v1.ThreadSlashCommandsChangeH\x00R\bcommandsB\a\n" +
+	"\bcommands\x18\b \x01(\v2).codefoundry.v1.ThreadSlashCommandsChangeH\x00R\bcommands\x12?\n" +
+	"\theartbeat\x18\t \x01(\v2\x1f.codefoundry.v1.StreamHeartbeatH\x00R\theartbeatB\a\n" +
 	"\x05event\"\x9d\x01\n" +
 	"\aMcpTool\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
@@ -3950,8 +3969,9 @@ var file_codefoundry_v1_thread_proto_goTypes = []any{
 	nil,                                     // 51: codefoundry.v1.ThreadRequestItem.AnswersEntry
 	nil,                                     // 52: codefoundry.v1.RespondThreadRequest.AnswersEntry
 	(*timestamppb.Timestamp)(nil),           // 53: google.protobuf.Timestamp
-	(*Session)(nil),                         // 54: codefoundry.v1.Session
-	(PermissionMode)(0),                     // 55: codefoundry.v1.PermissionMode
+	(*StreamHeartbeat)(nil),                 // 54: codefoundry.v1.StreamHeartbeat
+	(*Session)(nil),                         // 55: codefoundry.v1.Session
+	(PermissionMode)(0),                     // 56: codefoundry.v1.PermissionMode
 }
 var file_codefoundry_v1_thread_proto_depIdxs = []int32{
 	53, // 0: codefoundry.v1.ThreadItem.created_at:type_name -> google.protobuf.Timestamp
@@ -3986,52 +4006,53 @@ var file_codefoundry_v1_thread_proto_depIdxs = []int32{
 	22, // 29: codefoundry.v1.ThreadEvent.pending_snapshot:type_name -> codefoundry.v1.ThreadPendingSnapshot
 	27, // 30: codefoundry.v1.ThreadEvent.mcp:type_name -> codefoundry.v1.ThreadMcpChange
 	48, // 31: codefoundry.v1.ThreadEvent.commands:type_name -> codefoundry.v1.ThreadSlashCommandsChange
-	2,  // 32: codefoundry.v1.McpServer.status:type_name -> codefoundry.v1.McpServerStatus
-	24, // 33: codefoundry.v1.McpServer.tools:type_name -> codefoundry.v1.McpTool
-	53, // 34: codefoundry.v1.ThreadMcpStatus.checked_at:type_name -> google.protobuf.Timestamp
-	3,  // 35: codefoundry.v1.ThreadMcpStatus.trigger:type_name -> codefoundry.v1.McpCheckTrigger
-	25, // 36: codefoundry.v1.ThreadMcpStatus.servers:type_name -> codefoundry.v1.McpServer
-	26, // 37: codefoundry.v1.ThreadMcpChange.status:type_name -> codefoundry.v1.ThreadMcpStatus
-	18, // 38: codefoundry.v1.ListThreadItemsResponse.snapshot:type_name -> codefoundry.v1.ThreadItemsSnapshot
-	6,  // 39: codefoundry.v1.SendThreadMessageResponse.item:type_name -> codefoundry.v1.ThreadItem
-	4,  // 40: codefoundry.v1.RespondThreadRequest.decision:type_name -> codefoundry.v1.ThreadDecision
-	52, // 41: codefoundry.v1.RespondThreadRequest.answers:type_name -> codefoundry.v1.RespondThreadRequest.AnswersEntry
-	6,  // 42: codefoundry.v1.RespondThreadResponse.item:type_name -> codefoundry.v1.ThreadItem
-	54, // 43: codefoundry.v1.SetThreadModelResponse.session:type_name -> codefoundry.v1.Session
-	55, // 44: codefoundry.v1.SetThreadPermissionModeRequest.permission_mode:type_name -> codefoundry.v1.PermissionMode
-	54, // 45: codefoundry.v1.SetThreadPermissionModeResponse.session:type_name -> codefoundry.v1.Session
-	54, // 46: codefoundry.v1.SetThreadEffortResponse.session:type_name -> codefoundry.v1.Session
-	26, // 47: codefoundry.v1.McpStatusResponse.status:type_name -> codefoundry.v1.ThreadMcpStatus
-	26, // 48: codefoundry.v1.McpReconnectResponse.status:type_name -> codefoundry.v1.ThreadMcpStatus
-	47, // 49: codefoundry.v1.ThreadSlashCommandsChange.commands:type_name -> codefoundry.v1.SlashCommand
-	47, // 50: codefoundry.v1.SlashCommandsResponse.commands:type_name -> codefoundry.v1.SlashCommand
-	28, // 51: codefoundry.v1.ThreadService.ListItems:input_type -> codefoundry.v1.ListThreadItemsRequest
-	30, // 52: codefoundry.v1.ThreadService.Watch:input_type -> codefoundry.v1.WatchThreadRequest
-	31, // 53: codefoundry.v1.ThreadService.Send:input_type -> codefoundry.v1.SendThreadMessageRequest
-	33, // 54: codefoundry.v1.ThreadService.Respond:input_type -> codefoundry.v1.RespondThreadRequest
-	35, // 55: codefoundry.v1.ThreadService.Interrupt:input_type -> codefoundry.v1.InterruptThreadRequest
-	37, // 56: codefoundry.v1.ThreadService.SetModel:input_type -> codefoundry.v1.SetThreadModelRequest
-	39, // 57: codefoundry.v1.ThreadService.SetPermissionMode:input_type -> codefoundry.v1.SetThreadPermissionModeRequest
-	41, // 58: codefoundry.v1.ThreadService.SetEffort:input_type -> codefoundry.v1.SetThreadEffortRequest
-	43, // 59: codefoundry.v1.ThreadService.McpStatus:input_type -> codefoundry.v1.McpStatusRequest
-	45, // 60: codefoundry.v1.ThreadService.McpReconnect:input_type -> codefoundry.v1.McpReconnectRequest
-	49, // 61: codefoundry.v1.ThreadService.SlashCommands:input_type -> codefoundry.v1.SlashCommandsRequest
-	29, // 62: codefoundry.v1.ThreadService.ListItems:output_type -> codefoundry.v1.ListThreadItemsResponse
-	23, // 63: codefoundry.v1.ThreadService.Watch:output_type -> codefoundry.v1.ThreadEvent
-	32, // 64: codefoundry.v1.ThreadService.Send:output_type -> codefoundry.v1.SendThreadMessageResponse
-	34, // 65: codefoundry.v1.ThreadService.Respond:output_type -> codefoundry.v1.RespondThreadResponse
-	36, // 66: codefoundry.v1.ThreadService.Interrupt:output_type -> codefoundry.v1.InterruptThreadResponse
-	38, // 67: codefoundry.v1.ThreadService.SetModel:output_type -> codefoundry.v1.SetThreadModelResponse
-	40, // 68: codefoundry.v1.ThreadService.SetPermissionMode:output_type -> codefoundry.v1.SetThreadPermissionModeResponse
-	42, // 69: codefoundry.v1.ThreadService.SetEffort:output_type -> codefoundry.v1.SetThreadEffortResponse
-	44, // 70: codefoundry.v1.ThreadService.McpStatus:output_type -> codefoundry.v1.McpStatusResponse
-	46, // 71: codefoundry.v1.ThreadService.McpReconnect:output_type -> codefoundry.v1.McpReconnectResponse
-	50, // 72: codefoundry.v1.ThreadService.SlashCommands:output_type -> codefoundry.v1.SlashCommandsResponse
-	62, // [62:73] is the sub-list for method output_type
-	51, // [51:62] is the sub-list for method input_type
-	51, // [51:51] is the sub-list for extension type_name
-	51, // [51:51] is the sub-list for extension extendee
-	0,  // [0:51] is the sub-list for field type_name
+	54, // 32: codefoundry.v1.ThreadEvent.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
+	2,  // 33: codefoundry.v1.McpServer.status:type_name -> codefoundry.v1.McpServerStatus
+	24, // 34: codefoundry.v1.McpServer.tools:type_name -> codefoundry.v1.McpTool
+	53, // 35: codefoundry.v1.ThreadMcpStatus.checked_at:type_name -> google.protobuf.Timestamp
+	3,  // 36: codefoundry.v1.ThreadMcpStatus.trigger:type_name -> codefoundry.v1.McpCheckTrigger
+	25, // 37: codefoundry.v1.ThreadMcpStatus.servers:type_name -> codefoundry.v1.McpServer
+	26, // 38: codefoundry.v1.ThreadMcpChange.status:type_name -> codefoundry.v1.ThreadMcpStatus
+	18, // 39: codefoundry.v1.ListThreadItemsResponse.snapshot:type_name -> codefoundry.v1.ThreadItemsSnapshot
+	6,  // 40: codefoundry.v1.SendThreadMessageResponse.item:type_name -> codefoundry.v1.ThreadItem
+	4,  // 41: codefoundry.v1.RespondThreadRequest.decision:type_name -> codefoundry.v1.ThreadDecision
+	52, // 42: codefoundry.v1.RespondThreadRequest.answers:type_name -> codefoundry.v1.RespondThreadRequest.AnswersEntry
+	6,  // 43: codefoundry.v1.RespondThreadResponse.item:type_name -> codefoundry.v1.ThreadItem
+	55, // 44: codefoundry.v1.SetThreadModelResponse.session:type_name -> codefoundry.v1.Session
+	56, // 45: codefoundry.v1.SetThreadPermissionModeRequest.permission_mode:type_name -> codefoundry.v1.PermissionMode
+	55, // 46: codefoundry.v1.SetThreadPermissionModeResponse.session:type_name -> codefoundry.v1.Session
+	55, // 47: codefoundry.v1.SetThreadEffortResponse.session:type_name -> codefoundry.v1.Session
+	26, // 48: codefoundry.v1.McpStatusResponse.status:type_name -> codefoundry.v1.ThreadMcpStatus
+	26, // 49: codefoundry.v1.McpReconnectResponse.status:type_name -> codefoundry.v1.ThreadMcpStatus
+	47, // 50: codefoundry.v1.ThreadSlashCommandsChange.commands:type_name -> codefoundry.v1.SlashCommand
+	47, // 51: codefoundry.v1.SlashCommandsResponse.commands:type_name -> codefoundry.v1.SlashCommand
+	28, // 52: codefoundry.v1.ThreadService.ListItems:input_type -> codefoundry.v1.ListThreadItemsRequest
+	30, // 53: codefoundry.v1.ThreadService.Watch:input_type -> codefoundry.v1.WatchThreadRequest
+	31, // 54: codefoundry.v1.ThreadService.Send:input_type -> codefoundry.v1.SendThreadMessageRequest
+	33, // 55: codefoundry.v1.ThreadService.Respond:input_type -> codefoundry.v1.RespondThreadRequest
+	35, // 56: codefoundry.v1.ThreadService.Interrupt:input_type -> codefoundry.v1.InterruptThreadRequest
+	37, // 57: codefoundry.v1.ThreadService.SetModel:input_type -> codefoundry.v1.SetThreadModelRequest
+	39, // 58: codefoundry.v1.ThreadService.SetPermissionMode:input_type -> codefoundry.v1.SetThreadPermissionModeRequest
+	41, // 59: codefoundry.v1.ThreadService.SetEffort:input_type -> codefoundry.v1.SetThreadEffortRequest
+	43, // 60: codefoundry.v1.ThreadService.McpStatus:input_type -> codefoundry.v1.McpStatusRequest
+	45, // 61: codefoundry.v1.ThreadService.McpReconnect:input_type -> codefoundry.v1.McpReconnectRequest
+	49, // 62: codefoundry.v1.ThreadService.SlashCommands:input_type -> codefoundry.v1.SlashCommandsRequest
+	29, // 63: codefoundry.v1.ThreadService.ListItems:output_type -> codefoundry.v1.ListThreadItemsResponse
+	23, // 64: codefoundry.v1.ThreadService.Watch:output_type -> codefoundry.v1.ThreadEvent
+	32, // 65: codefoundry.v1.ThreadService.Send:output_type -> codefoundry.v1.SendThreadMessageResponse
+	34, // 66: codefoundry.v1.ThreadService.Respond:output_type -> codefoundry.v1.RespondThreadResponse
+	36, // 67: codefoundry.v1.ThreadService.Interrupt:output_type -> codefoundry.v1.InterruptThreadResponse
+	38, // 68: codefoundry.v1.ThreadService.SetModel:output_type -> codefoundry.v1.SetThreadModelResponse
+	40, // 69: codefoundry.v1.ThreadService.SetPermissionMode:output_type -> codefoundry.v1.SetThreadPermissionModeResponse
+	42, // 70: codefoundry.v1.ThreadService.SetEffort:output_type -> codefoundry.v1.SetThreadEffortResponse
+	44, // 71: codefoundry.v1.ThreadService.McpStatus:output_type -> codefoundry.v1.McpStatusResponse
+	46, // 72: codefoundry.v1.ThreadService.McpReconnect:output_type -> codefoundry.v1.McpReconnectResponse
+	50, // 73: codefoundry.v1.ThreadService.SlashCommands:output_type -> codefoundry.v1.SlashCommandsResponse
+	63, // [63:74] is the sub-list for method output_type
+	52, // [52:63] is the sub-list for method input_type
+	52, // [52:52] is the sub-list for extension type_name
+	52, // [52:52] is the sub-list for extension extendee
+	0,  // [0:52] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_thread_proto_init() }
@@ -4039,6 +4060,7 @@ func file_codefoundry_v1_thread_proto_init() {
 	if File_codefoundry_v1_thread_proto != nil {
 		return
 	}
+	file_codefoundry_v1_heartbeat_proto_init()
 	file_codefoundry_v1_session_proto_init()
 	file_codefoundry_v1_thread_proto_msgTypes[0].OneofWrappers = []any{
 		(*ThreadItem_UserMessage)(nil),
@@ -4063,6 +4085,7 @@ func file_codefoundry_v1_thread_proto_init() {
 		(*ThreadEvent_PendingSnapshot)(nil),
 		(*ThreadEvent_Mcp)(nil),
 		(*ThreadEvent_Commands)(nil),
+		(*ThreadEvent_Heartbeat)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

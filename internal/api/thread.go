@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -22,6 +23,7 @@ const threadWatchBuffer = 2048
 type Thread struct {
 	store session.Store
 	bus   *bus.Bus
+	beat  time.Duration // Watch's heartbeat interval; zero is HeartbeatInterval (tests shorten it)
 }
 
 var _ codefoundryv1connect.ThreadServiceHandler = (*Thread)(nil)
@@ -47,6 +49,7 @@ func (h *Thread) ListItems(ctx context.Context, req *connect.Request[v1.ListThre
 
 // Watch sends the thread's snapshot, then its events. It counts as a viewer of the
 // thread while open (Store.WatchItems). After dropped events it resends the snapshot.
+// A quiet thread gets a heartbeat every HeartbeatInterval (see heartbeat.proto).
 func (h *Thread) Watch(ctx context.Context, req *connect.Request[v1.WatchThreadRequest], stream *connect.ServerStream[v1.ThreadEvent]) error {
 	id := req.Msg.GetSessionId()
 	// Subscribe first: events published between the snapshot and the loop are in the
@@ -57,7 +60,13 @@ func (h *Thread) Watch(ctx context.Context, req *connect.Request[v1.WatchThreadR
 	if err != nil {
 		return sessionError(err)
 	}
-	if err := stream.Send(&v1.ThreadEvent{Event: &v1.ThreadEvent_Snapshot{Snapshot: itemsSnapshotToProto(snap)}}); err != nil {
+	beat := newHeartbeat(h.beat)
+	defer beat.Stop()
+	send := func(msg *v1.ThreadEvent) error {
+		beat.Reset()
+		return stream.Send(msg)
+	}
+	if err := send(&v1.ThreadEvent{Event: &v1.ThreadEvent_Snapshot{Snapshot: itemsSnapshotToProto(snap)}}); err != nil {
 		return err
 	}
 	seen := snap.Seq
@@ -66,6 +75,10 @@ func (h *Thread) Watch(ctx context.Context, req *connect.Request[v1.WatchThreadR
 		select {
 		case <-ctx.Done():
 			return nil
+		case <-beat.C():
+			if err := send(&v1.ThreadEvent{Event: &v1.ThreadEvent_Heartbeat{Heartbeat: &v1.StreamHeartbeat{}}}); err != nil {
+				return err
+			}
 		case ev, ok := <-sub.C():
 			if !ok {
 				return nil
@@ -76,7 +89,7 @@ func (h *Thread) Watch(ctx context.Context, req *connect.Request[v1.WatchThreadR
 					return sessionError(err)
 				}
 				seen = snap.Seq
-				if err := stream.Send(&v1.ThreadEvent{Event: &v1.ThreadEvent_Snapshot{Snapshot: itemsSnapshotToProto(snap)}}); err != nil {
+				if err := send(&v1.ThreadEvent{Event: &v1.ThreadEvent_Snapshot{Snapshot: itemsSnapshotToProto(snap)}}); err != nil {
 					return err
 				}
 				continue
@@ -85,7 +98,7 @@ func (h *Thread) Watch(ctx context.Context, req *connect.Request[v1.WatchThreadR
 				continue
 			}
 			if msg := threadEventToProto(ev); msg != nil {
-				if err := stream.Send(msg); err != nil {
+				if err := send(msg); err != nil {
 					return err
 				}
 			}

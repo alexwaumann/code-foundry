@@ -11,6 +11,31 @@ export interface Backoff {
 
 export const defaultBackoff: Backoff = { initialMs: 250, maxMs: 10_000, factor: 2 };
 
+/**
+ * How often the daemon sends a StreamHeartbeat on a quiet ThreadService.Watch,
+ * TerminalService.Attach or EventService.Watch. Mirrors api.HeartbeatInterval
+ * (internal/api/heartbeat.go): keep them equal.
+ */
+export const HEARTBEAT_MS = 5_000;
+
+/** A stream that has sent heartbeats and then nothing for this long is treated as dead. */
+export const LIVENESS_MS = 3 * HEARTBEAT_MS;
+
+/**
+ * What a stream's `open` yields for a StreamHeartbeat. runStream consumes it (it arms
+ * and feeds the liveness watchdog); it never reaches `onEvent`.
+ */
+export const HEARTBEAT: unique symbol = Symbol("heartbeat");
+export type Heartbeat = typeof HEARTBEAT;
+
+/** The liveness watchdog's reason for aborting an attempt. */
+export class StreamSilentError extends Error {
+  constructor(ms: number) {
+    super(`no data for ${String(Math.round(ms / 1000))} s`);
+    this.name = "StreamSilentError";
+  }
+}
+
 /** Delay before retry number `attempt` (0-based), without jitter. */
 export function backoffDelay(attempt: number, b: Backoff = defaultBackoff): number {
   return Math.min(b.maxMs, b.initialMs * b.factor ** Math.max(0, attempt));
@@ -31,9 +56,29 @@ export function isPermanent(err: unknown): boolean {
   return err instanceof ConnectError && (err.code === Code.NotFound || err.code === Code.InvalidArgument);
 }
 
+/**
+ * Calls `cb` each time the page becomes visible after having been hidden (the Wails
+ * window was hidden, minimized or fully covered). Returns the unsubscribe function.
+ */
+export function onBecameVisible(cb: () => void): () => void {
+  if (typeof document === "undefined") return () => undefined;
+  let hidden = document.visibilityState === "hidden";
+  const onChange = () => {
+    if (document.visibilityState === "hidden") hidden = true;
+    else if (hidden) {
+      hidden = false;
+      cb();
+    }
+  };
+  document.addEventListener("visibilitychange", onChange);
+  return () => {
+    document.removeEventListener("visibilitychange", onChange);
+  };
+}
+
 export interface StreamHandlers<T> {
-  /** Opens one stream attempt. Must honour the signal. */
-  open: (signal: AbortSignal) => AsyncIterable<T>;
+  /** Opens one stream attempt. Must honour the signal. Yields HEARTBEAT for heartbeats. */
+  open: (signal: AbortSignal) => AsyncIterable<T | Heartbeat>;
   onEvent: (event: T) => void;
   /**
    * Called on every (re)connect, concurrently with the stream. Events that arrive
@@ -48,6 +93,19 @@ export interface StreamHandlers<T> {
   onError?: (err: unknown) => void;
   backoff?: Backoff;
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
+  /**
+   * Liveness watchdog: once an attempt has delivered a heartbeat, it is aborted and
+   * reconnected (with backoff) after this long without any message. Default LIVENESS_MS;
+   * 0 turns it off. An attempt that never sends a heartbeat (a fake, the mock daemon)
+   * is never watched.
+   */
+  livenessMs?: number;
+  /**
+   * Reconnect at once (no backoff; status "connecting") when the page becomes visible
+   * after being hidden, so the new attempt starts from a fresh snapshot. For streams
+   * whose first message is a snapshot that replaces the client's state.
+   */
+  resyncOnVisible?: boolean;
 }
 
 function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -68,29 +126,59 @@ function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
 
 /**
  * Keeps a server stream open: reconnects with exponential backoff (plus jitter) after
- * errors or a clean end, until the returned stop function is called. Each attempt gets
- * its own AbortController, chained to the outer one.
+ * errors, a clean end or a silent stream (livenessMs), until the returned stop function
+ * is called. Each attempt gets its own AbortController, chained to the outer one.
  */
 export function runStream<T>(h: StreamHandlers<T>): () => void {
   const outer = new AbortController();
   const backoff = h.backoff ?? defaultBackoff;
   const sleep = h.sleep ?? abortableSleep;
+  const liveness = h.livenessMs ?? LIVENESS_MS;
   const stopped = () => outer.signal.aborted;
   // Once stopped, a runner reports nothing: a replacement runner may own the status now.
   const status = (s: StreamStatus, err?: string) => {
     if (!stopped()) h.onStatus?.(s, err);
   };
+  // A resync aborts the current attempt (or the backoff sleep) and starts a new one at once.
+  let resyncPending = false;
+  let wake = new AbortController();
+  const resync = () => {
+    resyncPending = true;
+    wake.abort();
+  };
+  // Read and clear through a function: TS would narrow a direct read across the awaits
+  // during which resync() can run.
+  const takeResync = () => {
+    const p = resyncPending;
+    resyncPending = false;
+    return p;
+  };
+  const unwatchVisibility = h.resyncOnVisible ? onBecameVisible(resync) : () => undefined;
 
   void (async () => {
     let attempt = 0;
     while (!outer.signal.aborted) {
       const ctl = new AbortController();
+      // This attempt is itself the fresh start a pending resync asked for (one during the
+      // backoff sleep cut it short), and it starts over the backoff.
+      if (takeResync()) attempt = 0;
+      wake = new AbortController();
       const onAbort = () => {
         ctl.abort();
       };
       outer.signal.addEventListener("abort", onAbort);
+      wake.signal.addEventListener("abort", onAbort);
       status(attempt === 0 ? "connecting" : "retrying");
       let failure: unknown = null;
+      let watchdog: ReturnType<typeof setTimeout> | undefined;
+      let armed = false;
+      const feed = () => {
+        if (!armed) return;
+        clearTimeout(watchdog);
+        watchdog = setTimeout(() => {
+          ctl.abort(new StreamSilentError(liveness));
+        }, liveness);
+      };
       try {
         let buffering = h.onConnect !== undefined;
         const buffer: T[] = [];
@@ -104,37 +192,71 @@ export function runStream<T>(h: StreamHandlers<T>): () => void {
         connected?.catch((err: unknown) => {
           ctl.abort(err);
         });
-        if (!connected) status("open");
+        // Without onConnect the attempt is open once its first message arrives: a request
+        // that hangs (a stopped daemon) keeps reporting connecting or retrying.
+        let first = !connected;
         for await (const ev of h.open(ctl.signal)) {
+          // A stopped or resynced attempt's late events must not reach the client.
+          if (ctl.signal.aborted) break;
+          if (first) {
+            first = false;
+            status("open");
+          }
+          if (ev === HEARTBEAT) {
+            armed ||= liveness > 0;
+            feed();
+            continue;
+          }
+          feed();
           if (!connected) attempt = 0;
           if (buffering) buffer.push(ev);
           else h.onEvent(ev);
         }
+        // An abort can end the iteration cleanly (the break above): treat it as one.
+        if (ctl.signal.aborted) throw ctl.signal.reason;
         await connected;
       } catch (err) {
         failure = ctl.signal.reason instanceof Error && !isAbort(ctl.signal.reason) ? ctl.signal.reason : err;
       } finally {
+        clearTimeout(watchdog);
         outer.signal.removeEventListener("abort", onAbort);
+        wake.signal.removeEventListener("abort", onAbort);
       }
       if (stopped()) break;
+      if (takeResync()) {
+        attempt = 0;
+        continue;
+      }
       if (failure !== null) {
         h.onError?.(failure);
         if (isPermanent(failure)) {
           status("stopped", errorMessage(failure));
+          unwatchVisibility();
           return;
         }
         status("retrying", errorMessage(failure));
       } else if (h.shouldReconnectOnEnd && !h.shouldReconnectOnEnd()) {
         status("stopped");
+        unwatchVisibility();
         return;
       }
       const delay = backoffDelay(attempt, backoff) * (0.8 + Math.random() * 0.4);
       attempt++;
-      await sleep(delay, outer.signal);
+      const nap = new AbortController();
+      const cut = () => {
+        nap.abort();
+      };
+      outer.signal.addEventListener("abort", cut);
+      wake.signal.addEventListener("abort", cut);
+      await sleep(delay, nap.signal);
+      outer.signal.removeEventListener("abort", cut);
+      wake.signal.removeEventListener("abort", cut);
     }
+    unwatchVisibility();
   })();
 
   return () => {
     outer.abort();
+    unwatchVisibility();
   };
 }

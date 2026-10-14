@@ -1,5 +1,5 @@
 import type { AttachEventView } from "@/api/terminal";
-import { errorMessage, runStream, type StreamStatus } from "@/api/stream";
+import { errorMessage, runStream, type Heartbeat, type StreamStatus } from "@/api/stream";
 import type { Disposable, TerminalRenderer } from "./renderer";
 
 export type AttachPhase = "idle" | "connecting" | "live" | "reconnecting" | "exited" | "error";
@@ -12,7 +12,8 @@ export interface AttachState {
 }
 
 export interface AttachDeps {
-  attach: (id: string, signal: AbortSignal) => AsyncIterable<AttachEventView>;
+  /** Yields HEARTBEAT for the daemon's heartbeats (runStream's liveness watchdog consumes them). */
+  attach: (id: string, signal: AbortSignal) => AsyncIterable<AttachEventView | Heartbeat>;
   write: (id: string, data: Uint8Array) => Promise<void>;
   resize: (id: string, cols: number, rows: number) => Promise<void>;
   onStreamError?: (err: unknown) => void;

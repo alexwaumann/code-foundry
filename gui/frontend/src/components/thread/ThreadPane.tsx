@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Backdrop } from "@/components/backdrop/Backdrop";
 import { SessionIndicator, SessionTitle } from "@/components/session/SessionParts";
@@ -68,6 +69,7 @@ function ThreadView({ sessionId }: { sessionId: string }) {
   const loaded = useThreadLoaded(sessionId);
   const empty = useThreadEmpty(sessionId);
   const watchError = useThreadStore((s) => (s.watch?.sessionId === sessionId && s.watch.status === "retrying" ? s.watch.error : null));
+  const reconnecting = useThreadStore((s) => s.watch?.sessionId === sessionId && s.watch.status === "retrying");
   // The prompts to dock: pending requests minus the ones just answered (their answer is on its way).
   const open = useOpenRequests(sessionId);
   const waiting = pendingList.length > 0;
@@ -89,6 +91,16 @@ function ThreadView({ sessionId }: { sessionId: string }) {
         </PaneHeader>
         <div className="relative flex min-h-0 flex-1 flex-col">
           <SessionIndicator id={sessionId} />
+          {/* The log on screen may be behind while the Watch reconnects (a dropped or silent stream). */}
+          {loaded && reconnecting && state !== "starting" && state !== "closing" && (
+            <div
+              className="pointer-events-none absolute top-2 right-4 z-10 flex items-center gap-1.5 rounded-md border bg-popover/90 px-2 py-0.5 text-[11px] text-muted-foreground"
+              data-testid="thread-reconnecting"
+            >
+              <Loader2 className="size-3 animate-spin" />
+              reconnecting…
+            </div>
+          )}
           {!loaded && <p className="absolute inset-x-0 top-10 text-center text-sm text-muted-foreground">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
           {/* Connected with nothing to show (a thread started without a prompt; a fork starts with its parent's items). */}
           {empty && state === "connected" && !working && (

@@ -269,6 +269,10 @@ export function startThreadWatch(sessionId: string): () => void {
   };
   const stop = runStream<ThreadEventView>({
     open: (signal) => watchThread(sessionId, signal),
+    // WKWebView can hold the tail of the stream after the window was hidden, minimized or
+    // covered (docs/notes/thread-render-stall.md): a fresh Watch's snapshot catches up at
+    // once on return, as leaving and reopening the thread does.
+    resyncOnVisible: true,
     onEvent: (ev) => {
       queue.push(ev);
       timer ??= setTimeout(flush, WATCH_BATCH_MS);
