@@ -30,6 +30,8 @@ type Settings struct {
 	Repos      Repos
 	GitOps     GitOps
 	Appearance Appearance
+	// Notifications are consumed by the GUI (the Dock badge and alerts).
+	Notifications Notifications
 	// Keybindings are the valid overrides: command name -> canonical chord or
 	// KeybindingNone.
 	Keybindings map[string]string
@@ -74,6 +76,17 @@ type Appearance struct {
 	Density     string // compact, comfortable
 	ThreadWidth string // compact, comfortable, full
 	Backdrop    string // forest, none
+}
+
+// Notifications configure the GUI's Dock badge and attention alerts. A bare executable
+// has no bundle, so macOS notification banners are not available
+// (docs/notes/dock-alerts.md).
+type Notifications struct {
+	DockBadge       bool // the attention count on the Dock icon
+	Bounce          bool // bounce the Dock icon on an alert
+	Sound           bool // play a sound on an alert
+	SoundVolume     int  // percent of the output volume, 0 to 100
+	CooldownSeconds int  // minimum gap between alerts; 0 = none
 }
 
 // Update configures the updater.

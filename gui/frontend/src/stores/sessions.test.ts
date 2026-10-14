@@ -240,6 +240,17 @@ describe("event dispatch", () => {
     expect(useUiStore.getState().selection).toEqual({ kind: "session", id: "s1" });
   });
 
+  it("a session snapshot bumps the epoch; updates and removals do not", () => {
+    const start = useSessionsStore.getState().epoch;
+    dispatchEvent({ source: "session", event: { kind: "snapshot", sessions: [session("s1")], retiredUsage: [] } });
+    expect(useSessionsStore.getState().epoch).toBe(start + 1);
+    dispatchEvent({ source: "session", event: { kind: "updated", session: session("s2") } });
+    dispatchEvent({ source: "session", event: { kind: "removed", id: "s1" } });
+    expect(useSessionsStore.getState().epoch).toBe(start + 1);
+    dispatchEvent({ source: "session", event: { kind: "snapshot", sessions: [], retiredUsage: [] } });
+    expect(useSessionsStore.getState().epoch).toBe(start + 2);
+  });
+
   it("a FocusTerminal that races its shell reveals the shell once it arrives", () => {
     useSessionsStore.setState({ ...replaceSessions(emptySessions, [session("s1")]), availability: "available" });
     useTerminalsStore.setState({ ...emptyTerminals, loaded: true });

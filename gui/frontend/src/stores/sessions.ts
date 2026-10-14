@@ -22,6 +22,13 @@ interface SessionsState extends SessionsData {
    * sessions' usage plus this. From the snapshot and "retiredUsage" events.
    */
   retiredUsage: readonly UsageBucketView[];
+  /**
+   * Bumped whenever the whole set is replaced rather than changed: the List on each
+   * events-stream (re)connect and every snapshot event. Whoever reacts to transitions
+   * (stores/dockAlerts.ts) treats the set after a bump as a new baseline, since changes
+   * missed while disconnected are not transitions the user just caused.
+   */
+  epoch: number;
 }
 
 export const emptySessions: SessionsData = { byId: {}, order: [] };
@@ -117,6 +124,7 @@ export const useSessionsStore = create<SessionsState>()(() => ({
   availability: "unknown",
   error: null,
   retiredUsage: [],
+  epoch: 0,
 }));
 
 /**

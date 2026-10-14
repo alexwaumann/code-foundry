@@ -60,6 +60,14 @@ func TestFieldParse(t *testing.T) {
 		{key: KeyClaudePath, in: plain, err: plain + " is not an executable file"},
 		{key: KeyClaudePath, in: "/nope/claude", err: "/nope/claude does not exist"},
 		{key: KeyFontFamily, in: "Iosevka", want: "Iosevka"},
+		{key: KeyDockBadge, in: "false", want: "false"},
+		{key: KeySound, in: "on", err: `want true or false, got "on"`},
+		{key: KeySoundVolume, in: "0", want: "0"},
+		{key: KeySoundVolume, in: "100", want: "100"},
+		{key: KeySoundVolume, in: "101", err: "want 0 to 100, got 101"},
+		{key: KeyAlertCooldown, in: "0", want: "0"},
+		{key: KeyAlertCooldown, in: "3600", want: "3600"},
+		{key: KeyAlertCooldown, in: "-1", err: "want 0 to 3600, got -1"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.key+"="+tt.in, func(t *testing.T) {
@@ -269,5 +277,47 @@ func TestCacheTTLField(t *testing.T) {
 		if _, err := f.parse(tt.in); (err == nil) != tt.ok {
 			t.Errorf("parse(%q) err = %v, want ok %v", tt.in, err, tt.ok)
 		}
+	}
+}
+
+func TestNotificationFields(t *testing.T) {
+	tests := []struct {
+		key      string
+		typ      Type
+		def      string
+		min, max int
+	}{
+		{KeyDockBadge, Bool, "true", 0, 0},
+		{KeyBounce, Bool, "true", 0, 0},
+		{KeySound, Bool, "false", 0, 0},
+		{KeySoundVolume, Int, "50", 0, 100},
+		{KeyAlertCooldown, Int, "60", 0, 3600},
+	}
+	var keys []string
+	for _, tt := range tests {
+		keys = append(keys, tt.key)
+		f := field(t, tt.key)
+		// All live: the GUI reads them from every snapshot.
+		if f.Group != GroupNotify || f.Type != tt.typ || f.Default != tt.def || f.Min != tt.min || f.Max != tt.max || f.Restart {
+			t.Errorf("%s = %+v", tt.key, f)
+		}
+	}
+	// In display order, as one run of fields.
+	i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyDockBadge })
+	var got []string
+	for _, f := range staticFields[i : i+len(keys)] {
+		got = append(got, f.Key)
+	}
+	if !slices.Equal(got, keys) {
+		t.Errorf("field order = %v, want %v", got, keys)
+	}
+	// The group sits right after Appearance.
+	g := slices.IndexFunc(Groups, func(g Group) bool { return g.ID == GroupNotify })
+	if g < 1 || Groups[g-1].ID != GroupAppearance {
+		t.Errorf("Notifications group at %d, want after Appearance", g)
+	}
+	want := Notifications{DockBadge: true, Bounce: true, Sound: false, SoundVolume: 50, CooldownSeconds: 60}
+	if got := Defaults().Notifications; got != want {
+		t.Errorf("Defaults().Notifications = %+v, want %+v", got, want)
 	}
 }

@@ -1,5 +1,5 @@
 import { Browser, Events } from "@wailsio/runtime";
-import { Info, PickDirectory, Relaunch, SetZoom } from "../../bindings/github.com/alexwaumann/code-foundry/gui/appservice";
+import { Bounce, Info, PickDirectory, Relaunch, SetBadge, SetZoom } from "../../bindings/github.com/alexwaumann/code-foundry/gui/appservice";
 
 /** The Wails host (window shell). */
 export interface AppInfoView {
@@ -57,6 +57,29 @@ export async function setHostZoom(percent: number): Promise<void> {
     await SetZoom(percent);
   } catch (err: unknown) {
     console.warn("host zoom", err);
+  }
+}
+
+/**
+ * Shows the number of threads that need attention on the Dock icon (0 removes the badge,
+ * above 99 shows "99+"; gui/notify.go). No-op without a host.
+ */
+export async function setDockBadge(count: number): Promise<void> {
+  if (!(await appInfo())) return;
+  try {
+    await SetBadge(count);
+  } catch (err: unknown) {
+    console.warn("dock badge", err);
+  }
+}
+
+/** Bounces the Dock icon once (macOS ignores it while the app is active). No-op without a host. */
+export async function bounceDock(): Promise<void> {
+  if (!(await appInfo())) return;
+  try {
+    await Bounce();
+  } catch (err: unknown) {
+    console.warn("dock bounce", err);
   }
 }
 
