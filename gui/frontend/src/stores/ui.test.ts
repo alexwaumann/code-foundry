@@ -116,6 +116,27 @@ describe("ui persistence", () => {
     expect(useUiStore.getState().archivedCollapsed).toBe(true);
   });
 
+  it("saves and loads the Snoozed section's collapsed state; collapsed by default and for a bad value", () => {
+    expect(useUiStore.getInitialState().snoozedCollapsed).toBe(true);
+    const opts = useUiStore.persist.getOptions();
+    const current = useUiStore.getState();
+    useUiStore.setState({ snoozedCollapsed: true });
+    useUiStore.getState().toggleSnoozedCollapsed();
+    expect(useUiStore.getState().snoozedCollapsed).toBe(false);
+    expect(opts.partialize?.(useUiStore.getState())).toMatchObject({ snoozedCollapsed: false });
+    expect(opts.merge?.({ snoozedCollapsed: false }, current).snoozedCollapsed).toBe(false);
+    expect(opts.merge?.({}, { ...current, snoozedCollapsed: true }).snoozedCollapsed).toBe(true);
+    expect(opts.merge?.({ snoozedCollapsed: "no" }, { ...current, snoozedCollapsed: true }).snoozedCollapsed).toBe(true);
+    // Independent of Working and Archived.
+    expect(opts.merge?.({ archivedCollapsed: false, workingCollapsed: true }, { ...current, snoozedCollapsed: true })).toMatchObject({
+      workingCollapsed: true,
+      archivedCollapsed: false,
+      snoozedCollapsed: true,
+    });
+    useUiStore.getState().toggleSnoozedCollapsed();
+    expect(useUiStore.getState().snoozedCollapsed).toBe(true);
+  });
+
   it("saves and loads the Projects page's collapsed projects and workspaces; none by default and for a bad value", () => {
     expect(useUiStore.getInitialState().collapsedProjects).toEqual([]);
     expect(useUiStore.getInitialState().collapsedWorkspaces).toEqual([]);

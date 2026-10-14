@@ -50,11 +50,13 @@ export const badgeLabels: Record<SessionBadge, string> = {
  * - "interrupted": status "error", reason "interrupted" (the process ended mid-turn)
  * - "trust": "trust: <dialog text>" (folder trust dialog)
  * - "notification": "notification: <text>" (OSC 9/99/777) or "bell"
+ * - "snoozeEnded": "snooze ended" (the daemon woke a snoozed thread; it waits on the user
+ *   like a prompt, docs/notes/snooze-threads-1-daemon.md)
  * - "other": everything else, including every busy / idle / unknown status and the
  *   untested "blocked: …", "continue: …", "menu: …" dialogs
  * Only "attention" and "error" statuses are classified; the rest are "other".
  */
-export type StatusKind = "done" | "permission" | "question" | "plan" | "error" | "interrupted" | "trust" | "notification" | "other";
+export type StatusKind = "done" | "permission" | "question" | "plan" | "error" | "interrupted" | "trust" | "notification" | "snoozeEnded" | "other";
 
 const reasonKinds: Readonly<Record<string, StatusKind>> = {
   finished: "done",
@@ -67,6 +69,7 @@ const reasonKinds: Readonly<Record<string, StatusKind>> = {
   trust: "trust",
   notification: "notification",
   bell: "notification",
+  "snooze ended": "snoozeEnded",
 };
 
 /** "permission: Do you want to proceed?" -> ["permission", "Do you want to proceed?"]; no colon -> [reason, ""]. */

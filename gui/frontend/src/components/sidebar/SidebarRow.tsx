@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { ArrowRightLeft, ChevronDown, ChevronRight, CircleAlert, Folder, FolderGit2, GitBranch, House, Layers, OctagonX, Pin, type LucideIcon } from "lucide-react";
+import { AlarmClock, ArrowRightLeft, ChevronDown, ChevronRight, CircleAlert, Folder, FolderGit2, GitBranch, House, Layers, OctagonX, Pin, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { sessionBadge, shortAge } from "@/lib/session";
+import { shortRemaining, snoozeTimeFull } from "@/lib/snooze";
 import { showsPlace, statusLine, statusText, statusTones, tipStatusTone, type StatusLine, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
 import { modelLabel, threadRowModel, type RepoLookup, type WorkspaceLookup } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
@@ -281,12 +282,29 @@ function TipStatus({ id }: { id: string }) {
 }
 
 /**
- * The tooltip's body: name, status (attention or error only), project ("No project" with
- * the House icon for a thread without one), branch (git only) and model. Mounted only
- * while open.
+ * A snoozed thread's wake time in full ("Snoozed until Thu, Oct 15, 9:00 AM"): its row
+ * shows only the time left. Nothing for a thread that is not snoozed.
+ */
+function TipSnooze({ id }: { id: string }) {
+  const until = useSessionsStore((s) => s.byId[id]?.snoozedUntilMs ?? null);
+  const now = useNow(30_000);
+  if (until === null) return null;
+  return (
+    <div className="mb-[3px] flex items-start gap-2 leading-5" data-testid="tip-snooze">
+      <AlarmClock className="mt-[3px] size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      <span className="min-w-0 break-words">Snoozed until {snoozeTimeFull(until, now)}</span>
+    </div>
+  );
+}
+
+/**
+ * The tooltip's body: name, status (attention or error only; for a snoozed thread its wake
+ * time instead), project ("No project" with the House icon for a thread without one),
+ * branch (git only) and model. Mounted only while open.
  */
 function ThreadTipBody({ id }: { id: string }) {
   const name = useSessionsStore((s) => s.byId[id]?.name ?? "");
+  const snoozed = useSessionsStore((s) => (s.byId[id]?.snoozedUntilMs ?? null) !== null);
   const model = useSessionsStore((s) => s.byId[id]?.model ?? "");
   const effort = useSessionsStore((s) => s.byId[id]?.effort ?? "");
   const models = useModelChoices();
@@ -307,7 +325,7 @@ function ThreadTipBody({ id }: { id: string }) {
       <div className="mb-[5px] truncate text-[13px] font-semibold" data-testid="tip-name">
         {name || id}
       </div>
-      <TipStatus id={id} />
+      {snoozed ? <TipSnooze id={id} /> : <TipStatus id={id} />}
       <TipRow icon={<TipIcon icon={m.noProject ? House : m.noGit ? Folder : FolderGit2} />} chip={m.noGit ? "no git" : null} testId="tip-project">
         {m.project}
       </TipRow>
@@ -351,7 +369,7 @@ function ThreadTooltip({ id, children }: { id: string; children: ReactElement })
 }
 
 /**
- * A footer's header, Working or Archived (design record: /tmp/working-header/index.html?v=2):
+ * A footer's header, Working, Snoozed or Archived (design record: /tmp/working-header/index.html?v=2):
  * an 11px uppercase muted label, the number of threads in the section after it, and a
  * chevron on the right saying whether the section is open. A button (aria-expanded) inside
  * the row; the row itself is role="presentation", so the listbox's cursor never lands on
@@ -373,6 +391,7 @@ function SectionHeader({ row }: { row: HeaderRow }) {
         onClick={() => {
           const ui = useUiStore.getState();
           if (row.section === "archived") ui.toggleArchivedCollapsed();
+          else if (row.section === "snoozed") ui.toggleSnoozedCollapsed();
           else ui.toggleWorkingCollapsed();
         }}
       >
@@ -401,16 +420,29 @@ function ArchivedAge({ id }: { id: string }) {
   );
 }
 
+/** How long until the snoozed thread wakes ("45m", "2h", "4d"; "<1m"), on the shared 30 s clock. */
+function SnoozeLeft({ id }: { id: string }) {
+  const until = useSessionsStore((s) => s.byId[id]?.snoozedUntilMs ?? null);
+  const now = useNow(30_000);
+  if (until === null) return null;
+  return (
+    <span className="ml-auto shrink-0 pl-1 text-[11px] text-muted-foreground tabular-nums" data-testid="row-snooze-left">
+      {shortRemaining(until, now)}
+    </span>
+  );
+}
+
 /**
- * An archived thread's single line: the name (the id, muted, while unnamed) and, on the
- * right, how long ago it was archived. No status line, badges or pin (an archived thread is
- * disconnected and unpinned), and not dimmed: the whole section is archived threads.
+ * An archived or snoozed thread's single line: the name (the id, muted, while unnamed) and,
+ * on the right, how long ago it was archived or how long until it wakes. No status line,
+ * badges or pin (such a thread is disconnected and unpinned), and not dimmed: the whole
+ * section is such threads.
  */
-function ArchivedLabel({ id }: { id: string }) {
+function SingleLineLabel({ id, section }: { id: string; section: "archived" | "snoozed" }) {
   const name = useSessionsStore((s) => s.byId[id]?.name ?? "");
   const renaming = useUiStore((s) => s.renamingSessionId === id);
   return (
-    <span className="flex min-w-0 flex-1 items-center gap-1.5" data-testid="session-body" data-archived>
+    <span className="flex min-w-0 flex-1 items-center gap-1.5" data-testid="session-body" data-archived={section === "archived" || undefined} data-snoozed={section === "snoozed" || undefined}>
       {renaming ? (
         <RenameField id={id} name={name} />
       ) : (
@@ -418,7 +450,7 @@ function ArchivedLabel({ id }: { id: string }) {
           <span className={cn("truncate", !name && "text-muted-foreground")} data-testid="session-name">
             {name || id}
           </span>
-          <ArchivedAge id={id} />
+          {section === "archived" ? <ArchivedAge id={id} /> : <SnoozeLeft id={id} />}
         </>
       )}
     </span>
@@ -449,7 +481,7 @@ export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onAc
           useUiStore.getState().setRenaming(row.sessionId);
         }}
       >
-        {row.section === "archived" ? <ArchivedLabel id={row.sessionId} /> : <SessionLabel id={row.sessionId} />}
+        {row.section === "archived" || row.section === "snoozed" ? <SingleLineLabel id={row.sessionId} section={row.section} /> : <SessionLabel id={row.sessionId} />}
       </div>
     </ThreadTooltip>
   );

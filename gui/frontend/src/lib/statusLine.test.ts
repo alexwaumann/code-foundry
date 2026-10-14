@@ -25,6 +25,9 @@ describe("statusLine / statusText", () => {
     ["interrupted", "disconnected", "error", "interrupted", NOW - 60 * MIN, "interrupted", "Interrupted while working · 1 h ago"],
     ["interrupted, time unknown", "disconnected", "error", "interrupted", null, "interrupted", "Interrupted while working"],
     ["other error status", "disconnected", "error", "daemon restarted", 1, "error", "Error · daemon restarted"],
+    ["snooze ended", "disconnected", "attention", "snooze ended", NOW - 2 * MIN, "snoozeEnded", "Snooze ended · 2 min ago"],
+    ["snooze ended just now", "disconnected", "attention", "snooze ended", NOW - 5_000, "snoozeEnded", "Snooze ended · just now"],
+    ["snooze ended, time unknown", "disconnected", "attention", "snooze ended", null, "snoozeEnded", "Snooze ended"],
     ["question after a restart", "disconnected", "attention", "question: Which density?", 1, "question", "Asked a question"],
     ["idle", "connected", "idle", "at prompt", 1, "place", ""],
     ["unknown", "unknown", "unknown", "", null, "place", ""],
@@ -42,8 +45,9 @@ describe("statusLine / statusText", () => {
     expect(statusLine(undefined)).toEqual({ kind: "place", detail: "", at: null });
   });
 
-  it("carries the time only for finished and interrupted", () => {
+  it("carries the time only for finished, interrupted and snooze ended", () => {
     expect(statusLine({ state: "connected", status: "attention", statusReason: "finished", statusChangedAtMs: 5 }).at).toBe(5);
+    expect(statusLine({ state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: 6 }).at).toBe(6);
     expect(statusLine({ state: "connected", status: "attention", statusReason: "question: x", statusChangedAtMs: 5 }).at).toBeNull();
     expect(statusLine({ state: "connected", status: "busy", statusReason: "", statusChangedAtMs: 5 }).at).toBeNull();
   });
@@ -59,6 +63,7 @@ describe("statusLine / statusText", () => {
     ["finished", false, "emerald"],
     ["error", false, "red"],
     ["interrupted", false, "red"],
+    ["snoozeEnded", false, "amber"],
   ])("%s: place %s, tone %s", (kind, place, tone) => {
     expect(showsPlace(kind)).toBe(place);
     expect(statusTones[kind]).toBe(tone);
@@ -79,6 +84,7 @@ describe("tipStatusTone", () => {
     ["interrupted", "disconnected", "error", "interrupted", NOW - 60 * MIN, "red", "Interrupted while working · 1 h ago"],
     ["interrupted, time unknown", "disconnected", "error", "interrupted", null, "red", "Interrupted while working"],
     ["other error status", "disconnected", "error", "daemon restarted", 1, "red", "Error · daemon restarted"],
+    ["snooze ended", "disconnected", "attention", "snooze ended", NOW - 2 * MIN, "amber", "Snooze ended · 2 min ago"],
     ["finished", "connected", "attention", "finished", NOW - 3 * MIN, null, "Finished 3 min ago"],
     ["busy", "connected", "busy", "working: Say hi", null, null, "Working"],
     ["idle", "connected", "idle", "at prompt", 1, null, ""],

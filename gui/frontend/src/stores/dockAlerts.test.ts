@@ -182,7 +182,7 @@ function thread(id: string, over: Partial<SessionView> = {}): SessionView {
 }
 
 describe("attentionIds (the badge count)", () => {
-  it("counts prompts and finished turns, pinned or not, never errors, archived or working ones", () => {
+  it("counts prompts and finished turns, pinned or not, never errors, archived, snoozed or working ones", () => {
     const data = replaceSessions(emptySessions, [
       thread("prompt", { status: "attention", statusReason: "permission: Bash" }),
       thread("done", { status: "attention", statusReason: "finished" }),
@@ -190,11 +190,13 @@ describe("attentionIds (the badge count)", () => {
       thread("pinned", { status: "attention", statusReason: "question: Which?", pinned: true }),
       thread("offline-prompt", { state: "disconnected", status: "attention", statusReason: "finished" }),
       thread("archived", { status: "attention", statusReason: "finished", archivedAtMs: 5 }),
+      thread("snoozed", { state: "disconnected", status: "attention", statusReason: "finished", snoozedUntilMs: 9 }),
+      thread("woken", { state: "disconnected", status: "attention", statusReason: "snooze ended" }),
       thread("busy", { status: "busy" }),
       thread("idle"),
       thread("starting", { state: "starting", status: "unknown" }),
     ]);
-    expect(attentionIds(data).sort()).toEqual(["done", "offline-prompt", "pinned", "prompt"]);
+    expect(attentionIds(data).sort()).toEqual(["done", "offline-prompt", "pinned", "prompt", "woken"]);
   });
 });
 
@@ -279,6 +281,17 @@ describe("startDockAlerts", () => {
     useSessionsStore.setState((s) => ({ ...replaceSessions(s, [thread("a", { status: "busy" })]), epoch: s.epoch + 1 }));
     useSessionsStore.setState((s) => applySessionEvent(s, { kind: "updated", session: thread("a", { status: "attention", statusReason: "finished" }) }));
     expect(calls).toEqual(["badge 0", "badge 1", "bounce", "sound 50"]);
+  });
+
+  it("snoozing a waiting thread drops it from the badge; its wake badges and bounces", () => {
+    settings({});
+    useSessionsStore.setState((s) => ({ ...replaceSessions(s, [thread("a", { status: "attention", statusReason: "finished" })]), epoch: s.epoch + 1 }));
+    expect(calls).toEqual(["badge 0", "badge 1"]);
+    useSessionsStore.setState((s) => applySessionEvent(s, { kind: "updated", session: thread("a", { state: "disconnected", status: "attention", statusReason: "finished", snoozedUntilMs: 5 }) }));
+    expect(calls).toEqual(["badge 0", "badge 1", "badge 0"]);
+    now = 120_000;
+    useSessionsStore.setState((s) => applySessionEvent(s, { kind: "updated", session: thread("a", { state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: now }) }));
+    expect(calls).toEqual(["badge 0", "badge 1", "badge 0", "badge 1", "bounce"]);
   });
 
   it("plays the sound alone at the volume setting with the bounce off", () => {
