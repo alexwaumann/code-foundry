@@ -1,4 +1,4 @@
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ThreadItemView } from "@/api/thread";
 import { buildRows, buildTurns, decodeTimelineKey, timelineKey } from "@/lib/threadTimeline";
@@ -105,5 +105,50 @@ describe("a system note", () => {
     // The note is the last row; the copied turn above it folded under its footer.
     expect(c.lastElementChild).toBe(note);
     expect(c.querySelector('[data-testid="thread-footer"]')?.getAttribute("data-folded")).toBe("true");
+  });
+});
+
+describe("the latest turn", () => {
+  const turn: ThreadItemView[] = [
+    { ...base, id: "u", ordinal: 1, kind: "user", text: "hi", attachments: [], composerText: "" },
+    { ...base, id: "t", ordinal: 2, kind: "tool", toolUseId: "t", name: "Bash", inputJson: '{"command":"ls"}', status: "done", output: "", isError: false, resultJson: "" },
+    { ...base, id: "a", ordinal: 3, kind: "text", text: "done" },
+  ];
+  const end: ThreadItemView = {
+    ...base,
+    id: "e",
+    ordinal: 4,
+    kind: "turnEnd",
+    subtype: "success",
+    isError: false,
+    interrupted: false,
+    stopReason: "",
+    terminalReason: "",
+    durationMs: 1000,
+    numTurns: 1,
+    costUsd: 0,
+    turnCostUsd: null,
+    model: "",
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    errors: [],
+  };
+
+  it("is open while it runs", () => {
+    const c = show(turn);
+    expect(c.textContent).toContain("ls");
+    expect(c.querySelector('[data-testid="thread-footer"]')).toBeNull();
+  });
+
+  it("folds under its footer once it ends; the footer reopens it (the user's choice)", () => {
+    const c = show([...turn, end]);
+    const footer = c.querySelector('[data-testid="thread-footer"]');
+    expect(footer?.getAttribute("data-folded")).toBe("true");
+    expect(c.textContent).not.toContain("ls");
+    expect(c.querySelector('[data-testid="thread-text"]')?.textContent).toContain("done");
+    fireEvent.click(footer?.querySelector("button.fold") as HTMLButtonElement);
+    expect(useThreadStore.getState().folds.s?.u).toBe(false);
   });
 });

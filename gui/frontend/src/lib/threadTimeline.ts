@@ -241,18 +241,19 @@ export interface TimelineOptions {
 }
 
 /**
- * The default fold of a turn: a finished turn folds unless it is the latest one.
+ * The default fold of a turn: every finished turn folds, the latest one included, the
+ * moment it ends (whatever the user scrolled to or expanded meanwhile); a running turn is
+ * open. The user's choice on the footer (stores/thread.ts setTurnFolded) wins over it.
  */
-export function defaultFolded(turn: TimelineTurn, latest: boolean): boolean {
-  return turn.end !== "" && !latest;
+export function defaultFolded(turn: TimelineTurn): boolean {
+  return turn.end !== "";
 }
 
 /** The rows to lay out, top to bottom. */
 export function buildRows(turns: readonly TimelineTurn[], opts: TimelineOptions): TimelineRow[] {
   const rows: TimelineRow[] = [];
-  turns.forEach((t, i) => {
-    const latest = i === turns.length - 1;
-    const folded = t.end !== "" && (opts.fold(t.key) ?? defaultFolded(t, latest));
+  turns.forEach((t) => {
+    const folded = t.end !== "" && (opts.fold(t.key) ?? defaultFolded(t));
     for (const u of t.user) rows.push({ type: "user", key: u, id: u });
     for (const n of t.body) if (!folded || !foldsAway(n)) rows.push(n);
     const finals = t.body.flatMap((n) => (n.type === "text" && n.final ? [n.id] : []));
