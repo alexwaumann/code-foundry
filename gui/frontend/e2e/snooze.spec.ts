@@ -157,7 +157,7 @@ test("snoozing a working thread from the header asks first; it then drops its pa
   await expect(page.getByTestId("side-panel")).toBeVisible();
 
   const header = page.getByTestId("thread-header");
-  await header.getByRole("button", { name: "Snooze Thread" }).click();
+  await header.getByRole("button", { name: "Snooze Thread", exact: true }).click();
   const presets = page.getByTestId("pane-snooze-presets");
   await expect(presets).toBeVisible();
   await presets.locator('[data-preset="tomorrow"]').click();
@@ -182,14 +182,14 @@ test("snoozing a working thread from the header asks first; it then drops its pa
   expect(await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.usePanelStore.getState().byKey["session:s-1"])`)).toEqual({ open: false, tabs: [], activeTabId: null });
   // The header button unsnoozes now.
   await expect(header.getByRole("button", { name: "Unsnooze Thread" })).toBeVisible();
-  await expect(header.getByRole("button", { name: "Snooze Thread" })).toHaveCount(0);
+  await expect(header.getByRole("button", { name: "Snooze Thread", exact: true })).toHaveCount(0);
 
   // The card's Unsnooze: back in the main list, still disconnected (interrupted), no attention added.
   await card.getByTestId("thread-unsnooze").click();
   await expect(page.getByTestId("snoozed-count")).toHaveText("2");
   await expect(row(page, "s:s-1")).toHaveAttribute("data-section", "attention");
   await expect(card).toContainText("Not connected · closed. Reconnect to continue the conversation.");
-  await expect(header.getByRole("button", { name: "Snooze Thread" })).toBeVisible();
+  await expect(header.getByRole("button", { name: "Snooze Thread", exact: true })).toBeVisible();
 
   // Snoozed from the CLI (another client): the same panel reset.
   await row(page, "s:s-2").click();
@@ -269,7 +269,7 @@ test("a wake brings the thread back needing attention: Snooze ended in amber, co
   await expect(card.getByTestId("thread-unsnooze")).toHaveCount(0);
 
   // Snooze again from the header: 3 hours.
-  await page.getByTestId("thread-header").getByRole("button", { name: "Snooze Thread" }).click();
+  await page.getByTestId("thread-header").getByRole("button", { name: "Snooze Thread", exact: true }).click();
   await page.getByTestId("pane-snooze-presets").locator('[data-preset="3h"]').click();
   await expect(page.getByTestId("snoozed-count")).toHaveText("2");
   await expect(bell.getByTestId("attention-badge")).toHaveText("1");
