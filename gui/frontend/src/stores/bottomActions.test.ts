@@ -448,6 +448,14 @@ describe("toggleBottomFromHere (cmd+j, the header toggle, the palette)", () => {
     ],
     ["the dashboard: a no-op", () => useUiStore.setState({ selection: { kind: "view", name: "dashboard" } }), false, false],
     [
+      "before the terminals are listed: just opens",
+      () => {
+        useTerminalsStore.setState({ byId: {}, order: [], loaded: false });
+      },
+      true,
+      false,
+    ],
+    [
       "already starting a shell for it: just opens",
       () => {
         setTerminals([]);

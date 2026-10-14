@@ -196,13 +196,16 @@ export async function newBottomTerminal(key: string): Promise<boolean> {
  * presenter in keys/bindings.ts). Like toggleBottomCommand, except that a panel about to
  * open with no tab starts a shell (openBottomShell) instead of showing the empty state,
  * when there is a context for one (a thread always; the Projects page never without a
- * tab, so it gets the empty state's hint). Hiding stays a plain hide. The CLI's ShowView
- * reaches every window with the plain toggle, so one CLI call never starts a shell per
- * window. Returns the new open state.
+ * tab, so it gets the empty state's hint), and once the terminals are listed. Hiding stays
+ * a plain hide. The CLI's ShowView reaches every window with the plain toggle, so one CLI
+ * call never starts a shell per window. Returns the new open state.
  */
 export function toggleBottomFromHere(): boolean {
   const key = bottomKeyOf(useUiStore.getState().selection);
-  const opensEmpty = key !== null && !getBottom(key).open && bottomCanShow(key) && getBottomTabIds(key).length === 0;
+  // Before the first List the store has no terminals at all, so "no tab" means nothing yet:
+  // a thread with shells would get another one. Until then it is the plain toggle.
+  const opensEmpty =
+    key !== null && useTerminalsStore.getState().loaded && !getBottom(key).open && bottomCanShow(key) && getBottomTabIds(key).length === 0;
   if (!opensEmpty || isStarting(key) || paneContext(key) === null) return toggleBottomCommand();
   void openBottomShell(key);
   return true;
