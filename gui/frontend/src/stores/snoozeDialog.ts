@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { snoozeSession } from "./sessionActions";
+import { useSessionsStore } from "./sessions";
 
 /**
  * The custom snooze dialog ("Pick a date and time…" in the snooze menus,
@@ -26,4 +28,18 @@ export function openSnoozeDialog(sessionId: string): void {
 
 export function closeSnoozeDialog(): void {
   useSnoozeDialogStore.setState({ open: false });
+}
+
+/**
+ * session.snooze's presenter (the palette, a chord): a snoozed thread is unsnoozed, any
+ * other opens the custom dialog, since the command needs a time the palette would not ask
+ * for (until is optional, so it is not prompted). False without such a thread, so the
+ * command falls back to its default presentation.
+ */
+export function presentSnooze(sessionId: string): boolean {
+  const s = useSessionsStore.getState().byId[sessionId];
+  if (!s) return false;
+  if (s.snoozedUntilMs !== null) void snoozeSession(sessionId, null);
+  else openSnoozeDialog(sessionId);
+  return true;
 }
