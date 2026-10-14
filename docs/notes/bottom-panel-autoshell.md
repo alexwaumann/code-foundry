@@ -43,9 +43,11 @@ skipped, 0 failed. Live: `e2e/live-bottom.spec.ts` against a real daemon
 * **When it starts one.** The panel is closed, could show (`bottomCanShow`: under Settings,
   Usage or an expanded side panel cmd+j stays a no-op, as before), has no tab, no start is
   already in flight for the key, and `paneContext(key)` exists. A thread always has one.
-  The Projects page has none without a tab, so there cmd+j shows the empty state's hint
-  ("Start one with New terminal on a project or worktree row."). The dashboard and the
-  PR page have no key at all.
+  It also waits for the first terminal List (`useTerminalsStore.loaded`): before that the
+  store is empty, and cmd+j at startup would start a second shell for a thread that has
+  one (review fix). The Projects page has none without a tab, so there cmd+j shows the
+  empty state's hint ("Start one with New terminal on a project or worktree row."). The
+  dashboard and the PR page have no key at all.
 * **Closing stays a plain hide.** cmd+j / × on an open panel never closes or starts shells.
 * **No "No terminals" flash.** `openBottomShell` marks the key as starting before it opens
   the panel, and the body stays blank (`data-starting`) until the shell arrives (the mark
