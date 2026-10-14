@@ -1,9 +1,8 @@
-# Thread render stall: diagnosis
+# Thread render stall: diagnosis and fix
 
 The report: in a rendered thread, messages stop rendering while Claude keeps working.
-They show up once the user leaves the thread and comes back. This note covers the
-diagnosis only. No fix is shipped. The branch adds diagnostic tests and two tests that
-fail until the fix lands.
+They show up once the user leaves the thread and comes back. The diagnosis comes first;
+the shipped fix and its live result are in "Fix (shipped)" below.
 
 ## Verdict
 
@@ -198,6 +197,69 @@ Minor findings that are not the cause, recorded for later:
 Item 1 alone fixes the reported symptom with at most about 5 s of lag. Item 2 removes
 the lag on return. Item 3 covers a stream that dies for any other reason.
 
+## Fix (shipped)
+
+All three items, on branch `t3code/thread-stream-heartbeat`.
+
+1. **Heartbeats.** `proto/codefoundry/v1/heartbeat.proto` adds an empty
+   `StreamHeartbeat`, a oneof case on `ThreadEvent` (9), `AttachEvent` (5) and `Event`
+   (13). `internal/api/heartbeat.go` holds the one interval, `HeartbeatInterval = 5s`, and
+   a small silence timer: each stream selects on it next to its sources and resets it
+   after every message it sends (the heartbeat included), so a busy stream never
+   heartbeats and the timer stops with the handler. A heartbeat carries no seq, so the
+   Watch's seq and dedupe are untouched (`TestThreadWatchHeartbeatKeepsSeq`). Streams:
+   * `ThreadService.Watch`: the stall itself.
+   * `TerminalService.Attach`: the same risk for a shell's last output after a hide.
+   * `EventService.Watch`: its own traffic is not guaranteed (gh polling off, no thread
+     busy), and it carries the sidebar status and pending prompts.
+   * Not `TerminalService.Watch`: the GUI does not hold it (EventService carries
+     terminal events); only tests and the CLI use it, and they do not run in WebKit.
+2. **Resync on visible.** `runStream`'s `resyncOnVisible` (used by the thread Watch
+   only) aborts the current attempt, or cuts its backoff sleep, and reopens at once
+   (status `connecting`, no error, backoff reset) when `visibilitychange` goes to
+   `visible` after `hidden`. WKWebView in Wails fires `visibilitychange` for all three
+   cases measured live: app hidden, window minimized, and window covered by another app's
+   window (occlusion). The terminal Attach does not resync: its snapshot resets xterm and
+   rewrites up to 10,000 lines of scrollback (losing the scroll position and selection),
+   and the heartbeat already releases a held tail within 5 s.
+3. **Liveness watchdog.** `runStream` (all three streams) arms a timer on an attempt's
+   first heartbeat and resets it on every message; after `LIVENESS_MS` (3 ×
+   `HEARTBEAT_MS`, 15 s) of silence it aborts the attempt with `StreamSilentError` and
+   reconnects through the normal backoff. Mixed GUI/daemon versions are not a concern
+   (the update replaces both together); the arming on the first heartbeat stays because
+   it keeps fakes and the mock daemon, which send no heartbeats, from reconnecting every
+   15 s. `HEARTBEAT_MS` in `api/stream.ts` mirrors the Go constant (comments on both).
+   Two related fixes in `runStream`: a stopped or resynced attempt's late events no
+   longer reach `onEvent` (minor finding (b)), and a stream without `onConnect` reports
+   `open` on its first message instead of as soon as the request starts, so a reconnect
+   that hangs (a stopped daemon) stays `retrying`.
+4. **Reconnecting chip.** With a log on screen, a `retrying` Watch shows a small
+   "reconnecting…" chip at the top right of the thread pane (the SessionIndicator's
+   style), hidden while the session is starting or closing.
+
+### Live result (real Wails window, after the fix)
+
+Same recipe as above (isolated home, haiku 5.5 at medium in a scratch repo, 1500-word
+story, hide 6 s in, show after 30 s, wait 10 s). A scratch build (not committed) reported
+the GUI's store seq, heartbeats, Watch opens and visibility events to a local listener,
+so the catch-up time could be compared with the turn end's timestamp in the daemon.
+
+| GUI state during the turn | runs | tail held (catch-up 5–6 s after the turn end) | behind at show | behind 10 s after show |
+| --- | --- | --- | --- | --- |
+| hidden 30 s | 7 | 5 | 0 | 0 |
+| minimized 30 s | 2 | 1 | 0 | 0 |
+| covered by Finder 30 s | 2 | 2 | 0 | 0 |
+
+The hold still happens (8 of 11 runs), but every time the first heartbeat after the turn
+end released it, 5.1–6.1 s later, while the window was still hidden. The other three
+caught up within 0.5 s. No run was behind when shown, so the stall rate went from 8 of
+14 to 0 of 11. On show the thread Watch reopened and its snapshot matched the daemon.
+
+Watchdog check: `kill -STOP` on the daemon with the thread open. The Watch reported
+`retrying: no data for 15 s` 15 s after the last heartbeat, the "reconnecting…" chip
+appeared over the log, and after `kill -CONT` the Watch reopened with a snapshot and the
+chip went away.
+
 ## Diagnostics kept on the branch
 
 * `gui/frontend/e2e/live-stall.spec.ts`: an opt-in live run (`LIVE_DAEMON=1`,
@@ -208,8 +270,11 @@ the lag on return. Item 3 covers a stream that dies for any other reason.
   and render layers.
 * `gui/frontend/src/stores/threadStall.test.ts`: the Watch batching model test (passes).
 * `internal/api/thread_stall_test.go` and `gui/frontend/src/stores/threadStallVisibility.test.ts`:
-  the two failing tests above. **`make check` is red on this branch by design** until the
-  fix lands.
+  written before the fix, they failed on the diagnosis branch and pass with it. New tests:
+  `internal/api/heartbeat_test.go` (the timer; each stream heartbeats when idle, never
+  while busy, and ends on client cancel; seq unchanged), `api/streamLiveness.test.ts`
+  (watchdog arming and firing, open status, resync) and `api/heartbeat.test.ts` (the
+  stream openers map a heartbeat to `HEARTBEAT`).
 
 The scratch tools were not committed: the Go Watch checker, the hide, minimize and occlude
 scripts, the pane overlay and the per-send log. They are described above well enough to
@@ -219,7 +284,10 @@ rebuild.
 
 * `code-foundry <verb> --help` without `CODE_FOUNDRY_HOME` auto-starts a daemon in the
   real home. That happened once during this investigation (`~/.code-foundry`, about 44
-  minutes, no threads reconnected). It was stopped with SIGTERM.
+  minutes, no threads reconnected). It was stopped with SIGTERM. It happened again during
+  the fix's live check: a run script set its home variable but did not export
+  `CODE_FOUNDRY_HOME`, so its `thread.send` started a daemon in `~/.code-foundry` (78 s,
+  nothing reconnected, the send failed: unknown thread). Export the variable in scripts.
 * The GUI started with an isolated home auto-starts a daemon as soon as its daemon dies.
   To restart the daemon with different flags, stop the GUI first.
 * `go test` outside `make` needs `CGO_LDFLAGS=-mmacosx-version-min=13.0` as well as

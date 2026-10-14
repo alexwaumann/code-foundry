@@ -365,6 +365,13 @@ from the pull request (docs/notes/pr-thread-commands.md).
   panel's active shell `TerminalService.Attach`, each only while it is visible. Everything else is unary, except a
   `RepoService.Clone` stream while the Add Project dialog clones a repository. This keeps
   the browser's six HTTP/1.1 connections per origin mostly free.
+* Stream liveness: the daemon sends a `StreamHeartbeat` on each of those three streams
+  after 5 s without other messages (`api.HeartbeatInterval`, mirrored by
+  `api/stream.ts` `HEARTBEAT_MS`). WKWebView can hold a stream's last bytes after the
+  window was hidden, minimized or covered until more bytes arrive; the heartbeat releases
+  them. `runStream` reconnects an attempt that heartbeated and then went silent for three
+  intervals, and the thread Watch (`resyncOnVisible`) reopens for a fresh snapshot when
+  the page becomes visible again (`docs/notes/thread-render-stall.md`).
 * A thread's content pane is `components/thread`: a virtualized
   work-log timeline built from the items' structure (`lib/threadTimeline.ts`; text deltas
   re-render only their row), turns that fold under their footer the moment they finish (the
