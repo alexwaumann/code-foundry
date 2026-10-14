@@ -310,10 +310,8 @@ export interface ReviewerCandidateView {
 }
 
 export interface ReviewerCandidatesView {
-  /** Requested first, then by login; the author is left out. */
+  /** The pending requests, then (for a query) GitHub's matches, each by login; the author is left out. */
   candidates: ReviewerCandidateView[];
-  /** More assignable users exist than were listed (100). */
-  truncated: boolean;
 }
 
 const ms = (t: Timestamp | undefined): number | null => (t ? timestampMs(t) : null);
@@ -689,8 +687,15 @@ export function parseRefreshResult(resultJson: string): PullRequestDetailView | 
   }
 }
 
-export async function listReviewerCandidates(repoSlug: string, number: number, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<ReviewerCandidatesView> {
+/** An empty query lists only the pending requests; otherwise GitHub matches login and name (up to 20). */
+export async function listReviewerCandidates(
+  repoSlug: string,
+  number: number,
+  query: string,
+  conn: DaemonConnection = daemon,
+  signal?: AbortSignal,
+): Promise<ReviewerCandidatesView> {
   const c = await conn.client(GhService);
-  const r = await c.listReviewerCandidates({ repoSlug, number }, { signal });
-  return { candidates: r.candidates.map(toReviewerCandidateView), truncated: r.truncated };
+  const r = await c.listReviewerCandidates({ repoSlug, number, query }, { signal });
+  return { candidates: r.candidates.map(toReviewerCandidateView) };
 }

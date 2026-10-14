@@ -92,7 +92,8 @@
  *        app.restart (Restart Now) and daemon.restart come back as the installed version;
  *        GET /__mock/update counts app.restart runs (restarts)
  *   POST /__mock/gh/update | poll | stale | auth?ok=false | touch?path=…   (GitHub + detail)
- *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts)
+ *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts;
+ *        "ListReviewerCandidates query" counts the searches)
  *   POST /__mock/gh/pr-fail?command=pr.refresh             (that command's next run fails;
  *        also pr.ask, pr.explain, pr.fix.findings, and pr.merge as a moved head)
  *   POST /__mock/gh/pr-delay?ms=800          (pr.ask, pr.explain, pr.fix.findings, pr.merge take 800ms)
@@ -295,7 +296,7 @@ function routes(router: ConnectRouter): void {
     },
     refresh: () => ({}),
     getPullRequestDetail: (req) => prDetailCall(() => ({ detail: world.gh.prDetails.get(req.repoSlug, req.number, req.refresh) })),
-    listReviewerCandidates: (req) => prDetailCall(() => world.gh.prDetails.listCandidates(req.repoSlug, req.number)),
+    listReviewerCandidates: (req) => prDetailCall(() => world.gh.prDetails.listCandidates(req.repoSlug, req.number, req.query)),
     setReviewRequest: (req) =>
       prDetailCall(() => ({ requested: world.gh.prDetails.setReviewRequest(req.repoSlug, req.number, req.login, req.kind, req.requested) })),
     revertPullRequest: (req) => prDetailCall(() => world.gh.prDetails.revert(req.repoSlug, req.number)),

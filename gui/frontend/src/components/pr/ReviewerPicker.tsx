@@ -1,72 +1,183 @@
-import { useState } from "react";
-import { Check, Loader2, Search, UserPlus } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Check, Loader2, Search, UserPlus, X } from "lucide-react";
 import type { ReviewerCandidateView } from "@/api/gh";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { pullRequestKey } from "@/stores/gh";
-import { requestingKey, reviewerCandidatesResource, setReviewRequest, usePrPanelStore } from "@/stores/prPanel";
+import { requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, setReviewRequest, usePrPanelStore } from "@/stores/prPanel";
 import { useResource } from "@/stores/resource";
+import { addRecentReviewer, removeRecentReviewer, useRecentReviewers, type RecentReviewer } from "@/stores/reviewerRecents";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
 import { POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
+import { REVIEWER_SEARCH_MIN_CHARS, reviewerSearchTerm, useReviewerSearchTerm } from "./reviewerSearch";
 
 export const WRITE_ACCESS_HINT = "Asking someone to review needs write access on this repository.";
 
-function CandidateRow({ prRef, c }: { prRef: PrRef; c: ReviewerCandidateView }) {
+const sameReviewer = (a: { login: string; kind: string }, b: { login: string; kind: string }): boolean =>
+  a.kind === b.kind && a.login.toLowerCase() === b.login.toLowerCase();
+
+/** A requested candidate shown among search results only when it matches the term too. */
+const matches = (c: ReviewerCandidateView, term: string): boolean => {
+  const t = term.toLowerCase();
+  return c.login.toLowerCase().includes(t) || c.name.toLowerCase().includes(t);
+};
+
+function Message({ children, testId }: { children: ReactNode; testId?: string }) {
+  return (
+    <p className="px-2 py-3 text-sm text-muted-foreground" data-testid={testId}>
+      {children}
+    </p>
+  );
+}
+
+/**
+ * One person (or requested team): selecting requests a review, or withdraws a pending
+ * one. A successful request puts them first in the repository's recents. `onRemove`
+ * (Recent rows) adds the × that drops the row from the recents.
+ */
+function CandidateRow({ prRef, c, onRemove }: { prRef: PrRef; c: ReviewerCandidateView; onRemove?: () => void }) {
   const busy = usePrPanelStore((s) => s.requesting[requestingKey(prRef, c.login)] ?? false);
+  const select = () => {
+    const requested = !c.isRequested;
+    void setReviewRequest(prRef, c.login, c.kind, requested).then((ok) => {
+      if (ok && requested) addRecentReviewer(prRef.slug, c);
+    });
+  };
   return (
     <CommandItem
-      value={`${c.login} ${c.name}`}
+      value={`${c.kind}:${c.login}`}
       data-testid="pr-reviewer-candidate"
       data-login={c.login}
       data-requested={c.isRequested}
-      onSelect={() => void setReviewRequest(prRef, c.login, c.kind, !c.isRequested)}
+      onSelect={select}
     >
       <Avatar login={c.login} src={c.avatarUrl} size={20} />
       <span className="truncate">{c.login}</span>
       {c.name && <span className="truncate text-xs text-muted-foreground">{c.name}</span>}
-      <span className="ml-auto flex size-4 items-center justify-center">
-        {busy ? <Loader2 className="size-3.5 animate-spin" aria-label="Updating" /> : c.isRequested ? <Check className="size-3.5 text-foreground" aria-label="Requested" /> : null}
+      <span className="ml-auto flex size-4 shrink-0 items-center justify-center">
+        {busy ? (
+          <Loader2 className="size-3.5 animate-spin" aria-label="Updating" />
+        ) : c.isRequested ? (
+          <Check className="size-3.5 text-foreground" aria-label="Requested" />
+        ) : onRemove ? (
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Remove from recent"
+            data-testid="pr-reviewer-recent-remove"
+            className="flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent-foreground/10 hover:text-foreground"
+            // Keep the press to the button: cmdk selects the row on click.
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRemove();
+            }}
+          >
+            <X className="size-3.5" aria-hidden />
+          </button>
+        ) : null}
       </span>
     </CommandItem>
   );
 }
 
-/** Mounted only while the popover is open: watching the resource reads the candidates on open. */
-function Candidates({ prRef }: { prRef: PrRef }) {
-  const entry = useResource(reviewerCandidatesResource, pullRequestKey(prRef.slug, prRef.number));
-  const list = entry?.data?.candidates ?? null;
+const recentAsCandidate = (r: RecentReviewer): ReviewerCandidateView => ({ id: "", kind: r.kind, login: r.login, name: r.name, avatarUrl: r.avatarUrl, isRequested: false });
+
+/** Under the search threshold: the pending requests, then this repository's recents. */
+function RequestedAndRecent({ prRef }: { prRef: PrRef }) {
+  const entry = useResource(reviewerCandidatesResource, reviewerCandidatesKey(prRef, ""));
+  const recents = useRecentReviewers(prRef.slug);
+  const requested = (entry?.data?.candidates ?? []).filter((c) => c.isRequested);
+  const recent = recents.filter((r) => !requested.some((c) => sameReviewer(c, r)));
+  const loaded = entry?.data != null;
   return (
-    <Command className="bg-transparent" loop>
-      <CommandInput placeholder="Search people with access" autoFocus className="h-9" data-testid="pr-reviewer-search" />
-      <CommandList className="max-h-72 p-1">
-        {list === null ? (
-          <p className="px-2 py-3 text-sm text-muted-foreground">{entry?.error ? `Cannot list people: ${entry.error}` : "Loading…"}</p>
-        ) : list.length === 0 ? (
-          <p className="px-2 py-3 text-sm text-muted-foreground" data-testid="pr-reviewer-nobody">
-            Nobody else has access to this repository.
-          </p>
-        ) : (
-          <>
-            <CommandEmpty className="px-2 py-3 text-sm text-muted-foreground">No one matches.</CommandEmpty>
-            <CommandGroup className="p-0">
-              {list.map((c) => (
-                <CandidateRow key={c.id || c.login} prRef={prRef} c={c} />
-              ))}
-            </CommandGroup>
-            {entry?.data?.truncated && <p className="px-2 pt-1 pb-1.5 text-xs text-muted-foreground">Showing the first 100 people. Search narrows them.</p>}
-          </>
-        )}
-      </CommandList>
+    <>
+      {!loaded && <Message>{entry?.error ? `Cannot list requests: ${entry.error}` : "Loading…"}</Message>}
+      {requested.length > 0 && (
+        <CommandGroup heading="Requested" className="p-0" data-testid="pr-reviewer-requested">
+          {requested.map((c) => (
+            <CandidateRow key={`${c.kind}:${c.login}`} prRef={prRef} c={c} />
+          ))}
+        </CommandGroup>
+      )}
+      {recent.length > 0 && (
+        <CommandGroup heading="Recent" className="p-0" data-testid="pr-reviewer-recent">
+          {recent.map((r) => (
+            <CandidateRow
+              key={`${r.kind}:${r.login}`}
+              prRef={prRef}
+              c={recentAsCandidate(r)}
+              onRemove={() => {
+                removeRecentReviewer(prRef.slug, r.login, r.kind);
+              }}
+            />
+          ))}
+        </CommandGroup>
+      )}
+      {loaded && requested.length === 0 && recent.length === 0 && (
+        <Message testId="pr-reviewer-hint">Type {REVIEWER_SEARCH_MIN_CHARS}+ characters to search</Message>
+      )}
+    </>
+  );
+}
+
+/** At or over the threshold: GitHub's matches for term (rows exactly as returned). */
+function SearchResults({ prRef, term }: { prRef: PrRef; term: string }) {
+  const entry = useResource(reviewerCandidatesResource, term === "" ? null : reviewerCandidatesKey(prRef, term));
+  const list = entry?.data?.candidates.filter((c) => !c.isRequested || matches(c, term)) ?? null;
+  if (list === null) return <Message>{entry?.error ? `Cannot search: ${entry.error}` : "Searching…"}</Message>;
+  if (list.length === 0) return <Message testId="pr-reviewer-nomatch">No one matches.</Message>;
+  return (
+    <CommandGroup className="p-0">
+      {list.map((c) => (
+        <CandidateRow key={`${c.kind}:${c.login}`} prRef={prRef} c={c} />
+      ))}
+    </CommandGroup>
+  );
+}
+
+/** Mounted only while the popover is open: the groups watch their reads while shown. */
+function Candidates({ prRef }: { prRef: PrRef }) {
+  const [input, setInput] = useState("");
+  const { term, pending } = useReviewerSearchTerm(input);
+  const searching = reviewerSearchTerm(input) !== "";
+  const loading = usePrSearchLoading(prRef, searching ? term : "");
+  return (
+    <Command className="bg-transparent" loop shouldFilter={false}>
+      <CommandInput
+        placeholder="Search people with access"
+        autoFocus
+        className="h-9"
+        data-testid="pr-reviewer-search"
+        value={input}
+        onValueChange={setInput}
+        trailing={
+          searching && (pending || loading) ? (
+            <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" aria-label="Searching" data-testid="pr-reviewer-searching" />
+          ) : null
+        }
+      />
+      <CommandList className="max-h-72 p-1">{searching ? <SearchResults prRef={prRef} term={term} /> : <RequestedAndRecent prRef={prRef} />}</CommandList>
     </Command>
   );
 }
 
+/** Whether the search for term is being read (false for ""). */
+function usePrSearchLoading(prRef: PrRef, term: string): boolean {
+  const key = term === "" ? null : reviewerCandidatesKey(prRef, term);
+  return reviewerCandidatesResource.store((s) => (key === null ? false : (s.entries[key]?.loading ?? false)));
+}
+
 /**
- * The add-reviewer button and its picker (T3 Code's): people with access, requested ones
- * first with a check; choosing one requests or withdraws a review (pr.review.request).
- * Without write access it explains why instead of listing anyone.
+ * The add-reviewer button and its picker (T3 Code's): the pending requests (with a
+ * check) and recently asked people until 2+ characters are typed, then GitHub's matches
+ * for them; choosing one requests or withdraws a review (pr.review.request). Without
+ * write access it explains why instead of listing anyone.
  */
 export function ReviewerPicker({ prRef, canUpdate }: { prRef: PrRef; canUpdate: boolean }) {
   const [open, setOpen] = useState(false);

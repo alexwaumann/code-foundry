@@ -126,6 +126,21 @@ function keepBranch(pr: { headRef?: string; baseRef?: string; isCrossRepository?
 const avatar = (login: string) => `https://avatars.example.com/${login.replace("/", "-")}.png`;
 const key = (slug: string, number: number) => `${slug.toLowerCase()}#${String(number)}`;
 
+/** ListReviewerCandidates returns at most this many matches, as GitHub's search does (first: 20). */
+const CANDIDATE_SEARCH_LIMIT = 20;
+
+/**
+ * The rest of the organization: 120 more assignable users ("ada-abbott" … "zoe-zimmerman",
+ * names "Ada Abbott" …), more than GitHub's first page of 100, so only a search finds
+ * the last of them.
+ */
+const ORG_MEMBERS: readonly CandidateInit[] = ["Ada", "Ben", "Cleo", "Dev", "Eli", "Fay", "Gus", "Hana", "Ivo", "Jun", "Kai", "Zoe"].flatMap((first) =>
+  ["Abbott", "Brook", "Castro", "Dunn", "Ellis", "Fox", "Grant", "Hale", "Ito", "Zimmerman"].map((last) => {
+    const login = `${first}-${last}`.toLowerCase();
+    return { id: `U_${login}`, kind: ReviewerKind.USER, login, name: `${first} ${last}`, avatarUrl: avatar(login) };
+  }),
+);
+
 export interface PrDetailHooks {
   t0: number;
   viewer: string;
@@ -170,6 +185,7 @@ export class PrDetailWorld {
       { id: "U_kim", kind: ReviewerKind.USER, login: "teammate-kim", name: "Kim", avatarUrl: avatar("teammate-kim"), isRequested: true },
       { id: "U_lee", kind: ReviewerKind.USER, login: "teammate-lee", name: "Lee", avatarUrl: avatar("teammate-lee") },
       { id: "U_max", kind: ReviewerKind.USER, login: "teammate-max", name: "", avatarUrl: avatar("teammate-max") },
+      ...ORG_MEMBERS.map((m) => ({ ...m })),
     ]);
   }
 
@@ -501,12 +517,27 @@ export class PrDetailWorld {
     return d;
   }
 
-  listCandidates(slug: string, number: number) {
+  /**
+   * The pending requests, then (for a non-empty query) up to 20 people whose login or
+   * name contains it, case-insensitively (GitHub's own matching is close enough); a
+   * requested match is listed once.
+   */
+  listCandidates(slug: string, number: number, query: string) {
+    const q = query.trim().toLowerCase();
     this.h.count("ListReviewerCandidates");
-    const sorted = [...this.candidateList(slug, number)].sort(
-      (a, b) => Number(Boolean(b.isRequested)) - Number(Boolean(a.isRequested)) || (a.login ?? "").localeCompare(b.login ?? ""),
-    );
-    return { candidates: sorted, truncated: false };
+    if (q) this.h.count("ListReviewerCandidates query");
+    const list = this.candidateList(slug, number);
+    const byLogin = (a: CandidateInit, b: CandidateInit) => (a.login ?? "").localeCompare(b.login ?? "");
+    const requested = list.filter((c) => c.isRequested).sort(byLogin);
+    const found =
+      q === ""
+        ? []
+        : list
+            .filter((c) => c.kind !== ReviewerKind.TEAM && ((c.login ?? "").toLowerCase().includes(q) || (c.name ?? "").toLowerCase().includes(q)))
+            .slice(0, CANDIDATE_SEARCH_LIMIT)
+            .filter((c) => !c.isRequested)
+            .sort(byLogin);
+    return { candidates: [...requested, ...found] };
   }
 
   /** The candidates (stored, mutable), made up from teammates when none are set. */
@@ -518,7 +549,8 @@ export class PrDetailWorld {
       const author = d.pullRequest?.author ?? "";
       list = ["teammate-ana", "teammate-kim", "teammate-lee", this.h.viewer]
         .filter((l) => l !== author)
-        .map((login) => ({ id: `U_${login}`, kind: ReviewerKind.USER, login, name: "", avatarUrl: avatar(login), isRequested: false }));
+        .map((login): CandidateInit => ({ id: `U_${login}`, kind: ReviewerKind.USER, login, name: "", avatarUrl: avatar(login), isRequested: false }))
+        .concat(ORG_MEMBERS.map((m) => ({ ...m })));
       this.candidates.set(k, list);
     }
     return list;

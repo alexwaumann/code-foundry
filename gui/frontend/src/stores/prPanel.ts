@@ -80,11 +80,22 @@ export function toggleOrder(key: string, which: "commentOrder" | "timelineOrder"
   updatePrTab(key, (s) => ({ ...s, [which]: s[which] === "newest" ? "oldest" : "newest" }));
 }
 
-/** Key: pullRequestKey(slug, number). Read when the reviewer picker opens (no keep-alive). */
-export const reviewerCandidatesResource = createResource((key, signal) => {
-  const i = key.lastIndexOf("#");
-  return listReviewerCandidates(key.slice(0, i), Number(key.slice(i + 1)), undefined, signal);
-});
+/** reviewerCandidatesResource's key: the pull request, then the (trimmed) search; "" lists the requests only. */
+export const reviewerCandidatesKey = (ref: PrRef, query: string): string => `${pullRequestKey(ref.slug, ref.number)}\u0000${query}`;
+
+/**
+ * Key: reviewerCandidatesKey. Read while the reviewer picker shows it (no keep-alive); a
+ * search the user typed past is aborted.
+ */
+export const reviewerCandidatesResource = createResource(
+  (key, signal) => {
+    const sep = key.indexOf("\u0000");
+    const pr = key.slice(0, sep);
+    const i = pr.lastIndexOf("#");
+    return listReviewerCandidates(pr.slice(0, i), Number(pr.slice(i + 1)), key.slice(sep + 1), undefined, signal);
+  },
+  { abortOnRelease: true },
+);
 
 /**
  * Opens a pull request in the current selection's side panel (a row on the Pull
@@ -131,9 +142,13 @@ export async function refreshPullRequest(ref: PrRef): Promise<boolean> {
   }
 }
 
-/** Resolves once key's entry is not loading (at once when nothing reads it), or after timeoutMs. */
-function settled<V>(r: Resource<V>, key: string, timeoutMs = 15_000): Promise<void> {
-  if (!r.store.getState().entries[key]?.loading) return Promise.resolve();
+/**
+ * Resolves once no entry of the keys matching pred is loading (at once when nothing reads
+ * them), or after timeoutMs.
+ */
+function settled<V>(r: Resource<V>, pred: (key: string) => boolean, timeoutMs = 15_000): Promise<void> {
+  const idle = (entries: Readonly<Record<string, { loading: boolean }>>) => !Object.entries(entries).some(([k, e]) => e.loading && pred(k));
+  if (idle(r.store.getState().entries)) return Promise.resolve();
   return new Promise((resolve) => {
     const done = () => {
       clearTimeout(timer);
@@ -142,7 +157,7 @@ function settled<V>(r: Resource<V>, key: string, timeoutMs = 15_000): Promise<vo
     };
     const timer = setTimeout(done, timeoutMs);
     const unsub = r.store.subscribe((s) => {
-      if (!s.entries[key]?.loading) done();
+      if (idle(s.entries)) done();
     });
   });
 }
@@ -151,8 +166,9 @@ export const requestingKey = (ref: PrRef, login: string): string => `${pullReque
 
 /**
  * Reviewer picker: requests a review from login, or withdraws the pending request. The
- * row stays busy until the picker's candidates are read again, so it never shows the old
- * state after the request, and a second click cannot repeat the same request.
+ * row stays busy until the picker's candidates (every query it watches) are read again,
+ * so it never shows the old state after the request, and a second click cannot repeat
+ * the same request.
  */
 export async function setReviewRequest(ref: PrRef, login: string, kind: "user" | "team", requested: boolean): Promise<boolean> {
   const busy = requestingKey(ref, login);
@@ -163,8 +179,9 @@ export async function setReviewRequest(ref: PrRef, login: string, kind: "user" |
     return await runCommand("pr.review.request", { ...prArgs(ref), login, kind, requested: String(requested) });
   } finally {
     pullRequestDetailResource.invalidate(key);
-    reviewerCandidatesResource.invalidate(key);
-    await settled(reviewerCandidatesResource, key);
+    const ofThisPr = (k: string) => k.startsWith(`${key}\u0000`);
+    reviewerCandidatesResource.invalidate(ofThisPr);
+    await settled(reviewerCandidatesResource, ofThisPr);
     usePrPanelStore.setState((s) => {
       const { [busy]: _done, ...rest } = s.requesting;
       return { requesting: rest };
