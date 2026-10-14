@@ -35,7 +35,10 @@ Three processes, one protocol.
   token into the page. It also adopts the user's login-shell PATH when it was started
   with launchd's minimal one, auto-starts the daemon from the CLI installed next to it,
   and relaunches itself when the daemon asks (`app.relaunch` at once, `app.restart` once
-  the daemon has exited). No business logic lives
+  the daemon has exited). It sets the Dock badge and bounces the Dock icon when the
+  frontend asks (`SetBadge`, `Bounce`; the frontend's `stores/dockAlerts.ts` decides
+  from the sessions and the `notifications.*` settings; no notification banners for a
+  bare executable, `docs/notes/dock-alerts.md`). No business logic lives
   in the Wails host.
 * **CLI** subcommands (`code-foundry new-session --repo foo`, `code-foundry focus <id>`, …)
   are clients of the same daemon API. A Claude Code session running inside the app can call
