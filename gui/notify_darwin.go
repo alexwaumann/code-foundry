@@ -8,7 +8,7 @@ package main
 
 // The Dock badge, bounce and alert sound for a bare executable. Notification banners are not an
 // option: UNUserNotificationCenter needs a bundle proxy, which a binary without a .app
-// does not have (docs/notes/dock-alerts.md). Both calls run on the main thread,
+// does not have (docs/notes/dock-alerts.md). Every call runs on the main thread,
 // asynchronously, so they are safe from any goroutine and never wait on AppKit.
 
 // cfSetDockBadge sets the Dock tile's badge; an empty label removes it. Takes ownership
