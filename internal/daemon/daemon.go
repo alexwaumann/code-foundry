@@ -146,8 +146,9 @@ func Run(ctx context.Context, opts Options) error {
 		AwaitTerminalOutput: func(ctx context.Context, id string) error {
 			return terminal.AwaitOutput(ctx, st.terminal, id, promptSettle)
 		},
-		Repo:  worktreeDirRepo{RepoBackend: repoAPI, repos: st.repo, settings: st.settings},
-		Clone: repoAPI.CloneRef,
+		TerminalBracketedPaste: st.terminal.BracketedPaste,
+		Repo:                   worktreeDirRepo{RepoBackend: repoAPI, repos: st.repo, settings: st.settings},
+		Clone:                  repoAPI.CloneRef,
 		Projects: command.ProjectDeps{
 			Backend: repoAPI,
 			HasOrigin: func(c command.Context) bool {

@@ -343,6 +343,19 @@ func (m *Manager) ScreenText(ctx context.Context, id string) (string, error) {
 	return text, terr
 }
 
+// BracketedPaste reads mode 2004 from the terminal's emulator (on its actor).
+func (m *Manager) BracketedPaste(ctx context.Context, id string) (bool, error) {
+	a, err := m.actor(id)
+	if err != nil {
+		return false, err
+	}
+	var on bool
+	if err := a.call(ctx, func() { on = a.bracketedPaste() }); err != nil {
+		return false, err
+	}
+	return on, nil
+}
+
 // Watch merges TerminalUpdated and TerminalRemoved bus events into one channel.
 func (m *Manager) Watch(ctx context.Context) (<-chan Event, error) {
 	return watchBus(ctx, m.opts.Bus), nil

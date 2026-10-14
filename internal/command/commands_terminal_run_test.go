@@ -32,6 +32,9 @@ func TestTerminalNewRun(t *testing.T) {
 		wantMsg  string        // substring of the error
 		wantKeys string        // what Write typed; "" means no Write
 		noCreate bool
+		paste    bool  // the shell reads bracketed pastes
+		pasteErr error // BracketedPaste fails
+		noPaste  bool  // TerminalDeps.BracketedPaste is nil
 	}{
 		{name: "no --run types nothing"},
 		{name: "a blank --run types nothing", run: " \n\t\n"},
@@ -51,6 +54,11 @@ func TestTerminalNewRun(t *testing.T) {
 			callerTO: 20 * time.Millisecond, wantErr: context.DeadlineExceeded, wantMsg: "could not run the command"},
 		{name: "the write fails", run: "ls", writeErr: exited, wantErr: exited, wantMsg: "could not run the command", wantKeys: "ls\r"},
 		{name: "without AwaitOutput it types at once", run: "ls", noAwait: true, wantKeys: "ls\r"},
+		{name: "bracketed paste: one paste, then Return", run: "ls -la\n", paste: true, wantKeys: "\x1b[200~ls -la\x1b[201~\r"},
+		{name: "bracketed paste keeps tabs and newlines", run: "for f in *; do\r\n\techo \"$f\"\r\ndone\n\n", paste: true,
+			wantKeys: "\x1b[200~for f in *; do\n\techo \"$f\"\ndone\x1b[201~\r"},
+		{name: "bracketed paste unknown: typed", run: "a\nb", paste: true, pasteErr: exited, wantKeys: "a\rb\r"},
+		{name: "no BracketedPaste: typed", run: "a\nb", paste: true, noPaste: true, wantKeys: "a\rb\r"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -61,6 +69,9 @@ func TestTerminalNewRun(t *testing.T) {
 			deps := command.TerminalDeps{Terminal: term, Repo: &commandtest.Repo{Repos: repos}, Session: &commandtest.Session{}, RunWait: tt.runWait}
 			if !tt.noAwait {
 				deps.AwaitOutput = out.Await
+			}
+			if !tt.noPaste {
+				deps.BracketedPaste = func(context.Context, string) (bool, error) { return tt.paste, tt.pasteErr }
 			}
 			reg := command.NewRegistry()
 			if err := command.RegisterTerminal(reg, deps); err != nil {

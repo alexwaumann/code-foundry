@@ -56,6 +56,11 @@ type TerminalDeps struct {
 	// prompt; terminal.AwaitOutput) or ctx ends. terminal.new --run waits with it before
 	// typing, so the line is not echoed ahead of the prompt. Nil: it types at once.
 	AwaitOutput func(ctx context.Context, id string) error
+	// BracketedPaste reports whether terminal id's line editor has turned on bracketed
+	// paste (terminal.Store.BracketedPaste). When it has, terminal.new --run sends the
+	// command as one paste and then Return, so tabs are not completion and a multi-line
+	// block lands in the editor whole. Nil, or an error: the keys are typed one by one.
+	BracketedPaste func(ctx context.Context, id string) (bool, error)
 	// RunWait caps that wait (0: DefaultRunWait). When it passes, the command is typed
 	// anyway: a shell that has printed nothing yet still runs it, only echoed twice.
 	RunWait time.Duration
@@ -98,7 +103,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				{Name: "cwd", Type: Path, Description: "Working directory; without a thread or worktree context, its registered worktree owns the shell"},
 				{Name: "argv", Type: String, Description: `Command line, split like a shell would (e.g. "claude --model opus")`},
 				{Name: "run", Type: String, Description: "A command line typed into the new shell once it has printed its prompt, then Return; " +
-					"the shell stays open after it. Each line of a multi-line value runs in turn"},
+					"the shell stays open after it. A multi-line value is pasted whole where the shell supports bracketed paste, else typed line by line"},
 				{Name: "here", Type: Path, DefaultToCwd: true, Description: "Where the CLI runs: without a thread, worktree or --cwd, " +
 					"the registered worktree containing it owns the shell, which starts there (CLI default: the working directory)"},
 			},
@@ -218,11 +223,10 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 	)
 }
 
-// runInput is terminal.new --run's value as the keys typed into the shell: line endings
-// become Return (CR, what the Enter key sends) and one Return ends it; trailing blank
-// lines and spaces are dropped. Control characters other than tab and newline are
-// refused (a code block has none, and an ESC or ^C typed into a shell does things).
-// Empty or blank: nothing to type.
+// runInput is terminal.new --run's value as the text to enter: CRLF becomes LF and
+// trailing blank lines and spaces are dropped. Control characters other than tab and
+// newline are refused (a code block has none, and an ESC or ^C typed into a shell does
+// things; an ESC could also end a bracketed paste early). Empty or blank: nothing to type.
 func runInput(s string) (string, error) {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = strings.TrimRight(s, "\n\t ")
@@ -234,13 +238,32 @@ func runInput(s string) (string, error) {
 			return "", InvalidArg("run", "the command has a control character (%U)", r)
 		}
 	}
-	return strings.ReplaceAll(s, "\n", "\r") + "\r", nil
+	return s, nil
 }
 
-// typeRun waits (up to RunWait) for shell id's first output, then types keys into it.
-// When the wait times out the keys are typed anyway; any other failure of the wait (the
-// shell exited, the caller went away) is an error, and the shell stays.
-func typeRun(ctx context.Context, d TerminalDeps, id, keys string) error {
+// Bracketed paste's start and end (mode 2004).
+const (
+	pasteStart = "\x1b[200~"
+	pasteEnd   = "\x1b[201~"
+)
+
+// runKeys is the bytes that enter text (runInput's) into a shell. With bracketed paste
+// on, one paste and Return: the line editor inserts it as is, tabs and newlines
+// included, and Return runs the whole buffer. Without it, typed: each newline becomes
+// Return (CR, what the Enter key sends) and one Return ends it; a tab is the Tab key
+// there (completion), which only bracketed paste avoids.
+func runKeys(text string, bracketed bool) []byte {
+	if bracketed {
+		return []byte(pasteStart + text + pasteEnd + "\r")
+	}
+	return []byte(strings.ReplaceAll(text, "\n", "\r") + "\r")
+}
+
+// typeRun waits (up to RunWait) for shell id's first output, then enters text into it
+// (runKeys: pasted when the shell reads bracketed pastes). When the wait times out the
+// text is typed anyway; any other failure of the wait (the shell exited, the caller went
+// away) is an error, and the shell stays.
+func typeRun(ctx context.Context, d TerminalDeps, id, text string) error {
 	if d.AwaitOutput != nil {
 		wait := cmp.Or(d.RunWait, DefaultRunWait)
 		wctx, cancel := context.WithTimeout(ctx, wait)
@@ -254,7 +277,12 @@ func typeRun(ctx context.Context, d TerminalDeps, id, keys string) error {
 			return fmt.Errorf("created terminal %s, but could not run the command: %w", id, err)
 		}
 	}
-	if _, err := d.Terminal.Write(ctx, connect.NewRequest(&v1.WriteTerminalRequest{Id: id, Data: []byte(keys)})); err != nil {
+	bracketed := false
+	if d.BracketedPaste != nil {
+		on, err := d.BracketedPaste(ctx, id)
+		bracketed = err == nil && on
+	}
+	if _, err := d.Terminal.Write(ctx, connect.NewRequest(&v1.WriteTerminalRequest{Id: id, Data: runKeys(text, bracketed)})); err != nil {
 		return fmt.Errorf("created terminal %s, but could not run the command: %w", id, err)
 	}
 	return nil

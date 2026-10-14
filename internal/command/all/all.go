@@ -25,6 +25,9 @@ type Deps struct {
 	// AwaitTerminalOutput blocks until a new terminal has printed something (its
 	// prompt); terminal.new --run waits with it before typing. Nil: it types at once.
 	AwaitTerminalOutput func(ctx context.Context, id string) error
+	// TerminalBracketedPaste reports whether a terminal reads bracketed pastes;
+	// terminal.new --run then pastes its command. Nil: it types it.
+	TerminalBracketedPaste func(ctx context.Context, id string) (bool, error)
 	// Repo backs repo.*. Nil works like Terminal.
 	Repo command.RepoBackend
 	// NotGit reports a context in a project without git: it gates repo.worktree.*,
@@ -95,7 +98,7 @@ func Register(r *command.Registry, d Deps) error {
 	return errors.Join(
 		command.RegisterDaemon(r, d.Daemon),
 		command.RegisterUI(r, d.Emitter),
-		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Repo: d.Repo, Session: d.Session, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput}),
+		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Repo: d.Repo, Session: d.Session, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput, BracketedPaste: d.TerminalBracketedPaste}),
 		command.RegisterRepo(r, d.Repo, d.NotGit),
 		command.RegisterRepoAdd(r, d.Repo, d.Clone),
 		command.RegisterRepoCleanup(r, command.RepoCleanupDeps{Repo: d.Repo, GitOps: d.GitOps.Backend, NotGit: d.NotGit}),

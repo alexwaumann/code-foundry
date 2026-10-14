@@ -532,6 +532,34 @@ func TestAltScreenAndTitleMetadata(t *testing.T) {
 	_ = m.Kill(ctx, term.ID)
 }
 
+func TestBracketedPaste(t *testing.T) {
+	ctx := testCtx(t)
+	m := newTestManager(t, Options{})
+	// A line editor turns mode 2004 on while it reads a line and off to run it.
+	script := `printf 'on\033[?2004h'; read -r _; printf 'off\033[?2004l'; sleep 5`
+	term, err := m.Create(ctx, Spec{Argv: []string{"/bin/sh", "-c", script}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch, err := m.Attach(ctx, term.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := collect(ch)
+	c.waitFor(t, "on", rawContains("on"))
+	if on, err := m.BracketedPaste(ctx, term.ID); err != nil || !on {
+		t.Fatalf("BracketedPaste after ESC[?2004h = %v, %v; want true", on, err)
+	}
+	if err := m.Write(ctx, term.ID, []byte("\r")); err != nil {
+		t.Fatal(err)
+	}
+	c.waitFor(t, "off", rawContains("off"))
+	if on, err := m.BracketedPaste(ctx, term.ID); err != nil || on {
+		t.Fatalf("BracketedPaste after ESC[?2004l = %v, %v; want false", on, err)
+	}
+	_ = m.Kill(ctx, term.ID)
+}
+
 func TestCreateValidation(t *testing.T) {
 	ctx := testCtx(t)
 	m := newTestManager(t, Options{})
@@ -641,6 +669,7 @@ func TestOperationsOnUnknownID(t *testing.T) {
 	checks["Kill"] = m.Kill(ctx, "nope")
 	checks["Remove"] = m.Remove(ctx, "nope")
 	_, checks["Attach"] = m.Attach(ctx, "nope")
+	_, checks["BracketedPaste"] = m.BracketedPaste(ctx, "nope")
 	for op, err := range checks {
 		if !errors.Is(err, ErrNotFound) {
 			t.Errorf("%s err = %v, want ErrNotFound", op, err)

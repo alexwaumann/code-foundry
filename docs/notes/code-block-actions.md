@@ -48,16 +48,23 @@ real daemon (below): green.
   failure (the shell exited before printing, the caller went away) fails the command with
   "created terminal X, but could not run the command"; the shell stays. A failed Write
   fails the same way.
-* **What is typed** (`runInput`): CRLF becomes LF, trailing newlines/spaces/tabs go, every
-  line end becomes Return (CR, what Enter sends) and one Return ends it. A blank value types
-  nothing. Control characters other than tab and newline (ESC, ^C, a lone CR, DEL) are
-  refused with InvalidArgument before the shell starts: a code block has none, and typed
-  into a shell they do things.
-* **Multi-line blocks are sent as is**: each line runs in turn as the shell reads it. Lines
-  after the first are typeahead while the first runs, so a slow first command (a build)
-  makes the PTY echo the later lines early, like typing ahead by hand; they still run once.
-  `\` continuations and heredocs work (the shell's PS2). Live, `echo …` then `pwd` showed
-  each line once.
+* **What is typed** (`runInput`, `runKeys`): CRLF becomes LF, trailing newlines/spaces/tabs
+  go. A blank value types nothing. Control characters other than tab and newline (ESC, ^C,
+  a lone CR, DEL) are refused with InvalidArgument before the shell starts: a code block has
+  none, typed into a shell they do things, and an ESC could end a bracketed paste early.
+* **Pasted when the shell reads bracketed pastes** (review fix). After the wait the daemon
+  asks the terminal whether mode 2004 is on (`terminal.Store.BracketedPaste`, read from the
+  emulator on the actor; zsh and bash 5.1+ turn it on while their line editor reads a line).
+  If so the text goes as one `ESC[200~ … ESC[201~` paste and then Return: the line editor
+  inserts it as is and Return runs the whole buffer. Typed key by key instead, a tab is the
+  Tab key, so zsh and bash completed on it: `printf "%s\n" a<TAB>b` ran as `printf "%s\n" ab`
+  (checked in a PTY with Alex's zsh), and `cat RE<TAB>` would have run `cat README.md`.
+* **Without bracketed paste (macOS /bin/bash 3.2, sh) the keys are typed**: every line end
+  becomes Return (CR, what Enter sends) and one Return ends it, so each line runs in turn as
+  the shell reads it. Lines after the first are typeahead while the first runs, so a slow
+  first command (a build) makes the PTY echo the later lines early, like typing ahead by
+  hand; they still run once. `\` continuations and heredocs work (the shell's PS2). Tabs
+  stay the Tab key there.
 * **Which blocks get Run** (`runnableCommand`): fence languages `bash`, `sh`, `shell`, `zsh`
   (any case) run as written; when every non-blank line starts with `$ ` (a transcript
   fenced as bash) the prompts are dropped. `console` is a transcript: only its `$ ` lines
