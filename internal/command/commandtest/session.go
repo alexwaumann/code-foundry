@@ -164,6 +164,25 @@ func (s *Session) Archive(_ context.Context, r *connect.Request[v1.ArchiveSessio
 	return connect.NewResponse(&v1.ArchiveSessionResponse{Session: cur}), nil
 }
 
+// Snooze returns Current (default: a CONNECTED session) with the requested id:
+// snoozing disconnects, unpins and unarchives it and sets snoozed_until to the request's
+// until; an unset until clears snoozed_until.
+func (s *Session) Snooze(_ context.Context, r *connect.Request[v1.SnoozeSessionRequest]) (*connect.Response[v1.SnoozeSessionResponse], error) {
+	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	cur := &v1.Session{State: v1.SessionState_SESSION_STATE_CONNECTED}
+	if s.Current != nil {
+		cur = proto.CloneOf(s.Current)
+	}
+	cur.Id = r.Msg.GetId()
+	cur.SnoozedUntil = r.Msg.GetUntil()
+	if cur.SnoozedUntil != nil {
+		cur.State, cur.Pinned, cur.ArchivedAt = v1.SessionState_SESSION_STATE_DISCONNECTED, false, nil
+	}
+	return connect.NewResponse(&v1.SnoozeSessionResponse{Session: cur}), nil
+}
+
 // RunIn returns Current (default: a CONNECTED session in workspace "w-1") with the
 // requested id. A disconnected session runs in the target at once; a live one gets it
 // as pending_worktree_path. The target is worktree_path, else /worktrees/<repo_id>.
