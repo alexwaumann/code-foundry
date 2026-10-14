@@ -82,7 +82,8 @@ export function Timeline({ sessionId, working, bottomInset }: { sessionId: strin
   }, []);
 
   // Follow the bottom while pinned: whenever the content's height changes (rows measured,
-  // text streaming in, the composer growing).
+  // text streaming in, the composer growing), or the list's own (the bottom panel opening
+  // under the pane, e.g. a code block's Run in terminal).
   useLayoutEffect(() => {
     const inner = innerRef.current;
     if (!inner) return;
@@ -91,6 +92,7 @@ export function Timeline({ sessionId, working, bottomInset }: { sessionId: strin
       if (pinned.current) toBottom();
     });
     ro.observe(inner);
+    if (scrollRef.current) ro.observe(scrollRef.current);
     return () => {
       ro.disconnect();
     };

@@ -80,6 +80,9 @@ test("Run in terminal: hidden while the block streams, then a new shell in the t
   const id = await host(page).getAttribute("data-terminal-id");
   expect(id).toMatch(/^t-new-/);
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
+  // The panel took height from the pane; the timeline still shows its end (the block).
+  await expect(page.getByTestId("thread-timeline")).toHaveAttribute("data-at-bottom", "true");
+  await expect(bashBlock(page)).toBeInViewport();
   await expect
     .poll(() => page.evaluate(() => document.activeElement?.closest('[data-testid="bottom-terminal-host"]') !== null))
     .toBe(true);
