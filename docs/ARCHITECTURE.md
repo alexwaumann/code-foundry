@@ -391,8 +391,9 @@ from the pull request (docs/notes/pr-thread-commands.md).
   page, the Projects page with each project's worktrees and each workspace's members, or
   the composer; a worktree's overview is a side panel tab, not a page; a shell is never
   selected), command palette overlay. Under the content pane, a thread and the Projects
-  page each have a bottom terminal panel (cmd+j, `view.bottom.toggle`), the only place
-  shells show: tabs for the shells it owns, derived from the terminal list by the owner
+  page each have a bottom terminal panel (cmd+j, `view.bottom.toggle`; opening a thread's
+  empty one starts a shell, and a panel hides when its last shell goes:
+  `docs/notes/bottom-panel-autoshell.md`), the only place shells show: tabs for the shells it owns, derived from the terminal list by the owner
   labels (`session` for a thread's, none for the Projects page's worktree shells). Every
   way to start one lands there: cmd+t and the palette's New Terminal, a thread row's New
   terminal here, the Projects page's rows, a workspace member (in a thread's side panel
