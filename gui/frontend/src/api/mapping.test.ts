@@ -336,6 +336,8 @@ describe("events mapping", () => {
     expect(toSessionView(s)).toMatchObject({ statusReason: "", statusChangedAtMs: null });
     expect(toSessionView(s).archivedAtMs).toBeNull();
     expect(toSessionView(create(SessionSchema, { id: "s4", archivedAt: timestampFromMs(9000) })).archivedAtMs).toBe(9000);
+    expect(toSessionView(s).snoozedUntilMs).toBeNull();
+    expect(toSessionView(create(SessionSchema, { id: "s5", snoozedUntil: timestampFromMs(12_345) })).snoozedUntilMs).toBe(12_345);
     expect(
       toSessionView(create(SessionSchema, { id: "s3", status: SessionStatus.ERROR, statusReason: "interrupted", statusChangedAt: timestampFromMs(7000) })),
     ).toMatchObject({ status: "error", statusReason: "interrupted", statusChangedAtMs: 7000 });

@@ -172,6 +172,7 @@ function thread(id: string, over: Partial<SessionView> = {}): SessionView {
     status: "idle",
     statusReason: "",
     archivedAtMs: null,
+    snoozedUntilMs: null,
     pinned: false,
     linkedPullRequests: [],
     usage: [],

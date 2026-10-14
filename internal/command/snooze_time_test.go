@@ -62,6 +62,7 @@ func TestParseSnoozeUntil(t *testing.T) {
 		{name: "later today", now: wed, in: "2026-10-14 16:00", want: at(2026, time.October, 14, 16, 0)},
 		{name: "RFC 3339 UTC", now: wed, in: "2026-10-20T14:00:00Z", want: utc(2026, time.October, 20, 14, 0)},
 		{name: "RFC 3339 lower case", now: wed, in: "2026-10-20t14:00:00z", want: utc(2026, time.October, 20, 14, 0)},
+		{name: "RFC 3339 with milliseconds (the GUI's toISOString)", now: wed, in: "2026-10-20T14:00:00.000Z", want: utc(2026, time.October, 20, 14, 0)},
 		{name: "RFC 3339 with an offset", now: wed, in: "2026-10-20T14:00:00+02:00", want: utc(2026, time.October, 20, 12, 0)},
 		{name: "next year", now: wed, in: "2027-01-05", want: at(2027, time.January, 5, 9, 0)},
 
