@@ -53,8 +53,8 @@ interface PromptEditorProps {
   onChange: (text: string) => void;
   /** Enter (without Shift): send. */
   onSubmit: () => void;
-  /** Escape; return true when handled. */
-  onEscape: () => boolean;
+  /** Escape; return true when handled. Absent: Escape is left alone. */
+  onEscape?: () => boolean;
   /** Pasted image files (a paste with files inserts no text). */
   onPasteFiles: (files: File[]) => void;
   /** Space on a selected chip: preview its attachment; false when it has none. */
@@ -234,7 +234,7 @@ export function PromptEditor({
           }
           return false;
         }
-        if (e.key === "Escape" && plain) return cb.current.onEscape();
+        if (e.key === "Escape" && plain) return cb.current.onEscape?.() ?? false;
         const sel = view.state.selection;
         // Space on a selected chip (clicked, or Shift+Arrow over it) previews its image
         // instead of replacing it. Enter is left alone: it sends.

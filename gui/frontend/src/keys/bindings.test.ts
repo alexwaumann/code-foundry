@@ -5,7 +5,6 @@ import { useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
-import { useThreadStore } from "@/stores/thread";
 import { chordFires, commandBindings, handleKeyDown, isGlobalChord, openRunInPicker } from "./bindings";
 
 const runCommandForResult = vi.hoisted(() => vi.fn(() => Promise.resolve(null)));
@@ -346,7 +345,7 @@ describe("Run in… presentation (session.run-in)", () => {
   });
 });
 
-describe("a bare-key command chord (Escape interrupts a thread)", () => {
+describe("a bare-key command chord", () => {
   let pane: HTMLElement;
   let prompt: HTMLElement;
   let sidebar: HTMLElement;
@@ -359,9 +358,10 @@ describe("a bare-key command chord (Escape interrupts a thread)", () => {
     sidebar = document.getElementById("side") as HTMLElement;
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     useUiStore.setState({ palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" }, selection: { kind: "session", id: "s-r" } });
-    useCommandsStore.setState({ commands: [cmd({ name: "thread.interrupt", keybindings: ["escape"] })] });
+    // No shipped command binds a bare key (thread.interrupt dropped Escape); a stand-in
+    // exercises the rule.
+    useCommandsStore.setState({ commands: [cmd({ name: "demo.bare", keybindings: ["escape"] }), cmd({ name: "thread.interrupt" })] });
     useSessionsStore.setState({ byId: { "s-r": session("s-r", { status: "busy" }) }, order: ["s-r"] });
-    useThreadStore.setState({ logs: {}, pending: {} });
     useCommandsStore.setState({ contextKey: contextKey(getUiContext()) });
     runCommandForResult.mockClear();
   });
@@ -372,31 +372,34 @@ describe("a bare-key command chord (Escape interrupts a thread)", () => {
 
   const escape = { key: "Escape", code: "Escape" };
 
-  it("fires in the content pane while the thread works", () => {
+  it("fires in the content pane", () => {
     expect(press(pane, escape).defaultPrevented).toBe(true);
-    expect(runCommandForResult).toHaveBeenCalledWith("thread.interrupt", {}, expect.objectContaining({ quiet: true }));
+    expect(runCommandForResult).toHaveBeenCalledWith("demo.bare", {}, expect.anything());
   });
 
-  it.each<[string, () => void, () => HTMLElement]>([
-    ["outside the content pane (lists, dialogs)", () => undefined, () => sidebar],
-    ["inside an element with its own keys (a docked prompt)", () => undefined, () => prompt],
-    ["when the thread is idle", () => { useSessionsStore.setState({ byId: { "s-r": session("s-r", { status: "idle" }) } }); }, () => pane],
-    ["while a prompt waits for the user", () => { useThreadStore.setState({ pending: { "s-r": { sessionId: "s-r", seq: 1, pending: [{ requestId: "r", itemId: "i", question: false, toolName: "Bash", summary: "ls" }] } } }); }, () => pane],
-  ])("leaves the key alone %s", (_name, setup, target) => {
-    setup();
+  it.each<[string, () => HTMLElement]>([
+    ["outside the content pane (lists, dialogs)", () => sidebar],
+    ["inside an element with its own keys (a docked prompt)", () => prompt],
+  ])("leaves the key alone %s", (_name, target) => {
     expect(press(target(), escape).defaultPrevented).toBe(false);
     expect(runCommandForResult).not.toHaveBeenCalled();
   });
 
-  it("fires from a composer button (not the prompt's text) while the thread works", () => {
+  it("fires from a composer button (not the prompt's text)", () => {
     pane.insertAdjacentHTML("beforeend", '<div data-chord-yield><button id="picker" type="button"></button></div>');
     expect(press(document.getElementById("picker") as HTMLElement, escape).defaultPrevented).toBe(true);
-    expect(runCommandForResult).toHaveBeenCalledWith("thread.interrupt", {}, expect.objectContaining({ quiet: true }));
+    expect(runCommandForResult).toHaveBeenCalledWith("demo.bare", {}, expect.anything());
+  });
+
+  it("never interrupts a working thread on Escape", () => {
+    useCommandsStore.setState({ commands: [cmd({ name: "thread.interrupt" })] });
+    expect(press(pane, escape).defaultPrevented).toBe(false);
+    expect(runCommandForResult).not.toHaveBeenCalled();
   });
 
   it("modified chords keep firing anywhere", () => {
-    expect(chordFires("x", "cmd+t", sidebar)).toBe(true);
-    expect(chordFires("x", "escape", sidebar)).toBe(false);
-    expect(chordFires("x", "shift+escape", pane)).toBe(true);
+    expect(chordFires("cmd+t", sidebar)).toBe(true);
+    expect(chordFires("escape", sidebar)).toBe(false);
+    expect(chordFires("shift+escape", pane)).toBe(true);
   });
 });

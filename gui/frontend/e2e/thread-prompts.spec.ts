@@ -4,7 +4,7 @@ import { invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtu
 /**
  * Answering a thread (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
  * the docked permission and question prompts over the mock's scripted thread
- * (mock/thread.ts), their keyboard, the Escape interrupt and effort changes. Set SHOTS=<dir>
+ * (mock/thread.ts), their keyboard, Escape not interrupting and effort changes. Set SHOTS=<dir>
  * to save screenshots of the panels in both schemes.
  */
 
@@ -242,39 +242,32 @@ test("question keyboard: digits pick, Enter moves on and submits, Escape skips",
   await expect(lastText(page)).toContainText("No problem, I'll leave those for later.");
 });
 
-test("Escape interrupts a running turn from the empty editor or the timeline, never typed text", async ({ page }) => {
+test("Escape never interrupts a running turn (editor or timeline); the Interrupt button does", async ({ page }) => {
   await openThread(page, "streaming");
+  const interrupts = async () => (await calls()).filter((c) => c.startsWith("interrupt"));
+  // The empty editor.
   await editor(page).click();
-  await page.keyboard.type("wait");
+  await page.keyboard.press("Escape");
+  // The timeline (the pane focused).
+  await page.getByTestId("thread-timeline").click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("Escape");
   await page.waitForTimeout(200);
-  expect((await calls()).filter((c) => c.startsWith("interrupt"))).toEqual([]);
-  for (let i = 0; i < 4; i++) await page.keyboard.press("Backspace");
-  await page.keyboard.press("Escape");
+  expect(await interrupts()).toEqual([]);
+  await expect(page.getByTestId("thread-interrupt")).toBeVisible();
+
+  await page.getByTestId("thread-interrupt").click();
   await expect.poll(calls).toContain("interrupt s-r1");
   await expect(page.getByTestId("thread-footer").last()).toContainText("Interrupted");
   // No success toast for an interrupt: the footer says it.
   await expect(page.getByText("interrupted thread s-r1")).toHaveCount(0);
-
-  // From the timeline (the pane focused), via the thread.interrupt keybinding.
-  await openThread(page, "streaming");
-  await expect(page.getByTestId("thread-interrupt")).toBeVisible();
-  await page.getByTestId("thread-timeline").click({ position: { x: 5, y: 5 } });
-  await page.keyboard.press("Escape");
-  await expect.poll(async () => (await calls()).filter((c) => c.startsWith("interrupt")).length).toBe(2);
-  await expect(page.getByTestId("thread-interrupt")).toHaveCount(0);
-
-  // Idle: Escape does nothing.
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(200);
-  expect((await calls()).filter((c) => c.startsWith("interrupt")).length).toBe(2);
 });
 
-test("the Shortcuts list has Escape for Interrupt Thread", async ({ page }) => {
+test("Interrupt Thread has no shortcut", async ({ page }) => {
   await openThread(page, "idle");
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Interrupt Thread");
-  await expect(page.getByRole("option", { name: /Interrupt Thread/ })).toContainText(/esc/i);
+  await expect(page.getByRole("option", { name: /Interrupt Thread/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /Interrupt Thread/ })).not.toContainText(/esc/i);
 });
 
 test("an effort change while busy waits for the turn; when idle it applies at once", async ({ page }) => {

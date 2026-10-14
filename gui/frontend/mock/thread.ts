@@ -970,7 +970,7 @@ export class MockThreads {
         },
       },
       {
-        cmd: { name: "thread.interrupt", title: "Interrupt Thread", category: "Thread", description: "Stop a thread's running turn", keybindings: ["escape"], args: [id] },
+        cmd: { name: "thread.interrupt", title: "Interrupt Thread", category: "Thread", description: "Stop a thread's running turn", keybindings: [], args: [id] },
         when,
         run: (_ctx, a) => {
           this.calls.push(`interrupt ${a.id ?? ""}`);
