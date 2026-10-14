@@ -10,8 +10,7 @@
  */
 import { bounceDock, setDockBadge } from "@/api/app";
 import type { SettingsSnapshotView } from "@/api/settings";
-import { threadGroup } from "@/lib/session";
-import { useSessionsStore, type SessionsData } from "./sessions";
+import { attentionIds, useSessionsStore } from "./sessions";
 import { useSettingsStore } from "./settings";
 
 /** The notifications.* settings (internal/store/settings/schema.go). */
@@ -52,20 +51,6 @@ export function alertSettings(snap: SettingsSnapshotView | null): AlertSettings 
   };
 }
 
-/**
- * The threads that need the user, in `order`: the sidebar's attention groups (lib/session.ts
- * threadGroup: waiting on the user, failed or interrupted, an unseen finished turn), pinned
- * or not. Archived threads never count.
- */
-export function dockAttentionIds(data: SessionsData): string[] {
-  return data.order.filter((id) => {
-    const s = data.byId[id];
-    if (s === undefined || s.archivedAtMs !== null) return false;
-    const g = threadGroup(s);
-    return g === "prompt" || g === "error" || g === "done";
-  });
-}
-
 export interface DockAlertsState {
   /** The sessions epoch `attention` was taken in; null before the first evaluation. */
   epoch: number | null;
@@ -82,7 +67,7 @@ export const initialDockAlerts: DockAlertsState = { epoch: null, attention: new 
 export interface DockAlertsInput {
   /** useSessionsStore's epoch: a change means the set was replaced (startup, reconnect). */
   epoch: number;
-  /** dockAttentionIds of the current sessions. */
+  /** attentionIds of the current sessions: the bell and window title count. */
   attention: readonly string[];
   /** Code Foundry is the active app (its window has focus). */
   focused: boolean;
@@ -158,7 +143,7 @@ export function startDockAlerts(deps: DockAlertsDeps = hostDeps): () => void {
     const sessions = useSessionsStore.getState();
     const next = stepDockAlerts(state, {
       epoch: sessions.epoch,
-      attention: dockAttentionIds(sessions),
+      attention: attentionIds(sessions),
       focused: deps.focused(),
       nowMs: deps.now(),
       settings: alertSettings(useSettingsStore.getState().snapshot),

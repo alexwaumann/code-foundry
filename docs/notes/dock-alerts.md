@@ -53,10 +53,11 @@ mirrors the fields.
   table-tested; `startDockAlerts` feeds it from the sessions and settings stores and runs
   the effects through `api/app.ts` `setDockBadge` / `bounceDock` (no-ops without a Wails
   host, detected with `appInfo()` like `setHostZoom`).
-* **Attention set** (`dockAttentionIds`): unarchived threads whose `threadGroup` is
-  `prompt`, `error` or `done`, i.e. the sidebar's attention groups (waiting on the user,
-  failed or interrupted, an unseen finished turn), pinned or not. Note this is wider than
-  `attentionIds` (the bell, the window title, cmd+shift+a), which leaves out errors.
+* **Attention set**: `stores/sessions.ts` `attentionIds`, the same count as the bell, the
+  window title and cmd+shift+a (unarchived threads with status `attention`: waiting on the
+  user or a finished turn). Errors are left out, as there: after a daemon restart every
+  busy thread turns "interrupted", and the badge would disagree with the title. An earlier
+  draft counted the sidebar's `error` group too; it was narrowed to match before review.
 * **Badge**: the set's size when `dock_badge` is on, else 0; sent only when it changes.
   Ignores focus and cooldown. Nothing is sent before the first settings snapshot, so a
   badge the user turned off never flashes on at startup.

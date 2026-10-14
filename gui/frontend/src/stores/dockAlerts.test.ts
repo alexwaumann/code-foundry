@@ -3,7 +3,6 @@ import type { SessionView } from "@/api/session";
 import type { SettingsSnapshotView } from "@/api/settings";
 import {
   alertSettings,
-  dockAttentionIds,
   initialDockAlerts,
   startDockAlerts,
   stepDockAlerts,
@@ -13,7 +12,7 @@ import {
   type DockAlertsState,
   type DockEffect,
 } from "./dockAlerts";
-import { applySessionEvent, emptySessions, replaceSessions, useSessionsStore } from "./sessions";
+import { applySessionEvent, attentionIds, emptySessions, replaceSessions, useSessionsStore } from "./sessions";
 import { useSettingsStore } from "./settings";
 
 const on: AlertSettings = { dockBadge: true, bounce: true, sound: false, cooldownMs: 60_000 };
@@ -161,8 +160,8 @@ function thread(id: string, over: Partial<SessionView> = {}): SessionView {
   } as unknown as SessionView;
 }
 
-describe("dockAttentionIds", () => {
-  it("counts prompts, finished turns and errors, pinned or not, never archived or working ones", () => {
+describe("attentionIds (the badge count)", () => {
+  it("counts prompts and finished turns, pinned or not, never errors, archived or working ones", () => {
     const data = replaceSessions(emptySessions, [
       thread("prompt", { status: "attention", statusReason: "permission: Bash" }),
       thread("done", { status: "attention", statusReason: "finished" }),
@@ -174,7 +173,7 @@ describe("dockAttentionIds", () => {
       thread("idle"),
       thread("starting", { state: "starting", status: "unknown" }),
     ]);
-    expect(dockAttentionIds(data).sort()).toEqual(["done", "error", "offline-prompt", "pinned", "prompt"]);
+    expect(attentionIds(data).sort()).toEqual(["done", "offline-prompt", "pinned", "prompt"]);
   });
 });
 
@@ -253,7 +252,7 @@ describe("startDockAlerts", () => {
   it("an alert plays the sound with the bounce when both are on", () => {
     settings({ "notifications.sound": "true" });
     useSessionsStore.setState((s) => ({ ...replaceSessions(s, [thread("a", { status: "busy" })]), epoch: s.epoch + 1 }));
-    useSessionsStore.setState((s) => applySessionEvent(s, { kind: "updated", session: thread("a", { state: "disconnected", status: "error", statusReason: "interrupted" }) }));
+    useSessionsStore.setState((s) => applySessionEvent(s, { kind: "updated", session: thread("a", { status: "attention", statusReason: "finished" }) }));
     expect(calls).toEqual(["badge 0", "badge 1", "bounce", "sound"]);
   });
 });
