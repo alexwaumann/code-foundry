@@ -173,6 +173,21 @@ test("reveal settings file runs settings.reveal", async ({ page }) => {
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("settings.reveal");
 });
 
+test("the alert volume is a slider saved per step, with Play running notifications.test", async ({ page }) => {
+  await openSettings(page);
+  const row = setting(page, "notifications.sound_volume");
+  const thumb = row.getByRole("slider", { name: "Alert volume" });
+  await expect(thumb).toHaveAttribute("aria-valuenow", "50");
+  await thumb.focus();
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  await expect(row.getByTestId("volume-value")).toHaveText("48%");
+  await expect.poll(async () => (await mockSettings()).raw["notifications.sound_volume"]).toBe("48");
+  await expect(thumb).toBeFocused();
+  await row.getByRole("button", { name: "Play alert sound" }).click();
+  await expect.poll(async () => (await invocations()).at(-1)).toMatchObject({ name: "notifications.test", args: { volume: "48" } });
+});
+
 test("cmd+/ opens the help overlay listing commands and app chords", async ({ page }) => {
   await openApp(page);
   await page.keyboard.press("Meta+Slash");
