@@ -4,6 +4,7 @@
 package all
 
 import (
+	"context"
 	"errors"
 
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
@@ -21,6 +22,9 @@ type Deps struct {
 	// IsShellTerminal reports whether a terminal is a shell terminal.new started; it gates
 	// terminal.close. Nil: any terminal.
 	IsShellTerminal func(id string) bool
+	// AwaitTerminalOutput blocks until a new terminal has printed something (its
+	// prompt); terminal.new --run waits with it before typing. Nil: it types at once.
+	AwaitTerminalOutput func(ctx context.Context, id string) error
 	// Repo backs repo.*. Nil works like Terminal.
 	Repo command.RepoBackend
 	// NotGit reports a context in a project without git: it gates repo.worktree.*,
@@ -91,7 +95,7 @@ func Register(r *command.Registry, d Deps) error {
 	return errors.Join(
 		command.RegisterDaemon(r, d.Daemon),
 		command.RegisterUI(r, d.Emitter),
-		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Repo: d.Repo, Session: d.Session, IsShell: d.IsShellTerminal}),
+		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Repo: d.Repo, Session: d.Session, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput}),
 		command.RegisterRepo(r, d.Repo, d.NotGit),
 		command.RegisterRepoAdd(r, d.Repo, d.Clone),
 		command.RegisterRepoCleanup(r, command.RepoCleanupDeps{Repo: d.Repo, GitOps: d.GitOps.Backend, NotGit: d.NotGit}),

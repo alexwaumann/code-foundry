@@ -3,7 +3,9 @@ package command
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"os"
 	"path/filepath"
@@ -11,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -30,6 +33,7 @@ type TerminalBackend interface {
 	Remove(context.Context, *connect.Request[v1.RemoveTerminalRequest]) (*connect.Response[v1.RemoveTerminalResponse], error)
 	Close(context.Context, *connect.Request[v1.CloseTerminalRequest]) (*connect.Response[v1.CloseTerminalResponse], error)
 	List(context.Context, *connect.Request[v1.ListTerminalsRequest]) (*connect.Response[v1.ListTerminalsResponse], error)
+	Write(context.Context, *connect.Request[v1.WriteTerminalRequest]) (*connect.Response[v1.WriteTerminalResponse], error)
 }
 
 var (
@@ -48,7 +52,19 @@ type TerminalDeps struct {
 	// (unlabelled ones TerminalService.Create made) anyway. Nil: any terminal (the
 	// refusal then comes from Close).
 	IsShell func(id string) bool
+	// AwaitOutput blocks until terminal id has printed its first output (a shell's
+	// prompt; terminal.AwaitOutput) or ctx ends. terminal.new --run waits with it before
+	// typing, so the line is not echoed ahead of the prompt. Nil: it types at once.
+	AwaitOutput func(ctx context.Context, id string) error
+	// RunWait caps that wait (0: DefaultRunWait). When it passes, the command is typed
+	// anyway: a shell that has printed nothing yet still runs it, only echoed twice.
+	RunWait time.Duration
 }
+
+// DefaultRunWait is how long terminal.new --run waits for a new shell's first output
+// before it types the command anyway. A login shell with heavy startup files (nvm,
+// conda) can take a second or two.
+const DefaultRunWait = 5 * time.Second
 
 func hasTerminal(c Context) bool { return c.ActiveTerminalID != "" }
 
@@ -74,12 +90,15 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			Title: "New Terminal",
 			Description: "Start a shell (or argv) that belongs to the active thread, else to the active worktree, " +
 				"else to the registered worktree containing --cwd (from the CLI: the working directory). " +
-				"It starts in --cwd, else in the CLI's working directory when that chose the owner, else in the thread's or worktree's directory.",
+				"It starts in --cwd, else in the CLI's working directory when that chose the owner, else in the thread's or worktree's directory. " +
+				"With --run, a command line is typed into it once it has printed its prompt (the shell stays open).",
 			Category:    "Terminal",
 			Keybindings: []string{"cmd+t"},
 			Args: []ArgSpec{
 				{Name: "cwd", Type: Path, Description: "Working directory; without a thread or worktree context, its registered worktree owns the shell"},
 				{Name: "argv", Type: String, Description: `Command line, split like a shell would (e.g. "claude --model opus")`},
+				{Name: "run", Type: String, Description: "A command line typed into the new shell once it has printed its prompt, then Return; " +
+					"the shell stays open after it. Each line of a multi-line value runs in turn"},
 				{Name: "here", Type: Path, DefaultToCwd: true, Description: "Where the CLI runs: without a thread, worktree or --cwd, " +
 					"the registered worktree containing it owns the shell, which starts there (CLI default: the working directory)"},
 			},
@@ -95,6 +114,10 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				if len(argv) == 0 {
 					argv = defaultShell()
 				}
+				run, err := runInput(a.String("run"))
+				if err != nil {
+					return Result{}, err
+				}
 				owner, err := shellOwner(ctx, d, c, a.Path("cwd"), a.Path("here"))
 				if err != nil {
 					return Result{}, err
@@ -106,7 +129,14 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 					return Result{}, err
 				}
 				t := res.Msg.GetTerminal()
-				return Result{Message: "created terminal " + t.GetId(), JSON: t}, nil
+				msg := "created terminal " + t.GetId()
+				if run != "" {
+					if err := typeRun(ctx, d, t.GetId(), run); err != nil {
+						return Result{}, err
+					}
+					msg += " and ran the command in it"
+				}
+				return Result{Message: msg, JSON: t}, nil
 			},
 		},
 		Command{
@@ -186,6 +216,48 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			},
 		},
 	)
+}
+
+// runInput is terminal.new --run's value as the keys typed into the shell: line endings
+// become Return (CR, what the Enter key sends) and one Return ends it; trailing blank
+// lines and spaces are dropped. Control characters other than tab and newline are
+// refused (a code block has none, and an ESC or ^C typed into a shell does things).
+// Empty or blank: nothing to type.
+func runInput(s string) (string, error) {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.TrimRight(s, "\n\t ")
+	if strings.TrimSpace(s) == "" {
+		return "", nil
+	}
+	for _, r := range s {
+		if (r < 0x20 && r != '\t' && r != '\n') || r == 0x7f {
+			return "", InvalidArg("run", "the command has a control character (%U)", r)
+		}
+	}
+	return strings.ReplaceAll(s, "\n", "\r") + "\r", nil
+}
+
+// typeRun waits (up to RunWait) for shell id's first output, then types keys into it.
+// When the wait times out the keys are typed anyway; any other failure of the wait (the
+// shell exited, the caller went away) is an error, and the shell stays.
+func typeRun(ctx context.Context, d TerminalDeps, id, keys string) error {
+	if d.AwaitOutput != nil {
+		wait := cmp.Or(d.RunWait, DefaultRunWait)
+		wctx, cancel := context.WithTimeout(ctx, wait)
+		err := d.AwaitOutput(wctx, id)
+		cancel()
+		switch {
+		case err == nil:
+		case errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil:
+			slog.WarnContext(ctx, "terminal.new --run: no output from the shell in time, typing anyway", "terminal", id, "wait", wait)
+		default:
+			return fmt.Errorf("created terminal %s, but could not run the command: %w", id, err)
+		}
+	}
+	if _, err := d.Terminal.Write(ctx, connect.NewRequest(&v1.WriteTerminalRequest{Id: id, Data: []byte(keys)})); err != nil {
+		return fmt.Errorf("created terminal %s, but could not run the command: %w", id, err)
+	}
+	return nil
 }
 
 // terminalState is "running", or "exited <code>".

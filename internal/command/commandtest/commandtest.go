@@ -67,6 +67,8 @@ func (c *Calls) Requests() []proto.Message {
 type Terminal struct {
 	Calls
 	Err error
+	// WriteErr, when set, is returned by Write only.
+	WriteErr error
 	// Created is returned by Create; its Argv, Cwd and Labels are filled from the
 	// request.
 	Created *v1.Terminal
@@ -108,6 +110,15 @@ func (t *Terminal) Close(_ context.Context, r *connect.Request[v1.CloseTerminalR
 	return connect.NewResponse(&v1.CloseTerminalResponse{}), t.Err
 }
 
+// Write records the request. WriteErr, else Err, is returned.
+func (t *Terminal) Write(_ context.Context, r *connect.Request[v1.WriteTerminalRequest]) (*connect.Response[v1.WriteTerminalResponse], error) {
+	t.record(r.Msg)
+	if err := cmp.Or(t.WriteErr, t.Err); err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&v1.WriteTerminalResponse{}), nil
+}
+
 // List records the request and returns Terminals.
 func (t *Terminal) List(_ context.Context, r *connect.Request[v1.ListTerminalsRequest]) (*connect.Response[v1.ListTerminalsResponse], error) {
 	t.record(r.Msg)
@@ -115,6 +126,44 @@ func (t *Terminal) List(_ context.Context, r *connect.Request[v1.ListTerminalsRe
 		return nil, t.Err
 	}
 	return connect.NewResponse(&v1.ListTerminalsResponse{Terminals: t.Terminals}), nil
+}
+
+// Output is a fake command.TerminalDeps.AwaitOutput (pass its Await): a shell that has
+// printed its prompt (nil), never prints anything (Block), or fails (Err).
+type Output struct {
+	// Block makes Await wait for its context to end and return its error (the
+	// RunWait timeout, or the caller going away).
+	Block bool
+	// Err is returned by Await when it does not block.
+	Err error
+	// OnAwait, when set, is called with the id as Await starts (to look at other fakes
+	// at that moment).
+	OnAwait func(id string)
+
+	mu  sync.Mutex
+	ids []string
+}
+
+// Await records id, then blocks or returns Err.
+func (o *Output) Await(ctx context.Context, id string) error {
+	o.mu.Lock()
+	o.ids = append(o.ids, id)
+	o.mu.Unlock()
+	if o.OnAwait != nil {
+		o.OnAwait(id)
+	}
+	if o.Block {
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	return o.Err
+}
+
+// IDs returns the terminals Await was called for, in order.
+func (o *Output) IDs() []string {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return append([]string(nil), o.ids...)
 }
 
 // Repo is a fake command.RepoBackend. Err, when set, is returned by every call. List
