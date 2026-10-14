@@ -273,8 +273,11 @@ chip went away.
   written before the fix, they failed on the diagnosis branch and pass with it. New tests:
   `internal/api/heartbeat_test.go` (the timer; each stream heartbeats when idle, never
   while busy, and ends on client cancel; seq unchanged), `api/streamLiveness.test.ts`
-  (watchdog arming and firing, open status, resync) and `api/heartbeat.test.ts` (the
-  stream openers map a heartbeat to `HEARTBEAT`).
+  (watchdog arming and firing, open status, resync, rapid hide/show keeping one attempt,
+  late events after stop or resync dropped), `api/heartbeat.test.ts` (the stream openers
+  map a heartbeat to `HEARTBEAT`) and `e2e/thread-reconnect.spec.ts` (a faked
+  hide/show reopens one Watch with no chip on open, switch or resync; a Watch that
+  cannot reconnect shows the chip over the log until it is back).
 
 The scratch tools were not committed: the Go Watch checker, the hide, minimize and occlude
 scripts, the pane overlay and the per-send log. They are described above well enough to
