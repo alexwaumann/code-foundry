@@ -59,9 +59,9 @@ service GhService {
   // copy is returned with last_error set.
   rpc GetPullRequestDetail(GetPullRequestDetailRequest) returns (GetPullRequestDetailResponse) {}
   // ListReviewerCandidates returns who can be asked to review a pull request: the
-  // repository's assignable users (first 100) and the current requests (users and
-  // teams). Requested first, then by login; the pull request's author is left out.
-  // Fetched on every call (not cached).
+  // current requests (users and teams) and, for a non-empty query, up to 20 of the
+  // repository's assignable users GitHub matches against it. Requested first, then by
+  // login; the pull request's author is left out. Fetched on every call (not cached).
   rpc ListReviewerCandidates(ListReviewerCandidatesRequest) returns (ListReviewerCandidatesResponse) {}
   // SetReviewRequest requests (or withdraws a request for) a review from a user or
   // team. The pull request's cached detail is invalidated and
@@ -640,12 +640,15 @@ enum ReviewerKind {
 message ListReviewerCandidatesRequest {
   string repo_slug = 1;
   int32 number = 2;
+  // Matched by GitHub against assignable users' login and name. Empty returns only
+  // the pending requests.
+  string query = 3;
 }
 
 message ListReviewerCandidatesResponse {
+  reserved 2;
+  reserved "truncated";
   repeated ReviewerCandidate candidates = 1;
-  // The repository has more assignable users than were listed (100).
-  bool truncated = 2;
 }
 
 message ReviewerCandidate {

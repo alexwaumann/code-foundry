@@ -15,7 +15,7 @@ mock daemon.
 | RPC | GitHub | Cache |
 |---|---|---|
 | `GetPullRequestDetail(repo_slug, number, refresh)` → `PullRequestDetail` | `queries/pull_request_full.graphql`, one request; `checks.graphql` pages only beyond 100 checks | memory (64 entries) + `gh_activity` row `pr_detail:<slug>#<n>` |
-| `ListReviewerCandidates(repo_slug, number)` | `queries/reviewer_candidates.graphql` | none |
+| `ListReviewerCandidates(repo_slug, number, query)` | `queries/reviewer_candidates.graphql`: the pending requests, plus `assignableUsers(first: 20, query:)` for a non-empty query (`docs/notes/reviewer-search.md`) | none |
 | `SetReviewRequest(repo_slug, number, login, kind, requested)` → pending requests | REST `POST`/`DELETE repos/{o}/{r}/pulls/{n}/requested_reviewers` | marks the detail stale |
 | `RevertPullRequest(repo_slug, number)` → number, url | GraphQL mutation `revertPullRequest(input: {pullRequestId})` | marks the detail stale, polls soon |
 | `MergePullRequest(repo_slug, number, method, delete_branch, expected_head_sha)` → merged, sha, message, branch_deleted | GraphQL `mergePullRequest(input: {pullRequestId, mergeMethod, expectedHeadOid})`, then REST `DELETE repos/{o}/{r}/git/refs/heads/{branch}` | marks the detail stale, polls soon (see "Merge" below) |
@@ -237,7 +237,7 @@ against the mock daemon.
 | same with `refresh` | fetched again (816 ms), new `fetched_at`, no event (unchanged) |
 | `GetPullRequestDetail ghostty-org/ghostty#13779` | OPEN, `read`/cannot update, label `gtk`, reviewers `bo2themax`, `jcollie` (requested), `pluiedev` APPROVED stale, `copilot-pull-request-reviewer` COMMENTED stale (bot); 37 comments, 15 threads (1 unresolved), 9 commits, no checks (fork PR); 1.5 s, 60 KB, cost 1 |
 | `ListReviewerCandidates code-foundry#1` | empty: the only assignable user is the author (excluded); 251 ms, cost 1 |
-| `ListReviewerCandidates ghostty#13779` | 94, not truncated; `bo2themax`, `jcollie` (requested) then `00-kat`, `a-lang`, …; 1.7 s, cost 1 |
+| `ListReviewerCandidates ghostty#13779` (before the search: first 100) | 94; `bo2themax`, `jcollie` (requested) then `00-kat`, `a-lang`, …; 1.7 s, cost 1 |
 | `RevertPullRequest ghostty#13779` (open) | `failed_precondition: pull request #13779 is open, not merged`; it refreshed the detail once, no mutation sent |
 | `GetPullRequestDetail code-foundry#99999` | `not_found: … Could not resolve to a PullRequest with the number of 99999.` |
 | SQLite | `pr_detail:alexwaumann/code-foundry#1` (5.4 KB) and `pr_detail:ghostty-org/ghostty#13779` (57 KB) |

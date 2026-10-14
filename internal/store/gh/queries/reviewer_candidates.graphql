@@ -1,11 +1,10 @@
-# Who can be asked to review a pull request: the repository's assignable users (first
-# 100) plus whoever is requested now (users and teams). Fetched on demand by
-# ListReviewerCandidates; never cached.
-query ReviewerCandidates($owner: String!, $name: String!, $number: Int!) {
+# Who can be asked to review a pull request: whoever is requested now (users and teams)
+# plus, when $search is set, up to 20 assignable users GitHub matches against $query
+# (login and name). Fetched on demand by ListReviewerCandidates; never cached.
+query ReviewerCandidates($owner: String!, $name: String!, $number: Int!, $query: String, $search: Boolean!) {
   rateLimit { ...RateLimitFields }
   repository(owner: $owner, name: $name) {
-    assignableUsers(first: 100) {
-      totalCount
+    assignableUsers(first: 20, query: $query) @include(if: $search) {
       nodes { id login name avatarUrl }
     }
     pullRequest(number: $number) {

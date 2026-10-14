@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, openApp, resetMock, row, selectWorktree } from "./fixtures";
+import { CF, invocations, mockPost, mockUrl, openApp, resetMock, row, selectWorktree } from "./fixtures";
 
 /**
  * The Pull request surface in the side panel, against the mock daemon's fixtures
@@ -14,7 +14,12 @@ const SLUG = "alexwaumann/code-foundry";
 const shots = process.env.SHOTS;
 
 async function shot(page: Page, name: string): Promise<void> {
-  if (shots) await page.screenshot({ path: `${shots}/${name}.png` });
+  if (!shots) return;
+  // Popovers fade in; wait so the shot is not half transparent (spinners never finish).
+  await page.waitForFunction(() =>
+    document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getTiming().iterations === Infinity),
+  );
+  await page.screenshot({ path: `${shots}/${name}.png` });
 }
 
 /** Screenshots are taken at 1400x900. */
@@ -190,39 +195,82 @@ test("Timeline lists the end state, commits, comments and reviews; inner tabs st
   await expect(page.getByTestId("pr-tab-code")).toBeDisabled();
 });
 
-test("the reviewer picker lists people with access and toggles requests through pr.review.request", async ({ page }) => {
+async function ghCalls(): Promise<Record<string, number>> {
+  const res = await fetch(`${mockUrl}/__mock/gh/calls`);
+  return (await res.json()) as Record<string, number>;
+}
+
+test("the reviewer picker shows requests and recents, searches GitHub from 2 characters, and toggles requests through pr.review.request", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
   await page.getByTestId("pr-add-reviewer").click();
   const picker = page.getByTestId("pr-reviewer-picker");
+  const search = page.getByTestId("pr-reviewer-search");
   await expect(picker).toBeVisible();
-  await expect(page.getByTestId("pr-reviewer-search")).toBeFocused();
-  await expect(page.getByTestId("pr-reviewer-search")).toHaveAttribute("placeholder", "Search people with access");
+  await expect(search).toBeFocused();
+  await expect(search).toHaveAttribute("placeholder", "Search people with access");
   const cands = page.getByTestId("pr-reviewer-candidate");
-  // Requested first (with a check), then by login.
-  await expect(cands).toHaveCount(5);
-  await expect(cands.evaluateAll((els) => els.map((e) => [e.getAttribute("data-login"), e.getAttribute("data-requested")]))).resolves.toEqual([
+  const logins = () => cands.evaluateAll((els) => els.map((e) => [e.getAttribute("data-login"), e.getAttribute("data-requested")]));
+  // Under 2 characters: the pending requests (with a check); nobody recent yet.
+  await expect(page.getByTestId("pr-reviewer-requested")).toContainText("Requested");
+  await expect.poll(logins).toEqual([
     ["acme/core", "true"],
     ["teammate-ana", "true"],
     ["teammate-kim", "true"],
-    ["teammate-lee", "false"],
-    ["teammate-max", "false"],
   ]);
+  await expect(page.getByTestId("pr-reviewer-recent")).toHaveCount(0);
   await shot(page, "chunk3-reviewers");
 
-  // Typing filters; choosing someone requests a review.
-  await page.getByTestId("pr-reviewer-search").fill("lee");
-  await expect(cands).toHaveCount(1);
+  // One character searches nothing.
+  await search.fill("z");
+  await page.waitForTimeout(600);
+  expect((await ghCalls())["ListReviewerCandidates query"]).toBeUndefined();
+  await expect(cands).toHaveCount(3);
+
+  // Two or more search GitHub: someone past the first 100 is found; no match says so.
+  await search.fill("zoe-zim");
+  await expect.poll(logins).toEqual([["zoe-zimmerman", "false"]]);
+  await expect(page.getByTestId("pr-reviewer-requested")).toHaveCount(0);
+  await expect(page.getByTestId("pr-reviewer-searching")).toHaveCount(0);
+  await shot(page, "reviewer-search");
+  await search.fill("nobody-at-all");
+  await expect(page.getByTestId("pr-reviewer-nomatch")).toHaveText("No one matches.");
+
+  // Choosing a result requests a review; the candidates and the detail are read again.
+  await search.fill("lee");
+  await expect.poll(logins).toEqual([["teammate-lee", "false"]]);
   await cands.first().click();
   await expect.poll(async () => (await invocations()).filter((i) => i.name === "pr.review.request").map((i) => i.args)).toEqual([
     { "repo-slug": SLUG, number: "145", login: "teammate-lee", kind: "user", requested: "true" },
   ]);
-  // The candidates and the detail are read again.
   await expect(cands.filter({ hasText: "teammate-lee" })).toHaveAttribute("data-requested", "true");
   await expect(page.getByTestId("pr-reviewer").filter({ hasText: "teammate-lee" })).toHaveAttribute("data-status", "requested");
 
+  // Requested now, so not in Recent; withdrawn, it stays in Recent with a ×.
+  await search.fill("");
+  await expect(page.getByTestId("pr-reviewer-requested").getByTestId("pr-reviewer-candidate").filter({ hasText: "teammate-lee" })).toHaveCount(1);
+  await expect(page.getByTestId("pr-reviewer-recent")).toHaveCount(0);
+  await page.getByTestId("pr-reviewer-requested").getByTestId("pr-reviewer-candidate").filter({ hasText: "teammate-lee" }).click();
+  const recent = page.getByTestId("pr-reviewer-recent").getByTestId("pr-reviewer-candidate");
+  await expect(recent).toHaveCount(1);
+  await expect(recent).toHaveAttribute("data-login", "teammate-lee");
+  await expect(recent).toHaveAttribute("data-requested", "false");
+
+  // Recents survive closing the picker.
+  await page.keyboard.press("Escape");
+  await expect(picker).toHaveCount(0);
+  await page.getByTestId("pr-add-reviewer").click();
+  await expect(recent).toHaveCount(1);
+  await shot(page, "reviewer-recent");
+
+  // × drops the row from Recent without requesting anything.
+  const before = (await invocations()).filter((i) => i.name === "pr.review.request").length;
+  await recent.getByTestId("pr-reviewer-recent-remove").click();
+  await expect(page.getByTestId("pr-reviewer-recent")).toHaveCount(0);
+  await page.waitForTimeout(300);
+  expect((await invocations()).filter((i) => i.name === "pr.review.request")).toHaveLength(before);
+
   // Choosing a requested team withdraws it.
-  await page.getByTestId("pr-reviewer-search").fill("");
   await cands.filter({ hasText: "acme/core" }).click();
   await expect.poll(async () => (await invocations()).filter((i) => i.name === "pr.review.request").at(-1)?.args).toEqual({
     "repo-slug": SLUG,

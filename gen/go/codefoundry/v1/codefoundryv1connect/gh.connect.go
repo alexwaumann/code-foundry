@@ -118,9 +118,9 @@ type GhServiceClient interface {
 	// copy is returned with last_error set.
 	GetPullRequestDetail(context.Context, *connect.Request[v1.GetPullRequestDetailRequest]) (*connect.Response[v1.GetPullRequestDetailResponse], error)
 	// ListReviewerCandidates returns who can be asked to review a pull request: the
-	// repository's assignable users (first 100) and the current requests (users and
-	// teams). Requested first, then by login; the pull request's author is left out.
-	// Fetched on every call (not cached).
+	// current requests (users and teams) and, for a non-empty query, up to 20 of the
+	// repository's assignable users GitHub matches against it. Requested first, then by
+	// login; the pull request's author is left out. Fetched on every call (not cached).
 	ListReviewerCandidates(context.Context, *connect.Request[v1.ListReviewerCandidatesRequest]) (*connect.Response[v1.ListReviewerCandidatesResponse], error)
 	// SetReviewRequest requests (or withdraws a request for) a review from a user or
 	// team. The pull request's cached detail is invalidated and
@@ -383,9 +383,9 @@ type GhServiceHandler interface {
 	// copy is returned with last_error set.
 	GetPullRequestDetail(context.Context, *connect.Request[v1.GetPullRequestDetailRequest]) (*connect.Response[v1.GetPullRequestDetailResponse], error)
 	// ListReviewerCandidates returns who can be asked to review a pull request: the
-	// repository's assignable users (first 100) and the current requests (users and
-	// teams). Requested first, then by login; the pull request's author is left out.
-	// Fetched on every call (not cached).
+	// current requests (users and teams) and, for a non-empty query, up to 20 of the
+	// repository's assignable users GitHub matches against it. Requested first, then by
+	// login; the pull request's author is left out. Fetched on every call (not cached).
 	ListReviewerCandidates(context.Context, *connect.Request[v1.ListReviewerCandidatesRequest]) (*connect.Response[v1.ListReviewerCandidatesResponse], error)
 	// SetReviewRequest requests (or withdraws a request for) a review from a user or
 	// team. The pull request's cached detail is invalidated and

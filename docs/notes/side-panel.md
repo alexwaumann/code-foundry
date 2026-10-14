@@ -281,8 +281,10 @@ PullRequestSurface (tab body; watches pullRequestDetailResource)
   on GitHub" action, and opens the new pull request as a tab of the same panel.
   `parseRevertResult` (`api/gh.ts`) reads the result JSON. Open on GitHub and links
   use `openUrl` (view.open.url). Copy link uses `copyText`. The candidates are a resource
-  (`reviewerCandidatesResource`, no keep-alive) watched only while the picker is open,
-  so it is read on every open, and no component calls an RPC.
+  (`reviewerCandidatesResource`, no keep-alive, keyed by pull request and search query)
+  watched only while the picker shows them, so they are read on every open, and no
+  component calls an RPC. Since `reviewer-search.md` the picker searches GitHub from 2
+  characters and shows the requests and recent reviewers below that.
 * **Not found.** `getPullRequestDetail` rethrows NOT_FOUND as an `Error` whose message
   starts with `not found: ` (with the ConnectError as `cause`), and `isNotFoundMessage`
   tells the surface. The resource keeps only a message, so this was the smallest way

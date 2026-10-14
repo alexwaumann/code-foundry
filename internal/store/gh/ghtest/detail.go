@@ -40,8 +40,10 @@ func (s *Store) SetFullPullRequest(slug string, d gh.FullPullRequest) {
 	s.publishDetail(key, d.PullRequest.Number)
 }
 
-// SetReviewerCandidates sets what ReviewerCandidates returns for slug and number.
-// SetReviewRequest flips Requested on a listed candidate.
+// SetReviewerCandidates sets who ReviewerCandidates knows for slug and number: it
+// returns the requested ones, plus, for a non-empty query, the others whose login or
+// name contains it (case-insensitive). SetReviewRequest flips Requested on a listed
+// candidate.
 func (s *Store) SetReviewerCandidates(slug string, number int, c gh.ReviewerCandidates) {
 	key, _ := prKey(slug, number)
 	s.mu.Lock()
@@ -91,8 +93,8 @@ func (s *Store) FullPullRequest(_ context.Context, slug string, number int, refr
 	return d, nil
 }
 
-// ReviewerCandidates implements gh.Service.
-func (s *Store) ReviewerCandidates(_ context.Context, slug string, number int) (gh.ReviewerCandidates, error) {
+// ReviewerCandidates implements gh.Service (see SetReviewerCandidates).
+func (s *Store) ReviewerCandidates(_ context.Context, slug string, number int, query string) (gh.ReviewerCandidates, error) {
 	key, err := prKey(slug, number)
 	if err != nil {
 		return gh.ReviewerCandidates{}, err
@@ -106,8 +108,14 @@ func (s *Store) ReviewerCandidates(_ context.Context, slug string, number int) (
 	if !ok {
 		return gh.ReviewerCandidates{}, fmt.Errorf("%w: %s", gh.ErrNotFound, key)
 	}
-	c.Candidates = append([]gh.ReviewerCandidate(nil), c.Candidates...)
-	return c, nil
+	q := strings.ToLower(strings.TrimSpace(query))
+	out := gh.ReviewerCandidates{Candidates: []gh.ReviewerCandidate{}}
+	for _, x := range c.Candidates {
+		if x.Requested || q != "" && (strings.Contains(strings.ToLower(x.Login), q) || strings.Contains(strings.ToLower(x.Name), q)) {
+			out.Candidates = append(out.Candidates, x)
+		}
+	}
+	return out, nil
 }
 
 // SetReviewRequest implements gh.Service: it records "review <key> <kind> <login>

@@ -18,6 +18,37 @@ afterEach(() => {
 });
 
 describe("createResource", () => {
+  it("abortOnRelease aborts a released key's fetch and stops it loading; a re-watch fetches again", async () => {
+    const signals: AbortSignal[] = [];
+    const r = createResource(
+      (_key, signal) => {
+        signals.push(signal);
+        return new Promise<string>((_resolve, reject) => {
+          signal.addEventListener("abort", () => {
+            reject(new DOMException("aborted", "AbortError"));
+          });
+        });
+      },
+      { abortOnRelease: true },
+    );
+    const release = r.watch("q");
+    expect(r.store.getState().entries.q?.loading).toBe(true);
+    release();
+    expect(signals[0]?.aborted).toBe(true);
+    await flush();
+    expect(r.store.getState().entries.q).toEqual({ data: null, error: null, loading: false });
+    r.watch("q");
+    expect(signals).toHaveLength(2);
+    expect(signals[1]?.aborted).toBe(false);
+    // Without the option a released fetch runs on.
+    const plain = createResource((_key, signal) => {
+      signals.push(signal);
+      return Promise.resolve("x");
+    });
+    plain.watch("p")();
+    expect(signals[2]?.aborted).toBe(false);
+  });
+
   it("fetches watched keys only, once per invalidation, keeping data on error", async () => {
     const calls: string[] = [];
     let fail = false;

@@ -32,20 +32,28 @@ var (
 	teamSlugRE      = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`)
 )
 
-// ReviewerCandidates implements Service.
-func (s *Store) ReviewerCandidates(ctx context.Context, slug string, number int) (ReviewerCandidates, error) {
+// ReviewerCandidates implements Service. An empty (or blank) query skips the search:
+// only the pending requests come back.
+func (s *Store) ReviewerCandidates(ctx context.Context, slug string, number int, query string) (ReviewerCandidates, error) {
 	k, err := fullKeyOf(slug, number)
 	if err != nil {
 		return ReviewerCandidates{}, err
 	}
 	owner, name := splitSlug(k.slug)
-	return submitFunc(ctx, s, "candidates|"+k.String(), func(ctx context.Context) (ReviewerCandidates, error) {
-		data, err := s.call(ctx, queryReviewerCandidates, map[string]any{"owner": owner, "name": name, "number": k.number})
+	query = strings.TrimSpace(query)
+	return submitFunc(ctx, s, "candidates|"+k.String()+"|"+query, func(ctx context.Context) (ReviewerCandidates, error) {
+		data, err := s.call(ctx, queryReviewerCandidates, reviewerCandidatesVars(owner, name, k.number, query))
 		if err != nil && !isPartial(err) {
 			return ReviewerCandidates{}, err
 		}
 		return decodeReviewerCandidates(data)
 	})
+}
+
+// reviewerCandidatesVars are the ReviewerCandidates document's variables; search is
+// set only for a non-empty query.
+func reviewerCandidatesVars(owner, name string, number int, query string) map[string]any {
+	return map[string]any{"owner": owner, "name": name, "number": number, "query": query, "search": query != ""}
 }
 
 // SetReviewRequest implements Service. It returns the pending requests afterwards

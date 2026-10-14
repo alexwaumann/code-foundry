@@ -11,7 +11,9 @@ import (
 // The fixtures are real captures of pull_request_full.graphql and
 // reviewer_candidates.graphql (2026-10-09, alexwaumann): ghostty-org/ghostty#13779 (open,
 // busy: threads, reviews, a bot, a request for an unreadable team) and
-// alexwaumann/code-foundry#1 (merged, admin viewer).
+// alexwaumann/code-foundry#1 (merged, admin viewer). The reviewer_candidates capture
+// predates the search (assignableUsers(first: 100), with totalCount); the nodes have the
+// same shape a search returns.
 
 func TestDecodeFullPullRequestBusy(t *testing.T) {
 	d, page, err := decodeFullPullRequest(fixtureData(t, "pull_request_full_13779.json"))
@@ -280,8 +282,8 @@ func TestDecodeReviewerCandidates(t *testing.T) {
 	}
 	// 94 assignable users, two of them requested; one request is a team the token
 	// cannot read (null); the author (alex19EP) is not assignable here.
-	if len(c.Candidates) != 94 || c.Truncated {
-		t.Fatalf("candidates = %d truncated %v", len(c.Candidates), c.Truncated)
+	if len(c.Candidates) != 94 {
+		t.Fatalf("candidates = %d", len(c.Candidates))
 	}
 	var head []string
 	for _, x := range c.Candidates[:3] {
@@ -304,26 +306,32 @@ func TestDecodeReviewerCandidatesShapes(t *testing.T) {
 	tests := []struct {
 		name, data string
 		want       []string
-		truncated  bool
 		err        error
 	}{
 		{
-			name: "author excluded, team requested, truncated",
-			data: `{"repository":{"assignableUsers":{"totalCount":250,"nodes":[
-				{"id":"U1","login":"Zed"},{"id":"U2","login":"author"},{"id":"U3","login":"amy"}]},
+			name: "requested then search results, author excluded, requested once",
+			data: `{"repository":{"assignableUsers":{"nodes":[
+				{"id":"U1","login":"Zed"},{"id":"U2","login":"author"},{"id":"U4","login":"bob"},{"id":"U3","login":"amy"}]},
 				"pullRequest":{"author":{"login":"Author"},"reviewRequests":{"nodes":[
 				{"requestedReviewer":{"__typename":"Team","id":"T1","slug":"core","name":"Core","organization":{"login":"acme"}}},
-				{"requestedReviewer":{"__typename":"User","id":"U1","login":"Zed"}}]}}}}`,
-			want:      []string{"acme/core:TEAM:true", "Zed:USER:true", "amy:USER:false"},
-			truncated: true,
+				{"requestedReviewer":{"__typename":"User","id":"U1","login":"zed"}}]}}}}`,
+			want: []string{"acme/core:TEAM:true", "zed:USER:true", "amy:USER:false", "bob:USER:false"},
+		},
+		{
+			name: "search skipped: only the requests",
+			data: `{"repository":{"pullRequest":{"author":{"login":"a"},"reviewRequests":{"nodes":[
+				{"requestedReviewer":{"__typename":"User","id":"U1","login":"kim"}}]}}}}`,
+			want: []string{"kim:USER:true"},
 		},
 		{
 			name: "deleted author, nothing requested",
-			data: `{"repository":{"assignableUsers":{"totalCount":1,"nodes":[{"id":"U1","login":"bob"}]},
+			data: `{"repository":{"assignableUsers":{"nodes":[{"id":"U1","login":"bob"}]},
 				"pullRequest":{"author":null,"reviewRequests":{"nodes":[]}}}}`,
 			want: []string{"bob:USER:false"},
 		},
-		{name: "missing pull request", data: `{"repository":{"assignableUsers":{"nodes":[]},"pullRequest":null}}`, err: ErrNotFound},
+		{name: "no matches, nothing requested", data: `{"repository":{"assignableUsers":{"nodes":[]},
+			"pullRequest":{"author":{"login":"a"},"reviewRequests":{"nodes":[]}}}}`},
+		{name: "missing pull request", data: `{"repository":{"pullRequest":null}}`, err: ErrNotFound},
 		{name: "missing repository", data: `{"repository":null}`, err: ErrNotFound},
 	}
 	for _, tt := range tests {
@@ -342,8 +350,8 @@ func TestDecodeReviewerCandidatesShapes(t *testing.T) {
 			for _, x := range c.Candidates {
 				got = append(got, fmt.Sprintf("%s:%s:%v", x.Login, x.Kind, x.Requested))
 			}
-			if !slices.Equal(got, tt.want) || c.Truncated != tt.truncated {
-				t.Errorf("got %v truncated %v, want %v %v", got, c.Truncated, tt.want, tt.truncated)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -375,7 +383,8 @@ func TestDetailQueryVariables(t *testing.T) {
 		vars map[string]any
 	}{
 		{queryPullRequestFull, map[string]any{"owner": "o", "name": "r", "number": 1}},
-		{queryReviewerCandidates, map[string]any{"owner": "o", "name": "r", "number": 1}},
+		{queryReviewerCandidates, reviewerCandidatesVars("o", "r", 1, "")},
+		{queryReviewerCandidates, reviewerCandidatesVars("o", "r", 1, "kim")},
 		{queryRevertPullRequest, map[string]any{"id": "PR_x"}},
 		{queryMergePullRequest, map[string]any{"id": "PR_x", "method": "SQUASH", "head": "abc"}},
 	} {

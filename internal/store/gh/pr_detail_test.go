@@ -140,25 +140,51 @@ func TestFullPullRequestCache(t *testing.T) {
 
 func TestReviewerCandidatesThroughWorker(t *testing.T) {
 	data := fixtureData(t, "reviewer_candidates_13779.json")
+	var mu sync.Mutex
+	var got []map[string]any
 	f := &fakeRunner{}
 	f.set(func(op string, vars map[string]any) (json.RawMessage, error) {
 		if op != "ReviewerCandidates" {
 			return nil, errors.New("github graphql: not this one")
 		}
-		if vars["owner"] != "ghostty-org" || vars["name"] != "ghostty" || vars["number"] != 13779 {
-			t.Errorf("vars = %v", vars)
-		}
+		mu.Lock()
+		got = append(got, vars)
+		mu.Unlock()
 		return data, nil
 	})
 	s := startStore(t, testOptions(openTestDB(t), f, nil))
-	c, err := s.ReviewerCandidates(context.Background(), "ghostty-org/ghostty", 13779)
+	c, err := s.ReviewerCandidates(context.Background(), "ghostty-org/ghostty", 13779, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(c.Candidates) != 94 || c.Candidates[0].Login != "bo2themax" || !c.Candidates[1].Requested || c.Candidates[2].Requested {
 		t.Errorf("candidates = %d, head %+v", len(c.Candidates), c.Candidates[:3])
 	}
-	if n := f.count("ReviewerCandidates"); n != 1 {
+
+	// The query is trimmed; blank skips the search.
+	tests := []struct {
+		query, want string
+		search      bool
+	}{
+		{query: "", want: "", search: false},
+		{query: "   ", want: "", search: false},
+		{query: " jc ", want: "jc", search: true},
+	}
+	for _, tt := range tests {
+		mu.Lock()
+		got = nil
+		mu.Unlock()
+		if _, err := s.ReviewerCandidates(context.Background(), "ghostty-org/ghostty", 13779, tt.query); err != nil {
+			t.Fatal(err)
+		}
+		mu.Lock()
+		if len(got) != 1 || got[0]["owner"] != "ghostty-org" || got[0]["name"] != "ghostty" || got[0]["number"] != 13779 ||
+			got[0]["query"] != tt.want || got[0]["search"] != tt.search {
+			t.Errorf("query %q: vars = %v", tt.query, got)
+		}
+		mu.Unlock()
+	}
+	if n := f.count("ReviewerCandidates"); n != 4 {
 		t.Errorf("requests = %d", n)
 	}
 }
@@ -341,7 +367,7 @@ func TestRevertPullRequest(t *testing.T) {
 	if _, err := s.RevertPullRequest(ctx, "o/r", 2); !errors.Is(err, ErrRateLimited) {
 		t.Errorf("paused err = %v", err)
 	}
-	if _, err := s.ReviewerCandidates(ctx, "o/r", 1); !errors.Is(err, ErrRateLimited) {
+	if _, err := s.ReviewerCandidates(ctx, "o/r", 1, ""); !errors.Is(err, ErrRateLimited) {
 		t.Errorf("paused candidates err = %v", err)
 	}
 }

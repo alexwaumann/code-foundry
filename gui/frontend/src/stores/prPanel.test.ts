@@ -15,7 +15,7 @@ vi.mock("sonner", () => ({ toast }));
 
 const { pullRequestDetailResource, pullRequestKey } = await import("./gh");
 const { makeTab, closePanelTab, openSurface, usePanelStore } = await import("./panel");
-const { prTabKey, refreshPullRequest, requestingKey, reviewerCandidatesResource, revertPullRequest, setInnerTab, setReviewRequest, usePrPanelStore } = await import("./prPanel");
+const { prTabKey, refreshPullRequest, requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, revertPullRequest, setInnerTab, setReviewRequest, usePrPanelStore } = await import("./prPanel");
 
 const SLUG = "acme/repo";
 const view = (body: string, lastError = "") => ({ body, lastError }) as PullRequestDetailView;
@@ -80,11 +80,12 @@ describe("refreshPullRequest", () => {
 });
 
 describe("setReviewRequest", () => {
-  const candidates = (requested: boolean): ReviewerCandidatesView => ({ candidates: [{ id: "U_lee", kind: "user", login: "lee", name: "", avatarUrl: "", isRequested: requested }], truncated: false });
+  const candidates = (requested: boolean): ReviewerCandidatesView => ({ candidates: [{ id: "U_lee", kind: "user", login: "lee", name: "", avatarUrl: "", isRequested: requested }] });
 
   it("keeps the row busy until the candidates are read again, and ignores a second click meanwhile", async () => {
     const ref = { slug: SLUG, number: 3 };
-    const key = pullRequestKey(SLUG, 3);
+    // The open picker shows a search: that is the key re-read.
+    const key = reviewerCandidatesKey(ref, "le");
     getPullRequestDetail.mockResolvedValue(view("d"));
     listReviewerCandidates.mockResolvedValueOnce(candidates(false));
     const release = reviewerCandidatesResource.watch(key);
@@ -105,6 +106,7 @@ describe("setReviewRequest", () => {
     await expect(setReviewRequest(ref, "lee", "user", true)).resolves.toBe(false);
     expect(invokeCommand).toHaveBeenCalledTimes(1);
 
+    expect(listReviewerCandidates).toHaveBeenLastCalledWith(SLUG, 3, "le", undefined, expect.any(AbortSignal));
     reread.resolve(candidates(true));
     await expect(first).resolves.toBe(true);
     expect(busy()).toBe(false);
@@ -114,7 +116,7 @@ describe("setReviewRequest", () => {
 
   it("a failed request is toasted, re-reads, and clears the spinner", async () => {
     const ref = { slug: SLUG, number: 4 };
-    const key = pullRequestKey(SLUG, 4);
+    const key = reviewerCandidatesKey(ref, "");
     listReviewerCandidates.mockResolvedValue(candidates(false));
     const release = reviewerCandidatesResource.watch(key);
     await vi.waitFor(() => {

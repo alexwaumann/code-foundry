@@ -27,11 +27,11 @@ func (h *Gh) GetPullRequestDetail(ctx context.Context, req *connect.Request[v1.G
 
 // ListReviewerCandidates returns who can be asked to review.
 func (h *Gh) ListReviewerCandidates(ctx context.Context, req *connect.Request[v1.ListReviewerCandidatesRequest]) (*connect.Response[v1.ListReviewerCandidatesResponse], error) {
-	c, err := h.store.ReviewerCandidates(ctx, req.Msg.GetRepoSlug(), int(req.Msg.GetNumber()))
+	c, err := h.store.ReviewerCandidates(ctx, req.Msg.GetRepoSlug(), int(req.Msg.GetNumber()), req.Msg.GetQuery())
 	if err != nil {
 		return nil, ghError(err)
 	}
-	out := &v1.ListReviewerCandidatesResponse{Truncated: c.Truncated, Candidates: make([]*v1.ReviewerCandidate, 0, len(c.Candidates))}
+	out := &v1.ListReviewerCandidatesResponse{Candidates: make([]*v1.ReviewerCandidate, 0, len(c.Candidates))}
 	for _, x := range c.Candidates {
 		out.Candidates = append(out.Candidates, &v1.ReviewerCandidate{
 			Id:          x.ID,

@@ -32,8 +32,13 @@ export interface Resource<V> {
  * One fetch per key at a time; an invalidation during a fetch schedules one more.
  * `keepAliveMs` re-fetches watched keys periodically (renews daemon-side watches that
  * lapse without calls, e.g. GetBranchPullRequests and GetWorktreeDetail).
+ * `abortOnRelease` aborts a key's fetch when its last watcher lets go (a search the user
+ * typed past); the entry keeps its data and stops loading.
  */
-export function createResource<V>(fetcher: (key: string, signal: AbortSignal) => Promise<V>, opts: { keepAliveMs?: number } = {}): Resource<V> {
+export function createResource<V>(
+  fetcher: (key: string, signal: AbortSignal) => Promise<V>,
+  opts: { keepAliveMs?: number; abortOnRelease?: boolean } = {},
+): Resource<V> {
   const store = create<{ entries: Readonly<Record<string, ResourceEntry<V>>> }>()(() => ({ entries: {} }));
   const interest = new Map<string, number>();
   const inflight = new Map<string, AbortController>();
@@ -64,7 +69,10 @@ export function createResource<V>(fetcher: (key: string, signal: AbortSignal) =>
         patch(key, current() ? { data, error: null, loading: false } : { loading: false });
       })
       .catch((err: unknown) => {
-        if (isAbort(err)) return;
+        if (ctl.signal.aborted || isAbort(err)) {
+          if (ctl.signal.aborted) patch(key, { loading: false });
+          return;
+        }
         invalidateOnTransportError(err);
         patch(key, current() ? { error: errorMessage(err), loading: false } : { loading: false });
       })
@@ -97,6 +105,10 @@ export function createResource<V>(fetcher: (key: string, signal: AbortSignal) =>
         interest.delete(key);
         clearInterval(timers.get(key));
         timers.delete(key);
+        if (opts.abortOnRelease) {
+          rerun.delete(key);
+          inflight.get(key)?.abort();
+        }
       };
     },
     invalidate: (keyOrPred) => {
