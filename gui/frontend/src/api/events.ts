@@ -1,5 +1,6 @@
 import { EventService, type Event } from "@/gen/codefoundry/v1/events_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { HEARTBEAT, type Heartbeat } from "./stream";
 import { toGhEventView, type GhEventView } from "./gh";
 import { toGitOpsEventView, type GitOpsEventView } from "./gitops";
 import { toRepoEventView, type RepoEventView } from "./repo";
@@ -77,10 +78,14 @@ export function toEventView(ev: Event): EventView | null {
   }
 }
 
-/** Opens EventService.Watch (all sources) and yields mapped events. */
-export async function* watchEvents(signal: AbortSignal, conn: DaemonConnection = daemon): AsyncGenerator<EventView> {
+/** Opens EventService.Watch (all sources) and yields mapped events and HEARTBEAT for heartbeats. */
+export async function* watchEvents(signal: AbortSignal, conn: DaemonConnection = daemon): AsyncGenerator<EventView | Heartbeat> {
   const c = await conn.client(EventService);
   for await (const ev of c.watch({}, { signal })) {
+    if (ev.event.case === "heartbeat") {
+      yield HEARTBEAT;
+      continue;
+    }
     const v = toEventView(ev);
     if (v) yield v;
   }

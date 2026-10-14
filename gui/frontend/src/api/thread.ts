@@ -18,6 +18,7 @@ import {
   type ThreadRequestItem,
 } from "@/gen/codefoundry/v1/thread_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { HEARTBEAT, type Heartbeat } from "./stream";
 import { toMcpStatusView, type McpStatusView } from "./mcp";
 import { toSlashCommandViews, type SlashCommandView } from "./slashCommands";
 
@@ -303,10 +304,14 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
   }
 }
 
-/** Opens ThreadService.Watch for one thread and yields mapped events (a snapshot first). */
-export async function* watchThread(sessionId: string, signal: AbortSignal, conn: DaemonConnection = daemon): AsyncGenerator<ThreadEventView> {
+/** Opens ThreadService.Watch for one thread and yields mapped events (a snapshot first) and HEARTBEAT for heartbeats. */
+export async function* watchThread(sessionId: string, signal: AbortSignal, conn: DaemonConnection = daemon): AsyncGenerator<ThreadEventView | Heartbeat> {
   const c = await conn.client(ThreadService);
   for await (const ev of c.watch({ sessionId }, { signal })) {
+    if (ev.event.case === "heartbeat") {
+      yield HEARTBEAT;
+      continue;
+    }
     const v = toThreadEventView(ev);
     if (v) yield v;
   }

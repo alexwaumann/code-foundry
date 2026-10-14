@@ -7,6 +7,7 @@ import {
   type TerminalEvent,
 } from "@/gen/codefoundry/v1/terminal_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { HEARTBEAT, type Heartbeat } from "./stream";
 
 export type TerminalStateView = "running" | "exited" | "unknown";
 
@@ -94,9 +95,13 @@ export async function* attachTerminal(
   id: string,
   signal: AbortSignal,
   conn: DaemonConnection = daemon,
-): AsyncGenerator<AttachEventView> {
+): AsyncGenerator<AttachEventView | Heartbeat> {
   const c = await conn.client(TerminalService);
   for await (const ev of c.attach({ id }, { signal })) {
+    if (ev.event.case === "heartbeat") {
+      yield HEARTBEAT;
+      continue;
+    }
     const v = toAttachEventView(ev);
     if (v) yield v;
   }

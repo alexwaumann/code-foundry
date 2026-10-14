@@ -2,8 +2,8 @@
  * docs/notes/thread-render-stall.md, cause 1: after the Wails window was hidden, minimized
  * or covered, WKWebView holds the last bytes of the ThreadService.Watch response until more
  * bytes arrive. The stream stays open, so nothing reconnects, and the thread shows a stale
- * tail until the user leaves and comes back. These tests describe the proposed client half
- * of the fix (resync when the page becomes visible) and FAIL until it lands.
+ * tail until the user leaves and comes back. These tests cover the client half of the fix
+ * (resync when the page becomes visible: runStream resyncOnVisible).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadEventView } from "@/api/thread";
@@ -52,7 +52,7 @@ describe("the visible thread's Watch after the window was hidden", () => {
     setVisibility("visible");
     await vi.advanceTimersByTimeAsync(1_000);
 
-    // Today nothing happens: the open stream is trusted, and the stale log stays.
+    // The held tail never arrives on the old stream: a new Watch brings a fresh snapshot.
     expect(watched.opened).toBe(2);
     expect(useThreadStore.getState().logs.s?.seq).toBe(2);
     stop();
