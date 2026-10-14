@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -17,6 +18,7 @@ import (
 // Terminal implements codefoundryv1connect.TerminalServiceHandler over a terminal.Store.
 type Terminal struct {
 	store terminal.Store
+	beat  time.Duration // Attach's heartbeat interval; zero is HeartbeatInterval (tests shorten it)
 }
 
 var _ codefoundryv1connect.TerminalServiceHandler = (*Terminal)(nil)
@@ -80,10 +82,18 @@ func (h *Terminal) Attach(ctx context.Context, req *connect.Request[v1.AttachReq
 	if err != nil {
 		return terminalError(err)
 	}
+	// A quiet shell gets a heartbeat every HeartbeatInterval (see heartbeat.proto).
+	beat := newHeartbeat(h.beat)
+	defer beat.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
+		case <-beat.C():
+			beat.Reset()
+			if err := stream.Send(&v1.AttachEvent{Event: &v1.AttachEvent_Heartbeat{Heartbeat: &v1.StreamHeartbeat{}}}); err != nil {
+				return err
+			}
 		case ev, ok := <-ch:
 			if !ok {
 				return nil
@@ -91,6 +101,7 @@ func (h *Terminal) Attach(ctx context.Context, req *connect.Request[v1.AttachReq
 			if ev.Dropped {
 				return connect.NewError(connect.CodeResourceExhausted, terminal.ErrSlowSubscriber)
 			}
+			beat.Reset()
 			if err := stream.Send(attachEventToProto(ev)); err != nil {
 				return err
 			}

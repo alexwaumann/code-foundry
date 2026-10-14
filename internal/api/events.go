@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"sync"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -46,6 +47,7 @@ type EventsDeps struct {
 // instead of one per service.
 type Events struct {
 	deps EventsDeps
+	beat time.Duration // Watch's heartbeat interval; zero is HeartbeatInterval (tests shorten it)
 }
 
 var _ codefoundryv1connect.EventServiceHandler = (*Events)(nil)
@@ -142,10 +144,18 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 		}()
 	}
 
+	// Quiet sources (gh polling off, no thread busy) get a heartbeat every
+	// HeartbeatInterval (see heartbeat.proto).
+	beat := newHeartbeat(h.beat)
+	defer beat.Stop()
+	send := func(ev *v1.Event) error {
+		beat.Reset()
+		return stream.Send(ev)
+	}
 	sendSnapshot := func(s eventSource) (int, error) {
 		evs := s.snapshot(ctx)
 		for _, ev := range evs {
-			if err := stream.Send(ev); err != nil {
+			if err := send(ev); err != nil {
 				return 0, err
 			}
 		}
@@ -162,7 +172,7 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 	// Flush response headers now if no snapshot did: clients block until they arrive,
 	// and the first live event may be a long way off.
 	if sent == 0 {
-		if err := stream.Send(nil); err != nil {
+		if err := send(nil); err != nil {
 			return err
 		}
 	}
@@ -173,6 +183,10 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 			return nil
 		case <-h.deps.Done:
 			return nil
+		case <-beat.C():
+			if err := send(&v1.Event{Event: &v1.Event_Heartbeat{Heartbeat: &v1.StreamHeartbeat{}}}); err != nil {
+				return err
+			}
 		case t := <-merged:
 			if t.ev == nil {
 				if _, err := sendSnapshot(srcs[t.src]); err != nil {
@@ -180,7 +194,7 @@ func (h *Events) Watch(ctx context.Context, req *connect.Request[v1.WatchEventsR
 				}
 				continue
 			}
-			if err := stream.Send(t.ev); err != nil {
+			if err := send(t.ev); err != nil {
 				return err
 			}
 		}

@@ -12,10 +12,10 @@ import (
 )
 
 // threadWatchIdleBudget is how long an idle ThreadService.Watch may stay silent in the
-// proposed fix (docs/notes/thread-render-stall.md, cause 1).
+// fix (docs/notes/thread-render-stall.md, cause 1): HeartbeatInterval plus slack.
 const threadWatchIdleBudget = 8 * time.Second
 
-// TestThreadWatchIdleHeartbeat FAILS until the Watch sends a heartbeat. After the Wails
+// TestThreadWatchIdleHeartbeat: an idle Watch sends a heartbeat. After the Wails
 // window was hidden, minimized or covered, WKWebView holds the last bytes of a streaming
 // response until more bytes arrive (reproduced live; see the note). A Watch that goes
 // quiet after a turn's last events (the turn ended, or a long tool call started) then
