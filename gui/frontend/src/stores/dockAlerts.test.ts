@@ -190,7 +190,7 @@ describe("alertSettings", () => {
       { dockBadge: false, bounce: false, sound: true, cooldownMs: 0 },
     ],
     // An older daemon without the keys: the schema's defaults.
-    [{}, { dockBadge: true, bounce: true, sound: false, cooldownMs: 0 }],
+    [{}, { dockBadge: true, bounce: true, sound: false, cooldownMs: 60_000 }],
   ])("%j", (values, want) => {
     expect(alertSettings(snap(values))).toEqual(want);
   });

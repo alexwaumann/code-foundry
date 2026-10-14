@@ -23,6 +23,9 @@ export const NOTIFY_KEYS = {
   cooldown: "notifications.cooldown_seconds",
 } as const;
 
+/** notifications.cooldown_seconds' default in the daemon's schema. */
+const DEFAULT_COOLDOWN_SECONDS = 60;
+
 export interface AlertSettings {
   dockBadge: boolean;
   bounce: boolean;
@@ -39,7 +42,8 @@ export interface AlertSettings {
 export function alertSettings(snap: SettingsSnapshotView | null): AlertSettings | null {
   if (!snap) return null;
   const v = snap.values;
-  const cooldown = Number(v[NOTIFY_KEYS.cooldown]);
+  // An older daemon without the keys gets the schema's defaults.
+  const cooldown = Number(v[NOTIFY_KEYS.cooldown] ?? DEFAULT_COOLDOWN_SECONDS);
   return {
     dockBadge: v[NOTIFY_KEYS.dockBadge] !== "false",
     bounce: v[NOTIFY_KEYS.bounce] !== "false",
