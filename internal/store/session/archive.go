@@ -9,8 +9,8 @@ import (
 // Archive archives or unarchives a thread (docs/notes/archive-threads-1-daemon.md).
 //
 // Archiving closes the thread like Close (a no-op when it is disconnected), kills and
-// removes its shells like Remove, then, under m.mu, unpins it and stamps ArchivedAt
-// unless it already has one (a second archive keeps the first time). A Reconnect that
+// removes its shells like Remove, then, under m.mu, unpins and unsnoozes it and stamps
+// ArchivedAt unless it already has one (a second archive keeps the first time). A Reconnect that
 // wins the race between the close and that last step makes Archive fail rather than
 // archive a live thread. Unarchiving only clears ArchivedAt: the thread stays
 // disconnected until the user reconnects it.
@@ -42,7 +42,8 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Sessio
 	if rec.run != nil || rec.s.State != StateDisconnected {
 		return Session{}, fmt.Errorf("%w: session %s was reconnected while being archived", ErrFailedPrecondition, id)
 	}
-	if !rec.s.ArchivedAt.IsZero() && !rec.s.Pinned {
+	unsnoozed := m.unsnoozeLocked(rec) // archive and snooze are exclusive
+	if !rec.s.ArchivedAt.IsZero() && !rec.s.Pinned && !unsnoozed {
 		return rec.s, nil
 	}
 	if rec.s.ArchivedAt.IsZero() {
@@ -65,12 +66,17 @@ func (m *Manager) unarchiveLocked(rec *record) bool {
 	return true
 }
 
-// unarchive is unarchiveLocked for a caller without m.mu (Send), committing and
-// publishing when the thread was archived.
-func (m *Manager) unarchive(id string) {
+// backToList unarchives and unsnoozes (unarchiveLocked, unsnoozeLocked) for a caller
+// without m.mu (Send), committing and publishing when the thread was either.
+func (m *Manager) backToList(id string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if rec, ok := m.recs[id]; ok && m.unarchiveLocked(rec) {
+	rec, ok := m.recs[id]
+	if !ok {
+		return
+	}
+	unarchived := m.unarchiveLocked(rec)
+	if m.unsnoozeLocked(rec) || unarchived {
 		m.commitLocked(rec, true)
 	}
 }

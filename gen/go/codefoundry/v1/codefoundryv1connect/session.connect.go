@@ -56,6 +56,8 @@ const (
 	SessionServicePinProcedure = "/codefoundry.v1.SessionService/Pin"
 	// SessionServiceArchiveProcedure is the fully-qualified name of the SessionService's Archive RPC.
 	SessionServiceArchiveProcedure = "/codefoundry.v1.SessionService/Archive"
+	// SessionServiceSnoozeProcedure is the fully-qualified name of the SessionService's Snooze RPC.
+	SessionServiceSnoozeProcedure = "/codefoundry.v1.SessionService/Snooze"
 	// SessionServiceWatchProcedure is the fully-qualified name of the SessionService's Watch RPC.
 	SessionServiceWatchProcedure = "/codefoundry.v1.SessionService/Watch"
 	// SessionServiceStageAttachmentProcedure is the fully-qualified name of the SessionService's
@@ -101,6 +103,15 @@ type SessionServiceClient interface {
 	// clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
 	// Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
 	Archive(context.Context, *connect.Request[v1.ArchiveSessionRequest]) (*connect.Response[v1.ArchiveSessionResponse], error)
+	// Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
+	// Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
+	// thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze
+	// replaces it). until must be in the future (INVALID_ARGUMENT otherwise). When the
+	// time comes the daemon wakes the thread: snoozed_until is cleared and the thread,
+	// still disconnected, becomes NEEDS_ATTENTION "snooze ended" (status_changed_at = the
+	// wake time). Unsnoozing before then only clears snoozed_until. Reconnect, Pin
+	// (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
+	Snooze(context.Context, *connect.Request[v1.SnoozeSessionRequest]) (*connect.Response[v1.SnoozeSessionResponse], error)
 	// Watch streams session changes. The first event is a snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchSessionsRequest]) (*connect.ServerStreamForClient[v1.SessionEvent], error)
 	// StageAttachment stores an image the first prompt refers to and returns its path.
@@ -191,6 +202,12 @@ func NewSessionServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(sessionServiceMethods.ByName("Archive")),
 			connect.WithClientOptions(opts...),
 		),
+		snooze: connect.NewClient[v1.SnoozeSessionRequest, v1.SnoozeSessionResponse](
+			httpClient,
+			baseURL+SessionServiceSnoozeProcedure,
+			connect.WithSchema(sessionServiceMethods.ByName("Snooze")),
+			connect.WithClientOptions(opts...),
+		),
 		watch: connect.NewClient[v1.WatchSessionsRequest, v1.SessionEvent](
 			httpClient,
 			baseURL+SessionServiceWatchProcedure,
@@ -225,6 +242,7 @@ type sessionServiceClient struct {
 	runIn           *connect.Client[v1.RunInSessionRequest, v1.RunInSessionResponse]
 	pin             *connect.Client[v1.PinSessionRequest, v1.PinSessionResponse]
 	archive         *connect.Client[v1.ArchiveSessionRequest, v1.ArchiveSessionResponse]
+	snooze          *connect.Client[v1.SnoozeSessionRequest, v1.SnoozeSessionResponse]
 	watch           *connect.Client[v1.WatchSessionsRequest, v1.SessionEvent]
 	stageAttachment *connect.Client[v1.StageAttachmentRequest, v1.StageAttachmentResponse]
 	readAttachment  *connect.Client[v1.ReadAttachmentRequest, v1.ReadAttachmentResponse]
@@ -285,6 +303,11 @@ func (c *sessionServiceClient) Archive(ctx context.Context, req *connect.Request
 	return c.archive.CallUnary(ctx, req)
 }
 
+// Snooze calls codefoundry.v1.SessionService.Snooze.
+func (c *sessionServiceClient) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeSessionRequest]) (*connect.Response[v1.SnoozeSessionResponse], error) {
+	return c.snooze.CallUnary(ctx, req)
+}
+
 // Watch calls codefoundry.v1.SessionService.Watch.
 func (c *sessionServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchSessionsRequest]) (*connect.ServerStreamForClient[v1.SessionEvent], error) {
 	return c.watch.CallServerStream(ctx, req)
@@ -335,6 +358,15 @@ type SessionServiceHandler interface {
 	// clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
 	// Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
 	Archive(context.Context, *connect.Request[v1.ArchiveSessionRequest]) (*connect.Response[v1.ArchiveSessionResponse], error)
+	// Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
+	// Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
+	// thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze
+	// replaces it). until must be in the future (INVALID_ARGUMENT otherwise). When the
+	// time comes the daemon wakes the thread: snoozed_until is cleared and the thread,
+	// still disconnected, becomes NEEDS_ATTENTION "snooze ended" (status_changed_at = the
+	// wake time). Unsnoozing before then only clears snoozed_until. Reconnect, Pin
+	// (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
+	Snooze(context.Context, *connect.Request[v1.SnoozeSessionRequest]) (*connect.Response[v1.SnoozeSessionResponse], error)
 	// Watch streams session changes. The first event is a snapshot.
 	Watch(context.Context, *connect.Request[v1.WatchSessionsRequest], *connect.ServerStream[v1.SessionEvent]) error
 	// StageAttachment stores an image the first prompt refers to and returns its path.
@@ -421,6 +453,12 @@ func NewSessionServiceHandler(svc SessionServiceHandler, opts ...connect.Handler
 		connect.WithSchema(sessionServiceMethods.ByName("Archive")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sessionServiceSnoozeHandler := connect.NewUnaryHandler(
+		SessionServiceSnoozeProcedure,
+		svc.Snooze,
+		connect.WithSchema(sessionServiceMethods.ByName("Snooze")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sessionServiceWatchHandler := connect.NewServerStreamHandler(
 		SessionServiceWatchProcedure,
 		svc.Watch,
@@ -463,6 +501,8 @@ func NewSessionServiceHandler(svc SessionServiceHandler, opts ...connect.Handler
 			sessionServicePinHandler.ServeHTTP(w, r)
 		case SessionServiceArchiveProcedure:
 			sessionServiceArchiveHandler.ServeHTTP(w, r)
+		case SessionServiceSnoozeProcedure:
+			sessionServiceSnoozeHandler.ServeHTTP(w, r)
 		case SessionServiceWatchProcedure:
 			sessionServiceWatchHandler.ServeHTTP(w, r)
 		case SessionServiceStageAttachmentProcedure:
@@ -520,6 +560,10 @@ func (UnimplementedSessionServiceHandler) Pin(context.Context, *connect.Request[
 
 func (UnimplementedSessionServiceHandler) Archive(context.Context, *connect.Request[v1.ArchiveSessionRequest]) (*connect.Response[v1.ArchiveSessionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SessionService.Archive is not implemented"))
+}
+
+func (UnimplementedSessionServiceHandler) Snooze(context.Context, *connect.Request[v1.SnoozeSessionRequest]) (*connect.Response[v1.SnoozeSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SessionService.Snooze is not implemented"))
 }
 
 func (UnimplementedSessionServiceHandler) Watch(context.Context, *connect.Request[v1.WatchSessionsRequest], *connect.ServerStream[v1.SessionEvent]) error {

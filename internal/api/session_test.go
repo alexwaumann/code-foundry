@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
@@ -255,5 +256,61 @@ func TestSessionWatchSendsSnapshotThenEvents(t *testing.T) {
 	}
 	if !stream.Receive() || stream.Msg().GetRemovedId() != "s-a" {
 		t.Fatalf("third event = %v (%v)", stream.Msg(), stream.Err())
+	}
+}
+
+func TestSessionSnooze(t *testing.T) {
+	now := time.Date(2026, 10, 14, 15, 4, 5, 0, time.UTC)
+	until := now.Add(90 * time.Minute)
+	tests := []struct {
+		name      string
+		id        string
+		until     *timestamppb.Timestamp
+		wantCode  connect.Code
+		wantUntil time.Time // zero: snoozed_until unset
+		wantCall  string    // "" when the store is not called
+	}{
+		{name: "snooze maps the time both ways", id: "s-1", until: timestamppb.New(until),
+			wantUntil: until, wantCall: "Snooze s-1 2026-10-14T16:34:05.000Z"},
+		{name: "unset until unsnoozes", id: "s-1", wantCall: "Snooze s-1 -"},
+		{name: "a past time is invalid", id: "s-1", until: timestamppb.New(now.Add(-time.Minute)),
+			wantCode: connect.CodeInvalidArgument, wantCall: "Snooze s-1 2026-10-14T15:03:05.000Z"},
+		{name: "a malformed timestamp is invalid", id: "s-1", until: &timestamppb.Timestamp{Seconds: until.Unix(), Nanos: -1},
+			wantCode: connect.CodeInvalidArgument},
+		{name: "unknown thread", id: "nope", until: timestamppb.New(until), wantCode: connect.CodeNotFound,
+			wantCall: "Snooze nope 2026-10-14T16:34:05.000Z"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake, c := newSessionServer(t)
+			fake.Now = func() time.Time { return now }
+			fake.Put(session.Session{ID: "s-1", State: session.StateConnected, Pinned: true, ArchivedAt: now.Add(-time.Hour),
+				SnoozedUntil: now.Add(time.Hour), CreatedAt: now})
+			res, err := c.Snooze(context.Background(), connect.NewRequest(&v1.SnoozeSessionRequest{Id: tt.id, Until: tt.until}))
+			if connect.CodeOf(err) != tt.wantCode && (tt.wantCode != 0 || err != nil) {
+				t.Fatalf("Snooze = %v, want code %v", err, tt.wantCode)
+			}
+			var calls []string
+			if tt.wantCall != "" {
+				calls = []string{tt.wantCall}
+			}
+			if got := fake.Calls(); !slices.Equal(got, calls) {
+				t.Errorf("calls = %q, want %q", got, calls)
+			}
+			if tt.wantCode != 0 {
+				return
+			}
+			s := res.Msg.GetSession()
+			if tt.wantUntil.IsZero() {
+				if s.GetSnoozedUntil() != nil {
+					t.Errorf("snoozed_until = %v, want unset", s.GetSnoozedUntil())
+				}
+				return
+			}
+			if !s.GetSnoozedUntil().AsTime().Equal(tt.wantUntil) || s.GetArchivedAt() != nil || s.GetPinned() ||
+				s.GetState() != v1.SessionState_SESSION_STATE_DISCONNECTED {
+				t.Errorf("snoozed = %v; want snoozed_until %v, not archived, unpinned, disconnected", s, tt.wantUntil)
+			}
+		})
 	}
 }

@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -105,6 +107,23 @@ func (h *Session) Archive(ctx context.Context, req *connect.Request[v1.ArchiveSe
 		return nil, sessionError(err)
 	}
 	return connect.NewResponse(&v1.ArchiveSessionResponse{Session: sessionToProto(s)}), nil
+}
+
+// Snooze snoozes a thread until req.until (closing it and its shells, unpinning,
+// unarchiving) or unsnoozes it (until unset).
+func (h *Session) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeSessionRequest]) (*connect.Response[v1.SnoozeSessionResponse], error) {
+	var until time.Time
+	if t := req.Msg.GetUntil(); t != nil {
+		if err := t.CheckValid(); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("until: %w", err))
+		}
+		until = t.AsTime()
+	}
+	s, err := h.store.Snooze(ctx, req.Msg.GetId(), until)
+	if err != nil {
+		return nil, sessionError(err)
+	}
+	return connect.NewResponse(&v1.SnoozeSessionResponse{Session: sessionToProto(s)}), nil
 }
 
 // Close ends the process gracefully; it returns once the session is DISCONNECTED.
@@ -240,6 +259,9 @@ func sessionToProto(s session.Session) *v1.Session {
 	}
 	if !s.ArchivedAt.IsZero() {
 		p.ArchivedAt = timestamppb.New(s.ArchivedAt)
+	}
+	if !s.SnoozedUntil.IsZero() {
+		p.SnoozedUntil = timestamppb.New(s.SnoozedUntil)
 	}
 	for _, l := range s.LinkedPullRequests {
 		lp := &v1.LinkedPullRequest{Slug: l.Slug, Number: int32(l.Number), Url: l.URL}

@@ -41,6 +41,15 @@ service SessionService {
   // clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
   // Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
   rpc Archive(ArchiveSessionRequest) returns (ArchiveSessionResponse) {}
+  // Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
+  // Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
+  // thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze
+  // replaces it). until must be in the future (INVALID_ARGUMENT otherwise). When the
+  // time comes the daemon wakes the thread: snoozed_until is cleared and the thread,
+  // still disconnected, becomes NEEDS_ATTENTION "snooze ended" (status_changed_at = the
+  // wake time). Unsnoozing before then only clears snoozed_until. Reconnect, Pin
+  // (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
+  rpc Snooze(SnoozeSessionRequest) returns (SnoozeSessionResponse) {}
   // Watch streams session changes. The first event is a snapshot.
   rpc Watch(WatchSessionsRequest) returns (stream SessionEvent) {}
   // StageAttachment stores an image the first prompt refers to and returns its path.
@@ -135,7 +144,9 @@ message Session {
   // Forked from this session id, if any.
   string parent_id = 17;
   // Short explanation of status from the detector, e.g. "finished", "at prompt",
-  // "permission: Do you want to proceed?", or "interrupted" for ERROR. Persisted with
+  // "permission: Do you want to proceed?", "snooze ended" (NEEDS_ATTENTION on a
+  // disconnected thread whose snooze ran out; cleared like "finished" on a disconnected
+  // thread, by a reconnect), or "interrupted" for ERROR. Persisted with
   // status: a DISCONNECTED session keeps the status and reason it had when its process
   // ended (a busy one becomes ERROR "interrupted"), across daemon restarts. Empty when
   // unknown.
@@ -214,6 +225,14 @@ message Session {
   // archived. An archived thread is disconnected, unpinned and has no shells; the GUI
   // lists it apart. Reconnect, Pin (pinned) and Send clear it. Persisted.
   google.protobuf.Timestamp archived_at = 37;
+  // When a snoozed thread wakes (SessionService.Snooze); unset when it is not snoozed.
+  // A snoozed thread is disconnected, unpinned, not archived and has no shells; the GUI
+  // lists it apart. The daemon checks the wall clock (every 30 s and at startup, so a
+  // snooze that ended while the Mac slept or the daemon was stopped wakes as soon as it
+  // can): waking clears this field and sets status NEEDS_ATTENTION with status_reason
+  // "snooze ended". Reconnect, Pin (pinned), Send and Archive (archived) clear it.
+  // Persisted.
+  google.protobuf.Timestamp snoozed_until = 38;
 }
 
 // ApiRetry is a thread's pending API retry: Claude's system/api_retry frame.
@@ -471,6 +490,16 @@ message ArchiveSessionRequest {
 }
 
 message ArchiveSessionResponse {
+  Session session = 1;
+}
+
+message SnoozeSessionRequest {
+  string id = 1;
+  // When the thread wakes; must be in the future. Unset unsnoozes.
+  google.protobuf.Timestamp until = 2;
+}
+
+message SnoozeSessionResponse {
   Session session = 1;
 }
 

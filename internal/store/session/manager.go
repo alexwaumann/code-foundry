@@ -103,7 +103,12 @@ type Options struct {
 	// from its last result (the sessions.cache_ttl_seconds setting; SetCacheTTL changes
 	// it live). Default DefaultCacheTTL.
 	CacheTTL time.Duration
-	Now      func() time.Time
+	// SnoozeCheckInterval is how often snoozed threads are checked against the wall
+	// clock (wakeSnoozed). Default SnoozeCheckInterval (the package constant).
+	SnoozeCheckInterval time.Duration
+	// Now is the wall clock: timestamps, snooze validation and wake-ups. Default
+	// time.Now.
+	Now func() time.Time
 }
 
 func (o Options) withDefaults() (Options, error) {
@@ -156,6 +161,7 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.AttachmentMaxAge, AttachmentMaxAge)
 	def(&o.AttachmentReapInterval, AttachmentReapInterval)
 	def(&o.CacheTTL, DefaultCacheTTL)
+	def(&o.SnoozeCheckInterval, SnoozeCheckInterval)
 	if o.Now == nil {
 		o.Now = time.Now
 	}
@@ -231,6 +237,16 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	m.mu.Lock()
 	m.rebuildLocked()
 	m.mu.Unlock()
+	// Snoozes that ended while the daemon was stopped wake now, then the clock is
+	// checked on every tick (snooze.go).
+	m.wakeSnoozed()
+	snoozeTicker := time.NewTicker(opts.SnoozeCheckInterval)
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		defer snoozeTicker.Stop()
+		m.wakeSnoozedLoop(snoozeTicker.C)
+	}()
 	if opts.AttachmentsDir != "" {
 		// Exists for claude --add-dir (see spawn) before anything is staged.
 		if err := os.MkdirAll(opts.AttachmentsDir, 0o700); err != nil {
@@ -512,7 +528,7 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Session, error) {
 
 // Reconnect resumes a DISCONNECTED session. Without a resumable conversation (no
 // Claude session id yet, or its transcript is gone) it starts a new conversation in
-// the same worktree and says so in LastError. It unarchives the thread.
+// the same worktree and says so in LastError. It unarchives and unsnoozes the thread.
 func (m *Manager) Reconnect(ctx context.Context, id string) (Session, error) {
 	m.mu.Lock()
 	rec, err := m.record(id)
@@ -561,8 +577,10 @@ func (m *Manager) Reconnect(ctx context.Context, id string) (Session, error) {
 	}
 	m.update(id, false, func(r *record) {
 		r.s.LastError = lastErr
-		// Reconnecting unarchives (persisted by spawn's commit, or by revert).
+		// Reconnecting unarchives and unsnoozes (persisted by spawn's commit, or by
+		// revert).
 		m.unarchiveLocked(r)
+		m.unsnoozeLocked(r)
 		if l.resume == "" {
 			r.s.ClaudeSessionID = ""
 			r.namingTried = r.s.Name != ""
@@ -680,7 +698,7 @@ func (m *Manager) Rename(_ context.Context, id, name string) (Session, error) {
 }
 
 // Pin sets or clears the user's pin. It works in any state and is persisted. Pinning an
-// archived thread unarchives it.
+// archived or snoozed thread unarchives or unsnoozes it.
 func (m *Manager) Pin(_ context.Context, id string, pinned bool) (Session, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -689,7 +707,8 @@ func (m *Manager) Pin(_ context.Context, id string, pinned bool) (Session, error
 		return Session{}, err
 	}
 	unarchived := pinned && m.unarchiveLocked(rec)
-	if rec.s.Pinned == pinned && !unarchived {
+	unsnoozed := pinned && m.unsnoozeLocked(rec)
+	if rec.s.Pinned == pinned && !unarchived && !unsnoozed {
 		return rec.s, nil
 	}
 	rec.s.Pinned = pinned
