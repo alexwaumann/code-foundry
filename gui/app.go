@@ -23,17 +23,42 @@ type AppInfo struct {
 	Version string `json:"version"`
 }
 
-// AppService is bound to the frontend: the GUI's own version, relaunching itself, and
-// the native folder picker (pickdir.go).
+// AppService is bound to the frontend: the GUI's own version, relaunching itself, the
+// native folder picker (pickdir.go), and the Dock badge and bounce (notify.go).
 // Updates are installed by the daemon; the host only quits and reopens the window.
 type AppService struct {
 	log *slog.Logger
 	// window is the main window, set by main after it is created (for SetZoom).
 	window *application.WebviewWindow
+	// badge holds the Dock badge until the app has finished launching (dockLaunched).
+	badge *dockBadge
 }
 
 // NewAppService returns an AppService.
-func NewAppService(log *slog.Logger) *AppService { return &AppService{log: log} }
+func NewAppService(log *slog.Logger) *AppService {
+	return &AppService{log: log, badge: &dockBadge{apply: setDockBadgeLabel}}
+}
+
+// SetBadge shows count on the Dock icon: no badge for 0, "99+" above 99. The frontend
+// calls it with the number of threads that need attention whenever that changes
+// (stores/dockAlerts.ts). Before the app has finished launching the badge is held and
+// applied then.
+func (s *AppService) SetBadge(count int) {
+	s.badge.set(badgeLabel(count))
+}
+
+// Bounce bounces the Dock icon once. macOS ignores it while Code Foundry is the active
+// app. The frontend decides when (a thread started needing attention, outside the alert
+// cooldown).
+func (s *AppService) Bounce() {
+	bounceDock()
+}
+
+// dockLaunched applies a badge set before the app finished launching. Called from the
+// ApplicationDidFinishLaunching handler (icon.go), after the icon is set.
+func (s *AppService) dockLaunched() {
+	s.badge.didLaunch()
+}
 
 // Info returns the GUI's version.
 func (s *AppService) Info() AppInfo {
