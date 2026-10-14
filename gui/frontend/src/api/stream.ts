@@ -192,10 +192,16 @@ export function runStream<T>(h: StreamHandlers<T>): () => void {
         connected?.catch((err: unknown) => {
           ctl.abort(err);
         });
-        if (!connected) status("open");
+        // Without onConnect the attempt is open once its first message arrives: a request
+        // that hangs (a stopped daemon) keeps reporting connecting or retrying.
+        let first = !connected;
         for await (const ev of h.open(ctl.signal)) {
           // A stopped or resynced attempt's late events must not reach the client.
           if (ctl.signal.aborted) break;
+          if (first) {
+            first = false;
+            status("open");
+          }
           if (ev === HEARTBEAT) {
             armed ||= liveness > 0;
             feed();

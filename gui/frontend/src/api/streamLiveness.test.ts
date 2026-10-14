@@ -152,6 +152,24 @@ describe("liveness watchdog", () => {
   });
 });
 
+describe("open status", () => {
+  it("is reported on an attempt's first message, so a hanging reconnect stays retrying", async () => {
+    const s = server();
+    const r = start(s);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(r.statuses).toEqual(["connecting"]);
+    s.push(HEARTBEAT);
+    await vi.advanceTimersByTimeAsync(LIVENESS_MS + 1_000);
+    // The watchdog fired; the new attempt has sent nothing yet (a stopped daemon).
+    expect(s.opened).toBe(2);
+    expect(r.statuses).toEqual(["connecting", "open", "retrying", "retrying"]);
+    s.push(1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(r.statuses.at(-1)).toBe("open");
+    r.stop();
+  });
+});
+
 describe("resyncOnVisible", () => {
   it("reconnects at once when the page becomes visible after being hidden", async () => {
     const s = server();
@@ -164,6 +182,9 @@ describe("resyncOnVisible", () => {
     setVisibility("visible");
     await vi.advanceTimersByTimeAsync(0);
     expect(s.opened).toBe(2);
+    s.push(2);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(r.got).toEqual([1, 2]);
     // A resync is not a failure: no error, no backoff, "connecting" rather than "retrying".
     expect(r.errors).toEqual([]);
     expect(r.statuses).toEqual(["connecting", "open", "connecting", "open"]);
