@@ -6,8 +6,8 @@
     {
       "layers" : [
         {
-          "image-name" : "logo-art.png",
-          "name" : "logo-art",
+          "image-name" : "core-art.png",
+          "name" : "core-art",
           "position" : {
             "scale" : 1.0,
             "translation-in-points" : [
