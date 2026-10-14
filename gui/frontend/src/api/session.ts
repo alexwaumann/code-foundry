@@ -74,6 +74,14 @@ export interface SessionView {
    */
   archivedAtMs: number | null;
   /**
+   * When a snoozed thread wakes (session.snooze), epoch ms; null when it is not snoozed. A
+   * snoozed thread is disconnected, unpinned, not archived and has no shells. The daemon
+   * wakes it: this becomes null and the thread needs attention with status reason
+   * "snooze ended" (statusChangedAtMs = the wake). Reconnecting, pinning, archiving or
+   * sending unsnoozes it. docs/notes/snooze-threads-1-daemon.md.
+   */
+  snoozedUntilMs: number | null;
+  /**
    * An effort change (thread.set-effort) not applied yet: `effort` is the
    * new level; Claude restarts with it once the running turn ends.
    */
@@ -254,6 +262,7 @@ export function toSessionView(s: Session): SessionView {
     pendingWorktreePath: s.pendingWorktreePath,
     pinned: s.pinned,
     archivedAtMs: s.archivedAt ? timestampMs(s.archivedAt) : null,
+    snoozedUntilMs: s.snoozedUntil ? timestampMs(s.snoozedUntil) : null,
     effortPending: s.effortPending,
     linkedPullRequests: s.linkedPullRequests.map((l) => ({
       slug: l.slug,

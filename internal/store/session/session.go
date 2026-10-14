@@ -153,8 +153,12 @@ type Session struct {
 	// Pinned is the user's pin (Store.Pin). Persisted.
 	Pinned bool
 	// ArchivedAt is when the user archived the thread (Store.Archive); zero when it is
-	// not archived. Reconnect, Pin(true) and Send clear it. Persisted.
+	// not archived. Reconnect, Pin(true), Send and Snooze clear it. Persisted.
 	ArchivedAt time.Time
+	// SnoozedUntil is when a snoozed thread wakes (Store.Snooze); zero when it is not
+	// snoozed. Waking clears it and sets StatusNeedsAttention ReasonSnoozeEnded.
+	// Reconnect, Pin(true), Send and Archive(true) clear it. Persisted.
+	SnoozedUntil time.Time
 	// LinkedPullRequests are the pull requests Claude linked to the conversation
 	// (pr-link transcript records; prlink.go), one per URL, in first-seen order. Never
 	// shrinks. Persisted. Copy on write: a new slice replaces the old one, the backing
@@ -332,12 +336,18 @@ type Store interface {
 	// thread is idle at its prompt (the row's cwd changes when Claude accepts), or the
 	// row's cwd at once for a disconnected thread.
 	RunIn(ctx context.Context, id string, target RunInTarget) (Session, error)
-	// Pin sets or clears the user's pin, in any state. Pinning unarchives.
+	// Pin sets or clears the user's pin, in any state. Pinning unarchives and unsnoozes.
 	Pin(ctx context.Context, id string, pinned bool) (Session, error)
 	// Archive archives a thread (archived true): it closes it like Close, kills and
-	// removes its shells, unpins it and sets ArchivedAt (kept when already set). With
+	// removes its shells, unpins and unsnoozes it and sets ArchivedAt (kept when already set). With
 	// archived false it only clears ArchivedAt; the thread stays disconnected.
 	Archive(ctx context.Context, id string, archived bool) (Session, error)
+	// Snooze snoozes a thread until a time (after now; ErrInvalidArgument otherwise):
+	// it closes it like Close, kills and removes its shells, unpins and unarchives it
+	// and sets SnoozedUntil (replacing an earlier one). When the time comes the store
+	// clears it and the disconnected thread needs attention (ReasonSnoozeEnded). A zero
+	// until only clears SnoozedUntil.
+	Snooze(ctx context.Context, id string, until time.Time) (Session, error)
 	// StageAttachment stores an image for a first prompt and returns its absolute
 	// path. mimeType must be one of AttachmentTypes; data at most MaxAttachmentBytes.
 	// name is the user's file name, used only in logs.

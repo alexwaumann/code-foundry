@@ -15,6 +15,7 @@ export const SESSION_COMMANDS = {
   fork: "session.fork",
   pin: "session.pin",
   archive: "session.archive",
+  snooze: "session.snooze",
   runIn: "session.run-in",
 } as const;
 
@@ -62,6 +63,18 @@ export function pinSession(id: string, pinned: boolean): Promise<boolean> {
  */
 export function archiveSession(id: string, archived: boolean): Promise<boolean> {
   return runCommand(SESSION_COMMANDS.archive, { archived: String(archived) }, sessionContext(id));
+}
+
+/**
+ * session.snooze until an absolute time (epoch ms, sent as RFC 3339; the caller computes
+ * presets such as "tomorrow 9 AM" itself), or null to unsnooze. Snoozing closes Claude,
+ * removes the thread's shells and unpins and unarchives it; the daemon asks for
+ * confirmation (runCommand opens the dialog) only while Claude is working or waiting on an
+ * answer, and refuses a time that is not in the future. Unsnoozing never asks.
+ */
+export function snoozeSession(id: string, untilMs: number | null): Promise<boolean> {
+  const args: Record<string, string> = untilMs === null ? { clear: "true" } : { until: new Date(untilMs).toISOString() };
+  return runCommand(SESSION_COMMANDS.snooze, args, sessionContext(id));
 }
 
 /** session.run-in ("Run in…"): moves a workspace thread to the member in repoId. */

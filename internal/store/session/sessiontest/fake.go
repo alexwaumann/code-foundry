@@ -238,20 +238,20 @@ func (f *Fake) Rename(_ context.Context, id, name string) (session.Session, erro
 	})
 }
 
-// Pin records "Pin <id> <pinned>" and sets Pinned. Pinning unarchives.
+// Pin records "Pin <id> <pinned>" and sets Pinned. Pinning unarchives and unsnoozes.
 func (f *Fake) Pin(_ context.Context, id string, pinned bool) (session.Session, error) {
 	return f.mutate(fmt.Sprintf("Pin %s %t", id, pinned), id, func(s *session.Session) error {
 		s.Pinned = pinned
 		if pinned {
-			s.ArchivedAt = time.Time{}
+			s.ArchivedAt, s.SnoozedUntil = time.Time{}, time.Time{}
 		}
 		return nil
 	})
 }
 
 // Archive records "Archive <id> <archived>". Archiving disconnects a live session
-// (reason "closed"), unpins it and sets ArchivedAt to Now unless already set;
-// unarchiving clears ArchivedAt only. No shells are involved.
+// (reason "closed"), unpins and unsnoozes it and sets ArchivedAt to Now unless already
+// set; unarchiving clears ArchivedAt only. No shells are involved.
 func (f *Fake) Archive(_ context.Context, id string, archived bool) (session.Session, error) {
 	return f.mutate(fmt.Sprintf("Archive %s %t", id, archived), id, func(s *session.Session) error {
 		if !archived {
@@ -261,10 +261,36 @@ func (f *Fake) Archive(_ context.Context, id string, archived bool) (session.Ses
 		if s.State != session.StateDisconnected {
 			s.State, s.DisconnectReason = session.StateDisconnected, session.ReasonClosed
 		}
-		s.Pinned = false
+		s.Pinned, s.SnoozedUntil = false, time.Time{}
 		if s.ArchivedAt.IsZero() {
 			s.ArchivedAt = f.Now()
 		}
+		return nil
+	})
+}
+
+// Snooze records "Snooze <id> <until RFC3339 ms>" ("Snooze <id> -" to unsnooze).
+// Snoozing requires until after Now (ErrInvalidArgument), disconnects a live session
+// (reason "closed"), unpins and unarchives it and sets SnoozedUntil; unsnoozing clears
+// SnoozedUntil only. No shells are involved and nothing wakes: tests Put the woken
+// state.
+func (f *Fake) Snooze(_ context.Context, id string, until time.Time) (session.Session, error) {
+	call := "Snooze " + id + " -"
+	if !until.IsZero() {
+		call = "Snooze " + id + " " + until.UTC().Format("2006-01-02T15:04:05.000Z07:00")
+	}
+	return f.mutate(call, id, func(s *session.Session) error {
+		if until.IsZero() {
+			s.SnoozedUntil = time.Time{}
+			return nil
+		}
+		if !until.After(f.Now()) {
+			return fmt.Errorf("%w: snooze time is not in the future", session.ErrInvalidArgument)
+		}
+		if s.State != session.StateDisconnected {
+			s.State, s.DisconnectReason = session.StateDisconnected, session.ReasonClosed
+		}
+		s.Pinned, s.ArchivedAt, s.SnoozedUntil = false, time.Time{}, until
 		return nil
 	})
 }
@@ -280,13 +306,14 @@ func (f *Fake) Close(_ context.Context, id string) error {
 	return err
 }
 
-// Reconnect requires DISCONNECTED and moves the session to STARTING, unarchived.
+// Reconnect requires DISCONNECTED and moves the session to STARTING, unarchived and
+// unsnoozed.
 func (f *Fake) Reconnect(_ context.Context, id string) (session.Session, error) {
 	return f.mutate("Reconnect "+id, id, func(s *session.Session) error {
 		if s.State != session.StateDisconnected {
 			return fmt.Errorf("%w: session %s is %s", session.ErrFailedPrecondition, id, s.State)
 		}
-		s.State, s.DisconnectReason, s.ArchivedAt = session.StateStarting, "", time.Time{}
+		s.State, s.DisconnectReason, s.ArchivedAt, s.SnoozedUntil = session.StateStarting, "", time.Time{}, time.Time{}
 		return nil
 	})
 }
@@ -447,7 +474,8 @@ func (f *Fake) appendItem(id string, it session.Item) (session.Item, session.Thr
 
 // Send records "Send <id> <text>" (" attachments=<a,b>" and " composer=<text>" when
 // set) and appends a
-// user_message item. The session must not be disconnected. Sending unarchives.
+// user_message item. The session must not be disconnected. Sending unarchives and
+// unsnoozes.
 func (f *Fake) Send(_ context.Context, id string, msg session.Message) (session.Item, error) {
 	f.mu.Lock()
 	call := "Send " + id + " " + msg.Text
@@ -471,9 +499,9 @@ func (f *Fake) Send(_ context.Context, id string, msg session.Message) (session.
 	}
 	f.next++
 	it, ev := f.appendItem(id, session.Item{ID: fmt.Sprintf("u-%d", f.next), Kind: session.KindUserMessage, Text: msg.Text, Attachments: msg.Attachments, ComposerText: msg.ComposerText})
-	unarchived := !s.ArchivedAt.IsZero()
+	unarchived := !s.ArchivedAt.IsZero() || !s.SnoozedUntil.IsZero()
 	if unarchived {
-		s.ArchivedAt = time.Time{}
+		s.ArchivedAt, s.SnoozedUntil = time.Time{}, time.Time{}
 		f.byID[id] = s
 		f.rebuild()
 	}

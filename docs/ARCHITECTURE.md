@@ -127,7 +127,9 @@ Services (v1):
 * `SessionService` — Create, Fork, List, Get, Rename, Close, Reconnect, Remove, RunIn,
   Pin (the user's pin, persisted; `docs/notes/workspaces-4-sidebar.md`), Archive (close,
   remove the thread's shells, unpin, stamp `archived_at`; reconnect, pin and send
-  unarchive; `docs/notes/archive-threads-1-daemon.md`), Watch (server stream), StageAttachment (images the first prompt refers to). Create can
+  unarchive; `docs/notes/archive-threads-1-daemon.md`), Snooze (close, remove the
+  thread's shells, unpin, unarchive, set `snoozed_until`; the store wakes it on the wall
+  clock into NEEDS_ATTENTION "snooze ended"; `docs/notes/snooze-threads-1-daemon.md`), Watch (server stream), StageAttachment (images the first prompt refers to). Create can
   make the worktree first (`new_worktree`), start a thread in a workspace member
   (`workspace_id`) or in a new workspace (`new_workspace`), or without a project in the
   home directory (`no_project`; `docs/notes/no-project-1-daemon.md`; the GUI's "No

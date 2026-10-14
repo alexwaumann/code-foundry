@@ -31,6 +31,7 @@ type SessionBackend interface {
 	RunIn(context.Context, *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error)
 	Pin(context.Context, *connect.Request[v1.PinSessionRequest]) (*connect.Response[v1.PinSessionResponse], error)
 	Archive(context.Context, *connect.Request[v1.ArchiveSessionRequest]) (*connect.Response[v1.ArchiveSessionResponse], error)
+	Snooze(context.Context, *connect.Request[v1.SnoozeSessionRequest]) (*connect.Response[v1.SnoozeSessionResponse], error)
 }
 
 var (
@@ -177,7 +178,7 @@ func minutesLeft(d time.Duration) string {
 
 // RegisterSession registers session.new, session.list, session.focus, session.close,
 // session.reconnect, session.rename, session.fork, session.remove, session.run-in,
-// session.pin, and session.archive. The user-facing word is "thread" (titles, descriptions, messages);
+// session.pin, session.archive, and session.snooze. The user-facing word is "thread" (titles, descriptions, messages);
 // command names and identifiers keep "session".
 func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextSession, Description: "Thread id"}
@@ -393,5 +394,6 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 		sessionRunIn(b, idArg),
 		sessionPin(b, idArg),
 		sessionArchive(b, idArg),
+		sessionSnooze(b, idArg),
 	)
 }
