@@ -119,7 +119,11 @@ export function Timeline({ sessionId, working, bottomInset }: { sessionId: strin
       for (let i = a.index; at === undefined && i < a.rows.length; i++) at = index.get(a.rows[i]?.key ?? "");
       const start = at === undefined ? undefined : v.measurementsCache[at]?.start;
       if (start !== undefined) {
-        const top = start - a.offset;
+        // The anchor row itself keeps its offset; a row that takes its place starts at the
+        // viewport's top, not as far above it as the user had scrolled into the row that
+        // folded away (an open tool row's output can be hundreds of px).
+        const own = rows[at ?? -1]?.key === a.rows[a.index]?.key;
+        const top = start - (own ? a.offset : Math.max(a.offset, 0));
         // Past the new bottom (the fold left too little below to keep the place): pin, so
         // the footer the turn just got ends up in view rather than wherever the clamp
         // leaves it.

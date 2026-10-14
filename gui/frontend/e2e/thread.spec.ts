@@ -293,6 +293,41 @@ for (const scheme of ["dark", "light"] as const) {
   });
 }
 
+test("reading deep into an open tool row when the turn ends: the answer that replaces it starts at the top", async ({ page }) => {
+  await openThread(page, "streaming");
+  const timeline = page.getByTestId("thread-timeline");
+  // A long answer below the work, so there is room to keep the place.
+  const lines = Array.from({ length: 60 }, (_, i) => `line ${String(i)}`).join("\n\n");
+  await mockPost("thread/delta?text=" + encodeURIComponent(`ewDecision,\n}\n\`\`\`\n\n${lines}\n`));
+  await expect(pane(page).locator('[data-testid="thread-text"][data-streaming]')).toContainText("line 59");
+  // The Edit row open (its diff is a few hundred px tall). Pinned, the list stays at the
+  // bottom, so the row is clicked where it is (above the viewport).
+  const edit = pane(page).locator('[data-tool="Edit"]').last();
+  await edit.getByTestId("thread-tool").evaluate((b) => {
+    (b as HTMLElement).click();
+  });
+  await expect(edit.getByTestId("thread-tool")).toHaveAttribute("aria-expanded", "true");
+  const row = edit.locator("xpath=ancestor::*[@data-index][1]");
+  const rowBox = await row.boundingBox();
+  expect(rowBox?.height ?? 0).toBeGreaterThan(200);
+  // The user's wheel unpins; then the viewport's top goes 150px into the open row.
+  const box = await timeline.boundingBox();
+  await page.mouse.move((box?.x ?? 0) + 200, (box?.y ?? 0) + 200);
+  await page.mouse.wheel(0, -200);
+  await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
+  await row.evaluate((r) => {
+    const el = r.closest('[data-testid="thread-timeline"]') as HTMLElement;
+    el.scrollTop += r.getBoundingClientRect().top - el.getBoundingClientRect().top + 150;
+  });
+  await page.waitForTimeout(100);
+  await mockPost("thread/finish");
+  await expect(footers(page).last()).toHaveAttribute("data-folded", "true");
+  await expect(pane(page).locator('[data-tool="Edit"]')).toHaveCount(0);
+  const answer = pane(page).locator('[data-testid="thread-text"][data-final]').last().locator("xpath=ancestor::*[@data-index][1]");
+  await expect.poll(async () => Math.round(((await answer.boundingBox())?.y ?? -1) - (box?.y ?? 0))).toBe(0);
+  await expect(timeline).not.toHaveAttribute("data-at-bottom", "true");
+});
+
 test("footers: the daemon's turn cost and model; a turn without them shows neither", async ({ page }) => {
   await openThread(page, "idle");
   // Turn 2 ran in a new process whose total passed the old one's: the difference of the

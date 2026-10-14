@@ -30,8 +30,11 @@ Feedback from daily use, decisions confirmed by Alex.
   that row back at the same offset, or, when the row folded away, the next row of the old
   list that is still there (the turn's final text or footer). This matters when the user is
   reading the answer while the work above it folds: without it, `scrollTop` stays and the
-  answer jumps up by the height of the folded rows. If the kept place is past the new
-  bottom (the fold left too little below), the list pins instead so the footer shows.
+  answer jumps up by the height of the folded rows. A row that takes the anchor's place
+  starts at the viewport's top: it does not inherit how far the user had scrolled into the
+  row that folded away (an open Edit or Bash row is hundreds of px; inheriting it hid the
+  start of the answer). If the kept place is past the new bottom (the fold left too little
+  below), the list pins instead so the footer shows.
 * Gotcha: the anchor's new start comes from `v.measurementsCache` in a layout effect after
   render (the render already recomputed measurements via `getVirtualItems`); keys are
   stable, so measured heights carry over. An earlier version also pinned when the kept
@@ -41,7 +44,8 @@ Feedback from daily use, decisions confirmed by Alex.
   composer (pinned); scrolled up, a streamed delta does not move the list and the fold
   keeps the turn's bubble in place; reading a long answer, the work above it folds and the
   answer stays put (this one fails with the anchor disabled); scrolled into the work rows,
-  the list pins. Specs that checked a tool row after a turn ended reopen the turn first
+  the list pins; scrolled 150px into an open Edit row, the answer that replaces it starts at
+  the viewport's top. Specs that checked a tool row after a turn ended reopen the turn first
   (`unfoldLatest` in `thread-prompts.spec.ts`).
 
 ## Lighter dark pane, user bubble variant B

@@ -10,7 +10,7 @@
  * - AskUserQuestion's tool call is hidden (the question item stands for it), and a
  *   permission request annotates its tool call (pending: "waiting for you");
  * - every finished turn ends with a footer (duration, steps, its cost, model) that folds it;
- *   a finished turn other than the latest folds by default: only the user message, the
+ *   every finished turn, the latest included, folds by default: only the user message, the
  *   final assistant text (the trailing text of the turn), notes and the footer show;
  * - a system note (the daemon's, e.g. a fork's "Forked from …" where the copied history
  *   ends) stands alone between turns: it closes the turn before it and never folds.
