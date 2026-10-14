@@ -29,7 +29,9 @@ const ViewPanelToggle = "panel.toggle"
 
 // ViewBottomToggle is the ShowView name that toggles the bottom panel (the terminals
 // under the main content) of whatever the window has selected. Like ViewPanelToggle it
-// is an action on per-selection GUI state, not a page.
+// is an action on per-selection GUI state, not a page. It only toggles: the GUI's own
+// cmd+j (its presenter, not this intent) also starts a shell when the panel would open
+// empty, so a CLI call reaching every window does not start one per window.
 const ViewBottomToggle = "bottom.toggle"
 
 // ViewPanelExpand is the ShowView name that toggles the selection's side panel between
@@ -157,7 +159,7 @@ func RegisterView(r *Registry, e Emitter) error {
 		Command{
 			Name:        "view.bottom.toggle",
 			Title:       "Toggle Bottom Panel",
-			Description: "Show or hide the terminals under the selected thread or page.",
+			Description: "Show or hide the terminals under the selected thread or page. In the app, opening it with no terminal starts a shell.",
 			Category:    "View",
 			Keybindings: []string{"cmd+j"},
 			Run: func(context.Context, Context, Args) (Result, error) {

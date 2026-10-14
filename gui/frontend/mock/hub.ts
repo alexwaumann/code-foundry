@@ -1,6 +1,7 @@
 /** Minimal fan-out pub/sub with per-subscriber unbounded queues, for mock streams. */
 export class Hub<T> {
   private readonly subs = new Set<(v: T) => void>();
+  private readonly enders = new Set<() => void>();
 
   /** `tap` sees every published value first (used to tee into the EventService hub). */
   constructor(private readonly tap?: (v: T) => void) {}
@@ -15,7 +16,12 @@ export class Hub<T> {
     return this.subs.size;
   }
 
-  /** Yields published values until the signal aborts. `initial` values are yielded first. */
+  /** Ends every current subscription, as a server going away would (a daemon restart). */
+  endAll(): void {
+    for (const end of [...this.enders]) end();
+  }
+
+  /** Yields published values until the signal aborts (or endAll). `initial` values are yielded first. */
   async *subscribe(signal: AbortSignal, initial: readonly T[] = []): AsyncGenerator<T> {
     const queue: T[] = [...initial];
     let wake: (() => void) | null = null;
@@ -24,10 +30,17 @@ export class Hub<T> {
       wake?.();
     };
     const onAbort = () => wake?.();
+    // An object, so the loop re-reads what endAll set from outside it.
+    const state = { ended: false };
+    const end = () => {
+      state.ended = true;
+      wake?.();
+    };
     this.subs.add(push);
+    this.enders.add(end);
     signal.addEventListener("abort", onAbort);
     try {
-      while (!signal.aborted) {
+      while (!signal.aborted && !state.ended) {
         const next = queue.shift();
         if (next !== undefined) {
           yield next;
@@ -40,6 +53,7 @@ export class Hub<T> {
       }
     } finally {
       this.subs.delete(push);
+      this.enders.delete(end);
       signal.removeEventListener("abort", onAbort);
     }
   }

@@ -514,6 +514,9 @@ export class World {
   attachments = new Map<string, { name: string; mimeType: string; size: number }>();
   /** How long session.new takes to create a worktree (ms). */
   worktreeDelayMs = 700;
+  /** terminal.new: how long it takes (ms), and whether its next run fails (the reason). POST /__mock/terminal/new. */
+  terminalNewDelayMs = 0;
+  terminalNewFail: string | null = null;
   /** Bumped by reset(), so a session.new still sleeping from before a reset does nothing. */
   private generation = 0;
   invocations: Invocation[] = [];
@@ -536,6 +539,8 @@ export class World {
     this.attachments.clear();
     this.threads.reset();
     this.worktreeDelayMs = 700;
+    this.terminalNewDelayMs = 0;
+    this.terminalNewFail = null;
     this.generation++;
     this.gitops.reset();
     this.settings.reset();
@@ -1419,6 +1424,21 @@ export class World {
     return { labels: shellLabels("", best.repoId, best.path), cwd: cwd || best.path };
   }
 
+  /**
+   * A daemon restart as the GUI sees it: every shell is gone (the daemon prunes them) with
+   * no `removed` events, and the event streams end, so the GUI reconnects and learns it
+   * from TerminalService.List. Threads and other terminals stay.
+   */
+  restartDaemon(): void {
+    for (const t of [...this.terms.values()]) {
+      if (t.labels[LABEL_KIND] !== KIND_SHELL) continue;
+      this.terms.delete(t.id);
+      t.attach.publish("end");
+    }
+    this.events.endAll();
+    this.termEvents.endAll();
+  }
+
   remove(id: string): void {
     const t = this.term(id);
     if (t.state === TerminalState.RUNNING) throw new CommandError("unavailable", "terminal is still running");
@@ -1894,10 +1914,14 @@ export class World {
         when: (ctx) => Boolean(ctx?.activeSessionId || ctx?.activeWorktreePath),
         // Like the daemon: no focus intent; the result's JSON is the new terminal (the GUI
         // focuses it in the bottom panel by its id).
-        run: (ctx, args) => {
+        run: async (ctx, args) => {
           const owner = this.shellOwner(ctx, args.cwd ?? "");
+          const fail = this.terminalNewFail;
+          this.terminalNewFail = null;
+          if (this.terminalNewDelayMs > 0) await new Promise((r) => setTimeout(r, this.terminalNewDelayMs));
+          if (fail !== null) throw new CommandError("unavailable", fail);
           const t = this.create(["/bin/zsh"], owner.cwd, owner.labels, "shell");
-          return Promise.resolve({ message: `created terminal ${t.id}`, resultJson: JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels }) });
+          return { message: `created terminal ${t.id}`, resultJson: JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels }) };
         },
       },
       {
@@ -2382,7 +2406,7 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "panel.toggle" } } }))}`,
       },
       {
-        cmd: { name: "view.bottom.toggle", title: "Toggle Bottom Panel", category: "View", description: "Show or hide the terminals under the selected thread or page.", keybindings: ["cmd+j"], args: [] },
+        cmd: { name: "view.bottom.toggle", title: "Toggle Bottom Panel", category: "View", description: "Show or hide the terminals under the selected thread or page. In the app, opening it with no terminal starts a shell.", keybindings: ["cmd+j"], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "bottom.toggle" } } }))}`,
       },
