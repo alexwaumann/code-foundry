@@ -15,7 +15,7 @@ const snoozeHour = 9
 const SnoozeUntilHelp = "a duration (1h, 3h, 90m, 1h30m), tomorrow, next-week, a weekday (mon..sun), " +
 	"a date (2026-10-20, 9:00 AM), a local date and time (2026-10-20 14:00) or RFC 3339"
 
-var errSnoozeUntil = errors.New("unrecognized snooze time")
+var errSnoozeUntil = errors.New("invalid snooze time")
 
 // parseSnoozeUntil turns session.snooze's until into an absolute time, for now in loc
 // (the daemon's local zone). It accepts, case-insensitively:
