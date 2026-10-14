@@ -10,6 +10,7 @@ import {
   ContextMenuSubTrigger,
 } from "@/components/ui/context-menu";
 import { useNoProjectThread } from "@/components/session/useNoProject";
+import { SnoozeRowItems } from "@/components/snooze/SnoozeMenu";
 import { beginRename } from "@/keys/bindings";
 import { worktreeBranch } from "@/lib/threadRow";
 import { newThreadTerminal } from "@/stores/bottomActions";
@@ -75,6 +76,7 @@ export function RowMenu({ id }: { id: string }) {
   const noProject = useNoProjectThread(id);
   const pinned = useSessionsStore((s) => s.byId[id]?.pinned ?? false);
   const archived = useSessionsStore((s) => (s.byId[id]?.archivedAtMs ?? null) !== null);
+  const snoozed = useSessionsStore((s) => (s.byId[id]?.snoozedUntilMs ?? null) !== null);
   const state = useSessionsStore((s) => s.byId[id]?.state ?? "unknown");
   const workspaceId = useSessionsStore((s) => s.byId[id]?.workspaceId ?? "");
   return (
@@ -103,6 +105,7 @@ export function RowMenu({ id }: { id: string }) {
         {pinned ? <PinOff /> : <Pin />}
         {pinned ? "Unpin" : "Pin"}
       </ContextMenuItem>
+      <SnoozeRowItems id={id} snoozed={snoozed} />
       <ContextMenuItem
         data-testid="menu-archive"
         onSelect={() => {

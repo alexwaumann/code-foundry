@@ -9,6 +9,10 @@ vi.mock("@/keys/bindings", async (orig) => ({ ...(await orig<typeof import("@/ke
 const getPullRequestDetail = vi.hoisted(() => vi.fn());
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), getPullRequestDetail }));
 const openPullRequestInPanel = vi.hoisted(() => vi.fn(() => true));
+const snoozeSession = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
+vi.mock("@/stores/sessionActions", async (orig) => ({ ...(await orig<typeof import("@/stores/sessionActions")>()), snoozeSession }));
+const openSnoozeDialog = vi.hoisted(() => vi.fn());
+vi.mock("@/stores/snoozeDialog", async (orig) => ({ ...(await orig<typeof import("@/stores/snoozeDialog")>()), openSnoozeDialog }));
 vi.mock("@/stores/prPanel", async (orig) => ({ ...(await orig<typeof import("@/stores/prPanel")>()), openPullRequestInPanel }));
 
 const { HeaderActions } = await import("./HeaderActions");
@@ -26,7 +30,7 @@ const detail = (o: Partial<PullRequestView>): PullRequestDetailView => ({ pullRe
 beforeEach(() => {
   getPullRequestDetail.mockImplementation(() => new Promise(() => undefined));
   pullRequestDetailResource.store.setState({ entries: {} });
-  useCommandsStore.setState({ commands: [cmd("session.close", "Close Thread"), cmd("session.archive", "Archive or Unarchive Thread"), cmd("view.panel.linked-prs", "Show Linked PRs in Side Panel"), cmd("view.panel.workspace", "Show Workspace in Side Panel"), cmd("view.bottom.toggle"), cmd("view.panel.toggle")] });
+  useCommandsStore.setState({ commands: [cmd("session.close", "Close Thread"), cmd("session.snooze", "Snooze or Unsnooze Thread"), cmd("session.archive", "Archive or Unarchive Thread"), cmd("view.panel.linked-prs", "Show Linked PRs in Side Panel"), cmd("view.panel.workspace", "Show Workspace in Side Panel"), cmd("view.bottom.toggle"), cmd("view.panel.toggle")] });
   useWorkspacesStore.setState({ byId: {} });
   useUiStore.setState({ selection: { kind: "session", id: "s-1" } });
 });
@@ -48,14 +52,14 @@ describe("HeaderActions", () => {
     useCommandsStore.setState({ commands: [...useCommandsStore.getState().commands, cmd("session.rename"), cmd("session.fork")] });
     setThread({});
     render(<HeaderActions sessionId="s-1" />);
-    expect(order()).toEqual(["session.close", "session.archive", "bottom-toggle", "panel-toggle"]);
+    expect(order()).toEqual(["session.close", "pane-snooze", "session.archive", "bottom-toggle", "panel-toggle"]);
   });
 
   it("a workspace thread: the workspace chip by name first, opening view.panel.workspace", () => {
     useWorkspacesStore.setState({ byId: { w1: { name: "release-channels", members: [] } as never } });
     setThread({ workspaceId: "w1", linkedPullRequests: [link(1), link(2), link(3)] });
     render(<HeaderActions sessionId="s-1" />);
-    expect(order()).toEqual(["pane-workspace", "pane-linked-prs", "session.close", "session.archive", "bottom-toggle", "panel-toggle"]);
+    expect(order()).toEqual(["pane-workspace", "pane-linked-prs", "session.close", "pane-snooze", "session.archive", "bottom-toggle", "panel-toggle"]);
     const ws = screen.getByTestId("pane-workspace");
     expect(ws.textContent).toBe("release-channels");
     expect(ws.getAttribute("title")).toBeNull();
@@ -73,6 +77,50 @@ describe("HeaderActions", () => {
     expect(b.dataset.commandButton).toBe("session.archive");
     fireEvent.click(b);
     expect(startCommandNamed).toHaveBeenCalledWith("session.archive");
+  });
+
+  it("the snooze button opens the presets with their times; a preset snoozes until that time", () => {
+    setThread({});
+    render(<HeaderActions sessionId="s-1" />);
+    const b = screen.getByRole("button", { name: "Snooze Thread" });
+    expect(b.getAttribute("title")).toBe("Snooze Thread");
+    fireEvent.keyDown(b, { key: "Enter" });
+    const items = screen.getAllByTestId("snooze-preset");
+    expect(items.map((i) => i.dataset.preset)).toEqual(["1h", "3h", "tomorrow", "next-week"]);
+    const times = screen.getAllByTestId("snooze-preset-time").map((t) => t.textContent);
+    expect(items.map((i, n) => i.textContent.slice(0, -(times[n] ?? "").length))).toEqual(["1 hour", "3 hours", "Tomorrow", "Next week"]);
+    expect(times.every((t) => /\d:\d\d [AP]M$/.test(t))).toBe(true);
+    const before = Date.now();
+    fireEvent.click(items[0] as HTMLElement);
+    expect(snoozeSession).toHaveBeenCalledTimes(1);
+    const [id, until] = snoozeSession.mock.calls[0] as unknown as [string, number];
+    expect(id).toBe("s-1");
+    expect(until - before).toBeGreaterThan(3_600_000 - 5_000);
+    expect(until - before).toBeLessThanOrEqual(3_600_000);
+  });
+
+  it("Pick a date and time… opens the custom dialog for the thread", () => {
+    setThread({});
+    render(<HeaderActions sessionId="s-1" />);
+    fireEvent.keyDown(screen.getByTestId("pane-snooze"), { key: "Enter" });
+    fireEvent.click(screen.getByTestId("snooze-pick"));
+    expect(openSnoozeDialog).toHaveBeenCalledWith("s-1");
+    expect(snoozeSession).not.toHaveBeenCalled();
+  });
+
+  it("a snoozed thread: Unsnooze Thread, which unsnoozes on click", () => {
+    setThread({ state: "disconnected", snoozedUntilMs: Date.now() + 3_600_000 });
+    render(<HeaderActions sessionId="s-1" />);
+    expect(screen.queryByTestId("pane-snooze")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Unsnooze Thread" }));
+    expect(snoozeSession).toHaveBeenCalledWith("s-1", null);
+  });
+
+  it("no snooze button when the daemon does not list session.snooze", () => {
+    useCommandsStore.setState({ commands: useCommandsStore.getState().commands.filter((c) => c.name !== "session.snooze") });
+    setThread({});
+    render(<HeaderActions sessionId="s-1" />);
+    expect(order()).toEqual(["session.close", "session.archive", "bottom-toggle", "panel-toggle"]);
   });
 
   it("two or more links: a muted count opening view.panel.linked-prs", () => {
