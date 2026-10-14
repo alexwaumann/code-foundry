@@ -257,6 +257,22 @@ const SK = `${HOME}/src/sketches`;
 const WR = `${HOME}/Documents/writing`;
 const enc = new TextEncoder();
 
+/** How long a new shell takes to print its prompt before terminal.new --run types into it. */
+const RUN_PROMPT_MS = 150;
+
+/**
+ * terminal.new --run's value as typed keys, like the daemon (commands_terminal.go
+ * runInput): line ends become Return, one Return ends it, trailing blank lines go, control
+ * characters other than tab and newline are refused. "" when blank.
+ */
+function runKeys(run: string): string {
+  const s = run.replace(/\r\n/g, "\n").replace(/[\n\t ]+$/, "");
+  if (s.trim() === "") return "";
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x08\x0b-\x1f\x7f]/.test(s)) throw new CommandError("invalid", "run: the command has a control character");
+  return `${s.replace(/\n/g, "\r")}\r`;
+}
+
 /** session.new's `permission` arg values. */
 const permissionModes: Record<string, PermissionMode> = {
   supervised: PermissionMode.SUPERVISED,
@@ -1909,7 +1925,17 @@ export class World {
       ...this.threads.commands(),
       ...mcpCommands(this.threads, (i) => this.emit(i)),
       {
-        cmd: { name: "terminal.new", title: "New Terminal", category: "Terminal", description: "Start a shell that belongs to the active thread, else to the active worktree", keybindings: ["cmd+t"], args: [{ name: "cwd", type: ArgType.PATH, required: false, description: "Working directory" }] },
+        cmd: {
+          name: "terminal.new",
+          title: "New Terminal",
+          category: "Terminal",
+          description: "Start a shell that belongs to the active thread, else to the active worktree",
+          keybindings: ["cmd+t"],
+          args: [
+            { name: "cwd", type: ArgType.PATH, required: false, description: "Working directory" },
+            { name: "run", type: ArgType.STRING, required: false, description: "A command line typed into the new shell once it has printed its prompt, then Return" },
+          ],
+        },
         // Like the daemon: a thread, or a worktree to own the shell (never the dashboard or a page).
         when: (ctx) => Boolean(ctx?.activeSessionId || ctx?.activeWorktreePath),
         // Like the daemon: no focus intent; the result's JSON is the new terminal (the GUI
@@ -1920,8 +1946,15 @@ export class World {
           this.terminalNewFail = null;
           if (this.terminalNewDelayMs > 0) await new Promise((r) => setTimeout(r, this.terminalNewDelayMs));
           if (fail !== null) throw new CommandError("unavailable", fail);
+          const keys = runKeys(args.run ?? "");
           const t = this.create(["/bin/zsh"], owner.cwd, owner.labels, "shell");
-          return { message: `created terminal ${t.id}`, resultJson: JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels }) };
+          const resultJson = JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels });
+          if (keys === "") return { message: `created terminal ${t.id}`, resultJson };
+          // Like the daemon: the shell is listed at once, and the command is typed once it
+          // has printed its prompt (RUN_PROMPT_MS here), before the command returns.
+          await new Promise((r) => setTimeout(r, RUN_PROMPT_MS));
+          this.write(t.id, enc.encode(keys));
+          return { message: `created terminal ${t.id} and ran the command in it`, resultJson };
         },
       },
       {
