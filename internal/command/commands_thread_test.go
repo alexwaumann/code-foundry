@@ -46,6 +46,15 @@ func TestThreadCommandsAvailability(t *testing.T) {
 	}
 }
 
+// Escape interrupted turns by accident; the composer's Interrupt button is the only way.
+func TestThreadInterruptHasNoKeybinding(t *testing.T) {
+	reg, _ := newThreadRegistry(t)
+	c, _ := reg.Get("thread.interrupt")
+	if len(c.Keybindings) != 0 {
+		t.Errorf("thread.interrupt keybindings = %v, want none", c.Keybindings)
+	}
+}
+
 func TestThreadCommands(t *testing.T) {
 	question := `{"questions":[{"question":"Which color?","header":"Color","options":[{"label":"Red"},{"label":"Blue"}],"multiSelect":false}]}`
 	tests := []struct {

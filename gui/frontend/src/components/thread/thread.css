@@ -14,7 +14,9 @@
   --t-emerald-500: oklch(0.696 0.17 162.48);
   --t-red-500: oklch(0.637 0.237 25.331);
   --t-amber-500: oklch(0.769 0.188 70.08);
-  --t-bubble: oklch(0 0 0 / 4.5%);
+  /* User messages (variant B): a tint and a hairline a step stronger than it. */
+  --t-bubble: oklch(0 0 0 / 7%);
+  --t-bubble-border: oklch(0 0 0 / 10%);
   --t-hover: oklch(0 0 0 / 4%);
   /* Terminal palette, light (theme.ts). */
   --syn-fg: #24292f;
@@ -34,7 +36,8 @@
   --t-amber: oklch(0.879 0.169 91.605);
   --t-emerald: oklch(0.765 0.177 163.223);
   --t-red: oklch(0.704 0.191 22.216);
-  --t-bubble: oklch(1 0 0 / 7%);
+  --t-bubble: oklch(1 0 0 / 13%);
+  --t-bubble-border: oklch(1 0 0 / 14%);
   --t-hover: oklch(1 0 0 / 5%);
   --syn-fg: #d8dadf;
   --syn-kw: #c678dd;
@@ -521,6 +524,7 @@ html[data-thread-width="full"] .cf-thread {
 .cf-thread .u .bubble {
   max-width: 80%;
   background: var(--t-bubble);
+  border: 1px solid var(--t-bubble-border);
   border-radius: 16px;
   padding: 9px 14px;
   font-size: 13px;

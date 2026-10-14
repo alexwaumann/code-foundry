@@ -126,10 +126,9 @@ function Reconnect({ sessionId, ref }: { sessionId: string; ref: Ref<HTMLButtonE
  * attachments, the model / effort / permission pickers, attach, Interrupt while Claude
  * works (the only Interrupt), and send. Pending permissions and questions dock into the
  * top of the card, oldest first (the card turns opaque); while the editor is empty its
- * digits (and a question's Enter) answer the oldest. Escape in an empty editor interrupts
- * a running turn when nothing is pending (Claude Code's key; thread.interrupt). An effort
- * change restarts Claude, after the turn when one runs. The draft is the compose store's
- * `thread:<id>`.
+ * digits (and a question's Enter) answer the oldest. Escape does not interrupt (it stopped
+ * turns by accident); only the Interrupt button does. An effort change restarts Claude,
+ * after the turn when one runs. The draft is the compose store's `thread:<id>`.
  */
 export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string; pending: readonly ThreadPendingView[]; busy: boolean }) {
   const draftKey = threadDraftKey(sessionId);
@@ -323,12 +322,6 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
                 updateDraft(draftKey, { text: t, error: null });
               }}
               onSubmit={send}
-              onEscape={() => {
-                // Claude Code's interrupt key, with nothing to lose: no text, no prompt waiting.
-                if (!busy || !live || docked || !editorEmpty) return false;
-                void interruptThread(sessionId);
-                return true;
-              }}
               onPasteFiles={attach}
               onPreviewChip={(id, el) => openPreview(draftKey, id, el)}
               triggers={sources.noProject ? HOME_TRIGGERS : TRIGGERS}

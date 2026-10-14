@@ -4,7 +4,7 @@ import { invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtu
 /**
  * Answering a thread (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
  * the docked permission and question prompts over the mock's scripted thread
- * (mock/thread.ts), their keyboard, the Escape interrupt and effort changes. Set SHOTS=<dir>
+ * (mock/thread.ts), their keyboard, Escape not interrupting and effort changes. Set SHOTS=<dir>
  * to save screenshots of the panels in both schemes.
  */
 
@@ -46,6 +46,19 @@ const composer = (page: Page) => page.getByTestId("thread-composer");
 const editor = (page: Page) => composer(page).locator('[contenteditable="true"]');
 const lastText = (page: Page) => page.getByTestId("thread-pane").locator('[data-testid="thread-text"]').last();
 
+/**
+ * Waits for the running turn to end (it folds under its footer), then opens it again.
+ * `footers` is how many the thread has once it ended: the final text streams in before
+ * the turn_end, so until then the last footer is an earlier turn's (also folded).
+ */
+async function unfoldLatest(page: Page, footers: number): Promise<void> {
+  await expect(page.getByTestId("thread-footer")).toHaveCount(footers);
+  const footer = page.getByTestId("thread-footer").nth(footers - 1);
+  await expect(footer).toHaveAttribute("data-folded", "true");
+  await footer.getByRole("button", { name: "Show this turn's work" }).click();
+  await expect(footer).not.toHaveAttribute("data-folded", "true");
+}
+
 async function editorFocused(page: Page): Promise<boolean> {
   return page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable);
 }
@@ -71,6 +84,7 @@ for (const scheme of ["dark", "light"] as const) {
       await expect.poll(responds).toEqual(["respond s-r1 deny req-push message=Use the staging branch instead"]);
       await expect(composer(page).getByTestId("thread-permission")).toHaveCount(0);
       await expect(lastText(page)).toContainText("You said: Use the staging branch instead");
+      await unfoldLatest(page, 2);
       await expect(page.getByTestId("thread-pane").locator('[data-tool="Bash"]').last()).toContainText("denied");
     });
 
@@ -119,8 +133,9 @@ test("Allow answers at once; the sidebar and the bell stop asking", async ({ pag
   await expect(page.getByTestId("attention-badge")).toHaveText("1");
   await expect(row(page, "s:s-r1")).not.toContainText("Needs input");
   await expect(lastText(page)).toContainText("Pushed. PR #63 now has the fix.");
-  await expect(page.getByTestId("thread-pane").locator('[data-tool="Bash"]').last()).toContainText("Ran git push");
   await expect(page.getByTestId("thread-footer").last()).toBeVisible();
+  await unfoldLatest(page, 2);
+  await expect(page.getByTestId("thread-pane").locator('[data-tool="Bash"]').last()).toContainText("Ran git push");
 });
 
 test("keyboard: an empty editor's digits answer, a typed message keeps them, Escape hands focus back", async ({ page }) => {
@@ -242,39 +257,32 @@ test("question keyboard: digits pick, Enter moves on and submits, Escape skips",
   await expect(lastText(page)).toContainText("No problem, I'll leave those for later.");
 });
 
-test("Escape interrupts a running turn from the empty editor or the timeline, never typed text", async ({ page }) => {
+test("Escape never interrupts a running turn (editor or timeline); the Interrupt button does", async ({ page }) => {
   await openThread(page, "streaming");
+  const interrupts = async () => (await calls()).filter((c) => c.startsWith("interrupt"));
+  // The empty editor.
   await editor(page).click();
-  await page.keyboard.type("wait");
+  await page.keyboard.press("Escape");
+  // The timeline (the pane focused).
+  await page.getByTestId("thread-timeline").click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("Escape");
   await page.waitForTimeout(200);
-  expect((await calls()).filter((c) => c.startsWith("interrupt"))).toEqual([]);
-  for (let i = 0; i < 4; i++) await page.keyboard.press("Backspace");
-  await page.keyboard.press("Escape");
+  expect(await interrupts()).toEqual([]);
+  await expect(page.getByTestId("thread-interrupt")).toBeVisible();
+
+  await page.getByTestId("thread-interrupt").click();
   await expect.poll(calls).toContain("interrupt s-r1");
   await expect(page.getByTestId("thread-footer").last()).toContainText("Interrupted");
   // No success toast for an interrupt: the footer says it.
   await expect(page.getByText("interrupted thread s-r1")).toHaveCount(0);
-
-  // From the timeline (the pane focused), via the thread.interrupt keybinding.
-  await openThread(page, "streaming");
-  await expect(page.getByTestId("thread-interrupt")).toBeVisible();
-  await page.getByTestId("thread-timeline").click({ position: { x: 5, y: 5 } });
-  await page.keyboard.press("Escape");
-  await expect.poll(async () => (await calls()).filter((c) => c.startsWith("interrupt")).length).toBe(2);
-  await expect(page.getByTestId("thread-interrupt")).toHaveCount(0);
-
-  // Idle: Escape does nothing.
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(200);
-  expect((await calls()).filter((c) => c.startsWith("interrupt")).length).toBe(2);
 });
 
-test("the Shortcuts list has Escape for Interrupt Thread", async ({ page }) => {
+test("Interrupt Thread has no shortcut", async ({ page }) => {
   await openThread(page, "idle");
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Interrupt Thread");
-  await expect(page.getByRole("option", { name: /Interrupt Thread/ })).toContainText(/esc/i);
+  await expect(page.getByRole("option", { name: /Interrupt Thread/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /Interrupt Thread/ })).not.toContainText(/esc/i);
 });
 
 test("an effort change while busy waits for the turn; when idle it applies at once", async ({ page }) => {

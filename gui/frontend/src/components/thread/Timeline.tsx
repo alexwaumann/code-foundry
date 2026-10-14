@@ -95,9 +95,45 @@ export function Timeline({ sessionId, working, bottomInset }: { sessionId: strin
       ro.disconnect();
     };
   }, [toBottom]);
+  // Away from the bottom, the row at the top of the viewport (and how far it starts above
+  // the viewport's top) is the anchor a change of rows keeps in place.
+  const anchor = useRef<{ index: number; offset: number; rows: readonly TimelineRow[] } | null>(null);
+  const captureAnchor = useCallback(() => {
+    const el = scrollRef.current;
+    const vi = el ? v.getVirtualItemForOffset(el.scrollTop) : undefined;
+    anchor.current = el && vi ? { index: vi.index, offset: vi.start - el.scrollTop, rows } : null;
+  }, [v, rows]);
+
+  // Rows change (a turn folds when it ends, the user folds one, rows arrive): pinned, the
+  // list follows the bottom. Scrolled up, the anchor row keeps its place; when it folded
+  // away (the user was reading the turn's work as it ended) the next row that is still
+  // there (its final text or footer) takes that place, so the viewport never jumps to an
+  // unrelated part of the conversation. When that place is past the new bottom, the list
+  // pins again.
   useLayoutEffect(() => {
+    const el = scrollRef.current;
+    const a = anchor.current;
+    if (!pinned.current && el && a && a.rows !== rows) {
+      const index = new Map(rows.map((r, i) => [r.key, i]));
+      let at: number | undefined;
+      for (let i = a.index; at === undefined && i < a.rows.length; i++) at = index.get(a.rows[i]?.key ?? "");
+      const start = at === undefined ? undefined : v.measurementsCache[at]?.start;
+      if (start !== undefined) {
+        // The anchor row itself keeps its offset; a row that takes its place starts at the
+        // viewport's top, not as far above it as the user had scrolled into the row that
+        // folded away (an open tool row's output can be hundreds of px).
+        const own = rows[at ?? -1]?.key === a.rows[a.index]?.key;
+        const top = start - (own ? a.offset : Math.max(a.offset, 0));
+        // Past the new bottom (the fold left too little below to keep the place): pin, so
+        // the footer the turn just got ends up in view rather than wherever the clamp
+        // leaves it.
+        if (top > el.scrollHeight - el.clientHeight) pinned.current = true;
+        else el.scrollTop = top;
+      }
+    }
     if (pinned.current) toBottom();
-  }, [rows, bottomInset, toBottom]);
+    captureAnchor();
+  }, [rows, bottomInset, toBottom, v, captureAnchor]);
 
   return (
     <>
@@ -128,6 +164,7 @@ export function Timeline({ sessionId, working, bottomInset }: { sessionId: strin
           else if (performance.now() - userInput.current < USER_SCROLL_MS) pinned.current = false;
           else if (pinned.current) toBottom();
           if (bottom !== atBottom) setAtBottom(bottom);
+          captureAnchor();
         }}
       >
         <div ref={innerRef} className="col" role="log" aria-label="Conversation" style={{ position: "relative", height: v.getTotalSize() }}>

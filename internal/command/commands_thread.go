@@ -136,11 +136,10 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 			Title:       "Interrupt Thread",
 			Description: "Stop a thread's running turn. Pending requests are withdrawn.",
 			Category:    "Thread",
-			// Claude Code's own interrupt key. The GUI starts it from the keyboard only while
-			// the thread is on a turn and the key is not someone else's (keys/bindings.ts).
-			Keybindings: []string{"escape"},
-			Args:        []ArgSpec{idArg},
-			When:        hasSession,
+			// No keybinding: Escape (Claude Code's key) stopped turns by accident. The GUI
+			// interrupts from the composer's Interrupt button only.
+			Args: []ArgSpec{idArg},
+			When: hasSession,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				if _, err := b.Interrupt(ctx, connect.NewRequest(&v1.InterruptThreadRequest{SessionId: a.String("id")})); err != nil {
 					return Result{}, err

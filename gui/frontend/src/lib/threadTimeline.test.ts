@@ -39,6 +39,8 @@ function shape(rows: readonly TimelineRow[]): string[] {
 }
 
 const open = { fold: () => undefined, working: false };
+/** Every turn unfolded by the user: the whole structure of finished turns. */
+const expanded = { fold: () => false, working: false };
 
 describe("groupLabel", () => {
   it.each([
@@ -55,7 +57,7 @@ describe("groupLabel", () => {
 describe("buildTurns / buildRows", () => {
   it("groups consecutive reads and searches, absorbing thinking between them but not after", () => {
     const items = [user("u1"), item("thinking"), tool("Read"), item("thinking"), tool("Grep"), tool("Read"), item("thinking"), tool("Bash"), text("t1"), end("e1")];
-    const rows = buildRows(buildTurns(items), open);
+    const rows = buildRows(buildTurns(items), expanded);
     expect(shape(rows)).toEqual(["user:u1", "thinking(1)", "group(Read,Grep,Read)", "thinking(1)", "tool:Bash", "final:t1", "footer"]);
   });
 
@@ -101,7 +103,7 @@ describe("buildTurns / buildRows", () => {
     expect(shape(buildRows(buildTurns(items), open))).toEqual(["user:u1", "tool:Read", "tool:Read+perm"]);
   });
 
-  it("folds finished turns except the latest; final text, notes and the footer stay", () => {
+  it("folds every finished turn, the latest included; final text, notes and the footer stay", () => {
     const items = [
       user("u1"),
       item("thinking"),
@@ -122,14 +124,25 @@ describe("buildTurns / buildRows", () => {
     const turns = buildTurns(items);
     expect(turns.map((t) => t.key)).toEqual(["u1", "u2"]);
     const rows = buildRows(turns, open);
-    expect(shape(rows)).toEqual(["user:u1", "note:error", "final:a1", "final:a2", "footer(folded 5)", "user:u2", "tool:Bash", "final:b1", "footer"]);
+    expect(shape(rows)).toEqual(["user:u1", "note:error", "final:a1", "final:a2", "footer(folded 5)", "user:u2", "final:b1", "footer(folded 1)"]);
     expect(rows.flatMap((r) => (r.type === "footer" ? [r.finals] : []))).toEqual([["a1", "a2"], ["b1"]]);
     // Every finished turn's footer counts its steps (open or folded).
     expect(rows.flatMap((r) => (r.type === "footer" ? [[r.id, r.steps, r.folded]] : []))).toEqual([
       ["e1", 5, true],
-      ["e2", 1, false],
+      ["e2", 1, true],
     ]);
-    // The user's choice wins both ways.
+    // The user's choice wins both ways: the latest turn reopened, then an older one.
+    expect(shape(buildRows(turns, { fold: (k) => (k === "u2" ? false : undefined), working: false }))).toEqual([
+      "user:u1",
+      "note:error",
+      "final:a1",
+      "final:a2",
+      "footer(folded 5)",
+      "user:u2",
+      "tool:Bash",
+      "final:b1",
+      "footer",
+    ]);
     const fold = (k: string) => (k === "u1" ? false : k === "u2" ? true : undefined);
     expect(shape(buildRows(turns, { fold, working: false }))).toEqual([
       "user:u1",
@@ -148,11 +161,14 @@ describe("buildTurns / buildRows", () => {
     ]);
   });
 
-  it("the running turn never folds; a new turn folds the one before it", () => {
+  it("the running turn never folds; it folds the moment it ends", () => {
     const items = [user("u1"), tool("Bash"), text("a"), end("e1"), user("u2"), tool("Read")];
     expect(shape(buildRows(buildTurns(items), { fold: () => undefined, working: true }))).toEqual(["user:u1", "final:a", "footer(folded 1)", "user:u2", "tool:Read", "working(u2)"]);
-    // Nothing runs after a turn_end: no working row even when the thread says busy.
-    expect(shape(buildRows(buildTurns(items.slice(0, 4)), { fold: () => undefined, working: true }))).toEqual(["user:u1", "tool:Bash", "final:a", "footer"]);
+    // The running turn has no footer, so no user choice: it stays open whatever fold says.
+    expect(shape(buildRows(buildTurns(items), { fold: () => true, working: true })).slice(3)).toEqual(["user:u2", "tool:Read", "working(u2)"]);
+    // Nothing runs after a turn_end: no working row even when the thread says busy, and
+    // the just-finished (latest) turn is folded.
+    expect(shape(buildRows(buildTurns(items.slice(0, 4)), { fold: () => undefined, working: true }))).toEqual(["user:u1", "final:a", "footer(folded 1)"]);
   });
 
   it("consecutive user messages share a turn; items before any user message form one", () => {

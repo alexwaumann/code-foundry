@@ -4,10 +4,10 @@ import type { ColorScheme } from "./renderer";
 // `background` is the pane colour: it must equal --pane in src/index.css (.dark and
 // :root) so the terminal reads as part of the pane it sits in.
 const dark: ITheme = {
-  background: "#060606",
+  background: "#080808",
   foreground: "#d8dadf",
   cursor: "#e6e6e6",
-  cursorAccent: "#060606",
+  cursorAccent: "#080808",
   selectionBackground: "#3a4a6b",
   selectionInactiveBackground: "#2c3446",
   black: "#1d1f23",
