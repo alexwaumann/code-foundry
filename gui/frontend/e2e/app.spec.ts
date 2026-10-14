@@ -12,7 +12,7 @@ test("sidebar lists threads only; repos and worktrees are on the Projects page, 
   // shells (t-top, t-s1-shell) show in their owner's bottom panel.
   await expect.poll(() => list.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).toEqual(DEFAULT_ORDER);
   await expect(list.locator('[data-row-kind]:not([data-row-kind="session"]):not([data-row-kind="header"])')).toHaveCount(0);
-  await expect.poll(() => list.locator('[data-row-kind="header"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-section")))).toEqual(["working", "archived"]);
+  await expect.poll(() => list.locator('[data-row-kind="header"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-section")))).toEqual(["working", "snoozed", "archived"]);
   await openProjects(page);
   await expect(page.getByTestId("project-name")).toHaveText(["code-foundry", "dotfiles", "ghostty-playground", "sketches", "writing"]);
   await expect(page.locator('[data-testid="project"][data-repo="repo-cf"]').getByTestId("worktree-branch")).toHaveText(["main", "feat/sidebar", "fix/resize"]);

@@ -54,7 +54,7 @@ test("Archived section: collapsed by default with its count; expanded, single-li
   await expect(row(page, "h:archived")).toHaveAttribute("role", "presentation");
   await expect(row(page, "s:s-7")).toHaveCount(0);
   // Below Working, last in the list.
-  await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4", "s:s-3", "# Working 2", "s:s-5", "s:s-1", "# Archived 1"]);
+  await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4", "s:s-3", "# Working 2", "s:s-5", "s:s-1", "# Snoozed 2", "# Archived 1"]);
   expect((await box(page, "sidebar-archived")).top).toBeGreaterThanOrEqual((await box(page, "sidebar-working")).bottom - 0.5);
 
   await header.click();
@@ -120,7 +120,7 @@ test("Archive from the row menu moves a thread to Archived and out of the main l
 
   // Most recently archived first.
   await page.getByTestId("archived-header").click();
-  await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4", "# Working 2", "s:s-5", "s:s-1", "# Archived 2", "s:s-3", "s:s-7"]);
+  await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4", "# Working 2", "s:s-5", "s:s-1", "# Snoozed 2", "# Archived 2", "s:s-3", "s:s-7"]);
   await expect(row(page, "s:s-3").getByTestId("row-archived-age")).toHaveText("0m");
 
   menu = await openMenu(page, "s:s-3");
