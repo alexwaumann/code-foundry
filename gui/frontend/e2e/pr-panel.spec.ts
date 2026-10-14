@@ -14,7 +14,12 @@ const SLUG = "alexwaumann/code-foundry";
 const shots = process.env.SHOTS;
 
 async function shot(page: Page, name: string): Promise<void> {
-  if (shots) await page.screenshot({ path: `${shots}/${name}.png` });
+  if (!shots) return;
+  // Popovers fade in; wait so the shot is not half transparent (spinners never finish).
+  await page.waitForFunction(() =>
+    document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getTiming().iterations === Infinity),
+  );
+  await page.screenshot({ path: `${shots}/${name}.png` });
 }
 
 /** Screenshots are taken at 1400x900. */
