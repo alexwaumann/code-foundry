@@ -1,9 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { CF, invocations, mockUrl, openApp, openProjects, openStreams, resetMock, row, threadPrompt, writes } from "./fixtures";
+import { CF, invocations, mockPost, mockUrl, openApp, openProjects, openStreams, resetMock, row, threadPrompt, writes } from "./fixtures";
 
-// The bottom terminal panel (docs/notes/bottom-panel-2-gui.md). Mock seeds: t-s1-shell is
-// thread s-1's shell, t-top a shell of the feat/sidebar worktree (the Projects page's).
+// The bottom terminal panel (docs/notes/bottom-panel-2-gui.md, bottom-panel-autoshell.md).
+// Mock seeds: t-s1-shell is thread s-1's shell, t-top a shell of the feat/sidebar worktree
+// (the Projects page's). s-2 and s-3 have none, so opening their panel starts one.
 const CFW = `${CF}.worktrees`;
 
 test.beforeEach(async () => {
@@ -112,24 +113,26 @@ test("the palette returns to the bottom panel, and the panel is per thread", asy
   await page.keyboard.press("Escape");
   await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
 
-  // s-2 has no shells and its own (closed) panel.
+  // s-2 has no shells and its own (closed) panel: Toggle Bottom Panel from the palette
+  // opens it with a new shell, which the palette returns to.
   await selectSession(page, "s-2");
   await expect(bottom(page)).toHaveCount(0);
-  await page.getByTestId("bottom-toggle").click();
-  await expect(bottom(page).getByTestId("bottom-empty")).toContainText("No terminals");
-  await expect(tabs(page)).toHaveCount(0);
-  await expect(host(page)).toBeHidden();
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("Toggle Bottom Panel");
+  await page.getByTestId("palette").locator('[data-command="view.bottom.toggle"]').click();
+  await expect(page.getByTestId("palette")).toHaveCount(0);
+  await expect(tabs(page)).toHaveText(["ghostty-playground"]);
+  await expect(host(page)).toHaveAttribute("data-terminal-id", /^t-new-/);
+  await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
   await selectSession(page, "s-1");
   await expect(tabs(page)).toHaveText(["code-foundry"]);
 });
 
-test('"+" and the empty state start a shell for the thread, which opens there focused', async ({ page }) => {
+test('the toggle and "+" start shells for the thread, which open there focused', async ({ page }) => {
   await openApp(page);
   await selectSession(page, "s-2");
+  // The header's toggle on a thread without shells: the panel opens with one.
   await page.getByTestId("bottom-toggle").click();
-  const empty = bottom(page).getByTestId("bottom-empty");
-  await expect(empty.getByTestId("bottom-empty-new")).toHaveText("New Terminal⌘T");
-  await empty.getByTestId("bottom-empty-new").click();
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("terminal.new");
   expect((await invocations()).at(-1)?.context).toMatchObject({ activeSessionId: "s-2" });
   await expect(tabs(page)).toHaveCount(1);
@@ -166,11 +169,13 @@ test("a disconnected thread has the toggle left of the side panel's, and its pan
   const pair = header.locator('[data-testid="bottom-toggle"] + [data-testid="panel-toggle"]');
   await expect(pair).toHaveCount(1);
   await header.getByTestId("bottom-toggle").click();
-  await expect(bottom(page).getByTestId("bottom-empty")).toBeVisible();
+  await expect(tabs(page)).toHaveCount(1);
+  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
+  expect((await invocations()).at(-1)?.context).toMatchObject({ activeSessionId: "s-3" });
   await expect(page.getByTestId("thread-disconnected")).toBeVisible();
 });
 
-test("× and cmd+w close terminals through terminal.close; cmd+w on an empty panel hides it", async ({ page }) => {
+test("× and cmd+w close terminals through terminal.close; closing the last one hides the panel", async ({ page }) => {
   await openApp(page);
   await selectSession(page, "s-1");
   await page.getByTestId("bottom-toggle").click();
@@ -190,20 +195,15 @@ test("× and cmd+w close terminals through terminal.close; cmd+w on an empty pan
   await expect(host(page)).toHaveAttribute("data-terminal-id", "t-s1-shell");
   await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
 
-  // The ×: the last tab goes, the panel stays open and empty, focus stays in the panel.
+  // The × on the last tab: the panel hides and the content pane takes the keyboard.
   const tab = bottom(page).locator('[data-tab-id="t-s1-shell"]');
   await tab.hover();
   await tab.getByRole("button", { name: "Close code-foundry" }).click();
   await expect.poll(async () => (await invocations()).at(-1)?.args).toEqual({ id: "t-s1-shell" });
-  await expect(tabs(page)).toHaveCount(0);
-  await expect(bottom(page).getByTestId("bottom-empty")).toBeVisible();
-  await expect(host(page)).toBeHidden();
-  expect(await attachStreams()).toBe(0);
-  // cmd+w with no tabs hides the panel and hands focus to the content pane.
-  await bottom(page).focus();
-  await page.keyboard.press("Meta+w");
   await expect(bottom(page)).toHaveCount(0);
+  await expect(page.getByTestId("thread-header").getByTestId("bottom-toggle")).toHaveAttribute("aria-pressed", "false");
   await expect.poll(() => region(page)).toBe("content");
+  await expect.poll(attachStreams).toBe(0);
 });
 
 test("the resize handle sizes one panel by keyboard and double-click, and the height persists", async ({ page }) => {
@@ -460,4 +460,122 @@ test("the Usage page hides the panel and brings it back when it closes", async (
   await page.getByTestId("usage-page-close").click();
   await expect(bottom(page)).toBeVisible();
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
+});
+
+test("cmd+j on a thread without shells starts one; its exit hides the panel; the next cmd+j starts a fresh one", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-2");
+  await threadPrompt(page).click();
+  // terminal.new takes a moment: the panel opens at once, blank (no "No terminals" flash).
+  await mockPost("terminal/new?delay=600");
+  await page.keyboard.press("Meta+j");
+  await expect(bottom(page)).toBeVisible();
+  await expect(bottom(page).getByTestId("bottom-body")).toHaveAttribute("data-starting", "true");
+  await expect(bottom(page).getByTestId("bottom-empty")).toHaveCount(0);
+  await expect(tabs(page)).toHaveText(["ghostty-playground"]);
+  await expect(bottom(page).getByTestId("bottom-body")).not.toHaveAttribute("data-starting", "true");
+  const first = await host(page).getAttribute("data-terminal-id");
+  expect(first).toMatch(/^t-new-/);
+  const started = (await invocations()).filter((i) => i.name === "terminal.new");
+  expect(started).toHaveLength(1);
+  expect(started[0]?.context).toMatchObject({ activeSessionId: "s-2" });
+  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
+  await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
+  await mockPost("terminal/new?delay=0");
+
+  // The shell exits (`exit` typed): its tab goes, and with it the panel; the prompt takes the keyboard.
+  await mockPost(`terminal/exit?id=${first ?? ""}&code=0`);
+  await expect(bottom(page)).toHaveCount(0);
+  await expect.poll(() => region(page)).toBe("content");
+
+  // cmd+j again: a fresh shell, not the empty state.
+  await page.keyboard.press("Meta+j");
+  await expect(tabs(page)).toHaveCount(1);
+  await expect(host(page)).toHaveAttribute("data-terminal-id", /^t-new-/);
+  await expect(host(page)).not.toHaveAttribute("data-terminal-id", first ?? "");
+  await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
+  // Hiding stays a plain hide: no shell is closed or started.
+  const before = (await invocations()).length;
+  await page.keyboard.press("Meta+j");
+  await expect(bottom(page)).toHaveCount(0);
+  await page.keyboard.press("Meta+j");
+  await expect(tabs(page)).toHaveCount(1);
+  expect((await invocations()).length).toBe(before);
+});
+
+test("the last shell of a panel that is not on screen exiting closes that panel too", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-2");
+  await page.keyboard.press("Meta+j");
+  await expect(tabs(page)).toHaveCount(1);
+  const shell = await host(page).getAttribute("data-terminal-id");
+  await selectSession(page, "s-1");
+  await mockPost(`terminal/exit?id=${shell ?? ""}&code=0`);
+  await selectSession(page, "s-2");
+  await expect(bottom(page)).toHaveCount(0);
+  await expect(page.getByTestId("thread-header").getByTestId("bottom-toggle")).toHaveAttribute("aria-pressed", "false");
+});
+
+test("the Projects page: its last shell exiting hides the panel, and cmd+j then shows the empty state's hint", async ({ page }) => {
+  await openApp(page);
+  await openProjects(page);
+  await page.getByTestId("projects-page").getByTestId("bottom-toggle").click();
+  await expect(tabs(page)).toHaveText(["feat-sidebar"]);
+  await mockPost("terminal/exit?id=t-top&code=0");
+  await expect(bottom(page)).toHaveCount(0);
+  // No worktree to own a shell: the panel opens on the hint, and nothing is started.
+  await page.getByTestId("projects-page").getByTestId("bottom-toggle").click();
+  await expect(bottom(page).getByTestId("bottom-empty")).toContainText("Start one with New terminal on a project or worktree row.");
+  expect((await invocations()).some((i) => i.name === "terminal.new")).toBe(false);
+});
+
+test("a daemon restart that pruned the shells leaves the panel closed; cmd+j starts a fresh one", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  await page.getByTestId("bottom-toggle").click();
+  await expect(host(page)).toHaveAttribute("data-terminal-id", "t-s1-shell");
+  await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
+  await mockPost("daemon/restart");
+  await expect(bottom(page)).toHaveCount(0);
+  await expect.poll(() => region(page)).toBe("content");
+  await page.keyboard.press("Meta+j");
+  await expect(tabs(page)).toHaveCount(1);
+  await expect(host(page)).toHaveAttribute("data-terminal-id", /^t-new-/);
+  // After a reload the panel comes back open, with the shell that is still there.
+  await page.reload();
+  await selectSession(page, "s-1");
+  await expect(tabs(page)).toHaveCount(1);
+});
+
+test("a persisted open panel whose shells are gone comes back closed", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("code-foundry.bottom", JSON.stringify({ state: { byKey: { "session:s-2": { open: true } } }, version: 1 }));
+  });
+  await openApp(page);
+  await selectSession(page, "s-2");
+  await expect(bottom(page)).toHaveCount(0);
+  await expect(page.getByTestId("thread-header").getByTestId("bottom-toggle")).toHaveAttribute("aria-pressed", "false");
+});
+
+test("when terminal.new fails, the empty state is the fallback: its button retries, cmd+w hides it", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-2");
+  await mockPost("terminal/new?fail=no%20shell%20for%20you");
+  await page.keyboard.press("Meta+j");
+  const empty = bottom(page).getByTestId("bottom-empty");
+  await expect(empty).toContainText("No terminals");
+  await expect(empty.getByTestId("bottom-empty-new")).toHaveText("New Terminal⌘T");
+  await expect(tabs(page)).toHaveCount(0);
+  await expect(host(page)).toBeHidden();
+  // cmd+w with no tabs hides the panel and hands focus to the content pane.
+  await bottom(page).focus();
+  await page.keyboard.press("Meta+w");
+  await expect(bottom(page)).toHaveCount(0);
+  await expect.poll(() => region(page)).toBe("content");
+  // It fails again on the next cmd+j (the empty state once more); its button then starts one.
+  await mockPost("terminal/new?fail=again");
+  await page.keyboard.press("Meta+j");
+  await empty.getByTestId("bottom-empty-new").click();
+  await expect(tabs(page)).toHaveCount(1);
+  await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
 });

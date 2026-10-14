@@ -178,10 +178,17 @@ export interface BottomState {
    * that shell takes focus when it does, within PENDING_FOCUS_MS. Not persisted.
    */
   pendingFocusId: { id: string; at: number } | null;
+  /**
+   * Keys whose panel is waiting on a shell this window is starting for it (cmd+j on an
+   * empty panel, "+", the empty state; stores/bottomActions.ts openBottomShell), with when
+   * it started. While set, an empty panel shows a blank body instead of the empty state,
+   * and losing its last tab does not hide it. Not persisted.
+   */
+  starting: Readonly<Record<string, number>>;
 }
 
 export const useBottomStore = create<BottomState>()(
-  persist((): BottomState => ({ byKey: {}, pendingFocus: null, pendingFocusId: null }), {
+  persist((): BottomState => ({ byKey: {}, pendingFocus: null, pendingFocusId: null, starting: {} }), {
     name: "code-foundry.bottom",
     version: 1,
     partialize: (s) => ({ byKey: s.byKey }),
@@ -280,6 +287,36 @@ export function takePendingFocusId(id: string, now = Date.now()): boolean {
   return true;
 }
 
+/** Marks that this window is starting a shell for `key`'s panel (see BottomState.starting). */
+export function markStarting(key: string, now = Date.now()): void {
+  useBottomStore.setState((s) => ({ starting: { ...s.starting, [key]: now } }));
+}
+
+/** The shell for `key` arrived, failed, or took too long. `at`: only the start marked then. */
+export function clearStarting(key: string, at?: number): void {
+  useBottomStore.setState((s) => {
+    const was = s.starting[key];
+    if (was === undefined || (at !== undefined && was !== at)) return s;
+    const { [key]: _done, ...rest } = s.starting;
+    return { starting: rest };
+  });
+}
+
+/** Whether this window is starting a shell for `key` and it is recent enough to wait for. */
+export function isStarting(key: string, now = Date.now()): boolean {
+  const at = useBottomStore.getState().starting[key];
+  return at !== undefined && now - at <= PENDING_FOCUS_MS;
+}
+
+/**
+ * The open panels that have no tab and are not waiting on a shell: what is left after a
+ * daemon restart pruned every shell (the reconnect's List removes terminals without
+ * `removed` events), or a persisted open state for a key whose shells are gone.
+ */
+export function emptyOpenKeys(byKey: Readonly<Record<string, BottomEntry>>, terminals: TerminalsData, starting: Readonly<Record<string, number>> = {}): string[] {
+  return Object.keys(byKey).filter((key) => byKey[key]?.open === true && !(key in starting) && bottomTabIds(terminals, key).length === 0);
+}
+
 /**
  * The shell the keyboard is in (or the palette returns to): the current key's active tab
  * while focus is in its open bottom panel, else "". The command context's terminal then
@@ -311,6 +348,11 @@ export function useBottomOpen(key: string | null): boolean {
 /** A key's stored height (BOTTOM_DEFAULT when it has none); not yet bounded by bottomMax. */
 export function useBottomHeight(key: string): number {
   return useBottomStore((s) => s.byKey[key]?.height ?? BOTTOM_DEFAULT);
+}
+
+/** Whether this window is starting a shell for a key's panel (BottomState.starting). */
+export function useBottomStarting(key: string): boolean {
+  return useBottomStore((s) => key in s.starting);
 }
 
 /** A key's tab ids; shallow-stable, so unrelated terminal updates do not re-render. */

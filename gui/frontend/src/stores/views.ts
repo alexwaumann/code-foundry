@@ -49,6 +49,14 @@ export function visibleBottomKey(): string | null {
   return key !== null && bottomVisible(key, getBottom(key).open, pageOpen(), sideExpanded()) ? key : null;
 }
 
+/**
+ * Whether a key's bottom panel would be on screen if it were open: no settings or usage
+ * page is up and the side panel is not expanded over the content column.
+ */
+export function bottomCanShow(key: string): boolean {
+  return bottomVisible(key, true, pageOpen(), sideExpanded());
+}
+
 /** Shows a named view (UiIntent.ShowView.name). Returns false for an unknown name. */
 export function showView(name: string): boolean {
   switch (name) {
@@ -144,13 +152,17 @@ export function togglePanelCommand(): boolean {
  * Focus works like view.panel.toggle: showing focuses the panel (its active terminal, else
  * the panel), hiding it while it has focus hands focus to the content pane, and with the
  * palette open its return target moves instead.
+ *
+ * This is the plain toggle, which the CLI's ShowView reaches in every window. This
+ * window's own cmd+j, header button and palette go through toggleBottomFromHere
+ * (stores/bottomActions.ts), which starts a shell when the panel would open empty.
  */
 export function toggleBottomCommand(): boolean {
   const ui = useUiStore.getState();
   const key = bottomKeyOf(ui.selection);
   if (key === null) return false;
   // Whether it could show if open: otherwise a toggle flips state nobody sees.
-  if (!bottomVisible(key, true, pageOpen(), sideExpanded())) return getBottom().open;
+  if (!bottomCanShow(key)) return getBottom().open;
   const inPalette = ui.palette.open;
   const from: FocusRegion = inPalette ? ui.palette.returnTo : ui.focus;
   const open = toggleBottom("current", undefined, { focus: !inPalette });

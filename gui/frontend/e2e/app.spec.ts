@@ -97,8 +97,8 @@ test("invoking a command sends the current context", async ({ page }) => {
   // terminal.kill requires confirmation; the confirm button has focus.
   await expect(page.getByTestId("confirm-dialog")).toContainText("Kill terminal t-s1-shell?");
   await page.keyboard.press("Enter");
-  // A shell that exits is removed: its tab goes, the panel shows its empty state.
-  await expect(page.getByTestId("bottom-panel").getByRole("tab")).toHaveCount(0);
+  // A shell that exits is removed: its tab goes, and as the last one, the panel with it.
+  await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
   const last = (await invocations()).at(-1);
   expect(last?.name).toBe("terminal.kill");
   expect(last?.context).toEqual({

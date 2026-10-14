@@ -11,8 +11,8 @@ import { useThreadStore } from "@/stores/thread";
 import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
-import { markTerminalNewFromHere } from "@/stores/bottomActions";
-import { expandPanelCommand, linkedPrsPanelCommand, newPanelTabCommand, showView, toggleBottomCommand, toggleHelp, togglePanelCommand, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
+import { markTerminalNewFromHere, toggleBottomFromHere } from "@/stores/bottomActions";
+import { expandPanelCommand, linkedPrsPanelCommand, newPanelTabCommand, showView, toggleHelp, togglePanelCommand, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -241,9 +241,10 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
     worktreePanelCommand();
     return true;
   },
-  // And for the bottom terminal panel: this window's panel for its selection.
+  // And for the bottom terminal panel: this window's panel for its selection. Opening an
+  // empty one starts a shell there (the CLI's ShowView only toggles).
   "view.bottom.toggle": () => {
-    toggleBottomCommand();
+    toggleBottomFromHere();
     return true;
   },
   // Not a presentation: terminal.new still runs as usual (false). Started here (cmd+t,

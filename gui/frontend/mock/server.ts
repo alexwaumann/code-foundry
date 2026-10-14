@@ -36,6 +36,10 @@
  *        /__mock/thread/commands?set=none|more|default (the slash commands: mock/slashCommands.ts)
  *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
  *                                                 shell stays, exited, as if the reaper were late)
+ *   POST /__mock/terminal/new?delay=700&fail=reason   (terminal.new takes that long; its next run
+ *                                                 fails with that reason; reset: at once, no failure)
+ *   POST /__mock/daemon/restart                   (every shell goes without a removed event and the
+ *                                                 event streams end: the GUI reconnects and Lists)
  *   POST /__mock/session/hold?id=s-1&id=s-5   (the clock stops changing them: s-1 stops flipping
  *        busy/idle, a starting or closing one does not settle; the sidebar order then holds still.
  *        e2e's resetMock holds s-1 and s-5.) POST /__mock/session/release?id=s-5 undoes it.
@@ -589,6 +593,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       } catch (err) {
         json(res, 404, { error: err instanceof Error ? err.message : String(err) });
       }
+      break;
+    case "POST /__mock/terminal/new":
+      if (q.has("delay")) world.terminalNewDelayMs = Number(q.get("delay"));
+      if (q.has("fail")) world.terminalNewFail = q.get("fail") ?? "";
+      json(res, 200, { delayMs: world.terminalNewDelayMs, fail: world.terminalNewFail });
+      break;
+    case "POST /__mock/daemon/restart":
+      world.restartDaemon();
+      json(res, 200, { ok: true });
       break;
     case "POST /__mock/sessions-service":
       // enabled=false simulates a daemon without Phase 2a: SessionService 404s and the
