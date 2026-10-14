@@ -1,14 +1,14 @@
 /**
  * The Dock badge and attention alerts (docs/notes/dock-alerts.md). macOS notification
  * banners are not available to the bare GUI executable, so the Dock is the channel: the
- * badge counts the threads that need the user, and an alert (a bounce; a sound later)
+ * badge counts the threads that need the user, and an alert (a bounce, a sound or both)
  * fires when a thread starts needing them while Code Foundry is not the active app.
  *
  * stepDockAlerts is the whole decision, pure: state + inputs -> state + effects.
  * startDockAlerts feeds it from the sessions and settings stores and runs the effects
  * against the Wails host (api/app.ts; no-ops without one).
  */
-import { bounceDock, setDockBadge } from "@/api/app";
+import { bounceDock, playAlertSound, setDockBadge } from "@/api/app";
 import type { SettingsSnapshotView } from "@/api/settings";
 import { attentionIds, useSessionsStore } from "./sessions";
 import { useSettingsStore } from "./settings";
@@ -24,11 +24,15 @@ export const NOTIFY_KEYS = {
 
 /** notifications.cooldown_seconds' default in the daemon's schema. */
 const DEFAULT_COOLDOWN_SECONDS = 60;
+/** notifications.sound_volume's default in the daemon's schema. */
+const DEFAULT_SOUND_VOLUME = 50;
 
 export interface AlertSettings {
   dockBadge: boolean;
   bounce: boolean;
   sound: boolean;
+  /** The sound's volume in percent of the Mac's output volume, 0–100. */
+  soundVolume: number;
   /** Minimum gap between alerts; 0 = none. */
   cooldownMs: number;
 }
@@ -43,10 +47,12 @@ export function alertSettings(snap: SettingsSnapshotView | null): AlertSettings 
   const v = snap.values;
   // An older daemon without the keys gets the schema's defaults.
   const cooldown = Number(v[NOTIFY_KEYS.cooldown] ?? DEFAULT_COOLDOWN_SECONDS);
+  const volume = Number(v[NOTIFY_KEYS.soundVolume] ?? DEFAULT_SOUND_VOLUME);
   return {
     dockBadge: v[NOTIFY_KEYS.dockBadge] !== "false",
     bounce: v[NOTIFY_KEYS.bounce] !== "false",
     sound: v[NOTIFY_KEYS.sound] === "true",
+    soundVolume: Number.isFinite(volume) ? Math.min(Math.max(Math.round(volume), 0), 100) : DEFAULT_SOUND_VOLUME,
     cooldownMs: Number.isFinite(cooldown) && cooldown > 0 ? cooldown * 1000 : 0,
   };
 }
@@ -75,17 +81,21 @@ export interface DockAlertsInput {
   settings: AlertSettings | null;
 }
 
-/** An alert does every enabled part at once; the cooldown covers it as a whole. */
-export type DockEffect = { kind: "badge"; count: number } | { kind: "alert"; bounce: boolean; sound: boolean };
+/**
+ * An alert does every enabled part at once; the cooldown covers it as a whole. `volume`
+ * is the sound's (0 when it does not play).
+ */
+export type DockEffect = { kind: "badge"; count: number } | { kind: "alert"; bounce: boolean; sound: boolean; volume: number };
 
 /**
  * One evaluation. The badge follows the attention count (0 when the badge is off),
  * whatever the focus or cooldown. An alert fires when a thread enters the attention set
  * (absent at the previous evaluation of the same epoch) while the app is not focused,
- * at least one of bounce and sound is on, and the cooldown since the last alert has
- * passed. Inside the cooldown the trigger is dropped, not queued. With bounce and sound
- * both off nothing fires and the cooldown is not consumed. The first evaluation, and the
- * first after the epoch changes, only takes the baseline.
+ * at least one of bounce and sound is on (a sound at volume 0 counts as off), and the
+ * cooldown since the last alert has passed. Inside the cooldown the trigger is dropped,
+ * not queued. With bounce and sound both off nothing fires and the cooldown is not
+ * consumed. The first evaluation, and the first after the epoch changes, only takes the
+ * baseline.
  */
 export function stepDockAlerts(state: DockAlertsState, input: DockAlertsInput): { state: DockAlertsState; effects: DockEffect[] } {
   const effects: DockEffect[] = [];
@@ -100,11 +110,12 @@ export function stepDockAlerts(state: DockAlertsState, input: DockAlertsInput): 
   }
   let lastAlertAtMs = state.lastAlertAtMs;
   const baseline = state.epoch !== input.epoch;
-  if (!baseline && settings && !input.focused && (settings.bounce || settings.sound)) {
+  const sound = settings !== null && settings.sound && settings.soundVolume > 0;
+  if (!baseline && settings && !input.focused && (settings.bounce || sound)) {
     const entered = input.attention.some((id) => !state.attention.has(id));
     const cooled = lastAlertAtMs === null || input.nowMs - lastAlertAtMs >= settings.cooldownMs;
     if (entered && cooled) {
-      effects.push({ kind: "alert", bounce: settings.bounce, sound: settings.sound });
+      effects.push({ kind: "alert", bounce: settings.bounce, sound, volume: sound ? settings.soundVolume : 0 });
       lastAlertAtMs = input.nowMs;
     }
   }
@@ -114,8 +125,8 @@ export function stepDockAlerts(state: DockAlertsState, input: DockAlertsInput): 
 export interface DockAlertsDeps {
   setBadge: (count: number) => void;
   bounce: () => void;
-  /** Plays the alert sound; not wired to anything yet, so the default does nothing. */
-  playSound: () => void;
+  /** Plays the alert sound at volume percent (host-side NSSound, gui/notify_darwin.go). */
+  playSound: (volume: number) => void;
   focused: () => boolean;
   now: () => number;
 }
@@ -123,7 +134,7 @@ export interface DockAlertsDeps {
 const hostDeps: DockAlertsDeps = {
   setBadge: (count) => void setDockBadge(count),
   bounce: () => void bounceDock(),
-  playSound: () => undefined,
+  playSound: (volume) => void playAlertSound(volume),
   // WKWebView's document has focus while the window is key: an in-app dialog keeps it,
   // switching to another app (or its window) takes it.
   focused: () => document.hasFocus(),
@@ -155,7 +166,7 @@ export function startDockAlerts(deps: DockAlertsDeps = hostDeps): () => void {
         continue;
       }
       if (e.bounce) deps.bounce();
-      if (e.sound) deps.playSound();
+      if (e.sound) deps.playSound(e.volume);
     }
   };
   evaluate();
