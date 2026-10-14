@@ -158,6 +158,16 @@ panels: the main list scrolling above the Working and Archived footers; single-l
 archived rows with their age; Archive / Unarchive in the row menu and thread header; an
 archived thread's side and bottom panels reset) done: `docs/notes/archive-threads-2-sidebar.md`.
 
+### Snoozed threads: two PRs (2026-10-14)
+
+Snooze a thread until a time: closes Claude, removes its shells, unpins and unarchives
+it, sets `snoozed_until`; the daemon wakes it (wall-clock check every 30 s and at
+startup) into NEEDS_ATTENTION "snooze ended". Reconnect, pin, send and archive unsnooze.
+PR 1 (proto, store, migration 0018, `session.snooze` with its `until` parser and
+confirmation only mid-turn, API and view mapping) done:
+`docs/notes/snooze-threads-1-daemon.md`. PR 2: the GUI (sidebar section, snooze menu,
+mock daemon).
+
 ### Release channels: stable and tip (design 2026-10-11, revised 2026-10-12)
 
 Two channels, one install: every push to main publishes a `vX.Y.Z-tip.N` prerelease
