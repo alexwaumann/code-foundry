@@ -259,7 +259,7 @@ var staticFields = []Field{
 	},
 	{
 		Key: KeyDockBadge, Group: GroupNotify, Type: Bool, Title: "Dock badge",
-		Description: "Show how many threads need attention (waiting on you, finished, or failed) on the Dock icon.",
+		Description: "Show how many threads need attention (waiting on you or finished) on the Dock icon.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Notifications.DockBadge },
 	},
