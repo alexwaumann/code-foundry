@@ -261,8 +261,9 @@ const enc = new TextEncoder();
 const RUN_PROMPT_MS = 150;
 
 /**
- * terminal.new --run's value as typed keys, like the daemon (commands_terminal.go
- * runInput): line ends become Return, one Return ends it, trailing blank lines go, control
+ * terminal.new --run's value as typed keys, like the daemon for a shell without bracketed
+ * paste (commands_terminal.go runInput, runKeys; the mock's shells never turn mode 2004
+ * on): line ends become Return, one Return ends it, trailing blank lines go, control
  * characters other than tab and newline are refused. "" when blank.
  */
 function runKeys(run: string): string {
