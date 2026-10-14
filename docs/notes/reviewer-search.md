@@ -42,7 +42,9 @@ a large org anyone past the first 100 could not be found. It now asks GitHub.
   navigation is unchanged; there is no keyboard path to remove a recent.
 * `useReviewerSearchTerm` never sets state synchronously in its effect (react-hooks
   lint): under the threshold it reports `""` directly and keeps the last term in state.
-  Typing back to a term searched earlier shows it straight away from the cache.
+  Typing back to a term searched earlier shows it straight away from the cache. The
+  flip side: after clearing the input, a new search shows the previous term's results
+  (with the spinner) for the 250 ms pause.
 * The ghostty#13779 capture predates the search (`first: 100` with `totalCount`); its
   nodes have the shape a search returns, so the decoder tests still use it.
 * The mock daemon (`mock/prDetail.ts`) adds 120 org members (`ada-abbott` …
