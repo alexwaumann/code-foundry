@@ -13,7 +13,7 @@ vi.mock("sonner", () => ({ toast: { error: toastError } }));
 const writeTerminal = vi.hoisted(() => vi.fn());
 vi.mock("@/api/terminal", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/api/terminal")>()), writeTerminal }));
 
-const { closeBottomTerminal, closeEmptyPanels, newBottomTerminal, newThreadTerminal, onNewTerminal, onRemovedTerminal, openBottomShell, paneContext, revealShell, toggleBottomFromHere } =
+const { closeBottomTerminal, closeEmptyPanels, newBottomTerminal, newThreadTerminal, onNewTerminal, onRemovedTerminal, openBottomShell, paneContext, revealShell, runInThreadTerminal, toggleBottomFromHere } =
   await import("./bottomActions");
 const { getBottom, markPendingFocus, markStarting, useBottomStore } = await import("./bottomPanel");
 const { usePanelStore } = await import("./panel");
@@ -383,19 +383,43 @@ describe("openBottomShell", () => {
     expect(useUiStore.getState().bottomFocusSeq).toBe(2);
   });
 
-  it("fresh: a new shell beside the tabs, with args and a command typed into it", async () => {
+  it("fresh: a new shell beside the tabs, with args and the command as terminal.new --run (the daemon types it)", async () => {
     expect(await openBottomShell("session:s1", { fresh: true, args: { cwd: "/src/app/docs" }, command: "make test\n" })).toBe("t-new");
-    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", { cwd: "/src/app/docs" }, expect.anything());
-    expect(writeTerminal).toHaveBeenCalledTimes(1);
-    const [id, data] = writeTerminal.mock.calls[0] as [string, Uint8Array];
-    expect(id).toBe("t-new");
-    expect(new TextDecoder().decode(data)).toBe("make test\r");
+    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", { cwd: "/src/app/docs", run: "make test\n" }, expect.anything());
+    expect(writeTerminal).not.toHaveBeenCalled();
   });
 
-  it("a failed write toasts", async () => {
-    writeTerminal.mockRejectedValue(new Error("gone"));
-    await openBottomShell("session:s1", { fresh: true, command: "ls" });
-    expect(toastError).toHaveBeenCalledWith("Could not run the command", { description: "gone" });
+  it("--run: the shell arriving while terminal.new waits for its prompt takes the tab and the keyboard, once", async () => {
+    let finish: (v: unknown) => void = () => undefined;
+    commands.runCommandForResult.mockReturnValue(new Promise((r) => (finish = r)));
+    useUiStore.setState({ focus: "bottom" });
+    const pending = openBottomShell("session:s1", { fresh: true, command: "ls" });
+    const t = term("t-new", shell("s1"));
+    setTerminals([term("claude", { session: "s1" }), term("a", shell("s1")), t]);
+    onNewTerminal(t);
+    expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "t-new" });
+    const focused = useUiStore.getState().bottomFocusSeq;
+    expect(focused).toBe(2); // the panel as it opened, then the shell on arrival
+    finish({ message: "", resultJson: JSON.stringify({ id: "t-new" }) });
+    expect(await pending).toBe("t-new");
+    expect(useUiStore.getState().bottomFocusSeq).toBe(focused);
+    expect(useBottomStore.getState().pendingFocus).toBeNull();
+  });
+
+  it("--run: no shell arrived before terminal.new returned: the id takes focus on arrival, nothing else is left pending", async () => {
+    expect(await openBottomShell("session:s1", { fresh: true, command: "ls" })).toBe("t-new");
+    expect(useBottomStore.getState().pendingFocus).toBeNull();
+    expect(useBottomStore.getState().pendingFocusId?.id).toBe("t-new");
+  });
+
+  it("runInThreadTerminal: a fresh shell in the thread's panel with the command", async () => {
+    expect(await runInThreadTerminal("s2", "go test ./...")).toBe("t-new");
+    expect(commands.runCommandForResult).toHaveBeenCalledWith(
+      "terminal.new",
+      { run: "go test ./..." },
+      { ctx: expect.objectContaining({ activeSessionId: "s2" }) as unknown, quiet: true },
+    );
+    expect(getBottom("session:s2").open).toBe(true);
   });
 
   it("terminal.new failed: null, nothing pending, the panel stays open on its empty state", async () => {

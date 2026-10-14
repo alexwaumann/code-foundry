@@ -186,4 +186,9 @@ type Store interface {
 	// dialogs: TUIs position text with cursor movement, so the raw output stream does
 	// not contain the words a user sees. Must not be called from an Observer.
 	ScreenText(ctx context.Context, id string) (string, error)
+	// BracketedPaste reports whether the program has turned on bracketed paste (mode
+	// 2004), as a shell's line editor does while it reads a command line: text wrapped
+	// in ESC[200~ … ESC[201~ is then inserted as is (tabs are not completion, newlines
+	// do not run lines one by one). Must not be called from an Observer.
+	BracketedPaste(ctx context.Context, id string) (bool, error)
 }

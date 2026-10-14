@@ -384,6 +384,11 @@ func (a *actor) screenText() (string, error) {
 	return formatActivePlain(a.vt, a.cur.Cols, a.cur.Rows)
 }
 
+// bracketedPaste reports whether the program has turned on mode 2004.
+func (a *actor) bracketedPaste() bool {
+	return modeOf(a.vt, ghostty.ModeBracketedPaste)
+}
+
 func (a *actor) detach(ch chan AttachEvent) {
 	if _, ok := a.subs[ch]; ok {
 		delete(a.subs, ch)

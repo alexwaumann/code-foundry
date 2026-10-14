@@ -4,6 +4,7 @@
 package terminaltest
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"maps"
@@ -39,6 +40,7 @@ type fakeTerm struct {
 	output  []byte
 	written []byte
 	screen  *string
+	paste   bool // mode 2004, from the last ESC[?2004h/l emitted
 	subs    map[chan terminal.AttachEvent]struct{}
 }
 
@@ -242,6 +244,17 @@ func (f *Fake) ScreenText(_ context.Context, id string) (string, error) {
 	return string(t.output), nil
 }
 
+// BracketedPaste reports mode 2004 as the last ESC[?2004h or ESC[?2004l Emit sent left it.
+func (f *Fake) BracketedPaste(_ context.Context, id string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	t, err := f.get(id)
+	if err != nil {
+		return false, err
+	}
+	return t.paste, nil
+}
+
 // Watch merges bus events like the real store.
 func (f *Fake) Watch(ctx context.Context) (<-chan terminal.Event, error) {
 	return terminal.WatchBus(ctx, f.bus), nil
@@ -255,6 +268,10 @@ func (f *Fake) Emit(id string, data []byte) error {
 	data = slices.Clone(data)
 	if err := f.apply(id, false, func(t *fakeTerm) []terminal.AttachEvent {
 		t.output = append(t.output, data...)
+		on, off := bytes.LastIndex(data, []byte("\x1b[?2004h")), bytes.LastIndex(data, []byte("\x1b[?2004l"))
+		if on != off {
+			t.paste = on > off
+		}
 		return []terminal.AttachEvent{{Output: data}}
 	}); err != nil {
 		return err

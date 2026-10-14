@@ -31,6 +31,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
+	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 	"github.com/alexwaumann/code-foundry/internal/version"
 )
@@ -41,6 +42,11 @@ const shutdownTimeout = 5 * time.Second
 // restartDelay is how long daemon.restart waits before shutting down, so its response
 // is delivered.
 const restartDelay = 250 * time.Millisecond
+
+// promptSettle is how long a new shell must stay quiet after its first output before
+// terminal.new --run types into it: a startup file printing ahead of the prompt, or a
+// prompt drawn in pieces, gets that long to finish.
+const promptSettle = 150 * time.Millisecond
 
 // errRestartRequested is the shutdown cause for daemon.restart.
 var errRestartRequested = errors.New("daemon.restart requested")
@@ -137,8 +143,12 @@ func Run(ctx context.Context, opts Options) error {
 			t, err := st.terminal.Get(context.Background(), id)
 			return err == nil && termlabel.IsShell(t.Labels)
 		},
-		Repo:  worktreeDirRepo{RepoBackend: repoAPI, repos: st.repo, settings: st.settings},
-		Clone: repoAPI.CloneRef,
+		AwaitTerminalOutput: func(ctx context.Context, id string) error {
+			return terminal.AwaitOutput(ctx, st.terminal, id, promptSettle)
+		},
+		TerminalBracketedPaste: st.terminal.BracketedPaste,
+		Repo:                   worktreeDirRepo{RepoBackend: repoAPI, repos: st.repo, settings: st.settings},
+		Clone:                  repoAPI.CloneRef,
 		Projects: command.ProjectDeps{
 			Backend: repoAPI,
 			HasOrigin: func(c command.Context) bool {

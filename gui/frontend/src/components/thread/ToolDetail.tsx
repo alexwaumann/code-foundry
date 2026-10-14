@@ -4,6 +4,7 @@ import type { ToolCallView } from "@/api/thread";
 import { grammarForPath, highlightLines, shellTokens } from "@/lib/highlight";
 import { agentReport, obj, parseObject, relPath, str, toolHunks, type Json } from "@/lib/toolSummary";
 import { ThreadMarkdown, TokenSpans } from "./Code";
+import { CopyButton } from "./CodeActions";
 import { DiffView } from "./DiffView";
 
 /** Lines of tool output shown before the rest is cut (the block scrolls within its max height). */
@@ -29,9 +30,14 @@ function BashDetail({ t }: { t: ToolCallView }) {
   const lines = clip(output).split("\n");
   return (
     <div className="term selectable" data-testid="thread-bash">
-      <div className="cmd">
+      <div className="cmd cf-code">
         <span className="pr">$ </span>
         <TokenSpans tokens={shellTokens(command)} />
+        {command && (
+          <div className="cf-code-actions">
+            <CopyButton text={command} label="Copy command" />
+          </div>
+        )}
       </div>
       {output && (
         <div className="out">

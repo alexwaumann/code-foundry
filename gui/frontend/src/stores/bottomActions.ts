@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import type { UiContextView } from "@/api/command";
 import { isNotFound } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
-import { terminalIdFromResult, writeTerminal, type TerminalView } from "@/api/terminal";
+import { terminalIdFromResult, type TerminalView } from "@/api/terminal";
 import {
   activate,
   activeTabOf,
@@ -127,9 +127,9 @@ export interface BottomShellOptions {
    */
   fresh?: boolean;
   /**
-   * A command line typed into the new shell (TerminalService.Write) followed by Return,
-   * once terminal.new has returned it. The shell stays open after the command. Ignored
-   * when an existing tab is reused.
+   * A command line for the new shell: terminal.new --run, so the daemon types it (and
+   * Return) once the shell has printed its prompt. The shell stays open after the
+   * command. Ignored when an existing tab is reused.
    */
   command?: string;
   /** terminal.new's args (e.g. `cwd`); the context is always paneContext(key). */
@@ -163,24 +163,36 @@ export async function openBottomShell(key: string, opts: BottomShellOptions = {}
   }, PENDING_FOCUS_MS);
   // A panel already on screen keeps the keyboard where it is ("+") until the shell arrives.
   if (visibleBottomKey() !== key) showBottom(key);
-  const res = await runCommandForResult("terminal.new", opts.args ?? {}, { ctx, quiet: true });
+  const args = opts.command ? { ...opts.args, run: opts.command } : (opts.args ?? {});
+  // With --run, terminal.new returns only once the command is typed (after the shell's
+  // prompt), so the shell arrives first: the first new shell for this key takes the tab
+  // and the keyboard on arrival, as for cmd+t.
+  if (opts.command) markPendingFocus(key, at);
+  const res = await runCommandForResult("terminal.new", args, { ctx, quiet: true });
+  // Still pending: no shell for the key arrived meanwhile.
+  const pending = useBottomStore.getState().pendingFocus;
+  const unclaimed = Boolean(opts.command) && pending?.key === key && pending.at === at;
+  if (unclaimed) markPendingFocus(null);
   const id = res === null ? null : terminalIdFromResult(res.resultJson);
   if (id === null) {
     clearStarting(key, at);
     return null;
   }
-  focusOwnShell(id);
-  if (opts.command) await typeCommand(id, opts.command);
+  // A --run shell that took the keyboard on arrival is not focused again: the user may
+  // have moved on while the daemon waited for the prompt.
+  if (!opts.command || unclaimed) focusOwnShell(id);
   return id;
 }
 
-/** Types a command line into shell `id` and presses Return. A failure toasts. */
-async function typeCommand(id: string, command: string): Promise<void> {
-  try {
-    await writeTerminal(id, new TextEncoder().encode(`${command.replace(/\r?\n$/, "")}\r`));
-  } catch (err) {
-    toast.error("Could not run the command", { description: errorMessage(err) });
-  }
+/**
+ * A code block's "Run in terminal" (components/thread/CodeActions.tsx): a new shell in
+ * the thread's bottom panel that runs `command` and stays open (openBottomShell, fresh,
+ * terminal.new --run).
+ */
+export function runInThreadTerminal(sessionId: string, command: string): Promise<string | null> {
+  const key = bottomKeyOf({ kind: "session", id: sessionId });
+  if (key === null) return Promise.resolve(null);
+  return openBottomShell(key, { fresh: true, command });
 }
 
 /**

@@ -1,4 +1,4 @@
-import { memo, useEffect, useState, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
   Bot,
@@ -32,6 +32,7 @@ import { useSessionsStore } from "@/stores/sessions";
 import { useModelChoices } from "@/stores/settings";
 import { getThreadItems, setRowExpanded, setTurnFolded, useRowExpanded, useThreadItem, useThreadStore } from "@/stores/thread";
 import { ThreadMarkdown } from "./Code";
+import { CodeRunContext } from "./codeContext";
 import { useThreadCtx } from "./context";
 import { AgentReport, ToolDetail } from "./ToolDetail";
 import { UserBubble } from "./UserBubble";
@@ -274,17 +275,26 @@ const ThinkingRow = memo(function ThinkingRow({ node }: { node: Extract<WorkNode
 const TextRow = memo(function TextRow({ id, final, nested }: { id: string; final: boolean; nested?: boolean }) {
   const { sessionId } = useThreadCtx();
   const it = useThreadItem(sessionId, id);
+  const text = it?.kind === "text" ? it.text : "";
+  const streaming = it?.kind === "text" && it.streaming;
+  // Claude's reply: its shell blocks offer Run in terminal (CodeActions).
+  const run = useMemo(() => ({ sessionId, text, streaming }), [sessionId, text, streaming]);
   if (it?.kind !== "text") return null;
+  const md = (
+    <CodeRunContext.Provider value={run}>
+      <ThreadMarkdown className={it.streaming ? "cf-streaming" : undefined}>{it.text}</ThreadMarkdown>
+    </CodeRunContext.Provider>
+  );
   if (nested) {
     return (
       <div className="subresult selectable" data-testid="thread-text">
-        <ThreadMarkdown className={it.streaming ? "cf-streaming" : undefined}>{it.text}</ThreadMarkdown>
+        {md}
       </div>
     );
   }
   return (
     <div className={final ? "a-md final selectable" : "a-md selectable"} data-testid="thread-text" data-final={final || undefined} data-streaming={it.streaming || undefined}>
-      <ThreadMarkdown className={it.streaming ? "cf-streaming" : undefined}>{it.text}</ThreadMarkdown>
+      {md}
     </div>
   );
 });

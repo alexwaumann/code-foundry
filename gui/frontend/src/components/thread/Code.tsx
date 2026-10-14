@@ -3,6 +3,7 @@ import { ImageIcon } from "lucide-react";
 import { Markdown, type MarkdownExtras } from "@/components/pr/Markdown";
 import { grammarFor, highlightLines, type MarkedToken, type Token } from "@/lib/highlight";
 import { useAttachmentUrl } from "@/stores/attachmentImages";
+import { CodeActions } from "./CodeActions";
 
 /** One line's tokens as spans (marked tokens wrapped in `mark`: ins or del). */
 export function TokenSpans({ tokens, mark }: { tokens: readonly (Token | MarkedToken)[]; mark?: "ins" | "del" }): ReactNode {
@@ -22,20 +23,26 @@ export function TokenSpans({ tokens, mark }: { tokens: readonly (Token | MarkedT
   });
 }
 
-/** A fenced code block, highlighted with the terminal palette (lib/highlight). */
+/**
+ * A fenced code block, highlighted with the terminal palette (lib/highlight), with Copy
+ * (and Run in terminal for a shell block in Claude's reply) at its top right.
+ */
 export const CodeBlock = memo(function CodeBlock({ lang, code }: { lang: string; code: string }) {
   const lines = useMemo(() => highlightLines(code, grammarFor(lang)), [code, lang]);
   return (
-    <pre data-lang={lang || undefined}>
-      <code>
-        {lines.map((l, i) => (
-          <span key={i}>
-            <TokenSpans tokens={l} />
-            {i < lines.length - 1 ? "\n" : ""}
-          </span>
-        ))}
-      </code>
-    </pre>
+    <div className="cf-code">
+      <pre data-lang={lang || undefined}>
+        <code>
+          {lines.map((l, i) => (
+            <span key={i}>
+              <TokenSpans tokens={l} />
+              {i < lines.length - 1 ? "\n" : ""}
+            </span>
+          ))}
+        </code>
+      </pre>
+      <CodeActions lang={lang} code={code} />
+    </div>
   );
 });
 

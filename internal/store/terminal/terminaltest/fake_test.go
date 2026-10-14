@@ -56,3 +56,32 @@ func TestFakeLifecycle(t *testing.T) {
 		t.Fatalf("Get after Remove = %v", err)
 	}
 }
+
+func TestFakeBracketedPaste(t *testing.T) {
+	ctx := context.Background()
+	f := New(nil)
+	term, err := f.Create(ctx, terminal.Spec{Argv: []string{"/bin/zsh"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, step := range []struct {
+		emit string
+		want bool
+	}{
+		{"", false},
+		{"% \x1b[?2004h", true},
+		{"ls", true},
+		{"\x1b[?2004l\r\nout\r\n% \x1b[?2004h", true},
+		{"\x1b[?2004h\x1b[?2004l", false},
+	} {
+		if step.emit != "" {
+			_ = f.Emit(term.ID, []byte(step.emit))
+		}
+		if on, err := f.BracketedPaste(ctx, term.ID); err != nil || on != step.want {
+			t.Errorf("after %q: BracketedPaste = %v, %v; want %v", step.emit, on, err, step.want)
+		}
+	}
+	if _, err := f.BracketedPaste(ctx, "nope"); !errors.Is(err, terminal.ErrNotFound) {
+		t.Errorf("unknown id: err = %v, want ErrNotFound", err)
+	}
+}

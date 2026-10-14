@@ -379,6 +379,10 @@ from the pull request (docs/notes/pr-thread-commands.md).
   The follow-up composer's `/` card offers the running process's slash commands from the
   thread's log (Claude Code's own in a last "Claude Code" group, inserted as plain text),
   and the ListSkills scan while there are none (`docs/notes/slash-commands-2-gui.md`).
+  Every fenced code block and Bash command has Copy; a shell block in Claude's reply also
+  has Run in terminal, a new shell in the thread's bottom panel through `terminal.new
+  --run` (the daemon types the line once the shell has printed its prompt;
+  `docs/notes/code-block-actions.md`).
 * Only the visible thread is watched and only the visible shell is attached. Switching
   sessions (or bottom panel tabs) ends the old stream and opens the new one. Background
   sessions cost nothing in the frontend. Watching is also how the daemon knows a thread
@@ -401,7 +405,7 @@ from the pull request (docs/notes/pr-thread-commands.md).
   labels (`session` for a thread's, none for the Projects page's worktree shells). Every
   way to start one lands there: cmd+t and the palette's New Terminal, a thread row's New
   terminal here, the Projects page's rows, a workspace member (in a thread's side panel
-  the thread owns it), the panel's own "+", and `terminal new` on the CLI; the
+  the thread owns it), the panel's own "+", a code block's Run in terminal, and `terminal new` on the CLI; the
   focusTerminal intent reveals a shell there (threads have no terminal of their own)
   (`docs/notes/bottom-panel-2-gui.md`, `docs/notes/bottom-panel-3-routing.md`). Strip and sidebar sit on one background (the sheet);
   the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Each
