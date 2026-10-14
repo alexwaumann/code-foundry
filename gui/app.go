@@ -51,6 +51,7 @@ func (s *AppService) SetBadge(count int) {
 // app. The frontend decides when (a thread started needing attention, outside the alert
 // cooldown).
 func (s *AppService) Bounce() {
+	s.log.Info("dock bounce")
 	bounceDock()
 }
 
