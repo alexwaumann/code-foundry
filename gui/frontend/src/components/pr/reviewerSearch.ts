@@ -28,7 +28,8 @@ export function useReviewerSearchTerm(input: string): { term: string; pending: b
       clearTimeout(t);
     };
   }, [next]);
-  // Below the threshold the term clears at once (the last one is kept, unused, until the
-  // next search replaces it).
+  // Below the threshold the term clears at once, so a new search never shows the last
+  // one's results during the pause.
+  if (next === "" && term !== "") setTerm("");
   return next === "" ? { term: "", pending: false } : { term, pending: term !== next };
 }

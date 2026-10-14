@@ -48,5 +48,8 @@ describe("useReviewerSearchTerm", () => {
 
     rerender({ input: "a" });
     expect(result.current).toEqual({ term: "", pending: false });
+
+    rerender({ input: "bo" }); // a new search starts empty, not with the last results
+    expect(result.current).toEqual({ term: "", pending: true });
   });
 });
