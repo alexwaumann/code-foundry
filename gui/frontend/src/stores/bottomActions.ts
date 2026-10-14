@@ -1,24 +1,30 @@
 /**
  * What the bottom panel (stores/bottomPanel.ts, components/bottom) does beyond its own
  * state: starting and closing shells through the registry (terminal.new, terminal.close),
- * opening a key's panel when a new shell shows up, and the focusTerminal intent for a
- * shell. Kept apart from the store so the store imports no command code.
+ * opening a key's panel when a new shell shows up (and hiding it when its last one goes),
+ * this window's cmd+j (a shell when the panel would open empty), and the focusTerminal
+ * intent for a shell. Kept apart from the store so the store imports no command code.
+ * See docs/notes/bottom-panel-autoshell.md.
  */
 import { toast } from "sonner";
 import type { UiContextView } from "@/api/command";
 import { isNotFound } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
-import { terminalIdFromResult, type TerminalView } from "@/api/terminal";
+import { terminalIdFromResult, writeTerminal, type TerminalView } from "@/api/terminal";
 import {
   activate,
   activeTabOf,
   bottomKeyOf,
   bottomTabIds,
+  clearStarting,
+  emptyOpenKeys,
   getBottom,
   getBottomActiveId,
   getBottomTabIds,
+  isStarting,
   markPendingFocus,
   markPendingFocusId,
+  markStarting,
   neighbourOf,
   openOn,
   ownerKeyOf,
@@ -30,13 +36,14 @@ import {
   takePendingFocus,
   takePendingFocusId,
   updateBottom,
+  useBottomStore,
 } from "./bottomPanel";
 import { invokeConfirmed, refreshCommands, runCommandForResult, useCommandsStore } from "./commands";
 import { getUiContext, projectsShellPlace, worktreeContext } from "./context";
 import { expandPanel, getPanel } from "./panel";
 import { useTerminalsStore, type TerminalsData } from "./terminals";
 import { useUiStore } from "./ui";
-import { useViewsStore, visibleBottomKey } from "./views";
+import { bottomCanShow, toggleBottomCommand, useViewsStore, visibleBottomKey } from "./views";
 
 /**
  * The context a bottom panel's actions run in. A thread's panel: the thread's own context
@@ -96,20 +103,109 @@ function focusOwnShell(id: string): void {
 
 /** focusOwnShell for a shell in the store: open its panel on it; uncover and focus it when it is the selection's. */
 function showOwnShell(key: string, id: string): void {
-  updateBottom(key, (e) => openOn(e, id));
+  clearStarting(key);
+  showBottom(key, id);
+}
+
+/**
+ * Opens a key's panel (on shell `id`, if given). If it is the selection's, uncovers it
+ * (Settings, Usage, an expanded side panel) and focuses it (the active terminal, else the
+ * panel), or makes it the open palette's return target.
+ */
+function showBottom(key: string, id?: string): void {
+  updateBottom(key, (e) => (id === undefined ? setOpen(e, true) : openOn(e, id)));
   if (bottomKeyOf(useUiStore.getState().selection) !== key) return;
   uncoverBottom(key);
   focusBottom();
 }
 
+/** What openBottomShell does beyond making sure the panel shows a shell. */
+export interface BottomShellOptions {
+  /**
+   * Start a new shell even when the panel has tabs (the "+", a code block's "Run in
+   * terminal"). Without it an existing active tab is reused.
+   */
+  fresh?: boolean;
+  /**
+   * A command line typed into the new shell (TerminalService.Write) followed by Return,
+   * once terminal.new has returned it. The shell stays open after the command. Ignored
+   * when an existing tab is reused.
+   */
+  command?: string;
+  /** terminal.new's args (e.g. `cwd`); the context is always paneContext(key). */
+  args?: Record<string, string>;
+}
+
+/**
+ * Makes sure `key`'s bottom panel is open with a shell. A panel with an active tab (and no
+ * `fresh`) just shows it on that tab. Otherwise terminal.new runs in paneContext(key); the
+ * panel opens at once with a blank body (BottomState.starting, so no "No terminals" flash)
+ * and the shell takes it, active and focused, when it arrives. Uncovering and focus only
+ * apply when `key` is the selection's (showBottom).
+ *
+ * Resolves to the shell's id (the reused tab, or the new one, which may not have arrived
+ * yet), or null when there is no context to own a shell (nothing changes) or terminal.new
+ * failed (it toasts; the panel stays open on its empty state).
+ */
+export async function openBottomShell(key: string, opts: BottomShellOptions = {}): Promise<string | null> {
+  const active = getBottomActiveId(key);
+  if (active !== null && !opts.fresh) {
+    showOwnShell(key, active);
+    return active;
+  }
+  const ctx = paneContext(key);
+  if (ctx === null) return null;
+  const at = Date.now();
+  markStarting(key, at);
+  // The timer only drops this start's mark, never a later one.
+  setTimeout(() => {
+    clearStarting(key, at);
+  }, PENDING_FOCUS_MS);
+  // A panel already on screen keeps the keyboard where it is ("+") until the shell arrives.
+  if (visibleBottomKey() !== key) showBottom(key);
+  const res = await runCommandForResult("terminal.new", opts.args ?? {}, { ctx, quiet: true });
+  const id = res === null ? null : terminalIdFromResult(res.resultJson);
+  if (id === null) {
+    clearStarting(key, at);
+    return null;
+  }
+  focusOwnShell(id);
+  if (opts.command) await typeCommand(id, opts.command);
+  return id;
+}
+
+/** Types a command line into shell `id` and presses Return. A failure toasts. */
+async function typeCommand(id: string, command: string): Promise<void> {
+  try {
+    await writeTerminal(id, new TextEncoder().encode(`${command.replace(/\r?\n$/, "")}\r`));
+  } catch (err) {
+    toast.error("Could not run the command", { description: errorMessage(err) });
+  }
+}
+
 /**
  * terminal.new for a key's panel (its "+" and empty state), in paneContext. The new shell
- * opens there and takes focus. False when there is no context for it.
+ * opens there and takes focus. False when there is no context for it or the run failed.
  */
-export function newBottomTerminal(key: string): Promise<boolean> {
-  const ctx = paneContext(key);
-  if (ctx === null) return Promise.resolve(false);
-  return startShell(ctx);
+export async function newBottomTerminal(key: string): Promise<boolean> {
+  return (await openBottomShell(key, { fresh: true })) !== null;
+}
+
+/**
+ * view.bottom.toggle from this window (cmd+j, the header's toggle, the palette; the
+ * presenter in keys/bindings.ts). Like toggleBottomCommand, except that a panel about to
+ * open with no tab starts a shell (openBottomShell) instead of showing the empty state,
+ * when there is a context for one (a thread always; the Projects page never without a
+ * tab, so it gets the empty state's hint). Hiding stays a plain hide. The CLI's ShowView
+ * reaches every window with the plain toggle, so one CLI call never starts a shell per
+ * window. Returns the new open state.
+ */
+export function toggleBottomFromHere(): boolean {
+  const key = bottomKeyOf(useUiStore.getState().selection);
+  const opensEmpty = key !== null && !getBottom(key).open && bottomCanShow(key) && getBottomTabIds(key).length === 0;
+  if (!opensEmpty || isStarting(key) || paneContext(key) === null) return toggleBottomCommand();
+  void openBottomShell(key);
+  return true;
 }
 
 /**
@@ -252,15 +348,48 @@ export function onNewTerminal(t: TerminalView): void {
 }
 
 /**
- * A terminal left the store (`before` is the store with it). When it was its panel's
- * active tab, the tab after it becomes active, else the one before (not the last tab,
- * which is what activeTabOf would fall back to).
+ * A terminal left the store (`before` is the store with it). When it was its panel's last
+ * tab, the panel hides (hideEmptyBottom), shown or not, so the next cmd+j starts a fresh
+ * shell. When it was its panel's active tab, the tab after it becomes active, else the
+ * one before (not the last tab, which is what activeTabOf would fall back to).
  */
 export function onRemovedTerminal(t: TerminalView, before: TerminalsData): void {
   const key = ownerKeyOf(t);
   if (key === null) return;
+  if (getBottomTabIds(key).length === 0) {
+    hideEmptyBottom(key);
+    return;
+  }
   const ids = bottomTabIds(before, key);
   if (activeTabOf(getBottom(key), ids) !== t.id) return;
   const next = neighbourOf(ids, t.id);
   if (next !== null) updateBottom(key, (e) => activate(e, next));
+}
+
+/**
+ * Hides a key's panel that has no tab left, unless this window is starting a shell for it.
+ * If it was on screen with the keyboard in it, the keyboard goes to the content pane (or
+ * the open palette returns there), like cmd+w on an empty panel.
+ */
+function hideEmptyBottom(key: string): void {
+  if (isStarting(key)) return;
+  const shown = visibleBottomKey() === key;
+  updateBottom(key, (e) => setOpen(e, false));
+  if (!shown) return;
+  const ui = useUiStore.getState();
+  if (ui.palette.open) {
+    if (ui.palette.returnTo === "bottom") useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "content" } }));
+  } else if (ui.focus === "bottom") {
+    ui.focusContent();
+  }
+}
+
+/**
+ * Hides every open panel left without tabs (emptyOpenKeys). events.ts runs it after the
+ * reconnect's List: a restarted daemon pruned the shells without `removed` events, and a
+ * persisted open state may name a key whose shells are gone.
+ */
+export function closeEmptyPanels(): void {
+  const s = useBottomStore.getState();
+  for (const key of emptyOpenKeys(s.byKey, useTerminalsStore.getState(), s.starting)) hideEmptyBottom(key);
 }

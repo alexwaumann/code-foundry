@@ -20,6 +20,7 @@ import {
   useBottomActiveId,
   useBottomHeight,
   useBottomOpen,
+  useBottomStarting,
   useBottomStore,
   useBottomTabIds,
   useCurrentBottomKey,
@@ -198,9 +199,10 @@ function TabStrip({ panelKey, ids, activeId }: { panelKey: string; ids: readonly
 }
 
 /**
- * No terminals yet: a button for terminal.new with its chord, like the side panel's
- * surface list. The Projects page has no worktree to own a shell until it has a tab, so
- * it points at the page's rows instead.
+ * No terminals: a button for terminal.new with its chord, like the side panel's surface
+ * list. A fallback since cmd+j starts a shell in an empty panel and the last tab's exit
+ * hides it: it shows when terminal.new failed, or on the Projects page, which has no
+ * worktree to own a shell until it has a tab, so it points at the page's rows instead.
  */
 function EmptyState({ panelKey }: { panelKey: string }) {
   const { title, chord } = useNewTerminalCommand();
@@ -260,6 +262,8 @@ function Panel({
 }) {
   const ids = useBottomTabIds(panelKey);
   const activeId = useBottomActiveId(panelKey);
+  // A shell this window is starting for the panel: a blank body until it arrives.
+  const starting = useBottomStarting(panelKey);
 
   // The active terminal changed under the keyboard (a tab closed, a new shell came in):
   // keep the keyboard in the panel, on the terminal now showing, or on the panel itself.
@@ -306,11 +310,12 @@ function Panel({
           aria-labelledby={activeId === null ? undefined : tabDomId(activeId)}
           className="flex min-h-0 flex-1 flex-col"
           data-testid="bottom-body"
+          data-starting={(activeId === null && starting) || undefined}
         >
           {/* One host for every tab: switching tabs re-attaches the same xterm. Hidden
               (and detached) while there is no tab. */}
           <TerminalHost ref={hostRef} terminalId={activeId} hidden={activeId === null} testId="bottom-terminal-host" />
-          {activeId === null && <EmptyState panelKey={panelKey} />}
+          {activeId === null && !starting && <EmptyState panelKey={panelKey} />}
         </div>
       </aside>
     </div>

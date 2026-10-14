@@ -10,9 +10,12 @@ const commands = vi.hoisted(() => ({
 vi.mock("./commands", async (importOriginal) => ({ ...(await importOriginal<typeof import("./commands")>()), ...commands }));
 const toastError = vi.hoisted(() => vi.fn());
 vi.mock("sonner", () => ({ toast: { error: toastError } }));
+const writeTerminal = vi.hoisted(() => vi.fn());
+vi.mock("@/api/terminal", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/api/terminal")>()), writeTerminal }));
 
-const { closeBottomTerminal, newBottomTerminal, newThreadTerminal, onNewTerminal, onRemovedTerminal, paneContext, revealShell } = await import("./bottomActions");
-const { getBottom, markPendingFocus, useBottomStore } = await import("./bottomPanel");
+const { closeBottomTerminal, closeEmptyPanels, newBottomTerminal, newThreadTerminal, onNewTerminal, onRemovedTerminal, openBottomShell, paneContext, revealShell, toggleBottomFromHere } =
+  await import("./bottomActions");
+const { getBottom, markPendingFocus, markStarting, useBottomStore } = await import("./bottomPanel");
 const { usePanelStore } = await import("./panel");
 const { useTerminalsStore } = await import("./terminals");
 const { useUiStore } = await import("./ui");
@@ -33,10 +36,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   commands.runCommandForResult.mockResolvedValue({ message: "created terminal t-new", resultJson: JSON.stringify({ id: "t-new" }) });
   commands.invokeConfirmed.mockResolvedValue({ message: "", resultJson: "" });
-  useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null });
+  writeTerminal.mockResolvedValue(undefined);
+  useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null, starting: {} });
   usePanelStore.setState({ byKey: {} });
   useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
-  useUiStore.setState({ selection: { kind: "session", id: "s1" }, focus: "content", bottomFocusSeq: 0, palette: closedPalette });
+  useUiStore.setState({ selection: { kind: "session", id: "s1" }, focus: "content", bottomFocusSeq: 0, contentFocusSeq: 0, palette: closedPalette });
   setTerminals([term("claude", { session: "s1" }), term("a", shell("s1")), term("w", shell("", "/src/app.worktrees/x"))]);
 });
 
@@ -154,6 +158,8 @@ describe("paneContext and newBottomTerminal", () => {
 
 describe("focus for this window's own shells (by id)", () => {
   it("a shell that arrives after the result takes focus then", async () => {
+    // "+" in the panel on screen: the keyboard stays put until the shell arrives.
+    useBottomStore.setState({ byKey: { "session:s1": { open: true } } });
     await newBottomTerminal("session:s1");
     expect(useBottomStore.getState().pendingFocusId?.id).toBe("t-new");
     expect(useUiStore.getState().bottomFocusSeq).toBe(0);
@@ -265,6 +271,205 @@ describe("onRemovedTerminal", () => {
     useBottomStore.setState({ byKey: { "session:s1": remembered === undefined ? { open: true } : { open: true, activeTerminalId: remembered } } });
     onRemovedTerminal(term(removed, shell("s1")), before(["a", "b", "c"]));
     expect(getBottom("session:s1").activeTerminalId).toBe(want);
+  });
+});
+
+/** The events handler's order: the store loses the terminal, then onRemovedTerminal runs. */
+function removeTerminal(id: string): void {
+  const before = useTerminalsStore.getState();
+  const t = before.byId[id];
+  if (!t) throw new Error(`no terminal ${id}`);
+  setTerminals(before.order.filter((x) => x !== id).flatMap((x) => (before.byId[x] ? [before.byId[x]] : [])));
+  onRemovedTerminal(t, before);
+}
+
+describe("the last tab going hides its panel", () => {
+  it("shown with the keyboard in it: hidden, the content pane takes the keyboard", () => {
+    useBottomStore.setState({ byKey: { "session:s1": { open: true, height: 300, activeTerminalId: "a" } } });
+    useUiStore.setState({ focus: "bottom" });
+    removeTerminal("a");
+    expect(getBottom("session:s1")).toEqual({ open: false, height: 300, activeTerminalId: "a" });
+    expect(useUiStore.getState().contentFocusSeq).toBe(1);
+  });
+
+  const cases: [string, () => void, number, string][] = [
+    ["shown, the keyboard elsewhere: focus stays", () => useUiStore.setState({ focus: "sidebar" }), 0, "content"],
+    ["another thread selected: hidden all the same", () => useUiStore.setState({ selection: { kind: "session", id: "s9" }, focus: "bottom" }), 0, "content"],
+    ["the palette open over it: it returns to the content pane", () => useUiStore.setState({ palette: { ...closedPalette, open: true, returnTo: "bottom" } }), 0, "content"],
+  ];
+  it.each(cases)("%s", (_name, arrange, contentFocus, returnTo) => {
+    useBottomStore.setState({ byKey: { "session:s1": { open: true } } });
+    arrange();
+    removeTerminal("a");
+    expect(getBottom("session:s1").open).toBe(false);
+    expect(useUiStore.getState().contentFocusSeq).toBe(contentFocus);
+    expect(useUiStore.getState().palette.returnTo).toBe(returnTo);
+  });
+
+  it("a tab left: the panel stays open", () => {
+    setTerminals([term("a", shell("s1")), term("b", shell("s1"))]);
+    useBottomStore.setState({ byKey: { "session:s1": { open: true } } });
+    removeTerminal("b");
+    expect(getBottom("session:s1").open).toBe(true);
+  });
+
+  it("a shell this window is starting for it: the panel stays open", () => {
+    useBottomStore.setState({ byKey: { "session:s1": { open: true } } });
+    markStarting("session:s1");
+    removeTerminal("a");
+    expect(getBottom("session:s1").open).toBe(true);
+  });
+
+  it("the Projects page's last worktree shell", () => {
+    useUiStore.setState({ selection: { kind: "view", name: "projects" }, focus: "bottom" });
+    useBottomStore.setState({ byKey: { "view:projects": { open: true } } });
+    removeTerminal("w");
+    expect(getBottom("view:projects").open).toBe(false);
+    expect(useUiStore.getState().contentFocusSeq).toBe(1);
+  });
+
+  it("the Claude terminal is no tab: nothing changes", () => {
+    useBottomStore.setState({ byKey: { "session:s1": { open: true } } });
+    removeTerminal("claude");
+    expect(getBottom("session:s1").open).toBe(true);
+  });
+});
+
+describe("closeEmptyPanels (after the reconnect's List)", () => {
+  it("hides every open panel without tabs, keeps the rest, and moves the keyboard out of the shown one", () => {
+    useBottomStore.setState({
+      byKey: { "session:s1": { open: true }, "session:s2": { open: true, height: 200 }, "view:projects": { open: true }, "session:s3": { open: true } },
+    });
+    markStarting("session:s3");
+    useUiStore.setState({ selection: { kind: "session", id: "s1" }, focus: "bottom" });
+    // The restarted daemon has none of s1's shells: only the worktree shell is left.
+    setTerminals([term("claude", { session: "s1" }), term("w", shell("", "/src/app.worktrees/x"))]);
+    closeEmptyPanels();
+    expect(useBottomStore.getState().byKey).toEqual({
+      "session:s1": { open: false },
+      "session:s2": { open: false, height: 200 },
+      "view:projects": { open: true },
+      "session:s3": { open: true },
+    });
+    expect(useUiStore.getState().contentFocusSeq).toBe(1);
+  });
+});
+
+describe("openBottomShell", () => {
+  it("a panel with an active tab: shown on it and focused, no new shell", async () => {
+    expect(await openBottomShell("session:s1")).toBe("a");
+    expect(commands.runCommandForResult).not.toHaveBeenCalled();
+    expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "a" });
+    expect(useUiStore.getState().bottomFocusSeq).toBe(1);
+  });
+
+  it("no tab: opens at once, blank while the shell starts, and the shell takes it when it arrives", async () => {
+    setTerminals([term("claude", { session: "s1" })]);
+    useViewsStore.setState({ usageOpen: true });
+    const pending = openBottomShell("session:s1");
+    // Before terminal.new returns: open, uncovered, focused (the panel), waiting.
+    expect(getBottom("session:s1").open).toBe(true);
+    expect(useViewsStore.getState().usageOpen).toBe(false);
+    expect(useUiStore.getState().bottomFocusSeq).toBe(1);
+    expect("session:s1" in useBottomStore.getState().starting).toBe(true);
+    expect(await pending).toBe("t-new");
+    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, { ctx: expect.objectContaining({ activeSessionId: "s1" }) as unknown, quiet: true });
+    expect("session:s1" in useBottomStore.getState().starting).toBe(true);
+    const t = term("t-new", shell("s1"));
+    setTerminals([term("claude", { session: "s1" }), t]);
+    onNewTerminal(t);
+    expect(getBottom("session:s1")).toEqual({ open: true, activeTerminalId: "t-new" });
+    expect(useBottomStore.getState().starting).toEqual({});
+    expect(useUiStore.getState().bottomFocusSeq).toBe(2);
+  });
+
+  it("fresh: a new shell beside the tabs, with args and a command typed into it", async () => {
+    expect(await openBottomShell("session:s1", { fresh: true, args: { cwd: "/src/app/docs" }, command: "make test\n" })).toBe("t-new");
+    expect(commands.runCommandForResult).toHaveBeenCalledWith("terminal.new", { cwd: "/src/app/docs" }, expect.anything());
+    expect(writeTerminal).toHaveBeenCalledTimes(1);
+    const [id, data] = writeTerminal.mock.calls[0] as [string, Uint8Array];
+    expect(id).toBe("t-new");
+    expect(new TextDecoder().decode(data)).toBe("make test\r");
+  });
+
+  it("a failed write toasts", async () => {
+    writeTerminal.mockRejectedValue(new Error("gone"));
+    await openBottomShell("session:s1", { fresh: true, command: "ls" });
+    expect(toastError).toHaveBeenCalledWith("Could not run the command", { description: "gone" });
+  });
+
+  it("terminal.new failed: null, nothing pending, the panel stays open on its empty state", async () => {
+    commands.runCommandForResult.mockResolvedValue(null);
+    setTerminals([]);
+    expect(await openBottomShell("session:s1", { command: "ls" })).toBeNull();
+    expect(getBottom("session:s1").open).toBe(true);
+    expect(useBottomStore.getState().starting).toEqual({});
+    expect(writeTerminal).not.toHaveBeenCalled();
+  });
+
+  it("no context to own a shell (the Projects page without tabs): null, nothing changes", async () => {
+    setTerminals([]);
+    expect(await openBottomShell("view:projects")).toBeNull();
+    expect(commands.runCommandForResult).not.toHaveBeenCalled();
+    expect(useBottomStore.getState().byKey).toEqual({});
+  });
+
+  it("for a thread that is not selected: opens there without focus or uncovering", async () => {
+    useViewsStore.setState({ settingsOpen: true });
+    expect(await openBottomShell("session:s2")).toBe("t-new");
+    expect(getBottom("session:s2").open).toBe(true);
+    expect(useUiStore.getState().bottomFocusSeq).toBe(0);
+    expect(useViewsStore.getState().settingsOpen).toBe(true);
+  });
+});
+
+describe("toggleBottomFromHere (cmd+j, the header toggle, the palette)", () => {
+  const cases: [string, () => void, boolean, boolean][] = [
+    ["a thread's panel without tabs opens with a new shell", () => { setTerminals([term("claude", { session: "s1" })]); }, true, true],
+    ["a thread's panel with a tab just opens", () => undefined, true, false],
+    ["an open panel just hides", () => useBottomStore.setState({ byKey: { "session:s1": { open: true } } }), false, false],
+    [
+      "the Projects page without tabs opens on its empty state",
+      () => {
+        useUiStore.setState({ selection: { kind: "view", name: "projects" } });
+        setTerminals([]);
+      },
+      true,
+      false,
+    ],
+    [
+      "under the settings page: a no-op",
+      () => {
+        setTerminals([]);
+        useViewsStore.setState({ settingsOpen: true });
+      },
+      false,
+      false,
+    ],
+    ["the dashboard: a no-op", () => useUiStore.setState({ selection: { kind: "view", name: "dashboard" } }), false, false],
+    [
+      "already starting a shell for it: just opens",
+      () => {
+        setTerminals([]);
+        markStarting("session:s1");
+      },
+      true,
+      false,
+    ],
+  ];
+  it.each(cases)("%s", async (_name, arrange, open, started) => {
+    arrange();
+    expect(toggleBottomFromHere()).toBe(open);
+    await Promise.resolve();
+    expect(commands.runCommandForResult).toHaveBeenCalledTimes(started ? 1 : 0);
+  });
+
+  it("from the palette, its return target moves to the starting panel", () => {
+    setTerminals([]);
+    useUiStore.setState({ palette: { ...closedPalette, open: true, returnTo: "content" } });
+    toggleBottomFromHere();
+    expect(useUiStore.getState().palette.returnTo).toBe("bottom");
+    expect(useUiStore.getState().bottomFocusSeq).toBe(0);
   });
 });
 

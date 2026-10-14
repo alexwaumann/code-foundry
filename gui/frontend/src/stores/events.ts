@@ -6,7 +6,7 @@ import { listRepos } from "@/api/repo";
 import { listSessions } from "@/api/session";
 import { errorMessage, isAbort, runStream, type StreamStatus } from "@/api/stream";
 import { listTerminals } from "@/api/terminal";
-import { onNewTerminal, onRemovedTerminal, revealArrived } from "./bottomActions";
+import { closeEmptyPanels, onNewTerminal, onRemovedTerminal, revealArrived } from "./bottomActions";
 import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
 import { applyIntent } from "./intents";
@@ -44,7 +44,8 @@ const handlers: Handlers = {
   terminal: (ev) => {
     // A terminal the store did not have (not one the reconnect's List already brought):
     // a new shell opens its owner's bottom panel (stores/bottomActions.ts).
-    // A removed one that was its panel's active tab hands that to its neighbour.
+    // A removed one that was its panel's active tab hands that to its neighbour; its
+    // panel's last tab hides the panel.
     const before = useTerminalsStore.getState();
     const fresh = ev.kind === "updated" && before.loaded && !(ev.terminal.id in before.byId) ? ev.terminal : null;
     const removed = ev.kind === "removed" ? before.byId[ev.id] : undefined;
@@ -111,6 +112,9 @@ export function startEventSync(sessionRetryMs = 10_000): () => void {
       useTerminalsStore.setState((s) => ({ ...replaceTerminals(s, terminals), loaded: true }));
       // The List brings terminals without updated events: a pending reveal's shell may be here now.
       revealArrived();
+      // Nor removed events: a restarted daemon pruned its shells, so open panels left
+      // without tabs hide (as a last tab's removal does) instead of showing empty.
+      closeEmptyPanels();
     },
     onEvent: dispatchEvent,
     onStatus: (stream, err) => {

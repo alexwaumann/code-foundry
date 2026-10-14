@@ -3,6 +3,10 @@ import type { TerminalView } from "@/api/terminal";
 import {
   activate,
   bottomVisible,
+  clearStarting,
+  emptyOpenKeys,
+  isStarting,
+  markStarting,
   focusedBottomShell,
   markPendingFocusId,
   neighbourOf,
@@ -225,9 +229,28 @@ describe("reducers", () => {
   });
 });
 
+describe("emptyOpenKeys", () => {
+  const terminals = data([term("claude", { session: "s1" }), term("a", shell("s1")), term("w", shell(""))]);
+  const cases: [string, Record<string, BottomEntry>, Record<string, number>, string[]][] = [
+    ["an open thread panel with a shell stays", { "session:s1": { open: true } }, {}, []],
+    ["an open thread panel without shells (its Claude terminal does not count)", { "session:s2": { open: true } }, {}, ["session:s2"]],
+    ["a closed one is left alone", { "session:s2": { open: false } }, {}, []],
+    ["one waiting on a shell this window starts", { "session:s2": { open: true } }, { "session:s2": 1 }, []],
+    ["the Projects page with a worktree shell stays", { "view:projects": { open: true } }, {}, []],
+    ["several", { "session:s1": { open: true }, "session:s3": { open: true, height: 300 }, "session:s4": { open: true } }, {}, ["session:s3", "session:s4"]],
+  ];
+  it.each(cases)("%s", (_name, byKey, starting, want) => {
+    expect(emptyOpenKeys(byKey, terminals, starting)).toEqual(want);
+  });
+
+  it("the Projects page without worktree shells", () => {
+    expect(emptyOpenKeys({ "view:projects": { open: true } }, data([term("a", shell("s1"))]))).toEqual(["view:projects"]);
+  });
+});
+
 describe("store", () => {
   beforeEach(() => {
-    useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null });
+    useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null, starting: {} });
     useUiStore.setState({ selection: { kind: "session", id: "s1" }, bottomFocusSeq: 0 });
   });
 
@@ -270,14 +293,29 @@ describe("store", () => {
     expect(takePendingFocusId("t1", 1003)).toBe(false);
   });
 
-  it("persists byKey (not the pending focus) and rehydrates it", async () => {
+  it("a start mark is per key, waits PENDING_FOCUS_MS, and is cleared only by its own start when `at` is given", () => {
+    markStarting("session:s1", 1000);
+    expect(isStarting("session:s1", 1000 + PENDING_FOCUS_MS)).toBe(true);
+    expect(isStarting("session:s1", 1000 + PENDING_FOCUS_MS + 1)).toBe(false);
+    expect(isStarting("session:s2", 1001)).toBe(false);
+    clearStarting("session:s1", 999); // an older start's timer
+    expect(useBottomStore.getState().starting).toEqual({ "session:s1": 1000 });
+    clearStarting("session:s1", 1000);
+    expect(useBottomStore.getState().starting).toEqual({});
+    markStarting("session:s1", 2000);
+    clearStarting("session:s1");
+    expect(useBottomStore.getState().starting).toEqual({});
+  });
+
+  it("persists byKey (not the pending focus or start marks) and rehydrates it", async () => {
     toggleBottom("session:s1", true);
     setBottomHeight("session:s1", 360);
     markPendingFocus("session:s1");
+    markStarting("session:s2");
     const raw = localStorage.getItem("code-foundry.bottom") ?? "{}";
     expect((JSON.parse(raw) as { state: unknown }).state).toEqual({ byKey: { "session:s1": { open: true, height: 360 } } });
     // Clearing the store saves too; put the saved value back before loading it.
-    useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null });
+    useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null, starting: {} });
     localStorage.setItem("code-foundry.bottom", raw);
     await useBottomStore.persist.rehydrate();
     expect(getBottom("session:s1")).toEqual({ open: true, height: 360 });
