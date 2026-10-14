@@ -44,7 +44,8 @@ type Deps struct {
 	// pr.fix.findings (which also use Repo, Session, GitOps.Backend and Emitter). Nil
 	// works like Terminal.
 	Gh command.GhBackend
-	// Settings backs settings.*. Nil works like Terminal.
+	// Settings backs settings.* and notifications.test (the alert volume). Nil works like
+	// Terminal.
 	Settings command.SettingsBackend
 	// Reveal shows a file in Finder (settings.reveal). Nil: command.RevealInFinder.
 	Reveal command.RevealFunc
@@ -106,6 +107,7 @@ func Register(r *command.Registry, d Deps) error {
 			Gh: d.Gh, Repo: d.Repo, Session: d.Session, GitOps: d.GitOps.Backend, Emitter: d.Emitter,
 		}),
 		command.RegisterSettings(r, d.Settings, d.Emitter, d.Reveal),
+		command.RegisterNotifications(r, d.Settings, d.Emitter),
 		command.RegisterUpdate(r, command.UpdateDeps{Update: d.Update, Session: d.Session, Restart: d.Restart, Daemon: d.Daemon}),
 		command.RegisterView(r, d.Emitter),
 		command.RegisterUsage(r, d.Session),
