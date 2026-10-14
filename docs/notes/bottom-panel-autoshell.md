@@ -95,8 +95,9 @@ WebKit-only screenshot runs). Live: `e2e/live-bottom.spec.ts` against a real dae
 * `mock/hub.ts`: `while (!signal.aborted && !ended)` with a closure-set `let ended`
   trips `no-unnecessary-condition` (TS narrows it to `false`); it reads an object field.
 * WebGL bottom hosts have no DOM text: the live spec reads `window.__cfTerminal`.
-* Running Playwright in parallel with another worktree: use `E2E_MOCK_PORT` /
-  `E2E_VITE_PORT` (7841 / 9341 here) so the default ports of another run do not collide.
+* Running Playwright while other worktrees run theirs: pass `E2E_MOCK_PORT` /
+  `E2E_VITE_PORT`, and check them with `lsof` first. Another agent's mock took 7841/9341
+  between two of these runs ("is already used"); 7863/9363 were free.
 
 ## Tests
 
