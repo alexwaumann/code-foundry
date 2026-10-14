@@ -46,9 +46,14 @@ const composer = (page: Page) => page.getByTestId("thread-composer");
 const editor = (page: Page) => composer(page).locator('[contenteditable="true"]');
 const lastText = (page: Page) => page.getByTestId("thread-pane").locator('[data-testid="thread-text"]').last();
 
-/** Waits for the running turn to end (it folds under its footer), then opens it again. */
-async function unfoldLatest(page: Page): Promise<void> {
-  const footer = page.getByTestId("thread-footer").last();
+/**
+ * Waits for the running turn to end (it folds under its footer), then opens it again.
+ * `footers` is how many the thread has once it ended: the final text streams in before
+ * the turn_end, so until then the last footer is an earlier turn's (also folded).
+ */
+async function unfoldLatest(page: Page, footers: number): Promise<void> {
+  await expect(page.getByTestId("thread-footer")).toHaveCount(footers);
+  const footer = page.getByTestId("thread-footer").nth(footers - 1);
   await expect(footer).toHaveAttribute("data-folded", "true");
   await footer.getByRole("button", { name: "Show this turn's work" }).click();
   await expect(footer).not.toHaveAttribute("data-folded", "true");
@@ -79,7 +84,7 @@ for (const scheme of ["dark", "light"] as const) {
       await expect.poll(responds).toEqual(["respond s-r1 deny req-push message=Use the staging branch instead"]);
       await expect(composer(page).getByTestId("thread-permission")).toHaveCount(0);
       await expect(lastText(page)).toContainText("You said: Use the staging branch instead");
-      await unfoldLatest(page);
+      await unfoldLatest(page, 2);
       await expect(page.getByTestId("thread-pane").locator('[data-tool="Bash"]').last()).toContainText("denied");
     });
 
@@ -129,7 +134,7 @@ test("Allow answers at once; the sidebar and the bell stop asking", async ({ pag
   await expect(row(page, "s:s-r1")).not.toContainText("Needs input");
   await expect(lastText(page)).toContainText("Pushed. PR #63 now has the fix.");
   await expect(page.getByTestId("thread-footer").last()).toBeVisible();
-  await unfoldLatest(page);
+  await unfoldLatest(page, 2);
   await expect(page.getByTestId("thread-pane").locator('[data-tool="Bash"]').last()).toContainText("Ran git push");
 });
 
