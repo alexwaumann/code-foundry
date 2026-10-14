@@ -125,3 +125,40 @@ func TestRead(t *testing.T) {
 		})
 	}
 }
+
+// A file written before the Notifications group existed loads with its defaults, keeps
+// its own values, and reports no issues.
+func TestOlderFileGetsNotificationDefaults(t *testing.T) {
+	path := filepath.Join(t.TempDir(), FileName)
+	old := "[sessions]\nauto_name = false\n\n[appearance]\ntheme = \"dark\"\n"
+	if err := os.WriteFile(path, []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := Read(path)
+	if got.Sessions.AutoName || got.Appearance.Theme != "dark" {
+		t.Errorf("own values lost: %+v", got)
+	}
+	if got.Notifications != Defaults().Notifications {
+		t.Errorf("Notifications = %+v, want the defaults %+v", got.Notifications, Defaults().Notifications)
+	}
+	raw, err := decode([]byte(old))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := resolve(raw, nil)
+	if len(r.issues) != 0 {
+		t.Errorf("issues = %v", r.issues)
+	}
+	for k, want := range map[string]string{KeyDockBadge: "true", KeyBounce: "true", KeySound: "false", KeySoundVolume: "50", KeyAlertCooldown: "60"} {
+		if r.values[k] != want {
+			t.Errorf("values[%s] = %q, want %q", k, r.values[k], want)
+		}
+	}
+	// Rendering keeps them commented out at their defaults.
+	text := string(render(r.accepted))
+	for _, want := range []string{"[notifications]\n", "# dock_badge = true\n", "# sound_volume = 50\n", "# cooldown_seconds = 60\n"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("rendered file lacks %q", want)
+		}
+	}
+}

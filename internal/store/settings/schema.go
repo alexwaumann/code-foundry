@@ -76,6 +76,7 @@ const (
 	GroupRepos       = "repos"
 	GroupGitOps      = "gitops"
 	GroupAppearance  = "appearance"
+	GroupNotify      = "notifications"
 	GroupKeybindings = "keybindings"
 	GroupUpdate      = "update"
 	GroupAdvanced    = "advanced"
@@ -88,6 +89,7 @@ var Groups = []Group{
 	{GroupRepos, "Repositories", "Git fetching and where new worktrees go."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
 	{GroupAppearance, "Appearance", "Theme, terminal font, density, and backdrop. Applied live in every window."},
+	{GroupNotify, "Notifications", "Dock badge and alerts for threads that need you. macOS banners aren't available to an app without a bundle."},
 	{GroupKeybindings, "Keybindings", `Override a command's chord, or "none" to unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) cannot be bound.`},
 	{GroupUpdate, "Updates", "Which releases the app checks for and offers to install."},
 	{GroupAdvanced, "Advanced", "Executables and logging."},
@@ -114,6 +116,11 @@ const (
 	KeyDensity           = "appearance.density"
 	KeyThreadWidth       = "appearance.thread_width"
 	KeyBackdrop          = "appearance.backdrop"
+	KeyDockBadge         = "notifications.dock_badge"
+	KeyBounce            = "notifications.bounce"
+	KeySound             = "notifications.sound"
+	KeySoundVolume       = "notifications.sound_volume"
+	KeyAlertCooldown     = "notifications.cooldown_seconds"
 	KeyUpdateChannel     = "update.channel"
 	KeyClaudePath        = "advanced.claude_path"
 	KeyGhPath            = "advanced.gh_path"
@@ -125,6 +132,8 @@ const (
 	defaultCacheTTL      = 3600
 	defaultGhPollSeconds = 60
 	defaultFetchSeconds  = 120
+	defaultSoundVolume   = 50
+	defaultAlertCooldown = 60
 )
 
 // KeybindingKey is the settings key of a command's keybinding override.
@@ -247,6 +256,36 @@ var staticFields = []Field{
 		Description: "Faint artwork behind the start page and the new-thread composer.",
 		Enum:        []string{"forest", "none"}, Default: "forest",
 		bind: func(s *Settings) any { return &s.Appearance.Backdrop },
+	},
+	{
+		Key: KeyDockBadge, Group: GroupNotify, Type: Bool, Title: "Dock badge",
+		Description: "Show how many threads need attention (waiting on you, finished, or failed) on the Dock icon.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.Notifications.DockBadge },
+	},
+	{
+		Key: KeyBounce, Group: GroupNotify, Type: Bool, Title: "Bounce the Dock icon",
+		Description: "Bounce the Dock icon once when a thread starts needing attention while Code Foundry is not the active app.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.Notifications.Bounce },
+	},
+	{
+		Key: KeySound, Group: GroupNotify, Type: Bool, Title: "Alert sound",
+		Description: "Play a short sound when a thread starts needing attention while Code Foundry is not the active app.",
+		Default:     "false",
+		bind:        func(s *Settings) any { return &s.Notifications.Sound },
+	},
+	{
+		Key: KeySoundVolume, Group: GroupNotify, Type: Int, Title: "Alert volume",
+		Description: "Loudness of the alert sound, as a share (percent) of the Mac's output volume.",
+		Default:     strconv.Itoa(defaultSoundVolume), Min: 0, Max: 100,
+		bind: func(s *Settings) any { return &s.Notifications.SoundVolume },
+	},
+	{
+		Key: KeyAlertCooldown, Group: GroupNotify, Type: Int, Title: "Alert cooldown (seconds)",
+		Description: "Minimum gap between alerts (bounce and sound). Alerts during the cooldown are skipped; the badge still updates. 0 alerts every time.",
+		Default:     strconv.Itoa(defaultAlertCooldown), Min: 0, Max: 3600,
+		bind: func(s *Settings) any { return &s.Notifications.CooldownSeconds },
 	},
 	{
 		Key: KeyUpdateChannel, Group: GroupUpdate, Type: Enum, Title: "Channel",
