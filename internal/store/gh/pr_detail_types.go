@@ -172,12 +172,10 @@ type ReviewerCandidate struct {
 	Requested bool   `json:"requested,omitempty"`
 }
 
-// ReviewerCandidates is the picker's list: requested first, then by login, without the
-// pull request's author.
+// ReviewerCandidates is the picker's list: the pending requests first, then the search
+// results, each by login, without the pull request's author or duplicates.
 type ReviewerCandidates struct {
 	Candidates []ReviewerCandidate
-	// Truncated: the repository has more assignable users than were listed (100).
-	Truncated bool
 }
 
 // ReviewRequest asks for (or withdraws) a review.

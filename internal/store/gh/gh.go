@@ -57,8 +57,9 @@ type Service interface {
 	// from cache unless refresh is set or the entry is stale (pr_detail.go). On fetch
 	// failure the cached copy comes back with LastError set.
 	FullPullRequest(ctx context.Context, slug string, number int, refresh bool) (FullPullRequest, error)
-	// ReviewerCandidates returns who can be asked to review a pull request.
-	ReviewerCandidates(ctx context.Context, slug string, number int) (ReviewerCandidates, error)
+	// ReviewerCandidates returns who can be asked to review a pull request: the pending
+	// requests and, for a non-empty query, the assignable users GitHub matches (up to 20).
+	ReviewerCandidates(ctx context.Context, slug string, number int, query string) (ReviewerCandidates, error)
 	// SetReviewRequest requests or withdraws a review and returns the pending requests
 	// afterwards (logins and "org/team").
 	SetReviewRequest(ctx context.Context, slug string, number int, r ReviewRequest) ([]string, error)

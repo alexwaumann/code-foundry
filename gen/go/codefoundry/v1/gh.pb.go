@@ -3597,9 +3597,12 @@ func (x *PullRequestReviewThread) GetCommentsTruncated() bool {
 }
 
 type ListReviewerCandidatesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RepoSlug      string                 `protobuf:"bytes,1,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
-	Number        int32                  `protobuf:"varint,2,opt,name=number,proto3" json:"number,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	RepoSlug string                 `protobuf:"bytes,1,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
+	Number   int32                  `protobuf:"varint,2,opt,name=number,proto3" json:"number,omitempty"`
+	// Matched by GitHub against assignable users' login and name. Empty returns only
+	// the pending requests.
+	Query         string `protobuf:"bytes,3,opt,name=query,proto3" json:"query,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3648,11 +3651,16 @@ func (x *ListReviewerCandidatesRequest) GetNumber() int32 {
 	return 0
 }
 
+func (x *ListReviewerCandidatesRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
 type ListReviewerCandidatesResponse struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	Candidates []*ReviewerCandidate   `protobuf:"bytes,1,rep,name=candidates,proto3" json:"candidates,omitempty"`
-	// The repository has more assignable users than were listed (100).
-	Truncated     bool `protobuf:"varint,2,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Candidates    []*ReviewerCandidate   `protobuf:"bytes,1,rep,name=candidates,proto3" json:"candidates,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3692,13 +3700,6 @@ func (x *ListReviewerCandidatesResponse) GetCandidates() []*ReviewerCandidate {
 		return x.Candidates
 	}
 	return nil
-}
-
-func (x *ListReviewerCandidatesResponse) GetTruncated() bool {
-	if x != nil {
-		return x.Truncated
-	}
-	return false
 }
 
 type ReviewerCandidate struct {
@@ -4764,15 +4765,15 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\vis_outdated\x18\x06 \x01(\bR\n" +
 	"isOutdated\x12>\n" +
 	"\bcomments\x18\a \x03(\v2\".codefoundry.v1.PullRequestCommentR\bcomments\x12-\n" +
-	"\x12comments_truncated\x18\b \x01(\bR\x11commentsTruncated\"T\n" +
+	"\x12comments_truncated\x18\b \x01(\bR\x11commentsTruncated\"j\n" +
 	"\x1dListReviewerCandidatesRequest\x12\x1b\n" +
 	"\trepo_slug\x18\x01 \x01(\tR\brepoSlug\x12\x16\n" +
-	"\x06number\x18\x02 \x01(\x05R\x06number\"\x81\x01\n" +
+	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x14\n" +
+	"\x05query\x18\x03 \x01(\tR\x05query\"t\n" +
 	"\x1eListReviewerCandidatesResponse\x12A\n" +
 	"\n" +
 	"candidates\x18\x01 \x03(\v2!.codefoundry.v1.ReviewerCandidateR\n" +
-	"candidates\x12\x1c\n" +
-	"\ttruncated\x18\x02 \x01(\bR\ttruncated\"\xc1\x01\n" +
+	"candidatesJ\x04\b\x02\x10\x03R\ttruncated\"\xc1\x01\n" +
 	"\x11ReviewerCandidate\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x120\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x1c.codefoundry.v1.ReviewerKindR\x04kind\x12\x14\n" +

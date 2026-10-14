@@ -154,17 +154,40 @@ func TestGhReviewerCandidatesAndRequests(t *testing.T) {
 	store, client, _ := newGhTest(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	store.SetReviewerCandidates("o/r", 7, gh.ReviewerCandidates{Truncated: true, Candidates: []gh.ReviewerCandidate{
+	store.SetReviewerCandidates("o/r", 7, gh.ReviewerCandidates{Candidates: []gh.ReviewerCandidate{
 		{ID: "T_1", Kind: gh.ReviewerTeam, Login: "acme/core", Name: "Core", Requested: true},
 		{ID: "U_1", Kind: gh.ReviewerUser, Login: "kim", Name: "Kim", AvatarURL: "https://a/kim"},
+		{ID: "U_2", Kind: gh.ReviewerUser, Login: "lee", Name: "Lee"},
 	}})
 
-	list, err := client.ListReviewerCandidates(ctx, connect.NewRequest(&v1.ListReviewerCandidatesRequest{RepoSlug: "o/r", Number: 7}))
+	// The query reaches the store: empty lists only the requests.
+	for _, tt := range []struct {
+		query string
+		want  []string
+	}{
+		{query: "", want: []string{"acme/core"}},
+		{query: "KI", want: []string{"acme/core", "kim"}},
+		{query: "nobody", want: []string{"acme/core"}},
+	} {
+		list, err := client.ListReviewerCandidates(ctx, connect.NewRequest(&v1.ListReviewerCandidatesRequest{RepoSlug: "o/r", Number: 7, Query: tt.query}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, c := range list.Msg.GetCandidates() {
+			got = append(got, c.GetLogin())
+		}
+		if !slices.Equal(got, tt.want) {
+			t.Errorf("query %q: got %v, want %v", tt.query, got, tt.want)
+		}
+	}
+
+	list, err := client.ListReviewerCandidates(ctx, connect.NewRequest(&v1.ListReviewerCandidatesRequest{RepoSlug: "o/r", Number: 7, Query: "kim"}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	c := list.Msg.GetCandidates()
-	if !list.Msg.GetTruncated() || len(c) != 2 || c[0].GetKind() != v1.ReviewerKind_REVIEWER_KIND_TEAM || !c[0].GetIsRequested() ||
+	if len(c) != 2 || c[0].GetKind() != v1.ReviewerKind_REVIEWER_KIND_TEAM || !c[0].GetIsRequested() ||
 		c[1].GetKind() != v1.ReviewerKind_REVIEWER_KIND_USER || c[1].GetId() != "U_1" || c[1].GetName() != "Kim" ||
 		c[1].GetAvatarUrl() != "https://a/kim" || c[1].GetIsRequested() {
 		t.Errorf("candidates = %v", list.Msg)

@@ -309,16 +309,18 @@ func mapThread(n threadJSON) ReviewThread {
 	return t
 }
 
+type candidateUserJSON struct {
+	ID        string `json:"id"`
+	Login     string `json:"login"`
+	Name      string `json:"name"`
+	AvatarURL string `json:"avatarUrl"`
+}
+
 type reviewerCandidatesData struct {
 	Repository *struct {
-		AssignableUsers struct {
-			TotalCount int `json:"totalCount"`
-			Nodes      []struct {
-				ID        string `json:"id"`
-				Login     string `json:"login"`
-				Name      string `json:"name"`
-				AvatarURL string `json:"avatarUrl"`
-			} `json:"nodes"`
+		// Absent when the search was skipped (@include(if: $search)).
+		AssignableUsers *struct {
+			Nodes []candidateUserJSON `json:"nodes"`
 		} `json:"assignableUsers"`
 		PullRequest *struct {
 			Author         *loginJSON          `json:"author"`
@@ -328,7 +330,8 @@ type reviewerCandidatesData struct {
 }
 
 // decodeReviewerCandidates maps a ReviewerCandidates response: the requested users and
-// teams first, then the assignable users, each by login; the author is left out.
+// teams first, then the search results, each by login; the author is left out and a
+// requested user the search also returned appears once.
 func decodeReviewerCandidates(data []byte) (ReviewerCandidates, error) {
 	var d reviewerCandidatesData
 	if err := json.Unmarshal(data, &d); err != nil {
@@ -360,8 +363,11 @@ func decodeReviewerCandidates(data []byte) (ReviewerCandidates, error) {
 				AvatarURL: rr.AvatarURL, Requested: true})
 		}
 	}
-	users := d.Repository.AssignableUsers
-	for _, u := range users.Nodes {
+	var users []candidateUserJSON
+	if d.Repository.AssignableUsers != nil {
+		users = d.Repository.AssignableUsers.Nodes
+	}
+	for _, u := range users {
 		key := strings.ToLower(u.Login)
 		if u.Login == "" || key == author || seen[key] {
 			continue
@@ -374,7 +380,7 @@ func decodeReviewerCandidates(data []byte) (ReviewerCandidates, error) {
 	}
 	slices.SortStableFunc(requested, byLogin)
 	slices.SortStableFunc(others, byLogin)
-	return ReviewerCandidates{Candidates: append(requested, others...), Truncated: users.TotalCount > len(users.Nodes)}, nil
+	return ReviewerCandidates{Candidates: append(requested, others...)}, nil
 }
 
 // decodeRevert maps a RevertPullRequest mutation response.
