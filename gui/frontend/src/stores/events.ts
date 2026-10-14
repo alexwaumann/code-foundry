@@ -54,7 +54,13 @@ const handlers: Handlers = {
   },
   session: (ev) => {
     // Session events prove the service exists, even if List failed transiently.
-    useSessionsStore.setState((s) => ({ ...applySessionEvent(s, ev), retiredUsage: applyRetiredUsage(s.retiredUsage, ev), availability: "available", error: null }));
+    useSessionsStore.setState((s) => ({
+      ...applySessionEvent(s, ev),
+      retiredUsage: applyRetiredUsage(s.retiredUsage, ev),
+      availability: "available",
+      error: null,
+      epoch: ev.kind === "snapshot" ? s.epoch + 1 : s.epoch,
+    }));
     // A removed thread's items go with it.
     if (ev.kind === "removed" || ev.kind === "snapshot") pruneThreadLogs((id) => id in useSessionsStore.getState().byId);
   },
@@ -81,7 +87,7 @@ function isMissingService(err: unknown): boolean {
 async function reconcileSessions(signal: AbortSignal): Promise<void> {
   try {
     const list = await listSessions(daemon, signal);
-    useSessionsStore.setState((s) => ({ ...replaceSessions(s, list), loaded: true, availability: "available", error: null }));
+    useSessionsStore.setState((s) => ({ ...replaceSessions(s, list), loaded: true, availability: "available", error: null, epoch: s.epoch + 1 }));
   } catch (err) {
     if (isAbort(err)) throw err;
     const missing = isMissingService(err);
