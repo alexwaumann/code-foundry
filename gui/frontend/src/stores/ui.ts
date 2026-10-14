@@ -140,6 +140,8 @@ interface UiState {
   workingCollapsed: boolean;
   /** The sidebar's Archived section is collapsed (its threads hidden; the header counts them). Collapsed by default. */
   archivedCollapsed: boolean;
+  /** The sidebar's Snoozed section is collapsed (its threads hidden; the header counts them). Collapsed by default. */
+  snoozedCollapsed: boolean;
   /** Projects page: repo ids whose worktree rows are hidden (the header counts them). */
   collapsedProjects: string[];
   /** Projects page: workspace ids whose member rows are hidden. */
@@ -171,6 +173,7 @@ interface UiState {
   setUsageRange: (days: UsageRange) => void;
   toggleWorkingCollapsed: () => void;
   toggleArchivedCollapsed: () => void;
+  toggleSnoozedCollapsed: () => void;
   /** Collapses (true) or expands a project on the Projects page; false when it already was. */
   setProjectCollapsed: (repoId: string, collapsed: boolean) => boolean;
   /** Collapses (true) or expands a workspace on the Projects page; false when it already was. */
@@ -274,6 +277,7 @@ export const useUiStore = create<UiState>()(
       usageRange: USAGE_RANGE_DEFAULT,
       workingCollapsed: false,
       archivedCollapsed: true,
+      snoozedCollapsed: true,
       collapsedProjects: [],
       collapsedWorkspaces: [],
 
@@ -348,6 +352,9 @@ export const useUiStore = create<UiState>()(
       toggleArchivedCollapsed: () => {
         set((s) => ({ archivedCollapsed: !s.archivedCollapsed }));
       },
+      toggleSnoozedCollapsed: () => {
+        set((s) => ({ snoozedCollapsed: !s.snoozedCollapsed }));
+      },
       setProjectCollapsed: (repoId, collapsed) => {
         const prev = get().collapsedProjects;
         const next = withMember(prev, repoId, collapsed);
@@ -382,6 +389,7 @@ export const useUiStore = create<UiState>()(
           usageRange: isUsageRange(p.usageRange) ? p.usageRange : current.usageRange,
           workingCollapsed: typeof p.workingCollapsed === "boolean" ? p.workingCollapsed : current.workingCollapsed,
           archivedCollapsed: typeof p.archivedCollapsed === "boolean" ? p.archivedCollapsed : current.archivedCollapsed,
+          snoozedCollapsed: typeof p.snoozedCollapsed === "boolean" ? p.snoozedCollapsed : current.snoozedCollapsed,
           collapsedProjects: isStringArray(p.collapsedProjects) ? p.collapsedProjects : current.collapsedProjects,
           collapsedWorkspaces: isStringArray(p.collapsedWorkspaces) ? p.collapsedWorkspaces : current.collapsedWorkspaces,
         };
@@ -395,6 +403,7 @@ export const useUiStore = create<UiState>()(
         usageRange: s.usageRange,
         workingCollapsed: s.workingCollapsed,
         archivedCollapsed: s.archivedCollapsed,
+        snoozedCollapsed: s.snoozedCollapsed,
         collapsedProjects: s.collapsedProjects,
         collapsedWorkspaces: s.collapsedWorkspaces,
       }),

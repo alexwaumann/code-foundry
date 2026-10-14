@@ -70,10 +70,10 @@ export async function releaseSessions(...ids: string[]): Promise<void> {
 
 /**
  * The default world's sidebar order after resetMock: s-2 waits, s-6/s-4/s-3 are idle, s-5
- * (starting) and s-1 (busy) work, and s-7 is archived (its section collapsed by default:
- * only the header).
+ * (starting) and s-1 (busy) work, s-8 and s-9 are snoozed and s-7 is archived (both
+ * sections collapsed by default: only the headers).
  */
-export const DEFAULT_ORDER = ["s:s-2", "s:s-6", "s:s-4", "s:s-3", "h:working", "s:s-5", "s:s-1", "h:archived"];
+export const DEFAULT_ORDER = ["s:s-2", "s:s-6", "s:s-4", "s:s-3", "h:working", "s:s-5", "s:s-1", "h:snoozed", "h:archived"];
 
 /** Long-lived streams the mock has open right now, by RPC (e.g. "EventService/Watch"). */
 export async function openStreams(): Promise<Record<string, number>> {

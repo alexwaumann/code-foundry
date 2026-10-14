@@ -134,10 +134,10 @@ export function decodeRepoKeys(keys: readonly string[]): TreeRepo[] {
 }
 
 /**
- * One string per session for the sidebar list: id + pin + group + archive time (name,
- * model, a different dialog and the status line's text don't rebuild the list; a question
- * turning into a finished turn, an idle thread starting work, or archiving and
- * unarchiving does, since it moves). In the store's order.
+ * One string per session for the sidebar list: id + pin + group + archive time + snooze
+ * end (name, model, a different dialog and the status line's text don't rebuild the list;
+ * a question turning into a finished turn, an idle thread starting work, archiving,
+ * snoozing and their undoing does, since it moves). In the store's order.
  */
 export function useSessionListKeys(): string[] {
   return useSessionsStore(useShallow((s) => s.order.map((id) => encodeSessionListKey(id, s.byId[id]))));
@@ -145,13 +145,20 @@ export function useSessionListKeys(): string[] {
 
 /** One thread's list key (useSessionListKeys); decodeSessionListKeys reads it back. */
 export function encodeSessionListKey(id: string, x: SessionView | undefined): string {
-  return [id, x?.pinned ? "1" : "", x ? threadGroup(x) : "idle", x?.archivedAtMs != null ? String(x.archivedAtMs) : ""].join(SEP);
+  const ms = (v: number | null | undefined) => (v != null ? String(v) : "");
+  return [id, x?.pinned ? "1" : "", x ? threadGroup(x) : "idle", ms(x?.archivedAtMs), ms(x?.snoozedUntilMs)].join(SEP);
 }
 
 export function decodeSessionListKeys(keys: readonly string[]): ListSession[] {
   return keys.map((k) => {
-    const [id = "", pinned = "", group = "", archived = ""] = k.split(SEP);
-    return { id, pinned: pinned === "1", group: isThreadGroup(group) ? group : "idle", archivedAtMs: archived === "" ? null : Number(archived) };
+    const [id = "", pinned = "", group = "", archived = "", snoozed = ""] = k.split(SEP);
+    return {
+      id,
+      pinned: pinned === "1",
+      group: isThreadGroup(group) ? group : "idle",
+      archivedAtMs: archived === "" ? null : Number(archived),
+      snoozedUntilMs: snoozed === "" ? null : Number(snoozed),
+    };
   });
 }
 
@@ -160,12 +167,12 @@ export function getListSessions(): ListSession[] {
   const s = useSessionsStore.getState();
   return s.order.flatMap((id) => {
     const x = s.byId[id];
-    return x ? [{ id, pinned: x.pinned, group: threadGroup(x), archivedAtMs: x.archivedAtMs }] : [];
+    return x ? [{ id, pinned: x.pinned, group: threadGroup(x), archivedAtMs: x.archivedAtMs, snoozedUntilMs: x.snoozedUntilMs }] : [];
   });
 }
 
 /** The sidebar list's display options read imperatively, so cmd+1..9 and cmd+shift+a see the rendered list. */
 export function getListOptions(): ListOptions {
   const ui = useUiStore.getState();
-  return { workingCollapsed: ui.workingCollapsed, archivedCollapsed: ui.archivedCollapsed };
+  return { workingCollapsed: ui.workingCollapsed, snoozedCollapsed: ui.snoozedCollapsed, archivedCollapsed: ui.archivedCollapsed };
 }

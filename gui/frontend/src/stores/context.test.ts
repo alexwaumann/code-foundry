@@ -82,24 +82,34 @@ describe("a Projects-page shell in the command context", () => {
 });
 
 describe("the sidebar list's keys", () => {
-  const session = (o: Partial<SessionView>) => ({ id: "s1", state: "connected", status: "idle", statusReason: "", pinned: false, archivedAtMs: null, ...o }) as SessionView;
+  const session = (o: Partial<SessionView>) => ({ id: "s1", state: "connected", status: "idle", statusReason: "", pinned: false, archivedAtMs: null, snoozedUntilMs: null, ...o }) as SessionView;
+  type Want = { pinned: boolean; group: string; archivedAtMs: number | null; snoozedUntilMs: number | null };
 
-  it.each<[string, Partial<SessionView>, { pinned: boolean; group: string; archivedAtMs: number | null }]>([
-    ["idle", {}, { pinned: false, group: "idle", archivedAtMs: null }],
-    ["pinned and busy", { pinned: true, status: "busy" }, { pinned: true, group: "working", archivedAtMs: null }],
-    ["archived", { state: "disconnected", archivedAtMs: 1760352000123 }, { pinned: false, group: "idle", archivedAtMs: 1760352000123 }],
+  it.each<[string, Partial<SessionView>, Want]>([
+    ["idle", {}, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null }],
+    ["pinned and busy", { pinned: true, status: "busy" }, { pinned: true, group: "working", archivedAtMs: null, snoozedUntilMs: null }],
+    ["archived", { state: "disconnected", archivedAtMs: 1760352000123 }, { pinned: false, group: "idle", archivedAtMs: 1760352000123, snoozedUntilMs: null }],
+    ["snoozed", { state: "disconnected", snoozedUntilMs: 1760518800000 }, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: 1760518800000 }],
+    [
+      "woken (snooze ended)",
+      { state: "disconnected", status: "attention", statusReason: "snooze ended" },
+      { pinned: false, group: "prompt", archivedAtMs: null, snoozedUntilMs: null },
+    ],
   ])("round-trips %s", (_name, o, want) => {
     expect(decodeSessionListKeys([encodeSessionListKey("s1", session(o))])).toEqual([{ id: "s1", ...want }]);
   });
 
-  it("an unknown session decodes as an idle, unarchived thread", () => {
-    expect(decodeSessionListKeys([encodeSessionListKey("s9", undefined)])).toEqual([{ id: "s9", pinned: false, group: "idle", archivedAtMs: null }]);
+  it("an unknown session decodes as an idle, unarchived, unsnoozed thread", () => {
+    expect(decodeSessionListKeys([encodeSessionListKey("s9", undefined)])).toEqual([{ id: "s9", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null }]);
   });
 
-  it("getListSessions and getListOptions read the stores (archive time, both collapsed states)", () => {
-    useSessionsStore.setState({ byId: { s1: session({ archivedAtMs: 5 }) }, order: ["s1"] });
-    useUiStore.setState({ workingCollapsed: true, archivedCollapsed: false });
-    expect(getListSessions()).toEqual([{ id: "s1", pinned: false, group: "idle", archivedAtMs: 5 }]);
-    expect(getListOptions()).toEqual({ workingCollapsed: true, archivedCollapsed: false });
+  it("getListSessions and getListOptions read the stores (archive and snooze times, the collapsed states)", () => {
+    useSessionsStore.setState({ byId: { s1: session({ archivedAtMs: 5 }), s2: session({ id: "s2", snoozedUntilMs: 7 }) }, order: ["s1", "s2"] });
+    useUiStore.setState({ workingCollapsed: true, archivedCollapsed: false, snoozedCollapsed: true });
+    expect(getListSessions()).toEqual([
+      { id: "s1", pinned: false, group: "idle", archivedAtMs: 5, snoozedUntilMs: null },
+      { id: "s2", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: 7 },
+    ]);
+    expect(getListOptions()).toEqual({ workingCollapsed: true, archivedCollapsed: false, snoozedCollapsed: true });
   });
 });

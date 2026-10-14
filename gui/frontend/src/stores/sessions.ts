@@ -137,14 +137,16 @@ export function isAttention(s: Pick<SessionView, "status" | "state">): boolean {
 }
 
 /**
- * Session ids that need the user, in `order`. An archived thread never counts (the bell,
- * the window title, cmd+shift+a, the start page): archiving one that was waiting (usually
- * a finished turn) says the user is done with it, and it sits in a collapsed section.
+ * Session ids that need the user, in `order`. An archived or snoozed thread never counts
+ * (the bell, the window title, the dock badge, cmd+shift+a, the start page): archiving one
+ * that was waiting (usually a finished turn) says the user is done with it, snoozing says
+ * not until later, and it sits in a collapsed section. A snoozed thread counts again once
+ * the daemon wakes it ("snooze ended" attention, snoozedUntilMs cleared).
  */
 export function attentionIds(data: SessionsData): string[] {
   return data.order.filter((id) => {
     const s = data.byId[id];
-    return s !== undefined && s.archivedAtMs === null && isAttention(s);
+    return s !== undefined && s.archivedAtMs === null && s.snoozedUntilMs === null && isAttention(s);
   });
 }
 

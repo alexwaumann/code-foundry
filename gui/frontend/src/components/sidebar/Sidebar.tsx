@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ProjectsNav } from "@/components/projects/ProjectsPage";
 import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
 import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
-import { buildSections, isSessionRow, rowCache, sessionKey, type FooterSection, type HeaderRow, type Row, type SessionRow } from "@/lib/tree";
+import { buildSections, FOOTERS, isSessionRow, rowCache, sessionKey, type FooterSection, type HeaderRow, type Row, type SessionRow } from "@/lib/tree";
 import { zoomFactor } from "@/lib/zoom";
 import { decodeSessionListKeys, useSessionListKeys } from "@/stores/context";
 import { useEventsStore } from "@/stores/events";
@@ -19,17 +19,17 @@ import { SidebarRow } from "./SidebarRow";
 import { SidebarStatus } from "./SidebarStatus";
 import { SidebarToolbar } from "./SidebarToolbar";
 
-/** A footer header's height; thread rows are two lines (rowHeight + SECOND_LINE), archived rows one (rowHeight). */
+/** A footer header's height; thread rows are two lines (rowHeight + SECOND_LINE), snoozed and archived rows one (rowHeight). */
 const HEADER_HEIGHT = 26;
 const SECOND_LINE = 15;
 
 /** The most of the sidebar body a footer (header and rows) takes before its rows scroll. */
-const FOOTER_CAPS: Readonly<Record<FooterSection, number>> = { working: 0.4, archived: 0.3 };
+const FOOTER_CAPS: Readonly<Record<FooterSection, number>> = { working: 0.4, snoozed: 0.25, archived: 0.3 };
 
 type Panel = "main" | FooterSection;
 
 interface ListRows {
-  /** Every row in one order (main, Working, Archived): the cursor, arrows and the menu use it. */
+  /** Every row in one order (main, Working, Snoozed, Archived): the cursor, arrows and the menu use it. */
   rows: Row[];
   main: Row[];
   /** A footer's header, or null when the footer is empty (not rendered). */
@@ -52,22 +52,26 @@ function splitFooter(rows: readonly Row[]): [HeaderRow | null, Row[]] {
 function useListRows(): ListRows {
   const sessionKeys = useSessionListKeys();
   const workingCollapsed = useUiStore((s) => s.workingCollapsed);
+  const snoozedCollapsed = useUiStore((s) => s.snoozedCollapsed);
   const archivedCollapsed = useUiStore((s) => s.archivedCollapsed);
   const [stable] = useState(rowCache);
   return useMemo(() => {
-    const sec = buildSections(decodeSessionListKeys(sessionKeys), { workingCollapsed, archivedCollapsed });
-    const rows = stable([...sec.main, ...sec.working, ...sec.archived]);
-    const m = sec.main.length;
-    const w = sec.working.length;
-    const [workingHeader, working] = splitFooter(rows.slice(m, m + w));
-    const [archivedHeader, archived] = splitFooter(rows.slice(m + w));
-    return { rows, main: rows.slice(0, m), headers: { working: workingHeader, archived: archivedHeader }, footers: { working, archived } };
-  }, [stable, sessionKeys, workingCollapsed, archivedCollapsed]);
+    const sec = buildSections(decodeSessionListKeys(sessionKeys), { workingCollapsed, snoozedCollapsed, archivedCollapsed });
+    const rows = stable([...sec.main, ...FOOTERS.flatMap((f) => sec[f])]);
+    const headers: Record<FooterSection, HeaderRow | null> = { working: null, snoozed: null, archived: null };
+    const footers: Record<FooterSection, Row[]> = { working: [], snoozed: [], archived: [] };
+    let at = sec.main.length;
+    for (const f of FOOTERS) {
+      [headers[f], footers[f]] = splitFooter(rows.slice(at, at + sec[f].length));
+      at += sec[f].length;
+    }
+    return { rows, main: rows.slice(0, sec.main.length), headers, footers };
+  }, [stable, sessionKeys, workingCollapsed, snoozedCollapsed, archivedCollapsed]);
 }
 
 /** The panel a row is shown in. */
 function panelOf(row: Row): Panel {
-  return row.section === "working" || row.section === "archived" ? row.section : "main";
+  return row.section === "working" || row.section === "snoozed" || row.section === "archived" ? row.section : "main";
 }
 
 /** Index of the next thread row from i in direction dir (skipping headers); i itself when none. */
@@ -101,7 +105,7 @@ type ScrollTo = (index: number) => void;
 
 interface PanelRowsProps {
   rows: readonly Row[];
-  /** Size of one row (header, archived, or two-line thread row). */
+  /** Size of one row (header, snoozed or archived, or two-line thread row). */
   sizeOf: (row: Row | undefined) => number;
   selectedKey: string | null;
   cursorKey: string | null;
@@ -167,19 +171,21 @@ function PanelRows({ rows, sizeOf, selectedKey, cursorKey, onActivate, scrollTo,
 }
 
 /**
- * The sidebar's thread list: a listbox of three stacked panels. The main list (pinned,
+ * The sidebar's thread list: a listbox of four stacked panels. The main list (pinned,
  * waiting, finished, idle) scrolls on its own and takes the remaining height; under it,
  * pinned to the bottom whatever the main list's scroll, the Working footer (expanded by
- * default, up to 40% of the sidebar body) and the Archived footer (collapsed by default, up
- * to 30%), each its header and then its rows, which scroll inside it once they reach the
- * cap. A footer without threads is not rendered. Keyboard and cmd+N walk one order across
- * the three (buildSections). See docs/notes/archive-threads-2-sidebar.md.
+ * default, up to 40% of the sidebar body), the Snoozed footer (collapsed by default, up to
+ * 25%) and the Archived footer (collapsed by default, up to 30%), each its header and then
+ * its rows, which scroll inside it once they reach the cap. A footer without threads is
+ * not rendered. Keyboard and cmd+N walk one order across the four (buildSections). See
+ * docs/notes/archive-threads-2-sidebar.md and snooze-threads-2-sidebar.md.
  */
 function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   const { rows, main, headers, footers } = useListRows();
   const listRef = useRef<HTMLDivElement>(null);
   const scrollMain = useRef<ScrollTo>(null);
   const scrollWorking = useRef<ScrollTo>(null);
+  const scrollSnoozed = useRef<ScrollTo>(null);
   const scrollArchived = useRef<ScrollTo>(null);
   const selectedKey = useUiStore((s) => (s.selection.kind === "session" ? sessionKey(s.selection.id) : null));
   const cursorKey = useUiStore((s) => s.cursorKey);
@@ -191,7 +197,10 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   // The row the context menu is open for (right-clicked), or null.
   const [menuRow, setMenuRow] = useState<SessionRow | null>(null);
 
-  const sizeOf = useCallback((row: Row | undefined) => (row?.kind === "header" ? HEADER_HEIGHT : row?.section === "archived" ? rowHeight : rowHeight + SECOND_LINE), [rowHeight]);
+  const sizeOf = useCallback(
+    (row: Row | undefined) => (row?.kind === "header" ? HEADER_HEIGHT : row?.section === "archived" || row?.section === "snoozed" ? rowHeight : rowHeight + SECOND_LINE),
+    [rowHeight],
+  );
 
   const cursorIndex = useMemo(() => {
     const key = cursorKey ?? selectedKey;
@@ -214,6 +223,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   const panels: Readonly<Record<Panel, { rows: readonly Row[]; scrollTo: RefObject<ScrollTo | null> }>> = {
     main: { rows: main, scrollTo: scrollMain },
     working: { rows: footers.working, scrollTo: scrollWorking },
+    snoozed: { rows: footers.snoozed, scrollTo: scrollSnoozed },
     archived: { rows: footers.archived, scrollTo: scrollArchived },
   };
 
@@ -283,7 +293,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
     // Before the body is measured (0), no cap: the footer fits its rows.
     const cap = bodyHeight > 0 ? Math.max(0, Math.floor(bodyHeight * FOOTER_CAPS[section]) - HEADER_HEIGHT) : Number.POSITIVE_INFINITY;
     return (
-      <div className="flex shrink-0 flex-col" data-testid={`sidebar-${section}`}>
+      <div key={section} className="flex shrink-0 flex-col" data-testid={`sidebar-${section}`}>
         <div className="shrink-0" style={{ height: HEADER_HEIGHT }}>
           <SidebarRow row={header} selected={false} cursor={false} onActivate={activate} />
         </div>
@@ -346,8 +356,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
                     </p>
                   )}
               </PanelRows>
-              {footer("working")}
-              {footer("archived")}
+              {FOOTERS.map(footer)}
             </div>
           </ContextMenuTrigger>
           {menuRow && <RowMenu id={menuRow.sessionId} />}

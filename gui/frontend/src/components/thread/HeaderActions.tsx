@@ -3,6 +3,7 @@ import { Archive, ArchiveRestore, GitPullRequest, Layers, Power } from "lucide-r
 import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { CommandButton } from "@/components/command/CommandButton";
 import { PanelToggle } from "@/components/panel/PanelToggle";
+import { SnoozeButton } from "@/components/snooze/SnoozeMenu";
 import { prStateLook, type PrStateTone } from "@/components/prs/prState";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -105,6 +106,7 @@ export function HeaderActions({ sessionId }: { sessionId: string }) {
       <WorkspaceChip sessionId={sessionId} />
       <LinkedPrs sessionId={sessionId} />
       <CommandButton command="session.close" icon={Power} />
+      <SnoozeButton sessionId={sessionId} />
       <ArchiveButton sessionId={sessionId} />
       <BottomToggle />
       <PanelToggle />

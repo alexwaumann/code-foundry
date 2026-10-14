@@ -155,9 +155,11 @@ describe("session reducers", () => {
       session("c"),
       session("d", { status: "error", statusReason: "interrupted", state: "disconnected" }),
       session("e", { status: "attention", statusReason: "finished", state: "disconnected", archivedAtMs: 7 }),
+      session("f", { status: "attention", statusReason: "finished", state: "disconnected", snoozedUntilMs: 9 }),
+      session("g", { status: "attention", statusReason: "snooze ended", state: "disconnected" }),
     ]);
-    // e waits (a finished turn) but is archived: not counted.
-    expect(attentionIds(d)).toEqual(["a", "b"]);
+    // e waits (a finished turn) but is archived, f is snoozed: not counted. g woke: counted.
+    expect(attentionIds(d)).toEqual(["a", "b", "g"]);
   });
 
   it("start page counts and thread list: waiting first, then running; disconnected never", () => {

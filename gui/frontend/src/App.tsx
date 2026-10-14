@@ -3,6 +3,7 @@ import { Composer } from "@/components/compose/Composer";
 import { AddProjectDialog } from "@/components/addproject/AddProjectDialog";
 import { BottomPanel } from "@/components/bottom/BottomPanel";
 import { PublishDialog } from "@/components/publish/PublishDialog";
+import { SnoozeDialog } from "@/components/snooze/SnoozeDialog";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
 import { StartPage } from "@/components/start/StartPage";
 import { HelpOverlay } from "@/components/help/HelpOverlay";
@@ -196,6 +197,7 @@ export function App() {
       <UpdateDialog />
       <AddProjectDialog />
       <PublishDialog />
+      <SnoozeDialog />
       <Toaster theme={scheme} position="bottom-right" offset={{ bottom: 20, right: 20 }} />
     </div>
   );

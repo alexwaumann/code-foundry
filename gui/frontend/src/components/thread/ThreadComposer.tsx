@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Ref } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { ArrowUp, Brain, Gauge, Loader2, Paperclip, RotateCcw, ShieldCheck } from "lucide-react";
+import { AlarmClockOff, ArrowUp, Brain, Gauge, Loader2, Paperclip, RotateCcw, ShieldCheck } from "lucide-react";
 import { ATTACHMENT_MIME_TYPES } from "@/api/session";
 import type { ThreadPendingView } from "@/api/thread";
 import { AttachmentPreview } from "@/components/compose/AttachmentPreview";
@@ -13,11 +13,14 @@ import { useNoProjectThread } from "@/components/session/useNoProject";
 import { useCommandSource, useCompletion, useFileSource, useSkillSource } from "@/components/compose/useCompletion";
 import { choiceLabel, EFFORT_CHOICES, PERMISSION_CHOICES, type ComposePermission } from "@/lib/compose";
 import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
+import { useNow } from "@/lib/clock";
 import { disconnectCause } from "@/lib/session";
+import { snoozeTimeShort } from "@/lib/snooze";
+import { statusLine, statusText } from "@/lib/statusLine";
 import { cn } from "@/lib/utils";
 import { addAttachments, openPreview, updateDraft, useDraft } from "@/stores/compose";
 import { getPanel } from "@/stores/panel";
-import { reconnectSession } from "@/stores/sessionActions";
+import { reconnectSession, snoozeSession } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
 import { useModelChoices } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
@@ -81,23 +84,66 @@ function useThreadSources(sessionId: string) {
   }, [noProject, repoId, worktreePath, memberKeys]);
 }
 
+/** "Snoozed until Thu 9:00 AM" for a snoozed thread, on the shared 30 s clock. */
+function SnoozedUntil({ until }: { until: number }) {
+  const now = useNow(30_000);
+  return <span data-testid="thread-snoozed">Snoozed until {snoozeTimeShort(until, now)}</span>;
+}
+
+/** "Snooze ended · 2 min ago" in amber, like the sidebar row's line 2, for a woken thread. */
+function SnoozeEnded({ at }: { at: number | null }) {
+  const now = useNow(30_000);
+  return (
+    <span className="text-amber-600 dark:text-amber-400" data-testid="thread-snooze-ended">
+      {statusText({ kind: "snoozeEnded", detail: "", at }, now)}
+    </span>
+  );
+}
+
 /**
  * A disconnected thread's composer: what happened, and Reconnect. The button takes the
  * focus requests the prompt would (`ref`), and the keyboard when the thread disconnects
- * while shown; once it reconnects the prompt takes it back (ThreadComposer).
+ * while shown; once it reconnects the prompt takes it back (ThreadComposer). A snoozed
+ * thread says until when, with Unsnooze next to Reconnect (which unsnoozes too); a thread
+ * the daemon woke says "Snooze ended · <ago>" (the header's Snooze button snoozes again).
  */
 function Reconnect({ sessionId, ref }: { sessionId: string; ref: Ref<HTMLButtonElement> }) {
   const cause = useSessionsStore((s) => {
     const x = s.byId[sessionId];
     return x ? disconnectCause(x) : "";
   });
+  const snoozedUntil = useSessionsStore((s) => s.byId[sessionId]?.snoozedUntilMs ?? null);
+  const wokeAt = useSessionsStore((s) => {
+    const l = statusLine(s.byId[sessionId]);
+    return l.kind === "snoozeEnded" ? (l.at ?? 0) : null;
+  });
   const [busy, setBusy] = useState(false);
   return (
     <div className="ccard docked items-center" data-testid="thread-disconnected">
       <p className="px-4 py-3 text-[13px] text-muted-foreground">
-        Not connected{cause ? ` · ${cause}` : ""}. Reconnect to continue the conversation.
+        {snoozedUntil !== null ? (
+          <SnoozedUntil until={snoozedUntil} />
+        ) : wokeAt !== null ? (
+          <SnoozeEnded at={wokeAt === 0 ? null : wokeAt} />
+        ) : (
+          <>Not connected{cause ? ` · ${cause}` : ""}</>
+        )}
+        . Reconnect to continue the conversation.
       </p>
-      <div className="pr-2">
+      <div className="flex shrink-0 items-center gap-1.5 pr-2">
+        {snoozedUntil !== null && (
+          <button
+            type="button"
+            className="btn outline"
+            data-testid="thread-unsnooze"
+            onClick={() => {
+              void snoozeSession(sessionId, null);
+            }}
+          >
+            <AlarmClockOff aria-hidden />
+            Unsnooze
+          </button>
+        )}
         <button
           ref={ref}
           type="button"

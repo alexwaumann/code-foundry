@@ -21,7 +21,7 @@ describe("placeSession", () => {
   });
 });
 
-const thread = (id: string, over: Partial<ListSession> = {}): ListSession => ({ id, pinned: false, group: "idle", archivedAtMs: null, ...over });
+const thread = (id: string, over: Partial<ListSession> = {}): ListSession => ({ id, pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, ...over });
 
 /** The row key per row, a header as "# <label> <count>" (and its state). */
 function shape(rows: readonly Row[]): string[] {
@@ -109,14 +109,60 @@ describe("buildSections (main list, Working and Archived footers)", () => {
 
   it("has a footer only when it has threads", () => {
     expect(buildSections([thread("s1"), thread("s2", { group: "working" })]).archived).toEqual([]);
-    expect(buildSections([thread("s1", { archivedAtMs: 5 })])).toEqual({ main: [], working: [], archived: [expect.objectContaining({ key: "h:archived", count: 1 }), expect.objectContaining({ key: sessionKey("s1") })] });
-    expect(buildSections([])).toEqual({ main: [], working: [], archived: [] });
+    expect(buildSections([thread("s1", { archivedAtMs: 5 })])).toEqual({
+      main: [],
+      working: [],
+      snoozed: [],
+      archived: [expect.objectContaining({ key: "h:archived", count: 1 }), expect.objectContaining({ key: sessionKey("s1") })],
+    });
+    expect(buildSections([])).toEqual({ main: [], working: [], snoozed: [], archived: [] });
   });
 
   it("orders threads (cmd+1..9, cmd+shift+a, arrows) across main, Working and Archived; collapsed rows absent", () => {
     expect(sessionOrder(sessions)).toEqual(["s1", "s5", "s7", "s2", "s8", "s3", "s6", "s4"]);
     expect(sessionOrder(sessions, { archivedCollapsed: true })).toEqual(["s1", "s5", "s7", "s2"]);
     expect(sessionOrder(sessions, { workingCollapsed: true })).toEqual(["s1", "s5", "s8", "s3", "s6", "s4"]);
+  });
+});
+
+describe("buildSections: the Snoozed footer", () => {
+  const sessions = [
+    thread("s1", { group: "prompt" }),
+    thread("s2", { group: "working" }),
+    thread("s3", { snoozedUntilMs: 9000 }),
+    thread("s4", { pinned: true, group: "working", snoozedUntilMs: 5000 }), // defensively: pinned and working, snoozed is snoozed
+    thread("s5", { archivedAtMs: 100 }),
+    thread("s6", { group: "prompt", snoozedUntilMs: 7000 }), // waiting on the user, snoozed: under Snoozed only
+    thread("s7", { snoozedUntilMs: 9000 }), // same wake as s3: newer created first
+    thread("s8", { archivedAtMs: 200, snoozedUntilMs: 1000 }), // defensively both: archived wins
+    thread("s9"),
+  ];
+
+  it("lists snoozed threads only under Snoozed, between Working and Archived, soonest wake first", () => {
+    const sec = buildSections(sessions);
+    expect(shape(sec.main)).toEqual(s("s1", "s9"));
+    expect(shape(sec.working)).toEqual(["# Working 1", ...s("s2")]);
+    expect(shape(sec.snoozed)).toEqual(["# Snoozed 4", ...s("s4", "s6", "s7", "s3")]);
+    expect(sec.snoozed.map((r) => r.section)).toEqual(["snoozed", "snoozed", "snoozed", "snoozed", "snoozed"]);
+    expect(shape(sec.archived)).toEqual(["# Archived 2", ...s("s8", "s5")]);
+    expect(shape(buildRows(sessions))).toEqual([...shape(sec.main), ...shape(sec.working), ...shape(sec.snoozed), ...shape(sec.archived)]);
+  });
+
+  it("collapsed: keeps its header and count; only when it has threads", () => {
+    expect(shape(buildSections(sessions, { snoozedCollapsed: true }).snoozed)).toEqual(["# Snoozed 4 (collapsed)"]);
+    expect(shape(buildSections(sessions, { snoozedCollapsed: true }).archived)).toEqual(["# Archived 2", ...s("s8", "s5")]);
+    expect(buildSections([thread("s1"), thread("s2", { archivedAtMs: 1 })]).snoozed).toEqual([]);
+  });
+
+  it("orders threads across all four sections; collapsed rows absent", () => {
+    expect(sessionOrder(sessions)).toEqual(["s1", "s9", "s2", "s4", "s6", "s7", "s3", "s8", "s5"]);
+    expect(sessionOrder(sessions, { snoozedCollapsed: true })).toEqual(["s1", "s9", "s2", "s8", "s5"]);
+    expect(sessionOrder(sessions, { workingCollapsed: true, snoozedCollapsed: true, archivedCollapsed: true })).toEqual(["s1", "s9"]);
+  });
+
+  it("an unsnoozed thread goes back to its group in the main list", () => {
+    const woke = sessions.map((t) => (t.id === "s6" ? { ...t, snoozedUntilMs: null } : t));
+    expect(shape(buildSections(woke).main)).toEqual(s("s6", "s1", "s9"));
   });
 });
 
@@ -164,6 +210,17 @@ describe("rowCache", () => {
     expect(byKey(second, sessionKey("s3"))).toBe(byKey(first, sessionKey("s3")));
     expect(byKey(second, sessionKey("s2"))).toMatchObject({ section: "archived" });
     expect(byKey(second, "h:archived")).not.toBe(byKey(first, "h:archived"));
+  });
+
+  it("snoozing a thread moves only that row (a new object in the snoozed section)", () => {
+    const stable = rowCache();
+    const first = stable(buildRows([thread("s1"), thread("s2"), thread("s3", { archivedAtMs: 1 })]));
+    const second = stable(buildRows([thread("s1"), thread("s2", { snoozedUntilMs: 2 }), thread("s3", { archivedAtMs: 1 })]));
+    expect(shape(second)).toEqual([sessionKey("s1"), "# Snoozed 1", sessionKey("s2"), "# Archived 1", sessionKey("s3")]);
+    expect(byKey(second, sessionKey("s1"))).toBe(byKey(first, sessionKey("s1")));
+    expect(byKey(second, sessionKey("s3"))).toBe(byKey(first, sessionKey("s3")));
+    expect(byKey(second, "h:archived")).toBe(byKey(first, "h:archived"));
+    expect(byKey(second, sessionKey("s2"))).toMatchObject({ section: "snoozed" });
   });
 });
 

@@ -27,6 +27,9 @@
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
  *   POST /__mock/session/archive?id=s-1[&archived=false]   (session.archive as the CLI's --yes does it:
  *                                                 closes, removes its shells, unpins, stamps; false unarchives)
+ *   POST /__mock/session/snooze?id=s-1&until=2m|<RFC 3339>[&clear=true]   (session.snooze as the CLI's
+ *                                                 --yes does it: closes, removes its shells, unpins, unarchives)
+ *   POST /__mock/session/wake?id=s-8              (the daemon's wake: unsnoozed, attention "snooze ended")
  *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N&model=M]   (a thread's last result that long ago; mock/context.ts)
  *   POST /__mock/thread?state=permission|question|streaming|idle   (the scripted thread s-r1:
  *        mock/thread.ts, also parallel|multi); POST /__mock/thread/delta?text=… | /__mock/thread/stream?text=… |
@@ -127,7 +130,7 @@ import { retiredUsage, utcDay } from "./usage";
 import { reconnectMcp, refreshMcp } from "./mcp";
 import { refuseSlashCommand, slashCommandsFor } from "./slashCommands";
 import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreads, THREAD_STATES, type ThreadState } from "./thread";
-import { CommandError, ConfirmNeeded, World, type EventInit } from "./world";
+import { CommandError, ConfirmNeeded, snoozeUntil, World, type EventInit } from "./world";
 
 type AttachEventInit = MessageInitShape<typeof AttachEventSchema>;
 
@@ -526,6 +529,7 @@ function sessionSummary(id: string): Record<string, unknown> {
     pendingWorktreePath: s.pendingWorktreePath,
     pinned: s.pinned,
     archivedAt: s.archivedAt?.toISOString() ?? null,
+    snoozedUntil: s.snoozedUntil?.toISOString() ?? null,
     linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url })),
   };
 }
@@ -562,6 +566,12 @@ function sessionControl(res: ServerResponse, action: string, q: URLSearchParams)
         return;
       case "archive":
         world.archiveSession(id, q.get("archived") !== "false");
+        break;
+      case "snooze":
+        world.snoozeSession(id, snoozeUntil({ until: q.get("until") ?? "", clear: q.get("clear") ?? "" }));
+        break;
+      case "wake":
+        world.wakeSession(id);
         break;
       default:
         json(res, 404, { error: "unknown session action" });

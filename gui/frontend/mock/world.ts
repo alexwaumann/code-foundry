@@ -84,6 +84,11 @@ interface MockSession {
   pinned: boolean;
   /** session.archive: when it was archived; null when not. Reconnect and pin(true) clear it, like the daemon. */
   archivedAt: Date | null;
+  /**
+   * session.snooze: when it wakes; null when not snoozed. Reconnect, pin(true) and archive
+   * clear it, like the daemon; the tick (or POST /__mock/session/wake) wakes it.
+   */
+  snoozedUntil: Date | null;
   /** An effort change waiting for the turn to end (thread.set-effort). */
   effortPending: boolean;
   /** Mock-only: a new thread's first message, sent once it connects (the daemon sends it after the handshake). */
@@ -155,6 +160,24 @@ function shellLabels(sessionId: string, repoId: string, worktree: string): Recor
 /** session.archive archives (rather than unarchives): its `archived` arg, else the opposite of now. */
 function archiving(s: { archivedAt: Date | null }, args: Record<string, string>): boolean {
   return args.archived === undefined || args.archived === "" ? s.archivedAt === null : args.archived === "true";
+}
+
+/**
+ * session.snooze's time: `clear` unsnoozes (null); `until` is RFC 3339 (what the GUI sends)
+ * or a duration from now ("90s", "2m", "1h"; the CLI forms the tests need). It must be in
+ * the future, like the daemon's.
+ */
+export function snoozeUntil(args: Record<string, string>, now = Date.now()): Date | null {
+  const clear = args.clear === "true";
+  const until = args.until ?? "";
+  if (clear && until) throw new CommandError("invalid", "invalid until: give until or clear, not both");
+  if (clear) return null;
+  if (!until) throw new CommandError("invalid", "invalid until: give until (1h, tomorrow, …) or clear");
+  const d = /^(\d+)([smh])$/.exec(until.trim());
+  const ms = d ? now + Number(d[1]) * { s: 1_000, m: 60_000, h: 3_600_000 }[d[2] as "s" | "m" | "h"] : Date.parse(until);
+  if (!Number.isFinite(ms)) throw new CommandError("invalid", `invalid snooze time: ${until}`);
+  if (ms <= now) throw new CommandError("invalid", `invalid snooze time: ${new Date(ms).toISOString()} is in the past`);
+  return new Date(ms);
 }
 
 /**
@@ -582,6 +605,11 @@ export class World {
     this.addSession({ id: "s-6", repoId: "repo-dot", worktreePath: `${HOME}/dotfiles`, name: "Tidy zshrc", model: "claude-sonnet-5[1m]", effort: "", state: SessionState.CLOSING, settleIn: 8, createdAt: ago(60) });
     // Archived 90 min ago (the sidebar's Archived section, collapsed by default).
     this.addSession({ id: "s-7", repoId: "repo-cf", worktreePath: CF, name: "Spike a canvas sidebar", model: "claude-sonnet-5[1m]", effort: "", state: SessionState.DISCONNECTED, disconnectReason: "closed", status: SessionStatus.NEEDS_ATTENTION, statusReason: "finished", statusChangedAt: ago(95), createdAt: ago(600), lastActivityAt: ago(95), archivedAt: ago(90) });
+    // Snoozed (the sidebar's Snoozed section, collapsed by default): s-8 wakes in 2.5 h (a
+    // finished turn, so it does not count as attention while snoozed), s-9 in 4 days.
+    const later = (min: number) => new Date(Date.now() + min * 60_000);
+    this.addSession({ id: "s-8", repoId: "repo-cf", worktreePath: CF, name: "Refactor the gh poller", model: "claude-sonnet-5[1m]", effort: "", state: SessionState.DISCONNECTED, disconnectReason: "closed", status: SessionStatus.NEEDS_ATTENTION, statusReason: "finished", statusChangedAt: ago(30), createdAt: ago(500), lastActivityAt: ago(30), snoozedUntil: later(150) });
+    this.addSession({ id: "s-9", repoId: "repo-gp", worktreePath: GP, name: "Bump wails to v3.1", model: "claude-opus-4-8[1m]", effort: "medium", state: SessionState.DISCONNECTED, disconnectReason: "closed", createdAt: ago(450), lastActivityAt: ago(20), snoozedUntil: later(4 * 24 * 60 + 60) });
     for (const [id, h] of Object.entries(SEEDS)) if (h) this.threads.seed(id, h);
     // Republish so connected watchers converge on the reset state.
     for (const t of this.terms.values()) this.termEvents.publish({ event: { case: "updated", value: this.terminalMsg(t) } });
@@ -912,6 +940,7 @@ export class World {
       pendingWorktreePath: "",
       pinned: false,
       archivedAt: null,
+      snoozedUntil: null,
       effortPending: false,
       firstMessage: null,
       linkedPullRequests: [],
@@ -959,6 +988,7 @@ export class World {
       pendingWorktreePath: s.pendingWorktreePath,
       pinned: s.pinned,
       ...(s.archivedAt ? { archivedAt: timestampFromDate(s.archivedAt) } : {}),
+      ...(s.snoozedUntil ? { snoozedUntil: timestampFromDate(s.snoozedUntil) } : {}),
       effortPending: s.effortPending,
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
       ...usageFields(s.usage),
@@ -1161,14 +1191,55 @@ export class World {
     this.closeShells((l) => l[LABEL_SESSION] === s.id);
     s.pinned = false;
     s.archivedAt ??= new Date();
+    s.snoozedUntil = null;
     this.publishSession(s);
     return `archived thread ${label}`;
+  }
+
+  /**
+   * session.snooze without its confirmation (POST /__mock/session/snooze does what the CLI
+   * with --yes does). Snoozing closes Claude like archiving (busy becomes ERROR
+   * "interrupted"), removes the thread's shells, unpins and unarchives it and sets the wake
+   * time (a re-snooze replaces it); null unsnoozes (no attention). Returns the message.
+   */
+  snoozeSession(id: string, until: Date | null): string {
+    const s = this.session(id);
+    const label = s.name ? `${s.name} (${s.id})` : s.id;
+    if (until === null) {
+      s.snoozedUntil = null;
+      this.publishSession(s);
+      return `unsnoozed thread ${label}`;
+    }
+    if (s.state !== SessionState.DISCONNECTED) this.disconnectSession(s.id, "closed", 0);
+    this.closeShells((l) => l[LABEL_SESSION] === s.id);
+    s.pinned = false;
+    s.archivedAt = null;
+    s.snoozedUntil = until;
+    this.publishSession(s);
+    return `snoozed thread ${label} until ${until.toISOString()}`;
+  }
+
+  /**
+   * The daemon's wake (POST /__mock/session/wake, or the tick once the time passed): the
+   * snooze is cleared and a disconnected thread needs attention, "snooze ended", stamped
+   * now (re-stamped when it already read so).
+   */
+  wakeSession(id: string): void {
+    const s = this.session(id);
+    s.snoozedUntil = null;
+    if (s.state === SessionState.DISCONNECTED) {
+      s.status = SessionStatus.NEEDS_ATTENTION;
+      s.statusReason = "snooze ended";
+      s.statusChangedAt = new Date();
+    }
+    this.publishSession(s);
   }
 
   /** session.reconnect: claude --resume in a new process; STARTING until the handshake (~2 s). */
   private reconnect(s: MockSession): void {
     s.state = SessionState.STARTING;
     s.archivedAt = null;
+    s.snoozedUntil = null;
     // The fresh detector owns status again: the persisted one is cleared.
     this.setStatus(s, SessionStatus.UNSPECIFIED);
     s.settleIn = 2;
@@ -1182,6 +1253,7 @@ export class World {
   private tickSessions(): void {
     for (const s of this.sessions.values()) {
       if (s.held) continue;
+      if (s.snoozedUntil !== null && s.snoozedUntil.getTime() <= Date.now()) this.wakeSession(s.id);
       // A queued run-in: the daemon sends set_cwd once the thread is idle.
       if (s.pendingWorktreePath && s.status !== SessionStatus.BUSY && --s.moveIn <= 0) this.applyMove(s);
       if (s.nameIn > 0 && --s.nameIn === 0 && !s.name) {
@@ -2069,7 +2141,10 @@ export class World {
           const s = activeSession(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
           s.pinned = args.pinned === undefined || args.pinned === "" ? !s.pinned : args.pinned === "true";
-          if (s.pinned) s.archivedAt = null;
+          if (s.pinned) {
+            s.archivedAt = null;
+            s.snoozedUntil = null;
+          }
           this.publishSession(s);
           return `${s.pinned ? "pinned" : "unpinned"} thread ${s.name ? `${s.name} (${s.id})` : s.id}`;
         },
@@ -2156,6 +2231,40 @@ export class World {
           const s = activeSession(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
           return this.archiveSession(s.id, archiving(s, args));
+        },
+      },
+      {
+        cmd: {
+          name: "session.snooze",
+          title: "Snooze or Unsnooze Thread",
+          category: "Thread",
+          description:
+            "Snooze a thread until a time: Claude is closed, its terminals are removed and it is unpinned and listed apart; when the time comes it returns needing attention (\"snooze ended\"), still disconnected. clear unsnoozes.",
+          keybindings: [],
+          args: [
+            { name: "until", type: ArgType.STRING, required: false, description: "When the thread wakes: 1h, 90m, tomorrow, next-week, mon..sun, 2026-10-20, 2026-10-20 14:00 or RFC 3339" },
+            { name: "clear", type: ArgType.BOOL, required: false, description: "Unsnooze the thread instead" },
+          ],
+          // Like the daemon: only snoozing (a valid time) a thread that is mid-turn asks.
+          confirmIf: (ctx, args) => {
+            const s = activeSession(ctx);
+            if (s === undefined || args.clear === "true" || archiveInterrupts(s) === "") return false;
+            try {
+              return snoozeUntil(args) !== null;
+            } catch {
+              return false;
+            }
+          },
+          confirm: (ctx) => {
+            const s = activeSession(ctx);
+            return `Snooze thread ${s?.name || (s?.id ?? "")}? ${s ? archiveInterrupts(s) : ""}; snoozing ends the turn.`;
+          },
+        },
+        when: (ctx) => activeSession(ctx) !== undefined,
+        run: (ctx, args) => {
+          const s = activeSession(ctx);
+          if (!s) throw new CommandError("unavailable", "no active session");
+          return this.snoozeSession(s.id, snoozeUntil(args));
         },
       },
       {

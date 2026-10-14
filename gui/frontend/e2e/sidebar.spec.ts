@@ -99,7 +99,7 @@ test("the sidebar is a flat thread list: waiting threads on top, working ones un
   await expect(page.getByTestId("sidebar-band")).toContainText("Code Foundry");
   // The waiting thread (s-2) on top, then idle threads newest first (no header), then the
   // working ones under Working. No terminal rows: shells live in bottom panels.
-  await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", `s:${driver}`, "s:s-6", "s:s-4", "s:s-3", "# Working 2", "s:s-5", "s:s-1", "# Archived 1"]);
+  await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", `s:${driver}`, "s:s-6", "s:s-4", "s:s-3", "# Working 2", "s:s-5", "s:s-1", "# Snoozed 2", "# Archived 1"]);
   await expect(list(page).locator('[data-row-kind]:not([data-row-kind="session"]):not([data-row-kind="header"])')).toHaveCount(0);
   await expect(list(page)).toHaveAttribute("aria-label", "Threads");
 
@@ -342,6 +342,7 @@ test("status kinds: each thread's second line says its status in words and colou
       "s:s-5",
       "s:s-k-busy",
       "s:s-1",
+      "# Snoozed 2",
       "# Archived 1",
     ]);
   const sections = await list(page)
@@ -406,7 +407,7 @@ test("status kinds: each thread's second line says its status in words and colou
 
 test("Working section: a header with the count collapses and expands its rows, persists across a reload, and cmd+N skips hidden rows", async ({ page }) => {
   await openApp(page);
-  await expect.poll(() => rowKeys(page)).toEqual(DEFAULT_ORDER.map((k) => (k === "h:working" ? "# Working 2" : k === "h:archived" ? "# Archived 1" : k)));
+  await expect.poll(() => rowKeys(page)).toEqual(DEFAULT_ORDER.map((k) => (k === "h:working" ? "# Working 2" : k === "h:snoozed" ? "# Snoozed 2" : k === "h:archived" ? "# Archived 1" : k)));
   const header = page.getByTestId("working-header");
   await expect(header).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByTestId("working-label")).toHaveText("Working");
@@ -428,7 +429,7 @@ test("Working section: a header with the count collapses and expands its rows, p
   await expect(row(page, "s:s-1")).toHaveCount(0);
   await expect(row(page, "s:s-5")).toHaveCount(0);
   await expect(page.getByTestId("working-count")).toHaveText("2");
-  await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4", "s:s-3", "# Working 2", "# Archived 1"]);
+  await expect.poll(() => rowKeys(page)).toEqual(["s:s-2", "s:s-6", "s:s-4", "s:s-3", "# Working 2", "# Snoozed 2", "# Archived 1"]);
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-1");
 
   // cmd+N counts only the rows shown: cmd+4 is s-3, the last one, and cmd+5 does nothing.
@@ -455,7 +456,7 @@ test("Working section: a header with the count collapses and expands its rows, p
   // Expanding brings the rows back, and cmd+5 is the starting thread again.
   await page.getByTestId("working-header").click();
   await expect(page.getByTestId("working-header")).toHaveAttribute("aria-expanded", "true");
-  await expect.poll(() => rowKeys(page)).toEqual(DEFAULT_ORDER.map((k) => (k === "h:working" ? "# Working 2" : k === "h:archived" ? "# Archived 1" : k)));
+  await expect.poll(() => rowKeys(page)).toEqual(DEFAULT_ORDER.map((k) => (k === "h:working" ? "# Working 2" : k === "h:snoozed" ? "# Snoozed 2" : k === "h:archived" ? "# Archived 1" : k)));
   await page.keyboard.press("Meta+5");
   await expect(row(page, "s:s-5")).toHaveAttribute("aria-selected", "true");
 
@@ -487,7 +488,7 @@ test("Working section: the header counts threads as they start and stop working,
   await expect(row(page, "s:s-1")).toHaveAttribute("data-section", "idle");
   await mockPost("session/disconnect?id=s-5&reason=closed&code=0&status=idle");
   await expect(page.getByTestId("working-header")).toHaveCount(0);
-  expect((await rowKeys(page)).filter((k) => k.startsWith("#"))).toEqual(["# Archived 1"]);
+  expect((await rowKeys(page)).filter((k) => k.startsWith("#"))).toEqual(["# Snoozed 2", "# Archived 1"]);
 });
 
 test("hovering a thread row shows its tooltip: name, project, branch with a worktree chip, model and effort", async ({ page }) => {

@@ -15,8 +15,9 @@ import { formatAgo, sessionBadge, statusKind, statusNote } from "./session";
  * - "finished": "Finished <ago>" (emerald)
  * - "error": "Error · <code or reason>" (red): Claude reported an error, or an error status other than interrupted
  * - "interrupted": "Interrupted while working · <ago>" (red): the process ended mid-turn
+ * - "snoozeEnded": "Snooze ended · <ago>" (amber): the daemon woke a snoozed thread
  */
-export type StatusLineKind = "place" | "starting" | "closing" | "working" | "input" | "question" | "plan" | "finished" | "error" | "interrupted";
+export type StatusLineKind = "place" | "starting" | "closing" | "working" | "input" | "question" | "plan" | "finished" | "error" | "interrupted" | "snoozeEnded";
 
 export type StatusTone = "muted" | "sky" | "amber" | "emerald" | "red";
 
@@ -24,7 +25,7 @@ export interface StatusLine {
   kind: StatusLineKind;
   /** The tool, dialog text, error code or reason after "Needs input · " / "Error · "; "" for none. */
   detail: string;
-  /** When the status began (epoch ms), for "finished" and "interrupted"; null otherwise or when unknown. */
+  /** When the status began (epoch ms), for "finished", "interrupted" and "snoozeEnded"; null otherwise or when unknown. */
   at: number | null;
 }
 
@@ -39,6 +40,7 @@ export const statusTones: Readonly<Record<StatusLineKind, StatusTone>> = {
   finished: "emerald",
   error: "red",
   interrupted: "red",
+  snoozeEnded: "amber",
 };
 
 /** Whether "project @ branch" follows the status text (or stands alone, for "place"). */
@@ -69,6 +71,8 @@ export function statusLine(s: Pick<SessionView, "state" | "status" | "statusReas
       return { kind: "finished", detail: "", at: s.statusChangedAtMs };
     case "interrupted":
       return { kind: "interrupted", detail: "", at: s.statusChangedAtMs };
+    case "snoozeEnded":
+      return { kind: "snoozeEnded", detail: "", at: s.statusChangedAtMs };
     case "question":
       return { kind: "question", detail: "", at: null };
     case "plan":
@@ -91,6 +95,7 @@ const words: Readonly<Record<StatusLineKind, string>> = {
   finished: "Finished",
   error: "Error",
   interrupted: "Interrupted while working",
+  snoozeEnded: "Snooze ended",
 };
 
 /** The status text before the place: "" for "place". `now` only matters when `at` is set. */

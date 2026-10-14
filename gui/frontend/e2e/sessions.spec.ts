@@ -20,10 +20,10 @@ test("session rows render with status badges, above the terminals no thread owns
   await expect(badge(page, "s-4")).toHaveAttribute("data-session-badge", "disconnected");
   await expect(badge(page, "s-5")).toHaveAttribute("data-session-badge", "starting");
   await expect(badge(page, "s-6")).toHaveAttribute("data-session-badge", "closing");
-  // Only threads have rows (and the Working and Archived headers): their terminals show
+  // Only threads have rows (and the Working, Snoozed and Archived headers): their terminals show
   // through them, shells in bottom panels.
   const keys = await tree.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
-  expect(keys.every((k) => k?.startsWith("s:") || k === "h:working" || k === "h:archived")).toBe(true);
+  expect(keys.every((k) => k?.startsWith("s:") || k === "h:working" || k === "h:snoozed" || k === "h:archived")).toBe(true);
   // Disconnected rows are dimmed as a whole (not just the name); starting settles into connected on the mock's timer.
   await expect(row(page, "s:s-3").getByTestId("session-body")).toHaveAttribute("data-offline", "true");
   await expect(row(page, "s:s-3").getByTestId("session-body")).toHaveCSS("opacity", "0.5");

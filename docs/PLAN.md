@@ -165,8 +165,10 @@ it, sets `snoozed_until`; the daemon wakes it (wall-clock check every 30 s and a
 startup) into NEEDS_ATTENTION "snooze ended". Reconnect, pin, send and archive unsnooze.
 PR 1 (proto, store, migration 0018, `session.snooze` with its `until` parser and
 confirmation only mid-turn, API and view mapping) done:
-`docs/notes/snooze-threads-1-daemon.md`. PR 2: the GUI (sidebar section, snooze menu,
-mock daemon).
+`docs/notes/snooze-threads-1-daemon.md`. PR 2 (the Snoozed sidebar footer with the time
+left; the Snooze submenu, header button and custom date dialog; "Snooze ended" in amber;
+snoozed threads out of attention; panels reset like archive; mock daemon) done:
+`docs/notes/snooze-threads-2-sidebar.md`.
 
 ### Release channels: stable and tip (design 2026-10-11, revised 2026-10-12)
 

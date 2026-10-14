@@ -400,11 +400,14 @@ from the pull request (docs/notes/pr-thread-commands.md).
 * Layout: a draggable title strip under the hidden-inset traffic lights, sidebar (Pull
   Requests and Projects entries, then a flat list of threads and nothing else: pinned
   threads, then the ones waiting on the user (prompts, then errors), finished turns and
-  idle ones, newest first within each group and with no headers, then the working ones
-  under a collapsible Working header that counts them; each row says its status in words
-  on its second line (or project and branch) with a hover tooltip; a status row at its
-  foot; see `docs/notes/workspaces-4-sidebar.md`, `docs/notes/thread-list.md` and
-  `docs/notes/sidebar-working-section.md`), content (a thread's conversation, the Pull Requests
+  idle ones, newest first within each group and with no headers, scrolling on its own;
+  pinned under it the collapsible footers Working, Snoozed (single-line rows with the
+  time left, soonest wake first) and Archived (single-line rows with their age), each
+  counting its threads; each thread row says its status in words on its second line (or
+  project and branch) with a hover tooltip; a status row at its foot; see
+  `docs/notes/workspaces-4-sidebar.md`, `docs/notes/thread-list.md`,
+  `docs/notes/sidebar-working-section.md`, `docs/notes/archive-threads-2-sidebar.md` and
+  `docs/notes/snooze-threads-2-sidebar.md`), content (a thread's conversation, the Pull Requests
   page, the Projects page with each project's worktrees and each workspace's members, or
   the composer; a worktree's overview is a side panel tab, not a page; a shell is never
   selected), command palette overlay. Under the content pane, a thread and the Projects

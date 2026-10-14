@@ -6,6 +6,7 @@ import { contextKey, getListOptions, getListSessions, getUiContext } from "@/sto
 import { openAddProject } from "@/stores/addProject";
 import { openNewThreadPicker } from "@/stores/compose";
 import { openPublishDialog } from "@/stores/publish";
+import { presentSnooze } from "@/stores/snoozeDialog";
 import { attentionIds, useSessionsStore } from "@/stores/sessions";
 import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
@@ -105,7 +106,7 @@ export function isStartable(c: CommandView): boolean {
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
-const paletteSupplied: ReadonlySet<string> = new Set(["session.new", "session.run-in", "repo.clone", "repo.create", "repo.github.publish"]);
+const paletteSupplied: ReadonlySet<string> = new Set(["session.new", "session.run-in", "session.snooze", "repo.clone", "repo.create", "repo.github.publish"]);
 
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
@@ -182,6 +183,9 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   },
   // "Run in…": the member picker for the active workspace thread; it invokes session.run-in.
   "session.run-in": () => openRunInPicker(getUiContext().activeSessionId),
+  // Snooze: the custom date dialog for the active thread (the menus offer presets), or
+  // unsnooze it when it is snoozed; both invoke session.snooze.
+  "session.snooze": () => presentSnooze(getUiContext().activeSessionId),
   // The Add Project dialog; its tabs call RepoService.Register (repo.add's CLI form with
   // a folder), stream RepoService.Clone (repo.clone's CLI form), or invoke repo.create.
   // repo.add's optional path is never prompted for. repo.clone opens it on the GitHub tab.
