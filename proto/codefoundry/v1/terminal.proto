@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package codefoundry.v1;
 
+import "codefoundry/v1/heartbeat.proto";
 import "google/protobuf/timestamp.proto";
 
 // TerminalService owns PTY-backed terminals. It is program-agnostic: a terminal runs any
@@ -110,6 +111,8 @@ message AttachEvent {
     Output output = 2;
     Resized resized = 3;
     Exited exited = 4;
+    // Nothing else was sent for a while (see StreamHeartbeat).
+    StreamHeartbeat heartbeat = 5;
   }
 
   // Snapshot is a byte sequence that reproduces the current screen (and scrollback when

@@ -570,6 +570,7 @@ type AttachEvent struct {
 	//	*AttachEvent_Output_
 	//	*AttachEvent_Resized_
 	//	*AttachEvent_Exited_
+	//	*AttachEvent_Heartbeat
 	Event         isAttachEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -648,6 +649,15 @@ func (x *AttachEvent) GetExited() *AttachEvent_Exited {
 	return nil
 }
 
+func (x *AttachEvent) GetHeartbeat() *StreamHeartbeat {
+	if x != nil {
+		if x, ok := x.Event.(*AttachEvent_Heartbeat); ok {
+			return x.Heartbeat
+		}
+	}
+	return nil
+}
+
 type isAttachEvent_Event interface {
 	isAttachEvent_Event()
 }
@@ -668,6 +678,11 @@ type AttachEvent_Exited_ struct {
 	Exited *AttachEvent_Exited `protobuf:"bytes,4,opt,name=exited,proto3,oneof"`
 }
 
+type AttachEvent_Heartbeat struct {
+	// Nothing else was sent for a while (see StreamHeartbeat).
+	Heartbeat *StreamHeartbeat `protobuf:"bytes,5,opt,name=heartbeat,proto3,oneof"`
+}
+
 func (*AttachEvent_Snapshot_) isAttachEvent_Event() {}
 
 func (*AttachEvent_Output_) isAttachEvent_Event() {}
@@ -675,6 +690,8 @@ func (*AttachEvent_Output_) isAttachEvent_Event() {}
 func (*AttachEvent_Resized_) isAttachEvent_Event() {}
 
 func (*AttachEvent_Exited_) isAttachEvent_Event() {}
+
+func (*AttachEvent_Heartbeat) isAttachEvent_Event() {}
 
 type WriteTerminalRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1434,7 +1451,7 @@ var File_codefoundry_v1_terminal_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_terminal_proto_rawDesc = "" +
 	"\n" +
-	"\x1dcodefoundry/v1/terminal.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xdc\x03\n" +
+	"\x1dcodefoundry/v1/terminal.proto\x12\x0ecodefoundry.v1\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xdc\x03\n" +
 	"\bTerminal\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04argv\x18\x02 \x03(\tR\x04argv\x12\x10\n" +
@@ -1474,12 +1491,13 @@ const file_codefoundry_v1_terminal_proto_rawDesc = "" +
 	"\x13GetTerminalResponse\x124\n" +
 	"\bterminal\x18\x01 \x01(\v2\x18.codefoundry.v1.TerminalR\bterminal\"\x1f\n" +
 	"\rAttachRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xf6\x03\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xb7\x04\n" +
 	"\vAttachEvent\x12B\n" +
 	"\bsnapshot\x18\x01 \x01(\v2$.codefoundry.v1.AttachEvent.SnapshotH\x00R\bsnapshot\x12<\n" +
 	"\x06output\x18\x02 \x01(\v2\".codefoundry.v1.AttachEvent.OutputH\x00R\x06output\x12?\n" +
 	"\aresized\x18\x03 \x01(\v2#.codefoundry.v1.AttachEvent.ResizedH\x00R\aresized\x12<\n" +
-	"\x06exited\x18\x04 \x01(\v2\".codefoundry.v1.AttachEvent.ExitedH\x00R\x06exited\x1ae\n" +
+	"\x06exited\x18\x04 \x01(\v2\".codefoundry.v1.AttachEvent.ExitedH\x00R\x06exited\x12?\n" +
+	"\theartbeat\x18\x05 \x01(\v2\x1f.codefoundry.v1.StreamHeartbeatH\x00R\theartbeat\x1ae\n" +
 	"\bSnapshot\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x12\n" +
 	"\x04cols\x18\x02 \x01(\rR\x04cols\x12\x12\n" +
@@ -1579,6 +1597,7 @@ var file_codefoundry_v1_terminal_proto_goTypes = []any{
 	(*AttachEvent_Resized)(nil),    // 26: codefoundry.v1.AttachEvent.Resized
 	(*AttachEvent_Exited)(nil),     // 27: codefoundry.v1.AttachEvent.Exited
 	(*timestamppb.Timestamp)(nil),  // 28: google.protobuf.Timestamp
+	(*StreamHeartbeat)(nil),        // 29: codefoundry.v1.StreamHeartbeat
 }
 var file_codefoundry_v1_terminal_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.Terminal.state:type_name -> codefoundry.v1.TerminalState
@@ -1593,32 +1612,33 @@ var file_codefoundry_v1_terminal_proto_depIdxs = []int32{
 	25, // 9: codefoundry.v1.AttachEvent.output:type_name -> codefoundry.v1.AttachEvent.Output
 	26, // 10: codefoundry.v1.AttachEvent.resized:type_name -> codefoundry.v1.AttachEvent.Resized
 	27, // 11: codefoundry.v1.AttachEvent.exited:type_name -> codefoundry.v1.AttachEvent.Exited
-	1,  // 12: codefoundry.v1.TerminalEvent.updated:type_name -> codefoundry.v1.Terminal
-	2,  // 13: codefoundry.v1.TerminalService.Create:input_type -> codefoundry.v1.CreateTerminalRequest
-	4,  // 14: codefoundry.v1.TerminalService.List:input_type -> codefoundry.v1.ListTerminalsRequest
-	6,  // 15: codefoundry.v1.TerminalService.Get:input_type -> codefoundry.v1.GetTerminalRequest
-	8,  // 16: codefoundry.v1.TerminalService.Attach:input_type -> codefoundry.v1.AttachRequest
-	10, // 17: codefoundry.v1.TerminalService.Write:input_type -> codefoundry.v1.WriteTerminalRequest
-	12, // 18: codefoundry.v1.TerminalService.Resize:input_type -> codefoundry.v1.ResizeTerminalRequest
-	14, // 19: codefoundry.v1.TerminalService.Kill:input_type -> codefoundry.v1.KillTerminalRequest
-	16, // 20: codefoundry.v1.TerminalService.Remove:input_type -> codefoundry.v1.RemoveTerminalRequest
-	18, // 21: codefoundry.v1.TerminalService.Close:input_type -> codefoundry.v1.CloseTerminalRequest
-	20, // 22: codefoundry.v1.TerminalService.Watch:input_type -> codefoundry.v1.WatchTerminalsRequest
-	3,  // 23: codefoundry.v1.TerminalService.Create:output_type -> codefoundry.v1.CreateTerminalResponse
-	5,  // 24: codefoundry.v1.TerminalService.List:output_type -> codefoundry.v1.ListTerminalsResponse
-	7,  // 25: codefoundry.v1.TerminalService.Get:output_type -> codefoundry.v1.GetTerminalResponse
-	9,  // 26: codefoundry.v1.TerminalService.Attach:output_type -> codefoundry.v1.AttachEvent
-	11, // 27: codefoundry.v1.TerminalService.Write:output_type -> codefoundry.v1.WriteTerminalResponse
-	13, // 28: codefoundry.v1.TerminalService.Resize:output_type -> codefoundry.v1.ResizeTerminalResponse
-	15, // 29: codefoundry.v1.TerminalService.Kill:output_type -> codefoundry.v1.KillTerminalResponse
-	17, // 30: codefoundry.v1.TerminalService.Remove:output_type -> codefoundry.v1.RemoveTerminalResponse
-	19, // 31: codefoundry.v1.TerminalService.Close:output_type -> codefoundry.v1.CloseTerminalResponse
-	21, // 32: codefoundry.v1.TerminalService.Watch:output_type -> codefoundry.v1.TerminalEvent
-	23, // [23:33] is the sub-list for method output_type
-	13, // [13:23] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	29, // 12: codefoundry.v1.AttachEvent.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
+	1,  // 13: codefoundry.v1.TerminalEvent.updated:type_name -> codefoundry.v1.Terminal
+	2,  // 14: codefoundry.v1.TerminalService.Create:input_type -> codefoundry.v1.CreateTerminalRequest
+	4,  // 15: codefoundry.v1.TerminalService.List:input_type -> codefoundry.v1.ListTerminalsRequest
+	6,  // 16: codefoundry.v1.TerminalService.Get:input_type -> codefoundry.v1.GetTerminalRequest
+	8,  // 17: codefoundry.v1.TerminalService.Attach:input_type -> codefoundry.v1.AttachRequest
+	10, // 18: codefoundry.v1.TerminalService.Write:input_type -> codefoundry.v1.WriteTerminalRequest
+	12, // 19: codefoundry.v1.TerminalService.Resize:input_type -> codefoundry.v1.ResizeTerminalRequest
+	14, // 20: codefoundry.v1.TerminalService.Kill:input_type -> codefoundry.v1.KillTerminalRequest
+	16, // 21: codefoundry.v1.TerminalService.Remove:input_type -> codefoundry.v1.RemoveTerminalRequest
+	18, // 22: codefoundry.v1.TerminalService.Close:input_type -> codefoundry.v1.CloseTerminalRequest
+	20, // 23: codefoundry.v1.TerminalService.Watch:input_type -> codefoundry.v1.WatchTerminalsRequest
+	3,  // 24: codefoundry.v1.TerminalService.Create:output_type -> codefoundry.v1.CreateTerminalResponse
+	5,  // 25: codefoundry.v1.TerminalService.List:output_type -> codefoundry.v1.ListTerminalsResponse
+	7,  // 26: codefoundry.v1.TerminalService.Get:output_type -> codefoundry.v1.GetTerminalResponse
+	9,  // 27: codefoundry.v1.TerminalService.Attach:output_type -> codefoundry.v1.AttachEvent
+	11, // 28: codefoundry.v1.TerminalService.Write:output_type -> codefoundry.v1.WriteTerminalResponse
+	13, // 29: codefoundry.v1.TerminalService.Resize:output_type -> codefoundry.v1.ResizeTerminalResponse
+	15, // 30: codefoundry.v1.TerminalService.Kill:output_type -> codefoundry.v1.KillTerminalResponse
+	17, // 31: codefoundry.v1.TerminalService.Remove:output_type -> codefoundry.v1.RemoveTerminalResponse
+	19, // 32: codefoundry.v1.TerminalService.Close:output_type -> codefoundry.v1.CloseTerminalResponse
+	21, // 33: codefoundry.v1.TerminalService.Watch:output_type -> codefoundry.v1.TerminalEvent
+	24, // [24:34] is the sub-list for method output_type
+	14, // [14:24] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_terminal_proto_init() }
@@ -1626,11 +1646,13 @@ func file_codefoundry_v1_terminal_proto_init() {
 	if File_codefoundry_v1_terminal_proto != nil {
 		return
 	}
+	file_codefoundry_v1_heartbeat_proto_init()
 	file_codefoundry_v1_terminal_proto_msgTypes[8].OneofWrappers = []any{
 		(*AttachEvent_Snapshot_)(nil),
 		(*AttachEvent_Output_)(nil),
 		(*AttachEvent_Resized_)(nil),
 		(*AttachEvent_Exited_)(nil),
+		(*AttachEvent_Heartbeat)(nil),
 	}
 	file_codefoundry_v1_terminal_proto_msgTypes[20].OneofWrappers = []any{
 		(*TerminalEvent_Updated)(nil),

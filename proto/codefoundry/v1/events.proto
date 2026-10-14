@@ -4,6 +4,7 @@ package codefoundry.v1;
 
 import "codefoundry/v1/gh.proto";
 import "codefoundry/v1/gitops.proto";
+import "codefoundry/v1/heartbeat.proto";
 import "codefoundry/v1/repo.proto";
 import "codefoundry/v1/session.proto";
 import "codefoundry/v1/settings.proto";
@@ -67,5 +68,7 @@ message Event {
     WorkspaceEvent workspace = 11;
     // Rendered threads: pending_snapshot, then pending (never items or deltas).
     ThreadEvent thread = 12;
+    // Nothing else was sent for a while (see StreamHeartbeat).
+    StreamHeartbeat heartbeat = 13;
   }
 }
