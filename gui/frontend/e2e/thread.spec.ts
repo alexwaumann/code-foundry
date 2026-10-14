@@ -214,6 +214,13 @@ for (const scheme of ["dark", "light"] as const) {
           return box && composer && box.y + box.height <= composer.y;
         })
         .toBe(true);
+      if (process.env.SHOTS) {
+        // Tall enough for the whole folded turn: the user's bubble, the answer, the footer.
+        await page.setViewportSize({ width: 1280, height: 1000 });
+        await page.mouse.move(0, 0);
+        await page.waitForTimeout(300);
+        await shot(page, `thread-folded-${scheme}`);
+      }
     });
 
     test("scrolled up, new content does not move the list and the fold on end keeps the user's place", async ({ page }) => {

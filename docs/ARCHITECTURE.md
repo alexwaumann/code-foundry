@@ -363,8 +363,8 @@ from the pull request (docs/notes/pr-thread-commands.md).
   the browser's six HTTP/1.1 connections per origin mostly free.
 * A thread's content pane is `components/thread`: a virtualized
   work-log timeline built from the items' structure (`lib/threadTimeline.ts`; text deltas
-  re-render only their row), turns that fold under their footer once finished (the latest
-  stays open), inline diffs, lowlight-highlighted markdown in the terminal palette, and the
+  re-render only their row), turns that fold under their footer the moment they finish (the
+  latest too), inline diffs, lowlight-highlighted markdown in the terminal palette, and the
   follow-up composer with a pending permission or question docked into it. Its items live
   in `stores/thread.ts`, fed only by that thread's `ThreadService.Watch` (snapshot, then
   seq-ordered events, batched per frame); the EventService `thread` source only carries
