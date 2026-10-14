@@ -152,6 +152,59 @@ describe("liveness watchdog", () => {
   });
 });
 
+describe("late events", () => {
+  /** An attempt that ignores its signal and yields once the test releases it. */
+  function deaf() {
+    let release: (() => void) | null = null;
+    let opened = 0;
+    return {
+      get opened() {
+        return opened;
+      },
+      async *open(): AsyncGenerator<number> {
+        opened++;
+        const n = opened;
+        if (n === 1) {
+          yield 1;
+          await new Promise<void>((r) => (release = r));
+          yield 99; // the first attempt's late event
+        }
+        yield n * 10;
+        await new Promise<void>(() => undefined);
+      },
+      release() {
+        release?.();
+      },
+    };
+  }
+
+  it("an event a stopped attempt yields never reaches onEvent", async () => {
+    const d = deaf();
+    const got: number[] = [];
+    const stop = runStream<number>({ open: () => d.open(), onEvent: (v) => got.push(v) });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(got).toEqual([1]);
+    stop();
+    d.release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(got).toEqual([1]);
+  });
+
+  it("an event a resynced attempt yields never reaches onEvent", async () => {
+    const d = deaf();
+    const got: number[] = [];
+    const stop = runStream<number>({ open: () => d.open(), onEvent: (v) => got.push(v), resyncOnVisible: true });
+    await vi.advanceTimersByTimeAsync(0);
+    setVisibility("hidden");
+    setVisibility("visible");
+    d.release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(d.opened).toBe(2);
+    expect(got).toEqual([1, 20]);
+    stop();
+  });
+});
+
 describe("open status", () => {
   it("is reported on an attempt's first message, so a hanging reconnect stays retrying", async () => {
     const s = server();
@@ -229,6 +282,26 @@ describe("resyncOnVisible", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(s.opened).toBe(1);
     r();
+  });
+
+  it("rapid hide/show keeps one attempt open: each show aborts the previous one", async () => {
+    const s = server();
+    const r = start(s, { resyncOnVisible: true });
+    s.push(1);
+    await vi.advanceTimersByTimeAsync(0);
+    for (let i = 0; i < 5; i++) {
+      setVisibility("hidden");
+      setVisibility("visible");
+    }
+    await vi.advanceTimersByTimeAsync(0);
+    // Every attempt but the last was aborted: never two Watches at once.
+    expect(s.opened - s.aborted).toBe(1);
+    s.push(2);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(r.got).toEqual([1, 2]);
+    expect(r.errors).toEqual([]);
+    expect(r.statuses).not.toContain("retrying");
+    r.stop();
   });
 
   it("stops listening once stopped", async () => {
