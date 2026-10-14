@@ -124,7 +124,8 @@ committed); their cards in the pane were illustrative only.
 
 ## Verification
 
-* `make check` green (see the PR for the counts). New or changed unit tests:
+* `make check` green: gofmt, vet, staticcheck, `go test ./...`, typecheck, lint, 2578
+  vitest tests in 124 files. New or changed unit tests:
   `lib/snooze.test.ts` (presets table incl. Monday → following Monday, Sunday → tomorrow,
   late evening past midnight, after midnight, year end, spring-forward and fall-back
   nights, 23 / 25 h days; all presets in the future; short / full formats;
@@ -148,7 +149,12 @@ committed); their cards in the pane were illustrative only.
   again from the header, reconnect unsnoozes); keyboard order and cmd+N across four
   sections, cmd+shift+a skipping snoozed; the palette presenter. Specs whose orders
   changed: `app`, `archive`, `sidebar`, `sessions`.
-* `make gui-e2e`: see the PR body.
+* `make gui-e2e` (after rebasing onto main): 728 passed, 28 skipped (live specs), none
+  failed or flaky. `snooze.spec.ts` alone `--repeat-each 4`: 56 / 56. The first full run
+  (before the spec updates) failed only the expected order assertions in `app`,
+  `archive`, `sessions` and `sidebar`; one snooze test first failed because
+  `getByRole({ name: "Snooze Thread" })` also matches "Unsnooze Thread" (substring,
+  case-insensitive): it uses `exact: true` now.
 * `make build && make gui-build` green.
 * **Live** (2026-10-14; isolated `CODE_FOUNDRY_HOME=/tmp/cf-snooze-ui` for the GUI's
   daemon and every CLI call, through a wrapper script; scratch repo
