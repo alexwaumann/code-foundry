@@ -14,7 +14,8 @@ User feedback on the bottom terminal panel (`bottom-panel-2-gui.md`,
 Status: `make check` green (Go packages all ok; 112 vitest files / 2194 tests). e2e on
 both browsers for the touched specs (`bottom-panel`, `app`, `archive`, `font`, `layout`,
 `sessions`, `terminal-routing`, `no-project`, `panel`): 186 passed, 12 skipped (the
-WebKit-only screenshot runs). Live: `e2e/live-bottom.spec.ts` against a real daemon
+WebKit-only screenshot runs). The full `gui-e2e` suite, both browsers: 688 passed, 28
+skipped, 0 failed. Live: `e2e/live-bottom.spec.ts` against a real daemon
 (below), 2 passed.
 
 ## Pieces
