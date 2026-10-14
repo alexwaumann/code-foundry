@@ -108,8 +108,8 @@ export function Timeline({ sessionId, working, bottomInset }: { sessionId: strin
   // list follows the bottom. Scrolled up, the anchor row keeps its place; when it folded
   // away (the user was reading the turn's work as it ended) the next row that is still
   // there (its final text or footer) takes that place, so the viewport never jumps to an
-  // unrelated part of the conversation. A list that became too short clamps to the
-  // bottom, and onScroll pins it again.
+  // unrelated part of the conversation. When that place is past the new bottom, the list
+  // pins again.
   useLayoutEffect(() => {
     const el = scrollRef.current;
     const a = anchor.current;
@@ -118,7 +118,14 @@ export function Timeline({ sessionId, working, bottomInset }: { sessionId: strin
       let at: number | undefined;
       for (let i = a.index; at === undefined && i < a.rows.length; i++) at = index.get(a.rows[i]?.key ?? "");
       const start = at === undefined ? undefined : v.measurementsCache[at]?.start;
-      if (start !== undefined) el.scrollTop = start - a.offset;
+      if (start !== undefined) {
+        const top = start - a.offset;
+        // Past the new bottom (the fold left too little below to keep the place): pin, so
+        // the footer the turn just got ends up in view rather than wherever the clamp
+        // leaves it.
+        if (top > el.scrollHeight - el.clientHeight) pinned.current = true;
+        else el.scrollTop = top;
+      }
     }
     if (pinned.current) toBottom();
     captureAnchor();
