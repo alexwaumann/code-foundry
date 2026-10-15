@@ -196,10 +196,10 @@ Users never manage whether a thread's `claude` runs: a message starts a stopped 
 stops. `session.close` and `session.reconnect` are gone. Three PRs:
 
 * PR A (background shells tracked, `Session.BackgroundWork()`, the strip counts them)
-  on `cf/background-shells`: `docs/notes/background-shells.md`.
+  done (#105): `docs/notes/background-shells.md`.
 * PR B (daemon + CLI: start on send, the idle stop, settings on stopped threads, slash
   commands and MCP status persisted (migration 0021), crash vs idle exit items, the two
-  commands removed, restart counts) on `cf/thread-lifecycle`:
+  commands removed, restart counts) on `cf/thread-lifecycle` (#108):
   `docs/notes/thread-lifecycle.md`.
 * PR C (GUI: remove the connection UI; the list is in the PR B note) pending.
 

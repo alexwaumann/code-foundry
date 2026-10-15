@@ -1,7 +1,7 @@
 # Thread lifecycle, PR B of 3: threads start on send and stop at cache expiry
 
-Status: built on branch `cf/thread-lifecycle`, stacked on `cf/background-shells` (PR A,
-#105; rebased onto its wake-hold fix). `make check` green, `make gui-build` green,
+Status: built on branch `cf/thread-lifecycle` (PR #108), on main after PR A (#105, with
+its wake hold) merged. `make check` green, `make gui-build` green,
 exercised live (below). PR C removes the GUI's connection UI (the list at the end).
 
 ## The decision (with Alex, 2026-10-15)
