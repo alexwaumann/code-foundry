@@ -74,7 +74,7 @@ test("switch the project from the heading: the draft moves, Also in is swapped, 
   // ghostty-playground was swapped out of Also in; code-foundry is not demoted to it.
   await expect(chips(page)).toHaveCount(0);
   await expect(page.getByTestId("composer-also-in")).toHaveText("Also in…");
-  await expect(page.getByTestId("composer-worktree")).toHaveText("New worktree");
+  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
 
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.new");
@@ -121,7 +121,7 @@ test("switch to a workspace and back to a project", async ({ page }) => {
   await expect(heading(page)).toHaveText("What should we build in dotfiles?");
   await expect(prompt(page)).toHaveAttribute("data-value", "Share the session cookie");
   await expect(chips(page)).toHaveCount(0);
-  await expect(page.getByTestId("composer-worktree")).toHaveText("New worktree");
+  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
 });
 
 test("the trigger is a Tab stop before the chips; Enter/Space open it, Esc closes it back to the trigger", async ({ page }) => {

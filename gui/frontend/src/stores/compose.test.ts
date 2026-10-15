@@ -4,12 +4,16 @@ import { HOME_KEY } from "@/lib/compose";
 import { tagToken } from "@/lib/prompt";
 import {
   addAlsoIn,
+  clearDraft,
   composeNoProject,
   composeSelection,
   composeTarget,
+  draftPlace,
   emptyDraft,
   emptyWorkspaceDraft,
   getDraft,
+  pickWorktree,
+  projectWorktree,
   removeAlsoIn,
   setPrimary,
   switchDraftTarget,
@@ -19,7 +23,9 @@ import {
 } from "./compose";
 import { answerConfirm, useConfirmStore } from "./confirm";
 import { useReposStore } from "./repos";
+import { useSettingsStore } from "./settings";
 import { useUiStore } from "./ui";
+import { useWorkInStore } from "./workIn";
 import { useWorkspacesStore } from "./workspaces";
 
 afterEach(() => {
@@ -28,7 +34,8 @@ afterEach(() => {
 });
 
 describe("compose drafts", () => {
-  it("a project draft starts with a new worktree, a workspace draft in its worktrees", () => {
+  it("a project draft starts with the project's default (null), a workspace draft in its worktrees", () => {
+    expect(emptyDraft.worktree).toBeNull();
     expect(getDraft("repo-cf")).toBe(emptyDraft);
     expect(getDraft("ws:w-1")).toBe(emptyWorkspaceDraft);
     expect(getDraft("ws:w-1").worktree).toEqual({ kind: "members" });
@@ -80,6 +87,82 @@ describe("the no-project composer", () => {
   });
 });
 
+describe("Work in: the setting, the per-project memory, the draft's own pick", () => {
+  const wt = (path: string, isMain: boolean) => ({ path, branch: isMain ? "main" : "feat/x", head: "abc1234", detached: false, isMain, status: undefined });
+  const repo = (id: string): RepoView =>
+    ({ id, path: `/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [wt(`/src/${id}`, true), wt(`/wt/${id}-x`, false)] }) as unknown as RepoView;
+  const setting = (v: string | undefined) => {
+    useSettingsStore.setState({
+      snapshot: { values: v === undefined ? {} : { "sessions.default_worktree": v }, path: "", revision: 1, loadError: "", issues: [], restartPending: [] },
+    });
+  };
+  const place = (id: string) => {
+    const p = draftPlace({ kind: "project", repoId: id }, getDraft(id));
+    return p?.kind === "project" ? p.worktree : p;
+  };
+
+  beforeEach(() => {
+    useReposStore.setState({ byId: { "repo-cf": repo("repo-cf"), "repo-gp": repo("repo-gp") }, order: ["repo-cf", "repo-gp"] });
+    useWorkInStore.setState({ byRepo: {} });
+  });
+  afterEach(() => {
+    useSettingsStore.setState({ snapshot: null });
+    useWorkInStore.setState({ byRepo: {} });
+  });
+
+  it.each<[string, string | undefined, Record<string, "new" | "current">, { kind: string; path?: string }]>([
+    ["no settings yet: a fresh copy", undefined, {}, { kind: "new" }],
+    ["setting new", "new", {}, { kind: "new" }],
+    ["setting current: the main checkout", "current", {}, { kind: "existing", path: "/src/repo-cf" }],
+    ["an unknown setting value: a fresh copy", "elsewhere", {}, { kind: "new" }],
+    ["remembered in place beats the setting", "new", { "repo-cf": "current" }, { kind: "existing", path: "/src/repo-cf" }],
+    ["remembered fresh copy beats the setting", "current", { "repo-cf": "new" }, { kind: "new" }],
+    ["another project's memory does not apply", "new", { "repo-gp": "current" }, { kind: "new" }],
+  ])("%s", (_, value, byRepo, want) => {
+    setting(value);
+    useWorkInStore.setState({ byRepo });
+    expect(projectWorktree("repo-cf")).toEqual(want);
+    expect(place("repo-cf")).toEqual(want);
+  });
+
+  it("current with an unknown main checkout falls back to a fresh copy", () => {
+    setting("current");
+    expect(projectWorktree("repo-unknown")).toEqual({ kind: "new" });
+  });
+
+  it("a pick sets the draft and teaches the project (fresh copy or in place only)", () => {
+    setting("new");
+    pickWorktree("repo-cf", { kind: "existing", path: "/src/repo-cf" });
+    expect(getDraft("repo-cf").worktree).toEqual({ kind: "existing", path: "/src/repo-cf" });
+    expect(useWorkInStore.getState().byRepo).toEqual({ "repo-cf": "current" });
+    // Another existing worktree is a one-off: the memory stays.
+    pickWorktree("repo-cf", { kind: "existing", path: "/wt/repo-cf-x" });
+    expect(useWorkInStore.getState().byRepo).toEqual({ "repo-cf": "current" });
+    // The next draft for the project starts in place; another project does not.
+    clearDraft("repo-cf");
+    expect(getDraft("repo-cf").worktree).toBeNull();
+    expect(place("repo-cf")).toEqual({ kind: "existing", path: "/src/repo-cf" });
+    expect(place("repo-gp")).toEqual({ kind: "new" });
+    pickWorktree("repo-cf", { kind: "new" });
+    expect(useWorkInStore.getState().byRepo).toEqual({ "repo-cf": "new" });
+  });
+
+  it("the draft's own choice wins over the default; a vanished worktree still falls back to a fresh copy", () => {
+    setting("current");
+    updateDraft("repo-cf", { worktree: { kind: "new" } });
+    expect(place("repo-cf")).toEqual({ kind: "new" });
+    updateDraft("repo-cf", { worktree: { kind: "existing", path: "/gone" } });
+    expect(place("repo-cf")).toEqual({ kind: "new" });
+  });
+
+  it("workspace drafts ignore the setting and the memory", () => {
+    setting("current");
+    useWorkspacesStore.setState({ byId: { "w-1": { id: "w-1", name: "login", branch: "cf/login", members: [{ repoId: "repo-gp", worktreePath: "/wt/gp" }], createdAtMs: null } }, order: ["w-1"], loaded: true });
+    expect(getDraft("ws:w-1").worktree).toEqual({ kind: "members" });
+    expect(draftPlace({ kind: "workspace", workspaceId: "w-1" }, getDraft("ws:w-1"))).toMatchObject({ kind: "workspace", worktreePath: "/wt/gp" });
+  });
+});
+
 describe("switchDraftTarget", () => {
   const repo = (id: string, git = true): RepoView => ({ id, path: `/src/${id}`, name: id.replace("repo-", ""), defaultBranch: "main", githubSlug: "", remotes: [], git, worktrees: [] });
   const cf = { kind: "project", repoId: "repo-cf" } as const;
@@ -101,7 +184,7 @@ describe("switchDraftTarget", () => {
     const seq = useUiStore.getState().composerFocusSeq;
     await expect(switchDraftTarget(cf, gp)).resolves.toBe(true);
     expect(useComposeStore.getState().drafts["repo-cf"]).toBeUndefined();
-    expect(getDraft("repo-gp")).toMatchObject({ text: "hi", model: "haiku", alsoIn: ["repo-sk"], base: null, worktree: { kind: "new" } });
+    expect(getDraft("repo-gp")).toMatchObject({ text: "hi", model: "haiku", alsoIn: ["repo-sk"], base: null, worktree: null });
     expect(getDraft("repo-gp").attachments.map((a) => a.url)).toEqual(["blob:a1"]);
     expect(revoke).not.toHaveBeenCalled();
     expect(useUiStore.getState().selection).toEqual({ kind: "compose", repoId: "repo-gp" });
@@ -181,7 +264,7 @@ describe("switchDraftTarget", () => {
     expect(useUiStore.getState().selection).toEqual({ kind: "compose", repoId: "", noProject: true });
     await expect(switchDraftTarget({ kind: "home" }, gp)).resolves.toBe(true);
     expect(useComposeStore.getState().drafts[HOME_KEY]).toBeUndefined();
-    expect(getDraft("repo-gp")).toMatchObject({ text: "hi", worktree: { kind: "new" } });
+    expect(getDraft("repo-gp")).toMatchObject({ text: "hi", worktree: null });
   });
 
   it("to no project with project tags: removed only after the confirm, which names No project", async () => {

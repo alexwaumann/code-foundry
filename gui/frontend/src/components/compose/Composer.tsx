@@ -18,6 +18,7 @@ import {
   choiceLabel,
   DEFAULT_EFFORT,
   DEFAULT_MODEL,
+  defaultWorktree,
   draftKey as keyOf,
   draftMembers,
   EFFORT_CHOICES,
@@ -25,6 +26,8 @@ import {
   PERMISSION_CHOICES,
   pickDefault,
   projectChipBranch,
+  WORK_IN_SETTING_KEY,
+  workInText,
   type ComposePermission,
   type ComposeTarget,
   type WorktreeChoice,
@@ -41,6 +44,7 @@ import {
   loadRefs,
   noGitCheckout,
   openPreview,
+  pickWorktree,
   removeAttachment,
   sendDraft,
   updateDraft,
@@ -54,6 +58,7 @@ import { useReposStore } from "@/stores/repos";
 import { useModelChoices, useSettingValue } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
 import { DASHBOARD, useUiStore } from "@/stores/ui";
+import { useRememberedWorkIn } from "@/stores/workIn";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
 const SEP = "\u0001";
@@ -272,10 +277,21 @@ function cycleStops(e: React.KeyboardEvent<HTMLElement>): void {
 
 const NEW_IN_EVERY = "A cf/… branch in every project (a new workspace)";
 
+/** Work in: where a project's thread runs. The picker's copy (docs/notes/onboarding-3-work-in.md). */
+const FRESH_COPY = "A fresh copy of the project";
+const FRESH_COPY_DETAIL = "Its own folder and branch (cf/…, named from your prompt). Run several threads at once; keep or discard each one.";
+const IN_PLACE = "The project folder itself";
+const WORK_IN_FOOTER = "Default for new threads: Settings › Sessions › New threads work in";
+
+function inPlaceDetail(path: string): string {
+  return `Edits land in ${tildify(path)} directly. One thread at a time is safest.`;
+}
+
 /**
  * The member chips (MemberChips) above the card. The card: attachments, the prompt, the
- * model/effort/permission/view pickers, attach and send; below it the worktree picker
- * and, beside it, the base-ref picker for new worktrees or the chosen worktree's branch
+ * model/effort/permission/view pickers, attach and send; below it the Work in picker
+ * (where the thread runs: a fresh copy, the project folder itself, or an existing
+ * worktree; a project draft starts from stores/compose projectWorktree) and, beside it, the base-ref picker for new worktrees or the chosen worktree's branch
  * (read-only, not a Tab stop) otherwise. Grid placement keeps the send button inside the
  * card while Tab goes textarea → pickers (worktree and base included) → send; the chips
  * come before the prompt.
@@ -308,6 +324,9 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   const defaultRef = useComposeStore((s) => s.refs[primary]?.defaultRef ?? "");
   const projectId = target.kind === "project" ? target.repoId : "";
   const worktrees = useWorktrees(projectId);
+  const mainPath = worktrees.find((w) => w.isMain)?.path;
+  const workInSetting = useSettingValue(WORK_IN_SETTING_KEY);
+  const remembered = useRememberedWorkIn(projectId);
   // A project without git runs threads in its folder only: Current checkout, no base.
   const noGitPath = useReposStore((s) => noGitCheckout(s.byId[projectId]));
   const wsBranch = useWorkspacesStore((s) => (target.kind === "workspace" ? (s.byId[target.workspaceId]?.branch ?? "") : ""));
@@ -324,14 +343,14 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
   const multi = target.kind === "project" && repoIds.length > 1;
   const worktree: WorktreeChoice =
     target.kind === "workspace"
-      ? choice.kind === "new"
+      ? choice?.kind === "new"
         ? choice
         : { kind: "members" }
       : noGitPath !== undefined
         ? { kind: "existing", path: noGitPath }
         : multi
           ? { kind: "new" }
-          : resolveWorktree(choice, worktrees);
+          : resolveWorktree(choice ?? defaultWorktree({ setting: workInSetting, remembered, mainPath }), worktrees);
   const newWorktrees = home || worktree.kind !== "new" ? 0 : target.kind === "workspace" || multi ? repoIds.length : 1;
   const base = baseChoice ?? defaultRef;
   const canSend = !busy && (text.trim() !== "" || hasAttachments);
@@ -407,17 +426,23 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
         },
       ];
     }
-    if (noGitPath !== undefined) return [{ options: [{ value: noGitPath, label: "Current checkout", detail: `${tildify(noGitPath)} · not a git repository` }] }];
-    if (multi) return [{ options: [{ value: "new", label: "New worktree", detail: NEW_IN_EVERY }] }];
+    if (noGitPath !== undefined) {
+      return [{ heading: "Work in", options: [{ value: noGitPath, label: IN_PLACE, tag: "no git", detail: inPlaceDetail(noGitPath), wrap: true }] }];
+    }
+    if (multi) return [{ heading: "Work in", options: [{ value: "new", label: "A fresh copy of every project", tag: "new worktrees", detail: NEW_IN_EVERY, wrap: true }] }];
+    const main = worktrees.find((w) => w.isMain);
     return [
-      { options: [{ value: "new", label: "New worktree", detail: "A cf/… branch named from the prompt" }] },
       {
-        heading: "Existing",
-        options: worktrees.map((w) => ({
-          value: w.path,
-          label: w.isMain ? "Current checkout" : worktreeName(w),
-          detail: w.isMain ? `${worktreeName(w)} · ${tildify(w.path)}` : tildify(w.path),
-        })),
+        heading: "Work in",
+        options: [
+          { value: "new", label: FRESH_COPY, tag: "new worktree", detail: FRESH_COPY_DETAIL, wrap: true },
+          ...(main ? [{ value: main.path, label: IN_PLACE, tag: worktreeName(main), detail: inPlaceDetail(main.path), wrap: true }] : []),
+        ],
+      },
+      {
+        heading: "An existing copy",
+        separated: true,
+        options: worktrees.filter((w) => !w.isMain).map((w) => ({ value: w.path, label: worktreeName(w), detail: tildify(w.path) })),
       },
     ];
   }, [target.kind, multi, wsBranch, projects, worktrees, noGitPath]);
@@ -429,16 +454,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
     worktree.kind === "new",
     projectChipBranch({ noGit: noGitPath !== undefined, newWorktree: worktree.kind === "new", checkout: chosen }),
   );
-  const worktreeText =
-    noGitPath !== undefined
-      ? "Current checkout"
-      : worktree.kind === "members"
-        ? "Workspace worktrees"
-        : !chosen
-          ? "New worktree"
-          : chosen.isMain
-            ? "Current checkout"
-            : `Existing worktree: ${worktreeName(chosen)}`;
+  const worktreeText = workInText({ workspace: target.kind === "workspace", noGit: noGitPath !== undefined, worktree, chosen });
   const worktreeIcon = noGitPath !== undefined ? Folder : worktree.kind === "members" ? Layers : !chosen ? GitBranchPlus : chosen.isMain ? FolderGit2 : GitBranch;
 
   // ListRefs order (local branches, then remote-tracking refs), the default first.
@@ -600,16 +616,21 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
           {!home && (
             <>
               <ComposerPicker
-                label="Worktree"
+                label="Work in"
                 icon={worktreeIcon}
                 text={worktreeText}
                 value={worktree.kind === "existing" ? worktree.path : worktree.kind}
                 groups={worktreeGroups}
                 onChange={(v) => {
-                  updateDraft(draftKey, { worktree: v === "new" || v === "members" ? { kind: v } : { kind: "existing", path: v } });
+                  const next: WorktreeChoice = v === "new" || v === "members" ? { kind: v } : { kind: "existing", path: v };
+                  // A project's own pick (not one forced by Also in or a missing git) is remembered for it.
+                  if (target.kind === "project" && !multi && noGitPath === undefined && next.kind !== "members") pickWorktree(target.repoId, next);
+                  else updateDraft(draftKey, { worktree: next });
                 }}
+                footer={target.kind === "project" && noGitPath === undefined && !multi ? WORK_IN_FOOTER : undefined}
                 disabled={busy}
-                contentClassName="w-80"
+                contentClassName={target.kind === "workspace" ? "w-80" : "w-90"}
+                listClassName="max-h-96"
                 data-testid="composer-worktree"
               />
               {noGitPath !== undefined ? <NoGitBadge className="mx-1 h-6 rounded-md px-1.5 text-xs" /> : chosen && <BranchIndicator worktree={chosen} />}

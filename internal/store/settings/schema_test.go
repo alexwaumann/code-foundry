@@ -321,3 +321,40 @@ func TestNotificationFields(t *testing.T) {
 		t.Errorf("Defaults().Notifications = %+v, want %+v", got, want)
 	}
 }
+
+func TestDefaultWorktreeField(t *testing.T) {
+	f := field(t, KeyDefaultWorktree)
+	// Live (the composer reads every snapshot), in Sessions, right after the default effort.
+	if f.Group != GroupSessions || f.Type != Enum || f.Default != WorktreeNew || f.Restart || f.Title != "New threads work in" {
+		t.Errorf("field = %+v", f)
+	}
+	if i := slices.IndexFunc(staticFields, func(f Field) bool { return f.Key == KeyDefaultEffort }); staticFields[i+1].Key != KeyDefaultWorktree {
+		t.Errorf("field after %s = %s", KeyDefaultEffort, staticFields[i+1].Key)
+	}
+	if got := Defaults().Sessions.DefaultWorktree; got != WorktreeNew {
+		t.Errorf("Defaults().Sessions.DefaultWorktree = %q, want %q", got, WorktreeNew)
+	}
+	tests := []struct {
+		in, label string
+		ok        bool
+	}{
+		{"new", "A fresh copy of the project", true},
+		{"current", "The project folder itself", true},
+		{"", "", false},
+		{"existing", "", false},
+		{"New", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			got, err := f.parse(tt.in)
+			if (err == nil) != tt.ok || (tt.ok && got != tt.in) {
+				t.Fatalf("parse(%q) = %q, %v; want ok=%v", tt.in, got, err, tt.ok)
+			}
+			if tt.ok {
+				if label := f.EnumLabels[slices.Index(f.Enum, tt.in)]; label != tt.label {
+					t.Errorf("label = %q, want %q", label, tt.label)
+				}
+			}
+		})
+	}
+}

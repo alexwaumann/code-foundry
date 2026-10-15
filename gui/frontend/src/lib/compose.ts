@@ -51,6 +51,55 @@ export type WorktreeChoice = { kind: "new" } | { kind: "existing"; path: string 
 export type ProjectWorktree = Exclude<WorktreeChoice, { kind: "members" }>;
 
 /**
+ * Where a project's new thread works by default (sessions.default_worktree, and the
+ * choice remembered per project): a fresh copy (a new worktree) or the project folder
+ * itself (the main checkout).
+ */
+export type WorkInMode = "new" | "current";
+
+export const WORK_IN_SETTING_KEY = "sessions.default_worktree";
+
+function workInMode(v: string | undefined): WorkInMode | undefined {
+  return v === "new" || v === "current" ? v : undefined;
+}
+
+/**
+ * A project draft's worktree before the user picks one: the choice remembered for the
+ * project, else the setting, else a fresh copy. "current" is the main checkout, or a
+ * fresh copy while the main checkout is not known.
+ */
+export function defaultWorktree(p: { setting?: string; remembered?: string; mainPath?: string }): ProjectWorktree {
+  const mode = workInMode(p.remembered) ?? workInMode(p.setting) ?? "new";
+  return mode === "current" && p.mainPath ? { kind: "existing", path: p.mainPath } : { kind: "new" };
+}
+
+/**
+ * What picking a worktree teaches the project's default: a fresh copy or the main
+ * checkout; null for another existing worktree (a one-off; the memory stays as it was).
+ */
+export function workInMemory(choice: ProjectWorktree, mainPath: string | undefined): WorkInMode | null {
+  if (choice.kind === "new") return "new";
+  return mainPath !== undefined && choice.path === mainPath ? "current" : null;
+}
+
+/**
+ * The Work in pill's text. A project: "Fresh copy" (a new worktree), "In place" (the main
+ * checkout, or the folder of a project without git), else the worktree's branch (its short
+ * head when detached). A workspace keeps "Workspace worktrees" / "New worktree".
+ */
+export function workInText(p: {
+  workspace: boolean;
+  noGit: boolean;
+  worktree: WorktreeChoice;
+  chosen?: { isMain: boolean; branch: string; head: string };
+}): string {
+  if (p.workspace) return p.worktree.kind === "new" ? "New worktree" : "Workspace worktrees";
+  if (p.noGit) return "In place";
+  if (p.worktree.kind !== "existing" || !p.chosen) return "Fresh copy";
+  return p.chosen.isMain ? "In place" : p.chosen.branch || p.chosen.head.slice(0, 7);
+}
+
+/**
  * What a composer starts a thread in: a project, a workspace and its members, or no
  * project at all (`home`: the thread runs in the daemon's home directory, session.new
  * --no-project; docs/notes/no-project-2-gui.md).
@@ -82,7 +131,8 @@ export function isWorkspaceKey(key: string): boolean {
 export interface MovableDraft {
   /** The prompt with tag tokens (lib/prompt.ts). */
   text: string;
-  worktree: WorktreeChoice;
+  /** null: the project's default (defaultWorktree). */
+  worktree: WorktreeChoice | null;
   base: string | null;
   alsoIn: readonly string[];
   primary: string | null;
@@ -92,7 +142,7 @@ export interface MovableDraft {
 /**
  * A draft moved to another target (the composer heading's project switch). Carried
  * over: every field this does not name (text, attachments, model, effort, permission,
- * notice, phase). Reset: the worktree (a project's "new", a workspace's "members"), the
+ * notice, phase). Reset: the worktree (a project's default, a workspace's "members"), the
  * base (it was one of the old primary's refs) and the error.
  *
  * Also in: the old project is dropped (never demoted to Also in); the new project leaves
@@ -120,7 +170,7 @@ export function movedDraft<D extends MovableDraft>(
   return {
     ...d,
     text: retainRepoTags(d.text, members),
-    worktree: to.kind === "workspace" ? { kind: "members" } : { kind: "new" },
+    worktree: to.kind === "workspace" ? { kind: "members" } : null,
     base: null,
     alsoIn,
     primary,

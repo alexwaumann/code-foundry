@@ -22,14 +22,18 @@ import {
   checkAttachments,
   createdSessionId,
   DEFAULT_PERMISSION,
+  defaultWorktree,
   draftKey,
   draftMembers,
   isWorkspaceKey,
   movedDraft,
   threadArgs,
   threadPlace,
+  WORK_IN_SETTING_KEY,
+  workInMemory,
   type ComposePermission,
   type ComposeTarget,
+  type ProjectWorktree,
   type ThreadPlace,
   type WorktreeChoice,
 } from "@/lib/compose";
@@ -41,7 +45,9 @@ import { requestConfirm, type ConfirmRequest } from "./confirm";
 import { getUiContext } from "./context";
 import { useReposStore } from "./repos";
 import { SESSION_COMMANDS } from "./sessionActions";
+import { useSettingsStore } from "./settings";
 import { useUiStore, type Selection } from "./ui";
+import { rememberedWorkIn, rememberWorkIn } from "./workIn";
 import { useWorkspacesStore } from "./workspaces";
 
 export interface DraftAttachment {
@@ -64,7 +70,11 @@ export interface Draft {
   model: string | null;
   effort: string | null;
   permission: ComposePermission;
-  worktree: WorktreeChoice;
+  /**
+   * null: the project's default, resolved live (projectWorktree: the choice remembered
+   * for the project, else sessions.default_worktree). Workspace drafts always have one.
+   */
+  worktree: WorktreeChoice | null;
   /** null: the primary repo's default base ref (ListRefs.default_ref). */
   base: string | null;
   /** Project drafts: other projects the thread also works in (a new workspace on send). */
@@ -110,7 +120,7 @@ export const emptyDraft: Draft = {
   model: null,
   effort: null,
   permission: DEFAULT_PERMISSION,
-  worktree: { kind: "new" },
+  worktree: null,
   base: null,
   alsoIn: [],
   primary: null,
@@ -397,7 +407,13 @@ export function draftPlace(target: ComposeTarget, d: Draft): ThreadPlace | null 
   const isRepo = (id: string) => repos[id]?.git === true;
   const { primary } = draftMembers({ target, alsoIn: d.alsoIn, primary: d.primary }, workspace, isRepo);
   return threadPlace(
-    { target, worktree: d.worktree, base: d.base, alsoIn: d.alsoIn, primary: d.primary },
+    {
+      target,
+      worktree: d.worktree ?? (target.kind === "project" ? projectWorktree(target.repoId) : { kind: "members" }),
+      base: d.base,
+      alsoIn: d.alsoIn,
+      primary: d.primary,
+    },
     {
       workspace,
       isRepo,
@@ -406,6 +422,34 @@ export function draftPlace(target: ComposeTarget, d: Draft): ThreadPlace | null 
       noGitCheckout: (repoId) => noGitCheckout(repos[repoId]),
     },
   );
+}
+
+function mainCheckout(repoId: string): string | undefined {
+  return useReposStore.getState().byId[repoId]?.worktrees.find((w) => w.isMain)?.path;
+}
+
+/**
+ * Where a project's new thread works until the user picks: the choice remembered for the
+ * project, else sessions.default_worktree (lib/compose defaultWorktree). The composer
+ * resolves the same inputs with hooks.
+ */
+export function projectWorktree(repoId: string): ProjectWorktree {
+  return defaultWorktree({
+    setting: useSettingsStore.getState().snapshot?.values[WORK_IN_SETTING_KEY],
+    remembered: rememberedWorkIn(repoId),
+    mainPath: mainCheckout(repoId),
+  });
+}
+
+/**
+ * The user picked where a project's thread works (the Work in picker): the draft takes
+ * it, and a fresh copy or the main checkout becomes the project's default for new
+ * threads (another existing worktree is a one-off).
+ */
+export function pickWorktree(repoId: string, choice: ProjectWorktree): void {
+  updateDraft(repoId, { worktree: choice });
+  const mode = workInMemory(choice, mainCheckout(repoId));
+  if (mode) rememberWorkIn(repoId, mode);
 }
 
 /** The one checkout of a project without git (its main worktree, else its path); undefined for git or unknown. */

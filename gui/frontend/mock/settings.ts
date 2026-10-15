@@ -60,6 +60,16 @@ const staticFields: FieldInit[] = [
     defaultValue: "claude-opus-4-8[1m]",
   },
   { key: "sessions.default_effort", group: "sessions", type: S.ENUM, title: "Default effort", description: "Effort level for new sessions when none is picked.", enumValues: ["", "low", "medium", "high", "xhigh", "max"], defaultValue: "high" },
+  {
+    key: "sessions.default_worktree",
+    group: "sessions",
+    type: S.ENUM,
+    title: "New threads work in",
+    description: "A fresh copy keeps each thread on its own branch and folder. The project folder itself edits your files in place.",
+    enumValues: ["new", "current"],
+    enumLabels: ["A fresh copy of the project", "The project folder itself"],
+    defaultValue: "new",
+  },
   { key: "sessions.auto_name", group: "sessions", type: S.BOOL, title: "Name sessions automatically", description: "Name a new session from its first message with a short claude -p call.", defaultValue: "true" },
   {
     key: "sessions.naming_model",

@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
@@ -10,10 +10,16 @@ export interface PickerOption {
   label: string;
   /** Second, muted line (or trailing text). */
   detail?: string;
+  /** A small muted tag after the label ("new worktree", a branch). */
+  tag?: string;
+  /** The detail wraps instead of being cut to one line (a sentence, not a path). */
+  wrap?: boolean;
 }
 
 export interface PickerGroup {
   heading?: string;
+  /** A rule above the group. */
+  separated?: boolean;
   options: readonly PickerOption[];
 }
 
@@ -30,9 +36,13 @@ interface ComposerPickerProps {
   filterPlaceholder?: string;
   /** Shown in place of the options (loading, errors). */
   status?: ReactNode;
+  /** A muted line under the options (not an option). */
+  footer?: ReactNode;
   disabled?: boolean;
   className?: string;
   contentClassName?: string;
+  /** Overrides the list's height cap (max-h-72). */
+  listClassName?: string;
   "data-testid"?: string;
 }
 
@@ -50,9 +60,11 @@ export function ComposerPicker({
   onChange,
   filterPlaceholder,
   status,
+  footer,
   disabled,
   className,
   contentClassName,
+  listClassName,
   "data-testid": testId,
 }: ComposerPickerProps) {
   const [open, setOpen] = useState(false);
@@ -125,7 +137,7 @@ export function ComposerPicker({
       >
         <Command ref={rootRef} loop defaultValue={value} label={label} className="min-h-0 rounded-lg outline-hidden">
           {filterPlaceholder && <CommandInput ref={inputRef} placeholder={filterPlaceholder} value={search} onValueChange={setSearch} />}
-          <CommandList className="max-h-72 min-h-0">
+          <CommandList className={cn("max-h-72 min-h-0", listClassName)}>
             {status ? (
               <div className="px-3 py-3 text-xs text-muted-foreground" role="status">
                 {status}
@@ -136,30 +148,42 @@ export function ComposerPicker({
             {!status &&
               groups.map((g, i) =>
                 g.options.length === 0 ? null : (
-                  <CommandGroup key={g.heading ?? String(i)} heading={g.heading}>
-                    {g.options.map((o) => (
-                      <CommandItem
-                        key={o.value}
-                        value={o.value}
-                        keywords={[o.label, o.detail ?? ""]}
-                        onSelect={() => {
-                          onChange(o.value);
-                          setOpen(false);
-                          // Now, not after the exit animation: an immediate Tab moves on from the trigger.
-                          triggerRef.current?.focus();
-                        }}
-                      >
-                        <Check aria-hidden className={cn("size-3.5", o.value !== value && "invisible")} />
-                        <span className="flex min-w-0 flex-col">
-                          <span className="truncate">{o.label}</span>
-                          {o.detail && <span className="truncate text-xs text-muted-foreground">{o.detail}</span>}
-                        </span>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
+                  <Fragment key={g.heading ?? String(i)}>
+                    {g.separated && <CommandSeparator className="mx-2" />}
+                    <CommandGroup heading={g.heading}>
+                      {g.options.map((o) => (
+                        <CommandItem
+                          key={o.value}
+                          value={o.value}
+                          keywords={[o.label, o.tag ?? "", o.detail ?? ""]}
+                          className={cn(o.wrap && "items-start")}
+                          onSelect={() => {
+                            onChange(o.value);
+                            setOpen(false);
+                            // Now, not after the exit animation: an immediate Tab moves on from the trigger.
+                            triggerRef.current?.focus();
+                          }}
+                        >
+                          <Check aria-hidden className={cn("size-3.5", o.wrap && "mt-0.5", o.value !== value && "invisible")} />
+                          <span className="flex min-w-0 flex-col">
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <span className="truncate">{o.label}</span>
+                              {o.tag && <span className="shrink-0 rounded border border-border px-1 text-[11px] leading-4 text-muted-foreground">{o.tag}</span>}
+                            </span>
+                            {o.detail && <span className={cn("text-xs text-muted-foreground", o.wrap ? "text-pretty" : "truncate")}>{o.detail}</span>}
+                          </span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Fragment>
                 ),
               )}
           </CommandList>
+          {footer && !status && (
+            <div className="mx-2 border-t border-border px-1 py-2 text-xs text-muted-foreground" data-slot="picker-footer">
+              {footer}
+            </div>
+          )}
         </Command>
       </PopoverContent>
     </Popover>

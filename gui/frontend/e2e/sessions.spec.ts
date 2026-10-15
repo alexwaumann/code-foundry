@@ -162,7 +162,7 @@ test("new thread: a worktree's + on the Projects page opens the composer with th
   await wt.getByTestId("worktree-new-thread").click();
   await expect(page.getByTestId("palette")).toHaveCount(0);
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in code-foundry?");
-  await expect(page.getByTestId("composer-worktree")).toHaveText("Existing worktree: fix/resize");
+  await expect(page.getByTestId("composer-worktree")).toHaveText("fix/resize");
   // No base ref for an existing worktree.
   await expect(page.getByTestId("composer-base")).toHaveCount(0);
   await expect(page.getByTestId("composer-input")).toBeFocused();

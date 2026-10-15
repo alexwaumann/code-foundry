@@ -48,6 +48,10 @@ test("cmd+, opens settings rendered from the schema", async ({ page }) => {
     "Haiku 5.5",
     "Haiku 4.5",
   ]);
+  // Where new threads work: a dropdown with plain-language labels, a fresh copy by default.
+  await expect(setting(page, "sessions.default_worktree")).toContainText("New threads work in");
+  await expect(setting(page, "sessions.default_worktree").getByRole("combobox")).toHaveValue("new");
+  await expect(setting(page, "sessions.default_worktree").getByRole("option")).toHaveText(["A fresh copy of the project (default)", "The project folder itself"]);
   // The naming model is its own live setting, defaulting to Sonnet 5.
   await expect(setting(page, "sessions.naming_model").getByRole("combobox")).toHaveValue("claude-sonnet-5[1m]");
   await expect(setting(page, "sessions.naming_model").getByRole("option", { name: "Sonnet 5 (default)" })).toHaveCount(1);

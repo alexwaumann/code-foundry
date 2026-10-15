@@ -43,6 +43,7 @@ type Settings struct {
 type Sessions struct {
 	DefaultModel      string // default model.Default
 	DefaultEffort     string // default "high"
+	DefaultWorktree   string // WorktreeNew or WorktreeCurrent; read by the GUI's composer only
 	AutoName          bool
 	NamingModel       string // default model.NamingDefault; the effort is always low
 	CacheTTLSeconds   int    // the API's prompt cache lifetime; default 3600
