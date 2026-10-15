@@ -4,7 +4,7 @@
  *   pnpm run mock            # http://127.0.0.1:7788, token "dev-mock-token"
  *   MOCK_PORT=7799 MOCK_TOKEN=secret pnpm run mock
  *
- * Serves Health, Terminal, Repo, Filesystem, Session, Command, Ui and Event over Connect (HTTP/1.1,
+ * Serves Health, Terminal, Repo, Filesystem, Session, Command, Ui, Action and Event over Connect (HTTP/1.1,
  * like the real daemon's loopback listener for browsers), with bearer auth and
  * permissive CORS. Non-RPC control endpoints for tests live under /__mock/:
  *
@@ -103,6 +103,19 @@
  *        #138 merged, #131 closed, #140 read-only, #142 mergeable, #146 from a fork, #147 open
  *        with failing checks on no dashboard); its commands are
  *        pr.merge, pr.revert, pr.review.request and pr.refresh
+ *   ActionService, the action event source and action.*: mock/actions.ts (repo-cf's six seeded
+ *        actions, a-dev000000000 … a-debug0000000; every other project has none). A terminal run
+ *        is a kind=action terminal that plays its script and stays EXITED; reset restores the seeds.
+ *   GET  /__mock/actions                          (actions and runs as JSON, runs with their output)
+ *   POST /__mock/action/finish?run=r-…&code=N     (or terminal=t-…: that running run's process exits
+ *                                                 now with code N, default 0)
+ *   POST /__mock/action/setup?session=s-1&code=1[&action=Install deps]   (a worktree-create
+ *                                                 background run for that thread: some output, then
+ *                                                 code after ~600 ms; default action: the project's
+ *                                                 first on-worktree-create one)
+ *   POST /__mock/action/run?session=s-1&action=Test[&mode=terminal|background]   (or worktree=…
+ *                                                 instead of session: a run as the CLI or an agent
+ *                                                 would start it, not through the GUI)
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
@@ -119,6 +132,7 @@ import { RepoService } from "../src/gen/codefoundry/v1/repo_pb";
 import { SessionService, SessionState, SessionStatus } from "../src/gen/codefoundry/v1/session_pb";
 import { TerminalService, TerminalState, type AttachEventSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { ThreadDecision, ThreadService } from "../src/gen/codefoundry/v1/thread_pb";
+import { ActionRunMode, ActionRunState, ActionService } from "../src/gen/codefoundry/v1/action_pb";
 import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
@@ -130,6 +144,7 @@ import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
 import { retiredUsage, utcDay } from "./usage";
 import { reconnectMcp, refreshMcp } from "./mcp";
+import type { ActionEventInit } from "./actions";
 import { refuseSlashCommand, slashCommandsFor } from "./slashCommands";
 import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreads, THREAD_STATES, type ThreadState } from "./thread";
 import { CommandError, ConfirmNeeded, snoozeUntil, World, type EventInit } from "./world";
@@ -396,6 +411,24 @@ function routes(router: ConnectRouter): void {
     },
   });
 
+  // Actions (mock/actions.ts). The GUI may also go through the action.* commands.
+  router.service(ActionService, {
+    list: (req) => world.actions.list(req.repoId),
+    create: (req) => guard(() => ({ action: world.actions.create(req) })),
+    update: (req) => guard(() => ({ action: world.actions.update(req) })),
+    delete: (req) => guard(() => (world.actions.delete(req.id), {})),
+    run: (req) => guard(() => ({ run: world.actions.run(req) })),
+    getRun: (req) => guard(() => ({ run: world.actions.getRun(req.runId) })),
+    waitRun: async (req, ctx) => {
+      try {
+        return { run: await world.actions.waitRun(req.runId, ctx.signal) };
+      } catch (err) {
+        throw rpcError(err);
+      }
+    },
+    watch: (_req, ctx) => tracked("ActionService/Watch", actionEvents(world.events.subscribe(ctx.signal, [{ source: EventSource.ACTION, event: { event: { case: "action", value: world.actions.snapshot() } } }]))),
+  });
+
   router.service(UpdateService, {
     get: () => ({ status: world.update.msg() }),
     check: () => guard(() => (world.update.check(), { status: world.update.msg() })),
@@ -406,12 +439,12 @@ function routes(router: ConnectRouter): void {
 
   router.service(EventService, {
     // Snapshots first in the order events.proto promises (repo, workspace, terminal,
-    // session, gh, gitops, settings, update), then everything published, filtered by `sources`.
+    // session, gh, gitops, settings, update, action), then everything published, filtered by `sources`.
     watch: (req, ctx) => {
       const want = new Set(
         req.sources.length > 0
           ? req.sources
-          : [EventSource.REPO, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.SESSION, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI],
+          : [EventSource.REPO, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.SESSION, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION],
       );
       if (!sessionsEnabled) want.delete(EventSource.SESSION);
       const initial: { source: EventSource; event: EventInit }[] = [
@@ -424,6 +457,7 @@ function routes(router: ConnectRouter): void {
         { source: EventSource.GITOPS, event: { event: { case: "gitops", value: world.gitops.snapshot() } } },
         { source: EventSource.SETTINGS, event: { event: { case: "settings", value: { event: { case: "snapshot", value: world.settings.snapshot() } } } } },
         { source: EventSource.UPDATE, event: { event: { case: "update", value: world.update.event() } } },
+        { source: EventSource.ACTION, event: { event: { case: "action", value: world.actions.snapshot() } } },
       ];
       const ui = want.has(EventSource.UI);
       return tracked("EventService/Watch", filterEvents(world.events.subscribe(ctx.signal, initial), want), () => {
@@ -434,6 +468,40 @@ function routes(router: ConnectRouter): void {
       });
     },
   });
+}
+
+async function* actionEvents(src: AsyncGenerator<{ source: EventSource; event: EventInit }>): AsyncGenerator<ActionEventInit> {
+  for await (const { source, event } of src) {
+    if (source === EventSource.ACTION && event.event?.case === "action") yield event.event.value;
+  }
+}
+
+/** Action controls: GET /__mock/actions, POST /__mock/action/{finish|setup|run}. */
+function actionControl(res: ServerResponse, action: string, q: URLSearchParams): void {
+  const modes: Record<string, ActionRunMode> = { terminal: ActionRunMode.TERMINAL, background: ActionRunMode.BACKGROUND };
+  try {
+    let run;
+    switch (action) {
+      case "finish":
+        run = world.actions.finishNow({ run: q.get("run") ?? undefined, terminal: q.get("terminal") ?? undefined }, Number(q.get("code") ?? "0"));
+        break;
+      case "setup":
+        run = world.actions.setupRun(q.get("session") ?? "", Number(q.get("code") ?? "1"), q.get("action") ?? "");
+        break;
+      case "run": {
+        const mode = q.get("mode") ?? "";
+        if (mode && modes[mode] === undefined) throw new CommandError("invalid", "mode must be terminal or background");
+        run = world.actions.run({ action: q.get("action") ?? "", sessionId: q.get("session") ?? "", worktreePath: q.get("worktree") ?? "", mode: modes[mode] ?? ActionRunMode.UNSPECIFIED });
+        break;
+      }
+      default:
+        json(res, 404, { error: "unknown action control" });
+        return;
+    }
+    json(res, 200, { id: run.id, terminalId: run.terminalId, state: ActionRunState[run.state ?? 0], mode: ActionRunMode[run.mode ?? 0], exitCode: run.exitCode, output: run.output });
+  } catch (err) {
+    json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
+  }
 }
 
 async function* updateEvents(src: AsyncGenerator<{ source: EventSource; event: EventInit }>): AsyncGenerator<UpdateEventInit> {
@@ -589,6 +657,11 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
   const session = /^\/__mock\/session\/([a-z]+)$/.exec(path);
   if (req.method === "POST" && session?.[1]) {
     sessionControl(res, session[1], q);
+    return;
+  }
+  const actionCtl = /^\/__mock\/action\/([a-z]+)$/.exec(path);
+  if (req.method === "POST" && actionCtl?.[1]) {
+    actionControl(res, actionCtl[1], q);
     return;
   }
   const update = /^\/__mock\/update\/([a-z]+)$/.exec(path);
@@ -853,6 +926,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "GET /__mock/sessions":
       json(res, 200, [...world.sessions.keys()].map(sessionSummary));
+      break;
+    case "GET /__mock/actions":
+      json(res, 200, world.actions.json());
       break;
     case "GET /__mock/invocations":
       json(res, 200, world.invocations);
