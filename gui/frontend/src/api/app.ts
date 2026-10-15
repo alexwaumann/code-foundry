@@ -10,6 +10,9 @@ export interface AppInfoView {
 /** Emitted by the app menu's "Check for Updates…" (gui/app.go EventCheckForUpdates). */
 export const EVENT_CHECK_FOR_UPDATES = "app:check-for-updates";
 
+/** Emitted by app menu items that run a command in the window; data is its name (gui/menu.go EventRunCommand). */
+export const EVENT_RUN_COMMAND = "app:run-command";
+
 const INFO_TIMEOUT_MS = 2000;
 
 let info: Promise<AppInfoView | null> | null = null;
@@ -106,6 +109,18 @@ export async function relaunchApp(): Promise<boolean> {
   if (!(await appInfo())) return false;
   await Relaunch();
   return true;
+}
+
+/**
+ * Calls fn with the command name of an app menu item that runs something in the window
+ * (Settings…, the Thread and Help menus; gui/menu.go EventRunCommand). Returns an
+ * unsubscribe.
+ */
+export function onRunCommandMenu(fn: (name: string) => void): () => void {
+  return Events.On(EVENT_RUN_COMMAND, (ev) => {
+    const name: unknown = ev.data;
+    if (typeof name === "string" && name !== "") fn(name);
+  });
 }
 
 /** Calls fn when the app menu's "Check for Updates…" is chosen. Returns an unsubscribe. */

@@ -20,6 +20,7 @@ import { ThreadPane } from "@/components/thread/ThreadPane";
 import { Toaster } from "@/components/ui/sonner";
 import { UpdateDialog } from "@/components/update/UpdateDialog";
 import { installKeybindings } from "@/keys/bindings";
+import { startMenuCommands } from "@/keys/menu";
 import { syncDocumentScheme, useColorScheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { useWindowTitle } from "@/lib/title";
@@ -68,6 +69,7 @@ function startApp(): () => void {
     startViewSync(),
     startArchiveCleanup(),
     startUpdateSync(),
+    startMenuCommands(),
     startDockAlerts(),
   ];
   return () => {
