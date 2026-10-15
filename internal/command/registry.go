@@ -96,11 +96,15 @@ type Listed struct {
 }
 
 // List returns the commands available in uctx, or all commands with Available filled
-// in when includeUnavailable is set. Order is deterministic: category, title, name.
+// in when includeUnavailable is set; never a hidden one (Command.Hidden). Order is
+// deterministic: category, title, name.
 func (r *Registry) List(uctx Context, includeUnavailable bool) []Listed {
 	r.mu.RLock()
 	out := make([]Listed, 0, len(r.cmds))
 	for _, c := range r.cmds {
+		if c.Hidden {
+			continue
+		}
 		avail := c.Available(uctx)
 		if avail || includeUnavailable {
 			l := Listed{Command: r.effective(c), Available: avail}

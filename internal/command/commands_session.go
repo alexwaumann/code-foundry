@@ -25,6 +25,7 @@ type SessionBackend interface {
 	List(context.Context, *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error)
 	Get(context.Context, *connect.Request[v1.GetSessionRequest]) (*connect.Response[v1.GetSessionResponse], error)
 	Rename(context.Context, *connect.Request[v1.RenameSessionRequest]) (*connect.Response[v1.RenameSessionResponse], error)
+	Reconnect(context.Context, *connect.Request[v1.ReconnectSessionRequest]) (*connect.Response[v1.ReconnectSessionResponse], error)
 	Remove(context.Context, *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error)
 	RunIn(context.Context, *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error)
 	Pin(context.Context, *connect.Request[v1.PinSessionRequest]) (*connect.Response[v1.PinSessionResponse], error)
@@ -162,8 +163,8 @@ func minutesLeft(d time.Duration) string {
 
 // RegisterSession registers session.new, session.list, session.focus, session.rename,
 // session.fork, session.remove, session.run-in, session.pin, session.archive, and
-// session.snooze. There is no close or reconnect: a message starts a stopped thread and
-// the daemon stops idle ones (docs/notes/thread-lifecycle.md). The user-facing word is "thread" (titles, descriptions, messages);
+// session.snooze, and the hidden session.reconnect. There is no close: a message starts a
+// stopped thread and the daemon stops idle ones (docs/notes/thread-lifecycle.md). The user-facing word is "thread" (titles, descriptions, messages);
 // command names and identifiers keep "session".
 func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextSession, Description: "Thread id"}
@@ -278,6 +279,40 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 			Run: func(_ context.Context, _ Context, a Args) (Result, error) {
 				n := focus(a.String("id"))
 				return Result{Message: fmt.Sprintf("delivered=%d", n), JSON: EmitResult{Delivered: n}}, nil
+			},
+		},
+		// Hidden (not listed: no palette entry, chord or CLI verb) and only until the GUI
+		// stops calling it (PR C of the thread lifecycle): today's GUI sends only to a
+		// connected thread and offers its Reconnect card otherwise. A message starts a
+		// stopped thread by itself (docs/notes/thread-lifecycle.md).
+		Command{
+			Name:        "session.reconnect",
+			Title:       "Reconnect Thread",
+			Description: "Resume a stopped thread's conversation in a new Claude process (for clients that predate start-on-send).",
+			Category:    "Thread",
+			Hidden:      true,
+			Args:        []ArgSpec{idArg},
+			When:        hasSession,
+			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+				id := a.String("id")
+				cur, err := b.Get(ctx, connect.NewRequest(&v1.GetSessionRequest{Id: id}))
+				if err != nil {
+					return Result{}, err
+				}
+				if st := cur.Msg.GetSession().GetState(); st != v1.SessionState_SESSION_STATE_DISCONNECTED {
+					return Result{}, connect.NewError(connect.CodeFailedPrecondition,
+						fmt.Errorf("thread %s is %s; only a stopped thread can be started this way", id, strings.ToLower(strings.TrimPrefix(st.String(), "SESSION_STATE_"))))
+				}
+				res, err := b.Reconnect(ctx, connect.NewRequest(&v1.ReconnectSessionRequest{Id: id}))
+				if err != nil {
+					return Result{}, err
+				}
+				s := res.Msg.GetSession()
+				msg := "starting thread " + sessionLabel(s)
+				if s.GetLastError() != "" {
+					msg += ": " + s.GetLastError()
+				}
+				return Result{Message: msg, JSON: s}, nil
 			},
 		},
 		Command{
