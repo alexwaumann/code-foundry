@@ -26,7 +26,9 @@ type actionRuns interface {
 //
 //   - a project is unregistered (repo.RepoRemoved): its actions are forgotten (the
 //     database cascades) and its runs killed and forgotten;
-//   - a thread is removed (session.Removed): its background runs are killed;
+//   - a thread is removed (session.Removed), archived or snoozed (session.Updated with
+//     ArchivedAt or SnoozedUntil set): its background runs are killed, as its action
+//     terminals are by the session store;
 //   - a worktree's directory is removed (repo.WorktreeRemoved, directory gone): the
 //     background runs in it are killed.
 //
@@ -65,8 +67,17 @@ func startActionCleanupWith(ctx context.Context, log *slog.Logger, runs actionRu
 					}
 				}
 			case ev := <-sessionEvents.C():
-				if e, ok := ev.(session.Removed); ok {
+				switch e := ev.(type) {
+				case session.Removed:
 					kill("thread removed", func(r action.Run) bool { return r.SessionID == e.ID })
+				case session.Updated:
+					id := e.Session.ID
+					switch {
+					case !e.Session.ArchivedAt.IsZero():
+						kill("thread archived", func(r action.Run) bool { return r.SessionID == id })
+					case !e.Session.SnoozedUntil.IsZero():
+						kill("thread snoozed", func(r action.Run) bool { return r.SessionID == id })
+					}
 				}
 			}
 		}

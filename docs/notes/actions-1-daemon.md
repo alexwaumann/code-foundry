@@ -50,8 +50,8 @@ PR C follow. Sketch: `docs/sketches/actions/`.
   code is the status, 128+signal when signalled. Kill: SIGTERM to the group, SIGKILL
   after 3s.
 * Background runs are killed on daemon shutdown (`Manager.Close`, before the session
-  store shuts down), when their project is unregistered, their thread removed, or their
-  worktree directory removed (`internal/daemon/actions.go`, same rules as the shell
+  store shuts down), when their project is unregistered, their thread removed, archived
+  or snoozed, or their worktree directory removed (`internal/daemon/actions.go`, same rules as the shell
   reaper, including "WorktreeRemoved only counts when the directory is gone").
 * `RunFinished` (run, action, name, repo, session, terminal, mode, trigger, exit code)
   follows the finishing `RunUpdated`, once per run.

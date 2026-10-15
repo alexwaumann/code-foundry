@@ -66,7 +66,11 @@ func TestActionCleanup(t *testing.T) {
 		{name: "a removed worktree's runs are killed", event: repo.WorktreeRemoved{RepoID: "web", Path: "/wt/main"}, gone: []string{"/wt/main"},
 			wantKilled: []string{"r2"}},
 		{name: "a worktree still on disk (a failed refresh) keeps its runs", event: repo.WorktreeRemoved{RepoID: "web", Path: "/wt/main"}},
-		{name: "other session events are ignored", event: session.Updated{}},
+		{name: "an archived thread's background runs are killed",
+			event: session.Updated{Session: session.Session{ID: "s2", ArchivedAt: time.Unix(1, 0)}}, wantKilled: []string{"r3"}},
+		{name: "a snoozed thread's background runs are killed",
+			event: session.Updated{Session: session.Session{ID: "s1", SnoozedUntil: time.Unix(1, 0)}}, wantKilled: []string{"r1"}},
+		{name: "other session updates are ignored", event: session.Updated{Session: session.Session{ID: "s1"}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
