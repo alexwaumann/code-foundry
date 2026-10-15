@@ -88,6 +88,37 @@ re-run of the failed job was green. Both look like the slow runner stretching a 
 a test's deadline; not yet reproduced locally, so no fix. If either recurs, capture the
 full log of the failing run before re-running it.
 
+## `TestCLISettings/get_after_set` (cmd/code-foundry) — store bug, fixed (2026-10-15)
+
+Seen 2026-10-13 and on PR #105's run 38692064459 attempt 1: `settings get` printed 13
+right after `settings set appearance.font_size 15` printed 15. Not the test: the settings
+store's watcher `reload` read `settings.toml` *before* taking `s.mu`. The previous
+subtest's `set` (naming model) wrote the file, its debounced reload read it, `Update(15)`
+then took the lock, wrote, published 15 and returned, and the reload got the lock next
+and published its stale bytes (font size 13) until the following fs event repaired it.
+Any client could see a setting flip back for one debounce after setting it.
+
+Fix: `reload` reads under `s.mu`, so an Update's write and a reload's read are ordered.
+`TestReloadNeverRevertsAnUpdate` pauses a reload right after its read (a `readFile`
+package seam) and runs an Update in the gap: 13 every time before the fix, 20/20 after;
+`TestCLISettings` 20 `-race` repeats green.
+
+## `TestClearRescansEveryTranscript` (internal/store/session) — test order, fixed (2026-10-15)
+
+Seen on PR #105's run 38692064459 attempt 2: "timed out waiting for first file" with the
+run A1 present, `done`, and no usage. Not the earlier SIGUSR1 cause (agents-1-daemon.md).
+The test wrote the thread's transcript, spawn *and* completed result, before
+`writeAgent` wrote the run's meta file and then its line. A run met first at its closing
+result is drained once by `close` and never again, so a runner that read the transcript
+after the meta file appeared but before the run's line was appended closed A1 empty.
+Claude never writes in that order (the run's file is complete before the result lands in
+the thread's transcript), so the runner is right and the test now writes the run's files
+first. Widening the gap with a 300 ms sleep between meta and line failed 3/3 before and
+passed 5/5 after. The 60 ms sleep before the /clear transcript also went: a newly
+followed transcript is read from its start whenever it was written. Not reproduced
+without the widened gap locally (100 runs under 24 `yes` burners); after the fix, this
+test and `TestAgentRunsRollUpAndPersist` passed 50x at `-race -cpu 1,4` under the same load.
+
 ## Gotchas
 
 - Agent worktrees don't have libghostty-vt built; `make check` there needs

@@ -248,11 +248,16 @@ func (s *Store) Update(_ context.Context, partial map[string]string) (*Snapshot,
 	return s.Snapshot(), nil
 }
 
-// reload re-reads the file after an fs event.
+// readFile is os.ReadFile; tests replace it to pause a reload mid-read.
+var readFile = os.ReadFile
+
+// reload re-reads the file after an fs event. The read happens under s.mu: read
+// outside it, a reload could read the file just before an Update wrote it and then
+// publish those stale bytes after the Update had returned.
 func (s *Store) reload() {
-	data, err := os.ReadFile(s.opts.Path)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	data, err := readFile(s.opts.Path)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
 		s.raw, s.loadErr = map[string]string{}, ""

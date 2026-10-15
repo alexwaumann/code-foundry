@@ -527,8 +527,14 @@ func TestClearRescansEveryTranscript(t *testing.T) {
 	req := func(id string, at time.Time) string {
 		return usageLine(id, at.UTC().Format(time.RFC3339Nano), "x", "claude-haiku-5-5", 1, 1, 1, 0, h1(0), "standard")
 	}
+	// The run's files first, as Claude writes them: they are complete by the time the
+	// transcript has the spawn's result. The runner drains a run one last time when that
+	// result closes it and never again, so written the other way round a runner that
+	// read the transcript between the meta file and the run's line (a loaded CI runner
+	// under -race) closed the run empty and "first file" never came.
+	e.writeAgent(first, "A1", agentMetaJSON("T1"))
+	e.writeAgent(first, "A1", "", agentReq("A1", "a-1", now))
 	e.writeTranscript(first, userLine("hi"), req("r-1", now), spawnFg(c, "T1"), completed(c, "T1", "A1"))
-	e.writeAgent(first, "A1", agentMetaJSON("T1"), agentReq("A1", "a-1", now))
 	e.waitFor(s.ID, "first file", func(s Session) bool { return totalRequests(s.Usage) == 2 })
 
 	// /clear: Claude moves to a new id and file.
@@ -537,7 +543,8 @@ func TestClearRescansEveryTranscript(t *testing.T) {
 	if err := os.WriteFile(e.paths.pidFile(pid), []byte(fmt.Sprintf(`{"pid":%d,"sessionId":"cleared-id"}`, pid)), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(60 * time.Millisecond)
+	// No need to wait for the runner to see the pid file: it reads a newly followed
+	// transcript from its start, whenever the file was written.
 	e.writeTranscript("cleared-id", userLine("again"), req("r-2", now.Add(time.Second)))
 	live := e.waitFor(s.ID, "both files", func(s Session) bool {
 		return s.ClaudeSessionID == "cleared-id" && totalRequests(s.Usage) == 3
