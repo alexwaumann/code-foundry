@@ -1,5 +1,9 @@
 # Sidebar toolbar
 
+> **Superseded in part (2026-10-15):** the toolbar holds only Dashboard and Notifications.
+> Add project (`sidebar-add-project`) is gone and New thread is a full-width labelled
+> button under the toolbar; see `onboarding-1-entry-points.md`.
+
 Decided 2026-10-10 (Alex). Supersedes the "controls in the band" parts of
 `sidebar-title-band.md`. Frontend plus one command (`view.dashboard`), so the daemon needs
 a restart for the Dashboard button to enable.

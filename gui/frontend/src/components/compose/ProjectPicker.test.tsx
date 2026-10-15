@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RepoView } from "@/api/repo";
+import { useAddProjectStore } from "@/stores/addProject";
 import { useComposeStore } from "@/stores/compose";
 import { useReposStore } from "@/stores/repos";
 import { useUiStore } from "@/stores/ui";
@@ -37,11 +38,11 @@ afterEach(() => {
 const rows = () => Array.from(document.querySelectorAll<HTMLElement>("[cmdk-item]"));
 
 describe("ProjectPicker and No project", () => {
-  it("lists No project last, with ~ and no cmd+number shortcut; the first project stays highlighted", () => {
+  it("lists No project after the projects, with ~ and no cmd+number shortcut; the first project stays highlighted", () => {
     render(<ProjectPicker close={() => undefined} />);
     const all = rows();
-    const last = all.at(-1);
-    expect(all.map((r) => r.dataset.workspace ?? r.dataset.project ?? r.dataset.testid)).toEqual(["w-1", "web", "api", "picker-no-project"]);
+    const last = all.at(-2);
+    expect(all.map((r) => r.dataset.workspace ?? r.dataset.project ?? r.dataset.testid)).toEqual(["w-1", "web", "api", "picker-no-project", "picker-add-project"]);
     expect(last?.textContent).toBe("No project~");
     expect(last?.querySelector("[data-slot=command-shortcut]")).toBeNull();
     expect(all[1]?.querySelector("[data-slot=command-shortcut]")).not.toBeNull();
@@ -53,6 +54,26 @@ describe("ProjectPicker and No project", () => {
     render(<ProjectPicker close={() => undefined} />);
     fireEvent.click(screen.getByTestId("picker-no-project"));
     expect(useUiStore.getState().selection).toEqual({ kind: "compose", repoId: "", noProject: true });
+  });
+
+  it("ends with Add a project…, which closes the picker and opens the Add Project dialog", async () => {
+    useAddProjectStore.setState({ open: false });
+    const close = vi.fn();
+    render(<ProjectPicker close={close} />);
+    const add = screen.getByTestId("picker-add-project");
+    expect(add.textContent).toBe("Add a project…a folder on this Mac, or from GitHub");
+    expect(add.getAttribute("aria-selected")).toBe("false");
+    fireEvent.click(add);
+    expect(close).toHaveBeenCalledOnce();
+    await vi.waitFor(() => {
+      expect(useAddProjectStore.getState().open).toBe(true);
+    });
+  });
+
+  it("keeps Add a project… when a search matches nothing", () => {
+    render(<ProjectPicker close={() => undefined} />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "zzz-no-such-project" } });
+    expect(rows().map((r) => r.dataset.testid)).toEqual(["picker-add-project"]);
   });
 
   it("with no projects yet: Add a project first, then No project", () => {

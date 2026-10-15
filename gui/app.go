@@ -145,13 +145,22 @@ func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''
 // unhandled closed the only window, which quits the app
 // (ApplicationShouldTerminateAfterLastWindowClosed). Close Window stays in the menu,
 // without a key equivalent; the red traffic light still closes the window.
+//
+// Settings…, the Thread menu and the Help menu run commands in the window
+// (EventRunCommand; menu.go). For the same reason none of them has a key equivalent:
+// their chords (cmd+, cmd+n, cmd+r, cmd+/, cmd+k, ...) belong to the page, where the
+// user can rebind them, and a native one would also fire whenever the page left the key
+// unhandled. Wails cannot show a chord without binding it, so the menus show none.
 func appMenu(app *application.App) *application.Menu {
+	run := runInWindow(app)
 	menu := application.NewMenu()
 	m := menu.AddSubmenu("Code Foundry")
 	m.AddRole(application.About)
 	m.Add("Check for Updates…").OnClick(func(*application.Context) {
 		app.Event.Emit(EventCheckForUpdates)
 	})
+	m.AddSeparator()
+	addCommandGroups(m, [][]menuCommand{{settingsItem}}, run)
 	m.AddSeparator()
 	m.AddRole(application.ServicesMenu)
 	m.AddSeparator()
@@ -170,6 +179,15 @@ func appMenu(app *application.App) *application.Menu {
 	view := menu.AddSubmenu("View")
 	view.AddRole(application.OpenDevTools) // nil, so skipped, in production builds
 	view.AddRole(application.ToggleFullscreen)
+	addCommandGroups(menu.AddSubmenu("Thread"), threadMenu, run)
 	menu.AddRole(application.WindowMenu)
+	help := menu.AddSubmenu("Help")
+	addCommandGroups(help, helpMenu, run)
+	help.AddSeparator()
+	help.Add("Report an Issue…").OnClick(func(*application.Context) {
+		if err := app.Browser.OpenURL(reportIssueURL); err != nil {
+			app.Logger.Error("open issue page", "err", err)
+		}
+	})
 	return menu
 }

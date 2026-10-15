@@ -1,8 +1,10 @@
-import { Bell, BellRing, FolderPlus, LayoutDashboard, SquarePen } from "lucide-react";
+import { Bell, BellRing, LayoutDashboard, SquarePen } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { Button } from "@/components/ui/button";
 import { jumpToAttention } from "@/keys/bindings";
+import { formatChord } from "@/keys/chord";
 import { cn } from "@/lib/utils";
+import { useCommandsStore } from "@/stores/commands";
 import { useAttentionCount } from "@/stores/sessions";
 import { isDashboard, useUiStore } from "@/stores/ui";
 
@@ -50,9 +52,9 @@ function NotificationsButton() {
 
 /**
  * The row of icon buttons under the sidebar's title band: Dashboard (view.dashboard) and
- * Notifications on the left; Add project (repo.add) and New thread (session.new) on the
- * right, New thread rightmost. Not part of the window drag area. See
- * docs/notes/sidebar-toolbar.md.
+ * Notifications. Not part of the window drag area. New thread is the labelled button
+ * under it (SidebarNewThread). See docs/notes/sidebar-toolbar.md and
+ * docs/notes/onboarding-1-entry-points.md.
  */
 export function SidebarToolbar() {
   const dashboard = useUiStore((s) => isDashboard(s.selection));
@@ -72,9 +74,32 @@ export function SidebarToolbar() {
         data-testid="sidebar-dashboard"
       />
       <NotificationsButton />
-      <div className="flex-1" aria-hidden />
-      <CommandButton command="repo.add" icon={FolderPlus} data-testid="sidebar-add-project" />
-      <CommandButton command="session.new" icon={SquarePen} whenUnavailable="disable" data-testid="sidebar-new-session" />
     </div>
+  );
+}
+
+/**
+ * The sidebar's primary action: a full-width "New thread" button (session.new) under the
+ * toolbar, with the command's first chord (cmd+n unless rebound; none when unbound) as a
+ * muted hint on the right. Runs exactly what the palette does (the project picker).
+ */
+export function SidebarNewThread() {
+  const chord = useCommandsStore((s) => s.commands.find((c) => c.name === "session.new")?.keybindings[0] ?? null);
+  return (
+    <CommandButton
+      command="session.new"
+      variant="default"
+      whenUnavailable="disable"
+      className="mt-1.5 h-8 w-full shrink-0 justify-start gap-2 px-2 text-[13px] has-[>svg]:px-2 [--wails-draggable:no-drag]"
+      data-testid="sidebar-new-session"
+    >
+      <SquarePen aria-hidden className="size-4" />
+      <span className="min-w-0 flex-1 truncate text-left">New thread</span>
+      {chord && (
+        <kbd className="shrink-0 font-sans text-[11px] text-primary-foreground/60" data-testid="sidebar-new-session-chord">
+          {formatChord(chord)}
+        </kbd>
+      )}
+    </CommandButton>
   );
 }

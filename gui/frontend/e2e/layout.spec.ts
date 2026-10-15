@@ -79,8 +79,16 @@ test("the sidebar band holds only the empty traffic-light gutter and the app nam
     .getByTestId("sidebar-toolbar")
     .locator("button")
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
-  expect(buttons).toEqual(["sidebar-dashboard", "sidebar-notifications", "sidebar-add-project", "sidebar-new-session"]);
+  expect(buttons).toEqual(["sidebar-dashboard", "sidebar-notifications"]);
   expect((await box(page, "sidebar-dashboard")).left).toBe(8);
+  // New thread is a full-width button under the toolbar: 8px from the window edge, and it
+  // ends where the sidebar does (the content pane's 8px margin is the gap beyond it).
+  const newThread = await box(page, "sidebar-new-session");
+  const sidebar = await box(page, "sidebar");
+  expect(newThread.left).toBe(8);
+  expect(newThread.top).toBeGreaterThan(BAND + 32);
+  expect(newThread.height).toBe(32);
+  expect(newThread.left + newThread.width).toBe(sidebar.left + sidebar.width);
   // New terminal is not in the sidebar (palette, cmd+t and the row menu only).
   await expect(page.getByTestId("sidebar-new-terminal")).toHaveCount(0);
   // Pull Requests, Projects and the thread list sit below the toolbar and do not drag.

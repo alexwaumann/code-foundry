@@ -36,7 +36,8 @@ const hints = [
  * listed above projects (ProjectRows), "No project" last; picking any opens the
  * new-thread composer for it. The active thread's workspace, else the project in the
  * current context, is highlighted first; cmd+1..9 pick projects by position. With no
- * projects yet, "Add a project…" comes first and "No project" still starts a thread.
+ * projects yet, "Add a project…" comes first and "No project" still starts a thread;
+ * with some, it is the last row.
  */
 export function ProjectPicker({ close }: { close: () => void }) {
   const { workspaces, projects: order, loaded } = useProjectRows();
@@ -118,6 +119,28 @@ export function ProjectPicker({ close }: { close: () => void }) {
           onPickWorkspace={pickWorkspace}
           onPickNoProject={loaded ? pickNoProject : undefined}
         />
+        {loaded && order.length > 0 && (
+          // The way to a project that is not listed yet: the Add Project dialog (repo.add),
+          // last, under a border. Always shown, so a search that finds nothing still offers it.
+          <CommandGroup forceMount className="border-t">
+            <CommandItem
+              forceMount
+              value={ADD_PROJECT_VALUE}
+              onSelect={() => {
+                close();
+                addProject();
+              }}
+              data-testid="picker-add-project"
+              className="gap-3 py-2"
+            >
+              <span aria-hidden className="flex size-6 shrink-0 items-center justify-center text-muted-foreground">
+                <FolderPlus className="size-4" />
+              </span>
+              <span className="truncate font-medium">Add a project…</span>
+              <span className="truncate text-xs text-muted-foreground">a folder on this Mac, or from GitHub</span>
+            </CommandItem>
+          </CommandGroup>
+        )}
       </CommandList>
       <div className="flex items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground" data-testid="picker-hints">
         {hints.map(([key, label]) => (

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { invocations, mockUrl, openApp, openProjects, resetMock, row, selectProject } from "./fixtures";
+import { invocations, mockUrl, openAddProjectDialog, openApp, openProjects, resetMock, row, selectProject } from "./fixtures";
 
 // Add-project PR 4: the Add Project dialog's New tab (repo.create, then optionally
 // repo.github.publish) and the overview's Publish to GitHub dialog, against the mock's
@@ -28,7 +28,7 @@ async function lastInvocation(name: string) {
 
 async function openNew(page: Page) {
   await openApp(page);
-  await page.getByTestId("sidebar-add-project").click();
+  await openAddProjectDialog(page);
   await page.getByTestId("add-project-tab-new").click();
   await expect(dialog(page)).toHaveAttribute("data-tab", "new");
   const name = page.getByTestId("add-project-new-name");
@@ -82,7 +82,7 @@ test("New: the name is checked as typed, Create makes the project and opens it",
   expect(await lastInvocation("repo.github.publish")).toBeUndefined();
 
   // The same name again is AlreadyExists, shown under the name.
-  await page.getByTestId("sidebar-add-project").click();
+  await openAddProjectDialog(page);
   await page.getByTestId("add-project-tab-new").click();
   await page.getByTestId("add-project-new-name").fill("my-app");
   await page.keyboard.press("Enter");
@@ -207,7 +207,7 @@ test("cancelling after a refused publish deletes the new project; Keep it local 
   await expect(page.getByText("Deleted taken")).toBeVisible();
 
   // The close button is the same cancel; nothing to delete this time.
-  await page.getByTestId("sidebar-add-project").click();
+  await openAddProjectDialog(page);
   await page.getByTestId("add-project-tab-new").click();
   await page.getByTestId("add-project-close").click();
   await expect(dialog(page)).toHaveCount(0);

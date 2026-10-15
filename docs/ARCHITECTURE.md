@@ -485,7 +485,10 @@ from the pull request (docs/notes/pr-thread-commands.md).
   `docs/notes/agents-2-gui.md`). Every
   palette command is reachable without the mouse, and common ones also have buttons that
   invoke the same registry command. Chords are listed only in the palette and the
-  Keyboard Shortcuts overlay (`docs/notes/phase3-ui-buttons.md`).
+  Keyboard Shortcuts overlay (`docs/notes/phase3-ui-buttons.md`), plus the hint on the
+  sidebar's New thread button. The native app menu's Settings…, Thread and Help items
+  run commands in the window through one host event and carry no key equivalents
+  (`docs/notes/onboarding-1-entry-points.md`).
 
 ## 9. Repo and GitHub stores
 

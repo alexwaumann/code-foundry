@@ -102,6 +102,16 @@ export async function openApp(page: Page): Promise<void> {
   await expect(page.getByTestId("thread-list").locator("[data-row-key]").first()).toBeVisible();
 }
 
+/**
+ * Opens the Add Project dialog (repo.add) the way a user without a shortcut does: the
+ * sidebar's New thread button, then the project picker's "Add a project…" row.
+ */
+export async function openAddProjectDialog(page: Page): Promise<void> {
+  await page.getByTestId("sidebar-new-session").click();
+  await page.getByTestId("palette").getByTestId("picker-add-project").click();
+  await expect(page.getByTestId("add-project-dialog")).toBeVisible();
+}
+
 /** Shows the Projects page from its sidebar entry. */
 export async function openProjects(page: Page): Promise<void> {
   await page.getByTestId("nav-projects").click();
