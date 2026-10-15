@@ -12,18 +12,23 @@ service SessionService {
   rpc Create(CreateSessionRequest) returns (CreateSessionResponse) {}
   // Fork starts a new session that continues an existing session's conversation.
   rpc Fork(ForkSessionRequest) returns (ForkSessionResponse) {}
-  // List returns all sessions, connected and disconnected.
+  // List returns all sessions.
   rpc List(ListSessionsRequest) returns (ListSessionsResponse) {}
   // Get returns one session.
   rpc Get(GetSessionRequest) returns (GetSessionResponse) {}
   // Rename sets a user-chosen name and disables auto-naming for the session.
   rpc Rename(RenameSessionRequest) returns (RenameSessionResponse) {}
   // Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
-  // then kill). The session remains, DISCONNECTED, until Remove.
+  // then kill). The session remains, DISCONNECTED, until Remove. No command calls it
+  // since 2026-10-15: the daemon starts a thread's process when a message is sent
+  // (ThreadService.Send) and stops it at the prompt cache expiry
+  // (docs/notes/thread-lifecycle.md). Kept for compatibility.
   rpc Close(CloseSessionRequest) returns (CloseSessionResponse) {}
-  // Reconnect resumes a DISCONNECTED session in a new claude process.
+  // Reconnect resumes a DISCONNECTED session in a new claude process, without a
+  // prompt. No command calls it since 2026-10-15 (a message starts a stopped thread).
+  // Kept for compatibility.
   rpc Reconnect(ReconnectSessionRequest) returns (ReconnectSessionResponse) {}
-  // Remove forgets a session. Closes it first if connected.
+  // Remove forgets a session. Stops its Claude first if it runs.
   rpc Remove(RemoveSessionRequest) returns (RemoveSessionResponse) {}
   // RunIn moves a workspace thread's cwd to another member worktree of its workspace.
   // A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
@@ -76,16 +81,22 @@ enum PermissionMode {
   PERMISSION_MODE_AUTO = 3;
 }
 
-// SessionState is the lifecycle of the Claude process behind a session.
+// SessionState is the lifecycle of the Claude process behind a session. The daemon
+// manages it (docs/notes/thread-lifecycle.md): a message starts a stopped thread, and a
+// thread idle at its prompt past its prompt cache expiry stops. Users never need to know
+// it; clients may use it internally (a thread that is STARTING has not answered yet).
 enum SessionState {
   SESSION_STATE_UNSPECIFIED = 0;
-  // Process spawned, the stream-json initialize handshake not yet done.
+  // Process spawned, the stream-json initialize handshake not yet done. Messages sent
+  // meanwhile wait for it.
   SESSION_STATE_STARTING = 1;
   // Claude is running.
   SESSION_STATE_CONNECTED = 2;
-  // Close requested; waiting for the process to exit.
+  // A stop is under way (idle, archive, snooze, remove); waiting for the process to
+  // exit. A message sent meanwhile starts a new process once it has.
   SESSION_STATE_CLOSING = 3;
-  // No process. Either closed by us, exited by the user (/exit), or crashed.
+  // No process: stopped by the daemon (idle, archive, snooze), exited by Claude, crashed,
+  // or not started since the daemon started. The next message starts it.
   SESSION_STATE_DISCONNECTED = 4;
 }
 
@@ -97,9 +108,10 @@ enum SessionStatus {
   // Claude is waiting on the user: a permission prompt, a question, or a dialog.
   SESSION_STATUS_NEEDS_ATTENTION = 3;
   // The session's process ended while Claude was working (status_reason
-  // "interrupted"): it crashed, exited, was closed, or the daemon stopped mid-turn. Set
-  // only on a DISCONNECTED session; a reconnect replaces it with the detector's
-  // reading. Claude-reported API errors stay NEEDS_ATTENTION "error: <code>".
+  // "interrupted"): it crashed, exited, was closed, or the daemon stopped mid-turn; or
+  // Claude did not start for a message (status_reason "did not start"; the timeline has
+  // an error item saying why). Set only on a DISCONNECTED session; the next start
+  // replaces it. Claude-reported API errors stay NEEDS_ATTENTION "error: <code>".
   SESSION_STATUS_ERROR = 4;
 }
 
@@ -138,7 +150,11 @@ message Session {
   google.protobuf.Timestamp last_activity_at = 13;
   // Exit code of the last process, valid when DISCONNECTED after a process ran.
   int32 exit_code = 14;
-  // Why the session is DISCONNECTED: "closed", "exited", "crashed", or empty.
+  // Why the session is DISCONNECTED: "idle" (stopped at its prompt cache expiry),
+  // "closed" (archive, snooze, remove), "exited", "crashed", "daemon stopped", "daemon
+  // restarted", "spawn failed" (Claude did not start or never answered its handshake),
+  // or empty. Internal detail for clients; the next message starts the thread whatever it
+  // says.
   string disconnect_reason = 15;
   string last_error = 16;
   // Forked from this session id, if any.
@@ -146,7 +162,7 @@ message Session {
   // Short explanation of status from the detector, e.g. "finished", "at prompt",
   // "permission: Do you want to proceed?", "snooze ended" (NEEDS_ATTENTION on a
   // disconnected thread whose snooze ran out; cleared like "finished" on a disconnected
-  // thread, by a reconnect), or "interrupted" for ERROR. Persisted with
+  // thread, by the next start), or "interrupted" / "did not start" for ERROR. Persisted with
   // status: a DISCONNECTED session keeps the status and reason it had when its process
   // ended (a busy one becomes ERROR "interrupted"), across daemon restarts. Empty when
   // unknown.
@@ -198,7 +214,8 @@ message Session {
   reserved "render";
   // An effort change (ThreadService.SetEffort) not applied yet: effort is
   // the new level, and Claude restarts with it (--resume) once the running turn ends.
-  // Not persisted.
+  // Never set on a thread that is not running (its next start passes the row's
+  // effort). Not persisted.
   bool effort_pending = 32;
   // The thread's context size after its last turn: the last top-level API
   // response's input + cache read + cache write + output tokens (Claude Code's own

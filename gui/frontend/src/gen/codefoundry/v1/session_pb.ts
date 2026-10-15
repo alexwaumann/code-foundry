@@ -110,7 +110,11 @@ export type Session = Message<"codefoundry.v1.Session"> & {
   exitCode: number;
 
   /**
-   * Why the session is DISCONNECTED: "closed", "exited", "crashed", or empty.
+   * Why the session is DISCONNECTED: "idle" (stopped at its prompt cache expiry),
+   * "closed" (archive, snooze, remove), "exited", "crashed", "daemon stopped", "daemon
+   * restarted", "spawn failed" (Claude did not start or never answered its handshake),
+   * or empty. Internal detail for clients; the next message starts the thread whatever it
+   * says.
    *
    * @generated from field: string disconnect_reason = 15;
    */
@@ -132,7 +136,7 @@ export type Session = Message<"codefoundry.v1.Session"> & {
    * Short explanation of status from the detector, e.g. "finished", "at prompt",
    * "permission: Do you want to proceed?", "snooze ended" (NEEDS_ATTENTION on a
    * disconnected thread whose snooze ran out; cleared like "finished" on a disconnected
-   * thread, by a reconnect), or "interrupted" for ERROR. Persisted with
+   * thread, by the next start), or "interrupted" / "did not start" for ERROR. Persisted with
    * status: a DISCONNECTED session keeps the status and reason it had when its process
    * ended (a busy one becomes ERROR "interrupted"), across daemon restarts. Empty when
    * unknown.
@@ -246,7 +250,8 @@ export type Session = Message<"codefoundry.v1.Session"> & {
   /**
    * An effort change (ThreadService.SetEffort) not applied yet: effort is
    * the new level, and Claude restarts with it (--resume) once the running turn ends.
-   * Not persisted.
+   * Never set on a thread that is not running (its next start passes the row's
+   * effort). Not persisted.
    *
    * @generated from field: bool effort_pending = 32;
    */
@@ -1469,7 +1474,10 @@ export const PermissionModeSchema: GenEnum<PermissionMode> = /*@__PURE__*/
   enumDesc(file_codefoundry_v1_session, 0);
 
 /**
- * SessionState is the lifecycle of the Claude process behind a session.
+ * SessionState is the lifecycle of the Claude process behind a session. The daemon
+ * manages it (docs/notes/thread-lifecycle.md): a message starts a stopped thread, and a
+ * thread idle at its prompt past its prompt cache expiry stops. Users never need to know
+ * it; clients may use it internally (a thread that is STARTING has not answered yet).
  *
  * @generated from enum codefoundry.v1.SessionState
  */
@@ -1480,7 +1488,8 @@ export enum SessionState {
   UNSPECIFIED = 0,
 
   /**
-   * Process spawned, the stream-json initialize handshake not yet done.
+   * Process spawned, the stream-json initialize handshake not yet done. Messages sent
+   * meanwhile wait for it.
    *
    * @generated from enum value: SESSION_STATE_STARTING = 1;
    */
@@ -1494,14 +1503,16 @@ export enum SessionState {
   CONNECTED = 2,
 
   /**
-   * Close requested; waiting for the process to exit.
+   * A stop is under way (idle, archive, snooze, remove); waiting for the process to
+   * exit. A message sent meanwhile starts a new process once it has.
    *
    * @generated from enum value: SESSION_STATE_CLOSING = 3;
    */
   CLOSING = 3,
 
   /**
-   * No process. Either closed by us, exited by the user (/exit), or crashed.
+   * No process: stopped by the daemon (idle, archive, snooze), exited by Claude, crashed,
+   * or not started since the daemon started. The next message starts it.
    *
    * @generated from enum value: SESSION_STATE_DISCONNECTED = 4;
    */
@@ -1544,9 +1555,10 @@ export enum SessionStatus {
 
   /**
    * The session's process ended while Claude was working (status_reason
-   * "interrupted"): it crashed, exited, was closed, or the daemon stopped mid-turn. Set
-   * only on a DISCONNECTED session; a reconnect replaces it with the detector's
-   * reading. Claude-reported API errors stay NEEDS_ATTENTION "error: <code>".
+   * "interrupted"): it crashed, exited, was closed, or the daemon stopped mid-turn; or
+   * Claude did not start for a message (status_reason "did not start"; the timeline has
+   * an error item saying why). Set only on a DISCONNECTED session; the next start
+   * replaces it. Claude-reported API errors stay NEEDS_ATTENTION "error: <code>".
    *
    * @generated from enum value: SESSION_STATUS_ERROR = 4;
    */
@@ -1622,7 +1634,7 @@ export const SessionService: GenService<{
     output: typeof ForkSessionResponseSchema;
   },
   /**
-   * List returns all sessions, connected and disconnected.
+   * List returns all sessions.
    *
    * @generated from rpc codefoundry.v1.SessionService.List
    */
@@ -1653,7 +1665,10 @@ export const SessionService: GenService<{
   },
   /**
    * Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
-   * then kill). The session remains, DISCONNECTED, until Remove.
+   * then kill). The session remains, DISCONNECTED, until Remove. No command calls it
+   * since 2026-10-15: the daemon starts a thread's process when a message is sent
+   * (ThreadService.Send) and stops it at the prompt cache expiry
+   * (docs/notes/thread-lifecycle.md). Kept for compatibility.
    *
    * @generated from rpc codefoundry.v1.SessionService.Close
    */
@@ -1663,7 +1678,9 @@ export const SessionService: GenService<{
     output: typeof CloseSessionResponseSchema;
   },
   /**
-   * Reconnect resumes a DISCONNECTED session in a new claude process.
+   * Reconnect resumes a DISCONNECTED session in a new claude process, without a
+   * prompt. No command calls it since 2026-10-15 (a message starts a stopped thread).
+   * Kept for compatibility.
    *
    * @generated from rpc codefoundry.v1.SessionService.Reconnect
    */
@@ -1673,7 +1690,7 @@ export const SessionService: GenService<{
     output: typeof ReconnectSessionResponseSchema;
   },
   /**
-   * Remove forgets a session. Closes it first if connected.
+   * Remove forgets a session. Stops its Claude first if it runs.
    *
    * @generated from rpc codefoundry.v1.SessionService.Remove
    */

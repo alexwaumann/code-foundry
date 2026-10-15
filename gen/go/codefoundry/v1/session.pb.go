@@ -80,18 +80,24 @@ func (PermissionMode) EnumDescriptor() ([]byte, []int) {
 	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{0}
 }
 
-// SessionState is the lifecycle of the Claude process behind a session.
+// SessionState is the lifecycle of the Claude process behind a session. The daemon
+// manages it (docs/notes/thread-lifecycle.md): a message starts a stopped thread, and a
+// thread idle at its prompt past its prompt cache expiry stops. Users never need to know
+// it; clients may use it internally (a thread that is STARTING has not answered yet).
 type SessionState int32
 
 const (
 	SessionState_SESSION_STATE_UNSPECIFIED SessionState = 0
-	// Process spawned, the stream-json initialize handshake not yet done.
+	// Process spawned, the stream-json initialize handshake not yet done. Messages sent
+	// meanwhile wait for it.
 	SessionState_SESSION_STATE_STARTING SessionState = 1
 	// Claude is running.
 	SessionState_SESSION_STATE_CONNECTED SessionState = 2
-	// Close requested; waiting for the process to exit.
+	// A stop is under way (idle, archive, snooze, remove); waiting for the process to
+	// exit. A message sent meanwhile starts a new process once it has.
 	SessionState_SESSION_STATE_CLOSING SessionState = 3
-	// No process. Either closed by us, exited by the user (/exit), or crashed.
+	// No process: stopped by the daemon (idle, archive, snooze), exited by Claude, crashed,
+	// or not started since the daemon started. The next message starts it.
 	SessionState_SESSION_STATE_DISCONNECTED SessionState = 4
 )
 
@@ -150,9 +156,10 @@ const (
 	// Claude is waiting on the user: a permission prompt, a question, or a dialog.
 	SessionStatus_SESSION_STATUS_NEEDS_ATTENTION SessionStatus = 3
 	// The session's process ended while Claude was working (status_reason
-	// "interrupted"): it crashed, exited, was closed, or the daemon stopped mid-turn. Set
-	// only on a DISCONNECTED session; a reconnect replaces it with the detector's
-	// reading. Claude-reported API errors stay NEEDS_ATTENTION "error: <code>".
+	// "interrupted"): it crashed, exited, was closed, or the daemon stopped mid-turn; or
+	// Claude did not start for a message (status_reason "did not start"; the timeline has
+	// an error item saying why). Set only on a DISCONNECTED session; the next start
+	// replaces it. Claude-reported API errors stay NEEDS_ATTENTION "error: <code>".
 	SessionStatus_SESSION_STATUS_ERROR SessionStatus = 4
 )
 
@@ -288,7 +295,11 @@ type Session struct {
 	LastActivityAt *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
 	// Exit code of the last process, valid when DISCONNECTED after a process ran.
 	ExitCode int32 `protobuf:"varint,14,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
-	// Why the session is DISCONNECTED: "closed", "exited", "crashed", or empty.
+	// Why the session is DISCONNECTED: "idle" (stopped at its prompt cache expiry),
+	// "closed" (archive, snooze, remove), "exited", "crashed", "daemon stopped", "daemon
+	// restarted", "spawn failed" (Claude did not start or never answered its handshake),
+	// or empty. Internal detail for clients; the next message starts the thread whatever it
+	// says.
 	DisconnectReason string `protobuf:"bytes,15,opt,name=disconnect_reason,json=disconnectReason,proto3" json:"disconnect_reason,omitempty"`
 	LastError        string `protobuf:"bytes,16,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
 	// Forked from this session id, if any.
@@ -296,7 +307,7 @@ type Session struct {
 	// Short explanation of status from the detector, e.g. "finished", "at prompt",
 	// "permission: Do you want to proceed?", "snooze ended" (NEEDS_ATTENTION on a
 	// disconnected thread whose snooze ran out; cleared like "finished" on a disconnected
-	// thread, by a reconnect), or "interrupted" for ERROR. Persisted with
+	// thread, by the next start), or "interrupted" / "did not start" for ERROR. Persisted with
 	// status: a DISCONNECTED session keeps the status and reason it had when its process
 	// ended (a busy one becomes ERROR "interrupted"), across daemon restarts. Empty when
 	// unknown.
@@ -345,7 +356,8 @@ type Session struct {
 	AgentRuns []*AgentRun `protobuf:"bytes,30,rep,name=agent_runs,json=agentRuns,proto3" json:"agent_runs,omitempty"`
 	// An effort change (ThreadService.SetEffort) not applied yet: effort is
 	// the new level, and Claude restarts with it (--resume) once the running turn ends.
-	// Not persisted.
+	// Never set on a thread that is not running (its next start passes the row's
+	// effort). Not persisted.
 	EffortPending bool `protobuf:"varint,32,opt,name=effort_pending,json=effortPending,proto3" json:"effort_pending,omitempty"`
 	// The thread's context size after its last turn: the last top-level API
 	// response's input + cache read + cache write + output tokens (Claude Code's own
