@@ -6,7 +6,7 @@ import type { UpdateStatusView } from "@/api/update";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { formatAgo, restartCutsOff } from "@/lib/session";
-import { busyHeading, displayVersion, failureHeadline, updateView, type UpdateVariant, type UpdateView } from "@/lib/update";
+import { busyHeading, cutOffLabel, displayVersion, failureHeadline, updateView, type UpdateVariant, type UpdateView } from "@/lib/update";
 import { cn } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions";
 import { closeUpdateDialog, runUpdateAction, useCutOffThreadIds, useUpdateStore, type UpdateAction } from "@/stores/update";
@@ -107,22 +107,23 @@ function ProgressBar({ className }: { className?: string }) {
   );
 }
 
-/** One thread a restart would cut off: its name, and "working" or "waiting on you". */
+/** One thread a restart would cut off: its name, and what it loses (cutOffLabel). */
 function BusyThread({ id }: { id: string }) {
   const name = useSessionsStore((s) => s.byId[id]?.name || "Untitled thread");
-  const waiting = useSessionsStore((s) => {
+  const label = useSessionsStore((s) => {
     const x = s.byId[id];
-    return x ? restartCutsOff(x) === "waiting" : false;
+    const kind = x ? restartCutsOff(x) : null;
+    return x && kind ? cutOffLabel(kind, x.backgroundAgentsRunning, x.backgroundShellsRunning) : "";
   });
   return (
     <div className="flex gap-1.5" data-testid="update-busy-thread">
       <span className="min-w-0 truncate text-foreground">{name}</span>
-      <span className="ml-auto shrink-0 text-muted-foreground">{waiting ? "waiting on you" : "working"}</span>
+      <span className="ml-auto shrink-0 text-muted-foreground">{label}</span>
     </div>
   );
 }
 
-/** The threads a restart would cut off: working or waiting on the user. */
+/** The threads a restart would cut off (the daemon's count: working, waiting on the user, background work). */
 function BusyThreads() {
   const ids = useCutOffThreadIds();
   if (ids.length === 0) return null;

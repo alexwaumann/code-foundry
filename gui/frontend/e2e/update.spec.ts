@@ -101,10 +101,10 @@ test("install shows progress, then lists busy threads; Restart Now runs app.rest
   // with the right count (the daemon's: working or waiting on you).
   await expect(d).toHaveAttribute("data-variant", "readyBusy", { timeout: 8000 });
   await expect(d.getByTestId("update-state")).toHaveText("Code Foundry v0.2.0 is ready");
-  await expect(d).toContainText("Restarting now cuts these threads off mid-turn. Let them finish first, or restart anyway: they keep their history, and a message continues each.");
+  await expect(d).toContainText("Restarting now cuts these threads off. Let them finish first, or restart anyway: they keep their history, and a message continues each.");
   await expect(d).not.toContainText(/connect/);
   const box = d.getByTestId("update-busy-threads");
-  await expect(box.getByTestId("update-busy-heading")).toHaveText("3 threads are working or waiting on you");
+  await expect(box.getByTestId("update-busy-heading")).toHaveText("3 threads would be cut off");
   await expect(box.getByTestId("update-busy-thread")).toHaveText([/^Port renderer\s*waiting on you$/, /^Job 1\s*working$/, /^Job 2\s*working$/]);
   await expect(d.getByTestId("update-later")).toHaveText("Wait, I’ll restart later");
   await expect(d.getByTestId("update-meta")).toContainText("Running v0.1.0");
@@ -113,7 +113,7 @@ test("install shows progress, then lists busy threads; Restart Now runs app.rest
 
   // Another busy thread shows up live.
   await mockPost("session/status?id=s-1&status=busy");
-  await expect(box.getByTestId("update-busy-heading")).toHaveText("4 threads are working or waiting on you");
+  await expect(box.getByTestId("update-busy-heading")).toHaveText("4 threads would be cut off");
   await expect(box).toContainText("Refactor sidebar tree");
 
   // Restart Now: the dialog is the confirmation, so no confirm dialog and one confirmed call.
@@ -174,7 +174,7 @@ test("daemon.restart from the palette asks for confirmation instead of running",
   await mockPost("update/state?state=restartRequired&version=v0.2.0");
   await paletteRun(page, "daemon.restart");
   const confirm = page.getByTestId("confirm-dialog");
-  await expect(confirm).toContainText(/\d+ threads? (is|are) working or waiting on you and will be cut off\. Restart the daemon anyway\?/);
+  await expect(confirm).toContainText(/\d+ threads? working or waiting on you( and [^.]+)? will be cut off\. Restart the daemon anyway\?/);
   await confirm.getByTestId("confirm-cancel").click();
   await expect(confirm).toHaveCount(0);
   // Only the unconfirmed attempt reached the daemon; nothing restarted.

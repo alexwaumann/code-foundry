@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { UpdateStateView, UpdateStatusView } from "@/api/update";
-import { busyHeading, compareVersions, displayVersion, failureHeadline, olderStable, updateBadge, updateView, versionMismatch, type ThreadActivity, type UpdateVariant } from "./update";
+import type { CutOff } from "./session";
+import { busyHeading, compareVersions, cutOffLabel, displayVersion, failureHeadline, olderStable, updateBadge, updateView, versionMismatch, type ThreadActivity, type UpdateVariant } from "./update";
 
 describe("displayVersion", () => {
   it.each([
@@ -129,7 +130,7 @@ describe("updateView", () => {
       false,
       "readyBusy",
       "Code Foundry v0.2.0 is ready",
-      "Restarting now cuts these threads off mid-turn. Let them finish first, or restart anyway: they keep their history, and a message continues each.",
+      "Restarting now cuts these threads off. Let them finish first, or restart anyway: they keep their history, and a message continues each.",
       "Wait, I’ll restart later",
       false,
       true,
@@ -142,7 +143,7 @@ describe("updateView", () => {
       false,
       "readyBusy",
       "Code Foundry v0.2.0 is ready",
-      "Restarting now cuts this thread off mid-turn. Let it finish first, or restart anyway: it keeps its history, and a message continues it.",
+      "Restarting now cuts this thread off. Let it finish first, or restart anyway: it keeps its history, and a message continues it.",
       "Wait, I’ll restart later",
       false,
       true,
@@ -236,7 +237,7 @@ describe("updateView", () => {
       false,
       "partlyApplied",
       "Code Foundry v0.2.0 is partly applied",
-      "The app is on v0.2.0 but the daemon is still on v0.1.0; some things won’t work until you restart. Restarting now cuts these threads off mid-turn.",
+      "The app is on v0.2.0 but the daemon is still on v0.1.0; some things won’t work until you restart. Restarting now cuts these threads off.",
       "Wait, I’ll restart later",
       false,
       true,
@@ -301,10 +302,25 @@ describe("updateView", () => {
 
 describe("busyHeading", () => {
   it.each([
-    [1, "1 thread is working or waiting on you"],
-    [2, "2 threads are working or waiting on you"],
+    [1, "1 thread would be cut off"],
+    [2, "2 threads would be cut off"],
   ])("%d", (n, want) => {
     expect(busyHeading(n)).toBe(want);
+  });
+});
+
+describe("cutOffLabel (a busy thread's row)", () => {
+  it.each<[CutOff, number, number, string]>([
+    ["working", 0, 0, "working"],
+    ["waiting", 0, 0, "waiting on you"],
+    ["reporting", 0, 0, "reporting finished work"],
+    ["background", 1, 0, "1 background agent"],
+    ["background", 2, 0, "2 background agents"],
+    ["background", 0, 1, "1 background shell"],
+    ["background", 2, 1, "2 background agents and 1 shell"],
+    ["background", 1, 3, "1 background agent and 3 shells"],
+  ])("%s %i %i", (kind, agents, shells, want) => {
+    expect(cutOffLabel(kind, agents, shells)).toBe(want);
   });
 });
 

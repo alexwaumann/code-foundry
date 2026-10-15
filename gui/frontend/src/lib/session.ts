@@ -127,18 +127,25 @@ export function isThreadGroup(v: string): v is ThreadGroup {
   return v === "prompt" || v === "error" || v === "done" || v === "idle" || v === "working";
 }
 
+/** What a restart would cut off in one thread (restartCutsOff). */
+export type CutOff = "working" | "waiting" | "background" | "reporting";
+
 /**
  * What a restart (of the daemon or the app) cuts off, as the daemon's
- * command.ActiveSession counts it: "working" (Claude starting for a message or on a turn)
- * or "waiting" (a permission request or question pending), else null. An idle or stopped
- * thread loses nothing: a message starts it again.
+ * command.ActiveSession counts it: "working" (Claude starting for a message or on a turn),
+ * "waiting" (a permission request or question pending), "background" (its background
+ * agents or shells), "reporting" (the turn reporting background work that just ended),
+ * else null. An idle or stopped thread loses nothing: a message starts it again.
  */
-export function restartCutsOff(s: Pick<SessionView, "state" | "status" | "statusReason">): "working" | "waiting" | null {
+export function restartCutsOff(
+  s: Pick<SessionView, "state" | "status" | "statusReason" | "backgroundAgentsRunning" | "backgroundShellsRunning" | "backgroundWakePending">,
+): CutOff | null {
   if (s.state === "starting") return "working";
   if (s.state !== "connected") return null;
   if (s.status === "busy") return "working";
   if (s.status === "attention" && (s.statusReason.startsWith("permission:") || s.statusReason.startsWith("question:"))) return "waiting";
-  return null;
+  if (s.backgroundAgentsRunning + s.backgroundShellsRunning > 0) return "background";
+  return s.backgroundWakePending ? "reporting" : null;
 }
 
 export function threadGroup(s: Pick<SessionView, "state" | "status" | "statusReason">): ThreadGroup {

@@ -1,4 +1,5 @@
 import type { UpdateStatusView } from "@/api/update";
+import type { CutOff } from "./session";
 
 interface Semver {
   core: [number, number, number];
@@ -121,7 +122,7 @@ export function updateBadge(status: UpdateStatusView | null, guiVersion: string 
 }
 
 /**
- * Threads a restart would cut off: busy = working or waiting on the user (restartCutsOff,
+ * Threads a restart would cut off: busy = working, waiting on the user or running background work (restartCutsOff,
  * the daemon's command.ActiveSession). Any other thread loses nothing: a message starts it
  * again.
  */
@@ -161,13 +162,34 @@ function threads(n: number): string {
   return `${String(n)} thread${n === 1 ? "" : "s"}`;
 }
 
-/** "2 threads are working or waiting on you", "1 thread is working or waiting on you". */
+/** "2 threads would be cut off", "1 thread would be cut off". */
 export function busyHeading(n: number): string {
-  return `${threads(n)} ${n === 1 ? "is" : "are"} working or waiting on you`;
+  return `${threads(n)} would be cut off`;
+}
+
+/**
+ * What a restart cuts off in one thread, for its row in the busy list: "working", "waiting
+ * on you", its background work ("2 background agents and 1 shell", "1 background shell"),
+ * "reporting finished work".
+ */
+export function cutOffLabel(kind: CutOff, agents: number, shells: number): string {
+  switch (kind) {
+    case "working":
+      return "working";
+    case "waiting":
+      return "waiting on you";
+    case "reporting":
+      return "reporting finished work";
+    case "background": {
+      const count = (n: number, word: string) => `${String(n)} ${word}${n === 1 ? "" : "s"}`;
+      if (agents > 0 && shells > 0) return `${count(agents, "background agent")} and ${count(shells, "shell")}`;
+      return agents > 0 ? count(agents, "background agent") : count(shells, "background shell");
+    }
+  }
 }
 
 function cutOff(busy: number): string {
-  return busy === 1 ? "Restarting now cuts this thread off mid-turn." : "Restarting now cuts these threads off mid-turn.";
+  return busy === 1 ? "Restarting now cuts this thread off." : "Restarting now cuts these threads off.";
 }
 
 function laterFor(t: ThreadActivity): string {

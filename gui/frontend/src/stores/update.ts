@@ -50,7 +50,7 @@ export function applyUpdateEvent(ev: UpdateEventView): void {
 }
 
 /**
- * Ids of the threads a restart cuts off (working or waiting on the user, restartCutsOff:
+ * Ids of the threads a restart cuts off (working, waiting on the user or running background work; restartCutsOff:
  * the daemon's own count), in sidebar order.
  */
 export function useCutOffThreadIds(): string[] {

@@ -135,6 +135,11 @@ export interface SessionView {
    */
   backgroundShellsRunning: number;
   /**
+   * A background run or shell just ended at the prompt and Claude's turn reporting it has
+   * not ended yet (a few seconds): a restart would lose that report (restartCutsOff).
+   */
+  backgroundWakePending: boolean;
+  /**
    * Claude waits to retry a failed API request (a 429, a 529, a 5xx, a connection
    * error); null otherwise. docs/notes/api-retry-note.md.
    */
@@ -292,6 +297,7 @@ export function toSessionView(s: Session): SessionView {
     agentsRunning: s.agentsRunning,
     backgroundAgentsRunning: s.backgroundAgentsRunning,
     backgroundShellsRunning: s.backgroundShellsRunning,
+    backgroundWakePending: s.backgroundWakePending,
     retry: s.retry
       ? { attempt: s.retry.attempt, maxRetries: s.retry.maxRetries, retryAtMs: s.retry.retryAt ? timestampMs(s.retry.retryAt) : 0, errorStatus: s.retry.errorStatus, error: s.retry.error }
       : null,

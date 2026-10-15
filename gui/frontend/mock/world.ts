@@ -20,7 +20,7 @@ import { HOME, projectFolder } from "./filesystem";
 import { projectCommands } from "./create";
 import { Hub } from "./hub";
 import { MockSettings, MODEL_VALUES } from "./settings";
-import { MockUpdater } from "./update";
+import { MockUpdater, type RestartCost } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
@@ -593,8 +593,22 @@ export class World {
   /** UpdateService (Phase 3d): publishes into the events hub as the update source. */
   readonly update = new MockUpdater(
     (v) => this.events.publish({ source: EventSource.UPDATE, event: { event: { case: "update", value: v } } }),
-    () => [...this.sessions.values()].filter((s) => midTurn(s) !== "").length,
+    () => this.restartCost(),
   );
+
+  /** The daemon's command.RestartCostOf over the threads (ActiveSession: archiveInterrupts). */
+  private restartCost(): RestartCost {
+    const c: RestartCost = { threads: 0, midTurn: 0, agents: 0, shells: 0 };
+    for (const s of this.sessions.values()) {
+      if (this.interrupts(s).why === "") continue;
+      c.threads++;
+      if (midTurn(s) !== "") c.midTurn++;
+      if (s.state !== SessionState.CONNECTED) continue;
+      c.agents += agentCounts(this.threads.agentRunsOf(s.id)).backgroundAgentsRunning;
+      c.shells += this.threads.shellsOf(s.id);
+    }
+    return c;
+  }
   /** Phase 3a GitHub dashboards/activity and worktree details (mock/github.ts). */
   readonly gh = new GhWorld(
     (e) => this.events.publish(ghEvent(e)),

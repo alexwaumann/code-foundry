@@ -11,6 +11,7 @@ import {
   statusKind,
   statusNote,
   threadGroup,
+  type CutOff,
   type SessionBadge,
   type StatusKind,
   type ThreadGroup,
@@ -117,7 +118,7 @@ describe("sessionBadge", () => {
 
 // The daemon's command.ActiveSession: what a restart cuts off.
 describe("restartCutsOff", () => {
-  it.each<[SessionStateView, SessionStatusView, string, "working" | "waiting" | null]>([
+  it.each<[SessionStateView, SessionStatusView, string, CutOff | null]>([
     ["starting", "idle", "", "working"],
     ["starting", "attention", "finished", "working"],
     ["connected", "busy", "working", "working"],
@@ -131,7 +132,19 @@ describe("restartCutsOff", () => {
     ["disconnected", "attention", "question: Which one?", null],
     ["unknown", "busy", "", null],
   ])("%s %s %j", (state, status, statusReason, want) => {
-    expect(restartCutsOff({ state, status, statusReason })).toBe(want);
+    expect(restartCutsOff({ state, status, statusReason, backgroundAgentsRunning: 0, backgroundShellsRunning: 0, backgroundWakePending: false })).toBe(want);
+  });
+
+  // Background work counts like the daemon's archiveInterrupts, after mid-turn, only with a process.
+  it.each<[SessionStateView, SessionStatusView, number, number, boolean, CutOff | null]>([
+    ["connected", "idle", 1, 0, false, "background"],
+    ["connected", "attention", 0, 2, false, "background"],
+    ["connected", "idle", 0, 0, true, "reporting"],
+    ["connected", "busy", 1, 1, true, "working"],
+    ["disconnected", "idle", 1, 1, true, null],
+    ["closing", "idle", 1, 0, false, null],
+  ])("%s %s agents %i shells %i wake %s", (state, status, agents, shells, wake, want) => {
+    expect(restartCutsOff({ state, status, statusReason: "", backgroundAgentsRunning: agents, backgroundShellsRunning: shells, backgroundWakePending: wake })).toBe(want);
   });
 });
 
