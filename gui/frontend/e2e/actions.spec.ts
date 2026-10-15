@@ -99,7 +99,12 @@ test("the header's Play menu lists the project's actions and runs one in the thr
   await expect(status(page).getByTestId("action-status-time")).toHaveText(/^\d\.\ds$/);
   await expect(page.getByTestId("action-rerun")).toBeVisible();
   await expect(page.getByTestId("exit-overlay")).toHaveCount(0);
-  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
+  // No toast for it. A failing setup run follows (events arrive in order): once its toast
+  // shows, this run's run_finished was seen, and the toasts are counted at once (a retrying
+  // toHaveCount(0) would wait out a toast's own dismissal).
+  await mockPost("action/setup?session=s-1&code=2&action=Build");
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Setup action Build failed (exit 2)" })).toBeVisible();
+  expect(await page.locator("[data-sonner-toast]").count()).toBe(1);
 });
 
 test("a project without actions: the empty state and New action…", async ({ page }) => {
@@ -146,7 +151,8 @@ test("add, then edit (pencil and ArrowRight), then delete an action", async ({ p
   // Without the store's "failed precondition: " (the mock sends it like the daemon).
   await expect(dialog(page).getByTestId("action-error")).toHaveText('this project already has an action named "Test"');
   await expect(dialog(page).getByTestId("action-name")).toHaveAttribute("aria-invalid", "true");
-  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
+  // A toast would come from the same failure as the inline line: counted at once, not retried.
+  expect(await page.locator("[data-sonner-toast]").count()).toBe(0);
   await dialog(page).getByTestId("action-cancel").click();
   await expect(dialog(page)).toHaveCount(0);
 
