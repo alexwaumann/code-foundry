@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { listCommands, type CommandView } from "@/api/command";
 import { errorMessage } from "@/api/stream";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Markdown } from "@/components/pr/Markdown";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { viewActions } from "@/keys/bindings";
 import { helpSections, type LocalChord } from "@/keys/help";
+import { cn } from "@/lib/utils";
 import { getUiContext } from "@/stores/context";
-import { setHelpOpen, useViewsStore } from "@/stores/views";
+import { setHelpOpen, setHelpTab, useViewsStore, type HelpTab } from "@/stores/views";
+import { guideMarkdown, guideToc } from "./guide";
 
 /**
  * GUI chords that are not view actions but are worth knowing. This overlay (and the
@@ -42,9 +48,10 @@ function Keys({ keys }: { keys: string[] }) {
   );
 }
 
-function HelpBody() {
+/** The Keyboard shortcuts tab: every command with its effective chords, then the GUI's own. */
+function Shortcuts() {
   // Every command, available or not, with the keybindings CommandService reports
-  // (settings overrides applied). Fetched once per opening.
+  // (settings overrides applied). Fetched each time the tab shows.
   const [commands, setCommands] = useState<CommandView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -64,68 +71,131 @@ function HelpBody() {
   const sections = useMemo(() => helpSections(commands ?? [], [...viewActions, ...extraChords]), [commands]);
 
   return (
-    <div className="grid max-h-[calc(72vh/var(--cf-zoom))] grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-6 overflow-y-auto p-5">
-      <section className="space-y-3 text-sm text-muted-foreground" aria-label="How code-foundry works">
-        <DialogTitle className="text-base text-foreground">How code-foundry works</DialogTitle>
-        <DialogDescription asChild>
-          <div className="space-y-3">
-            <p>
-              <span className="font-medium text-foreground">Threads</span> are Claude Code running in a terminal the daemon owns. They keep
-              running when the window closes. A closed thread stays listed, disconnected, and Reconnect resumes its conversation.
-            </p>
-            <p>
-              <span className="font-medium text-foreground">Worktrees</span> give each thread its own checkout of a project (a registered
-              repository), so threads never edit each other's files. A new thread can make its own worktree. The sidebar lists threads,
-              newest first, with pinned and waiting ones on top; the Projects page lists each project's worktrees and each workspace (one
-              branch across several projects) with its members.
-            </p>
-            <p>
-              <span className="font-medium text-foreground">Terminals</span> (⌘T) are shells in the bottom panel (⌘J) under a thread or the
-              Projects page: a thread's start in its worktree, the Projects page's in the row's worktree. Opening a thread's empty
-              panel starts one, and the panel hides when its last one exits.
-            </p>
-            <p>
-              <span className="font-medium text-foreground">The palette</span> (⌘K) lists every action available for what you are looking
-              at. The same commands are keyboard shortcuts and <code className="font-mono text-xs">code-foundry</code> CLI verbs.
-            </p>
-            <p>
-              Change shortcuts, defaults and appearance in <span className="font-medium text-foreground">Settings</span> (⌘,).
-            </p>
-          </div>
-        </DialogDescription>
-      </section>
-      <section aria-label="Keyboard shortcuts" data-testid="help-shortcuts" className="space-y-4">
-        <h3 className="text-base font-semibold">Keyboard shortcuts</h3>
-        {error && <p className="text-xs text-destructive">Cannot list commands: {error}</p>}
-        {sections.map((s) => (
-          <div key={s.title} data-help-section={s.title}>
-            <h4 className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{s.title}</h4>
-            <ul className="space-y-0.5">
-              {s.items.map((i) => (
-                <li
-                  key={`${i.command ?? ""}:${i.label}`}
-                  className="flex items-center justify-between gap-3 text-sm"
-                  data-help-command={i.command}
-                  title={i.available ? i.command : `${i.command ?? ""} (not available here)`}
-                >
-                  <span className={i.available ? "truncate" : "truncate text-muted-foreground"}>{i.label}</span>
-                  <Keys keys={i.keys} />
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </section>
+    <section aria-label="Keyboard shortcuts" data-testid="help-shortcuts" data-help-scroll tabIndex={-1} className="h-full columns-2 gap-8 overflow-y-auto px-5 py-4 outline-none">
+      {error && <p className="mb-4 text-xs text-destructive">Cannot list commands: {error}</p>}
+      {sections.map((s) => (
+        <div key={s.title} data-help-section={s.title} className="mb-4 break-inside-avoid">
+          <h4 className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{s.title}</h4>
+          <ul className="space-y-0.5">
+            {s.items.map((i) => (
+              <li
+                key={`${i.command ?? ""}:${i.label}`}
+                className="flex items-center justify-between gap-3 text-sm"
+                data-help-command={i.command}
+                title={i.available ? i.command : `${i.command ?? ""} (not available here)`}
+              >
+                <span className={i.available ? "truncate" : "truncate text-muted-foreground"}>{i.label}</span>
+                <Keys keys={i.keys} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/**
+ * The Guide tab: docs/GETTING-STARTED.md rendered with the markdown component and styles
+ * threads use, and on the left its h2/h3 headings, each scrolling the guide to its section.
+ */
+export function Guide() {
+  const body = useRef<HTMLDivElement>(null);
+  const scrollTo = (index: number) => {
+    // guideToc lists exactly the h2/h3 headings the renderer produces, in order.
+    body.current?.querySelectorAll("h2, h3")[index]?.scrollIntoView({ block: "start" });
+  };
+  return (
+    <div className="grid h-full grid-cols-[11rem_minmax(0,1fr)]">
+      <nav aria-label="Contents" data-testid="help-toc" className="overflow-y-auto py-4 pr-2 pl-5">
+        <ul>
+          {guideToc.map((e, i) => (
+            <li key={`${String(i)}:${e.title}`} className={e.level === 2 && i > 0 ? "mt-3" : undefined}>
+              <button
+                type="button"
+                className={cn("w-full truncate rounded py-0.5 text-left text-[13px] hover:text-foreground", e.level === 2 ? "font-medium text-foreground" : "text-muted-foreground")}
+                data-toc-level={e.level}
+                onClick={() => {
+                  scrollTo(i);
+                }}
+              >
+                {e.title}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <div ref={body} data-testid="help-guide" data-help-scroll tabIndex={-1} className="overflow-y-auto py-4 pr-6 pl-2 outline-none [&_:is(h2,h3)]:scroll-mt-4">
+        <Markdown>{guideMarkdown}</Markdown>
+      </div>
     </div>
   );
 }
 
-/** cmd+/ (view.help): keybindings and a short orientation. */
+/** Underlined tabs in the overlay's header (the shared TabsList is a segmented control). */
+const tabClass =
+  "h-auto flex-none rounded-none border-0 border-b-2 border-transparent px-0.5 pt-3 pb-2.5 text-sm font-normal text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none dark:data-[state=active]:border-foreground dark:data-[state=active]:bg-transparent";
+
+/** The overlay's body: the Guide and Keyboard shortcuts tabs, and a close button. */
+function HelpBody() {
+  const tab = useViewsStore((s) => s.helpTab);
+  return (
+    <Tabs
+      value={tab}
+      onValueChange={(v) => {
+        setHelpTab(v as HelpTab);
+      }}
+      className="gap-0"
+    >
+      <DialogTitle className="sr-only">Help</DialogTitle>
+      <DialogDescription className="sr-only">The getting started guide and the keyboard shortcuts.</DialogDescription>
+      <div className="flex items-center border-b px-5">
+        <TabsList className="h-auto gap-5 rounded-none bg-transparent p-0" data-testid="help-tabs">
+          <TabsTrigger value="guide" className={tabClass} data-testid="help-tab-guide">
+            Guide
+          </TabsTrigger>
+          <TabsTrigger value="shortcuts" className={tabClass} data-testid="help-tab-shortcuts">
+            Keyboard shortcuts
+          </TabsTrigger>
+        </TabsList>
+        <DialogClose asChild>
+          <Button type="button" variant="ghost" size="icon-sm" className="-mr-2 ml-auto" aria-label="Close" data-testid="help-close">
+            <X aria-hidden />
+          </Button>
+        </DialogClose>
+      </div>
+      <div className="h-[calc(72vh/var(--cf-zoom))]">
+        <TabsContent value="guide" className="h-full">
+          <Guide />
+        </TabsContent>
+        <TabsContent value="shortcuts" className="h-full">
+          <Shortcuts />
+        </TabsContent>
+      </div>
+    </Tabs>
+  );
+}
+
+/**
+ * cmd+/ (view.help) and the Help menu: the getting started guide (the default tab) and
+ * the keyboard shortcuts.
+ */
 export function HelpOverlay() {
   const open = useViewsStore((s) => s.helpOpen);
   return (
     <Dialog open={open} onOpenChange={setHelpOpen}>
-      <DialogContent className="top-[calc(8vh/var(--cf-zoom))] max-w-3xl" data-testid="help-overlay">
+      <DialogContent
+        className="top-[calc(8vh/var(--cf-zoom))] max-w-3xl"
+        data-testid="help-overlay"
+        onOpenAutoFocus={(e) => {
+          // Focus the open tab's scrolling body rather than the first tab (which would
+          // draw its focus ring): the arrow keys and space then scroll the guide.
+          const scroll = e.currentTarget instanceof HTMLElement ? e.currentTarget.querySelector<HTMLElement>("[data-help-scroll]") : null;
+          if (!scroll) return;
+          e.preventDefault();
+          scroll.focus();
+        }}
+      >
         {open && <HelpBody />}
       </DialogContent>
     </Dialog>

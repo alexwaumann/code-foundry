@@ -22,9 +22,14 @@ interface ViewsState {
   /** The Usage page (view.usage, docs/notes/session-usage.md). Never open with settings. */
   usageOpen: boolean;
   helpOpen: boolean;
+  /** The help overlay's tab. Opening it lands on the guide unless a caller asks for the shortcuts. */
+  helpTab: HelpTab;
 }
 
-export const useViewsStore = create<ViewsState>()(() => ({ settingsOpen: false, usageOpen: false, helpOpen: false }));
+/** The help overlay's tabs: the getting started guide (docs/GETTING-STARTED.md) and the keyboard shortcuts. */
+export type HelpTab = "guide" | "shortcuts";
+
+export const useViewsStore = create<ViewsState>()(() => ({ settingsOpen: false, usageOpen: false, helpOpen: false, helpTab: "guide" }));
 
 /**
  * A window-level page (settings or usage) covers the content area. It hides the side
@@ -72,7 +77,7 @@ export function showView(name: string): boolean {
       else useViewsStore.setState({ usageOpen: true, settingsOpen: false, helpOpen: false });
       return true;
     case "help":
-      useViewsStore.setState({ helpOpen: true });
+      openHelp();
       return true;
     case "panel.toggle":
       // view.panel.toggle: an action on the current selection's side panel, not a page.
@@ -351,12 +356,27 @@ export function closeUsage(): void {
   requestPromptFocus();
 }
 
+/** view.help (cmd+/): closes the help overlay, or opens it on the guide. */
 export function toggleHelp(): void {
-  useViewsStore.setState((s) => ({ helpOpen: !s.helpOpen }));
+  if (useViewsStore.getState().helpOpen) setHelpOpen(false);
+  else openHelp();
+}
+
+/**
+ * Opens the help overlay on a tab (the guide by default), or switches the open overlay
+ * to it: Help > Getting Started, Help > Keyboard Shortcuts and Help, and the start page's
+ * Keyboard Shortcuts link.
+ */
+export function openHelp(tab: HelpTab = "guide"): void {
+  useViewsStore.setState({ helpOpen: true, helpTab: tab });
 }
 
 export function setHelpOpen(open: boolean): void {
   useViewsStore.setState({ helpOpen: open });
+}
+
+export function setHelpTab(tab: HelpTab): void {
+  useViewsStore.setState({ helpTab: tab });
 }
 
 /** Selecting something in the sidebar leaves the settings or usage page. */

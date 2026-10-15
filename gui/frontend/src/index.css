@@ -378,6 +378,16 @@
 .cf-markdown code {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
+/* Keys (<kbd>⌘N</kbd>, the help overlay's guide), drawn like the shortcut list's. */
+.cf-markdown kbd {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--muted) 60%, transparent);
+  padding: 0.05em 0.4em;
+  font-family: inherit;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
 .cf-markdown pre {
   overflow-x: auto;
   border: 1px solid var(--border);
