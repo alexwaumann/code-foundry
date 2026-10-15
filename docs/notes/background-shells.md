@@ -1,8 +1,9 @@
 # Background shells, PR A of 3: track them, count them in the strip
 
-Status: built on branch `cf/background-shells`. `make check` green, `make gui-build` green,
-exercised live (isolated daemon, the CLI, the built app, Haiku 5.5). The next PR reads
-`Session.background_shells_running` and `Session.BackgroundWork()` (below).
+Status: built on branch `cf/background-shells` (PR #105, review fixes included). `make
+check` green, `make gui-build` green, exercised live (isolated daemon, the CLI, the built
+app, Haiku 5.5). The next PR reads `Session.background_shells_running` and
+`Session.BackgroundWork()`, which includes the wake hold (below).
 
 ## Wire facts (Claude Code 2.1.300, from the captures)
 
@@ -56,7 +57,11 @@ Monitor printing two lines), `shells-close.jsonl` (stdin closed while a shell ru
   `Monitor`, started at). `onTask` hands a frame to it first; a shell's frames never reach
   the agents model, and anything that is not one of the thread's own shells (a subagent's)
   goes on as before (skipped). Ends on whichever terminal frame comes first; the
-  notification, which carries the summary, completes the item.
+  notification, which carries the summary, completes the item. A shell `task_updated`
+  ended whose notification has not come keeps that end when the process goes (`orphan`
+  emits it final: the call gets Claude's status and leaves `projector.async`). A frame
+  after a shell's end (SIGTERM: `task_updated` after the notification) falls through to the
+  agents model, which skips it (its task id is no run).
 * **Items.** The projector keeps a top-level Bash/Monitor call whose result names a task
   (`isShellLaunch`) running in `projector.async`, the same set as async Agent calls, and
   `agentEnded` completes it: done with the summary as output, or an error with the summary
@@ -70,7 +75,16 @@ Monitor printing two lines), `shells-close.jsonl` (stdin closed while a shell ru
   when it changes, so EventService carries it with the session. Proto
   `Session.background_shells_running = 41`.
 * **Effort restart**: `maybeRestart` also waits while a shell runs (the running item already
-  blocked it; the count makes it explicit).
+  blocked it; the count is a defence: no capture has the count above 0 with the call
+  finished, both fall at the same `task_updated`).
+* **The wake hold** (`wake.go`, from the review). A shell's or a background agent run's end
+  (spawn depth 1) arriving while Claude is at its prompt means Claude is about to start a
+  turn by itself (init, reply, result). `maybeRestart` runs after every event, so it used to
+  close stdin in that gap, under the reply. Now such an end sets `runner.wakePending` (an
+  end during a turn does not: that turn reports it); the next `result` clears it, and a
+  fallback timer (`Options.WakeTimeout`, 10 s) clears it when no turn comes. `maybeRestart`
+  holds while it is set. The row mirrors it as `Session.WakePending` (not persisted, not on
+  the proto) and `BackgroundWork()` counts it.
 * **`Session.BackgroundWork()`**: a running background agent the thread launched itself
   (spawn depth 1) or a running shell. Foreground runs are part of a turn; a nested run
   keeps its background parent running.
@@ -85,7 +99,10 @@ Monitor printing two lines), `shells-close.jsonl` (stdin closed while a shell ru
   `SquareTerminal`, no activity, no Agents button (`data-kind` agents | shells).
 * **Mock**: `mock/shells.ts`; the `agents` state has one shell beside its agents, the new
   `shells` state a Bash and a Monitor running; `POST /__mock/thread/shell-end[?status=failed]`
-  ends the oldest; the count is 0 for a disconnected session.
+  ends the oldest; the count is 0 for a disconnected session. The mock's `thread.agents`
+  text ends with " · N shell(s) in the background" like the daemon's; its JSON stays the
+  runs only (the count is in the text, as in the daemon, whose JSON is
+  `ThreadAgentsChange`).
 
 ## Decisions and gotchas
 
@@ -105,6 +122,15 @@ Monitor printing two lines), `shells-close.jsonl` (stdin closed while a shell ru
   hardlinks). `third_party/ghostty-vt` was copied from the main checkout with the `.pc`
   prefix rewritten (else cgo links another worktree's stale path from the build cache).
 
+* **Testing the gap.** The "send next" runner tests cannot show the bug: the send makes
+  the thread busy until the result. The fake gained `CF_FAKE_CLAUDE_UNPROMPTED=<dir>`
+  (fakeclaude_test.go): turn n replays without a user message once `<dir>/turn-<n>`
+  exists and holds before its `system/init` until `<dir>/turn-<n>.init` exists, so a test
+  releases a capture's end frames, checks, then releases Claude's turn. "No restart yet" is
+  checked without a sleep (`env.restartBegun`): a SetEffort to the wanted effort goes
+  through the runner's goroutine, so the event it had taken and its maybeRestart are done,
+  then the runner's restart phase is read.
+
 ## Verification
 
 * `make check` green: Go (gofmt, vet, staticcheck, `go test -race ./...`), typecheck, lint,
@@ -116,7 +142,11 @@ Monitor printing two lines), `shells-close.jsonl` (stdin closed while a shell ru
   shells skipped (agents captures), `isShellLaunch` on captured results, `BackgroundWork`
   table; through the runner and the fake Claude: the lifecycle for Bash, a failure and a
   Monitor (count 1 → 0, `BackgroundWork`), TaskStop in the turn, orphaned by a process exit
-  and a daemon stop, the effort restart held until the shell ends.
+  and a daemon stop, the effort restart held until the shell ends; the wake hold for a
+  shell (`shells.jsonl`) and a background agent (`agents.jsonl`): no restart after the end
+  frames, the restart once Claude's own turn ended, its reply not cut; the fallback timer;
+  `orphan` keeping a `task_updated` end (done and failed). The wake clause and the `ending`
+  loop were each removed once: their tests failed.
   `api/thread_agents_test.go` maps the count; `command/commands_agents_test.go` the header.
   The projector branch and the exit path's `endBgShells` were each disabled once: the tests
   failed.
@@ -144,4 +174,6 @@ Monitor printing two lines), `shells-close.jsonl` (stdin closed while a shell ru
 * `Session.background_shells_running` (proto 41, over EventService with the session; no
   Watch) and `background_agents_running`.
 * In Go, `Session.BackgroundWork()`: true while the thread has work running after its turn
-  (its own background agents or shells).
+  (its own background agents or shells) or Claude's turn for one that just ended is due
+  (`Session.WakePending`, Go only). An idle check should hold on it the way `maybeRestart`
+  does; the runner keeps it in sync on the row.
