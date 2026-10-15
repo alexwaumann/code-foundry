@@ -122,7 +122,7 @@ func Run(ctx context.Context, opts Options) error {
 	events := st.bus
 	repoAPI := api.NewRepo(st.repo, events).WithGitHub(st.gh, st.cloner).WithProjects(st.projects, st.gh).
 		WithCleanupHold(func(w repo.Worktree) string {
-			return cleanupHold(w.Path, liveThreads(st.session.Snapshot()), st.terminal.List(context.Background()), st.workspace.Snapshot())
+			return cleanupHold(w.Path, worktreeThreads(st.session.Snapshot()), st.terminal.List(context.Background()), st.workspace.Snapshot())
 		})
 	terminalAPI := api.NewTerminal(st.terminal)
 	sessionAPI := api.NewSession(st.session, events)

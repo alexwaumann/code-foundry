@@ -185,7 +185,7 @@ Services (v1):
   it directly, the CLI through `repo add <folder>`),
   Unregister, List, ListWorktrees, CreateWorktree (optionally fetching the base first),
   CleanupWorktrees (remove worktrees whose work is in origin/<default>: `merged_clean`,
-  no live thread, terminal or workspace; never deletes branches;
+  no thread (archived ones aside), terminal or workspace on it; never deletes branches;
   `docs/notes/projects-polish-3.md`),
   ListRefs, Watch, GetWorktreeDetail (files and log against the base branch, Phase 3a),
   InitGit (`git init` and an empty first commit in a project without git;

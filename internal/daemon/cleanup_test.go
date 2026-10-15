@@ -1,8 +1,11 @@
 package daemon
 
 import (
+	"slices"
 	"testing"
+	"time"
 
+	"github.com/alexwaumann/code-foundry/internal/store/session"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
@@ -28,15 +31,15 @@ func TestCleanupHold(t *testing.T) {
 	}{
 		{name: "nothing", path: wt, ws: ws, want: ""},
 		{name: "nil workspaces", path: wt, want: ""},
-		{name: "live thread in it", path: wt, threads: []workspace.Thread{{ID: "s1", Name: "fix-badge", Cwd: wt}}, want: "live thread fix-badge runs in it"},
-		{name: "unnamed thread in a subdirectory", path: wt, threads: []workspace.Thread{{ID: "s1", Cwd: wt + "/sub"}}, want: "a live thread runs in it"},
+		{name: "a thread on it", path: wt, threads: []workspace.Thread{{ID: "s1", Name: "fix-badge", Cwd: wt}}, want: "thread fix-badge is on it"},
+		{name: "unnamed thread in a subdirectory", path: wt, threads: []workspace.Thread{{ID: "s1", Cwd: wt + "/sub"}}, want: "a thread is on it"},
 		{name: "thread in a sibling with a common prefix", path: wt, threads: []workspace.Thread{{ID: "s1", Cwd: wt + "-other"}}, want: ""},
 		{name: "running shell owned by it", path: wt, terminals: []terminal.Terminal{shell(terminal.StateRunning, "/elsewhere", wt)}, want: "a terminal is open in it"},
 		{name: "running terminal inside it", path: wt, terminals: []terminal.Terminal{shell(terminal.StateRunning, wt+"/sub", "")}, want: "a terminal is open in it"},
 		{name: "exited shell", path: wt, terminals: []terminal.Terminal{shell(terminal.StateExited, wt, wt)}, want: ""},
 		{name: "shell elsewhere", path: wt, terminals: []terminal.Terminal{shell(terminal.StateRunning, "/wt/cf-b", "/wt/cf-b")}, want: ""},
 		{name: "workspace member", path: "/wt/cf-pay", ws: ws, want: "member of workspace pay"},
-		{name: "thread wins over workspace", path: "/wt/cf-pay", ws: ws, threads: []workspace.Thread{{Name: "x", Cwd: "/wt/cf-pay"}}, want: "live thread x runs in it"},
+		{name: "thread wins over workspace", path: "/wt/cf-pay", ws: ws, threads: []workspace.Thread{{Name: "x", Cwd: "/wt/cf-pay"}}, want: "thread x is on it"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -44,5 +47,39 @@ func TestCleanupHold(t *testing.T) {
 				t.Errorf("cleanupHold = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// The threads that hold a worktree (cleanup, workspace removal): every one but an archived
+// one, whatever its process state.
+func TestWorktreeThreads(t *testing.T) {
+	now := time.Date(2026, 10, 15, 4, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name string
+		s    session.Session
+		want bool
+	}{
+		{name: "running", s: session.Session{State: session.StateConnected}, want: true},
+		{name: "starting", s: session.Session{State: session.StateStarting}, want: true},
+		{name: "stopped at cache expiry", s: session.Session{State: session.StateDisconnected, DisconnectReason: "idle"}, want: true},
+		{name: "stopping", s: session.Session{State: session.StateClosing}, want: true},
+		{name: "snoozed (it comes back to the worktree)", s: session.Session{State: session.StateDisconnected, SnoozedUntil: now}, want: true},
+		{name: "archived", s: session.Session{State: session.StateDisconnected, ArchivedAt: now}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.s.ID, tt.s.Name, tt.s.WorktreePath = "s1", "fix-badge", "/wt/cf-a"
+			got := worktreeThreads(&session.Snapshot{Sessions: []session.Session{tt.s}})
+			var want []workspace.Thread
+			if tt.want {
+				want = []workspace.Thread{{ID: "s1", Name: "fix-badge", Cwd: "/wt/cf-a"}}
+			}
+			if !slices.Equal(got, want) {
+				t.Errorf("worktreeThreads = %+v, want %+v", got, want)
+			}
+		})
+	}
+	if worktreeThreads(nil) != nil {
+		t.Error("nil snapshot")
 	}
 }

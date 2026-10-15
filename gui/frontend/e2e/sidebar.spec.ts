@@ -256,13 +256,13 @@ test("the Projects page lists projects with their own worktrees and workspaces w
   // The worktree is gone from disk (and so from the projects too).
   await expect(cf.getByTestId("project-in-workspaces")).toHaveCount(0);
 
-  // A member where a thread's Claude runs is refused (archive it first), and stays.
+  // A member with a thread on it is refused (archive it first), and stays.
   const gp = ws.locator('[data-nav-key="m:w-000000000001::repo-gp"]');
   await gp.getByTestId("member-more").click();
   await page.getByTestId("member-remove").focus();
   await page.keyboard.press("Enter");
   await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
-  await expect(page.getByText(/running in .*ghostty-playground\/cf-login; archive it first \(that stops Claude\)/)).toBeVisible();
+  await expect(page.getByText(/is on .*ghostty-playground\/cf-login; archive it first/)).toBeVisible();
   await expect(ws.getByTestId("member-name")).toHaveText(["ghostty-playground", "dotfiles"]);
 
   // Enter on a worktree row shows it in the page's side panel (worktree-panel.spec.ts).

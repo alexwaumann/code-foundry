@@ -235,7 +235,7 @@ function inside(p: string, root: string): boolean {
 
 export interface CleanupSessions {
   order: readonly string[];
-  byId: Readonly<Record<string, Pick<SessionView, "state" | "worktreePath"> | undefined>>;
+  byId: Readonly<Record<string, Pick<SessionView, "archivedAtMs" | "worktreePath"> | undefined>>;
 }
 
 export interface CleanupTerminals {
@@ -244,14 +244,14 @@ export interface CleanupTerminals {
 }
 
 /**
- * A thread whose Claude process runs (or is starting or stopping) has its cwd in the
- * worktree: the daemon's cleanup guard (cleanupHold) counts exactly those, so the
- * prediction reads the process state here. Internal only; nothing on screen says it.
+ * A thread is on the worktree (its cwd is the worktree or inside it), whatever its state;
+ * archived ones are put away: the daemon's cleanup guard (cleanupHold over
+ * worktreeThreads) counts exactly those.
  */
 export function threadHolds(sessions: CleanupSessions, path: string): boolean {
   return sessions.order.some((id) => {
     const s = sessions.byId[id];
-    return s !== undefined && s.state !== "disconnected" && inside(s.worktreePath, path);
+    return s !== undefined && s.archivedAtMs === null && inside(s.worktreePath, path);
   });
 }
 
@@ -270,7 +270,7 @@ export function memberHolds(workspaces: ProjectsWorkspaces, path: string): boole
 
 /**
  * Whether repo.worktree.cleanup would remove the worktree now: the daemon's git verdict
- * (mergedClean) and nothing holds it, as the daemon's cleanupHold checks (a running thread,
+ * (mergedClean) and nothing holds it, as the daemon's cleanupHold checks (a thread on it,
  * a terminal that has not exited, a workspace). The daemon checks again after a fetch.
  */
 export function isCleanable(
@@ -285,5 +285,5 @@ export function isCleanable(
 
 /** The "in main" tag's tooltip. */
 export function cleanableTitle(baseRef: string | undefined): string {
-  return `Clean: no changes, every commit is in ${baseRef || "origin/<default>"}, nothing running in it`;
+  return `Clean: no changes, every commit is in ${baseRef || "origin/<default>"}, no thread or terminal on it`;
 }

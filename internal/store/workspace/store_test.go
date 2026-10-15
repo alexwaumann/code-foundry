@@ -294,10 +294,16 @@ func TestRemoveRepo(t *testing.T) {
 	}{
 		{name: "by name", opts: RemoveRepoOptions{Ref: Ref{Workspace: "x"}, Repo: "api"}, removed: true},
 		{
-			name:    "live thread in the worktree",
+			name:    "a thread on the worktree",
 			threads: []Thread{{ID: "s-1", Name: "fix-login", Cwd: "API/src"}},
 			opts:    RemoveRepoOptions{Ref: Ref{Workspace: "x"}, Repo: "api"},
-			wantErr: ErrFailedPrecondition, errText: "thread fix-login (s-1) running in API; archive it first (that stops Claude)",
+			wantErr: ErrFailedPrecondition, errText: "thread fix-login (s-1) is on API; archive it first",
+		},
+		{
+			name:    "two threads on the worktree",
+			threads: []Thread{{ID: "s-1", Cwd: "API"}, {ID: "s-2", Cwd: "API/src"}},
+			opts:    RemoveRepoOptions{Ref: Ref{Workspace: "x"}, Repo: "api"},
+			wantErr: ErrFailedPrecondition, errText: "thread s-1, thread s-2 are on API; archive them first",
 		},
 		{
 			name:    "thread in another member is fine",
@@ -384,7 +390,7 @@ func TestRemove(t *testing.T) {
 		{
 			name:    "threads in two members",
 			threads: []Thread{{ID: "s-1", Cwd: "WEB"}, {ID: "s-2", Name: "b", Cwd: "API/x"}},
-			wantErr: ErrFailedPrecondition, errText: "thread s-1 in WEB; thread b (s-2) in API", left: []string{"web", "api"},
+			wantErr: ErrFailedPrecondition, errText: "thread s-1 is on WEB; thread b (s-2) is on API; archive them first", left: []string{"web", "api"},
 		},
 		{name: "dirty refused before anything is removed", dirty: "api", wantErr: ErrFailedPrecondition,
 			errText: "uncommitted changes in api (API)", left: []string{"web", "api"}},

@@ -726,10 +726,10 @@ export class World {
     return w;
   }
 
-  /** Why the daemon's cleanupHold keeps a worktree: a live thread, a running terminal, a workspace; "" for nothing. */
+  /** Why the daemon's cleanupHold keeps a worktree: a thread on it, a running terminal, a workspace; "" for nothing. */
   private cleanupHold(path: string): string {
     const thread = this.threadsIn([path])[0];
-    if (thread) return `live thread ${thread.name || thread.id} runs in it`;
+    if (thread) return thread.name ? `thread ${thread.name} is on it` : "a thread is on it";
     for (const t of this.terms.values()) {
       if (t.state === TerminalState.RUNNING && (t.labels[LABEL_WORKTREE] === path || t.cwd === path || t.cwd.startsWith(`${path}/`))) return "a terminal is open in it";
     }
@@ -946,7 +946,8 @@ export class World {
 
   /** Live threads whose cwd is in one of these worktrees (the daemon's removal guard). */
   private threadsIn(paths: readonly string[]): MockSession[] {
-    return [...this.sessions.values()].filter((s) => s.state !== SessionState.DISCONNECTED && paths.some((p) => s.worktreePath === p || s.worktreePath.startsWith(`${p}/`)));
+    // The daemon's worktreeThreads: every thread but an archived one, whatever its state.
+    return [...this.sessions.values()].filter((s) => s.archivedAt === null && paths.some((p) => s.worktreePath === p || s.worktreePath.startsWith(`${p}/`)));
   }
 
   private dropWorktree(path: string): void {
@@ -965,7 +966,7 @@ export class World {
     const member = ws.members.find((m) => m.worktreePath === repoRef) ?? ws.members.find((m) => m.repoId === this.repoRef(repoRef).id);
     if (!member) throw new CommandError("unavailable", `${repoRef} is not a member of workspace ${ws.name}`);
     const busy = this.threadsIn([member.worktreePath])[0];
-    if (busy) throw new CommandError("unavailable", `thread ${busy.name || busy.id} (${busy.id}) running in ${member.worktreePath}; archive it first (that stops Claude)`);
+    if (busy) throw new CommandError("unavailable", `thread ${busy.name || busy.id} (${busy.id}) is on ${member.worktreePath}; archive it first`);
     const wt = [...this.repos.values()].flatMap((r) => r.worktrees).find((w) => w.path === member.worktreePath);
     if (wt?.status.dirty && !force) throw new CommandError("unavailable", `remove worktree ${member.worktreePath}: it has uncommitted changes; use --force`);
     this.dropWorktree(member.worktreePath);
@@ -978,7 +979,7 @@ export class World {
   removeWorkspace(workspace: string, force: boolean): void {
     const ws = this.workspaceRef(workspace);
     const busy = this.threadsIn(ws.members.map((m) => m.worktreePath))[0];
-    if (busy) throw new CommandError("unavailable", `thread ${busy.name || busy.id} (${busy.id}) running in ${busy.worktreePath}; archive them first (that stops Claude)`);
+    if (busy) throw new CommandError("unavailable", `thread ${busy.name || busy.id} (${busy.id}) is on ${busy.worktreePath}; archive them first`);
     const paths = new Set(ws.members.map((m) => m.worktreePath));
     const dirty = [...this.repos.values()].flatMap((r) => r.worktrees).find((w) => paths.has(w.path) && w.status.dirty);
     if (dirty && !force) throw new CommandError("unavailable", `worktree ${dirty.path} has uncommitted changes; use --force`);

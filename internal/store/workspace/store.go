@@ -31,8 +31,9 @@ type Options struct {
 	Repos RepoSource
 	Bus   *bus.Bus     // default: a private bus
 	Log   *slog.Logger // default: slog.Default()
-	// Threads lists the live threads (sessions with a process). Removing a member
-	// worktree a thread runs in is refused. Nil: none.
+	// Threads lists the threads that own their cwd (every one but an archived one, in any
+	// state: the daemon's worktreeThreads). Removing a member
+	// worktree a thread is on is refused. Nil: none.
 	Threads func() []Thread
 	// Trust pre-trusts a new member worktree for Claude, as a session's worktree is
 	// before claude starts. Nil skips it. A failure is logged, not returned.
@@ -235,7 +236,7 @@ func (m *Manager) RemoveRepo(ctx context.Context, o RemoveRepoOptions) (Workspac
 		return Workspace{}, err
 	}
 	if ts := threadsIn(m.threads(), mem.WorktreePath); len(ts) > 0 {
-		return Workspace{}, fmt.Errorf("%w: %s running in %s; %s first (that stops Claude)", ErrFailedPrecondition, describeThreads(ts), mem.WorktreePath, archiveThem(len(ts)))
+		return Workspace{}, fmt.Errorf("%w: %s %s on %s; %s first", ErrFailedPrecondition, describeThreads(ts), isAre(len(ts)), mem.WorktreePath, archiveThem(len(ts)))
 	}
 	gone, rmErr := m.removeMember(ctx, mem, o.Force, o.DeleteBranch)
 	if gone {
@@ -259,13 +260,15 @@ func (m *Manager) Remove(ctx context.Context, o RemoveOptions) error {
 	}
 	threads := m.threads()
 	var busy []string
+	n := 0
 	for _, mem := range w.Members {
 		if ts := threadsIn(threads, mem.WorktreePath); len(ts) > 0 {
-			busy = append(busy, describeThreads(ts)+" in "+mem.WorktreePath)
+			busy = append(busy, describeThreads(ts)+" "+isAre(len(ts))+" on "+mem.WorktreePath)
+			n += len(ts)
 		}
 	}
 	if len(busy) > 0 {
-		return fmt.Errorf("%w: %s; archive them first (that stops Claude)", ErrFailedPrecondition, strings.Join(busy, "; "))
+		return fmt.Errorf("%w: %s; %s first", ErrFailedPrecondition, strings.Join(busy, "; "), archiveThem(n))
 	}
 	if !o.Force {
 		if dirty := m.dirtyMembers(ctx, w); len(dirty) > 0 {

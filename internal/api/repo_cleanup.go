@@ -11,7 +11,7 @@ import (
 )
 
 // WithCleanupHold sets what CleanupWorktrees asks, besides git, before removing a
-// worktree: why a live thread, a running terminal or a workspace keeps it, or "". The
+// worktree: why a thread on it, a running terminal or a workspace keeps it, or "". The
 // daemon joins those stores' snapshots there; nil holds nothing.
 func (h *Repo) WithCleanupHold(hold func(repo.Worktree) string) *Repo {
 	h.cleanupHold = hold

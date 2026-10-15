@@ -353,7 +353,7 @@ test("a merged, clean worktree shows 'in main' and a broom that removes it after
   const row = wtRow(page, "repo-cf", MERGED);
   // The tag and the broom are on the fixture only.
   await expect(row.getByTestId("worktree-cleanable")).toHaveText("in main");
-  await expectTooltip(page, row.getByTestId("worktree-cleanable"), "Clean: no changes, every commit is in origin/main, nothing running in it");
+  await expectTooltip(page, row.getByTestId("worktree-cleanable"), "Clean: no changes, every commit is in origin/main, no thread or terminal on it");
   await expect(page.getByTestId("worktree-cleanable")).toHaveCount(1);
   await expect(page.getByTestId("worktree-cleanup")).toHaveCount(1);
   await expectTooltip(page, row.getByTestId("worktree-cleanup"), "Clean up: remove this worktree");

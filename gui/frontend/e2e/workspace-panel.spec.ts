@@ -196,7 +196,7 @@ test("remove member confirms and the mock applies it; add member and Run in go t
   await gp.hover();
   await gp.getByTestId("member-remove").click();
   await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
-  await expect(page.getByText(/running in .*ghostty-playground\/cf-checkout; archive it first \(that stops Claude\)/)).toBeVisible();
+  await expect(page.getByText(/is on .*ghostty-playground\/cf-checkout; archive it first/)).toBeVisible();
   await expect(surface(page).getByTestId("member-name")).toHaveText(["ghostty-playground", "dotfiles"]);
 
   // Add sketches (workspace.add-repo).
