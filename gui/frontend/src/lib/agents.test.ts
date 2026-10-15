@@ -9,6 +9,7 @@ import {
   agentStatusText,
   agentsLabel,
   agentsSubline,
+  backgroundLabel,
   fmtElapsed,
   parseAgentNote,
   sameAgent,
@@ -109,6 +110,18 @@ describe("labels", () => {
     [3, "3 agents"],
   ])("agentsLabel(%i) = %s", (n, want) => {
     expect(agentsLabel(n)).toBe(want);
+  });
+
+  it.each([
+    [1, 0, "1 agent running in the background"],
+    [3, 0, "3 agents running in the background"],
+    [0, 1, "1 shell running in the background"],
+    [0, 2, "2 shells running in the background"],
+    [2, 1, "2 agents and 1 shell running in the background"],
+    [1, 3, "1 agent and 3 shells running in the background"],
+    [0, 0, ""],
+  ])("backgroundLabel(%i, %i) = %s", (agents, shells, want) => {
+    expect(backgroundLabel(agents, shells)).toBe(want);
   });
 });
 

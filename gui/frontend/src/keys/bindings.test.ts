@@ -63,6 +63,7 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     contextRereadUsd: 0,
     agentsRunning: 0,
     backgroundAgentsRunning: 0,
+    backgroundShellsRunning: 0,
     retry: null,
     ...over,
   };
