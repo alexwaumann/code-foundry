@@ -70,6 +70,13 @@ type Service interface {
 	// (ErrFailedPrecondition when it is not open, a draft, its head moved, or GitHub
 	// refuses), and optionally deletes its head branch.
 	MergePullRequest(ctx context.Context, slug string, number int, r MergeRequest) (MergeResult, error)
+	// SubmitPullRequestReview submits a review as the viewer (ErrInvalidArgument for a
+	// bad event or body; ErrFailedPrecondition, with GitHub's message, when GitHub
+	// refuses) (pr_review.go).
+	SubmitPullRequestReview(ctx context.Context, slug string, number int, r ReviewSubmission) (SubmittedReview, error)
+	// AddPullRequestComment posts a comment on a pull request's conversation as the
+	// viewer. Errors as for SubmitPullRequestReview.
+	AddPullRequestComment(ctx context.Context, slug string, number int, body string) (PostedComment, error)
 }
 
 // Errors returned by the store and the runner. Match with errors.Is.

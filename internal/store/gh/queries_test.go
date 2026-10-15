@@ -15,12 +15,14 @@ func TestQueriesAssemble(t *testing.T) {
 		queryPullRequestDetails: {"PullRequestDetail", "PullRequestSummary", "RateLimitFields", "RollupCounts", "RollupFingerprint"},
 		queryPullRequestFull: {"ActorFields", "CheckContexts", "PullRequestDetail", "PullRequestSummary", "RateLimitFields",
 			"RequestedReviewerFields", "RollupCounts", "RollupFingerprint"},
-		queryReviewerCandidates: {"RateLimitFields", "RequestedReviewerFields"},
-		queryRevertPullRequest:  nil,
-		queryMergePullRequest:   nil,
-		querySearchRepositories: {"RateLimitFields", "RepositoryCard"},
-		queryLookupRepository:   {"RateLimitFields", "RepositoryCard"},
-		queryPublishOwners:      {"RateLimitFields"},
+		queryReviewerCandidates:   {"RateLimitFields", "RequestedReviewerFields"},
+		queryRevertPullRequest:    nil,
+		queryMergePullRequest:     nil,
+		queryAddPullRequestReview: nil,
+		queryAddComment:           nil,
+		querySearchRepositories:   {"RateLimitFields", "RepositoryCard"},
+		queryLookupRepository:     {"RateLimitFields", "RepositoryCard"},
+		queryPublishOwners:        {"RateLimitFields"},
 	}
 	if qs, _ := loadQueries(); len(qs) != len(wantFrags) {
 		t.Errorf("queries = %d files, want %d", len(qs), len(wantFrags))

@@ -1,0 +1,8 @@
+# Submits a review as the viewer (SubmitPullRequestReview). With an event GitHub submits
+# it at once: no pending draft is left behind. body is null for an approval without
+# text.
+mutation AddPullRequestReview($id: ID!, $event: PullRequestReviewEvent!, $body: String) {
+  addPullRequestReview(input: { pullRequestId: $id, event: $event, body: $body }) {
+    pullRequestReview { id url state submittedAt author { login } }
+  }
+}

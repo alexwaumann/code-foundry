@@ -204,9 +204,9 @@ func keepBranch(d *FullPullRequest) string {
 // no or an unknown type) is a failed precondition with GitHub's message, and a moved
 // head or base says so.
 func mergeRefused(k fullKey, pr *PullRequest, pe *PartialError) error {
-	cls := pe.Unwrap()
-	if errors.Is(cls, ErrRateLimited) || errors.Is(cls, ErrPermissionDenied) || errors.Is(cls, ErrNotFound) {
-		return cls
+	err := writeRefused(pe) // pr_review.go
+	if !errors.Is(err, ErrFailedPrecondition) {
+		return err
 	}
 	switch branchMoved(pe) {
 	case "head":
@@ -216,11 +216,7 @@ func mergeRefused(k fullKey, pr *PullRequest, pe *PartialError) error {
 		return fmt.Errorf("%w: pull request #%d: its base branch %s changed on GitHub during the merge; "+
 			"refresh and try again", ErrFailedPrecondition, k.number, pr.BaseRef)
 	}
-	msgs := make([]string, 0, len(pe.Errors))
-	for _, e := range pe.Errors {
-		msgs = append(msgs, e.Message)
-	}
-	return fmt.Errorf("%w: %s", ErrFailedPrecondition, strings.Join(msgs, "; "))
+	return err
 }
 
 // headDiffers reports whether the client expects another head than d has.

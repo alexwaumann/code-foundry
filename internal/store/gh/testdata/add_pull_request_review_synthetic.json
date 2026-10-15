@@ -1,0 +1,13 @@
+{
+  "data": {
+    "addPullRequestReview": {
+      "pullRequestReview": {
+        "id": "PRR_kwDOVAtW7M7Bm4Qz",
+        "url": "https://github.com/alexwaumann/code-foundry/pull/120#pullrequestreview-3245901875",
+        "state": "CHANGES_REQUESTED",
+        "submittedAt": "2026-10-15T09:41:07Z",
+        "author": { "login": "kim" }
+      }
+    }
+  }
+}

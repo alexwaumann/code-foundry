@@ -1,0 +1,7 @@
+# Posts a comment on a pull request's conversation as the viewer (AddPullRequestComment).
+# subjectId is the pull request's node id; the comment is an issue comment, not a review.
+mutation AddComment($id: ID!, $body: String!) {
+  addComment(input: { subjectId: $id, body: $body }) {
+    commentEdge { node { id url createdAt } }
+  }
+}
