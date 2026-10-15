@@ -666,16 +666,16 @@ export type ThreadItemsSnapshot = Message<"codefoundry.v1.ThreadItemsSnapshot"> 
   pending: ThreadPendingRequest[];
 
   /**
-   * The thread's MCP servers as last checked; unset when not checked since its process
-   * started, or when it is not running.
+   * The thread's MCP servers as last checked, kept while it is not running; unset when
+   * Claude never reported them.
    *
    * @generated from field: codefoundry.v1.ThreadMcpStatus mcp = 5;
    */
   mcp?: ThreadMcpStatus | undefined;
 
   /**
-   * The slash commands the running thread offers (ThreadService.SlashCommands); empty
-   * when it is not running.
+   * The slash commands the thread offers (ThreadService.SlashCommands), kept while it
+   * is not running; empty when Claude never answered a handshake.
    *
    * @generated from field: repeated codefoundry.v1.SlashCommand commands = 6;
    */
@@ -900,8 +900,7 @@ export type ThreadEvent = Message<"codefoundry.v1.ThreadEvent"> & {
     case: "pendingSnapshot";
   } | {
     /**
-     * Watch only: the thread's MCP servers were checked again, or dropped (status unset:
-     * the process ended).
+     * Watch only: the thread's MCP servers were checked again.
      *
      * @generated from field: codefoundry.v1.ThreadMcpChange mcp = 7;
      */
@@ -909,8 +908,7 @@ export type ThreadEvent = Message<"codefoundry.v1.ThreadEvent"> & {
     case: "mcp";
   } | {
     /**
-     * Watch only: the thread's slash commands changed (Claude's list changed, or the
-     * process ended: empty).
+     * Watch only: the thread's slash commands changed (Claude's list changed).
      *
      * @generated from field: codefoundry.v1.ThreadSlashCommandsChange commands = 8;
      */
@@ -1115,7 +1113,8 @@ export type ThreadMcpChange = Message<"codefoundry.v1.ThreadMcpChange"> & {
   seq: bigint;
 
   /**
-   * Unset: the thread has none any more (its process ended).
+   * Always set since 2026-10-15 (the status outlives the process); unset was "none any
+   * more".
    *
    * @generated from field: codefoundry.v1.ThreadMcpStatus status = 3;
    */
@@ -1807,7 +1806,7 @@ export type ThreadSlashCommandsChange = Message<"codefoundry.v1.ThreadSlashComma
   seq: bigint;
 
   /**
-   * The whole new list; empty when the process ended.
+   * The whole new list.
    *
    * @generated from field: repeated codefoundry.v1.SlashCommand commands = 3;
    */
@@ -1843,7 +1842,7 @@ export const SlashCommandsRequestSchema: GenMessage<SlashCommandsRequest> = /*@_
  */
 export type SlashCommandsResponse = Message<"codefoundry.v1.SlashCommandsResponse"> & {
   /**
-   * Empty when the thread is not running.
+   * Empty when Claude never answered the thread's handshake.
    *
    * @generated from field: repeated codefoundry.v1.SlashCommand commands = 1;
    */
@@ -2127,8 +2126,13 @@ export const ThreadService: GenService<{
     output: typeof ThreadEventSchema;
   },
   /**
-   * Send sends a user message to a connected thread. Allowed while a turn runs:
-   * Claude queues it or folds it in. A message whose first non-blank line starts with a
+   * Send sends a user message. Allowed while a turn runs: Claude queues it or folds it
+   * in. A thread that is not running starts with the message as its first prompt: the
+   * returned item is in the timeline at once, and a start that fails is an error item
+   * ("Claude did not start: <reason>", status ERROR "did not start"), not an RPC error.
+   * The RPC returns at once with the item: a message to a starting thread is delivered
+   * after its handshake, one to a closing thread once a new process started after the
+   * old one exited. A message whose first non-blank line starts with a
    * slash command the app replaces (/model, /effort, /fast, /mcp, /rename, /clear, and
    * the aliases /reset, /new, /name) is INVALID_ARGUMENT, nothing sent or recorded; the
    * error's message is a sentence pointing at the app's control, shown as it is.
@@ -2141,7 +2145,8 @@ export const ThreadService: GenService<{
     output: typeof SendThreadMessageResponseSchema;
   },
   /**
-   * Respond answers a pending permission request or question.
+   * Respond answers a pending permission request or question. A thread that is not
+   * running has none (FAILED_PRECONDITION).
    *
    * @generated from rpc codefoundry.v1.ThreadService.Respond
    */
@@ -2151,7 +2156,8 @@ export const ThreadService: GenService<{
     output: typeof RespondThreadResponseSchema;
   },
   /**
-   * Interrupt stops the running turn; pending requests are withdrawn.
+   * Interrupt stops the running turn; pending requests are withdrawn. A no-op on a
+   * thread that is not running.
    *
    * @generated from rpc codefoundry.v1.ThreadService.Interrupt
    */
@@ -2161,8 +2167,8 @@ export const ThreadService: GenService<{
     output: typeof InterruptThreadResponseSchema;
   },
   /**
-   * SetModel switches a connected thread's model (from its next request) and records
-   * it for later spawns.
+   * SetModel switches a running thread's model (from its next request) and records it
+   * for later spawns; on a thread that is not running it only records it.
    *
    * @generated from rpc codefoundry.v1.ThreadService.SetModel
    */
@@ -2172,8 +2178,9 @@ export const ThreadService: GenService<{
     output: typeof SetThreadModelResponseSchema;
   },
   /**
-   * SetPermissionMode switches a connected thread's permission mode: SUPERVISED,
-   * ACCEPT_EDITS or AUTO (UNSPECIFIED, Claude's default, cannot be selected live).
+   * SetPermissionMode switches a thread's permission mode: SUPERVISED, ACCEPT_EDITS or
+   * AUTO (UNSPECIFIED, Claude's default, cannot be selected live). On a thread that is
+   * not running it only records it.
    *
    * @generated from rpc codefoundry.v1.ThreadService.SetPermissionMode
    */
@@ -2183,10 +2190,11 @@ export const ThreadService: GenService<{
     output: typeof SetThreadPermissionModeResponseSchema;
   },
   /**
-   * SetEffort changes a connected thread's effort level. Claude has no live effort
-   * switch, so the daemon restarts the process with --resume and the new --effort: at
-   * once when the thread is idle, else once the running turn ends (Session.effort_pending
-   * says so meanwhile). The row records the effort for later spawns either way.
+   * SetEffort changes a thread's effort level. Claude has no live effort switch, so the
+   * daemon restarts a running process with --resume and the new --effort: at once when
+   * the thread is idle, else once the running turn ends (Session.effort_pending says so
+   * meanwhile). The row records the effort for later spawns either way; a thread that is
+   * not running only records it.
    *
    * @generated from rpc codefoundry.v1.ThreadService.SetEffort
    */
@@ -2199,9 +2207,10 @@ export const ThreadService: GenService<{
    * McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
    * (mcp_status) at the start of every turn, again every few seconds while a server is
    * still connecting, and after McpReconnect; Watch carries each new answer (the `mcp`
-   * event). refresh asks Claude now (a connected thread only). Without it a connected
-   * thread not checked yet is asked once; a thread that is not running has none (status
-   * unset). See docs/notes/mcp-panel.md.
+   * event). The last answer is kept while the thread is not running, also across daemon
+   * restarts. refresh asks Claude now, starting a stopped thread without a prompt.
+   * Without it a running thread not checked yet is asked once; status is unset when
+   * Claude never reported. See docs/notes/mcp-panel.md.
    *
    * @generated from rpc codefoundry.v1.ThreadService.McpStatus
    */
@@ -2211,8 +2220,9 @@ export const ThreadService: GenService<{
     output: typeof McpStatusResponseSchema;
   },
   /**
-   * McpReconnect reconnects one MCP server of a connected thread (also how a login made
-   * out of band, `claude /mcp` in a shell, is picked up), then checks the servers again.
+   * McpReconnect reconnects one MCP server of a thread, starting a stopped thread
+   * without a prompt (also how a login made out of band, `claude /mcp` in a shell, is
+   * picked up), then checks the servers again.
    * A server that still fails is not an RPC error: the response's error says why and the
    * status shows it. An unknown server is NOT_FOUND.
    *
@@ -2229,7 +2239,8 @@ export const ThreadService: GenService<{
    * list it pushes when skills change, minus the commands the daemon denies (replaced by
    * the app's own controls, terminal-only, or retired; never a skill or a user, project
    * or plugin command). In Claude's order: its skills, then its built-ins, then plugin
-   * skills. Empty when the thread is not running. Watch carries every change (the
+   * skills. What Claude last reported, kept while the thread is not running (also across
+   * daemon restarts); empty when it never answered a handshake. Watch carries every change (the
    * `commands` event). See docs/notes/slash-commands-1-daemon.md.
    *
    * @generated from rpc codefoundry.v1.ThreadService.SlashCommands

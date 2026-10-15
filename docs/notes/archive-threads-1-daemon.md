@@ -1,5 +1,9 @@
 # Archived threads, PR 1 of 2: daemon, command, API mapping
 
+Update 2026-10-15 (`thread-lifecycle.md`): `session.reconnect` and `session.close` are gone; a
+message starts a stopped thread (and unarchives it), the daemon stops idle ones, and
+archive also asks while background agents or shells run.
+
 Status: built on branch `t3code/archive-daemon`. `make check` green; exercised end to end
 with an isolated daemon, the CLI and haiku threads (below). PR 2 (the sidebar's archived
 section and the row menu's Archive / Unarchive) follows.

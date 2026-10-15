@@ -23,7 +23,10 @@ type runner struct {
 	closeReq chan struct{}
 	cdReq    chan cdRequest // RunIn; capacity 1, latest wins
 	stopReq  chan struct{}
+	idleReq  chan idleCheck // stopIdle; capacity 1 (lifecycle.go)
 	done     chan struct{}
+	// ready is closed once Claude first answered the handshake (lifecycle.go running).
+	ready chan struct{}
 
 	// ---- run goroutine only (st and tail are set by spawnStream before run starts) ----
 	st    *streamState
@@ -36,6 +39,15 @@ type runner struct {
 	atPromptSince time.Time
 
 	closing bool
+	// disconnectAs is the disconnect reason a close the daemon began itself records
+	// instead of ReasonClosed (ReasonIdle); empty for a Close.
+	disconnectAs string
+	// startedAt is when the running process was spawned (the idle stop's grace).
+	startedAt time.Time
+	// startFailed: the process did not come up (no handshake); the thread ends with
+	// status error ReasonStartFailed.
+	startFailed bool
+	readyClosed bool
 	// closeStatus/closeReason are the status when the close began: the close interrupts
 	// a running turn, so the reading at exit no longer says it was busy (see finish).
 	closeStatus Status
@@ -84,7 +96,9 @@ func newRunner(m *Manager, id, cwd string, l launch) *runner {
 		closeReq: make(chan struct{}, 1),
 		cdReq:    make(chan cdRequest, 1),
 		stopReq:  make(chan struct{}, 1),
+		idleReq:  make(chan idleCheck, 1),
 		done:     make(chan struct{}),
+		ready:    make(chan struct{}),
 		state:    StateStarting,
 		usage:    newThreadUsage(time.Time{}, m.opts.Now, m.opts.AgentIdleClose),
 	}
@@ -324,13 +338,13 @@ func (r *runner) publishStatus() {
 }
 
 // finish detaches the runner, applying the final state. Every disconnect of a live
-// process goes through here (exit, crash, close, daemon stop): the session keeps the
+// process goes through here (exit, crash, close, idle stop, daemon stop): the session
+// keeps the slash commands and MCP status Claude last reported (threadcache_db.go) and the
 // status it had at that moment, read fresh (the published one may lag by the
 // debounce), or as it was when a close began; disconnectedStatus turns busy
 // into interrupted.
 func (r *runner) finish(fn func(*Session)) {
 	r.finished = true
-	r.st.log.setSlashCommands(nil) // only a running thread has them
 	for _, t := range []*time.Timer{r.closeTimer, r.debounce} {
 		if t != nil {
 			t.Stop()
@@ -341,6 +355,9 @@ func (r *runner) finish(fn func(*Session)) {
 		st, reason = r.closeStatus, r.closeReason
 	}
 	st, reason = disconnectedStatus(st, reason)
+	if r.startFailed {
+		st, reason = StatusError, ReasonStartFailed
+	}
 	now := r.m.opts.Now()
 	r.m.detach(r, func(s *Session) {
 		fn(s)

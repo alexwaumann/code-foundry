@@ -473,9 +473,8 @@ func (f *Fake) appendItem(id string, it session.Item) (session.Item, session.Thr
 }
 
 // Send records "Send <id> <text>" (" attachments=<a,b>" and " composer=<text>" when
-// set) and appends a
-// user_message item. The session must not be disconnected. Sending unarchives and
-// unsnoozes.
+// set) and appends a user_message item. A disconnected session becomes CONNECTED (the
+// Manager starts it). Sending unarchives and unsnoozes.
 func (f *Fake) Send(_ context.Context, id string, msg session.Message) (session.Item, error) {
 	f.mu.Lock()
 	call := "Send " + id + " " + msg.Text
@@ -490,24 +489,26 @@ func (f *Fake) Send(_ context.Context, id string, msg session.Message) (session.
 		return session.Item{}, err
 	}
 	s, err := f.get(id)
-	if err == nil && s.State == session.StateDisconnected {
-		err = fmt.Errorf("%w: thread %s is disconnected", session.ErrFailedPrecondition, id)
-	}
 	if err != nil {
 		f.mu.Unlock()
 		return session.Item{}, err
 	}
 	f.next++
 	it, ev := f.appendItem(id, session.Item{ID: fmt.Sprintf("u-%d", f.next), Kind: session.KindUserMessage, Text: msg.Text, Attachments: msg.Attachments, ComposerText: msg.ComposerText})
-	unarchived := !s.ArchivedAt.IsZero() || !s.SnoozedUntil.IsZero()
-	if unarchived {
+	// A message starts a stopped thread (no handshake to fake: connected at once).
+	started := s.State == session.StateDisconnected
+	if started {
+		s.State, s.DisconnectReason = session.StateConnected, ""
+	}
+	changed := started || !s.ArchivedAt.IsZero() || !s.SnoozedUntil.IsZero()
+	if changed {
 		s.ArchivedAt, s.SnoozedUntil = time.Time{}, time.Time{}
 		f.byID[id] = s
 		f.rebuild()
 	}
 	f.mu.Unlock()
 	bus.Publish(f.bus, ev)
-	if unarchived {
+	if changed {
 		bus.Publish[session.Event](f.bus, session.Updated{Session: s})
 	}
 	return it, nil

@@ -223,11 +223,12 @@ type ItemsSnapshot struct {
 	Seq     uint64
 	Items   []Item
 	Pending []PendingRequest
-	// Mcp is the thread's MCP servers as last checked (mcp.go); nil when not checked
-	// since the process started, or when it is not running.
+	// Mcp is the thread's MCP servers as last checked (mcp.go), kept while it is not
+	// running; nil when Claude never reported them.
 	Mcp *McpStatus
-	// Commands are the slash commands the running thread offers (slashcommands.go);
-	// nil when it is not running or has not answered the handshake.
+	// Commands are the slash commands the thread offers (slashcommands.go): what Claude
+	// last reported, kept while it is not running; nil when it never answered a
+	// handshake.
 	Commands []SlashCommand
 	// Agents are the thread's subagent runs, in spawn order (agents.go), without usage;
 	// also while it is not running (the persisted runs).
@@ -361,10 +362,17 @@ type threadLog struct {
 	byID    map[string]int
 	nextOrd int64
 	mcp     mcpState
-	// commands: the running process's slash commands (slashcommands.go).
+	// commands: the slash commands Claude last reported (slashcommands.go); kept, and
+	// persisted, while the thread is not running.
 	commands []SlashCommand
 	// agents: the thread's subagent runs (agents_runner.go setAgents).
 	agents []AgentRun
+	// saveCommands and saveMcp persist the commands and the MCP status when they change
+	// (threadcache_db.go); nil in tests that build a log alone. Called without mu.
+	saveCommands func([]SlashCommand)
+	saveMcp      func(*McpStatus)
+	// saveMu orders the MCP saves (persistMcp); taken without mu.
+	saveMu sync.Mutex
 }
 
 func newThreadLog(id string, b *bus.Bus, now func() time.Time, items []Item) *threadLog {
@@ -395,6 +403,16 @@ func (t *threadLog) get(id string) (Item, bool) {
 		return Item{}, false
 	}
 	return t.items[i], true
+}
+
+// last returns the newest item.
+func (t *threadLog) last() (Item, bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if len(t.items) == 0 {
+		return Item{}, false
+	}
+	return t.items[len(t.items)-1], true
 }
 
 // append adds it with the next ordinal (an existing id is updated instead) and
@@ -575,6 +593,22 @@ func (m *Manager) thread(ctx context.Context, id string) (*threadLog, error) {
 	}
 	t := newThreadLog(id, m.opts.Bus, m.opts.Now, items)
 	t.agents = logAgents(runs)
+	// What Claude last reported outlives its process (threadcache_db.go).
+	cmds, mcp, err := loadThreadCache(ctx, m.opts.DB, id)
+	if err != nil {
+		m.log.Warn("load thread cache", "session", id, "err", err)
+	}
+	t.commands, t.mcp.status = cmds, mcp
+	t.saveCommands = func(cs []SlashCommand) {
+		if err := saveSlashCommands(context.Background(), m.opts.DB, id, cs); err != nil {
+			m.log.Error("persist slash commands", "session", id, "err", err)
+		}
+	}
+	t.saveMcp = func(s *McpStatus) {
+		if err := saveMcpStatus(context.Background(), m.opts.DB, id, s); err != nil {
+			m.log.Error("persist MCP status", "session", id, "err", err)
+		}
+	}
 	m.threads[id] = t
 	if idle {
 		// A run the daemon lost (a crash) left items open; nothing will finish them.

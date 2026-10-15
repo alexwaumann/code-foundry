@@ -378,9 +378,9 @@ func TestBgShellBlocksTheEffortRestart(t *testing.T) {
 // every event the runner had taken, and the maybeRestart after it, is done.
 func (e *env) restartBegun(id string) bool {
 	e.t.Helper()
-	r, s, err := e.m.liveStream(id)
-	if err != nil {
-		e.t.Fatal(err)
+	r, _, _, s, err := e.m.lifecycle(id)
+	if err != nil || r == nil {
+		e.t.Fatalf("thread %s is not running (%v)", id, err)
 	}
 	if _, err := e.m.SetEffort(e.ctx(), id, s.Effort); err != nil {
 		e.t.Fatal(err)

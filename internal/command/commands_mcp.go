@@ -47,7 +47,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,
-				{Name: "refresh", Type: Bool, Description: "Ask Claude now instead of showing the last check"},
+				{Name: "refresh", Type: Bool, Description: "Ask Claude now instead of showing the last check (starts Claude if it is not running)"},
 				{Name: "full", Type: Bool, Description: "List each server's tools with their hints"},
 			},
 			When: hasSession,
@@ -63,7 +63,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 		Command{
 			Name:  "thread.mcp-reconnect",
 			Title: "Reconnect Thread MCP Server",
-			Description: "Reconnect one of a connected thread's MCP servers, then check them again. " +
+			Description: "Reconnect one of a thread's MCP servers (starting Claude if it is not running), then check them again. " +
 				"After logging in to a server with /mcp in an interactive claude (a shell in the bottom panel), this picks the login up.",
 			Category: "Thread",
 			Args: []ArgSpec{
@@ -167,10 +167,10 @@ func toolHints(t *v1.McpTool) string {
 }
 
 // FormatMcpStatus renders a thread's MCP servers as a table (now dates the check); full
-// lists each server's tools under it. A nil status is a thread that is not running.
+// lists each server's tools under it. A nil status: Claude never reported them.
 func FormatMcpStatus(st *v1.ThreadMcpStatus, full bool, now time.Time) string {
 	if st == nil {
-		return "no MCP status: the thread is not running (reconnect it first)"
+		return "no MCP status yet: Claude has not reported this thread's MCP servers"
 	}
 	servers := st.GetServers()
 	if len(servers) == 0 {

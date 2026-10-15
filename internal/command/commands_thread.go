@@ -55,10 +55,11 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextSession, Description: "Thread id"}
 	return r.RegisterAll(
 		Command{
-			Name:        "thread.send",
-			Title:       "Send to Thread",
-			Description: "Send a message to a thread, also while it works (Claude queues it or folds it in).",
-			Category:    "Thread",
+			Name:  "thread.send",
+			Title: "Send to Thread",
+			Description: "Send a message to a thread, also while it works (Claude queues it or folds it in). " +
+				"A thread whose Claude is not running starts with it.",
+			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,
 				{Name: "text", Type: String, Required: true, Positional: true, Description: "The message"},
@@ -169,7 +170,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		Command{
 			Name:        "thread.set-model",
 			Title:       "Set Thread Model",
-			Description: "Switch a connected thread's model from its next request.",
+			Description: "Switch a thread's model from its next request.",
 			Category:    "Thread",
 			Args: []ArgSpec{
 				idArg,
@@ -188,7 +189,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		Command{
 			Name:        "thread.set-mode",
 			Title:       "Set Thread Permissions",
-			Description: "Switch a connected thread's permission mode: supervised (confirm every tool call), accept-edits, or auto.",
+			Description: "Switch a thread's permission mode: supervised (confirm every tool call), accept-edits, or auto.",
 			Category:    "Thread",
 			Args: []ArgSpec{
 				idArg,
@@ -209,8 +210,8 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 		Command{
 			Name:  "thread.set-effort",
 			Title: "Set Thread Effort",
-			Description: "Change a connected thread's effort level. Claude restarts with it (resuming the " +
-				"conversation) at once when idle, else when the running turn ends.",
+			Description: "Change a thread's effort level. A running Claude restarts with it (resuming the " +
+				"conversation) at once when idle, else when the running turn ends; otherwise the next message starts it with it.",
 			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,
@@ -224,13 +225,23 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				}
 				s := res.Msg.GetSession()
 				msg := "thread " + sessionLabel(s) + " restarts with effort " + s.GetEffort()
-				if s.GetEffortPending() && onTurn(s) {
+				switch {
+				case s.GetEffortPending() && onTurn(s):
 					msg = "thread " + sessionLabel(s) + " switches to effort " + s.GetEffort() + " after this turn"
+				case notRunning(s):
+					msg = "thread " + sessionLabel(s) + " uses effort " + s.GetEffort() + " from its next message"
 				}
 				return Result{Message: msg, JSON: s}, nil
 			},
 		},
 	)
+}
+
+// notRunning: s has no Claude process up (stopped, or on its way down); a setting
+// applies when the next message starts it.
+func notRunning(s *v1.Session) bool {
+	st := s.GetState()
+	return st == v1.SessionState_SESSION_STATE_DISCONNECTED || st == v1.SessionState_SESSION_STATE_CLOSING
 }
 
 // questionTexts are the questions of the question item itemID.

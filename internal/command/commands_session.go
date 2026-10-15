@@ -25,7 +25,6 @@ type SessionBackend interface {
 	List(context.Context, *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error)
 	Get(context.Context, *connect.Request[v1.GetSessionRequest]) (*connect.Response[v1.GetSessionResponse], error)
 	Rename(context.Context, *connect.Request[v1.RenameSessionRequest]) (*connect.Response[v1.RenameSessionResponse], error)
-	Close(context.Context, *connect.Request[v1.CloseSessionRequest]) (*connect.Response[v1.CloseSessionResponse], error)
 	Reconnect(context.Context, *connect.Request[v1.ReconnectSessionRequest]) (*connect.Response[v1.ReconnectSessionResponse], error)
 	Remove(context.Context, *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error)
 	RunIn(context.Context, *connect.Request[v1.RunInSessionRequest]) (*connect.Response[v1.RunInSessionResponse], error)
@@ -123,20 +122,6 @@ func linkedPRs(s *v1.Session) string {
 	return strings.Join(out, ",")
 }
 
-func sessionStateName(s v1.SessionState) string {
-	return strings.ToLower(strings.TrimPrefix(s.String(), "SESSION_STATE_"))
-}
-
-// listState is session.list's STATE cell: the state, with the disconnect reason when
-// disconnected ("disconnected (daemon stopped)").
-func listState(s *v1.Session) string {
-	st := sessionStateName(s.GetState())
-	if s.GetState() == v1.SessionState_SESSION_STATE_DISCONNECTED && s.GetDisconnectReason() != "" {
-		st += " (" + s.GetDisconnectReason() + ")"
-	}
-	return st
-}
-
 // listStatus is session.list's STATUS cell: the status, with the reason for ERROR
 // ("error (interrupted)").
 func listStatus(s *v1.Session) string {
@@ -176,9 +161,10 @@ func minutesLeft(d time.Duration) string {
 	}
 }
 
-// RegisterSession registers session.new, session.list, session.focus, session.close,
-// session.reconnect, session.rename, session.fork, session.remove, session.run-in,
-// session.pin, session.archive, and session.snooze. The user-facing word is "thread" (titles, descriptions, messages);
+// RegisterSession registers session.new, session.list, session.focus, session.rename,
+// session.fork, session.remove, session.run-in, session.pin, session.archive, and
+// session.snooze, and the hidden session.reconnect. There is no close: a message starts a
+// stopped thread and the daemon stops idle ones (docs/notes/thread-lifecycle.md). The user-facing word is "thread" (titles, descriptions, messages);
 // command names and identifiers keep "session".
 func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextSession, Description: "Thread id"}
@@ -261,7 +247,7 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 		Command{
 			Name:        "session.list",
 			Title:       "List Threads",
-			Description: "List every thread, connected and disconnected.",
+			Description: "List every thread.",
 			Category:    "Thread",
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
 				res, err := b.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))
@@ -270,12 +256,12 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				}
 				var sb strings.Builder
 				tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
-				_, _ = fmt.Fprintln(tw, "ID\tNAME\tSTATE\tSTATUS\tREASON\tWORKSPACE\tPRS\tCONTEXT\tWORKTREE")
+				// No state column: whether Claude runs is the daemon's business (--json
+				// keeps state and disconnect_reason).
+				_, _ = fmt.Fprintln(tw, "ID\tNAME\tSTATUS\tREASON\tWORKSPACE\tPRS\tCONTEXT\tWORKTREE")
 				now := time.Now()
 				for _, s := range res.Msg.GetSessions() {
-					// The status and its reason persist once disconnected (a thread that
-					// was asking a question still is); the state cell says why it is.
-					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), cmp.Or(s.GetName(), "-"), listState(s),
+					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.GetId(), cmp.Or(s.GetName(), "-"),
 						listStatus(s), cmp.Or(s.GetStatusReason(), "-"), cmp.Or(s.GetWorkspaceId(), "-"), linkedPRs(s),
 						listContext(s, now), s.GetWorktreePath())
 				}
@@ -295,29 +281,16 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				return Result{Message: fmt.Sprintf("delivered=%d", n), JSON: EmitResult{Delivered: n}}, nil
 			},
 		},
-		Command{
-			Name:        "session.close",
-			Title:       "Close Thread",
-			Description: "End Claude gracefully. The thread stays listed, disconnected, until removed.",
-			Category:    "Thread",
-			// Not cmd+w: the side panel closes its active tab with it (ReservedChords).
-			Keybindings: []string{"cmd+shift+w"},
-			Args:        []ArgSpec{idArg},
-			When:        hasSession,
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				id := a.String("id")
-				if _, err := b.Close(ctx, connect.NewRequest(&v1.CloseSessionRequest{Id: id})); err != nil {
-					return Result{}, err
-				}
-				return Result{Message: "closed thread " + id}, nil
-			},
-		},
+		// Hidden (not listed: no palette entry, chord or CLI verb) and only until the GUI
+		// stops calling it (PR C of the thread lifecycle): today's GUI sends only to a
+		// connected thread and offers its Reconnect card otherwise. A message starts a
+		// stopped thread by itself (docs/notes/thread-lifecycle.md).
 		Command{
 			Name:        "session.reconnect",
 			Title:       "Reconnect Thread",
-			Description: "Resume a disconnected thread's conversation in a new Claude process.",
+			Description: "Resume a stopped thread's conversation in a new Claude process (for clients that predate start-on-send).",
 			Category:    "Thread",
-			Keybindings: []string{"cmd+shift+r"},
+			Hidden:      true,
 			Args:        []ArgSpec{idArg},
 			When:        hasSession,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
@@ -328,14 +301,14 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 				}
 				if st := cur.Msg.GetSession().GetState(); st != v1.SessionState_SESSION_STATE_DISCONNECTED {
 					return Result{}, connect.NewError(connect.CodeFailedPrecondition,
-						fmt.Errorf("thread %s is %s; only a disconnected thread can be reconnected", id, sessionStateName(st)))
+						fmt.Errorf("thread %s is %s; only a stopped thread can be started this way", id, strings.ToLower(strings.TrimPrefix(st.String(), "SESSION_STATE_"))))
 				}
 				res, err := b.Reconnect(ctx, connect.NewRequest(&v1.ReconnectSessionRequest{Id: id}))
 				if err != nil {
 					return Result{}, err
 				}
 				s := res.Msg.GetSession()
-				msg := "reconnecting thread " + sessionLabel(s)
+				msg := "starting thread " + sessionLabel(s)
 				if s.GetLastError() != "" {
 					msg += ": " + s.GetLastError()
 				}
@@ -378,11 +351,11 @@ func RegisterSession(r *Registry, b SessionBackend, e Emitter) error {
 		Command{
 			Name:        "session.remove",
 			Title:       "Remove Thread",
-			Description: "Forget a thread, closing it first if it is connected.",
+			Description: "Forget a thread, stopping Claude first if it runs.",
 			Category:    "Thread",
 			Args:        []ArgSpec{idArg},
 			When:        hasSession,
-			Confirm:     "Remove thread {id}? It is closed first if connected, and its row is forgotten.",
+			Confirm:     "Remove thread {id}? Claude stops if it runs, and the thread is forgotten.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				id := a.String("id")
 				if _, err := b.Remove(ctx, connect.NewRequest(&v1.RemoveSessionRequest{Id: id})); err != nil {

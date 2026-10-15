@@ -114,15 +114,14 @@ func TestSessionCommands(t *testing.T) {
 			wantMsg:  "created thread s1 in /wt",
 			wantReqs: []proto.Message{&v1.CreateSessionRequest{WorktreePath: "/wt", Model: "claude-opus-4-8[1m]", PermissionMode: auto}}, wantIntent: focusIntent("s1")},
 		{name: "new model outside the registry", cmd: "session.new", args: map[string]string{"worktree": "/wt", "model": "claude-opus-5-5"}, wantErr: command.ErrInvalidArgs},
-		{name: "close from context", cmd: "session.close", ctx: command.Context{ActiveSessionID: "s5"},
-			wantMsg: "closed thread s5", wantReqs: []proto.Message{&v1.CloseSessionRequest{Id: "s5"}}},
-		{name: "close explicit id", cmd: "session.close", args: map[string]string{"id": "s6"},
-			wantReqs: []proto.Message{&v1.CloseSessionRequest{Id: "s6"}}},
-		{name: "close unavailable", cmd: "session.close", wantErr: command.ErrUnavailable},
-		{name: "reconnect disconnected", cmd: "session.reconnect", args: map[string]string{"id": "s5"}, current: disconnected,
-			wantMsg:  "reconnecting thread s5",
+		// Gone (docs/notes/thread-lifecycle.md): a message starts a thread, the daemon
+		// stops idle ones.
+		{name: "no close", cmd: "session.close", args: map[string]string{"id": "s5"}, wantErr: command.ErrUnknownCommand},
+		// Hidden, kept for today's GUI until PR C: runs, but is never listed.
+		{name: "hidden reconnect starts a stopped thread", cmd: "session.reconnect", args: map[string]string{"id": "s5"}, current: disconnected,
+			wantMsg:  "starting thread s5",
 			wantReqs: []proto.Message{&v1.GetSessionRequest{Id: "s5"}, &v1.ReconnectSessionRequest{Id: "s5"}}},
-		{name: "reconnect refused while connected", cmd: "session.reconnect", args: map[string]string{"id": "s5"},
+		{name: "hidden reconnect refused while running", cmd: "session.reconnect", args: map[string]string{"id": "s5"},
 			wantCode: connect.CodeFailedPrecondition, wantReqs: []proto.Message{&v1.GetSessionRequest{Id: "s5"}}},
 		{name: "rename", cmd: "session.rename", ctx: command.Context{ActiveSessionID: "s5"}, args: map[string]string{"name": "new"},
 			wantMsg: "renamed thread new (s5)", wantReqs: []proto.Message{&v1.RenameSessionRequest{Id: "s5", Name: "new"}}},
@@ -157,42 +156,44 @@ func TestSessionCommands(t *testing.T) {
 			wantMsg: "unpinned thread s5", wantReqs: []proto.Message{&v1.PinSessionRequest{Id: "s5"}}},
 		{name: "pin unavailable without a thread", cmd: "session.pin", wantErr: command.ErrUnavailable},
 		{name: "focus", cmd: "session.focus", ctx: command.Context{ActiveSessionID: "s7"}, wantMsg: "delivered=1", wantIntent: focusIntent("s7")},
-		{name: "list", cmd: "session.list", current: &v1.Session{Id: "s1", Name: "n", State: v1.SessionState_SESSION_STATE_DISCONNECTED, DisconnectReason: "closed"},
-			wantReqs: []proto.Message{&v1.ListSessionsRequest{}}, wantIn: []string{"s1", "n", "disconnected", "(closed)", "unspecified", "-"}},
+		// session.list has no state column (whether Claude runs is the daemon's business);
+		// a stopped thread reads like a running one.
+		{name: "list", cmd: "session.list", current: &v1.Session{Id: "s1", Name: "n", State: v1.SessionState_SESSION_STATE_DISCONNECTED, DisconnectReason: "idle"},
+			wantReqs: []proto.Message{&v1.ListSessionsRequest{}}, wantIn: []string{"s1", "n", "unspecified", "-", "-", "-", "-"}},
 		{name: "list shows an interrupted thread's error", cmd: "session.list",
 			current: &v1.Session{Id: "s1", Name: "n", State: v1.SessionState_SESSION_STATE_DISCONNECTED, DisconnectReason: "daemon stopped",
 				Status: v1.SessionStatus_SESSION_STATUS_ERROR, StatusReason: "interrupted"},
-			wantIn: []string{"s1", "n", "disconnected", "(daemon", "stopped)", "error", "(interrupted)", "interrupted"}},
-		{name: "list shows the persisted status of a disconnected thread", cmd: "session.list",
+			wantIn: []string{"s1", "n", "error", "(interrupted)", "interrupted"}},
+		{name: "list shows the persisted status of a stopped thread", cmd: "session.list",
 			current: &v1.Session{Id: "s1", Name: "n", State: v1.SessionState_SESSION_STATE_DISCONNECTED, DisconnectReason: "daemon restarted",
 				Status: v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION, StatusReason: "permission: Do you want to proceed?"},
-			wantIn: []string{"s1", "n", "disconnected", "(daemon", "restarted)", "needs_attention", "permission:", "Do", "you", "want", "to", "proceed?"}},
-		{name: "list shows the status reason of a live session", cmd: "session.list",
+			wantIn: []string{"s1", "n", "needs_attention", "permission:", "Do", "you", "want", "to", "proceed?"}},
+		{name: "list shows the status reason of a running thread", cmd: "session.list",
 			current: &v1.Session{Id: "s2", Name: "m", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION, StatusReason: "finished", DisconnectReason: "exited"},
-			wantIn:  []string{"s2", "m", "connected", "needs_attention", "finished"}},
+			wantIn:  []string{"s2", "m", "needs_attention", "finished"}},
 		{name: "list shows the workspace", cmd: "session.list",
 			current: &v1.Session{Id: "s3", Name: "w", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_IDLE,
 				StatusReason: "idle", WorkspaceId: "w-1", WorktreePath: "/wt/api"},
-			wantIn: []string{"s3", "w", "connected", "idle", "idle", "w-1", "-", "-", "/wt/api"}},
+			wantIn: []string{"s3", "w", "idle", "idle", "w-1", "-", "-", "/wt/api"}},
 		{name: "list shows linked pull requests", cmd: "session.list",
 			current: &v1.Session{Id: "s4", Name: "p", State: v1.SessionState_SESSION_STATE_CONNECTED, LinkedPullRequests: []*v1.LinkedPullRequest{
 				{Slug: "o/api", Number: 5, Url: "https://github.com/o/api/pull/5"}, {Slug: "o/api", Number: 7, Url: "https://github.com/o/api/pull/7"}}},
-			wantIn: []string{"s4", "p", "connected", "unspecified", "-", "-", "#5,#7"}},
+			wantIn: []string{"s4", "p", "unspecified", "-", "-", "#5,#7"}},
 		{name: "list prefixes linked pull requests of several repositories", cmd: "session.list",
 			current: &v1.Session{Id: "s4", Name: "p", State: v1.SessionState_SESSION_STATE_CONNECTED, LinkedPullRequests: []*v1.LinkedPullRequest{
 				{Slug: "o/api", Number: 5, Url: "https://github.com/o/api/pull/5"}, {Slug: "o/web", Number: 2, Url: "https://github.com/o/web/pull/2"}}},
-			wantIn: []string{"s4", "p", "connected", "unspecified", "-", "-", "api#5,web#2"}},
+			wantIn: []string{"s4", "p", "unspecified", "-", "-", "api#5,web#2"}},
 		{name: "list shows a natural name as typed", cmd: "session.list",
 			current: &v1.Session{Id: "s7", Name: "Fix the login redirect", State: v1.SessionState_SESSION_STATE_CONNECTED},
-			wantIn:  []string{"s7", "Fix", "the", "login", "redirect", "connected"}},
+			wantIn:  []string{"s7", "Fix", "the", "login", "redirect", "unspecified"}},
 		{name: "list shows a dash for an unnamed thread", cmd: "session.list",
 			current: &v1.Session{Id: "s8", State: v1.SessionState_SESSION_STATE_CONNECTED},
-			wantIn:  []string{"s8", "-", "connected"}},
+			wantIn:  []string{"s8", "-", "unspecified"}},
 		{name: "list shows an expired cache", cmd: "session.list",
 			current: &v1.Session{Id: "s6", Name: "r", State: v1.SessionState_SESSION_STATE_CONNECTED, ContextTokens: 25_700,
 				CacheExpiresAt: timestamppb.New(time.Unix(1, 0)), WorktreePath: "/wt/r"},
-			wantIn: []string{"s6", "r", "connected", "unspecified", "-", "-", "-", "25.7K", "·", "cache", "expired", "/wt/r"}},
-		{name: "backend error passes through", cmd: "session.close", args: map[string]string{"id": "s5"},
+			wantIn: []string{"s6", "r", "unspecified", "-", "-", "-", "25.7K", "·", "cache", "expired", "/wt/r"}},
+		{name: "backend error passes through", cmd: "session.remove", args: map[string]string{"id": "s5"},
 			backendErr: connect.NewError(connect.CodeNotFound, errors.New("nope")), wantCode: connect.CodeNotFound},
 	}
 	for _, tt := range tests {
@@ -227,6 +228,14 @@ func TestSessionCommands(t *testing.T) {
 				lines := strings.Split(res.Message, "\n")
 				if len(lines) != 2 || !slices.Equal(strings.Fields(lines[1])[:len(tt.wantIn)], tt.wantIn) {
 					t.Errorf("list output = %q, want a row starting %v", res.Message, tt.wantIn)
+				}
+				if h := strings.Fields(lines[0]); !slices.Equal(h, []string{"ID", "NAME", "STATUS", "REASON", "WORKSPACE", "PRS", "CONTEXT", "WORKTREE"}) {
+					t.Errorf("list header %q", h)
+				}
+				for _, word := range []string{"connected", "disconnected", "starting", "closing"} {
+					if slices.Contains(strings.Fields(lines[1]), word) {
+						t.Errorf("list row says %q: %q", word, lines[1])
+					}
 				}
 			}
 		})
@@ -264,5 +273,23 @@ func TestSessionNewKeybindingAndEnums(t *testing.T) {
 				t.Errorf("permission = %v default %q", a.Enum, a.Default)
 			}
 		}
+	}
+}
+
+// session.reconnect stays invocable for the GUI that predates start-on-send, but no list
+// shows it (palette, help, CLI verbs) and it has no chord.
+func TestSessionReconnectHidden(t *testing.T) {
+	reg, _, _ := newSessionRegistry(t)
+	c, ok := reg.Get("session.reconnect")
+	if !ok || !c.Hidden || len(c.Keybindings) != 0 {
+		t.Fatalf("session.reconnect = %+v (registered %v)", c, ok)
+	}
+	for _, l := range reg.List(command.Context{ActiveSessionID: "s5"}, true) {
+		if l.Name == "session.reconnect" || l.Name == "session.close" {
+			t.Errorf("%s is listed", l.Name)
+		}
+	}
+	if _, ok := reg.Get("session.close"); ok {
+		t.Error("session.close is registered")
 	}
 }

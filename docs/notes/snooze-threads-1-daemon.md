@@ -1,5 +1,9 @@
 # Snoozed threads, PR 1 of 2: daemon, command, API mapping
 
+Update 2026-10-15 (`thread-lifecycle.md`): `session.reconnect` and `session.close` are gone; a
+message starts a stopped thread (and unsnoozes it), the daemon stops idle ones, and
+snooze also asks while background agents or shells run.
+
 Status: built on branch `cf/snooze-daemon`. `make check` green; exercised end to end with
 an isolated daemon, the CLI and a haiku thread (below). PR 2 (the GUI: sidebar section,
 snooze menu, mock daemon) follows. Modelled on archive (`archive-threads-1-daemon.md`).

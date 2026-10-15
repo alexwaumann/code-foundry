@@ -74,18 +74,23 @@ type SessionServiceClient interface {
 	Create(context.Context, *connect.Request[v1.CreateSessionRequest]) (*connect.Response[v1.CreateSessionResponse], error)
 	// Fork starts a new session that continues an existing session's conversation.
 	Fork(context.Context, *connect.Request[v1.ForkSessionRequest]) (*connect.Response[v1.ForkSessionResponse], error)
-	// List returns all sessions, connected and disconnected.
+	// List returns all sessions.
 	List(context.Context, *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error)
 	// Get returns one session.
 	Get(context.Context, *connect.Request[v1.GetSessionRequest]) (*connect.Response[v1.GetSessionResponse], error)
 	// Rename sets a user-chosen name and disables auto-naming for the session.
 	Rename(context.Context, *connect.Request[v1.RenameSessionRequest]) (*connect.Response[v1.RenameSessionResponse], error)
 	// Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
-	// then kill). The session remains, DISCONNECTED, until Remove.
+	// then kill). The session remains, DISCONNECTED, until Remove. No command calls it
+	// since 2026-10-15: the daemon starts a thread's process when a message is sent
+	// (ThreadService.Send) and stops it at the prompt cache expiry
+	// (docs/notes/thread-lifecycle.md). Kept for compatibility.
 	Close(context.Context, *connect.Request[v1.CloseSessionRequest]) (*connect.Response[v1.CloseSessionResponse], error)
-	// Reconnect resumes a DISCONNECTED session in a new claude process.
+	// Reconnect resumes a DISCONNECTED session in a new claude process, without a
+	// prompt. No command calls it since 2026-10-15 (a message starts a stopped thread).
+	// Kept for compatibility.
 	Reconnect(context.Context, *connect.Request[v1.ReconnectSessionRequest]) (*connect.Response[v1.ReconnectSessionResponse], error)
-	// Remove forgets a session. Closes it first if connected.
+	// Remove forgets a session. Stops its Claude first if it runs.
 	Remove(context.Context, *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error)
 	// RunIn moves a workspace thread's cwd to another member worktree of its workspace.
 	// A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued
@@ -329,18 +334,23 @@ type SessionServiceHandler interface {
 	Create(context.Context, *connect.Request[v1.CreateSessionRequest]) (*connect.Response[v1.CreateSessionResponse], error)
 	// Fork starts a new session that continues an existing session's conversation.
 	Fork(context.Context, *connect.Request[v1.ForkSessionRequest]) (*connect.Response[v1.ForkSessionResponse], error)
-	// List returns all sessions, connected and disconnected.
+	// List returns all sessions.
 	List(context.Context, *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error)
 	// Get returns one session.
 	Get(context.Context, *connect.Request[v1.GetSessionRequest]) (*connect.Response[v1.GetSessionResponse], error)
 	// Rename sets a user-chosen name and disables auto-naming for the session.
 	Rename(context.Context, *connect.Request[v1.RenameSessionRequest]) (*connect.Response[v1.RenameSessionResponse], error)
 	// Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
-	// then kill). The session remains, DISCONNECTED, until Remove.
+	// then kill). The session remains, DISCONNECTED, until Remove. No command calls it
+	// since 2026-10-15: the daemon starts a thread's process when a message is sent
+	// (ThreadService.Send) and stops it at the prompt cache expiry
+	// (docs/notes/thread-lifecycle.md). Kept for compatibility.
 	Close(context.Context, *connect.Request[v1.CloseSessionRequest]) (*connect.Response[v1.CloseSessionResponse], error)
-	// Reconnect resumes a DISCONNECTED session in a new claude process.
+	// Reconnect resumes a DISCONNECTED session in a new claude process, without a
+	// prompt. No command calls it since 2026-10-15 (a message starts a stopped thread).
+	// Kept for compatibility.
 	Reconnect(context.Context, *connect.Request[v1.ReconnectSessionRequest]) (*connect.Response[v1.ReconnectSessionResponse], error)
-	// Remove forgets a session. Closes it first if connected.
+	// Remove forgets a session. Stops its Claude first if it runs.
 	Remove(context.Context, *connect.Request[v1.RemoveSessionRequest]) (*connect.Response[v1.RemoveSessionResponse], error)
 	// RunIn moves a workspace thread's cwd to another member worktree of its workspace.
 	// A live thread gets set_cwd once it is idle (pending_worktree_path shows the queued

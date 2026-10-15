@@ -65,7 +65,7 @@ func RegisterSlash(r *Registry, b SlashBackend) error {
 // line, cut), in the thread's order.
 func FormatSlashCommands(cs []*v1.SlashCommand) string {
 	if len(cs) == 0 {
-		return "no slash commands: the thread is not running (reconnect it first)"
+		return "no slash commands yet: Claude has not run in this thread"
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "%d slash commands\n", len(cs))

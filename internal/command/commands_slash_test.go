@@ -76,7 +76,7 @@ func TestSlashCommandsCommand(t *testing.T) {
 			notMsg:   []string{"Second line", "cost, stats"},
 			wantJSON: `[{"name":"deploy","description":"Ship it (project)","argumentHint":"\u003cenv\u003e","builtin":false},`,
 		},
-		{name: "not running", id: "s2", wantMsg: []string{"no slash commands: the thread is not running"}, wantJSON: `[]`},
+		{name: "never reported", id: "s2", wantMsg: []string{"no slash commands yet: Claude has not run in this thread"}, wantJSON: `[]`},
 		{name: "unknown thread", id: "nope", wantErr: connect.CodeNotFound},
 	}
 	for _, tt := range tests {

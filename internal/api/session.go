@@ -126,7 +126,8 @@ func (h *Session) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeSess
 	return connect.NewResponse(&v1.SnoozeSessionResponse{Session: sessionToProto(s)}), nil
 }
 
-// Close ends the process gracefully; it returns once the session is DISCONNECTED.
+// Close ends the process gracefully; it returns once the session is DISCONNECTED. No
+// command calls it (docs/notes/thread-lifecycle.md); kept for compatibility.
 func (h *Session) Close(ctx context.Context, req *connect.Request[v1.CloseSessionRequest]) (*connect.Response[v1.CloseSessionResponse], error) {
 	if err := h.store.Close(ctx, req.Msg.GetId()); err != nil {
 		return nil, sessionError(err)
@@ -134,7 +135,8 @@ func (h *Session) Close(ctx context.Context, req *connect.Request[v1.CloseSessio
 	return connect.NewResponse(&v1.CloseSessionResponse{}), nil
 }
 
-// Reconnect resumes a DISCONNECTED session.
+// Reconnect resumes a DISCONNECTED session without a prompt. No command calls it (a
+// message starts a stopped thread); kept for compatibility.
 func (h *Session) Reconnect(ctx context.Context, req *connect.Request[v1.ReconnectSessionRequest]) (*connect.Response[v1.ReconnectSessionResponse], error) {
 	s, err := h.store.Reconnect(ctx, req.Msg.GetId())
 	if err != nil {
@@ -275,6 +277,7 @@ func sessionToProto(s session.Session) *v1.Session {
 	all, background := s.AgentsRunning()
 	p.AgentsRunning, p.BackgroundAgentsRunning = int32(all), int32(background)
 	p.BackgroundShellsRunning = int32(s.BackgroundShellsRunning)
+	p.BackgroundWakePending = s.WakePending
 	p.ContextTokens, p.ContextRereadUsd = s.ContextTokens, contextRereadUSD(s)
 	if !s.CacheExpiresAt.IsZero() {
 		p.CacheExpiresAt = timestamppb.New(s.CacheExpiresAt)

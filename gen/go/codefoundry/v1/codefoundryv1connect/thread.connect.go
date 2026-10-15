@@ -70,36 +70,47 @@ type ThreadServiceClient interface {
 	// looked at: a finished turn is seen at once. Apply only
 	// events whose seq is greater than the snapshot's.
 	Watch(context.Context, *connect.Request[v1.WatchThreadRequest]) (*connect.ServerStreamForClient[v1.ThreadEvent], error)
-	// Send sends a user message to a connected thread. Allowed while a turn runs:
-	// Claude queues it or folds it in. A message whose first non-blank line starts with a
+	// Send sends a user message. Allowed while a turn runs: Claude queues it or folds it
+	// in. A thread that is not running starts with the message as its first prompt: the
+	// returned item is in the timeline at once, and a start that fails is an error item
+	// ("Claude did not start: <reason>", status ERROR "did not start"), not an RPC error.
+	// The RPC returns at once with the item: a message to a starting thread is delivered
+	// after its handshake, one to a closing thread once a new process started after the
+	// old one exited. A message whose first non-blank line starts with a
 	// slash command the app replaces (/model, /effort, /fast, /mcp, /rename, /clear, and
 	// the aliases /reset, /new, /name) is INVALID_ARGUMENT, nothing sent or recorded; the
 	// error's message is a sentence pointing at the app's control, shown as it is.
 	Send(context.Context, *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error)
-	// Respond answers a pending permission request or question.
+	// Respond answers a pending permission request or question. A thread that is not
+	// running has none (FAILED_PRECONDITION).
 	Respond(context.Context, *connect.Request[v1.RespondThreadRequest]) (*connect.Response[v1.RespondThreadResponse], error)
-	// Interrupt stops the running turn; pending requests are withdrawn.
+	// Interrupt stops the running turn; pending requests are withdrawn. A no-op on a
+	// thread that is not running.
 	Interrupt(context.Context, *connect.Request[v1.InterruptThreadRequest]) (*connect.Response[v1.InterruptThreadResponse], error)
-	// SetModel switches a connected thread's model (from its next request) and records
-	// it for later spawns.
+	// SetModel switches a running thread's model (from its next request) and records it
+	// for later spawns; on a thread that is not running it only records it.
 	SetModel(context.Context, *connect.Request[v1.SetThreadModelRequest]) (*connect.Response[v1.SetThreadModelResponse], error)
-	// SetPermissionMode switches a connected thread's permission mode: SUPERVISED,
-	// ACCEPT_EDITS or AUTO (UNSPECIFIED, Claude's default, cannot be selected live).
+	// SetPermissionMode switches a thread's permission mode: SUPERVISED, ACCEPT_EDITS or
+	// AUTO (UNSPECIFIED, Claude's default, cannot be selected live). On a thread that is
+	// not running it only records it.
 	SetPermissionMode(context.Context, *connect.Request[v1.SetThreadPermissionModeRequest]) (*connect.Response[v1.SetThreadPermissionModeResponse], error)
-	// SetEffort changes a connected thread's effort level. Claude has no live effort
-	// switch, so the daemon restarts the process with --resume and the new --effort: at
-	// once when the thread is idle, else once the running turn ends (Session.effort_pending
-	// says so meanwhile). The row records the effort for later spawns either way.
+	// SetEffort changes a thread's effort level. Claude has no live effort switch, so the
+	// daemon restarts a running process with --resume and the new --effort: at once when
+	// the thread is idle, else once the running turn ends (Session.effort_pending says so
+	// meanwhile). The row records the effort for later spawns either way; a thread that is
+	// not running only records it.
 	SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error)
 	// McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
 	// (mcp_status) at the start of every turn, again every few seconds while a server is
 	// still connecting, and after McpReconnect; Watch carries each new answer (the `mcp`
-	// event). refresh asks Claude now (a connected thread only). Without it a connected
-	// thread not checked yet is asked once; a thread that is not running has none (status
-	// unset). See docs/notes/mcp-panel.md.
+	// event). The last answer is kept while the thread is not running, also across daemon
+	// restarts. refresh asks Claude now, starting a stopped thread without a prompt.
+	// Without it a running thread not checked yet is asked once; status is unset when
+	// Claude never reported. See docs/notes/mcp-panel.md.
 	McpStatus(context.Context, *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error)
-	// McpReconnect reconnects one MCP server of a connected thread (also how a login made
-	// out of band, `claude /mcp` in a shell, is picked up), then checks the servers again.
+	// McpReconnect reconnects one MCP server of a thread, starting a stopped thread
+	// without a prompt (also how a login made out of band, `claude /mcp` in a shell, is
+	// picked up), then checks the servers again.
 	// A server that still fails is not an RPC error: the response's error says why and the
 	// status shows it. An unknown server is NOT_FOUND.
 	McpReconnect(context.Context, *connect.Request[v1.McpReconnectRequest]) (*connect.Response[v1.McpReconnectResponse], error)
@@ -108,7 +119,8 @@ type ThreadServiceClient interface {
 	// list it pushes when skills change, minus the commands the daemon denies (replaced by
 	// the app's own controls, terminal-only, or retired; never a skill or a user, project
 	// or plugin command). In Claude's order: its skills, then its built-ins, then plugin
-	// skills. Empty when the thread is not running. Watch carries every change (the
+	// skills. What Claude last reported, kept while the thread is not running (also across
+	// daemon restarts); empty when it never answered a handshake. Watch carries every change (the
 	// `commands` event). See docs/notes/slash-commands-1-daemon.md.
 	SlashCommands(context.Context, *connect.Request[v1.SlashCommandsRequest]) (*connect.Response[v1.SlashCommandsResponse], error)
 }
@@ -273,36 +285,47 @@ type ThreadServiceHandler interface {
 	// looked at: a finished turn is seen at once. Apply only
 	// events whose seq is greater than the snapshot's.
 	Watch(context.Context, *connect.Request[v1.WatchThreadRequest], *connect.ServerStream[v1.ThreadEvent]) error
-	// Send sends a user message to a connected thread. Allowed while a turn runs:
-	// Claude queues it or folds it in. A message whose first non-blank line starts with a
+	// Send sends a user message. Allowed while a turn runs: Claude queues it or folds it
+	// in. A thread that is not running starts with the message as its first prompt: the
+	// returned item is in the timeline at once, and a start that fails is an error item
+	// ("Claude did not start: <reason>", status ERROR "did not start"), not an RPC error.
+	// The RPC returns at once with the item: a message to a starting thread is delivered
+	// after its handshake, one to a closing thread once a new process started after the
+	// old one exited. A message whose first non-blank line starts with a
 	// slash command the app replaces (/model, /effort, /fast, /mcp, /rename, /clear, and
 	// the aliases /reset, /new, /name) is INVALID_ARGUMENT, nothing sent or recorded; the
 	// error's message is a sentence pointing at the app's control, shown as it is.
 	Send(context.Context, *connect.Request[v1.SendThreadMessageRequest]) (*connect.Response[v1.SendThreadMessageResponse], error)
-	// Respond answers a pending permission request or question.
+	// Respond answers a pending permission request or question. A thread that is not
+	// running has none (FAILED_PRECONDITION).
 	Respond(context.Context, *connect.Request[v1.RespondThreadRequest]) (*connect.Response[v1.RespondThreadResponse], error)
-	// Interrupt stops the running turn; pending requests are withdrawn.
+	// Interrupt stops the running turn; pending requests are withdrawn. A no-op on a
+	// thread that is not running.
 	Interrupt(context.Context, *connect.Request[v1.InterruptThreadRequest]) (*connect.Response[v1.InterruptThreadResponse], error)
-	// SetModel switches a connected thread's model (from its next request) and records
-	// it for later spawns.
+	// SetModel switches a running thread's model (from its next request) and records it
+	// for later spawns; on a thread that is not running it only records it.
 	SetModel(context.Context, *connect.Request[v1.SetThreadModelRequest]) (*connect.Response[v1.SetThreadModelResponse], error)
-	// SetPermissionMode switches a connected thread's permission mode: SUPERVISED,
-	// ACCEPT_EDITS or AUTO (UNSPECIFIED, Claude's default, cannot be selected live).
+	// SetPermissionMode switches a thread's permission mode: SUPERVISED, ACCEPT_EDITS or
+	// AUTO (UNSPECIFIED, Claude's default, cannot be selected live). On a thread that is
+	// not running it only records it.
 	SetPermissionMode(context.Context, *connect.Request[v1.SetThreadPermissionModeRequest]) (*connect.Response[v1.SetThreadPermissionModeResponse], error)
-	// SetEffort changes a connected thread's effort level. Claude has no live effort
-	// switch, so the daemon restarts the process with --resume and the new --effort: at
-	// once when the thread is idle, else once the running turn ends (Session.effort_pending
-	// says so meanwhile). The row records the effort for later spawns either way.
+	// SetEffort changes a thread's effort level. Claude has no live effort switch, so the
+	// daemon restarts a running process with --resume and the new --effort: at once when
+	// the thread is idle, else once the running turn ends (Session.effort_pending says so
+	// meanwhile). The row records the effort for later spawns either way; a thread that is
+	// not running only records it.
 	SetEffort(context.Context, *connect.Request[v1.SetThreadEffortRequest]) (*connect.Response[v1.SetThreadEffortResponse], error)
 	// McpStatus returns the thread's MCP servers as last checked. The daemon asks Claude
 	// (mcp_status) at the start of every turn, again every few seconds while a server is
 	// still connecting, and after McpReconnect; Watch carries each new answer (the `mcp`
-	// event). refresh asks Claude now (a connected thread only). Without it a connected
-	// thread not checked yet is asked once; a thread that is not running has none (status
-	// unset). See docs/notes/mcp-panel.md.
+	// event). The last answer is kept while the thread is not running, also across daemon
+	// restarts. refresh asks Claude now, starting a stopped thread without a prompt.
+	// Without it a running thread not checked yet is asked once; status is unset when
+	// Claude never reported. See docs/notes/mcp-panel.md.
 	McpStatus(context.Context, *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error)
-	// McpReconnect reconnects one MCP server of a connected thread (also how a login made
-	// out of band, `claude /mcp` in a shell, is picked up), then checks the servers again.
+	// McpReconnect reconnects one MCP server of a thread, starting a stopped thread
+	// without a prompt (also how a login made out of band, `claude /mcp` in a shell, is
+	// picked up), then checks the servers again.
 	// A server that still fails is not an RPC error: the response's error says why and the
 	// status shows it. An unknown server is NOT_FOUND.
 	McpReconnect(context.Context, *connect.Request[v1.McpReconnectRequest]) (*connect.Response[v1.McpReconnectResponse], error)
@@ -311,7 +334,8 @@ type ThreadServiceHandler interface {
 	// list it pushes when skills change, minus the commands the daemon denies (replaced by
 	// the app's own controls, terminal-only, or retired; never a skill or a user, project
 	// or plugin command). In Claude's order: its skills, then its built-ins, then plugin
-	// skills. Empty when the thread is not running. Watch carries every change (the
+	// skills. What Claude last reported, kept while the thread is not running (also across
+	// daemon restarts); empty when it never answered a handshake. Watch carries every change (the
 	// `commands` event). See docs/notes/slash-commands-1-daemon.md.
 	SlashCommands(context.Context, *connect.Request[v1.SlashCommandsRequest]) (*connect.Response[v1.SlashCommandsResponse], error)
 }

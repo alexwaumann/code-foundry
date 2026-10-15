@@ -1,5 +1,8 @@
 # Slash commands in the composer, PR 1 of 2: the daemon
 
+Update 2026-10-15 (`thread-lifecycle.md`): the list is kept and persisted while the thread is
+stopped (migration 0021), and the next handshake replaces it.
+
 Status: built on branch `t3code/composer-slash-command-shortlist`. `make check` green;
 exercised end to end with an isolated daemon, the CLI and a haiku thread (below). PR 2
 (the GUI's "/" card reading this instead of `FilesystemService.ListSkills` for a running

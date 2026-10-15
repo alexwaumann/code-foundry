@@ -55,6 +55,8 @@ func (m *Manager) RunIn(_ context.Context, id string, t RunInTarget) (Session, e
 	switch {
 	case rec.s.State == StateClosing:
 		return Session{}, fmt.Errorf("%w: thread %s is closing", ErrFailedPrecondition, id)
+	case rec.reserved != nil:
+		return Session{}, fmt.Errorf("%w: thread %s is starting; try again in a moment", ErrFailedPrecondition, id)
 	case rec.run == nil:
 		rec.s.WorktreePath, rec.s.RepoID, rec.s.PendingWorktreePath = mem.WorktreePath, mem.RepoID, ""
 		m.commitLocked(rec, true)

@@ -157,7 +157,7 @@ func TestFormatMcpStatus(t *testing.T) {
 		st   *v1.ThreadMcpStatus
 		want string
 	}{
-		{name: "not running", st: nil, want: "no MCP status: the thread is not running (reconnect it first)"},
+		{name: "never reported", st: nil, want: "no MCP status yet: Claude has not reported this thread's MCP servers"},
 		{name: "no servers", st: &v1.ThreadMcpStatus{CheckedAt: at(3 * time.Second), Trigger: v1.McpCheckTrigger_MCP_CHECK_TRIGGER_REFRESH},
 			want: "no MCP servers (checked just now)"},
 		{name: "after a reconnect", st: &v1.ThreadMcpStatus{CheckedAt: at(5 * time.Minute), Trigger: v1.McpCheckTrigger_MCP_CHECK_TRIGGER_RECONNECT, Server: "a",

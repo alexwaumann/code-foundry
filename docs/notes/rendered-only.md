@@ -1,5 +1,10 @@
 # Rendered-only threads (decision record, 2026-10-12)
 
+Update 2026-10-15 (`thread-lifecycle.md`): the daemon starts a thread's process when a message
+is sent and stops it at its prompt cache expiry; there is no close or reconnect any more
+(the GUI's Reconnect card goes in PR C). For a TUI-only feature, run `claude --resume <id>`
+in a shell while the thread is stopped.
+
 Status: **built**; daemon detail in `rendered-only-daemon.md`, GUI detail in
 `rendered-only-gui.md`.
 

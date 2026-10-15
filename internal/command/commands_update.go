@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"connectrpc.com/connect"
 
@@ -31,9 +32,9 @@ var (
 type UpdateDeps struct {
 	Update  UpdateBackend
 	Session SessionBackend
-	// Restart stops the daemon gracefully (sessions are closed and recorded as
-	// disconnected) shortly after the command returns; the next client auto-starts the
-	// binary that is installed now. Nil makes daemon.restart and app.restart fail.
+	// Restart stops the daemon gracefully (Claude stops in every thread; a message
+	// starts it again) shortly after the command returns; the next client auto-starts
+	// the binary that is installed now. Nil makes daemon.restart and app.restart fail.
 	Restart func()
 	Daemon  DaemonInfo
 }
@@ -50,14 +51,15 @@ type AppVersion struct {
 	Target  string `json:"target,omitempty"`
 }
 
-// DaemonRestart is daemon.restart's JSON result.
+// DaemonRestart is daemon.restart's JSON result. ThreadsInterrupted counts the threads
+// the restart cut off (ActiveSession).
 type DaemonRestart struct {
-	SessionsClosed int `json:"sessions_closed"`
+	ThreadsInterrupted int `json:"threads_interrupted"`
 }
 
 // AppRestart is app.restart's JSON result.
 type AppRestart struct {
-	SessionsClosed int `json:"sessions_closed"`
+	ThreadsInterrupted int `json:"threads_interrupted"` // as DaemonRestart's
 	// GUINotified is how many GUI listeners received the restart request; 0 when no
 	// window is connected (nothing relaunches; `code-foundry gui` opens one).
 	GUINotified int `json:"gui_notified"`
@@ -135,48 +137,95 @@ func channelSuffix(st *v1.UpdateStatus) string {
 	return " (" + st.GetChannel() + " channel)"
 }
 
-// LiveSessions counts sessions with a running process (everything but disconnected):
-// the ones a daemon restart closes. 0 when the session service is unavailable.
-func LiveSessions(ctx context.Context, s SessionBackend) int {
-	res, err := s.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))
-	if err != nil {
-		return 0
-	}
-	n := 0
-	for _, x := range res.Msg.GetSessions() {
-		if x.GetState() != v1.SessionState_SESSION_STATE_DISCONNECTED {
-			n++
-		}
-	}
-	return n
+// ActiveSession reports whether a restart cuts s off, by the predicate archive and
+// snooze confirm with (archiveInterrupts): Claude starting or running a turn, waiting on
+// a permission request or question, background agents or shells running, or the turn
+// that reports one that just ended. An idle thread loses nothing: a message starts it
+// again.
+func ActiveSession(s *v1.Session) bool {
+	why, _ := archiveInterrupts(s)
+	return why != ""
 }
 
-// BusySessions counts live sessions whose status is busy: the threads still working,
-// which a daemon restart cuts off mid-turn. 0 when the session service is unavailable.
-func BusySessions(ctx context.Context, s SessionBackend) int {
-	res, err := s.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))
-	if err != nil {
-		return 0
-	}
-	n := 0
-	for _, x := range res.Msg.GetSessions() {
-		if x.GetState() != v1.SessionState_SESSION_STATE_DISCONNECTED && x.GetStatus() == v1.SessionStatus_SESSION_STATUS_BUSY {
-			n++
-		}
-	}
-	return n
+// RestartCost is what a restart cuts off, summed over the threads (ActiveSession).
+type RestartCost struct {
+	// Threads is how many threads lose something.
+	Threads int
+	// MidTurn counts threads working or waiting on the user; Agents and Shells the
+	// background runs and shells of running threads; Waking threads about to report
+	// background work that just ended (and running none).
+	MidTurn, Agents, Shells, Waking int
 }
 
-// appRestartConfirm is app.restart's confirmation, warning about busy threads.
-func appRestartConfirm(busy int) string {
-	if busy == 0 {
-		return "Restart Code Foundry? Open threads keep their history and can be reconnected."
+// RestartCostOf sums what a restart would cut off.
+func RestartCostOf(sessions []*v1.Session) RestartCost {
+	var c RestartCost
+	for _, s := range sessions {
+		if !ActiveSession(s) {
+			continue
+		}
+		c.Threads++
+		agents, shells := int(s.GetBackgroundAgentsRunning()), int(s.GetBackgroundShellsRunning())
+		c.Agents, c.Shells = c.Agents+agents, c.Shells+shells
+		switch {
+		case midTurn(s) != "":
+			c.MidTurn++
+		case agents+shells == 0 && s.GetBackgroundWakePending():
+			c.Waking++
+		}
 	}
-	verb := "are"
-	if busy == 1 {
-		verb = "is"
+	return c
+}
+
+// String names what is cut off: "1 thread working or waiting on you and 2 background
+// agents", "1 background shell", "1 thread about to report finished background work";
+// "" for nothing.
+func (c RestartCost) String() string {
+	var parts []string
+	if c.MidTurn > 0 {
+		parts = append(parts, plural(c.MidTurn, "thread")+" working or waiting on you")
 	}
-	return fmt.Sprintf("%s %s still working and will be cut off mid-turn. Restart Code Foundry anyway?", plural(busy, "thread"), verb)
+	if w := backgroundWork(c.Agents, c.Shells); w != "" {
+		parts = append(parts, w)
+	}
+	if c.Waking > 0 {
+		parts = append(parts, plural(c.Waking, "thread")+" about to report finished background work")
+	}
+	switch len(parts) {
+	case 0:
+		return ""
+	case 1:
+		return parts[0]
+	}
+	return strings.Join(parts[:len(parts)-1], ", ") + " and " + parts[len(parts)-1]
+}
+
+// restartCost is RestartCostOf the daemon's threads; nothing when the session service
+// is unavailable.
+func restartCost(ctx context.Context, s SessionBackend) RestartCost {
+	res, err := s.List(ctx, connect.NewRequest(&v1.ListSessionsRequest{}))
+	if err != nil {
+		return RestartCost{}
+	}
+	return RestartCostOf(res.Msg.GetSessions())
+}
+
+// restartConfirm is app.restart's and daemon.restart's confirmation ("Restart
+// Code Foundry", "Restart the daemon"), naming what the restart cuts off.
+func restartConfirm(what string, c RestartCost) string {
+	if c.Threads == 0 {
+		return what + "? Threads keep their history; a message starts each again."
+	}
+	return c.String() + " will be cut off. " + what + " anyway?"
+}
+
+// cutOff is " (cuts off 1 thread working or waiting on you)" for a restart's result, ""
+// for nothing.
+func cutOff(c RestartCost) string {
+	if c.Threads == 0 {
+		return ""
+	}
+	return " (cuts off " + c.String() + ")"
 }
 
 func plural(n int, word string) string {
@@ -276,10 +325,10 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 			Title:    "Restart Code Foundry",
 			Category: "App",
 			Description: "Restart the daemon and relaunch the app so both run the installed version. " +
-				"Running threads disconnect, keep their history and can be reconnected.",
-			Confirm: appRestartConfirm(0),
+				"Threads keep their history and a message starts each again; a turn or background work running is cut off.",
+			Confirm: restartConfirm("Restart Code Foundry", RestartCost{}),
 			DynamicConfirm: func(ctx context.Context, _ Context, _ Args) string {
-				return appRestartConfirm(BusySessions(ctx, d.Session))
+				return restartConfirm("Restart Code Foundry", restartCost(ctx, d.Session))
 			},
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
 				if d.Restart == nil {
@@ -288,7 +337,7 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 				if updateStatus(ctx, d.Update).GetState() == v1.UpdateState_UPDATE_STATE_DOWNLOADING {
 					return Result{}, fmt.Errorf("%w: an update is being installed; restart when it finishes", ErrUnavailable)
 				}
-				n := LiveSessions(ctx, d.Session)
+				n := restartCost(ctx, d.Session)
 				// Announce before stopping, so GUIs hear it while the daemon is still up;
 				// each relaunches once its Watch stream ends.
 				res, err := d.Update.RequestRestart(ctx, connect.NewRequest(&v1.RequestRestartRequest{}))
@@ -297,22 +346,22 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 				}
 				notified := int(res.Msg.GetDelivered())
 				d.Restart()
-				msg := fmt.Sprintf("restarting Code Foundry: closing %s; the app relaunches once the daemon has stopped", plural(n, "session"))
+				msg := "restarting Code Foundry" + cutOff(n) + "; the app relaunches once the daemon has stopped"
 				if notified == 0 {
-					msg = fmt.Sprintf("restarting the daemon: closing %s; no app window is connected (open it with `code-foundry gui`)", plural(n, "session"))
+					msg = "restarting the daemon" + cutOff(n) + "; no app window is connected (open it with `code-foundry gui`)"
 				}
-				return Result{Message: msg, JSON: AppRestart{SessionsClosed: n, GUINotified: notified}}, nil
+				return Result{Message: msg, JSON: AppRestart{ThreadsInterrupted: n.Threads, GUINotified: notified}}, nil
 			},
 		},
 		Command{
 			Name:  "daemon.restart",
 			Title: "Restart Daemon",
-			Description: "Close every session and restart the daemon, so it runs the installed version. " +
-				"Sessions are recorded as disconnected and can be reconnected afterwards.",
+			Description: "Restart the daemon, so it runs the installed version. " +
+				"Threads keep their history and a message starts each again; a turn or background work running is cut off.",
 			Category: "Daemon",
-			Confirm:  "Close every session and restart the daemon?",
+			Confirm:  restartConfirm("Restart the daemon", RestartCost{}),
 			DynamicConfirm: func(ctx context.Context, _ Context, _ Args) string {
-				return fmt.Sprintf("Close %s and restart the daemon?", plural(LiveSessions(ctx, d.Session), "session"))
+				return restartConfirm("Restart the daemon", restartCost(ctx, d.Session))
 			},
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
 				if d.Restart == nil {
@@ -321,11 +370,11 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 				if updateStatus(ctx, d.Update).GetState() == v1.UpdateState_UPDATE_STATE_DOWNLOADING {
 					return Result{}, fmt.Errorf("%w: an update is being installed; restart when it finishes", ErrUnavailable)
 				}
-				n := LiveSessions(ctx, d.Session)
+				n := restartCost(ctx, d.Session)
 				d.Restart()
 				return Result{
-					Message: fmt.Sprintf("restarting the daemon: closing %s; the next client starts the installed version", plural(n, "session")),
-					JSON:    DaemonRestart{SessionsClosed: n},
+					Message: "restarting the daemon" + cutOff(n) + "; the next client starts the installed version",
+					JSON:    DaemonRestart{ThreadsInterrupted: n.Threads},
 				}, nil
 			},
 		},

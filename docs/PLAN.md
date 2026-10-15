@@ -189,6 +189,21 @@ header, a terminal run opening as a tab in the bottom panel. Sketch:
   done: `docs/notes/actions-2-gui.md`.
 * PR C pending.
 
+### Thread lifecycle: the daemon starts and stops Claude (2026-10-15)
+
+Users never manage whether a thread's `claude` runs: a message starts a stopped thread
+(resuming its conversation), and a thread idle at its prompt past its prompt cache expiry
+stops. `session.close` is gone; `session.reconnect` stays hidden until PR C deletes it.
+Three PRs:
+
+* PR A (background shells tracked, `Session.BackgroundWork()`, the strip counts them)
+  done (#105): `docs/notes/background-shells.md`.
+* PR B (daemon + CLI: start on send, the idle stop, settings on stopped threads, slash
+  commands and MCP status persisted (migration 0021), crash vs idle exit items, the two
+  commands removed, restart counts) on `cf/thread-lifecycle` (#108):
+  `docs/notes/thread-lifecycle.md`.
+* PR C (GUI: remove the connection UI; the list is in the PR B note) pending.
+
 ### Release channels: stable and tip (design 2026-10-11, revised 2026-10-12)
 
 Two channels, one install: every push to main publishes a `vX.Y.Z-tip.N` prerelease
@@ -295,7 +310,8 @@ Steps:
   disconnected state + reconnect, needs-attention surfacing. Collapse Watch streams into
   one shared events stream first: the browser's 6-connections-per-origin limit is already
   close with four open streams.
-* 2d CLI: `session new|list|focus|close|reconnect|rename|fork` from the registry.
+* 2d CLI: `session new|list|focus|close|reconnect|rename|fork` from the registry (close
+  and reconnect removed on 2026-10-15: `docs/notes/thread-lifecycle.md`).
 
 ## Phase 3 — Supervision surface (parallel after Phase 2)
 

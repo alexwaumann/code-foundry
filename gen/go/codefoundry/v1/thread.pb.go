@@ -1586,11 +1586,11 @@ type ThreadItemsSnapshot struct {
 	Seq     uint64                  `protobuf:"varint,2,opt,name=seq,proto3" json:"seq,omitempty"`
 	Items   []*ThreadItem           `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
 	Pending []*ThreadPendingRequest `protobuf:"bytes,4,rep,name=pending,proto3" json:"pending,omitempty"`
-	// The thread's MCP servers as last checked; unset when not checked since its process
-	// started, or when it is not running.
+	// The thread's MCP servers as last checked, kept while it is not running; unset when
+	// Claude never reported them.
 	Mcp *ThreadMcpStatus `protobuf:"bytes,5,opt,name=mcp,proto3" json:"mcp,omitempty"`
-	// The slash commands the running thread offers (ThreadService.SlashCommands); empty
-	// when it is not running.
+	// The slash commands the thread offers (ThreadService.SlashCommands), kept while it
+	// is not running; empty when Claude never answered a handshake.
 	Commands []*SlashCommand `protobuf:"bytes,6,rep,name=commands,proto3" json:"commands,omitempty"`
 	// The thread's subagent runs, in spawn order (never reordered by status); also while
 	// it is not running (the runs persist). See docs/notes/agents-1-daemon.md.
@@ -2109,14 +2109,12 @@ type ThreadEvent_PendingSnapshot struct {
 }
 
 type ThreadEvent_Mcp struct {
-	// Watch only: the thread's MCP servers were checked again, or dropped (status unset:
-	// the process ended).
+	// Watch only: the thread's MCP servers were checked again.
 	Mcp *ThreadMcpChange `protobuf:"bytes,7,opt,name=mcp,proto3,oneof"`
 }
 
 type ThreadEvent_Commands struct {
-	// Watch only: the thread's slash commands changed (Claude's list changed, or the
-	// process ended: empty).
+	// Watch only: the thread's slash commands changed (Claude's list changed).
 	Commands *ThreadSlashCommandsChange `protobuf:"bytes,8,opt,name=commands,proto3,oneof"`
 }
 
@@ -2424,7 +2422,8 @@ type ThreadMcpChange struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	SessionId string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	Seq       uint64                 `protobuf:"varint,2,opt,name=seq,proto3" json:"seq,omitempty"`
-	// Unset: the thread has none any more (its process ended).
+	// Always set since 2026-10-15 (the status outlives the process); unset was "none any
+	// more".
 	Status        *ThreadMcpStatus `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3818,7 +3817,7 @@ type ThreadSlashCommandsChange struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	SessionId string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	Seq       uint64                 `protobuf:"varint,2,opt,name=seq,proto3" json:"seq,omitempty"`
-	// The whole new list; empty when the process ended.
+	// The whole new list.
 	Commands      []*SlashCommand `protobuf:"bytes,3,rep,name=commands,proto3" json:"commands,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3921,7 +3920,7 @@ func (x *SlashCommandsRequest) GetSessionId() string {
 
 type SlashCommandsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Empty when the thread is not running.
+	// Empty when Claude never answered the thread's handshake.
 	Commands      []*SlashCommand `protobuf:"bytes,1,rep,name=commands,proto3" json:"commands,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

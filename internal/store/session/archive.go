@@ -40,7 +40,7 @@ func (m *Manager) Archive(ctx context.Context, id string, archived bool) (Sessio
 		return Session{}, err
 	}
 	if rec.run != nil || rec.s.State != StateDisconnected {
-		return Session{}, fmt.Errorf("%w: session %s was reconnected while being archived", ErrFailedPrecondition, id)
+		return Session{}, fmt.Errorf("%w: session %s was started while being archived", ErrFailedPrecondition, id)
 	}
 	unsnoozed := m.unsnoozeLocked(rec) // archive and snooze are exclusive
 	if !rec.s.ArchivedAt.IsZero() && !rec.s.Pinned && !unsnoozed {

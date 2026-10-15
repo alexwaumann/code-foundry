@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/db"
@@ -189,6 +190,11 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 		Namer:          settingsNamer(s.settings, session.ClaudeNamer(claude, "/tmp", sessionLog)),
 		AttachmentsDir: p.Attachments(), WorktreePath: settingsWorktreePath(s.settings),
 		Env: sessionEnv, CacheTTL: cfg.CacheTTL(),
+		// Development aids: how long a thread's process stays up at least, and how often
+		// idle threads are checked against their cache expiry (Go durations; unset or
+		// invalid: the defaults, 5m and 30s). See docs/notes/thread-lifecycle.md.
+		IdleGrace:         envDuration(log, "CODE_FOUNDRY_IDLE_GRACE"),
+		IdleCheckInterval: envDuration(log, "CODE_FOUNDRY_IDLE_CHECK"),
 		// A new thread's worktree runs its project's on-worktree-create actions in the
 		// background (WorktreeCreated returns at once).
 		WorktreeCreated: s.action.WorktreeCreated,
@@ -214,6 +220,22 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 	s.update = update.Start(ctx, uo)
 	applyUpdateChannel(s.settings, s.update)
 	return s, nil
+}
+
+// envDuration is the Go duration in the environment variable name, 0 when it is unset
+// or invalid (logged).
+func envDuration(log *slog.Logger, name string) time.Duration {
+	v := os.Getenv(name)
+	if v == "" {
+		return 0
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d <= 0 {
+		log.Warn("ignoring an invalid duration", "env", name, "value", v)
+		return 0
+	}
+	log.Info("development setting from the environment", "env", name, "value", d.String())
+	return d
 }
 
 // sessionOwner is thread id's project and worktree, the owner of its action runs.

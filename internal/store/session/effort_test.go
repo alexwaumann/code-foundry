@@ -139,8 +139,10 @@ func TestRenderedSetEffortRefusals(t *testing.T) {
 	if err := re.m.Close(re.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := re.m.SetEffort(re.ctx(), s.ID, "high"); !errors.Is(err, ErrFailedPrecondition) {
-		t.Errorf("disconnected thread: %v", err)
+	// Stopped: the row takes it for the next start, nothing restarts.
+	got, err := re.m.SetEffort(re.ctx(), s.ID, "high")
+	if err != nil || got.Effort != "high" || got.EffortPending || got.State != StateDisconnected {
+		t.Errorf("stopped thread: %+v, %v", got, err)
 	}
 }
 
@@ -305,9 +307,10 @@ func waitErr(t *testing.T, what string, ch <-chan error) error {
 // lingers 400 ms after its stdin closes, so they land in the gap).
 func TestRenderedSetEffortGap(t *testing.T) {
 	tests := []struct {
-		name string
-		env  []string
-		run  func(t *testing.T, re *env, s Session)
+		name   string
+		env    []string
+		mutate func(*Options)
+		run    func(t *testing.T, re *env, s Session)
 	}{
 		{
 			name: "a send is held and reaches the new process once",
@@ -367,22 +370,24 @@ func TestRenderedSetEffortGap(t *testing.T) {
 			},
 		},
 		{
-			name: "a close fails the held send",
+			// A message is never lost to a close: like a send to a closing thread, the
+			// held one waits for the exit and starts the thread again with it.
+			name: "a close during the restart: the held send starts the thread again",
 			run: func(t *testing.T, re *env, s Session) {
 				done := re.sendAsync(re.ctx(), s.ID, "held")
 				time.Sleep(20 * time.Millisecond) // the send is on the runner first
 				if err := re.m.Close(re.ctx(), s.ID); err != nil {
 					t.Fatal(err)
 				}
-				if err := waitErr(t, "the held send", done); !errors.Is(err, ErrFailedPrecondition) {
+				if err := waitErr(t, "the held send", done); err != nil {
 					t.Errorf("held send after close: %v", err)
 				}
-				got := re.waitFor(s.ID, "closed", func(s Session) bool { return s.State == StateDisconnected })
-				if got.DisconnectReason != ReasonClosed || got.Effort != "high" || got.EffortPending {
-					t.Errorf("closed %+v", got)
+				got := re.waitFor(s.ID, "started again", func(s Session) bool { return s.State == StateConnected && turnOver(s) })
+				if got.Effort != "high" || got.EffortPending {
+					t.Errorf("after the start %+v", got)
 				}
-				if fresh, resumed := re.deliveries("held"); fresh+resumed != 0 {
-					t.Errorf("delivered after close (%d, %d)", fresh, resumed)
+				if _, resumed := re.waitDeliveries("held", func(_, r int) bool { return r == 1 }); resumed != 1 {
+					t.Errorf("held message delivered %d times after the close", resumed)
 				}
 			},
 		},
@@ -410,31 +415,31 @@ func TestRenderedSetEffortGap(t *testing.T) {
 			},
 		},
 		{
-			name: "the new process crashes",
+			// The held message is not lost: the thread starts again with it as the first
+			// prompt (the fake fails only the first resumed process, CF_FAKE_CLAUDE_ONCE).
+			name: "the new process exits before its handshake",
 			env:  []string{"CF_FAKE_CLAUDE_RESUME_EXIT=3"},
 			run: func(t *testing.T, re *env, s Session) {
-				done := re.sendAsync(re.ctx(), s.ID, "held")
-				if err := waitErr(t, "the held send", done); !errors.Is(err, ErrFailedPrecondition) {
-					t.Errorf("held send: %v", err)
-				}
-				got := re.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
-				if got.DisconnectReason != ReasonCrashed || got.ExitCode != 3 || got.Effort != "high" || got.EffortPending ||
-					!strings.Contains(got.LastError, "cannot resume") {
-					t.Errorf("after the crash %+v", got)
-				}
-				items := re.items(s.ID).Items
-				if e, ok := lastKind(items, KindError); !ok || !strings.Contains(e.Text, "before answering the initialize handshake") {
-					t.Errorf("no error item:\n%s", describeItems(items))
-				}
-				if hasEffortNote("high")(items) {
-					t.Errorf("the effort note for a restart that failed")
-				}
+				heldItemThenStarted(t, re, s, "Claude did not start: exit code 3: fake claude: cannot resume")
+			},
+		},
+		{
+			name:   "the new process never answers its handshake",
+			env:    []string{"CF_FAKE_CLAUDE_RESUME_HANG=1"},
+			mutate: func(o *Options) { o.StartTimeout = 700 * time.Millisecond },
+			run: func(t *testing.T, re *env, s Session) {
+				heldItemThenStarted(t, re, s, "Claude did not start: no answer to the initialize handshake after a restart")
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			re := newFixtureEnvAt(t, fixturePath("text-table"), append([]string{"CF_FAKE_CLAUDE_EXIT_DELAY=400ms"}, tt.env...))
+			vars := append([]string{"CF_FAKE_CLAUDE_EXIT_DELAY=400ms", "CF_FAKE_CLAUDE_ONCE=" + filepath.Join(t.TempDir(), "once")}, tt.env...)
+			var mutate []func(*Options)
+			if tt.mutate != nil {
+				mutate = append(mutate, tt.mutate)
+			}
+			re := newFixtureEnvAt(t, fixturePath("text-table"), vars, mutate...)
 			s := re.create(CreateOptions{Model: "haiku", Effort: "low", PermissionMode: PermissionSupervised})
 			re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
 			re.writeTranscript(argOf(re.argvOf(), "--session-id"), userLine("earlier"))
@@ -449,6 +454,83 @@ func TestRenderedSetEffortGap(t *testing.T) {
 
 // The respawn's argv is the original launch's but for the conversation (--resume, no
 // --session-id) and the effort, plus what allow for session granted the old process.
+// heldItemThenStarted: an effort restart's new process failed (failText in the
+// timeline); the send it held succeeds, the thread starts again with the message as its
+// first prompt (one delivery, to a resumed process), and the failed restart's effort note
+// never came.
+func heldItemThenStarted(t *testing.T, re *env, s Session, failText string) {
+	t.Helper()
+	it, err := re.m.Send(re.ctx(), s.ID, Message{Text: "held"})
+	if err != nil || it.Text != "held" {
+		t.Fatalf("held send: %+v, %v", it, err)
+	}
+	if _, resumed := re.waitDeliveries("held", func(_, r int) bool { return r == 1 }); resumed != 1 {
+		t.Errorf("held message delivered %d times", resumed)
+	}
+	got := re.waitFor(s.ID, "started again", func(s Session) bool { return s.State == StateConnected && turnOver(s) })
+	if got.Effort != "high" || got.EffortPending {
+		t.Errorf("after the start %+v", got)
+	}
+	items := re.items(s.ID).Items
+	if !slices.ContainsFunc(items, func(x Item) bool { return x.Kind == KindError && strings.HasPrefix(x.Text, failText) }) {
+		t.Errorf("no %q item:\n%s", failText, describeItems(items))
+	}
+	if n := len(userItems(items)); n != 1 {
+		t.Errorf("%d user items:\n%s", n, describeItems(items))
+	}
+	if hasEffortNote("high")(items) {
+		t.Errorf("the effort note for a restart that failed")
+	}
+}
+
+// The restart cannot even exec the new process (claude is gone): the held send still
+// returns its item, which stays in the timeline with the failures after it; the thread
+// is stopped, and the next message (claude back) starts it.
+func TestRenderedSetEffortRespawnExecFails(t *testing.T) {
+	link := filepath.Join(t.TempDir(), "claude")
+	if err := os.Symlink(os.Args[0], link); err != nil {
+		t.Fatal(err)
+	}
+	re := newFixtureEnvAt(t, fixturePath("text-table"), []string{"CF_FAKE_CLAUDE_EXIT_DELAY=400ms"},
+		func(o *Options) { o.Claude = link })
+	s := re.create(CreateOptions{Model: "haiku", Effort: "low"})
+	re.waitFor(s.ID, "idle", func(s Session) bool { return s.Status == StatusIdle })
+	re.writeTranscript(argOf(re.argvOf(), "--session-id"), userLine("earlier"))
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := re.m.SetEffort(re.ctx(), s.ID, "high"); err != nil {
+		t.Fatal(err)
+	}
+	re.waitSwapping(s.ID)
+	it, err := re.m.Send(re.ctx(), s.ID, Message{Text: "held"})
+	if err != nil || it.Text != "held" {
+		t.Fatalf("held send: %+v, %v", it, err)
+	}
+	got := re.waitFor(s.ID, "stopped with an error", func(s Session) bool { return s.State == StateDisconnected && s.Status == StatusError })
+	if got.StatusReason != ReasonStartFailed || got.Effort != "high" || got.EffortPending {
+		t.Errorf("after the failed restart %+v", got)
+	}
+	items := re.items(s.ID).Items
+	u := slices.IndexFunc(items, func(x Item) bool { return x.ID == it.ID })
+	if u < 0 || u == len(items)-1 || items[len(items)-1].Kind != KindError ||
+		!strings.HasPrefix(items[len(items)-1].Text, "Claude did not start: spawn claude: ") ||
+		!slices.ContainsFunc(items[:u], func(x Item) bool { return strings.HasPrefix(x.Text, "Claude did not restart for the effort change") }) {
+		t.Errorf("want the restart failure, the message, then the start failure:\n%s", describeItems(items))
+	}
+	if err := os.Symlink(os.Args[0], link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := re.m.Send(re.ctx(), s.ID, Message{Text: "again"}); err != nil {
+		t.Fatal(err)
+	}
+	argv := re.waitArgv("the start", func(a []string) bool { return argOf(a, "--effort") == "high" && argOf(a, "--resume") != "" })
+	if argOf(argv, "--model") != "haiku" {
+		t.Errorf("argv %q", argv)
+	}
+	re.waitFor(s.ID, "started", func(s Session) bool { return s.State == StateConnected })
+}
+
 func TestRenderedSetEffortRespawnArgv(t *testing.T) {
 	re := newFixtureEnv(t, "bash")
 	s := re.create(CreateOptions{Model: "haiku", Effort: "low", PermissionMode: PermissionAcceptEdits, InitialPrompt: "run it"})

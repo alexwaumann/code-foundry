@@ -73,7 +73,7 @@ func TestMcpStatusCounts(t *testing.T) {
 }
 
 // Answers apply in ticket order: an older check's answer arriving late is dropped, and
-// a clear drops every check in flight.
+// a process end drops every check in flight but keeps the status.
 func TestThreadLogMcpTickets(t *testing.T) {
 	b := bus.New()
 	sub := bus.Subscribe[ThreadEvent](b, 16)
@@ -92,11 +92,10 @@ func TestThreadLogMcpTickets(t *testing.T) {
 		t.Errorf("status = %+v", log.mcpStatus())
 	}
 	inFlight := log.mcpTicket()
-	log.clearMcp()
-	if log.setMcp(inFlight, a) || log.mcpStatus() != nil {
-		t.Error("an answer from before the clear applied")
+	log.dropMcpChecks() // the process ended
+	if log.setMcp(inFlight, a) || log.mcpStatus() != c {
+		t.Error("an answer from before the process ended applied, or the status was dropped")
 	}
-	log.clearMcp() // nothing cached: no event
 	var got []string
 	for len(sub.C()) > 0 {
 		ev := <-sub.C()
@@ -106,11 +105,11 @@ func TestThreadLogMcpTickets(t *testing.T) {
 		}
 		got = append(got, string(statusTrigger(mc.Status)))
 	}
-	if want := []string{"refresh", "nil"}; !slices.Equal(got, want) {
+	if want := []string{"refresh"}; !slices.Equal(got, want) {
 		t.Errorf("events %q want %q", got, want)
 	}
 	if next := log.mcpTicket(); !log.setMcp(next, a) {
-		t.Error("a check after the clear was dropped")
+		t.Error("a check after the process ended was dropped")
 	}
 }
 
@@ -204,19 +203,35 @@ func TestRenderedMcpOnInit(t *testing.T) {
 		t.Errorf("refresh = %+v, %v", fresh, err)
 	}
 
-	// The process ends: no status.
+	// The process ends: the last check stays, and a cached read does not start Claude.
 	if err := re.m.Close(re.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
-	re.waitMcp(s.ID, "cleared", func(m *McpStatus) bool { return m == nil })
-	if m, err := re.m.McpStatus(re.ctx(), s.ID, false); m != nil || err != nil {
-		t.Errorf("disconnected status = %+v, %v", m, err)
+	if m, err := re.m.McpStatus(re.ctx(), s.ID, false); m != fresh || err != nil {
+		t.Errorf("stopped status = %+v, %v", m, err)
 	}
-	if _, err := re.m.McpStatus(re.ctx(), s.ID, true); !errors.Is(err, ErrFailedPrecondition) {
-		t.Errorf("disconnected refresh: %v", err)
+	if re.items(s.ID).Mcp != fresh {
+		t.Errorf("snapshot of a stopped thread lost its MCP status")
 	}
-	if _, err := re.m.McpReconnect(re.ctx(), s.ID, "broken"); !errors.Is(err, ErrFailedPrecondition) {
-		t.Errorf("disconnected reconnect: %v", err)
+	if got := re.snapshot(s.ID); got.State != StateDisconnected {
+		t.Errorf("a cached read started the thread: %+v", got)
+	}
+	// Asked again: Claude starts without a prompt and answers.
+	again, err := re.m.McpStatus(re.ctx(), s.ID, true)
+	if err != nil || again == fresh || again.Trigger != McpTriggerRefresh {
+		t.Errorf("stopped refresh = %+v, %v", again, err)
+	}
+	if got := re.snapshot(s.ID); got.State != StateConnected || got.Status == StatusBusy {
+		t.Errorf("after the refresh %+v", got)
+	}
+	if err := re.m.Close(re.ctx(), s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := re.m.McpReconnect(re.ctx(), s.ID, "broken"); err != nil {
+		t.Errorf("stopped reconnect: %v", err)
+	}
+	if got := re.snapshot(s.ID); got.State != StateConnected {
+		t.Errorf("after the reconnect %+v", got)
 	}
 }
 

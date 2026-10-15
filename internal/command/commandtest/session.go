@@ -104,14 +104,6 @@ func (s *Session) Rename(_ context.Context, r *connect.Request[v1.RenameSessionR
 	return connect.NewResponse(&v1.RenameSessionResponse{Session: &v1.Session{Id: r.Msg.GetId(), Name: r.Msg.GetName()}}), nil
 }
 
-// Close records the request.
-func (s *Session) Close(_ context.Context, r *connect.Request[v1.CloseSessionRequest]) (*connect.Response[v1.CloseSessionResponse], error) {
-	if err := s.do(r.Msg); err != nil {
-		return nil, err
-	}
-	return connect.NewResponse(&v1.CloseSessionResponse{}), nil
-}
-
 // Reconnect returns a STARTING session.
 func (s *Session) Reconnect(_ context.Context, r *connect.Request[v1.ReconnectSessionRequest]) (*connect.Response[v1.ReconnectSessionResponse], error) {
 	if err := s.do(r.Msg); err != nil {

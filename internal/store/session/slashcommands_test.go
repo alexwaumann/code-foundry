@@ -411,9 +411,10 @@ func TestRenderedSlashCommands(t *testing.T) {
 	if err := re.m.Close(re.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
-	re.waitCommands(s.ID, "dropped", func(cs []SlashCommand) bool { return cs == nil })
-	if cs, err := re.m.SlashCommands(re.ctx(), s.ID); cs != nil || err != nil {
-		t.Errorf("closed: %q, %v", names(cs), err)
+	// Stopped: the last list stays (and is persisted; TestThreadCacheSurvivesRestart).
+	re.waitFor(s.ID, "stopped", func(s Session) bool { return s.State == StateDisconnected })
+	if cs, err := re.m.SlashCommands(re.ctx(), s.ID); len(cs) != 42 || err != nil {
+		t.Errorf("stopped: %q, %v", names(cs), err)
 	}
 	if _, err := re.m.SlashCommands(re.ctx(), "nope"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("unknown thread: %v", err)

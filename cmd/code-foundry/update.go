@@ -13,6 +13,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/client"
+	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
@@ -137,18 +138,26 @@ func (cl *cli) afterUpdate(ctx context.Context) {
 		return // no daemon running: the next one starts from the new install
 	}
 	_, _ = c.Update.Check(ctx, connect.NewRequest(&v1.CheckForUpdateRequest{}))
-	sessions := 0
+	// Only threads working, waiting on an answer or running background work lose
+	// anything to the restart; an idle one starts again with its next message.
+	var cost command.RestartCost
 	if res, err := c.Command.Invoke(ctx, connect.NewRequest(&v1.InvokeCommandRequest{Name: "session.list"})); err == nil {
 		var list v1.ListSessionsResponse
 		if protojson.Unmarshal([]byte(res.Msg.GetResultJson()), &list) == nil {
-			for _, s := range list.GetSessions() {
-				if s.GetState() != v1.SessionState_SESSION_STATE_DISCONNECTED {
-					sessions++
-				}
-			}
+			cost = command.RestartCostOf(list.GetSessions())
 		}
 	}
-	fmt.Fprintf(cl.stdout, "\nThe app and the daemon (pid %d, %s, %d open session(s)) keep running the old version\n", ping.GetPid(), ping.GetVersion(), sessions)
+	fmt.Fprintf(cl.stdout, "\nThe app and the daemon (pid %d, %s, %s) keep running the old version\n", ping.GetPid(), ping.GetVersion(), activeThreads(cost))
 	fmt.Fprintf(cl.stdout, "until you restart Code Foundry (Restart Now in the app, or palette: Restart Code Foundry):\n")
 	fmt.Fprintf(cl.stdout, "  code-foundry app restart\n")
+}
+
+// activeThreads is afterUpdate's note of what a restart would cut off: "nothing
+// running", or "restarting cuts off 1 thread working or waiting on you and 1 background
+// shell" (command.RestartCost).
+func activeThreads(c command.RestartCost) string {
+	if c.Threads == 0 {
+		return "nothing running"
+	}
+	return "restarting cuts off " + c.String()
 }

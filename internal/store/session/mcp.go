@@ -16,8 +16,9 @@ import (
 // a server's status changes, so the runner asks (mcp_status) after every system/init,
 // i.e. at the start of each turn, again every few seconds while a server is still
 // connecting, and after the user's own reconnects. The answer is cached on the thread's
-// log in memory, not persisted: a disconnected thread has none. Every new answer is an
-// McpChanged event in the thread's seq order, so ThreadService.Watch carries it.
+// log and persisted (threadcache_db.go): a thread whose process stopped (lifecycle.go)
+// keeps its last check, also across a daemon restart. Every new answer is an McpChanged
+// event in the thread's seq order, so ThreadService.Watch carries it.
 
 // McpTrigger says what made the daemon check the servers.
 type McpTrigger string
@@ -94,7 +95,7 @@ type McpReconnectResult struct {
 }
 
 // McpChanged is published on the bus (as a ThreadEvent) when a thread's MCP status was
-// checked again or dropped (Status nil: the process ended).
+// checked again.
 type McpChanged struct {
 	SessionID string
 	Seq       uint64
@@ -158,6 +159,9 @@ type mcpState struct {
 	status  *McpStatus
 	issued  uint64
 	applied uint64
+	// saved is the ticket of the status last persisted, guarded by threadLog.saveMu:
+	// setMcp saves after unlocking mu, so two checks' saves can arrive out of order.
+	saved uint64
 }
 
 // mcpTicket numbers a check about to be made.
@@ -168,34 +172,43 @@ func (t *threadLog) mcpTicket() uint64 {
 	return t.mcp.issued
 }
 
-// setMcp caches the answer of check ticket and publishes it, unless a later check's
-// answer is there already. It reports whether it was applied.
+// setMcp caches the answer of check ticket, publishes and persists it, unless a later
+// check's answer is there already. It reports whether it was applied.
 func (t *threadLog) setMcp(ticket uint64, s *McpStatus) bool {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	if ticket <= t.mcp.applied {
+		t.mu.Unlock()
 		return false
 	}
 	t.mcp.applied = ticket
 	t.mcp.status = s
 	t.seq++
 	bus.Publish[ThreadEvent](t.bus, McpChanged{SessionID: t.id, Seq: t.seq, Status: s})
+	t.mu.Unlock()
+	t.persistMcp(ticket, s)
 	return true
 }
 
-// clearMcp drops the cached status (the process ended) and every check in flight.
-func (t *threadLog) clearMcp() {
-	t.mu.Lock()
-	had := t.mcp.status != nil
-	t.mu.Unlock()
-	ticket := t.mcpTicket()
-	if had {
-		t.setMcp(ticket, nil)
+// persistMcp saves the status of check ticket unless a later check's is saved already.
+func (t *threadLog) persistMcp(ticket uint64, s *McpStatus) {
+	if t.saveMcp == nil {
 		return
 	}
+	t.saveMu.Lock()
+	defer t.saveMu.Unlock()
+	if ticket <= t.mcp.saved {
+		return
+	}
+	t.mcp.saved = ticket
+	t.saveMcp(s)
+}
+
+// dropMcpChecks discards every check in flight (the process ended: a late answer of
+// the old process must not land), keeping the cached status.
+func (t *threadLog) dropMcpChecks() {
 	t.mu.Lock()
-	t.mcp.applied = max(t.mcp.applied, ticket)
-	t.mu.Unlock()
+	defer t.mu.Unlock()
+	t.mcp.applied = t.mcp.issued
 }
 
 func (t *threadLog) mcpStatus() *McpStatus {
@@ -291,13 +304,15 @@ func (m *Manager) McpStatus(ctx context.Context, id string, refresh bool) (*McpS
 		if s := log.mcpStatus(); s != nil {
 			return s, nil
 		}
-	}
-	r, _, err := m.liveStream(id)
-	if err != nil {
-		if refresh {
-			return nil, err
+		r, _, err := m.liveOrStopped(ctx, id)
+		if err != nil || r == nil {
+			return nil, err // not running and never checked: nothing to report
 		}
-		return nil, nil // not running: no servers to report
+	}
+	// Asked again: a stopped thread starts (without a prompt) to answer.
+	r, err := m.running(ctx, id)
+	if err != nil {
+		return nil, err
 	}
 	conn, err := r.st.connection()
 	if err != nil {
@@ -316,14 +331,15 @@ func (m *Manager) McpReconnect(ctx context.Context, id, server string) (McpRecon
 	if err != nil {
 		return McpReconnectResult{}, err
 	}
-	r, _, err := m.liveStream(id)
-	if err != nil {
-		return McpReconnectResult{}, err
-	}
 	if cur := log.mcpStatus(); cur != nil {
 		if _, ok := cur.server(server); !ok {
 			return McpReconnectResult{}, fmt.Errorf("%w: thread %s has no MCP server %q", ErrNotFound, id, server)
 		}
+	}
+	// A stopped thread starts (without a prompt) to reconnect it.
+	r, err := m.running(ctx, id)
+	if err != nil {
+		return McpReconnectResult{}, err
 	}
 	conn, err := r.st.connection()
 	if err != nil {
