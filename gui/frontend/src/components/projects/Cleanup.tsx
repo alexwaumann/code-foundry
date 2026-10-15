@@ -10,7 +10,7 @@ export function CleanableTag({ repoId, path }: { repoId: string; path: string })
   if (!cleanable) return null;
   return (
     <span
-      className="flex shrink-0 items-center gap-[3px] rounded-sm bg-emerald-500/15 px-1 text-[10px] leading-4 font-medium text-emerald-700 dark:text-emerald-400"
+      className="flex shrink-0 items-center gap-[3px] rounded-sm bg-success/15 px-1 text-[10px] leading-4 font-medium text-success"
       title={cleanableTitle(baseRef)}
       data-testid="worktree-cleanable"
     >

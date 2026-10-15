@@ -55,13 +55,13 @@ function PanelMemberRow({ workspaceId, member, threadId, onOpen }: RowOptions & 
   return (
     <NavRow navKey={memberKey(workspaceId, member.repoId)} className="group/member flex h-full flex-col justify-center gap-0.5 px-2 text-sm" title={member.path}>
       <span className="flex min-w-0 items-center gap-1.5" data-testid="workspace-member" data-repo={member.repoId} data-current={at === "current" || undefined}>
-        <FolderGit2 className="size-3.5 shrink-0 text-sky-400/90" aria-hidden />
+        <FolderGit2 className="size-3.5 shrink-0 text-info/90" aria-hidden />
         <span className="min-w-0 truncate font-medium" data-testid="member-name">
           {name}
         </span>
         {at && (
           <span
-            className={cn("shrink-0 rounded-sm px-1 text-[10px] leading-4 font-medium", at === "current" ? "bg-emerald-400/15 text-emerald-300" : "bg-amber-400/15 text-amber-300")}
+            className={cn("shrink-0 rounded-sm px-1 text-[10px] leading-4 font-medium", at === "current" ? "bg-success/15 text-success" : "bg-warning/15 text-warning")}
             title={at === "current" ? "The thread runs in this worktree" : "The thread moves here once it is idle at its prompt"}
             data-testid="member-at"
           >
@@ -102,7 +102,7 @@ function MemberRow({ workspaceId, member }: { workspaceId: string; member: Membe
   return (
     <NavRow navKey={memberKey(workspaceId, member.repoId)} className="group/member flex h-full items-center gap-2 px-2 text-sm" title={member.path}>
       <span className="flex h-full min-w-0 flex-1 items-center gap-2" data-testid="workspace-member" data-repo={member.repoId}>
-        <FolderGit2 className="size-3.5 shrink-0 text-sky-400/90" aria-hidden />
+        <FolderGit2 className="size-3.5 shrink-0 text-info/90" aria-hidden />
         <span className="w-32 shrink-0 truncate font-medium" data-testid="member-name">
           {name}
         </span>
