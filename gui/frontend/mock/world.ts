@@ -2514,6 +2514,13 @@ export class World {
         },
       },
       {
+        // Mock-only: no daemon command prompts for a path in the palette (context-bound
+        // paths are sent as not required), so e2e/paths.spec.ts drives the prompt with this.
+        cmd: { name: "dev.path", title: "Echo Path", category: "Developer", description: "Report a folder (the palette's path prompt)", keybindings: [], args: [{ name: "path", type: ArgType.PATH, required: true, description: "Folder" }] },
+        when: always,
+        run: (_ctx, args) => `path ${args.path ?? ""}`,
+      },
+      {
         cmd: { name: "daemon.status", title: "Daemon Status", category: "Daemon", description: "Show pid and uptime", keybindings: [], args: [] },
         when: always,
         run: () => `mock daemon pid ${String(process.pid)}, up ${String(Math.round((Date.now() - this.startedAt) / 1000))}s`,
