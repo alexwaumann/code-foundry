@@ -9,8 +9,8 @@ A single surface for all your agents. Code Foundry runs coding agents (Claude Co
 today) on the folders on your Mac, as many at once as you like, in one window.
 
 Two words come up everywhere. A **project** is a folder on your Mac. A **thread** is
-one conversation with an agent working in that folder. Threads keep running when you
-close the window.
+one conversation with an agent working in that folder. Threads keep working when you
+close the window; a thread keeps its history, and a message always continues it.
 
 ### Add a project
 

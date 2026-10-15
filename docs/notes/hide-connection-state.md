@@ -45,7 +45,8 @@ screen says connected, disconnected, starting, closing, reconnect or close.
   is working at once; a start without a message (an MCP check) keeps the saved status.
 * **Removed actions**: `RowMenu` Reconnect and Close, the header's Close button,
   `closeSession`/`reconnectSession`, the comments naming cmd+shift+w. The help overlay
-  says "A thread keeps its history, and a message always continues it."
+  (its Guide tab, `docs/GETTING-STARTED.md`, since #115) says "Threads keep working when
+  you close the window; a thread keeps its history, and a message always continues it."
 * **MCP panel**: Refresh and per-server Reconnect are always enabled (the daemon starts
   Claude for them); the status ask (`ensureMcpStatus`) runs for any thread (no refresh:
   cached status, no start); the empty state is "Checking MCP servers…" while Claude runs or
