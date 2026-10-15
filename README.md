@@ -32,6 +32,8 @@ afterwards, then launch it with:
 code-foundry gui
 ```
 
+New to the app? Read the [getting started guide](docs/GETTING-STARTED.md), also in the app under **Help › Getting Started**.
+
 ### Options
 
 Download the script first to pass flags:
