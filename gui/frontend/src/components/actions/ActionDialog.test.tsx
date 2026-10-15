@@ -83,6 +83,24 @@ describe("ActionDialog", () => {
     expect(saveAction).not.toHaveBeenCalled();
   });
 
+  it("a refusal goes, with the Name field's red state, once the user edits the name", async () => {
+    useActionDialogStore.setState({ editor: { mode: "new", repoId: "web", from: "thread" }, seq: 2 });
+    saveAction.mockImplementationOnce(() => Promise.resolve('this project already has an action named "Test"' as never));
+    render(<ActionDialog />);
+    const name = screen.getByTestId<HTMLInputElement>("action-name");
+    fireEvent.change(name, { target: { value: "test" } });
+    fireEvent.change(screen.getByTestId("action-command"), { target: { value: "true" } });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("action-save"));
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("action-error").textContent).toBe('this project already has an action named "Test"');
+    expect(name.getAttribute("aria-invalid")).toBe("true");
+    fireEvent.change(name, { target: { value: "test 2" } });
+    expect(screen.queryByTestId("action-error")).toBeNull();
+    expect(name.hasAttribute("aria-invalid")).toBe(false);
+  });
+
   it("an action deleted elsewhere while the editor is open says so and cannot be saved", () => {
     render(<ActionDialog />);
     act(() => {

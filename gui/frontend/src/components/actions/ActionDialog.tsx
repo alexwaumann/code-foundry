@@ -105,8 +105,11 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
   const nameError = error !== null && /\bname/i.test(error);
   const commandError = error !== null && !nameError && /\bcommand/i.test(error);
 
+  // An edit makes the last refusal stale (it was about the draft as it was): the line and
+  // the field's red state go until the next Save.
   const set = <K extends keyof ActionDraft>(k: K, v: ActionDraft[K]) => {
     setDraft((d) => ({ ...d, [k]: v }));
+    setError(null);
   };
 
   const save = async () => {
