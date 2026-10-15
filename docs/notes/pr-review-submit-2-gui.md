@@ -14,11 +14,12 @@ Screenshots (dark | light, the mock's #139): `pr-review-submit-2-gui/review-menu
 | File | What |
 |---|---|
 | `components/pr/review.ts` | pure: `VERDICT_SPECS` (title, hint, label, tone, body required, empty hint, placeholder, own-PR reason), `canSubmit`, `composerHint`, `disabledVerdicts`, `reviewVisible`, `yourReview`, `reviewArgs` |
-| `components/pr/reviewIcons.ts` | lucide icons per verdict and per "your review" (own file: react-refresh wants components-only modules) |
+| `components/pr/reviewIcons.ts` | one table of icons per verdict (menu/label icon, button icon) and per "your review" (own file: react-refresh wants components-only modules) |
 | `components/pr/ReviewButton.tsx` | the header's Review ▾ / chip and its shadcn DropdownMenu |
-| `components/pr/PrReviewComposer.tsx` | the composer, modeled on `PrAskComposer` |
+| `components/pr/PanelComposer.tsx` | the inline composer both Ask and Review use: label, 3→6 row textarea, hint, Cancel, submit; keys, focus request, close with panel focus handoff, `useId` ids |
+| `components/pr/PrReviewComposer.tsx` | the review composer: verdict copy, tone, submit through `submitReview` |
 | `components/pr/keys.ts` | `composerKeyAction(e, "cmd-enter")` |
-| `stores/prPanel.ts` | `submitReview` (pr.review), busy flag `reviewing` per pull request |
+| `stores/prPanel.ts` | `submitReview` and `reviewArgs` (pr.review, on `prArgs`), busy flag `reviewing` per pull request |
 | `stores/gh.ts`, `api/gh.ts` | `viewerResource` / `useViewerLogin` over `GhService.GetViewer` |
 | `PullRequestSurface.tsx` | one composer slot: `"ask" \| Verdict \| null` |
 | `mock/prDetail.ts`, `mock/server.ts` | the two RPCs and the two commands; #139 fixture |
@@ -58,19 +59,36 @@ Screenshots (dark | light, the mock's #139): `pr-review-submit-2-gui/review-menu
   65536 characters).
 * **Submitting** goes through the registry: `runCommand("pr.review", …)` (not quiet, so
   the daemon's "Approved #139" is the success toast, like the reviewer picker's
-  request). `submitReview` invalidates the detail and waits (`settled`) until it is read
-  again, so the chip and the review in Comments are there when the composer closes.
+  request). `submitReview` invalidates the detail either way. On success it waits
+  (`settled`) until the detail is read again, so the chip and the review in Comments are
+  there when the composer closes; on failure it frees the composer at once (waiting up
+  to 15 s for the re-read left it read-only after a refusal).
   While it runs: the textarea is read-only, the hint says "Submitting…", Cancel and
   Escape do nothing, the submit button spins (`aria-busy`), and the header button is
   `aria-disabled` with a spinner and will not open (the review menu's `open && !busy`,
   as Merge). A second submit while one runs sends nothing. Failure: the generic
   "Review Pull Request failed" toast with the daemon's message; the text stays.
+* **Another surface submitting** a review of the same pull request (busy, not this
+  composer's send): the submit button shows the shared spinner, the hint says "Already
+  submitting a review for this pull request" (`role=status`), the text stays editable
+  and Cancel works; cmd+Enter sends nothing. The review menu shuts when a review starts
+  and stays shut after it settles (its `open` is cleared during render when `busy`
+  turns on; the controlled `open && !busy` alone reopened it).
+* **The composer goes with Review ▾.** When the detail stops taking reviews (merged,
+  closed, write access lost) the surface drops a review composer during render.
+* **One composer component.** `PanelComposer` holds what Ask and Review share; each
+  passes its copy, tone, keys mode (`enter` / `cmd-enter`), submit button and testids.
+  Its `onSubmit` resolves whether to close. Ids come from `useId`, so two panels
+  showing a composer no longer share `pr-ask-input` / `pr-review-input` ids (the
+  data-testids are unchanged). Ask's hint now gets a truncation tooltip in every state,
+  not only "Already starting…".
 * **Approve tint.** Only the approve composer has a background (`bg-success/5`), per the
   sketch; its label and button are green. Request changes is red text and button,
   Comment the primary button.
 * **`pr.comment`** stays CLI/palette only. The Comment item submits a COMMENT review, as
   GitHub's Review → Comment does.
-* **Mock.** `submitReview`/`postComment` on `PrDetailWorld`, served as RPCs and as
+* **Mock.** `submitReview`/`postComment` on `PrDetailWorld` (the viewer's login compared
+  case-insensitively, like the daemon), served as RPCs and as
   `pr.review`/`pr.comment` (results are protojson of the responses). A review appends a
   REVIEW comment by the viewer, moves the viewer's reviewer entry (request answered) to
   the front of the reviewed, bumps `updated_at` in place (the dashboard row shares it)
@@ -109,7 +127,12 @@ Screenshots (dark | light, the mock's #139): `pr-review-submit-2-gui/review-menu
   `reviewArgs`; `composerKeyAction(…, "cmd-enter")` table.
 * `prPanel.test.ts` `submitReview`: trimmed args, busy until the detail re-read lands, a
   second submit sends nothing, the success toast; an empty approval sends no body; a
-  refusal toasts and re-reads.
+  refusal toasts, re-reads, and is not busy while that read is in flight; `reviewArgs`.
+* `PrReviewComposer.test.tsx`: cmd+Enter (not Enter) submits and hands focus to the
+  panel; a failure keeps the text and unlocks; the elsewhere hint (status), spinner and
+  no send; unique ids and label/hint wiring for two review and two ask composers.
+* `ReviewButton.test.tsx`: a review starting elsewhere shuts the open menu and it stays
+  shut after (fails without the fix).
 * `pr-panel.spec.ts` (new): the #139 menu (left of Merge, hints, inside the panel),
   Approve composer, Enter newline, cmd+Enter submits, the recorded `pr.review` args and
   `SubmitPullRequestReview` count, toast, focus to the panel, the chip, reviewer entry
@@ -118,7 +141,8 @@ Screenshots (dark | light, the mock's #139): `pr-review-submit-2-gui/review-menu
   (read-only, spinner, toast, text kept, the same text refused again, other text posts);
   #145 disabled items with their tooltips and Comment posting, GitHub's refusal from
   the command; #140 and #138 without Review; 280px (button icon-only, menu and composer
-  fit, chip icon-only). The existing 280px test also opens the review menu on #145.
+  fit, chip icon-only); a Comment composer on #142 goes away when #142 is merged. The
+  existing 280px test also opens the review menu on #145.
 
 Runs (2026-10-15): `make check` green (Go vet/staticcheck/race tests, tsc, eslint,
 vitest 148 files / 2971 tests). `playwright test e2e/pr-panel.spec.ts --project=webkit`
