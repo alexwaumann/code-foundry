@@ -403,8 +403,13 @@ type Session struct {
 	// shells are not counted). They die with the thread's process, so 0 once it ended
 	// and after a daemon restart. See docs/notes/background-shells.md.
 	BackgroundShellsRunning int32 `protobuf:"varint,41,opt,name=background_shells_running,json=backgroundShellsRunning,proto3" json:"background_shells_running,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	// A background shell or agent run ended while Claude was at its prompt, and the turn
+	// Claude starts by itself to report it has not ended yet (a few seconds at most).
+	// Stopping Claude now loses that report: archive, snooze and restarts confirm it like
+	// running background work. Not persisted. See docs/notes/thread-lifecycle.md.
+	BackgroundWakePending bool `protobuf:"varint,42,opt,name=background_wake_pending,json=backgroundWakePending,proto3" json:"background_wake_pending,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *Session) Reset() {
@@ -708,6 +713,13 @@ func (x *Session) GetBackgroundShellsRunning() int32 {
 		return x.BackgroundShellsRunning
 	}
 	return 0
+}
+
+func (x *Session) GetBackgroundWakePending() bool {
+	if x != nil {
+		return x.BackgroundWakePending
+	}
+	return false
 }
 
 // ApiRetry is a thread's pending API retry: Claude's system/api_retry frame.
@@ -2981,7 +2993,7 @@ var File_codefoundry_v1_session_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccodefoundry/v1/session.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe9\r\n" +
+	"\x1ccodefoundry/v1/session.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa1\x0e\n" +
 	"\aSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x17\n" +
@@ -3027,7 +3039,8 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\rsnoozed_until\x18& \x01(\v2\x1a.google.protobuf.TimestampR\fsnoozedUntil\x12%\n" +
 	"\x0eagents_running\x18' \x01(\x05R\ragentsRunning\x12:\n" +
 	"\x19background_agents_running\x18( \x01(\x05R\x17backgroundAgentsRunning\x12:\n" +
-	"\x19background_shells_running\x18) \x01(\x05R\x17backgroundShellsRunningJ\x04\b\t\x10\n" +
+	"\x19background_shells_running\x18) \x01(\x05R\x17backgroundShellsRunning\x126\n" +
+	"\x17background_wake_pending\x18* \x01(\bR\x15backgroundWakePendingJ\x04\b\t\x10\n" +
 	"J\x04\b\x1f\x10 R\vterminal_idR\x06render\"\xb5\x01\n" +
 	"\bApiRetry\x12\x18\n" +
 	"\aattempt\x18\x01 \x01(\x05R\aattempt\x12\x1f\n" +

@@ -57,6 +57,10 @@ func TestSessionAgentCounts(t *testing.T) {
 	if p.GetAgentsRunning() != 2 || p.GetBackgroundAgentsRunning() != 1 || p.GetBackgroundShellsRunning() != 3 {
 		t.Errorf("running %d, background %d, shells %d", p.GetAgentsRunning(), p.GetBackgroundAgentsRunning(), p.GetBackgroundShellsRunning())
 	}
+	// The wake hold travels too (restarts and archive confirm it as background work).
+	if p.GetBackgroundWakePending() || !sessionToProto(session.Session{ID: "s2", WakePending: true}).GetBackgroundWakePending() {
+		t.Error("background_wake_pending mapping")
+	}
 	want := []v1.AgentRunStatus{v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN, v1.AgentRunStatus_AGENT_RUN_STATUS_CLOSED,
 		v1.AgentRunStatus_AGENT_RUN_STATUS_CLOSED, v1.AgentRunStatus_AGENT_RUN_STATUS_CLOSED, v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN}
 	for i, r := range p.GetAgentRuns() {

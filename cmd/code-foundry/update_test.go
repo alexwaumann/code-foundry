@@ -1,22 +1,26 @@
 package main
 
-import "testing"
+import (
+	"testing"
 
-// After an update the CLI counts only the threads a restart would cut off (working or
-// waiting on an answer, command.ActiveSession); idle and stopped ones start again with
-// their next message.
+	"github.com/alexwaumann/code-foundry/internal/command"
+)
+
+// After an update the CLI names what a restart would cut off (command.RestartCost: turns,
+// prompts, background work); idle and stopped threads start again with their next
+// message.
 func TestActiveThreads(t *testing.T) {
 	tests := []struct {
-		n    int
+		c    command.RestartCost
 		want string
 	}{
-		{0, "no thread working"},
-		{1, "1 thread working or waiting on you"},
-		{3, "3 threads working or waiting on you"},
+		{command.RestartCost{}, "nothing running"},
+		{command.RestartCost{Threads: 1, MidTurn: 1}, "restarting cuts off 1 thread working or waiting on you"},
+		{command.RestartCost{Threads: 2, MidTurn: 1, Shells: 1}, "restarting cuts off 1 thread working or waiting on you and 1 background shell"},
 	}
 	for _, tt := range tests {
-		if got := activeThreads(tt.n); got != tt.want {
-			t.Errorf("activeThreads(%d) = %q, want %q", tt.n, got, tt.want)
+		if got := activeThreads(tt.c); got != tt.want {
+			t.Errorf("activeThreads(%+v) = %q, want %q", tt.c, got, tt.want)
 		}
 	}
 }

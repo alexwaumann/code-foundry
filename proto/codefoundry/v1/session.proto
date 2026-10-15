@@ -261,6 +261,11 @@ message Session {
   // shells are not counted). They die with the thread's process, so 0 once it ended
   // and after a daemon restart. See docs/notes/background-shells.md.
   int32 background_shells_running = 41;
+  // A background shell or agent run ended while Claude was at its prompt, and the turn
+  // Claude starts by itself to report it has not ended yet (a few seconds at most).
+  // Stopping Claude now loses that report: archive, snooze and restarts confirm it like
+  // running background work. Not persisted. See docs/notes/thread-lifecycle.md.
+  bool background_wake_pending = 42;
 }
 
 // ApiRetry is a thread's pending API retry: Claude's system/api_retry frame.

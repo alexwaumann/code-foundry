@@ -207,7 +207,7 @@ type Session struct {
 	BackgroundShellsRunning int
 	// WakePending: a background shell or agent run ended while Claude was at its prompt,
 	// and the turn Claude starts by itself to report it has not ended yet (wake.go). Not
-	// persisted, not sent.
+	// persisted; Session.background_wake_pending on the API.
 	WakePending bool
 }
 

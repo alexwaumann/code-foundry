@@ -2,7 +2,6 @@ package command
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -93,8 +92,9 @@ func archiveConfirm(ctx context.Context, b SessionBackend, a Args) string {
 // pending (status reasons "permission: ..." and "question: ...", stream_status.go), or
 // "Claude is still working" while it starts or runs a turn, both "ends the turn"; the
 // thread's background agents and shells running after its turn ("1 background agent
-// and 2 shells are running", "stops them"); "" otherwise (idle, a finished or failed
-// turn, closing, stopped).
+// and 2 shells are running", "stops them"), or Claude's turn to report one that just
+// ended (the wake hold); "" otherwise (idle, a finished or failed turn, closing,
+// stopped).
 func archiveInterrupts(s *v1.Session) (why, ends string) {
 	if why := midTurn(s); why != "" {
 		return why, "ends the turn"
@@ -104,6 +104,9 @@ func archiveInterrupts(s *v1.Session) (why, ends string) {
 	}
 	agents, shells := int(s.GetBackgroundAgentsRunning()), int(s.GetBackgroundShellsRunning())
 	if agents+shells == 0 {
+		if s.GetBackgroundWakePending() {
+			return "Claude is about to report background work that just finished", "loses that report"
+		}
 		return "", ""
 	}
 	ends = "stops them"
@@ -136,23 +139,23 @@ func midTurn(s *v1.Session) string {
 // backgroundRunning is "1 background agent is running", "2 background shells are
 // running", "1 background agent and 2 shells are running".
 func backgroundRunning(agents, shells int) string {
-	count := func(n int, word string) string {
-		if n == 1 {
-			return "1 " + word
-		}
-		return fmt.Sprintf("%d %ss", n, word)
-	}
-	var what string
-	switch {
-	case agents > 0 && shells > 0:
-		what = count(agents, "background agent") + " and " + count(shells, "shell")
-	case agents > 0:
-		what = count(agents, "background agent")
-	default:
-		what = count(shells, "background shell")
-	}
+	what := backgroundWork(agents, shells)
 	if agents+shells == 1 {
 		return what + " is running"
 	}
 	return what + " are running"
+}
+
+// backgroundWork is "1 background agent", "2 background shells", "1 background agent
+// and 2 shells"; "" for none.
+func backgroundWork(agents, shells int) string {
+	switch {
+	case agents > 0 && shells > 0:
+		return plural(agents, "background agent") + " and " + plural(shells, "shell")
+	case agents > 0:
+		return plural(agents, "background agent")
+	case shells > 0:
+		return plural(shells, "background shell")
+	}
+	return ""
 }

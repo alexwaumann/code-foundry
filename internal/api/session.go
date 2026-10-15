@@ -277,6 +277,7 @@ func sessionToProto(s session.Session) *v1.Session {
 	all, background := s.AgentsRunning()
 	p.AgentsRunning, p.BackgroundAgentsRunning = int32(all), int32(background)
 	p.BackgroundShellsRunning = int32(s.BackgroundShellsRunning)
+	p.BackgroundWakePending = s.WakePending
 	p.ContextTokens, p.ContextRereadUsd = s.ContextTokens, contextRereadUSD(s)
 	if !s.CacheExpiresAt.IsZero() {
 		p.CacheExpiresAt = timestamppb.New(s.CacheExpiresAt)
