@@ -30,15 +30,46 @@ function setting(page: Page, key: string) {
   return page.locator(`[data-setting="${key}"]`);
 }
 
+/**
+ * An enum setting's select trigger: the shadcn Select, a combobox button whose data-value is
+ * the setting's value. Found by its slot, not its role: while the list is open Radix hides
+ * everything else from the accessibility tree (aria-hidden), the trigger too.
+ */
+function select(page: Page, key: string) {
+  return setting(page, key).locator('[data-slot="select-trigger"]');
+}
+
+/** The open select's list (portaled, outside the row; the sidebar is a listbox too). */
+function listbox(page: Page) {
+  return page.locator('[data-slot="select-content"]');
+}
+
+/** Opens an enum setting's select and lists its options, then closes it with Escape (which leaves the page open). */
+async function expectOptions(page: Page, key: string, labels: string[]) {
+  await select(page, key).click();
+  await expect(listbox(page).getByRole("option")).toHaveText(labels);
+  await page.keyboard.press("Escape");
+  await expect(listbox(page)).toHaveCount(0);
+  await expect(page.getByTestId("settings-page")).toBeVisible();
+}
+
+/** Picks an enum setting's option by its label. */
+async function pick(page: Page, key: string, label: string) {
+  await select(page, key).click();
+  await listbox(page).getByRole("option", { name: label, exact: true }).click();
+  await expect(listbox(page)).toHaveCount(0);
+}
+
 test("cmd+, opens settings rendered from the schema", async ({ page }) => {
   const settings = await openSettings(page);
   for (const title of ["Sessions", "GitHub", "Repositories", "Appearance", "Keybindings", "Advanced"]) {
     await expect(settings.getByRole("heading", { name: title, exact: true })).toBeVisible();
   }
   await expect(setting(page, "appearance.font_size").getByRole("spinbutton")).toHaveValue("13");
-  await expect(setting(page, "sessions.default_model").getByRole("combobox")).toHaveValue("claude-opus-4-8[1m]");
+  await expect(select(page, "sessions.default_model")).toHaveAttribute("data-value", "claude-opus-4-8[1m]");
+  await expect(select(page, "sessions.default_model")).toHaveText("Opus 4.8 (default)");
   // The model registry's labels; the setting's own default is marked.
-  await expect(setting(page, "sessions.default_model").getByRole("option")).toHaveText([
+  await expectOptions(page, "sessions.default_model", [
     "Opus 5.5",
     "Opus 4.8 (default)",
     "Opus 4.7",
@@ -50,11 +81,11 @@ test("cmd+, opens settings rendered from the schema", async ({ page }) => {
   ]);
   // Where new threads work: a dropdown with plain-language labels, a fresh copy by default.
   await expect(setting(page, "sessions.default_worktree")).toContainText("New threads work in");
-  await expect(setting(page, "sessions.default_worktree").getByRole("combobox")).toHaveValue("new");
-  await expect(setting(page, "sessions.default_worktree").getByRole("option")).toHaveText(["A fresh copy of the project (default)", "The project folder itself"]);
+  await expect(select(page, "sessions.default_worktree")).toHaveAttribute("data-value", "new");
+  await expectOptions(page, "sessions.default_worktree", ["A fresh copy of the project (default)", "The project folder itself"]);
   // The naming model is its own live setting, defaulting to Sonnet 5.
-  await expect(setting(page, "sessions.naming_model").getByRole("combobox")).toHaveValue("claude-sonnet-5[1m]");
-  await expect(setting(page, "sessions.naming_model").getByRole("option", { name: "Sonnet 5 (default)" })).toHaveCount(1);
+  await expect(select(page, "sessions.naming_model")).toHaveAttribute("data-value", "claude-sonnet-5[1m]");
+  await expect(select(page, "sessions.naming_model")).toHaveText("Sonnet 5 (default)");
   await expect(setting(page, "sessions.naming_model").getByTestId("restart-hint")).toHaveCount(0);
   // Every thread is rendered: no view setting (the schema has none).
   await expect(setting(page, "sessions.render")).toHaveCount(0);
@@ -87,10 +118,10 @@ test("changing a bool and an enum saves to the file and applies live", async ({ 
   await expect(page.getByText("Saved Name sessions automatically")).toBeVisible();
   await expect.poll(async () => (await mockSettings()).raw["sessions.auto_name"]).toBe("false");
 
-  await setting(page, "appearance.theme").getByRole("combobox").selectOption("light");
+  await pick(page, "appearance.theme", "light");
   await expect.poll(async () => (await mockSettings()).raw["appearance.theme"]).toBe("light");
   await expect(page.locator("html")).not.toHaveClass(/dark/);
-  await setting(page, "appearance.theme").getByRole("combobox").selectOption("dark");
+  await pick(page, "appearance.theme", "dark");
   await expect(page.locator("html")).toHaveClass(/dark/);
 
   // An out-of-range number is rejected inline and not saved.
@@ -107,16 +138,68 @@ test("changing a bool and an enum saves to the file and applies live", async ({ 
   await expect(setting(page, "sessions.scrollback_lines").getByTestId("restart-pending")).toBeVisible();
 });
 
+test("an enum select works from the keyboard and its list is themed", async ({ page }) => {
+  await openSettings(page);
+  const trigger = select(page, "appearance.thread_width");
+  await trigger.focus();
+  await page.keyboard.press("Enter");
+  const list = listbox(page);
+  await expect(list).toBeVisible();
+  // Drawn with the popover tokens, under its trigger and as wide (once the zoom-in is done).
+  await list.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+  const box = await list.boundingBox();
+  const tbox = await trigger.boundingBox();
+  if (!box || !tbox) throw new Error("no boxes");
+  expect(box.y).toBeGreaterThanOrEqual(tbox.y + tbox.height);
+  expect(box.x).toBeCloseTo(tbox.x, 0);
+  expect(box.width).toBeCloseTo(tbox.width, 0);
+  const bg = await page.locator('[data-slot="select-content"]').evaluate((el) => getComputedStyle(el).backgroundColor);
+  const popover = await page.evaluate(() => {
+    const probe = document.createElement("div");
+    probe.className = "bg-popover";
+    document.body.append(probe);
+    const c = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return c;
+  });
+  expect(bg).toBe(popover);
+  // The selected item has the focus; ArrowDown moves to the next and Enter picks it.
+  await expect(list.getByRole("option", { name: "comfortable (default)" })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  // Radix moves the focus in a timeout; Enter picks whichever option has it.
+  await expect(list.getByRole("option", { name: "full" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(list).toHaveCount(0);
+  await expect(trigger).toHaveAttribute("data-value", "full");
+  await expect(trigger).toBeFocused();
+  await expect.poll(async () => (await mockSettings()).raw["appearance.thread_width"]).toBe("full");
+  // Escape on the closed trigger leaves the page open, as on a field.
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("settings-page")).toBeVisible();
+});
+
+test("a text setting reverts on Escape and commits on Enter", async ({ page }) => {
+  await openSettings(page);
+  const size = setting(page, "appearance.font_size").getByRole("spinbutton");
+  await size.fill("15");
+  await size.press("Escape");
+  await expect(size).toHaveValue("13");
+  await expect(page.getByTestId("settings-page")).toBeVisible();
+  expect((await mockSettings()).raw["appearance.font_size"]).toBeUndefined();
+  await size.fill("15");
+  await size.press("Enter");
+  await expect.poll(async () => (await mockSettings()).raw["appearance.font_size"]).toBe("15");
+});
+
 test("appearance.thread_width sets data-thread-width on <html>, live", async ({ page }) => {
   await openSettings(page);
   const html = page.locator("html");
   await expect(html).toHaveAttribute("data-thread-width", "comfortable");
-  const width = setting(page, "appearance.thread_width").getByRole("combobox");
-  await expect(width).toHaveValue("comfortable");
-  await width.selectOption("full");
+  await expect(select(page, "appearance.thread_width")).toHaveAttribute("data-value", "comfortable");
+  await pick(page, "appearance.thread_width", "full");
   await expect.poll(async () => (await mockSettings()).raw["appearance.thread_width"]).toBe("full");
   await expect(html).toHaveAttribute("data-thread-width", "full");
-  await width.selectOption("compact");
+  await pick(page, "appearance.thread_width", "compact");
   await expect(html).toHaveAttribute("data-thread-width", "compact");
   // A hand edit back to the default.
   await mockPost("settings/external?appearance.thread_width=");

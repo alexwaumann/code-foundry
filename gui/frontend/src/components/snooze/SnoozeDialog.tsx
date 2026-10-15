@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useNow } from "@/lib/clock";
 import { addDays, compareDays, dayOf, formatDay, monthGrid, monthTitle, parseTimeValue, sameDay, shiftMonth, SNOOZE_HOUR, wallTime, type Day } from "@/lib/snooze";
@@ -129,19 +130,19 @@ function SnoozeBody({ sessionId }: { sessionId: string }) {
     >
       <Calendar now={now} selected={day} onSelect={setDay} />
       <div className="flex items-center gap-3">
-        <label className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border bg-transparent px-2.5 focus-within:ring-[3px] focus-within:ring-ring/50">
-          <Clock className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          <input
+        <div className="relative flex min-w-0 flex-1 items-center">
+          <Clock className="pointer-events-none absolute left-2.5 size-3.5 text-muted-foreground" aria-hidden />
+          <Input
             type="time"
             value={time}
             onChange={(e) => {
               setTime(e.target.value);
             }}
             aria-label="Time"
-            className="min-w-0 flex-1 bg-transparent text-sm tabular-nums outline-none"
+            className="pl-8 tabular-nums"
             data-testid="snooze-time"
           />
-        </label>
+        </div>
         <span className={cn("shrink-0 text-xs tabular-nums", untilMs !== null && !ready ? "text-destructive" : "text-muted-foreground")} data-testid="snooze-summary">
           {untilMs !== null && !ready ? "In the past" : formatDay(day, now)}
         </span>

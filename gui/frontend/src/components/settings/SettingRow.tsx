@@ -3,6 +3,10 @@ import { RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "cn";
 import type { SettingFieldView } from "@/api/settings";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Tip } from "@/components/ui/tooltip";
 import { chordFromEvent, formatChord } from "@/keys/chord";
 import { enumOptionLabel } from "@/lib/models";
@@ -10,9 +14,6 @@ import { validateSetting } from "@/settings/validate";
 import { saveSettings, useSettingsStore, useSettingValue } from "@/stores/settings";
 import type { EditorProps, SettingEditor } from "./editor";
 import { keyEditors } from "./keyEditors";
-
-const inputClass =
-  "h-7 w-full rounded-md border border-input bg-background px-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50 aria-invalid:border-destructive";
 
 /** An enum value's name: the schema's label (the model registry's "Opus 4.8"), else the value; "" is "no preference". */
 function enumLabel(f: SettingFieldView, v: string): string {
@@ -29,43 +30,45 @@ function displayValue(f: SettingFieldView, v: string): string {
 function BoolEditor({ field, value, pending, commit }: EditorProps) {
   const on = value === "true";
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
+    <Switch
       aria-label={field.title}
+      checked={on}
       disabled={pending}
-      onClick={() => {
-        commit(on ? "false" : "true");
+      onCheckedChange={(checked) => {
+        commit(checked ? "true" : "false");
       }}
-      className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-        on ? "bg-primary" : "bg-input",
-      )}
-    >
-      <span className={cn("inline-block size-4 rounded-full bg-background shadow transition-transform", on ? "translate-x-4.5" : "translate-x-0.5")} />
-    </button>
+    />
   );
 }
 
-function EnumEditor({ field, value, pending, commit }: EditorProps) {
+/**
+ * Radix Select reserves "" for "no value" (an item cannot have it), and "" is an enum's
+ * "no preference" (Default); the list uses this stand-in for it.
+ */
+const EMPTY_ENUM = "__cf_default__";
+
+function EnumEditor({ field, value, pending, invalid, commit }: EditorProps) {
+  const toItem = (v: string) => (v === "" ? EMPTY_ENUM : v);
   return (
-    <select
-      aria-label={field.title}
-      className={inputClass}
-      value={value}
+    <Select
+      value={toItem(value)}
       disabled={pending}
-      onChange={(e) => {
-        commit(e.target.value);
+      onValueChange={(v) => {
+        commit(v === EMPTY_ENUM ? "" : v);
       }}
     >
-      {field.enumValues.map((v) => (
-        <option key={v} value={v}>
-          {enumLabel(field, v)}
-          {v === field.defaultValue && v !== "" ? " (default)" : ""}
-        </option>
-      ))}
-    </select>
+      <SelectTrigger className="w-full" aria-label={field.title} aria-invalid={invalid || undefined} data-value={value}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {field.enumValues.map((v) => (
+          <SelectItem key={v} value={toItem(v)}>
+            {enumLabel(field, v)}
+            {v === field.defaultValue && v !== "" ? " (default)" : ""}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -82,12 +85,12 @@ function TextEditor({ field, value, pending, invalid, commit, setError }: Editor
     }
   };
   return (
-    <input
+    <Input
       // Remount on a new daemon value (e.g. the file was edited by hand).
       key={value}
       aria-label={field.title}
       aria-invalid={invalid || undefined}
-      className={cn(inputClass, field.type === "path" || field.type === "string" ? "font-mono text-xs" : "")}
+      className={field.type === "path" || field.type === "string" ? "font-mono text-xs" : undefined}
       type={field.type === "int" ? "number" : "text"}
       min={field.type === "int" ? field.min : undefined}
       max={field.type === "int" ? field.max : undefined}
@@ -117,13 +120,15 @@ function KeybindingEditor({ field, value, pending, invalid, commit, setError }: 
     commit(chord === "backspace" || chord === "delete" ? "none" : chord);
   };
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="sm"
       data-key-recorder
       aria-label={`${field.title} shortcut`}
       aria-invalid={invalid || undefined}
       disabled={pending}
-      className={cn(inputClass, "flex items-center justify-between text-left", recording && "ring-2 ring-ring/60")}
+      className={cn("w-full justify-between px-2.5 font-normal", recording && "border-ring ring-[3px] ring-ring/50")}
       onClick={(e) => {
         // WebKit does not focus a button on click; the recorder needs the keydowns.
         e.currentTarget.focus();
@@ -140,7 +145,7 @@ function KeybindingEditor({ field, value, pending, invalid, commit, setError }: 
       ) : (
         <span className={value && value !== "none" ? "" : "text-muted-foreground"}>{displayValue(field, value)}</span>
       )}
-    </button>
+    </Button>
   );
 }
 

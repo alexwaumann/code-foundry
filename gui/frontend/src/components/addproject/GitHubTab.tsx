@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { appendProgress, cloneRepo, lookupGitHub, searchGitHub, type CloneProgressView, type GitHubRepoView } from "@/api/addProject";
 import { errorMessage, isAbort } from "@/api/stream";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { parseGitHubInput } from "@/lib/githubRef";
 import { tildify } from "@/lib/path";
 import { finishAddProject, registerFolder, selectAddedProject } from "@/stores/addProject";
@@ -255,9 +256,9 @@ export function GitHubTab({ active }: { active: boolean }) {
           void go();
         }}
       >
-        <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border px-3 focus-within:ring-[3px] focus-within:ring-ring/50">
-          <Search className="size-4 shrink-0 opacity-50" aria-hidden />
-          <input
+        <div className="relative flex min-w-0 flex-1 items-center">
+          <Search className="pointer-events-none absolute left-2.5 size-4 opacity-50" aria-hidden />
+          <Input
             ref={inputRef}
             disabled={cloning}
             value={text}
@@ -267,7 +268,7 @@ export function GitHubTab({ active }: { active: boolean }) {
             }}
             placeholder="owner/repo, https://github.com/owner/repo, or search"
             aria-label="GitHub repository or search"
-            className="h-full w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            className="pl-8"
             spellCheck={false}
             autoComplete="off"
             data-testid="add-project-github-input"

@@ -357,9 +357,14 @@
   top: 0.3em;
   margin: 0;
 }
+/* A task-list box is native and read-only (GFM renders it disabled), tinted with the info
+   token: sky-600 in light as before, sky-400 in dark (WebKit dims a disabled box either way).
+   The shadcn Checkbox was tried: disabled it goes grey at 50% and its empty box all but
+   vanishes on a dark pane; at full opacity it reads as a control you can click
+   (docs/notes/theme-4-forms.md). */
 .cf-markdown input[type="checkbox"] {
   opacity: 1;
-  accent-color: oklch(0.588 0.158 241.966);
+  accent-color: var(--info);
 }
 .cf-markdown a {
   color: var(--link);

@@ -1,8 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { CloudUpload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { errorMessage } from "@/api/stream";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { projectNameError, type PublishOwnerView } from "@/lib/publish";
 import { closePublishDialog, publishProject, usePublishDialogStore } from "@/stores/publish";
@@ -18,6 +20,7 @@ import { usePublishOwners, type PublishChoice } from "./usePublishOwners";
 function PublishBody({ repoId }: { repoId: string }) {
   const project = useReposStore((s) => s.byId[repoId]?.name ?? "");
   const [name, setName] = useState(project);
+  const nameId = useId();
   const [choice, setChoice] = useState<PublishChoice>({ owner: "", visibility: null });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,8 +60,11 @@ function PublishBody({ repoId }: { repoId: string }) {
       </p>
       <PublishPicker owners={owners} value={choice} onChange={setChoice} disabled={busy} error={error} />
       <div className="flex flex-wrap items-center gap-2">
-        <span className="w-16 text-xs text-muted-foreground">Name</span>
-        <input
+        <Label htmlFor={nameId} className="w-16 text-xs font-normal text-muted-foreground">
+          Name
+        </Label>
+        <Input
+          id={nameId}
           value={name}
           onChange={(e) => {
             setName(e.target.value);
@@ -69,7 +75,7 @@ function PublishBody({ repoId }: { repoId: string }) {
           aria-invalid={nameError ? true : undefined}
           spellCheck={false}
           autoComplete="off"
-          className="h-8 min-w-0 flex-1 rounded-md border bg-transparent px-2.5 font-mono text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60 aria-invalid:border-destructive"
+          className="flex-1 font-mono"
           data-testid="publish-name"
         />
       </div>
