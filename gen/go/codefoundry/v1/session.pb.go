@@ -386,6 +386,11 @@ type Session struct {
 	// docs/notes/agents-1-daemon.md.
 	AgentsRunning           int32 `protobuf:"varint,39,opt,name=agents_running,json=agentsRunning,proto3" json:"agents_running,omitempty"`
 	BackgroundAgentsRunning int32 `protobuf:"varint,40,opt,name=background_agents_running,json=backgroundAgentsRunning,proto3" json:"background_agents_running,omitempty"`
+	// The thread's own background shells still running: Bash calls with
+	// run_in_background and Monitor calls, which run on after its turn ends (a subagent's
+	// shells are not counted). They die with the thread's process, so 0 once it ended
+	// and after a daemon restart. See docs/notes/background-shells.md.
+	BackgroundShellsRunning int32 `protobuf:"varint,41,opt,name=background_shells_running,json=backgroundShellsRunning,proto3" json:"background_shells_running,omitempty"`
 	unknownFields           protoimpl.UnknownFields
 	sizeCache               protoimpl.SizeCache
 }
@@ -682,6 +687,13 @@ func (x *Session) GetAgentsRunning() int32 {
 func (x *Session) GetBackgroundAgentsRunning() int32 {
 	if x != nil {
 		return x.BackgroundAgentsRunning
+	}
+	return 0
+}
+
+func (x *Session) GetBackgroundShellsRunning() int32 {
+	if x != nil {
+		return x.BackgroundShellsRunning
 	}
 	return 0
 }
@@ -2957,7 +2969,7 @@ var File_codefoundry_v1_session_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccodefoundry/v1/session.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xad\r\n" +
+	"\x1ccodefoundry/v1/session.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe9\r\n" +
 	"\aSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x17\n" +
@@ -3002,7 +3014,8 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"archivedAt\x12?\n" +
 	"\rsnoozed_until\x18& \x01(\v2\x1a.google.protobuf.TimestampR\fsnoozedUntil\x12%\n" +
 	"\x0eagents_running\x18' \x01(\x05R\ragentsRunning\x12:\n" +
-	"\x19background_agents_running\x18( \x01(\x05R\x17backgroundAgentsRunningJ\x04\b\t\x10\n" +
+	"\x19background_agents_running\x18( \x01(\x05R\x17backgroundAgentsRunning\x12:\n" +
+	"\x19background_shells_running\x18) \x01(\x05R\x17backgroundShellsRunningJ\x04\b\t\x10\n" +
 	"J\x04\b\x1f\x10 R\vterminal_idR\x06render\"\xb5\x01\n" +
 	"\bApiRetry\x12\x18\n" +
 	"\aattempt\x18\x01 \x01(\x05R\aattempt\x12\x1f\n" +
