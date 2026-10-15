@@ -120,7 +120,7 @@ function MonthTile({ month, testId }: { month: MonthView; testId: string }) {
 
 function Banner({ tone, children }: { tone: "warn" | "info"; children: React.ReactNode }) {
   return (
-    <p className={cn("rounded-md border px-3 py-2 text-sm", tone === "warn" ? "border-amber-400/40 bg-amber-400/10 text-amber-200" : "text-muted-foreground")} role="status">
+    <p className={cn("rounded-md border px-3 py-2 text-sm", tone === "warn" ? "border-warning/40 bg-warning/10 text-warning" : "text-muted-foreground")} role="status">
       {children}
     </p>
   );

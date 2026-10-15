@@ -1,22 +1,16 @@
 import { CircleCheck, CircleDashed, CircleDot, CircleX } from "lucide-react";
 import type { CheckRollupView, PrStateView, ReviewView } from "@/api/gh";
+import { prStateText, toneText } from "@/components/pr/tones";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { checksSummary, freshness, reviewLabel, shortAge, updatedAgo } from "./format";
-import { prStateLook, type PrStateTone } from "./prState";
-
-const toneClass = {
-  success: "text-emerald-400",
-  failure: "text-red-400",
-  pending: "text-amber-300",
-  none: "text-muted-foreground",
-} as const;
+import { prStateLook } from "./prState";
 
 export function ChecksBadge({ checks, compact = false }: { checks: CheckRollupView; compact?: boolean }) {
   const { tone, label } = checksSummary(checks);
   const Icon = tone === "success" ? CircleCheck : tone === "failure" ? CircleX : tone === "pending" ? CircleDot : CircleDashed;
   return (
-    <span className={cn("inline-flex items-center gap-1 tabular-nums", toneClass[tone])} title={label} data-checks={tone}>
+    <span className={cn("inline-flex items-center gap-1 tabular-nums", toneText[tone === "none" ? "neutral" : tone])} title={label} data-checks={tone}>
       <Icon className="size-3.5 shrink-0" aria-hidden />
       {!compact && <span className="truncate text-xs">{label}</span>}
     </span>
@@ -24,28 +18,20 @@ export function ChecksBadge({ checks, compact = false }: { checks: CheckRollupVi
 }
 
 const reviewClass: Record<NonNullable<ReviewView> | "none", string> = {
-  approved: "text-emerald-400",
-  changes_requested: "text-red-400",
-  review_required: "text-amber-300",
-  none: "text-muted-foreground",
+  approved: toneText.success,
+  changes_requested: toneText.failure,
+  review_required: toneText.pending,
+  none: toneText.neutral,
 };
 
 export function ReviewBadge({ review }: { review: ReviewView }) {
   return <span className={cn("truncate text-xs", reviewClass[review ?? "none"])}>{reviewLabel(review)}</span>;
 }
 
-/** The PR lists' state colours (the dark-first 400s). */
-const stateIconClass: Record<PrStateTone, string> = {
-  emerald: "text-emerald-400",
-  violet: "text-violet-400",
-  red: "text-red-400",
-  muted: "text-muted-foreground",
-};
-
 export function PrStateIcon({ state, draft }: { state: PrStateView; draft: boolean }) {
   const look = prStateLook(state, draft);
   const Icon = look.icon;
-  return <Icon className={cn("size-3.5 shrink-0", stateIconClass[look.tone])} aria-label={look.label} />;
+  return <Icon className={cn("size-3.5 shrink-0", prStateText[look.tone])} aria-label={look.label} />;
 }
 
 /** Relative age that refreshes every 30s. */
@@ -62,7 +48,7 @@ export function Age({ ms, className }: { ms: number | null; className?: string }
 export function Freshness({ fetchedAtMs, lastError, staleAfterMs, testId }: { fetchedAtMs: number | null; lastError: string; staleAfterMs: number; testId?: string }) {
   const now = useNow(1000);
   const f = freshness(fetchedAtMs, lastError, now, staleAfterMs);
-  const cls = f === "error" ? "text-red-400" : f === "stale" ? "text-amber-300" : "text-muted-foreground";
+  const cls = f === "error" ? toneText.failure : f === "stale" ? toneText.pending : toneText.neutral;
   const text = updatedAgo(fetchedAtMs, now) + (f === "stale" ? " · stale" : "");
   return (
     <span className={cn("text-xs tabular-nums", cls)} title={lastError || undefined} data-testid={testId} data-freshness={f}>

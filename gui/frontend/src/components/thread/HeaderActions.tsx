@@ -4,22 +4,15 @@ import { ThreadActionsMenu } from "@/components/actions/ActionsMenu";
 import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { CommandButton } from "@/components/command/CommandButton";
 import { PanelToggle } from "@/components/panel/PanelToggle";
+import { prStateText } from "@/components/pr/tones";
+import { prStateLook } from "@/components/prs/prState";
 import { SnoozeButton } from "@/components/snooze/SnoozeMenu";
-import { prStateLook, type PrStateTone } from "@/components/prs/prState";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import { useSessionsStore } from "@/stores/sessions";
 import { useWorkspacesStore } from "@/stores/workspaces";
-
-/** The header's PR colours: the PR lists' tones, darker in light mode for contrast. */
-const toneClass: Record<PrStateTone, string> = {
-  emerald: "text-emerald-600 dark:text-emerald-400",
-  violet: "text-violet-600 dark:text-violet-400",
-  red: "text-red-600 dark:text-red-400",
-  muted: "text-muted-foreground",
-};
 
 /**
  * The thread's only linked pull request: its state icon and "#number" in the state's
@@ -40,7 +33,7 @@ function SingleLinkedPr({ sessionId }: { sessionId: string }) {
       type="button"
       variant="ghost"
       size="xs"
-      className={cn("gap-1 px-1.5 text-[11.5px] font-medium tabular-nums", toneClass[look.tone])}
+      className={cn("gap-1 px-1.5 text-[11.5px] font-medium tabular-nums", prStateText[look.tone])}
       tabIndex={-1}
       data-testid="pane-linked-pr"
       data-state={look.label}

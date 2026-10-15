@@ -1,22 +1,37 @@
+import type { PrStateTone } from "@/components/prs/prState";
 import type { Tone } from "./model";
+
+/**
+ * The PR surfaces' tone → class tables (the Pull Requests page, the PR panel, the thread
+ * header and the worktree overview all read these). Colours are the theme's status
+ * tokens (index.css), so one class follows both schemes and any imported theme.
+ */
 
 /** Text colour per tone, readable on the pane in both schemes. */
 export const toneText: Record<Tone | "skipped", string> = {
-  success: "text-emerald-600 dark:text-emerald-400",
-  failure: "text-red-600 dark:text-red-400",
-  pending: "text-amber-600 dark:text-amber-300",
-  merged: "text-violet-600 dark:text-violet-400",
+  success: "text-success",
+  failure: "text-destructive",
+  pending: "text-warning",
+  merged: "text-highlight",
   draft: "text-muted-foreground",
   neutral: "text-muted-foreground",
   skipped: "text-muted-foreground",
 };
 
+/** A pull request's state colour (prState.ts: open, merged, closed; draft and unknown muted). */
+export const prStateText: Record<PrStateTone, string> = {
+  emerald: toneText.success,
+  violet: toneText.merged,
+  red: toneText.failure,
+  muted: toneText.neutral,
+};
+
 /** Badge (border + tint) per tone. */
 export const toneBadge: Record<Tone, string> = {
-  success: "border-emerald-600/30 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/30 dark:text-emerald-400",
-  failure: "border-red-600/30 bg-red-500/10 text-red-700 dark:border-red-400/30 dark:text-red-400",
-  pending: "border-amber-600/30 bg-amber-500/10 text-amber-700 dark:border-amber-300/30 dark:text-amber-300",
-  merged: "border-violet-600/30 bg-violet-500/10 text-violet-700 dark:border-violet-400/30 dark:text-violet-400",
+  success: "border-success/30 bg-success/10 text-success",
+  failure: "border-destructive/30 bg-destructive/10 text-destructive",
+  pending: "border-warning/30 bg-warning/10 text-warning",
+  merged: "border-highlight/30 bg-highlight/10 text-highlight",
   draft: "border-border bg-muted/60 text-muted-foreground",
   neutral: "border-border bg-muted/60 text-muted-foreground",
 };
