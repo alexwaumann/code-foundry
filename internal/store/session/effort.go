@@ -76,11 +76,13 @@ func (r *runner) setEffort(effort string) Session {
 
 // maybeRestart begins a restart for a pending effort change once nothing would be
 // lost: connected, idle at the prompt, nothing pending, streaming or running (a
-// background agent's tool call keeps running across turns), no send on its way.
+// background agent's tool call keeps running across turns), no background shell
+// running (it dies with the process), no turn Claude is about to start for a background
+// end (wake.go), no send on its way.
 func (r *runner) maybeRestart() {
 	st := r.st
 	if st.wantEffort == st.effort || st.restart != restartNone || r.closing || r.finished || !st.initialized ||
-		st.first != nil || !st.sd.AtPrompt() || len(st.log.unfinished()) > 0 {
+		st.first != nil || !st.sd.AtPrompt() || len(st.log.unfinished()) > 0 || r.bgShells.count() > 0 || r.wakePending {
 		return
 	}
 	st.restart = restartClosing
@@ -110,8 +112,10 @@ func (r *runner) respawn() {
 	clear(st.pending)
 	st.sd.pending = nil
 	closeUnfinished(st.proj.w, "Claude restarted")
-	// Subagents run inside the old process; the new one reports them stopped.
+	// Subagents and shells run inside the old process; the new one reports them stopped.
 	r.endRuns(orphanRestarted)
+	// A defence: maybeRestart does not restart while a shell runs, so none is left here.
+	r.endBgShells(orphanRestarted)
 	l := r.launch
 	if id := r.tail.id; id != "" {
 		if _, ok := r.m.opts.Paths.transcriptPath(r.cwd, id); ok {

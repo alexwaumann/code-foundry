@@ -42,6 +42,7 @@ import { CommandError } from "./errors";
 import { Hub } from "./hub";
 import { mcpFixture, type McpStatusInit } from "./mcp";
 import { refuseSlashCommand, slashCommandsFixture, type SlashCommandInit } from "./slashCommands";
+import { scriptShells, shellSummary, type ShellCall } from "./shells";
 
 export type ThreadEventInit = MessageInitShape<typeof ThreadEventSchema>;
 type ItemInit = MessageInitShape<typeof ThreadItemSchema>;
@@ -108,8 +109,8 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
  * disconnected (closed); crashed: Claude exited before answering the handshake (an error
  * item, nothing else; mock/world.ts disconnects the thread).
  */
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "closed" | "crashed";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "closed", "crashed"];
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "closed" | "crashed";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "closed", "crashed"];
 
 /** The stderr line of the "crashed" state's claude (Session.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
@@ -246,6 +247,8 @@ export class MockThreads {
   private slash = new Map<string, SlashCommandInit[]>();
   /** Subagent runs per thread in spawn order (mock/agents.ts); absent: none. */
   private agents = new Map<string, AgentRunInit[]>();
+  /** Running background shells per thread, oldest first (mock/shells.ts); absent: none. */
+  private shells = new Map<string, ShellCall[]>();
   /** Every thread event, for the Watch streams. */
   private readonly hub = new Hub<{ sessionId: string; event: ThreadEventInit }>();
   /** thread.* calls, for GET /__mock/thread/calls. */
@@ -269,6 +272,7 @@ export class MockThreads {
     this.mcp.clear();
     this.slash.clear();
     this.agents.clear();
+    this.shells.clear();
     this.calls = [];
     this.failRespond = "";
     this.generation++;
@@ -307,6 +311,33 @@ export class MockThreads {
   /** The runs of a thread for its Session's counts (no check: the session may be going away). */
   agentRunsOf(id: string): readonly AgentRunInit[] {
     return this.agents.get(id) ?? [];
+  }
+
+  /** The thread's running background shells, for its Session's count. */
+  shellsOf(id: string): number {
+    return this.shells.get(id)?.length ?? 0;
+  }
+
+  /**
+   * POST /__mock/thread/shell-end: the oldest running shell ends like the daemon ends it:
+   * its call finishes with Claude's summary (an error when failed), the count is published.
+   */
+  endShell(id: string, failed: boolean): void {
+    this.world.worktreeOf(id);
+    const running = this.shells.get(id) ?? [];
+    const shell = running[0];
+    if (!shell) throw new CommandError("invalid", `thread ${id} has no background shell running`);
+    const call = this.log(id).items.find((x) => x.id === shell.toolUseId);
+    if (call?.payload?.case === "toolCall") {
+      this.update(id, {
+        ...call,
+        updatedAt: timestampFromDate(new Date()),
+        payload: { case: "toolCall", value: { ...call.payload.value, status: failed ? ToolCallStatus.ERROR : ToolCallStatus.DONE, isError: failed, output: shellSummary(shell, failed) } },
+      } as ItemInit);
+    }
+    if (running.length > 1) this.shells.set(id, running.slice(1));
+    else this.shells.delete(id);
+    this.world.agentsChanged(id);
   }
 
   /** Replaces the thread's runs, publishes the Watch's `agents` event (the whole list) and the session's counts. */
@@ -651,6 +682,7 @@ export class MockThreads {
     this.generation++;
     this.logs.delete(id);
     this.agents.delete(id);
+    this.shells.delete(id);
     // A running thread was checked at the start of its last turn; a closed or crashed one has none.
     if (loaded === "closed" || loaded === "crashed") {
       this.mcp.delete(id);
@@ -680,9 +712,20 @@ export class MockThreads {
     };
     const cwd = this.world.worktreeOf(id);
     if (state === "agents") {
-      // The agents panel sketch (mock/agents.ts): idle at its prompt, background runs going on.
-      const runs = scriptAgents({ cwd, it, tool });
+      // The agents panel sketch (mock/agents.ts): idle at its prompt, background runs going on,
+      // and one background shell (mock/shells.ts).
+      const shells: ShellCall[] = [];
+      const runs = scriptAgents({ cwd, it, tool, shells });
       this.agents.set(id, runs);
+      this.shells.set(id, shells);
+      l.seq = l.items.length;
+      this.world.setStatus(id, SessionStatus.IDLE, "at prompt");
+      this.world.agentsChanged(id);
+      return;
+    }
+    if (state === "shells") {
+      // Background shells only (mock/shells.ts): idle at its prompt, two shells running.
+      this.shells.set(id, scriptShells({ cwd, it, tool }));
       l.seq = l.items.length;
       this.world.setStatus(id, SessionStatus.IDLE, "at prompt");
       this.world.agentsChanged(id);
@@ -935,6 +978,7 @@ export class MockThreads {
   seed(id: string, h: SeedHistory): void {
     this.logs.delete(id);
     this.agents.delete(id);
+    this.shells.delete(id);
     if (h.end === "working" || h.end === "permission") {
       this.mcp.set(id, mcpFixture());
       this.slash.set(id, slashCommandsFixture());

@@ -61,10 +61,16 @@ func (t *threadLog) setAgents(runs []AgentRun) {
 // onTask applies a task frame: the run's record, the Agent call's item when a
 // background run ends, the note announcing it, then publication.
 func (r *runner) onTask(t *claudestream.Task) {
+	if r.onShellTask(t) { // bgshells_runner.go
+		return
+	}
 	ch := r.usage.task(t, r.m.opts.Now(), r.subagentsWhere, r.spawnInput)
 	run := ch.run
 	if run == nil {
 		return
+	}
+	if ch.ended && run.info.Background && run.info.SpawnDepth <= 1 {
+		r.expectWake("agent " + run.info.ID) // wake.go
 	}
 	if (ch.ended || ch.final) && run.info.Status != AgentRunning && run.info.ToolUseID != "" {
 		out, failed := run.info.Summary, run.info.Status == AgentFailed
@@ -145,7 +151,8 @@ func (r *runner) carryRuns(u *threadUsage, saved []AgentRun) {
 	u.orphan(orphanRescan, time.Time{}, true)
 }
 
-// agentEnded completes the item of a background Agent call whose run ended (failed:
+// agentEnded completes the item of a background Agent call whose run ended, or of a
+// background shell's call (bgshells.go) whose shell ended (failed:
 // an error with the error as output; else done with the report). final: the run's
 // notification, after which the item no longer follows the run (a later wake is the
 // SendMessage call's).

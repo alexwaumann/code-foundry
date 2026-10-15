@@ -197,6 +197,14 @@ type Session struct {
 	// a 429, a 529, a 5xx, a connection error) and nil once any other frame follows or
 	// the process ends. Not persisted. See docs/notes/api-retry-note.md.
 	Retry *APIRetry
+	// BackgroundShellsRunning counts the thread's own background shells running now
+	// (bgshells.go): Bash calls with run_in_background and Monitor calls. 0 once the
+	// process ended. Not persisted.
+	BackgroundShellsRunning int
+	// WakePending: a background shell or agent run ended while Claude was at its prompt,
+	// and the turn Claude starts by itself to report it has not ended yet (wake.go). Not
+	// persisted, not sent.
+	WakePending bool
 }
 
 // APIRetry is one api_retry frame of a thread's stream (stream.go): Claude retries a

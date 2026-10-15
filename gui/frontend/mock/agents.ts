@@ -17,6 +17,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { ThreadAgentStatus, ToolCallStatus, type ThreadAgentRunSchema, type ThreadItemSchema } from "../src/gen/codefoundry/v1/thread_pb";
 import type { InvokeOut } from "./gitops";
+import { launchShell, type ShellCall } from "./shells";
 import type { UiIntentInit } from "./world";
 
 export type AgentRunInit = MessageInitShape<typeof ThreadAgentRunSchema>;
@@ -28,6 +29,8 @@ export interface AgentsScript {
   cwd: string;
   it(payload: ItemInit["payload"], over?: Over): ItemInit;
   tool(name: string, input: object, value: { output?: string; isError?: boolean; resultJson?: string; status?: ToolCallStatus }, over?: Over): ItemInit;
+  /** Receives the background shells the script launches (mock/shells.ts), if given. */
+  shells?: ShellCall[];
 }
 
 const ts = (d: Date) => timestampFromDate(d);
@@ -116,6 +119,8 @@ export function scriptAgents(s: AgentsScript, now = Date.now()): AgentRunInit[] 
     { status: ToolCallStatus.ERROR, isError: true, output: FAILED_ERROR },
     { at: ago(246), until: ago(183) },
   );
+  const shell = launchShell(s, { taskId: "b7n2x4kq0", command: "pnpm --dir gui/frontend dev:mock", description: "Start the mock daemon's dev server", at: ago(228) });
+  s.shells?.push(shell);
   s.it(
     { case: "assistantText", value: { text: "Both PRs are building in the background. The screenshot agent died when the Wails window failed to start; I will retry it once PR 2 lands." } },
     { at: ago(226) },
@@ -223,6 +228,8 @@ export function agentCounts(runs: readonly AgentRunInit[]): { agentsRunning: num
 export interface AgentThreads {
   /** The thread's runs in spawn order ([] for none). Throws for an unknown thread. */
   agentsOf(id: string): AgentRunInit[];
+  /** The thread's running background shells (mock/shells.ts). */
+  shellsOf(id: string): number;
   calls: string[];
 }
 
@@ -231,6 +238,12 @@ type Command = {
   when: (ctx: UiContext | undefined) => boolean;
   run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut>;
 };
+
+/** The thread.agents header's tail: " · N shell(s) in the background", "" for none. */
+function shellsNote(n: number): string {
+  if (n <= 0) return "";
+  return ` · ${String(n)} ${n === 1 ? "shell" : "shells"} in the background`;
+}
 
 /** thread.agents and view.panel.agents, like the daemon's (any active thread). */
 export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) => number): Command[] {
@@ -250,10 +263,11 @@ export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) =>
         const id = a.id || ctx?.activeSessionId || "";
         threads.calls.push(`agents ${id}`);
         const runs = threads.agentsOf(id);
-        if (runs.length === 0) return Promise.resolve({ message: "no subagent runs in this thread", resultJson: JSON.stringify({ sessionId: id, agents: [] }) });
+        const shells = shellsNote(threads.shellsOf(id));
+        if (runs.length === 0) return Promise.resolve({ message: `no subagent runs in this thread${shells}`, resultJson: JSON.stringify({ sessionId: id, agents: [] }) });
         const c = agentCounts(runs);
         return Promise.resolve({
-          message: `Agents: ${String(c.agentsRunning)} running (${String(c.backgroundAgentsRunning)} in the background) · ${String(runs.length)} this thread`,
+          message: `Agents: ${String(c.agentsRunning)} running (${String(c.backgroundAgentsRunning)} in the background) · ${String(runs.length)} this thread${shells}`,
           resultJson: JSON.stringify({ sessionId: id, agents: runs.map((r) => ({ id: r.id, description: r.description })) }),
         });
       },

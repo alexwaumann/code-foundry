@@ -37,7 +37,8 @@
  *        /__mock/thread/fail-respond[?withdrawn=1] (the next answer fails; withdrawn: Claude withdrew
  *        the request first, NotFound); GET /__mock/thread/calls;
  *        /__mock/thread/commands?set=none|more|default (the slash commands: mock/slashCommands.ts) |
- *        /__mock/thread/agent-end?run=a1[&status=failed] (a subagent run of state=agents ends: mock/agents.ts)
+ *        /__mock/thread/agent-end?run=a1[&status=failed] (a subagent run of state=agents ends: mock/agents.ts) |
+ *        /__mock/thread/shell-end[?status=failed] (the oldest background shell of state=agents|shells ends: mock/shells.ts)
  *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
  *                                                 shell stays, exited, as if the reaper were late)
  *   POST /__mock/terminal/new?delay=700&fail=reason   (terminal.new takes that long; its next run
@@ -787,6 +788,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       // id=s-r1&run=a1[&status=done|failed]: a subagent run ends (mock/agents.ts).
       try {
         world.threads.endAgent(q.get("id") ?? "s-r1", q.get("run") ?? "", q.get("status") === "failed");
+        json(res, 200, { ok: true });
+      } catch (err) {
+        json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
+    case "POST /__mock/thread/shell-end":
+      // id=s-r1[&status=failed]: the oldest background shell ends (mock/shells.ts).
+      try {
+        world.threads.endShell(q.get("id") ?? "s-r1", q.get("status") === "failed");
         json(res, 200, { ok: true });
       } catch (err) {
         json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });

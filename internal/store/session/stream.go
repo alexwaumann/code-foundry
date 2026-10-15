@@ -227,6 +227,10 @@ func (r *runner) run() {
 				st.drainTimer = time.NewTimer(streamDrain)
 			}
 			r.maybeExited()
+		case <-timerC(r.wakeTimer):
+			r.wakeTimer = nil
+			r.wakeOver("no turn came") // wake.go
+			r.maybeRestart()
 		case <-timerC(st.drainTimer):
 			st.drainTimer = nil
 			r.log().warn("claude exited but its output is still open; closing it")
@@ -373,6 +377,7 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 			r.checkMcp(e.McpServers) // a turn starts: Claude pushes no MCP status changes (mcp.go)
 		}
 	case *claudestream.Result:
+		r.wakeOver("Claude's turn ended") // wake.go
 		r.acknowledgeIfViewed()
 		if last := r.st.proj.last; last.tokens > 0 {
 			r.m.recordContext(r.id, last.tokens, last.model)
@@ -717,6 +722,7 @@ func (r *runner) shutdown() {
 	r.failHeld("the daemon stopped")
 	closeUnfinished(st.proj.w, "the daemon stopped")
 	r.endRuns(orphanDaemonStopped)
+	r.endBgShells(orphanDaemonStopped)
 	st.log.clearMcp()
 	r.stopStreamTimers()
 	st.conn.Close()
@@ -777,6 +783,7 @@ func (r *runner) maybeExited() {
 	st.sd.pending = nil
 	closeUnfinished(st.proj.w, "the thread's process ended")
 	r.endRuns(orphanProcessEnded)
+	r.endBgShells(orphanProcessEnded)
 	st.log.clearMcp()
 	r.stopStreamTimers()
 	st.conn.Close()

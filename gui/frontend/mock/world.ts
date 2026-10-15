@@ -1026,6 +1026,8 @@ export class World {
       ...usageFields(s.usage),
       ...contextFields(s, this.cacheTTLSeconds()),
       ...agentCounts(this.threads.agentRunsOf(s.id)),
+      // Shells die with the thread's process (mock/shells.ts).
+      backgroundShellsRunning: s.state === SessionState.CONNECTED ? this.threads.shellsOf(s.id) : 0,
       ...(s.retry ? { retry: { attempt: s.retry.attempt, maxRetries: s.retry.maxRetries, retryAt: timestampFromDate(s.retry.retryAt), errorStatus: s.retry.errorStatus, error: s.retry.error } } : {}),
     };
   }

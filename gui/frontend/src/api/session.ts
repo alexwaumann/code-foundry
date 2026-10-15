@@ -127,6 +127,12 @@ export interface SessionView {
   agentsRunning: number;
   backgroundAgentsRunning: number;
   /**
+   * The thread's own background shells running now (Bash run_in_background, Monitor),
+   * which keep running after its turn ends; 0 once its process ended
+   * (docs/notes/background-shells.md).
+   */
+  backgroundShellsRunning: number;
+  /**
    * Claude waits to retry a failed API request (a 429, a 529, a 5xx, a connection
    * error); null otherwise. docs/notes/api-retry-note.md.
    */
@@ -286,6 +292,7 @@ export function toSessionView(s: Session): SessionView {
     contextRereadUsd: s.contextRereadUsd,
     agentsRunning: s.agentsRunning,
     backgroundAgentsRunning: s.backgroundAgentsRunning,
+    backgroundShellsRunning: s.backgroundShellsRunning,
     retry: s.retry
       ? { attempt: s.retry.attempt, maxRetries: s.retry.maxRetries, retryAtMs: s.retry.retryAt ? timestampMs(s.retry.retryAt) : 0, errorStatus: s.retry.errorStatus, error: s.retry.error }
       : null,

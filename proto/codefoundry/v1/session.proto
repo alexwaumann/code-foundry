@@ -239,6 +239,11 @@ message Session {
   // docs/notes/agents-1-daemon.md.
   int32 agents_running = 39;
   int32 background_agents_running = 40;
+  // The thread's own background shells still running: Bash calls with
+  // run_in_background and Monitor calls, which run on after its turn ends (a subagent's
+  // shells are not counted). They die with the thread's process, so 0 once it ended
+  // and after a daemon restart. See docs/notes/background-shells.md.
+  int32 background_shells_running = 41;
 }
 
 // ApiRetry is a thread's pending API retry: Claude's system/api_retry frame.

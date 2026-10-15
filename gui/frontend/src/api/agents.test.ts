@@ -92,4 +92,9 @@ describe("the session's running agents", () => {
     const v = toSessionView(create(SessionSchema, { id: "s", agentsRunning: 3, backgroundAgentsRunning: 2 }));
     expect([v.agentsRunning, v.backgroundAgentsRunning]).toEqual([3, 2]);
   });
+
+  it("maps the background shells", () => {
+    expect(toSessionView(create(SessionSchema, { id: "s", backgroundShellsRunning: 2 })).backgroundShellsRunning).toBe(2);
+    expect(toSessionView(create(SessionSchema, { id: "s" })).backgroundShellsRunning).toBe(0);
+  });
 });

@@ -53,9 +53,9 @@ func TestThreadAgentsToProto(t *testing.T) {
 func TestSessionAgentCounts(t *testing.T) {
 	runs := agentsSample(time.Now())
 	runs = append(runs, session.AgentRun{ID: "a5", Background: true, SpawnDepth: 2, Status: session.AgentRunning})
-	p := sessionToProto(session.Session{ID: "s1", AgentRuns: runs})
-	if p.GetAgentsRunning() != 2 || p.GetBackgroundAgentsRunning() != 1 {
-		t.Errorf("running %d, background %d", p.GetAgentsRunning(), p.GetBackgroundAgentsRunning())
+	p := sessionToProto(session.Session{ID: "s1", AgentRuns: runs, BackgroundShellsRunning: 3})
+	if p.GetAgentsRunning() != 2 || p.GetBackgroundAgentsRunning() != 1 || p.GetBackgroundShellsRunning() != 3 {
+		t.Errorf("running %d, background %d, shells %d", p.GetAgentsRunning(), p.GetBackgroundAgentsRunning(), p.GetBackgroundShellsRunning())
 	}
 	want := []v1.AgentRunStatus{v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN, v1.AgentRunStatus_AGENT_RUN_STATUS_CLOSED,
 		v1.AgentRunStatus_AGENT_RUN_STATUS_CLOSED, v1.AgentRunStatus_AGENT_RUN_STATUS_CLOSED, v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN}

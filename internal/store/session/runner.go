@@ -64,6 +64,14 @@ type runner struct {
 	usageOff  bool
 	// agentsPubAt: when the runs were last published (agents_runner.go throttle).
 	agentsPubAt time.Time
+	// bgShells are the thread's own background shells running in its process (bgshells.go).
+	bgShells shellSet
+	// bgShellsPub is the count last published on the row.
+	bgShellsPub int
+	// wakePending: a background end at the prompt; Claude's own turn is due (wake.go).
+	// wakePub is the value last published on the row.
+	wakePending, wakePub bool
+	wakeTimer            *time.Timer
 
 	// viewers is the number of item watchers (Store.WatchItems). While someone watches,
 	// whatever Claude produces is seen: see acknowledge.
@@ -344,6 +352,8 @@ func (r *runner) finish(fn func(*Session)) {
 		s.PendingWorktreePath = ""
 		s.EffortPending = false // the next spawn uses the row's effort
 		s.Retry = nil           // the process is gone, so is the request it retried
+		s.BackgroundShellsRunning = 0
+		s.WakePending = false
 		s.setStatus(st, reason, now)
 		if r.activity.After(s.LastActivityAt) {
 			s.LastActivityAt = r.activity

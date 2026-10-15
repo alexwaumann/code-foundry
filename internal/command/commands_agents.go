@@ -22,9 +22,17 @@ type AgentsBackend interface {
 	ListItems(context.Context, *connect.Request[v1.ListThreadItemsRequest]) (*connect.Response[v1.ListThreadItemsResponse], error)
 }
 
+// AgentsSessions is the slice of SessionService thread.agents reads: the thread's
+// count of background shells is on its Session.
+type AgentsSessions interface {
+	Get(context.Context, *connect.Request[v1.GetSessionRequest]) (*connect.Response[v1.GetSessionResponse], error)
+}
+
 var (
-	_ AgentsBackend = codefoundryv1connect.ThreadServiceHandler(nil)
-	_ AgentsBackend = codefoundryv1connect.ThreadServiceClient(nil)
+	_ AgentsBackend  = codefoundryv1connect.ThreadServiceHandler(nil)
+	_ AgentsBackend  = codefoundryv1connect.ThreadServiceClient(nil)
+	_ AgentsSessions = codefoundryv1connect.SessionServiceHandler(nil)
+	_ AgentsSessions = codefoundryv1connect.SessionServiceClient(nil)
 )
 
 // ViewPanelAgents is the ShowView name that opens (or reveals) the Agents surface in the
@@ -33,13 +41,14 @@ var (
 const ViewPanelAgents = "panel.agents"
 
 // RegisterAgents registers thread.agents and view.panel.agents.
-func RegisterAgents(r *Registry, b AgentsBackend, e Emitter) error {
+func RegisterAgents(r *Registry, b AgentsBackend, s AgentsSessions, e Emitter) error {
 	return r.RegisterAll(
 		Command{
 			Name:  "thread.agents",
 			Title: "Show Thread Agents",
 			Description: "Print a thread's subagent runs in spawn order, foreground and background, nested ones under their parent: " +
-				"type, model, mode, status, elapsed time, tool uses and tokens, then what each running one is doing and what each finished one reported.",
+				"type, model, mode, status, elapsed time, tool uses and tokens, then what each running one is doing and what each finished one reported. " +
+				"The header also counts the thread's own background shells (Bash run_in_background, Monitor) still running.",
 			Category: "Thread",
 			Args:     []ArgSpec{{Name: "id", Type: String, Required: true, Context: ContextSession, Description: "Thread id"}},
 			When:     hasSession,
@@ -50,7 +59,12 @@ func RegisterAgents(r *Registry, b AgentsBackend, e Emitter) error {
 				}
 				snap := res.Msg.GetSnapshot()
 				runs := snap.GetAgents()
-				return Result{Message: FormatAgents(runs, time.Now()), JSON: &v1.ThreadAgentsChange{SessionId: snap.GetSessionId(), Seq: snap.GetSeq(), Agents: runs}}, nil
+				got, err := s.Get(ctx, connect.NewRequest(&v1.GetSessionRequest{Id: a.String("id")}))
+				if err != nil {
+					return Result{}, err
+				}
+				shells := int(got.Msg.GetSession().GetBackgroundShellsRunning())
+				return Result{Message: FormatAgents(runs, shells, time.Now()), JSON: &v1.ThreadAgentsChange{SessionId: snap.GetSessionId(), Seq: snap.GetSeq(), Agents: runs}}, nil
 			},
 		},
 		Command{
@@ -95,6 +109,17 @@ func agentRunning(runs []*v1.ThreadAgentRun) (all, background int) {
 		}
 	}
 	return all, background
+}
+
+// shellsNote is " · N shell(s) in the background", "" for none.
+func shellsNote(n int) string {
+	switch {
+	case n <= 0:
+		return ""
+	case n == 1:
+		return " · 1 shell in the background"
+	}
+	return fmt.Sprintf(" · %d shells in the background", n)
 }
 
 // agentLabel is a run's name: its description, else its type.
@@ -173,14 +198,15 @@ func shortTokens(n int64) string {
 }
 
 // FormatAgents renders a thread's runs as a table (now times the running ones), then
-// each running run's activity and each finished one's report or error.
-func FormatAgents(runs []*v1.ThreadAgentRun, now time.Time) string {
+// each running run's activity and each finished one's report or error. shells, the
+// thread's own background shells running, ends the header when there are any.
+func FormatAgents(runs []*v1.ThreadAgentRun, shells int, now time.Time) string {
 	if len(runs) == 0 {
-		return "no subagent runs in this thread"
+		return "no subagent runs in this thread" + shellsNote(shells)
 	}
 	all, background := agentRunning(runs)
 	var b strings.Builder
-	fmt.Fprintf(&b, "Agents: %d running (%d in the background) · %d this thread\n", all, background, len(runs))
+	fmt.Fprintf(&b, "Agents: %d running (%d in the background) · %d this thread%s\n", all, background, len(runs), shellsNote(shells))
 	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "NAME\tTYPE\tMODEL\tMODE\tSTATUS\tELAPSED\tTOOLS\tTOKENS")
 	for _, r := range runs {

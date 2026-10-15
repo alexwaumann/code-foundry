@@ -70,6 +70,20 @@ export function agentsLabel(n: number): string {
   return `${String(n)} ${n === 1 ? "agent" : "agents"}`;
 }
 
+/** "1 shell", "3 shells". */
+export function shellsLabel(n: number): string {
+  return `${String(n)} ${n === 1 ? "shell" : "shells"}`;
+}
+
+/**
+ * The strip's sentence: "2 agents and 1 shell running in the background", "1 agent …",
+ * "2 shells …"; "" when nothing runs.
+ */
+export function backgroundLabel(agents: number, shells: number): string {
+  const parts = [...(agents > 0 ? [agentsLabel(agents)] : []), ...(shells > 0 ? [shellsLabel(shells)] : [])];
+  return parts.length === 0 ? "" : `${parts.join(" and ")} running in the background`;
+}
+
 /** The header's second line: why runs keep going after the turn, or that none run. */
 export function agentsSubline(c: { running: number; background: number }): string {
   if (c.background > 0) return `${String(c.background)} in the background ${c.background === 1 ? "keeps" : "keep"} running after the turn ends`;

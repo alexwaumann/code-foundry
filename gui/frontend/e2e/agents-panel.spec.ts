@@ -5,8 +5,9 @@ import { emit, mockPost, openApp, resetMock, row } from "./fixtures";
  * Subagent runs in the GUI (docs/notes/agents-2-gui.md, docs/sketches/agents-panel L1)
  * over the mock's scripted thread s-r1 in its "agents" state (mock/agents.ts): a finished
  * Explore, two background runs still running ("PR 1", "PR 2"), a nested run under PR 1,
- * and a failed background run with its note; idle at its prompt. Set SHOTS=<dir> to save
- * screenshots (WebKit, dark and light).
+ * and a failed background run with its note, plus one background shell; idle at its
+ * prompt. The "shells" state has background shells only (mock/shells.ts). Set SHOTS=<dir>
+ * to save screenshots (WebKit, dark and light).
  */
 
 const panel = (page: Page) => page.getByTestId("side-panel");
@@ -15,8 +16,8 @@ const surface = (page: Page) => page.getByTestId("agents-surface");
 const agentRow = (page: Page, id: string) => surface(page).locator(`[data-testid="agent-row"][data-agent="${id}"]`);
 const strip = (page: Page) => page.getByTestId("agents-strip");
 
-async function openThread(page: Page): Promise<void> {
-  await mockPost("thread?state=agents");
+async function openThread(page: Page, state = "agents"): Promise<void> {
+  await mockPost(`thread?state=${state}`);
   await openApp(page);
   await row(page, "s:s-r1").click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
@@ -111,7 +112,9 @@ test("view.panel.agents and the palette open it; a run ending moves only its row
 test("the strip shows only background runs, opens the tab, and goes when they end; the sidebar counts every run", async ({ page }) => {
   await openThread(page);
   await expect(strip(page)).toBeVisible();
-  await expect(strip(page).getByTestId("agents-strip-count")).toHaveText("2 agents running in the background");
+  // One sentence for the background agents and the thread's background shell.
+  await expect(strip(page).getByTestId("agents-strip-count")).toHaveText("2 agents and 1 shell running in the background");
+  await expect(strip(page)).toHaveAttribute("data-kind", "agents");
   // The nested foreground run is not named; the two background ones are, with their activity.
   await expect(strip(page).getByTestId("agents-strip-runs")).toHaveText("PR 1: daemon task frames · Running go test ./internal/store/...PR 2: Agents surface in the panel · Editing AgentsSurface.tsx");
   await expect(row(page, "s:s-r1").getByTestId("row-agents")).toHaveText("3 agents");
@@ -120,16 +123,48 @@ test("the strip shows only background runs, opens the tab, and goes when they en
   await expectAgentsTab(page);
 
   await mockPost("thread/agent-end?run=a1");
-  await expect(strip(page).getByTestId("agents-strip-count")).toHaveText("1 agent running in the background");
+  await expect(strip(page).getByTestId("agents-strip-count")).toHaveText("1 agent and 1 shell running in the background");
   await expect(strip(page).getByTestId("agents-strip-runs")).toHaveText("PR 2: Agents surface in the panel · Editing AgentsSurface.tsx");
   await expect(row(page, "s:s-r1").getByTestId("row-agents")).toHaveText("2 agents");
 
-  // The last background run ends: the strip goes, though the nested foreground one runs on.
+  // The last background run ends: the shell keeps the strip, as the sentence alone.
   await mockPost("thread/agent-end?run=a2&status=failed");
+  await expect(strip(page)).toHaveAttribute("data-kind", "shells");
+  await expect(strip(page)).toHaveText("1 shell running in the background");
+  await expect(strip(page).getByTestId("agents-strip-open")).toHaveCount(0);
+  // The shell ends: the strip goes, though the nested foreground run runs on.
+  await mockPost("thread/shell-end");
   await expect(strip(page)).toHaveCount(0);
   await expect(row(page, "s:s-r1").getByTestId("row-agents")).toHaveText("1 agent");
   await mockPost("thread/agent-end?run=a1b");
   await expect(row(page, "s:s-r1").getByTestId("row-agents")).toHaveCount(0);
+});
+
+test("background shells only: the sentence behind a terminal icon, the calls run until their shell ends", async ({ page }) => {
+  await openThread(page, "shells");
+  await expect(strip(page)).toBeVisible();
+  await expect(strip(page)).toHaveAttribute("data-kind", "shells");
+  await expect(strip(page)).toHaveText("2 shells running in the background");
+  await expect(strip(page).locator(".lucide-square-terminal")).toHaveCount(1);
+  await expect(strip(page).locator(".lucide-bot")).toHaveCount(0);
+  await expect(strip(page).getByTestId("agents-strip-runs")).toHaveCount(0);
+  await expect(strip(page).getByTestId("agents-strip-open")).toHaveCount(0);
+  // No agents: the sidebar says nothing about them.
+  await expect(row(page, "s:s-r1").getByTestId("row-agents")).toHaveCount(0);
+
+  await unfoldTurn(page);
+  const bash = page.locator('[data-tool="Bash"]').filter({ hasText: "make gui-e2e" });
+  const monitor = page.locator('[data-tool="Monitor"]');
+  await expect(bash).toHaveAttribute("data-status", "running");
+  await expect(monitor).toHaveAttribute("data-status", "running");
+
+  await mockPost("thread/shell-end");
+  await expect(strip(page)).toHaveText("1 shell running in the background");
+  await expect(bash).toHaveAttribute("data-status", "done");
+  await expect(monitor).toHaveAttribute("data-status", "running");
+  await mockPost("thread/shell-end");
+  await expect(strip(page)).toHaveCount(0);
+  await expect(monitor).toHaveAttribute("data-status", "done");
 });
 
 test("the timeline: background and failed chips, live activity, and the end notes", async ({ page }) => {
@@ -182,5 +217,25 @@ for (const scheme of ["dark", "light"] as const) {
     await expectAgentsTab(page);
     await page.mouse.move(0, 0);
     await page.screenshot({ path: `${String(shots)}/agents-${scheme}.png` });
+  });
+}
+
+/** SHOTS=<dir>: the strip with agents and a shell, and with shells only, WebKit, dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`strip screenshots (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    for (const [state, name, text] of [
+      ["agents", "agents-and-shell", "2 agents and 1 shell running in the background"],
+      ["shells", "shells-only", "2 shells running in the background"],
+    ] as const) {
+      await openThread(page, state);
+      await expect(strip(page).getByTestId("agents-strip-count")).toHaveText(text);
+      await page.mouse.move(0, 0);
+      await page.screenshot({ path: `${String(shots)}/strip-${name}-${scheme}.png` });
+      await page.locator(".dock").first().screenshot({ path: `${String(shots)}/strip-${name}-${scheme}-dock.png` });
+    }
   });
 }

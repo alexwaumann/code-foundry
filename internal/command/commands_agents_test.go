@@ -25,7 +25,7 @@ func newAgentsRegistry(t *testing.T) (*command.Registry, *sessiontest.Fake, *com
 	fake := sessiontest.New(b)
 	reg := command.NewRegistry()
 	emit := &commandtest.Emitter{Delivered: 1}
-	if err := command.RegisterAgents(reg, api.NewThread(fake, b), emit); err != nil {
+	if err := command.RegisterAgents(reg, api.NewThread(fake, b), api.NewSession(fake, b), emit); err != nil {
 		t.Fatal(err)
 	}
 	fake.Put(session.Session{ID: "s1", Name: "fix", State: session.StateConnected})
@@ -55,6 +55,7 @@ func TestAgentsCommandsAvailability(t *testing.T) {
 
 func TestThreadAgentsCommand(t *testing.T) {
 	reg, fake, _ := newAgentsRegistry(t)
+	fake.Put(session.Session{ID: "s1", Name: "fix", State: session.StateConnected, BackgroundShellsRunning: 2})
 	start := time.Now().Add(-90 * time.Second)
 	fake.PutAgents("s1",
 		session.AgentRun{ID: "a1", Description: "Slow count", AgentType: "general-purpose", Model: "haiku", Background: true, SpawnDepth: 1,
@@ -67,7 +68,7 @@ func TestThreadAgentsCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, w := range []string{
-		"Agents: 1 running (1 in the background) · 2 this thread\n",
+		"Agents: 1 running (1 in the background) · 2 this thread · 2 shells in the background\n",
 		"NAME         TYPE             MODEL    MODE        STATUS   ELAPSED  TOOLS  TOKENS\n",
 		"Slow count   general-purpose  haiku    background  running  1m 30s   1      14.1k\n",
 		"Outer agent  general-purpose  inherit  foreground  done     5s       2      18.1k\n",
@@ -105,11 +106,21 @@ func TestFormatAgents(t *testing.T) {
 	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
 	at := func(d time.Duration) *timestamppb.Timestamp { return timestamppb.New(now.Add(-d)) }
 	tests := []struct {
-		name string
-		runs []*v1.ThreadAgentRun
-		want string
+		name   string
+		runs   []*v1.ThreadAgentRun
+		shells int
+		want   string
 	}{
 		{name: "none", want: "no subagent runs in this thread"},
+		{name: "no runs, a shell", shells: 1, want: "no subagent runs in this thread · 1 shell in the background"},
+		{
+			name:   "a run and shells",
+			runs:   []*v1.ThreadAgentRun{{Description: "Outer", AgentType: "general-purpose", SpawnDepth: 1, Status: v1.ThreadAgentStatus_THREAD_AGENT_STATUS_DONE, DurationMs: 4000}},
+			shells: 3,
+			want: "Agents: 0 running (0 in the background) · 1 this thread · 3 shells in the background\n" +
+				"NAME   TYPE             MODEL    MODE        STATUS  ELAPSED  TOOLS  TOKENS\n" +
+				"Outer  general-purpose  inherit  foreground  done    4s       -      -",
+		},
 		{
 			name: "every state, nested, woken",
 			runs: []*v1.ThreadAgentRun{
@@ -132,7 +143,7 @@ func TestFormatAgents(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := command.FormatAgents(tt.runs, now); got != tt.want {
+			if got := command.FormatAgents(tt.runs, tt.shells, now); got != tt.want {
 				t.Errorf("got\n%s\nwant\n%s", got, tt.want)
 			}
 		})
