@@ -25,6 +25,19 @@ func newThreadRegistry(t *testing.T) (*command.Registry, *sessiontest.Fake) {
 	return reg, fake
 }
 
+// A setting on a stopped thread only goes to its row; the message says when it applies.
+func TestThreadSetEffortStopped(t *testing.T) {
+	reg, fake := newThreadRegistry(t)
+	fake.Put(session.Session{ID: "s2", Name: "idle", State: session.StateDisconnected, DisconnectReason: session.ReasonIdle})
+	res, err := reg.Invoke(context.Background(), command.Context{}, "thread.set-effort", map[string]string{"id": "s2", "effort": "high"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "thread idle (s2) uses effort high from its next message"; res.Message != want {
+		t.Errorf("message %q, want %q", res.Message, want)
+	}
+}
+
 func TestThreadCommandsAvailability(t *testing.T) {
 	reg, _ := newThreadRegistry(t)
 	tests := []struct {
