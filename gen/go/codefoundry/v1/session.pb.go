@@ -201,16 +201,16 @@ func (SessionStatus) EnumDescriptor() ([]byte, []int) {
 	return file_codefoundry_v1_session_proto_rawDescGZIP(), []int{2}
 }
 
-// Whether a subagent run is still followed.
+// Whether a subagent run is still running (ThreadAgentRun.status in detail).
 type AgentRunStatus int32
 
 const (
 	AgentRunStatus_AGENT_RUN_STATUS_UNSPECIFIED AgentRunStatus = 0
-	// Its result has not reached the thread yet: running, or a background run that has
-	// not notified.
+	// Running: its end has not been reported yet (a background run runs on after the
+	// turn).
 	AgentRunStatus_AGENT_RUN_STATUS_OPEN AgentRunStatus = 1
-	// Its result (completed, failed, interrupted, stopped) reached the thread, or it was
-	// idle past the safety net.
+	// It ended (completed, failed, stopped), its process ended first, or it was idle past
+	// the safety net.
 	AgentRunStatus_AGENT_RUN_STATUS_CLOSED AgentRunStatus = 2
 )
 
@@ -379,9 +379,15 @@ type Session struct {
 	// can): waking clears this field and sets status NEEDS_ATTENTION with status_reason
 	// "snooze ended". Reconnect, Pin (pinned), Send and Archive (archived) clear it.
 	// Persisted.
-	SnoozedUntil  *timestamppb.Timestamp `protobuf:"bytes,38,opt,name=snoozed_until,json=snoozedUntil,proto3" json:"snoozed_until,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	SnoozedUntil *timestamppb.Timestamp `protobuf:"bytes,38,opt,name=snoozed_until,json=snoozedUntil,proto3" json:"snoozed_until,omitempty"`
+	// Subagent runs still running: all of them (nested ones too), and those the thread
+	// launched in the background itself (spawn depth 1, run_in_background), which run on
+	// after its turn ends. The thread's runs in detail: ThreadItemsSnapshot.agents. See
+	// docs/notes/agents-1-daemon.md.
+	AgentsRunning           int32 `protobuf:"varint,39,opt,name=agents_running,json=agentsRunning,proto3" json:"agents_running,omitempty"`
+	BackgroundAgentsRunning int32 `protobuf:"varint,40,opt,name=background_agents_running,json=backgroundAgentsRunning,proto3" json:"background_agents_running,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *Session) Reset() {
@@ -664,6 +670,20 @@ func (x *Session) GetSnoozedUntil() *timestamppb.Timestamp {
 		return x.SnoozedUntil
 	}
 	return nil
+}
+
+func (x *Session) GetAgentsRunning() int32 {
+	if x != nil {
+		return x.AgentsRunning
+	}
+	return 0
+}
+
+func (x *Session) GetBackgroundAgentsRunning() int32 {
+	if x != nil {
+		return x.BackgroundAgentsRunning
+	}
+	return 0
 }
 
 // ApiRetry is a thread's pending API retry: Claude's system/api_retry frame.
@@ -2937,7 +2957,7 @@ var File_codefoundry_v1_session_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccodefoundry/v1/session.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xca\f\n" +
+	"\x1ccodefoundry/v1/session.proto\x12\x0ecodefoundry.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xad\r\n" +
 	"\aSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11claude_session_id\x18\x02 \x01(\tR\x0fclaudeSessionId\x12\x17\n" +
@@ -2980,7 +3000,9 @@ const file_codefoundry_v1_session_proto_rawDesc = "" +
 	"\x05retry\x18$ \x01(\v2\x18.codefoundry.v1.ApiRetryR\x05retry\x12;\n" +
 	"\varchived_at\x18% \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"archivedAt\x12?\n" +
-	"\rsnoozed_until\x18& \x01(\v2\x1a.google.protobuf.TimestampR\fsnoozedUntilJ\x04\b\t\x10\n" +
+	"\rsnoozed_until\x18& \x01(\v2\x1a.google.protobuf.TimestampR\fsnoozedUntil\x12%\n" +
+	"\x0eagents_running\x18' \x01(\x05R\ragentsRunning\x12:\n" +
+	"\x19background_agents_running\x18( \x01(\x05R\x17backgroundAgentsRunningJ\x04\b\t\x10\n" +
 	"J\x04\b\x1f\x10 R\vterminal_idR\x06render\"\xb5\x01\n" +
 	"\bApiRetry\x12\x18\n" +
 	"\aattempt\x18\x01 \x01(\x05R\aattempt\x12\x1f\n" +
