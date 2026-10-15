@@ -5,10 +5,10 @@ import { cn } from "@/lib/utils";
 import { openUpdateDialog, useUpdateStore } from "@/stores/update";
 
 const tone: Record<UpdateBadgeKind, { className: string; icon: LucideIcon }> = {
-  available: { className: "bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 dark:bg-sky-400/10 dark:text-sky-400 dark:hover:bg-sky-400/15", icon: Download },
-  downloading: { className: "bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 dark:bg-sky-400/10 dark:text-sky-400 dark:hover:bg-sky-400/15", icon: Download },
-  failed: { className: "bg-red-500/10 text-red-700 hover:bg-red-500/15 dark:bg-red-400/10 dark:text-red-400 dark:hover:bg-red-400/15", icon: TriangleAlert },
-  installed: { className: "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:bg-emerald-400/10 dark:text-emerald-400 dark:hover:bg-emerald-400/15", icon: RefreshCw },
+  available: { className: "bg-info/10 text-info hover:bg-info/15", icon: Download },
+  downloading: { className: "bg-info/10 text-info hover:bg-info/15", icon: Download },
+  failed: { className: "bg-destructive/10 text-destructive hover:bg-destructive/15", icon: TriangleAlert },
+  installed: { className: "bg-success/10 text-success hover:bg-success/15", icon: RefreshCw },
 };
 
 /**

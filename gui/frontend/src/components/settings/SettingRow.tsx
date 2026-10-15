@@ -194,7 +194,7 @@ export function SettingRow({ field }: { field: SettingFieldView }) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[13px] font-medium">{field.title}</span>
           {restartPending ? (
-            <span className="rounded bg-amber-500/15 px-1.5 py-px text-[10px] font-medium text-amber-600 dark:text-amber-400" data-testid="restart-pending">
+            <span className="rounded bg-warning/15 px-1.5 py-px text-[10px] font-medium text-warning" data-testid="restart-pending">
               Restart the daemon to apply
             </span>
           ) : (

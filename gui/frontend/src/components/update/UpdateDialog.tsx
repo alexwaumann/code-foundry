@@ -10,7 +10,7 @@ import { busyHeading, displayVersion, failureHeadline, updateView, type UpdateVa
 import { cn } from "@/lib/utils";
 import { closeUpdateDialog, runUpdateAction, useBusyThreadNames, useLiveSessionCount, useUpdateStore, type UpdateAction } from "@/stores/update";
 
-const linkTone = "text-sky-700 hover:underline dark:text-sky-400";
+const linkTone = "text-link hover:underline";
 
 interface Primary {
   action: UpdateAction;
@@ -114,7 +114,7 @@ function BusyThreads() {
   if (names.length === 0) return null;
   return (
     <div className="mx-auto mt-3.5 max-w-[330px] rounded-lg border border-pane-border px-3 py-2 text-left text-xs" data-testid="update-busy-threads">
-      <div className="mb-1 flex items-center gap-[7px] font-medium text-amber-700 dark:text-amber-400" data-testid="update-busy-heading">
+      <div className="mb-1 flex items-center gap-[7px] font-medium text-warning" data-testid="update-busy-heading">
         <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden />
         {busyHeading(names.length)}
       </div>
@@ -130,8 +130,8 @@ function BusyThreads() {
 
 function Failure({ reason }: { reason: string }) {
   return (
-    <div className="mt-3.5 flex gap-[9px] rounded-lg bg-red-500/10 px-3 py-2.5 text-left text-xs">
-      <TriangleAlert className="mt-px size-3.5 shrink-0 text-red-600 dark:text-red-400" aria-hidden />
+    <div className="mt-3.5 flex gap-[9px] rounded-lg bg-destructive/10 px-3 py-2.5 text-left text-xs">
+      <TriangleAlert className="mt-px size-3.5 shrink-0 text-destructive" aria-hidden />
       <div className="min-w-0">
         {failureHeadline(reason)}
         <pre className="mt-[3px] max-h-32 overflow-auto font-mono text-[11px] break-words whitespace-pre-wrap text-muted-foreground select-text" data-testid="update-failure">
@@ -189,12 +189,12 @@ function Body({ st, v }: { st: UpdateStatusView; v: UpdateView }) {
       )}
       {v.variant === "restarting" && <ProgressBar className="mt-4" />}
       {checkError && (
-        <p className="mt-3 text-[11.5px] text-amber-700 dark:text-amber-400" data-testid="update-check-error">
+        <p className="mt-3 text-[11.5px] text-warning" data-testid="update-check-error">
           Last check failed: {checkError}
         </p>
       )}
       {error && (
-        <p className="mt-3 text-[11.5px] break-words text-red-600 dark:text-red-400" data-testid="update-error">
+        <p className="mt-3 text-[11.5px] break-words text-destructive" data-testid="update-error">
           {error}
         </p>
       )}
