@@ -7,11 +7,18 @@
  * transition counts (archivedAtMs or snoozedUntilMs null to set, on a thread this window
  * already knew), so panels opened later on an archived or snoozed thread are left alone,
  * a re-snooze to another time resets nothing, and neither does the first snapshot.
- * See docs/notes/archive-threads-2-sidebar.md and snooze-threads-2-sidebar.md.
+ * The selection follows the same rule: when the selected thread is archived, snoozed or
+ * removed (a `removed` event, or a snapshot without it) the window selects the dashboard
+ * instead of showing a put-away or missing thread. The dashboard is selected, not
+ * focused: the keyboard stays where it was (a row menu, the header). Only the selected
+ * thread counts; unarchiving and waking leave the selection alone.
+ * See docs/notes/archive-threads-2-sidebar.md, snooze-threads-2-sidebar.md and
+ * put-away-focuses-dashboard.md.
  */
 import { emptyBottom, useBottomStore } from "./bottomPanel";
 import { emptyEntry, keyOf, usePanelStore } from "./panel";
 import { useSessionsStore, type SessionsData } from "./sessions";
+import { DASHBOARD, useUiStore, type Selection } from "./ui";
 
 /** The fields whose null → set transition puts a thread away. */
 type PutAwayField = "archivedAtMs" | "snoozedUntilMs";
@@ -43,9 +50,27 @@ export function resetThreadPanels(id: string): void {
   if (key in useBottomStore.getState().byKey) useBottomStore.setState((s) => ({ byKey: { ...s.byKey, [key]: emptyBottom } }));
 }
 
-/** Starts resetting archived and snoozed threads' panels; returns the unsubscribe. */
+/** Ids the store had before and not now (a removed event, or a snapshot without them). */
+export function newlyRemoved(prev: SessionsData, next: SessionsData): string[] {
+  if (prev.byId === next.byId) return [];
+  return prev.order.filter((id) => !(id in next.byId));
+}
+
+/** True when the selection is a thread among `putAway` (archived, snoozed or removed just now). */
+export function putAwaySelected(selection: Selection, putAway: ReadonlySet<string>): boolean {
+  return selection.kind === "session" && putAway.has(selection.id);
+}
+
+/**
+ * Starts resetting archived and snoozed threads' panels, and selecting the dashboard when
+ * the selected thread is archived, snoozed or removed; returns the unsubscribe.
+ */
 export function startArchiveCleanup(): () => void {
   return useSessionsStore.subscribe((s, prev) => {
-    for (const id of new Set([...newlyArchived(prev, s), ...newlySnoozed(prev, s)])) resetThreadPanels(id);
+    const putAway = new Set([...newlyArchived(prev, s), ...newlySnoozed(prev, s)]);
+    for (const id of putAway) resetThreadPanels(id);
+    for (const id of newlyRemoved(prev, s)) putAway.add(id);
+    const ui = useUiStore.getState();
+    if (putAwaySelected(ui.selection, putAway)) ui.select(DASHBOARD);
   });
 }

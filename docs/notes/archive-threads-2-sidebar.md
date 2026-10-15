@@ -29,8 +29,10 @@ Decided 2026-10-13 (Alex). Frontend only (plus the Playwright mock daemon); stac
   `CommandButton` in the thread header after `session.close` (`Archive` icon, tooltip
   "Archive Thread"; `ArchiveRestore` and "Unarchive Thread" while archived; run without
   args the command toggles). Confirmation comes from the daemon through runCommand.
-* **Selection**: an archived thread may stay selected (the pane shows it disconnected
-  with its Reconnect card); nothing beyond what a collapsed Working already does.
+* **Selection**: originally an archived thread could stay selected (the pane showed it
+  disconnected with its Reconnect card). Since 2026-10-15 archiving, snoozing or removing
+  the selected thread selects the dashboard instead; see
+  `docs/notes/put-away-focuses-dashboard.md`.
 
 ## What was built
 
