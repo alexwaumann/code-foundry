@@ -52,6 +52,25 @@ describe("SidebarRow line 2", () => {
   });
 });
 
+describe("SidebarRow running agents", () => {
+  it.each([
+    ["idle: N agents, then the place", { agentsRunning: 3 }, "3 agents · code-foundry @ main"],
+    ["one", { agentsRunning: 1 }, "1 agent · code-foundry @ main"],
+    ["working: before the status", { agentsRunning: 2, status: "busy" as const }, "2 agents · Working · code-foundry @ main"],
+    ["a question: before it, no place", { agentsRunning: 1, status: "attention" as const, statusReason: "question: Which one?" }, "1 agent · Asked a question"],
+    ["none: nothing", { agentsRunning: 0 }, "code-foundry @ main"],
+  ])("%s", (_name, o, text) => {
+    expect(renderRow(o).textContent).toBe(text);
+  });
+
+  it("is sky with a bot icon", () => {
+    renderRow({ agentsRunning: 2 });
+    const el = screen.getByTestId("row-agents");
+    expect(el.className).toContain("text-sky-600");
+    expect(el.querySelector("svg")).not.toBeNull();
+  });
+});
+
 describe("SidebarRow archived", () => {
   function renderArchived(o: Partial<SessionView>): HTMLElement {
     useSessionsStore.setState({ byId: { "s-1": thread({ state: "disconnected", status: "attention", statusReason: "finished", ...o }) }, order: ["s-1"] });
