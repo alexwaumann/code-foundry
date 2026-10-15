@@ -176,7 +176,9 @@ func (u *threadUsage) taskStarted(t *claudestream.Task, at time.Time, where func
 		return agentChange{} // a shell or another kind of task
 	}
 	r := u.runs[t.TaskID]
-	woke := r != nil && r.info.Status != AgentRunning
+	// A wake: the run ended before (a frame said so, or its process went). A run the
+	// transcript met a moment before its first frame is just starting.
+	woke := r != nil && r.info.Status != AgentRunning && (r.live || !r.info.EndedAt.IsZero())
 	if r == nil {
 		if !validAgentID(t.TaskID) {
 			return agentChange{}
