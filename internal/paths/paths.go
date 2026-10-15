@@ -31,6 +31,19 @@ const (
 	EnvToken    = "CODE_FOUNDRY_TOKEN"
 )
 
+// EnvSession is the id of the thread a process belongs to. The daemon sets it in every
+// Claude session it spawns (and in a thread's action runs); the CLI sends it as the
+// default --context-session, so `code-foundry terminal new` or `action run` from a
+// thread's agent lands in that thread's bottom panel.
+const EnvSession = "CODE_FOUNDRY_SESSION"
+
+// Every action run (internal/store/action) gets these: the project's main checkout and
+// the worktree the run belongs to (its cwd).
+const (
+	EnvProjectRoot = "CODE_FOUNDRY_PROJECT_ROOT"
+	EnvWorktree    = "CODE_FOUNDRY_WORKTREE"
+)
+
 // DirName is the default config home's name inside the user's home directory.
 const DirName = ".code-foundry"
 
