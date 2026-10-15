@@ -51,7 +51,7 @@ left it.
 
 ### Review and ship
 
-The side panel (<kbd>⌘⇧E</kbd>) shows more about the selected thread: its copy of the
+The side panel (<kbd>⇧⌘E</kbd>) shows more about the selected thread: its copy of the
 project (changes, commits and files), its pull requests, the agents it started and
 what it cost. The bottom panel (<kbd>⌘J</kbd>) is a terminal in the thread's folder.
 
