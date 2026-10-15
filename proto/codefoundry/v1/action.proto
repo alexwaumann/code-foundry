@@ -1,0 +1,241 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// ActionService manages actions: per-project commands the user defines (modelled on T3
+// Code's Actions) and runs them. A run either opens as a terminal in its owner's bottom
+// panel (labels kind=action, see Terminal.labels) or runs in the background with its
+// combined output captured. Every run gets CODE_FOUNDRY_PROJECT_ROOT (the project's main
+// checkout) and CODE_FOUNDRY_WORKTREE (where it runs) in its environment, and runs
+// `$SHELL -lc <command>` in the worktree. Runs live in memory only (the newest 50 per
+// project). See docs/notes/actions-1-daemon.md.
+service ActionService {
+  // List returns a project's actions in order (every project's when repo_id is empty)
+  // and the runs the daemon remembers, without their output.
+  rpc List(ListActionsRequest) returns (ListActionsResponse) {}
+  // Create adds an action at the end of its project's list. Names are unique within a
+  // project, ignoring case.
+  rpc Create(CreateActionRequest) returns (CreateActionResponse) {}
+  // Update changes the fields that are set.
+  rpc Update(UpdateActionRequest) returns (UpdateActionResponse) {}
+  // Delete forgets an action. Its runs keep going.
+  rpc Delete(DeleteActionRequest) returns (DeleteActionResponse) {}
+  // Run starts an action for an owner: a thread (session_id; the run belongs to its
+  // bottom panel) or a worktree (worktree_path). It returns the run as soon as it has
+  // started.
+  rpc Run(RunActionRequest) returns (RunActionResponse) {}
+  // GetRun returns one run with its output so far.
+  rpc GetRun(GetActionRunRequest) returns (GetActionRunResponse) {}
+  // WaitRun returns a run with its output once it has finished (a terminal run: once
+  // its terminal has exited, or is gone). Cancelling the call does not stop the run.
+  rpc WaitRun(WaitActionRunRequest) returns (WaitActionRunResponse) {}
+  // Watch sends a snapshot, then every change. A client that falls behind gets a new
+  // snapshot.
+  rpc Watch(WatchActionsRequest) returns (stream ActionEvent) {}
+}
+
+// ActionIcon is the icon an action shows with.
+enum ActionIcon {
+  ACTION_ICON_UNSPECIFIED = 0;
+  ACTION_ICON_PLAY = 1;
+  ACTION_ICON_TEST = 2;
+  ACTION_ICON_LINT = 3;
+  ACTION_ICON_CONFIGURE = 4;
+  ACTION_ICON_BUILD = 5;
+  ACTION_ICON_DEBUG = 6;
+}
+
+message Action {
+  // "a-" + 12 hex digits.
+  string id = 1;
+  // The project (repository id) the action belongs to.
+  string repo_id = 2;
+  // Unique within the project, ignoring case.
+  string name = 3;
+  // A shell command line, run as `$SHELL -lc <command>`.
+  string command = 4;
+  ActionIcon icon = 5;
+  // Runs open as a terminal in the bottom panel; false: in the background.
+  bool in_terminal = 6;
+  // Runs (in the background) when a new thread creates its worktree in this project.
+  bool on_worktree_create = 7;
+  // 0-based order within the project.
+  int32 position = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+enum ActionRunMode {
+  // On RunActionRequest: the action's own choice (in_terminal).
+  ACTION_RUN_MODE_UNSPECIFIED = 0;
+  // In a terminal (labels kind=action) in the owner's bottom panel.
+  ACTION_RUN_MODE_TERMINAL = 1;
+  // A child process of the daemon; combined stdout and stderr captured (last 64 KiB).
+  ACTION_RUN_MODE_BACKGROUND = 2;
+}
+
+enum ActionRunState {
+  ACTION_RUN_STATE_UNSPECIFIED = 0;
+  ACTION_RUN_STATE_RUNNING = 1;
+  ACTION_RUN_STATE_EXITED = 2;
+}
+
+// ActionRunTrigger says what started a run.
+enum ActionRunTrigger {
+  ACTION_RUN_TRIGGER_UNSPECIFIED = 0;
+  // ActionService.Run or action.run (the GUI, the CLI, a thread's agent).
+  ACTION_RUN_TRIGGER_USER = 1;
+  // A new thread created its worktree (Action.on_worktree_create).
+  ACTION_RUN_TRIGGER_WORKTREE_CREATE = 2;
+}
+
+message ActionRun {
+  // "r-" + 12 hex digits.
+  string id = 1;
+  string action_id = 2;
+  // The action's name and command when the run started.
+  string action_name = 3;
+  string command = 4;
+  string repo_id = 5;
+  // The thread the run belongs to; empty for a worktree's run.
+  string session_id = 6;
+  // Where it runs (its cwd and CODE_FOUNDRY_WORKTREE).
+  string worktree_path = 7;
+  ActionRunMode mode = 8;
+  // The terminal of a TERMINAL run.
+  string terminal_id = 9;
+  ActionRunState state = 10;
+  // Valid when state is EXITED: the process's exit code, 128+signal when a signal
+  // ended it, -1 when a terminal run's terminal was removed before its exit was seen.
+  int32 exit_code = 11;
+  google.protobuf.Timestamp started_at = 12;
+  google.protobuf.Timestamp finished_at = 13;
+  ActionRunTrigger trigger = 14;
+  // A BACKGROUND run's combined output (the last 64 KiB, invalid UTF-8 replaced), only
+  // in GetRun, WaitRun, and Run's response; never in List, snapshots or events.
+  string output = 15;
+  // The output began earlier than what `output` holds.
+  bool output_truncated = 16;
+}
+
+message ListActionsRequest {
+  // Empty: every project.
+  string repo_id = 1;
+}
+
+message ListActionsResponse {
+  repeated Action actions = 1;
+  // Newest first.
+  repeated ActionRun runs = 2;
+}
+
+message CreateActionRequest {
+  string repo_id = 1;
+  string name = 2;
+  string command = 3;
+  // UNSPECIFIED: PLAY.
+  ActionIcon icon = 4;
+  bool in_terminal = 5;
+  bool on_worktree_create = 6;
+}
+
+message CreateActionResponse {
+  Action action = 1;
+}
+
+message UpdateActionRequest {
+  // Action id.
+  string id = 1;
+  optional string name = 2;
+  optional string command = 3;
+  optional ActionIcon icon = 4;
+  optional bool in_terminal = 5;
+  optional bool on_worktree_create = 6;
+  // Move to this 0-based index within the project (clamped).
+  optional int32 position = 7;
+}
+
+message UpdateActionResponse {
+  Action action = 1;
+}
+
+message DeleteActionRequest {
+  // Action id.
+  string id = 1;
+}
+
+message DeleteActionResponse {}
+
+message RunActionRequest {
+  // Action id, or its name (ignoring case) within the owner's project or repo_id.
+  string action = 1;
+  // The owning thread: the run uses its project and worktree. Wins over worktree_path.
+  string session_id = 2;
+  // The owning worktree when there is no thread: a registered worktree of the action's
+  // project.
+  string worktree_path = 3;
+  // The project to find the action's name in; default: the owner's.
+  string repo_id = 4;
+  // UNSPECIFIED: the action's in_terminal.
+  ActionRunMode mode = 5;
+}
+
+message RunActionResponse {
+  ActionRun run = 1;
+}
+
+message GetActionRunRequest {
+  string run_id = 1;
+}
+
+message GetActionRunResponse {
+  ActionRun run = 1;
+}
+
+message WaitActionRunRequest {
+  string run_id = 1;
+}
+
+message WaitActionRunResponse {
+  ActionRun run = 1;
+}
+
+message WatchActionsRequest {}
+
+message ActionEvent {
+  oneof event {
+    // Every action and the remembered runs (without output).
+    ActionSnapshot snapshot = 1;
+    // An action's full state after a change.
+    Action updated = 2;
+    // An action was deleted (or its project unregistered).
+    string removed_id = 3;
+    // A run started or finished (without output).
+    ActionRun run_updated = 4;
+    // A run was forgotten (history cap, or its project unregistered).
+    string run_removed_id = 5;
+    // A run finished; follows its run_updated. For toasts.
+    ActionRunFinished run_finished = 6;
+  }
+}
+
+message ActionSnapshot {
+  repeated Action actions = 1;
+  // Newest first.
+  repeated ActionRun runs = 2;
+}
+
+// ActionRunFinished is sent once per run when it ends.
+message ActionRunFinished {
+  string run_id = 1;
+  string action_id = 2;
+  string action_name = 3;
+  string repo_id = 4;
+  string session_id = 5;
+  int32 exit_code = 6;
+  ActionRunMode mode = 7;
+  ActionRunTrigger trigger = 8;
+  string terminal_id = 9;
+}

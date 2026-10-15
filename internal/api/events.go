@@ -12,6 +12,7 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/store/action"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
@@ -38,6 +39,8 @@ type EventsDeps struct {
 	Update   update.Service
 	// Workspace is the workspace store (branch sets).
 	Workspace workspace.Store
+	// Action is the action store (per-project commands and their runs).
+	Action action.Store
 	// Done ends every stream when closed (daemon shutdown). May be nil.
 	Done <-chan struct{}
 }
@@ -76,7 +79,8 @@ type eventSource interface {
 }
 
 // sources lists the stream's sources in the order their snapshots are sent (see
-// events.proto: repo, workspace, terminal, session, thread, gh, gitops, settings, update),
+// events.proto: repo, workspace, terminal, session, thread, gh, gitops, settings, update,
+// action),
 // followed by UI intents.
 func (h *Events) sources() []eventSource {
 	d := h.deps
@@ -104,6 +108,9 @@ func (h *Events) sources() []eventSource {
 	}
 	if d.Update != nil {
 		out = append(out, updateSource{svc: d.Update, bus: d.Bus}) // api/update.go
+	}
+	if d.Action != nil {
+		out = append(out, actionSource{store: d.Action, bus: d.Bus}) // api/action_events.go
 	}
 	out = append(out, uiSource{bus: d.Bus})
 	return out

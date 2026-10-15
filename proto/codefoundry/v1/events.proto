@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package codefoundry.v1;
 
+import "codefoundry/v1/action.proto";
 import "codefoundry/v1/gh.proto";
 import "codefoundry/v1/gitops.proto";
 import "codefoundry/v1/heartbeat.proto";
@@ -20,7 +21,7 @@ import "codefoundry/v1/workspace.proto";
 // Watch RPCs remain for the CLI and tests.
 service EventService {
   // Watch streams all events. Each store's snapshot event is sent first, in the order
-  // repo, workspace, terminal, session, thread, gh, gitops, settings, update, so a
+  // repo, workspace, terminal, session, thread, gh, gitops, settings, update, action, so a
   // client can replace its state wholesale on connect.
   rpc Watch(WatchEventsRequest) returns (stream Event) {}
 }
@@ -51,6 +52,9 @@ enum EventSource {
   // ThreadEvent.pending per change. A thread's items come only from
   // ThreadService.ListItems or Watch; this source never carries them.
   EVENT_SOURCE_THREAD = 12;
+  // Actions and their runs: an ActionEvent snapshot (after update), then changes and
+  // run_finished. Runs never carry their output here.
+  EVENT_SOURCE_ACTION = 13;
 }
 
 message Event {
@@ -70,5 +74,8 @@ message Event {
     ThreadEvent thread = 12;
     // Nothing else was sent for a while (see StreamHeartbeat).
     StreamHeartbeat heartbeat = 13;
+    // Actions: a snapshot, then updated / removed_id / run_updated / run_removed_id /
+    // run_finished.
+    ActionEvent action = 14;
   }
 }

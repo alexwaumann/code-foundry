@@ -93,6 +93,9 @@ message InvokeCommandResponse {
   string message = 1;
   // Optional structured result for CLI --json; JSON-encoded.
   string result_json = 2;
+  // A process exit status the command reports (action.run --wait: the action's exit
+  // code). The CLI prints the result, then exits with it when it is not 0.
+  int32 exit_code = 3;
 }
 
 // ConfirmationRequired is the error detail of an Invoke that needs confirmation.

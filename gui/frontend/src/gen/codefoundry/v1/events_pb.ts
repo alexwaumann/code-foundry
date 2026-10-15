@@ -4,6 +4,8 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { ActionEvent } from "./action_pb";
+import { file_codefoundry_v1_action } from "./action_pb";
 import type { GhEvent } from "./gh_pb";
 import { file_codefoundry_v1_gh } from "./gh_pb";
 import type { GitOpsEvent } from "./gitops_pb";
@@ -32,7 +34,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/events.proto.
  */
 export const file_codefoundry_v1_events: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIkIKEldhdGNoRXZlbnRzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygOMhsuY29kZWZvdW5kcnkudjEuRXZlbnRTb3VyY2UimQQKBUV2ZW50EikKBHJlcG8YASABKAsyGS5jb2RlZm91bmRyeS52MS5SZXBvRXZlbnRIABIxCgh0ZXJtaW5hbBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsRXZlbnRIABIvCgdzZXNzaW9uGAMgASgLMhwuY29kZWZvdW5kcnkudjEuU2Vzc2lvbkV2ZW50SAASJQoCZ2gYBCABKAsyFy5jb2RlZm91bmRyeS52MS5HaEV2ZW50SAASJgoCdWkYBSABKAsyGC5jb2RlZm91bmRyeS52MS5VaUludGVudEgAEi0KBmdpdG9wcxgGIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkdpdE9wc0V2ZW50SAASMQoIc2V0dGluZ3MYByABKAsyHS5jb2RlZm91bmRyeS52MS5TZXR0aW5nc0V2ZW50SAASLQoGdXBkYXRlGAogASgLMhsuY29kZWZvdW5kcnkudjEuVXBkYXRlRXZlbnRIABIzCgl3b3Jrc3BhY2UYCyABKAsyHi5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2VFdmVudEgAEi0KBnRocmVhZBgMIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLlRocmVhZEV2ZW50SAASNAoJaGVhcnRiZWF0GA0gASgLMh8uY29kZWZvdW5kcnkudjEuU3RyZWFtSGVhcnRiZWF0SABCBwoFZXZlbnQqowIKC0V2ZW50U291cmNlEhwKGEVWRU5UX1NPVVJDRV9VTlNQRUNJRklFRBAAEhUKEUVWRU5UX1NPVVJDRV9SRVBPEAESGQoVRVZFTlRfU09VUkNFX1RFUk1JTkFMEAISGAoURVZFTlRfU09VUkNFX1NFU1NJT04QAxITCg9FVkVOVF9TT1VSQ0VfR0gQBBITCg9FVkVOVF9TT1VSQ0VfVUkQBRIXChNFVkVOVF9TT1VSQ0VfR0lUT1BTEAYSGQoVRVZFTlRfU09VUkNFX1NFVFRJTkdTEAcSFwoTRVZFTlRfU09VUkNFX1VQREFURRAKEhoKFkVWRU5UX1NPVVJDRV9XT1JLU1BBQ0UQCxIXChNFVkVOVF9TT1VSQ0VfVEhSRUFEEAwyVgoMRXZlbnRTZXJ2aWNlEkYKBVdhdGNoEiIuY29kZWZvdW5kcnkudjEuV2F0Y2hFdmVudHNSZXF1ZXN0GhUuY29kZWZvdW5kcnkudjEuRXZlbnQiADABQsMBChJjb20uY29kZWZvdW5kcnkudjFCC0V2ZW50c1Byb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_gh, file_codefoundry_v1_gitops, file_codefoundry_v1_heartbeat, file_codefoundry_v1_repo, file_codefoundry_v1_session, file_codefoundry_v1_settings, file_codefoundry_v1_terminal, file_codefoundry_v1_thread, file_codefoundry_v1_ui, file_codefoundry_v1_update, file_codefoundry_v1_workspace]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9ldmVudHMucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIkIKEldhdGNoRXZlbnRzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygOMhsuY29kZWZvdW5kcnkudjEuRXZlbnRTb3VyY2UiyAQKBUV2ZW50EikKBHJlcG8YASABKAsyGS5jb2RlZm91bmRyeS52MS5SZXBvRXZlbnRIABIxCgh0ZXJtaW5hbBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRlcm1pbmFsRXZlbnRIABIvCgdzZXNzaW9uGAMgASgLMhwuY29kZWZvdW5kcnkudjEuU2Vzc2lvbkV2ZW50SAASJQoCZ2gYBCABKAsyFy5jb2RlZm91bmRyeS52MS5HaEV2ZW50SAASJgoCdWkYBSABKAsyGC5jb2RlZm91bmRyeS52MS5VaUludGVudEgAEi0KBmdpdG9wcxgGIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkdpdE9wc0V2ZW50SAASMQoIc2V0dGluZ3MYByABKAsyHS5jb2RlZm91bmRyeS52MS5TZXR0aW5nc0V2ZW50SAASLQoGdXBkYXRlGAogASgLMhsuY29kZWZvdW5kcnkudjEuVXBkYXRlRXZlbnRIABIzCgl3b3Jrc3BhY2UYCyABKAsyHi5jb2RlZm91bmRyeS52MS5Xb3Jrc3BhY2VFdmVudEgAEi0KBnRocmVhZBgMIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLlRocmVhZEV2ZW50SAASNAoJaGVhcnRiZWF0GA0gASgLMh8uY29kZWZvdW5kcnkudjEuU3RyZWFtSGVhcnRiZWF0SAASLQoGYWN0aW9uGA4gASgLMhsuY29kZWZvdW5kcnkudjEuQWN0aW9uRXZlbnRIAEIHCgVldmVudCq8AgoLRXZlbnRTb3VyY2USHAoYRVZFTlRfU09VUkNFX1VOU1BFQ0lGSUVEEAASFQoRRVZFTlRfU09VUkNFX1JFUE8QARIZChVFVkVOVF9TT1VSQ0VfVEVSTUlOQUwQAhIYChRFVkVOVF9TT1VSQ0VfU0VTU0lPThADEhMKD0VWRU5UX1NPVVJDRV9HSBAEEhMKD0VWRU5UX1NPVVJDRV9VSRAFEhcKE0VWRU5UX1NPVVJDRV9HSVRPUFMQBhIZChVFVkVOVF9TT1VSQ0VfU0VUVElOR1MQBxIXChNFVkVOVF9TT1VSQ0VfVVBEQVRFEAoSGgoWRVZFTlRfU09VUkNFX1dPUktTUEFDRRALEhcKE0VWRU5UX1NPVVJDRV9USFJFQUQQDBIXChNFVkVOVF9TT1VSQ0VfQUNUSU9OEA0yVgoMRXZlbnRTZXJ2aWNlEkYKBVdhdGNoEiIuY29kZWZvdW5kcnkudjEuV2F0Y2hFdmVudHNSZXF1ZXN0GhUuY29kZWZvdW5kcnkudjEuRXZlbnQiADABQsMBChJjb20uY29kZWZvdW5kcnkudjFCC0V2ZW50c1Byb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_codefoundry_v1_action, file_codefoundry_v1_gh, file_codefoundry_v1_gitops, file_codefoundry_v1_heartbeat, file_codefoundry_v1_repo, file_codefoundry_v1_session, file_codefoundry_v1_settings, file_codefoundry_v1_terminal, file_codefoundry_v1_thread, file_codefoundry_v1_ui, file_codefoundry_v1_update, file_codefoundry_v1_workspace]);
 
 /**
  * @generated from message codefoundry.v1.WatchEventsRequest
@@ -134,6 +136,15 @@ export type Event = Message<"codefoundry.v1.Event"> & {
      */
     value: StreamHeartbeat;
     case: "heartbeat";
+  } | {
+    /**
+     * Actions: a snapshot, then updated / removed_id / run_updated / run_removed_id /
+     * run_finished.
+     *
+     * @generated from field: codefoundry.v1.ActionEvent action = 14;
+     */
+    value: ActionEvent;
+    case: "action";
   } | { case: undefined; value?: undefined };
 };
 
@@ -215,6 +226,14 @@ export enum EventSource {
    * @generated from enum value: EVENT_SOURCE_THREAD = 12;
    */
   THREAD = 12,
+
+  /**
+   * Actions and their runs: an ActionEvent snapshot (after update), then changes and
+   * run_finished. Runs never carry their output here.
+   *
+   * @generated from enum value: EVENT_SOURCE_ACTION = 13;
+   */
+  ACTION = 13,
 }
 
 /**
@@ -234,7 +253,7 @@ export const EventSourceSchema: GenEnum<EventSource> = /*@__PURE__*/
 export const EventService: GenService<{
   /**
    * Watch streams all events. Each store's snapshot event is sent first, in the order
-   * repo, workspace, terminal, session, thread, gh, gitops, settings, update, so a
+   * repo, workspace, terminal, session, thread, gh, gitops, settings, update, action, so a
    * client can replace its state wholesale on connect.
    *
    * @generated from rpc codefoundry.v1.EventService.Watch
