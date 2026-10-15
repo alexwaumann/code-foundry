@@ -90,17 +90,24 @@ type Terminal struct {
 	// Labels set by the creator. TerminalService does not interpret them; the daemon's
 	// creators follow this contract (internal/termlabel):
 	//
-	//	kind      "shell" on a shell started by the terminal.new command. A session's
-	//	          Claude terminal has no kind. The daemon removes a "shell" terminal as
-	//	          soon as it exits, and kills and removes it when its thread is removed,
-	//	          its project is unregistered, or its worktree directory is removed.
+	//	kind      "shell" on a shell started by the terminal.new command; "action" on
+	//	          an action run in a terminal (ActionService.Run, action.run). A
+	//	          session's Claude terminal has no kind. The daemon removes a "shell"
+	//	          terminal as soon as it exits; an "action" terminal stays EXITED until
+	//	          it is closed (terminal.close), so its output can be read. Both are
+	//	          killed and removed when their thread is removed, their project is
+	//	          unregistered, or their worktree directory is removed.
 	//	session   the thread (session id) the terminal belongs to: on a session's Claude
 	//	          terminal, and on a shell started for a thread.
 	//	repo      the repository id of the worktree a shell belongs to.
 	//	worktree  the worktree path (symlinks resolved) the terminal belongs to: the
 	//	          session's worktree on a Claude terminal; on a shell, its owner worktree
 	//	          (the thread's worktree when it belongs to a thread).
+	//	action    on kind "action": the action's id (ActionService).
+	//	action.name  on kind "action": the action's name when the run started.
 	//
+	// An action terminal carries the same session / repo / worktree owner labels as a
+	// shell, so a bottom panel shows both the same way.
 	// A terminal created through Create without labels belongs to nothing.
 	Labels        map[string]string `protobuf:"bytes,12,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields

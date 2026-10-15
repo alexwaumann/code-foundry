@@ -47,8 +47,8 @@ type TerminalDeps struct {
 	Terminal TerminalBackend
 	Repo     RepoBackend
 	Session  SessionBackend
-	// IsShell reports whether terminal id is a shell terminal.new started
-	// (termlabel.KindShell). It gates terminal.close, which refuses other terminals
+	// IsShell reports whether terminal id is a shell terminal.new started or an action
+	// run (termlabel.IsPanel). It gates terminal.close, which refuses other terminals
 	// (unlabelled ones TerminalService.Create made) anyway. Nil: any terminal (the
 	// refusal then comes from Close).
 	IsShell func(id string) bool
@@ -170,7 +170,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			Description: "Terminate the terminal's process (SIGHUP, then SIGKILL after a grace period) and remove it once it has exited.",
 			Category:    "Terminal",
 			Args:        []ArgSpec{idArg},
-			// Only shells: an unlabelled terminal (TerminalService.Create) is ended with
+			// Only shells and action runs: an unlabelled terminal (TerminalService.Create) is ended with
 			// terminal.kill and terminal.remove. Close refuses it too.
 			When: func(c Context) bool {
 				return hasTerminal(c) && (d.IsShell == nil || d.IsShell(c.ActiveTerminalID))

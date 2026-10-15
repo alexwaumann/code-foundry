@@ -32,6 +32,9 @@ func TestShellReaper(t *testing.T) {
 		}
 	}
 	event := func(ev any) func(string) any { return func(string) any { return ev } }
+	action := func(sessionID, repoID, worktree string) map[string]string {
+		return termlabel.ActionRun(sessionID, repoID, worktree, "a-1", "Test")
+	}
 	tests := []struct {
 		name string
 		// labels of the terminal under test ("%dir": a worktree directory that exists),
@@ -74,6 +77,23 @@ func TestShellReaper(t *testing.T) {
 			event: event(repo.RepoRemoved{ID: "r1"})},
 		{name: "removing a no-project thread kills and removes its shell", labels: termlabel.Shell("s1", "", "%dir"),
 			event: event(session.Removed{ID: "s1"}), wantGone: true},
+		// Action runs in a terminal: they stay when they exit (the user reads the output,
+		// the GUI closes them), and go with their owner like a shell, exited or not.
+		{name: "an action terminal that exits stays", labels: action("s1", "r1", "%dir"), exit: true},
+		{name: "an action terminal that exited before the start stays through the sweep", labels: action("s1", "r1", "%dir"),
+			exitedBefore: true},
+		{name: "removing its thread kills and removes an action terminal", labels: action("s1", "r1", "%dir"),
+			event: event(session.Removed{ID: "s1"}), wantGone: true},
+		{name: "removing its thread removes an exited action terminal", labels: action("s1", "r1", "%dir"), exitedBefore: true,
+			event: event(session.Removed{ID: "s1"}), wantGone: true},
+		{name: "unregistering its project kills and removes an action terminal", labels: action("", "r1", "%dir"),
+			event: event(repo.RepoRemoved{ID: "r1"}), wantGone: true},
+		{name: "removing its worktree kills and removes an action terminal", labels: action("", "r1", gone),
+			event: worktreeRemoved(gone), wantGone: true},
+		{name: "the sweep removes an exited action terminal whose worktree is gone", labels: action("", "r1", gone), exitedBefore: true,
+			wantGone: true},
+		{name: "the sweep removes an action terminal of a removed thread", labels: action("s9", "r1", "%dir"), wantGone: true},
+		{name: "the sweep leaves a live thread's action terminal", labels: action("s1", "r1", "%dir")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

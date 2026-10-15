@@ -141,7 +141,7 @@ func Run(ctx context.Context, opts Options) error {
 		Terminal: terminalAPI,
 		IsShellTerminal: func(id string) bool {
 			t, err := st.terminal.Get(context.Background(), id)
-			return err == nil && termlabel.IsShell(t.Labels)
+			return err == nil && termlabel.IsPanel(t.Labels)
 		},
 		AwaitTerminalOutput: func(ctx context.Context, id string) error {
 			return terminal.AwaitOutput(ctx, st.terminal, id, promptSettle)

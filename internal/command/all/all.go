@@ -19,7 +19,8 @@ type Deps struct {
 	// shell's owner). Nil registers the commands against
 	// UnimplementedTerminalServiceHandler, so they list but fail with Unimplemented.
 	Terminal command.TerminalBackend
-	// IsShellTerminal reports whether a terminal is a shell terminal.new started; it gates
+	// IsShellTerminal reports whether a terminal is a bottom panel terminal (a shell
+	// terminal.new started, or an action run; termlabel.IsPanel); it gates
 	// terminal.close. Nil: any terminal.
 	IsShellTerminal func(id string) bool
 	// AwaitTerminalOutput blocks until a new terminal has printed something (its
