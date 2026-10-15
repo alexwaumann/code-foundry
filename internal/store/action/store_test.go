@@ -137,7 +137,10 @@ func TestCreateUpdateDelete(t *testing.T) {
 		// want is web's action names in order afterwards.
 		want []string
 	}{
-		{name: "create appends", run: func(h *harness) error { h.create(CreateOptions{RepoID: "web", Name: "Lint", Command: "make lint"}); return nil },
+		{name: "create appends", run: func(h *harness) error {
+			h.create(CreateOptions{RepoID: "web", Name: "Lint", Command: "make lint"})
+			return nil
+		},
 			want: []string{"Test", "Build", "Lint"}},
 		{name: "a name is unique ignoring case", run: func(h *harness) error {
 			_, err := h.m.Create(context.Background(), CreateOptions{RepoID: "web", Name: "  test ", Command: "x"})
@@ -307,7 +310,6 @@ func TestRepoRemovedForgetsActionsAndRuns(t *testing.T) {
 		t.Errorf("reloaded = %+v", m2.Snapshot().Actions)
 	}
 }
-
 
 func mkdir(dir string) error { return os.MkdirAll(dir, 0o755) }
 

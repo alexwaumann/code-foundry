@@ -132,6 +132,7 @@ func Run(ctx context.Context, opts Options) error {
 	settingsAPI := api.NewSettings(st.settings)
 	updateAPI := api.NewUpdate(st.update, events, ctx.Done())
 	workspaceAPI := api.NewWorkspace(st.workspace, events)
+	actionAPI := api.NewAction(st.action, events)
 	commands := command.NewRegistry()
 	if err := all.Register(commands, all.Deps{
 		Daemon: command.DaemonInfo{
@@ -175,6 +176,7 @@ func Run(ctx context.Context, opts Options) error {
 		Settings:  settingsAPI,
 		Update:    updateAPI,
 		Workspace: workspaceAPI,
+		Action:    actionAPI,
 		Restart: func() {
 			// Let the command's response reach the caller first.
 			time.AfterFunc(restartDelay, func() { restart(errRestartRequested) })
@@ -196,8 +198,9 @@ func Run(ctx context.Context, opts Options) error {
 		settingsAPI.Route(),
 		updateAPI.Route(),
 		workspaceAPI.Route(),
+		actionAPI.Route(),
 		api.NewFilesystem(st.home, st.repo).Route(),
-		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Session: st.session, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Done: ctx.Done()}).Route(),
+		api.NewEvents(api.EventsDeps{Bus: events, Repo: st.repo, Terminal: st.terminal, Session: st.session, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Done: ctx.Done()}).Route(),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routes {

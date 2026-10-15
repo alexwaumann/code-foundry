@@ -14,6 +14,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/db"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/store/action"
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
@@ -60,6 +61,13 @@ type stores struct {
 	// through repo and asks session which threads are live. Opened before session,
 	// which reads workspace members at launch.
 	workspace *workspace.Manager
+	// action holds each project's actions and runs them (in a terminal, or in the
+	// background). Opened before session (whose new worktrees run on-worktree-create
+	// actions) and closed before it, killing background runs.
+	action *action.Manager
+	// stopActions stops the glue that forgets an unregistered project's actions and
+	// kills a removed thread's or worktree's background runs (actions.go).
+	stopActions func()
 	// home is the user's home directory (symlinks resolved): the root every project
 	// path must stay inside, and what FilesystemService completes under.
 	home string
@@ -162,6 +170,17 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 	}); err != nil {
 		return nil, err
 	}
+	if s.action, err = action.New(ctx, action.Options{
+		DB: s.db, Repos: s.repo, Terminals: s.terminal, Bus: s.bus, Log: log.With("store", "action"),
+		Session: func(id string) (action.Owner, bool) {
+			if s.session == nil {
+				return action.Owner{}, false
+			}
+			return sessionOwner(s.session.Snapshot(), id)
+		},
+	}); err != nil {
+		return nil, err
+	}
 	claude := cmp.Or(settings.ExpandedPath(cfg.Advanced.ClaudePath), "claude")
 	sessionLog := log.With("store", "session")
 	if s.session, err = session.New(ctx, session.Options{
@@ -170,6 +189,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 		Namer:          settingsNamer(s.settings, session.ClaudeNamer(claude, "/tmp", sessionLog)),
 		AttachmentsDir: p.Attachments(), WorktreePath: settingsWorktreePath(s.settings),
 		Env: sessionEnv, CacheTTL: cfg.CacheTTL(),
+		// A new thread's worktree runs its project's on-worktree-create actions in the
+		// background (WorktreeCreated returns at once).
+		WorktreeCreated: s.action.WorktreeCreated,
 	}); err != nil {
 		return nil, err
 	}
@@ -185,12 +207,25 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 	}); err != nil {
 		return nil, err
 	}
+	s.stopActions = startActionCleanup(ctx, log.With("store", "action"), s.action, s.bus)
 	uo := update.DefaultOptions(version.Version)
 	uo.Bus, uo.Log = s.bus, log.With("store", "update")
 	uo.Channel = update.ParseChannel(cfg.Update.Channel)
 	s.update = update.Start(ctx, uo)
 	applyUpdateChannel(s.settings, s.update)
 	return s, nil
+}
+
+// sessionOwner is thread id's project and worktree, the owner of its action runs.
+func sessionOwner(snap *session.Snapshot, id string) (action.Owner, bool) {
+	if snap == nil {
+		return action.Owner{}, false
+	}
+	i := slices.IndexFunc(snap.Sessions, func(x session.Session) bool { return x.ID == id })
+	if i < 0 {
+		return action.Owner{}, false
+	}
+	return action.Owner{SessionID: id, RepoID: snap.Sessions[i].RepoID, Worktree: snap.Sessions[i].WorktreePath}, true
 }
 
 // liveThreads lists the sessions with a process, for the workspace store's removal
@@ -216,6 +251,14 @@ func (s *stores) close() error {
 	}
 	if s.stopShells != nil {
 		s.stopShells()
+	}
+	if s.stopActions != nil {
+		s.stopActions()
+	}
+	if s.action != nil {
+		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		errs = append(errs, s.action.Close(closeCtx))
+		cancel()
 	}
 	if s.session != nil {
 		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)

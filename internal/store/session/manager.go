@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
@@ -71,8 +72,14 @@ type Options struct {
 	RefExists func(ctx context.Context, dir, ref string) bool
 	// Env entries ("KEY=VALUE") are added to every claude process's environment
 	// (Create, Reconnect, Fork). The daemon passes its loopback endpoint and token so
-	// the CLI inside a session reaches it without the Unix socket.
+	// the CLI inside a session reaches it without the Unix socket. Every process also
+	// gets its own thread's id as paths.EnvSession (CODE_FOUNDRY_SESSION), which the CLI
+	// sends as its default --context-session.
 	Env []string
+	// WorktreeCreated, when set, is called after Create made a new worktree for a thread
+	// (CreateOptions.NewWorktree) and the thread has started. It must not block: the
+	// daemon runs the project's on-worktree-create actions from it in the background.
+	WorktreeCreated func(sessionID, repoID, worktree string)
 	// Home is the cwd of a thread without a project (CreateOptions.NoProject). Default:
 	// os.UserHomeDir().
 	Home string
@@ -457,6 +464,9 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Session, error) 
 	if late != nil {
 		m.applyLateName(id, late)
 	}
+	if o.NewWorktree != nil && m.opts.WorktreeCreated != nil {
+		m.opts.WorktreeCreated(id, s.RepoID, s.WorktreePath)
+	}
 	return m.Get(ctx, id)
 }
 
@@ -664,7 +674,7 @@ func (m *Manager) claudeCommand(s Session, l launch, g grants) (argv, env []stri
 		// may read its images again.
 		sa.addDirs = []string{m.opts.AttachmentsDir}
 	}
-	env = m.opts.Env
+	env = append(slices.Clip(m.opts.Env), paths.EnvSession+"="+s.ID)
 	if s.WorkspaceID != "" {
 		// The current members, every spawn (create, reconnect, fork): a repo added to
 		// the workspace since the row was written is included.
