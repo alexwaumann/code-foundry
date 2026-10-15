@@ -288,10 +288,20 @@ test("a failed worktree-create action toasts; Open selects the thread and shows 
   await out.getByTestId("action-run-again").click();
   await expect(out).toHaveCount(0);
   await expect(bottom(page).locator('[data-kind="action"]')).toHaveText("Install deps");
-  // A successful setup run stays quiet.
-  await mockPost("action/setup?session=s-1&code=0");
-  await page.waitForTimeout(1200);
-  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "(exit 0)" })).toHaveCount(0);
+  // A successful setup run stays quiet. Once it has finished, a failing one follows: events
+  // arrive in order, so when that one's toast shows, the passing run's run_finished was seen.
+  const passed = (await mockPost("action/setup?session=s-1&code=0")) as { id: string };
+  await expect
+    .poll(async () => {
+      const res = await fetch(`${mockUrl}/__mock/actions`);
+      const body = (await res.json()) as { runs: { id: string; state: string }[] };
+      return body.runs.find((r) => r.id === passed.id)?.state;
+    })
+    .toBe("EXITED");
+  await mockPost("action/setup?session=s-1&code=2&action=Build");
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Setup action Build failed (exit 2)" })).toBeVisible();
+  // Counted now, not retried: a retrying toHaveCount(0) would wait out the toast's own dismissal.
+  expect(await page.locator("[data-sonner-toast]").filter({ hasText: "(exit 0)" }).count()).toBe(0);
 });
 
 /** SHOTS=<dir>: the notes' screenshots, WebKit, 1280x800 at 2x, dark and light. */
