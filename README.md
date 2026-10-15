@@ -98,3 +98,7 @@ network access to ziglang.org, github.com and codeberg.org).
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/PLAN.md](docs/PLAN.md), and
 [CLAUDE.md](CLAUDE.md) for the build commands.
+
+## License
+
+Copyright 2026 Alejandro Waumann. Licensed under the [Apache License, Version 2.0](LICENSE).
