@@ -600,16 +600,21 @@ test("the tooltip shows the full status, wrapped, under the name for threads tha
   }
 });
 
-test("the toolbar: Dashboard and Notifications on the left, Add project then New thread on the right", async ({ page }) => {
+test("the toolbar: Dashboard and Notifications; New thread is a labelled button under it", async ({ page }) => {
   await openApp(page);
-  const bar = await page.getByTestId("sidebar-toolbar").boundingBox();
-  const at = async (id: string) => (await page.getByTestId(id).boundingBox()) ?? { x: 0, width: 0 };
-  const [dash, bell, add, add2] = [await at("sidebar-dashboard"), await at("sidebar-notifications"), await at("sidebar-add-project"), await at("sidebar-new-session")];
+  const bar = (await page.getByTestId("sidebar-toolbar").boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+  const at = async (id: string) => (await page.getByTestId(id).boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+  const [dash, bell, add] = [await at("sidebar-dashboard"), await at("sidebar-notifications"), await at("sidebar-new-session")];
   expect(dash.x).toBeLessThan(bell.x);
-  expect(bell.x + bell.width).toBeLessThan((bar?.x ?? 0) + (bar?.width ?? 0) / 2);
-  expect(add.x).toBeGreaterThan((bar?.x ?? 0) + (bar?.width ?? 0) / 2);
-  expect(add.x).toBeLessThan(add2.x);
-  // New thread is rightmost, flush with the toolbar's right edge (#40: no inset; the
-  // content pane's 8px margin is the gap beyond it).
-  expect(Math.round((bar?.x ?? 0) + (bar?.width ?? 0) - (add2.x + add2.width))).toBe(0);
+  expect(bell.x + bell.width).toBeLessThan(bar.x + bar.width / 2);
+  await expect(page.getByTestId("sidebar-add-project")).toHaveCount(0);
+  // New thread spans the toolbar's width, below it (#40: no inset; the content pane's 8px
+  // margin is the gap beyond it), labelled, with session.new's chord as a hint.
+  expect(add.y).toBeGreaterThanOrEqual(bar.y + bar.height);
+  expect(Math.round(add.x - bar.x)).toBe(0);
+  expect(Math.round(add.width - bar.width)).toBe(0);
+  const button = page.getByTestId("sidebar-new-session");
+  await expect(button).toHaveText("New thread⌘N");
+  await expect(button).toBeEnabled();
+  await expect(page.getByTestId("sidebar-new-session-chord")).toHaveText("⌘N");
 });

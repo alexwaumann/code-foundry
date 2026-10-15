@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, openApp, repoAt, resetMock } from "./fixtures";
+import { invocations, openAddProjectDialog, openApp, repoAt, resetMock } from "./fixtures";
 
 // Folder completion against FilesystemService.ListDirectories over the mock's fake home
 // (mock/filesystem.ts), driven through the Add Project dialog's Local folder tab. The
@@ -11,7 +11,7 @@ test.beforeEach(async () => {
 
 async function openAddProject(page: Page) {
   await openApp(page);
-  await page.getByTestId("sidebar-add-project").click();
+  await openAddProjectDialog(page);
   const dialog = page.getByTestId("add-project-dialog");
   await expect(dialog).toHaveAttribute("data-tab", "local");
   await expect(page.getByTestId("add-project-local-input")).toBeFocused();

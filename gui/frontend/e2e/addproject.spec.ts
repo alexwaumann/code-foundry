@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { invocations, listRepos, mockUrl, openApp, openProjects, repoAt, resetMock } from "./fixtures";
+import { invocations, listRepos, mockUrl, openAddProjectDialog, openApp, openProjects, repoAt, resetMock } from "./fixtures";
 
 // The Add Project dialog (repo.add): its entry points, the tab order, the Local folder
 // tab (RepoService.Register with path completion; completion itself is e2e/paths.spec.ts),
@@ -39,7 +39,7 @@ async function openFromPalette(page: Page, command: string): Promise<void> {
 
 async function openGitHub(page: Page) {
   await openApp(page);
-  await page.getByTestId("sidebar-add-project").click();
+  await openAddProjectDialog(page);
   await page.getByTestId("add-project-tab-github").click();
   await expect(dialog(page)).toHaveAttribute("data-tab", "github");
   const input = page.getByTestId("add-project-github-input");
@@ -70,11 +70,20 @@ test("every entry point opens the dialog", async ({ page }) => {
   await expect(page.getByTestId("add-project-github-input")).toBeFocused();
   await page.keyboard.press("Escape");
 
-  // The sidebar toolbar's button, next to New thread.
-  const toolbar = page.getByTestId("sidebar-toolbar");
-  await expect(toolbar.getByTestId("sidebar-new-session")).toBeVisible();
-  await toolbar.getByTestId("sidebar-add-project").click();
+  // The sidebar has no Add project button; New thread's project picker ends with
+  // "Add a project…" under a border, which closes the picker and opens the dialog.
+  await expect(page.getByTestId("sidebar-add-project")).toHaveCount(0);
+  await page.getByTestId("sidebar-new-session").click();
+  const picker = page.getByTestId("palette");
+  await expect(picker).toHaveAttribute("data-mode", "projects");
+  const add = picker.locator("[cmdk-item]").last();
+  await expect(add).toHaveAttribute("data-testid", "picker-add-project");
+  await expect(add).toHaveText("Add a project…a folder on this Mac, or from GitHub");
+  await expect(add).not.toHaveAttribute("data-selected", "true");
+  await add.click();
+  await expect(picker).toHaveCount(0);
   await expect(dialog(page)).toBeVisible();
+  await expect(dialog(page)).toHaveAttribute("data-tab", "local");
   await page.keyboard.press("Escape");
 
   // The Projects page's Add project button.
@@ -111,7 +120,7 @@ test("the project picker's empty state opens the dialog", async ({ page }) => {
 
 test("tabs are New, Local folder, GitHub; it opens on Local folder", async ({ page }) => {
   await openApp(page);
-  await page.getByTestId("sidebar-add-project").click();
+  await openAddProjectDialog(page);
   const tabs = page.getByTestId("add-project-tabs").getByRole("tab");
   await expect(tabs).toHaveText(["New", "Local folder", "GitHub"]);
   await expect(page.getByTestId("add-project-tab-local")).toHaveAttribute("data-state", "active");
@@ -123,7 +132,7 @@ test("tabs are New, Local folder, GitHub; it opens on Local folder", async ({ pa
 
 test("Local folder: Tab completes, Enter adds, and the new project opens", async ({ page }) => {
   await openApp(page);
-  await page.getByTestId("sidebar-add-project").click();
+  await openAddProjectDialog(page);
   const input = page.getByTestId("add-project-local-input");
   await expect(input).toBeFocused();
 
@@ -148,7 +157,7 @@ test("Local folder: Tab completes, Enter adds, and the new project opens", async
 test("Local folder: a click opens a folder; only Enter and the button add", async ({ page }) => {
   await openApp(page);
   const before = (await listRepos()).length;
-  await page.getByTestId("sidebar-add-project").click();
+  await openAddProjectDialog(page);
   const input = page.getByTestId("add-project-local-input");
   const message = page.getByTestId("add-project-local-message");
   const entry = (name: string) => page.getByTestId("path-entry").and(page.locator(`[data-entry-name="${name}"]`));
@@ -198,7 +207,7 @@ test("Local folder: a click opens a folder; only Enter and the button add", asyn
 
 test("Local folder: after a click, Enter adds the typed path, and so does the button", async ({ page }) => {
   await openApp(page);
-  await page.getByTestId("sidebar-add-project").click();
+  await openAddProjectDialog(page);
   const input = page.getByTestId("add-project-local-input");
   const entry = (name: string) => page.getByTestId("path-entry").and(page.locator(`[data-entry-name="${name}"]`));
 
@@ -213,7 +222,7 @@ test("Local folder: after a click, Enter adds the typed path, and so does the bu
   expect(await repoAt("/Users/dev/Documents/Projects")).toBeUndefined();
 
   // The button adds the typed path.
-  await page.getByTestId("sidebar-add-project").click();
+  await openAddProjectDialog(page);
   await entry("src").click();
   await entry("Notebook").click();
   await expect(input).toHaveAttribute("data-path", "~/src/Notebook/");
@@ -226,7 +235,7 @@ test("Local folder: after a click, Enter adds the typed path, and so does the bu
 test("Local folder: a plain folder has no git, and a folder inside a project opens that project", async ({ page }) => {
   await openApp(page);
   const before = (await listRepos()).length;
-  await page.getByTestId("sidebar-add-project").click();
+  await openAddProjectDialog(page);
   const input = page.getByTestId("add-project-local-input");
   await input.fill("src/Notebook");
   await page.keyboard.press("Enter");
@@ -234,7 +243,7 @@ test("Local folder: a plain folder has no git, and a folder inside a project ope
   expect(await repoAt("/Users/dev/src/Notebook")).toMatchObject({ name: "Notebook", git: false });
 
   // A folder that does not exist is refused in place.
-  await page.getByTestId("sidebar-add-project").click();
+  await openAddProjectDialog(page);
   await input.fill("src/nope");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("add-project-local-message")).toContainText("/Users/dev/src/nope: no such file or directory");
@@ -311,7 +320,7 @@ test("GitHub: search, pick a result, clone with progress, and open the new proje
   await expect(page.getByTestId("worktree-surface-title")).toHaveText("Hello-World@main");
 
   // Cloned once: the next lookup says so and offers the existing folder.
-  await page.getByTestId("sidebar-add-project").click();
+  await openAddProjectDialog(page);
   await page.getByTestId("add-project-tab-github").click();
   await page.getByTestId("add-project-github-input").fill("octo-org/hello-world");
   await page.keyboard.press("Enter");

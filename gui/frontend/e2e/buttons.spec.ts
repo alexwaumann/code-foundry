@@ -12,8 +12,9 @@ test("no footer and no chord hints outside the palette and help", async ({ page 
   await openApp(page);
   await expect(page.locator("footer")).toHaveCount(0);
   await expect(page.getByTestId("hints")).toHaveCount(0);
-  // The welcome panel and the sidebar name no chords.
-  await expect(page.locator("kbd")).toHaveCount(0);
+  // The welcome panel names no chords; the sidebar only New thread's (onboarding-1).
+  await expect(page.locator("kbd")).toHaveCount(1);
+  await expect(page.getByTestId("sidebar-new-session").locator("kbd")).toHaveCount(1);
   await expect(page.getByTestId("nav-pullrequests")).toHaveText("Pull Requests");
 });
 

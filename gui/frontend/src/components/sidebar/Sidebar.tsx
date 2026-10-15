@@ -17,7 +17,7 @@ import { ResizeHandle } from "./ResizeHandle";
 import { RowTooltipsEnabled } from "./rowTooltips";
 import { SidebarRow } from "./SidebarRow";
 import { SidebarStatus } from "./SidebarStatus";
-import { SidebarToolbar } from "./SidebarToolbar";
+import { SidebarNewThread, SidebarToolbar } from "./SidebarToolbar";
 
 /** A footer header's height; thread rows are two lines (rowHeight + SECOND_LINE), snoozed and archived rows one (rowHeight). */
 const HEADER_HEIGHT = 26;
@@ -423,6 +423,7 @@ function SidebarShown({ width }: { width: number }) {
           the window edge as from the pane. */}
       <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col pl-2" data-testid="sidebar-body">
         <SidebarToolbar />
+        <SidebarNewThread />
         <nav className="flex shrink-0 flex-col" aria-label="Pages">
           <PullRequestsNav />
           <ProjectsNav />

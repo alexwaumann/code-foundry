@@ -43,7 +43,8 @@ test("search, look up and clone a GitHub repository with the dialog", async ({ p
   const [owner = "", name = ""] = REPO.split("/");
   const dest = path.join(HOME, "projects", owner, name);
   await page.goto("/");
-  await page.getByTestId("sidebar-add-project").click();
+  await page.getByTestId("sidebar-new-session").click();
+  await page.getByTestId("picker-add-project").click();
   await page.getByTestId("add-project-tab-github").click();
   const input = page.getByTestId("add-project-github-input");
 
