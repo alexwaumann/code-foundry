@@ -310,6 +310,16 @@ test("a failed worktree-create action toasts; Open selects the thread and shows 
   await expect(out.getByRole("heading")).toHaveText("Setup action Install deps failed");
   await expect(out.getByTestId("action-run-meta")).toContainText("Exited with code 1");
   await expect(out.getByTestId("action-run-output")).not.toBeEmpty();
+  // Narrow: the status stays on one line and the path gives way in the middle, keeping its
+  // last folder (the worktree's branch folder) whole.
+  await page.setViewportSize({ width: 360, height: 800 });
+  const meta = out.getByTestId("action-run-meta");
+  await expect.poll(async () => (await meta.boundingBox())?.height ?? 0).toBeLessThan(24);
+  const tail = out.getByTestId("action-run-path").locator("span").last();
+  await expect(tail).toHaveText("code-foundry");
+  expect(await tail.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  expect(await out.getByTestId("action-run-path").locator("span").first().evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  await page.setViewportSize({ width: 1280, height: 800 });
   // Run in terminal: the same action again for the thread, as a tab.
   await out.getByTestId("action-run-again").click();
   await expect(out).toHaveCount(0);

@@ -5,7 +5,7 @@ import { errorMessage } from "@/api/stream";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { formatRunDuration } from "@/lib/actions";
-import { tildify } from "@/lib/path";
+import { splitPathTail, tildify } from "@/lib/path";
 import { runAction } from "@/stores/actionActions";
 import { closeActionRunOutput, useActionDialogStore } from "@/stores/actionDialog";
 
@@ -47,17 +47,27 @@ function RunOutput({ runId }: { runId: string }) {
     );
   const { run, output, truncated } = load.data;
   const took = run.startedAtMs !== null && run.finishedAtMs !== null ? formatRunDuration(run.finishedAtMs - run.startedAtMs) : null;
+  const path = splitPathTail(tildify(run.worktreePath));
   const owner = run.sessionId ? ({ kind: "thread", sessionId: run.sessionId } as const) : ({ kind: "worktree", repoId: run.repoId, path: run.worktreePath } as const);
   return (
     <>
-      <DialogDescription className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="action-run-meta">
-        <CircleX className="size-3.5 text-red-600 dark:text-red-400" aria-hidden />
-        <span className="text-red-600 dark:text-red-400">Exited with code {run.exitCode}</span>
-        {took && <span aria-hidden className="opacity-50">·</span>}
-        {took && <span className="tabular-nums">{took}</span>}
-        <span aria-hidden className="opacity-50">·</span>
-        <span className="min-w-0 truncate font-mono" title={run.worktreePath}>
-          {tildify(run.worktreePath)}
+      {/* One line: only the path gives way, its directory first (a middle ellipsis), so the
+          branch folder at its end stays readable. */}
+      <DialogDescription className="mt-1 flex items-center gap-1.5 pr-7 text-xs whitespace-nowrap text-muted-foreground" data-testid="action-run-meta">
+        <CircleX className="size-3.5 shrink-0 text-red-600 dark:text-red-400" aria-hidden />
+        <span className="shrink-0 text-red-600 dark:text-red-400">Exited with code {run.exitCode}</span>
+        {took && (
+          <span aria-hidden className="shrink-0 opacity-50">
+            ·
+          </span>
+        )}
+        {took && <span className="shrink-0 tabular-nums">{took}</span>}
+        <span aria-hidden className="shrink-0 opacity-50">
+          ·
+        </span>
+        <span className="flex min-w-0 font-mono" title={run.worktreePath} data-testid="action-run-path">
+          <span className="min-w-0 shrink-[1000] truncate">{path.head}</span>
+          <span className="min-w-0 truncate">{path.tail}</span>
         </span>
       </DialogDescription>
       <p className="mt-3 truncate font-mono text-xs text-muted-foreground" title={run.command}>
