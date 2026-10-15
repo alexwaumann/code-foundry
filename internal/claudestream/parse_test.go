@@ -268,6 +268,113 @@ func TestParseFixtures(t *testing.T) {
 				}
 			},
 		},
+		{
+			// Claude Code 2.1.300: the thread's own background shell (Bash
+			// run_in_background), done after the turn; Claude then starts a turn itself.
+			name: "shells",
+			want: map[string]int{"Task": 3, "BackgroundTasks": 2, "Result": 2},
+			check: func(t *testing.T, evs []Event) {
+				sh := shellFramesOf(t, evs)
+				st := sh.started
+				if st.TaskType != TaskTypeShell || !st.IsBackgrounded || st.OwnedBySubagent || st.ParentTaskID != "" ||
+					st.TaskID != "by3gxdr0o" || st.Description != "Run sleep 15 then echo done in background" {
+					t.Errorf("start %+v", st)
+				}
+				if sh.call.Name != "Bash" || sh.call.ID != st.ToolUseID || !strings.Contains(string(sh.call.Input), `"run_in_background":true`) {
+					t.Errorf("call %+v", sh.call)
+				}
+				if !strings.Contains(string(sh.result.ToolUseResult), `"backgroundTaskId":"by3gxdr0o"`) {
+					t.Errorf("launch result %s", sh.result.ToolUseResult)
+				}
+				if sh.updated.Patch == nil || sh.updated.Patch.Status != "completed" || sh.updated.Patch.EndTime == 0 {
+					t.Errorf("updated %+v", sh.updated.Patch)
+				}
+				n := sh.notified
+				if n.Status != "completed" || n.ToolUseID != st.ToolUseID || n.Usage != nil ||
+					n.Summary != `Background command "Run sleep 15 then echo done in background" completed (exit code 0)` {
+					t.Errorf("notification %+v", n)
+				}
+				// The end comes between the turn's result and the turn Claude starts itself.
+				if sh.at[n] < sh.results[0] || sh.at[n] > sh.results[1] {
+					t.Errorf("notification at %d, results at %v", sh.at[n], sh.results)
+				}
+				if first, last := sh.lists[0], sh.lists[len(sh.lists)-1]; len(first.Tasks) != 1 || first.Tasks[0].TaskID != st.TaskID ||
+					first.Tasks[0].TaskType != TaskTypeShell || len(last.Tasks) != 0 {
+					t.Errorf("background task lists %+v … %+v", first, last)
+				}
+			},
+		},
+		{
+			// A background shell that exits 3.
+			name: "shells-fail",
+			want: map[string]int{"Task": 3, "Result": 2},
+			check: func(t *testing.T, evs []Event) {
+				sh := shellFramesOf(t, evs)
+				if sh.updated.Patch == nil || sh.updated.Patch.Status != "failed" {
+					t.Errorf("updated %+v", sh.updated.Patch)
+				}
+				if n := sh.notified; n.Status != "failed" || !strings.HasSuffix(n.Summary, "failed with exit code 3") {
+					t.Errorf("notification %+v", n)
+				}
+			},
+		},
+		{
+			// A background shell stopped with TaskStop in the same turn.
+			name: "shells-stop",
+			want: map[string]int{"Task": 3, "Result": 1},
+			check: func(t *testing.T, evs []Event) {
+				sh := shellFramesOf(t, evs)
+				if sh.updated.Patch == nil || sh.updated.Patch.Status != "killed" {
+					t.Errorf("updated %+v", sh.updated.Patch)
+				}
+				if n := sh.notified; n.Status != "stopped" || n.Report() != sh.started.Description {
+					t.Errorf("notification %+v", n)
+				}
+			},
+		},
+		{
+			// A Monitor call whose command ends (a file appeared) after the turn.
+			name: "shells-monitor",
+			want: map[string]int{"Task": 3, "Result": 2},
+			check: func(t *testing.T, evs []Event) {
+				sh := shellFramesOf(t, evs)
+				if st := sh.started; st.TaskType != TaskTypeShell || !st.IsBackgrounded || st.Description != "Wait for ready file" {
+					t.Errorf("start %+v", st)
+				}
+				if sh.call.Name != "Monitor" || !strings.Contains(string(sh.result.ToolUseResult), `"taskId":"byocrxron"`) {
+					t.Errorf("call %+v result %s", sh.call, sh.result.ToolUseResult)
+				}
+				if n := sh.notified; n.Status != "completed" || n.Summary != `Monitor "Wait for ready file" stream ended` {
+					t.Errorf("notification %+v", n)
+				}
+			},
+		},
+		{
+			// A Monitor whose output line starts a turn while it keeps running.
+			name: "shells-monitor-events",
+			want: map[string]int{"Task": 3, "Result": 3},
+			check: func(t *testing.T, evs []Event) {
+				sh := shellFramesOf(t, evs)
+				if sh.at[sh.notified] < sh.results[1] {
+					t.Errorf("the monitor ended at %d, before the event's turn ended (results %v)", sh.at[sh.notified], sh.results)
+				}
+			},
+		},
+		{
+			// stdin closed with the shell running: claude stays; SIGTERM stops the shell
+			// (the notification first) and exits 143.
+			name: "shells-close",
+			want: map[string]int{"Task": 3, "Result": 1},
+			check: func(t *testing.T, evs []Event) {
+				sh := shellFramesOf(t, evs)
+				if sh.notified.Status != "stopped" || sh.notified.OutputFile != "" || sh.at[sh.notified] > sh.at[sh.updated] {
+					t.Errorf("notification %+v (at %d, updated at %d)", sh.notified, sh.at[sh.notified], sh.at[sh.updated])
+				}
+				if sh.updated.Patch == nil || sh.updated.Patch.Status != "killed" {
+					t.Errorf("updated %+v", sh.updated.Patch)
+				}
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -299,6 +406,63 @@ func TestParseFixtures(t *testing.T) {
 			}
 		})
 	}
+}
+
+// shellFrames are a capture's one background shell: its frames, the call that started
+// it and the call's result, the background task lists, where each came.
+type shellFrames struct {
+	started, updated, notified *Task
+	call                       Block
+	result                     *User
+	lists                      []*BackgroundTasks
+	results                    []int
+	at                         map[*Task]int
+}
+
+func shellFramesOf(t *testing.T, evs []Event) shellFrames {
+	t.Helper()
+	sh := shellFrames{at: map[*Task]int{}}
+	for i, ev := range evs {
+		switch e := ev.(type) {
+		case *Task:
+			sh.at[e] = i
+			switch e.Subtype {
+			case TaskStarted:
+				sh.started = e
+			case TaskUpdated:
+				sh.updated = e
+			case TaskNotification:
+				sh.notified = e
+			}
+		case *BackgroundTasks:
+			sh.lists = append(sh.lists, e)
+		case *Result:
+			sh.results = append(sh.results, i)
+		}
+	}
+	if sh.started == nil || sh.updated == nil || sh.notified == nil {
+		t.Fatalf("shell frames %+v", sh)
+	}
+	for _, ev := range evs {
+		switch e := ev.(type) {
+		case *Assistant:
+			for _, b := range e.Message.Content {
+				if b.Type == "tool_use" && b.ID == sh.started.ToolUseID {
+					sh.call = b
+				}
+			}
+		case *User:
+			for _, b := range e.Blocks() {
+				if b.Type == "tool_result" && b.ToolUseID == sh.started.ToolUseID {
+					sh.result = e
+				}
+			}
+		}
+	}
+	if sh.call.ID == "" || sh.result == nil {
+		t.Fatalf("no call or result for %s", sh.started.ToolUseID)
+	}
+	return sh
 }
 
 // only returns the single event of type T among evs (failing on none or several).

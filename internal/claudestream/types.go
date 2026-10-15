@@ -111,7 +111,7 @@ func (r PermissionResult) wire(input json.RawMessage) map[string]any {
 // (the Conn resolves those). Concrete types: *Init, *Status, *PermissionDenied,
 // *CompactBoundary, *ThinkingTokens, *CommandsChanged, *ConversationReset, *Assistant,
 // *User, *StreamEvent, *Result, *RateLimit, *APIRetry, *CommandLifecycle, *Task,
-// *PermissionRequest (an inbound can_use_tool, from a Conn only), *ControlCancel,
+// *BackgroundTasks, *PermissionRequest (an inbound can_use_tool, from a Conn only), *ControlCancel,
 // *Unknown.
 type Event interface{ RawJSON() json.RawMessage }
 
@@ -437,6 +437,16 @@ type CommandLifecycle struct {
 //     usage, and with handback "send" the report in handback_report (summary is then a
 //     pointer to it). A resumed process reports a background run the previous process
 //     left running as stopped ("didn't finish before the previous session ended").
+//
+// The thread's own background shells (Claude Code 2.1.300, testdata/shells*.jsonl): a
+// Bash call with run_in_background or a Monitor call is task_type local_bash with
+// is_backgrounded and no owned_by_subagent; task_id is the "b…" id the call's result
+// names, tool_use_id the call, description the call's description. The frames do not
+// tell Bash from Monitor and carry no command (the call's input has both). No
+// task_progress comes. The end is task_updated (completed, failed, killed) and
+// task_notification (completed, failed, stopped) with summary "Background command "X"
+// completed (exit code 0)", "… failed with exit code 3", "Monitor "X" stream ended", or
+// a stopped shell's description; on SIGTERM the notification comes first.
 type Task struct {
 	base
 	TaskID          string `json:"task_id"`
@@ -463,14 +473,32 @@ type Task struct {
 	HandbackReport *HandbackReport `json:"handback_report,omitempty"`
 }
 
-// Task subtypes and the task type of a subagent.
+// Task subtypes and the task types of a subagent and a shell.
 const (
 	TaskStarted      = "task_started"
 	TaskProgress     = "task_progress"
 	TaskUpdated      = "task_updated"
 	TaskNotification = "task_notification"
 	TaskTypeAgent    = "local_agent"
+	TaskTypeShell    = "local_bash"
 )
+
+// BackgroundTasks is system/background_tasks_changed (new in Claude Code 2.1.300): the
+// background tasks running now, the whole list after each change (a shell started, an
+// empty list once the last one ended). The task frames say the same per task; the
+// daemon follows those.
+type BackgroundTasks struct {
+	base
+	Tasks []BackgroundTask `json:"tasks"`
+}
+
+// BackgroundTask is one entry of BackgroundTasks.
+type BackgroundTask struct {
+	TaskID      string `json:"task_id"`
+	RunID       string `json:"run_id,omitempty"`
+	TaskType    string `json:"task_type,omitempty"`
+	Description string `json:"description,omitempty"`
+}
 
 // TaskUsage is a task's counters so far (task_progress) or final (task_notification).
 type TaskUsage struct {

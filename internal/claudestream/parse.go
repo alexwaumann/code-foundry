@@ -46,6 +46,8 @@ func Parse(line []byte) Event {
 			ev = &CommandsChanged{}
 		case TaskStarted, TaskProgress, TaskUpdated, TaskNotification:
 			ev = &Task{}
+		case "background_tasks_changed":
+			ev = &BackgroundTasks{}
 		}
 	case "assistant":
 		ev = &Assistant{}
