@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, repoAt, resetMock } from "./fixtures";
+import { invocations, openApp, repoAt, resetMock } from "./fixtures";
 
 // Folder completion against FilesystemService.ListDirectories over the mock's fake home
 // (mock/filesystem.ts), driven through the Add Project dialog's Local folder tab. The
@@ -112,4 +112,20 @@ test("an absolute path is taken under home, and long listings are bounded", asyn
   await expect(dialog.getByText("Folders (first 200)")).toBeVisible();
   await page.keyboard.press("Tab");
   await expect(input).toHaveValue("many/d");
+});
+
+test("the palette's path prompt still uses a clicked folder, with no chevron", async ({ page }) => {
+  await openApp(page);
+  await page.keyboard.press("Meta+k");
+  const palette = page.getByTestId("palette");
+  await palette.locator('[data-command="dev.path"]').click();
+  await expect(palette).toHaveAttribute("data-mode", "args");
+  await page.keyboard.type("~/");
+  await expect(entry(page, "src")).toBeVisible();
+  await expect(palette.getByText("Use ~/")).toBeVisible();
+  await expect(palette.getByTestId("path-entry-open")).toHaveCount(0);
+  await entry(page, "src").click();
+  await expect(palette).toHaveCount(0);
+  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("dev.path");
+  expect((await invocations()).at(-1)?.args).toEqual({ path: "~/src" });
 });
