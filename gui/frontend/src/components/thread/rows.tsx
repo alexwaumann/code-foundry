@@ -4,6 +4,8 @@ import {
   Bot,
   ChevronRight,
   CircleAlert,
+  CircleCheck,
+  CircleX,
   Copy,
   FilePen,
   FilePlus,
@@ -22,12 +24,17 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
+import type { AgentRunView } from "@/api/agents";
 import type { ThreadItemView, ToolCallView } from "@/api/thread";
+import { agentElapsedMs, fmtElapsed, parseAgentNote } from "@/lib/agents";
 import { copyText } from "@/lib/clipboard";
+import { useNow } from "@/lib/clock";
 import { canonicalModelName } from "@/lib/models";
+import { formatAgo } from "@/lib/session";
 import { questionsOf } from "@/lib/threadRequest";
 import { groupLabel, turnCostLabel, type TimelineRow, type WorkNode } from "@/lib/threadTimeline";
 import { formatDuration, parseObject, splitPath, str, toolSummary, type Tense } from "@/lib/toolSummary";
+import { useAgentRunOfCall, useAgentRunOfNote } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions";
 import { useModelChoices } from "@/stores/settings";
 import { getThreadItems, setRowExpanded, setTurnFolded, useRowExpanded, useThreadItem, useThreadStore } from "@/stores/thread";
@@ -141,6 +148,45 @@ function ToolLabel({ t, tense, cwd }: { t: ToolCallView; tense: Tense; cwd: stri
 /** File edits: while one waits for permission its diff shows, so the user sees what they allow. */
 const EDIT_TOOLS: ReadonlySet<string> = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
 
+/** A run's elapsed time, live (1 s clock) while it runs. */
+function AgentElapsed({ run }: { run: AgentRunView }) {
+  const now = useNow(1000);
+  const ms = agentElapsedMs(run, now);
+  return ms === null ? null : <span data-testid="thread-agent-elapsed">{fmtElapsed(ms)}</span>;
+}
+
+/**
+ * An Agent call's meta from its run: a "background" chip; while running, the activity
+ * after a "·" and the live elapsed time with the spinner (also while the daemon keeps a
+ * background call's item running); a failed run's "failed" chip; else the call's own meta
+ * ("4 tools · 41s"), or the run's duration when the call has none.
+ */
+function AgentMeta({ run, itemRunning, fallback }: { run: AgentRunView; itemRunning: boolean; fallback: string }) {
+  const running = run.status === "running";
+  const ended = agentElapsedMs(run, 0);
+  return (
+    <>
+      {run.background && (
+        <span className="chip bg" data-testid="thread-agent-bg">
+          background
+        </span>
+      )}
+      {running && run.activity && (
+        <span className="act" data-testid="thread-agent-activity">
+          {run.activity}
+        </span>
+      )}
+      {run.status === "failed" && (
+        <span className="chip fail" data-testid="thread-agent-failed">
+          failed
+        </span>
+      )}
+      {running ? <AgentElapsed run={run} /> : fallback ? <span>{fallback}</span> : ended !== null && <span>{fmtElapsed(ended)}</span>}
+      {(running || itemRunning) && <LoaderCircle className="size-3.5 animate-spin text-sky-500" aria-label="Running" />}
+    </>
+  );
+}
+
 /**
  * A tool call: its row, and when open its detail (a subagent: its nested rows and report).
  * Open by default: a running subagent, and a file edit waiting for permission.
@@ -151,9 +197,14 @@ const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type
   const perm = useThreadItem(sessionId, node.permissionId);
   const t = item?.kind === "tool" ? item : null;
   const agent = node.name === "Agent" || node.name === "Task";
+  // The run the daemon follows for this Agent call (docs/notes/agents-1-daemon.md); a
+  // background call's item stays running until the run ends.
+  const run = useAgentRunOfCall(sessionId, agent ? node.id : "");
   const request = perm?.kind === "permission" ? perm.request : null;
   const waiting = request?.state === "pending";
-  const [open, toggle] = useToggle(node.key, (agent && t?.status === "running") || (waiting && EDIT_TOOLS.has(node.name)));
+  // A running foreground subagent opens to show its work; a background one stays a line
+  // (its progress is the activity on the row, the strip and the Agents tab).
+  const [open, toggle] = useToggle(node.key, (agent && t?.status === "running" && !run?.background) || (waiting && EDIT_TOOLS.has(node.name)));
   if (!t) return null;
   const tense: Tense = waiting ? "pending" : t.status === "running" ? "running" : "done";
   const s = toolSummary(t, { tense, durationMs: durationOf(t), cwd });
@@ -162,6 +213,8 @@ const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type
     <span className="t-amber" data-testid="thread-waiting">
       waiting for you
     </span>
+  ) : run ? (
+    <AgentMeta run={run} itemRunning={t.status === "running"} fallback={s.meta} />
   ) : (
     <>
       {denied && <span className="chip fail">denied</span>}
@@ -433,13 +486,53 @@ const NoteRow = memo(function NoteRow({ id }: { id: string }) {
 const SystemNoteRow = memo(function SystemNoteRow({ id }: { id: string }) {
   const { sessionId } = useThreadCtx();
   const it = useThreadItem(sessionId, id);
+  const run = useAgentRunOfNote(sessionId, id);
   if (it?.kind !== "note") return null;
+  const note = parseAgentNote(it.text, run?.description ?? "");
+  if (note) return <AgentNoteRow note={note} atMs={it.createdAtMs} />;
   return (
     <div className="sysnote" role="separator" aria-label={it.text} data-testid="thread-note">
       <span className="selectable">{it.text}</span>
     </div>
   );
 });
+
+/** "just now", "5 min ago": the note's age on the shared 30 s clock. */
+function NoteAge({ atMs }: { atMs: number }) {
+  const now = useNow(30_000);
+  return <>{formatAgo(atMs, now)}</>;
+}
+
+/**
+ * The daemon's note when a background subagent ends (docs/notes/agents-1-daemon.md):
+ * one quiet line, a check (emerald) or a cross (red), "Agent finished · name", the report's
+ * first line ellipsised, and its age on the right.
+ */
+function AgentNoteRow({ note, atMs }: { note: ReturnType<typeof parseAgentNote> & object; atMs: number | null }) {
+  const Icon = note.failed ? CircleX : CircleCheck;
+  return (
+    <div className="agentnote" role="note" data-testid="thread-agent-note" data-failed={note.failed || undefined}>
+      <Icon className={note.failed ? "t-red" : "t-emerald"} aria-label={note.failed ? "Failed" : "Finished"} />
+      <span className="nm">{note.failed ? "Agent failed" : "Agent finished"}</span>
+      <span className="ghost" aria-hidden>
+        ·
+      </span>
+      <span className="nm" data-testid="thread-agent-note-name">
+        {note.name}
+      </span>
+      {note.summary && (
+        <span className="sum" title={note.summary} data-testid="thread-agent-note-summary">
+          {note.summary}
+        </span>
+      )}
+      {atMs !== null && (
+        <span className="ago">
+          <NoteAge atMs={atMs} />
+        </span>
+      )}
+    </div>
+  );
+}
 
 /** A row of a turn's work log, top level or nested under a subagent. */
 export function WorkNodeView({ node, nested }: { node: WorkNode; nested?: boolean }) {

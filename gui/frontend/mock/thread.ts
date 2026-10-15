@@ -29,6 +29,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { SessionStatus } from "../src/gen/codefoundry/v1/session_pb";
 import {
+  ThreadAgentStatus,
   ThreadItemDelta_Field,
   ThreadRequestState,
   ToolCallStatus,
@@ -36,6 +37,7 @@ import {
   type ThreadItemSchema,
   type ThreadPendingRequestSchema,
 } from "../src/gen/codefoundry/v1/thread_pb";
+import { END_REPORTS, scriptAgents, type AgentRunInit } from "./agents";
 import { CommandError } from "./errors";
 import { Hub } from "./hub";
 import { mcpFixture, type McpStatusInit } from "./mcp";
@@ -76,6 +78,8 @@ export interface ThreadWorld {
   modelOf(id: string): string;
   /** A turn ended: the thread's context totals move to now (mock/context.ts). */
   recordResult(id: string, model: string): void;
+  /** The thread's subagent runs changed: its session's running counts follow (mock/agents.ts). */
+  agentsChanged(id: string): void;
 }
 
 /** What Claude reports as the model of a reply for a picked one (a family alias resolves to its current model). */
@@ -104,8 +108,8 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
  * disconnected (closed); crashed: Claude exited before answering the handshake (an error
  * item, nothing else; mock/world.ts disconnects the thread).
  */
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "closed" | "crashed";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "closed", "crashed"];
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "closed" | "crashed";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "closed", "crashed"];
 
 /** The stderr line of the "crashed" state's claude (Session.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
@@ -240,6 +244,8 @@ export class MockThreads {
   private mcp = new Map<string, McpStatusInit>();
   /** Slash commands per running thread (mock/slashCommands.ts); absent: none. */
   private slash = new Map<string, SlashCommandInit[]>();
+  /** Subagent runs per thread in spawn order (mock/agents.ts); absent: none. */
+  private agents = new Map<string, AgentRunInit[]>();
   /** Every thread event, for the Watch streams. */
   private readonly hub = new Hub<{ sessionId: string; event: ThreadEventInit }>();
   /** thread.* calls, for GET /__mock/thread/calls. */
@@ -262,6 +268,7 @@ export class MockThreads {
     this.logs.clear();
     this.mcp.clear();
     this.slash.clear();
+    this.agents.clear();
     this.calls = [];
     this.failRespond = "";
     this.generation++;
@@ -285,10 +292,72 @@ export class MockThreads {
   }
 
   /** ListItems' snapshot. */
-  snapshotValue(id: string): { sessionId: string; seq: bigint; items: ItemInit[]; pending: PendingInit[]; mcp?: McpStatusInit; commands: SlashCommandInit[] } {
+  snapshotValue(id: string): { sessionId: string; seq: bigint; items: ItemInit[]; pending: PendingInit[]; mcp?: McpStatusInit; commands: SlashCommandInit[]; agents: AgentRunInit[] } {
     this.world.worktreeOf(id);
     const l = this.log(id);
-    return { sessionId: id, seq: BigInt(l.seq), items: l.items, pending: l.pending, mcp: this.mcp.get(id), commands: this.slash.get(id) ?? [] };
+    return { sessionId: id, seq: BigInt(l.seq), items: l.items, pending: l.pending, mcp: this.mcp.get(id), commands: this.slash.get(id) ?? [], agents: this.agents.get(id) ?? [] };
+  }
+
+  /** The thread's subagent runs in spawn order ([] for none). Throws for an unknown thread. */
+  agentsOf(id: string): AgentRunInit[] {
+    this.world.worktreeOf(id);
+    return this.agents.get(id) ?? [];
+  }
+
+  /** The runs of a thread for its Session's counts (no check: the session may be going away). */
+  agentRunsOf(id: string): readonly AgentRunInit[] {
+    return this.agents.get(id) ?? [];
+  }
+
+  /** Replaces the thread's runs, publishes the Watch's `agents` event (the whole list) and the session's counts. */
+  setAgents(id: string, runs: AgentRunInit[]): void {
+    if (runs.length > 0) this.agents.set(id, runs);
+    else this.agents.delete(id);
+    const l = this.log(id);
+    l.seq++;
+    this.publish(id, { event: { case: "agents", value: { sessionId: id, seq: BigInt(l.seq), agents: runs } } });
+    this.world.agentsChanged(id);
+  }
+
+  /**
+   * POST /__mock/thread/agent-end: a running run ends like the daemon ends it. Its Agent
+   * call's item finishes with the report (or fails with the error), a background run's
+   * end adds the "Agent finished · …" note, then the list and the counts are published.
+   */
+  endAgent(id: string, runId: string, failed: boolean): void {
+    const runs = this.agentsOf(id);
+    const run = runs.find((r) => r.id === runId);
+    if (!run) throw new CommandError("notfound", `thread ${id} has no agent run ${runId}`);
+    if (run.status !== ThreadAgentStatus.RUNNING) throw new CommandError("invalid", `agent run ${runId} is not running`);
+    const now = new Date();
+    const report = END_REPORTS[runId] ?? "Done.";
+    const error = "Stopped: the agent was killed";
+    const started = run.resumedAt ?? run.startedAt;
+    const ended: AgentRunInit = {
+      ...run,
+      status: failed ? ThreadAgentStatus.FAILED : ThreadAgentStatus.DONE,
+      summary: failed ? "" : report,
+      error: failed ? error : "",
+      endedAt: timestampFromDate(now),
+      durationMs: started ? BigInt(now.getTime() - Number(started.seconds ?? 0n) * 1000) : (run.durationMs ?? 0n),
+    };
+    const call = this.log(id).items.find((x) => x.id === run.toolUseId);
+    if (call?.payload?.case === "toolCall") {
+      const out = failed ? error : report;
+      this.update(id, {
+        ...call,
+        updatedAt: timestampFromDate(now),
+        payload: { case: "toolCall", value: { ...call.payload.value, status: failed ? ToolCallStatus.ERROR : ToolCallStatus.DONE, isError: failed, output: out, resultJson: "" } },
+      } as ItemInit);
+    }
+    if (run.background) {
+      const note = this.append(id, this.item(id, { case: "note", value: { text: failed ? `Agent failed · ${run.description ?? ""} · ${error}` : `Agent finished · ${run.description ?? ""} · ${report}` } }));
+      ended.noteItemId = note.id ?? "";
+    }
+    this.setAgents(
+      id,
+      runs.map((r) => (r.id === runId ? ended : r)),
+    );
   }
 
   /** ThreadService.SlashCommands: the running thread's list ([] when none). Throws for an unknown thread. */
@@ -426,8 +495,11 @@ export class MockThreads {
       }
       this.setPending(id, []);
     }
+    // A background Agent call stays running until its run ends (mock/agents.ts endAgent); so do its run's calls.
+    const runs = this.agents.get(id) ?? [];
+    const live = new Set(runs.filter((r) => r.status === ThreadAgentStatus.RUNNING).map((r) => r.toolUseId ?? ""));
     for (const x of l.items) {
-      if (x.payload?.case === "toolCall" && x.payload.value.status === ToolCallStatus.RUNNING) {
+      if (x.payload?.case === "toolCall" && x.payload.value.status === ToolCallStatus.RUNNING && !live.has(x.id ?? "") && !live.has(x.parentToolUseId ?? "")) {
         this.update(id, { ...x, payload: { case: "toolCall", value: { ...x.payload.value, status: ToolCallStatus.ERROR, isError: true, output: "Interrupted" } } } as ItemInit);
       }
     }
@@ -578,6 +650,7 @@ export class MockThreads {
     // A scripted reply still running for the previous conversation stops.
     this.generation++;
     this.logs.delete(id);
+    this.agents.delete(id);
     // A running thread was checked at the start of its last turn; a closed or crashed one has none.
     if (loaded === "closed" || loaded === "crashed") {
       this.mcp.delete(id);
@@ -606,6 +679,15 @@ export class MockThreads {
       return it({ case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: ToolCallStatus.DONE, ...value } }, { id: toolUseId, ...over });
     };
     const cwd = this.world.worktreeOf(id);
+    if (state === "agents") {
+      // The agents panel sketch (mock/agents.ts): idle at its prompt, background runs going on.
+      const runs = scriptAgents({ cwd, it, tool });
+      this.agents.set(id, runs);
+      l.seq = l.items.length;
+      this.world.setStatus(id, SessionStatus.IDLE, "at prompt");
+      this.world.agentsChanged(id);
+      return;
+    }
     const p = (rel: string) => `${cwd}/${rel}`;
     const text = (t: string, over: Partial<ItemInit> & { at?: Date } = {}) => it({ case: "assistantText", value: { text: t } }, over);
     const read = (rel: string, lines: number, at: Date, parent = "") =>
@@ -852,6 +934,7 @@ export class MockThreads {
    */
   seed(id: string, h: SeedHistory): void {
     this.logs.delete(id);
+    this.agents.delete(id);
     if (h.end === "working" || h.end === "permission") {
       this.mcp.set(id, mcpFixture());
       this.slash.set(id, slashCommandsFixture());

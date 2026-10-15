@@ -28,7 +28,7 @@ class DaemonLog {
   private nextOrd = 1;
 
   snapshot(): ThreadEventView {
-    return { kind: "snapshot", sessionId: "s", seq: this.seq, items: this.items.map((it) => ({ ...it })), pending: [], mcp: null, commands: [] };
+    return { kind: "snapshot", sessionId: "s", seq: this.seq, items: this.items.map((it) => ({ ...it })), pending: [], mcp: null, commands: [], agents: [] };
   }
 
   append(id: string, streaming: boolean): ThreadEventView {

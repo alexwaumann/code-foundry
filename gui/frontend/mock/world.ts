@@ -24,6 +24,7 @@ import { MockUpdater } from "./update";
 import { pageUsage, retiredUsage, sampleUsage, usageFields, type MockUsage } from "./usage";
 import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
+import { agentCounts, agentsCommands } from "./agents";
 import { mcpCommands } from "./mcp";
 import { CRASH_STDERR, MockThreads, type SeedHistory, type ThreadState } from "./thread";
 import { contextFields, recordResult, type MockContext } from "./context";
@@ -525,6 +526,10 @@ export class World {
         recordResult(s, model);
         this.publishSession(s);
       },
+      agentsChanged: (id) => {
+        const s = this.sessions.get(id);
+        if (s) this.publishSession(s);
+      },
     },
     (ev) => this.events.publish({ source: EventSource.THREAD, event: { event: { case: "thread", value: ev } } }),
   );
@@ -993,6 +998,7 @@ export class World {
       linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url, linkedAt: timestampFromDate(l.linkedAt) })),
       ...usageFields(s.usage),
       ...contextFields(s, this.cacheTTLSeconds()),
+      ...agentCounts(this.threads.agentRunsOf(s.id)),
       ...(s.retry ? { retry: { attempt: s.retry.attempt, maxRetries: s.retry.maxRetries, retryAt: timestampFromDate(s.retry.retryAt), errorStatus: s.retry.errorStatus, error: s.retry.error } } : {}),
     };
   }
@@ -1111,6 +1117,8 @@ export class World {
       retry: null,
     });
     this.threads.load(id, state);
+    // The agents panel sketch's thread (mock/agents.ts).
+    if (state === "agents") s.name = "Agents panel";
     if (state === "closed") this.disconnectSession(id, "closed", 0);
     if (state === "crashed") {
       // Before the handshake: no turn ran, so no status to keep.
@@ -1997,6 +2005,7 @@ export class World {
       ...viewCommands((i) => this.emit(i)),
       ...this.threads.commands(),
       ...mcpCommands(this.threads, (i) => this.emit(i)),
+      ...agentsCommands(this.threads, (i) => this.emit(i)),
       {
         cmd: {
           name: "terminal.new",

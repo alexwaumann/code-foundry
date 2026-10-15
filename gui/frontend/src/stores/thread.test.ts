@@ -25,7 +25,7 @@ function tool(id: string, ordinal: number, input = ""): ThreadItemView {
   return { id, ordinal, parentToolUseId: "", createdAtMs: 1, updatedAtMs: 1, streaming: true, kind: "tool", toolUseId: id, name: "Bash", inputJson: input, status: "running", output: "", isError: false, resultJson: "" };
 }
 const pend = (requestId: string): ThreadPendingView => ({ requestId, itemId: `perm-${requestId}`, question: false, toolName: "Bash", summary: "Bash ls" });
-const snapshot = (seq: number, items: ThreadItemView[], pending: ThreadPendingView[] = []): ThreadEventView => ({ kind: "snapshot", sessionId: "s", seq, items, pending, mcp: null, commands: [] });
+const snapshot = (seq: number, items: ThreadItemView[], pending: ThreadPendingView[] = []): ThreadEventView => ({ kind: "snapshot", sessionId: "s", seq, items, pending, mcp: null, commands: [], agents: [] });
 
 function apply(log: ThreadLog | undefined, ...evs: ThreadEventView[]): ThreadLog | undefined {
   return evs.reduce(applyThreadEvent, log);

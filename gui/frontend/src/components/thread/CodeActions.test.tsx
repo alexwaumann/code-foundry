@@ -21,7 +21,7 @@ const terminalNew = (available: boolean): CommandView => ({ name: "terminal.new"
 /** A thread `s` with these items, rendered as the timeline renders them, inside `.cf-thread`. */
 function show(items: ThreadItemView[]): HTMLElement {
   const byId = Object.fromEntries(items.map((it) => [it.id, it]));
-  useThreadStore.setState({ logs: { s: { seq: 1, byId, order: items.map((it) => it.id), pending: [], mcp: null, commands: [] } } });
+  useThreadStore.setState({ logs: { s: { seq: 1, byId, order: items.map((it) => it.id), pending: [], mcp: null, commands: [], agents: [] } } });
   const rows = buildRows(buildTurns(items.map((it) => decodeTimelineKey(timelineKey(structOf(it))))), { fold: () => undefined, working: false });
   return render(
     <div className="cf-thread">

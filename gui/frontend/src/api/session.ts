@@ -120,6 +120,13 @@ export interface SessionView {
   /** What re-reading contextTokens costs once the cache expired, USD; 0 when unpriced. */
   contextRereadUsd: number;
   /**
+   * Subagent runs running now, nested ones included, and the thread's own background runs
+   * among them (spawn depth 1), which keep running after its turn ends
+   * (docs/notes/agents-1-daemon.md). The runs in detail: the thread log's `agents`.
+   */
+  agentsRunning: number;
+  backgroundAgentsRunning: number;
+  /**
    * Claude waits to retry a failed API request (a 429, a 529, a 5xx, a connection
    * error); null otherwise. docs/notes/api-retry-note.md.
    */
@@ -277,6 +284,8 @@ export function toSessionView(s: Session): SessionView {
     contextTokens: Number(s.contextTokens),
     cacheExpiresAtMs: s.cacheExpiresAt ? timestampMs(s.cacheExpiresAt) : null,
     contextRereadUsd: s.contextRereadUsd,
+    agentsRunning: s.agentsRunning,
+    backgroundAgentsRunning: s.backgroundAgentsRunning,
     retry: s.retry
       ? { attempt: s.retry.attempt, maxRetries: s.retry.maxRetries, retryAtMs: s.retry.retryAt ? timestampMs(s.retry.retryAt) : 0, errorStatus: s.retry.errorStatus, error: s.retry.error }
       : null,

@@ -15,9 +15,11 @@ import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { runStream, type StreamStatus } from "@/api/stream";
+import type { AgentRunView } from "@/api/agents";
 import type { McpStatusView } from "@/api/mcp";
 import { shareCommands, type SlashCommandView } from "@/api/slashCommands";
 import { watchThread, type ThreadEventView, type ThreadItemView, type ThreadPendingListView, type ThreadPendingView } from "@/api/thread";
+import { shareAgents } from "@/lib/agents";
 import { shareMcp } from "@/lib/mcp";
 import { timelineKey } from "@/lib/threadTimeline";
 
@@ -36,6 +38,11 @@ export interface ThreadLog {
    * in Claude's order; empty when it is not running (or the daemon predates the list).
    */
   commands: readonly SlashCommandView[];
+  /**
+   * Its subagent runs in spawn order (docs/notes/agents-1-daemon.md), unchanged runs kept
+   * by identity (lib/agents shareAgents); empty when it never ran one.
+   */
+  agents: readonly AgentRunView[];
 }
 
 export interface ThreadState {
@@ -95,6 +102,7 @@ function byOrdinal(byId: Readonly<Record<string, ThreadItemView>>): string[] {
 }
 
 const NO_COMMANDS: readonly SlashCommandView[] = [];
+const NO_AGENTS: readonly AgentRunView[] = [];
 
 /** A snapshot over the previous log, keeping unchanged items (and arrays) by identity. */
 function replaceLog(
@@ -104,6 +112,7 @@ function replaceLog(
   pending: readonly ThreadPendingView[],
   mcp: McpStatusView | null,
   commands: readonly SlashCommandView[],
+  agents: readonly AgentRunView[],
 ): ThreadLog {
   const byId: Record<string, ThreadItemView> = {};
   for (const it of items) {
@@ -118,6 +127,7 @@ function replaceLog(
     pending: prev && samePending(prev.pending, pending) ? prev.pending : pending,
     mcp: shareMcp(prev?.mcp ?? null, mcp),
     commands: shareCommands(prev?.commands ?? NO_COMMANDS, commands),
+    agents: shareAgents(prev?.agents ?? NO_AGENTS, agents),
   };
 }
 
@@ -137,7 +147,7 @@ function putItem(log: ThreadLog, it: ThreadItemView, seq: number): ThreadLog {
  */
 export function applyThreadEvent(log: ThreadLog | undefined, ev: ThreadEventView): ThreadLog | undefined {
   if (ev.kind === "pendingSnapshot") return log;
-  if (ev.kind === "snapshot") return replaceLog(log, ev.seq, ev.items, ev.pending, ev.mcp, ev.commands);
+  if (ev.kind === "snapshot") return replaceLog(log, ev.seq, ev.items, ev.pending, ev.mcp, ev.commands, ev.agents);
   if (!log || ev.seq <= log.seq) return log;
   switch (ev.kind) {
     case "appended":
@@ -158,6 +168,8 @@ export function applyThreadEvent(log: ThreadLog | undefined, ev: ThreadEventView
       return { ...log, seq: ev.seq, mcp: shareMcp(log.mcp, ev.status) };
     case "commands":
       return { ...log, seq: ev.seq, commands: shareCommands(log.commands, ev.commands) };
+    case "agents":
+      return { ...log, seq: ev.seq, agents: shareAgents(log.agents, ev.agents) };
   }
 }
 

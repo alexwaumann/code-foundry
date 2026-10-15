@@ -1,0 +1,156 @@
+/* Agents panel sketch: additions over ../mcp-panel/style.css (panel chrome, cards, rows). */
+
+/* ---------- thread: agent rows ---------- */
+.thread .row .ico{width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex:none}
+.thread .row .ico svg{width:14px;height:14px}
+.thread .row .chip.bg{color:var(--muted-fg);border-color:color-mix(in oklab,var(--muted-fg) 40%,transparent)}
+.thread .row .chip.fail{color:var(--red);border-color:color-mix(in oklab,var(--red) 35%,transparent)}
+.thread .row .act{color:var(--muted-fg);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.thread .row .act::before{content:"· ";opacity:.6}
+.thread .row .spin{color:var(--sky);width:14px;height:14px}
+.thread .children{margin:0 0 4px 12px;padding-left:16px;border-left:1px solid color-mix(in oklab,var(--fg) 14%,transparent)}
+.thread .children .row{height:24px}
+.thread .subresult{font-size:12.5px;line-height:1.5;color:var(--muted-fg);padding:2px 2px 6px 30px}
+.thread .note{display:flex;align-items:center;gap:8px;color:var(--muted-fg);font-size:12.5px;padding:2px 0}
+.thread .note svg{width:14px;height:14px;color:var(--emerald)}
+.thread .note .nm{color:var(--fg)}
+.thread .note .sum{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.thread .working{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted-fg);height:24px}
+.thread .working svg{width:14px;height:14px;color:var(--sky)}
+.thread .working .link{margin-left:auto;font-size:12px;color:var(--muted-fg);display:flex;align-items:center;gap:4px}
+.thread .working .link svg{width:12px;height:12px;color:var(--muted-fg)}
+.thread .bubble.two{margin-top:6px}
+
+/* option: header chip */
+.phdr .acts .agents{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;color:var(--sky);padding:0 6px;height:24px;border-radius:6px;font-variant-numeric:tabular-nums}
+.phdr .acts .agents svg{width:14px;height:14px}
+.phdr .acts .agents .spin{width:12px;height:12px}
+
+/* option: strip above the composer */
+.strip-agents{margin:0 40px 8px;border:1px solid color-mix(in oklab,var(--sky) 35%,transparent);background:color-mix(in oklab,var(--sky) 7%,transparent);border-radius:10px;padding:7px 12px;display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--fg)}
+.strip-agents svg{width:14px;height:14px;color:var(--sky)}
+.strip-agents .t{font-weight:500}
+.strip-agents .d{color:var(--muted-fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.strip-agents .show{margin-left:auto;color:var(--sky);font-weight:500;white-space:nowrap;display:flex;align-items:center;gap:4px}
+.strip-agents .show svg{width:12px;height:12px}
+.dock.tight{padding-top:8px}
+
+/* sidebar line 2 */
+.trow .s .t-sky svg{width:10px;height:10px;vertical-align:-1px;margin-right:2px}
+
+/* ---------- panel: shared ---------- */
+.shdr h2 svg{color:var(--sky)}
+.ag-dot{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block}
+.ag-dot.run{background:var(--sky)}
+.ag-dot.ok{background:var(--emerald-500)}
+.ag-dot.bad{background:var(--red-500)}
+.ag-dot.wait{background:transparent;border:1.5px solid var(--muted-fg);opacity:.6}
+.pill.run{background:color-mix(in oklab,var(--sky) 15%,transparent);color:var(--sky)}
+.pill.bgk{background:var(--muted);color:var(--muted-fg)}
+.stat{display:flex;align-items:center;gap:4px;color:var(--muted-fg);font-size:11.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stat svg{width:12px;height:12px}
+.stats{display:flex;gap:12px;flex:none}
+.actline{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fg);min-width:0}
+.actline svg{width:13px;height:13px;color:var(--muted-fg);flex:none}
+.actline .shimmer{background:linear-gradient(90deg,var(--muted-fg) 0%,var(--fg) 50%,var(--muted-fg) 100%);background-size:200% 100%;-webkit-background-clip:text;color:transparent;animation:sh 2s linear infinite;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.actline .tl{font-family:var(--font-mono);font-size:11px;color:var(--muted-fg);flex:none}
+.summ{font-size:12px;line-height:1.45;color:var(--muted-fg);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.summ code{font-family:var(--font-mono);font-size:11px}
+.kind{display:inline-flex;align-items:center;gap:4px}
+.kind svg{width:12px;height:12px}
+.nested-mark{color:var(--muted-fg);font-size:11px;display:inline-flex;align-items:center;gap:3px}
+.nested-mark svg{width:11px;height:11px}
+.ghost{color:var(--muted-fg);opacity:.75}
+
+/* ---------- variant A: grouped two-line rows ---------- */
+.va .grp{padding:4px 8px 2px}
+.va .gh{display:flex;align-items:center;gap:6px;padding:8px 8px 4px;font-size:11px;letter-spacing:.06em;color:var(--muted-fg);text-transform:uppercase}
+.va .gh .n{font-weight:400;letter-spacing:0;font-variant-numeric:tabular-nums}
+.va .gh.run{color:var(--sky)}
+.va .arow{display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-radius:7px;font-size:13px}
+.va .arow:hover{background:var(--hover)}
+.va .arow>.ag-dot,.va .arow>.spin{margin-top:6px}
+.va .arow>.spin{width:12px;height:12px;color:var(--sky);flex:none}
+.va .arow .txt{display:flex;flex-direction:column;min-width:0;gap:2px;flex:1}
+.va .arow .name{font-weight:500;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.va .arow .line2{font-size:12px;color:var(--muted-fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;gap:6px}
+.va .arow .line2 .sep{opacity:.5}
+.va .arow .right{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none;padding-top:1px}
+.va .arow.depth2{padding-left:28px}
+.va .arow.depth2 .name::before{content:"↳";color:var(--muted-fg);font-weight:400;margin-right:2px}
+.va .arow.done .name{font-weight:450}
+
+/* ---------- variant B: cards ---------- */
+.vb .cards{padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.vb .card{border:1px solid var(--border);border-radius:10px;padding:10px 12px 9px;display:flex;flex-direction:column;gap:6px}
+.vb .card.run{border-color:color-mix(in oklab,var(--sky) 35%,transparent)}
+.vb .card.bad{border-color:color-mix(in oklab,var(--red-500) 35%,transparent)}
+.vb .card.done{opacity:.85}
+.vb .card .top{display:flex;align-items:center;gap:8px;font-size:13px}
+.vb .card .top .name{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vb .card .top .pill{margin-left:auto}
+.vb .card .top .spin{width:12px;height:12px;color:var(--sky);flex:none}
+.vb .card .meta{display:flex;align-items:center;gap:6px;color:var(--muted-fg);font-size:12px;flex-wrap:wrap}
+.vb .card .meta .sep{opacity:.5}
+.vb .card .foot{display:flex;align-items:center;gap:12px;margin-top:2px}
+.vb .card .foot .reveal{margin-left:auto}
+.vb .card.depth2{margin-left:18px;position:relative}
+.vb .card.depth2::before{content:"";position:absolute;left:-12px;top:-8px;bottom:50%;width:8px;border-left:1px solid var(--border);border-bottom:1px solid var(--border);border-bottom-left-radius:6px}
+.vb .sect{padding:10px 4px 2px;font-size:11px;letter-spacing:.06em;color:var(--muted-fg);text-transform:uppercase;display:flex;align-items:center;gap:6px}
+.vb .sect .n{letter-spacing:0;font-variant-numeric:tabular-nums}
+
+/* ---------- variant C: tree / timeline ---------- */
+.vc .tree{padding:8px 12px}
+.vc .trun{display:grid;grid-template-columns:18px 1fr auto;column-gap:8px;row-gap:3px;padding:6px 6px;border-radius:7px;align-items:start}
+.vc .trun:hover{background:var(--hover)}
+.vc .trun .ic{width:18px;height:18px;display:flex;align-items:center;justify-content:center}
+.vc .trun .ic svg{width:14px;height:14px;color:var(--muted-fg)}
+.vc .trun .ic .spin{color:var(--sky)}
+.vc .trun .ic .okc{color:var(--emerald)}
+.vc .trun .ic .badc{color:var(--red)}
+.vc .trun .name{font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.vc .trun .right{display:flex;gap:10px;flex:none}
+.vc .trun .sub{grid-column:2/4;display:flex;flex-direction:column;gap:3px;min-width:0}
+.vc .trun .meta{font-size:12px;color:var(--muted-fg);display:flex;gap:6px}
+.vc .trun .meta .sep{opacity:.5}
+.vc .trun.d2{margin-left:22px;position:relative}
+.vc .trun.d2::before{content:"";position:absolute;left:-13px;top:-6px;height:22px;width:9px;border-left:1px solid var(--border);border-bottom:1px solid var(--border);border-bottom-left-radius:6px}
+.vc .bar{height:3px;border-radius:2px;background:var(--muted);overflow:hidden;margin-top:2px;width:100%}
+.vc .bar i{display:block;height:100%;background:var(--sky);width:40%;animation:ind 1.6s ease-in-out infinite}
+@keyframes ind{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
+.vc .divider{height:1px;background:var(--border);margin:8px 0}
+.vc .gh{display:flex;align-items:center;gap:6px;padding:6px 6px 4px;font-size:11px;letter-spacing:.06em;color:var(--muted-fg);text-transform:uppercase}
+.vc .gh .n{letter-spacing:0;font-variant-numeric:tabular-nums}
+.vc .turn{font-size:11px;color:var(--muted-fg);padding:8px 6px 2px;display:flex;align-items:center;gap:6px}
+.vc .turn::after{content:"";flex:1;height:1px;background:var(--border)}
+.thread .note>span{white-space:nowrap;flex:none}
+.thread .note .sum{flex:1;min-width:0}
+.thread .note .nm+.ghost{opacity:.5}
+.vc .trun{grid-template-columns:18px 1fr}
+.vc .trun .right{display:none}
+.vc .trun .meta .stats{margin-left:auto}
+.vc .trun .meta .stats{margin-left:0}
+.vc .trun .meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- variants L1 / L2: flat list in spawn order, edge-to-edge separators ---------- */
+.vl1 .list,.vl2 .list{display:flex;flex-direction:column}
+.vl1 .lrow,.vl2 .lrow{display:flex;flex-direction:column;gap:3px;padding:9px 16px 10px;border-bottom:1px solid var(--pane-border)}
+.vl1 .lrow:hover,.vl2 .lrow:hover{background:var(--hover)}
+.vl1 .lrow.d2,.vl2 .lrow.d2{padding-left:36px;position:relative}
+.vl1 .lrow.d2::before,.vl2 .lrow.d2::before{content:"";position:absolute;left:21px;top:0;height:20px;width:8px;border-left:1px solid var(--border);border-bottom:1px solid var(--border);border-bottom-left-radius:6px}
+.lrow .top{display:flex;align-items:center;gap:8px;font-size:13px;min-width:0}
+.lrow .top .spin{width:12px;height:12px;color:var(--sky);flex:none}
+.lrow .top .name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.lrow .top .st{flex:none;font-size:11.5px;color:var(--muted-fg);font-variant-numeric:tabular-nums}
+.lrow .top .st.run{color:var(--sky)}
+.lrow .top .st.bad{color:var(--red)}
+.lrow .top .st.ok{color:var(--emerald)}
+.lrow .meta{display:flex;align-items:center;gap:6px;color:var(--muted-fg);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:20px}
+.lrow .meta .sep{opacity:.5}
+.lrow .meta .stats{margin-left:auto}
+.lrow .actline,.lrow .summ,.lrow .err{margin-left:20px}
+.lrow.done .name{font-weight:450}
+/* L2: compact, one meta line carrying the stats on the right */
+.vl2 .lrow{padding:7px 16px 8px}
+.vl2 .lrow .meta>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.vl2 .lrow .meta .stats{flex:none}
