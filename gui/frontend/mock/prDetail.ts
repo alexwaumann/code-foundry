@@ -1,7 +1,8 @@
 /**
  * Mock GhService pull request detail panel: GetPullRequestDetail, ListReviewerCandidates,
- * SetReviewRequest, RevertPullRequest, MergePullRequest. Two rich fixtures on
- * alexwaumann/code-foundry, and the mergeable one:
+ * SetReviewRequest, RevertPullRequest, MergePullRequest, SubmitPullRequestReview,
+ * AddPullRequestComment. Two rich fixtures on alexwaumann/code-foundry, and the
+ * mergeable one:
  *
  *   #145 open, draft, failing, in-progress and queued checks, changes requested by a
  *        reviewer who is stale and re-requested, a team and a user pending, a bot
@@ -16,18 +17,25 @@
  *        merge flips it to merged (it moves to the dashboard's recently merged)
  *   #146 open from a fork (outside-contrib:patch-1), approved, mergeable, the viewer an
  *        admin: merging never deletes its branch
+ *   #139 teammate-kim's, awaiting the viewer's review (requested), the viewer has write
+ *        access: the Review menu's main fixture
  *
  * #131, #140 and #146 are on no dashboard: open them by number. Every other pull request the
  * dashboards or branches list gets a minimal detail built from its summary, so any row
  * the GUI shows can open the panel.
  *
- * The panel's actions are commands (pr.revert, pr.merge, pr.review.request, pr.refresh;
- * see commands()), like the daemon's; the RPCs they wrap are served too. Every open pull
+ * The panel's actions are commands (pr.revert, pr.merge, pr.review.request, pr.review,
+ * pr.comment, pr.refresh; see commands()), like the daemon's; the RPCs they wrap are served too. Every open pull
  * request allows all three merge methods; every repository's default branch is main.
  * pr.merge refuses a head-sha other than the fixture's head. pr.refresh answers
  * with the detail (protojson), as the daemon does. POST /__mock/gh/pr-fail?command=pr.refresh
  * makes that command's next run fail (UNAVAILABLE, like a refresh GitHub refused);
- * ?command=pr.merge fails the next merge like a moved head (FAILED_PRECONDITION).
+ * ?command=pr.merge fails the next merge like a moved head (FAILED_PRECONDITION);
+ * ?command=pr.review fails the next review as unconfirmed (UNAVAILABLE; the same text
+ * then gets that error for 2 minutes, like the daemon's write memo). A review or comment is posted as the viewer: it joins the comments, the viewer's
+ * reviewer entry takes the review's state (its request is answered), and updated_at
+ * moves. Approving or requesting changes on the viewer's own pull request is refused
+ * with GitHub's message, as the daemon relays it (FAILED_PRECONDITION).
  */
 import { create, toJson, type MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate, type Timestamp } from "@bufbuild/protobuf/wkt";
@@ -39,6 +47,7 @@ import {
   CheckStatus,
   DiffSide,
   PullRequestCommentKind,
+  PullRequestReviewEvent,
   PullRequestReviewState,
   PullRequestState,
   ReviewDecision,
@@ -46,6 +55,8 @@ import {
   type GhEventSchema,
   PullRequestDetailSchema,
   PullRequestMergeMethod,
+  AddPullRequestCommentResponseSchema,
+  SubmitPullRequestReviewResponseSchema,
   MergeStateStatus,
   Mergeable,
   type ReviewerCandidateSchema,
@@ -107,6 +118,37 @@ const ALL_METHODS = [PullRequestMergeMethod.MERGE, PullRequestMergeMethod.SQUASH
 const methodNames: Record<string, PullRequestMergeMethod> = { merge: PullRequestMergeMethod.MERGE, squash: PullRequestMergeMethod.SQUASH, rebase: PullRequestMergeMethod.REBASE };
 const methodWords: Record<string, string> = { merge: "a merge commit", squash: "squash", rebase: "rebase" };
 
+/** pr.review's verdicts: the event, the state the review gets, and the daemon's message ("Approved #N"). */
+const reviewVerdicts: Record<string, { event: PullRequestReviewEvent; done: string }> = {
+  approve: { event: PullRequestReviewEvent.APPROVE, done: "Approved #%d" },
+  "request-changes": { event: PullRequestReviewEvent.REQUEST_CHANGES, done: "Requested changes on #%d" },
+  comment: { event: PullRequestReviewEvent.COMMENT, done: "Commented on #%d (review)" },
+};
+const reviewStates: Partial<Record<PullRequestReviewEvent, PullRequestReviewState>> = {
+  [PullRequestReviewEvent.APPROVE]: PullRequestReviewState.APPROVED,
+  [PullRequestReviewEvent.REQUEST_CHANGES]: PullRequestReviewState.CHANGES_REQUESTED,
+  [PullRequestReviewEvent.COMMENT]: PullRequestReviewState.COMMENTED,
+};
+/** GitHub's refusals on the viewer's own pull request (UNPROCESSABLE), as the daemon relays them. */
+const ownRefusals: Partial<Record<PullRequestReviewEvent, string>> = {
+  [PullRequestReviewEvent.APPROVE]: "Review Can not approve your own pull request",
+  [PullRequestReviewEvent.REQUEST_CHANGES]: "Review Can not request changes on your own pull request",
+};
+/** GitHub's body limit in characters (gh.MaxCommentChars). */
+const MAX_COMMENT_CHARS = 65536;
+/** How long the daemon remembers a review or comment write's outcome (gh's writeMemoTTL). */
+const WRITE_MEMO_TTL_MS = 2 * 60_000;
+
+/** The daemon's body check (gh.NormalizeReview, gh.NormalizeComment): trimmed, required unless optional, at most 65536 characters. */
+function normalizeBody(body: string, required: boolean): string {
+  const b = body.trim();
+  if (required && b === "") throw new PrDetailError("invalid_argument", "invalid argument: a body is required");
+  // Code points, as Go's utf8.RuneCountInString counts them.
+  const n = Array.from(b).length;
+  if (n > MAX_COMMENT_CHARS) throw new PrDetailError("invalid_argument", `invalid argument: the body is ${String(n)} characters, GitHub accepts at most ${String(MAX_COMMENT_CHARS)}`);
+  return b;
+}
+
 /** MergePullRequestResponse, as JSON (the command's result) and the RPC's answer. */
 interface MergeOut {
   merged: boolean;
@@ -161,10 +203,12 @@ export class PrDetailWorld {
   private readonly candidates = new Map<string, CandidateInit[]>();
   private readonly reverts = new Map<string, { number: number; url: string }>();
   private readonly merges = new Map<string, { res: MergeOut; deleteAsked: boolean }>();
+  /** Review and comment outcomes by write (pull request, kind, trimmed text), like the daemon's write memos. */
+  private readonly writeMemos = new Map<string, { at: number; result?: unknown; error?: ConnectError }>();
   private nextNumber = 151;
   /** Commands whose next run fails (POST /__mock/gh/pr-fail?command=…). */
   readonly failNext = new Set<string>();
-  /** How long pr.ask, pr.explain, pr.fix.findings and pr.merge take (POST /__mock/gh/pr-delay?ms=…). */
+  /** How long pr.ask, pr.explain, pr.fix.findings, pr.merge and pr.review take (POST /__mock/gh/pr-delay?ms=…). */
   sessionDelayMs = 0;
 
   constructor(private readonly h: PrDetailHooks) {
@@ -178,6 +222,16 @@ export class PrDetailWorld {
     // #147: the viewer's open pull request whose checks fail, on no dashboard (the
     // Linked PRs surface's fixtures link it with /__mock/link-pr).
     this.details.set(key(CF, 147), this.linkedDetail());
+    // #139: a teammate's pull request awaiting the viewer's review, in a repository the
+    // viewer can write to (the summary-built detail would be read-only).
+    const kim = h.findPr(CF, 139);
+    if (kim) {
+      const d = this.fromSummary(kim);
+      d.reviewers = [{ login: h.viewer, requested: true, avatarUrl: avatar(h.viewer) }];
+      d.viewerCanUpdate = true;
+      d.viewerPermission = "write";
+      this.details.set(key(CF, 139), d);
+    }
     for (const d of this.details.values()) d.defaultBranch = "main";
     this.candidates.set(key(CF, 145), [
       { id: "T_core", kind: ReviewerKind.TEAM, login: "acme/core", name: "Core", avatarUrl: avatar("acme/core"), isRequested: true },
@@ -686,6 +740,48 @@ export class PrDetailWorld {
       },
       {
         cmd: {
+          name: "pr.review",
+          title: "Review Pull Request",
+          category: "Pull Request",
+          description: "Submit a review on a pull request: approve, request changes, or comment (a body is required for the last two).",
+          keybindings: [],
+          args: [
+            slugArg,
+            numberArg,
+            { name: "verdict", type: ArgType.ENUM, required: true, description: "The review: approve, request-changes, or comment", enumValues: ["approve", "request-changes", "comment"] },
+            { name: "body", type: ArgType.STRING, required: false, positional: true, description: "The review's text (Markdown); required for request-changes and comment" },
+          ],
+        },
+        when: always,
+        run: async (_ctx: UiContext | undefined, args: Record<string, string>) => {
+          const [slug, n] = target(args);
+          const v = reviewVerdicts[args.verdict ?? ""];
+          if (!v) throw new ConnectError("verdict must be approve, request-changes, or comment", Code.InvalidArgument);
+          if (this.sessionDelayMs > 0) await new Promise((r) => setTimeout(r, this.sessionDelayMs));
+          // Like the daemon's command: the body as typed; the write checks it.
+          const r = prDetailCall(() => this.submitReview(slug, n, v.event, args.body ?? "", this.failNext.delete("pr.review")));
+          // The daemon's result is protojson of the response.
+          return out(v.done.replace("%d", String(n)), toJson(SubmitPullRequestReviewResponseSchema, create(SubmitPullRequestReviewResponseSchema, r)));
+        },
+      },
+      {
+        cmd: {
+          name: "pr.comment",
+          title: "Comment on Pull Request",
+          category: "Pull Request",
+          description: "Post a comment on a pull request's conversation (not a review).",
+          keybindings: [],
+          args: [slugArg, numberArg, { name: "body", type: ArgType.STRING, required: true, positional: true, description: "The comment's text (Markdown)" }],
+        },
+        when: always,
+        run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
+          const [slug, n] = target(args);
+          const r = prDetailCall(() => this.postComment(slug, n, args.body ?? ""));
+          return out(`Commented on #${String(n)}`, toJson(AddPullRequestCommentResponseSchema, create(AddPullRequestCommentResponseSchema, r)));
+        },
+      },
+      {
+        cmd: {
           name: "pr.refresh",
           title: "Refresh Pull Request",
           category: "Pull Request",
@@ -801,6 +897,97 @@ export class PrDetailWorld {
     this.merges.set(k, { res, deleteAsked: deleteBranch });
     this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
     return res;
+  }
+
+  /**
+   * Submits a review as the viewer (SubmitPullRequestReview, pr.review): the body is
+   * checked like the daemon's; approving or requesting changes on the viewer's own pull
+   * request is refused with GitHub's message. The review joins the comments, the viewer's
+   * reviewer entry takes its state (a pending request is answered), and it is announced.
+   */
+  submitReview(slug: string, number: number, event: PullRequestReviewEvent, body: string, unconfirmed = false) {
+    this.h.count("SubmitPullRequestReview");
+    const state = reviewStates[event];
+    if (state === undefined) throw new PrDetailError("invalid_argument", "event is required: approve, request changes, or comment");
+    const b = normalizeBody(body, event !== PullRequestReviewEvent.APPROVE);
+    return this.once(`${key(slug, number)}|review|${PullRequestReviewEvent[event]}|${b}`, "review", number, unconfirmed, () => this.postReview(slug, number, event, state, b));
+  }
+
+  private postReview(slug: string, number: number, event: PullRequestReviewEvent, state: PullRequestReviewState, b: string) {
+    const d = this.detailOf(slug, number);
+    const pr = d.pullRequest;
+    const refusal = ownRefusals[event];
+    if (refusal && pr?.author === this.h.viewer) {
+      // GitHub refused: the daemon invalidates the detail anyway (it may have changed).
+      this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
+      throw new PrDetailError("failed_precondition", `failed precondition: ${refusal}`);
+    }
+    const now = timestampFromDate(new Date());
+    const id = `PRR_mock_${String(number)}_${String((d.comments ?? []).length + 1)}`;
+    const url = `https://github.com/${slug}/pull/${String(number)}#pullrequestreview-${id}`;
+    d.comments = [...(d.comments ?? []), { id, kind: PullRequestCommentKind.REVIEW, author: this.h.viewer, authorAvatarUrl: avatar(this.h.viewer), body: b, createdAt: now, url, reviewState: state }];
+    // Requested first, then the most recent review first: the viewer leads the reviewed.
+    const rest = (d.reviewers ?? []).filter((r) => r.login !== this.h.viewer);
+    const requested = rest.filter((r) => r.requested);
+    const reviewed = rest.filter((r) => !r.requested);
+    d.reviewers = [...requested, { login: this.h.viewer, state, submittedAt: now, requested: false, stale: false, avatarUrl: avatar(this.h.viewer) }, ...reviewed];
+    const cand = this.candidates.get(key(slug, number))?.find((c) => c.login === this.h.viewer);
+    if (cand) cand.isRequested = false;
+    this.touch(d, now);
+    this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
+    return { id, url, state, author: this.h.viewer, submittedAt: now };
+  }
+
+  /** Posts an issue comment as the viewer (AddPullRequestComment, pr.comment) and announces it. */
+  postComment(slug: string, number: number, body: string) {
+    this.h.count("AddPullRequestComment");
+    const b = normalizeBody(body, true);
+    return this.once(`${key(slug, number)}|comment|${b}`, "comment", number, false, () => this.appendComment(slug, number, b));
+  }
+
+  /**
+   * The daemon's write memo: the same write (pull request, kind, trimmed text) within 2
+   * minutes answers with the first one's result, or its error when GitHub never
+   * confirmed it (unconfirmed: POST /__mock/gh/pr-fail?command=pr.review). Refusals
+   * are not remembered: nothing was posted.
+   */
+  private once<T>(k: string, what: string, number: number, unconfirmed: boolean, post: () => T): T {
+    const now = Date.now();
+    const m = this.writeMemos.get(k);
+    if (m && now - m.at < WRITE_MEMO_TTL_MS) {
+      if (m.error) throw m.error;
+      return m.result as T;
+    }
+    if (unconfirmed) {
+      const until = new Date(now + WRITE_MEMO_TTL_MS).toTimeString().slice(0, 8);
+      const error = new ConnectError(
+        `pull request #${String(number)}: GitHub did not confirm the ${what}, and it may have been posted; check GitHub before trying again (until ${until} the same ${what} returns this error): github graphql: 502 Bad Gateway`,
+        Code.Unavailable,
+      );
+      this.writeMemos.set(k, { at: now, error });
+      throw error;
+    }
+    const result = post();
+    this.writeMemos.set(k, { at: now, result });
+    return result;
+  }
+
+  private appendComment(slug: string, number: number, b: string) {
+    const d = this.detailOf(slug, number);
+    const now = timestampFromDate(new Date());
+    const id = `IC_mock_${String(number)}_${String((d.comments ?? []).length + 1)}`;
+    const url = `https://github.com/${slug}/pull/${String(number)}#issuecomment-${id}`;
+    d.comments = [...(d.comments ?? []), { id, kind: PullRequestCommentKind.ISSUE_COMMENT, author: this.h.viewer, authorAvatarUrl: avatar(this.h.viewer), body: b, createdAt: now, url }];
+    this.touch(d, now);
+    this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
+    return { id, url, createdAt: now };
+  }
+
+  /** The pull request moved on GitHub: updated_at, and the detail was fetched just now. */
+  private touch(d: DetailInit, now: Timestamp): void {
+    // In place, like merge: a summary-built detail shares the dashboards' row.
+    if (d.pullRequest) d.pullRequest.updatedAt = now;
+    d.fetchedAt = now;
   }
 
   /** A poll saw the pull request change: a new comment, announced like the daemon does. */
