@@ -5,6 +5,7 @@ import { openExternal } from "@/api/app";
 import type { UpdateStatusView } from "@/api/update";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 import { formatAgo, restartCutsOff } from "@/lib/session";
 import { busyHeading, cutOffLabel, displayVersion, failureHeadline, updateView, type UpdateVariant, type UpdateView } from "@/lib/update";
 import { cn } from "@/lib/utils";
@@ -99,13 +100,6 @@ function Meta({ items, lead }: { items: ReactNode[]; lead: string }) {
   );
 }
 
-function ProgressBar({ className }: { className?: string }) {
-  return (
-    <div className={cn("h-1 overflow-hidden rounded-sm bg-foreground/10", className)} role="progressbar" aria-busy>
-      <div className="h-full w-1/3 animate-[cf-indeterminate_1.4s_ease-in-out_infinite] rounded-sm bg-foreground" />
-    </div>
-  );
-}
 
 /** One thread a restart would cut off: its name, and what it loses (cutOffLabel). */
 function BusyThread({ id }: { id: string }) {
@@ -193,13 +187,13 @@ function Body({ st, v }: { st: UpdateStatusView; v: UpdateView }) {
       {v.variant === "failed" && <Failure reason={st.failureReason} />}
       {v.variant === "installing" && (
         <>
-          <ProgressBar className="mt-[18px]" />
+          <Progress className="mt-[18px] h-1" aria-label="Installing the update" data-testid="update-progress-bar" />
           <p className="mt-[7px] truncate text-left font-mono text-[11.5px] text-muted-foreground" data-testid="update-progress">
             {st.progress}
           </p>
         </>
       )}
-      {v.variant === "restarting" && <ProgressBar className="mt-4" />}
+      {v.variant === "restarting" && <Progress className="mt-4 h-1" aria-label="Restarting" data-testid="update-progress-bar" />}
       {checkError && (
         <p className="mt-3 text-[11.5px] text-warning" data-testid="update-check-error">
           Last check failed: {checkError}
