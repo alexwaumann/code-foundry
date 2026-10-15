@@ -207,10 +207,16 @@ func (r *runner) onRestarted() {
 	r.maybeRestart()
 }
 
-// failHeld answers sends held by a restart that will not complete.
+// failHeld answers sends held by a restart that will not complete (it failed, the
+// thread is closing, the daemon stops) with errProcessGone: Send then waits for this
+// process to end and starts the thread with the message as its first prompt, so the
+// message is not lost (or, while the daemon stops, gets ErrClosed).
 func (r *runner) failHeld(why string) {
+	if len(r.st.held) > 0 {
+		r.log().info("sends held by the effort restart go to the next process", "why", why, "sends", len(r.st.held))
+	}
 	for _, cmd := range r.st.held {
-		cmd.reply <- threadReply{err: fmt.Errorf("%w: %s", ErrFailedPrecondition, why)}
+		cmd.reply <- threadReply{err: errProcessGone}
 	}
 	r.st.held = nil
 }
