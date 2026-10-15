@@ -59,6 +59,30 @@ describe("ActionDialog", () => {
     expect(document.activeElement).toBe(screen.getByTestId("action-delete"));
   });
 
+  // WebKit does not focus a button on click: after clicking an icon tile or the switch, the
+  // keyboard is on the dialog's content (outside the form), and Cmd+Enter must still save.
+  it.each([
+    ["the dialog's content", () => screen.getByTestId("action-dialog")],
+    ["an icon tile", () => screen.getAllByTestId("action-icon")[2] as HTMLElement],
+    ["the switch", () => screen.getByTestId("action-on-create")],
+    ["the Name field", () => screen.getByTestId("action-name")],
+  ])("Cmd+Enter saves from %s", async (_n, el) => {
+    render(<ActionDialog />);
+    await act(async () => {
+      fireEvent.keyDown(el(), { key: "Enter", metaKey: true });
+      await Promise.resolve();
+    });
+    expect(saveAction).toHaveBeenCalledTimes(1);
+    expect(saveAction).toHaveBeenCalledWith({ repoId: "web", actionId: "a-1" }, { name: "Test", command: "go test", icon: "test", onWorktreeCreate: false });
+  });
+
+  it("Cmd+Enter does not save while the delete confirm is open", () => {
+    render(<ActionDialog />);
+    fireEvent.click(screen.getByTestId("action-delete"));
+    fireEvent.keyDown(screen.getByTestId("action-dialog"), { key: "Enter", metaKey: true });
+    expect(saveAction).not.toHaveBeenCalled();
+  });
+
   it("an action deleted elsewhere while the editor is open says so and cannot be saved", () => {
     render(<ActionDialog />);
     act(() => {

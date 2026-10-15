@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { Loader2, Trash2, X } from "lucide-react";
 import { ACTION_ICONS } from "@/api/actions";
 import { Button } from "@/components/ui/button";
@@ -80,7 +80,7 @@ function IconTiles({ value, onChange, disabled }: { value: ActionDraft["icon"]; 
  * confirm it). Save and Delete go through action.add / action.edit / action.remove; the
  * daemon's refusal shows above the footer and the form stays as it was.
  */
-function ActionForm({ target }: { target: ActionEditorTarget }) {
+function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: RefObject<((e: KeyboardEvent) => void) | null> }) {
   const project = useReposStore((s) => s.byId[target.repoId]?.name ?? target.repoId);
   const existing = useActionsStore((s) => (target.mode === "edit" ? s.byId[target.actionId] : undefined));
   const [draft, setDraft] = useState<ActionDraft>(() => (existing ? draftOf(existing) : NEW_ACTION_DRAFT));
@@ -134,19 +134,26 @@ function ActionForm({ target }: { target: ActionEditorTarget }) {
     }
   };
 
-  // Cmd+Enter saves from anywhere in the form (Enter is a newline in the command).
+  // Cmd+Enter saves from anywhere in the dialog (Enter is a newline in the command). The
+  // dialog's content handles the key, not the form: WebKit does not focus a button on click,
+  // so after clicking an icon tile or the switch the keyboard is on the content itself.
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !confirming) {
       e.preventDefault();
       void save();
     }
   };
+  useEffect(() => {
+    keysRef.current = onKeyDown;
+    return () => {
+      keysRef.current = null;
+    };
+  });
 
   const where = target.from === "projects" ? "the worktree's checkout" : "the thread's checkout";
   return (
     <form
       className="flex flex-col"
-      onKeyDown={onKeyDown}
       onSubmit={(e) => {
         e.preventDefault();
         void save();
@@ -292,6 +299,8 @@ function ActionForm({ target }: { target: ActionEditorTarget }) {
 export function ActionDialog() {
   const target = useActionDialogStore((s) => s.editor);
   const seq = useActionDialogStore((s) => s.seq);
+  // The form's Cmd+Enter, handled on the whole content (see ActionForm).
+  const keys = useRef<((e: KeyboardEvent) => void) | null>(null);
   return (
     <Dialog
       open={target !== null}
@@ -299,9 +308,16 @@ export function ActionDialog() {
         if (!o) closeActionEditor();
       }}
     >
-      <DialogContent className="max-w-lg p-4" data-testid="action-dialog" data-mode={target?.mode}>
+      <DialogContent
+        className="max-w-lg p-4"
+        data-testid="action-dialog"
+        data-mode={target?.mode}
+        onKeyDown={(e) => {
+          keys.current?.(e);
+        }}
+      >
         <DialogTitle>{target?.mode === "edit" ? "Edit action" : "New action"}</DialogTitle>
-        {target !== null && <ActionForm key={seq} target={target} />}
+        {target !== null && <ActionForm key={seq} target={target} keysRef={keys} />}
         {/* After the form, so the dialog's first focus lands on Name. */}
         <DialogClose
           className="absolute top-2.5 right-2.5 flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
