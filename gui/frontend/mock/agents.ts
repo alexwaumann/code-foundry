@@ -17,6 +17,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { ThreadAgentStatus, ToolCallStatus, type ThreadAgentRunSchema, type ThreadItemSchema } from "../src/gen/codefoundry/v1/thread_pb";
 import type { InvokeOut } from "./gitops";
+import { launchShell, type ShellCall } from "./shells";
 import type { UiIntentInit } from "./world";
 
 export type AgentRunInit = MessageInitShape<typeof ThreadAgentRunSchema>;
@@ -28,6 +29,8 @@ export interface AgentsScript {
   cwd: string;
   it(payload: ItemInit["payload"], over?: Over): ItemInit;
   tool(name: string, input: object, value: { output?: string; isError?: boolean; resultJson?: string; status?: ToolCallStatus }, over?: Over): ItemInit;
+  /** Receives the background shells the script launches (mock/shells.ts), if given. */
+  shells?: ShellCall[];
 }
 
 const ts = (d: Date) => timestampFromDate(d);
@@ -116,6 +119,8 @@ export function scriptAgents(s: AgentsScript, now = Date.now()): AgentRunInit[] 
     { status: ToolCallStatus.ERROR, isError: true, output: FAILED_ERROR },
     { at: ago(246), until: ago(183) },
   );
+  const shell = launchShell(s, { taskId: "b7n2x4kq0", command: "pnpm --dir gui/frontend dev:mock", description: "Start the mock daemon's dev server", at: ago(228) });
+  s.shells?.push(shell);
   s.it(
     { case: "assistantText", value: { text: "Both PRs are building in the background. The screenshot agent died when the Wails window failed to start; I will retry it once PR 2 lands." } },
     { at: ago(226) },
