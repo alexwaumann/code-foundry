@@ -57,7 +57,8 @@ function TooltipContent({ className, sideOffset = 6, alignOffset, collisionPaddi
  *   asChild>…`). Both set `data-state` on the element and the tooltip's wins, so style the
  *   open trigger with `aria-expanded:` rather than `data-[state=open]:`.
  * - It opens on hover and on focus reached by keyboard navigation, not on the focus a
- *   closing menu hands back to its trigger or a dialog gives its first button (`wanted`).
+ *   closing menu hands back to its trigger or a dialog gives its first button, not after
+ *   a press until the pointer leaves, and not while a nested Tip is hovered (`wanted`).
  */
 function Tip({
   label,
@@ -81,6 +82,10 @@ function Tip({
 }) {
   const [open, setOpen] = React.useState(false)
   const triggerRef = React.useRef<HTMLButtonElement>(null)
+  // A press on the trigger (or inside it) keeps the tooltip shut until the pointer leaves:
+  // Radix only cancels an open that is already showing, so one still in its delay would
+  // pop up over the menu the press opened (and take its Escape).
+  const pressed = React.useRef(false)
   React.useEffect(listenForNavKeys, [])
   // Without a label the trigger stays in place (no remount, focus kept) and never opens.
   const has = label !== null && label !== undefined && label !== false && label !== ""
@@ -88,11 +93,23 @@ function Tip({
     <Tooltip
       open={has && open}
       onOpenChange={(next) => {
-        setOpen(next && wanted(triggerRef.current) && (!whenTruncated || truncated(triggerRef.current)))
+        const el = triggerRef.current
+        setOpen(next && !pressed.current && wanted(el) && (!whenTruncated || truncated(el)))
       }}
       disableHoverableContent
     >
-      <TooltipTrigger asChild ref={triggerRef}>
+      <TooltipTrigger
+        asChild
+        ref={triggerRef}
+        data-tip={has ? "" : undefined}
+        onPointerDown={() => {
+          pressed.current = true
+          setOpen(false)
+        }}
+        onPointerLeave={() => {
+          pressed.current = false
+        }}
+      >
         {children}
       </TooltipTrigger>
       {has && (
@@ -105,13 +122,18 @@ function Tip({
 }
 
 /**
- * Whether a tooltip may open now. An open while its trigger does not hold the focus came
+ * Whether a tooltip may open now. Not while a nested trigger (a count in a row with a path
+ * tooltip) is hovered: Radix closes other tooltips when one opens, but two whose delays
+ * end together both stay open. An open while its trigger does not hold the focus came
  * from the pointer. With the focus, only a hovered trigger or one just reached with a
  * navigation key (Tab, arrows) opens it: not the focus a closing menu hands back to its
  * trigger, or a dialog gives its first button, away from the pointer.
  */
 function wanted(el: HTMLElement | null): boolean {
-  if (!el || !el.contains(document.activeElement)) return true
+  if (!el) return true
+  // A tooltip trigger inside this one is under the pointer: its tooltip, not this one.
+  if (el.querySelector("[data-tip]:hover")) return false
+  if (!el.contains(document.activeElement)) return true
   if (performance.now() - navKeyAt < 500) return true
   try {
     return el.matches(":hover")

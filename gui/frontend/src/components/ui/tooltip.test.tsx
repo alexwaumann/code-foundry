@@ -51,6 +51,23 @@ describe("Tip", () => {
     expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
+  it("a press keeps it shut until the pointer leaves (a delayed open would cover the menu the press opened)", () => {
+    render(
+      <Tip label="More actions">
+        <button type="button">x</button>
+      </Tip>,
+    );
+    const b = screen.getByRole("button");
+    fireEvent.pointerDown(b);
+    fireEvent.pointerUp(document);
+    expect(tooltipText(b)).toBeNull();
+    act(() => {
+      b.blur();
+    });
+    fireEvent.pointerLeave(b);
+    expect(tooltipText(b)).toBe("More actions");
+  });
+
   it.each([
     ["cut short: opens", true, "a-very-long-name"],
     ["fits: stays closed (it would repeat the text)", false, null],
