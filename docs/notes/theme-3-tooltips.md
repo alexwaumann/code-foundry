@@ -192,9 +192,9 @@ spot no tooltip opens until the pointer leaves (Radix, and `Tip`'s press rule).
 ## Verified
 
 - `make check`.
-- `make gui-e2e` (WebKit + Chromium): see the PR; the targeted specs (actions, projects,
-  sidebar, panels, compose, PR panel, thread prompts, terminal routing, worktree panel)
-  passed after the press/nesting/Escape fixes.
+- `make gui-e2e` (WebKit + Chromium): 760 passed, 40 skipped, 0 failed (the known
+  `panel.spec.ts` Chromium flake did not show). The first run had failed on the nested
+  row/count tooltips and the late open over a menu, which the press and nesting rules fix.
 - Live (`make gui-build`, isolated `CODE_FOUNDRY_HOME`, a Haiku thread in a scratch repo
   whose origin is the GitHub repo): the sidebar status bar's Command Palette button, the
   thread header's Archive Thread (flips below at the window top), a Pull Requests row's
