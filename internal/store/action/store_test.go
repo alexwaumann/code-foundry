@@ -465,7 +465,7 @@ func TestTerminalRun(t *testing.T) {
 	}
 	wantLabels := map[string]string{
 		termlabel.Kind: termlabel.KindAction, termlabel.Session: "s1", termlabel.Repo: "web", termlabel.Worktree: h.feat,
-		termlabel.Action: a.ID, termlabel.ActionName: "Dev",
+		termlabel.Action: a.ID, termlabel.ActionName: "Dev", termlabel.ActionRun: r.ID,
 	}
 	if !slices.Equal(spec.Argv, []string{"/bin/sh", "-lc", "pnpm dev"}) || spec.Cwd != h.feat || !maps.Equal(spec.Labels, wantLabels) {
 		t.Errorf("terminal spec argv %q cwd %q labels %v", spec.Argv, spec.Cwd, spec.Labels)

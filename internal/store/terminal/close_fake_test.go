@@ -131,7 +131,7 @@ func TestCloseShell(t *testing.T) {
 	}{
 		{name: "a worktree shell", labels: termlabel.Shell("", "r1", "/wt"), wantGone: true},
 		{name: "a thread's shell", labels: termlabel.Shell("s1", "r1", "/wt"), wantGone: true},
-		{name: "an action run", labels: termlabel.ActionRun("s1", "r1", "/wt", "a-1", "Test"), wantGone: true},
+		{name: "an action run", labels: termlabel.ActionTerminal("s1", "r1", "/wt", "a-1", "Test", "r-1"), wantGone: true},
 		{name: "owner labels without the shell kind", labels: map[string]string{termlabel.Session: "s1", termlabel.Worktree: "/wt"},
 			wantErr: terminal.ErrNotShell},
 		{name: "an unlabelled terminal", wantErr: terminal.ErrNotShell},

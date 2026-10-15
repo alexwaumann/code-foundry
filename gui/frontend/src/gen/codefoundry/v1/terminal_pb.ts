@@ -99,6 +99,7 @@ export type Terminal = Message<"codefoundry.v1.Terminal"> & {
    *             (the thread's worktree when it belongs to a thread).
    *   action    on kind "action": the action's id (ActionService).
    *   action.name  on kind "action": the action's name when the run started.
+   *   action.run   on kind "action": the run's id (ActionRun.id).
    * An action terminal carries the same session / repo / worktree owner labels as a
    * shell, so a bottom panel shows both the same way.
    * A terminal created through Create without labels belongs to nothing.

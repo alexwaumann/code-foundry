@@ -13,7 +13,7 @@
 //     and Worktree is its cwd, the home directory).
 //   - An action run in a terminal (internal/store/action) has Kind = KindAction, the
 //     same owner labels as a shell (Session, Repo, Worktree), plus Action (the action's
-//     id) and ActionName (its name when it started).
+//     id), ActionName (its name when it started) and ActionRun (the run's id).
 //
 // Claude itself never runs in a terminal. A terminal without labels
 // (TerminalService.Create called directly) belongs to nothing.
@@ -33,6 +33,9 @@ const (
 	Action = "action"
 	// ActionName is the name the action had when the terminal started (a tab title).
 	ActionName = "action.name"
+	// ActionRun is the id of the run (ActionService's ActionRun) a KindAction terminal
+	// belongs to.
+	ActionRun = "action.run"
 )
 
 // KindShell is Kind's value on a shell started by terminal.new. The daemon removes such a
@@ -66,12 +69,13 @@ func Shell(sessionID, repoID, worktree string) map[string]string {
 	return l
 }
 
-// ActionRun returns the labels of action actionID (named name) running in a terminal
-// owned like a shell (see Shell).
-func ActionRun(sessionID, repoID, worktree, actionID, name string) map[string]string {
+// ActionTerminal returns the labels of run runID of action actionID (named name) in a
+// terminal owned like a shell (see Shell).
+func ActionTerminal(sessionID, repoID, worktree, actionID, name, runID string) map[string]string {
 	l := Shell(sessionID, repoID, worktree)
 	l[Kind] = KindAction
 	l[Action] = actionID
 	l[ActionName] = name
+	l[ActionRun] = runID
 	return l
 }

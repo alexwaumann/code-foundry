@@ -159,7 +159,7 @@ func (m *Manager) start(ctx context.Context, a Action, owner Owner, mode Mode, t
 	case ModeTerminal:
 		t, err := m.opts.Terminals.Create(ctx, terminal.Spec{
 			Argv: []string{m.opts.Shell, "-lc", a.Command}, Cwd: owner.Worktree, Env: env,
-			Labels:   termlabel.ActionRun(owner.SessionID, owner.RepoID, owner.Worktree, a.ID, a.Name),
+			Labels:   termlabel.ActionTerminal(owner.SessionID, owner.RepoID, owner.Worktree, a.ID, a.Name, id),
 			Observer: m.observer(rec),
 		})
 		if err != nil {

@@ -33,7 +33,7 @@ func TestShellReaper(t *testing.T) {
 	}
 	event := func(ev any) func(string) any { return func(string) any { return ev } }
 	action := func(sessionID, repoID, worktree string) map[string]string {
-		return termlabel.ActionRun(sessionID, repoID, worktree, "a-1", "Test")
+		return termlabel.ActionTerminal(sessionID, repoID, worktree, "a-1", "Test", "r-1")
 	}
 	tests := []struct {
 		name string
