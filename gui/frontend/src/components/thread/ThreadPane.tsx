@@ -6,6 +6,7 @@ import { DragBand } from "@/components/window/DragBand";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useSessionsStore } from "@/stores/sessions";
 import { startThreadWatch, useOpenRequests, useThreadEmpty, useThreadLoaded, useThreadPending, useThreadStore } from "@/stores/thread";
+import { AgentsStrip } from "./AgentsStrip";
 import { ThreadContext } from "./context";
 import { HeaderActions } from "./HeaderActions";
 import { Timeline } from "./Timeline";
@@ -110,6 +111,7 @@ function ThreadView({ sessionId }: { sessionId: string }) {
           )}
           <Timeline key={sessionId} sessionId={sessionId} working={working} bottomInset={dockHeight} />
           <div className="dock" ref={dockRef}>
+            <AgentsStrip sessionId={sessionId} />
             <ThreadComposer key={sessionId} sessionId={sessionId} pending={open} busy={busy} />
           </div>
         </div>
