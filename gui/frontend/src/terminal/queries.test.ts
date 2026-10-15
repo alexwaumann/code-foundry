@@ -19,7 +19,7 @@ beforeAll(() => {
 
 /** Writes output into a real xterm and returns what xterm sent back through onData. */
 async function replies(output: string): Promise<string[]> {
-  const r = new XtermRenderer({ fontSize: 12, colorScheme: "dark", isGlobalChord: () => false });
+  const r = new XtermRenderer({ fontSize: 12, isGlobalChord: () => false });
   // Color reports come from the browser terminal's theme service, which needs open().
   const host = document.createElement("div");
   document.body.append(host);
@@ -62,7 +62,7 @@ describe("daemon-answered queries", () => {
   });
 
   it("still applies the effects of sequences that share a final byte", async () => {
-    const r = new XtermRenderer({ fontSize: 12, colorScheme: "dark", isGlobalChord: () => false });
+    const r = new XtermRenderer({ fontSize: 12, isGlobalChord: () => false });
     await new Promise<void>((resolve) => {
       // OSC 4 set (snapshot palette replay), then kitty push, which must still be tracked.
       r.term.write("\x1b]4;1;rgb:12/34/56\x07\x1b[>1u", resolve);

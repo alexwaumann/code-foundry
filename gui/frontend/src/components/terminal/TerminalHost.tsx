@@ -3,7 +3,6 @@ import { CircleX, Loader2, RefreshCw } from "lucide-react";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { attachTerminal, resizeTerminal, writeTerminal } from "@/api/terminal";
 import { isGlobalChord } from "@/keys/bindings";
-import { useColorScheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { useScrollbackLines, useTerminalFontFamily } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
@@ -108,7 +107,6 @@ export function TerminalHost({
   const ctlRef = useRef<DevHook | null>(null);
   const [state, setState] = useState<AttachState>({ terminalId: null, phase: "idle", exitCode: null, error: null });
   const [rendererKind, setRendererKind] = useState<RendererKind | null>(null);
-  const scheme = useColorScheme();
   // The page zoom (lib/zoom.ts) is undone on the terminal host and applied to the font
   // size instead: xterm's WebGL canvas is sized from devicePixelRatio, which CSS zoom
   // does not change, so a zoomed canvas would be resampled and blurry.
@@ -131,7 +129,6 @@ export function TerminalHost({
     const ui = useUiStore.getState();
     const renderer = new XtermRenderer({
       fontSize: Math.round((ui.fontSize * ui.zoom) / 100),
-      colorScheme: scheme,
       isGlobalChord,
       onRendererChange: setRendererKind,
     });
@@ -173,8 +170,8 @@ export function TerminalHost({
       ctlRef.current = null;
       if (import.meta.env.DEV && window.__cfTerminal === hook) delete window.__cfTerminal;
     };
-    // The renderer is created once; scheme/font changes are applied by the effects below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // The renderer is created once; font changes are applied by the effects below, and the
+    // palette follows the document's CSS variables itself (terminal/theme.ts).
   }, []);
 
   useEffect(() => {
@@ -183,10 +180,6 @@ export function TerminalHost({
     if (terminalId === null) ctl.detach();
     else ctl.attach(terminalId);
   }, [terminalId]);
-
-  useEffect(() => {
-    ctlRef.current?.renderer.setColorScheme(scheme);
-  }, [scheme]);
 
   useEffect(() => {
     ctlRef.current?.renderer.setFontSize(fontSize);
@@ -201,7 +194,7 @@ export function TerminalHost({
   }, [scrollback]);
 
   return (
-    <div className={cn("relative min-h-0 flex-1 bg-[var(--terminal-bg)] py-1 pl-2", hidden && "hidden")}>
+    <div className={cn("relative min-h-0 flex-1 bg-pane py-1 pl-2", hidden && "hidden")}>
       <div
         ref={hostRef}
         className="h-full w-full"

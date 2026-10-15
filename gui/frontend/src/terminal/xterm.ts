@@ -6,17 +6,16 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import { chordFromEvent } from "@/keys/chord";
 import { copyText } from "@/lib/clipboard";
-import type { ColorScheme, Disposable, TermSize, TerminalRenderer } from "./renderer";
+import type { Disposable, TermSize, TerminalRenderer } from "./renderer";
 import { DEFAULT_TERMINAL_FONT_FAMILY, onBundledFontLoaded } from "./fonts";
 import { KeyboardModes, shiftEnterSequence } from "./keyboard";
 import { swallowDaemonAnsweredQueries } from "./queries";
-import { terminalTheme } from "./theme";
+import { terminalTheme, watchTerminalTheme } from "./theme";
 
 export type RendererKind = "webgl" | "dom";
 
 export interface XtermRendererOptions {
   fontSize: number;
-  colorScheme: ColorScheme;
   /** Chords xterm must not consume (handled by the app's global key handler). */
   isGlobalChord: (chord: string) => boolean;
   /** Notified when the active renderer changes (WebGL -> DOM after context loss). */
@@ -54,7 +53,7 @@ export class XtermRenderer implements TerminalRenderer {
     this.term = new Terminal({
       fontFamily: DEFAULT_TERMINAL_FONT_FAMILY,
       fontSize: opts.fontSize,
-      theme: terminalTheme(opts.colorScheme),
+      theme: terminalTheme(),
       scrollback: 10_000,
       allowProposedApi: true,
       macOptionIsMeta: false,
@@ -68,6 +67,12 @@ export class XtermRenderer implements TerminalRenderer {
         for (const cb of this.resizeListeners) cb(size);
       }),
     );
+    // The palette is the document's CSS variables (theme.ts); follow them when the scheme
+    // (or, later, the theme) on <html> changes.
+    const stopTheme = watchTerminalTheme((theme) => {
+      this.term.options.theme = theme;
+    });
+    this.disposables.push({ dispose: stopTheme });
     this.term.attachCustomKeyEventHandler((e) => this.keyHandler(e));
     this.trackKeyboardModes();
     this.disposables.push(...swallowDaemonAnsweredQueries(this.term));
@@ -273,10 +278,6 @@ export class XtermRenderer implements TerminalRenderer {
     if (this.term.options.fontSize === px) return;
     this.term.options.fontSize = px;
     this.fit();
-  }
-
-  setColorScheme(scheme: ColorScheme): void {
-    this.term.options.theme = terminalTheme(scheme);
   }
 
   /** appearance.font_family (with fallbacks). Changes cell metrics, so it refits. */
