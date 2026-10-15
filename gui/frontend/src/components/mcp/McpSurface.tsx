@@ -58,7 +58,6 @@ function CheckedText({ checkedAtMs, trigger, server }: { checkedAtMs: number | n
 function Header({ threadId }: { threadId: string }) {
   const h = useMcpHeader(threadId);
   const refreshing = useMcpRefreshing(threadId);
-  const connected = useSessionsStore((s) => s.byId[threadId]?.state === "connected");
   return (
     <header className="flex min-w-0 flex-col gap-0.5 border-b border-pane-border px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="mcp-header">
       <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
@@ -80,7 +79,7 @@ function Header({ threadId }: { threadId: string }) {
               type="button"
               className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 dark:hover:bg-accent/50"
               aria-label="Refresh MCP servers"
-              disabled={!connected || refreshing}
+              disabled={refreshing}
               onClick={() => void refreshMcp(threadId)}
               data-testid="mcp-refresh"
             >
@@ -134,7 +133,6 @@ function ToolRow({ tool }: { tool: McpToolView }) {
 function ServerCard({ threadId, name }: { threadId: string; name: string }) {
   const server = useMcpServer(threadId, name);
   const reconnecting = useMcpReconnecting(threadId, name);
-  const live = useSessionsStore((s) => s.byId[threadId]?.state === "connected");
   const [open, setOpen] = useState(false);
   if (!server) return null;
   // While a reconnect runs the card reads like a server still connecting.
@@ -204,7 +202,7 @@ function ServerCard({ threadId, name }: { threadId: string; name: string }) {
                   ? "border-warning/40 text-warning hover:bg-warning/10"
                   : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent/50",
               )}
-              disabled={reconnecting || !live}
+              disabled={reconnecting}
               onClick={() => void reconnectMcp(threadId, server.name)}
               data-testid="mcp-reconnect"
             >
@@ -252,18 +250,23 @@ function Message({ testId, children }: { testId: string; children: string }) {
  * the selected thread's MCP servers as Claude last reported them, one card each
  * (name, version, status pill; scope · transport · tools; the error or the login hint;
  * Reconnect and the tools disclosure), under a header with the connected count, when the
- * servers were checked, and a refresh button.
+ * servers were checked, and a refresh button. Refresh and Reconnect work whether or not
+ * Claude runs for the thread (the daemon starts it for them); its last status outlives
+ * the process.
  */
 export function McpSurface() {
   const threadId = useThreadId();
   const known = useSessionsStore((s) => threadId !== "" && threadId in s.byId);
-  const connected = useSessionsStore((s) => s.byId[threadId]?.state === "connected");
+  // Internal only: a running Claude answers the status ask below, so the empty state says
+  // a check is on its way; a stopped one has nothing new to say until a refresh.
+  const asking = useSessionsStore((s) => s.byId[threadId]?.state === "connected" || s.byId[threadId]?.state === "starting");
+  const refreshing = useMcpRefreshing(threadId);
   const status = useMcpStatus(threadId);
   const names = useMcpServerNames(threadId);
   const missing = status === null;
   useEffect(() => {
-    if (known && connected && missing) ensureMcpStatus(threadId);
-  }, [threadId, known, connected, missing]);
+    if (known && missing) ensureMcpStatus(threadId);
+  }, [threadId, known, missing]);
 
   if (!known) return <Message testId="mcp-missing">Select a thread to see its MCP servers.</Message>;
   return (
@@ -273,7 +276,7 @@ export function McpSurface() {
       {status === undefined ? (
         <Message testId="mcp-loading">Loading…</Message>
       ) : status === null ? (
-        <Message testId="mcp-empty">{connected ? "Checking MCP servers…" : "The thread is not running. Reconnect it to see its MCP servers."}</Message>
+        <Message testId="mcp-empty">{asking || refreshing ? "Checking MCP servers…" : "No MCP status yet. Refresh to check."}</Message>
       ) : names.length === 0 ? (
         <Message testId="mcp-none">Claude has no MCP servers in this thread.</Message>
       ) : (

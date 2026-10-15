@@ -118,9 +118,10 @@ export async function refreshMcp(sessionId: string): Promise<boolean> {
 }
 
 /**
- * Asks a connected thread whose servers were not checked yet (no turn since it connected)
- * once; the answer arrives through the Watch. The surface calls it from an effect keyed on
- * the thread, its connection and whether a status is there, so it does not repeat.
+ * Asks a thread whose servers the Watch has no status for once (ThreadService.McpStatus
+ * without refresh: a running Claude is asked, a stopped thread starts nothing); the answer
+ * arrives through the Watch. The surface calls it from an effect keyed on the thread and
+ * whether a status is there, so it does not repeat.
  */
 export function ensureMcpStatus(sessionId: string): void {
   const log = useThreadStore.getState().logs[sessionId];

@@ -11,7 +11,7 @@ export const AGENTS_TITLE = "Agents";
 
 /**
  * The selection's thread when the sessions store knows it (selectionThread). Null
- * otherwise, a page or a composer included. A disconnected thread counts: its runs persist.
+ * otherwise, a page or a composer included. Whether Claude runs for it does not matter: its runs persist.
  */
 export function selectionAgentsThread(sel: Selection, s: SelectionStores): string | null {
   return selectionThread(sel, s);
