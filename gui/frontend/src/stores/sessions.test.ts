@@ -48,6 +48,8 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     contextTokens: 0,
     cacheExpiresAtMs: null,
     contextRereadUsd: 0,
+    agentsRunning: 0,
+    backgroundAgentsRunning: 0,
     retry: null,
     ...over,
   };

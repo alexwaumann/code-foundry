@@ -19,6 +19,7 @@ import {
 } from "@/gen/codefoundry/v1/thread_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, type Heartbeat } from "./stream";
+import { toAgentRunViews, type AgentRunView } from "./agents";
 import { toMcpStatusView, type McpStatusView } from "./mcp";
 import { toSlashCommandViews, type SlashCommandView } from "./slashCommands";
 
@@ -140,7 +141,17 @@ export interface ThreadPendingListView {
 }
 
 export type ThreadEventView =
-  | { kind: "snapshot"; sessionId: string; seq: number; items: ThreadItemView[]; pending: ThreadPendingView[]; mcp: McpStatusView | null; commands: SlashCommandView[] }
+  | {
+      kind: "snapshot";
+      sessionId: string;
+      seq: number;
+      items: ThreadItemView[];
+      pending: ThreadPendingView[];
+      mcp: McpStatusView | null;
+      commands: SlashCommandView[];
+      /** The thread's subagent runs in spawn order (docs/notes/agents-1-daemon.md). */
+      agents: AgentRunView[];
+    }
   | { kind: "appended" | "updated"; sessionId: string; seq: number; item: ThreadItemView }
   | { kind: "delta"; sessionId: string; seq: number; itemId: string; ordinal: number; field: "text" | "input"; text: string }
   | ({ kind: "pending" } & ThreadPendingListView)
@@ -148,6 +159,8 @@ export type ThreadEventView =
   | { kind: "mcp"; sessionId: string; seq: number; status: McpStatusView | null }
   /** Watch only: the thread's slash commands changed (the whole new list; empty: its process ended). */
   | { kind: "commands"; sessionId: string; seq: number; commands: SlashCommandView[] }
+  /** Watch only: the thread's subagent runs changed (the whole list, in spawn order). */
+  | { kind: "agents"; sessionId: string; seq: number; agents: AgentRunView[] }
   /** EventService only: the pending requests of every thread that has any. */
   | { kind: "pendingSnapshot"; threads: ThreadPendingListView[] };
 
@@ -278,6 +291,7 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
         pending: e.value.pending.map(toPendingView),
         mcp: toMcpStatusView(e.value.mcp),
         commands: toSlashCommandViews(e.value.commands),
+        agents: toAgentRunViews(e.value.agents),
       };
     case "appended":
     case "updated": {
@@ -294,6 +308,8 @@ export function toThreadEventView(ev: ThreadEvent): ThreadEventView | null {
       return { kind: "mcp", sessionId: e.value.sessionId, seq: Number(e.value.seq), status: toMcpStatusView(e.value.status) };
     case "commands":
       return { kind: "commands", sessionId: e.value.sessionId, seq: Number(e.value.seq), commands: toSlashCommandViews(e.value.commands) };
+    case "agents":
+      return { kind: "agents", sessionId: e.value.sessionId, seq: Number(e.value.seq), agents: toAgentRunViews(e.value.agents) };
     case "pendingSnapshot":
       return {
         kind: "pendingSnapshot",
