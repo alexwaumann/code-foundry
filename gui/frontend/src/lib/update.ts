@@ -120,9 +120,12 @@ export function updateBadge(status: UpdateStatusView | null, guiVersion: string 
   }
 }
 
-/** Threads a restart would close: live = not disconnected, busy = live and mid-turn. */
+/**
+ * Threads a restart would cut off: busy = working or waiting on the user (restartCutsOff,
+ * the daemon's command.ActiveSession). Any other thread loses nothing: a message starts it
+ * again.
+ */
 export interface ThreadActivity {
-  live: number;
   busy: number;
 }
 
@@ -135,7 +138,6 @@ export type UpdateVariant =
   | "failed"
   | "readyIdle"
   | "readyBusy"
-  | "readyOpen"
   | "partlyApplied";
 
 /** What the update dialog shows; the component adds icons, buttons and the meta line. */
@@ -149,7 +151,7 @@ export interface UpdateView {
   later: string | null;
   /** A × in the corner: only where there is no `later` link to close with. */
   close: boolean;
-  /** List the busy threads (a restart cuts them off mid-turn). */
+  /** List the busy threads (working or waiting on the user: a restart cuts them off mid-turn). */
   showBusy: boolean;
   /** Set for partlyApplied. */
   mismatch: Mismatch | null;
@@ -159,9 +161,9 @@ function threads(n: number): string {
   return `${String(n)} thread${n === 1 ? "" : "s"}`;
 }
 
-/** "2 threads are still working", "1 thread is still working". */
+/** "2 threads are working or waiting on you", "1 thread is working or waiting on you". */
 export function busyHeading(n: number): string {
-  return `${threads(n)} ${n === 1 ? "is" : "are"} still working`;
+  return `${threads(n)} ${n === 1 ? "is" : "are"} working or waiting on you`;
 }
 
 function cutOff(busy: number): string {
@@ -189,7 +191,7 @@ function sentence(s: string): string {
 
 /**
  * Picks the update dialog's variant and copy from the daemon's updater status, the
- * window's own version, the live/busy thread counts, and whether Restart Now already ran.
+ * window's own version, the busy thread count, and whether Restart Now already ran.
  */
 export function updateView(status: UpdateStatusView, guiVersion: string | null, t: ThreadActivity, restarting = false): UpdateView {
   // Copy shows versions through displayVersion; `version` and `mismatch` keep the tags.
@@ -246,18 +248,11 @@ export function updateView(status: UpdateStatusView, guiVersion: string | null, 
       if (t.busy > 0) {
         const rest =
           t.busy === 1
-            ? "Let it finish first, or restart anyway: it keeps its history and can be reconnected."
-            : "Let them finish first, or restart anyway: they keep their history and can be reconnected.";
+            ? "Let it finish first, or restart anyway: it keeps its history, and a message continues it."
+            : "Let them finish first, or restart anyway: they keep their history, and a message continues each.";
         return { ...base, variant: "readyBusy", title, body: `${cutOff(t.busy)} ${rest}`, later: laterFor(t), showBusy: true };
       }
-      if (t.live > 0) {
-        const body =
-          t.live === 1
-            ? "Restart to finish updating. 1 thread is open but it isn’t working, so nothing will be interrupted. It’ll reconnect with its history."
-            : `Restart to finish updating. ${threads(t.live)} are open but none are working, so nothing will be interrupted. They’ll reconnect with their history.`;
-        return { ...base, variant: "readyOpen", title, body };
-      }
-      return { ...base, variant: "readyIdle", title, body: "Restart to finish updating. Nothing is running right now, so nothing will be interrupted." };
+      return { ...base, variant: "readyIdle", title, body: "Restart to finish updating. No thread is working or waiting on you, so nothing will be interrupted." };
     }
   }
 }

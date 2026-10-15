@@ -115,21 +115,21 @@ describe("updateBadge", () => {
   });
 });
 
-const none: ThreadActivity = { live: 0, busy: 0 };
+const none: ThreadActivity = { busy: 0 };
 
 describe("updateView", () => {
   it.each<[string, UpdateStatusView, string | null, ThreadActivity, boolean, UpdateVariant, string, string, string | null, boolean, boolean]>([
     // name, status, gui, threads, restarting -> variant, title, body, later, close, showBusy
-    ["ready, nothing running", status("installed"), "v0.1.0", none, false, "readyIdle", "Code Foundry v0.2.0 is ready", "Restart to finish updating. Nothing is running right now, so nothing will be interrupted.", "Later", false, false],
+    ["ready, nothing running", status("installed"), "v0.1.0", none, false, "readyIdle", "Code Foundry v0.2.0 is ready", "Restart to finish updating. No thread is working or waiting on you, so nothing will be interrupted.", "Later", false, false],
     [
       "ready, threads mid-turn",
       status("restartRequired"),
       null,
-      { live: 3, busy: 2 },
+      { busy: 2 },
       false,
       "readyBusy",
       "Code Foundry v0.2.0 is ready",
-      "Restarting now cuts these threads off mid-turn. Let them finish first, or restart anyway: they keep their history and can be reconnected.",
+      "Restarting now cuts these threads off mid-turn. Let them finish first, or restart anyway: they keep their history, and a message continues each.",
       "Wait, I’ll restart later",
       false,
       true,
@@ -138,40 +138,14 @@ describe("updateView", () => {
       "ready, one thread mid-turn",
       status("installed"),
       null,
-      { live: 1, busy: 1 },
+      { busy: 1 },
       false,
       "readyBusy",
       "Code Foundry v0.2.0 is ready",
-      "Restarting now cuts this thread off mid-turn. Let it finish first, or restart anyway: it keeps its history and can be reconnected.",
+      "Restarting now cuts this thread off mid-turn. Let it finish first, or restart anyway: it keeps its history, and a message continues it.",
       "Wait, I’ll restart later",
       false,
       true,
-    ],
-    [
-      "ready, threads open but none busy",
-      status("installed"),
-      null,
-      { live: 3, busy: 0 },
-      false,
-      "readyOpen",
-      "Code Foundry v0.2.0 is ready",
-      "Restart to finish updating. 3 threads are open but none are working, so nothing will be interrupted. They’ll reconnect with their history.",
-      "Later",
-      false,
-      false,
-    ],
-    [
-      "ready, one thread open",
-      status("installed"),
-      null,
-      { live: 1, busy: 0 },
-      false,
-      "readyOpen",
-      "Code Foundry v0.2.0 is ready",
-      "Restart to finish updating. 1 thread is open but it isn’t working, so nothing will be interrupted. It’ll reconnect with its history.",
-      "Later",
-      false,
-      false,
     ],
     [
       "available",
@@ -187,7 +161,7 @@ describe("updateView", () => {
       false,
     ],
     ["installing", status("downloading"), "v0.1.0", none, false, "installing", "Installing v0.2.0…", "You can close this and keep working.", "Hide", false, false],
-    ["up to date", status("idle"), "v0.1.0", { live: 2, busy: 1 }, false, "upToDate", "You’re up to date", "Code Foundry v0.1.0 is the latest version.", null, true, false],
+    ["up to date", status("idle"), "v0.1.0", { busy: 1 }, false, "upToDate", "You’re up to date", "Code Foundry v0.1.0 is the latest version.", null, true, false],
     ["checking", status("idle", { checking: true }), null, none, false, "upToDate", "Checking for updates…", "Code Foundry v0.1.0 is the latest version.", null, true, false],
     [
       "up to date on tip",
@@ -258,7 +232,7 @@ describe("updateView", () => {
       "partly applied: GUI newer, idle, busy threads",
       status("idle"),
       "v0.2.0",
-      { live: 2, busy: 2 },
+      { busy: 2 },
       false,
       "partlyApplied",
       "Code Foundry v0.2.0 is partly applied",
@@ -271,7 +245,7 @@ describe("updateView", () => {
       "partly applied: installed, GUI on target, nothing busy",
       status("installed"),
       "v0.2.0",
-      { live: 1, busy: 0 },
+      { busy: 0 },
       false,
       "partlyApplied",
       "Code Foundry v0.2.0 is partly applied",
@@ -294,7 +268,7 @@ describe("updateView", () => {
       false,
     ],
     ["failed", status("failed", { failureReason: "x" }), "v0.1.0", none, false, "failed", "Couldn’t install v0.2.0", "Nothing changed. You’re still on v0.1.0.", "Not now", false, false],
-    ["restarting", status("idle", { currentVersion: "v0.2.0" }), "v0.1.0", { live: 2, busy: 1 }, true, "restarting", "Restarting…", "Code Foundry will reopen in a moment.", null, false, false],
+    ["restarting", status("idle", { currentVersion: "v0.2.0" }), "v0.1.0", { busy: 1 }, true, "restarting", "Restarting…", "Code Foundry will reopen in a moment.", null, false, false],
     ["disabled", status("idle", { enabled: false, disabledReason: "dev build" }), "dev", none, false, "disabled", "Updates are off for this build", "Dev build.", null, true, false],
   ])("%s", (_name, st, gui, threads, restarting, variant, title, body, later, close, showBusy) => {
     const v = updateView(st, gui, threads, restarting);
@@ -327,8 +301,8 @@ describe("updateView", () => {
 
 describe("busyHeading", () => {
   it.each([
-    [1, "1 thread is still working"],
-    [2, "2 threads are still working"],
+    [1, "1 thread is working or waiting on you"],
+    [2, "2 threads are working or waiting on you"],
   ])("%d", (n, want) => {
     expect(busyHeading(n)).toBe(want);
   });

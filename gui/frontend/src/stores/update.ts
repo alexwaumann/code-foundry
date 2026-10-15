@@ -7,7 +7,8 @@ import { errorMessage } from "@/api/stream";
 import type { UpdateEventView, UpdateStatusView } from "@/api/update";
 import { invokeConfirmed, refreshCommands, useCommandsStore } from "./commands";
 import { getUiContext } from "./context";
-import { isRunning, useSessionsStore } from "./sessions";
+import { restartCutsOff } from "@/lib/session";
+import { useSessionsStore } from "./sessions";
 
 export type UpdateAction = "check" | "install" | "relaunch" | "restart";
 
@@ -48,25 +49,19 @@ export function applyUpdateEvent(ev: UpdateEventView): void {
   if (prev?.state !== ev.status.state || prev.targetVersion !== ev.status.targetVersion) void refreshCommands();
 }
 
-/** Sessions with a running process: the ones a restart closes. */
-export function useLiveSessionCount(): number {
-  return useSessionsStore((s) => {
-    let n = 0;
-    for (const id of s.order) if (s.byId[id] && s.byId[id].state !== "disconnected") n++;
-    return n;
-  });
-}
-
-/** Names of the live sessions that are mid-turn (busy), in sidebar order. */
-export function useBusyThreadNames(): string[] {
+/**
+ * Ids of the threads a restart cuts off (working or waiting on the user, restartCutsOff:
+ * the daemon's own count), in sidebar order.
+ */
+export function useCutOffThreadIds(): string[] {
   return useSessionsStore(
     useShallow((s) => {
-      const names: string[] = [];
+      const ids: string[] = [];
       for (const id of s.order) {
         const x = s.byId[id];
-        if (x && isRunning(x)) names.push(x.name || "Untitled thread");
+        if (x && restartCutsOff(x) !== null) ids.push(id);
       }
-      return names;
+      return ids;
     }),
   );
 }
