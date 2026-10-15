@@ -15,7 +15,7 @@ function useProjectName(repoId: string): string {
 
 /**
  * A text-only tag (a skill, a file) with a hover tooltip: one line saying what it is,
- * an optional muted second line. The editor's TooltipProvider groups the delays.
+ * an optional muted second line. The app root's TooltipProvider sets the delays.
  */
 function TextTag({
   kind,

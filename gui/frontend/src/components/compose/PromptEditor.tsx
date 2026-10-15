@@ -8,7 +8,6 @@ import { splitBlock } from "@tiptap/pm/commands";
 import { Fragment, Slice, type Node as PMNode } from "@tiptap/pm/model";
 import { TextSelection, type EditorState } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { findTrigger, LEAF_CHAR, type TriggerChar } from "@/lib/completion";
 import { chipInsertText, chipToken, parseLine, parsePrompt, proseOf, serializePrompt, type PromptPiece, type PromptTag } from "@/lib/prompt";
 import { TagDraftContext, TAG_NODE, tagAttrs, tagOf } from "./tagContext";
@@ -376,17 +375,15 @@ export function PromptEditor({
 
   return (
     <TagDraftContext.Provider value={draftKey}>
-      <TooltipProvider>
-        {/* data-value: the prompt as stored (tag tokens included), for tests and debugging. */}
-        <div className="relative" data-testid="composer-prompt" data-value={value}>
-          {value === "" && (
-            <span aria-hidden className="pointer-events-none absolute top-3.5 left-4 text-sm leading-6 text-muted-foreground select-none">
-              {placeholder}
-            </span>
-          )}
-          <EditorContent editor={editor} />
-        </div>
-      </TooltipProvider>
+      {/* data-value: the prompt as stored (tag tokens included), for tests and debugging. */}
+      <div className="relative" data-testid="composer-prompt" data-value={value}>
+        {value === "" && (
+          <span aria-hidden className="pointer-events-none absolute top-3.5 left-4 text-sm leading-6 text-muted-foreground select-none">
+            {placeholder}
+          </span>
+        )}
+        <EditorContent editor={editor} />
+      </div>
     </TagDraftContext.Provider>
   );
 }
