@@ -235,7 +235,7 @@ func (m *Manager) RemoveRepo(ctx context.Context, o RemoveRepoOptions) (Workspac
 		return Workspace{}, err
 	}
 	if ts := threadsIn(m.threads(), mem.WorktreePath); len(ts) > 0 {
-		return Workspace{}, fmt.Errorf("%w: %s running in %s; close it first", ErrFailedPrecondition, describeThreads(ts), mem.WorktreePath)
+		return Workspace{}, fmt.Errorf("%w: %s running in %s; %s first (that stops Claude)", ErrFailedPrecondition, describeThreads(ts), mem.WorktreePath, archiveThem(len(ts)))
 	}
 	gone, rmErr := m.removeMember(ctx, mem, o.Force, o.DeleteBranch)
 	if gone {
@@ -265,7 +265,7 @@ func (m *Manager) Remove(ctx context.Context, o RemoveOptions) error {
 		}
 	}
 	if len(busy) > 0 {
-		return fmt.Errorf("%w: %s; close them first", ErrFailedPrecondition, strings.Join(busy, "; "))
+		return fmt.Errorf("%w: %s; archive them first (that stops Claude)", ErrFailedPrecondition, strings.Join(busy, "; "))
 	}
 	if !o.Force {
 		if dirty := m.dirtyMembers(ctx, w); len(dirty) > 0 {

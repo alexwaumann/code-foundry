@@ -297,7 +297,7 @@ func TestRemoveRepo(t *testing.T) {
 			name:    "live thread in the worktree",
 			threads: []Thread{{ID: "s-1", Name: "fix-login", Cwd: "API/src"}},
 			opts:    RemoveRepoOptions{Ref: Ref{Workspace: "x"}, Repo: "api"},
-			wantErr: ErrFailedPrecondition, errText: "thread fix-login (s-1) running in",
+			wantErr: ErrFailedPrecondition, errText: "thread fix-login (s-1) running in API; archive it first (that stops Claude)",
 		},
 		{
 			name:    "thread in another member is fine",
@@ -327,8 +327,8 @@ func TestRemoveRepo(t *testing.T) {
 				h.repos.failRemove = h.wt("api", "cf/x")
 			}
 			got, err := h.m.RemoveRepo(context.Background(), tt.opts)
-			if !errors.Is(err, tt.wantErr) || (err != nil && !strings.Contains(err.Error(), tt.errText)) {
-				t.Fatalf("err = %v, want %v mentioning %q", err, tt.wantErr, tt.errText)
+			if !errors.Is(err, tt.wantErr) || (err != nil && !strings.Contains(err.Error(), subst.Replace(tt.errText))) {
+				t.Fatalf("err = %v, want %v mentioning %q", err, tt.wantErr, subst.Replace(tt.errText))
 			}
 			snap, _ := h.m.Snapshot().Workspace(w.ID)
 			stored, _ := h.open().Snapshot().Workspace(w.ID)

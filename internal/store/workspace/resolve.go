@@ -250,6 +250,16 @@ func describeThreads(ts []Thread) string {
 	return strings.Join(parts, ", ")
 }
 
+// archiveThem is what a refusal asks for threads whose Claude runs where a removal
+// would go: archiving stops Claude (there is no close; the daemon stops idle threads
+// itself at cache expiry). "archive it" for one thread, "archive them" for more.
+func archiveThem(n int) string {
+	if n == 1 {
+		return "archive it"
+	}
+	return "archive them"
+}
+
 // cleanName trims and validates a workspace name.
 func cleanName(name string) (string, error) {
 	name = strings.TrimSpace(name)
