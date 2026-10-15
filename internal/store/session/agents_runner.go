@@ -106,9 +106,16 @@ func (r *runner) spawnInput(toolUseID string) spawnInput {
 }
 
 // endRuns fails the runs still running: their process is gone (why), so they cannot
-// finish. Their Agent call items were already closed by closeUnfinished.
+// finish. closeUnfinished already made their background Agent calls errors; the error
+// becomes their output (it kept the launch's).
 func (r *runner) endRuns(why string) {
-	if r.usage.orphan(why, r.m.opts.Now(), false) {
+	ended := r.usage.orphan(why, r.m.opts.Now(), false)
+	for _, run := range ended {
+		if run.ToolUseID != "" {
+			r.st.proj.agentEnded(run.ToolUseID, true, run.Error, true)
+		}
+	}
+	if len(ended) > 0 {
 		r.publishUsage()
 	}
 }

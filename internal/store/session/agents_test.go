@@ -214,8 +214,8 @@ func TestAgentsOrphanAndCarry(t *testing.T) {
 	u := newThreadUsage(time.Time{}, func() time.Time { return now }, 0)
 	u.runs = map[string]*runUsage{"live": running("live", true), "stale": running("stale", false),
 		"done": {info: AgentRun{ID: "done", Status: AgentDone}}}
-	if !u.orphan(orphanRescan, time.Time{}, true) {
-		t.Fatal("nothing orphaned")
+	if got := u.orphan(orphanRescan, time.Time{}, true); len(got) != 1 || got[0].ID != "stale" {
+		t.Fatalf("orphaned %+v", got)
 	}
 	if s := u.runs["stale"].info; s.Status != AgentFailed || s.Error != "the thread restarted before the agent finished" || !s.EndedAt.IsZero() {
 		t.Errorf("stale %+v", s)
@@ -223,12 +223,14 @@ func TestAgentsOrphanAndCarry(t *testing.T) {
 	if u.runs["live"].info.Status != AgentRunning || u.runs["done"].info.Status != AgentDone {
 		t.Errorf("staleOnly touched live or done runs")
 	}
+	u.runs["live"].info.StartedAt, u.runs["live"].info.DurationMS = now.Add(-90*time.Second), 1200 // its last progress
 	u.orphan(orphanDaemonStopped, now, false)
-	if l := u.runs["live"].info; l.Status != AgentFailed || l.Error != "the daemon stopped before the agent finished" || !l.EndedAt.Equal(now) {
+	if l := u.runs["live"].info; l.Status != AgentFailed || l.Error != "the daemon stopped before the agent finished" || !l.EndedAt.Equal(now) ||
+		l.DurationMS != 90_000 {
 		t.Errorf("live %+v", l)
 	}
-	if u.orphan(orphanDaemonStopped, now, false) {
-		t.Errorf("orphaned twice")
+	if got := u.orphan(orphanDaemonStopped, now, false); len(got) != 0 {
+		t.Errorf("orphaned twice: %+v", got)
 	}
 
 	// carry: a rescanned run takes the saved lifecycle; a saved run the rescan did not
@@ -559,7 +561,8 @@ func TestAgentsOrphaned(t *testing.T) {
 		if r := got.AgentRuns[0]; r.Status != AgentFailed || r.Error != "the thread's process ended before the agent finished" || r.EndedAt.IsZero() {
 			t.Errorf("run %+v", r)
 		}
-		if it := agentItem(t, e.items(s.ID).Items, fxSlowTool); it.Tool.Status != ToolError {
+		if it := agentItem(t, e.items(s.ID).Items, fxSlowTool); it.Tool.Status != ToolError || !it.Tool.IsError ||
+			it.Tool.Output != "the thread's process ended before the agent finished" {
 			t.Errorf("Agent call %+v", it.Tool)
 		}
 		if a := e.items(s.ID).Agents; len(a) != 1 || a[0].Status != AgentFailed {

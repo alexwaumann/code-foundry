@@ -328,9 +328,10 @@ func (u *threadUsage) transcriptLife(r *runUsage, end runEnd) {
 }
 
 // orphan fails every running run (only those no frame spoke for, with staleOnly): their
-// process is gone. at is when (zero: unknown). It reports whether any changed.
-func (u *threadUsage) orphan(why string, at time.Time, staleOnly bool) bool {
-	n := 0
+// process is gone. at is when (zero: unknown); it ends their running time too (the last
+// progress is older). It returns the runs it failed.
+func (u *threadUsage) orphan(why string, at time.Time, staleOnly bool) []AgentRun {
+	var out []AgentRun
 	for _, r := range u.runs {
 		if r.info.Status != AgentRunning || (staleOnly && r.live) {
 			continue
@@ -338,14 +339,18 @@ func (u *threadUsage) orphan(why string, at time.Time, staleOnly bool) bool {
 		r.info.Status, r.info.Error = AgentFailed, why+orphanSuffix
 		if !at.IsZero() {
 			r.info.EndedAt = runTime(at)
+			from := cmp.Or(r.info.ResumedAt, r.info.StartedAt)
+			if ran := r.info.EndedAt.Sub(from).Milliseconds(); !from.IsZero() && ran > 0 {
+				r.info.DurationMS = max(r.info.DurationMS, r.baseDurationMS+ran)
+			}
 		}
 		r.notePending = false
-		n++
+		out = append(out, r.info)
 	}
-	if n > 0 {
+	if len(out) > 0 {
 		u.changed = true
 	}
-	return n > 0
+	return out
 }
 
 // carry gives a run its lifecycle again after a rescan rebuilt the folds: prev is the
