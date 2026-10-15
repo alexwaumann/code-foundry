@@ -271,8 +271,10 @@ func TestAddPullRequestComment(t *testing.T) {
 			want: PostedComment{ID: "IC_1", URL: "https://github.com/o/r/pull/3#issuecomment-1", CreatedAt: time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)},
 			sent: &fakeReviewCall{op: "AddComment", id: "PR_3", body: "shipped"}, event: true},
 		{name: "locked: GitHub's refusal", number: 1, body: "x",
-			setup: func(g *fakeGitHub) { g.refuseReviews("UNPROCESSABLE", "Unable to create comment because issue is locked.") },
-			err:   ErrFailedPrecondition, errHas: "issue is locked", sent: &fakeReviewCall{op: "AddComment", id: "PR_1", body: "x"}, event: true},
+			setup: func(g *fakeGitHub) {
+				g.refuseReviews("UNPROCESSABLE", "Unable to create comment because issue is locked.")
+			},
+			err: ErrFailedPrecondition, errHas: "issue is locked", sent: &fakeReviewCall{op: "AddComment", id: "PR_1", body: "x"}, event: true},
 		{name: "rate limited keeps its kind", number: 1, body: "x",
 			setup: func(g *fakeGitHub) { g.refuseReviews("RATE_LIMITED", "was submitted too quickly") },
 			err:   ErrRateLimited, sent: &fakeReviewCall{op: "AddComment", id: "PR_1", body: "x"}},

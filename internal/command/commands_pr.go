@@ -12,7 +12,7 @@ import (
 )
 
 // GhBackend is the slice of GhService the pull request detail panel's commands need
-// (pr.revert, pr.merge, pr.review.request, pr.refresh), in generated Connect signatures (see
+// (pr.revert, pr.merge, pr.review.request, pr.refresh, pr.review, pr.comment), in generated Connect signatures (see
 // TerminalBackend). Reads the panel shows (GetPullRequestDetail without refresh,
 // ListReviewerCandidates) stay RPCs.
 type GhBackend interface {
@@ -20,6 +20,8 @@ type GhBackend interface {
 	SetReviewRequest(context.Context, *connect.Request[v1.SetReviewRequestRequest]) (*connect.Response[v1.SetReviewRequestResponse], error)
 	RevertPullRequest(context.Context, *connect.Request[v1.RevertPullRequestRequest]) (*connect.Response[v1.RevertPullRequestResponse], error)
 	MergePullRequest(context.Context, *connect.Request[v1.MergePullRequestRequest]) (*connect.Response[v1.MergePullRequestResponse], error)
+	SubmitPullRequestReview(context.Context, *connect.Request[v1.SubmitPullRequestReviewRequest]) (*connect.Response[v1.SubmitPullRequestReviewResponse], error)
+	AddPullRequestComment(context.Context, *connect.Request[v1.AddPullRequestCommentRequest]) (*connect.Response[v1.AddPullRequestCommentResponse], error)
 }
 
 var (
@@ -34,7 +36,8 @@ var (
 func hasPullRequest(Context) bool { return true }
 
 // RegisterPullRequest registers pr.revert, pr.merge (commands_pr_merge.go),
-// pr.review.request, and pr.refresh: the pull request detail panel's actions. b nil registers them against
+// pr.review.request, pr.refresh, pr.review and pr.comment (commands_pr_review.go): the
+// pull request detail panel's actions. b nil registers them against
 // UnimplementedGhServiceHandler.
 func RegisterPullRequest(r *Registry, b GhBackend) error {
 	if b == nil {
@@ -42,6 +45,9 @@ func RegisterPullRequest(r *Registry, b GhBackend) error {
 	}
 	slug := ArgSpec{Name: "repo-slug", Type: String, Required: true, Positional: true, Description: `GitHub repository, "owner/name"`}
 	number := ArgSpec{Name: "number", Type: Int, Required: true, Positional: true, Description: "Pull request number"}
+	if err := r.RegisterAll(reviewCommands(b, slug, number)...); err != nil {
+		return err
+	}
 	return r.RegisterAll(
 		mergeCommand(b, slug, number),
 		Command{
