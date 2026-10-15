@@ -36,7 +36,8 @@
  *        /__mock/thread/finish[?total=1.5&turnCost=1.5&model=claude-sonnet-5] (the turn_end's figures) |
  *        /__mock/thread/fail-respond[?withdrawn=1] (the next answer fails; withdrawn: Claude withdrew
  *        the request first, NotFound); GET /__mock/thread/calls;
- *        /__mock/thread/commands?set=none|more|default (the slash commands: mock/slashCommands.ts)
+ *        /__mock/thread/commands?set=none|more|default (the slash commands: mock/slashCommands.ts) |
+ *        /__mock/thread/agent-end?run=a1[&status=failed] (a subagent run of state=agents ends: mock/agents.ts)
  *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
  *                                                 shell stays, exited, as if the reaper were late)
  *   POST /__mock/terminal/new?delay=700&fail=reason   (terminal.new takes that long; its next run
@@ -709,6 +710,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { id: s.id });
       break;
     }
+    case "POST /__mock/thread/agent-end":
+      // id=s-r1&run=a1[&status=done|failed]: a subagent run ends (mock/agents.ts).
+      try {
+        world.threads.endAgent(q.get("id") ?? "s-r1", q.get("run") ?? "", q.get("status") === "failed");
+        json(res, 200, { ok: true });
+      } catch (err) {
+        json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
     case "POST /__mock/thread/cache":
       try {
         world.ageThreadCache(q.get("id") ?? "s-r1", Number(q.get("ago") ?? "3660"), q.has("tokens") ? Number(q.get("tokens")) : undefined, q.get("model") ?? undefined);
