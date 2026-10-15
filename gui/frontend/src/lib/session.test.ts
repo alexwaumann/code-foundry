@@ -31,9 +31,9 @@ describe("threadGroup (the sidebar group of an unpinned thread)", () => {
     ["unknown", "busy", "running Bash", "working"],
     ["starting", "unknown", "", "working"],
     ["starting", "idle", "", "working"],
-    // A message to a finished or interrupted thread: working at once.
-    ["starting", "attention", "finished", "working"],
-    ["starting", "error", "interrupted", "working"],
+    // A start that keeps a saved status (an MCP check; a message makes the daemon say busy): attention and error win.
+    ["starting", "attention", "finished", "done"],
+    ["starting", "error", "interrupted", "error"],
     ["closing", "busy", "working: Say hi", "idle"],
     ["closing", "attention", "finished", "done"],
     ["closing", "idle", "", "idle"],
@@ -95,8 +95,8 @@ describe("sessionBadge", () => {
     ["unknown", "unknown", "unknown"],
     ["starting", "idle", "busy"],
     ["starting", "unknown", "busy"],
-    ["starting", "attention", "busy"],
-    ["starting", "error", "busy"],
+    ["starting", "attention", "attention"],
+    ["starting", "error", "error"],
     ["closing", "busy", "idle"],
     ["closing", "idle", "idle"],
     ["closing", "attention", "attention"],

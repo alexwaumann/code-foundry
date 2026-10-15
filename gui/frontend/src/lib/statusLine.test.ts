@@ -38,7 +38,7 @@ describe("statusLine / statusText", () => {
     ["legacy busy, stopped", "disconnected", "busy", "working: x", 1, "place", ""],
     ["finished, stopped", "disconnected", "attention", "finished", NOW - 3 * MIN, "finished", "Finished 3 min ago"],
     ["starting", "starting", "unknown", "", null, "working", "Working"],
-    ["starting after a finished turn", "starting", "attention", "finished", NOW - 3 * MIN, "working", "Working"],
+    ["starting with a saved finished turn (an MCP check)", "starting", "attention", "finished", NOW - 3 * MIN, "finished", "Finished 3 min ago"],
     ["closing", "closing", "busy", "working: x", null, "place", ""],
     ["closing a finished turn", "closing", "attention", "finished", NOW - 3 * MIN, "finished", "Finished 3 min ago"],
   ])("%s", (_name, state, status, statusReason, statusChangedAtMs, kind, text) => {

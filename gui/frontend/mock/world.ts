@@ -1100,6 +1100,8 @@ export class World {
     s.disconnectReason = reason;
     s.exitCode = code;
     s.settleIn = 0;
+    // A stop while starting: the queued reply never comes (the daemon drops it with the process).
+    s.onReady = [];
     s.lastActivityAt = new Date();
     this.publishSession(s);
   }
@@ -1253,7 +1255,9 @@ export class World {
    */
   private createSession(repoId: string, path: string, model: string, effort: string, extra: Partial<MockSession> = {}): MockSession {
     const id = `s-new-${String(this.nextId++)}`;
-    const s = this.addSession({ id, repoId, worktreePath: path, name: "", model, effort, state: SessionState.STARTING, settleIn: 2, nameIn: 1, pendingName: `thread-${id}`, createdAt: new Date(), ...extra });
+    // With a first prompt the thread is on that turn already (the daemon says busy at spawn).
+    const busy = extra.firstMessage ? { status: SessionStatus.BUSY, statusReason: "working" } : {};
+    const s = this.addSession({ id, repoId, worktreePath: path, name: "", model, effort, state: SessionState.STARTING, settleIn: 2, nameIn: 1, pendingName: `thread-${id}`, createdAt: new Date(), ...busy, ...extra });
     this.publishSession(s);
     return s;
   }
@@ -1323,7 +1327,7 @@ export class World {
   /**
    * A message to a stopped thread (the daemon's startStopped): claude --resume in a new
    * process, STARTING until the handshake (~2 s), back in the thread list; the status it
-   * persisted stays until the message makes it busy. `ready` runs once Claude is up; a
+   * persisted is replaced by busy "working" at once. `ready` runs once Claude is up; a
    * thread already starting (or stopping: the mock just starts it again) queues it.
    */
   startThread(id: string, ready: () => void): void {
@@ -1333,6 +1337,8 @@ export class World {
     s.state = SessionState.STARTING;
     s.archivedAt = null;
     s.snoozedUntil = null;
+    // A message starts a turn: the saved status is replaced at once, like the daemon.
+    this.setStatus(s, SessionStatus.BUSY, "working");
     s.settleIn = 2;
     s.disconnectReason = "";
     s.exitCode = 0;
@@ -1360,7 +1366,8 @@ export class World {
       if (s.settleIn > 0 && --s.settleIn === 0) {
         if (s.state === SessionState.STARTING) {
           s.state = SessionState.CONNECTED;
-          this.setStatus(s, SessionStatus.IDLE);
+          // A message waiting for the handshake keeps it busy (the reply follows below).
+          if (s.onReady.length === 0 && !s.firstMessage) this.setStatus(s, SessionStatus.IDLE);
           this.publishSession(s);
           // A new thread: its first message goes out once Claude answered the handshake.
           const first = s.firstMessage;

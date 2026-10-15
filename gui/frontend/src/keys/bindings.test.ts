@@ -266,10 +266,14 @@ describe("handleKeyDown precedence", () => {
       expect([1, 2, 3, 4, 5, 6].map(jumpTo)).toEqual(["f", "d", "b", "e", "c", "a"]);
     });
 
-    it("a thread starting for a message sorts with Working (even after a finished turn); a stopped idle one with the idle ones", () => {
+    it("a stopped idle thread sorts with the idle ones; a starting one keeps a saved finished turn, or is Working once busy", () => {
+      // An MCP check starts e without a message: it still waits on the user (never in Working).
       useSessionsStore.setState((s) => ({
         byId: { ...s.byId, c: session("c", { state: "disconnected", status: "idle" }), e: session("e", { state: "starting", status: "attention", statusReason: "finished" }) },
       }));
+      expect([1, 2, 3, 4, 5, 6].map(jumpTo)).toEqual(["f", "d", "b", "e", "c", "a"]);
+      // A message starts it: the daemon says busy at once.
+      useSessionsStore.setState((s) => ({ byId: { ...s.byId, e: session("e", { state: "starting", status: "busy", statusReason: "working" }) } }));
       expect([1, 2, 3, 4, 5, 6].map(jumpTo)).toEqual(["f", "d", "b", "c", "e", "a"]);
     });
 

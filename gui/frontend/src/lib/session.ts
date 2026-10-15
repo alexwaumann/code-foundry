@@ -5,18 +5,19 @@ import type { SessionView } from "@/api/session";
  * daemon starts it on a message and stops it at cache expiry,
  * docs/notes/hide-connection-state.md); the process state only decides where the status
  * alone would mislead:
- * - starting (Claude coming up for a message just sent) is "busy", whatever the status
- *   it persisted (a resend to a finished or interrupted thread is working);
- * - a stopped or stopping thread keeps an "attention" (it still waits on the user, see
- *   isAttention) or "error" (it ended mid-turn) status; anything else is "idle" (a busy
- *   left by an older daemon included: nothing runs).
+ * - "attention" (it waits on the user, see isAttention) and "error" (it ended mid-turn or
+ *   did not start) always show, so a thread counted as waiting is never shown working;
+ * - otherwise starting is "busy" (a message to a stopped thread makes the daemon say busy
+ *   at once; a start without one, for an MCP check, keeps the saved status);
+ * - a stopped or stopping thread is otherwise "idle" (a busy left by an older daemon
+ *   included: nothing runs).
  */
 export type SessionBadge = "busy" | "idle" | "attention" | "error" | "unknown";
 
 export function sessionBadge(s: Pick<SessionView, "state" | "status"> | undefined): SessionBadge {
   if (!s) return "unknown";
-  if (s.state === "starting") return "busy";
   if (s.status === "attention" || s.status === "error") return s.status;
+  if (s.state === "starting") return "busy";
   if (s.state === "closing" || s.state === "disconnected") return "idle";
   return s.status;
 }
@@ -116,10 +117,10 @@ export function attentionTier(s: Pick<SessionView, "status" | "statusReason">): 
 /**
  * The sidebar group an unpinned thread sorts in (lib/tree.ts buildRows): "prompt" (waits on
  * the user, attentionTier), "error" (error / interrupted), "done" (an unseen finished turn),
- * "working" (busy, or Claude starting for a message), "idle" (everything else). The same
- * reading as sessionBadge: starting wins (the user just sent a message), then attention and
- * error, so a thread waiting on the user never hides in the collapsible Working section; a
- * stopped or stopping busy thread is idle.
+ * "working" (busy, or Claude starting), "idle" (everything else). The same reading as
+ * sessionBadge: attention and error win, so a thread waiting on the user never hides in the
+ * collapsible Working section (keys/bindings.ts jumpToAttention); a stopped or stopping
+ * busy thread is idle.
  */
 export type ThreadGroup = "prompt" | "error" | "done" | "idle" | "working";
 
@@ -149,7 +150,6 @@ export function restartCutsOff(
 }
 
 export function threadGroup(s: Pick<SessionView, "state" | "status" | "statusReason">): ThreadGroup {
-  if (s.state === "starting") return "working";
   const tier = attentionTier(s);
   if (tier !== "") return tier;
   if (s.status === "error") return "error";

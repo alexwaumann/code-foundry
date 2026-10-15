@@ -35,7 +35,8 @@ describe("coldCacheNote", () => {
     ["stopped, before the expiry", { state: "disconnected", nowMs: EXPIRES - 1 }, null],
     // Starting for a message just sent is working.
     ["starting", { state: "starting" }, null],
-    ["starting after a finished turn", { state: "starting", status: "attention" }, null],
+    // A start that kept a finished turn (an MCP check): no message is on its way.
+    ["starting with a saved finished turn", { state: "starting", status: "attention" }, NOTE],
     ["Claude is working", { status: "busy" }, null],
     ["a prompt is pending", { pending: 1 }, null],
     ["a send is starting", { phase: "starting" }, null],

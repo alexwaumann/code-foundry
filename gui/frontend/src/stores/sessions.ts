@@ -151,28 +151,35 @@ export function attentionIds(data: SessionsData): string[] {
   });
 }
 
-/** The session is working: the "busy" badge (busy, or Claude starting for a message; sessionBadge). */
+/**
+ * The session is working: the "busy" badge (busy, or Claude starting; sessionBadge), never
+ * a session that needs attention.
+ */
 export function isRunning(s: Pick<SessionView, "status" | "state">): boolean {
-  return sessionBadge(s) === "busy";
+  return !isAttention(s) && sessionBadge(s) === "busy";
+}
+
+/** Sessions that are running (isRunning), in `order`; none of them in attentionIds. */
+function runningIds(data: SessionsData): string[] {
+  return data.order.filter((id) => {
+    const s = data.byId[id];
+    return s !== undefined && isRunning(s);
+  });
 }
 
 /** Sessions that are running (isRunning). */
 export function runningCount(data: SessionsData): number {
-  let n = 0;
-  for (const id of data.order) {
-    const s = data.byId[id];
-    if (s && isRunning(s)) n++;
-  }
-  return n;
+  return runningIds(data).length;
 }
 
-/** The start page's thread list: sessions waiting on the user, then running ones, each in `order`. */
+/**
+ * The start page's thread list: sessions waiting on the user, then running ones, each in
+ * `order`. An id is never in both (attention wins): the list keys rows by id.
+ */
 export function activeThreadIds(data: SessionsData): string[] {
-  const running = data.order.filter((id) => {
-    const s = data.byId[id];
-    return s !== undefined && isRunning(s);
-  });
-  return [...attentionIds(data), ...running];
+  const waiting = attentionIds(data);
+  const seen = new Set(waiting);
+  return [...waiting, ...runningIds(data).filter((id) => !seen.has(id))];
 }
 
 /** Number of sessions needing attention (a narrow, primitive selector). */

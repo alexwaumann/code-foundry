@@ -175,6 +175,19 @@ describe("session reducers", () => {
     ]);
     expect(runningCount(d)).toBe(2);
     expect(activeThreadIds(d)).toEqual(["wait1", "wait2", "busy1", "start"]);
+  });
+
+  it("a thread is never both waiting and running: attention wins (an MCP start keeps a saved finished turn)", () => {
+    const d = replaceSessions(emptySessions, [
+      session("mcp", { status: "attention", statusReason: "finished", state: "starting", createdAtMs: 1 }),
+      session("busy", { status: "busy", createdAtMs: 2 }),
+      session("asking", { status: "attention", statusReason: "question: Which?", state: "starting", createdAtMs: 3 }),
+    ]);
+    expect(attentionIds(d)).toEqual(["mcp", "asking"]);
+    expect(runningCount(d)).toBe(1);
+    const ids = activeThreadIds(d);
+    expect(ids).toEqual(["mcp", "asking", "busy"]);
+    expect(new Set(ids).size).toBe(ids.length);
     expect(activeThreadIds(emptySessions)).toEqual([]);
   });
 });
