@@ -182,7 +182,9 @@ for (const scheme of ["dark", "light"] as const) {
     await expectAgentsTab(page);
     await page.mouse.move(0, 0);
     await page.screenshot({ path: `${String(shots)}/agents-${scheme}.png` });
-    await panel(page).screenshot({ path: `${String(shots)}/agents-${scheme}-panel.png` });
-    await page.getByTestId("sidebar").screenshot({ path: `${String(shots)}/agents-${scheme}-sidebar.png` });
+    // The sidebar's rows down to the thread's: its line 2 says "3 agents".
+    const side = await page.getByTestId("sidebar").boundingBox();
+    const r = await row(page, "s:s-r1").boundingBox();
+    if (side && r) await page.screenshot({ path: `${String(shots)}/agents-${scheme}-sidebar.png`, clip: { x: side.x, y: side.y, width: side.width, height: r.y + r.height + 12 - side.y } });
   });
 }
