@@ -228,6 +228,8 @@ export function agentCounts(runs: readonly AgentRunInit[]): { agentsRunning: num
 export interface AgentThreads {
   /** The thread's runs in spawn order ([] for none). Throws for an unknown thread. */
   agentsOf(id: string): AgentRunInit[];
+  /** The thread's running background shells (mock/shells.ts). */
+  shellsOf(id: string): number;
   calls: string[];
 }
 
@@ -236,6 +238,12 @@ type Command = {
   when: (ctx: UiContext | undefined) => boolean;
   run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut>;
 };
+
+/** The thread.agents header's tail: " · N shell(s) in the background", "" for none. */
+function shellsNote(n: number): string {
+  if (n <= 0) return "";
+  return ` · ${String(n)} ${n === 1 ? "shell" : "shells"} in the background`;
+}
 
 /** thread.agents and view.panel.agents, like the daemon's (any active thread). */
 export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) => number): Command[] {
@@ -255,10 +263,11 @@ export function agentsCommands(threads: AgentThreads, emit: (i: UiIntentInit) =>
         const id = a.id || ctx?.activeSessionId || "";
         threads.calls.push(`agents ${id}`);
         const runs = threads.agentsOf(id);
-        if (runs.length === 0) return Promise.resolve({ message: "no subagent runs in this thread", resultJson: JSON.stringify({ sessionId: id, agents: [] }) });
+        const shells = shellsNote(threads.shellsOf(id));
+        if (runs.length === 0) return Promise.resolve({ message: `no subagent runs in this thread${shells}`, resultJson: JSON.stringify({ sessionId: id, agents: [] }) });
         const c = agentCounts(runs);
         return Promise.resolve({
-          message: `Agents: ${String(c.agentsRunning)} running (${String(c.backgroundAgentsRunning)} in the background) · ${String(runs.length)} this thread`,
+          message: `Agents: ${String(c.agentsRunning)} running (${String(c.backgroundAgentsRunning)} in the background) · ${String(runs.length)} this thread${shells}`,
           resultJson: JSON.stringify({ sessionId: id, agents: runs.map((r) => ({ id: r.id, description: r.description })) }),
         });
       },
