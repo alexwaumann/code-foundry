@@ -12,7 +12,10 @@ gui-e2e` (both browsers, nothing else running): 738 passed, 32 skipped, 4 failed
 `projects.spec.ts` tests that list the project overflow menu, on each browser, which now
 has "New action…". Fixed in the spec; rerun with `actions.spec.ts` and
 `bottom-panel.spec.ts`: 80 passed, 4 skipped (the SHOTS-only screenshots).
-`make gui-build` green. Not exercised against the live daemon (see Not done).
+`make gui-build` green. Then a live pass against the real daemon and Wails window (see
+Live pass), whose defects are fixed here; after the fixes `make check` is green (132
+vitest files / 2693 tests) and `actions.spec.ts`, `bottom-panel.spec.ts` and
+`projects.spec.ts` on both browsers: 82 passed, 4 skipped (SHOTS-only).
 
 ## Pieces
 
@@ -23,7 +26,9 @@ has "New action…". Fixed in the spec; rerun with `actions.spec.ts` and
 | `stores/actions.ts` | `byId`, `byRepo` (ids in position order), `runs`; `applyActionEvent`; `useRepoActionIds`, `useAction`, `useActionRun` |
 | `stores/actionActions.ts` | `runAction` (action.run `--terminal` in the owner's context), `stopActionRun` (terminal.kill, confirmed), `rerunAction`, `saveAction` (action.add / action.edit with changed fields), `deleteAction` (action.remove), `onActionRunFinished` + `openFailedRun` |
 | `stores/actionDialog.ts` | Which editor (new / edit, project, from where) or run output is open |
-| `lib/actions.ts` | Pure: tab status, `formatRunClock` (0:12), `formatRunDuration` (4.2s, 3m 5s), the echo, drafts and the args Save sends |
+| `stores/actionStops.ts` | Action terminals the user pressed Stop on (GUI-only), for "Stopping…" and "Stopped" |
+| `lib/actions.ts` | Pure: tab status (running / stopping / ok / stopped / failed), `formatRunClock` (0:12), `formatRunDuration` (4.2s, 3m 5s), the echo, drafts and the args Save sends |
+| `lib/path.ts` | `splitPathTail`: a path's directory and last segment, for the run dialog's middle ellipsis |
 | `lib/termlabel.ts` | `KIND_ACTION`, `ACTION_LABEL`, `ACTION_NAME_LABEL`, `ACTION_RUN_LABEL`, `isActionLabels`, `isPanelLabels` |
 | `stores/bottomPanel.ts` | `ownerKeyOf` takes `kind in (shell, action)`; an action tab's title is `action.name` (numbered like shells: "Test", "Test 2") |
 | `stores/bottomActions.ts` | `showOwnTerminal` (the "+" focus path, for a run's terminal) |
@@ -33,6 +38,7 @@ has "New action…". Fixed in the spec; rerun with `actions.spec.ts` and
 | `components/actions/ActionTabParts.tsx` | Tab icon and status mark, `ActionEcho`, `ActionStatusLine` |
 | `components/bottom/BottomPanel.tsx` | Action tabs; echo above and status line under the one `TerminalHost` |
 | `components/terminal/TerminalHost.tsx` | `exitOverlay={false}` for action tabs (the status line says it) |
+| `terminal/attach.ts`, `terminal/xterm.ts` | An exited terminal hides its cursor (`hideCursor`, DECTCEM off) |
 | `HeaderActions.tsx`, `ProjectsPage.tsx`, `App.tsx` | The header menu (left of the bottom toggle), the row menu and "New action…" in the project overflow, the two dialogs |
 | `mock/actions.ts` (+ `world.ts`, `server.ts`) | ActionService, the action source, `action.*`, `kind=action` terminals with scripted output, the worktree-create hook, `/__mock/action/*` |
 
@@ -50,7 +56,8 @@ has "New action…". Fixed in the spec; rerun with `actions.spec.ts` and
   (`aria-keyshortcuts="ArrowRight"` on the item), as it would open a submenu; letters stay
   Radix's typeahead. The pencil is a mouse affordance (tabIndex -1) shown on the
   highlighted row (hover or arrow keys). The palette also has `action.edit`/`remove` with
-  args. Cmd+Enter saves the editor (Enter is a newline in the command).
+  args. Cmd+Enter saves the editor from anywhere in the dialog (Enter is a newline in the
+  command); the key is handled on the dialog's content, not the form (see Gotchas).
 * **Header**: Play (`pane-actions-menu`) left of the bottom toggle, only for a thread with
   a project and only while the daemon lists `action.run` (like Snooze). The menu's label is
   the project's name; empty: "No actions for <project> yet" and "New action…".
@@ -60,9 +67,11 @@ has "New action…". Fixed in the spec; rerun with `actions.spec.ts` and
 * **Picked items run after the menu has closed** and handed focus back (as the Projects
   overflow menus do), so a run's tab or the dialog takes focus last.
 * **Editor**: the sketch's form. The daemon's refusal shows above the footer (no toast);
-  a message mentioning the name marks the Name field invalid. Save is disabled without a
-  name and a command. Delete swaps the footer for "Delete X for every thread in
-  <project>?" Keep / Delete, the armed Delete on the right. The description says "the
+  a message mentioning the name marks the Name field invalid. Any edit clears the refusal
+  and the red field (it was about the draft as it was). Save is disabled without a name
+  and a command. Delete swaps the footer for "Delete X for every thread in
+  <project>?" Keep / Delete, the armed Delete on the right; the project's name does not
+  break at its hyphens. The description says "the
   worktree's checkout" when opened from the Projects page. **The switch's subtitle
   differs from the sketch**: the daemon runs worktree-create actions in the background
   regardless of `in_terminal`, so "Opens in the new thread's bottom panel" would be wrong;
@@ -73,16 +82,23 @@ has "New action…". Fixed in the spec; rerun with `actions.spec.ts` and
   is drawn from the run's command (else the terminal's argv `[$SHELL, -lc, cmd]`), dimmed,
   one line with "+N lines" for a multi-line command. The status line is 28px, always
   there for an action tab, so the terminal does not refit on exit; times come from the
-  run, else the terminal. Stop keeps the keyboard in the terminal. A stopped run reads
-  "Exited with code 129" in red (no separate "Stopped" state).
+  run, else the terminal. Stop keeps the keyboard in the terminal. **Stop** reads "Stopping…" (muted
+  spinner, Stop disabled) until the run exits, then "Stopped · 4.2s · Rerun", neutral (a
+  muted stop mark on the tab), when the exit code is 129 or 137 after the user's Stop. A
+  command that exits 137 (or anything else non-zero) on its own stays red "Exited with
+  code N". The GUI remembers the Stop (`stores/actionStops.ts`); the daemon is unchanged.
+  An exited action tab hides the terminal's cursor.
 * **Rerun** runs the action again for the same owner first, then closes the old tab: if
   the run fails (the action was deleted), the old tab and its output stay. The new tab is
   appended and active.
 * **Toast**: run_finished with trigger worktree-create and a non-zero exit only: "Setup
-  action X failed (exit N)" with Open (id per run, so a reconnect cannot repeat it). Open
+  action X failed (exit N)" with Open (id per run, so a reconnect cannot repeat it). It
+  stays until dismissed (× or Open; `duration: Infinity`, like a failed git op's toast):
+  the run is in the background with no tab, so the toast is the only sign it failed. Open
   reveals the run's tab when it had a terminal; the daemon runs setup in the background,
   so normally it selects the thread and opens the run's captured output (GetRun) in a
-  dialog with "Run in terminal".
+  dialog with "Run in terminal". The dialog's status is one line; its path ellipsizes in
+  the middle, keeping the last folder (the worktree's branch folder).
 
 ## Gotchas
 
@@ -101,38 +117,71 @@ has "New action…". Fixed in the spec; rerun with `actions.spec.ts` and
   only drops Connect's own code prefix). The editor strips it (`lib/actions.ts`
   `refusalText`); the mock's action errors carry it like the daemon's.
 
+* **WebKit does not focus a button on click.** After clicking an icon tile or the switch
+  the focus is on the dialog's content (Radix's focus target), outside the form, so a
+  form-level `onKeyDown` never saw Cmd+Enter. The form registers its handler through a
+  ref and `DialogContent` calls it.
+* **Stop takes ~3 s live.** terminal.kill sends SIGHUP; `$SHELL -lc cmd` passes it on, but
+  a child that ignores it (a dev server, `make dev`) keeps running until the daemon's
+  SIGKILL after the grace period, so the run ends 137, not 129. Hence "Stopping…" and both
+  codes for "Stopped". The mock's Debug daemon (`make dev`) ignores SIGHUP the same way
+  (137 after 1.5 s), so the e2e sees "Stopping…".
+* **Hiding the cursor is a write** (`ESC[?25l`), queued behind the output, so it works for
+  the DOM and the WebGL renderer alike and comes after a reattach's snapshot.
+
 ## Tests
 
 * Unit: `lib/actions.test.ts` (status, clock and duration tables, echo, drafts and
   edit/add args), `stores/actions.test.ts` (reducer), `api/actions.test.ts` (mapping,
-  `runFromResult`), `stores/actionActions.test.ts` (toast conditions, Open, owners, run,
-  rerun, stop, save/delete and the inline refusal), `stores/bottomPanel.test.ts` (action
+  `runFromResult`), `stores/actionActions.test.ts` (toast conditions and its sticky
+  options, Open, owners, run, rerun, stop and its Stopping flag, save/delete and the
+  inline refusal), `components/actions/ActionDialog.test.tsx` (Cmd+Enter from the
+  content, an icon tile, the switch and Name, not during the delete confirm; a refusal
+  cleared by editing Name), `lib/path.test.ts`, `terminal/attach.test.ts` and
+  `terminal/xterm.test.ts` (the cursor hidden on exit), `stores/bottomPanel.test.ts` (action
   rows for `ownerKeyOf`, `bottomTabIds`, titles and numbering), `HeaderActions.test.tsx`
   (where the menu shows, the list and the empty state).
 * e2e `e2e/actions.spec.ts`: the header menu (order, pencil on hover, a click runs
   `action.run --terminal` for s-1, the tab, echo, running then failed status line, no exit
   overlay, no toast); the empty state; add, a duplicate refused inline, edit by pencil
   (only changed args, Cmd+Enter) and by ArrowRight, delete with Keep and Delete; Stop
-  (`terminal.kill`, confirmed, tab kept at 129), Rerun (new run, old tab gone, new one
+  (`terminal.kill`, confirmed, tab kept, "Stopped" at 129; "Stopping…" with Stop
+  disabled, then "Stopped" at 137, for a run that ignores SIGHUP), Rerun (new run, old tab gone, new one
   active), an exit-0 run, × closing through `terminal.close`; an agent's run showing up;
   the Projects page (row run with the worktree's context in the page's panel, "New
-  action…" for ghostty-playground); the setup toast, Open, the output dialog and Run in
-  terminal, and a passing setup run staying quiet.
+  action…" for ghostty-playground); the setup toast, Open, the output dialog (one status line and the path's tail at 360px
+  wide) and Run in terminal, a passing setup run staying quiet, and × on a failure toast.
+
+## Live pass
+
+Against the real daemon and Wails window (`make gui-build`, an isolated
+`CODE_FOUNDRY_HOME`, a scratch repo). Checked: the header menu with and without actions,
+New / Edit / Delete in the editor (a duplicate name refused inline, the worktree-create
+switch), the Projects row menu and a row run in the page's panel, running, stopped and
+exited action tabs, and a failing worktree-create action on a new-worktree thread: its
+toast, Open and the output dialog. No `code-foundry` CLI was on PATH, so the agent ran
+the CLI as `$CODE_FOUNDRY_BIN` (which `code-foundry daemon` and `gui` export to every
+session). Defects it found, fixed in this PR: the setup toast vanished after 4 s; Stop gave
+no feedback for ~3 s and then read red "Exited with code 137" (see Gotchas); Cmd+Enter did
+nothing after clicking an icon or the switch; a refusal stayed after the user fixed the
+name; the output dialog's status wrapped and cut the path's end; the delete confirm broke
+the project's name at its hyphen; exited action tabs kept a block cursor. The refusal's
+"failed precondition: " prefix was fixed earlier (`refusalText`).
 
 ## Screenshots
 
-WebKit against the mock daemon, 1280x800 at 2x, dark and light, in
-`docs/notes/actions-2-gui/` (`SHOTS=<dir> pnpm exec playwright test e2e/actions.spec.ts
---project=webkit -g screenshots`):
+From the live pass (Wails window, real daemon), in `docs/notes/actions-2-gui/`, taken
+before the fixes above (the Stop and output-dialog states changed since):
 
-* `menu-{dark,light}.png`: s-1's header menu, the pencil on the hovered Test row.
-* `menu-empty-{dark,light}.png`: s-2 (ghostty-playground), no actions.
-* `dialog-new-{dark,light}.png`: New action filled in like the sketch (Install deps,
-  two-line command, Configure, the switch on).
-* `dialog-delete-{dark,light}.png`: Edit Test after Delete, the inline confirm.
-* `panel-running-{dark,light}.png`: Check running, the echo and "Running · 0:02 · Stop".
-* `panel-exited-{dark,light}.png`: Test exited 1 beside Check's green check, the red
-  status line with Rerun.
+* `live-menu-dark.png`: the header menu, the pencil on the highlighted row.
+* `live-menu-empty-light.png`: a project without actions.
+* `live-dialog-delete-light.png`: Edit after Delete, the inline confirm.
+* `live-panel-running-dark.png`: a running action tab, the echo and "Running · 0:02 · Stop".
+* `live-panel-exited-light.png`: an exited action tab, the status line with Rerun.
+* `live-toast-setup-failed-light.png`: a failed setup action's toast with Open.
+
+The e2e's `SHOTS=<dir>` test still writes mock screenshots on demand (`SHOTS=<dir> pnpm exec
+playwright test e2e/actions.spec.ts --project=webkit -g screenshots`); they are not kept.
 
 ## Daemon changes
 
@@ -140,10 +189,8 @@ None needed.
 
 ## Not done
 
-* **Not run against the real daemon and Wails window.** Everything here is against the
-  mock; a live pass (isolated `CODE_FOUNDRY_HOME`, a scratch repo, the header menu, a
-  failing setup action on a new-worktree thread) and live screenshots are still to do.
-* No "Stopped" wording for a run the user stopped (it reads "Exited with code 129").
+* The fixes after the live pass are checked by unit and e2e tests against the mock, not
+  by a second live pass; the screenshots predate them.
 * No drag reorder of actions (the daemon has `--position`; the GUI does not use it).
 * The header Play button and the Projects row menus are mouse-first, like their
   neighbours (tabIndex -1); the palette's `action.run` / `action.add` / `action.edit` /
