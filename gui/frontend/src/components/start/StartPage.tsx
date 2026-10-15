@@ -35,7 +35,7 @@ function Onboarding() {
   return (
     <>
       <Header title="Welcome to Code Foundry">
-        <p>Run fleets of Claude Code threads across git worktrees.</p>
+        <p>A single surface for all your agents.</p>
       </Header>
       <div className="flex flex-wrap justify-center gap-2" data-testid="welcome-actions">
         <CommandButton command="repo.add" icon={FolderPlus} label="Add a project" variant="default" whenUnavailable="disable" keepFocus={false} />
