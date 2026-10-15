@@ -115,12 +115,15 @@ sanitizer's `input`) as GitHub sends it.
 
 ## Verified
 
-- `make check` green (frontend 146 vitest files / 2883 tests; Go unchanged).
+- `make check` green (frontend 2883 tests before the rebase onto #114, 2921 after;
+  no Go change on this branch).
 - `make gui-e2e` (WebKit + Chromium): 771 passed, 40 skipped, 1 failed: the new
   keyboard-select test on Chromium, which pressed Enter before Radix had moved the focus
   to the next option (Radix moves it in a timeout). The test now waits for the focus; it
   then passed 10 of 10 (`--repeat-each=5`, both browsers), and `settings.spec.ts` and
   `zoom-popovers.spec.ts` pass whole. The known `panel.spec.ts` flake did not show.
+- After rebasing onto #114: settings, zoom-popovers, actions, create, addproject, snooze,
+  projects, pr-panel and sessions specs on both browsers, 210 passed, 4 skipped.
 - Live (`make gui-build`, isolated `CODE_FOUNDRY_HOME`, a scratch repo under `~` and one
   unprompted Haiku thread, all deleted afterwards), dark and light:
   - Settings: the select opens under its trigger, as wide, in the popover colours; arrows
