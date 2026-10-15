@@ -166,6 +166,8 @@ test("an enum select works from the keyboard and its list is themed", async ({ p
   // The selected item has the focus; ArrowDown moves to the next and Enter picks it.
   await expect(list.getByRole("option", { name: "comfortable (default)" })).toBeFocused();
   await page.keyboard.press("ArrowDown");
+  // Radix moves the focus in a timeout; Enter picks whichever option has it.
+  await expect(list.getByRole("option", { name: "full" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(list).toHaveCount(0);
   await expect(trigger).toHaveAttribute("data-value", "full");
