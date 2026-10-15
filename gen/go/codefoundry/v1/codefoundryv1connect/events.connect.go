@@ -40,7 +40,7 @@ const (
 // EventServiceClient is a client for the codefoundry.v1.EventService service.
 type EventServiceClient interface {
 	// Watch streams all events. Each store's snapshot event is sent first, in the order
-	// repo, workspace, terminal, session, thread, gh, gitops, settings, update, so a
+	// repo, workspace, terminal, session, thread, gh, gitops, settings, update, action, so a
 	// client can replace its state wholesale on connect.
 	Watch(context.Context, *connect.Request[v1.WatchEventsRequest]) (*connect.ServerStreamForClient[v1.Event], error)
 }
@@ -78,7 +78,7 @@ func (c *eventServiceClient) Watch(ctx context.Context, req *connect.Request[v1.
 // EventServiceHandler is an implementation of the codefoundry.v1.EventService service.
 type EventServiceHandler interface {
 	// Watch streams all events. Each store's snapshot event is sent first, in the order
-	// repo, workspace, terminal, session, thread, gh, gitops, settings, update, so a
+	// repo, workspace, terminal, session, thread, gh, gitops, settings, update, action, so a
 	// client can replace its state wholesale on connect.
 	Watch(context.Context, *connect.Request[v1.WatchEventsRequest], *connect.ServerStream[v1.Event]) error
 }

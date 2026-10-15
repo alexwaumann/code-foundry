@@ -26,9 +26,10 @@ service TerminalService {
   rpc Kill(KillTerminalRequest) returns (KillTerminalResponse) {}
   // Remove forgets an exited terminal.
   rpc Remove(RemoveTerminalRequest) returns (RemoveTerminalResponse) {}
-  // Close kills a shell terminal (labels kind=shell) like Kill, waits for it to exit,
-  // and removes it. It returns once the terminal is gone (Watch has sent `updated` with
-  // state EXITED, then `removed_id`). Closing an exited shell just removes it. Any other
+  // Close kills a shell terminal (labels kind=shell) or an action run (kind=action) like
+  // Kill, waits for it to exit, and removes it. It returns once the terminal is gone
+  // (Watch has sent `updated` with state EXITED, then `removed_id`). Closing an exited
+  // shell or action run just removes it. Any other
   // terminal (a thread's Claude terminal: use SessionService.Close) is refused with
   // FailedPrecondition; an unknown id is NotFound.
   rpc Close(CloseTerminalRequest) returns (CloseTerminalResponse) {}
@@ -59,16 +60,24 @@ message Terminal {
   bool alt_screen = 11;
   // Labels set by the creator. TerminalService does not interpret them; the daemon's
   // creators follow this contract (internal/termlabel):
-  //   kind      "shell" on a shell started by the terminal.new command. A session's
-  //             Claude terminal has no kind. The daemon removes a "shell" terminal as
-  //             soon as it exits, and kills and removes it when its thread is removed,
-  //             its project is unregistered, or its worktree directory is removed.
+  //   kind      "shell" on a shell started by the terminal.new command; "action" on
+  //             an action run in a terminal (ActionService.Run, action.run). A
+  //             session's Claude terminal has no kind. The daemon removes a "shell"
+  //             terminal as soon as it exits; an "action" terminal stays EXITED until
+  //             it is closed (terminal.close), so its output can be read. Both are
+  //             killed and removed when their thread is removed, their project is
+  //             unregistered, or their worktree directory is removed.
   //   session   the thread (session id) the terminal belongs to: on a session's Claude
   //             terminal, and on a shell started for a thread.
   //   repo      the repository id of the worktree a shell belongs to.
   //   worktree  the worktree path (symlinks resolved) the terminal belongs to: the
   //             session's worktree on a Claude terminal; on a shell, its owner worktree
   //             (the thread's worktree when it belongs to a thread).
+  //   action    on kind "action": the action's id (ActionService).
+  //   action.name  on kind "action": the action's name when the run started.
+  //   action.run   on kind "action": the run's id (ActionRun.id).
+  // An action terminal carries the same session / repo / worktree owner labels as a
+  // shell, so a bottom panel shows both the same way.
   // A terminal created through Create without labels belongs to nothing.
   map<string, string> labels = 12;
 }

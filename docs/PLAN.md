@@ -170,6 +170,23 @@ left; the Snooze submenu, header button and custom date dialog; "Snooze ended" i
 snoozed threads out of attention; panels reset like archive; mock daemon) done:
 `docs/notes/snooze-threads-2-sidebar.md`.
 
+### Actions: per-project commands (2026-10-14)
+
+Per-project actions modelled on T3 Code's: name, command, icon, in a terminal or in the
+background, run on worktree create. A thread's agent runs them with `code-foundry action
+run` (its `CODE_FOUNDRY_SESSION` makes it the owner); the user runs them from the thread
+header, a terminal run opening as a tab in the bottom panel. Sketch:
+`docs/sketches/actions/`.
+
+* PR A (migration 0020, `internal/store/action` with the terminal and background runners,
+  `ActionService` + the EventService action source, `kind=action` terminals the reaper
+  keeps when they exit, `action.*` commands with `--wait` exit codes,
+  `CODE_FOUNDRY_SESSION` as the CLI's default `--context-session`, on-worktree-create
+  runs) done: `docs/notes/actions-1-daemon.md`.
+* PR B (GUI: header menu, editor dialog, action tabs with a status line, Stop/Rerun,
+  toasts for worktree-create runs; mock daemon) pending.
+* PR C pending.
+
 ### Release channels: stable and tip (design 2026-10-11, revised 2026-10-12)
 
 Two channels, one install: every push to main publishes a `vX.Y.Z-tip.N` prerelease

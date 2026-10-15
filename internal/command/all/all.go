@@ -19,7 +19,8 @@ type Deps struct {
 	// shell's owner). Nil registers the commands against
 	// UnimplementedTerminalServiceHandler, so they list but fail with Unimplemented.
 	Terminal command.TerminalBackend
-	// IsShellTerminal reports whether a terminal is a shell terminal.new started; it gates
+	// IsShellTerminal reports whether a terminal is a bottom panel terminal (a shell
+	// terminal.new started, or an action run; termlabel.IsPanel); it gates
 	// terminal.close. Nil: any terminal.
 	IsShellTerminal func(id string) bool
 	// AwaitTerminalOutput blocks until a new terminal has printed something (its
@@ -62,6 +63,9 @@ type Deps struct {
 	Restart func()
 	// Workspace backs workspace.*. Nil works like Terminal.
 	Workspace command.WorkspaceBackend
+	// Action backs action.* (which also use Repo and Session to find a run's owner).
+	// Nil works like Terminal.
+	Action command.ActionBackend
 }
 
 // Register registers every domain's commands into r.
@@ -86,6 +90,9 @@ func Register(r *command.Registry, d Deps) error {
 	}
 	if d.Workspace == nil {
 		d.Workspace = codefoundryv1connect.UnimplementedWorkspaceServiceHandler{}
+	}
+	if d.Action == nil {
+		d.Action = codefoundryv1connect.UnimplementedActionServiceHandler{}
 	}
 	if d.Update == nil {
 		d.Update = codefoundryv1connect.UnimplementedUpdateServiceHandler{}
@@ -120,5 +127,6 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterView(r, d.Emitter),
 		command.RegisterUsage(r, d.Session),
 		command.RegisterWorkspace(r, d.Workspace),
+		command.RegisterAction(r, command.ActionDeps{Action: d.Action, Repo: d.Repo, Session: d.Session}),
 	)
 }

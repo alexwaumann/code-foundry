@@ -40,15 +40,18 @@ type shellReaperOptions struct {
 	SessionExists func(id string) bool
 }
 
-// shellReaper removes the shells terminal.new starts (termlabel.KindShell) once nothing
-// shows them. Other terminals (unlabelled ones) are never touched.
+// shellReaper removes the bottom panel's terminals (termlabel.IsPanel: the shells
+// terminal.new starts and the action runs the action store starts in a terminal) once
+// nothing shows them. Other terminals (unlabelled ones) are never touched.
 //
-//   - A shell is removed as soon as it exits.
+//   - A shell is removed as soon as it exits. An action terminal is not: it stays
+//     EXITED so the user can read its output, and the GUI closes it (terminal.close).
+//     The sweep leaves exited action terminals alone too.
 //   - Its worktree is removed (repo.WorktreeRemoved, from repo.worktree.remove, a
 //     workspace removal, or `git worktree remove` outside the app): killed and removed,
 //     but only once the directory is gone. The repo store also publishes WorktreeRemoved
 //     for every worktree when a refresh fails (it lists none), and that must not kill
-//     anything.
+//     anything. This and the next two apply to action terminals too, exited or not.
 //   - Its project is unregistered (repo.RepoRemoved): killed and removed.
 //   - Its thread is removed (session.Removed): killed and removed. session.Manager.Remove
 //     does it first, synchronously; this catches a shell started while that ran.
@@ -138,7 +141,8 @@ func (r *shellReaper) remove(id string) {
 	}
 }
 
-// reap kills and removes, in the background, every shell whose label key is value.
+// reap kills and removes, in the background, every shell and action terminal whose
+// label key is value.
 func (r *shellReaper) reap(why, key, value string) {
 	if value == "" {
 		return
@@ -147,7 +151,7 @@ func (r *shellReaper) reap(why, key, value string) {
 		ctx, cancel := context.WithTimeout(r.ctx, reapTimeout)
 		defer cancel()
 		n, err := terminal.KillAndRemoveWhere(ctx, r.opts.Terminals, func(t terminal.Terminal) bool {
-			return termlabel.IsShell(t.Labels) && t.Labels[key] == value
+			return termlabel.IsPanel(t.Labels) && t.Labels[key] == value
 		})
 		if err != nil && r.ctx.Err() == nil {
 			r.opts.Log.Warn("remove shells", "why", why, key, value, "err", err)
@@ -158,7 +162,7 @@ func (r *shellReaper) reap(why, key, value string) {
 	})
 }
 
-// sweep re-checks every shell against the current state.
+// sweep re-checks every shell and action terminal against the current state.
 func (r *shellReaper) sweep() {
 	reaped := map[string]bool{} // key + "=" + value, once per sweep
 	reap := func(why, key, value string) {
@@ -168,12 +172,12 @@ func (r *shellReaper) sweep() {
 		}
 	}
 	for _, t := range r.opts.Terminals.List(r.ctx) {
-		if !termlabel.IsShell(t.Labels) {
+		if !termlabel.IsPanel(t.Labels) {
 			continue
 		}
 		l := t.Labels
 		switch {
-		case t.State == terminal.StateExited:
+		case t.State == terminal.StateExited && termlabel.IsShell(l):
 			r.remove(t.ID)
 		case l[termlabel.Worktree] != "" && r.opts.DirGone(l[termlabel.Worktree]):
 			reap("worktree gone", termlabel.Worktree, l[termlabel.Worktree])

@@ -38,6 +38,12 @@ var subcommands = []subcommand{
 // errUsage marks errors already explained to the user; main exits 2 without repeating them.
 var errUsage = errors.New("usage")
 
+// exitCodeError is a command's reported exit status (InvokeCommandResponse.exit_code,
+// e.g. action.run --wait): its result is printed already; main exits with it.
+type exitCodeError int
+
+func (e exitCodeError) Error() string { return fmt.Sprintf("exit status %d", int(e)) }
+
 // cli carries the dispatcher's I/O and daemon connection so tests can swap them.
 type cli struct {
 	stdout, stderr io.Writer
@@ -49,16 +55,23 @@ type cli struct {
 	// interactive reports false) destructive commands need --yes.
 	stdin       io.Reader
 	interactive func() bool
+	// getenv reads the environment (os.Getenv); nil reads nothing. It supplies the
+	// default --context-session (paths.EnvSession, set in a thread's Claude session).
+	getenv func(string) string
 }
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn})))
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	cl := &cli{stdout: os.Stdout, stderr: os.Stderr, connect: connectDaemon, getwd: os.Getwd, stdin: os.Stdin, interactive: stdinIsTerminal}
+	cl := &cli{stdout: os.Stdout, stderr: os.Stderr, connect: connectDaemon, getwd: os.Getwd, stdin: os.Stdin, interactive: stdinIsTerminal,
+		getenv: os.Getenv}
 	err := cl.dispatch(ctx, os.Args[1:])
 	stop()
+	var exit exitCodeError
 	switch {
 	case err == nil:
+	case errors.As(err, &exit):
+		os.Exit(int(exit))
 	case errors.Is(err, errUsage):
 		os.Exit(2)
 	case errors.Is(err, errCancelled), errors.Is(err, errReported):

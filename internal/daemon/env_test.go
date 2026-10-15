@@ -73,9 +73,10 @@ func TestSessionEnv(t *testing.T) {
 func TestScrubEndpointEnv(t *testing.T) {
 	t.Setenv("CODE_FOUNDRY_ENDPOINT", "http://127.0.0.1:1")
 	t.Setenv("CODE_FOUNDRY_TOKEN", "other-daemon")
+	t.Setenv("CODE_FOUNDRY_SESSION", "s-other-daemon")
 	var logs bytes.Buffer
 	scrubEndpointEnv(slog.New(slog.NewTextHandler(&logs, nil)))
-	for _, k := range []string{"CODE_FOUNDRY_ENDPOINT", "CODE_FOUNDRY_TOKEN"} {
+	for _, k := range []string{"CODE_FOUNDRY_ENDPOINT", "CODE_FOUNDRY_TOKEN", "CODE_FOUNDRY_SESSION"} {
 		if _, ok := os.LookupEnv(k); ok {
 			t.Errorf("%s still set", k)
 		}

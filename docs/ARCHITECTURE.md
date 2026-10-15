@@ -90,6 +90,9 @@ internal/
     update/                release checks via gh (stable or tip channel), installs with the embedded installer
     workspace/             branch sets: one branch as a worktree in several repos
                            (docs/notes/workspaces-1-store.md)
+    action/                per-project actions (named command lines) and their runs, in a
+                           kind=action terminal or in the background with captured output
+                           (docs/notes/actions-1-daemon.md)
   db/                      SQLite (modernc.org/sqlite, WAL) + migrations; refuses a database
                            migrated by a newer build (db.ErrNewerSchema)
   client/                  Go client for the daemon API, used by CLI and the Wails host
@@ -118,6 +121,10 @@ Transport:
 | CLI, Wails host | Unix socket `$CONFIG/daemon.sock` | filesystem permissions (0600) |
 | Frontend | `http://127.0.0.1:<random port>` | bearer token from `$CONFIG/daemon.token` (0600) |
 | CLI inside a session | `CODE_FOUNDRY_ENDPOINT` (the loopback listener) | `CODE_FOUNDRY_TOKEN`; both set in every session's env, never auto-starts a daemon |
+
+Every Claude process also gets `CODE_FOUNDRY_SESSION=<its thread id>`, which the CLI sends
+as its default `--context-session`: an agent's `code-foundry terminal new` or `action run`
+lands in its own thread's bottom panel (`docs/notes/actions-1-daemon.md`).
 
 Both listeners serve the same handlers. The port and token are written by the daemon on
 start; the Wails host reads them and injects them into the page before load.
@@ -200,7 +207,7 @@ Services (v1):
   CLI).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
   intents (sources repo, workspace, terminal, session, thread, gh, gitops, settings,
-  update, ui; the thread source carries threads' pending requests only, a
+  update, action, ui; the thread source carries threads' pending requests only, a
   snapshot then changes, never items; filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream; the per-service Watch RPCs remain for the CLI and tests.
@@ -228,6 +235,15 @@ Services (v1):
   a checkout's git-listed or walked files, cached ~5s) feed the composer's `/` and `@`
   completion (`docs/notes/composer-tags-1-daemon.md`; the GUI's tags and `/` card:
   `docs/notes/composer-tags-3-skills.md`; the `@` card: `docs/notes/composer-tags-4-files.md`).
+* `ActionService` — List, Create, Update, Delete, Run, GetRun, WaitRun, Watch. Per-project
+  actions (name unique per project ignoring case, command, icon, in terminal or in the
+  background, run on worktree create, position; SQLite, cascading with the project) and
+  their runs (in memory, 50 per project). A run belongs to a thread or a worktree like a
+  shell, runs `$SHELL -lc <command>` there with `CODE_FOUNDRY_PROJECT_ROOT` and
+  `CODE_FOUNDRY_WORKTREE`, in a `kind=action` terminal or as a background process whose
+  last 64 KiB of output WaitRun returns. A new thread's worktree runs the project's
+  on-worktree-create actions in the background; `run_finished` events carry every end
+  (`docs/notes/actions-1-daemon.md`). The action.* commands are the CLI's surface.
 * `HealthService` — Ping, Version.
 
 Rules:
@@ -259,12 +275,15 @@ PTY (creack/pty) ──reader goroutine──► tee ──► libghostty-vt (fe
 * Resize is driven by the attached GUI terminal; the daemon applies it to the PTY and vt.
   With no attachment, size is the last known size.
 * Labels are opaque to the store; their contract lives in `internal/termlabel`: `kind`
-  (`shell` on a shell `terminal.new` started), `session` (the owning thread), `repo` and
-  `worktree` (the owning worktree). `terminal.new`
+  (`shell` on a shell `terminal.new` started, `action` on an action run in a terminal),
+  `session` (the owning thread), `repo` and `worktree` (the owning worktree), and on
+  action terminals `action`, `action.name` and `action.run`. `terminal.new`
   gives every shell an owner (thread, else worktree) and refuses a cwd outside every
   registered project. The shell reaper (`internal/daemon/shells.go`) removes a shell when
   it exits or when its worktree, project or thread goes away, with a periodic sweep for
-  dropped events (`docs/notes/bottom-panel-1-daemon.md`).
+  dropped events (`docs/notes/bottom-panel-1-daemon.md`). An exited action terminal stays
+  (the user reads its output; the GUI closes it), but goes with its owner like a shell
+  (`docs/notes/actions-1-daemon.md`).
 
 ## 6. Session store
 
@@ -313,7 +332,10 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   (`docs/notes/rendered-threads-cold-cache.md`).
 * Auto-naming via an independent `claude -p` call producing a short natural title
   ("Fix the login redirect"); a new worktree's branch is `cf/` + the title's slug
-  (`docs/notes/natural-thread-names.md`).
+  (`docs/notes/natural-thread-names.md`). Once a thread whose worktree Create made has
+  started, `Options.WorktreeCreated` hands the worktree to the daemon, which runs the
+  project's on-worktree-create actions in the background (the session store does not
+  know about actions; `docs/notes/actions-1-daemon.md`).
 * **Linked pull requests** come from Claude's own `pr-link` transcript records: every
   distinct URL in first-seen order, persisted in `session_pull_requests`, backfilled from
   the transcript's history when a thread is resumed (`docs/notes/linked-prs.md`).

@@ -72,6 +72,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"app.version", "app.update.check", "app.update", "app.relaunch", "app.restart", "daemon.restart",
 		"view.dashboard", "view.usage", "usage.show", "view.pullrequests", "view.projects", "view.panel.toggle", "view.bottom.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.workspace", "view.panel.linked-prs", "view.panel.usage", "view.panel.worktree",
 		"workspace.new", "workspace.list", "workspace.members", "workspace.add-repo", "workspace.remove-repo", "workspace.remove",
+		"action.list", "action.add", "action.edit", "action.remove", "action.run", "action.wait", "action.runs",
 	}
 	for _, n := range want {
 		if _, ok := f.reg.Get(n); !ok {

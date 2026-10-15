@@ -549,7 +549,10 @@ type InvokeCommandResponse struct {
 	// Human-readable result for the palette toast or CLI stdout. May be empty.
 	Message string `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
 	// Optional structured result for CLI --json; JSON-encoded.
-	ResultJson    string `protobuf:"bytes,2,opt,name=result_json,json=resultJson,proto3" json:"result_json,omitempty"`
+	ResultJson string `protobuf:"bytes,2,opt,name=result_json,json=resultJson,proto3" json:"result_json,omitempty"`
+	// A process exit status the command reports (action.run --wait: the action's exit
+	// code). The CLI prints the result, then exits with it when it is not 0.
+	ExitCode      int32 `protobuf:"varint,3,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -596,6 +599,13 @@ func (x *InvokeCommandResponse) GetResultJson() string {
 		return x.ResultJson
 	}
 	return ""
+}
+
+func (x *InvokeCommandResponse) GetExitCode() int32 {
+	if x != nil {
+		return x.ExitCode
+	}
+	return 0
 }
 
 // ConfirmationRequired is the error detail of an Invoke that needs confirmation.
@@ -707,11 +717,12 @@ const file_codefoundry_v1_command_proto_rawDesc = "" +
 	"\tconfirmed\x18\x04 \x01(\bR\tconfirmed\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"R\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"o\n" +
 	"\x15InvokeCommandResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x1f\n" +
 	"\vresult_json\x18\x02 \x01(\tR\n" +
-	"resultJson\"`\n" +
+	"resultJson\x12\x1b\n" +
+	"\texit_code\x18\x03 \x01(\x05R\bexitCode\"`\n" +
 	"\x14ConfirmationRequired\x12\x18\n" +
 	"\acommand\x18\x01 \x01(\tR\acommand\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x14\n" +
