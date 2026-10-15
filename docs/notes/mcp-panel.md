@@ -1,5 +1,9 @@
 # Rendered threads: the MCP panel tab
 
+Update 2026-10-15 (`thread-lifecycle.md`): the MCP status is kept and persisted while the
+thread is stopped; a refresh or a server reconnect starts a stopped thread without a
+prompt.
+
 Status: built on branch `t3code/mcp-panel` (follow-ups §2, `rendered-threads-followups.md`;
 design: `docs/sketches/mcp-panel/`, variant B). `make check` and `make gui-e2e` green; the
 daemon side exercised end to end with an isolated home and haiku (below). Mock screenshots
