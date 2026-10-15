@@ -100,8 +100,8 @@ test("the header's Play menu lists the project's actions and runs one in the thr
   await expect(page.getByTestId("action-rerun")).toBeVisible();
   await expect(page.getByTestId("exit-overlay")).toHaveCount(0);
   // No toast for it. A failing setup run follows (events arrive in order): once its toast
-  // shows, this run's run_finished was seen, and the toasts are counted at once (a retrying
-  // toHaveCount(0) would wait out a toast's own dismissal).
+  // shows, this run's run_finished was seen, and the toasts are counted then (a
+  // toHaveCount(0) before it could pass before a toast had a chance to arrive).
   await mockPost("action/setup?session=s-1&code=2&action=Build");
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Setup action Build failed (exit 2)" })).toBeVisible();
   expect(await page.locator("[data-sonner-toast]").count()).toBe(1);
@@ -306,8 +306,12 @@ test("a failed worktree-create action toasts; Open selects the thread and shows 
     .toBe("EXITED");
   await mockPost("action/setup?session=s-1&code=2&action=Build");
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Setup action Build failed (exit 2)" })).toBeVisible();
-  // Counted now, not retried: a retrying toHaveCount(0) would wait out the toast's own dismissal.
+  // Counted now, after the ordering point (before it, a zero count would prove nothing).
   expect(await page.locator("[data-sonner-toast]").filter({ hasText: "(exit 0)" }).count()).toBe(0);
+  // The failure toast stays until dismissed (it is the only sign of a background run): ×.
+  const build = page.locator("[data-sonner-toast]").filter({ hasText: "Setup action Build failed (exit 2)" });
+  await build.getByRole("button", { name: "Close toast" }).click();
+  await expect(build).toHaveCount(0);
 });
 
 /** SHOTS=<dir>: the notes' screenshots, WebKit, 1280x800 at 2x, dark and light. */

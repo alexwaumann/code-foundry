@@ -52,7 +52,7 @@ describe("onActionRunFinished", () => {
   ])("%s", (_n, f, toasts) => {
     onActionRunFinished(f);
     expect(toastError).toHaveBeenCalledTimes(toasts ? 1 : 0);
-    if (toasts) expect(toastError).toHaveBeenCalledWith("Setup action Install deps failed (exit 1)", expect.objectContaining({ id: "action-run-r-1" }));
+    if (toasts) expect(toastError).toHaveBeenCalledWith("Setup action Install deps failed (exit 1)", expect.objectContaining({ id: "action-run-r-1", duration: Infinity, closeButton: true }));
   });
 
   it("the message", () => {

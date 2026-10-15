@@ -154,11 +154,15 @@ export function openFailedRun(f: Pick<ActionRunFinishedView, "runId" | "sessionI
 /**
  * run_finished (stores/events.ts): a worktree-create action that exited non-zero toasts
  * "Setup action X failed (exit N)" with Open. Other runs finish quietly (their tab shows it).
+ * The toast stays until dismissed (× or Open), like a failed git op's: setup runs in the
+ * background with no tab, so it is the only sign the run failed.
  */
 export function onActionRunFinished(f: ActionRunFinishedView): void {
   if (f.trigger !== "worktree-create" || f.exitCode === 0) return;
   toast.error(setupFailedMessage(f), {
     id: `action-run-${f.runId}`,
+    duration: Infinity,
+    closeButton: true,
     action: {
       label: "Open",
       onClick: () => {
