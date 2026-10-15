@@ -31,10 +31,16 @@ describe("statusLine / statusText", () => {
     ["question after a restart", "disconnected", "attention", "question: Which density?", 1, "question", "Asked a question"],
     ["idle", "connected", "idle", "at prompt", 1, "place", ""],
     ["unknown", "unknown", "unknown", "", null, "place", ""],
-    ["plain disconnected", "disconnected", "idle", "at prompt", 1, "place", ""],
-    ["legacy busy disconnected", "disconnected", "busy", "working: x", 1, "place", ""],
-    ["starting", "starting", "unknown", "", null, "starting", "Starting"],
-    ["closing", "closing", "busy", "working: x", null, "closing", "Closing"],
+    // Whether Claude runs never shows: stopped reads as its status, starting as working,
+    // stopping as the place (or its attention).
+    ["stopped at its prompt", "disconnected", "idle", "at prompt", 1, "place", ""],
+    ["stopped, status unknown", "disconnected", "unknown", "", null, "place", ""],
+    ["legacy busy, stopped", "disconnected", "busy", "working: x", 1, "place", ""],
+    ["finished, stopped", "disconnected", "attention", "finished", NOW - 3 * MIN, "finished", "Finished 3 min ago"],
+    ["starting", "starting", "unknown", "", null, "working", "Working"],
+    ["starting after a finished turn", "starting", "attention", "finished", NOW - 3 * MIN, "working", "Working"],
+    ["closing", "closing", "busy", "working: x", null, "place", ""],
+    ["closing a finished turn", "closing", "attention", "finished", NOW - 3 * MIN, "finished", "Finished 3 min ago"],
   ])("%s", (_name, state, status, statusReason, statusChangedAtMs, kind, text) => {
     const l = statusLine({ state, status, statusReason, statusChangedAtMs });
     expect(l.kind).toBe(kind);
@@ -54,8 +60,6 @@ describe("statusLine / statusText", () => {
 
   it.each<[StatusLineKind, boolean, string]>([
     ["place", true, "muted"],
-    ["starting", true, "muted"],
-    ["closing", true, "muted"],
     ["working", true, "sky"],
     ["input", false, "amber"],
     ["question", false, "amber"],
@@ -88,10 +92,10 @@ describe("tipStatusTone", () => {
     ["finished", "connected", "attention", "finished", NOW - 3 * MIN, null, "Finished 3 min ago"],
     ["busy", "connected", "busy", "working: Say hi", null, null, "Working"],
     ["idle", "connected", "idle", "at prompt", 1, null, ""],
-    ["plain disconnected", "disconnected", "idle", "at prompt", 1, null, ""],
+    ["stopped at its prompt", "disconnected", "idle", "at prompt", 1, null, ""],
     ["unknown", "unknown", "unknown", "", null, null, ""],
-    ["starting", "starting", "unknown", "", null, null, "Starting"],
-    ["closing", "closing", "busy", "working: x", null, null, "Closing"],
+    ["starting", "starting", "unknown", "", null, null, "Working"],
+    ["closing", "closing", "busy", "working: x", null, null, ""],
   ])("%s", (_name, state, status, statusReason, statusChangedAtMs, tone, text) => {
     const l = statusLine({ state, status, statusReason, statusChangedAtMs });
     expect(tipStatusTone(l.kind)).toBe(tone);

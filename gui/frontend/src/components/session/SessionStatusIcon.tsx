@@ -1,23 +1,19 @@
-import { Bot, Circle, CircleX, Loader2, Unplug } from "lucide-react";
+import { Bot, Circle, CircleX, Loader2 } from "lucide-react";
 import { badgeLabels, sessionBadge } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { useSessionsStore } from "@/stores/sessions";
 
 /**
- * Session status badge: busy spinner, idle dot, needs-attention accent with a subtle
- * pulse; starting/closing spin muted; disconnected shows an unplugged icon; error (the
- * process ended mid-turn: interrupted) a red crossed circle. The sidebar's thread rows do
- * not use it (they say the status in words, lib/statusLine); SessionLink and SessionParts do.
+ * Session status badge: busy spinner (Claude starting for a message included), idle dot,
+ * needs-attention accent with a subtle pulse, error (the process ended mid-turn:
+ * interrupted) a red crossed circle. Whether the process runs never shows (sessionBadge).
+ * The sidebar's thread rows do not use it (they say the status in words, lib/statusLine);
+ * SessionLink and SessionParts do.
  */
 export function SessionStatusIcon({ id, className }: { id: string; className?: string }) {
   const badge = useSessionsStore((s) => sessionBadge(s.byId[id]));
   const common = { "aria-label": badgeLabels[badge], "data-session-badge": badge, role: "img" } as const;
   switch (badge) {
-    case "disconnected":
-      return <Unplug className={cn("size-3.5 shrink-0 text-muted-foreground", className)} {...common} />;
-    case "starting":
-    case "closing":
-      return <Loader2 className={cn("size-3.5 shrink-0 animate-spin text-muted-foreground", className)} {...common} />;
     case "busy":
       return <Loader2 className={cn("size-3.5 shrink-0 animate-spin text-info", className)} {...common} />;
     case "attention":

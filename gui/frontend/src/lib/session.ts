@@ -1,32 +1,27 @@
 import type { SessionView } from "@/api/session";
 
 /**
- * The one badge a session row shows. Lifecycle wins over activity status, except that a
- * disconnected session shows the status it persisted when that status still matters:
- * "attention" (it was waiting on the user; it still is, and counts as attention, see
- * isAttention) or "error" (its process ended mid-turn: interrupted). A disconnected session
- * that was idle or unknown shows "disconnected".
+ * The one badge a session row shows. It never tells whether Claude's process runs (the
+ * daemon starts it on a message and stops it at cache expiry,
+ * docs/notes/hide-connection-state.md); the process state only decides where the status
+ * alone would mislead:
+ * - starting (Claude coming up for a message just sent) is "busy", whatever the status
+ *   it persisted (a resend to a finished or interrupted thread is working);
+ * - a stopped or stopping thread keeps an "attention" (it still waits on the user, see
+ *   isAttention) or "error" (it ended mid-turn) status; anything else is "idle" (a busy
+ *   left by an older daemon included: nothing runs).
  */
-export type SessionBadge = "starting" | "closing" | "disconnected" | "busy" | "idle" | "attention" | "error" | "unknown";
+export type SessionBadge = "busy" | "idle" | "attention" | "error" | "unknown";
 
 export function sessionBadge(s: Pick<SessionView, "state" | "status"> | undefined): SessionBadge {
   if (!s) return "unknown";
-  switch (s.state) {
-    case "starting":
-    case "closing":
-      return s.state;
-    case "disconnected":
-      return s.status === "attention" || s.status === "error" ? s.status : "disconnected";
-    case "connected":
-    case "unknown":
-      return s.status;
-  }
+  if (s.state === "starting") return "busy";
+  if (s.status === "attention" || s.status === "error") return s.status;
+  if (s.state === "closing" || s.state === "disconnected") return "idle";
+  return s.status;
 }
 
 export const badgeLabels: Record<SessionBadge, string> = {
-  starting: "starting",
-  closing: "closing",
-  disconnected: "disconnected",
   busy: "busy",
   idle: "idle",
   attention: "needs attention",
@@ -38,7 +33,7 @@ export const badgeLabels: Record<SessionBadge, string> = {
  * What a session is waiting on or why it stopped, classified from the daemon's status
  * reason (the daemon's stream_status.go; the store's "interrupted"). "waiting for …",
  * "plan", "trust", "notification" and "bell" came from the screen detector of terminal
- * threads (removed 2026-10-12) and only survive on rows that disconnected before then:
+ * threads (removed 2026-10-12) and only survive on rows that stopped before then:
  * - "done": "finished" (a turn ended with output the user has not seen)
  * - "permission": "permission: <dialog question>" or "waiting for approval: <Tool>"
  *   (the latter when no screen read saw the dialog)
@@ -121,10 +116,10 @@ export function attentionTier(s: Pick<SessionView, "status" | "statusReason">): 
 /**
  * The sidebar group an unpinned thread sorts in (lib/tree.ts buildRows): "prompt" (waits on
  * the user, attentionTier), "error" (error / interrupted), "done" (an unseen finished turn),
- * "working" (busy, or starting up), "idle" (everything else: idle, unknown, closing, plain
- * disconnected). Attention and error win over the process state, so a thread waiting on the
- * user never hides in the collapsible Working section; closing wins over busy (the close
- * interrupts the turn), and a disconnected busy thread (an older daemon's) is idle.
+ * "working" (busy, or Claude starting for a message), "idle" (everything else). The same
+ * reading as sessionBadge: starting wins (the user just sent a message), then attention and
+ * error, so a thread waiting on the user never hides in the collapsible Working section; a
+ * stopped or stopping busy thread is idle.
  */
 export type ThreadGroup = "prompt" | "error" | "done" | "idle" | "working";
 
@@ -132,37 +127,26 @@ export function isThreadGroup(v: string): v is ThreadGroup {
   return v === "prompt" || v === "error" || v === "done" || v === "idle" || v === "working";
 }
 
+/**
+ * What a restart (of the daemon or the app) cuts off, as the daemon's
+ * command.ActiveSession counts it: "working" (Claude starting for a message or on a turn)
+ * or "waiting" (a permission request or question pending), else null. An idle or stopped
+ * thread loses nothing: a message starts it again.
+ */
+export function restartCutsOff(s: Pick<SessionView, "state" | "status" | "statusReason">): "working" | "waiting" | null {
+  if (s.state === "starting") return "working";
+  if (s.state !== "connected") return null;
+  if (s.status === "busy") return "working";
+  if (s.status === "attention" && (s.statusReason.startsWith("permission:") || s.statusReason.startsWith("question:"))) return "waiting";
+  return null;
+}
+
 export function threadGroup(s: Pick<SessionView, "state" | "status" | "statusReason">): ThreadGroup {
+  if (s.state === "starting") return "working";
   const tier = attentionTier(s);
   if (tier !== "") return tier;
   if (s.status === "error") return "error";
-  if (s.state === "closing" || s.state === "disconnected") return "idle";
-  return s.state === "starting" || s.status === "busy" ? "working" : "idle";
-}
-
-/** Why a session is not connected (disconnectCause lowercases it for the Reconnect card). */
-export function disconnectReason(s: Pick<SessionView, "disconnectReason" | "exitCode" | "lastError">): string {
-  switch (s.disconnectReason) {
-    case "closed":
-      return "Closed";
-    case "exited":
-      return s.exitCode === 0 ? "Claude exited" : `Claude exited with code ${String(s.exitCode)}`;
-    case "crashed":
-      return `Crashed (exit code ${String(s.exitCode)})`;
-    case "":
-      return s.lastError ? `Stopped: ${s.lastError}` : "Not running";
-    default:
-      return s.disconnectReason;
-  }
-}
-
-/**
- * disconnectReason as a disconnected thread's Reconnect card says it: lowercased ("closed",
- * "crashed (exit code 1)", "stopped: <err>"), except "Claude exited…", which keeps Claude's capital.
- */
-export function disconnectCause(s: Pick<SessionView, "disconnectReason" | "exitCode" | "lastError">): string {
-  const r = disconnectReason(s);
-  return r.startsWith("Claude ") ? r : r.charAt(0).toLowerCase() + r.slice(1);
+  return sessionBadge(s) === "busy" ? "working" : "idle";
 }
 
 /** "just now", "5 min ago", "3 h ago", "2 d ago"; "never" for null. */

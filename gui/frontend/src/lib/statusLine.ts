@@ -7,9 +7,8 @@ import type { SessionView } from "@/api/session";
 import { formatAgo, sessionBadge, statusKind, statusNote } from "./session";
 
 /**
- * - "place": just "project @ branch" (idle, unknown, plain disconnected)
- * - "starting" / "closing": the lifecycle word, then the place (muted)
- * - "working": "Working" (sky), then the place
+ * - "place": just "project @ branch" (idle, unknown; whether Claude's process runs never shows)
+ * - "working": "Working" (sky), then the place (Claude starting for a message included)
  * - "input": "Needs input · <tool, dialog or reason>" (amber): permission, trust, notification, other dialogs
  * - "question": "Asked a question" (amber); "plan": "Plan ready for review" (amber)
  * - "finished": "Finished <ago>" (emerald)
@@ -17,7 +16,7 @@ import { formatAgo, sessionBadge, statusKind, statusNote } from "./session";
  * - "interrupted": "Interrupted while working · <ago>" (red): the process ended mid-turn
  * - "snoozeEnded": "Snooze ended · <ago>" (amber): the daemon woke a snoozed thread
  */
-export type StatusLineKind = "place" | "starting" | "closing" | "working" | "input" | "question" | "plan" | "finished" | "error" | "interrupted" | "snoozeEnded";
+export type StatusLineKind = "place" | "working" | "input" | "question" | "plan" | "finished" | "error" | "interrupted" | "snoozeEnded";
 
 export type StatusTone = "muted" | "sky" | "amber" | "emerald" | "red";
 
@@ -31,8 +30,6 @@ export interface StatusLine {
 
 export const statusTones: Readonly<Record<StatusLineKind, StatusTone>> = {
   place: "muted",
-  starting: "muted",
-  closing: "muted",
   working: "sky",
   input: "amber",
   question: "amber",
@@ -45,7 +42,7 @@ export const statusTones: Readonly<Record<StatusLineKind, StatusTone>> = {
 
 /** Whether "project @ branch" follows the status text (or stands alone, for "place"). */
 export function showsPlace(kind: StatusLineKind): boolean {
-  return kind === "place" || kind === "starting" || kind === "closing" || kind === "working";
+  return kind === "place" || kind === "working";
 }
 
 const PLACE: StatusLine = { kind: "place", detail: "", at: null };
@@ -54,9 +51,6 @@ export function statusLine(s: Pick<SessionView, "state" | "status" | "statusReas
   if (!s) return PLACE;
   const badge = sessionBadge(s);
   switch (badge) {
-    case "starting":
-    case "closing":
-      return { kind: badge, detail: "", at: null };
     case "busy":
       return { kind: "working", detail: "", at: null };
     case "attention":
@@ -86,8 +80,6 @@ export function statusLine(s: Pick<SessionView, "state" | "status" | "statusReas
 
 const words: Readonly<Record<StatusLineKind, string>> = {
   place: "",
-  starting: "Starting",
-  closing: "Closing",
   working: "Working",
   input: "Needs input",
   question: "Asked a question",
@@ -112,7 +104,7 @@ export type TipStatusTone = Extract<StatusTone, "amber" | "red">;
  * Whether the thread tooltip shows a status row under the name, and in which tone
  * (docs/notes/tooltip-status-reason.md): only for a thread that needs the user (amber) or
  * is in error or was interrupted (red), whose line 2 the row usually truncates. Null for
- * finished, working, idle, starting and closing. The text is `statusText`, untruncated.
+ * finished, working and idle. The text is `statusText`, untruncated.
  */
 export function tipStatusTone(kind: StatusLineKind): TipStatusTone | null {
   const tone = statusTones[kind];

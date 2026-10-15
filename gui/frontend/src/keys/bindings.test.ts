@@ -40,9 +40,6 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     statusChangedAtMs: null,
     createdAtMs: 1,
     lastActivityAtMs: null,
-    exitCode: 0,
-    disconnectReason: "",
-    lastError: "",
     parentId: "",
     permissionMode: "",
     baseRef: "",
@@ -266,6 +263,13 @@ describe("handleKeyDown precedence", () => {
 
     it("expanded: pinned, prompts, errors, finished, idle, working", () => {
       expect([1, 2, 3, 4, 5, 6].map(jumpTo)).toEqual(["f", "d", "b", "e", "c", "a"]);
+    });
+
+    it("a thread starting for a message sorts with Working (even after a finished turn); a stopped idle one with the idle ones", () => {
+      useSessionsStore.setState((s) => ({
+        byId: { ...s.byId, c: session("c", { state: "disconnected", status: "idle" }), e: session("e", { state: "starting", status: "attention", statusReason: "finished" }) },
+      }));
+      expect([1, 2, 3, 4, 5, 6].map(jumpTo)).toEqual(["f", "d", "b", "c", "e", "a"]);
     });
 
     it("collapsed: the hidden Working rows are skipped (cmd+6 does nothing)", () => {
