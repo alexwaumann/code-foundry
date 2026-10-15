@@ -197,7 +197,9 @@ spot no tooltip opens until the pointer leaves (Radix, and `Tip`'s press rule).
   load average 12). No Go file differs from main and main's CI is green: a timing flake
   on this machine, not this PR.
 - `make gui-e2e` (WebKit + Chromium), after the rebase: 762 passed, 40 skipped, 0 failed
-  (the known `panel.spec.ts` Chromium flake did not show). The first run had failed on the nested
+  (the known `panel.spec.ts` Chromium flake did not show). Rebased once more onto #115
+  (the Help overlay's Guide tab; its shortcut rows keep their `Tip`): frontend checks
+  green, and the help, settings, start, sidebar and buttons specs pass (74). The first run had failed on the nested
   row/count tooltips and the late open over a menu, which the press and nesting rules fix.
 - Live (`make gui-build`, isolated `CODE_FOUNDRY_HOME`, a Haiku thread in a scratch repo
   whose origin is the GitHub repo): the sidebar status bar's Command Palette button, the
