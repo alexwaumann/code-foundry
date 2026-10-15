@@ -68,3 +68,7 @@ click added that folder as a project. Frontend only; the daemon is unchanged.
   listing, which `group-hover` would light up.
 * **Worktree build** needs `third_party/ghostty-vt` copied from the main checkout with the
   `.pc` prefix rewritten, as in the earlier add-project PRs.
+* **The live check writes into the real app's panel state.** Adding a project selects it
+  and opens its tab in the Projects page panel (localStorage, shared with the installed
+  app). The scratch project's tab was closed before quitting; the theme was switched with
+  `settings set appearance.theme` against the scratch home, so nothing else leaked.
