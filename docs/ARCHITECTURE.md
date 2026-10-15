@@ -204,7 +204,9 @@ Services (v1):
   Data events go out only when data changed; `Polled` after every poll carries the
   freshness time. The PR detail panel: GetPullRequestDetail (on demand, cached per PR,
   invalidated by the poll's fingerprints), ListReviewerCandidates, SetReviewRequest,
-  RevertPullRequest (`docs/notes/gh-pr-detail.md`).
+  RevertPullRequest (`docs/notes/gh-pr-detail.md`), SubmitPullRequestReview and
+  AddPullRequestComment (GitHub's refusals relayed as FAILED_PRECONDITION;
+  `docs/notes/pr-review-submit-1-daemon.md`).
 * `GitOpsService` — Fetch, Pull, Push, CreatePullRequest, OpenPullRequest, OpenEditor,
   Reveal, OpenUrl, List, Watch. One operation at a time per worktree; a failed operation
   is a result (state FAILED, output), not an RPC error. The GUI reaches it only through
@@ -393,7 +395,8 @@ doors to this one registry. Adding a feature means registering commands, not edi
 switch.
 
 Pull request commands: the detail panel's actions (`pr.merge`, `pr.revert`,
-`pr.review.request`, `pr.refresh`; docs/notes/gh-pr-detail.md) and the session starters `pr.ask`,
+`pr.review.request`, `pr.refresh`; docs/notes/gh-pr-detail.md; `pr.review`, `pr.comment`;
+docs/notes/pr-review-submit-1-daemon.md) and the session starters `pr.ask`,
 `pr.explain`, `pr.fix.findings`, which pick or create a worktree and type a prompt built
 from the pull request (docs/notes/pr-thread-commands.md).
 
