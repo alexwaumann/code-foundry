@@ -190,7 +190,10 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 		}
 		r.first = o.first
 	})
-	if err := m.spawn(ctx, id, l); err != nil {
+	if err := m.spawn(ctx, id, l); errors.Is(err, ErrClosed) {
+		// The daemon is stopping: not a failure to tell in the timeline.
+		return it, m.failStart(id, nil, err)
+	} else if err != nil {
 		return it, m.failStart(id, log, err)
 	}
 	return it, nil

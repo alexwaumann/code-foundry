@@ -22,8 +22,9 @@ service ThreadService {
   // in. A thread that is not running starts with the message as its first prompt: the
   // returned item is in the timeline at once, and a start that fails is an error item
   // ("Claude did not start: <reason>", status ERROR "did not start"), not an RPC error.
-  // A message to a starting thread waits for the handshake; one to a closing thread
-  // starts a new process once the old one exited. A message whose first non-blank line starts with a
+  // The RPC returns at once with the item: a message to a starting thread is delivered
+  // after its handshake, one to a closing thread once a new process started after the
+  // old one exited. A message whose first non-blank line starts with a
   // slash command the app replaces (/model, /effort, /fast, /mcp, /rename, /clear, and
   // the aliases /reset, /new, /name) is INVALID_ARGUMENT, nothing sent or recorded; the
   // error's message is a sentence pointing at the app's control, shown as it is.

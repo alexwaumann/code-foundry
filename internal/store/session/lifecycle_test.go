@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/bus"
 )
 
 // The thread lifecycle (lifecycle.go, docs/notes/thread-lifecycle.md): a message starts a
@@ -147,15 +149,14 @@ func TestSendStartsNewConversationWhenTranscriptGone(t *testing.T) {
 // items at once, in order after the first prompt's, and Claude gets them in that order.
 // Two messages racing to start a stopped thread start one process.
 func TestSendWhileStartingQueues(t *testing.T) {
-	e := newFixtureEnvAt(t, fixturePath("text-table"), []string{"CF_FAKE_CLAUDE_INIT_DELAY=300ms"})
+	gate := initGate(t)
+	e := newFixtureEnvAt(t, fixturePath("text-table"), []string{"CF_FAKE_CLAUDE_INIT_GATE=" + gate.path})
+	t.Cleanup(gate.open) // before the env's shutdown (cleanups run last first)
 	s := e.create(CreateOptions{InitialPrompt: "first"})
-	start := time.Now()
+	// The handshake is held: Send returns without waiting for it.
 	it, err := e.m.Send(e.ctx(), s.ID, Message{Text: "second"})
 	if err != nil {
 		t.Fatal(err)
-	}
-	if took := time.Since(start); took > 250*time.Millisecond {
-		t.Errorf("the send waited %s for the handshake", took)
 	}
 	if got := e.snapshot(s.ID); got.State != StateStarting {
 		t.Fatalf("the thread was not starting: %+v", got)
@@ -163,6 +164,7 @@ func TestSendWhileStartingQueues(t *testing.T) {
 	if got := userItems(e.items(s.ID).Items); !slices.Equal(got, []string{"first", "second"}) || it.Text != "second" {
 		t.Errorf("user items %q, returned %+v", got, it)
 	}
+	gate.open()
 	e.sentUser("second")
 	var order []string
 	for _, m := range e.sent() {
@@ -194,6 +196,22 @@ func TestSendWhileStartingQueues(t *testing.T) {
 	}
 	if got := userItems(e.items(s.ID).Items); len(got) != 4 {
 		t.Errorf("user items %q", got)
+	}
+}
+
+// initGate holds a fake claude's initialize answer until open (CF_FAKE_CLAUDE_INIT_GATE).
+type gateFile struct {
+	t    *testing.T
+	path string
+}
+
+func initGate(t *testing.T) gateFile {
+	return gateFile{t: t, path: filepath.Join(t.TempDir(), "init-gate")}
+}
+
+func (g gateFile) open() {
+	if err := os.WriteFile(g.path, nil, 0o600); err != nil {
+		g.t.Error(err)
 	}
 }
 
@@ -564,6 +582,7 @@ func TestIdleStopHolds(t *testing.T) {
 	tests := []struct {
 		name, fixture string
 		vars          []string
+		gated         bool // the handshake is held until the test ends
 		// setup brings the thread to the state to hold in.
 		setup func(e *env) Session
 		want  string
@@ -582,7 +601,7 @@ func TestIdleStopHolds(t *testing.T) {
 			e.waitItems(s.ID, "launched", turnCount(1))
 			return e.waitFor(s.ID, "running", func(s Session) bool { _, bg := s.AgentsRunning(); return bg == 1 })
 		}},
-		{name: "a message waiting for the handshake", fixture: "text-table", vars: []string{"CF_FAKE_CLAUDE_INIT_DELAY=500ms"},
+		{name: "a message waiting for the handshake", fixture: "text-table", gated: true,
 			want: "starting", setup: func(e *env) Session {
 				s := e.create(CreateOptions{InitialPrompt: "first"})
 				if _, err := e.m.Send(e.ctx(), s.ID, Message{Text: "second"}); err != nil {
@@ -593,7 +612,16 @@ func TestIdleStopHolds(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e, clock := idleEnv(t, tt.fixture, tt.vars)
+			vars := tt.vars
+			var gate gateFile
+			if tt.gated {
+				gate = initGate(t)
+				vars = append(vars, "CF_FAKE_CLAUDE_INIT_GATE="+gate.path)
+			}
+			e, clock := idleEnv(t, tt.fixture, vars)
+			if tt.gated {
+				t.Cleanup(gate.open)
+			}
 			s := tt.setup(e)
 			if h := e.idleHold(s.ID, clock.Now().Add(far)); h != tt.want {
 				t.Errorf("hold %q, want %q", h, tt.want)
@@ -697,5 +725,45 @@ func TestIdleHoldOf(t *testing.T) {
 				t.Errorf("idleHoldOf = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// Shutdown began while claude started: spawn's commit does not attach the runner (no
+// m.wg.Add racing Shutdown's Wait); the process goes and the start fails.
+func TestSpawnAfterShutdownBegan(t *testing.T) {
+	e := newEnv(t)
+	s := e.connected(CreateOptions{})
+	if err := e.m.Close(e.ctx(), s.ID); err != nil {
+		t.Fatal(err)
+	}
+	e.m.mu.Lock()
+	e.m.closed = true
+	e.m.mu.Unlock()
+	cid, err := newUUID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.m.spawn(e.ctx(), s.ID, launch{newID: cid}); !errors.Is(err, ErrClosed) {
+		t.Fatalf("spawn: %v", err)
+	}
+	e.m.mu.Lock()
+	run := e.m.recs[s.ID].run
+	e.m.mu.Unlock()
+	if run != nil {
+		t.Error("a runner was attached after Shutdown began")
+	}
+}
+
+// The MCP saves follow the checks' tickets: a save that comes after a later check's is
+// dropped (setMcp saves outside its lock).
+func TestThreadLogMcpSavesInOrder(t *testing.T) {
+	log := newThreadLog("s1", bus.New(), time.Now, nil)
+	var saved []McpTrigger
+	log.saveMcp = func(s *McpStatus) { saved = append(saved, s.Trigger) }
+	log.persistMcp(2, &McpStatus{Trigger: McpTriggerRefresh})
+	log.persistMcp(1, &McpStatus{Trigger: McpTriggerTurn})
+	log.persistMcp(3, &McpStatus{Trigger: McpTriggerReconnect})
+	if want := []McpTrigger{McpTriggerRefresh, McpTriggerReconnect}; !slices.Equal(saved, want) {
+		t.Errorf("saved %v, want %v", saved, want)
 	}
 }

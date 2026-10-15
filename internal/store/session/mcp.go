@@ -159,6 +159,9 @@ type mcpState struct {
 	status  *McpStatus
 	issued  uint64
 	applied uint64
+	// saved is the ticket of the status last persisted, guarded by threadLog.saveMu:
+	// setMcp saves after unlocking mu, so two checks' saves can arrive out of order.
+	saved uint64
 }
 
 // mcpTicket numbers a check about to be made.
@@ -182,10 +185,22 @@ func (t *threadLog) setMcp(ticket uint64, s *McpStatus) bool {
 	t.seq++
 	bus.Publish[ThreadEvent](t.bus, McpChanged{SessionID: t.id, Seq: t.seq, Status: s})
 	t.mu.Unlock()
-	if t.saveMcp != nil {
-		t.saveMcp(s)
-	}
+	t.persistMcp(ticket, s)
 	return true
+}
+
+// persistMcp saves the status of check ticket unless a later check's is saved already.
+func (t *threadLog) persistMcp(ticket uint64, s *McpStatus) {
+	if t.saveMcp == nil {
+		return
+	}
+	t.saveMu.Lock()
+	defer t.saveMu.Unlock()
+	if ticket <= t.mcp.saved {
+		return
+	}
+	t.mcp.saved = ticket
+	t.saveMcp(s)
 }
 
 // dropMcpChecks discards every check in flight (the process ended: a late answer of

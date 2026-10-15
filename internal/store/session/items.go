@@ -371,6 +371,8 @@ type threadLog struct {
 	// (threadcache_db.go); nil in tests that build a log alone. Called without mu.
 	saveCommands func([]SlashCommand)
 	saveMcp      func(*McpStatus)
+	// saveMu orders the MCP saves (persistMcp); taken without mu.
+	saveMu sync.Mutex
 }
 
 func newThreadLog(id string, b *bus.Bus, now func() time.Time, items []Item) *threadLog {

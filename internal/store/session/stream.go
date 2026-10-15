@@ -775,6 +775,22 @@ func (r *runner) closeNext() {
 	}
 }
 
+// abandon ends a process whose runner never ran (spawn found the store shutting down):
+// killed and reaped, its pipes and transcript tailer closed.
+func (r *runner) abandon() {
+	st := r.st
+	_ = st.proc.Signal(syscall.SIGKILL)
+	st.conn.Close()
+	st.proc.CloseOutput()
+	select {
+	case <-st.proc.Done():
+	case <-time.After(streamKillGrace):
+		r.log().warn("abandoned claude did not exit after SIGKILL")
+	}
+	r.tail.close()
+	r.usage.closeAll()
+}
+
 // shutdown is daemon shutdown: the process cannot outlive the daemon (it talks to
 // it over pipes), so it is terminated, and the thread disconnects "daemon stopped".
 func (r *runner) shutdown() {
@@ -873,10 +889,10 @@ func exitWhy(code int, lastErr string) string {
 	return why
 }
 
-// addErrorOnce adds an error item unless the timeline already ends with one (failStart's,
-// a failed delivery's): one process end, one line.
+// addErrorOnce adds an error item unless the timeline already ends with this very line
+// (one process end, one line); any other error before it stays and this one follows.
 func (r *runner) addErrorOnce(text string) {
-	if last, ok := r.st.log.last(); ok && last.Kind == KindError {
+	if last, ok := r.st.log.last(); ok && last.Kind == KindError && last.Text == text {
 		return
 	}
 	r.st.proj.w.add(Item{ID: r.st.proj.nextID("err"), Kind: KindError, Text: text})

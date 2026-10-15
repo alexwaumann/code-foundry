@@ -618,6 +618,13 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	}
 	now := m.opts.Now()
 	m.mu.Lock()
+	if m.closed {
+		// Shutdown began while claude started: it would never stop this runner, and
+		// m.wg.Add must not race its m.wg.Wait. The process goes; the start fails.
+		m.mu.Unlock()
+		r.abandon()
+		return ErrClosed
+	}
 	rec.run = r
 	rec.release()
 	rec.s.State = StateStarting

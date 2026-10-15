@@ -179,8 +179,17 @@ func (m *Manager) setLive(ctx context.Context, id string, apply func(*claudestre
 		if err != nil {
 			return Session{}, err
 		}
-		if err := controlErr(apply(conn)); err != nil {
-			return Session{}, err
+		if err := apply(conn); errors.Is(err, claudestream.ErrClosed) {
+			// The process ended under the request (an idle stop raced it): once the
+			// runner is gone the row takes the setting (updateStopped).
+			select {
+			case <-r.done:
+			case <-ctx.Done():
+				return Session{}, ctx.Err()
+			}
+			continue
+		} else if err != nil {
+			return Session{}, controlErr(err)
 		}
 		s, _ := m.update(id, true, func(rec *record) { row(&rec.s) })
 		return s, nil
