@@ -123,7 +123,8 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				if err != nil {
 					return Result{}, err
 				}
-				owner, err := shellOwner(ctx, d, c, a.Path("cwd"), a.Path("here"))
+				owner, err := shellOwner(ctx, d.Repo, d.Session, c, a.Path("cwd"), a.Path("here"),
+					"terminal.new needs a thread, a worktree, or --cwd inside a registered project")
 				if err != nil {
 					return Result{}, err
 				}
@@ -314,14 +315,15 @@ type owner struct {
 	cwd                     string
 }
 
-// shellOwner decides who owns a shell terminal.new starts, in this order: the active
-// thread; the active worktree (ActiveWorktreePath, matched with ActiveRepoID when given,
-// else the registered worktree containing it); the registered worktree containing cwd,
-// else here (the CLI's working directory). The shell starts in cwd, else in here when here
-// chose the owner, else in the thread's worktree or the context's worktree path.
-func shellOwner(ctx context.Context, d TerminalDeps, c Context, cwd, here string) (owner, error) {
+// shellOwner decides who owns a shell terminal.new starts (and an action run action.run
+// starts), in this order: the active thread; the active worktree (ActiveWorktreePath,
+// matched with ActiveRepoID when given, else the registered worktree containing it); the
+// registered worktree containing cwd, else here (the CLI's working directory). The shell
+// starts in cwd, else in here when here chose the owner, else in the thread's worktree or
+// the context's worktree path. Without any of them it fails with missing.
+func shellOwner(ctx context.Context, repos RepoBackend, sessions SessionBackend, c Context, cwd, here, missing string) (owner, error) {
 	if c.ActiveSessionID != "" {
-		res, err := d.Session.Get(ctx, connect.NewRequest(&v1.GetSessionRequest{Id: c.ActiveSessionID}))
+		res, err := sessions.Get(ctx, connect.NewRequest(&v1.GetSessionRequest{Id: c.ActiveSessionID}))
 		if err != nil {
 			return owner{}, err
 		}
@@ -334,9 +336,9 @@ func shellOwner(ctx context.Context, d TerminalDeps, c Context, cwd, here string
 		start = path
 	}
 	if path == "" {
-		return owner{}, InvalidArg("cwd", "terminal.new needs a thread, a worktree, or --cwd inside a registered project")
+		return owner{}, InvalidArg("cwd", "%s", missing)
 	}
-	res, err := d.Repo.List(ctx, connect.NewRequest(&v1.ListReposRequest{}))
+	res, err := repos.List(ctx, connect.NewRequest(&v1.ListReposRequest{}))
 	if err != nil {
 		return owner{}, err
 	}

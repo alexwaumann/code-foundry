@@ -151,6 +151,10 @@ type Result struct {
 	// JSON is an optional structured result, printed by the CLI with --json. It is
 	// encoded with protojson when it is a proto.Message and encoding/json otherwise.
 	JSON any
+	// ExitCode is a process exit status the command reports (action.run --wait: the
+	// action's). The CLI prints the result, then exits with it when it is not 0. The
+	// palette ignores it.
+	ExitCode int
 }
 
 // NamePattern is the required shape of command names: lowercase dotted segments, at

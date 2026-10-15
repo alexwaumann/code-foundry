@@ -48,7 +48,7 @@ func (h *Command) Invoke(ctx context.Context, req *connect.Request[v1.InvokeComm
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	return connect.NewResponse(&v1.InvokeCommandResponse{Message: res.Message, ResultJson: js}), nil
+	return connect.NewResponse(&v1.InvokeCommandResponse{Message: res.Message, ResultJson: js, ExitCode: int32(res.ExitCode)}), nil
 }
 
 // commandError maps registry and command errors to Connect errors. Errors that already

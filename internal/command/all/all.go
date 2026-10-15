@@ -63,6 +63,9 @@ type Deps struct {
 	Restart func()
 	// Workspace backs workspace.*. Nil works like Terminal.
 	Workspace command.WorkspaceBackend
+	// Action backs action.* (which also use Repo and Session to find a run's owner).
+	// Nil works like Terminal.
+	Action command.ActionBackend
 }
 
 // Register registers every domain's commands into r.
@@ -87,6 +90,9 @@ func Register(r *command.Registry, d Deps) error {
 	}
 	if d.Workspace == nil {
 		d.Workspace = codefoundryv1connect.UnimplementedWorkspaceServiceHandler{}
+	}
+	if d.Action == nil {
+		d.Action = codefoundryv1connect.UnimplementedActionServiceHandler{}
 	}
 	if d.Update == nil {
 		d.Update = codefoundryv1connect.UnimplementedUpdateServiceHandler{}
@@ -121,5 +127,6 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterView(r, d.Emitter),
 		command.RegisterUsage(r, d.Session),
 		command.RegisterWorkspace(r, d.Workspace),
+		command.RegisterAction(r, command.ActionDeps{Action: d.Action, Repo: d.Repo, Session: d.Session}),
 	)
 }
