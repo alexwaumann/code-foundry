@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Loader2, Trash2, X } from "lucide-react";
 import { ACTION_ICONS } from "@/api/actions";
 import { Button } from "@/components/ui/button";
@@ -90,6 +90,16 @@ function ActionForm({ target }: { target: ActionEditorTarget }) {
   // A Delete in flight: the action's removal event usually comes before action.remove
   // answers, and must not read as "deleted meanwhile" for the moment the dialog stays.
   const [removing, setRemoving] = useState(false);
+  // Delete and Keep swap the footer, which drops the focused button: the keyboard moves to
+  // Keep when the confirm opens and back to Delete when Keep closes it.
+  const deleteRef = useRef<HTMLButtonElement>(null);
+  const keepRef = useRef<HTMLButtonElement>(null);
+  const swapped = useRef(false);
+  useEffect(() => {
+    if (!swapped.current) return;
+    swapped.current = false;
+    (confirming ? keepRef : deleteRef).current?.focus();
+  }, [confirming]);
   const problem = draftProblem(draft);
   const gone = target.mode === "edit" && !existing && !removing;
   const nameError = error !== null && /\bname/i.test(error);
@@ -228,7 +238,9 @@ function ActionForm({ target }: { target: ActionEditorTarget }) {
             variant="outline"
             disabled={busy}
             data-testid="action-delete-keep"
+            ref={keepRef}
             onClick={() => {
+              swapped.current = true;
               setConfirming(false);
             }}
           >
@@ -249,8 +261,10 @@ function ActionForm({ target }: { target: ActionEditorTarget }) {
               disabled={busy}
               className="-ml-1.5 text-destructive hover:text-destructive"
               data-testid="action-delete"
+              ref={deleteRef}
               onClick={() => {
                 setError(null);
+                swapped.current = true;
                 setConfirming(true);
               }}
             >

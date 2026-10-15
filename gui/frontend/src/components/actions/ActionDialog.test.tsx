@@ -49,6 +49,16 @@ describe("ActionDialog", () => {
     expect(useActionDialogStore.getState().editor).toBeNull();
   });
 
+  it("the inline confirm keeps the keyboard: Delete moves it to Keep, Keep back to Delete", () => {
+    render(<ActionDialog />);
+    const del = screen.getByTestId("action-delete");
+    del.focus();
+    fireEvent.click(del);
+    expect(document.activeElement).toBe(screen.getByTestId("action-delete-keep"));
+    fireEvent.click(screen.getByTestId("action-delete-keep"));
+    expect(document.activeElement).toBe(screen.getByTestId("action-delete"));
+  });
+
   it("an action deleted elsewhere while the editor is open says so and cannot be saved", () => {
     render(<ActionDialog />);
     act(() => {

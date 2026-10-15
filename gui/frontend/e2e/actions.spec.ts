@@ -180,9 +180,13 @@ test("add, then edit (pencil and ArrowRight), then delete an action", async ({ p
   const confirm = dialog(page).getByTestId("action-delete-confirm");
   await expect(confirm).toContainText("Delete Lint for every thread in code-foundry?");
   await expect(dialog(page).getByTestId("action-save")).toHaveCount(0);
-  await confirm.getByTestId("action-delete-keep").click();
+  // The keyboard follows the swap: to Keep, and back to Delete.
+  await expect(confirm.getByTestId("action-delete-keep")).toBeFocused();
+  await page.keyboard.press("Enter");
   await expect(confirm).toHaveCount(0);
-  await dialog(page).getByTestId("action-delete").click();
+  await expect(dialog(page).getByTestId("action-delete")).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(confirm.getByTestId("action-delete-keep")).toBeFocused();
   await dialog(page).getByTestId("action-delete-yes").click();
   await expect(dialog(page)).toHaveCount(0);
   const [remove] = await calls("action.remove");
