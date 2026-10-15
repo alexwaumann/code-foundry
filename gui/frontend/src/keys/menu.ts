@@ -6,6 +6,7 @@
 import { toast } from "sonner";
 import { onRunCommandMenu } from "@/api/app";
 import { useCommandsStore } from "@/stores/commands";
+import { openHelp } from "@/stores/views";
 import { jumpToAttention, startCommandNamed } from "./bindings";
 
 /**
@@ -16,6 +17,14 @@ const menuViewActions: Readonly<Record<string, () => void>> = {
   // Thread > Next Needing Attention, as cmd+shift+a and the sidebar's bell.
   "attention.next": () => {
     if (!jumpToAttention()) toast.info("No threads need attention");
+  },
+  // Help > Getting Started and Keyboard Shortcuts and Help: the help overlay on a tab.
+  // Not view.help, a toggle: picking one while the overlay shows switches its tab.
+  "help.guide": () => {
+    openHelp("guide");
+  },
+  "help.shortcuts": () => {
+    openHelp("shortcuts");
   },
 };
 

@@ -6,9 +6,9 @@ import (
 
 // EventRunCommand is emitted to the frontend by app menu items that run something in the
 // window: the data is a registry command name (session.new, view.settings, ...) or the
-// name of a GUI view action that has one (gui/frontend/src/keys/bindings.ts
-// menuViewActions). The page starts it exactly as the palette would, so the menu adds no
-// user action of its own (docs/notes/onboarding-1-entry-points.md).
+// name of a GUI view action (menuViewActions in gui/frontend/src/keys/menu.ts). The page
+// starts it exactly as the palette would, so the menu adds no user action of its own
+// (docs/notes/onboarding-1-entry-points.md).
 const EventRunCommand = "app:run-command"
 
 // reportIssueURL is opened in the browser by Help > Report an Issue….
@@ -37,9 +37,11 @@ var threadMenu = [][]menuCommand{
 }
 
 // helpMenu is the Help menu's command items, one slice per separated group. Report an
-// Issue… (a URL, not a command) follows them below a separator.
+// Issue… (a URL, not a command) follows them below a separator. The first two open the
+// help overlay on its Guide and Keyboard shortcuts tabs: GUI view actions, not view.help
+// (a toggle), so picking one while the overlay shows switches its tab.
 var helpMenu = [][]menuCommand{
-	{{"Keyboard Shortcuts and Help", "view.help"}},
+	{{"Getting Started", "help.guide"}, {"Keyboard Shortcuts and Help", "help.shortcuts"}},
 	{{"Open Command Palette", "ui.palette.open"}},
 }
 

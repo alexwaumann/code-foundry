@@ -488,7 +488,9 @@ from the pull request (docs/notes/pr-thread-commands.md).
   Keyboard Shortcuts overlay (`docs/notes/phase3-ui-buttons.md`), plus the hint on the
   sidebar's New thread button. The native app menu's Settings…, Thread and Help items
   run commands in the window through one host event and carry no key equivalents
-  (`docs/notes/onboarding-1-entry-points.md`).
+  (`docs/notes/onboarding-1-entry-points.md`). The help overlay's first tab is the
+  getting started guide, `docs/GETTING-STARTED.md` bundled at build time; keep every
+  label and chord it names in step with the app (`docs/notes/onboarding-2-guide.md`).
 
 ## 9. Repo and GitHub stores
 

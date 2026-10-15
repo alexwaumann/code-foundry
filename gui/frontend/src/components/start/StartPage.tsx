@@ -6,13 +6,13 @@ import { CommandButton } from "@/components/command/CommandButton";
 import { DragBand } from "@/components/window/DragBand";
 import { SessionLink } from "@/components/session/SessionLink";
 import { useNoProjectThread } from "@/components/session/useNoProject";
-import { startCommandNamed } from "@/keys/bindings";
 import { greeting } from "@/lib/greeting";
 import { NO_PROJECT } from "@/lib/threadRow";
 import { placeSession } from "@/lib/tree";
 import { cn } from "@/lib/utils";
 import { decodeRepoKeys, useRepoStructureKeys } from "@/stores/context";
 import { useReposStore } from "@/stores/repos";
+import { openHelp } from "@/stores/views";
 import { activeThreadIds, attentionIds, connectedCount, isAttention, runningCount, useSessionsStore } from "@/stores/sessions";
 
 /** Rows in the start page's thread list before "+N more". */
@@ -132,7 +132,8 @@ function Fleet() {
         type="button"
         className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
         onClick={() => {
-          startCommandNamed("view.help");
+          // Straight to the shortcuts tab (view.help opens the guide).
+          openHelp("shortcuts");
         }}
       >
         Keyboard Shortcuts

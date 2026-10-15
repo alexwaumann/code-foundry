@@ -18,6 +18,7 @@ const { runMenuCommand, startMenuCommands } = await import("./menu");
 const { useCommandsStore } = await import("@/stores/commands");
 const { useSessionsStore } = await import("@/stores/sessions");
 const { useUiStore } = await import("@/stores/ui");
+const { useViewsStore } = await import("@/stores/views");
 
 function cmd(over: Partial<CommandView>): CommandView {
   return { name: "c", title: "C", description: "", category: "X", args: [], keybindings: [], available: true, ...over };
@@ -55,6 +56,16 @@ describe("runMenuCommand", () => {
   it("runs the attention jump, a GUI view action, by its menu name", () => {
     runMenuCommand("attention.next");
     expect(toastInfo).toHaveBeenCalledWith("No threads need attention");
+  });
+
+  it.each([
+    ["help.guide", "guide"],
+    ["help.shortcuts", "shortcuts"],
+  ] as const)("%s opens the help overlay on its tab, and switches an open one", (name, tab) => {
+    useViewsStore.setState({ helpOpen: true, helpTab: tab === "guide" ? "shortcuts" : "guide" });
+    runMenuCommand(name);
+    expect(useViewsStore.getState()).toMatchObject({ helpOpen: true, helpTab: tab });
+    expect(toastInfo).not.toHaveBeenCalled();
   });
 });
 

@@ -192,12 +192,13 @@ test("the alert volume is a slider saved per step, with Play running notificatio
   await expect.poll(async () => (await invocations()).at(-1)).toMatchObject({ name: "notifications.test", args: { volume: "48" } });
 });
 
-test("cmd+/ opens the help overlay listing commands and app chords", async ({ page }) => {
+test("cmd+/ opens the help overlay; its shortcuts tab lists commands and app chords", async ({ page }) => {
   await openApp(page);
   await page.keyboard.press("Meta+Slash");
   const help = page.getByTestId("help-overlay");
   await expect(help).toBeVisible();
-  await expect(help.getByRole("heading", { name: "How code-foundry works" })).toBeVisible();
+  await expect(page.getByTestId("help-tab-guide")).toHaveAttribute("data-state", "active");
+  await page.getByTestId("help-tab-shortcuts").click();
   await expect(help.locator('[data-help-section="App"]')).toContainText("Command palette");
   await expect(help.locator('[data-help-section="App"]')).toContainText("⌘K");
   // Registry commands with their effective chords, grouped by category; unavailable

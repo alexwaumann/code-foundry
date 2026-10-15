@@ -49,8 +49,8 @@ func TestCommandMenus(t *testing.T) {
 		{
 			name:   "help",
 			groups: helpMenu,
-			want:   []string{"Keyboard Shortcuts and Help", "-", "Open Command Palette"},
-			cmds:   []string{"view.help", "ui.palette.open"},
+			want:   []string{"Getting Started", "Keyboard Shortcuts and Help", "-", "Open Command Palette"},
+			cmds:   []string{"help.guide", "help.shortcuts", "ui.palette.open"},
 		},
 	}
 	for _, tt := range tests {

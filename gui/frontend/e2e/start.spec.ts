@@ -49,8 +49,11 @@ test("with projects: greeting, counts, actions, and no New terminal", async ({ p
   await expect(page.getByTestId("start-counts")).toHaveText("3 connected · 2 running");
   await expect(page.getByTestId("start-waiting")).toHaveCount(0);
 
+  // The link lands on the overlay's shortcuts tab, not the guide.
   await start(page).getByRole("button", { name: "Keyboard Shortcuts" }).click();
   await expect(page.getByTestId("help-overlay")).toBeVisible();
+  await expect(page.getByTestId("help-tab-shortcuts")).toHaveAttribute("data-state", "active");
+  await expect(page.getByTestId("help-shortcuts")).toBeVisible();
 });
 
 test("thread list: waiting first, capped at six, a row selects its thread", async ({ page }) => {
