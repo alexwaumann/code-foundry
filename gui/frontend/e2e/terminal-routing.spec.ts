@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, openApp, openProjects, resetMock, row } from "./fixtures";
+import { CF, expectTooltip, invocations, mockPost, openApp, openProjects, resetMock, row } from "./fixtures";
 
 // Every way to start a shell lands in a bottom panel (docs/notes/bottom-panel-3-routing.md):
 // the thread's when a thread owns it, else the Projects page's. The sidebar never gets a row.
@@ -81,7 +81,7 @@ test("a workspace member's New terminal here in a thread's side panel: the threa
   await expect(bottom(page).getByRole("tab")).toHaveCount(1);
   const id = (await host(page).getAttribute("data-terminal-id")) ?? "";
   expect(await shellLabels(page, id)).toMatchObject({ kind: "shell", session: driver });
-  await expect(bottom(page).getByRole("tab")).toHaveAttribute("title", "~/.code-foundry/worktrees/alexwaumann/code-foundry/cf-checkout");
+  await expectTooltip(page, bottom(page).getByRole("tab"), "~/.code-foundry/worktrees/alexwaumann/code-foundry/cf-checkout");
 });
 
 test("a member's New terminal here from an expanded side panel collapses it so the shell shows", async ({ page }) => {

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, mockUrl, openApp, resetMock, row, selectWorktree } from "./fixtures";
+import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, resetMock, row, selectWorktree } from "./fixtures";
 
 /**
  * The Pull request surface in the side panel, against the mock daemon's fixtures
@@ -898,7 +898,7 @@ test("the merge button: draft, read-only and merged pull requests; unchecking th
   await prRow(page, "authored", 145).click();
   const button = page.getByTestId("pr-merge-button");
   await expect(button).toHaveAttribute("aria-disabled", "true");
-  await expect(button).toHaveAttribute("title", "Draft pull requests cannot be merged");
+  await expectTooltip(page, button, "Draft pull requests cannot be merged");
   await expect(button).toHaveAccessibleDescription("Draft pull requests cannot be merged");
   // Playwright will not click an aria-disabled element; force it: it must open nothing.
   await button.click({ force: true });
@@ -909,7 +909,7 @@ test("the merge button: draft, read-only and merged pull requests; unchecking th
   await expect(button).toHaveCount(0);
   // #140: read access only.
   await openPr(page, 140);
-  await expect(button).toHaveAttribute("title", "Merging needs write access");
+  await expectTooltip(page, button, "Merging needs write access");
 
   // #142: keep the branch, then decline: nothing is sent.
   await prRow(page, "authored", 142).click();

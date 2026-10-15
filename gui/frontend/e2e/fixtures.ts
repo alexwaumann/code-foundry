@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { MOCK_PORT, MOCK_TOKEN } from "../playwright.config";
 
 export const mockUrl = `http://127.0.0.1:${String(MOCK_PORT)}`;
@@ -160,4 +160,32 @@ export async function expectTerminalText(page: Page, text: string | RegExp): Pro
 /** The selected thread's prompt: its composer's editor, where a selected thread puts the keyboard. */
 export function threadPrompt(page: Page) {
   return page.getByTestId("thread-composer").getByTestId("composer-input");
+}
+
+/** The open tooltip (`Tip`, components/ui/tooltip.tsx); one fading out has data-state="closed". */
+export function openTooltip(page: Page): Locator {
+  return page.locator('[data-slot="tooltip-content"]:not([data-state="closed"])');
+}
+
+/**
+ * Hovers `target` and expects the themed tooltip that opens to read `text` (there are no
+ * native `title` tooltips), then moves the pointer off and waits for it to close.
+ */
+export async function expectTooltip(page: Page, target: Locator, text: string | RegExp): Promise<void> {
+  // From outside: a tooltip opens when the pointer enters, and not again after a click
+  // until it leaves.
+  await page.mouse.move(0, 0);
+  await target.hover();
+  await expect(openTooltip(page)).toHaveText(text);
+  await page.mouse.move(0, 0);
+  await expect(openTooltip(page)).toHaveCount(0);
+}
+
+/** Hovers `target` past the tooltip delay and expects no tooltip (one that would repeat visible text). */
+export async function expectNoTooltip(page: Page, target: Locator): Promise<void> {
+  await page.mouse.move(0, 0);
+  await target.hover();
+  await page.waitForTimeout(800);
+  await expect(openTooltip(page)).toHaveCount(0);
+  await page.mouse.move(0, 0);
 }

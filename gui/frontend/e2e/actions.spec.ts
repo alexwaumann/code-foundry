@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, mockUrl, openApp, openProjects, resetMock, row } from "./fixtures";
+import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, openProjects, resetMock, row } from "./fixtures";
 
 // Actions (docs/notes/actions-2-gui.md): the thread header's Play menu, the editor dialog,
 // and a run's bottom-panel tab with its command echo and status line. Mock seeds
@@ -62,7 +62,7 @@ test("the header's Play menu lists the project's actions and runs one in the thr
   await selectSession(page, "s-1");
   // Left of the bottom panel's toggle.
   await expect(page.getByTestId("thread-header").locator('[data-testid="pane-actions-menu"] + [data-testid="bottom-toggle"]')).toHaveCount(1);
-  await expect(trigger(page)).toHaveAttribute("title", "Run an action");
+  await expectTooltip(page, trigger(page), "Run an action");
   await trigger(page).click();
   await expect(menu(page).getByTestId("actions-project")).toHaveText("code-foundry");
   await expect(items(page)).toHaveText(NAMES);

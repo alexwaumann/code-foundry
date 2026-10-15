@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 const OUTDATED = "The running daemon is older than the app. Restart it (Daemon → Restart) to use this feature.";
 
@@ -620,7 +620,6 @@ test("attachment preview: from the thumbnail; Esc, ×, and the backdrop close it
   await compose(page);
   await page.getByTestId("composer-file-input").setInputFiles([{ name: "shot.png", mimeType: "image/png", buffer: PNG }]);
   const open = page.getByTestId("attachment-open");
-  await expect(open).toHaveAttribute("title", "Open preview");
   await expect(open).toHaveCSS("cursor", "pointer");
   const preview = page.getByTestId("attachment-preview");
   await expect(preview).toHaveCount(0);
@@ -672,7 +671,6 @@ test("attachment preview: from an inline chip by click or Space; Enter next to a
   await page.keyboard.type("Compare");
   await pasteImage(page, "image.png");
   await page.keyboard.type("with the header");
-  await expect(chip).toHaveAttribute("title", "Open preview");
   await expect(chip).toHaveCSS("cursor", "pointer");
   const id = (await chip.getAttribute("data-attachment-id")) ?? "";
   const value = `Compare ![image.png](cf-attachment://${id}) with the header`;
@@ -721,7 +719,7 @@ test("attachment preview: a chip whose image is gone opens nothing", async ({ pa
   await pasteText(page, " ![gone.png](cf-attachment://a999) ");
   const chip = page.getByTestId("prompt-chip");
   await expect(chip).toHaveAttribute("data-missing", "true");
-  await expect(chip).toHaveAttribute("title", "gone.png (removed)");
+  await expectTooltip(page, chip, "gone.png (removed)");
   await expect(chip).not.toHaveCSS("cursor", "pointer");
   await chip.click();
   await page.keyboard.press("Space");

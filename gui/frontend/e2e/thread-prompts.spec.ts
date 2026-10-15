@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { expectNoTooltip, invocations, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
 
 /**
  * Answering a thread (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
@@ -220,14 +220,14 @@ test("a subagent's request names the agent that asked", async ({ page }) => {
   // A tooltip only when the label is cut short (the prompt's header is narrow here).
   expect(await chip.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
   await chip.hover();
-  await expect(chip).toHaveAttribute("title", "general-purpose · Write the changelog entry");
+  await expect(openTooltip(page)).toHaveText("general-purpose · Write the changelog entry");
   await shot(page, "subagent-dark");
   await page.mouse.move(0, 0);
+  await expect(openTooltip(page)).toHaveCount(0);
   await chip.evaluate((el) => {
     el.style.flex = "none";
   });
-  await chip.hover();
-  expect((await chip.getAttribute("title")) ?? "").toBe("");
+  await expectNoTooltip(page, chip);
   await prompt.getByTestId("thread-permission-allow").click();
   await expect(composer(page).getByTestId("thread-permission")).toHaveCount(0);
   await expect.poll(responds).toEqual(["respond s-r1 allow req-sub"]);

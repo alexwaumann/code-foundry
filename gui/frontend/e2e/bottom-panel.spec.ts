@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { CF, invocations, mockPost, mockUrl, openApp, openProjects, openStreams, resetMock, row, threadPrompt, writes } from "./fixtures";
+import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, openProjects, openStreams, resetMock, row, threadPrompt, writes } from "./fixtures";
 
 // The bottom terminal panel (docs/notes/bottom-panel-2-gui.md, bottom-panel-autoshell.md).
 // Mock seeds: t-s1-shell is thread s-1's shell, t-top a shell of the feat/sidebar worktree
@@ -60,7 +60,7 @@ test("the header toggle and cmd+j show and hide a thread's bottom panel", async 
   await expect(bottom(page)).toHaveCount(0);
   const toggle = page.getByTestId("thread-header").getByTestId("bottom-toggle");
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
-  await expect(toggle).toHaveAttribute("title", "Toggle Bottom Panel");
+  await expectTooltip(page, toggle, "Toggle Bottom Panel");
   // Immediately left of the side panel's toggle.
   const toggles = page.getByTestId("thread-header").locator('[data-testid="bottom-toggle"] + [data-testid="panel-toggle"]');
   await expect(toggles).toHaveCount(1);
@@ -71,7 +71,7 @@ test("the header toggle and cmd+j show and hide a thread's bottom panel", async 
   // The thread's shell, titled by its cwd's last segment, active and attached, with focus.
   await expect(tabs(page)).toHaveText(["code-foundry"]);
   await expect(tabs(page).first()).toHaveAttribute("aria-selected", "true");
-  await expect(tabs(page).first()).toHaveAttribute("title", "~/src/code-foundry");
+  await expectTooltip(page, tabs(page).first(), "~/src/code-foundry");
   await expect(host(page)).toHaveAttribute("data-terminal-id", "t-s1-shell");
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
   await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
@@ -307,7 +307,7 @@ test("the Projects page's panel lists the worktree shells; its + starts one in t
   await toggle.click();
   // t-top (feat/sidebar), titled by its worktree's folder; thread shells are not here.
   await expect(tabs(page)).toHaveText(["feat-sidebar"]);
-  await expect(tabs(page).first()).toHaveAttribute("title", "~/src/code-foundry.worktrees/feat-sidebar");
+  await expectTooltip(page, tabs(page).first(), "~/src/code-foundry.worktrees/feat-sidebar");
   await expect(host(page)).toHaveAttribute("data-terminal-id", "t-top");
 
   await bottom(page).getByTestId("bottom-new-terminal").click();
