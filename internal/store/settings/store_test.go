@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -258,5 +259,63 @@ func TestSetCommandsRevalidates(t *testing.T) {
 	}
 	if n := len(s.Fields()); n != len(staticFields)+len(testCmds) {
 		t.Errorf("fields after SetCommands = %d", n)
+	}
+}
+
+// TestReloadNeverRevertsAnUpdate pins the ordering between the watcher's reload and
+// Update: a reload that read the file before an Update wrote it must not publish its
+// stale bytes after the Update returned. (It did once: reload read the file outside
+// s.mu, so `settings set` followed by `settings get` could print the old value until
+// the next fs event.) readFile pauses the reload right after its read; the Update runs
+// in that gap if it can.
+func TestReloadNeverRevertsAnUpdate(t *testing.T) {
+	path := filepath.Join(t.TempDir(), FileName)
+	if err := os.WriteFile(path, []byte("[appearance]\nfont_size = 13\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// The watcher never fires during the test; the test drives reload itself.
+	s, err := Open(context.Background(), Options{Path: path, Debounce: time.Hour, Log: slog.New(slog.DiscardHandler)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+
+	read, proceed := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	readFile = func(name string) ([]byte, error) {
+		data, err := os.ReadFile(name)
+		once.Do(func() { close(read); <-proceed })
+		return data, err
+	}
+	t.Cleanup(func() { readFile = os.ReadFile })
+
+	reloaded := make(chan struct{})
+	go func() { defer close(reloaded); s.reload() }()
+	<-read
+
+	updated := make(chan error, 1)
+	go func() {
+		_, err := s.Update(context.Background(), map[string]string{KeyFontSize: "15"})
+		updated <- err
+	}()
+	// With reload reading under s.mu the Update waits for the paused reload, so give it
+	// a moment to run (when it can) and then let the reload finish either way.
+	select {
+	case err := <-updated:
+		if err != nil {
+			t.Fatal(err)
+		}
+		updated = nil
+	case <-time.After(200 * time.Millisecond):
+	}
+	close(proceed)
+	<-reloaded
+	if updated != nil {
+		if err := <-updated; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := s.Snapshot().Values[KeyFontSize]; got != "15" {
+		t.Fatalf("font size after Update returned and a concurrent reload finished = %s, want 15", got)
 	}
 }
