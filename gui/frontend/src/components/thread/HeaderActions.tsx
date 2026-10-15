@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Archive, ArchiveRestore, GitPullRequest, Layers, Power } from "lucide-react";
+import { Archive, ArchiveRestore, GitPullRequest, Layers } from "lucide-react";
 import { ThreadActionsMenu } from "@/components/actions/ActionsMenu";
 import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { CommandButton } from "@/components/command/CommandButton";
@@ -99,7 +99,6 @@ export function HeaderActions({ sessionId }: { sessionId: string }) {
     <span className="-mr-1.5 flex items-center [--wails-draggable:no-drag]" data-testid="pane-actions">
       <WorkspaceChip sessionId={sessionId} />
       <LinkedPrs sessionId={sessionId} />
-      <CommandButton command="session.close" icon={Power} />
       <SnoozeButton sessionId={sessionId} />
       <ArchiveButton sessionId={sessionId} />
       <ThreadActionsMenu sessionId={sessionId} />

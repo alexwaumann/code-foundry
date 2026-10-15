@@ -32,7 +32,7 @@ const detail = (o: Partial<PullRequestView>): PullRequestDetailView => ({ pullRe
 beforeEach(() => {
   getPullRequestDetail.mockImplementation(() => new Promise(() => undefined));
   pullRequestDetailResource.store.setState({ entries: {} });
-  useCommandsStore.setState({ commands: [cmd("session.close", "Close Thread"), cmd("session.snooze", "Snooze or Unsnooze Thread"), cmd("session.archive", "Archive or Unarchive Thread"), cmd("view.panel.linked-prs", "Show Linked PRs in Side Panel"), cmd("view.panel.workspace", "Show Workspace in Side Panel"), cmd("view.bottom.toggle"), cmd("view.panel.toggle")] });
+  useCommandsStore.setState({ commands: [cmd("session.snooze", "Snooze or Unsnooze Thread"), cmd("session.archive", "Archive or Unarchive Thread"), cmd("view.panel.linked-prs", "Show Linked PRs in Side Panel"), cmd("view.panel.workspace", "Show Workspace in Side Panel"), cmd("view.bottom.toggle"), cmd("view.panel.toggle")] });
   useWorkspacesStore.setState({ byId: {} });
   useUiStore.setState({ selection: { kind: "session", id: "s-1" } });
 });
@@ -50,18 +50,18 @@ function setThread(o: Partial<SessionView>): void {
 const order = () => [...screen.getByTestId("pane-actions").querySelectorAll("button")].map((b) => b.dataset.testid ?? b.dataset.commandButton);
 
 describe("HeaderActions", () => {
-  it("a thread without links or workspace: close, the bottom and panel toggles; no rename or fork", () => {
-    useCommandsStore.setState({ commands: [...useCommandsStore.getState().commands, cmd("session.rename"), cmd("session.fork")] });
+  it("a thread without links or workspace: snooze, archive, the bottom and panel toggles; no close, rename or fork", () => {
+    useCommandsStore.setState({ commands: [...useCommandsStore.getState().commands, cmd("session.rename"), cmd("session.fork"), cmd("session.close")] });
     setThread({});
     render(<HeaderActions sessionId="s-1" />);
-    expect(order()).toEqual(["session.close", "pane-snooze", "session.archive", "bottom-toggle", "panel-toggle"]);
+    expect(order()).toEqual(["pane-snooze", "session.archive", "bottom-toggle", "panel-toggle"]);
   });
 
   it("a workspace thread: the workspace chip by name first, opening view.panel.workspace", () => {
     useWorkspacesStore.setState({ byId: { w1: { name: "release-channels", members: [] } as never } });
     setThread({ workspaceId: "w1", linkedPullRequests: [link(1), link(2), link(3)] });
     render(<HeaderActions sessionId="s-1" />);
-    expect(order()).toEqual(["pane-workspace", "pane-linked-prs", "session.close", "pane-snooze", "session.archive", "bottom-toggle", "panel-toggle"]);
+    expect(order()).toEqual(["pane-workspace", "pane-linked-prs", "pane-snooze", "session.archive", "bottom-toggle", "panel-toggle"]);
     const ws = screen.getByTestId("pane-workspace");
     expect(ws.textContent).toBe("release-channels");
     expect(ws.getAttribute("title")).toBeNull();
@@ -122,7 +122,7 @@ describe("HeaderActions", () => {
     useCommandsStore.setState({ commands: useCommandsStore.getState().commands.filter((c) => c.name !== "session.snooze") });
     setThread({});
     render(<HeaderActions sessionId="s-1" />);
-    expect(order()).toEqual(["session.close", "session.archive", "bottom-toggle", "panel-toggle"]);
+    expect(order()).toEqual(["session.archive", "bottom-toggle", "panel-toggle"]);
   });
 
   it.each([
@@ -134,8 +134,8 @@ describe("HeaderActions", () => {
     setThread({ repoId });
     render(<HeaderActions sessionId="s-1" />);
     const want = shown
-      ? ["session.close", "pane-snooze", "session.archive", "pane-actions-menu", "bottom-toggle", "panel-toggle"]
-      : ["session.close", "pane-snooze", "session.archive", "bottom-toggle", "panel-toggle"];
+      ? ["pane-snooze", "session.archive", "pane-actions-menu", "bottom-toggle", "panel-toggle"]
+      : ["pane-snooze", "session.archive", "bottom-toggle", "panel-toggle"];
     expect(order()).toEqual(want);
   });
 

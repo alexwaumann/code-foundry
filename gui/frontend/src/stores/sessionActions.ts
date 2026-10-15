@@ -9,9 +9,7 @@ import { getUiContext } from "./context";
 export const SESSION_COMMANDS = {
   create: "session.new",
   rename: "session.rename",
-  reconnect: "session.reconnect",
   remove: "session.remove",
-  close: "session.close",
   fork: "session.fork",
   pin: "session.pin",
   archive: "session.archive",
@@ -34,16 +32,8 @@ export function renameSession(id: string, name: string): Promise<boolean> {
   return runCommand(SESSION_COMMANDS.rename, { [renameArgName()]: name }, sessionContext(id));
 }
 
-export function reconnectSession(id: string): Promise<boolean> {
-  return runCommand(SESSION_COMMANDS.reconnect, {}, sessionContext(id));
-}
-
 export function removeSession(id: string): Promise<boolean> {
   return runCommand(SESSION_COMMANDS.remove, {}, sessionContext(id));
-}
-
-export function closeSession(id: string): Promise<boolean> {
-  return runCommand(SESSION_COMMANDS.close, {}, sessionContext(id));
 }
 
 export function forkSession(id: string): Promise<boolean> {
@@ -56,10 +46,10 @@ export function pinSession(id: string, pinned: boolean): Promise<boolean> {
 }
 
 /**
- * session.archive with an explicit value. Archiving closes Claude, removes the thread's
+ * session.archive with an explicit value. Archiving stops Claude, removes the thread's
  * shells and unpins it; the daemon asks for confirmation (runCommand opens the dialog) only
- * while Claude is working or waiting on an answer. Unarchiving never asks and leaves the
- * thread disconnected.
+ * while Claude is working, waiting on an answer or running background work. Unarchiving
+ * never asks; a message starts Claude again.
  */
 export function archiveSession(id: string, archived: boolean): Promise<boolean> {
   return runCommand(SESSION_COMMANDS.archive, { archived: String(archived) }, sessionContext(id));
@@ -67,7 +57,7 @@ export function archiveSession(id: string, archived: boolean): Promise<boolean> 
 
 /**
  * session.snooze until an absolute time (epoch ms, sent as RFC 3339; the caller computes
- * presets such as "tomorrow 9 AM" itself), or null to unsnooze. Snoozing closes Claude,
+ * presets such as "tomorrow 9 AM" itself), or null to unsnooze. Snoozing stops Claude,
  * removes the thread's shells and unpins and unarchives it; the daemon asks for
  * confirmation (runCommand opens the dialog) only while Claude is working or waiting on an
  * answer, and refuses a time that is not in the future. Unsnoozing never asks.
