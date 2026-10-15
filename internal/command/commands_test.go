@@ -60,7 +60,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"terminal.new", "terminal.list", "terminal.close", "terminal.kill", "terminal.remove",
 		"repo.unregister", "repo.worktree.new", "repo.worktree.remove", "repo.worktree.cleanup", "repo.refresh", "repo.git.init",
 		"repo.add", "repo.clone", "repo.create", "repo.github.publish", "repo.delete",
-		"session.new", "session.list", "session.focus", "session.close", "session.reconnect",
+		"session.new", "session.list", "session.focus",
 		"session.rename", "session.fork", "session.remove", "session.run-in", "session.pin", "session.archive", "session.snooze",
 		"thread.send", "thread.respond", "thread.interrupt", "thread.items", "thread.set-model", "thread.set-mode", "thread.set-effort",
 		"thread.mcp", "thread.mcp-reconnect", "view.panel.mcp", "thread.commands", "thread.agents", "view.panel.agents",

@@ -54,10 +54,8 @@ func TestPanelKeybindings(t *testing.T) {
 func TestSessionKeybindings(t *testing.T) {
 	f := newFixture(t)
 	want := map[string]string{
-		"session.new":       "cmd+n",
-		"session.rename":    "cmd+r",
-		"session.reconnect": "cmd+shift+r",
-		"session.close":     "cmd+shift+w",
+		"session.new":    "cmd+n",
+		"session.rename": "cmd+r",
 	}
 	for name, chord := range want {
 		c, ok := f.reg.Get(name)

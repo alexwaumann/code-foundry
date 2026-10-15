@@ -13,7 +13,7 @@ import (
 )
 
 // Session is a fake command.SessionBackend. Err, when set, is returned by every call.
-// Sessions returned by Create/Fork/Reconnect/Rename echo the request; Get returns
+// Sessions returned by Create/Fork/Rename echo the request; Get returns
 // Current (default: a CONNECTED session with the requested id). List returns Current
 // and Others.
 type Session struct {
@@ -102,22 +102,6 @@ func (s *Session) Rename(_ context.Context, r *connect.Request[v1.RenameSessionR
 		return nil, err
 	}
 	return connect.NewResponse(&v1.RenameSessionResponse{Session: &v1.Session{Id: r.Msg.GetId(), Name: r.Msg.GetName()}}), nil
-}
-
-// Close records the request.
-func (s *Session) Close(_ context.Context, r *connect.Request[v1.CloseSessionRequest]) (*connect.Response[v1.CloseSessionResponse], error) {
-	if err := s.do(r.Msg); err != nil {
-		return nil, err
-	}
-	return connect.NewResponse(&v1.CloseSessionResponse{}), nil
-}
-
-// Reconnect returns a STARTING session.
-func (s *Session) Reconnect(_ context.Context, r *connect.Request[v1.ReconnectSessionRequest]) (*connect.Response[v1.ReconnectSessionResponse], error) {
-	if err := s.do(r.Msg); err != nil {
-		return nil, err
-	}
-	return connect.NewResponse(&v1.ReconnectSessionResponse{Session: &v1.Session{Id: r.Msg.GetId(), State: v1.SessionState_SESSION_STATE_STARTING}}), nil
 }
 
 // Remove records the request.
