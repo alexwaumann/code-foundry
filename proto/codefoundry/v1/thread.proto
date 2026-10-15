@@ -264,6 +264,9 @@ message ThreadItemsSnapshot {
   // The slash commands the running thread offers (ThreadService.SlashCommands); empty
   // when it is not running.
   repeated SlashCommand commands = 6;
+  // The thread's subagent runs, in spawn order (never reordered by status); also while
+  // it is not running (the runs persist). See docs/notes/agents-1-daemon.md.
+  repeated ThreadAgentRun agents = 7;
 }
 
 // Text appended to a streaming item.
@@ -323,6 +326,10 @@ message ThreadEvent {
     // Watch only: nothing else was sent for a while (see StreamHeartbeat). It does not
     // advance seq.
     StreamHeartbeat heartbeat = 9;
+    // Watch only: the thread's subagent runs changed (the whole list). A run's status,
+    // report or a new run comes at once; its progress (activity, last tool, counters) at
+    // most once a second.
+    ThreadAgentsChange agents = 10;
   }
 }
 
@@ -401,6 +408,71 @@ message ThreadMcpChange {
   uint64 seq = 2;
   // Unset: the thread has none any more (its process ended).
   ThreadMcpStatus status = 3;
+}
+
+// A subagent run's lifecycle.
+enum ThreadAgentStatus {
+  THREAD_AGENT_STATUS_UNSPECIFIED = 0;
+  THREAD_AGENT_STATUS_RUNNING = 1;
+  // Claude reported it completed.
+  THREAD_AGENT_STATUS_DONE = 2;
+  // Claude reported it failed, killed or stopped, or its process ended first.
+  THREAD_AGENT_STATUS_FAILED = 3;
+}
+
+// One subagent run of a thread (an Agent tool call, foreground or background, also one
+// spawned by another run), as the stream's task frames report it. A run woken again by
+// SendMessage goes back to RUNNING in place (resumed_at). Persisted, with Session.agent_runs.
+message ThreadAgentRun {
+  // Claude's agent id (the task id).
+  string id = 1;
+  // The Agent tool_use that spawned it: its thread item's id. Empty if unknown.
+  string tool_use_id = 2;
+  // The run that spawned this one (spawn_depth 2 and up); empty for the thread's own.
+  string parent_id = 3;
+  // The run's name: the Agent call's description.
+  string description = 4;
+  // "general-purpose", "Explore", ...
+  string agent_type = 5;
+  // As requested ("haiku"); empty when inherited from the thread.
+  string model = 6;
+  string effort = 7;
+  // Launched in the background (run_in_background): the thread can go on meanwhile.
+  bool background = 8;
+  // 1: spawned by the thread; 2 and up: by another run.
+  int32 spawn_depth = 9;
+  ThreadAgentStatus status = 10;
+  // What it is doing now (Claude's own line, e.g. "Running Sleep 6 seconds"), as of its
+  // last progress; kept once it ends.
+  string activity = 11;
+  // Its latest tool's name.
+  string last_tool = 12;
+  // Claude's counters: the tokens of its latest request, its tool uses and running time
+  // (summed over its wakes).
+  int64 total_tokens = 13;
+  int64 tool_uses = 14;
+  int64 duration_ms = 15;
+  // Its report once DONE (the handed-back report, else Claude's summary).
+  string summary = 16;
+  // Why it FAILED: Claude's summary, its status word ("stopped"), or "the thread's
+  // process ended before the agent finished".
+  string error = 17;
+  // When it started (the order of the list), when SendMessage last woke it (unset if
+  // never), when it last ended (unset while running and when unknown).
+  google.protobuf.Timestamp started_at = 18;
+  google.protobuf.Timestamp resumed_at = 19;
+  google.protobuf.Timestamp ended_at = 20;
+  // The note item that announced a background run's end ("Agent finished · ..."); empty
+  // for none.
+  string note_item_id = 21;
+}
+
+// A thread's subagent runs changed (ThreadService.Watch).
+message ThreadAgentsChange {
+  string session_id = 1;
+  uint64 seq = 2;
+  // The whole list, in spawn order.
+  repeated ThreadAgentRun agents = 3;
 }
 
 message ListThreadItemsRequest {

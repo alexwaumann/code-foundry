@@ -158,6 +158,9 @@ Services (v1):
   initialize reply and `commands_changed` pushes, minus a daemon-side deny table, cached
   in memory; the items snapshot and Watch carry them; Send refuses a message starting with
   a command the app replaces, such as `/clear`; `docs/notes/slash-commands-1-daemon.md`).
+  The items snapshot and Watch also carry the thread's subagent runs (`agents`: every
+  Agent run, foreground, background and nested, in spawn order, with live status,
+  activity and report; `docs/notes/agents-1-daemon.md`).
   See `docs/notes/rendered-threads-1-daemon.md`
   and `docs/notes/rendered-threads-3-interaction.md`.
 * `TerminalService` — Attach (server stream: initial screen snapshot then live output
@@ -322,6 +325,12 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   replaced by complete folds (a resume rescans every source from byte zero). Removing a
   thread adds its buckets to `usage_retired`. Cost is priced at read time by
   `internal/pricing` (`docs/notes/session-usage.md`).
+* **Subagent runs** are the same records, live: the stream's task frames give each run
+  its lifecycle (running, done, failed; activity, Claude's counters, report or error; a
+  SendMessage wake runs again in place), persisted with the run. A background run's
+  Agent call stays running until the run ends, which adds a note item. Runs still
+  running when their process ends fail: subagents run inside it
+  (`docs/notes/agents-1-daemon.md`).
 * Persists session metadata in SQLite so the sidebar can show resumable sessions after a
   daemon restart. v1 does not keep Claude processes alive across daemon restarts.
 
@@ -342,7 +351,7 @@ type Command struct {
 `Context` is what the caller is looking at: active session, active repo/worktree, active
 view, and the workspace that owns the active thread or composer (so `session.run-in` is
 offered for workspace threads only; the `thread.*` commands,
-send/respond/interrupt/items/set-model/set-mode/set-effort/mcp/mcp-reconnect/commands, are
+send/respond/interrupt/items/set-model/set-mode/set-effort/mcp/mcp-reconnect/commands/agents, are
 offered whenever a thread is active). The GUI sends its context with `List` and `Invoke`;
 the CLI passes an explicit context from flags or none. The palette, keybindings, and CLI subcommands are three front
 doors to this one registry. Adding a feature means registering commands, not editing a

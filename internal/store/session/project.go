@@ -73,6 +73,10 @@ type projector struct {
 		tokens int64
 		model  string
 	}
+	// async are the Agent calls launched in the background whose run has not reported
+	// its end yet: their result came at once (async_launched), so their item stays
+	// running until the run ends (agentEnded, agents_runner.go).
+	async map[string]bool
 }
 
 type openBlock struct {
@@ -85,7 +89,7 @@ type openBlock struct {
 // (restoredTotals). The log's last turn end, if any, is the previous process's (a
 // Reconnect, a daemon restart).
 func newProjector(w itemWriter, base runningTotals) *projector {
-	p := &projector{w: w, open: map[string][]openBlock{}}
+	p := &projector{w: w, open: map[string][]openBlock{}, async: map[string]bool{}}
 	items := w.log.snapshot().Items
 	for i := len(items) - 1; i >= 0; i-- {
 		if items[i].Kind == KindTurnEnd {
@@ -321,6 +325,7 @@ func (p *projector) user(e *claudestream.User) {
 		if len(e.ToolUseResult) > 0 && len(e.ToolUseResult) <= maxResultJSON && len(blocks) == 1 {
 			res = string(e.ToolUseResult)
 		}
+		async := len(blocks) == 1 && !b.IsError && isAsyncLaunch(e.ToolUseResult)
 		p.w.change(b.ToolUseID, func(it *Item) {
 			if it.Tool == nil {
 				return
@@ -330,6 +335,11 @@ func (p *projector) user(e *claudestream.User) {
 			it.Tool.Status = ToolDone
 			if b.IsError {
 				it.Tool.Status = ToolError
+			}
+			if async && (it.Tool.Name == "Agent" || it.Tool.Name == "Task") {
+				// A background run: the call follows the run, not its result.
+				it.Tool.Status = ToolRunning
+				p.async[it.ID] = true
 			}
 		})
 	}

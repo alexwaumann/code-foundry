@@ -238,6 +238,11 @@ func (e *env) exit(id string, code int) {
 	case 1:
 		sig = syscall.SIGUSR2
 	}
+	if sig != syscall.SIGKILL {
+		// The fake handles SIGUSR1/2 once it has started (its spawn record is written
+		// after signal.Notify); Go ignores them before that.
+		e.spec(id)
+	}
 	if err := syscall.Kill(e.pid(id), sig); err != nil {
 		e.t.Fatal(err)
 	}

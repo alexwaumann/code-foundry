@@ -49,7 +49,7 @@ func agentRunsToProto(runs []session.AgentRun) []*v1.AgentRun {
 			Id: r.ID, Description: r.Description, AgentType: r.AgentType, Model: r.Model, Effort: r.Effort,
 			Background: r.Background, Status: v1.AgentRunStatus_AGENT_RUN_STATUS_CLOSED, SpawnDepth: int32(r.SpawnDepth),
 		}
-		if r.Open {
+		if r.Status == session.AgentRunning || (r.Status == "" && r.Open) {
 			p.Status = v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN
 		}
 		if !r.StartedAt.IsZero() {

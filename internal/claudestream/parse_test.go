@@ -174,6 +174,100 @@ func TestParseFixtures(t *testing.T) {
 			name: "image",
 			want: map[string]int{"Assistant": 1, "Result": 1},
 		},
+		{
+			// Claude Code 2.1.299: a background run, a nested foreground pair, the
+			// background run woken again by SendMessage.
+			name: "agents",
+			want: map[string]int{"Task": 18, "Result": 6},
+			check: func(t *testing.T, evs []Event) {
+				var started, notified []*Task
+				var progress, updated *Task
+				for _, ev := range evs {
+					tk, ok := ev.(*Task)
+					if !ok {
+						continue
+					}
+					switch tk.Subtype {
+					case TaskStarted:
+						started = append(started, tk)
+					case TaskNotification:
+						notified = append(notified, tk)
+					case TaskProgress:
+						if progress == nil {
+							progress = tk
+						}
+					case TaskUpdated:
+						if updated == nil {
+							updated = tk
+						}
+					}
+				}
+				if len(started) != 5 || len(notified) != 5 {
+					t.Fatalf("started %d, notified %d", len(started), len(notified))
+				}
+				bg, shell, outer, inner, again := started[0], started[1], started[2], started[3], started[4]
+				if bg.TaskType != TaskTypeAgent || !bg.IsBackgrounded || bg.SpawnDepth != 1 || bg.Description != "Slow count" ||
+					bg.SubagentType != "general-purpose" || bg.ToolUseID == "" || bg.RunID == "" {
+					t.Errorf("background start %+v", bg)
+				}
+				if shell.TaskType != "local_bash" || !shell.OwnedBySubagent || shell.ParentTaskID != bg.TaskID {
+					t.Errorf("shell start %+v", shell)
+				}
+				if outer.IsBackgrounded || outer.SpawnDepth != 1 || inner.SpawnDepth != 2 || inner.ParentTaskID != outer.TaskID {
+					t.Errorf("nested starts %+v / %+v", outer, inner)
+				}
+				if again.TaskID != bg.TaskID || again.ToolUseID == bg.ToolUseID || again.RunID == bg.RunID || again.Prompt == "" {
+					t.Errorf("resumed start %+v (first %+v)", again, bg)
+				}
+				if progress.LastToolName != "Bash" || progress.Usage == nil || progress.Usage.ToolUses != 1 ||
+					!strings.HasPrefix(progress.Description, "Running ") {
+					t.Errorf("progress %+v", progress)
+				}
+				if updated.Patch == nil || updated.Patch.Status != "completed" || updated.Patch.EndTime == 0 {
+					t.Errorf("updated %+v", updated)
+				}
+				n := notified[1] // the background run's (the shell's comes first)
+				if n.TaskID != bg.TaskID || n.Status != "completed" || n.Report() != "three" || n.Handback != "send" ||
+					n.Usage == nil || n.Usage.TotalTokens == 0 || !strings.Contains(n.Summary, "SubagentHandback") {
+					t.Errorf("notification %+v report %q", n, n.Report())
+				}
+			},
+		},
+		{
+			// A background run stopped with TaskStop.
+			name: "agents-stop",
+			want: map[string]int{"Task": 6},
+			check: func(t *testing.T, evs []Event) {
+				for _, ev := range evs {
+					tk, ok := ev.(*Task)
+					if !ok || tk.TaskID != "a8625072e13dedaad" {
+						continue
+					}
+					switch tk.Subtype {
+					case TaskUpdated:
+						if tk.Patch == nil || tk.Patch.Status != "killed" {
+							t.Errorf("updated %+v", tk.Patch)
+						}
+					case TaskNotification:
+						if tk.Status != "stopped" || tk.Report() != "Long wait" {
+							t.Errorf("notification %+v", tk)
+						}
+					}
+				}
+			},
+		},
+		{
+			// A process resumed after its predecessor was killed with a background run
+			// open: Claude reports the run stopped before anything else.
+			name: "agents-resume",
+			want: map[string]int{"Task": 1, "Result": 2},
+			check: func(t *testing.T, evs []Event) {
+				tk, ok := evs[0].(*Task)
+				if !ok || tk.Subtype != TaskNotification || tk.Status != "stopped" || !strings.Contains(tk.Summary, "didn't finish") {
+					t.Errorf("first event %+v", evs[0])
+				}
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

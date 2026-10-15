@@ -233,6 +233,12 @@ message Session {
   // "snooze ended". Reconnect, Pin (pinned), Send and Archive (archived) clear it.
   // Persisted.
   google.protobuf.Timestamp snoozed_until = 38;
+  // Subagent runs still running: all of them (nested ones too), and those the thread
+  // launched in the background itself (spawn depth 1, run_in_background), which run on
+  // after its turn ends. The thread's runs in detail: ThreadItemsSnapshot.agents. See
+  // docs/notes/agents-1-daemon.md.
+  int32 agents_running = 39;
+  int32 background_agents_running = 40;
 }
 
 // ApiRetry is a thread's pending API retry: Claude's system/api_retry frame.
@@ -248,14 +254,14 @@ message ApiRetry {
   string error = 5;
 }
 
-// Whether a subagent run is still followed.
+// Whether a subagent run is still running (ThreadAgentRun.status in detail).
 enum AgentRunStatus {
   AGENT_RUN_STATUS_UNSPECIFIED = 0;
-  // Its result has not reached the thread yet: running, or a background run that has
-  // not notified.
+  // Running: its end has not been reported yet (a background run runs on after the
+  // turn).
   AGENT_RUN_STATUS_OPEN = 1;
-  // Its result (completed, failed, interrupted, stopped) reached the thread, or it was
-  // idle past the safety net.
+  // It ended (completed, failed, stopped), its process ended first, or it was idle past
+  // the safety net.
   AGENT_RUN_STATUS_CLOSED = 2;
 }
 
