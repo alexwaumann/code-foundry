@@ -91,6 +91,7 @@ describe("surface registry", () => {
       ["linkedprs", "l"],
       ["usage", "u"],
       ["mcp", "m"],
+      ["agents", "a"],
       ["workspace", "w"],
       ["worktree", "t"],
     ]);
@@ -100,6 +101,7 @@ describe("surface registry", () => {
     expect(surfaceByHotkey("l")?.kind).toBe("linkedprs");
     expect(surfaceByHotkey("U")?.kind).toBe("usage");
     expect(surfaceByHotkey("m")?.kind).toBe("mcp");
+    expect(surfaceByHotkey("A")?.kind).toBe("agents");
     expect(surfaceByHotkey("T")?.kind).toBe("worktree");
     // s-1 is unknown here: no pull request, no linked pull requests, not a known thread,
     // no workspace thread, no worktree to place it in.

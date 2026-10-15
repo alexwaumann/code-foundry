@@ -1,0 +1,34 @@
+/* The Agents surface and strip (docs/sketches/agents-panel variant L1). */
+
+/* A running run's activity: muted text with a light sweeping through it. */
+@keyframes cf-agents-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+.cf-agents-shimmer {
+  background: linear-gradient(90deg, var(--muted-foreground) 0%, var(--foreground) 50%, var(--muted-foreground) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: cf-agents-shimmer 2s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cf-agents-shimmer {
+    animation: none;
+  }
+}
+
+/* A nested run's connector: from the row's top down to its first line, then right. */
+.cf-agents-nest::before {
+  content: "";
+  position: absolute;
+  left: var(--nest-x);
+  top: 0;
+  height: 20px;
+  width: 8px;
+  border-left: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-bottom-left-radius: 6px;
+}

@@ -11,6 +11,7 @@ import { bottomKeyOf, bottomVisible, getBottom, toggleBottom } from "./bottomPan
 import { linkedPrsTarget, openLinkedPrsSurface } from "./linkedPrsPanel";
 import { expandPanel, getPanel, startPanelPicking, togglePanel } from "./panel";
 import { useUiStore, viewNames, type FocusRegion } from "./ui";
+import { openAgentsSurface } from "./agentsPanel";
 import { openMcpSurface } from "./mcpPanel";
 import { openUsageSurface } from "./usagePanel";
 import { openWorkspaceSurface } from "./workspacePanel";
@@ -100,6 +101,10 @@ export function showView(name: string): boolean {
     case "panel.mcp":
       // view.panel.mcp: the MCP surface in the current thread's panel.
       mcpPanelCommand();
+      return true;
+    case "panel.agents":
+      // view.panel.agents: the Agents surface in the current thread's panel.
+      agentsPanelCommand();
       return true;
     case "panel.worktree":
       // view.panel.worktree: the thread's own worktree in the current thread's panel.
@@ -305,6 +310,23 @@ export function usagePanelCommand(): boolean {
 export function mcpPanelCommand(): boolean {
   if (pageOpen()) return false;
   const key = openMcpSurface();
+  if (key === null) return false;
+  const inPalette = useUiStore.getState().palette.open;
+  togglePanel(key, true, { focus: !inPalette });
+  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
+  return true;
+}
+
+/**
+ * view.panel.agents for the current selection: opens (or activates) the Agents tab in the
+ * selected thread's panel and shows the panel, like view.panel.mcp. A no-op while the
+ * settings or usage page is up and when no thread is selected.
+ *
+ * Focus moves to the panel; with the palette open, its return target moves there instead.
+ */
+export function agentsPanelCommand(): boolean {
+  if (pageOpen()) return false;
+  const key = openAgentsSurface();
   if (key === null) return false;
   const inPalette = useUiStore.getState().palette.open;
   togglePanel(key, true, { focus: !inPalette });
