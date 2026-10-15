@@ -59,6 +59,7 @@ function TooltipContent({ className, sideOffset = 6, alignOffset, collisionPaddi
  * - It opens on hover and on focus reached by keyboard navigation, not on the focus a
  *   closing menu hands back to its trigger or a dialog gives its first button, not after
  *   a press until the pointer leaves, and not while a nested Tip is hovered (`wanted`).
+ * - Escape closes it and then reaches what is under it (`EscapeForwarder`).
  */
 function Tip({
   label,
@@ -86,6 +87,8 @@ function Tip({
   // Radix only cancels an open that is already showing, so one still in its delay would
   // pop up over the menu the press opened (and take its Escape).
   const pressed = React.useRef(false)
+  // Where an Escape that closed the tooltip goes next (see EscapeForwarder).
+  const escapeTo = React.useRef<Element | null>(null)
   React.useEffect(listenForNavKeys, [])
   // Without a label the trigger stays in place (no remount, focus kept) and never opens.
   const has = label !== null && label !== undefined && label !== false && label !== ""
@@ -113,12 +116,46 @@ function Tip({
         {children}
       </TooltipTrigger>
       {has && (
-        <TooltipContent side={side} align={align} sideOffset={sideOffset} className={cn("max-w-80 px-2.5 py-1.5 text-xs break-words whitespace-pre-line", className)} data-testid={testId}>
+        <TooltipContent
+          side={side}
+          align={align}
+          sideOffset={sideOffset}
+          className={cn("max-w-80 px-2.5 py-1.5 text-xs break-words whitespace-pre-line", className)}
+          data-testid={testId}
+          onEscapeKeyDown={() => {
+            escapeTo.current = document.activeElement ?? document.body
+          }}
+        >
           {label}
+          <EscapeForwarder target={escapeTo} />
         </TooltipContent>
       )}
     </Tooltip>
   )
+}
+
+/**
+ * An open tooltip is the topmost Radix dismissable layer, and only the topmost layer
+ * hears Escape: hovering a Tip in a menu (or over a dialog, a popover) and pressing
+ * Escape would close the tooltip and leave the menu open. So the Escape that closed a
+ * tooltip is sent again once its content has unmounted (the next layer down listens
+ * again a frame later), to wherever the focus was: as if the tooltip had not been there.
+ */
+function EscapeForwarder({ target }: { target: React.RefObject<Element | null> }) {
+  React.useEffect(
+    () => () => {
+      const to = target.current
+      target.current = null
+      if (!to) return
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          if (to.isConnected) to.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true, cancelable: true }))
+        })
+      )
+    },
+    [target]
+  )
+  return null
 }
 
 /**

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, openProjects, resetMock, row } from "./fixtures";
+import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, openProjects, openTooltip, resetMock, row } from "./fixtures";
 
 // Actions (docs/notes/actions-2-gui.md): the thread header's Play menu, the editor dialog,
 // and a run's bottom-panel tab with its command echo and status line. Mock seeds
@@ -74,6 +74,15 @@ test("the header's Play menu lists the project's actions and runs one in the thr
   await expect(pencil("Test")).toHaveCSS("opacity", "1");
   await expect(pencil("Dev")).toHaveCSS("opacity", "0");
   await expect(pencil("Test")).toHaveAttribute("aria-label", "Edit Test");
+  // The pencil's tooltip opens inside the menu; Escape closes the tooltip and then the
+  // menu under it (the tooltip must not swallow it), and the menu opens again.
+  await pencil("Test").hover();
+  await expect(openTooltip(page)).toHaveText("Edit Test");
+  await page.keyboard.press("Escape");
+  await expect(openTooltip(page)).toHaveCount(0);
+  await expect(menu(page)).toHaveCount(0);
+  await trigger(page).click();
+  await expect(items(page)).toHaveText(NAMES);
 
   // A click runs it for the thread, always in a terminal, without a toast.
   await item(page, "Test").click();
