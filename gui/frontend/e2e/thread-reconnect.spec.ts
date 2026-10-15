@@ -29,7 +29,7 @@ async function track(page: Page): Promise<{ watches: () => number }> {
     const w = window as unknown as { __chipSeen: boolean };
     w.__chipSeen = false;
     new MutationObserver(() => {
-      if (document.querySelector('[data-testid="thread-reconnecting"]')) w.__chipSeen = true;
+      if (document.querySelector('[data-testid="thread-catching-up"]')) w.__chipSeen = true;
     }).observe(document, { childList: true, subtree: true });
   });
   return { watches: () => watches };
@@ -65,7 +65,7 @@ test("a Watch that cannot reconnect shows the chip over the log until it is back
   await openApp(page);
   await row(page, "s:s-r1").click();
   await expect(timeline(page)).toBeVisible();
-  const chip = page.getByTestId("thread-reconnecting");
+  const chip = page.getByTestId("thread-catching-up");
   await expect(chip).toHaveCount(0);
 
   // The daemon is unreachable for the Watch; a resync drops the open one.
@@ -73,6 +73,7 @@ test("a Watch that cannot reconnect shows the chip over the log until it is back
   await setVisibility(page, "hidden");
   await setVisibility(page, "visible");
   await expect(chip).toBeVisible();
+  await expect(chip).toHaveText("catching up…");
   // The log stays on screen under it.
   await expect(timeline(page)).toBeVisible();
 

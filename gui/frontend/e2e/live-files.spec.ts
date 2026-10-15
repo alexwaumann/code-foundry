@@ -82,5 +82,5 @@ test("composer: an @file tag from the card starts a haiku thread that reads the 
   console.log(`answer: ${answer().slice(0, 800)}`);
   await expect.poll(() => find()?.status, { timeout: 60_000 }).toBe("SESSION_STATUS_IDLE");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "live-files-thread.png") });
-  cli("session", "close", "--id", id);
+  cli("session", "archive", "--id", id, "--yes");
 });

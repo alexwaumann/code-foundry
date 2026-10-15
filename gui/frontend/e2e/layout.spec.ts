@@ -180,9 +180,9 @@ test("every page header is 44px, ends on the band and drags; its controls do not
   await check('[data-testid="settings-page"] > header', ['input[type="search"]', '[data-testid="reveal-settings"]', 'button[aria-label="Close settings"]']);
   await page.getByRole("button", { name: "Close settings" }).click();
 
-  // A disconnected thread keeps the thread header.
+  // A stopped thread keeps the thread header.
   await row(page, "s:s-3").click();
-  await expect(page.getByTestId("thread-disconnected")).toBeVisible();
+  await expect(page.getByTestId("thread-composer")).toBeVisible();
   await check('[data-testid="thread-header"]', ['[data-testid="pane-actions"]', '[data-testid="panel-toggle"]']);
 });
 

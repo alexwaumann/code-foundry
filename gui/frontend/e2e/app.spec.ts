@@ -206,7 +206,7 @@ test("sidebar is keyboard navigable", async ({ page }) => {
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-2");
   await page.keyboard.press("Meta+3");
   await expect(row(page, "s:s-4")).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("thread-disconnected")).toBeVisible();
+  await expect(page.getByTestId("thread-composer")).toBeVisible();
   // Past the last thread: nothing changes.
   await page.keyboard.press("Meta+9");
   await expect(row(page, "s:s-4")).toHaveAttribute("aria-selected", "true");

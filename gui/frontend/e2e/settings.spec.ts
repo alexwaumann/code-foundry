@@ -198,7 +198,11 @@ test("cmd+/ opens the help overlay; its shortcuts tab lists commands and app cho
   const help = page.getByTestId("help-overlay");
   await expect(help).toBeVisible();
   await expect(page.getByTestId("help-tab-guide")).toHaveAttribute("data-state", "active");
+  // Threads never need closing or reconnecting: a message always continues one.
+  await expect(page.getByTestId("help-guide")).toContainText("a thread keeps its history, and a message always continues it.");
+  await expect(help).not.toContainText(/disconnected|Reconnect/);
   await page.getByTestId("help-tab-shortcuts").click();
+  await expect(help.locator('[data-help-command="session.close"], [data-help-command="session.reconnect"]')).toHaveCount(0);
   await expect(help.locator('[data-help-section="App"]')).toContainText("Command palette");
   await expect(help.locator('[data-help-section="App"]')).toContainText("⌘K");
   // Registry commands with their effective chords, grouped by category; unavailable

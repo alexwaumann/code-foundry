@@ -12,7 +12,7 @@
  * It starts one haiku thread ("say hi and stop") in the first member, opens the surface
  * from the thread's workspace badge, checks the members' state and the current member,
  * opens the first member as a tab, and adds and removes LIVE_ADD_REPO through the
- * surface (the removal through the daemon's confirm). The thread is closed at the end.
+ * surface (the removal through the daemon's confirm). The thread is archived at the end (Claude stops).
  */
 import { execFileSync } from "node:child_process";
 import path from "node:path";
@@ -113,7 +113,7 @@ test("workspace surface with a real thread: members' state, member tab, add and 
     });
   } finally {
     try {
-      cli("session", "close", "--id", thread);
+      cli("session", "archive", "--id", thread, "--yes");
     } catch {
       // already closed
     }

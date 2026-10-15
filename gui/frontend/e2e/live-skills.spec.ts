@@ -86,5 +86,5 @@ test("composer: a /skill tag from the card starts a haiku thread that runs the s
   console.log(`answer: ${answer().slice(0, 600)}`);
   await expect.poll(() => find()?.status, { timeout: 60_000 }).toBe("SESSION_STATUS_IDLE");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "live-skills-thread.png") });
-  cli("session", "close", "--id", id);
+  cli("session", "archive", "--id", id, "--yes");
 });

@@ -11,119 +11,133 @@ function badge(page: Page, sessionId: string) {
   return row(page, `s:${sessionId}`).locator("[data-session-badge]");
 }
 
-test("session rows render with status badges, above the terminals no thread owns", async ({ page }) => {
+test("session rows render with status badges, above the terminals no thread owns; none says whether Claude runs", async ({ page }) => {
   await openApp(page);
   const tree = page.getByTestId("thread-list");
   await expect(badge(page, "s-1")).toHaveAttribute("data-session-badge", /^(busy|idle)$/);
   await expect(badge(page, "s-2")).toHaveAttribute("data-session-badge", "attention");
-  await expect(badge(page, "s-3")).toHaveAttribute("data-session-badge", "disconnected");
-  await expect(badge(page, "s-4")).toHaveAttribute("data-session-badge", "disconnected");
-  await expect(badge(page, "s-5")).toHaveAttribute("data-session-badge", "starting");
-  await expect(badge(page, "s-6")).toHaveAttribute("data-session-badge", "closing");
+  // Stopped (at its prompt, after a crash) reads as idle; starting as working; stopping as idle.
+  await expect(badge(page, "s-3")).toHaveAttribute("data-session-badge", "idle");
+  await expect(badge(page, "s-4")).toHaveAttribute("data-session-badge", "idle");
+  await expect(badge(page, "s-5")).toHaveAttribute("data-session-badge", "busy");
+  await expect(row(page, "s:s-5")).toHaveAttribute("data-section", "working");
+  await expect(row(page, "s:s-5").getByTestId("row-status")).toHaveText("Working");
+  await expect(badge(page, "s-6")).toHaveAttribute("data-session-badge", "idle");
   // Only threads have rows (and the Working, Snoozed and Archived headers): their terminals show
   // through them, shells in bottom panels.
   const keys = await tree.locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
   expect(keys.every((k) => k?.startsWith("s:") || k === "h:working" || k === "h:snoozed" || k === "h:archived")).toBe(true);
-  // Disconnected rows are dimmed as a whole (not just the name); starting settles into connected on the mock's timer.
-  await expect(row(page, "s:s-3").getByTestId("session-body")).toHaveAttribute("data-offline", "true");
-  await expect(row(page, "s:s-3").getByTestId("session-body")).toHaveCSS("opacity", "0.5");
-  await expect(row(page, "s:s-3").getByTestId("session-name")).not.toHaveClass(/text-muted-foreground/);
-  await expect(row(page, "s:s-1").getByTestId("session-body")).not.toHaveAttribute("data-offline");
+  // A stopped thread's row looks like a running one's: not dimmed, no offline mark.
+  for (const id of ["s-3", "s-4", "s-6"]) {
+    await expect(row(page, `s:${id}`).getByTestId("session-body")).not.toHaveAttribute("data-offline");
+    await expect(row(page, `s:${id}`).getByTestId("session-body")).toHaveCSS("opacity", "1");
+  }
+  await expect(tree).not.toContainText(/disconnected|starting|closing/i);
   // resetMock holds s-5 starting; released, the mock's clock settles it.
   await releaseSessions("s-5");
   await expect(badge(page, "s-5")).toHaveAttribute("data-session-badge", /^(idle|busy)$/, { timeout: 12_000 });
   await expect(row(page, "s:s-5")).toHaveAttribute("data-section", "idle");
 });
 
-test("a disconnected thread shows its conversation and the Reconnect card; Reconnect starts it again", async ({ page }) => {
+test("a stopped thread shows its conversation and the composer; a message starts it and gets the answer", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-4").click();
   const pane = page.getByTestId("thread-pane");
   await expect(pane.getByTestId("thread-user").first()).toContainText("Investigate the flaky e2e run on CI.");
-  const card = page.getByTestId("thread-disconnected");
-  await expect(card).toHaveText(/Not connected · crashed \(exit code 139\)\. Reconnect to continue the conversation\./);
-  await expect(page.getByTestId("thread-composer")).toHaveCount(0);
-  await expect(card.getByTestId("reconnect")).toBeFocused();
+  await expect(page.getByTestId("thread-disconnected")).toHaveCount(0);
+  await expect(page.getByTestId("reconnect")).toHaveCount(0);
+  await expect(pane).not.toContainText(/Not connected|Reconnect|starting…|closing…/);
+  const composer = page.getByTestId("thread-composer");
+  await expect(composer.getByTestId("composer-input")).toBeFocused();
 
-  await card.getByTestId("reconnect").click();
-  await expect(page.getByTestId("session-indicator")).toHaveText("starting…");
-  await expect(page.getByTestId("thread-composer")).toBeVisible();
-  // The prompt takes the keyboard back from the Reconnect button.
-  await expect(page.getByTestId("thread-composer").getByTestId("composer-input")).toBeFocused();
-  await expect(page.getByTestId("session-indicator")).toHaveCount(0, { timeout: 8000 });
-  await expect(badge(page, "s-4")).toHaveAttribute("data-session-badge", "idle");
-  const last = (await invocations()).at(-1);
-  expect(last?.name).toBe("session.reconnect");
-  expect(last?.context).toMatchObject({ activeSessionId: "s-4", activeView: "session" });
+  await page.keyboard.type("Is it still flaky?");
+  await expect(composer.getByTestId("thread-send")).toBeEnabled();
+  await page.keyboard.press("Enter");
+  // The message is in at once; while Claude starts it looks like any working thread.
+  await expect(pane.getByTestId("thread-user").last()).toContainText("Is it still flaky?");
+  await expect(pane.getByTestId("thread-working")).toContainText("Working");
+  await expect(pane).not.toContainText(/Starting Claude|starting…/);
+  await expect(badge(page, "s-4")).toHaveAttribute("data-session-badge", "busy");
+  await expect(pane.locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.", { timeout: 10_000 });
+  await expect(composer.getByTestId("composer-input")).toBeFocused();
 });
 
-test("a live thread that disconnects swaps its composer for the Reconnect card, and Enter reconnects", async ({ page }) => {
+test("a running thread that stops looks the same: the composer stays focused and still sends", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   const composer = page.getByTestId("thread-composer");
   await expect(composer.getByTestId("composer-input")).toBeFocused();
 
-  await mockPost("session/disconnect?id=s-1&reason=exited&code=0&status=idle");
-  const card = page.getByTestId("thread-disconnected");
-  await expect(card).toContainText("Not connected · Claude exited.");
-  await expect(badge(page, "s-1")).toHaveAttribute("data-session-badge", "disconnected");
+  // The daemon's idle stop at cache expiry.
+  await mockPost("session/stop?id=s-1&reason=idle&code=0&status=idle");
+  await expect(badge(page, "s-1")).toHaveAttribute("data-session-badge", "idle");
+  await expect(page.getByTestId("thread-disconnected")).toHaveCount(0);
+  await expect(composer.getByTestId("composer-input")).toBeFocused();
   // The conversation stays.
   await expect(page.getByTestId("thread-pane").getByTestId("thread-user").first()).toContainText("Refactor the sidebar tree");
 
-  // Enter on the focused Reconnect button (keyboard path).
-  await expect(card.getByTestId("reconnect")).toBeFocused();
+  await page.keyboard.type("Carry on");
   await page.keyboard.press("Enter");
-  await expect(composer.getByTestId("composer-input")).toBeFocused();
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.reconnect");
+  await expect(page.getByTestId("thread-pane").getByTestId("thread-user").last()).toContainText("Carry on");
+  await expect(page.getByTestId("thread-pane").locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.", { timeout: 10_000 });
 });
 
-test("a disconnected thread keeps its status: busy ends interrupted, attention persists", async ({ page }) => {
+test("no Close or Reconnect anywhere: header, row menu, palette, chords", async ({ page }) => {
   await openApp(page);
-  await mockPost("session/disconnect?id=s-1&reason=crashed&code=1&status=busy");
+  await row(page, "s:s-4").click();
+  const header = page.getByTestId("thread-header");
+  await expect(header.getByRole("button", { name: /Close Thread|Reconnect Thread/ })).toHaveCount(0);
+  await row(page, "s:s-4").click({ button: "right" });
+  const menu = page.getByTestId("row-menu");
+  await expect(menu).toBeVisible();
+  await expect(menu).not.toContainText("Reconnect");
+  await expect(menu.getByRole("menuitem", { name: "Close" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("Thread");
+  const palette = page.getByTestId("palette");
+  await expect(palette.locator('[data-command="session.rename"]')).toBeVisible();
+  await expect(palette.locator('[data-command="session.close"], [data-command="session.reconnect"]')).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  const before = (await invocations()).length;
+  await page.getByTestId("thread-composer").getByTestId("composer-input").click();
+  await page.keyboard.press("Meta+Shift+w");
+  await page.keyboard.press("Meta+Shift+r");
+  expect((await invocations()).slice(before).map((i) => i.name)).toEqual([]);
+});
+
+test("a stopped thread keeps its status: busy ends interrupted, attention persists", async ({ page }) => {
+  await openApp(page);
+  await mockPost("session/stop?id=s-1&reason=crashed&code=1&status=busy");
   await expect(badge(page, "s-1")).toHaveAttribute("data-session-badge", "error");
   await expect(row(page, "s:s-1").getByTestId("row-status")).toHaveText("Interrupted while working · just now");
-  await mockPost("session/disconnect?id=s-2&reason=daemon%20stopped&code=0");
+  await mockPost("session/stop?id=s-2&reason=daemon%20stopped&code=0");
   await expect(badge(page, "s-2")).toHaveAttribute("data-session-badge", "attention");
   // Still waiting on the user: counted, still on top, still saying so (dimmed).
   await expect(page.getByTestId("attention-badge")).toHaveText("1");
   await expect.poll(async () => (await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).slice(0, 1)).toEqual(["s:s-2"]);
   await expect(row(page, "s:s-2").getByTestId("row-status")).toHaveText("Needs input · Bash zig build -Doptimize=ReleaseFast");
-  await expect(row(page, "s:s-2").getByTestId("session-body")).toHaveAttribute("data-offline", "true");
+  await expect(row(page, "s:s-2").getByTestId("session-body")).toHaveCSS("opacity", "1");
 });
 
-test("the Reconnect card says why the thread stopped; the header still says where it ran", async ({ page }) => {
+test("a crashed thread says what happened in its timeline, not in a card; the header says where it ran", async ({ page }) => {
   await openApp(page);
-  const card = page.getByTestId("thread-disconnected");
-
-  // s-1 crashes mid-turn.
-  await mockPost("session/disconnect?id=s-1&reason=crashed&code=1&status=busy");
+  // s-1 crashes mid-turn: interrupted, and the composer is still there.
+  await mockPost("session/stop?id=s-1&reason=crashed&code=1&status=busy");
   await row(page, "s:s-1").click();
-  await expect(card).toContainText("Not connected · crashed (exit code 1).");
   await expect(page.getByTestId("thread-title")).toHaveText("Refactor sidebar tree");
+  await expect(page.getByTestId("thread-composer")).toBeVisible();
+  await expect(page.getByTestId("thread-pane")).not.toContainText(/Not connected|Reconnect/);
 
-  // s-2 was asking for permission when the daemon stopped.
-  await mockPost("session/disconnect?id=s-2&reason=daemon%20stopped&code=0");
-  await row(page, "s:s-2").click();
-  await expect(card).toContainText("Not connected · daemon stopped.");
-
-  // s-3 is seeded after Claude exited, in the fix/resize worktree.
+  // s-3 is seeded stopped, in the fix/resize worktree.
   await row(page, "s:s-3").click();
-  await expect(card).toContainText("Not connected · Claude exited.");
+  await expect(page.getByTestId("thread-composer")).toBeVisible();
   // The header says where it runs (project @ branch, a linked worktree), not the path, model or status.
   await expect(page.getByTestId("thread-location")).toHaveText("code-foundry@fix/resizeworktree");
   await expect(page.getByTestId("thread-worktree-chip")).toBeVisible();
   await expect(page.getByTestId("thread-header")).not.toContainText("Opus");
   await expect(page.getByTestId("thread-header")).not.toContainText("fix-resize");
-  await expect(page.getByTestId("thread-header")).not.toContainText("disconnected");
-});
-
-test("close shows closing… then the Reconnect card with the reason", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-2").click();
-  await expect(page.getByTestId("thread-composer").getByTestId("composer-input")).toBeFocused();
-  await page.keyboard.press("Meta+Shift+w"); // session.close, from the focused prompt
-  await expect(page.getByTestId("session-indicator")).toHaveText("closing…");
-  await expect(page.getByTestId("thread-disconnected")).toContainText("Not connected · closed.", { timeout: 8000 });
+  await expect(page.getByTestId("thread-header")).not.toContainText(/disconnected|stopped|Close/);
 });
 
 test("needs-attention: count badge, window title, and cmd+shift+a", async ({ page }) => {
@@ -213,8 +227,8 @@ test("FocusSession intent selects the session", async ({ page }) => {
   await openApp(page);
   await expect.poll(async () => ((await mockPost("session/focus?id=s-3")) as { delivered: number }).delivered).toBeGreaterThan(0);
   await expect(row(page, "s:s-3")).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("thread-disconnected")).toBeVisible();
-  await expect(page.getByTestId("reconnect")).toBeFocused();
+  // A stopped thread: the composer, as for any other.
+  await expect(page.getByTestId("thread-composer").getByTestId("composer-input")).toBeFocused();
 });
 
 test("the whole app runs on one events stream plus one thread Watch", async ({ page }) => {

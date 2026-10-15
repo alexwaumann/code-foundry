@@ -7,9 +7,9 @@ test.beforeEach(async () => {
 
 const start = (page: Page) => page.getByTestId("start-page");
 
-/** A steady fleet: s-1 (which flips busy/idle) and the settling s-5/s-6 disconnected, s-2 waiting. */
+/** A steady fleet: s-1 (which flips busy/idle) and the settling s-5/s-6 stopped, s-2 waiting. */
 async function steadyFleet(): Promise<void> {
-  for (const id of ["s-1", "s-5", "s-6"]) await mockPost(`session/disconnect?id=${id}&reason=closed&code=0&status=idle`);
+  for (const id of ["s-1", "s-5", "s-6"]) await mockPost(`session/stop?id=${id}&reason=closed&code=0&status=idle`);
 }
 
 test("onboarding: no projects shows the welcome and Add a project", async ({ page }) => {
@@ -38,15 +38,15 @@ test("with projects: greeting, counts, actions, and no New terminal", async ({ p
   await openApp(page);
   await expect(start(page)).toHaveAttribute("data-state", "fleet");
   await expect(page.getByTestId("start-heading")).toHaveText(/^Good (morning|afternoon|evening)$/);
-  await expect(page.getByTestId("start-counts")).toHaveText("3 connected · 2 running · 1 waiting on you");
   await expect(page.getByTestId("start-waiting")).toHaveClass(/text-warning/);
+  await expect(page.getByTestId("start-counts")).toHaveText("2 running · 1 waiting on you");
   const actions = page.getByTestId("welcome-actions");
   await expect(actions.getByRole("button")).toHaveText(["New thread", "Command palette"]);
   await expect(start(page).getByRole("button", { name: "New terminal" })).toHaveCount(0);
 
   // Nothing waiting: zero counts are dropped from the line.
   await mockPost("session/status?id=s-2&status=idle");
-  await expect(page.getByTestId("start-counts")).toHaveText("3 connected · 2 running");
+  await expect(page.getByTestId("start-counts")).toHaveText("2 running");
   await expect(page.getByTestId("start-waiting")).toHaveCount(0);
 
   // The link lands on the overlay's shortcuts tab, not the guide.
@@ -62,7 +62,7 @@ test("thread list: waiting first, capped at six, a row selects its thread", asyn
   await mockPost("threads?repo=repo-dot&count=3&status=attention&prefix=Ask");
   await mockPost("threads?repo=repo-cf&count=2&status=idle&prefix=Idle");
   await openApp(page);
-  await expect(page.getByTestId("start-counts")).toHaveText("10 connected · 4 running · 4 waiting on you");
+  await expect(page.getByTestId("start-counts")).toHaveText("4 running · 4 waiting on you");
   const rows = page.getByTestId("start-threads").locator("[data-session-link]");
   await expect(rows).toHaveCount(6);
   await expect(page.getByTestId("start-threads-more")).toHaveText("+2 more");
@@ -81,7 +81,8 @@ test("thread list hides when nothing is running or waiting", async ({ page }) =>
   await steadyFleet();
   await mockPost("session/status?id=s-2&status=idle");
   await openApp(page);
-  await expect(page.getByTestId("start-counts")).toHaveText("1 connected");
+  // Nothing running or waiting: no counts at all (stopped or idle threads are never counted).
+  await expect(page.getByTestId("start-counts")).toHaveCount(0);
   await expect(page.getByTestId("start-threads")).toHaveCount(0);
 });
 

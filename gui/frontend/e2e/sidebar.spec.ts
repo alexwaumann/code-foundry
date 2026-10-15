@@ -256,13 +256,13 @@ test("the Projects page lists projects with their own worktrees and workspaces w
   // The worktree is gone from disk (and so from the projects too).
   await expect(cf.getByTestId("project-in-workspaces")).toHaveCount(0);
 
-  // A member with a live thread is refused, and stays.
+  // A member where a thread's Claude runs is refused (archive it first), and stays.
   const gp = ws.locator('[data-nav-key="m:w-000000000001::repo-gp"]');
   await gp.getByTestId("member-more").click();
   await page.getByTestId("member-remove").focus();
   await page.keyboard.press("Enter");
   await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
-  await expect(page.getByText(/running in .*ghostty-playground\/cf-login; close it first/)).toBeVisible();
+  await expect(page.getByText(/running in .*ghostty-playground\/cf-login; archive it first \(that stops Claude\)/)).toBeVisible();
   await expect(ws.getByTestId("member-name")).toHaveText(["ghostty-playground", "dotfiles"]);
 
   // Enter on a worktree row shows it in the page's side panel (worktree-panel.spec.ts).
@@ -389,10 +389,9 @@ test("status kinds: each thread's second line says its status in words and colou
   await expect(idle.getByTestId("row-status")).toHaveCount(0);
   await expect(idle.getByTestId("row-place")).toHaveText("code-foundry @ main");
   await expect(row(page, "s:s-k-question").getByTestId("row-project")).toHaveCount(0);
-  // Offline rows are dimmed, the rest are not; the name is never coloured by status.
-  for (const id of ["s-k-interrupted", "s-k-asked-before-restart"]) await expect(row(page, `s:${id}`).getByTestId("session-body"), id).toHaveAttribute("data-offline", "true");
-  for (const id of ["s-k-approval", "s-k-finished", "s-k-busy", "s-k-idle"]) await expect(row(page, `s:${id}`).getByTestId("session-body"), id).not.toHaveAttribute("data-offline");
   await expect(row(page, "s:s-k-approval").getByTestId("session-name")).not.toHaveClass(/text-warning/);
+  // No row is dimmed (whether Claude runs never shows); the name is never coloured by status.
+  for (const id of ["s-k-interrupted", "s-k-asked-before-restart", "s-k-approval", "s-k-finished", "s-k-busy", "s-k-idle"]) await expect(row(page, `s:${id}`).getByTestId("session-body"), id).toHaveCSS("opacity", "1");
   // No status icon in thread rows.
   await expect(list(page).locator('[data-row-kind="session"] [role="img"]')).toHaveCount(0);
 
@@ -486,7 +485,7 @@ test("Working section: the header counts threads as they start and stop working,
   await mockPost("session/status?id=s-1&status=idle");
   await expect(page.getByTestId("working-count")).toHaveText("1");
   await expect(row(page, "s:s-1")).toHaveAttribute("data-section", "idle");
-  await mockPost("session/disconnect?id=s-5&reason=closed&code=0&status=idle");
+  await mockPost("session/stop?id=s-5&reason=closed&code=0&status=idle");
   await expect(page.getByTestId("working-header")).toHaveCount(0);
   expect((await rowKeys(page)).filter((k) => k.startsWith("#"))).toEqual(["# Snoozed 2", "# Archived 1"]);
 });

@@ -63,5 +63,5 @@ test("composer: pick a workspace, make the second member primary, start a haiku 
   expect(find()).toMatchObject({ workspaceId: members.workspace.id, repoId: second.repoId, worktreePath: second.worktreePath });
   await expect.poll(() => find()?.status, { timeout: 120_000 }).toBe("SESSION_STATUS_IDLE");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "live-workspace-thread.png") });
-  cli("session", "close", "--id", id);
+  cli("session", "archive", "--id", id, "--yes");
 });
