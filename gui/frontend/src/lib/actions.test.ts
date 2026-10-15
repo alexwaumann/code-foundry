@@ -15,6 +15,20 @@ describe("actionTabStatus", () => {
   ])("%s", (_n, t, want) => {
     expect(actionTabStatus(t)).toBe(want);
   });
+
+  it.each([
+    ["running after Stop", { state: "running", exitCode: 0 }, "stopping"],
+    ["SIGHUP after Stop", { state: "exited", exitCode: 129 }, "stopped"],
+    ["SIGKILL after Stop (ignored SIGHUP)", { state: "exited", exitCode: 137 }, "stopped"],
+    ["exit 0 after Stop", { state: "exited", exitCode: 0 }, "ok"],
+    ["its own failure after Stop", { state: "exited", exitCode: 1 }, "failed"],
+  ])("Stop pressed: %s", (_n, t, want) => {
+    expect(actionTabStatus(t, true)).toBe(want);
+  });
+
+  it("a command that exits 137 on its own stays failed", () => {
+    expect(actionTabStatus({ state: "exited", exitCode: 137 })).toBe("failed");
+  });
 });
 
 describe("formatRunClock", () => {

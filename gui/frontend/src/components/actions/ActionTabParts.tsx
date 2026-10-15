@@ -1,18 +1,20 @@
-import { CircleCheck, CircleX, LoaderCircle, RotateCcw, Square } from "lucide-react";
+import { CircleCheck, CircleStop, CircleX, LoaderCircle, RotateCcw, Square } from "lucide-react";
 import { actionCommandOf, actionTabStatus, commandEcho, formatRunClock, formatRunDuration, type ActionTabStatus } from "@/lib/actions";
 import { useNow } from "@/lib/clock";
 import { ACTION_LABEL, ACTION_RUN_LABEL } from "@/lib/termlabel";
 import { cn } from "@/lib/utils";
 import { rerunAction, stopActionRun } from "@/stores/actionActions";
 import { useActionsStore } from "@/stores/actions";
+import { useStopRequested } from "@/stores/actionStops";
 import { useTerminalsStore } from "@/stores/terminals";
 import { ACTION_ICON } from "./actionIcons";
 
-/** An action tab's status from its terminal (a primitive, for a narrow selector). */
+/** An action tab's status from its terminal and a pressed Stop (a primitive, for a narrow selector). */
 function useTabStatus(id: string): ActionTabStatus {
+  const stopRequested = useStopRequested(id);
   return useTerminalsStore((s) => {
     const t = s.byId[id];
-    return t ? actionTabStatus(t) : "running";
+    return t ? actionTabStatus(t, stopRequested) : stopRequested ? "stopping" : "running";
   });
 }
 
@@ -24,9 +26,14 @@ export function ActionTabIcon({ id, className }: { id: string; className?: strin
   return <Icon className={cn("size-3.5 shrink-0", className)} aria-hidden />;
 }
 
-/** The tab's status mark: a sky spinner while running, an emerald check for exit 0, a red x otherwise. */
+/**
+ * The tab's status mark: a sky spinner while running (or stopping), an emerald check for
+ * exit 0, a muted stop for a run the user stopped, a red x otherwise.
+ */
 export function ActionTabStatusMark({ id }: { id: string }) {
   const status = useTabStatus(id);
+  if (status === "stopping") return <LoaderCircle className="size-3 shrink-0 animate-spin text-muted-foreground" aria-label="Stopping" data-status="stopping" data-testid="action-tab-status" />;
+  if (status === "stopped") return <CircleStop className="size-3 shrink-0 text-muted-foreground" aria-label="Stopped" data-status="stopped" data-testid="action-tab-status" />;
   if (status === "running") return <LoaderCircle className="size-3 shrink-0 animate-spin text-sky-500 dark:text-sky-400" aria-label="Running" data-status="running" data-testid="action-tab-status" />;
   if (status === "ok") return <CircleCheck className="size-3 shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Exited with code 0" data-status="ok" data-testid="action-tab-status" />;
   return <CircleX className="size-3 shrink-0 text-red-600 dark:text-red-400" aria-label="Failed" data-status="failed" data-testid="action-tab-status" />;
@@ -73,9 +80,11 @@ function Sep() {
 /**
  * The status line under an action's output, shown from the start so the terminal does not
  * refit when the command exits: "Running · 0:12 · Stop", then "Exited with code N · 4.2s ·
- * Rerun", tinted red for a non-zero code. Times come from the run (started_at,
- * finished_at), else from the terminal. Stop is terminal.kill (the tab stays, exited);
- * Rerun runs the action again for the same owner and closes this tab.
+ * Rerun", tinted red for a non-zero code. After Stop: "Stopping… · 0:12 · Stop" (disabled)
+ * until the run exits (the daemon's SIGHUP, then SIGKILL after its grace period), then a
+ * neutral "Stopped · 4.2s · Rerun". Times come from the run (started_at, finished_at), else
+ * from the terminal. Stop is terminal.kill (the tab stays, exited); Rerun runs the action
+ * again for the same owner and closes this tab.
  */
 export function ActionStatusLine({ id }: { id: string }) {
   const status = useTabStatus(id);
@@ -98,17 +107,20 @@ export function ActionStatusLine({ id }: { id: string }) {
       data-testid="action-status"
       data-status={status}
     >
-      {status === "running" ? (
+      {status === "running" || status === "stopping" ? (
         <>
-          <LoaderCircle className="size-3.5 animate-spin text-sky-500 dark:text-sky-400" aria-hidden />
-          <span className="text-foreground">Running</span>
+          <LoaderCircle className={cn("size-3.5 animate-spin", status === "running" ? "text-sky-500 dark:text-sky-400" : "text-muted-foreground")} aria-hidden />
+          <span className="text-foreground" data-testid="action-status-label">
+            {status === "running" ? "Running" : "Stopping…"}
+          </span>
           <Sep />
           <RunningClock startedAtMs={started} />
           <Sep />
           <button
             type="button"
-            className={button}
+            className={cn(button, "disabled:pointer-events-none disabled:opacity-50")}
             data-testid="action-stop"
+            disabled={status === "stopping"}
             // The keyboard stays in the terminal.
             onMouseDown={(e) => {
               e.preventDefault();
@@ -121,9 +133,15 @@ export function ActionStatusLine({ id }: { id: string }) {
         </>
       ) : (
         <>
-          {failed ? <CircleX className="size-3.5 text-red-600 dark:text-red-400" aria-hidden /> : <CircleCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />}
+          {failed ? (
+            <CircleX className="size-3.5 text-red-600 dark:text-red-400" aria-hidden />
+          ) : status === "stopped" ? (
+            <CircleStop className="size-3.5" aria-hidden />
+          ) : (
+            <CircleCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+          )}
           <span className={failed ? "text-red-600 dark:text-red-400" : "text-foreground"} data-testid="action-status-label">
-            Exited with code {exitCode}
+            {status === "stopped" ? "Stopped" : `Exited with code ${String(exitCode)}`}
           </span>
           {started !== null && finished !== null && (
             <>

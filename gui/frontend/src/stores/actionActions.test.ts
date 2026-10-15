@@ -16,6 +16,7 @@ vi.mock("./bottomActions", async (orig) => ({ ...(await orig<typeof import("./bo
 const { deleteAction, onActionRunFinished, openFailedRun, ownerOfTerminal, rerunAction, runAction, saveAction, setupFailedMessage, stopActionRun } = await import("./actionActions");
 const { useActionsStore } = await import("./actions");
 const { useActionDialogStore } = await import("./actionDialog");
+const { useActionStopsStore } = await import("./actionStops");
 const { useTerminalsStore } = await import("./terminals");
 const { useSessionsStore } = await import("./sessions");
 const { useUiStore } = await import("./ui");
@@ -129,6 +130,26 @@ describe("runs", () => {
   it("stopActionRun: terminal.kill, confirmed (the button is the confirmation)", async () => {
     await stopActionRun("t-1");
     expect(invokeCommand).toHaveBeenCalledWith("terminal.kill", expect.objectContaining({ activeTerminalId: "t-1" }), { id: "t-1" }, undefined, { confirmed: true });
+  });
+
+  it("stopActionRun marks the terminal stopping before the kill returns", async () => {
+    useActionStopsStore.setState({ byId: {} });
+    let release = () => {};
+    invokeCommand.mockImplementationOnce(() => new Promise((r) => (release = () => r({ message: "", resultJson: "" }))));
+    const done = stopActionRun("t-2");
+    expect(useActionStopsStore.getState().byId).toHaveProperty("t-2");
+    release();
+    await done;
+    expect(useActionStopsStore.getState().byId).toHaveProperty("t-2");
+  });
+
+  it("a kill that fails on a running terminal goes back to Running (and toasts)", async () => {
+    useActionStopsStore.setState({ byId: {} });
+    useTerminalsStore.setState({ byId: { "t-3": { id: "t-3", state: "running", labels: { kind: "action" } } as never }, order: ["t-3"] });
+    invokeCommand.mockImplementationOnce(() => Promise.reject(new Error("boom")));
+    await stopActionRun("t-3");
+    expect(useActionStopsStore.getState().byId).not.toHaveProperty("t-3");
+    expect(toastError).toHaveBeenCalledTimes(1);
   });
 });
 

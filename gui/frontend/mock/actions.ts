@@ -4,7 +4,9 @@
  * commands. A terminal run is a mock terminal (labels kind=action, see the label contract)
  * whose output plays from a script on timers; a background run keeps its output. Runs
  * finish with their script's exit code, or when their terminal is killed (129), exits
- * (TerminalService.Kill, terminal.close, ^C: 130) or is removed while running (-1).
+ * (TerminalService.Kill, terminal.close, ^C: 130) or is removed while running (-1). Debug
+ * daemon ignores SIGHUP like a real `make dev` child: terminal.kill ends it with SIGKILL
+ * (137) after KILL_GRACE_MS, like the daemon's grace period.
  *
  * Seeds (repo-cf only, in order; ids fixed for e2e):
  *   a-dev000000000  Dev           play       pnpm dev          terminal, runs until stopped
@@ -87,13 +89,20 @@ interface MockRun {
   outputTruncated: boolean;
   timers: ReturnType<typeof setTimeout>[];
   waiters: (() => void)[];
+  /** terminal.kill's SIGHUP does not end it; SIGKILL follows after KILL_GRACE_MS. */
+  ignoresHangup: boolean;
 }
 
 /** Output lines at times (ms after the start), then an exit; exit null runs until stopped. */
 interface Script {
   steps: { at: number; text: string }[];
   exit: { at: number; code: number } | null;
+  /** terminal.kill's SIGHUP does not end it (SIGKILL, 137, follows after KILL_GRACE_MS). */
+  ignoresHangup?: boolean;
 }
+
+/** How long terminal.kill waits before SIGKILL for a run that ignores SIGHUP (the daemon's is ~3 s). */
+export const KILL_GRACE_MS = 1500;
 
 const RUNS_PER_PROJECT = 50;
 const OUTPUT_CAP = 64 * 1024;
@@ -192,6 +201,7 @@ const SCRIPTS: { match: (cmd: string) => boolean; script: (cwd: string) => Scrip
         `time=09:14:02.902 level=${G}INFO${X} msg="gh poll" repos=3 prs=7 took=761ms`,
       ]),
       exit: null,
+      ignoresHangup: true,
     }),
   },
   {
@@ -565,6 +575,7 @@ export class MockActions {
       outputTruncated: false,
       timers: [],
       waiters: [],
+      ignoresHangup: script.ignoresHangup === true,
     };
     this.runs.unshift(r);
     if (mode === ActionRunMode.TERMINAL) {
@@ -643,6 +654,12 @@ export class MockActions {
     for (const t of r.timers) clearTimeout(t);
     this.runs = this.runs.filter((x) => x !== r);
     this.host.publish({ event: { case: "runRemovedId", value: r.id } });
+  }
+
+  /** terminal.kill: how long its SIGHUP goes unheeded (0: it ends the run at once). */
+  hangupGraceMs(terminalId: string): number {
+    const r = this.runs.find((x) => x.terminalId === terminalId && x.state === ActionRunState.RUNNING);
+    return r?.ignoresHangup ? KILL_GRACE_MS : 0;
   }
 
   /** world.kill: a terminal's process exited. */

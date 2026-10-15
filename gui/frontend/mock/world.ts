@@ -2347,6 +2347,14 @@ export class World {
         run: (ctx, args) => {
           const t = args.id ? this.term(args.id) : activeTerm(ctx);
           if (!t) throw new CommandError("unavailable", "no active terminal");
+          // An action run that ignores SIGHUP ends with SIGKILL after the grace period, like the daemon's.
+          const grace = this.actions.hangupGraceMs(t.id);
+          if (grace > 0) {
+            setTimeout(() => {
+              if (this.terms.has(t.id)) this.kill(t.id, 137);
+            }, grace);
+            return `Killed ${t.id}`;
+          }
           this.kill(t.id);
           return `Killed ${t.id}`;
         },

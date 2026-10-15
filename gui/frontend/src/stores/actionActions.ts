@@ -13,6 +13,7 @@ import { addArgs, editArgs, refusalText, type ActionDraft } from "@/lib/actions"
 import { ACTION_LABEL, REPO_LABEL, SESSION_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { useActionsStore } from "./actions";
 import { openActionRunOutput } from "./actionDialog";
+import { clearStopRequested, markStopRequested } from "./actionStops";
 import { closeBottomTerminal, revealShell, showOwnTerminal } from "./bottomActions";
 import { refreshCommands, runCommandForResult, useCommandsStore } from "./commands";
 import { getUiContext, repoContext, worktreeContext } from "./context";
@@ -52,15 +53,19 @@ export function ownerOfTerminal(labels: Readonly<Record<string, string>>): Actio
 }
 
 /**
- * Stop: terminal.kill for a running action's terminal. Its tab stays, now exited (129),
- * with Rerun. The button is the confirmation, so the command runs confirmed.
+ * Stop: terminal.kill for a running action's terminal. The tab reads "Stopping…" until the
+ * run exits (SIGHUP, then SIGKILL after the daemon's grace period when the command ignores
+ * it), then "Stopped" with Rerun; the tab stays. The button is the confirmation, so the
+ * command runs confirmed. A kill that fails on a running terminal goes back to Running.
  */
 export async function stopActionRun(terminalId: string): Promise<void> {
   const ctx: UiContextView = { ...getUiContext(), activeTerminalId: terminalId };
+  markStopRequested(terminalId);
   try {
     await invokeCommand("terminal.kill", ctx, { id: terminalId }, undefined, { confirmed: true });
   } catch (err) {
     if (useTerminalsStore.getState().byId[terminalId]?.state === "exited") return;
+    clearStopRequested(terminalId);
     const title = useCommandsStore.getState().commands.find((c) => c.name === "terminal.kill")?.title ?? "Kill Terminal";
     toast.error(`${title} failed`, { description: errorMessage(err) });
   } finally {

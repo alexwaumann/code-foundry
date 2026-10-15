@@ -5,12 +5,23 @@
  */
 import type { ActionIconName, ActionView } from "@/api/actions";
 
-export type ActionTabStatus = "running" | "ok" | "failed";
+export type ActionTabStatus = "running" | "stopping" | "ok" | "stopped" | "failed";
 
-/** An action tab's status from its terminal: running, exited 0, or exited with anything else. */
-export function actionTabStatus(t: { state: string; exitCode: number }): ActionTabStatus {
-  if (t.state !== "exited") return "running";
-  return t.exitCode === 0 ? "ok" : "failed";
+/**
+ * Exit codes of a run the user stopped: terminal.kill sends SIGHUP (129), and SIGKILL (137)
+ * after the daemon's grace period when the command ignores it.
+ */
+const STOPPED_CODES: ReadonlySet<number> = new Set([129, 137]);
+
+/**
+ * An action tab's status from its terminal and whether the user pressed Stop on it:
+ * running (or stopping, after Stop), exited 0, stopped (exited 129 or 137 after Stop), or
+ * failed (anything else, including a command that exits 137 on its own).
+ */
+export function actionTabStatus(t: { state: string; exitCode: number }, stopRequested = false): ActionTabStatus {
+  if (t.state !== "exited") return stopRequested ? "stopping" : "running";
+  if (t.exitCode === 0) return "ok";
+  return stopRequested && STOPPED_CODES.has(t.exitCode) ? "stopped" : "failed";
 }
 
 /** A running run's clock: "0:12", "12:05", "1:02:03". */

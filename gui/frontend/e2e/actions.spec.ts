@@ -4,10 +4,10 @@ import { CF, invocations, mockPost, mockUrl, openApp, openProjects, resetMock, r
 // Actions (docs/notes/actions-2-gui.md): the thread header's Play menu, the editor dialog,
 // and a run's bottom-panel tab with its command echo and status line. Mock seeds
 // (mock/actions.ts): code-foundry (s-1's project) has Dev (runs until stopped), Test
-// (exits 1 after ~2.6 s), Check, Build, Install deps (on worktree create) and Debug daemon;
-// every other project has none. Set SHOTS=<dir> to save the notes' screenshots.
+// (exits 1 after ~2.6 s), Check, Build, Install deps (on worktree create) and Debug daemon
+// (ignores SIGHUP: Stop ends it with 137 after ~1.5 s); every other project has none. Set SHOTS=<dir> to save the notes' screenshots.
 
-const IDS = { dev: "a-dev000000000", test: "a-test00000000", build: "a-build0000000" };
+const IDS = { dev: "a-dev000000000", test: "a-test00000000", build: "a-build0000000", debug: "a-debug0000000" };
 const NAMES = ["Dev", "Test", "Check", "Build", "Install deps", "Debug daemon"];
 
 test.beforeEach(async () => {
@@ -201,7 +201,7 @@ test("add, then edit (pencil and ArrowRight), then delete an action", async ({ p
   await expect(items(page)).toHaveText(NAMES);
 });
 
-test("an action tab: Stop keeps the tab exited, Rerun replaces it with a new run, × closes it", async ({ page }) => {
+test("an action tab: Stop keeps the tab, stopped, Rerun replaces it with a new run, × closes it", async ({ page }) => {
   await openApp(page);
   await selectSession(page, "s-1");
   const dev = await runFromMenu(page, "Dev");
@@ -209,8 +209,11 @@ test("an action tab: Stop keeps the tab exited, Rerun replaces it with a new run
   await expect(status(page)).toHaveAttribute("data-status", "running");
   await page.getByTestId("action-stop").click();
   await expect.poll(async () => (await calls("terminal.kill")).map((c) => [c.args, c.confirmed])).toEqual([[{ id: dev }, true]]);
-  await expect(status(page)).toHaveAttribute("data-status", "failed");
-  await expect(page.getByTestId("action-status-label")).toHaveText("Exited with code 129");
+  // Exited 129 after Stop: "Stopped", neutral (not the red failure), with Rerun.
+  await expect(status(page)).toHaveAttribute("data-status", "stopped");
+  await expect(page.getByTestId("action-status-label")).toHaveText("Stopped");
+  await expect(status(page).getByTestId("action-status-time")).toHaveText(/^\d\.\ds$/);
+  await expect(bottom(page).locator(`[data-tab-id="${dev}"]`).getByTestId("action-tab-status")).toHaveAttribute("data-status", "stopped");
   await expect(bottom(page).locator(`[data-tab-id="${dev}"]`)).toHaveCount(1);
 
   // Rerun: a new run of the same action for the same thread; the old tab goes, the new one is active.
@@ -239,6 +242,23 @@ test("an action tab: Stop keeps the tab exited, Rerun replaces it with a new run
   await buildTab.getByRole("button", { name: "Close Build" }).click();
   await expect(buildTab).toHaveCount(0);
   expect((await calls("terminal.close")).map((c) => c.args.id)).toContain(build);
+});
+
+test("Stop on a run that ignores SIGHUP: Stopping… (Stop disabled) until SIGKILL, then Stopped", async ({ page }) => {
+  await openApp(page);
+  await selectSession(page, "s-1");
+  const debug = await runFromMenu(page, "Debug daemon");
+  await expect(status(page)).toHaveAttribute("data-status", "running");
+  await page.getByTestId("action-stop").click();
+  await expect(status(page)).toHaveAttribute("data-status", "stopping");
+  await expect(page.getByTestId("action-status-label")).toHaveText("Stopping…");
+  await expect(page.getByTestId("action-stop")).toBeDisabled();
+  await expect(bottom(page).locator(`[data-tab-id="${debug}"]`).getByTestId("action-tab-status")).toHaveAttribute("data-status", "stopping");
+  // The mock's SIGKILL comes after ~1.5 s: exit 137, still "Stopped" (the user pressed Stop).
+  await expect(status(page)).toHaveAttribute("data-status", "stopped", { timeout: 5000 });
+  await expect(page.getByTestId("action-status-label")).toHaveText("Stopped");
+  expect((await calls("terminal.kill")).map((c) => c.args)).toEqual([{ id: debug }]);
+  expect((await calls("action.run"))[0]?.args).toEqual({ action: IDS.debug, terminal: "true" });
 });
 
 test("an action an agent ran shows up as a tab of its thread's panel", async ({ page }) => {
