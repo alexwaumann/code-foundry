@@ -134,8 +134,8 @@ func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''
 
 // appMenu is the default macOS menu with "Check for Updates…" in the app menu, which
 // asks the frontend to open the update dialog and check. The View menu is custom: the
-// default one binds Reload (cmd+r) and Force Reload (cmd+shift+r), which are
-// session.rename and session.reconnect, and Zoom (cmd+0/=/-), which the GUI uses for
+// default one binds Reload (cmd+r) and Force Reload (cmd+shift+r): cmd+r is
+// session.rename, a stray cmd+shift+r must not reload the GUI either, and Zoom (cmd+0/=/-), which the GUI uses for
 // its own page zoom (appearance.zoom; CSS zoom on <html>, see gui/frontend/src/lib/zoom.ts). A menu chord fires whenever the page leaves the key unhandled,
 // so cmd+r with no session selected would reload the whole GUI. Keep the chords left
 // here in command.ReservedChords.
