@@ -35,7 +35,8 @@ test("session rows render with status badges, above the terminals no thread owns
   await expect(tree).not.toContainText(/disconnected|starting|closing/i);
   // resetMock holds s-5 starting; released, the mock's clock settles it.
   await releaseSessions("s-5");
-  await expect(badge(page, "s-5")).toHaveAttribute("data-session-badge", /^(idle|busy)$/, { timeout: 12_000 });
+  // Starting reads as busy; once Claude is up the mock leaves it idle.
+  await expect(badge(page, "s-5")).toHaveAttribute("data-session-badge", "idle", { timeout: 12_000 });
   await expect(row(page, "s:s-5")).toHaveAttribute("data-section", "idle");
 });
 
@@ -63,18 +64,23 @@ test("a stopped thread shows its conversation and the composer; a message starts
 });
 
 test("a running thread that stops looks the same: the composer stays focused and still sends", async ({ page }) => {
+  // The scripted thread, running and idle at its prompt (both turns done).
+  await mockPost("thread?state=idle");
   await openApp(page);
-  await row(page, "s:s-1").click();
+  await row(page, "s:s-r1").click();
   const composer = page.getByTestId("thread-composer");
   await expect(composer.getByTestId("composer-input")).toBeFocused();
+  const firstUser = page.getByTestId("thread-pane").getByTestId("thread-user").first();
+  await expect(firstUser).toBeVisible();
+  const firstText = (await firstUser.textContent()) ?? "";
 
   // The daemon's idle stop at cache expiry.
-  await mockPost("session/stop?id=s-1&reason=idle&code=0&status=idle");
-  await expect(badge(page, "s-1")).toHaveAttribute("data-session-badge", "idle");
+  await mockPost("session/stop?id=s-r1&reason=idle&code=0&status=idle");
+  await expect(badge(page, "s-r1")).toHaveAttribute("data-session-badge", "idle");
   await expect(page.getByTestId("thread-disconnected")).toHaveCount(0);
   await expect(composer.getByTestId("composer-input")).toBeFocused();
   // The conversation stays.
-  await expect(page.getByTestId("thread-pane").getByTestId("thread-user").first()).toContainText("Refactor the sidebar tree");
+  await expect(firstUser).toHaveText(firstText);
 
   await page.keyboard.type("Carry on");
   await page.keyboard.press("Enter");
