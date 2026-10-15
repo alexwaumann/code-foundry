@@ -102,3 +102,51 @@ describe("tooltip guard", () => {
     expect(stale.map((o) => `${o.file}: ${o.component}`)).toEqual([]);
   });
 });
+
+/**
+ * Radix reaches the app only through the shadcn wrappers in components/ui, styled there
+ * from the tokens (docs/notes/theme-5-cleanup.md); call sites import the wrapper. The
+ * hand-rolled copies of the wrappers stay gone: key chips are `Kbd`, radios `RadioGroup`,
+ * switches `Switch`, checkboxes `Checkbox`, progress bars `Progress`. No allowlist.
+ */
+const allSources = import.meta.glob<string>(["/src/**/*.{ts,tsx}", "!/src/**/*.test.{ts,tsx}", "!/src/gen/**", "!/src/components/ui/**"], {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
+
+function scanAll(re: RegExp): string[] {
+  const out: string[] = [];
+  for (const [file, src] of Object.entries(allSources)) {
+    src.split("\n").forEach((text, i) => {
+      if (re.test(text)) out.push(`${file}:${String(i + 1)}: ${text.trim()}`);
+    });
+  }
+  return out;
+}
+
+const RADIX_IMPORT = /from\s+["'](?:radix-ui|@radix-ui\/[\w-]+)["']/;
+const HAND_ROLLED = /<kbd\b|role=["'{]+(?:radio|radiogroup|switch|checkbox|progressbar)["'}]/;
+
+describe("shadcn primitives guard", () => {
+  it("reads the sources outside components/ui", () => {
+    expect(Object.keys(allSources).length).toBeGreaterThan(100);
+    expect(Object.keys(allSources).some((f) => f.startsWith("/src/components/ui/"))).toBe(false);
+    expect(allSources["/src/components/publish/PublishPicker.tsx"]).toContain("@/components/ui/radio-group");
+  });
+
+  it("no direct radix-ui import outside components/ui: use the shadcn wrapper", () => {
+    expect(scanAll(RADIX_IMPORT)).toEqual([]);
+  });
+
+  it("no hand-rolled kbd, radio, switch, checkbox or progress bar: use Kbd, RadioGroup, Switch, Checkbox, Progress", () => {
+    expect(scanAll(HAND_ROLLED)).toEqual([]);
+  });
+
+  it("the patterns catch what they guard against", () => {
+    for (const s of ['import { RadioGroup } from "radix-ui";', "import { Slot } from 'radix-ui'", 'import * as Tabs from "@radix-ui/react-tabs";']) expect(RADIX_IMPORT.test(s), s).toBe(true);
+    for (const s of ['import { RadioGroup } from "@/components/ui/radio-group";', "// radix-ui writes data-state"]) expect(RADIX_IMPORT.test(s), s).toBe(false);
+    for (const s of ["<kbd>⌘K</kbd>", '<button role="radio"', "role={\"switch\"}", '<div role="progressbar">', '<div role="radiogroup"']) expect(HAND_ROLLED.test(s), s).toBe(true);
+    for (const s of ["<Kbd size=\"sm\">", '<div role="group"', 'role="tab"', 'role="option"']) expect(HAND_ROLLED.test(s), s).toBe(false);
+  });
+});
