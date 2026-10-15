@@ -35,22 +35,28 @@ export const POPUP_COLLISION_PADDING = 8;
 const IME_KEY_CODE = 229;
 
 /**
- * The ask composer's keys: Enter sends, Shift+Enter is a newline, Escape cancels. Keys
- * while an input method is composing belong to the IME. WebKit fires compositionend
- * before the Enter that confirms a candidate, so that keydown has isComposing false; its
- * keyCode is still 229 (pass the native event's keyCode).
+ * The panel composers' keys. Escape cancels. `submit: "enter"` (the ask composer): Enter
+ * (or cmd+Enter) sends and Shift+Enter is a newline. `submit: "cmd-enter"` (the review
+ * composer, whose text is often several lines): only cmd+Enter sends and Enter is a
+ * newline. Keys while an input method is composing belong to the IME. WebKit fires
+ * compositionend before the Enter that confirms a candidate, so that keydown has
+ * isComposing false; its keyCode is still 229 (pass the native event's keyCode).
  */
-export function composerKeyAction(e: {
-  key: string;
-  shiftKey: boolean;
-  metaKey?: boolean;
-  ctrlKey?: boolean;
-  altKey?: boolean;
-  isComposing?: boolean;
-  keyCode?: number;
-}): "send" | "cancel" | null {
+export function composerKeyAction(
+  e: {
+    key: string;
+    shiftKey: boolean;
+    metaKey?: boolean;
+    ctrlKey?: boolean;
+    altKey?: boolean;
+    isComposing?: boolean;
+    keyCode?: number;
+  },
+  submit: "enter" | "cmd-enter" = "enter",
+): "send" | "cancel" | null {
   if (e.isComposing || e.keyCode === IME_KEY_CODE) return null;
   if (e.key === "Escape") return "cancel";
-  if (e.key === "Enter" && !e.shiftKey && !e.altKey && !e.ctrlKey) return "send";
-  return null;
+  if (e.key !== "Enter" || e.shiftKey || e.altKey || e.ctrlKey) return null;
+  if (submit === "cmd-enter" && !e.metaKey) return null;
+  return "send";
 }

@@ -15,7 +15,7 @@ vi.mock("sonner", () => ({ toast }));
 
 const { pullRequestDetailResource, pullRequestKey } = await import("./gh");
 const { makeTab, closePanelTab, openSurface, usePanelStore } = await import("./panel");
-const { prTabKey, refreshPullRequest, requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, revertPullRequest, setInnerTab, setReviewRequest, usePrPanelStore } = await import("./prPanel");
+const { prTabKey, refreshPullRequest, requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, revertPullRequest, reviewArgs, setInnerTab, setReviewRequest, submitReview, usePrPanelStore } = await import("./prPanel");
 
 const SLUG = "acme/repo";
 const view = (body: string, lastError = "") => ({ body, lastError }) as PullRequestDetailView;
@@ -30,7 +30,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
-  usePrPanelStore.setState({ byTab: {}, refreshing: {}, requesting: {} });
+  usePrPanelStore.setState({ byTab: {}, refreshing: {}, requesting: {}, reviewing: {} });
   usePanelStore.setState({ byKey: {} });
 });
 
@@ -138,6 +138,69 @@ describe("setReviewRequest", () => {
     expect(listReviewerCandidates).toHaveBeenCalledTimes(2);
     expect(busy()).toBe(false);
     release();
+  });
+});
+
+describe("submitReview", () => {
+  it("runs pr.review with the trimmed body and stays busy until the detail is read again; a second submit meanwhile sends nothing", async () => {
+    const ref = { slug: SLUG, number: 5 };
+    const key = pullRequestKey(SLUG, 5);
+    getPullRequestDetail.mockResolvedValueOnce(view("before"));
+    const release = pullRequestDetailResource.watch(key);
+    await vi.waitFor(() => {
+      expect(entry(key)?.data?.body).toBe("before");
+    });
+    const reread = deferred<PullRequestDetailView>();
+    getPullRequestDetail.mockReturnValueOnce(reread.promise);
+    invokeCommand.mockResolvedValueOnce({ message: "Approved #5", resultJson: "{}" });
+    const busy = () => usePrPanelStore.getState().reviewing[key] ?? false;
+
+    const first = submitReview(ref, "approve", "  LGTM \n");
+    expect(busy()).toBe(true);
+    await vi.waitFor(() => {
+      expect(getPullRequestDetail).toHaveBeenCalledTimes(2);
+    });
+    await expect(submitReview(ref, "approve", "again")).resolves.toBe(false);
+    expect(invokeCommand).toHaveBeenCalledTimes(1);
+    expect(invokeCommand).toHaveBeenCalledWith("pr.review", expect.anything(), { "repo-slug": SLUG, number: "5", verdict: "approve", body: "LGTM" });
+    expect(busy()).toBe(true);
+    reread.resolve(view("after"));
+    await expect(first).resolves.toBe(true);
+    expect(busy()).toBe(false);
+    expect(entry(key)?.data?.body).toBe("after");
+    expect(toast.success).toHaveBeenCalledWith("Approved #5");
+    release();
+  });
+
+  it("an empty approval sends no body; a refusal is toasted with GitHub's message, re-reads, and frees the composer without waiting for that read", async () => {
+    const ref = { slug: SLUG, number: 6 };
+    const key = pullRequestKey(SLUG, 6);
+    getPullRequestDetail.mockResolvedValueOnce(view("d"));
+    const release = pullRequestDetailResource.watch(key);
+    await vi.waitFor(() => {
+      expect(entry(key)?.data?.body).toBe("d");
+    });
+    const reread = deferred<PullRequestDetailView>();
+    getPullRequestDetail.mockReturnValueOnce(reread.promise);
+    invokeCommand.mockRejectedValueOnce(new ConnectError("failed precondition: Review Can not approve your own pull request", Code.FailedPrecondition));
+
+    await expect(submitReview(ref, "approve", "   ")).resolves.toBe(false);
+    expect(invokeCommand).toHaveBeenCalledWith("pr.review", expect.anything(), { "repo-slug": SLUG, number: "6", verdict: "approve" });
+    expect(toast.error).toHaveBeenCalledWith("pr.review failed", { description: expect.stringContaining("Can not approve your own") as unknown });
+    expect(getPullRequestDetail).toHaveBeenCalledTimes(2);
+    // The re-read is still in flight; the busy flag is already gone.
+    expect(entry(key)?.loading).toBe(true);
+    expect(usePrPanelStore.getState().reviewing).toEqual({});
+    reread.resolve(view("d2"));
+    await vi.waitFor(() => {
+      expect(entry(key)?.data?.body).toBe("d2");
+    });
+    release();
+  });
+
+  it("reviewArgs trims the body and leaves an empty one out", () => {
+    expect(reviewArgs({ slug: "o/r", number: 7 }, "request-changes", "  Fix it\n")).toEqual({ "repo-slug": "o/r", number: "7", verdict: "request-changes", body: "Fix it" });
+    expect(reviewArgs({ slug: "o/r", number: 7 }, "approve", " \n")).toEqual({ "repo-slug": "o/r", number: "7", verdict: "approve" });
   });
 });
 

@@ -5,7 +5,7 @@ import { CF, expectTooltip, invocations, mockPost, mockUrl, openApp, resetMock, 
  * The Pull request surface in the side panel, against the mock daemon's fixtures
  * (mock/prDetail.ts): #145 open with failing checks, threads, labels and reviewers;
  * #138 merged and revertable; #131 closed; #140 read-only; #142 mergeable; #146 from a
- * fork. Set SHOTS=<dir> to save
+ * fork; #139 a teammate's, awaiting the viewer's review. Set SHOTS=<dir> to save
  * screenshots.
  */
 
@@ -505,6 +505,10 @@ test("at 280px nothing overflows: header, inner tab bar, logins, popups; the act
   await expect(page.getByTestId("pr-reviewer-picker")).toBeVisible();
   expect(inside(await boxOf(page, "pr-reviewer-picker"), await boxOf(page, "side-panel"))).toBe(true);
   await page.keyboard.press("Escape");
+  await page.getByTestId("pr-review-button").click();
+  await expect(page.getByTestId("pr-review-menu")).toBeVisible();
+  expect(inside(await boxOf(page, "pr-review-menu"), await boxOf(page, "side-panel"))).toBe(true);
+  await page.keyboard.press("Escape");
 
   // Many tabs: each new one scrolls into view in the strip.
   for (const [section, n] of [["authored", 142], ["authored", 12], ["review", 139], ["merged", 138], ["merged", 136], ["merged", 10]] as const) {
@@ -990,4 +994,260 @@ test("at 280px the merge button keeps its icons and its dropdown stays inside th
   expect(cut).toBeLessThanOrEqual(0);
   await settledAnimations(page, "pr-merge-menu");
   await shot(page, "merge-button-280");
+});
+
+// ---- Review ▾ (pr.review; docs/notes/pr-review-submit-2-gui.md) ----------------------
+
+const reviews = async () => (await invocations()).filter((i) => i.name === "pr.review").map((i) => i.args);
+const reviewInput = (page: Page) => page.getByTestId("pr-review-input");
+const focusedRegion = (page: Page) => page.evaluate(() => document.activeElement?.closest("[data-region]")?.getAttribute("data-region"));
+
+async function chooseVerdict(page: Page, verdict: "approve" | "request-changes" | "comment"): Promise<void> {
+  // The Review button, or the chip once the viewer has reviewed.
+  await page.getByTestId("pr-actions").locator('[data-testid="pr-review-button"], [data-testid="pr-your-review"]').click();
+  await expect(page.getByTestId("pr-review-menu")).toBeVisible();
+  await page.getByTestId(`pr-review-${verdict}`).click();
+  await expect(page.getByTestId("pr-review-menu")).toHaveCount(0);
+  await expect(page.getByTestId("pr-review-composer")).toHaveAttribute("data-verdict", verdict);
+}
+
+test("Review on #139: the menu, Approve with cmd+Enter runs pr.review; the header says You approved and Comments has the review", async ({ page }) => {
+  await shotViewport(page);
+  await openPrPage(page);
+  await prRow(page, "review", 139).click();
+  await expect(page.getByTestId("pr-author")).toHaveText("teammate-kim");
+  const button = page.getByTestId("pr-review-button");
+  await expect(button).toHaveText("Review");
+  // Left of Merge.
+  expect((await boxOf(page, "pr-review-button")).x).toBeLessThan((await boxOf(page, "pr-merge-button")).x);
+  await expect(page.getByTestId("pr-reviewer").filter({ hasText: "alexwaumann" })).toHaveAttribute("data-status", "requested");
+
+  await button.click();
+  const menu = page.getByTestId("pr-review-menu");
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText("Review #139");
+  await expect(page.getByTestId("pr-review-approve")).toContainText("Submit an approving review, with an optional note.");
+  await expect(page.getByTestId("pr-review-request-changes")).toContainText("Block merging until your points are addressed.");
+  await expect(page.getByTestId("pr-review-comment")).toContainText("General feedback without a verdict.");
+  for (const v of ["approve", "request-changes", "comment"]) await expect(page.getByTestId(`pr-review-${v}`)).not.toHaveAttribute("data-disabled");
+  expect(inside(await boxOf(page, "pr-review-menu"), await boxOf(page, "side-panel"))).toBe(true);
+  await settledAnimations(page, "pr-review-menu");
+  await shot(page, "review-menu");
+
+  await page.getByTestId("pr-review-approve").click();
+  const composer = page.getByTestId("pr-review-composer");
+  await expect(composer).toHaveAttribute("data-verdict", "approve");
+  await expect(page.getByTestId("pr-review-label")).toHaveText("Approve #139");
+  await expect(reviewInput(page)).toBeFocused();
+  await expect(reviewInput(page)).toHaveAttribute("placeholder", "Say why, or leave it empty…");
+  await expect(page.getByTestId("pr-review-hint")).toHaveText("⌘⏎ submit · esc cancel");
+  // An approval needs no text.
+  await expect(page.getByTestId("pr-review-submit")).toBeEnabled();
+  await expect(page.getByTestId("pr-review-submit")).toHaveText("Approve");
+  // Enter is a newline; only cmd+Enter submits.
+  await reviewInput(page).pressSequentially("Read it through.");
+  await page.keyboard.press("Enter");
+  await reviewInput(page).pressSequentially("Ship it.");
+  await expect(reviewInput(page)).toHaveValue("Read it through.\nShip it.");
+  expect(await reviews()).toEqual([]);
+  await shot(page, "review-approve");
+
+  await page.keyboard.press("Meta+Enter");
+  await expect(composer).toHaveCount(0);
+  expect(await reviews()).toEqual([{ "repo-slug": SLUG, number: "139", verdict: "approve", body: "Read it through.\nShip it." }]);
+  expect((await ghCalls()).SubmitPullRequestReview).toBe(1);
+  await expect(page.getByText("Approved #139")).toBeVisible();
+  await expect.poll(() => focusedRegion(page)).toBe("panel");
+
+  // The refreshed detail: the chip in place of Review, the reviewer entry, the review in Comments.
+  const chip = page.getByTestId("pr-your-review");
+  await expect(chip).toHaveText("You approved");
+  await expect(chip).toHaveAttribute("data-review", "approved");
+  await expect(button).toHaveCount(0);
+  await expect(page.getByTestId("pr-reviewer").filter({ hasText: "alexwaumann" })).toHaveAttribute("data-status", "approved");
+  const mine = page.getByTestId("pr-comment").filter({ hasText: "Ship it." });
+  await expect(mine).toHaveCount(1);
+  await expect(mine.getByTestId("pr-review-verdict")).toHaveText("approved");
+  await page.mouse.move(0, 0);
+  await shot(page, "review-approved");
+
+  // The chip still opens the menu: GitHub takes another review.
+  await chip.click();
+  await expect(page.getByTestId("pr-review-menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pr-review-menu")).toHaveCount(0);
+});
+
+test("Review composer: Request changes waits for text, verdicts switch keeping it, Escape cancels, one composer at a time", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "review", 139).click();
+  await chooseVerdict(page, "request-changes");
+  await expect(page.getByTestId("pr-review-label")).toHaveText("Request changes on #139");
+  const submit = page.getByTestId("pr-review-submit");
+  await expect(submit).toBeDisabled();
+  await expect(submit).toHaveText("Request changes");
+  await expect(page.getByTestId("pr-review-hint")).toHaveText("Say what should change");
+  // Blank (spaces only) cannot be submitted, by key or button.
+  await reviewInput(page).pressSequentially("   ");
+  await page.keyboard.press("Meta+Enter");
+  await expect(page.getByTestId("pr-review-composer")).toBeVisible();
+  await expect(submit).toBeDisabled();
+  await reviewInput(page).fill("Rename the flag.");
+  await expect(page.getByTestId("pr-review-hint")).toHaveText("⌘⏎ submit · esc cancel");
+  await expect(submit).toBeEnabled();
+
+  // Another verdict: same text, new label and button.
+  await chooseVerdict(page, "comment");
+  await expect(page.getByTestId("pr-review-label")).toHaveText("Comment on #139");
+  await expect(submit).toHaveText("Comment");
+  await expect(reviewInput(page)).toHaveValue("Rename the flag.");
+  await expect(reviewInput(page)).toBeFocused();
+  await reviewInput(page).fill("");
+  await expect(page.getByTestId("pr-review-hint")).toHaveText("Write a comment");
+
+  // Escape cancels and hands focus to the panel; nothing was sent.
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
+  await expect(tabs(page)).toHaveText(["#139"]);
+  await expect.poll(() => focusedRegion(page)).toBe("panel");
+  expect(await reviews()).toEqual([]);
+
+  // Ask and Review share the slot: opening one closes the other.
+  await page.getByTestId("pr-menu-button").click();
+  await page.getByTestId("pr-menu-ask").click();
+  await expect(page.getByTestId("pr-ask")).toBeVisible();
+  await chooseVerdict(page, "approve");
+  await expect(page.getByTestId("pr-ask")).toHaveCount(0);
+  await page.getByTestId("pr-review-cancel").click();
+  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
+  await chooseVerdict(page, "comment");
+  await page.getByTestId("pr-menu-button").click();
+  await page.getByTestId("pr-menu-ask").click();
+  await expect(page.getByTestId("pr-ask")).toBeVisible();
+  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
+});
+
+test("a review GitHub did not confirm is toasted and keeps the text; the same text gets that answer again; while it runs the field is read-only", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "review", 139).click();
+  await chooseVerdict(page, "request-changes");
+  await reviewInput(page).fill("The retry loop never backs off.");
+  await mockPost("gh/pr-fail?command=pr.review");
+  await mockPost("gh/pr-delay?ms=800");
+  await page.getByTestId("pr-review-submit").click();
+  await expect(page.getByTestId("pr-review-submit")).toHaveAttribute("aria-busy", "true");
+  await expect(reviewInput(page)).toHaveAttribute("readonly", "");
+  await expect(page.getByTestId("pr-review-hint")).toHaveText("Submitting…");
+  await expect(page.getByTestId("pr-review-cancel")).toBeDisabled();
+  await expect(page.getByTestId("pr-review-button")).toHaveAttribute("aria-busy", "true");
+  await expect(page.getByText("Review Pull Request failed")).toBeVisible();
+  await expect(page.getByText(/GitHub did not confirm the review/)).toBeVisible();
+  await expect(page.getByTestId("pr-review-submit")).not.toHaveAttribute("aria-busy");
+  await expect(reviewInput(page)).not.toHaveAttribute("readonly");
+  await expect(reviewInput(page)).toHaveValue("The retry loop never backs off.");
+  await expect(page.getByTestId("pr-review-button")).toHaveText("Review");
+
+  // The daemon remembers the unknown outcome: the same text gets the same answer for 2
+  // minutes (it may have been posted), and nothing is posted.
+  await mockPost("gh/pr-delay?ms=0");
+  await reviewInput(page).focus();
+  await page.keyboard.press("Meta+Enter");
+  await expect(page.getByText("Review Pull Request failed")).toHaveCount(2);
+  await expect(page.getByText(/GitHub did not confirm the review/)).toHaveCount(2);
+  await expect(page.getByTestId("pr-review-composer")).toBeVisible();
+  await expect(page.getByTestId("pr-review-button")).toHaveText("Review");
+  // Other text posts.
+  await reviewInput(page).fill("The retry loop never backs off; add a jittered delay.");
+  await page.keyboard.press("Meta+Enter");
+  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
+  await expect(page.getByTestId("pr-your-review")).toHaveText("You requested changes");
+  await expect(page.getByTestId("pr-your-review")).toHaveAttribute("data-review", "changes_requested");
+  await expect(page.getByTestId("pr-comment").filter({ hasText: "jittered delay" })).toHaveCount(1);
+  expect((await reviews()).map((a) => a.body)).toEqual([
+    "The retry loop never backs off.",
+    "The retry loop never backs off.",
+    "The retry loop never backs off; add a jittered delay.",
+  ]);
+});
+
+test("#145 (the viewer's own): Approve and Request changes are disabled with the reason; Comment posts a review; #140 and #138 have no Review", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "authored", 145).click();
+  await expect(page.getByTestId("pr-author")).toHaveText("alexwaumann");
+  await page.getByTestId("pr-review-button").click();
+  await expect(page.getByTestId("pr-review-menu")).toBeVisible();
+  await expect(page.getByTestId("pr-review-approve")).toHaveAttribute("data-disabled", "");
+  await expect(page.getByTestId("pr-review-request-changes")).toHaveAttribute("data-disabled", "");
+  await expect(page.getByTestId("pr-review-comment")).not.toHaveAttribute("data-disabled");
+  await settledAnimations(page, "pr-review-menu");
+  await expectTooltip(page, page.getByTestId("pr-review-approve-reason"), "You cannot approve your own pull request.");
+  await expectTooltip(page, page.getByTestId("pr-review-request-changes-reason"), "Not on your own pull request.");
+  // A disabled item opens nothing.
+  await page.getByTestId("pr-review-approve").click({ force: true });
+  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
+  await page.getByTestId("pr-review-comment").click();
+  await expect(page.getByTestId("pr-review-composer")).toHaveAttribute("data-verdict", "comment");
+  await reviewInput(page).pressSequentially("Rebased on main.");
+  await page.keyboard.press("Meta+Enter");
+  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
+  await expect(page.getByTestId("pr-your-review")).toHaveText("You commented");
+  await expect(page.getByTestId("pr-comment").filter({ hasText: "Rebased on main." })).toHaveCount(1);
+  expect(await reviews()).toEqual([{ "repo-slug": SLUG, number: "145", verdict: "comment", body: "Rebased on main." }]);
+
+  // GitHub's refusal from the palette or CLI (the menu never sends it) comes back as its message.
+  await page.evaluate(`import("/src/stores/commands.ts").then((m) => m.runCommandForResult("pr.review", { "repo-slug": "${SLUG}", number: "145", verdict: "approve" }))`);
+  await expect(page.getByText("Review Can not approve your own pull request")).toBeVisible();
+
+  // Read access only: no Review. Merged: none either.
+  await openPr(page, 140);
+  await expect(page.getByTestId("pr-author")).toHaveText("outside-contrib");
+  await expect(page.getByTestId("pr-merge-button")).toBeVisible();
+  await expect(page.getByTestId("pr-review-button")).toHaveCount(0);
+  await expect(page.getByTestId("pr-your-review")).toHaveCount(0);
+  await prRow(page, "merged", 138).click();
+  await expect(page.getByTestId("pr-state")).toHaveText("Merged");
+  await expect(page.getByTestId("pr-review-button")).toHaveCount(0);
+});
+
+test("at 280px Review keeps its icons, its menu and composer fit the panel, and the chip keeps its icon", async ({ page }) => {
+  await shotViewport(page);
+  await openPrPage(page);
+  await prRow(page, "review", 139).click();
+  await setPanelWidth(page, 280);
+  const button = page.getByTestId("pr-review-button");
+  await expect(button).toBeVisible();
+  expect(await overflowX(page, "pr-header")).toBeLessThanOrEqual(0);
+  expect((await boxOf(page, "pr-review-button")).width).toBeLessThan(48);
+  await expect(button).toHaveAccessibleName("Review");
+  expect(inside(await boxOf(page, "pr-actions"), await boxOf(page, "pr-header"))).toBe(true);
+  await button.click();
+  await expect(page.getByTestId("pr-review-menu")).toBeVisible();
+  await settledAnimations(page, "pr-review-menu");
+  expect(inside(await boxOf(page, "pr-review-menu"), await boxOf(page, "side-panel"))).toBe(true);
+  expect(await page.getByTestId("pr-review-menu").evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+  await page.getByTestId("pr-review-request-changes").click();
+  expect(await overflowX(page, "pr-review-composer")).toBeLessThanOrEqual(0);
+  expect(inside(await boxOf(page, "pr-review-submit"), await boxOf(page, "side-panel"))).toBe(true);
+  await reviewInput(page).fill("Split this into two pull requests.");
+  await page.keyboard.press("Meta+Enter");
+  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
+  const chip = page.getByTestId("pr-your-review");
+  await expect(chip).toHaveAttribute("data-review", "changes_requested");
+  await expect(chip).toHaveAccessibleName("You requested changes");
+  expect((await boxOf(page, "pr-your-review")).width).toBeLessThan(40);
+  expect(await overflowX(page, "pr-header")).toBeLessThanOrEqual(0);
+});
+
+test("the review composer closes when the pull request stops taking reviews (merged meanwhile)", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "authored", 142).click();
+  await chooseVerdict(page, "comment");
+  await reviewInput(page).fill("Looks done.");
+  await page.getByTestId("pr-merge-button").click();
+  await page.getByTestId("pr-merge-method-squash").click();
+  await page.getByTestId("confirm-ok").click();
+  await expect(page.getByTestId("pr-state")).toHaveText("Merged");
+  await expect(page.getByTestId("pr-review-button")).toHaveCount(0);
+  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
+  expect(await reviews()).toEqual([]);
 });

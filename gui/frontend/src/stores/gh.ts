@@ -1,10 +1,10 @@
 import { toast } from "sonner";
 import { create } from "zustand";
 import { invokeCommand } from "@/api/command";
-import { getBranchPullRequests, getDashboard, getPullRequestDetail, getRepoActivity, type GhEventView } from "@/api/gh";
+import { getBranchPullRequests, getDashboard, getPullRequestDetail, getRepoActivity, getViewer, type GhEventView } from "@/api/gh";
 import { errorMessage } from "@/api/stream";
 import { getUiContext } from "./context";
-import { createResource } from "./resource";
+import { createResource, useResource } from "./resource";
 
 /**
  * GitHub views fed by GhService unary reads. The daemon polls GitHub and announces a
@@ -45,6 +45,17 @@ export function useFreshness(fetchedAtMs: number | null, lastError: string, poll
   const pollErr = usePollStore((s) => s.lastError);
   const known = usePollStore((s) => s.known);
   return polled ? pollFreshness({ fetchedAtMs: pollAt, lastError: pollErr, known }, fetchedAtMs, lastError) : { fetchedAtMs, lastError };
+}
+
+/** The one key of viewerResource. */
+export const VIEWER_KEY = "viewer";
+
+/** Key: VIEWER_KEY. The authenticated GitHub user (GhService.GetViewer, the daemon's snapshot). */
+export const viewerResource = createResource((_key, signal) => getViewer(undefined, signal));
+
+/** The viewer's GitHub login while mounted; "" until known (or when gh is not authenticated). */
+export function useViewerLogin(): string {
+  return useResource(viewerResource, VIEWER_KEY)?.data?.login ?? "";
 }
 
 /** Keys: "tracked" (registered repos only) or "all". */
@@ -103,8 +114,9 @@ export function applyGhEvent(ev: GhEventView): void {
     case "polled":
       usePollStore.setState({ fetchedAtMs: ev.fetchedAtMs, lastError: ev.lastError, known: true });
       break;
-    case "dashboard":
     case "viewer":
+    case "dashboard":
+      if (ev.kind === "viewer") viewerResource.invalidate(VIEWER_KEY);
       dashboardResource.invalidate(() => true);
       // Repo activity carries the dashboard's recently merged PRs for its repo.
       repoActivityResource.invalidate(() => true);

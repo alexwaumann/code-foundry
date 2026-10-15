@@ -97,13 +97,15 @@
  *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts;
  *        "ListReviewerCandidates query" counts the searches)
  *   POST /__mock/gh/pr-fail?command=pr.refresh             (that command's next run fails;
- *        also pr.ask, pr.explain, pr.fix.findings, and pr.merge as a moved head)
- *   POST /__mock/gh/pr-delay?ms=800          (pr.ask, pr.explain, pr.fix.findings, pr.merge take 800ms)
+ *        also pr.ask, pr.explain, pr.fix.findings, pr.merge as a moved head, and
+ *        pr.review as unconfirmed)
+ *   POST /__mock/gh/pr-delay?ms=800          (pr.ask, pr.explain, pr.fix.findings, pr.merge, pr.review take 800ms)
  *   POST /__mock/gh/pr-comment?repo=o/r&number=145&body=…   (a new comment on a PR detail;
  *        pull_request_detail_updated). PR detail fixtures: mock/prDetail.ts (#145 open,
  *        #138 merged, #131 closed, #140 read-only, #142 mergeable, #146 from a fork, #147 open
- *        with failing checks on no dashboard); its commands are
- *        pr.merge, pr.revert, pr.review.request and pr.refresh
+ *        with failing checks on no dashboard, #139 awaiting the viewer's review); its commands
+ *        are pr.merge, pr.revert, pr.review.request, pr.review, pr.comment and pr.refresh
+ *        ("SubmitPullRequestReview" and "AddPullRequestComment" count in /__mock/gh/calls)
  *   ActionService, the action event source and action.*: mock/actions.ts (repo-cf's six seeded
  *        actions, a-dev000000000 … a-debug0000000; every other project has none). A terminal run
  *        is a kind=action terminal that plays its script and stays EXITED; reset restores the seeds.
@@ -318,6 +320,8 @@ function routes(router: ConnectRouter): void {
       prDetailCall(() => ({ requested: world.gh.prDetails.setReviewRequest(req.repoSlug, req.number, req.login, req.kind, req.requested) })),
     revertPullRequest: (req) => prDetailCall(() => world.gh.prDetails.revert(req.repoSlug, req.number)),
     mergePullRequest: (req) => prDetailCall(() => world.gh.prDetails.merge(req.repoSlug, req.number, req.method, req.deleteBranch, req.expectedHeadSha)),
+    submitPullRequestReview: (req) => prDetailCall(() => world.gh.prDetails.submitReview(req.repoSlug, req.number, req.event, req.body)),
+    addPullRequestComment: (req) => prDetailCall(() => world.gh.prDetails.postComment(req.repoSlug, req.number, req.body)),
   });
 
   router.service(CommandService, {

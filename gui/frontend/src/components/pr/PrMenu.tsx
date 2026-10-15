@@ -13,7 +13,8 @@ import { startingKey, startPrSession, usePrSessionsStore, type PrSessionKind } f
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { COPY_LINK_CHORD, POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
 
-function Item({ icon, title, hint, children }: { icon: ReactNode; title: string; hint?: ReactNode; children?: ReactNode }) {
+/** A menu item's body: icon, title, and a one-line hint under it (the Review menu shares it). */
+export function Item({ icon, title, hint, children }: { icon: ReactNode; title: string; hint?: ReactNode; children?: ReactNode }) {
   return (
     <>
       {icon}
