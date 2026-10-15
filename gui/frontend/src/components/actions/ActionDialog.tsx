@@ -87,8 +87,11 @@ function ActionForm({ target }: { target: ActionEditorTarget }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  // A Delete in flight: the action's removal event usually comes before action.remove
+  // answers, and must not read as "deleted meanwhile" for the moment the dialog stays.
+  const [removing, setRemoving] = useState(false);
   const problem = draftProblem(draft);
-  const gone = target.mode === "edit" && !existing;
+  const gone = target.mode === "edit" && !existing && !removing;
   const nameError = error !== null && /\bname/i.test(error);
   const commandError = error !== null && !nameError && /\bcommand/i.test(error);
 
@@ -109,11 +112,13 @@ function ActionForm({ target }: { target: ActionEditorTarget }) {
   const remove = async () => {
     if (target.mode !== "edit" || busy) return;
     setBusy(true);
+    setRemoving(true);
     setError(null);
     const err = await deleteAction(target.actionId, target.repoId);
     setBusy(false);
     if (err === null) closeActionEditor();
     else {
+      setRemoving(false);
       setConfirming(false);
       setError(err);
     }
