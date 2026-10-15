@@ -124,7 +124,7 @@ stylesheets hold their colours in variables; a palette class can only enter CSS 
 ## Verified
 
 - `make check`.
-- `make gui-e2e` (WebKit + Chromium): see the PR.
+- `make gui-e2e` (WebKit + Chromium): 760 passed, 40 skipped, 0 failed (the known `panel.spec.ts` Chromium flake did not show).
 - Mock (Chromium, status-kinds world plus a workspace): start page, Pull Requests,
   Projects, worktree overview and a thread, dark and light, before and after, compared
   side by side and by sampled pixels: dark moves only at the former -300 sites (amber
