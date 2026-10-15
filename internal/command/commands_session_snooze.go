@@ -15,16 +15,17 @@ import (
 // needs-attention "snooze ended") or unsnooze it with clear. until is parsed here
 // (parseSnoozeUntil, the daemon's local zone) and the API gets an absolute time; the
 // GUI computes its presets itself. Snoozing asks for confirmation only while Claude is
-// mid-turn or waiting on the user, like session.archive; unsnoozing never asks. See
+// mid-turn or waiting on the user, or background agents or shells run, like
+// session.archive; unsnoozing never asks. See
 // docs/notes/snooze-threads-1-daemon.md.
 func sessionSnooze(b SessionBackend, idArg ArgSpec) Command {
 	return Command{
 		Name:  "session.snooze",
 		Title: "Snooze or Unsnooze Thread",
 		Description: "Snooze a thread until a time: Claude is closed, its terminals are removed and it is unpinned and " +
-			"listed apart; when the time comes it returns needing attention (\"snooze ended\"), still disconnected. " +
+			"listed apart; when the time comes it returns needing attention (\"snooze ended\"). " +
 			"until takes " + SnoozeUntilHelp + ". clear unsnoozes. " +
-			"Reconnecting, pinning, archiving or sending a message unsnoozes a thread too.",
+			"Pinning, archiving or sending a message unsnoozes a thread too.",
 		Category: "Thread",
 		Args: []ArgSpec{
 			idArg,
@@ -83,7 +84,7 @@ func snoozeArgs(a Args, now time.Time) (time.Time, error) {
 
 // snoozeConfirm is session.snooze's confirmation for this call, or "" when it needs
 // none: unsnoozing, args Run will refuse anyway, an unknown thread (Run reports it), or
-// snoozing a thread that is not mid-turn (archiveInterrupts).
+// snoozing a thread that is not mid-turn and runs no background work (archiveInterrupts).
 func snoozeConfirm(ctx context.Context, b SessionBackend, a Args) string {
 	if until, err := snoozeArgs(a, time.Now()); err != nil || until.IsZero() {
 		return ""
@@ -93,7 +94,7 @@ func snoozeConfirm(ctx context.Context, b SessionBackend, a Args) string {
 		return ""
 	}
 	s := res.Msg.GetSession()
-	why := archiveInterrupts(s)
+	why, ends := archiveInterrupts(s)
 	if why == "" {
 		return ""
 	}
@@ -101,5 +102,5 @@ func snoozeConfirm(ctx context.Context, b SessionBackend, a Args) string {
 	if name == "" {
 		name = s.GetId()
 	}
-	return "Snooze thread " + name + "? " + why + "; snoozing ends the turn."
+	return "Snooze thread " + name + "? " + why + "; snoozing " + ends + "."
 }

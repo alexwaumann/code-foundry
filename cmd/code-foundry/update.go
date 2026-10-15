@@ -13,6 +13,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/client"
+	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
@@ -137,18 +138,32 @@ func (cl *cli) afterUpdate(ctx context.Context) {
 		return // no daemon running: the next one starts from the new install
 	}
 	_, _ = c.Update.Check(ctx, connect.NewRequest(&v1.CheckForUpdateRequest{}))
-	sessions := 0
+	// Only threads that are working or waiting on an answer lose anything to the
+	// restart; an idle one starts again with its next message.
+	active := 0
 	if res, err := c.Command.Invoke(ctx, connect.NewRequest(&v1.InvokeCommandRequest{Name: "session.list"})); err == nil {
 		var list v1.ListSessionsResponse
 		if protojson.Unmarshal([]byte(res.Msg.GetResultJson()), &list) == nil {
 			for _, s := range list.GetSessions() {
-				if s.GetState() != v1.SessionState_SESSION_STATE_DISCONNECTED {
-					sessions++
+				if command.ActiveSession(s) {
+					active++
 				}
 			}
 		}
 	}
-	fmt.Fprintf(cl.stdout, "\nThe app and the daemon (pid %d, %s, %d open session(s)) keep running the old version\n", ping.GetPid(), ping.GetVersion(), sessions)
+	fmt.Fprintf(cl.stdout, "\nThe app and the daemon (pid %d, %s, %s) keep running the old version\n", ping.GetPid(), ping.GetVersion(), activeThreads(active))
 	fmt.Fprintf(cl.stdout, "until you restart Code Foundry (Restart Now in the app, or palette: Restart Code Foundry):\n")
 	fmt.Fprintf(cl.stdout, "  code-foundry app restart\n")
+}
+
+// activeThreads is afterUpdate's count of threads a restart would cut off: "no thread
+// working", "1 thread working or waiting on you", "3 threads working or waiting on you".
+func activeThreads(n int) string {
+	switch n {
+	case 0:
+		return "no thread working"
+	case 1:
+		return "1 thread working or waiting on you"
+	}
+	return fmt.Sprintf("%d threads working or waiting on you", n)
 }

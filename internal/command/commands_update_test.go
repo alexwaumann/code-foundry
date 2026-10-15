@@ -115,9 +115,11 @@ func TestAppUpdateCommands(t *testing.T) {
 	}
 }
 
-func TestBusySessions(t *testing.T) {
-	sess := func(id string, st v1.SessionState, status v1.SessionStatus) *v1.Session {
-		return &v1.Session{Id: id, State: st, Status: status}
+// A restart cuts off only threads that are working or waiting on an answer; an idle
+// or stopped thread starts again with its next message.
+func TestActiveSessions(t *testing.T) {
+	sess := func(id string, st v1.SessionState, status v1.SessionStatus, reason string) *v1.Session {
+		return &v1.Session{Id: id, State: st, Status: status, StatusReason: reason}
 	}
 	const (
 		connected    = v1.SessionState_SESSION_STATE_CONNECTED
@@ -134,16 +136,18 @@ func TestBusySessions(t *testing.T) {
 		want     int
 	}{
 		{"none", nil, nil, 0},
-		{"busy and connected", []*v1.Session{sess("a", connected, busy), sess("b", starting, busy)}, nil, 2},
-		{"idle and attention do not count", []*v1.Session{sess("a", connected, idle), sess("b", connected, attention)}, nil, 0},
-		{"disconnected busy does not count", []*v1.Session{sess("a", disconnected, busy), sess("b", connected, busy)}, nil, 1},
+		{"busy and starting", []*v1.Session{sess("a", connected, busy, "working"), sess("b", starting, 0, "")}, nil, 2},
+		{"a permission prompt and a question count", []*v1.Session{sess("a", connected, attention, "permission: Bash ls"),
+			sess("b", connected, attention, "question: Which?")}, nil, 2},
+		{"idle and finished do not count", []*v1.Session{sess("a", connected, idle, "at prompt"), sess("b", connected, attention, "finished")}, nil, 0},
+		{"stopped threads do not count", []*v1.Session{sess("a", disconnected, attention, "permission: x"), sess("b", connected, busy, "working")}, nil, 1},
 		{"service down", nil, errors.New("unavailable"), 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := command.BusySessions(context.Background(), &commandtest.Session{Others: tt.sessions, Err: tt.err})
+			got := command.ActiveSessions(context.Background(), &commandtest.Session{Others: tt.sessions, Err: tt.err})
 			if got != tt.want {
-				t.Fatalf("BusySessions = %d, want %d", got, tt.want)
+				t.Fatalf("ActiveSessions = %d, want %d", got, tt.want)
 			}
 		})
 	}
@@ -155,7 +159,8 @@ func TestAppRestart(t *testing.T) {
 	busy2 := &v1.Session{Id: "s2", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_BUSY}
 	idle := &v1.Session{Id: "s3", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_IDLE}
 	dead := &v1.Session{Id: "s4", State: v1.SessionState_SESSION_STATE_DISCONNECTED, Status: v1.SessionStatus_SESSION_STATUS_BUSY}
-	const quiet = "Restart Code Foundry? Open threads keep their history and can be reconnected."
+	asking := &v1.Session{Id: "s5", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_NEEDS_ATTENTION, StatusReason: "question: Which?"}
+	const quiet = "Restart Code Foundry? Threads keep their history; a message starts each again."
 	tests := []struct {
 		name     string
 		sessions []*v1.Session
@@ -171,29 +176,29 @@ func TestAppRestart(t *testing.T) {
 		wantConfirm string
 	}{
 		{
-			name: "two busy threads", sessions: []*v1.Session{busy, busy2, idle}, status: v1.UpdateState_UPDATE_STATE_INSTALLED, restart: true, windows: 1,
-			wantMsg:     "restarting Code Foundry: closing 3 sessions; the app relaunches once the daemon has stopped",
-			wantJSON:    command.AppRestart{SessionsClosed: 3, GUINotified: 1},
+			name: "two busy threads and a question", sessions: []*v1.Session{busy, busy2, idle, asking}, status: v1.UpdateState_UPDATE_STATE_INSTALLED, restart: true, windows: 1,
+			wantMsg:     "restarting Code Foundry (3 threads cut off); the app relaunches once the daemon has stopped",
+			wantJSON:    command.AppRestart{ThreadsInterrupted: 3, GUINotified: 1},
 			restarts:    1,
-			wantConfirm: "2 threads are still working and will be cut off mid-turn. Restart Code Foundry anyway?",
+			wantConfirm: "3 threads are working or waiting on you and will be cut off. Restart Code Foundry anyway?",
 		},
 		{
 			name: "one busy thread", sessions: []*v1.Session{busy}, status: v1.UpdateState_UPDATE_STATE_RESTART_REQUIRED, restart: true, windows: 1,
-			wantMsg:     "restarting Code Foundry: closing 1 session; the app relaunches once the daemon has stopped",
-			wantJSON:    command.AppRestart{SessionsClosed: 1, GUINotified: 1},
+			wantMsg:     "restarting Code Foundry (1 thread cut off); the app relaunches once the daemon has stopped",
+			wantJSON:    command.AppRestart{ThreadsInterrupted: 1, GUINotified: 1},
 			restarts:    1,
-			wantConfirm: "1 thread is still working and will be cut off mid-turn. Restart Code Foundry anyway?",
+			wantConfirm: "1 thread is working or waiting on you and will be cut off. Restart Code Foundry anyway?",
 		},
 		{
 			name: "nothing working", sessions: []*v1.Session{idle, dead}, status: v1.UpdateState_UPDATE_STATE_IDLE, restart: true, windows: 2,
-			wantMsg:     "restarting Code Foundry: closing 1 session; the app relaunches once the daemon has stopped",
-			wantJSON:    command.AppRestart{SessionsClosed: 1, GUINotified: 2},
+			wantMsg:     "restarting Code Foundry; the app relaunches once the daemon has stopped",
+			wantJSON:    command.AppRestart{GUINotified: 2},
 			restarts:    1,
 			wantConfirm: quiet,
 		},
 		{
 			name: "no window connected", status: v1.UpdateState_UPDATE_STATE_INSTALLED, restart: true, windows: 0,
-			wantMsg:     "restarting the daemon: closing 0 sessions; no app window is connected (open it with `code-foundry gui`)",
+			wantMsg:     "restarting the daemon; no app window is connected (open it with `code-foundry gui`)",
 			wantJSON:    command.AppRestart{},
 			restarts:    1,
 			wantConfirm: quiet,
@@ -201,7 +206,7 @@ func TestAppRestart(t *testing.T) {
 		{
 			name: "refused while installing", sessions: []*v1.Session{busy}, status: v1.UpdateState_UPDATE_STATE_DOWNLOADING, restart: true,
 			wantErr:     command.ErrUnavailable,
-			wantConfirm: "1 thread is still working and will be cut off mid-turn. Restart Code Foundry anyway?",
+			wantConfirm: "1 thread is working or waiting on you and will be cut off. Restart Code Foundry anyway?",
 		},
 		{
 			name: "no restart hook", status: v1.UpdateState_UPDATE_STATE_INSTALLED,
@@ -282,8 +287,11 @@ func requested(u *commandtest.Update, m proto.Message) bool {
 
 func TestDaemonRestart(t *testing.T) {
 	ctx := context.Background()
-	live := &v1.Session{Id: "s1", State: v1.SessionState_SESSION_STATE_CONNECTED}
-	dead := &v1.Session{Id: "s2", State: v1.SessionState_SESSION_STATE_DISCONNECTED}
+	live := &v1.Session{Id: "s1", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_BUSY}
+	idle := &v1.Session{Id: "s3", State: v1.SessionState_SESSION_STATE_CONNECTED, Status: v1.SessionStatus_SESSION_STATUS_IDLE}
+	dead := &v1.Session{Id: "s2", State: v1.SessionState_SESSION_STATE_DISCONNECTED, Status: v1.SessionStatus_SESSION_STATUS_BUSY}
+	const quiet = "Restart the daemon? Threads keep their history; a message starts each again."
+	const one = "1 thread is working or waiting on you and will be cut off. Restart the daemon anyway?"
 	tests := []struct {
 		name     string
 		session  *v1.Session
@@ -295,10 +303,11 @@ func TestDaemonRestart(t *testing.T) {
 		// wantConfirm is the confirmation message of an unconfirmed invoke.
 		wantConfirm string
 	}{
-		{"one live session", live, v1.UpdateState_UPDATE_STATE_RESTART_REQUIRED, true, "restarting the daemon: closing 1 session; the next client starts the installed version", nil, 1, "Close 1 session and restart the daemon?"},
-		{"disconnected sessions do not count", dead, v1.UpdateState_UPDATE_STATE_IDLE, true, "restarting the daemon: closing 0 sessions; the next client starts the installed version", nil, 1, "Close 0 sessions and restart the daemon?"},
-		{"refused while installing", live, v1.UpdateState_UPDATE_STATE_DOWNLOADING, true, "", command.ErrUnavailable, 0, "Close 1 session and restart the daemon?"},
-		{"no restart hook", live, v1.UpdateState_UPDATE_STATE_IDLE, false, "", nil, 0, "Close 1 session and restart the daemon?"},
+		{"one working thread", live, v1.UpdateState_UPDATE_STATE_RESTART_REQUIRED, true, "restarting the daemon (1 thread cut off); the next client starts the installed version", nil, 1, one},
+		{"an idle running thread does not count", idle, v1.UpdateState_UPDATE_STATE_IDLE, true, "restarting the daemon; the next client starts the installed version", nil, 1, quiet},
+		{"stopped threads do not count", dead, v1.UpdateState_UPDATE_STATE_IDLE, true, "restarting the daemon; the next client starts the installed version", nil, 1, quiet},
+		{"refused while installing", live, v1.UpdateState_UPDATE_STATE_DOWNLOADING, true, "", command.ErrUnavailable, 0, one},
+		{"no restart hook", live, v1.UpdateState_UPDATE_STATE_IDLE, false, "", nil, 0, one},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
