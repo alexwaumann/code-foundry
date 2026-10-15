@@ -15,7 +15,7 @@ import { persist } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 import { basename } from "@/lib/path";
 import { NO_PROJECT } from "@/lib/threadRow";
-import { isShellLabels, SESSION_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
+import { ACTION_NAME_LABEL, isActionLabels, isPanelLabels, SESSION_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { keyOf } from "./panel";
 import { useTerminalsStore, type TerminalsData } from "./terminals";
 import { BOTTOM_DEFAULT, useUiStore, type Selection } from "./ui";
@@ -50,18 +50,18 @@ export function sessionOfKey(key: string): string | null {
 type LabelledTerminal = { labels: Readonly<Record<string, string>> };
 
 /**
- * The key whose bottom panel shows a terminal: its thread's for a shell a thread owns,
- * the Projects page's for a shell a worktree owns, null for anything that is no shell
- * (an unlabelled terminal from a raw TerminalService.Create, or one labelled without
- * kind=shell).
+ * The key whose bottom panel shows a terminal: its thread's for a shell or action run a
+ * thread owns, the Projects page's for one a worktree owns, null for anything else (an
+ * unlabelled terminal from a raw TerminalService.Create, or one labelled without
+ * kind=shell or kind=action).
  */
 export function ownerKeyOf(t: LabelledTerminal): string | null {
-  if (!isShellLabels(t.labels)) return null;
+  if (!isPanelLabels(t.labels)) return null;
   const session = t.labels[SESSION_LABEL];
   return session ? `${SESSION_PREFIX}${session}` : PROJECTS_KEY;
 }
 
-/** A key's tabs: the ids of the shells it owns, in the terminals store's order. */
+/** A key's tabs: the ids of the shells and action runs it owns, in the terminals store's order. */
 export function bottomTabIds(terminals: TerminalsData, key: string): string[] {
   return terminals.order.filter((id) => {
     const t = terminals.byId[id];
@@ -77,12 +77,14 @@ export function activeTabOf(entry: BottomEntry, ids: readonly string[]): string 
 }
 
 /**
- * A tab's title. On a thread: the terminal's title (OSC) when it has one, else the last
+ * A tab's title. An action run: the action's name when it started (its icon tells it from
+ * a shell). On a thread: the terminal's title (OSC) when it has one, else the last
  * segment of its cwd; a thread without a project (`noProject`) names a shell in its home
  * directory (its worktree label) "No project", not after the user's home folder. On the
  * Projects page, where shells of many worktrees share a strip: the worktree's folder name.
  */
 export function bottomTabTitle(t: { title: string; cwd: string; labels: Readonly<Record<string, string>> }, key: string, noProject = false): string {
+  if (isActionLabels(t.labels)) return t.labels[ACTION_NAME_LABEL] || "Action";
   if (key === PROJECTS_KEY) {
     const wt = t.labels[WORKTREE_LABEL] ?? "";
     return basename(wt || t.cwd);
@@ -93,9 +95,10 @@ export function bottomTabTitle(t: { title: string; cwd: string; labels: Readonly
 
 /**
  * Every tab title of a key's panel (bottomTabTitle), with fallback names told apart: the
- * first shell named after a folder keeps the name, later ones with the same name get " 2",
- * " 3", … in the terminals store's order, so they stay put as tabs come and go after
- * them. A thread's shell with an OSC title shows it as is and takes no number.
+ * first shell named after a folder (or run of an action) keeps the name, later ones with
+ * the same name get " 2", " 3", … in the terminals store's order, so they stay put as
+ * tabs come and go after them. A thread's shell with an OSC title shows it as is and takes
+ * no number.
  */
 export function bottomTabTitles(terminals: TerminalsData, key: string, noProject = false): Record<string, string> {
   const out: Record<string, string> = {};
@@ -103,7 +106,7 @@ export function bottomTabTitles(terminals: TerminalsData, key: string, noProject
   for (const id of bottomTabIds(terminals, key)) {
     const t = terminals.byId[id];
     if (!t) continue;
-    if (key !== PROJECTS_KEY && t.title) {
+    if (key !== PROJECTS_KEY && t.title && !isActionLabels(t.labels)) {
       out[id] = t.title;
       continue;
     }

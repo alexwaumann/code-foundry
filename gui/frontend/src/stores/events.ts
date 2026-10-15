@@ -6,6 +6,8 @@ import { listRepos } from "@/api/repo";
 import { listSessions } from "@/api/session";
 import { errorMessage, isAbort, runStream, type StreamStatus } from "@/api/stream";
 import { listTerminals } from "@/api/terminal";
+import { applyActionEvent, useActionsStore } from "./actions";
+import { onActionRunFinished } from "./actionActions";
 import { closeEmptyPanels, onNewTerminal, onRemovedTerminal, revealArrived } from "./bottomActions";
 import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
@@ -72,6 +74,11 @@ const handlers: Handlers = {
   ui: applyIntent,
   settings: applySettingsSnapshot,
   update: applyUpdateEvent,
+  action: (ev) => {
+    useActionsStore.setState((s) => ({ ...applyActionEvent(s, ev), loaded: true }));
+    // A failed worktree-create run toasts (stores/actionActions.ts).
+    if (ev.kind === "runFinished") onActionRunFinished(ev.finished);
+  },
 };
 
 export function dispatchEvent(ev: EventView): void {

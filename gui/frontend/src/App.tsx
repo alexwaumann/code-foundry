@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefO
 import { Composer } from "@/components/compose/Composer";
 import { AddProjectDialog } from "@/components/addproject/AddProjectDialog";
 import { BottomPanel } from "@/components/bottom/BottomPanel";
+import { ActionDialog } from "@/components/actions/ActionDialog";
+import { ActionRunDialog } from "@/components/actions/ActionRunDialog";
 import { PublishDialog } from "@/components/publish/PublishDialog";
 import { SnoozeDialog } from "@/components/snooze/SnoozeDialog";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
@@ -198,6 +200,8 @@ export function App() {
       <AddProjectDialog />
       <PublishDialog />
       <SnoozeDialog />
+      <ActionDialog />
+      <ActionRunDialog />
       <Toaster theme={scheme} position="bottom-right" offset={{ bottom: 20, right: 20 }} />
     </div>
   );

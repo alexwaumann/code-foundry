@@ -11,6 +11,7 @@ import {
   GitBranchPlus,
   Layers,
   PanelRight,
+  Play,
   RefreshCw,
   Search,
   SquarePen,
@@ -18,6 +19,7 @@ import {
   Trash2,
   Unlink,
 } from "lucide-react";
+import { ActionsMenu } from "@/components/actions/ActionsMenu";
 import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { GithubMark } from "@/components/icons/GithubMark";
 import { PanelToggle } from "@/components/panel/PanelToggle";
@@ -48,6 +50,7 @@ import {
   type ProjectsWorkspaces,
 } from "@/lib/projects";
 import { cn } from "@/lib/utils";
+import { openActionEditor } from "@/stores/actionDialog";
 import { composeIn, composeInWorkspace } from "@/stores/compose";
 import {
   addProject,
@@ -183,8 +186,8 @@ const UNKNOWN_REPO = { githubSlug: "", remotes: [] };
 
 /**
  * One worktree of a project. `cleanupSlot`: some row of the project can be cleaned up,
- * so every row keeps a fourth action slot (the broom, or empty) and the columns stay
- * aligned; projects with nothing to clean up keep three.
+ * so every row keeps a fifth action slot (the broom, or empty) and the columns stay
+ * aligned; projects with nothing to clean up keep four.
  */
 function WorktreeRow({ repoId, path, cleanupSlot }: { repoId: string; path: string; cleanupSlot: boolean }) {
   const isMain = useReposStore((s) => findWorktree(s, repoId, path)?.isMain ?? false);
@@ -200,7 +203,7 @@ function WorktreeRow({ repoId, path, cleanupSlot }: { repoId: string; path: stri
       </span>
       {/* Always shown, muted at rest; a fixed width so every row's state column ends at the same x. */}
       <span
-        className={cn("flex shrink-0 items-center justify-end opacity-55", cleanupSlot ? "w-24" : "w-18", " transition-opacity group-hover/wt:opacity-100 group-focus-within/wt:opacity-100 group-aria-selected/wt:opacity-100 has-[[data-state=open]]:opacity-100")}
+        className={cn("flex shrink-0 items-center justify-end opacity-55", cleanupSlot ? "w-30" : "w-24", " transition-opacity group-hover/wt:opacity-100 group-focus-within/wt:opacity-100 group-aria-selected/wt:opacity-100 has-[[data-state=open]]:opacity-100")}
         data-testid="worktree-actions"
       >
         <RowAction label="New thread here" testId="worktree-new-thread" onClick={() => { composeIn(repoId, path); }}>
@@ -209,6 +212,7 @@ function WorktreeRow({ repoId, path, cleanupSlot }: { repoId: string; path: stri
         <RowAction label="New terminal here" testId="worktree-new-terminal" onClick={() => void newTerminalIn(repoId, path)}>
           <SquareTerminal />
         </RowAction>
+        <ActionsMenu repoId={repoId} owner={{ kind: "worktree", repoId, path }} from="projects" variant="row" testId="worktree-actions-menu" />
         {cleanable ? (
           <RowAction label="Clean up: remove this worktree" testId="worktree-cleanup" className="text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300" onClick={() => void cleanupWorktree(repoId, path)}>
             <Broom />
@@ -254,13 +258,14 @@ function RefreshAction({ repoId }: { repoId: string }) {
 }
 
 /**
- * A project header's overflow: New worktree… (git), Clean up merged worktrees (git with a
- * remote: merged means in origin/<default>; disabled at 0), its setup step, then Remove
- * project.
+ * A project header's overflow: New worktree… (git), New action… (the action editor),
+ * Clean up merged worktrees (git with a remote: merged means in origin/<default>;
+ * disabled at 0), its setup step, then Remove project.
  */
 function projectMenu(repoId: string, kind: ProjectKind, step: ProjectNextStep, cleanup: number | null): OverflowItem[] {
   const items: OverflowItem[] = [];
   if (kind !== "nogit") items.push({ label: "New worktree…", icon: GitBranchPlus, testId: "project-new-worktree", onSelect: () => { newWorktreeIn(repoId); } });
+  items.push({ label: "New action…", icon: Play, testId: "project-new-action", onSelect: () => { openActionEditor({ mode: "new", repoId, from: "projects" }); } });
   if (cleanup !== null) {
     items.push({ label: "Clean up merged worktrees", icon: Broom, testId: "project-cleanup", badge: cleanup, disabled: cleanup === 0, onSelect: () => void cleanupMergedWorktrees(repoId) });
   }

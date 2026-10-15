@@ -1,5 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent, type RefObject } from "react";
 import { Plus, SquareTerminal, X } from "lucide-react";
+import { ActionEcho, ActionStatusLine, ActionTabIcon, ActionTabStatusMark } from "@/components/actions/ActionTabParts";
 import { CommandButton } from "@/components/command/CommandButton";
 import { revealTab } from "@/components/panel/reveal";
 import { useNoProjectThread } from "@/components/session/useNoProject";
@@ -7,6 +8,7 @@ import { TerminalHost, type TerminalHostHandle } from "@/components/terminal/Ter
 import { Button } from "@/components/ui/button";
 import { chordFromEvent, formatChord } from "@/keys/chord";
 import { tildify } from "@/lib/path";
+import { isActionLabels } from "@/lib/termlabel";
 import { cn } from "@/lib/utils";
 import { closeBottomTerminal, newBottomTerminal, paneContext } from "@/stores/bottomActions";
 import {
@@ -51,21 +53,30 @@ function openTab(panelKey: string, id: string): void {
   requestBottomFocus();
 }
 
+/** Whether a terminal is an action run's (kind=action): a primitive, for a narrow selector. */
+function useIsAction(id: string | null): boolean {
+  return useTerminalsStore((s) => (id === null ? false : isActionLabels(s.byId[id]?.labels ?? {})));
+}
+
 /**
  * One terminal's tab: icon, title (bottomTabTitleOf: duplicates numbered), × (on hover, keyboard focus, or when
  * active). Middle click closes. The tab's tooltip is the full cwd, which the title hides.
+ * An action run's tab: the action's icon and name, then its status mark (running, exit 0,
+ * failed); it stays after the command exits until it is closed.
  * `focusable` is the roving tabindex: only the active tab (and its ×) is in the Tab order.
  */
 function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id: string; active: boolean; focusable: boolean }) {
   const noProject = useNoProjectThread(sessionOfKey(panelKey));
   const title = useTerminalsStore((s) => bottomTabTitleOf(s, panelKey, id, noProject));
   const cwd = useTerminalsStore((s) => s.byId[id]?.cwd ?? "");
-  const exited = useTerminalsStore((s) => s.byId[id]?.state === "exited");
+  const action = useIsAction(id);
+  const exited = useTerminalsStore((s) => s.byId[id]?.state === "exited") && !action;
   return (
     <div
       role="presentation"
       data-tab-id={id}
       data-exited={exited || undefined}
+      data-kind={action ? "action" : "shell"}
       className={cn(
         "group relative flex h-7 max-w-48 shrink-0 items-center rounded-md pr-1 text-xs [--wails-draggable:no-drag]",
         active ? "bg-accent text-accent-foreground dark:bg-accent/50" : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
@@ -90,8 +101,9 @@ function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id
           openTab(panelKey, id);
         }}
       >
-        <SquareTerminal className={cn("size-3.5 shrink-0", exited && "opacity-50")} aria-hidden />
+        {action ? <ActionTabIcon id={id} /> : <SquareTerminal className={cn("size-3.5 shrink-0", exited && "opacity-50")} aria-hidden />}
         <span className={cn("truncate", exited && "line-through opacity-60")}>{title}</span>
+        {action && <ActionTabStatusMark id={id} />}
       </button>
       <button
         type="button"
@@ -262,6 +274,7 @@ function Panel({
 }) {
   const ids = useBottomTabIds(panelKey);
   const activeId = useBottomActiveId(panelKey);
+  const activeIsAction = useIsAction(activeId);
   // A shell this window is starting for the panel: a blank body until it arrives.
   const starting = useBottomStarting(panelKey);
 
@@ -314,7 +327,11 @@ function Panel({
         >
           {/* One host for every tab: switching tabs re-attaches the same xterm. Hidden
               (and detached) while there is no tab. */}
-          <TerminalHost ref={hostRef} terminalId={activeId} hidden={activeId === null} testId="bottom-terminal-host" />
+          {/* An action run: its command above the output and its status line under it. The
+              host keeps its place among the siblings, so a tab switch never remounts it. */}
+          {activeIsAction && activeId !== null && <ActionEcho key={`echo-${activeId}`} id={activeId} />}
+          <TerminalHost ref={hostRef} terminalId={activeId} hidden={activeId === null} exitOverlay={!activeIsAction} testId="bottom-terminal-host" />
+          {activeIsAction && activeId !== null && <ActionStatusLine key={`status-${activeId}`} id={activeId} />}
           {activeId === null && !starting && <EmptyState panelKey={panelKey} />}
         </div>
       </aside>

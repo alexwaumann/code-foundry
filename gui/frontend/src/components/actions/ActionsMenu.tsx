@@ -1,0 +1,203 @@
+import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { Pencil, Play, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { runAction, type ActionOwner } from "@/stores/actionActions";
+import { openActionEditor } from "@/stores/actionDialog";
+import { isStartable } from "@/keys/bindings";
+import { useAction, useRepoActionIds } from "@/stores/actions";
+import { useCommandsStore } from "@/stores/commands";
+import { useReposStore } from "@/stores/repos";
+import { useSessionsStore } from "@/stores/sessions";
+import { ACTION_ICON } from "./actionIcons";
+
+type From = "thread" | "projects";
+
+/** Stops a pointer event at the pencil, so the Radix item under it neither selects nor closes. */
+function stop(e: PointerEvent) {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+/**
+ * One action: its icon and name; picking it runs it. The pencil at the right end shows on
+ * the highlighted row (hover or keyboard) and opens the editor; ArrowRight does the same
+ * from the keyboard (aria-keyshortcuts), the way it would open a submenu.
+ */
+function ActionItem({ id, onRun, onEdit }: { id: string; onRun: (id: string) => void; onEdit: (id: string) => void }) {
+  const action = useAction(id);
+  if (!action) return null;
+  const Icon = ACTION_ICON[action.icon];
+  return (
+    <DropdownMenuItem
+      className="group/item pr-1"
+      data-testid="action-item"
+      data-action={id}
+      aria-keyshortcuts="ArrowRight"
+      onSelect={() => {
+        onRun(id);
+      }}
+      onKeyDown={(e: KeyboardEvent) => {
+        if (e.key !== "ArrowRight" || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onEdit(id);
+      }}
+    >
+      <Icon aria-hidden />
+      <span className="min-w-0 flex-1 truncate">{action.name}</span>
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label={`Edit ${action.name}`}
+        title={`Edit ${action.name}`}
+        data-testid="action-edit"
+        className="-my-0.5 flex size-6 shrink-0 items-center justify-center rounded-[5px] text-muted-foreground opacity-0 group-hover/item:opacity-100 group-data-[highlighted]/item:opacity-100 hover:bg-foreground/10 hover:text-foreground [&_svg]:size-3.5"
+        onPointerDown={stop}
+        onPointerUp={stop}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onEdit(id);
+        }}
+      >
+        <Pencil aria-hidden />
+      </button>
+    </DropdownMenuItem>
+  );
+}
+
+/**
+ * The thread header's actions menu: only for a thread with a project (actions belong to
+ * one), and hidden when the daemon does not list action.run here, like a CommandButton.
+ */
+export function ThreadActionsMenu({ sessionId }: { sessionId: string }) {
+  const repoId = useSessionsStore((s) => s.byId[sessionId]?.repoId ?? "");
+  const available = useCommandsStore((s) => s.commands.some((c) => c.name === "action.run" && isStartable(c)));
+  if (!repoId || !available) return null;
+  return <ActionsMenu repoId={repoId} owner={{ kind: "thread", sessionId }} from="thread" variant="header" testId="pane-actions-menu" />;
+}
+
+/**
+ * A project's actions as a dropdown, from a thread's header (runs for the thread) or a
+ * Projects page worktree row (runs for that worktree): one row per action (click runs it,
+ * the pencil edits it), then "New action…". With none: "No actions for <project> yet" and
+ * "New action…". What was picked runs once the menu has closed and handed focus back
+ * (a run's tab or the editor then takes it), like the Projects page's overflow menus.
+ */
+export function ActionsMenu({ repoId, owner, from, variant, testId }: { repoId: string; owner: ActionOwner; from: From; variant: "header" | "row"; testId: string }) {
+  const ids = useRepoActionIds(repoId);
+  const project = useReposStore((s) => s.byId[repoId]?.name ?? repoId);
+  const [open, setOpen] = useState(false);
+  const picked = useRef<(() => void) | null>(null);
+  const before = useRef<Element | null>(null);
+
+  const pick = (run: () => void) => {
+    picked.current = run;
+    setOpen(false);
+  };
+  const onRun = (id: string) => {
+    pick(() => void runAction(id, owner));
+  };
+  const onEdit = (id: string) => {
+    pick(() => {
+      openActionEditor({ mode: "edit", actionId: id, repoId, from });
+    });
+  };
+  const onNew = () => {
+    pick(() => {
+      openActionEditor({ mode: "new", repoId, from });
+    });
+  };
+
+  const label = "Run an action";
+  return (
+    <DropdownMenu
+      modal={false}
+      open={open}
+      onOpenChange={(o) => {
+        if (o) before.current = document.activeElement;
+        setOpen(o);
+      }}
+    >
+      <DropdownMenuTrigger asChild>
+        {variant === "header" ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            title={label}
+            aria-label={label}
+            tabIndex={-1}
+            data-testid={testId}
+            className="[--wails-draggable:no-drag] data-[state=open]:bg-accent data-[state=open]:text-accent-foreground dark:data-[state=open]:bg-accent/50"
+            onMouseDown={(e) => {
+              e.preventDefault();
+            }}
+          >
+            <Play aria-hidden className="size-3.5" />
+          </Button>
+        ) : (
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label={label}
+            title={label}
+            data-testid={testId}
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground [&_svg]:size-3.5"
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <Play aria-hidden />
+          </button>
+        )}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="min-w-52"
+        data-testid={`${testId}-menu`}
+        onKeyDown={(e) => {
+          // Keys stay in the menu (a Projects row's list must not move its cursor).
+          e.stopPropagation();
+        }}
+        onClick={(e) => {
+          // Portal events still bubble through React: not to a row.
+          e.stopPropagation();
+        }}
+        onCloseAutoFocus={(e) => {
+          // Back to where the keyboard was before the menu (the trigger keeps no focus),
+          // then what was picked, which may move it on (a run's tab, the editor).
+          e.preventDefault();
+          const prev = before.current;
+          before.current = null;
+          if (prev instanceof HTMLElement && prev.isConnected && prev !== document.body) prev.focus({ preventScroll: true });
+          const run = picked.current;
+          picked.current = null;
+          run?.();
+        }}
+      >
+        {ids.length === 0 ? (
+          <DropdownMenuLabel className="font-normal" data-testid="actions-empty">
+            No actions for {project} yet
+          </DropdownMenuLabel>
+        ) : (
+          <>
+            <DropdownMenuLabel data-testid="actions-project">{project}</DropdownMenuLabel>
+            {ids.map((id) => (
+              <ActionItem key={id} id={id} onRun={onRun} onEdit={onEdit} />
+            ))}
+            <DropdownMenuSeparator />
+          </>
+        )}
+        <DropdownMenuItem data-testid="action-new" onSelect={onNew}>
+          <Plus aria-hidden />
+          New action…
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
