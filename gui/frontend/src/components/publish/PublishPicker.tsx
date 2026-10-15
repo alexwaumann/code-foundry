@@ -1,7 +1,7 @@
 import { Building2, Check, ChevronDown, Globe, Loader2, Lock, User, Users } from "lucide-react";
-import { RadioGroup as RadioGroupPrimitive } from "radix-ui";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { Tip } from "@/components/ui/tooltip";
 import { keepVisibility, visibilityLabels, visibilityOptions, type Visibility } from "@/lib/publish";
 import type { OwnersState, PublishChoice } from "./usePublishOwners";
@@ -91,8 +91,8 @@ export function PublishPicker({
             {value.owner} does not let members create repositories.
           </span>
         ) : (
-          <RadioGroupPrimitive.Root
-            className="inline-flex h-8 items-center rounded-lg bg-muted p-[3px]"
+          <RadioGroup
+            variant="segmented"
             aria-labelledby="publish-visibility-label"
             value={value.visibility ?? ""}
             disabled={disabled}
@@ -105,20 +105,15 @@ export function PublishPicker({
             {options.map((v) => {
               const Icon = visibilityIcons[v];
               return (
-                // The tooltip's data-state wins on the item, so checked is styled from aria-checked.
                 <Tip key={v} label={visibilityHints[v]}>
-                  <RadioGroupPrimitive.Item
-                    value={v}
-                    className="inline-flex h-full items-center gap-1.5 rounded-md border border-transparent px-2.5 text-xs font-medium text-foreground/70 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50 aria-checked:bg-background aria-checked:text-foreground aria-checked:shadow-sm dark:aria-checked:border-input dark:aria-checked:bg-input/30 [&_svg]:size-3.5"
-                    data-testid={`publish-visibility-${v}`}
-                  >
+                  <RadioGroupChoice value={v} variant="segment" data-testid={`publish-visibility-${v}`}>
                     <Icon aria-hidden />
                     {visibilityLabels[v]}
-                  </RadioGroupPrimitive.Item>
+                  </RadioGroupChoice>
                 </Tip>
               );
             })}
-          </RadioGroupPrimitive.Root>
+          </RadioGroup>
         )}
       </div>
       {owner && !owner.known && (
