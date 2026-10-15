@@ -91,9 +91,13 @@ export function ActionsMenu({ repoId, owner, from, variant, testId }: { repoId: 
   const [open, setOpen] = useState(false);
   const picked = useRef<(() => void) | null>(null);
   const before = useRef<Element | null>(null);
+  // The closing menu's onCloseAutoFocus comes after its exit animation, maybe after it
+  // opened again: it then must not move focus (that would dismiss the new one).
+  const openRef = useRef(false);
 
   const pick = (run: () => void) => {
     picked.current = run;
+    openRef.current = false;
     setOpen(false);
   };
   const onRun = (id: string) => {
@@ -117,6 +121,7 @@ export function ActionsMenu({ repoId, owner, from, variant, testId }: { repoId: 
       open={open}
       onOpenChange={(o) => {
         if (o) before.current = document.activeElement;
+        openRef.current = o;
         setOpen(o);
       }}
     >
@@ -172,9 +177,11 @@ export function ActionsMenu({ repoId, owner, from, variant, testId }: { repoId: 
           // Back to where the keyboard was before the menu (the trigger keeps no focus),
           // then what was picked, which may move it on (a run's tab, the editor).
           e.preventDefault();
-          const prev = before.current;
-          before.current = null;
-          if (prev instanceof HTMLElement && prev.isConnected && prev !== document.body) prev.focus({ preventScroll: true });
+          if (!openRef.current) {
+            const prev = before.current;
+            before.current = null;
+            if (prev instanceof HTMLElement && prev.isConnected && prev !== document.body) prev.focus({ preventScroll: true });
+          }
           const run = picked.current;
           picked.current = null;
           run?.();

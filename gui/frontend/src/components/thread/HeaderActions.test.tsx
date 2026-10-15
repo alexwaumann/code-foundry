@@ -21,6 +21,7 @@ const { pullRequestDetailResource } = await import("@/stores/gh");
 const { useSessionsStore } = await import("@/stores/sessions");
 const { useUiStore } = await import("@/stores/ui");
 const { useWorkspacesStore } = await import("@/stores/workspaces");
+const { useActionsStore } = await import("@/stores/actions");
 
 const cmd = (name: string, title = name): CommandView => ({ name, title, description: "", category: "", args: [], keybindings: [], available: true });
 const link = (number: number): LinkedPullRequestView => ({ slug: "o/web", number, url: `https://github.com/o/web/pull/${String(number)}`, linkedAt: null });
@@ -121,6 +122,40 @@ describe("HeaderActions", () => {
     setThread({});
     render(<HeaderActions sessionId="s-1" />);
     expect(order()).toEqual(["session.close", "session.archive", "bottom-toggle", "panel-toggle"]);
+  });
+
+  it.each([
+    ["a project thread with action.run listed: the Play menu, left of the bottom toggle", "web", true, true],
+    ["a thread without a project: none", "", true, false],
+    ["action.run not listed: none", "web", false, false],
+  ])("%s", (_name, repoId, listed, shown) => {
+    if (listed) useCommandsStore.setState({ commands: [...useCommandsStore.getState().commands, cmd("action.run", "Run Action")] });
+    setThread({ repoId });
+    render(<HeaderActions sessionId="s-1" />);
+    const want = shown
+      ? ["session.close", "pane-snooze", "session.archive", "pane-actions-menu", "bottom-toggle", "panel-toggle"]
+      : ["session.close", "pane-snooze", "session.archive", "bottom-toggle", "panel-toggle"];
+    expect(order()).toEqual(want);
+  });
+
+  it("the Play menu lists the project's actions, or says it has none", () => {
+    useCommandsStore.setState({ commands: [...useCommandsStore.getState().commands, cmd("action.run", "Run Action")] });
+    useActionsStore.setState({
+      byId: { "a-1": { id: "a-1", repoId: "web", name: "Test", command: "go test", icon: "test", inTerminal: true, onWorktreeCreate: false, position: 0 } },
+      byRepo: { web: ["a-1"] },
+      runs: {},
+    });
+    setThread({});
+    const { unmount } = render(<HeaderActions sessionId="s-1" />);
+    fireEvent.keyDown(screen.getByTestId("pane-actions-menu"), { key: "Enter" });
+    expect(screen.getAllByTestId("action-item").map((i) => i.textContent)).toEqual(["Test"]);
+    expect(screen.getByTestId("action-edit").getAttribute("aria-label")).toBe("Edit Test");
+    expect(screen.getByTestId("action-new").textContent).toBe("New action…");
+    unmount();
+    useActionsStore.setState({ byId: {}, byRepo: {}, runs: {} });
+    render(<HeaderActions sessionId="s-1" />);
+    fireEvent.keyDown(screen.getByTestId("pane-actions-menu"), { key: "Enter" });
+    expect(screen.getByTestId("actions-empty").textContent).toBe("No actions for web yet");
   });
 
   it("two or more links: a muted count opening view.panel.linked-prs", () => {

@@ -65,6 +65,8 @@ describe("ownerKeyOf", () => {
     ["a thread-labelled terminal that is no shell (session, no kind)", { session: "s1", worktree: "/src/app" }, null],
     ["an unlabelled terminal", {}, null],
     ["another kind", { kind: "job", session: "s1" }, null],
+    ["a thread's action run", { kind: "action", session: "s1", action: "a-1", "action.name": "Test", "action.run": "r-1" }, "session:s1"],
+    ["a worktree's action run", { kind: "action", repo: "r", worktree: "/src/app", action: "a-1" }, "view:projects"],
   ];
   it.each(cases)("%s", (_name, labels, want) => {
     expect(ownerKeyOf({ labels })).toBe(want);
@@ -80,9 +82,10 @@ describe("bottomTabIds", () => {
     term("loose", {}),
     term("c", shell("s1")),
     term("w2", shell("", "/src/app.worktrees/x")),
+    term("run", { kind: "action", session: "s1", "action.name": "Test" }, { state: "exited", exitCode: 1 }),
   ]);
   const cases: [string, string, string[]][] = [
-    ["a thread: its shells in store order, not a non-shell terminal", "session:s1", ["a", "c"]],
+    ["a thread: its shells and action runs (exited too) in store order, not a non-shell terminal", "session:s1", ["a", "c", "run"]],
     ["another thread", "session:s2", ["b"]],
     ["a thread without shells", "session:s3", []],
     ["the Projects page: every shell no thread owns", "view:projects", ["w1", "w2"]],
@@ -111,6 +114,8 @@ describe("bottomTabTitle", () => {
     ["a thread's shell without a title: its cwd's last segment", { cwd: "/src/app/cmd/" }, "session:s1", "cmd"],
     ["the Projects page: the worktree's folder, whatever the title", { title: "vim", cwd: "/src/app.worktrees/x/sub", labels: shell("", "/src/app.worktrees/x") }, "view:projects", "x"],
     ["the Projects page without a worktree label: the cwd's", { cwd: "/src/other", labels: { kind: "shell" } }, "view:projects", "other"],
+    ["an action run: the action's name, not its OSC title", { title: "zsh", labels: { kind: "action", session: "s1", "action.name": "Test" } }, "session:s1", "Test"],
+    ["an action run on the Projects page: the action's name", { labels: { kind: "action", worktree: "/src/app", "action.name": "Build" } }, "view:projects", "Build"],
   ];
   it.each(cases)("%s", (_name, extra, key, want) => {
     expect(bottomTabTitle(term("t", shell("s1"), extra), key)).toBe(want);
@@ -127,6 +132,12 @@ describe("bottomTabTitle", () => {
 describe("bottomTabTitles (duplicates numbered)", () => {
   const terms = (list: TerminalView[]) => ({ byId: Object.fromEntries(list.map((t) => [t.id, t])), order: list.map((t) => t.id) });
   const cases: [string, TerminalView[], string, Record<string, string>][] = [
+    [
+      "two runs of one action: the second is numbered",
+      [term("a", { kind: "action", session: "s1", "action.name": "Test" }, { title: "zsh" }), term("b", shell("s1")), term("c", { kind: "action", session: "s1", "action.name": "Test" })],
+      "session:s1",
+      { a: "Test", b: "app", c: "Test 2" },
+    ],
     [
       "two shells in one folder: the second is numbered",
       [term("a", shell("s1")), term("b", shell("s1"))],

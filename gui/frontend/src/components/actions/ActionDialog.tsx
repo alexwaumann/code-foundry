@@ -195,7 +195,7 @@ function ActionForm({ target }: { target: ActionEditorTarget }) {
         <div className="flex items-center gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035]">
           <span className="min-w-0 flex-1">
             Run automatically when a worktree is created
-            <small className="mt-px block text-xs text-muted-foreground">In the background, when a new thread makes its worktree; a failure shows a notification</small>
+            <small className="mt-px block text-xs text-muted-foreground">In the background, for a new thread's worktree; failures notify you</small>
           </span>
           <Switch
             on={draft.onWorktreeCreate}

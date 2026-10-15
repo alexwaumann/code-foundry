@@ -49,7 +49,7 @@ export function ActionEcho({ id }: { id: string }) {
   const { first, more } = commandEcho(command);
   if (!first) return null;
   return (
-    <div className="flex shrink-0 items-baseline gap-2 bg-[var(--terminal-bg)] pt-1.5 pr-3 pl-3 font-mono text-xs leading-[17px] text-muted-foreground" title={command} data-testid="action-echo">
+    <div className="flex shrink-0 items-baseline gap-2 bg-[var(--terminal-bg)] pt-1.5 pr-3 pl-[9px] font-mono text-xs leading-[17px] text-muted-foreground" title={command} data-testid="action-echo">
       <span className="min-w-0 truncate">$ {first}</span>
       {more > 0 && <span className="shrink-0 font-sans text-[11px] opacity-80">+{more} {more === 1 ? "line" : "lines"}</span>}
     </div>
