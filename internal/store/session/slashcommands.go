@@ -8,14 +8,15 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/claudestream"
 )
 
-// A running thread's slash commands (docs/notes/slash-commands-1-daemon.md): the list
-// Claude reports in its initialize reply, replaced by every system/commands_changed
-// push, minus the deny table (slashdeny.go). Cached on the thread's log in memory, not
-// persisted: a thread that is not running has none. Every change is a
-// SlashCommandsChanged event in the thread's seq order, so ThreadService.Watch carries
-// it.
+// A thread's slash commands (docs/notes/slash-commands-1-daemon.md): the list Claude
+// reports in its initialize reply, replaced by every system/commands_changed push, minus
+// the deny table (slashdeny.go). Cached on the thread's log and persisted
+// (threadcache_db.go): a thread whose process stopped (lifecycle.go) keeps offering the
+// last list, also across a daemon restart, until the next handshake replaces it. Every
+// change is a SlashCommandsChanged event in the thread's seq order, so
+// ThreadService.Watch carries it.
 
-// SlashCommand is one slash command a running thread offers. A value: never mutate one
+// SlashCommand is one slash command a thread offers. A value: never mutate one
 // read from a snapshot or an event.
 type SlashCommand struct {
 	// Name is what follows "/" ("compact", "anthropic-skills:deep-research").
@@ -33,7 +34,7 @@ type SlashCommand struct {
 
 // SlashCommandsChanged is published on the bus (as a ThreadEvent) when a thread's slash
 // commands changed: Claude answered initialize with a different list, or pushed a new
-// one. Commands nil: dropped (the process ended).
+// one. Commands nil: none (a thread whose Claude never answered a handshake).
 type SlashCommandsChanged struct {
 	SessionID string
 	Seq       uint64
@@ -82,19 +83,24 @@ func sameSlashCommands(a, b []SlashCommand) bool {
 	})
 }
 
-// setSlashCommands caches cs (nil: none) and publishes the change, if it is one.
+// setSlashCommands caches cs (nil: none), publishes the change, if it is one, and
+// persists it.
 func (t *threadLog) setSlashCommands(cs []SlashCommand) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	if sameSlashCommands(t.commands, cs) {
+		t.mu.Unlock()
 		return
 	}
 	t.commands = cs
 	t.seq++
 	bus.Publish[ThreadEvent](t.bus, SlashCommandsChanged{SessionID: t.id, Seq: t.seq, Commands: cs})
+	t.mu.Unlock()
+	if t.saveCommands != nil {
+		t.saveCommands(cs)
+	}
 }
 
-// offersSlashCommand reports whether the running thread offers a command called name.
+// offersSlashCommand reports whether the thread offers a command called name.
 func (t *threadLog) offersSlashCommand(name string) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()

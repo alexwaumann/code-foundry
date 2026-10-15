@@ -11,30 +11,18 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
-// Store methods for live threads (Send, Respond, Interrupt, SetModel,
-// SetPermissionMode). Items and WatchItems are in items.go.
+// Store methods for a thread's conversation (Send, Respond, Interrupt, SetModel,
+// SetPermissionMode). Items and WatchItems are in items.go. A message to a stopped
+// thread starts it (lifecycle.go); settings changed while it is stopped go to its row.
 
-// liveStream returns a thread's runner, or why there is none.
-func (m *Manager) liveStream(id string) (*runner, Session, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	rec, err := m.record(id)
-	if err != nil {
-		return nil, Session{}, err
-	}
-	if rec.run == nil || rec.s.State == StateClosing {
-		return nil, rec.s, fmt.Errorf("%w: thread %s is %s; reconnect it first", ErrFailedPrecondition, id, rec.s.State)
-	}
-	return rec.run, rec.s, nil
-}
-
-// call runs cmd on the runner's goroutine.
+// call runs cmd on the runner's goroutine. errProcessGone when the runner finished
+// before taking it.
 func (r *runner) call(ctx context.Context, cmd threadCmd) (Item, error) {
 	cmd.ctx, cmd.reply = ctx, make(chan threadReply, 1)
 	select {
 	case r.st.cmds <- cmd:
 	case <-r.done:
-		return Item{}, fmt.Errorf("%w: thread %s disconnected", ErrFailedPrecondition, r.id)
+		return Item{}, errProcessGone
 	case <-ctx.Done():
 		return Item{}, ctx.Err()
 	}
@@ -46,14 +34,19 @@ func (r *runner) call(ctx context.Context, cmd threadCmd) (Item, error) {
 	}
 }
 
-// Send implements Store. A sent message unarchives and unsnoozes the thread.
+// Send implements Store. A thread that is not running starts with the message as its
+// first prompt (startStopped): the item is written at once, and a start that fails is
+// told in the timeline, not by an error. A message to a starting thread waits for the
+// handshake behind the first prompt (queue); one to a closing thread waits for the exit,
+// then starts it. A sent message unarchives and unsnoozes the thread.
 func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error) {
-	r, s, err := m.liveStream(id)
+	log, err := m.thread(ctx, id)
 	if err != nil {
 		return Item{}, err
 	}
-	// "/clear" and the like: the app has its own control (slashdeny.go).
-	if ref := refusedSlashCommand(msg.Text, r.st.log.offersSlashCommand); ref != nil {
+	// "/clear" and the like: the app has its own control (slashdeny.go). The commands
+	// Claude last reported count while it is stopped too.
+	if ref := refusedSlashCommand(msg.Text, log.offersSlashCommand); ref != nil {
 		m.log.Info("refused a slash command the app replaces", "session", id, "command", ref.Command)
 		return Item{}, ref
 	}
@@ -68,16 +61,48 @@ func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error
 	if strings.ContainsRune(prompt, 0) {
 		return Item{}, fmt.Errorf("%w: message contains a NUL byte", ErrInvalidArgument)
 	}
+	s, err := m.Get(ctx, id)
+	if err != nil {
+		return Item{}, err
+	}
 	prompt, dropped := rewriteFileRefs(prompt, m.fileRefRoots(s))
 	if len(dropped) > 0 {
 		m.log.Warn("file references outside the thread's projects; passing their relative paths", "session", id, "refs", dropped)
 	}
-	it, err := r.call(ctx, threadCmd{send: &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt}})
-	if err == nil {
-		// A new turn brings an archived or snoozed thread back to the main list.
-		m.backToList(id)
+	o := &outgoing{text: strings.TrimSpace(msg.Text), composer: strings.TrimSpace(msg.ComposerText), attachments: attachments, prompt: prompt}
+	for {
+		live, closing, reserved, _, err := m.lifecycle(id)
+		var it Item
+		switch {
+		case err != nil:
+			return Item{}, err
+		case live != nil:
+			if it, err = live.call(ctx, threadCmd{send: o}); errors.Is(err, errProcessGone) {
+				continue // it is ending: wait for it, then start again
+			}
+		case closing != nil:
+			if err := waitDone(ctx, closing); err != nil {
+				return Item{}, err
+			}
+			continue
+		case reserved != nil:
+			select {
+			case <-reserved:
+			case <-ctx.Done():
+				return Item{}, ctx.Err()
+			}
+			continue
+		default:
+			if it, err = m.startStopped(ctx, id, startOpts{first: o, backToList: true}); errors.Is(err, errNotStopped) {
+				continue
+			}
+		}
+		if err == nil {
+			// A new turn brings an archived or snoozed thread back to the main list.
+			m.backToList(id)
+		}
+		return it, err
 	}
-	return it, err
 }
 
 // fileRefRoots resolves a file reference's repository to its worktree for thread s:
@@ -98,22 +123,26 @@ func (m *Manager) fileRefRoots(s Session) func(repoID string) (string, bool) {
 	}
 }
 
-// Respond implements Store.
+// Respond implements Store. A thread that is not running has no pending request.
 func (m *Manager) Respond(ctx context.Context, id, requestID string, d Decision) (Item, error) {
 	if requestID == "" {
 		return Item{}, fmt.Errorf("%w: a request id is required", ErrInvalidArgument)
 	}
-	r, _, err := m.liveStream(id)
+	r, _, err := m.liveOrStopped(ctx, id)
 	if err != nil {
 		return Item{}, err
+	}
+	if r == nil {
+		return Item{}, fmt.Errorf("%w: no pending request %s on thread %s: Claude is not running", ErrFailedPrecondition, requestID, id)
 	}
 	return r.call(ctx, threadCmd{requestID: requestID, decision: d})
 }
 
-// Interrupt implements Store.
+// Interrupt implements Store. A thread that is not running has nothing to stop: a
+// no-op.
 func (m *Manager) Interrupt(ctx context.Context, id string) error {
-	r, _, err := m.liveStream(id)
-	if err != nil {
+	r, _, err := m.liveOrStopped(ctx, id)
+	if err != nil || r == nil {
 		return err
 	}
 	conn, err := r.st.connection()
@@ -121,6 +150,41 @@ func (m *Manager) Interrupt(ctx context.Context, id string) error {
 		return err
 	}
 	return controlErr(conn.Interrupt(ctx))
+}
+
+// setLive applies a setting: through Claude's control protocol (apply) on a live
+// thread, then on the row; only on the row (persisted) for a thread that is not
+// running, which the next spawn reads (claudeCommand).
+func (m *Manager) setLive(ctx context.Context, id string, apply func(*claudestream.Conn) error, row func(*Session)) (Session, error) {
+	for {
+		r, _, err := m.liveOrStopped(ctx, id)
+		if err != nil {
+			return Session{}, err
+		}
+		if r == nil {
+			s, ok, err := m.updateStopped(id, row)
+			if err != nil || ok {
+				return s, err
+			}
+			continue // started meanwhile
+		}
+		select { // a starting process gets it once it answered the handshake
+		case <-r.ready:
+		case <-r.done:
+			continue
+		case <-ctx.Done():
+			return Session{}, ctx.Err()
+		}
+		conn, err := r.st.connection()
+		if err != nil {
+			return Session{}, err
+		}
+		if err := controlErr(apply(conn)); err != nil {
+			return Session{}, err
+		}
+		s, _ := m.update(id, true, func(rec *record) { row(&rec.s) })
+		return s, nil
+	}
 }
 
 // SetModel implements Store.
@@ -131,20 +195,12 @@ func (m *Manager) SetModel(ctx context.Context, id, model string) (Session, erro
 	if err := validateModelEffort(model, ""); err != nil {
 		return Session{}, err
 	}
-	r, _, err := m.liveStream(id)
-	if err != nil {
-		return Session{}, err
+	s, err := m.setLive(ctx, id, func(c *claudestream.Conn) error { return c.SetModel(ctx, model) },
+		func(s *Session) { s.Model = model })
+	if err == nil {
+		m.log.Info("thread model changed", "session", id, "model", model)
 	}
-	conn, err := r.st.connection()
-	if err != nil {
-		return Session{}, err
-	}
-	if err := controlErr(conn.SetModel(ctx, model)); err != nil {
-		return Session{}, err
-	}
-	s, _ := m.update(id, true, func(rec *record) { rec.s.Model = model })
-	m.log.Info("thread model changed", "session", id, "model", model)
-	return s, nil
+	return s, err
 }
 
 // SetPermissionMode implements Store. Only supervised, accept edits and auto: plan and
@@ -162,20 +218,12 @@ func (m *Manager) SetPermissionMode(ctx context.Context, id string, mode Permiss
 	default:
 		return Session{}, fmt.Errorf("%w: permission mode %d (want supervised, accept edits or auto)", ErrInvalidArgument, mode)
 	}
-	r, _, err := m.liveStream(id)
-	if err != nil {
-		return Session{}, err
+	s, err := m.setLive(ctx, id, func(c *claudestream.Conn) error { return c.SetPermissionMode(ctx, wire) },
+		func(s *Session) { s.PermissionMode = mode })
+	if err == nil {
+		m.log.Info("thread permission mode changed", "session", id, "mode", mode.Flag())
 	}
-	conn, err := r.st.connection()
-	if err != nil {
-		return Session{}, err
-	}
-	if err := controlErr(conn.SetPermissionMode(ctx, wire)); err != nil {
-		return Session{}, err
-	}
-	s, _ := m.update(id, true, func(rec *record) { rec.s.PermissionMode = mode })
-	m.log.Info("thread permission mode changed", "session", id, "mode", mode.Flag())
-	return s, nil
+	return s, err
 }
 
 // controlErr maps the CLI's refusal to InvalidArgument and a gone process to

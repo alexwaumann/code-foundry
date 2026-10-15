@@ -139,8 +139,10 @@ func TestRenderedSetEffortRefusals(t *testing.T) {
 	if err := re.m.Close(re.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := re.m.SetEffort(re.ctx(), s.ID, "high"); !errors.Is(err, ErrFailedPrecondition) {
-		t.Errorf("disconnected thread: %v", err)
+	// Stopped: the row takes it for the next start, nothing restarts.
+	got, err := re.m.SetEffort(re.ctx(), s.ID, "high")
+	if err != nil || got.Effort != "high" || got.EffortPending || got.State != StateDisconnected {
+		t.Errorf("stopped thread: %+v, %v", got, err)
 	}
 }
 
@@ -423,7 +425,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 					t.Errorf("after the crash %+v", got)
 				}
 				items := re.items(s.ID).Items
-				if e, ok := lastKind(items, KindError); !ok || !strings.Contains(e.Text, "before answering the initialize handshake") {
+				if e, ok := lastKind(items, KindError); !ok || !strings.HasPrefix(e.Text, "Claude did not start: exit code 3: fake claude: cannot resume") {
 					t.Errorf("no error item:\n%s", describeItems(items))
 				}
 				if hasEffortNote("high")(items) {

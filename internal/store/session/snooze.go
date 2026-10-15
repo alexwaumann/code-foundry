@@ -56,7 +56,7 @@ func (m *Manager) Snooze(ctx context.Context, id string, until time.Time) (Sessi
 		return Session{}, err
 	}
 	if rec.run != nil || rec.s.State != StateDisconnected {
-		return Session{}, fmt.Errorf("%w: session %s was reconnected while being snoozed", ErrFailedPrecondition, id)
+		return Session{}, fmt.Errorf("%w: session %s was started while being snoozed", ErrFailedPrecondition, id)
 	}
 	rec.s.SnoozedUntil = until
 	rec.s.Pinned = false

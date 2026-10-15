@@ -163,16 +163,9 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 	if got.State != StateDisconnected || got.StatusReason != "finished" {
 		t.Errorf("after restart %+v", got)
 	}
-	if _, err := re.m.Send(re.ctx(), s.ID, Message{Text: "more"}); !errors.Is(err, ErrFailedPrecondition) {
-		t.Errorf("send while disconnected: %v", err)
-	}
-
-	// Reconnect appends after the old items.
-	if _, err := re.m.Reconnect(re.ctx(), s.ID); err != nil {
-		t.Fatal(err)
-	}
-	re.waitFor(s.ID, "reconnected", func(s Session) bool { return s.State == StateConnected })
+	// A message starts the stopped thread and appends after the old items.
 	sentIt, err := re.m.Send(re.ctx(), s.ID, Message{Text: "/tdd again", ComposerText: "[/tdd](cf-skill://~/tdd) again"})
+	re.waitFor(s.ID, "started", func(s Session) bool { return s.State == StateConnected })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -490,12 +483,13 @@ func TestRenderedStartCrash(t *testing.T) {
 	re := newFixtureEnv(t, "no-such-fixture")
 	s := re.create(CreateOptions{InitialPrompt: "hi"})
 	got := re.waitFor(s.ID, "disconnected", func(s Session) bool { return s.State == StateDisconnected })
-	if got.DisconnectReason != ReasonCrashed || got.ExitCode != 2 || !strings.Contains(got.LastError, "fake claude") {
+	if got.DisconnectReason != ReasonCrashed || got.ExitCode != 2 || !strings.Contains(got.LastError, "fake claude") ||
+		got.Status != StatusError || got.StatusReason != ReasonStartFailed {
 		t.Errorf("after crash %+v", got)
 	}
 	items := re.items(s.ID).Items
 	errItem, ok := lastKind(items, KindError)
-	if !ok || !strings.Contains(errItem.Text, "before answering the initialize handshake") || !strings.Contains(errItem.Text, "fake claude") {
+	if !ok || !strings.HasPrefix(errItem.Text, "Claude did not start: exit code 2: fake claude") {
 		t.Errorf("items:\n%s", describeItems(items))
 	}
 	if _, err := re.m.Reconnect(re.ctx(), s.ID); err != nil {

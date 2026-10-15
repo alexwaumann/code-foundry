@@ -1,8 +1,9 @@
 // Package session is the Claude session store. A session (a thread) is Claude Code
 // running in a worktree as `claude -p` over stream-json (internal/claudestream): a
-// connected session owns one claude process, a disconnected one owns none and can be
-// reconnected with `claude --resume`. Its conversation is recorded as thread items
-// (Store.Items).
+// connected session owns one claude process, a disconnected one owns none. The store
+// starts the process when a message is sent (`claude --resume`) and stops it when the
+// thread has idled past its prompt cache expiry (lifecycle.go): users never manage it.
+// Its conversation is recorded as thread items (Store.Items).
 //
 // The Manager persists sessions in SQLite (they survive daemon restarts as
 // DISCONNECTED), publishes an immutable Snapshot behind an atomic pointer, and emits
@@ -94,12 +95,15 @@ func (p PermissionMode) valid() bool { return p >= PermissionDefault && p <= Per
 
 // Disconnect reasons recorded in Session.DisconnectReason.
 const (
-	ReasonClosed         = "closed"           // closed through Close/Remove
+	ReasonClosed         = "closed"           // closed through Close (archive, snooze, remove)
 	ReasonExited         = "exited"           // process exited 0 without a close request (/exit)
 	ReasonCrashed        = "crashed"          // process exited non-zero without a close request
 	ReasonDaemonStopped  = "daemon stopped"   // daemon shut down while connected
 	ReasonDaemonRestarts = "daemon restarted" // row was live when the daemon last died
-	ReasonSpawnFailed    = "spawn failed"     // claude could not be started (an effort restart's)
+	ReasonSpawnFailed    = "spawn failed"     // claude could not be started, or never answered its handshake
+	// ReasonIdle: the daemon stopped the thread idle at its prompt past its prompt cache
+	// expiry (lifecycle.go); the next message starts it again.
+	ReasonIdle = "idle"
 )
 
 // ReasonInterrupted is the StatusReason of StatusError: the process ended mid-turn.
@@ -334,9 +338,11 @@ type Store interface {
 	// Rename sets a user-chosen name and disables auto-naming.
 	Rename(ctx context.Context, id, name string) (Session, error)
 	// Close ends the Claude process gracefully and waits until the session is
-	// DISCONNECTED (bounded by the store's close timeout plus the kill grace).
+	// DISCONNECTED (bounded by the store's close timeout plus the kill grace). No
+	// command calls it: archive, snooze and remove close through it.
 	Close(ctx context.Context, id string) error
-	// Reconnect resumes a DISCONNECTED session in a new claude process.
+	// Reconnect resumes a DISCONNECTED session in a new claude process, without a
+	// prompt. No command calls it: a message starts a stopped thread (Send).
 	Reconnect(ctx context.Context, id string) (Session, error)
 	// Remove closes the session if needed and forgets it.
 	Remove(ctx context.Context, id string) error
@@ -375,33 +381,37 @@ type Store interface {
 	// so a finished turn is seen at once. Subscribe to
 	// ThreadEvent on the bus first; events with Seq <= the snapshot's are in it.
 	WatchItems(ctx context.Context, id string) (ItemsSnapshot, error)
-	// Send sends a user message to a connected thread (also while a turn
-	// runs: Claude queues or folds it in).
+	// Send sends a user message (also while a turn runs: Claude queues or folds it
+	// in). A thread that is not running starts with it as its first prompt; its item is
+	// returned at once, and a start that fails is told in the timeline (lifecycle.go).
 	Send(ctx context.Context, id string, msg Message) (Item, error)
 	// Respond answers a pending permission request or question.
 	Respond(ctx context.Context, id, requestID string, d Decision) (Item, error)
-	// Interrupt stops the running turn.
+	// Interrupt stops the running turn; a no-op when the thread is not running.
 	Interrupt(ctx context.Context, id string) error
-	// SetModel switches the model of a connected thread and records it for later
-	// spawns.
+	// SetModel switches the model of a running thread and records it for later
+	// spawns; on a thread that is not running it only records it.
 	SetModel(ctx context.Context, id, model string) (Session, error)
-	// SetPermissionMode switches the permission mode of a connected thread (supervised,
-	// accept edits or auto; Claude's default cannot be restored live) and records it.
+	// SetPermissionMode switches the permission mode (supervised, accept edits or auto;
+	// Claude's default cannot be restored live) and records it; on a thread that is not
+	// running it only records it.
 	SetPermissionMode(ctx context.Context, id string, mode PermissionMode) (Session, error)
-	// SetEffort changes a connected thread's effort and records it. Claude has no live
-	// effort switch: the process restarts with --resume and the new --effort, at once
-	// when idle, else after the running turn (EffortPending meanwhile).
+	// SetEffort changes a thread's effort and records it. Claude has no live effort
+	// switch: a running process restarts with --resume and the new --effort, at once
+	// when idle, else after the running turn (EffortPending meanwhile); a thread that is
+	// not running only records it.
 	SetEffort(ctx context.Context, id, effort string) (Session, error)
-	// McpStatus returns a thread's MCP servers as last checked (mcp.go).
-	// refresh asks Claude again first (a connected thread only). Without it, a connected
-	// thread not checked yet is asked once; one that is not running has none (nil).
+	// McpStatus returns a thread's MCP servers as last checked (mcp.go), also while it
+	// is not running. refresh asks Claude again first, starting a stopped thread without
+	// a prompt. Without it, a running thread not checked yet is asked once.
 	McpStatus(ctx context.Context, id string, refresh bool) (*McpStatus, error)
-	// McpReconnect reconnects one of a connected thread's MCP servers (by name), then
-	// checks the servers again. Claude refusing the attempt (the server still fails) is
-	// the result's Error, not an error; an unknown server is ErrNotFound.
+	// McpReconnect reconnects one of a thread's MCP servers (by name), starting a
+	// stopped thread without a prompt, then checks the servers again. Claude refusing the
+	// attempt (the server still fails) is the result's Error, not an error; an unknown
+	// server is ErrNotFound.
 	McpReconnect(ctx context.Context, id, server string) (McpReconnectResult, error)
-	// SlashCommands returns the slash commands a running thread offers: Claude's list
-	// minus the deny table, kept current as Claude pushes changes (slashcommands.go).
-	// nil when it is not running.
+	// SlashCommands returns the slash commands the thread offers: Claude's list minus
+	// the deny table, kept current as Claude pushes changes and kept while it is not
+	// running (slashcommands.go). nil when Claude never answered a handshake.
 	SlashCommands(ctx context.Context, id string) ([]SlashCommand, error)
 }

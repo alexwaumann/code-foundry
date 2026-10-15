@@ -23,7 +23,8 @@ import (
 //
 // Across a daemon restart: the row's Effort is the new level from SetEffort on, and
 // EffortPending is not persisted, so a change that had not restarted Claude yet is applied
-// by the next spawn (Reconnect, fork) rather than lost.
+// by the next spawn (a message to the stopped thread, fork) rather than lost. A thread
+// that is not running only changes its row (EffortPending stays false).
 
 // restartPhase is where a restart is.
 type restartPhase int
@@ -39,15 +40,31 @@ func (m *Manager) SetEffort(ctx context.Context, id, effort string) (Session, er
 	if !slices.Contains(Efforts, effort) {
 		return Session{}, fmt.Errorf("%w: effort %q (want one of %s)", ErrInvalidArgument, effort, strings.Join(Efforts, ", "))
 	}
-	r, _, err := m.liveStream(id)
-	if err != nil {
-		return Session{}, err
+	var r *runner
+	for {
+		live, _, err := m.liveOrStopped(ctx, id)
+		if err != nil {
+			return Session{}, err
+		}
+		if live != nil {
+			r = live
+			break
+		}
+		// Not running: the row has it, the next spawn passes it (claudeCommand).
+		s, ok, err := m.updateStopped(id, func(s *Session) { s.Effort, s.EffortPending = effort, false })
+		if err != nil {
+			return Session{}, err
+		}
+		if ok {
+			m.log.Info("thread effort changed for its next start", "session", id, "effort", effort)
+			return s, nil
+		}
 	}
 	cmd := threadCmd{effort: &effort, reply: make(chan threadReply, 1)}
 	select {
 	case r.st.cmds <- cmd:
 	case <-r.done:
-		return Session{}, fmt.Errorf("%w: thread %s disconnected", ErrFailedPrecondition, id)
+		return m.SetEffort(ctx, id, effort) // it stopped meanwhile: the row takes it
 	case <-ctx.Done():
 		return Session{}, ctx.Err()
 	}
@@ -150,6 +167,7 @@ func (r *runner) respawn() {
 	st.initialized, st.outputEnded, st.exited, st.commandsPushed = false, false, false, false
 	st.effort = s.Effort
 	st.restart = restartStarting
+	r.startedAt = r.m.opts.Now()
 	st.restartTimer = time.NewTimer(r.m.opts.StartTimeout)
 	r.launch = l
 	r.log().info("claude restarted", "pid", proc.Pid(), "argv", argv, "effort", s.Effort)

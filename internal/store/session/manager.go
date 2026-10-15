@@ -116,8 +116,15 @@ type Options struct {
 	// SnoozeCheckInterval is how often snoozed threads are checked against the wall
 	// clock (wakeSnoozed). Default SnoozeCheckInterval (the package constant).
 	SnoozeCheckInterval time.Duration
-	// Now is the wall clock: timestamps, snooze validation and wake-ups. Default
-	// time.Now.
+	// IdleCheckInterval is how often connected threads are checked for an idle stop at
+	// their prompt cache expiry (stopIdle). Default IdleCheckInterval (the package
+	// constant).
+	IdleCheckInterval time.Duration
+	// IdleGrace is how long a process stays up at least before an idle stop. Default
+	// IdleGrace (the package constant).
+	IdleGrace time.Duration
+	// Now is the wall clock: timestamps, snooze validation and wake-ups, idle stops.
+	// Default time.Now.
 	Now func() time.Time
 }
 
@@ -173,6 +180,8 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.AttachmentReapInterval, AttachmentReapInterval)
 	def(&o.CacheTTL, DefaultCacheTTL)
 	def(&o.SnoozeCheckInterval, SnoozeCheckInterval)
+	def(&o.IdleCheckInterval, IdleCheckInterval)
+	def(&o.IdleGrace, IdleGrace)
 	if o.Now == nil {
 		o.Now = time.Now
 	}
@@ -209,6 +218,9 @@ type record struct {
 	namingTried bool    // one naming call per session (per daemon run)
 	// first is the thread's first prompt, handed to its runner by spawn.
 	first *outgoing
+	// reserved is set while a stopped thread starts and has no runner yet (reserve in
+	// lifecycle.go); it is closed when the start resolves.
+	reserved chan struct{}
 }
 
 var _ Store = (*Manager)(nil)
@@ -265,6 +277,14 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		defer m.wg.Done()
 		defer snoozeTicker.Stop()
 		m.wakeSnoozedLoop(snoozeTicker.C)
+	}()
+	// Idle threads stop at their cache expiry (lifecycle.go). Nothing runs at startup.
+	idleTicker := time.NewTicker(opts.IdleCheckInterval)
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		defer idleTicker.Stop()
+		m.stopIdleLoop(idleTicker.C)
 	}()
 	if opts.AttachmentsDir != "" {
 		// Exists for claude --add-dir (see spawn) before anything is staged.
@@ -548,68 +568,18 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Session, error) {
 	return m.Get(ctx, newID)
 }
 
-// Reconnect resumes a DISCONNECTED session. Without a resumable conversation (no
-// Claude session id yet, or its transcript is gone) it starts a new conversation in
-// the same worktree and says so in LastError. It unarchives and unsnoozes the thread.
+// Reconnect resumes a DISCONNECTED session without a prompt. Without a resumable
+// conversation (no Claude session id yet, or its transcript is gone) it starts a new
+// conversation in the same worktree and says so in LastError. It unarchives and
+// unsnoozes the thread. No command calls it any more (a message starts a stopped
+// thread: Send); it stays for SessionService.Reconnect and tests.
 func (m *Manager) Reconnect(ctx context.Context, id string) (Session, error) {
-	m.mu.Lock()
-	rec, err := m.record(id)
-	if err != nil {
-		m.mu.Unlock()
+	if _, err := m.startStopped(ctx, id, startOpts{backToList: true}); err != nil {
+		if errors.Is(err, errNotStopped) {
+			s, _ := m.Get(ctx, id)
+			return Session{}, fmt.Errorf("%w: session %s is %s; only a disconnected session can be reconnected", ErrFailedPrecondition, id, s.State)
+		}
 		return Session{}, err
-	}
-	if m.closed {
-		m.mu.Unlock()
-		return Session{}, ErrClosed
-	}
-	if rec.s.State != StateDisconnected || rec.run != nil {
-		st := rec.s.State
-		m.mu.Unlock()
-		return Session{}, fmt.Errorf("%w: session %s is %s; only a disconnected session can be reconnected", ErrFailedPrecondition, id, st)
-	}
-	prev := rec.s
-	rec.s.State = StateStarting // reserve against a concurrent Reconnect
-	m.mu.Unlock()
-
-	revert := func(err error) (Session, error) {
-		m.update(id, true, func(r *record) {
-			r.s.State = StateDisconnected
-			r.s.LastError = err.Error()
-		})
-		return Session{}, err
-	}
-	if _, err := os.Stat(prev.WorktreePath); err != nil {
-		return revert(fmt.Errorf("%w: worktree %s: %v", ErrFailedPrecondition, prev.WorktreePath, err))
-	}
-	var l launch
-	lastErr := ""
-	if prev.ClaudeSessionID != "" {
-		if _, ok := m.opts.Paths.transcriptPath(prev.WorktreePath, prev.ClaudeSessionID); ok {
-			l.resume = prev.ClaudeSessionID
-		} else {
-			lastErr = "transcript of " + prev.ClaudeSessionID + " not found; started a new conversation"
-		}
-	} else {
-		lastErr = "no saved conversation to resume (no message was sent); started a new conversation"
-	}
-	if l.resume == "" {
-		if l.newID, err = newUUID(); err != nil {
-			return revert(err)
-		}
-	}
-	m.update(id, false, func(r *record) {
-		r.s.LastError = lastErr
-		// Reconnecting unarchives and unsnoozes (persisted by spawn's commit, or by
-		// revert).
-		m.unarchiveLocked(r)
-		m.unsnoozeLocked(r)
-		if l.resume == "" {
-			r.s.ClaudeSessionID = ""
-			r.namingTried = r.s.Name != ""
-		}
-	})
-	if err := m.spawn(ctx, id, l); err != nil {
-		return revert(err)
 	}
 	return m.Get(ctx, id)
 }
@@ -649,6 +619,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	now := m.opts.Now()
 	m.mu.Lock()
 	rec.run = r
+	rec.release()
 	rec.s.State = StateStarting
 	// The fresh process owns status from here: the persisted one is cleared.
 	rec.s.setStatus(StatusUnknown, "", now)
@@ -739,6 +710,7 @@ func (m *Manager) Pin(_ context.Context, id string, pinned bool) (Session, error
 }
 
 // Close ends the process gracefully and waits until the session is DISCONNECTED.
+// Archive, Snooze and Remove close through it; no command calls it directly any more.
 func (m *Manager) Close(ctx context.Context, id string) error {
 	m.mu.Lock()
 	rec, err := m.record(id)
@@ -775,8 +747,8 @@ func (m *Manager) Remove(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	if rec.run != nil {
-		return fmt.Errorf("%w: session %s was reconnected while being removed", ErrFailedPrecondition, id)
+	if rec.run != nil || rec.reserved != nil {
+		return fmt.Errorf("%w: session %s was started while being removed", ErrFailedPrecondition, id)
 	}
 	// The session's usage moves to the retired ledger in the delete's transaction.
 	if err := retireSession(ctx, m.opts.DB, id, rec.s.Usage); err != nil {

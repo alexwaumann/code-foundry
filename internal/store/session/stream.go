@@ -1,6 +1,7 @@
 package session
 
 import (
+	"cmp"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -37,6 +38,10 @@ type outgoing struct {
 	composer    string   // the composer's text: the item's ComposerText
 	attachments []string // staged paths
 	prompt      string   // the text Claude gets (file refs rewritten, attachment lines)
+	// itemID is the user item's id when the item was written before the message could
+	// go out (a message to a stopped or starting thread: recordUser); sendMessage then
+	// delivers it under that id without writing a second item.
+	itemID string
 }
 
 // streamState is the runner's process half. Every field is touched only by
@@ -54,6 +59,9 @@ type streamState struct {
 	proj   *projector
 
 	first *outgoing // sent once initialize succeeds
+	// queued are messages that came before the handshake (queue): their items are in
+	// the timeline, they go out after first.
+	queued []*outgoing
 
 	initDone chan initResult
 	cmds     chan threadCmd
@@ -166,6 +174,7 @@ func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv,
 	r.usage.watchDir = r.tail.watch
 	now := m.opts.Now()
 	r.activity, r.pubActivity, r.savedActivity = now, now, now
+	r.startedAt = now
 	r.viewers = m.viewerCount(s.ID)
 	return nil
 }
@@ -266,6 +275,8 @@ func (r *runner) run() {
 			r.publishStatus()
 		case <-r.stopReq:
 			r.shutdown()
+		case c := <-r.idleReq:
+			r.onIdleCheck(c)
 		}
 	}
 }
@@ -313,6 +324,10 @@ func (r *runner) onInitialized(res initResult) {
 	if r.closing {
 		return // closed while starting: the close finishes it
 	}
+	if !r.readyClosed {
+		r.readyClosed = true
+		close(r.ready)
+	}
 	r.onSlashCommands(res.resp.Commands, false)
 	if st.restart != restartNone {
 		r.onRestarted()
@@ -325,11 +340,12 @@ func (r *runner) onInitialized(res initResult) {
 	sentFirst := false
 	if f := st.first; f != nil {
 		st.first = nil
-		if _, err := r.sendMessage(f); err != nil {
-			r.log().warn("send first prompt", "err", err)
-		} else {
-			sentFirst = true
-		}
+		sentFirst = r.deliver(f)
+	}
+	queued := st.queued
+	st.queued = nil
+	for _, q := range queued {
+		sentFirst = r.deliver(q) || sentFirst
 	}
 	now := r.m.opts.Now()
 	r.m.update(r.id, true, func(rec *record) {
@@ -349,16 +365,51 @@ func (r *runner) onInitialized(res initResult) {
 	r.checkStatus()
 }
 
-// failStart records why the process did not come up and ends it.
+// failStart records why the process did not come up and ends it; the thread ends with
+// status error ReasonStartFailed (finish).
 func (r *runner) failStart(err error) {
-	msg := "claude did not start: " + err.Error()
+	msg := "Claude did not start: " + err.Error()
 	if line := r.st.proc.LastStderrLine(); line != "" {
 		msg += ": " + line
 	}
 	r.log().warn("thread failed to start", "err", err)
 	r.st.proj.w.add(Item{ID: r.st.proj.nextID("err"), Kind: KindError, Text: msg})
 	r.m.update(r.id, true, func(rec *record) { rec.s.LastError = msg })
+	r.startFailed, r.disconnectAs = true, ReasonSpawnFailed
 	r.beginClose()
+}
+
+// deliver sends a message that waited for the handshake (the first prompt, or one
+// queued behind it) and reports whether it went out. When its item was written
+// already, a failure is told in the timeline.
+func (r *runner) deliver(o *outgoing) bool {
+	if _, err := r.sendMessage(o); err != nil {
+		r.log().warn("send a message that waited for the handshake", "err", err)
+		if o.itemID != "" {
+			r.st.proj.w.add(Item{ID: r.st.proj.nextID("err"), Kind: KindError, Text: "Claude did not get this message: " + err.Error()})
+		}
+		return false
+	}
+	return true
+}
+
+// queue takes a message that came before the handshake (a send to a starting thread):
+// its item goes into the timeline now, after the first prompt's (written first so the
+// order holds), and it goes out once Claude answers (onInitialized). It never fails for
+// the handshake's sake: a start that fails is told in the timeline.
+func (r *runner) queue(o *outgoing) (Item, error) {
+	st := r.st
+	if f := st.first; f != nil && f.itemID == "" {
+		if _, err := recordUser(st.proj.w, f); err != nil {
+			return Item{}, err
+		}
+	}
+	it, err := recordUser(st.proj.w, o)
+	if err != nil {
+		return Item{}, err
+	}
+	st.queued = append(st.queued, o)
+	return it, nil
 }
 
 func (r *runner) onStreamEvent(ev claudestream.Event) {
@@ -462,16 +513,24 @@ func (r *runner) sendMessage(o *outgoing) (Item, error) {
 		}
 		blocks = append(blocks, b)
 	}
-	id, err := newUUID()
-	if err != nil {
-		return Item{}, err
+	id := o.itemID
+	if id == "" {
+		var err error
+		if id, err = newUUID(); err != nil {
+			return Item{}, err
+		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), streamControlTimeout)
 	defer cancel()
 	if err := st.conn.Send(ctx, claudestream.UserMessage{UUID: id, Blocks: blocks}); err != nil {
 		return Item{}, fmt.Errorf("%w: send to claude: %v", ErrFailedPrecondition, err)
 	}
-	it := st.proj.w.add(Item{ID: id, Kind: KindUserMessage, Text: o.text, Attachments: o.attachments, ComposerText: o.composer})
+	var it Item
+	if o.itemID == "" {
+		it = st.proj.w.add(userItem(id, o))
+	} else {
+		it, _ = st.log.get(id)
+	}
 	st.sd.sent()
 	r.activity = r.m.opts.Now()
 	r.checkStatus()
@@ -542,10 +601,16 @@ func (r *runner) resolveItem(id string, fn func(*Request)) (Item, bool) {
 func (r *runner) onThreadCmd(cmd threadCmd) {
 	var rep threadReply
 	switch {
+	case cmd.send != nil && (r.closing || r.finished):
+		// The process is on its way out: Send waits for it, then starts a new one.
+		cmd.reply <- threadReply{err: errProcessGone}
+		return
 	case cmd.send != nil && r.st.restart != restartNone:
 		// Sent once the restarted process is up (onRestarted).
 		r.st.held = append(r.st.held, cmd)
 		return
+	case cmd.send != nil && !r.st.initialized:
+		rep.item, rep.err = r.queue(cmd.send)
 	case cmd.send != nil:
 		rep.item, rep.err = r.sendMessage(cmd.send)
 	case cmd.effort != nil:
@@ -665,7 +730,8 @@ func (r *runner) beginClose() {
 	st.restart = restartNone
 	st.setSwapping(false)
 	r.failHeld("the thread is closing")
-	st.sd.pending = nil // the requests die with the process; do not keep their status
+	st.first, st.queued = nil, nil // their items stay; Claude never got them
+	st.sd.pending = nil            // the requests die with the process; do not keep their status
 	r.closeStatus, r.closeReason = st.sd.Status()
 	for id, req := range st.pending {
 		r.answer(req, claudestream.PermissionResult{Message: "The thread was closed.", Interrupt: true})
@@ -723,7 +789,7 @@ func (r *runner) shutdown() {
 	closeUnfinished(st.proj.w, "the daemon stopped")
 	r.endRuns(orphanDaemonStopped)
 	r.endBgShells(orphanDaemonStopped)
-	st.log.clearMcp()
+	st.log.dropMcpChecks()
 	r.stopStreamTimers()
 	st.conn.Close()
 	// End the reader even if a grandchild kept stdout open.
@@ -758,33 +824,30 @@ func (r *runner) maybeExited() {
 	reason := ReasonExited
 	switch {
 	case r.closing:
-		reason = ReasonClosed
+		reason = cmp.Or(r.disconnectAs, ReasonClosed)
 	case code != 0:
 		reason = ReasonCrashed
 	}
 	lastErr := ""
 	if !r.closing {
+		// Ended on its own. Mid-turn (or before its handshake) the timeline says so; at
+		// the prompt nothing is lost and nothing is added: the next message starts it.
 		midTurn := st.sd.busy || st.sd.compacting || len(st.pending) > 0
 		lastErr = st.proc.LastStderrLine()
-		if midTurn || code != 0 || !st.initialized {
-			msg := fmt.Sprintf("Claude exited (code %d)", code)
-			switch {
-			case midTurn:
-				msg = fmt.Sprintf("Claude exited mid-turn (code %d)", code)
-			case !st.initialized:
-				msg = fmt.Sprintf("Claude exited (code %d) before answering the initialize handshake", code)
-			}
-			if lastErr != "" {
-				msg += ": " + lastErr
-			}
-			st.proj.w.add(Item{ID: st.proj.nextID("err"), Kind: KindError, Text: msg})
+		why := exitWhy(code, lastErr)
+		switch {
+		case !st.initialized:
+			r.startFailed = true
+			r.addErrorOnce("Claude did not start: " + why)
+		case midTurn:
+			r.addErrorOnce("Claude stopped unexpectedly (" + why + ")")
 		}
 	}
 	st.sd.pending = nil
 	closeUnfinished(st.proj.w, "the thread's process ended")
 	r.endRuns(orphanProcessEnded)
 	r.endBgShells(orphanProcessEnded)
-	st.log.clearMcp()
+	st.log.dropMcpChecks()
 	r.stopStreamTimers()
 	st.conn.Close()
 	r.log().info("session disconnected", "reason", reason, "exit_code", code)
@@ -794,4 +857,25 @@ func (r *runner) maybeExited() {
 			s.LastError = lastErr
 		}
 	})
+}
+
+// exitWhy says how a process ended: "exit code 1: <its last stderr line>", "killed".
+func exitWhy(code int, lastErr string) string {
+	why := fmt.Sprintf("exit code %d", code)
+	if code < 0 {
+		why = "killed"
+	}
+	if lastErr != "" {
+		why += ": " + lastErr
+	}
+	return why
+}
+
+// addErrorOnce adds an error item unless the timeline already ends with one (failStart's,
+// a failed delivery's): one process end, one line.
+func (r *runner) addErrorOnce(text string) {
+	if last, ok := r.st.log.last(); ok && last.Kind == KindError {
+		return
+	}
+	r.st.proj.w.add(Item{ID: r.st.proj.nextID("err"), Kind: KindError, Text: text})
 }
