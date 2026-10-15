@@ -1,7 +1,7 @@
 // Package action is the action store. An action is a per-project command line the user
 // defines (modelled on T3 Code's Actions): a name, an icon, the command, whether it runs
 // in a terminal or in the background, and whether it runs when a new thread creates its
-// worktree. Actions are persisted in SQLite (migration 0019); the store publishes an
+// worktree. Actions are persisted in SQLite (migration 0020); the store publishes an
 // immutable Snapshot behind an atomic pointer and emits events on the bus.
 //
 // The store also runs actions. Every run executes `$SHELL -lc <command>` in a worktree

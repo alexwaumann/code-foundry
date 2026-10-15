@@ -178,7 +178,7 @@ run` (its `CODE_FOUNDRY_SESSION` makes it the owner); the user runs them from th
 header, a terminal run opening as a tab in the bottom panel. Sketch:
 `docs/sketches/actions/`.
 
-* PR A (migration 0019, `internal/store/action` with the terminal and background runners,
+* PR A (migration 0020, `internal/store/action` with the terminal and background runners,
   `ActionService` + the EventService action source, `kind=action` terminals the reaper
   keeps when they exit, `action.*` commands with `--wait` exit codes,
   `CODE_FOUNDRY_SESSION` as the CLI's default `--context-session`, on-worktree-create

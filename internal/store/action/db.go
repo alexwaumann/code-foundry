@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Persistence for the actions table (migration 0019).
+// Persistence for the actions table (migration 0020).
 
 const actionColumns = `id, repo_id, name, command, icon, in_terminal, on_worktree_create, position, created_at, updated_at`
 

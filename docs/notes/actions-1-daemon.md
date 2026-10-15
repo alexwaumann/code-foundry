@@ -9,7 +9,7 @@ PR C follow. Sketch: `docs/sketches/actions/`.
 
 ## Storage
 
-* Migration `0019_actions.sql`: `actions(id, repo_id → repos ON DELETE CASCADE, name,
+* Migration `0020_actions.sql`: `actions(id, repo_id → repos ON DELETE CASCADE, name,
   command, icon, in_terminal, on_worktree_create, position, created_at, updated_at)`,
   STRICT, unique index on `(repo_id, name COLLATE NOCASE)`. The first table with a
   foreign key to `repos`: `repo.Unregister`'s `DELETE FROM repos` removes a project's
