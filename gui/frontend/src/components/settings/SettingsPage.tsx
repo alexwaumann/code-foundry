@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FileText, Search, TriangleAlert, X } from "lucide-react";
 import type { SettingFieldView } from "@/api/settings";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useEscapeCloses } from "@/components/window/useEscapeCloses";
@@ -78,7 +79,7 @@ export function SettingsPage() {
         <h1 className="text-sm font-semibold">Settings</h1>
         <div className="relative max-w-xs flex-1 [--wails-draggable:no-drag]">
           <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <input
+          <Input
             ref={searchRef}
             type="search"
             aria-label="Search settings"
@@ -93,7 +94,8 @@ export function SettingsPage() {
                 setQuery("");
               }
             }}
-            className="h-7 w-full rounded-md border border-input bg-background pr-2 pl-7 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            // The pane header's compact size, beside its xs buttons.
+            className="h-7 pl-7 text-[13px]"
           />
         </div>
         <Tip label={path} side="bottom">
