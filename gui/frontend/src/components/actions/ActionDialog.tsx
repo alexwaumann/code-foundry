@@ -3,6 +3,10 @@ import { Loader2, Trash2, X } from "lucide-react";
 import { ACTION_ICONS } from "@/api/actions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { Tip } from "@/components/ui/tooltip";
 import { draftOf, draftProblem, NEW_ACTION_DRAFT, type ActionDraft } from "@/lib/actions";
 import { cn } from "@/lib/utils";
@@ -11,32 +15,6 @@ import { closeActionEditor, useActionDialogStore, type ActionEditorTarget } from
 import { useActionsStore } from "@/stores/actions";
 import { useReposStore } from "@/stores/repos";
 import { ACTION_ICON, ACTION_ICON_LABEL } from "./actionIcons";
-
-const inputClass =
-  "w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60 aria-invalid:border-destructive";
-
-/** A setting row's switch (settings/SettingRow.tsx BoolEditor's look). */
-function Switch({ on, onChange, label, disabled }: { on: boolean; onChange: (on: boolean) => void; label: string; disabled?: boolean }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      disabled={disabled}
-      data-testid="action-on-create"
-      onClick={() => {
-        onChange(!on);
-      }}
-      className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-        on ? "bg-primary" : "bg-input",
-      )}
-    >
-      <span className={cn("inline-block size-4 rounded-full bg-background shadow transition-transform", on ? "translate-x-4.5" : "translate-x-0.5")} />
-    </button>
-  );
-}
 
 /** The six icon tiles (T3's look, in a row); one is picked. */
 function IconTiles({ value, onChange, disabled }: { value: ActionDraft["icon"]; onChange: (v: ActionDraft["icon"]) => void; disabled?: boolean }) {
@@ -167,9 +145,12 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
         Saved for every thread in <span className="font-medium text-foreground">{project}</span>. Runs in {where} and opens as a tab in the bottom panel.
       </DialogDescription>
       <div className="mt-4 flex flex-col gap-3.5">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium">Name</span>
-          <input
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="action-name" className="text-xs">
+            Name
+          </Label>
+          <Input
+            id="action-name"
             value={draft.name}
             onChange={(e) => {
               set("name", e.target.value);
@@ -181,12 +162,14 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
             autoComplete="off"
             aria-invalid={nameError || undefined}
             data-testid="action-name"
-            className={cn(inputClass, "h-8")}
           />
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium">Command</span>
-          <textarea
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="action-command" className="text-xs">
+            Command
+          </Label>
+          <Textarea
+            id="action-command"
             value={draft.command}
             onChange={(e) => {
               set("command", e.target.value);
@@ -200,12 +183,12 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
             aria-invalid={commandError || undefined}
             aria-describedby="action-command-help"
             data-testid="action-command"
-            className={cn(inputClass, "min-h-[72px] resize-y py-1.5 font-mono text-[12.5px] leading-[19px] whitespace-pre")}
+            className="min-h-[72px] resize-y py-1.5 font-mono text-[12.5px] leading-[19px] whitespace-pre"
           />
           <span id="action-command-help" className="text-xs text-muted-foreground">
             Runs from the checkout's root. Each line runs in order.
           </span>
-        </label>
+        </div>
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-medium" id="action-icon-label">
             Icon
@@ -224,10 +207,11 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
             <small className="mt-px block text-xs text-muted-foreground">In the background, for a new thread's worktree; failures notify you</small>
           </span>
           <Switch
-            on={draft.onWorktreeCreate}
+            checked={draft.onWorktreeCreate}
             disabled={busy}
-            label="Run automatically when a worktree is created"
-            onChange={(v) => {
+            aria-label="Run automatically when a worktree is created"
+            data-testid="action-on-create"
+            onCheckedChange={(v) => {
               set("onWorktreeCreate", v);
             }}
           />
