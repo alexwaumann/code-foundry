@@ -44,7 +44,7 @@ func Parse(line []byte) Event {
 			ev = &ThinkingTokens{}
 		case "commands_changed":
 			ev = &CommandsChanged{}
-		case "task_started", "task_progress", "task_updated", "task_notification":
+		case TaskStarted, TaskProgress, TaskUpdated, TaskNotification:
 			ev = &Task{}
 		}
 	case "assistant":

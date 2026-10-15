@@ -423,14 +423,79 @@ type CommandLifecycle struct {
 }
 
 // Task is a system task_* frame (task_started, task_progress, task_updated,
-// task_notification): a subagent or background task's lifecycle.
+// task_notification): a subagent or background task's lifecycle. Claude Code 2.1.299
+// (testdata/agents.jsonl, agents-stop.jsonl, agents-resume.jsonl):
+//
+//   - task_started opens a run: task_type local_agent for an Agent call (task_id is the
+//     agent id), local_bash for a shell a subagent started (owned_by_subagent). A
+//     SendMessage that wakes a finished agent starts it again under the same task_id,
+//     with a new run_id and the SendMessage's tool_use_id.
+//   - task_progress comes per tool call: description is the agent's current activity,
+//     usage its tokens (the last request's), tool uses and duration so far this run.
+//   - task_updated patches the status (completed, killed, ...) with end_time.
+//   - task_notification ends it: status (completed, failed, stopped), summary, final
+//     usage, and with handback "send" the report in handback_report (summary is then a
+//     pointer to it). A resumed process reports a background run the previous process
+//     left running as stopped ("didn't finish before the previous session ended").
 type Task struct {
 	base
-	TaskID       string `json:"task_id"`
-	ToolUseID    string `json:"tool_use_id,omitempty"`
-	Description  string `json:"description,omitempty"`
-	SubagentType string `json:"subagent_type,omitempty"`
-	Status       string `json:"status,omitempty"`
+	TaskID          string `json:"task_id"`
+	RunID           string `json:"run_id,omitempty"`
+	ToolUseID       string `json:"tool_use_id,omitempty"`
+	Description     string `json:"description,omitempty"`
+	SubagentType    string `json:"subagent_type,omitempty"`
+	TaskType        string `json:"task_type,omitempty"`
+	IsBackgrounded  bool   `json:"is_backgrounded,omitempty"`
+	SpawnDepth      int    `json:"spawn_depth,omitempty"`
+	ParentTaskID    string `json:"parent_task_id,omitempty"`
+	OwnedBySubagent bool   `json:"owned_by_subagent,omitempty"`
+	Prompt          string `json:"prompt,omitempty"`
+	// LastToolName: task_progress's latest tool.
+	LastToolName string `json:"last_tool_name,omitempty"`
+	// Status: task_notification's (completed, failed, stopped).
+	Status     string     `json:"status,omitempty"`
+	Summary    string     `json:"summary,omitempty"`
+	OutputFile string     `json:"output_file,omitempty"`
+	Usage      *TaskUsage `json:"usage,omitempty"`
+	// Patch: task_updated's.
+	Patch          *TaskPatch      `json:"patch,omitempty"`
+	Handback       string          `json:"handback,omitempty"`
+	HandbackReport *HandbackReport `json:"handback_report,omitempty"`
+}
+
+// Task subtypes and the task type of a subagent.
+const (
+	TaskStarted      = "task_started"
+	TaskProgress     = "task_progress"
+	TaskUpdated      = "task_updated"
+	TaskNotification = "task_notification"
+	TaskTypeAgent    = "local_agent"
+)
+
+// TaskUsage is a task's counters so far (task_progress) or final (task_notification).
+type TaskUsage struct {
+	TotalTokens int64 `json:"total_tokens"`
+	ToolUses    int64 `json:"tool_uses"`
+	DurationMS  int64 `json:"duration_ms"`
+}
+
+// TaskPatch is task_updated's change: a status and, once it ended, end_time (unix ms).
+type TaskPatch struct {
+	Status  string `json:"status,omitempty"`
+	EndTime int64  `json:"end_time,omitempty"`
+}
+
+// HandbackReport is the report a subagent handed back (SubagentHandback).
+type HandbackReport struct {
+	Text string `json:"text"`
+}
+
+// Report is what a finished task said: its handed-back report, else its summary.
+func (t *Task) Report() string {
+	if t.HandbackReport != nil && t.HandbackReport.Text != "" {
+		return t.HandbackReport.Text
+	}
+	return t.Summary
 }
 
 // ControlCancel is a control_cancel_request: the CLI withdrew one of its own requests
