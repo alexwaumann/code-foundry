@@ -38,7 +38,8 @@ import (
 // and keeps its fold; only the file handle goes.
 
 // AgentRun is one subagent run of a thread. Persisted (session_agent_runs; its Usage in
-// session_source_usage).
+// session_source_usage). The transcripts give its identity, Open and Usage; the stream's
+// task frames its lifecycle (Status down to NoteItemID; agents.go).
 type AgentRun struct {
 	ID              string // Claude's agent id: agent-<ID>.jsonl
 	ClaudeSessionID string // the transcript whose subagents/ directory holds the run
@@ -51,19 +52,52 @@ type AgentRun struct {
 	Background      bool // run_in_background, or launched async
 	// Open: the run is still followed (its result has not reached the transcript).
 	Open bool
-	// StartedAt is the time of the run's first record; zero if unknown.
+	// StartedAt is when the run started (its task_started, else its first record); zero
+	// if unknown. Runs are listed by it, so it never changes once set.
 	StartedAt time.Time
 	// Usage is the run's own fold, sorted like Session.Usage. Included in Session.Usage.
 	Usage []UsageBucket
+
+	// ParentID is the run that spawned this one (SpawnDepth 2+); "" for the thread's own.
+	ParentID string
+	// Status is running, done or failed (agents.go).
+	Status AgentStatus
+	// Activity is what the run is doing now (task_progress's description), LastTool its
+	// latest tool; both as of the last progress, kept once it ends.
+	Activity string
+	LastTool string
+	// TotalTokens is Claude's token count of the run's latest request; ToolUses and
+	// DurationMS its tool uses and running time, summed over its wakes.
+	TotalTokens int64
+	ToolUses    int64
+	DurationMS  int64
+	// Summary is the run's report once done (its handed-back report, else Claude's
+	// summary); Error why it failed.
+	Summary string
+	Error   string
+	// ResumedAt is when SendMessage last woke the run (zero if never), EndedAt when it
+	// last ended (zero while running, and when unknown).
+	ResumedAt time.Time
+	EndedAt   time.Time
+	// NoteItemID is the note item that announced the end of a background run (its last
+	// end); "" for none.
+	NoteItemID string
 }
 
 // sameRunInfo compares everything but Usage.
 func sameRunInfo(a, b AgentRun) bool {
-	a.Usage, b.Usage = nil, nil
 	return a.ID == b.ID && a.ClaudeSessionID == b.ClaudeSessionID && a.ToolUseID == b.ToolUseID &&
 		a.Description == b.Description && a.AgentType == b.AgentType && a.Model == b.Model &&
 		a.Effort == b.Effort && a.SpawnDepth == b.SpawnDepth && a.Background == b.Background &&
-		a.Open == b.Open && a.StartedAt.Equal(b.StartedAt)
+		a.Open == b.Open && a.StartedAt.Equal(b.StartedAt) && sameRunLife(a, b)
+}
+
+// sameRunLife compares the lifecycle fields.
+func sameRunLife(a, b AgentRun) bool {
+	return a.ParentID == b.ParentID && a.Status == b.Status && a.Activity == b.Activity && a.LastTool == b.LastTool &&
+		a.TotalTokens == b.TotalTokens && a.ToolUses == b.ToolUses && a.DurationMS == b.DurationMS &&
+		a.Summary == b.Summary && a.Error == b.Error && a.ResumedAt.Equal(b.ResumedAt) && a.EndedAt.Equal(b.EndedAt) &&
+		a.NoteItemID == b.NoteItemID
 }
 
 func sameRuns(a, b []AgentRun) bool {
@@ -100,6 +134,7 @@ type runEvent struct {
 	toolUseID string
 	agentID   string
 	status    string // runResult: toolUseResult.status ("completed", "async_launched"); runNotified: <status>
+	summary   string // runNotified: <summary>
 	// runSpawned: the tool_use input. runResult: what toolUseResult says.
 	background                            bool
 	description, agentType, model, effort string
@@ -114,8 +149,9 @@ var (
 	quotedResumedID     = []byte(`"resumedAgentId"`)
 	taskNotification    = []byte(`<task-notification>`)
 
-	notifyTaskID = regexp.MustCompile(`<task-id>([^<]*)</task-id>`)
-	notifyStatus = regexp.MustCompile(`<status>([^<]*)</status>`)
+	notifyTaskID  = regexp.MustCompile(`<task-id>([^<]*)</task-id>`)
+	notifyStatus  = regexp.MustCompile(`<status>([^<]*)</status>`)
+	notifySummary = regexp.MustCompile(`(?s)<summary>(.*?)</summary>`)
 )
 
 // runRecord is the subset of a transcript record that run lifecycle reads.
@@ -259,6 +295,9 @@ func notification(text string) []runEvent {
 	if s := notifyStatus.FindStringSubmatch(text); s != nil {
 		ev.status = s[1]
 	}
+	if s := notifySummary.FindStringSubmatch(text); s != nil {
+		ev.summary = strings.TrimSpace(s[1])
+	}
 	return []runEvent{ev}
 }
 
@@ -272,6 +311,8 @@ type agentMeta struct {
 	RequestShape string `json:"requestShape"` // "foreground" | "background" (absent before 2.1.29x)
 	Model        string `json:"model"`
 	Effort       string `json:"effort"`
+	// ParentAgentID is the run that spawned it (spawnDepth 2+; 2.1.299).
+	ParentAgentID string `json:"parentAgentId"`
 }
 
 func readAgentMeta(path string) (agentMeta, bool) {
@@ -353,6 +394,8 @@ type runUsage struct {
 	// so a nested run's notification (enqueued in the thread's transcript) can come
 	// before its launch (in its parent run's file).
 	stateAt time.Time
+	// agentLife is the run's lifecycle state from the stream's task frames (agents.go).
+	agentLife
 }
 
 // spawnInfo is an Agent tool use whose run is not known yet.
@@ -374,8 +417,11 @@ type threadUsage struct {
 	byTool map[string]*runUsage // by spawning tool use id
 	spawns map[string]spawnInfo // Agent tool uses without a run yet, by tool use id
 
-	changed bool            // something to publish
-	dirty   map[string]bool // sources whose buckets changed since the last snapshot
+	changed bool // something to publish
+	// progressed: a run's progress changed (task_progress; agents.go), published at most
+	// once per agentPublishGap.
+	progressed bool
+	dirty      map[string]bool // sources whose buckets changed since the last snapshot
 	// err is the first read error of a rescan other than a missing file: some fold is
 	// partial and must not be published.
 	err error
@@ -444,7 +490,12 @@ func (u *threadUsage) watched(line []byte) bool {
 func (u *threadUsage) apply(dir, cid string, depth int, ev runEvent) {
 	switch ev.kind {
 	case runSpawned:
-		if _, ok := u.byTool[ev.toolUseID]; !ok {
+		if r, ok := u.byTool[ev.toolUseID]; ok {
+			// A run its task_started made before this line was read (agents.go).
+			if r.takeSpawn(ev) {
+				u.changed = true
+			}
+		} else {
 			u.spawns[ev.toolUseID] = spawnInfo{dir: dir, cid: cid, depth: depth, ev: ev}
 		}
 	case runResult:
@@ -479,7 +530,7 @@ func (u *threadUsage) apply(dir, cid string, depth int, ev runEvent) {
 		case known || ev.status == "completed":
 			// The spawn's own result: completed, or an error or interrupt with no agentId.
 			// Any other tool naming the agent (an output read, say) decides nothing.
-			u.close(r, ev.at)
+			u.close(r, ev.at, transcriptEnd(ev.status, ""))
 		}
 	case runNotified:
 		r := u.runs[ev.agentID]
@@ -487,7 +538,7 @@ func (u *threadUsage) apply(dir, cid string, depth int, ev runEvent) {
 			r = u.ensureRun(ev.agentID, dir, cid, "")
 		}
 		if r != nil {
-			u.close(r, ev.at)
+			u.close(r, ev.at, transcriptEnd(ev.status, ev.summary))
 		}
 	case runResumed:
 		r := u.runs[ev.agentID]
@@ -515,7 +566,7 @@ func (u *threadUsage) ensureRun(agentID, dir, cid, toolUseID string) *runUsage {
 	if _, err := os.Stat(path); err != nil && !hasMeta {
 		return nil
 	}
-	r := &runUsage{info: AgentRun{ID: agentID, ClaudeSessionID: cid, ToolUseID: toolUseID, SpawnDepth: 1},
+	r := &runUsage{info: AgentRun{ID: agentID, ClaudeSessionID: cid, ToolUseID: toolUseID, SpawnDepth: 1, Status: AgentDone},
 		dir: dir, fold: usageFold{notBefore: u.notBefore}, tail: fileTail{path: path}}
 	if hasMeta {
 		u.mergeMeta(r, meta)
@@ -540,16 +591,22 @@ func (u *threadUsage) link(r *runUsage) {
 	u.byTool[id] = r
 	if sp, ok := u.spawns[id]; ok {
 		delete(u.spawns, id)
-		ev := sp.ev
-		r.info.Description = orStr(r.info.Description, ev.description)
-		r.info.AgentType = orStr(r.info.AgentType, ev.agentType)
-		r.info.Model = orStr(r.info.Model, ev.model)
-		r.info.Effort = orStr(r.info.Effort, ev.effort)
-		r.info.Background = r.info.Background || ev.background
+		r.takeSpawn(sp.ev)
 		if !r.metaRead && r.info.SpawnDepth < sp.depth {
 			r.info.SpawnDepth = sp.depth
 		}
 	}
+}
+
+// takeSpawn fills what r lacks from its Agent tool use's input; it reports a change.
+func (r *runUsage) takeSpawn(ev runEvent) bool {
+	before := r.info
+	r.info.Description = orStr(r.info.Description, ev.description)
+	r.info.AgentType = orStr(r.info.AgentType, ev.agentType)
+	r.info.Model = orStr(r.info.Model, ev.model)
+	r.info.Effort = orStr(r.info.Effort, ev.effort)
+	r.info.Background = r.info.Background || ev.background
+	return !sameRunInfo(before, r.info)
 }
 
 // mergeMeta takes the meta file's fields over anything the transcripts said (the
@@ -562,6 +619,7 @@ func (u *threadUsage) mergeMeta(r *runUsage, m agentMeta) {
 	r.info.Model = cmp.Or(m.Model, r.info.Model)
 	r.info.Effort = cmp.Or(m.Effort, r.info.Effort)
 	r.info.Background = r.info.Background || m.RequestShape == "background"
+	r.info.ParentID = orStr(r.info.ParentID, m.ParentAgentID)
 	if m.SpawnDepth > 0 {
 		r.info.SpawnDepth = m.SpawnDepth
 	}
@@ -575,7 +633,7 @@ func (u *threadUsage) mergeMeta(r *runUsage, m agentMeta) {
 func (r *runUsage) stale(at time.Time) bool { return !at.IsZero() && at.Before(r.stateAt) }
 
 // open starts (or resumes) following r from where its fold stopped, for a record at
-// at (zero: no time, never stale).
+// at (zero: no time, never stale). A run no task frame has spoken for is running.
 func (u *threadUsage) open(r *runUsage, at time.Time) {
 	if r.stale(at) {
 		return
@@ -583,6 +641,7 @@ func (u *threadUsage) open(r *runUsage, at time.Time) {
 	if !at.IsZero() {
 		r.stateAt = at
 	}
+	u.transcriptLife(r, runEnd{status: AgentRunning})
 	if r.info.Open {
 		return
 	}
@@ -595,8 +654,8 @@ func (u *threadUsage) open(r *runUsage, at time.Time) {
 }
 
 // close drains r one last time and stops following it, for a record at at. Its fold
-// stays.
-func (u *threadUsage) close(r *runUsage, at time.Time) {
+// stays. end is how it ended, for a run no task frame has spoken for.
+func (u *threadUsage) close(r *runUsage, at time.Time, end runEnd) {
 	u.drain(r)
 	if r.stale(at) {
 		return
@@ -604,6 +663,7 @@ func (u *threadUsage) close(r *runUsage, at time.Time) {
 	if !at.IsZero() {
 		r.stateAt = at
 	}
+	u.transcriptLife(r, end)
 	r.tail.closeFile()
 	if r.info.Open {
 		r.info.Open = false
@@ -735,7 +795,7 @@ func (u *threadUsage) discover(all bool) {
 			u.open(r, time.Time{})
 			u.drain(r)
 		} else {
-			u.close(r, time.Time{})
+			u.close(r, time.Time{}, runEnd{status: AgentDone})
 		}
 	}
 }
@@ -779,7 +839,7 @@ func (u *threadUsage) closeIdle(atPrompt bool) {
 			limit *= backgroundIdleFactor
 		}
 		if now.Sub(r.lastGrowth) >= limit {
-			u.close(r, time.Time{})
+			u.close(r, time.Time{}, runEnd{status: AgentFailed, why: "no result from Claude"})
 		}
 	}
 }

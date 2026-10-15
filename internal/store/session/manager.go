@@ -211,6 +211,14 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Nothing runs yet: a run saved as running lost its process (agents_db.go).
+	orphaned, err := failOrphanedRuns(ctx, opts.DB)
+	if err != nil {
+		return nil, err
+	}
+	if orphaned > 0 {
+		opts.Log.Info("subagent runs failed: the daemon restarted while they ran", "runs", orphaned)
+	}
 	rows, err := loadSessions(ctx, opts.DB)
 	if err != nil {
 		return nil, err

@@ -62,6 +62,8 @@ type runner struct {
 	usage     *threadUsage
 	usageSeen bool
 	usageOff  bool
+	// agentsPubAt: when the runs were last published (agents_runner.go throttle).
+	agentsPubAt time.Time
 
 	// viewers is the number of item watchers (Store.WatchItems). While someone watches,
 	// whatever Claude produces is seen: see acknowledge.
@@ -183,14 +185,29 @@ func (r *runner) pollTranscript() {
 	r.publishUsage()
 }
 
-// publishUsage replaces the session's usage when a fold changed: at most once per poll
-// with a new API response or a run opening or closing (streaming repeats of a counted
-// request change nothing).
+// publishUsage replaces the session's usage and runs when a fold or a run changed: at
+// most once per poll with a new API response, a run opening or closing, or a run's
+// lifecycle changing (streaming repeats of a counted request change nothing); a run's
+// progress alone at most once per agentPublishGap. The thread log's runs follow. While
+// the usage is off (a failed rescan) only the runs' records are published.
 func (r *runner) publishUsage() {
-	if !r.usage.changed || r.usageOff {
+	u := r.usage
+	now := r.m.opts.Now()
+	due := u.progressed && now.Sub(r.agentsPubAt) >= agentPublishGap
+	if !u.changed && !due {
 		return
 	}
-	r.m.setUsage(r.id, r.usage.snapshot())
+	var runs []AgentRun
+	if r.usageOff {
+		runs = u.runList()
+		r.m.setAgentRuns(r.id, runs)
+	} else {
+		up := u.snapshot()
+		runs = up.runs
+		r.m.setUsage(r.id, up)
+	}
+	u.progressed, r.agentsPubAt = false, now
+	r.st.log.setAgents(runs)
 }
 
 // rescan folds every source of the thread from byte zero into a fresh threadUsage that
@@ -257,9 +274,7 @@ func (r *runner) rescan(s Session, cid, path string, limit int64) {
 		u.file(cid, path)
 	}
 	u.settle()
-	for _, run := range s.AgentRuns {
-		u.adopt(run)
-	}
+	r.carryRuns(u, s.AgentRuns)
 	for id := range u.runs {
 		u.markDirty(runSource(id))
 	}

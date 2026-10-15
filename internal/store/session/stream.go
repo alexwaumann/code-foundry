@@ -206,6 +206,10 @@ func (r *runner) run() {
 	startup := time.NewTimer(opts.StartTimeout)
 	defer startup.Stop()
 	r.initialize()
+	// A resumed conversation's transcript is there already: discover it (and rescan its
+	// runs) before the first frame, which can be Claude reporting a run the previous
+	// process left (agents_runner.go).
+	r.pollTranscript()
 	for !r.finished {
 		select {
 		case res := <-st.initDone:
@@ -380,6 +384,8 @@ func (r *runner) onStreamEvent(ev claudestream.Event) {
 		r.m.recordContext(r.id, 0, "")
 	case *claudestream.APIRetry:
 		r.onAPIRetry(e)
+	case *claudestream.Task:
+		r.onTask(e) // agents_runner.go
 	}
 	r.clearRetry(ev)
 	r.checkStatus()
@@ -710,6 +716,7 @@ func (r *runner) shutdown() {
 	st.sd.pending = nil
 	r.failHeld("the daemon stopped")
 	closeUnfinished(st.proj.w, "the daemon stopped")
+	r.endRuns(orphanDaemonStopped)
 	st.log.clearMcp()
 	r.stopStreamTimers()
 	st.conn.Close()
@@ -769,6 +776,7 @@ func (r *runner) maybeExited() {
 	}
 	st.sd.pending = nil
 	closeUnfinished(st.proj.w, "the thread's process ended")
+	r.endRuns(orphanProcessEnded)
 	st.log.clearMcp()
 	r.stopStreamTimers()
 	st.conn.Close()

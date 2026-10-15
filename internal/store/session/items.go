@@ -229,6 +229,9 @@ type ItemsSnapshot struct {
 	// Commands are the slash commands the running thread offers (slashcommands.go);
 	// nil when it is not running or has not answered the handshake.
 	Commands []SlashCommand
+	// Agents are the thread's subagent runs, in spawn order (agents.go), without usage;
+	// also while it is not running (the persisted runs).
+	Agents []AgentRun
 }
 
 // Message is a user turn for Store.Send.
@@ -360,6 +363,8 @@ type threadLog struct {
 	mcp     mcpState
 	// commands: the running process's slash commands (slashcommands.go).
 	commands []SlashCommand
+	// agents: the thread's subagent runs (agents_runner.go setAgents).
+	agents []AgentRun
 }
 
 func newThreadLog(id string, b *bus.Bus, now func() time.Time, items []Item) *threadLog {
@@ -377,7 +382,8 @@ func newThreadLog(id string, b *bus.Bus, now func() time.Time, items []Item) *th
 func (t *threadLog) snapshot() ItemsSnapshot {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return ItemsSnapshot{SessionID: t.id, Seq: t.seq, Items: slices.Clone(t.items), Pending: pendingOf(t.items), Mcp: t.mcp.status, Commands: t.commands}
+	return ItemsSnapshot{SessionID: t.id, Seq: t.seq, Items: slices.Clone(t.items), Pending: pendingOf(t.items), Mcp: t.mcp.status, Commands: t.commands,
+		Agents: t.agents}
 }
 
 // get returns the item with id.
@@ -556,6 +562,7 @@ func (m *Manager) thread(ctx context.Context, id string) (*threadLog, error) {
 		return nil, err
 	}
 	idle := rec.run == nil
+	runs := rec.s.AgentRuns
 	m.mu.Unlock()
 	m.tmu.Lock()
 	defer m.tmu.Unlock()
@@ -567,6 +574,7 @@ func (m *Manager) thread(ctx context.Context, id string) (*threadLog, error) {
 		return nil, err
 	}
 	t := newThreadLog(id, m.opts.Bus, m.opts.Now, items)
+	t.agents = logAgents(runs)
 	m.threads[id] = t
 	if idle {
 		// A run the daemon lost (a crash) left items open; nothing will finish them.

@@ -8,7 +8,7 @@ import (
 )
 
 // Persistence for session_transcripts, session_agent_runs and session_source_usage
-// (migration 0013; usage_runs.go).
+// (migrations 0013 and 0019; usage_runs.go, agents.go).
 
 // saveUsageUpdate writes a usage update in one transaction: the thread's total
 // (session_usage, replaced whole), the changed sources' buckets (each replaced whole),
@@ -34,27 +34,51 @@ func saveUsageUpdate(ctx context.Context, db *sql.DB, sessionID string, up usage
 		}
 	}
 	for _, r := range runs {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO session_agent_runs (session_id, agent_id, claude_session_id,
-				tool_use_id, description, agent_type, model, effort, spawn_depth, background, open, started_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT (session_id, agent_id) DO UPDATE SET
-				claude_session_id = excluded.claude_session_id,
-				tool_use_id = excluded.tool_use_id,
-				description = excluded.description,
-				agent_type = excluded.agent_type,
-				model = excluded.model,
-				effort = excluded.effort,
-				spawn_depth = excluded.spawn_depth,
-				background = excluded.background,
-				open = excluded.open,
-				started_at = excluded.started_at`,
-			sessionID, r.ID, r.ClaudeSessionID, r.ToolUseID, r.Description, r.AgentType, r.Model, r.Effort,
-			r.SpawnDepth, r.Background, r.Open, millis(r.StartedAt)); err != nil {
-			return fmt.Errorf("session: save agent run %s of %s: %w", r.ID, sessionID, err)
+		if err := saveAgentRunTx(ctx, tx, sessionID, r); err != nil {
+			return err
 		}
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("session: save usage of %s: %w", sessionID, err)
+	}
+	return nil
+}
+
+// saveAgentRunTx writes one run's row (everything but its usage).
+func saveAgentRunTx(ctx context.Context, tx *sql.Tx, sessionID string, r AgentRun) error {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO session_agent_runs (session_id, agent_id, claude_session_id,
+			tool_use_id, description, agent_type, model, effort, spawn_depth, background, open, started_at,
+			parent_id, status, activity, last_tool, total_tokens, tool_uses, duration_ms, summary, error,
+			resumed_at, ended_at, note_item_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (session_id, agent_id) DO UPDATE SET
+			claude_session_id = excluded.claude_session_id,
+			tool_use_id = excluded.tool_use_id,
+			description = excluded.description,
+			agent_type = excluded.agent_type,
+			model = excluded.model,
+			effort = excluded.effort,
+			spawn_depth = excluded.spawn_depth,
+			background = excluded.background,
+			open = excluded.open,
+			started_at = excluded.started_at,
+			parent_id = excluded.parent_id,
+			status = excluded.status,
+			activity = excluded.activity,
+			last_tool = excluded.last_tool,
+			total_tokens = excluded.total_tokens,
+			tool_uses = excluded.tool_uses,
+			duration_ms = excluded.duration_ms,
+			summary = excluded.summary,
+			error = excluded.error,
+			resumed_at = excluded.resumed_at,
+			ended_at = excluded.ended_at,
+			note_item_id = excluded.note_item_id`,
+		sessionID, r.ID, r.ClaudeSessionID, r.ToolUseID, r.Description, r.AgentType, r.Model, r.Effort,
+		r.SpawnDepth, r.Background, r.Open, millis(r.StartedAt),
+		r.ParentID, string(r.Status), r.Activity, r.LastTool, r.TotalTokens, r.ToolUses, r.DurationMS, r.Summary, r.Error,
+		millis(r.ResumedAt), millis(r.EndedAt), r.NoteItemID); err != nil {
+		return fmt.Errorf("session: save agent run %s of %s: %w", r.ID, sessionID, err)
 	}
 	return nil
 }
@@ -94,7 +118,9 @@ func loadTranscripts(ctx context.Context, db *sql.DB) (map[string][]string, erro
 // their usage.
 func loadAgentRuns(ctx context.Context, db *sql.DB) (map[string][]AgentRun, error) {
 	rows, err := db.QueryContext(ctx, `SELECT session_id, agent_id, claude_session_id, tool_use_id, description,
-			agent_type, model, effort, spawn_depth, background, open, started_at
+			agent_type, model, effort, spawn_depth, background, open, started_at,
+			parent_id, status, activity, last_tool, total_tokens, tool_uses, duration_ms, summary, error,
+			resumed_at, ended_at, note_item_id
 		FROM session_agent_runs`)
 	if err != nil {
 		return nil, fmt.Errorf("session: load agent runs: %w", err)
@@ -102,16 +128,19 @@ func loadAgentRuns(ctx context.Context, db *sql.DB) (map[string][]AgentRun, erro
 	defer func() { _ = rows.Close() }()
 	out := map[string][]AgentRun{}
 	for rows.Next() {
-		var id string
+		var id, status string
 		var r AgentRun
-		var started int64
+		var started, resumed, ended int64
 		if err := rows.Scan(&id, &r.ID, &r.ClaudeSessionID, &r.ToolUseID, &r.Description, &r.AgentType, &r.Model,
-			&r.Effort, &r.SpawnDepth, &r.Background, &r.Open, &started); err != nil {
+			&r.Effort, &r.SpawnDepth, &r.Background, &r.Open, &started,
+			&r.ParentID, &status, &r.Activity, &r.LastTool, &r.TotalTokens, &r.ToolUses, &r.DurationMS, &r.Summary, &r.Error,
+			&resumed, &ended, &r.NoteItemID); err != nil {
 			return nil, fmt.Errorf("session: load agent runs: %w", err)
 		}
 		if started != 0 {
 			r.StartedAt = time.UnixMilli(started).UTC()
 		}
+		r.Status, r.ResumedAt, r.EndedAt = AgentStatus(status), fromMillis(resumed), fromMillis(ended)
 		out[id] = append(out[id], r)
 	}
 	if err := rows.Err(); err != nil {

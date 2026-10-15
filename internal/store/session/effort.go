@@ -110,6 +110,8 @@ func (r *runner) respawn() {
 	clear(st.pending)
 	st.sd.pending = nil
 	closeUnfinished(st.proj.w, "Claude restarted")
+	// Subagents run inside the old process; the new one reports them stopped.
+	r.endRuns(orphanRestarted)
 	l := r.launch
 	if id := r.tail.id; id != "" {
 		if _, ok := r.m.opts.Paths.transcriptPath(r.cwd, id); ok {
