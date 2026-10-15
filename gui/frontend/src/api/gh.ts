@@ -170,7 +170,7 @@ export type GhEventView =
   | { kind: "pullRequestDetail"; repoSlug: string; number: number };
 
 // ---- Pull request detail panel (GetPullRequestDetail, ListReviewerCandidates) ------
-// Reads only. Its actions are daemon commands (pr.revert, pr.review.request, pr.refresh):
+// Reads only. Its actions are daemon commands (pr.revert, pr.review.request, pr.review, pr.refresh):
 // the GUI invokes them with runCommand, like the palette and the CLI.
 
 /** A submitted review's state; "" when there is none (only requested) or unknown. */
@@ -437,6 +437,13 @@ export function toGhEventView(e: GhEvent): GhEventView | null {
     default:
       return null;
   }
+}
+
+/** GetViewer: the authenticated GitHub user from the daemon's snapshot (no GitHub call); null until known. */
+export async function getViewer(conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<ViewerView | null> {
+  const c = await conn.client(GhService);
+  const r = await c.getViewer({}, { signal });
+  return r.viewer ? { login: r.viewer.login, name: r.viewer.name, url: r.viewer.url } : null;
 }
 
 export async function getDashboard(includeUntracked = false, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<DashboardView> {

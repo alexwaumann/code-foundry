@@ -14,6 +14,9 @@ import { ago, checksHeadline, commentCount, stateBadge, timeline, type Tone } fr
 import { MergeButton } from "./MergeButton";
 import { PrAskComposer } from "./PrAskComposer";
 import { PrMenu } from "./PrMenu";
+import { PrReviewComposer } from "./PrReviewComposer";
+import { ReviewButton } from "./ReviewButton";
+import type { Verdict } from "./review";
 import { OrderToggle, PrSummary } from "./PrSummary";
 import { PrTimeline } from "./PrTimeline";
 import { toneBadge, toneText } from "./tones";
@@ -58,11 +61,11 @@ export function ChecksHeadline({ d }: { d: PullRequestDetailView }) {
 }
 
 /**
- * Row one: the repo link, then the actions (merge, the menu) at the far right. Row two:
+ * Row one: the repo link, then the actions (review, merge, the menu) at the far right. Row two:
  * the title, with the comment count and state at the right. Then author and age, and
  * branches with the diffstat wrapping below in a narrow panel.
  */
-function Header({ d, prRef, panelKey, onAsk }: { d: PullRequestDetailView; prRef: PrRef; panelKey: string; onAsk: () => void }) {
+function Header({ d, prRef, panelKey, onAsk, onReview }: { d: PullRequestDetailView; prRef: PrRef; panelKey: string; onAsk: () => void; onReview: (v: Verdict) => void }) {
   const pr = d.pullRequest;
   const now = useNow(30_000);
   const comments = commentCount(d);
@@ -80,6 +83,7 @@ function Header({ d, prRef, panelKey, onAsk }: { d: PullRequestDetailView; prRef
           <ExternalLink className="size-3 shrink-0" aria-hidden />
         </button>
         <span className="ml-auto flex shrink-0 items-center gap-1" data-testid="pr-actions">
+          <ReviewButton prRef={prRef} detail={d} onChoose={onReview} />
           <MergeButton prRef={prRef} detail={d} />
           <PrMenu prRef={prRef} detail={d} panelKey={panelKey} onAsk={onAsk} />
         </span>
@@ -265,9 +269,17 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
   const d = pullRequestDetailResource.store((s) => s.entries[key]?.data ?? null);
   const error = pullRequestDetailResource.store((s) => s.entries[key]?.error ?? null);
   const inner = usePrPanelStore((s) => s.byTab[tabKey]?.inner ?? "summary");
-  const [asking, setAsking] = useState(false);
-  // Bumped each time Ask a question is chosen: the composer (re)takes focus.
-  const [askFocus, setAskFocus] = useState(0);
+  // The composer under the header: Ask a question, or a review with its verdict (one at a time).
+  const [composer, setComposer] = useState<"ask" | Verdict | null>(null);
+  // Bumped each time Ask or a verdict is chosen: the composer (re)takes focus.
+  const [composerFocus, setComposerFocus] = useState(0);
+  const openComposer = (which: "ask" | Verdict) => {
+    setComposer(which);
+    setComposerFocus((n) => n + 1);
+  };
+  const closeComposer = () => {
+    setComposer(null);
+  };
 
   if (!d) {
     if (isNotFoundMessage(error)) {
@@ -294,19 +306,16 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
         prRef={prRef}
         panelKey={panelKey}
         onAsk={() => {
-          setAsking(true);
-          setAskFocus((n) => n + 1);
+          openComposer("ask");
         }}
+        onReview={openComposer}
       />
-      {asking && (
-        <PrAskComposer
-          prRef={prRef}
-          focusRequest={askFocus}
-          onClose={() => {
-            setAsking(false);
-          }}
-        />
-      )}
+      {composer === "ask" ? (
+        <PrAskComposer key="ask" prRef={prRef} focusRequest={composerFocus} onClose={closeComposer} />
+      ) : composer !== null ? (
+        // One instance across verdicts: switching keeps the text.
+        <PrReviewComposer key="review" prRef={prRef} verdict={composer} focusRequest={composerFocus} onClose={closeComposer} />
+      ) : null}
       {d.lastError && !d.checksTruncated && <StaleBanner fetchedAtMs={d.fetchedAtMs} lastError={d.lastError} />}
       {error && <Banner testId="pr-refresh-error">Could not refresh: {error}</Banner>}
       <InnerTabBar d={d} tabKey={tabKey} inner={inner} />
