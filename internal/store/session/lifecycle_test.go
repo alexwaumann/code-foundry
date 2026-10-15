@@ -605,6 +605,40 @@ func TestIdleStopHolds(t *testing.T) {
 	}
 }
 
+// A background shell ended at the prompt: Claude is about to start a turn to report it
+// (the wake hold, wake.go), so the thread is not idle yet, even with nothing running.
+// Once that turn ended it stops.
+func TestIdleStopHoldsForTheWake(t *testing.T) {
+	gates := t.TempDir()
+	release := func(name string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(gates, name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e, clock := idleEnv(t, "shells", []string{"CF_FAKE_CLAUDE_UNPROMPTED=" + gates})
+	s := e.create(CreateOptions{InitialPrompt: "launch"})
+	e.waitItems(s.ID, "launched", turnCount(1))
+	e.waitFor(s.ID, "a shell at the prompt", func(s Session) bool { return s.BackgroundShellsRunning == 1 && turnOver(s) })
+	far := clock.Now().Add(24 * time.Hour)
+	if h := e.idleHold(s.ID, far); h != "background work" {
+		t.Errorf("with the shell running: %q", h)
+	}
+	release("turn-2") // the end frames; Claude's own turn is held before its init
+	e.waitFor(s.ID, "a wake due", func(s Session) bool { return s.BackgroundShellsRunning == 0 && s.WakePending })
+	if h := e.idleHold(s.ID, far); h != "background work" {
+		t.Errorf("with Claude's turn due: %q", h)
+	}
+	release("turn-2.init")
+	e.waitFor(s.ID, "the turn over", func(s Session) bool { return !s.WakePending && turnOver(s) })
+	if h := e.idleHold(s.ID, far); h != "" {
+		t.Errorf("after Claude's turn: %q", h)
+	}
+	if got := e.waitFor(s.ID, "stopped", stopped); got.DisconnectReason != ReasonIdle {
+		t.Errorf("after the stop %+v", got)
+	}
+}
+
 // Archived and snoozed threads are stopped already: the check passes them by.
 func TestIdleStopSkipsStopped(t *testing.T) {
 	e, clock := idleEnv(t, "text-table", nil)

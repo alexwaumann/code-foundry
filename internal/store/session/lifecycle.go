@@ -464,7 +464,7 @@ func (r *runner) idleHold(now time.Time) string {
 		pendingRequest:  len(st.pending) > 0 || len(st.sd.pending) > 0,
 		atPrompt:        st.sd.AtPrompt(),
 		unfinishedItem:  len(st.log.unfinished()) > 0,
-		backgroundWork:  r.bgShells.count() > 0 || s.BackgroundWork(),
+		backgroundWork:  r.bgShells.count() > 0 || r.wakePending || s.BackgroundWork(), // wakePending: Claude's turn for a background end is due (wake.go)
 		startedAt:       r.startedAt,
 		cacheExpiresAt:  s.CacheExpiresAt,
 		lastActive:      r.lastActive(),
