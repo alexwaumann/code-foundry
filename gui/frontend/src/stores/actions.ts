@@ -1,7 +1,7 @@
 /**
  * Actions and their runs, fed by the shared events stream's `action` source
  * (stores/events.ts): a snapshot on every (re)connect, then updated / removed /
- * run_updated / run_removed. run_finished changes nothing here; stores/actionToasts.ts
+ * run_updated / run_removed. run_finished changes nothing here; stores/actionActions.ts
  * reacts to it. Runs are what the daemon remembers (its newest 50 per project, never a
  * running one), without their output. See docs/notes/actions-2-gui.md.
  */
