@@ -137,3 +137,47 @@ Over `gui/frontend/src` (production files), every remaining hit is one of:
   `update.spec.ts`, `start.spec.ts`, `projects.spec.ts`, `workspace-panel.spec.ts`,
   `buttons.spec.ts`, `thread-reconnect.spec.ts` (chip "catching up…"), and the rest that
   asserted the card. Live specs archive instead of `session close`.
+
+## Verification
+
+* `make check` green; `make gui-e2e` (WebKit + Chromium, 804 runs): 756 passed, 40
+  skipped, 8 failed on the first run: four were this PR's `sessions.spec.ts` (a starting
+  thread's badge is busy now, so the settle wait matched too early; the stop-then-send
+  test sent into the seeded s-1, whose reply is still streaming), fixed and green on
+  repeat (48/48); two `pr-panel` failures were trace-artifact ENOENTs from a concurrent
+  single-test run sharing `test-results`; `compose.spec.ts:354` and `workspaces.spec.ts:224`
+  are timing flakes (green alone, 3/3). All eight green on rerun. `make gui-build` green.
+* Gotcha: `internal/store/session` `TestRenderedSetEffortGap/the_new_process_never_answers_its_handshake`
+  (PR B, unchanged here) failed 1 of 2 runs under load (a 700 ms start timeout against a
+  hanging fake); green on the next `make go-check`.
+
+## Live run (2026-10-15)
+
+Built app (`make gui-build`) against an isolated daemon (`CODE_FOUNDRY_HOME=/tmp/cf-hide-home
+CODE_FOUNDRY_IDLE_GRACE=20s CODE_FOUNDRY_IDLE_CHECK=5s ./bin/code-foundry daemon --dev`),
+`sessions.cache_ttl_seconds = 60`, a plain scratch folder `~/.cf-hide-scratch`,
+`claude-haiku-5-5[1m]` at medium. Removed afterwards (and its `~/.claude/projects` slug).
+
+```
+03:55:23 $ cf session new --repo d4e8ab414aa8 --model 'claude-haiku-5-5[1m]' --effort medium \
+           --name "hide check" --prompt "Remember the word tangerine for later. Reply with just: ok"
+# app: the thread, its composer; no Close in the header
+# log 03:56:29.897 stopping idle thread at its prompt cache expiry session=s-e22117a11e7c idle=1m5s
+# log 03:56:30.033 session disconnected reason=idle exit_code=0
+# app: unchanged, then (next 30 s tick) "Cache expired · the next message re-reads 22.2K tokens (<$0.01)"
+03:57:55 typed in the app's composer: "What word did I ask you to remember? Reply with just the word."
+# log 03:57:54.377 session spawned … --resume c7913748-… --model claude-haiku-5-5[1m] --effort medium
+# app: the message, the Working row, sidebar Working 1, Interrupt; no "starting"
+#5 claude: tangerine
+# theme light; log 03:58:59.897 stopping idle thread … idle=1m4s
+03:59:45 typed: "And the word again, in capitals? Reply with just the word."  ->  #8 claude: TANGERINE
+```
+
+Screenshots (dark, light) are on the unmerged `shots/hide-connection-state` branch and
+in the PR body: the stopped thread at its prompt with the cold-cache note, and the same
+thread right after sending.
+
+## Daemon restart
+
+Needed after merging: the command registry changed (`session.reconnect` gone) and the
+workspace refusal's wording.
