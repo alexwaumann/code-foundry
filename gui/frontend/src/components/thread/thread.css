@@ -1008,17 +1008,6 @@ html[data-thread-width="full"] .cf-thread {
 .cf-thread .btn.outline:hover {
   background: var(--accent);
 }
-.cf-thread .btn kbd {
-  font-family: inherit;
-  font-size: 10px;
-  line-height: 14px;
-  min-width: 14px;
-  padding: 0 3px;
-  border-radius: 3px;
-  border: 1px solid currentColor;
-  opacity: 0.45;
-  text-align: center;
-}
 .cf-thread .q-text {
   font-size: 13px;
   margin: 10px 0 8px;

@@ -5,49 +5,41 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tip } from "@/components/ui/tooltip";
 import { draftOf, draftProblem, NEW_ACTION_DRAFT, type ActionDraft } from "@/lib/actions";
-import { cn } from "@/lib/utils";
 import { deleteAction, saveAction } from "@/stores/actionActions";
 import { closeActionEditor, useActionDialogStore, type ActionEditorTarget } from "@/stores/actionDialog";
 import { useActionsStore } from "@/stores/actions";
 import { useReposStore } from "@/stores/repos";
 import { ACTION_ICON, ACTION_ICON_LABEL } from "./actionIcons";
 
-/** The six icon tiles (T3's look, in a row); one is picked. */
+/** The six icon tiles (T3's look, in a row); one is picked, one tab stop, arrows move it. */
 function IconTiles({ value, onChange, disabled }: { value: ActionDraft["icon"]; onChange: (v: ActionDraft["icon"]) => void; disabled?: boolean }) {
   return (
-    <div role="radiogroup" aria-label="Icon" className="grid grid-cols-6 gap-2" data-testid="action-icons">
+    <RadioGroup
+      aria-label="Icon"
+      className="grid-cols-6 gap-2"
+      value={value}
+      disabled={disabled}
+      onValueChange={(v) => {
+        const icon = ACTION_ICONS.find((n) => n === v);
+        if (icon) onChange(icon);
+      }}
+      data-testid="action-icons"
+    >
       {ACTION_ICONS.map((name) => {
         const Icon = ACTION_ICON[name];
-        const on = name === value;
         return (
-          <button
-            key={name}
-            type="button"
-            role="radio"
-            aria-checked={on}
-            disabled={disabled}
-            data-icon={name}
-            data-testid="action-icon"
-            onClick={() => {
-              onChange(name);
-            }}
-            className={cn(
-              "flex flex-col items-center gap-1.5 rounded-md border px-1 pt-2 pb-1.5 text-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-              on
-                ? "border-primary/70 bg-primary/10 text-foreground dark:border-transparent dark:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--primary)_30%,transparent)]"
-                : "border-border/70 text-muted-foreground hover:bg-accent/50 hover:text-foreground dark:border-transparent dark:bg-white/[0.035]",
-            )}
-          >
-            <Icon aria-hidden className="size-4" />
+          <RadioGroupChoice key={name} value={name} variant="tile" data-icon={name} data-testid="action-icon">
+            <Icon aria-hidden />
             {ACTION_ICON_LABEL[name]}
-          </button>
+          </RadioGroupChoice>
         );
       })}
-    </div>
+    </RadioGroup>
   );
 }
 

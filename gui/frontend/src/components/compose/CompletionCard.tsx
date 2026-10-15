@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
+import { Kbd } from "@/components/ui/kbd";
 import { projectHue } from "@/lib/compose";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
@@ -21,10 +22,6 @@ function Detail({ item }: { item: CompletionItem }) {
   }
   parts.push(item.detail.slice(at));
   return <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{parts}</span>;
-}
-
-function Kbd({ children }: { children: ReactNode }) {
-  return <kbd className="inline-block min-w-4 rounded border px-1 text-center font-sans text-[10px] leading-[15px] text-muted-foreground">{children}</kbd>;
 }
 
 function ProjectHeading({ repoId }: { repoId: string }) {
@@ -220,15 +217,15 @@ export function CompletionCard({ completion, above = false }: { completion: Comp
       <div
         className={cn("flex shrink-0 items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground group-data-[short]/completion:hidden", show !== "list" && "hidden")} data-testid="completion-hints">
         <span className="flex items-center gap-1">
-          <Kbd>↑</Kbd>
-          <Kbd>↓</Kbd> move
+          <Kbd size="sm">↑</Kbd>
+          <Kbd size="sm">↓</Kbd> move
         </span>
         <span className="flex items-center gap-1">
-          <Kbd>⏎</Kbd>
-          <Kbd>⇥</Kbd> insert
+          <Kbd size="sm">⏎</Kbd>
+          <Kbd size="sm">⇥</Kbd> insert
         </span>
         <span className="flex items-center gap-1">
-          <Kbd>esc</Kbd> dismiss
+          <Kbd size="sm">esc</Kbd> dismiss
         </span>
       </div>
     </div>

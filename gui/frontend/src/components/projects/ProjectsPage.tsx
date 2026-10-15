@@ -27,6 +27,7 @@ import { Freshness, SectionTitle } from "@/components/prs/PrBits";
 import { RowList } from "@/components/prs/RowList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Kbd } from "@/components/ui/kbd";
 import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
@@ -510,9 +511,9 @@ export function ProjectsPage() {
             }}
           />
           {!query && (
-            <kbd className="pointer-events-none absolute right-2 rounded-[3px] border px-1 font-sans text-[10px] leading-[14px] text-muted-foreground" aria-hidden>
+            <Kbd size="sm" className="absolute right-2" aria-hidden>
               /
-            </kbd>
+            </Kbd>
           )}
         </div>
         <span className="ml-auto flex items-center gap-1 [--wails-draggable:no-drag]">

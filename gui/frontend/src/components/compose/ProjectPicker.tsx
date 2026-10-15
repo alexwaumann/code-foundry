@@ -3,6 +3,7 @@ import { FolderPlus } from "lucide-react";
 import { ProjectRowGroups } from "./ProjectRows";
 import { useProjectRows } from "./useProjectRows";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Kbd } from "@/components/ui/kbd";
 import { draftKey } from "@/lib/compose";
 import { composeIn, composeInWorkspace, composeNoProject } from "@/stores/compose";
 import { addProject } from "@/stores/projectActions";
@@ -145,7 +146,7 @@ export function ProjectPicker({ close }: { close: () => void }) {
       <div className="flex items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground" data-testid="picker-hints">
         {hints.map(([key, label]) => (
           <span key={key} className="flex items-center gap-1">
-            <kbd className="rounded border border-border bg-muted/60 px-1 font-sans text-[10px] text-foreground/80">{key}</kbd>
+            <Kbd size="sm">{key}</Kbd>
             {label}
           </span>
         ))}

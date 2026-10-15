@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActionView } from "@/api/actions";
 
@@ -74,6 +74,33 @@ describe("ActionDialog", () => {
     });
     expect(saveAction).toHaveBeenCalledTimes(1);
     expect(saveAction).toHaveBeenCalledWith({ repoId: "web", actionId: "a-1" }, { name: "Test", command: "go test", icon: "test", onWorktreeCreate: false });
+  });
+
+  it("the icon tiles are one radio group: one tab stop, arrow keys move the choice", async () => {
+    render(<ActionDialog />);
+    const tiles = screen.getAllByTestId("action-icon");
+    const group = screen.getByRole("radiogroup", { name: "Icon" });
+    expect(group).toBe(screen.getByTestId("action-icons"));
+    // Radix's roving focus: the group is the one tab stop and hands the focus to the checked tile.
+    expect(group.getAttribute("tabindex")).toBe("0");
+    expect(tiles.map((t) => t.getAttribute("tabindex"))).toEqual(["-1", "-1", "-1", "-1", "-1", "-1"]);
+    const test = tiles[1] as HTMLElement;
+    expect(test.dataset.icon).toBe("test");
+    expect(test.getAttribute("aria-checked")).toBe("true");
+    act(() => {
+      test.focus();
+    });
+    fireEvent.keyDown(test, { key: "ArrowRight" });
+    await waitFor(() => {
+      expect(tiles[2]?.getAttribute("aria-checked")).toBe("true");
+    });
+    expect(document.activeElement).toBe(tiles[2]);
+    expect(test.getAttribute("aria-checked")).toBe("false");
+    await act(async () => {
+      fireEvent.keyDown(tiles[2] as HTMLElement, { key: "Enter", metaKey: true });
+      await Promise.resolve();
+    });
+    expect(saveAction).toHaveBeenCalledWith({ repoId: "web", actionId: "a-1" }, { name: "Test", command: "go test", icon: "lint", onWorktreeCreate: false });
   });
 
   it("Cmd+Enter does not save while the delete confirm is open", () => {

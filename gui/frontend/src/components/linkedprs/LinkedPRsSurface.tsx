@@ -6,6 +6,7 @@ import { RowAction } from "@/components/projects/WorktreeState";
 import { RowList } from "@/components/prs/RowList";
 import { ago, stateBadge } from "@/components/pr/model";
 import { toneBadge } from "@/components/pr/tones";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { useNav, type NavItem } from "@/lib/nav";
@@ -129,7 +130,7 @@ function LinkedPrRow({ link, showRepo }: { link: LinkRow; showRepo: boolean }) {
         ) : (
           <span className="flex min-w-0 flex-1 items-center gap-1.5" aria-busy="true" data-testid="linkedpr-loading">
             <span className="shrink-0 text-xs text-muted-foreground">{urlHost(link.url)}</span>
-            <span className="h-3 max-w-40 flex-1 animate-pulse rounded bg-muted" />
+            <Skeleton className="h-3 max-w-40 flex-1" />
           </span>
         )}
         {pr && <StateChip state={pr.state} draft={pr.draft} />}

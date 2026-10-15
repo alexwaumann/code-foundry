@@ -5,6 +5,7 @@ import { errorMessage } from "@/api/stream";
 import { Markdown } from "@/components/pr/Markdown";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Kbd } from "@/components/ui/kbd";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tip } from "@/components/ui/tooltip";
 import { viewActions } from "@/keys/bindings";
@@ -41,9 +42,7 @@ function Keys({ keys }: { keys: string[] }) {
   return (
     <span className="flex shrink-0 gap-1">
       {keys.map((k) => (
-        <kbd key={k} className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-sans text-[11px] text-foreground/80">
-          {k}
-        </kbd>
+        <Kbd key={k}>{k}</Kbd>
       ))}
     </span>
   );

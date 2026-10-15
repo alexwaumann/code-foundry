@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowLeft, CircleCheck, CircleDashed, CircleDot, CircleX, ExternalLink, FileDiff, GitCommitHorizontal, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, History, MessageSquare, SearchX, TriangleAlert } from "lucide-react";
 import { isNotFoundMessage, type PullRequestDetailView } from "@/api/gh";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
@@ -224,18 +225,18 @@ function Banner({ children, testId }: { children: ReactNode; testId: string }) {
   );
 }
 
-function Skeleton() {
-  const bar = "animate-pulse rounded bg-muted";
+/** The detail's first load: bars where the header, the tabs and the body will be. */
+function Loading() {
   return (
     <div className="flex flex-col gap-3 p-4" data-testid="pr-loading" aria-busy="true" aria-label="Loading pull request">
-      <div className={cn(bar, "h-3.5 w-1/2")} />
-      <div className={cn(bar, "h-5 w-5/6")} />
-      <div className={cn(bar, "h-3.5 w-1/3")} />
-      <div className={cn(bar, "h-3 w-2/3")} />
-      <div className={cn(bar, "mt-4 h-7 w-48")} />
-      <div className={cn(bar, "h-3 w-full")} />
-      <div className={cn(bar, "h-3 w-11/12")} />
-      <div className={cn(bar, "h-3 w-4/5")} />
+      <Skeleton className="h-3.5 w-1/2" />
+      <Skeleton className="h-5 w-5/6" />
+      <Skeleton className="h-3.5 w-1/3" />
+      <Skeleton className="h-3 w-2/3" />
+      <Skeleton className="mt-4 h-7 w-48" />
+      <Skeleton className="h-3 w-full" />
+      <Skeleton className="h-3 w-11/12" />
+      <Skeleton className="h-3 w-4/5" />
     </div>
   );
 }
@@ -283,7 +284,7 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
         </Centered>
       );
     }
-    return <Skeleton />;
+    return <Loading />;
   }
   return (
     // @container: the header, tab bar and summary rows adapt to the panel's width.
