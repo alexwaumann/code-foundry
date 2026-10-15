@@ -3,7 +3,6 @@ package command
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"connectrpc.com/connect"
 
@@ -22,9 +21,9 @@ var reviewVerdicts = map[string]struct {
 }
 
 // reviewCommands are pr.review (GhService.SubmitPullRequestReview) and pr.comment
-// (GhService.AddPullRequestComment). Neither asks for confirmation. Who may review is
-// GitHub's call: the daemon relays its refusal (FAILED_PRECONDITION with GitHub's
-// message), so the commands do not check authorship.
+// (GhService.AddPullRequestComment). Neither asks for confirmation. The daemon trims and
+// checks the body (INVALID_ARGUMENT), and who may review is GitHub's call: the daemon
+// relays its refusal (FAILED_PRECONDITION with GitHub's message).
 func reviewCommands(b GhBackend, slug, number ArgSpec) []Command {
 	return []Command{
 		{
@@ -43,17 +42,11 @@ func reviewCommands(b GhBackend, slug, number ArgSpec) []Command {
 				if err := checkPullRequestArgs(a); err != nil {
 					return Result{}, err
 				}
-				v, ok := reviewVerdicts[a.String("verdict")]
-				if !ok {
-					return Result{}, InvalidArg("verdict", "verdict must be approve, request-changes, or comment")
-				}
-				body := strings.TrimSpace(a.String("body"))
-				if body == "" && v.event != v1.PullRequestReviewEvent_PULL_REQUEST_REVIEW_EVENT_APPROVE {
-					return Result{}, InvalidArg("body", "body is required to %s", strings.ReplaceAll(a.String("verdict"), "-", " "))
-				}
+				// The Enum arg admits only the map's keys; the daemon checks the body.
+				v := reviewVerdicts[a.String("verdict")]
 				n := a.Int("number")
 				res, err := b.SubmitPullRequestReview(ctx, connect.NewRequest(&v1.SubmitPullRequestReviewRequest{
-					RepoSlug: a.String("repo-slug"), Number: int32(n), Event: v.event, Body: body,
+					RepoSlug: a.String("repo-slug"), Number: int32(n), Event: v.event, Body: a.String("body"),
 				}))
 				if err != nil {
 					return Result{}, err
@@ -74,13 +67,9 @@ func reviewCommands(b GhBackend, slug, number ArgSpec) []Command {
 				if err := checkPullRequestArgs(a); err != nil {
 					return Result{}, err
 				}
-				body := strings.TrimSpace(a.String("body"))
-				if body == "" {
-					return Result{}, InvalidArg("body", "body is required")
-				}
 				n := a.Int("number")
 				res, err := b.AddPullRequestComment(ctx, connect.NewRequest(&v1.AddPullRequestCommentRequest{
-					RepoSlug: a.String("repo-slug"), Number: int32(n), Body: body,
+					RepoSlug: a.String("repo-slug"), Number: int32(n), Body: a.String("body"),
 				}))
 				if err != nil {
 					return Result{}, err

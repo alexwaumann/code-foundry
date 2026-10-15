@@ -64,16 +64,24 @@ func TestReviewCommands(t *testing.T) {
 	}{
 		{name: "approve without a body", cmd: "pr.review", args: map[string]string{"repo-slug": "o/r", "number": "7", "verdict": "approve"},
 			wantReq: &v1.SubmitPullRequestReviewRequest{RepoSlug: "o/r", Number: 7, Event: approve}, wantMsg: "Approved #7"},
-		{name: "approve with a body, trimmed", cmd: "pr.review", args: map[string]string{"repo-slug": "o/r", "number": "7", "verdict": "approve", "body": " lgtm \n"},
-			wantReq: &v1.SubmitPullRequestReviewRequest{RepoSlug: "o/r", Number: 7, Event: approve, Body: "lgtm"}, wantMsg: "Approved #7"},
+		{name: "approve with a body, sent as typed (the daemon trims)", cmd: "pr.review", args: map[string]string{"repo-slug": "o/r", "number": "7", "verdict": "approve", "body": " lgtm \n"},
+			wantReq: &v1.SubmitPullRequestReviewRequest{RepoSlug: "o/r", Number: 7, Event: approve, Body: " lgtm \n"}, wantMsg: "Approved #7"},
 		{name: "request changes", cmd: "pr.review", args: map[string]string{"repo-slug": "o/r", "number": "7", "verdict": "request-changes", "body": "fix x"},
 			wantReq: &v1.SubmitPullRequestReviewRequest{RepoSlug: "o/r", Number: 7, Event: changes, Body: "fix x"}, wantMsg: "Requested changes on #7"},
 		{name: "comment review", cmd: "pr.review", args: map[string]string{"repo-slug": "o/r", "number": "7", "verdict": "comment", "body": "a note"},
 			wantReq: &v1.SubmitPullRequestReviewRequest{RepoSlug: "o/r", Number: 7, Event: comment, Body: "a note"}, wantMsg: "Commented on #7 (review)"},
-		{name: "request changes needs a body", cmd: "pr.review", args: map[string]string{"repo-slug": "o/r", "number": "7", "verdict": "request-changes", "body": " "},
-			wantErr: command.ErrInvalidArgs, wantArg: "body"},
-		{name: "comment review needs a body", cmd: "pr.review", args: map[string]string{"repo-slug": "o/r", "number": "7", "verdict": "comment"},
-			wantErr: command.ErrInvalidArgs, wantArg: "body"},
+		{name: "request changes without a body: the daemon's invalid argument", cmd: "pr.review", args: map[string]string{"repo-slug": "o/r", "number": "7", "verdict": "request-changes", "body": " "},
+			backend: func(g *commandtest.Gh) {
+				g.Err = connect.NewError(connect.CodeInvalidArgument, errors.New("invalid argument: a body is required"))
+			},
+			wantReq:  &v1.SubmitPullRequestReviewRequest{RepoSlug: "o/r", Number: 7, Event: changes, Body: " "},
+			wantCode: connect.CodeInvalidArgument},
+		{name: "comment review without a body: the daemon's invalid argument", cmd: "pr.review", args: map[string]string{"repo-slug": "o/r", "number": "7", "verdict": "comment"},
+			backend: func(g *commandtest.Gh) {
+				g.Err = connect.NewError(connect.CodeInvalidArgument, errors.New("invalid argument: a body is required"))
+			},
+			wantReq:  &v1.SubmitPullRequestReviewRequest{RepoSlug: "o/r", Number: 7, Event: comment},
+			wantCode: connect.CodeInvalidArgument},
 		{name: "no verdict", cmd: "pr.review", args: map[string]string{"repo-slug": "o/r", "number": "7", "body": "x"},
 			wantErr: command.ErrInvalidArgs},
 		{name: "unknown verdict", cmd: "pr.review", args: map[string]string{"repo-slug": "o/r", "number": "7", "verdict": "lgtm"},
@@ -87,9 +95,13 @@ func TestReviewCommands(t *testing.T) {
 			},
 			wantReq: &v1.SubmitPullRequestReviewRequest{RepoSlug: "o/r", Number: 7, Event: approve}, wantCode: connect.CodeFailedPrecondition},
 		{name: "comment", cmd: "pr.comment", args: map[string]string{"repo-slug": "O/R", "number": "7", "body": "\n thanks \n"},
-			wantReq: &v1.AddPullRequestCommentRequest{RepoSlug: "O/R", Number: 7, Body: "thanks"}, wantMsg: "Commented on #7"},
-		{name: "comment: blank body", cmd: "pr.comment", args: map[string]string{"repo-slug": "o/r", "number": "7", "body": "  "},
-			wantErr: command.ErrInvalidArgs, wantArg: "body"},
+			wantReq: &v1.AddPullRequestCommentRequest{RepoSlug: "O/R", Number: 7, Body: "\n thanks \n"}, wantMsg: "Commented on #7"},
+		{name: "comment: blank body is the daemon's invalid argument", cmd: "pr.comment", args: map[string]string{"repo-slug": "o/r", "number": "7", "body": "  "},
+			backend: func(g *commandtest.Gh) {
+				g.Err = connect.NewError(connect.CodeInvalidArgument, errors.New("invalid argument: a body is required"))
+			},
+			wantReq:  &v1.AddPullRequestCommentRequest{RepoSlug: "o/r", Number: 7, Body: "  "},
+			wantCode: connect.CodeInvalidArgument},
 		{name: "comment: no body", cmd: "pr.comment", args: map[string]string{"repo-slug": "o/r", "number": "7"},
 			wantErr: command.ErrInvalidArgs},
 		{name: "comment: no repo", cmd: "pr.comment", args: map[string]string{"number": "7", "body": "x"},
@@ -101,7 +113,7 @@ func TestReviewCommands(t *testing.T) {
 			wantReq: &v1.AddPullRequestCommentRequest{RepoSlug: "o/r", Number: 7, Body: "x"}, wantCode: connect.CodeFailedPrecondition},
 		{name: "comment: daemon's invalid argument passes through", cmd: "pr.comment", args: map[string]string{"repo-slug": "o/r", "number": "7", "body": "x"},
 			backend: func(g *commandtest.Gh) {
-				g.Err = connect.NewError(connect.CodeInvalidArgument, errors.New("the body is 70000 bytes"))
+				g.Err = connect.NewError(connect.CodeInvalidArgument, errors.New("the body is 70000 characters"))
 			},
 			wantReq: &v1.AddPullRequestCommentRequest{RepoSlug: "o/r", Number: 7, Body: "x"}, wantCode: connect.CodeInvalidArgument},
 	}
