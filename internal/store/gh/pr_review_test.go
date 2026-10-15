@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +15,13 @@ import (
 // reviewWorld is the fake GitHub for reviews and comments: on o/r, #1 open by kim, #2
 // open by the viewer (octocat), #3 merged by kim.
 func reviewWorld(t *testing.T) (*fakeGitHub, *fakeRunner, *Store, *bus.Subscription[PullRequestDetailUpdated]) {
+	t.Helper()
+	g, r, s, _, events := reviewWorldClock(t)
+	return g, r, s, events
+}
+
+// reviewWorldClock is reviewWorld with the store's clock.
+func reviewWorldClock(t *testing.T) (*fakeGitHub, *fakeRunner, *Store, *testClock, *bus.Subscription[PullRequestDetailUpdated]) {
 	t.Helper()
 	g := newFakeGitHub()
 	t0 := time.Date(2026, 10, 15, 9, 0, 0, 0, time.UTC)
@@ -28,11 +36,14 @@ func reviewWorld(t *testing.T) (*fakeGitHub, *fakeRunner, *Store, *bus.Subscript
 	r := (&fakeRunner{}).serve(g)
 	b := bus.New()
 	events := bus.Subscribe[PullRequestDetailUpdated](b, 64)
-	return g, r, startStore(t, testOptions(openTestDB(t), r, b)), events
+	clk := &testClock{}
+	opts := testOptions(openTestDB(t), r, b)
+	opts.Now = clk.now
+	return g, r, startStore(t, opts), clk, events
 }
 
 func TestNormalizeReview(t *testing.T) {
-	long := strings.Repeat("x", MaxCommentBytes)
+	long := strings.Repeat("x", MaxCommentChars)
 	tests := []struct {
 		name  string
 		in    ReviewSubmission
@@ -48,6 +59,8 @@ func TestNormalizeReview(t *testing.T) {
 		{name: "comment at the limit", in: ReviewSubmission{Event: ReviewEventComment, Body: " " + long + " "}, want: long},
 		{name: "comment over the limit", in: ReviewSubmission{Event: ReviewEventComment, Body: long + "y"}, error: true},
 		{name: "approve over the limit", in: ReviewSubmission{Event: ReviewEventApprove, Body: long + "é"}, error: true},
+		{name: "the limit is characters, not bytes", in: ReviewSubmission{Event: ReviewEventComment, Body: strings.Repeat("é", MaxCommentChars)},
+			want: strings.Repeat("é", MaxCommentChars)},
 		{name: "no event", in: ReviewSubmission{Body: "x"}, error: true},
 		{name: "dismiss is not an event here", in: ReviewSubmission{Event: "DISMISS", Body: "x"}, error: true},
 		{name: "lower case event", in: ReviewSubmission{Event: "approve"}, error: true},
@@ -76,8 +89,9 @@ func TestNormalizeComment(t *testing.T) {
 		{in: "  hello\n", want: "hello"},
 		{in: "", error: true},
 		{in: "\n \t", error: true},
-		{in: strings.Repeat("é", MaxCommentBytes/2), want: strings.Repeat("é", MaxCommentBytes/2)},
-		{in: strings.Repeat("é", MaxCommentBytes/2) + "x", error: true}, // bytes, not runes
+		{in: strings.Repeat("é", MaxCommentChars), want: strings.Repeat("é", MaxCommentChars)}, // characters, not bytes
+		{in: strings.Repeat("🙂", MaxCommentChars-1) + "x", want: strings.Repeat("🙂", MaxCommentChars-1) + "x"},
+		{in: strings.Repeat("é", MaxCommentChars) + "x", error: true},
 	} {
 		got, err := NormalizeComment(tt.in)
 		if tt.error != (err != nil) || got != tt.want || (err != nil && !errors.Is(err, ErrInvalidArgument)) {
@@ -217,6 +231,12 @@ func TestSubmitPullRequestReview(t *testing.T) {
 			setup: func(g *fakeGitHub) { g.refuseReviews("FORBIDDEN", "Resource not accessible by integration") },
 			err:   ErrPermissionDenied, errHas: "Resource not accessible",
 			sent: &fakeReviewCall{op: "AddPullRequestReview", id: "PR_1", event: "APPROVE"}},
+		{name: "gone since it was cached: not found, detail invalidated", number: 1, req: ReviewSubmission{Event: ReviewEventApprove},
+			setup: func(g *fakeGitHub) {
+				g.refuseReviews("NOT_FOUND", "Could not resolve to a node with the global id of 'PR_1'")
+			},
+			err: ErrNotFound, errHas: "Could not resolve",
+			sent: &fakeReviewCall{op: "AddPullRequestReview", id: "PR_1", event: "APPROVE"}, event: true},
 		{name: "GitHub timed out: it may have been posted", number: 1, req: ReviewSubmission{Event: ReviewEventApprove},
 			setup: func(g *fakeGitHub) { g.failNext("AddPullRequestReview", fmt.Errorf("%w: HTTP 502", ErrServerTimeout)) },
 			err:   ErrServerTimeout, errHas: "GitHub did not confirm the review, and it may have been posted; check GitHub", event: true},
@@ -225,8 +245,8 @@ func TestSubmitPullRequestReview(t *testing.T) {
 		{name: "comment without a body: nothing sent", number: 1, req: ReviewSubmission{Event: ReviewEventComment, Body: " "},
 			err: ErrInvalidArgument, errHas: "a body is required"},
 		{name: "no event: nothing sent", number: 1, req: ReviewSubmission{Body: "x"}, err: ErrInvalidArgument},
-		{name: "too long: nothing sent", number: 1, req: ReviewSubmission{Event: ReviewEventComment, Body: strings.Repeat("x", MaxCommentBytes+1)},
-			err: ErrInvalidArgument, errHas: "at most 65536"},
+		{name: "too long: nothing sent", number: 1, req: ReviewSubmission{Event: ReviewEventComment, Body: strings.Repeat("x", MaxCommentChars+1)},
+			err: ErrInvalidArgument, errHas: "65537 characters, GitHub accepts at most 65536"},
 		{name: "bad number", number: 0, req: ReviewSubmission{Event: ReviewEventApprove}, err: ErrInvalidArgument},
 	}
 	for _, tt := range tests {
@@ -282,7 +302,7 @@ func TestAddPullRequestComment(t *testing.T) {
 			setup: func(g *fakeGitHub) { g.failNext("AddComment", fmt.Errorf("%w: connection reset", ErrNetwork)) },
 			err:   ErrNetwork, errHas: "GitHub did not confirm the comment, and it may have been posted", event: true},
 		{name: "empty body: nothing sent", number: 1, body: "\n", err: ErrInvalidArgument},
-		{name: "too long: nothing sent", number: 1, body: strings.Repeat("x", MaxCommentBytes+1), err: ErrInvalidArgument},
+		{name: "too long: nothing sent", number: 1, body: strings.Repeat("x", MaxCommentChars+1), err: ErrInvalidArgument},
 		{name: "unknown pull request", number: 99, body: "x", err: ErrNotFound},
 	}
 	for _, tt := range tests {
@@ -329,6 +349,177 @@ func TestAddPullRequestCommentRefetches(t *testing.T) {
 	if n := r.count("PullRequestFull"); n != 2 {
 		t.Errorf("detail fetches = %d, want 2", n)
 	}
+}
+
+// The same review or comment within writeMemoTTL returns the first's outcome instead of
+// posting again; anything else posts.
+func TestReviewWritesIdempotent(t *testing.T) {
+	ctx := context.Background()
+	type write struct {
+		comment bool // AddPullRequestComment; else SubmitPullRequestReview
+		number  int
+		event   ReviewEvent
+		body    string
+	}
+	send := func(s *Store, w write) (string, error) {
+		if w.comment {
+			c, err := s.AddPullRequestComment(ctx, "o/r", w.number, w.body)
+			return c.ID, err
+		}
+		r, err := s.SubmitPullRequestReview(ctx, "o/r", w.number, ReviewSubmission{Event: w.event, Body: w.body})
+		return r.ID, err
+	}
+	comment := func(n int, body string) write { return write{comment: true, number: n, body: body} }
+	review := func(n int, e ReviewEvent, body string) write { return write{number: n, event: e, body: body} }
+	tests := []struct {
+		name   string
+		first  write
+		setup  func(g *fakeGitHub, clk *testClock) // between the two writes
+		second write
+		// mutations: how many were sent in all; same: the second answered with the
+		// first's id and error.
+		mutations int
+		same      bool
+	}{
+		{name: "the same comment again", first: comment(1, "thanks"), second: comment(1, "thanks"), mutations: 1, same: true},
+		{name: "the same comment, other whitespace", first: comment(1, "thanks"), second: comment(1, " thanks\n"), mutations: 1, same: true},
+		{name: "the same review again", first: review(1, ReviewEventApprove, ""), second: review(1, ReviewEventApprove, " "), mutations: 1, same: true},
+		{name: "another comment", first: comment(1, "thanks"), second: comment(1, "thanks!"), mutations: 2},
+		{name: "the same text on another pull request", first: comment(1, "thanks"), second: comment(3, "thanks"), mutations: 2},
+		{name: "the same text as another verdict", first: review(1, ReviewEventComment, "hm"), second: review(1, ReviewEventRequestChanges, "hm"), mutations: 2},
+		{name: "a review and a comment with the same text", first: review(1, ReviewEventComment, "hm"), second: comment(1, "hm"), mutations: 2},
+		{name: "the same comment after the window", first: comment(1, "thanks"), second: comment(1, "thanks"),
+			setup: func(_ *fakeGitHub, clk *testClock) { clk.advance(writeMemoTTL + time.Second) }, mutations: 2},
+		// Sent again, and refused again with the same message.
+		{name: "a refusal is not remembered", first: review(2, ReviewEventApprove, ""), second: review(2, ReviewEventApprove, ""), mutations: 2, same: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g, _, s, clk, _ := reviewWorldClock(t)
+			id1, err1 := send(s, tt.first)
+			if tt.setup != nil {
+				tt.setup(g, clk)
+			}
+			id2, err2 := send(s, tt.second)
+			if n := len(g.reviewCalls()); n != tt.mutations {
+				t.Errorf("mutations = %d, want %d", n, tt.mutations)
+			}
+			if got := id1 == id2 && fmt.Sprint(err1) == fmt.Sprint(err2); got != tt.same {
+				t.Errorf("second = %q, %v; first = %q, %v; want the same: %t", id2, err2, id1, err1, tt.same)
+			}
+		})
+	}
+}
+
+// A comment whose outcome is unknown answers its repeats with that error for the
+// window, so it is not posted twice; other text goes through.
+func TestReviewWriteOutcomeUnknownRemembered(t *testing.T) {
+	ctx := context.Background()
+	g, _, s, clk, _ := reviewWorldClock(t)
+	g.failNext("AddComment", fmt.Errorf("%w: HTTP 504", ErrServerTimeout))
+	_, err := s.AddPullRequestComment(ctx, "o/r", 1, "thanks")
+	if !errors.Is(err, ErrServerTimeout) || !strings.Contains(err.Error(), "the same comment returns this error") {
+		t.Fatalf("first: %v", err)
+	}
+	if _, err2 := s.AddPullRequestComment(ctx, "o/r", 1, "thanks"); fmt.Sprint(err2) != fmt.Sprint(err) {
+		t.Errorf("repeat: %v, want the first error", err2)
+	}
+	if _, err := s.AddPullRequestComment(ctx, "o/r", 1, "other"); err != nil {
+		t.Errorf("other text: %v", err)
+	}
+	clk.advance(writeMemoTTL + time.Second)
+	if _, err := s.AddPullRequestComment(ctx, "o/r", 1, "thanks"); err != nil {
+		t.Errorf("after the window: %v", err)
+	}
+	// The failed one never reached the fake; "other" and the late retry did.
+	if n := len(g.reviewCalls()); n != 2 {
+		t.Errorf("mutations = %d, want 2", n)
+	}
+}
+
+// Duplicates sent while the first is in flight, including one whose caller gave up
+// waiting, post once and all get the first's answer.
+func TestReviewWriteDuplicatesInFlight(t *testing.T) {
+	ctx := context.Background()
+	g, r, s, _, _ := reviewWorldClock(t)
+	if _, err := s.FullPullRequest(ctx, "o/r", 1, false); err != nil {
+		t.Fatal(err)
+	}
+	r.mu.Lock()
+	r.delay = 150 * time.Millisecond
+	r.mu.Unlock()
+	// The first caller gives up while its mutation is in flight.
+	gaveUp, cancel := context.WithCancel(ctx)
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := s.SubmitPullRequestReview(gaveUp, "o/r", 1, ReviewSubmission{Event: ReviewEventApprove})
+		firstDone <- err
+	}()
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+	if err := <-firstDone; !errors.Is(err, context.Canceled) {
+		t.Fatalf("first caller: %v", err)
+	}
+	var wg sync.WaitGroup
+	ids := make([]string, 4)
+	errs := make([]error, 4)
+	for i := range ids {
+		wg.Go(func() {
+			res, err := s.SubmitPullRequestReview(ctx, "o/r", 1, ReviewSubmission{Event: ReviewEventApprove})
+			ids[i], errs[i] = res.ID, err
+		})
+	}
+	wg.Wait()
+	for i := range ids {
+		if errs[i] != nil || ids[i] != "PRR_1" {
+			t.Errorf("retry %d: %q, %v; want PRR_1", i, ids[i], errs[i])
+		}
+	}
+	if n := len(g.reviewCalls()); n != 1 {
+		t.Errorf("mutations = %d, want 1", n)
+	}
+}
+
+// The node id comes from the cached detail whatever its age; only a pull request with
+// nothing cached is fetched, and that fetch must succeed.
+func TestReviewWriteNodeID(t *testing.T) {
+	ctx := context.Background()
+	t.Run("aged and stale cache: no fetch", func(t *testing.T) {
+		g, r, s, clk, _ := reviewWorldClock(t)
+		if _, err := s.FullPullRequest(ctx, "o/r", 1, false); err != nil {
+			t.Fatal(err)
+		}
+		clk.advance(2 * time.Hour) // past the poll interval
+		s.full.markStale(fullKey{"o/r", 1})
+		if _, err := s.AddPullRequestComment(ctx, "o/r", 1, "x"); err != nil {
+			t.Fatal(err)
+		}
+		if n := r.count("PullRequestFull"); n != 1 {
+			t.Errorf("detail fetches = %d, want 1", n)
+		}
+		if calls := g.reviewCalls(); len(calls) != 1 || calls[0].id != "PR_1" {
+			t.Errorf("mutations = %+v", calls)
+		}
+	})
+	t.Run("nothing cached: fetched once", func(t *testing.T) {
+		g, r, s, _, _ := reviewWorldClock(t)
+		if _, err := s.AddPullRequestComment(ctx, "o/r", 1, "x"); err != nil {
+			t.Fatal(err)
+		}
+		if n := r.count("PullRequestFull"); n != 1 || len(g.reviewCalls()) != 1 {
+			t.Errorf("detail fetches = %d, mutations = %d", n, len(g.reviewCalls()))
+		}
+	})
+	t.Run("nothing cached and the fetch fails: no write", func(t *testing.T) {
+		g, _, s, _, _ := reviewWorldClock(t)
+		g.failNext("PullRequestFull", fmt.Errorf("%w: connection refused", ErrNetwork))
+		if _, err := s.AddPullRequestComment(ctx, "o/r", 1, "x"); !errors.Is(err, ErrNetwork) {
+			t.Errorf("err = %v, want the fetch's", err)
+		}
+		if n := len(g.reviewCalls()); n != 0 {
+			t.Errorf("mutations = %d, want 0", n)
+		}
+	})
 }
 
 func TestLoggedVars(t *testing.T) {

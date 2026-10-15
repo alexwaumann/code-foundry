@@ -10,11 +10,14 @@ import (
 	"maps"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Reviewing and commenting from the detail panel (SubmitPullRequestReview,
 // AddPullRequestComment): one GraphQL mutation each, on the pull request's node id from
-// the cached detail. Both are paced requests on the store's worker and never retried.
+// the cached detail. Both are paced requests on the store's worker and never retried;
+// the same review or comment sent again within writeMemoTTL gets the first's outcome
+// instead of posting twice.
 // GitHub decides who may review: the store does not check authorship or access, it
 // relays GitHub's refusal (docs/notes/pr-review-submit-1-daemon.md).
 
@@ -24,8 +27,9 @@ const (
 	queryAddComment           = "add_comment"
 )
 
-// MaxCommentBytes is the longest review or comment body GitHub accepts.
-const MaxCommentBytes = 65536
+// MaxCommentChars is the longest review or comment body GitHub accepts, in characters
+// ("Body is too long (maximum is 65536 characters)").
+const MaxCommentChars = 65536
 
 // ReviewEvent is GitHub's PullRequestReviewEvent (DISMISS aside).
 type ReviewEvent string
@@ -78,7 +82,7 @@ func (s *Store) SubmitPullRequestReview(ctx context.Context, slug string, number
 	if r.Body != "" {
 		vars["body"] = r.Body
 	}
-	res, err := writeOnPullRequest(ctx, s, k, "review|"+string(r.Event), r.Body, "review", queryAddPullRequestReview, vars, decodeReview)
+	res, err := writeOnPullRequest(ctx, s, k, &s.full.reviews, "review|"+string(r.Event), r.Body, "review", queryAddPullRequestReview, vars, decodeReview)
 	if err != nil {
 		return SubmittedReview{}, err
 	}
@@ -100,7 +104,7 @@ func (s *Store) AddPullRequestComment(ctx context.Context, slug string, number i
 	if body, err = NormalizeComment(body); err != nil {
 		return PostedComment{}, err
 	}
-	res, err := writeOnPullRequest(ctx, s, k, "comment", body, "comment", queryAddComment, map[string]any{"body": body}, decodeComment)
+	res, err := writeOnPullRequest(ctx, s, k, &s.full.comments, "comment", body, "comment", queryAddComment, map[string]any{"body": body}, decodeComment)
 	if err != nil {
 		return PostedComment{}, err
 	}
@@ -108,52 +112,93 @@ func (s *Store) AddPullRequestComment(ctx context.Context, slug string, number i
 	return res, nil
 }
 
+// writeKey identifies one write for its memo: the pull request, and op ("review|EVENT",
+// "comment") with a hash of the body.
+type writeKey struct {
+	k   fullKey
+	sig string
+}
+
 // writeOnPullRequest sends one of the review mutations for k: vars plus the pull
-// request's node id (from the detail, cached or fetched) as $id. Identical writes that
-// are queued at once (a double click) coalesce into one mutation; the job id carries a
-// hash of the body, never the body. what names the write in errors ("review",
-// "comment"). Afterwards, and when GitHub refused (in the pull request's state) or did
-// not answer, the detail is invalidated so clients re-read.
-func writeOnPullRequest[T any](ctx context.Context, s *Store, k fullKey, op, body, what, doc string, vars map[string]any,
-	decode func([]byte) (T, error)) (T, error) {
+// request's node id as $id. what names the write in errors ("review", "comment").
+//
+// The same write (op and body) within writeMemoTTL returns the first's outcome: its
+// result or, when GitHub did not answer, the error saying it may have been posted. The
+// memo is checked and written on the serial worker, so a duplicate sent while the first
+// is in flight (a double click, or a retry after the caller gave up waiting) waits for
+// it and gets its answer. Refusals are not remembered: nothing was posted.
+//
+// Afterwards, and when GitHub refused in the pull request's state, could not find it,
+// or did not answer, the detail is invalidated so clients re-read.
+func writeOnPullRequest[T any](ctx context.Context, s *Store, k fullKey, memo *writeMemos[writeKey, T], op, body, what, doc string,
+	vars map[string]any, decode func([]byte) (T, error)) (T, error) {
 	var zero T
-	d, err := s.FullPullRequest(ctx, k.slug, k.number, false)
+	sum := sha256.Sum256([]byte(body))
+	wk := writeKey{k: k, sig: op + "|" + hex.EncodeToString(sum[:8])}
+	if m, ok := memo.recent(wk, s.opts.Now()); ok {
+		return m.res, m.err
+	}
+	id, err := s.nodeID(ctx, k)
 	if err != nil {
 		return zero, err
 	}
-	if d.PullRequest.ID == "" {
-		return zero, fmt.Errorf("pull request #%d: no node id", k.number)
-	}
-	vars["id"] = d.PullRequest.ID
-	sum := sha256.Sum256([]byte(body))
-	id := op + "|" + k.String() + "|" + hex.EncodeToString(sum[:8])
-	// The detail is invalidated on the worker: a caller that stopped waiting still
-	// leaves clients re-reading once GitHub answered.
-	return submitFunc(ctx, s, id, func(ctx context.Context) (T, error) {
+	vars["id"] = id
+	// The job id carries the hash, never the body. Invalidation runs on the worker too:
+	// a caller that stopped waiting still leaves clients re-reading.
+	return submitFunc(ctx, s, op+"|"+k.String()+"|"+wk.sig, func(ctx context.Context) (T, error) {
+		if m, ok := memo.recent(wk, s.opts.Now()); ok {
+			return m.res, m.err
+		}
 		data, err := s.call(ctx, doc, vars)
 		var pe *PartialError
 		switch {
 		case errors.As(err, &pe):
 			// GitHub refused the write: nothing was posted, but the pull request may not
-			// be what the client showed (closed, locked since).
-			if err = writeRefused(pe); errors.Is(err, ErrFailedPrecondition) {
+			// be what the client showed (closed, locked, or gone since).
+			if err = writeRefused(pe); errors.Is(err, ErrFailedPrecondition) || errors.Is(err, ErrNotFound) {
 				s.invalidateFull(k)
 			}
 			return zero, err
 		case outcomeUnknown(err):
+			now := s.opts.Now()
+			err = fmt.Errorf("pull request #%d: GitHub did not confirm the %s, and it may have been posted; "+
+				"check GitHub before trying again (until %s the same %s returns this error): %w",
+				k.number, what, now.Add(writeMemoTTL).Local().Format(time.TimeOnly), what, err)
+			memo.remember(wk, writeMemo[T]{err: err, at: now})
 			s.invalidateFull(k)
-			return zero, fmt.Errorf("pull request #%d: GitHub did not confirm the %s, and it may have been posted; "+
-				"check GitHub before trying again: %w", k.number, what, err)
+			return zero, err
 		case err != nil:
 			return zero, err
 		}
 		s.invalidateFull(k)
-		return decode(data)
+		res, err := decode(data)
+		if err != nil {
+			// Posted, but unreadable: still never post it again.
+			err = fmt.Errorf("pull request #%d: GitHub posted the %s but its answer could not be read: %w", k.number, what, err)
+		}
+		memo.remember(wk, writeMemo[T]{res: res, err: err, at: s.opts.Now()})
+		return res, err
 	})
 }
 
+// nodeID returns k's GraphQL node id from the cached detail, whatever its age (the id
+// never changes), or fetches the detail when nothing is cached; that fetch must succeed.
+func (s *Store) nodeID(ctx context.Context, k fullKey) (string, error) {
+	d, _, ok := s.cachedFull(ctx, k)
+	if !ok || d.PullRequest.ID == "" {
+		var err error
+		if d, err = s.fetchFullJob(ctx, k); err != nil {
+			return "", err
+		}
+	}
+	if d.PullRequest.ID == "" {
+		return "", fmt.Errorf("pull request #%d: no node id", k.number)
+	}
+	return d.PullRequest.ID, nil
+}
+
 // NormalizeReview validates a review's event and trims its body: required for
-// REQUEST_CHANGES and COMMENT, optional for APPROVE, at most MaxCommentBytes.
+// REQUEST_CHANGES and COMMENT, optional for APPROVE, at most MaxCommentChars.
 // Errors wrap ErrInvalidArgument.
 func NormalizeReview(r ReviewSubmission) (ReviewSubmission, error) {
 	var err error
@@ -169,7 +214,7 @@ func NormalizeReview(r ReviewSubmission) (ReviewSubmission, error) {
 }
 
 // NormalizeComment trims a comment's body, which is required and at most
-// MaxCommentBytes. Errors wrap ErrInvalidArgument.
+// MaxCommentChars. Errors wrap ErrInvalidArgument.
 func NormalizeComment(body string) (string, error) { return commentBody(body, true) }
 
 // commentBody trims body and checks it against GitHub's limits.
@@ -178,8 +223,9 @@ func commentBody(body string, required bool) (string, error) {
 	switch {
 	case required && body == "":
 		return "", fmt.Errorf("%w: a body is required", ErrInvalidArgument)
-	case len(body) > MaxCommentBytes:
-		return "", fmt.Errorf("%w: the body is %d bytes, GitHub accepts at most %d", ErrInvalidArgument, len(body), MaxCommentBytes)
+	case utf8.RuneCountInString(body) > MaxCommentChars:
+		return "", fmt.Errorf("%w: the body is %d characters, GitHub accepts at most %d", ErrInvalidArgument,
+			utf8.RuneCountInString(body), MaxCommentChars)
 	}
 	return body, nil
 }

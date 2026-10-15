@@ -25,8 +25,9 @@ import (
 // fullCacheMax bounds the in-memory entries; the least recently fetched go first.
 const fullCacheMax = 64
 
-// writeMemoTTL is how long a revert's or a merge's outcome answers repeated calls for
-// the same pull request instead of sending the mutation again.
+// writeMemoTTL is how long a revert's or a merge's outcome (or a review's or comment's,
+// for the same text) answers repeated calls for the same pull request instead of
+// sending the mutation again.
 const writeMemoTTL = 2 * time.Minute
 
 type fullKey struct {
@@ -60,15 +61,15 @@ type writeMemo[T any] struct {
 	at  time.Time
 }
 
-// writeMemos holds the recent outcomes of one kind of mutation per pull request. The
-// zero value is ready to use.
-type writeMemos[T any] struct {
+// writeMemos holds the recent outcomes of one kind of mutation, keyed by K (the pull
+// request, or the pull request and what was written). The zero value is ready to use.
+type writeMemos[K comparable, T any] struct {
 	mu sync.Mutex
-	m  map[fullKey]writeMemo[T]
+	m  map[K]writeMemo[T]
 }
 
 // recent returns the outcome for k within writeMemoTTL of now.
-func (w *writeMemos[T]) recent(k fullKey, now time.Time) (writeMemo[T], bool) {
+func (w *writeMemos[K, T]) recent(k K, now time.Time) (writeMemo[T], bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	m, ok := w.m[k]
@@ -79,11 +80,11 @@ func (w *writeMemos[T]) recent(k fullKey, now time.Time) (writeMemo[T], bool) {
 }
 
 // remember records k's outcome and drops the expired ones.
-func (w *writeMemos[T]) remember(k fullKey, m writeMemo[T]) {
+func (w *writeMemos[K, T]) remember(k K, m writeMemo[T]) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.m == nil {
-		w.m = map[fullKey]writeMemo[T]{}
+		w.m = map[K]writeMemo[T]{}
 	}
 	for key, old := range w.m {
 		if m.at.Sub(old.at) > writeMemoTTL {
@@ -98,10 +99,13 @@ type fullCache struct {
 	mu sync.Mutex
 	m  map[fullKey]*fullEntry
 	// reverts and merges answer repeats of a recent revert or merge (pr_actions.go,
-	// pr_merge.go); mergeLocks runs one merge of a pull request at a time.
-	reverts    writeMemos[RevertResult]
-	merges     writeMemos[mergeMemo]
+	// pr_merge.go); mergeLocks runs one merge of a pull request at a time. reviews and
+	// comments answer an identical review or comment sent again soon (pr_review.go).
+	reverts    writeMemos[fullKey, RevertResult]
+	merges     writeMemos[fullKey, mergeMemo]
 	mergeLocks keyLocks
+	reviews    writeMemos[writeKey, SubmittedReview]
+	comments   writeMemos[writeKey, PostedComment]
 }
 
 func (c *fullCache) get(k fullKey) (d FullPullRequest, stale, ok bool) {
