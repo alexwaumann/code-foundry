@@ -385,6 +385,8 @@ for (const scheme of ["dark", "light"] as const) {
       await trigger(page).click();
       await item(page, "Test").hover();
       await item(page, "Test").getByTestId("action-edit").click();
+      await settle();
+      await page.screenshot({ path: `${dir}/dialog-edit-${scheme}.png` });
       await dialog(page).getByTestId("action-delete").click();
       await settle();
       await page.screenshot({ path: `${dir}/dialog-delete-${scheme}.png` });
