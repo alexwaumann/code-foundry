@@ -23,5 +23,8 @@ export default defineConfig({
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["src/test/setup.ts"],
+    // Vitest hands stylesheets back empty; "?raw" ones keep their text so the palette guard
+    // (src/lib/palette.test.ts) can read them. Plain CSS imports stay empty.
+    css: { include: [/\.css\?raw$/] },
   },
 });
