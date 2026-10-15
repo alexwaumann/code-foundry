@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { runFromResult, type ActionRunFinishedView } from "@/api/actions";
 import { invokeCommand, type UiContextView } from "@/api/command";
 import { errorMessage } from "@/api/stream";
-import { addArgs, editArgs, type ActionDraft } from "@/lib/actions";
+import { addArgs, editArgs, refusalText, type ActionDraft } from "@/lib/actions";
 import { ACTION_LABEL, REPO_LABEL, SESSION_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { useActionsStore } from "./actions";
 import { openActionRunOutput } from "./actionDialog";
@@ -106,7 +106,7 @@ export async function saveAction(target: { repoId: string; actionId?: string }, 
     ctx: repoContext(target.repoId),
     quiet: true,
     onError: (m) => {
-      failed.message = m;
+      failed.message = refusalText(m);
     },
     expected: () => true,
   });
@@ -120,7 +120,7 @@ export async function deleteAction(actionId: string, repoId: string): Promise<st
     ctx: repoContext(repoId),
     quiet: true,
     onError: (m) => {
-      failed.message = m;
+      failed.message = refusalText(m);
     },
     expected: () => true,
   });

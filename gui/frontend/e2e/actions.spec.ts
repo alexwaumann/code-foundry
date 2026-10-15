@@ -143,7 +143,8 @@ test("add, then edit (pencil and ArrowRight), then delete an action", async ({ p
   await dialog(page).getByTestId("action-name").fill("test");
   await dialog(page).getByTestId("action-command").fill("true");
   await dialog(page).getByTestId("action-save").click();
-  await expect(dialog(page).getByTestId("action-error")).toContainText('already has an action named "Test"');
+  // Without the store's "failed precondition: " (the mock sends it like the daemon).
+  await expect(dialog(page).getByTestId("action-error")).toHaveText('this project already has an action named "Test"');
   await expect(dialog(page).getByTestId("action-name")).toHaveAttribute("aria-invalid", "true");
   await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
   await dialog(page).getByTestId("action-cancel").click();

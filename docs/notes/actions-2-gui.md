@@ -96,8 +96,10 @@ has "New action…". Fixed in the spec; rerun with `actions.spec.ts` and
   to go.)
 * `action.run`'s result JSON is the protojson `ActionRun` (`terminalId`), not a
   `Terminal` (`id`), so `terminalIdFromResult` does not apply.
-* The mock's error messages have no code prefix; the GUI shows `rawMessage`, which drops
-  it for the real daemon too.
+* The action store's errors start with their sentinel (`failed precondition: this project
+  already has an action named "Test"`, from `%w`), and `rawMessage` keeps that text (it
+  only drops Connect's own code prefix). The editor strips it (`lib/actions.ts`
+  `refusalText`); the mock's action errors carry it like the daemon's.
 
 ## Tests
 

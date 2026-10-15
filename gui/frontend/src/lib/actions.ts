@@ -70,6 +70,15 @@ export function draftProblem(d: ActionDraft): string | null {
   return null;
 }
 
+/**
+ * The daemon's refusal as the editor shows it in place. The action store's errors start
+ * with their kind (`failed precondition: this project already has an action named "Test"`,
+ * internal/store/action wraps its sentinels with %w), which Connect's rawMessage keeps.
+ */
+export function refusalText(message: string): string {
+  return message.replace(/^(?:failed precondition|invalid argument|not found): /, "");
+}
+
 /** action.add's args for a new action of project `repoId`. */
 export function addArgs(repoId: string, d: ActionDraft): Record<string, string> {
   return {

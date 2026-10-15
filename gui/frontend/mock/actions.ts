@@ -15,6 +15,8 @@
  *   a-debug0000000  Debug daemon  debug      make dev          terminal, runs until stopped
  * Any other command prints two lines and exits after ~1.2 s with the code in "exit N"
  * (else 0); one containing "sleep infinity" or the word "dev" runs until stopped.
+ * Store refusals read like internal/store/action's: the sentinel first ("failed
+ * precondition: this project already has…"), which Connect's rawMessage keeps.
  */
 import { create, toJsonString, type MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
@@ -243,23 +245,23 @@ const iconName = (i: ActionIcon) => ICONS.find((x) => x.icon === i)?.name ?? "pl
 
 function cleanName(raw: string): string {
   const name = raw.trim();
-  if (!name) throw new CommandError("invalid", "an action needs a name");
-  if (Array.from(name).length > MAX_NAME) throw new CommandError("invalid", `an action name has at most ${String(MAX_NAME)} characters`);
+  if (!name) throw new CommandError("invalid", "invalid argument: an action needs a name");
+  if (Array.from(name).length > MAX_NAME) throw new CommandError("invalid", `invalid argument: an action name has at most ${String(MAX_NAME)} characters`);
   // eslint-disable-next-line no-control-regex
-  if (/[\x00-\x1f\x7f]/.test(name)) throw new CommandError("invalid", "an action name is one line without control characters");
+  if (/[\x00-\x1f\x7f]/.test(name)) throw new CommandError("invalid", "invalid argument: an action name is one line without control characters");
   return name;
 }
 
 function cleanCommand(raw: string): string {
   const cmd = raw.replace(/\r\n/g, "\n").replace(/\s+$/, "");
-  if (!cmd.trim()) throw new CommandError("invalid", "an action needs a command");
-  if (cmd.includes("\0")) throw new CommandError("invalid", "the command contains a NUL byte");
+  if (!cmd.trim()) throw new CommandError("invalid", "invalid argument: an action needs a command");
+  if (cmd.includes("\0")) throw new CommandError("invalid", "invalid argument: the command contains a NUL byte");
   return cmd;
 }
 
 function checkIcon(icon: ActionIcon): ActionIcon {
   if (icon === ActionIcon.UNSPECIFIED) return ActionIcon.PLAY;
-  if (!ICONS.some((x) => x.icon === icon)) throw new CommandError("invalid", `icon ${String(icon)}; want one of ${ICONS.map((x) => x.name).join(", ")}`);
+  if (!ICONS.some((x) => x.icon === icon)) throw new CommandError("invalid", `invalid argument: icon ${String(icon)}; want one of ${ICONS.map((x) => x.name).join(", ")}`);
   return icon;
 }
 
@@ -415,18 +417,18 @@ export class MockActions {
 
   private action(id: string): MockAction {
     const a = this.actions.get(id);
-    if (!a) throw new CommandError("notfound", `action "${id}" not found`);
+    if (!a) throw new CommandError("notfound", `not found: action "${id}"`);
     return a;
   }
 
   private checkUnique(repoId: string, name: string, self = ""): void {
     const lower = name.toLowerCase();
     const dup = [...this.actions.values()].find((a) => a.repoId === repoId && a.id !== self && a.name.toLowerCase() === lower);
-    if (dup) throw new CommandError("unavailable", `this project already has an action named "${dup.name}"`);
+    if (dup) throw new CommandError("unavailable", `failed precondition: this project already has an action named "${dup.name}"`);
   }
 
   create(req: { repoId: string; name: string; command: string; icon: ActionIcon; inTerminal: boolean; onWorktreeCreate: boolean }): ActionInit {
-    if (!this.host.repos().some((r) => r.id === req.repoId)) throw new CommandError("notfound", `project "${req.repoId}" is not registered`);
+    if (!this.host.repos().some((r) => r.id === req.repoId)) throw new CommandError("notfound", `not found: project "${req.repoId}" is not registered`);
     const name = cleanName(req.name);
     const command = cleanCommand(req.command);
     const icon = checkIcon(req.icon);
@@ -485,7 +487,7 @@ export class MockActions {
 
   private run_(id: string): MockRun {
     const r = this.runs.find((x) => x.id === id);
-    if (!r) throw new CommandError("notfound", `run "${id}" not found`);
+    if (!r) throw new CommandError("notfound", `not found: run "${id}"`);
     return r;
   }
 
@@ -520,7 +522,7 @@ export class MockActions {
     const owner = this.owner(req.sessionId ?? "", req.worktreePath ?? "", req.repoId ?? "");
     const ref = req.action.trim();
     let a = this.actions.get(ref);
-    if (a && a.repoId !== owner.repoId) throw new CommandError("invalid", `action ${ref} belongs to another project`);
+    if (a && a.repoId !== owner.repoId) throw new CommandError("unavailable", `action ${a.name} (${a.id}) belongs to another project`);
     a ??= this.sorted(req.repoId || owner.repoId).find((x) => x.name.toLowerCase() === ref.toLowerCase());
     if (!a) throw new CommandError("notfound", `no action "${ref}" in this project`);
     const mode = req.mode === ActionRunMode.TERMINAL || req.mode === ActionRunMode.BACKGROUND ? req.mode : a.inTerminal ? ActionRunMode.TERMINAL : ActionRunMode.BACKGROUND;
@@ -530,17 +532,17 @@ export class MockActions {
   private owner(sessionId: string, worktree: string, repoId: string): { sessionId: string; repoId: string; worktree: string } {
     if (sessionId) {
       const s = this.host.session(sessionId);
-      if (!s) throw new CommandError("notfound", `thread ${sessionId} not found`);
-      if (!s.repoId) throw new CommandError("unavailable", `thread ${sessionId} has no project; actions belong to a project`);
-      if (repoId && repoId !== s.repoId) throw new CommandError("invalid", `thread ${sessionId} is in project ${s.repoId}, not ${repoId}`);
+      if (!s) throw new CommandError("notfound", `not found: thread ${sessionId}`);
+      if (!s.repoId) throw new CommandError("unavailable", `failed precondition: thread ${sessionId} has no project; actions belong to a project`);
+      if (repoId && repoId !== s.repoId) throw new CommandError("invalid", `invalid argument: thread ${sessionId} is in project ${s.repoId}, not ${repoId}`);
       return { sessionId, repoId: s.repoId, worktree: s.worktreePath };
     }
     if (worktree) {
       const repo = this.host.repos().find((r) => r.worktrees.includes(worktree));
-      if (!repo) throw new CommandError("invalid", `${worktree} is not a worktree of a registered project`);
+      if (!repo) throw new CommandError("invalid", `invalid argument: ${worktree} is not a worktree of a registered project`);
       return { sessionId: "", repoId: repo.id, worktree };
     }
-    throw new CommandError("invalid", "a run needs a thread or a worktree");
+    throw new CommandError("invalid", "invalid argument: a run needs a thread or a worktree");
   }
 
   private start(a: MockAction, owner: { sessionId: string; repoId: string; worktree: string }, mode: ActionRunMode, trigger: ActionRunTrigger, script: Script): MockRun {

@@ -136,7 +136,8 @@ describe("saveAction and deleteAction", () => {
   it("the daemon's refusal comes back for the editor, not as a toast", async () => {
     runCommandForResult.mockImplementationOnce((_n, _a, opts) => {
       const o = opts as { onError?: (m: string) => void; expected?: (e: unknown) => boolean };
-      o.onError?.('this project already has an action named "Test"');
+      // The daemon's text, as Connect's rawMessage has it (the store's sentinel first).
+      o.onError?.('failed precondition: this project already has an action named "Test"');
       expect(o.expected?.(new Error("x"))).toBe(true);
       return Promise.resolve(null);
     });
