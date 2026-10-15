@@ -46,12 +46,24 @@ export function useColorScheme(): ColorScheme {
   return useSyncExternalStore(subscribe, effectiveScheme, () => "dark");
 }
 
-/** Keeps the `dark` class on <html> in sync with the effective scheme. */
+/**
+ * The colour theme on <html> (`data-theme`). Only "default" (src/index.css) for now; it is
+ * the attribute a theme engine will set, with the `dark` class picking the scheme within it.
+ */
+export const DEFAULT_THEME = "default";
+
+/**
+ * Keeps <html> in sync with the effective scheme: the `dark` class, color-scheme, and
+ * `data-theme`. Everything colour-related reads CSS variables those select
+ * (src/index.css), so this is the one place the document's colours change.
+ */
 export function syncDocumentScheme(): () => void {
   const apply = () => {
     const scheme = effectiveScheme();
-    document.documentElement.classList.toggle("dark", scheme === "dark");
-    document.documentElement.style.colorScheme = scheme;
+    const root = document.documentElement;
+    root.dataset.theme = DEFAULT_THEME;
+    root.classList.toggle("dark", scheme === "dark");
+    root.style.colorScheme = scheme;
   };
   apply();
   return subscribe(apply);

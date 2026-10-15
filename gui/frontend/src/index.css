@@ -48,6 +48,16 @@
     --color-accent: var(--accent);
     --color-accent-foreground: var(--accent-foreground);
     --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+    --color-info: var(--info);
+    --color-info-foreground: var(--info-foreground);
+    --color-highlight: var(--highlight);
+    --color-highlight-foreground: var(--highlight-foreground);
+    --color-link: var(--link);
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);
@@ -93,6 +103,20 @@
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
     --destructive: oklch(0.577 0.245 27.325);
+    /* Status colours (docs/notes/theme-1-tokens.md). shadcn-style names, so a published
+     * theme maps one to one. Each is the Tailwind shade the components use for text
+     * (600 light, 400 dark): success emerald, warning amber, info sky, destructive red,
+     * highlight violet. A -foreground is the text on a solid fill of its colour. */
+    --destructive-foreground: oklch(0.985 0 0);
+    --success: oklch(0.596 0.145 163.225);
+    --success-foreground: oklch(0.985 0 0);
+    --warning: oklch(0.666 0.179 58.318);
+    --warning-foreground: oklch(0.205 0 0);
+    --info: oklch(0.588 0.158 241.966);
+    --info-foreground: oklch(0.985 0 0);
+    --highlight: oklch(0.541 0.281 293.009);
+    --highlight-foreground: oklch(0.985 0 0);
+    --link: oklch(0.588 0.158 241.966);
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
     --ring: oklch(0.708 0 0);
@@ -125,7 +149,9 @@
     --foreground: oklch(0.985 0 0);
     --card: var(--pane);
     --card-foreground: oklch(0.985 0 0);
-    --popover: var(--pane);
+    /* neutral-950: the menus were dark:bg-neutral-950, a touch above the pane; every
+     * floating surface now uses this one value. */
+    --popover: oklch(0.145 0 0);
     --popover-foreground: oklch(0.985 0 0);
     --primary: oklch(0.922 0 0);
     --primary-foreground: oklch(0.205 0 0);
@@ -136,6 +162,16 @@
     --accent: oklch(0.269 0 0);
     --accent-foreground: oklch(0.985 0 0);
     --destructive: oklch(0.704 0.191 22.216);
+    --destructive-foreground: oklch(0.145 0 0);
+    --success: oklch(0.765 0.177 163.223);
+    --success-foreground: oklch(0.145 0 0);
+    --warning: oklch(0.828 0.189 84.429);
+    --warning-foreground: oklch(0.145 0 0);
+    --info: oklch(0.746 0.16 232.661);
+    --info-foreground: oklch(0.145 0 0);
+    --highlight: oklch(0.702 0.183 293.541);
+    --highlight-foreground: oklch(0.145 0 0);
+    --link: oklch(0.746 0.16 232.661);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.556 0 0);
@@ -283,11 +319,8 @@
   accent-color: oklch(0.588 0.158 241.966);
 }
 .cf-markdown a {
-  color: oklch(0.588 0.158 241.966);
+  color: var(--link);
   cursor: pointer;
-}
-.dark .cf-markdown a {
-  color: oklch(0.746 0.16 232.661);
 }
 .cf-markdown a:hover {
   text-decoration: underline;
