@@ -75,7 +75,8 @@ type projector struct {
 	}
 	// async are the Agent calls launched in the background whose run has not reported
 	// its end yet: their result came at once (async_launched), so their item stays
-	// running until the run ends (agentEnded, agents_runner.go).
+	// running until the run ends (agentEnded, agents_runner.go). The thread's own
+	// background Bash and Monitor calls too, until their shell ends (bgshells.go).
 	async map[string]bool
 }
 
@@ -326,6 +327,8 @@ func (p *projector) user(e *claudestream.User) {
 			res = string(e.ToolUseResult)
 		}
 		async := len(blocks) == 1 && !b.IsError && isAsyncLaunch(e.ToolUseResult)
+		// A subagent's own background shell is not the thread's: its item ends here.
+		shell := len(blocks) == 1 && !b.IsError && e.ParentToolUseID == "" && isShellLaunch(e.ToolUseResult)
 		p.w.change(b.ToolUseID, func(it *Item) {
 			if it.Tool == nil {
 				return
@@ -338,6 +341,11 @@ func (p *projector) user(e *claudestream.User) {
 			}
 			if async && (it.Tool.Name == "Agent" || it.Tool.Name == "Task") {
 				// A background run: the call follows the run, not its result.
+				it.Tool.Status = ToolRunning
+				p.async[it.ID] = true
+			}
+			if shell && (it.Tool.Name == "Bash" || it.Tool.Name == "Monitor") {
+				// A background shell: the call follows the shell (bgshells.go).
 				it.Tool.Status = ToolRunning
 				p.async[it.ID] = true
 			}

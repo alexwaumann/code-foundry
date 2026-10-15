@@ -717,6 +717,7 @@ func (r *runner) shutdown() {
 	r.failHeld("the daemon stopped")
 	closeUnfinished(st.proj.w, "the daemon stopped")
 	r.endRuns(orphanDaemonStopped)
+	r.endBgShells(orphanDaemonStopped)
 	st.log.clearMcp()
 	r.stopStreamTimers()
 	st.conn.Close()
@@ -777,6 +778,7 @@ func (r *runner) maybeExited() {
 	st.sd.pending = nil
 	closeUnfinished(st.proj.w, "the thread's process ended")
 	r.endRuns(orphanProcessEnded)
+	r.endBgShells(orphanProcessEnded)
 	st.log.clearMcp()
 	r.stopStreamTimers()
 	st.conn.Close()
