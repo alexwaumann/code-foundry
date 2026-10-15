@@ -5,6 +5,7 @@ import { isRemoteless, type GitStatusView, type RepoView, type WorktreeView } fr
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { Button } from "@/components/ui/button";
 import type { LogEntryView, WorktreeDetailView } from "@/api/worktreeDetail";
+import { toneText } from "@/components/pr/tones";
 import { checksSummary } from "@/components/prs/format";
 import { Age, ChecksBadge, Freshness, PrStateIcon, ReviewBadge } from "@/components/prs/PrBits";
 import { RowList } from "@/components/prs/RowList";
@@ -26,12 +27,12 @@ const FILE_ROW_H = 24;
 const LOG_ROW_H = 24;
 
 function AheadBehind({ ahead, behind }: { ahead: number; behind: number }) {
-  if (ahead === 0 && behind === 0) return <span className="text-emerald-400">✓ in sync</span>;
+  if (ahead === 0 && behind === 0) return <span className="text-success">✓ in sync</span>;
   return (
     <span className="tabular-nums">
-      {ahead > 0 && <span className="text-emerald-400">↑{ahead}</span>}
+      {ahead > 0 && <span className="text-success">↑{ahead}</span>}
       {ahead > 0 && behind > 0 && " "}
-      {behind > 0 && <span className="text-amber-300">↓{behind}</span>}
+      {behind > 0 && <span className="text-warning">↓{behind}</span>}
     </span>
   );
 }
@@ -52,9 +53,9 @@ function SyncLine({ st }: { st: GitStatusView }) {
       )}
       <span>
         <span className="text-muted-foreground">Working tree: </span>
-        <span className={st.dirty ? "text-amber-300" : "text-muted-foreground"}>{describeChanges(st)}</span>
+        <span className={st.dirty ? "text-warning" : "text-muted-foreground"}>{describeChanges(st)}</span>
       </span>
-      {st.error && <span className="text-red-400" title={st.error}>status failed</span>}
+      {st.error && <span className="text-destructive" title={st.error}>status failed</span>}
     </div>
   );
 }
@@ -72,13 +73,13 @@ function Section({ title, extra, children, testId }: { title: ReactNode; extra?:
 }
 
 const statusColor: Record<string, string> = {
-  A: "text-emerald-400",
-  M: "text-amber-300",
-  D: "text-red-400",
-  R: "text-sky-400",
-  C: "text-sky-400",
-  T: "text-sky-400",
-  U: "text-red-400",
+  A: "text-success",
+  M: "text-warning",
+  D: "text-destructive",
+  R: "text-info",
+  C: "text-info",
+  T: "text-info",
+  U: "text-destructive",
   "?": "text-muted-foreground",
 };
 
@@ -86,7 +87,7 @@ function Counts({ added, deleted, binary }: { added: number; deleted: number; bi
   if (binary && added === 0 && deleted === 0) return <span className="text-xs text-muted-foreground">bin</span>;
   return (
     <span className="text-xs tabular-nums">
-      <span className="text-emerald-400">+{added}</span> <span className="text-red-400">−{deleted}</span>
+      <span className="text-success">+{added}</span> <span className="text-destructive">−{deleted}</span>
     </span>
   );
 }
@@ -100,7 +101,7 @@ function FileLine({ row }: { row: FileRow }) {
       <span className="flex min-w-0 items-center gap-1" style={{ paddingLeft: row.depth * 14 }}>
         {row.kind === "dir" &&
           (row.expanded ? <ChevronDown className="size-3 shrink-0 text-muted-foreground" /> : <ChevronRight className="size-3 shrink-0 text-muted-foreground" />)}
-        <span className={cn("truncate", row.kind === "dir" && "text-sky-300")}>
+        <span className={cn("truncate", row.kind === "dir" && "text-info")}>
           {row.name}
           {row.kind === "dir" && "/"}
         </span>
@@ -120,7 +121,7 @@ function LogLine({ e }: { e: LogEntryView }) {
       title={`${e.sha}\n${e.authorName} <${e.authorEmail}>`}
       className="grid h-full grid-cols-[4.5rem_minmax(0,1fr)_3rem_minmax(6rem,10rem)] items-center gap-3 px-2 text-xs @max-[420px]:grid-cols-[4rem_minmax(0,1fr)_2.5rem] @max-[420px]:gap-2"
     >
-      <span className="font-mono text-amber-200/80">{e.shortSha}</span>
+      <span className="font-mono text-warning/80">{e.shortSha}</span>
       <span className="truncate">{e.subject}</span>
       <Age ms={e.authoredAtMs} className="text-right" />
       <span className="truncate text-muted-foreground @max-[420px]:hidden">{e.authorName}</span>
@@ -132,7 +133,7 @@ function CheckLine({ c }: { c: CheckRunView }) {
   return (
     <NavRow navKey={`c:${c.url || c.name}`} title={c.url} className="flex h-6 items-center gap-2 px-2 pl-6 font-mono text-xs @max-[420px]:pl-2">
       {c.workflow && <span className="min-w-0 shrink truncate text-muted-foreground">{c.workflow}:</span>}
-      <span className="min-w-0 truncate text-red-400">{c.name}</span>
+      <span className="min-w-0 truncate text-destructive">{c.name}</span>
       <span className="shrink-0 text-muted-foreground @max-[420px]:hidden">{c.conclusion.replace(/_/g, " ")}</span>
     </NavRow>
   );
@@ -170,9 +171,9 @@ function PrLine({ pr, prefix, viewer }: { pr: PullRequestView; prefix: string; v
 }
 
 function CiIcon({ tone }: { tone: ReturnType<typeof checksSummary>["tone"] }) {
-  if (tone === "success") return <CircleCheck className="size-3.5 text-emerald-400" />;
-  if (tone === "failure") return <CircleX className="size-3.5 text-red-400" />;
-  if (tone === "pending") return <CircleDot className="size-3.5 text-amber-300" />;
+  if (tone === "success") return <CircleCheck className={cn("size-3.5", toneText.success)} />;
+  if (tone === "failure") return <CircleX className={cn("size-3.5", toneText.failure)} />;
+  if (tone === "pending") return <CircleDot className={cn("size-3.5", toneText.pending)} />;
   return <CircleDashed className="size-3.5 text-muted-foreground" />;
 }
 
@@ -209,7 +210,7 @@ function GithubActivity({ activity, activityError, branch, branchPrs }: {
         ) : (
           <span className="text-muted-foreground">not fetched yet</span>
         )}
-        {stats.lastError && <span className="ml-2 text-red-400" title={stats.lastError}>(last poll failed)</span>}
+        {stats.lastError && <span className="ml-2 text-destructive" title={stats.lastError}>(last poll failed)</span>}
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-x-1.5" data-testid="gh-default-branch" data-ci={summary?.tone ?? "unknown"}>
         {ci && summary ? (
@@ -217,7 +218,7 @@ function GithubActivity({ activity, activityError, branch, branchPrs }: {
             <CiIcon tone={summary.tone} />
             <span className="text-muted-foreground">default</span>
             <span className="font-mono">{ci.branch}</span>
-            <span className={cn(summary.tone === "failure" && "text-red-400", summary.tone === "pending" && "text-amber-300", summary.tone === "success" && "text-emerald-400")}>
+            <span className={cn(summary.tone !== "none" && toneText[summary.tone])}>
               {summary.tone === "none" ? "no checks" : summary.tone === "success" ? "passing" : summary.label}
             </span>
             <span className="text-muted-foreground">·</span>
@@ -237,7 +238,7 @@ function GithubActivity({ activity, activityError, branch, branchPrs }: {
       )}
       <div className="mt-1 text-muted-foreground">
         Your PRs for <span className="font-mono">{branch || "(detached)"}</span>
-        {branchPrs.error && <span className="ml-2 text-red-400" title={branchPrs.error}>(last poll failed)</span>}
+        {branchPrs.error && <span className="ml-2 text-destructive" title={branchPrs.error}>(last poll failed)</span>}
       </div>
       {!branch ? null : branchPrs.fetchedAtMs === null && branchPrs.prs.length === 0 ? (
         <div className="pl-6 text-muted-foreground">checking GitHub…</div>
@@ -407,8 +408,8 @@ function OverviewBody({ repo, wt }: { repo: RepoView; wt: WorktreeView }) {
               <>
                 Files{" "}
                 <span className="font-normal text-muted-foreground tabular-nums">
-                  ({totals.count} {totals.count === 1 ? "file" : "files"}, <span className="text-emerald-400">+{totals.added}</span>{" "}
-                  <span className="text-red-400">−{totals.deleted}</span>
+                  ({totals.count} {totals.count === 1 ? "file" : "files"}, <span className="text-success">+{totals.added}</span>{" "}
+                  <span className="text-destructive">−{totals.deleted}</span>
                   {detail.filesTruncated && ", truncated"})
                 </span>
               </>
@@ -470,7 +471,7 @@ export function WorktreePanelView({ repoId, path }: { repoId: string; path: stri
     <div className="@container flex min-w-0 flex-col gap-3 px-4 py-3 @max-[340px]:px-3" data-testid="worktree-surface" data-repo={repoId} data-path={path} data-git={repo ? !noGit : undefined}>
       <header className="flex min-w-0 flex-col gap-0.5 border-b border-pane-border pb-2" data-testid="worktree-surface-header">
         <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
-          {noGit ? <Folder className="size-4 shrink-0 text-muted-foreground" aria-hidden /> : <GitBranch className="size-4 shrink-0 text-violet-400" aria-hidden />}
+          {noGit ? <Folder className="size-4 shrink-0 text-muted-foreground" aria-hidden /> : <GitBranch className="size-4 shrink-0 text-highlight" aria-hidden />}
           <span className="flex min-w-0 items-center gap-2 truncate" data-testid="worktree-surface-title">
             {repo?.name ?? repoId}
             {noGit ? (

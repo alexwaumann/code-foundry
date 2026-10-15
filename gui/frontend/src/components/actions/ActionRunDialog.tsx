@@ -54,8 +54,8 @@ function RunOutput({ runId }: { runId: string }) {
       {/* One line: only the path gives way, its directory first (a middle ellipsis), so the
           branch folder at its end stays readable. */}
       <DialogDescription className="mt-1 flex items-center gap-1.5 pr-7 text-xs whitespace-nowrap text-muted-foreground" data-testid="action-run-meta">
-        <CircleX className="size-3.5 shrink-0 text-red-600 dark:text-red-400" aria-hidden />
-        <span className="shrink-0 text-red-600 dark:text-red-400">Exited with code {run.exitCode}</span>
+        <CircleX className="size-3.5 shrink-0 text-destructive" aria-hidden />
+        <span className="shrink-0 text-destructive">Exited with code {run.exitCode}</span>
         {took && (
           <span aria-hidden className="shrink-0 opacity-50">
             ·

@@ -1,19 +1,21 @@
 /*
  * A thread (docs/sketches/rendered-thread, variant A). Ported from the sketch's
  * style.css / variants.css onto the app's tokens (index.css): status tones are the
- * Tailwind colours the sidebar uses, syntax colours the terminal palette
+ * status tokens the sidebar uses, syntax colours the terminal palette
  * (src/terminal/theme.ts), mono text the bundled JetBrains Mono.
  */
 .cf-thread {
-  /* Light: the -700 shades, so 11-12px status text clears 4.5:1 on the pane (the -600s
-     the sidebar's icons use are about 3:1 for amber and 3.8:1 for emerald). */
-  --t-sky: oklch(0.5 0.134 242.749);
-  --t-amber: oklch(0.555 0.163 48.998);
-  --t-emerald: oklch(0.508 0.118 165.612);
-  --t-red: oklch(0.577 0.245 27.325);
-  --t-emerald-500: oklch(0.696 0.17 162.48);
-  --t-red-500: oklch(0.637 0.237 25.331);
-  --t-amber-500: oklch(0.769 0.188 70.08);
+  /* Status tones from the theme tokens (index.css). Light darkens them a step (15% black
+     turns the default 600s into about the 700s), so 11-12px status text clears 4.5:1 on
+     the pane (the 600s are about 3:1 for amber and 3.8:1 for emerald). */
+  --t-sky: color-mix(in oklab, var(--info) 85%, black);
+  --t-amber: color-mix(in oklab, var(--warning) 85%, black);
+  --t-emerald: color-mix(in oklab, var(--success) 85%, black);
+  --t-red: var(--destructive);
+  /* Tints (diff lines, chips) mix the plain token into transparent. */
+  --t-emerald-500: var(--success);
+  --t-red-500: var(--destructive);
+  --t-amber-500: var(--warning);
   /* User messages (variant B): a tint and a hairline a step stronger than it. */
   --t-bubble: oklch(0 0 0 / 7%);
   --t-bubble-border: oklch(0 0 0 / 10%);
@@ -32,10 +34,9 @@
   --t-mono: "JetBrainsMono Nerd Font Mono", "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
 }
 .dark .cf-thread {
-  --t-sky: oklch(0.746 0.16 232.661);
-  --t-amber: oklch(0.879 0.169 91.605);
-  --t-emerald: oklch(0.765 0.177 163.223);
-  --t-red: oklch(0.704 0.191 22.216);
+  --t-sky: var(--info);
+  --t-amber: var(--warning);
+  --t-emerald: var(--success);
   --t-bubble: oklch(1 0 0 / 13%);
   --t-bubble-border: oklch(1 0 0 / 14%);
   --t-hover: oklch(1 0 0 / 5%);
@@ -798,7 +799,7 @@ html[data-thread-width="full"] .cf-thread {
   background: var(--card);
 }
 .cf-thread .ccard[data-dragging] {
-  border-color: oklch(0.746 0.16 232.661 / 70%);
+  border-color: color-mix(in oklab, var(--info) 70%, transparent);
 }
 .cf-thread .pend-stack {
   grid-column: 1 / 3;

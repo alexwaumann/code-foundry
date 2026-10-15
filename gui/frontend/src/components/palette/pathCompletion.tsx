@@ -74,7 +74,7 @@ export function PathSuggestions({
                 else onPick(e.name);
               }}
             >
-              {e.isGit ? <FolderGit2 className="text-orange-600 dark:text-orange-400" aria-label="git repository" /> : <Folder />}
+              {e.isGit ? <FolderGit2 className="text-warning" aria-label="git repository" /> : <Folder />}
               <span className="truncate font-mono">{e.name}</span>
               {e.registered && <span className="ml-auto shrink-0 text-xs text-muted-foreground">already added</span>}
               {onOpen && (

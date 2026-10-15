@@ -26,7 +26,7 @@ function NotificationsButton() {
       aria-disabled={count === 0 || undefined}
       data-testid="sidebar-notifications"
       data-count={count}
-      className={cn("relative", count > 0 ? "text-amber-600 hover:text-amber-600 dark:text-amber-300 dark:hover:text-amber-300" : "opacity-50 hover:bg-transparent dark:hover:bg-transparent")}
+      className={cn("relative", count > 0 ? "text-warning hover:text-warning" : "opacity-50 hover:bg-transparent dark:hover:bg-transparent")}
       onMouseDown={(e) => {
         e.preventDefault();
       }}
@@ -39,7 +39,7 @@ function NotificationsButton() {
         <span
           aria-hidden
           data-testid="attention-badge"
-          className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-amber-500 px-[3px] text-[9px] leading-none font-semibold text-white tabular-nums dark:bg-amber-400 dark:text-black"
+          className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-warning px-[3px] text-[9px] leading-none font-semibold text-warning-foreground tabular-nums"
         >
           {count}
         </span>

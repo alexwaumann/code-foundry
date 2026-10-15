@@ -27,7 +27,7 @@ function Banners() {
   return (
     <>
       {noService && (
-        <p className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs" data-testid="settings-unavailable">
+        <p className="mb-4 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs" data-testid="settings-unavailable">
           The daemon has not sent settings yet. If this persists it may be older than this window; restart it.
         </p>
       )}

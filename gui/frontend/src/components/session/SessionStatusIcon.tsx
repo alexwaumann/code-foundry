@@ -19,18 +19,18 @@ export function SessionStatusIcon({ id, className }: { id: string; className?: s
     case "closing":
       return <Loader2 className={cn("size-3.5 shrink-0 animate-spin text-muted-foreground", className)} {...common} />;
     case "busy":
-      return <Loader2 className={cn("size-3.5 shrink-0 animate-spin text-sky-400", className)} {...common} />;
+      return <Loader2 className={cn("size-3.5 shrink-0 animate-spin text-info", className)} {...common} />;
     case "attention":
       return (
         <span className={cn("relative flex size-2.5 shrink-0", className)} {...common}>
-          <span className="absolute inline-flex size-full animate-[ping_2s_cubic-bezier(0,0,0.2,1)_infinite] rounded-full bg-amber-400 opacity-50" />
-          <span className="relative inline-flex size-2.5 rounded-full bg-amber-400" />
+          <span className="absolute inline-flex size-full animate-[ping_2s_cubic-bezier(0,0,0.2,1)_infinite] rounded-full bg-warning opacity-50" />
+          <span className="relative inline-flex size-2.5 rounded-full bg-warning" />
         </span>
       );
     case "error":
-      return <CircleX className={cn("size-3.5 shrink-0 text-red-400", className)} {...common} />;
+      return <CircleX className={cn("size-3.5 shrink-0 text-destructive", className)} {...common} />;
     case "idle":
-      return <Circle className={cn("size-2.5 shrink-0 fill-emerald-400 text-emerald-400", className)} {...common} />;
+      return <Circle className={cn("size-2.5 shrink-0 fill-success text-success", className)} {...common} />;
     default:
       return <Bot className={cn("size-3.5 shrink-0 text-muted-foreground", className)} {...common} />;
   }

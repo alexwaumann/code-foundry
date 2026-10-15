@@ -84,7 +84,7 @@ export function WorktreeState({ repoId, path, showPath = false }: { repoId: stri
           {tildify(path)}
         </span>
         <span className="ml-auto flex shrink-0 items-center gap-2 pl-1 text-[11px] text-muted-foreground tabular-nums">
-          {missing && <span className="text-amber-300">missing</span>}
+          {missing && <span className="text-warning">missing</span>}
           <LiveThreads path={path} />
         </span>
       </span>
@@ -92,7 +92,7 @@ export function WorktreeState({ repoId, path, showPath = false }: { repoId: stri
   }
   return (
     <span className="flex min-w-0 flex-1 items-center gap-2">
-      <GitBranch className={cn("size-3.5 shrink-0", isMain ? "text-muted-foreground" : "text-violet-400/90")} aria-hidden />
+      <GitBranch className={cn("size-3.5 shrink-0", isMain ? "text-muted-foreground" : "text-highlight/90")} aria-hidden />
       <span className="max-w-[45%] shrink-0 truncate font-mono text-[13px]" data-testid="worktree-branch">
         {branch}
       </span>
@@ -102,10 +102,10 @@ export function WorktreeState({ repoId, path, showPath = false }: { repoId: stri
         </span>
       )}
       <span className="ml-auto flex shrink-0 items-center gap-2 pl-1 text-[11px] text-muted-foreground tabular-nums">
-        {missing && <span className="text-amber-300">missing</span>}
+        {missing && <span className="text-warning">missing</span>}
         <LiveThreads path={path} />
         {dirty && (
-          <span className="flex items-center gap-0.5 text-amber-400" title={`${String(changes)} changed`} data-testid="worktree-dirty">
+          <span className="flex items-center gap-0.5 text-warning" title={`${String(changes)} changed`} data-testid="worktree-dirty">
             <CircleDot className="size-3" aria-label="dirty" />
             {changes > 0 && changes}
           </span>

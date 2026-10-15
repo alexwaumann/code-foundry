@@ -7,8 +7,8 @@ import { inlineImagePaths, parseUserMessage } from "@/lib/userMessage";
 import { useAttachmentUrl } from "@/stores/attachmentImages";
 import { useReposStore } from "@/stores/repos";
 
-/** The image chip's accent (green, the sketch's), light / dark. */
-const IMAGE_ACCENT = "[--chip-accent:oklch(0.62_0.13_152)] dark:[--chip-accent:oklch(0.76_0.12_152)]";
+/** The image chip's accent: green, the success token. */
+const IMAGE_ACCENT = "[--chip-accent:var(--success)]";
 
 /** The lightbox for an image the message sent. */
 function ImagePreview({ open, onClose, url, name }: { open: boolean; onClose: () => void; url: string; name: string }) {

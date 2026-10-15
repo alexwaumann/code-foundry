@@ -200,7 +200,7 @@ function StaleBanner({ fetchedAtMs, lastError }: { fetchedAtMs: number | null; l
 
 function Banner({ children, testId }: { children: ReactNode; testId: string }) {
   return (
-    <div className="mx-4 mt-3 flex items-start gap-2 rounded-md border border-amber-600/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:border-amber-400/30 dark:text-amber-200" role="status" data-testid={testId}>
+    <div className="mx-4 mt-3 flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning" role="status" data-testid={testId}>
       <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 break-words">{children}</span>
     </div>

@@ -50,7 +50,7 @@ function Overlay({ state }: { state: AttachState }) {
     return (
       <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center" data-testid="exit-overlay">
         <div className="pointer-events-auto flex items-center gap-2 rounded-md border bg-popover/95 px-3 py-2 text-sm shadow-lg backdrop-blur">
-          <CircleX className={state.exitCode === 0 ? "size-4 text-muted-foreground" : "size-4 text-red-400"} />
+          <CircleX className={state.exitCode === 0 ? "size-4 text-muted-foreground" : "size-4 text-destructive"} />
           <span>
             Process exited with code <span className="font-mono">{state.exitCode ?? "?"}</span>
           </span>

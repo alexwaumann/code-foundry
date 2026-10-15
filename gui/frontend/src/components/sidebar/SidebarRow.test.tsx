@@ -66,7 +66,7 @@ describe("SidebarRow running agents", () => {
   it("is sky with a bot icon", () => {
     renderRow({ agentsRunning: 2 });
     const el = screen.getByTestId("row-agents");
-    expect(el.className).toContain("text-sky-600");
+    expect(el.className).toContain("text-info");
     expect(el.querySelector("svg")).not.toBeNull();
   });
 });
@@ -138,7 +138,7 @@ describe("SidebarRow line 2 after a snooze", () => {
   it("a woken thread reads Snooze ended with how long ago, amber, without the place", () => {
     renderRow({ state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() - 2 * 60_000 });
     expect(screen.getByTestId("row-place").textContent).toBe("Snooze ended · 2 min ago");
-    expect(screen.getByTestId("row-status").className).toContain("text-amber-600");
+    expect(screen.getByTestId("row-status").className).toContain("text-warning");
     expect(screen.getByTestId("row-place").getAttribute("data-status-line")).toBe("snoozeEnded");
   });
 });

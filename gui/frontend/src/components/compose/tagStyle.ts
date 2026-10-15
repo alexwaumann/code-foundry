@@ -2,12 +2,12 @@ import { cn } from "@/lib/utils";
 import type { TagKind } from "@/lib/prompt";
 
 /**
- * The accent of a text tag, as `--chip-accent` (light / dark). Image chips sample theirs
- * from the thumbnail (AttachmentChip).
+ * The accent of a text tag, as `--chip-accent`: a theme token, so it follows the scheme.
+ * Image chips sample theirs from the thumbnail (AttachmentChip).
  */
 export const TAG_ACCENT: Record<Exclude<TagKind, "image">, string> = {
-  skill: "[--chip-accent:oklch(0.62_0.17_300)] dark:[--chip-accent:oklch(0.78_0.14_300)]",
-  file: "[--chip-accent:oklch(0.6_0.14_230)] dark:[--chip-accent:oklch(0.78_0.12_230)]",
+  skill: "[--chip-accent:var(--highlight)]",
+  file: "[--chip-accent:var(--info)]",
 };
 
 /**

@@ -19,7 +19,7 @@ type View =
 type Clone = { state: "idle" } | { state: "running"; lines: CloneProgressView[] } | { state: "failed"; lines: CloneProgressView[]; error: string };
 
 function Badge({ children, tone = "muted" }: { children: string; tone?: "muted" | "amber" }) {
-  const cls = tone === "amber" ? "border-amber-500/40 text-amber-300" : "border-border text-muted-foreground";
+  const cls = tone === "amber" ? "border-warning/40 text-warning" : "border-border text-muted-foreground";
   return <span className={`shrink-0 rounded border px-1.5 py-px text-[10px] font-medium tracking-wide uppercase ${cls}`}>{children}</span>;
 }
 
@@ -155,7 +155,7 @@ function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (
           Clones into <span className="font-mono text-foreground" data-testid="add-project-clone-dest">{tildify(repo.clonePath)}</span>
         </span>
         {repo.clonePathExists && (
-          <span className="text-xs text-amber-300" data-testid="add-project-clone-exists">
+          <span className="text-xs text-warning" data-testid="add-project-clone-exists">
             That folder already exists, so it cannot be cloned there. Add the existing folder instead.
           </span>
         )}

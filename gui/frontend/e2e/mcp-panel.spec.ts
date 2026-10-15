@@ -117,7 +117,7 @@ test("Reconnect on the failed card: Connecting… with a spinner, then Connected
   expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
   await expectMcpTab(page);
   const pw = card(page, "playwright");
-  await expect(pw.getByTestId("mcp-reconnect")).toHaveClass(/border-amber-500/);
+  await expect(pw.getByTestId("mcp-reconnect")).toHaveClass(/border-warning\/40/);
   await pw.getByTestId("mcp-reconnect").click();
   await expect(pw).toHaveAttribute("data-status", "pending");
   await expect(pw.getByTestId("mcp-pill")).toHaveText("Connecting…");

@@ -79,7 +79,7 @@ export function MergeButton({ prRef, detail }: { prRef: PrRef; detail: PullReque
           Merge into <span className="font-mono">{pr.baseRef}</span>
         </DropdownMenuLabel>
         {a.notes.map((n) => (
-          <p key={n} className="px-2 pb-1.5 text-xs text-amber-700 dark:text-amber-300" data-testid="pr-merge-note">
+          <p key={n} className="px-2 pb-1.5 text-xs text-warning" data-testid="pr-merge-note">
             {n}
           </p>
         ))}

@@ -140,7 +140,7 @@ export function NewTab({ active }: { active: boolean }) {
           </span>
         )}
         {created && (
-          <span className="text-xs text-emerald-400" data-testid="add-project-new-created">
+          <span className="text-xs text-success" data-testid="add-project-new-created">
             Created {created.name}. It stays a local project until it is published; closing this dialog deletes it.
           </span>
         )}

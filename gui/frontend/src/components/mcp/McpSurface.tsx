@@ -26,18 +26,18 @@ function useThreadId(): string {
 }
 
 const DOT: Record<McpServerStatusView, string> = {
-  connected: "bg-emerald-500",
-  failed: "bg-red-500",
-  "needs-auth": "bg-amber-500",
+  connected: "bg-success",
+  failed: "bg-destructive",
+  "needs-auth": "bg-warning",
   pending: "bg-muted-foreground/60",
   disabled: "border-[1.5px] border-muted-foreground/50",
   unknown: "bg-muted-foreground/40",
 };
 
 const PILL: Record<McpServerStatusView, string> = {
-  connected: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  failed: "bg-red-500/15 text-red-600 dark:text-red-400",
-  "needs-auth": "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  connected: "bg-success/15 text-success",
+  failed: "bg-destructive/15 text-destructive",
+  "needs-auth": "bg-warning/15 text-warning",
   pending: "bg-muted text-muted-foreground",
   disabled: "bg-muted text-muted-foreground",
   unknown: "bg-muted text-muted-foreground",
@@ -62,7 +62,7 @@ function Header({ threadId }: { threadId: string }) {
   return (
     <header className="flex min-w-0 flex-col gap-0.5 border-b border-pane-border px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="mcp-header">
       <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
-        <Plug className="size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+        <Plug className="size-4 shrink-0 text-warning" aria-hidden />
         <span className="min-w-0 truncate">MCP servers</span>
         {h && (
           <span className="ml-auto shrink-0 text-xs font-normal text-muted-foreground tabular-nums" data-testid="mcp-count">
@@ -96,7 +96,7 @@ function HintIcon({ hint }: { hint: ToolHint }) {
   return (
     <Tooltip disableHoverableContent>
       <TooltipTrigger asChild>
-        <span role="img" aria-label={label} className={cn("inline-flex", hint === "destructive" && "text-red-600 dark:text-red-400")} data-testid="mcp-hint" data-hint={hint}>
+        <span role="img" aria-label={label} className={cn("inline-flex", hint === "destructive" && "text-destructive")} data-testid="mcp-hint" data-hint={hint}>
           <Icon className="size-3" aria-hidden />
         </span>
       </TooltipTrigger>
@@ -144,8 +144,8 @@ function ServerCard({ threadId, name }: { threadId: string; name: string }) {
     <div
       className={cn(
         "flex min-w-0 flex-col gap-1.5 rounded-[10px] border border-border px-3 pt-2.5 pb-2",
-        shown === "failed" && "border-red-500/35",
-        shown === "needs-auth" && "border-amber-500/35",
+        shown === "failed" && "border-destructive/35",
+        shown === "needs-auth" && "border-warning/35",
         shown === "disabled" && "opacity-65",
       )}
       data-testid="mcp-card"
@@ -180,11 +180,11 @@ function ServerCard({ threadId, name }: { threadId: string; name: string }) {
         </div>
       )}
       {server.error ? (
-        <div className="font-mono text-[11.5px] leading-4 break-words text-red-600 dark:text-red-400" data-testid="mcp-error">
+        <div className="font-mono text-[11.5px] leading-4 break-words text-destructive" data-testid="mcp-error">
           {server.error}
         </div>
       ) : server.status === "needs-auth" ? (
-        <div className="text-xs leading-4 text-amber-700 dark:text-amber-400" data-testid="mcp-login-hint">
+        <div className="text-xs leading-4 text-warning" data-testid="mcp-login-hint">
           {MCP_LOGIN_HINT}
         </div>
       ) : null}
@@ -196,7 +196,7 @@ function ServerCard({ threadId, name }: { threadId: string; name: string }) {
               className={cn(
                 "inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-xs font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-60",
                 attention
-                  ? "border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+                  ? "border-warning/40 text-warning hover:bg-warning/10"
                   : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent/50",
               )}
               disabled={reconnecting || !live}
