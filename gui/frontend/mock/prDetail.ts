@@ -917,7 +917,9 @@ export class PrDetailWorld {
     const d = this.detailOf(slug, number);
     const pr = d.pullRequest;
     const refusal = ownRefusals[event];
-    if (refusal && pr?.author === this.h.viewer) {
+    // Logins compare case-insensitively, as the daemon (and GitHub) do.
+    const viewer = this.h.viewer.toLowerCase();
+    if (refusal && (pr?.author ?? "").toLowerCase() === viewer) {
       // GitHub refused: the daemon invalidates the detail anyway (it may have changed).
       this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
       throw new PrDetailError("failed_precondition", `failed precondition: ${refusal}`);
@@ -927,11 +929,11 @@ export class PrDetailWorld {
     const url = `https://github.com/${slug}/pull/${String(number)}#pullrequestreview-${id}`;
     d.comments = [...(d.comments ?? []), { id, kind: PullRequestCommentKind.REVIEW, author: this.h.viewer, authorAvatarUrl: avatar(this.h.viewer), body: b, createdAt: now, url, reviewState: state }];
     // Requested first, then the most recent review first: the viewer leads the reviewed.
-    const rest = (d.reviewers ?? []).filter((r) => r.login !== this.h.viewer);
+    const rest = (d.reviewers ?? []).filter((r) => (r.login ?? "").toLowerCase() !== viewer);
     const requested = rest.filter((r) => r.requested);
     const reviewed = rest.filter((r) => !r.requested);
     d.reviewers = [...requested, { login: this.h.viewer, state, submittedAt: now, requested: false, stale: false, avatarUrl: avatar(this.h.viewer) }, ...reviewed];
-    const cand = this.candidates.get(key(slug, number))?.find((c) => c.login === this.h.viewer);
+    const cand = this.candidates.get(key(slug, number))?.find((c) => (c.login ?? "").toLowerCase() === viewer);
     if (cand) cand.isRequested = false;
     this.touch(d, now);
     this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
