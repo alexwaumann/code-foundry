@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { keepVisibility, visibilityLabels, visibilityOptions, type Visibility } from "@/lib/publish";
 import type { OwnersState, PublishChoice } from "./usePublishOwners";
+import { Tip } from "@/components/ui/tooltip";
 
 const visibilityIcons: Record<Visibility, typeof Globe> = { public: Globe, internal: Users, private: Lock };
 
@@ -104,16 +105,17 @@ export function PublishPicker({
             {options.map((v) => {
               const Icon = visibilityIcons[v];
               return (
-                <RadioGroupPrimitive.Item
-                  key={v}
-                  value={v}
-                  title={visibilityHints[v]}
-                  className="inline-flex h-full items-center gap-1.5 rounded-md border border-transparent px-2.5 text-xs font-medium text-foreground/70 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50 data-[state=checked]:bg-background data-[state=checked]:text-foreground data-[state=checked]:shadow-sm dark:data-[state=checked]:border-input dark:data-[state=checked]:bg-input/30 [&_svg]:size-3.5"
-                  data-testid={`publish-visibility-${v}`}
-                >
-                  <Icon aria-hidden />
-                  {visibilityLabels[v]}
-                </RadioGroupPrimitive.Item>
+                // The tooltip's data-state wins on the item, so checked is styled from aria-checked.
+                <Tip key={v} label={visibilityHints[v]}>
+                  <RadioGroupPrimitive.Item
+                    value={v}
+                    className="inline-flex h-full items-center gap-1.5 rounded-md border border-transparent px-2.5 text-xs font-medium text-foreground/70 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50 aria-checked:bg-background aria-checked:text-foreground aria-checked:shadow-sm dark:aria-checked:border-input dark:aria-checked:bg-input/30 [&_svg]:size-3.5"
+                    data-testid={`publish-visibility-${v}`}
+                  >
+                    <Icon aria-hidden />
+                    {visibilityLabels[v]}
+                  </RadioGroupPrimitive.Item>
+                </Tip>
               );
             })}
           </RadioGroupPrimitive.Root>

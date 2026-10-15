@@ -8,6 +8,7 @@ import { useActionsStore } from "@/stores/actions";
 import { useStopRequested } from "@/stores/actionStops";
 import { useTerminalsStore } from "@/stores/terminals";
 import { ACTION_ICON } from "./actionIcons";
+import { Tip } from "@/components/ui/tooltip";
 
 /** An action tab's status from its terminal and a pressed Stop (a primitive, for a narrow selector). */
 function useTabStatus(id: string): ActionTabStatus {
@@ -49,17 +50,19 @@ function useCommand(id: string): string {
 /**
  * The dimmed `$ command` above an action's terminal. The PTY does not print it (the shell
  * runs it from argv), so it is drawn here, from the run. A multi-line command shows its
- * first line and "+N lines" (the whole command in the tooltip).
+ * first line and "+N lines" (the whole command in the tooltip, as for a line cut short).
  */
 export function ActionEcho({ id }: { id: string }) {
   const command = useCommand(id);
   const { first, more } = commandEcho(command);
   if (!first) return null;
   return (
-    <div className="flex shrink-0 items-baseline gap-2 bg-pane pt-1.5 pr-3 pl-[9px] font-mono text-xs leading-[17px] text-muted-foreground" title={command} data-testid="action-echo">
-      <span className="min-w-0 truncate">$ {first}</span>
-      {more > 0 && <span className="shrink-0 font-sans text-[11px] opacity-80">+{more} {more === 1 ? "line" : "lines"}</span>}
-    </div>
+    <Tip label={command} whenTruncated={more === 0} align="start">
+      <div className="flex shrink-0 items-baseline gap-2 bg-pane pt-1.5 pr-3 pl-[9px] font-mono text-xs leading-[17px] text-muted-foreground" data-testid="action-echo">
+        <span className="min-w-0 truncate">$ {first}</span>
+        {more > 0 && <span className="shrink-0 font-sans text-[11px] opacity-80">+{more} {more === 1 ? "line" : "lines"}</span>}
+      </div>
+    </Tip>
   );
 }
 

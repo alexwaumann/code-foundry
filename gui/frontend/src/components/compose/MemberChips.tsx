@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { addAlsoIn, getDraft, removeAlsoIn, setPrimary } from "@/stores/compose";
 import { requestConfirm } from "@/stores/confirm";
 import { useReposStore } from "@/stores/repos";
+import { Tip } from "@/components/ui/tooltip";
 
 /**
  * Removes an "Also in" project. When tags in the text refer to it (its skills, files),
@@ -86,19 +87,20 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
         )}
       </button>
       {member.removable && (
-        <button
-          type="button"
-          disabled={disabled}
-          aria-label={`Remove ${name}`}
-          title={`Remove ${name}`}
-          data-compose-stop
-          className="mr-1 flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:hidden"
-          onClick={() => {
-            void removeWithConfirm(draftKey, member.repoId, name);
-          }}
-        >
-          <X className="size-3" />
-        </button>
+        <Tip label={`Remove ${name}`}>
+          <button
+            type="button"
+            disabled={disabled}
+            aria-label={`Remove ${name}`}
+            data-compose-stop
+            className="mr-1 flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:hidden"
+            onClick={() => {
+              void removeWithConfirm(draftKey, member.repoId, name);
+            }}
+          >
+            <X className="size-3" />
+          </button>
+        </Tip>
       )}
     </li>
   );

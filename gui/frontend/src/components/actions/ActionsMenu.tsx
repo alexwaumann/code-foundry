@@ -10,6 +10,7 @@ import { useCommandsStore } from "@/stores/commands";
 import { useReposStore } from "@/stores/repos";
 import { useSessionsStore } from "@/stores/sessions";
 import { ACTION_ICON } from "./actionIcons";
+import { Tip } from "@/components/ui/tooltip";
 
 type From = "thread" | "projects";
 
@@ -46,23 +47,24 @@ function ActionItem({ id, onRun, onEdit }: { id: string; onRun: (id: string) => 
     >
       <Icon aria-hidden />
       <span className="min-w-0 flex-1 truncate">{action.name}</span>
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label={`Edit ${action.name}`}
-        title={`Edit ${action.name}`}
-        data-testid="action-edit"
-        className="-my-0.5 flex size-6 shrink-0 items-center justify-center rounded-[5px] text-muted-foreground opacity-0 group-hover/item:opacity-100 group-data-[highlighted]/item:opacity-100 hover:bg-foreground/10 hover:text-foreground [&_svg]:size-3.5"
-        onPointerDown={stop}
-        onPointerUp={stop}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onEdit(id);
-        }}
-      >
-        <Pencil aria-hidden />
-      </button>
+      <Tip label={`Edit ${action.name}`}>
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label={`Edit ${action.name}`}
+          data-testid="action-edit"
+          className="-my-0.5 flex size-6 shrink-0 items-center justify-center rounded-[5px] text-muted-foreground opacity-0 group-hover/item:opacity-100 group-data-[highlighted]/item:opacity-100 hover:bg-foreground/10 hover:text-foreground [&_svg]:size-3.5"
+          onPointerDown={stop}
+          onPointerUp={stop}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onEdit(id);
+          }}
+        >
+          <Pencil aria-hidden />
+        </button>
+      </Tip>
     </DropdownMenuItem>
   );
 }
@@ -125,42 +127,42 @@ export function ActionsMenu({ repoId, owner, from, variant, testId }: { repoId: 
         setOpen(o);
       }}
     >
-      <DropdownMenuTrigger asChild>
-        {variant === "header" ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            title={label}
-            aria-label={label}
-            tabIndex={-1}
-            data-testid={testId}
-            className="[--wails-draggable:no-drag] data-[state=open]:bg-accent data-[state=open]:text-accent-foreground dark:data-[state=open]:bg-accent/50"
-            onMouseDown={(e) => {
-              e.preventDefault();
-            }}
-          >
-            <Play aria-hidden className="size-3.5" />
-          </Button>
-        ) : (
-          <button
-            type="button"
-            tabIndex={-1}
-            aria-label={label}
-            title={label}
-            data-testid={testId}
-            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground [&_svg]:size-3.5"
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-            }}
-          >
-            <Play aria-hidden />
-          </button>
-        )}
-      </DropdownMenuTrigger>
+      <Tip label={label}>
+        <DropdownMenuTrigger asChild>
+          {variant === "header" ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={label}
+              tabIndex={-1}
+              data-testid={testId}
+              className="[--wails-draggable:no-drag] aria-expanded:bg-accent aria-expanded:text-accent-foreground dark:aria-expanded:bg-accent/50"
+              onMouseDown={(e) => {
+                e.preventDefault();
+              }}
+            >
+              <Play aria-hidden className="size-3.5" />
+            </Button>
+          ) : (
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label={label}
+              data-testid={testId}
+              className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground [&_svg]:size-3.5"
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+              }}
+            >
+              <Play aria-hidden />
+            </button>
+          )}
+        </DropdownMenuTrigger>
+      </Tip>
       <DropdownMenuContent
         align="end"
         className="min-w-52"

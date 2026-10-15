@@ -60,6 +60,7 @@ import { loadSkills } from "@/stores/skills";
 import { DASHBOARD, useUiStore } from "@/stores/ui";
 import { useRememberedWorkIn } from "@/stores/workIn";
 import { useWorkspacesStore } from "@/stores/workspaces";
+import { Tip } from "@/components/ui/tooltip";
 
 const SEP = "\u0001";
 
@@ -226,7 +227,6 @@ export function Attachments({ draftKey, disabled, refocus }: { draftKey: string;
         >
           <button
             type="button"
-            title="Open preview"
             aria-label={`Preview ${a.file.name}, ${formatAttachmentSize(a.file.size)}`}
             aria-haspopup="dialog"
             data-testid="attachment-open"
@@ -571,18 +571,22 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
             contentClassName="w-60"
             data-testid="composer-permission"
           />
-          <button
-            type="button"
-            disabled={busy}
-            aria-label="Attach images"
-            title="Attach images"
-            data-compose-stop
-            data-testid="composer-attach"
-            className="ml-auto flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
-            onClick={() => fileRef.current?.click()}
-          >
-            <Paperclip className="size-4" />
-          </button>
+          {/* The span carries the tooltip while the button is disabled (no pointer events). */}
+          <Tip label="Attach images">
+            <span className="ml-auto flex">
+              <button
+                type="button"
+                disabled={busy}
+                aria-label="Attach images"
+                data-compose-stop
+                data-testid="composer-attach"
+                className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+                onClick={() => fileRef.current?.click()}
+              >
+                <Paperclip className="size-4" />
+              </button>
+            </span>
+          </Tip>
           <input
             ref={fileRef}
             type="file"
@@ -665,29 +669,33 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
           <CompletionCard completion={completion} />
         </div>
         <div className="col-start-2 row-start-2 flex items-end pr-2 pb-2">
-          <button
-            type="button"
-            disabled={!canSend}
-            aria-label={busy ? phaseText(phase, newWorktrees) : "Start thread"}
-            title="Start thread"
-            data-compose-stop
-            data-testid="composer-send"
-            data-phase={phase}
-            className={cn(
-              "flex h-8 items-center justify-center gap-1.5 rounded-full bg-primary text-primary-foreground outline-none transition-all hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none",
-              busy ? "px-3 text-xs font-medium" : "w-8 disabled:opacity-40",
-            )}
-            onClick={send}
-          >
-            {busy ? (
-              <>
-                <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                {phaseText(phase, newWorktrees)}
-              </>
-            ) : (
-              <ArrowUp className="size-4" aria-hidden />
-            )}
-          </button>
+          {/* Icon-only until it sends; the span carries the tooltip while it is disabled. */}
+          <Tip label={busy ? null : "Start thread"}>
+            <span className="flex">
+              <button
+                type="button"
+                disabled={!canSend}
+                aria-label={busy ? phaseText(phase, newWorktrees) : "Start thread"}
+                data-compose-stop
+                data-testid="composer-send"
+                data-phase={phase}
+                className={cn(
+                  "flex h-8 items-center justify-center gap-1.5 rounded-full bg-primary text-primary-foreground outline-none transition-all hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none",
+                  busy ? "px-3 text-xs font-medium" : "w-8 disabled:opacity-40",
+                )}
+                onClick={send}
+              >
+                {busy ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                    {phaseText(phase, newWorktrees)}
+                  </>
+                ) : (
+                  <ArrowUp className="size-4" aria-hidden />
+                )}
+              </button>
+            </span>
+          </Tip>
         </div>
       </div>
     </div>

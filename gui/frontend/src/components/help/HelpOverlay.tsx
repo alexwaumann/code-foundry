@@ -6,6 +6,7 @@ import { Markdown } from "@/components/pr/Markdown";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tip } from "@/components/ui/tooltip";
 import { viewActions } from "@/keys/bindings";
 import { helpSections, type LocalChord } from "@/keys/help";
 import { cn } from "@/lib/utils";
@@ -78,15 +79,13 @@ function Shortcuts() {
           <h4 className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{s.title}</h4>
           <ul className="space-y-0.5">
             {s.items.map((i) => (
-              <li
-                key={`${i.command ?? ""}:${i.label}`}
-                className="flex items-center justify-between gap-3 text-sm"
-                data-help-command={i.command}
-                title={i.available ? i.command : `${i.command ?? ""} (not available here)`}
-              >
-                <span className={i.available ? "truncate" : "truncate text-muted-foreground"}>{i.label}</span>
-                <Keys keys={i.keys} />
-              </li>
+              // The tooltip names the command (and why a dimmed one is dimmed).
+              <Tip key={`${i.command ?? ""}:${i.label}`} label={i.command && (i.available ? i.command : `${i.command} (not available here)`)} align="start">
+                <li className="flex items-center justify-between gap-3 text-sm" data-help-command={i.command}>
+                  <span className={i.available ? "truncate" : "truncate text-muted-foreground"}>{i.label}</span>
+                  <Keys keys={i.keys} />
+                </li>
+              </Tip>
             ))}
           </ul>
         </div>

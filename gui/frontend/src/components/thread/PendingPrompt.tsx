@@ -29,6 +29,7 @@ import { respondThread } from "@/stores/threadActions";
 import { TokenSpans } from "./Code";
 import { useThreadCtx } from "./context";
 import { DiffView } from "./DiffView";
+import { Tip } from "@/components/ui/tooltip";
 
 /**
  * The docked prompts (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
@@ -139,18 +140,13 @@ function PromptDiff({ r }: { r: ThreadRequestView }) {
 function AskingAgent({ toolUseId }: { toolUseId: string }) {
   const { sessionId } = useThreadCtx();
   const label = askingAgentLabel(useAgentInputOf(sessionId, toolUseId));
+  // A tooltip only for a label a narrow pane cut short.
   return (
-    <span
-      className="chip muted agent"
-      data-testid="thread-asking-agent"
-      onMouseEnter={(e) => {
-        // A tooltip only for a label a narrow pane cut short.
-        const el = e.currentTarget;
-        el.title = el.scrollWidth > el.clientWidth ? label : "";
-      }}
-    >
-      {label}
-    </span>
+    <Tip label={label} whenTruncated>
+      <span className="chip muted agent" data-testid="thread-asking-agent">
+        {label}
+      </span>
+    </Tip>
   );
 }
 

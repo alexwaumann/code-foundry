@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Clock, Eye, Globe, LoaderCircle, Pencil, Plug, RefreshCw, TriangleAlert, type LucideIcon } from "lucide-react";
 import type { McpServerStatusView, McpToolView } from "@/api/mcp";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import {
   canReconnect,
@@ -73,17 +73,21 @@ function Header({ threadId }: { threadId: string }) {
       <span className="flex min-h-6 min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
         <Clock className="size-3.5 shrink-0" aria-hidden />
         {h ? <CheckedText checkedAtMs={h.checkedAtMs} trigger={h.trigger} server={h.server} /> : <span className="min-w-0 truncate">Not checked yet</span>}
-        <button
-          type="button"
-          className="ml-auto inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 dark:hover:bg-accent/50"
-          aria-label="Refresh MCP servers"
-          title="Refresh"
-          disabled={!connected || refreshing}
-          onClick={() => void refreshMcp(threadId)}
-          data-testid="mcp-refresh"
-        >
-          <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} aria-hidden />
-        </button>
+        {/* The span carries the tooltip while the button is disabled (no pointer events). */}
+        <Tip label="Refresh">
+          <span className="ml-auto inline-flex shrink-0">
+            <button
+              type="button"
+              className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 dark:hover:bg-accent/50"
+              aria-label="Refresh MCP servers"
+              disabled={!connected || refreshing}
+              onClick={() => void refreshMcp(threadId)}
+              data-testid="mcp-refresh"
+            >
+              <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} aria-hidden />
+            </button>
+          </span>
+        </Tip>
       </span>
     </header>
   );
@@ -94,16 +98,11 @@ function HintIcon({ hint }: { hint: ToolHint }) {
   const Icon = HINT_ICON[hint];
   const label = TOOL_HINT_LABEL[hint];
   return (
-    <Tooltip disableHoverableContent>
-      <TooltipTrigger asChild>
-        <span role="img" aria-label={label} className={cn("inline-flex", hint === "destructive" && "text-destructive")} data-testid="mcp-hint" data-hint={hint}>
-          <Icon className="size-3" aria-hidden />
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="top" className="px-2.5 py-1.5 text-xs" data-testid="mcp-hint-tooltip">
-        {label}
-      </TooltipContent>
-    </Tooltip>
+    <Tip label={label} data-testid="mcp-hint-tooltip">
+      <span role="img" aria-label={label} className={cn("inline-flex", hint === "destructive" && "text-destructive")} data-testid="mcp-hint" data-hint={hint}>
+        <Icon className="size-3" aria-hidden />
+      </span>
+    </Tip>
   );
 }
 
@@ -112,13 +111,15 @@ function ToolRow({ tool }: { tool: McpToolView }) {
     <li className="flex h-6 min-w-0 items-center gap-2 pl-1 text-xs" data-testid="mcp-tool" data-tool={tool.name}>
       {/* The description gives way first; a name wider than the row truncates on its own. */}
       <span className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="max-w-full shrink-0 truncate font-mono text-[11.5px]" title={tool.name}>
-          {tool.name}
-        </span>
-        {tool.description && (
-          <span className="min-w-0 truncate text-muted-foreground" title={tool.description}>
-            {tool.description}
+        <Tip label={tool.name} whenTruncated>
+          <span className="max-w-full shrink-0 truncate font-mono text-[11.5px]" data-testid="mcp-tool-name">
+            {tool.name}
           </span>
+        </Tip>
+        {tool.description && (
+          <Tip label={tool.description} whenTruncated>
+            <span className="min-w-0 truncate text-muted-foreground">{tool.description}</span>
+          </Tip>
         )}
       </span>
       <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
@@ -156,13 +157,17 @@ function ServerCard({ threadId, name }: { threadId: string; name: string }) {
         {shown === "pending" ? <LoaderCircle className="size-3 shrink-0 animate-spin text-muted-foreground" aria-hidden /> : <span className={cn("size-2 shrink-0 rounded-full", DOT[shown])} aria-hidden />}
         {/* The pill always shows: the version gives way first, then the name truncates. */}
         <span className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="max-w-full shrink-0 truncate font-semibold" title={server.name} data-testid="mcp-name">
-            {server.name}
-          </span>
-          {server.version && (
-            <span className="min-w-0 truncate font-mono text-[11.5px] text-muted-foreground" title={`v${server.version}`} data-testid="mcp-version">
-              v{server.version}
+          <Tip label={server.name} whenTruncated>
+            <span className="max-w-full shrink-0 truncate font-semibold" data-testid="mcp-name">
+              {server.name}
             </span>
+          </Tip>
+          {server.version && (
+            <Tip label={`v${server.version}`} whenTruncated>
+              <span className="min-w-0 truncate font-mono text-[11.5px] text-muted-foreground" data-testid="mcp-version">
+                v{server.version}
+              </span>
+            </Tip>
           )}
         </span>
         <span className={cn("shrink-0 rounded-full px-1.5 text-[10.5px] leading-4 font-medium whitespace-nowrap", PILL[shown])} data-testid="mcp-pill">
@@ -263,23 +268,21 @@ export function McpSurface() {
   if (!known) return <Message testId="mcp-missing">Select a thread to see its MCP servers.</Message>;
   return (
     // @container: tightens the padding when the panel is narrow (down to 280px).
-    <TooltipProvider delayDuration={300}>
-      <div className="@container flex min-w-0 flex-col" data-testid="mcp-surface" data-thread={threadId}>
-        <Header threadId={threadId} />
-        {status === undefined ? (
-          <Message testId="mcp-loading">Loading…</Message>
-        ) : status === null ? (
-          <Message testId="mcp-empty">{connected ? "Checking MCP servers…" : "The thread is not running. Reconnect it to see its MCP servers."}</Message>
-        ) : names.length === 0 ? (
-          <Message testId="mcp-none">Claude has no MCP servers in this thread.</Message>
-        ) : (
-          <div className="flex min-w-0 flex-col gap-2 px-3 py-2.5 @max-[340px]:px-2" data-testid="mcp-cards">
-            {names.map((n) => (
-              <ServerCard key={n} threadId={threadId} name={n} />
-            ))}
-          </div>
-        )}
-      </div>
-    </TooltipProvider>
+    <div className="@container flex min-w-0 flex-col" data-testid="mcp-surface" data-thread={threadId}>
+      <Header threadId={threadId} />
+      {status === undefined ? (
+        <Message testId="mcp-loading">Loading…</Message>
+      ) : status === null ? (
+        <Message testId="mcp-empty">{connected ? "Checking MCP servers…" : "The thread is not running. Reconnect it to see its MCP servers."}</Message>
+      ) : names.length === 0 ? (
+        <Message testId="mcp-none">Claude has no MCP servers in this thread.</Message>
+      ) : (
+        <div className="flex min-w-0 flex-col gap-2 px-3 py-2.5 @max-[340px]:px-2" data-testid="mcp-cards">
+          {names.map((n) => (
+            <ServerCard key={n} threadId={threadId} name={n} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

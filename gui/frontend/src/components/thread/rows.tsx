@@ -43,6 +43,7 @@ import { CodeRunContext } from "./codeContext";
 import { useThreadCtx } from "./context";
 import { AgentReport, ToolDetail } from "./ToolDetail";
 import { UserBubble } from "./UserBubble";
+import { Tip } from "@/components/ui/tooltip";
 
 const TOOL_ICONS: Readonly<Record<string, LucideIcon>> = {
   Bash: SquareTerminal,
@@ -521,9 +522,11 @@ function AgentNoteRow({ note, atMs }: { note: ReturnType<typeof parseAgentNote> 
         {note.name}
       </span>
       {note.summary && (
-        <span className="sum" title={note.summary} data-testid="thread-agent-note-summary">
-          {note.summary}
-        </span>
+        <Tip label={note.summary} whenTruncated>
+          <span className="sum" data-testid="thread-agent-note-summary">
+            {note.summary}
+          </span>
+        </Tip>
       )}
       {atMs !== null && (
         <span className="ago">
@@ -612,9 +615,11 @@ const FooterRow = memo(function FooterRow({ row }: { row: Extract<TimelineRow, {
       </button>
       <span className="flex-1" />
       {row.finals.length > 0 && (
-        <button type="button" className="tb" aria-label="Copy answer" title="Copy answer" onClick={copy}>
-          <Copy />
-        </button>
+        <Tip label="Copy answer">
+          <button type="button" className="tb" aria-label="Copy answer" onClick={copy}>
+            <Copy />
+          </button>
+        </Tip>
       )}
     </div>
   );

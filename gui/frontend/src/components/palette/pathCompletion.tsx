@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { ChevronRight, Folder, FolderGit2, FolderOpen } from "lucide-react";
 import { CommandGroup, CommandItem } from "@/components/ui/command";
+import { Tip } from "@/components/ui/tooltip";
 import type { PathListingState } from "./usePathListing";
 
 // Shared by the palette's path prompts and the Add Project dialog; the keys and the
@@ -10,16 +11,17 @@ import type { PathListingState } from "./usePathListing";
 /** The folder picker button beside a path input (only with the Wails host). */
 export function PickFolderButton({ onClick }: { onClick: () => void }) {
   return (
-    <button
-      type="button"
-      className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-      title="Choose folder…"
-      aria-label="Choose folder"
-      data-testid="pick-directory"
-      onClick={onClick}
-    >
-      <FolderOpen className="size-4" />
-    </button>
+    <Tip label="Choose folder…">
+      <button
+        type="button"
+        className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        aria-label="Choose folder"
+        data-testid="pick-directory"
+        onClick={onClick}
+      >
+        <FolderOpen className="size-4" />
+      </button>
+    </Tip>
   );
 }
 

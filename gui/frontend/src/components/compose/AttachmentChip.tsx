@@ -5,6 +5,7 @@ import { formatAttachmentSize, middleTruncate } from "@/lib/prompt";
 import { openPreview, useComposeStore } from "@/stores/compose";
 import { TagDraftContext } from "./tagContext";
 import { tagClass } from "./tagStyle";
+import { Tip } from "@/components/ui/tooltip";
 
 const DEFAULT_ACCENT = "oklch(0.62 0.16 16)";
 const accents = new Map<string, string | null>();
@@ -69,32 +70,34 @@ export function AttachmentChip({ id, label, selected, editor }: { id: string; la
   const accent = useAccent(att?.url);
   const name = att?.file.name ?? label;
   const size = att ? formatAttachmentSize(att.file.size) : "";
+  // A removed image says so in its tooltip; a present one shows its name and opens on click.
   return (
-    <NodeViewWrapper
-      as="span"
-      data-testid="prompt-chip"
-      data-tag-kind="image"
-      data-attachment-id={id}
-      data-missing={att ? undefined : "true"}
-      role="img"
-      aria-label={size ? `Image attachment, ${name}, ${size}` : `Image attachment, ${name} (removed)`}
-      title={att ? "Open preview" : `${name} (removed)`}
-      aria-keyshortcuts={att ? "Space" : undefined}
-      // A click selects the node (ProseMirror, on mousedown) and opens the preview; focus
-      // returns to the prompt with the chip still selected, where Space opens it again.
-      onClick={
-        att
-          ? () => {
-              openPreview(draftKey, id, editor.view.dom);
-            }
-          : undefined
-      }
-      style={{ "--chip-accent": accent }}
-      className={tagClass(selected, att ? "cursor-pointer" : "border-dashed")}
-    >
-      {att ? <img src={att.url} alt="" draggable={false} className="size-[1.17em] shrink-0 rounded-sm object-cover" /> : <ImageIcon aria-hidden className="size-[1.17em] shrink-0" />}
-      <span className="truncate">{middleTruncate(name)}</span>
-      {size && <span className="shrink-0 text-[0.8em] font-normal opacity-70">{size}</span>}
-    </NodeViewWrapper>
+    <Tip label={att ? null : `${name} (removed)`}>
+      <NodeViewWrapper
+        as="span"
+        data-testid="prompt-chip"
+        data-tag-kind="image"
+        data-attachment-id={id}
+        data-missing={att ? undefined : "true"}
+        role="img"
+        aria-label={size ? `Image attachment, ${name}, ${size}` : `Image attachment, ${name} (removed)`}
+        aria-keyshortcuts={att ? "Space" : undefined}
+        // A click selects the node (ProseMirror, on mousedown) and opens the preview; focus
+        // returns to the prompt with the chip still selected, where Space opens it again.
+        onClick={
+          att
+            ? () => {
+                openPreview(draftKey, id, editor.view.dom);
+              }
+            : undefined
+        }
+        style={{ "--chip-accent": accent }}
+        className={tagClass(selected, att ? "cursor-pointer" : "border-dashed")}
+      >
+        {att ? <img src={att.url} alt="" draggable={false} className="size-[1.17em] shrink-0 rounded-sm object-cover" /> : <ImageIcon aria-hidden className="size-[1.17em] shrink-0" />}
+        <span className="truncate">{middleTruncate(name)}</span>
+        {size && <span className="shrink-0 text-[0.8em] font-normal opacity-70">{size}</span>}
+      </NodeViewWrapper>
+    </Tip>
   );
 }

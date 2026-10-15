@@ -8,6 +8,7 @@ import { formatRunDuration } from "@/lib/actions";
 import { splitPathTail, tildify } from "@/lib/path";
 import { runAction } from "@/stores/actionActions";
 import { closeActionRunOutput, useActionDialogStore } from "@/stores/actionDialog";
+import { Tip } from "@/components/ui/tooltip";
 
 type Load = { phase: "loading" } | { phase: "loaded"; data: ActionRunOutputView } | { phase: "error"; message: string };
 
@@ -65,14 +66,17 @@ function RunOutput({ runId }: { runId: string }) {
         <span aria-hidden className="shrink-0 opacity-50">
           ·
         </span>
-        <span className="flex min-w-0 font-mono" title={run.worktreePath} data-testid="action-run-path">
-          <span className="min-w-0 shrink-[1000] truncate">{path.head}</span>
-          <span className="min-w-0 truncate">{path.tail}</span>
-        </span>
+        <Tip label={run.worktreePath} whenTruncated>
+          <span className="flex min-w-0 font-mono" data-testid="action-run-path">
+            <span className="min-w-0 shrink-[1000] truncate">{path.head}</span>
+            <span className="min-w-0 truncate">{path.tail}</span>
+          </span>
+        </Tip>
       </DialogDescription>
-      <p className="mt-3 truncate font-mono text-xs text-muted-foreground" title={run.command}>
-        $ {run.command.split("\n")[0]}
-      </p>
+      {/* The whole command when the line cuts it short or it has more lines. */}
+      <Tip label={run.command} whenTruncated={!run.command.includes("\n")} align="start">
+        <p className="mt-3 truncate font-mono text-xs text-muted-foreground">$ {run.command.split("\n")[0]}</p>
+      </Tip>
       <pre className="mt-1 max-h-72 overflow-auto rounded-md border bg-pane p-2.5 font-mono text-xs leading-[17px] whitespace-pre-wrap" data-testid="action-run-output">
         {truncated && <span className="text-muted-foreground">…{"\n"}</span>}
         {output || <span className="text-muted-foreground">(no output)</span>}

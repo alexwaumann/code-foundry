@@ -10,6 +10,7 @@ import { closeActionEditor, useActionDialogStore, type ActionEditorTarget } from
 import { useActionsStore } from "@/stores/actions";
 import { useReposStore } from "@/stores/repos";
 import { ACTION_ICON, ACTION_ICON_LABEL } from "./actionIcons";
+import { Tip } from "@/components/ui/tooltip";
 
 const inputClass =
   "w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60 aria-invalid:border-destructive";
@@ -293,10 +294,15 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
               Cancel
             </Button>
           </DialogClose>
-          <Button type="submit" size="sm" disabled={problem !== null || busy || gone} title={problem ?? undefined} data-testid="action-save">
-            {busy && <Loader2 className="animate-spin" aria-hidden />}
-            Save
-          </Button>
+          {/* Why Save is disabled; the span takes the hover a disabled button does not get. */}
+          <Tip label={problem}>
+            <span className="inline-flex">
+              <Button type="submit" size="sm" disabled={problem !== null || busy || gone} data-testid="action-save">
+                {busy && <Loader2 className="animate-spin" aria-hidden />}
+                Save
+              </Button>
+            </span>
+          </Tip>
         </div>
       )}
     </form>

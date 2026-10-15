@@ -4,6 +4,7 @@ import { Markdown, type MarkdownExtras } from "@/components/pr/Markdown";
 import { grammarFor, highlightLines, type MarkedToken, type Token } from "@/lib/highlight";
 import { useAttachmentUrl } from "@/stores/attachmentImages";
 import { CodeActions } from "./CodeActions";
+import { Tip } from "@/components/ui/tooltip";
 
 /** One line's tokens as spans (marked tokens wrapped in `mark`: ins or del). */
 export function TokenSpans({ tokens, mark }: { tokens: readonly (Token | MarkedToken)[]; mark?: "ins" | "del" }): ReactNode {
@@ -54,10 +55,13 @@ function LocalImage({ src, alt }: { src: string; alt: string }) {
   const { url, loading } = useAttachmentUrl(src);
   if (url) return <img src={url} alt={alt} />;
   return (
-    <span className="inline-flex items-center gap-1 rounded border px-1.5 text-xs text-muted-foreground" title={src}>
-      <ImageIcon className="size-3" aria-hidden />
-      {loading ? "Loading image…" : alt || src}
-    </span>
+    // The path, when the chip shows the alt text or "Loading image…" instead.
+    <Tip label={loading || alt ? src : null}>
+      <span className="inline-flex items-center gap-1 rounded border px-1.5 text-xs text-muted-foreground">
+        <ImageIcon className="size-3" aria-hidden />
+        {loading ? "Loading image…" : alt || src}
+      </span>
+    </Tip>
   );
 }
 
