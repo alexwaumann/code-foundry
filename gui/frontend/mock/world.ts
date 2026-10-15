@@ -61,7 +61,7 @@ interface MockSession {
   model: string;
   effort: string;
   state: SessionState;
-  /** Persisted like the daemon's: a disconnected thread keeps it (busy becomes ERROR "interrupted"). */
+  /** Persisted like the daemon's: a stopped thread keeps it (busy becomes ERROR "interrupted"). */
   status: SessionStatus;
   /** The detector's reason ("permission: Do you want to proceed?", "finished", "interrupted", …). */
   statusReason: string;
@@ -84,10 +84,10 @@ interface MockSession {
   pendingWorktreePath: string;
   /** session.pin. */
   pinned: boolean;
-  /** session.archive: when it was archived; null when not. Reconnect and pin(true) clear it, like the daemon. */
+  /** session.archive: when it was archived; null when not. A message and pin(true) clear it, like the daemon. */
   archivedAt: Date | null;
   /**
-   * session.snooze: when it wakes; null when not snoozed. Reconnect, pin(true) and archive
+   * session.snooze: when it wakes; null when not snoozed. A message, pin(true) and archive
    * clear it, like the daemon; the tick (or POST /__mock/session/wake) wakes it.
    */
   snoozedUntil: Date | null;
@@ -95,6 +95,8 @@ interface MockSession {
   effortPending: boolean;
   /** Mock-only: a new thread's first message, sent once it connects (the daemon sends it after the handshake). */
   firstMessage: { text: string; attachments: string[]; composerText: string } | null;
+  /** Mock-only: what runs once a started thread is up (a message that started it: its reply). */
+  onReady: (() => void)[];
   /** Claude's pr-link records: one per URL, first-seen order (POST /__mock/link-pr). */
   linkedPullRequests: { slug: string; number: number; url: string; linkedAt: Date }[];
   /** Token usage buckets (mock/usage.ts; POST /__mock/usage). */
@@ -187,15 +189,35 @@ export function snoozeUntil(args: Record<string, string>, now = Date.now()): Dat
 }
 
 /**
- * Why archiving would end a turn (the daemon's archiveInterrupts): starting, or connected
- * and busy, or waiting on a permission request or question; "" when it would not.
+ * Why stopping Claude now cuts something off (the daemon's midTurn): starting, or
+ * connected and busy, or waiting on a permission request or question; "" otherwise.
+ * Restarts count the threads this is set for (command.ActiveSession).
  */
-function archiveInterrupts(s: { state: SessionState; status: SessionStatus; statusReason: string }): string {
+function midTurn(s: { state: SessionState; status: SessionStatus; statusReason: string }): string {
   if (s.state === SessionState.STARTING) return "Claude is still working";
   if (s.state !== SessionState.CONNECTED) return "";
   if (s.status === SessionStatus.BUSY) return "Claude is still working";
   if (s.status === SessionStatus.NEEDS_ATTENTION && /^(permission|question):/.test(s.statusReason)) return "Claude is waiting on your answer";
   return "";
+}
+
+/** The daemon's backgroundRunning: "1 background agent and 2 shells are running". */
+function backgroundRunning(agents: number, shells: number): string {
+  const count = (n: number, word: string) => `${String(n)} ${word}${n === 1 ? "" : "s"}`;
+  const what = agents > 0 && shells > 0 ? `${count(agents, "background agent")} and ${count(shells, "shell")}` : agents > 0 ? count(agents, "background agent") : count(shells, "background shell");
+  return `${what} ${agents + shells === 1 ? "is" : "are"} running`;
+}
+
+/**
+ * What archiving (or snoozing) cuts off and what that ends (the daemon's
+ * archiveInterrupts): mid-turn ("ends the turn"), else the background agents and shells
+ * still running ("stops them"); empty strings when nothing.
+ */
+function archiveInterrupts(s: { state: SessionState; status: SessionStatus; statusReason: string }, agents: number, shells: number): { why: string; ends: string } {
+  const why = midTurn(s);
+  if (why) return { why, ends: "ends the turn" };
+  if (s.state !== SessionState.CONNECTED || agents + shells === 0) return { why: "", ends: "" };
+  return { why: backgroundRunning(agents, shells), ends: agents + shells === 1 ? "stops it" : "stops them" };
 }
 
 /** "end" closes attached streams (after the process exits). */
@@ -503,6 +525,9 @@ export class World {
       worktreeOf: (id) => this.session(id).worktreePath,
       modelOf: (id) => this.session(id).model,
       isConnected: (id) => this.session(id).state === SessionState.CONNECTED,
+      start: (id, ready) => {
+        this.startThread(id, ready);
+      },
       setStatus: (id, status, reason) => {
         const s = this.session(id);
         this.setStatus(s, status, reason);
@@ -568,7 +593,7 @@ export class World {
   /** UpdateService (Phase 3d): publishes into the events hub as the update source. */
   readonly update = new MockUpdater(
     (v) => this.events.publish({ source: EventSource.UPDATE, event: { event: { case: "update", value: v } } }),
-    () => [...this.sessions.values()].filter((s) => s.state !== SessionState.DISCONNECTED).length,
+    () => [...this.sessions.values()].filter((s) => midTurn(s) !== "").length,
   );
   /** Phase 3a GitHub dashboards/activity and worktree details (mock/github.ts). */
   readonly gh = new GhWorld(
@@ -626,7 +651,7 @@ export class World {
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
     this.addSession({ id: "s-1", repoId: "repo-cf", worktreePath: CF, name: "Refactor sidebar tree", model: "claude-opus-4-8[1m]", effort: "high", status: SessionStatus.BUSY, statusReason: "working: Refactor sidebar tree", createdAt: ago(42), usage: sampleUsage() });
     this.addSession({ id: "s-2", repoId: "repo-gp", worktreePath: GP, name: "Port renderer", model: "claude-sonnet-5[1m]", effort: "", status: SessionStatus.NEEDS_ATTENTION, statusReason: `permission: Bash ${SEEDS["s-2"]?.reply ?? ""}`, statusChangedAt: ago(3), createdAt: ago(40) });
-    this.addSession({ id: "s-3", repoId: "repo-cf", worktreePath: `${CFW}/fix-resize`, name: "Fix resize race", model: "claude-opus-4-8[1m]", effort: "medium", state: SessionState.DISCONNECTED, disconnectReason: "exited", createdAt: ago(300), lastActivityAt: ago(95), usage: pageUsage("s-3") });
+    this.addSession({ id: "s-3", repoId: "repo-cf", worktreePath: `${CFW}/fix-resize`, name: "Fix resize race", model: "claude-opus-4-8[1m]", effort: "medium", state: SessionState.DISCONNECTED, disconnectReason: "idle", createdAt: ago(300), lastActivityAt: ago(95), usage: pageUsage("s-3") });
     this.addSession({ id: "s-4", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Investigate flaky e2e", model: "claude-4.5-haiku[1m]", effort: "", state: SessionState.DISCONNECTED, disconnectReason: "crashed", exitCode: 139, createdAt: ago(200), lastActivityAt: ago(17), usage: pageUsage("s-4") });
     this.addSession({ id: "s-5", repoId: "repo-cf", worktreePath: `${CFW}/feat-sidebar`, name: "Write session docs", model: "claude-opus-4-8[1m]", effort: "low", state: SessionState.STARTING, settleIn: 8, createdAt: ago(0) });
     this.addSession({ id: "s-6", repoId: "repo-dot", worktreePath: `${HOME}/dotfiles`, name: "Tidy zshrc", model: "claude-sonnet-5[1m]", effort: "", state: SessionState.CLOSING, settleIn: 8, createdAt: ago(60) });
@@ -858,7 +883,7 @@ export class World {
   }
 
   /**
-   * session.run-in: a disconnected thread moves at once; a live one gets the target as
+   * session.run-in: a stopped thread moves at once; a running one gets the target as
    * pendingWorktreePath and moves ~2s after it stops being busy (MockSession.moveIn).
    * Asking for the current member cancels a queued move.
    */
@@ -920,13 +945,13 @@ export class World {
     this.actions.stopBackground((r) => r.worktreePath === path);
   }
 
-  /** workspace.remove-repo: refused while a live thread runs there or with changes (unless force). */
+  /** workspace.remove-repo: refused while a thread's Claude runs there or with changes (unless force). */
   removeWorkspaceRepo(workspace: string, repoRef: string, force: boolean): MockWorkspace {
     const ws = this.workspaceRef(workspace);
     const member = ws.members.find((m) => m.worktreePath === repoRef) ?? ws.members.find((m) => m.repoId === this.repoRef(repoRef).id);
     if (!member) throw new CommandError("unavailable", `${repoRef} is not a member of workspace ${ws.name}`);
     const busy = this.threadsIn([member.worktreePath])[0];
-    if (busy) throw new CommandError("unavailable", `thread ${busy.name || busy.id} (${busy.id}) running in ${member.worktreePath}; close it first`);
+    if (busy) throw new CommandError("unavailable", `thread ${busy.name || busy.id} (${busy.id}) running in ${member.worktreePath}; archive it first (that stops Claude)`);
     const wt = [...this.repos.values()].flatMap((r) => r.worktrees).find((w) => w.path === member.worktreePath);
     if (wt?.status.dirty && !force) throw new CommandError("unavailable", `remove worktree ${member.worktreePath}: it has uncommitted changes; use --force`);
     this.dropWorktree(member.worktreePath);
@@ -939,7 +964,7 @@ export class World {
   removeWorkspace(workspace: string, force: boolean): void {
     const ws = this.workspaceRef(workspace);
     const busy = this.threadsIn(ws.members.map((m) => m.worktreePath))[0];
-    if (busy) throw new CommandError("unavailable", `thread ${busy.name || busy.id} (${busy.id}) running in ${busy.worktreePath}; close it first`);
+    if (busy) throw new CommandError("unavailable", `thread ${busy.name || busy.id} (${busy.id}) running in ${busy.worktreePath}; archive them first (that stops Claude)`);
     const paths = new Set(ws.members.map((m) => m.worktreePath));
     const dirty = [...this.repos.values()].flatMap((r) => r.worktrees).find((w) => paths.has(w.path) && w.status.dirty);
     if (dirty && !force) throw new CommandError("unavailable", `worktree ${dirty.path} has uncommitted changes; use --force`);
@@ -975,6 +1000,7 @@ export class World {
       snoozedUntil: null,
       effortPending: false,
       firstMessage: null,
+      onReady: [],
       linkedPullRequests: [],
       usage: [],
       contextTokens: 0,
@@ -1047,12 +1073,12 @@ export class World {
   }
 
   /**
-   * Session → disconnected (its claude process is gone). Like the daemon, the status it had
+   * Session → stopped (its claude process is gone: the idle stop, a crash). Like the daemon, the status it had
    * is kept, except busy, which becomes ERROR "interrupted".
    * `status`, when given, is the status it had at that moment (tests use it: s-1 flips
    * busy/idle on a timer).
    */
-  disconnectSession(id: string, reason: string, code: number, status?: SessionStatus): void {
+  stopSession(id: string, reason: string, code: number, status?: SessionStatus): void {
     const s = this.session(id);
     if (status !== undefined) this.setStatus(s, status);
     if (s.status === SessionStatus.BUSY) this.setStatus(s, SessionStatus.ERROR, "interrupted");
@@ -1148,11 +1174,19 @@ export class World {
     this.threads.load(id, state);
     // The agents panel sketch's thread (mock/agents.ts).
     if (state === "agents") s.name = "Agents panel";
-    if (state === "closed") this.disconnectSession(id, "closed", 0);
+    if (state === "stopped") {
+      // Stopped at its prompt cache expiry: the last result is past the TTL, so the
+      // composer's cold-cache note shows (the daemon's idle stop).
+      s.lastResultAt = new Date(Date.now() - (this.cacheTTLSeconds() + 120) * 1000);
+      this.stopSession(id, "idle", 0, SessionStatus.IDLE);
+    }
     if (state === "crashed") {
-      // Before the handshake: no turn ran, so no status to keep.
-      s.lastError = CRASH_STDERR;
-      this.disconnectSession(id, "crashed", 1, SessionStatus.UNSPECIFIED);
+      // Before the handshake (the daemon's failStart): no turn ran; status error "did not start".
+      s.lastError = `Claude did not start: exit code 1: ${CRASH_STDERR}`;
+      s.contextTokens = 0;
+      s.lastResultAt = null;
+      this.stopSession(id, "spawn failed", 1, SessionStatus.UNSPECIFIED);
+      this.setStatus(s, SessionStatus.ERROR, "did not start");
     }
     this.publishSession(s);
     return s;
@@ -1224,7 +1258,7 @@ export class World {
       this.publishSession(s);
       return `unarchived thread ${label}`;
     }
-    if (s.state !== SessionState.DISCONNECTED) this.disconnectSession(s.id, "closed", 0);
+    if (s.state !== SessionState.DISCONNECTED) this.stopSession(s.id, "closed", 0);
     this.closeShells((l) => l[LABEL_SESSION] === s.id);
     s.pinned = false;
     s.archivedAt ??= new Date();
@@ -1247,7 +1281,7 @@ export class World {
       this.publishSession(s);
       return `unsnoozed thread ${label}`;
     }
-    if (s.state !== SessionState.DISCONNECTED) this.disconnectSession(s.id, "closed", 0);
+    if (s.state !== SessionState.DISCONNECTED) this.stopSession(s.id, "closed", 0);
     this.closeShells((l) => l[LABEL_SESSION] === s.id);
     s.pinned = false;
     s.archivedAt = null;
@@ -1258,7 +1292,7 @@ export class World {
 
   /**
    * The daemon's wake (POST /__mock/session/wake, or the tick once the time passed): the
-   * snooze is cleared and a disconnected thread needs attention, "snooze ended", stamped
+   * snooze is cleared and a stopped thread needs attention, "snooze ended", stamped
    * now (re-stamped when it already read so).
    */
   wakeSession(id: string): void {
@@ -1272,19 +1306,31 @@ export class World {
     this.publishSession(s);
   }
 
-  /** session.reconnect: claude --resume in a new process; STARTING until the handshake (~2 s). */
-  private reconnect(s: MockSession): void {
+  /**
+   * A message to a stopped thread (the daemon's startStopped): claude --resume in a new
+   * process, STARTING until the handshake (~2 s), back in the thread list; the status it
+   * persisted stays until the message makes it busy. `ready` runs once Claude is up; a
+   * thread already starting (or stopping: the mock just starts it again) queues it.
+   */
+  startThread(id: string, ready: () => void): void {
+    const s = this.session(id);
+    s.onReady.push(ready);
+    if (s.state === SessionState.STARTING) return;
     s.state = SessionState.STARTING;
     s.archivedAt = null;
     s.snoozedUntil = null;
-    // The fresh detector owns status again: the persisted one is cleared.
-    this.setStatus(s, SessionStatus.UNSPECIFIED);
     s.settleIn = 2;
     s.disconnectReason = "";
     s.exitCode = 0;
     s.lastError = "";
     s.lastActivityAt = new Date();
     this.publishSession(s);
+  }
+
+  /** archiveInterrupts over the thread's own background agents and shells. */
+  private interrupts(s: MockSession): { why: string; ends: string } {
+    const { backgroundAgentsRunning } = agentCounts(this.threads.agentRunsOf(s.id));
+    return archiveInterrupts(s, backgroundAgentsRunning, this.threads.shellsOf(s.id));
   }
 
   private tickSessions(): void {
@@ -1306,8 +1352,12 @@ export class World {
           const first = s.firstMessage;
           s.firstMessage = null;
           if (first) this.threads.send(s.id, first.text, first.attachments, first.composerText);
+          // A stopped thread started by a message: the reply follows now.
+          const ready = s.onReady;
+          s.onReady = [];
+          for (const f of ready) f();
         } else if (s.state === SessionState.CLOSING) {
-          this.disconnectSession(s.id, "closed", 0);
+          this.stopSession(s.id, "closed", 0);
         }
         continue;
       }
@@ -2113,18 +2163,6 @@ export class World {
         run: (ctx, args) => this.newSession(ctx, args),
       },
       {
-        cmd: { name: "session.close", title: "Close Thread", category: "Session", description: "Exit Claude gracefully; the session stays, disconnected", keybindings: ["cmd+shift+w"], args: [] },
-        when: (ctx) => activeSession(ctx)?.state === SessionState.CONNECTED,
-        run: (ctx) => {
-          const s = activeSession(ctx);
-          if (!s) throw new CommandError("unavailable", "no active session");
-          s.state = SessionState.CLOSING;
-          s.settleIn = 2;
-          this.publishSession(s);
-          return "";
-        },
-      },
-      {
         cmd: { name: "session.fork", title: "Fork Thread", category: "Session", description: "Start a new session that continues this one's conversation", keybindings: [], args: [{ name: "name", type: ArgType.STRING, required: false, description: "Name for the fork" }] },
         when: (ctx) => activeSession(ctx) !== undefined,
         run: (ctx) => {
@@ -2134,16 +2172,6 @@ export class World {
           this.threads.fork(s.id, f.id, s.name || s.id);
           this.focusSession(f.id);
           return `Forked ${s.name || s.id}`;
-        },
-      },
-      {
-        cmd: { name: "session.reconnect", title: "Reconnect Thread", category: "Session", description: "Resume the session in a new claude process (claude --resume)", keybindings: ["cmd+shift+r"], args: [] },
-        when: (ctx) => activeSession(ctx)?.state === SessionState.DISCONNECTED,
-        run: (ctx) => {
-          const s = activeSession(ctx);
-          if (!s) throw new CommandError("unavailable", "no active session");
-          this.reconnect(s);
-          return "";
         },
       },
       {
@@ -2267,17 +2295,19 @@ export class World {
           name: "session.archive",
           title: "Archive or Unarchive Thread",
           category: "Thread",
-          description: "Archive a thread: Claude is closed, its terminals are removed and it is unpinned and listed apart. Unarchive puts it back in the thread list, still disconnected. Without archived, toggles.",
+          description:
+            "Archive a thread: Claude is closed, its terminals are removed and it is unpinned and listed apart. Unarchive puts it back in the thread list. Without archived, toggles. Pinning or sending a message unarchives a thread too.",
           keybindings: [],
           args: [{ name: "archived", type: ArgType.BOOL, required: false, description: "Archive (true) or unarchive (false); default: the opposite of now" }],
-          // Like the daemon: only archiving a thread that is mid-turn asks.
+          // Like the daemon: only archiving a thread that is mid-turn or running background work asks.
           confirmIf: (ctx, args) => {
             const s = activeSession(ctx);
-            return s !== undefined && archiving(s, args) && archiveInterrupts(s) !== "";
+            return s !== undefined && archiving(s, args) && this.interrupts(s).why !== "";
           },
           confirm: (ctx) => {
             const s = activeSession(ctx);
-            return `Archive thread ${s?.name || (s?.id ?? "")}? ${s ? archiveInterrupts(s) : ""}; archiving ends the turn.`;
+            const { why, ends } = s ? this.interrupts(s) : { why: "", ends: "" };
+            return `Archive thread ${s?.name || (s?.id ?? "")}? ${why}; archiving ${ends}.`;
           },
         },
         when: (ctx) => activeSession(ctx) !== undefined,
@@ -2293,7 +2323,7 @@ export class World {
           title: "Snooze or Unsnooze Thread",
           category: "Thread",
           description:
-            "Snooze a thread until a time: Claude is closed, its terminals are removed and it is unpinned and listed apart; when the time comes it returns needing attention (\"snooze ended\"), still disconnected. clear unsnoozes.",
+            "Snooze a thread until a time: Claude is closed, its terminals are removed and it is unpinned and listed apart; when the time comes it returns needing attention (\"snooze ended\"). clear unsnoozes. Pinning, archiving or sending a message unsnoozes a thread too.",
           keybindings: [],
           args: [
             { name: "until", type: ArgType.STRING, required: false, description: "When the thread wakes: 1h, 90m, tomorrow, next-week, mon..sun, 2026-10-20, 2026-10-20 14:00 or RFC 3339" },
@@ -2302,7 +2332,7 @@ export class World {
           // Like the daemon: only snoozing (a valid time) a thread that is mid-turn asks.
           confirmIf: (ctx, args) => {
             const s = activeSession(ctx);
-            if (s === undefined || args.clear === "true" || archiveInterrupts(s) === "") return false;
+            if (s === undefined || args.clear === "true" || this.interrupts(s).why === "") return false;
             try {
               return snoozeUntil(args) !== null;
             } catch {
@@ -2311,7 +2341,8 @@ export class World {
           },
           confirm: (ctx) => {
             const s = activeSession(ctx);
-            return `Snooze thread ${s?.name || (s?.id ?? "")}? ${s ? archiveInterrupts(s) : ""}; snoozing ends the turn.`;
+            const { why, ends } = s ? this.interrupts(s) : { why: "", ends: "" };
+            return `Snooze thread ${s?.name || (s?.id ?? "")}? ${why}; snoozing ${ends}.`;
           },
         },
         when: (ctx) => activeSession(ctx) !== undefined,
@@ -2330,7 +2361,7 @@ export class World {
         run: (ctx) => {
           const s = activeSession(ctx);
           if (!s) throw new CommandError("unavailable", "no active session");
-          if (s.state !== SessionState.DISCONNECTED) this.disconnectSession(s.id, "closed", 0);
+          if (s.state !== SessionState.DISCONNECTED) this.stopSession(s.id, "closed", 0);
           this.closeShells((l) => l[LABEL_SESSION] === s.id);
           this.actions.stopBackground((r) => r.sessionId === s.id);
           this.sessions.delete(s.id);

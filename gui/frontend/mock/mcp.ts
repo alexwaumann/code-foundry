@@ -79,7 +79,7 @@ export function mcpFixture(now = Date.now()): McpStatusInit {
 
 /** What MockThreads offers the MCP commands. */
 export interface McpThreads {
-  /** The thread's MCP status; undefined when it has none (not running). Throws for an unknown thread. */
+  /** The thread's MCP status; undefined when Claude never reported one. Throws for an unknown thread. */
   mcpOf(id: string): McpStatusInit | undefined;
   /** Replaces it and publishes the Watch's `mcp` event. */
   setMcp(id: string, status: McpStatusInit | undefined): void;
@@ -88,10 +88,13 @@ export interface McpThreads {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Re-checks a thread's servers now (a refresh): same servers, new time. */
-export function refreshMcp(threads: McpThreads, id: string): McpStatusInit | undefined {
-  const cur = threads.mcpOf(id);
-  if (!cur) return undefined;
+/**
+ * Re-checks a thread's servers now (a refresh): same servers, new time. A thread with no
+ * status yet gets the sketch's servers: the daemon starts Claude for a refresh, whether or
+ * not it ran.
+ */
+export function refreshMcp(threads: McpThreads, id: string): McpStatusInit {
+  const cur = threads.mcpOf(id) ?? mcpFixture();
   const next = { ...cur, checkedAt: timestampFromDate(new Date()), trigger: McpCheckTrigger.REFRESH, server: "" };
   threads.setMcp(id, next);
   return next;
@@ -99,8 +102,8 @@ export function refreshMcp(threads: McpThreads, id: string): McpStatusInit | und
 
 /** McpReconnect: the new status and Claude's refusal ("" when it went through). */
 export async function reconnectMcp(threads: McpThreads, id: string, server: string): Promise<{ status: McpStatusInit; error: string }> {
-  const cur = threads.mcpOf(id);
-  if (!cur) throw new CommandError("unavailable", `thread ${id} is not running; reconnect it first`);
+  // The daemon starts Claude for a stopped thread; its last status outlives the process.
+  const cur = threads.mcpOf(id) ?? mcpFixture();
   const servers = cur.servers ?? [];
   if (!servers.some((s) => s.name === server)) throw new CommandError("notfound", `thread ${id} has no MCP server "${server}"`);
   await sleep(MCP_RECONNECT_MS);

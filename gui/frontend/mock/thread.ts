@@ -69,7 +69,13 @@ export interface SeedHistory {
 export interface ThreadWorld {
   /** The session's worktree; throws when the session does not exist. */
   worktreeOf(id: string): string;
+  /** Claude runs for the thread (CONNECTED). Internal to the daemon: the GUI never shows it. */
   isConnected(id: string): boolean;
+  /**
+   * Starts a stopped thread for a message, as the daemon's Send does (STARTING, back in the
+   * thread list; a thread already starting just queues); `ready` runs once Claude is up.
+   */
+  start(id: string, ready: () => void): void;
   setStatus(id: string, status: SessionStatus, reason: string): void;
   setModel(id: string, model: string): void;
   setPermission(id: string, permission: string): void;
@@ -105,12 +111,13 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
 );
 
 /**
- * The scripted conversation's states. closed: idle's conversation, the thread
- * disconnected (closed); crashed: Claude exited before answering the handshake (an error
- * item, nothing else; mock/world.ts disconnects the thread).
+ * The scripted conversation's states. stopped: idle's conversation, the thread stopped at
+ * its prompt cache expiry (no process; mock/world.ts backdates its last result so the
+ * cache has expired); crashed: Claude did not start (an error item, nothing else;
+ * mock/world.ts stops the thread with status error "did not start").
  */
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "closed" | "crashed";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "closed", "crashed"];
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "stopped" | "crashed";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "stopped", "crashed"];
 
 /** The stderr line of the "crashed" state's claude (Session.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
@@ -575,22 +582,28 @@ export class MockThreads {
     this.world.setEffort(id, effort, false);
   }
 
-  /** thread.set-effort: at once when idle (after a short "restart"), else when the turn ends. */
-  setEffort(id: string, effort: string): boolean {
-    if (!this.world.isConnected(id)) throw new Error(`thread ${id} is not connected; reconnect it first`);
+  /**
+   * thread.set-effort: at once when idle (after a short "restart"), else when the turn ends.
+   * A stopped thread just keeps it for its next start, like the daemon (nothing restarts).
+   */
+  setEffort(id: string, effort: string): "after-turn" | "restart" | "next-message" {
+    if (!this.world.isConnected(id)) {
+      this.world.setEffort(id, effort, false);
+      return "next-message";
+    }
     const l = this.log(id);
     const status = this.world.statusOf(id);
     const onTurn = status === SessionStatus.BUSY || l.pending.length > 0;
     this.world.setEffort(id, effort, true);
     if (onTurn) {
       l.pendingEffort = effort;
-      return true;
+      return "after-turn";
     }
     const gen = this.generation;
     setTimeout(() => {
       if (gen === this.generation) this.applyEffort(id, effort);
     }, 300);
-    return false;
+    return "restart";
   }
 
   /**
@@ -683,8 +696,9 @@ export class MockThreads {
     this.logs.delete(id);
     this.agents.delete(id);
     this.shells.delete(id);
-    // A running thread was checked at the start of its last turn; a closed or crashed one has none.
-    if (loaded === "closed" || loaded === "crashed") {
+    // Checked at the start of its last turn (the status outlives the process); a thread
+    // whose Claude never started has none.
+    if (loaded === "crashed") {
       this.mcp.delete(id);
       this.slash.delete(id);
     } else {
@@ -700,11 +714,11 @@ export class MockThreads {
     };
     if (loaded === "crashed") {
       // The daemon's item for a claude that exited before the initialize handshake.
-      it({ case: "error", value: { text: `Claude exited (code 1) before answering the initialize handshake: ${CRASH_STDERR}` } }, { at: ago(0, -2) });
+      it({ case: "error", value: { text: `Claude did not start: exit code 1: ${CRASH_STDERR}` } }, { at: ago(0, -2) });
       l.seq = l.items.length;
       return;
     }
-    const state = loaded === "closed" ? "idle" : loaded;
+    const state = loaded === "stopped" ? "idle" : loaded;
     const tool = (name: string, input: object, value: { output?: string; isError?: boolean; resultJson?: string; status?: ToolCallStatus }, over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
       const toolUseId = `toolu_${name.toLowerCase()}_${String(l.nextOrdinal)}`;
       // A tool call's item id is its tool_use id, like the daemon's.
@@ -1047,10 +1061,24 @@ export class MockThreads {
     l.seq = l.items.length;
   }
 
-  /** thread.send: the user message, then a short streamed reply and the turn's end. */
+  /**
+   * thread.send: the user message at once, then a short streamed reply and the turn's end.
+   * A stopped thread starts first, like the daemon's Send: the reply waits for Claude.
+   */
   send(id: string, text: string, attachments: string[], composerText = ""): ItemInit {
-    if (!this.world.isConnected(id)) throw new Error(`thread ${id} is not connected; reconnect it first`);
     const msg = this.append(id, this.item(id, { case: "userMessage", value: { text, attachments, composerText } }));
+    if (this.world.isConnected(id)) this.reply(id);
+    else {
+      const gen = this.generation;
+      this.world.start(id, () => {
+        if (gen === this.generation) this.reply(id);
+      });
+    }
+    return msg;
+  }
+
+  /** The scripted reply to a message: thinking, a streamed answer, the turn's end. */
+  private reply(id: string): void {
     this.world.setStatus(id, SessionStatus.BUSY, "working");
     const gen = this.generation;
     void (async () => {
@@ -1069,7 +1097,6 @@ export class MockThreads {
       if (gen !== this.generation || !this.log(id).items.some((x) => x.streaming)) return;
       this.finish(id);
     })();
-    return msg;
   }
 
   /** The thread.* commands (mock/world.ts registry): the GUI passes the thread as `id`. */
@@ -1151,8 +1178,9 @@ export class MockThreads {
         when,
         run: (_ctx, a) => {
           this.calls.push(`set-effort ${a.id ?? ""} ${a.effort ?? ""}`);
-          const later = this.setEffort(a.id ?? "", a.effort ?? "");
-          return later ? `thread switches to effort ${a.effort ?? ""} after this turn` : `thread restarts with effort ${a.effort ?? ""}`;
+          const when = this.setEffort(a.id ?? "", a.effort ?? "");
+          if (when === "next-message") return `thread uses effort ${a.effort ?? ""} from its next message`;
+          return when === "after-turn" ? `thread switches to effort ${a.effort ?? ""} after this turn` : `thread restarts with effort ${a.effort ?? ""}`;
         },
       },
       {

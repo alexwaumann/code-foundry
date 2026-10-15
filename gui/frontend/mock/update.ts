@@ -65,6 +65,21 @@ export const updateStateNames: Record<string, UpdateState> = {
   failed: UpdateState.FAILED,
 };
 
+function plural(n: number, word: string): string {
+  return `${String(n)} ${word}${n === 1 ? "" : "s"}`;
+}
+
+/** The daemon's restartConfirm: "Restart the daemon? Threads keep their history; …". */
+function restartConfirm(what: string, active: number): string {
+  if (active === 0) return `${what}? Threads keep their history; a message starts each again.`;
+  return `${plural(active, "thread")} ${active === 1 ? "is" : "are"} working or waiting on you and will be cut off. ${what} anyway?`;
+}
+
+/** The daemon's cutOff: " (2 threads cut off)" for a restart's result, "" for none. */
+function cutOff(active: number): string {
+  return active === 0 ? "" : ` (${plural(active, "thread")} cut off)`;
+}
+
 export class MockUpdater {
   status!: MockStatus;
   latest = "v0.1.0";
@@ -79,7 +94,8 @@ export class MockUpdater {
 
   constructor(
     private readonly publish: (e: UpdateEventInit) => number,
-    private readonly liveSessions: () => number,
+    /** Threads a restart cuts off (the daemon's command.ActiveSession: working or waiting on you). */
+    private readonly activeSessions: () => number,
   ) {
     this.reset();
   }
@@ -191,11 +207,11 @@ export class MockUpdater {
   /** daemon.restart: the mock keeps running but comes back as the installed version. */
   restart(): string {
     if (this.status.state === UpdateState.DOWNLOADING) throw new Error("an update is being installed; restart when it finishes");
-    const n = this.liveSessions();
+    const n = this.activeSessions();
     const installed = this.status.state === UpdateState.INSTALLED || this.status.state === UpdateState.RESTART_REQUIRED;
     if (installed) this.status.currentVersion = this.status.targetVersion;
     this.set(UpdateState.IDLE, "");
-    return `restarting the daemon: closing ${String(n)} session${n === 1 ? "" : "s"}; the next client starts the installed version`;
+    return `restarting the daemon${cutOff(n)}; the next client starts the installed version`;
   }
 
   private installable(): boolean {
@@ -238,19 +254,16 @@ export class MockUpdater {
       },
       {
         // The update dialog's Restart Now (confirmed: the dialog is the confirmation). The
-        // real daemon closes sessions, asks the window host to relaunch once it has exited,
+        // real daemon stops threads, asks the window host to relaunch once it has exited,
         // and exits; the mock comes back as the installed version, like daemon.restart.
         cmd: {
           name: "app.restart",
           title: "Restart Code Foundry",
           category: "App",
-          description: "Close every session, restart the daemon and reopen the app window",
+          description: "Restart the daemon and relaunch the app so both run the installed version. Threads keep their history and a message starts each again; one that is working is cut off.",
           keybindings: [],
           args: [],
-          confirm: () => {
-            const n = this.liveSessions();
-            return `Close ${String(n)} session${n === 1 ? "" : "s"} and restart Code Foundry?`;
-          },
+          confirm: () => restartConfirm("Restart Code Foundry", this.activeSessions()),
         },
         when: always,
         run: () => {
@@ -263,13 +276,10 @@ export class MockUpdater {
           name: "daemon.restart",
           title: "Restart Daemon",
           category: "Daemon",
-          description: "Close every session and restart the daemon",
+          description: "Restart the daemon, so it runs the installed version. Threads keep their history and a message starts each again; one that is working is cut off.",
           keybindings: [],
           args: [],
-          confirm: () => {
-            const n = this.liveSessions();
-            return `Close ${String(n)} session${n === 1 ? "" : "s"} and restart the daemon?`;
-          },
+          confirm: () => restartConfirm("Restart the daemon", this.activeSessions()),
         },
         when: always,
         run: () => this.restart(),
