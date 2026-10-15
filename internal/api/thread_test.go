@@ -129,8 +129,12 @@ func TestThreadWatchSendRespond(t *testing.T) {
 	if _, err := c.SetEffort(ctx, connect.NewRequest(&v1.SetThreadEffortRequest{SessionId: "s1", Effort: "huge"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Errorf("bad effort: %v", err)
 	}
-	if _, err := c.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{SessionId: "d1", Text: "x"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Errorf("send to a disconnected thread: %v", err)
+	// A message starts a stopped thread.
+	if res, err := c.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{SessionId: "d1", Text: "x"})); err != nil || res.Msg.GetItem().GetUserMessage().GetText() != "x" {
+		t.Errorf("send to a stopped thread: %v, %v", res, err)
+	}
+	if s, _ := fake.Get(ctx, "d1"); s.State != session.StateConnected {
+		t.Errorf("after the send %+v", s)
 	}
 
 	// Closing the stream releases the viewer.
