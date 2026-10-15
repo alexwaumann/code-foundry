@@ -27,6 +27,15 @@ export function ReviewButton({ prRef, detail, onChoose }: { prRef: PrRef; detail
   const viewer = useViewerLogin();
   const busy = usePrPanelStore((s) => s.reviewing[pullRequestKey(prRef.slug, prRef.number)] ?? false);
   const [open, setOpen] = useState(false);
+  // A review starting (here or on another surface showing this pull request) shuts the
+  // menu for good: the controlled `open && !busy` alone would leave `open` set, and the
+  // menu would pop back once the review settles. Derived during render (React's
+  // "adjusting state when a prop changes"), as an effect's setState trips the lint.
+  const [wasBusy, setWasBusy] = useState(busy);
+  if (busy !== wasBusy) {
+    setWasBusy(busy);
+    if (busy) setOpen(false);
+  }
   const { ref, boundary } = usePanelBoundary();
   // A chosen verdict hands focus to the composer, so the menu must not take it back.
   const keepFocus = useRef(false);

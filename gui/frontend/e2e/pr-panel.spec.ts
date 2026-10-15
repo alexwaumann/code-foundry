@@ -1237,3 +1237,17 @@ test("at 280px Review keeps its icons, its menu and composer fit the panel, and 
   expect((await boxOf(page, "pr-your-review")).width).toBeLessThan(40);
   expect(await overflowX(page, "pr-header")).toBeLessThanOrEqual(0);
 });
+
+test("the review composer closes when the pull request stops taking reviews (merged meanwhile)", async ({ page }) => {
+  await openPrPage(page);
+  await prRow(page, "authored", 142).click();
+  await chooseVerdict(page, "comment");
+  await reviewInput(page).fill("Looks done.");
+  await page.getByTestId("pr-merge-button").click();
+  await page.getByTestId("pr-merge-method-squash").click();
+  await page.getByTestId("confirm-ok").click();
+  await expect(page.getByTestId("pr-state")).toHaveText("Merged");
+  await expect(page.getByTestId("pr-review-button")).toHaveCount(0);
+  await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
+  expect(await reviews()).toEqual([]);
+});

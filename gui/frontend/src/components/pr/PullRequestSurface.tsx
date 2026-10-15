@@ -16,7 +16,7 @@ import { PrAskComposer } from "./PrAskComposer";
 import { PrMenu } from "./PrMenu";
 import { PrReviewComposer } from "./PrReviewComposer";
 import { ReviewButton } from "./ReviewButton";
-import type { Verdict } from "./review";
+import { reviewVisible, type Verdict } from "./review";
 import { OrderToggle, PrSummary } from "./PrSummary";
 import { PrTimeline } from "./PrTimeline";
 import { toneBadge, toneText } from "./tones";
@@ -280,6 +280,9 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
   const closeComposer = () => {
     setComposer(null);
   };
+  // The pull request stopped taking reviews here (merged, closed, write access lost):
+  // Review ▾ is gone, and so is its composer (adjusted during render, not in an effect).
+  if (composer !== null && composer !== "ask" && d && !reviewVisible(d)) setComposer(null);
 
   if (!d) {
     if (isNotFoundMessage(error)) {
