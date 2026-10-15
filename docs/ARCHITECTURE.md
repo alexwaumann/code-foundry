@@ -442,9 +442,12 @@ from the pull request (docs/notes/pr-thread-commands.md).
   `docs/notes/worktree-panel-tab.md`, `docs/notes/workspaces-5-panel.md`) and Linked PRs (the
   thread's linked pull requests, newest first, each opening as a PR tab; opened by L,
   `view.panel.linked-prs`, the thread header and the sidebar's PR badge;
-  `docs/notes/linked-prs.md`) and MCP (the thread's MCP servers, one card each
+  `docs/notes/linked-prs.md`), MCP (the thread's MCP servers, one card each
   with status, error, tools and Reconnect; opened by M and `view.panel.mcp`;
-  `docs/notes/mcp-panel.md`). Every
+  `docs/notes/mcp-panel.md`) and Agents (the thread's subagent runs, one row each in
+  spawn order with status, activity or report, and stats; opened by A, `view.panel.agents`
+  and the strip above the composer that shows while background runs go on;
+  `docs/notes/agents-2-gui.md`). Every
   palette command is reachable without the mouse, and common ones also have buttons that
   invoke the same registry command. Chords are listed only in the palette and the
   Keyboard Shortcuts overlay (`docs/notes/phase3-ui-buttons.md`).
