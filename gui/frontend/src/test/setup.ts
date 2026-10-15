@@ -23,3 +23,17 @@ vi.mock("@testing-library/react", async (importOriginal) => {
   const render = ((ui: Parameters<typeof rtl.render>[0], options?: Parameters<typeof rtl.render>[1]) => rtl.render(ui, { wrapper: TooltipProvider, ...options })) as typeof rtl.render;
   return { ...rtl, render };
 });
+
+// Radix form controls inside a <form> (Switch, Checkbox, Select) measure their trigger
+// with ResizeObserver for the hidden native input they render; jsdom has none.
+if (!("ResizeObserver" in globalThis)) {
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    configurable: true,
+    writable: true,
+    value: class {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    },
+  });
+}
