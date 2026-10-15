@@ -315,6 +315,14 @@ func (r *runner) onInitialized(res initResult) {
 			// Still running but not answering (the startup timer says the same).
 			// ErrClosed means its stdout ended: the process is gone or going, and
 			// maybeExited records how (crashed, with its last stderr line).
+			if errors.Is(err, context.DeadlineExceeded) {
+				// The handshake's deadline and the startup (or restart) timer are the
+				// same StartTimeout: whichever fires first, the timeline says the same.
+				err = errors.New("no answer to the initialize handshake")
+				if st.restart != restartNone {
+					err = errors.New("no answer to the initialize handshake after a restart")
+				}
+			}
 			r.failStart(err)
 		}
 		return
