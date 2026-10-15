@@ -131,12 +131,16 @@ start; the Wails host reads them and injects them into the page before load.
 
 Services (v1):
 
-* `SessionService` — Create, Fork, List, Get, Rename, Close, Reconnect, Remove, RunIn,
+* `SessionService` — Create, Fork, List, Get, Rename, Remove, RunIn,
   Pin (the user's pin, persisted; `docs/notes/workspaces-4-sidebar.md`), Archive (close,
-  remove the thread's shells, unpin, stamp `archived_at`; reconnect, pin and send
+  remove the thread's shells, unpin, stamp `archived_at`; pin and send
   unarchive; `docs/notes/archive-threads-1-daemon.md`), Snooze (close, remove the
   thread's shells, unpin, unarchive, set `snoozed_until`; the store wakes it on the wall
-  clock into NEEDS_ATTENTION "snooze ended"; `docs/notes/snooze-threads-1-daemon.md`), Watch (server stream), StageAttachment (images the first prompt refers to). Create can
+  clock into NEEDS_ATTENTION "snooze ended"; `docs/notes/snooze-threads-1-daemon.md`), Watch (server stream), StageAttachment (images the first prompt refers to).
+  Close and Reconnect remain in the proto for compatibility; no command calls them: the
+  daemon starts a thread's process when a message is sent and stops it once the thread
+  has idled at its prompt past its prompt cache expiry
+  (`docs/notes/thread-lifecycle.md`). Create can
   make the worktree first (`new_worktree`), start a thread in a workspace member
   (`workspace_id`) or in a new workspace (`new_workspace`), or without a project in the
   home directory (`no_project`; `docs/notes/no-project-1-daemon.md`; the GUI's "No
@@ -147,23 +151,25 @@ Services (v1):
   stream-json, no terminal; the conversation is ThreadService items). The terminal
   thread mode (Claude's own interface in a PTY) was removed on 2026-10-12
   (`docs/notes/rendered-only.md`). A session carries lifecycle `state` (starting,
-  connected, closing, disconnected) and `status` (busy, idle, needs-attention; error
-  when the process ended mid-turn) with `status_reason` and `status_changed_at`,
+  connected, closing, disconnected; the daemon's business, internal to clients) and
+  `status` (busy, idle, needs-attention; error when the process ended mid-turn or did
+  not start) with `status_reason` and `status_changed_at`,
   persisted (`docs/notes/thread-status-persistence.md`).
 * `ThreadService` — the conversation: ListItems, Watch (server stream: an items
   snapshot, then appended/updated items, text deltas and pending-request changes, all
   seq-ordered; an open Watch marks the thread's turns seen),
-  Send (also while busy), Respond (a permission request or AskUserQuestion: allow,
+  Send (also while busy; a stopped thread starts with the message), Respond (a permission request or AskUserQuestion: allow,
   allow for session, deny with a reason, answers), Interrupt, SetModel,
   SetPermissionMode, SetEffort (Claude has no live effort switch: the runner restarts
   the process with `--resume` and the new `--effort`, at once when idle, else when the
   running turn ends, `Session.effort_pending` meanwhile; the thread stays connected; the
   new process gets the session's allow-for-session grants again as `--allowedTools` /
-  `--add-dir`), McpStatus and McpReconnect (the thread's MCP servers as Claude last
-  reported them, checked at the start of every turn and cached in memory; Watch carries
+  `--add-dir`; a stopped thread's model, mode and effort changes only go to its row), McpStatus and McpReconnect (the thread's MCP servers as Claude last
+  reported them, checked at the start of every turn, kept and persisted while the thread
+  is stopped; a refresh or reconnect starts a stopped thread without a prompt; Watch carries
   each check; `docs/notes/mcp-panel.md`), SlashCommands (the commands Claude reports in its
-  initialize reply and `commands_changed` pushes, minus a daemon-side deny table, cached
-  in memory; the items snapshot and Watch carry them; Send refuses a message starting with
+  initialize reply and `commands_changed` pushes, minus a daemon-side deny table, kept and
+  persisted while the thread is stopped; the items snapshot and Watch carry them; Send refuses a message starting with
   a command the app replaces, such as `/clear`; `docs/notes/slash-commands-1-daemon.md`).
   The items snapshot and Watch also carry the thread's subagent runs (`agents`: every
   Agent run, foreground, background and nested, in spawn order, with live status,
@@ -309,8 +315,14 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   busy from send to `result`, needs-attention while a `can_use_tool` or question is
   pending, finished until seen, error when the process exits mid-turn. The status is
   persisted: a disconnected thread keeps the one it ended with (busy becomes error
-  "interrupted"), across daemon restarts, until a reconnect replaces it
+  "interrupted"), across daemon restarts, until the next start replaces it
   (`docs/notes/thread-status-persistence.md`; its screen detector is gone).
+* **Lifecycle** (`lifecycle.go`): a message to a stopped thread reserves it, writes the
+  user item and resumes the conversation with the message as the first prompt (a failed
+  start is an error item and status error); every 30 s the store stops threads idle at
+  their prompt past their prompt cache expiry (nothing pending, unfinished, queued or
+  running in the background; up at least 5 minutes), disconnect reason "idle"
+  (`docs/notes/thread-lifecycle.md`).
 * **The runner** (`runner.go`, `stream.go`): `internal/claudestream` speaks the control
   protocol (initialize handshake, `can_use_tool` routed to the store, interrupt,
   set_model, set_permission_mode, set_cwd for RunIn). The stream is projected into
@@ -362,8 +374,8 @@ Every user-facing action is a `command.Command`:
 
 ```go
 type Command struct {
-    Name    string            // "session.close"
-    Title   string            // "Close Session"
+    Name    string            // "session.rename"
+    Title   string            // "Rename Thread"
     Args    ArgSchema         // for CLI flags and palette prompts
     When    func(Context) bool // context-aware availability
     Run     func(context.Context, Context, Args) (Result, error)
