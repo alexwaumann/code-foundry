@@ -88,7 +88,8 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   await expect(page.getByTestId("composer-model")).toHaveText("Opus 4.8");
   await expect(page.getByTestId("composer-effort")).toHaveText("High");
   await expect(page.getByTestId("composer-permission")).toHaveText("Auto");
-  await expect(page.getByTestId("composer-worktree")).toHaveText("New worktree");
+  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
+  await expect(page.getByTestId("composer-worktree")).toHaveAccessibleName("Work in: Fresh copy");
   await expect(page.getByTestId("composer-base")).toHaveText("From origin/main");
 
   await page.keyboard.type("Add a dark mode toggle");
@@ -242,12 +243,20 @@ test("a failed start keeps the draft editable and shows why", async ({ page }) =
   await expect(page.getByTestId("composer")).toBeVisible();
   expect(await sessionCount()).toBe(before);
 
-  // Pick the current checkout instead: the base picker goes away. Editing clears the error.
+  // Work in the project folder instead: the base picker goes away. Editing clears the error.
   await page.getByTestId("composer-worktree").click();
-  const options = page.getByTestId("composer-worktree-list").getByRole("option");
-  await expect(options).toHaveText([/^New worktree/, /^Current checkout\s*main · ~\/src\/code-foundry/, /^feat\/sidebar/, /^fix\/resize/]);
-  await options.filter({ hasText: "Current checkout" }).click();
-  await expect(page.getByTestId("composer-worktree")).toHaveText("Current checkout");
+  const list = page.getByTestId("composer-worktree-list");
+  const options = list.getByRole("option");
+  await expect(options).toHaveText([
+    /^A fresh copy of the project\s*new worktree\s*Its own folder and branch \(cf\/…, named from your prompt\)\. Run several threads at once; keep or discard each one\.$/,
+    /^The project folder itself\s*main\s*Edits land in ~\/src\/code-foundry directly\. One thread at a time is safest\.$/,
+    /^feat\/sidebar\s*~\/src\/code-foundry\.worktrees\/feat-sidebar$/,
+    /^fix\/resize/,
+  ]);
+  await expect(list.locator("[cmdk-group-heading]")).toHaveText(["Work in", "An existing copy"]);
+  await expect(list.getByText("Default for new threads: Settings › Sessions › New threads work in")).toBeVisible();
+  await options.filter({ hasText: "The project folder itself" }).click();
+  await expect(page.getByTestId("composer-worktree")).toHaveText("In place");
   await expect(page.getByTestId("composer-base")).toHaveCount(0);
   await input.fill("Please work");
   await expect(error).toHaveCount(0);
@@ -270,7 +279,7 @@ test("an existing worktree or the current checkout shows its branch, read-only a
   await expect(indicator).toHaveCount(0);
 
   await worktree.click();
-  await options.filter({ hasText: "Current checkout" }).click();
+  await options.filter({ hasText: "The project folder itself" }).click();
   await expect(page.getByTestId("composer-base")).toHaveCount(0);
   await expect(indicator).toHaveText("On main");
   await expect(indicator).toHaveAccessibleName("Current checkout is on main");
@@ -299,17 +308,52 @@ test("an existing worktree or the current checkout shows its branch, read-only a
 
   // An existing worktree: its branch. The option labels keep branch + path.
   await worktree.click();
-  await expect(options).toHaveText([/^New worktree/, /^Current checkout\s*3c3c465 · ~\/src\/code-foundry/, /^feat\/sidebar/, /^fix\/resize/]);
+  await expect(options).toHaveText([/^A fresh copy of the project/, /^The project folder itself\s*3c3c465\s*Edits land in ~\/src\/code-foundry/, /^feat\/sidebar/, /^fix\/resize/]);
   await options.filter({ hasText: "feat/sidebar" }).click();
-  await expect(worktree).toHaveText("Existing worktree: feat/sidebar");
+  await expect(worktree).toHaveText("feat/sidebar");
   await expect(indicator).toHaveText("On feat/sidebar");
   await expect(indicator).toHaveAccessibleName("Worktree is on feat/sidebar");
 
   // Back to a new worktree: the base picker returns in the same slot.
   await worktree.click();
-  await options.filter({ hasText: "New worktree" }).click();
+  await options.filter({ hasText: "A fresh copy of the project" }).click();
   await expect(indicator).toHaveCount(0);
   await expect(page.getByTestId("composer-base")).toHaveText("From origin/main");
+});
+
+test("Work in: sessions.default_worktree = current starts in place; a pick is remembered per project", async ({ page }) => {
+  await mockPost("settings/external?sessions.default_worktree=current");
+  await openApp(page);
+  await compose(page);
+  const worktree = page.getByTestId("composer-worktree");
+  await expect(worktree).toHaveText("In place");
+  await expect(page.getByTestId("composer-base")).toHaveCount(0);
+  await expect(page.getByTestId("composer-checkout-branch")).toHaveText("On main");
+
+  // Picking a fresh copy brings the base back and becomes code-foundry's default.
+  await worktree.click();
+  await page.getByTestId("composer-worktree-list").getByRole("option").filter({ hasText: "A fresh copy of the project" }).click();
+  await expect(worktree).toHaveText("Fresh copy");
+  await expect(page.getByTestId("composer-base")).toHaveText("From origin/main");
+  await page.getByTestId("composer-input").focus();
+  await page.keyboard.type("Tidy the README");
+  await page.keyboard.press("Enter");
+  await expect(page.locator('[data-row-kind="session"][aria-selected="true"]')).toBeVisible();
+  expect((await invocations()).at(-1)?.args).toMatchObject({ repo: "repo-cf", "new-worktree": "true", base: "origin/main" });
+  await expect.poll(() => promptFocused(page)).toBe(true);
+
+  // The next code-foundry draft starts from the memory; another project from the setting.
+  await compose(page);
+  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
+  await row(page, "s:s-1").click();
+  await compose(page, 2);
+  await expect(page.getByTestId("composer-worktree")).toHaveText("In place");
+  await expect(page.getByTestId("composer-base")).toHaveCount(0);
+
+  // The memory outlives a reload (drafts do not).
+  await openApp(page);
+  await compose(page);
+  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
 });
 
 test("attachments: picked, rejected, removed, staged on send", async ({ page }) => {

@@ -99,6 +99,7 @@ var Groups = []Group{
 const (
 	KeyDefaultModel      = "sessions.default_model"
 	KeyDefaultEffort     = "sessions.default_effort"
+	KeyDefaultWorktree   = "sessions.default_worktree"
 	KeyAutoName          = "sessions.auto_name"
 	KeyNamingModel       = "sessions.naming_model"
 	KeyCacheTTL          = "sessions.cache_ttl_seconds"
@@ -136,6 +137,12 @@ const (
 	defaultAlertCooldown = 60
 )
 
+// sessions.default_worktree values: a new worktree, or the project's main checkout.
+const (
+	WorktreeNew     = "new"
+	WorktreeCurrent = "current"
+)
+
 // KeybindingKey is the settings key of a command's keybinding override.
 func KeybindingKey(command string) string { return keybindingKeyPrefix + command }
 
@@ -152,6 +159,17 @@ var staticFields = []Field{
 		Description: "Effort level for new threads when none is picked.",
 		Enum:        command.SessionEfforts, Default: "high",
 		bind: func(s *Settings) any { return &s.Sessions.DefaultEffort },
+	},
+	{
+		// Read by the GUI only: the composer's "Work in" picker starts from it (a choice
+		// remembered per project wins). session.new itself stays explicit (--new-worktree
+		// or --worktree).
+		Key: KeyDefaultWorktree, Group: GroupSessions, Type: Enum, Title: "New threads work in",
+		Description: "A fresh copy keeps each thread on its own branch and folder. The project folder itself edits your files in place.",
+		Enum:        []string{WorktreeNew, WorktreeCurrent},
+		EnumLabels:  []string{"A fresh copy of the project", "The project folder itself"},
+		Default:     WorktreeNew,
+		bind:        func(s *Settings) any { return &s.Sessions.DefaultWorktree },
 	},
 	{
 		Key: KeyAutoName, Group: GroupSessions, Type: Bool, Title: "Name sessions automatically",

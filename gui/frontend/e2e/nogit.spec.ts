@@ -74,7 +74,7 @@ test("the composer in a project without git offers only its current checkout; th
   // Projects by name: code-foundry, dotfiles, ghostty-playground, sketches, writing.
   await compose(page, 5);
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in writing?");
-  await expect(page.getByTestId("composer-worktree")).toHaveText("Current checkout");
+  await expect(page.getByTestId("composer-worktree")).toHaveText("In place");
   // Its member chip names the project with the No git badge, never a branch (no "cf/…").
   const chip = page.getByTestId("composer-member");
   await expect(chip).toHaveCount(1);
@@ -88,7 +88,7 @@ test("the composer in a project without git offers only its current checkout; th
   // No base ref, no branch, no Also in (a workspace needs git).
   for (const id of ["composer-base", "composer-checkout-branch", "composer-also-in"]) await expect(page.getByTestId(id)).toHaveCount(0);
   await page.getByTestId("composer-worktree").click();
-  await expect(page.getByTestId("composer-worktree-list").getByRole("option")).toHaveText([/^Current checkout\s*~\/Documents\/writing · not a git repository/]);
+  await expect(page.getByTestId("composer-worktree-list").getByRole("option")).toHaveText([/^The project folder itself\s*no git\s*Edits land in ~\/Documents\/writing directly/]);
   await page.keyboard.press("Escape");
 
   await page.getByTestId("composer-input").click();

@@ -149,12 +149,12 @@ test("pick a project, add Also in: a new workspace with a cf/<slug> worktree in 
   await expect(chips(page)).toHaveCount(0);
   const alsoIn = page.getByTestId("composer-also-in");
   await expect(alsoIn).toHaveText("Also in…");
-  await expect(page.getByTestId("composer-worktree")).toHaveText("New worktree");
+  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
 
   // Choose an existing worktree first: Also in overrides it (new worktrees only).
   await page.getByTestId("composer-worktree").click();
   await page.getByTestId("composer-worktree-list").getByRole("option").filter({ hasText: "feat/sidebar" }).click();
-  await expect(page.getByTestId("composer-worktree")).toHaveText("Existing worktree: feat/sidebar");
+  await expect(page.getByTestId("composer-worktree")).toHaveText("feat/sidebar");
 
   await alsoIn.click();
   const projects = page.getByTestId("composer-also-in-list").getByRole("option");
@@ -167,9 +167,9 @@ test("pick a project, add Also in: a new workspace with a cf/<slug> worktree in 
   await expect(chips(page).nth(1)).toContainText("ghostty-playground");
   await expect(chips(page).nth(1)).toContainText("cf/…");
   await expect(alsoIn).toHaveText("Add project");
-  await expect(page.getByTestId("composer-worktree")).toHaveText("New worktree");
+  await expect(page.getByTestId("composer-worktree")).toHaveText("Fresh copy");
   await page.getByTestId("composer-worktree").click();
-  await expect(page.getByTestId("composer-worktree-list").getByRole("option")).toHaveText([/^New worktree\s*A cf\/… branch in every project/]);
+  await expect(page.getByTestId("composer-worktree-list").getByRole("option")).toHaveText([/^A fresh copy of every project\s*new worktrees\s*A cf\/… branch in every project/]);
   await page.keyboard.press("Escape");
 
   // A third one, removed again; the project itself cannot be removed.

@@ -18,8 +18,12 @@ import {
   sessionNewArgs,
   threadArgs,
   threadPlace,
+  defaultWorktree,
+  workInMemory,
+  workInText,
   type ComposeTarget,
   type DraftArgsInput,
+  type WorktreeChoice,
   type MovableDraft,
   type PlaceEnv,
   type PlaceInput,
@@ -184,6 +188,46 @@ describe("workspaces", () => {
   });
 });
 
+describe("Work in", () => {
+  it.each<[string, { setting?: string; remembered?: string; mainPath?: string }, WorktreeChoice]>([
+    ["nothing set: a fresh copy", { mainPath: "/src/cf" }, { kind: "new" }],
+    ["setting new", { setting: "new", mainPath: "/src/cf" }, { kind: "new" }],
+    ["setting current: the main checkout", { setting: "current", mainPath: "/src/cf" }, { kind: "existing", path: "/src/cf" }],
+    ["setting current, main checkout unknown: a fresh copy", { setting: "current" }, { kind: "new" }],
+    ["an unknown setting value: a fresh copy", { setting: "", mainPath: "/src/cf" }, { kind: "new" }],
+    ["remembered current over setting new", { setting: "new", remembered: "current", mainPath: "/src/cf" }, { kind: "existing", path: "/src/cf" }],
+    ["remembered new over setting current", { setting: "current", remembered: "new", mainPath: "/src/cf" }, { kind: "new" }],
+    ["a garbled memory is ignored", { setting: "current", remembered: "elsewhere", mainPath: "/src/cf" }, { kind: "existing", path: "/src/cf" }],
+  ])("defaultWorktree: %s", (_, input, want) => {
+    expect(defaultWorktree(input)).toEqual(want);
+  });
+
+  it.each<[string, WorktreeChoice & { kind: "new" | "existing" }, string | undefined, string | null]>([
+    ["a fresh copy", { kind: "new" }, "/src/cf", "new"],
+    ["the main checkout", { kind: "existing", path: "/src/cf" }, "/src/cf", "current"],
+    ["another worktree: a one-off", { kind: "existing", path: "/wt/cf-x" }, "/src/cf", null],
+    ["main checkout unknown", { kind: "existing", path: "/src/cf" }, undefined, null],
+  ])("workInMemory: %s", (_, choice, mainPath, want) => {
+    expect(workInMemory(choice, mainPath)).toBe(want);
+  });
+
+  const main = { isMain: true, branch: "main", head: "3c3c4651234" };
+  const feat = { isMain: false, branch: "feat/sidebar", head: "abcdef01234" };
+  it.each<[string, Parameters<typeof workInText>[0], string]>([
+    ["a new worktree", { workspace: false, noGit: false, worktree: { kind: "new" } }, "Fresh copy"],
+    ["the main checkout", { workspace: false, noGit: false, worktree: { kind: "existing", path: "/src/cf" }, chosen: main }, "In place"],
+    ["the main checkout, detached", { workspace: false, noGit: false, worktree: { kind: "existing", path: "/src/cf" }, chosen: { ...main, branch: "" } }, "In place"],
+    ["another worktree: its branch", { workspace: false, noGit: false, worktree: { kind: "existing", path: "/wt/x" }, chosen: feat }, "feat/sidebar"],
+    ["another worktree, detached: its short head", { workspace: false, noGit: false, worktree: { kind: "existing", path: "/wt/x" }, chosen: { ...feat, branch: "" } }, "abcdef0"],
+    ["an existing worktree not listed: a fresh copy", { workspace: false, noGit: false, worktree: { kind: "existing", path: "/gone" } }, "Fresh copy"],
+    ["a project without git", { workspace: false, noGit: true, worktree: { kind: "existing", path: "/docs" } }, "In place"],
+    ["a workspace in its worktrees", { workspace: true, noGit: false, worktree: { kind: "members" } }, "Workspace worktrees"],
+    ["a workspace in new-worktree mode", { workspace: true, noGit: false, worktree: { kind: "new" } }, "New worktree"],
+  ])("workInText: %s", (_, input, want) => {
+    expect(workInText(input)).toBe(want);
+  });
+});
+
 describe("checkoutBranch", () => {
   it.each([
     [{ branch: "main", head: "3c3c4651aa", detached: false, isMain: true }, "On main", "Current checkout is on main"],
@@ -282,9 +326,9 @@ describe("movedDraft", () => {
   };
 
   it.each<[string, Partial<MovableDraft>, ComposeTarget, ComposeTarget, Partial<MovableDraft>]>([
-    ["project → project: new worktree; base and error reset", {}, proj("repo-cf"), proj("repo-gp"), { worktree: { kind: "new" }, base: null, error: null, alsoIn: [], primary: null }],
+    ["project → project: the project default; base and error reset", {}, proj("repo-cf"), proj("repo-gp"), { worktree: null, base: null, error: null, alsoIn: [], primary: null }],
     ["project → workspace: workspace worktrees; base and error reset", {}, proj("repo-cf"), ws("w-1"), { worktree: { kind: "members" }, base: null, error: null }],
-    ["workspace → project: new worktree", { worktree: { kind: "members" } }, ws("w-1"), proj("repo-cf"), { worktree: { kind: "new" } }],
+    ["workspace → project: the project default", { worktree: { kind: "members" } }, ws("w-1"), proj("repo-cf"), { worktree: null }],
     ["workspace (new-worktree mode) → workspace: workspace worktrees", { worktree: { kind: "new" } }, ws("w-1"), ws("w-2"), { worktree: { kind: "members" } }],
     ["Also in carried to another git project; the old project is not demoted to it", { alsoIn: ["repo-sk"] }, proj("repo-cf"), proj("repo-gp"), { alsoIn: ["repo-sk"] }],
     ["the new project leaves Also in (a swap)", { alsoIn: ["repo-gp", "repo-sk"] }, proj("repo-cf"), proj("repo-gp"), { alsoIn: ["repo-sk"] }],
@@ -297,9 +341,9 @@ describe("movedDraft", () => {
     ["primary dropped with Also in for a workspace target", { alsoIn: ["repo-sk"], primary: "repo-sk" }, proj("repo-cf"), ws("w-1"), { alsoIn: [], primary: null }],
     ["a workspace member as primary does not survive a move", { primary: "repo-gp" }, ws("w-1"), ws("w-2"), { primary: null }],
     ["primary dropped for a project without git", { alsoIn: ["repo-sk"], primary: "repo-sk" }, proj("repo-cf"), proj("repo-wr"), { alsoIn: [], primary: null }],
-    ["project → no project: no Also in, primary or base", { alsoIn: ["repo-sk"], primary: "repo-sk" }, proj("repo-cf"), { kind: "home" }, { alsoIn: [], primary: null, base: null, worktree: { kind: "new" }, error: null }],
-    ["workspace → no project", { worktree: { kind: "members" } }, ws("w-1"), { kind: "home" }, { alsoIn: [], worktree: { kind: "new" } }],
-    ["no project → project: a new worktree", { worktree: { kind: "new" }, base: null }, { kind: "home" }, proj("repo-cf"), { worktree: { kind: "new" }, alsoIn: [] }],
+    ["project → no project: no Also in, primary or base", { alsoIn: ["repo-sk"], primary: "repo-sk" }, proj("repo-cf"), { kind: "home" }, { alsoIn: [], primary: null, base: null, worktree: null, error: null }],
+    ["workspace → no project", { worktree: { kind: "members" } }, ws("w-1"), { kind: "home" }, { alsoIn: [], worktree: null }],
+    ["no project → project: the project default", { worktree: { kind: "new" }, base: null }, { kind: "home" }, proj("repo-cf"), { worktree: null, alsoIn: [] }],
     ["no project → workspace: workspace worktrees", { worktree: { kind: "new" } }, { kind: "home" }, ws("w-1"), { worktree: { kind: "members" } }],
   ])("%s", (_, over, from, to, want) => {
     const got = movedDraft({ ...draft, ...over }, from, to, isGit);

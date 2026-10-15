@@ -186,7 +186,7 @@ export function SettingRow({ field }: { field: SettingFieldView }) {
   const message = error ?? (fileIssue ? `In the file: ${fileIssue}` : null);
   return (
     <div
-      className="grid grid-cols-[minmax(0,1fr)_16rem] items-start gap-x-6 gap-y-1 border-b border-border/60 py-3 last:border-b-0"
+      className="grid grid-cols-[minmax(0,1fr)_18rem] items-start gap-x-6 gap-y-1 border-b border-border/60 py-3 last:border-b-0"
       data-setting={field.key}
       data-modified={modified || undefined}
     >

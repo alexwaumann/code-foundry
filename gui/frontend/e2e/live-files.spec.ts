@@ -44,7 +44,7 @@ test("composer: an @file tag from the card starts a haiku thread that reads the 
   await page.getByTestId("composer-model-list").getByRole("option", { name: /Haiku/ }).click();
   await page.getByTestId("composer-effort").click();
   await page.getByTestId("composer-effort-list").getByRole("option", { name: /Medium/ }).click();
-  await expect(page.getByTestId("composer-worktree")).toContainText("New worktree");
+  await expect(page.getByTestId("composer-worktree")).toContainText("Fresh copy");
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("print the first line of @READ");
   const card = page.getByTestId("completion-card");
