@@ -185,6 +185,8 @@ test("add, then edit (pencil and ArrowRight), then delete an action", async ({ p
   await dialog(page).getByTestId("action-delete").click();
   const confirm = dialog(page).getByTestId("action-delete-confirm");
   await expect(confirm).toContainText("Delete Lint for every thread in code-foundry?");
+  // The project's name does not break at its hyphen.
+  await expect(confirm.getByTestId("action-delete-project")).toHaveCSS("white-space", "nowrap");
   await expect(dialog(page).getByTestId("action-save")).toHaveCount(0);
   // The keyboard follows the swap: to Keep, and back to Delete.
   await expect(confirm.getByTestId("action-delete-keep")).toBeFocused();

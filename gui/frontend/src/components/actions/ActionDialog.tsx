@@ -240,7 +240,12 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
       {confirming ? (
         <div className="mt-4 flex items-center gap-2" data-testid="action-delete-confirm">
           <p className="min-w-0 flex-1 text-sm">
-            Delete <span className="font-medium">{existing?.name ?? draft.name}</span> for every thread in {project}?
+            {/* The project's name does not break (at its hyphens, say); a long one ellipsizes. */}
+            Delete <span className="font-medium">{existing?.name ?? draft.name}</span> for every thread in{" "}
+            <span className="inline-block max-w-full truncate align-bottom" data-testid="action-delete-project">
+              {project}
+            </span>
+            ?
           </p>
           <Button
             type="button"
