@@ -628,8 +628,13 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	rec.run = r
 	rec.release()
 	rec.s.State = StateStarting
-	// The fresh process owns status from here: the persisted one is cleared.
-	rec.s.setStatus(StatusUnknown, "", now)
+	// The fresh process owns status from here: the persisted one is cleared, or, with a
+	// message waiting for the handshake, the thread is on that turn already.
+	if first != nil {
+		rec.s.setStatus(StatusBusy, "working", now)
+	} else {
+		rec.s.setStatus(StatusUnknown, "", now)
+	}
 	rec.s.DisconnectReason, rec.s.ExitCode = "", 0
 	rec.s.LastActivityAt = now
 	m.commitLocked(rec, true)

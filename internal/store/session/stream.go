@@ -149,7 +149,7 @@ func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv,
 		return err
 	}
 	st := &streamState{
-		sd: &streamStatus{}, log: log, first: first,
+		sd: &streamStatus{waiting: first != nil}, log: log, first: first,
 		initDone: make(chan initResult, 1),
 		cmds:     make(chan threadCmd),
 		viewSig:  make(chan struct{}, 1),
@@ -411,6 +411,8 @@ func (r *runner) queue(o *outgoing) (Item, error) {
 		return Item{}, err
 	}
 	st.queued = append(st.queued, o)
+	st.sd.waiting = true
+	r.checkStatus()
 	return it, nil
 }
 
