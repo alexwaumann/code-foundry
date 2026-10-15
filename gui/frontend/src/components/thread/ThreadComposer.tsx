@@ -429,7 +429,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
         </div>
         {effortPending && (
           <p className="col-span-2 px-4 pb-2 text-xs text-muted-foreground" role="status" data-testid="thread-effort-pending">
-            {busy ? `Effort changes to ${choiceLabel(EFFORT_CHOICES, effort)} after this turn` : `Restarting Claude with ${choiceLabel(EFFORT_CHOICES, effort)} effort…`}
+            {busy ? `Effort changes to ${choiceLabel(EFFORT_CHOICES, effort)} after this turn` : `Switching to ${choiceLabel(EFFORT_CHOICES, effort)} effort…`}
           </p>
         )}
         {(error ?? notice) && (

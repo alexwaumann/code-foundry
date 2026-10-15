@@ -33,12 +33,16 @@ screen says connected, disconnected, starting, closing, reconnect or close.
   reads "catching up…" (`thread-catching-up`). "No messages yet." no longer needs
   `connected`.
 * **Badges and line 2** (`lib/session.ts`, `lib/statusLine.ts`): `SessionBadge` is busy /
-  idle / attention / error / unknown. Starting reads as busy (whatever status it
-  persisted: a resend to a finished or interrupted thread is working); a stopped or
-  stopping thread keeps attention and error, anything else (idle, unknown, a stale busy)
-  is idle. `statusLine` has no starting/closing kinds. `threadGroup` follows the badge
-  (starting sorts under Working). `SessionStatusIcon` drops the unplugged icon; the row is
-  never dimmed (`offline`, `data-offline` gone).
+  idle / attention / error / unknown. Attention and error always show (a thread counted
+  as waiting is never shown working); otherwise starting reads as busy, and a stopped or
+  stopping thread is idle (a stale busy included). `statusLine` has no starting/closing
+  kinds. `threadGroup` follows the badge. `SessionStatusIcon` drops the unplugged icon;
+  the row is never dimmed (`offline`, `data-offline` gone). `isRunning` excludes
+  attention and `activeThreadIds` never lists an id twice.
+* **Daemon: a message makes a stopped thread busy at once** (review): the reservation,
+  the spawn and the runner's status before the handshake say busy "working" whenever a
+  message waits (`streamStatus.waiting`), so a resend to a finished or interrupted thread
+  is working at once; a start without a message (an MCP check) keeps the saved status.
 * **Removed actions**: `RowMenu` Reconnect and Close, the header's Close button,
   `closeSession`/`reconnectSession`, the comments naming cmd+shift+w. The help overlay
   says "A thread keeps its history, and a message always continues it."
@@ -50,7 +54,11 @@ screen says connected, disconnected, starting, closing, reconnect or close.
   includes a thread starting for a message). `worktreeThreadCount` counts the threads on a
   worktree whether or not Claude runs (title "2 threads on this worktree"), archived ones
   left out; the workspace row's `workspaceThread` is the most recently active
-  non-archived thread. The cleanable tag's tooltip ends "nothing running in it".
+  non-archived thread. A thread holds its worktree whatever its state (review): the
+  daemon's `worktreeThreads` (cleanup and workspace member removal), the GUI's
+  `threadHolds` and the mock count every thread but an archived one (snoozed ones come
+  back); the cleanable tag's tooltip ends "no thread or terminal on it", cleanup says
+  "thread X is on it", refusals "thread X is on <path>; archive it first".
 * **Update dialog**: the busy list follows the daemon's restart count
   (`command.ActiveSession`/`RestartCostOf`): `restartCutsOff` names each thread's loss
   ("working", "waiting on you", "2 background agents and 1 shell", "reporting finished
@@ -65,8 +73,10 @@ screen says connected, disconnected, starting, closing, reconnect or close.
 * **Go**: the hidden `session.reconnect` is deleted for good (a revert of PR B's
   `d9ecbc82`: the command, `Command.Hidden`, `SessionBackend.Reconnect`, the commandtest
   fake; it is an unknown command again). The workspace removal refusal said "close it
-  first", which no longer exists: "…running in <path>; archive it first (that stops
-  Claude)" (`archiveThem`).
+  first", which no longer exists (now "archive it first", above). CLI strings drop
+  process words: run-in ("at once when Claude is not running for it"), repo cleanup, the
+  dead Reconnect RPC's error. The composer's effort line says "Switching to High
+  effort…" instead of "Restarting Claude with …".
 * **Mock daemon**: `session.close`/`session.reconnect` removed; Send starts a stopped
   thread (user item at once, the reply after a ~2 s handshake, `ThreadWorld.start`);
   set-effort on a stopped thread keeps it for the next start; MCP refresh/reconnect work
@@ -78,10 +88,10 @@ screen says connected, disconnected, starting, closing, reconnect or close.
 
 ## Decisions made here (not in the brief)
 
-* **Starting wins over a persisted attention/error** in the badge, line 2 and the sidebar
-  group: the daemon keeps the old status until Claude is up, and the user just sent a
-  message. Side effect: an MCP refresh on a stopped thread shows it working for the
-  couple of seconds Claude takes to start.
+* **Attention and error win over starting** (changed in review: first "starting wins",
+  which counted a thread as both working and waiting; the daemon now says busy for a
+  message start, so only an MCP start keeps a saved status, and it still waits on the
+  user: no false dock alert, never in Working).
 * **No Interrupt while starting**: the daemon cannot interrupt before the handshake (no
   connection yet), so the button appears once Claude is on the turn.
 * **Snooze lines moved into the composer** rather than dropped.
@@ -90,8 +100,8 @@ screen says connected, disconnected, starting, closing, reconnect or close.
   heading is "would be cut off" rather than "working or waiting on you".
 * **`SessionView` lost the three disconnect fields** instead of keeping dead data.
 * **The workspace refusal's wording** changed in Go (the only user-visible "close" left).
-* **The cleanup prediction still reads `state`**: the daemon's guard counts threads with a
-  process (unchanged by PR B).
+* **Follow-up**: the `Close` and `Reconnect` RPCs and `Manager.Reconnect` stay (the proto
+  is additive; no command calls them). Remove them once no client can.
 
 ## Remaining grep hits (`disconnect|reconnect|"connected"|closing|Close thread|Reconnect`)
 
@@ -113,8 +123,7 @@ Over `gui/frontend/src` (production files), every remaining hit is one of:
 * **MCP servers** (a server's connection and its Reconnect action, `thread.mcp-reconnect`):
   stores/mcp.ts, McpSurface, lib/mcp.ts, api/mcp.ts, surfaces/mcp.ts.
 * **Internal state reads** (behaviour, nothing shown): api/session.ts (the type and its
-  mapping), lib/session.ts `sessionBadge` and `restartCutsOff`, lib/projects.ts
-  `threadHolds` (mirrors the daemon's cleanup guard), ThreadPane `running` (a stale busy
+  mapping), lib/session.ts `sessionBadge` and `restartCutsOff`, ThreadPane `running` (a stale busy
   on a stopped thread is not a turn), McpSurface `asking` (which empty-state line).
 
 ## Tests
@@ -179,5 +188,5 @@ thread right after sending.
 
 ## Daemon restart
 
-Needed after merging: the command registry changed (`session.reconnect` gone) and the
-workspace refusal's wording.
+Needed after merging: the command registry changed (`session.reconnect` gone), a message
+makes a stopped thread busy at once, and a thread holds its worktree whatever its state.

@@ -109,7 +109,9 @@ test("no Close or Reconnect anywhere: header, row menu, palette, chords", async 
   await page.getByTestId("thread-composer").getByTestId("composer-input").click();
   await page.keyboard.press("Meta+Shift+w");
   await page.keyboard.press("Meta+Shift+r");
-  expect((await invocations()).slice(before).map((i) => i.name)).toEqual([]);
+  // A chord that does run a command (cmd+t, terminal.new) after them: once it is in, nothing came before it.
+  await page.keyboard.press("Meta+t");
+  await expect.poll(async () => (await invocations()).slice(before).map((i) => i.name)).toEqual(["terminal.new"]);
 });
 
 test("a stopped thread keeps its status: busy ends interrupted, attention persists", async ({ page }) => {
@@ -119,14 +121,14 @@ test("a stopped thread keeps its status: busy ends interrupted, attention persis
   await expect(row(page, "s:s-1").getByTestId("row-status")).toHaveText("Interrupted while working · just now");
   await mockPost("session/stop?id=s-2&reason=daemon%20stopped&code=0");
   await expect(badge(page, "s-2")).toHaveAttribute("data-session-badge", "attention");
-  // Still waiting on the user: counted, still on top, still saying so (dimmed).
+  // Still waiting on the user: counted, still on top, still saying so (not dimmed).
   await expect(page.getByTestId("attention-badge")).toHaveText("1");
   await expect.poll(async () => (await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).slice(0, 1)).toEqual(["s:s-2"]);
   await expect(row(page, "s:s-2").getByTestId("row-status")).toHaveText("Needs input · Bash zig build -Doptimize=ReleaseFast");
   await expect(row(page, "s:s-2").getByTestId("session-body")).toHaveCSS("opacity", "1");
 });
 
-test("a crashed thread says what happened in its timeline, not in a card; the header says where it ran", async ({ page }) => {
+test("a crashed thread keeps its composer, no card; the header says where it ran", async ({ page }) => {
   await openApp(page);
   // s-1 crashes mid-turn: interrupted, and the composer is still there.
   await mockPost("session/stop?id=s-1&reason=crashed&code=1&status=busy");
