@@ -206,10 +206,10 @@ test("overflow menus per row kind; the menu keeps the list's cursor and gives it
   await openProjects(page);
 
   const want: [string, string[]][] = [
-    ["repo-cf", ["New worktree…", "Clean up merged worktrees 0", "Remove project"]],
-    ["repo-dot", ["New worktree…", "Clean up merged worktrees 0", "Remove project"]],
-    ["repo-sk", ["New worktree…", "Publish to GitHub…", "Remove project"]],
-    ["repo-wr", ["Initialize git", "Remove project"]],
+    ["repo-cf", ["New worktree…", "New action…", "Clean up merged worktrees 0", "Remove project"]],
+    ["repo-dot", ["New worktree…", "New action…", "Clean up merged worktrees 0", "Remove project"]],
+    ["repo-sk", ["New worktree…", "New action…", "Publish to GitHub…", "Remove project"]],
+    ["repo-wr", ["New action…", "Initialize git", "Remove project"]],
   ];
   for (const [id, items] of want) {
     await project(page, id).getByTestId("project-more").click();
@@ -355,8 +355,8 @@ test("a merged, clean worktree shows 'in main' and a broom that removes it after
   await expect(page.getByTestId("worktree-cleanable")).toHaveCount(1);
   await expect(page.getByTestId("worktree-cleanup")).toHaveCount(1);
   await expect(row.getByTestId("worktree-cleanup")).toHaveAttribute("title", "Clean up: remove this worktree");
-  // Every row of the project keeps a fourth slot so the state columns still end at one x;
-  // a project with nothing to clean up keeps three.
+  // Every row of the project keeps a fifth slot so the state columns still end at one x;
+  // a project with nothing to clean up keeps four.
   const widths = await Promise.all([CF, FEAT, FIX, MERGED].map(async (p) => (await wtRow(page, "repo-cf", p).getByTestId("worktree-actions").boundingBox())?.width));
   expect(new Set(widths).size).toBe(1);
   const gpWidth = (await wtRow(page, "repo-gp", "/Users/dev/src/ghostty-playground").getByTestId("worktree-actions").boundingBox())?.width;
@@ -394,11 +394,11 @@ test("the project menu counts merged worktrees, cleans them all up, and is disab
   await expect(page.getByTestId("project-cleanup")).toHaveAttribute("data-disabled", "");
   await closeMenu(page, "project-more");
   await project(page, "repo-sk").getByTestId("project-more").click();
-  expect(await menuItems(page, "project-more")).toEqual(["New worktree…", "Publish to GitHub…", "Remove project"]);
+  expect(await menuItems(page, "project-more")).toEqual(["New worktree…", "New action…", "Publish to GitHub…", "Remove project"]);
   await closeMenu(page, "project-more");
 
   await project(page, "repo-cf").getByTestId("project-more").click();
-  expect(await menuItems(page, "project-more")).toEqual(["New worktree…", "Clean up merged worktrees 2", "Remove project"]);
+  expect(await menuItems(page, "project-more")).toEqual(["New worktree…", "New action…", "Clean up merged worktrees 2", "Remove project"]);
   await expect(page.getByTestId("project-cleanup")).not.toHaveAttribute("data-disabled");
   await page.getByTestId("project-cleanup").click();
   const dialog = page.getByTestId("confirm-dialog");
