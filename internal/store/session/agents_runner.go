@@ -69,6 +69,9 @@ func (r *runner) onTask(t *claudestream.Task) {
 	if run == nil {
 		return
 	}
+	if ch.ended && run.info.Background && run.info.SpawnDepth <= 1 {
+		r.expectWake("agent " + run.info.ID) // wake.go
+	}
 	if (ch.ended || ch.final) && run.info.Status != AgentRunning && run.info.ToolUseID != "" {
 		out, failed := run.info.Summary, run.info.Status == AgentFailed
 		if failed {

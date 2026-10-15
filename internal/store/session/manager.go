@@ -87,10 +87,13 @@ type Options struct {
 	// and before a RunIn move (set_cwd refuses an untrusted folder). For tests.
 	DisablePreTrust bool
 
-	NamingTimeout  time.Duration // default 20s
-	StartTimeout   time.Duration // bound on the initialize handshake (STARTING -> CONNECTED); default 15s
-	CloseTimeout   time.Duration // graceful close (stdin closed) before SIGTERM; default 10s
-	Tick           time.Duration // transcript poll and housekeeping; default 1s
+	NamingTimeout time.Duration // default 20s
+	StartTimeout  time.Duration // bound on the initialize handshake (STARTING -> CONNECTED); default 15s
+	CloseTimeout  time.Duration // graceful close (stdin closed) before SIGTERM; default 10s
+	Tick          time.Duration // transcript poll and housekeeping; default 1s
+	// WakeTimeout is how long a background end at the prompt holds the thread for the turn
+	// Claude starts by itself (wake.go); default 10s.
+	WakeTimeout    time.Duration
 	StatusDebounce time.Duration // default 100ms
 	// SlugTimeout bounds how long Create waits for the namer before naming a new
 	// worktree's branch after the session id. Default 6s.
@@ -162,6 +165,7 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.StartTimeout, 15*time.Second)
 	def(&o.CloseTimeout, 10*time.Second)
 	def(&o.Tick, time.Second)
+	def(&o.WakeTimeout, 10*time.Second)
 	def(&o.StatusDebounce, 100*time.Millisecond)
 	def(&o.ActivityPublish, 15*time.Second)
 	def(&o.AgentIdleClose, defaultAgentIdleClose)

@@ -49,8 +49,8 @@ type shellSet struct {
 	// running are the shells running now, by task id.
 	running map[string]*BackgroundShell
 	// ending are shells task_updated ended whose task_notification (with the summary)
-	// has not come yet.
-	ending map[string]*BackgroundShell
+	// has not come yet, with that end.
+	ending map[string]shellEnd
 }
 
 // shellEnd is what a shell's end does to its call's item.
@@ -120,21 +120,24 @@ func (s *shellSet) task(t *claudestream.Task, at time.Time, call func(toolUseID 
 			end := shellEndOf(*sh, st, wire, t.Summary, final)
 			if !final {
 				if s.ending == nil {
-					s.ending = map[string]*BackgroundShell{}
+					s.ending = map[string]shellEnd{}
 				}
-				s.ending[t.TaskID] = sh
+				s.ending[t.TaskID] = shellEndOf(*sh, st, wire, "", true)
 			}
 			return shellChange{handled: true, counted: true, end: &end}
 		}
-		if sh, ok := s.ending[t.TaskID]; ok {
+		if prev, ok := s.ending[t.TaskID]; ok {
 			if !final {
 				return shellChange{handled: true}
 			}
 			delete(s.ending, t.TaskID)
-			end := shellEndOf(*sh, agentStatusOf(wire), wire, t.Summary, true)
+			end := shellEndOf(prev.shell, agentStatusOf(wire), wire, t.Summary, true)
 			return shellChange{handled: true, end: &end}
 		}
 	}
+	// Not one of the thread's shells: a subagent's, or a frame after a shell's end (on
+	// SIGTERM task_updated follows the notification). The agents model skips both: their
+	// task id is no run of its.
 	return shellChange{}
 }
 
@@ -167,11 +170,16 @@ func (ch shellChange) apply(p *projector) {
 	}
 }
 
-// orphan ends every shell: their process is gone (why), so they cannot finish.
+// orphan ends every shell: their process is gone (why), so they cannot finish. A shell
+// task_updated already ended keeps that end, now final (its notification will not come):
+// its call gets the status Claude gave and stops following the shell.
 func (s *shellSet) orphan(why string) []shellEnd {
 	var out []shellEnd
 	for _, sh := range s.running {
 		out = append(out, shellEnd{shell: *sh, failed: true, output: why + shellOrphanSuffix, final: true})
+	}
+	for _, end := range s.ending {
+		out = append(out, end)
 	}
 	s.running, s.ending = nil, nil
 	return out
@@ -180,6 +188,7 @@ func (s *shellSet) orphan(why string) []shellEnd {
 // isShellLaunch reports whether a tool result says a Bash or Monitor call went to the
 // background: Bash names its task in backgroundTaskId, Monitor in taskId.
 func isShellLaunch(raw json.RawMessage) bool {
+	// A cheap pre-filter before decoding: "askId" is in both backgroundTaskId and taskId.
 	if len(raw) == 0 || !strings.Contains(string(raw), "askId") {
 		return false
 	}
@@ -192,10 +201,10 @@ func isShellLaunch(raw json.RawMessage) bool {
 }
 
 // BackgroundWork reports whether the thread has work running after its turn: a
-// background agent run it launched itself or one of its own background shells.
-// Foreground runs are part of a turn, nested runs keep their background parent
-// running.
+// background agent run it launched itself, one of its own background shells, or the turn
+// Claude is about to start for one that just ended (WakePending, wake.go). Foreground runs
+// are part of a turn, nested runs keep their background parent running.
 func (s Session) BackgroundWork() bool {
 	_, background := s.AgentsRunning()
-	return background > 0 || s.BackgroundShellsRunning > 0
+	return background > 0 || s.BackgroundShellsRunning > 0 || s.WakePending
 }

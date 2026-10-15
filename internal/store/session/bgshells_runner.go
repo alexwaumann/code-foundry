@@ -18,6 +18,7 @@ func (r *runner) onShellTask(t *claudestream.Task) bool {
 	}
 	if e := ch.end; e != nil && ch.counted {
 		r.log().info("background shell ended", "task", e.shell.TaskID, "failed", e.failed, "output", e.output)
+		r.expectWake("shell " + e.shell.TaskID) // wake.go
 	}
 	ch.apply(r.st.proj)
 	if ch.counted {
@@ -39,9 +40,10 @@ func (r *runner) shellCall(toolUseID string) (name, input string) {
 // with the process). EventService carries it with the session.
 func (r *runner) publishBgShells() {
 	n := r.bgShells.count()
-	if s, ok := r.m.Snapshot().Session(r.id); ok && s.BackgroundShellsRunning == n {
+	if n == r.bgShellsPub {
 		return
 	}
+	r.bgShellsPub = n
 	r.m.update(r.id, false, func(rec *record) { rec.s.BackgroundShellsRunning = n })
 }
 

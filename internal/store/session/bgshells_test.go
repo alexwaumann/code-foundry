@@ -3,6 +3,8 @@ package session
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -243,6 +245,7 @@ func TestBackgroundWork(t *testing.T) {
 		{"a nested background run alone", Session{AgentRuns: []AgentRun{run(AgentRunning, true, 2)}}, false},
 		{"a finished background agent", Session{AgentRuns: []AgentRun{run(AgentDone, true, 1)}}, false},
 		{"both", Session{BackgroundShellsRunning: 2, AgentRuns: []AgentRun{run(AgentRunning, true, 1)}}, true},
+		{"Claude's turn for an end is due", Session{WakePending: true}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -359,12 +362,8 @@ func TestBgShellBlocksTheEffortRestart(t *testing.T) {
 	if err != nil || !got.EffortPending {
 		t.Fatalf("set effort %+v %v", got, err)
 	}
-	time.Sleep(50 * time.Millisecond)
-	if eff := argOf(e.argvOf(), "--effort"); eff != "low" {
-		t.Fatalf("restarted with a shell running: effort %q", eff)
-	}
-	if !e.snapshot(s.ID).EffortPending {
-		t.Errorf("no longer pending")
+	if e.restartBegun(s.ID) {
+		t.Fatalf("restarted with a shell running")
 	}
 	// The shell ends (and Claude's own turn): now it restarts.
 	if _, err := e.m.Send(e.ctx(), s.ID, Message{Text: "next"}); err != nil {
@@ -372,4 +371,157 @@ func TestBgShellBlocksTheEffortRestart(t *testing.T) {
 	}
 	e.waitArgv("the restart after the shell", func(a []string) bool { return argOf(a, "--effort") == "high" })
 	e.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && s.State == StateConnected })
+}
+
+// restartBegun reports whether the thread's runner began an effort restart. It goes
+// through the runner's goroutine first (a SetEffort to the effort already wanted), so
+// every event the runner had taken, and the maybeRestart after it, is done.
+func (e *env) restartBegun(id string) bool {
+	e.t.Helper()
+	r, s, err := e.m.liveStream(id)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	if _, err := e.m.SetEffort(e.ctx(), id, s.Effort); err != nil {
+		e.t.Fatal(err)
+	}
+	return r.st.restart != restartNone
+}
+
+// A shell that task_updated ended keeps that end when its process goes before the
+// notification: the call gets Claude's status and no longer follows the shell.
+func TestBgShellOrphanKeepsTheUpdatedEnd(t *testing.T) {
+	tests := []struct {
+		fixture, call string
+		status        ToolStatus
+		output        string // "": the launch text stays
+	}{
+		{"shells", fxShellCall, ToolDone, ""},
+		{"shells-fail", fxFailCall, ToolError, "failed"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.fixture, func(t *testing.T) {
+			data, err := os.ReadFile(fixturePath(tt.fixture))
+			if err != nil {
+				t.Fatal(err)
+			}
+			log := newThreadLog("s", bus.New(), time.Now, nil)
+			p := newProjector(itemWriter{log: log, save: func(Item) {}}, runningTotals{known: true})
+			var set shellSet
+			var sp claudestream.Splitter
+			for _, line := range sp.Split(nil, data) {
+				ev := claudestream.Parse(line)
+				p.event(ev)
+				if tk, ok := ev.(*claudestream.Task); ok {
+					set.task(tk, time.Now(), nil).apply(p)
+					if tk.Subtype == claudestream.TaskUpdated {
+						break // the process ends before the notification
+					}
+				}
+			}
+			ends := set.orphan(orphanProcessEnded)
+			if len(ends) != 1 || !ends[0].final || ends[0].shell.ToolUseID != tt.call {
+				t.Fatalf("ends %+v", ends)
+			}
+			ends[0].apply(p)
+			if p.async[tt.call] {
+				t.Errorf("the call still follows the shell")
+			}
+			it, _ := log.get(tt.call)
+			if it.Tool.Status != tt.status || (tt.output != "" && it.Tool.Output != tt.output) ||
+				(tt.output == "" && !strings.HasPrefix(it.Tool.Output, "Command running in background")) {
+				t.Errorf("call %s %q", it.Tool.Status, it.Tool.Output)
+			}
+			if len(set.orphan(orphanProcessEnded)) != 0 {
+				t.Errorf("ended twice")
+			}
+		})
+	}
+}
+
+// When a background shell or agent ends while Claude is at its prompt, Claude starts a
+// turn by itself to report it. An effort change must wait for that turn: restarting in
+// the gap would close stdin under the reply. The fake replays the capture's second turn
+// unprompted: its end frames, then (held) the turn's init, reply and result.
+func TestBackgroundEndHoldsTheEffortRestartForClaudesTurn(t *testing.T) {
+	tests := []struct {
+		fixture string
+		running func(Session) bool
+	}{
+		{"shells", func(s Session) bool { return s.BackgroundShellsRunning == 1 }},
+		{"agents", func(s Session) bool { _, bg := s.AgentsRunning(); return bg == 1 }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.fixture, func(t *testing.T) {
+			gates := t.TempDir()
+			release := func(name string) {
+				t.Helper()
+				if err := os.WriteFile(filepath.Join(gates, name), nil, 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			e := newFixtureEnvAt(t, fixturePath(tt.fixture), []string{"CF_FAKE_CLAUDE_UNPROMPTED=" + gates})
+			s := e.create(CreateOptions{Effort: "low", InitialPrompt: "launch"})
+			e.waitItems(s.ID, "launched", turnCount(1))
+			e.waitFor(s.ID, "background work at the prompt", func(s Session) bool { return tt.running(s) && turnOver(s) })
+			if got, err := e.m.SetEffort(e.ctx(), s.ID, "high"); err != nil || !got.EffortPending {
+				t.Fatalf("set effort %+v %v", got, err)
+			}
+			if e.restartBegun(s.ID) {
+				t.Fatalf("restarted with background work running")
+			}
+
+			// The end frames: nothing runs any more, but Claude's turn is due.
+			release("turn-2")
+			got := e.waitFor(s.ID, "the end, a wake due", func(s Session) bool { return !tt.running(s) && s.WakePending })
+			if !got.BackgroundWork() {
+				t.Errorf("no background work while the wake is due: %+v", got)
+			}
+			if e.restartBegun(s.ID) {
+				t.Fatalf("restarted between the end and Claude's own turn")
+			}
+
+			// Claude's turn: once it ended, the restart goes ahead.
+			release("turn-2.init")
+			e.waitArgv("the restart after Claude's turn", func(a []string) bool { return argOf(a, "--effort") == "high" })
+			got = e.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && !s.WakePending && s.State == StateConnected })
+			if got.BackgroundWork() {
+				t.Errorf("background work after the turn: %+v", got)
+			}
+			items := e.waitItems(s.ID, "the effort note", hasEffortNote("high"))
+			var ends []Item
+			for _, it := range items {
+				if it.Kind == KindTurnEnd {
+					ends = append(ends, it)
+				}
+				if it.Tool != nil && strings.Contains(it.Tool.Output, "Claude restarted") {
+					t.Errorf("cut by the restart: %+v", it.Tool)
+				}
+			}
+			note := items[slices.IndexFunc(items, func(it Item) bool { return it.Kind == KindCommandOutput })]
+			if len(ends) != 2 || ends[1].Turn == nil || ends[1].Turn.IsError || ends[1].Ordinal > note.Ordinal {
+				t.Errorf("Claude's own turn did not end before the restart:\n%s", describeItems(items))
+			}
+		})
+	}
+}
+
+// No turn comes after the end (Claude stayed quiet): the hold lapses after WakeTimeout.
+func TestBackgroundWakeTimesOut(t *testing.T) {
+	gates := t.TempDir()
+	e := newFixtureEnvAt(t, fixturePath("shells"), []string{"CF_FAKE_CLAUDE_UNPROMPTED=" + gates},
+		func(o *Options) { o.WakeTimeout = 150 * time.Millisecond })
+	s := e.create(CreateOptions{Effort: "low", InitialPrompt: "launch"})
+	e.waitItems(s.ID, "launched", turnCount(1))
+	e.waitFor(s.ID, "a shell at the prompt", func(s Session) bool { return s.BackgroundShellsRunning == 1 && turnOver(s) })
+	if _, err := e.m.SetEffort(e.ctx(), s.ID, "high"); err != nil {
+		t.Fatal(err)
+	}
+	// The end frames only; the turn's init never comes.
+	if err := os.WriteFile(filepath.Join(gates, "turn-2"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e.waitFor(s.ID, "a wake due", func(s Session) bool { return s.WakePending })
+	e.waitArgv("the restart after the timeout", func(a []string) bool { return argOf(a, "--effort") == "high" })
+	e.waitFor(s.ID, "applied", func(s Session) bool { return !s.EffortPending && !s.WakePending })
 }
