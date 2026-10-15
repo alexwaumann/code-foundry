@@ -92,7 +92,7 @@ function WorkspaceBadge({ id }: { id: string }) {
     // A click opens the workspace surface in the thread's side panel; the click goes on
     // to the row, which selects the thread (and so shows that panel).
     <span
-      className="flex max-w-24 min-w-0 cursor-pointer items-center gap-0.5 rounded-sm bg-violet-400/15 px-1 text-[10px] leading-4 font-medium text-violet-300 hover:bg-violet-400/30"
+      className="flex max-w-24 min-w-0 cursor-pointer items-center gap-0.5 rounded-sm bg-highlight/15 px-1 text-[10px] leading-4 font-medium text-highlight hover:bg-highlight/30"
       title={`Workspace ${workspace}: show its members in the side panel`}
       data-testid="row-workspace"
       onClick={() => {
@@ -113,7 +113,7 @@ function LinkedPrsBadge({ id }: { id: string }) {
     // Like the workspace badge: a click opens the Linked PRs surface in the thread's side
     // panel, and goes on to the row, which selects the thread (and so shows that panel).
     <span
-      className="flex shrink-0 cursor-pointer items-center rounded-sm bg-emerald-500/15 px-1 text-[10px] leading-4 font-medium text-emerald-700 tabular-nums hover:bg-emerald-500/30 dark:text-emerald-300"
+      className="flex shrink-0 cursor-pointer items-center rounded-sm bg-success/15 px-1 text-[10px] leading-4 font-medium text-success tabular-nums hover:bg-success/30"
       title={`${prBadge(count)} linked: show them in the side panel`}
       data-testid="row-linked-prs"
       onClick={() => {
@@ -144,13 +144,13 @@ function useThreadPlace(id: string) {
   return { project, branch, noGit, noProject, movingTo };
 }
 
-/** Tailwind colours for the status text: the sketch's sky / amber / emerald / red 400s, darker in light mode. */
+/** Status text colours: the theme's status tokens (index.css), sky info, amber warning, emerald success, red destructive. */
 const toneClasses: Readonly<Record<StatusTone, string>> = {
   muted: "",
-  sky: "text-sky-600 dark:text-sky-400",
-  amber: "text-amber-600 dark:text-amber-400",
-  emerald: "text-emerald-600 dark:text-emerald-400",
-  red: "text-red-600 dark:text-red-400",
+  sky: "text-info",
+  amber: "text-warning",
+  emerald: "text-success",
+  red: "text-destructive",
 };
 
 /** Status text with a relative time; only these rows subscribe to the shared 30 s clock. */
@@ -191,7 +191,7 @@ function ThreadLine({ id }: { id: string }) {
   return (
     <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground" data-testid="row-place" data-status-line={line.kind} data-session-badge={badge}>
       {movingTo !== null ? (
-        <span className="flex min-w-0 items-center gap-1 text-amber-300" data-testid="row-moving" title={`Runs in ${movingTo} once it is idle at its prompt`}>
+        <span className="flex min-w-0 items-center gap-1 text-warning" data-testid="row-moving" title={`Runs in ${movingTo} once it is idle at its prompt`}>
           <ArrowRightLeft className="size-3 shrink-0" aria-hidden />
           <span className="truncate">moving to {movingTo}…</span>
         </span>

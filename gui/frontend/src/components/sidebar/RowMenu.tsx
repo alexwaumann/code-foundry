@@ -32,7 +32,7 @@ function MemberItem({ sessionId, repoId, path, current, queued }: { sessionId: s
         void runSessionIn(sessionId, repoId);
       }}
     >
-      <FolderGit2 className="text-sky-400/90" />
+      <FolderGit2 className="text-info/90" />
       <span className="flex min-w-0 flex-col">
         <span className="truncate">{name}</span>
         <span className="truncate font-mono text-xs text-muted-foreground">{branch}</span>

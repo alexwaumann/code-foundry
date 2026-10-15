@@ -367,14 +367,14 @@ test("status kinds: each thread's second line says its status in words and colou
   ]);
 
   const want: [string, string, string, RegExp][] = [
-    ["s-k-approval", "input", "Needs input · Bash", /text-amber/],
-    ["s-k-question", "question", "Asked a question", /text-amber/],
-    ["s-k-plan", "plan", "Plan ready for review", /text-amber/],
-    ["s-k-finished", "finished", "Finished 12 min ago", /text-emerald/],
-    ["s-k-error", "error", "Error · model_not_found", /text-red/],
-    ["s-k-busy", "working", "Working", /text-sky/],
-    ["s-k-interrupted", "interrupted", "Interrupted while working · 35 min ago", /text-red/],
-    ["s-k-asked-before-restart", "question", "Asked a question", /text-amber/],
+    ["s-k-approval", "input", "Needs input · Bash", /text-warning/],
+    ["s-k-question", "question", "Asked a question", /text-warning/],
+    ["s-k-plan", "plan", "Plan ready for review", /text-warning/],
+    ["s-k-finished", "finished", "Finished 12 min ago", /text-success/],
+    ["s-k-error", "error", "Error · model_not_found", /text-destructive/],
+    ["s-k-busy", "working", "Working", /text-info/],
+    ["s-k-interrupted", "interrupted", "Interrupted while working · 35 min ago", /text-destructive/],
+    ["s-k-asked-before-restart", "question", "Asked a question", /text-warning/],
   ];
   for (const [id, kind, text, tone] of want) {
     const r = row(page, `s:${id}`);
@@ -392,7 +392,7 @@ test("status kinds: each thread's second line says its status in words and colou
   // Offline rows are dimmed, the rest are not; the name is never coloured by status.
   for (const id of ["s-k-interrupted", "s-k-asked-before-restart"]) await expect(row(page, `s:${id}`).getByTestId("session-body"), id).toHaveAttribute("data-offline", "true");
   for (const id of ["s-k-approval", "s-k-finished", "s-k-busy", "s-k-idle"]) await expect(row(page, `s:${id}`).getByTestId("session-body"), id).not.toHaveAttribute("data-offline");
-  await expect(row(page, "s:s-k-approval").getByTestId("session-name")).not.toHaveClass(/amber/);
+  await expect(row(page, "s:s-k-approval").getByTestId("session-name")).not.toHaveClass(/text-warning/);
   // No status icon in thread rows.
   await expect(list(page).locator('[data-row-kind="session"] [role="img"]')).toHaveCount(0);
 
@@ -567,7 +567,7 @@ test("the tooltip shows the full status, wrapped, under the name for threads tha
   const status = tip.getByTestId("tip-status");
   await expect(status).toHaveText(`Needs input · ${long}`);
   await expect(status).toHaveAttribute("data-tone", "amber");
-  await expect(status).toHaveClass(/text-amber/);
+  await expect(status).toHaveClass(/text-warning/);
   const line2 = await approval.getByTestId("row-place").locator("span.truncate").evaluate((el) => el.scrollWidth > el.clientWidth);
   expect(line2).toBe(true);
   // Wrapped over several lines inside the 220px tooltip, between the name and the project.
@@ -588,7 +588,7 @@ test("the tooltip shows the full status, wrapped, under the name for threads tha
     await expect(tip, id).toHaveAttribute("data-session-id", id);
     await expect(tip.getByTestId("tip-status"), id).toHaveText(text);
     await expect(tip.getByTestId("tip-status"), id).toHaveAttribute("data-tone", tone);
-    await expect(tip.getByTestId("tip-status"), id).toHaveClass(tone === "amber" ? /text-amber/ : /text-red/);
+    await expect(tip.getByTestId("tip-status"), id).toHaveClass(tone === "amber" ? /text-warning/ : /text-destructive/);
   }
 
   // Finished, working and idle threads: no status row; the rest of the tooltip is unchanged.

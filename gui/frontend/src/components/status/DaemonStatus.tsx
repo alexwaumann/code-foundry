@@ -5,9 +5,9 @@ import { useEventsStore } from "@/stores/events";
 import { useHealthStore } from "@/stores/health";
 
 const dot = {
-  connecting: "bg-yellow-500",
-  ok: "bg-emerald-500",
-  error: "bg-red-500",
+  connecting: "bg-warning",
+  ok: "bg-success",
+  error: "bg-destructive",
 } as const;
 
 /** "events" while the shared events stream is not open (connecting or reconnecting). */
@@ -35,7 +35,7 @@ export function DaemonStatus() {
   return (
     <div className="flex min-w-0 items-center gap-2.5 overflow-hidden whitespace-nowrap" data-testid="daemon-status" title={details}>
       {status === "ok" && degraded && (
-        <span className="shrink-0 text-amber-400" title={`Not streaming: ${degraded}`}>
+        <span className="shrink-0 text-warning" title={`Not streaming: ${degraded}`}>
           syncing {degraded}…
         </span>
       )}

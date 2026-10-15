@@ -64,7 +64,7 @@ function ThreadRow({ id }: { id: string }) {
     return x !== undefined && isAttention(x);
   });
   const project = useSessionProject(id);
-  const dot = <span aria-hidden className={cn("size-[7px] rounded-full", waiting ? "bg-amber-500 dark:bg-amber-400" : "bg-emerald-500 dark:bg-emerald-400")} />;
+  const dot = <span aria-hidden className={cn("size-[7px] rounded-full", waiting ? "bg-warning" : "bg-success")} />;
   return <SessionLink id={id} icon={dot} detail={`${waiting ? "waiting" : "running"}${project ? ` · ${project}` : ""}`} />;
 }
 
@@ -95,7 +95,7 @@ function Counts({ connected, running, waiting }: { connected: number; running: n
   if (running > 0) parts.push(<span key="running">{running} running</span>);
   if (waiting > 0) {
     parts.push(
-      <span key="waiting" className="text-amber-600 dark:text-amber-400" data-testid="start-waiting">
+      <span key="waiting" className="text-warning" data-testid="start-waiting">
         {waiting} waiting on you
       </span>,
     );
