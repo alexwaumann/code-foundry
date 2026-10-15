@@ -324,10 +324,6 @@ func (r *runner) onInitialized(res initResult) {
 	if r.closing {
 		return // closed while starting: the close finishes it
 	}
-	if !r.readyClosed {
-		r.readyClosed = true
-		close(r.ready)
-	}
 	r.onSlashCommands(res.resp.Commands, false)
 	if st.restart != restartNone {
 		r.onRestarted()
@@ -360,6 +356,12 @@ func (r *runner) onInitialized(res initResult) {
 	r.pubActivity = r.activity
 	if sentFirst {
 		r.pubStatus, r.pubReason = r.status, r.reason
+	}
+	if !r.readyClosed {
+		// After the row says connected: a caller waiting on ready (lifecycle.go running)
+		// reads it next.
+		r.readyClosed = true
+		close(r.ready)
 	}
 	r.log().info("session connected", "why", "initialized", "pid", st.proc.Pid())
 	r.checkStatus()

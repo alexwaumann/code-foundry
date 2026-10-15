@@ -41,6 +41,8 @@ import (
 // Knobs for the effort restart's tests: CF_FAKE_CLAUDE_EXIT_DELAY (a duration) keeps
 // the process alive that long after stdin closes; CF_FAKE_CLAUDE_RESUME_EXIT (a code)
 // makes a process started with --resume print to stderr and exit with it at once.
+// CF_FAKE_CLAUDE_INIT_DELAY (a duration) holds the initialize answer that long (the
+// lifecycle tests' slow start).
 //
 // Turns Claude starts by itself (a background shell or agent ended while the thread was
 // idle): with CF_FAKE_CLAUDE_UNPROMPTED=<dir>, only the first turn waits for a user
@@ -238,6 +240,9 @@ func fakeStreamClaude(fixture string) int {
 			resp := map[string]any{"subtype": "success", "request_id": m.RequestID}
 			switch m.Request["subtype"] {
 			case "initialize":
+				if d, err := time.ParseDuration(os.Getenv("CF_FAKE_CLAUDE_INIT_DELAY")); err == nil {
+					time.Sleep(d) // a slow start: messages sent meanwhile wait in stdin
+				}
 				resp["response"] = map[string]any{"pid": os.Getpid(), "current_permission_mode": "default", "commands": commands}
 			case "set_cwd":
 				resp["response"] = map[string]any{"status": "ok", "cwd": m.Request["path"], "changed": true}

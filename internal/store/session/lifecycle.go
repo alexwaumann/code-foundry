@@ -399,42 +399,76 @@ func (r *runner) lastActive() time.Time {
 	return r.activity
 }
 
-// idleHold says what keeps the process up at now, "" when nothing does: it is closing
-// or (re)starting, a message is on its way (the first prompt, one queued behind the
-// handshake or held by an effort restart), an effort change waits, Claude is not idle
-// at its prompt, a request waits on the user, an item is unfinished, background work
-// runs (the thread's own background agents and shells: Session.BackgroundWork), the
-// process is younger than IdleGrace, or the prompt cache has not expired (CacheExpiresAt;
-// a thread without a result counts from its last activity). Viewers do not matter.
-func (r *runner) idleHold(now time.Time) string {
-	st := r.st
-	s, _ := r.m.Snapshot().Session(r.id)
+// idleInputs is what an idle stop depends on, read by the runner (idleHold).
+type idleInputs struct {
+	now                 time.Time
+	closing, starting   bool // a close or a (re)start is under way
+	messageOnItsWay     bool // the first prompt, one queued behind the handshake, one held by an effort restart
+	effortChange        bool // a wanted effort the running process does not have
+	pendingRequest      bool
+	atPrompt            bool
+	unfinishedItem      bool
+	backgroundWork      bool // the thread's own background agents and shells
+	startedAt           time.Time
+	cacheExpiresAt      time.Time // zero without a result
+	lastActive          time.Time
+	cacheTTL, idleGrace time.Duration
+}
+
+// idleHoldOf says what keeps a process up, "" when nothing does: it is closing or
+// (re)starting, a message is on its way, an effort change waits, a request waits on the
+// user, Claude is not idle at its prompt, background work runs, an item is unfinished,
+// the process is younger than the grace, or the prompt cache has not expired (a thread
+// without a result counts from its last activity). Viewers do not matter.
+func idleHoldOf(in idleInputs) string {
 	switch {
-	case r.closing || r.finished:
+	case in.closing:
 		return "closing"
-	case !st.initialized || st.restart != restartNone:
+	case in.starting:
 		return "starting"
-	case st.first != nil || len(st.queued) > 0 || len(st.held) > 0:
+	case in.messageOnItsWay:
 		return "message on its way"
-	case st.wantEffort != st.effort:
+	case in.effortChange:
 		return "effort change"
-	case len(st.pending) > 0 || len(st.sd.pending) > 0:
+	case in.pendingRequest:
 		return "pending request"
-	case !st.sd.AtPrompt():
+	case !in.atPrompt:
 		return "busy"
-	case len(st.log.unfinished()) > 0:
-		return "unfinished item"
-	case r.bgShells.count() > 0 || s.BackgroundWork():
+	case in.backgroundWork: // before its call, which stays unfinished while it runs
 		return "background work"
-	case now.Sub(r.startedAt) < r.m.opts.IdleGrace:
+	case in.unfinishedItem:
+		return "unfinished item"
+	case in.now.Sub(in.startedAt) < in.idleGrace:
 		return "grace"
 	}
-	exp := s.CacheExpiresAt
+	exp := in.cacheExpiresAt
 	if exp.IsZero() {
-		exp = r.lastActive().Add(r.m.cacheTTLNow())
+		exp = in.lastActive.Add(in.cacheTTL)
 	}
-	if now.Before(exp) {
+	if in.now.Before(exp) {
 		return "cache warm"
 	}
 	return ""
+}
+
+// idleHold is idleHoldOf for this runner at now (run goroutine only).
+func (r *runner) idleHold(now time.Time) string {
+	st := r.st
+	s, _ := r.m.Snapshot().Session(r.id)
+	return idleHoldOf(idleInputs{
+		now:             now,
+		closing:         r.closing || r.finished,
+		starting:        !st.initialized || st.restart != restartNone,
+		messageOnItsWay: st.first != nil || len(st.queued) > 0 || len(st.held) > 0,
+		effortChange:    st.wantEffort != st.effort,
+		pendingRequest:  len(st.pending) > 0 || len(st.sd.pending) > 0,
+		atPrompt:        st.sd.AtPrompt(),
+		unfinishedItem:  len(st.log.unfinished()) > 0,
+		backgroundWork:  r.bgShells.count() > 0 || s.BackgroundWork(),
+		startedAt:       r.startedAt,
+		cacheExpiresAt:  s.CacheExpiresAt,
+		lastActive:      r.lastActive(),
+		cacheTTL:        r.m.cacheTTLNow(),
+		idleGrace:       r.m.opts.IdleGrace,
+	})
 }
