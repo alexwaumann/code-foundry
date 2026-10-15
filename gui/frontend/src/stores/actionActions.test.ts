@@ -135,7 +135,14 @@ describe("runs", () => {
   it("stopActionRun marks the terminal stopping before the kill returns", async () => {
     useActionStopsStore.setState({ byId: {} });
     let release = () => {};
-    invokeCommand.mockImplementationOnce(() => new Promise((r) => (release = () => r({ message: "", resultJson: "" }))));
+    invokeCommand.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          release = () => {
+            r({ message: "", resultJson: "" });
+          };
+        }),
+    );
     const done = stopActionRun("t-2");
     expect(useActionStopsStore.getState().byId).toHaveProperty("t-2");
     release();
