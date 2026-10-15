@@ -1,6 +1,7 @@
 import { Bell, BellRing, LayoutDashboard, SquarePen } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { Button } from "@/components/ui/button";
+import { Tip } from "@/components/ui/tooltip";
 import { jumpToAttention } from "@/keys/bindings";
 import { formatChord } from "@/keys/chord";
 import { cn } from "@/lib/utils";
@@ -18,35 +19,36 @@ function NotificationsButton() {
   const label = count === 0 ? "No threads need attention" : `${String(count)} ${count === 1 ? "thread needs" : "threads need"} attention`;
   const Icon = count > 0 ? BellRing : Bell;
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      tabIndex={-1}
-      title={label}
-      aria-label={label}
-      aria-disabled={count === 0 || undefined}
-      data-testid="sidebar-notifications"
-      data-count={count}
-      className={cn("relative", count > 0 ? "text-warning hover:text-warning" : "opacity-50 hover:bg-transparent dark:hover:bg-transparent")}
-      onMouseDown={(e) => {
-        e.preventDefault();
-      }}
-      onClick={() => {
-        if (count > 0) jumpToAttention();
-      }}
-    >
-      <Icon aria-hidden className="size-3.5" />
-      {count > 0 && (
-        <span
-          aria-hidden
-          data-testid="attention-badge"
-          className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-warning px-[3px] text-[9px] leading-none font-semibold text-warning-foreground tabular-nums"
-        >
-          {count}
-        </span>
-      )}
-    </Button>
+    <Tip label={label}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        tabIndex={-1}
+        aria-label={label}
+        aria-disabled={count === 0 || undefined}
+        data-testid="sidebar-notifications"
+        data-count={count}
+        className={cn("relative", count > 0 ? "text-warning hover:text-warning" : "opacity-50 hover:bg-transparent dark:hover:bg-transparent")}
+        onMouseDown={(e) => {
+          e.preventDefault();
+        }}
+        onClick={() => {
+          if (count > 0) jumpToAttention();
+        }}
+      >
+        <Icon aria-hidden className="size-3.5" />
+        {count > 0 && (
+          <span
+            aria-hidden
+            data-testid="attention-badge"
+            className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-warning px-[3px] text-[9px] leading-none font-semibold text-warning-foreground tabular-nums"
+          >
+            {count}
+          </span>
+        )}
+      </Button>
+    </Tip>
   );
 }
 

@@ -4,6 +4,7 @@ import { fmtRequests, fmtShare, fmtTok, fmtUsd, modelColorVars, SWATCH_BG, TOKEN
 import { cn } from "@/lib/utils";
 import { sameUsage, useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
+import { Tip } from "@/components/ui/tooltip";
 
 const NONE: readonly UsageBucketView[] = [];
 
@@ -44,9 +45,11 @@ function ModelRow({ row, total }: { row: ModelUsage; total: number }) {
       <span className={cn("size-2 shrink-0 rounded-[2px]", SWATCH_BG)} style={modelColorVars(row.model) as CSSProperties} data-testid="usage-swatch" aria-hidden />
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center">
-          <span className="min-w-0 truncate font-mono text-[13px]" title={row.model} data-testid="usage-model-name">
-            {row.model}
-          </span>
+          <Tip label={row.model} whenTruncated>
+            <span className="min-w-0 truncate font-mono text-[13px]" data-testid="usage-model-name">
+              {row.model}
+            </span>
+          </Tip>
           {row.unpriced && <UnpricedTag />}
         </div>
         <div className="mt-0.5 text-[11px] text-muted-foreground tabular-nums" data-testid="usage-model-meta">

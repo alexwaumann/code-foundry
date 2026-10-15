@@ -34,6 +34,7 @@ import { bottomMax, useUiStore } from "@/stores/ui";
 import { selectPageOpen, useViewsStore, visibleBottomKey } from "@/stores/views";
 import { BottomResizeHandle } from "./BottomResizeHandle";
 import { bottomKeyAction, tabFocusIndex } from "./keys";
+import { Tip } from "@/components/ui/tooltip";
 
 const BODY_ID = "bottom-panel-body";
 
@@ -88,36 +89,39 @@ function TerminalTab({ panelKey, id, active, focusable }: { panelKey: string; id
         if (e.button === 1) void closeBottomTerminal(id);
       }}
     >
-      <button
-        type="button"
-        role="tab"
-        id={tabDomId(id)}
-        aria-selected={active}
-        aria-controls={active ? BODY_ID : undefined}
-        tabIndex={focusable ? 0 : -1}
-        title={tildify(cwd)}
-        className="flex h-full min-w-0 cursor-default items-center gap-1.5 rounded-md pr-1 pl-2 outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        onClick={() => {
-          openTab(panelKey, id);
-        }}
-      >
-        {action ? <ActionTabIcon id={id} /> : <SquareTerminal className={cn("size-3.5 shrink-0", exited && "opacity-50")} aria-hidden />}
-        <span className={cn("truncate", exited && "line-through opacity-60")}>{title}</span>
-        {action && <ActionTabStatusMark id={id} />}
-      </button>
-      <button
-        type="button"
-        tabIndex={focusable ? 0 : -1}
-        aria-label={`Close ${title}`}
-        title="Close terminal"
-        className={cn(
-          "flex size-4 shrink-0 items-center justify-center rounded-sm outline-none hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring",
-          active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-        )}
-        onClick={() => void closeBottomTerminal(id)}
-      >
-        <X className="size-3" aria-hidden />
-      </button>
+      {/* The tab's tooltip is the shell's working directory. */}
+      <Tip label={tildify(cwd)}>
+        <button
+          type="button"
+          role="tab"
+          id={tabDomId(id)}
+          aria-selected={active}
+          aria-controls={active ? BODY_ID : undefined}
+          tabIndex={focusable ? 0 : -1}
+          className="flex h-full min-w-0 cursor-default items-center gap-1.5 rounded-md pr-1 pl-2 outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          onClick={() => {
+            openTab(panelKey, id);
+          }}
+        >
+          {action ? <ActionTabIcon id={id} /> : <SquareTerminal className={cn("size-3.5 shrink-0", exited && "opacity-50")} aria-hidden />}
+          <span className={cn("truncate", exited && "line-through opacity-60")}>{title}</span>
+          {action && <ActionTabStatusMark id={id} />}
+        </button>
+      </Tip>
+      <Tip label="Close terminal">
+        <button
+          type="button"
+          tabIndex={focusable ? 0 : -1}
+          aria-label={`Close ${title}`}
+          className={cn(
+            "flex size-4 shrink-0 items-center justify-center rounded-sm outline-none hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring",
+            active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+          )}
+          onClick={() => void closeBottomTerminal(id)}
+        >
+          <X className="size-3" aria-hidden />
+        </button>
+      </Tip>
     </div>
   );
 }
@@ -161,23 +165,24 @@ function useCanStartTerminal(panelKey: string): boolean {
 function NewTerminalButton({ panelKey }: { panelKey: string }) {
   const { title } = useNewTerminalCommand();
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      className="size-7 text-muted-foreground [--wails-draggable:no-drag] hover:bg-accent/40 hover:text-foreground dark:hover:bg-accent/40"
-      title={title}
-      aria-label={title}
-      data-testid="bottom-new-terminal"
-      data-strip-stop
-      // Keeps focus where it is; the new terminal takes it when it shows up.
-      onMouseDown={(e) => {
-        e.preventDefault();
-      }}
-      onClick={() => void newBottomTerminal(panelKey)}
-    >
-      <Plus />
-    </Button>
+    <Tip label={title}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        className="size-7 text-muted-foreground [--wails-draggable:no-drag] hover:bg-accent/40 hover:text-foreground dark:hover:bg-accent/40"
+        aria-label={title}
+        data-testid="bottom-new-terminal"
+        data-strip-stop
+        // Keeps focus where it is; the new terminal takes it when it shows up.
+        onMouseDown={(e) => {
+          e.preventDefault();
+        }}
+        onClick={() => void newBottomTerminal(panelKey)}
+      >
+        <Plus />
+      </Button>
+    </Tip>
   );
 }
 
@@ -254,7 +259,7 @@ function BottomHeader({ panelKey, ids, activeId }: { panelKey: string; ids: read
   return (
     <div className="flex h-9 shrink-0 items-center gap-2 border-b border-pane-border pr-1.5 pl-1 [--wails-draggable:no-drag]" data-testid="bottom-header">
       <TabStrip panelKey={panelKey} ids={ids} activeId={activeId} />
-      <CommandButton command="view.bottom.toggle" icon={X} title="Close bottom panel" className="shrink-0 [--wails-draggable:no-drag]" data-testid="bottom-close" />
+      <CommandButton command="view.bottom.toggle" icon={X} tooltip="Close bottom panel" className="shrink-0 [--wails-draggable:no-drag]" data-testid="bottom-close" />
     </div>
   );
 }

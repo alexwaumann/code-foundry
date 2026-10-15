@@ -1,6 +1,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tip } from "@/components/ui/tooltip";
 import { isStartable, startCommandNamed } from "@/keys/bindings";
 import { useCommandsStore } from "@/stores/commands";
 
@@ -14,10 +15,10 @@ interface CommandButtonProps {
   /** Visible text. Omit for an icon-only button; the command's title is then its label. */
   label?: string;
   /** Tooltip of an icon-only button; defaults to the command's title. A button with a label has none. Never a chord: those live in the palette and help. */
-  title?: string;
+  tooltip?: string;
   /**
    * Content drawn instead of the icon and label (a thread's name, its project and branch).
-   * Visible, so the button has no title; its text is its accessible name.
+   * Visible, so the button has no tooltip; its text is its accessible name.
    */
   children?: ReactNode;
   /**
@@ -53,7 +54,7 @@ export function CommandButton({
   icon: Icon,
   label,
   children,
-  title,
+  tooltip,
   whenUnavailable = "hide",
   keepFocus = true,
   variant = "ghost",
@@ -72,17 +73,16 @@ export function CommandButton({
         {children}
       </span>
     );
-  const name = title ?? commandTitle ?? label ?? command;
-  // Visible text (a label or custom content) names the button itself: no title.
+  const name = tooltip ?? commandTitle ?? label ?? command;
+  // Visible text (a label or custom content) names the button itself: no tooltip.
   const visible = Boolean(label) || children !== undefined;
-  return (
+  const button = (
     <Button
       type="button"
       variant={variant}
       size={size ?? (visible ? "sm" : count !== undefined ? "xs" : "icon-xs")}
       className={className}
       disabled={commandTitle === null}
-      title={visible ? undefined : name}
       aria-label={visible ? undefined : count !== undefined ? `${name} (${String(count)})` : name}
       aria-pressed={pressed}
       aria-current={current ? "page" : undefined}
@@ -110,4 +110,8 @@ export function CommandButton({
       {children}
     </Button>
   );
+  if (visible) return button;
+  // An icon-only button names itself in a tooltip (and aria-label). A disabled button gets
+  // no pointer events, so a disabled one is hovered through a span around it.
+  return <Tip label={name}>{commandTitle === null ? <span className="inline-flex">{button}</span> : button}</Tip>;
 }

@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
 import { useCommandsStore } from "@/stores/commands";
+import { tooltipText } from "@/test/tooltip";
 import { CommandButton } from "./CommandButton";
 
 const startCommandNamed = vi.hoisted(() => vi.fn(() => true));
@@ -42,11 +43,26 @@ describe("CommandButton", () => {
     useCommandsStore.setState({ commands: [cmd({})] });
     render(<CommandButton command="terminal.new" icon={Plus} data-testid="b" />);
     const b = screen.getByTestId("b");
-    expect(b.getAttribute("title")).toBe("New Terminal");
+    expect(b.getAttribute("title")).toBeNull();
     expect(b.getAttribute("aria-label")).toBe("New Terminal");
     expect(b.tabIndex).toBe(-1);
+    // The name is its tooltip (the shadcn Tooltip, not a native title).
+    expect(tooltipText(b)).toBe("New Terminal");
     fireEvent.click(b);
     expect(startCommandNamed).toHaveBeenCalledWith("terminal.new");
+  });
+
+  it("an icon-only button's tooltip can be overridden; a disabled one hangs it on a span around the button", () => {
+    useCommandsStore.setState({ commands: [] });
+    render(<CommandButton command="terminal.new" icon={Plus} tooltip="Open a shell" whenUnavailable="disable" data-testid="b" />);
+    const b = screen.getByTestId<HTMLButtonElement>("b");
+    expect(b.disabled).toBe(true);
+    expect(b.getAttribute("aria-label")).toBe("Open a shell");
+    // A disabled button gets no pointer events: the span is the tooltip's trigger.
+    const wrap = b.parentElement as HTMLElement;
+    expect(wrap.tagName).toBe("SPAN");
+    expect(wrap.dataset.state).toBe("closed");
+    expect(b.dataset.state).toBeUndefined();
   });
 
   it.each([
@@ -65,6 +81,8 @@ describe("CommandButton", () => {
     expect(b.textContent).toBe("my thread");
     expect(b.getAttribute("title")).toBeNull();
     expect(b.getAttribute("aria-label")).toBeNull();
+    // Visible content names the button: no tooltip either.
+    expect(b.dataset.state).toBeUndefined();
     expect(b.classList.contains("x")).toBe(true);
     fireEvent.click(b);
     expect(startCommandNamed).toHaveBeenCalledTimes(tag === "button" ? 1 : 0);

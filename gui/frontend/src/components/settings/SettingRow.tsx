@@ -9,6 +9,7 @@ import { validateSetting } from "@/settings/validate";
 import { saveSettings, useSettingsStore, useSettingValue } from "@/stores/settings";
 import type { EditorProps, SettingEditor } from "./editor";
 import { keyEditors } from "./keyEditors";
+import { Tip } from "@/components/ui/tooltip";
 
 const inputClass =
   "h-7 w-full rounded-md border border-input bg-background px-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50 aria-invalid:border-destructive";
@@ -213,18 +214,19 @@ export function SettingRow({ field }: { field: SettingFieldView }) {
           <div className={field.type === "bool" ? "flex flex-1 justify-end" : "min-w-0 flex-1"}>
             <Editor field={field} value={value} pending={pending} invalid={message !== null} commit={commit} setError={setError} />
           </div>
-          <button
-            type="button"
-            title={`Reset to default (${displayValue(field, field.defaultValue)})`}
-            aria-label={`Reset ${field.title}`}
-            className={cn("rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground", !modified && "invisible")}
-            disabled={pending || !modified}
-            onClick={() => {
-              commit("");
-            }}
-          >
-            <RotateCcw className="size-3.5" />
-          </button>
+          <Tip label={`Reset to default (${displayValue(field, field.defaultValue)})`}>
+            <button
+              type="button"
+              aria-label={`Reset ${field.title}`}
+              className={cn("rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground", !modified && "invisible")}
+              disabled={pending || !modified}
+              onClick={() => {
+                commit("");
+              }}
+            >
+              <RotateCcw className="size-3.5" />
+            </button>
+          </Tip>
         </div>
         {message && (
           <p className="text-xs break-words text-destructive" role="alert" data-testid="setting-error">

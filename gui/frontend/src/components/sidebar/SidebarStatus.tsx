@@ -18,22 +18,22 @@ export function SidebarStatus() {
       <div className="flex h-6 min-w-0 items-center gap-2">
         <DaemonStatus />
         <span className="ml-auto flex shrink-0 items-center">
-          <CommandButton command="ui.palette.open" icon={Command} title="Command Palette" data-testid="status-palette" />
+          <CommandButton command="ui.palette.open" icon={Command} tooltip="Command Palette" data-testid="status-palette" />
           {/* A toggle (stores/views.ts showView "usage"): pressed while the Usage page shows. */}
           <CommandButton
             command="view.usage"
             icon={ChartColumn}
-            title="Usage"
+            tooltip="Usage"
             pressed={usageOpen}
             className={usageOpen ? "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent" : undefined}
             data-testid="status-usage"
           />
-          <CommandButton command="view.help" icon={CircleHelp} title="Keyboard Shortcuts and Help" data-testid="status-help" />
+          <CommandButton command="view.help" icon={CircleHelp} tooltip="Keyboard Shortcuts and Help" data-testid="status-help" />
           {/* A toggle like usage (showView "settings"): pressed while the settings page shows. */}
           <CommandButton
             command="view.settings"
             icon={Settings}
-            title="Settings"
+            tooltip="Settings"
             pressed={settingsOpen}
             className={settingsOpen ? "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent" : undefined}
             data-testid="status-settings"

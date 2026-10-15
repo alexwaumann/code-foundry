@@ -12,6 +12,7 @@ import { closeUsage } from "@/stores/views";
 import { Segmented } from "./Segmented";
 import { Swatch, UsageChart, type ChartMode } from "./UsageChart";
 import { usagePageData, utcDays } from "./usageData";
+import { Tip } from "@/components/ui/tooltip";
 
 const NONE: readonly UsageBucketView[] = [];
 const RANGE_OPTIONS = USAGE_RANGES.map((d) => ({ value: d, label: d === 1 ? "1 day" : `${String(d)} days` }));
@@ -67,9 +68,11 @@ export function UsagePage() {
           data-testid="usage-page-range"
           className="ml-1"
         />
-        <Button variant="ghost" size="icon-xs" className="[--wails-draggable:no-drag]" aria-label="Close usage" title="Close (Esc)" onClick={closeUsage} data-testid="usage-page-close">
-          <X />
-        </Button>
+        <Tip label="Close (Esc)">
+          <Button variant="ghost" size="icon-xs" className="[--wails-draggable:no-drag]" aria-label="Close usage" onClick={closeUsage} data-testid="usage-page-close">
+            <X />
+          </Button>
+        </Tip>
       </PaneHeader>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[1040px] px-8 pt-7 pb-10">

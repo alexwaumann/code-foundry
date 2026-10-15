@@ -93,7 +93,6 @@ function WorkspaceBadge({ id }: { id: string }) {
     // to the row, which selects the thread (and so shows that panel).
     <span
       className="flex max-w-24 min-w-0 cursor-pointer items-center gap-0.5 rounded-sm bg-highlight/15 px-1 text-[10px] leading-4 font-medium text-highlight hover:bg-highlight/30"
-      title={`Workspace ${workspace}: show its members in the side panel`}
       data-testid="row-workspace"
       onClick={() => {
         openWorkspaceSurface({ kind: "session", id });
@@ -114,7 +113,6 @@ function LinkedPrsBadge({ id }: { id: string }) {
     // panel, and goes on to the row, which selects the thread (and so shows that panel).
     <span
       className="flex shrink-0 cursor-pointer items-center rounded-sm bg-success/15 px-1 text-[10px] leading-4 font-medium text-success tabular-nums hover:bg-success/30"
-      title={`${prBadge(count)} linked: show them in the side panel`}
       data-testid="row-linked-prs"
       onClick={() => {
         openLinkedPrsSurface({ kind: "session", id });
@@ -191,7 +189,7 @@ function ThreadLine({ id }: { id: string }) {
   return (
     <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground" data-testid="row-place" data-status-line={line.kind} data-session-badge={badge}>
       {movingTo !== null ? (
-        <span className="flex min-w-0 items-center gap-1 text-warning" data-testid="row-moving" title={`Runs in ${movingTo} once it is idle at its prompt`}>
+        <span className="flex min-w-0 items-center gap-1 text-warning" data-testid="row-moving">
           <ArrowRightLeft className="size-3 shrink-0" aria-hidden />
           <span className="truncate">moving to {movingTo}…</span>
         </span>
@@ -212,7 +210,7 @@ function ThreadLine({ id }: { id: string }) {
               {noProject ? null : noGit ? (
                 <>
                   {" "}
-                  <NoGitBadge className="align-[1px]" />
+                  <NoGitBadge className="align-[1px]" tip={false} />
                 </>
               ) : (
                 <>
@@ -318,8 +316,23 @@ function TipSnooze({ id }: { id: string }) {
 }
 
 /**
+ * A queued "Run in…" move in full (the row's "moving to X…" is cut short and does not say
+ * when): the thread runs there once it is idle at its prompt. Nothing without a move.
+ */
+function TipMoving({ id }: { id: string }) {
+  const { movingTo } = useThreadPlace(id);
+  if (movingTo === null) return null;
+  return (
+    <div className="mb-[3px] flex items-start gap-2 leading-5 text-warning" data-testid="tip-moving">
+      <ArrowRightLeft className="mt-[3px] size-3.5 shrink-0" aria-hidden />
+      <span className="min-w-0 break-words">Runs in {movingTo} once it is idle at its prompt</span>
+    </div>
+  );
+}
+
+/**
  * The tooltip's body: name, status (attention or error only; for a snoozed thread its wake
- * time instead), project ("No project" with the House icon for a thread without one),
+ * time instead), a queued move, project ("No project" with the House icon for a thread without one),
  * branch (git only) and model. Mounted only while open.
  */
 function ThreadTipBody({ id }: { id: string }) {
@@ -346,6 +359,7 @@ function ThreadTipBody({ id }: { id: string }) {
         {name || id}
       </div>
       {snoozed ? <TipSnooze id={id} /> : <TipStatus id={id} />}
+      <TipMoving id={id} />
       <TipRow icon={<TipIcon icon={m.noProject ? House : m.noGit ? Folder : FolderGit2} />} chip={m.noGit ? "no git" : null} testId="tip-project">
         {m.project}
       </TipRow>
@@ -363,7 +377,7 @@ function ThreadTipBody({ id }: { id: string }) {
 }
 
 /**
- * A thread row's hover tooltip (the provider in Sidebar sets the 500 ms delay). Pointer
+ * A thread row's hover tooltip (the app root's TooltipProvider sets the 500 ms delay). Pointer
  * only: the rows are not focusable (the list uses aria-activedescendant), so keyboard
  * navigation never opens it; a click or right-click closes it. Not while renaming.
  */

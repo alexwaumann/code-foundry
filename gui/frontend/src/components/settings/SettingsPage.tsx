@@ -9,6 +9,7 @@ import { runCommand } from "@/stores/commands";
 import { loadSettingsSchema, useSettingsStore } from "@/stores/settings";
 import { closeSettings } from "@/stores/views";
 import { SettingRow } from "./SettingRow";
+import { Tip } from "@/components/ui/tooltip";
 
 function matches(f: SettingFieldView, q: string): boolean {
   if (!q) return true;
@@ -95,9 +96,11 @@ export function SettingsPage() {
             className="h-7 w-full rounded-md border border-input bg-background pr-2 pl-7 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           />
         </div>
-        <span className="ml-auto truncate font-mono text-[11px] text-muted-foreground" title={path} data-testid="settings-path">
-          {tildify(path)}
-        </span>
+        <Tip label={path} side="bottom">
+          <span className="ml-auto truncate font-mono text-[11px] text-muted-foreground" data-testid="settings-path">
+            {tildify(path)}
+          </span>
+        </Tip>
         <Button variant="outline" size="xs" className="[--wails-draggable:no-drag]" onClick={() => void runCommand("settings.reveal")} data-testid="reveal-settings">
           <FileText /> Reveal settings file
         </Button>
