@@ -26,9 +26,16 @@ describe("coldCacheNote", () => {
     ["a finished turn not seen yet is idle enough", { status: "attention" }, NOTE],
     ["unknown status while connected", { status: "unknown" }, NOTE],
     ["before the expiry", { nowMs: EXPIRES - 1 }, null],
-    ["disconnected (the Reconnect card shows instead)", { state: "disconnected" }, null],
+    // Whether Claude runs does not matter; after the idle stop every stopped thread is past expiry.
+    ["stopped at its prompt", { state: "disconnected" }, NOTE],
+    ["stopped with a finished turn", { state: "disconnected", status: "attention" }, NOTE],
+    ["stopped, status unknown", { state: "disconnected", status: "unknown" }, NOTE],
+    ["stopped with a busy left by an older daemon", { state: "disconnected", status: "busy" }, NOTE],
+    ["stopping", { state: "closing" }, NOTE],
+    ["stopped, before the expiry", { state: "disconnected", nowMs: EXPIRES - 1 }, null],
+    // Starting for a message just sent is working.
     ["starting", { state: "starting" }, null],
-    ["closing", { state: "closing" }, null],
+    ["starting after a finished turn", { state: "starting", status: "attention" }, null],
     ["Claude is working", { status: "busy" }, null],
     ["a prompt is pending", { pending: 1 }, null],
     ["a send is starting", { phase: "starting" }, null],

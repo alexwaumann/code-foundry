@@ -36,7 +36,6 @@ import { questionsOf } from "@/lib/threadRequest";
 import { groupLabel, turnCostLabel, type TimelineRow, type WorkNode } from "@/lib/threadTimeline";
 import { formatDuration, parseObject, splitPath, str, toolSummary, type Tense } from "@/lib/toolSummary";
 import { useAgentRunOfCall, useAgentRunOfNote } from "@/stores/agents";
-import { useSessionsStore } from "@/stores/sessions";
 import { useModelChoices } from "@/stores/settings";
 import { getThreadItems, setRowExpanded, setTurnFolded, useRowExpanded, useThreadItem, useThreadStore } from "@/stores/thread";
 import { ThreadMarkdown } from "./Code";
@@ -625,11 +624,10 @@ const FooterRow = memo(function FooterRow({ row }: { row: Extract<TimelineRow, {
   );
 });
 
-/** "Working 3m 52s" while the turn runs (since its user message); "Starting Claude…" until Claude is up. */
+/** "Working 3m 52s" while the turn runs, since its user message (Claude starting up for it included). */
 function WorkingRow({ since }: { since: string }) {
   const { sessionId } = useThreadCtx();
   const start = useThreadStore((s) => s.logs[sessionId]?.byId[since]?.createdAtMs ?? null);
-  const starting = useSessionsStore((s) => s.byId[sessionId]?.state === "starting");
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => {
@@ -641,10 +639,10 @@ function WorkingRow({ since }: { since: string }) {
   }, []);
   const took = start !== null ? formatDuration(Math.max(0, now - start)) : "";
   return (
-    <div className="working" data-testid="thread-working" data-starting={starting || undefined}>
+    <div className="working" data-testid="thread-working">
       <LoaderCircle className="animate-spin" aria-hidden />
-      <span className="shimmer">{starting ? "Starting Claude…" : "Working"}</span>
-      {!starting && took && <span className="tabular-nums">{took.replace(/\.\ds$/, "s")}</span>}
+      <span className="shimmer">Working</span>
+      {took && <span className="tabular-nums">{took.replace(/\.\ds$/, "s")}</span>}
     </div>
   );
 }
