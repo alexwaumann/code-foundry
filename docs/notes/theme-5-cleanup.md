@@ -150,7 +150,11 @@ Grepped `gui/frontend/src/components` (outside `ui/`) for hand-rolled equivalent
 
 ## Verified
 
-- `make check` green; `make gui-e2e` results in the PR body.
+- `make check` green (frontend 2928 tests; no Go change on this branch).
+- `make gui-e2e` (WebKit + Chromium): 778 passed, 40 skipped, 0 failed; the known
+  `panel.spec.ts` flake did not show. The tile hover/disabled tweak (`415be252`) landed
+  during that run; `actions.spec.ts` and `create.spec.ts` rerun at the head: 32 passed,
+  4 skipped. The new tile test passed 10 of 10 (`--repeat-each=5`, both browsers).
 - Live (`make gui-build`, isolated `CODE_FOUNDRY_HOME`, a scratch repo under `~`, no
   Claude session; all deleted afterwards), dark and light:
   - Action editor (Projects page, project menu, New action…): Tab from Command lands on
