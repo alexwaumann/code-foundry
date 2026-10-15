@@ -285,7 +285,7 @@
   zoom: var(--cf-zoom);
 }
 
-/* Thin indeterminate bar (the update dialog). */
+/* A Progress without a value (components/ui/progress.tsx): the update dialog's bar. */
 @keyframes cf-indeterminate {
   0% {
     transform: translateX(-100%);
