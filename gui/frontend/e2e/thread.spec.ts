@@ -11,7 +11,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-type State = "permission" | "question" | "streaming" | "idle" | "closed" | "crashed";
+type State = "permission" | "question" | "streaming" | "idle" | "stopped" | "crashed";
 
 async function openThread(page: Page, state: State, scheme: "dark" | "light" = "dark"): Promise<void> {
   await page.emulateMedia({ colorScheme: scheme });
@@ -474,7 +474,7 @@ test("the thread.* commands are offered for a thread, not for a page", async ({ 
     await expect(page.getByRole("option", { name: new RegExp(title) })).toBeVisible();
   }
   await page.keyboard.press("Escape");
-  // Every thread has them: the seeded s-3 too, disconnected.
+  // Every thread has them: the seeded s-3 too, stopped.
   await row(page, "s:s-3").click();
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-3");
   await page.keyboard.press("Meta+k");
@@ -492,31 +492,39 @@ test("the thread.* commands are offered for a thread, not for a page", async ({ 
   }
 });
 
-test("a claude that died before the handshake: its error in the timeline, Reconnect, then Starting Claude…", async ({ page }) => {
+test("a claude that did not start: its error in the timeline, the composer, and the next message starts it", async ({ page }) => {
   await openThread(page, "crashed");
-  await expect(pane(page).getByTestId("thread-error")).toHaveText("Claude exited (code 1) before answering the initialize handshake: error: unknown option '--bogus'");
-  const bar = page.getByTestId("thread-disconnected");
-  await expect(bar).toContainText("Not connected · crashed (exit code 1)");
-  await expect(page.getByTestId("thread-composer")).toHaveCount(0);
+  await expect(pane(page).getByTestId("thread-error")).toHaveText("Claude did not start: exit code 1: error: unknown option '--bogus'");
+  await expect(row(page, "s:s-r1").getByTestId("row-status")).toHaveText("Error · did not start");
+  await expect(page.getByTestId("thread-disconnected")).toHaveCount(0);
+  const composer = page.getByTestId("thread-composer");
+  await expect(composer).toBeVisible();
   await shot(page, "crashed");
-  await bar.getByRole("button", { name: "Reconnect" }).click();
-  // Until Claude answers the handshake the timeline says so (no elapsed time: no turn yet).
-  const starting = page.getByTestId("thread-working");
-  await expect(starting).toHaveText("Starting Claude…");
-  await expect(starting).toHaveAttribute("data-starting", "true");
+  await composer.getByTestId("composer-input").click();
+  await page.keyboard.type("Try again");
+  await page.keyboard.press("Enter");
+  // While Claude starts the timeline shows the same Working row as a turn, no "starting" word.
+  const working = page.getByTestId("thread-working");
+  await expect(working).toContainText("Working");
+  await expect(pane(page)).not.toContainText(/Starting Claude|starting…/);
   await shot(page, "starting");
-  await expect(page.getByTestId("thread-composer")).toBeVisible();
-  await expect(starting).toHaveCount(0, { timeout: 5000 });
+  await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.", { timeout: 10_000 });
+  await expect(working).toHaveCount(0, { timeout: 5000 });
   await expect(pane(page).getByTestId("thread-error")).toBeVisible();
 });
 
-test("a closed thread keeps its conversation above the Reconnect bar", async ({ page }) => {
-  await openThread(page, "closed");
-  await expect(page.getByTestId("thread-disconnected")).toContainText("Not connected · closed. Reconnect to continue the conversation.");
+test("a stopped thread at its prompt keeps its conversation, the composer and the cold-cache note", async ({ page }) => {
+  await openThread(page, "stopped");
+  await expect(page.getByTestId("thread-disconnected")).toHaveCount(0);
+  await expect(page.getByTestId("reconnect")).toHaveCount(0);
+  const composer = page.getByTestId("thread-composer");
+  await expect(composer.getByTestId("thread-cold-cache")).toHaveText(/^Cache expired · the next message re-reads 25\.7K tokens/);
+  await expect(composer.getByTestId("thread-send")).toBeDisabled();
   await expect(footers(page).last()).toContainText("Sonnet 5");
   await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("All 412 tests pass and the branch is pushed");
   await expect(page.getByTestId("thread-working")).toHaveCount(0);
   await expect(page.getByTestId("thread-empty")).toHaveCount(0);
+  await expect(row(page, "s:s-r1").getByTestId("row-place")).toHaveAttribute("data-session-badge", "idle");
 });
 
 test("a fork shows its parent's conversation, ended by a Forked from note", async ({ page }) => {
@@ -530,7 +538,7 @@ test("a fork shows its parent's conversation, ended by a Forked from note", asyn
   await expect(page.getByTestId("thread-pane")).toBeVisible();
   const note = pane(page).getByTestId("thread-note");
   await expect(note).toHaveText("Forked from Fix stale PR badge");
-  await expect(page.getByTestId("thread-working")).toHaveText("Starting Claude…");
+  await expect(page.getByTestId("thread-working")).toContainText("Working");
   // The copied turns are all there (folded: the note is the latest row), and nothing waits.
   await expect(footers(page)).toHaveCount(parentFooters);
   await expect(pane(page).locator('[data-testid="thread-text"]').last()).toContainText("All 412 tests pass and the branch is pushed");

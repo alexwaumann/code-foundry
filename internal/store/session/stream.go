@@ -149,7 +149,7 @@ func (m *Manager) spawnStream(ctx context.Context, rec *record, r *runner, argv,
 		return err
 	}
 	st := &streamState{
-		sd: &streamStatus{}, log: log, first: first,
+		sd: &streamStatus{waiting: first != nil}, log: log, first: first,
 		initDone: make(chan initResult, 1),
 		cmds:     make(chan threadCmd),
 		viewSig:  make(chan struct{}, 1),
@@ -315,6 +315,14 @@ func (r *runner) onInitialized(res initResult) {
 			// Still running but not answering (the startup timer says the same).
 			// ErrClosed means its stdout ended: the process is gone or going, and
 			// maybeExited records how (crashed, with its last stderr line).
+			if errors.Is(err, context.DeadlineExceeded) {
+				// The handshake's deadline and the startup (or restart) timer are the
+				// same StartTimeout: whichever fires first, the timeline says the same.
+				err = errors.New("no answer to the initialize handshake")
+				if st.restart != restartNone {
+					err = errors.New("no answer to the initialize handshake after a restart")
+				}
+			}
 			r.failStart(err)
 		}
 		return
@@ -411,6 +419,8 @@ func (r *runner) queue(o *outgoing) (Item, error) {
 		return Item{}, err
 	}
 	st.queued = append(st.queued, o)
+	st.sd.waiting = true
+	r.checkStatus()
 	return it, nil
 }
 

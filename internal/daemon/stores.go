@@ -151,7 +151,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 		Bus: s.bus, Logger: log.With("store", "terminal"), MaxScrollbackLines: uint(cfg.Sessions.ScrollbackLines),
 	})
 	// Workspaces open before sessions: a session reads a workspace thread's members at
-	// every spawn, and the workspace store asks sessions about live threads (and
+	// every spawn, and the workspace store asks sessions about their threads (and
 	// pre-trusts worktrees) only through these closures, which run after both exist.
 	if s.workspace, err = workspace.New(ctx, workspace.Options{
 		DB: s.db, Repos: s.repo, Bus: s.bus, Log: log.With("store", "workspace"),
@@ -159,7 +159,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, sessionEnv
 			if s.session == nil {
 				return nil
 			}
-			return liveThreads(s.session.Snapshot())
+			return worktreeThreads(s.session.Snapshot())
 		},
 		Trust: func(dir string) error {
 			if s.session == nil {
@@ -250,15 +250,17 @@ func sessionOwner(snap *session.Snapshot, id string) (action.Owner, bool) {
 	return action.Owner{SessionID: id, RepoID: snap.Sessions[i].RepoID, Worktree: snap.Sessions[i].WorktreePath}, true
 }
 
-// liveThreads lists the sessions with a process, for the workspace store's removal
-// guard.
-func liveThreads(snap *session.Snapshot) []workspace.Thread {
+// worktreeThreads lists the threads that own their cwd, for the cleanup rule and the
+// workspace store's removal guards: every thread but an archived one, whatever its state
+// (a stopped thread looks like any other in the GUI and a message starts it again in the
+// same worktree; a snoozed one comes back to it).
+func worktreeThreads(snap *session.Snapshot) []workspace.Thread {
 	var out []workspace.Thread
 	if snap == nil {
 		return nil
 	}
 	for _, s := range snap.Sessions {
-		if s.State != session.StateDisconnected {
+		if s.ArchivedAt.IsZero() {
 			out = append(out, workspace.Thread{ID: s.ID, Name: s.Name, Cwd: s.WorktreePath})
 		}
 	}

@@ -6,7 +6,6 @@ import {
   collapsedWorkspaceSummary,
   filterProjects,
   isCleanable,
-  liveThreadCount,
   memberKey,
   pageItems,
   projectKey,
@@ -17,6 +16,7 @@ import {
   repoRef,
   threadAt,
   workspaceKey,
+  worktreeThreadCount,
   type ProjectKind,
   type ProjectNextStep,
   type ProjectsModel,
@@ -221,25 +221,28 @@ describe("projectNextStep (the header's Publish / Initialize git gate)", () => {
   });
 });
 
-describe("liveThreadCount", () => {
+describe("worktreeThreadCount", () => {
+  // Every thread on exactly the worktree, whether or not Claude runs for it; archived ones are put away.
   const sessions = {
-    order: ["a", "b", "c", "d", "e", "f"],
+    order: ["a", "b", "c", "d", "e", "f", "g"],
     byId: {
-      a: { state: "connected" as const, worktreePath: "/src/web" },
-      b: { state: "starting" as const, worktreePath: "/src/web" },
-      c: { state: "disconnected" as const, worktreePath: "/src/web" },
-      d: { state: "closing" as const, worktreePath: "/wt/web/feat" },
-      e: { state: "connected" as const, worktreePath: "/src/web/sub" },
-      f: { state: "unknown" as const, worktreePath: "/wt/web/feat" },
+      a: { worktreePath: "/src/web", archivedAtMs: null },
+      b: { worktreePath: "/src/web", archivedAtMs: null },
+      c: { worktreePath: "/src/web", archivedAtMs: null },
+      d: { worktreePath: "/wt/web/feat", archivedAtMs: null },
+      e: { worktreePath: "/src/web/sub", archivedAtMs: null },
+      f: { worktreePath: "/wt/web/feat", archivedAtMs: 5 },
+      g: { worktreePath: "/src/web", archivedAtMs: 9 },
     },
   };
   it.each<[string, number]>([
-    ["/src/web", 2],
-    ["/wt/web/feat", 2],
+    ["/src/web", 3],
+    ["/wt/web/feat", 1],
+    ["/src/web/sub", 1],
     ["/src/api", 0],
     ["", 0],
   ])("%s: %i", (path, want) => {
-    expect(liveThreadCount(sessions, path)).toBe(want);
+    expect(worktreeThreadCount(sessions, path)).toBe(want);
   });
 });
 
@@ -248,7 +251,7 @@ describe("isCleanable", () => {
   const none = { order: [], byId: {} };
   type Sessions = Parameters<typeof isCleanable>[1];
   type Terminals = Parameters<typeof isCleanable>[2];
-  const thread = (state: "connected" | "starting" | "closing" | "disconnected", worktreePath: string): Sessions => ({ order: ["s"], byId: { s: { state, worktreePath } } });
+  const thread = (worktreePath: string, archivedAtMs: number | null = null): Sessions => ({ order: ["s"], byId: { s: { archivedAtMs, worktreePath } } });
   const term = (state: "running" | "exited", cwd: string, worktree?: string): Terminals => ({
     order: ["t"],
     byId: { t: { state, cwd, labels: worktree ? { kind: "shell", worktree } : {} } },
@@ -260,10 +263,10 @@ describe("isCleanable", () => {
     { name: "not merged clean", wt: { path: WT, mergedClean: false }, want: false },
     { name: "an older daemon (no flag)", wt: { path: WT }, want: false },
     { name: "unknown worktree", wt: undefined, want: false },
-    { name: "a live thread in it", wt: merged, sessions: thread("connected", WT), want: false },
-    { name: "a starting thread in a subdirectory", wt: merged, sessions: thread("starting", `${WT}/sub`), want: false },
-    { name: "a disconnected thread does not hold", wt: merged, sessions: thread("disconnected", WT), want: true },
-    { name: "a thread in a sibling with a common prefix", wt: merged, sessions: thread("connected", `${WT}-b`), want: true },
+    { name: "a thread on it", wt: merged, sessions: thread(WT), want: false },
+    { name: "a thread in a subdirectory", wt: merged, sessions: thread(`${WT}/sub`), want: false },
+    { name: "a thread on it holds whatever its state (stopped, snoozed); an archived one does not", wt: merged, sessions: thread(WT, 5), want: true },
+    { name: "a thread in a sibling with a common prefix", wt: merged, sessions: thread(`${WT}-b`), want: true },
     { name: "a running shell it owns", wt: merged, terminals: term("running", "/elsewhere", WT), want: false },
     { name: "a running terminal inside it", wt: merged, terminals: term("running", `${WT}/src`), want: false },
     { name: "an exited shell does not hold", wt: merged, terminals: term("exited", WT, WT), want: true },
@@ -276,7 +279,7 @@ describe("isCleanable", () => {
     });
   }
   it("names the base in its tooltip", () => {
-    expect(cleanableTitle("origin/main")).toBe("Clean: no changes, every commit is in origin/main, no live thread or terminal");
+    expect(cleanableTitle("origin/main")).toBe("Clean: no changes, every commit is in origin/main, no thread or terminal on it");
     expect(cleanableTitle("")).toContain("origin/<default>");
   });
 });

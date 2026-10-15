@@ -6,7 +6,6 @@
  * lib/projects.ts threadAt. Pure: callers feed it the stores' current state.
  */
 import type { SessionView } from "@/api/session";
-import { isLiveThread } from "@/lib/projects";
 import { deriveContext } from "@/stores/context";
 import { makeTab, type Tab } from "@/stores/panel";
 import type { ReposData } from "@/stores/repos";
@@ -89,14 +88,15 @@ export const memberOfTab = worktreeOfTab;
 
 /**
  * The thread a workspace row on the Projects page opens the surface for: the workspace's
- * connected thread (not disconnected) that was active most recently, else the newest.
- * Null when no thread of the workspace is live: the row then keeps step 4's actions only.
+ * thread that was active most recently (else the newest), whether or not Claude runs for
+ * it; archived threads are passed over. Null when the workspace has no such thread: the
+ * row then keeps step 4's actions only.
  */
-export function liveWorkspaceThread(sessions: SessionsData, workspaceId: string): string | null {
+export function workspaceThread(sessions: SessionsData, workspaceId: string): string | null {
   let best: SessionView | null = null;
   for (const id of sessions.order) {
     const s = sessions.byId[id];
-    if (s?.workspaceId !== workspaceId || !isLiveThread(s)) continue;
+    if (s?.workspaceId !== workspaceId || s.archivedAtMs !== null) continue;
     const at = s.lastActivityAtMs ?? s.createdAtMs ?? 0;
     const bestAt = best ? (best.lastActivityAtMs ?? best.createdAtMs ?? 0) : -1;
     if (at > bestAt) best = s;

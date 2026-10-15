@@ -2,13 +2,17 @@ import { describe, expect, it } from "vitest";
 import type { SessionStateView, SessionStatusView } from "@/api/session";
 import {
   attentionTier,
-  disconnectCause,
+  badgeLabels,
   isThreadGroup,
+  restartCutsOff,
+  sessionBadge,
   shortAge,
   statusDetail,
   statusKind,
   statusNote,
   threadGroup,
+  type CutOff,
+  type SessionBadge,
   type StatusKind,
   type ThreadGroup,
 } from "./session";
@@ -27,7 +31,11 @@ describe("threadGroup (the sidebar group of an unpinned thread)", () => {
     ["unknown", "busy", "running Bash", "working"],
     ["starting", "unknown", "", "working"],
     ["starting", "idle", "", "working"],
+    // A start that keeps a saved status (an MCP check; a message makes the daemon say busy): attention and error win.
+    ["starting", "attention", "finished", "done"],
+    ["starting", "error", "interrupted", "error"],
     ["closing", "busy", "working: Say hi", "idle"],
+    ["closing", "attention", "finished", "done"],
     ["closing", "idle", "", "idle"],
     ["disconnected", "busy", "", "idle"],
     ["disconnected", "idle", "", "idle"],
@@ -74,17 +82,69 @@ describe("statusKind / statusDetail", () => {
   });
 });
 
-describe("disconnectCause", () => {
-  it.each([
-    [{ disconnectReason: "closed", exitCode: 0, lastError: "" }, "closed"],
-    [{ disconnectReason: "crashed", exitCode: 1, lastError: "" }, "crashed (exit code 1)"],
-    [{ disconnectReason: "exited", exitCode: 0, lastError: "" }, "Claude exited"],
-    [{ disconnectReason: "exited", exitCode: 2, lastError: "" }, "Claude exited with code 2"],
-    [{ disconnectReason: "daemon stopped", exitCode: 0, lastError: "" }, "daemon stopped"],
-    [{ disconnectReason: "", exitCode: 0, lastError: "" }, "not running"],
-    [{ disconnectReason: "", exitCode: 0, lastError: "Worktree is missing" }, "stopped: Worktree is missing"],
-  ])("%j", (s, want) => {
-    expect(disconnectCause(s)).toBe(want);
+// The badge never tells whether Claude's process runs: a stopped thread reads as its
+// status (idle when that would be idle, unknown or a stale busy), starting reads as busy.
+describe("sessionBadge", () => {
+  it.each<[SessionStateView, SessionStatusView, SessionBadge]>([
+    ["connected", "busy", "busy"],
+    ["connected", "idle", "idle"],
+    ["connected", "attention", "attention"],
+    ["connected", "error", "error"],
+    ["connected", "unknown", "unknown"],
+    ["unknown", "busy", "busy"],
+    ["unknown", "unknown", "unknown"],
+    ["starting", "idle", "busy"],
+    ["starting", "unknown", "busy"],
+    ["starting", "attention", "attention"],
+    ["starting", "error", "error"],
+    ["closing", "busy", "idle"],
+    ["closing", "idle", "idle"],
+    ["closing", "attention", "attention"],
+    ["disconnected", "idle", "idle"],
+    ["disconnected", "unknown", "idle"],
+    ["disconnected", "busy", "idle"],
+    ["disconnected", "attention", "attention"],
+    ["disconnected", "error", "error"],
+  ])("%s %s", (state, status, want) => {
+    expect(sessionBadge({ state, status })).toBe(want);
+  });
+  it("is unknown without a session", () => {
+    expect(sessionBadge(undefined)).toBe("unknown");
+  });
+  it("has no lifecycle badges", () => {
+    expect(Object.keys(badgeLabels).sort()).toEqual(["attention", "busy", "error", "idle", "unknown"]);
+  });
+});
+
+// The daemon's command.ActiveSession: what a restart cuts off.
+describe("restartCutsOff", () => {
+  it.each<[SessionStateView, SessionStatusView, string, CutOff | null]>([
+    ["starting", "idle", "", "working"],
+    ["starting", "attention", "finished", "working"],
+    ["connected", "busy", "working", "working"],
+    ["connected", "attention", "permission: Bash git push", "waiting"],
+    ["connected", "attention", "question: Which one?", "waiting"],
+    ["connected", "attention", "finished", null],
+    ["connected", "attention", "error: overloaded", null],
+    ["connected", "idle", "at prompt", null],
+    ["closing", "busy", "working", null],
+    ["disconnected", "busy", "", null],
+    ["disconnected", "attention", "question: Which one?", null],
+    ["unknown", "busy", "", null],
+  ])("%s %s %j", (state, status, statusReason, want) => {
+    expect(restartCutsOff({ state, status, statusReason, backgroundAgentsRunning: 0, backgroundShellsRunning: 0, backgroundWakePending: false })).toBe(want);
+  });
+
+  // Background work counts like the daemon's archiveInterrupts, after mid-turn, only with a process.
+  it.each<[SessionStateView, SessionStatusView, number, number, boolean, CutOff | null]>([
+    ["connected", "idle", 1, 0, false, "background"],
+    ["connected", "attention", 0, 2, false, "background"],
+    ["connected", "idle", 0, 0, true, "reporting"],
+    ["connected", "busy", 1, 1, true, "working"],
+    ["disconnected", "idle", 1, 1, true, null],
+    ["closing", "idle", 1, 0, false, null],
+  ])("%s %s agents %i shells %i wake %s", (state, status, agents, shells, wake, want) => {
+    expect(restartCutsOff({ state, status, statusReason: "", backgroundAgentsRunning: agents, backgroundShellsRunning: shells, backgroundWakePending: wake })).toBe(want);
   });
 });
 

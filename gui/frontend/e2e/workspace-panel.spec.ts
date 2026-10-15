@@ -196,7 +196,7 @@ test("remove member confirms and the mock applies it; add member and Run in go t
   await gp.hover();
   await gp.getByTestId("member-remove").click();
   await page.getByTestId("confirm-dialog").getByTestId("confirm-ok").click();
-  await expect(page.getByText(/running in .*ghostty-playground\/cf-checkout; close it first/)).toBeVisible();
+  await expect(page.getByText(/is on .*ghostty-playground\/cf-checkout; archive it first/)).toBeVisible();
   await expect(surface(page).getByTestId("member-name")).toHaveText(["ghostty-playground", "dotfiles"]);
 
   // Add sketches (workspace.add-repo).
@@ -252,7 +252,7 @@ test("at 280px nothing overflows: the workspace surface and a member tab", async
   await shot(page, "ws5-member-tab-280");
 });
 
-test("a Projects page workspace row opens the surface in a live thread's panel, and only with one", async ({ page }) => {
+test("a Projects page workspace row opens the surface in a thread's panel, and only with one", async ({ page }) => {
   await mixedWorkspace(false);
   await openApp(page);
   await openProjects(page);
@@ -263,6 +263,9 @@ test("a Projects page workspace row opens the surface in a live thread's panel, 
   await expect(ws.getByTestId("workspace-new-thread")).toHaveCount(1);
 
   const s = (await mockPost("workspace-thread?workspace=checkout&repo=repo-gp&name=driver")) as { id: string };
+  await expect(ws.getByTestId("workspace-show-panel")).toHaveCount(1);
+  // Stopped (the idle stop) it still counts: whether Claude runs never matters here.
+  await mockPost(`session/stop?id=${s.id}&reason=idle&code=0&status=idle`);
   await expect(ws.getByTestId("workspace-show-panel")).toHaveCount(1);
   await ws.getByTestId("workspace-show-panel").click();
   await expect(page.getByTestId("projects-page")).toHaveCount(0);

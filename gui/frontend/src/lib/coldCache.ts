@@ -1,5 +1,6 @@
 import type { SessionView } from "@/api/session";
 import type { DraftPhase } from "@/stores/compose";
+import { sessionBadge } from "./session";
 import { fmtTok, fmtUsd } from "./usage";
 
 /**
@@ -20,13 +21,14 @@ export type ColdCacheInput = Pick<SessionView, "state" | "status" | "contextToke
 };
 
 /**
- * The note, or null when it does not show. It shows only for a connected thread
- * that is idle (not busy, nothing pending, no send in flight), has a result (context
- * tokens and an expiry), and whose cache expired at or before now. A reconnected thread
- * follows the same rule: its expiry counts from the last result before the disconnect.
+ * The note, or null when it does not show. It shows for a thread that is idle (not
+ * working, which includes Claude starting for a message just sent; nothing pending; no
+ * send in flight), has a result (context tokens and an expiry), and whose cache expired at
+ * or before now, whether or not Claude's process runs: the daemon stops an idle thread at
+ * its expiry, so every stopped thread with a result shows it.
  */
 export function coldCacheNote(i: ColdCacheInput): string | null {
-  if (i.state !== "connected" || i.status === "busy") return null;
+  if (sessionBadge(i) === "busy") return null;
   if (i.pending > 0 || i.phase !== "idle") return null;
   if (!(i.contextTokens > 0) || i.cacheExpiresAtMs === null || i.nowMs < i.cacheExpiresAtMs) return null;
   const cost = i.contextRereadUsd > 0 ? ` (${fmtRereadUsd(i.contextRereadUsd)})` : "";

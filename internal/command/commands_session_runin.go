@@ -23,7 +23,7 @@ func sessionRunIn(b SessionBackend, idArg ArgSpec) Command {
 		Name:  "session.run-in",
 		Title: "Run Thread In…",
 		Description: "Move a workspace thread to another member worktree of its workspace. " +
-			"A running thread moves once it is idle at its prompt; a disconnected one moves at once.",
+			"A thread moves once it is idle at its prompt (at once when Claude is not running for it).",
 		Category: "Thread",
 		Args: []ArgSpec{
 			idArg,

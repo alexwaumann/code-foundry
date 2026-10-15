@@ -1,5 +1,8 @@
 # Disconnected thread page redesign
 
+Superseded 2026-10-15: there is no disconnected page or Reconnect card any more; a stopped
+thread shows its conversation and composer like any other (`hide-connection-state.md`).
+
 Frontend only (no proto or Go). Design record: `docs/sketches/disconnected-page`
 (`index.html?v=e`, the approved variant; `approved.png` is the approved render).
 The page builds on the status persistence from `thread-status-persistence.md`.

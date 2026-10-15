@@ -128,7 +128,7 @@ export function commandBindings(commands: readonly CommandView[]): Map<string, C
 /**
  * The command a focused terminal (a bottom panel shell) or thread prompt
  * ([data-chord-yield]) yields this chord to (see terminalYieldable), so
- * session.close/rename, cmd+j and cmd+t still fire while typing to Claude or a shell.
+ * session.rename, cmd+j and cmd+t still fire while typing to Claude or a shell.
  */
 function terminalYields(chord: string): CommandView | undefined {
   if (!terminalYieldable(chord)) return undefined;
@@ -371,7 +371,7 @@ export function handleKeyDown(e: KeyboardEvent): void {
       startCommand(yielded);
     } else if (terminalYieldable(chord) && (shell || declaredChord(chord))) {
       // Focusing a shell or selecting a thread changes the context (a Projects-page shell
-      // brings its worktree): cmd+t or cmd+shift+w right after it must not be lost to the
+      // brings its worktree): cmd+t or cmd+r right after it must not be lost to the
       // debounced re-list. In a prompt only for a chord some command declares: the
       // others edit (cmd+arrows, cmd+backspace) and must not be held.
       startWhenListed(e, chord);

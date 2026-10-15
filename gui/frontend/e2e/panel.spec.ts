@@ -499,15 +499,15 @@ test("closing the last tab on the Pull Requests page focuses the page's list", a
   await expect(page.getByTestId("prs-list").locator('[aria-selected="true"]')).toHaveCount(1);
 });
 
-test("hiding the focused panel on a disconnected thread focuses its Reconnect button", async ({ page }) => {
+test("hiding the focused panel on a stopped thread focuses its prompt", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-3").click();
-  await expect(page.getByTestId("thread-disconnected")).toBeVisible();
+  await expect(page.getByTestId("thread-composer")).toBeVisible();
   await page.keyboard.press("Meta+Shift+e");
   await expect.poll(() => region(page)).toBe("panel");
   await page.keyboard.press("Meta+Shift+e");
   await expect(panel(page)).toHaveCount(0);
-  await expect(page.getByTestId("reconnect")).toBeFocused();
+  await expect(page.getByTestId("thread-composer").getByTestId("composer-input")).toBeFocused();
 });
 
 test("worktrees and the Pull Requests page have their own panels and toggles", async ({ page }) => {
@@ -518,7 +518,7 @@ test("worktrees and the Pull Requests page have their own panels and toggles", a
   await expect(panel(page)).toHaveAttribute("data-panel-key", "view:pullrequests");
 
   await row(page, "s:s-3").click();
-  await expect(page.getByTestId("thread-disconnected")).toBeVisible();
+  await expect(page.getByTestId("thread-composer")).toBeVisible();
   await expect(panel(page)).toHaveCount(0);
   await page.getByTestId("thread-header").getByTestId("panel-toggle").click();
   await expect(panel(page)).toHaveAttribute("data-panel-key", "session:s-3");

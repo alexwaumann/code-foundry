@@ -152,6 +152,13 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 	}
 	prev := rec.s
 	rec.reserve()
+	if o.first != nil {
+		// A message starts a turn: the status the thread saved (a finished turn, a prompt
+		// lost with its process, an interruption) is replaced at once, as a send to a live
+		// thread does, so clients never count it as both working and waiting on the user.
+		// Published with the start's own update below; a failed start sets error.
+		rec.s.setStatus(StatusBusy, "working", m.opts.Now())
+	}
 	m.mu.Unlock()
 
 	var log *threadLog

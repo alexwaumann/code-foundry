@@ -9,7 +9,7 @@ import type { ApiRetryView, SessionView } from "@/api/session";
 /** How often a mounted note re-reads the clock, so the countdown moves. */
 export const RETRY_RECHECK_MS = 1_000;
 
-export type RetryNoteInput = Pick<SessionView, "state" | "retry"> & { nowMs: number };
+export type RetryNoteInput = Pick<SessionView, "retry"> & { nowMs: number };
 
 /** What failed, in words: Claude's error category first, the HTTP status as a fallback. */
 export function retryCause(r: Pick<ApiRetryView, "error" | "errorStatus">): string {
@@ -38,12 +38,12 @@ export function fmtRetryIn(ms: number): string {
 }
 
 /**
- * The note, or null when it does not show: a connected thread with a pending retry.
- * Past the due time the request is in flight (Claude announces nothing when a retry
+ * The note, or null when it does not show: a thread with a pending retry (the daemon
+ * clears it when the process ends, so a stopped thread has none). Past the due time the request is in flight (Claude announces nothing when a retry
  * goes through; the next frame clears it), so the note says "retrying now".
  */
 export function retryNote(i: RetryNoteInput): string | null {
-  if (i.state !== "connected" || !i.retry) return null;
+  if (!i.retry) return null;
   const r = i.retry;
   const attempt = r.maxRetries > 0 ? ` (attempt ${String(r.attempt)} of ${String(r.maxRetries)})` : ` (attempt ${String(r.attempt)})`;
   const left = r.retryAtMs - i.nowMs;

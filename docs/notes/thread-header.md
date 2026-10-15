@@ -1,5 +1,8 @@
 # Thread header redesign
 
+Update 2026-10-15: the header has no Close button and no starting/closing indicator
+(`hide-connection-state.md`).
+
 Decided 2026-10-13 (Alex, layout "A"). Design record: `docs/sketches/thread-header/`
 (`index.html?h=a&s=wt|main|ws|merged|nogit` on top of the rendered-thread sketch, whose
 style, icons and thread script it loads from `../rendered-thread/`; PNGs `a-*.png`).

@@ -4,7 +4,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { CleanableTag } from "./Cleanup";
 import { NoGitBadge } from "./NoGitBadge";
 import { tildify } from "@/lib/path";
-import { liveThreadCount } from "@/lib/projects";
+import { worktreeThreadCount } from "@/lib/projects";
 import { worktreeBranch } from "@/lib/threadRow";
 import { cn } from "@/lib/utils";
 import { branchKey, branchPullRequestsResource } from "@/stores/gh";
@@ -43,12 +43,12 @@ function BranchPullRequest({ repoId, branch }: { repoId: string; branch: string 
   );
 }
 
-/** How many live threads run in the worktree (hidden at 0); subscribes to the count only. */
-function LiveThreads({ path }: { path: string }) {
-  const n = useSessionsStore((s) => liveThreadCount(s, path));
+/** How many threads are on the worktree (hidden at 0); subscribes to the count only. */
+function WorktreeThreads({ path }: { path: string }) {
+  const n = useSessionsStore((s) => worktreeThreadCount(s, path));
   if (n === 0) return null;
   return (
-    <Tip label={`${String(n)} live ${n === 1 ? "thread" : "threads"}`}>
+    <Tip label={`${String(n)} ${n === 1 ? "thread" : "threads"} on this worktree`}>
       <span className="flex items-center gap-0.5" data-testid="worktree-threads">
         <MessageSquare className="size-3" aria-hidden />
         {n}
@@ -58,7 +58,7 @@ function LiveThreads({ path }: { path: string }) {
 }
 
 /**
- * One worktree's git state on a line: branch, then at the right its live threads,
+ * One worktree's git state on a line: branch, then at the right its thread count,
  * changed files, ahead/behind its upstream, "in main" when the cleanup would remove it,
  * and its pull request. Shared by the Projects
  * page's project worktrees and the workspace member list. The path is the row's tooltip;
@@ -89,7 +89,7 @@ export function WorktreeState({ repoId, path, showPath = false }: { repoId: stri
         </span>
         <span className="ml-auto flex shrink-0 items-center gap-2 pl-1 text-[11px] text-muted-foreground tabular-nums">
           {missing && <span className="text-warning">missing</span>}
-          <LiveThreads path={path} />
+          <WorktreeThreads path={path} />
         </span>
       </span>
     );
@@ -107,7 +107,7 @@ export function WorktreeState({ repoId, path, showPath = false }: { repoId: stri
       )}
       <span className="ml-auto flex shrink-0 items-center gap-2 pl-1 text-[11px] text-muted-foreground tabular-nums">
         {missing && <span className="text-warning">missing</span>}
-        <LiveThreads path={path} />
+        <WorktreeThreads path={path} />
         {dirty && (
           <Tip label={`${String(changes)} changed`}>
             <span className="flex items-center gap-0.5 text-warning" data-testid="worktree-dirty">

@@ -9,7 +9,7 @@ function retry(o: Partial<ApiRetryView> = {}): ApiRetryView {
 }
 
 function input(o: Partial<RetryNoteInput> = {}): RetryNoteInput {
-  return { state: "connected", retry: retry(), nowMs: DUE - 20_000, ...o };
+  return { retry: retry(), nowMs: DUE - 20_000, ...o };
 }
 
 describe("retryNote", () => {
@@ -22,8 +22,6 @@ describe("retryNote", () => {
     ["a connection error", { retry: retry({ error: "connection", errorStatus: 0 }) }, "No response from the API · retrying in 20 s (attempt 3 of 10)"],
     ["no max", { retry: retry({ maxRetries: 0 }) }, "Rate limited · retrying in 20 s (attempt 3)"],
     ["no retry", { retry: null }, null],
-    ["disconnected", { state: "disconnected" }, null],
-    ["starting", { state: "starting" }, null],
   ])("%s", (_name, over, want) => {
     expect(retryNote(input(over))).toBe(want);
   });

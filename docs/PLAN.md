@@ -151,7 +151,7 @@ table; Send refuses the commands the app replaces (`/clear`, `/model`, ...).
 ### Archived threads: two PRs (2026-10-13)
 
 Manual, reversible archive: closes Claude, removes the thread's shells, unpins, stamps
-`archived_at`; reconnect, pin and send unarchive. PR 1 (proto, store, migration 0017,
+`archived_at`; pin and send unarchive (reconnect did until 2026-10-15). PR 1 (proto, store, migration 0017,
 `session.archive` with confirmation only mid-turn via `Command.ConfirmIf`, API and view
 mapping) done: `docs/notes/archive-threads-1-daemon.md`. PR 2 (the sidebar as stacked
 panels: the main list scrolling above the Working and Archived footers; single-line
@@ -162,7 +162,7 @@ archived thread's side and bottom panels reset) done: `docs/notes/archive-thread
 
 Snooze a thread until a time: closes Claude, removes its shells, unpins and unarchives
 it, sets `snoozed_until`; the daemon wakes it (wall-clock check every 30 s and at
-startup) into NEEDS_ATTENTION "snooze ended". Reconnect, pin, send and archive unsnooze.
+startup) into NEEDS_ATTENTION "snooze ended". Pin, send and archive unsnooze.
 PR 1 (proto, store, migration 0018, `session.snooze` with its `until` parser and
 confirmation only mid-turn, API and view mapping) done:
 `docs/notes/snooze-threads-1-daemon.md`. PR 2 (the Snoozed sidebar footer with the time
@@ -193,7 +193,7 @@ header, a terminal run opening as a tab in the bottom panel. Sketch:
 
 Users never manage whether a thread's `claude` runs: a message starts a stopped thread
 (resuming its conversation), and a thread idle at its prompt past its prompt cache expiry
-stops. `session.close` is gone; `session.reconnect` stays hidden until PR C deletes it.
+stops. `session.close` and `session.reconnect` are gone (PR C deleted the hidden reconnect).
 Three PRs:
 
 * PR A (background shells tracked, `Session.BackgroundWork()`, the strip counts them)
@@ -202,7 +202,9 @@ Three PRs:
   commands and MCP status persisted (migration 0021), crash vs idle exit items, the two
   commands removed, restart counts) on `cf/thread-lifecycle` (#108):
   `docs/notes/thread-lifecycle.md`.
-* PR C (GUI: remove the connection UI; the list is in the PR B note) pending.
+* PR C (GUI: nothing shows whether Claude runs; no Reconnect card, Close, starting/closing
+  indicators, disconnected badge or dimming; the composer always sends; the hidden
+  `session.reconnect` deleted) on `cf/hide-connection-state`: `docs/notes/hide-connection-state.md`.
 
 ### Release channels: stable and tip (design 2026-10-11, revised 2026-10-12)
 

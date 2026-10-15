@@ -72,7 +72,7 @@ import { useUiStore } from "@/stores/ui";
 import { showWorkspaceInThread } from "@/stores/workspacePanel";
 import { showWorktreeInPanel } from "@/stores/worktreePanel";
 import { useWorkspacesStore } from "@/stores/workspaces";
-import { liveWorkspaceThread } from "@/surfaces/workspaceTarget";
+import { workspaceThread } from "@/surfaces/workspaceTarget";
 import { useCleanable, useCleanableCount } from "./useCleanable";
 import { NoGitBadge } from "./NoGitBadge";
 import { OverflowMenu, type OverflowItem } from "./OverflowMenu";
@@ -366,8 +366,8 @@ function WorkspaceBlock({ id, collapsed, filtering }: { id: string; collapsed: b
   const name = useWorkspacesStore((s) => s.byId[id]?.name ?? id);
   const branch = useWorkspacesStore((s) => s.byId[id]?.branch ?? "");
   const members = useWorkspacesStore((s) => s.byId[id]?.members.length ?? 0);
-  // A live thread of the workspace: the row can show the workspace surface in its panel.
-  const thread = useSessionsStore((s) => liveWorkspaceThread(s, id));
+  // A thread of the workspace: the row can show the workspace surface in its panel.
+  const thread = useSessionsStore((s) => workspaceThread(s, id));
   const threadName = useSessionsStore((s) => (thread ? s.byId[thread]?.name || thread : ""));
   return (
     <section className="group/card rounded-md border" data-testid="workspace" data-workspace={id} data-collapsed={collapsed}>

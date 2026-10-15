@@ -160,11 +160,11 @@ test('the toggle and "+" start shells for the thread, which open there focused',
   await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
 });
 
-test("a disconnected thread has the toggle left of the side panel's, and its panel", async ({ page }) => {
+test("a stopped thread has the toggle left of the side panel's, and its panel", async ({ page }) => {
   await openApp(page);
-  // s-3 is disconnected; a shell it owns keeps running.
+  // s-3 is stopped; a shell it owns keeps running.
   await row(page, "s:s-3").click();
-  await expect(page.getByTestId("thread-disconnected")).toBeVisible();
+  await expect(page.getByTestId("thread-composer")).toBeVisible();
   const header = page.getByTestId("thread-header");
   const pair = header.locator('[data-testid="bottom-toggle"] + [data-testid="panel-toggle"]');
   await expect(pair).toHaveCount(1);
@@ -172,7 +172,7 @@ test("a disconnected thread has the toggle left of the side panel's, and its pan
   await expect(tabs(page)).toHaveCount(1);
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
   expect((await invocations()).at(-1)?.context).toMatchObject({ activeSessionId: "s-3" });
-  await expect(page.getByTestId("thread-disconnected")).toBeVisible();
+  await expect(page.getByTestId("thread-composer")).toBeVisible();
 });
 
 test("× and cmd+w close terminals through terminal.close; closing the last one hides the panel", async ({ page }) => {

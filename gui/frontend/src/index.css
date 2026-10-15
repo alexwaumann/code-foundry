@@ -285,7 +285,7 @@
   zoom: var(--cf-zoom);
 }
 
-/* Thin indeterminate bar for a session that is starting or closing. */
+/* Thin indeterminate bar (the update dialog). */
 @keyframes cf-indeterminate {
   0% {
     transform: translateX(-100%);

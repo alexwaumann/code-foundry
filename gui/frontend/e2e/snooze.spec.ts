@@ -78,7 +78,7 @@ test("Snoozed section: collapsed by default between Working and Archived; expand
   const one = (await s8.boundingBox())?.height ?? 0;
   const two = (await row(page, "s:s-3").boundingBox())?.height ?? 0;
   expect(two - one).toBe(15);
-  await expect(s8.getByTestId("session-body")).not.toHaveAttribute("data-offline", /.*/);
+  await expect(s8.getByTestId("session-body")).toHaveCSS("opacity", "1");
   // Same left edge as the main list's rows.
   expect((await s8.boundingBox())?.x).toBe((await row(page, "s:s-3").boundingBox())?.x);
 
@@ -171,12 +171,13 @@ test("snoozing a working thread from the header asks first; it then drops its pa
   const until = new Date(confirmed[1]?.args.until ?? "");
   expect([until.getHours(), until.getMinutes()]).toEqual([9, 0]);
 
-  // Still selected: disconnected, "Snoozed until <day> 9:00 AM" with Unsnooze next to Reconnect.
+  // Still selected: the composer, with "Snoozed until <day> 9:00 AM" and Unsnooze above the prompt.
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-1");
-  const card = page.getByTestId("thread-disconnected");
-  await expect(card).toContainText(/^Snoozed until (Sun|Mon|Tue|Wed|Thu|Fri|Sat) 9:00 AM\. Reconnect to continue the conversation\./);
-  await expect(card.getByTestId("thread-unsnooze")).toBeVisible();
-  await expect(card.getByTestId("reconnect")).toBeVisible();
+  const card = page.getByTestId("thread-composer");
+  const note = card.getByTestId("thread-snooze-note");
+  await expect(note).toContainText(/^Snoozed until (Sun|Mon|Tue|Wed|Thu|Fri|Sat) 9:00 AM/);
+  await expect(note.getByTestId("thread-unsnooze")).toBeVisible();
+  await expect(page.getByTestId("reconnect")).toHaveCount(0);
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
   expect(await page.evaluate(`import("/src/stores/panel.ts").then((m) => m.usePanelStore.getState().byKey["session:s-1"])`)).toEqual({ open: false, tabs: [], activeTabId: null });
@@ -184,11 +185,12 @@ test("snoozing a working thread from the header asks first; it then drops its pa
   await expect(header.getByRole("button", { name: "Unsnooze Thread" })).toBeVisible();
   await expect(header.getByRole("button", { name: "Snooze Thread", exact: true })).toHaveCount(0);
 
-  // The card's Unsnooze: back in the main list, still disconnected (interrupted), no attention added.
-  await card.getByTestId("thread-unsnooze").click();
+  // The note's Unsnooze: back in the main list (interrupted), no attention added; the note goes.
+  await note.getByTestId("thread-unsnooze").click();
   await expect(page.getByTestId("snoozed-count")).toHaveText("2");
   await expect(row(page, "s:s-1")).toHaveAttribute("data-section", "attention");
-  await expect(card).toContainText("Not connected · closed. Reconnect to continue the conversation.");
+  await expect(note).toHaveCount(0);
+  await expect(card).toBeVisible();
   await expect(header.getByRole("button", { name: "Snooze Thread", exact: true })).toBeVisible();
 
   // Snoozed from the CLI (another client): the same panel reset.
@@ -261,10 +263,10 @@ test("a wake brings the thread back needing attention: Snooze ended in amber, co
   await expect(bell.getByTestId("attention-badge")).toHaveText("2");
   await expectTooltip(page, bell, "2 threads need attention");
 
-  // Its page: the disconnected card says so, in amber.
+  // Its page: the composer's note says so, in amber.
   await s8.click();
-  const card = page.getByTestId("thread-disconnected");
-  await expect(card).toContainText("Snooze ended · just now. Reconnect to continue the conversation.");
+  const card = page.getByTestId("thread-composer");
+  await expect(card.getByTestId("thread-snooze-note")).toHaveText("Snooze ended · just now");
   await expect(card.getByTestId("thread-snooze-ended")).toHaveClass(/text-warning/);
   await expect(card.getByTestId("thread-unsnooze")).toHaveCount(0);
 
@@ -274,9 +276,13 @@ test("a wake brings the thread back needing attention: Snooze ended in amber, co
   await expect(page.getByTestId("snoozed-count")).toHaveText("2");
   await expect(bell.getByTestId("attention-badge")).toHaveText("1");
   await expect(card.getByTestId("thread-snoozed")).toHaveText(/^Snoozed until (\w{3} )?\d{1,2}:\d\d [AP]M$/);
-  // Reconnecting unsnoozes (the daemon's rule).
-  await card.getByTestId("reconnect").click();
+  // A message unsnoozes (the daemon's rule) and gets its answer.
+  await card.getByTestId("composer-input").click();
+  await page.keyboard.type("Back to it");
+  await page.keyboard.press("Enter");
   await expect(page.getByTestId("snoozed-count")).toHaveText("1");
+  await expect(card.getByTestId("thread-snooze-note")).toHaveCount(0);
+  await expect(page.getByTestId("thread-pane").locator('[data-testid="thread-text"]').last()).toContainText("Got it: I'll take a look now.", { timeout: 10_000 });
 });
 
 test("the keyboard walks main → Working → Snoozed → Archived; collapsed sections are skipped", async ({ page }) => {

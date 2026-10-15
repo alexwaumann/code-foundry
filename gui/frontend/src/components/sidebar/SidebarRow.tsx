@@ -177,7 +177,7 @@ function AgentsRunning({ id, more }: { id: string; more: boolean }) {
 
 /**
  * The thread's second line (lib/statusLine): what it is doing or waiting on, coloured, and
- * "project @ branch" where the status leaves room for it (working, idle, offline); "No
+ * "project @ branch" where the status leaves room for it (working, idle); "No
  * project" alone for a thread without one. A queued "Run in…" move replaces it until the
  * thread's worktree changes.
  */
@@ -233,11 +233,10 @@ function SessionLabel({ id }: { id: string }) {
   // Unnamed until the daemon names it from the first prompt: the id stands in.
   const name = useSessionsStore((s) => s.byId[id]?.name ?? "");
   const pinned = useSessionsStore((s) => s.byId[id]?.pinned ?? false);
-  const offline = useSessionsStore((s) => s.byId[id]?.state === "disconnected");
   const renaming = useUiStore((s) => s.renamingSessionId === id);
   return (
-    // An offline (disconnected) thread is dimmed as a whole; its text is otherwise the same.
-    <span className={cn("flex min-w-0 flex-1 flex-col gap-0.5", offline && "opacity-50")} data-testid="session-body" data-offline={offline || undefined}>
+    // Whether Claude runs for the thread never shows: a stopped thread looks like any other.
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5" data-testid="session-body">
       <span className="flex min-w-0 items-center gap-1.5">
         {renaming ? (
           <RenameField id={id} name={name} />
@@ -469,8 +468,7 @@ function SnoozeLeft({ id }: { id: string }) {
 /**
  * An archived or snoozed thread's single line: the name (the id, muted, while unnamed) and,
  * on the right, how long ago it was archived or how long until it wakes. No status line,
- * badges or pin (such a thread is disconnected and unpinned), and not dimmed: the whole
- * section is such threads.
+ * badges or pin (such a thread is unpinned): the whole section is such threads.
  */
 function SingleLineLabel({ id, section }: { id: string; section: "archived" | "snoozed" }) {
   const name = useSessionsStore((s) => s.byId[id]?.name ?? "");

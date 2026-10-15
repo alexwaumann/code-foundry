@@ -1,7 +1,7 @@
 import { Loader2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Backdrop } from "@/components/backdrop/Backdrop";
-import { SessionIndicator, SessionTitle } from "@/components/session/SessionParts";
+import { SessionTitle } from "@/components/session/SessionParts";
 import { DragBand } from "@/components/window/DragBand";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useSessionsStore } from "@/stores/sessions";
@@ -53,8 +53,9 @@ function ThreadMissing() {
  * A thread in the content pane (docs/notes/rendered-threads-2-gui.md, design
  * docs/sketches/rendered-thread variant A): a header (name, project @ branch, workspace,
  * linked PRs and the pane's commands; docs/notes/thread-header.md), the conversation as a dense work log, and the follow-up composer floating
- * over its bottom (a disconnected thread's is its Reconnect card). While shown it holds
- * the thread's ThreadService.Watch (which also marks finished turns seen).
+ * over its bottom, the same whether Claude's process runs or not (the daemon starts it on
+ * a message and stops it at cache expiry; docs/notes/hide-connection-state.md). While
+ * shown it holds the thread's ThreadService.Watch (which also marks finished turns seen).
  */
 export function ThreadPane({ sessionId }: { sessionId: string }) {
   const exists = useSessionsStore((s) => sessionId in s.byId);
@@ -70,14 +71,17 @@ function ThreadView({ sessionId }: { sessionId: string }) {
   const loaded = useThreadLoaded(sessionId);
   const empty = useThreadEmpty(sessionId);
   const watchError = useThreadStore((s) => (s.watch?.sessionId === sessionId && s.watch.status === "retrying" ? s.watch.error : null));
-  const reconnecting = useThreadStore((s) => s.watch?.sessionId === sessionId && s.watch.status === "retrying");
+  const catchingUp = useThreadStore((s) => s.watch?.sessionId === sessionId && s.watch.status === "retrying");
   // The prompts to dock: pending requests minus the ones just answered (their answer is on its way).
   const open = useOpenRequests(sessionId);
   const waiting = pendingList.length > 0;
-  const live = state === "connected" || state === "starting";
+  // Internal only: a process on its way out or gone makes a busy status (an older
+  // daemon's) mean nothing. Nothing on screen says whether it runs.
+  const running = state !== "disconnected" && state !== "closing";
   // Claude is on a turn: busy, or waiting on the user mid-turn.
-  const busy = live && (status === "busy" || waiting);
-  const working = live && (status === "busy" || state === "starting") && open.length === 0;
+  const busy = running && (status === "busy" || waiting);
+  // Working: busy, or Claude starting for a message just sent, which looks the same.
+  const working = running && (status === "busy" || state === "starting") && open.length === 0;
   const dockRef = useRef<HTMLDivElement>(null);
   const dockHeight = useHeight(dockRef);
   const ctx = useMemo(() => ({ sessionId, cwd }), [sessionId, cwd]);
@@ -91,20 +95,19 @@ function ThreadView({ sessionId }: { sessionId: string }) {
           </span>
         </PaneHeader>
         <div className="relative flex min-h-0 flex-1 flex-col">
-          <SessionIndicator id={sessionId} />
-          {/* The log on screen may be behind while the Watch reconnects (a dropped or silent stream). */}
-          {loaded && reconnecting && state !== "starting" && state !== "closing" && (
+          {/* The log on screen may be behind while the Watch stream retries (a dropped or silent stream). */}
+          {loaded && catchingUp && (
             <div
               className="pointer-events-none absolute top-2 right-4 z-10 flex items-center gap-1.5 rounded-md border bg-popover/90 px-2 py-0.5 text-[11px] text-muted-foreground"
-              data-testid="thread-reconnecting"
+              data-testid="thread-catching-up"
             >
               <Loader2 className="size-3 animate-spin" />
-              reconnecting…
+              catching up…
             </div>
           )}
           {!loaded && <p className="absolute inset-x-0 top-10 text-center text-sm text-muted-foreground">{watchError ? `Cannot load the conversation: ${watchError}` : "Loading the conversation…"}</p>}
-          {/* Connected with nothing to show (a thread started without a prompt; a fork starts with its parent's items). */}
-          {empty && state === "connected" && !working && (
+          {/* Nothing to show (a thread made without a prompt; a fork starts with its parent's items). */}
+          {loaded && empty && !working && (
             <p className="absolute inset-x-0 top-10 px-10 text-center text-sm text-muted-foreground" data-testid="thread-empty">
               No messages yet.
             </p>

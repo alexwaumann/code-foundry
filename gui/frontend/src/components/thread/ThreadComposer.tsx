@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Ref } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { AlarmClockOff, ArrowUp, Brain, Gauge, Loader2, Paperclip, RotateCcw, ShieldCheck } from "lucide-react";
+import { AlarmClockOff, ArrowUp, Brain, Gauge, Loader2, Paperclip, ShieldCheck } from "lucide-react";
 import { ATTACHMENT_MIME_TYPES } from "@/api/session";
 import type { ThreadPendingView } from "@/api/thread";
 import { AttachmentPreview } from "@/components/compose/AttachmentPreview";
@@ -15,13 +15,12 @@ import { Tip } from "@/components/ui/tooltip";
 import { choiceLabel, EFFORT_CHOICES, PERMISSION_CHOICES, type ComposePermission } from "@/lib/compose";
 import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
 import { useNow } from "@/lib/clock";
-import { disconnectCause } from "@/lib/session";
 import { snoozeTimeShort } from "@/lib/snooze";
 import { statusLine, statusText } from "@/lib/statusLine";
 import { cn } from "@/lib/utils";
 import { addAttachments, openPreview, updateDraft, useDraft } from "@/stores/compose";
 import { getPanel } from "@/stores/panel";
-import { reconnectSession, snoozeSession } from "@/stores/sessionActions";
+import { snoozeSession } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
 import { useModelChoices } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
@@ -43,12 +42,6 @@ const HOME_TRIGGERS: readonly TriggerChar[] = ["/"];
  * sees the request as new.
  */
 let handledPromptSeq = 0;
-
-/** The keyboard is in a region a thread's disconnect or reconnect must not take it from. */
-function keyboardElsewhere(): boolean {
-  const ui = useUiStore.getState();
-  return ui.palette.open || ui.focus === "bottom" || ui.focus === "panel" || ui.focus === "palette";
-}
 
 function hasFocusWithin(el: HTMLElement | null): boolean {
   return !!el && el.contains(document.activeElement);
@@ -102,66 +95,33 @@ function SnoozeEnded({ at }: { at: number | null }) {
 }
 
 /**
- * A disconnected thread's composer: what happened, and Reconnect. The button takes the
- * focus requests the prompt would (`ref`), and the keyboard when the thread disconnects
- * while shown; once it reconnects the prompt takes it back (ThreadComposer). A snoozed
- * thread says until when, with Unsnooze next to Reconnect (which unsnoozes too); a thread
- * the daemon woke says "Snooze ended · <ago>" (the header's Snooze button snoozes again).
+ * The composer's snooze line above the prompt: a snoozed thread says until when, with
+ * Unsnooze (a message unsnoozes too); a thread the daemon woke says "Snooze ended · <ago>"
+ * (the header's Snooze button snoozes again). Nothing otherwise.
  */
-function Reconnect({ sessionId, ref }: { sessionId: string; ref: Ref<HTMLButtonElement> }) {
-  const cause = useSessionsStore((s) => {
-    const x = s.byId[sessionId];
-    return x ? disconnectCause(x) : "";
-  });
+function SnoozeNote({ sessionId }: { sessionId: string }) {
   const snoozedUntil = useSessionsStore((s) => s.byId[sessionId]?.snoozedUntilMs ?? null);
   const wokeAt = useSessionsStore((s) => {
     const l = statusLine(s.byId[sessionId]);
     return l.kind === "snoozeEnded" ? (l.at ?? 0) : null;
   });
-  const [busy, setBusy] = useState(false);
+  if (snoozedUntil === null && wokeAt === null) return null;
   return (
-    <div className="ccard docked items-center" data-testid="thread-disconnected">
-      <p className="px-4 py-3 text-[13px] text-muted-foreground">
-        {snoozedUntil !== null ? (
-          <SnoozedUntil until={snoozedUntil} />
-        ) : wokeAt !== null ? (
-          <SnoozeEnded at={wokeAt === 0 ? null : wokeAt} />
-        ) : (
-          <>Not connected{cause ? ` · ${cause}` : ""}</>
-        )}
-        . Reconnect to continue the conversation.
-      </p>
-      <div className="flex shrink-0 items-center gap-1.5 pr-2">
-        {snoozedUntil !== null && (
-          <button
-            type="button"
-            className="btn outline"
-            data-testid="thread-unsnooze"
-            onClick={() => {
-              void snoozeSession(sessionId, null);
-            }}
-          >
-            <AlarmClockOff aria-hidden />
-            Unsnooze
-          </button>
-        )}
+    <div className="col-span-2 flex min-w-0 items-center gap-2 px-4 pt-2 text-xs text-muted-foreground" data-testid="thread-snooze-note">
+      {snoozedUntil !== null ? <SnoozedUntil until={snoozedUntil} /> : <SnoozeEnded at={wokeAt === 0 ? null : wokeAt} />}
+      {snoozedUntil !== null && (
         <button
-          ref={ref}
           type="button"
-          className="btn primary"
-          disabled={busy}
-          data-testid="reconnect"
+          className="btn outline ml-auto"
+          data-testid="thread-unsnooze"
           onClick={() => {
-            setBusy(true);
-            void reconnectSession(sessionId).finally(() => {
-              setBusy(false);
-            });
+            void snoozeSession(sessionId, null);
           }}
         >
-          {busy ? <Loader2 className="animate-spin" aria-hidden /> : <RotateCcw aria-hidden />}
-          Reconnect
+          <AlarmClockOff aria-hidden />
+          Unsnooze
         </button>
-      </div>
+      )}
     </div>
   );
 }
@@ -184,7 +144,6 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
   const phase = useDraft(draftKey, "phase");
   const error = useDraft(draftKey, "error");
   const notice = useDraft(draftKey, "notice");
-  const state = useSessionsStore((s) => s.byId[sessionId]?.state ?? "unknown");
   const model = useSessionsStore((s) => s.byId[sessionId]?.model ?? "");
   const effort = useSessionsStore((s) => s.byId[sessionId]?.effort ?? "");
   const permission = useSessionsStore((s) => s.byId[sessionId]?.permissionMode ?? "");
@@ -194,7 +153,6 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
   const modelGroups = useMemo(() => [{ options: modelChoices }], [modelChoices]);
   const sources = useThreadSources(sessionId);
   const editorRef = useRef<PromptEditorHandle>(null);
-  const reconnectRef = useRef<HTMLButtonElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [trigger, setTrigger] = useState<EditorTrigger | null>(null);
@@ -206,26 +164,22 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
   const slashSource = commands.length > 0 ? commandSource : skillSource;
   const fileSource = useFileSource(trigger, sources.files, sources.repoIds, sources.repoIds[0] ?? "");
   const completion = useCompletion(trigger, setTrigger, trigger?.char === "@" ? fileSource : slashSource, editorRef);
-  const live = state === "connected";
   const sending = phase !== "idle";
-  const canSend = live && !sending && (text.trim() !== "" || hasAttachments);
+  // The daemon takes a message in any state: a stopped thread starts on it.
+  const canSend = !sending && (text.trim() !== "" || hasAttachments);
 
   useEffect(() => {
     void loadSkills(sources.skills);
   }, [sources.skills]);
 
-  // Focus requests land in the prompt (a disconnected thread's: its Reconnect button): a
-  // thread selected to be typed in (ui promptFocusSeq), the content pane asked for (the side
-  // panel hid, ui contentFocusSeq). So does the thread disconnecting or reconnecting while
-  // shown, unless the keyboard is elsewhere (keyboardElsewhere: a key typed in the bottom
-  // panel, the side panel or the palette must not land on the Reconnect button). A composer
-  // that mounts with no request (Show worktree, a revealed shell) leaves the keyboard where
-  // that put it. Under an expanded side panel the panel takes the requested focus.
-  const disconnected = state === "disconnected";
+  // Focus requests land in the prompt: a thread selected to be typed in (ui
+  // promptFocusSeq), the content pane asked for (the side panel hid, ui contentFocusSeq).
+  // A composer that mounts with no request (Show worktree, a revealed shell) leaves the
+  // keyboard where that put it. Under an expanded side panel the panel takes the
+  // requested focus.
   const focusSeq = useUiStore((s) => s.promptFocusSeq);
   const contentFocusSeq = useUiStore((s) => s.contentFocusSeq);
   const seenContent = useRef(contentFocusSeq);
-  const wasDisconnected = useRef(disconnected);
   // Where the keyboard was when this request came in (kept across StrictMode's effect replay).
   const request = useRef<{ key: string; before: Element | null } | null>(null);
   // Settled a frame after mount: the editor (recreated by StrictMode's replay in dev) is
@@ -240,37 +194,33 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
       settled.current = false;
     };
   }, []);
-  const rootOrCard = (el: Element | null): boolean => el !== null && (rootRef.current?.contains(el) === true || el === reconnectRef.current);
+  const inRoot = (el: Element | null): boolean => el !== null && rootRef.current?.contains(el) === true;
   useEffect(() => {
-    const asked = handledPromptSeq !== focusSeq || seenContent.current !== contentFocusSeq;
-    const flipped = wasDisconnected.current !== disconnected;
-    wasDisconnected.current = disconnected;
-    if (!asked && (!flipped || keyboardElsewhere())) return;
-    const key = `${String(focusSeq)}:${String(contentFocusSeq)}:${String(disconnected)}`;
+    if (handledPromptSeq === focusSeq && seenContent.current === contentFocusSeq) return;
+    const key = `${String(focusSeq)}:${String(contentFocusSeq)}`;
     if (request.current?.key !== key) request.current = { key, before: document.activeElement };
     const { before } = request.current;
     // At once when the composer has settled (a key pressed right after must reach the
     // prompt, not the palette input closing over it), else on the next frame (a composer
-    // just mounted, or a prompt or card that just replaced the other: its editor may still
-    // be replaced).
+    // just mounted: its editor may still be replaced).
     const attempt = (): boolean => {
       const panel = getPanel();
       if (panel.open && panel.expanded) {
-        if (asked) useUiStore.setState((u) => ({ panelFocusSeq: u.panelFocusSeq + 1 }));
+        useUiStore.setState((u) => ({ panelFocusSeq: u.panelFocusSeq + 1 }));
         return true;
       }
       // Something took the keyboard meanwhile (the side panel, the inline rename a
       // double-click on the sidebar row starts): leave it there.
       const now = document.activeElement;
-      if (now !== before && now !== null && now !== document.body && !rootOrCard(now)) return true;
-      (editorRef.current ?? reconnectRef.current)?.focus();
-      return rootOrCard(document.activeElement);
+      if (now !== before && now !== null && now !== document.body && !inRoot(now)) return true;
+      editorRef.current?.focus();
+      return inRoot(document.activeElement);
     };
     const done = () => {
       handledPromptSeq = focusSeq;
       seenContent.current = contentFocusSeq;
     };
-    if (settled.current && !flipped && attempt()) {
+    if (settled.current && attempt()) {
       done();
       return;
     }
@@ -281,7 +231,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
     return () => {
       cancelAnimationFrame(raf);
     };
-  }, [focusSeq, contentFocusSeq, sessionId, disconnected]);
+  }, [focusSeq, contentFocusSeq, sessionId]);
 
   // The editor turns read-only while a send is in flight. Chromium drops its focus then;
   // WebKit keeps the element focused but no longer edits in it, and the editor's focus()
@@ -303,8 +253,6 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
     editorRef.current?.focus();
   }, [sending]);
 
-  if (state === "disconnected") return <Reconnect sessionId={sessionId} ref={reconnectRef} />;
-
   const send = () => {
     if (canSend) void sendThreadDraft(sessionId);
   };
@@ -317,7 +265,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
   const docked = pending.length > 0;
 
   return (
-    // data-chord-yield: cmd chords bound to commands (cmd+j, cmd+shift+w, cmd+r) reach
+    // data-chord-yield: cmd chords bound to commands (cmd+j, cmd+r) reach
     // the app from the prompt, as they did from a thread's terminal (keys/bindings.ts).
     <div className="relative" ref={rootRef} data-chord-yield="">
       <div
@@ -342,6 +290,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
         }}
       >
         {docked && <PendingPrompts pending={pending} keysRef={promptKeys} refocus={refocus} />}
+        <SnoozeNote sessionId={sessionId} />
         <RetryNote sessionId={sessionId} />
         <ColdCacheNote sessionId={sessionId} pending={pending.length} />
         <div
@@ -388,7 +337,6 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
             onChange={(v) => {
               if (v !== model) void setThreadModel(sessionId, v);
             }}
-            disabled={!live}
             contentClassName="w-44"
             data-testid="thread-model"
           />
@@ -402,7 +350,6 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
             onChange={(v) => {
               if (v !== effort) void setThreadEffort(sessionId, v);
             }}
-            disabled={!live}
             contentClassName="w-44"
             data-testid="thread-effort"
           />
@@ -415,7 +362,6 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
             onChange={(v) => {
               if (v !== permission) void setThreadPermission(sessionId, v as ComposePermission);
             }}
-            disabled={!live}
             contentClassName="w-60"
             data-testid="thread-permission-mode"
           />
@@ -447,7 +393,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
           />
         </div>
         <div className="col-start-2 flex items-end gap-1.5 pr-2 pb-2">
-          {busy && live && (
+          {busy && (
             <button
               type="button"
               className="intr"
@@ -481,9 +427,9 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
             </span>
           </Tip>
         </div>
-        {effortPending && live && (
+        {effortPending && (
           <p className="col-span-2 px-4 pb-2 text-xs text-muted-foreground" role="status" data-testid="thread-effort-pending">
-            {busy ? `Effort changes to ${choiceLabel(EFFORT_CHOICES, effort)} after this turn` : `Restarting Claude with ${choiceLabel(EFFORT_CHOICES, effort)} effort…`}
+            {busy ? `Effort changes to ${choiceLabel(EFFORT_CHOICES, effort)} after this turn` : `Switching to ${choiceLabel(EFFORT_CHOICES, effort)} effort…`}
           </p>
         )}
         {(error ?? notice) && (

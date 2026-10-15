@@ -199,7 +199,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
         )
         .toBe("SESSION_STATUS_NEEDS_ATTENTION finished");
       expect(cli("session", "list")).toMatch(
-        /unwatched\s+connected\s+needs_attention\s+finished/,
+        /unwatched\s+needs_attention\s+finished/,
       );
       await openApp(page);
       await expect(badge(page, s2.id)).toHaveAttribute(
@@ -221,34 +221,32 @@ test("sessions end to end against the real daemon", async ({ page }) => {
       await expect(page).toHaveTitle("Code Foundry");
     });
 
-    // (d) Closing from the CLI swaps the composer for the Reconnect card; Reconnect resumes
-    // with the conversation kept.
-    await test.step("d: CLI close shows Not connected; Reconnect resumes", async () => {
+    // (d) Archiving from the CLI stops Claude; the pane looks the same (no card, the
+    // composer), and a message starts it again with the conversation kept.
+    await test.step("d: a stopped thread keeps its composer; a message continues it", async () => {
       await row(page, `s:${s1.id}`).click();
       await expect(pane(page)).toHaveAttribute("data-session-id", s1.id);
-      cli("session", "close", "--id", s1.id);
-      const card = page.getByTestId("thread-disconnected");
-      await expect(card).toContainText("Not connected · closed.", {
-        timeout: 20_000,
-      });
-      await expect(badge(page, s1.id)).toHaveAttribute(
-        "data-session-badge",
-        "disconnected",
-      );
-      await shot(page, "not-connected.png");
-      await card.getByTestId("reconnect").click();
-      await expect(page.getByTestId("thread-composer")).toBeVisible({
-        timeout: 20_000,
-      });
+      cli("session", "archive", "--id", s1.id, "--yes");
+      await expect
+        .poll(() => sessionInfo(s1.id)?.state, { timeout: 20_000 })
+        .toBe("SESSION_STATE_DISCONNECTED");
+      await expect(page.getByTestId("thread-disconnected")).toHaveCount(0);
+      await expect(page.getByTestId("thread-composer")).toBeVisible();
+      await expect(pane(page)).not.toContainText(/Not connected|Reconnect/);
+      await shot(page, "stopped.png");
+      await page.getByTestId("thread-composer").getByTestId("composer-input").click();
+      await page.keyboard.type("reply with the single word ping");
+      await page.keyboard.press("Enter");
       await expect(pane(page).getByTestId("thread-user").first()).toContainText(
         "reply with the single word pong",
       );
       await expect(pane(page).getByTestId("thread-text").last()).toContainText(
-        /pong/i,
+        /ping/i,
+        { timeout: 60_000 },
       );
       await expect(badge(page, s1.id)).toHaveAttribute(
         "data-session-badge",
-        "idle",
+        /^(idle|attention)$/,
         { timeout: 30_000 },
       );
     });
@@ -297,7 +295,7 @@ test("sessions end to end against the real daemon", async ({ page }) => {
   } finally {
     for (const id of created) {
       if (sessionInfo(id)?.state !== "SESSION_STATE_DISCONNECTED")
-        cli("session", "close", "--id", id);
+        cli("session", "archive", "--id", id, "--yes");
     }
     // For the caller's cleanup of ~/.claude/projects/<slug>/<id>.jsonl.
     console.log(

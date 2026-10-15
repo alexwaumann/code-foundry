@@ -107,8 +107,8 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   expect(key).toMatch(/^s:s-new-\d+$/);
   await expect(page.getByTestId("composer")).toHaveCount(0);
   await expect(page.getByTestId("thread-pane")).toBeVisible();
-  // No items until Claude is up: the timeline says it is starting.
-  await expect(page.getByTestId("thread-working")).toHaveText("Starting Claude…");
+  // While Claude starts the timeline looks like any working thread.
+  await expect(page.getByTestId("thread-working")).toContainText("Working");
   await expect.poll(() => promptFocused(page)).toBe(true);
   // Unnamed at first: the id stands in until the daemon names it.
   await expect(created.getByTestId("session-name")).toHaveText(key.slice(2));

@@ -96,14 +96,14 @@ test("status row buttons toggle settings, open help and the palette", async ({ p
   expect((await invocations()).some((i) => i.name === "ui.palette.open")).toBe(false);
 });
 
-test("session pane header: the name renames, the location opens the worktree, close runs session.close; fork is palette-only", async ({ page }) => {
+test("session pane header: the name renames, the location opens the worktree; no Close; fork is palette-only", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   const header = page.getByTestId("thread-header");
   await expect(header.getByTestId("thread-title")).toHaveText("Refactor sidebar tree");
   // 44px, like every pane header (window/PaneHeader; layout.spec.ts).
   expect((await header.boundingBox())?.height).toBe(44);
-  // The thread's commands only: no Kill Terminal (a thread has no terminal; session.close ends it).
+  // The thread's commands only: no Kill Terminal (a thread has no terminal).
   await expect(header.getByRole("button", { name: "Kill Terminal" })).toHaveCount(0);
   // No rename (the name is the button) or fork buttons.
   await expect(header.getByRole("button", { name: "Rename Thread" })).toHaveCount(0);
@@ -130,12 +130,10 @@ test("session pane header: the name renames, the location opens the worktree, cl
   const fork = page.locator('[data-row-kind="session"][aria-selected="true"]');
   await expect(fork).toHaveAttribute("data-row-key", /^s:s-new-/);
 
+  // No Close: the daemon starts and stops Claude itself (docs/notes/hide-connection-state.md).
   await row(page, "s:s-1").click();
-  await header.getByRole("button", { name: "Close Thread" }).click();
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("session.close");
-  expect((await invocations()).at(-1)?.context?.activeSessionId).toBe("s-1");
-  // Closing: session.close is no longer available, so its button goes away.
   await expect(header.getByRole("button", { name: "Close Thread" })).toHaveCount(0);
+  await expect(header.getByRole("button", { name: "Reconnect Thread" })).toHaveCount(0);
 });
 
 test("empty states and the welcome panel offer buttons", async ({ page }) => {

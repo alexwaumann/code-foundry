@@ -107,7 +107,7 @@ test("Archived section: collapsed by default with its count; expanded, single-li
 
 test("Archive from the row menu moves a thread to Archived and out of the main list; Unarchive brings it back, idle", async ({ page }) => {
   await openApp(page);
-  // s-3: an idle (disconnected) thread. Archiving it asks nothing.
+  // s-3: an idle thread (stopped). Archiving it asks nothing.
   let menu = await openMenu(page, "s:s-3");
   await expect(menu.getByTestId("menu-archive")).toHaveText("Archive");
   await menu.getByTestId("menu-archive").click();
@@ -150,9 +150,9 @@ test("archiving a working thread asks first (the daemon's confirmation); it then
   await expect(page.getByTestId("archived-count")).toHaveText("2");
   await expect(page.getByTestId("working-count")).toHaveText("1");
   await expect(row(page, "s:s-1")).toHaveCount(0);
-  // Still selected: the pane shows it disconnected, with its Reconnect card.
+  // Still selected: the pane shows it with its composer, as before.
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-session-id", "s-1");
-  await expect(page.getByTestId("thread-disconnected")).toBeVisible();
+  await expect(page.getByTestId("thread-composer")).toBeVisible();
   await expect(page.getByTestId("side-panel")).toHaveCount(0);
   await expect(page.getByTestId("bottom-panel")).toHaveCount(0);
   expect(

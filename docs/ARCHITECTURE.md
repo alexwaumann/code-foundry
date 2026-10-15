@@ -137,8 +137,7 @@ Services (v1):
   unarchive; `docs/notes/archive-threads-1-daemon.md`), Snooze (close, remove the
   thread's shells, unpin, unarchive, set `snoozed_until`; the store wakes it on the wall
   clock into NEEDS_ATTENTION "snooze ended"; `docs/notes/snooze-threads-1-daemon.md`), Watch (server stream), StageAttachment (images the first prompt refers to).
-  Close and Reconnect remain in the proto for compatibility; no listed command calls them
-  (the hidden `session.reconnect` serves the GUI until it stops calling it): the
+  Close and Reconnect remain in the proto for compatibility; no command calls them: the
   daemon starts a thread's process when a message is sent and stops it once the thread
   has idled at its prompt past its prompt cache expiry
   (`docs/notes/thread-lifecycle.md`). Create can
@@ -152,7 +151,8 @@ Services (v1):
   stream-json, no terminal; the conversation is ThreadService items). The terminal
   thread mode (Claude's own interface in a PTY) was removed on 2026-10-12
   (`docs/notes/rendered-only.md`). A session carries lifecycle `state` (starting,
-  connected, closing, disconnected; the daemon's business, internal to clients) and
+  connected, closing, disconnected; the daemon's business, internal to clients: the GUI
+  never shows it, `docs/notes/hide-connection-state.md`) and
   `status` (busy, idle, needs-attention; error when the process ended mid-turn or did
   not start) with `status_reason` and `status_changed_at`,
   persisted (`docs/notes/thread-status-persistence.md`).
@@ -185,7 +185,7 @@ Services (v1):
   it directly, the CLI through `repo add <folder>`),
   Unregister, List, ListWorktrees, CreateWorktree (optionally fetching the base first),
   CleanupWorktrees (remove worktrees whose work is in origin/<default>: `merged_clean`,
-  no live thread, terminal or workspace; never deletes branches;
+  no thread (archived ones aside), terminal or workspace on it; never deletes branches;
   `docs/notes/projects-polish-3.md`),
   ListRefs, Watch, GetWorktreeDetail (files and log against the base branch, Phase 3a),
   InitGit (`git init` and an empty first commit in a project without git;
@@ -305,7 +305,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   project when `repo_id` is set, else none: a thread without a project runs in the home
   directory (`Options.Home`), pre-trusted like any cwd, and RunIn refuses it
   (`docs/notes/no-project-1-daemon.md`). `repo_id`/`worktree_path` are the cwd. Every spawn of a workspace thread
-  (create, reconnect, fork) reads the workspace's current members from the workspace
+  (create, a start on send, fork) reads the workspace's current members from the workspace
   store and adds `--add-dir` for each other member,
   `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`, and one static
   `--append-system-prompt` line pointing at `code-foundry workspace members`.
@@ -315,7 +315,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
 * **Status** (busy / idle / needs-attention) comes from the stream, never from a screen:
   busy from send to `result`, needs-attention while a `can_use_tool` or question is
   pending, finished until seen, error when the process exits mid-turn. The status is
-  persisted: a disconnected thread keeps the one it ended with (busy becomes error
+  persisted: a stopped thread keeps the one it ended with (busy becomes error
   "interrupted"), across daemon restarts, until the next start replaces it
   (`docs/notes/thread-status-persistence.md`; its screen detector is gone).
 * **Lifecycle** (`lifecycle.go`): a message to a stopped thread reserves it, writes the
@@ -329,7 +329,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   set_model, set_permission_mode, set_cwd for RunIn). The stream is projected into
   `thread_items` (user message, assistant text, thinking, tool call, permission request,
   question, turn end, error, compaction, command output): streaming items stay in memory
-  and are written when complete, so a restart rehydrates them and a reconnect appends.
+  and are written when complete, so a restart rehydrates them and a resumed process appends.
   A `note` item is the daemon's own line, not the stream's: a fork's items start as a
   copy of its parent's (never live: pending requests cancelled, running tools ended),
   then the note "Forked from <parent>" (`fork.go`, `docs/notes/fork-copies-history.md`).
@@ -451,7 +451,9 @@ from the pull request (docs/notes/pr-thread-commands.md).
   project and branch) with a hover tooltip; a status row at its foot; see
   `docs/notes/workspaces-4-sidebar.md`, `docs/notes/thread-list.md`,
   `docs/notes/sidebar-working-section.md`, `docs/notes/archive-threads-2-sidebar.md` and
-  `docs/notes/snooze-threads-2-sidebar.md`), content (a thread's conversation, the Pull Requests
+  `docs/notes/snooze-threads-2-sidebar.md`; nothing in the GUI shows whether a thread's
+  Claude runs: its composer always sends, starting looks like working, a stopped thread
+  reads as its status: `docs/notes/hide-connection-state.md`), content (a thread's conversation, the Pull Requests
   page, the Projects page with each project's worktrees and each workspace's members, or
   the composer; a worktree's overview is a side panel tab, not a page; a shell is never
   selected), command palette overlay. Under the content pane, a thread and the Projects

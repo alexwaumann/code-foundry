@@ -15,7 +15,6 @@ function nowSeconds(): number {
  * other kind. The clock ticks every RETRY_RECHECK_MS only while a retry is pending.
  */
 export function RetryNote({ sessionId }: { sessionId: string }) {
-  const state = useSessionsStore((s) => s.byId[sessionId]?.state ?? "unknown");
   const retry = useSessionsStore((s) => s.byId[sessionId]?.retry ?? null);
   const ticking = retry !== null;
   const subscribe = useCallback(
@@ -29,7 +28,7 @@ export function RetryNote({ sessionId }: { sessionId: string }) {
     [ticking],
   );
   const seconds = useSyncExternalStore(subscribe, nowSeconds, nowSeconds);
-  const note = retryNote({ state, retry, nowMs: seconds * 1000 });
+  const note = retryNote({ retry, nowMs: seconds * 1000 });
   if (!note) return null;
   return (
     <p className="col-span-2 px-4 pt-2.5 text-xs text-warning" role="status" data-testid="thread-retry">

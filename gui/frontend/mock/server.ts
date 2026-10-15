@@ -18,11 +18,11 @@
  *   GET  /__mock/projects/calls                   ("create <name>", "publish <id> <o/n> <visibility>", "delete <id>")
  *   POST /__mock/session/attention?id=s-1
  *   POST /__mock/session/status?id=s-1&status=busy|idle|attention[&reason=question: Which color?]
- *   POST /__mock/session/disconnect?id=s-1&reason=crashed&code=139[&status=busy|idle|attention]
+ *   POST /__mock/session/stop?id=s-1&reason=crashed&code=139[&status=busy|idle|attention]   (the process ends: a crash, or reason=idle for the idle stop)
  *        (status: what it was doing at that moment; busy ends as ERROR "interrupted", other
  *        statuses persist, like the daemon)
  *   POST /__mock/status-kinds                     (one thread per status kind: approval, question,
- *        plan, finished, Claude error, busy, idle, interrupted, and a disconnected one still asking
+ *        plan, finished, Claude error, busy, idle, interrupted, and a stopped one still asking
  *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
  *   POST /__mock/session/focus?id=s-3     (FocusSession intent)
  *   POST /__mock/session/archive?id=s-1[&archived=false]   (session.archive as the CLI's --yes does it:
@@ -369,11 +369,13 @@ function routes(router: ConnectRouter): void {
     rename: () => {
       throw new ConnectError("use the session.rename command in the mock", Code.Unimplemented);
     },
+    // Kept in the proto for compatibility; the daemon starts and stops threads itself and no
+    // command calls them (docs/notes/thread-lifecycle.md).
     close: () => {
-      throw new ConnectError("use the session.close command in the mock", Code.Unimplemented);
+      throw new ConnectError("the daemon starts and stops threads itself", Code.Unimplemented);
     },
     reconnect: () => {
-      throw new ConnectError("use the session.reconnect command in the mock", Code.Unimplemented);
+      throw new ConnectError("the daemon starts and stops threads itself", Code.Unimplemented);
     },
     remove: () => {
       throw new ConnectError("use the session.remove command in the mock", Code.Unimplemented);
@@ -607,7 +609,7 @@ function sessionSummary(id: string): Record<string, unknown> {
 
 const statusNames: Record<string, SessionStatus> = { busy: SessionStatus.BUSY, idle: SessionStatus.IDLE, attention: SessionStatus.NEEDS_ATTENTION };
 
-/** Session controls: POST /__mock/session/{attention|status|disconnect|hold|release|focus|archive}?id=…[&status=…][&reason=…&code=…] */
+/** Session controls: POST /__mock/session/{attention|status|stop|hold|release|focus|archive}?id=…[&status=…][&reason=…&code=…] */
 function sessionControl(res: ServerResponse, action: string, q: URLSearchParams): void {
   const id = q.get("id") ?? "";
   try {
@@ -621,11 +623,11 @@ function sessionControl(res: ServerResponse, action: string, q: URLSearchParams)
         world.setSessionStatus(id, status, q.get("reason") ?? undefined);
         break;
       }
-      case "disconnect": {
+      case "stop": {
         const at = q.get("status");
         const status = at === null ? undefined : statusNames[at];
         if (at !== null && status === undefined) throw new CommandError("invalid", "status must be busy, idle or attention");
-        world.disconnectSession(id, q.get("reason") ?? "crashed", Number(q.get("code") ?? 1), status);
+        world.stopSession(id, q.get("reason") ?? "crashed", Number(q.get("code") ?? 1), status);
         break;
       }
       case "hold":

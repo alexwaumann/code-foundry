@@ -181,18 +181,19 @@ test("row actions show without hover, muted at rest, in a fixed-width column; ro
   await expect(project(page, "repo-wr").getByTestId("worktree-path")).toHaveText("~/Documents/writing");
 });
 
-test("each worktree counts its live threads", async ({ page }) => {
+test("each worktree counts its threads, whether or not Claude runs for them", async ({ page }) => {
   await openApp(page);
   await openProjects(page);
-  // s-1 (busy) in the main worktree; s-5 (starting) and s-4 (disconnected) on feat/sidebar; s-3 (disconnected) on fix/resize.
-  await expect(wtRow(page, "repo-cf", CF).getByTestId("worktree-threads")).toHaveText("1");
-  await expectTooltip(page, wtRow(page, "repo-cf", CF).getByTestId("worktree-threads"), "1 live thread");
-  await expect(wtRow(page, "repo-cf", FEAT).getByTestId("worktree-threads")).toHaveText("1");
-  await expect(wtRow(page, "repo-cf", FIX).getByTestId("worktree-threads")).toHaveCount(0);
+  // The main worktree: s-1 (busy) and s-8 (snoozed); s-7 is archived, left out. feat/sidebar:
+  // s-5 (starting) and s-4 (stopped); fix/resize: s-3 (stopped).
+  await expect(wtRow(page, "repo-cf", CF).getByTestId("worktree-threads")).toHaveText("2");
+  await expectTooltip(page, wtRow(page, "repo-cf", CF).getByTestId("worktree-threads"), "2 threads on this worktree");
+  await expect(wtRow(page, "repo-cf", FEAT).getByTestId("worktree-threads")).toHaveText("2");
+  await expect(wtRow(page, "repo-cf", FIX).getByTestId("worktree-threads")).toHaveText("1");
+  await expectTooltip(page, wtRow(page, "repo-cf", FIX).getByTestId("worktree-threads"), "1 thread on this worktree");
   await mockPost("threads?repo=repo-cf&count=2&status=idle");
-  await expect(wtRow(page, "repo-cf", CF).getByTestId("worktree-threads")).toHaveText("3");
-  await expectTooltip(page, wtRow(page, "repo-cf", CF).getByTestId("worktree-threads"), "3 live threads");
-  // A workspace member with a live thread counts it too.
+  await expect(wtRow(page, "repo-cf", CF).getByTestId("worktree-threads")).toHaveText("4");
+  // A workspace member with a thread counts it too.
   await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
   const gp = page.locator('[data-testid="workspace-member"][data-repo="repo-gp"]');
   await expect(gp).toBeVisible();
@@ -352,7 +353,7 @@ test("a merged, clean worktree shows 'in main' and a broom that removes it after
   const row = wtRow(page, "repo-cf", MERGED);
   // The tag and the broom are on the fixture only.
   await expect(row.getByTestId("worktree-cleanable")).toHaveText("in main");
-  await expectTooltip(page, row.getByTestId("worktree-cleanable"), "Clean: no changes, every commit is in origin/main, no live thread or terminal");
+  await expectTooltip(page, row.getByTestId("worktree-cleanable"), "Clean: no changes, every commit is in origin/main, no thread or terminal on it");
   await expect(page.getByTestId("worktree-cleanable")).toHaveCount(1);
   await expect(page.getByTestId("worktree-cleanup")).toHaveCount(1);
   await expectTooltip(page, row.getByTestId("worktree-cleanup"), "Clean up: remove this worktree");

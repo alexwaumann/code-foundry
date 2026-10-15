@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { AgentRunView, SessionEventView, SessionView, UsageBucketView } from "@/api/session";
+import { sessionBadge } from "@/lib/session";
 
 export interface SessionsData {
   byId: Readonly<Record<string, SessionView>>;
@@ -26,7 +27,7 @@ interface SessionsState extends SessionsData {
    * Bumped whenever the whole set is replaced rather than changed: the List on each
    * events-stream (re)connect and every snapshot event. Whoever reacts to transitions
    * (stores/dockAlerts.ts) treats the set after a bump as a new baseline, since changes
-   * missed while disconnected are not transitions the user just caused.
+   * missed while the events stream was down are not transitions the user just caused.
    */
   epoch: number;
 }
@@ -129,7 +130,7 @@ export const useSessionsStore = create<SessionsState>()(() => ({
 
 /**
  * The session needs the user: needs-attention, in any state. The daemon persists status, so
- * a thread that disconnected (or outlived a daemon restart) while asking a question or
+ * a thread whose process stopped (or outlived a daemon restart) while asking a question or
  * waiting on a permission prompt still counts. "error" (interrupted) does not.
  */
 export function isAttention(s: Pick<SessionView, "status" | "state">): boolean {
@@ -150,35 +151,35 @@ export function attentionIds(data: SessionsData): string[] {
   });
 }
 
-/** The session is working: busy and not disconnected. */
+/**
+ * The session is working: the "busy" badge (busy, or Claude starting; sessionBadge), never
+ * a session that needs attention.
+ */
 export function isRunning(s: Pick<SessionView, "status" | "state">): boolean {
-  return s.status === "busy" && s.state !== "disconnected";
+  return !isAttention(s) && sessionBadge(s) === "busy";
 }
 
-/** Sessions that are not disconnected (starting, connected, closing, unknown). */
-export function connectedCount(data: SessionsData): number {
-  let n = 0;
-  for (const id of data.order) if (data.byId[id] && data.byId[id].state !== "disconnected") n++;
-  return n;
+/** Sessions that are running (isRunning), in `order`; none of them in attentionIds. */
+function runningIds(data: SessionsData): string[] {
+  return data.order.filter((id) => {
+    const s = data.byId[id];
+    return s !== undefined && isRunning(s);
+  });
 }
 
 /** Sessions that are running (isRunning). */
 export function runningCount(data: SessionsData): number {
-  let n = 0;
-  for (const id of data.order) {
-    const s = data.byId[id];
-    if (s && isRunning(s)) n++;
-  }
-  return n;
+  return runningIds(data).length;
 }
 
-/** The start page's thread list: sessions waiting on the user, then running ones, each in `order`. */
+/**
+ * The start page's thread list: sessions waiting on the user, then running ones, each in
+ * `order`. An id is never in both (attention wins): the list keys rows by id.
+ */
 export function activeThreadIds(data: SessionsData): string[] {
-  const running = data.order.filter((id) => {
-    const s = data.byId[id];
-    return s !== undefined && isRunning(s);
-  });
-  return [...attentionIds(data), ...running];
+  const waiting = attentionIds(data);
+  const seen = new Set(waiting);
+  return [...waiting, ...runningIds(data).filter((id) => !seen.has(id))];
 }
 
 /** Number of sessions needing attention (a narrow, primitive selector). */

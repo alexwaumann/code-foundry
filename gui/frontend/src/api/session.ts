@@ -14,11 +14,17 @@ import {
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
 
+/**
+ * Where the thread's Claude process is. The daemon manages it (starts it on a message,
+ * stops it at cache expiry) and it is internal to the GUI: nothing on screen says it
+ * (docs/notes/hide-connection-state.md). Read it only where behaviour needs it, through
+ * lib/session (sessionBadge, threadGroup, restartCutsOff).
+ */
 export type SessionStateView = "starting" | "connected" | "closing" | "disconnected" | "unknown";
 /**
- * What Claude is doing. Persisted by the daemon: a disconnected session keeps the status it
- * ended with ("attention" with its reason survives a restart). "error" is set only on a
- * disconnected session whose process ended mid-turn (statusReason "interrupted").
+ * What Claude is doing. Persisted by the daemon: a stopped session keeps the status it
+ * ended with ("attention" with its reason survives a restart). "error" is set on a
+ * session whose process ended mid-turn (statusReason "interrupted") or did not start.
  */
 export type SessionStatusView = "busy" | "idle" | "attention" | "error" | "unknown";
 /** claude --permission-mode, as session.new's `permission` arg spells it; "" = Claude's default. */
@@ -45,10 +51,6 @@ export interface SessionView {
   statusChangedAtMs: number | null;
   createdAtMs: number | null;
   lastActivityAtMs: number | null;
-  exitCode: number;
-  /** "closed" | "exited" | "crashed" | "" */
-  disconnectReason: string;
-  lastError: string;
   parentId: string;
   permissionMode: PermissionModeView;
   /** Ref the session's worktree branch was created from ("" unless createdWorktree). */
@@ -69,16 +71,16 @@ export interface SessionView {
   pinned: boolean;
   /**
    * When the user archived the thread (session.archive), epoch ms; null when it is not
-   * archived. An archived thread is disconnected, unpinned and has no shells; reconnecting,
-   * pinning or sending unarchives it. docs/notes/archive-threads-1-daemon.md.
+   * archived. An archived thread is stopped, unpinned and has no shells; pinning or
+   * sending unarchives it. docs/notes/archive-threads-1-daemon.md.
    */
   archivedAtMs: number | null;
   /**
    * When a snoozed thread wakes (session.snooze), epoch ms; null when it is not snoozed. A
-   * snoozed thread is disconnected, unpinned, not archived and has no shells. The daemon
+   * snoozed thread is stopped, unpinned, not archived and has no shells. The daemon
    * wakes it: this becomes null and the thread needs attention with status reason
-   * "snooze ended" (statusChangedAtMs = the wake). Reconnecting, pinning, archiving or
-   * sending unsnoozes it. docs/notes/snooze-threads-1-daemon.md.
+   * "snooze ended" (statusChangedAtMs = the wake). Pinning, archiving or sending
+   * unsnoozes it. docs/notes/snooze-threads-1-daemon.md.
    */
   snoozedUntilMs: number | null;
   /**
@@ -132,6 +134,11 @@ export interface SessionView {
    * (docs/notes/background-shells.md).
    */
   backgroundShellsRunning: number;
+  /**
+   * A background run or shell just ended at the prompt and Claude's turn reporting it has
+   * not ended yet (a few seconds): a restart would lose that report (restartCutsOff).
+   */
+  backgroundWakePending: boolean;
   /**
    * Claude waits to retry a failed API request (a 429, a 529, a 5xx, a connection
    * error); null otherwise. docs/notes/api-retry-note.md.
@@ -264,9 +271,6 @@ export function toSessionView(s: Session): SessionView {
     statusChangedAtMs: s.statusChangedAt ? timestampMs(s.statusChangedAt) : null,
     createdAtMs: s.createdAt ? timestampMs(s.createdAt) : null,
     lastActivityAtMs: s.lastActivityAt ? timestampMs(s.lastActivityAt) : null,
-    exitCode: s.exitCode,
-    disconnectReason: s.disconnectReason,
-    lastError: s.lastError,
     parentId: s.parentId,
     permissionMode: permissionMap[s.permissionMode],
     baseRef: s.baseRef,
@@ -293,6 +297,7 @@ export function toSessionView(s: Session): SessionView {
     agentsRunning: s.agentsRunning,
     backgroundAgentsRunning: s.backgroundAgentsRunning,
     backgroundShellsRunning: s.backgroundShellsRunning,
+    backgroundWakePending: s.backgroundWakePending,
     retry: s.retry
       ? { attempt: s.retry.attempt, maxRetries: s.retry.maxRetries, retryAtMs: s.retry.retryAt ? timestampMs(s.retry.retryAt) : 0, errorStatus: s.retry.errorStatus, error: s.retry.error }
       : null,

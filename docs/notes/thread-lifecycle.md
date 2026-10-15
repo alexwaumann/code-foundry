@@ -8,8 +8,8 @@ exercised live (below). PR C removes the GUI's connection UI (the list at the en
 
 Users never need to know whether a thread's `claude` process runs. The daemon starts it
 when a message is sent and stops it when the thread has idled past its prompt cache
-expiry. `session.close` is gone; `session.reconnect` stays registered but hidden until PR
-C (below). This PR is the daemon and CLI; PR C removes the GUI's connection UI.
+expiry. `session.close` is gone; `session.reconnect` stayed registered but hidden until PR
+C, which deleted it (`docs/notes/hide-connection-state.md`). This PR is the daemon and CLI; PR C removes the GUI's connection UI.
 
 ## What was built
 

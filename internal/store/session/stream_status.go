@@ -22,7 +22,10 @@ import (
 // The runner feeds it; all methods run on the runner goroutine. The GUI classifies the
 // reasons by prefix ("permission:", "question:", "finished", "error:"): keep them.
 type streamStatus struct {
-	started    bool
+	started bool
+	// waiting: a message waits for the handshake (a start for a message, a send queued
+	// while starting): the thread is on a turn already, Busy "working" before started.
+	waiting    bool
 	busy       bool
 	compacting bool
 	pending    []pendingReason
@@ -35,6 +38,8 @@ type pendingReason struct{ id, reason string }
 // Status returns the current status and its reason.
 func (d *streamStatus) Status() (Status, string) {
 	switch {
+	case !d.started && d.waiting:
+		return StatusBusy, "working"
 	case !d.started:
 		return StatusUnknown, "starting"
 	case len(d.pending) > 0:

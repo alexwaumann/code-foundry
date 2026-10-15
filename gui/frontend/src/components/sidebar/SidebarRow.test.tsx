@@ -36,13 +36,22 @@ describe("SidebarRow line 2", () => {
   it.each([
     ["idle: project @ branch", {}, "code-foundry @ main"],
     ["working: the status, then the place", { status: "busy" as const }, "Working · code-foundry @ main"],
-    ["starting", { state: "starting" as const }, "Starting · code-foundry @ main"],
+    ["starting reads as working", { state: "starting" as const }, "Working · code-foundry @ main"],
+    ["stopped at its prompt: the place, like idle", { state: "disconnected" as const }, "code-foundry @ main"],
     ["no git: the project and the No git badge, no @", { repoId: "notes", worktreePath: "/src/notes" }, "writing No git"],
     ["a question: no place", { status: "attention" as const, statusReason: "question: Which one?" }, "Asked a question"],
     ["no project: No project alone, no branch", { repoId: "", worktreePath: "/Users/dev" }, "No project"],
     ["no project, working", { repoId: "", worktreePath: "/Users/dev", status: "busy" as const }, "Working · No project"],
   ])("%s", (_name, o, text) => {
     expect(renderRow(o).textContent).toBe(text);
+  });
+
+  it("a stopped thread looks like any other: not dimmed, no offline mark", () => {
+    renderRow({ state: "disconnected" });
+    const body = screen.getByTestId("session-body");
+    expect(body.className).not.toContain("opacity-50");
+    expect(body.getAttribute("data-offline")).toBeNull();
+    expect(screen.getByTestId("row-place").getAttribute("data-session-badge")).toBe("idle");
   });
 
   it("the @ is muted and the branch mono", () => {
@@ -87,7 +96,7 @@ describe("SidebarRow archived", () => {
     expect(row.textContent).toBe("Old work3h");
     expect(screen.queryByTestId("row-place")).toBeNull();
     expect(screen.getByTestId("row-archived-age").className).toContain("tabular-nums");
-    expect(screen.getByTestId("session-body").getAttribute("data-offline")).toBeNull();
+    expect(screen.getByTestId("session-body").className).not.toContain("opacity-50");
   });
 
   it("an unnamed thread shows its id, muted", () => {
@@ -122,7 +131,7 @@ describe("SidebarRow snoozed", () => {
     expect(screen.queryByTestId("row-place")).toBeNull();
     expect(screen.getByTestId("row-snooze-left").className).toContain("tabular-nums");
     expect(screen.getByTestId("row-snooze-left").className).toContain("text-[11px]");
-    expect(screen.getByTestId("session-body").getAttribute("data-offline")).toBeNull();
+    expect(screen.getByTestId("session-body").className).not.toContain("opacity-50");
     expect(screen.getByTestId("session-body").hasAttribute("data-snoozed")).toBe(true);
   });
 

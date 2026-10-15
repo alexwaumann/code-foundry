@@ -11,8 +11,8 @@ export const MCP_TITLE = "MCP";
 
 /**
  * The selection's thread when the sessions store knows it (selectionThread). Null
- * otherwise, a page or a composer included. A disconnected thread counts: the surface
- * says it has no servers to show until it reconnects.
+ * otherwise, a page or a composer included. Whether Claude runs for it does not matter:
+ * the last status outlives the process, and Refresh starts Claude.
  */
 export function selectionMcpThread(sel: Selection, s: SelectionStores): string | null {
   return selectionThread(sel, s);

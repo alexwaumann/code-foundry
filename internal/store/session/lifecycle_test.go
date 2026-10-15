@@ -199,6 +199,35 @@ func TestSendWhileStartingQueues(t *testing.T) {
 	}
 }
 
+// A message to a stopped thread starts a turn at once: the status it saved (an unseen
+// finished turn here) becomes busy "working" before Claude answers its handshake, as a
+// send to a live thread does; an MCP start (no message) keeps it.
+func TestSendToStoppedThreadIsBusyAtOnce(t *testing.T) {
+	gate := initGate(t)
+	e := newFixtureEnvAt(t, fixturePath("text-table"), []string{"CF_FAKE_CLAUDE_INIT_GATE=" + gate.path})
+	t.Cleanup(gate.open) // before the env's shutdown (cleanups run last first)
+	gate.open()
+	s := e.create(CreateOptions{InitialPrompt: "first"})
+	e.waitFor(s.ID, "a finished turn", func(s Session) bool { return s.Status == StatusNeedsAttention })
+	if err := e.m.Close(e.ctx(), s.ID); err != nil {
+		t.Fatal(err)
+	}
+	e.waitFor(s.ID, "stopped, still finished", func(s Session) bool { return stopped(s) && s.Status == StatusNeedsAttention })
+
+	// The next start's handshake is held.
+	if err := os.Remove(gate.path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.m.Send(e.ctx(), s.ID, Message{Text: "second"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.snapshot(s.ID); got.State != StateStarting || got.Status != StatusBusy || got.StatusReason != "working" {
+		t.Fatalf("after a send to a stopped thread: state %v status %v %q", got.State, got.Status, got.StatusReason)
+	}
+	gate.open()
+	e.sentUser("second")
+}
+
 // initGate holds a fake claude's initialize answer until open (CF_FAKE_CLAUDE_INIT_GATE).
 type gateFile struct {
 	t    *testing.T

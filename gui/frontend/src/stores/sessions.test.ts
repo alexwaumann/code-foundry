@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { SessionView } from "@/api/session";
 import type { TerminalView } from "@/api/terminal";
-import { disconnectReason, formatAgo, sessionBadge } from "@/lib/session";
+import { formatAgo } from "@/lib/session";
 import { windowTitle } from "@/lib/title";
 import { deriveContext, emptyContext } from "./context";
 import { dispatchEvent } from "./events";
 import { applyIntent } from "./intents";
 import { emptyRepos, replaceRepos, useReposStore } from "./repos";
-import { activeThreadIds, applyRetiredUsage, applySessionEvent, attentionIds, connectedCount, emptySessions, replaceSessions, runningCount, useSessionsStore } from "./sessions";
+import { activeThreadIds, applyRetiredUsage, applySessionEvent, attentionIds, emptySessions, replaceSessions, runningCount, useSessionsStore } from "./sessions";
 import { emptyTerminals, useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 
@@ -27,9 +27,6 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     statusChangedAtMs: null,
     createdAtMs: 10,
     lastActivityAtMs: null,
-    exitCode: 0,
-    disconnectReason: "",
-    lastError: "",
     parentId: "",
     permissionMode: "auto",
     baseRef: "",
@@ -51,6 +48,7 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     agentsRunning: 0,
     backgroundAgentsRunning: 0,
     backgroundShellsRunning: 0,
+    backgroundWakePending: false,
     retry: null,
     ...over,
   };
@@ -151,7 +149,7 @@ describe("session reducers", () => {
     expect(applySessionEvent(withRun, { kind: "updated", session: session("a", { agentRuns: [run("open", 2)] }) })).not.toBe(withRun);
   });
 
-  it("attentionIds counts a disconnected session's persisted attention, not an interrupted one", () => {
+  it("attentionIds counts a stopped session's persisted attention, not an interrupted one", () => {
     const d = replaceSessions(emptySessions, [
       session("a", { status: "attention" }),
       session("b", { status: "attention", statusReason: "question: Which color do you prefer?", state: "disconnected" }),
@@ -165,18 +163,31 @@ describe("session reducers", () => {
     expect(attentionIds(d)).toEqual(["a", "b", "g"]);
   });
 
-  it("start page counts and thread list: waiting first, then running; disconnected never", () => {
+  it("start page counts and thread list: waiting first, then running (starting included); a stopped busy never", () => {
     const d = replaceSessions(emptySessions, [
       session("busy1", { status: "busy", createdAtMs: 1 }),
       session("idle", { createdAtMs: 2 }),
       session("wait1", { status: "attention", createdAtMs: 3 }),
       session("gone", { status: "busy", state: "disconnected", createdAtMs: 4 }),
-      session("start", { status: "busy", state: "starting", createdAtMs: 5 }),
+      session("start", { status: "idle", state: "starting", createdAtMs: 5 }),
       session("wait2", { status: "attention", state: "closing", createdAtMs: 6 }),
+      session("stopped", { status: "idle", state: "disconnected", createdAtMs: 7 }),
     ]);
-    expect(connectedCount(d)).toBe(5);
     expect(runningCount(d)).toBe(2);
     expect(activeThreadIds(d)).toEqual(["wait1", "wait2", "busy1", "start"]);
+  });
+
+  it("a thread is never both waiting and running: attention wins (an MCP start keeps a saved finished turn)", () => {
+    const d = replaceSessions(emptySessions, [
+      session("mcp", { status: "attention", statusReason: "finished", state: "starting", createdAtMs: 1 }),
+      session("busy", { status: "busy", createdAtMs: 2 }),
+      session("asking", { status: "attention", statusReason: "question: Which?", state: "starting", createdAtMs: 3 }),
+    ]);
+    expect(attentionIds(d)).toEqual(["mcp", "asking"]);
+    expect(runningCount(d)).toBe(1);
+    const ids = activeThreadIds(d);
+    expect(ids).toEqual(["mcp", "asking", "busy"]);
+    expect(new Set(ids).size).toBe(ids.length);
     expect(activeThreadIds(emptySessions)).toEqual([]);
   });
 });
@@ -268,32 +279,6 @@ describe("event dispatch", () => {
 });
 
 describe("session presentation", () => {
-  it.each([
-    [{ state: "connected", status: "busy" }, "busy"],
-    [{ state: "connected", status: "attention" }, "attention"],
-    [{ state: "starting", status: "attention" }, "starting"],
-    [{ state: "closing", status: "busy" }, "closing"],
-    [{ state: "disconnected", status: "attention" }, "attention"],
-    [{ state: "disconnected", status: "error" }, "error"],
-    [{ state: "disconnected", status: "idle" }, "disconnected"],
-    [{ state: "disconnected", status: "unknown" }, "disconnected"],
-    [{ state: "disconnected", status: "busy" }, "disconnected"],
-    [{ state: "closing", status: "attention" }, "closing"],
-    [{ state: "connected", status: "unknown" }, "unknown"],
-  ] as const)("badge %#", (s, want) => {
-    expect(sessionBadge(s)).toBe(want);
-  });
-
-  it.each([
-    [{ disconnectReason: "closed", exitCode: 0, lastError: "" }, "Closed"],
-    [{ disconnectReason: "exited", exitCode: 0, lastError: "" }, "Claude exited"],
-    [{ disconnectReason: "exited", exitCode: 2, lastError: "" }, "Claude exited with code 2"],
-    [{ disconnectReason: "crashed", exitCode: 139, lastError: "" }, "Crashed (exit code 139)"],
-    [{ disconnectReason: "", exitCode: 0, lastError: "spawn failed" }, "Stopped: spawn failed"],
-  ])("reason %#", (s, want) => {
-    expect(disconnectReason(s)).toBe(want);
-  });
-
   it.each([
     [null, "never"],
     [1_000_000 - 10_000, "just now"],

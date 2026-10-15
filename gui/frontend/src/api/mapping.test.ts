@@ -331,7 +331,10 @@ describe("events mapping", () => {
       exitCode: 1,
       disconnectReason: "crashed",
     });
-    expect(toSessionView(s)).toMatchObject({ id: "s1", state: "disconnected", status: "attention", lastActivityAtMs: 5000, createdAtMs: null, exitCode: 1, disconnectReason: "crashed" });
+    expect(toSessionView(s)).toMatchObject({ id: "s1", state: "disconnected", status: "attention", lastActivityAtMs: 5000, createdAtMs: null });
+    // The process's exit is internal to the daemon: the view leaves it out.
+    expect(toSessionView(s)).not.toHaveProperty("disconnectReason");
+    expect(toSessionView(s)).not.toHaveProperty("exitCode");
     expect(toSessionView(s).workspaceId).toBe("");
     expect(toSessionView(s)).toMatchObject({ statusReason: "", statusChangedAtMs: null });
     expect(toSessionView(s).archivedAtMs).toBeNull();

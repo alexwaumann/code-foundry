@@ -40,9 +40,6 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     statusChangedAtMs: null,
     createdAtMs: 1,
     lastActivityAtMs: null,
-    exitCode: 0,
-    disconnectReason: "",
-    lastError: "",
     parentId: "",
     permissionMode: "",
     baseRef: "",
@@ -64,6 +61,7 @@ function session(id: string, over: Partial<SessionView> = {}): SessionView {
     agentsRunning: 0,
     backgroundAgentsRunning: 0,
     backgroundShellsRunning: 0,
+    backgroundWakePending: false,
     retry: null,
     ...over,
   };
@@ -266,6 +264,17 @@ describe("handleKeyDown precedence", () => {
 
     it("expanded: pinned, prompts, errors, finished, idle, working", () => {
       expect([1, 2, 3, 4, 5, 6].map(jumpTo)).toEqual(["f", "d", "b", "e", "c", "a"]);
+    });
+
+    it("a stopped idle thread sorts with the idle ones; a starting one keeps a saved finished turn, or is Working once busy", () => {
+      // An MCP check starts e without a message: it still waits on the user (never in Working).
+      useSessionsStore.setState((s) => ({
+        byId: { ...s.byId, c: session("c", { state: "disconnected", status: "idle" }), e: session("e", { state: "starting", status: "attention", statusReason: "finished" }) },
+      }));
+      expect([1, 2, 3, 4, 5, 6].map(jumpTo)).toEqual(["f", "d", "b", "e", "c", "a"]);
+      // A message starts it: the daemon says busy at once.
+      useSessionsStore.setState((s) => ({ byId: { ...s.byId, e: session("e", { state: "starting", status: "busy", statusReason: "working" }) } }));
+      expect([1, 2, 3, 4, 5, 6].map(jumpTo)).toEqual(["f", "d", "b", "c", "e", "a"]);
     });
 
     it("collapsed: the hidden Working rows are skipped (cmd+6 does nothing)", () => {

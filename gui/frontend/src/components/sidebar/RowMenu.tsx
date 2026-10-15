@@ -1,5 +1,5 @@
 import { useShallow } from "zustand/react/shallow";
-import { Archive, ArchiveRestore, ArrowRightLeft, FolderGit2, GitFork, Pencil, Pin, PinOff, Plug, Power, SquareTerminal, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowRightLeft, FolderGit2, GitFork, Pencil, Pin, PinOff, SquareTerminal, Trash2 } from "lucide-react";
 import {
   ContextMenuContent,
   ContextMenuItem,
@@ -15,7 +15,7 @@ import { beginRename } from "@/keys/bindings";
 import { worktreeBranch } from "@/lib/threadRow";
 import { newThreadTerminal } from "@/stores/bottomActions";
 import { useReposStore } from "@/stores/repos";
-import { archiveSession, closeSession, forkSession, pinSession, reconnectSession, removeSession, runSessionIn } from "@/stores/sessionActions";
+import { archiveSession, forkSession, pinSession, removeSession, runSessionIn } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
@@ -77,7 +77,6 @@ export function RowMenu({ id }: { id: string }) {
   const pinned = useSessionsStore((s) => s.byId[id]?.pinned ?? false);
   const archived = useSessionsStore((s) => (s.byId[id]?.archivedAtMs ?? null) !== null);
   const snoozed = useSessionsStore((s) => (s.byId[id]?.snoozedUntilMs ?? null) !== null);
-  const state = useSessionsStore((s) => s.byId[id]?.state ?? "unknown");
   const workspaceId = useSessionsStore((s) => s.byId[id]?.workspaceId ?? "");
   return (
     <ContextMenuContent
@@ -144,26 +143,6 @@ export function RowMenu({ id }: { id: string }) {
         <GitFork />
         Fork
       </ContextMenuItem>
-      {state === "disconnected" ? (
-        <ContextMenuItem
-          onSelect={() => {
-            void reconnectSession(id);
-          }}
-        >
-          <Plug />
-          Reconnect
-        </ContextMenuItem>
-      ) : (
-        <ContextMenuItem
-          disabled={state !== "connected"}
-          onSelect={() => {
-            void closeSession(id);
-          }}
-        >
-          <Power />
-          Close
-        </ContextMenuItem>
-      )}
       <ContextMenuItem
         variant="destructive"
         onSelect={() => {

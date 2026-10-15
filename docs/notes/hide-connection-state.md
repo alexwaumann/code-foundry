@@ -1,0 +1,193 @@
+# Threads never show their process state (thread lifecycle, PR C of 3)
+
+Status: built on branch `cf/hide-connection-state`, on main after PR B (#108, the daemon
+starts Claude on send and stops it at cache expiry; `docs/notes/thread-lifecycle.md`).
+Frontend, the mock daemon, and two small Go changes (below).
+
+## The decision (with Alex, 2026-10-15)
+
+The GUI never shows whether a thread's `claude` process runs. The user sees the same
+conversation and composer either way; a message always continues a thread. The frontend
+still receives `state` and reads it internally where behaviour needs it, but nothing on
+screen says connected, disconnected, starting, closing, reconnect or close.
+
+## What changed
+
+* **Composer** (`ThreadComposer.tsx`): the Reconnect card (`thread-disconnected`,
+  `reconnect`) and its focus "flip" juggling are gone; the composer always renders and
+  `canSend` no longer needs `connected` (the daemon accepts a message in any state). The
+  model / effort / permission pickers work on a stopped thread (the daemon writes the row).
+  Send-while-busy and Interrupt are unchanged. The card also hosted the snooze lines:
+  they moved into the composer as a note row above the prompt (`thread-snooze-note`:
+  "Snoozed until Thu 9:00 AM" with Unsnooze, or "Snooze ended · 2 min ago" in the warning
+  tone).
+* **Cold-cache note** (`lib/coldCache.ts`): no `connected` gate. It shows whenever the
+  thread is idle past its expiry and not working, so after the idle stop every stopped
+  thread with a result shows it. It still hides while Claude starts for a message (that
+  is working: `sessionBadge(...) === "busy"`). Wording unchanged.
+* **Retry note** (`lib/retryNote.ts`): no state gate; the daemon clears `retry` when the
+  process ends.
+* **Thread pane**: the `SessionIndicator` ("starting…"/"closing…", with its indeterminate
+  bar) is gone. Starting shows the pane's ordinary Working row ("Working" plus the time
+  since the message; no "Starting Claude…"); closing shows nothing. The Watch stream's chip
+  reads "catching up…" (`thread-catching-up`). "No messages yet." no longer needs
+  `connected`.
+* **Badges and line 2** (`lib/session.ts`, `lib/statusLine.ts`): `SessionBadge` is busy /
+  idle / attention / error / unknown. Attention and error always show (a thread counted
+  as waiting is never shown working); otherwise starting reads as busy, and a stopped or
+  stopping thread is idle (a stale busy included). `statusLine` has no starting/closing
+  kinds. `threadGroup` follows the badge. `SessionStatusIcon` drops the unplugged icon;
+  the row is never dimmed (`offline`, `data-offline` gone). `isRunning` excludes
+  attention and `activeThreadIds` never lists an id twice.
+* **Daemon: a message makes a stopped thread busy at once** (review): the reservation,
+  the spawn and the runner's status before the handshake say busy "working" whenever a
+  message waits (`streamStatus.waiting`), so a resend to a finished or interrupted thread
+  is working at once; a start without a message (an MCP check) keeps the saved status.
+* **Removed actions**: `RowMenu` Reconnect and Close, the header's Close button,
+  `closeSession`/`reconnectSession`, the comments naming cmd+shift+w. The help overlay
+  (its Guide tab, `docs/GETTING-STARTED.md`, since #115) says "Threads keep working when
+  you close the window; a thread keeps its history, and a message always continues it."
+* **MCP panel**: Refresh and per-server Reconnect are always enabled (the daemon starts
+  Claude for them); the status ask (`ensureMcpStatus`) runs for any thread (no refresh:
+  cached status, no start); the empty state is "Checking MCP servers…" while Claude runs or
+  a refresh is in flight, else "No MCP status yet. Refresh to check."
+* **Start page and Projects**: "N connected" is gone (running and waiting stay; running
+  includes a thread starting for a message). `worktreeThreadCount` counts the threads on a
+  worktree whether or not Claude runs (title "2 threads on this worktree"), archived ones
+  left out; the workspace row's `workspaceThread` is the most recently active
+  non-archived thread. A thread holds its worktree whatever its state (review): the
+  daemon's `worktreeThreads` (cleanup and workspace member removal), the GUI's
+  `threadHolds` and the mock count every thread but an archived one (snoozed ones come
+  back); the cleanable tag's tooltip ends "no thread or terminal on it", cleanup says
+  "thread X is on it", refusals "thread X is on <path>; archive it first".
+* **Update dialog**: the busy list follows the daemon's restart count
+  (`command.ActiveSession`/`RestartCostOf`): `restartCutsOff` names each thread's loss
+  ("working", "waiting on you", "2 background agents and 1 shell", "reporting finished
+  work"); heading "N threads would be cut off"; body "Restarting now cuts these threads
+  off. Let them finish first, or restart anyway: they keep their history, and a message
+  continues each."; the `readyOpen` variant (open but idle threads that "reconnect") is
+  gone: with nothing cut off it is "No thread is working or waiting on you, so nothing
+  will be interrupted." `SessionView` maps `background_wake_pending`. `DaemonStatus` is
+  the daemon connection and is unchanged.
+* **`SessionView`** drops `exitCode`, `disconnectReason` and `lastError` (nothing reads
+  them); `SessionStateView` is documented as internal.
+* **Go**: the hidden `session.reconnect` is deleted for good (a revert of PR B's
+  `d9ecbc82`: the command, `Command.Hidden`, `SessionBackend.Reconnect`, the commandtest
+  fake; it is an unknown command again). The workspace removal refusal said "close it
+  first", which no longer exists (now "archive it first", above). CLI strings drop
+  process words: run-in ("at once when Claude is not running for it"), repo cleanup, the
+  dead Reconnect RPC's error. The composer's effort line says "Switching to High
+  effort…" instead of "Restarting Claude with …".
+* **Mock daemon**: `session.close`/`session.reconnect` removed; Send starts a stopped
+  thread (user item at once, the reply after a ~2 s handshake, `ThreadWorld.start`);
+  set-effort on a stopped thread keeps it for the next start; MCP refresh/reconnect work
+  without a process. Scripted states: `stopped` (was `closed`: the idle stop, last result
+  past the TTL so the cold-cache note shows) and `crashed` (PR B's failed start: "Claude
+  did not start: exit code 1: …", status error "did not start"). The test hook
+  `session/disconnect` is `session/stop`. Restart confirmations and archive/snooze
+  confirms follow PR B's copy (background work named).
+
+## Decisions made here (not in the brief)
+
+* **Attention and error win over starting** (changed in review: first "starting wins",
+  which counted a thread as both working and waiting; the daemon now says busy for a
+  message start, so only an MCP start keeps a saved status, and it still waits on the
+  user: no false dock alert, never in Working).
+* **No Interrupt while starting**: the daemon cannot interrupt before the handshake (no
+  connection yet), so the button appears once Claude is on the turn.
+* **Snooze lines moved into the composer** rather than dropped.
+* **Worktree counts leave archived threads out**; snoozed ones count.
+* **The restart count includes background work** (PR B's final rule), so the dialog's
+  heading is "would be cut off" rather than "working or waiting on you".
+* **`SessionView` lost the three disconnect fields** instead of keeping dead data.
+* **The workspace refusal's wording** changed in Go (the only user-visible "close" left).
+* **Follow-up**: the `Close` and `Reconnect` RPCs and `Manager.Reconnect` stay (the proto
+  is additive; no command calls them). Remove them once no client can.
+
+## Remaining grep hits (`disconnect|reconnect|"connected"|closing|Close thread|Reconnect`)
+
+Over `gui/frontend/src` (production files), every remaining hit is one of:
+
+* **DOM observers**: `ResizeObserver`/`MutationObserver` `.disconnect()` (App, Sidebar,
+  ThreadPane, Timeline, CompletionCard, TerminalHost, VirtualStack, UsageChart,
+  terminal/theme).
+* **Closing UI** (tabs, dialogs, menus, the palette, a code fence): panel.ts, prPanel.ts,
+  compose.ts, snoozeDialog.ts, actionDialog.ts, actionActions.ts, publish.ts,
+  addProject.ts, RowMenu (rename focus), ActionsMenu, Composer, ThreadComposer (palette
+  input), panel/keys.ts, codeActions.ts, api/errors.ts, bottomActions.ts ("starting and
+  closing shells"), NewTab ("closing this dialog deletes it").
+* **Stream liveness** (not the process): api/stream.ts, terminal/attach.ts and
+  TerminalHost's "Reconnecting…" (the bottom shell's Attach stream), stores/events.ts,
+  bottomActions.ts, bottomPanel.ts, worktreeDetail.ts, dockAlerts.ts, thread.ts (the
+  Watch), api/app.ts and stores/update.ts (the page reconnecting to a daemon),
+  DaemonStatus (the daemon connection page).
+* **MCP servers** (a server's connection and its Reconnect action, `thread.mcp-reconnect`):
+  stores/mcp.ts, McpSurface, lib/mcp.ts, api/mcp.ts, surfaces/mcp.ts.
+* **Internal state reads** (behaviour, nothing shown): api/session.ts (the type and its
+  mapping), lib/session.ts `sessionBadge` and `restartCutsOff`, ThreadPane `running` (a stale busy
+  on a stopped thread is not a turn), McpSurface `asking` (which empty-state line).
+
+## Tests
+
+* Unit: `lib/session.test.ts` (sessionBadge table, no lifecycle badges, threadGroup with
+  starting, restartCutsOff incl. background and wake), `statusLine.test.ts`,
+  `coldCache.test.ts` (stopped, stopping, starting), `retryNote.test.ts`,
+  `projects.test.ts` (`worktreeThreadCount`, cleanable title, the guard),
+  `workspaceTarget.test.ts`, `update.test.ts` (copy, `cutOffLabel`), `stores/sessions.test.ts`,
+  `bindings.test.ts` (starting sorts under Working, a stopped idle one with the idle),
+  `HeaderActions.test.tsx` (no Close even when listed), `SidebarRow.test.tsx` (a stopped
+  row looks like any other), `surfaces/mcp.test.tsx` (stopped: enabled, cached status),
+  `api/mapping.test.ts` (the dropped fields). Tests for deleted behaviour were removed.
+* e2e (mock): `sessions.spec.ts` (badges, no dimming, a stopped thread's composer sends
+  and gets the answer, a running thread that stops looks the same, no Close/Reconnect in
+  header, row menu, palette or chords), `thread.spec.ts` (a failed start: error item,
+  composer, a message starts it; a stopped thread at its prompt with the cold-cache
+  note), `mcp-panel.spec.ts` (stopped and never-reported threads), `settings.spec.ts`
+  (help overlay text), `snooze.spec.ts` (the note row; a message unsnoozes),
+  `update.spec.ts`, `start.spec.ts`, `projects.spec.ts`, `workspace-panel.spec.ts`,
+  `buttons.spec.ts`, `thread-reconnect.spec.ts` (chip "catching up…"), and the rest that
+  asserted the card. Live specs archive instead of `session close`.
+
+## Verification
+
+* `make check` green; `make gui-e2e` (WebKit + Chromium, 804 runs): 756 passed, 40
+  skipped, 8 failed on the first run: four were this PR's `sessions.spec.ts` (a starting
+  thread's badge is busy now, so the settle wait matched too early; the stop-then-send
+  test sent into the seeded s-1, whose reply is still streaming), fixed and green on
+  repeat (48/48); two `pr-panel` failures were trace-artifact ENOENTs from a concurrent
+  single-test run sharing `test-results`; `compose.spec.ts:354` and `workspaces.spec.ts:224`
+  are timing flakes (green alone, 3/3). All eight green on rerun. `make gui-build` green.
+* Gotcha: `internal/store/session` `TestRenderedSetEffortGap/the_new_process_never_answers_its_handshake`
+  (PR B, unchanged here) failed 1 of 2 runs under load (a 700 ms start timeout against a
+  hanging fake); green on the next `make go-check`.
+
+## Live run (2026-10-15)
+
+Built app (`make gui-build`) against an isolated daemon (`CODE_FOUNDRY_HOME=/tmp/cf-hide-home
+CODE_FOUNDRY_IDLE_GRACE=20s CODE_FOUNDRY_IDLE_CHECK=5s ./bin/code-foundry daemon --dev`),
+`sessions.cache_ttl_seconds = 60`, a plain scratch folder `~/.cf-hide-scratch`,
+`claude-haiku-5-5[1m]` at medium. Removed afterwards (and its `~/.claude/projects` slug).
+
+```
+03:55:23 $ cf session new --repo d4e8ab414aa8 --model 'claude-haiku-5-5[1m]' --effort medium \
+           --name "hide check" --prompt "Remember the word tangerine for later. Reply with just: ok"
+# app: the thread, its composer; no Close in the header
+# log 03:56:29.897 stopping idle thread at its prompt cache expiry session=s-e22117a11e7c idle=1m5s
+# log 03:56:30.033 session disconnected reason=idle exit_code=0
+# app: unchanged, then (next 30 s tick) "Cache expired · the next message re-reads 22.2K tokens (<$0.01)"
+03:57:55 typed in the app's composer: "What word did I ask you to remember? Reply with just the word."
+# log 03:57:54.377 session spawned … --resume c7913748-… --model claude-haiku-5-5[1m] --effort medium
+# app: the message, the Working row, sidebar Working 1, Interrupt; no "starting"
+#5 claude: tangerine
+# theme light; log 03:58:59.897 stopping idle thread … idle=1m4s
+03:59:45 typed: "And the word again, in capitals? Reply with just the word."  ->  #8 claude: TANGERINE
+```
+
+Screenshots (dark, light) are on the unmerged `shots/hide-connection-state` branch and
+in the PR body: the stopped thread at its prompt with the cold-cache note, and the same
+thread right after sending.
+
+## Daemon restart
+
+Needed after merging: the command registry changed (`session.reconnect` gone), a message
+makes a stopped thread busy at once, and a thread holds its worktree whatever its state.

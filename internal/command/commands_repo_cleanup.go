@@ -32,7 +32,7 @@ const cleanupConfirm = "Fetch {repo} and remove the worktrees created by Code Fo
 // RegisterRepoCleanup registers repo.worktree.cleanup: reclaim the disk space of
 // worktrees whose work is already in origin/<default>. A worktree goes only when it is
 // not the main one, created by Code Foundry (under its worktrees directory), on a branch, without staged, modified, untracked or conflicted
-// files, every commit on it is in origin/<default>, and no live thread, running
+// files, every commit on it is in origin/<default>, and no thread (but an archived one), running
 // terminal or workspace holds it. It fetches first and the daemon checks again after
 // the fetch; removal is `git worktree remove` without --force, and branches are never
 // deleted.
@@ -60,7 +60,7 @@ func RegisterRepoCleanup(r *Registry, d RepoCleanupDeps) error {
 		Title: "Clean Up Merged Worktrees",
 		Description: "Fetch, then remove the project's worktrees (or one) whose work is already in origin/<default>: " +
 			"created by Code Foundry (under its worktrees directory), no uncommitted changes, every commit merged, " +
-			"no live thread, terminal or workspace. Branches are kept.",
+			"no thread (archived ones aside), terminal or workspace on it. Branches are kept.",
 		Category: "Project",
 		Args: []ArgSpec{
 			{Name: "repo", Type: String, Required: true, Context: ContextRepo, Positional: true, Description: "Repository name or id"},

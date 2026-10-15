@@ -576,8 +576,7 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Session, error) {
 func (m *Manager) Reconnect(ctx context.Context, id string) (Session, error) {
 	if _, err := m.startStopped(ctx, id, startOpts{backToList: true}); err != nil {
 		if errors.Is(err, errNotStopped) {
-			s, _ := m.Get(ctx, id)
-			return Session{}, fmt.Errorf("%w: session %s is %s; only a disconnected session can be reconnected", ErrFailedPrecondition, id, s.State)
+			return Session{}, fmt.Errorf("%w: thread %s is not stopped; only a stopped thread can be started this way", ErrFailedPrecondition, id)
 		}
 		return Session{}, err
 	}
@@ -628,8 +627,13 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 	rec.run = r
 	rec.release()
 	rec.s.State = StateStarting
-	// The fresh process owns status from here: the persisted one is cleared.
-	rec.s.setStatus(StatusUnknown, "", now)
+	// The fresh process owns status from here: the persisted one is cleared, or, with a
+	// message waiting for the handshake, the thread is on that turn already.
+	if first != nil {
+		rec.s.setStatus(StatusBusy, "working", now)
+	} else {
+		rec.s.setStatus(StatusUnknown, "", now)
+	}
 	rec.s.DisconnectReason, rec.s.ExitCode = "", 0
 	rec.s.LastActivityAt = now
 	m.commitLocked(rec, true)

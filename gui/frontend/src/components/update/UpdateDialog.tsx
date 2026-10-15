@@ -5,10 +5,11 @@ import { openExternal } from "@/api/app";
 import type { UpdateStatusView } from "@/api/update";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { formatAgo } from "@/lib/session";
-import { busyHeading, displayVersion, failureHeadline, updateView, type UpdateVariant, type UpdateView } from "@/lib/update";
+import { formatAgo, restartCutsOff } from "@/lib/session";
+import { busyHeading, cutOffLabel, displayVersion, failureHeadline, updateView, type UpdateVariant, type UpdateView } from "@/lib/update";
 import { cn } from "@/lib/utils";
-import { closeUpdateDialog, runUpdateAction, useBusyThreadNames, useLiveSessionCount, useUpdateStore, type UpdateAction } from "@/stores/update";
+import { useSessionsStore } from "@/stores/sessions";
+import { closeUpdateDialog, runUpdateAction, useCutOffThreadIds, useUpdateStore, type UpdateAction } from "@/stores/update";
 
 const linkTone = "text-link hover:underline";
 
@@ -25,7 +26,6 @@ const restart: Primary = { action: "restart", label: () => "Restart Now", icon: 
 const primaries: Partial<Record<UpdateVariant, Primary>> = {
   readyIdle: restart,
   readyBusy: restart,
-  readyOpen: restart,
   partlyApplied: restart,
   available: { action: "install", label: (v) => `Install ${displayVersion(v.version)}`, icon: Download },
   failed: { action: "install", label: () => "Try Again" },
@@ -63,7 +63,6 @@ function RepoLink({ repo }: { repo: string }) {
 const metas: Partial<Record<UpdateVariant, (st: UpdateStatusView, v: UpdateView) => ReactNode[]>> = {
   readyIdle: (st) => [running(st), <NotesLink key="n" url={st.notesUrl} />],
   readyBusy: (st) => [running(st), <NotesLink key="n" url={st.notesUrl} />],
-  readyOpen: (st) => [running(st), <NotesLink key="n" url={st.notesUrl} />],
   available: (st) => [checked(st), <NotesLink key="n" url={st.notesUrl} />],
   upToDate: (st) => [checked(st), <RepoLink key="r" repo={st.releaseRepo} />],
   partlyApplied: (_st, v) => (v.mismatch ? [`App ${displayVersion(v.mismatch.app)}`, `Daemon ${displayVersion(v.mismatch.daemon)}`] : []),
@@ -108,21 +107,34 @@ function ProgressBar({ className }: { className?: string }) {
   );
 }
 
-/** The busy threads a restart would cut off mid-turn. */
+/** One thread a restart would cut off: its name, and what it loses (cutOffLabel). */
+function BusyThread({ id }: { id: string }) {
+  const name = useSessionsStore((s) => s.byId[id]?.name || "Untitled thread");
+  const label = useSessionsStore((s) => {
+    const x = s.byId[id];
+    const kind = x ? restartCutsOff(x) : null;
+    return x && kind ? cutOffLabel(kind, x.backgroundAgentsRunning, x.backgroundShellsRunning) : "";
+  });
+  return (
+    <div className="flex gap-1.5" data-testid="update-busy-thread">
+      <span className="min-w-0 truncate text-foreground">{name}</span>
+      <span className="ml-auto shrink-0 text-muted-foreground">{label}</span>
+    </div>
+  );
+}
+
+/** The threads a restart would cut off (the daemon's count: working, waiting on the user, background work). */
 function BusyThreads() {
-  const names = useBusyThreadNames();
-  if (names.length === 0) return null;
+  const ids = useCutOffThreadIds();
+  if (ids.length === 0) return null;
   return (
     <div className="mx-auto mt-3.5 max-w-[330px] rounded-lg border border-pane-border px-3 py-2 text-left text-xs" data-testid="update-busy-threads">
       <div className="mb-1 flex items-center gap-[7px] font-medium text-warning" data-testid="update-busy-heading">
         <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden />
-        {busyHeading(names.length)}
+        {busyHeading(ids.length)}
       </div>
-      {names.map((name, i) => (
-        <div key={i} className="flex gap-1.5" data-testid="update-busy-thread">
-          <span className="min-w-0 truncate text-foreground">{name}</span>
-          <span className="ml-auto shrink-0 text-muted-foreground">working</span>
-        </div>
+      {ids.map((id) => (
+        <BusyThread key={id} id={id} />
       ))}
     </div>
   );
@@ -220,9 +232,8 @@ export function UpdateDialog() {
   const st = useUpdateStore((s) => s.status);
   const guiVersion = useUpdateStore((s) => s.guiVersion);
   const restarting = useUpdateStore((s) => s.restarting);
-  const live = useLiveSessionCount();
-  const busy = useBusyThreadNames().length;
-  const v = useMemo(() => (st ? updateView(st, guiVersion, { live, busy }, restarting) : null), [st, guiVersion, live, busy, restarting]);
+  const busy = useCutOffThreadIds().length;
+  const v = useMemo(() => (st ? updateView(st, guiVersion, { busy }, restarting) : null), [st, guiVersion, busy, restarting]);
   return (
     <Dialog
       open={open}

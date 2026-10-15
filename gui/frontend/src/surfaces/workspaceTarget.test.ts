@@ -5,19 +5,19 @@ import type { ReposData } from "@/stores/repos";
 import type { SessionsData } from "@/stores/sessions";
 import type { Selection } from "@/stores/ui";
 import {
-  liveWorkspaceThread,
   memberOfTab,
   memberTab,
   selectionWorkspaceThread,
   workspaceOfTab,
   workspaceTab,
+  workspaceThread,
 } from "./workspaceTarget";
 
 const WEB = "/wt/web/cf-demo";
 const API = "/wt/api/cf-demo";
 
 function session(id: string, o: Partial<SessionView> = {}): SessionView {
-  return { id, repoId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", createdAtMs: 1, lastActivityAtMs: null, ...o } as SessionView;
+  return { id, repoId: "web", worktreePath: WEB, workspaceId: "", pendingWorktreePath: "", state: "connected", archivedAtMs: null, createdAtMs: 1, lastActivityAtMs: null, ...o } as SessionView;
 }
 
 const repos: ReposData = {
@@ -65,13 +65,15 @@ describe("tabs", () => {
   });
 });
 
-describe("liveWorkspaceThread (the Projects page's workspace rows)", () => {
+describe("workspaceThread (the Projects page's workspace rows)", () => {
   it.each<[string, SessionView[], string | null]>([
     ["no thread", [], null],
     ["only project threads", [session("p1")], null],
-    ["only disconnected workspace threads", [session("d1", { workspaceId: "w1", state: "disconnected" })], null],
+    ["a stopped workspace thread counts", [session("d1", { workspaceId: "w1", state: "disconnected" })], "d1"],
+    ["only archived workspace threads", [session("a1", { workspaceId: "w1", archivedAtMs: 5 })], null],
     ["another workspace's thread", [session("o1", { workspaceId: "w2" })], null],
-    ["the live one over a disconnected one", [session("d1", { workspaceId: "w1", state: "disconnected", lastActivityAtMs: 99 }), session("l1", { workspaceId: "w1" })], "l1"],
+    ["a stopped one active more recently wins", [session("d1", { workspaceId: "w1", state: "disconnected", lastActivityAtMs: 99 }), session("l1", { workspaceId: "w1" })], "d1"],
+    ["an archived one never wins", [session("a1", { workspaceId: "w1", archivedAtMs: 5, lastActivityAtMs: 99 }), session("l1", { workspaceId: "w1" })], "l1"],
     [
       "the most recently active of several",
       [session("a", { workspaceId: "w1", lastActivityAtMs: 10 }), session("b", { workspaceId: "w1", lastActivityAtMs: 30 }), session("c", { workspaceId: "w1", lastActivityAtMs: 20 })],
@@ -79,6 +81,6 @@ describe("liveWorkspaceThread (the Projects page's workspace rows)", () => {
     ],
     ["the newest when none has activity", [session("a", { workspaceId: "w1", createdAtMs: 5 }), session("b", { workspaceId: "w1", createdAtMs: 7 })], "b"],
   ])("%s", (_name, list, want) => {
-    expect(liveWorkspaceThread(sessions(...list), "w1")).toBe(want);
+    expect(workspaceThread(sessions(...list), "w1")).toBe(want);
   });
 });

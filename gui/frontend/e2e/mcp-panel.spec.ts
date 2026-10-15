@@ -144,6 +144,37 @@ test("Reconnect on the failed card: Connecting… with a spinner, then Connected
   expect(await threadCalls()).toContain("mcp s-r1 refresh");
 });
 
+test("a stopped thread keeps its last status; Refresh and Reconnect are enabled and work (the daemon starts Claude)", async ({ page }) => {
+  await mockPost("thread?state=stopped");
+  await openApp(page);
+  await row(page, "s:s-r1").click();
+  await expect(page.getByTestId("thread-pane")).toBeVisible();
+  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
+  await expectMcpTab(page);
+  await expect(surface(page)).not.toContainText(/not running|Reconnect it/);
+  await expect(surface(page).getByTestId("mcp-count")).toHaveText("2 of 6 connected");
+  await expect(surface(page).getByTestId("mcp-refresh")).toBeEnabled();
+  const pw = card(page, "playwright");
+  await expect(pw.getByTestId("mcp-reconnect")).toBeEnabled();
+  await pw.getByTestId("mcp-reconnect").click();
+  await expect(pw).toHaveAttribute("data-status", "connected");
+  expect(await threadCalls()).toContain("mcp-reconnect s-r1 playwright");
+  await surface(page).getByTestId("mcp-refresh").click();
+  await expect(surface(page).getByTestId("mcp-checked")).toHaveText(/^Checked (just now|\d+s ago)$/);
+  expect(await threadCalls()).toContain("mcp s-r1 refresh");
+});
+
+test("a thread Claude never reported for says so without mentioning running; Refresh checks", async ({ page }) => {
+  await mockPost("thread?state=crashed");
+  await openApp(page);
+  await row(page, "s:s-r1").click();
+  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
+  await expectMcpTab(page);
+  await expect(surface(page).getByTestId("mcp-empty")).toHaveText("No MCP status yet. Refresh to check.");
+  await surface(page).getByTestId("mcp-refresh").click();
+  await expect(surface(page).getByTestId("mcp-count")).toHaveText("2 of 6 connected");
+});
+
 test("listed for every thread; hidden for a page: not in the panel's list, not in the palette", async ({ page }) => {
   await openThread(page);
   // A seeded thread lists it too.

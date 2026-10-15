@@ -213,18 +213,16 @@ export function projectNextStep(r: Pick<RepoView, "git" | "remotes" | "worktrees
 /** A project's git status counts as stale (amber) in its header's freshness after this. */
 export const PROJECT_STALE_MS = 10 * 60_000;
 
-/** A thread that is not disconnected (starting, connected, closing): what the rows count as live. */
-export function isLiveThread(s: Pick<SessionView, "state">): boolean {
-  return s.state !== "disconnected";
-}
-
-/** How many live threads run in exactly this worktree (a row's thread count). */
-export function liveThreadCount(sessions: { order: readonly string[]; byId: Readonly<Record<string, Pick<SessionView, "state" | "worktreePath"> | undefined>> }, path: string): number {
+/**
+ * How many threads are on exactly this worktree (a row's thread count): every thread whose
+ * cwd it is, whether or not Claude runs for it, except archived ones (put away).
+ */
+export function worktreeThreadCount(sessions: { order: readonly string[]; byId: Readonly<Record<string, Pick<SessionView, "worktreePath" | "archivedAtMs"> | undefined>> }, path: string): number {
   if (!path) return 0;
   let n = 0;
   for (const id of sessions.order) {
     const s = sessions.byId[id];
-    if (s?.worktreePath === path && isLiveThread(s)) n++;
+    if (s?.worktreePath === path && s.archivedAtMs === null) n++;
   }
   return n;
 }
@@ -237,7 +235,7 @@ function inside(p: string, root: string): boolean {
 
 export interface CleanupSessions {
   order: readonly string[];
-  byId: Readonly<Record<string, Pick<SessionView, "state" | "worktreePath"> | undefined>>;
+  byId: Readonly<Record<string, Pick<SessionView, "archivedAtMs" | "worktreePath"> | undefined>>;
 }
 
 export interface CleanupTerminals {
@@ -245,11 +243,15 @@ export interface CleanupTerminals {
   byId: Readonly<Record<string, Pick<TerminalView, "state" | "cwd" | "labels"> | undefined>>;
 }
 
-/** A live thread runs in the worktree (its cwd is the worktree or inside it). */
+/**
+ * A thread is on the worktree (its cwd is the worktree or inside it), whatever its state;
+ * archived ones are put away: the daemon's cleanup guard (cleanupHold over
+ * worktreeThreads) counts exactly those.
+ */
 export function threadHolds(sessions: CleanupSessions, path: string): boolean {
   return sessions.order.some((id) => {
     const s = sessions.byId[id];
-    return s !== undefined && isLiveThread(s) && inside(s.worktreePath, path);
+    return s !== undefined && s.archivedAtMs === null && inside(s.worktreePath, path);
   });
 }
 
@@ -268,7 +270,7 @@ export function memberHolds(workspaces: ProjectsWorkspaces, path: string): boole
 
 /**
  * Whether repo.worktree.cleanup would remove the worktree now: the daemon's git verdict
- * (mergedClean) and nothing holds it, as the daemon's cleanupHold checks (a live thread,
+ * (mergedClean) and nothing holds it, as the daemon's cleanupHold checks (a thread on it,
  * a terminal that has not exited, a workspace). The daemon checks again after a fetch.
  */
 export function isCleanable(
@@ -283,5 +285,5 @@ export function isCleanable(
 
 /** The "in main" tag's tooltip. */
 export function cleanableTitle(baseRef: string | undefined): string {
-  return `Clean: no changes, every commit is in ${baseRef || "origin/<default>"}, no live thread or terminal`;
+  return `Clean: no changes, every commit is in ${baseRef || "origin/<default>"}, no thread or terminal on it`;
 }

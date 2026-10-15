@@ -108,9 +108,9 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
   } finally {
     for (const id of [wsThread, projThread]) {
       try {
-        cli("session", "close", "--id", id);
+        cli("session", "archive", "--id", id, "--yes");
       } catch {
-        // already closed
+        // already gone
       }
     }
   }

@@ -168,7 +168,7 @@ describe("MCP surface", () => {
     expect(commands.run).toHaveBeenCalledWith("thread.mcp", { id: "s-r", refresh: "true" }, expect.objectContaining({ quiet: true }));
   });
 
-  it("asks once for a connected thread never checked; a stopped thread says so", () => {
+  it("asks once for a thread never checked, running or not; the empty state never mentions running", () => {
     setMcp("s-r", null);
     act(() => {
       showView("panel.mcp");
@@ -185,8 +185,27 @@ describe("MCP surface", () => {
       showView("panel.mcp");
     });
     render(<SidePanel />);
-    expect(screen.getByTestId("mcp-empty").textContent).toBe("The thread is not running. Reconnect it to see its MCP servers.");
-    expect(screen.getByTestId<HTMLButtonElement>("mcp-refresh").disabled).toBe(true);
-    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("mcp-empty").textContent).toBe("No MCP status yet. Refresh to check.");
+    expect(screen.getByTestId<HTMLButtonElement>("mcp-refresh").disabled).toBe(false);
+    // McpStatus without refresh: the cached status, no start.
+    expect(api.get).toHaveBeenCalledTimes(2);
+    expect(api.get).toHaveBeenLastCalledWith("s-off");
+  });
+
+  it("a stopped thread keeps its last status, with Refresh and Reconnect enabled (the daemon starts Claude for them)", () => {
+    commands.run.mockResolvedValue({ message: "", resultJson: "{}" });
+    useUiStore.setState({ selection: { kind: "session", id: "s-off" } });
+    setMcp("s-off", STATUS);
+    act(() => {
+      showView("panel.mcp");
+    });
+    render(<SidePanel />);
+    expect(screen.getByTestId<HTMLButtonElement>("mcp-refresh").disabled).toBe(false);
+    const reconnect = within(card("linear"), "mcp-reconnect") as HTMLButtonElement;
+    expect(reconnect.disabled).toBe(false);
+    fireEvent.click(reconnect);
+    expect(commands.run).toHaveBeenCalledWith("thread.mcp-reconnect", { id: "s-off", server: "linear" }, expect.objectContaining({ quiet: true }));
+    fireEvent.click(screen.getByTestId("mcp-refresh"));
+    expect(commands.run).toHaveBeenCalledWith("thread.mcp", { id: "s-off", refresh: "true" }, expect.objectContaining({ quiet: true }));
   });
 });
