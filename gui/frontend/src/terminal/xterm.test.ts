@@ -80,3 +80,17 @@ describe("XtermRenderer keyup", () => {
     r.dispose();
   });
 });
+
+describe("XtermRenderer hideCursor", () => {
+  const hidden = (r: XtermRenderer) => (r.term as unknown as { _core: { coreService: { isCursorHidden: boolean } } })._core.coreService.isCursorHidden;
+
+  it("hides the cursor after the output written before it, even one that showed it", async () => {
+    const r = renderer();
+    expect(hidden(r)).toBe(false);
+    r.write(new TextEncoder().encode("done\r\n\x1b[?25h"));
+    r.hideCursor();
+    await write(r, "");
+    expect(hidden(r)).toBe(true);
+    r.dispose();
+  });
+});
