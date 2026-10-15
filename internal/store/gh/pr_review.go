@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 )
@@ -196,6 +197,18 @@ func writeRefused(pe *PartialError) error {
 		msgs = append(msgs, e.Message)
 	}
 	return fmt.Errorf("%w: %s", ErrFailedPrecondition, strings.Join(msgs, "; "))
+}
+
+// loggedVars is vars for the debug log: a review's or comment's body (the user's text,
+// up to 64 KB) becomes its size.
+func loggedVars(vars map[string]any) map[string]any {
+	body, ok := vars["body"].(string)
+	if !ok {
+		return vars
+	}
+	out := maps.Clone(vars)
+	out["body"] = fmt.Sprintf("<%d bytes>", len(body))
+	return out
 }
 
 // decodeReview maps an AddPullRequestReview mutation response.

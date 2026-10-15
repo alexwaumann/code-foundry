@@ -331,6 +331,22 @@ func TestAddPullRequestCommentRefetches(t *testing.T) {
 	}
 }
 
+func TestLoggedVars(t *testing.T) {
+	vars := map[string]any{"id": "PR_1", "event": "COMMENT", "body": "secret plans"}
+	got := loggedVars(vars)
+	if got["body"] != "<12 bytes>" || got["id"] != "PR_1" || got["event"] != "COMMENT" {
+		t.Errorf("logged = %v", got)
+	}
+	if vars["body"] != "secret plans" {
+		t.Errorf("the sent vars changed: %v", vars)
+	}
+	for _, v := range []map[string]any{{"owner": "o"}, {"id": "PR_1", "body": nil}} {
+		if got := loggedVars(v); fmt.Sprint(got) != fmt.Sprint(v) {
+			t.Errorf("loggedVars(%v) = %v", v, got)
+		}
+	}
+}
+
 func checkReviewCalls(t *testing.T, g *fakeGitHub, want *fakeReviewCall) {
 	t.Helper()
 	calls := g.reviewCalls()
