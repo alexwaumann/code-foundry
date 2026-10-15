@@ -59,11 +59,6 @@ type Command struct {
 	// Listing still reports the command as requiring confirmation, so clients offer
 	// their confirm flag. It sees the effective context and validated args.
 	ConfirmIf func(ctx context.Context, uctx Context, args Args) bool
-	// Hidden keeps the command out of List (so out of the palette, help, the CLI's verbs
-	// and the keybindings) while Invoke still runs it by name: a stopgap for a client
-	// that has not caught up with a removal (session.reconnect until the GUI stops
-	// calling it). A hidden command has no keybindings.
-	Hidden bool
 }
 
 // Available reports whether c is available in uctx.
@@ -207,9 +202,6 @@ func (c *Command) validate() error {
 	}
 	if c.Run == nil {
 		return invalid("Run is required")
-	}
-	if c.Hidden && len(c.Keybindings) > 0 {
-		return invalid("a hidden command has no keybindings")
 	}
 	seen := make(map[string]bool, len(c.Args))
 	for _, a := range c.Args {

@@ -117,12 +117,7 @@ func TestSessionCommands(t *testing.T) {
 		// Gone (docs/notes/thread-lifecycle.md): a message starts a thread, the daemon
 		// stops idle ones.
 		{name: "no close", cmd: "session.close", args: map[string]string{"id": "s5"}, wantErr: command.ErrUnknownCommand},
-		// Hidden, kept for today's GUI until PR C: runs, but is never listed.
-		{name: "hidden reconnect starts a stopped thread", cmd: "session.reconnect", args: map[string]string{"id": "s5"}, current: disconnected,
-			wantMsg:  "starting thread s5",
-			wantReqs: []proto.Message{&v1.GetSessionRequest{Id: "s5"}, &v1.ReconnectSessionRequest{Id: "s5"}}},
-		{name: "hidden reconnect refused while running", cmd: "session.reconnect", args: map[string]string{"id": "s5"},
-			wantCode: connect.CodeFailedPrecondition, wantReqs: []proto.Message{&v1.GetSessionRequest{Id: "s5"}}},
+		{name: "no reconnect", cmd: "session.reconnect", args: map[string]string{"id": "s5"}, current: disconnected, wantErr: command.ErrUnknownCommand},
 		{name: "rename", cmd: "session.rename", ctx: command.Context{ActiveSessionID: "s5"}, args: map[string]string{"name": "new"},
 			wantMsg: "renamed thread new (s5)", wantReqs: []proto.Message{&v1.RenameSessionRequest{Id: "s5", Name: "new"}}},
 		{name: "rename needs a name", cmd: "session.rename", ctx: command.Context{ActiveSessionID: "s5"}, wantErr: command.ErrInvalidArgs},
@@ -273,23 +268,5 @@ func TestSessionNewKeybindingAndEnums(t *testing.T) {
 				t.Errorf("permission = %v default %q", a.Enum, a.Default)
 			}
 		}
-	}
-}
-
-// session.reconnect stays invocable for the GUI that predates start-on-send, but no list
-// shows it (palette, help, CLI verbs) and it has no chord.
-func TestSessionReconnectHidden(t *testing.T) {
-	reg, _, _ := newSessionRegistry(t)
-	c, ok := reg.Get("session.reconnect")
-	if !ok || !c.Hidden || len(c.Keybindings) != 0 {
-		t.Fatalf("session.reconnect = %+v (registered %v)", c, ok)
-	}
-	for _, l := range reg.List(command.Context{ActiveSessionID: "s5"}, true) {
-		if l.Name == "session.reconnect" || l.Name == "session.close" {
-			t.Errorf("%s is listed", l.Name)
-		}
-	}
-	if _, ok := reg.Get("session.close"); ok {
-		t.Error("session.close is registered")
 	}
 }

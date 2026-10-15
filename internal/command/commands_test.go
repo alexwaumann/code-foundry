@@ -79,10 +79,6 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 			t.Errorf("%s not registered", n)
 		}
 	}
-	// Hidden: registered for the GUI until it stops calling it, never listed.
-	if _, ok := f.reg.Get("session.reconnect"); !ok {
-		t.Error("session.reconnect not registered")
-	}
 	if got := len(f.reg.List(command.Context{}, true)); got != len(want) {
 		t.Errorf("registered %d commands, want %d", got, len(want))
 	}
