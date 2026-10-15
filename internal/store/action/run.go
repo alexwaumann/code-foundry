@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -47,23 +48,33 @@ func (r *runRec) public(withOutput bool) Run {
 	return out
 }
 
-// kill ends a running background run: SIGTERM to its process group, SIGKILL after
-// grace. Callers hold Manager.mu.
-func (r *runRec) kill(grace time.Duration) {
+// kill ends a running background run: SIGTERM to its process group, SIGKILL to the
+// group after grace. The run finishing first is not enough to skip the SIGKILL: the
+// shell can die of the SIGTERM at once and leave a group member that ignores it, so
+// only a group that is gone entirely is spared. wg (the Manager's) tracks the
+// escalation so Close waits for it; adding to it is safe because a running run's
+// process waiter still holds it. Callers hold Manager.mu.
+func (r *runRec) kill(grace time.Duration, wg *sync.WaitGroup) {
 	if r.run.Mode != ModeBackground || r.run.State != RunRunning || r.pid <= 0 || r.killing {
 		return
 	}
 	r.killing = true
 	pgid, done := r.pid, r.done
 	_ = syscall.Kill(-pgid, syscall.SIGTERM)
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		t := time.NewTimer(grace)
 		defer t.Stop()
 		select {
 		case <-done:
+			if syscall.Kill(-pgid, 0) != nil {
+				return // the whole group is gone
+			}
+			<-t.C
 		case <-t.C:
-			_ = syscall.Kill(-pgid, syscall.SIGKILL)
 		}
+		_ = syscall.Kill(-pgid, syscall.SIGKILL)
 	}()
 }
 
@@ -176,7 +187,7 @@ func (m *Manager) start(ctx context.Context, a Action, owner Owner, mode Mode, t
 	m.mu.Lock()
 	m.runs[id] = rec
 	if m.closed {
-		rec.kill(m.opts.KillGrace) // Close ran while it started
+		rec.kill(m.opts.KillGrace, &m.wg) // Close ran while it started
 	}
 	dropped := m.trim(owner.RepoID)
 	m.rebuild()

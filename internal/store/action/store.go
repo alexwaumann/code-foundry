@@ -337,7 +337,7 @@ func (m *Manager) RepoRemoved(ctx context.Context, repoID string) {
 	var dropped []string
 	for id, r := range m.runs {
 		if r.run.RepoID == repoID {
-			r.kill(m.opts.KillGrace)
+			r.kill(m.opts.KillGrace, &m.wg)
 			delete(m.runs, id)
 			dropped = append(dropped, id)
 		}
@@ -368,7 +368,7 @@ func (m *Manager) KillRuns(match func(Run) bool) int {
 	n := 0
 	for _, r := range m.runs {
 		if r.run.Mode == ModeBackground && r.run.State == RunRunning && match(r.run) {
-			r.kill(m.opts.KillGrace)
+			r.kill(m.opts.KillGrace, &m.wg)
 			n++
 		}
 	}
@@ -387,7 +387,7 @@ func (m *Manager) Close(ctx context.Context) error {
 	n := 0
 	for _, r := range m.runs {
 		if r.run.Mode == ModeBackground && r.run.State == RunRunning {
-			r.kill(m.opts.KillGrace)
+			r.kill(m.opts.KillGrace, &m.wg)
 			n++
 		}
 	}
