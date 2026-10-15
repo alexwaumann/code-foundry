@@ -256,3 +256,43 @@ test("the footers stay pinned under a long main list, are capped, and scroll the
   await page.keyboard.press("Home");
   await expect.poll(async () => (await scrollState(page, "sidebar-main")).top).toBeLessThanOrEqual(4);
 });
+
+test("archiving, snoozing or removing the selected thread selects the dashboard; another thread's leaves it (docs/notes/put-away-focuses-dashboard.md)", async ({ page }) => {
+  await openApp(page);
+  const pane = page.getByTestId("thread-pane");
+  const dashboard = page.getByTestId("sidebar-dashboard");
+
+  // Archive the selected idle thread from its row menu: the start page shows and the
+  // Dashboard button is current. The thread stays in the archived list.
+  await row(page, "s:s-3").click();
+  await expect(pane).toHaveAttribute("data-session-id", "s-3");
+  let menu = await openMenu(page, "s:s-3");
+  await menu.getByTestId("menu-archive").click();
+  await expect(page.getByTestId("start-heading")).toBeVisible();
+  await expect(pane).toHaveCount(0);
+  await expect(dashboard).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("archived-count")).toHaveText("2");
+
+  // Another thread's archive (as from the CLI) leaves the selection alone.
+  await row(page, "s:s-2").click();
+  await expect(pane).toHaveAttribute("data-session-id", "s-2");
+  await mockPost("session/archive?id=s-6");
+  await expect(page.getByTestId("archived-count")).toHaveText("3");
+  await expect(pane).toHaveAttribute("data-session-id", "s-2");
+
+  // The selected thread snoozed from the CLI: dashboard.
+  await mockPost("session/snooze?id=s-2&until=2m");
+  await expect(page.getByTestId("start-heading")).toBeVisible();
+  await expect(pane).toHaveCount(0);
+
+  // Remove the selected thread (the daemon's confirmation): dashboard, no "no longer exists" pane.
+  await row(page, "s:s-4").click();
+  await expect(pane).toHaveAttribute("data-session-id", "s-4");
+  menu = await openMenu(page, "s:s-4");
+  await menu.getByText("Remove…").click();
+  await expect(page.getByTestId("confirm-dialog")).toBeVisible();
+  await page.getByTestId("confirm-ok").click();
+  await expect(page.getByTestId("start-heading")).toBeVisible();
+  await expect(page.getByTestId("session-missing")).toHaveCount(0);
+  await expect(row(page, "s:s-4")).toHaveCount(0);
+});
