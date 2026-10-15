@@ -13,6 +13,7 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/internal/paths"
 )
 
 // User-facing verbs are generated at runtime from the daemon's CommandService.List, so
@@ -34,14 +35,26 @@ type contextFlags struct {
 	terminal, session, repo, worktree, workspace string
 }
 
+// addContextFlags adds the --context-* flags. --context-session defaults to
+// $CODE_FOUNDRY_SESSION, which the daemon sets in every thread's Claude session, so a
+// thread's agent running `code-foundry terminal new` or `action run` acts for its own
+// thread (its bottom panel). --context-session= (empty) opts out.
 func (cl *cli) addContextFlags(fs *flag.FlagSet) *contextFlags {
 	cf := &contextFlags{}
 	fs.StringVar(&cf.terminal, "context-terminal", "", "active terminal `id`")
-	fs.StringVar(&cf.session, "context-session", "", "active session `id`")
+	fs.StringVar(&cf.session, "context-session", cl.env(paths.EnvSession), "active session `id` (default $"+paths.EnvSession+")")
 	fs.StringVar(&cf.repo, "context-repo", "", "active repository `id`")
 	fs.StringVar(&cf.worktree, "context-worktree", "", "active worktree `path`")
 	fs.StringVar(&cf.workspace, "context-workspace", "", "active workspace `id`")
 	return cf
+}
+
+// env reads an environment variable through cl.getenv; "" without one.
+func (cl *cli) env(key string) string {
+	if cl.getenv == nil {
+		return ""
+	}
+	return strings.TrimSpace(cl.getenv(key))
 }
 
 func (cl *cli) uiContext(cf *contextFlags) (*v1.UiContext, error) {
@@ -210,6 +223,9 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	case res.GetMessage() != "":
 		fmt.Fprintln(cl.stdout, res.GetMessage())
 	}
+	if code := res.GetExitCode(); code != 0 {
+		return exitCodeError(code)
+	}
 	return nil
 }
 
@@ -307,7 +323,7 @@ func printCommandHelp(w io.Writer, cmd *v1.Command) {
 		fmt.Fprintln(tw, "  --yes\tdo not ask for confirmation (required without a terminal)")
 	}
 	fmt.Fprintln(tw, "  --context-terminal id\tactive terminal, for availability and defaults")
-	fmt.Fprintln(tw, "  --context-session id\tactive session")
+	fmt.Fprintln(tw, "  --context-session id\tactive session (default $"+paths.EnvSession+", set in a thread's Claude session)")
 	fmt.Fprintln(tw, "  --context-repo id\tactive repository")
 	fmt.Fprintln(tw, "  --context-worktree path\tactive worktree")
 	fmt.Fprintln(tw, "  --context-workspace id\tactive workspace")

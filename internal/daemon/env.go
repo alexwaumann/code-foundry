@@ -56,12 +56,13 @@ func sessionEnv(port int, token string) []string {
 	}
 }
 
-// scrubEndpointEnv removes an inherited endpoint and token (a daemon started by hand
-// from inside a session), so this daemon's plain terminals do not point the CLI at
-// the other daemon. Sessions get this daemon's own values (sessionEnv).
+// scrubEndpointEnv removes an inherited endpoint, token and thread id (a daemon
+// started by hand from inside a session), so this daemon's plain terminals and action
+// runs do not point the CLI at the other daemon or at a thread of it. Sessions get this
+// daemon's own values (sessionEnv, and their own paths.EnvSession).
 func scrubEndpointEnv(log *slog.Logger) {
 	var vars []string
-	for _, k := range []string{paths.EnvEndpoint, paths.EnvToken} {
+	for _, k := range []string{paths.EnvEndpoint, paths.EnvToken, paths.EnvSession} {
 		if _, ok := os.LookupEnv(k); ok {
 			_ = os.Unsetenv(k)
 			vars = append(vars, k)
