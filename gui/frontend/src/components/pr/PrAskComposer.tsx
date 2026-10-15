@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from
 import { startingKey, startPrSession, usePrSessionsStore } from "@/stores/prSessions";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { composerKeyAction } from "./keys";
+import { Tip } from "@/components/ui/tooltip";
 
 /** The hint while nothing runs: narrow enough for a 280px panel. */
 export const ASK_KEYS_HINT = "⏎ send · ⇧⏎ newline";
@@ -111,14 +112,11 @@ export function PrAskComposer({ prRef, focusRequest, onClose }: { prRef: PrRef; 
         onKeyDown={onKeyDown}
       />
       <div className="flex min-w-0 items-center gap-2">
-        <span
-          className="min-w-0 truncate text-xs text-muted-foreground"
-          title={elsewhere ? ASK_ELSEWHERE_HINT : undefined}
-          role={elsewhere ? "status" : undefined}
-          data-testid="pr-ask-hint"
-        >
-          {sending ? ASK_SENDING_HINT : elsewhere ? ASK_ELSEWHERE_HINT : ASK_KEYS_HINT}
-        </span>
+        <Tip label={elsewhere ? ASK_ELSEWHERE_HINT : null} whenTruncated align="start">
+          <span className="min-w-0 truncate text-xs text-muted-foreground" role={elsewhere ? "status" : undefined} data-testid="pr-ask-hint">
+            {sending ? ASK_SENDING_HINT : elsewhere ? ASK_ELSEWHERE_HINT : ASK_KEYS_HINT}
+          </span>
+        </Tip>
         <button
           type="button"
           disabled={sending}

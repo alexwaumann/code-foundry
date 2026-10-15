@@ -11,6 +11,7 @@ import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
 import { POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
 import { REVIEWER_SEARCH_MIN_CHARS, reviewerSearchTerm, useReviewerSearchTerm } from "./reviewerSearch";
+import { Tip } from "@/components/ui/tooltip";
 
 export const WRITE_ACCESS_HINT = "Asking someone to review needs write access on this repository.";
 
@@ -184,18 +185,19 @@ export function ReviewerPicker({ prRef, canUpdate }: { prRef: PrRef; canUpdate: 
   const { ref, boundary } = usePanelBoundary();
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          ref={ref}
-          type="button"
-          aria-label="Request a review"
-          title={canUpdate ? "Request a review" : WRITE_ACCESS_HINT}
-          data-testid="pr-add-reviewer"
-          className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring data-[state=open]:bg-accent"
-        >
-          <UserPlus className="size-3.5" aria-hidden />
-        </button>
-      </PopoverTrigger>
+      <Tip label={canUpdate ? "Request a review" : WRITE_ACCESS_HINT}>
+        <PopoverTrigger asChild>
+          <button
+            ref={ref}
+            type="button"
+            aria-label="Request a review"
+            data-testid="pr-add-reviewer"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring aria-expanded:bg-accent"
+          >
+            <UserPlus className="size-3.5" aria-hidden />
+          </button>
+        </PopoverTrigger>
+      </Tip>
       <PopoverContent
         align="start"
         collisionBoundary={boundary}
