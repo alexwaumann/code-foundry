@@ -76,7 +76,10 @@ of variable values. Frontend only; nothing visibly changes.
 
 ## Verified
 
-- `make check`; `make gui-e2e` (WebKit + Chromium).
+- `make check`; `make gui-e2e` (WebKit + Chromium): 757 passed, 36 skipped, 1 failed:
+  `panel.spec.ts:851` on Chromium (the click on the Files tab after a drag did not
+  activate it within 5 s). Unrelated to colours; it passed 5 of 5 with
+  `--repeat-each=5` on its own.
 - Live (`make gui-build`, isolated `CODE_FOUNDRY_HOME`): an ANSI 0-15 test in a bottom
   shell plus the project row menu, dark and light (`theme-1-tokens/dark.png`,
   `light.png`). Terminal and pane both sample 8,8,8 in dark and 255,255,255 in light;
