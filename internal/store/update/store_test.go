@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -363,5 +364,34 @@ func TestDefaultOptions(t *testing.T) {
 				t.Fatalf("%+v", o)
 			}
 		})
+	}
+}
+
+// TestCheckAfterSleep: the loop measures the interval on the wall clock, so a check that
+// came due while the machine slept runs on the first tick after wake rather than a full
+// interval later. The fake clock stands still until it jumps past the interval.
+func TestCheckAfterSleep(t *testing.T) {
+	var mu sync.Mutex
+	now := time.Date(2026, 10, 15, 9, 0, 0, 0, time.UTC)
+	r := newRig(t, "v0.2.0", func(o *update.Options) {
+		o.InitialDelay = time.Millisecond
+		o.Interval = time.Hour
+		o.Tick = time.Millisecond
+		o.Now = func() time.Time { mu.Lock(); defer mu.Unlock(); return now }
+	})
+	r.waitState(t, update.Available)
+	time.Sleep(20 * time.Millisecond) // several ticks with the clock still: no re-check
+	if n := r.source.Calls(); n != 1 {
+		t.Fatalf("checks before the clock moved = %d, want 1", n)
+	}
+	mu.Lock()
+	now = now.Add(90 * time.Minute) // the lid was shut for an hour and a half
+	mu.Unlock()
+	deadline := time.Now().Add(5 * time.Second)
+	for r.source.Calls() < 2 {
+		if time.Now().After(deadline) {
+			t.Fatalf("no check after the clock jumped; %d checks", r.source.Calls())
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }

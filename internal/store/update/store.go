@@ -129,7 +129,7 @@ type Service interface {
 // Defaults.
 const (
 	DefaultInitialDelay = 30 * time.Second
-	DefaultInterval     = 24 * time.Hour
+	DefaultInterval     = time.Hour
 	// EnvInitialDelay overrides DefaultInitialDelay (a Go duration), for testing.
 	EnvInitialDelay = "CODE_FOUNDRY_UPDATE_DELAY"
 )
@@ -157,7 +157,11 @@ type Options struct {
 	Log              *slog.Logger
 	InitialDelay     time.Duration
 	Interval         time.Duration
-	Now              func() time.Time
+	// Tick is how often the loop compares the wall clock against Interval (so an
+	// overdue check runs this soon after wake from sleep). Default the smaller of a
+	// minute and Interval.
+	Tick time.Duration
+	Now  func() time.Time
 }
 
 // DefaultOptions configures the updater for the running build: the release repository
@@ -226,6 +230,9 @@ func Start(ctx context.Context, opts Options) *Store {
 	if opts.Interval <= 0 {
 		opts.Interval = DefaultInterval
 	}
+	if opts.Tick <= 0 {
+		opts.Tick = min(time.Minute, opts.Interval)
+	}
 	if opts.InstalledVersion == nil {
 		opts.InstalledVersion = installedVersionIn(RunningDir())
 	}
@@ -272,20 +279,33 @@ func (s *Store) Snapshot() Status {
 	return s.status
 }
 
+// loop checks InitialDelay after start, then whenever Interval of wall-clock time has
+// passed since the last check, polled on a short tick. Wall clock rather than a timer
+// because Go timers run on the monotonic clock, which stops while a Mac sleeps: a
+// closed lid would push the next check out by however long the lid stayed shut. With
+// wall-clock polling the first tick after wake runs the overdue check.
 func (s *Store) loop() {
-	t := time.NewTimer(s.opts.InitialDelay)
-	defer t.Stop()
+	initial := time.NewTimer(s.opts.InitialDelay)
+	defer initial.Stop()
+	tick := time.NewTicker(s.opts.Tick)
+	defer tick.Stop()
+	var last time.Time // wall clock of the last check this loop ran; zero until the first
 	for {
 		select {
 		case <-s.ctx.Done():
 			return
-		case <-t.C:
+		case <-initial.C:
 		case <-s.recheck:
+		case <-tick.C:
+			// Round(0) strips the monotonic reading so Sub measures wall-clock time.
+			if last.IsZero() || s.opts.Now().Round(0).Sub(last) < s.opts.Interval {
+				continue
+			}
 		}
 		if _, err := s.Check(s.ctx); err != nil && s.ctx.Err() == nil {
 			s.log.Warn("update check failed", "err", err)
 		}
-		t.Reset(s.opts.Interval) // Go 1.23+ timers: Reset discards a pending fire
+		last = s.opts.Now().Round(0)
 	}
 }
 
