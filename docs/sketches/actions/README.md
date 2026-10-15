@@ -5,10 +5,10 @@ into a bottom-panel tab that stays open after the command exits. Static HTML on 
 thread-header sketch (layout A), which builds on `../rendered-thread/` (style, lucide
 icons, fake thread). Open `index.html?v=<state>&x=a|b&theme=dark|light`.
 
-| State | URL | Shots (`-dark.png`, `-light.png`) |
+| State | URL | Shot name |
 |---|---|---|
 | Header trigger (Play left of the bottom toggle) | `?v=header` | `header` |
-| Menu, edit = pencil on hover | `?v=menu&x=a` | `menu-a` |
+| Menu, edit = pencil on hover (chosen) | `?v=menu&x=a` | `menu-a` |
 | Menu, edit = submenu (Run / Edit…) | `?v=menu&x=b` | `menu-b` |
 | Menu, no actions | `?v=empty` | `menu-empty` |
 | New action | `?v=new` | `dialog-new` |
@@ -16,9 +16,14 @@ icons, fake thread). Open `index.html?v=<state>&x=a|b&theme=dark|light`.
 | Edit, after Delete was clicked | `?v=delete` | `dialog-delete` |
 | Action running, status line | `?v=running&x=a` | `panel-running-a` |
 | Action running, status in the strip | `?v=running&x=b` | `panel-running-b` |
-| Exited 1, status line | `?v=exited&x=a` | `panel-exited-a` |
+| Exited 1, status line (chosen) | `?v=exited&x=a` | `panel-exited-a` |
 | Exited 1, status + Rerun in the strip | `?v=exited&x=b` | `panel-exited-b` |
 | Exited 0, status line | `?v=exited&x=a&code=0` | `panel-exited-ok-a` |
+
+Committed shots: three, the chosen variants `menu-a-dark.png` and `panel-exited-a-light.png`,
+and the delete confirm `dialog-delete-dark.png`. The others (each state in `-dark.png` and `-light.png`) are
+not kept in the repo; regenerate them with `shoot.mjs` below. The shipped GUI's live
+screenshots are in `docs/notes/actions-2-gui/`.
 
 Shots: `node shoot.mjs [name,...]` (WebKit, 1180 wide at 2x like the thread-header shots;
 header 1180x150, menus 1180x400, the rest the full 1180x760 window). Playwright comes from
