@@ -827,13 +827,17 @@ func (u *threadUsage) adopt(saved AgentRun) {
 }
 
 // closeIdle is the safety net: closes runs that have not grown for idleClose (times
-// backgroundIdleFactor for a background run) while the thread is at its prompt.
+// backgroundIdleFactor for a background run) while the thread is at its prompt, unless
+// a task frame says the run is still running (agents.go).
 func (u *threadUsage) closeIdle(atPrompt bool) {
 	if !atPrompt {
 		return
 	}
 	now := u.now()
 	for _, r := range u.openRuns() {
+		if r.live && r.info.Status == AgentRunning {
+			continue // the stream says it runs (a long tool call writes nothing meanwhile)
+		}
 		limit := u.idleClose
 		if r.info.Background {
 			limit *= backgroundIdleFactor

@@ -294,6 +294,22 @@ func TestAgentsTranscriptLife(t *testing.T) {
 	if s := status("A2"); s.Status != AgentRunning {
 		t.Errorf("live run's status followed the transcript: %+v", s)
 	}
+
+	// The idle safety net fails a run nothing speaks for and keeps following one the
+	// stream says still runs.
+	fx.meta("A4", "T4", 1, "foreground")
+	fx.meta("A5", "T5", 1, "foreground")
+	fx.parent(spawnFg(c, "T4"), spawnFg(c, "T5"))
+	fx.wantRun("A4", true, 0)
+	fx.u.runs["A5"].live = true
+	fx.now = fx.now.Add(2 * time.Hour)
+	fx.u.closeIdle(true)
+	if s := status("A4"); s.Open || s.Status != AgentFailed || s.Error != "no result from Claude" {
+		t.Errorf("idle run %+v", s)
+	}
+	if s := status("A5"); !s.Open || s.Status != AgentRunning {
+		t.Errorf("live idle run %+v", s)
+	}
 }
 
 // The runner publishes a lifecycle change at once and progress alone at most once per
