@@ -41,6 +41,12 @@ import (
 // Knobs for the effort restart's tests: CF_FAKE_CLAUDE_EXIT_DELAY (a duration) keeps
 // the process alive that long after stdin closes; CF_FAKE_CLAUDE_RESUME_EXIT (a code)
 // makes a process started with --resume print to stderr and exit with it at once.
+//
+// Turns Claude starts by itself (a background shell or agent ended while the thread was
+// idle): with CF_FAKE_CLAUDE_UNPROMPTED=<dir>, only the first turn waits for a user
+// message; turn n (2, 3, …) replays once the file <dir>/turn-<n> exists, and pauses
+// before its first system/init line until <dir>/turn-<n>.init exists. Both waits end
+// when stdin closes (the rest of the turn is then dropped, as a killed claude would).
 
 const fakeClaudeEnv = "CF_FAKE_CLAUDE"
 
@@ -159,6 +165,55 @@ func fakeStreamClaude(fixture string) int {
 	waiting := map[string]chan struct{}{}
 	var replay sync.WaitGroup
 	next := 0
+	unprompted := os.Getenv("CF_FAKE_CLAUDE_UNPROMPTED")
+	stdinClosed := make(chan struct{})
+	// waitFile waits for path to exist; false once stdin closed.
+	waitFile := func(path string) bool {
+		for {
+			if _, err := os.Stat(path); err == nil {
+				return true
+			}
+			select {
+			case <-stdinClosed:
+				return false
+			case <-time.After(5 * time.Millisecond):
+			}
+		}
+	}
+	// play writes a turn's lines, stopping at each can_use_tool until the daemon answers
+	// and, with initGate, before the first system/init until that file exists. False when
+	// stdin closed at the gate.
+	play := func(turn []string, initGate string) bool {
+		for _, l := range turn {
+			var req struct {
+				Type      string `json:"type"`
+				Subtype   string `json:"subtype"`
+				RequestID string `json:"request_id"`
+				Request   struct {
+					Subtype string `json:"subtype"`
+				} `json:"request"`
+			}
+			_ = json.Unmarshal([]byte(l), &req)
+			if initGate != "" && req.Type == "system" && req.Subtype == "init" {
+				if !waitFile(initGate) {
+					return false
+				}
+				initGate = ""
+			}
+			var ch chan struct{}
+			if req.Type == "control_request" && req.Request.Subtype == "can_use_tool" {
+				ch = make(chan struct{})
+				mu.Lock()
+				waiting[req.RequestID] = ch
+				mu.Unlock()
+			}
+			write(l)
+			if ch != nil {
+				<-ch
+			}
+		}
+		return true
+	}
 	sc := bufio.NewScanner(os.Stdin)
 	sc.Buffer(nil, 64<<20)
 	for sc.Scan() {
@@ -217,38 +272,28 @@ func fakeStreamClaude(fixture string) int {
 			}
 			mu.Unlock()
 		case "user":
-			if next >= len(turns) {
+			if next >= len(turns) || (unprompted != "" && next > 0) {
 				continue
 			}
-			turn := turns[next]
+			turn, first := turns[next], next == 0
 			next++
 			replay.Add(1)
 			go func() {
 				defer replay.Done()
-				for _, l := range turn {
-					var req struct {
-						Type      string `json:"type"`
-						RequestID string `json:"request_id"`
-						Request   struct {
-							Subtype string `json:"subtype"`
-						} `json:"request"`
-					}
-					_ = json.Unmarshal([]byte(l), &req)
-					var ch chan struct{}
-					if req.Type == "control_request" && req.Request.Subtype == "can_use_tool" {
-						ch = make(chan struct{})
-						mu.Lock()
-						waiting[req.RequestID] = ch
-						mu.Unlock()
-					}
-					write(l)
-					if ch != nil {
-						<-ch
+				play(turn, "")
+				if unprompted == "" || !first {
+					return
+				}
+				for n := 2; n <= len(turns); n++ {
+					gate := filepath.Join(unprompted, "turn-"+strconv.Itoa(n))
+					if !waitFile(gate) || !play(turns[n-1], gate+".init") {
+						return
 					}
 				}
 			}()
 		}
 	}
+	close(stdinClosed)
 	// stdin closed: nobody will answer a pending request.
 	mu.Lock()
 	for id, ch := range waiting {
