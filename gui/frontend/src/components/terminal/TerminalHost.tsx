@@ -90,7 +90,20 @@ function Overlay({ state }: { state: AttachState }) {
  * Focus is the parent's call (`ref.focus()`). The host's focus counts for the region
  * around it (the bottom panel's "bottom").
  */
-export function TerminalHost({ ref, terminalId, hidden = false, testId }: { ref?: Ref<TerminalHostHandle>; terminalId: string | null; hidden?: boolean; testId: string }) {
+export function TerminalHost({
+  ref,
+  terminalId,
+  hidden = false,
+  exitOverlay = true,
+  testId,
+}: {
+  ref?: Ref<TerminalHostHandle>;
+  terminalId: string | null;
+  hidden?: boolean;
+  /** Show "Process exited with code N" over an exited terminal (an action tab has its status line instead). */
+  exitOverlay?: boolean;
+  testId: string;
+}) {
   const hostRef = useRef<HTMLDivElement>(null);
   const ctlRef = useRef<DevHook | null>(null);
   const [state, setState] = useState<AttachState>({ terminalId: null, phase: "idle", exitCode: null, error: null });
@@ -199,7 +212,7 @@ export function TerminalHost({ ref, terminalId, hidden = false, testId }: { ref?
         data-attach-phase={state.phase}
         data-terminal-id={state.terminalId ?? undefined}
       />
-      <Overlay state={state} />
+      {(exitOverlay || state.phase !== "exited") && <Overlay state={state} />}
     </div>
   );
 }

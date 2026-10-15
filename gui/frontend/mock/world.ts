@@ -26,6 +26,7 @@ import { ENTER_ALT, prompt, RESET, topFrame } from "./screens";
 import { CommandError } from "./errors";
 import { agentCounts, agentsCommands } from "./agents";
 import { mcpCommands } from "./mcp";
+import { MockActions } from "./actions";
 import { CRASH_STDERR, MockThreads, type SeedHistory, type ThreadState } from "./thread";
 import { contextFields, recordResult, type MockContext } from "./context";
 
@@ -142,7 +143,7 @@ interface CmdDef {
 }
 export type UiIntentInit = MessageInitShape<typeof UiIntentSchema>;
 
-type Kind = "top" | "shell";
+type Kind = "top" | "shell" | "action";
 
 // The terminal label contract (internal/termlabel, proto Terminal.labels).
 const LABEL_KIND = "kind";
@@ -150,6 +151,10 @@ const LABEL_SESSION = "session";
 const LABEL_REPO = "repo";
 const LABEL_WORKTREE = "worktree";
 const KIND_SHELL = "shell";
+const KIND_ACTION = "action";
+
+/** termlabel.IsPanel: a shell or an action run (the bottom panel's terminals; what close and thread removal take). */
+const isPanel = (labels: Record<string, string>) => labels[LABEL_KIND] === KIND_SHELL || labels[LABEL_KIND] === KIND_ACTION;
 
 /** Labels of a shell terminal.new starts: owned by a worktree, and by a thread when sessionId is set. */
 function shellLabels(sessionId: string, repoId: string, worktree: string): Record<string, string> {
@@ -543,6 +548,23 @@ export class World {
       for (const s of this.sessions.values()) if (s.lastResultAt) this.publishSession(s);
     },
   );
+  /** Actions and their runs (mock/actions.ts); terminal runs are kind=action terminals here. */
+  readonly actions = new MockActions({
+    publish: (v) => this.events.publish({ source: EventSource.ACTION, event: { event: { case: "action", value: v } } }),
+    repos: () => [...this.repos.values()].map((r) => ({ id: r.id, name: r.name, worktrees: r.worktrees.map((w) => w.path) })),
+    session: (id) => {
+      const s = this.sessions.get(id);
+      return s && { repoId: s.repoId, worktreePath: s.worktreePath };
+    },
+    startTerminal: (argv, cwd, labels) => this.create(argv, cwd, labels, "action").id,
+    write: (id, text) => {
+      const t = this.terms.get(id);
+      if (t?.state === TerminalState.RUNNING) this.output(t, text);
+    },
+    exit: (id, code) => {
+      if (this.terms.has(id)) this.kill(id, code);
+    },
+  });
   /** UpdateService (Phase 3d): publishes into the events hub as the update source. */
   readonly update = new MockUpdater(
     (v) => this.events.publish({ source: EventSource.UPDATE, event: { event: { case: "update", value: v } } }),
@@ -621,6 +643,7 @@ export class World {
     for (const r of this.repos.values()) this.repoEvents.publish({ event: { case: "repoUpdated", value: this.repoMsg(r) } });
     this.workspaceEvents.publish(this.workspaceSnapshot());
     this.sessionEvents.publish(this.sessionSnapshot());
+    this.actions.reset();
     this.update.reset();
   }
 
@@ -771,7 +794,10 @@ export class World {
     this.terms.clear();
     this.sessions.clear();
     this.workspaces.clear();
-    for (const id of [...this.repos.keys()]) this.repoEvents.publish({ event: { case: "repoRemovedId", value: id } });
+    for (const id of [...this.repos.keys()]) {
+      this.actions.removeRepo(id);
+      this.repoEvents.publish({ event: { case: "repoRemovedId", value: id } });
+    }
     this.repos.clear();
     this.workspaceEvents.publish(this.workspaceSnapshot());
     this.sessionEvents.publish(this.sessionSnapshot());
@@ -891,6 +917,7 @@ export class World {
       this.repoEvents.publish({ event: { case: "worktreeRemoved", value: { repoId: repo.id, path } } });
     }
     this.closeShells((l) => l[LABEL_WORKTREE] === path);
+    this.actions.stopBackground((r) => r.worktreePath === path);
   }
 
   /** workspace.remove-repo: refused while a live thread runs there or with changes (unless force). */
@@ -1319,6 +1346,9 @@ export class World {
       case "shell":
         t.history = `${RESET}Last login: Thu Oct  8 09:12:44 on ttys004\r\n${prompt(o.cwd)}`;
         break;
+      case "action":
+        // `$SHELL -lc <command>` prints only the command's output (the GUI draws the command).
+        break;
     }
     this.terms.set(t.id, t);
     return t;
@@ -1413,6 +1443,11 @@ export class World {
     const text = new TextDecoder().decode(data);
     this.writes.push({ id, data: text });
     if (t.state !== TerminalState.RUNNING) return;
+    if (t.kind === "action") {
+      // No shell reads the keys; ^C interrupts the command (SIGINT: 130).
+      if (text.includes("\x03")) this.kill(id, 130);
+      return;
+    }
     if (t.kind === "top") {
       if (text.includes("q")) {
         t.altScreen = false;
@@ -1478,22 +1513,24 @@ export class World {
     t.attach.publish({ event: { case: "exited", value: { exitCode: code } } });
     t.attach.publish("end");
     this.publishTerm(t);
+    // An action run's terminal: its run finishes with this code (the terminal stays, EXITED).
+    this.actions.terminalExited(id, code);
     // Like the daemon's shell reaper: a shell terminal.new started is removed once it exits.
     if (t.labels[LABEL_KIND] === KIND_SHELL && !keep) this.remove(id);
   }
 
-  /** terminal.close / TerminalService.Close: kill, then remove once exited. Only shells, like the daemon. */
+  /** terminal.close / TerminalService.Close: kill, then remove once exited. Only shells and action runs, like the daemon. */
   close(id: string): void {
     const t = this.term(id);
-    if (t.labels[LABEL_KIND] !== KIND_SHELL) throw new CommandError("unavailable", `terminal ${id} is not a shell`);
+    if (!isPanel(t.labels)) throw new CommandError("unavailable", `terminal ${id} is not a shell`);
     this.kill(id);
     if (this.terms.get(id)?.state === TerminalState.EXITED) this.remove(id);
   }
 
-  /** Closes every running or exited shell terminal.new started whose labels match (thread or worktree removal). */
+  /** Closes every running or exited shell or action terminal whose labels match (thread or worktree removal). */
   private closeShells(match: (labels: Record<string, string>) => boolean): void {
     for (const t of [...this.terms.values()]) {
-      if (t.labels[LABEL_KIND] === KIND_SHELL && match(t.labels) && this.terms.has(t.id)) this.close(t.id);
+      if (isPanel(t.labels) && match(t.labels) && this.terms.has(t.id)) this.close(t.id);
     }
   }
 
@@ -1528,10 +1565,11 @@ export class World {
    */
   restartDaemon(): void {
     for (const t of [...this.terms.values()]) {
-      if (t.labels[LABEL_KIND] !== KIND_SHELL) continue;
+      if (!isPanel(t.labels)) continue;
       this.terms.delete(t.id);
       t.attach.publish("end");
     }
+    this.actions.restart();
     this.events.endAll();
     this.termEvents.endAll();
   }
@@ -1542,6 +1580,7 @@ export class World {
     this.terms.delete(id);
     t.attach.publish("end");
     this.termEvents.publish({ event: { case: "removedId", value: id } });
+    this.actions.terminalRemoved(id);
   }
 
   /**
@@ -1597,6 +1636,8 @@ export class World {
       createdWorktree: created,
       firstMessage: first,
     });
+    // Like the daemon's WorktreeCreated: the project's on-worktree-create actions, in the background.
+    if (created) this.actions.worktreeCreated(s.id, repo.id, path);
     this.focusSession(s.id);
     return { message: `created session ${s.id} in ${path}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path }) };
   }
@@ -1827,6 +1868,7 @@ export class World {
 
   /** RepoService.Delete (and repo.unregister): the project is gone. */
   removeRepo(id: string): void {
+    this.actions.removeRepo(id);
     this.repos.delete(id);
     this.repoEvents.publish({ event: { case: "repoRemovedId", value: id } });
   }
@@ -2006,6 +2048,7 @@ export class World {
       ...this.threads.commands(),
       ...mcpCommands(this.threads, (i) => this.emit(i)),
       ...agentsCommands(this.threads, (i) => this.emit(i)),
+      ...this.actions.commands(),
       {
         cmd: {
           name: "terminal.new",
@@ -2287,6 +2330,7 @@ export class World {
           if (!s) throw new CommandError("unavailable", "no active session");
           if (s.state !== SessionState.DISCONNECTED) this.disconnectSession(s.id, "closed", 0);
           this.closeShells((l) => l[LABEL_SESSION] === s.id);
+          this.actions.stopBackground((r) => r.sessionId === s.id);
           this.sessions.delete(s.id);
           this.sessionEvents.publish({ event: { case: "removedId", value: s.id } });
           return `Removed ${s.name || s.id}`;
@@ -2294,13 +2338,23 @@ export class World {
       },
       {
         cmd: {
-          name: "terminal.kill", title: "Kill Terminal", category: "Terminal", description: "Send SIGHUP to the active terminal", keybindings: ["cmd+alt+w"], args: [],
-          confirm: (ctx) => `Kill terminal ${ctx?.activeTerminalId ?? ""}? Its process is terminated.`,
+          name: "terminal.kill", title: "Kill Terminal", category: "Terminal", description: "Send SIGHUP to the active terminal", keybindings: ["cmd+alt+w"],
+          // --id defaults to the active terminal, like the daemon (context-bound; invoke puts it in the context).
+          args: [{ name: "id", type: ArgType.STRING, required: false, description: "Terminal id (default: the active terminal)" }],
+          confirm: (ctx, args) => `Kill terminal ${args.id || (ctx?.activeTerminalId ?? "")}? Its process is terminated.`,
         },
         when: (ctx) => activeTerm(ctx)?.state === TerminalState.RUNNING,
-        run: (ctx) => {
-          const t = activeTerm(ctx);
+        run: (ctx, args) => {
+          const t = args.id ? this.term(args.id) : activeTerm(ctx);
           if (!t) throw new CommandError("unavailable", "no active terminal");
+          // An action run that ignores SIGHUP ends with SIGKILL after the grace period, like the daemon's.
+          const grace = this.actions.hangupGraceMs(t.id);
+          if (grace > 0) {
+            setTimeout(() => {
+              if (this.terms.has(t.id)) this.kill(t.id, 137);
+            }, grace);
+            return `Killed ${t.id}`;
+          }
           this.kill(t.id);
           return `Killed ${t.id}`;
         },
@@ -2308,8 +2362,11 @@ export class World {
       {
         // --id defaults to the active terminal, like the daemon (a context-bound arg, so not required in List).
         cmd: { name: "terminal.close", title: "Close Terminal", category: "Terminal", description: "Terminate the terminal's process and remove it once it has exited", keybindings: [], args: [{ name: "id", type: ArgType.STRING, required: false, description: "Terminal id (default: the active terminal)" }] },
-        // Only shells, like the daemon.
-        when: (ctx) => activeTerm(ctx)?.labels[LABEL_KIND] === KIND_SHELL,
+        // Only shells and action runs, like the daemon.
+        when: (ctx) => {
+          const t = activeTerm(ctx);
+          return t !== undefined && isPanel(t.labels);
+        },
         run: (ctx, args) => {
           const id = args.id || activeTerm(ctx)?.id;
           if (!id) throw new CommandError("unavailable", "no active terminal");
@@ -2717,7 +2774,9 @@ export class World {
     });
     if (!entry) throw new CommandError("notfound", `unknown command ${name}`);
     // Like the daemon's context-bound args: an explicit worktree stands in for the context's.
-    const whenCtx = args.worktree ? ({ ...ctx, activeWorktreePath: args.worktree } as UiContext) : ctx;
+    let whenCtx = args.worktree ? ({ ...ctx, activeWorktreePath: args.worktree } as UiContext) : ctx;
+    // A terminal command's --id stands in for the context's terminal the same way.
+    if (name.startsWith("terminal.") && args.id) whenCtx = { ...whenCtx, activeTerminalId: args.id } as UiContext;
     if (!entry.when(whenCtx)) throw new CommandError("unavailable", `${name} is not available here`);
     for (const a of entry.cmd.args) {
       if (a.required && !args[a.name]) throw new CommandError("invalid", `missing required arg ${a.name}`);

@@ -21,6 +21,11 @@ export interface TerminalRenderer {
   write(data: Uint8Array): void;
   /** Full reset (RIS) plus cleared scrollback; used before a snapshot. */
   reset(): void;
+  /**
+   * Hides the cursor (DECTCEM off, as a program would), after any output already written.
+   * An exited terminal takes no input, so its block cursor would be a false prompt.
+   */
+  hideCursor(): void;
   /** Sets the grid size because the program's size changed. Does not fire onResize. */
   resize(cols: number, rows: number): void;
   /** Fits the grid to the container; fires onResize when the size changes. */

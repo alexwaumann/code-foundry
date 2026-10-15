@@ -17,6 +17,9 @@ class FakeRenderer implements TerminalRenderer {
   reset(): void {
     this.calls.push("reset");
   }
+  hideCursor(): void {
+    this.calls.push("hideCursor");
+  }
   resize(cols: number, rows: number): void {
     this.size = { cols, rows };
     this.calls.push(`resize:${String(cols)}x${String(rows)}`);
@@ -141,7 +144,8 @@ describe("AttachController", () => {
     s.push("t1", { kind: "exited", exitCode: 2 });
     await flush();
     await vi.advanceTimersByTimeAsync(100);
-    expect(r.calls.slice(-2)).toEqual(["write:x", "resize:90x20"]);
+    // The cursor goes after the output (an exited terminal takes no input).
+    expect(r.calls.slice(-3)).toEqual(["write:x", "resize:90x20", "hideCursor"]);
     expect(resizes).toEqual([]);
     expect(ctl.current).toMatchObject({ phase: "exited", exitCode: 2 });
     // No reconnect after the stream ends post-exit.

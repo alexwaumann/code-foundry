@@ -1,4 +1,5 @@
 import { EventService, type Event } from "@/gen/codefoundry/v1/events_pb";
+import { toActionEventView, type ActionEventView } from "./actions";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, type Heartbeat } from "./stream";
 import { toGhEventView, type GhEventView } from "./gh";
@@ -28,7 +29,8 @@ export type EventView =
   | { source: "gitops"; event: GitOpsEventView }
   | { source: "ui"; event: UiIntentView }
   | { source: "settings"; event: SettingsSnapshotView }
-  | { source: "update"; event: UpdateEventView };
+  | { source: "update"; event: UpdateEventView }
+  | { source: "action"; event: ActionEventView };
 
 export function toEventView(ev: Event): EventView | null {
   const e = ev.event;
@@ -72,6 +74,10 @@ export function toEventView(ev: Event): EventView | null {
     case "update": {
       const v = toUpdateEventView(e.value);
       return v && { source: "update", event: v };
+    }
+    case "action": {
+      const v = toActionEventView(e.value);
+      return v && { source: "action", event: v };
     }
     default:
       return null;

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Archive, ArchiveRestore, GitPullRequest, Layers, Power } from "lucide-react";
+import { ThreadActionsMenu } from "@/components/actions/ActionsMenu";
 import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { CommandButton } from "@/components/command/CommandButton";
 import { PanelToggle } from "@/components/panel/PanelToggle";
@@ -108,6 +109,7 @@ export function HeaderActions({ sessionId }: { sessionId: string }) {
       <CommandButton command="session.close" icon={Power} />
       <SnoozeButton sessionId={sessionId} />
       <ArchiveButton sessionId={sessionId} />
+      <ThreadActionsMenu sessionId={sessionId} />
       <BottomToggle />
       <PanelToggle />
     </span>

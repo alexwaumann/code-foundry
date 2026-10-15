@@ -1,0 +1,115 @@
+/* actions sketch: header trigger + menu (ui/dropdown-menu.tsx), editor dialog (ui/dialog.tsx,
+   publish/PublishDialog.tsx inputs, settings/SettingRow.tsx switch, T3's icon tiles), bottom
+   panel (bottom/BottomPanel.tsx). */
+:root{--popover:var(--pane);--destructive:oklch(0.577 0.245 27.325);--neutral-950:oklch(0.145 0 0)}
+.dark{--destructive:oklch(0.704 0.191 22.216)}
+
+/* ---------- content column (App.tsx ContentColumn: pane + bottom panel, 8px apart) ---------- */
+.column{flex:1;min-width:0;display:flex;flex-direction:column;margin:8px 8px 8px 0}
+.column>.pane{margin:0;flex:1;min-height:0}
+
+/* ---------- menu (DropdownMenuContent / Item / Label / Separator) ---------- */
+.menu{position:fixed;z-index:50;min-width:13rem;padding:4px;border:1px solid var(--border);border-radius:10px;background:var(--popover);color:var(--fg);box-shadow:0 10px 15px -3px oklch(0 0 0/10%),0 4px 6px -4px oklch(0 0 0/10%)}
+.dark .menu{background:var(--neutral-950);box-shadow:0 10px 15px -3px oklch(0 0 0/45%),0 4px 6px -4px oklch(0 0 0/45%)}
+.mi{position:relative;display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:14px;line-height:20px;white-space:nowrap}
+.mi>svg{width:16px;height:16px;color:var(--muted-fg)}
+.mi.hl{background:var(--accent)}
+.mi .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.mi .end{margin-left:auto;display:flex;align-items:center;height:20px}
+.mi .chev{width:14px;height:14px;color:var(--muted-fg)}
+.mi .edit{width:24px;height:24px;margin:-2px -4px -2px 0;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--muted-fg)}
+.mi .edit svg{width:14px;height:14px}
+.mi .edit.hov{background:color-mix(in oklab,var(--fg) 10%,transparent);color:var(--fg)}
+.ml{padding:6px 8px;font-size:12px;font-weight:500;color:var(--muted-fg)}
+.ml.hint{font-weight:400;padding-bottom:4px}
+.msep{height:1px;margin:4px -4px;background:var(--border)}
+.phdr .acts .tb.on{background:var(--accent);color:var(--fg)}
+.dark .phdr .acts .tb.on{background:color-mix(in oklab,var(--accent) 50%,transparent)}
+
+/* ---------- dialog (DialogOverlay + DialogContent max-w-lg p-4) ---------- */
+.overlay{position:fixed;inset:0;z-index:50;background:oklch(0 0 0/40%)}
+.dlg{position:fixed;z-index:51;top:14vh;left:50%;transform:translateX(-50%);width:512px;padding:16px;border:1px solid var(--border);border-radius:10px;background:var(--popover);box-shadow:0 25px 50px -12px oklch(0 0 0/25%)}
+.dlg .x{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--muted-fg)}
+.dlg .x svg{width:16px;height:16px}
+.dlg h2{margin:0;font-size:14px;font-weight:600;line-height:20px}
+.dlg .desc{margin-top:4px;font-size:12px;line-height:17px;color:var(--muted-fg);padding-right:28px}
+.dlg .desc .mono{font-size:11px}
+.fields{margin-top:16px;display:flex;flex-direction:column;gap:14px}
+.fld{display:flex;flex-direction:column;gap:6px}
+.fld>label{font-size:12px;font-weight:500}
+.fld .help{font-size:12px;color:var(--muted-fg)}
+.in{height:32px;display:flex;align-items:center;border:1px solid var(--border);border-radius:6px;padding:0 10px;font-size:14px;background:transparent}
+.in.ph{color:var(--muted-fg)}
+.in.area{display:block;height:auto;min-height:72px;padding:7px 10px;font-family:var(--font-mono);font-size:12.5px;line-height:19px;white-space:pre}
+.in.focus{border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklab,var(--ring) 50%,transparent)}
+.in .caret{display:inline-block;width:1.5px;height:15px;background:var(--fg);vertical-align:-3px;margin-left:1px}
+.in .sh-c{color:var(--sh-cmd)}.in .sh-f{color:var(--sh-flag)}
+/* icon tiles (T3 projectScriptEditor: flex-col, border, selected primary/10) */
+.tiles{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.tile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:9px 4px 7px;border:1px solid color-mix(in oklab,var(--border) 70%,transparent);border-radius:6px;font-size:12px;color:var(--muted-fg)}
+.tile svg{width:16px;height:16px}
+.dark .tile{border-color:transparent;background:oklch(1 0 0/3.5%)}
+.tile.sel{border-color:color-mix(in oklab,var(--primary) 70%,transparent);background:color-mix(in oklab,var(--primary) 10%,transparent);color:var(--fg)}
+.dark .tile.sel{border-color:transparent;background:color-mix(in oklab,var(--primary) 10%,transparent);box-shadow:inset 0 0 0 1px color-mix(in oklab,var(--primary) 30%,transparent)}
+/* switch row (T3 label row + SettingRow BoolEditor) */
+.swrow{display:flex;align-items:center;gap:12px;padding:9px 12px;border:1px solid color-mix(in oklab,var(--border) 70%,transparent);border-radius:6px;font-size:14px}
+.dark .swrow{border-color:transparent;background:oklch(1 0 0/3.5%)}
+.swrow .tt{flex:1;min-width:0}
+.swrow small{display:block;font-size:12px;color:var(--muted-fg);margin-top:1px}
+.sw{position:relative;width:36px;height:20px;border-radius:999px;background:var(--input);flex:none}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--sheet);box-shadow:0 1px 3px oklch(0 0 0/20%)}
+.dark .sw::after{background:var(--sheet)}
+.sw.on{background:var(--primary)}
+.sw.on::after{left:18px}
+.dark .sw.on::after{background:var(--primary-fg)}
+/* footer buttons (ui/button.tsx, size sm) */
+.foot{margin-top:18px;display:flex;align-items:center;gap:8px}
+.foot .sp{flex:1}
+.b{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;font-size:14px;font-weight:500;white-space:nowrap}
+.b svg{width:16px;height:16px}
+.b.primary{background:var(--primary);color:var(--primary-fg)}
+.b.outline{border:1px solid var(--border);background:var(--sheet);box-shadow:0 1px 2px oklch(0 0 0/5%)}
+.dark .b.outline{border-color:var(--input);background:oklch(1 0 0/4.5%)}
+.b.ghost{color:var(--muted-fg)}
+.b.del{color:var(--destructive);padding:0 10px;margin-left:-6px}
+.b.danger{background:var(--destructive);color:#fff}
+.dark .b.danger{background:color-mix(in oklab,var(--destructive) 60%,transparent)}
+.confirm{font-size:14px;color:var(--fg)}
+.confirm b{font-weight:500}
+
+/* ---------- bottom panel (BottomPanel.tsx: rounded-lg border pane, h-9 header, h-7 tabs) ---------- */
+.bottom{margin-top:8px;height:280px;flex:none;display:flex;flex-direction:column;border:1px solid var(--pane-border);border-radius:10px;background:var(--pane);overflow:hidden;box-shadow:0 1px 2px oklch(0 0 0/5%)}
+.bhead{height:36px;flex:none;display:flex;align-items:center;gap:8px;padding:0 6px 0 4px;border-bottom:1px solid var(--pane-border)}
+.btabs{flex:1;min-width:0;display:flex;align-items:center;gap:4px}
+.btab{display:flex;align-items:center;height:28px;max-width:192px;padding:0 4px 0 8px;gap:6px;border-radius:6px;font-size:12px;color:var(--muted-fg);white-space:nowrap}
+.btab.on{background:var(--accent);color:var(--fg)}
+.dark .btab.on{background:color-mix(in oklab,var(--accent) 50%,transparent)}
+.btab>svg{width:14px;height:14px}
+.btab .st{width:12px;height:12px}
+.btab .st.spin{color:var(--sky)}
+.btab .bx{width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;opacity:0}
+.btab.on .bx{opacity:1}
+.btab .bx svg{width:12px;height:12px}
+.bhead .tb{width:28px;height:28px}
+.bhead .tb svg{width:15px;height:15px}
+.bhead .run{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted-fg);white-space:nowrap}
+.bhead .run .sep{opacity:.5}
+.bb{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 6px;border-radius:6px;font-size:12px;font-weight:500;color:var(--fg)}
+.bb svg{width:12px;height:12px}
+.bb.hov,.bb.out{background:var(--accent)}
+.dark .bb.out{background:color-mix(in oklab,var(--accent) 60%,transparent)}
+.bb kbd{font-family:var(--font-ui);font-size:10px;color:var(--muted-fg);margin-left:2px}
+/* terminal area: xterm, 12px JetBrains Mono, terminal theme */
+.tarea{flex:1;min-height:0;padding:6px 12px;font-family:var(--font-mono);font-size:12px;line-height:17px;color:var(--syn-fg);white-space:pre;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end}
+.tarea .dim{color:var(--muted-fg)}
+.tarea .ok{color:var(--sh-str)}
+.tarea .fl{color:var(--red)}
+.tarea .cur{display:inline-block;width:7px;height:14px;vertical-align:-3px;background:var(--fg);opacity:.75}
+/* a: the status line under the output (shown from the start, so the terminal never refits) */
+.tstat{height:28px;flex:none;display:flex;align-items:center;gap:6px;padding:0 6px 0 12px;border-top:1px solid var(--pane-border);font-size:12px;color:var(--muted-fg)}
+.tstat>svg{width:13px;height:13px}
+.tstat .sep{opacity:.5}
+.tstat .who{color:var(--fg)}
+.tstat.fail{background:color-mix(in oklab,var(--red-500) 7%,transparent)}
+.tstat.fail .who{color:var(--red)}
+.tstat .push{margin-left:auto}

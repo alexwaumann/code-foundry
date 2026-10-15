@@ -130,6 +130,8 @@ export class AttachController {
         this.renderer.resize(ev.cols, ev.rows);
         break;
       case "exited":
+        // No input point any more: no cursor (the program may have left it showing).
+        this.renderer.hideCursor();
         this.setState({ phase: "exited", exitCode: ev.exitCode });
         break;
     }

@@ -101,6 +101,14 @@ function focusOwnShell(id: string): void {
   showOwnShell(key, id);
 }
 
+/**
+ * A panel terminal this window started some other way (an action run, stores/actionActions.ts):
+ * shown and focused like a shell from "+" (focusOwnShell), now or when it arrives.
+ */
+export function showOwnTerminal(id: string): void {
+  focusOwnShell(id);
+}
+
 /** focusOwnShell for a shell in the store: open its panel on it; uncover and focus it when it is the selection's. */
 function showOwnShell(key: string, id: string): void {
   clearStarting(key);

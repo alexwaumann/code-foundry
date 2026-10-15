@@ -207,6 +207,11 @@ export class XtermRenderer implements TerminalRenderer {
     this.keyboardModes.reset();
   }
 
+  hideCursor(): void {
+    // Queued behind earlier writes, like program output, so a snapshot cannot show it again.
+    this.term.write("\x1b[?25l");
+  }
+
   resize(cols: number, rows: number): void {
     if (cols < 1 || rows < 1 || (cols === this.term.cols && rows === this.term.rows)) return;
     this.suppressResize = true;

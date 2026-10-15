@@ -183,8 +183,10 @@ header, a terminal run opening as a tab in the bottom panel. Sketch:
   keeps when they exit, `action.*` commands with `--wait` exit codes,
   `CODE_FOUNDRY_SESSION` as the CLI's default `--context-session`, on-worktree-create
   runs) done: `docs/notes/actions-1-daemon.md`.
-* PR B (GUI: header menu, editor dialog, action tabs with a status line, Stop/Rerun,
-  toasts for worktree-create runs; mock daemon) pending.
+* PR B (GUI: the header's and Projects rows' Play menu, the editor dialog through
+  `action.add/edit/remove`, `kind=action` bottom-panel tabs with the command echo and a
+  status line, Stop/Rerun, the failed-setup toast with the run's output; mock daemon)
+  done: `docs/notes/actions-2-gui.md`.
 * PR C pending.
 
 ### Release channels: stable and tip (design 2026-10-11, revised 2026-10-12)
