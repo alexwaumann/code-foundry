@@ -1,10 +1,11 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { AlarmClock, ArrowRightLeft, ChevronDown, ChevronRight, CircleAlert, Folder, FolderGit2, GitBranch, House, Layers, OctagonX, Pin, type LucideIcon } from "lucide-react";
+import { AlarmClock, ArrowRightLeft, Bot, ChevronDown, ChevronRight, CircleAlert, Folder, FolderGit2, GitBranch, House, Layers, OctagonX, Pin, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { Chip } from "@/components/session/Chip";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { agentsLabel } from "@/lib/agents";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { sessionBadge, shortAge } from "@/lib/session";
@@ -159,6 +160,24 @@ function TimedStatusText({ line }: { line: StatusLine }) {
 }
 
 /**
+ * "N agents" (sky, with a bot) while the thread's subagents run (Session.agents_running,
+ * docs/notes/agents-2-gui.md), ahead of the status; nothing otherwise. The sort ignores it.
+ */
+function AgentsRunning({ id, more }: { id: string; more: boolean }) {
+  const n = useSessionsStore((st) => st.byId[id]?.agentsRunning ?? 0);
+  if (n <= 0) return null;
+  return (
+    <>
+      <span className={toneClasses.sky} data-testid="row-agents">
+        <Bot className="mr-0.5 inline size-2.5 align-[-1px]" aria-hidden />
+        {agentsLabel(n)}
+      </span>
+      {more && <span aria-hidden> · </span>}
+    </>
+  );
+}
+
+/**
  * The thread's second line (lib/statusLine): what it is doing or waiting on, coloured, and
  * "project @ branch" where the status leaves room for it (working, idle, offline); "No
  * project" alone for a thread without one. A queued "Run in…" move replaces it until the
@@ -178,6 +197,7 @@ function ThreadLine({ id }: { id: string }) {
         </span>
       ) : (
         <span className="min-w-0 truncate">
+          <AgentsRunning id={id} more={status || showsPlace(line.kind)} />
           {status && (
             <span className={toneClasses[statusTones[line.kind]]} data-testid="row-status">
               {line.at !== null ? <TimedStatusText line={line} /> : statusText(line, 0)}
