@@ -94,6 +94,10 @@ test("install shows progress, then lists busy threads; Restart Now runs app.rest
   await expect(d).toHaveAttribute("data-variant", "installing");
   await expect(d.getByTestId("update-state")).toHaveText("Installing v0.2.0…");
   await expect(d.getByTestId("update-progress")).toContainText("==>");
+  // No fraction to report: the shadcn Progress without a value, a sliding bar.
+  const bar = d.getByRole("progressbar", { name: "Installing the update" });
+  await expect(bar).toHaveAttribute("data-state", "indeterminate");
+  await expect(bar).not.toHaveAttribute("aria-valuenow");
   await expect(d.getByTestId("update-later")).toHaveText("Hide");
   await expectChip(page, "downloading", "Installing v0.2.0…", null);
 
