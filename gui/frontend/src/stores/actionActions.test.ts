@@ -115,6 +115,17 @@ describe("runs", () => {
     expect(closeBottomTerminal).not.toHaveBeenCalled();
   });
 
+  it("rerunAction: a second Rerun of the same tab while one is in flight runs nothing", async () => {
+    useTerminalsStore.setState({ byId: { "t-1": { id: "t-1", labels: { kind: "action", session: "s-1", action: "a-1" } } as never }, order: ["t-1"] });
+    const first = rerunAction("t-1");
+    await expect(rerunAction("t-1")).resolves.toBeNull();
+    await expect(first).resolves.toBe("t-9");
+    expect(runCommandForResult).toHaveBeenCalledTimes(1);
+    expect(closeBottomTerminal).toHaveBeenCalledTimes(1);
+    // Done: the tab (were it still there) could rerun again.
+    await expect(rerunAction("t-1")).resolves.toBe("t-9");
+  });
+
   it("stopActionRun: terminal.kill, confirmed (the button is the confirmation)", async () => {
     await stopActionRun("t-1");
     expect(invokeCommand).toHaveBeenCalledWith("terminal.kill", expect.objectContaining({ activeTerminalId: "t-1" }), { id: "t-1" }, undefined, { confirmed: true });

@@ -68,19 +68,28 @@ export async function stopActionRun(terminalId: string): Promise<void> {
   }
 }
 
+/** Tabs whose Rerun is in flight: the button stays until the old tab closes, so a double click must not run twice. */
+const rerunning = new Set<string>();
+
 /**
  * Rerun: the same action again for the same owner (a terminal runs one process, so there
  * is no restart in place), then the old tab closes. Run first: if the run fails (the action
- * was deleted meanwhile), the old tab and its output stay. The new tab is active.
+ * was deleted meanwhile), the old tab and its output stay. The new tab is active. A second
+ * Rerun of the same tab while one is in flight does nothing.
  */
 export async function rerunAction(terminalId: string): Promise<string | null> {
   const t = useTerminalsStore.getState().byId[terminalId];
   const actionId = t?.labels[ACTION_LABEL] ?? "";
   const owner = t ? ownerOfTerminal(t.labels) : null;
-  if (!actionId || owner === null) return null;
-  const id = await runAction(actionId, owner);
-  if (id !== null) await closeBottomTerminal(terminalId);
-  return id;
+  if (!actionId || owner === null || rerunning.has(terminalId)) return null;
+  rerunning.add(terminalId);
+  try {
+    const id = await runAction(actionId, owner);
+    if (id !== null) await closeBottomTerminal(terminalId);
+    return id;
+  } finally {
+    rerunning.delete(terminalId);
+  }
 }
 
 /**
