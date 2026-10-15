@@ -71,6 +71,12 @@ const (
 	// GhServiceMergePullRequestProcedure is the fully-qualified name of the GhService's
 	// MergePullRequest RPC.
 	GhServiceMergePullRequestProcedure = "/codefoundry.v1.GhService/MergePullRequest"
+	// GhServiceSubmitPullRequestReviewProcedure is the fully-qualified name of the GhService's
+	// SubmitPullRequestReview RPC.
+	GhServiceSubmitPullRequestReviewProcedure = "/codefoundry.v1.GhService/SubmitPullRequestReview"
+	// GhServiceAddPullRequestCommentProcedure is the fully-qualified name of the GhService's
+	// AddPullRequestComment RPC.
+	GhServiceAddPullRequestCommentProcedure = "/codefoundry.v1.GhService/AddPullRequestComment"
 )
 
 // GhServiceClient is a client for the codefoundry.v1.GhService service.
@@ -138,6 +144,17 @@ type GhServiceClient interface {
 	// branches and worktrees are never touched. The detail is invalidated and
 	// pull_request_detail_updated is sent.
 	MergePullRequest(context.Context, *connect.Request[v1.MergePullRequestRequest]) (*connect.Response[v1.MergePullRequestResponse], error)
+	// SubmitPullRequestReview submits a review (approve, request changes, or comment)
+	// as the viewer. The body is trimmed; it is required for REQUEST_CHANGES and COMMENT,
+	// optional for APPROVE, and at most 65536 bytes (INVALID_ARGUMENT otherwise, as is
+	// an UNSPECIFIED event). GitHub's refusals (approving one's own pull request, a closed
+	// or locked pull request) are FAILED_PRECONDITION with GitHub's message. The detail
+	// is invalidated and pull_request_detail_updated is sent.
+	SubmitPullRequestReview(context.Context, *connect.Request[v1.SubmitPullRequestReviewRequest]) (*connect.Response[v1.SubmitPullRequestReviewResponse], error)
+	// AddPullRequestComment posts a comment on a pull request's conversation as the
+	// viewer (an issue comment, not a review). The body is trimmed, required, and at most
+	// 65536 bytes. Errors and the event as for SubmitPullRequestReview.
+	AddPullRequestComment(context.Context, *connect.Request[v1.AddPullRequestCommentRequest]) (*connect.Response[v1.AddPullRequestCommentResponse], error)
 }
 
 // NewGhServiceClient constructs a client for the codefoundry.v1.GhService service. By default, it
@@ -241,26 +258,40 @@ func NewGhServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(ghServiceMethods.ByName("MergePullRequest")),
 			connect.WithClientOptions(opts...),
 		),
+		submitPullRequestReview: connect.NewClient[v1.SubmitPullRequestReviewRequest, v1.SubmitPullRequestReviewResponse](
+			httpClient,
+			baseURL+GhServiceSubmitPullRequestReviewProcedure,
+			connect.WithSchema(ghServiceMethods.ByName("SubmitPullRequestReview")),
+			connect.WithClientOptions(opts...),
+		),
+		addPullRequestComment: connect.NewClient[v1.AddPullRequestCommentRequest, v1.AddPullRequestCommentResponse](
+			httpClient,
+			baseURL+GhServiceAddPullRequestCommentProcedure,
+			connect.WithSchema(ghServiceMethods.ByName("AddPullRequestComment")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // ghServiceClient implements GhServiceClient.
 type ghServiceClient struct {
-	getViewer              *connect.Client[v1.GetViewerRequest, v1.GetViewerResponse]
-	getPullRequest         *connect.Client[v1.GetPullRequestRequest, v1.GetPullRequestResponse]
-	listChecks             *connect.Client[v1.ListChecksRequest, v1.ListChecksResponse]
-	refresh                *connect.Client[v1.RefreshGhRequest, v1.RefreshGhResponse]
-	track                  *connect.Client[v1.TrackGhRepoRequest, v1.TrackGhRepoResponse]
-	untrack                *connect.Client[v1.UntrackGhRepoRequest, v1.UntrackGhRepoResponse]
-	watch                  *connect.Client[v1.WatchGhRequest, v1.GhEvent]
-	getDashboard           *connect.Client[v1.GetDashboardRequest, v1.GetDashboardResponse]
-	getRepoActivity        *connect.Client[v1.GetRepoActivityRequest, v1.GetRepoActivityResponse]
-	getBranchPullRequests  *connect.Client[v1.GetBranchPullRequestsRequest, v1.GetBranchPullRequestsResponse]
-	getPullRequestDetail   *connect.Client[v1.GetPullRequestDetailRequest, v1.GetPullRequestDetailResponse]
-	listReviewerCandidates *connect.Client[v1.ListReviewerCandidatesRequest, v1.ListReviewerCandidatesResponse]
-	setReviewRequest       *connect.Client[v1.SetReviewRequestRequest, v1.SetReviewRequestResponse]
-	revertPullRequest      *connect.Client[v1.RevertPullRequestRequest, v1.RevertPullRequestResponse]
-	mergePullRequest       *connect.Client[v1.MergePullRequestRequest, v1.MergePullRequestResponse]
+	getViewer               *connect.Client[v1.GetViewerRequest, v1.GetViewerResponse]
+	getPullRequest          *connect.Client[v1.GetPullRequestRequest, v1.GetPullRequestResponse]
+	listChecks              *connect.Client[v1.ListChecksRequest, v1.ListChecksResponse]
+	refresh                 *connect.Client[v1.RefreshGhRequest, v1.RefreshGhResponse]
+	track                   *connect.Client[v1.TrackGhRepoRequest, v1.TrackGhRepoResponse]
+	untrack                 *connect.Client[v1.UntrackGhRepoRequest, v1.UntrackGhRepoResponse]
+	watch                   *connect.Client[v1.WatchGhRequest, v1.GhEvent]
+	getDashboard            *connect.Client[v1.GetDashboardRequest, v1.GetDashboardResponse]
+	getRepoActivity         *connect.Client[v1.GetRepoActivityRequest, v1.GetRepoActivityResponse]
+	getBranchPullRequests   *connect.Client[v1.GetBranchPullRequestsRequest, v1.GetBranchPullRequestsResponse]
+	getPullRequestDetail    *connect.Client[v1.GetPullRequestDetailRequest, v1.GetPullRequestDetailResponse]
+	listReviewerCandidates  *connect.Client[v1.ListReviewerCandidatesRequest, v1.ListReviewerCandidatesResponse]
+	setReviewRequest        *connect.Client[v1.SetReviewRequestRequest, v1.SetReviewRequestResponse]
+	revertPullRequest       *connect.Client[v1.RevertPullRequestRequest, v1.RevertPullRequestResponse]
+	mergePullRequest        *connect.Client[v1.MergePullRequestRequest, v1.MergePullRequestResponse]
+	submitPullRequestReview *connect.Client[v1.SubmitPullRequestReviewRequest, v1.SubmitPullRequestReviewResponse]
+	addPullRequestComment   *connect.Client[v1.AddPullRequestCommentRequest, v1.AddPullRequestCommentResponse]
 }
 
 // GetViewer calls codefoundry.v1.GhService.GetViewer.
@@ -338,6 +369,16 @@ func (c *ghServiceClient) MergePullRequest(ctx context.Context, req *connect.Req
 	return c.mergePullRequest.CallUnary(ctx, req)
 }
 
+// SubmitPullRequestReview calls codefoundry.v1.GhService.SubmitPullRequestReview.
+func (c *ghServiceClient) SubmitPullRequestReview(ctx context.Context, req *connect.Request[v1.SubmitPullRequestReviewRequest]) (*connect.Response[v1.SubmitPullRequestReviewResponse], error) {
+	return c.submitPullRequestReview.CallUnary(ctx, req)
+}
+
+// AddPullRequestComment calls codefoundry.v1.GhService.AddPullRequestComment.
+func (c *ghServiceClient) AddPullRequestComment(ctx context.Context, req *connect.Request[v1.AddPullRequestCommentRequest]) (*connect.Response[v1.AddPullRequestCommentResponse], error) {
+	return c.addPullRequestComment.CallUnary(ctx, req)
+}
+
 // GhServiceHandler is an implementation of the codefoundry.v1.GhService service.
 type GhServiceHandler interface {
 	// GetViewer returns the authenticated GitHub user.
@@ -403,6 +444,17 @@ type GhServiceHandler interface {
 	// branches and worktrees are never touched. The detail is invalidated and
 	// pull_request_detail_updated is sent.
 	MergePullRequest(context.Context, *connect.Request[v1.MergePullRequestRequest]) (*connect.Response[v1.MergePullRequestResponse], error)
+	// SubmitPullRequestReview submits a review (approve, request changes, or comment)
+	// as the viewer. The body is trimmed; it is required for REQUEST_CHANGES and COMMENT,
+	// optional for APPROVE, and at most 65536 bytes (INVALID_ARGUMENT otherwise, as is
+	// an UNSPECIFIED event). GitHub's refusals (approving one's own pull request, a closed
+	// or locked pull request) are FAILED_PRECONDITION with GitHub's message. The detail
+	// is invalidated and pull_request_detail_updated is sent.
+	SubmitPullRequestReview(context.Context, *connect.Request[v1.SubmitPullRequestReviewRequest]) (*connect.Response[v1.SubmitPullRequestReviewResponse], error)
+	// AddPullRequestComment posts a comment on a pull request's conversation as the
+	// viewer (an issue comment, not a review). The body is trimmed, required, and at most
+	// 65536 bytes. Errors and the event as for SubmitPullRequestReview.
+	AddPullRequestComment(context.Context, *connect.Request[v1.AddPullRequestCommentRequest]) (*connect.Response[v1.AddPullRequestCommentResponse], error)
 }
 
 // NewGhServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -502,6 +554,18 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(ghServiceMethods.ByName("MergePullRequest")),
 		connect.WithHandlerOptions(opts...),
 	)
+	ghServiceSubmitPullRequestReviewHandler := connect.NewUnaryHandler(
+		GhServiceSubmitPullRequestReviewProcedure,
+		svc.SubmitPullRequestReview,
+		connect.WithSchema(ghServiceMethods.ByName("SubmitPullRequestReview")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ghServiceAddPullRequestCommentHandler := connect.NewUnaryHandler(
+		GhServiceAddPullRequestCommentProcedure,
+		svc.AddPullRequestComment,
+		connect.WithSchema(ghServiceMethods.ByName("AddPullRequestComment")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.GhService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case GhServiceGetViewerProcedure:
@@ -534,6 +598,10 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 			ghServiceRevertPullRequestHandler.ServeHTTP(w, r)
 		case GhServiceMergePullRequestProcedure:
 			ghServiceMergePullRequestHandler.ServeHTTP(w, r)
+		case GhServiceSubmitPullRequestReviewProcedure:
+			ghServiceSubmitPullRequestReviewHandler.ServeHTTP(w, r)
+		case GhServiceAddPullRequestCommentProcedure:
+			ghServiceAddPullRequestCommentHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -601,4 +669,12 @@ func (UnimplementedGhServiceHandler) RevertPullRequest(context.Context, *connect
 
 func (UnimplementedGhServiceHandler) MergePullRequest(context.Context, *connect.Request[v1.MergePullRequestRequest]) (*connect.Response[v1.MergePullRequestResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.MergePullRequest is not implemented"))
+}
+
+func (UnimplementedGhServiceHandler) SubmitPullRequestReview(context.Context, *connect.Request[v1.SubmitPullRequestReviewRequest]) (*connect.Response[v1.SubmitPullRequestReviewResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.SubmitPullRequestReview is not implemented"))
+}
+
+func (UnimplementedGhServiceHandler) AddPullRequestComment(context.Context, *connect.Request[v1.AddPullRequestCommentRequest]) (*connect.Response[v1.AddPullRequestCommentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.AddPullRequestComment is not implemented"))
 }
