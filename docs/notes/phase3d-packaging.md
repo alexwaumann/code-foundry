@@ -206,7 +206,7 @@ dir, with a temp HOME and no TTY. It covers:
 ## How updates flow
 
 ```
-daemon start ──30s──► check ──every 24h──► check            (CODE_FOUNDRY_UPDATE_DELAY overrides 30s)
+daemon start ──30s──► check ──every 1h of wall-clock time──► check   (CODE_FOUNDRY_UPDATE_DELAY overrides 30s; a check overdue after sleep runs within a minute of wake)
  gh api repos/<slug>/releases/latest --jq .tag_name          (or $CODE_FOUNDRY_RELEASE_DIR/latest)
    404 → "no published release": a successful check with nothing to do
    strict semver; malformed tag → check error, state unchanged
