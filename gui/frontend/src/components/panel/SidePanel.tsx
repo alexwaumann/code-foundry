@@ -6,6 +6,7 @@ import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dn
 import { CSS } from "@dnd-kit/utilities";
 import { Plus, X } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
+import { Tip } from "@/components/ui/tooltip";
 import { chordFromEvent } from "@/keys/chord";
 import { cn } from "@/lib/utils";
 import {
@@ -33,7 +34,6 @@ import { PanelToggle } from "./PanelToggle";
 import { PanelResizeHandle } from "./PanelResizeHandle";
 import { isPanelChord, panelKeyAction, tabMoveIndex } from "./keys";
 import { revealElement, revealTab, tabNode } from "./reveal";
-import { Tip } from "@/components/ui/tooltip";
 
 const BODY_ID = "side-panel-body";
 

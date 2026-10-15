@@ -1,9 +1,9 @@
+import { Tip } from "@/components/ui/tooltip";
 import { formatUptime } from "@/lib/format";
 import { displayVersion } from "@/lib/update";
 import { cn } from "@/lib/utils";
 import { useEventsStore } from "@/stores/events";
 import { useHealthStore } from "@/stores/health";
-import { Tip } from "@/components/ui/tooltip";
 
 const dot = {
   connecting: "bg-warning",

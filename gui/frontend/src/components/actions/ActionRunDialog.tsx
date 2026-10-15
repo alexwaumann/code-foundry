@@ -4,11 +4,11 @@ import { getActionRun, type ActionRunOutputView } from "@/api/actions";
 import { errorMessage } from "@/api/stream";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Tip } from "@/components/ui/tooltip";
 import { formatRunDuration } from "@/lib/actions";
 import { splitPathTail, tildify } from "@/lib/path";
 import { runAction } from "@/stores/actionActions";
 import { closeActionRunOutput, useActionDialogStore } from "@/stores/actionDialog";
-import { Tip } from "@/components/ui/tooltip";
 
 type Load = { phase: "loading" } | { phase: "loaded"; data: ActionRunOutputView } | { phase: "error"; message: string };
 

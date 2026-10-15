@@ -3,13 +3,13 @@ import { RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "cn";
 import type { SettingFieldView } from "@/api/settings";
+import { Tip } from "@/components/ui/tooltip";
 import { chordFromEvent, formatChord } from "@/keys/chord";
 import { enumOptionLabel } from "@/lib/models";
 import { validateSetting } from "@/settings/validate";
 import { saveSettings, useSettingsStore, useSettingValue } from "@/stores/settings";
 import type { EditorProps, SettingEditor } from "./editor";
 import { keyEditors } from "./keyEditors";
-import { Tip } from "@/components/ui/tooltip";
 
 const inputClass =
   "h-7 w-full rounded-md border border-input bg-background px-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50 aria-invalid:border-destructive";

@@ -1,4 +1,5 @@
 import { CircleCheck, CircleStop, CircleX, LoaderCircle, RotateCcw, Square } from "lucide-react";
+import { Tip } from "@/components/ui/tooltip";
 import { actionCommandOf, actionTabStatus, commandEcho, formatRunClock, formatRunDuration, type ActionTabStatus } from "@/lib/actions";
 import { useNow } from "@/lib/clock";
 import { ACTION_LABEL, ACTION_RUN_LABEL } from "@/lib/termlabel";
@@ -8,7 +9,6 @@ import { useActionsStore } from "@/stores/actions";
 import { useStopRequested } from "@/stores/actionStops";
 import { useTerminalsStore } from "@/stores/terminals";
 import { ACTION_ICON } from "./actionIcons";
-import { Tip } from "@/components/ui/tooltip";
 
 /** An action tab's status from its terminal and a pressed Stop (a primitive, for a narrow selector). */
 function useTabStatus(id: string): ActionTabStatus {

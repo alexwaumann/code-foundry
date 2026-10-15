@@ -9,6 +9,7 @@ import { toneText } from "@/components/pr/tones";
 import { checksSummary } from "@/components/prs/format";
 import { Age, ChecksBadge, Freshness, PrStateIcon, ReviewBadge } from "@/components/prs/PrBits";
 import { RowList } from "@/components/prs/RowList";
+import { Tip } from "@/components/ui/tooltip";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
 import { tildify } from "@/lib/path";
@@ -22,7 +23,6 @@ import { findWorktree, useReposStore } from "@/stores/repos";
 import { useResource } from "@/stores/resource";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
 import { buildFileRows, describeChanges, fileTotals, type FileRow } from "./files";
-import { Tip } from "@/components/ui/tooltip";
 
 const FILE_ROW_H = 24;
 const LOG_ROW_H = 24;

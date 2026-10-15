@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Check, Copy, Play } from "lucide-react";
+import { Tip } from "@/components/ui/tooltip";
 import { copyText } from "@/lib/clipboard";
 import { isStreamingBlock, runnableCommand } from "@/lib/codeActions";
 import { runInThreadTerminal } from "@/stores/bottomActions";
 import { useCommandsStore } from "@/stores/commands";
 import { useCodeRun } from "./codeContext";
 import "./codeActions.css";
-import { Tip } from "@/components/ui/tooltip";
 
 /** How long a copy button shows its check. */
 const COPIED_MS = 1500;

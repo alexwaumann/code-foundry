@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { ProjectsNav } from "@/components/projects/ProjectsPage";
 import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
+import { Tip } from "@/components/ui/tooltip";
 import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
 import { buildSections, FOOTERS, isSessionRow, rowCache, sessionKey, type FooterSection, type HeaderRow, type Row, type SessionRow } from "@/lib/tree";
 import { zoomFactor } from "@/lib/zoom";
@@ -17,7 +18,6 @@ import { RowTooltipsEnabled } from "./rowTooltips";
 import { SidebarRow } from "./SidebarRow";
 import { SidebarStatus } from "./SidebarStatus";
 import { SidebarNewThread, SidebarToolbar } from "./SidebarToolbar";
-import { Tip } from "@/components/ui/tooltip";
 
 /** A footer header's height; thread rows are two lines (rowHeight + SECOND_LINE), snoozed and archived rows one (rowHeight). */
 const HEADER_HEIGHT = 26;

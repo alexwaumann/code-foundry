@@ -2,13 +2,13 @@ import { ChevronDown, GitMerge, Loader2 } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { pullRequestKey } from "@/stores/gh";
 import { mergePullRequest, usePrPanelStore } from "@/stores/prPanel";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
 import { branchDelete, MERGE_METHOD_LABELS, mergeAvailability, mergeMethodHint } from "./merge";
-import { Tip } from "@/components/ui/tooltip";
 
 /**
  * The header's Merge button, left of the ⋯ menu: a dropdown of the methods the repository

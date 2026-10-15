@@ -1,10 +1,10 @@
 import { memo, useMemo, type ReactNode } from "react";
 import { ImageIcon } from "lucide-react";
 import { Markdown, type MarkdownExtras } from "@/components/pr/Markdown";
+import { Tip } from "@/components/ui/tooltip";
 import { grammarFor, highlightLines, type MarkedToken, type Token } from "@/lib/highlight";
 import { useAttachmentUrl } from "@/stores/attachmentImages";
 import { CodeActions } from "./CodeActions";
-import { Tip } from "@/components/ui/tooltip";
 
 /** One line's tokens as spans (marked tokens wrapped in `mark`: ins or del). */
 export function TokenSpans({ tokens, mark }: { tokens: readonly (Token | MarkedToken)[]; mark?: "ins" | "del" }): ReactNode {

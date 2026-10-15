@@ -6,6 +6,7 @@ import { RowAction } from "@/components/projects/WorktreeState";
 import { RowList } from "@/components/prs/RowList";
 import { ago, stateBadge } from "@/components/pr/model";
 import { toneBadge } from "@/components/pr/tones";
+import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
@@ -15,7 +16,6 @@ import { copyPullRequestLink, openPullRequestInPanel } from "@/stores/prPanel";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
 import { linkedCount, newestFirst, spansRepos, urlHost } from "@/surfaces/linkedprsTarget";
-import { Tip } from "@/components/ui/tooltip";
 
 /** Two lines: number, title, state and checks; then branch, repository and when it was linked. */
 export const LINKED_PR_ROW_HEIGHT = 48;

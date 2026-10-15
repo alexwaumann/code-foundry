@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { GitPullRequest } from "lucide-react";
 import type { DashboardView, MonthView, PullRequestView } from "@/api/gh";
 import { PanelToggle } from "@/components/panel/PanelToggle";
+import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNow } from "@/lib/clock";
 import { useNav, type NavItem } from "@/lib/nav";
@@ -15,7 +16,6 @@ import { useUiStore } from "@/stores/ui";
 import { monthName, prKey, repoName } from "./format";
 import { Age, ChecksBadge, Freshness, PrStateIcon, ReviewBadge, SectionTitle } from "./PrBits";
 import { RowList } from "./RowList";
-import { Tip } from "@/components/ui/tooltip";
 
 /** The daemon polls every minute by default; older than a few polls plus slack is stale. */
 const STALE_AFTER_MS = 5 * 60_000;

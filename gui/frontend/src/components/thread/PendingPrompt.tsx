@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, MessageCircleQuestionMark, ShieldAlert } from "lucide-react";
 import type { ThreadPendingView, ThreadRequestView } from "@/api/thread";
+import { Tip } from "@/components/ui/tooltip";
 import { diffStats } from "@/lib/diff";
 import { shellTokens } from "@/lib/highlight";
 import {
@@ -29,7 +30,6 @@ import { respondThread } from "@/stores/threadActions";
 import { TokenSpans } from "./Code";
 import { useThreadCtx } from "./context";
 import { DiffView } from "./DiffView";
-import { Tip } from "@/components/ui/tooltip";
 
 /**
  * The docked prompts (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):

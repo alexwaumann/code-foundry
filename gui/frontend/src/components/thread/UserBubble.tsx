@@ -2,11 +2,11 @@ import { memo, useMemo, useState } from "react";
 import { ImageIcon, X } from "lucide-react";
 import { TAG_ACCENT, tagClass } from "@/components/compose/tagStyle";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Tip } from "@/components/ui/tooltip";
 import { middleTruncate, tagLabel } from "@/lib/prompt";
 import { inlineImagePaths, parseUserMessage } from "@/lib/userMessage";
 import { useAttachmentUrl } from "@/stores/attachmentImages";
 import { useReposStore } from "@/stores/repos";
-import { Tip } from "@/components/ui/tooltip";
 
 /** The image chip's accent: green, the success token. */
 const IMAGE_ACCENT = "[--chip-accent:var(--success)]";

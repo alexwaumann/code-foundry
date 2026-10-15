@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { UsageBucketView } from "@/api/session";
 import { Button } from "@/components/ui/button";
+import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useEscapeCloses } from "@/components/window/useEscapeCloses";
 import { fmtShare, fmtTok, fmtUsd, type ModelUsage, type UsageTotals } from "@/lib/usage";
@@ -12,7 +13,6 @@ import { closeUsage } from "@/stores/views";
 import { Segmented } from "./Segmented";
 import { Swatch, UsageChart, type ChartMode } from "./UsageChart";
 import { usagePageData, utcDays } from "./usageData";
-import { Tip } from "@/components/ui/tooltip";
 
 const NONE: readonly UsageBucketView[] = [];
 const RANGE_OPTIONS = USAGE_RANGES.map((d) => ({ value: d, label: d === 1 ? "1 day" : `${String(d)} days` }));

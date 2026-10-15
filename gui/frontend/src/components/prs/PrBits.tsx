@@ -1,9 +1,9 @@
 import { CircleCheck, CircleDashed, CircleDot, CircleX } from "lucide-react";
 import type { CheckRollupView, PrStateView, ReviewView } from "@/api/gh";
 import { prStateText, toneText } from "@/components/pr/tones";
+import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
-import { Tip } from "@/components/ui/tooltip";
 import { checksSummary, freshness, reviewLabel, shortAge, updatedAgo } from "./format";
 import { prStateLook } from "./prState";
 

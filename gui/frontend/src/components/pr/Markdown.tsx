@@ -3,10 +3,10 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema, type Options as SanitizeSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import { resolveLink } from "./model";
-import { Tip } from "@/components/ui/tooltip";
 
 const baseComponents: Components = {
   a: ({ href, children, title }) => {

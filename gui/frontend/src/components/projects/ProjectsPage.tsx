@@ -26,6 +26,7 @@ import { PanelToggle } from "@/components/panel/PanelToggle";
 import { Freshness, SectionTitle } from "@/components/prs/PrBits";
 import { RowList } from "@/components/prs/RowList";
 import { Button } from "@/components/ui/button";
+import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
@@ -77,7 +78,6 @@ import { NoGitBadge } from "./NoGitBadge";
 import { OverflowMenu, type OverflowItem } from "./OverflowMenu";
 import { WorkspaceMembers } from "./WorkspaceMembers";
 import { RowAction, WorktreeState } from "./WorktreeState";
-import { Tip } from "@/components/ui/tooltip";
 
 const ROW_H = 32;
 const SEP = "\u0001";

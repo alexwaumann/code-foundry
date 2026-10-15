@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowLeft, CircleCheck, CircleDashed, CircleDot, CircleX, ExternalLink, FileDiff, GitCommitHorizontal, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, History, MessageSquare, SearchX, TriangleAlert } from "lucide-react";
 import { isNotFoundMessage, type PullRequestDetailView } from "@/api/gh";
+import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
@@ -15,7 +16,6 @@ import { PrMenu } from "./PrMenu";
 import { OrderToggle, PrSummary } from "./PrSummary";
 import { PrTimeline } from "./PrTimeline";
 import { toneBadge, toneText } from "./tones";
-import { Tip } from "@/components/ui/tooltip";
 
 const stateIcon: Record<string, typeof GitPullRequest> = { Open: GitPullRequest, Draft: GitPullRequestDraft, Merged: GitMerge, Closed: GitPullRequestClosed };
 const checksIcon: Partial<Record<Tone, typeof CircleCheck>> = { success: CircleCheck, failure: CircleX, pending: CircleDot };

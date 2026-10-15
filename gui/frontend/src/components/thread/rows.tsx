@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import type { AgentRunView } from "@/api/agents";
 import type { ThreadItemView, ToolCallView } from "@/api/thread";
+import { Tip } from "@/components/ui/tooltip";
 import { agentElapsedMs, fmtElapsed, parseAgentNote } from "@/lib/agents";
 import { copyText } from "@/lib/clipboard";
 import { useNow } from "@/lib/clock";
@@ -43,7 +44,6 @@ import { CodeRunContext } from "./codeContext";
 import { useThreadCtx } from "./context";
 import { AgentReport, ToolDetail } from "./ToolDetail";
 import { UserBubble } from "./UserBubble";
-import { Tip } from "@/components/ui/tooltip";
 
 const TOOL_ICONS: Readonly<Record<string, LucideIcon>> = {
   Bash: SquareTerminal,

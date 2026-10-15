@@ -6,6 +6,7 @@ import { revealTab } from "@/components/panel/reveal";
 import { useNoProjectThread } from "@/components/session/useNoProject";
 import { TerminalHost, type TerminalHostHandle } from "@/components/terminal/TerminalHost";
 import { Button } from "@/components/ui/button";
+import { Tip } from "@/components/ui/tooltip";
 import { chordFromEvent, formatChord } from "@/keys/chord";
 import { tildify } from "@/lib/path";
 import { isActionLabels } from "@/lib/termlabel";
@@ -34,7 +35,6 @@ import { bottomMax, useUiStore } from "@/stores/ui";
 import { selectPageOpen, useViewsStore, visibleBottomKey } from "@/stores/views";
 import { BottomResizeHandle } from "./BottomResizeHandle";
 import { bottomKeyAction, tabFocusIndex } from "./keys";
-import { Tip } from "@/components/ui/tooltip";
 
 const BODY_ID = "bottom-panel-body";
 

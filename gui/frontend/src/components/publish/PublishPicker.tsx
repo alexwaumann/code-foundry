@@ -2,9 +2,9 @@ import { Building2, Check, ChevronDown, Globe, Loader2, Lock, User, Users } from
 import { RadioGroup as RadioGroupPrimitive } from "radix-ui";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tip } from "@/components/ui/tooltip";
 import { keepVisibility, visibilityLabels, visibilityOptions, type Visibility } from "@/lib/publish";
 import type { OwnersState, PublishChoice } from "./usePublishOwners";
-import { Tip } from "@/components/ui/tooltip";
 
 const visibilityIcons: Record<Visibility, typeof Globe> = { public: Globe, internal: Users, private: Lock };
 

@@ -3,13 +3,13 @@ import { useShallow } from "zustand/react/shallow";
 import { Plus, X } from "lucide-react";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
+import { Tip } from "@/components/ui/tooltip";
 import { tildify } from "@/lib/path";
 import { repoTagCount } from "@/lib/prompt";
 import { cn } from "@/lib/utils";
 import { addAlsoIn, getDraft, removeAlsoIn, setPrimary } from "@/stores/compose";
 import { requestConfirm } from "@/stores/confirm";
 import { useReposStore } from "@/stores/repos";
-import { Tip } from "@/components/ui/tooltip";
 
 /**
  * Removes an "Also in" project. When tags in the text refer to it (its skills, files),

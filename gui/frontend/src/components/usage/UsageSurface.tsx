@@ -1,10 +1,10 @@
 import { useMemo, useRef, type CSSProperties } from "react";
 import type { UsageBucketView } from "@/api/session";
+import { Tip } from "@/components/ui/tooltip";
 import { fmtRequests, fmtShare, fmtTok, fmtUsd, modelColorVars, SWATCH_BG, TOKEN_KINDS, totalUsage, usageByModel, type ModelUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import { sameUsage, useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
-import { Tip } from "@/components/ui/tooltip";
 
 const NONE: readonly UsageBucketView[] = [];
 

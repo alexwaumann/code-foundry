@@ -1,9 +1,9 @@
 import { CornerDownLeft, Loader2, MessageCircleQuestion } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { Tip } from "@/components/ui/tooltip";
 import { startingKey, startPrSession, usePrSessionsStore } from "@/stores/prSessions";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { composerKeyAction } from "./keys";
-import { Tip } from "@/components/ui/tooltip";
 
 /** The hint while nothing runs: narrow enough for a 280px panel. */
 export const ASK_KEYS_HINT = "⏎ send · ⇧⏎ newline";

@@ -1,6 +1,7 @@
 import { ArrowDownUp, Bot, Check, ChevronDown, ChevronRight, CircleCheck, CircleDashed, CircleDot, CircleMinus, CircleX, Clock, ExternalLink, FileCode2, FileDiff, MessageSquare, Users } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 import type { CheckView, PullRequestCommentView, PullRequestDetailView, PullRequestReviewerView, ReviewThreadView } from "@/api/gh";
+import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
@@ -12,7 +13,6 @@ import { ago, checkMeta, checkRunning, checkTone, commentCount, conversation, re
 import { ReviewerPicker } from "./ReviewerPicker";
 import { toneText } from "./tones";
 import { VirtualStack } from "./VirtualStack";
-import { Tip } from "@/components/ui/tooltip";
 
 function useSectionOpen(tabKey: string, section: PrSection): boolean {
   return usePrPanelStore((s) => s.byTab[tabKey]?.open[section] ?? sectionOpenByDefault[section]);
@@ -94,9 +94,10 @@ const checkIcon = { success: CircleCheck, failure: CircleX, pending: CircleDot, 
 function CheckRow({ c, now }: { c: CheckView; now: number }) {
   const tone = checkTone(c);
   const Icon = checkIcon[tone];
-  // The tooltip hangs on the item: a check without a URL is a disabled button (no pointer events).
+  // The name and description (the row has no room for the latter; without one, only when
+  // the name is cut). On the item: a check without a URL is a disabled button (no pointer events).
   return (
-    <Tip label={c.description ? `${c.name}\n${c.description}` : null} align="start">
+    <Tip label={[c.name, c.description].filter(Boolean).join("\n")} whenTruncated={!c.description} align="start">
       <li>
         <button
           type="button"

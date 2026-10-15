@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FileText, Search, TriangleAlert, X } from "lucide-react";
 import type { SettingFieldView } from "@/api/settings";
 import { Button } from "@/components/ui/button";
+import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useEscapeCloses } from "@/components/window/useEscapeCloses";
 import { tildify } from "@/lib/path";
@@ -9,7 +10,6 @@ import { runCommand } from "@/stores/commands";
 import { loadSettingsSchema, useSettingsStore } from "@/stores/settings";
 import { closeSettings } from "@/stores/views";
 import { SettingRow } from "./SettingRow";
-import { Tip } from "@/components/ui/tooltip";
 
 function matches(f: SettingFieldView, q: string): boolean {
   if (!q) return true;

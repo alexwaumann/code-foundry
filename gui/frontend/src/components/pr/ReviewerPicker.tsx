@@ -3,6 +3,7 @@ import { Check, Loader2, Search, UserPlus, X } from "lucide-react";
 import type { ReviewerCandidateView } from "@/api/gh";
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, setReviewRequest, usePrPanelStore } from "@/stores/prPanel";
 import { useResource } from "@/stores/resource";
@@ -11,7 +12,6 @@ import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Avatar } from "./Avatar";
 import { POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
 import { REVIEWER_SEARCH_MIN_CHARS, reviewerSearchTerm, useReviewerSearchTerm } from "./reviewerSearch";
-import { Tip } from "@/components/ui/tooltip";
 
 export const WRITE_ACCESS_HINT = "Asking someone to review needs write access on this repository.";
 

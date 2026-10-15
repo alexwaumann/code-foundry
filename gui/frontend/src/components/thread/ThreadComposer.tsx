@@ -11,6 +11,7 @@ import { PromptEditor, type EditorTrigger, type PromptEditorHandle } from "@/com
 import { TagMultiProjectContext } from "@/components/compose/tagContext";
 import { useNoProjectThread } from "@/components/session/useNoProject";
 import { useCommandSource, useCompletion, useFileSource, useSkillSource } from "@/components/compose/useCompletion";
+import { Tip } from "@/components/ui/tooltip";
 import { choiceLabel, EFFORT_CHOICES, PERMISSION_CHOICES, type ComposePermission } from "@/lib/compose";
 import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
 import { useNow } from "@/lib/clock";
@@ -31,7 +32,6 @@ import { useWorkspacesStore } from "@/stores/workspaces";
 import { ColdCacheNote } from "./ColdCacheNote";
 import { RetryNote } from "./RetryNote";
 import { PendingPrompts, type PromptKeys } from "./PendingPrompt";
-import { Tip } from "@/components/ui/tooltip";
 
 const TRIGGERS: readonly TriggerChar[] = ["/", "@"];
 /** A thread without a project: "/" only ("@" would search its cwd, the home directory, which is never indexed). */

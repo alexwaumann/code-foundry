@@ -1,11 +1,11 @@
 import { useContext, useEffect, useState } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { ImageIcon } from "lucide-react";
+import { Tip } from "@/components/ui/tooltip";
 import { formatAttachmentSize, middleTruncate } from "@/lib/prompt";
 import { openPreview, useComposeStore } from "@/stores/compose";
 import { TagDraftContext } from "./tagContext";
 import { tagClass } from "./tagStyle";
-import { Tip } from "@/components/ui/tooltip";
 
 const DEFAULT_ACCENT = "oklch(0.62 0.16 16)";
 const accents = new Map<string, string | null>();

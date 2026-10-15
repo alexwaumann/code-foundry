@@ -3,6 +3,7 @@ import { Loader2, Trash2, X } from "lucide-react";
 import { ACTION_ICONS } from "@/api/actions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Tip } from "@/components/ui/tooltip";
 import { draftOf, draftProblem, NEW_ACTION_DRAFT, type ActionDraft } from "@/lib/actions";
 import { cn } from "@/lib/utils";
 import { deleteAction, saveAction } from "@/stores/actionActions";
@@ -10,7 +11,6 @@ import { closeActionEditor, useActionDialogStore, type ActionEditorTarget } from
 import { useActionsStore } from "@/stores/actions";
 import { useReposStore } from "@/stores/repos";
 import { ACTION_ICON, ACTION_ICON_LABEL } from "./actionIcons";
-import { Tip } from "@/components/ui/tooltip";
 
 const inputClass =
   "w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60 aria-invalid:border-destructive";

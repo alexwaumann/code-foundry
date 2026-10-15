@@ -3,6 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import { ArrowRightLeft, FolderGit2, PanelRightOpen, Plus, SquareTerminal, X } from "lucide-react";
 import { ComposerPicker, type PickerGroup } from "@/components/compose/ComposerPicker";
 import { RowList } from "@/components/prs/RowList";
+import { Tip } from "@/components/ui/tooltip";
 import { NavRow } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
 import { addableRepos, memberKey, threadAt } from "@/lib/projects";
@@ -15,7 +16,6 @@ import { useSessionsStore } from "@/stores/sessions";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { OverflowMenu } from "./OverflowMenu";
 import { RowAction, WorktreeState } from "./WorktreeState";
-import { Tip } from "@/components/ui/tooltip";
 
 export const MEMBER_ROW_HEIGHT = 32;
 /** The panel layout's two-line rows: project and actions, then the worktree state. */

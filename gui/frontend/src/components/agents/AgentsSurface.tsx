@@ -1,6 +1,7 @@
 import { Fragment, type CSSProperties, type ReactNode } from "react";
 import { Bot, Clock, LoaderCircle, Wrench, Zap } from "lucide-react";
 import type { AgentRunView, AgentStatusView } from "@/api/agents";
+import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { agentElapsedMs, agentMeta, agentName, agentStatusText, agentsSubline, fmtElapsed } from "@/lib/agents";
 import { fmtTok } from "@/lib/usage";
@@ -10,7 +11,6 @@ import { useSessionsStore } from "@/stores/sessions";
 import { useThreadStore } from "@/stores/thread";
 import { useUiStore } from "@/stores/ui";
 import "./agents.css";
-import { Tip } from "@/components/ui/tooltip";
 
 /** The thread this panel belongs to: the selected session ("" otherwise). */
 function useThreadId(): string {

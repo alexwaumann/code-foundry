@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { GitMerge, GitPullRequest, GitPullRequestClosed } from "lucide-react";
 import type { PullRequestDetailView } from "@/api/gh";
+import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
@@ -10,7 +11,6 @@ import { Markdown } from "./Markdown";
 import { ago, reviewVerb, timeline, type TimelineEntry } from "./model";
 import { toneText } from "./tones";
 import { VirtualStack } from "./VirtualStack";
-import { Tip } from "@/components/ui/tooltip";
 
 /** Where an entry sits on the rail: the line runs from the first entry's icon to the last's. */
 interface RailPos {

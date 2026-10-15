@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, CircleDot, Folder, GitBranch, MessageSquare } from "lucide-react";
 import { ChecksBadge, PrStateIcon } from "@/components/prs/PrBits";
+import { Tip } from "@/components/ui/tooltip";
 import { CleanableTag } from "./Cleanup";
 import { NoGitBadge } from "./NoGitBadge";
 import { tildify } from "@/lib/path";
@@ -11,7 +12,6 @@ import { openPullRequestInPanel } from "@/stores/prPanel";
 import { findWorktree, useReposStore } from "@/stores/repos";
 import { useResource } from "@/stores/resource";
 import { useSessionsStore } from "@/stores/sessions";
-import { Tip } from "@/components/ui/tooltip";
 
 /**
  * The viewer's pull request on the worktree's branch (GhService.GetBranchPullRequests,

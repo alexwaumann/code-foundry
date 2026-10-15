@@ -1,11 +1,11 @@
 import { memo, useMemo, useState } from "react";
 import { Copy } from "lucide-react";
+import { Tip } from "@/components/ui/tooltip";
 import { copyText } from "@/lib/clipboard";
 import { hunkHeader, type DiffHunk, type DiffLine } from "@/lib/diff";
 import { grammarForPath, highlightLines, markTokens, type Token } from "@/lib/highlight";
 import { splitPath } from "@/lib/toolSummary";
 import { TokenSpans } from "./Code";
-import { Tip } from "@/components/ui/tooltip";
 
 /** Lines shown before "Show N more lines". */
 const DIFF_LIMIT = 400;

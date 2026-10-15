@@ -2,6 +2,7 @@ import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Pencil, Play, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tip } from "@/components/ui/tooltip";
 import { runAction, type ActionOwner } from "@/stores/actionActions";
 import { openActionEditor } from "@/stores/actionDialog";
 import { isStartable } from "@/keys/bindings";
@@ -10,7 +11,6 @@ import { useCommandsStore } from "@/stores/commands";
 import { useReposStore } from "@/stores/repos";
 import { useSessionsStore } from "@/stores/sessions";
 import { ACTION_ICON } from "./actionIcons";
-import { Tip } from "@/components/ui/tooltip";
 
 type From = "thread" | "projects";
 

@@ -13,6 +13,7 @@ import { useCompletion, useFileSource, useSkillSource } from "./useCompletion";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
 import { ATTACHMENT_MIME_TYPES } from "@/api/session";
 import { Backdrop } from "@/components/backdrop/Backdrop";
+import { Tip } from "@/components/ui/tooltip";
 import { DragBand } from "@/components/window/DragBand";
 import {
   choiceLabel,
@@ -60,7 +61,6 @@ import { loadSkills } from "@/stores/skills";
 import { DASHBOARD, useUiStore } from "@/stores/ui";
 import { useRememberedWorkIn } from "@/stores/workIn";
 import { useWorkspacesStore } from "@/stores/workspaces";
-import { Tip } from "@/components/ui/tooltip";
 
 const SEP = "\u0001";
 

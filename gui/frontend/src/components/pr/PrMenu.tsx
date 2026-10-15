@@ -3,6 +3,7 @@ import { useCallback, useRef, useState, type ReactNode } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { updatedAgo } from "@/components/prs/format";
+import { Tip } from "@/components/ui/tooltip";
 import { formatChord } from "@/keys/chord";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
@@ -11,7 +12,6 @@ import { copyPullRequestLink, refreshPullRequest, revertPullRequest, usePrPanelS
 import { startingKey, startPrSession, usePrSessionsStore, type PrSessionKind } from "@/stores/prSessions";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { COPY_LINK_CHORD, POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
-import { Tip } from "@/components/ui/tooltip";
 
 function Item({ icon, title, hint, children }: { icon: ReactNode; title: string; hint?: ReactNode; children?: ReactNode }) {
   return (

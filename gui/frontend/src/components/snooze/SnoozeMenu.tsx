@@ -3,13 +3,13 @@ import { AlarmClock, AlarmClockOff, Calendar, CalendarClock, Clock, Sun, type Lu
 import { Button } from "@/components/ui/button";
 import { ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger } from "@/components/ui/context-menu";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tip } from "@/components/ui/tooltip";
 import { isStartable } from "@/keys/bindings";
 import { snoozePresets, type SnoozePresetId } from "@/lib/snooze";
 import { useCommandsStore } from "@/stores/commands";
 import { SESSION_COMMANDS, snoozeSession } from "@/stores/sessionActions";
 import { useSessionsStore } from "@/stores/sessions";
 import { openSnoozeDialog } from "@/stores/snoozeDialog";
-import { Tip } from "@/components/ui/tooltip";
 
 const presetIcons: Readonly<Record<SnoozePresetId, LucideIcon>> = { "1h": Clock, "3h": Clock, tomorrow: Sun, "next-week": Calendar };
 
