@@ -26,6 +26,7 @@ import { PanelToggle } from "@/components/panel/PanelToggle";
 import { Freshness, SectionTitle } from "@/components/prs/PrBits";
 import { RowList } from "@/components/prs/RowList";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
@@ -485,9 +486,9 @@ export function ProjectsPage() {
         <span className="text-xs text-muted-foreground tabular-nums" data-testid="projects-counts">
           {all.projects.length} {all.projects.length === 1 ? "project" : "projects"} · {all.workspaces.length} {all.workspaces.length === 1 ? "workspace" : "workspaces"}
         </span>
-        <label className="relative ml-1 flex w-[220px] min-w-0 shrink items-center [--wails-draggable:no-drag]">
+        <div className="relative ml-1 flex w-[220px] min-w-0 shrink items-center [--wails-draggable:no-drag]">
           <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" aria-hidden />
-          <input
+          <Input
             ref={filterRef}
             type="text"
             value={query}
@@ -496,7 +497,8 @@ export function ProjectsPage() {
             spellCheck={false}
             autoComplete="off"
             data-testid="projects-filter"
-            className="h-7 w-full rounded-md border border-input bg-background pr-7 pl-7 text-[13px] outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+            // The pane header's compact size.
+            className="h-7 pr-7 pl-7 text-[13px]"
             onChange={(e) => {
               setQuery(e.target.value);
             }}
@@ -512,7 +514,7 @@ export function ProjectsPage() {
               /
             </kbd>
           )}
-        </label>
+        </div>
         <span className="ml-auto flex items-center gap-1 [--wails-draggable:no-drag]">
           <Button
             type="button"

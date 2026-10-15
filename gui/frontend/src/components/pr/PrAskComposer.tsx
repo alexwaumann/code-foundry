@@ -1,5 +1,7 @@
 import { CornerDownLeft, Loader2, MessageCircleQuestion } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Tip } from "@/components/ui/tooltip";
 import { startingKey, startPrSession, usePrSessionsStore } from "@/stores/prSessions";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
@@ -93,18 +95,18 @@ export function PrAskComposer({ prRef, focusRequest, onClose }: { prRef: PrRef; 
 
   return (
     <section className="flex flex-col gap-2 border-b border-pane-border px-4 py-3 @max-[340px]:px-3" aria-label={`Ask about #${String(prRef.number)}`} data-testid="pr-ask">
-      <label htmlFor="pr-ask-input" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+      <Label htmlFor="pr-ask-input" className="gap-1.5 text-xs text-muted-foreground">
         <MessageCircleQuestion className="size-3.5" aria-hidden />
         Ask about #{prRef.number}
-      </label>
-      <textarea
+      </Label>
+      <Textarea
         id="pr-ask-input"
         ref={ref}
         rows={3}
         value={text}
         readOnly={sending}
         placeholder="Ask about this pull request…"
-        className="max-h-[calc(6lh+1rem+2px)] w-full resize-none overflow-y-auto rounded-md border border-input bg-transparent px-2.5 py-2 text-[13px] leading-snug outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring read-only:opacity-70"
+        className="max-h-[calc(6lh+1rem+2px)] min-h-0 resize-none overflow-y-auto text-[13px] leading-snug read-only:opacity-70"
         data-testid="pr-ask-input"
         onChange={(e) => {
           setText(e.target.value);

@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { CloudUpload, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { errorMessage } from "@/api/stream";
 import { PublishPicker } from "@/components/publish/PublishPicker";
 import { usePublishOwners, type PublishChoice } from "@/components/publish/usePublishOwners";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { tildify } from "@/lib/path";
 import { projectNameError, projectsDirFrom, type PublishOwnerView } from "@/lib/publish";
 import { finishAddProject, selectAddedProject, setAddProjectBusy, setCreatedProject } from "@/stores/addProject";
@@ -23,6 +26,7 @@ export function NewTab({ active }: { active: boolean }) {
   const [name, setName] = useState("");
   const [touched, setTouched] = useState(false);
   const [publish, setPublish] = useState(false);
+  const publishId = useId();
   const [choice, setChoice] = useState<PublishChoice>({ owner: "", visibility: null });
   const [created, setCreated] = useState<CreatedProject | null>(null);
   const [busy, setBusy] = useState<"create" | "publish" | null>(null);
@@ -115,7 +119,7 @@ export function NewTab({ active }: { active: boolean }) {
     >
       <p className="text-xs text-muted-foreground">An empty project with git initialized (an empty first commit on the default branch).</p>
       <div className="flex flex-col gap-1.5">
-        <input
+        <Input
           ref={inputRef}
           value={name}
           onChange={(e) => {
@@ -128,7 +132,7 @@ export function NewTab({ active }: { active: boolean }) {
           aria-invalid={nameMessage ? true : undefined}
           spellCheck={false}
           autoComplete="off"
-          className="h-9 rounded-md border bg-transparent px-3 font-mono text-sm outline-none placeholder:font-sans placeholder:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60 aria-invalid:border-destructive"
+          className="font-mono placeholder:font-sans"
           data-testid="add-project-new-name"
         />
         <span className="truncate text-xs text-muted-foreground">
@@ -146,21 +150,22 @@ export function NewTab({ active }: { active: boolean }) {
         )}
       </div>
       <div className="flex flex-col gap-2 rounded-md border px-3 py-2.5">
-        <label className="flex w-fit items-center gap-2 text-sm">
-          <input
-            type="checkbox"
+        <div className="flex w-fit items-center gap-2">
+          <Checkbox
+            id={publishId}
             checked={publish}
             disabled={busy !== null}
-            onChange={(e) => {
-              setPublish(e.target.checked);
+            onCheckedChange={(checked) => {
+              setPublish(checked === true);
               setPublishError(null);
             }}
-            className="size-3.5 accent-primary"
             data-testid="add-project-new-publish"
           />
-          <CloudUpload className="size-4 text-muted-foreground" aria-hidden />
-          Publish to GitHub
-        </label>
+          <Label htmlFor={publishId} className="font-normal">
+            <CloudUpload className="size-4 text-muted-foreground" aria-hidden />
+            Publish to GitHub
+          </Label>
+        </div>
         {publish && <PublishPicker owners={owners} value={choice} onChange={setChoice} disabled={busy !== null} error={publishError} />}
       </div>
       <div className="flex items-center justify-end gap-2">
