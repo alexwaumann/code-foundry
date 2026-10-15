@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { composerKeyAction } from "./keys";
-import { canSubmit, composerHint, disabledVerdicts, REVIEW_KEYS_HINT, REVIEW_SENDING_HINT, reviewArgs, reviewVisible, VERDICT_SPECS, yourReview, type Verdict } from "./review";
+import { canSubmit, composerHint, disabledVerdicts, REVIEW_ELSEWHERE_HINT, REVIEW_KEYS_HINT, REVIEW_SENDING_HINT, reviewVisible, VERDICT_SPECS, yourReview, type Verdict } from "./review";
 
 describe("VERDICT_SPECS", () => {
   it.each([
@@ -29,6 +29,11 @@ describe("canSubmit and composerHint", () => {
   ] as [Verdict, string, boolean, boolean, string][])("%s %j (sending %s) → submit %s, hint %s", (v, text, sending, ok, hint) => {
     expect(canSubmit(v, text)).toBe(ok);
     expect(composerHint(v, text, sending)).toBe(hint);
+  });
+  it("another surface submitting for the pull request: the elsewhere hint, over what this one waits for", () => {
+    expect(composerHint("comment", "", false, true)).toBe(REVIEW_ELSEWHERE_HINT);
+    expect(composerHint("approve", "ok", false, true)).toBe(REVIEW_ELSEWHERE_HINT);
+    expect(composerHint("approve", "ok", true, true)).toBe(REVIEW_SENDING_HINT);
   });
 });
 
@@ -77,13 +82,6 @@ describe("yourReview", () => {
   });
   it("an unknown viewer has no review", () => {
     expect(yourReview([r("", "approved")], "")).toBeNull();
-  });
-});
-
-describe("reviewArgs", () => {
-  it("trims the body and leaves an empty one out", () => {
-    expect(reviewArgs({ slug: "o/r", number: 7 }, "request-changes", "  Fix it\n")).toEqual({ "repo-slug": "o/r", number: "7", verdict: "request-changes", body: "Fix it" });
-    expect(reviewArgs({ slug: "o/r", number: 7 }, "approve", " \n")).toEqual({ "repo-slug": "o/r", number: "7", verdict: "approve" });
   });
 });
 

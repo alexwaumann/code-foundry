@@ -10,7 +10,7 @@ import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
 import { Item } from "./PrMenu";
 import { disabledVerdicts, reviewVisible, VERDICT_SPECS, VERDICTS, YOUR_REVIEW_SPECS, yourReview, type Verdict } from "./review";
-import { verdictIcon, yourReviewIcon } from "./reviewIcons";
+import { verdictIcons, yourReviewIcon } from "./reviewIcons";
 import { toneBadge, toneText } from "./tones";
 
 
@@ -82,7 +82,7 @@ export function ReviewButton({ prRef, detail, onChoose }: { prRef: PrRef; detail
         <DropdownMenuLabel>Review #{prRef.number}</DropdownMenuLabel>
         {VERDICTS.map((v) => {
           const spec = VERDICT_SPECS[v];
-          const VIcon = verdictIcon[v];
+          const VIcon = verdictIcons[v].icon;
           const reason = disabled[v];
           const item = (
             <DropdownMenuItem

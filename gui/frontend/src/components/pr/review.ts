@@ -63,17 +63,24 @@ export const VERDICT_SPECS: Record<Verdict, VerdictSpec> = {
 
 /** The composer's keys hint while it can submit: narrow enough for a 280px panel. */
 export const REVIEW_KEYS_HINT = "⌘⏎ submit · esc cancel";
-/** The composer's hint while pr.review runs. */
+/** The composer's hint while its pr.review runs. */
 export const REVIEW_SENDING_HINT = "Submitting…";
+/** The composer's hint while a review of the same pull request is submitted from another surface. */
+export const REVIEW_ELSEWHERE_HINT = "Already submitting a review for this pull request";
 
 /** Whether the composer may submit this text (an approval needs none). */
 export function canSubmit(verdict: Verdict, text: string): boolean {
   return !VERDICT_SPECS[verdict].bodyRequired || text.trim() !== "";
 }
 
-/** The composer's footer hint: what it waits for, else the keys. */
-export function composerHint(verdict: Verdict, text: string, sending: boolean): string {
+/**
+ * The composer's footer hint: its own submit running, another surface's (elsewhere: the
+ * same pull request's review is in flight and this one cannot submit), what it waits
+ * for, else the keys.
+ */
+export function composerHint(verdict: Verdict, text: string, sending: boolean, elsewhere = false): string {
   if (sending) return REVIEW_SENDING_HINT;
+  if (elsewhere) return REVIEW_ELSEWHERE_HINT;
   return canSubmit(verdict, text) ? REVIEW_KEYS_HINT : VERDICT_SPECS[verdict].emptyHint;
 }
 
@@ -126,10 +133,4 @@ export function yourReview(reviewers: readonly Pick<PullRequestReviewerView, "lo
     default:
       return null;
   }
-}
-
-/** pr.review's args. The body is trimmed (the daemon trims it too); an empty approval sends none. */
-export function reviewArgs(ref: { slug: string; number: number }, verdict: Verdict, body: string): Record<string, string> {
-  const b = body.trim();
-  return { "repo-slug": ref.slug, number: String(ref.number), verdict, ...(b === "" ? {} : { body: b }) };
 }

@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { create } from "zustand";
 import { listReviewerCandidates, parseMergeResult, parseRefreshResult, parseRevertResult, type MergeMethodView } from "@/api/gh";
 import { mergeArgs } from "@/components/pr/merge";
-import { reviewArgs, type Verdict } from "@/components/pr/review";
+import type { Verdict } from "@/components/pr/review";
 import { copyText } from "@/lib/clipboard";
 import { pullRequestTab, type PrRef } from "@/surfaces/pullrequestTarget";
 import { runCommand, runCommandForResult } from "./commands";
@@ -108,7 +108,13 @@ export function openPullRequestInPanel(ref: PrRef): boolean {
   return openSurface("current", pullRequestTab(ref));
 }
 
-const prArgs = (ref: PrRef): Record<string, string> => ({ "repo-slug": ref.slug, number: String(ref.number) });
+export const prArgs = (ref: PrRef): Record<string, string> => ({ "repo-slug": ref.slug, number: String(ref.number) });
+
+/** pr.review's args. The body is trimmed (the daemon trims it too); an empty approval sends none. */
+export function reviewArgs(ref: PrRef, verdict: Verdict, body: string): Record<string, string> {
+  const b = body.trim();
+  return { ...prArgs(ref), verdict, ...(b === "" ? {} : { body: b }) };
+}
 
 export function pullRequestUrl(ref: PrRef): string {
   return `https://github.com/${ref.slug}/pull/${String(ref.number)}`;
@@ -248,19 +254,24 @@ export async function mergePullRequest(ref: PrRef, method: MergeMethodView, dele
  * The Review composer: pr.review with the verdict and the (trimmed) body. The daemon's
  * message is toasted ("Approved #N"); a refusal is the generic "Review Pull Request
  * failed" toast with GitHub's message. Either way the detail is read again (the daemon
- * also announces it) and this waits for that read, so on success the header's chip and
- * the new review in Comments are there when the composer closes. Returns whether it was
+ * also announces it); on success this waits for that read, so the header's chip and the
+ * new review in Comments are there when the composer closes, and a failure returns at
+ * once. Returns whether it was
  * submitted; a second call while one runs sends nothing.
  */
 export async function submitReview(ref: PrRef, verdict: Verdict, body: string): Promise<boolean> {
   const key = pullRequestKey(ref.slug, ref.number);
   if (usePrPanelStore.getState().reviewing[key]) return false;
   usePrPanelStore.setState((s) => ({ reviewing: { ...s.reviewing, [key]: true } }));
+  let ok = false;
   try {
-    return await runCommand("pr.review", reviewArgs(ref, verdict, body));
+    ok = await runCommand("pr.review", reviewArgs(ref, verdict, body));
+    return ok;
   } finally {
     pullRequestDetailResource.invalidate(key);
-    await settled(pullRequestDetailResource, (k) => k === key);
+    // A failure frees the composer at once (its text stays for a retry); only a posted
+    // review waits for the detail that shows it.
+    if (ok) await settled(pullRequestDetailResource, (k) => k === key);
     usePrPanelStore.setState((s) => {
       const { [key]: _done, ...rest } = s.reviewing;
       return { reviewing: rest };
