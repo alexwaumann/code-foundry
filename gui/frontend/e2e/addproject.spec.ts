@@ -145,6 +145,84 @@ test("Local folder: Tab completes, Enter adds, and the new project opens", async
   await expect(page.getByTestId("worktree-surface-title")).toHaveText("new-app@main");
 });
 
+test("Local folder: a click opens a folder; only Enter and the button add", async ({ page }) => {
+  await openApp(page);
+  const before = (await listRepos()).length;
+  await page.getByTestId("sidebar-add-project").click();
+  const input = page.getByTestId("add-project-local-input");
+  const message = page.getByTestId("add-project-local-message");
+  const entry = (name: string) => page.getByTestId("path-entry").and(page.locator(`[data-entry-name="${name}"]`));
+  await expect(entry("src")).toBeVisible();
+  await expect(message).toHaveText("Click or Tab opens a folder · Enter adds");
+
+  // No "Add ~/..." row, and no folder highlighted until the keyboard or the mouse moves there.
+  await expect(dialog(page).getByText(/^Add ~\//)).toHaveCount(0);
+  await expect(page.getByTestId("add-project-local-typed")).toBeHidden();
+  await expect(page.locator('[data-testid="path-entry"][data-selected="true"]')).toHaveCount(0);
+
+  // A click opens the folder (clearing an error), and adds nothing.
+  await page.keyboard.press("Enter");
+  await expect(message).toContainText("Type a folder path");
+  await entry("src").click();
+  await expect(input).toHaveValue("src/");
+  await expect(input).toHaveAttribute("data-path", "~/src/");
+  await expect(input).toBeFocused();
+  await expect(message).toHaveText("Click or Tab opens a folder · Enter adds");
+  await expect(entry("new-app")).toBeVisible();
+
+  // An already added folder opens the same way.
+  await expect(entry("code-foundry")).toContainText("already added");
+  await entry("code-foundry").click();
+  await expect(input).toHaveAttribute("data-path", "~/src/code-foundry/");
+  await expect(entry("docs")).toBeVisible();
+  await expect(dialog(page)).toBeVisible();
+  expect((await listRepos()).length).toBe(before);
+
+  // The chevron shows on the highlighted (or hovered) row only.
+  await page.mouse.move(0, 0);
+  await page.keyboard.press("ArrowDown");
+  const first = page.getByTestId("path-entry").first();
+  await expect(first).toHaveAttribute("data-selected", "true");
+  await expect(first.getByTestId("path-entry-open")).toHaveCSS("opacity", "1");
+  await expect(page.getByTestId("path-entry").nth(1).getByTestId("path-entry-open")).toHaveCSS("opacity", "0");
+
+  // Enter on a highlighted folder adds that folder.
+  await input.fill("src/");
+  await expect(entry("Website")).toBeVisible();
+  await page.keyboard.press("End");
+  await expect(entry("Website")).toHaveAttribute("data-selected", "true");
+  await page.keyboard.press("Enter");
+  await expect(dialog(page)).toHaveCount(0);
+  expect(await repoAt("/Users/dev/src/Website")).toMatchObject({ name: "Website", git: true });
+});
+
+test("Local folder: after a click, Enter adds the typed path, and so does the button", async ({ page }) => {
+  await openApp(page);
+  await page.getByTestId("sidebar-add-project").click();
+  const input = page.getByTestId("add-project-local-input");
+  const entry = (name: string) => page.getByTestId("path-entry").and(page.locator(`[data-entry-name="${name}"]`));
+
+  // Enter with nothing highlighted: the typed path, not a folder in its listing.
+  await entry("Documents").click();
+  await expect(input).toHaveValue("Documents/");
+  await expect(entry("Projects")).toBeVisible();
+  await expect(page.locator('[data-testid="path-entry"][data-selected="true"]')).toHaveCount(0);
+  await page.keyboard.press("Enter");
+  await expect(dialog(page)).toHaveCount(0);
+  expect(await repoAt("/Users/dev/Documents")).toMatchObject({ name: "Documents", git: false });
+  expect(await repoAt("/Users/dev/Documents/Projects")).toBeUndefined();
+
+  // The button adds the typed path.
+  await page.getByTestId("sidebar-add-project").click();
+  await entry("src").click();
+  await entry("Notebook").click();
+  await expect(input).toHaveAttribute("data-path", "~/src/Notebook/");
+  await expect(dialog(page)).toBeVisible();
+  await page.getByTestId("add-project-local-submit").click();
+  await expect(dialog(page)).toHaveCount(0);
+  expect(await repoAt("/Users/dev/src/Notebook")).toMatchObject({ name: "Notebook", git: false });
+});
+
 test("Local folder: a plain folder has no git, and a folder inside a project opens that project", async ({ page }) => {
   await openApp(page);
   const before = (await listRepos()).length;

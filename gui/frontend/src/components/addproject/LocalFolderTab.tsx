@@ -1,19 +1,28 @@
 import { useEffect, useRef, useState } from "react";
-import { CornerDownLeft, FolderPlus, Loader2, SearchIcon } from "lucide-react";
+import { FolderPlus, Loader2, SearchIcon } from "lucide-react";
 import { toast } from "sonner";
 import { errorMessage } from "@/api/stream";
 import { PathSuggestions, PickFolderButton } from "@/components/palette/pathCompletion";
 import { usePathCompletion } from "@/components/palette/usePathListing";
 import { Button } from "@/components/ui/button";
-import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { entryPath, HOME_PREFIX, homeDisplay, homeRelative } from "@/palette/paths";
+import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { descendInto, entryPath, HOME_PREFIX, homeDisplay, homeRelative } from "@/palette/paths";
 import { finishAddProject, registerFolder, selectAddedProject } from "@/stores/addProject";
+
+/**
+ * cmdk always highlights an item (the first, after each keystroke). This hidden one comes
+ * first and stands for "no folder highlighted": Enter on it adds the typed path.
+ */
+const TYPED = "__typed";
 
 /**
  * Local folder: a path under home with the palette's folder completion (Tab, `/`, the
  * folder picker), added with RepoService.Register. The input's "~/" is permanent: what is
  * typed, pasted or picked is taken relative to home (homeRelative). A git repository adds
  * that repository, any other folder a project without git.
+ *
+ * A click on a folder (or Tab, or `/` on the highlighted one) opens it; only Enter and the
+ * Add project button add. Enter adds the highlighted folder, else the typed path.
  */
 export function LocalFolderTab({ active }: { active: boolean }) {
   const [path, setPath] = useState(HOME_PREFIX);
@@ -66,6 +75,16 @@ export function LocalFolderTab({ active }: { active: boolean }) {
     }
   };
 
+  const focusInput = () => {
+    rootRef.current?.querySelector("input")?.focus();
+  };
+
+  const open = (name: string) => {
+    setPath(homeRelative(descendInto(path, name)));
+    setError(null);
+    focusInput();
+  };
+
   const pickFolder = async () => {
     try {
       const picked = await chooseFolder();
@@ -73,7 +92,7 @@ export function LocalFolderTab({ active }: { active: boolean }) {
     } catch (err) {
       setError(errorMessage(err));
     }
-    rootRef.current?.querySelector("input")?.focus();
+    focusInput();
   };
 
   const typed = homeDisplay(path);
@@ -86,7 +105,7 @@ export function LocalFolderTab({ active }: { active: boolean }) {
         ref={rootRef}
         shouldFilter={false}
         loop
-        defaultValue="__submit"
+        defaultValue={TYPED}
         className="rounded-md border"
         onKeyDown={(e) => {
           handleKey(e);
@@ -120,34 +139,26 @@ export function LocalFolderTab({ active }: { active: boolean }) {
           }
         />
         <CommandList className="max-h-64">
-          <CommandGroup>
-            <CommandItem
-              value="__submit"
-              onSelect={() => {
-                void submit(path);
-              }}
-            >
-              <CornerDownLeft />
-              {typed ? (
-                <span className="truncate">
-                  Add <span className="font-mono">{path}</span>
-                </span>
-              ) : (
-                <span className="text-muted-foreground">Type a path; Tab completes</span>
-              )}
-            </CommandItem>
-          </CommandGroup>
+          <CommandItem
+            value={TYPED}
+            className="hidden"
+            data-testid="add-project-local-typed"
+            onSelect={() => {
+              void submit(path);
+            }}
+          />
           <PathSuggestions
             paths={paths}
             onPick={(name) => {
               void submit(entryPath(path, name));
             }}
+            onOpen={open}
           />
         </CommandList>
       </Command>
       <div className="flex items-center justify-between gap-3">
         <span className={`text-xs ${error ? "text-destructive" : "text-muted-foreground"}`} role={error ? "alert" : undefined} data-testid="add-project-local-message">
-          {error ?? "Tab completes · / opens the highlighted folder · Enter adds"}
+          {error ?? "Click or Tab opens a folder · Enter adds"}
         </span>
         <Button type="button" size="sm" disabled={busy || typed === ""} onClick={() => void submit(path)} data-testid="add-project-local-submit">
           {busy ? <Loader2 className="animate-spin" aria-hidden /> : <FolderPlus aria-hidden />}
