@@ -182,7 +182,7 @@ function AgentMeta({ run, itemRunning, fallback }: { run: AgentRunView; itemRunn
         </span>
       )}
       {running ? <AgentElapsed run={run} /> : fallback ? <span>{fallback}</span> : ended !== null && <span>{fmtElapsed(ended)}</span>}
-      {(running || itemRunning) && <LoaderCircle className="size-3.5 animate-spin text-sky-500" aria-label="Running" />}
+      {(running || itemRunning) && <LoaderCircle className="size-3.5 animate-spin text-info" aria-label="Running" />}
     </>
   );
 }
@@ -226,7 +226,7 @@ const ToolRow = memo(function ToolRow({ node }: { node: Extract<WorkNode, { type
         </span>
       )}
       {s.meta && <span>{s.meta}</span>}
-      {t.status === "running" && <LoaderCircle className="size-3.5 animate-spin text-sky-500" aria-label="Running" />}
+      {t.status === "running" && <LoaderCircle className="size-3.5 animate-spin text-info" aria-label="Running" />}
     </>
   );
   return (
@@ -445,7 +445,7 @@ const NoteRow = memo(function NoteRow({ id }: { id: string }) {
   if (!it) return null;
   if (it.kind === "error") {
     return (
-      <div className="my-1.5 flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/5 px-2.5 py-1.5 text-[13px] selectable" data-testid="thread-error">
+      <div className="my-1.5 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-[13px] selectable" data-testid="thread-error">
         <CircleAlert className="mt-0.5 size-3.5 shrink-0 t-red" aria-hidden />
         <span className="t-red whitespace-pre-wrap">{it.text}</span>
       </div>

@@ -94,7 +94,7 @@ function SnoozedUntil({ until }: { until: number }) {
 function SnoozeEnded({ at }: { at: number | null }) {
   const now = useNow(30_000);
   return (
-    <span className="text-amber-600 dark:text-amber-400" data-testid="thread-snooze-ended">
+    <span className="text-warning" data-testid="thread-snooze-ended">
       {statusText({ kind: "snoozeEnded", detail: "", at }, now)}
     </span>
   );
@@ -485,7 +485,7 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
               </p>
             )}
             {notice && (
-              <p role="status" className="text-amber-600 dark:text-amber-300">
+              <p role="status" className="text-warning">
                 {notice}
               </p>
             )}

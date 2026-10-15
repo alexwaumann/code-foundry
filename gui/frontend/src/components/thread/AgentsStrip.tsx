@@ -5,9 +5,9 @@ import { useStripParts } from "@/stores/agents";
 import { useSessionsStore } from "@/stores/sessions";
 
 const STRIP =
-  "agents-strip flex min-w-0 items-center gap-2.5 rounded-[10px] border border-sky-500/35 bg-sky-500/[0.07] py-[7px] pr-2 pl-3 text-[12.5px] text-foreground";
-const ICON = "size-3.5 shrink-0 text-sky-600 dark:text-sky-400";
-const LABEL = "shrink-0 font-medium whitespace-nowrap text-sky-700 dark:text-sky-300";
+  "agents-strip flex min-w-0 items-center gap-2.5 rounded-[10px] border border-info/35 bg-info/[0.07] py-[7px] pr-2 pl-3 text-[12.5px] text-foreground";
+const ICON = "size-3.5 shrink-0 text-info";
+const LABEL = "shrink-0 font-medium whitespace-nowrap text-info";
 
 /**
  * The sky-tinted bar above the composer while the thread's work keeps running after its
@@ -53,7 +53,7 @@ function Strip({ sessionId, agents, shells }: { sessionId: string; agents: numbe
         whenUnavailable="hide"
         variant="ghost"
         size="xs"
-        className="ml-auto h-6 shrink-0 gap-1 px-1.5 font-medium text-sky-600 hover:bg-sky-500/10 hover:text-sky-700 dark:text-sky-400 dark:hover:bg-sky-500/15 dark:hover:text-sky-300"
+        className="ml-auto h-6 shrink-0 gap-1 px-1.5 font-medium text-info hover:bg-info/10 hover:text-info dark:hover:bg-info/15"
         data-testid="agents-strip-open"
       >
         Agents

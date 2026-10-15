@@ -257,7 +257,7 @@ test("a wake brings the thread back needing attention: Snooze ended in amber, co
   const s8 = row(page, "s:s-8");
   await expect(s8).toHaveAttribute("data-section", "attention");
   await expect(s8.getByTestId("row-status")).toHaveText("Snooze ended · just now");
-  await expect(s8.getByTestId("row-status")).toHaveClass(/text-amber-/);
+  await expect(s8.getByTestId("row-status")).toHaveClass(/text-warning/);
   await expect(bell.getByTestId("attention-badge")).toHaveText("2");
   await expect(bell).toHaveAttribute("title", "2 threads need attention");
 
@@ -265,7 +265,7 @@ test("a wake brings the thread back needing attention: Snooze ended in amber, co
   await s8.click();
   const card = page.getByTestId("thread-disconnected");
   await expect(card).toContainText("Snooze ended · just now. Reconnect to continue the conversation.");
-  await expect(card.getByTestId("thread-snooze-ended")).toHaveClass(/text-amber-/);
+  await expect(card.getByTestId("thread-snooze-ended")).toHaveClass(/text-warning/);
   await expect(card.getByTestId("thread-unsnooze")).toHaveCount(0);
 
   // Snooze again from the header: 3 hours.

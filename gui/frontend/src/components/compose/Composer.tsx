@@ -481,7 +481,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
           className={cn(
             // Translucent over the backdrop, frosted so the prompt stays readable.
             "-z-10 col-span-2 col-start-1 row-span-2 row-start-1 rounded-2xl border shadow-sm backdrop-blur-xl transition-colors",
-            dragging ? "border-sky-400/70 bg-sky-400/5" : "border-border bg-card/85",
+            dragging ? "border-info/70 bg-info/5" : "border-border bg-card/85",
           )}
         />
         <div className="col-span-2 col-start-1 row-start-1 flex min-w-0 flex-col">
@@ -588,7 +588,7 @@ function ComposerCard({ target }: { target: ComposeTarget }) {
               </p>
             )}
             {notice && (
-              <p role="status" className="text-amber-600 dark:text-amber-300" data-testid="composer-notice">
+              <p role="status" className="text-warning" data-testid="composer-notice">
                 {notice}
               </p>
             )}

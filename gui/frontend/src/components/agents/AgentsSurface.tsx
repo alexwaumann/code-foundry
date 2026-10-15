@@ -17,15 +17,15 @@ function useThreadId(): string {
 }
 
 const STATUS_TONE: Readonly<Record<AgentStatusView, string>> = {
-  running: "text-sky-600 dark:text-sky-400",
-  done: "text-emerald-600 dark:text-emerald-400",
-  failed: "text-red-600 dark:text-red-400",
+  running: "text-info",
+  done: "text-success",
+  failed: "text-destructive",
   unknown: "text-muted-foreground",
 };
 
 const DOT: Readonly<Record<Exclude<AgentStatusView, "running">, string>> = {
-  done: "bg-emerald-500",
-  failed: "bg-red-500",
+  done: "bg-success",
+  failed: "bg-destructive",
   unknown: "bg-muted-foreground/40",
 };
 
@@ -34,7 +34,7 @@ function Header({ threadId }: { threadId: string }) {
   return (
     <header className="flex min-w-0 flex-col gap-0.5 border-b border-pane-border px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="agents-header">
       <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
-        <Bot className="size-4 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden />
+        <Bot className="size-4 shrink-0 text-info" aria-hidden />
         <span className="min-w-0 truncate">Agents</span>
         {c && c.total > 0 && (
           <span className="ml-auto shrink-0 text-xs font-normal text-muted-foreground tabular-nums" data-testid="agents-count">
@@ -104,7 +104,7 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
     >
       <div className="flex min-w-0 items-center gap-2 text-[13px]">
         {running ? (
-          <LoaderCircle className="size-3 shrink-0 animate-spin text-sky-500" aria-label="Running" />
+          <LoaderCircle className="size-3 shrink-0 animate-spin text-info" aria-label="Running" />
         ) : (
           <span className={cn("size-2 shrink-0 rounded-full", DOT[run.status as Exclude<AgentStatusView, "running">])} aria-hidden />
         )}
@@ -135,7 +135,7 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
         </div>
       ) : run.status === "failed" ? (
         run.error && (
-          <div className="ml-5 line-clamp-2 text-xs leading-[1.45] break-words text-red-600 dark:text-red-400" title={run.error} data-testid="agent-error">
+          <div className="ml-5 line-clamp-2 text-xs leading-[1.45] break-words text-destructive" title={run.error} data-testid="agent-error">
             {run.error}
           </div>
         )
