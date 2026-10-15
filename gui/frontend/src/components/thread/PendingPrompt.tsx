@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, MessageCircleQuestionMark, ShieldAlert } from "lucide-react";
 import type { ThreadPendingView, ThreadRequestView } from "@/api/thread";
+import { Kbd } from "@/components/ui/kbd";
 import { Tip } from "@/components/ui/tooltip";
 import { diffStats } from "@/lib/diff";
 import { shellTokens } from "@/lib/highlight";
@@ -106,8 +107,13 @@ function permissionTitle(r: ThreadRequestView, input: Json, cwd: string): string
   }
 }
 
-function Kbd({ k }: { k: string }) {
-  return <kbd>{k}</kbd>;
+/** A button's key hint, in the button's own colour. */
+function ButtonKey({ k }: { k: string }) {
+  return (
+    <Kbd variant="inherit" size="sm">
+      {k}
+    </Kbd>
+  );
 }
 
 /** An Edit/Write waiting for permission: its +/− summary, and the diff on demand. */
@@ -295,29 +301,29 @@ function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
             }}
           />
           <button type="submit" className="btn primary" data-testid="thread-deny-submit">
-            Deny <Kbd k="↵" />
+            Deny <ButtonKey k="↵" />
           </button>
           <button
             type="button"
             className="btn outline"
             onClick={cancelDeny}
           >
-            Cancel <Kbd k="esc" />
+            Cancel <ButtonKey k="esc" />
           </button>
         </form>
       ) : (
         <div className="acts">
           <button type="button" className="btn primary" data-testid="thread-permission-allow" onClick={() => { decide("allow"); }}>
             <Check aria-hidden />
-            Allow <Kbd k={numberOf("allow")} />
+            Allow <ButtonKey k={numberOf("allow")} />
           </button>
           {sessionRule && (
             <button type="button" className="btn outline" data-testid="thread-permission-allow-session" onClick={() => { decide("allow-session"); }}>
-              Allow for session <Kbd k={numberOf("allow-session")} />
+              Allow for session <ButtonKey k={numberOf("allow-session")} />
             </button>
           )}
           <button type="button" className="btn outline" data-testid="thread-permission-deny" onClick={() => { decide("deny"); }}>
-            Deny <Kbd k={numberOf("deny")} />
+            Deny <ButtonKey k={numberOf("deny")} />
           </button>
         </div>
       )}
@@ -489,10 +495,10 @@ function QuestionPrompt({ r, keysRef, refocus }: PromptProps) {
         )}
         <button type="button" className="btn primary" data-testid="thread-question-next" disabled={!answered} onClick={submit}>
           {last ? "Submit" : "Next"}
-          {last ? <Kbd k="↵" /> : <ArrowRight aria-hidden />}
+          {last ? <ButtonKey k="↵" /> : <ArrowRight aria-hidden />}
         </button>
         <button type="button" className="btn outline" data-testid="thread-question-skip" onClick={skip}>
-          Skip {questions.length === 1 ? "question" : "questions"} <Kbd k="esc" />
+          Skip {questions.length === 1 ? "question" : "questions"} <ButtonKey k="esc" />
         </button>
       </div>
     </div>

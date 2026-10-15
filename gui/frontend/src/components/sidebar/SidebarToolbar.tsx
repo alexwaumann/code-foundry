@@ -1,6 +1,7 @@
 import { Bell, BellRing, LayoutDashboard, SquarePen } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { Tip } from "@/components/ui/tooltip";
 import { jumpToAttention } from "@/keys/bindings";
 import { formatChord } from "@/keys/chord";
@@ -98,9 +99,9 @@ export function SidebarNewThread() {
       <SquarePen aria-hidden className="size-4" />
       <span className="min-w-0 flex-1 truncate text-left">New thread</span>
       {chord && (
-        <kbd className="shrink-0 font-sans text-[11px] text-primary-foreground/60" data-testid="sidebar-new-session-chord">
+        <Kbd variant="inherit" data-testid="sidebar-new-session-chord">
           {formatChord(chord)}
-        </kbd>
+        </Kbd>
       )}
     </CommandButton>
   );

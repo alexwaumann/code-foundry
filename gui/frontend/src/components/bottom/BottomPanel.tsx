@@ -6,6 +6,7 @@ import { revealTab } from "@/components/panel/reveal";
 import { useNoProjectThread } from "@/components/session/useNoProject";
 import { TerminalHost, type TerminalHostHandle } from "@/components/terminal/TerminalHost";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { Tip } from "@/components/ui/tooltip";
 import { chordFromEvent, formatChord } from "@/keys/chord";
 import { tildify } from "@/lib/path";
@@ -239,7 +240,7 @@ function EmptyState({ panelKey }: { panelKey: string }) {
               >
                 <SquareTerminal className="size-4 text-muted-foreground" aria-hidden />
                 <span className="flex-1 truncate">{title}</span>
-                {chord && <kbd className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-sans text-[11px] text-muted-foreground">{formatChord(chord)}</kbd>}
+                {chord && <Kbd>{formatChord(chord)}</Kbd>}
               </button>
             </li>
           </ul>

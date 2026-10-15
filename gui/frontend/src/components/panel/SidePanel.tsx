@@ -6,6 +6,7 @@ import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dn
 import { CSS } from "@dnd-kit/utilities";
 import { Plus, X } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
+import { Kbd } from "@/components/ui/kbd";
 import { Tip } from "@/components/ui/tooltip";
 import { chordFromEvent } from "@/keys/chord";
 import { cn } from "@/lib/utils";
@@ -370,7 +371,7 @@ function SurfaceRow({ spec, ctx }: { spec: SurfaceSpec; ctx: SurfaceContext }) {
       >
         <spec.icon className="size-4 text-muted-foreground" aria-hidden />
         <span className="flex-1 truncate">{spec.title}</span>
-        {spec.hotkey && <kbd className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-sans text-[11px] text-muted-foreground">{spec.hotkey.toUpperCase()}</kbd>}
+        {spec.hotkey && <Kbd>{spec.hotkey.toUpperCase()}</Kbd>}
       </button>
     </li>
   );
