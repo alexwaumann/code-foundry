@@ -193,7 +193,8 @@ header, a terminal run opening as a tab in the bottom panel. Sketch:
 
 Users never manage whether a thread's `claude` runs: a message starts a stopped thread
 (resuming its conversation), and a thread idle at its prompt past its prompt cache expiry
-stops. `session.close` and `session.reconnect` are gone. Three PRs:
+stops. `session.close` is gone; `session.reconnect` stays hidden until PR C deletes it.
+Three PRs:
 
 * PR A (background shells tracked, `Session.BackgroundWork()`, the strip counts them)
   done (#105): `docs/notes/background-shells.md`.

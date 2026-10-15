@@ -137,7 +137,8 @@ Services (v1):
   unarchive; `docs/notes/archive-threads-1-daemon.md`), Snooze (close, remove the
   thread's shells, unpin, unarchive, set `snoozed_until`; the store wakes it on the wall
   clock into NEEDS_ATTENTION "snooze ended"; `docs/notes/snooze-threads-1-daemon.md`), Watch (server stream), StageAttachment (images the first prompt refers to).
-  Close and Reconnect remain in the proto for compatibility; no command calls them: the
+  Close and Reconnect remain in the proto for compatibility; no listed command calls them
+  (the hidden `session.reconnect` serves the GUI until it stops calling it): the
   daemon starts a thread's process when a message is sent and stops it once the thread
   has idled at its prompt past its prompt cache expiry
   (`docs/notes/thread-lifecycle.md`). Create can

@@ -8,8 +8,8 @@ exercised live (below). PR C removes the GUI's connection UI (the list at the en
 
 Users never need to know whether a thread's `claude` process runs. The daemon starts it
 when a message is sent and stops it when the thread has idled past its prompt cache
-expiry. `session.close` and `session.reconnect` are gone. This PR is the daemon and CLI;
-the GUI keeps calling the removed commands until PR C (accepted).
+expiry. `session.close` is gone; `session.reconnect` stays registered but hidden until PR
+C (below). This PR is the daemon and CLI; PR C removes the GUI's connection UI.
 
 ## What was built
 
@@ -27,11 +27,20 @@ the GUI keeps calling the removed commands until PR C (accepted).
     While a start is reserved (no runner yet) Send waits on the reservation, then queues.
   * While CLOSING Send waits for the exit, then starts a new process. A send the runner
     takes after its close began gets `errProcessGone` and does the same.
+  * A send held by an effort restart that does not complete (the new process cannot
+    exec, exits before its handshake, never answers it; or a close or daemon stop during
+    the restart) gets `errProcessGone` too (`failHeld`): Send waits for the exit and
+    starts the thread with the message as its first prompt, so it is never lost (during
+    a daemon stop it gets ErrClosed). If the new start fails as well, the message stays in
+    the timeline with "Claude did not start: …" after it.
   * A start that fails (worktree gone, `claude` missing, no handshake, exit before it):
     Send still returns the accepted item, an error item follows ("Claude did not start:
     <reason>"), status ERROR `did not start` (`ReasonStartFailed`), disconnect reason
     `spawn failed`, the thread stays stopped; the next message tries again. One error
-    item per failed start (`addErrorOnce`).
+    item per failed start (`addErrorOnce` skips only a repeat of the same line). A start
+    that races the daemon's shutdown fails with ErrClosed and no timeline line: spawn's
+    commit re-checks `m.closed` and kills the new process (`runner.abandon`), so
+    `m.wg.Add` never races Shutdown's `Wait`.
   * A conversation whose transcript is gone starts a new one with a note item before the
     message: "Started a new conversation: the previous one's transcript is gone, so Claude
     does not remember this thread's earlier messages." (`LastError` says it too, as
@@ -57,11 +66,14 @@ the GUI keeps calling the removed commands until PR C (accepted).
   SetModel, SetPermissionMode and SetEffort change and persist the row without starting
   Claude; `EffortPending` stays false; the next spawn passes the row (`claudeCommand`).
   A closing thread counts as stopped; a reserved start is waited out; a live but starting
-  thread gets the control request after its handshake (`runner.ready`).
+  thread gets the control request after its handshake (`runner.ready`); a request that
+  meets `claudestream.ErrClosed` (an idle stop raced it) waits for the runner to go and
+  writes the row.
 * **Slash commands and MCP status outlive the process** (`threadcache_db.go`, migration
   `0021_session_thread_cache.sql`: one row per thread, two JSON columns, cascading). The
   runner no longer clears them at exit (`dropMcpChecks` only discards checks in flight).
-  They are written when they change and loaded with the thread's log, so they survive a
+  They are written when they change (MCP saves in check-ticket order: `persistMcp` drops
+  a save older than the last one) and loaded with the thread's log, so they survive a
   daemon restart; the next handshake and turn refresh them. `McpStatus(refresh=true)` and
   `McpReconnect` on a stopped thread start Claude without a prompt (`running`: one start
   at most, then wait for `ready`); the grace keeps it up 5 minutes. `McpStatus(false)`
@@ -72,26 +84,34 @@ the GUI keeps calling the removed commands until PR C (accepted).
   before the handshake "Claude did not start: exit code N: …"; at the prompt nothing (the
   next message starts it). The status rules are unchanged (busy becomes ERROR
   "interrupted"). Wording never says connected or disconnected.
-* **Commands**: `session.close` and `session.reconnect` are gone (registry, chords
-  cmd+shift+w / cmd+shift+r, CLI verbs, `SessionBackend.Close/Reconnect`, the
-  commandtest fake). `session.list` drops the STATE column (`--json` keeps `state` and
-  `disconnect_reason`). `daemon.restart`, `app.restart` and the CLI's after-update line
-  count only threads a restart cuts off (`ActiveSession`: starting, busy, or a permission
-  prompt / question): "Restart the daemon? Threads keep their history; a message starts
-  each again." / "2 threads are working or waiting on you and will be cut off. Restart the
-  daemon anyway?"; results "restarting the daemon (1 thread cut off); …"; JSON
-  `threads_interrupted` replaces `sessions_closed`. `thread.mcp`/`thread.commands` no
+* **Commands**: `session.close` is gone (registry, chord cmd+shift+w, CLI verb,
+  `SessionBackend.Close`). `session.reconnect` stays registered but hidden
+  (`Command.Hidden`: out of List, so no palette entry, help, chord or CLI verb; Invoke by
+  name still runs it): today's GUI sends only to a connected thread and offers its
+  Reconnect card otherwise, and a push to main ships a tip release, so without it no
+  thread could continue until PR C, which deletes it. `session.list` drops the STATE
+  column (`--json` keeps `state` and `disconnect_reason`). `daemon.restart`,
+  `app.restart` and the CLI's after-update line count what a restart cuts off by
+  archive's predicate (`ActiveSession` = `archiveInterrupts`: starting, busy, a
+  permission prompt or question, background agents or shells, or the wake hold) and name
+  it (`RestartCost`): "Restart the daemon? Threads keep their history; a message starts
+  each again." / "1 thread working or waiting on you and 2 background agents will be cut
+  off. Restart the daemon anyway?"; results "restarting the daemon (cuts off 1 background
+  shell); …"; the CLI "… restarting cuts off …" or "nothing running"; JSON
+  `threads_interrupted` (threads that lose something) replaces `sessions_closed`. `thread.mcp`/`thread.commands` no
   longer say "reconnect it first"; `thread.set-effort` on a stopped thread says "uses
   effort high from its next message"; descriptions drop "connected".
 * **Archive and snooze confirm background work** (the coordinator's ask): `ConfirmIf`
-  is "busy, prompting or background agents/shells running"; the message names them:
-  "Archive thread drv? 2 background agents and 1 shell are running; archiving stops
-  them." (`archiveInterrupts`, `midTurn`, `backgroundRunning`).
-* **Proto**: comments only (additive): SessionState is daemon-managed and internal to
+  is "busy, prompting, background agents/shells running or the wake hold"; the message
+  names them: "Archive thread drv? 2 background agents and 1 shell are running; archiving
+  stops them." / "… Claude is about to report background work that just finished;
+  archiving loses that report." (`archiveInterrupts`, `midTurn`, `backgroundRunning`).
+* **Proto** (additive): `Session.background_wake_pending` (42, PR A's wake hold, so the
+  command layer sees it); the rest is comments: SessionState is daemon-managed and internal to
   clients, `disconnect_reason` lists "idle" (and the rest), ERROR "did not start", Send
   starts a stopped thread, settings on a stopped thread go to the row, MCP status and slash
-  commands outlive the process. `Close` and `Reconnect` stay for compatibility; no command
-  calls them. `make gen`.
+  commands outlive the process; the Send RPC returns at once. The `Close` and `Reconnect`
+  RPCs stay for compatibility. `make gen`.
 * **Development aids**: `CODE_FOUNDRY_IDLE_GRACE` and `CODE_FOUNDRY_IDLE_CHECK` (Go
   durations) set the grace and the check interval of a daemon (like
   `CODE_FOUNDRY_GH_SEARCH_AS`; invalid values are logged and ignored).
@@ -106,10 +126,12 @@ the GUI keeps calling the removed commands until PR C (accepted).
   user saw once reconnecting became automatic.
 * **Restart counts include prompting threads** for `app.restart` too (it counted busy
   only): a pending permission is lost to a restart as well. `BusySessions` and
-  `LiveSessions` are replaced by `ActiveSessions`/`ActiveSession`; the JSON field is
+  `LiveSessions` are replaced by `RestartCost`/`ActiveSession`; the JSON field is
   renamed (`threads_interrupted`); nothing in the GUI read it.
-* **The restart counts leave background work out** (the brief: busy or prompting). The
-  archive/snooze confirm counts it.
+* **Restart counts include background work and the wake hold** (decided in review:
+  killing background work is the worst failure), with archive's predicate.
+* **The wake hold goes on the proto** (`background_wake_pending`): the commands only see
+  proto sessions, and PR A kept it off the wire.
 * **A start's failure status** is ERROR `did not start` (a new reason; the GUI shows the
   error item; PR C may style it like "interrupted").
 * **`midTurn` for the process-death item** stays busy/compacting/pending: a crash at the
@@ -140,11 +162,19 @@ the GUI keeps calling the removed commands until PR C (accepted).
 
 ## Tests
 
+* Review round: `effort_test.go` a send held by an effort restart whose new process
+  cannot exec (`TestRenderedSetEffortRespawnExecFails`: the message stays with both
+  failures after it, the next message starts the thread), exits before its handshake,
+  or never answers it (`CF_FAKE_CLAUDE_RESUME_EXIT` / `_RESUME_HANG` with `_ONCE`: the
+  thread starts again with the held message, one delivery), and a close during the
+  restart (the held send starts the thread again); `TestSpawnAfterShutdownBegan`;
+  `TestThreadLogMcpSavesInOrder`; the send-while-starting tests hold the handshake with
+  `CF_FAKE_CLAUDE_INIT_GATE` instead of timing it; api maps `background_wake_pending`;
+  archive confirms the wake hold.
 * `session/lifecycle_test.go`: send to a stopped thread (item before Claude is up, one
   delivery under the item's id, `--resume`, unarchived, no note); a lost transcript (new
   conversation, the note right before the message); send while starting
-  (`CF_FAKE_CLAUDE_INIT_DELAY`: returns before the handshake, items and deliveries in
-  order) and two racing sends to a stopped thread (one process); send while closing (waits
+  (the handshake held: returns at once, items and deliveries in order) and two racing sends to a stopped thread (one process); send while closing (waits
   for the exit, a new pid, one delivery); start failures (worktree gone, `claude`
   missing, exit before the handshake: the item, one error item, ERROR `did not start`,
   then a retry works); Respond/Interrupt on a stopped thread; settings on a stopped thread
@@ -164,8 +194,10 @@ the GUI keeps calling the removed commands until PR C (accepted).
   send after a daemon restart starts the thread).
 * `api/thread_test.go`: a send to a stopped fake thread connects it.
 * `command`: the removed commands are unknown, the registry list and chords, session.list
-  (header without STATE, no state words in rows), `ActiveSessions` table, app.restart and
-  daemon.restart confirmations and results, archive/snooze background confirmations,
+  (header without STATE, no state words in rows), the hidden `session.reconnect` (runs,
+  never listed, no chord), `RestartCostOf` table (turns, prompts, background agents and
+  shells, the wake hold, the joined sentence), app.restart and daemon.restart
+  confirmations and results (background work too), archive/snooze background confirmations,
   set-effort on a stopped thread, the new MCP/slash wording. `cmd/code-foundry`:
   `activeThreads`. `daemon`: `envDuration`.
 
@@ -233,12 +265,15 @@ Production:
   `disconnectReason`, `lastError`, 228-233 `stateMap`, 261-269 mapping, 19-21/72/78-80
   comments ("disconnected", "reconnecting"): shrink or drop.
 * `src/stores/sessionActions.ts` 12/14 `SESSION_COMMANDS.reconnect/close`, 37-39
-  `reconnectSession`, 45-47 `closeSession` (the commands are gone: remove), 59-62
-  archive comment.
+  `reconnectSession`, 45-47 `closeSession` (`session.close` is gone; remove both), 59-62
+  archive comment. Then delete the hidden `session.reconnect` from
+  `internal/command/commands_session.go` (and `Reconnect` from `SessionBackend` and the
+  commandtest fake) in the same PR.
 * `src/stores/sessions.ts` 153-156 `isRunning` (busy and not disconnected: status only),
   158-163 `connectedCount` (remove), 29/132 comments.
-* `src/stores/update.ts` 51-58 `useLiveSessionCount` (count working-or-prompting like
-  `command.ActiveSession`), 67 busy names.
+* `src/stores/update.ts` 51-58 `useLiveSessionCount` (count what a restart cuts off like
+  `command.RestartCostOf`: turns, prompts, background work, `backgroundWakePending`), 67
+  busy names.
 * `src/lib/session.ts` 3-30 `sessionBadge`/`badgeLabels` (starting/closing/disconnected
   badges), 125-140 `threadGroup` (state-based groups: status only), 143-166
   `disconnectReason` + `disconnectCause` (the Reconnect card's text: delete).
