@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { decodeRepoKeys, useRepoStructureKeys } from "@/stores/context";
 import { useReposStore } from "@/stores/repos";
 import { openHelp } from "@/stores/views";
-import { activeThreadIds, attentionIds, connectedCount, isAttention, runningCount, useSessionsStore } from "@/stores/sessions";
+import { activeThreadIds, attentionIds, isAttention, runningCount, useSessionsStore } from "@/stores/sessions";
 
 /** Rows in the start page's thread list before "+N more". */
 const MAX_THREADS = 6;
@@ -89,9 +89,8 @@ function ActiveThreads() {
 }
 
 /** The fleet's counts, showing only the ones that are non-zero; nothing at all when every count is zero. */
-function Counts({ connected, running, waiting }: { connected: number; running: number; waiting: number }) {
+function Counts({ running, waiting }: { running: number; waiting: number }) {
   const parts: ReactNode[] = [];
-  if (connected > 0) parts.push(<span key="connected">{connected} connected</span>);
   if (running > 0) parts.push(<span key="running">{running} running</span>);
   if (waiting > 0) {
     parts.push(
@@ -115,13 +114,12 @@ function Counts({ connected, running, waiting }: { connected: number; running: n
 
 /** Projects exist: a greeting, the fleet's counts, actions, and the threads that matter now. */
 function Fleet() {
-  const connected = useSessionsStore((s) => connectedCount(s));
   const running = useSessionsStore((s) => runningCount(s));
   const waiting = useSessionsStore((s) => attentionIds(s).length);
   return (
     <>
       <Header title={greeting(new Date().getHours())}>
-        <Counts connected={connected} running={running} waiting={waiting} />
+        <Counts running={running} waiting={waiting} />
       </Header>
       <div className="flex flex-wrap justify-center gap-2" data-testid="welcome-actions">
         <CommandButton command="session.new" icon={SquarePen} label="New thread" variant="default" whenUnavailable="disable" keepFocus={false} />
