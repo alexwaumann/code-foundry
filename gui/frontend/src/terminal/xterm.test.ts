@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { XtermRenderer } from "./xterm";
 
 function renderer(): XtermRenderer {
-  return new XtermRenderer({ fontSize: 12, colorScheme: "dark", isGlobalChord: () => false });
+  return new XtermRenderer({ fontSize: 12, isGlobalChord: () => false });
 }
 
 function write(r: XtermRenderer, s: string): Promise<void> {
@@ -72,7 +72,7 @@ describe("XtermRenderer keyboard modes", () => {
 
 describe("XtermRenderer keyup", () => {
   it("an app chord's keyup and cmd's are not xterm's (they would take the keyboard back); other keyups are", () => {
-    const r = new XtermRenderer({ fontSize: 12, colorScheme: "dark", isGlobalChord: (c) => c === "cmd+t" });
+    const r = new XtermRenderer({ fontSize: 12, isGlobalChord: (c) => c === "cmd+t" });
     expect(press(r, { key: "t", code: "KeyT", metaKey: true }, "keyup").handled).toBe(false);
     expect(press(r, { key: "t", code: "KeyT" }, "keyup").handled).toBe(true);
     expect(press(r, { key: "Meta", code: "MetaLeft" }, "keyup").handled).toBe(false);

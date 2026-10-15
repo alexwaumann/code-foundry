@@ -73,7 +73,7 @@ function RunOutput({ runId }: { runId: string }) {
       <p className="mt-3 truncate font-mono text-xs text-muted-foreground" title={run.command}>
         $ {run.command.split("\n")[0]}
       </p>
-      <pre className="mt-1 max-h-72 overflow-auto rounded-md border bg-[var(--terminal-bg)] p-2.5 font-mono text-xs leading-[17px] whitespace-pre-wrap" data-testid="action-run-output">
+      <pre className="mt-1 max-h-72 overflow-auto rounded-md border bg-pane p-2.5 font-mono text-xs leading-[17px] whitespace-pre-wrap" data-testid="action-run-output">
         {truncated && <span className="text-muted-foreground">…{"\n"}</span>}
         {output || <span className="text-muted-foreground">(no output)</span>}
       </pre>

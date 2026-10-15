@@ -12,8 +12,6 @@ export interface TermSize {
   rows: number;
 }
 
-export type ColorScheme = "dark" | "light";
-
 export interface TerminalRenderer {
   /** Attaches to a container. Call once. */
   mount(el: HTMLElement): void;
@@ -37,6 +35,5 @@ export interface TerminalRenderer {
   /** The viewport asked for a new grid size (container resize, font change). */
   onResize(cb: (size: TermSize) => void): Disposable;
   setFontSize(px: number): void;
-  setColorScheme(scheme: ColorScheme): void;
   dispose(): void;
 }

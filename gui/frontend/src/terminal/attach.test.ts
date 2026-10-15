@@ -44,7 +44,6 @@ class FakeRenderer implements TerminalRenderer {
     for (const cb of this.dataCbs) cb(new TextEncoder().encode(s));
   }
   setFontSize(): void {}
-  setColorScheme(): void {}
   dispose(): void {}
 }
 
