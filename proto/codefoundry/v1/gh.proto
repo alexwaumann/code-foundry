@@ -79,6 +79,17 @@ service GhService {
   // branches and worktrees are never touched. The detail is invalidated and
   // pull_request_detail_updated is sent.
   rpc MergePullRequest(MergePullRequestRequest) returns (MergePullRequestResponse) {}
+  // SubmitPullRequestReview submits a review (approve, request changes, or comment)
+  // as the viewer. The body is trimmed; it is required for REQUEST_CHANGES and COMMENT,
+  // optional for APPROVE, and at most 65536 bytes (INVALID_ARGUMENT otherwise, as is
+  // an UNSPECIFIED event). GitHub's refusals (approving one's own pull request, a closed
+  // or locked pull request) are FAILED_PRECONDITION with GitHub's message. The detail
+  // is invalidated and pull_request_detail_updated is sent.
+  rpc SubmitPullRequestReview(SubmitPullRequestReviewRequest) returns (SubmitPullRequestReviewResponse) {}
+  // AddPullRequestComment posts a comment on a pull request's conversation as the
+  // viewer (an issue comment, not a review). The body is trimmed, required, and at most
+  // 65536 bytes. Errors and the event as for SubmitPullRequestReview.
+  rpc AddPullRequestComment(AddPullRequestCommentRequest) returns (AddPullRequestCommentResponse) {}
 }
 
 // GitHub's pull request state.
@@ -730,4 +741,48 @@ message MergePullRequestResponse {
   string message = 3;
   // The head branch was deleted (or GitHub had already deleted it).
   bool branch_deleted = 4;
+}
+
+// ---- Reviews and comments (SubmitPullRequestReview, AddPullRequestComment) --------
+
+// GitHub's PullRequestReviewEvent, minus DISMISS.
+enum PullRequestReviewEvent {
+  PULL_REQUEST_REVIEW_EVENT_UNSPECIFIED = 0;
+  PULL_REQUEST_REVIEW_EVENT_APPROVE = 1;
+  PULL_REQUEST_REVIEW_EVENT_REQUEST_CHANGES = 2;
+  PULL_REQUEST_REVIEW_EVENT_COMMENT = 3;
+}
+
+message SubmitPullRequestReviewRequest {
+  string repo_slug = 1;
+  int32 number = 2;
+  // Required (UNSPECIFIED is INVALID_ARGUMENT).
+  PullRequestReviewEvent event = 3;
+  // Markdown. Required for REQUEST_CHANGES and COMMENT, optional for APPROVE.
+  string body = 4;
+}
+
+message SubmitPullRequestReviewResponse {
+  // GitHub's node id of the new review.
+  string id = 1;
+  string url = 2;
+  // APPROVED, CHANGES_REQUESTED, or COMMENTED.
+  PullRequestReviewState state = 3;
+  // The review's author: the viewer's login.
+  string author = 4;
+  google.protobuf.Timestamp submitted_at = 5;
+}
+
+message AddPullRequestCommentRequest {
+  string repo_slug = 1;
+  int32 number = 2;
+  // Markdown. Required.
+  string body = 3;
+}
+
+message AddPullRequestCommentResponse {
+  // GitHub's node id of the new comment.
+  string id = 1;
+  string url = 2;
+  google.protobuf.Timestamp created_at = 3;
 }
