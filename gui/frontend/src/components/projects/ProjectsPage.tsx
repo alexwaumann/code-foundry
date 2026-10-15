@@ -77,6 +77,7 @@ import { NoGitBadge } from "./NoGitBadge";
 import { OverflowMenu, type OverflowItem } from "./OverflowMenu";
 import { WorkspaceMembers } from "./WorkspaceMembers";
 import { RowAction, WorktreeState } from "./WorktreeState";
+import { Tip } from "@/components/ui/tooltip";
 
 const ROW_H = 32;
 const SEP = "\u0001";
@@ -197,13 +198,13 @@ function WorktreeRow({ repoId, path, cleanupSlot }: { repoId: string; path: stri
     ? [show]
     : [show, "separator", { label: "Remove worktree…", icon: Trash2, destructive: true, testId: "worktree-remove", onSelect: () => void removeWorktree(repoId, path) }];
   return (
-    <NavRow navKey={projectWorktreeKey(repoId, path)} className="group/wt flex h-full items-center gap-2 pr-2 pl-6 text-sm" title={path}>
+    <NavRow navKey={projectWorktreeKey(repoId, path)} className="group/wt flex h-full items-center gap-2 pr-2 pl-6 text-sm" tip={path}>
       <span className="flex h-full min-w-0 flex-1 items-center" data-testid="project-worktree" data-path={path}>
         <WorktreeState repoId={repoId} path={path} />
       </span>
       {/* Always shown, muted at rest; a fixed width so every row's state column ends at the same x. */}
       <span
-        className={cn("flex shrink-0 items-center justify-end opacity-55", cleanupSlot ? "w-30" : "w-24", " transition-opacity group-hover/wt:opacity-100 group-focus-within/wt:opacity-100 group-aria-selected/wt:opacity-100 has-[[data-state=open]]:opacity-100")}
+        className={cn("flex shrink-0 items-center justify-end opacity-55", cleanupSlot ? "w-30" : "w-24", " transition-opacity group-hover/wt:opacity-100 group-focus-within/wt:opacity-100 group-aria-selected/wt:opacity-100 has-[[aria-expanded=true]]:opacity-100")}
         data-testid="worktree-actions"
       >
         <RowAction label="New thread here" testId="worktree-new-thread" onClick={() => { composeIn(repoId, path); }}>
@@ -300,9 +301,11 @@ function ProjectBlock({ project, collapsed, filtering }: { project: ProjectModel
             useUiStore.getState().setProjectCollapsed(repoId, !collapsed);
           }}
         />
-        <span className="flex shrink-0" title={kind.title} data-testid="project-kind-icon">
-          <Icon className={cn("size-4", iconClass)} />
-        </span>
+        <Tip label={kind.title}>
+          <span className="flex shrink-0" data-testid="project-kind-icon">
+            <Icon className={cn("size-4", iconClass)} />
+          </span>
+        </Tip>
         <span className="truncate font-medium" data-testid="project-name">
           {name}
         </span>
@@ -321,7 +324,7 @@ function ProjectBlock({ project, collapsed, filtering }: { project: ProjectModel
         <span className="ml-auto flex shrink-0 items-center">
           {kind.kind !== "nogit" && <ProjectFreshness repoId={repoId} main={main} />}
           <span
-            className="flex items-center opacity-70 transition-opacity group-hover/card:opacity-100 group-focus-within/p:opacity-100 group-aria-selected/p:opacity-100 has-[[data-state=open]]:opacity-100"
+            className="flex items-center opacity-70 transition-opacity group-hover/card:opacity-100 group-focus-within/p:opacity-100 group-aria-selected/p:opacity-100 has-[[aria-expanded=true]]:opacity-100"
             data-testid="project-actions"
           >
             {kind.kind !== "nogit" && <RefreshAction repoId={repoId} />}
@@ -391,7 +394,7 @@ function WorkspaceBlock({ id, collapsed, filtering }: { id: string; collapsed: b
           </span>
         )}
         <span
-          className="ml-auto flex shrink-0 items-center opacity-70 transition-opacity group-hover/card:opacity-100 group-focus-within/ws:opacity-100 group-aria-selected/ws:opacity-100 has-[[data-state=open]]:opacity-100"
+          className="ml-auto flex shrink-0 items-center opacity-70 transition-opacity group-hover/card:opacity-100 group-focus-within/ws:opacity-100 group-aria-selected/ws:opacity-100 has-[[aria-expanded=true]]:opacity-100"
           data-testid="workspace-actions"
         >
           {thread && (

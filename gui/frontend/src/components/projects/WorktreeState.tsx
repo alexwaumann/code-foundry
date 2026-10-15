@@ -11,6 +11,7 @@ import { openPullRequestInPanel } from "@/stores/prPanel";
 import { findWorktree, useReposStore } from "@/stores/repos";
 import { useResource } from "@/stores/resource";
 import { useSessionsStore } from "@/stores/sessions";
+import { Tip } from "@/components/ui/tooltip";
 
 /**
  * The viewer's pull request on the worktree's branch (GhService.GetBranchPullRequests,
@@ -24,20 +25,21 @@ function BranchPullRequest({ repoId, branch }: { repoId: string; branch: string 
   const pr = entry?.data?.pullRequests[0];
   if (!pr) return null;
   return (
-    <button
-      type="button"
-      tabIndex={-1}
-      className="flex shrink-0 items-center gap-1 rounded px-1 text-xs text-muted-foreground tabular-nums hover:bg-accent hover:text-foreground"
-      title={`#${String(pr.number)} ${pr.title}`}
-      data-testid="worktree-pr"
-      onClick={(e) => {
-        e.stopPropagation();
-        openPullRequestInPanel({ slug: pr.repoSlug || slug, number: pr.number });
-      }}
-    >
-      <PrStateIcon state={pr.state} draft={pr.draft} />#{pr.number}
-      {pr.state === "open" && <ChecksBadge checks={pr.checks} compact />}
-    </button>
+    <Tip label={`#${String(pr.number)} ${pr.title}`}>
+      <button
+        type="button"
+        tabIndex={-1}
+        className="flex shrink-0 items-center gap-1 rounded px-1 text-xs text-muted-foreground tabular-nums hover:bg-accent hover:text-foreground"
+        data-testid="worktree-pr"
+        onClick={(e) => {
+          e.stopPropagation();
+          openPullRequestInPanel({ slug: pr.repoSlug || slug, number: pr.number });
+        }}
+      >
+        <PrStateIcon state={pr.state} draft={pr.draft} />#{pr.number}
+        {pr.state === "open" && <ChecksBadge checks={pr.checks} compact />}
+      </button>
+    </Tip>
   );
 }
 
@@ -46,10 +48,12 @@ function LiveThreads({ path }: { path: string }) {
   const n = useSessionsStore((s) => liveThreadCount(s, path));
   if (n === 0) return null;
   return (
-    <span className="flex items-center gap-0.5" title={`${String(n)} live ${n === 1 ? "thread" : "threads"}`} data-testid="worktree-threads">
-      <MessageSquare className="size-3" aria-hidden />
-      {n}
-    </span>
+    <Tip label={`${String(n)} live ${n === 1 ? "thread" : "threads"}`}>
+      <span className="flex items-center gap-0.5" data-testid="worktree-threads">
+        <MessageSquare className="size-3" aria-hidden />
+        {n}
+      </span>
+    </Tip>
   );
 }
 
@@ -105,22 +109,28 @@ export function WorktreeState({ repoId, path, showPath = false }: { repoId: stri
         {missing && <span className="text-warning">missing</span>}
         <LiveThreads path={path} />
         {dirty && (
-          <span className="flex items-center gap-0.5 text-warning" title={`${String(changes)} changed`} data-testid="worktree-dirty">
-            <CircleDot className="size-3" aria-label="dirty" />
-            {changes > 0 && changes}
-          </span>
+          <Tip label={`${String(changes)} changed`}>
+            <span className="flex items-center gap-0.5 text-warning" data-testid="worktree-dirty">
+              <CircleDot className="size-3" aria-label="dirty" />
+              {changes > 0 && changes}
+            </span>
+          </Tip>
         )}
         {ahead > 0 && (
-          <span className="flex items-center" title={`${String(ahead)} ahead`} data-testid="worktree-ahead">
-            <ArrowUp className="size-3" />
-            {ahead}
-          </span>
+          <Tip label={`${String(ahead)} ahead`}>
+            <span className="flex items-center" data-testid="worktree-ahead">
+              <ArrowUp className="size-3" />
+              {ahead}
+            </span>
+          </Tip>
         )}
         {behind > 0 && (
-          <span className="flex items-center" title={`${String(behind)} behind`} data-testid="worktree-behind">
-            <ArrowDown className="size-3" />
-            {behind}
-          </span>
+          <Tip label={`${String(behind)} behind`}>
+            <span className="flex items-center" data-testid="worktree-behind">
+              <ArrowDown className="size-3" />
+              {behind}
+            </span>
+          </Tip>
         )}
         <CleanableTag repoId={repoId} path={path} />
         {realBranch && <BranchPullRequest repoId={repoId} branch={realBranch} />}
@@ -129,7 +139,7 @@ export function WorktreeState({ repoId, path, showPath = false }: { repoId: stri
   );
 }
 
-/** A small icon button for a row action (mouse; the keyboard reaches the same commands through the palette). */
+/** A small icon button for a row action, named by its tooltip (mouse; the keyboard reaches the same commands through the palette). */
 export function RowAction({
   label,
   onClick,
@@ -147,12 +157,11 @@ export function RowAction({
   testId?: string;
   className?: string;
 }) {
-  return (
+  const button = (
     <button
       type="button"
       tabIndex={-1}
       aria-label={label}
-      title={label}
       disabled={disabled}
       data-testid={testId}
       className={cn(
@@ -172,4 +181,6 @@ export function RowAction({
       {children}
     </button>
   );
+  // A disabled button gets no pointer events: its tooltip hangs on a span around it.
+  return <Tip label={label}>{disabled ? <span className="flex shrink-0">{button}</span> : button}</Tip>;
 }

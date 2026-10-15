@@ -15,6 +15,7 @@ import { useUiStore } from "@/stores/ui";
 import { monthName, prKey, repoName } from "./format";
 import { Age, ChecksBadge, Freshness, PrStateIcon, ReviewBadge, SectionTitle } from "./PrBits";
 import { RowList } from "./RowList";
+import { Tip } from "@/components/ui/tooltip";
 
 /** The daemon polls every minute by default; older than a few polls plus slack is stale. */
 const STALE_AFTER_MS = 5 * 60_000;
@@ -49,21 +50,22 @@ function PrRow({ section, pr, viewer }: { section: Section; pr: PullRequestView;
   return (
     <NavRow
       navKey={prKey(section, pr)}
-      title={pr.url}
       activateOnClick
       onCmdClick={() => void openUrl(pr.url)}
       className={cn("grid h-full items-center gap-3 px-2 text-sm", columns[section])}>
-      <span className="truncate text-muted-foreground" title={pr.repoSlug}>
-        {repoName(pr.repoSlug)}
-      </span>
+      <Tip label={pr.repoSlug}>
+        <span className="truncate text-muted-foreground">{repoName(pr.repoSlug)}</span>
+      </Tip>
       <span className="flex items-center gap-1 text-muted-foreground tabular-nums">
         <PrStateIcon state={pr.state} draft={pr.draft} />#{pr.number}
       </span>
       {section !== "authored" && <span className="truncate text-muted-foreground">{author}</span>}
-      <span className="truncate" title={pr.title}>
-        {pr.draft && <span className="mr-1.5 rounded bg-muted px-1 text-[10px] text-muted-foreground uppercase">draft</span>}
-        {pr.title}
-      </span>
+      <Tip label={pr.title}>
+        <span className="truncate">
+          {pr.draft && <span className="mr-1.5 rounded bg-muted px-1 text-[10px] text-muted-foreground uppercase">draft</span>}
+          {pr.title}
+        </span>
+      </Tip>
       {section !== "merged" && <ChecksBadge checks={pr.checks} />}
       {section === "authored" && <ReviewBadge review={pr.review} />}
       <Age ms={section === "merged" ? pr.mergedAtMs : pr.updatedAtMs} className="text-right" />
@@ -206,7 +208,6 @@ export function PullRequestsPage() {
           type="button"
           onClick={toggle}
           className="rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground [--wails-draggable:no-drag] hover:bg-accent"
-          title="Switch between registered and all repositories"
           data-testid="prs-scope"
         >
           {includeAll ? "all repositories" : "registered repositories"}

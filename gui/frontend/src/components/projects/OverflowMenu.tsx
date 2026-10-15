@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { Ellipsis } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tip } from "@/components/ui/tooltip";
 
 /** One item of a row's overflow menu; "separator" draws a line. */
 export type OverflowItem =
@@ -31,25 +32,26 @@ export function OverflowMenu({ label, items, testId }: { label: string; items: r
   const picked = useRef<(() => void) | null>(null);
   return (
     <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <button
-          ref={triggerRef}
-          type="button"
-          tabIndex={-1}
-          aria-label={label}
-          title={label}
-          data-testid={testId}
-          className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground [&_svg]:size-3.5"
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-          onDoubleClick={(e) => {
-            e.stopPropagation();
-          }}
-        >
-          <Ellipsis />
-        </button>
-      </DropdownMenuTrigger>
+      <Tip label={label}>
+        <DropdownMenuTrigger asChild>
+          <button
+            ref={triggerRef}
+            type="button"
+            tabIndex={-1}
+            aria-label={label}
+            data-testid={testId}
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground [&_svg]:size-3.5"
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <Ellipsis />
+          </button>
+        </DropdownMenuTrigger>
+      </Tip>
       <DropdownMenuContent
         align="end"
         className="min-w-[200px]"

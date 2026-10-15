@@ -22,6 +22,7 @@ import { findWorktree, useReposStore } from "@/stores/repos";
 import { useResource } from "@/stores/resource";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
 import { buildFileRows, describeChanges, fileTotals, type FileRow } from "./files";
+import { Tip } from "@/components/ui/tooltip";
 
 const FILE_ROW_H = 24;
 const LOG_ROW_H = 24;
@@ -55,7 +56,11 @@ function SyncLine({ st }: { st: GitStatusView }) {
         <span className="text-muted-foreground">Working tree: </span>
         <span className={st.dirty ? "text-warning" : "text-muted-foreground"}>{describeChanges(st)}</span>
       </span>
-      {st.error && <span className="text-destructive" title={st.error}>status failed</span>}
+      {st.error && (
+        <Tip label={st.error}>
+          <span className="text-destructive">status failed</span>
+        </Tip>
+      )}
     </div>
   );
 }
@@ -94,7 +99,7 @@ function Counts({ added, deleted, binary }: { added: number; deleted: number; bi
 
 function FileLine({ row }: { row: FileRow }) {
   return (
-    <NavRow navKey={row.key} title={row.file?.oldPath ? `${row.file.oldPath} → ${row.path}` : row.path} className="flex h-full items-center gap-2 px-2 font-mono text-xs">
+    <NavRow navKey={row.key} tip={row.file?.oldPath ? `${row.file.oldPath} → ${row.path}` : row.path} className="flex h-full items-center gap-2 px-2 font-mono text-xs">
       <span className={cn("w-7 shrink-0 text-center", row.kind === "file" ? statusColor[row.status] : "text-muted-foreground")} data-status={row.status}>
         {row.kind === "file" ? row.status : ""}
       </span>
@@ -118,7 +123,7 @@ function LogLine({ e }: { e: LogEntryView }) {
   return (
     <NavRow
       navKey={`l:${e.sha}`}
-      title={`${e.sha}\n${e.authorName} <${e.authorEmail}>`}
+      tip={`${e.sha}\n${e.authorName} <${e.authorEmail}>`}
       className="grid h-full grid-cols-[4.5rem_minmax(0,1fr)_3rem_minmax(6rem,10rem)] items-center gap-3 px-2 text-xs @max-[420px]:grid-cols-[4rem_minmax(0,1fr)_2.5rem] @max-[420px]:gap-2"
     >
       <span className="font-mono text-warning/80">{e.shortSha}</span>
@@ -131,7 +136,7 @@ function LogLine({ e }: { e: LogEntryView }) {
 
 function CheckLine({ c }: { c: CheckRunView }) {
   return (
-    <NavRow navKey={`c:${c.url || c.name}`} title={c.url} className="flex h-6 items-center gap-2 px-2 pl-6 font-mono text-xs @max-[420px]:pl-2">
+    <NavRow navKey={`c:${c.url || c.name}`} className="flex h-6 items-center gap-2 px-2 pl-6 font-mono text-xs @max-[420px]:pl-2">
       {c.workflow && <span className="min-w-0 shrink truncate text-muted-foreground">{c.workflow}:</span>}
       <span className="min-w-0 truncate text-destructive">{c.name}</span>
       <span className="shrink-0 text-muted-foreground @max-[420px]:hidden">{c.conclusion.replace(/_/g, " ")}</span>
@@ -144,7 +149,6 @@ function PrLine({ pr, prefix, viewer }: { pr: PullRequestView; prefix: string; v
   return (
     <NavRow
       navKey={`${prefix}:${String(pr.number)}`}
-      title={pr.url}
       activateOnClick
       onCmdClick={() => void openUrl(pr.url)}
       className="flex h-6 items-center gap-2 px-2 pl-6 text-xs @max-[420px]:pl-2"
@@ -210,7 +214,11 @@ function GithubActivity({ activity, activityError, branch, branchPrs }: {
         ) : (
           <span className="text-muted-foreground">not fetched yet</span>
         )}
-        {stats.lastError && <span className="ml-2 text-destructive" title={stats.lastError}>(last poll failed)</span>}
+        {stats.lastError && (
+          <Tip label={stats.lastError}>
+            <span className="ml-2 text-destructive">(last poll failed)</span>
+          </Tip>
+        )}
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-x-1.5" data-testid="gh-default-branch" data-ci={summary?.tone ?? "unknown"}>
         {ci && summary ? (
@@ -238,7 +246,11 @@ function GithubActivity({ activity, activityError, branch, branchPrs }: {
       )}
       <div className="mt-1 text-muted-foreground">
         Your PRs for <span className="font-mono">{branch || "(detached)"}</span>
-        {branchPrs.error && <span className="ml-2 text-destructive" title={branchPrs.error}>(last poll failed)</span>}
+        {branchPrs.error && (
+          <Tip label={branchPrs.error}>
+            <span className="ml-2 text-destructive">(last poll failed)</span>
+          </Tip>
+        )}
       </div>
       {!branch ? null : branchPrs.fetchedAtMs === null && branchPrs.prs.length === 0 ? (
         <div className="pl-6 text-muted-foreground">checking GitHub…</div>
@@ -484,9 +496,9 @@ export function WorktreePanelView({ repoId, path }: { repoId: string; path: stri
             )}
           </span>
         </h2>
-        <span className="min-w-0 truncate font-mono text-xs text-muted-foreground" title={path}>
-          {tildify(path)}
-        </span>
+        <Tip label={path} align="start">
+          <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{tildify(path)}</span>
+        </Tip>
       </header>
       {!repo ? (
         <p className="text-sm text-muted-foreground">Project not found.</p>
