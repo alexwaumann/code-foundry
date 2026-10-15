@@ -1,6 +1,7 @@
 import { ArrowDownUp, Bot, Check, ChevronDown, ChevronRight, CircleCheck, CircleDashed, CircleDot, CircleMinus, CircleX, Clock, ExternalLink, FileCode2, FileDiff, MessageSquare, Users } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 import type { CheckView, PullRequestCommentView, PullRequestDetailView, PullRequestReviewerView, ReviewThreadView } from "@/api/gh";
+import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
@@ -55,21 +56,23 @@ const reviewerIcon: Record<ReviewerStatus, { icon: typeof Check; cls: string } |
 function Reviewer({ r }: { r: PullRequestReviewerView }) {
   const { status, label } = reviewerStatus(r);
   const icon = reviewerIcon[status];
+  // The review state is an icon on the chip: the tooltip names it.
   return (
-    <span
-      className={cn("inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-full border border-border bg-muted/40 pr-2 pl-0.5 text-xs", r.stale && "opacity-70")}
-      title={label ? `${r.login}: ${label}` : r.login}
-      data-testid="pr-reviewer"
-      data-login={r.login}
-      data-status={status}
-      data-stale={r.stale}
-    >
-      <Avatar login={r.login} src={r.avatarUrl} size={18} />
-      <span className="max-w-36 min-w-0 truncate">{r.login}</span>
-      {r.isBot && <Bot className="size-3 shrink-0 text-muted-foreground" aria-label="bot" />}
-      {icon && <icon.icon className={cn("size-3.5 shrink-0", icon.cls)} aria-label={label} />}
-      {r.requested && r.state !== "" && <Clock className={cn("size-3 shrink-0", toneText.pending)} aria-hidden />}
-    </span>
+    <Tip label={label ? `${r.login}: ${label}` : null}>
+      <span
+        className={cn("inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-full border border-border bg-muted/40 pr-2 pl-0.5 text-xs", r.stale && "opacity-70")}
+        data-testid="pr-reviewer"
+        data-login={r.login}
+        data-status={status}
+        data-stale={r.stale}
+      >
+        <Avatar login={r.login} src={r.avatarUrl} size={18} />
+        <span className="max-w-36 min-w-0 truncate">{r.login}</span>
+        {r.isBot && <Bot className="size-3 shrink-0 text-muted-foreground" aria-label="bot" />}
+        {icon && <icon.icon className={cn("size-3.5 shrink-0", icon.cls)} aria-label={label} />}
+        {r.requested && r.state !== "" && <Clock className={cn("size-3 shrink-0", toneText.pending)} aria-hidden />}
+      </span>
+    </Tip>
   );
 }
 
@@ -91,26 +94,29 @@ const checkIcon = { success: CircleCheck, failure: CircleX, pending: CircleDot, 
 function CheckRow({ c, now }: { c: CheckView; now: number }) {
   const tone = checkTone(c);
   const Icon = checkIcon[tone];
+  // The name and description (the row has no room for the latter; without one, only when
+  // the name is cut). On the item: a check without a URL is a disabled button (no pointer events).
   return (
-    <li>
-      <button
-        type="button"
-        disabled={!c.url}
-        className="group flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-[13px] outline-none enabled:hover:bg-accent/60 focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default"
-        title={[c.name, c.description, c.url].filter(Boolean).join("\n")}
-        data-testid="pr-check"
-        data-tone={tone}
-        onClick={() => void openUrl(c.url)}
-      >
-        <Icon className={cn("size-3.5 shrink-0", toneText[tone], tone === "pending" && c.status === "in_progress" && "animate-pulse")} aria-label={tone} />
-        <span className="min-w-0 truncate">{c.name}</span>
-        {c.workflow && <span className="min-w-0 shrink truncate text-xs text-muted-foreground">{c.workflow}</span>}
-        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums" data-testid="pr-check-meta">
-          {checkMeta(c, now)}
-        </span>
-        <ExternalLink className={cn("size-3 shrink-0 text-muted-foreground opacity-0", c.url && "group-hover:opacity-100")} aria-hidden />
-      </button>
-    </li>
+    <Tip label={[c.name, c.description].filter(Boolean).join("\n")} whenTruncated={!c.description} align="start">
+      <li>
+        <button
+          type="button"
+          disabled={!c.url}
+          className="group flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-[13px] outline-none enabled:hover:bg-accent/60 focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default"
+          data-testid="pr-check"
+          data-tone={tone}
+          onClick={() => void openUrl(c.url)}
+        >
+          <Icon className={cn("size-3.5 shrink-0", toneText[tone], tone === "pending" && c.status === "in_progress" && "animate-pulse")} aria-label={tone} />
+          <span className="min-w-0 truncate">{c.name}</span>
+          {c.workflow && <span className="min-w-0 shrink truncate text-xs text-muted-foreground">{c.workflow}</span>}
+          <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums" data-testid="pr-check-meta">
+            {checkMeta(c, now)}
+          </span>
+          <ExternalLink className={cn("size-3 shrink-0 text-muted-foreground opacity-0", c.url && "group-hover:opacity-100")} aria-hidden />
+        </button>
+      </li>
+    </Tip>
   );
 }
 
@@ -149,20 +155,21 @@ function CommentHeader({ c, now, verb }: { c: PullRequestCommentView; now: numbe
         </span>
         {c.authorIsBot && <span className="rounded border px-1 text-[10px] text-muted-foreground">bot</span>}
         {verb}
-        <span className="whitespace-nowrap text-muted-foreground" title={c.createdAtMs === null ? undefined : new Date(c.createdAtMs).toLocaleString()}>
-          {ago(c.createdAtMs, now)}
-        </span>
+        <Tip label={c.createdAtMs === null ? null : new Date(c.createdAtMs).toLocaleString()}>
+          <span className="whitespace-nowrap text-muted-foreground">{ago(c.createdAtMs, now)}</span>
+        </Tip>
       </span>
       {c.url && (
-        <button
-          type="button"
-          className="ml-auto flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 outline-none group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring"
-          aria-label="Open on GitHub"
-          title="Open on GitHub"
-          onClick={() => void openUrl(c.url)}
-        >
-          <ExternalLink className="size-3" aria-hidden />
-        </button>
+        <Tip label="Open on GitHub">
+          <button
+            type="button"
+            className="ml-auto flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 outline-none group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring"
+            aria-label="Open on GitHub"
+            onClick={() => void openUrl(c.url)}
+          >
+            <ExternalLink className="size-3" aria-hidden />
+          </button>
+        </Tip>
       )}
     </div>
   );
@@ -210,10 +217,12 @@ function Thread({ t, now }: { t: ReviewThreadView; now: number }) {
       <header className="flex items-center gap-2 border-b border-border px-2.5 py-1.5 text-xs">
         <FileCode2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
         {/* The directory gives way first, so the file and line stay readable. */}
-        <span className="flex min-w-0 font-mono" title={threadLocation(t)} data-testid="pr-thread-location">
-          <span className="min-w-0 truncate text-muted-foreground">{dirOf(t.path)}</span>
-          <span className="shrink-0">{threadLocation({ path: baseOf(t.path), line: t.line })}</span>
-        </span>
+        <Tip label={threadLocation(t)} whenTruncated align="start">
+          <span className="flex min-w-0 font-mono" data-testid="pr-thread-location">
+            <span className="min-w-0 truncate text-muted-foreground">{dirOf(t.path)}</span>
+            <span className="shrink-0">{threadLocation({ path: baseOf(t.path), line: t.line })}</span>
+          </span>
+        </Tip>
         <span className="ml-auto flex shrink-0 gap-1">
           {t.isOutdated && <Badge tone="pending">Outdated</Badge>}
           {t.isResolved ? <Badge tone="success">Resolved</Badge> : <Badge tone="neutral">Unresolved</Badge>}
@@ -247,24 +256,25 @@ function Conversation({ items }: { items: ConversationItem[] }) {
   );
 }
 
-/** "Newest first" / "Oldest first". `compact` keeps only the icon (and the tooltip) below 480px. */
+/** "Newest first" / "Oldest first". `compact` keeps only the icon below 480px, and the label moves to a tooltip. */
 function OrderToggle({ tabKey, which, compact = false }: { tabKey: string; which: "commentOrder" | "timelineOrder"; compact?: boolean }) {
   const order = usePrPanelStore((s) => s.byTab[tabKey]?.[which] ?? "newest");
   const label = order === "newest" ? "Newest first" : "Oldest first";
   return (
-    <button
-      type="button"
-      title={compact ? `${label} (click to reverse)` : undefined}
-      className="flex h-6 shrink-0 items-center gap-1 rounded px-1.5 text-xs whitespace-nowrap text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-      data-testid={which === "commentOrder" ? "pr-comment-order" : "pr-timeline-order"}
-      data-order={order}
-      onClick={() => {
-        toggleOrder(tabKey, which);
-      }}
-    >
-      <ArrowDownUp className="size-3" aria-hidden />
-      <span className={compact ? "@max-[480px]:sr-only" : undefined}>{label}</span>
-    </button>
+    <Tip label={label} whenTruncated>
+      <button
+        type="button"
+        className="flex h-6 shrink-0 items-center gap-1 rounded px-1.5 text-xs whitespace-nowrap text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+        data-testid={which === "commentOrder" ? "pr-comment-order" : "pr-timeline-order"}
+        data-order={order}
+        onClick={() => {
+          toggleOrder(tabKey, which);
+        }}
+      >
+        <ArrowDownUp className="size-3" aria-hidden />
+        <span className={compact ? "@max-[480px]:sr-only" : undefined}>{label}</span>
+      </button>
+    </Tip>
   );
 }
 

@@ -1,4 +1,5 @@
 import { GitMerge } from "lucide-react";
+import { Tip } from "@/components/ui/tooltip";
 import { cleanableTitle } from "@/lib/projects";
 import { findWorktree, useReposStore } from "@/stores/repos";
 import { useCleanable } from "./useCleanable";
@@ -9,13 +10,11 @@ export function CleanableTag({ repoId, path }: { repoId: string; path: string })
   const baseRef = useReposStore((s) => findWorktree(s, repoId, path)?.status.baseRef ?? "");
   if (!cleanable) return null;
   return (
-    <span
-      className="flex shrink-0 items-center gap-[3px] rounded-sm bg-success/15 px-1 text-[10px] leading-4 font-medium text-success"
-      title={cleanableTitle(baseRef)}
-      data-testid="worktree-cleanable"
-    >
-      <GitMerge className="size-2.5" aria-hidden />
-      in main
-    </span>
+    <Tip label={cleanableTitle(baseRef)}>
+      <span className="flex shrink-0 items-center gap-[3px] rounded-sm bg-success/15 px-1 text-[10px] leading-4 font-medium text-success" data-testid="worktree-cleanable">
+        <GitMerge className="size-2.5" aria-hidden />
+        in main
+      </span>
+    </Tip>
   );
 }

@@ -3,6 +3,7 @@ import { AlarmClock, AlarmClockOff, Calendar, CalendarClock, Clock, Sun, type Lu
 import { Button } from "@/components/ui/button";
 import { ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger } from "@/components/ui/context-menu";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tip } from "@/components/ui/tooltip";
 import { isStartable } from "@/keys/bindings";
 import { snoozePresets, type SnoozePresetId } from "@/lib/snooze";
 import { useCommandsStore } from "@/stores/commands";
@@ -106,29 +107,32 @@ export function SnoozeButton({ sessionId }: { sessionId: string }) {
   };
   if (snoozed)
     return (
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        title="Unsnooze Thread"
-        aria-label="Unsnooze Thread"
-        tabIndex={-1}
-        data-testid="pane-unsnooze"
-        onMouseDown={keepFocus}
-        onClick={() => {
-          void snoozeSession(sessionId, null);
-        }}
-      >
-        <AlarmClockOff aria-hidden className="size-3.5" />
-      </Button>
+      <Tip label="Unsnooze Thread">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Unsnooze Thread"
+          tabIndex={-1}
+          data-testid="pane-unsnooze"
+          onMouseDown={keepFocus}
+          onClick={() => {
+            void snoozeSession(sessionId, null);
+          }}
+        >
+          <AlarmClockOff aria-hidden className="size-3.5" />
+        </Button>
+      </Tip>
     );
   return (
     <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" size="icon-xs" title="Snooze Thread" aria-label="Snooze Thread" tabIndex={-1} data-testid="pane-snooze" onMouseDown={keepFocus}>
-          <AlarmClock aria-hidden className="size-3.5" />
-        </Button>
-      </DropdownMenuTrigger>
+      <Tip label="Snooze Thread">
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="ghost" size="icon-xs" aria-label="Snooze Thread" tabIndex={-1} data-testid="pane-snooze" onMouseDown={keepFocus}>
+            <AlarmClock aria-hidden className="size-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+      </Tip>
       <DropdownMenuContent align="end" data-testid="pane-snooze-presets">
         <SnoozePresetItems id={sessionId} Item={DropdownMenuItem} Separator={DropdownMenuSeparator} />
       </DropdownMenuContent>

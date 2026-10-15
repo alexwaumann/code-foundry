@@ -2,6 +2,7 @@ import { ChevronDown, GitMerge, Loader2 } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { pullRequestKey } from "@/stores/gh";
 import { mergePullRequest, usePrPanelStore } from "@/stores/prPanel";
@@ -39,33 +40,35 @@ export function MergeButton({ prRef, detail }: { prRef: PrRef; detail: PullReque
         if (!next || !blocked) setOpen(next);
       }}
     >
-      <DropdownMenuTrigger asChild>
-        <button
-          ref={ref}
-          type="button"
-          data-testid="pr-merge-button"
-          aria-label={busy ? "Merging…" : "Merge"}
-          aria-disabled={blocked || undefined}
-          aria-busy={busy || undefined}
-          aria-describedby={a.reason ? reasonId : undefined}
-          data-reason={a.reason ?? undefined}
-          title={a.reason ?? undefined}
-          className={cn(
-            "flex h-7 shrink-0 items-center gap-1 rounded-md bg-primary pr-1.5 pl-2 text-[13px] font-medium text-primary-foreground shadow-xs outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/60 @max-[340px]:pl-1.5",
-            blocked && "cursor-default hover:bg-primary",
-            a.reason !== null && "opacity-50",
-          )}
-        >
-          {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <GitMerge className="size-3.5" aria-hidden />}
-          <span className="@max-[340px]:sr-only">Merge</span>
-          <ChevronDown className="size-3.5 opacity-80" aria-hidden />
-          {a.reason && (
-            <span id={reasonId} className="sr-only">
-              {a.reason}
-            </span>
-          )}
-        </button>
-      </DropdownMenuTrigger>
+      {/* A blocked merge says why in its tooltip; the button is aria-disabled, so it still gets hover. */}
+      <Tip label={a.reason}>
+        <DropdownMenuTrigger asChild>
+          <button
+            ref={ref}
+            type="button"
+            data-testid="pr-merge-button"
+            aria-label={busy ? "Merging…" : "Merge"}
+            aria-disabled={blocked || undefined}
+            aria-busy={busy || undefined}
+            aria-describedby={a.reason ? reasonId : undefined}
+            data-reason={a.reason ?? undefined}
+            className={cn(
+              "flex h-7 shrink-0 items-center gap-1 rounded-md bg-primary pr-1.5 pl-2 text-[13px] font-medium text-primary-foreground shadow-xs outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/60 @max-[340px]:pl-1.5",
+              blocked && "cursor-default hover:bg-primary",
+              a.reason !== null && "opacity-50",
+            )}
+          >
+            {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <GitMerge className="size-3.5" aria-hidden />}
+            <span className="@max-[340px]:sr-only">Merge</span>
+            <ChevronDown className="size-3.5 opacity-80" aria-hidden />
+            {a.reason && (
+              <span id={reasonId} className="sr-only">
+                {a.reason}
+              </span>
+            )}
+          </button>
+        </DropdownMenuTrigger>
+      </Tip>
       <DropdownMenuContent
         align="end"
         collisionBoundary={boundary}
@@ -75,9 +78,11 @@ export function MergeButton({ prRef, detail }: { prRef: PrRef; detail: PullReque
         data-region="panel"
         onKeyDown={stopPlainKeys}
       >
-        <DropdownMenuLabel className="truncate" title={`Merge into ${pr.baseRef}`}>
-          Merge into <span className="font-mono">{pr.baseRef}</span>
-        </DropdownMenuLabel>
+        <Tip label={`Merge into ${pr.baseRef}`} whenTruncated side="left">
+          <DropdownMenuLabel className="truncate">
+            Merge into <span className="font-mono">{pr.baseRef}</span>
+          </DropdownMenuLabel>
+        </Tip>
         {a.notes.map((n) => (
           <p key={n} className="px-2 pb-1.5 text-xs text-warning" data-testid="pr-merge-note">
             {n}

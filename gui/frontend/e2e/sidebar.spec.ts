@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, DEFAULT_ORDER, holdSessions, invocations, mockPost, mockUrl, openApp, openProjects, resetMock, row } from "./fixtures";
+import { CF, DEFAULT_ORDER, expectTooltip, holdSessions, invocations, mockPost, mockUrl, openApp, openProjects, resetMock, row } from "./fixtures";
 
 /** Where the mock (like the daemon) puts a repo's worktree for a cf/<name> branch. */
 const WT = "/Users/dev/.code-foundry/worktrees/alexwaumann";
@@ -78,12 +78,12 @@ test("Notifications: the count over the bell jumps to the waiting thread; with n
   const bell = page.getByTestId("sidebar-notifications");
   // The mock's s-2 waits on the user.
   await expect(bell.getByTestId("attention-badge")).toHaveText("1");
-  await expect(bell).toHaveAttribute("title", "1 thread needs attention");
+  await expectTooltip(page, bell, "1 thread needs attention");
   await bell.click();
   await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
 
   await mockPost("session/status?id=s-2&status=idle");
-  await expect(bell).toHaveAttribute("title", "No threads need attention");
+  await expectTooltip(page, bell, "No threads need attention");
   await expect(bell).toHaveAttribute("aria-disabled", "true");
   await expect(bell.getByTestId("attention-badge")).toHaveCount(0);
   // aria-disabled, not disabled, so the tooltip still shows; a forced click does nothing.

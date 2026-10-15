@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, Copy, Play } from "lucide-react";
+import { Tip } from "@/components/ui/tooltip";
 import { copyText } from "@/lib/clipboard";
 import { isStreamingBlock, runnableCommand } from "@/lib/codeActions";
 import { runInThreadTerminal } from "@/stores/bottomActions";
@@ -26,22 +27,23 @@ export function CopyButton({ text, label = "Copy code" }: { text: string; label?
     };
   }, [copied]);
   return (
-    <button
-      type="button"
-      className="cf-code-btn"
-      aria-label={copied ? "Copied" : label}
-      title={copied ? undefined : label}
-      data-copied={copied || undefined}
-      data-testid="code-copy"
-      onClick={() => {
-        void copyText(text).then(() => {
-          setCopied(true);
-        });
-      }}
-    >
-      {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-      {copied && <span>Copied</span>}
-    </button>
+    <Tip label={copied ? null : label}>
+      <button
+        type="button"
+        className="cf-code-btn"
+        aria-label={copied ? "Copied" : label}
+        data-copied={copied || undefined}
+        data-testid="code-copy"
+        onClick={() => {
+          void copyText(text).then(() => {
+            setCopied(true);
+          });
+        }}
+      >
+        {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+        {copied && <span>Copied</span>}
+      </button>
+    </Tip>
   );
 }
 
@@ -61,18 +63,19 @@ function RunButton({ lang, code }: { lang: string; code: string }) {
   const command = run ? runnableCommand(lang, code) : null;
   if (!run || !can || command === null || isStreamingBlock(run.text, code, run.streaming)) return null;
   return (
-    <button
-      type="button"
-      className="cf-code-btn"
-      aria-label="Run in terminal"
-      title="Run in terminal"
-      data-testid="code-run"
-      onClick={() => {
-        void runInThreadTerminal(run.sessionId, command);
-      }}
-    >
-      <Play aria-hidden />
-    </button>
+    <Tip label="Run in terminal">
+      <button
+        type="button"
+        className="cf-code-btn"
+        aria-label="Run in terminal"
+        data-testid="code-run"
+        onClick={() => {
+          void runInThreadTerminal(run.sessionId, command);
+        }}
+      >
+        <Play aria-hidden />
+      </button>
+    </Tip>
   );
 }
 

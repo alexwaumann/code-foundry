@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
 import type { PullRequestDetailView, PullRequestView } from "@/api/gh";
 import type { LinkedPullRequestView, SessionView } from "@/api/session";
+import { tooltipText } from "@/test/tooltip";
 
 const startCommandNamed = vi.hoisted(() => vi.fn(() => true));
 vi.mock("@/keys/bindings", async (orig) => ({ ...(await orig<typeof import("@/keys/bindings")>()), startCommandNamed }));
@@ -84,7 +85,7 @@ describe("HeaderActions", () => {
     setThread({});
     render(<HeaderActions sessionId="s-1" />);
     const b = screen.getByRole("button", { name: "Snooze Thread" });
-    expect(b.getAttribute("title")).toBe("Snooze Thread");
+    expect(tooltipText(b)).toBe("Snooze Thread");
     fireEvent.keyDown(b, { key: "Enter" });
     const items = screen.getAllByTestId("snooze-preset");
     expect(items.map((i) => i.dataset.preset)).toEqual(["1h", "3h", "tomorrow", "next-week"]);

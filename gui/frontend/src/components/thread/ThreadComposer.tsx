@@ -11,6 +11,7 @@ import { PromptEditor, type EditorTrigger, type PromptEditorHandle } from "@/com
 import { TagMultiProjectContext } from "@/components/compose/tagContext";
 import { useNoProjectThread } from "@/components/session/useNoProject";
 import { useCommandSource, useCompletion, useFileSource, useSkillSource } from "@/components/compose/useCompletion";
+import { Tip } from "@/components/ui/tooltip";
 import { choiceLabel, EFFORT_CHOICES, PERMISSION_CHOICES, type ComposePermission } from "@/lib/compose";
 import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
 import { useNow } from "@/lib/clock";
@@ -418,17 +419,21 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
             contentClassName="w-60"
             data-testid="thread-permission-mode"
           />
-          <button
-            type="button"
-            disabled={sending}
-            aria-label="Attach images"
-            title="Attach images"
-            data-testid="thread-attach"
-            className="ml-auto flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
-            onClick={() => fileRef.current?.click()}
-          >
-            <Paperclip className="size-4" />
-          </button>
+          {/* The span carries the tooltip while the button is disabled (no pointer events). */}
+          <Tip label="Attach images">
+            <span className="ml-auto flex">
+              <button
+                type="button"
+                disabled={sending}
+                aria-label="Attach images"
+                data-testid="thread-attach"
+                className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+                onClick={() => fileRef.current?.click()}
+              >
+                <Paperclip className="size-4" />
+              </button>
+            </span>
+          </Tip>
           <input
             ref={fileRef}
             type="file"
@@ -455,22 +460,26 @@ export function ThreadComposer({ sessionId, pending, busy }: { sessionId: string
               Interrupt
             </button>
           )}
-          <button
-            type="button"
-            disabled={!canSend}
-            aria-label={phase === "attaching" ? "Attaching images…" : sending ? "Sending…" : "Send"}
-            title="Send"
-            data-testid="thread-send"
-            data-phase={phase}
-            className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground outline-none transition-all hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-40"
-            // A click leaves the caret in the prompt, so it is focused again after the send.
-            onMouseDown={(e) => {
-              e.preventDefault();
-            }}
-            onClick={send}
-          >
-            {sending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <ArrowUp className="size-4" aria-hidden />}
-          </button>
+          {/* The span carries the tooltip while the button is disabled (no pointer events). */}
+          <Tip label="Send">
+            <span className="flex">
+              <button
+                type="button"
+                disabled={!canSend}
+                aria-label={phase === "attaching" ? "Attaching images…" : sending ? "Sending…" : "Send"}
+                data-testid="thread-send"
+                data-phase={phase}
+                className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground outline-none transition-all hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-40"
+                // A click leaves the caret in the prompt, so it is focused again after the send.
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                }}
+                onClick={send}
+              >
+                {sending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <ArrowUp className="size-4" aria-hidden />}
+              </button>
+            </span>
+          </Tip>
         </div>
         {effortPending && live && (
           <p className="col-span-2 px-4 pb-2 text-xs text-muted-foreground" role="status" data-testid="thread-effort-pending">

@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { MOCK_TOKEN } from "../playwright.config";
-import { emit, invocations, mockUrl, openApp, openStreams, resetMock, row, threadPrompt } from "./fixtures";
+import { emit, expectTooltip, invocations, mockUrl, openApp, openStreams, resetMock, row, threadPrompt } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -81,7 +81,7 @@ test("the header toggle shows the empty surface list and hides the panel again",
   await expect(panel(page)).toHaveCount(0);
   const toggle = page.getByTestId("thread-header").getByTestId("panel-toggle");
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
-  await expect(toggle).toHaveAttribute("title", "Toggle Side Panel");
+  await expectTooltip(page, toggle, "Toggle Side Panel");
 
   await toggle.click();
   await expect(panel(page)).toBeVisible();
@@ -555,7 +555,7 @@ test("expand fills the content area, keeps the thread mounted, and restores the 
 
   const expand = panel(page).getByTestId("panel-header").getByTestId("panel-expand");
   await expect(expand).toHaveAttribute("aria-pressed", "false");
-  await expect(expand).toHaveAttribute("title", "Expand Side Panel");
+  await expectTooltip(page, expand, "Expand Side Panel");
   expect(await expandIcon(page)).toBe("maximize");
   // Left of the toggle, and not a window drag surface.
   expect((await box(page, "panel-expand")).right).toBeLessThanOrEqual((await panel(page).getByTestId("panel-toggle").boundingBox())?.x ?? 0);

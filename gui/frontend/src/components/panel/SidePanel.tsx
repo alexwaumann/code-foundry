@@ -6,6 +6,7 @@ import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dn
 import { CSS } from "@dnd-kit/utilities";
 import { Plus, X } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
+import { Tip } from "@/components/ui/tooltip";
 import { chordFromEvent } from "@/keys/chord";
 import { cn } from "@/lib/utils";
 import {
@@ -135,21 +136,22 @@ function TabButton({ panelKey, tab, active, focusable }: { panelKey: string; tab
         {Icon && <Icon className="size-3.5 shrink-0" aria-hidden />}
         <span className="truncate">{tab.title}</span>
       </button>
-      <button
-        type="button"
-        tabIndex={focusable ? 0 : -1}
-        aria-label={`Close ${tab.title}`}
-        title="Close tab"
-        className={cn(
-          "flex size-4 shrink-0 items-center justify-center rounded-sm outline-none hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring",
-          active || isDragging ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-        )}
-        onClick={() => {
-          closeTab(panelKey, tab.id);
-        }}
-      >
-        <X className="size-3" aria-hidden />
-      </button>
+      <Tip label="Close tab">
+        <button
+          type="button"
+          tabIndex={focusable ? 0 : -1}
+          aria-label={`Close ${tab.title}`}
+          className={cn(
+            "flex size-4 shrink-0 items-center justify-center rounded-sm outline-none hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring",
+            active || isDragging ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+          )}
+          onClick={() => {
+            closeTab(panelKey, tab.id);
+          }}
+        >
+          <X className="size-3" aria-hidden />
+        </button>
+      </Tip>
     </div>
   );
 }
@@ -200,7 +202,7 @@ function NewTabButton({ picking }: { picking: boolean }) {
     <CommandButton
       command="view.panel.new-tab"
       icon={Plus}
-      title="New tab"
+      tooltip="New tab"
       pressed={picking}
       className={cn(
         "size-7 [--wails-draggable:no-drag]",

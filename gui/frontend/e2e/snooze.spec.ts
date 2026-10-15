@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, mockPost, openApp, resetMock, row } from "./fixtures";
+import { expectTooltip, invocations, mockPost, openApp, resetMock, row } from "./fixtures";
 
 // Snoozed threads in the GUI (docs/notes/snooze-threads-2-sidebar.md). The default world
 // has two snoozed threads: s-8 ("Refactor the gh poller", a finished turn, wakes in 2.5 h)
@@ -259,7 +259,7 @@ test("a wake brings the thread back needing attention: Snooze ended in amber, co
   await expect(s8.getByTestId("row-status")).toHaveText("Snooze ended · just now");
   await expect(s8.getByTestId("row-status")).toHaveClass(/text-warning/);
   await expect(bell.getByTestId("attention-badge")).toHaveText("2");
-  await expect(bell).toHaveAttribute("title", "2 threads need attention");
+  await expectTooltip(page, bell, "2 threads need attention");
 
   // Its page: the disconnected card says so, in amber.
   await s8.click();

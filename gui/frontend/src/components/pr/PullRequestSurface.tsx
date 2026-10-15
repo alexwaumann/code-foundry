@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowLeft, CircleCheck, CircleDashed, CircleDot, CircleX, ExternalLink, FileDiff, GitCommitHorizontal, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, History, MessageSquare, SearchX, TriangleAlert } from "lucide-react";
 import { isNotFoundMessage, type PullRequestDetailView } from "@/api/gh";
+import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
@@ -39,17 +40,19 @@ export function ChecksHeadline({ d }: { d: PullRequestDetailView }) {
   const Icon = checksIcon[h.tone] ?? CircleDashed;
   const m = /^(\d+) (.*)$/.exec(h.text);
   return (
-    <span className={cn("flex min-w-0 items-center gap-1.5 text-xs whitespace-nowrap", toneText[h.tone])} title={h.text} data-testid="pr-checks-summary" data-tone={h.tone}>
-      <Icon className="size-3.5 shrink-0" aria-hidden />
-      {m ? (
-        <span className="min-w-0 truncate">
-          {m[1]}
-          <span className="@max-[340px]:sr-only"> {m[2]}</span>
-        </span>
-      ) : (
-        <span className="min-w-0 truncate @max-[340px]:sr-only">{h.text}</span>
-      )}
-    </span>
+    <Tip label={h.text} whenTruncated>
+      <span className={cn("flex min-w-0 items-center gap-1.5 text-xs whitespace-nowrap", toneText[h.tone])} data-testid="pr-checks-summary" data-tone={h.tone}>
+        <Icon className="size-3.5 shrink-0" aria-hidden />
+        {m ? (
+          <span className="min-w-0 truncate">
+            {m[1]}
+            <span className="@max-[340px]:sr-only"> {m[2]}</span>
+          </span>
+        ) : (
+          <span className="min-w-0 truncate @max-[340px]:sr-only">{h.text}</span>
+        )}
+      </span>
+    </Tip>
   );
 }
 
@@ -68,7 +71,6 @@ function Header({ d, prRef, panelKey, onAsk }: { d: PullRequestDetailView; prRef
         <button
           type="button"
           className="flex min-w-0 items-center gap-1 rounded text-[13px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-          title={`Open ${pr.url} on GitHub`}
           data-testid="pr-repo-link"
           onClick={() => void openUrl(pr.url)}
         >
@@ -86,10 +88,12 @@ function Header({ d, prRef, panelKey, onAsk }: { d: PullRequestDetailView; prRef
           {pr.title || `#${String(prRef.number)}`}
         </h2>
         <span className="flex shrink-0 items-center gap-1.5 pt-px">
-          <span className="flex items-center gap-1 px-1 text-[13px] text-muted-foreground tabular-nums" title={`${String(comments)} comments`} data-testid="pr-comment-count">
-            <MessageSquare className="size-3.5" aria-hidden />
-            {comments}
-          </span>
+          <Tip label={`${String(comments)} comments`}>
+            <span className="flex items-center gap-1 px-1 text-[13px] text-muted-foreground tabular-nums" data-testid="pr-comment-count">
+              <MessageSquare className="size-3.5" aria-hidden />
+              {comments}
+            </span>
+          </Tip>
           <StateBadge d={d} />
         </span>
       </div>
@@ -99,16 +103,20 @@ function Header({ d, prRef, panelKey, onAsk }: { d: PullRequestDetailView; prRef
           {pr.author || "ghost"}
         </span>
         <span className="text-muted-foreground">·</span>
-        <span className="shrink-0 text-muted-foreground" title={pr.updatedAtMs === null ? undefined : new Date(pr.updatedAtMs).toLocaleString()} data-testid="pr-updated">
-          updated {ago(pr.updatedAtMs, now) || "—"}
-        </span>
+        <Tip label={pr.updatedAtMs === null ? null : new Date(pr.updatedAtMs).toLocaleString()}>
+          <span className="shrink-0 text-muted-foreground" data-testid="pr-updated">
+            updated {ago(pr.updatedAtMs, now) || "—"}
+          </span>
+        </Tip>
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        <span className="flex max-w-full min-w-0 items-center gap-1.5 font-mono" data-testid="pr-branches" title={`${pr.headRef} into ${pr.baseRef}`}>
-          <span className="min-w-0 shrink truncate">{pr.baseRef}</span>
-          <ArrowLeft className="size-3 shrink-0" aria-hidden />
-          <span className="min-w-0 truncate">{pr.headRef}</span>
-        </span>
+        <Tip label={`${pr.headRef} into ${pr.baseRef}`} whenTruncated align="start">
+          <span className="flex max-w-full min-w-0 items-center gap-1.5 font-mono" data-testid="pr-branches">
+            <span className="min-w-0 shrink truncate">{pr.baseRef}</span>
+            <ArrowLeft className="size-3 shrink-0" aria-hidden />
+            <span className="min-w-0 truncate">{pr.headRef}</span>
+          </span>
+        </Tip>
         <span className="ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap tabular-nums" data-testid="pr-diffstat">
           <FileDiff className="size-3.5" aria-hidden />
           {pr.changedFiles} {pr.changedFiles === 1 ? "file" : "files"}
@@ -141,14 +149,13 @@ function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView; tabKey: s
         {innerTabs.map((t) => {
           const active = t.id === inner;
           const disabled = t.id === "code";
-          return (
+          const tab = (
             <button
               key={t.id}
               type="button"
               role="tab"
               aria-selected={active}
               disabled={disabled}
-              title={disabled ? "The diff view comes in a later step" : undefined}
               data-testid={`pr-tab-${t.id}`}
               className={cn(
                 "h-6 rounded-md px-2.5 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default disabled:opacity-55 @max-[340px]:px-2",
@@ -161,6 +168,14 @@ function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView; tabKey: s
               {t.label}
             </button>
           );
+          // Disabled: the reason hangs on a span around it (a disabled button gets no pointer events).
+          return disabled ? (
+            <Tip key={t.id} label="The diff view comes in a later step">
+              <span className="flex">{tab}</span>
+            </Tip>
+          ) : (
+            tab
+          );
         })}
       </div>
       <div className="ml-auto flex min-w-0 items-center gap-2 overflow-hidden" data-testid="pr-inner-bar-end">
@@ -170,15 +185,17 @@ function InnerTabBar({ d, tabKey, inner }: { d: PullRequestDetailView; tabKey: s
           <>
             <span className="flex shrink-0 items-center gap-2 text-xs whitespace-nowrap text-muted-foreground tabular-nums @max-[400px]:hidden" data-testid="pr-timeline-counts">
               {/* Timeline entries, not comments: the header's comment count includes thread replies the timeline leaves out. */}
-              <span className="flex items-center gap-1" title={`${String(entries)} timeline entries`}>
+              <span className="flex items-center gap-1">
                 <History className="size-3" aria-hidden />
                 {entries} {entries === 1 ? "entry" : "entries"}
               </span>
               <span>·</span>
-              <span className="flex items-center gap-1" title={`${String(d.commitCount)} commits`}>
-                <GitCommitHorizontal className="size-3.5" aria-hidden />
-                {d.commitCount}
-              </span>
+              <Tip label={`${String(d.commitCount)} commits`}>
+                <span className="flex items-center gap-1">
+                  <GitCommitHorizontal className="size-3.5" aria-hidden />
+                  {d.commitCount}
+                </span>
+              </Tip>
             </span>
             <OrderToggle tabKey={tabKey} which="timelineOrder" compact />
           </>

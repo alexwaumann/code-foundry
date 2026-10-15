@@ -18,6 +18,7 @@ import { SidePanel } from "@/components/panel/SidePanel";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { ThreadPane } from "@/components/thread/ThreadPane";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { UpdateDialog } from "@/components/update/UpdateDialog";
 import { installKeybindings } from "@/keys/bindings";
 import { startMenuCommands } from "@/keys/menu";
@@ -183,28 +184,33 @@ export function App() {
     // and bottom edges), with the selection's bottom terminal panel under it; the selection's side panel, when open, is a second pane to its
     // right (components/panel, docs/notes/side-panel.md). Nothing spans the title band
     // (components/window/titleBand.ts): the sidebar's top band and the pane headers fill it.
-    <div className="relative flex h-full flex-col overflow-hidden bg-sheet text-foreground">
-      {/* The sheet above the panes drags the window too (as the sidebar band and the pane
-          headers do), so a page without a header (dashboard, composer) still has a drag
-          surface when the sidebar is hidden. */}
-      <div className="absolute inset-x-0 top-0 h-2 [--wails-draggable:drag]" data-testid="window-drag-edge" aria-hidden />
-      <div className="flex min-h-0 flex-1">
-        <Sidebar />
-        <ContentColumn hidden={panelExpanded}>
-          <ContentPane>{settingsOpen ? <SettingsPage /> : usageOpen ? <UsagePage /> : <Content />}</ContentPane>
-        </ContentColumn>
-        <SidePanel />
+    // One TooltipProvider for the whole window (docs/notes/theme-3-tooltips.md): its 500 ms
+    // delay, and the skip delay when moving from one tooltip trigger to the next, apply
+    // across the sidebar, panes, panels and dialogs.
+    <TooltipProvider>
+      <div className="relative flex h-full flex-col overflow-hidden bg-sheet text-foreground">
+        {/* The sheet above the panes drags the window too (as the sidebar band and the pane
+            headers do), so a page without a header (dashboard, composer) still has a drag
+            surface when the sidebar is hidden. */}
+        <div className="absolute inset-x-0 top-0 h-2 [--wails-draggable:drag]" data-testid="window-drag-edge" aria-hidden />
+        <div className="flex min-h-0 flex-1">
+          <Sidebar />
+          <ContentColumn hidden={panelExpanded}>
+            <ContentPane>{settingsOpen ? <SettingsPage /> : usageOpen ? <UsagePage /> : <Content />}</ContentPane>
+          </ContentColumn>
+          <SidePanel />
+        </div>
+        <CommandPalette />
+        <HelpOverlay />
+        <ConfirmDialog />
+        <UpdateDialog />
+        <AddProjectDialog />
+        <PublishDialog />
+        <SnoozeDialog />
+        <ActionDialog />
+        <ActionRunDialog />
+        <Toaster theme={scheme} position="bottom-right" offset={{ bottom: 20, right: 20 }} />
       </div>
-      <CommandPalette />
-      <HelpOverlay />
-      <ConfirmDialog />
-      <UpdateDialog />
-      <AddProjectDialog />
-      <PublishDialog />
-      <SnoozeDialog />
-      <ActionDialog />
-      <ActionRunDialog />
-      <Toaster theme={scheme} position="bottom-right" offset={{ bottom: 20, right: 20 }} />
-    </div>
+    </TooltipProvider>
   );
 }

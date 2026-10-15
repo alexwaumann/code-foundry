@@ -2,6 +2,7 @@ import { memo, useMemo, useState } from "react";
 import { ImageIcon, X } from "lucide-react";
 import { TAG_ACCENT, tagClass } from "@/components/compose/tagStyle";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Tip } from "@/components/ui/tooltip";
 import { middleTruncate, tagLabel } from "@/lib/prompt";
 import { inlineImagePaths, parseUserMessage } from "@/lib/userMessage";
 import { useAttachmentUrl } from "@/stores/attachmentImages";
@@ -115,9 +116,11 @@ function Thumbnail({ path }: { path: string }) {
 function FileChip({ repoId, path }: { repoId: string; path: string }) {
   const project = useReposStore((s) => s.byId[repoId]?.name ?? repoId);
   return (
-    <span data-testid="thread-tag" data-tag-kind="file" data-path={path} title={`${project}/${path}`} className={tagClass(false, TAG_ACCENT.file)}>
-      <span className="truncate">{tagLabel({ tagKind: "file", repoId, path })}</span>
-    </span>
+    <Tip label={`${project}/${path}`}>
+      <span data-testid="thread-tag" data-tag-kind="file" data-path={path} className={tagClass(false, TAG_ACCENT.file)}>
+        <span className="truncate">{tagLabel({ tagKind: "file", repoId, path })}</span>
+      </span>
+    </Tip>
   );
 }
 

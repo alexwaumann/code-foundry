@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import type { AgentRunView } from "@/api/agents";
 import type { ThreadItemView, ToolCallView } from "@/api/thread";
+import { Tip } from "@/components/ui/tooltip";
 import { agentElapsedMs, fmtElapsed, parseAgentNote } from "@/lib/agents";
 import { copyText } from "@/lib/clipboard";
 import { useNow } from "@/lib/clock";
@@ -521,9 +522,11 @@ function AgentNoteRow({ note, atMs }: { note: ReturnType<typeof parseAgentNote> 
         {note.name}
       </span>
       {note.summary && (
-        <span className="sum" title={note.summary} data-testid="thread-agent-note-summary">
-          {note.summary}
-        </span>
+        <Tip label={note.summary} whenTruncated>
+          <span className="sum" data-testid="thread-agent-note-summary">
+            {note.summary}
+          </span>
+        </Tip>
       )}
       {atMs !== null && (
         <span className="ago">
@@ -612,9 +615,11 @@ const FooterRow = memo(function FooterRow({ row }: { row: Extract<TimelineRow, {
       </button>
       <span className="flex-1" />
       {row.finals.length > 0 && (
-        <button type="button" className="tb" aria-label="Copy answer" title="Copy answer" onClick={copy}>
-          <Copy />
-        </button>
+        <Tip label="Copy answer">
+          <button type="button" className="tb" aria-label="Copy answer" onClick={copy}>
+            <Copy />
+          </button>
+        </Tip>
       )}
     </div>
   );

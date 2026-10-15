@@ -3,6 +3,7 @@ import { RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "cn";
 import type { SettingFieldView } from "@/api/settings";
+import { Tip } from "@/components/ui/tooltip";
 import { chordFromEvent, formatChord } from "@/keys/chord";
 import { enumOptionLabel } from "@/lib/models";
 import { validateSetting } from "@/settings/validate";
@@ -213,18 +214,19 @@ export function SettingRow({ field }: { field: SettingFieldView }) {
           <div className={field.type === "bool" ? "flex flex-1 justify-end" : "min-w-0 flex-1"}>
             <Editor field={field} value={value} pending={pending} invalid={message !== null} commit={commit} setError={setError} />
           </div>
-          <button
-            type="button"
-            title={`Reset to default (${displayValue(field, field.defaultValue)})`}
-            aria-label={`Reset ${field.title}`}
-            className={cn("rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground", !modified && "invisible")}
-            disabled={pending || !modified}
-            onClick={() => {
-              commit("");
-            }}
-          >
-            <RotateCcw className="size-3.5" />
-          </button>
+          <Tip label={`Reset to default (${displayValue(field, field.defaultValue)})`}>
+            <button
+              type="button"
+              aria-label={`Reset ${field.title}`}
+              className={cn("rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground", !modified && "invisible")}
+              disabled={pending || !modified}
+              onClick={() => {
+                commit("");
+              }}
+            >
+              <RotateCcw className="size-3.5" />
+            </button>
+          </Tip>
         </div>
         {message && (
           <p className="text-xs break-words text-destructive" role="alert" data-testid="setting-error">

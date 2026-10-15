@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { ProjectsNav } from "@/components/projects/ProjectsPage";
 import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
+import { Tip } from "@/components/ui/tooltip";
 import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
 import { buildSections, FOOTERS, isSessionRow, rowCache, sessionKey, type FooterSection, type HeaderRow, type Row, type SessionRow } from "@/lib/tree";
 import { zoomFactor } from "@/lib/zoom";
@@ -317,51 +317,49 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   const emptyText = unavailable ? "Threads are unavailable on this daemon." : loaded ? null : streamError ? `Cannot list threads: ${streamError}. Retrying…` : "Loading…";
   return (
     <RowTooltipsEnabled value={menuRow === null}>
-      <TooltipProvider delayDuration={500}>
-        <ContextMenu
-          modal={false}
-          onOpenChange={(open) => {
-            if (!open) setMenuRow(null);
-          }}
-        >
-          <ContextMenuTrigger asChild>
-            <div
-              ref={listRef}
-              role="listbox"
-              aria-label="Threads"
-              tabIndex={0}
-              data-region="sidebar"
-              data-testid="thread-list"
-              aria-activedescendant={activeRow ? `row-${activeRow.key}` : undefined}
-              className="group flex min-h-0 flex-1 flex-col outline-none"
-              onKeyDown={onKeyDown}
-              onContextMenu={onContextMenu}
+      <ContextMenu
+        modal={false}
+        onOpenChange={(open) => {
+          if (!open) setMenuRow(null);
+        }}
+      >
+        <ContextMenuTrigger asChild>
+          <div
+            ref={listRef}
+            role="listbox"
+            aria-label="Threads"
+            tabIndex={0}
+            data-region="sidebar"
+            data-testid="thread-list"
+            aria-activedescendant={activeRow ? `row-${activeRow.key}` : undefined}
+            className="group flex min-h-0 flex-1 flex-col outline-none"
+            onKeyDown={onKeyDown}
+            onContextMenu={onContextMenu}
+          >
+            <PanelRows
+              rows={main}
+              sizeOf={sizeOf}
+              selectedKey={selectedKey}
+              cursorKey={shownCursor}
+              onActivate={activate}
+              scrollTo={scrollMain}
+              paddingStart={4}
+              paddingEnd={8}
+              testId="sidebar-main"
             >
-              <PanelRows
-                rows={main}
-                sizeOf={sizeOf}
-                selectedKey={selectedKey}
-                cursorKey={shownCursor}
-                onActivate={activate}
-                scrollTo={scrollMain}
-                paddingStart={4}
-                paddingEnd={8}
-                testId="sidebar-main"
-              >
-                {rows.length === 0 &&
-                  emptyText !== null && (
-                    // No threads (once loaded): the list is simply empty.
-                    <p className="px-2 py-4 text-xs break-words text-muted-foreground" data-testid="thread-list-empty">
-                      {emptyText}
-                    </p>
-                  )}
-              </PanelRows>
-              {FOOTERS.map(footer)}
-            </div>
-          </ContextMenuTrigger>
-          {menuRow && <RowMenu id={menuRow.sessionId} />}
-        </ContextMenu>
-      </TooltipProvider>
+              {rows.length === 0 &&
+                emptyText !== null && (
+                  // No threads (once loaded): the list is simply empty.
+                  <p className="px-2 py-4 text-xs break-words text-muted-foreground" data-testid="thread-list-empty">
+                    {emptyText}
+                  </p>
+                )}
+            </PanelRows>
+            {FOOTERS.map(footer)}
+          </div>
+        </ContextMenuTrigger>
+        {menuRow && <RowMenu id={menuRow.sessionId} />}
+      </ContextMenu>
     </RowTooltipsEnabled>
   );
 }
@@ -372,9 +370,11 @@ function SessionsUnavailable() {
   const error = useSessionsStore((s) => s.error);
   if (!unavailable) return null;
   return (
-    <p className="shrink-0 border-t border-sidebar-border px-2 py-1.5 text-[11px] text-muted-foreground" data-testid="sessions-unavailable" title={error ?? ""}>
-      Threads: service unavailable
-    </p>
+    <Tip label={error} side="right">
+      <p className="shrink-0 border-t border-sidebar-border px-2 py-1.5 text-[11px] text-muted-foreground" data-testid="sessions-unavailable">
+        Threads: service unavailable
+      </p>
+    </Tip>
   );
 }
 

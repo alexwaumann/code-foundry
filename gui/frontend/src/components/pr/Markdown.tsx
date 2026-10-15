@@ -3,6 +3,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema, type Options as SanitizeSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
 import { resolveLink } from "./model";
@@ -12,19 +13,26 @@ const baseComponents: Components = {
     const url = resolveLink(href);
     // A link whose target was stripped (javascript:, an anchor) is plain text: no href,
     // no pointer, nothing to click.
-    if (!url) return <span title={title ?? undefined}>{children}</span>;
+    // The tooltip is the link's markdown title, else where it goes (the window has no status bar).
+    if (!url)
+      return (
+        <Tip label={title}>
+          <span>{children}</span>
+        </Tip>
+      );
     return (
-      <a
-        href={url}
-        title={title ?? url}
-        onClick={(e) => {
-          // Never navigate the app's own webview: links open in the browser.
-          e.preventDefault();
-          void openUrl(url);
-        }}
-      >
-        {children}
-      </a>
+      <Tip label={title ?? url}>
+        <a
+          href={url}
+          onClick={(e) => {
+            // Never navigate the app's own webview: links open in the browser.
+            e.preventDefault();
+            void openUrl(url);
+          }}
+        >
+          {children}
+        </a>
+      </Tip>
     );
   },
   img: ({ src, alt }) => (typeof src === "string" && /^https:\/\//.test(src) ? <img src={src} alt={alt ?? ""} loading="lazy" referrerPolicy="no-referrer" /> : null),

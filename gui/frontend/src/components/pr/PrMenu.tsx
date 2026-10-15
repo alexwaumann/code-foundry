@@ -3,6 +3,7 @@ import { useCallback, useRef, useState, type ReactNode } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { updatedAgo } from "@/components/prs/format";
+import { Tip } from "@/components/ui/tooltip";
 import { formatChord } from "@/keys/chord";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
@@ -31,10 +32,12 @@ function RefreshHint({ fetchedAtMs, lastError, busy }: { fetchedAtMs: number | n
   if (busy) return <span data-testid="pr-menu-refresh-hint">Refreshing…</span>;
   const when = f.fetchedAtMs === null ? "Not fetched yet" : `U${updatedAgo(f.fetchedAtMs, now).slice(1)}`;
   return (
-    <span data-testid="pr-menu-refresh-hint" className={f.lastError ? "text-warning" : undefined} title={f.lastError || undefined}>
-      {when}
-      {f.lastError && " · last fetch failed"}
-    </span>
+    <Tip label={f.lastError} side="left">
+      <span data-testid="pr-menu-refresh-hint" className={f.lastError ? "text-warning" : undefined}>
+        {when}
+        {f.lastError && " · last fetch failed"}
+      </span>
+    </Tip>
   );
 }
 
@@ -89,18 +92,19 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
         setOpen(next);
       }}
     >
-      <DropdownMenuTrigger asChild>
-        <button
-          ref={ref}
-          type="button"
-          aria-label="Pull request actions"
-          title="More actions"
-          data-testid="pr-menu-button"
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring data-[state=open]:bg-accent"
-        >
-          <Ellipsis className="size-4" aria-hidden />
-        </button>
-      </DropdownMenuTrigger>
+      <Tip label="More actions">
+        <DropdownMenuTrigger asChild>
+          <button
+            ref={ref}
+            type="button"
+            aria-label="Pull request actions"
+            data-testid="pr-menu-button"
+            className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring aria-expanded:bg-accent"
+          >
+            <Ellipsis className="size-4" aria-hidden />
+          </button>
+        </DropdownMenuTrigger>
+      </Tip>
       <DropdownMenuContent
         align="end"
         collisionBoundary={boundary}

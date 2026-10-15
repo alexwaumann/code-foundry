@@ -1,4 +1,5 @@
 import { useContext, useEffect, useRef, type ReactNode } from "react";
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { navId, NavContext, type NavCtx } from "./nav";
 
@@ -9,20 +10,22 @@ export function NavProvider({ value, children }: { value: NavCtx; children: Reac
 /**
  * One navigable row. Click moves the cursor (or activates, with activateOnClick);
  * double-click activates; cmd+click runs onCmdClick when given. The cursor row is
- * highlighted and scrolled into view.
+ * highlighted and scrolled into view. `tip` is a hover tooltip for what the row hides (a
+ * full path); the rows are not focusable (the list uses aria-activedescendant), so arrow
+ * keys never open it.
  */
 export function NavRow({
   navKey,
   className,
   children,
-  title,
+  tip,
   activateOnClick = false,
   onCmdClick,
 }: {
   navKey: string;
   className?: string;
   children: ReactNode;
-  title?: string;
+  tip?: string;
   activateOnClick?: boolean;
   onCmdClick?: () => void;
 }) {
@@ -32,14 +35,13 @@ export function NavRow({
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: "nearest" });
   }, [selected]);
-  return (
+  const row = (
     <div
       ref={ref}
       id={navId(navKey)}
       role="option"
       aria-selected={selected}
       data-nav-key={navKey}
-      title={title}
       className={cn("cursor-default rounded-sm", selected ? "bg-accent text-accent-foreground ring-1 ring-ring/40" : "hover:bg-accent/50", className)}
       onClick={(e) => {
         if (e.metaKey && onCmdClick) {
@@ -54,5 +56,10 @@ export function NavRow({
     >
       {children}
     </div>
+  );
+  return tip === undefined ? row : (
+    <Tip label={tip} align="start">
+      {row}
+    </Tip>
   );
 }

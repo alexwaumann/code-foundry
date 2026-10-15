@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { invocations, mockPost, openApp, resetMock, row, writes } from "./fixtures";
+import { expectTooltip, invocations, mockPost, openApp, resetMock, row, writes } from "./fixtures";
 
 /**
  * Copy and Run in terminal on a thread's code blocks (components/thread/CodeActions.tsx,
@@ -65,8 +65,8 @@ test("Run in terminal: hidden while the block streams, then a new shell in the t
   await expect(actions).toHaveCSS("opacity", "0");
   await bashBlock(page).hover();
   await expect(actions).toHaveCSS("opacity", "1");
-  await expect(run).toHaveAttribute("title", "Run in terminal");
   await shot(page, "code-block-hover");
+  await expectTooltip(page, run, "Run in terminal");
 
   await expect(bottom(page)).toHaveCount(0);
   await run.click();

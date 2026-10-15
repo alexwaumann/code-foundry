@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, openApp, openProjects, resetMock } from "./fixtures";
+import { CF, expectTooltip, invocations, mockPost, openApp, openProjects, resetMock } from "./fixtures";
 
 /**
  * The Projects page's project kinds, collapsible projects and workspaces, and the header
@@ -32,7 +32,6 @@ test("each project's header says what kind it is", async ({ page }) => {
     const p = project(page, id);
     await expect(p).toHaveAttribute("data-kind", kind);
     await expect(p).toHaveAttribute("data-git", String(kind !== "nogit"));
-    await expect(p.getByTestId("project-kind-icon")).toHaveAttribute("title", /\.$/);
     if (meta === null) {
       await expect(p.getByTestId("project-meta")).toHaveCount(0);
       await expect(p.locator(`[data-nav-key="p:${id}"]`).getByTestId("no-git-badge")).toBeVisible();
@@ -40,7 +39,9 @@ test("each project's header says what kind it is", async ({ page }) => {
       await expect(p.getByTestId("project-meta")).toHaveText(meta);
     }
   }
-  await expect(project(page, "repo-sk").getByTestId("project-kind-icon")).toHaveAttribute("title", /no remote/);
+  // The kind icon explains itself in a tooltip.
+  await expectTooltip(page, project(page, "repo-cf").getByTestId("project-kind-icon"), /^A GitHub repository: .*\.$/);
+  await expectTooltip(page, project(page, "repo-sk").getByTestId("project-kind-icon"), /no remote.*\.$/);
 });
 
 test("collapse a project and a workspace by mouse and keyboard; it persists across a reload", async ({ page }) => {
@@ -176,7 +177,7 @@ test("row actions show without hover, muted at rest, in a fixed-width column; ro
 
   // No path on git rows (the row's tooltip keeps it); the folder without git keeps it.
   await expect(project(page, "repo-cf").getByTestId("worktree-path")).toHaveCount(0);
-  await expect(main).toHaveAttribute("title", CF);
+  await expectTooltip(page, main, CF);
   await expect(project(page, "repo-wr").getByTestId("worktree-path")).toHaveText("~/Documents/writing");
 });
 
@@ -185,12 +186,12 @@ test("each worktree counts its live threads", async ({ page }) => {
   await openProjects(page);
   // s-1 (busy) in the main worktree; s-5 (starting) and s-4 (disconnected) on feat/sidebar; s-3 (disconnected) on fix/resize.
   await expect(wtRow(page, "repo-cf", CF).getByTestId("worktree-threads")).toHaveText("1");
-  await expect(wtRow(page, "repo-cf", CF).getByTestId("worktree-threads")).toHaveAttribute("title", "1 live thread");
+  await expectTooltip(page, wtRow(page, "repo-cf", CF).getByTestId("worktree-threads"), "1 live thread");
   await expect(wtRow(page, "repo-cf", FEAT).getByTestId("worktree-threads")).toHaveText("1");
   await expect(wtRow(page, "repo-cf", FIX).getByTestId("worktree-threads")).toHaveCount(0);
   await mockPost("threads?repo=repo-cf&count=2&status=idle");
   await expect(wtRow(page, "repo-cf", CF).getByTestId("worktree-threads")).toHaveText("3");
-  await expect(wtRow(page, "repo-cf", CF).getByTestId("worktree-threads")).toHaveAttribute("title", "3 live threads");
+  await expectTooltip(page, wtRow(page, "repo-cf", CF).getByTestId("worktree-threads"), "3 live threads");
   // A workspace member with a live thread counts it too.
   await mockPost("workspace?name=login&repos=repo-cf,repo-gp");
   const gp = page.locator('[data-testid="workspace-member"][data-repo="repo-gp"]');
@@ -351,10 +352,10 @@ test("a merged, clean worktree shows 'in main' and a broom that removes it after
   const row = wtRow(page, "repo-cf", MERGED);
   // The tag and the broom are on the fixture only.
   await expect(row.getByTestId("worktree-cleanable")).toHaveText("in main");
-  await expect(row.getByTestId("worktree-cleanable")).toHaveAttribute("title", "Clean: no changes, every commit is in origin/main, no live thread or terminal");
+  await expectTooltip(page, row.getByTestId("worktree-cleanable"), "Clean: no changes, every commit is in origin/main, no live thread or terminal");
   await expect(page.getByTestId("worktree-cleanable")).toHaveCount(1);
   await expect(page.getByTestId("worktree-cleanup")).toHaveCount(1);
-  await expect(row.getByTestId("worktree-cleanup")).toHaveAttribute("title", "Clean up: remove this worktree");
+  await expectTooltip(page, row.getByTestId("worktree-cleanup"), "Clean up: remove this worktree");
   // Every row of the project keeps a fifth slot so the state columns still end at one x;
   // a project with nothing to clean up keeps four.
   const widths = await Promise.all([CF, FEAT, FIX, MERGED].map(async (p) => (await wtRow(page, "repo-cf", p).getByTestId("worktree-actions").boundingBox())?.width));

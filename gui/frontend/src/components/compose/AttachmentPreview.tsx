@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Tip } from "@/components/ui/tooltip";
 import { formatAttachmentSize } from "@/lib/prompt";
 import { closePreview, useComposeStore } from "@/stores/compose";
 
@@ -37,16 +38,17 @@ export function AttachmentPreview({ draftKey }: { draftKey: string }) {
           <DialogDescription className="shrink-0 text-xs" data-testid="attachment-preview-size">
             {att ? formatAttachmentSize(att.file.size) : ""}
           </DialogDescription>
-          <button
-            type="button"
-            aria-label="Close preview"
-            title="Close"
-            data-testid="attachment-preview-close"
-            className="ml-auto flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            onClick={closePreview}
-          >
-            <X className="size-4" />
-          </button>
+          <Tip label="Close">
+            <button
+              type="button"
+              aria-label="Close preview"
+              data-testid="attachment-preview-close"
+              className="ml-auto flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              onClick={closePreview}
+            >
+              <X className="size-4" />
+            </button>
+          </Tip>
         </div>
         {att && <img src={att.url} alt={att.file.name} draggable={false} className="mx-auto block h-auto max-h-[calc(85vh/var(--cf-zoom))] w-auto max-w-[calc(90vw/var(--cf-zoom))] object-contain" />}
       </DialogContent>

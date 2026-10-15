@@ -1,6 +1,7 @@
 import { Fragment, type CSSProperties, type ReactNode } from "react";
 import { Bot, Clock, LoaderCircle, Wrench, Zap } from "lucide-react";
 import type { AgentRunView, AgentStatusView } from "@/api/agents";
+import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { agentElapsedMs, agentMeta, agentName, agentStatusText, agentsSubline, fmtElapsed } from "@/lib/agents";
 import { fmtTok } from "@/lib/usage";
@@ -108,9 +109,11 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
         ) : (
           <span className={cn("size-2 shrink-0 rounded-full", DOT[run.status as Exclude<AgentStatusView, "running">])} aria-hidden />
         )}
-        <span className={cn("min-w-0 flex-1 truncate", running || run.status === "failed" ? "font-medium" : "font-[450]")} title={name} data-testid="agent-name">
-          {name}
-        </span>
+        <Tip label={name} whenTruncated>
+          <span className={cn("min-w-0 flex-1 truncate", running || run.status === "failed" ? "font-medium" : "font-[450]")} data-testid="agent-name">
+            {name}
+          </span>
+        </Tip>
         <span className={cn("shrink-0 text-[11.5px] tabular-nums", STATUS_TONE[run.status])} data-testid="agent-status">
           {running || run.endedAtMs === null ? agentStatusText(run, 0) : <EndedStatus run={run} />}
         </span>
@@ -135,15 +138,19 @@ function AgentRow({ threadId, id }: { threadId: string; id: string }) {
         </div>
       ) : run.status === "failed" ? (
         run.error && (
-          <div className="ml-5 line-clamp-2 text-xs leading-[1.45] break-words text-destructive" title={run.error} data-testid="agent-error">
-            {run.error}
-          </div>
+          <Tip label={run.error} whenTruncated>
+            <div className="ml-5 line-clamp-2 text-xs leading-[1.45] break-words text-destructive" data-testid="agent-error">
+              {run.error}
+            </div>
+          </Tip>
         )
       ) : (
         run.summary && (
-          <div className="ml-5 line-clamp-2 text-xs leading-[1.45] break-words text-muted-foreground" title={run.summary} data-testid="agent-summary">
-            {run.summary}
-          </div>
+          <Tip label={run.summary} whenTruncated>
+            <div className="ml-5 line-clamp-2 text-xs leading-[1.45] break-words text-muted-foreground" data-testid="agent-summary">
+              {run.summary}
+            </div>
+          </Tip>
         )
       )}
       <div className="flex min-w-0 items-center justify-end gap-3 pl-5 text-[11.5px] text-muted-foreground tabular-nums" data-testid="agent-stats">

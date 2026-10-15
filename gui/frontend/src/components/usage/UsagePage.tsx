@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { UsageBucketView } from "@/api/session";
 import { Button } from "@/components/ui/button";
+import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useEscapeCloses } from "@/components/window/useEscapeCloses";
 import { fmtShare, fmtTok, fmtUsd, type ModelUsage, type UsageTotals } from "@/lib/usage";
@@ -67,9 +68,11 @@ export function UsagePage() {
           data-testid="usage-page-range"
           className="ml-1"
         />
-        <Button variant="ghost" size="icon-xs" className="[--wails-draggable:no-drag]" aria-label="Close usage" title="Close (Esc)" onClick={closeUsage} data-testid="usage-page-close">
-          <X />
-        </Button>
+        <Tip label="Close (Esc)">
+          <Button variant="ghost" size="icon-xs" className="[--wails-draggable:no-drag]" aria-label="Close usage" onClick={closeUsage} data-testid="usage-page-close">
+            <X />
+          </Button>
+        </Tip>
       </PaneHeader>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[1040px] px-8 pt-7 pb-10">

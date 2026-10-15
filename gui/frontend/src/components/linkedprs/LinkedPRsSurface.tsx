@@ -6,6 +6,7 @@ import { RowAction } from "@/components/projects/WorktreeState";
 import { RowList } from "@/components/prs/RowList";
 import { ago, stateBadge } from "@/components/pr/model";
 import { toneBadge } from "@/components/pr/tones";
+import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
@@ -82,9 +83,11 @@ function LinkedAge({ ms }: { ms: number | null }) {
   const now = useNow(30_000);
   if (ms === null) return null;
   return (
-    <span className="shrink-0 tabular-nums" title={`Linked ${new Date(ms).toLocaleString()}`} data-testid="linkedpr-age">
-      linked {ago(ms, now)}
-    </span>
+    <Tip label={`Linked ${new Date(ms).toLocaleString()}`}>
+      <span className="shrink-0 tabular-nums" data-testid="linkedpr-age">
+        linked {ago(ms, now)}
+      </span>
+    </Tip>
   );
 }
 
@@ -106,20 +109,23 @@ function LinkedPrRow({ link, showRepo }: { link: LinkRow; showRepo: boolean }) {
       activateOnClick
       onCmdClick={() => void openUrl(link.url)}
       className="group/link flex h-full flex-col justify-center gap-0.5 px-2"
-      title={link.url}
     >
       <span className="flex min-w-0 items-center gap-1.5 text-sm" data-testid="linkedpr" data-url={link.url} data-loaded={pr ? "true" : "false"}>
         <span className="shrink-0 font-medium text-muted-foreground tabular-nums" data-testid="linkedpr-number">
           #{link.number}
         </span>
         {pr ? (
-          <span className="min-w-0 flex-1 truncate" title={pr.title} data-testid="linkedpr-title">
-            {pr.title}
-          </span>
+          <Tip label={pr.title} whenTruncated>
+            <span className="min-w-0 flex-1 truncate" data-testid="linkedpr-title">
+              {pr.title}
+            </span>
+          </Tip>
         ) : failed ? (
-          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={failed} data-testid="linkedpr-unavailable">
-            {urlHost(link.url)} · details unavailable
-          </span>
+          <Tip label={failed}>
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" data-testid="linkedpr-unavailable">
+              {urlHost(link.url)} · details unavailable
+            </span>
+          </Tip>
         ) : (
           <span className="flex min-w-0 flex-1 items-center gap-1.5" aria-busy="true" data-testid="linkedpr-loading">
             <span className="shrink-0 text-xs text-muted-foreground">{urlHost(link.url)}</span>

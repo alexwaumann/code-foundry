@@ -3,6 +3,7 @@ import { Loader2, Trash2, X } from "lucide-react";
 import { ACTION_ICONS } from "@/api/actions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Tip } from "@/components/ui/tooltip";
 import { draftOf, draftProblem, NEW_ACTION_DRAFT, type ActionDraft } from "@/lib/actions";
 import { cn } from "@/lib/utils";
 import { deleteAction, saveAction } from "@/stores/actionActions";
@@ -293,10 +294,15 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
               Cancel
             </Button>
           </DialogClose>
-          <Button type="submit" size="sm" disabled={problem !== null || busy || gone} title={problem ?? undefined} data-testid="action-save">
-            {busy && <Loader2 className="animate-spin" aria-hidden />}
-            Save
-          </Button>
+          {/* Why Save is disabled; the span takes the hover a disabled button does not get. */}
+          <Tip label={problem}>
+            <span className="inline-flex">
+              <Button type="submit" size="sm" disabled={problem !== null || busy || gone} data-testid="action-save">
+                {busy && <Loader2 className="animate-spin" aria-hidden />}
+                Save
+              </Button>
+            </span>
+          </Tip>
         </div>
       )}
     </form>

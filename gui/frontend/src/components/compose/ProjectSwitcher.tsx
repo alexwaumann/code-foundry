@@ -53,7 +53,6 @@ export function ProjectSwitcher({ target, name, disabled }: { target: ComposeTar
           disabled={disabled}
           aria-label="Change project"
           aria-haspopup="dialog"
-          title="Change project"
           data-compose-stop
           data-testid="composer-project-trigger"
           // The underline is on the inline span: the button's box is the heading's line

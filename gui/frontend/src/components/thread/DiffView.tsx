@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from "react";
 import { Copy } from "lucide-react";
+import { Tip } from "@/components/ui/tooltip";
 import { copyText } from "@/lib/clipboard";
 import { hunkHeader, type DiffHunk, type DiffLine } from "@/lib/diff";
 import { grammarForPath, highlightLines, markTokens, type Token } from "@/lib/highlight";
@@ -39,20 +40,23 @@ export const DiffView = memo(function DiffView({ path, hunks, cwd }: { path: str
   return (
     <div className="diff selectable" data-testid="thread-diff">
       <div className="dh">
-        <span className="path" title={path}>
-          {dir && <span className="dir">{dir}/</span>}
-          {base}
-        </span>
+        <Tip label={path} align="start">
+          <span className="path">
+            {dir && <span className="dir">{dir}/</span>}
+            {base}
+          </span>
+        </Tip>
         <span className="flex-1" />
-        <button
-          type="button"
-          className="flex size-[22px] items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-          aria-label="Copy diff"
-          title="Copy diff"
-          onClick={() => void copyText(unified(hunks))}
-        >
-          <Copy className="size-3" />
-        </button>
+        <Tip label="Copy diff">
+          <button
+            type="button"
+            className="flex size-[22px] items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+            aria-label="Copy diff"
+            onClick={() => void copyText(unified(hunks))}
+          >
+            <Copy className="size-3" />
+          </button>
+        </Tip>
       </div>
       {hunks.map((h, hi) => {
         if (left <= 0) return null;

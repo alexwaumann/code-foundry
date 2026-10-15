@@ -1,3 +1,4 @@
+import { Tip } from "@/components/ui/tooltip";
 import { formatUptime } from "@/lib/format";
 import { displayVersion } from "@/lib/update";
 import { cn } from "@/lib/utils";
@@ -17,7 +18,7 @@ function useDegradedStreams(): string {
 
 /**
  * Daemon pid/version/uptime from HealthService.Ping, in the sidebar's status row. A
- * narrow sidebar clips the trailing details; the tooltip carries all of them.
+ * narrow sidebar clips the trailing details; the tooltip carries all of them then.
  */
 export function DaemonStatus() {
   const status = useHealthStore((s) => s.status);
@@ -32,28 +33,27 @@ export function DaemonStatus() {
     .filter(Boolean)
     .join(" · ");
 
+  // The details while the row clips them, and always for an error (the row shows no message).
   return (
-    <div className="flex min-w-0 items-center gap-2.5 overflow-hidden whitespace-nowrap" data-testid="daemon-status" title={details}>
-      {status === "ok" && degraded && (
-        <span className="shrink-0 text-warning" title={`Not streaming: ${degraded}`}>
-          syncing {degraded}…
+    <Tip label={details} whenTruncated={status !== "error"} align="start">
+      <div className="flex min-w-0 items-center gap-2.5 overflow-hidden whitespace-nowrap" data-testid="daemon-status">
+        {status === "ok" && degraded && <span className="shrink-0 text-warning">syncing {degraded}…</span>}
+        <span className="flex shrink-0 items-center gap-1.5">
+          <span className={cn("size-2 rounded-full", dot[status])} aria-hidden />
+          <span data-testid="status">{label}</span>
         </span>
-      )}
-      <span className="flex shrink-0 items-center gap-1.5">
-        <span className={cn("size-2 rounded-full", dot[status])} aria-hidden />
-        <span data-testid="status">{label}</span>
-      </span>
-      {pid !== undefined && (
-        <span className="tabular-nums">
-          pid <span data-testid="pid">{pid}</span>
-        </span>
-      )}
-      {version && <span data-testid="version">{version}</span>}
-      {uptime !== undefined && (
-        <span className="tabular-nums">
-          up <span data-testid="uptime">{formatUptime(uptime)}</span>
-        </span>
-      )}
-    </div>
+        {pid !== undefined && (
+          <span className="tabular-nums">
+            pid <span data-testid="pid">{pid}</span>
+          </span>
+        )}
+        {version && <span data-testid="version">{version}</span>}
+        {uptime !== undefined && (
+          <span className="tabular-nums">
+            up <span data-testid="uptime">{formatUptime(uptime)}</span>
+          </span>
+        )}
+      </div>
+    </Tip>
   );
 }

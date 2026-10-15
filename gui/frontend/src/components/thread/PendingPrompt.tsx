@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, MessageCircleQuestionMark, ShieldAlert } from "lucide-react";
 import type { ThreadPendingView, ThreadRequestView } from "@/api/thread";
+import { Tip } from "@/components/ui/tooltip";
 import { diffStats } from "@/lib/diff";
 import { shellTokens } from "@/lib/highlight";
 import {
@@ -139,18 +140,13 @@ function PromptDiff({ r }: { r: ThreadRequestView }) {
 function AskingAgent({ toolUseId }: { toolUseId: string }) {
   const { sessionId } = useThreadCtx();
   const label = askingAgentLabel(useAgentInputOf(sessionId, toolUseId));
+  // A tooltip only for a label a narrow pane cut short.
   return (
-    <span
-      className="chip muted agent"
-      data-testid="thread-asking-agent"
-      onMouseEnter={(e) => {
-        // A tooltip only for a label a narrow pane cut short.
-        const el = e.currentTarget;
-        el.title = el.scrollWidth > el.clientWidth ? label : "";
-      }}
-    >
-      {label}
-    </span>
+    <Tip label={label} whenTruncated>
+      <span className="chip muted agent" data-testid="thread-asking-agent">
+        {label}
+      </span>
+    </Tip>
   );
 }
 

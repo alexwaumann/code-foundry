@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { GitMerge, GitPullRequest, GitPullRequestClosed } from "lucide-react";
 import type { PullRequestDetailView } from "@/api/gh";
+import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@/stores/gh";
@@ -22,7 +23,7 @@ interface RailPos {
  * own piece of the vertical line, so the line starts at the first icon, stops at the last
  * one, and works when rows are virtualized.
  */
-function Entry({ rail, children, kind, pos, onOpen, title }: { rail: ReactNode; children: ReactNode; kind: TimelineEntry["kind"]; pos: RailPos; onOpen?: () => void; title?: string }) {
+function Entry({ rail, children, kind, pos, onOpen, tip }: { rail: ReactNode; children: ReactNode; kind: TimelineEntry["kind"]; pos: RailPos; onOpen?: () => void; tip?: string }) {
   const body = (
     <>
       <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full bg-pane">{rail}</span>
@@ -37,9 +38,11 @@ function Entry({ rail, children, kind, pos, onOpen, title }: { rail: ReactNode; 
         <span className={cn("absolute left-[20px] w-px bg-foreground/20", pos.first ? "top-6" : "top-0", pos.last ? "h-6" : "bottom-0")} aria-hidden data-testid="pr-timeline-rail" />
       )}
       {onOpen ? (
-        <button type="button" className={cn(cls, "outline-none hover:bg-accent/40 focus-visible:ring-1 focus-visible:ring-ring")} title={title} onClick={onOpen}>
-          {body}
-        </button>
+        <Tip label={tip} align="start">
+          <button type="button" className={cn(cls, "outline-none hover:bg-accent/40 focus-visible:ring-1 focus-visible:ring-ring")} onClick={onOpen}>
+            {body}
+          </button>
+        </Tip>
       ) : (
         <div className={cls}>{body}</div>
       )}
@@ -86,7 +89,7 @@ function Row({ e, slug, now, pos }: { e: TimelineEntry; slug: string; now: numbe
           pos={pos}
           // Only a GitHub login has an avatar; a bare git author name gets its initial.
           rail={<Avatar login={c.authorLogin} name={c.authorName} size={24} />}
-          title={`${c.sha}\n${c.authorName || c.authorLogin}`}
+          tip={`${c.sha}\n${c.authorName || c.authorLogin}`}
           onOpen={() => void openUrl(`https://github.com/${slug}/commit/${c.sha}`)}
         >
           <span className="truncate text-[13px] font-medium">{c.headline}</span>

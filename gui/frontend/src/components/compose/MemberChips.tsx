@@ -3,6 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import { Plus, X } from "lucide-react";
 import { ComposerPicker, type PickerGroup } from "./ComposerPicker";
 import { NoGitBadge } from "@/components/projects/NoGitBadge";
+import { Tip } from "@/components/ui/tooltip";
 import { tildify } from "@/lib/path";
 import { repoTagCount } from "@/lib/prompt";
 import { cn } from "@/lib/utils";
@@ -86,19 +87,20 @@ function MemberChip({ draftKey, member, primary, disabled }: { draftKey: string;
         )}
       </button>
       {member.removable && (
-        <button
-          type="button"
-          disabled={disabled}
-          aria-label={`Remove ${name}`}
-          title={`Remove ${name}`}
-          data-compose-stop
-          className="mr-1 flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:hidden"
-          onClick={() => {
-            void removeWithConfirm(draftKey, member.repoId, name);
-          }}
-        >
-          <X className="size-3" />
-        </button>
+        <Tip label={`Remove ${name}`}>
+          <button
+            type="button"
+            disabled={disabled}
+            aria-label={`Remove ${name}`}
+            data-compose-stop
+            className="mr-1 flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:hidden"
+            onClick={() => {
+              void removeWithConfirm(draftKey, member.repoId, name);
+            }}
+          >
+            <X className="size-3" />
+          </button>
+        </Tip>
       )}
     </li>
   );

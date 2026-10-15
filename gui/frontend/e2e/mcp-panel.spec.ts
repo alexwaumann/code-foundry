@@ -179,7 +179,7 @@ async function stretchNames(page: Page): Promise<void> {
     };
     set('[data-server="t3-code"] [data-testid="mcp-version"]', "v1.2.3-a-prerelease-tag-that-goes-on-and-on-and-on");
     set('[data-server="github"] [data-testid="mcp-name"]', "my-extremely-long-mcp-server-name-that-keeps-going-and-going-forever");
-    set('[data-server="github"] [data-testid="mcp-tool"] [title]', "mcp__some_extremely_long_tool_name_that_never_ends_at_all_ok");
+    set('[data-server="github"] [data-testid="mcp-tool"] [data-testid="mcp-tool-name"]', "mcp__some_extremely_long_tool_name_that_never_ends_at_all_ok");
     set('[data-server="linear"] [data-testid="mcp-name"]', "another_very_long_server_name_with_underscores_everywhere_and_more");
     set('[data-server="playwright"] [data-testid="mcp-error"]', "Error: connect ECONNREFUSED https://example.com/a/very/long/path/that/has/no/spaces/in/it/at/all");
   });

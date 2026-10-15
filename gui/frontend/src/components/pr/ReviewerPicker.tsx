@@ -3,6 +3,7 @@ import { Check, Loader2, Search, UserPlus, X } from "lucide-react";
 import type { ReviewerCandidateView } from "@/api/gh";
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, setReviewRequest, usePrPanelStore } from "@/stores/prPanel";
 import { useResource } from "@/stores/resource";
@@ -184,18 +185,19 @@ export function ReviewerPicker({ prRef, canUpdate }: { prRef: PrRef; canUpdate: 
   const { ref, boundary } = usePanelBoundary();
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          ref={ref}
-          type="button"
-          aria-label="Request a review"
-          title={canUpdate ? "Request a review" : WRITE_ACCESS_HINT}
-          data-testid="pr-add-reviewer"
-          className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring data-[state=open]:bg-accent"
-        >
-          <UserPlus className="size-3.5" aria-hidden />
-        </button>
-      </PopoverTrigger>
+      <Tip label={canUpdate ? "Request a review" : WRITE_ACCESS_HINT}>
+        <PopoverTrigger asChild>
+          <button
+            ref={ref}
+            type="button"
+            aria-label="Request a review"
+            data-testid="pr-add-reviewer"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring aria-expanded:bg-accent"
+          >
+            <UserPlus className="size-3.5" aria-hidden />
+          </button>
+        </PopoverTrigger>
+      </Tip>
       <PopoverContent
         align="start"
         collisionBoundary={boundary}
