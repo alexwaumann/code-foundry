@@ -68,6 +68,10 @@ HeaderActions do. roles.test.ts pins the merge.
 - Completion card: `ROW` (h-7) is fixed; the hints footer is 1 + 12 + 16 = 29 as before.
 - Attention badge on the bell: 9px text was unreadable as a role; it is `text-overline`
   (11) and the badge grows from 14 to 16px.
+- App name: at 17px "Code Foundry" is ~107px. At SIDEBAR_MIN (220) and 90% zoom the
+  gutter is 89 layout px, leaving 107 inside `pl-3 pr-3`: 1px short (the e2e caught it). The
+  header's right padding is now `pr-1`, which nothing shows, so it fits with 7px to spare
+  at 90% and more at 100% and 150%.
 - Palette and menu items keep 20px line height (`text-label`), so their heights are unchanged.
 
 ## Guard

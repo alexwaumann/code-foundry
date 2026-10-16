@@ -389,15 +389,16 @@ function SessionsUnavailable() {
  * down), as the traffic lights do (gui/trafficlights_darwin.go).
  *
  * The name is a span, not a heading: every page in the content pane has its own h1. At
- * 17px (text-brand) it fits beside the gutter at SIDEBAR_MIN and 150% zoom, so it is not measured; the overflow
- * clip only guards against an unexpected font.
+ * 17px (text-brand, ~107px wide) it fits beside the gutter at SIDEBAR_MIN from 90% zoom
+ * (the widest gutter in layout px) up, with the header's right padding only 4px (pr-1);
+ * so it is not measured, and the overflow clip only guards against an unexpected font.
  */
 function SidebarBand() {
   const gutter = useUiStore((s) => trafficLightGutter(s.zoom));
   return (
     <div className="flex shrink-0 items-center [--wails-draggable:drag]" style={{ height: TITLE_BAND_HEIGHT }} data-testid="sidebar-band">
       <div className="h-full shrink-0" style={{ width: gutter }} data-testid="traffic-light-gutter" aria-hidden />
-      <header className="flex h-full min-w-0 flex-1 items-center pt-shell pr-3 pl-3">
+      <header className="flex h-full min-w-0 flex-1 items-center pt-shell pr-1 pl-3">
         <span
           className="min-w-0 overflow-hidden text-brand leading-none whitespace-nowrap text-sidebar-foreground select-none"
           data-testid="sidebar-app-name"
