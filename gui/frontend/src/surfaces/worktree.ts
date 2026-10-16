@@ -13,8 +13,9 @@ function worktree(sel: Selection): WorktreeTarget | null {
 }
 
 /**
- * Worktree: one worktree's overview (sync state, GitHub activity, files, log) as a panel
- * tab. For a thread in a registered worktree, T opens that worktree;
+ * Worktree: what matters about one worktree (who else works in it, a git operation in
+ * progress, origin/base/working-tree facts, the branch's pull request, changes, commits)
+ * as a panel tab. For a thread in a registered worktree, T opens that worktree;
  * hidden for everything else, because its tabs are also opened from elsewhere: the
  * Projects page's project and worktree rows (Enter or double-click, into the page's own
  * panel) and the workspace surface's member rows (stores/worktreePanel.ts,
