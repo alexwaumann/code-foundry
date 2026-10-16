@@ -233,6 +233,8 @@ test("the daemon status and update indicator sit at the bottom of the sidebar", 
   expect(settings.right).toBe(sidebar.right + ICON_INSET);
   expect(await page.getByTestId("status-settings").locator("svg").evaluate((el) => el.getBoundingClientRect().right)).toBe(sidebar.right);
   expect((await box(page, "content-pane")).left - sidebar.right).toBe(GAP);
+  // So does a footer header's chevron (its box) just above it.
+  expect(await page.getByTestId("snoozed-header").locator("svg").evaluate((el) => el.getBoundingClientRect().right)).toBe(sidebar.right);
 });
 
 for (const scheme of ["dark", "light"] as const) {
