@@ -119,11 +119,11 @@ Usage totals: PR 4 had left them at `text-title`; the page total is now `text-di
 ## Verified
 
 - `make check` green.
-- `make gui-e2e` (`E2E_MOCK_PORT=7833 E2E_VITE_PORT=9288`): 804 passed, 40 skipped, 6 failed.
-  One was real: the app name 1px too wide at 90% zoom (WebKit only), fixed with `pr-1`.
-  The other five died closing their trace (`ENOENT` under test-results) because a second
-  Playwright run shared that folder; they and the layout, workspaces, thread, update,
-  settings and sidebar specs were re-run alone on both browsers: 154 passed.
-- Mock daemon, Playwright WebKit, dark and light, before/after: thread with composer and
+- `make gui-e2e` (`E2E_MOCK_PORT=7833 E2E_VITE_PORT=9288`) on the head rebased on #130 and
+  #131: 812 passed, 40 skipped, 0 failed. A run before the rebase had one real failure: the
+  app name 1px too wide at 90% zoom (WebKit only), fixed with `pr-1`. Five more in that run
+  died closing their trace (`ENOENT` under test-results) because a second Playwright run
+  shared the folder; don't run `playwright test` twice at once in one checkout.
+- Mock daemon, Playwright WebKit, dark and light, before (main at c8e79d9d) / after: thread with composer and
   bottom shell, palette, Settings, Themes, Add Project, Update dialog. The app name at 17px
   fits at SIDEBAR_MIN at 90% and 150% zoom (layout.spec).
