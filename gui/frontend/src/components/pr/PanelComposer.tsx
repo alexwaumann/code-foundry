@@ -161,9 +161,9 @@ export function PanelComposer({
         }}
         onKeyDown={onKeyDown}
       />
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 items-center gap-1.5">
         <Tip label={hint} whenTruncated align="start">
-          <span id={hintId} className="min-w-0 truncate text-caption" role={hintIsStatus ? "status" : undefined} data-testid={testIds.hint}>
+          <span id={hintId} className="min-w-0 truncate text-caption-sm" role={hintIsStatus ? "status" : undefined} data-testid={testIds.hint}>
             {hint}
           </span>
         </Tip>

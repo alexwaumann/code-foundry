@@ -106,5 +106,9 @@ PR 3 removes the weight category.
 - **`cn` drops `leading-none` when a role follows it** (tailwind-merge: a font size after a
   leading removes it), so the Label primitive's `leading-none` goes when a role is passed in
   `className`. That is what we want for these labels.
+- **The PR composers' key hint stays 12px.** At the 280px panel minimum the hint
+  ("⏎ send · ⇧⏎ newline") shares a row with Cancel and Ask, which grew to 13px; as
+  `text-caption` it ellipsized (pr-panel.spec asserts it fits). It is `text-caption-sm`
+  and the row's gap 6px instead of 8, which leaves it ~3px to spare.
 - **The 8px swatch** has no 2px step on the scale; square reads as a legend swatch next to
   the round status dots.
