@@ -236,12 +236,12 @@ export type GitStatus = Message<"codefoundry.v1.GitStatus"> & {
   error: string;
 
   /**
-   * The git operation in progress in the worktree: "" (none), "rebase", "merge",
-   * "cherry-pick", "revert" or "bisect". Read from the marker files in the worktree's
-   * git admin dir (rebase-merge/, rebase-apply/, MERGE_HEAD, …) during the status
-   * refresh; no extra git command runs. A rebase also fills operation_step (the
-   * current pick, 1-based) and operation_total (the picks in the todo); both are 0
-   * when git does not record them (merge, cherry-pick, revert, bisect).
+   * The git operation in progress in the worktree: "" (none), "rebase", "am",
+   * "merge", "cherry-pick", "revert" or "bisect". Read from the marker files in the
+   * worktree's git admin dir (rebase-merge/, rebase-apply/, MERGE_HEAD, …) during the
+   * status refresh; no extra git command runs. A rebase or am also fills
+   * operation_step (the current patch, 1-based) and operation_total (the last one);
+   * both are 0 when git does not record them (merge, cherry-pick, revert, bisect).
    *
    * @generated from field: string operation = 14;
    */
