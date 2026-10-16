@@ -1,0 +1,127 @@
+{
+  "defaults": {
+    "dark": "catppuccin-mocha",
+    "light": "catppuccin-latte"
+  },
+  "themes": [
+    {
+      "id": "catppuccin-mocha",
+      "name": "Catppuccin Mocha",
+      "scheme": "dark",
+      "pair": "catppuccin-latte"
+    },
+    {
+      "id": "graphite-dark",
+      "name": "Graphite Dark",
+      "scheme": "dark",
+      "pair": "graphite-light"
+    },
+    {
+      "id": "dracula",
+      "name": "Dracula",
+      "scheme": "dark"
+    },
+    {
+      "id": "gruvbox-dark",
+      "name": "Gruvbox Dark",
+      "scheme": "dark",
+      "pair": "gruvbox-light"
+    },
+    {
+      "id": "nord",
+      "name": "Nord",
+      "scheme": "dark"
+    },
+    {
+      "id": "tokyo-night",
+      "name": "Tokyo Night",
+      "scheme": "dark"
+    },
+    {
+      "id": "rose-pine",
+      "name": "Rosé Pine",
+      "scheme": "dark",
+      "pair": "rose-pine-dawn"
+    },
+    {
+      "id": "atom-one-dark",
+      "name": "Atom One Dark",
+      "scheme": "dark",
+      "pair": "atom-one-light"
+    },
+    {
+      "id": "solarized-dark",
+      "name": "Solarized Dark",
+      "scheme": "dark",
+      "pair": "solarized-light"
+    },
+    {
+      "id": "monokai-pro",
+      "name": "Monokai Pro",
+      "scheme": "dark"
+    },
+    {
+      "id": "github-dark",
+      "name": "GitHub Dark",
+      "scheme": "dark",
+      "pair": "github-light"
+    },
+    {
+      "id": "kanagawa-wave",
+      "name": "Kanagawa Wave",
+      "scheme": "dark"
+    },
+    {
+      "id": "everforest-dark-hard",
+      "name": "Everforest Dark Hard",
+      "scheme": "dark"
+    },
+    {
+      "id": "ayu-mirage",
+      "name": "Ayu Mirage",
+      "scheme": "dark"
+    },
+    {
+      "id": "catppuccin-latte",
+      "name": "Catppuccin Latte",
+      "scheme": "light",
+      "pair": "catppuccin-mocha"
+    },
+    {
+      "id": "graphite-light",
+      "name": "Graphite Light",
+      "scheme": "light",
+      "pair": "graphite-dark"
+    },
+    {
+      "id": "gruvbox-light",
+      "name": "Gruvbox Light",
+      "scheme": "light",
+      "pair": "gruvbox-dark"
+    },
+    {
+      "id": "rose-pine-dawn",
+      "name": "Rosé Pine Dawn",
+      "scheme": "light",
+      "pair": "rose-pine"
+    },
+    {
+      "id": "atom-one-light",
+      "name": "Atom One Light",
+      "scheme": "light",
+      "pair": "atom-one-dark"
+    },
+    {
+      "id": "solarized-light",
+      "name": "Solarized Light",
+      "scheme": "light",
+      "pair": "solarized-dark"
+    },
+    {
+      "id": "github-light",
+      "name": "GitHub Light",
+      "scheme": "light",
+      "pair": "github-dark"
+    }
+  ]
+}
