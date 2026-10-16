@@ -135,7 +135,7 @@ never a clip that changes hue).
 | primary text | if neither pane nor fg reaches 4.5:1 on the accent, step the accent's L away from the better one | Solarized Dark (#268bd2 → #3093da), Solarized Light (→ #0075ba), Atom One Light (#4078f2 → #356be4), Rosé Pine Dawn (#907aa9 → #7d6795) |
 | inverted selection | selection under 3:1 against the terminal fg → fg at 25% over the pane. xterm keeps the cell's colour, so a fg-coloured selection hides the text | GitHub Dark/Light, Gruvbox Light, Nord, Kanagawa, Ayu Mirage |
 | code tokens | every syntax colour except comments at 4.5:1 on the pane and on `--muted` (code blocks) | light themes |
-| comment | ANSI 8 under 3:1, or above 85% of fg's contrast (as dark as body text) → muted-foreground | Catppuccin Mocha, Tokyo Night, Nord, Solarized Dark, Monokai, Ayu (too faint); Atom One Light, Solarized Light, Rosé Pine Dawn (as dark as the text) |
+| comment | the comment slot (ANSI 8 dark, 7 light) under 3:1, or above 85% of fg's contrast (as dark as body text) → muted-foreground | Catppuccin Mocha and Latte, Tokyo Night, Nord, Solarized Dark and Light, Monokai, Ayu, Atom One Light (too faint); Rosé Pine Dawn (its ANSI 7 is the text colour) |
 
 The converter prints a contrast table (fg, muted on sheet, statuses, primary text, ΔL) on
 every run.
@@ -155,7 +155,7 @@ every run.
 | `rose-pine` | #c4a7e7 iris | success #95b1ac (leaf) | Rosé Pine has no green; its ANSI green is pine (blue-teal) |
 | `rose-pine-dawn` | #907aa9 iris | success #6d8f89 (leaf), info ANSI 4 (foam) | as Rosé Pine |
 | `atom-one-dark` | #61afef | | |
-| `atom-one-light` | #4078f2 | | guards fix the pale yellow and the black comments |
+| `atom-one-light` | #4078f2 | | guards fix the pale yellow and the faint comments |
 | `solarized-dark` | #268bd2 | `slots: normal` | bright slots are greys (and bright red is orange) |
 | `solarized-light` | #268bd2 | | guards lift everything to the floor |
 | `monokai-pro` | #ffd866 yellow | info ANSI 6 (cyan), warning ANSI 4 (orange) | the accent is also its ANSI yellow; Monokai's ANSI blue is orange |
