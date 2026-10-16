@@ -2,12 +2,18 @@ import { ChartColumn, CircleHelp, Command, Settings } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { DaemonStatus } from "@/components/status/DaemonStatus";
 import { UpdateIndicator } from "@/components/update/UpdateIndicator";
+import { cn } from "@/lib/utils";
 import { useViewsStore } from "@/stores/views";
 
 /**
  * The bottom of the sidebar, on the sheet: a pending update (when there is one) above
  * the daemon's status, with buttons for the palette, usage, help and settings. Hidden
  * with the sidebar.
+ *
+ * The last button's glyph sits on the sidebar's right edge (the rows' and New thread's
+ * edge, a shell gap from the pane): an icon-xs box is 24px (size-6) around a 14px glyph
+ * (size-3.5), so it is pushed right by (24 - 14) / 2 = 5px (-mr-1.25), as the toolbar's
+ * first button is pulled left. docs/notes/design-system-2-shell.md.
  */
 export function SidebarStatus() {
   const usageOpen = useViewsStore((s) => s.usageOpen);
@@ -35,7 +41,7 @@ export function SidebarStatus() {
             icon={Settings}
             tooltip="Settings"
             pressed={settingsOpen}
-            className={settingsOpen ? "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent" : undefined}
+            className={cn("-mr-1.25", settingsOpen && "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent")}
             data-testid="status-settings"
           />
         </span>

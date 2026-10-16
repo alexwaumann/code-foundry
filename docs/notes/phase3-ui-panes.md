@@ -56,6 +56,10 @@ gutter is 80px because the zoom button ends at x=79. `TITLE_STRIP_HEIGHT` (TS) a
 
 ## Panes reach the window top (branch `t3code/per-pane-side-panel-width-and-fullscreen`)
 
+> Since design-system-2-shell.md: the gap is 12px (`--gap-shell`, `m-shell`), the band 56
+> (12 + 44), and its content, traffic lights included, centres on the pane header at
+> y=34. The 8px / 52px / y=26 figures below are the state before that.
+
 The full-width strip is gone. The content pane and the side panel extend up into the
 title band, and their headers occupy it.
 

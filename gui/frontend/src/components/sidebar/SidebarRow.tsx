@@ -408,6 +408,10 @@ function ThreadTooltip({ id, children }: { id: string; children: ReactElement })
  * the row; the row itself is role="presentation", so the listbox's cursor never lands on
  * it. Pressing it with the mouse does not take focus from the list. Test ids
  * `<section>-header`, `-label`, `-count`.
+ *
+ * The chevron's box ends on the sidebar's right edge, the line the status row's last
+ * button (SidebarStatus) ends on just below: it is pulled through the button's 8px right
+ * padding (px-2, so -mr-2). docs/notes/design-system-2-shell.md.
  */
 function SectionHeader({ row }: { row: HeaderRow }) {
   const Chevron = row.collapsed ? ChevronRight : ChevronDown;
@@ -435,7 +439,7 @@ function SectionHeader({ row }: { row: HeaderRow }) {
         <span className="shrink-0 text-[11px] tabular-nums opacity-70" data-testid={`${row.section}-count`}>
           {row.count}
         </span>
-        <Chevron className="ml-auto size-3 shrink-0" aria-hidden />
+        <Chevron className="-mr-2 ml-auto size-3 shrink-0" aria-hidden />
       </button>
     </div>
   );

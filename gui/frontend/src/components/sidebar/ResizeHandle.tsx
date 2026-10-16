@@ -1,7 +1,12 @@
 import { useRef } from "react";
 import { SIDEBAR_DEFAULT, useUiStore } from "@/stores/ui";
 
-/** Drag handle on the sidebar's right edge. Double-click resets the width. */
+/**
+ * Drag handle filling the shell gap right of the sidebar, its hairline in the middle (as
+ * the side and bottom panels' handles fill theirs), so it covers nothing in the sidebar:
+ * the status row's last button reaches the sidebar's edge (SidebarStatus). Double-click
+ * resets the width.
+ */
 export function ResizeHandle() {
   const drag = useRef<{ x: number; w: number } | null>(null);
   return (
@@ -9,7 +14,7 @@ export function ResizeHandle() {
       role="separator"
       aria-orientation="vertical"
       aria-label="Resize sidebar"
-      className="absolute top-0 -right-1 z-10 h-full w-2 cursor-col-resize touch-none [--wails-draggable:no-drag] after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent after:transition-colors hover:after:bg-ring active:after:bg-ring"
+      className="absolute top-0 -right-shell z-10 h-full w-shell cursor-col-resize touch-none [--wails-draggable:no-drag] after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent after:transition-colors hover:after:bg-ring active:after:bg-ring"
       onPointerDown={(e) => {
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);

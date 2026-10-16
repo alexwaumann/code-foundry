@@ -3,7 +3,7 @@ import tailwindCss from "tailwindcss/index.css?raw";
 import { describe, expect, it } from "vitest";
 import indexCss from "../index.css?raw";
 import { cn } from "@/lib/utils";
-import { INLINE_TYPE_ROLES, TYPE_ROLES } from "./tokens";
+import { INLINE_TYPE_ROLES, SHELL_GAP, TYPE_ROLES } from "./tokens";
 
 /**
  * The type roles, radius scale and shell gap (index.css), compiled by Tailwind itself so
@@ -114,6 +114,10 @@ describe("radius scale and shell gap", () => {
   it("the pane radius is 12px and the shell gap 12px", () => {
     expect(indexCss).toMatch(/:root \{[^}]*--radius: 0\.75rem;/);
     expect(indexCss).toMatch(/:root \{[^}]*--gap-shell: 12px;/);
+  });
+
+  it("SHELL_GAP, for layout arithmetic in TS, is --gap-shell", () => {
+    expect(indexCss).toMatch(new RegExp(`:root \\{[^}]*--gap-shell: ${String(SHELL_GAP)}px;`));
   });
 
   it.each([

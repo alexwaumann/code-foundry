@@ -2,7 +2,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { useUiStore } from "@/stores/ui";
 import { PaneHeader } from "./PaneHeader";
-import { TRAFFIC_LIGHT_GUTTER, trafficLightGutter } from "./titleBand";
+import { PANE_HEADER_HEIGHT, TITLE_BAND_CENTER, TITLE_BAND_HEIGHT, TRAFFIC_LIGHT_GUTTER, trafficLightGutter } from "./titleBand";
 
 afterEach(() => {
   cleanup();
@@ -19,7 +19,7 @@ describe("PaneHeader", () => {
     expect(h.style.paddingLeft).toBe(paddingLeft);
     expect(h.style.color).toBe("red");
     expect(h.className).toContain("[--wails-draggable:drag]");
-    expect(h.className).toContain("h-11");
+    expect(h.style.height).toBe(`${String(PANE_HEADER_HEIGHT)}px`);
     expect(h.hasAttribute("data-pane-header")).toBe(true);
   });
 
@@ -48,5 +48,13 @@ describe("trafficLightGutter", () => {
     useUiStore.setState({ sidebarVisible: false, zoom: 200 });
     render(<PaneHeader data-testid="z" />);
     expect(screen.getByTestId("z").style.paddingLeft).toBe("40px");
+  });
+});
+
+describe("title band geometry", () => {
+  it("is the shell gap plus a pane header, centred on the header (gui/trafficlights_darwin.go has the same numbers)", () => {
+    expect(PANE_HEADER_HEIGHT).toBe(44);
+    expect(TITLE_BAND_HEIGHT).toBe(56);
+    expect(TITLE_BAND_CENTER).toBe(34);
   });
 });

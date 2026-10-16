@@ -309,10 +309,10 @@ function Panel({
   };
 
   return (
-    // Not clipped, so the resize handle can sit in the 8px gap above it. The region (and
+    // Not clipped, so the resize handle can sit in the shell gap above it. The region (and
     // cmd+w) is the wrapper's, so the handle counts as the panel: cmd+j, cmd+w and the
     // palette's return work from it as from the terminal.
-    <div className="relative mt-2 flex shrink-0" style={{ height }} data-region="bottom" data-testid="bottom-panel-wrapper" onKeyDownCapture={onKeyDownCapture}>
+    <div className="relative mt-shell flex shrink-0" style={{ height }} data-region="bottom" data-testid="bottom-panel-wrapper" onKeyDownCapture={onKeyDownCapture}>
       <BottomResizeHandle panelKey={panelKey} height={height} max={max} />
       <aside
         ref={asideRef}
@@ -320,7 +320,7 @@ function Panel({
         aria-label="Bottom panel"
         data-testid="bottom-panel"
         data-panel-key={panelKey}
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-pane-border bg-pane shadow-xs outline-none"
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-pane border border-pane-border bg-pane shadow-xs outline-none"
       >
         <BottomHeader panelKey={panelKey} ids={ids} activeId={activeId} />
         <div
