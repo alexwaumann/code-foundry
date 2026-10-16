@@ -14,6 +14,7 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/db"
+	"github.com/alexwaumann/code-foundry/internal/db/dbtest"
 )
 
 // isolateGit points git at a throwaway global config so the developer's config
@@ -97,7 +98,7 @@ type harness struct {
 func startHarness(t *testing.T, dbPath string, opts Options) *harness {
 	t.Helper()
 	if dbPath == "" {
-		dbPath = filepath.Join(t.TempDir(), "db.sqlite")
+		dbPath = dbtest.Path(t)
 	}
 	d, err := db.Open(context.Background(), dbPath)
 	if err != nil {

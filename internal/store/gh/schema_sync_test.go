@@ -2,11 +2,11 @@ package gh
 
 import (
 	"context"
-	"path/filepath"
 	"slices"
 	"testing"
 
 	"github.com/alexwaumann/code-foundry/internal/db"
+	"github.com/alexwaumann/code-foundry/internal/db/dbtest"
 )
 
 // The daemon creates tables from internal/db/migrations, not schema.sql (which only
@@ -30,7 +30,7 @@ func TestDaemonMigrationsCreateEveryGhTable(t *testing.T) {
 		}
 		return out
 	}
-	daemonDB, err := db.Open(ctx, filepath.Join(t.TempDir(), "daemon.sqlite"))
+	daemonDB, err := db.Open(ctx, dbtest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

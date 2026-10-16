@@ -40,5 +40,5 @@ before it is pushed, so CI mostly repeats a result we have.
 
 - `pnpm/action-setup` spent 2:16 on the macOS runner doing nothing visible; worth
   replacing with `packageManager` + corepack or a cached download.
-- The session package's tests sleep on real time (about 50 second-scale waits). A fake
-  clock would cut `make check` locally from about 6 minutes to under 2.
+- The session package took 216 s under `-race`. It was not sleeps: see
+  docs/notes/fake-claude-binary.md (done).

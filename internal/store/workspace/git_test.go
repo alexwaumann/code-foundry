@@ -11,6 +11,7 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/db"
+	"github.com/alexwaumann/code-foundry/internal/db/dbtest"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 )
 
@@ -59,7 +60,7 @@ func TestWithGit(t *testing.T) {
 	gitCmd(t, web, "remote", "set-head", "origin", "main")
 
 	ctx := context.Background()
-	d, err := db.Open(ctx, filepath.Join(base, "db.sqlite"))
+	d, err := db.Open(ctx, dbtest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

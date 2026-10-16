@@ -3,7 +3,6 @@ package session
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,38 +12,13 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/claudestream"
+	"github.com/alexwaumann/code-foundry/internal/claudestream/fakeclaude"
 )
-
-// fakeInitCommands reads the initialize reply's commands from a capture like
-// claudestream/testdata/commands.jsonl (the fake's CF_FAKE_CLAUDE_COMMANDS); "" is none.
-func fakeInitCommands(path string) (json.RawMessage, error) {
-	if path == "" {
-		return json.RawMessage(`[]`), nil
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	for _, l := range strings.Split(string(data), "\n") {
-		var m struct {
-			Type     string `json:"type"`
-			Response struct {
-				Response struct {
-					Commands json.RawMessage `json:"commands"`
-				} `json:"response"`
-			} `json:"response"`
-		}
-		if json.Unmarshal([]byte(l), &m) == nil && m.Type == "control_response" && m.Response.Response.Commands != nil {
-			return m.Response.Response.Commands, nil
-		}
-	}
-	return nil, fmt.Errorf("%s has no initialize reply with commands", path)
-}
 
 // fixtureCommands returns the commands fixture's initialize list and its pushes.
 func fixtureCommands(t *testing.T) (init []claudestream.SlashCommand, pushes [][]claudestream.SlashCommand) {
 	t.Helper()
-	raw, err := fakeInitCommands(fixturePath("commands"))
+	raw, err := fakeclaude.InitCommands(fixturePath("commands"))
 	if err != nil {
 		t.Fatal(err)
 	}
