@@ -80,7 +80,7 @@ async function startShell(ctx: UiContextView, args: Record<string, string> = {})
  * side panel leaves full width (an expanded side panel hides the content column).
  */
 function uncoverBottom(key: string): void {
-  useViewsStore.setState({ settingsOpen: false, usageOpen: false });
+  useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false });
   if (getPanel(key).expanded) expandPanel(key, false);
 }
 

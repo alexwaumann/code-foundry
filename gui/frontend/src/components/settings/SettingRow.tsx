@@ -47,7 +47,7 @@ function BoolEditor({ field, value, pending, commit }: EditorProps) {
  */
 const EMPTY_ENUM = "__cf_default__";
 
-function EnumEditor({ field, value, pending, invalid, commit }: EditorProps) {
+export function EnumEditor({ field, value, pending, invalid, commit }: EditorProps) {
   const toItem = (v: string) => (v === "" ? EMPTY_ENUM : v);
   return (
     <Select

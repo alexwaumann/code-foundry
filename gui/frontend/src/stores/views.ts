@@ -1,5 +1,5 @@
 /**
- * Window-level views that are not selections: the settings and usage pages (each replaces
+ * Window-level views that are not selections: the settings, usage and themes pages (each replaces
  * the content area; at most one is open) and the help overlay. Top-level pages that are selections (ui.ts `viewNames`,
  * the Pull Requests page) are routed to `select`. Opened by view.settings / view.help (their chords are
  * presented locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon. Settings
@@ -16,11 +16,14 @@ import { openMcpSurface } from "./mcpPanel";
 import { openUsageSurface } from "./usagePanel";
 import { openWorkspaceSurface } from "./workspacePanel";
 import { openWorktreeSurface } from "./worktreePanel";
+import { resetThemePicker, setPickerSlot, useThemePickerStore, type ThemeSlot } from "./themePicker";
 
 interface ViewsState {
   settingsOpen: boolean;
   /** The Usage page (view.usage, docs/notes/session-usage.md). Never open with settings. */
   usageOpen: boolean;
+  /** The Themes page (theme.pick, docs/notes/theme-engine-4-picker.md). Never open with settings or usage. */
+  themesOpen: boolean;
   helpOpen: boolean;
   /** The help overlay's tab. Opening it lands on the guide unless a caller asks for the shortcuts. */
   helpTab: HelpTab;
@@ -29,14 +32,14 @@ interface ViewsState {
 /** The help overlay's tabs: the getting started guide (docs/GETTING-STARTED.md) and the keyboard shortcuts. */
 export type HelpTab = "guide" | "shortcuts";
 
-export const useViewsStore = create<ViewsState>()(() => ({ settingsOpen: false, usageOpen: false, helpOpen: false, helpTab: "guide" }));
+export const useViewsStore = create<ViewsState>()(() => ({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false, helpTab: "guide" }));
 
 /**
  * A window-level page (settings or usage) covers the content area. It hides the side
  * panel, so the panel commands are no-ops meanwhile.
  */
 export function selectPageOpen(s: ViewsState): boolean {
-  return s.settingsOpen || s.usageOpen;
+  return s.settingsOpen || s.usageOpen || s.themesOpen;
 }
 
 function pageOpen(): boolean {
@@ -69,12 +72,19 @@ export function showView(name: string): boolean {
     case "settings":
       // A toggle like usage: the sidebar's settings button (and view.settings, cmd+,) closes it again.
       if (useViewsStore.getState().settingsOpen) closeSettings();
-      else useViewsStore.setState({ settingsOpen: true, usageOpen: false, helpOpen: false });
+      else useViewsStore.setState({ settingsOpen: true, usageOpen: false, themesOpen: false, helpOpen: false });
       return true;
     case "usage":
       // A toggle: the sidebar's usage button (and view.usage from anywhere) closes it again.
       if (useViewsStore.getState().usageOpen) closeUsage();
-      else useViewsStore.setState({ usageOpen: true, settingsOpen: false, helpOpen: false });
+      else useViewsStore.setState({ usageOpen: true, settingsOpen: false, themesOpen: false, helpOpen: false });
+      return true;
+    case "themes":
+    case "themes.dark":
+    case "themes.light":
+      // theme.pick: opens (not a toggle; Esc and × close it), or moves the open page to
+      // the slot asked for. Opened from a Settings row, closing goes back to Settings.
+      openThemes(name === "themes" ? undefined : name === "themes.dark" ? "dark" : "light");
       return true;
     case "help":
       openHelp();
@@ -123,7 +133,7 @@ export function showView(name: string): boolean {
       // Top-level pages (the Pull Requests page) are selections. Closing settings and
       // usage here too covers re-selecting the page that is already selected.
       if (!viewNames.includes(name)) return false;
-      useViewsStore.setState({ settingsOpen: false, usageOpen: false, helpOpen: false });
+      useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
       useUiStore.getState().select({ kind: "view", name });
       return true;
   }
@@ -350,6 +360,29 @@ export function closeSettings(): void {
   requestPromptFocus();
 }
 
+/**
+ * Opens the Themes page editing `slot` (the slot in use when omitted), with no preview.
+ * `from: "settings"` (the Choose… buttons in Settings → Appearance) makes closing it go
+ * back to the settings page. On a page already open, only the slot changes.
+ */
+export function openThemes(slot?: ThemeSlot, from?: "settings"): void {
+  const views = useViewsStore.getState();
+  if (views.themesOpen) {
+    if (slot) setPickerSlot(slot);
+    return;
+  }
+  resetThemePicker(slot, from ?? (views.settingsOpen ? "settings" : null));
+  useViewsStore.setState({ themesOpen: true, settingsOpen: false, usageOpen: false, helpOpen: false });
+}
+
+/** Leaves the Themes page, dropping its preview; back to Settings when it came from there. */
+export function closeThemes(): void {
+  const back = useThemePickerStore.getState().returnTo === "settings";
+  resetThemePicker(undefined, null);
+  useViewsStore.setState({ themesOpen: false, settingsOpen: back });
+  if (!back) requestPromptFocus();
+}
+
 export function closeUsage(): void {
   useViewsStore.setState({ usageOpen: false });
   // Like closeSettings: back to the selection, whose prompt takes focus again.
@@ -382,6 +415,6 @@ export function setHelpTab(tab: HelpTab): void {
 /** Selecting something in the sidebar leaves the settings or usage page. */
 export function startViewSync(): () => void {
   return useUiStore.subscribe((s, prev) => {
-    if (s.selection !== prev.selection && pageOpen()) useViewsStore.setState({ settingsOpen: false, usageOpen: false });
+    if (s.selection !== prev.selection && pageOpen()) useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false });
   });
 }

@@ -12,7 +12,7 @@ import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
 import { markTerminalNewFromHere, toggleBottomFromHere } from "@/stores/bottomActions";
-import { expandPanelCommand, linkedPrsPanelCommand, newPanelTabCommand, showView, toggleHelp, togglePanelCommand, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
+import { expandPanelCommand, linkedPrsPanelCommand, newPanelTabCommand, openThemes, showView, toggleHelp, togglePanelCommand, workspacePanelCommand, worktreePanelCommand } from "@/stores/views";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -106,7 +106,7 @@ export function isStartable(c: CommandView): boolean {
 }
 
 /** Presenters that also replace the palette's arg prompts when the command is picked there. */
-const paletteSupplied: ReadonlySet<string> = new Set(["session.new", "session.run-in", "session.snooze", "repo.clone", "repo.create", "repo.github.publish"]);
+const paletteSupplied: ReadonlySet<string> = new Set(["session.new", "session.run-in", "session.snooze", "repo.clone", "repo.create", "repo.github.publish", "theme.pick"]);
 
 let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
 
@@ -210,6 +210,13 @@ const commandPresenters: Readonly<Record<string, () => boolean>> = {
   "view.settings": () => showView("settings"),
   // The Usage page, a toggle (stores/views.ts): window-local like view.settings.
   "view.usage": () => showView("usage"),
+  // The Themes page, window-local like view.settings, on the slot in use (its slot chips
+  // switch; the palette's slot prompt is skipped). The CLI's theme pick [slot] reaches
+  // every window through ShowView "themes[.slot]".
+  "theme.pick": () => {
+    openThemes();
+    return true;
+  },
   "view.help": () => {
     toggleHelp();
     return true;
