@@ -16,6 +16,11 @@
 # a terminal it never prompts: it upgrades and sets up PATH silently. The in-app updater
 # and `code-foundry update` run the copy of this script embedded in the binary.
 #
+# The in-app updater splits an upgrade in two so nothing on disk changes while the old
+# daemon and window still run: --stage-only downloads, verifies and unpacks into app.new
+# and stops there; --apply-staged (run by `app.restart` right before the restart) only
+# does the two renames.
+#
 # Uninstall: rm -rf ~/.code-foundry/app ~/.local/bin/code-foundry
 #
 # Options:
@@ -35,6 +40,12 @@
 #                      ~/.code-foundry/app); replaced as a whole, so it must be a
 #                      previous install or absent
 #   --bin-dir DIR      where the code-foundry link goes (default ~/.local/bin)
+#   --stage-only       download, verify and unpack into <app-dir>.new, then stop: the
+#                      install is left untouched and app.new stays for --apply-staged
+#                      (no link or PATH setup)
+#   --apply-staged     no download: swap a previous --stage-only of --version (default:
+#                      the version staged) into the app directory; fails when app.new
+#                      does not hold that version. Exclusive with --stage-only
 #
 # Environment:
 #   CODE_FOUNDRY_RELEASE_REPO  owner/name to download from (default below)
@@ -64,6 +75,8 @@ YES=0
 FORCE=0
 SKIP_PATH=0
 SKIP_LINK=0
+STAGE_ONLY=0
+APPLY_STAGED=0
 
 say() { printf '==> %s\n' "$*"; }
 warn() { printf 'warning: %s\n' "$*" >&2; }
@@ -76,7 +89,7 @@ usage() {
 	if [ -f "$0" ]; then
 		sed -n '2,/^set -euo/p' "$0" | sed -e '$d' -e 's/^# \{0,1\}//'
 	else
-		echo "usage: install.sh [--channel stable|tip] [--version vX.Y.Z] [--yes] [--force] [--skip-path] [--skip-link] [--app-dir DIR] [--bin-dir DIR]"
+		echo "usage: install.sh [--channel stable|tip] [--version vX.Y.Z] [--yes] [--force] [--skip-path] [--skip-link] [--app-dir DIR] [--bin-dir DIR] [--stage-only | --apply-staged]"
 	fi
 }
 
@@ -126,6 +139,14 @@ while [ $# -gt 0 ]; do
 		BIN_DIR="$2"
 		shift 2
 		;;
+	--stage-only)
+		STAGE_ONLY=1
+		shift
+		;;
+	--apply-staged)
+		APPLY_STAGED=1
+		shift
+		;;
 	-h | --help)
 		usage
 		exit 0
@@ -137,6 +158,7 @@ case "$CHANNEL" in
 stable | tip) ;;
 *) die "unknown channel: '$CHANNEL' (want stable or tip)" ;;
 esac
+[ "$STAGE_ONLY" = 0 ] || [ "$APPLY_STAGED" = 0 ] || die "--stage-only and --apply-staged exclude each other"
 
 # Interactive: a terminal to talk to, and not --yes. Prompts read /dev/tty so this works
 # when the script itself arrives on stdin (`... -O - | bash`).
@@ -209,8 +231,11 @@ installed_version() {
 
 # ---- release source -----------------------------------------------------------------
 
+# --apply-staged needs no release source: the version comes from --version or app.new.
 GH=""
-if [ -z "$RELEASE_DIR" ]; then
+if [ "$APPLY_STAGED" = 1 ]; then
+	: # nothing to look up
+elif [ -z "$RELEASE_DIR" ]; then
 	GH="${CODE_FOUNDRY_GH:-}"
 	if [ -z "$GH" ]; then
 		GH="$(command -v gh 2>/dev/null || true)"
@@ -229,7 +254,9 @@ if [ -z "$RELEASE_DIR" ]; then
 	export GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1
 fi
 
-if [ -z "$TAG" ] && [ "$CHANNEL" = stable ]; then
+if [ "$APPLY_STAGED" = 1 ]; then
+	: # resolved from app.new below when --version is absent
+elif [ -z "$TAG" ] && [ "$CHANNEL" = stable ]; then
 	if [ -n "$RELEASE_DIR" ]; then
 		[ -f "$RELEASE_DIR/latest" ] || die "no release published in $RELEASE_DIR (missing $RELEASE_DIR/latest)"
 		TAG="$(tr -d '[:space:]' <"$RELEASE_DIR/latest")"
@@ -260,7 +287,9 @@ elif [ -z "$TAG" ]; then
 	fi
 	say "tip channel: $TAG"
 fi
-is_tag "$TAG" || die "not a release version: '$TAG' (want vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-tip.N)"
+if [ "$APPLY_STAGED" = 0 ] || [ -n "$TAG" ]; then
+	is_tag "$TAG" || die "not a release version: '$TAG' (want vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-tip.N)"
+fi
 
 # ---- already installed? ---------------------------------------------------------------
 
@@ -278,6 +307,14 @@ OLD="$APP_DIR.old"
 if [ ! -e "$APP_DIR" ] && [ -d "$OLD" ] && [ -f "$OLD/VERSION" ]; then
 	warn "restoring $APP_DIR from an interrupted install"
 	mv "$OLD" "$APP_DIR"
+fi
+
+if [ "$APPLY_STAGED" = 1 ]; then
+	if [ -z "$TAG" ]; then
+		TAG="$(installed_version "$STAGE")"
+		[ -n "$TAG" ] || die "no staged download in $STAGE; run again without --apply-staged"
+		is_tag "$TAG" || die "$STAGE holds '$TAG', which is not a release version; run again without --apply-staged"
+	fi
 fi
 
 CURRENT=""
@@ -322,12 +359,20 @@ setup_path() {
 
 if [ -n "$CURRENT" ] && [ "$CURRENT" = "$TAG" ] && [ "$FORCE" = 0 ]; then
 	say "Code Foundry $TAG is already installed in $APP_DIR"
+	[ "$STAGE_ONLY" = 1 ] && exit 0
 	link_cli
 	setup_path
 	exit 0
 fi
 
-if [ -n "$CURRENT" ]; then
+if [ "$STAGE_ONLY" = 1 ]; then
+	# Nothing to confirm: the install is not touched.
+	if [ -n "$CURRENT" ]; then
+		say "downloading Code Foundry $TAG (installed: $CURRENT)"
+	else
+		say "downloading Code Foundry $TAG"
+	fi
+elif [ -n "$CURRENT" ]; then
 	confirm "Replace Code Foundry $CURRENT with $TAG?" || die "cancelled"
 	say "upgrading Code Foundry $CURRENT -> $TAG"
 elif [ -f "$APP_DIR/VERSION" ]; then
@@ -337,12 +382,16 @@ else
 	say "installing Code Foundry $TAG"
 fi
 
-# ---- download and verify ---------------------------------------------------------------
+# ---- download and verify (or check the staged download) --------------------------------
 
-TMP="$(mktemp -d "${TMPDIR:-/tmp}/code-foundry-install.XXXXXX")"
+TMP=""
 SWAPPED=0
+# KEEP_STAGE: app.new survives the exit (a finished --stage-only, or --apply-staged,
+# whose stage is not ours to delete when the swap fails).
+KEEP_STAGE="$APPLY_STAGED"
 cleanup() {
-	rm -rf "$TMP" "$STAGE"
+	[ -z "$TMP" ] || rm -rf "$TMP"
+	[ "$KEEP_STAGE" = 1 ] || rm -rf "$STAGE"
 	if [ "$SWAPPED" = 1 ]; then
 		rm -rf "$OLD"
 	elif [ ! -e "$APP_DIR" ] && [ -d "$OLD" ]; then
@@ -351,38 +400,67 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if [ -n "$RELEASE_DIR" ]; then
-	say "copying $ARCHIVE from $RELEASE_DIR/$TAG"
-	[ -f "$RELEASE_DIR/$TAG/$ARCHIVE" ] || die "$RELEASE_DIR/$TAG/$ARCHIVE not found"
-	[ -f "$RELEASE_DIR/$TAG/$SUMS" ] || die "$RELEASE_DIR/$TAG/$SUMS not found"
-	cp "$RELEASE_DIR/$TAG/$ARCHIVE" "$RELEASE_DIR/$TAG/$SUMS" "$TMP/"
-else
-	say "downloading $ARCHIVE from $REPO $TAG"
-	"$GH" release download "$TAG" --repo "$REPO" --pattern "$ARCHIVE" --pattern "$SUMS" --dir "$TMP" ||
-		die "download failed"
-fi
+# check_staged: --apply-staged's precondition, app.new holding TAG and both executables.
+check_staged() {
+	local got
+	got="$(installed_version "$STAGE")"
+	if [ "$got" != "$TAG" ] || [ ! -x "$STAGE/code-foundry" ] || [ ! -x "$STAGE/Code Foundry" ]; then
+		local detail=""
+		[ -z "$got" ] || [ "$got" = "$TAG" ] || detail=" (it holds $got)"
+		die "no staged download of $TAG in $STAGE$detail; run again without --apply-staged"
+	fi
+	say "applying the download staged in $STAGE"
+}
 
-say "verifying checksum"
-EXPECTED="$(awk -v f="$ARCHIVE" '$2 == f || $2 == "*"f { print $1 }' "$TMP/$SUMS")"
-[ -n "$EXPECTED" ] || die "$SUMS has no entry for $ARCHIVE"
-ACTUAL="$(/usr/bin/shasum -a 256 "$TMP/$ARCHIVE" | awk '{ print $1 }')"
-[ "$EXPECTED" = "$ACTUAL" ] || die "checksum mismatch for $ARCHIVE: expected $EXPECTED, got $ACTUAL"
+# stage_download: download TAG, verify its checksum and unpack it into app.new.
+stage_download() {
+	TMP="$(mktemp -d "${TMPDIR:-/tmp}/code-foundry-install.XXXXXX")"
+	if [ -n "$RELEASE_DIR" ]; then
+		say "copying $ARCHIVE from $RELEASE_DIR/$TAG"
+		[ -f "$RELEASE_DIR/$TAG/$ARCHIVE" ] || die "$RELEASE_DIR/$TAG/$ARCHIVE not found"
+		[ -f "$RELEASE_DIR/$TAG/$SUMS" ] || die "$RELEASE_DIR/$TAG/$SUMS not found"
+		cp "$RELEASE_DIR/$TAG/$ARCHIVE" "$RELEASE_DIR/$TAG/$SUMS" "$TMP/"
+	else
+		say "downloading $ARCHIVE from $REPO $TAG"
+		"$GH" release download "$TAG" --repo "$REPO" --pattern "$ARCHIVE" --pattern "$SUMS" --dir "$TMP" ||
+			die "download failed"
+	fi
+
+	say "verifying checksum"
+	local expected actual got
+	expected="$(awk -v f="$ARCHIVE" '$2 == f || $2 == "*"f { print $1 }' "$TMP/$SUMS")"
+	[ -n "$expected" ] || die "$SUMS has no entry for $ARCHIVE"
+	actual="$(/usr/bin/shasum -a 256 "$TMP/$ARCHIVE" | awk '{ print $1 }')"
+	[ "$expected" = "$actual" ] || die "checksum mismatch for $ARCHIVE: expected $expected, got $actual"
+
+	# Unpack beside APP_DIR so the swap is two renames on one filesystem.
+	mkdir -p "$(dirname "$APP_DIR")"
+	rm -rf "$STAGE"
+	mkdir "$STAGE"
+	say "unpacking"
+	/usr/bin/tar -xzf "$TMP/$ARCHIVE" -C "$STAGE" || die "could not unpack $ARCHIVE"
+	[ -f "$STAGE/code-foundry" ] && [ -x "$STAGE/code-foundry" ] || die "the archive has no code-foundry executable"
+	[ -f "$STAGE/Code Foundry" ] && [ -x "$STAGE/Code Foundry" ] || die "the archive has no Code Foundry executable"
+	got="$(installed_version "$STAGE")"
+	[ "$got" = "$TAG" ] || die "the archive contains version '$got', expected $TAG"
+	# Belt and braces: gh does not quarantine downloads, but a copied archive might be, and
+	# tar propagates the attribute to what it extracts.
+	/usr/bin/xattr -dr com.apple.quarantine "$STAGE" 2>/dev/null || true
+}
+
+if [ "$APPLY_STAGED" = 1 ]; then
+	check_staged
+else
+	stage_download
+fi
+if [ "$STAGE_ONLY" = 1 ]; then
+	KEEP_STAGE=1
+	say "downloaded $TAG to $STAGE"
+	exit 0
+fi
 
 # ---- install -----------------------------------------------------------------------------
 
-# Unpack beside APP_DIR so the swap is two renames on one filesystem.
-mkdir -p "$(dirname "$APP_DIR")"
-rm -rf "$STAGE"
-mkdir "$STAGE"
-say "unpacking"
-/usr/bin/tar -xzf "$TMP/$ARCHIVE" -C "$STAGE" || die "could not unpack $ARCHIVE"
-[ -f "$STAGE/code-foundry" ] && [ -x "$STAGE/code-foundry" ] || die "the archive has no code-foundry executable"
-[ -f "$STAGE/Code Foundry" ] && [ -x "$STAGE/Code Foundry" ] || die "the archive has no Code Foundry executable"
-GOT="$(installed_version "$STAGE")"
-[ "$GOT" = "$TAG" ] || die "the archive contains version '$GOT', expected $TAG"
-# Belt and braces: gh does not quarantine downloads, but a copied archive might be, and
-# tar propagates the attribute to what it extracts.
-/usr/bin/xattr -dr com.apple.quarantine "$STAGE" 2>/dev/null || true
 
 # Running processes keep their open executables across the renames; they pick up the new
 # version when they are restarted.
