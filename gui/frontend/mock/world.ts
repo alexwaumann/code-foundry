@@ -2797,6 +2797,22 @@ export class World {
           return `${scheme} theme = ${args.theme ?? ""}`;
         },
       })),
+      // Like internal/command/commands_theme_pick.go: the Themes page, optionally on a slot.
+      {
+        cmd: {
+          name: "theme.pick",
+          title: "Choose Theme…",
+          category: "Settings",
+          description: "Open the Themes page: preview each theme in a gallery of the app's controls, then apply it to the dark or light slot.",
+          keybindings: [],
+          args: [{ name: "slot", type: ArgType.ENUM, required: false, description: "The slot to edit first (default: the one in use)", enumValues: ["dark", "light"] }],
+        },
+        when: always,
+        run: (_ctx: UiContext | undefined, args: Record<string, string>) => {
+          const name = args.slot ? `themes.${args.slot}` : "themes";
+          return `delivered=${String(this.emit({ intent: { case: "showView", value: { name } } }))}`;
+        },
+      },
       ...this.update.commands(),
     ];
   }

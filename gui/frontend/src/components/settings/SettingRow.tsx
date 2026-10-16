@@ -47,7 +47,11 @@ function BoolEditor({ field, value, pending, commit }: EditorProps) {
  */
 const EMPTY_ENUM = "__cf_default__";
 
-function EnumEditor({ field, value, pending, invalid, commit }: EditorProps) {
+/**
+ * `markDefault` (on) appends " (default)" to the default's label; the theme slot rows turn it
+ * off to leave room for their Choose… button (the reset arrow already marks a changed value).
+ */
+export function EnumEditor({ field, value, pending, invalid, commit, markDefault = true }: EditorProps & { markDefault?: boolean }) {
   const toItem = (v: string) => (v === "" ? EMPTY_ENUM : v);
   return (
     <Select
@@ -64,7 +68,7 @@ function EnumEditor({ field, value, pending, invalid, commit }: EditorProps) {
         {field.enumValues.map((v) => (
           <SelectItem key={v} value={toItem(v)}>
             {enumLabel(field, v)}
-            {v === field.defaultValue && v !== "" ? " (default)" : ""}
+            {markDefault && v === field.defaultValue && v !== "" ? " (default)" : ""}
           </SelectItem>
         ))}
       </SelectContent>

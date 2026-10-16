@@ -39,7 +39,7 @@
   --sh-str: var(--terminal-ansi-2);
   --t-mono: "JetBrainsMono Nerd Font Mono", "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
 }
-.dark .cf-thread {
+.dark .cf-thread:not(:where(.light *)) {
   --t-sky: var(--info);
   --t-amber: var(--warning);
   --t-emerald: var(--success);
@@ -105,7 +105,7 @@ html[data-thread-width="full"] .cf-thread {
   tab-size: 4;
   color: var(--syn-fg);
 }
-.dark .cf-thread .cf-markdown :where(pre, :not(pre) > code) {
+.dark .cf-thread:not(:where(.light *)) .cf-markdown :where(pre, :not(pre) > code) {
   background: color-mix(in oklab, var(--foreground) 5%, transparent);
 }
 .cf-thread .cf-markdown th {
@@ -339,7 +339,7 @@ html[data-thread-width="full"] .cf-thread {
   font-family: var(--t-mono);
   font-weight: 400;
 }
-.dark .cf-thread :is(.chip.tool, .chip.muted) {
+.dark .cf-thread:not(:where(.light *)) :is(.chip.tool, .chip.muted) {
   background: color-mix(in oklab, var(--foreground) 5%, transparent);
 }
 /* A background subagent's chip: a muted outline (docs/sketches/agents-panel). */
@@ -373,7 +373,7 @@ html[data-thread-width="full"] .cf-thread {
   color: var(--muted-foreground);
   margin-right: 2px;
 }
-.dark .cf-thread .q-hdr {
+.dark .cf-thread:not(:where(.light *)) .q-hdr {
   background: color-mix(in oklab, var(--foreground) 7%, transparent);
 }
 .cf-thread .detail {
@@ -417,7 +417,7 @@ html[data-thread-width="full"] .cf-thread {
   line-height: 18px;
   background: color-mix(in oklab, var(--foreground) 1.5%, transparent);
 }
-.dark .cf-thread .term {
+.dark .cf-thread:not(:where(.light *)) .term {
   background: color-mix(in oklab, var(--foreground) 2.5%, transparent);
 }
 .cf-thread .term .cmd {
@@ -460,7 +460,7 @@ html[data-thread-width="full"] .cf-thread {
   border-bottom: 1px solid var(--border);
   background: var(--muted);
 }
-.dark .cf-thread .diff .dh {
+.dark .cf-thread:not(:where(.light *)) .diff .dh {
   background: color-mix(in oklab, var(--foreground) 4%, transparent);
 }
 .cf-thread .diff .dh .path {
@@ -735,7 +735,7 @@ html[data-thread-width="full"] .cf-thread {
     visibility 0s linear 150ms,
     color 100ms ease;
 }
-.dark .cf-thread .jump-bottom {
+.dark .cf-thread:not(:where(.light *)) .jump-bottom {
   box-shadow: 0 1px 3px oklch(0 0 0 / 40%);
 }
 .cf-thread .jump-bottom[data-shown] {
@@ -792,7 +792,7 @@ html[data-thread-width="full"] .cf-thread {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
 }
-.dark .cf-thread .ccard {
+.dark .cf-thread:not(:where(.light *)) .ccard {
   box-shadow: 0 1px 2px oklch(0 0 0 / 40%);
 }
 .cf-thread .ccard.docked {
@@ -953,7 +953,7 @@ html[data-thread-width="full"] .cf-thread {
   max-height: 160px;
   overflow: auto;
 }
-.dark .cf-thread .pend .cmdbox {
+.dark .cf-thread:not(:where(.light *)) .pend .cmdbox {
   background: color-mix(in oklab, var(--foreground) 3%, transparent);
 }
 .cf-thread .pend .desc {
@@ -1001,7 +1001,7 @@ html[data-thread-width="full"] .cf-thread {
   background: var(--sheet);
   box-shadow: 0 1px 2px oklch(0 0 0 / 5%);
 }
-.dark .cf-thread .btn.outline {
+.dark .cf-thread:not(:where(.light *)) .btn.outline {
   border-color: var(--input);
   background: color-mix(in oklab, var(--foreground) 4.5%, transparent);
 }
@@ -1101,7 +1101,7 @@ html[data-thread-width="full"] .cf-thread {
   font-weight: 500;
   background: var(--sheet);
 }
-.dark .cf-thread .intr {
+.dark .cf-thread:not(:where(.light *)) .intr {
   border-color: var(--input);
   background: color-mix(in oklab, var(--foreground) 4.5%, transparent);
 }

@@ -1,4 +1,5 @@
 import type { SettingEditor } from "./editor";
+import { ThemeDarkEditor, ThemeLightEditor } from "./ThemeSlotEditor";
 import { VolumeEditor } from "./VolumeEditor";
 
 /**
@@ -7,4 +8,6 @@ import { VolumeEditor } from "./VolumeEditor";
  */
 export const keyEditors: Readonly<Partial<Record<string, SettingEditor>>> = {
   "notifications.sound_volume": VolumeEditor,
+  "appearance.theme_dark": ThemeDarkEditor,
+  "appearance.theme_light": ThemeLightEditor,
 };

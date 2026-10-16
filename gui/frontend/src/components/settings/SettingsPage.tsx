@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FileText, Search, TriangleAlert, X } from "lucide-react";
+import { ChevronRight, FileText, Search, TriangleAlert, X } from "lucide-react";
 import type { SettingFieldView } from "@/api/settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { useEscapeCloses } from "@/components/window/useEscapeCloses";
 import { tildify } from "@/lib/path";
 import { runCommand } from "@/stores/commands";
 import { loadSettingsSchema, useSettingsStore } from "@/stores/settings";
-import { closeSettings } from "@/stores/views";
+import { closeSettings, openThemes } from "@/stores/views";
 import { SettingRow } from "./SettingRow";
 
 function matches(f: SettingFieldView, q: string): boolean {
@@ -125,6 +125,19 @@ export function SettingsPage() {
               {query && <span className="text-[11px] text-muted-foreground">{fields.length}</span>}
             </button>
           ))}
+          {/* The Themes page (theme.pick): a page of its own, so a link, not a group. */}
+          <div className="my-1.5 h-px bg-pane-border" aria-hidden />
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-md px-2 py-1 text-left hover:bg-accent"
+            onClick={() => {
+              openThemes(undefined, "settings");
+            }}
+            data-testid="settings-themes-link"
+          >
+            <span>Themes</span>
+            <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />
+          </button>
         </nav>
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           <div className="mx-auto max-w-3xl">
