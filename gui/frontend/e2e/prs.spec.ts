@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, emit, invocations, mockPost, mockUrl, openApp, resetMock, row, selectProject, selectWorktree } from "./fixtures";
+import { CF, emit, invocations, mockPost, mockUrl, openApp, resetMock, row, selectWorktree } from "./fixtures";
 
 /**
- * Phase 3a: the Pull Requests page and the worktree overview, against the mock daemon
- * (mock/github.ts). Set SHOTS=<dir> to save screenshots.
+ * Phase 3a: the Pull Requests page, against the mock daemon (mock/github.ts); the
+ * worktree overview is e2e/worktree-panel.spec.ts. Set SHOTS=<dir> to save screenshots.
  */
 
 const CFW = `${CF}.worktrees`;
@@ -126,112 +126,5 @@ test.describe("Pull Requests page", () => {
     await expect(page.getByTestId("prs-updated")).toHaveAttribute("data-freshness", "fresh");
     await expect(page.getByTestId("prs-updated")).toContainText(/updated \d+s ago/);
     expect((await ghCalls()).GetDashboard ?? 0).toBe(reads);
-  });
-});
-
-test.describe("worktree overview", () => {
-  test("feature worktree: sync line, GitHub activity, files tree, log", async ({ page }) => {
-    await openApp(page);
-    await selectWorktree(page, "repo-cf", `${CFW}/feat-sidebar`);
-    await expect(page.getByTestId("worktree-surface-title")).toHaveText("code-foundry@feat/sidebar");
-    const sync = page.getByTestId("sync-line");
-    await expect(sync).toContainText("Upstream origin/feat/sidebar: ↑2");
-    await expect(sync).toContainText("Base origin/main: ↑3 ↓1");
-    // The mock flips the modified count between 3 and 4 every 8s (World tick).
-    await expect(sync).toContainText(/[34] modified · 1 new/);
-
-    const gh = page.getByTestId("gh-activity");
-    await expect(page.getByTestId("gh-merged-stats")).toHaveText("My PRs merged: 2 this month · 7 last month");
-    await expect(page.getByTestId("gh-commit-stats")).toHaveText("My commits: 9 this month · 75 last month");
-    await expect(page.getByTestId("gh-default-branch")).toHaveAttribute("data-ci", "failure");
-    await expect(page.getByTestId("gh-default-branch")).toContainText("2/16 failing");
-    await expect(gh.locator('[data-nav-key^="c:"]')).toHaveCount(2);
-    await expect(gh.locator('[data-nav-key^="c:"]').nth(1)).toContainText("continuous-integration/jenkins/branch");
-    await expect(gh.locator('[data-nav-key^="m:"]')).toHaveCount(2); // #138 and #136 (code-foundry only)
-    await expect(gh.locator('[data-nav-key="b:142"]')).toContainText("feat/sidebar → main");
-
-    const files = page.getByTestId("files-list");
-    await expect(files).toHaveAttribute("data-virtual", "false");
-    await expect(page.getByTestId("section-files")).toContainText("8 files");
-    await expect(files.locator('[data-nav-key="d:gui/frontend/src"]')).toContainText("(5)");
-    await expect(files.locator('[data-nav-key="f:gui/frontend/src/lib/old-tree.ts"] [data-status]')).toHaveText("D");
-    await expect(files.locator('[data-nav-key="f:scratch.txt"] [data-status]')).toHaveText("?");
-    await expect(files.locator('[data-nav-key="f:docs/notes/sidebar.md"]')).toContainText("← docs/sidebar.md");
-    await expect(files.locator('[data-nav-key="f:assets/icon.png"]')).toContainText("bin");
-    await expect(page.getByTestId("log-list").locator("[data-nav-key]")).toHaveCount(3);
-    await expect(page.getByTestId("section-log")).toContainText("(3 commits)");
-    await shot(page, "overview-feature");
-  });
-
-  test("keyboard: fold directories, open failing checks and commits", async ({ page }) => {
-    await openApp(page);
-    await selectWorktree(page, "repo-cf", `${CFW}/feat-sidebar`);
-    // In the panel the list does not take focus on its own.
-    const list = page.getByTestId("overview-list");
-    await list.focus();
-    await expect(page.getByTestId("files-list")).toBeVisible();
-    // First row: the first failing check; Enter opens its log.
-    await list.press("ArrowDown");
-    await list.press("Enter");
-    await expect.poll(async () => (await invocations()).filter((i) => i.name === "view.open.url").map((i) => i.args.url)).toEqual([
-      "https://ci.example.com/job/code-foundry/main/812/",
-    ]);
-    // Click a directory, collapse it with ←, expand with →.
-    const dir = page.locator('[data-nav-key="d:gui/frontend/src"]');
-    await dir.click();
-    await list.focus();
-    await list.press("ArrowLeft");
-    await expect(page.locator('[data-nav-key="f:gui/frontend/src/lib/tree.ts"]')).toHaveCount(0);
-    await list.press("ArrowRight");
-    await expect(page.locator('[data-nav-key="f:gui/frontend/src/lib/tree.ts"]')).toBeVisible();
-    // End: the oldest commit; Enter opens it on GitHub.
-    await list.press("End");
-    await list.press("Enter");
-    await expect.poll(async () => (await invocations()).filter((i) => i.name === "view.open.url").at(-1)?.args.url).toMatch(
-      /^https:\/\/github\.com\/alexwaumann\/code-foundry\/commit\/8e7d6c5b4a/,
-    );
-  });
-
-  test("long file lists start collapsed and virtualize when expanded", async ({ page }) => {
-    await openApp(page);
-    await selectWorktree(page, "repo-cf", `${CFW}/fix-resize`);
-    await expect(page.getByTestId("section-files")).toContainText("120 files");
-    const files = page.getByTestId("files-list");
-    await expect(files).toHaveAttribute("data-virtual", "false");
-    await expect(files.locator('[data-nav-key^="d:"]').first()).toBeVisible();
-    await expect(files.locator('[data-nav-key^="f:"]')).toHaveCount(0);
-    const list = page.getByTestId("overview-list");
-    await list.press("e");
-    await expect(files).toHaveAttribute("data-virtual", "true");
-    const mounted = await files.locator("[data-nav-key]").count();
-    expect(mounted).toBeGreaterThan(10);
-    expect(mounted).toBeLessThan(120);
-    // The cursor reaches rows that were not mounted.
-    await list.press("End");
-    await expect(page.getByTestId("log-list").locator("[data-nav-key]").last()).toHaveAttribute("aria-selected", "true");
-    await shot(page, "overview-long");
-    await list.press("E");
-    await expect(files.locator('[data-nav-key^="f:"]')).toHaveCount(0);
-  });
-
-  test("detail updates live; main worktree shows untracked files and an empty log", async ({ page }) => {
-    await openApp(page);
-    await selectProject(page, "repo-cf");
-    await expect(page.getByTestId("worktree-surface-title")).toHaveText("code-foundry@main");
-    await expect(page.locator('[data-nav-key="f:.pr1853.diff"]')).toContainText("+1368");
-    await expect(page.locator('[data-nav-key="f:notes/"] [data-status]')).toHaveText("?");
-    await expect(page.getByTestId("section-log")).toContainText("no commits in range");
-    await expect(page.getByTestId("sync-line")).toContainText("✓ in sync");
-
-    const before = (await ghCalls()).GetWorktreeDetail ?? 0;
-    await mockPost(`gh/touch?path=${encodeURIComponent(CF)}`);
-    await expect(page.locator('[data-nav-key="f:later.txt"]')).toBeVisible();
-    expect((await ghCalls()).GetWorktreeDetail ?? 0).toBeGreaterThan(before);
-  });
-
-  test("a repo without a GitHub remote says so", async ({ page }) => {
-    await openApp(page);
-    await selectProject(page, "repo-dot");
-    await expect(page.getByTestId("section-github")).toContainText("No GitHub remote");
   });
 });

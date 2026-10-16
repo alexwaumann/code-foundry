@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 import { create } from "zustand";
 import { invokeCommand } from "@/api/command";
-import { getBranchPullRequests, getDashboard, getPullRequestDetail, getRepoActivity, getViewer, type GhEventView } from "@/api/gh";
+import { getBranchPullRequests, getDashboard, getPullRequestDetail, getViewer, type GhEventView } from "@/api/gh";
 import { errorMessage } from "@/api/stream";
 import { getUiContext } from "./context";
 import { createResource, useResource } from "./resource";
@@ -61,9 +61,6 @@ export function useViewerLogin(): string {
 /** Keys: "tracked" (registered repos only) or "all". */
 export const dashboardResource = createResource((key, signal) => getDashboard(key === "all", undefined, signal));
 
-/** Key: repo slug. */
-export const repoActivityResource = createResource((slug, signal) => getRepoActivity(slug, undefined, signal));
-
 const SEP = "\u0000";
 export const branchKey = (slug: string, head: string): string => `${slug}${SEP}${head}`;
 
@@ -118,11 +115,6 @@ export function applyGhEvent(ev: GhEventView): void {
     case "dashboard":
       if (ev.kind === "viewer") viewerResource.invalidate(VIEWER_KEY);
       dashboardResource.invalidate(() => true);
-      // Repo activity carries the dashboard's recently merged PRs for its repo.
-      repoActivityResource.invalidate(() => true);
-      break;
-    case "repoActivity":
-      repoActivityResource.invalidate(ev.repoSlug);
       break;
     case "branchPullRequests":
       branchPullRequestsResource.invalidate(branchKey(ev.repoSlug, ev.headRef));

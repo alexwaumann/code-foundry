@@ -88,8 +88,9 @@ test("workspace surface with a real thread: members' state, member tab, add and 
       const wt = page.getByTestId("worktree-surface");
       await expect(wt).toHaveAttribute("data-path", first.worktreePath);
       await expect(wt.getByTestId("worktree-surface-title")).toHaveText(`${first.repoName}@${ws.workspace.branch}`);
-      await expect(wt.getByTestId("sync-line")).toContainText("↑1");
-      await expect(wt.getByTestId("section-log")).toContainText("ahead commit");
+      await expect(wt.getByTestId("worktree-facts")).toContainText("↑1");
+      await wt.getByTestId("worktree-commits").locator('[data-nav-key="commits"]').click();
+      await expect(wt.getByTestId("commits-list")).toContainText("ahead commit");
       await page.waitForTimeout(300);
       await shot(page, "live-wspanel-member-tab");
       await page.getByTestId("panel-tabs").getByRole("tab", { name: ws.workspace.name }).click();

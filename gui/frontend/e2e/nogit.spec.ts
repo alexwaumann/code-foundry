@@ -43,8 +43,8 @@ test("a project without git: No git on the Projects page, its overview, then Ini
   await expect(overview).toHaveAttribute("data-git", "false");
   await expect(page.getByTestId("worktree-surface-title")).toHaveText(/^writing\s*No git$/);
   await expect(page.getByTestId("section-nogit")).toContainText("Not a git repository");
-  // Nothing git-shaped renders: sync line, GitHub, files, log.
-  for (const id of ["sync-line", "section-github", "section-files", "section-log"]) await expect(page.getByTestId(id)).toHaveCount(0);
+  // Nothing git-shaped renders: facts, pull request, changes, commits.
+  for (const id of ["worktree-facts", "overview-pr", "worktree-changes", "worktree-commits"]) await expect(page.getByTestId(id)).toHaveCount(0);
 
   // Initialize Git runs repo.git.init on the project (the page itself has no repo context).
   const init = page.getByTestId("init-git");
@@ -55,8 +55,8 @@ test("a project without git: No git on the Projects page, its overview, then Ini
   // A git repository on main now: the normal overview takes over.
   await expect(overview).toHaveAttribute("data-git", "true");
   await expect(page.getByTestId("worktree-surface-title")).toHaveText("writing@main");
-  await expect(page.getByTestId("sync-line")).toBeVisible();
-  await expect(page.getByTestId("section-files")).toBeVisible();
+  await expect(page.getByTestId("worktree-facts")).toBeVisible();
+  await expect(page.getByTestId("worktree-changes")).toBeVisible();
   await expect(page.getByTestId("section-nogit")).toHaveCount(0);
   // Still without a remote: Publish to GitHub.
   await expect(page.getByTestId("publish-github")).toBeVisible();
@@ -121,8 +121,8 @@ test("a git repository without a remote: Publish to GitHub is there", async ({ p
   await expect(page.getByTestId("publish-github")).toBeEnabled();
   await expect(page.getByTestId("publish-github")).toHaveText("Publish to GitHub");
   // Worktrees and files work as for any git repository.
-  await expect(page.getByTestId("sync-line")).toBeVisible();
-  await expect(page.getByTestId("section-files")).toBeVisible();
+  await expect(page.getByTestId("worktree-facts")).toBeVisible();
+  await expect(page.getByTestId("worktree-changes")).toBeVisible();
 
   // A remote that is not GitHub, and a GitHub repository: no Publish button.
   for (const id of ["repo-dot", "repo-cf"]) {

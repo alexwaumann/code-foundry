@@ -420,7 +420,7 @@ test("panel state is per selection; a session or worktree on a PR branch enables
 
   // The worktree tab on the Projects page: its branch PR row opens in that page's panel, beside it.
   await selectWorktree(page, "repo-cf", `${CFW}/feat-sidebar`);
-  await page.locator('[data-nav-key="b:142"]').click();
+  await page.getByTestId("overview-pr").locator('[data-nav-key="pr"]').click();
   await expect(tabs(page)).toHaveText(["code-foundry · feat/sidebar", "#142"]);
   await expect(page.getByTestId("pr-title")).toContainText("virtualized sidebar tree");
 

@@ -132,25 +132,6 @@ export interface DashboardView {
   trackedSlugs: string[];
 }
 
-export interface DefaultBranchView {
-  branch: string;
-  sha: string;
-  headline: string;
-  committedAtMs: number | null;
-  rollup: CheckRollupView;
-  failing: CheckRunView[];
-  fetchedAtMs: number | null;
-  lastError: string;
-}
-
-export interface RepoActivityView {
-  repoSlug: string;
-  tracked: boolean;
-  stats: StatsView;
-  defaultBranch: DefaultBranchView | null;
-  recentlyMerged: PullRequestView[];
-}
-
 export interface BranchPullRequestsView {
   pullRequests: PullRequestView[];
   fetchedAtMs: number | null;
@@ -461,30 +442,6 @@ export async function getDashboard(includeUntracked = false, conn: DaemonConnect
     fetchedAtMs: ms(r.fetchedAt),
     lastError: r.lastError,
     trackedSlugs: r.trackedSlugs,
-  };
-}
-
-export async function getRepoActivity(repoSlug: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<RepoActivityView> {
-  const c = await conn.client(GhService);
-  const r = await c.getRepoActivity({ repoSlug }, { signal });
-  const d = r.defaultBranch;
-  return {
-    repoSlug: r.repoSlug,
-    tracked: r.tracked,
-    stats: toStatsView(r.stats),
-    defaultBranch: d
-      ? {
-          branch: d.branch,
-          sha: d.sha,
-          headline: d.headline,
-          committedAtMs: ms(d.committedAt),
-          rollup: toRollupView(d.rollup),
-          failing: d.failing.map(toCheckRunView),
-          fetchedAtMs: ms(d.fetchedAt),
-          lastError: d.lastError,
-        }
-      : null,
-    recentlyMerged: r.recentlyMerged.map(toPullRequestView),
   };
 }
 

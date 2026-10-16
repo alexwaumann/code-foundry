@@ -155,9 +155,9 @@ test("a member opens as a worktree tab showing that worktree's overview", async 
   const wt = page.getByTestId("worktree-surface");
   await expect(wt).toHaveAttribute("data-path", CF_MEMBER);
   await expect(wt.getByTestId("worktree-surface-title")).toHaveText("code-foundry@cf/checkout");
-  await expect(wt.getByTestId("sync-line")).toContainText("Upstream origin/cf/checkout");
-  await expect(wt.getByTestId("section-github")).toContainText("#151");
-  await expect(wt.getByTestId("section-files")).toBeVisible();
+  await expect(wt.getByTestId("fact-origin")).toHaveText("originin sync");
+  await expect(wt.getByTestId("overview-pr")).toContainText("#151");
+  await expect(wt.getByTestId("worktree-changes")).toBeVisible();
   // The content pane still shows the thread.
   await expect(page.getByTestId("thread-header")).toContainText("driver");
 
@@ -169,7 +169,7 @@ test("a member opens as a worktree tab showing that worktree's overview", async 
   await page.keyboard.press("Enter");
   await expect(tabs).toHaveText(["checkout", "code-foundry", "ghostty-playground"]);
   await expect(page.getByTestId("worktree-surface")).toHaveAttribute("data-path", GP_MEMBER);
-  await expect(page.getByTestId("worktree-surface").getByTestId("sync-line")).toContainText("↑2");
+  await expect(page.getByTestId("worktree-surface").getByTestId("fact-origin")).toHaveText("origin↑2 to push");
 });
 
 test("remove member confirms and the mock applies it; add member and Run in go through their commands", async ({ page }) => {
@@ -247,7 +247,7 @@ test("at 280px nothing overflows: the workspace surface and a member tab", async
   await cf.hover();
   await cf.getByTestId("member-open").click();
   await expect(page.getByTestId("worktree-surface")).toBeVisible();
-  await expect(page.getByTestId("worktree-surface").getByTestId("section-github")).toContainText("#151");
+  await expect(page.getByTestId("worktree-surface").getByTestId("overview-pr")).toContainText("#151");
   expect(await overflowX(page, "panel-body")).toBeLessThanOrEqual(0);
   await shot(page, "ws5-member-tab-280");
 });

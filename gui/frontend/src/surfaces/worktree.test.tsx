@@ -2,8 +2,9 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RepoView, WorktreeView } from "@/api/repo";
 import type { SessionView } from "@/api/session";
+import type { TerminalView } from "@/api/terminal";
 
-// The tab body's GitHub section reads branch pull requests; nothing to fetch here.
+// The tab body reads the branch's pull requests; nothing to fetch here.
 const getBranchPullRequests = vi.hoisted(() => vi.fn(() => Promise.resolve({ pullRequests: [], fetchedAtMs: 1, lastError: "" })));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), getBranchPullRequests }));
 
@@ -11,6 +12,7 @@ const { SidePanel } = await import("@/components/panel/SidePanel");
 const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useReposStore } = await import("@/stores/repos");
 const { useSessionsStore } = await import("@/stores/sessions");
+const { useTerminalsStore } = await import("@/stores/terminals");
 const { useUiStore } = await import("@/stores/ui");
 const { showView, useViewsStore, worktreePanelCommand } = await import("@/stores/views");
 const { showWorktreeInPanel, worktreeTabTitle } = await import("@/stores/worktreePanel");
@@ -37,6 +39,7 @@ beforeEach(() => {
     },
     order: ["s-main", "s-feat", "s-sub", "s-lost"],
   });
+  useTerminalsStore.setState({ byId: {}, order: [] });
   const open = { open: true, tabs: [], activeTabId: null };
   usePanelStore.setState({ byKey: { "session:s-main": open, "session:s-feat": open, "session:s-sub": open, "view:projects": open } });
   useViewsStore.setState({ settingsOpen: false });
@@ -90,6 +93,19 @@ describe("Worktree surface availability", () => {
     expect(p.tabs[0]?.title).toBe("web · cf/feat");
     expect(screen.getByTestId("worktree-surface").getAttribute("data-path")).toBe(WEB_FEAT);
     expect(screen.getByTestId("worktree-surface-title").textContent).toBe("web@cf/feat");
+  });
+
+  it("the tab's who-else line counts the worktree's other threads and shells, not the thread it is open for", () => {
+    useSessionsStore.setState((s) => ({ byId: { ...s.byId, "s-feat2": thread("s-feat2", { worktreePath: WEB_FEAT }) }, order: [...s.order, "s-feat2"] }));
+    useTerminalsStore.setState({ byId: { t1: { id: "t1", cwd: WEB_FEAT, state: "running" } as TerminalView }, order: ["t1"] });
+    render(<SidePanel />);
+    fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "t" });
+    expect(screen.getByTestId("worktree-who").textContent).toBe("1 other thread1 shell");
+    act(() => {
+      useTerminalsStore.setState({ byId: {}, order: [] });
+      useSessionsStore.setState((s) => ({ byId: { ...s.byId, "s-feat2": { ...thread("s-feat2", { worktreePath: WEB_FEAT }), archivedAtMs: 1 } } }));
+    });
+    expect(screen.queryByTestId("worktree-who")).toBeNull();
   });
 
   it("a thread's tab follows its placement (the worktree, not the folder inside it)", () => {
