@@ -249,7 +249,7 @@ func TestStreamHeartbeats(t *testing.T) {
 		{"real events reset the timer", func(t *testing.T, s beatStream, _ context.CancelFunc) {
 			stop := make(chan struct{})
 			go func() {
-				tick := time.NewTicker(every / 5)
+				tick := time.NewTicker(every / 10)
 				defer tick.Stop()
 				for {
 					select {
@@ -262,8 +262,11 @@ func TestStreamHeartbeats(t *testing.T) {
 			}()
 			got := count(s.msgs, 5*every)
 			close(stop)
-			if got["heartbeat"] != 0 || got["event"] == 0 {
-				t.Fatalf("while busy got %v, want events and no heartbeat", got)
+			// A busy stream would beat five times here if events did not reset the
+			// timer. One is allowed: a loaded runner can starve the 10 ms ticker past an
+			// interval (seen on macos-latest under -race).
+			if got["heartbeat"] > 1 || got["event"] == 0 {
+				t.Fatalf("while busy got %v, want events and at most one heartbeat", got)
 			}
 			// Quiet again: the heartbeat comes back.
 			if got := count(s.msgs, 3*every); got["heartbeat"] == 0 {

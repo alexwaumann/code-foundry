@@ -17,6 +17,7 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/db"
+	"github.com/alexwaumann/code-foundry/internal/db/dbtest"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
@@ -47,7 +48,7 @@ type harness struct {
 func newHarness(t *testing.T, mut ...func(*Options)) *harness {
 	t.Helper()
 	ctx := context.Background()
-	d, err := db.Open(ctx, filepath.Join(t.TempDir(), "db.sqlite"))
+	d, err := db.Open(ctx, dbtest.Path(t))
 	if err != nil {
 		t.Fatal(err)
 	}

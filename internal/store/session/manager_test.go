@@ -19,6 +19,7 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/db"
+	"github.com/alexwaumann/code-foundry/internal/db/dbtest"
 	"github.com/alexwaumann/code-foundry/internal/store/repo"
 	"github.com/alexwaumann/code-foundry/internal/store/repo/repotest"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal/terminaltest"
@@ -73,7 +74,7 @@ func newFixtureEnvAt(t *testing.T, path string, vars []string, mutate ...func(*O
 		t.Fatal(err)
 	}
 	e.mutate = func(o *Options) {
-		o.Claude = os.Args[0]
+		o.Claude = fakeClaudeBin
 		o.Env = append([]string{fakeClaudeEnv + "=" + path, "CF_FAKE_CLAUDE_LOG=" + e.log, "CF_FAKE_CLAUDE_ARGV=" + e.argv,
 			"CF_FAKE_CLAUDE_SPAWN=" + e.spawns}, vars...)
 		o.DisablePreTrust = true
@@ -92,7 +93,7 @@ func newFixtureEnvAt(t *testing.T, path string, vars []string, mutate ...func(*O
 		t.Fatal(err)
 	}
 	e.paths = ClaudePaths{Dir: filepath.Join(dir, "claude"), Config: filepath.Join(dir, "claude.json")}
-	e.dbPath = filepath.Join(dir, "cf.db")
+	e.dbPath = dbtest.Path(t)
 	e.namer = func(msg string) (string, error) { return "named-" + strings.Fields(msg)[0], nil }
 	e.events = bus.Subscribe[Event](e.bus, 1024)
 	t.Cleanup(e.events.Close)
@@ -359,7 +360,7 @@ func TestCreateSpawnsClaude(t *testing.T) {
 		t.Fatalf("created = %+v", s)
 	}
 	spec := e.spec(s.ID)
-	if spec.Argv[0] != os.Args[0] || argOf(spec.Argv, "--model") != "opus" || argOf(spec.Argv, "--effort") != "high" {
+	if spec.Argv[0] != fakeClaudeBin || argOf(spec.Argv, "--model") != "opus" || argOf(spec.Argv, "--effort") != "high" {
 		t.Errorf("argv = %q", spec.Argv)
 	}
 	if len(argOf(spec.Argv, "--session-id")) != 36 {

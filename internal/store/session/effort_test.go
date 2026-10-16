@@ -488,7 +488,7 @@ func heldItemThenStarted(t *testing.T, re *env, s Session, failText string) {
 // is stopped, and the next message (claude back) starts it.
 func TestRenderedSetEffortRespawnExecFails(t *testing.T) {
 	link := filepath.Join(t.TempDir(), "claude")
-	if err := os.Symlink(os.Args[0], link); err != nil {
+	if err := os.Symlink(fakeClaudeBin, link); err != nil {
 		t.Fatal(err)
 	}
 	re := newFixtureEnvAt(t, fixturePath("text-table"), []string{"CF_FAKE_CLAUDE_EXIT_DELAY=400ms"},
@@ -518,7 +518,7 @@ func TestRenderedSetEffortRespawnExecFails(t *testing.T) {
 		!slices.ContainsFunc(items[:u], func(x Item) bool { return strings.HasPrefix(x.Text, "Claude did not restart for the effort change") }) {
 		t.Errorf("want the restart failure, the message, then the start failure:\n%s", describeItems(items))
 	}
-	if err := os.Symlink(os.Args[0], link); err != nil {
+	if err := os.Symlink(fakeClaudeBin, link); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := re.m.Send(re.ctx(), s.ID, Message{Text: "again"}); err != nil {
