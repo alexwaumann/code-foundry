@@ -296,7 +296,7 @@ export function checkoutBranch(w: { branch: string; head: string; detached: bool
 }
 
 export const MAX_ATTACHMENTS = 10;
-export const ATTACHMENT_TYPE_NAMES = "PNG, JPEG, GIF or WebP";
+export const ATTACHMENT_TYPE_NAMES = "PNG, JPEG, GIF, WebP or PDF";
 
 export interface FileLike {
   name: string;
@@ -304,27 +304,86 @@ export interface FileLike {
   size: number;
 }
 
+/** What the composer accepts (api/threads.ts has the daemon's values). */
+export interface AttachmentLimits {
+  types: readonly string[];
+  /** The PDF type; every other accepted type is an image. */
+  pdfType: string;
+  /** Per file, by type. */
+  maxBytes: (type: string) => number;
+  /** What one message sends inline: images, and PDFs of at most maxInlinePages pages. */
+  maxInlineBytes: number;
+  maxInlinePages: number;
+  /** Files per message (MAX_ATTACHMENTS). */
+  max?: number;
+}
+
+/** An attachment as the inline cap sees it: pages null while a PDF is still being counted. */
+export interface InlineLike {
+  kind: "image" | "pdf";
+  size: number;
+  pages: number | null;
+}
+
+/**
+ * Whether an attachment goes to Claude inline (in the request) rather than as a path:
+ * every image, and a PDF of at most `maxPages` pages. A PDF whose pages are not known
+ * yet (or could not be counted) is not counted as inline: the cap applies to it once
+ * its count arrives (stores/compose.ts), and the daemon checks again on send.
+ */
+export function sentInline(a: InlineLike, maxPages: number): boolean {
+  return a.kind === "image" || (a.pages !== null && a.pages <= maxPages);
+}
+
+/** The bytes the attachments send inline (sentInline). */
+export function inlineBytes(list: readonly InlineLike[], maxPages: number): number {
+  return list.reduce((sum, a) => sum + (sentInline(a, maxPages) ? a.size : 0), 0);
+}
+
+/** The notice for an attachment that would take the message over the inline cap. */
+export function inlineCapNotice(name: string, maxInlineBytes: number): string {
+  return `Attachments sent with one message must total under ${String(Math.round(maxInlineBytes / (1024 * 1024)))} MB; ${name} not attached`;
+}
+
+/** The notice for a PDF too long to go inline. */
+export function longPdfNotice(name: string, pages: number): string {
+  return `${name} has ${String(pages)} pages; Claude reads it page by page`;
+}
+
+/** "1 page", "12 pages". */
+export function pageCount(pages: number): string {
+  return `${String(pages)} ${pages === 1 ? "page" : "pages"}`;
+}
+
 /**
  * Splits dropped/pasted/picked files into the ones to attach and one message per
- * rejection (wrong type, too big, over the count cap).
+ * rejection (wrong type, too big, over the count cap, over the inline cap). `existing`
+ * is what the draft already has. An image counts toward the inline cap at once; a PDF
+ * only once its pages are counted (sentInline), so it is not checked here.
  */
 export function checkAttachments<F extends FileLike>(
   files: readonly F[],
-  existing: number,
-  opts: { types: readonly string[]; maxBytes: number; max?: number },
+  existing: { count: number; inlineBytes: number },
+  limits: AttachmentLimits,
 ): { accepted: F[]; rejected: string[] } {
-  const max = opts.max ?? MAX_ATTACHMENTS;
+  const max = limits.max ?? MAX_ATTACHMENTS;
   const accepted: F[] = [];
   const rejected: string[] = [];
+  let inline = existing.inlineBytes;
   let over = 0;
   for (const f of files) {
     const name = f.name || "pasted image";
-    if (!opts.types.includes(f.type)) rejected.push(`${name}: not a ${ATTACHMENT_TYPE_NAMES} image`);
-    else if (f.size > opts.maxBytes) rejected.push(`${name}: larger than ${String(Math.round(opts.maxBytes / (1024 * 1024)))} MB`);
-    else if (existing + accepted.length >= max) over++;
-    else accepted.push(f);
+    const maxBytes = limits.maxBytes(f.type);
+    if (!limits.types.includes(f.type)) rejected.push(`${name}: not a ${ATTACHMENT_TYPE_NAMES} file`);
+    else if (f.size > maxBytes) rejected.push(`${name}: larger than ${String(Math.round(maxBytes / (1024 * 1024)))} MB`);
+    else if (existing.count + accepted.length >= max) over++;
+    else if (f.type !== limits.pdfType && inline + f.size > limits.maxInlineBytes) rejected.push(inlineCapNotice(name, limits.maxInlineBytes));
+    else {
+      if (f.type !== limits.pdfType) inline += f.size;
+      accepted.push(f);
+    }
   }
-  if (over > 0) rejected.push(`At most ${String(max)} images per thread; ${String(over)} not attached`);
+  if (over > 0) rejected.push(`At most ${String(max)} attachments per message; ${String(over)} not attached`);
   return { accepted, rejected };
 }
 

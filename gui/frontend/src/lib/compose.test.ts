@@ -3,6 +3,13 @@ import { FALLBACK_MODEL_CHOICES } from "./models";
 import {
   checkAttachments,
   checkoutBranch,
+  inlineBytes,
+  inlineCapNotice,
+  longPdfNotice,
+  pageCount,
+  sentInline,
+  type AttachmentLimits,
+  type InlineLike,
   createdThreadId,
   DEFAULT_MODEL,
   draftKey,
@@ -32,20 +39,66 @@ import {
 import { tagToken } from "./prompt";
 
 const MB = 1024 * 1024;
-const opts = { types: ["image/png", "image/jpeg"], maxBytes: 10 * MB };
+const PDF = "application/pdf";
+const limits: AttachmentLimits = {
+  types: ["image/png", "image/jpeg", PDF],
+  pdfType: PDF,
+  maxBytes: (type) => (type === PDF ? 20 * MB : 10 * MB),
+  maxInlineBytes: 24 * MB,
+  maxInlinePages: 10,
+};
 const file = (name: string, type = "image/png", size = 1000) => ({ name, type, size });
+const CAP = "Attachments sent with one message must total under 24 MB";
 
 describe("checkAttachments", () => {
-  it.each([
-    ["accepts images", [file("a.png"), file("b.jpg", "image/jpeg")], 0, ["a.png", "b.jpg"], []],
-    ["rejects other types", [file("notes.txt", "text/plain")], 0, [], ["notes.txt: not a PNG, JPEG, GIF or WebP image"]],
-    ["rejects files over the limit", [file("big.png", "image/png", 11 * MB)], 0, [], ["big.png: larger than 10 MB"]],
-    ["names unnamed pastes", [file("", "image/svg+xml")], 0, [], ["pasted image: not a PNG, JPEG, GIF or WebP image"]],
-    ["caps the count at 10 including existing ones", [file("a.png"), file("b.png"), file("c.png")], 9, ["a.png"], ["At most 10 images per thread; 2 not attached"]],
+  it.each<[string, ReturnType<typeof file>[], { count: number; inlineBytes: number }, string[], string[]]>([
+    ["accepts images and PDFs", [file("a.png"), file("b.jpg", "image/jpeg"), file("spec.pdf", PDF)], { count: 0, inlineBytes: 0 }, ["a.png", "b.jpg", "spec.pdf"], []],
+    ["rejects other types", [file("notes.txt", "text/plain")], { count: 0, inlineBytes: 0 }, [], ["notes.txt: not a PNG, JPEG, GIF, WebP or PDF file"]],
+    ["rejects images over 10 MB", [file("big.png", "image/png", 11 * MB)], { count: 0, inlineBytes: 0 }, [], ["big.png: larger than 10 MB"]],
+    ["takes PDFs up to 20 MB", [file("book.pdf", PDF, 19 * MB)], { count: 0, inlineBytes: 0 }, ["book.pdf"], []],
+    ["rejects PDFs over 20 MB", [file("huge.pdf", PDF, 21 * MB)], { count: 0, inlineBytes: 0 }, [], ["huge.pdf: larger than 20 MB"]],
+    ["names unnamed pastes", [file("", "image/svg+xml")], { count: 0, inlineBytes: 0 }, [], ["pasted image: not a PNG, JPEG, GIF, WebP or PDF file"]],
+    ["caps the count at 10 including existing ones", [file("a.png"), file("b.pdf", PDF), file("c.png")], { count: 9, inlineBytes: 0 }, ["a.png"], ["At most 10 attachments per message; 2 not attached"]],
+    [
+      "rejects an image that takes the message over the inline cap",
+      [file("a.png", "image/png", 9 * MB), file("b.png", "image/png", 9 * MB), file("c.png", "image/png", 1 * MB)],
+      { count: 0, inlineBytes: 8 * MB },
+      ["a.png", "c.png"],
+      [`${CAP}; b.png not attached`],
+    ],
+    // A PDF's pages are not known yet: the cap applies once they are (stores/compose settlePdf).
+    ["does not hold a PDF to the inline cap", [file("spec.pdf", PDF, 19 * MB)], { count: 0, inlineBytes: 20 * MB }, ["spec.pdf"], []],
   ])("%s", (_name, files, existing, accepted, rejected) => {
-    const res = checkAttachments(files, existing, opts);
+    const res = checkAttachments(files, existing, limits);
     expect(res.accepted.map((f) => f.name)).toEqual(accepted);
     expect(res.rejected).toEqual(rejected);
+  });
+});
+
+describe("inline bytes", () => {
+  it.each<[string, InlineLike, boolean]>([
+    ["an image", { kind: "image", size: 1, pages: null }, true],
+    ["a PDF still being counted", { kind: "pdf", size: 1, pages: null }, false],
+    ["a 10-page PDF", { kind: "pdf", size: 1, pages: 10 }, true],
+    ["an 11-page PDF", { kind: "pdf", size: 1, pages: 11 }, false],
+  ])("%s", (_name, a, inline) => {
+    expect(sentInline(a, 10)).toBe(inline);
+  });
+
+  it("sums what goes inline", () => {
+    const list: InlineLike[] = [
+      { kind: "image", size: 3, pages: null },
+      { kind: "pdf", size: 5, pages: 2 },
+      { kind: "pdf", size: 7, pages: 30 },
+      { kind: "pdf", size: 11, pages: null },
+    ];
+    expect(inlineBytes(list, 10)).toBe(8);
+  });
+
+  it("words the notices", () => {
+    expect(inlineCapNotice("a.pdf", 24 * MB)).toBe(`${CAP}; a.pdf not attached`);
+    expect(longPdfNotice("book.pdf", 30)).toBe("book.pdf has 30 pages; Claude reads it page by page");
+    expect([pageCount(1), pageCount(12)]).toEqual(["1 page", "12 pages"]);
   });
 });
 

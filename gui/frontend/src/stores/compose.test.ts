@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RepoView } from "@/api/repo";
 import { HOME_KEY } from "@/lib/compose";
 import { tagToken } from "@/lib/prompt";
+import { pdfSummary } from "@/lib/pdf";
 import {
   addAlsoIn,
+  addAttachments,
   clearDraft,
   composeNoProject,
   composeSelection,
@@ -16,6 +18,7 @@ import {
   projectWorktree,
   removeAlsoIn,
   setPrimary,
+  settlePdf,
   switchDraftTarget,
   updateDraft,
   useComposeStore,
@@ -27,6 +30,9 @@ import { useSettingsStore } from "./settings";
 import { useUiStore } from "./ui";
 import { useWorkInStore } from "./workIn";
 import { useWorkspacesStore } from "./workspaces";
+
+// pdf.js does not run in jsdom: each test says what a PDF turns out to be.
+vi.mock("@/lib/pdf", () => ({ pdfSummary: vi.fn(() => new Promise(() => undefined)) }));
 
 afterEach(() => {
   useComposeStore.setState({ drafts: {}, refs: {}, preview: null });
@@ -168,7 +174,7 @@ describe("switchDraftTarget", () => {
   const cf = { kind: "project", repoId: "repo-cf" } as const;
   const gp = { kind: "project", repoId: "repo-gp" } as const;
   const login = { kind: "workspace", workspaceId: "w-1" } as const;
-  const image = (id: string): DraftAttachment => ({ id, file: new File(["x"], `${id}.png`, { type: "image/png" }), url: `blob:${id}`, stagedPath: null });
+  const image = (id: string): DraftAttachment => ({ id, file: new File(["x"], `${id}.png`, { type: "image/png" }), kind: "image", url: `blob:${id}`, stagedPath: null, pages: null, thumb: null });
   const revoke = vi.fn();
 
   beforeEach(() => {
@@ -212,7 +218,7 @@ describe("switchDraftTarget", () => {
     updateDraft("repo-cf", { text: "new idea" });
     updateDraft("repo-gp", { text: "older idea", attachments: [image("a2")] });
     const cancelled = switchDraftTarget(cf, gp);
-    expect(useConfirmStore.getState().pending).toMatchObject({ title: "Replace the draft in gp?", message: "It has unsent text or images.", confirmLabel: "Replace" });
+    expect(useConfirmStore.getState().pending).toMatchObject({ title: "Replace the draft in gp?", message: "It has unsent text or attachments.", confirmLabel: "Replace" });
     answerConfirm(false);
     await expect(cancelled).resolves.toBe(false);
     expect(getDraft("repo-cf").text).toBe("new idea");
@@ -294,5 +300,102 @@ describe("switchDraftTarget", () => {
     expect(useConfirmStore.getState().pending).toBeNull();
     expect(getDraft("repo-gp")).toMatchObject({ text: "older idea", model: null });
     expect(useUiStore.getState().selection).toEqual({ kind: "compose", repoId: "repo-gp" });
+  });
+});
+
+describe("attachments: kinds, PDF pages and the inline cap", () => {
+  const MB = 1024 * 1024;
+  const KEY = "repo-cf";
+  /** A File that says it has `size` bytes without holding them. */
+  const sized = (name: string, type: string, size: number): File => {
+    const f = new File(["x"], name, { type });
+    Object.defineProperty(f, "size", { value: size });
+    return f;
+  };
+  const summary = vi.mocked(pdfSummary);
+  const CAP = "Attachments sent with one message must total under 24 MB";
+  const revoke = vi.fn();
+
+  beforeEach(() => {
+    URL.createObjectURL = vi.fn(() => "blob:x");
+    revoke.mockClear();
+    URL.revokeObjectURL = revoke;
+    summary.mockReset();
+    summary.mockReturnValue(new Promise(() => undefined));
+  });
+
+  it("adds images and PDFs by kind; a .pdf without a type is a PDF", () => {
+    const added = addAttachments(KEY, [sized("a.png", "image/png", 10), sized("spec.pdf", "application/pdf", 10), sized("drag.PDF", "", 10)]);
+    expect(added.map((a) => [a.kind, a.file.type, a.pages, a.thumb])).toEqual([
+      ["image", "image/png", null, null],
+      ["pdf", "application/pdf", null, null],
+      ["pdf", "application/pdf", null, null],
+    ]);
+    expect(summary).toHaveBeenCalledTimes(2);
+    expect(getDraft(KEY).notice).toBeNull();
+  });
+
+  it("stores a PDF's pages and thumbnail; over 10 pages adds the page-by-page notice", async () => {
+    summary.mockResolvedValueOnce({ pages: 2, thumb: "data:image/png;base64,AA" }).mockResolvedValueOnce({ pages: 30, thumb: null });
+    addAttachments(KEY, [sized("short.pdf", "application/pdf", 10), sized("book.pdf", "application/pdf", 10), sized("notes.txt", "text/plain", 1)]);
+    await vi.waitFor(() => {
+      expect(getDraft(KEY).attachments.map((a) => a.pages)).toEqual([2, 30]);
+    });
+    expect(getDraft(KEY).attachments[0]?.thumb).toBe("data:image/png;base64,AA");
+    expect(getDraft(KEY).notice).toBe("notes.txt: not a PNG, JPEG, GIF, WebP or PDF file · book.pdf has 30 pages; Claude reads it page by page");
+  });
+
+  it("removes a short PDF, chip and all, that takes the message over the inline cap", () => {
+    const [img] = addAttachments(KEY, [sized("big.png", "image/png", 9 * MB)]);
+    const [a, b, long] = addAttachments(KEY, [sized("a.pdf", "application/pdf", 9 * MB), sized("b.pdf", "application/pdf", 9 * MB), sized("long.pdf", "application/pdf", 19 * MB)]);
+    if (!img || !a || !b || !long) throw new Error("not added");
+    updateDraft(KEY, { text: `see ![b.pdf](cf-attachment://${b.id}) now` });
+    settlePdf(long.id, { pages: 40, thumb: null });
+    settlePdf(a.id, { pages: 3, thumb: null });
+    settlePdf(b.id, { pages: 3, thumb: null });
+    const d = getDraft(KEY);
+    // 9 (image) + 9 (a) = 18 MB inline; b would make it 27. long.pdf goes as a path.
+    expect(d.attachments.map((x) => x.file.name)).toEqual(["big.png", "a.pdf", "long.pdf"]);
+    expect(d.text).toBe("see now");
+    expect(d.notice).toBe(`long.pdf has 40 pages; Claude reads it page by page · ${CAP}; b.pdf not attached`);
+    expect(revoke).toHaveBeenCalledWith("blob:x");
+  });
+
+  it("holds images to the inline cap against counted short PDFs only", () => {
+    const [pdf] = addAttachments(KEY, [sized("a.pdf", "application/pdf", 15 * MB)]);
+    expect(addAttachments(KEY, [sized("b.png", "image/png", 10 * MB)])).toHaveLength(1);
+    if (!pdf) throw new Error("not added");
+    settlePdf(pdf.id, { pages: 2, thumb: null });
+    // 15 + 10 already: a PDF counted after the image is the one that goes.
+    expect(getDraft(KEY).attachments.map((x) => x.file.name)).toEqual(["b.png"]);
+    expect(addAttachments(KEY, [sized("c.png", "image/png", 9 * MB)])).toHaveLength(1);
+    expect(addAttachments(KEY, [sized("d.png", "image/png", 6 * MB)])).toHaveLength(0);
+    expect(getDraft(KEY).notice).toBe(`${CAP}; d.png not attached`);
+  });
+
+  it("keeps a PDF over the inline cap that a failed send already staged", () => {
+    const [img, pdf] = addAttachments(KEY, [sized("big.png", "image/png", 9 * MB), sized("a.pdf", "application/pdf", 18 * MB)]);
+    if (!img || !pdf) throw new Error("not added");
+    // The send staged both and failed; the count arrives with the draft idle again.
+    updateDraft(KEY, { phase: "idle", attachments: getDraft(KEY).attachments.map((x) => ({ ...x, stagedPath: `/att/${x.file.name}` })) });
+    settlePdf(pdf.id, { pages: 2, thumb: null });
+    expect(getDraft(KEY).attachments.map((x) => [x.file.name, x.pages])).toEqual([
+      ["big.png", null],
+      ["a.pdf", 2],
+    ]);
+  });
+
+  it("settles a PDF in the draft it moved to; ignores one that is gone", () => {
+    const [pdf] = addAttachments(KEY, [sized("a.pdf", "application/pdf", 10)]);
+    if (!pdf) throw new Error("not added");
+    useComposeStore.setState((s) => {
+      const { [KEY]: moved, ...rest } = s.drafts;
+      return { drafts: moved ? { ...rest, "repo-gp": moved } : rest };
+    });
+    settlePdf(pdf.id, { pages: 4, thumb: null });
+    expect(getDraft("repo-gp").attachments[0]?.pages).toBe(4);
+    clearDraft("repo-gp");
+    settlePdf(pdf.id, { pages: 5, thumb: null });
+    expect(getDraft("repo-gp").attachments).toEqual([]);
   });
 });

@@ -2,7 +2,7 @@
  * The composer prompt's text model. The draft keeps the prompt as a plain string in which
  * each inline tag is a Markdown-link token:
  *
- *   image  ![shot.png](cf-attachment://a3)            a draft attachment, by id
+ *   image  ![shot.png](cf-attachment://a3)            a draft attachment (an image or a PDF), by id
  *   skill  [/deploy](cf-skill://~/deploy)              a user skill (~/.claude)
  *          [/deploy](cf-skill://<repoId>/deploy)       a project skill (the project's .claude)
  *   file   [Composer.tsx](cf-file://<repoId>/src/components/Composer.tsx)
@@ -10,7 +10,7 @@
  *
  * The editor (components/compose/PromptEditor.tsx) parses the string into its document
  * and serializes it back on every edit; on send, projectPrompt turns each token into what
- * Claude gets: `[Image: <name>; ref=<staged path>]`, `/<skill>`, or `@cf-file://…` (the
+ * Claude gets: `[Image: <name>; ref=<staged path>]` (`[PDF: …]` for a PDF), `/<skill>`, or `@cf-file://…` (the
  * daemon resolves that to the thread's worktree; docs/notes/composer-tags-1-daemon.md).
  * Skill and file labels are derived from the URL, never read back from the token. Pure
  * functions only.
@@ -223,14 +223,20 @@ export function retainRepoTags(text: string, repoIds: readonly string[]): string
   return removeTags(text, (t) => tagRepo(t) !== "" && !repoIds.includes(tagRepo(t)));
 }
 
+/** A chip's attachment kind when only its name is known (the attachment is gone): a ".pdf" name is a PDF. */
+export function kindFromName(name: string): "image" | "pdf" {
+  return /\.pdf$/i.test(name.trim()) ? "pdf" : "image";
+}
+
 /**
- * The prompt Claude gets. An image chip becomes `[Image: <name>; ref=<ref>]` at its
- * position (ref is the staged path; a chip whose attachment is gone keeps only its name).
+ * The prompt Claude gets. An attachment chip becomes `[Image: <name>; ref=<ref>]`, or
+ * `[PDF: <name>; ref=<ref>]` for a PDF, at its position (ref is the staged path; a chip
+ * whose attachment is gone keeps only its name, its kind guessed from the name).
  * A skill becomes `/<name>`, a file `@cf-file://<repoId>/<encoded path>`; a space is put
  * after either when anything but whitespace follows, because a slash command and the
  * daemon's file reference both end at whitespace.
  */
-export function projectPrompt(text: string, lookup: (id: string) => { name: string; ref: string } | undefined): string {
+export function projectPrompt(text: string, lookup: (id: string) => { name: string; ref: string; kind: "image" | "pdf" } | undefined): string {
   let out = "";
   let last = 0;
   for (const { m, tag } of tokens(text)) {
@@ -241,7 +247,8 @@ export function projectPrompt(text: string, lookup: (id: string) => { name: stri
     switch (tag.tagKind) {
       case "image": {
         const a = lookup(tag.id);
-        out += a ? `[Image: ${cleanLabel(a.name)}; ref=${a.ref}]` : `[Image: ${cleanLabel(tag.name)}]`;
+        const label = (a?.kind ?? kindFromName(tag.name)) === "pdf" ? "PDF" : "Image";
+        out += a ? `[${label}: ${cleanLabel(a.name)}; ref=${a.ref}]` : `[${label}: ${cleanLabel(tag.name)}]`;
         break;
       }
       case "skill":

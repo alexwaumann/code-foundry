@@ -366,15 +366,28 @@ export async function listThreads(conn: DaemonConnection = daemon, signal?: Abor
   return res.threads.map(toThreadView);
 }
 
-/**
- * Image types ThreadService.StageAttachment accepts, and its per-file limit. The daemon
- * enforces both; the composer checks first so a bad file is rejected before upload.
- */
-export const ATTACHMENT_MIME_TYPES: readonly string[] = ["image/png", "image/jpeg", "image/gif", "image/webp"];
-export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+export const PDF_MIME_TYPE = "application/pdf";
 
 /**
- * A staged attachment's bytes (a user message shows its images); null
+ * The types ThreadService.StageAttachment accepts and its limits: 10 MiB per image,
+ * 20 MiB per PDF, and 24 MiB for what one message sends inline (its images and its PDFs
+ * of at most MAX_INLINE_PDF_PAGES pages; a longer PDF goes as its path only and Claude
+ * reads it page by page). The daemon enforces all of them; the composer checks first so
+ * a bad file is rejected before upload.
+ */
+export const ATTACHMENT_MIME_TYPES: readonly string[] = ["image/png", "image/jpeg", "image/gif", "image/webp", PDF_MIME_TYPE];
+export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+export const PDF_MAX_BYTES = 20 * 1024 * 1024;
+export const MESSAGE_INLINE_MAX_BYTES = 24 * 1024 * 1024;
+export const MAX_INLINE_PDF_PAGES = 10;
+
+/** The per-file limit for an attachment type. */
+export function attachmentMaxBytes(type: string): number {
+  return type === PDF_MIME_TYPE ? PDF_MAX_BYTES : IMAGE_MAX_BYTES;
+}
+
+/**
+ * A staged attachment's bytes (a user message shows its images and PDFs); null
  * once the daemon reaped it. Rejects when the daemon could not be asked.
  */
 export async function readAttachment(path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<{ data: Uint8Array; mimeType: string } | null> {
@@ -391,14 +404,16 @@ export async function readAttachment(path: string, conn: DaemonConnection = daem
 }
 
 /**
- * Uploads an image for a new thread's first prompt; returns the daemon-side path. A
- * daemon older than the RPC fails with OutdatedDaemonError.
+ * Uploads an image or a PDF for a message; returns the daemon-side path. `pages` is a
+ * PDF's page count from pdf.js (null when not counted): the daemon takes it when it has
+ * no pdfinfo, so both agree on what goes inline. A daemon older than the RPC fails with
+ * OutdatedDaemonError.
  */
-export async function stageAttachment(file: { name: string; type: string; arrayBuffer(): Promise<ArrayBuffer> }, conn: DaemonConnection = daemon): Promise<string> {
+export async function stageAttachment(file: { name: string; type: string; arrayBuffer(): Promise<ArrayBuffer> }, pages: number | null = null, conn: DaemonConnection = daemon): Promise<string> {
   const c = await conn.client(ThreadService);
   const data = new Uint8Array(await file.arrayBuffer());
   try {
-    const res = await c.stageAttachment({ name: file.name, mimeType: file.type, data });
+    const res = await c.stageAttachment({ name: file.name, mimeType: file.type, data, pages: pages ?? 0 });
     return res.path;
   } catch (err) {
     throw orOutdatedDaemon(err);

@@ -4,6 +4,7 @@ import {
   chipToken,
   formatAttachmentSize,
   isReferenced,
+  kindFromName,
   middleTruncate,
   parsePrompt,
   projectPrompt,
@@ -57,8 +58,17 @@ describe("prompt tokens", () => {
 
   it("projects chips to [Image: name; ref=path] at their position", () => {
     const text = `Match ${A} and ${B}\nthanks`;
-    const staged: Record<string, { name: string; ref: string }> = { a1: { name: "shot.png", ref: "/att/1.png" } };
+    const staged: Record<string, { name: string; ref: string; kind: "image" | "pdf" }> = { a1: { name: "shot.png", ref: "/att/1.png", kind: "image" } };
     expect(projectPrompt(text, (id) => staged[id])).toBe("Match [Image: shot.png; ref=/att/1.png] and [Image: logo.webp]\nthanks");
+  });
+
+  it("projects PDF chips to [PDF: name; ref=path]; a gone one by its name", () => {
+    const spec = chipToken("p1", "spec.pdf");
+    const gone = chipToken("p9", "old.PDF");
+    const staged: Record<string, { name: string; ref: string; kind: "image" | "pdf" }> = { p1: { name: "spec.pdf", ref: "/att/2.pdf", kind: "pdf" } };
+    expect(projectPrompt(`Read ${spec} then ${gone}`, (id) => staged[id])).toBe("Read [PDF: spec.pdf; ref=/att/2.pdf] then [PDF: old.PDF]");
+    expect(kindFromName("notes.pdf ")).toBe("pdf");
+    expect(kindFromName("shot.png")).toBe("image");
   });
 });
 
@@ -168,7 +178,7 @@ describe("skill and file tags", () => {
   });
 
   it("projects skills to /name and files to @cf-file://, each followed by whitespace", () => {
-    const staged: Record<string, { name: string; ref: string }> = { a1: { name: "shot.png", ref: "/att/1.png" } };
+    const staged: Record<string, { name: string; ref: string; kind: "image" | "pdf" }> = { a1: { name: "shot.png", ref: "/att/1.png", kind: "image" } };
     expect(projectPrompt(`${DEPLOY} now, ${COMMIT}\n${FILE}${DIR}. ${A}`, (id) => staged[id])).toBe(
       "/deploy now, /commit\n@cf-file://r1/src/my%20notes%20%281%29.md @cf-file://r2/src/components/ . [Image: shot.png; ref=/att/1.png]",
     );
