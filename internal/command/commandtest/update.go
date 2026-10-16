@@ -10,14 +10,15 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
-// Update is a fake command.UpdateBackend. Every call returns Status (Install moves it to
-// DOWNLOADING first); Err, when set, is returned instead. Relaunch and RequestRestart
-// report Delivered.
+// Update is a fake command.UpdateBackend. Every call returns Status (Download moves it
+// to DOWNLOADING first, Install to INSTALLED); Err, when set, is returned instead, and
+// InstallErr fails Install alone. Relaunch and RequestRestart report Delivered.
 type Update struct {
 	Calls
-	Err       error
-	Status    *v1.UpdateStatus
-	Delivered int32
+	Err        error
+	InstallErr error
+	Status     *v1.UpdateStatus
+	Delivered  int32
 }
 
 var _ command.UpdateBackend = (*Update)(nil)
@@ -51,16 +52,33 @@ func (u *Update) Check(_ context.Context, r *connect.Request[v1.CheckForUpdateRe
 	return connect.NewResponse(&v1.CheckForUpdateResponse{Status: st}), nil
 }
 
-// Install sets Status to DOWNLOADING and returns it.
+// Download sets Status to DOWNLOADING and returns it.
+func (u *Update) Download(_ context.Context, r *connect.Request[v1.DownloadUpdateRequest]) (*connect.Response[v1.DownloadUpdateResponse], error) {
+	st, err := u.status(r.Msg)
+	if err != nil {
+		return nil, err
+	}
+	u.Status = withState(st, v1.UpdateState_UPDATE_STATE_DOWNLOADING)
+	return connect.NewResponse(&v1.DownloadUpdateResponse{Status: u.Status}), nil
+}
+
+// Install returns InstallErr, or sets Status to INSTALLED and returns it.
 func (u *Update) Install(_ context.Context, r *connect.Request[v1.InstallUpdateRequest]) (*connect.Response[v1.InstallUpdateResponse], error) {
 	st, err := u.status(r.Msg)
 	if err != nil {
 		return nil, err
 	}
+	if u.InstallErr != nil {
+		return nil, u.InstallErr
+	}
+	u.Status = withState(st, v1.UpdateState_UPDATE_STATE_INSTALLED)
+	return connect.NewResponse(&v1.InstallUpdateResponse{Status: u.Status}), nil
+}
+
+func withState(st *v1.UpdateStatus, s v1.UpdateState) *v1.UpdateStatus {
 	st = proto.CloneOf(st)
-	st.State = v1.UpdateState_UPDATE_STATE_DOWNLOADING
-	u.Status = st
-	return connect.NewResponse(&v1.InstallUpdateResponse{Status: st}), nil
+	st.State = s
+	return st
 }
 
 // Relaunch reports Delivered.

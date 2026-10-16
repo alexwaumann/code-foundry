@@ -38,12 +38,13 @@ func TestAppUpdateAvailabilityAndTitle(t *testing.T) {
 		available bool
 		title     string
 	}{
-		{"idle", st(v1.UpdateState_UPDATE_STATE_IDLE, ""), nil, false, "Update Code Foundry"},
-		{"available", st(v1.UpdateState_UPDATE_STATE_AVAILABLE, "v0.2.0"), nil, true, "Update to v0.2.0"},
-		{"failed retries", st(v1.UpdateState_UPDATE_STATE_FAILED, "v0.2.0"), nil, true, "Update to v0.2.0"},
-		{"downloading", st(v1.UpdateState_UPDATE_STATE_DOWNLOADING, "v0.2.0"), nil, false, "Update Code Foundry"},
-		{"installed", st(v1.UpdateState_UPDATE_STATE_INSTALLED, "v0.2.0"), nil, false, "Update Code Foundry"},
-		{"service down", nil, errors.New("unimplemented"), false, "Update Code Foundry"},
+		{"idle", st(v1.UpdateState_UPDATE_STATE_IDLE, ""), nil, false, "Download Update"},
+		{"available", st(v1.UpdateState_UPDATE_STATE_AVAILABLE, "v0.2.0"), nil, true, "Download v0.2.0"},
+		{"failed retries", st(v1.UpdateState_UPDATE_STATE_FAILED, "v0.2.0"), nil, true, "Download v0.2.0"},
+		{"downloading", st(v1.UpdateState_UPDATE_STATE_DOWNLOADING, "v0.2.0"), nil, false, "Download Update"},
+		{"downloaded", st(v1.UpdateState_UPDATE_STATE_DOWNLOADED, "v0.2.0"), nil, false, "Download Update"},
+		{"installed", st(v1.UpdateState_UPDATE_STATE_INSTALLED, "v0.2.0"), nil, false, "Download Update"},
+		{"service down", nil, errors.New("unimplemented"), false, "Download Update"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -82,7 +83,10 @@ func TestAppUpdateCommands(t *testing.T) {
 	}{
 		{"check up to date", "app.update.check", &v1.UpdateStatus{State: v1.UpdateState_UPDATE_STATE_IDLE, Enabled: true, CurrentVersion: "v0.1.0"}, 0, "Code Foundry v0.1.0 is up to date"},
 		{"check finds one", "app.update.check", &v1.UpdateStatus{State: v1.UpdateState_UPDATE_STATE_AVAILABLE, Enabled: true, TargetVersion: "v0.2.0"}, 0, "v0.2.0 available"},
-		{"update", "app.update", &v1.UpdateStatus{State: v1.UpdateState_UPDATE_STATE_AVAILABLE, Enabled: true, TargetVersion: "v0.2.0"}, 0, "installing v0.2.0"},
+		{"update", "app.update", &v1.UpdateStatus{State: v1.UpdateState_UPDATE_STATE_AVAILABLE, Enabled: true, TargetVersion: "v0.2.0"}, 0, "downloading v0.2.0"},
+		{"version downloading", "app.version", &v1.UpdateStatus{State: v1.UpdateState_UPDATE_STATE_DOWNLOADING, Enabled: true, TargetVersion: "v0.2.0"}, 0, "Code Foundry v0.1.0; downloading v0.2.0"},
+		{"version downloaded", "app.version", &v1.UpdateStatus{State: v1.UpdateState_UPDATE_STATE_DOWNLOADED, Enabled: true, TargetVersion: "v0.2.0"}, 0, "Code Foundry v0.1.0; v0.2.0 downloaded; restart Code Foundry to install it"},
+		{"version failed", "app.version", &v1.UpdateStatus{State: v1.UpdateState_UPDATE_STATE_FAILED, Enabled: true, TargetVersion: "v0.2.0", FailureReason: "checksum mismatch"}, 0, "Code Foundry v0.1.0; updating to v0.2.0 failed: checksum mismatch"},
 		{"relaunch with a window", "app.relaunch", nil, 1, "relaunching the app"},
 		{"relaunch without a window", "app.relaunch", nil, 0, "no app window is connected; open it with `code-foundry gui`"},
 		{"version disabled", "app.version", &v1.UpdateStatus{State: v1.UpdateState_UPDATE_STATE_IDLE, DisabledReason: "dev build"}, 0, "Code Foundry v0.1.0; updates disabled (dev build)"},
@@ -181,10 +185,12 @@ func TestAppRestart(t *testing.T) {
 		restart  bool
 		windows  int32
 		backErr  bool // RequestRestart fails
-		wantMsg  string
-		wantJSON command.AppRestart
-		wantErr  error
-		restarts int
+		// installErr fails Install (the status is DOWNLOADED).
+		installErr error
+		wantMsg    string
+		wantJSON   command.AppRestart
+		wantErr    error
+		restarts   int
 		// wantConfirm is the confirmation message of an unconfirmed invoke.
 		wantConfirm string
 	}{
@@ -217,9 +223,28 @@ func TestAppRestart(t *testing.T) {
 			wantConfirm: quiet,
 		},
 		{
-			name: "refused while installing", sessions: []*v1.Session{busy}, status: v1.UpdateState_UPDATE_STATE_DOWNLOADING, restart: true,
+			name: "refused while downloading", sessions: []*v1.Session{busy}, status: v1.UpdateState_UPDATE_STATE_DOWNLOADING, restart: true,
 			wantErr:     command.ErrUnavailable,
 			wantConfirm: "1 thread working or waiting on you will be cut off. Restart Code Foundry anyway?",
+		},
+		{
+			name: "installs a download first", sessions: []*v1.Session{busy}, status: v1.UpdateState_UPDATE_STATE_DOWNLOADED, restart: true, windows: 1,
+			wantMsg:     "installed v0.2.0; restarting Code Foundry (cuts off 1 thread working or waiting on you); the app relaunches once the daemon has stopped",
+			wantJSON:    command.AppRestart{ThreadsInterrupted: 1, GUINotified: 1, Installed: "v0.2.0"},
+			restarts:    1,
+			wantConfirm: "1 thread working or waiting on you will be cut off. Install v0.2.0 and restart Code Foundry anyway?",
+		},
+		{
+			name: "installs a download, no window", status: v1.UpdateState_UPDATE_STATE_DOWNLOADED, restart: true,
+			wantMsg:     "installed v0.2.0; restarting the daemon; no app window is connected (open it with `code-foundry gui`)",
+			wantJSON:    command.AppRestart{Installed: "v0.2.0"},
+			restarts:    1,
+			wantConfirm: "Install v0.2.0 and restart Code Foundry? Threads keep their history; a message starts each again.",
+		},
+		{
+			name: "a failed install restarts nothing", status: v1.UpdateState_UPDATE_STATE_DOWNLOADED, restart: true, windows: 1,
+			installErr:  errors.New("installer: exit status 1: error: no staged download"),
+			wantConfirm: "Install v0.2.0 and restart Code Foundry? Threads keep their history; a message starts each again.",
 		},
 		{
 			name: "no restart hook", status: v1.UpdateState_UPDATE_STATE_INSTALLED,
@@ -232,7 +257,7 @@ func TestAppRestart(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			u := &commandtest.Update{Status: &v1.UpdateStatus{State: tt.status}, Delivered: tt.windows}
+			u := &commandtest.Update{Status: &v1.UpdateStatus{State: tt.status, TargetVersion: "v0.2.0"}, Delivered: tt.windows, InstallErr: tt.installErr}
 			restarts := 0
 			var restart func()
 			if tt.restart {
@@ -241,6 +266,9 @@ func TestAppRestart(t *testing.T) {
 					// GUIs are told before the daemon stops.
 					if !requested(u, &v1.RequestRestartRequest{}) {
 						t.Error("Restart called before RequestRestart")
+					}
+					if tt.status == v1.UpdateState_UPDATE_STATE_DOWNLOADED && !requested(u, &v1.InstallUpdateRequest{}) {
+						t.Error("Restart called before Install")
 					}
 				}
 			}
@@ -273,6 +301,13 @@ func TestAppRestart(t *testing.T) {
 				if err == nil || !strings.Contains(err.Error(), "notify the app") {
 					t.Fatalf("err = %v, want a notify error", err)
 				}
+			case tt.installErr != nil:
+				if !errors.Is(err, tt.installErr) || !strings.Contains(err.Error(), "install v0.2.0: ") {
+					t.Fatalf("err = %v, want the install error", err)
+				}
+				if requested(u, &v1.RequestRestartRequest{}) {
+					t.Fatal("a failed install still notified GUIs")
+				}
 			default:
 				if err != nil || res.Message != tt.wantMsg {
 					t.Fatalf("got %q, %v; want %q", res.Message, err, tt.wantMsg)
@@ -284,6 +319,34 @@ func TestAppRestart(t *testing.T) {
 			if restarts != tt.restarts {
 				t.Fatalf("restarts = %d, want %d", restarts, tt.restarts)
 			}
+			if tt.status != v1.UpdateState_UPDATE_STATE_DOWNLOADED && requested(u, &v1.InstallUpdateRequest{}) {
+				t.Fatal("installed without a download")
+			}
+		})
+	}
+}
+
+func TestAppRestartTitle(t *testing.T) {
+	tests := []struct {
+		state v1.UpdateState
+		want  string
+	}{
+		{v1.UpdateState_UPDATE_STATE_DOWNLOADED, "Install v0.2.0 and Restart"},
+		{v1.UpdateState_UPDATE_STATE_INSTALLED, "Restart Code Foundry"},
+		{v1.UpdateState_UPDATE_STATE_IDLE, "Restart Code Foundry"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.state.String(), func(t *testing.T) {
+			reg := newUpdateRegistry(t, &commandtest.Update{Status: &v1.UpdateStatus{State: tt.state, TargetVersion: "v0.2.0"}}, &commandtest.Session{}, func() {})
+			for _, l := range reg.List(command.Context{}, true) {
+				if l.Name == "app.restart" {
+					if l.Title != tt.want {
+						t.Fatalf("title %q, want %q", l.Title, tt.want)
+					}
+					return
+				}
+			}
+			t.Fatal("app.restart not listed")
 		})
 	}
 }
@@ -322,7 +385,8 @@ func TestDaemonRestart(t *testing.T) {
 			"1 background shell will be cut off. Restart the daemon anyway?"},
 		{"an idle running thread does not count", idle, v1.UpdateState_UPDATE_STATE_IDLE, true, "restarting the daemon; the next client starts the installed version", nil, 1, quiet},
 		{"stopped threads do not count", dead, v1.UpdateState_UPDATE_STATE_IDLE, true, "restarting the daemon; the next client starts the installed version", nil, 1, quiet},
-		{"refused while installing", live, v1.UpdateState_UPDATE_STATE_DOWNLOADING, true, "", command.ErrUnavailable, 0, one},
+		{"refused while downloading", live, v1.UpdateState_UPDATE_STATE_DOWNLOADING, true, "", command.ErrUnavailable, 0, one},
+		{"a download is not installed", idle, v1.UpdateState_UPDATE_STATE_DOWNLOADED, true, "restarting the daemon; the next client starts the installed version", nil, 1, quiet},
 		{"no restart hook", live, v1.UpdateState_UPDATE_STATE_IDLE, false, "", nil, 0, one},
 	}
 	for _, tt := range tests {
