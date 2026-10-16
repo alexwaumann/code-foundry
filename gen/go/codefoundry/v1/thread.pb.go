@@ -703,13 +703,13 @@ func (*ThreadItem_Note) isThreadItem_Payload() {}
 type UserMessageItem struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Text  string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
-	// Staged image paths (StageAttachment); Claude got each as an image block and a
-	// path line.
+	// Staged image and PDF paths (StageAttachment); Claude got each as a path line and,
+	// unless a PDF over 10 pages, an image or document block.
 	Attachments []string `protobuf:"bytes,2,rep,name=attachments,proto3" json:"attachments,omitempty"`
 	// The composer's text with its tags as Markdown-link tokens (gui lib/prompt.ts):
 	// "[/name](cf-skill://<repo id or ~>/<name>)", "[base](cf-file://<repo id>/<path>)",
-	// and "![name](cf-attachment://<n>)" where n is the image's index in attachments
-	// (not a number: the chip had lost its image). Empty for a message without tags or sent
+	// and "![name](cf-attachment://<n>)" where n is the attachment's index in
+	// attachments (not a number: the chip had lost its file). Empty for a message without tags or sent
 	// without the composer (the CLI): text is then shown as is. Stored, never interpreted.
 	ComposerText  string `protobuf:"bytes,3,opt,name=composer_text,json=composerText,proto3" json:"composer_text,omitempty"`
 	unknownFields protoimpl.UnknownFields

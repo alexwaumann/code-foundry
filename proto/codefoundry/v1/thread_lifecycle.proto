@@ -307,7 +307,7 @@ message CreateThreadRequest {
   // Optional explicit name; disables auto-naming.
   string name = 5;
   // Optional first prompt, sent as the thread's first user message once Claude has
-  // started (attachments as image blocks).
+  // started (attachments as image or document blocks).
   string initial_prompt = 6;
   PermissionMode permission_mode = 7;
   // When set, Create makes a new worktree for the thread before claude starts and
@@ -358,9 +358,15 @@ message NewWorkspace {
 message StageAttachmentRequest {
   // Original file name (for the extension only).
   string name = 1;
-  // image/png, image/jpeg, image/gif or image/webp.
+  // image/png, image/jpeg, image/gif, image/webp or application/pdf.
   string mime_type = 2;
   bytes data = 3;
+  // A PDF's page count as the client counted it (0 = unknown). A hint: the daemon
+  // counts with pdfinfo when it is installed, else takes this, else estimates one
+  // page per 100 KiB. The count is settled once, here, and recorded in the returned
+  // path (<32 hex>-<N>p.pdf, or <32 hex>-~<N>p.pdf for an estimate), so every
+  // message that sends the PDF agrees on it.
+  uint32 pages = 4;
 }
 
 message StageAttachmentResponse {
@@ -374,7 +380,8 @@ message ReadAttachmentRequest {
 
 message ReadAttachmentResponse {
   bytes data = 1;
-  // Sniffed from the content: image/png, image/jpeg, image/gif or image/webp.
+  // Sniffed from the content: image/png, image/jpeg, image/gif, image/webp or
+  // application/pdf.
   string mime_type = 2;
 }
 

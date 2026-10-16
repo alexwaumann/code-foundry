@@ -293,7 +293,7 @@ func threadError(err error) error {
 	return connect.NewError(code, err)
 }
 
-// StageAttachment stores an image for a first prompt and returns its path.
+// StageAttachment stores an image or PDF for a message and returns its path.
 func (h *Thread) StageAttachment(ctx context.Context, req *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error) {
 	m := req.Msg
 	path, err := h.store.StageAttachment(ctx, m.GetName(), m.GetMimeType(), m.GetData())

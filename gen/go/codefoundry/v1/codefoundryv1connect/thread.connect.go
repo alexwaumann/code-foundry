@@ -145,13 +145,16 @@ type ThreadServiceClient interface {
 	// Watch streams changes to the thread list (every thread's record, not its items).
 	// The first event is a snapshot. WatchThread streams one thread's conversation.
 	Watch(context.Context, *connect.Request[v1.WatchThreadsRequest]) (*connect.ServerStreamForClient[v1.ThreadListEvent], error)
-	// StageAttachment stores an image the first prompt refers to and returns its path.
-	// Create appends "Attached image: <path>" lines for CreateThreadRequest.attachments;
-	// Claude reads them with its Read tool. Only image types are accepted, with size
-	// limits; unused staged files are reaped by the daemon.
+	// StageAttachment stores an image or PDF a message refers to and returns its path.
+	// Create and Send append an "Attached image: <path>" or "Attached PDF: <path> (<N>
+	// pages)" line per attachment and send its content as an image or document block; a
+	// PDF over 10 pages goes only as its path, and Claude reads it with its Read tool.
+	// Only image types and PDFs are accepted, with size limits (images 10 MiB, PDFs
+	// 20 MiB, 24 MiB sent inline per message); unused staged files are reaped by the
+	// daemon.
 	StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error)
 	// ReadAttachment returns a staged attachment's bytes (a user message shows its
-	// images). Only files directly in the attachments directory;
+	// images and PDFs). Only files directly in the attachments directory;
 	// NOT_FOUND once the file was reaped.
 	ReadAttachment(context.Context, *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error)
 	// ListItems returns a thread's items (the streaming one included) and its pending
@@ -599,13 +602,16 @@ type ThreadServiceHandler interface {
 	// Watch streams changes to the thread list (every thread's record, not its items).
 	// The first event is a snapshot. WatchThread streams one thread's conversation.
 	Watch(context.Context, *connect.Request[v1.WatchThreadsRequest], *connect.ServerStream[v1.ThreadListEvent]) error
-	// StageAttachment stores an image the first prompt refers to and returns its path.
-	// Create appends "Attached image: <path>" lines for CreateThreadRequest.attachments;
-	// Claude reads them with its Read tool. Only image types are accepted, with size
-	// limits; unused staged files are reaped by the daemon.
+	// StageAttachment stores an image or PDF a message refers to and returns its path.
+	// Create and Send append an "Attached image: <path>" or "Attached PDF: <path> (<N>
+	// pages)" line per attachment and send its content as an image or document block; a
+	// PDF over 10 pages goes only as its path, and Claude reads it with its Read tool.
+	// Only image types and PDFs are accepted, with size limits (images 10 MiB, PDFs
+	// 20 MiB, 24 MiB sent inline per message); unused staged files are reaped by the
+	// daemon.
 	StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error)
 	// ReadAttachment returns a staged attachment's bytes (a user message shows its
-	// images). Only files directly in the attachments directory;
+	// images and PDFs). Only files directly in the attachments directory;
 	// NOT_FOUND once the file was reaped.
 	ReadAttachment(context.Context, *connect.Request[v1.ReadAttachmentRequest]) (*connect.Response[v1.ReadAttachmentResponse], error)
 	// ListItems returns a thread's items (the streaming one included) and its pending
