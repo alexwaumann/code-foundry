@@ -32,7 +32,7 @@ func newUpdateFixture(t *testing.T, current string) *updateFixture {
 	f := &updateFixture{source: updatetest.NewSource("v0.2.0"), installer: updatetest.NewInstaller(disk)}
 	opts := update.Options{
 		Current: current, Repo: "o/n", Source: f.source, Installer: f.installer,
-		InstalledVersion: disk.Version, Bus: b, InitialDelay: time.Hour,
+		InstalledVersion: disk.Version, StagedVersion: f.installer.Staged().Version, Bus: b, InitialDelay: time.Hour,
 	}
 	if !update.IsSemver(current) {
 		opts.DisabledReason = "dev build"
@@ -74,7 +74,10 @@ func TestUpdateServiceFlow(t *testing.T) {
 		t.Fatalf("snapshot %v", st)
 	}
 
-	// Install before a check: nothing to install.
+	// Before a check: nothing to download or install.
+	if _, err := f.update.Download(ctx, connect.NewRequest(&v1.DownloadUpdateRequest{})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("Download err = %v", err)
+	}
 	if _, err := f.update.Install(ctx, connect.NewRequest(&v1.InstallUpdateRequest{})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("Install err = %v", err)
 	}
@@ -95,17 +98,35 @@ func TestUpdateServiceFlow(t *testing.T) {
 		t.Fatal("no available event")
 	}
 
+	// Available, not downloaded: Install is refused.
+	if _, err := f.update.Install(ctx, connect.NewRequest(&v1.InstallUpdateRequest{})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("Install before Download err = %v", err)
+	}
+	dr, err := f.update.Download(ctx, connect.NewRequest(&v1.DownloadUpdateRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dr.Msg.GetStatus().GetState() != v1.UpdateState_UPDATE_STATE_DOWNLOADING {
+		t.Fatalf("download %v", dr.Msg.GetStatus())
+	}
+	for {
+		if s := next().GetStatus(); s.GetState() == v1.UpdateState_UPDATE_STATE_DOWNLOADED {
+			if s.GetTargetVersion() != "v0.2.0" {
+				t.Fatalf("downloaded %v", s)
+			}
+			break
+		}
+	}
+
 	ir, err := f.update.Install(ctx, connect.NewRequest(&v1.InstallUpdateRequest{}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ir.Msg.GetStatus().GetState() != v1.UpdateState_UPDATE_STATE_DOWNLOADING {
+	if ir.Msg.GetStatus().GetState() != v1.UpdateState_UPDATE_STATE_INSTALLED {
 		t.Fatalf("install %v", ir.Msg.GetStatus())
 	}
-	for {
-		if s := next().GetStatus(); s.GetState() == v1.UpdateState_UPDATE_STATE_INSTALLED {
-			break
-		}
+	if next().GetStatus().GetState() != v1.UpdateState_UPDATE_STATE_INSTALLED {
+		t.Fatal("no installed event")
 	}
 
 	rr, err := f.update.Relaunch(ctx, connect.NewRequest(&v1.RelaunchAppRequest{}))
@@ -178,6 +199,10 @@ func TestUpdateServiceDisabled(t *testing.T) {
 	for name, call := range map[string]func() error{
 		"Check": func() error {
 			_, err := f.update.Check(ctx, connect.NewRequest(&v1.CheckForUpdateRequest{}))
+			return err
+		},
+		"Download": func() error {
+			_, err := f.update.Download(ctx, connect.NewRequest(&v1.DownloadUpdateRequest{}))
 			return err
 		},
 		"Install": func() error {

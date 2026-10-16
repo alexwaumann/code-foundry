@@ -111,6 +111,7 @@ export function updateBadge(status: UpdateStatusView | null, guiVersion: string 
       return { kind: "downloading", label: `Installing ${target}…`, cta: "" };
     case "failed":
       return { kind: "failed", label: "Update failed", cta: "Details" };
+    case "downloaded":
     case "installed":
     case "restartRequired":
       return { kind: "installed", label: `${target} installed`, cta: "Restart to apply" };
@@ -264,6 +265,7 @@ export function updateView(status: UpdateStatusView, guiVersion: string | null, 
       return { ...base, variant: "installing", title: `Installing ${target}…`, body: "You can close this and keep working.", later: "Hide" };
     case "failed":
       return { ...base, variant: "failed", title: `Couldn’t install ${target}`, body: `Nothing changed. You’re still on ${current}.`, later: "Not now" };
+    case "downloaded":
     case "installed":
     case "restartRequired": {
       const title = `Code Foundry ${target} is ready`;

@@ -60,6 +60,7 @@ export const updateStateNames: Record<string, UpdateState> = {
   idle: UpdateState.IDLE,
   available: UpdateState.AVAILABLE,
   downloading: UpdateState.DOWNLOADING,
+  downloaded: UpdateState.DOWNLOADED,
   installed: UpdateState.INSTALLED,
   restartRequired: UpdateState.RESTART_REQUIRED,
   failed: UpdateState.FAILED,
