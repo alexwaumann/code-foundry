@@ -379,9 +379,18 @@ type GitStatus struct {
 	BaseAhead  int32  `protobuf:"varint,11,opt,name=base_ahead,json=baseAhead,proto3" json:"base_ahead,omitempty"`
 	BaseBehind int32  `protobuf:"varint,12,opt,name=base_behind,json=baseBehind,proto3" json:"base_behind,omitempty"`
 	// Non-empty when the last status refresh failed; the other fields are then stale.
-	Error         string `protobuf:"bytes,13,opt,name=error,proto3" json:"error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Error string `protobuf:"bytes,13,opt,name=error,proto3" json:"error,omitempty"`
+	// The git operation in progress in the worktree: "" (none), "rebase", "merge",
+	// "cherry-pick", "revert" or "bisect". Read from the marker files in the worktree's
+	// git admin dir (rebase-merge/, rebase-apply/, MERGE_HEAD, …) during the status
+	// refresh; no extra git command runs. A rebase also fills operation_step (the
+	// current pick, 1-based) and operation_total (the picks in the todo); both are 0
+	// when git does not record them (merge, cherry-pick, revert, bisect).
+	Operation      string `protobuf:"bytes,14,opt,name=operation,proto3" json:"operation,omitempty"`
+	OperationStep  int32  `protobuf:"varint,15,opt,name=operation_step,json=operationStep,proto3" json:"operation_step,omitempty"`
+	OperationTotal int32  `protobuf:"varint,16,opt,name=operation_total,json=operationTotal,proto3" json:"operation_total,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GitStatus) Reset() {
@@ -503,6 +512,27 @@ func (x *GitStatus) GetError() string {
 		return x.Error
 	}
 	return ""
+}
+
+func (x *GitStatus) GetOperation() string {
+	if x != nil {
+		return x.Operation
+	}
+	return ""
+}
+
+func (x *GitStatus) GetOperationStep() int32 {
+	if x != nil {
+		return x.OperationStep
+	}
+	return 0
+}
+
+func (x *GitStatus) GetOperationTotal() int32 {
+	if x != nil {
+		return x.OperationTotal
+	}
+	return 0
 }
 
 type RegisterRepoRequest struct {
@@ -3259,7 +3289,7 @@ const file_codefoundry_v1_repo_proto_rawDesc = "" +
 	"\ais_main\x18\x05 \x01(\bR\x06isMain\x121\n" +
 	"\x06status\x18\x06 \x01(\v2\x19.codefoundry.v1.GitStatusR\x06status\x12\x1a\n" +
 	"\bdetached\x18\a \x01(\bR\bdetached\x12!\n" +
-	"\fmerged_clean\x18\b \x01(\bR\vmergedClean\"\x8d\x03\n" +
+	"\fmerged_clean\x18\b \x01(\bR\vmergedClean\"\xfb\x03\n" +
 	"\tGitStatus\x12\x1a\n" +
 	"\bupstream\x18\x01 \x01(\tR\bupstream\x12\x14\n" +
 	"\x05ahead\x18\x02 \x01(\x05R\x05ahead\x12\x16\n" +
@@ -3278,7 +3308,10 @@ const file_codefoundry_v1_repo_proto_rawDesc = "" +
 	"base_ahead\x18\v \x01(\x05R\tbaseAhead\x12\x1f\n" +
 	"\vbase_behind\x18\f \x01(\x05R\n" +
 	"baseBehind\x12\x14\n" +
-	"\x05error\x18\r \x01(\tR\x05error\")\n" +
+	"\x05error\x18\r \x01(\tR\x05error\x12\x1c\n" +
+	"\toperation\x18\x0e \x01(\tR\toperation\x12%\n" +
+	"\x0eoperation_step\x18\x0f \x01(\x05R\roperationStep\x12'\n" +
+	"\x0foperation_total\x18\x10 \x01(\x05R\x0eoperationTotal\")\n" +
 	"\x13RegisterRepoRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\"@\n" +
 	"\x14RegisterRepoResponse\x12(\n" +
