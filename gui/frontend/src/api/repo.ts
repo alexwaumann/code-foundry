@@ -16,12 +16,22 @@ export interface GitStatusView {
   staged: number;
   modified: number;
   untracked: number;
+  /** Unmerged (conflicted) entries; counted in dirty, not in staged or modified. */
+  conflicted?: number;
   dirty: boolean;
   refreshedAtMs: number | null;
   /** Remote-tracking default branch HEAD is compared with ("origin/main"); "" when none. */
   baseRef?: string;
   baseAhead?: number;
   baseBehind?: number;
+  /**
+   * Git operation in progress: "" (none), "rebase", "am", "merge", "cherry-pick",
+   * "revert" or "bisect". Read by the daemon from the worktree's git admin dir.
+   */
+  operation?: string;
+  /** A rebase's (or am's) current patch, 1-based, and its last; 0 when unknown. */
+  operationStep?: number;
+  operationTotal?: number;
   /** Last status refresh error ("" when fine). */
   error?: string;
 }
@@ -85,11 +95,15 @@ const cleanStatus: GitStatusView = {
   staged: 0,
   modified: 0,
   untracked: 0,
+  conflicted: 0,
   dirty: false,
   refreshedAtMs: null,
   baseRef: "",
   baseAhead: 0,
   baseBehind: 0,
+  operation: "",
+  operationStep: 0,
+  operationTotal: 0,
   error: "",
 };
 
@@ -102,11 +116,15 @@ export function toGitStatusView(s: GitStatus | undefined): GitStatusView {
     staged: s.staged,
     modified: s.modified,
     untracked: s.untracked,
+    conflicted: s.conflicted,
     dirty: s.dirty,
     refreshedAtMs: s.refreshedAt ? timestampMs(s.refreshedAt) : null,
     baseRef: s.baseRef,
     baseAhead: s.baseAhead,
     baseBehind: s.baseBehind,
+    operation: s.operation,
+    operationStep: s.operationStep,
+    operationTotal: s.operationTotal,
     error: s.error,
   };
 }

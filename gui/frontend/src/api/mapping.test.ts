@@ -100,6 +100,14 @@ describe("repo mapping", () => {
     expect(toRepoView(create(RepoSchema, { id: "r", remotes: ["origin", "upstream"] })).remotes).toEqual(["origin", "upstream"]);
   });
 
+  it("maps conflicts and the git operation in progress", () => {
+    const status = { conflicted: 2, dirty: true, operation: "rebase", operationStep: 3, operationTotal: 6 };
+    const r = toRepoView(create(RepoSchema, { id: "r", worktrees: [{ repoId: "r", path: "/a", status }] }));
+    expect(r.worktrees[0]?.status).toMatchObject(status);
+    const idle = toRepoView(create(RepoSchema, { id: "r", worktrees: [{ repoId: "r", path: "/a", status: {} }] }));
+    expect(idle.worktrees[0]?.status).toMatchObject({ conflicted: 0, operation: "", operationStep: 0, operationTotal: 0 });
+  });
+
   it("maps git, and tells a remoteless git repository from one without git", () => {
     const wt = [{ repoId: "r", path: "/a", isMain: true }];
     const plain = toRepoView(create(RepoSchema, { id: "r", worktrees: wt }));
