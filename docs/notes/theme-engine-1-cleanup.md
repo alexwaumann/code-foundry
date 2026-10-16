@@ -13,7 +13,7 @@ index.css is untouched (PR 2 restructures it).
 | --- | --- | --- |
 | `thread/thread.css` `--syn-*`, `--sh-*` | hex copies of the terminal palette | `var(--terminal-fg)` / `var(--terminal-ansi-N)`, the slot each hex already was (table below) |
 | `thread/thread.css` `--t-bubble`, `--t-bubble-border` | `oklch(0 0 0 / 7%)`, `/ 10%`; dark `oklch(1 0 0 / 13%)`, `/ 14%` | `color-mix(in oklab, var(--primary) N%, transparent)`: light 8% / 11%, dark 14.5% / 15.5% |
-| `thread/thread.css` `--t-hover` and the ten other tints (code background, tool chips, question header, terminal box, diff header, command box, outline button, interrupt) | `oklch(0 0 0 / x)` light, `oklch(1 0 0 / x)` dark | `color-mix(in oklab, var(--foreground) x, transparent)`, same alpha |
+| `thread/thread.css` `--t-hover` and the other tints, eight rules (code background, tool chips, question header, terminal box, diff header, command box, outline button, interrupt) | `oklch(0 0 0 / x)` light, `oklch(1 0 0 / x)` dark | `color-mix(in oklab, var(--foreground) x, transparent)`, same alpha |
 | `ui/radio-group.tsx` tile, `actions/ActionDialog.tsx` command row | `dark:bg-white/[0.035]` | `dark:bg-foreground/[0.035]` |
 | `ui/button.tsx` destructive | `text-white` | `text-destructive-foreground dark:text-foreground` |
 | `lib/palette.test.ts` | TypeScript only; `white`/`black` classes not caught | also white/black classes and the component stylesheets (below) |
